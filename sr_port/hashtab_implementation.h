@@ -762,17 +762,18 @@ sm_uc_ptr_t COPY_HASHTAB_TO_BUFFER(HASH_TABLE *table, sm_uc_ptr_t buffer, int (*
  * The buffer is expected to stay alive for the duration of
  *  the life of the hastable; we don't perform an extra copy
  * @param [in] buffer the written hashtable value; note that the caller is responsible for making the buffer
- * 	is large enough for the hash table, hash table entries, and the values the entries point too
+ * 	is large enough for the hash table, hash table entries, and the values the entries point to
  * @param [in] copy_entry_from_buffer function pointed to returns an int representing bits used in the buffer,
  * 	and takes the current hash table entry along with a pointer to the buffer. It should fill out the hash
  * 	table entry
  */
 HASH_TABLE *ACTIVATE_HASHTAB_IN_BUFFER(sm_uc_ptr_t buffer, int (*copy_entry_from_buffer)(HT_ENT *, sm_uc_ptr_t))
 {
-	int i;
-	HT_ENT *cur, *top;
+	int		i;
+	HT_ENT		*cur, *top;
+	HASH_TABLE	*table;
 
-	HASH_TABLE *table = (HASH_TABLE *)buffer;
+	table = (HASH_TABLE *)buffer;
 	if (TRUE == table->active)
 		return table;
 	buffer += SIZEOF(HASH_TABLE);

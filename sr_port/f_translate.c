@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,21 +28,18 @@
 #include "gtm_utf8.h"
 #endif
 
+GBLREF	boolean_t	badchar_inhibit;
+
 LITREF mval literal_null;
 
 int f_translate(oprtype *a, opctype op)
 {
-	boolean_t	more_args, use_hash = FALSE, clean = FALSE;
-	/* srch = searhc string, rplc = replace string */
-	int		i, srch_string_len, rplc_str_len, min;
-	int4		*xlate, maxLengthString, inlen, outlen, delete_value, no_value;
-	unsigned int	code;
-	triple		*args[4];
-	mval		*xlateTable, *srch_mval, *rplc_mval;
-	ht_ent_int4     *tabent;
-	char		*srch_string, *rplc_str;
-	sm_uc_ptr_t	inpt, outpt, ntop, ch, nextptr, buffer, outtop;
+	boolean_t	more_args;
 	hash_table_int4 *xlate_hash;
+	int4		i, maxLengthString, *xlate;
+	mval		dst_mval, *rplc_mval, *srch_mval, *xlateTable[2];
+	sm_uc_ptr_t	nextptr;
+	triple		*args[4];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -70,8 +67,7 @@ int f_translate(oprtype *a, opctype op)
 	assert((TRIP_REF == args[0]->operand[1].oprclass) && (TRIP_REF == args[0]->operand[1].oprval.tref->operand[0].oprclass)
 			&& (TRIP_REF == args[0]->operand[1].oprval.tref->operand[1].oprclass));
 	/* If the second and third parameters are literals, pre-calculate the translation table and store it in the stringpool */
-	if ((OC_LIT == args[1]->operand[0].oprval.tref->opcode)
-			&& (OC_LIT == args[2]->operand[0].oprval.tref->opcode))
+	if ((OC_LIT == args[1]->operand[0].oprval.tref->opcode) && (OC_LIT == args[2]->operand[0].oprval.tref->opcode))
 	{	/* We only do this if we have all literals and (not utf8, or utf8 and valid strings) */
 		srch_mval = &args[1]->operand[0].oprval.tref->operand[0].oprval.mlit->v;
 		rplc_mval = &args[2]->operand[0].oprval.tref->operand[0].oprval.mlit->v;
@@ -80,36 +76,46 @@ int f_translate(oprtype *a, opctype op)
 		ENSURE_STP_FREE_SPACE(NUM_CHARS * SIZEOF(int4));
 		xlate = (int4 *)stringpool.free;
 		stringpool.free += NUM_CHARS * SIZEOF(int4);
-		if (!gtm_utf8_mode || OC_FNZTRANSLATE == op ||
-				(gtm_utf8_mode && valid_utf_string(&srch_mval->str) && valid_utf_string(&rplc_mval->str)))
-		{
+		xlateTable[0] = (mval *)mcalloc(SIZEOF(mval));
+		xlateTable[0]->str.addr = (char *)xlate;
+		xlateTable[0]->mvtype = MV_STR;
+		xlateTable[0]->str.len = NUM_CHARS * SIZEOF(int4);
+		if (!gtm_utf8_mode || (OC_FNZTRANSLATE == op))
+		{	/* just doing bytes - no need for a hash table */
+			create_byte_xlate_table(srch_mval, rplc_mval, xlate);
+			if (OC_LIT == args[0]->operand[0].oprval.tref->opcode)
+			{	/* the source is a literal too - lets do it all at compile time */
+				op_fnztranslate_fast(&args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v, xlateTable[0],
+					&dst_mval);
+				unuse_literal(&args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
+				dqdel(args[0]->operand[0].oprval.tref, exorder);
+				args[0]->opcode = OC_LIT;
+				put_lit_s(&dst_mval, args[0]);
+				args[0]->operand[1].oprclass = NO_REF;
+			} else
+			{
+				args[0]->opcode = OC_FNZTRANSLATE_FAST;
+				args[0]->operand[1] = put_lit(xlateTable[0]);
+			}
 			unuse_literal(&args[1]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
+			unuse_literal(&args[2]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
 			dqdel(args[1]->operand[0].oprval.tref, exorder);
 			dqdel(args[2]->operand[0].oprval.tref, exorder);
 			dqdel(args[1], exorder);
 			dqdel(args[2], exorder);
-		}
-		if (!gtm_utf8_mode || OC_FNZTRANSLATE == op)
-		{
-			create_byte_xlate_table(srch_mval, rplc_mval, xlate);
-			xlateTable = (mval *)mcalloc(SIZEOF(mval));
-			xlateTable->str.addr = (char *)xlate;
-			xlateTable->mvtype = MV_STR;
-			xlateTable->str.len = NUM_CHARS * SIZEOF(int4);
-			args[0]->opcode = OC_FNZTRANSLATE_FAST;
-			args[0]->operand[1] = put_lit((mval *)xlateTable);
-			unuse_literal(&args[2]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
-		}
-		else if (gtm_utf8_mode && valid_utf_string(&srch_mval->str) && valid_utf_string(&rplc_mval->str))
-		{	/* The optimized version needs 4 arguments; the src, rplc, xlate, xlate_hash, so we need to allocate more
-		 	 	 triples. We can remove the old arguments (mostly, except the rplc string) */
-			args[0]->opcode = OC_FNTRANSLATE_FAST; /* note no Z */
-			args[1] = newtriple(OC_PARAMETER);
-			/* Promote the rplc string to the second argument */
-			args[1]->operand[0] = args[2]->operand[0];
-			args[2] = newtriple(OC_PARAMETER);
-			args[3] = newtriple(OC_PARAMETER);
-			args[0]->operand[1].oprval.tref = newtriple(OC_PARAMETER);
+		} else if (gtm_utf8_mode && valid_utf_string(&srch_mval->str) && valid_utf_string(&rplc_mval->str))
+		{	/* actual UTF-8 characters, so need hashtable rather than just than code table; WARNING assignment below */
+			unuse_literal(&args[1]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
+			if (!badchar_inhibit)
+				MV_FORCE_LEN(srch_mval);      		/* needed only to validate for BADCHARs */
+			else
+				MV_FORCE_LEN_SILENT(srch_mval);		/* but need some at least sorta valid length */
+			if (NUM_CHARS < (maxLengthString = MIN(rplc_mval->str.char_len, srch_mval->str.char_len)))
+			{	/* they went wild with replacement, so need more space */
+				assert((NUM_CHARS * SIZEOF(int4)) == ((int4 *)stringpool.free - xlate));
+				stringpool.free += ((maxLengthString - NUM_CHARS) * SIZEOF(int4));
+				xlateTable[0]->str.len = maxLengthString * SIZEOF(int4);
+			}
 			xlate_hash = create_utf8_xlate_table(srch_mval, rplc_mval, xlate);
 			if (NULL != xlate_hash)
 			{
@@ -117,29 +123,43 @@ int f_translate(oprtype *a, opctype op)
 					+ SIZEOF(hash_table_int4) + ROUND_UP(xlate_hash->size, BITS_PER_UCHAR);
 				ENSURE_STP_FREE_SPACE(maxLengthString);
 				nextptr = copy_hashtab_to_buffer_int4(xlate_hash, stringpool.free, NULL);
-				xlateTable = (mval *)mcalloc(SIZEOF(mval));
-				xlateTable->str.addr = (char *)stringpool.free;
-				xlateTable->mvtype = MV_STR;
-				xlateTable->str.len = nextptr - stringpool.free;
-				assert(maxLengthString == xlateTable->str.len);
+				xlateTable[1] = (mval *)mcalloc(SIZEOF(mval));
+				xlateTable[1]->str.addr = (char *)stringpool.free;
+				xlateTable[1]->mvtype = MV_STR;
+				xlateTable[1]->str.len = nextptr - stringpool.free;
+				assert(maxLengthString <= xlateTable[0]->str.len);
 				stringpool.free = nextptr;
 			} else
-			{
-				xlateTable = (mval *)mcalloc(SIZEOF(mval));
-				xlateTable->str.addr = NULL;
-				xlateTable->mvtype = MV_STR;
-				xlateTable->str.len = 0;
+				xlateTable[1] = (mval *)&literal_null;
+			if ((OC_LIT == args[0]->operand[0].oprval.tref->opcode)
+				&& valid_utf_string(&args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v.str))
+			{	/* the source is a literal too - lets do it all at compile time */
+				op_fntranslate_fast(&args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v,
+						    rplc_mval, xlateTable[0], xlateTable[1], &dst_mval);
+				unuse_literal(&args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
+				dqdel(args[0]->operand[0].oprval.tref, exorder);
+				args[0]->opcode = OC_LIT;
+				put_lit_s(&dst_mval, args[0]);
+				args[0]->operand[1].oprclass = NO_REF;
+				unuse_literal(&args[2]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
+				dqdel(args[1]->operand[0].oprval.tref, exorder);
+				dqdel(args[2]->operand[0].oprval.tref, exorder);
+				dqdel(args[1], exorder);
+				dqdel(args[2], exorder);
+			} else
+			{	/* op_fntranslate_fast arguments; src, rplc, xlate, xlate_hash, so need one more triple */
+				args[0]->opcode = OC_FNTRANSLATE_FAST;		/* note no Z */
+				assert(OC_PARAMETER == args[1]->opcode);
+				args[1]->operand[0] = args[2]->operand[0];	/* Promote the rplc string to the second argument */
+				assert(OC_PARAMETER == args[2]->opcode);
+				args[2]->operand[0] = put_lit(xlateTable[0]);
+				args[3] = newtriple(OC_PARAMETER);
+				args[3]->operand[0] = put_lit(xlateTable[1]);
+				/* bind up triple structure */
+				args[0]->operand[1] = put_tref(args[1]);
+				args[1]->operand[1] = put_tref(args[2]);
+				args[2]->operand[1] = put_tref(args[3]);
 			}
-			args[3]->operand[0] = put_lit(xlateTable);
-			xlateTable = (mval *)mcalloc(SIZEOF(mval));
-			xlateTable->str.addr = (char *)xlate;
-			xlateTable->mvtype = MV_STR;
-			xlateTable->str.len = NUM_CHARS * SIZEOF(int4);
-			args[2]->operand[0] = put_lit(xlateTable);
-			/* Setup triple structure */
-			args[0]->operand[1] = put_tref(args[1]);
-			args[1]->operand[1] = put_tref(args[2]);
-			args[2]->operand[1] = put_tref(args[3]);
 		}
 	}
 	ins_triple(args[0]);

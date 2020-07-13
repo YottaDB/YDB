@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,6 +33,7 @@
 #include <rtnhdr.h>
 #include "mv_stent.h"		/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
+#include "gvt_inline.h"
 
 /*the header files below are for environment translation*/
 #ifdef UNIX

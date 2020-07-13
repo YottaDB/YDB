@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -730,7 +730,7 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 	mname_entry		gvname;
 	int			len, len1, badpos;
 	boolean_t		trig_name;
-	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key_buf		save_currkey;
 	gd_region		*save_gv_cur_region;
 	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;

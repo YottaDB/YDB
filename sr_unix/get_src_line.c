@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,7 +60,7 @@ GBLREF stack_frame	*frame_pointer;
 GBLREF tp_frame		*tp_pointer;
 
 LITDEF char		litconst_space = ' ';
-LITDEF mval		literal_null;
+LITREF mval		literal_null;
 
 error_def(ERR_TXTSRCFMT);
 error_def(ERR_SYSCALL);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,7 +71,7 @@ boolean_t gvcst_queryget(mval *val)
 {
 	bool		found, is_hidden, is_dummy = FALSE, sn_tpwrapped;
 	boolean_t	est_first_pass;
-	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key_buf	save_currkey;
 	int		save_dollar_tlevel;
 
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);

@@ -46,7 +46,7 @@ LITREF	octabstruct	oc_tab[];
  * alphabet so changes here should be reflected there.
  */
 LITDEF nametabent svn_names[] =
-{
+{	/* Must be in alpha order and in sync with svn_index[], svn_data[]; when inerting beware of legacy implications */
 	 { 1, "D" }, { 6, "DEVICE" }
 	,{ 2, "EC" }, { 5, "ECODE" }
 	,{ 2, "ES" }, { 6, "ESTACK" }
@@ -55,9 +55,9 @@ LITDEF nametabent svn_names[] =
 	,{ 1, "I" }, { 2, "IO" }
 	,{ 1, "J" }, { 3, "JOB" }
 	,{ 1, "K" }, { 3, "KEY" }
-	,{ 1, "P" }, { 8, "PRINCIPA*" }
+	,{ 1, "P" }, { 9, "PRINCIPAL" }
 	,{ 1, "Q" }, { 4, "QUIT" }
-	,{ 1, "R" }, { 8, "REFERENC*" }
+	,{ 1, "R" }, { 9, "REFERENCE" }
 	,{ 2, "ST" }, { 5, "STACK" }
 	,{ 1, "S" }, { 7, "STORAGE" }
 	,{ 2, "SY" }, { 6, "SYSTEM" }
@@ -67,73 +67,76 @@ LITDEF nametabent svn_names[] =
 	,{ 1, "X" }
 	,{ 1, "Y" }
 	,{ 2, "ZA" }
-	,{ 3, "ZAL*"}
+	,{10, "ZALLOCSTOR" }
 	,{ 6, "ZAUDIT" }
 	,{ 2, "ZB" }
 	,{ 2, "ZC" }
-	,{ 3, "ZCH" }, { 6, "ZCHSET" }
-	,{ 3, "ZCL*" }
-	,{ 3, "ZCM*" }
-	,{ 3, "ZCO*" }
-	,{ 3, "ZCS*" }
-	,{ 3, "ZDA*" }
-	,{ 2, "ZD*" }
-	,{ 2, "ZE" }
-	,{ 3, "ZED*" }
-	,{ 3, "ZEO*" }
-	,{ 3, "ZER*" }
-	,{ 2, "ZG*" }
-	,{ 2, "ZH" }, { 8 , "ZHOROLOG" }
-	,{ 4, "ZINI*"}
-	,{ 4, "ZINT*"}
+	,{ 6, "ZCHSET" }
+	,{ 6, "ZCLOSE" }
+	,{ 8, "ZCMDLINE" }
+	,{ 8, "ZCOMPILE" }
+	,{ 8, "ZCSTATUS" }
+	,{ 2, "ZD" }	/* legacy abbreviation for $ZDIRECTORY */
+	,{ 9, "ZDATEFORM" }
+	,{10, "ZDIRECTORY" }
+	,{ 2, "ZE" }	/* legacy abbreviation for $ZERROR */
+	,{ 7, "ZEDITOR" }
+	,{ 4, "ZEOF" }
+	,{ 6, "ZERROR" }
+	,{ 7, "ZGBLDIR" }
+	,{ 8, "ZHOROLOG" }
+	,{12, "ZININTERRUPT" }
+	,{10, "ZINTERRUPT"}
 	,{ 3, "ZIO" }
-	,{ 2, "ZJ" }, { 4, "ZJOB" }
+	,{ 4, "ZJOB" }
 	,{ 4, "ZKEY" }
-	,{ 2, "ZL*" }
-	,{ 8, "ZMAXTPTI*" }
+	,{ 6, "ZLEVEL" }
+	,{13, "ZMAXTPTIMEOUT" }
 	,{ 8, "ZMLKHASH" }
-	,{ 3, "ZMO*" }
-	,{ 5, "ZONLN*"}
-	,{ 5, "ZPATN" }, {8, "ZPATNUME*" }
+	,{ 5, "ZMODE" }
+	,{ 9, "ZONLNRLBK" }
+	,{ 2, "ZP" }	/* legacy abbreviation for $ZPOSITION */
+	,{11, "ZPATNUMERIC" }
 	,{ 4, "ZPIN" }
-	,{ 4, "ZPOS*" }
+	,{ 9, "ZPOSITION" }
 	,{ 5, "ZPOUT" }
-	,{ 5, "ZPROC*" }
-	,{ 5, "ZPROM*" }
-	,{ 2, "ZQ*" }
-	,{ 3, "ZRE" }, {4, "ZREA*" }
-	,{ 4, "ZREL*" }
-	,{ 3, "ZRO*" }
-	,{ 3, "ZSO*" }
-	,{ 2, "ZS" }, { 4, "ZSTA*" }
+	,{ 7, "ZPROMPT" }
+	,{ 5, "ZQUIT" }
+	,{10, "ZREALSTORE" }
+	,{ 8, "ZRELDATE" }
+	,{ 9, "ZROUTINES" }
+	,{ 2, "ZS" }	/* legacy abbreviation for $ZSTATUS */
+	,{ 7, "ZSOURCE" }
+	,{ 7, "ZSTATUS" }
 	,{ 5, "ZSTEP"}
-	,{ 5, "ZSTRP*"}
-	,{ 3, "ZSY*"}
-	,{ 4, "ZTCO*"}
-	,{ 4, "ZTDA*"}
-	,{ 4, "ZTDE*"}
-	,{ 3, "ZTE" }, { 4, "ZTEX*"}
-	,{ 4, "ZTIM*" }
-	,{ 4, "ZTLE*"}
-	,{ 4, "ZTNA*"}
-	,{ 4, "ZTOL*"}
-	,{ 4, "ZTRI*"}
-	,{ 4, "ZTSL*"}
-	,{ 4, "ZTUP*"}
-	,{ 4, "ZTVA*"}
-	,{ 4, "ZTWO*"}
-	,{ 2, "ZT*" }
-	,{ 3, "ZUS*" }
+	,{ 9, "ZSTRPLLIM" }
+	,{ 7, "ZSYSTEM" }
+	,{ 2, "ZT" }	/* legacy abbreviation for $ZTRAP */
+	,{ 6, "ZTCODE" }
+	,{ 6, "ZTDATA" }
+	,{ 7, "ZTDELIM"}
+	,{ 6, "ZTEXIT" }
+	,{ 8, "ZTIMEOUT" }
+	,{ 7, "ZTLEVEL" }
+	,{ 6, "ZTNAME" }
+	,{10, "ZTOLDVALUE" }
+	,{ 5, "ZTRAP" }
+	,{10, "ZTRIGGEROP" }
+	,{ 7, "ZTSLATE" }
+	,{ 8, "ZTUPDATE" }
+	,{ 7, "ZTVALUE" }
+	,{10, "ZTWORMHOLE" }
+	,{ 9, "ZUSEDSTOR" }
 	,{ 3, "ZUT" }
-	,{ 2, "ZV*" }
-	,{ 4, "ZYER*" }
+	,{ 8, "ZVERSION" }
+	,{ 7, "ZYERROR" }
 };
 
 /* Indexes into svn_names array for each letter of the alphabet */
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 104	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 100	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -163,11 +166,12 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZAUDIT, FALSE, ALL_SYS }
 	,{ SV_ZB, FALSE, ALL_SYS }
 	,{ SV_ZC, FALSE, ALL_SYS }
-	,{ SV_ZCHSET, FALSE, ALL_SYS }, { SV_ZCHSET, FALSE, ALL_SYS }
+	,{ SV_ZCHSET, FALSE, ALL_SYS }
 	,{ SV_ZCLOSE, FALSE, UNIX_OS }
 	,{ SV_ZCMDLINE, FALSE, ALL_SYS }
 	,{ SV_ZCOMPILE, TRUE, ALL_SYS }
 	,{ SV_ZCSTATUS, FALSE, ALL_SYS}
+	,{ SV_ZDIR, TRUE, ALL_SYS }
 	,{ SV_ZDATE_FORM, TRUE, ALL_SYS }
 	,{ SV_ZDIR, TRUE, ALL_SYS }
 	,{ SV_ZERROR, TRUE, ALL_SYS }
@@ -175,46 +179,48 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZEOF, FALSE, ALL_SYS }
 	,{ SV_ZERROR, TRUE, ALL_SYS }
 	,{ SV_ZGBLDIR, TRUE, ALL_SYS }
-	,{ SV_ZHOROLOG, FALSE, ALL_SYS }, { SV_ZHOROLOG, FALSE, ALL_SYS }
+	,{ SV_ZHOROLOG, FALSE, ALL_SYS }
 	,{ SV_ZININTERRUPT, FALSE, ALL_SYS}
 	,{ SV_ZINTERRUPT, TRUE, ALL_SYS}
 	,{ SV_ZIO, FALSE, ALL_SYS }
-	,{ SV_ZJOB, FALSE, ALL_SYS }, { SV_ZJOB, FALSE, ALL_SYS }
+	,{ SV_ZJOB, FALSE, ALL_SYS }
 	,{ SV_ZKEY, FALSE , ALL_SYS }
 	,{ SV_ZLEVEL, FALSE, ALL_SYS }
 	,{ SV_ZMAXTPTIME, TRUE, ALL_SYS }
 	,{ SV_ZMLKHASH, FALSE, ALL_SYS }
 	,{ SV_ZMODE, FALSE, ALL_SYS }
 	,{ SV_ZONLNRLBK, FALSE, UNIX_OS }
-	,{ SV_ZPATNUMERIC, FALSE, ALL_SYS }, { SV_ZPATNUMERIC, FALSE, ALL_SYS }
+	,{ SV_ZPOS, FALSE, ALL_SYS }
+	,{ SV_ZPATNUMERIC, FALSE, ALL_SYS }
 	,{ SV_ZPIN, FALSE, ALL_SYS }
 	,{ SV_ZPOS, FALSE, ALL_SYS }
 	,{ SV_ZPOUT, FALSE, ALL_SYS }
-	,{ SV_ZPROC, FALSE, VMS_OS  }
 	,{ SV_PROMPT, TRUE, ALL_SYS }
 	,{ SV_ZQUIT, TRUE, ALL_SYS }
-	,{ SV_ZREALSTOR, FALSE, ALL_SYS }, { SV_ZREALSTOR, FALSE, ALL_SYS }
+	,{ SV_ZREALSTOR, FALSE, ALL_SYS }
 	,{ SV_ZRELDATE, FALSE, ALL_SYS }
 	,{ SV_ZROUTINES, TRUE, ALL_SYS }
+	,{ SV_ZSTATUS, TRUE, ALL_SYS }
 	,{ SV_ZSOURCE, TRUE, ALL_SYS }
-	,{ SV_ZSTATUS, TRUE, ALL_SYS }, { SV_ZSTATUS, TRUE, ALL_SYS }
+	,{ SV_ZSTATUS, TRUE, ALL_SYS }
 	,{ SV_ZSTEP, TRUE, ALL_SYS }
 	,{ SV_ZSTRPLLIM, TRUE, ALL_SYS }
 	,{ SV_ZSYSTEM, FALSE, ALL_SYS }
+	,{ SV_ZTRAP, TRUE, ALL_SYS }
 	,{ SV_ZTCODE, FALSE, TRIGGER_OS }
 	,{ SV_ZTDATA, FALSE, TRIGGER_OS }
 	,{ SV_ZTDELIM, FALSE, TRIGGER_OS }
-	,{ SV_ZTEXIT, TRUE, ALL_SYS }, { SV_ZTEXIT, TRUE, ALL_SYS }
+	,{ SV_ZTEXIT, TRUE, ALL_SYS }
 	,{ SV_ZTIMEOUT, TRUE, UNIX_OS}
 	,{ SV_ZTLEVEL, FALSE, TRIGGER_OS}
 	,{ SV_ZTNAME, FALSE, TRIGGER_OS }
 	,{ SV_ZTOLDVAL, FALSE, TRIGGER_OS }
+	,{ SV_ZTRAP, TRUE, ALL_SYS }
 	,{ SV_ZTRIGGEROP, FALSE, TRIGGER_OS}
 	,{ SV_ZTSLATE, TRUE, TRIGGER_OS}
 	,{ SV_ZTUPDATE, FALSE, TRIGGER_OS }
 	,{ SV_ZTVALUE, TRUE, TRIGGER_OS }
 	,{ SV_ZTWORMHOLE, TRUE, TRIGGER_OS }
-	,{ SV_ZTRAP, TRUE, ALL_SYS }
 	,{ SV_ZUSEDSTOR, FALSE, ALL_SYS }
 	,{ SV_ZUT, FALSE, ALL_SYS }
 	,{ SV_ZVERSION, FALSE, ALL_SYS }
@@ -226,7 +232,7 @@ LITDEF svn_data_type svn_data[] =
  * "*" is used below only after 8 characters.
  */
 LITDEF nametabent fun_names[] =
-{
+{	/* Must be in alpha order & in sync with fun_index[], fun_data[], fun_parse; when inerting beware of legacy implications */
 	 {1, "A"}, {5, "ASCII"}
 	,{1, "C"}, {4, "CHAR"}
 	,{1, "D"}, {4, "DATA"}
@@ -234,75 +240,71 @@ LITDEF nametabent fun_names[] =
 	,{1, "F"}, {4, "FIND"}
 	,{2, "FN"}, {7, "FNUMBER"}
 	,{1, "G"}, {3, "GET"}
-	,{1, "I"}, {4, "INCR"}, {8, "INCREMEN*"}
+	,{1, "I"}, {4, "INCR"}, {9, "INCREMENT"}
 	,{1, "J"}, {7, "JUSTIFY"}
 	,{1, "L"}, {6, "LENGTH"}
-	,{1, "N"}
+	,{1, "N"}	/* legacy abbreviation for $NEXT() */
 	,{2, "NA"}, {4, "NAME"}
 	,{4, "NEXT"}
 	,{1, "O"}, {5, "ORDER"}
 	,{1, "P"}, {5, "PIECE"}
+	,{1, "Q"}	/* legacy abbreviation for $QUERY() */
 	,{2, "QL"}, {7, "QLENGTH"}
-	,{2, "QS"}, {8, "QSUBSCRI*"}
-	,{1, "Q"}, {5, "QUERY"}
+	,{2, "QS"}, {10, "QSUBSCRIPT"}
+	,{5, "QUERY"}
 	,{1, "R"}, {6, "RANDOM"}
 	,{2, "RE"}, {7, "REVERSE"}
 	,{1, "S"}, {6, "SELECT"}
 	,{2, "ST"}, {5, "STACK"}
 	,{1, "T"}, {4, "TEXT"}
-	,{2, "TR"}, {8, "TRANSLAT*"}
-	,{1, "V*"}
-	,{2, "ZA"}, {6, "ZASCII"}
-	,{3, "ZAH"}, {8, "ZAHANDLE"}
-	,{4, "ZATR"}, {8, "ZATRANSF*"}
+	,{2, "TR"}, {9, "TRANSLATE"}
+	,{1, "V"} ,{4, "VIEW"}
+	,{2, "ZA"}	/* legacy abbreviation for $ZASCII() */
+	,{8, "ZAHANDLE"}
+	,{6, "ZASCII"}
+	,{11,"ZATRANSFORM"}
 	,{7, "ZBITAND"}
-	,{8, "ZBITCOUN*"}
+	,{9, "ZBITCOUNT"}
 	,{8, "ZBITFIND"}
 	,{7, "ZBITGET"}
-	,{7, "ZBITLEN"}
+	,{10, "ZBITLENGTH"}
 	,{7, "ZBITNOT"}
 	,{6, "ZBITOR"}
 	,{7, "ZBITSET"}
 	,{7, "ZBITSTR"}
 	,{7, "ZBITXOR"}
-	,{2, "ZC"}, {5, "ZCALL"}
-	,{3, "ZCH"}, {5, "ZCHAR"}
-	,{3, "ZCO"}, {8, "ZCONVERT"}
-	,{4, "ZCOL"}, {8, "ZCOLLATE"}
-	,{2, "ZD"}
+	,{5, "ZCHAR"}
+	,{3, "ZCO"}
+	,{8, "ZCOLLATE"}
+	,{8, "ZCONVERT"}
+	,{2, "ZD"}	/* legacy abbreviation for $ZDATE() */
 	,{5, "ZDATA"}
 	,{5, "ZDATE"}
-	,{2, "ZE"}, {8, "ZEXTRACT"}
-	,{2, "ZF"}, {5, "ZFIND"}
-	,{5, "ZFILE"}, {8, "ZFILEATT*"}
-	,{7, "ZGETDVI"}
+	,{8, "ZEXTRACT"}
+	,{5, "ZFIND"}
 	,{7, "ZGETJPI"}
-	,{7, "ZGETLKI"}
-	,{7, "ZGETSYI"}
-	,{5, "ZINCR"}, {8, "ZINCREME*"}
-	,{2, "ZJ"}, {8, "ZJUSTIFY"}
+	,{10,"ZINCREMENT"}
+	,{2, "ZJ"}	/* legacy abbreviation for $ZJUSTIFY() */
 	,{8, "ZJOBEXAM"}
-	,{2, "ZL"}, {7, "ZLENGTH"}
-	,{5, "ZLKID"}
-	,{2, "ZM"}, {8, "ZMESSAGE"}
-	,{2, "ZP"}, {8, "ZPREVIOU*"}
+	,{8, "ZJUSTIFY"}
+	,{7, "ZLENGTH"}
+	,{8, "ZMESSAGE"}
+	,{2, "ZP"}	/* legacy abbreviation for $ZPREVIOUS() */
 	,{6, "ZPARSE"}
 	,{5, "ZPEEK"}
-	,{3, "ZPI"}, {6, "ZPIECE"}
-	,{4, "ZPID"}
-	,{5, "ZPRIV"}, {8, "ZPRIVILE*"}
-	,{2, "ZQ"}, {8, "ZQGBLMOD"}
+	,{6, "ZPIECE"}
+	,{9, "ZPREVIOUS"}
+	,{8, "ZQGBLMOD"}
 	,{7, "ZSEARCH"}
-	,{7, "ZSETPRV"}
 	,{8, "ZSIGPROC"}
 	,{7, "ZSOCKET"}
-	,{4, "ZSUB"}, {7, "ZSUBSTR"}
+	,{7, "ZSUBSTR"}
 	,{7, "ZSYSLOG"}
-	,{3, "ZTR"}, {8, "ZTRANSLA*"}
-	,{4, "ZTRI"}, {8, "ZTRIGGER"}
+	,{10,"ZTRANSLATE"}
+	,{8, "ZTRIGGER"}
 	,{7, "ZTRNLNM"}
-	,{2, "ZW"}, {6, "ZWIDTH"}
-	,{3, "ZWR"}, {6, "ZWRITE"}
+	,{6, "ZWIDTH"}
+	,{6, "ZWRITE"}
 };
 
 /* Index into fun_names array where entries that start with each letter of the alphabet begin. */
@@ -310,7 +312,7 @@ LITDEF unsigned char fun_index[27] =
 {
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
 	17, 19, 19, 21, 21, 25, 27, 29, 35,	/* j k l m n o p q r */
-	39, 43, 47, 47, 48, 48, 48, 48, 122	/* s t u v w x y z ~ */
+	39, 43, 47, 47, 49, 49, 49, 49, 95	/* s t u v w x y z ~ */
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -331,19 +333,21 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNNEXT, ALL_SYS }
 	,{ OC_FNORDER, ALL_SYS }, {OC_FNORDER, ALL_SYS }
 	,{ OC_FNPIECE, ALL_SYS }, { OC_FNPIECE, ALL_SYS }
+	,{ OC_FNQUERY, ALL_SYS }
 	,{ OC_FNQLENGTH, ALL_SYS }, { OC_FNQLENGTH, ALL_SYS }
 	,{ OC_FNQSUBSCR, ALL_SYS }, { OC_FNQSUBSCR, ALL_SYS }
-	,{ OC_FNQUERY, ALL_SYS }, { OC_FNQUERY, ALL_SYS }
+	,{ OC_FNQUERY, ALL_SYS }
 	,{ OC_FNRANDOM, ALL_SYS }, { OC_FNRANDOM, ALL_SYS }
 	,{ OC_FNREVERSE, ALL_SYS }, { OC_FNREVERSE, ALL_SYS }
 	,{ OC_PASSTHRU, ALL_SYS }, { OC_PASSTHRU, ALL_SYS }	/* f_select creates a STOTEMP and STOs anchored by a PASSTHRU */
 	,{ OC_FNSTACK1, ALL_SYS }, { OC_FNSTACK1, ALL_SYS }
 	,{ OC_FNTEXT, ALL_SYS }, { OC_FNTEXT, ALL_SYS }
 	,{ OC_FNTRANSLATE, ALL_SYS }, { OC_FNTRANSLATE, ALL_SYS }
-	,{ OC_FNVIEW, ALL_SYS }
-	,{ OC_FNZASCII, ALL_SYS }, { OC_FNZASCII, ALL_SYS }
-	,{ OC_FNZAHANDLE, ALL_SYS }, { OC_FNZAHANDLE, ALL_SYS }
-	,{ OC_FNZATRANSFORM, ALL_SYS }, { OC_FNZATRANSFORM, ALL_SYS }
+	,{ OC_FNVIEW, ALL_SYS } ,{ OC_FNVIEW, ALL_SYS }
+	,{ OC_FNZASCII, ALL_SYS }
+	,{ OC_FNZAHANDLE, ALL_SYS }
+	,{ OC_FNZASCII, ALL_SYS }
+	,{ OC_FNZATRANSFORM, ALL_SYS }
 	,{ OC_FNZBITAND, ALL_SYS }
 	,{ OC_FNZBITCOUN, ALL_SYS }
 	,{ OC_FNZBITFIND, ALL_SYS }
@@ -354,44 +358,38 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZBITSET, ALL_SYS }
 	,{ OC_FNZBITSTR, ALL_SYS }
 	,{ OC_FNZBITXOR, ALL_SYS }
-	,{ OC_FNZCALL, VMS_OS }, { OC_FNZCALL, VMS_OS }
-	,{ OC_FNZCHAR, ALL_SYS }, { OC_FNZCHAR, ALL_SYS }
-	,{ OC_FNZCONVERT2, UNIX_OS }, { OC_FNZCONVERT2, UNIX_OS }
-	,{ OC_FNZCOLLATE, UNIX_OS }, { OC_FNZCOLLATE, UNIX_OS }
+	,{ OC_FNZCHAR, ALL_SYS }
+	,{ OC_FNZCONVERT2, UNIX_OS }
+	,{ OC_FNZCOLLATE, UNIX_OS }
+	,{ OC_FNZCONVERT2, UNIX_OS }
 	,{ OC_FNZDATE, ALL_SYS }
 	,{ OC_FNZDATA, ALL_SYS }
 	,{ OC_FNZDATE, ALL_SYS }
-	,{ OC_FNZEXTRACT, ALL_SYS }, { OC_FNZEXTRACT, ALL_SYS }
-	,{ OC_FNZFIND, ALL_SYS }, { OC_FNZFIND, ALL_SYS }
-	,{ OC_FNZFILE, VMS_OS }, { OC_FNZFILE, VMS_OS }
-	,{ OC_FNZGETDVI, VMS_OS }
+	,{ OC_FNZEXTRACT, ALL_SYS }
+	,{ OC_FNZFIND, ALL_SYS }
 	,{ OC_FNZGETJPI, ALL_SYS }
-	,{ OC_FNZGETLKI, VMS_OS }
-	,{ OC_FNZGETSYI, VMS_OS }
-	,{ OC_FNINCR, ALL_SYS }, { OC_FNINCR, ALL_SYS }
-	,{ OC_FNZJ2, ALL_SYS }, { OC_FNZJ2, ALL_SYS }
+	,{ OC_FNINCR, ALL_SYS }
+	,{ OC_FNZJ2, ALL_SYS }
 	,{ OC_FNZJOBEXAM, ALL_SYS }
-	,{ OC_FNZLENGTH, ALL_SYS }, { OC_FNZLENGTH, ALL_SYS }
-	,{ OC_FNZLKID, VMS_OS}
-	,{ OC_FNZM, ALL_SYS }, { OC_FNZM, ALL_SYS }
-	,{ OC_FNZPREVIOUS, ALL_SYS }, { OC_FNZPREVIOUS, ALL_SYS }
+	,{ OC_FNZJ2, ALL_SYS }
+	,{ OC_FNZLENGTH, ALL_SYS }
+	,{ OC_FNZM, ALL_SYS }
+	,{ OC_FNZPREVIOUS, ALL_SYS }
 	,{ OC_FNZPARSE, ALL_SYS }
 	,{ OC_FNZPEEK, UNIX_OS }
-	,{ OC_FNZPIECE, ALL_SYS }, { OC_FNZPIECE, ALL_SYS }
-	,{ OC_FNZPID, VMS_OS }
-	,{ OC_FNZPRIV, VMS_OS }, { OC_FNZPRIV, VMS_OS }
-	,{ OC_FNZQGBLMOD, ALL_SYS }, { OC_FNZQGBLMOD, ALL_SYS }
+	,{ OC_FNZPIECE, ALL_SYS }
+	,{ OC_FNZPREVIOUS, ALL_SYS }
+	,{ OC_FNZQGBLMOD, ALL_SYS }
 	,{ OC_FNZSEA, ALL_SYS }
-	,{ OC_FNZSETPRV, VMS_OS }
 	,{ OC_FNZSIGPROC, ALL_SYS }
 	,{ OC_FNZSOCKET, ALL_SYS }
-	,{ OC_FNZSUBSTR, ALL_SYS }, { OC_FNZSUBSTR, ALL_SYS }
+	,{ OC_FNZSUBSTR, ALL_SYS }
 	,{ OC_FNZSYSLOG, UNIX_OS }
-	,{ OC_FNZTRANSLATE, ALL_SYS }, { OC_FNZTRANSLATE, ALL_SYS }
-	,{ OC_FNZTRIGGER, TRIGGER_OS }, { OC_FNZTRIGGER, TRIGGER_OS }
+	,{ OC_FNZTRANSLATE, ALL_SYS }
+	,{ OC_FNZTRIGGER, TRIGGER_OS }
 	,{ OC_FNZTRNLNM, ALL_SYS }
-	,{ OC_FNZWIDTH, ALL_SYS }, { OC_FNZWIDTH, ALL_SYS }
-	,{ OC_FNZWRITE, ALL_SYS }, { OC_FNZWRITE, ALL_SYS }
+	,{ OC_FNZWIDTH, ALL_SYS }
+	,{ OC_FNZWRITE, ALL_SYS }
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -412,67 +410,63 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 	f_next,
 	f_order, f_order,
 	f_piece, f_piece,
+	f_query,
 	f_qlength, f_qlength,
 	f_qsubscript, f_qsubscript,
-	f_query, f_query,
+	f_query,
 	f_mint, f_mint,
 	f_reverse, f_reverse,
 	f_select, f_select,
 	f_stack, f_stack,
 	f_text, f_text,
 	f_translate, f_translate,
-	f_view,
-	f_ascii, f_ascii,
-	f_zahandle, f_zahandle,
-	f_zatransform, f_zatransform,
-	f_two_mval,
-	f_one_mval,
+	f_view, f_view,
+	f_ascii,
+	f_zahandle,
+	f_ascii,
+	f_zatransform,
+	f_two_mval,			/* $ZBITAND */
+	f_one_mval,			/* $ZBITCOUNT */
 	f_fnzbitfind,
 	f_fnzbitget,
-	f_one_mval,
-	f_one_mval,
-	f_two_mval,
+	f_one_mval,			/* $ZBITLENGTH*/
+	f_one_mval,			/* $ZBITNOT */
+	f_two_mval,			/* $ZBITOR */
 	f_fnzbitset,
 	f_fnzbitstr,
-	f_two_mval,
-	f_zcall, f_zcall,
-	f_zchar, f_zchar,
-	f_zconvert, f_zconvert,
-	f_zcollate, f_zcollate,
+	f_two_mval,			/* $ZBITXOR */
+	f_zchar,
+	f_zconvert,
+	f_zcollate,
+	f_zconvert,
 	f_zdate,
 	f_data,				/* $ZDATA reuses parser for $DATA since only runtime execution differs */
 	f_zdate,
-	f_extract, f_extract,
-	f_find, f_find,
-	f_two_mstrs, f_two_mstrs,
-	f_two_mstrs,
-	f_mint_mstr,
-	f_two_mstrs,
-	f_zgetsyi,
-	f_incr, f_incr,
-	f_justify, f_justify,
+	f_extract,
+	f_find,
+	f_mint_mstr,			/* $ZGETJPI */
+	f_incr,
+	f_justify,
 	f_zjobexam,
-	f_length, f_length,
-	f_mint,
-	f_mint, f_mint,
-	f_zprevious, f_zprevious,
+	f_justify,
+	f_length,
+	f_mint,				/* $ZMESSAGE */
+	f_zprevious,
 	f_zparse,
 	f_zpeek,
-	f_piece, f_piece,
-	f_mint,
-	f_mstr, f_mstr,
-	f_zqgblmod, f_zqgblmod,
+	f_piece,
+	f_zprevious,
+	f_zqgblmod,
 	f_zsearch,
-	f_mstr,
 	f_zsigproc,
 	f_zsocket,
-	f_extract, f_extract,		/* $ZSUBSTR */
+	f_extract,			/* $ZSUBSTR */
 	f_one_mval,			/* $ZSYSLOG */
-	f_translate, f_translate,
-	f_ztrigger, f_ztrigger,
+	f_translate,
+	f_ztrigger,
 	f_ztrnlnm,
-	f_zwidth, f_zwidth,
-	f_zwrite, f_zwrite
+	f_zwidth,
+	f_zwrite,
 };
 
 int expritem(oprtype *a)
@@ -489,10 +483,7 @@ int expritem(oprtype *a)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-#	ifdef DEBUG
-	if (NULL != TREF(expr_start))
-		CHKTCHAIN(TREF(expr_start), exorder, FALSE);
-#	endif
+	CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq.h except with DEBUG_TRIPLES */
 	assert(svn_index[26] == (SIZEOF(svn_names)/SIZEOF(nametabent)));
 	assert(SIZEOF(svn_names)/SIZEOF(nametabent) == SIZEOF(svn_data)/SIZEOF(svn_data_type)); /* are all SVNs covered? */
 	assert(fun_index[26] == (SIZEOF(fun_names)/SIZEOF(nametabent)));

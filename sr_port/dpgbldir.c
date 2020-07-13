@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,8 +43,8 @@ GBLREF	gv_namehead	*gv_target_list;
 
 LITREF	char gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE];
 
-STATICDEF gdr_name	*gdr_name_head;
-STATICDEF gd_addr	*gd_addr_head;
+GBLDEF gdr_name	*gdr_name_head;
+GBLDEF gd_addr	*gd_addr_head;
 
 error_def(ERR_GDINVALID);
 

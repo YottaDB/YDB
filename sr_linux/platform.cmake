@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2018 Fidelity National Information		#
+# Copyright (c) 2013-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -55,6 +55,12 @@ else()
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -fPIC ")
 endif()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wimplicit -Wall -Wno-parentheses -Wno-unused-value -Wno-unused-function")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-variable -Wno-char-subscripts")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-but-set-variable -fno-builtin")
+if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.8)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-result -Wno-maybe-uninitialized")
+endif()
 
 add_definitions(
   #-DNOLIBGTMSHR #gt_cc_option_DBTABLD=-DNOLIBGTMSHR

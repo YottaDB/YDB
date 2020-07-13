@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,12 @@
 #include "muextr.h"
 #include "mupip_size.h"
 #include "mu_getkey.h"
+#include "gvt_inline.h"
 
+GBLDEF gv_key *mu_start_key;
+GBLDEF gv_key *mu_end_key;
+GBLDEF int mu_start_keyend;
+GBLDEF int mu_end_keyend;
 
 GBLREF	boolean_t	mu_subsc;
 GBLREF	boolean_t	mu_key;

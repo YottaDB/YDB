@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,7 @@
 #include "gvsub2str.h"
 #include "io.h"
 #include "gtm_descript.h"
+#include "gvt_inline.h"
 
 #define MAX_KEY_SIZE	(MAX_KEY_SZ - 4)	/* internal and external maximums differ */
 
@@ -99,7 +100,7 @@ CONDITION_HANDLER(op_fnzatransform_ch)
  */
 void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 {
-	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key_buf	save_currkey;
 	gv_key		*gvkey;
 	unsigned char	*key;
 	unsigned char	buff[MAX_KEY_SZ + 1], msrcbuff[MAX_KEY_SZ + 1];
@@ -143,7 +144,7 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 	gv_target = &temp_gv_target;
 	memset(gv_target, 0, SIZEOF(gv_namehead));
 	gv_target->collseq = csp;
-	gvkey = &save_currkey[0];
+	gvkey = (gv_key *)&save_currkey.key;
 	gvkey->prev = 0;
 	gvkey->top = DBKEYSIZE(MAX_KEY_SZ);
 	gvkey->end = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,7 +81,7 @@ GBLDEF	CLI_ENTRY			*cmd_ary = &mumps_cmd_ary[0]; /* Define cmd_ary to be the MUM
 # pragma pointer_size (long)
 #endif
 
-GBLDEF	char 				**gtmenvp;
+GBLREF	char 				**gtmenvp;
 
 error_def(ERR_CRYPTDLNOOPEN);
 error_def(ERR_CRYPTDLNOOPEN2);

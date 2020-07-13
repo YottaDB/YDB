@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,8 +43,7 @@
 #include "incr_link.h"
 #include "have_crit.h"
 
-GBLDEF uint4 			lits_text_size, lits_mval_size;
-
+GBLREF uint4 			lits_text_size, lits_mval_size;
 GBLREF int4			curr_addr, code_size;
 GBLREF char			cg_phase;	/* code generation phase */
 GBLREF char			cg_phase_last;	/* previous code generation phase */

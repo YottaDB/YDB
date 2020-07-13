@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -129,8 +129,7 @@ enum gds_t_mode
 
 typedef struct key_value_struct
 {
-	gv_key			key;			/* note that the following array holds the actual key contents */
-	char			key_contents[DBKEYSIZE(MAX_KEY_SZ)];
+	gv_key_buf		keybuf;
 	mstr			value;
 	struct key_value_struct	*next;
 } key_cum_value;
@@ -222,7 +221,7 @@ GBLREF	uint4		dollar_tlevel;
 #endif
 
 /* See comment in tp_tend where this macro is used for details */
-#define	IS_BG_PHASE2_COMMIT_IN_CRIT(CSE, MODE) (DBG_ASSERT(dollar_tlevel || (NULL == CSE->recompute_list_head))		\
-					(gds_t_writemap == MODE) || (CSE->recompute_list_head && (gds_t_write == MODE)))
+#define	IS_BG_PHASE2_COMMIT_IN_CRIT(CSE, MODE)							\
+	((gds_t_writemap == MODE) || (CSE->recompute_list_head && (gds_t_write == MODE)))
 
 #endif

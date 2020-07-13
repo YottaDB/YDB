@@ -22,11 +22,9 @@
 #include "stringpool.h"
 #include "gtm_string.h"
 #include "gtm_utf8.h"
-#include "gtmdbglvl.h"
 
 GBLREF boolean_t	run_time;
 GBLREF triple		t_orig;
-GBLREF uint4		gtmDebugLevel;
 
 error_def(ERR_EXPR);
 error_def(ERR_MAXARGCNT);
@@ -64,8 +62,9 @@ int eval_expr(oprtype *a)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq.h except with DEBUG_TRIPLES */
 	if (!expratom(&optyp_1))
-	{	/* If didn't already add an error of our own, do so now with catch all expression error */
+	{	/* If didn't already add an error of our own, do so now to catch all expression errors */
 		if (!ALREADY_RTERROR)
 			stx_error(ERR_EXPR);
 		return EXPR_FAIL;
@@ -91,10 +90,7 @@ int eval_expr(oprtype *a)
 				}
 				assert(&t_orig != ref->exorder.fl);
 				TREF(expr_start) = TREF(expr_start_orig) = ref;
-#				ifdef DEBUG
-				if (GDL_DebugCompiler & gtmDebugLevel)
-					CHKTCHAIN(TREF(expr_start), exorder, FALSE);
-#				endif
+				CHKTCHAIN(TREF(curtchain), exorder, TRUE); /* defined away in mdq.h except with DEBUG_TRIPLES */
 			}
 			switch (bin_opcode)
 			{
@@ -134,10 +130,11 @@ int eval_expr(oprtype *a)
 					stringpool.free = (unsigned char *)tmp_mval.str.addr + tmp_mval.str.len;
 					s2n(&tmp_mval);		/* things rely on the compiler doing literals with complete types */
 					ref1->operand[0] = put_lit(&tmp_mval);
-					optyp_1 = ref1->operand[0];
-					replaced = TRUE;
 					unuse_literal(&m1->v);
 					unuse_literal(&m2->v);
+					dqdel(optyp_1.oprval.tref, exorder);
+					optyp_1 = ref1->operand[0];
+					replaced = TRUE;
 					op_count--;
 				} else
 				{
@@ -245,20 +242,14 @@ int eval_expr(oprtype *a)
 			} else
 			{
 				advancewindow();
-#				ifdef DEBUG
-				if ((GDL_DebugCompiler & gtmDebugLevel) && (NULL != TREF(expr_start)))
-					CHKTCHAIN(TREF(expr_start), exorder, FALSE);
-#				endif
+				CHKTCHAIN(TREF(curtchain), exorder, TRUE); /* defined away in mdq.h except with DEBUG_TRIPLES */
 				if (!expratom(&optyp_2))
 				{
 					stx_error(ERR_RHMISSING);
 					return EXPR_FAIL;
 				}
 			}
-#			ifdef DEBUG
-			if ((GDL_DebugCompiler & gtmDebugLevel) && (NULL != TREF(expr_start)))
-				CHKTCHAIN(TREF(expr_start), exorder, FALSE);
-#			endif
+			CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq.h except with DEBUG_TRIPLES */
 			coerce(&optyp_2, type);
 			ref1 = optyp_1.oprval.tref;
 			if (((OC_VAR == ref1->opcode) || (OC_GETINDX == ref1->opcode))

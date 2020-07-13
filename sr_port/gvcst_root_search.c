@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,7 @@
 #include "gtmimagename.h"
 #include "error.h"
 #include "io.h"
+#include "gvt_inline.h"
 
 GBLREF	gv_key		*gv_currkey, *gv_altkey;
 GBLREF	int4		gv_keysize;
@@ -57,8 +58,8 @@ GBLREF	boolean_t	mupip_jnl_recover;
 # ifdef DEBUG
 GBLREF	boolean_t	is_rcvr_server;
 GBLREF	boolean_t	is_src_server;
-GBLDEF	unsigned char	t_fail_hist_dbg[T_FAIL_HIST_DBG_SIZE];
-GBLDEF	unsigned int	t_tries_dbg;
+GBLREF	unsigned char	t_fail_hist_dbg[T_FAIL_HIST_DBG_SIZE];
+GBLREF	unsigned int	t_tries_dbg;
 # endif
 GBLREF	jnl_gbls_t	jgbl;
 GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
@@ -136,7 +137,7 @@ static	mstr	global_collation_mstr;
 	}											\
 	if (mu_reorg_process)									\
 	{	/* In case gv_currkey/gv_target are out of sync. */				\
-		rootsrch_ctxt_ptr->gv_currkey = &rootsrch_ctxt_ptr->currkey[0];			\
+		rootsrch_ctxt_ptr->gv_currkey = (gv_key *)&rootsrch_ctxt_ptr->currkey.key;	\
 		MEMCPY_KEY(rootsrch_ctxt_ptr->gv_currkey, gv_currkey);				\
 		SET_GV_CURRKEY_FROM_GVT(reorg_gv_target);					\
 	}											\

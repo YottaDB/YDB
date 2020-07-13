@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,7 @@
 #include "gvcst_protos.h"	/* for gvcst_search_blk,gvcst_search_tail,gvcst_search prototype */
 #include "min_max.h"
 #include "gvcst_expand_key.h"
+#include "gvt_inline.h"
 
 GBLREF	boolean_t		mu_reorg_process;
 GBLREF	char			gvcst_search_clue;
@@ -99,7 +100,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	pTarg = gv_target;
 	assert(NULL != pTarg);
 	assert(pTarg->root);
-	assert(pKey != &pTarg->clue);
+	assert(pKey != (gv_key *)&pTarg->clue);
 	nKeyLen = pKey->end + 1;
 
 	assert(!dollar_tlevel || ((NULL != sgm_info_ptr) && (cs_addrs->sgm_info_ptr == sgm_info_ptr)));
@@ -340,12 +341,12 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			 * The case (0 == n1) is not expected a lot (relatively) since the application may be able to optimize
 			 *	a number of reads of the same key into one read by using a local-variable to store the value.
 			 */
-			if (0 < (n1 = memcmp(pKey->base, pTarg->clue.base, nKeyLen)))
+			if (0 < (n1 = memcmp(pKey->base, ((gv_key *)&(pTarg->clue))->base, nKeyLen)))
 			{
 				if (memcmp(pKey->base, pTarg->last_rec->base, nKeyLen) <= 0)
 				{
 					SET_GVCST_SEARCH_CLUE(1);
-					status = gvcst_search_tail(pKey, pTargHist->h, &pTarg->clue);
+					status = gvcst_search_tail(pKey, pTargHist->h, (gv_key *)&pTarg->clue);
 					if (cdb_sc_normal == status)
 					{
 						if (NULL == pHist)
@@ -402,7 +403,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 					return cdb_sc_normal;
 				}
 				leaf_blk_hist = &pTarg->hist.h[0];
-				status = gvcst_expand_prev_key(leaf_blk_hist, &pTarg->clue, gv_altkey);
+				status = gvcst_expand_prev_key(leaf_blk_hist, (gv_key *)&pTarg->clue, gv_altkey);
 				if (cdb_sc_normal == status)
 				{
 					COPY_PREV_KEY_TO_GVT_CLUE(pTarg, TRUE);

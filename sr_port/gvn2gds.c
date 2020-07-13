@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,7 @@
 #include "is_canonic_name.h"
 #include "zshow.h"
 #include "io.h"
+#include "gvt_inline.h"
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF gv_namehead	*gv_target;
@@ -286,7 +287,7 @@ unsigned char *gds2gvn(mval *gds, unsigned char *buff, int col)
 {
 	collseq 	*csp;
 	unsigned char 	*key;
-	gv_key 		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key_buf	save_currkey;
 	gv_key 		*gvkey;
 	gd_region	tmpreg, *save_gv_cur_region;
 	gv_namehead	temp_gv_target;
@@ -317,7 +318,7 @@ unsigned char *gds2gvn(mval *gds, unsigned char *buff, int col)
 	memset(gv_target, 0, SIZEOF(gv_namehead));
 	gv_target->collseq = csp;
 	assert(MV_IS_STRING(gds));
-	gvkey = &save_currkey[0];
+	gvkey = (gv_key *)&save_currkey.key;
 	gvkey->prev = 0;
 	gvkey->top = DBKEYSIZE(MAX_KEY_SZ);
 	if ((gvkey->top < gds->str.len) || (2 > gds->str.len)
@@ -326,7 +327,7 @@ unsigned char *gds2gvn(mval *gds, unsigned char *buff, int col)
 		*key++ = '\0';
 	else
 	{
-		memcpy(&gvkey->base[0], gds->str.addr, gds->str.len);
+		memcpy(gvkey->base, gds->str.addr, gds->str.len);
 		gvkey->end = gds->str.len - 1;
 		ESTABLISH_NORET(gvn2gds_ch, est_first_pass);	/* format_targ_key calls gvsub2str which has an rts_error */
 		if (0 == (key = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gvkey, FALSE)))

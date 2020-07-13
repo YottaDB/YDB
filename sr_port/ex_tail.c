@@ -43,6 +43,7 @@ void ex_tail(oprtype *opr)
 	assert(TRIP_REF == opr->oprclass);
 	UNARY_TAIL(opr);	/* this is first because it can change opr and thus whether we should even process the tail */
 	RETURN_IF_RTS_ERROR;
+	CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq.h except with DEBUG_TRIPLES */
 	t = opr->oprval.tref; /* Refind t since UNARY_TAIL may have shifted it */
 	c = t->opcode;
 	oct = oc_tab[c].octype;
@@ -147,10 +148,8 @@ void ex_tail(oprtype *opr)
 	DEBUG_ONLY(bitrip->src = t->src);
 	dqrins(t1, exorder, bitrip);
 	t2 = t->exorder.fl;
-	assert((OC_COMVAL == t2->opcode) || (OC_COMINT == t2->opcode));
+	assert((OC_COMVAL == t2->opcode) || (OC_COMINT == t2->opcode));	/* may need to change COMINT to COMVAL in bx_boolop */
 	assert(&t2->operand[0] == opr);				/* check next operation ensures an expression */
-	if (OC_COMINT == t2->opcode)
-		dqdel(t2, exorder);
 	bftrip = maketriple(OC_BOOLFINI);
 	DEBUG_ONLY(bftrip->src = t->src);
 	bftrip->operand[0] = put_tref(bitrip);
@@ -159,6 +158,9 @@ void ex_tail(oprtype *opr)
 	i = (oprtype *)mcalloc(SIZEOF(oprtype));
 	bx_tail(t, FALSE, i);
 	RETURN_IF_RTS_ERROR;
+	if (OC_COMINT == (t2 = bftrip->exorder.fl)->opcode)	/* after bx_tail/bx_boolop it's safe to delete any OC_COMINT left */
+		dqdel(t2, exorder);
 	*i = put_tnxt(bftrip);
+	CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq except with DEBUG_TRIPLES */
 	return;
 }

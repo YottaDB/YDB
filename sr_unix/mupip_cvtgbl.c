@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,6 +44,7 @@ GBLREF	boolean_t	skip_dbtriggers;
 GBLREF	mstr		sys_input;
 GBLDEF	int		onerror;
 
+error_def(ERR_EXTRFMT);
 error_def(ERR_LDBINFMT);
 error_def(ERR_LOADBGSZ);
 error_def(ERR_LOADINVCHSET);
@@ -290,8 +291,8 @@ int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *lin
 			{	/* chances of this are small but we are careful not to overflow buffers */
 				ret = MU_FMT_GOQ;	/* abusing this value to mean not working, as we can't discover GOQ */
 				line2_len = 0;
+				/* There is no second line in this extract file */
 				mupip_error_occurred = TRUE;
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 			}
 		}
 		if (0 < line2_len)
@@ -329,7 +330,7 @@ int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *lin
 				{	/* chances of this are small but we are careful not to overflow buffers */
 					ret = MU_FMT_GOQ;
 					mupip_error_occurred = TRUE;
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXTRFMT);
 				}
 			} else
 			{

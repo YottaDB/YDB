@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2017 Fidelity National Information	*
+ * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,7 @@ TAB_BG_TRC_REC("  DbCshGetn_BfOwnerStuck", db_csh_getn_buf_owner_stuck)	/* produ
 TAB_BG_TRC_REC("  DbCshGetn_OutOfDesign ", db_csh_getn_out_of_design)	/* NON-INTERLOCKED increment.				  */
 TAB_BG_TRC_REC("  TQread_BfOwnerStuck   ", t_qread_buf_owner_stuck)
 TAB_BG_TRC_REC("  TQread_OutOfDesign    ", t_qread_out_of_design)
-TAB_BG_TRC_REC("  BtPut_FlushDirty      ", bt_put_flush_dirty)
+TAB_BG_TRC_REC("  UNUSED                ", unused_filler_0031)		/* bt_put_flush_dirty => gvstats n_bt_scarce BTS */
 TAB_BG_TRC_REC("  M-lock wakeups        ", mlock_wakeups)		/* # of times a process has been awakened after lock wait */
 TAB_BG_TRC_REC("  WcBlocked WcsReoverInv", wc_blocked_wcs_recover_invoked)
 TAB_BG_TRC_REC("  WcBlocked WcsVerifyPas", wc_blocked_wcs_verify_passed)
@@ -63,7 +63,7 @@ TAB_BG_TRC_REC("  WcBlocked bitmp nul bt", wc_blocked_t_end_bitmap_nullbt)
 TAB_BG_TRC_REC("  WcBlocked bitmp no nul", wc_blocked_t_end_bitmap_nonnullbt)
 TAB_BG_TRC_REC("  WcBlocked jnl cwset   ", wc_blocked_t_end_jnl_cwset)
 TAB_BG_TRC_REC("  WcBlocked jnl wcflu   ", wc_blocked_t_end_jnl_wcsflu)
-TAB_BG_TRC_REC("  DbCshGet TooManyLoops ", db_csh_get_too_many_loops)
+TAB_BG_TRC_REC("  UNUSED                ", unused_filler_0052)	/* db_csh_get_too_many_loops => gvstats n_buffer_scarce BUS*/
 TAB_BG_TRC_REC("  WcBlkdtpc hist1 nul bt", wc_blocked_tpckh_hist1_nullbt)
 TAB_BG_TRC_REC("  WcBlkdtpc hist1 no nul", wc_blocked_tpckh_hist1_nonnullbt)
 TAB_BG_TRC_REC("  JnlBlkd Writer Lost   ", jnl_blocked_writer_lost)
@@ -146,7 +146,7 @@ TAB_BG_TRC_REC("  recompute_upd rec_size", recompute_upd_array_rec_size)
 TAB_BG_TRC_REC("  recompute_upd rec_cmpc", recompute_upd_array_rec_cmpc)
 TAB_BG_TRC_REC("  recompute_upd blk_fini", recompute_upd_array_blk_fini)
 TAB_BG_TRC_REC("  recompute_upd blksplit", recompute_upd_array_blk_split)
-TAB_BG_TRC_REC("  T_qread ripsleep_cnt  ", t_qread_ripsleep_cnt)
+TAB_BG_TRC_REC("  UNUSED                ", unused_filler_0135)		/* t_qread_ripsleep_cnt => gvstats n_wait_for_read WFR*/
 TAB_BG_TRC_REC("  T_qread ripsleep_nblks", t_qread_ripsleep_nblks)
 TAB_BG_TRC_REC("  Wcs_wtfini invoked    ", wcs_wtfini_invoked)
 TAB_BG_TRC_REC("  Wcs_wterror invoked   ", wcs_wterror_invoked)
@@ -159,3 +159,4 @@ TAB_BG_TRC_REC("  LseekAIORestart EAGAIN", async_restart_eagain)
 TAB_BG_TRC_REC("  JnlBuff Phs2Cmt Full  ", jnlbuff_phs2cmt_array_full)
 TAB_BG_TRC_REC("  JnlPhs2ClnupIfPossible", jnl_phase2_cleanup_if_possible)
 TAB_BG_TRC_REC("  JnlBuff Phs2Cmt PrcAlv", jnlbuff_phs2cmt_isprcalv)
+TAB_BG_TRC_REC("  recompute_upd_paidoff ", recompute_upd_array_paidoff)

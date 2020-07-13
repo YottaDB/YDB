@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,9 +77,11 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	assert(OFFSETOF(gv_namehead, last_split_blk_num[0]) + SIZEOF(gvt->last_split_blk_num)
 			== OFFSETOF(gv_namehead, gvt_trigger));
 	GTM64_ONLY(assert(OFFSETOF(gv_namehead, filler_8byte_align2) + SIZEOF(gvt->filler_8byte_align2)
-			== OFFSETOF(gv_namehead, clue));)
+					+ SIZEOF(gvt->filler_clue_end_align)
+				== OFFSETOF(gv_namehead, clue));)
 	NON_GTM64_ONLY(assert(OFFSETOF(gv_namehead, trig_mismatch_test_done) + SIZEOF(gvt->trig_mismatch_test_done)
-			== OFFSETOF(gv_namehead, clue));)
+					+ SIZEOF(gvt->filler_clue_end_align)
+				== OFFSETOF(gv_namehead, clue));)
 #	endif
 	csa = ((NULL != reg) && reg->open) ? &FILE_INFO(reg)->s_addrs : NULL;
 	gvt_hashtab_present = FALSE;
@@ -118,7 +120,8 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 		gvt->gvname.var_name.len = 0;
 		gvt->gvname.hash_code = 0;
 	}
-	assert(0 == (OFFSETOF(gv_namehead, clue) % SIZEOF(gvt->clue)));
+	assert(SIZEOF(gvt->clue) == SIZEOF(gv_key));			/* gv_key_nobase should be the same size as gv_key */
+	assert(OFFSETOF(gv_namehead, clue) == SIZEOF(gv_namehead) - SIZEOF(gvt->clue));		/* check no padding after clue */
 	gvt->first_rec = (gv_key *)((char *)&gvt->clue + SIZEOF(gv_key) + keysize);
 	gvt->last_rec = (gv_key *)((char *)gvt->first_rec + SIZEOF(gv_key) + keysize);
 	gvt->prev_key = NULL;

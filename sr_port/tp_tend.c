@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,8 +32,6 @@
 #include "filestruct.h"
 #include "gdscc.h"
 #include "gdsbml.h"
-#include "min_max.h"		/* needed for gdsblkops.h */
-#include "gdsblkops.h"		/* needed for recompute_upd_array routine */
 #include "ccp.h"
 #include "copy.h"
 #include "error.h"
@@ -137,7 +135,6 @@ error_def(ERR_REPLOFFJNLON);
 error_def(ERR_TEXT);
 
 enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse);
-enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse);
 
 boolean_t	tp_crit_all_regions()
 {
@@ -173,13 +170,13 @@ boolean_t	tp_crit_all_regions()
 			tmpcsa = &FILE_INFO(reg)->s_addrs;
 			tmpcsd = tmpcsa->hdr;
 			tmpsi = (sgm_info *)(tmpcsa->sgm_info_ptr);
-			DEBUG_ONLY(
-				/* Track retries in debug mode */
-				if (0 != lcnt)
-				{
-					BG_TRACE_ANY(tmpcsa, tp_crit_retries);
-				}
-			)
+#			ifdef DEBUG
+			/* Track retries in debug mode */
+			if (0 != lcnt)
+			{
+				BG_TRACE_ANY(tmpcsa, tp_crit_retries);
+			}
+#			endif
 			assert(!tmpcsa->hold_onto_crit);
 			if (!tmpcsa->now_crit)
 				grab_crit(reg);	/* In "t_retry", we used "grab_crit_encr_cycle_sync" to ensure encryption
@@ -541,13 +538,13 @@ boolean_t	tp_tend()
 			cnl = csa->nl;
 			csd = cs_data;
 			assert(!si->cr_array_index);
-			DEBUG_ONLY(
-				/* Track retries in debug mode */
-				if (0 != lcnt)
-				{
-					BG_TRACE_ANY(csa, tp_crit_retries);
-				}
-			)
+			#ifdef DEBUG
+			/* Track retries in debug mode */
+			if (0 != lcnt)
+			{
+				BG_TRACE_ANY(csa, tp_crit_retries);
+			}
+#			endif
 			lcl_update_trans = si->update_trans;
 			assert(!(lcl_update_trans & ~UPDTRNS_VALID_MASK));
 			first_cw_set = si->first_cw_set;
@@ -565,6 +562,7 @@ boolean_t	tp_tend()
 			 * restart with a helped out code because the cache recovery will most likely result in a restart of
 			 * the current transaction which we want to avoid if we are in the final retry.
 			 */
+			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 			if (!csa->now_crit)
 			{
 				grab_crit(gv_cur_region); /* Step CMT01 (see secshr_db_clnup.c for CMTxx step descriptions) */
@@ -589,7 +587,6 @@ boolean_t	tp_tend()
 				x_lock = FALSE;
 				break;
 			}
-			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 			if (!is_mm)
 				oldest_hist_tn = OLDEST_HIST_TN(csa);
 			/* We never expect to come here with file_corrupt set to TRUE (in case of an online rollback) because
@@ -845,21 +842,18 @@ boolean_t	tp_tend()
 				{	/* the check below is different from the one for BG (i.e. doesn't have the killtn check)
 					 * because there is no BT equivalent in MM. there is a mmblk_rec which is more or
 					 * less the same as a BT. when the mmblk_rec becomes as fully functional as BT, we
-					 * can use the killtn optimization for MM also.
+					 * can use the killtn optimization for MM also, however we also removed the noisolation
+					 * optimization because it was not working, and getting BG working seemed more pressing at
+					 * the time of this writing
 					 */
 					if (t1->tn <= ((blk_hdr_ptr_t)t1->buffaddr)->tn)
 					{
 						assert(CDB_STAGNATE > t_tries);
-						assert(!cse || !cse->high_tlevel);
-						if (!cse || !cse->recompute_list_head || cse->write_type
-							|| (cdb_sc_normal != recompute_upd_array(t1, cse)) || !++leafmods)
-						{
-							status = cdb_sc_blkmod;
-							TP_TRACE_HIST_MOD(t1->blk_num, t1->blk_target, tp_blkmod_tp_tend, csd,
-								t1->tn, 0, t1->level);
-							DEBUG_ONLY(continue;)
-							PRO_ONLY(goto failed;)
-						}
+						status = cdb_sc_blkmod;
+						TP_TRACE_HIST_MOD(t1->blk_num, t1->blk_target, tp_blkmod_tp_tend, csd,
+							t1->tn, 0, t1->level);
+						DEBUG_ONLY(continue;)
+						PRO_ONLY(goto failed;)
 					}
 				} else
 				{
@@ -902,10 +896,12 @@ boolean_t	tp_tend()
 								else
 								{
 									assert(cse->write_type || cse->recompute_list_head);
+									assert(&(TREF(non_tp_noiso_key_n_value))
+										!= cse->recompute_list_head);
 									leafmods++;
 									if (indexmods || cse->write_type
 											|| (cdb_sc_normal !=
-												recompute_upd_array(t1, cse)))
+											t_recompute_upd_array(t1, cse, NULL)))
 										status = cdb_sc_blkmod;
 								}
 							}
@@ -1012,21 +1008,21 @@ boolean_t	tp_tend()
 					}
 				}
 			} /* for (t1 ... ) */
-			DEBUG_ONLY(
-				if (cdb_sc_normal != status)
-					goto failed;
-				else
-				{	/* Now that we have successfully validated all histories, check that there is no
-					 * gv_target mismatch between history and corresponding cse.
-					 */
-					for (t1 = si->first_tp_hist;  t1 != si->last_tp_hist; t1++)
-					{
-						cse = t1->cse;
-						if (NULL != cse)
-							assert(t1->blk_target == cse->blk_target);
-					}
+#			ifdef DEBUG
+			if (cdb_sc_normal != status)
+				goto failed;
+			else
+			{	/* Now that we have successfully validated all histories, check that there is no
+				 * gv_target mismatch between history and corresponding cse.
+				 */
+				for (t1 = si->first_tp_hist;  t1 != si->last_tp_hist; t1++)
+				{
+					cse = t1->cse;
+					if (NULL != cse)
+						assert(t1->blk_target == cse->blk_target);
 				}
-			)
+			}
+#			endif
 			if (DIVIDE_ROUND_UP(si->num_of_blks, 4) < leafmods)	/* if status == cdb_sc_normal, then leafmods  */
 			{
 				status = cdb_sc_toomanyrecompute;		/* is exactly the number of recomputed blocks */
@@ -1439,7 +1435,6 @@ boolean_t	tp_tend()
 						assert(n_gds_t_op < kill_t_write);
 						if (n_gds_t_op <= cse->mode)
 							continue;
-						DEBUG_ONLY(is_mm = (dba_mm == csd->acc_meth));
 						DBG_ENSURE_OLD_BLOCK_IS_VALID(cse, is_mm, csa, csd);
 						assert(((NULL != old_block) && (old_block->tn < epoch_tn))
 											|| (0 == cse->jnl_freeaddr));
@@ -1915,247 +1910,6 @@ failed_skip_revert:
 	if (save_jnlpool != jnlpool)
 		jnlpool = save_jnlpool;
 	return FALSE;
-}
-
-/* --------------------------------------------------------------------------------------------
- * This code is very similar to the code in gvcst_put for the non-block-split case. Any changes
- * in either place should be reflected in the other.
- * --------------------------------------------------------------------------------------------
- */
-enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
-{
-	blk_segment		*bs1, *bs_ptr;
-	boolean_t		new_rec;
-	cache_rec_ptr_t		cr;
-	char			*va;
-	enum cdb_sc		status;
-	gv_key			*pKey = NULL;
-	int4			blk_size, blk_fill_size, cur_blk_size, blk_seg_cnt, delta ;
-	int4                    n, new_rec_size, next_rec_shrink;
-	int4			rec_cmpc, target_key_size;
-	int			tmp_cmpc;
-	uint4			segment_update_array_size;
-	key_cum_value		*kv, *kvhead;
-	mstr			value;
-	off_chain		chain1;
-	rec_hdr_ptr_t		curr_rec_hdr, next_rec_hdr, rp;
-	sm_uc_ptr_t		cp1, buffaddr;
-	unsigned short		rec_size;
-	unsigned int		bsiz;
-	sgmnt_addrs		*csa;
-	blk_hdr_ptr_t		old_block;
-	gv_namehead		*gvt;
-	srch_blk_status		*t1;
-#	ifdef DEBUG
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-#	endif
-	csa = cs_addrs;
-	BG_TRACE_PRO_ANY(csa, recompute_upd_array_calls);
-	assert(csa->now_crit && dollar_tlevel && sgm_info_ptr);
-	assert(!cse->level && cse->blk_target && !cse->first_off && !cse->write_type);
-	blk_size = cs_data->blk_size;
-	blk_fill_size = (blk_size * gv_fillfactor) / 100 - cs_data->reserved_bytes;
-	cse->first_copy = TRUE;
-	if (dba_bg == csa->hdr->acc_meth)
-	{	/* For BG method, modify history with uptodate cache-record, buffer and cycle information.
-		 * Also modify cse->old_block and cse->ondsk_blkver to reflect the updated buffer.
-		 * This is necessary in case history contains an older twin cr or a cr which has since been recycled
-		 */
-		cr = db_csh_get(bh->blk_num);
-		assert(CR_NOTVALID != (sm_long_t)cr);
-		if (NULL == cr || CR_NOTVALID == (sm_long_t)cr || 0 <= cr->read_in_progress)
-		{
-			BG_TRACE_PRO_ANY(csa, recompute_upd_array_rip);
-			assert(CDB_STAGNATE > t_tries);
-			return cdb_sc_lostcr;
-		}
-		if (cr->in_tend)
-		{	/* Possible if this cache-record is being modified concurrently by another process in bg_update_phase2.
-			 * In this case, we cannot determine if recomputation is possible. Have to restart.
-			 */
-			assert(CDB_STAGNATE > t_tries);
-			BG_TRACE_PRO_ANY(csa, recompute_upd_array_in_tend);
-			return cdb_sc_blkmod;
-		}
-		bh->cr = cr;
-		bh->cycle = cr->cycle;
-		cse->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
-		cse->ondsk_blkver = cr->ondsk_blkver;
-		/* old_block needs to be repointed to the NEW buffer but the fact that this block was free does not change in this
-		 * entire function. So cse->blk_prior_state's free_status can stay as it is.
-		 */
-		bh->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
-	}
-	buffaddr = bh->buffaddr;
-	assert(NULL != cse->recompute_list_head);
-	for (kvhead = kv = cse->recompute_list_head; (NULL != kv); kv = kv->next)
-	{
-		pKey = &kv->key;
-		value = kv->value;
-		target_key_size = pKey->end + 1;
-		if (kvhead != kv)
-		{
-			assert(FALSE == cse->done);
-			assert(0 == cse->reference_cnt);
-			assert(0 == cse->ins_off);		/* because leaf-level block */
-			assert(0 == cse->level);
-			assert(0 == cse->index);
-			assert(FALSE == cse->forward_process);	/* because no kills should have taken place in this block */
-			gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, 0);
-			bh->buffaddr = buffaddr = cse->new_buff;
-		}
-		if (cdb_sc_normal != (status = gvcst_search_blk(pKey, bh)))
-		{
-			BG_TRACE_PRO_ANY(csa, recompute_upd_array_search_blk);
-			return status;
-		}
-		cur_blk_size = ((blk_hdr_ptr_t)buffaddr)->bsiz;
-		new_rec = (target_key_size != bh->curr_rec.match);
-		rp = (rec_hdr_ptr_t)(buffaddr + bh->curr_rec.offset);
-		if (bh->curr_rec.offset == cur_blk_size)
-		{
-			if (FALSE == new_rec)
-			{
-				assert(CDB_STAGNATE > t_tries);
-				BG_TRACE_PRO_ANY(csa, recompute_upd_array_new_rec);
-				return cdb_sc_mkblk;
-			}
-			rec_cmpc = 0;
-			rec_size = 0;
-		} else
-		{
-			GET_USHORT(rec_size, &rp->rsiz);
-			rec_cmpc = EVAL_CMPC(rp);
-			if ((sm_uc_ptr_t)rp + rec_size > (sm_uc_ptr_t)buffaddr + cur_blk_size)
-			{
-				assert(CDB_STAGNATE > t_tries);
-				BG_TRACE_PRO_ANY(csa, recompute_upd_array_rec_size);
-				return cdb_sc_mkblk;
-			}
-		}
-		if (new_rec)
-		{
-			new_rec_size = SIZEOF(rec_hdr) + target_key_size - bh->prev_rec.match + value.len;
-			if (cur_blk_size <= (int)bh->curr_rec.offset)
-				next_rec_shrink = 0;
-			else
-				next_rec_shrink = bh->curr_rec.match - rec_cmpc;
-			delta = new_rec_size - next_rec_shrink;
-		} else
-		{
-			if (rec_cmpc != bh->prev_rec.match)
-			{
-				assert(CDB_STAGNATE > t_tries);
-				BG_TRACE_PRO_ANY(csa, recompute_upd_array_rec_cmpc);
-				return cdb_sc_mkblk;
-			}
-			new_rec_size = SIZEOF(rec_hdr) + (target_key_size - rec_cmpc) + value.len;
-			delta = new_rec_size - rec_size;
-			next_rec_shrink = 0;
-		}
-		chain1 = *(off_chain *)&bh->blk_num;
-		assert(0 == chain1.flag);
-		if (cur_blk_size + delta <= blk_fill_size)
-		{
-			segment_update_array_size = UA_NON_BM_SIZE(cs_data);
-			ENSURE_UPDATE_ARRAY_SPACE(segment_update_array_size);
-			BLK_INIT(bs_ptr, bs1);
-			assertpro(0 == rc_set_fragment);
-			BLK_SEG(bs_ptr, buffaddr + SIZEOF(blk_hdr), bh->curr_rec.offset - SIZEOF(blk_hdr));
-			BLK_ADDR(curr_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
-			curr_rec_hdr->rsiz = new_rec_size;
-			SET_CMPC(curr_rec_hdr, bh->prev_rec.match);
-			BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, SIZEOF(rec_hdr));
-			BLK_ADDR(cp1, target_key_size - bh->prev_rec.match, unsigned char);
-			memcpy(cp1, pKey->base + bh->prev_rec.match, target_key_size - bh->prev_rec.match);
-			BLK_SEG(bs_ptr, cp1, target_key_size - bh->prev_rec.match);
-			if (0 != value.len)
-			{
-				BLK_ADDR(va, value.len, char);
-				memcpy(va, value.addr, value.len);
-				BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
-			}
-			if (!new_rec)
-				rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + rec_size);
-			n = (int)(cur_blk_size - ((sm_uc_ptr_t)rp - buffaddr));
-			if (n > 0)
-			{
-				if (new_rec)
-				{
-					BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
-					next_rec_hdr->rsiz = rec_size - next_rec_shrink;
-					SET_CMPC(next_rec_hdr, bh->curr_rec.match);
-					BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
-					next_rec_shrink += SIZEOF(rec_hdr);
-				}
-				BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + next_rec_shrink, n - next_rec_shrink);
-			}
-			if (0 == BLK_FINI(bs_ptr, bs1))
-			{
-				assert(CDB_STAGNATE > t_tries);
-				BG_TRACE_PRO_ANY(csa, recompute_upd_array_blk_fini);
-				return cdb_sc_mkblk;
-			}
-			cse->upd_addr = (unsigned char *)bs1;
-			cse->done = FALSE;
-		} else
-		{
-			BG_TRACE_PRO_ANY(csa, recompute_upd_array_blk_split);
-			return cdb_sc_blksplit;
-		}
-	}
-	/* Update bh->tn to reflect the fact that it is uptodate as of the current database transaction.
-	 * Not doing so could actually cause unnecessary restarts.
-	 */
-	bh->tn = csa->hdr->trans_hist.curr_tn;
-	/* If block in this history element is the same as gv_target's leaf block and it has a non-zero clue, update it */
-	gvt = bh->blk_target;
-	assert(!bh->level);	/* this is why it is safe to access 0th array index in the next line */
-	t1 = gvt->hist.h;
-	if (gvt->clue.end && (t1->blk_num == bh->blk_num))
-	{
-		*t1 = *bh;
-		/* Update clue to reflect last key in recompute list. No need to update gvt->first_rec and gvt->last_rec
-		 * as they are guaranteed to be the same as what it was when the clue was filled in by gvcst_search (if
-		 * they are different, an index block would have changed which means we would restart this transaction
-		 * anyways and the clue would be reset to 0).
-		 */
-		assert(NULL != pKey);
-		assert(!TREF(expand_prev_key));	/* this ensures it is safe to use EXPAND_PREV_KEY_FALSE below */
-		COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(gvt, pKey, EXPAND_PREV_KEY_FALSE);
-		if (new_rec)
-			t1->curr_rec.match = gvt->clue.end + 1;	/* Keep srch_hist and clue in sync for NEXT gvcst_search */
-		/* Now that the clue is known to be non-zero, we have the potential for the first_rec part of it to be
-		 * unreliable. Reset it to be safe. See comment in similar section in tp_hist for details on why.
-		 */
-		GVT_CLUE_INVALIDATE_FIRST_REC(gvt);
-	}
-	/* At this point, cse->new_buff could be non-NULL either because the same variable was being updated multiple times
-	 * inside of the TP transaction or because cse->recompute_list_head contained more than one variable (in which case
-	 * cse->new_buff will be set by the invocation of gvcst_blk_build (above) for the second element in the list. In
-	 * either case, the final update-array contents rely on the shared memory buffer (in case of BG access method) and
-	 * not on cse->new_buff. Therefore we need to PIN the corresponding cache-record in tp_tend. So reset cse->new_buff.
-	 */
-	cse->new_buff = NULL;
-	if (!WAS_FREE(cse->blk_prior_state) && (NULL != cse->old_block) && JNL_ENABLED(csa) && csa->jnl_before_image)
-	{
-		old_block = (blk_hdr_ptr_t)cse->old_block;
-		if (old_block->tn < csa->jnl->jnl_buff->epoch_tn)
-		{
-			bsiz = old_block->bsiz;
-			/* See comment before similar check in "gvincr_recompute_upd_array" for why this check is needed */
-			if (bsiz > csa->hdr->blk_size)
-			{	/* This is a restartable condition. Restart */
-				assert(CDB_STAGNATE > t_tries);
-				return cdb_sc_mkblk;
-			}
-			cse->blk_checksum = jnl_get_checksum(old_block, csa, bsiz);
-		} else
-			cse->blk_checksum = 0;
-	}
-	return cdb_sc_normal;
 }
 
 /* This function does not update "bml_cse->tn" (to reflect that the reallocation is valid as of the current database tn).

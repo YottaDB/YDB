@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,9 +49,9 @@
  * visible. For functions, do not use the "static" keyword to make them externally visible. Note that a STATICREF for variables
  * does not make sense since statics are supposed to be used only within one module.
  */
-#define	STATICDEF		GBLDEF
-#define	STATICFNDCL		extern
-#define	STATICFNDEF
+#define	STATICDEF		static
+#define	STATICFNDCL		static
+#define	STATICFNDEF		static
 
 #ifndef TRUE
 #  define TRUE			1

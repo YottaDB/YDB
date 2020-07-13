@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,10 +51,31 @@ void	op_commarg(mval *v, unsigned char argcode)
 	if (NULL == (obj = cache_get(&indir_src)))	/* NOTE assignment */
 	{
 		obj = &object;
-		if (((indir_do == argcode) || (indir_goto == argcode)) &&
-		    (frame_pointer->type & SFT_COUNT) && v->str.len && (MAX_MIDENT_LEN > v->str.len) &&
-		    !proc_act_type && do_indir_do(v, argcode))
-			return;
+		switch(argcode)
+		{	/* these characteristics could be 1 or more columns in inter.h, however it's widely used via indir_enum.h */
+		case indir_do:
+		case indir_goto:
+			if ((frame_pointer->type & SFT_COUNT) && v->str.len && (MAX_MIDENT_LEN > v->str.len) && !proc_act_type
+					&& do_indir_do(v, argcode))
+				return;
+			break;
+		case indir_hang:
+		case indir_if:
+		case indir_write:
+		case indir_xecute:
+		case indir_zsystem:
+		case indir_zmess:
+		case indir_zgoto:
+		case indir_zhelp:
+		case indir_zshow:
+		case indir_trollback:
+		case indir_quit:
+		case indir_zhalt:
+			if (0 == v->str.len)
+				return;						/* WARNING possible fallthrough */
+		default:
+			break;
+		}
 		comp_init(&v->str, NULL);
 		for (;;)
 		{
@@ -69,7 +91,7 @@ void	op_commarg(mval *v, unsigned char argcode)
 					advancewindow();
 				if (TK_EOL == TREF(window_token))
 					break;
-				rts_error(VARLSTCNT(1) ERR_INDEXTRACHARS);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INDEXTRACHARS);
 			}
 		}
 		if (EXPR_FAIL == comp_fini(rval, obj, OC_RET, NULL, NULL, v->str.len))

@@ -1,7 +1,7 @@
-#!/usr/local/bin/tcsh
+#!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2011-2019 Fidelity National Information		#
+# Copyright (c) 2011-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -232,10 +232,15 @@ if ($?save_icu) then
 endif
 # test gtmsecshr with an alternate user
 set XCMD='do ^GTMHELP("",$ztrnlnm("gtm_dist")_"/gtmhelp.gld")'
-su - gtmtest -c "env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL gtm_chset=UTF-8 gtm_dist=$gtm_dist gtmroutines='$gtmroutines' $gtm_dist/mumps -run %XCMD '${XCMD:q}' < /dev/null" > gtmtest.out   #BYPASSOKLENGTH
+if ($?gtm_icu_version) then
+	set icuver = "gtm_icu_version=$gtm_icu_version"
+else
+	set icuver = ""
+endif
+su - gtmtest -c "env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL gtm_chset=UTF-8 $icuver gtm_dist=$gtm_dist gtmroutines='$gtmroutines' $gtm_dist/mumps -run %XCMD '${XCMD:q}' < /dev/null" > gtmtest.out   #BYPASSOKLENGTH
 # if we see the 'Topic? ' prompt, all is well
 grep -q '^Topic. $' gtmtest.out
-if ( $status ) cat gtmtest.out			>>&! $save_gtm_dist/gtm_test_install.out
+if ( 0 == $status ) cat gtmtest.out			>>&! $save_gtm_dist/gtm_test_install.out
 # get journal output
 cd V*/g
 

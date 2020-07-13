@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,7 @@
 #include "copy.h"
 #include "error.h"
 #include "op.h"
+#include "gvt_inline.h"
 
 GBLREF spdesc stringpool;
 

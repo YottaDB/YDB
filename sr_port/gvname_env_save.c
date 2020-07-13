@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +28,7 @@
 #include "tp.h"
 #include "gtm_string.h"
 #include "gvname_info.h"
+#include "gvt_inline.h"
 
 GBLREF gv_key           *gv_currkey;
 GBLREF gd_region        *gv_cur_region;

@@ -83,7 +83,7 @@ GDEINIT
 	. s SIZEOF("gd_contents")=80		; --> size of the "gd_addr" structure (defined in gdsfhead.h)
 	. s SIZEOF("gd_header")=16		; --> 16-byte header structure at offset 0 of .gld (12 byte label, 4-byte filesize)
 	. s SIZEOF("gd_map")=16			; --> size of the "gd_binding" structure (defined in gdsfhead.h)
-	. s SIZEOF("gd_region")=412		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_region")=416		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
 	. s SIZEOF("gd_region_padding")=0	; --> padding at end of "gd_region" structure (4-bytes for 64-bit platforms)
 	. s SIZEOF("gd_segment")=372		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
 	e  d
@@ -92,8 +92,8 @@ GDEINIT
 	. s SIZEOF("gd_contents")=120		; --> size of the "gd_addr" structure (defined in gdsfhead.h)
 	. s SIZEOF("gd_header")=16		; --> 16-byte header structure at offset 0 of .gld (12 byte label, 4-byte filesize)
 	. s SIZEOF("gd_map")=24			; --> size of the "gd_binding" structure (defined in gdsfhead.h)
-	. s SIZEOF("gd_region")=424		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
-	. s SIZEOF("gd_region_padding")=4	; --> padding at end of "gd_region" structure (4-bytes for 64-bit platforms)
+	. s SIZEOF("gd_region")=432		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_region_padding")=8	; --> padding at end of "gd_region" structure (4-bytes for 64-bit platforms)
 	. s SIZEOF("gd_segment")=384		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
 	d gvstats
 	s SIZEOF("blk_hdr")=16
@@ -141,7 +141,7 @@ GDEINIT
 	s minreg("AUTODB")=0,maxreg("AUTODB")=1
 	s minreg("AUTOSWITCHLIMIT")=16384,maxreg("AUTOSWITCHLIMIT")=8388607
 	s minreg("BEFORE_IMAGE")=0,maxreg("BEFORE_IMAGE")=1
-	s minreg("BUFFER_SIZE")=2307,maxreg("BUFFER_SIZE")=32768
+	s minreg("BUFFER_SIZE")=2307,maxreg("BUFFER_SIZE")=1048576
 	s minreg("COLLATION_DEFAULT")=0,maxreg("COLLATION_DEFAULT")=255
 	s minreg("EPOCH_INTERVAL")=1,maxreg("EPOCH_INTERVAL")=32767
 	s minreg("EPOCHTAPER")=0,maxreg("EPOCHTAPER")=1
@@ -439,8 +439,8 @@ syntabi:
 	s syntab("VERIFY","TEMPLATE")=""
 	q
 UNIX:
-	s hdrlab="GTCGBDUNX014"         ; must be concurrently maintained in gbldirnam.h!!!
-	i (gtm64=TRUE) s hdrlab="GTCGBDUNX114" ; the high order digit is a 64-bit flag
+	s hdrlab="GTCGBDUNX015"         ; must be concurrently maintained in gbldirnam.h!!!
+	i (gtm64=TRUE) s hdrlab="GTCGBDUNX115" ; the high order digit is a 64-bit flag
 	s tfile="$gtmgbldir"
 	s accmeth="\BG\MM"
 	s helpfile="$gtm_dist/gdehelp.gld"

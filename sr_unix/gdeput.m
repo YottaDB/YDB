@@ -219,7 +219,7 @@ cregion:
 	s rec=rec_$$num2bin(4,regs(s,"EPOCH_INTERVAL"))
 	s rec=rec_$$num2bin(4,regs(s,"SYNC_IO"))
 	s rec=rec_$$num2bin(4,regs(s,"YIELD_LIMIT"))
-	s rec=rec_$$num2bin(2,regs(s,"BUFFER_SIZE"))
+	s rec=rec_$$num2bin(4,regs(s,"BUFFER_SIZE"))
 	s rec=rec_$c(regs(s,"BEFORE_IMAGE"))
 	s rec=rec_$tr($j("",4)," ",ZERO)							;filler
 	s rec=rec_$$num2bin(1,regs(s,"COLLATION_DEFAULT"))
@@ -228,6 +228,7 @@ cregion:
 	s rec=rec_$$num2bin(1,regs(s,"QDBRUNDOWN"))
 	s rec=rec_$$num2bin(1,$zl(regs(s,"FILE_NAME")))
 	s rec=rec_regs(s,"FILE_NAME")_$tr($j("",SIZEOF("file_spec")-$zl(regs(s,"FILE_NAME")))," ",ZERO)
+	s rec=rec_$tr($j("",2)," ",ZERO)                                               		;alignment
 	s rec=rec_$tr($j("",8)," ",ZERO)							; reserved
 	s rec=rec_$$num2bin(4,isSpanned(s))							; is_spanned
 	n maxregindex s maxregindex=$get(sreg(s,"STATSDB_REG_INDEX"),TWO(32)-1)

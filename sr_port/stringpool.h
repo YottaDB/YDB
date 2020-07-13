@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,9 +33,9 @@ boolean_t	is_stp_space_available(ssize_t space_needed);
 #endif
 
 #ifdef DEBUG
-#define	IS_STP_SPACE_AVAILABLE(SPC)	is_stp_space_available((ssize_t)SPC)
+#define	IS_STP_SPACE_AVAILABLE(SPC)	is_stp_space_available((ssize_t)(SPC))
 #else
-#define	IS_STP_SPACE_AVAILABLE(SPC)	IS_STP_SPACE_AVAILABLE_PRO((ssize_t)SPC)
+#define	IS_STP_SPACE_AVAILABLE(SPC)	IS_STP_SPACE_AVAILABLE_PRO((ssize_t)(SPC))
 #endif
 
 GBLREF	spdesc		stringpool;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,6 +63,7 @@
 #include "gtmimagename.h"
 #include "is_file_identical.h"
 #include "anticipatory_freeze.h"
+#include "gvt_inline.h"
 
 LITREF	mval	literal_null;
 

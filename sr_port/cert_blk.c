@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,8 +40,10 @@
 #include <rtnhdr.h>
 #include "gv_trigger.h"
 #endif
+#include "gvt_inline.h"
 
 GBLREF	uint4		dollar_tlevel;
+GBLREF	boolean_t	created_core;
 GBLREF	boolean_t	dse_running;
 GBLREF	boolean_t	mu_reorg_upgrd_dwngrd_in_prog;
 GBLREF	uint4		mu_reorg_encrypt_in_prog;
@@ -150,6 +152,8 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (created_core)
+		return TRUE;		/* limit the number of cores from a cert_blk failure (to 2) */
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	bplmap = csd->bplmap;

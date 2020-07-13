@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved. *
  *								*
  *	This source code contains the intellectual property	*
@@ -31,7 +31,7 @@
 GBLREF boolean_t        gtm_utf8_mode;
 
 /* $EXTRACT, $ZEXTRACT, and $ZSUBSTR use this compiler routine as all have similar function and identical invocation signatures */
-STATICDEF int f_extract(oprtype *a, opctype op)
+int f_extract(oprtype *a, opctype op)
 {
 	triple	*first, *last, *r;
 	mval	tmp_mval;

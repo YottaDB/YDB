@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,8 +29,10 @@
 #include "numcmp.h"
 #include "promodemo.h"	/* for "demote" prototype used in LV_NODE_GET_KEY */
 
-GBLREF spdesc		stringpool;
+GBLREF bool		undef_inhibit;
 GBLREF mv_stent		*mv_chain;
+GBLREF spdesc		stringpool;
+GBLREF symval		*curr_symval;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 
 LITREF	mval		literal_null;
@@ -41,18 +43,18 @@ error_def(ERR_STACKCRIT);
 
 void op_fnquery(int sbscnt, mval *dst, ...)
 {
-	int			length;
-	mval		 	tmp_sbs;
-	va_list			var;
-	mval			*varname, *v1, *v2, *mv, tmpmv;
-	mval			*arg1, **argpp, *args[MAX_LVSUBSCRIPTS], **argpp2, *lfrsbs, *argp2;
+	boolean_t		found, is_num, is_str, last_sub_null, nullify_term;
+	ht_ent_mname		*tabent;
+	int			i, j, length;
+	lv_val			*lvn, *lvns[MAX_LVSUBSCRIPTS], *v, *ve;
+	lvTree			*lvt;
+	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS], *node, *nullsubsnode, *nullsubsparent, *parent;
+	mname_entry		lvent;
+	mval			*arg1, **argpp, *argp2, **argpp2, *args[MAX_LVSUBSCRIPTS], *lfrsbs, *mv, tmpmv, tmp_sbs,
+				*varname, *v1, *v2;
 	mval			xform_args[MAX_LVSUBSCRIPTS];	/* for lclcol */
 	mstr			format_out;
-	lv_val			*v;
-	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS], *parent, *node, *nullsubsnode, *nullsubsparent;
-	lvTree			*lvt;
-	int			i, j;
-	boolean_t		found, is_num, last_sub_null, nullify_term, is_str;
+	va_list			var, var_dup;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -62,12 +64,24 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 	varname = va_arg(var, mval *);
 	v = va_arg(var, lv_val *);
 	assert(v);
-	assert(LV_IS_BASE_VAR(v));
-	lvt = LV_GET_CHILD(v);
+	if (varname->str.len > MAX_MIDENT_LEN)
+		varname->str.len = MAX_MIDENT_LEN;
+	lvent.var_name.len = varname->str.len;
+	lvent.var_name.addr = varname->str.addr;
+	COMPUTE_HASH_MNAME(&lvent);
+	if (tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &lvent))
+	{	/* if the variable exists find out if it has children */
+		ve = (lv_val *)tabent->value;
+		assert(ve);
+		assert(HTENT_VALID_MNAME(tabent, lv_val, ve));
+		assert(LV_IS_BASE_VAR(ve));
+		lvt = LV_GET_CHILD(ve);
+		assert((NULL == lvt) || (LV_GET_CHILD(v) == lvt));
+	} else
+		lvt = NULL;
 	if (NULL == lvt)
-	{
-		dst->mvtype = MV_STR;
-		dst->str.len = 0;
+	{	/* no such unsubscripted variable or no descendants */
+		*dst = literal_null;
 		return;
 	}
 	h1 = history;
@@ -100,7 +114,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 			}
 			if (is_num = MV_IS_CANONICAL(arg1))
 				MV_FORCE_NUM(arg1);
-			else if ((i + 1 == sbscnt) && (0 == arg1->str.len))
+			else if ((0 == arg1->str.len) && (i + 1 == sbscnt))
 			{ 	/* The last search argument is a null string. For this situation, there is the possibility
 				 * of a syntax collision if (1) the user had (for example) specified $Q(a(1,3,"") to get
 				 * the first a(1,3,x) node or (2) this is the "next" element that was legitimately returned
@@ -115,11 +129,10 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 				 * SE 2/2004 (D9D08-002352).
 				 */
 				nullify_term = TRUE;
-				if ((TREF(last_fnquery_return_varname)).str.len
-					&& (TREF(last_fnquery_return_varname)).str.len == varname->str.len
-					&& 0 == memcmp((TREF(last_fnquery_return_varname)).str.addr,
-						varname->str.addr, varname->str.len)
-					&& sbscnt == TREF(last_fnquery_return_subcnt))
+				if ((TREF(last_fnquery_return_varname)).str.len && (sbscnt == TREF(last_fnquery_return_subcnt))
+					&& ((TREF(last_fnquery_return_varname)).str.len == varname->str.len)
+					&& (0 == memcmp((TREF(last_fnquery_return_varname)).str.addr,
+						varname->str.addr, varname->str.len)))
 				{	/* We have an equivalent varname and same number subscripts */
 					for (j = 0, argpp2 = &args[0], lfrsbs = TADR(last_fnquery_return_sub);
 						j < i; j++, argpp2++, lfrsbs++)
@@ -205,8 +218,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 			{
 				found = TRUE;
 				nullsubsnode = TREF(local_collseq_stdnull)
-					?  lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &nullsubsparent)
-					: NULL;
+					?  lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &nullsubsparent) : NULL;
 				node = (NULL == nullsubsnode) ? lvAvlTreeFirst(lvt) : nullsubsnode;
 				assert(NULL != node);
 				*h1 = node;
@@ -230,8 +242,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 			assert(h1 >= &history[0]);
 			if (h1 == &history[0])
 			{
-				dst->mvtype = MV_STR;
-				dst->str.len = 0;
+				*dst = literal_null;
 				return;
 			}
 			node = *h1;
@@ -247,7 +258,6 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 	}
 	/* Saved last query result is irrelevant now */
 	TREF(last_fnquery_return_subcnt) = 0;
-	(TREF(last_fnquery_return_varname)).mvtype = MV_STR;
 	(TREF(last_fnquery_return_varname)).str.len = 0;
 	/* Go down leftmost subtree path (potentially > 1 avl trees) starting from "node" until you find the first DEFINED mval */
 	while (!LV_IS_VAL_DEFINED(node))
@@ -255,8 +265,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 		lvt = LV_GET_CHILD(node);
 		assert(NULL != lvt);	/* there cannot be an undefined lv node with no children dangling around */
 		nullsubsnode = TREF(local_collseq_stdnull)
-				? lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &nullsubsparent)
-				: NULL;
+				? lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &nullsubsparent) : NULL;
 		node = (NULL == nullsubsnode) ? lvAvlTreeFirst(lvt) : nullsubsnode;
 		assert(NULL != node);
 		*++h1 = node;
@@ -281,6 +290,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 	{
 		(TREF(last_fnquery_return_varname)).str.addr = (char *)stringpool.free;
 		(TREF(last_fnquery_return_varname)).str.len += varname->str.len;
+		(TREF(last_fnquery_return_varname)).mvtype = MV_STR;
 	}
 	stringpool.free += varname->str.len;
 	*stringpool.free++ = '(';
@@ -313,7 +323,8 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 			assert(MV_IS_STRING(mv));
 			v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
 			v2->mvtype = 0;	/* initialize it to 0 to avoid "stp_gcol" from getting confused
-					 * if it gets invoked before v2 has been completely setup. */
+					 * if it gets invoked before v2 has been completely setup.
+					 */
 			if (TREF(local_collseq))
 			{
 				ALLOC_XFORM_BUFF(mv->str.len);
@@ -349,8 +360,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype = MV_STR;
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr =
 						(char *)stringpool.free;
-					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len =
-						v2->str.len;
+					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len = v2->str.len;
 				}
 				stringpool.free += v2->str.len;
 				*stringpool.free++ = '\"';

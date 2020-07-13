@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,6 +57,7 @@
 #include "wbox_test_init.h"
 #include "have_crit.h"
 #include "gtm_trigger_trc.h"
+#include "gvt_inline.h"
 
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		is_dollar_incr;
@@ -621,8 +622,7 @@ STATICFNDEF uint4 gvtr_process_gvsubs(char *start, char *end, gvtr_subs_t *subsd
 void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 {
 	gv_namehead		*save_gvtarget, *gvt;
-	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
-	gv_key			save_altkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key_buf		save_currkey, save_altkey;
 	unsigned char		util_buff[MAX_TRIG_UTIL_LEN];
 	gv_key			*save_gv_currkey;
 	gv_key			*save_gv_altkey;
@@ -655,12 +655,12 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	SET_GVTARGET_TO_HASHT_GBL(csa);
 	/* Save gv_currkey and gv_altkey */
 	assert(NULL != gv_currkey);
-	assert((SIZEOF(gv_key) + gv_currkey->end) <= SIZEOF(save_currkey));
-	save_gv_currkey = &save_currkey[0];
+	assert((SIZEOF(gv_key) + gv_currkey->end + 1) <= SIZEOF(save_currkey));
+	save_gv_currkey = (gv_key *)&save_currkey.key;
 	MEMCPY_KEY(save_gv_currkey, gv_currkey);
 	assert(NULL != gv_altkey);
-	assert((SIZEOF(gv_key) + gv_altkey->end) <= SIZEOF(save_altkey));
-	save_gv_altkey = &save_altkey[0];
+	assert((SIZEOF(gv_key) + gv_altkey->end + 1) <= SIZEOF(save_altkey));
+	save_gv_altkey = (gv_key *)&save_altkey.key;
 	MEMCPY_KEY(save_gv_altkey, gv_altkey);
 	save_gv_last_subsc_null = TREF(gv_last_subsc_null);
 	save_gv_some_subsc_null = TREF(gv_some_subsc_null);
@@ -1471,7 +1471,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	char			*key_ptr, *key_start, *key_end;
 	char			*keysub_start[MAX_KEY_SZ + 1];
 	gv_key			*save_gv_currkey;
-	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key_buf		save_currkey;
 	gv_trigger_t		*trigdsc, *trigstop, *trigstart;
 	int			gtm_trig_status, tfxb_status, num_triggers_invoked, trigmax, trig_list_offset;
 	mstr			*ztupd_mstr;
@@ -1531,8 +1531,8 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	 * gets opened) inside any of the "gtm_trigger" invocations. So we should maintain pointers only
 	 * to the local copy (not the global gv_currkey) for use inside all iterations of the for loop.
 	 */
-	save_gv_currkey = &save_currkey[0];
-	assert(((char *)save_gv_currkey + SIZEOF(gv_key) + gv_currkey->end) < (char *)ARRAYTOP(save_currkey));
+	save_gv_currkey = (gv_key *)&save_currkey.key;
+	assert(((char *)save_gv_currkey + SIZEOF(gv_key) + gv_currkey->end + 1) < (char *)(&save_currkey + 1));
 	MEMCPY_KEY(save_gv_currkey, gv_currkey);
 	key_ptr = (char *)save_gv_currkey->base;
 	DEBUG_ONLY(key_start = key_ptr;)

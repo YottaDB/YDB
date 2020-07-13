@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -616,6 +616,9 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 				     : (X)->str.char_len)
 #	define	MV_FORCE_LEN_DEC(X) ((!((X)->mvtype & MV_UTF_LEN)) 							\
 				     ? (utf8_len_dec(&(X)->str), ((X)->mvtype |= MV_UTF_LEN), (X)->str.char_len)	\
+				     : (X)->str.char_len)
+#	define	MV_FORCE_LEN_SILENT(X) MV_FORCE_STR(X), ((!((X)->mvtype & MV_UTF_LEN)) 					\
+				     ? (utf8_len_silent(&(X)->str), ((X)->mvtype |= MV_UTF_LEN), (X)->str.char_len)	\
 				     : (X)->str.char_len)
 
 /* MV_FORCE_LEN_STRICT() is used to ensure that mval is valid in addition to computing the char_len.

@@ -253,7 +253,7 @@ GVGETFAIL	<Global variable retrieval failed.  Failure code: !AD.>/error/fao=2!/a
 GVIS		<!_!_Global variable: !AD>/info/fao=2!/ansi=0
 GVKILLFAIL	<Global variable kill failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 GVNAKED		<Illegal naked global reference>/error/fao=0!/ansi=1
-GVNEXTARG	<Argument to global variable $NEXT must be subscripted>/error/fao=0!/ansi=0
+UNUSEDMSG256	<GVNEXTARG removed from code in V6.3-013 June 2020; not issued for a long time prior to that>/error/fao=0!/ansi=0
 GVORDERFAIL	<Global variable $ORDER or $NEXT function failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 GVPUTFAIL	<Global variable put failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 PATTABSYNTAX	<Error in !AD at line !UL>/error/fao=3!/ansi=0
@@ -628,7 +628,7 @@ TERMWRITE	<Error writing to terminal>/error/fao=0!/ansi=0
 COLLTYPVERSION	<Collation type !UL, version !UL mismatch>/error/fao=2!/ansi=0
 LVNULLSUBS	<Null subscripts not allowed in local variables>/error/fao=0!/ansi=0
 GVREPLERR	<Error replicating global in region !AD>/error/fao=2!/ansi=0
-UNUSEDMSG631	<MTIOERR last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+DBFILERDONLY	<The database file !AD was opened as read-only (perms !UL)>/error/fao=3!/ansi=0
 RMWIDTHPOS	<File record size or width must be greater than zero>/error/fao=0!/ansi=72
 OFFSETINV	<Entry point !AD+!SL not valid>/error/fao=3!/ansi=13
 JOBPARTOOLONG	<Total parameter length is too long for job command>/error/fao=0!/ansi=0
@@ -770,7 +770,7 @@ REPLPOOLINST	<Error with replication pool (id = !UL) for instance file !AD>/erro
 ZCVECTORINDX	<Invalid Vector Index !UL>/warning/fao=1!/ansi=0
 REPLNOTON	<Replication is not on for journal file !AD, rollback will not continue>/error/fao=2!/ansi=0
 JNLMOVED	<Journal file appears to have been moved.  Journaling activity will not be done.>/error/fao=0!/ansi=0
-EXTRFMT		<Extract error: invalid format type.  Must be ZWR, GO, or BINARY.>/info/fao=0!/ansi=0
+EXTRFMT		<Extract error: invalid record format - no records found.>/error/fao=0!/ansi=0
 CALLERID	<Routine !AD called from 0x!XJ>/info/fao=3!/ansi=0
 KRNLKILL	<Process was terminated by SIGDANGER signal from the system -- System swap space is too low -- Report to System Administrator>/fatal/fao=0!/ansi=0
 MEMORYRECURSIVE	<Memory Subsystem called recursively>/fatal/fao=0!/ansi=0
@@ -1539,7 +1539,7 @@ ACTCOLLMISMTCH	<Global ^!AD inherits alternative collation sequence #!UL from gl
 GBLNOMAPTOREG	<Global !AD does not map to region !AD in current global directory>/error/fao=4!/ansi=0
 ISSPANGBL	<Operation cannot be performed on global ^!AD as it spans multiple regions in current global directory>/error/fao=2!/ansi=0
 TPNOSUPPORT	<Operation cannot be performed while inside of a TP transaction>/error/fao=0!/ansi=0
-UNUSEDMSG1542	<GVSUBSERR last used in V6.3-000A>/error/fao=0!/ansi=0
+EXITSTATUS	<Unexpected process exit (!AD), exit status !UL -- called from module !AD at line !UL>/error/fao=6!/ansi=0
 ZATRANSERR	<The input string is too long to convert>/error/fao=0!/ansi=0
 FILTERTIMEDOUT	<Replication server timed out attempting to read seqno !16@XQ from external filter>/error/fao=1!/ansi=0
 TLSDLLNOOPEN	<Failed to load GT.M TLS/SSL library for secure communication>/error/fao=0!/ansi=0

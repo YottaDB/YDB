@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,6 +79,7 @@
 #include "mvalconv.h"
 #endif
 #include "gtm_repl_multi_inst.h" /* for DISALLOW_MULTIINST_UPDATE_IN_TP */
+#include "gvt_inline.h"
 
 #ifdef GTM_TRIGGER
 LITREF	mval	literal_null;
@@ -96,6 +97,8 @@ LITREF	mstr	nsb_dummy;
 GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 GBLREF	boolean_t		horiz_growth;
 GBLREF	boolean_t		in_gvcst_incr;
+GBLREF	boolean_t		mu_reorg_process;
+GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;	/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	gv_key			*gv_altkey;
 GBLREF	gv_namehead		*reset_gv_target;
@@ -1099,7 +1102,7 @@ tn_restart:
 		if (curr_rec_offset == cur_blk_size)
 		{
 			if ((FALSE == new_rec) && dollar_tlevel)
-			{
+			{	/* why dollar_tlevel ??? */
 				assert(CDB_STAGNATE > t_tries);
 				status = cdb_sc_mkblk;
 				GOTO_RETRY;
@@ -1189,7 +1192,7 @@ tn_restart:
 		if (dollar_tlevel)
 		{
 			if ((SIZEOF(rec_hdr) + target_key_size - prev_rec_match + value.len) != new_rec_size)
-			{
+			{	/* why dollar_tlevel??? */
 				assert(CDB_STAGNATE > t_tries);
 				status = cdb_sc_mkblk;
 				GOTO_RETRY;
@@ -1342,71 +1345,79 @@ tn_restart:
 			 */
 			cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh_level,
 						FALSE, FALSE, (!prev_split_to_right ? GDS_WRITE_PLAIN : GDS_WRITE_KILLTN));
+			assert(cse);
 			assert(!dollar_tlevel || !cse->high_tlevel);
-			if ((0 != ins_chain_offset) && (NULL != cse) && (0 != cse->first_off))
-			{	/* formerly tp_offset_chain - inserts a new_entry in the chain */
-				assert(dollar_tlevel && !prev_split_to_right);
-				assert((NULL != cse->new_buff) || horiz_growth && cse->low_tlevel->new_buff
-									&& (buffaddr == cse->low_tlevel->new_buff));
-				assert(0 == cse->next_off);
-				assert(ins_chain_offset > (signed)SIZEOF(blk_hdr));	/* we want signed comparison */
-				offset_sum = cse->first_off;
-				curr = buffaddr + offset_sum;
-				assert(new_rec);
-				assert(offset_sum != curr_rec_offset);
-				/* The typecast is needed below to enforce a "signed int" (versus "unsigned int") comparison */
-				if (offset_sum >= (signed int)curr_rec_offset)
-				{	/* the new record is prior to the first existing chain record, id the new one as first */
-					/* first_off-------------v--------------------v
-					 * [blk_hdr]...[new rec ( )]...[existing rec ( )]... */
-					cse->next_off = value.len + (offset_sum - curr_rec_offset - next_rec_shrink1);
-					cse->first_off = ins_chain_offset;
-				} else
-				{
-					if (horiz_growth)
-					{
-						old_cse = cse->low_tlevel;
-						assert(old_cse->first_off);
-						assert(old_cse && old_cse->done);
-						assert(!old_cse->undo_next_off[0] && !old_cse->undo_offset[0]);
-					}
-					/* find chain records before and after the new one */
-					for ( ; ; curr += curr_chain.next_off)
-					{	/* try to make offset_sum identify the first chain entry after the new record */
-						GET_BLK_IDP(&curr_chain, curr);
-						assert(1 == curr_chain.flag);
-						if (0 == curr_chain.next_off)
-							break;
-						offset_sum += curr_chain.next_off;
-						assert(offset_sum != curr_rec_offset);
-						/* The typecast is needed below to enforce a "signed int" comparison */
-						if (offset_sum >= (signed int)curr_rec_offset)
-							break;
-					}
-					/* store the next_off in old_cse before changing it in the buffer (for rolling back) */
-					if (horiz_growth)
-					{
-						old_cse->undo_next_off[0] = curr_chain.next_off;
-						old_cse->undo_offset[0] = (block_offset)(curr - buffaddr);
-						assert(old_cse->undo_offset[0]);
-					}
-					if (0 == curr_chain.next_off)
-					{	/* the last chain record precedes the new record: just update it */
-						/* 			   ---|---------------v
-						 * [blk_hdr]...[existing rec ( )]...[new rec ( )]... */
-						curr_chain.next_off = ins_chain_offset - offset_sum;
-						GET_BLK_IDP(curr, &curr_chain);
-					} else
-					{	/* update the chain record before the new one */
-						/* 			   ---|---------------v--------------------v
-						 * [blk_hdr]...[existing rec ( )]...[new rec ( )]...[existing rec ( )] */
-						curr_chain.next_off = (unsigned int)(ins_chain_offset - (curr - buffaddr));
-						GET_BLK_IDP(curr, &curr_chain);
+			if ((0 != ins_chain_offset) && (dollar_tlevel ? (0 != cse->first_off) : !prev_split_to_right))
+			{
+				if (dollar_tlevel)
+				{	/* formerly tp_offset_chain - inserts a new_entry in the chain */
+					assert((NULL != cse->new_buff) || horiz_growth && cse->low_tlevel->new_buff
+						&& (buffaddr == cse->low_tlevel->new_buff));
+					assert(!prev_split_to_right && (0 == cse->next_off));
+					assert(ins_chain_offset > (signed)SIZEOF(blk_hdr));	/* we want signed comparison */
+					offset_sum = cse->first_off;
+					curr = buffaddr + offset_sum;
+					assert(new_rec);
+					assert(offset_sum != curr_rec_offset);
+					/* The typecast is needed below to enforce a "signed int" (versus "unsigned int") compare */
+					if (offset_sum >= (signed int)curr_rec_offset)
+					{	/* new record is prior to 1st existing chain record, id new one as 1st */
+						/* first_off-------------v--------------------v
+						 * [blk_hdr]...[new rec ( )]...[existing rec ( )]... */
 						cse->next_off = value.len + (offset_sum - curr_rec_offset - next_rec_shrink1);
+						cse->first_off = ins_chain_offset;
+					} else
+					{
+						if (horiz_growth)
+						{
+							old_cse = cse->low_tlevel;
+							assert(old_cse->first_off);
+							assert(old_cse && old_cse->done);
+							assert(!old_cse->undo_next_off[0] && !old_cse->undo_offset[0]);
+						}
+						/* find chain records before and after the new one */
+						for ( ; ; curr += curr_chain.next_off)
+						{	/* try to make offset_sum identify the 1st chain entry after new record */
+							GET_BLK_IDP(&curr_chain, curr);
+							assert(1 == curr_chain.flag);
+							if (0 == curr_chain.next_off)
+								break;
+							offset_sum += curr_chain.next_off;
+							assert(offset_sum != curr_rec_offset);
+							/* The typecast is needed below to enforce a "signed int" comparison */
+							if (offset_sum >= (signed int)curr_rec_offset)
+								break;
+						}
+						/* store next_off in old_cse before changing it in the buffer (for rolling back) */
+						if (horiz_growth)
+						{
+							old_cse->undo_next_off[0] = curr_chain.next_off;
+							old_cse->undo_offset[0] = (block_offset)(curr - buffaddr);
+							assert(old_cse->undo_offset[0]);
+						}
+						if (0 == curr_chain.next_off)
+						{	/* the last chain record precedes the new record: just update it */
+							/* 			   ---|---------------v
+							 * [blk_hdr]...[existing rec ( )]...[new rec ( )]... */
+							curr_chain.next_off = ins_chain_offset - offset_sum;
+							GET_BLK_IDP(curr, &curr_chain);
+						} else
+						{	/* update the chain record before the new one */
+							/* 			   ---|---------------v--------------------v
+							 * [blk_hdr]...[existing rec ( )]...[new rec ( )]...[existing rec ( )] */
+							curr_chain.next_off = (unsigned int)(ins_chain_offset - (curr - buffaddr));
+							GET_BLK_IDP(curr, &curr_chain);
+							cse->next_off = value.len
+								+ (offset_sum - curr_rec_offset - next_rec_shrink1);
+						}
 					}
+					assert((ins_chain_offset + (int)cse->next_off)
+						 <= (delta + (sm_long_t)cur_blk_size - SIZEOF(off_chain)));
+				} else if (mu_reorg_process || mu_reorg_upgrd_dwngrd_in_prog)
+				{	/* turn off t_end (non-TP) optimization while outside of crit */
+					cse->recompute_list_head = cse->recompute_list_tail = NULL;
+					cse = NULL;
 				}
-				assert((ins_chain_offset + (int)cse->next_off) <=
-				       (delta + (sm_long_t)cur_blk_size - SIZEOF(off_chain)));
 			}
 			succeeded = TRUE;
 			if (level_0)
@@ -1427,22 +1438,23 @@ tn_restart:
 				/* -------------------------------------------------------------------------------------------------
 				 * We have to maintain information for future recomputation only if the following are satisfied
 				 *	1) The block is a leaf-level block
-				 *	2) We are in TP (indicated by non-null cse)
-				 *	3) The global has NOISOLATION turned ON
-				 *	4) The cw_set_element hasn't encountered a block-split or a kill
-				 *	5) We don't need an extra_block_split
+				 *	2) The global has NOISOLATION turned ON
+				 *	3) The cw_set_element hasn't encountered a block-split or a kill
+				 *	4) We don't need an extra_block_split
 				 *
-				 * We can also add an optimization that only cse's of mode gds_t_write need to have such updations,
+				 * We can also add an optimization that only cse's of mode gds_t_write need to have such an update,
 				 *	but because of the belief that for a nonisolated variable, we will very rarely encounter a
-				 *	situation where a created block (in TP) will have some new keys added to it, and that adding
+				 *	situation where a created block will have some new keys added to it, and that adding
 				 *	the check slows down the normal code, we don't do that check here.
 				 * -------------------------------------------------------------------------------------------------
 				 */
-				if (cse && gv_target->noisolation && !cse->write_type && !need_extra_block_split)
+				if (cse && gv_target->noisolation && !cse->write_type && !need_extra_block_split
+					&& (dollar_tlevel || !is_dollar_incr))
 				{
-					assert(dollar_tlevel);
 					if (is_dollar_incr)
-					{	/* See comment in ENSURE_VALUE_WITHIN_MAX_REC_SIZE macro
+					{
+						assert(dollar_tlevel);
+						/* See comment in ENSURE_VALUE_WITHIN_MAX_REC_SIZE macro
 						 * definition for why the below macro call is necessary.
 						 */
 						ADD_TO_GVT_TP_LIST(gv_target, RESET_FIRST_TP_SRCH_STATUS_FALSE);
@@ -1450,18 +1462,19 @@ tn_restart:
 							gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr);
 					}
 					if (NULL == cse->recompute_list_tail ||
-						0 != memcmp(gv_currkey->base, cse->recompute_list_tail->key.base,
+						0 != memcmp(gv_currkey->base, cse->recompute_list_tail->keybuf.split.base,
 							gv_currkey->top))
 					{
-						tempkv = (key_cum_value *)get_new_element(si->recompute_list, 1);
-						tempkv->key = *gv_currkey;
+						tempkv = (dollar_tlevel ? (key_cum_value *)get_new_element(si->recompute_list, 1)
+									: &(TREF(non_tp_noiso_key_n_value)));
+						tempkv->keybuf.key = *(gv_key_nobase *)gv_currkey;
 						tempkv->next = NULL;
-						memcpy(tempkv->key.base, gv_currkey->base, gv_currkey->end + 1);
+						memcpy(tempkv->keybuf.split.base, gv_currkey->base, gv_currkey->end + 1);
 						if (NULL == cse->recompute_list_head)
 						{
 							assert(NULL == cse->recompute_list_tail);
 							cse->recompute_list_head = tempkv;
-						} else
+						} else if (dollar_tlevel)
 							cse->recompute_list_tail->next = tempkv;
 						cse->recompute_list_tail = tempkv;
 					} else
@@ -1469,8 +1482,8 @@ tn_restart:
 					assert(0 == val->str.len
 						|| ((val->str.len == bs1[4].len)
 							&& 0 == memcmp(val->str.addr, bs1[4].addr, val->str.len)));
-					tempkv->value.len = val->str.len;	/* bs1[4].addr is undefined if val->str.len is 0 */
-					tempkv->value.addr = (char *)bs1[4].addr;/* 	but not used in that case, so ok */
+					tempkv->value.len = val->str.len;	/* x.addr not used if val->str.len is 0 */
+					tempkv->value.addr = dollar_tlevel ? (char *)bs1[4].addr : val->str.addr;
 				}
 
 			}
@@ -1909,7 +1922,7 @@ tn_restart:
 						GOTO_RETRY;
 				} else if (temp_key != gv_altkey)
 				{
-					memcpy(gv_altkey, temp_key, SIZEOF(gv_key) + temp_key->end);
+					memcpy(gv_altkey, temp_key, SIZEOF(gv_key) + temp_key->end + 1);
 					temp_key = gv_altkey;
 				}
 				BLK_INIT(bs_ptr, bs1);
@@ -2457,11 +2470,10 @@ tn_restart:
 					cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh_level,
 								TRUE, FALSE, level_0 ? GDS_WRITE_PLAIN : GDS_WRITE_KILLTN);
 					assert(!dollar_tlevel || !cse->high_tlevel);
-					if (cse)
-					{
-						assert(dollar_tlevel);
+					if (dollar_tlevel)
 						cse->write_type |= GDS_WRITE_BLOCK_SPLIT;
-					}
+					else
+						cse = NULL;	/* if non-TP, NULL == cse is later a proxy for dollar_tlevel */
 				}
 				/* else left-side (i.e. current) block was untouched and new contents went into right block
 				 * so no need to invoke "t_write".

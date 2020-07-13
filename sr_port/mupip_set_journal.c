@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -157,7 +157,6 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		grlist = &dummy_rlist;
 	}
 	ESTABLISH_RET(mupip_set_jnl_ch, (uint4)ERR_MUNOFINISH);
-	SET_GBL_JREC_TIME; /* set_jnl_file_close/cre_jnl_file/wcs_flu need gbl_jrec_time initialized */
 	for (rptr = grlist; (EXIT_ERR != exit_status) && NULL != rptr; rptr = rptr->fPtr)
 	{
 		rptr->exclusive = FALSE;
@@ -197,8 +196,9 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			memcpy(seg->fname, db_fn, db_fn_len);
 		}
 		fc = seg->file_cntl;
-		/* open shared to see what's possible */
+		/* open shared to see what's possible.  This can be slow, so do SET_GBL_JREC_TIME after, not before (GTM-8878)*/
 		gvcst_init(gv_cur_region, NULL);
+		SET_GBL_JREC_TIME; /* set_jnl_file_close/cre_jnl_file/wcs_flu need gbl_jrec_time initialized */
 		tp_change_reg();
 		assert(!gv_cur_region->was_open);
 		rptr->sd = csd = cs_data;
@@ -213,20 +213,16 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		grab_crit(gv_cur_region);  /* corresponding rel_crit() is done in mupip_set_jnl_cleanup() */
 		if (FROZEN_CHILLED(cs_addrs))
 		{	/* While a FREEZE -ONLINE was in place, all processes exited, leaving the
-			 * shared memory up. Either autorelease, if enabled, or error out.
+			 * shared memory up.
 			 */
-			DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
-			if (FROZEN_CHILLED(cs_addrs))
-			{
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(gv_cur_region));
-				exit_status |= EXIT_WRN;
-				gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE);
-				exit_status |= gds_rundown_status;
-				rptr->sd = NULL;
-				rptr->state = NONALLOCATED;	/* This means do not call "gds_rundown" again for this region
-								 * and do not process this region anymore. */
-				continue;
-			}
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(gv_cur_region));
+			exit_status |= EXIT_WRN;
+			gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE);
+			exit_status |= gds_rundown_status;
+			rptr->sd = NULL;
+			rptr->state = NONALLOCATED;	/* This means do not call "gds_rundown" again for this region
+							 * and do not process this region anymore. */
+			continue;
 		}
 		/* Now determine new journal state, replication state and before_image for this region.
 		 * Information will be kept in "rptr", which is per region.

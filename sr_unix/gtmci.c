@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -903,7 +903,8 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 				case gtm_string_star:
 					mstr_parm = va_arg(temp_var, gtm_string_t *);
 					MV_FORCE_STR(arg_ptr);
-					mstr_parm->length = arg_ptr->str.len;
+					if (mstr_parm->length > arg_ptr->str.len)
+						mstr_parm->length = arg_ptr->str.len;
 					memcpy(mstr_parm->address, arg_ptr->str.addr, mstr_parm->length);
 					break;
 				default:

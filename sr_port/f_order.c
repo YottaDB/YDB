@@ -130,8 +130,9 @@ int f_order(oprtype *a, opctype op)
 			if (MV_IS_TRUEINT(&triptr->operand[0].oprval.mlit->v, &intval) && (1 == intval || -1 == intval))
 			{
 				direction = (1 == intval) ? FORWARD : BACKWARD;
-				sav_ref->opcode = OC_NOOP;
-				sav_ref = NULL;
+				sav_dirref = newtriple(OC_GVSAVTARG);	/* with a literal direction, $R reflects 1st argument */
+				triptr = newtriple(OC_GVRECTARG);
+				triptr->operand[0] = put_tref(sav_ref);
 			} else
 			{	/* bad direction */
 				if (NULL != oldchain)

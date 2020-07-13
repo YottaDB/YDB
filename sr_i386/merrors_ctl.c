@@ -87,7 +87,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GVIS", "!_!_Global variable: !AD", 2, 0 },
 	{ "GVKILLFAIL", "Global variable kill failed.  Failure code: !AD.", 2, 0 },
 	{ "GVNAKED", "Illegal naked global reference", 0, 0 },
-	{ "GVNEXTARG", "Argument to global variable $NEXT must be subscripted", 0, 0 },
+	{ "UNUSEDMSG256", "GVNEXTARG removed from code in V6.3-013 June 2020; not issued for a long time prior to that", 0, 0 },
 	{ "GVORDERFAIL", "Global variable $ORDER or $NEXT function failed.  Failure code: !AD.", 2, 0 },
 	{ "GVPUTFAIL", "Global variable put failed.  Failure code: !AD.", 2, 0 },
 	{ "PATTABSYNTAX", "Error in !AD at line !UL", 3, 0 },
@@ -462,7 +462,7 @@ LITDEF	err_msg merrors[] = {
 	{ "COLLTYPVERSION", "Collation type !UL, version !UL mismatch", 2, 0 },
 	{ "LVNULLSUBS", "Null subscripts not allowed in local variables", 0, 0 },
 	{ "GVREPLERR", "Error replicating global in region !AD", 2, 0 },
-	{ "UNUSEDMSG631", "MTIOERR last used in V6.3-003 Dec. 2017", 0, 0 },
+	{ "DBFILERDONLY", "The database file !AD was opened as read-only (perms !UL)", 3, 0 },
 	{ "RMWIDTHPOS", "File record size or width must be greater than zero", 0, 0 },
 	{ "OFFSETINV", "Entry point !AD+!SL not valid", 3, 0 },
 	{ "JOBPARTOOLONG", "Total parameter length is too long for job command", 0, 0 },
@@ -604,7 +604,7 @@ LITDEF	err_msg merrors[] = {
 	{ "ZCVECTORINDX", "Invalid Vector Index !UL", 1, 0 },
 	{ "REPLNOTON", "Replication is not on for journal file !AD, rollback will not continue", 2, 0 },
 	{ "JNLMOVED", "Journal file appears to have been moved.  Journaling activity will not be done.", 0, 0 },
-	{ "EXTRFMT", "Extract error: invalid format type.  Must be ZWR, GO, or BINARY.", 0, 0 },
+	{ "EXTRFMT", "Extract error: invalid record format - no records found.", 0, 0 },
 	{ "CALLERID", "Routine !AD called from 0x!XJ", 3, 0 },
 	{ "KRNLKILL", "Process was terminated by SIGDANGER signal from the system -- System swap space is too low -- Report to System Administrator", 0, 0 },
 	{ "MEMORYRECURSIVE", "Memory Subsystem called recursively", 0, 0 },
@@ -1371,7 +1371,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GBLNOMAPTOREG", "Global !AD does not map to region !AD in current global directory", 4, 0 },
 	{ "ISSPANGBL", "Operation cannot be performed on global ^!AD as it spans multiple regions in current global directory", 2, 0 },
 	{ "TPNOSUPPORT", "Operation cannot be performed while inside of a TP transaction", 0, 0 },
-	{ "UNUSEDMSG1542", "GVSUBSERR last used in V6.3-000A", 0, 0 },
+	{ "EXITSTATUS", "Unexpected process exit (!AD), exit status !UL -- called from module !AD at line !UL", 6, 0 },
 	{ "ZATRANSERR", "The input string is too long to convert", 0, 0 },
 	{ "FILTERTIMEDOUT", "Replication server timed out attempting to read seqno !16@XQ from external filter", 1, 0 },
 	{ "TLSDLLNOOPEN", "Failed to load GT.M TLS/SSL library for secure communication", 0, 0 },
@@ -1620,7 +1620,7 @@ LITDEF	int ERR_GVGETFAIL = 150372922;
 LITDEF	int ERR_GVIS = 150372931;
 LITDEF	int ERR_GVKILLFAIL = 150372938;
 LITDEF	int ERR_GVNAKED = 150372946;
-LITDEF	int ERR_GVNEXTARG = 150372954;
+LITDEF	int ERR_UNUSEDMSG256 = 150372954;
 LITDEF	int ERR_GVORDERFAIL = 150372962;
 LITDEF	int ERR_GVPUTFAIL = 150372970;
 LITDEF	int ERR_PATTABSYNTAX = 150372978;
@@ -1995,7 +1995,7 @@ LITDEF	int ERR_TERMWRITE = 150375922;
 LITDEF	int ERR_COLLTYPVERSION = 150375930;
 LITDEF	int ERR_LVNULLSUBS = 150375938;
 LITDEF	int ERR_GVREPLERR = 150375946;
-LITDEF	int ERR_UNUSEDMSG631 = 150375954;
+LITDEF	int ERR_DBFILERDONLY = 150375954;
 LITDEF	int ERR_RMWIDTHPOS = 150375962;
 LITDEF	int ERR_OFFSETINV = 150375970;
 LITDEF	int ERR_JOBPARTOOLONG = 150375978;
@@ -2137,7 +2137,7 @@ LITDEF	int ERR_REPLPOOLINST = 150377058;
 LITDEF	int ERR_ZCVECTORINDX = 150377064;
 LITDEF	int ERR_REPLNOTON = 150377074;
 LITDEF	int ERR_JNLMOVED = 150377082;
-LITDEF	int ERR_EXTRFMT = 150377091;
+LITDEF	int ERR_EXTRFMT = 150377090;
 LITDEF	int ERR_CALLERID = 150377099;
 LITDEF	int ERR_KRNLKILL = 150377108;
 LITDEF	int ERR_MEMORYRECURSIVE = 150377116;
@@ -2904,7 +2904,7 @@ LITDEF	int ERR_ACTCOLLMISMTCH = 150383194;
 LITDEF	int ERR_GBLNOMAPTOREG = 150383202;
 LITDEF	int ERR_ISSPANGBL = 150383210;
 LITDEF	int ERR_TPNOSUPPORT = 150383218;
-LITDEF	int ERR_UNUSEDMSG1542 = 150383226;
+LITDEF	int ERR_EXITSTATUS = 150383226;
 LITDEF	int ERR_ZATRANSERR = 150383234;
 LITDEF	int ERR_FILTERTIMEDOUT = 150383242;
 LITDEF	int ERR_TLSDLLNOOPEN = 150383250;

@@ -59,6 +59,18 @@ UTF-8
 GTM>
 
 ZCHSET= UTF-8
+
+
+
+
+Additional information available:
+
+About_GT.M  Commands    Err_Processing          Functions   Integrate_External
+Internationalization    IO_Processing           ISV         Language_Extensions
+M_Lang_Features         Opr_Dbg_Dir_Mode        Program_Cycle
+Triggers    Utility_Routines
+
+Topic?
 
 Global changes in the gtm.mjl file:
 ^a="1"

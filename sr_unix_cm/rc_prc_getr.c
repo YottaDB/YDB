@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +38,7 @@ GBLREF gv_key 		*gv_currkey;
 GBLREF gv_namehead 	*gv_target;
 GBLREF sgmnt_data	*cs_data;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLDEF rc_oflow		*rc_overflow;
+GBLREF rc_oflow		*rc_overflow;
 GBLREF gd_region	*gv_cur_region;
 GBLREF trans_num	rc_read_stamp;
 GBLREF int		gv_keysize;

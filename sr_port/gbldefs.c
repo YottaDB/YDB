@@ -253,7 +253,6 @@ GBLDEF	buddy_list	*noisolation_buddy_list;	/* a buddy_list for maintaining the g
 GBLDEF	int4		exi_condition;
 GBLDEF	uint4		gtmDebugLevel;
 GBLDEF	boolean_t	gtmSystemMalloc;
-GBLDEF	uint4		smCallerIdExtraLevels;	/* Extra stack levels to account for in caller_id */
 GBLDEF	int		process_exiting;
 GBLDEF	int4		dollar_zsystem;
 GBLDEF	int4		dollar_zeditor;
@@ -283,7 +282,6 @@ GBLDEF	gtm_chset_t	dse_over_chset = CHSET_M;
 LITDEF	MIDENT_DEF(zero_ident, 0, NULL);		/* the null mident */
 GBLDEF	int4		aligned_source_buffer[MAX_SRCLINE / SIZEOF(int4) + 1];
 GBLDEF	src_line_struct	src_head;
-GBLDEF	short int	source_line;
 GBLDEF	int		source_column;
 GBLDEF	bool		devctlexp;
 GBLDEF 	char		cg_phase;	/* code generation phase */

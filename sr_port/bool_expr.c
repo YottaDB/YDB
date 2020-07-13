@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -18,7 +18,7 @@
 #include "opcode.h"
 #include "stringpool.h"
 
-LITREF octabstruct	oc_tab[];
+LITREF	octabstruct	oc_tab[];
 
 int bool_expr(boolean_t sense, oprtype *addr)
 /*
@@ -68,6 +68,7 @@ int bool_expr(boolean_t sense, oprtype *addr)
 		return TRUE;
 	}
 	bx_tail(x.oprval.tref, sense, addr);
+	CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq.h except with DEBUG_TRIPLES */
 	DECREMENT_EXPR_DEPTH;
 	return TRUE;
 }

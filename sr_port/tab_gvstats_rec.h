@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2017 Fidelity National Information	*
+ * Copyright (c) 2008-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,3 +78,6 @@ TAB_GVSTATS_REC(n_crit_que_slps      , "CQT", "# of grab crit queued sleeps     
 TAB_GVSTATS_REC(sq_crit_yields       , "CYS", "sum squares grab crit yields          ")
 TAB_GVSTATS_REC(n_crit_yields        , "CYT", "# of grab crit yields                 ")
 TAB_GVSTATS_REC(n_clean2dirty        , "BTD", "# of Block Transitions to Dirty       ")
+TAB_GVSTATS_REC(n_wait_for_read      , "WFR", "# of Blocks needing sleep on the read ") /* was t_qread_ripsleep_cnt in BG_TRC_REC */
+TAB_GVSTATS_REC(n_buffer_scarce      , "BUS", "# times db_csh_get too many retries   ") /*was db_csh_get_too_many_loops BG_TRC_REC*/
+TAB_GVSTATS_REC(n_bt_scarce          , "BTS", "# times db_csh_get too many retries   ") /* was bt_put_flush_dirty in BG_TRC_REC */

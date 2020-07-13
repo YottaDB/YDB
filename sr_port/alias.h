@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,17 +27,6 @@
 #define MAX_SPGC_PER_LVGC 64
 
 #include "zwrite.h"
-
-/* Macro used intermittently in code to debug alias code in general. Note this macro must be specified
- * as a compile option since it is used in macros that do not pull in this alias.h header file.
- */
-#ifdef DEBUG_ALIAS
-# define DBGALS(x) DBGFPF(x)
-# define DBGALS_ONLY(x) x
-#else
-# define DBGALS(x)
-# define DBGALS_ONLY(x)
-#endif
 
 /* Macro used intermittently to trace reference count changes */
 /* #define DEBUG_REFCNT */

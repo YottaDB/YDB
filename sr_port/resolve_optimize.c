@@ -30,7 +30,6 @@
 
 GBLREF command_qualifier	cmd_qlf;
 GBLREF mident			routine_name;
-GBLREF short int 		source_line;
 GBLREF src_line_struct		src_head;
 
 error_def(ERR_DONOBLOCK);
@@ -51,12 +50,12 @@ boolean_t resolve_optimize(triple *curtrip)
 	switch (curtrip->opcode)
 	{
 	case OC_CALLSP:
-		assert((src_head.que.bl->line + 1) == source_line);
+		assert((src_head.que.bl->line + 1) == TREF(source_line));
 		sav_col = TREF(last_source_column);
-		source_line = curtrip->src.line;
+		TREF(source_line) = curtrip->src.line;
 		for (cur_line = src_head.que.fl; &src_head != cur_line; cur_line = cur_line->que.fl)
 		{
-			if (source_line == cur_line->line)
+			if (TREF(source_line) == cur_line->line)
 			{	/* this just spits out a warning */
 				if (!(cmd_qlf.qlf & CQ_WARNINGS))
 					break;
@@ -68,7 +67,7 @@ boolean_t resolve_optimize(triple *curtrip)
 				/* not aware of any reason to put the the following 3 back, but should be rare and safe */
 				TREF(source_buffer) = src_line;
 				TREF(last_source_column) = sav_col;
-				source_line = (src_head.que.bl->line + 1);
+				TREF(source_line) = (src_head.que.bl->line + 1);
 				break;
 			}
 		}

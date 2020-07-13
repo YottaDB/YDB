@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,7 +59,8 @@ void bx_tail(triple *t, boolean_t sense, oprtype *addr)
 		RETURN_IF_RTS_ERROR;
 		if (OC_GETTRUTH == t->operand[0].oprval.tref->opcode)
 		{
-			dqdel(t->operand[0].oprval.tref, exorder);
+			assert(NO_REF == t->operand[0].oprval.tref->operand[0].oprclass);
+			t->operand[0].oprval.tref->opcode = OC_NOOP;	/* must NOOP rather than delete as might be expr_start */
 			t->opcode = sense ? OC_JMPTSET : OC_JMPTCLR;
 			t->operand[0] = put_indr(addr);
 			return;

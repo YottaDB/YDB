@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -132,9 +132,9 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 		 * GT.M because it always relies on the onln_rlbk_cycle from csa->nl and not from repl_csa. But, we don't remove the
 		 * assert as it is valuable for replication servers (Source, Receiver and Update Process).
 		 */
-		assert((ASSERT_NO_ONLINE_ROLLBACK != onln_rlbk_action)
-		       || (jnlpool && jnlpool->jnlpool_ctl && (csa->onln_rlbk_cycle == jnlpool->jnlpool_ctl->onln_rlbk_cycle))
-		       || IS_GTCM_GNP_SERVER_IMAGE || (jnlpool_init_needed && INST_FREEZE_ON_ERROR_POLICY));
+		assert((ASSERT_NO_ONLINE_ROLLBACK != onln_rlbk_action) || (jnlpool_init_needed && INST_FREEZE_ON_ERROR_POLICY)
+		       || (jnlpool && jnlpool->jnlpool_ctl && csa
+		       && (csa->onln_rlbk_cycle == jnlpool->jnlpool_ctl->onln_rlbk_cycle)) || IS_GTCM_GNP_SERVER_IMAGE);
 		if ((HANDLE_CONCUR_ONLINE_ROLLBACK == onln_rlbk_action)
 		    && (jnlpool && jnlpool->jnlpool_ctl
 		   	 && (csa->onln_rlbk_cycle != jnlpool->jnlpool_ctl->onln_rlbk_cycle)))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,6 +57,7 @@
 #include "interlock.h"
 #include "cache.h"
 #include "hashtab_objcode.h"
+#include "gvt_inline.h"
 
 GBLREF spdesc			stringpool;
 GBLREF int4			cache_hits, cache_fails, max_cache_entries;
@@ -124,7 +125,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 	gd_gblname	*gname;
 	gd_region	*reg, *reg_start, *reg_top, *statsDBreg;
 	gv_key		*gvkey;
-	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key_buf	save_currkey;
 	gv_namehead	temp_gv_target;
 	gvnh_reg_t	*gvnh_reg;
 	gvnh_spanreg_t	*gvspan;
@@ -489,7 +490,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 				n = (NULL != gname) ? gname->act : 0;
 			} else
 				n = 0;
-			gvkey = (gv_key *)save_currkey;
+			gvkey = (gv_key *)&save_currkey.key;
 			key = gvn2gds(arg1, gvkey, n);
 			assert(key > &gvkey->base[0]);
 			assert(gvkey->end == key - &gvkey->base[0] - 1);
@@ -709,12 +710,12 @@ void	op_fnview(int numarg, mval *dst, ...)
 			break;
 		case VTK_YGVN2GDS:
 			n = (NULL != arg2) ? mval2i(arg2) : 0;
-			gvkey = &save_currkey[0];
+			gvkey = (gv_key *)&save_currkey.key;
 			key = gvn2gds(arg1, gvkey, n);
 			if (!n)
 				key = &gvkey->base[0];
 			/* If input has error at some point, copy whatever subscripts (+ gblname) have been successfully parsed */
-			COPY_ARG_TO_STRINGPOOL(dst, key, &gvkey->base[0]);
+			COPY_ARG_TO_STRINGPOOL(dst, key, gvkey->base);
 			break;
 		case VTK_YLCT:
 			n = -1;

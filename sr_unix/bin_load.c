@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,6 +50,7 @@
 #include "min_max.h"
 #include "mu_interactive.h"
 #include "mupip_load_reg_list.h"
+#include "gvt_inline.h"
 
 #define LAST_NEGATIVE_SUBSCRIPT 127
 

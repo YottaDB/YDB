@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,7 @@
 
 GBLREF char 			source_file_name[];
 GBLREF unsigned char 		*source_buffer;
-GBLREF short int 		source_name_len, source_line;
+GBLREF short int 		source_name_len;
 GBLREF command_qualifier	cmd_qlf;
 GBLREF bool 			dec_nofac;
 GBLREF boolean_t		run_time;

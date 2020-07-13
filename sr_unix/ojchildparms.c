@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,7 +81,7 @@ static CONDITION_HANDLER(job_addr_ch)
  * parameter structure
  * ------------------------------------------------
  */
-STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
+void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 {
 	char			parm_string[8];
 	int4			argcnt, i;

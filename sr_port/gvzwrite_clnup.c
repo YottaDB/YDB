@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,7 @@
 #include "gdscc.h"
 #include "jnl.h"
 #include "io.h"
+#include "gvt_inline.h"
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;

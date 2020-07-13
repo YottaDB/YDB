@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -126,8 +126,8 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 		*srclen = source_name_len;
 		if (!module_name.len && !(CQ_NAMEOFRTN & cmd_qlf.qlf) && !(CLI_PRESENT == cli_present("OBJECT")))
 		{
-			memcpy(routine_name.addr, file.addr, file.len);
 			clen = routine_name.len = MIN(file.len, MAX_MIDENT_LEN);
+			memcpy(routine_name.addr, file.addr, clen);
 			object_name_len = clen;
 			memcpy(object_file_name, pblk.l_name, object_name_len);
 			SET_OBJ(object_file_name, object_name_len);

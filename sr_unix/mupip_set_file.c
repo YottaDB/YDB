@@ -112,7 +112,8 @@ MBSTART {									\
 
 int4 mupip_set_file(int db_fn_len, char *db_fn)
 {
-	boolean_t		bypass_partial_recov, got_standalone, need_standalone = FALSE, acc_meth_changing;
+	boolean_t		bypass_partial_recov, flush_buffers = FALSE, got_standalone, need_standalone = FALSE,
+				acc_meth_changing;
 	char			acc_spec[MAX_ACC_METH_LEN + 1], *command = "MUPIP SET VERSION", *errptr, exit_stat, *fn,
 				ver_spec[MAX_DB_VER_LEN + 1];
 	enum db_acc_method	access, access_new;
@@ -170,7 +171,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					    which has not yet been read */
 	if (asyncio_status = cli_present("ASYNCIO"))
 		need_standalone = TRUE;
-	defer_allocate_status = cli_present("DEFER_ALLOCATE");
+	if (defer_allocate_status = cli_present("DEFER_ALLOCATE"))
+		flush_buffers = TRUE;
 	if (encryptable_status = cli_present("ENCRYPTABLE"))
 	{
 		need_standalone = TRUE;
@@ -213,6 +215,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("EXTENSION COUNT"));
 			exit_stat |= EXIT_ERR;
 		}
+		flush_buffers = TRUE;
 	}
 	if (full_blkwrt_status = cli_present("FULLBLKWRT"))
 	{
@@ -417,6 +420,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			desired_dbver = GDSV6;
 		else
 			assertpro(FALSE);		/* CLI should prevent us ever getting here */
+		flush_buffers = TRUE;
 	} else
 		desired_dbver = GDSVLAST;	/* really want to keep version, which has not yet been read */
 	if (disk_wait_status = cli_present("WAIT_DISK"))
@@ -748,16 +752,12 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			grab_crit(gv_cur_region);
 			if (FROZEN_CHILLED(cs_addrs))
 			{
-				DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
-				if (FROZEN_CHILLED(cs_addrs))
-				{
-					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2,
-								DB_LEN_STR(gv_cur_region));
-					exit_stat |= EXIT_WRN;
-					exit_stat |= gds_rundown(CLEANUP_UDI_TRUE);
-					mu_gv_cur_reg_free();
-					continue;
-				}
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2,
+							DB_LEN_STR(gv_cur_region));
+				exit_stat |= EXIT_WRN;
+				exit_stat |= gds_rundown(CLEANUP_UDI_TRUE);
+				mu_gv_cur_reg_free();
+				continue;
 			}
 		}
 		access_new = (n_dba == access ? csd->acc_meth : access);
@@ -1027,7 +1027,10 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 							(CLI_PRESENT == stdnullcoll_status) ?
 							"M standard null collation" : "GT.M null collation      ");
 			} else
-				wcs_flu(WCSFLU_FLUSH_HDR);
+				if (flush_buffers)
+					wcs_flu(WCSFLU_FLUSH_HDR);
+				else
+					fileheader_sync(gv_cur_region);
 		} else
 			exit_stat |= reg_exit_stat;
 		if (got_standalone)

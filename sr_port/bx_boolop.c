@@ -250,6 +250,8 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 	if (bfini == t->exorder.fl)
 	{	/* if OC_BOOLINIT/OC_BOOLFINI pair, move them to the new chain */
 		assert((NULL != binit) && (OC_BOOLFINI == bfini->opcode) && (OC_BOOLINIT == binit->opcode));
+		if (OC_COMINT == bfini->exorder.fl->opcode)			/* substitution safe here rather than in ex_tail */
+			bfini->exorder.fl->opcode = OC_COMVAL;
 		assert((OC_COMVAL == bfini->exorder.fl->opcode) && (TRIP_REF == bfini->exorder.fl->operand[0].oprclass));
 		ref0 = bfini->exorder.fl;					/* get a pointer to the OC_COMVAL */
 		bfini->opcode = OC_NOOP;

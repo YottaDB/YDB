@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,6 @@ GBLREF int			mlmax;
 GBLREF mlabel			*mlabtab;
 GBLREF mline			mline_root;
 GBLREF mline			*mline_tail;
-GBLREF short int		source_line;
 GBLREF triple			t_orig;		/* head of triples */
 
 error_def(ERR_BLKTOODEEP);

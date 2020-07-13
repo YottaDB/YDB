@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -107,7 +107,7 @@ unsigned char *gvsub2str(unsigned char *sub, mstr *opstr, boolean_t xlat_flg)
 		} else if (xlat_flg)
 			ptr = &buf[0];
 		else
-			targ = ptr;
+			targ = targ + in_length;
 		if (xlat_flg)
 		{
 			targ_len = opstr->len;

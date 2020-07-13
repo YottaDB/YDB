@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,7 +92,7 @@
 # pragma pointer_size (save)
 # pragma pointer_size (long)
 #endif
-GBLDEF char **gtmenvp;
+GBLREF char **gtmenvp;
 GBLREF char cli_err_str[];
 #ifdef __osf__
 # pragma pointer_size (restore)

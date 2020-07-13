@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,7 +19,7 @@
 #include "gtm_utf8.h"
 #endif
 
-GBLREF short int 	source_name_len, source_line;
+GBLREF short int 	source_name_len;
 GBLREF char 		source_file_name[];
 GBLREF bool		dec_nofac;
 GBLREF boolean_t	run_time;
@@ -134,7 +134,7 @@ void show_source_line(boolean_t warn)
 		else
 			dec_err(VARLSTCNT(2) ERR_SRCLNNTDSP, 1, MAXLINESIZEFORDISPLAY);
 		if (!run_time)
-			dec_err(VARLSTCNT(6) ERR_SRCLOC, 4, TREF(last_source_column), source_line,
+			dec_err(VARLSTCNT(6) ERR_SRCLOC, 4, TREF(last_source_column), TREF(source_line),
 				source_name_len, source_file_name);
 		dec_nofac = FALSE;
 	}

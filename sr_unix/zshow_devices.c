@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -220,7 +220,7 @@ void zshow_devices(zshow_out *output)
 					ZS_STR_OUT(&v, terminal_text);
 					tt_ptr = (d_tt_struct*)tiod->dev_sp;
 					if (!ctrlc_on && io_std_device->out == tiod) /* and standard input */
-					{	ZS_PARM_SP(&v, zshow_nocene);
+					{	ZS_PARM_SP(&v, zshow_nocena);
 					}
 					if (tt_ptr->enbld_outofbands.mask)
 					{	ZS_PARM_EQU(&v, zshow_ctra);

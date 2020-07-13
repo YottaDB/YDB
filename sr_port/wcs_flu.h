@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,8 @@ boolean_t wcs_flu(uint4 options);
 		 */											\
 		assert(gtm_white_box_test_case_enabled							\
 			&& (WB_PHASE2_COMMIT_ERR							\
-				|| (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));	\
+				|| (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)	\
+				|| (WBTEST_SLEEP_IN_WCS_WTSTART  == gtm_white_box_test_case_number)));	\
 		status = (enum cdb_sc)cdb_sc_helpedout;							\
 	} else												\
 		status = (enum cdb_sc)cdb_sc_cacheprob;							\

@@ -806,7 +806,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					rdfail_detail = cdb_sc_tqreadnowait;
 					return (sm_uc_ptr_t)NULL;
 				}
-				BG_TRACE_PRO_ANY(csa, t_qread_ripsleep_cnt);
+				INCR_GVSTATS_COUNTER(csa, cnl, n_wait_for_read, 1);
 				if (!sleep_invoked)	/* Count # of blks for which we ended up sleeping on the read */
 					BG_TRACE_PRO_ANY(csa, t_qread_ripsleep_nblks);
 				wcs_sleep(lcnt);

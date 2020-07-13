@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +33,7 @@
 #include "gtcmtr_protos.h"
 #include "gdscc.h"
 #include "jnl.h"
+#include "gvt_inline.h"
 
 GBLREF connection_struct *curr_entry;
 GBLREF gv_namehead	*gv_target;
@@ -40,6 +42,9 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region        *gv_cur_region;
+
+error_def(ERR_UNIMPLOP);
+error_def(ERR_TEXT);
 
 bool gtcmtr_zprevious(void)
 {
@@ -50,9 +55,6 @@ bool gtcmtr_zprevious(void)
 	gv_key			*save_key;
 	cm_region_list		*reg_ref;
 	cm_region_head		*cm_reg_head;
-
-	error_def(ERR_UNIMPLOP);
-	error_def(ERR_TEXT);
 
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(CMMS_Q_PREV == *ptr);
@@ -103,7 +105,7 @@ bool gtcmtr_zprevious(void)
 			gv_xform_key(gv_currkey, FALSE);
 			if (is_null)
 			{	/* Insert the NULL subscript at the end just in time for the gvcst_zprevious call. */
-				GVZPREVIOUS_APPEND_MAX_SUBS_KEY(gv_currkey, gv_target);
+				gvzprevious_append_max_subs_key(gv_currkey, gv_target);
 			}
 		}
 		found = (0 == gv_target->root) ? FALSE : gvcst_zprevious();
@@ -126,8 +128,7 @@ bool gtcmtr_zprevious(void)
 									 * and two <NUL> delimiters */
 			if ((PRE_V5_MAX_MIDENT_LEN < strlen((char *)gv_altkey->base)) && !curr_entry->client_supports_long_names)
 			{
-				rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0,
-					ERR_TEXT, 2,
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("GT.CM client does not support global names greater than 8 characters"));
 			}
 			save_key = gv_currkey;

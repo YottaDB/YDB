@@ -155,7 +155,7 @@ THREADGBLDEF(gv_some_subsc_null,		boolean_t)			/* TRUE if SOME subscript other t
 THREADGBLDEF(gv_sparekey,			gv_key *)			/* gv_xform_key working memory */
 THREADGBLDEF(gv_sparekey_mval,			mval)				/* gv_xform_key working memory */
 THREADGBLDEF(gv_sparekey_size,			int4)				/* part gv_xform_key working memory mechanism */
-THREADGBLDEF(gv_tporigkey_ptr,			gv_orig_key_array *)		/* copy of gv_currkey at outermost TSTART */
+THREADGBLDEF(gv_tporigkey_ptr,			gv_key_buf *)			/* copy of gv_currkey at outermost TSTART */
 THREADGBLDEF(gv_tporig_extnam_str,		mstr)				/* copy of extnam_str at outermost TSTART */
 THREADGBLDEF(in_gvcst_bmp_mark_free,		boolean_t)			/* May need to skip online rollback cleanup or
 										 * gvcst_redo_root_search on a restart */
@@ -199,6 +199,7 @@ THREADGBLDEF(wcs_recover_done,			boolean_t)			/* TRUE if wcs_recover was ever in
 										 * process. */
 THREADGBLDEF(statsdb_fnerr_reason,		int)				/* Failure code for "gvcst_set_statsdb_fname" */
 THREADGBLDEF(statsdb_memerr,			boolean_t)			/* If true, Failed to write to statsdb (SIG7)" */
+THREADGBLDEF(non_tp_noiso_key_n_value,		key_cum_value)			/* for non-TP recompute block */
 
 /* Local variables */
 THREADGBLDEF(curr_symval_cycle,			unsigned int)			/* When curr_symval is changed, counter is bumped */
@@ -496,6 +497,7 @@ THREADGBLDEF(was_open_reg_seen,			boolean_t)	/* TRUE => there is at least one re
 THREADGBLDEF(nontp_jbuf_rsrv,			jbuf_rsrv_struct_t *)	/* Pointer to structure corresponding to reservations
 									 * on the journal buffer for current non-TP transaction.
 									 */
+THREADGBLDEF(source_line,			int4)		/* keep track of line number in M file while compiling */
 /* Debug values */
 #ifdef DEBUG
 THREADGBLDEF(donot_commit,			boolean_t)			/* debug-only - see gdsfhead.h for purpose */

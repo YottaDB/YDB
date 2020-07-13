@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -150,6 +150,7 @@ error_def(ERR_JNLFLUSH);
 error_def(ERR_JRTNULLFAIL);
 error_def(ERR_NOTREPLICATED);
 error_def(ERR_TEXT);
+error_def(ERR_TNTOOLARGE);
 
 #define BLOCK_FLUSHING(x) (csa->hdr->clustered && x->flushing && !CCP_SEGMENT_STATE(cs_addrs->nl,CCST_MASK_HAVE_DIRTY_BUFFERS))
 
@@ -433,6 +434,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		assert(tmp_jnlpool == jnlpool);
 		CWS_RESET;
 		assert(!csa->now_crit || csa->hold_onto_crit); /* shouldn't hold crit unless asked to */
+		cw_set[0].recompute_list_head = cw_set[0].recompute_list_tail =  NULL;
 		t_tries = 0;	/* commit was successful so reset t_tries */
 		INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_readonly, 1);
 		INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_blkread, n_blks_validated);
@@ -517,6 +519,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						GET_CDB_SC_CODE(cs->blk, status);	/* code is set in status */
 						if (is_mm && (cdb_sc_gbloflow == status))
 						{
+							cw_set[0].recompute_list_head = cw_set[0].recompute_list_tail = NULL;
 							send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLOFLOW, 2,
 								DB_LEN_STR(csa->region));
 							if (save_jnlpool != jnlpool)
@@ -638,6 +641,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	block_saved = FALSE;
 	ESTABLISH_NOUNWIND(t_ch);	/* avoid hefty setjmp call, which is ok since we never unwind t_ch */
 	assert(!csa->hold_onto_crit || csa->now_crit);
+	CHECK_TN(csa, csd, cti->curr_tn);	/* macro might issue rts_error TNTOOLARGE */
 	if (!csa->now_crit)
 	{
 		/* Get more space if needed. This is done outside crit so that any necessary IO has a chance of occurring
@@ -924,15 +928,19 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						 * that update only one data block can benefit from this optimization.
 						 * But that has to be carefully thought out.
 						 */
-						if (!IS_DOLLAR_INCREMENT
-							|| t1->level || (1 != cw_set_depth) || (t1->blk_num != cw_set[0].blk))
+						if (t1->level || (1 != cw_set_depth) || (t1->blk_num != cw_set[0].blk)
+							|| !(IS_DOLLAR_INCREMENT || (t1->blk_target
+								&& t1->blk_target->noisolation && cw_set[0].recompute_list_head)))
 						{
 							status = cdb_sc_blkmod;
 							NONTP_TRACE_HIST_MOD(t1, t_blkmod_t_end3);
 							goto failed;
 						} else
 						{
-							status = gvincr_recompute_upd_array(t1, cw_set, cr);
+							assert((t1->blk_target->noisolation && cw_set[0].recompute_list_head)
+								? !IS_DOLLAR_INCREMENT : IS_DOLLAR_INCREMENT);	/* one at a time */
+							status = IS_DOLLAR_INCREMENT ? gvincr_recompute_upd_array(t1, cw_set, cr)
+											: t_recompute_upd_array(t1, cw_set, cr);
 							if (cdb_sc_normal != status)
 							{
 								status = cdb_sc_blkmod;
@@ -1225,7 +1233,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			|| (ERR_GVKILLFAIL == t_err) && gv_play_duplicate_kills);	/* exception case (b) */
 	assert(cw_set_depth < CDB_CW_SET_SIZE);
 	ASSERT_CURR_TN_EQUALS_EARLY_TN(csa, dbtn);
-	CHECK_TN(csa, csd, dbtn);	/* can issue rts_error TNTOOLARGE */
 	if (JNL_ENABLED(csa))
 	{	/* Since we got the system time (jgbl.gbl_jrec_time) outside of crit, it is possible that
 		 * journal records were written concurrently to this file with a timestamp that is future
@@ -1802,6 +1809,7 @@ skip_cr_array:
 	 */
 	update_trans = 0;
 	CWS_RESET;
+	cw_set[0].recompute_list_head = cw_set[0].recompute_list_tail = NULL;
 	/* although we have the same assert at the beginning of "skip_cr_array" label, the below assert ensures that we did not grab
 	 * crit in between (in process_deferred_stale() or backup_buffer_flush() or wcs_timer_start()). The assert at the beginning
 	 * of the loop is needed as well to ensure that if we are done with the commit, we should have released crit
@@ -1865,6 +1873,7 @@ failed_skip_revert:
 	 * for non-final-retry restarts (relies on "cw_stagnate_reinitialized") so do it always to avoid unnecessary "if" check.
 	 */
 	CWS_RESET;
+	cw_set[0].recompute_list_head = cw_set[0].recompute_list_tail = NULL;
 	cw_map_depth = 0;
 	assert(0 == cr_array_index);
 	if (save_jnlpool != jnlpool)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,6 +51,7 @@
 #ifdef GTM_TRIGGER
 #include "gtm_trigger_trc.h"
 #endif
+#include "gvt_inline.h"
 
 #ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"	/* needed by *TYPEMASK* macros defined in gtm_utf8.h */
@@ -402,10 +403,10 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	{	/* If the TP structures have not yet been initialized, do that now. */
 		if (NULL == TREF(gv_tporigkey_ptr))
 		{	/* This need only be set once */
-			TREF(gv_tporigkey_ptr) = (gv_orig_key_array *)malloc(SIZEOF(gv_orig_key_array));
-			memset(TREF(gv_tporigkey_ptr), 0, SIZEOF(gv_orig_key_array));
+			TREF(gv_tporigkey_ptr) = (gv_key_buf *)malloc(SIZEOF(gv_key_buf));
+			memset(TREF(gv_tporigkey_ptr), 0, SIZEOF(gv_key_buf));
 		}
-		tf->orig_key = &((TREF(gv_tporigkey_ptr))->gv_orig_key[0]);
+		tf->orig_key = (gv_key *)&((TREF(gv_tporigkey_ptr))->key);
 		assert(NULL != gv_currkey);
 		MEMCPY_KEY(tf->orig_key, gv_currkey);
 		tf->gd_header = gd_header;

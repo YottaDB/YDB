@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,12 +47,12 @@ void gv_xform_key(gv_key *keyp,  boolean_t xback)
 			(TREF(gv_sparekey_mval)).str.addr = (char *)malloc(MAX_ZWR_KEY_SZ);
 			(TREF(gv_sparekey_mval)).mvtype = MV_STR;
 		}
-		TREF(gv_sparekey) = (gv_key *)malloc(SIZEOF(gv_key) - 1 + gv_keysize);
+		TREF(gv_sparekey) = (gv_key *)malloc(SIZEOF(gv_key) + gv_keysize + 1);
 		TREF(gv_sparekey_size) = gv_keysize;
 	}
 	assert(keyp->top == gv_keysize);
 	assert(keyp->end < keyp->top);
-	memcpy(TREF(gv_sparekey), keyp, SIZEOF(gv_key) + keyp->end);
+	memcpy(TREF(gv_sparekey), keyp, SIZEOF(gv_key) + keyp->end + 1);
 	c1 = keyp->base;
 	while (*c1++)
 		;

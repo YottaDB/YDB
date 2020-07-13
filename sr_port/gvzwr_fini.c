@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +30,7 @@
 #include "gvzwrite_clnup.h"
 #include "mvalconv.h"
 #include "gtmimagename.h"
+#include "gvt_inline.h"
 
 GBLDEF zshow_out	*zwr_output;
 
@@ -61,9 +63,9 @@ void gvzwr_fini(zshow_out *out, int pat)
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	gvzwrite_block->gd_reg = gv_cur_region;
 	gvzwrite_block->old_targ = (unsigned char *)gv_target;
-	old = (gv_key *)malloc(SIZEOF(gv_key) + gv_currkey->end);
+	old = (gv_key *)malloc(SIZEOF(gv_key) + gv_currkey->end + 1);
 	gvzwrite_block->old_key = (unsigned char *)old;
-	memcpy(gvzwrite_block->old_key, gv_currkey, SIZEOF(gv_key) + gv_currkey->end);
+	memcpy(gvzwrite_block->old_key, gv_currkey, SIZEOF(gv_key) + gv_currkey->end + 1);
 	gvzwrite_block->gv_last_subsc_null = TREF(gv_last_subsc_null);
 	gvzwrite_block->gv_some_subsc_null = TREF(gv_some_subsc_null);
 	if (!pat)

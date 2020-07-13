@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2019 Fidelity National Information		#
+# Copyright (c) 2001-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -139,7 +139,7 @@ if ( $?gtm_version_change == "1" ) then
 #	on Cygwin, -ansi defines __STRICT_ANSI__ which suppresses many prototypes
 		setenv gt_cc_options_common     "-c "
 	else
-		setenv gt_cc_options_common     "-c -std=c99 "
+		setenv gt_cc_options_common     "-c -std=c99 -fno-common "
 	endif
 
         setenv  gt_cc_options_common    "$gt_cc_options_common -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 "
@@ -181,7 +181,7 @@ if ( $?gtm_version_change == "1" ) then
 			# code and macro use, making them harder to deal with.
 			set undesired_warnings = ( -Wunused-result -Wparentheses -Wunused-value -Wunused-variable )
 			set undesired_warnings = ( $undesired_warnings -Wmaybe-uninitialized -Wchar-subscripts )
-			set undesired_warnings = ( $undesired_warnings -Wunused-but-set-variable )
+			set undesired_warnings = ( $undesired_warnings -Wunused-but-set-variable -Wunused-function)
 			if ( { (cc --version |& grep -q -E '4.4.7|4.7.2|4.6.3|SUSE') } ) then
 				set undesired_warnings = ( $undesired_warnings -Wuninitialized )
 			endif

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +24,7 @@ union   semun {
 	struct seminfo *__buf;		/* buffer for IPC_INFO */
 	void *__pad;
 #endif
-} arg;
+};
 
 #endif /* GTM_SEM_INCLUDED */
 
@@ -36,6 +37,6 @@ union   semun {
         {                                                                               \
                 util_out_print("udi->ftok_semid is: !UL", TRUE, udi->ftok_semid);       \
                 util_out_print("save_errno is     : !UL", TRUE, save_errno);            \
-                GTMASSERT;                                                              \
+                assertpro(EINVAL != save_errno);                                        \
         }                                                                               \
 }

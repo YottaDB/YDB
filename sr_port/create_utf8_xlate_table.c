@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 Fidelity National Information		*
+ * Copyright (c) 2018-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,31 +32,29 @@
  *
  * @param [in] srch string containing characters to search for
  * @param [in] rplc string containing the characters to replace with
- * @param [out] xlate integer array of size NUM_CHARS (must be allocated by the caller) which this function fills out with the
- *  offsets in the rplc string for single-byte characters from srch
- * @return a hash table with each character mapped to the replace character offset multi-byte input characters have their offset
- *  stored in the hash table, single-byte characters have them stored in the integer xlate table
+ * @param [out] xlate pointer to integer array which this fills out with offsets into the rplc string of utf-8 characters
  *
+ * @return a hash table with each character mapped to the replace character offset
  */
 hash_table_int4 *create_utf8_xlate_table(mval *srch, mval *rplc, int4 *xlate)
 {
-	hash_table_int4 *xlate_hash = NULL;
-	ht_ent_int4 *tabent;
-	char *stop, *scur, *sprev, *rtop, *rcur, *rprev, *rbase;
-	int scode, rcode, rmb;
+	char		*rbase, *rcur, *rprev, *rtop, *scur, *sprev, *stop;
+	hash_table_int4	*xlate_hash = NULL;
+	ht_ent_int4	*tabent;
+	int		rcode, scode;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	memset(xlate, NO_VALUE, SIZEOF(int4) * NUM_CHARS);
 	if (!((srch->mvtype & MV_UTF_LEN) && srch->str.len == srch->str.char_len))
-	{	/* We don't need the hash table if it's a single byte string, but don't calculate the char_len if we don't have it
-		    because it could be compile time */
+	{       /* need hash table if srch is a not a sting of single bytes */
 		if (TREF(compile_time))
 			xlate_hash = (hash_table_int4*)mcalloc(SIZEOF(hash_table_int4));
 		else
 			xlate_hash = (hash_table_int4*)malloc(SIZEOF(hash_table_int4));
+		assert(0 < srch->str.len * (100.0 / HT_LOAD_FACTOR));
 		init_hashtab_int4(xlate_hash, srch->str.len * (100.0 / HT_LOAD_FACTOR),
-				HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
+			  HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
 	}
 	scur = srch->str.addr;
 	stop = scur + srch->str.len;
@@ -70,19 +68,19 @@ hash_table_int4 *create_utf8_xlate_table(mval *srch, mval *rplc, int4 *xlate)
 		rcur = (char *)UTF8_MBTOWC(rcur, rtop, rcode);
 		if (1 == (scur - sprev))
 		{
-			if (NO_VALUE == xlate[*sprev])
+			if (NO_VALUE == xlate[*sprev])		/* 1st replacement rules, so ignore any stragglers */
 				xlate[*sprev] = (rprev - rbase);
 		} else
 		{
 			assert(NULL != xlate_hash);
-			if(!lookup_hashtab_int4(xlate_hash, (uint4*)&scode))
+			if(!lookup_hashtab_int4(xlate_hash, (uint4*)&scode))	/* first replacement rules again */
 			{	/* Store the offset of that character in replace string */
 				add_hashtab_int4(xlate_hash, (uint4*)&scode, (void*)(rprev - rbase + 1), &tabent);
 			}
 		}
 	}
 	while (scur < stop)
-	{
+	{ /* if replacement character length is less than search character length, drop matches to remaining search characters */
 		sprev = scur;
 		scur = (char *)UTF8_MBTOWC(scur, stop, scode);
 		if (1 == (scur - sprev))

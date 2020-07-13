@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +26,7 @@ zshow_conv,
 zshow_ctra,
 zshow_dele,
 zshow_dest,
-zshow_ebcd,
+zshow_ebcdic,
 zshow_edit,
 zshow_empterm,
 zshow_exce,
@@ -40,7 +41,7 @@ zshow_independent,
 zshow_inse,
 zshow_lab,
 zshow_leng,
-zshow_nocene,
+zshow_nocena,
 zshow_nodest,
 zshow_noecho,
 zshow_noedit,

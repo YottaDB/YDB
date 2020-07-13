@@ -97,7 +97,7 @@ dircompare
 	..  ; if it is a symbolic link then leave it alone.  Otherwise, make some permission changes
 	..  if ("lrwxrwxrwx"'=perm)&("lrwxr-xr-x"'=perm) do
 	...   do rmwrite(.perm),zapworld(.perm)
-	...   if (".a"=ext)!(".o"=ext)!(".m"=ext)!(".dat"=ext)!(".gld"=ext)!(".h"=ext) do rmxall(.perm)
+	...   if (".a"=ext)!(".o"=ext)!(".m"=ext)!(".dat"=ext)!(".gld"=ext)!(".h"=ext)!(".xc"=ext) do rmxall(.perm)
 	..  use $P
 	..  write perm," ",filename,!
 

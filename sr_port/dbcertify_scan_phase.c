@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2018 Fidelity National Information	*
+ * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -763,7 +763,7 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	}
 	/* Copy our key to gv_target->clue since dbc_gv_key is somewhat different */
 	gv_target->clue.end = psa->first_rec_key->end;
-	memcpy(gv_target->clue.base, psa->first_rec_key->base, psa->first_rec_key->end + 1);
+	memcpy(((gv_key *)&gv_target->clue)->base, psa->first_rec_key->base, psa->first_rec_key->end + 1);
 	/* Figure out collation for this global */
 	GET_USHORT(us_rec_len, &((rec_hdr *)blk_set_p->curr_rec)->rsiz);
 	rec_len = us_rec_len;
@@ -793,7 +793,7 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	{	/* Need to setup gv_altkey in case of errors (contains gvn) */
 		if (NULL == gv_altkey)
 		{
-			gv_altkey = malloc(SIZEOF(gv_key) + psa->dbc_cs_data->max_key_size);
+			gv_altkey = malloc(SIZEOF(gv_key) + 1 + psa->dbc_cs_data->max_key_size);
 			gv_altkey->prev = 0;
 			gv_altkey->top = psa->first_rec_key->top;
 		}
@@ -803,7 +803,7 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	}
 	assert(gv_target->act || NULL == gv_target->collseq);
 	/* Format the resulting key into the result buffer which is sized appropriately for this task */
-	key_end_p = format_targ_key(psa->rslt_buff, SIZEOF(psa->rslt_buff), &gv_target->clue, TRUE);
+	key_end_p = format_targ_key(psa->rslt_buff, SIZEOF(psa->rslt_buff), (gv_key *)&gv_target->clue, TRUE);
 	*key_end_p = 0;
 	return psa->rslt_buff;
 }

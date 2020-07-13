@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2019 Fidelity National Information	*
+ * Copyright (c) 2017-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -174,10 +174,10 @@ int secshr_finish_CMT18(sgmnt_addrs *csa,
 	assert(0 < cs->old_mode);
 	cs->mode = gds_t_committed;	/* rolls forward Step (CMT18) */
 	CERT_BLK_IF_NEEDED(certify_all_blocks, csa->region, cs, blk_ptr, ((gv_namehead *)NULL));
-	cr = cs->cr;
-	assert(!cr->stopped || (process_id == cr->stopped));
 	if (!is_bg)
 		return 0;
+	cr = cs->cr;
+	assert(!cr->stopped || (process_id == cr->stopped));
 	assert(process_id == cr->in_tend);
 	if (!cr->stopped)
 	{	/* Reset cr->in_tend now that cr is uptodate. Take this opportunity to reset cr->in_cw_set and the

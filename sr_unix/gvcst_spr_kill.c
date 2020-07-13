@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,6 +41,7 @@
 #include "error.h"
 #include "stack_frame.h"
 #include "gtmimagename.h"
+#include "gvt_inline.h"
 
 LITREF	mval		literal_batch;
 

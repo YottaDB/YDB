@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +14,7 @@
 #include "gt_timer.h"
 #include "eintr_wrappers.h"
 
-GBLDEF struct NTD *ntd_root;
+GBLREF struct NTD *ntd_root;
 
 void cmi_idle(uint4 hiber)
 {

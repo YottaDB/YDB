@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,7 @@ void op_fnzpiece(mval *src, mval *del, int first, int last, mval *dst)
 	DCL_THREADGBL_ACCESS;
 	SETUP_THREADGBL_ACCESS;
 
-	assert(!TREF(compile_time) || valid_utf_string(&src->str));
+	assert(!is_gtm_chset_utf8 || !TREF(compile_time) || valid_utf_string(&src->str));
 
 	if (--first < 0)
 		first = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,9 +50,8 @@
 /* These fields are defined as globals not because they are used globally but
  * so they will be easily retrievable even in 'pro' cores.
  */
-GBLDEF siginfo_t	exi_siginfo;
-
-GBLDEF gtm_sigcontext_t	exi_context;
+GBLREF siginfo_t	exi_siginfo;
+GBLREF gtm_sigcontext_t	exi_context;
 
 GBLREF	int4			forced_exit_err;
 GBLREF	int4			exi_condition;

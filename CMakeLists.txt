@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2012-2019 Fidelity National Information		#
+# Copyright (c) 2012-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -27,7 +27,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version ${V6.3-012})
+set(version ${V6.3-013})
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -48,7 +48,9 @@ if(GTM_ENABLE_DEBUG)
 endif()
 
 if ( CMAKE_COMPILER_IS_GNUCC )
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra -Waddress")
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -Wno-unused-value -Wno-unused-variable")
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wno-maybe-uninitialized -Wno-char-subscripts -Wno-unused-but-set-variable")
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wno-unused-function")
 endif()
 
 set(install_permissions_script

@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2011-2019 Fidelity National Information		#
+# Copyright (c) 2011-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -20,6 +20,11 @@
 # set echo
 # set verbose
 #
+# root user of most (distribution) servers has default umask of 022. Some has 077
+# The file permissions while creating kits and installing are individually handled (with specific chmod operations)
+# The below umask is to have uniformity across servers for files in intermediate directories, especially when they
+# are compared against the installed copies (gtm_compare_dir.csh)
+umask 22
 # Make sure don't start in utf-8 mode
 if ($?gtm_chset) then
 	if (M != $gtm_chset) then
@@ -175,9 +180,11 @@ endif
 ########################################################################################
 
 set setactive_parms = ( $version p ) ; source $gtm_tools/setactive.csh
-cmsver $version	    # Set appropriate path to locate $version sources in CMS, the default is V990
 set zver = `$gtm_dist/mumps -run %XCMD 'write $zversion'`
 set releasever = $zver[2]
+
+set icuver =  `setenv gtm_dist $gtm_dist ; $gtm_tools/is_icu_symbol_rename.csh`
+if ("" != "$icuver") setenv gtm_icu_version "$icuver"
 
 # create a README.txt which has the current year in it
 setenv readme_txt ${gtm_com}/README.txt
@@ -516,8 +523,8 @@ CONFIGURE_EOF
 			# create the build.dir.  Only have to do it once
 			cd $gtm_ver || exit 14
 			# insert "pro:" for non Linux/Solaris
-			if (${osname} != linux) echo pro: > ${tmp_dist}/build.dir
-			ls -lR pro >> ${tmp_dist}/build.dir
+			echo pro: > ${tmp_dist}/build.dir
+			ls -l pro >> ${tmp_dist}/build.dir
 			if (aix == ${osname}) then
 				# insert a newline before "pro/gtmsecshrdir:" on AIX
 				mv ${tmp_dist}/build.dir ${tmp_dist}/tbuild.dir
@@ -531,12 +538,15 @@ CONFIGURE_EOF
 
 			set defgroup = "defgroup"
 			@ both = 0
+			# Exclude files that are created only during installation and not in regular builds
+			set install_only_files = "README.txt|custom_errors_sample.txt|gdedefaults|gtmbase|gtm|gtmcshrc"
+			set install_only_files = "$install_only_files|gtmprofile|gtmprofile_preV54000|libgtmutil.so"
 			while (2 > $both)
 				# create the install.dir from both installations
 				cd ${install}/$defgroup
 				# insert "pro:" for non Linux/Solaris
-				if (${osname} != linux) echo pro: > ${tmp_dist}/$defgroup/install.dir
-				ls -lR pro >> ${tmp_dist}/$defgroup/install.dir
+				echo pro: > ${tmp_dist}/$defgroup/install.dir
+				ls -l pro |& grep -vEw "$install_only_files" >> ${tmp_dist}/$defgroup/install.dir
 				if (aix == ${osname}) then
 					# insert a newline before "pro/gtmsecshrdir:" on AIX
 					mv ${tmp_dist}/$defgroup/install.dir ${tmp_dist}/$defgroup/tinstall.dir
@@ -569,6 +579,7 @@ CONFIGURE_EOF
 		endif
 
 		# test the default group installation
+		chmod a+x $install ${install}/defgroup ${install}/defgroup/${image}
 		$gtm_tools/gtm_test_install.csh ${install}/defgroup/${image}
 		set teststat = $status
 		echo ""

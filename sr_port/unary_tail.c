@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -117,7 +117,7 @@ void unary_tail(oprtype *opr)
 					PUT_LITERAL_TRUTH((!(1 & com) ? MV_FORCE_BOOL(v) : !MV_FORCE_BOOL(v)), t);
 					v = &t->operand[0].oprval.mlit->v;
 					if (neg)
-						unuse_literal(v);	/* need to negate the literal just added above */
+						unuse_literal(v);	/* negate below replaces the literal just added above */
 				}
 				assert(1 >= neg);
 				if (num)	/* if an "outer" OC_NEG or OC_FORCENUM, get it over with at compile time */

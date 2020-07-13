@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,7 +29,6 @@
 # else
 #  error			"Unsupported Algorithm for Libgcrypt"
 # endif
-STATICDEF int			gcry_already_inited;
 #else
 # error 			"Unsupported encryption library. Reference implementation currently supports OpenSSL and Libgcrypt"
 #endif	/* USE_GCRYPT */

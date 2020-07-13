@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,6 +82,7 @@
 #include "is_file_identical.h"	/* Needed for JNLPOOL_INIT_IF_NEEDED */
 #include "break.h"
 #include "min_max.h"
+#include "gvt_inline.h"
 
 STATICFNDCL void lvmon_release(void);
 STATICFNDCL void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg);

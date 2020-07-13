@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -109,7 +109,7 @@ GBLREF boolean_t		ztrap_explicit_null;
 
 error_def(ERR_TPTIMEOUT);
 
-STATICFNDCL void tptimeout_set(int4 dummy_param);
+void tptimeout_set(int4 dummy_param);
 STATICFNDCL void tp_expire_now(void);
 
 /* =============================================================================
@@ -144,7 +144,7 @@ STATICFNDEF void tp_expire_now(void)
  *    tp_timeout header file, because it's not for general use.
  * ------------------------------------------------------------------
  */
-STATICFNDEF void tptimeout_set(int4 dummy_param)
+void tptimeout_set(int4 dummy_param)
 {
 	DCL_THREADGBL_ACCESS;
 

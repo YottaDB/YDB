@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -119,11 +119,12 @@ void op_gvnext(mval *v)
 
 	}
 	v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
-	if ((2 == v->str.len) && ('-' == *v->str.addr) && ('1' == *(v->str.addr + 1)))
+	if ((2 == v->str.len) && ('-' == *v->str.addr) && ('1' == *(v->str.addr + 1)))	/* odd this is not !found with no comment */
 	{	/* adjust so $REFERENCE would be correct */
 		gv_currkey->end = gv_currkey->prev;
 		*(gv_currkey->base + gv_currkey->end++) = 0x40;
 		*(gv_currkey->base + gv_currkey->end++) = 0xEE;
+		gv_currkey->prev = gv_currkey->end;		/* preserve assumption asserted in (at least) op_gvorder */
 		*(gv_currkey->base + gv_currkey->end++) = 0xFF;
 		*(gv_currkey->base + gv_currkey->end++) = KEY_DELIMITER;
 		*(gv_currkey->base + gv_currkey->end) = KEY_DELIMITER;

@@ -73,6 +73,7 @@
 #include "gtm_semutils.h"
 #include "gtm_sem.h"
 #include "is_file_identical.h"
+#include "gvt_inline.h"
 
 #ifdef	GTM_FD_TRACE
 #include "gtm_dbjnl_dupfd_check.h"

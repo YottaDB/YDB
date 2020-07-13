@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,6 +94,7 @@
 #ifdef DEBUG
 #include "repl_filter.h"	/* needed by an assert in UPD_GV_BIND_NAME_APPROPRIATE macro */
 #endif
+#include "gvt_inline.h"
 
 #define	UPDPROC_WAIT_FOR_READJNLSEQNO	100	/* ms */
 #define UPDPROC_WAIT_FOR_STARTJNLSEQNO	100	/* ms */
@@ -1303,8 +1304,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			assert(0 == have_crit(CRIT_HAVE_ANY_REG));
 			if (dollar_tlevel)
 			{	/* Copy gv_currkey into temp variable before TROLLBACK overwrites the current variable. */
-				gv_failed_key = (gv_key *)malloc(SIZEOF(gv_key) + gv_currkey->end);
-				memcpy(gv_failed_key, gv_currkey, SIZEOF(gv_key) + gv_currkey->end);
+				gv_failed_key = (gv_key *)malloc(SIZEOF(gv_key) + gv_currkey->end + 1);
+				memcpy(gv_failed_key, gv_currkey, SIZEOF(gv_key) + gv_currkey->end + 1);
 				repl_log(updproc_log_fp, TRUE, TRUE,
 					"OP_TROLLBACK IS CALLED -->Bad trans :: dollar_tlevel = %ld\n", dollar_tlevel);
 				OP_TROLLBACK(0);	/* this should also release crit (if any) on all regions in TP */
