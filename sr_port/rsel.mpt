@@ -3,6 +3,9 @@
 ; Copyright (c) 1987-2018 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -51,9 +54,10 @@ CALL
         d main
         q
 SILENT(patt,label)
-        n $et s $et=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL")
+        n $et,io s $et=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL"),io=$io
 	i ""=$g(label) s label="SRC"
 	d @label
+	u io
 	q
 init
 	i $zver["VMS" d
