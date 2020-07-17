@@ -64,6 +64,7 @@ INVVALUE	<!AD is invalid !AD value for !AD>/error/fao=6
 INVZCONVERT	<Translation supported only between DEC/HEX OR between UTF-8/UTF-16/UTF-16LE/UTF-16BE>/error/fao=0
 ZYSQLNULLNOTVALID	<$ZYSQLNULL cannot be used as an integer, numeric, gvn subscript/value or lock subscript>/error/fao=0
 BOOLEXPRTOODEEP	<Boolean expression depth exceeds maximum supported limit of 2047>/error/fao=0
+TPCALLBACKINVRETVAL     <Invalid return type for TP callback function>/error/fao=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !
