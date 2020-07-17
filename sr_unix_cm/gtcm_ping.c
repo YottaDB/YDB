@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -166,7 +166,10 @@ int icmp_ping(int conn)
 	while (cc = sendto(pingsock, (char *)pingsend, ICMP_MINLEN + SIZEOF(int), 0, (struct sockaddr *)&paddr, paddr_len) < 0)
 	{
 		if (errno == EINTR)
+		{
+			EINTR_HANDLING_CHECK;
 			continue;
+		}
 		perror("ping: sendto");
 		continue;
 	}
@@ -214,7 +217,10 @@ int get_ping_rsp(void)
 					(GTM_SOCKLEN_TYPE *)&fromlen))) < 0)
 	{
 		if (errno == EINTR)
+		{
+			EINTR_HANDLING_CHECK;
 			continue;
+		}
 		perror("ping: recvfrom");
 		continue;
 	}

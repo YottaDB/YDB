@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,7 +89,10 @@ MBSTART {						\
 	do						\
 	{						\
 		RC = ioctl(FDESC, REQUEST, ARG);	\
-	} while (-1 == RC && EINTR == errno);		\
+		if ((-1 != RC) || (EINTR != errno))	\
+			break;				\
+		EINTR_HANDLING_CHECK;			\
+	} while (TRUE);					\
 	if (-1 != RC)					\
 		RC = 0;					\
 	else						\
@@ -101,7 +104,10 @@ MBSTART {						\
 	do						\
 	{						\
 		FDESC = OPEN(FNAME, FFLAGS);		\
-	} while (-1 == FDESC && EINTR == errno);	\
+		if ((-1 != FDESC) || (EINTR != errno))	\
+			break;				\
+		EINTR_HANDLING_CHECK;			\
+	} while (TRUE);					\
 } MBEND
 
 #define OPENFILE3(FNAME, FFLAGS, FMODE, FDESC)		\
@@ -109,7 +115,10 @@ MBSTART {						\
 	do						\
 	{						\
 		FDESC = OPEN3(FNAME, FFLAGS, FMODE);	\
-	} while (-1 == FDESC && EINTR == errno);	\
+		if ((-1 != FDESC) || (EINTR != errno))	\
+			break;				\
+		EINTR_HANDLING_CHECK;			\
+	} while (TRUE);					\
 } MBEND
 
 /* OPENFILE4 not needed - io_open_try handles interrupts */
@@ -142,7 +151,10 @@ MBSTART {								\
 	do								\
 	{								\
 		FDESC = OPEN3(FNAME, FFLAGS | O_CLOEXEC, FMODE);	\
-	} while (-1 == FDESC && EINTR == errno);			\
+		if ((-1 != FDESC) || (EINTR != errno))			\
+			break;						\
+		EINTR_HANDLING_CHECK;					\
+	} while (TRUE);							\
 } MBEND
 #define OPENFILE_CLOEXEC(FNAME, FFLAGS, FDESC)  OPENFILE(FNAME, FFLAGS | O_CLOEXEC, FDESC);
 #define OPENFILE_SYNC_CLOEXEC(FNAME, FFLAGS, FDESC)	OPENFILE_SYNC(FNAME, FFLAGS | O_CLOEXEC, FDESC);
@@ -284,7 +296,10 @@ MBSTART {							\
 	do							\
 	{							\
 		RC = close(FDESC);				\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 	if (-1 == RC)	/* Had legitimate error - return it */	\
 		RC = errno;					\
 } MBEND
@@ -327,6 +342,7 @@ MBSTART {											\
 		}										\
 		if (EINTR != errno)								\
 			break;									\
+		EINTR_HANDLING_CHECK;								\
 	}											\
 	if (0 == gtmioBuffLen)									\
 		RC = 0;										\
@@ -368,6 +384,7 @@ MBSTART {											\
 		}										\
 		if (EINTR != errno)								\
 			break;									\
+		EINTR_HANDLING_CHECK;								\
 	}											\
 	(ACTUAL_READLEN) = (FBUFF_LEN) - gtmioBuffLen;						\
 	if (0 == gtmioBuffLen)									\
@@ -433,6 +450,7 @@ MBSTART {											\
 		}										\
 		if (EINTR != errno)								\
 			break;									\
+		EINTR_HANDLING_CHECK;								\
 	}											\
 	if (0 == gtmioBuffLen)									\
 		RC = 0;										\
@@ -457,9 +475,9 @@ MBSTART {											\
 			if (0 == gtmioBuffLen || 0 == gtmioStatus)				\
 				break;								\
 			gtmioBuff += gtmioStatus;						\
-		}										\
-		else if (EINTR != errno)							\
+		} else if (EINTR != errno)							\
 			break;									\
+		EINTR_HANDLING_CHECK;								\
 	}											\
 	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
 		RC = errno;									\
@@ -484,9 +502,9 @@ MBSTART {											\
 			if (0 == gtmioBuffLen || 0 == gtmioStatus)				\
 				break;								\
 			gtmioBuff += gtmioStatus;						\
-		}										\
-		else if (EINTR != errno)							\
-		  break;									\
+		} else if (EINTR != errno)							\
+			break;									\
+		EINTR_HANDLING_CHECK;								\
 	}											\
 	if (-1 != gtmioStatus)									\
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually read */	\
@@ -546,6 +564,7 @@ MBSTART {													\
 					skip_read = TRUE;							\
 					break;									\
 				}										\
+				EINTR_HANDLING_CHECK;								\
 			}											\
 		}												\
 		/* if we didn't read 1 character or it's an error don't read anymore now */			\
@@ -557,15 +576,17 @@ MBSTART {													\
 			if (0 == gtmioBuffLen || 0 == gtmioStatus)						\
 				break;										\
 			gtmioBuff += gtmioStatus;								\
-		/* If it is pipe or fifo, read data that is currently available. If pipe contains data less than 		\
-		   the CHUNK_SIZE, no need to read once again since it is in BLOCKING mode, in which case it will return -1.	\
-		   So in the first read itself (after a successful read) break from the infinite loop. This variable is TRUE    \
-		   if DOREADRLTO2 macro is called for a CHUNK_SIZE read. In other places (eg: iorm_get) it will be FALSE.	\
-		*/												\
+			/* If it is pipe or fifo, read data that is currently available. If pipe contains data	\
+			 * less than the CHUNK_SIZE, no need to read once again since it is in BLOCKING mode,	\
+			 * in which case it will return -1. So in the first read itself (after a successful	\
+			 * read) break from the infinite loop. This variable is TRUE if DOREADRLTO2 macro is	\
+			 * called for a CHUNK_SIZE read. In other places (eg: iorm_get) it will be FALSE.	\
+			*/											\
 			if (UTF_VAR_PF)										\
 				break;										\
 		} else if (EINTR != errno || TOFLAG)								\
 			break;											\
+		EINTR_HANDLING_CHECK;										\
 		if (PIPE_OR_FIFO && outofband)									\
 			break;											\
 	}													\
@@ -597,6 +618,7 @@ MBSTART {										\
 			gtmioBuff += gtmioStatus;					\
 		} else if (EINTR != errno)						\
 			break;								\
+		EINTR_HANDLING_CHECK;							\
 	}										\
 	/* assertpro(FALSE)? */								\
 } MBEND
@@ -627,8 +649,7 @@ MBSTART {													\
 				if (0 == gtmioBuffLen)								\
 					break;									\
 				gtmioBuff += gtmioStatus;							\
-			}											\
-			else if (EINTR != errno && EAGAIN != errno)						\
+			} else if ((EINTR != errno) && (EAGAIN != errno))					\
 				break;										\
 			else if (EAGAIN == errno)								\
 			{											\
@@ -637,6 +658,7 @@ MBSTART {													\
 				SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);						\
 				block_cnt++;									\
 			}											\
+			EINTR_HANDLING_CHECK;									\
 		}												\
 		if (0 == gtmioBuffLen)										\
 			RC = 0;											\
@@ -662,8 +684,7 @@ MBSTART {											\
 			if (0 == gtmioBuffLen)							\
 				break;								\
 			gtmioBuff += gtmioStatus;						\
-		}										\
-		else if (EINTR != errno && EAGAIN != errno)					\
+		} else if ((EINTR != errno) && (EAGAIN != errno))				\
 			break;									\
 		else if (EAGAIN == errno)							\
 		{										\
@@ -672,6 +693,7 @@ MBSTART {											\
 			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
 			block_cnt++;								\
 		}										\
+		EINTR_HANDLING_CHECK;								\
 	}											\
 	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
 		RC = errno;									\
@@ -708,8 +730,7 @@ MBSTART {													\
 				if (0 == gtmioBuffLen)								\
 					break;									\
 				gtmioBuff += gtmioStatus;							\
-			}											\
-			else if (EINTR != errno && EAGAIN != errno)						\
+			} else if ((EINTR != errno) && (EAGAIN != errno))					\
 				break;										\
 			else if (EAGAIN == errno)								\
 			{											\
@@ -718,6 +739,7 @@ MBSTART {													\
 				SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);						\
 				block_cnt++;									\
 			}											\
+			EINTR_HANDLING_CHECK;									\
 		}												\
 		if (0 < gtmioStatus)										\
 			RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually written */		\
@@ -745,8 +767,7 @@ MBSTART {											\
 			if (0 == gtmioBuffLen)							\
 				break;								\
 			gtmioBuff += gtmioStatus;						\
-		}										\
-		else if (EINTR != errno && EAGAIN != errno)					\
+		} else if ((EINTR != errno) && (EAGAIN != errno))				\
 			break;									\
 		else if (EAGAIN == errno)							\
 		{										\
@@ -755,6 +776,7 @@ MBSTART {											\
 			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
 			block_cnt++;								\
 		}										\
+		EINTR_HANDLING_CHECK;								\
 	}											\
 	if (-1 != gtmioStatus)									\
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually written */	\
@@ -815,8 +837,7 @@ MBSTART {											\
 			if (0 == gtmioBuffLen)							\
 				break;								\
 			gtmioBuff += gtmioStatus;						\
-		}										\
-		else if (EINTR != errno && EAGAIN != errno)					\
+		} else if ((EINTR != errno) && (EAGAIN != errno))				\
 			break;									\
 		else if (EAGAIN == errno)							\
 		{										\
@@ -825,6 +846,7 @@ MBSTART {											\
 			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
 			block_cnt++;								\
 		}										\
+		EINTR_HANDLING_CHECK;								\
 	}											\
 	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
 		RC = errno;									\

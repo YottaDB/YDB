@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -309,7 +309,12 @@ void iorm_close(io_desc *iod, mval *pp)
 				{
 					status = 0;
 					done_pid = waitpid(rm_ptr->pipe_pid, &status, use_timer ? 0 : WNOHANG); /* BYPASSOK */
-				} while (((pid_t)-1 == done_pid) && (EINTR == errno) && (!out_of_time));
+					if ((pid_t)-1 != done_pid)
+						break;
+					if (EINTR != errno)
+						break;
+					EINTR_HANDLING_CHECK;
+				} while (!out_of_time);
 				if (((pid_t)-1 == done_pid) && (!out_of_time))
 				{
 					save_errno = errno;

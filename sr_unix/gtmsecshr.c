@@ -270,6 +270,8 @@ int main(int argc, char_ptr_t argv[])
 					process_id, ERR_GTMSECSHRRECVF, 0, save_errno);
 			if (0 < num_chars_recd)
 				recv_complete = TRUE;	/* Only complete messages received via UDP datagram */
+			else
+				EINTR_HANDLING_CHECK;
 		} while (!recv_complete);
 		cancel_timer(timer_id);
 		assert(0 < num_chars_recd);
@@ -292,6 +294,8 @@ int main(int argc, char_ptr_t argv[])
 						process_id, ERR_GTMSECSHRSENDF, 0, save_errno);
 				if (0 < num_chars_sent)
 					send_complete = TRUE;
+				else
+					EINTR_HANDLING_CHECK;
 			} while (!send_complete);
 			cancel_timer(timer_id);
 		} else

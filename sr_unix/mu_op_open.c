@@ -335,11 +335,12 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 		 */
 		while ((-1 == (file_des = OPEN3(buf, oflag, umask_creat))))
 		{
-			if (   EINTR == errno
-			       || ETXTBSY == errno
-			       || ENFILE == errno
-			       || EBUSY == errno
-			       || ((mb == iod->type) && (ENXIO == errno)))
+			if (EINTR == errno)
+			{
+				EINTR_HANDLING_CHECK;
+				continue;
+			}
+			if ((ETXTBSY == errno) || (ENFILE == errno) || (EBUSY == errno) || ((mb == iod->type) && (ENXIO == errno)))
 				continue;
 			else
 				break;

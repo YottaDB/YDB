@@ -26,6 +26,8 @@
 #include "gtm_multi_thread.h"
 #include "gtm_multi_proc.h"
 #include "gtmsiginfo.h"
+#include "interlock.h"
+#include "outofband.h"
 
 /* states of CRIT passed as argument to have_crit() */
 #define CRIT_HAVE_ANY_REG	0x00000001
@@ -137,6 +139,8 @@ GBLREF	volatile int4	gtmMallocDepth;
 #define	OK_TO_INTERRUPT	((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && OK_TO_INTERRUPT_TRIMMED)
 #define	OK_TO_INTERRUPT_TRIMMED	((0 == gtmMallocDepth) && (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)))
 
+GBLREF	int	in_os_signal_handler;
+
 /* Set the value of forced_exit to 1. This should indicate that we want a deferred signal handler to be invoked first upon leaving
  * the current deferred window. Since we do not want forced_exit state to ever regress, and there might be several signals delivered
  * within the same deferred window, assert that forced_exit is either 0 or 1 before setting it to 1.
@@ -144,8 +148,10 @@ GBLREF	volatile int4	gtmMallocDepth;
 #define SET_FORCED_EXIT_STATE(SIG)								\
 {												\
 	char			*rname;								\
+												\
 	GBLREF VSIG_ATOMIC_T	forced_exit;							\
 	GBLREF int		forced_exit_sig;						\
+	GBLREF	volatile int4	outofband;							\
 												\
 	/* Below code is not thread safe as it modifies global variables "forced_exit"		\
 	 * and "forced_exit_sig".								\
@@ -154,6 +160,14 @@ GBLREF	volatile int4	gtmMallocDepth;
 	assert((0 == forced_exit) || (1 == forced_exit));					\
 	forced_exit = 1;									\
 	forced_exit_sig = SIG;		/* Record the signal forcing us to exit */		\
+	if (in_os_signal_handler)								\
+	{	/* If we are inside an OS signal handler and therefore had to defer exit	\
+		 * handling, set "outofband" also to TRUE as this is checked by lots of		\
+		 * potentially long-running commands in the runtime (e.g. HANG etc.) and we	\
+		 * want all of those to automatically trigger process exit handling.		\
+		 */										\
+		outofband = deferred_signal;							\
+	}											\
 	/* Whenever "forced_exit" gets set to 1, set the corresponding deferred event too */	\
 	SET_DEFERRED_EXIT_CHECK_NEEDED;								\
 	SET_FORCED_THREAD_EXIT; 	/* Signal any running threads to stop */		\
@@ -288,10 +302,22 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
 	}											\
 }
 
-#define	OK_TO_SEND_MSG	((INTRPT_IN_X_TIME_FUNCTION != intrpt_ok_state) 	\
-			 && (INTRPT_IN_LOG_FUNCTION != intrpt_ok_state)		\
-			 && (INTRPT_IN_FUNC_WITH_MALLOC != intrpt_ok_state)	\
-			 && (INTRPT_IN_FORK_OR_SYSTEM != intrpt_ok_state))
+/* This macro used to previously check if the global variable "intrpt_ok_state" holds any of the following values.
+ *
+ *	INTRPT_IN_X_TIME_FUNCTION
+ *	INTRPT_IN_LOG_FUNCTION
+ *	INTRPT_IN_FUNC_WITH_MALLOC
+ *	INTRPT_IN_FORK_OR_SYSTEM
+ *
+ * And if so it returned FALSE to indicate it is not safe to do a "syslog()" call when a malloc/free etc. is
+ * potentially interrupted (due to a signal handler function invocation) and is in the C-stack. This was previously
+ * necessary because the signal handler could then invoke "syslog()". But as part of YDB#560, the signal handler
+ * ("generic_signal_handler") was changed to not invoke "syslog()" since it is not safe to invoke it inside a signal
+ * handler. Therefore, none of the above specific checks of the "intrpt_ok_state" variable are needed. Instead, all
+ * we need to know is if we are inside an OS signal handler and if so return FALSE (i.e. not safe to do "syslog").
+ * Hence the use of "in_os_signal_handler" global variable below.
+ */
+#define	OK_TO_SEND_MSG	(!in_os_signal_handler)
 
 uint4	have_crit(uint4 crit_state);
 void	deferred_signal_handler(void);

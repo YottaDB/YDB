@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -200,7 +200,8 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 			{
 				status = -1;
 				break;
-			}
+			} else
+				EINTR_HANDLING_CHECK;
 			continue;
 		}
 #		ifdef GTM_TLS

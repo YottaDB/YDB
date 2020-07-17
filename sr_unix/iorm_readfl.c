@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -645,6 +645,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 							bytes_count = 0;
 							break;
 						}
+						EINTR_HANDLING_CHECK;
 					}
 				} while (bytes_count < width);
 			} else
@@ -668,8 +669,12 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						bytes_count = tot_bytes_read;
 					else
 						bytes_count = 0;
-					if (errno == EINTR  &&  out_of_time)
-						status = -2;
+					if (EINTR == errno)
+					{
+						EINTR_HANDLING_CHECK;
+						if (out_of_time)
+							status = -2;
+					}
 				} else
 				{
 					tot_bytes_read = bytes_count = status;
@@ -855,10 +860,14 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 							}
 							continue; /* for now try and read again if eof or no input
 								     ready */
-						} else if (-1 == status && errno != EINTR)  /* error returned */
+						} else if (-1 == status)
 						{
-							bytes_count = 0;
-							break;
+							if (EINTR != errno)  /* error returned */
+							{
+								bytes_count = 0;
+								break;
+							}
+							EINTR_HANDLING_CHECK;
 						}
 					} else
 					{	/* NO FOLLOW */
@@ -981,6 +990,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						status = 0;
 					} else if (EINTR == errno)
 					{
+						EINTR_HANDLING_CHECK;
 						if (out_of_time)
 							status = -2;
 						else
@@ -1017,8 +1027,12 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 				if (0 > buff_len)
 				{
 					bytes_count = 0;
-					if (errno == EINTR  &&  out_of_time)
-						buff_len = -2;
+					if (EINTR == errno)
+					{
+						EINTR_HANDLING_CHECK;
+						if (out_of_time)
+							buff_len = -2;
+					}
 				} else if (outofband && (fol_bytes_read < rm_ptr->recordsize))
 				{
 					PIPE_DEBUG(PRINTF(" %d utf fixed outofband, buff_len: %d done_1st_read: %d\n", pid,
@@ -1375,10 +1389,14 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 								}
 								continue; /* for now try and read again if eof or no input
 									     ready */
-							} else if (-1 == status && errno != EINTR)  /* error returned */
+							} else if (-1 == status)
 							{
-								bytes_count = 0;
-								break;
+								if (EINTR != errno)  /* error returned */
+								{
+									bytes_count = 0;
+									break;
+								} else
+									EINTR_HANDLING_CHECK;
 							}
 						} else
 						{
@@ -1855,6 +1873,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						status = 0;
 					} else if (EINTR == errno)
 					{
+						EINTR_HANDLING_CHECK;
 						if (out_of_time)
 							status = -2;
 						else
@@ -1875,20 +1894,24 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 	 * platforms that we know of so it is enough to check for -1 status here. Assert that below.
 	 */
 	assert(EOF == -1);
-	if ((-1 == status) && (EINTR != real_errno))
+	if (-1 == status)
 	{
-		v->str.len = 0;
-		v->str.addr = (char *)stringpool.free;		/* ensure valid address */
-		if (EAGAIN != real_errno)
-		{	/* Cancel the timer before taking the error return */
-			if (timed && !out_of_time)
-				cancel_timer(timer_id);
-			io_ptr->dollar.za = 9;
-			/* save error in $device */
-			SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, real_errno);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
-		}
-		ret = FALSE;
+		if (EINTR != real_errno)
+		{
+			v->str.len = 0;
+			v->str.addr = (char *)stringpool.free;		/* ensure valid address */
+			if (EAGAIN != real_errno)
+			{	/* Cancel the timer before taking the error return */
+				if (timed && !out_of_time)
+					cancel_timer(timer_id);
+				io_ptr->dollar.za = 9;
+				/* save error in $device */
+				SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, real_errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
+			}
+			ret = FALSE;
+		} else
+			EINTR_HANDLING_CHECK;
 	}
 	if (timed)
 	{	/* No timer if nsec_timeout is zero, so handle the timer in the else. */

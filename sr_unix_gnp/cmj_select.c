@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 #include "gtm_time.h"
 #include <sys/time.h>
 #include <errno.h>
+#include "eintr_wrappers.h"
 
 GBLREF struct NTD *ntd_root;
 
@@ -40,7 +41,11 @@ void cmj_select(int signo)
 	do
 	{
 		count = select(n, &myrs, &myws, &myes, &t);
-	} while (0 > count && (EINTR == errno || EAGAIN == errno));
+		if ((0 <= count) || ((EINTR != errno) && (EAGAIN != errno)))
+			break;
+		if (EINTR == errno)
+			EINTR_HANDLING_CHECK;
+	} while (TRUE);
 
 	while (0 < count) {
 		/* decode */
@@ -86,6 +91,10 @@ void cmj_select(int signo)
 		do
 		{
 			count = select(n, &myrs, &myws, NULL, &t);
-		} while (0 > count && (EINTR == errno || EAGAIN == errno));
+			if ((0 <= count) || ((EINTR != errno) && (EAGAIN != errno)))
+				break;
+			if (EINTR == errno)
+				EINTR_HANDLING_CHECK;
+		} while (TRUE);
 	}
 }

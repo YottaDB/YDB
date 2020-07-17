@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,7 +65,17 @@ char *ydb_getenv(ydbenvindx_t envindx, mstr *suffix, boolean_t *is_ydb_env_match
 				 */
 				nbytes = snprintf(envwithsuffix, sizeof(envwithsuffix), "%s%.*s",
 									envstr, suffix->len, suffix->addr);
-			} while((-1 == nbytes) && (EINTR == errno));
+				if ((-1 != nbytes) || (EINTR != errno))
+					break;
+				/* The following macro invocation is commented out because "ydb_getenv" is also used by the
+				 * encryption plugin and therefore does not have access to the below macro.
+				 * That said, it is okay not to invoke it since there is no indefinite sleep loop here
+				 * that can cause a process to not terminate in a timely fashion even though it was say
+				 * sent a process-terminating signal like SIGTERM.
+				 *
+				 * EINTR_HANDLING_CHECK;
+				 */
+			} while (TRUE);
 			if ((0 > nbytes) || (nbytes >= sizeof(envwithsuffix)))
 			{	/* Error return from SNPRINTF or output was truncated. Move on to next env var */
 				continue;

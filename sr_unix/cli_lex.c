@@ -410,7 +410,10 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 			{	/* no f_ferror */
 				uc_fgets_ret = u_fgets(cli_fgets_Ubuffer,
 					(int32_t)(SIZEOF(cli_fgets_Ubuffer) / SIZEOF(UChar)) - 1, u_fp);
-			} while (NULL == uc_fgets_ret && !u_feof(u_fp) && ferror(fp) && EINTR == errno);
+				if ((NULL != uc_fgets_ret) || u_feof(u_fp) || !ferror(fp) || (EINTR != errno))
+					break;
+				EINTR_HANDLING_CHECK;
+			} while (TRUE);
 			if (NULL == uc_fgets_ret)
 			{
 				u_fclose(u_fp);

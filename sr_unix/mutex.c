@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -411,6 +411,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 				save_errno = errno;
 				if (EINTR == save_errno)
 				{
+					EINTR_HANDLING_CHECK;
 					if (msem_timedout)
 					{
 						MUTEX_DPRINT3("%d: msem sleep done, heartbeat_counter = %d\n",
@@ -454,6 +455,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 			{
 				if (EINTR == errno)
 				{	/* somebody interrupted me, reduce the timeout by half and continue */
+					EINTR_HANDLING_CHECK;
 					MUTEX_TRACE_CNTR(mutex_trc_slp_intr);
 					if (!(timeout_intr_slpcnt--)) /* Assume timed out */
 					{
@@ -1005,7 +1007,10 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 				do
 				{
 					rc = MSEM_LOCKNW(mutex_wake_msem_ptr);
-				} while (-1 == rc && EINTR == errno);
+					if ((-1 != rc) || (EINTR != errno))
+						break;
+					EINTR_HANDLING_CHECK;
+				} while (TRUE);
 #				endif
 				/*
 				 * Significance of mutex_wake_instance field : After queueing itself, a process might go to

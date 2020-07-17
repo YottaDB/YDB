@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +23,7 @@
 #include "do_semop.h"
 #include "gtm_c_stack_trace.h"
 #include "gtm_c_stack_trace_semop.h"
+#include "eintr_wrappers.h"
 
 /* perform one semop, returning errno if it was unsuccessful */
 int do_semop(int sems, int num, int op, int flg)
@@ -40,7 +44,7 @@ int do_semop(int sems, int num, int op, int flg)
 	} else
 	{
 		while (-1 == (rv = semop(sems, sop, 1)) && EINTR == errno)
-			;
+			EINTR_HANDLING_CHECK;
 		return (-1 == rv) ? errno : 0;
 	}
 }

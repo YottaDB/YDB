@@ -36,12 +36,23 @@
 #include "wbox_test_init.h"
 #endif
 
+/* Do any house keeping as part of handling an EINTR. One thing is to check whether a process terminating signal
+ * was received (e.g. SIGTERM). If so, now that we are outside the signal handler, it is safe to do exit processing.
+ */
+#define	EINTR_HANDLING_CHECK											\
+{														\
+	DEFERRED_SIGNAL_HANDLING_CHECK;	/* Handle SIGTERM etc. if needed when outside signal handler */		\
+}
+
 #define ACCEPT_SOCKET(SOCKET, ADDR, LEN, RC)			\
 {								\
 	do							\
 	{							\
 		RC = ACCEPT(SOCKET, ADDR, LEN);			\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define CHG_OWNER(PATH, OWNER, GRP, RC)				\
@@ -49,7 +60,10 @@
 	do							\
 	{							\
 		RC = CHOWN(PATH, OWNER, GRP);			\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define CLOSE(FD, RC)									\
@@ -61,7 +75,10 @@
 		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
 		RC = close(FD);								\
 		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
-	} while (-1 == RC && EINTR == errno);						\
+		if ((-1 != RC) || (EINTR != errno))					\
+			break;								\
+		EINTR_HANDLING_CHECK;							\
+	} while (TRUE);									\
 }
 
 #define CLOSEDIR(DIR, RC)					\
@@ -69,7 +86,10 @@
 	do							\
 	{							\
 		RC = closedir(DIR);				\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define CONNECT_SOCKET(SOCKET, ADDR, LEN, RC)			\
@@ -80,7 +100,10 @@
 	do							\
 	{							\
 		RC = CREAT(PATHNAME, MODE);			\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define DOREAD_A_NOINT(FD, BUF, SIZE, RC)			\
@@ -88,7 +111,10 @@
 	do							\
 	{							\
 		RC = DOREAD_A(FD, BUF, SIZE);			\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define DUP2(FDESC1, FDESC2, RC)				\
@@ -96,7 +122,10 @@
 	do							\
 	{							\
 		RC = dup2(FDESC1, FDESC2);			\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define FCLOSE(STREAM, RC)								\
@@ -108,7 +137,10 @@
 		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
 		RC = fclose(STREAM);							\
 		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
-	} while (-1 == RC && EINTR == errno);						\
+		if ((-1 != RC) || (EINTR != errno))					\
+			break;								\
+		EINTR_HANDLING_CHECK;							\
+	} while (TRUE);									\
 }
 
 #define	FLOCK(FD, FLAGS, RC)					\
@@ -116,7 +148,10 @@
 	do							\
 	{							\
 		RC = flock(FD, FLAGS);				\
-	} while ((-1 == RC) && (EINTR == errno));		\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define FCNTL2(FDESC, ACTION, RC)				\
@@ -124,7 +159,10 @@
 	do							\
 	{							\
 		RC = fcntl(FDESC, ACTION);			\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define FCNTL3(FDESC, ACTION, ARG, RC)				\
@@ -132,15 +170,21 @@
 	do							\
 	{							\
 		RC = fcntl(FDESC, ACTION, ARG);			\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
-#define FGETS_FILE(BUF, LEN, FP, RC)				\
-{								\
-	do							\
-	{							\
-		FGETS(BUF, LEN, FP, RC);			\
-	} while (NULL == RC && !feof(FP) && ferror(FP) && EINTR == errno);	\
+#define FGETS_FILE(BUF, LEN, FP, RC)							\
+{											\
+	do										\
+	{										\
+		FGETS(BUF, LEN, FP, RC);						\
+		if ((NULL != RC) || feof(FP) || !ferror(FP) || (EINTR != errno))	\
+			break;								\
+		EINTR_HANDLING_CHECK;							\
+	} while (TRUE);									\
 }
 
 #define FSTAT_FILE(FDESC, INFO, RC)						\
@@ -152,7 +196,10 @@
 		DEFER_INTERRUPTS(INTRPT_IN_FSTAT, prev_intrpt_state);		\
 		RC = fstat(FDESC, INFO);					\
 		ENABLE_INTERRUPTS(INTRPT_IN_FSTAT, prev_intrpt_state);		\
-	} while (-1 == RC && EINTR == errno);					\
+		if ((-1 != RC) || (EINTR != errno))				\
+			break;							\
+		EINTR_HANDLING_CHECK;						\
+	} while (TRUE);								\
 }
 
 #define FSTATVFS_FILE(FDESC, FSINFO, RC)			\
@@ -160,7 +207,10 @@
 	do							\
 	{							\
 		FSTATVFS(FDESC, FSINFO, RC);			\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define FTRUNCATE(FDESC, LENGTH, RC)				\
@@ -168,43 +218,54 @@
 	do							\
 	{							\
 		RC = ftruncate(FDESC, LENGTH);			\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 /* GTM_FREAD is an EINTR-safe versions of "fread". Retries on EINTR. Returns number of elements read in NREAD.
  * If NREAD < NELEMS, if error then copies errno into RC, if eof then sets RC to 0. Note: RC is not initialized otherwise.
  * Macro is named GTM_FREAD instead of FREAD because AIX defines a macro by the same name in fcntl.h.
  */
-#define GTM_FREAD(BUFF, ELEMSIZE, NELEMS, FP, NREAD, RC)			\
-MBSTART {									\
-	size_t		elems_to_read, elems_read;				\
-	intrpt_state_t	prev_intrpt_state;					\
-	\
-	DEFER_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);		\
-	elems_to_read = NELEMS;							\
-	for (;;)								\
-	{									\
-		elems_read = fread(BUFF, ELEMSIZE, elems_to_read, FP);		\
-		assert(elems_read <= elems_to_read);				\
-		elems_to_read -= elems_read;					\
-		if (0 == elems_to_read)						\
-			break;							\
-			RC = feof(FP);							\
-			if (RC)								\
-			{	/* Reached EOF. No error. */				\
-				RC = 0;							\
-				break;							\
-			}								\
-			RC = ferror(FP);						\
-			assert(RC);							\
-			clearerr(FP);	/* reset error set by the "fread" */		\
-			/* In case of EINTR, retry "fread" */				\
-			RC = errno;							\
-			if (EINTR != errno)						\
-				break;							\
-	}									\
-	NREAD = NELEMS - elems_to_read;						\
-	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);		\
+#define GTM_FREAD(BUFF, ELEMSIZE, NELEMS, FP, NREAD, RC)					\
+MBSTART {											\
+	size_t		elems_to_read, elems_read;						\
+	intrpt_state_t	prev_intrpt_state;							\
+												\
+	DEFER_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);				\
+	elems_to_read = NELEMS;									\
+	for (;;)										\
+	{											\
+		elems_read = fread(BUFF, ELEMSIZE, elems_to_read, FP);				\
+		assert(elems_read <= elems_to_read);						\
+		elems_to_read -= elems_read;							\
+		if (0 == elems_to_read)								\
+			break;									\
+		RC = feof(FP);									\
+		if (RC)										\
+		{	/* Reached EOF. No error. */						\
+			RC = 0;									\
+			break;									\
+		}										\
+		RC = ferror(FP);								\
+		assert(RC);									\
+		clearerr(FP);	/* reset error set by the "fread" */				\
+		/* In case of EINTR, retry "fread" */						\
+		RC = errno;									\
+		if (EINTR != errno)								\
+			break;									\
+		/* Note that the DEFERRED_SIGNAL_HANDLING_CHECK invocation inside the		\
+		 * EINTR_HANDLING_CHECK macro below will be a no-op since we still have		\
+		 * not done the ENABLE_INTERRUPTS. But that is okay since we are not waiting	\
+		 * for user input indefinitely here and so this will eventually return.		\
+		 * The macro is still invoked here in case some other check also gets added to	\
+		 * the macro at a later point.							\
+		 */										\
+		EINTR_HANDLING_CHECK;								\
+	}											\
+	NREAD = NELEMS - elems_to_read;								\
+	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);				\
 } MBEND
 
 #define GTM_FSYNC(FD, RC)					\
@@ -212,7 +273,10 @@ MBSTART {									\
 	do							\
 	{							\
 		RC = fsync(FD);					\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 /* GTM_FWRITE is an EINTR-safe versions of "fwrite". Retries on EINTR. Returns number of elements written in NWRITTEN.
@@ -220,7 +284,7 @@ MBSTART {									\
  * Macro is named GTM_FWRITE instead of FWRITE because AIX defines a macro by the same name in fcntl.h.
  */
 #define GTM_FWRITE(BUFF, ELEMSIZE, NELEMS, FP, NWRITTEN, RC)			\
-RC = gtm_fwrite(BUFF, ELEMSIZE, NELEMS, FP, &(NWRITTEN));
+	RC = gtm_fwrite(BUFF, ELEMSIZE, NELEMS, FP, &(NWRITTEN));
 
 static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE *fp, size_t *nwritten)
 {
@@ -248,6 +312,8 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		rc = errno;
 		if (EINTR != rc)
 			break;
+		/* See comment before EINTR_HANDLING_CHECK in GTM_FREAD macro for similar issue here */
+		EINTR_HANDLING_CHECK;
 	}
 	*nwritten = nelems - elems_to_write;
 	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);
@@ -259,7 +325,10 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	do							\
 	{							\
 		RC = LSTAT(PATH, INFO);				\
-	} while ((uint4)-1 == RC && EINTR == errno);		\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define MSGSND(MSGID, MSGP, MSGSZ, FLG, RC)			\
@@ -267,7 +336,10 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	do							\
 	{							\
 		RC = msgsnd(MSGID, MSGP, MSGSZ, FLG);		\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define OPENAT(PATH, FLAGS, MODE, RC)				\
@@ -275,7 +347,10 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	do							\
 	{							\
 		RC = openat(PATH, FLAGS, MODE);			\
-	} while ((-1 == RC) && (EINTR == errno));		\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define OPEN_PIPE(FDESC, RC)					\
@@ -283,7 +358,10 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	do							\
 	{							\
 		RC = pipe(FDESC);				\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define READ_FILE(FD, BUF, SIZE, RC)				\
@@ -291,7 +369,10 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	do							\
 	{							\
 		RC = read(FD, BUF, SIZE);			\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define RECV(SOCKET, BUF, LEN, FLAGS, RC)			\
@@ -299,7 +380,10 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	do							\
 	{							\
 		RC = (int)recv(SOCKET, BUF, (int)(LEN), FLAGS);	\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define RECVFROM_SOCK(SOCKET, BUF, LEN, FLAGS,			\
@@ -309,7 +393,10 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	{							\
 		RC = RECVFROM(SOCKET, BUF, LEN,			\
 			 FLAGS, ADDR, ADDR_LEN);		\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define SELECT(FDS, INLIST, OUTLIST, XLIST, TIMEOUT, RC)	\
@@ -320,7 +407,10 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		eintr_select_timeval = *(TIMEOUT);		\
 		RC = select(FDS, INLIST, OUTLIST,		\
 			XLIST, &eintr_select_timeval);		\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 
@@ -329,7 +419,10 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	do							\
 	{							\
 		RC = send(SOCKET, BUF, LEN, FLAGS);		\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define SENDTO_SOCK(SOCKET, BUF, LEN, FLAGS,			\
@@ -339,7 +432,10 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	{							\
 		RC = SENDTO(SOCKET, BUF, LEN, FLAGS,		\
 			 ADDR, ADDR_LEN);			\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define STAT_FILE(PATH, INFO, RC)				\
@@ -347,7 +443,10 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	do							\
 	{							\
 		RC = Stat(PATH, INFO);				\
-	} while ((uint4)-1 == RC && EINTR == errno);		\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #if defined(DEBUG)
@@ -382,8 +481,14 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	do							\
 	{							\
 		RC = tcflush(FDESC, REQUEST);			\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
+
+#define CHANGE_TERM_TRUE TRUE
+#define CHANGE_TERM_FALSE FALSE
 
 #define Tcsetattr(FDESC, WHEN, TERMPTR, RC, ERRNO, CHANGE_TERM)						\
 {													\
@@ -398,21 +503,24 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	do												\
 	{												\
 		RC = tcsetattr(FDESC, WHEN, TERMPTR);							\
-	} while (-1 == RC && EINTR == errno);								\
-	terminal_settings_changed_fd = CHANGE_TERM ? (FDESC + 1) : 0;					\
+		if ((-1 != RC) || (EINTR != errno))							\
+			break;										\
+		EINTR_HANDLING_CHECK;									\
+	} while (TRUE);											\
+	terminal_settings_changed_fd = (CHANGE_TERM_FALSE != CHANGE_TERM) ? (FDESC + 1) : 0;		\
 	ERRNO = errno;											\
 	SIGPROCMASK(SIG_SETMASK, &oldset, NULL, rc);							\
 }
-
-#define CHANGE_TERM_TRUE TRUE
-#define CHANGE_TERM_FALSE FALSE
 
 #define TRUNCATE_FILE(PATH, LENGTH, RC)				\
 {								\
 	do							\
 	{							\
 		RC = TRUNCATE(PATH, LENGTH);			\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define WAIT(STATUS, RC)					\
@@ -420,7 +528,10 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	do							\
 	{							\
 		RC = wait(STATUS);				\
-	} while (-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define WAITPID(PID, STATUS, OPTS, RC)											\
@@ -434,7 +545,10 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	do														\
 	{														\
 		RC = waitpid(PID, STATUS, OPTS);									\
-	} while (-1 == RC && EINTR == errno);										\
+		if ((-1 != RC) || (EINTR != errno))									\
+			break;												\
+		EINTR_HANDLING_CHECK;											\
+	} while (TRUE);													\
 }
 
 #endif

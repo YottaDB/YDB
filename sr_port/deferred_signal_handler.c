@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,7 @@
 
 GBLREF	int		process_exiting;
 GBLREF	VSIG_ATOMIC_T	forced_exit;
+GBLREF	int		in_os_signal_handler;
 
 void	deferred_signal_handler(void)
 {
@@ -37,6 +38,12 @@ void	deferred_signal_handler(void)
 	assert(GET_DEFERRED_EXIT_CHECK_NEEDED || (1 != forced_exit));
 	if (process_exiting)
 		return;	/* Process is already exiting. Skip handling deferred events in that case. */
+	if (in_os_signal_handler)
+		return;	/* While inside an OS signal handler, we cannot exit as exit processing can call various functions
+			 * (e.g. malloc/free/pthread_mutex_lock etc.) that are not allowed inside a signal handler. Hence return.
+			 * We will come back to exit handling once the signal handler is done and a safe point is reached
+			 * once the signal handler is done (e.g. at a later ENABLE_INTERRUPTS call).
+			 */
 	if (simpleThreadAPI_active)
 	{
 		if (timer_in_handler)

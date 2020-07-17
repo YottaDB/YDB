@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,8 +56,10 @@
 		if (-1 == xf_rval) 									\
 		{											\
 			if (EINTR == errno)								\
+			{										\
+				EINTR_HANDLING_CHECK;							\
 				continue;								\
-			else										\
+			} else										\
 				break;									\
 		}											\
 		else if (0 == xf_rval)									\
@@ -238,8 +240,10 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, uint8 nsec_timeout, int argcnt
 	do
 	{
 		rval = sendmsg(socketptr->sd, &msg, 0);
-	}
-	while (!outofband && !out_of_time && (-1 == rval) && (EINTR == errno));
+		if (outofband || out_of_time || (-1 != rval) || (EINTR != errno))
+			break;
+		EINTR_HANDLING_CHECK;
+	} while (TRUE);
 	if (-1 == rval)
 		goto ioerr;
 	assert(rval == iov.iov_len);
@@ -309,6 +313,7 @@ ioerr:
 	save_errno = errno;
 	if (out_of_time && (EINTR == save_errno))
 	{
+		EINTR_HANDLING_CHECK;
 		dollar_truth = FALSE;
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
@@ -427,8 +432,10 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, uint8 nsec
 	do
 	{
 		rval = recvmsg(socketptr->sd, &msg, 0);
-	}
-	while (!outofband && !out_of_time && (-1 == rval) && (EINTR == errno));
+		if (outofband || out_of_time || (-1 != rval) || (EINTR != errno))
+			break;
+		EINTR_HANDLING_CHECK;
+	} while (TRUE);
 	if (0 == rval)
 	{
 		rval = -1;
@@ -591,6 +598,7 @@ ioerr:
 	save_errno = errno;
 	if (out_of_time && (EINTR == save_errno))
 	{
+		EINTR_HANDLING_CHECK;
 		dollar_truth = FALSE;
 	}
 	if ((NO_M_TIMEOUT != nsec_timeout) && !out_of_time)

@@ -3,6 +3,9 @@
  * Copyright (c) 2015 Fidelity National Information 		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -27,7 +30,10 @@
 	do							\
 	{							\
 		RC = sem_wait(POSIX_SEM);			\
-	} while ((-1 == RC) && (EINTR == errno));		\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define GTM_SEM_TRYWAIT(POSIX_SEM, RC)				\
@@ -35,7 +41,10 @@
 	do							\
 	{							\
 		RC = sem_trywait(POSIX_SEM);			\
-	} while ((-1 == RC) && (EINTR == errno));		\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 /* "sem_post" does not return EINTR so no do/while loop needed like for "sem_wait" */

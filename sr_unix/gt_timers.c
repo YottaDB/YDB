@@ -81,6 +81,7 @@
 #include "sig_init.h"
 #include "libyottadb_int.h"
 #include "invocation_mode.h"
+#include "ydb_os_signal_handler.h"
 
 #ifdef ITIMER_REAL
 # define BSD_TIMER
@@ -474,7 +475,7 @@ void cancel_timer(TID tid)
 	if (first_timer)
 	{
 		if (timeroot)
-			start_first_timer(&at);		/* start the first timer in the chain */
+			start_first_timer(&at);	/* start the first timer in the chain */
 		else if (timer_active)
 			sys_canc_timer();
 	}
@@ -1125,13 +1126,16 @@ void init_timers()
 	{
 		memset(&act, 0, SIZEOF(act));
 		sigemptyset(&act.sa_mask);
-		act.sa_sigaction = timer_handler;
-		/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED (invoked in "timer_handler") relies on "info" and "context" being passed in */
+		act.sa_sigaction = ydb_os_signal_handler;	/* "ydb_os_signal_handler" will in turn invoke "timer_handler" */
+		/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED (invoked in "timer_handler") relies
+		 * on "info" and "context" being passed in.
+		 */
 		act.sa_flags = YDB_SIGACTION_FLAGS;
 		sigaction(SIGALRM, &act, &prev_alrm_handler);
-		/* Note - YDB used to verify the expected handler here (i.e. either SIG_DFL or SIG_IGN) but that is no longer valid with
-		 * timer initialization being done in gtm_startup now and not waiting for the first timer. In this case, with either
-		 * variant of simple API, the handler could be set for anything by a non-M main program before YDB is initialized.
+		/* Note - YDB used to verify the expected handler here (i.e. either SIG_DFL or SIG_IGN) but that is no longer
+		 * valid with timer initialization being done in gtm_startup now and not waiting for the first timer. In this
+		 * case, with either variant of simple API, the handler could be set for anything by a non-M main program before
+		 * YDB is initialized.
 		 */
 	} else
 	{	/* We use an alternate method to drive signals here */
@@ -1174,7 +1178,7 @@ void check_for_timer_pops(boolean_t sig_handler_changed)
 			sigaction(SIGALRM, NULL, &current_sa);	/* get current info */
 			if (!first_timeset)
 			{
-				if (timer_handler != current_sa.sa_sigaction)	/* check if what we expected */
+				if (ydb_os_signal_handler != current_sa.sa_sigaction)	/* check if what we expected */
 				{
 					init_timers();
 					if (!stolen_timer)

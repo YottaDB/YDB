@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -380,7 +380,10 @@ void	dm_read (mval *v)
 			if (EINTR != errno)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 			else
+			{
+				EINTR_HANDLING_CHECK;
 				continue;
+			}
 		else if (0 == selstat)
 			continue;	/* timeout but still not ready for reading, try again */
 		/* selstat > 0; try reading something */
@@ -392,7 +395,10 @@ void	dm_read (mval *v)
 				io_ptr->dollar.za = 9;
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 			} else
+			{
+				EINTR_HANDLING_CHECK;
 				continue;
+			}
 		} else if (0 == status)
 		{	/* select() says there's something to read, but read() found zero characters; assume connection dropped. */
 			if (io_curr_device.in == io_std_device.in)

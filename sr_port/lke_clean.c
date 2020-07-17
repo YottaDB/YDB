@@ -332,7 +332,7 @@ void lke_clean(void)
 			sleep_time -= ((uint8)NANOSECS_IN_SEC + end_clock.tv_nsec - start_clock.tv_nsec) / NANOSECS_IN_USEC;
 		}
 		if (sleep_time > 0)
-			SLEEP_USEC(sleep_time, 0);
+			SLEEP_USEC(sleep_time, FALSE);
 		if (util_interrupt)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 	} while (TRUE);

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <sys/uio.h>
 #include "gtm_inet.h"
+#include "eintr_wrappers.h"
 
 GBLREF struct NTD *ntd_root;
 
@@ -64,7 +65,7 @@ cmi_status_t cmj_write_start(struct CLB *lnk)
 	 *
 	 */
 	while ((-1 == (rval = sendmsg(lnk->mun, &msg, 0))) && EINTR == errno)
-		;
+		EINTR_HANDLING_CHECK;
 	if (-1 == rval)
 	{
 		save_errno = errno;
@@ -118,7 +119,7 @@ cmi_status_t cmj_write_urg_start(struct CLB *lnk)
 	lnk->prev_sta = lnk->sta;
 	lnk->sta = CM_CLB_WRITE_URG;
 	while ((-1 == (rval = send(lnk->mun, (void *)&lnk->urgdata, 1, MSG_OOB))) && EINTR == errno)
-		;
+		EINTR_HANDLING_CHECK;
 	if (-1 == rval && !CMI_IO_WOULDBLOCK(errno))
 		return errno;
 	if (1 == rval)
@@ -142,7 +143,7 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
 	if (lnk->sta == CM_CLB_WRITE_URG)
 	{
 		while ((-1 == (rval = send(lnk->mun, (void *)&lnk->urgdata, 1, MSG_OOB))) && EINTR == errno)
-			;
+			EINTR_HANDLING_CHECK;
 		if (-1 == rval)
 		{
 			save_errno = errno;
@@ -167,7 +168,7 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
 	{
 		while ((-1 == (rval = send(lnk->mun, (void *)(lnk->ios.u.lenbuf + lnk->ios.len_len),
 					CMI_TCP_PREFIX_LEN - lnk->ios.len_len, 0))) && EINTR == errno)
-			;
+			EINTR_HANDLING_CHECK;
 		if (-1 == rval)
 		{
 			save_errno = errno;
@@ -198,7 +199,7 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
 		assert(lnk->ios.u.len > lnk->ios.xfer_count); /* we shouldn't be wasting system calls on doing 0 byte output */
 		while ((-1 == (rval = send(lnk->mun, (void *)(lnk->mbf + lnk->ios.xfer_count),
 					(int)(lnk->ios.u.len - lnk->ios.xfer_count), 0))) && EINTR == errno)
-			;
+			EINTR_HANDLING_CHECK;
 		if (-1 == rval && !CMI_IO_WOULDBLOCK(errno))
 		{
 			cmj_err(lnk, CMI_REASON_STATUS, (cmi_status_t)errno);

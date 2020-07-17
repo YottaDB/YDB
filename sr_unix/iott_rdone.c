@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -288,6 +288,7 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				break;
 			}
+			EINTR_HANDLING_CHECK;
 		} else if (0 == selstat)
 		{
 			if (timed)
@@ -462,7 +463,7 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 			}
 		} else if (rdlen < 0)
 		{
-			if (errno != EINTR)
+			if (EINTR != errno)
 			{
 				io_ptr->dollar.za = 9;
 				if (timed && (0 == nsec_timeout))
@@ -470,6 +471,7 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				break;
 			}
+			EINTR_HANDLING_CHECK;
 		} else
 		/* ------------
 		 * rdlen == 0

@@ -275,7 +275,10 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 						rel_quant();	/* allow resources to become available - likely sb nanosleep */
 						status2 = 0;	/* treat as timeout */
 					} else if (EINTR == save_errno)
+					{
+						EINTR_HANDLING_CHECK;
 						status2 = 0;
+					}
 				}
 			} else
 				status2 = 1;	/* do accept/connect first time */

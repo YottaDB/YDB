@@ -431,61 +431,15 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 				outofband_action(FALSE);
 				assert(FALSE);	/* above line should not return (the "cancel_timer" done above assumes this) */
 			}
-			if (EINTR == errno
-					|| ETXTBSY == errno
-					|| ENFILE == errno
-					|| EBUSY == errno
-					|| ((mb == iod->type) && (ENXIO == errno)))
+			if (EINTR == errno)
+			{
+				EINTR_HANDLING_CHECK;
+				continue;
+			}
+			if ((ETXTBSY == errno) || (ENFILE == errno) || (EBUSY == errno) || ((mb == iod->type) && (ENXIO == errno)))
 				continue;
 			else
-			{
-#				ifdef __MVS__
-				if (EINVAL == errno && ff == tl->iod->type && (oflag & O_RDONLY) && (oflag & O_WRONLY))
-				{
-					int	oflag_clone;
-					int	fcntl_res;
-					/* oflag must be O_RDWR, set it to be O_RDONLY 	*/
-					oflag &= ~O_WRONLY;
-					oflag |= O_NONBLOCK;
-					while ((-1 == (file_des = OPEN3(buf, SETOCLOEXEC(oflag), umask_creat))) && !out_of_time)
-					{
-						if (0 == nsec_timeout)
-							out_of_time = TRUE;
-						if (outofband)
-							outofband_action(FALSE);
-						if (EINTR == errno
-						       || ETXTBSY == errno
-						       || ENFILE == errno
-						       || EBUSY == errno
-						       || ((mb == iod->type) && (ENXIO == errno)))
-							continue;
-						else
-							break;
-					}
-					FCNTL2(file_des, F_GETFL, oflag_clone);
-					FCNTL3(file_des, F_SETFL, (oflag_clone & ~O_NONBLOCK), fcntl_res);
-					/* oflag was just made O_RDONLY, now set it to be O_WRONLY */
-					oflag |= O_WRONLY;
-					oflag &= ~O_RDONLY;
-					while ((-1 == (file_des_w = OPEN3(buf, SETOCLOEXEC(oflag), umask_creat))) && !out_of_time)
-					{
-						if (0 == nsec_timeout)
-							out_of_time = TRUE;
-						if (outofband)
-							outofband_action(FALSE);
-						if (EINTR == errno
-						       || ETXTBSY == errno
-						       || ENFILE == errno
-						       || EBUSY == errno
-						       || ((mb == iod->type) && (ENXIO == errno)))
-							continue;
-						else
-							break;
-					}
-				}
-#				endif
 				break;
-			}
 		}
 		SETFDCLOEXEC(file_des);
 		if (timed && !out_of_time)

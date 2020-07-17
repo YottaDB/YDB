@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,13 +93,18 @@ cmi_status_t cmi_open(struct CLB *lnk)
 		assertpro(FD_SETSIZE > new_fd);
 		do
 		{
+			if (EINTR == errno)
+				EINTR_HANDLING_CHECK;
 			if ((EINTR == errno) && outofband && (jobinterrupt != outofband))
 				break;		/* abort unless job interrupt */
 			FD_ZERO(&writefds);
 			FD_SET(new_fd, &writefds);
 			rval = select(new_fd + 1, NULL, &writefds, NULL, NULL);
 			if (-1 == rval && EINTR == errno)
+			{
+				EINTR_HANDLING_CHECK;
 				continue;
+			}
 			if (0 < rval)
 			{	/* check for socket error */
 				sockerrorlen = SIZEOF(sockerror);

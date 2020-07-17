@@ -680,8 +680,9 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 			}
 			if (!terminator)
 				more_data = TRUE;
-		} else if ((EINTR == errno) && !out_of_time)	/* Unrelated timer popped */
+		} else if ((EINTR == errno) && !out_of_time)	/* Unrelated timer/signal popped */
 		{
+			EINTR_HANDLING_CHECK;
 			status = 0;
 			continue;
 		} else
@@ -810,7 +811,10 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 		}
 	}
 	if (EINTR == real_errno)
+	{
+		EINTR_HANDLING_CHECK;
 		status = 0;	/* Don't treat a <CTRL-C> or timeout as an error */
+	}
 	if (timed)
 	{
 		if (0 < nsec_timeout)

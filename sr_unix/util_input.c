@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,6 +24,7 @@
 #include "gtm_utf8.h"
 #endif
 #include "util.h"
+#include "eintr_wrappers.h"
 
 #ifdef UTF8_SUPPORTED
 GBLREF	boolean_t	gtm_utf8_mode;
@@ -70,7 +74,10 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 			do
 			{	/* no u_ferror */
 				uc_fgets_ret = u_fgets(ufgets_Ubuffer, (int32_t)(SIZEOF(ufgets_Ubuffer) / SIZEOF(UChar)) - 1, u_fp);
-			} while (NULL == uc_fgets_ret && !u_feof(u_fp) && ferror(fp) && EINTR == errno);
+				if ((NULL != uc_fgets_ret) || u_feof(u_fp) || !ferror(fp) || (EINTR != errno))
+					break;
+				EINTR_HANDLING_CHECK;
+			} while (TRUE);
 			if (NULL == uc_fgets_ret)
 			{
 				if (!u_feof(u_fp))
@@ -121,7 +128,10 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 		do
 		{
 			FGETS(buffer, buffersize, fp, retptr);
-		} while (NULL == retptr && !feof(fp) && ferror(fp) && EINTR == errno);
+			if ((NULL != retptr) || feof(fp) || !ferror(fp) || (EINTR != errno))
+				break;
+			EINTR_HANDLING_CHECK;
+		} while (TRUE);
 		if (NULL != retptr)
 		{
 			if (remove_leading_spaces)

@@ -752,7 +752,8 @@ STATICFNDEF void exec_read(BFILE *bf, char *buf, int nbytes)
 			CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
 			restore_read_errno = errno;
 			break;
-		}
+		} else if (EINTR == errno)
+			EINTR_HANDLING_CHECK;
 		wcs_sleep(100);
 	}
 	return;
@@ -795,12 +796,16 @@ STATICFNDEF void tcp_read(BFILE *bf, char *buf, int nbytes)
 				curr += status;
 			}
 		}
-		if ((status < 0) && (errno != EINTR))
+		if (0 > status)
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
-			CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
-			restore_read_errno = errno;
-			break;
+			if (errno != EINTR)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
+				CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
+				restore_read_errno = errno;
+				break;
+			} else
+				EINTR_HANDLING_CHECK;
 		}
 	}
 	return;

@@ -1378,3 +1378,8 @@ GBLDEF	GPCallback		go_panic_callback;	/* Address of C routine to drive Go rtn an
 							 * for Go panic after an alternate deferred fatal signal is handled.
 							 */
 GBLDEF	void (*process_pending_signals_fptr)(void);	/* Function pointer for process_pending_signals() */
+GBLDEF	volatile int		in_os_signal_handler;	/* Non-zero if we are in an OS invoked signal handler
+							 * (i.e. "ydb_os_signal_handler()"). It could be greater than zero if
+							 * we get a SIGTERM signal while handling a SIGALRM signal (both
+							 * signals go through "ydb_os_signal_handler").
+							 */

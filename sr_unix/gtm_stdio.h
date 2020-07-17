@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -111,28 +111,40 @@ int	gtm_sscanf(char *str, const char *format, ...);
 	do							\
 	{							\
 		RC = vprintf(FORMAT, VALUE);			\
-	} while(-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 #define VFPRINTF(STREAM, FORMAT, VALUE, RC)			\
 {								\
 	do							\
 	{							\
 		RC = vfprintf(STREAM, FORMAT, VALUE);		\
-	} while(-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 #define VSPRINTF(STRING, FORMAT, VALUE, RC)			\
 {								\
 	do							\
 	{							\
 		RC = vsprintf(STRING, FORMAT, VALUE);		\
-	} while(-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 #define VSNPRINTF(STRING, SIZE, FORMAT, VALUE, RC)		\
 {								\
 	do							\
 	{							\
 		RC = vsnprintf(STRING, SIZE, FORMAT, VALUE);	\
-	} while(-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 /* Note TRU64 does not have these v*scanf() functions so they will generate errors if used */
@@ -141,21 +153,30 @@ int	gtm_sscanf(char *str, const char *format, ...);
 	do							\
 	{							\
 		RC = vscanf(FORMAT, POINTER);			\
-	} while(-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 #define VSSCANF(STRING, FORMAT, POINTER, RC)			\
 {								\
 	do							\
 	{							\
 		RC = vsscanf(STRING, FORMAT, POINTER);		\
-	} while(-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 #define VFSCANF(STREAM, FORMAT, POINTER, RC)			\
 {								\
 	do							\
 	{							\
 		RC = vfscanf(STREAM, FORMAT, POINTER);		\
-	} while(-1 == RC && EINTR == errno);			\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+		EINTR_HANDLING_CHECK;				\
+	} while (TRUE);						\
 }
 
 #define SNPRINTF_ENV_NUM(BUFF, LEN, ENV_VAR, ENV_VAL, ENV_IND)						\

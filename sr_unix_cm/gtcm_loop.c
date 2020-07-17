@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -123,6 +123,7 @@ void gtcm_loop(omi_conn_ll *cll)
 	if ((nfds = select(nfds, &r_fds, (fd_set *)0, (fd_set *)0, tp)) < 0)
 	{
 	    if (errno == EINTR) {
+		EINTR_HANDLING_CHECK;
 		if (!omi_exitp)
 		    continue;
 	    }

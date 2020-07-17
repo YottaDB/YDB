@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -20,6 +23,7 @@
 #include "gtm_inet.h"
 #include "gtm_string.h"
 #include "gtm_select.h"
+#include "eintr_wrappers.h"
 
 int	gtm_connect(int socket, struct sockaddr *address, size_t address_len)
 {
@@ -39,8 +43,11 @@ int	gtm_connect(int socket, struct sockaddr *address, size_t address_len)
 			FD_ZERO(&writefds);
 			FD_SET(socket, &writefds);
 			res = select(socket + 1, NULL, &writefds, NULL, NULL);
-			if (-1 == res && EINTR == errno)
+			if ((-1 == res) && (EINTR == errno))
+			{
+				EINTR_HANDLING_CHECK;
 				continue;
+			}
 			if (0 < res)
 			{	/* check for socket error */
 				sockerrorlen = SIZEOF(sockerror);

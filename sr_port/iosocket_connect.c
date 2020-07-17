@@ -36,6 +36,7 @@
 #include "gtm_select.h"
 #include "min_max.h"
 #include "gtm_fcntl.h"
+#include "eintr_wrappers.h"
 
 #define	ESTABLISHED	"ESTABLISHED"
 
@@ -325,6 +326,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 						need_connect = FALSE;
 						break;
 					case EINTR:
+						EINTR_HANDLING_CHECK;
 						if (outofband && (0 != nsec_timeout))
 						{	/* handle outofband unless zero timeout */
 							save_errno = 0;
@@ -421,7 +423,8 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					} else if (0 == res && (0 != sockerror))
 					{
 						if (EINTR == sockerror)
-						{ /* loop on select */
+						{	/* loop on select */
+							EINTR_HANDLING_CHECK;
 							save_errno = 0;
 							continue;
 						} else
@@ -452,10 +455,14 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 				{
 					save_errno = errno;
 					break;
-				} else if (outofband)
+				} else
 				{
-					save_errno = 0;
-					break;
+					EINTR_HANDLING_CHECK;
+					if (outofband)
+					{
+						save_errno = 0;
+						break;
+					}
 				}
 			} while (TRUE); /* do select */
 		}

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -235,6 +235,7 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout)
 				rv = poll(poll_fds, poll_nfds, poll_timeout);
 				if (0 > rv && EINTR == errno)
 				{
+					EINTR_HANDLING_CHECK;
 					if (0 != outofband)
 					{
 						if (OUTOFBAND_RESTARTABLE(outofband))

@@ -54,7 +54,7 @@
 #include "patcode.h"
 #include "lke.h"
 #include "ydb_chk_dist.h"
-#include "generic_signal_handler.h"
+#include "ydb_os_signal_handler.h"
 #include "cli_parse.h"
 #include "getzdir.h"
 #include "dse_exit.h"
@@ -119,7 +119,7 @@ int dse_main(int argc, char **argv, char **envp)
 	err_init(util_base_ch);
 	DEFINE_EXIT_HANDLER(util_exit_handler, TRUE);	/* Must be defined only AFTER err_init() has setup condition handling */
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
-	sig_init(generic_signal_handler, dse_ctrlc_handler, suspsigs_handler, continue_handler);
+	sig_init(ydb_os_signal_handler, dse_ctrlc_handler, suspsigs_handler, continue_handler);
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	stp_init(STP_INITSIZE);
 	stpgc_ch = &stp_gcol_ch;

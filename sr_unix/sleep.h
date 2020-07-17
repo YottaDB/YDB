@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,8 @@
 
 #ifndef SLEEP_H
 #define SLEEP_H
+
+#include "eintr_wrappers.h"
 
 #define	RESTART_FALSE	FALSE
 #define	RESTART_TRUE	TRUE
@@ -62,7 +64,14 @@ MBSTART {											\
 		STATUS = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &REQTIM, NULL);	\
 		assert((0 == STATUS) || (EINTR == STATUS));					\
 		if (!(RESTART) || (0 == STATUS))						\
+		{										\
+			/* Check if any signal handling got deferred during the sleep.		\
+			 * If so handle it safely outside of the signal handler.		\
+			 */									\
+			DEFERRED_SIGNAL_HANDLING_CHECK;						\
 			break;									\
+		}										\
+		EINTR_HANDLING_CHECK;								\
 	} while (TRUE);										\
 } MBEND
 

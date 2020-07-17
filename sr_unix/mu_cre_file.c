@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -239,7 +239,10 @@ unsigned char mu_cre_file(void)
 	do
 	{
 		mu_cre_file_fd = OPEN3(pblk.l_dir, O_CREAT | O_EXCL | O_RDWR, 0600);
-	} while ((-1 == mu_cre_file_fd)  && (EINTR == errno));
+		if ((-1 != mu_cre_file_fd) || (EINTR != errno))
+			break;
+		EINTR_HANDLING_CHECK;
+	} while (TRUE);
 	if (FD_INVALID == mu_cre_file_fd)
 	{	/* Avoid error message if file already exists (another process created it) for AUTODBs that are NOT also
 		 * STATSDBs.

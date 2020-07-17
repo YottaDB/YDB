@@ -94,6 +94,7 @@
 #include "libyottadb_int.h"
 #include "mdq.h"
 #include "invocation_mode.h"
+#include "ydb_os_signal_handler.h"
 
 #define	NOISOLATION_LITERAL	"NOISOLATION"
 
@@ -250,15 +251,15 @@ void gtm_startup(struct startup_vector *svec)
 	{
 		DEFINE_EXIT_HANDLER(gtm_exit_handler, TRUE);
 		if (!(MUMPS_CALLIN & invocation_mode))
-			sig_init(generic_signal_handler, ctrlc_handler_ptr, suspsigs_handler, continue_handler);
+			sig_init(ydb_os_signal_handler, ctrlc_handler_ptr, suspsigs_handler, continue_handler);
 		else
 		{	/* SimpleAPI/Call-in invocation of YDB. Ctrl-C should terminate the process.
-			 * Treat it like SIGTERM by using "generic_signal_handler" for SIGINT (Ctrl-C) too.
+			 * Treat it like SIGTERM by using "ydb_os_signal_handler" for SIGINT (Ctrl-C) too.
 			 */
 			if (USING_ALTERNATE_SIGHANDLING)
 				sig_init_lang_altmain();
 			else
-				sig_init(generic_signal_handler, generic_signal_handler, suspsigs_handler, continue_handler);
+				sig_init(ydb_os_signal_handler, ydb_os_signal_handler, suspsigs_handler, continue_handler);
 		}
 	}
 	io_init(IS_MUPIP_IMAGE);		/* starts with nocenable for GT.M runtime, enabled for MUPIP */

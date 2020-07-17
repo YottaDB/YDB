@@ -60,7 +60,7 @@
 #include "patcode.h"
 #include "copy.h"
 #include "lockconst.h"
-#include "generic_signal_handler.h"
+#include "ydb_os_signal_handler.h"
 #include "gtcmtr_protos.h"
 #include "gtcm_shutdown_ast.h"
 #include "gtcm_neterr.h"
@@ -403,7 +403,7 @@ int gtcm_gnp_server_main(int argc, char **argv, char **envp)
 	rts_stringpool = stringpool;
 	getzdir();
 	DEFINE_EXIT_HANDLER(gtcm_exi_handler, TRUE);
-	sig_init(generic_signal_handler, null_handler, suspsigs_handler, continue_handler); /* should do be done before cmi_init */
+	sig_init(ydb_os_signal_handler, null_handler, suspsigs_handler, continue_handler); /* should be done before cmi_init */
 
 	/* Redefine handler for SIGHUP to switch log file */
 	memset(&act, 0, SIZEOF(act));

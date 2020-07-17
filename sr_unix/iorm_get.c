@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -219,8 +219,9 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, uint8 *nsec_timeout,
 			continue; /* for now try and read again if eof or no input ready */
 		} else		  /* error returned */
 		{
-			if (errno != EINTR)
+			if (EINTR != errno)
 				break;
+			EINTR_HANDLING_CHECK;
 		}
 	} while (rm_ptr->bom_buf_cnt < bom_bytes2read);
 	PIPE_DEBUG(PRINTF("iorm_get_bom_fl: status: %d, bom_buf_cnt: %d\n", status,rm_ptr->bom_buf_cnt); DEBUGPIPEFLUSH;);
@@ -423,8 +424,9 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, uint8 *nsec_timeout, boo
 				continue; /* for now try and read again if eof or no input ready */
 			} else		  /* error returned */
 			{
-				if (errno != EINTR)
+				if (EINTR != errno)
 					break;
+				EINTR_HANDLING_CHECK;
 			}
 		} while (bytes_count < bytes2read);
 		status = bytes_count;
@@ -608,8 +610,12 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 		}
 		if (0 > status)
 		{
-			if (errno == EINTR  &&  out_of_time)
-				status = -2;
+			if (EINTR == errno)
+			{
+				EINTR_HANDLING_CHECK;
+				if (out_of_time)
+					status = -2;
+			}
 			if (pipe_or_fifo && outofband)
 			{
 				PIPE_DEBUG(PRINTF("iorm_get_bom: status: %d, bom_buf_cnt: %d tot_bytes_read: %d\n", status,

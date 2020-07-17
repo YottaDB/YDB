@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -225,7 +225,10 @@ STATICFNDEF void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_t
 					}
 					save_errno = errno;
 					if (EINTR == save_errno)
+					{
+						EINTR_HANDLING_CHECK;
 						continue;
+					}
 					if (ERANGE != save_errno)
 					{
 						assert(FALSE);
@@ -309,7 +312,10 @@ STATICFNDEF void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_t
 					}
 					save_errno = errno;
 					if (EINTR == save_errno)
+					{
+						EINTR_HANDLING_CHECK;
 						continue;
+					}
 					if (ERANGE != save_errno)
 					{
 						assert(FALSE);
@@ -395,7 +401,10 @@ STATICFNDEF void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_t
 					}
 					save_errno = errno;
 					if (EINTR == save_errno)
+					{
+						EINTR_HANDLING_CHECK;
 						continue;
+					}
 					if (ERANGE != save_errno)
 					{
 						assert(FALSE);

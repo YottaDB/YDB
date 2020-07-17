@@ -21,6 +21,7 @@
 #include "stack_frame.h"
 #include "outofband.h"
 #include "libyottadb_int.h"
+#include "have_crit.h"
 
 GBLREF io_pair		io_std_device;
 GBLREF stack_frame	*frame_pointer;
@@ -38,6 +39,16 @@ void outofband_action(boolean_t lnfetch_or_start)
 {
 	if (outofband)
 	{
+		/* First check if a process terminating signal was deferred (that overloads "outofband" variable
+		 * so various existing code paths automatically recognize the signal as an outofband event).
+		 * If so handle just that and return and reset outofband to FALSE.
+		 */
+		if (deferred_signal == outofband)
+		{
+			DEFERRED_SIGNAL_HANDLING_CHECK;
+			outofband = 0;
+			return;
+		}
 		if (io_std_device.in->type == tt)
 			iott_flush(io_std_device.in);
 		if (lnfetch_or_start)
@@ -45,6 +56,10 @@ void outofband_action(boolean_t lnfetch_or_start)
 			frame_pointer->restart_pc = frame_pointer->mpc;
 			frame_pointer->restart_ctxt = frame_pointer->ctxt;
 		}
+		/* Check if any process terminating signal was received (e.g. SIGTERM, it would have set "outofband" to TRUE
+		 * as part of the SET_FORCED_EXIT macro invocation). If so handle it now when it is safe to do so
+		 * (i.e. while we are not inside a signal handler).
+		 */
 		switch(outofband)
 		{
 			case (ctrly):		/* This signal is ignored in simpleAPI */

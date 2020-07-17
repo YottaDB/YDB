@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -321,7 +321,10 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 				if (client_timer_popped)
 					break;
 				if (EINTR == save_errno)	/* Had an irrelevant interrupt - ignore */
+				{
+					EINTR_HANDLING_CHECK;
 					continue;
+				}
 				if (EBADF == save_errno)
 					break;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_GTMSECSHRSRVF, 4,
@@ -495,7 +498,8 @@ int create_server(void)
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSTART, 3,
 							RTS_ERROR_TEXT("Client"), process_id,
 							ERR_TEXT, 2, RTS_ERROR_TEXT("Error spawning gtmsecshr"), errno);
-				}
+				} else
+					EINTR_HANDLING_CHECK;
 			}
 		}
 	}

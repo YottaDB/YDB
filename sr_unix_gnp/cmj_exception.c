@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,10 +12,13 @@
  *								*
  ****************************************************************/
 
-#include <errno.h>
 #include "mdef.h"
+
+#include <errno.h>
+
 #include "cmidef.h"
 #include "gtm_socket.h"
+#include "eintr_wrappers.h"
 
 void cmj_exception_interrupt(struct CLB *lnk, int signo)
 {
@@ -27,7 +30,7 @@ void cmj_exception_interrupt(struct CLB *lnk, int signo)
 	if (signo == SIGURG)
 	{
 		while ((-1 == (rval = (int)recv(lnk->mun, (void *)&lnk->urgdata, 1, MSG_OOB))) && EINTR == errno)
-			;
+			EINTR_HANDLING_CHECK;
 		/* test to see if there is ANY oob data */
 		if (-1 == rval && (CMI_IO_WOULDBLOCK(errno) || errno == EINVAL))
 			return;

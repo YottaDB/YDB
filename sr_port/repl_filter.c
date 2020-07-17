@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -548,9 +548,16 @@ static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len, boole
 		prev_sent_len = 0;
 	} else
 		send_ptr = extract_buff + prev_sent_len;
-	while (0 > (sent_len = write(repl_srv_filter_fd[WRITE_END], send_ptr, send_len))
-			&& (errno == EINTR ))
-		;
+	do
+	{
+		sent_len = write(repl_srv_filter_fd[WRITE_END], send_ptr, send_len);
+		if ((0 > sent_len) && (EINTR == errno))
+		{
+			EINTR_HANDLING_CHECK;
+			continue;
+		}
+		break;
+	} while (TRUE);
 	if (0 > sent_len)
 	{
 		if (EAGAIN == errno)
@@ -646,8 +653,10 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 					if (-1 == status)
 					{
 						if (EINTR == errno) /* ignore interrupt and try again */
+						{
+							EINTR_HANDLING_CHECK;
 							continue;
-						else
+						} else
 						{
 							repl_errno = EREPL_FILTERRECV;
 							return errno;
@@ -676,6 +685,8 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 				save_errno = errno;
 				if ((ENOMEM != save_errno) && (EINTR != save_errno))
 					break;
+				if (EINTR == save_errno)
+					EINTR_HANDLING_CHECK;
 				/* EINTR/ENOMEM -- check if it's time to take the stack trace. */
 				if (send_done)
 				{
@@ -907,8 +918,10 @@ int repl_filter(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize
 				if (-1 == status)
 				{
 					if (EINTR == errno) /* ignore interrupt and try again */
+					{
+						EINTR_HANDLING_CHECK;
 						continue;
-					else
+					} else
 					{
 						repl_errno = EREPL_FILTERSEND;
 						return errno;
@@ -962,8 +975,10 @@ int repl_filter(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize
 				if (-1 == status)
 				{
 					if (EINTR == errno) /* ignore interrupt and try again */
+					{
+						EINTR_HANDLING_CHECK;
 						continue;
-					else
+					} else
 					{
 						repl_errno = EREPL_FILTERRECV;
 						return errno;

@@ -12,8 +12,10 @@
  *								*
  ****************************************************************/
 #include "mdef.h"
+
 #include "cmidef.h"
 #include "relqop.h"
+#include "have_crit.h"
 
 GBLREF struct NTD *ntd_root;
 
@@ -24,6 +26,10 @@ void cmj_housekeeping(void)
 	sigset_t oset;
 
 	ASSERT_IS_LIBCMISOCKETTCP;
+	/* Check if any process terminating signal was received (e.g. SIGTERM) and if so handle it now
+	 * when it is safe to do so (i.e. while we are not inside a signal handler).
+	 */
+	DEFERRED_SIGNAL_HANDLING_CHECK;
 	/* handle I/O interrupts */
 	if (ntd_root->sigurg_interrupt)
 	{

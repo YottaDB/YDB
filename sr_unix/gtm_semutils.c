@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -162,7 +162,11 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 			{
 				status = semop(semid, sop, sopcnt);
 				save_errno = errno;
-				if ((-1 == status) && (ERANGE == save_errno))
+				if (-1 != status)
+					break;
+				if (EINTR == save_errno)
+					EINTR_HANDLING_CHECK;
+				if (ERANGE == save_errno)
 				{
 					if (!(*sem_halted))
 					{
@@ -171,8 +175,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 						continue; /* Try again */
 					}
 				}
-			} while ((-1 == status) && ((EINTR == save_errno) || (ERANGE == save_errno))
-				 && (indefinite_wait || !*timedout));
+			} while (((EINTR == save_errno) || (ERANGE == save_errno)) && (indefinite_wait || !*timedout));
 			if (-1 != status)
 				return TRUE;
 			/* someone else is holding it and we are done waiting */
@@ -201,6 +204,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 				continue;	/* retry semop */
 			} else if (EINTR != save_errno)
 				break;
+			EINTR_HANDLING_CHECK;
 			sem_pid = semctl(semid, 0, GETPID);
 			if (-1 != sem_pid)
 			{

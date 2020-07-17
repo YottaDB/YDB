@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -155,6 +155,7 @@ int fd_ioready(int sock_fd, int poll_direction, int timeout)
 		save_errno = ERRNO;
 		if (EINTR == save_errno)
 		{	/* Give it another shot. But, halve the timeout so we don't keep doing this forever. */
+			EINTR_HANDLING_CHECK;
 			timeout = timeout >> 1;
 		} else if (EAGAIN == save_errno)
 		{	/* Resource starved system; relinquish the processor in the hope that we may get the required resources
@@ -252,7 +253,10 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 #			endif
 			assert((EMSGSIZE != save_errno) && (EWOULDBLOCK != save_errno));
 			if (EINTR == save_errno)
+			{
+				EINTR_HANDLING_CHECK;
 				continue;
+			}
 			if (EMSGSIZE == save_errno)
 			{
 				if (send_size > REPL_COMM_MIN_SEND_SIZE)
@@ -365,8 +369,10 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 			if (0 == bytes_recvd)
 				save_errno = ECONNRESET;
 			if (EINTR == save_errno)
+			{
+				EINTR_HANDLING_CHECK;
 				continue;
-			else if (ETIMEDOUT == save_errno)
+			} else if (ETIMEDOUT == save_errno)
 			{
 				repl_log(stderr, TRUE, TRUE, "Communication subsystem warning: network may be down;"
 								" socket recv() returned ETIMEDOUT\n");		/* BYPASSOK(recv) */

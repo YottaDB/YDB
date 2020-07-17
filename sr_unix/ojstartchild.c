@@ -897,11 +897,15 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			 * a union wait argument (on AIX)
 			 */
 			done_pid = waitpid(child_pid, &wait_status, 0);	/* BYPASSOK */
-		} while(!ojtimeout && 0 > done_pid && EINTR == errno);
+			if (ojtimeout || (0 <= done_pid) || (EINTR != errno))
+				break;
+			EINTR_HANDLING_CHECK;
+		} while (TRUE);
 		if (done_pid == child_pid)
 			return (wait_status);
-		else if (0 > done_pid && EINTR == errno && TRUE == ojtimeout)
+		else if ((0 > done_pid) && (EINTR == errno) && ojtimeout)
 		{
+			EINTR_HANDLING_CHECK;
 			/* Kill the middle process with SIGTERM and check the exit status from
 			 * the handler to see if the Middle process had actually successfully forked the Job */
 			KILL_N_REAP(child_pid, SIGTERM, kill_ret);

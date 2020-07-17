@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -171,7 +171,7 @@ STATICFNDCL void *io_getevents_multiplexer(void *arg)
 	do
 	{	/* we poll on the file descriptors */
 		while ((-1 == (ret = poll(fds, ARRAYSIZE(fds), -1))) && (EINTR == errno))
-			;
+			EINTR_HANDLING_CHECK;
 		assert(-1 != ret);
 		if (-1 == ret)
 			RECORD_ERROR_IN_WORKER_THREAD_AND_EXIT(gdi, "worker_thread::poll()", errno);
@@ -215,9 +215,8 @@ STATICFNDCL int io_getevents_internal(aio_context_t ctx)
 
 	do
 	{	/* Loop on EINTR. */
-		while (-1 == (ret = io_getevents(ctx, 0, MAX_EVENTS, event, &timeout))
-				&& (EINTR == errno))
-			;
+		while (-1 == (ret = io_getevents(ctx, 0, MAX_EVENTS, event, &timeout)) && (EINTR == errno))
+			EINTR_HANDLING_CHECK;
 		assert(ret >= 0);
 		if (-1 == ret)
 			return -1;

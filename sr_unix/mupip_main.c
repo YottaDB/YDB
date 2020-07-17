@@ -48,7 +48,7 @@
 #include "patcode.h"
 #include "lke.h"
 #include "ydb_chk_dist.h"
-#include "generic_signal_handler.h"
+#include "ydb_os_signal_handler.h"
 #include "mu_op_open.h"
 #include "cli_parse.h"
 #include "getzdir.h"
@@ -94,7 +94,7 @@ int mupip_main(int argc, char **argv, char **envp)
 	err_init(util_base_ch);
 	DEFINE_EXIT_HANDLER(mupip_exit_handler, TRUE);	/* Must be defined only AFTER err_init() has setup condition handling */
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
-	sig_init(generic_signal_handler, NULL, suspsigs_handler, continue_handler);	/* Note: no ^C handler is defined (yet) */
+	sig_init(ydb_os_signal_handler, NULL, suspsigs_handler, continue_handler);	/* Note: no ^C handler is defined (yet) */
 	licensed = TRUE;
 	in_backup = FALSE;
 	op_open_ptr = mu_op_open;

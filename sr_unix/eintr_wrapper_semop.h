@@ -3,6 +3,9 @@
  * Copyright (c) 2011-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -17,6 +20,7 @@
 #include <sys/types.h>
 #include <errno.h>
 #include "gtm_c_stack_trace_semop.h"
+#include "eintr_wrappers.h"		/* for EINTR_HANLDING_CHECK macro */
 #ifdef DEBUG
 #ifdef SUNOS
 #define SEMVALMAX 65535
@@ -47,7 +51,10 @@
 		do											\
 		{											\
 			RC = semop(SEMID, SOPS, NSOPS);							\
-		} while (-1 == RC && EINTR == errno);							\
+			if ((-1 != RC) || (EINTR != errno))						\
+				break;									\
+			EINTR_HANDLING_CHECK;								\
+		} while (TRUE);										\
 	}												\
 }
 #endif

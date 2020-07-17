@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -446,6 +446,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 				term_error_line = __LINE__;
 				goto term_error;
 			}
+			EINTR_HANDLING_CHECK;
 		} else if (0 == selstat)
 		{
 			if (timed)
@@ -1002,7 +1003,8 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 		{
 			term_error_line = __LINE__;
 			goto term_error;
-		}
+		} else
+			EINTR_HANDLING_CHECK;
 		if (FINI == io_ptr->esc_state)
 		{
 			int zb_len = (int)(zb_ptr - io_ptr->dollar.zb);

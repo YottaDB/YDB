@@ -54,9 +54,16 @@
 #include "gtm_exit_handler.h"
 #include "sighnd_debug.h"
 
+/* If we are in a signal handler, we want to defer exit processing as the exit handler can invoke various functions
+ * that are not async-signal safe (e.g. malloc/free/syslog etc.). Hence the check for "in_os_signal_handler" below.
+ * But if "exit_state" is EXIT_IMMED (happens if the user sends 3 such signals), the user is most likely wanting the
+ * process to terminate right away so we skip this safety check and proceed to exit in the hope that we won't encounter
+ * any issues with invoking such async-signal unsafe functions inside the signal handler. Hence the check for "exit_state"
+ * before we do the "in_os_signal_handler" check.
+ */
 #define	DEFER_EXIT_PROCESSING	((EXIT_PENDING_TOLERANT >= exit_state)			\
 				 && (exit_handler_active || multi_thread_in_use		\
-				     || multi_proc_in_use || !OK_TO_INTERRUPT))
+				     || in_os_signal_handler || multi_proc_in_use || !OK_TO_INTERRUPT))
 
 /* Combine send_msg and gtm_putmsg into one macro to conserve space. */
 #define SEND_AND_PUT_MSG(...)					\

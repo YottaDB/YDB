@@ -437,7 +437,10 @@ void	iorm_use(io_desc *iod, mval *pp)
 						do
 						{
 							newfd = dup(rm_ptr->fildes);
-						} while (-1 == newfd && EINTR == errno);
+							if ((-1 != newfd) || (EINTR != errno))
+								break;
+							EINTR_HANDLING_CHECK;
+						} while (TRUE);
 						if (-1 == newfd)
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 								RTS_ERROR_LITERAL("dup"), CALLFROM, save_errno);

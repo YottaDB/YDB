@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -146,7 +146,10 @@ mutex_wake_proc(msemaphore *mutex_wake_msem_ptr)
 	do
 	{
 		rc = MSEM_UNLOCK(mutex_wake_msem_ptr);
-	} while (-1 == rc && EINTR == errno);
+		if ((-1 != rc) || (EINTR != errno))
+			break;
+		EINTR_HANDLING_CHECK;
+	} while (TRUE);
 	if (0 > rc)
 	{
 		assert(FALSE);
