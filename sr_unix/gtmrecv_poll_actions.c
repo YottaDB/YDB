@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -149,6 +149,10 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	upd_proc_local = recvpool.upd_proc_local;
 	gtmrecv_local = recvpool.gtmrecv_local;
 	upd_helper_ctl = recvpool.upd_helper_ctl;
+	/* Check if any process terminating signal was received (e.g. SIGTERM) and if so handle it now
+	 * when it is safe to do so (i.e. while we are not inside a signal handler).
+	 */
+	DEFERRED_SIGNAL_HANDLING_CHECK;
 	if (SHUTDOWN == gtmrecv_local->shutdown)
 	{
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Shutdown signalled\n");

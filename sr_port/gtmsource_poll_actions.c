@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,6 +88,10 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	gtm_time4_t		time4;
 
 	gtmsource_local = jnlpool->gtmsource_local;
+	/* Check if any process terminating signal was received (e.g. SIGTERM) and if so handle it now
+	 * when it is safe to do so (i.e. while we are not inside a signal handler).
+	 */
+	DEFERRED_SIGNAL_HANDLING_CHECK;
 	if (SHUTDOWN == gtmsource_local->shutdown)
 	{
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Shutdown signalled\n");
