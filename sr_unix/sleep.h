@@ -37,6 +37,9 @@ void m_usleep(int useconds);
 #      error "Unsure of support for sleep functions on this platform"
 #endif
 
+#define	MT_SAFE_TRUE	TRUE
+#define	MT_SAFE_FALSE	FALSE
+
 /* Nonetheless, because we continue to press for the highest time discrimination available, where posible we use
  * clock_nanosleep and clock_gettime, which, while currently no faster than gettimeofday(), do eventually promise
  * sub-millisecond accuracy
@@ -45,7 +48,7 @@ void m_usleep(int useconds);
  * things but give the following macro a separate name so AIX can use it in op_hang.c to ensure that a 1 second sleep always
  * puts the process in a different second as measured by $HOROLOG and the like.
  */
-# define CLOCK_NANOSLEEP(NANOSECONDS, RESTART)							\
+# define CLOCK_NANOSLEEP(NANOSECONDS, RESTART, MT_SAFE)						\
 MBSTART {											\
 	int 		STATUS;									\
 	struct timespec	REQTIM;									\
@@ -63,15 +66,22 @@ MBSTART {											\
 	{											\
 		STATUS = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &REQTIM, NULL);	\
 		assert((0 == STATUS) || (EINTR == STATUS));					\
+		/* If MT_SAFE is FALSE the caller is in a multi-threaded environment and does	\
+		 * not hold the YottaDB engine lock. Therefore skip invoking macros which	\
+		 * assume a single-threaded engine execution.					\
+		 */										\
 		if (!(RESTART) || (0 == STATUS))						\
 		{										\
-			/* Check if any signal handling got deferred during the sleep.		\
-			 * If so handle it safely outside of the signal handler.		\
-			 */									\
-			DEFERRED_SIGNAL_HANDLING_CHECK;						\
+			if (MT_SAFE)								\
+			{	/* Check if any signal handling got deferred during the sleep.	\
+				 * If so handle it safely outside of the signal handler.	\
+				 */								\
+				DEFERRED_SIGNAL_HANDLING_CHECK;					\
+			}									\
 			break;									\
 		}										\
-		EINTR_HANDLING_CHECK;								\
+		if (MT_SAFE)									\
+			EINTR_HANDLING_CHECK;							\
 	} while (TRUE);										\
 } MBEND
 
@@ -92,7 +102,14 @@ MBSTART {										\
 MBSTART {										\
 	assert((8 == SIZEOF(NANOSECONDS)) ||						\
 			((NANOSECS_IN_SEC > NANOSECONDS) && (0 < NANOSECONDS)));	\
-	CLOCK_NANOSLEEP(NANOSECONDS, RESTART);						\
+	CLOCK_NANOSLEEP(NANOSECONDS, RESTART, MT_SAFE_TRUE);				\
+} MBEND
+
+# define SLEEP_USEC_MULTI_THREAD_UNSAFE(MICROSECONDS, RESTART)				\
+MBSTART {										\
+	assert((8 == SIZEOF(MICROSECONDS)) ||						\
+			((MICROSECS_IN_SEC > MICROSECONDS) && (0 < MICROSECONDS)));	\
+	CLOCK_NANOSLEEP(((MICROSECONDS) * NANOSECS_IN_USEC), RESTART, MT_SAFE_FALSE);	\
 } MBEND
 
 #endif /* SLEEP_H */

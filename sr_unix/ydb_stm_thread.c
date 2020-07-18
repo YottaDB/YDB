@@ -101,13 +101,15 @@ void *ydb_stm_thread(void *dummy_parm)
 	for (i = 1; !exit_handler_active; i++)
 	{
 		assert(ydb_engine_threadsafe_mutex_holder[0] != pthread_self());
-		SLEEP_USEC(MICROSECS_IN_SEC - 1, FALSE);	/* Sleep for 999,999 micro-seconds (i.e. almost 1 second).
-								 * Second parameter is FALSE to indicate do not restart the sleep
-								 * in case of signal interruption but instead check if signal can
-								 * be handled/forwarded right away first (i.e. in a timely fashion).
-								 */
+		/* Sleep for 999,999 micro-seconds (i.e. almost 1 second). Second parameter is FALSE to indicate
+		 * do not restart the sleep in case of signal interruption but instead check if signal can
+		 * be handled/forwarded right away first (i.e. in a timely fashion).
+		 * We use SLEEP_USEC_MULTI_THREAD_UNSAFE macro (instead of the usual SLEEP_USEC macro) as this
+		 * is a multi-threaded environment and this thread does not hold the YottaDB engine lock.
+		 */
+		SLEEP_USEC_MULTI_THREAD_UNSAFE(MICROSECS_IN_SEC - 1, FALSE);
 		if (exit_handler_active)
-			break;				/* If the exit handler is running or has run, then we're done */
+			break;		/* If the exit handler is running or has run, then we're done */
 		if (stapi_signal_handler_deferred || (USING_ALTERNATE_SIGHANDLING && SPQUE_NOT_EMPTY(&sigPendingQue, que)))
 		{	/* A signal handler was deferred (or queued if using alternate signal handling). Try getting the YottaDB
 			 * engine multi-thread mutex lock to see if we can invoke the signal handler in this thread. If we cannot

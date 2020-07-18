@@ -783,7 +783,13 @@ void m_usleep(int useconds);
 #endif
 
 #ifdef UNIX
-#	define UNIX_ONLY(X)			X
+	/* It is possible UNIX_ONLY is defined in case of .c files used in test system (due to they including
+	 * "gtm_stdio.h" ahead of "mdef.h" hence the "#ifndef" check below to avoid a compiler warning about
+	 * a duplicate macro definition.
+	 */
+#	ifndef UNIX_ONLY
+#		define UNIX_ONLY(X)		X
+#	endif
 #	define UNIX_ONLY_COMMA(X)		X,
 #	define UNSUPPORTED_PLATFORM_CHECK
 	/* z/OS is not able to have dynamic file extensions while running in MM access mode
