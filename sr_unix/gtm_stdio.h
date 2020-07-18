@@ -74,38 +74,43 @@
 #define SETVBUF				setvbuf
 
 #ifdef UNIX
-/* We are compiling a GTM source module if UNIX is defined */
+   /* We are compiling a GTM source module if UNIX is defined */
 #  define FPRINTF			gtm_fprintf
 #  define PRINTF			gtm_printf
 #  define SPRINTF(STR, ...)		assert(FALSE);	/* don't want to use invocation prone to buffer overruns */
 #  define SNPRINTF			gtm_snprintf
-int	gtm_printf(const char *format, ...);
-int	gtm_fprintf(FILE *stream, const char *format, ...);
-int	gtm_snprintf(char *str, size_t size, const char *format, ...);
+   int	gtm_printf(const char *format, ...);
+   int	gtm_fprintf(FILE *stream, const char *format, ...);
+   int	gtm_snprintf(char *str, size_t size, const char *format, ...);
+#  define SCANF				gtm_scanf
+#  define SSCANF			gtm_sscanf
+#  define FSCANF			gtm_fscanf
+   int	gtm_scanf(const char *format, ...);
+   int	gtm_fscanf(FILE *stream, const char *format, ...);
+   int	gtm_sscanf(char *str, const char *format, ...);
 #else
-/* We are compiling a standalone or test system module so no override (This is NOT VMS)  */
+   /* We are compiling a standalone or test system module so no override (This is NOT VMS)  */
 #  define FPRINTF			fprintf
 #  define PRINTF			printf
 #  define SPRINTF			sprintf
 #  define SNPRINTF			snprintf
-#endif
-
-/* Similar to above for *scanf invocations. Note however that TRU64 does NOT have
- * the v*scanf functions used by the wrappers so always use the non-wrapper versions.
- */
-#if defined(UNIX) && !defined(__osf__)
-#  define SCANF				gtm_scanf
-#  define SSCANF			gtm_sscanf
-#  define FSCANF			gtm_fscanf
-int	gtm_scanf(const char *format, ...);
-int	gtm_fscanf(FILE *stream, const char *format, ...);
-int	gtm_sscanf(char *str, const char *format, ...);
-#else
 #  define SCANF				scanf
 #  define SSCANF			sscanf
 #  define FSCANF			fscanf
+#  ifndef UNIX_ONLY
+     /* Define UNIX_ONLY macro in case it is not already defined (just like it is defined in mdef.h) for use below.
+      * Note: No need to define this macro in the "#ifdef UNIX" case above as it should be already defined by "mdef.h".
+      */
+#    define UNIX_ONLY(X)
+#  endif
 #endif
 
+
+/* Note: EINTR_HANDLING_CHECK is used below inside a UNIX_ONLY macro. This is so if the caller is a
+ * standalone or test system module (UNIX macro is not defined in that case as mdef.h would not be included)
+ * we do not use this macro which would cause a compile time error. This macro should only be used inside the
+ * YottaDB runtime. Hence the UNIX_ONLY macro use.
+ */
 #define VPRINTF(FORMAT, VALUE, RC)				\
 {								\
 	do							\
@@ -113,7 +118,7 @@ int	gtm_sscanf(char *str, const char *format, ...);
 		RC = vprintf(FORMAT, VALUE);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		UNIX_ONLY(EINTR_HANDLING_CHECK);		\
 	} while (TRUE);						\
 }
 #define VFPRINTF(STREAM, FORMAT, VALUE, RC)			\
@@ -123,7 +128,7 @@ int	gtm_sscanf(char *str, const char *format, ...);
 		RC = vfprintf(STREAM, FORMAT, VALUE);		\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		UNIX_ONLY(EINTR_HANDLING_CHECK);		\
 	} while (TRUE);						\
 }
 #define VSPRINTF(STRING, FORMAT, VALUE, RC)			\
@@ -133,7 +138,7 @@ int	gtm_sscanf(char *str, const char *format, ...);
 		RC = vsprintf(STRING, FORMAT, VALUE);		\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		UNIX_ONLY(EINTR_HANDLING_CHECK);		\
 	} while (TRUE);						\
 }
 #define VSNPRINTF(STRING, SIZE, FORMAT, VALUE, RC)		\
@@ -143,11 +148,10 @@ int	gtm_sscanf(char *str, const char *format, ...);
 		RC = vsnprintf(STRING, SIZE, FORMAT, VALUE);	\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		UNIX_ONLY(EINTR_HANDLING_CHECK);		\
 	} while (TRUE);						\
 }
 
-/* Note TRU64 does not have these v*scanf() functions so they will generate errors if used */
 #define VSCANF(FORMAT, POINTER, RC)				\
 {								\
 	do							\
@@ -155,7 +159,7 @@ int	gtm_sscanf(char *str, const char *format, ...);
 		RC = vscanf(FORMAT, POINTER);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		UNIX_ONLY(EINTR_HANDLING_CHECK);		\
 	} while (TRUE);						\
 }
 #define VSSCANF(STRING, FORMAT, POINTER, RC)			\
@@ -165,7 +169,7 @@ int	gtm_sscanf(char *str, const char *format, ...);
 		RC = vsscanf(STRING, FORMAT, POINTER);		\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		UNIX_ONLY(EINTR_HANDLING_CHECK);		\
 	} while (TRUE);						\
 }
 #define VFSCANF(STREAM, FORMAT, POINTER, RC)			\
@@ -175,7 +179,7 @@ int	gtm_sscanf(char *str, const char *format, ...);
 		RC = vfscanf(STREAM, FORMAT, POINTER);		\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		UNIX_ONLY(EINTR_HANDLING_CHECK);		\
 	} while (TRUE);						\
 }
 
