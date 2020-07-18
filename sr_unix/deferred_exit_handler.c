@@ -33,6 +33,7 @@
 #include "invocation_mode.h"
 #include "sig_init.h"
 #include "gtm_exit_handler.h"
+#include "signal_exit_handler.h"
 #ifdef DEBUG
 #include "wcs_sleep.h"
 #include "wbox_test_init.h"
@@ -40,9 +41,7 @@
 #endif
 
 GBLREF	int4			exi_condition;
-GBLREF	void			(*call_on_signal)();
 GBLREF	int4			forced_exit_err;
-GBLREF	int4			forced_exit_sig;
 GBLREF	uint4			process_id;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	enum gtmImageTypes	image_type;
@@ -66,10 +65,11 @@ error_def(ERR_KILLBYSIGUINFO);
 
 void deferred_exit_handler(void)
 {
-	void			(*signal_routine)();
 	char			*rname;
 	intrpt_state_t		prev_intrpt_state;
 	int			sig;
+	siginfo_t		*info;
+	gtm_sigcontext_t 	*context;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -108,39 +108,9 @@ void deferred_exit_handler(void)
 		ENABLE_INTERRUPTS(INTRPT_NO_TIMER_EVENTS, prev_intrpt_state);
 	}
 #	endif
-	/* If any special routines are registered to be driven on a signal, drive them now */
-	if ((0 != exi_condition) && (NULL != call_on_signal))
-	{
-		signal_routine = call_on_signal;
-		call_on_signal = NULL;		/* So we don't recursively call ourselves */
-		(*signal_routine)();
-	}
-	/* Note, we do not drive create_fatal_error zshow_dmp() in this routine since any deferrable signals are
-	 * by definition not fatal.
-	 *
-	 * Our last main task before we exit (which drives the exit handler) is if the main program of this process
-	 * is not M (meaning simple*API or EasyAPI or various language using call-ins) and if a handler for this signal
-	 * existed when YDB was intialized, we need to drive that handler now. The problem is that some languages (Golang
-	 * specifically), may rethrow this signal which causes an assert failure. To mitigate this problem, we invoke the
-	 * exit handler logic NOW before we give the main program's handler control so if we get the same signal again
-	 * after the exit handler cleanup has run, we just pass it straight to the main's handler and do not process it
-	 * again. (Also done in generic_exit_handler()).
-	 */
-	DRIVE_EXIT_HANDLER_IF_EXISTS;
-	if (!USING_ALTERNATE_SIGHANDLING)
-	{
-		sig = stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info.si_signo;
-		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("deferred_exit_handler", sig,
-			&stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info,
-			&stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_context, TRUE);
-	} else
-	{	/* The main() entry point of this process is not YottaDB but is something else that is using alternate signal
-		 * handling (currently only Go is supported). For Go, we cannot EXIT here. We need to drive a panic() to
-		 * unwind everything now that YottaDB state information has been cleaned up (by the exit handler). For Go,
-		 * drive a callback routine to do the panic() for us given the signal that caused this state.
-		 */
-		DRIVE_ALTSIG_CALLBACK(sig);
-		return;
-	}
-	EXIT(-exi_condition);
+	sig = stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info.si_signo;
+	info = &stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info;
+	context = &stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_context;
+	signal_exit_handler("deferred_exit_handler", sig, info, context, IS_DEFERRED_EXIT_TRUE);	/* exits the process */
+	return;
 }

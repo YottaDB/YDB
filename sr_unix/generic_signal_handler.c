@@ -52,7 +52,11 @@
 #include "libyottadb_int.h"
 #include "invocation_mode.h"
 #include "gtm_exit_handler.h"
+<<<<<<< HEAD
 #include "sighnd_debug.h"
+=======
+#include "signal_exit_handler.h"
+>>>>>>> [YDB#560] Fix v54002/C9K08003318 subtest failure (SIG-4 not creating fatal zshow dump file due to going through deferred_exit_handler)
 
 /* If we are in a signal handler, we want to defer exit processing as the exit handler can invoke various functions
  * that are not async-signal safe (e.g. malloc/free/syslog etc.). Hence the check for "in_os_signal_handler" below.
@@ -88,7 +92,6 @@ GBLREF	boolean_t		exit_handler_complete;
 GBLREF	void			(*exit_handler_fptr)();
 GBLREF	intrpt_state_t		intrpt_ok_state;
 GBLREF	int			last_sig;
-GBLREF	void			(*call_on_signal)();
 GBLREF	boolean_t		ydb_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 GBLREF	volatile boolean_t	timer_active;
@@ -150,7 +153,6 @@ static inline void check_for_statsdb_memerr()
 void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
 	boolean_t		signal_forwarded, is_sigterm;
-	void			(*signal_routine)();
 	int			rc;
 	sigset_t		savemask;
 	boolean_t		using_alternate_sighandling;
@@ -293,7 +295,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				if (OK_TO_SEND_MSG)
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
 			}
-			dont_want_core = TRUE; assert(IS_DONT_WANT_CORE_TRUE(sig));
+			dont_want_core = TRUE;
+			assert(IS_DONT_WANT_CORE_TRUE(sig));
 			break;
 		case SIGQUIT:	/* Handle SIGQUIT specially which we ALWAYS want to defer if possible as it is always sent */
 			dont_want_core = TRUE;
@@ -451,59 +454,11 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		need_core = TRUE;
 		MULTI_THREAD_AWARE_FORK_N_CORE(signal_forwarded);
 	}
-	/* If any special routines are registered to be driven on a signal, drive them now */
-	if (0 != exi_condition)
-	{
-		/* If this is a GTM-ish process in runtime mode, call the routine to generate the zshow dump. This separate
-		 * routine necessary because (1) generic_signal_handler() no longer calls condition handlers and (2) we couldn't
-		 * use call_on_signal because it would already be in use in updproc() where it is also possible this routine
-		 * needs to be called. Bypass this code if we didn't create a core since that means it is not a GTM
-		 * issue that forced its demise (and since this is an uncaring interrupt, we could be in any number of
-		 * situations that would cause a ZSHOW dump to explode). Better for user to use jobexam to cause a dump prior
-		 * to terminating the process in a deferrable fashion.
-		 */
-		if (!dont_want_core && IS_MCODE_RUNNING && (NULL != (signal_routine = RFPTR(create_fatal_error_zshow_dmp_fptr))))
-		{	/* note assignment of signal_routine above */
-			SFPTR(create_fatal_error_zshow_dmp_fptr, NULL);
-			(*signal_routine)(exi_condition);
-		}
-		/* Some mupip functions define an entry point to drive on signals. Make sure to do this AFTER we create the
-		 * dump file above as it may detach things (like the recvpool) we need to create the above dump.
-		 */
-		if (NULL != (signal_routine = call_on_signal))	/* Note assignment */
-		{
-			call_on_signal = NULL;		/* So we don't recursively call ourselves */
-			(*signal_routine)();
-		}
-	}
 	if (IS_GTMSECSHR_IMAGE)
 	{
 		DEBUG_ONLY(in_nondeferrable_signal_handler = save_in_nondeferrable_signal_handler);
 		return;
 	}
-	/* Our last main task before we exit (which drives the exit handler) is if the main program of this process
-	 * is not M (meaning simple*API or EasyAPI or various language using call-ins) and if a handler for this signal
-	 * existed when YDB was intialized, we need to drive that handler now. The problem is that some languages (Golang
-	 * specifically), may rethrow this signal which causes an assert failure. To mitigate this problem, we invoke the
-	 * exit handler logic NOW before we give the main program's handler control and if we get the same signal again
-	 * after the exit handler cleanup has run, we just pass it straight to the main's handler and do not process it
-	 * again. (Also done in deferred_exit_handler()). If this process is using alternate signal handling, we'll return
-	 * to the engine but further calls into the runtime will be prohibited because of the exit handler shutting things
-	 * down.
-	 */
-	DRIVE_EXIT_HANDLER_IF_EXISTS;
-	if (!using_alternate_sighandling)
-	{
-		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler", sig, info, context, TRUE);
-	} else
-	{	/* The main() entry point of this process is not YottaDB but is something else that is using alternate signal
-		 * handling (currently only Go is supported). For Go, we cannot EXIT here. We need to drive a panic() to
-		 * unwind everything now that YottaDB state information has been cleaned up (by the exit handler). For Go,
-		 * drive a callback routine to do the panic() for us given the signal that caused this state.
-		 */
-		DRIVE_ALTSIG_CALLBACK(sig);
-		return;		/* The above should not return so this is for the compiler */
-	}
-	assert((EXIT_IMMED <= exit_state) || !exit_handler_active);
-	EXIT(-exi_condition);
+	signal_exit_handler("generic_signal_handler", sig, info, context, IS_DEFERRED_EXIT_FALSE);	/* exits the process */
+	return;
 }
