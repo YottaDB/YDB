@@ -511,14 +511,25 @@ typedef struct trans_restart_hist_struct
 
 /* freeup killset starting from the link 'ks' */
 
-#define FREE_KILL_SET(KS)					\
-{								\
-	kill_set	*macro_next_ks;				\
-	for (; KS; KS = macro_next_ks)				\
-	{							\
-		macro_next_ks = KS->next_kill_set;		\
-		free(KS);					\
-	}							\
+#define FREE_KILL_SET(KS, KS_GBL)							\
+{											\
+	kill_set	*macro_next_ks;							\
+											\
+	/* Reset global (e.g. "si->kill_set_head") before "free()" invocation to	\
+	 * avoid possibility of double-free in case the "gtm_free()" call decides to	\
+	 * invoke "deferred_signal_handler()" after freeing the memory and the exit	\
+	 * handler tries to free up the same element as it sees the global variable	\
+	 * still set to a non-NULL value. Resetting the global before the "free()"	\
+	 * call can result in us not freeing all elements in the linked list if we	\
+	 * decide to exit but in that case we are exiting anyways so it does not matter	\
+	 * we did not free up a few elements.						\
+	 */										\
+	KS_GBL = NULL;									\
+	for ( ; KS; KS = macro_next_ks)							\
+	{										\
+		macro_next_ks = KS->next_kill_set;					\
+		free(KS);								\
+	}										\
 }
 
 /* Determine previous jfb, if any */

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -373,13 +373,12 @@ void rollbk_sgm_tlvl_info(uint4 newlevel, sgm_info *si)
 			ks->used = tli->tlvl_kill_used;
 			si->kill_set_tail = ks;
 			temp_kill_set = ks->next_kill_set;
-			FREE_KILL_SET(temp_kill_set);
-			ks->next_kill_set = NULL;
+			FREE_KILL_SET(temp_kill_set, ks->next_kill_set);
 		} else
 		{
 			temp_kill_set = si->kill_set_head;
-			FREE_KILL_SET(temp_kill_set);
-			si->kill_set_head = si->kill_set_tail = NULL;
+			si->kill_set_tail = NULL;
+			FREE_KILL_SET(temp_kill_set, si->kill_set_head);
 			assert(NULL == si->kip_csa);
 		}
 		FREE_JFB_INFO_IF_NEEDED(csa, si, tli, FALSE);
@@ -415,8 +414,8 @@ void rollbk_sgm_tlvl_info(uint4 newlevel, sgm_info *si)
 	{	/* there was nothing at the beginning of transaction level (newlevel + 1) */
 		assert(tli == si->tlvl_info_head);
 		temp_kill_set = si->kill_set_head;
-		FREE_KILL_SET(temp_kill_set);
-		si->kill_set_head = si->kill_set_tail = NULL;
+		si->kill_set_tail = NULL;
+		FREE_KILL_SET(temp_kill_set, si->kill_set_head);
 		assert(NULL == si->kip_csa);
 		FREE_JFB_INFO_IF_NEEDED(csa, si, tli, TRUE);
 		reinitialize_hashtab_int4(si->blks_in_use);
