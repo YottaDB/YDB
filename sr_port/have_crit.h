@@ -254,19 +254,10 @@ MBSTART {												\
 	GBLREF	VSIG_ATOMIC_T			forced_exit;						\
 													\
 	/* The forced_exit state of 2 indicates that the exit is already in progress, so we do not	\
-	 * need to process any deferred events. Note if threads are running, check if forced_exit is	\
-	 * non-zero and if so exit the thread (using pthread_exit) otherwise skip deferred event	\
-	 * processing. A similar check will happen once threads stop running.				\
+	 * need to process any deferred signals.							\
 	 */												\
 	assert(!INSIDE_THREADED_CODE(rname));								\
 	assert(!GET_DEFERRED_EXIT_CHECK_NEEDED || (1 == forced_exit));					\
-	/* Note: The order of the operands in the `||` check below matters. If it is coded as		\
-	 * `GET_DEFERRED_EXIT_CHECK_NEEDED || (1 != forced_exit)`, it is possible that the		\
-	 * GET_DEFERRED_EXIT_CHECK_NEEDED macro returns FALSE but before the `1 != forced_exit`		\
-	 * part gets checked, an interrupt (say MUPIP STOP) occurs that ends up setting `forced_exit`	\
-	 * to 1 and returning back to the assert and failing the assert.				\
-	 */												\
-	assert((1 != forced_exit) || GET_DEFERRED_EXIT_CHECK_NEEDED);					\
 	if (deferred_signal_handling_needed)								\
 		deferred_signal_handler();								\
 	PROCESS_PENDING_ALTERNATE_SIGNALS;								\
