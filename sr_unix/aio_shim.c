@@ -122,8 +122,8 @@ MBSTART {								\
 #define io_submit(ctx, nr, iocbpp) syscall(SYS_io_submit, ctx, nr, iocbpp)
 #define io_getevents(ctx, min_nr, max_nr, events, timeout) syscall(SYS_io_getevents, ctx, min_nr, max_nr, events, timeout)
 
-#define ATOMIC_SUB_FETCH(ptr, val) INTERLOCK_ADD(ptr, NULL,-val)
-#define ATOMIC_ADD_FETCH(ptr, val) INTERLOCK_ADD(ptr, NULL, val)
+#define ATOMIC_SUB_FETCH(ptr, val) INTERLOCK_ADD(ptr, -val)
+#define ATOMIC_ADD_FETCH(ptr, val) INTERLOCK_ADD(ptr, val)
 
 /* Note that ERROR_LIT MUST be a literal */
 #define ISSUE_SYSCALL_RTS_ERROR_WITH_GD(GD, ERROR_LIT, SAVE_ERRNO)			\

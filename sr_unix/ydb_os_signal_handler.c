@@ -47,14 +47,18 @@
 #include "ydb_os_signal_handler.h"
 #include "generic_signal_handler.h"
 #include "gt_timer.h"
+#include "interlock.h"
 
-GBLREF	int	in_os_signal_handler;
+GBLREF	volatile int	in_os_signal_handler;
 
 void ydb_os_signal_handler(int sig, siginfo_t *info, void *context)
 {
 	assert(0 <= in_os_signal_handler);
 	assert(4 > in_os_signal_handler);	/* Ensure this value goes not go beyond a reasonably small number */
-	in_os_signal_handler++;
+	INTERLOCK_ADD(&in_os_signal_handler, 1);	/* Need interlocked add to avoid issues with multiple threads
+							 * running this code at the same time (e.g. possible if SIGTERM
+							 * and SIGALRM happen at the same time),
+							 */
 	switch(sig)
 	{
 	case SIGALRM:
@@ -84,7 +88,7 @@ void ydb_os_signal_handler(int sig, siginfo_t *info, void *context)
 		generic_signal_handler(sig, info, context);
 		break;
 	}
-	in_os_signal_handler--;
+	INTERLOCK_ADD(&in_os_signal_handler, -1);
 	assert(0 <= in_os_signal_handler);
 }
 

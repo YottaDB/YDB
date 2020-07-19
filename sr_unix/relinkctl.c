@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -373,7 +373,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				" : shmid = %d\n", hdr->nattached, shmid));
 			assert(INVALID_SHMID != shmid);
 			assert(!hdr->file_deleted);
-			INTERLOCK_ADD(&hdr->nattached, NULL, 1);
+			INTERLOCK_ADD(&hdr->nattached, 1);
 			if (!is_mu_rndwn_rlnkctl)
 				relinkctl_unlock_exclu(linkctl);
 			if (-1 == (sm_long_t)(shm_base = (relinkshm_hdr_t *)do_shmat(shmid, 0, 0)))
@@ -385,7 +385,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 					relinkctl_lock_exclu(linkctl);
 				if (!shm_removed || !is_mu_rndwn_rlnkctl)
 				{
-					INTERLOCK_ADD(&hdr->nattached, NULL, -1);
+					INTERLOCK_ADD(&hdr->nattached, -1);
 					relinkctl_unlock_exclu(linkctl);
 					relinkctl_unmap(linkctl);
 					SNPRINTF(errstr, SIZEOF(errstr), "shmat() failed for shmid=%d shmsize=%llu [0x%llx]",
@@ -570,7 +570,7 @@ void relinkctl_incr_nattached(boolean_t rtnobj_refcnt_incr_cnt)
 		DBGARLNK((stderr, "relinkctl_incr_nattached : pid = %d : file %s : pre-incr hdr->nattached = %d\n",
 			  getpid(), linkctl->relinkctl_path, linkctl->hdr->nattached));
 		assert(linkctl->hdr->nattached);
-		INTERLOCK_ADD(&linkctl->hdr->nattached, NULL, 1);
+		INTERLOCK_ADD(&linkctl->hdr->nattached, 1);
 	}
 	if (rtnobj_refcnt_incr_cnt)
 	{
@@ -981,7 +981,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 			{
 				assert(0 < hdr->nattached);
 				if (0 < hdr->nattached)
-					INTERLOCK_ADD(&hdr->nattached, NULL, -1);
+					INTERLOCK_ADD(&hdr->nattached, -1);
 				nattached = hdr->nattached;
 				DBGARLNK((stderr, "relinkctl_rundown : pid = %d : file %s : post-decr nattached = %d\n",
 					getpid(), linkctl->relinkctl_path, nattached));

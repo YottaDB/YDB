@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -646,7 +646,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	ss_filhdr_ptr = (snapshot_filhdr_ptr_t)(ss_shmaddr);
 	FILL_SS_FILHDR_INFO(ss_shm_ptr, ss_filhdr_ptr)
 	ss_shm_ptr->preserve_snapshot = preserve_snapshot;
-	SET_LATCH_GLOBAL(&ss_shm_ptr->bitmap_latch, LOCK_AVAILABLE);
 	DECR_INHIBIT_KILLS(cnl);
 	/* announce GT.M that it's now ok to write the before images */
 	if (!SNAPSHOTS_IN_PROG(cnl))

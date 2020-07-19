@@ -37,7 +37,7 @@
 GBLREF	boolean_t	simpleThreadAPI_active;
 GBLREF	pthread_t	gtm_main_thread_id;
 GBLREF	boolean_t	gtm_main_thread_id_set;
-GBLREF	int		stapi_signal_handler_deferred;
+GBLREF	volatile int	stapi_signal_handler_deferred;
 GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];
 GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];
 GBLREF	sig_pending	sigPendingQue;				/* Queue of pending signals in alternate signal handling mode */

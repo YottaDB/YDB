@@ -193,28 +193,29 @@ GBLDEF	volatile boolean_t	timer_in_handler = FALSE;
 GBLDEF	void			(*wcs_clean_dbsync_fptr)();	/* Reference to wcs_clean_dbsync() to be used in gt_timers.c. */
 GBLDEF	void			(*wcs_stale_fptr)();		/* Reference to wcs_stale() to be used in gt_timers.c. */
 
-GBLREF	boolean_t	blocksig_initialized;			/* Set to TRUE when blockalrm, block_ttinout, and block_sigsent are
+GBLREF	boolean_t		blocksig_initialized;		/* Set to TRUE when blockalrm, block_ttinout, and block_sigsent are
 								 * initialized. */
-GBLREF	sigset_t	blockalrm;
-GBLREF	sigset_t	block_ttinout;
-GBLREF	sigset_t	block_sigsent;
-GBLREF	sigset_t	block_worker;
-GBLREF  sigset_t        block_sigusr;
-GBLREF 	volatile int4	fast_lock_count;
-GBLREF	boolean_t	oldjnlclose_started;
-GBLREF	void		(*jnl_file_close_timer_ptr)(void);	/* Initialized only in gtm_startup(). */
-GBLREF	int4		error_condition;
-GBLREF	int4		outofband;
-GBLREF	int		process_exiting;
-GBLREF	struct sigaction orig_sig_action[];
-GBLREF	int		stapi_signal_handler_deferred;
+GBLREF	sigset_t		blockalrm;
+GBLREF	sigset_t		block_ttinout;
+GBLREF	sigset_t		block_sigsent;
+GBLREF	sigset_t		block_worker;
+GBLREF  sigset_t		block_sigusr;
+GBLREF 	volatile int4		fast_lock_count;
+GBLREF	boolean_t		oldjnlclose_started;
+GBLREF	void			(*jnl_file_close_timer_ptr)(void);	/* Initialized only in gtm_startup(). */
+GBLREF	int4			error_condition;
+GBLREF	int4			outofband;
+GBLREF	int			process_exiting;
+GBLREF	struct sigaction	orig_sig_action[];
+GBLREF	volatile int		stapi_signal_handler_deferred;
+GBLREF	int			ydb_main_lang;
 #ifdef YDB_USE_POSIX_TIMERS
-GBLREF	pid_t		posix_timer_thread_id;
-GBLREF	boolean_t	posix_timer_created;
+GBLREF	pid_t			posix_timer_thread_id;
+GBLREF	boolean_t		posix_timer_created;
 #endif
 #ifdef DEBUG
-GBLREF	boolean_t	in_nondeferrable_signal_handler;
-GBLREF	boolean_t	gtm_jvm_process;
+GBLREF	boolean_t		in_nondeferrable_signal_handler;
+GBLREF	boolean_t		gtm_jvm_process;
 #endif
 
 error_def(ERR_SETITIMERFAILED);
@@ -694,10 +695,10 @@ void timer_handler(int why, siginfo_t *info, void *context)
 	 * For alternate signal handling, in which the main routine (non-M) does the signal handling and then notifies us of them
 	 * occurring, this routine is similarly gated by the simple API engine lock so interference is not possible.
 	 */
-	if (1 < INTERLOCK_ADD(&timer_stack_count, UNUSED, 1))
+	if (1 < INTERLOCK_ADD(&timer_stack_count, 1))
 	{
 		SET_DEFERRED_TIMERS_CHECK_NEEDED;
-		INTERLOCK_ADD(&timer_stack_count, UNUSED, -1);
+		INTERLOCK_ADD(&timer_stack_count, -1);
 #		ifdef SIGNAL_PASSTHRU
 		if (!USING_ALTERNATE_SIGHANDLING && ((SIGALRM == orig_why) || signal_forwarded))
 		{	/* Only drive this handler if we have an actual signal - not a dummy call */
@@ -870,7 +871,7 @@ void timer_handler(int why, siginfo_t *info, void *context)
 	 */
 	SET_ERROR_CONDITION(save_error_condition);	/* restore error_condition & severity */
 	errno = save_errno;			/* restore mainline errno by similar reasoning as mainline error_condition */
-	INTERLOCK_ADD(&timer_stack_count, UNUSED, -1);
+	INTERLOCK_ADD(&timer_stack_count, -1);
 #	ifdef DEBUG
 	if (safe_for_timer_pop)
 		in_nondeferrable_signal_handler = save_in_nondeferrable_signal_handler;

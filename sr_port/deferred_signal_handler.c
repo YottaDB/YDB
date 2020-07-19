@@ -19,7 +19,7 @@
 
 GBLREF	int		process_exiting;
 GBLREF	VSIG_ATOMIC_T	forced_exit;
-GBLREF	int		in_os_signal_handler;
+GBLREF	volatile int	in_os_signal_handler;
 
 void	deferred_signal_handler(void)
 {

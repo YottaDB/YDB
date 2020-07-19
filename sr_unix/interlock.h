@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,8 +92,8 @@
  */
 #define OWN_BUFF(X)			((X) == LATCH_CLEAR)
 
-#define INCR_CNT(X,Y)			INTERLOCK_ADD(X,Y,1)
-#define DECR_CNT(X,Y)			INTERLOCK_ADD(X,Y,-1)
+#define INCR_CNT(X,Y)			INTERLOCK_ADD(X, 1)
+#define DECR_CNT(X,Y)			INTERLOCK_ADD(X, -1)
 
 /* Doing the simple test before COMPSWAP_LOCK can help performance when a lock is highly contended */
 #define GET_SWAPLOCK(X)		(((X)->u.parts.latch_pid == LOCK_AVAILABLE) && COMPSWAP_LOCK((X), LOCK_AVAILABLE, process_id))

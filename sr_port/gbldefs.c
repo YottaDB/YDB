@@ -1264,7 +1264,7 @@ GBLDEF	int4		tstart_gtmci_nested_level;	/* TREF(gtmci_nested_level) at the time 
 							 * This should be used only if dollar_tlevel is non-zero as it is not
 							 * otherwise maintained.
 							 */
-GBLDEF	uint4		deferred_signal_handling_needed;	/* if non-zero, it means the DEFERRED_SIGNAL_HANDLING_CHECK
+GBLDEF	volatile uint4	deferred_signal_handling_needed;	/* if non-zero, it means the DEFERRED_SIGNAL_HANDLING_CHECK
 								 * macro needs to do some work.
 								 */
 GBLDEF	void_ptr_t	*dlopen_handle_array;	/* Array of handles returned from various "dlopen" calls done inside YottaDB.
@@ -1339,7 +1339,7 @@ GBLDEF	boolean_t		caller_func_is_stapi;	/* Set to TRUE by a SimpleThreadAPI func
 							 * distinguish whether the caller is a direct user invocation or a
 							 * SimpleThreadAPI invocation. Used to issue SIMPLEAPINOTALLOWED error.
 							 */
-GBLDEF	int			stapi_signal_handler_deferred;	/* non-zero if signal handler function
+GBLDEF	volatile int		stapi_signal_handler_deferred;	/* non-zero if signal handler function
 								 * should be invoked in a deferred fashion.
 								 */
 GBLDEF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];

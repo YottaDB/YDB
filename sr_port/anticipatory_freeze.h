@@ -328,10 +328,9 @@ MBSTART {															\
 #ifdef DEBUG
 #define DB_HANG_TRIGGER		75
 #define DB_LSEEKWRITE_HANG(CSA)	(WBTEST_ENABLED(WBTEST_DB_WRITE_HANG)								\
-						&& (CSA) && ((struct sgmnt_addrs_struct *)(CSA))->nl				\
-						&& (DB_HANG_TRIGGER								\
-							== INTERLOCK_ADD(&(((struct sgmnt_addrs_struct *)(CSA))			\
-											->nl->db_writes), NULL, 1)))
+					&& (CSA) && ((struct sgmnt_addrs_struct *)(CSA))->nl					\
+					&& (DB_HANG_TRIGGER									\
+						== INTERLOCK_ADD(&(((struct sgmnt_addrs_struct *)(CSA))->nl->db_writes), 1)))
 #else
 #define DB_LSEEKWRITE_HANG(CSA)	FALSE
 #endif
@@ -385,7 +384,7 @@ static inline boolean_t jnl_lseekwrite_hang(struct sgmnt_addrs_struct *csa)
 {
 	return (WBTEST_ENABLED(WBTEST_JNL_WRITE_HANG)
 			&& csa && csa->nl
-			&& (JNL_HANG_TRIGGER == INTERLOCK_ADD(&csa->nl->jnl_writes, NULL, 1)));
+			&& (JNL_HANG_TRIGGER == INTERLOCK_ADD(&csa->nl->jnl_writes, 1)));
 }
 
 #define LSEEKWRITE_HANG_SLEEP()		lseekwrite_hang_sleep()

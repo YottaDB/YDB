@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,6 @@ typedef struct shm_snapshot_struct
 	volatile pid_t	failed_pid;		/* the process_id that encountered the snapshot failure */
 	int		in_use;
 	boolean_t	preserve_snapshot;
-	global_latch_t	bitmap_latch;		/* latch to be passed on to add_inter while modifying the shadow bitmap */
 	trans_num	ss_tn_count;		/* count of transactions after the snapshot started */
 	sgmnt_data	shadow_file_header;
 } shm_snapshot_t;

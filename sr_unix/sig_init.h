@@ -22,6 +22,8 @@
 #include "libyottadb.h"
 #include "generic_signal_handler.h"
 #include "alternate_sighandling.h"
+#include "sighnd_debug.h"
+#include "interlock.h"
 
 /* Below signal handler function types are used as the first parameter to FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED */
 enum sig_handler_t
@@ -55,7 +57,7 @@ typedef struct
 	gtm_sigcontext_t	sig_context;	/* "context" from OS signal handler invocation */
 } sig_info_context_t;
 
-GBLREF	int			stapi_signal_handler_deferred;
+GBLREF	volatile int		stapi_signal_handler_deferred;
 GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 
@@ -65,31 +67,44 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
  * in the STAPI_CLEAR_SIGNAL_HANDLER_DEFERRED from failing inside the "timer_handler" function when it invokes the
  * FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED macro.
  */
-#define	STAPI_FAKE_TIMER_HANDLER_WAS_DEFERRED						\
-{											\
-	stapi_signal_handler_deferred |= (1 << sig_hndlr_timer_handler);		\
-	stapi_signal_handler_oscontext[sig_hndlr_timer_handler].sig_forwarded = TRUE;	\
+#define	STAPI_FAKE_TIMER_HANDLER_WAS_DEFERRED							\
+{												\
+	if (!STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_timer_handler))				\
+		INTERLOCK_ADD(&stapi_signal_handler_deferred, (1 << sig_hndlr_timer_handler));	\
+	stapi_signal_handler_oscontext[sig_hndlr_timer_handler].sig_forwarded = TRUE;		\
 }
 #endif
 
 #define	STAPI_IS_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE)		(stapi_signal_handler_deferred & (1 << SIGHNDLRTYPE))
 
-#define	STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG_NUM, INFO, CONTEXT)	\
-{										\
-	SAVE_OS_SIGNAL_HANDLER_SIGNUM(SIGHNDLRTYPE, SIG_NUM);			\
-	SAVE_OS_SIGNAL_HANDLER_INFO(SIGHNDLRTYPE, INFO);			\
-	SAVE_OS_SIGNAL_HANDLER_CONTEXT(SIGHNDLRTYPE, CONTEXT);			\
-	SHM_WRITE_MEMORY_BARRIER;						\
-	stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded = TRUE;	\
-	SHM_WRITE_MEMORY_BARRIER;						\
-	stapi_signal_handler_deferred |= (1 << SIGHNDLRTYPE);			\
-	SHM_WRITE_MEMORY_BARRIER;						\
-	SET_DEFERRED_STAPI_CHECK_NEEDED;					\
+#define	STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG_NUM, INFO, CONTEXT)		\
+{											\
+	SAVE_OS_SIGNAL_HANDLER_SIGNUM(SIGHNDLRTYPE, SIG_NUM);				\
+	SAVE_OS_SIGNAL_HANDLER_INFO(SIGHNDLRTYPE, INFO);				\
+	SAVE_OS_SIGNAL_HANDLER_CONTEXT(SIGHNDLRTYPE, CONTEXT);				\
+	SHM_WRITE_MEMORY_BARRIER;							\
+	stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded = TRUE;		\
+	SHM_WRITE_MEMORY_BARRIER;							\
+	/* Need interlocked add below since multiple threads can execute this code	\
+	 * at the same time (e.g. if SIGALRM and SIGTERM happen at same time).		\
+	 * Just like SET_DEFERRED_TIMERS_CHECK_NEEDED macro in "have_crit.h",		\
+	 * we need to check the value before doing the interlocked add.			\
+	 */										\
+	if (!STAPI_IS_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE))				\
+		INTERLOCK_ADD(&stapi_signal_handler_deferred, (1 << SIGHNDLRTYPE));	\
+	SHM_WRITE_MEMORY_BARRIER;							\
+	SET_DEFERRED_STAPI_CHECK_NEEDED;						\
 }
 
 #define	STAPI_CLEAR_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE)			\
 {										\
-	stapi_signal_handler_deferred &= ~(1 << SIGHNDLRTYPE);			\
+	/* Need interlocked add below since multiple threads can execute this code	\
+	 * at the same time (e.g. if SIGALRM and SIGTERM happen at same time).		\
+	 * Just like CLEAR_DEFERRED_TIMERS_CHECK_NEEDED macro in "have_crit.h",		\
+	 * we need to check the value before doing the interlocked add.			\
+	 */										\
+	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE))				\
+		INTERLOCK_ADD(&stapi_signal_handler_deferred, -(1 << SIGHNDLRTYPE));	\
 	SHM_WRITE_MEMORY_BARRIER;						\
 	stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded = FALSE;	\
 	SHM_WRITE_MEMORY_BARRIER;						\

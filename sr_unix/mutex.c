@@ -825,7 +825,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 						assert(cnl->in_crit == cnl->onln_rlbk_pid);
 						break;
 					}
-					if (INTERLOCK_ADD(&csa->critical->stuck_cycle, NULL, 1) == (local_stuck_cycle + 1))
+					if (INTERLOCK_ADD(&csa->critical->stuck_cycle, 1) == (local_stuck_cycle + 1))
 					{
 						GET_C_STACK_FROM_SCRIPT("MUTEXLCKALERT", process_id, cnl->in_crit,
 							csa->critical->crit_cycle);

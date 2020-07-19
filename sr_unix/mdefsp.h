@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -171,17 +171,13 @@ typedef char  mach_inst;	/* machine instruction */
 #endif
 
 #ifdef Linux390
-#  define INTERLOCK_ADD(X,Y,Z)	(interlock_add(Z, (sm_int_ptr_t)(X)))
+#  define INTERLOCK_ADD(X,Z)	(interlock_add(Z, (sm_int_ptr_t)(X)))
 #else
-#  ifdef __linux__
 #    ifdef __atomic_add_fetch
-#      define INTERLOCK_ADD(X,Y,Z)	(__atomic_add_fetch(X, Z, __ATOMIC_SEQ_CST))
+#      define INTERLOCK_ADD(X,Z)	(__atomic_add_fetch(X, Z, __ATOMIC_SEQ_CST))
 #    else
-#      define INTERLOCK_ADD(X,Y,Z)	(__sync_add_and_fetch(X, Z))
+#      define INTERLOCK_ADD(X,Z)	(__sync_add_and_fetch(X, Z))
 #    endif
-#  else
-#    define INTERLOCK_ADD(X,Y,Z) (add_inter(Z, (sm_int_ptr_t)(X), (sm_global_latch_ptr_t)(Y)))
-#  endif
 #endif
 
 #if __arm__

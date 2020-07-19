@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ * Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -108,6 +111,6 @@ void		ss_set_shdw_bitmap(sgmnt_addrs *csa, snapshot_context_ptr_t lcl_ss_ctx, bl
 	COMPUTE_BLOCK_OFFSET(blk, word, bit);
 	DEBUG_ONLY(prev_val = (*(unsigned int *)(bitmap_addr + word));)
 	assert(0 == (prev_val & (1 << bit)));
-	INTERLOCK_ADD((bitmap_addr + word), &ss_shm_ptr->bitmap_latch, (1 << bit));
+	INTERLOCK_ADD((bitmap_addr + word), (1 << bit));
 	return;
 }

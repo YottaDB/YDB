@@ -92,7 +92,7 @@ typedef enum
 
 GBLREF	intrpt_state_t	intrpt_ok_state;
 
-GBLREF	uint4		deferred_signal_handling_needed; /* a bitmask of the below DEFERRED_SIGNAL_HANDLING_NEEDED_* macros */
+GBLREF	volatile uint4	deferred_signal_handling_needed; /* a bitmask of the below DEFERRED_SIGNAL_HANDLING_NEEDED_* macros */
 
 /* Can't include sig_init.h until the interrupt definitions above were done. This included needed to define sig_pending type */
 #include "sig_init.h"
@@ -113,22 +113,50 @@ GBLREF	uint4		deferred_signal_handling_needed; /* a bitmask of the below DEFERRE
 							 * indicates whether deferred signals in SimpleThreadAPI mode
 							 * needs to be handled upon leaving deferred zone.
 							 */
-
+/* Note: The SET and CLEAR macros below can be invoked by multiple threads in the same process and therefore need
+ * INTERLOCK_ADD operations. But since they need to be idempotent (i.e. SET should be a no-op if bit is already set,
+ * CLEAR should be a no-op if bit is already cleared etc.), they need to do a GET to check the bit value and based
+ * on that determine the course of action.
+ */
 #define	GET_DEFERRED_TIMERS_CHECK_NEEDED	(deferred_signal_handling_needed & DEFERRED_SIGNAL_HANDLING_TIMERS)
-#define	SET_DEFERRED_TIMERS_CHECK_NEEDED	(deferred_signal_handling_needed |= (DEFERRED_SIGNAL_HANDLING_TIMERS))
-#define	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED	(deferred_signal_handling_needed &= (~DEFERRED_SIGNAL_HANDLING_TIMERS))
+#define	SET_DEFERRED_TIMERS_CHECK_NEEDED	(!GET_DEFERRED_TIMERS_CHECK_NEEDED					\
+							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
+										DEFERRED_SIGNAL_HANDLING_TIMERS))	\
+							: 0)
+#define	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED	(GET_DEFERRED_TIMERS_CHECK_NEEDED					\
+							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
+										-DEFERRED_SIGNAL_HANDLING_TIMERS))	\
+							: 0)
 
 #define	GET_DEFERRED_CTRLZ_CHECK_NEEDED		(deferred_signal_handling_needed & DEFERRED_SIGNAL_HANDLING_CTRLZ)
-#define	SET_DEFERRED_CTRLZ_CHECK_NEEDED		(deferred_signal_handling_needed |= (DEFERRED_SIGNAL_HANDLING_CTRLZ))
-#define	CLEAR_DEFERRED_CTRLZ_CHECK_NEEDED	(deferred_signal_handling_needed &= (~DEFERRED_SIGNAL_HANDLING_CTRLZ))
+#define	SET_DEFERRED_CTRLZ_CHECK_NEEDED		(!GET_DEFERRED_CTRLZ_CHECK_NEEDED					\
+							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
+										DEFERRED_SIGNAL_HANDLING_CTRLZ))	\
+							: 0)
+#define	CLEAR_DEFERRED_CTRLZ_CHECK_NEEDED	(GET_DEFERRED_CTRLZ_CHECK_NEEDED					\
+							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
+										-DEFERRED_SIGNAL_HANDLING_CTRLZ))	\
+							: 0)
 
 #define	GET_DEFERRED_EXIT_CHECK_NEEDED		(deferred_signal_handling_needed & DEFERRED_SIGNAL_HANDLING_EXIT)
-#define	SET_DEFERRED_EXIT_CHECK_NEEDED		(deferred_signal_handling_needed |= (DEFERRED_SIGNAL_HANDLING_EXIT))
-#define	CLEAR_DEFERRED_EXIT_CHECK_NEEDED	(deferred_signal_handling_needed &= (~DEFERRED_SIGNAL_HANDLING_EXIT))
+#define	SET_DEFERRED_EXIT_CHECK_NEEDED		(!GET_DEFERRED_EXIT_CHECK_NEEDED					\
+							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
+										DEFERRED_SIGNAL_HANDLING_EXIT))		\
+							: 0)
+#define	CLEAR_DEFERRED_EXIT_CHECK_NEEDED	(GET_DEFERRED_EXIT_CHECK_NEEDED						\
+							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
+										-DEFERRED_SIGNAL_HANDLING_EXIT))	\
+							: 0)
 
 #define	GET_DEFERRED_STAPI_CHECK_NEEDED		(deferred_signal_handling_needed & DEFERRED_SIGNAL_HANDLING_STAPI)
-#define	SET_DEFERRED_STAPI_CHECK_NEEDED		(deferred_signal_handling_needed |= (DEFERRED_SIGNAL_HANDLING_STAPI))
-#define	CLEAR_DEFERRED_STAPI_CHECK_NEEDED	(deferred_signal_handling_needed &= (~DEFERRED_SIGNAL_HANDLING_STAPI))
+#define	SET_DEFERRED_STAPI_CHECK_NEEDED		(!GET_DEFERRED_STAPI_CHECK_NEEDED					\
+							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
+										DEFERRED_SIGNAL_HANDLING_STAPI))	\
+							: 0)
+#define	CLEAR_DEFERRED_STAPI_CHECK_NEEDED	(GET_DEFERRED_STAPI_CHECK_NEEDED					\
+							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
+										-DEFERRED_SIGNAL_HANDLING_STAPI))	\
+							: 0)
 
 GBLREF	volatile int4	gtmMallocDepth;
 
@@ -139,7 +167,7 @@ GBLREF	volatile int4	gtmMallocDepth;
 #define	OK_TO_INTERRUPT	((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && OK_TO_INTERRUPT_TRIMMED)
 #define	OK_TO_INTERRUPT_TRIMMED	((0 == gtmMallocDepth) && (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)))
 
-GBLREF	int	in_os_signal_handler;
+GBLREF	volatile int	in_os_signal_handler;
 
 /* Set the value of forced_exit to 1. This should indicate that we want a deferred signal handler to be invoked first upon leaving
  * the current deferred window. Since we do not want forced_exit state to ever regress, and there might be several signals delivered
