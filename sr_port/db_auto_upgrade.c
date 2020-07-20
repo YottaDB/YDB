@@ -207,6 +207,11 @@ void db_auto_upgrade(gd_region *reg)
 				/* Note: This is a little-endian solution and will need to be modified if we
 				 * ever support big-endian.
 				 */
+				if (0 == csd->flush_trigger_top)
+					csd->flush_trigger_top = FLUSH_FACTOR(csd->n_bts);
+				/* Note: This ensures that the csd->flush_trigger_top field added in GT.M v63007 is set if
+				 * the old db_minorver is GDSMR122.
+				 */
 				break;
 			case GDSMR130:
 		/* When adding a new minor version, the following template should be maintained
