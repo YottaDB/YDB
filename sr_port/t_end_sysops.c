@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -189,7 +189,6 @@ void fileheader_sync(gd_region *reg)
 	cnl = csa->nl;
 	gvstats_rec_cnl2csd(csa);	/* Periodically transfer statistics from database shared-memory to file-header */
 	high_blk = cnl->highest_lbm_blk_changed;
-	cnl->highest_lbm_blk_changed = GDS_CREATE_BLK_MAX;	/* Reset to initial value */
 	flush_len = SGMNT_HDR_LEN;
 	if (0 <= high_blk)					/* If not negative, flush at least one master map block */
 		flush_len += ((high_blk / csd->bplmap / DISK_BLOCK_SIZE / BITS_PER_UCHAR) + 1) * DISK_BLOCK_SIZE;
@@ -209,6 +208,12 @@ void fileheader_sync(gd_region *reg)
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 			ERR_TEXT, 2, RTS_ERROR_TEXT("Error during FileHeader Flush"), save_errno);
 	}
+	/* Reset shared memory value to initial value now that we have successfully flushed all of the needed master map.
+	 * Cannot reset the shared memory value BEFORE the DB_LSEEKWRITE macro as that can abruptly terminate the process
+	 * if the instance is frozen and we had gotten a SIGTERM/SIGINT. We would then have not flushed the master map
+	 * and have lost all indication of how much to flush resulting in a DBMBPINCFL/DBMBMINCFRE integ error.
+	 */
+	cnl->highest_lbm_blk_changed = GDS_CREATE_BLK_MAX;
 	return;
 }
 
