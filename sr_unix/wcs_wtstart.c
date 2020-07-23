@@ -489,13 +489,13 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				continue;
 			}
 		}
-		if (simpleThreadAPI_active && timer_in_handler && IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver)
+		if (simpleThreadAPI_active && in_os_signal_handler && IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver)
 		    && !USING_ALTERNATE_SIGHANDLING)
 		{	/* "IS_GDS_BLK_DOWNGRADE_NEEDED" macro returns TRUE which means there is the potential for a "malloc" call
 			 * below (to allocate/expand the "reformat_buffer"). But since "simpleThreadAPI_active" is also TRUE, the
 			 * PTHREAD_MUTEX_LOCK_IF_NEEDED call in "gtm_malloc"/"gtm_free" will end up doing a "pthread_mutex_lock"
-			 * call which is a no-no since we are inside a signal handler (timer_in_handler is TRUE implies we are
-			 * in the SIGALRM signal handler). So skip flushing this cache-record. Since this invocation of
+			 * call which is a no-no since we are inside a signal handler ("in_os_signal_handler" is TRUE implies we
+			 * are in the SIGALRM signal handler). So skip flushing this cache-record. Since this invocation of
 			 * "wcs_wtstart" was from a timer handler, there is no need to flush anything. It is just a nice-to-have
 			 * flush call so it is okay to skip flushing in this case.
 			 *

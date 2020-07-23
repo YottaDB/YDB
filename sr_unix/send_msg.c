@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@
 #include "anticipatory_freeze.h"	/* for SET_ANTICIPATORY_FREEZE_IF_NEEDED */
 #include "get_syslog_flags.h"
 #include "libyottadb_int.h"
+#include "have_crit.h"
 
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	boolean_t		caller_id_flag;
@@ -99,6 +100,14 @@ void send_msg_va(void *csa, int arg_count, va_list var)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (in_os_signal_handler)
+	{	/* We are inside an OS signal handler and so should not make any "syslog()" calls as it has the potential
+		 * of causing a hang (YDB#464). Hence return right away without sending the message to the syslog
+		 * even if it means loss of potentially crucial information.
+		 */
+		assert(FALSE);	/* assert so we identify such a code path and try fix it if possible */
+		return;
+	}
 	/* Like in rts_error_csa() do some checking we aren't nesting too deep due to error loop */
 	if (MAX_RTS_ERROR_DEPTH < ++(TREF(rts_error_depth)))
 	{	/* Too many errors nesting - stop it here - fatally. What we do is the following:

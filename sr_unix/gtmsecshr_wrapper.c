@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -400,25 +400,34 @@ int main()
 	if (!ret)
 	{	/* go to root */
 		if (-1 == CHDIR(gtm_secshrdir_path))
+		{
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRCHDIRFAILED1, gtm_secshrdir_path_display, errno);
-		else if (-1 == Stat(REL_PATH_TO_CURDIR, &gtm_secshrdir_stat))
+		} else if (-1 == Stat(REL_PATH_TO_CURDIR, &gtm_secshrdir_stat))
+		{
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRSTATFAILED, gtm_secshrdir_path_display, errno);
-		else if (ROOTUID != gtm_secshrdir_stat.st_uid)
+		} else if (ROOTUID != gtm_secshrdir_stat.st_uid)
+		{
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRNOTOWNEDBYROOT, gtm_secshrdir_path_display);
-		else if (gtm_secshrdir_stat.st_mode & 0277)
+		} else if (gtm_secshrdir_stat.st_mode & 0277)
+		{
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRPERMINCRCT, gtm_secshrdir_path_display,
 					gtm_secshrdir_stat.st_mode & PERMALL);
-		else if (-1 == Stat(REL_PATH_TO_GTMSECSHR, &gtm_secshr_stat))
+		} else if (-1 == Stat(REL_PATH_TO_GTMSECSHR, &gtm_secshr_stat))
+		{
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRSTATFAILED, gtm_secshr_path_display, errno);
-		else if (ROOTUID != gtm_secshr_stat.st_uid)
+		} else if (ROOTUID != gtm_secshr_stat.st_uid)
+		{
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRNOTOWNEDBYROOT, gtm_secshr_path_display);
-		else if (gtm_secshr_stat.st_mode & 022)
+		} else if (gtm_secshr_stat.st_mode & 022)
+		{
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRWRITABLE, gtm_secshr_path_display);
-		else if (!(gtm_secshr_stat.st_mode & 04000))
+		} else if (!(gtm_secshr_stat.st_mode & 04000))
+		{
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRNOTSETUID, gtm_secshr_path_display);
-		else if (-1 == setuid(ROOTUID))
+		} else if (-1 == setuid(ROOTUID))
+		{
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRSETUIDFAILED);
-		else
+		} else
 		{	/* call the real gtmsecshr, but have ps display the original gtmsecshr location */
 			ret = execl(REL_PATH_TO_GTMSECSHR, gtm_secshr_orig_path, NULL);
 			if (-1 == ret)

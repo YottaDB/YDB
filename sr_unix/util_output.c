@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -757,7 +757,7 @@ void	util_out_send_oper(char *addr, unsigned int len)
 			 */
 		}
 		DEFER_INTERRUPTS(INTRPT_IN_LOG_FUNCTION, prev_intrpt_state);
-		(void)OPENLOG(facility, get_syslog_flags(), LOG_USER);
+		OPENLOG(facility, get_syslog_flags(), LOG_USER);
 		ENABLE_INTERRUPTS(INTRPT_IN_LOG_FUNCTION, prev_intrpt_state);
 	}
 	/* When syslog is processing and a signal occurs, the signal processing might eventually lead to another syslog
