@@ -869,6 +869,16 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	assert(0 == cr->data_invalid);
 	if (0 != cr->r_epid)
 	{	/* must have got it with a db_csh_getn */
+#		ifdef DEBUG
+		/* In rare cases (when free buffers are not easy to find), it is possible that "db_csh_getn" returned us a cr
+		 * whose buffer was used as part of a "gvcst_blk_build" of a prior block in the currently committing transaction.
+		 * In that case, the block header in that global buffer would hold a transaction number that is EQUAL TO the
+		 * current database transaction number. This will then fail the "blktn < ctn" assert in "gvcst_blk_build"
+		 * since in that case "blktn" will be EQUAL to "ctn" at the start of "gvcst_blk_build". To avoid that assert
+		 * failure, reset the blktn to be one less than ctn here (only for debug builds).
+		 */
+		((blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr))->tn = (ctn - 1);
+#		endif
 		if (gds_t_acquired != mode)
 		{	/* Not a newly created block, yet we have got it with a db_csh_getn. This means we have an in-memory
 			 * copy of the block already built. In that case, cr->ondsk_blkver is uninitialized. Copy it over
