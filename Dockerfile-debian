@@ -94,13 +94,34 @@ ENV ydb_dir=/data \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=C.UTF-8 \
-    ydb_chset=UTF-8
+    ydb_chset=UTF-8 \
+    GOPATH=$HOME/go
 # MUPIP RUNDOWN need in the following chain because otherwise ENTRYPOINT complains
 # about inability to run %XCMD and rundown needed. Cause not known, but this workaround works
 # and is otherwise benign.
+# Note that the current Go version in Debian buster is 1.10 whereas YDB requires 1.13.
+# Accordingly, the following series of `echo`s, `sed`, and `apt` calls below are to:
+#	1. Install the latest Go version from Debian testing, i.e. 1.13+, and
+#	2. Enable apt pinning to allow forward updates of the installed Go package
 RUN . /opt/yottadb/current/ydb_env_set \
- && go get -t lang.yottadb.com/go/yottadb \
+ && sed -i 's/buster/stable/g' /etc/apt/sources.list \
+ && echo "Package: *" >> /etc/apt/preferences.d/preferences \
+ && echo "Pin: release a=stable" >> /etc/apt/preferences.d/preferences \
+ && echo "Pin-Priority: 900" >> /etc/apt/preferences.d/preferences \
+ && echo >> /etc/apt/preferences.d/preferences \
+ && echo "Package: *" >> /etc/apt/preferences.d/preferences \
+ && echo "Pin: release o=testing" >> /etc/apt/preferences.d/preferences \
+ && echo "Pin-Priority: -10" >> /etc/apt/preferences.d/preferences \
+ && echo "deb http://deb.debian.org/debian/ testing main" >> /etc/apt/sources.list \
+ && echo "deb-src http://deb.debian.org/debian/ testing main" >> /etc/apt/sources.list \
+ && apt update -y \
+ && apt install -t testing golang -y \
+ && go version \
+ && go get -t -d lang.yottadb.com/go/yottadb \
+ && cd $GOPATH/src/lang.yottadb.com/go/yottadb \
+ && git checkout develop \
  && go test lang.yottadb.com/go/yottadb \
+ && cd - \
  && git clone https://gitlab.com/oesiman/yottadb-perl.git \
  && cd yottadb-perl \
  && perl Makefile.PL \
