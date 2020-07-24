@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include "libyottadb_int.h"
+#include "have_crit.h"
 
 GBLREF	boolean_t	noThreadAPI_active;
 GBLREF	boolean_t	simpleThreadAPI_active;
@@ -24,6 +25,7 @@ void	ydb_stm_atfork_prepare(void)
 {
 	if (process_exiting)
 		return;	/* A "fork" is happening after "ydb_exit" has been called. Return right away. */
+	DEFERRED_SIGNAL_HANDLING_CHECK;	/* Handle deferred signals (e.g. timer handlers), if any, BEFORE the fork */
 	assert(0 <= fork_after_ydb_init);
 	if (simpleThreadAPI_active || noThreadAPI_active)
 	{

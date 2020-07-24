@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,6 +22,7 @@
 #include <time.h>
 #include "gtm_unistd.h"
 #include "sleep.h"
+#include "rel_quant.h"
 
 GBLREF	uint4		process_id;
 /* yield processor macro - if argument is 0 or the (pseudo-)random value whose limit the argument defines is 0 just yield
@@ -56,7 +57,7 @@ MBSTART {												\
 			NANO_SLEEP_TIME = MAX_TIME_MASK;						\
 		NANOSLEEP(NANO_SLEEP_TIME, RESTART_FALSE);						\
 	} else												\
-		RELQUANT;										\
+		rel_quant();										\
 } MBEND
 
 /* Sleep/rel_quant <= 1 micro-second every 4 iterations and also perform caslatch check every ~4 seconds */

@@ -150,6 +150,8 @@ int4	time();
 #define	SAFE_FOR_TIMER_POP	(SAFE_FOR_ANY_TIMER && !multi_thread_in_use)
 #define	SAFE_FOR_TIMER_START	(SAFE_FOR_ANY_TIMER)
 
+#define	IS_KNOWN_UNSAFE_TIMER_HANDLER(HNDLR)	((wcs_stale_fptr == HNDLR) || (wcs_clean_dbsync_fptr == HNDLR))
+
 STATICDEF volatile GT_TIMER *timeroot = NULL;	/* chain of pending timer requests in time order */
 STATICDEF boolean_t first_timeset = TRUE;
 STATICDEF struct sigaction prev_alrm_handler;	/* save previous SIGALRM handler, if any */
@@ -190,8 +192,9 @@ STATICDEF GT_TIMER	trc_timerpop_array[MAX_TIMER_POP_TRACE_SZ];
 GBLDEF	volatile boolean_t	timer_active = FALSE;
 GBLDEF	volatile int4		timer_stack_count = 0;
 GBLDEF	volatile boolean_t	timer_in_handler = FALSE;
-GBLDEF	void			(*wcs_clean_dbsync_fptr)();	/* Reference to wcs_clean_dbsync() to be used in gt_timers.c. */
-GBLDEF	void			(*wcs_stale_fptr)();		/* Reference to wcs_stale() to be used in gt_timers.c. */
+GBLDEF	void			(*wcs_clean_dbsync_fptr)();	/* Reference to wcs_clean_dbsync() to be used in gt_timers.c */
+GBLDEF	void			(*wcs_stale_fptr)();		/* Reference to wcs_stale() to be used in gt_timers.c */
+
 
 GBLREF	boolean_t		blocksig_initialized;		/* Set to TRUE when blockalrm, block_ttinout, and block_sigsent are
 								 * initialized. */
@@ -619,7 +622,7 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 		if ((0 > deltatime.tv_sec) || ((0 == deltatime.tv_sec) && (0 == deltatime.tv_nsec)))
 		{	/* Timer has expired. Handle safe timers, defer unsafe timers. */
 			if (tpop->safe || (SAFE_FOR_TIMER_START && (1 > timer_stack_count)
-						&& !(TREF(in_ext_call) && (wcs_stale_fptr == tpop->handler))))
+						&& !(TREF(in_ext_call) && IS_KNOWN_UNSAFE_TIMER_HANDLER(tpop->handler))))
 			{
 				DEBUG_ONLY(STAPI_FAKE_TIMER_HANDLER_WAS_DEFERRED);
 				timer_handler(DUMMY_SIG_NUM, NULL, NULL);
@@ -755,11 +758,20 @@ void timer_handler(int why, siginfo_t *info, void *context)
 		}
 		last_continue_proc_cnt = TREF(continue_proc_cnt);
 #		endif
-		/* A timer might pop while we are in the non-zero intrpt_ok_state zone, which could cause collisions. Instead,
-		 * we will defer timer events and drive them once the deferral is removed, unless the timer is safe.
-		 * Handle wcs_stale timers during external calls similarly.
+		/* a) A timer might pop while we are in the non-zero intrpt_ok_state zone, which could cause collisions. Instead,
+		 *    we will defer timer events and drive them once the deferral is removed, unless the timer is safe. Hence the
+		 *    "safe_for_timer_pop" check below.
+		 * b) "wcs_stale" is a special timer which goes through lots of heavyweight functions ("wcs_wtstart" etc.) that
+		 *    can invoke functions like "syslog()/malloc()/free()" etc. all of which are a no-no while inside OS signal
+		 *    handler code. A similar example is "wcs_clean_dbsync". Therefore disallow such special timer handlers if we
+		 *    are inside an OS signal handler. The IS_KNOWN_UNSAFE_TIMER_HANDLER check below takes care of such functions.
+		 * c) Like (b), the unsafe handler functions cannot be invoked if we are in an external call (as they could
+		 *    interfere with potentially non-reentrant routines used in the external call with undesired results, GTM-8926).
+		 *    Hence the "TREF(in_ext_call)" check below.
 		 */
-		if ((safe_for_timer_pop && !(TREF(in_ext_call) && (wcs_stale_fptr == tpop->handler))) || tpop->safe)
+		if (tpop->safe || (safe_for_timer_pop
+					&& ((!in_os_signal_handler && !TREF(in_ext_call))
+						|| !IS_KNOWN_UNSAFE_TIMER_HANDLER(tpop->handler))))
 		{
 			if (NULL != tpop_prev)
 				tpop_prev->next = tpop->next;
@@ -855,7 +867,7 @@ void timer_handler(int why, siginfo_t *info, void *context)
 			tpop->block_int = intrpt_ok_state;
 			tpop_prev = tpop;
 			tpop = tpop->next;
-			if ((0 == safe_timer_cnt) && !(TREF(in_ext_call) && (wcs_stale_fptr == tpop_prev->handler)))
+			if ((0 == safe_timer_cnt) && !(TREF(in_ext_call) && IS_KNOWN_UNSAFE_TIMER_HANDLER(tpop_prev->handler)))
 				break;		/* no more safe timers left, and not special case, so quit */
 		}
 	}

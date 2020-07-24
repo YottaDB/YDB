@@ -960,8 +960,13 @@ void util_cond_flush(void)
  */
 void util_out_syslog_dump(void)
 {
+	int	lcl_in_os_signal_handler;
+
+	lcl_in_os_signal_handler = in_os_signal_handler;
+	in_os_signal_handler = 0; /* temporarily for the below call (to avoid assert failure while using OPENLOG/SYSLOG etc.) */
 	util_out_print("Just some white-box test message long enough to ensure that "
 			"whatever under-construction util_out buffer is not damaged.\n", OPER);
+	in_os_signal_handler = lcl_in_os_signal_handler;
 	/* Resubmit itself for the purposes of the white-box test which expects periodic writes to the syslog. */
 	start_timer((TID)&util_out_syslog_dump, UTIL_OUT_SYSLOG_INTERVAL, util_out_syslog_dump, 0, NULL);
 }

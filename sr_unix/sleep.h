@@ -16,7 +16,7 @@
 #ifndef SLEEP_H
 #define SLEEP_H
 
-#include "eintr_wrappers.h"
+#include "have_crit.h"
 
 #define	RESTART_FALSE	FALSE
 #define	RESTART_TRUE	TRUE
@@ -65,7 +65,7 @@ MBSTART {											\
 	do											\
 	{											\
 		STATUS = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &REQTIM, NULL);	\
-		assert((0 == STATUS) || (EINTR == STATUS));					\
+		assertpro((0 == STATUS) || (EINTR == STATUS));					\
 		/* If MT_SAFE is FALSE the caller is in a multi-threaded environment and does	\
 		 * not hold the YottaDB engine lock. Therefore skip invoking macros which	\
 		 * assume a single-threaded engine execution.					\

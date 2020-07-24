@@ -49,7 +49,8 @@ GBLREF	int4			exit_state;
 GBLREF	boolean_t		first_syslog;
 
 #ifdef DEBUG
-static uint4		nesting_level = 0;
+static	uint4		nesting_level = 0;
+GBLREF	boolean_t	in_fake_enospc;	/* used by an assert in "send_msg.c" */
 #endif
 
 void send_msg_va(void *csa, int arg_count, va_list var);
@@ -103,9 +104,13 @@ void send_msg_va(void *csa, int arg_count, va_list var)
 	if (in_os_signal_handler)
 	{	/* We are inside an OS signal handler and so should not make any "syslog()" calls as it has the potential
 		 * of causing a hang (YDB#464). Hence return right away without sending the message to the syslog
-		 * even if it means loss of potentially crucial information.
+		 * even if it means loss of potentially crucial information. We don't expect this code path to get exercised
+		 * unless
+		 *   a) This process was sent 3 consecutive SIGTERM/SIGINT etc. causing it to go to the exit handler right away OR
+		 *   b) A debug-only timer handler "fake_enospc()" invokes this.
+		 * Assert that too.
 		 */
-		assert(FALSE);	/* assert so we identify such a code path and try fix it if possible */
+		assert((EXIT_IMMED == exit_state) || in_fake_enospc);
 		return;
 	}
 	/* Like in rts_error_csa() do some checking we aren't nesting too deep due to error loop */

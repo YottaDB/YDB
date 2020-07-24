@@ -74,8 +74,10 @@ void mutex_deadlock_check(CRIT_PTR_T criticalPtr, sgmnt_addrs *csa)
 	int4		save_crit_count;
 	boolean_t	passed_cur_region;
 	gd_region	*region;
-	intrpt_state_t		prev_intrpt_state;
+	intrpt_state_t	prev_intrpt_state;
+
 	assert(csa);
+	DEFERRED_SIGNAL_HANDLING_CHECK;	/* Check for any deferred signals (timers etc.) that need to be handled */
 	if (in_mutex_deadlock_check)
 		return;
 	in_mutex_deadlock_check = TRUE;

@@ -14,12 +14,12 @@
 
 #include "have_crit.h"
 
-/* Do any house keeping as part of handling an EINTR. One thing is to check whether a signal was received (e.g. SIGTERM
- * or SIGALRM) whose processing had to be deferred. If so, now that we are outside the signal handler, it is safe to do
- * signal handling in a deferred fashion.
- */
+/* Do any house keeping as part of handling an EINTR. */
 void eintr_handling_check(void)
 {
-	DEFERRED_SIGNAL_HANDLING_CHECK;	/* Handle SIGTERM/SIGALRM etc. if needed when outside signal handler */
+	/* Check whether a signal was received (e.g. SIGTERM or SIGALRM) whose processing had to be deferred.
+	 * If so, now that we are outside the signal handler, it is safe to do signal handling in a deferred fashion.
+	 */
+	DEFERRED_SIGNAL_HANDLING_CHECK;
 }
 

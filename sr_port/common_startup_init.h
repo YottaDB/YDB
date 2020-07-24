@@ -28,7 +28,7 @@ GBLREF void		(*jnl_file_close_timer_ptr)(void);
 #	define	INIT_JNL_FILE_CLOSE_TIMER_FNPTR
 #endif
 
-#ifdef TIMER_DEBUGGING
+#ifdef DEBUG
 #	include "fake_enospc.h"
 #	include "gt_timer.h"
 GBLREF void		(*fake_enospc_ptr)(void);

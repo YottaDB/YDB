@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,6 +39,8 @@
 #ifdef DEBUG
 GBLREF		jnlpool_addrs_ptr_t	jnlpool;
 GBLREF		volatile int4		gtmMallocDepth;
+
+GBLDEF		boolean_t		in_fake_enospc;	/* used by an assert in "send_msg.c" */
 
 STATICDEF	uint4		syslog_deferred = 0;
 
@@ -87,7 +89,10 @@ void fake_enospc(void)
 		cancel_timer((TID)&syslog_deferred);
 		deferred_count = syslog_deferred;
 		syslog_deferred = 0;
+		assert(!in_fake_enospc);
+		in_fake_enospc = TRUE;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FAKENOSPCLEARED, 1, deferred_count);
+		in_fake_enospc = FALSE;
 	}
 	/* If ok_to_interrupt is FALSE and intrpt_ok_state == INTRPT_IN_SHMDT, it is possible we have detached
 	 * from the shared memory (i.e. in the middle of the shmdt()) when the timer interrupt occurs and so
@@ -171,8 +176,13 @@ void fake_enospc(void)
 				break;				/* NOTREACHED */
 			}
 			if (ok_to_interrupt && (NULL != syslog_msg))
+			{
+				assert(!in_fake_enospc);
+				in_fake_enospc = TRUE;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TEXT, 2, DB_LEN_STR(r_local), ERR_TEXT, 2,
 					LEN_AND_STR(syslog_msg));
+				in_fake_enospc = FALSE;
+			}
 		}
 	}
 
@@ -194,7 +204,10 @@ void handle_deferred_syslog(void)
 		{
 			deferred_count = syslog_deferred;
 			syslog_deferred = 0;
+			assert(!in_fake_enospc);
+			in_fake_enospc = TRUE;
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FAKENOSPCLEARED, 1, deferred_count);
+			in_fake_enospc = FALSE;
 		}
 		else
 		{
