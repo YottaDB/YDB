@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,7 @@ void setterm(io_desc *ioptr)
 		t.c_cc[VMIN] = 1;
 	}
 	t.c_iflag &= ~(ICRNL);
-	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
+	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno, CHANGE_TERM_TRUE);
 	if (0 != status)
 	{
 		if (gtm_isanlp(tt_ptr->fildes) == 0)
@@ -98,7 +98,7 @@ void iott_mterm(io_desc *ioptr)
 		t.c_cc[VMIN] = 0;
 	}
 	t.c_iflag &= ~(ICRNL);
-	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
+	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno, CHANGE_TERM_TRUE);
 	if (0 != status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 	return;
@@ -126,7 +126,7 @@ void iott_rterm(io_desc *ioptr)
 		t.c_cc[VMIN] = 1;
 	}
 	t.c_iflag &= ~(ICRNL);
-	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
+	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno, CHANGE_TERM_TRUE);
 	if (0 != status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 	return;

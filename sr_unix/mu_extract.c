@@ -82,6 +82,7 @@ GBLREF	mstr			sys_output;
 GBLREF	tp_region		*grlist;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	IN_PARMS 		*cli_lex_in_ptr;
+GBLREF	io_pair			io_std_device;
 
 error_def(ERR_DBNOREGION);
 error_def(ERR_EXTRACTCTRLY);
@@ -234,6 +235,7 @@ void mu_extract(void)
 	tp_region			*rptr;
 	uint4				pid;
 	char *				value_str[2];	/* holds realpath_val & cli_lex_in_ptr->in_str for copying to label buff */
+	boolean_t			is_extract_stdout;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -426,8 +428,10 @@ void mu_extract(void)
 	MU_EXTR_STATS_INIT(grand_total);
 	MU_EXTR_STATS_INIT(global_total);
 	n_len = SIZEOF(outfilename);
+	op_val.mvtype = MV_STR;
+	op_pars.mvtype = MV_STR;
 	if (CLI_PRESENT == cli_present("STDOUT"))
-		op_val.str = sys_output;	/* Redirect to standard output */
+		is_extract_stdout = TRUE;
 	else if (FALSE == cli_get_str("FILE", outfilename, &n_len))
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
@@ -440,22 +444,31 @@ void mu_extract(void)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_EXTRACTFILERR, 2, LEN_AND_STR(outfilename), local_errno);
 			mupip_exit(local_errno);
 		}
+		assert(MV_STR == op_val.mvtype);
 		op_val.str.len = filename_len = n_len;
 		op_val.str.addr = (char *)outfilename;
+		assert(MV_STR == op_pars.mvtype);
+		op_pars.str.len = SIZEOF(open_params_list);
+		op_pars.str.addr = (char *)open_params_list;
+		(*op_open_ptr)(&op_val, &op_pars, (mval *)&literal_zero, 0);
+		is_extract_stdout = FALSE;
 	} else
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_EXTRFILEXISTS, 2, LEN_AND_STR(outfilename));
 		mupip_exit(ERR_MUNOACTION);
 	}
-	op_pars.mvtype = MV_STR;
-	op_pars.str.len = SIZEOF(open_params_list);
-	op_pars.str.addr = (char *)open_params_list;
-	op_val.mvtype = MV_STR;
-	(*op_open_ptr)(&op_val, &op_pars, (mval *)&literal_zero, 0);
 	ESTABLISH(mu_extract_handler1);
+	assert(MV_STR == op_pars.mvtype);
 	op_pars.str.len = SIZEOF(use_params);
 	op_pars.str.addr = (char *)&use_params;
-	op_use(&op_val, &op_pars);
+	if (!is_extract_stdout)
+		op_use(&op_val, &op_pars);
+	else
+	{	/* Switch to io_std_device.out */
+		active_device = io_std_device.out;
+		io_curr_device = io_std_device.out->pair;
+		(active_device->disp_ptr->use)(active_device, &op_pars);
+	}
 	if (MU_FMT_BINARY == format)
 	{	/* binary header label format:
 		 * fixed length text, fixed length date & time,
@@ -531,6 +544,7 @@ void mu_extract(void)
 			(io_curr_device.out)->ochset = CHSET_M;
 #			endif
 		}
+		assert(MV_STR == op_val.mvtype);
 		op_val.str.addr = (char *)(&label_len);
 		op_val.str.len = SIZEOF(label_len);
 		op_write(&op_val);
@@ -606,7 +620,7 @@ void mu_extract(void)
 			label_len += STR_LIT_LEN(UTF8_NAME);
 		}
 		zwr_go_label_buff[label_len++] = '\n';
-		op_val.mvtype = MV_STR;
+		assert(MV_STR == op_val.mvtype);
 		op_val.str.len = label_len;
 		op_val.str.addr = zwr_go_label_buff;
 		op_write(&op_val);
@@ -636,7 +650,7 @@ void mu_extract(void)
 		if (MU_FMT_BINARY == format)
 		{
 			label_len = SIZEOF(extr_collhdr);
-			op_val.mvtype = MV_STR;
+			assert(MV_STR == op_val.mvtype);
 			op_val.str.addr = (char *)(&label_len);
 			op_val.str.len = SIZEOF(label_len);
 			op_write(&op_val);
@@ -688,9 +702,10 @@ void mu_extract(void)
 		}
 		MU_EXTR_STATS_ADD(grand_total, global_total);	/* add global_total to grand_total */
 	}
-	assert((MV_STR == op_val.mvtype) && (MV_STR == op_pars.mvtype));
+	assert(MV_STR == op_val.mvtype);
 	op_val.str.addr = (char *)outfilename;
 	op_val.str.len = filename_len;
+	assert(MV_STR == op_pars.mvtype);
 	op_pars.str.len = SIZEOF(no_param);
 	op_pars.str.addr = (char *)&no_param;
 	op_close(&op_val, &op_pars);

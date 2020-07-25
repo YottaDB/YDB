@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -464,7 +464,7 @@ void iott_use(io_desc *iod, mval *pp)
 				(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 		}
 		temp_ptr = (d_tt_struct *)d_in->dev_sp;
-		Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
+		Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno, CHANGE_TERM_TRUE);
 		if (0 != status)
 		{
 			assert(WBTEST_YDB_KILL_TERMINAL == ydb_white_box_test_case_number);
@@ -504,4 +504,3 @@ void iott_use(io_desc *iod, mval *pp)
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }
-

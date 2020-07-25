@@ -1358,3 +1358,7 @@ GBLDEF	int			boolZysqlnullCopyAllocLen;	/* The GBLDEF is needed here instead of 
 								 * `bool_zysqlnull_depth_check()` for the same reason as
 								 * the comment described against GBLDEF of `boolZysqlnullCopy`.
 								 */
+GBLDEF	int			terminal_settings_changed_fd;	/* This gbldef checks if a Tcsetattr has modified the terminal
+								 * so that mu_reset_term_characterstics() will only restore the
+								 * terminal state if it has been modified.
+								 */

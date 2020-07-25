@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -385,19 +385,27 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	} while (-1 == RC && EINTR == errno);			\
 }
 
-#define Tcsetattr(FDESC, WHEN, TERMPTR, RC, ERRNO)		\
-{								\
-	GBLREF sigset_t block_ttinout;				\
-	sigset_t oldset;					\
-	int rc;							\
-	SIGPROCMASK(SIG_BLOCK, &block_ttinout, &oldset, rc);	\
-	do							\
-	{							\
-		RC = tcsetattr(FDESC, WHEN, TERMPTR);		\
-	} while (-1 == RC && EINTR == errno);			\
-	ERRNO = errno;						\
-	SIGPROCMASK(SIG_SETMASK, &oldset, NULL, rc);		\
+#define Tcsetattr(FDESC, WHEN, TERMPTR, RC, ERRNO, CHANGE_TERM)						\
+{													\
+	GBLREF sigset_t		block_ttinout;								\
+	GBLREF int		terminal_settings_changed_fd;						\
+	sigset_t 		oldset;									\
+	int 			rc;									\
+													\
+	assert(0 <= FDESC);										\
+	assert((0 == terminal_settings_changed_fd) || ((FDESC + 1) == terminal_settings_changed_fd));	\
+	SIGPROCMASK(SIG_BLOCK, &block_ttinout, &oldset, rc);						\
+	do												\
+	{												\
+		RC = tcsetattr(FDESC, WHEN, TERMPTR);							\
+	} while (-1 == RC && EINTR == errno);								\
+	terminal_settings_changed_fd = CHANGE_TERM ? (FDESC + 1) : 0;					\
+	ERRNO = errno;											\
+	SIGPROCMASK(SIG_SETMASK, &oldset, NULL, rc);							\
 }
+
+#define CHANGE_TERM_TRUE TRUE
+#define CHANGE_TERM_FALSE FALSE
 
 #define TRUNCATE_FILE(PATH, LENGTH, RC)				\
 {								\

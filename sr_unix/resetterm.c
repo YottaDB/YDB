@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@ void  resetterm(io_desc *iod)
 	if (ttptr->ttio_struct)
 	{
 	        t = *ttptr->ttio_struct;
-		Tcsetattr(ttptr->fildes, TCSANOW, &t, status, save_errno);
+		Tcsetattr(ttptr->fildes, TCSANOW, &t, status, save_errno, CHANGE_TERM_FALSE);
 		if (0 != status)
 		{
 			assert(-1 == status);
