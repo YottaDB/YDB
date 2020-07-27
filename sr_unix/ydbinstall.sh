@@ -808,16 +808,28 @@ if [ "Y" = $ydb_posix ] ; then
 	mkdir build && cd build
 	cmake ..
 	make -j `grep -c ^processor /proc/cpuinfo` && sudo make install
+	# Get the exit code for the make command to save the build directory if it is an error (not 0)
+	status=$?
+	status_utf8=0
 	cd ..
 	if [ "Y" = $ydb_utf8 ] ; then
 		mkdir build_UTF8 && cd build_UTF8
 		cmake -DMUMPS_UTF8_MODE=1 ..
 		make && sudo make install
+		status_utf8=$?
 		cd ..
 	fi
 	cd ../..
 	. ${ydb_installdir}/ydb_env_unset
-	sudo rm -R posix_tmp
+	if [ "0" = $status -a "0" = $status_utf8 ] ; then
+		sudo rm -R posix_tmp
+	elif ["0" != $status -a "0" != $status_utf8] ; then
+		echo "POSIX plugin build failed in both M and UTF8 modes. The build directory ($PWD/posix_tmp) has been saved."
+	elif ["0" != $status] ; then
+		echo "POSIX plugin build failed in M mode. The build directory ($PWD/posix_tmp) has been saved."
+	else
+		echo "POSIX plugin build failed in UTF8 mode. The build directory ($PWD/posix_tmp) has been saved."
+	fi
 fi
 
 if [ "Y" = $ydb_encplugin ] ; then
@@ -827,8 +839,14 @@ if [ "Y" = $ydb_encplugin ] ; then
 	sudo tar -xf ${ydb_installdir}/plugin/gtmcrypt/source.tar
 	sudo ydb_dist=${ydb_installdir} make -j `grep -c ^processor /proc/cpuinfo`
 	sudo ydb_dist=${ydb_installdir} make install
+	# Get the exit code for the make command to save the build directory if it is an error (not 0)
+	status=$?
 	cd ..
-	sudo rm -R enc_tmp
+	if [ "0" = $status ] ; then
+		sudo rm -R enc_tmp
+	else
+		echo "Encryption plugin build failed. The build directory ($PWD/enc_tmp) has been saved."
+	fi
 	# rename gtmcrypt to ydbcrypt and create a symbolic link for backward compatibility
 	mv ${ydb_installdir}/plugin/gtmcrypt ${ydb_installdir}/plugin/ydbcrypt
 	ln -s ${ydb_installdir}/plugin/ydbcrypt ${ydb_installdir}/plugin/gtmcrypt
@@ -843,6 +861,8 @@ if [ "Y" = $ydb_zlib ] ; then
 	cd YDBZlib-master
 	gcc -c -fPIC -I${ydb_installdir} gtmzlib.c
 	gcc -o libgtmzlib.so -shared gtmzlib.o
+	# Get the exit code for the make command to save the build directory if it is an error (not 0)
+	status=$?
 	sudo cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
 	sudo cp _ZLIB.m ${ydb_installdir}/plugin/r
 	${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
@@ -862,7 +882,11 @@ if [ "Y" = $ydb_zlib ] ; then
 	sudo cp _ZLIB.o ${ydb_installdir}/plugin/o
 	. ${ydb_installdir}/ydb_env_unset
 	cd ../..
-	sudo rm -R zlib_tmp
+	if [ "0" = $status ]; then
+		sudo rm -R zlib_tmp
+	else
+		echo "zlib plugin build failed. The build directory ($PWD/zlib_tmp) has been saved."
+	fi
 fi
 
 if [ "Y" = $ydb_octo ] ; then
@@ -879,7 +903,13 @@ if [ "Y" = $ydb_octo ] ; then
 	fi
 	make -j `grep -c ^processor /proc/cpuinfo`
 	sudo -E make install
+	# Get the exit code for the make command to save the build directory if it is an error (not 0)
+	status=$?
 	cd ../..
-	sudo rm -R YDBOcto-master
-	sudo rm YDBOcto-master.tar.gz
+	if [ "0" = $status ] ; then
+		sudo rm -R YDBOcto-master
+		sudo rm YDBOcto-master.tar.gz
+	else
+		echo "Octo build failed. The build directory ($PWD/YDBOcto-master) and the tarball ($PWD/YDBOcto-master.tar.gz) have been saved."
+	fi
 fi
