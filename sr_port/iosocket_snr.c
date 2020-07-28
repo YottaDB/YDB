@@ -294,7 +294,7 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			DBGSOCK2((stdout, "socsnrupb: Buffer empty - bytes read: %d  errno: %d\n", bytesread, real_errno));
 			DBGSOCK_ONLY2(errno = real_errno);
 			if ((-1 == bytesread) && (EINTR == errno))
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 		} while ((((-1 == bytesread) && (EINTR == errno)) || (0 == bytesread && wait_for_input))
 			 && !out_of_time && (0 == outofband));
 		if (out_of_time || (0 != outofband))
@@ -392,7 +392,7 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			{	/* Some error occurred. Check for restartable condition. */
 				if (EINTR == errno)
 				{
-					EINTR_HANDLING_CHECK;
+					eintr_handling_check();
 					if (!out_of_time)
 						continue;
 					else

@@ -326,7 +326,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 						need_connect = FALSE;
 						break;
 					case EINTR:
-						EINTR_HANDLING_CHECK;
+						eintr_handling_check();
 						if (outofband && (0 != nsec_timeout))
 						{	/* handle outofband unless zero timeout */
 							save_errno = 0;
@@ -424,7 +424,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					{
 						if (EINTR == sockerror)
 						{	/* loop on select */
-							EINTR_HANDLING_CHECK;
+							eintr_handling_check();
 							save_errno = 0;
 							continue;
 						} else
@@ -457,7 +457,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					break;
 				} else
 				{
-					EINTR_HANDLING_CHECK;
+					eintr_handling_check();
 					if (outofband)
 					{
 						save_errno = 0;

@@ -30,7 +30,7 @@ void cmj_exception_interrupt(struct CLB *lnk, int signo)
 	if (signo == SIGURG)
 	{
 		while ((-1 == (rval = (int)recv(lnk->mun, (void *)&lnk->urgdata, 1, MSG_OOB))) && EINTR == errno)
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 		/* test to see if there is ANY oob data */
 		if (-1 == rval && (CMI_IO_WOULDBLOCK(errno) || errno == EINVAL))
 			return;

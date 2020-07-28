@@ -241,7 +241,7 @@ unsigned char mu_cre_file(void)
 		mu_cre_file_fd = OPEN3(pblk.l_dir, O_CREAT | O_EXCL | O_RDWR, 0600);
 		if ((-1 != mu_cre_file_fd) || (EINTR != errno))
 			break;
-		EINTR_HANDLING_CHECK;
+		eintr_handling_check();
 	} while (TRUE);
 	if (FD_INVALID == mu_cre_file_fd)
 	{	/* Avoid error message if file already exists (another process created it) for AUTODBs that are NOT also

@@ -167,7 +167,7 @@ int icmp_ping(int conn)
 	{
 		if (errno == EINTR)
 		{
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 			continue;
 		}
 		perror("ping: sendto");
@@ -218,7 +218,7 @@ int get_ping_rsp(void)
 	{
 		if (errno == EINTR)
 		{
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 			continue;
 		}
 		perror("ping: recvfrom");

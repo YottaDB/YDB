@@ -53,7 +53,7 @@ GBLDEF gtm_free_fnptr_t			gtm_free_fnptr;
 	{														\
 		RC = sigprocmask(FUNC, NEWSET, OLDSET);	/* BYPASSOK(sigprocmask) */					\
 	} while ((-1 == RC) && (EINTR == errno));									\
-		/* See comment in gtmcrypt_util.h for why EINTR_HANDLING_CHECK macro is not used in case of EINTR */	\
+		/* See comment in gtmcrypt_util.h for why eintr_handling_check() is not used in case of EINTR */	\
 }
 
 #define Tcsetattr(FDESC, WHEN, TERMPTR, RC, ERRNO)									\
@@ -70,7 +70,7 @@ GBLDEF gtm_free_fnptr_t			gtm_free_fnptr;
 	{														\
 		RC = tcsetattr(FDESC, WHEN, TERMPTR);									\
 	} while(-1 == RC && EINTR == errno);										\
-		/* See comment in gtmcrypt_util.h for why EINTR_HANDLING_CHECK macro is not used in case of EINTR */	\
+		/* See comment in gtmcrypt_util.h for why eintr_handling_check() is not used in case of EINTR */	\
 	ERRNO = errno;													\
 	SIGPROCMASK(SIG_SETMASK, &oldset, NULL, rc);									\
 }
@@ -170,7 +170,7 @@ int gc_read_passwd(char *prompt, char *buf, int maxlen, void *tty)
 	i = rv = 0;
 	do
 	{
-		/* See comment in gtmcrypt_util.h for why EINTR_HANDLING_CHECK macro is not used in case of EINTR */
+		/* See comment in gtmcrypt_util.h for why eintr_handling_check() is not used in case of EINTR */
 		while ((-1 == (status = read(fd, &c, 1))) && (EINTR == errno))
 			;
 		if (-1 == status)

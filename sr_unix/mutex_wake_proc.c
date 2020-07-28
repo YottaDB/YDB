@@ -148,7 +148,7 @@ mutex_wake_proc(msemaphore *mutex_wake_msem_ptr)
 		rc = MSEM_UNLOCK(mutex_wake_msem_ptr);
 		if ((-1 != rc) || (EINTR != errno))
 			break;
-		EINTR_HANDLING_CHECK;
+		eintr_handling_check();
 	} while (TRUE);
 	if (0 > rc)
 	{

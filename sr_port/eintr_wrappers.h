@@ -36,14 +36,6 @@
 #include "wbox_test_init.h"
 #endif
 
-/* Do any house keeping as part of handling an EINTR. One thing is to check whether a process terminating signal
- * was received (e.g. SIGTERM). If so, now that we are outside the signal handler, it is safe to do exit processing.
- */
-#define	EINTR_HANDLING_CHECK											\
-{														\
-	DEFERRED_SIGNAL_HANDLING_CHECK;	/* Handle SIGTERM etc. if needed when outside signal handler */		\
-}
-
 #define ACCEPT_SOCKET(SOCKET, ADDR, LEN, RC)			\
 {								\
 	do							\
@@ -51,7 +43,7 @@
 		RC = ACCEPT(SOCKET, ADDR, LEN);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -62,7 +54,7 @@
 		RC = CHOWN(PATH, OWNER, GRP);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -77,7 +69,7 @@
 		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
 		if ((-1 != RC) || (EINTR != errno))					\
 			break;								\
-		EINTR_HANDLING_CHECK;							\
+		eintr_handling_check();							\
 	} while (TRUE);									\
 }
 
@@ -88,7 +80,7 @@
 		RC = closedir(DIR);				\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -102,7 +94,7 @@
 		RC = CREAT(PATHNAME, MODE);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -113,7 +105,7 @@
 		RC = DOREAD_A(FD, BUF, SIZE);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -124,7 +116,7 @@
 		RC = dup2(FDESC1, FDESC2);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -139,7 +131,7 @@
 		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
 		if ((-1 != RC) || (EINTR != errno))					\
 			break;								\
-		EINTR_HANDLING_CHECK;							\
+		eintr_handling_check();							\
 	} while (TRUE);									\
 }
 
@@ -150,7 +142,7 @@
 		RC = flock(FD, FLAGS);				\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -161,7 +153,7 @@
 		RC = fcntl(FDESC, ACTION);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -172,7 +164,7 @@
 		RC = fcntl(FDESC, ACTION, ARG);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -183,7 +175,7 @@
 		FGETS(BUF, LEN, FP, RC);						\
 		if ((NULL != RC) || feof(FP) || !ferror(FP) || (EINTR != errno))	\
 			break;								\
-		EINTR_HANDLING_CHECK;							\
+		eintr_handling_check();							\
 	} while (TRUE);									\
 }
 
@@ -198,7 +190,7 @@
 		ENABLE_INTERRUPTS(INTRPT_IN_FSTAT, prev_intrpt_state);		\
 		if ((-1 != RC) || (EINTR != errno))				\
 			break;							\
-		EINTR_HANDLING_CHECK;						\
+		eintr_handling_check();						\
 	} while (TRUE);								\
 }
 
@@ -209,7 +201,7 @@
 		FSTATVFS(FDESC, FSINFO, RC);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -220,7 +212,7 @@
 		RC = ftruncate(FDESC, LENGTH);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -256,13 +248,13 @@ MBSTART {											\
 		if (EINTR != errno)								\
 			break;									\
 		/* Note that the DEFERRED_SIGNAL_HANDLING_CHECK invocation inside the		\
-		 * EINTR_HANDLING_CHECK macro below will be a no-op since we still have		\
+		 * eintr_handling_check() function below will be a no-op since we still have	\
 		 * not done the ENABLE_INTERRUPTS. But that is okay since we are not waiting	\
 		 * for user input indefinitely here and so this will eventually return.		\
-		 * The macro is still invoked here in case some other check also gets added to	\
-		 * the macro at a later point.							\
+		 * The function is still invoked here in case some other check also gets added	\
+		 * to the function at a later point.						\
 		 */										\
-		EINTR_HANDLING_CHECK;								\
+		eintr_handling_check();								\
 	}											\
 	NREAD = NELEMS - elems_to_read;								\
 	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);				\
@@ -275,7 +267,7 @@ MBSTART {											\
 		RC = fsync(FD);					\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -312,8 +304,8 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		rc = errno;
 		if (EINTR != rc)
 			break;
-		/* See comment before EINTR_HANDLING_CHECK in GTM_FREAD macro for similar issue here */
-		EINTR_HANDLING_CHECK;
+		/* See comment before eintr_handling_check() in GTM_FREAD macro for similar issue here */
+		eintr_handling_check();
 	}
 	*nwritten = nelems - elems_to_write;
 	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);
@@ -327,7 +319,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		RC = LSTAT(PATH, INFO);				\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -338,7 +330,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		RC = msgsnd(MSGID, MSGP, MSGSZ, FLG);		\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -349,7 +341,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		RC = openat(PATH, FLAGS, MODE);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -360,7 +352,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		RC = pipe(FDESC);				\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -371,7 +363,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		RC = read(FD, BUF, SIZE);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -382,7 +374,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		RC = (int)recv(SOCKET, BUF, (int)(LEN), FLAGS);	\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -395,7 +387,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			 FLAGS, ADDR, ADDR_LEN);		\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -409,7 +401,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			XLIST, &eintr_select_timeval);		\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -421,7 +413,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		RC = send(SOCKET, BUF, LEN, FLAGS);		\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -434,7 +426,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			 ADDR, ADDR_LEN);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -445,7 +437,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		RC = Stat(PATH, INFO);				\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -483,7 +475,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		RC = tcflush(FDESC, REQUEST);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -505,7 +497,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		RC = tcsetattr(FDESC, WHEN, TERMPTR);							\
 		if ((-1 != RC) || (EINTR != errno))							\
 			break;										\
-		EINTR_HANDLING_CHECK;									\
+		eintr_handling_check();									\
 	} while (TRUE);											\
 	terminal_settings_changed_fd = (CHANGE_TERM_FALSE != CHANGE_TERM) ? (FDESC + 1) : 0;		\
 	ERRNO = errno;											\
@@ -519,7 +511,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		RC = TRUNCATE(PATH, LENGTH);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -530,7 +522,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		RC = wait(STATUS);				\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -547,7 +539,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		RC = waitpid(PID, STATUS, OPTS);									\
 		if ((-1 != RC) || (EINTR != errno))									\
 			break;												\
-		EINTR_HANDLING_CHECK;											\
+		eintr_handling_check();											\
 	} while (TRUE);													\
 }
 

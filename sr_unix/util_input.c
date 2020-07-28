@@ -76,7 +76,7 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 				uc_fgets_ret = u_fgets(ufgets_Ubuffer, (int32_t)(SIZEOF(ufgets_Ubuffer) / SIZEOF(UChar)) - 1, u_fp);
 				if ((NULL != uc_fgets_ret) || u_feof(u_fp) || !ferror(fp) || (EINTR != errno))
 					break;
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 			} while (TRUE);
 			if (NULL == uc_fgets_ret)
 			{
@@ -130,7 +130,7 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 			FGETS(buffer, buffersize, fp, retptr);
 			if ((NULL != retptr) || feof(fp) || !ferror(fp) || (EINTR != errno))
 				break;
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 		} while (TRUE);
 		if (NULL != retptr)
 		{

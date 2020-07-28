@@ -44,7 +44,7 @@ void cmj_select(int signo)
 		if ((0 <= count) || ((EINTR != errno) && (EAGAIN != errno)))
 			break;
 		if (EINTR == errno)
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 	} while (TRUE);
 
 	while (0 < count) {
@@ -94,7 +94,7 @@ void cmj_select(int signo)
 			if ((0 <= count) || ((EINTR != errno) && (EAGAIN != errno)))
 				break;
 			if (EINTR == errno)
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 		} while (TRUE);
 	}
 }

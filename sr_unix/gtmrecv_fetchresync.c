@@ -184,7 +184,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 		{
 			if ((EINTR == errno)  || (EAGAIN == errno))
 			{
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 				t2 = time(NULL);
 				if (0 >= (int)(repl_poll_wait.tv_sec = (MAX_WAIT_FOR_FETCHRESYNC_CONN - (int)difftime(t2, t1))))
 				{

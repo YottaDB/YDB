@@ -186,7 +186,7 @@ int tcp_open(char *host, unsigned short port, uint8 timeout, boolean_t passive) 
                                 utimeout = save_utimeout;
 				if ((0 <= rv) || (EINTR != save_errno))
 					break;
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 				if (NO_M_TIMEOUT != timeout)
 				{
 					sys_get_curr_time(&cur_time);

@@ -271,7 +271,7 @@ int main(int argc, char_ptr_t argv[])
 			if (0 < num_chars_recd)
 				recv_complete = TRUE;	/* Only complete messages received via UDP datagram */
 			else
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 		} while (!recv_complete);
 		cancel_timer(timer_id);
 		assert(0 < num_chars_recd);
@@ -295,7 +295,7 @@ int main(int argc, char_ptr_t argv[])
 				if (0 < num_chars_sent)
 					send_complete = TRUE;
 				else
-					EINTR_HANDLING_CHECK;
+					eintr_handling_check();
 			} while (!send_complete);
 			cancel_timer(timer_id);
 		} else

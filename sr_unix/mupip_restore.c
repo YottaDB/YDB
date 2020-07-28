@@ -753,7 +753,7 @@ STATICFNDEF void exec_read(BFILE *bf, char *buf, int nbytes)
 			restore_read_errno = errno;
 			break;
 		} else if (EINTR == errno)
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 		wcs_sleep(100);
 	}
 	return;
@@ -805,7 +805,7 @@ STATICFNDEF void tcp_read(BFILE *bf, char *buf, int nbytes)
 				restore_read_errno = errno;
 				break;
 			} else
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 		}
 	}
 	return;

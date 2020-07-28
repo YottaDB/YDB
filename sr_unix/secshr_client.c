@@ -322,7 +322,7 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 					break;
 				if (EINTR == save_errno)	/* Had an irrelevant interrupt - ignore */
 				{
-					EINTR_HANDLING_CHECK;
+					eintr_handling_check();
 					continue;
 				}
 				if (EBADF == save_errno)
@@ -499,7 +499,7 @@ int create_server(void)
 							RTS_ERROR_TEXT("Client"), process_id,
 							ERR_TEXT, 2, RTS_ERROR_TEXT("Error spawning gtmsecshr"), errno);
 				} else
-					EINTR_HANDLING_CHECK;
+					eintr_handling_check();
 			}
 		}
 	}

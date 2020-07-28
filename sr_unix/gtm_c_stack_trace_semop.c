@@ -69,7 +69,7 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 		save_errno = errno;
 		if (EINTR != save_errno)
 			break;
-		EINTR_HANDLING_CHECK;
+		eintr_handling_check();
 		/* Timer popped, get C-stack trace */
 		if (TREF(semwait2long))
 		{

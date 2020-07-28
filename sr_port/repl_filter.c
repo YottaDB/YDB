@@ -553,7 +553,7 @@ static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len, boole
 		sent_len = write(repl_srv_filter_fd[WRITE_END], send_ptr, send_len);
 		if ((0 > sent_len) && (EINTR == errno))
 		{
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 			continue;
 		}
 		break;
@@ -654,7 +654,7 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 					{
 						if (EINTR == errno) /* ignore interrupt and try again */
 						{
-							EINTR_HANDLING_CHECK;
+							eintr_handling_check();
 							continue;
 						} else
 						{
@@ -686,7 +686,7 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 				if ((ENOMEM != save_errno) && (EINTR != save_errno))
 					break;
 				if (EINTR == save_errno)
-					EINTR_HANDLING_CHECK;
+					eintr_handling_check();
 				/* EINTR/ENOMEM -- check if it's time to take the stack trace. */
 				if (send_done)
 				{
@@ -919,7 +919,7 @@ int repl_filter(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize
 				{
 					if (EINTR == errno) /* ignore interrupt and try again */
 					{
-						EINTR_HANDLING_CHECK;
+						eintr_handling_check();
 						continue;
 					} else
 					{
@@ -976,7 +976,7 @@ int repl_filter(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize
 				{
 					if (EINTR == errno) /* ignore interrupt and try again */
 					{
-						EINTR_HANDLING_CHECK;
+						eintr_handling_check();
 						continue;
 					} else
 					{

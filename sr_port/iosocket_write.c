@@ -201,7 +201,7 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 				status = -1;
 				break;
 			} else
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 			continue;
 		}
 #		ifdef GTM_TLS

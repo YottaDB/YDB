@@ -235,7 +235,7 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout)
 				rv = poll(poll_fds, poll_nfds, poll_timeout);
 				if (0 > rv && EINTR == errno)
 				{
-					EINTR_HANDLING_CHECK;
+					eintr_handling_check();
 					if (0 != outofband)
 					{
 						if (OUTOFBAND_RESTARTABLE(outofband))

@@ -276,7 +276,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 						status2 = 0;	/* treat as timeout */
 					} else if (EINTR == save_errno)
 					{
-						EINTR_HANDLING_CHECK;
+						eintr_handling_check();
 						status2 = 0;
 					}
 				}

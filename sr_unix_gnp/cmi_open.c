@@ -94,7 +94,7 @@ cmi_status_t cmi_open(struct CLB *lnk)
 		do
 		{
 			if (EINTR == errno)
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 			if ((EINTR == errno) && outofband && (jobinterrupt != outofband))
 				break;		/* abort unless job interrupt */
 			FD_ZERO(&writefds);
@@ -102,7 +102,7 @@ cmi_status_t cmi_open(struct CLB *lnk)
 			rval = select(new_fd + 1, NULL, &writefds, NULL, NULL);
 			if (-1 == rval && EINTR == errno)
 			{
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 				continue;
 			}
 			if (0 < rval)

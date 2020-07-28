@@ -123,7 +123,7 @@ void gtcm_loop(omi_conn_ll *cll)
 	if ((nfds = select(nfds, &r_fds, (fd_set *)0, (fd_set *)0, tp)) < 0)
 	{
 	    if (errno == EINTR) {
-		EINTR_HANDLING_CHECK;
+		eintr_handling_check();
 		if (!omi_exitp)
 		    continue;
 	    }

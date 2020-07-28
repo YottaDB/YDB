@@ -45,7 +45,7 @@ int	gtm_connect(int socket, struct sockaddr *address, size_t address_len)
 			res = select(socket + 1, NULL, &writefds, NULL, NULL);
 			if ((-1 == res) && (EINTR == errno))
 			{
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 				continue;
 			}
 			if (0 < res)

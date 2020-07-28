@@ -381,7 +381,7 @@ void	dm_read (mval *v)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 			else
 			{
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 				continue;
 			}
 		else if (0 == selstat)
@@ -396,7 +396,7 @@ void	dm_read (mval *v)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 			} else
 			{
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 				continue;
 			}
 		} else if (0 == status)

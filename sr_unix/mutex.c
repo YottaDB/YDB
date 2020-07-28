@@ -411,7 +411,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 				save_errno = errno;
 				if (EINTR == save_errno)
 				{
-					EINTR_HANDLING_CHECK;
+					eintr_handling_check();
 					if (msem_timedout)
 					{
 						MUTEX_DPRINT3("%d: msem sleep done, heartbeat_counter = %d\n",
@@ -455,7 +455,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 			{
 				if (EINTR == errno)
 				{	/* somebody interrupted me, reduce the timeout by half and continue */
-					EINTR_HANDLING_CHECK;
+					eintr_handling_check();
 					MUTEX_TRACE_CNTR(mutex_trc_slp_intr);
 					if (!(timeout_intr_slpcnt--)) /* Assume timed out */
 					{
@@ -1009,7 +1009,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 					rc = MSEM_LOCKNW(mutex_wake_msem_ptr);
 					if ((-1 != rc) || (EINTR != errno))
 						break;
-					EINTR_HANDLING_CHECK;
+					eintr_handling_check();
 				} while (TRUE);
 #				endif
 				/*

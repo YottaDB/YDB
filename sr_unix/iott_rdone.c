@@ -288,7 +288,7 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				break;
 			}
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 		} else if (0 == selstat)
 		{
 			if (timed)
@@ -471,7 +471,7 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				break;
 			}
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 		} else
 		/* ------------
 		 * rdlen == 0

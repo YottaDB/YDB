@@ -226,7 +226,7 @@ STATICFNDEF void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_t
 					save_errno = errno;
 					if (EINTR == save_errno)
 					{
-						EINTR_HANDLING_CHECK;
+						eintr_handling_check();
 						continue;
 					}
 					if (ERANGE != save_errno)
@@ -313,7 +313,7 @@ STATICFNDEF void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_t
 					save_errno = errno;
 					if (EINTR == save_errno)
 					{
-						EINTR_HANDLING_CHECK;
+						eintr_handling_check();
 						continue;
 					}
 					if (ERANGE != save_errno)
@@ -402,7 +402,7 @@ STATICFNDEF void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_t
 					save_errno = errno;
 					if (EINTR == save_errno)
 					{
-						EINTR_HANDLING_CHECK;
+						eintr_handling_check();
 						continue;
 					}
 					if (ERANGE != save_errno)

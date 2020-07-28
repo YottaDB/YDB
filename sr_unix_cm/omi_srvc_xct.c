@@ -97,7 +97,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 /*	If true, an error occurred */
 	cc =(int)(&cptr->buff[cptr->bsiz] - &cptr->bptr[cptr->blen]);
 	while (!servtime_expired && (cc = (int)(read(cptr->fd, &cptr->bptr[cptr->blen], cc))) < 0  &&  errno == EINTR)
-		EINTR_HANDLING_CHECK;
+		eintr_handling_check();
 	save_errno = errno;
 	if (servtime_expired)
 		return -1;
@@ -443,7 +443,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 			}
 			else if (errno == EINTR)
 			{
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 				continue;
 			} else
 			{

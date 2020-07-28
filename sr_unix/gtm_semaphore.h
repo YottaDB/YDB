@@ -32,7 +32,7 @@
 		RC = sem_wait(POSIX_SEM);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 
@@ -43,7 +43,7 @@
 		RC = sem_trywait(POSIX_SEM);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 }
 

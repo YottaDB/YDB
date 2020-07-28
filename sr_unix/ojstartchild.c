@@ -899,13 +899,13 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			done_pid = waitpid(child_pid, &wait_status, 0);	/* BYPASSOK */
 			if (ojtimeout || (0 <= done_pid) || (EINTR != errno))
 				break;
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 		} while (TRUE);
 		if (done_pid == child_pid)
 			return (wait_status);
 		else if ((0 > done_pid) && (EINTR == errno) && ojtimeout)
 		{
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 			/* Kill the middle process with SIGTERM and check the exit status from
 			 * the handler to see if the Middle process had actually successfully forked the Job */
 			KILL_N_REAP(child_pid, SIGTERM, kill_ret);

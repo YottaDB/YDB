@@ -313,7 +313,7 @@ void iorm_close(io_desc *iod, mval *pp)
 						break;
 					if (EINTR != errno)
 						break;
-					EINTR_HANDLING_CHECK;
+					eintr_handling_check();
 				} while (!out_of_time);
 				if (((pid_t)-1 == done_pid) && (!out_of_time))
 				{

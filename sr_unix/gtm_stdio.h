@@ -106,7 +106,7 @@
 #endif
 
 
-/* Note: EINTR_HANDLING_CHECK is used below inside a UNIX_ONLY macro. This is so if the caller is a
+/* Note: eintr_handling_check() is used below inside a UNIX_ONLY macro. This is so if the caller is a
  * standalone or test system module (UNIX macro is not defined in that case as mdef.h would not be included)
  * we do not use this macro which would cause a compile time error. This macro should only be used inside the
  * YottaDB runtime. Hence the UNIX_ONLY macro use.
@@ -118,7 +118,7 @@
 		RC = vprintf(FORMAT, VALUE);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		UNIX_ONLY(EINTR_HANDLING_CHECK);		\
+		UNIX_ONLY(eintr_handling_check());		\
 	} while (TRUE);						\
 }
 #define VFPRINTF(STREAM, FORMAT, VALUE, RC)			\
@@ -128,7 +128,7 @@
 		RC = vfprintf(STREAM, FORMAT, VALUE);		\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		UNIX_ONLY(EINTR_HANDLING_CHECK);		\
+		UNIX_ONLY(eintr_handling_check());		\
 	} while (TRUE);						\
 }
 #define VSPRINTF(STRING, FORMAT, VALUE, RC)			\
@@ -138,7 +138,7 @@
 		RC = vsprintf(STRING, FORMAT, VALUE);		\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		UNIX_ONLY(EINTR_HANDLING_CHECK);		\
+		UNIX_ONLY(eintr_handling_check());		\
 	} while (TRUE);						\
 }
 #define VSNPRINTF(STRING, SIZE, FORMAT, VALUE, RC)		\
@@ -148,7 +148,7 @@
 		RC = vsnprintf(STRING, SIZE, FORMAT, VALUE);	\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		UNIX_ONLY(EINTR_HANDLING_CHECK);		\
+		UNIX_ONLY(eintr_handling_check());		\
 	} while (TRUE);						\
 }
 
@@ -159,7 +159,7 @@
 		RC = vscanf(FORMAT, POINTER);			\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		UNIX_ONLY(EINTR_HANDLING_CHECK);		\
+		UNIX_ONLY(eintr_handling_check());		\
 	} while (TRUE);						\
 }
 #define VSSCANF(STRING, FORMAT, POINTER, RC)			\
@@ -169,7 +169,7 @@
 		RC = vsscanf(STRING, FORMAT, POINTER);		\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		UNIX_ONLY(EINTR_HANDLING_CHECK);		\
+		UNIX_ONLY(eintr_handling_check());		\
 	} while (TRUE);						\
 }
 #define VFSCANF(STREAM, FORMAT, POINTER, RC)			\
@@ -179,7 +179,7 @@
 		RC = vfscanf(STREAM, FORMAT, POINTER);		\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		UNIX_ONLY(EINTR_HANDLING_CHECK);		\
+		UNIX_ONLY(eintr_handling_check());		\
 	} while (TRUE);						\
 }
 

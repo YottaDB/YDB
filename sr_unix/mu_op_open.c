@@ -337,7 +337,7 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 		{
 			if (EINTR == errno)
 			{
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 				continue;
 			}
 			if ((ETXTBSY == errno) || (ENFILE == errno) || (EBUSY == errno) || ((mb == iod->type) && (ENXIO == errno)))

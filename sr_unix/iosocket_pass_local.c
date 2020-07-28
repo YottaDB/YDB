@@ -57,7 +57,7 @@
 		{											\
 			if (EINTR == errno)								\
 			{										\
-				EINTR_HANDLING_CHECK;							\
+				eintr_handling_check();							\
 				continue;								\
 			} else										\
 				break;									\
@@ -242,7 +242,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, uint8 nsec_timeout, int argcnt
 		rval = sendmsg(socketptr->sd, &msg, 0);
 		if (outofband || out_of_time || (-1 != rval) || (EINTR != errno))
 			break;
-		EINTR_HANDLING_CHECK;
+		eintr_handling_check();
 	} while (TRUE);
 	if (-1 == rval)
 		goto ioerr;
@@ -313,7 +313,7 @@ ioerr:
 	save_errno = errno;
 	if (out_of_time && (EINTR == save_errno))
 	{
-		EINTR_HANDLING_CHECK;
+		eintr_handling_check();
 		dollar_truth = FALSE;
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
@@ -434,7 +434,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, uint8 nsec
 		rval = recvmsg(socketptr->sd, &msg, 0);
 		if (outofband || out_of_time || (-1 != rval) || (EINTR != errno))
 			break;
-		EINTR_HANDLING_CHECK;
+		eintr_handling_check();
 	} while (TRUE);
 	if (0 == rval)
 	{
@@ -598,7 +598,7 @@ ioerr:
 	save_errno = errno;
 	if (out_of_time && (EINTR == save_errno))
 	{
-		EINTR_HANDLING_CHECK;
+		eintr_handling_check();
 		dollar_truth = FALSE;
 	}
 	if ((NO_M_TIMEOUT != nsec_timeout) && !out_of_time)

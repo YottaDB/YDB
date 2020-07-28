@@ -44,7 +44,7 @@ int do_semop(int sems, int num, int op, int flg)
 	} else
 	{
 		while (-1 == (rv = semop(sems, sop, 1)) && EINTR == errno)
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 		return (-1 == rv) ? errno : 0;
 	}
 }

@@ -73,7 +73,7 @@ char *ydb_getenv(ydbenvindx_t envindx, mstr *suffix, boolean_t *is_ydb_env_match
 				 * that can cause a process to not terminate in a timely fashion even though it was say
 				 * sent a process-terminating signal like SIGTERM.
 				 *
-				 * EINTR_HANDLING_CHECK;
+				 * eintr_handling_check();
 				 */
 			} while (TRUE);
 			if ((0 > nbytes) || (nbytes >= sizeof(envwithsuffix)))

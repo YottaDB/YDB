@@ -221,7 +221,7 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, uint8 *nsec_timeout,
 		{
 			if (EINTR != errno)
 				break;
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 		}
 	} while (rm_ptr->bom_buf_cnt < bom_bytes2read);
 	PIPE_DEBUG(PRINTF("iorm_get_bom_fl: status: %d, bom_buf_cnt: %d\n", status,rm_ptr->bom_buf_cnt); DEBUGPIPEFLUSH;);
@@ -426,7 +426,7 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, uint8 *nsec_timeout, boo
 			{
 				if (EINTR != errno)
 					break;
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 			}
 		} while (bytes_count < bytes2read);
 		status = bytes_count;
@@ -612,7 +612,7 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 		{
 			if (EINTR == errno)
 			{
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 				if (out_of_time)
 					status = -2;
 			}

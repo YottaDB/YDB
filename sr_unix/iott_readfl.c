@@ -446,7 +446,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 				term_error_line = __LINE__;
 				goto term_error;
 			}
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 		} else if (0 == selstat)
 		{
 			if (timed)
@@ -1004,7 +1004,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 			term_error_line = __LINE__;
 			goto term_error;
 		} else
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 		if (FINI == io_ptr->esc_state)
 		{
 			int zb_len = (int)(zb_ptr - io_ptr->dollar.zb);

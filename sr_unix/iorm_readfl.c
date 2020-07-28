@@ -645,7 +645,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 							bytes_count = 0;
 							break;
 						}
-						EINTR_HANDLING_CHECK;
+						eintr_handling_check();
 					}
 				} while (bytes_count < width);
 			} else
@@ -671,7 +671,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						bytes_count = 0;
 					if (EINTR == errno)
 					{
-						EINTR_HANDLING_CHECK;
+						eintr_handling_check();
 						if (out_of_time)
 							status = -2;
 					}
@@ -867,7 +867,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 								bytes_count = 0;
 								break;
 							}
-							EINTR_HANDLING_CHECK;
+							eintr_handling_check();
 						}
 					} else
 					{	/* NO FOLLOW */
@@ -990,7 +990,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						status = 0;
 					} else if (EINTR == errno)
 					{
-						EINTR_HANDLING_CHECK;
+						eintr_handling_check();
 						if (out_of_time)
 							status = -2;
 						else
@@ -1029,7 +1029,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 					bytes_count = 0;
 					if (EINTR == errno)
 					{
-						EINTR_HANDLING_CHECK;
+						eintr_handling_check();
 						if (out_of_time)
 							buff_len = -2;
 					}
@@ -1396,7 +1396,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 									bytes_count = 0;
 									break;
 								} else
-									EINTR_HANDLING_CHECK;
+									eintr_handling_check();
 							}
 						} else
 						{
@@ -1873,7 +1873,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						status = 0;
 					} else if (EINTR == errno)
 					{
-						EINTR_HANDLING_CHECK;
+						eintr_handling_check();
 						if (out_of_time)
 							status = -2;
 						else
@@ -1911,7 +1911,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 			}
 			ret = FALSE;
 		} else
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 	}
 	if (timed)
 	{	/* No timer if nsec_timeout is zero, so handle the timer in the else. */

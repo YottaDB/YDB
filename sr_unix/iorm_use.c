@@ -439,7 +439,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 							newfd = dup(rm_ptr->fildes);
 							if ((-1 != newfd) || (EINTR != errno))
 								break;
-							EINTR_HANDLING_CHECK;
+							eintr_handling_check();
 						} while (TRUE);
 						if (-1 == newfd)
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,

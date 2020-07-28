@@ -81,7 +81,7 @@ MBSTART {											\
 			break;									\
 		}										\
 		if (MT_SAFE)									\
-			EINTR_HANDLING_CHECK;							\
+			eintr_handling_check();							\
 	} while (TRUE);										\
 } MBEND
 

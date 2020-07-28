@@ -91,7 +91,7 @@ MBSTART {						\
 		RC = ioctl(FDESC, REQUEST, ARG);	\
 		if ((-1 != RC) || (EINTR != errno))	\
 			break;				\
-		EINTR_HANDLING_CHECK;			\
+		eintr_handling_check();			\
 	} while (TRUE);					\
 	if (-1 != RC)					\
 		RC = 0;					\
@@ -106,7 +106,7 @@ MBSTART {						\
 		FDESC = OPEN(FNAME, FFLAGS);		\
 		if ((-1 != FDESC) || (EINTR != errno))	\
 			break;				\
-		EINTR_HANDLING_CHECK;			\
+		eintr_handling_check();			\
 	} while (TRUE);					\
 } MBEND
 
@@ -117,7 +117,7 @@ MBSTART {						\
 		FDESC = OPEN3(FNAME, FFLAGS, FMODE);	\
 		if ((-1 != FDESC) || (EINTR != errno))	\
 			break;				\
-		EINTR_HANDLING_CHECK;			\
+		eintr_handling_check();			\
 	} while (TRUE);					\
 } MBEND
 
@@ -153,7 +153,7 @@ MBSTART {								\
 		FDESC = OPEN3(FNAME, FFLAGS | O_CLOEXEC, FMODE);	\
 		if ((-1 != FDESC) || (EINTR != errno))			\
 			break;						\
-		EINTR_HANDLING_CHECK;					\
+		eintr_handling_check();					\
 	} while (TRUE);							\
 } MBEND
 #define OPENFILE_CLOEXEC(FNAME, FFLAGS, FDESC)  OPENFILE(FNAME, FFLAGS | O_CLOEXEC, FDESC);
@@ -298,7 +298,7 @@ MBSTART {							\
 		RC = close(FDESC);				\
 		if ((-1 != RC) || (EINTR != errno))		\
 			break;					\
-		EINTR_HANDLING_CHECK;				\
+		eintr_handling_check();				\
 	} while (TRUE);						\
 	if (-1 == RC)	/* Had legitimate error - return it */	\
 		RC = errno;					\
@@ -342,7 +342,7 @@ MBSTART {											\
 		}										\
 		if (EINTR != errno)								\
 			break;									\
-		EINTR_HANDLING_CHECK;								\
+		eintr_handling_check();								\
 	}											\
 	if (0 == gtmioBuffLen)									\
 		RC = 0;										\
@@ -384,7 +384,7 @@ MBSTART {											\
 		}										\
 		if (EINTR != errno)								\
 			break;									\
-		EINTR_HANDLING_CHECK;								\
+		eintr_handling_check();								\
 	}											\
 	(ACTUAL_READLEN) = (FBUFF_LEN) - gtmioBuffLen;						\
 	if (0 == gtmioBuffLen)									\
@@ -450,7 +450,7 @@ MBSTART {											\
 		}										\
 		if (EINTR != errno)								\
 			break;									\
-		EINTR_HANDLING_CHECK;								\
+		eintr_handling_check();								\
 	}											\
 	if (0 == gtmioBuffLen)									\
 		RC = 0;										\
@@ -477,7 +477,7 @@ MBSTART {											\
 			gtmioBuff += gtmioStatus;						\
 		} else if (EINTR != errno)							\
 			break;									\
-		EINTR_HANDLING_CHECK;								\
+		eintr_handling_check();								\
 	}											\
 	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
 		RC = errno;									\
@@ -504,7 +504,7 @@ MBSTART {											\
 			gtmioBuff += gtmioStatus;						\
 		} else if (EINTR != errno)							\
 			break;									\
-		EINTR_HANDLING_CHECK;								\
+		eintr_handling_check();								\
 	}											\
 	if (-1 != gtmioStatus)									\
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually read */	\
@@ -564,7 +564,7 @@ MBSTART {													\
 					skip_read = TRUE;							\
 					break;									\
 				}										\
-				EINTR_HANDLING_CHECK;								\
+				eintr_handling_check();								\
 			}											\
 		}												\
 		/* if we didn't read 1 character or it's an error don't read anymore now */			\
@@ -586,7 +586,7 @@ MBSTART {													\
 				break;										\
 		} else if (EINTR != errno || TOFLAG)								\
 			break;											\
-		EINTR_HANDLING_CHECK;										\
+		eintr_handling_check();										\
 		if (PIPE_OR_FIFO && outofband)									\
 			break;											\
 	}													\
@@ -618,7 +618,7 @@ MBSTART {										\
 			gtmioBuff += gtmioStatus;					\
 		} else if (EINTR != errno)						\
 			break;								\
-		EINTR_HANDLING_CHECK;							\
+		eintr_handling_check();							\
 	}										\
 	/* assertpro(FALSE)? */								\
 } MBEND
@@ -658,7 +658,7 @@ MBSTART {													\
 				SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);						\
 				block_cnt++;									\
 			}											\
-			EINTR_HANDLING_CHECK;									\
+			eintr_handling_check();									\
 		}												\
 		if (0 == gtmioBuffLen)										\
 			RC = 0;											\
@@ -693,7 +693,7 @@ MBSTART {											\
 			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
 			block_cnt++;								\
 		}										\
-		EINTR_HANDLING_CHECK;								\
+		eintr_handling_check();								\
 	}											\
 	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
 		RC = errno;									\
@@ -739,7 +739,7 @@ MBSTART {													\
 				SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);						\
 				block_cnt++;									\
 			}											\
-			EINTR_HANDLING_CHECK;									\
+			eintr_handling_check();									\
 		}												\
 		if (0 < gtmioStatus)										\
 			RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually written */		\
@@ -776,7 +776,7 @@ MBSTART {											\
 			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
 			block_cnt++;								\
 		}										\
-		EINTR_HANDLING_CHECK;								\
+		eintr_handling_check();								\
 	}											\
 	if (-1 != gtmioStatus)									\
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually written */	\
@@ -846,7 +846,7 @@ MBSTART {											\
 			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
 			block_cnt++;								\
 		}										\
-		EINTR_HANDLING_CHECK;								\
+		eintr_handling_check();								\
 	}											\
 	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
 		RC = errno;									\

@@ -165,7 +165,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 				if (-1 != status)
 					break;
 				if (EINTR == save_errno)
-					EINTR_HANDLING_CHECK;
+					eintr_handling_check();
 				if (ERANGE == save_errno)
 				{
 					if (!(*sem_halted))
@@ -204,7 +204,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 				continue;	/* retry semop */
 			} else if (EINTR != save_errno)
 				break;
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 			sem_pid = semctl(semid, 0, GETPID);
 			if (-1 != sem_pid)
 			{

@@ -155,7 +155,7 @@ int fd_ioready(int sock_fd, int poll_direction, int timeout)
 		save_errno = ERRNO;
 		if (EINTR == save_errno)
 		{	/* Give it another shot. But, halve the timeout so we don't keep doing this forever. */
-			EINTR_HANDLING_CHECK;
+			eintr_handling_check();
 			timeout = timeout >> 1;
 		} else if (EAGAIN == save_errno)
 		{	/* Resource starved system; relinquish the processor in the hope that we may get the required resources
@@ -254,7 +254,7 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 			assert((EMSGSIZE != save_errno) && (EWOULDBLOCK != save_errno));
 			if (EINTR == save_errno)
 			{
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 				continue;
 			}
 			if (EMSGSIZE == save_errno)
@@ -370,7 +370,7 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 				save_errno = ECONNRESET;
 			if (EINTR == save_errno)
 			{
-				EINTR_HANDLING_CHECK;
+				eintr_handling_check();
 				continue;
 			} else if (ETIMEDOUT == save_errno)
 			{

@@ -1433,6 +1433,8 @@ int gtcm_shmclean_main(int argc, char **argv, char **envp);
 int dbcertify_main(int argc, char **argv, char **envp);
 int ftok_main(int argc, char **argv, char **envp);
 
+void eintr_handling_check(void);
+
 #define ZTRAP_CODE	0x00000001
 #define ZTRAP_ENTRYREF	0x00000002
 #define ZTRAP_POP	0x00000004
