@@ -586,7 +586,8 @@ else
 		if [ $arch = "x8664" ] ; then
 			# If the current architecture is x86_64 and the distribution is RHEL (including CentOS and SLES)
 			# or Debian then set the platform to rhel or debian (not linux) as there are specific tarballs
-			# for these distributions.
+			# for these distributions. If the distribution is Ubuntu, then set the platform to ubuntu (not linux)
+			# if the version is 20.04 or later as there is a specific tarball for newer versions of Ubuntu.
 			#
 			# To get the correct binary for CentOS, RHEL and SLES, we treat OS major version 7 as rhel and later versions as centos
 			if [ "rhel" = "${osid}" -o "centos" = "${osid}" -o "sles" = "${osid}" ] ; then
@@ -608,6 +609,17 @@ else
 				# Debian-specific releases of YottaDB for x86_64 happened only after r1.24
 				if [ "r1.24" \< "${ydb_version}" ]; then
 					platform="debian"
+				fi
+			elif [ "ubuntu" = "${osid}" ] ; then
+				# Starting with r1.30, there is an Ubuntu 20.04 build where the platform is ubuntu (not linux)
+				# so set the platform to ubuntu only if the requested version is r1.30 or later and the
+				# Ubuntu version is 20.04 or later.
+				if [ "r1.28" \< "${ydb_version}" ]; then
+					# If the OS major version is 20 or later, treat it as ubuntu. Otherwise, treat it as linux.
+					osmajorver=`echo $osver | cut -d. -f1`
+					if [ 1 = `expr "$osmajorver" ">" "19"` ] ; then
+						platform="ubuntu"
+					fi
 				fi
 			fi
 		fi
