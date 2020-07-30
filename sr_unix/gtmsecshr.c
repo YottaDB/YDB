@@ -74,6 +74,7 @@
 #include "util.h"
 #include "send_msg.h"
 #include "generic_signal_handler.h"
+#include "ydb_os_signal_handler.h"
 #include "gtmmsg.h"
 #include "have_crit.h"
 #include "sig_init.h"
@@ -588,7 +589,7 @@ void gtmsecshr_timer_handler(void)
 void gtmsecshr_signal_handler(int sig, siginfo_t *info, void *context)
 {
 	/* Do standard signal handling */
-	(void)generic_signal_handler(sig, info, context);
+	(void)generic_signal_handler(sig, info, context, IS_OS_SIGNAL_HANDLER_TRUE);
 	/* Note that we are not letting process_signal run gtm_fork_n_core. In testing,
 	 * bad things occurred when the root process ran into trouble trying to fork
 	 * so our object is to avoid the problem entirely and core here if we need to

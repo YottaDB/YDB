@@ -47,23 +47,20 @@
 #include "ydb_os_signal_handler.h"
 #include "generic_signal_handler.h"
 #include "gt_timer.h"
-#include "interlock.h"
-
-GBLREF	volatile int	in_os_signal_handler;
 
 void ydb_os_signal_handler(int sig, siginfo_t *info, void *context)
 {
 	assert(0 <= in_os_signal_handler);
 	assert(4 > in_os_signal_handler);	/* Ensure this value goes not go beyond a reasonably small number */
-	INTERLOCK_ADD(&in_os_signal_handler, 1);	/* Need interlocked add to avoid issues with multiple threads
-							 * running this code at the same time (e.g. possible if SIGTERM
-							 * and SIGALRM happen at the same time),
-							 */
+	/* Since at this point, in a multi-threaded program, we are not guaranteed to hold the YDB engine lock, we cannot
+	 * update the "in_os_signal_handler" global variable. Therefore we do this after the FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED
+	 * macro invocation in each of the below signal handler functions ("timer_handler()" and "generic_signal_handler()").
+	 */
 	switch(sig)
 	{
 	case SIGALRM:
 		/* Invoke "timer_handler()" */
-		timer_handler(sig, info, context);
+		timer_handler(sig, info, context, IS_OS_SIGNAL_HANDLER_TRUE);
 		break;
 	default:
 		/* Invoke "generic_signal_handler()" */
@@ -85,10 +82,9 @@ void ydb_os_signal_handler(int sig, siginfo_t *info, void *context)
 			break;
 		}
 #		endif
-		generic_signal_handler(sig, info, context);
+		generic_signal_handler(sig, info, context, IS_OS_SIGNAL_HANDLER_TRUE);
 		break;
 	}
-	INTERLOCK_ADD(&in_os_signal_handler, -1);
 	assert(0 <= in_os_signal_handler);
 }
 

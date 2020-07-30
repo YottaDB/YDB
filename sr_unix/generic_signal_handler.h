@@ -94,6 +94,6 @@ MBSTART {														\
 	}														\
 }
 
-void generic_signal_handler(int sig, siginfo_t *info, void *context);
+void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t is_os_signal_handler);
 
 #endif /* GENERIC_SIGNAL_HANDLER_INCLUDED */

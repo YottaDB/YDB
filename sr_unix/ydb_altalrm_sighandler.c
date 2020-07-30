@@ -14,6 +14,7 @@
 
 #include "sig_init.h"
 #include "gt_timer.h"
+#include "ydb_os_signal_handler.h"
 #include "libyottadb.h"
 
 /* The alternate handler for SIGALRM - we are called from the dispatcher and call the regular handler but with two
@@ -21,6 +22,6 @@
  */
 int ydb_altalrm_sighandler(int signum)
 {
-	timer_handler(signum, NULL, NULL);
+	timer_handler(signum, NULL, NULL, IS_OS_SIGNAL_HANDLER_FALSE);
 	return YDB_OK;				/* No return code from timer_handler */
 }

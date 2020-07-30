@@ -457,7 +457,7 @@ STATICFNDEF void start_timer_int(TID tid, uint8 time_to_expir, void (*handler)()
 				&& ((newt->expir_time.tv_sec < sys_timer_at.tv_sec)
 					|| ((newt->expir_time.tv_sec == sys_timer_at.tv_sec)
 						&& (newt->expir_time.tv_nsec < sys_timer_at.tv_nsec)))))
-		start_first_timer(&at);
+		start_first_timer(&at, IS_OS_SIGNAL_HANDLER_FALSE);
 }
 
 /* Cancel timer.
@@ -479,7 +479,7 @@ void cancel_timer(TID tid)
 	if (first_timer)
 	{
 		if (timeroot)
-			start_first_timer(&at);	/* start the first timer in the chain */
+			start_first_timer(&at, IS_OS_SIGNAL_HANDLER_FALSE);	/* start the first timer in the chain */
 		else if (timer_active)
 			sys_canc_timer();
 	}
@@ -605,7 +605,7 @@ STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
 /* Start the first timer in the timer chain
  * Arguments:	curr_time	- current time assumed within the function
  */
-STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
+STATICFNDEF void start_first_timer(ABS_TIME *curr_time, boolean_t is_os_signal_handler)
 {
 	ABS_TIME	deltatime;
 	GT_TIMER	*tpop;
@@ -625,7 +625,7 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 						&& !(TREF(in_ext_call) && IS_KNOWN_UNSAFE_TIMER_HANDLER(tpop->handler))))
 			{
 				DEBUG_ONLY(STAPI_FAKE_TIMER_HANDLER_WAS_DEFERRED);
-				timer_handler(DUMMY_SIG_NUM, NULL, NULL);
+				timer_handler(DUMMY_SIG_NUM, NULL, NULL, is_os_signal_handler);
 				/* At this point all timers should have been handled, including a recursive call to
 				 * start_first_timer(), if needed, and SET_DEFERRED_TIMERS_CHECK_NEEDED invoked if
 				 * appropriate, so we are done.
@@ -653,7 +653,7 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
  * The "why" parameter can be DUMMY_SIG_NUM (if the handler is being invoked internally from YottaDB code)
  * or SIGALRM (if the handler is being invoked by the kernel upon receipt of the SIGALRM signal).
  */
-void timer_handler(int why, siginfo_t *info, void *context)
+void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_signal_handler)
 {
 	int4		cmp, save_error_condition;
 	GT_TIMER	*tpop, *tpop_prev = NULL;
@@ -679,6 +679,11 @@ void timer_handler(int why, siginfo_t *info, void *context)
 		signal_forwarded = IS_SIGNAL_FORWARDED(sig_hndlr_generic_signal_handler, why, info);
 		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_timer_handler, why, IS_EXI_SIGNAL_FALSE, info, context);
 	}
+	/* Now that we know FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED did not return, we hold the YDB engine lock in case this is a
+	 * multi-threaded program. Therefore we can safely set the global variable "in_os_signal_handler".
+	 */
+	if (is_os_signal_handler)
+		INCREMENT_IN_OS_SIGNAL_HANDLER;
 	assert(gtm_is_main_thread() || gtm_jvm_process || simpleThreadAPI_active);
 	DUMP_TIMER_INFO("At the start of timer_handler()");
 #	ifdef DEBUG
@@ -708,6 +713,7 @@ void timer_handler(int why, siginfo_t *info, void *context)
 			DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("timer_handler", why, info, context, FALSE);
 		}
 #		endif
+		DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
 		return;
 	}
 	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
@@ -874,7 +880,7 @@ void timer_handler(int why, siginfo_t *info, void *context)
 	if (safe_for_timer_pop)
 		RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
 	if (safe_for_timer_pop || (0 < safe_timer_cnt))
-		start_first_timer(&at);
+		start_first_timer(&at, is_os_signal_handler);
 	else if ((NULL != timeroot) || (0 < timer_defer_cnt))
 		SET_DEFERRED_TIMERS_CHECK_NEEDED;
 	/* Restore mainline error_condition global variable. This way any gtm_putmsg or rts_errors that occurred inside interrupt
@@ -896,6 +902,7 @@ void timer_handler(int why, siginfo_t *info, void *context)
 	}
 #	endif
 	DUMP_TIMER_INFO("At the end of timer_handler()");
+	DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
 }
 
 /* Find a timer given by tid in the timer chain.
@@ -1108,7 +1115,7 @@ void cancel_unsafe_timers(void)
 		if ((active != timeroot) || (!timer_active))
 		{
 			sys_get_curr_time(&at);
-			start_first_timer(&at);
+			start_first_timer(&at, IS_OS_SIGNAL_HANDLER_FALSE);
 		}
 	} else
 	{
@@ -1170,7 +1177,7 @@ void check_for_deferred_timers(void)
 	assert(!INSIDE_THREADED_CODE(rname));	/* below code is not thread safe as it does SIGPROCMASK() etc. */
 	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
 	DEBUG_ONLY(STAPI_FAKE_TIMER_HANDLER_WAS_DEFERRED);
-	timer_handler(DUMMY_SIG_NUM, NULL, NULL);
+	timer_handler(DUMMY_SIG_NUM, NULL, NULL, IS_OS_SIGNAL_HANDLER_FALSE);
 }
 
 /* Check for timer pops. If any timers are on the queue, pretend a sigalrm occurred, and we have to

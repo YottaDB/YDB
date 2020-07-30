@@ -37,8 +37,9 @@
 #include "gtmimagename.h"
 #include "gt_timer.h"
 #include "send_msg.h"
-#include "sig_init.h"
 #include "generic_signal_handler.h"
+#include "ydb_os_signal_handler.h"
+#include "sig_init.h"
 #include "gtmmsg.h"
 #include "io.h"
 #include "gtmio.h"
@@ -52,11 +53,8 @@
 #include "libyottadb_int.h"
 #include "invocation_mode.h"
 #include "gtm_exit_handler.h"
-<<<<<<< HEAD
 #include "sighnd_debug.h"
-=======
 #include "signal_exit_handler.h"
->>>>>>> [YDB#560] Fix v54002/C9K08003318 subtest failure (SIG-4 not creating fatal zshow dump file due to going through deferred_exit_handler)
 
 /* If we are in a signal handler, we want to defer exit processing as the exit handler can invoke various functions
  * that are not async-signal safe (e.g. malloc/free/syslog etc.). Hence the check for "in_os_signal_handler" below.
@@ -150,7 +148,7 @@ static inline void check_for_statsdb_memerr()
 	}
 }
 
-void generic_signal_handler(int sig, siginfo_t *info, void *context)
+void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t is_os_signal_handler)
 {
 	boolean_t		signal_forwarded, is_sigterm;
 	int			rc;
@@ -206,17 +204,39 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		 * the code when the regular "C" signal handling is in effect. Alternate signal handling is where YDB is
 		 * "notified" of signals having occurred so have no need to be "forwarded" to different threads.
 		 */
+		assert(!is_os_signal_handler);
 		signal_forwarded = FALSE;
 		assert(EXIT_IMMED >= exit_state);
 		assert(!non_forwarded_sig_seen[exit_state]);
 		non_forwarded_sig_seen[exit_state] = TRUE;
+	}
+	/* Now that we know FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED did not return, we hold the YDB engine lock in case this is a
+	 * multi-threaded program. Therefore we can safely set the global variable "in_os_signal_handler".
+	 */
+	if (is_os_signal_handler)
+		INCREMENT_IN_OS_SIGNAL_HANDLER;
+	/* It is possible that the exit handler has been started but not finished when we get a signal. Check that here. If
+	 * true, we just ignore it letting the earlier signal finish its processing.
+	 */
+	if (exit_handler_active && signal_forwarded && (sig == exi_condition))
+	{       /* a) exit_handler_active is TRUE but exit_handler_complete is FALSE implies we are inside but have not
+		 *    completed the exit handler record at (*exit_handler_fptr).
+		 * b) signal_forwarded implies this is a forwarded signal.
+		 * c) sig == exi_condition implies we already are exiting because of this very same signal.
+		 * In this case, we let the original exit handler invocation continue by returning from this right away.
+		 */
+		DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
+		return;
 	}
 	assert(!thread_block_sigsent || blocksig_initialized);
 	/* If "thread_block_sigsent" is TRUE, it means the threads do not want the master thread to honor external signals
 	 * anymore until the threads complete. Achieve that effect by returning right away from the signal handler.
 	 */
 	if (thread_block_sigsent && sigismember(&block_sigsent, sig))
+	{
+		DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
 		return;
+	}
 #	ifdef DEBUG
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into timer_handler
 	 * and then came here due to a nested signal (e.g. SIG-15). So save current value of global and restore it at
@@ -279,6 +299,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 						if (is_sigterm && exit_handler_active && !ydb_quiet_halt)
 							SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
 					}
+					DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
 					return;
 				}
 				DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
@@ -327,11 +348,11 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			if (DEFER_EXIT_PROCESSING)
 			{
 				SET_FORCED_EXIT_STATE(sig);
-				forced_exit_sig = sig;
 				/* Avoid duplicate bump of "exit_state" */
 				if (non_forwarded_sig_seen[exit_state])
 					exit_state++;		/* Make exit pending, may still be tolerant though */
 				assert(!IS_GTMSECSHR_IMAGE);
+				DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
 				return;
 			}
 			DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
@@ -388,6 +409,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 							exit_state++;	/* Make exit pending, may still be tolerant though */
 						need_core = TRUE;
 						MULTI_THREAD_AWARE_FORK_N_CORE(signal_forwarded);
+						DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
 						return;
 					}
 					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
@@ -457,8 +479,12 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	if (IS_GTMSECSHR_IMAGE)
 	{
 		DEBUG_ONLY(in_nondeferrable_signal_handler = save_in_nondeferrable_signal_handler);
+		DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
 		return;
 	}
 	signal_exit_handler("generic_signal_handler", sig, info, context, IS_DEFERRED_EXIT_FALSE);	/* exits the process */
+	/* Below code is unreachable since the previous step would exit the process but is there for completeness */
+	assert(FALSE);
+	DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
 	return;
 }

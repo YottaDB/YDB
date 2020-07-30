@@ -13,6 +13,7 @@
 #include "mdef.h"
 
 #include "generic_signal_handler.h"
+#include "ydb_os_signal_handler.h"
 #include "sig_init.h"
 #include "continue_handler.h"
 #include "ctrlc_handler.h"
@@ -78,7 +79,7 @@ void ydb_stm_invoke_deferred_signal_handler()
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_generic_signal_handler))
 	{
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_generic_signal_handler;
-		generic_signal_handler(DUMMY_SIG_NUM, NULL, NULL);
+		generic_signal_handler(DUMMY_SIG_NUM, NULL, NULL, IS_OS_SIGNAL_HANDLER_FALSE);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_continue_handler))
@@ -148,7 +149,7 @@ void ydb_stm_invoke_deferred_signal_handler()
 		assert((SIGALRM == stapi_signal_handler_oscontext[sig_hndlr_timer_handler].sig_num)
 		       || USING_ALTERNATE_SIGHANDLING);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_timer_handler;
-		timer_handler(DUMMY_SIG_NUM, NULL, NULL);
+		timer_handler(DUMMY_SIG_NUM, NULL, NULL, IS_OS_SIGNAL_HANDLER_FALSE);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;
 	}
 	CLEAR_DEFERRED_STAPI_CHECK_NEEDED;

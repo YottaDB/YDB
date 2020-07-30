@@ -14,6 +14,7 @@
 
 #include "sig_init.h"
 #include "generic_signal_handler.h"
+#include "ydb_os_signal_handler.h"
 #include "libyottadb.h"
 
 GBLREF	volatile int4		exit_state;
@@ -23,7 +24,7 @@ GBLREF	volatile int4		exit_state;
  */
 int ydb_altmain_sighandler(int signum)
 {
-	generic_signal_handler(signum, NULL, NULL);
+	generic_signal_handler(signum, NULL, NULL, IS_OS_SIGNAL_HANDLER_FALSE);
 	if (IS_SIGNAL_DEFERRED)
 		return YDB_DEFER_HANDLER;
 	return YDB_OK;
