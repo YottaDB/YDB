@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -397,7 +397,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				charptr = ((gtm_tls_socket_t *)socketptr->tlssocket)->tlsid;
 				len = STRLEN(charptr);
 				assertpro(MAX_TLSID_LEN >= len);
-				STRNCPY_STR(idstr, charptr, MAX_TLSID_LEN);
+				memcpy(idstr, charptr, len);
 				MEMCPY_LIT(&idstr[len], "-" RENEGOTIATE);	/* append dash RENEGOTIATE */
 				len += SIZEOF(RENEGOTIATE);	/* null accounts for dash */
 				idstr[len] = '\0';
