@@ -106,6 +106,7 @@ INTPTR_T callg_nc(callgncfnptr fnptr, gparam_list *paramlist)
 		case 36:
 			/* Only the below functions are aware of this extra space */
 			assert(((callgncfnptr)ydb_lock_s == fnptr)
+			       || ((callgncfnptr)ydb_lock_st == fnptr)
 			       || ((callgncfnptr)ydb_ci_t == fnptr)
 			       || ((callgncfnptr)ydb_cip_t == fnptr));
 			return (fnptr)(VAR_ARGS36(paramlist->arg));
