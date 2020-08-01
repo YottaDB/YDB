@@ -46,6 +46,7 @@ GBLREF	uint4			dollar_tlevel;
 GBLREF	int4			exi_condition;
 #ifdef DEBUG
 GBLREF	pthread_t		ydb_stm_worker_thread_id;
+GBLREF	boolean_t		gtm_main_thread_id_set;
 #endif
 OS_PAGE_SIZE_DECLARE
 
@@ -95,9 +96,12 @@ int ydb_exit()
 		DBGSIGHND((stderr, "ydb_exit(): ydb_exit() entered -- engine shutdown commencing\n"));
 		/* If this is a SimpleThreadAPI environment and we hold the YottaDB engine multi-thread mutex lock (obtained
 		 * above in the threaded_api_ydb_engine_lock call). So we can proceed with exit handling. We are also
-		 * guaranteed this thread is not the MAIN worker thread (asserted below).
+		 * guaranteed this thread is not the MAIN worker thread (asserted below) if that thread is still alive.
+		 * If that thread is dead ("gtm_main_thread_id_set" is 0), then it is possible that thread is reused for a
+		 * different goroutine (by Go while using the YDBGo wrapper) and invokes this function. Therefore skip the
+		 * assert in that case.
 		 */
-		assert(!simpleThreadAPI_active
+		assert(!simpleThreadAPI_active || (0 == gtm_main_thread_id_set)
 		       || (ydb_stm_worker_thread_id && !pthread_equal(pthread_self(), ydb_stm_worker_thread_id)));
 		ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 		if (error_encountered)

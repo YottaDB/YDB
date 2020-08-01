@@ -179,7 +179,7 @@ void *ydb_stm_thread(void *dummy_parm)
 
 /* Function to shutdown our signal handling thread prior as part of the YDB engine closing down. Note that this is called from
  * various places in generic_signal_handler() via its function pointer but in all cases, we have the engine lock so the call is
- *  properly protected.
+ * properly protected.
  */
 void	ydb_stm_thread_exit(void)
 {

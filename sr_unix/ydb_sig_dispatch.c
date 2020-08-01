@@ -194,7 +194,15 @@ int ydb_sig_dispatch(ydb_buffer_t *errstr, int signum)
 		sigpblk->sigNum = signum;
 		sigpblk->retCode = 0;
 		sigpblk->posted = FALSE;
-		DQRINS(&sigPendingQue, que, sigpblk);	/* Queue FIFO */
+		if (&ydb_altmain_sighandler == sigpblk->sigHandler)
+		{	/* This handler is needed to handle process terminating signals like SIGTERM/SIGINT/SIGSEGV etc.
+			 * Therefore, ensure this gets a higher priority by inserting this at the head of the queue.
+			 */
+			DQINS(&sigPendingQue, que, sigpblk);	/* Queue FIFO */
+		} else
+		{	/* Insert other signal handlers at usual priority (i.e. at end of the queue) */
+			DQRINS(&sigPendingQue, que, sigpblk);	/* Queue FIFO */
+		}
 		rc = rel_sigpend_lock(&sigPendingMutex);
 		SET_ERRSTR_AND_RETURN_IF_NECESSARY(rc, errstr);
 		/* Tell signal thread (aka main thread aka ydb_stm_thread()) that a signal needs processing */

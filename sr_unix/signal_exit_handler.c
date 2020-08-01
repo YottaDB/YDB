@@ -20,6 +20,7 @@
 #include "signal_exit_handler.h"
 #include "generic_signal_handler.h"
 #include "invocation_mode.h"
+#include "libyottadb_int.h"
 
 GBLREF	boolean_t		created_core;
 GBLREF	void			(*call_on_signal)();
@@ -83,8 +84,43 @@ void signal_exit_handler(char *exit_handler_name, int sig, siginfo_t *info, void
 		 * handling (currently only Go is supported). For Go, we cannot EXIT here. We need to drive a panic() to
 		 * unwind everything now that YottaDB released state information has been cleaned up (by the exit handler).
 		 * For Go, drive a callback routine to do the panic() for us given the signal that caused this state.
+		 * Also drives the ydb_stm_thread (signal thread) exit function.
 		 */
-		DRIVE_ALTSIG_CALLBACK(sig);
+		assert(sig);
+		if (NULL != ydb_stm_thread_exit_fnptr)
+			(*ydb_stm_thread_exit_fnptr)();
+		if (YDB_MAIN_LANG_GO == ydb_main_lang)
+		{	/* For Go, we need to use the panic callback so the GO main panics unwrapping the calls and driving
+			 * the defer handlers as it unwinds.
+			 */
+			pthread_t		mutexHolderThreadId, thisThreadId;
+			int			lclStatus, tLevel, lockIndex;
+
+			GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];
+			GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];
+
+			assert(NULL != go_panic_callback);
+			DBGSIGHND_ONLY(fprintf(stderr, "generic_signal_handler: Driving Go callback to panic for signal %d\n",
+						sig); fflush(stderr));	/* Engine no longer alive so don't use it */
+			/* This is a multi-threaded program (since "ydb_main_lang" is "YDB_MAIN_LANG_GO"). In that case, this
+			 * thread would be holding the YDB engine lock. Release that before invoking the Go panic callback
+			 * function as that would invoke "ydb_exit()" which would otherwise deadlock on this lock.
+			 */
+			assert(simpleThreadAPI_active);
+			SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutexHolderThreadId, tLevel);
+			thisThreadId = pthread_self();
+			assert(!tLevel);
+			assert(pthread_equal(mutexHolderThreadId, thisThreadId));
+			lockIndex = 0;
+			ydb_engine_threadsafe_mutex_holder[lockIndex] = 0;
+			lclStatus = pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[lockIndex]);
+			assert(0 == lclStatus);
+			LIBYOTTADB_DONE;	/* Also clear the global variable indicating current YDB action before panic call */
+			/* Invoke the Go panic callback function */
+			(*go_panic_callback)(sig);
+			assert(FALSE);			/* Should not return */
+		}
+		assertpro(FALSE);			/* No other language wrappers using alternate signal handling yet */
 		return;
 	}
 	assert(is_deferred_exit || (EXIT_IMMED <= exit_state) || !exit_handler_active);

@@ -84,28 +84,6 @@ GBLREF	GPCallback		go_panic_callback;
 	ydb_sig_handlers[SIGNUM] = HANDLERADDR;		\
 }
 
-/* Macro to drive the alternate signal handling callback routine (address of which supplied at initialization) which
- * for Go, drives a routine that does a panic() based on the signal supplied. Also drives the ydb_stm_thread (signal thread)
- * shutdown routine. Note at one point this was an inline routine but such created huge #include dependency loops when
- * DEBUG_SIGNAL_HANDLING was defined we made it a macro instead.
- */
-#define DRIVE_ALTSIG_CALLBACK(SIG)											\
-{															\
-	if (NULL != ydb_stm_thread_exit_fnptr)										\
-		(*ydb_stm_thread_exit_fnptr)();										\
-	if (YDB_MAIN_LANG_GO == ydb_main_lang)										\
-	{	/* For Go, we need to use the panic callback so the GO main panics unwrapping the calls and driving	\
-		 * the defer handlers as it unwinds.									\
-		 */													\
-		assert(NULL != go_panic_callback);									\
-		DBGSIGHND_ONLY(fprintf(stderr, "generic_signal_handler: Driving Go callback to panic for signal %d\n",	\
-				       sig); fflush(stderr));	/* Engine no longer alive so don't use it */		\
-		(*go_panic_callback)(SIG);										\
-		assert(FALSE);			/* Should not return */							\
-	}														\
-	assertpro(FALSE);			/* No other language wrappers using alternate signal handling yet */	\
-}
-
 int ydb_altalrm_sighandler(int signum);
 int ydb_altcont_sighandler(int signum);
 int ydb_altio_sighandler(int signum);		/* Alternate handler for SIGIO/SIGURG for GT.CM usage */

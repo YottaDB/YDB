@@ -75,6 +75,19 @@
 	gtm_putmsg_csa(CSA_ARG(NULL) __VA_ARGS__);		\
 }
 
+#define	ALTERNATE_SIGHANDLING_SAVE_SIGNUM(using_alternate_sighandling)					\
+{													\
+	if (using_alternate_sighandling)								\
+	{												\
+		SAVE_OS_SIGNAL_HANDLER_SIGNUM(sig_hndlr_generic_signal_handler, sig);			\
+		/* Currently "info" and "context" are uninitialized when invoked from YDBGo.		\
+		 * If that changes, we need to uncomment the below lines.				\
+		 *	SAVE_OS_SIGNAL_HANDLER_INFO(sig_hndlr_generic_signal_handler, info);		\
+		 *	SAVE_OS_SIGNAL_HANDLER_INFO(sig_hndlr_generic_signal_handler, context);		\
+		 */											\
+	}												\
+}
+
 GBLREF	int4			forced_exit_err;
 GBLREF	int4			forced_exit_sig;
 GBLREF	int4			exi_condition;
@@ -98,7 +111,6 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	boolean_t		blocksig_initialized;
 GBLREF	struct sigaction	orig_sig_action[];
 GBLREF	sigset_t		blockalrm;
-GBLREF	GPCallback		go_panic_callback;
 #ifdef DEBUG
 GBLREF	boolean_t		in_nondeferrable_signal_handler;
 #endif
@@ -289,6 +301,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 				 */
 				if (DEFER_EXIT_PROCESSING)
 				{
+					ALTERNATE_SIGHANDLING_SAVE_SIGNUM(using_alternate_sighandling);
 					SET_FORCED_EXIT_STATE(sig);
 					/* Before bumping "exit_state" or sending a ERR_FORCEDHALT message to syslog/console,
 					 * make sure we have not sent the same message already.
@@ -347,6 +360,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
 			if (DEFER_EXIT_PROCESSING)
 			{
+				ALTERNATE_SIGHANDLING_SAVE_SIGNUM(using_alternate_sighandling);
 				SET_FORCED_EXIT_STATE(sig);
 				/* Avoid duplicate bump of "exit_state" */
 				if (non_forwarded_sig_seen[exit_state])
@@ -404,6 +418,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 						 */
 						assert(!using_alternate_sighandling);
 						assert(!IS_GTMSECSHR_IMAGE);
+						ALTERNATE_SIGHANDLING_SAVE_SIGNUM(using_alternate_sighandling);
 						SET_FORCED_EXIT_STATE(sig);
 						if (non_forwarded_sig_seen[exit_state])
 							exit_state++;	/* Make exit pending, may still be tolerant though */

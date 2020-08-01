@@ -52,7 +52,6 @@ GBLREF	boolean_t		ydb_quiet_halt;
 GBLREF	volatile int4		gtmMallocDepth;         /* Recursion indicator */
 GBLREF	intrpt_state_t		intrpt_ok_state;
 GBLREF	struct sigaction	orig_sig_action[];
-GBLREF	GPCallback		go_panic_callback;
 
 LITREF	gtmImageName		gtmImageNames[];
 
@@ -108,7 +107,14 @@ void deferred_exit_handler(void)
 		ENABLE_INTERRUPTS(INTRPT_NO_TIMER_EVENTS, prev_intrpt_state);
 	}
 #	endif
-	sig = stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info.si_signo;
+	/* If we are using alternate signal handling, retrieve the signal number from `sig_num` field which was
+	 * stored using the ALTERNATE_SIGHANDLING_SAVE_SIGNUM macro in `generic_signal_handler.c`. This is because
+	 * we would not have done a FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED invocation in that case.
+	 */
+	sig = (!USING_ALTERNATE_SIGHANDLING
+		? stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info.si_signo
+		: stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_num);
+	assert(sig);	/* Assert that we did store the signal number to be handled in a deferred fashion */
 	info = &stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info;
 	context = &stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_context;
 	signal_exit_handler("deferred_exit_handler", sig, info, context, IS_DEFERRED_EXIT_TRUE);	/* exits the process */
