@@ -1543,7 +1543,7 @@ MBSTART {	/* We need to ensure that an uptodate value of cnl->intent_wtstart is 
 
 #define	SIGNAL_WRITERS_TO_RESUME(cnl)								\
 MBSTART {											\
-	SET_TRACEABLE_VAR((cnl)->wc_blocked, WC_UNBLOCK);						\
+	SET_TRACEABLE_VAR((cnl)->wc_blocked, WC_UNBLOCK);					\
 	/* memory barrier needed to broadcast this information to other processors */		\
 	SHM_WRITE_MEMORY_BARRIER;								\
 } MBEND

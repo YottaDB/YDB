@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -126,10 +126,14 @@ MBSTART {														\
 						|| (WBTEST_SLEEP_IN_WCS_WTSTART == ydb_white_box_test_case_number)	\
 						|| (WBTEST_DB_WRITE_HANG == ydb_white_box_test_case_number)		\
 						|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number)));		\
-				CNL->wcsflu_pid = 0;									\
 				SIGNAL_WRITERS_TO_RESUME(CNL);								\
-				if (!WAS_CRIT)										\
-					rel_crit(REG);									\
+				/* Send a syslog message for this unexpected event so we record it */			\
+				/* Note: Need to do this BEFORE the REL_CRIT_BEFORE_RETURN macro as we need		\
+				 * CSA->ti->curr_tn which is reliable only while we hold crit.				\
+				 */											\
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,				\
+						LEN_AND_LIT("WRITERSTUCK"), &CSA->ti->curr_tn, DB_LEN_STR(REG));	\
+				REL_CRIT_BEFORE_RETURN(CNL, REG, WAS_CRIT);						\
 				/* Disable white box testing after the first time the					\
 				WBTEST_BUFOWNERSTUCK_STACK mechanism has kicked in. This is because as			\
 				part of the exit handling process, the control once agin comes to wcs_flu		\
@@ -163,12 +167,12 @@ MBSTART {														\
 	}														\
 } MBEND
 
-#define REL_CRIT_BEFORE_RETURN(CNL, REG)	\
-MBSTART {					\
-	CNL->doing_epoch = FALSE;		\
-	CNL->wcsflu_pid = 0;			\
-	if (!was_crit)				\
-		rel_crit(REG);			\
+#define REL_CRIT_BEFORE_RETURN(CNL, REG, WAS_CRIT)	\
+MBSTART {						\
+	CNL->doing_epoch = FALSE;			\
+	CNL->wcsflu_pid = 0;				\
+	if (!WAS_CRIT)					\
+		rel_crit(REG);				\
 } MBEND
 
 /* The below macro returns TRUE if there is some cache-record still dirty in
@@ -179,30 +183,35 @@ MBSTART {					\
 #define	FLUSH_NOT_COMPLETE(CNL, CRQ, CRWIPQ, N_BTS) (CNL->wcs_active_lvl || CRQ->fl || CRWIPQ->fl || (N_BTS != CNL->wc_in_free))
 
 /* Sets RET to FALSE if the caller needs to do a "return FALSE" after macro returns. Sets RET to TRUE otherwise. */
-#define	CLEAR_WIP_QUEUE_IF_NEEDED(ASYNCIO, WTSTART_OR_WTFINI_ERRNO, CNL, CRWIPQ, REG, RET)		\
-MBSTART {												\
-	int	wtfini_errno;										\
-													\
-	RET = TRUE;											\
-	if (ASYNCIO)											\
-	{												\
-		assert(ENOSPC != WTSTART_OR_WTFINI_ERRNO);						\
-		WAIT_FOR_WIP_QUEUE_TO_CLEAR(CNL, CRWIPQ, ((cache_rec_ptr_t) NULL), REG, wtfini_errno);	\
-		if (wtfini_errno)									\
-		{											\
-			if (ENOSPC != wtfini_errno)							\
-			{										\
-				assert(FALSE);								\
-				REL_CRIT_BEFORE_RETURN(CNL, REG);					\
-				RET = FALSE;								\
-			} else										\
-			{										\
-				assert(!WTSTART_OR_WTFINI_ERRNO);					\
-				if (!WTSTART_OR_WTFINI_ERRNO)						\
-					WTSTART_OR_WTFINI_ERRNO = wtfini_errno;				\
-			}										\
-		}											\
-	}												\
+#define	CLEAR_WIP_QUEUE_IF_NEEDED(ASYNCIO, WTSTART_OR_WTFINI_ERRNO, CNL, CRWIPQ, REG, CSA, WAS_CRIT, RET)	\
+MBSTART {													\
+	int	wtfini_errno;											\
+														\
+	RET = TRUE;												\
+	if (ASYNCIO)												\
+	{													\
+		assert(ENOSPC != WTSTART_OR_WTFINI_ERRNO);							\
+		WAIT_FOR_WIP_QUEUE_TO_CLEAR(CNL, CRWIPQ, ((cache_rec_ptr_t) NULL), REG, wtfini_errno);		\
+		if (wtfini_errno)										\
+		{												\
+			if (ENOSPC != wtfini_errno)								\
+			{											\
+				assert(FALSE);									\
+				/* Send a syslog message for this unexpected event so we record it */		\
+				/* Need to do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */	\
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,			\
+						LEN_AND_LIT("WTFINI_ERRNO_NOT_ENOSPC"),				\
+						&CSA->ti->curr_tn, DB_LEN_STR(REG));				\
+				REL_CRIT_BEFORE_RETURN(CNL, REG, WAS_CRIT);					\
+				RET = FALSE;									\
+			} else											\
+			{											\
+				assert(!WTSTART_OR_WTFINI_ERRNO);						\
+				if (!WTSTART_OR_WTFINI_ERRNO)							\
+					WTSTART_OR_WTFINI_ERRNO = wtfini_errno;					\
+			}											\
+		}												\
+	}													\
 } MBEND
 
 boolean_t wcs_flu(uint4 options)
@@ -286,14 +295,17 @@ boolean_t wcs_flu(uint4 options)
 				SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 				BG_TRACE_PRO_ANY(csa, wcb_wcs_flu0);
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
-						LEN_AND_LIT("wcb_wcs_flu0"), process_id, &csa->ti->curr_tn,
-						DB_LEN_STR(reg));
+						LEN_AND_LIT("wcb_wcs_flu0"), process_id, &csa->ti->curr_tn, DB_LEN_STR(reg));
 			}
 			wcs_recover(reg);
 			assert(!cnl->wcs_phase2_commit_pidcnt || is_src_server); /* source server does not do "wcs_recover" */
 			if (cnl->wcs_phase2_commit_pidcnt)
 			{
-				REL_CRIT_BEFORE_RETURN(cnl, reg);
+				/* Send a syslog message for this unexpected event so we record it */
+				/* Need to do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,
+						LEN_AND_LIT("PHASE2_COMMIT_PIDCNT_NONZERO"), &csa->ti->curr_tn, DB_LEN_STR(reg));
+				REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
 				return FALSE;
 			}
 		}
@@ -309,6 +321,11 @@ boolean_t wcs_flu(uint4 options)
 			 */
 			if ((NULL !=jpc) && !JNL_FILE_SWITCHED(jpc))
 				jnl_wait(reg);
+			/* Send a syslog message for this unexpected event so we record it */
+			/* Need to do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,
+					LEN_AND_LIT("FROZEN_CHILLED"), &csa->ti->curr_tn, DB_LEN_STR(reg));
+			REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
 			return FALSE;	/* to indicate "wcs_flu" did not finish its job */
 		}
 		WAIT_FOR_REGION_TO_UNCHILL(csa, csd);
@@ -337,7 +354,7 @@ boolean_t wcs_flu(uint4 options)
 			}
 			assert((dba_bg != csd->acc_meth) || !csd->jnl_before_image
 				|| (!cnl->wcs_active_lvl && !csa->acc_meth.bg.cache_state->cacheq_active.fl));
-			REL_CRIT_BEFORE_RETURN(cnl, reg);
+			REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
 			return TRUE;
 		}
 		/* Assert that we never flush the cache in the midst of a database commit. The only exception is MUPIP RUNDOWN */
@@ -360,7 +377,11 @@ boolean_t wcs_flu(uint4 options)
 			{	/* If journaling is still enabled, but we failed to open the journal file,
 				 * we don't want to continue processing.
 				 */
-				REL_CRIT_BEFORE_RETURN(cnl, reg);
+				/* Send a syslog message for this unexpected event so we record it */
+				/* Need to do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,
+						LEN_AND_LIT("JNL_ENSURE_OPEN_FAILED"), &csa->ti->curr_tn, DB_LEN_STR(reg));
+				REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
 				return FALSE;
 			}
 			jnl_enabled = FALSE;
@@ -407,9 +428,19 @@ boolean_t wcs_flu(uint4 options)
 			if (SS_NORMAL != (jnl_status = jnl_flush(reg)))
 			{
 				assert(NOJNL == jpc->channel); /* jnl file lost */
-				REL_CRIT_BEFORE_RETURN(cnl, reg);
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd), ERR_TEXT, 2,
-					RTS_ERROR_TEXT("Error with journal flush during wcs_flu1"), jnl_status);
+				/* Send a syslog message for this unexpected event so we record it */
+				/* Need to do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCSFLUFAILED, 5,
+						LEN_AND_LIT("JNL_FLUSH_FAILED1"), &csa->ti->curr_tn, DB_LEN_STR(reg),
+						jnl_status);
+				REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
+				/* Even though we issue a WCSFLUFAILED error to the syslog, also keep the JNLFLUSH error
+				 * below as it is part of the default custom errors file (`custom_errors_sample.txt`) and
+				 * could cause an instance freeze. We do not want to change that behavior because of the
+				 * addition of the WCSFLUFAILED error in the syslog.
+				 */
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
+					ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush during wcs_flu1"), jnl_status);
 				return FALSE;
 			}
 #			ifdef DEBUG
@@ -424,7 +455,7 @@ boolean_t wcs_flu(uint4 options)
 		}
 		if (return_early)
 		{
-			REL_CRIT_BEFORE_RETURN(cnl, reg);
+			REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
 			return TRUE;
 		}
 	}
@@ -446,9 +477,11 @@ boolean_t wcs_flu(uint4 options)
 				csa->ti->last_mm_sync = csa->ti->curr_tn;
 			} else
 			{
-				REL_CRIT_BEFORE_RETURN(cnl, reg);
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
-					RTS_ERROR_TEXT("Error during file msync during flush"));
+				/* Send a syslog message for this unexpected event so we record it */
+				/* Need to do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,
+						LEN_AND_LIT("msync"), &csa->ti->curr_tn, DB_LEN_STR(reg));
+				REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
 				return FALSE;
 			}
 		}
@@ -466,8 +499,31 @@ boolean_t wcs_flu(uint4 options)
 					|| (WBTEST_WCS_FLU_FAIL == ydb_white_box_test_case_number)
 					|| (WBTEST_MURUNDOWN_KILLCMT06 == ydb_white_box_test_case_number));
 							/* WBTEST_MURUNDOWN_KILLCMT06 is same as WBTEST_CRASH_SHUTDOWN_EXPECTED */
-			REL_CRIT_BEFORE_RETURN(cnl, reg);
-			return FALSE;	/* We expect the caller to trigger cache-recovery which will fix this counter */
+			if (!in_commit)
+			{	/* Just like we did in the "!was_crit" case above, see if it is safe to invoke "wcs_recover"
+				 * (indicated by the in_commit variable being 0). If so do that to fix any dead phase2 commits
+				 * (if they exist). This will let us proceed with the "wcs_flu()".
+				 */
+				if (WC_BLOCK_RECOVER != cnl->wc_blocked)
+				{
+					SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
+					BG_TRACE_PRO_ANY(csa, wcb_wcs_flu0);
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
+						LEN_AND_LIT("PHASE2_COMMIT_WAIT_CRIT_PIDCNT_NONZERO"),
+						process_id, &csa->ti->curr_tn, DB_LEN_STR(reg));
+				}
+				wcs_recover(reg);
+				assert(!cnl->wcs_phase2_commit_pidcnt || is_src_server);
+					/* source server does not do "wcs_recover" */
+			}
+			if (cnl->wcs_phase2_commit_pidcnt)
+			{	/* Send a syslog message for this unexpected event so we record it */
+				/* Need to do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,
+					LEN_AND_LIT("PHASE2_COMMIT_WAIT_CRIT_PIDCNT_NONZERO"), &csa->ti->curr_tn, DB_LEN_STR(reg));
+				REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
+				return FALSE;	/* We expect the caller to trigger cache-recovery which will fix this counter */
+			}
 		}
 		/* Now that all concurrent commits are complete, wait for these dirty buffers to be flushed to disk.
 		 * Note that calling wcs_wtstart just once assumes that if we ask it to flush all the buffers, it will.
@@ -491,10 +547,11 @@ boolean_t wcs_flu(uint4 options)
 		assert(asyncio || !crwipq->fl);
 		WCS_OPS_TRACE(csa, process_id, wcs_ops_flu2, 0, 0, 0, 0, 0);
 		WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart, was_crit, reg, csa, cnl);
-		CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
+		CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, csa, was_crit, ret);
 		if (!ret)
-		{	/* We expect caller to trigger cache-recovery which will fix the wip queue */
-			REL_CRIT_BEFORE_RETURN(cnl, reg);
+		{	/* We expect caller to trigger cache-recovery which will fix the wip queue.
+			 * Note: REL_CRIT_BEFORE_RETURN is done already inside the CLEAR_WIP_QUEUE_IF_NEEDED macro.
+			 */
 			return FALSE;
 		}
 		WCS_OPS_TRACE(csa, process_id, wcs_ops_flu3, 0, 0, 0, 0, 0);
@@ -524,10 +581,11 @@ boolean_t wcs_flu(uint4 options)
 			wtstart_or_wtfini_errno = wcs_wtstart(reg, n_bts, NULL, NULL);		/* Flush it all */
 			WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart, was_crit, reg, csa, cnl);
 			WCS_OPS_TRACE(csa, process_id, wcs_ops_flu4, 0, 0, 0, 0, 0);
-			CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
+			CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, csa, was_crit, ret);
 			if (!ret)
-			{	/* We expect caller to trigger cache-recovery which will fix the wip queue */
-				REL_CRIT_BEFORE_RETURN(cnl, reg);
+			{	/* We expect caller to trigger cache-recovery which will fix the wip queue.
+				 * Note: REL_CRIT_BEFORE_RETURN is done already inside the CLEAR_WIP_QUEUE_IF_NEEDED macro.
+				 */
 				return FALSE;
 			}
 			WCS_OPS_TRACE(csa, process_id, wcs_ops_flu5, 0, 0, 0, 0, 0);
@@ -562,10 +620,13 @@ boolean_t wcs_flu(uint4 options)
 						hiber_start(1000);
 						to_wait--;
 						wtstart_or_wtfini_errno = wcs_wtstart(reg, n_bts, NULL, NULL);	/* Flush it all */
-						CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
+						CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno,	\
+									cnl, crwipq, reg, csa, was_crit, ret);
 						if (!ret)
-						{	/* We expect caller to trigger cache-recovery which will fix wip queue */
-							REL_CRIT_BEFORE_RETURN(cnl, reg);
+						{	/* We expect caller to trigger cache-recovery which will fix the wip queue.
+							 * Note: REL_CRIT_BEFORE_RETURN is done already inside the
+							 * CLEAR_WIP_QUEUE_IF_NEEDED macro.
+							 */
 							return FALSE;
 						}
 						if (!FLUSH_NOT_COMPLETE(cnl, crq, crwipq, n_bts))
@@ -638,16 +699,25 @@ boolean_t wcs_flu(uint4 options)
 						 * will get confused (see explanation above where variable "in_commit" gets set).
 						 */
 						assert(was_crit);	/* so don't need to rel_crit */
-						REL_CRIT_BEFORE_RETURN(cnl, reg);	/* invoke macro as it does other cleanup
-											 * besides just releasing crit.
-											 */
+						/* Send a syslog message for this unexpected event so we record it */
+						/* Need to do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */
+						send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,
+								LEN_AND_LIT("IN_COMMIT"), &csa->ti->curr_tn, DB_LEN_STR(reg));
+						REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);	/* invoke macro as it does other
+												 * cleanup besides just releasing
+												 * crit.
+												 */
 						return FALSE;
 					}
 					assert(!jnl_enabled || jb->fsync_dskaddr == jb->rsrv_freeaddr);
 					assert(0 == wtstart_or_wtfini_errno);
 					if (is_src_server)
-					{	/* source server does not do "wcs_recover". So return in this case. */
-						REL_CRIT_BEFORE_RETURN(cnl, reg);
+					{	/* Source server does not do "wcs_recover". So return in this case. */
+						/* Send a syslog message for this unexpected event so we record it. */
+						/* Need to do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */
+						send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,
+								LEN_AND_LIT("IS_SRC_SERVER"), &csa->ti->curr_tn, DB_LEN_STR(reg));
+						REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
 						return FALSE;
 					}
 					wcs_recover(reg);
@@ -664,7 +734,15 @@ boolean_t wcs_flu(uint4 options)
 							if (SS_NORMAL != (jnl_status = jnl_flush(reg)))
 							{
 								assert(NOJNL == jpc->channel); /* jnl file lost */
-								REL_CRIT_BEFORE_RETURN(cnl, reg);
+								/* Send a syslog message for this abnormal event so we record it */
+								/* Do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */
+								send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,
+										LEN_AND_LIT("JNL_FLUSH_FAILED2"), &csa->ti->curr_tn,
+										DB_LEN_STR(reg));
+								REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
+								/* See previous ERR_JNLFLUSH usage for why this is done in
+								 * addition to WCSFLUFAILED error.
+								 */
 								send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2,
 									JNL_LEN_STR(csd), ERR_TEXT, 2,
 									RTS_ERROR_TEXT("Error with journal flush during wcs_flu2"),
@@ -692,9 +770,13 @@ boolean_t wcs_flu(uint4 options)
 					{
 						wtstart_or_wtfini_errno = wcs_wtstart(reg, n_bts, NULL, NULL);	/* Flush it all */
 						WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart, was_crit, reg, csa, cnl);
-						CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
+						CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno,		\
+										cnl, crwipq, reg, csa, was_crit, ret);
 						if (!ret)
-						{	/* We expect caller to trigger cache-recovery which will fix wip queue */
+						{	/* We expect caller to trigger cache-recovery which will fix wip queue.
+							 * Note: REL_CRIT_BEFORE_RETURN is done already inside the
+							 * CLEAR_WIP_QUEUE_IF_NEEDED macro.
+							 */
 							return FALSE;
 						}
 						if (FLUSH_NOT_COMPLETE(cnl, crq, crwipq, n_bts))
@@ -702,7 +784,12 @@ boolean_t wcs_flu(uint4 options)
 							if (!lcnt)
 								continue;
 							/* Something wrong inspite of all these attempts */
-							REL_CRIT_BEFORE_RETURN(cnl, reg);
+							/* Send a syslog message for this unexpected event so we record it */
+							/* Need to do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,
+								LEN_AND_LIT("FLUSH_NOT_COMPLETE"),
+								&csa->ti->curr_tn, DB_LEN_STR(reg));
+							REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
 							assertpro(FALSE);
 						}
 					}
@@ -741,7 +828,11 @@ boolean_t wcs_flu(uint4 options)
 			{
 				GET_C_STACK_MULTIPLE_PIDS("MAXJNLQIOLOCKWAIT", cnl->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);
 				assert(FALSE);
-				REL_CRIT_BEFORE_RETURN(cnl, reg);
+				/* Send a syslog message for this unexpected event so we record it */
+				/* Need to do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,
+					LEN_AND_LIT("MAXJNLQIOLOCKWAIT"), &csa->ti->curr_tn, DB_LEN_STR(reg));
+				REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
 				assertpro(FALSE);
 			}
 			wcs_sleep(SLEEP_JNLQIOLOCKWAIT);	/* since it is a short lock, sleep the minimum */
@@ -776,7 +867,7 @@ boolean_t wcs_flu(uint4 options)
 			jb->next_epoch_time = jgbl.gbl_jrec_time + jb->epoch_interval;
 	}
 	cnl->last_wcsflu_tn = csa->ti->curr_tn;	/* record when last successful wcs_flu occurred */
-	REL_CRIT_BEFORE_RETURN(cnl, reg);
+	REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
 	/* sync the epoch record in the journal if needed. */
 	if (jnl_enabled && write_epoch && sync_epoch && (csa->ti->curr_tn == csa->ti->early_tn))
 	{	/* Note that if we are in the midst of committing and came here through a bizarre

@@ -66,6 +66,7 @@ ZYSQLNULLNOTVALID	<$ZYSQLNULL cannot be used as an integer, numeric, gvn subscri
 BOOLEXPRTOODEEP	<Boolean expression depth exceeds maximum supported limit of 2047>/error/fao=0
 TPCALLBACKINVRETVAL     <Invalid return type for TP callback function>/error/fao=0
 INVMAINLANG	<Invalid main routine language id specified: !UL>/error/fao=1
+WCSFLUFAILED	<!AD error while flushing buffers at transaction number 0x!16@XQ for database file !AD>/info/fao=5
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

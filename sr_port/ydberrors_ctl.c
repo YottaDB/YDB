@@ -54,6 +54,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "BOOLEXPRTOODEEP", "Boolean expression depth exceeds maximum supported limit of 2047", 0 },
 	{ "TPCALLBACKINVRETVAL", "Invalid return type for TP callback function", 0 },
 	{ "INVMAINLANG", "Invalid main routine language id specified: !UL", 1 },
+	{ "WCSFLUFAILED", "!AD error while flushing buffers at transaction number 0x!16@XQ for database file !AD", 5 },
 };
 
 
@@ -66,7 +67,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	37,
+	38,
 	&ydberrors_undocarr[0],
 	0
 };
