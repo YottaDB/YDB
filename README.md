@@ -97,6 +97,8 @@ listed below. For example for Ubuntu Linux:
   cd yottadb_r128
   ```
 
+  Please consult the FAQ below for information on resolving known build errors, e.g. `plugin needed to handle lto object` errors.
+
 ### Build with Clang/LLVM
   ```sh
   export CC=/usr/bin/clang
@@ -105,6 +107,8 @@ listed below. For example for Ubuntu Linux:
   make install
   cd yottadb_r128
   ```
+
+  Please consult the FAQ below for information on resolving known build errors, e.g. `plugin needed to handle lto object` errors.
 
   Note that the ```make install``` command above does not create the final installed YottaDB.
   Instead, it stages YottaDB for distribution.
