@@ -1264,9 +1264,9 @@ GBLDEF	int4		tstart_gtmci_nested_level;	/* TREF(gtmci_nested_level) at the time 
 							 * This should be used only if dollar_tlevel is non-zero as it is not
 							 * otherwise maintained.
 							 */
-GBLDEF	volatile uint4	deferred_signal_handling_needed;	/* if non-zero, it means the DEFERRED_SIGNAL_HANDLING_CHECK
-								 * macro needs to do some work.
-								 */
+GBLDEF	global_latch_t deferred_signal_handling_needed; /* if latch value is non-zero, it means the DEFERRED_SIGNAL_HANDLING_CHECK
+							 * macro needs to do some work.
+							 */
 GBLDEF	void_ptr_t	*dlopen_handle_array;	/* Array of handles returned from various "dlopen" calls done inside YottaDB.
 						 * Used later to "dlclose" at "ydb_exit" time.
 						 */

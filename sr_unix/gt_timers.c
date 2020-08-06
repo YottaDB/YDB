@@ -504,7 +504,7 @@ void clear_timers(void)
 		assert((FALSE == timer_in_handler) || process_exiting);
 		assert(FALSE == timer_active);
 		assert(FALSE == oldjnlclose_started);
-		assert(FALSE == GET_DEFERRED_TIMERS_CHECK_NEEDED);
+		assert(!GET_DEFERRED_TIMERS_CHECK_NEEDED);
 		return;
 	}
 	if (1 > timer_stack_count)

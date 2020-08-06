@@ -898,7 +898,8 @@ typedef struct
 } global_latch_t;
 #define latch_image_count latch_word
 
-#define GLOBAL_LATCH_HELD_BY_US(latch) (process_id == (latch)->u.parts.latch_pid)
+#define	GLOBAL_LATCH_VALUE(LATCH)	(LATCH)->u.parts.latch_pid
+#define GLOBAL_LATCH_HELD_BY_US(LATCH)	(process_id == (LATCH)->u.parts.latch_pid)
 
 typedef struct compswap_time_field_struct
 {	/* This structure is used where we want to do a compare-n-swap (CAS) on a time value. The CAS interfaces

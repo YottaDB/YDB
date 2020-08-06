@@ -92,7 +92,7 @@ typedef enum
 
 GBLREF	intrpt_state_t	intrpt_ok_state;
 
-GBLREF	volatile uint4	deferred_signal_handling_needed; /* a bitmask of the below DEFERRED_SIGNAL_HANDLING_NEEDED_* macros */
+GBLREF	global_latch_t deferred_signal_handling_needed; /* a bitmask of the below DEFERRED_SIGNAL_HANDLING_NEEDED_* macros */
 
 /* Can't include sig_init.h until the interrupt definitions above were done. This included needed to define sig_pending type */
 #include "sig_init.h"
@@ -114,49 +114,74 @@ GBLREF	volatile uint4	deferred_signal_handling_needed; /* a bitmask of the below
 							 * needs to be handled upon leaving deferred zone.
 							 */
 /* Note: The SET and CLEAR macros below can be invoked by multiple threads in the same process and therefore need
- * INTERLOCK_ADD operations. But since they need to be idempotent (i.e. SET should be a no-op if bit is already set,
- * CLEAR should be a no-op if bit is already cleared etc.), they need to do a GET to check the bit value and based
- * on that determine the course of action.
+ * atomic operations hence the use of COMPSWAP* below. But since they need to be idempotent (i.e. SET should be a
+ * no-op if bit is already set, CLEAR should be a no-op if bit is already cleared etc.), they need to do a GET to
+ * check the bit value and based on that determine the course of action.
  */
-#define	GET_DEFERRED_TIMERS_CHECK_NEEDED	(deferred_signal_handling_needed & DEFERRED_SIGNAL_HANDLING_TIMERS)
-#define	SET_DEFERRED_TIMERS_CHECK_NEEDED	(!GET_DEFERRED_TIMERS_CHECK_NEEDED					\
-							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
-										DEFERRED_SIGNAL_HANDLING_TIMERS))	\
-							: 0)
-#define	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED	(GET_DEFERRED_TIMERS_CHECK_NEEDED					\
-							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
-										-DEFERRED_SIGNAL_HANDLING_TIMERS))	\
-							: 0)
+#define	GET_DEFERRED_CONDITION(EVENT)	 (DBG_ASSERT(0 <= GLOBAL_LATCH_VALUE(&deferred_signal_handling_needed))	\
+						GLOBAL_LATCH_VALUE(&deferred_signal_handling_needed) & EVENT)
 
-#define	GET_DEFERRED_CTRLZ_CHECK_NEEDED		(deferred_signal_handling_needed & DEFERRED_SIGNAL_HANDLING_CTRLZ)
-#define	SET_DEFERRED_CTRLZ_CHECK_NEEDED		(!GET_DEFERRED_CTRLZ_CHECK_NEEDED					\
-							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
-										DEFERRED_SIGNAL_HANDLING_CTRLZ))	\
-							: 0)
-#define	CLEAR_DEFERRED_CTRLZ_CHECK_NEEDED	(GET_DEFERRED_CTRLZ_CHECK_NEEDED					\
-							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
-										-DEFERRED_SIGNAL_HANDLING_CTRLZ))	\
-							: 0)
+#define	SET_DEFERRED_CONDITION(EVENT)									\
+{													\
+	int4		oldvalue, newvalue, event;							\
+	boolean_t	clear_condition;								\
+													\
+	if (0 > EVENT)											\
+	{	/* This is a call from the CLEAR_DEFERRED_CONDITION macro. Invert sense. */		\
+		clear_condition = TRUE;									\
+		event = -EVENT;										\
+	} else												\
+	{												\
+		clear_condition = FALSE;								\
+		event = EVENT;										\
+	}												\
+	assert(0 < event);										\
+	for ( ; ; )											\
+	{												\
+		oldvalue = GLOBAL_LATCH_VALUE(&deferred_signal_handling_needed);			\
+		if (!clear_condition)									\
+		{											\
+			if (oldvalue & event)								\
+			{	/* Deferred condition is already set. No more action needed. */		\
+				break;									\
+			}										\
+		} else											\
+		{											\
+			if (!(oldvalue & event))							\
+			{	/* Deferred condition is already cleared. No more action needed. */	\
+				break;									\
+			}										\
+		}											\
+		newvalue = oldvalue + EVENT;	/* Note: EVENT can be positive or negative */		\
+		assert(0 <= newvalue);									\
+		if (COMPSWAP_LOCK(&deferred_signal_handling_needed, oldvalue, newvalue))		\
+			break;										\
+		/* If we are here, it means the latch value changed concurrently since we took a copy.	\
+		 * Possible for example if a timer interrupt occurs and the global variable		\
+		 * "deferred_signal_handling_needed" gets modified inside the interrupt code.		\
+		 * In that case, redo the deferred condition set based on the current global variable.	\
+		 */											\
+	}												\
+	assert(0 <= GLOBAL_LATCH_VALUE(&deferred_signal_handling_needed));				\
+}
 
-#define	GET_DEFERRED_EXIT_CHECK_NEEDED		(deferred_signal_handling_needed & DEFERRED_SIGNAL_HANDLING_EXIT)
-#define	SET_DEFERRED_EXIT_CHECK_NEEDED		(!GET_DEFERRED_EXIT_CHECK_NEEDED					\
-							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
-										DEFERRED_SIGNAL_HANDLING_EXIT))		\
-							: 0)
-#define	CLEAR_DEFERRED_EXIT_CHECK_NEEDED	(GET_DEFERRED_EXIT_CHECK_NEEDED						\
-							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
-										-DEFERRED_SIGNAL_HANDLING_EXIT))	\
-							: 0)
+#define	CLEAR_DEFERRED_CONDITION(EVENT)		SET_DEFERRED_CONDITION(-EVENT)
 
-#define	GET_DEFERRED_STAPI_CHECK_NEEDED		(deferred_signal_handling_needed & DEFERRED_SIGNAL_HANDLING_STAPI)
-#define	SET_DEFERRED_STAPI_CHECK_NEEDED		(!GET_DEFERRED_STAPI_CHECK_NEEDED					\
-							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
-										DEFERRED_SIGNAL_HANDLING_STAPI))	\
-							: 0)
-#define	CLEAR_DEFERRED_STAPI_CHECK_NEEDED	(GET_DEFERRED_STAPI_CHECK_NEEDED					\
-							? (INTERLOCK_ADD(&deferred_signal_handling_needed,		\
-										-DEFERRED_SIGNAL_HANDLING_STAPI))	\
-							: 0)
+#define	GET_DEFERRED_TIMERS_CHECK_NEEDED	GET_DEFERRED_CONDITION(DEFERRED_SIGNAL_HANDLING_TIMERS)
+#define	SET_DEFERRED_TIMERS_CHECK_NEEDED	SET_DEFERRED_CONDITION(DEFERRED_SIGNAL_HANDLING_TIMERS)
+#define	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED	CLEAR_DEFERRED_CONDITION(DEFERRED_SIGNAL_HANDLING_TIMERS)
+
+#define	GET_DEFERRED_CTRLZ_CHECK_NEEDED		GET_DEFERRED_CONDITION(DEFERRED_SIGNAL_HANDLING_CTRLZ)
+#define	SET_DEFERRED_CTRLZ_CHECK_NEEDED		SET_DEFERRED_CONDITION(DEFERRED_SIGNAL_HANDLING_CTRLZ)
+#define	CLEAR_DEFERRED_CTRLZ_CHECK_NEEDED	CLEAR_DEFERRED_CONDITION(DEFERRED_SIGNAL_HANDLING_CTRLZ)
+
+#define	GET_DEFERRED_EXIT_CHECK_NEEDED		GET_DEFERRED_CONDITION(DEFERRED_SIGNAL_HANDLING_EXIT)
+#define	SET_DEFERRED_EXIT_CHECK_NEEDED		SET_DEFERRED_CONDITION(DEFERRED_SIGNAL_HANDLING_EXIT)
+#define	CLEAR_DEFERRED_EXIT_CHECK_NEEDED	CLEAR_DEFERRED_CONDITION(DEFERRED_SIGNAL_HANDLING_EXIT)
+
+#define	GET_DEFERRED_STAPI_CHECK_NEEDED		GET_DEFERRED_CONDITION(DEFERRED_SIGNAL_HANDLING_STAPI)
+#define	SET_DEFERRED_STAPI_CHECK_NEEDED		SET_DEFERRED_CONDITION(DEFERRED_SIGNAL_HANDLING_STAPI)
+#define	CLEAR_DEFERRED_STAPI_CHECK_NEEDED	CLEAR_DEFERRED_CONDITION(DEFERRED_SIGNAL_HANDLING_STAPI)
 
 GBLREF	volatile int4	gtmMallocDepth;
 
@@ -258,7 +283,7 @@ MBSTART {												\
 	 */												\
 	assert(!INSIDE_THREADED_CODE(rname));								\
 	assert(!GET_DEFERRED_EXIT_CHECK_NEEDED || (1 == forced_exit));					\
-	if (deferred_signal_handling_needed)								\
+	if (GLOBAL_LATCH_VALUE(&deferred_signal_handling_needed))					\
 		deferred_signal_handler();								\
 	PROCESS_PENDING_ALTERNATE_SIGNALS;								\
 } MBEND
