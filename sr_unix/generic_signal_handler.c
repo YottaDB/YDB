@@ -123,7 +123,7 @@ LITREF	gtmImageName		gtmImageNames[];
  * Below are the possibilities.
  *	(a) by the OS
  *	(b) by a "pthread_kill" in the FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED macro or
- *	(c) by a "pthread_kill" from the MAIN worker thread ("ydb_stm_thread")
+ *	(c) by a "pthread_kill" from the STAPI signal thread ("ydb_stm_thread")
  *
  * Note that when using alternate signal handling (currently, only with the Go wrapper), this mechanism is
  * still active but it is "harder" to get it to happen because each succeeding signal must be "noticed" as

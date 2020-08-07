@@ -939,7 +939,7 @@ static inline void threaded_api_ydb_engine_lock(uint64_t TPTOKEN, ydb_buffer_t *
 					lclStatus = pthread_create(&ydb_stm_worker_thread_id, NULL, &ydb_stm_thread, NULL);
 					if (0 == lclStatus)
 					{
-						/* Wait for MAIN worker thread to set "simpleThreadAPI_active" */
+						/* Wait for STAPI signal thread to set "simpleThreadAPI_active" */
 						for (i = 0; ; i++)
 						{
 							if (simpleThreadAPI_active)

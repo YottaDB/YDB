@@ -48,9 +48,10 @@ GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
 #endif
 
-/* Thread (formerly referred to as the MAIN worker thread) that is created when a SimpleThreadAPI call is done in the process.
+/* This is the STAPI signal thread (formerly referred to as the MAIN worker thread) that is created when a SimpleThreadAPI
+ * call is done for the first time in the process.
  *
- * This thread has one of two purposes depending on the signal hanling mode in effect:
+ * This thread has one of two purposes depending on the signal handling mode in effect:
  *
  * 1. When running with a C or C-like main routine that lets YottaDB's signal handlers do the heavy lifting, the purpose
  *    of this thread is to be the only thread that receives any SIGALRM (timer signal) signals sent to this process by the

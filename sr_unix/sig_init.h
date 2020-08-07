@@ -235,7 +235,7 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 #define	IS_SIG_THREAD_DIRECTED(SIG)	((SIGBUS == SIG) || (SIGFPE == SIG) || (SIGILL == SIG) || (SIGSEGV == SIG))
 
 /* If SIG is DUMMY_SIG_NUM, we are guaranteed this is a forwarded signal. Otherwise, it could still be forwarded
- * from a "pthread_kill" invocation from the MAIN worker thread or the thread that randomly got the original signal.
+ * from a "pthread_kill" invocation from the STAPI signal thread or the thread that randomly got the original signal.
  * We find that out by using the linux-only SI_TKILL info code to check if this signal came from a "tkill" system call.
  * Even if the info code is SI_TKILL, it is possible a completely different signal than what was recorded before comes
  * in. In that case, do not treat that as a forwarded signal but as a new signal. Hence the "sig_num" check below.
@@ -280,18 +280,18 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 			 * Note: The below comment talks about SIGALRM as an example but the same reasoning applies to		\
 			 * other signals too which this macro can be called for.						\
 			 *													\
-			 * If SimpleThreadAPI is active, the MAIN worker thread is usually the one that will receive		\
+			 * If SimpleThreadAPI is active, the STAPI signal thread is usually the one that will receive		\
 			 * the SIGALRM signal (when using POSIX timers). Note though that it is possible some other		\
 			 * thread also receives the signal (for example if a C program holding a parent M-lock with		\
 			 * SimpleAPI can fork off processes that start waiting for a child M-lock with SimpleThreadAPI		\
 			 * in which case the lock wake up signal, also the same SIGALRM signal, from the parent program		\
 			 * would get sent to the child process-id, using "crit_wake", which should forward the signal		\
-			 * to the MAIN worker thread OR the currently active thread that is holding the YottaDB engine		\
+			 * to the STAPI signal thread OR the currently active thread that is holding the YottaDB engine		\
 			 * lock). In any case, as long as the thread holds the YottaDB engine lock, we can continue		\
 			 * "timer_handler" processing in this thread. If not, we need to defer the invocation until a		\
 			 * later point when we do hold the lock (cannot do a "pthread_mutex_lock" call here since we		\
 			 * are inside a signal handler and "pthread_mutex_lock" is not async-signal-safe).  Record the		\
-			 * fact that a timer invocation happened and let the MAIN worker thread invoke "timer_handler"		\
+			 * fact that a timer invocation happened and let the STAPI signal thread invoke "timer_handler"		\
 			 * outside of the signal handler as part of its normal processing ("ydb_stm_thread"). 			\
 			 */													\
 			thisThreadId = pthread_self();										\
@@ -304,9 +304,9 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 			 * higher but we cannot do that while inside a signal handler therefore we cannot safely determine if	\
 			 * we are the engine lock holder in TP. In that case, we forward the signal to the current holder	\
 			 * thread. Even if we forward to the wrong thread (since we are not determining the engine lock holder	\
-			 * using any other locks), it is okay since the MAIN worker thread ("ydb_stm_thread") will take care of	\
-			 * periodically forwarding the signal to the current engine lock holder thread until it eventually gets	\
-			 * handled. The only exception to this rule is if we are handling a signal that is thread directed	\
+			 * using any other locks), it is okay since the STAPI signal thread ("ydb_stm_thread") will take care	\
+			 * of periodically forwarding the signal to the current engine lock holder thread until it eventually	\
+			 * gets handled. The only exception to this rule is if we are handling a signal that is thread directed	\
 			 * (e.g. SIG-11/SIGSEGV) in which case we check if we hold the "ydb_engine_threadsafe_mutex[tLevel]"	\
 			 * lock and if so we assume there is no other thread holding "ydb_engine_threadsafe_mutex[tLevel+1]"	\
 			 * and treat us as holding the YottaDB engine lock and proceed with signal handling even if we are in	\
