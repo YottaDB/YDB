@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -180,13 +180,7 @@ STATICFNDEF void tptimeout_set(int4 dummy_param)
 	}
 	if (tptimeout != outofband)
 	{
-		outofband = tptimeout;
-		FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
-		FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);
-		FIX_XFER_ENTRY(xf_zbfetch, op_fetchintrrpt);
-		FIX_XFER_ENTRY(xf_zbstart, op_startintrrpt);
-		FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
-		FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
+		SET_OUTOFBAND(tptimeout);
 		tp_timeout_set_xfer = TRUE;
 #		ifdef VMS
 		/* Set event flag now that intercept is in place */

@@ -1383,3 +1383,11 @@ GBLDEF	volatile int		in_os_signal_handler;	/* Non-zero if we are in an OS invoke
 							 * we get a SIGTERM signal while handling a SIGALRM signal (both
 							 * signals go through "ydb_os_signal_handler").
 							 */
+GBLDEF	boolean_t (*xfer_set_handlers_fnptr)(int4, void (*callback)(int4), int4 param, boolean_t popped_entry);
+							/* Function pointer to "xfer_set_handlers". Stored this way since
+							 * "gtmsecshr" should not pull in "xfer_set_handlers()" and the world
+							 * when pulling in "generic_signal_handler()".
+							 */
+GBLDEF	void (*deferred_signal_set_fnptr)(int4 dummy_val);	/* Function pointer to "deferred_signal_set()". Like the above,
+								 * this exists only to keep "gtmsecshr" executable size small.
+								 */

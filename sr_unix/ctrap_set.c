@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,13 +36,7 @@ void ctrap_set(int4 ob_char)
 
 	if (!outofband)
 	{
-		outofband = ctrap;
+		SET_OUTOFBAND(ctrap);
 		ctrap_action_is = ob_char;
-	        FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
-       		FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);
-	        FIX_XFER_ENTRY(xf_zbfetch, op_fetchintrrpt);
-	        FIX_XFER_ENTRY(xf_zbstart, op_startintrrpt);
-	        FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
-	        FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
 	}
 }

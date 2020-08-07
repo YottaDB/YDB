@@ -95,6 +95,7 @@
 #include "mdq.h"
 #include "invocation_mode.h"
 #include "ydb_os_signal_handler.h"
+#include "deferred_events.h"
 
 #define	NOISOLATION_LITERAL	"NOISOLATION"
 
@@ -135,6 +136,8 @@ GBLREF enum gtmImageTypes	image_type;
 GBLREF int			init_xfer_table(void);
 GBLREF void			(*ydb_stm_thread_exit_fnptr)(void);
 GBLREF void			(*ydb_stm_invoke_deferred_signal_handler_fnptr)(void);
+GBLREF boolean_t		(*xfer_set_handlers_fnptr)(int4, void (*callback)(int4), int4 param, boolean_t popped_entry);
+GBLREF void			(*deferred_signal_set_fnptr)(int4 dummy_val);
 GBLREF pthread_mutex_t		ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM];
 GBLREF pthread_t		ydb_engine_threadsafe_mutex_holder[STMWORKQUEUEDIM];
 
@@ -309,7 +312,9 @@ void gtm_startup(struct startup_vector *svec)
 	 */
 	/* Allocate level 0 work queue (primary work queue) */
 	ydb_stm_thread_exit_fnptr = &ydb_stm_thread_exit;
-	ydb_stm_invoke_deferred_signal_handler_fnptr = ydb_stm_invoke_deferred_signal_handler;
+	ydb_stm_invoke_deferred_signal_handler_fnptr = &ydb_stm_invoke_deferred_signal_handler;
+	xfer_set_handlers_fnptr = &xfer_set_handlers;
+	deferred_signal_set_fnptr = &deferred_signal_set;
 	for (i = 1; i < STMWORKQUEUEDIM; i++)
 	{
 		status = pthread_mutex_init(&ydb_engine_threadsafe_mutex[i], NULL);

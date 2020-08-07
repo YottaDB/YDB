@@ -46,7 +46,8 @@ void outofband_action(boolean_t lnfetch_or_start)
 		if (deferred_signal == outofband)
 		{
 			DEFERRED_SIGNAL_HANDLING_CHECK;
-			outofband = 0;
+			outofband_clear();
+			assert(0 == outofband);
 			return;
 		}
 		if (io_std_device.in->type == tt)

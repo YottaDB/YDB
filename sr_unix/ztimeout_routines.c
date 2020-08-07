@@ -287,19 +287,7 @@ void ztimeout_set(int4 dummy_param)
 		DBGDFRDEVNT((stderr, "ztimeout_set: ZTIMEOUT NOT deferred - \n"));
 	if (ztimeout != outofband)
 	{
-		outofband = ztimeout;
-                FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
-                FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_zbfetch, op_fetchintrrpt);
-                FIX_XFER_ENTRY(xf_zbstart, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
-                FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
-                FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_zbfetch, op_fetchintrrpt);
-                FIX_XFER_ENTRY(xf_zbstart, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
+		SET_OUTOFBAND(ztimeout);
 		DBGDFRDEVNT((stderr, "ztimeout_set: Set the xfer entries for ztimeout\n"));
 	} else
 	{

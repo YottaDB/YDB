@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -30,20 +33,9 @@ GBLREF volatile int4		outofband,ctrap_action_is;
 
 void ctrly_set(int4 dummy_param)
 {
-
+	SET_OUTOFBAND(ctrly);
 	if (!IS_MCODE_RUNNING)
-	{
-		outofband = ctrly;
 		outofband_clear();
-	} else
-	{
+	else
 		ctrap_action_is = 0;
-		outofband = ctrly;
-                FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
-                FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_zbfetch, op_fetchintrrpt);
-                FIX_XFER_ENTRY(xf_zbstart, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
-	}
 }

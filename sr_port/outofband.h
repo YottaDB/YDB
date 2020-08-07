@@ -40,6 +40,20 @@ enum outofbands
 
 #define OUTOFBAND_RESTARTABLE(event)	(jobinterrupt == (event))
 
+/* Sets "outofband" global variable to an unusual event (e.g. Ctrl-C/SIGTERM etc.) and switches a few transfer table
+ * entries so we handle that unusual event as soon as a logical point is reached.
+ */
+#define	SET_OUTOFBAND(EVENT)					\
+{								\
+	outofband = EVENT;					\
+	FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);		\
+	FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);		\
+	FIX_XFER_ENTRY(xf_zbfetch, op_fetchintrrpt);		\
+	FIX_XFER_ENTRY(xf_zbstart, op_startintrrpt);		\
+	FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);		\
+	FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);		\
+}
+
 void outofband_action(boolean_t line_fetch_or_start);
 
 void outofband_clear(void);

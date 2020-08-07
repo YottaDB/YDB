@@ -3,12 +3,18 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#ifndef DEFERRED_EVENTS_included
+#define DEFERRED_EVENTS_included
 
 /* Uncomment below to enable tracing of deferred events */
 /*#define DEBUG_DEFERRED_EVENT*/
@@ -114,3 +120,5 @@ void async_action(bool);
 boolean_t xfer_table_changed(void);
 
 #define IS_VALID_TRAP ((set_fn == (&ctrlc_set)) || (set_fn == (&ctrap_set)) || (set_fn == (&ctrly_set)))
+
+#endif /* DEFERRED_EVENTS_included */

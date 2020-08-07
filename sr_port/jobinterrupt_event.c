@@ -71,12 +71,6 @@ void jobinterrupt_set(int4 dummy_val)
 	DBGDFRDEVNT((stderr, "jobinterrupt_set: Setting jobinterrupt outofband\n"));
 	if (jobinterrupt != outofband)
 	{	/* We need jobinterrupt out of band processing at our earliest convenience */
-		outofband = jobinterrupt;
-                FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
-                FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_zbfetch, op_fetchintrrpt);
-                FIX_XFER_ENTRY(xf_zbstart, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
+		SET_OUTOFBAND(jobinterrupt);
 	}
 }

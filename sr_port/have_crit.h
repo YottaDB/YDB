@@ -27,7 +27,9 @@
 #include "gtm_multi_proc.h"
 #include "gtmsiginfo.h"
 #include "interlock.h"
-#include "outofband.h"
+#include "xfer_enum.h"
+#include "deferred_signal_set.h"
+#include "deferred_events.h"
 
 /* states of CRIT passed as argument to have_crit() */
 #define CRIT_HAVE_ANY_REG	0x00000001
@@ -198,33 +200,38 @@ GBLREF	volatile int	in_os_signal_handler;
  * the current deferred window. Since we do not want forced_exit state to ever regress, and there might be several signals delivered
  * within the same deferred window, assert that forced_exit is either 0 or 1 before setting it to 1.
  */
-#define SET_FORCED_EXIT_STATE(SIG)								\
-{												\
-	char			*rname;								\
-												\
-	GBLREF VSIG_ATOMIC_T	forced_exit;							\
-	GBLREF int		forced_exit_sig;						\
-	GBLREF	volatile int4	outofband;							\
-												\
-	/* Below code is not thread safe as it modifies global variables "forced_exit"		\
-	 * and "forced_exit_sig".								\
-	 */											\
-	assert(!INSIDE_THREADED_CODE(rname));							\
-	assert((0 == forced_exit) || (1 == forced_exit));					\
-	forced_exit = 1;									\
-	forced_exit_sig = SIG;		/* Record the signal forcing us to exit */		\
-	if (in_os_signal_handler)								\
-	{	/* If we are inside an OS signal handler and therefore had to defer exit	\
-		 * handling, set "outofband" also to TRUE as this is checked by lots of		\
-		 * potentially long-running commands in the runtime (e.g. HANG etc.) and we	\
-		 * want all of those to automatically trigger process exit handling.		\
-		 */										\
-		outofband = deferred_signal;							\
-	}											\
-	/* Whenever "forced_exit" gets set to 1, set the corresponding deferred event too */	\
-	SET_DEFERRED_EXIT_CHECK_NEEDED;								\
-	SET_FORCED_THREAD_EXIT; 	/* Signal any running threads to stop */		\
-	SET_FORCED_MULTI_PROC_EXIT; 	/* Signal any parallel processes to stop */		\
+#define SET_FORCED_EXIT_STATE(SIG)												\
+{																\
+	char			*rname;												\
+																\
+	GBLREF VSIG_ATOMIC_T	forced_exit;											\
+	GBLREF int		forced_exit_sig;										\
+	GBLREF boolean_t	(*xfer_set_handlers_fnptr)(int4, void (*callback)(int4), int4 param, boolean_t popped_entry);	\
+	GBLREF void		(*deferred_signal_set_fnptr)(int4 dummy_val);							\
+																\
+	/* Below code is not thread safe as it modifies global variables "forced_exit"						\
+	 * and "forced_exit_sig".												\
+	 */															\
+	assert(!INSIDE_THREADED_CODE(rname));											\
+	assert((0 == forced_exit) || (1 == forced_exit));									\
+	forced_exit = 1;													\
+	forced_exit_sig = SIG;		/* Record the signal forcing us to exit */						\
+	if (in_os_signal_handler)												\
+	{	/* If we are inside an OS signal handler and therefore had to defer exit					\
+		 * handling, treat this as an outofband event as this is checked by lots of					\
+		 * potentially long-running commands in the runtime (e.g. HANG etc.) and we					\
+		 * want all of those to automatically trigger process exit handling.						\
+		 * The below invocation takes care of the signal as a deferred outofband event					\
+		 * that gets handled at the earliest safe point.								\
+		 */														\
+		if (NULL != xfer_set_handlers_fnptr)										\
+			(*xfer_set_handlers_fnptr)(outofband_event, deferred_signal_set_fnptr, 0, FALSE);			\
+		/* else: it is "gtmsecshr" in which case outofband does not apply */						\
+	}															\
+	/* Whenever "forced_exit" gets set to 1, set the corresponding deferred event too */					\
+	SET_DEFERRED_EXIT_CHECK_NEEDED;												\
+	SET_FORCED_THREAD_EXIT; 	/* Signal any running threads to stop */						\
+	SET_FORCED_MULTI_PROC_EXIT; 	/* Signal any parallel processes to stop */						\
 }
 
 /* Set the value of forced_exit to 2. This should indicate that we are already in the exit processing, and do not want to handle any
