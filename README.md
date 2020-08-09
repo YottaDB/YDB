@@ -43,7 +43,7 @@ sudo yum install cmake3
 On CentOS it will be installed as `cmake3` instead of cmake,
 so use `cmake3` on CentOS wherever `cmake` is referenced below.
 
-Note: Both gcc and Clang/LLVM are supported on x86_64. To use Clang/LLVM you would need to
+Note: Both gcc and Clang/LLVM are supported on `x86_64`. To use Clang/LLVM you would need to
 install the Clang/LLVM packages for your distribution in addition to the packages
 listed below. For example for Ubuntu Linux:
 
@@ -68,14 +68,14 @@ listed below. For example for Ubuntu Linux:
 
 - Building YottaDB from source tarball
 
-  The YottaDB source tarball extracts to a directory with the version number in the name, e.g. ```yottadb_r128```
+  The YottaDB source tarball extracts to a directory with the version number in the name, e.g. `YDB-r1.30`
 
   ```sh
-  tar xzf yottadb_r128_src.tar.gz
-  cd yottadb_r128_src
+  tar xzf YDB-r1.30.tar.gz
+  cd YDB-r1.30
   ```
 
-  You should find this README, LICENSE, COPYING and CMakeLists.txt file and sr\_\* directories.
+  You should find this README, LICENSE, COPYING and CMakeLists.txt file and `sr_*` directories.
 
   Build the YottaDB binaries:
 
@@ -85,30 +85,25 @@ listed below. For example for Ubuntu Linux:
   ```
 
   Note: By default the script creates production (pro) builds of YottaDB. To create
-  a debug (dbg) build of YottaDB supply the following parameter to cmake
-      ```-D CMAKE_BUILD\_TYPE=Debug```
+  a debug (dbg) build of YottaDB supply the `-D CMAKE_BUILD_TYPE=Debug` parameter to cmake
   (*Note: title case is important*)
 
-### Build with gcc
+  ### Build with gcc
   ```sh
   cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
   make -j `grep -c ^processor /proc/cpuinfo`
-  make install
-  cd yottadb_r128
+  make install	# For known errors in this step and how to work around them, consult the FAQ section below
+  cd YDB-r1.30
   ```
 
-  Please consult the FAQ below for information on resolving known build errors, e.g. `plugin needed to handle lto object` errors.
-
-### Build with Clang/LLVM
+  ### Build with Clang/LLVM
   ```sh
   export CC=/usr/bin/clang
   cmake -D CMAKE_LINKER:PATH=/usr/bin/ld.lld -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
   make -j `grep -c ^processor /proc/cpuinfo`
-  make install
-  cd yottadb_r128
+  make install	# For known errors in this step and how to work around them, consult the FAQ section below
+  cd YDB-r1.30
   ```
-
-  Please consult the FAQ below for information on resolving known build errors, e.g. `plugin needed to handle lto object` errors.
 
   Note that the ```make install``` command above does not create the final installed YottaDB.
   Instead, it stages YottaDB for distribution.
@@ -117,7 +112,7 @@ listed below. For example for Ubuntu Linux:
 - Installing YottaDB
 
   Now you are ready to install YottaDB. The default installation path for each release includes the release
-  (e.g. for YottaDB r1.28, the default installation path is /usr/local/lib/yottadb/r128),
+  (e.g. for YottaDB r1.28, the default installation path is /usr/local/lib/yottadb/r130),
   but can be controlled using the ```--installdir``` option. Run ```./ydbinstall --help``` for a list of options.
 
   ```sh
@@ -183,7 +178,7 @@ docker run --rm -it yottadb/yottadb # you can add a specific version after a ":"
   Example error message that would be printed to the screen:
 
   ```
-  %YDB-E-DLLNOOPEN, Failed to load external dynamic library /usr/local/lib/yottadb/r128/libyottadb.so
+  %YDB-E-DLLNOOPEN, Failed to load external dynamic library /usr/local/lib/yottadb/r130/libyottadb.so
   %YDB-E-TEXT, libtinfo.so.5: cannot open shared object file: No such file or directory
   ```
 
