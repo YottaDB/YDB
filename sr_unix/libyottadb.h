@@ -338,7 +338,7 @@ int	ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 int	ydb_zstatus(char* msg, int len);
 
 
-/* Utility entry points accessable in libyottadb.so */
+/* Utility entry points in libyottadb.so accessible through the SimpleAPI */
 int	ydb_call_variadic_plist_func(ydb_vplist_func cgfunc, uintptr_t cvplist);	/* Used by Golang to call variadic C function */
 int	ydb_child_init(void *param);
 int	ydb_ci(const char *c_rtn_name, ...);				/* Call-in interface */
@@ -347,6 +347,7 @@ int	ydb_ci_get_info(const char *rtnname, ci_parm_type *pptype);
 int	ydb_ci_get_info_t(uint64_t tptoken, ydb_buffer_t *errstr, const char *rtnname, ci_parm_type *pptype);
 int	ydb_ci_tab_open(const char *fname, uintptr_t *ret_value);
 int	ydb_ci_tab_switch(uintptr_t new_handle, uintptr_t *ret_old_handle);
+int	ydb_eintr_handler(void);
 int	ydb_exit(void);
 int	ydb_file_id_free(ydb_fileid_ptr_t fileid);
 int	ydb_file_is_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
@@ -366,7 +367,7 @@ void	ydb_timer_cancel(intptr_t timer_id);
 int	ydb_timer_start(intptr_t timer_id, unsigned long long limit_nsec, ydb_funcptr_retvoid_t handler, unsigned int hdata_len,
 			void *hdata);
 
-/* Utility routines for use in threaded applications - SimpleThreadAPI.
+/* Utility routines in libyottadb.so accessible through the SimpleThreadAPI (i.e. for use in threaded applications).
  * Note that "ydb_init" and "ydb_exit" are multi-thread safe utility routines and so can be used in SimpleAPI and SimpleThreadAPI.
  */
 int	ydb_ci_t(uint64_t tptoken, ydb_buffer_t *errstr, const char *c_rtn_name, ...);	/* SimpleThreadAPI version of "ydb_ci" */
@@ -374,6 +375,7 @@ int	ydb_cip_t(uint64_t tptoken, ydb_buffer_t *errstr, ci_name_descriptor *ci_inf
 											/* SimpleThreadAPI version of "ydb_cip" */
 int	ydb_ci_tab_open_t(uint64_t tptoken, ydb_buffer_t *errstr, char *fname, uintptr_t *ret_value);
 int	ydb_ci_tab_switch_t(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t new_handle, uintptr_t *ret_old_handle);
+int	ydb_eintr_handler_t(uint64_t tptoken, ydb_buffer_t *errstr);
 int	ydb_file_id_free_t(uint64_t tptoken, ydb_buffer_t *errstr, ydb_fileid_ptr_t fileid);
 int	ydb_file_is_identical_t(uint64_t tptoken, ydb_buffer_t *errstr, ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
 int	ydb_file_name_to_id_t(uint64_t tptoken, ydb_buffer_t *errstr, ydb_string_t *filename, ydb_fileid_ptr_t *fileid);

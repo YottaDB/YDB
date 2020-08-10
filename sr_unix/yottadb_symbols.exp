@@ -51,6 +51,8 @@ ydb_delete_excl_s
 ydb_delete_excl_st
 ydb_delete_s
 ydb_delete_st
+ydb_eintr_handler
+ydb_eintr_handler_t
 ydb_exit
 ydb_file_id_free
 ydb_file_id_free_t

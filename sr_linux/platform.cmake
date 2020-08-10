@@ -187,6 +187,11 @@ add_definitions(
 set(ydb_link  "-Wl,-u,gtm_filename_to_id -Wl,-u,ydb_zstatus -Wl,--version-script,\"${YDB_BINARY_DIR}/ydbexe_symbols.export\"")
 set(gtm_dep   "${YDB_BINARY_DIR}/ydbexe_symbols.export")
 
+# Note the -Wl,-u below is to tell the linker there is an unsatisfied reference to each of the functions mentioned below
+# thus triggering its inclusion into final linked libyottadb.so even though the function is not referenced anywhere in the code.
+# Note that almost all of the SimpleAPI, SimpleThreadAPI and Utility functions are in the list below. But "ydb_init" and "ydb_exit"
+# are not. That is because they are already referenced in the code base and so are automatically included (i.e. don't need this
+# trick to force the linker to include them in libyottadb.so).
 set(libyottadb_link "-Wl,-u,ydb_ci -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_is_main_thread")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,accumulate -Wl,-u,is_big_endian -Wl,-u,to_ulong")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,gtm_ci")
@@ -208,6 +213,8 @@ set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_delete_excl_s")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_delete_excl_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_delete_s")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_delete_st")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_eintr_handler")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_eintr_handler_t")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_file_id_free")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_file_id_free_t")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_file_is_identical")
