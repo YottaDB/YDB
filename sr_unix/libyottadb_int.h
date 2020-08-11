@@ -904,30 +904,6 @@ static inline void threaded_api_ydb_engine_lock(uint64_t TPTOKEN, ydb_buffer_t *
 				 */
 				*GET_LOCK = FALSE;
 			}
-		} else
-		{	/* During development of alternate signal handling, there was a case where there was a hang. The hang
-			 * was ydb_exit() waiting to get the YDB engine lock so it could clean up. Problem was, when checking
-			 * what thread actually held the lock, we found that it was the CURRENT thread. The only thing on the
-			 * C stack besides ydb_exit() were a couple of cgo references so this was a cgo invocation of ydb_exit()
-			 * which could only come from yottadb.Exit() and specifically, it had to have been done as part of
-			 * defer processing as part of panic processing. Our best conjecture on what could cause this strange
-			 * situation is the following:
-			 *   1. Go process/thread/goroutine drives some simplethreadAPI interface.
-			 *   2. The YDB engine grabs the YDB engine lock.
-			 *   3. A signal or other fatal error occurs resulting in a call to panic() which unwinds the C stack
-			 *      of each thread/goroutine dispensing with them (freeing those who are cgo-only threads for reuse).
-			 *   4. One of the last of these defer'd routines will be yottadb.Exit() which drives ydb_exit() which
-			 *      itself tries to get the YDB engine lock. When the call to ydb_exit() is done, it tries to get
-			 *      the 0 level engine lock (which this thread already owns).
-			 * By setting *GET_LOCK to FALSE, we don't require getting the lock if we already hold it in this odd
-			 * situation. When we are finished here, ydb_exit() will release the lock which is fine as the routine
-			 * that originally got the lock in this thread no longer exists so will never try to also free the
-			 * lock.
-			 *
-			 * If a different thread originally got the lock, we would hang until the timer expired (which is likely
-			 * the normal case when a signal-killed process is running down).
-			 */
-			*GET_LOCK = FALSE;
 		}
 	}
 	if (YDB_OK == *RETVAL)
