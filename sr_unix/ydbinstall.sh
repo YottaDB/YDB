@@ -756,7 +756,11 @@ if [ "Y" = "$gtm_dryrun" ] ; then echo Installation prepared in $gtm_tmpdir ; ex
 
 sh -x ./configure.sh <$gtm_configure_in 1> $gtm_tmpdir/configure_${timestamp}.out 2>$gtm_tmpdir/configure_${timestamp}.err
 if [ $? -gt 0 ] ; then echo "configure.sh failed. Output follows"; cat $gtm_tmpdir/configure_${timestamp}.out $gtm_tmpdir/configure_${timestamp}.err ; exit 1; fi
-rm -rf $tmpdir	# Now that install is successful, remove temporary directory
+
+rm -rf $tmpdir/*	# Now that install is successful, remove everything under temporary directory
+			# We might still need this temporary directory for installing optional plugins (encplugin, posix etc.)
+			# if they have been specified in the ydbinstall.sh command line. Not having a valid current directory
+			# will cause YDB-E-SYSCALL errors from "getcwd()" in ydb_env_set calls made later.
 if [ "Y" = "$gtm_gtm" ] ; then
 	product_name="GT.M"
 else
@@ -810,7 +814,11 @@ fi
 
 # install optional components if they were selected
 
+remove_tmpdir=1	# It is okay to remove $tmpdir at the end assuming ydbinstall is successful at installing plugins.
+		# Any errors while installing any plugin will set this variable to 0.
+
 if [ "Y" = $ydb_posix ] ; then
+	cd $tmpdir	# Get back to top level temporary directory as the current directory for ydb_env_set
 	. ${ydb_installdir}/ydb_env_set
 	mkdir posix_tmp
 	cd posix_tmp
@@ -837,14 +845,18 @@ if [ "Y" = $ydb_posix ] ; then
 		sudo rm -R posix_tmp
 	elif ["0" != $status -a "0" != $status_utf8] ; then
 		echo "POSIX plugin build failed in both M and UTF8 modes. The build directory ($PWD/posix_tmp) has been saved."
+		remove_tmpdir=0
 	elif ["0" != $status] ; then
 		echo "POSIX plugin build failed in M mode. The build directory ($PWD/posix_tmp) has been saved."
+		remove_tmpdir=0
 	else
 		echo "POSIX plugin build failed in UTF8 mode. The build directory ($PWD/posix_tmp) has been saved."
+		remove_tmpdir=0
 	fi
 fi
 
 if [ "Y" = $ydb_encplugin ] ; then
+	cd $tmpdir	# Get back to top level temporary directory as the current directory for ydb_env_set
 	export ydb_icu_version=$ydb_icu_version
 	mkdir enc_tmp
 	cd enc_tmp
@@ -858,6 +870,7 @@ if [ "Y" = $ydb_encplugin ] ; then
 		sudo rm -R enc_tmp
 	else
 		echo "Encryption plugin build failed. The build directory ($PWD/enc_tmp) has been saved."
+		remove_tmpdir=0
 	fi
 	# rename gtmcrypt to ydbcrypt and create a symbolic link for backward compatibility
 	mv ${ydb_installdir}/plugin/gtmcrypt ${ydb_installdir}/plugin/ydbcrypt
@@ -865,6 +878,7 @@ if [ "Y" = $ydb_encplugin ] ; then
 fi
 
 if [ "Y" = $ydb_zlib ] ; then
+	cd $tmpdir	# Get back to top level temporary directory as the current directory for ydb_env_set
 	. ${ydb_installdir}/ydb_env_set
 	mkdir zlib_tmp
 	cd zlib_tmp
@@ -879,7 +893,7 @@ if [ "Y" = $ydb_zlib ] ; then
 	sudo cp _ZLIB.m ${ydb_installdir}/plugin/r
 	${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
 	if [ "Y" = $ydb_utf8 ] ; then
-		if [ "default" = $ydb_icu_version ] ; then
+		if [ "default" = "$ydb_icu_version" ] ; then
 			ydb_icu_version=`pkg-config --modversion icu-io`
 		fi
 		mkdir utf8
@@ -898,10 +912,12 @@ if [ "Y" = $ydb_zlib ] ; then
 		sudo rm -R zlib_tmp
 	else
 		echo "zlib plugin build failed. The build directory ($PWD/zlib_tmp) has been saved."
+		remove_tmpdir=0
 	fi
 fi
 
 if [ "Y" = $ydb_octo ] ; then
+	cd $tmpdir	# Get back to top level temporary directory as the current directory for ydb_env_set
 	export ydb_dist=${ydb_installdir}
 	curl -fSsLO https://gitlab.com/YottaDB/DBMS/YDBOcto/-/archive/master/YDBOcto-master.tar.gz
 	tar xzf YDBOcto-master.tar.gz
@@ -923,5 +939,11 @@ if [ "Y" = $ydb_octo ] ; then
 		sudo rm YDBOcto-master.tar.gz
 	else
 		echo "Octo build failed. The build directory ($PWD/YDBOcto-master) and the tarball ($PWD/YDBOcto-master.tar.gz) have been saved."
+		remove_tmpdir=0
 	fi
 fi
+
+if [ 0 = "$remove_tmpdir" ] ; then exit 1; fi	# error seen while installing one or more plugins
+
+rm -rf $tmpdir	# Now that we know it is safe to remove $tmpdir, do that before returning normal status
+exit 0
