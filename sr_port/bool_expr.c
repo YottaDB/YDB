@@ -61,7 +61,7 @@ int bool_expr(boolean_t sense, oprtype *addr)
 								 * given a OC_BOOLEXPRFINISH.
 								 */
 	UNARY_TAIL(&x, 0);
-	for(t2 = t1 = x.oprval.tref; OCT_UNARY & oc_tab[t1->opcode].octype; t2 = t1, t1 = t1->operand[0].oprval.tref)
+	for (t2 = t1 = x.oprval.tref; OCT_UNARY & oc_tab[t1->opcode].octype; t2 = t1, t1 = t1->operand[0].oprval.tref)
 		;
 	if (OCT_ARITH & oc_tab[t1->opcode].octype)
 		ex_tail(&t2->operand[0], 0);

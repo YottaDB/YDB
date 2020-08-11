@@ -379,7 +379,7 @@ static inline void bool_zysqlnull_finish_error_if_needed(void)
 			depth = boolZysqlnull->cur_depth;
 			if (0 < depth)
 			{
-				for ( ; depth >= 0; depth--)
+				for ( ; 0 <= depth; depth--)
 				{
 					boolZysqlnull->array[depth].is_zysqlnull = FALSE;
 					boolZysqlnull->array[depth].andor_opcode = OC_NOOP;

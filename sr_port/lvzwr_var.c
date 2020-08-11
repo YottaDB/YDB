@@ -104,7 +104,7 @@
 		{											\
 			if (!do_pattern(&mv, zwr_sub->subsc_list[n].first))				\
 				do_lev = FALSE;								\
-		} else  if (zwr_sub->subsc_list[n].subsc_type != ZWRITE_ALL)				\
+		} else  if (ZWRITE_ALL != zwr_sub->subsc_list[n].subsc_type)				\
 		{											\
 			if (zwr_sub->subsc_list[n].first)						\
 			{										\

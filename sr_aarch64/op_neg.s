@@ -38,7 +38,7 @@ ENTRY op_neg
 	mv_force_defined x1
 	ldrh	w13, [x1, #mval_w_mvtype]
 	tst	w13, #mval_m_sqlnull
-	b.ne	sqlnull					/* jump to l40 if MV_SQLNULL bit is set */
+	b.ne	sqlnull					/* jump to sqlnull if MV_SQLNULL bit is set */
 	mv_if_number x1, numer
 	mov	x28, x1
 	mov	x0, x1

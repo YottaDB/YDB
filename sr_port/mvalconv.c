@@ -88,7 +88,7 @@ void i2mval(mval *v, int i)
 	int4	n;
 
 	v->mvtype = MV_NM;
-	if (i < 0)
+	if (0 > i)
 	{
 		v->sgn = 1;
 		n = -i;
@@ -97,7 +97,6 @@ void i2mval(mval *v, int i)
 		n = i;
 		v->sgn = 0;
 	}
-
 	xi2mval(v, n);
 }
 

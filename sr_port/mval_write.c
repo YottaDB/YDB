@@ -73,7 +73,7 @@ void mval_write(zshow_out *output, mval *v, boolean_t flush)
 		sqlnull.addr = DOLLAR_ZYSQLNULL_STRING;
 		sqlnull.len = DOLLAR_ZYSQLNULL_STRLEN;
 		zshow_output(output, &sqlnull);
-	} else if (src_len > 0)
+	} else if (0 < src_len)
 	{
 		if (val_iscan(v))
 		{

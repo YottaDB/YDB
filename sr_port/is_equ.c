@@ -47,7 +47,7 @@ boolean_t is_equ(mval *u, mval *v)
 				break;
 			}
 			/* They are both decimal floating numbers, do a full comparison */
-			result = ((((mval_b *)u)->sgne == ((mval_b *)v)->sgne) && (u->m[1] == v->m[1]) && (u->m[0]==v->m[0]));
+			result = ((((mval_b *)u)->sgne == ((mval_b *)v)->sgne) && (u->m[1] == v->m[1]) && (u->m[0] == v->m[0]));
 			break;
 		}
 		/* At least one of the numbers is not in numeric form or is not a canonical number, do a string compare */
