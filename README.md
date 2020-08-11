@@ -13,7 +13,7 @@ Documentation: https://yottadb.com/resources/documentation/
 You may want to clone the YottaDB repository for access to the latest code.
 
 ```sh
-git clone git@gitlab.com:YottaDB/DB/YDB.git
+git clone https://gitlab.com/YottaDB/DB/YDB.git
 ```
 
 To contribute or help with further development, [fork the repository](https://docs.gitlab.com/ee/gitlab-basics/fork-project.html), clone your fork to a local copy and begin contributing! Please also set up the pre-commit script to automatically enforce some coding conventions. Assuming you are in the top-level directory, the following will work:
