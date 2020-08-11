@@ -826,7 +826,7 @@ if [ "Y" = $ydb_posix ] ; then
 	cd ..
 	if [ "Y" = $ydb_utf8 ] ; then
 		mkdir build_UTF8 && cd build_UTF8
-		cmake -DMUMPS_UTF8_MODE=1 ..
+		cmake -DM_UTF8_MODE=1 ..
 		make && sudo make install
 		status_utf8=$?
 		cd ..
