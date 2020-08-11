@@ -787,6 +787,22 @@ MBSTART {													\
 	}													\
 }
 
+/* This macro negates the positive return value from the "ydb_ci_exec()" function call.
+ * Used by "ydb_ci()", "ydb_cip()", "ydb_ci_t()", "ydb_cip_t()" so they mostly return a negative value in case of errors
+ *	(exceptions are YDB_TP_RESTART etc. which are huge positive numbers) that way staying compatible with general
+ *	SimpleAPI/SimpleThreadAPI function behavior on error returns.
+ * Note: This is not used by "gtm_ci()" or "gtm_cip()" so those functions continue to return a positive value in case of errors
+ *	and staying compatible with GT.M behavior (TP restart returns ERR_TPRETRY and not YDB_TP_RESTART).
+ */
+#define	CONVERT_YDB_CI_EXEC_TO_SIMPLEAPI_RETVAL(RETVAL)				\
+{										\
+	GBLREF	uint4		dollar_tlevel;					\
+										\
+	assert(0 <= RETVAL);							\
+	RETVAL = ((ERR_TPRETRY == RETVAL) ? YDB_TP_RESTART : -RETVAL);		\
+	assert(dollar_tlevel || (YDB_TP_RESTART != RETVAL));			\
+}
+
 /* Define routines before get to inline routine definitions */
 int	sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn);
 void	sapi_save_targ_key_subscr_nodes(void);

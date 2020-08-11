@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,5 +42,6 @@ int ydb_cip(ci_name_descriptor* ci_info, ...)
 	VAR_START(var, ci_info);
 	/* Note: "va_end(var)" done inside "ydb_ci_exec" */
 	retval = ydb_ci_exec(ci_info->rtn_name.address, ci_info, var, FALSE);
+	CONVERT_YDB_CI_EXEC_TO_SIMPLEAPI_RETVAL(retval);
 	return retval;
 }

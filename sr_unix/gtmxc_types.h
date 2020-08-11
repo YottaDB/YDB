@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -96,9 +96,9 @@ void 		gtm_zstatus(char* msg, int len);
 /* Define backward compatibility routine name defines for GT.M entry points. Note some of these entry points are
  * the same as entry points defined above. This allows those references that can be transformed to effect a direct
  * call without the gtm_xxx wrapper that it would otherwise use also eliminating an extra level of indirection.
+ * Note: "gtm_ci()" and "gtm_cip()" are different from "ydb_ci()" and "ydb_cip()" in the error return value (positive vs negative)
+ * and so the former cannot be #defined to the latter.
  */
-#define gtm_ci				ydb_ci
-#define gtm_cip				ydb_cip
 #define gtm_init			ydb_init
 #ifdef GTM_PTHREAD
 # define gtm_jinit			ydb_jinit

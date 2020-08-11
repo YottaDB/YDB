@@ -531,7 +531,11 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	return 0;
 }
 
-/* Common work-routine for ydb_ci() and ydb_cip() to drive callin */
+/* Common work-routine for ydb_ci() and ydb_cip() to drive callin.
+ * Returns
+ *	= 0 on success (i.e. YDB_OK)
+ *	> 0 on error   (i.e. positive error code)
+ */
 int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list temp_var, boolean_t internal_use)
 {
 	ci_tab_entry_t		*ci_tab;

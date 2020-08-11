@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,6 +22,9 @@ GBLREF	boolean_t	simpleThreadAPI_active;
 
 /* Helper routine to do a "ydb_ci_t" or "ydb_cip_t" call with a "ydb_simpleapi_ch" condition handler wrapper
  * to handle TPRETRY/TPRESTART.
+ * Returns
+ *	= 0 on success (i.e. YDB_OK)
+ *	< 0 on error   (i.e. negative error code)
  */
 int ydb_cip_helper(int calltyp, ci_name_descriptor *ci_info, va_list *var)
 {
@@ -43,13 +46,10 @@ int ydb_cip_helper(int calltyp, ci_name_descriptor *ci_info, va_list *var)
 	{
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have been cleared by "ydb_simpleapi_ch" */
 		REVERT;
-		/* Note: Since "ydb_ci" and "ydb_cip" pre-date the SimpleAPI, we do not negate TREF(ydb_error_code)
-		 * before returning like is done in various SimpleAPI functions (e.g. "ydb_data_s"). Returning
-		 * the negated value would break backward compatibility.
-		 */
-		return ((ERR_TPRETRY == SIGNAL) ? ERR_TPRETRY : TREF(ydb_error_code));
+		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -TREF(ydb_error_code));
 	}
 	status = ydb_ci_exec(ci_info->rtn_name.address, ci_info, *var, FALSE);
+	CONVERT_YDB_CI_EXEC_TO_SIMPLEAPI_RETVAL(status);
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
 	REVERT;

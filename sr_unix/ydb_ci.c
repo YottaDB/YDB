@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,5 +41,6 @@ int ydb_ci(const char *c_rtn_name, ...)
 	VAR_START(var, c_rtn_name);
 	/* Note: "va_end(var)" done inside "ydb_ci_exec" */
 	retval = ydb_ci_exec(c_rtn_name, NULL, var, FALSE);
+	CONVERT_YDB_CI_EXEC_TO_SIMPLEAPI_RETVAL(retval);
 	return retval;
 }
