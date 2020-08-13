@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -108,15 +111,15 @@ void	op_fnzparse (mval *file, mval *field, mval *def1, mval *def2, mval *type, m
 
 	if (type->str.len != 0)
 	{
-		if (type->str.len <= SYN_LEN)
-			lower_to_upper((uchar_ptr_t)&type_buf[0], (uchar_ptr_t)type->str.addr, type->str.len);
+		lower_to_upper((uchar_ptr_t)&type_buf[0], (uchar_ptr_t)type->str.addr, type->str.len);
 
 		if (type->str.len <= SYN_LEN  &&  memcmp(&type_buf[0], "SYNTAX_ONLY", type->str.len) == 0)
 			pblk.fop |= F_SYNTAXO;
 		else if (type->str.len <= NCON_LEN  &&  memcmp(&type_buf[0], "NO_CONCEAL", type->str.len) == 0)
 		{
 			/* no meaning on unix */
-		}
+		} else if (type->str.len <= STR_LIT_LEN("SYMLINK") && !memcmp(&type_buf[0], "SYMLINK" , type->str.len))
+			pblk.symlink = TRUE;
 		else
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZPARSETYPE, 2, type->str.len, type->str.addr);
 	}

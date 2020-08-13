@@ -34,6 +34,8 @@
 #include "min_max.h"
 #include "dogetaddrinfo.h"
 
+#include "gtm_limits.h" /* next two header for realpath */
+#include "gtm_stdlib.h"
 #define LOCALHOSTNAME "localhost"
 #define LOCALHOSTNAME6 "::1"
 
@@ -44,6 +46,17 @@ error_def(ERR_PARBUFSM);
 error_def(ERR_PARNORMAL);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
+
+/*
+ *  Assert ensures that SRC.FIELD is within the bounds of SRC.buffer. This way when we do the SRC.FIELD - SRC.Buffer,
+ *  we are guaranteed to get a positive number that is less than SRC.buff_size
+ */
+#define	COPY_POINTER(SRC, DST, FIELD)							\
+{											\
+	assert((uintptr_t)SRC.FIELD >= (uintptr_t)SRC.buffer);				\
+	assert((uintptr_t)SRC.FIELD <= ((uintptr_t)SRC.buffer + SRC.buff_size));	\
+	DST->FIELD = DST->buffer + ((uintptr_t)SRC.FIELD - (uintptr_t)SRC.buffer);	\
+}
 
 enum	parse_state
 {
@@ -60,14 +73,15 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 {
 	struct stat		statbuf;
 	struct addrinfo		*ai_ptr, *localhost_ai_ptr, *temp_ai_ptr, hints;
-	mstr			trans, tmp;
+	mstr			trans, tmp, symlinkfile;
 	int			status, diff;
 	uint4			local_node_len, query_node_len, node_name_len;
-	parse_blk		def;
+	parse_blk		def, symlink_pblk;
 	char			local_node_name[MAX_HOST_NAME_LEN + 1], query_node_name[MAX_HOST_NAME_LEN + 1];
 	char			*base, *ptr, *top, *del, *node, *name, *ext, ch;
 	char			**hostaddrlist;
-	char			def_string[MAX_FN_LEN + 1];
+	char			def_string[MAX_FN_LEN + 1], symlink_pblk_string[MAX_FN_LEN + 1];
+	char			symlink_path[YDB_PATH_MAX]; /* buffer holding the target file name in case of a symbolic link */
 	boolean_t		hasnode, hasdir, hasname, hasext, wilddir, wildname;
 	enum parse_state	state;
 	struct sockaddr_storage	query_sas;
@@ -75,6 +89,8 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	mval			def_trans;
 	int			errcode;
 	boolean_t		donot_short_circuit;
+	/* Buffer Variables for symlink */
+	char symlink_buffer[YDB_PATH_MAX];
 
 	pblk->fnb = 0;
 	ai_ptr = localhost_ai_ptr = temp_ai_ptr = NULL;
@@ -411,7 +427,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	pblk->fnb |= (hasext << V_HAS_EXT);
 	pblk->fnb |= (wildname << V_WILD_NAME);
 	pblk->fnb |= (wilddir << V_WILD_DIR);
-	if (!(pblk->fop & F_SYNTAXO)  &&  !wilddir)
+	if (!(pblk->fop & F_SYNTAXO) && !wilddir)
 	{
 		assert('/' == pblk->l_dir[pblk->b_dir - 1]);
 		if (pblk->b_dir > 1)
@@ -422,6 +438,56 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 			if ((-1 == status) || !(statbuf.st_mode & S_IFDIR))
 				return ERR_FILENOTFND;
 		}
+	}
+	if (pblk->symlink)
+	{	/* $ZPARSE(...,"SYMLINK") has been specified so check if the result file is a soft link.
+		 * If so return the file that is linked to. "realpath()" call below does that symbolic link
+		 * translation as well as absolute path name expansion for us.
+		 */
+		pblk->buffer[pblk->b_esl] = '\0';	/* It is okay because all callers of "parse_blk()" set buff_size
+							 * to 1 less than the allocated buffer. Therefore we can safely
+							 * access to set the null terminator.
+							 */
+		/* Now that the file name is null terminated, pass it to "realpath()" */
+		if (NULL == realpath(pblk->buffer, symlink_path))
+		{	/* There weren't any symbolic linked files found for the link. Return original "pblk" information as is. */
+			return ERR_PARNORMAL;
+		}
+		/* Now that we know the input file is a soft link to another valid file, invoke "parse_file()" on that file
+		 * to determine (and return) the name, dir, extension information of that new file.
+		 */
+		memset(&symlink_pblk, 0, SIZEOF(symlink_pblk));
+		symlink_pblk.buffer = symlink_pblk_string; /* Buffer passed to child function */
+		symlink_pblk.buff_size = SIZEOF(symlink_pblk_string) - 1;	/* leave space for null terminator at end */
+		symlinkfile.addr = symlink_path;
+		symlinkfile.len = strlen(symlink_path);
+		if (ERR_PARNORMAL != parse_file(&symlinkfile, &symlink_pblk))
+		{	/* The soft link existed at the time of "realpath()" a few lines above but failed the "parse_file()"
+			 * call. Not sure why. In this case, just return the original "parse_file()" call information
+			 * of the linking file (which is already there in "pblk" so return ERR_PARNORMAL.
+			 */
+			return ERR_PARNORMAL;
+		}
+		/* Now that "parse_file()" on the linked file succeeded, copy over information from "symlink_pblk" to "pblk".
+		 * This involves copying over the full file name from the source buffer to the target buffer and adjusting
+		 * all pointer members in "pblk" to reflect the respective elements (directory, file, extension etc.)
+		 * of the copied over file name.
+		 */
+		assert(symlink_pblk.buff_size <= pblk->buff_size);
+		memcpy(pblk->buffer, symlink_pblk.buffer, symlink_pblk.b_esl); /* Copy over file name */
+		/* Copy over all length fields. They stay the same. */
+		pblk->b_name = symlink_pblk.b_name;
+		pblk->b_dir = symlink_pblk.b_dir;
+		pblk->b_ext = symlink_pblk.b_ext;
+		pblk->b_esl = symlink_pblk.b_esl;
+		/* Note: pblk->b_node not copied over since it is applicable at db open only */
+		/* Copy over result fields */
+		pblk->fnb = symlink_pblk.fnb;
+		/* Update all pointers in "pblk" so their relative offsets stay the same in "pblk" and "symlink_pblk" */
+		COPY_POINTER(symlink_pblk, pblk, l_dir);
+		COPY_POINTER(symlink_pblk, pblk, l_name);
+		COPY_POINTER(symlink_pblk, pblk, l_ext);
+		/* Note: pblk->l_node not updated since it is applicable at db open only */
 	}
 	return ERR_PARNORMAL;
 }

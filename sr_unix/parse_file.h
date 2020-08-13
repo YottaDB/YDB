@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,7 @@ typedef struct parse_blk_struct
 	char		*buffer;	/* Result buffer */
 	int4		fnb;		/* Parse result characteristics */
 	int4		fop;		/* Parse options SYNTAX_ONLY only */
+	boolean_t	symlink;	/* Indicates symbolic linking of file */
 	char		*l_node,	/* Pointer to node specification - db opening only */
 			*l_dir,		/* Pointer to directory path string */
 			*l_name,	/* Pointer to file name string */
