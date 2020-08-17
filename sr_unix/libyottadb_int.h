@@ -1003,13 +1003,14 @@ static inline void threaded_api_ydb_engine_unlock(uint64_t TPTOKEN, ydb_buffer_t
 	/* Since this macro can be called from "ydb_init" as part of opening YottaDB for the first time in the process,
 	 * we need to handle the case where "lcl_gtm_threadgbl" is NULL in which case we should not skip TREF usages.
 	 */
+	/* Whether RELEASE_LOCK is TRUE or FALSE, undo set to TREF(stapi_errstr) done in "threaded_api_ydb_engine_lock()". */
+	if (NULL != lcl_gtm_threadgbl)
+	{
+		assert(ERRSTR == TREF(stapi_errstr));
+		TREF(stapi_errstr) = SAVE_ERRSTR;
+	}
 	if (RELEASE_LOCK)
 	{
-		if (NULL != lcl_gtm_threadgbl)
-		{
-			assert(ERRSTR == TREF(stapi_errstr));
-			TREF(stapi_errstr) = SAVE_ERRSTR;
-		}
 		lockIndex = GET_TPDEPTH_FROM_TPTOKEN((uint64_t)TPTOKEN);
 		assert(pthread_self() == ydb_engine_threadsafe_mutex_holder[lockIndex]);
 		ydb_engine_threadsafe_mutex_holder[lockIndex] = 0;
@@ -1024,7 +1025,7 @@ static inline void threaded_api_ydb_engine_unlock(uint64_t TPTOKEN, ydb_buffer_t
 		}
 	} else if ((LYDB_RTN_YDB_CI == SAVE_ACTIVE_STAPI_RTN) || (LYDB_RTN_YDB_CIP == SAVE_ACTIVE_STAPI_RTN))
 	{	/* Undo active rtn indicator reset done in threaded_api_ydb_engine_lock */
-		 if (NULL != lcl_gtm_threadgbl)
+		if (NULL != lcl_gtm_threadgbl)
 			TREF(libyottadb_active_rtn) = SAVE_ACTIVE_STAPI_RTN;
 	}
 }
