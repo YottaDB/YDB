@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,8 +53,22 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 	 */
 	*dst = *src;
 	if (use_fract)
+	{
 		op_fnj3(dst, 0, fract, dst);
-	else
+		assert(MV_IS_STRING(dst));
+		/* In case "op_fnj3" was invoked above, it would have set mvtype to MV_STR (thereby losing MV_NM bit).
+		 * But since we know this number has zero or more '0's appended after the decimal point, a call to MV_FORCE_NUM
+		 * (i.e. "s2n()") will set the "MV_NUM_APPROX" bit which we want to discard (but retain the MV_NM bit) hence the
+		 * call to MV_FORCE_CANONICAL below.
+		 */
+		MV_FORCE_CANONICAL(dst);	/* if the source operand is not a canonical number, force conversion */
+		if (!MV_IS_STRING(dst))
+		{	/* MV_FORCE_CANONICAL reset the MV_STR bit. Unset that as we want the string representation to exactly
+			 * have the string representation (e.g. trailing 0s) created by "op_fnj3()" above.
+			 */
+			dst->mvtype |= MV_STR;
+		}
+	} else
 	{
 		MV_FORCE_NUM(dst);
 		MV_FORCE_CANONICAL(dst);	/* if the source operand is not a canonical number, force conversion */
