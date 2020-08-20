@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1502,7 +1502,6 @@ MBSTART {												\
 
 #define	FREE_JBUF_RSRV_STRUCT(JRS)		\
 MBSTART {					\
-	assert(NULL != JRS);			\
 	if (NULL != JRS)			\
 	{					\
 		if (NULL != JRS->jrs_array)	\
