@@ -1,7 +1,10 @@
- /****************************************************************
+/****************************************************************
  *								*
  * Copyright (c) 2014-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,16 +38,9 @@ void op_fnzsyslog(mval* src, mval* dst)
 	len = MIN(src->str.len, OUT_BUFF_SIZE - 1);
 	if (0 < len)
 	{
-		ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
-		if ((NULL != TREF(util_outptr)) && (TREF(util_outptr) != TREF(util_outbuff_ptr)))
-		{
-			SAVE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
-		}
 		memcpy(rebuff, src->str.addr, len);	/* Rebuffer to add null terminator */
 		rebuff[len] = '\0';			/* Add null terminator */
-		util_out_print(NULL, RESET);
-		util_out_print(rebuff, OPER);
-		RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
+		util_out_send_oper(rebuff, len);
 	}
 	memcpy(dst, &literal_one, SIZEOF(mval));
 }
