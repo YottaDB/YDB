@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -259,9 +259,6 @@ l10:
 ENTRY opp_zst_over_ret
 	CHKSTKALIGN				/* Verify stack alignment */
 	ldr	r12, [r5]
-	ldrh	r1, [r12, #msf_typ_off]
-	tst	r1, #1
-	beq	l11
 	ldr	r1, =zstep_level
 	ldr	r1, [r1]
 	ldr	r0, [r12, #msf_old_frame_off]

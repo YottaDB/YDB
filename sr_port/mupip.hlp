@@ -1088,8 +1088,8 @@
      o GT.M version starting from V6.3-000 use non-zero IVs.
      o Use the NULL_IV qualifier only on encrypted databases to create an
        encrypted binary extract in GDS BINARY EXTRACT LEVEL 8 format. This
-       format can load data on any encrypted GT.M database created with a
-       version prior to V6.3-000.
+       format can load data on any encrypted YottaDB database created with a
+       GT.M version prior to V6.3-000.
      o The default is -NONULL_IV which produces a binary extract in GDS
        BINARY EXTRACT LEVEL 9 format.
 
@@ -2527,7 +2527,7 @@
 
    **Note**
 
-     o FIS recommends rotating (changing) the encryption key of the database
+     o YottaDB recommends rotating (changing) the encryption key of the database
        for better security. The frequency of encryption key rotation depends
        on your security requirements and policies.
      o MUPIP REORG -ENCRYPT does not enable switching between encryption
@@ -3513,28 +3513,21 @@
    only for all users, including root. This designation augments UNIX
    authorizations and prevents any state updates that normally might require
    an operational action for a database with no current accessing (attached)
-<<<<<<< HEAD
-   processes. MUPIP emits an error on attempts to set -READ_ONLY on databases
-   with the BG access method, or to set the access method to BG on databases
-   with -READ_ONLY set. The YottaDB help databases have -READ_ONLY set by
-   default. The format of the READ_ONLY qualifier is:
-=======
    processes. Setting the -READ_ONLY attribute on a database file with BG
    access method or setting the access method to BG on a -READ_ONLY database
-   produces an error. The GT.M help databases have -READ_ONLY set by default.
+   produces an error. The YottaDB help databases have -READ_ONLY set by default.
    The format of the READ_ONLY qualifier is:
->>>>>>> 91552df2... GT.M V6.3-009
 
    -[NO]REA[D_ONLY]
 
    -NOREAD_ONLY makes a database file writable for users who have write
-   permissions on the database file. Note that because of the way GT.M
+   permissions on the database file. Note that because of the way YottaDB
    handles semaphores for READ_ONLY database files it does not enforce
    standalone access for setting the characteristic from READ_ONLY to
    NOREAD_ONLY. However, making a change from READ_ONLY to NOREAD_ONLY
    without standalone access will likely cause problems, such as errors on
    termination and failure to release IPC resources that would require
-   additional MUPIP commands to clean up. Therefore FIS recommends using
+   additional MUPIP commands to clean up. Therefore YottaDB recommends using
    other means such as the following based on fuser return of one (1) to
    verify there are no processes are accessing the file:
 
@@ -4476,11 +4469,11 @@
    **Important**
 
    AUTOSWITCHLIMIT is always the sum of ALLOCATION and a multiple of
-   EXTENSION value. GT.M automatically attempts to adjust
+   EXTENSION value. YottaDB automatically attempts to adjust
    ALLOCATION/AUTOSWITCHLIMIT values whenever AUTOSWITCHLIMIT is not the sum
    of ALLOCATION and a multiple of the EXTENSION value. When a MUPIP SET
    -JOURNAL command results in an inappropriate automatic adjustment (upward
-   or downward), GT.M rejects the command and reports a non-zero exit status.
+   or downward), YottaDB rejects the command and reports a non-zero exit status.
 
    [NO]BEFORE_IMAGES
 
@@ -4560,15 +4553,15 @@
    specifies how much space should be available at each review.
 
    When a journal file reaches the size of ALLOCATION and any multiple of
-   EXTENSION, GT.M checks for free space on the file system.
+   EXTENSION, YottaDB checks for free space on the file system.
 
-     o If the available space is less than three times the EXTENSION, GT.M
+     o If the available space is less than three times the EXTENSION, YottaDB
        sends the DSKSPACEFLOW informational message to the operator log.
      o If the available space is less than EXTENSION (even if there is space
-       to continue journaling), GT.M shuts off journaling for the
+       to continue journaling), YottaDB shuts off journaling for the
        corresponding database file or institutes and Instance Freeze.
 
-   In addition to checking for free space on the file system, GT.M also
+   In addition to checking for free space on the file system, YottaDB also
    attempts to write the JNLSPACELOW message to the operator log three times
    as a journal file reaches its maximum size. The first JNLSPACELOW message
    appears in the operator log when twice the number of EXTENSION blocks are
@@ -4583,8 +4576,8 @@
    disk space for the next generation journal files, the DSKSPACEFLOW message
    indicates that the available free disk space is low on the file system and
    requires immediate operator intervention to provide enough disk space to
-   allow GT.M to continue journaling. If GT.M cannot continue journaling, it
-   turns journaling off or freezes the system, depending on whether your
+   allow YottaDB to continue journaling. If YottaDB cannot continue journaling,
+   it turns journaling off or freezes the system, depending on whether your
    configuration has Instance Freeze enabled. Use a combination of
    ALLOCATION, AUTOSWITCHLIMIT, and EXTENSION values to setup a threshold
    point for triggering the JNLSPACELOW messages to the operator log. The
@@ -4592,11 +4585,11 @@
    include actions to ensure that adequate disk space is available for the
    next generations of the journal file.
 
-   With EXTENSION=0, GT.M checks for free space on the file system two times
+   With EXTENSION=0, YottaDB checks for free space on the file system two times
    - The first check happens when the journal file reaches the ALLOCATION
    size and second happens when the journal file reaches the maximum size
    (AUTOSWITCHLIMIT). If EXTENSION=AUTOSWITCHLIMIT, the check for free space
-   happens only once. With EXTENSION=0, GT.M writes the JNLSPACELOW message
+   happens only once. With EXTENSION=0, YottaDB writes the JNLSPACELOW message
    to the operator log only once when the journal file reaches its maximum
    size. This bypasses the operational aid that JNLSPACELOW messages may
    provide to help ensure that adequate disk space is available for the next
@@ -6891,8 +6884,8 @@
 
    Whenever the source and receiver server connect with each other, if the
    source server was started with a valid non-zero compression level, they
-   first determine whether the receiver server is running a version of GT.M
-   which handles compressed records and has been started with a non-zero
+   first determine whether the receiver server is running a version of YottaDB
+   or GT.M which handles compressed records and has been started with a non-zero
    compression level. Only if this is true, do they agree to use compressed
    journal records. They also verify with a test message that
    compression/decompression works correctly before sending any compressed
@@ -6911,82 +6904,32 @@
    **Note**
 
    If you plan to use the optional compression facility for replication, you
-   must provide the compression library. The GT.M interface for compression
+   must provide the compression library. The YottaDB interface for compression
    libraries accepts the zlib compression libraries without any need for
    adaptation. These libraries are included in many UNIX distributions and
-   are downloadable from the zlib home page. GT.M supports the use of the IBM
-   provided zlib library for AIX. If you prefer to use other compression
-   libraries, you need to configure or adapt them to provide the same API
-   provided by zlib. Simple instructions for compiling zlib on a number of
-   platforms follow. Although GT.M uses zlib, zlib is not FIS software and
-   FIS does not support zlib. These instructions are merely provided as a
-   convenience to you.
+   are downloadable from the zlib home page. If you prefer to use other
+   compression libraries, you need to configure or adapt them to provide the
+   same API provided by zlib. Simple instructions for compiling zlib on follow.
+   Although YottaDB uses zlib, zlib is not YottaDB software and YottaDB does not
+   support zlib. These instructions are merely provided as a convenience to you.
 
-<<<<<<< HEAD
-   If, in your environment, the same hostname is used for both IPv4 and IPv6,
-   YottaDB defaults to IPv6. If you wish to use IPv4, perhaps because you have a
-   Receiver Server running a pre-V6.0-003 version of YottaDB that does not
-   support IPv6, set the environment variable ydb_ipv4_only to "TRUE", "YES",
-   or a non-zero integer in order to force YottaDB to use IPv4.
-=======
-   If a package for zlib is available with your operating system, FIS
+   If a package for zlib is available with your operating system, YottaDB
    suggests that you use it rather than building your own.
-
-   AIX/XL compiler:
-
-   ./configure --shared
-   Add -q64 to the LDFLAGS line of the Makefile
-   make CFLAGS="-q64"
 
    Linux/gcc:
 
    ./configure --shared
    make CFLAGS="-m64"
 
-   z/OS:
-
-   Download the zlib 1.1.4 from the libpng project's download page on
-   SourceForge.com. Use a transfer mechanism that does not perform automatic
-   conversion to download a source tarball. If pax cannot read the archive,
-   it is a sign that the download mangled the archive. Use pax to unpack the
-   tarball, converting files from ASCII to EBCDIC.
-
-   pax -r -o setfiletag -ofrom=ISO8859-1,to=IBM-1047 -f zlib-1.1.4.tar.gz
-
-   Apply the following patch to the zlib 1.1.4 sources:
-
-   ---------------------------------- zlib_1.1.4_zos.patch
-   --------------------------------------------------diff -purN
-   downloads/zlib/src.orig/configure downloads/zlib/src/configure---
-   downloads/zlib/src.orig/configure Tue Dec 16 14:09:57 2008+++
-   downloads/zlib/src/configure Mon Feb 9 14:30:49 2009@@ -116,6 +116,11 @@
-   else SFLAGS=${CFLAGS-"-Kconform_pic -O"} CFLAGS=${CFLAGS-"-O"}
-   LDSHARED=${LDSHARED-"cc -G"};;+ OS/390*)+ CC=xlc+ SFLAGS=${CFLAGS-"-qascii
-   -q64 -Wc,DLL,LP64,XPLINK,EXPORTALL -D_ALL_SOURCE_NOTHREADS"}+
-   CFLAGS=${CFLAGS-"-qascii -q64 -Wc,DLL,LP64,XPLINK,EXPORTALL
-   -D_ALL_SOURCE_NOTHREADS"}+ LDSHARED=${LDSHARED-"xlc -qascii -q64
-   -Wl,dll,LP64,XPLINK "};; # send working options for other systems to
-   support@gzip.org *) SFLAGS=${CFLAGS-"-O"} CFLAGS=${CFLAGS-"-O"}
-
-   Build and install the zlib DLL, placing the xlc compilers in compatibility
-   to mode by setting the environment variable C89_CCMODE to 1. When not in
-   compatibility mode, xlc follows strict placement of command line options.
-   Configure and build the zlib software with ./configure --shared && make.
-   By default, the configure script places zlib in /usr/local/lib. Install
-   the software with make install. To ensure that GT.M finds zlib, include
-   /usr/local/lib in LIBPATH, the environment variable that provides a search
-   path for processes to use when they link DLLs.
-
-   By default, GT.M searches for the libz.so shared library in the standard
+   By default, YottaDB searches for the libz.so shared library in the standard
    system library directories (for example, /usr/lib, /usr/local/lib,
    /usr/local/lib64). If the shared library is installed in a non-standard
    location, before starting replication, you must ensure that the
-   environment variable $LIBPATH (AIX and z/OS) or $LD_LIBRARY_PATH (other
-   UNIX platforms) includes the directory containung the library. The Source
-   and Receiver Server link the shared library at runtime. If this fails for
-   any reason (such as file not found, or insufficient authorization), the
-   replication logic logs a DLLNOOPEN error and continues with no
-   compression.
+   environment variable $LD_LIBRARY_PATH includes the directory containing the
+   library. The Source and Receiver Server link the shared library at runtime.
+   If this fails for any reason (such as file not found, or insufficient
+   authorization), the replication logic logs a DLLNOOPEN error and continues
+   with no compression.
 
    -connectparams=<hard tries>,<hard tries period>, <soft tries
    period>,<alert time>,<heartbeat period><max heartbeat wait>
@@ -6996,7 +6939,6 @@
    broken or the Source Server fails to connect to the Receiver Server at
    startup, the Source Server applies these parameters to the reconnection
    attempts.
->>>>>>> 91552df2... GT.M V6.3-009
 
    First, the Source Server makes the number of connection attempts specified
    by the <hard tries> value every <hard tries period> milliseconds. Then,
@@ -7015,7 +6957,7 @@
    Specifies the size of the Journal Pool. The server rounds the size up or
    down to suit to align with other specified or implicit requirements. Any
    size less than 1 MiB is rounded up to 1 MiB. If you do not specify a
-   qualifier, the size defaults to the GT.M default value of 64 MiB. Remember
+   qualifier, the size defaults to the YottaDB default value of 64 MiB. Remember
    that you cannot exceed the system-provided maximum shared memory. For
    systems with high update rates, specify a larger buffer size to avoid the
    overflows and file I/O that occur when the Source Server reads journal
@@ -7052,20 +6994,7 @@
 
    -log_interval=0 sets the logging interval to the default value.
 
-<<<<<<< HEAD
-   -buffsize=<Journal Pool size in bytes>
-
-   Specifies the size of the Journal Pool. The server rounds the size up or
-   down to suit its needs. Any size less than 1 MiB is rounded up to 1 MiB.
-   If you do not specify a qualifier, the size defaults to the YottaDB default
-   value of 64 MiB. Remember that you cannot exceed the system-provided
-   maximum shared memory. For systems with high update rates, specify a
-   larger buffer size to avoid the overflows and file I/O that occur when the
-   Source Server reads journal records from journal files. The maximum value
-   is 4294967288(4GiB-8).
-=======
    Replication Filter Qualifiers:
->>>>>>> 91552df2... GT.M V6.3-009
 
    -filter=<filter command>
 
@@ -7076,11 +7005,7 @@
    filter stream passes to the replicating instance. If the filter program is
    an M program with entry-ref OLD2NEW^FILTER, specify the following path:
 
-<<<<<<< HEAD
    filter='"'$ydb_dist'/mumps -run OLD2NEW^FILTER"'
-=======
-   filter='"$gtm_dist/mumps -run OLD2NEW^FILTER"'
->>>>>>> 91552df2... GT.M V6.3-009
 
    Write the filter as a UNIX process that takes its input from STDIN and
    writes its output to STDOUT.
@@ -7100,17 +7025,11 @@
    Example:
 
    extfilter
-<<<<<<< HEAD
-     ; A command like mupip replic -source -start -buffsize=$buffsize
-     ;-instsecondary=$secondary_instance -secondary=$IP_Address:$portno
-     ;-filter='"'$ydb_dist'/mumps -run OLD2NEW^extfilter"' -log=$SRC_LOG_FILE
-     ;deploys this filter on the Source Server.
-=======
      ; A command like the following deploys this filter on the Receiver Server:
-     ; export gtmfilter=""$gtm_dist/mumps -run ^extfilter""
-     ; $gtm_dist/mupip replic -receiver -start -buffsize=$gtm_buffsize
+     ; export ydb_filter=""$ydb_dist/mumps -run ^extfilter""
+     ; $ydb_dist/mupip replic -receiver -start -buffsize=$buffsize
      ;-listenport=$portno
-     ;-filter=$gtmfilter -log=$REC_LOG_FILE
+     ;-filter=$ydb_filter -log=$REC_LOG_FILE
      ; deploys this demo filter on the Receiver Server.
      ;
      ; This program is a simple filter program that receives journal records
@@ -7120,12 +7039,11 @@
      ;
      ; Do not use this filter program as-is in a production environment.
      ; While writing filter programs ensure that your programming logic never
-     ; exposes non-public information (NPI) stored in GT.M local variables
+     ; exposes non-public information (NPI) stored in YottaDB local variables
      ; and global variables. You should take additional care about
      ; managing and sharing GTM_FATAL_ERROR.ZSHOW_DMP_*.txt
      ; and core dump files that may contain NPI.
      new TSTART,TCOMMIT,EOT,EOL,log,extrRec,filtrOut,cntr,tmp,rectype,max
->>>>>>> 91552df2... GT.M V6.3-009
      set $ztrap="goto err"
      set TSTART="08"
      set TCOMMIT="09"
@@ -7170,18 +7088,11 @@
      halt
 
    This example reads logical database updates associated with a transaction
-<<<<<<< HEAD
-   from STDIN and writes them to log.out and STDOUT just like the UNIX tee
-   command. It runs on YottaDB V5.5-000 where it is no longer required to treat
-   filter output as a transaction. To run this example on a pre-YottaDB V5.5-000
-   version, replace the line:
-=======
    from STDIN and writes them to a filter log (if filterlog environment
    variable is defined) and STDOUT just like the UNIX tee command. It runs on
-   GT.M V5.5-000 where it is no longer required to treat filter output as a
-   transaction. To run this example on a pre-GT.M V5.5-000 version, replace
-   the line:
->>>>>>> 91552df2... GT.M V6.3-009
+   GT.M V5.5-000 and YottaDB where it is no longer required to treat filter
+   output as a transaction. To run this example on a pre-GT.M V5.5-000 version,
+   replace the line:
 
    .. if rectype'=TSTART set filtrOut=extrRec_EOL
 
@@ -7191,95 +7102,7 @@
 
    to wrap mini-transactions in 08 09.
 
-<<<<<<< HEAD
-   -freeze[=on|off] -[no]comment[='"<string>"']
-
-   Promptly sets or clears an Instance Freeze on an instance irrespective of
-   whether a region is enabled for an Instance Freeze. -freeze with no
-   arguments displays the current state of the Instance Freeze on the
-   instance.
-
-   -[no]comment[='"<string>"'] allows specifying a comment/reason associated
-   with an Instance Freeze. Specify -nocomment if you do not wish to specify
-   a comment/reason.
-
-   -connectparams=<hard tries>,<hard tries period>, <soft tries
-   period>,<alert time>,<heartbeat period><max heartbeat wait>
-
-   Specifies the connection retry parameters. If the connection between the
-   Source and Receiver Servers is broken or the Source Server fails to
-   connect to the Receiver Server at startup, the Source Server applies these
-   parameters to the reconnection attempts.
-
-   First, the Source Server makes the number of reconnection attempts
-   specified by the <hard tries> value every <hard tries period>
-   milliseconds. Then, the Source Server attempts reconnection every <soft
-   tries period> seconds and logs an alert message every <alert time>
-   seconds. If the specified <alert time> value is less than <hard
-   tries>*<hard tries period>/1000 + lt;soft tries period>, it is set to the
-   larger value. The Source Server sends a heartbeat message to the Receiver
-   Server every <heartbeat period> seconds and expects a response back from
-   the Receiver Server within <max heartbeat wait> seconds.
-
-   -instsecondary
-
-   Identifies the replicating instance to which the Source Server replicates
-   data.
-
-   With no -instsecondary specified, the Source Server uses the environment
-   variable ydb_repl_instsecondary for the name of the replicating instance.
-
-   With no -instsecondary specified and environment variable
-   ydb_repl_instsecondary not set, mupip replicate -source -checkhealth looks
-   at all the Source Servers (Active or Passive) that are alive and running
-   and those that were abnormally shutdown (kill -9ed). Any Source Server
-   that was kill -15ed or MUPIP STOPped is ignored because YottaDB considers
-   those Source Server shut down in the normal way. This command reports
-   something only if it finds at least one Source Server that is alive and
-   running or was abnormally shutdown (kill -9ed). Otherwise it returns a
-   zero (0) status without anything to report even when the Journal Pool
-   exists and YottaDB processes (Update Process or Receiver Server on the
-   replicating instance) are up and running.
-
-   You can start multiple Source Servers from the same originating instance
-   as long as each of them specifies a different name for -instsecondary.
-
-   Specify -instsecondary explicitly (by providing a value) or implicitly
-   (through the environment variable ydb_repl_instsecondary) even for
-   starting a Passive Source Server. Whenever it activates, a Passive Source
-   Server connects to this replicating instance.
-
-   Example:
-
-   $ mupip replicate -source -start -buffsize=$gtm_buffsize -secondary=localhost:1234 -log=A2B.log -instsecondary=B
-
-   This command starts the Source Server for the originating instance with
-   instance B as its replicating instance.
-
-   -[no]jnlfileonly
-
-   Forces the Source Server to read transactions from journal files instead
-   of journal pool shared memory. When combined with the SYNC_IO journal
-   option, this feature delays replication of transactions until their
-   journal records are hardened to disk. This may be useful when replicating
-   to a supplementary instance, as a crash and rollback on the primary could
-   otherwise necessitate a rollback of local updates on the receiving
-   instance. The default is -NOJNLFILEONLY.
-
-   -rootprimary
-
-   Assign the current instance as the originating instance. You can specify
-   -rootprimary either explicitly or implicitly to start an instance as an
-   originating instance.
-
-   -updok
-
-   Instructs the Source Server to allow local updates on this instance. This
-   is a synonym for -rootprimary but is named so it better conveys its
-   purpose.
-=======
    Primary Role Qualifiers:
->>>>>>> 91552df2... GT.M V6.3-009
 
    -propagate[primary]
 
@@ -7328,20 +7151,10 @@
 
    **Note**
 
-<<<<<<< HEAD
-   Before starting replication, always remember to rundown every replicated
-   database region then start the Source Server.
-
-   **Important**
-
-   YottaDB updates to replicated regions are permitted only on the originating
-   instance and disabled on ALL other replicating instances.
-=======
      o Before starting replication, always remember to rundown every
        replicated database region then start the Source Server.
-     o GT.M updates to replicated regions are permitted only on the
+     o YottaDB updates to replicated regions are permitted only on the
        originating instance and disabled on ALL other replicating instances.
->>>>>>> 91552df2... GT.M V6.3-009
 
    The Source Server records actions and errors in A2B.log. It also
    periodically record statistics such as the current backlog, the number of
@@ -7361,45 +7174,7 @@
    This is a synonym for -propagateprimary but is named so it better conveys
    its purpose.
 
-<<<<<<< HEAD
-   -cmplvl=n
-
-   Specifies the desired compression level for the replication stream. n is a
-   positive integer value indicating the level of compression desired. Level
-   0 offers no compression. Level 1 offers the least compression while Level
-   9 (as of version 1.2.3.3 of the zlib library) offers the most compression
-   (at the cost of the most CPU usage). Specifying -cmplvl without an
-   accompanying -start produces an error. In the case of the source server,
-   if N specifies any value outside of the range accepted by the zlib library
-   or if -cmplvl is not specified, the compression level defaults to zero
-   (0). In the case of the receiver server, as long as N is non-zero the
-   decompression feature is enabled; since the source server setting
-   determines the actual level, any legal non-zero value enables compressed
-   operation at the receiver.
-
-   Alternatively, the environment variable ydb_zlib_cmp_level can specify the
-   desired compression level (in the same value range as N above) and the
-   source server can then be started without -cmplvl. This has the same
-   effect as starting it with -cmplvl specified. An explicitly specified
-   value on the command line overrides any value specified by the environment
-   variable.
-
-   Whenever the source and receiver server connect with each other, if the
-   source server was started with a valid non-zero compression level, they
-   first determine whether the receiver server is running a version of YottaDB
-   which handles compressed records and has been started with a non-zero
-   compression level. Only if this is true, do they agree to use compressed
-   journal records. They also verify with a test message that
-   compression/decompression works correctly before sending any compressed
-   journal data across. They automatically fall back to uncompressed mode of
-   transmission if this test fails or if, at any point, either side detects
-   that compression or decompression has failed. That is, any runtime error
-   in the compression/decompression logic results in uncompressed replication
-   (thereby reducing replication throughput) but never jeopardizes the
-   functional health of replication.
-=======
    -updok
->>>>>>> 91552df2... GT.M V6.3-009
 
    Instructs the Source Server to allow local updates on this instance. This
    is a synonym for -rootprimary but is named so it better conveys its
@@ -7407,24 +7182,6 @@
 
    Secondary Identification Qualifiers:
 
-<<<<<<< HEAD
-   If you plan to use the optional compression facility for replication, you
-   must provide the compression library. The YottaDB interface for compression
-   libraries accepts the zlib compression libraries without any need for
-   adaptation. These libraries are included in many UNIX distributions and
-   are downloadable from the zlib home page. YottaDB supports the use of the IBM
-   provided zlib library for AIX. If you prefer to use other compression
-   libraries, you need to configure or adapt them to provide the same API
-   provided by zlib. Simple instructions for compiling zlib on a number of
-   platforms follow. Although YottaDB uses zlib, zlib is not YottaDB software and
-   YottaDB does not support zlib. These instructions are merely provided as a
-   convenience to you.
-
-   If a package for zlib is available with your operating system, YottaDB
-   suggests that you use it rather than building your own.
-
-   Linux/gcc:
-=======
    -instsecondary
 
    Specifies the replicating instance to which the Source Server replicates
@@ -7439,35 +7196,22 @@
    gtm_repl_instsecondary not set, mupip replicate -source -checkhealth looks
    at all the Source Servers (Active or Passive) that are alive and running
    and those that were abnormally shutdown (say by a kill -9). Any Source
-   Server that was kill -15ed or MUPIP STOPped is ignored because GT.M
+   Server that was kill -15ed or MUPIP STOPped is ignored because YottaDB
    considers those Source Server shut down in the normal way. This command
    reports something only if it finds at least one Source Server that is
    alive and running or was abnormally shutdown. Otherwise it returns a zero
    (0) status without anything to report even when the Journal Pool exists
-   and GT.M processes (Update Process or Receiver Server on the replicating
+   and YottaDB processes (Update Process or Receiver Server on the replicating
    instance) are up and running.
 
    You can start multiple Source Servers from the same originating instance
    as long as each of them specifies a different name for -instsecondary.
->>>>>>> 91552df2... GT.M V6.3-009
 
    Specify -instsecondary explicitly (by providing a value) or implicitly
    (through the environment variable gtm_repl_instsecondary) even for
    starting a Passive Source Server. Whenever it activates, a Passive Source
    Server connects to this replicating instance.
 
-<<<<<<< HEAD
-   By default, YottaDB searches for the libz.so shared library in the standard
-   system library directories (for example, /usr/lib, /usr/local/lib,
-   /usr/local/lib64). If the shared library is installed in a non-standard
-   location, before starting replication, you must ensure that the
-   environment variable $LIBPATH (AIX and z/OS) or $LD_LIBRARY_PATH (other
-   UNIX platforms) includes the directory containung the library. The Source
-   and Receiver Server link the shared library at runtime. If this fails for
-   any reason (such as file not found, or insufficient authorization), the
-   replication logic logs a DLLNOOPEN error and continues with no
-   compression.
-=======
    Example:
 
    $ mupip replicate -source -start -buffsize=$gtm_buffsize -secondary=localhost:1234 -log=A2B.log -instsecondary=B
@@ -7484,13 +7228,12 @@
    waiting for a connection.
 
    If, in your environment, the same hostname is used for both IPv4 and IPv6,
-   GT.M defaults to IPv6. If you wish to use IPv4, perhaps because you have a
-   Receiver Server running a pre-V6.0-003 version of GT.M that does not
+   YottaDB defaults to IPv6. If you wish to use IPv4, perhaps because you have a
+   Receiver Server running a pre-V6.0-003 version of YottaDB that does not
    support IPv6, set the environment variable gtm_ipv4_only to "TRUE", "YES",
-   or a non-zero integer in order to force GT.M to use IPv4.
+   or a non-zero integer in order to force YottaDB to use IPv4.
 
    TLS Replication Qualifiers:
->>>>>>> 91552df2... GT.M V6.3-009
 
    -tlsid=<label>
 
@@ -8180,7 +7923,7 @@
    started with -UPDNOTOK (updates are disabled) produces a
    NORESYNCUPDATERONLY error. Note also that the noresync qualifier is not
    the opposite of the resync qualifier of rollback (mupip journal -rollback
-   -resync), which is intended for use under the direction of FIS GT.M
+   -resync), which is intended for use under the direction of YottaDB
    support.
 
    SI Replication Qualifiers:
@@ -8232,24 +7975,7 @@
    number for the current source connection (erasing any record of the older
    Group using the same stream number).
 
-<<<<<<< HEAD
-   -noresync
-
-   Instructs the Receiver Server to accept a SI replication stream even when
-   the receiver is ahead of the source. In this case, the source and receiver
-   servers exchange history records from the replication instance file to
-   determine the common journal stream sequence number and replication
-   resumes from that point onwards. Specifying -noresync on a BC replication
-   stream is produces a NORESYNCSUPPLONLY error. Specifying -noresync on a SI
-   replication stream receiver server where the receiving instance was
-   started with -UPDNOTOK (updates are disabled) produces a
-   NORESYNCUPDATERONLY error. Note also that the noresync qualifier is not
-   the opposite of the resync qualifier of rollback (mupip journal -rollback
-   -resync), which is intended for use under the direction of YottaDB
-   support.
-=======
    TLS Replication Qualifiers:
->>>>>>> 91552df2... GT.M V6.3-009
 
    -tlsid=<label>
 
@@ -8478,7 +8204,7 @@
    file containing the unreplicated updates for the organization to
    reconcile. After the reconcilation (or rejection as the case may be) of
    the lost transaction file, run MUPIP REPLICATE -SOURCE -LOSTTNCOMPLETE to
-   provide confirmation to GT.M that you have applied the lost transaction
+   provide confirmation to YottaDB that you have applied the lost transaction
    file. For -FETCHRESYNC to work on the replicating instance, you need to
    ensure that an active Source Server is running on the replication
    source/originating instance.
@@ -8511,7 +8237,7 @@
      o If you have broken transactions, they may have appeared due to system
        failures that occurred during processing. Do not reconcile these
        transactions as they are not considered to be committed.
-     o In your Receiver Server startup scripts, FIS recommends placing MUPIP
+     o In your Receiver Server startup scripts, YottaDB recommends placing MUPIP
        JOURNAL -ROLLBACK -BACKWARD -ONLINE -FETCHRESYNC after starting the
        passive Source Server but before starting the Receiver Server.
      o Stopping a ROLLBACK operation before it completes or losing the TCP
@@ -9243,14 +8969,7 @@ Example:
 
    **Note**
 
-<<<<<<< HEAD
    This help file is a concise representation of the revision r1.30 of the
    Administration and Operations Guide. To obtain a copy of the current
    revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
-=======
-   This help file is a concise representation of revision V6.3-009 of the
-   UNIX Administration and Operations Guide. To obtain a copy of the current
-   revision, go to www.fis-gtm.com and then click on the User Documentation
-   tab.
->>>>>>> 91552df2... GT.M V6.3-009
 

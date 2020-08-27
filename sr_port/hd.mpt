@@ -3,7 +3,7 @@
 ; Copyright (c) 1987-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -17,29 +17,23 @@
 	; invoke at FUNC as an extrinsic function
 	; if you make heavy use of this routine, consider an external call.
 	;
-<<<<<<< HEAD
-	s %HD=$$FUNC(%HD)
-	q
-INT	r !,"Hexadecimal: ",%HD s %HD=$$FUNC(%HD)
-	q
-FUNCFM(h)
-	n c,d,dg
-	s d=0,h=$tr(h,"abcdef","ABCDEF")
-	f c=1:1:$l(h) s dg=$f("0123456789ABCDEF",$e(h,c)) q:'dg  s d=(d*16)+(dg-2)
-	q d
+	set %HD=$$FUNC(%HD)
+	quit
+INT	read !,"Hexadecimal: ",%HD set %HD=$$FUNC(%HD)
+	quit
 FUNC(h)
-	new max s max="ffffffffffffffff"
-	quit:"-"=$ze(h,1) ""
-	new d set d=$ze(h,1,2) set:("0x"=d)!("0X"=d) h=$ze(h,3,$zlength(h))
-	new fval set fval=$zextract(h,1)	; first value
-	set:fval="0" h=$$VALIDVAL(h)	; removing leading zero's if present
+	new max set max="ffffffffffffffff"
+	quit:"-"=$zextract(h,1) ""
+	new d set d=$zextract(h,1,2) set:("0x"=d)!("0X"=d) h=$zextract(h,3,$zlength(h))
+	new fval set fval=$zextract(h,1) ; first value
+	set:fval="0" h=$$VALIDVAL(h) ; removing leading zero's if present
 	; Input greater than max hex value is handled by M implementation.
 	; As max value has lowercase f which is higher in ascii value, f or F doesnt make a difference in max comparison.
 	; Conversion from lower to upper is done in the else part as required by M implementation.
-	if (($l(h)<16)!(($l(h)=16)&(h']max))) do
-        . set d=$ZCONVERT(h,"HEX","DEC")
+	if (($length(h)<16)!(($length(h)=16)&(h']max))) do
+        . set d=$zconvert(h,"HEX","DEC")
 	else  do
-	. set h=$tr(h,"abcdef","ABCDEF")
+	. set h=$translate(h,"abcdef","ABCDEF")
 	. set d=$$CONVERTBASE^%CONVBASEUTIL(h,16,10)
 	quit d
 ; This routine removes any leading zero's in the input
@@ -50,19 +44,6 @@ VALIDVAL(val)
         for i=1:1:$zlength(val)  do  quit:inv=1
         . set res=$zextract(val,i)
         . set:res'=0 inv=1
-        . q:inv=1
+        . quit:inv=1
         set:res'=0 res=$extract(val,i,$zlength(val))
         quit res
-=======
-	set %HD=$$FUNC(%HD)
-	quit
-INT	read !,"Hexidecimal: ",%HD set %HD=$$FUNC(%HD)
-	quit
-FUNC(h)
-	quit:"-"=$extract(h) ""		; 0>h risks NUMOFLOW
-	new c,d,dg,l
-	set d=0,h=$translate(h,"abcdef","ABCDEF"),l=$length(h)
-	if (15>l) for c=1:1:l set dg=$find("0123456789ABCDEF",$extract(h,c)) quit:'dg  set d=(d*16)+(dg-2)
-	else  quit $$CONVERTBASE^%CONVBASEUTIL(h,16,10)
-	quit d
->>>>>>> 91552df2... GT.M V6.3-009

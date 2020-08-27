@@ -76,7 +76,6 @@ void alloc_reg(void)
 		opc = x->opcode;
 		switch (opc)
 		{
-<<<<<<< HEAD
 		case OC_NOOP:
 		case OC_PARAMETER:
 			continue;
@@ -114,87 +113,6 @@ void alloc_reg(void)
 				tempcont[TVAL_REF][c] = 0;	/* prevent leaking TVAL temps */
 			}
 			if (OC_LINESTART == opc)
-=======
-			case OC_NOOP:
-			case OC_PARAMETER:
-				continue;
-			case OC_LINESTART:
-				/* If the next triple is also a LINESTART, then this is a comment line.
-				 * Therefore eliminate this LINESTART
-				 */
-				opx = x->exorder.fl->opcode;
-				if ((OC_LINESTART == opx) || (OC_LINEFETCH == opx))
-				{
-					x->opcode = OC_NOOP;
-					COMPDBG(PRINTF("   ** Converting triple to NOOP (rsn 1) **\n"););
-					continue;	/* continue, because 'normal' NOOP continues from this switch */
-				}
-				/* There is a special case in the case of NOLINE_ENTRY being specified. If a blank line is followed
-				 * by a line with a label and that label generates fetch information, the generated triple sequence
-				 * will be LINESTART (from blank line), ILIT (count from PREVIOUS fetch), LINEFETCH. We will detect
-				 * that sequence here and change the LINESTART to a NOOP.
-				 */
-				if (!(cmd_qlf.qlf & CQ_LINE_ENTRY) && (OC_ILIT == opx) && (NULL != x->exorder.fl->exorder.fl)
-				    && (OC_LINEFETCH == x->exorder.fl->exorder.fl->opcode))
-				{
-					x->opcode = OC_NOOP;
-					COMPDBG(PRINTF("   ** Converting triple to NOOP (rsn 2) **\n"););
-					continue;	/* continue, because 'normal' NOOP continues from this switch */
-				}				/* WARNING else fallthrough */
-			case OC_LINEFETCH:
-				/* this code is a sad hack - it used to assert that there was no temp leak, but in non-short-circuit
-				 * mode there can be a leak, we weren't finding it and the customers were justifiably impatient
-				 * so the following code now makes the leak go away
-				 */
-				for (c = temphigh[TVAL_REF]; 0 <= c; c--)
-				{
-					assert((GTM_BOOL != TREF(gtm_fullbool)) || (0 == tempcont[TVAL_REF][c]));
-					tempcont[TVAL_REF][c] = 0;	/* prevent leaking TVAL temps */
-				}
-				if (OC_LINESTART == opc)
-					break;			/* WARNING else fallthrough */
-			case OC_FETCH:
-				assert((TRIP_REF == x->operand[0].oprclass) && (OC_ILIT == x->operand[0].oprval.tref->opcode));
-				if (x->operand[0].oprval.tref->operand[0].oprval.ilit == mvmax)
-				{
-					x->operand[0].oprval.tref->operand[0].oprval.ilit = 0;
-					x->operand[1].oprclass = NO_REF;
-				}
-				break;
-			case OC_STO:
-				/* If we are storing a literal e.g. s x="hi", don't call op_sto, because we do not
-				 * need to check if the literal is defined.  OC_STOLIT will be an in-line copy.
-				 * Bypass this if we have been requested to not do inline literals.
-				 */
-				if ((cmd_qlf.qlf & CQ_INLINE_LITERALS) && (TRIP_REF == x->operand[1].oprclass)
-				    && (OC_LIT == x->operand[1].oprval.tref->opcode))
-					opc = x->opcode = OC_STOLIT;
-				break;
-			case OC_EQU:
-				/* Check to see if the operation is a x="" or a ""=x, if so (and this is a very common case)
-				 * use special opcode OC_EQUNUL, which takes one argument and just checks length for zero
-				 */
-				if ((TRIP_REF == x->operand[0].oprclass) && (OC_LIT == x->operand[0].oprval.tref->opcode)
-				    && (0 == x->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len))
-				{
-					x->operand[0] = x->operand[1];
-					x->operand[1].oprclass = NO_REF;
-					opc = x->opcode = OC_EQUNUL;
-				} else if ((TRIP_REF == x->operand[1].oprclass) && (OC_LIT == x->operand[1].oprval.tref->opcode)
-					   && (0 == x->operand[1].oprval.tref->operand[0].oprval.mlit->v.str.len))
-				{
-					x->operand[1].oprclass = NO_REF;
-					opc = x->opcode = OC_EQUNUL;
-				}
-				break;
-			case OC_GVSAVTARG:
-				if (x->backptr.que.fl == &x->backptr)
-				{	/* jmp_opto removed all associated OC_GVRECTARGs - must get rid of this OC_GVSAVTARG */
-					opc = x->opcode = OC_NOOP;
-					assert((NO_REF == x->operand[0].oprclass) && (NO_REF == x->operand[1].oprclass));
-				}				/* WARNING fallthrough */
-			default:
->>>>>>> 91552df2... GT.M V6.3-009
 				break;
 		case OC_FETCH:
 			assert((TRIP_REF == x->operand[0].oprclass) && (OC_ILIT == x->operand[0].oprval.tref->opcode));
@@ -213,6 +131,12 @@ void alloc_reg(void)
 			    && (OC_LIT == x->operand[1].oprval.tref->opcode))
 				opc = x->opcode = OC_STOLIT;
 			break;
+		case OC_GVSAVTARG:
+			if (x->backptr.que.fl == &x->backptr)
+			{	/* jmp_opto removed all associated OC_GVRECTARGs - must get rid of this OC_GVSAVTARG */
+				opc = x->opcode = OC_NOOP;
+				assert((NO_REF == x->operand[0].oprclass) && (NO_REF == x->operand[1].oprclass));
+			}				/* WARNING fallthrough */
 		default:
 			break;
 		}

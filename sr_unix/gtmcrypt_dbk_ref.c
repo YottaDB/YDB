@@ -427,11 +427,7 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
 			{
 				if (isautodb)
 				{	/* Append EXT_NEW to see if this a matching AutoDB */
-<<<<<<< HEAD
 					SNPRINTF(lcl_key_name_buff, SIZEOF(lcl_key_name_buff), "%s%s", curr->key_name, EXT_NEW);
-=======
-					SNPRINTF(lcl_key_name_buff, GTM_PATH_MAX, "%s%s", curr->key_name, EXT_NEW);
->>>>>>> 91552df2... GT.M V6.3-009
 					lcl_key_name = lcl_key_name_buff;
 				} else
 					lcl_key_name = curr->key_name;
@@ -924,17 +920,10 @@ STATICFNDEF void insert_unresolved_key_link(char *keyname, char *keypath, int in
 	gtm_keystore_unres_key_link_t *node;
 
 	node = (gtm_keystore_unres_key_link_t *)MALLOC(SIZEOF(gtm_keystore_unres_key_link_t));
-<<<<<<< HEAD
 	memset(node->key_name, 0, YDB_PATH_MAX);
 	SNPRINTF(node->key_name, SIZEOF(node->key_name), "%s", keyname);
 	memset(node->key_path, 0, YDB_PATH_MAX);
 	SNPRINTF(node->key_path, SIZEOF(node->key_path), "%s", keypath);
-=======
-	memset(node->key_name, 0, GTM_PATH_MAX);
-	strncpy(node->key_name, keyname, GTM_PATH_MAX - 1);	/* Callers verified that the name fits in GTM_PATH_MAX */
-	memset(node->key_path, 0, GTM_PATH_MAX);
-	strncpy(node->key_path, keypath, GTM_PATH_MAX - 1);	/* Callers verified that the path fits in GTM_PATH_MAX */
->>>>>>> 91552df2... GT.M V6.3-009
 	node->next = keystore_by_unres_key_head;
 	node->index = index;
 	node->status = status;

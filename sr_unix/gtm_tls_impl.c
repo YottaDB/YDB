@@ -1322,16 +1322,11 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			session_id_len = session_id_len / 2;		/* bytes */
 		} else
 		{
-<<<<<<< HEAD
-			SNPRINTF((char *)session_id_string, SIZEOF(session_id_string), "%s", id);	/* default to tlsid */
-			session_id_len = STRLEN((char *)session_id_string);
-=======
 			session_id_len = STRLEN(id);
-			if (SSL_MAX_SSL_SESSION_ID_LENGTH <= session_id_len)
-				session_id_len = SSL_MAX_SSL_SESSION_ID_LENGTH - 1;
+			if (SIZEOF(session_id_string) <= session_id_len)
+				session_id_len = SIZEOF(session_id_string) - 1;
 			memcpy((char *)session_id_string, id, session_id_len);		/* default to tlsid */
 			session_id_string[session_id_len] = '\0';
->>>>>>> 91552df2... GT.M V6.3-009
 		}
 		if (0 >= SSL_set_session_id_context(ssl, (const unsigned char *)session_id_string, (unsigned int)session_id_len))
 		{

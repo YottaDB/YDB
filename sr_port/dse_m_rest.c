@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2009 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 91552df2... GT.M V6.3-009
+ *								*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,10 +71,7 @@ void dse_m_rest (
 	int4		bml_index;
 	short		level, rsize;
 	int4		bplmap;
-<<<<<<< HEAD
 
-=======
->>>>>>> 91552df2... GT.M V6.3-009
 	if(!(bp = t_qread (blk, &dummy_int, &dummy_cr)))
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
@@ -89,20 +82,12 @@ void dse_m_rest (
 		b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
 	level = ((blk_hdr_ptr_t)bp)->levl;
 	bplmap = cs_addrs->hdr->bplmap;
-<<<<<<< HEAD
 	for (rp = bp + SIZEOF(blk_hdr); rp < b_top; rp = r_top)
 	{
 		if (in_dir_tree || level > 1)	/* reread block because it may have been flushed from read	*/
 		{
 			if (!(np = t_qread(blk, &dummy_int, &dummy_cr))) /* cache due to LRU buffer scheme and reads in recursive */
-				rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);	/* calls to dse_m_rest.	*/
-=======
-
-	for (rp = bp + SIZEOF(blk_hdr); rp < b_top ;rp = r_top)
-	{	if (in_dir_tree || level > 1)	/* reread block because it may have been flushed from read	*/
-		{	if (!(np = t_qread(blk,&dummy_int,&dummy_cr))) /* cache due to LRU buffer scheme and reads in recursive */
 				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);	/* calls to dse_m_rest.	*/
->>>>>>> 91552df2... GT.M V6.3-009
 			if (np != bp)
 			{
 				b_top = np + (b_top - bp);

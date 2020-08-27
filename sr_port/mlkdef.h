@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,8 +52,8 @@ MBSTART {											\
 	HASH128_STATE_INIT(STATEVAR, (PVTBLK)->hash_seed);					\
 } MBEND
 #define MLK_SUBHASH_INIT_PVTCTL(PVTCTL, STATEVAR)	HASH128_STATE_INIT(STATEVAR, (PVTCTL)->ctl->hash_seed)
-#define MLK_SUBHASH_INGEST(STATEVAR, DATA, SIZE)	gtmmrhash_128_ingest(&(STATEVAR), (DATA), (SIZE))
-#define MLK_SUBHASH_FINALIZE(STATEVAR, LENGTH, RESVAR)	gtmmrhash_128_result(&(STATEVAR), LENGTH, &(RESVAR))
+#define MLK_SUBHASH_INGEST(STATEVAR, DATA, SIZE)	ydb_mmrhash_128_ingest(&(STATEVAR), (DATA), (SIZE))
+#define MLK_SUBHASH_FINALIZE(STATEVAR, LENGTH, RESVAR)	ydb_mmrhash_128_result(&(STATEVAR), LENGTH, &(RESVAR))
 #define MLK_SUBHASH_RES_VAL(RES)			((mlk_subhash_val_t)(RES).one)
 
 typedef struct				/* lock node.  The member descriptions below are correct if the entry
@@ -311,7 +311,6 @@ MBSTART {													\
 #define MLK_PVTBLK_SUBHASH(PVTBLK, N)												\
 		(((mlk_subhash_val_t *)&(PVTBLK)->value[ROUND_UP((PVTBLK)->nref_length, SIZEOF(mlk_subhash_val_t))])[N])
 
-<<<<<<< HEAD
 #ifdef DEBUG
 # define	DBG_LOCKHASH_N_BITS(HASH)						\
 {											\
@@ -330,35 +329,6 @@ MBSTART {													\
 		 */									\
 		if (0 == HASH)								\
 			HASH = 1;							\
-=======
-/* populate hash data from nref data - keep in sync with the versions in mlk_pvtblk_create() and mlk_shrhash_delete() */
-#define MLK_PVTBLK_SUBHASH_GEN(PVTBLK)							\
-MBSTART {										\
-	unsigned char		*cp;							\
-	int			hi;							\
-	mlk_subhash_state_t	accstate, tmpstate;					\
-	mlk_subhash_res_t	hashres;						\
-											\
-	MLK_SUBHASH_INIT(PVTBLK, accstate);						\
-	for (cp = (PVTBLK)->value, hi = 0; hi < (PVTBLK)->subscript_cnt; hi++)		\
-	{										\
-		MLK_SUBHASH_INGEST(accstate, cp, *cp + 1);				\
-		cp += *cp + 1;								\
-		tmpstate = accstate;							\
-		MLK_SUBHASH_FINALIZE(tmpstate, (cp - (PVTBLK)->value), hashres);	\
-		MLK_PVTBLK_SUBHASH(PVTBLK, hi) = MLK_SUBHASH_RES_VAL(hashres);		\
-	}										\
-} MBEND
-
-/* ensure that the seed is correct before using pvtblk hashes */
-#define MLK_PVTBLK_SUBHASH_SYNC(PVTBLK)							\
-MBSTART {										\
-	assert(NULL != (PVTBLK)->pvtctl.ctl);						\
-	if ((PVTBLK)->hash_seed != (PVTBLK)->pvtctl.ctl->hash_seed)			\
-	{										\
-		MLK_PVTBLK_SUBHASH_GEN(PVTBLK);						\
-		assert((PVTBLK)->hash_seed == (PVTBLK)->pvtctl.ctl->hash_seed);		\
->>>>>>> 91552df2... GT.M V6.3-009
 	}										\
 }
 #else
@@ -383,6 +353,17 @@ MBSTART {													\
 		DBG_LOCKHASH_N_BITS(hashres.one);								\
 		MLK_PVTBLK_SUBHASH(PVTBLK, hi) = (uint4)hashres.one;						\
 	}													\
+} MBEND
+
+/* ensure that the seed is correct before using pvtblk hashes */
+#define MLK_PVTBLK_SUBHASH_SYNC(PVTBLK)							\
+MBSTART {										\
+	assert(NULL != (PVTBLK)->pvtctl.ctl);						\
+	if ((PVTBLK)->hash_seed != (PVTBLK)->pvtctl.ctl->hash_seed)			\
+	{										\
+		MLK_PVTBLK_SUBHASH_GEN(PVTBLK);						\
+		assert((PVTBLK)->hash_seed == (PVTBLK)->pvtctl.ctl->hash_seed);		\
+	}										\
 } MBEND
 
 /* compute the address immediately after the pvtblk */

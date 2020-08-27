@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,11 +39,9 @@ void op_zstep(uint4 code, mval *action)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-<<<<<<< HEAD
 	if ((0 < gtm_trigger_depth) && RESTRICTED(trigger_mod))
-=======
+		return;
 	if (neterr_pending || outofband || iott_write_error)
->>>>>>> 91552df2... GT.M V6.3-009
 		return;
 	if (!action)
 		zstep_action = TREF(dollar_zstep);
@@ -62,15 +60,6 @@ void op_zstep(uint4 code, mval *action)
 			break;
 		case ZSTEP_OVER:
 		case ZSTEP_OUTOF:
-<<<<<<< HEAD
-			for (fp = frame_pointer; fp ; fp = fp->old_frame_pointer)
-			{
-				if (fp->type & SFT_COUNT)
-					break;
-			}
-			zstep_level = (unsigned char *) fp;
-			if (!neterr_pending && 0 == outofband && 0 == iott_write_error)
-=======
 
 			for (fp = frame_pointer; fp && !(fp->type & SFT_COUNT); fp = fp->old_frame_pointer)
 				; /* don't place in a non VM frame if we are in one */
@@ -82,7 +71,6 @@ void op_zstep(uint4 code, mval *action)
 				FIX_XFER_ENTRY(xf_zbfetch, op_zstzb_fet_over);
 				FIX_XFER_ENTRY(xf_zbstart, op_zstzb_st_over);
 			} else
->>>>>>> 91552df2... GT.M V6.3-009
 			{
 				FIX_XFER_ENTRY(xf_ret, opp_zstepret);
 				FIX_XFER_ENTRY(xf_retarg, opp_zstepretarg);

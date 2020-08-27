@@ -4,7 +4,7 @@
 # Copyright (c) 2009-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -458,15 +458,10 @@ do
 done
 rm sedin$$
 if [ "$doutf8" -ne 0 ]; then
-<<<<<<< HEAD
 	if [ ! -d $ydbdist/utf8 ]; then
 		mkdir -p $ydbdist/utf8 $ydbdist/plugin/o/utf8
-=======
-	if [ ! -d $gtmdist/utf8 ]; then
-		mkdir -p $gtmdist/utf8 $gtmdist/plugin/o/utf8
-		chmod 0755 $gtmdist/utf8 $gtmdist/plugin/o/utf8
-		chown ${owner}:${bingroup} $gtmdist/utf8 $gtmdist/plugin/o/utf8
->>>>>>> 91552df2... GT.M V6.3-009
+		chmod 0755 $ydbdist/utf8 $ydbdist/plugin/o/utf8
+		chown ${owner}:${bingroup} $ydbdist/utf8 $ydbdist/plugin/o/utf8
 	fi
 fi
 
@@ -817,14 +812,9 @@ fi
 cd $savedir
 
 # Optionally remove .o files if they are in a shared library
-<<<<<<< HEAD
 if [ -f $ydb_dist/libyottadbutil$ext ] ; then
 	chown ${owner}:${bingroup} $ydb_dist/libyottadbutil$ext
-=======
-if [ -f $gtm_dist/libgtmutil$ext ] ; then
-	chown ${owner}:${bingroup} $gtm_dist/libgtmutil$ext
-	chmod 755 $gtm_dist/libgtmutil$ext
->>>>>>> 91552df2... GT.M V6.3-009
+	chmod 755 $ydb_dist/libgtmutil$ext
 	$echo ""
 	$echo "Object files of M routines placed in shared library $ydb_dist/libyottadbutil$ext"
 	$echo "Keep original .o object files (y or n)? \c"
@@ -832,14 +822,9 @@ if [ -f $gtm_dist/libgtmutil$ext ] ; then
 	if [ ! -t 0 ] ; then echo "$resp"; fi
 	if [ "n" = "$resp" -o "N" = "$resp" ] ; then rm -f $ydb_dist/*.o $ydb_dist/utf8/*.o ; fi
 	$echo ""
-<<<<<<< HEAD
 	if [ -f $ydb_dist/utf8/libyottadbutil$ext ] ; then
 		chown ${owner}:${bingroup} $ydb_dist/utf8/libyottadbutil$ext
-=======
-	if [ -f $gtm_dist/utf8/libgtmutil$ext ] ; then
-		chown ${owner}:${bingroup} $gtm_dist/utf8/libgtmutil$ext
-		chmod 755 $gtm_dist/utf8/libgtmutil$ext
->>>>>>> 91552df2... GT.M V6.3-009
+		chmod 755 $ydb_dist/utf8/libgtmutil$ext
 	fi
 fi
 
@@ -906,24 +891,7 @@ if [ "$group" != "" ] ; then
 fi
 
 # leave nothing writeable
-<<<<<<< HEAD
-chmod a-w $ydbdist
-chmod a-w $ydbdist/*
-
-if [ -d $ydbdist/utf8 ]; then
-	chmod a-w $ydbdist/utf8/*
-fi
-
-if [ -d $ydbdist/plugin ]; then
-	chmod a-w $ydbdist/plugin/*
-fi
-
-if [ -d $ydbdist/plugin/gtmcrypt ]; then
-	chmod a-w $ydbdist/plugin/gtmcrypt/*
-fi
-=======
-chmod -R a-w $gtmdist
->>>>>>> 91552df2... GT.M V6.3-009
+chmod -R a-w $ydbdist
 
 # if we had a yottadb compilation error then remove executable bit recursively and exit
 # this could include compile and/or library load errors

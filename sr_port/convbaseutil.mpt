@@ -3,7 +3,7 @@
 ; Copyright (c) 2018-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -12,66 +12,6 @@
 ;	the license, please stop and do not read further.	;
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-<<<<<<< HEAD
-;Computes val1+val2 for any arbitrary-length val1 and val2 and for  base <= 16
-ADDVAL(val1,val2,base)
-	new carry,res,len,currsum,len1,len2,val1r,val2r,tmp1,tmp2,i,c,d,j,k
-	for k=0:1:16 set:k<10 c($CHAR(k+48))=k SET:k'<10 c($CHAR(k+55))=k
-	for j=0:1:16 set:j<10 d(j)=$CHAR(j+48) SET:j'<10 d(j)=$CHAR(j+55)
-	set val1r=$reverse(val1),val2r=$reverse(val2)
-	set carry=0,res="",len1=$length(val1r),len2=$length(val2r),len=len1
-	set:len2>len1 len=len2
-	for i=1:1:len do
-	. set tmp1=0,tmp2=0
-	. set:(i'>len1) tmp1=c(($extract(val1r,i))) set:(i'>len2) tmp2=c(($extract(val2r,i)))
-	. set currsum=tmp1+tmp2+carry
-	. set res=d((currsum#base))_res,carry=$piece((currsum/base),".")
-	set:carry>0 res=carry_res
-	quit res
-;Computes num*x by using x*((num>>2^0)&&1)*2^0 + ((num>>2^1)&&1)*2^1 + ((num>>2^2)&&1)*2^2 +...)
-;Will multiply two arbitrary-length numbers for base <= 10, but for base > 10 will only multiply
-;single digit numbers
-MULTIPLYBYNUMBER(num,x,base)
-	new res,k,c
-	if ($find("ABCDEF",num)) do
-	. for k=0:1:16 set:k<10 c($CHAR(k+48))=k SET:k'<10 c($CHAR(k+55))=k
-	. set num=c(num)
-	set res="0"
-	for  quit:num=0  do
-	. if (num#2>0) do
-	.. set res=$$ADDVAL(res,x,base)
-	. set num=$piece((num/2),"."),x=$$ADDVAL(x,x,base)
-	quit res
-CONVERTBASE(val,frombase,tobase)
-	new m,res,power
-	set m=$$VALIDLEN(val,frombase)
-	set res="0",power=1
-	for  quit:m<1  do
-	. set res=$$ADDVAL(res,$$MULTIPLYBYNUMBER($extract(val,m),power,tobase),tobase)
-	. set power=$$MULTIPLYBYNUMBER(frombase,power,tobase),m=$increment(m,-1)
-	quit res
-;Takes a base 16 or base 8 number and converts that number
-;into its two's compliment representation (flip bits and add one)
-CONVNEG(v,base)
-	new i,c,ns,charmap,pocharmap
-	set charmap="0123456789ABCDEF"
-	set:base=8 charmap="01234567"
-	set pocharmap=($extract(charmap,2,$length(charmap)))_"0"
-	set v=$translate(v,charmap,$reverse(charmap))
-	set ns="",c="0"
-	for i=0:1:$length(v)  quit:(c'="0")  set c=$extract(v,$length(v)-i),c=$translate(c,charmap,pocharmap),ns=c_ns
-	set:i'=$length(v) ns=$extract(v,1,$length(v)-i)_ns
-	set:$find(($extract(charmap,1,(base/2))),$extract(ns,1)) ns=($extract(charmap,$length(charmap)))_ns
-	quit ns
-;Returns length of string until which all characters are valid for the given base (works up to base 16)
-VALIDLEN(val,base)
-	new i,valbasechar,invalidi,len
-	set valbasechar=$extract("0123456789ABCDEF",1,base),len=$length(val)
-	quit:'len 0
-	for i=1:1:$length(val)  set invalidi='($find(valbasechar,($extract(val,i))))  quit:invalidi
-	quit $select($get(invalidi):i-1,1:i)
-=======
-
 ADDVAL(v,a1,a2,b)	;Computes val1+val2 for any arbitrary-length val1 and val2 and for base <= 16
 	; v - transform array as set up by CONVERTBASE
 	; a1, a2 - addends; b - base of addends
@@ -93,13 +33,12 @@ MULTIPLYBYNUMBER(v,m,x,b)	; for base<=10, multiplies 2 arbitrary-length numbers,
 	quit r
 
 CONVERTBASE(val,fb,tb)	; converts val from base fb to base tb
-	quit:'($$VERIFYNUM(val,fb)) 0
 	new e,i,o,r,v	; e - exponent; i - iterator; o - offset r - result ; v - transform array used by subroutines
 	for i=0:1:15 set:i<10 v(i)=i set:9<i v(i)=$char(i+55),v($char(i+55))=i
-	set r=0,e=1
-	for o=$length(val):-1:1 set r=$$ADDVAL(.v,r,$$MULTIPLYBYNUMBER(.v,$extract(val,o),e,tb),tb),e=$$MULTIPLYBYNUMBER(.v,fb,e,tb)
+	set r=0,e=1,o=$$VALIDLEN(val,fb)
+	quit:0=o
+	for o=o:-1:1 set r=$$ADDVAL(.v,r,$$MULTIPLYBYNUMBER(.v,$extract(val,o),e,tb),tb),e=$$MULTIPLYBYNUMBER(.v,fb,e,tb)
 	quit r
-
 CONVNEG(v,base)	;Takes a base 16 or base 8 number and converts it into its two's compliment representation (flip bits and add one)
 	new c,i,n	; c - complement; i - iterator; n - negatated result
 	if 8=base set v=$translate(v,"01234567","76543210")
@@ -109,10 +48,9 @@ CONVNEG(v,base)	;Takes a base 16 or base 8 number and converts it into its two's
 	else  for i=$length(v):-1:1 quit:("0"'=c)  set c=$translate($extract(v,i),"0123456789ABCDEF","123456789ABCDEF0"),n=c_n
 	set:1<i n=$extract(v,1,i)_n
 	quit $select($find($select(8=base:"0123",1:"01234567"),$extract(n)):$select(8=base:7,1:"F")_n,1:n)
-
-VERIFYNUM(val,base)	;Verifies every character in the passed string is a valid character in the given base (works up to base 16)
-	new i,valbasechar	; i - iterator; valbasechar - valid characters for base
-	set valbasechar=$extract("0123456789ABCDEF",1,base)
-	for i=1:1:$length(val)  quit:'($find(valbasechar,($extract(val,i))))
-	quit i=$length(val)
->>>>>>> 91552df2... GT.M V6.3-009
+VALIDLEN(val,base) ;Returns length of string until which all characters are valid for the given base (works up to base 16)
+	new i,valbasechar,invalidi,len
+	set valbasechar=$extract("0123456789ABCDEF",1,base),len=$length(val)
+	quit:'len 0
+	for i=1:1:$length(val)  set invalidi='($find(valbasechar,($extract(val,i))))  quit:invalidi
+	quit $select($get(invalidi):i-1,1:i)

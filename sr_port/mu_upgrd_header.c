@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2012 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 91552df2... GT.M V6.3-009
+ *								*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,13 +41,8 @@
 #include "lockconst.h"
 #include "wcs_phase2_commit_wait.h"
 
-<<<<<<< HEAD
-LITREF  char                    ydb_release_name[];
-LITREF  int4                    ydb_release_name_len;
-=======
-LITREF	char			gtm_release_name[];
-LITREF	int4			gtm_release_name_len;
->>>>>>> 91552df2... GT.M V6.3-009
+LITREF  char			ydb_release_name[];
+LITREF  int4			ydb_release_name_len;
 
 error_def(ERR_MUINFOUINT8);
 

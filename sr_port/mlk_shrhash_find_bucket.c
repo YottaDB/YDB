@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,7 +95,6 @@ int mlk_shrhash_find_bucket(mlk_pvtctl_ptr_t pctl, uint4 hash)
 				break;
 		}
 		if (si == fi)
-<<<<<<< HEAD
 		{	/* No movable buckets. Normally one needs to resize the hash table but since this hash
 			 * table is in shared memory, it cannot be resized (needs shared memory size change which
 			 * is not easily possible). Degenerate to linear search scheme for just this bucket.
@@ -106,35 +105,6 @@ int mlk_shrhash_find_bucket(mlk_pvtctl_ptr_t pctl, uint4 hash)
 			fi = -(fi + 1);	/* negative value to indicate bucket full situation; "+ 1" done to handle 0 fi */
 			assert(0 > fi);
 			break;
-=======
-		{	/* We couldn't find anything that could be moved to the free bucket, so give up.
-		 	 * Here is where we could potentially introduce more robust approaches, like resizing the hash table.
-		 	 */
-#			ifdef DEBUG
-			static boolean_t	did_core = FALSE;
-
-			if (!did_core && !WBTEST_ENABLED(WBTEST_MLOCK_HANG) && !WBTEST_ENABLED(WBTEST_TRASH_HASH_NO_RECOVER)
-				&& !WBTEST_ENABLED(WBTEST_LOCK_HASH_OFLOW))
-			{
-				gtm_fork_n_core();
-				did_core = TRUE;
-			}
-#			endif
-			if (0 == pctl->hash_fail_cnt)
-				pctl->ctl->gc_needed = TRUE;
-			else if (1 == pctl->hash_fail_cnt)
-			{
-				if (pctl->ctl->num_blkhash > (pctl->ctl->max_blkcnt - pctl->ctl->blkcnt) * 2)
-				{	/* We have more than twice as many hash buckets as we have active shrblks,
-					 * indicating something pathological, so try rehashing.
-					 */
-					pctl->ctl->rehash_needed = TRUE;
-				} else
-					pctl->ctl->resize_needed = TRUE;
-			}
-			pctl->hash_fail_cnt++;
-			return -1;
->>>>>>> 91552df2... GT.M V6.3-009
 		}
 		/* Move the bucket from the mapped bucket to the free bucket */
 		move_bucket = &shrhash[mi];

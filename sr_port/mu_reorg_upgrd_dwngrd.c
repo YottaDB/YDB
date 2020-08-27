@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,14 +53,9 @@
 #include "targ_alloc.h"
 #include "util.h"		/* for util_out_print prototype */
 #include "wcs_flu.h"
-<<<<<<< HEAD
-#include "repl_msg.h"			/* for gtmsource.h */
-#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
-#include "gvcst_protos.h"		/* for "gvcst_init" */
-=======
 #include "repl_msg.h"		/* for gtmsource.h */
 #include "gtmsource.h"		/* for jnlpool_addrs_ptr_t */
->>>>>>> 91552df2... GT.M V6.3-009
+#include "gvcst_protos.h"	/* for "gvcst_init" */
 
 #define	REORG_CONTINUE	1
 #define	REORG_BREAK	2

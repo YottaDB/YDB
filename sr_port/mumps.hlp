@@ -1216,11 +1216,7 @@
    YottaDB expects ICU to be compiled with symbol renaming disabled and will
    issue an error at startup if the available version of ICU is built with
    symbol renaming enabled. To use a version of ICU built with symbol
-<<<<<<< HEAD
-   renaming enabled, the $ydb_icu_version environment variable indicates the
-=======
-   renaming enabled, the gtm_icu_version environment variable indicates the
->>>>>>> 91552df2... GT.M V6.3-009
+   renaming enabled, the ydb_icu_version environment variable indicates the
    MAJOR VERSION and MINOR VERSION numbers of the desired ICU formatted as
    MajorVersion.MinorVersion (for example "3.6" to denote ICU-3.6). When
    $ydb_icu_version is so defined, YottaDB attempts to open the specific version
@@ -12040,29 +12036,13 @@
    characters when READ. CTRAP characters other than <CTRL-C> tend to be
    limited by terminal configuration.
 
-<<<<<<< HEAD
-   If an interrupt event occurs in a long running external call (for example,
-   waiting in a message queue), YottaDB recognizes the event but makes the
-   vector transfer after the external call returns when it reaches the next
-   appropriate execution boundary.
-
-   When an interrupt handler is invoked, YottaDB saves and restores the current
-   values of $REFERENCE. However, the current device ($IO) is neither saved
-   nor restored. If an interrupt handler changes $IO (via USE), ensure that
-   the interrupt handler restores the current device before returning. To
-   restore the device which was current when the interrupt handler began,
-   specify USE without any deviceparameters. Any attempt to do IO on a device
-   which was actively doing IO when the interrupt was recognized may result
-   in a ZINTERCURSEIO error.
-
-=======
-   The interrupt handler is executed by GT.M when on a statement boundary or
+   The interrupt handler is executed by YottaDB when on a statement boundary or
    on an appropriate boundary in a potentially long running COMMAND (in the
-   same place as GT.M recognizes <CTRL-C>). If a GT.M process is in a long
-   running external call (for example; waiting in a message queue) GT.M does
+   same place as YottaDB recognizes <CTRL-C>). If a YottaDB process is in a long
+   running external call (for example; waiting in a message queue) YottaDB does
    not have sufficient control of the process state to immediately drive the
-   interrupt handler. GT.M recognizes the interrupt request and drives the
-   handler after the external call returns to GT.M and the process reaches an
+   interrupt handler. YottaDB recognizes the interrupt request and drives the
+   handler after the external call returns to YottaDB and the process reaches an
    appropriate execution boundary.
 
    **Note**
@@ -12081,15 +12061,14 @@
    system. Any interrupt driven code should be designed to account for this
    issue.
 
-   When GT.M uses an interrupt handler, it saves and restores the current
-   values of $REFERENCE. However, GT.M does not implicitly save or restore
-   the current device ($IO). If an interrupt handler changes $IO (via USE),
-   ensure that the interrupt handler restores the current device before
-   returning. To restore the device which was current when the interrupt
-   handler began, specify USE without any deviceparameters. Any attempt to do
-   IO on a device which was actively doing IO when the interrupt was
-   recognized may cause a ZINTERCURSEIO error.
->>>>>>> 91552df2... GT.M V6.3-009
+   When an interrupt handler is invoked, YottaDB saves and restores the current
+   values of $REFERENCE. However, the current device ($IO) is neither saved
+   nor restored. If an interrupt handler changes $IO (via USE), ensure that
+   the interrupt handler restores the current device before returning. To
+   restore the device which was current when the interrupt handler began,
+   specify USE without any deviceparameters. Any attempt to do IO on a device
+   which was actively doing IO when the interrupt was recognized may result
+   in a ZINTERCURSEIO error.
 
    Code in $ZINTERRUPT must use routine names in any entryref argument to a
    DO, GOTO, JOB, ZGOTO or any extrinsic as the arrival of the interrupt can
@@ -12099,31 +12078,10 @@
    evaluates to 1 (TRUE).
 
    If an error occurs while compiling the $ZINTERRUPT code, the error handler
-<<<<<<< HEAD
-   is not invoked (the error handler is invoked if an error occurs while
-   executing the $ZINTERRUPT code), YottaDB sends the YDB-E-ERRWZINTR message and
-   the compiler error message to the operator log facility. If the YottaDB
-   process is at a direct mode prompt or is executing a direct mode command
-   (for example, a FOR loop), YottaDB sends also sends the YDB-E-EERRWZINTR error
-   message to the user console along with the compilation error. In both
-   cases, the interrupted process resumes execution without performing any
-   action specified by the defective $ZINTERRUPT vector.
-
-   If YottaDB encounters an error during creation of the interrupt handler's
-   stack frame (before transferring control to the application code specified
-   by the vector), that error is prefixed with a YDB-E-ERRWZINTR error. The
-   error handler then executes normal error processing associated with the
-   interrupted routine.
-
-   **Note**
-
-   The interrupt handler does not operate "outside" the current M environment
-   but rather within the environment of the process.
-=======
-   is not invoked, GT.M sends the ERRWZINTR message and the compiler error
-   message to the operator log facility. If the GT.M process is at a direct
-   mode prompt or is executing a direct mode command (for example, a FOR
-   loop), GT.M sends also sends the ERRWZINTR error message to the user
+   is not invoked, YottaDB sends the YDB-E-ERRWZINTR message and the compiler
+   error message to the operator log facility. If the YottaDB process is at a
+   direct mode prompt or is executing a direct mode command (for example, a FOR
+   loop), YottaDB sends also sends the YDB-E-ERRWZINTR error message to the user
    console along with the compilation error. In both cases, the interrupted
    process resumes execution without performing any action specified by the
    defective $ZINTERRUPT vector.
@@ -12131,11 +12089,10 @@
    The error handler is invoked if an error occurs while executing the
    $ZINTERRUPT code. If an error occurs during execution of the interrupt
    handler's stack frame (before it calls anything), that error is prefixed
-   with the ERRWZINTR error. The error handler then executes normal error
+   with the YDB-E-ERRWZINTR error. The error handler then executes normal error
    processing associated with the module that was interrupted. Any other
    errors that occur in code called by the interrupt handler are handled by
    normal error handling.
->>>>>>> 91552df2... GT.M V6.3-009
 
    TP transaction is in progress (0<$TLEVEL), updates to globals are not safe
    since a TP restart can be signaled at any time prior to the transaction
@@ -12149,18 +12106,7 @@
    are not restored by a TRESTART to defer the interrupt action until after
    the final TCOMMIT.
 
-<<<<<<< HEAD
-   The interrupt handler is executed by YottaDB when on a statement boundary or
-   on an appropriate boundary in a potentially long running COMMAND (in the
-   same place as YottaDB recognizes <CTRL-C>). If a YottaDB process is in a long
-   running external call (for example; waiting in a message queue) YottaDB does
-   not have sufficient control of the process state to immediately drive the
-   interrupt handler. YottaDB recognizes the interrupt request and drives the
-   handler after the external call returns to YottaDB and the process reaches an
-   appropriate execution boundary.
-=======
    **Important**
->>>>>>> 91552df2... GT.M V6.3-009
 
    Because sending an interrupt signal requires the sender to have
    appropriate permissions, the use of the job interrupt facility itself does
@@ -12171,33 +12117,7 @@
    and implementation of any interrupt logic includes careful consideration
    to security issues.
 
-<<<<<<< HEAD
-   If an error occurs while compiling the $ZINTERRUPT code, the action taken
-   depends on the process state at the time the interrupt was received and
-   the error handler is not invoked (the error handler is invoked if an error
-   occurs while executing the $ZINTERRUPT code). If the YottaDB process is at a
-   direct mode prompt or is executing a direct mode command (for example, a
-   FOR loop), the error message is sent to the user console along with the
-   ERRWZINTR error (refer to the YottaDB Messages and Recovery Procedures Manual).
-   In addition, the ERRWZINTR error is also sent to the operator log facility.
-   IF the process is not at a direct mode prompt or executing a direct mode
-   command, the ERRWZINTR message and the compiler error message are sent to
-   the operator log facility and nothing is displayed on the user's console.
-   In both cases, the interrupted process resumes execution.
-
-   If an error occurs during execution of the interrupt handler's stack frame
-   (before it calls anything), that error is prefixed with the ERRWZINTR
-   error. The error handler then executes normal error processing associated
-   with the module that was interrupted. Any other errors that occur in code
-   called by the interrupt handler are handled by normal error handling.
-
-   **Note**
-
-   The interrupt handler does not operate "outside" the current M environment
-   but rather within the environment of the process.
-=======
    Example:
->>>>>>> 91552df2... GT.M V6.3-009
 
    set $zinterrupt="do ^interrupthandler($io)"
    interrupthandler(currentdev)
@@ -18749,20 +18669,15 @@
    arguments defined in the external call table matches the function
    invocation.
 
-<<<<<<< HEAD
-   libyottadb.h also includes definitions for the following entry points
-   exported from libyottadb:
-=======
-   To protect the process, GT.M turns any return values containing a null
+   To protect the process, YottaDB turns any return values containing a null
    pointer to an empty string value and, for the first occurrence in a
    process, sends one XCRETNULLREF syslog message. If an external call sets a
-   gtm_string length to a negative value, to protect the process, GT.M turns
+   ydb_string length to a negative value, to protect the process, YottaDB turns
    any return with a negative length to an empty string value and, for the
    first occurrence in a process, sends one XCCONVERT syslog message.
 
-   gtmxc_types.h also includes definitions for the following entry points
-   exported from libgtmshr:
->>>>>>> 91552df2... GT.M V6.3-009
+   libyottadb.h also includes definitions for the following entry points
+   exported from libyottadb:
 
    void ydb_hiber_start(ydb_uint_t mssleep);
    void ydb_hiber_start_wait_any(ydb_uint_t mssleep)
@@ -22167,4 +22082,3 @@ Appendix A. M Coding Standards - Do's and Don'ts
            variable association. In the ZWRITE or ZSHOW "V" output of an
            alias container, SET $ZWRTAC lines appear in the order that YottaDB
            expects for restoration.
-

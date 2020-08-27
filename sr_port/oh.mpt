@@ -3,7 +3,7 @@
 ; Copyright (c) 1987-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -23,15 +23,7 @@ INT	read !,"Octal: ",%OH set %OH=$$FUNC(%OH)
 	write:%OH="" !,"Input must be an octal number"
 	quit
 FUNC(o)
-<<<<<<< HEAD
-	q:o=0 0
-	q:"-"=$ze(o,1) ""
-	q:o'?1.N ""
-	q:o[8!(o[9) ""
-	q:$l(o)<19 $$FUNCFM(o)
-	q $$CONVERTBASE^%CONVBASEUTIL(o,8,16)
-=======
-	quit:"0"[$get(o) 0
+	quit:"-"=$zextract(o,1) ""
 	quit:"-"=$extract(o) ""
 	quit:(o[8)!(o[9) ""
 	new c,d,h,l
@@ -40,4 +32,3 @@ FUNC(o)
 	for c=1:1:l s d=d*8+$e(o,c)
 	for  quit:'d  set h=$e("0123456789ABCDEF",d#16+1)_h,d=d\16
 	quit h
->>>>>>> 91552df2... GT.M V6.3-009

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,13 +67,8 @@ void lke_show_memory(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t bhead, char *prefix
 		MLK_SUBHASH_INIT_PVTCTL(pctl, hs);
 		total_len = 0;
 		mlk_shrhash_val_build(b, &total_len, &hs);
-<<<<<<< HEAD
-		ydb_mmrhash_128_result(&hs, total_len, &hashres);
-		hash = (uint4)hashres.one;
-=======
 		MLK_SUBHASH_FINALIZE(hs, total_len, hashres);
 		hash = MLK_SUBHASH_RES_VAL(hashres);
->>>>>>> 91552df2... GT.M V6.3-009
 		if (hash != b->hash)		/* Should never happen; only here in case things get mangled. */
 			PRINTF("\t\t: [computed shrhash] %x\n", hash);
 		FFLUSH(stdout);

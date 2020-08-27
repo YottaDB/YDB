@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,7 +85,7 @@ boolean_t ss_get_lock(gd_region *reg)
 				return TRUE;
 			}
 			if (!is_proc_alive(latch_pid = latch->u.parts.latch_pid, 0))	/* WARNING: assignment */
-				COMPSWAP_UNLOCK(latch, latch_pid, 0, LOCK_AVAILABLE, 0);
+				COMPSWAP_UNLOCK(latch, latch_pid, LOCK_AVAILABLE);
 		}
 		REST_FOR_LATCH(latch, (-1 == max_sleep_mask) ? SPIN_SLEEP_MASK(csa->hdr) : max_sleep_mask, retries);
 	}

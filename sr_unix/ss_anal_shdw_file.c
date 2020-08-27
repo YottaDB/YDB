@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,13 +51,8 @@ void	ss_anal_shdw_file(char	*filename, int flen)
 	off_t			blk_offset;
 	snapshot_filhdr_t	ss_filhdr;
 	blk_hdr_ptr_t		bp = NULL;
-<<<<<<< HEAD
-	block_id		blkno;
-	unsigned int		*bitmap_buffer;
-=======
 	block_id		blkno, tot_blks, bitmap_size, shadow_vbn, word, bit;
-	unsigned int		*bitmap_buffer = NULL;
->>>>>>> 91552df2... GT.M V6.3-009
+	unsigned int		*bitmap_buffer;
 
 	OPENFILE(filename, O_RDONLY, shdw_fd);
 	if (FD_INVALID == shdw_fd)

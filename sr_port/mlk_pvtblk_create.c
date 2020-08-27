@@ -151,21 +151,14 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 		*cp++ = len;
 		memcpy(cp, (mp_temp)->str.addr, len);
 		cp += len;
-<<<<<<< HEAD
-		ydb_mmrhash_128_ingest(&accstate, cp_prev, len + 1);
-		tmpstate = accstate;
-		ydb_mmrhash_128_result(&tmpstate, (cp - r->value), &hashres);
-		DBG_LOCKHASH_N_BITS(hashres.one);
-		MLK_PVTBLK_SUBHASH(r, i) = (uint4)hashres.one;
-=======
 		if (do_hash)
 		{
 			MLK_SUBHASH_INGEST(accstate, cp_prev, len + 1);
 			tmpstate = accstate;
 			MLK_SUBHASH_FINALIZE(tmpstate, (cp - r->value), hashres);
+			DBG_LOCKHASH_N_BITS(hashres.one);
 			MLK_PVTBLK_SUBHASH(r, i) = MLK_SUBHASH_RES_VAL(hashres);
 		}
->>>>>>> 91552df2... GT.M V6.3-009
 	}
 	if (do_hash)
 		mlk_last_hash = MLK_SUBHASH_RES_VAL(hashres);

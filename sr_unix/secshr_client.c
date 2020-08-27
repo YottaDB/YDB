@@ -108,11 +108,7 @@ const static char readonly *secshrstart_error_code[] = {
 	"gtmsecshr startup failed - gtmsecshr unable to chdir to tmp directory",
 	"gtmsecshr startup failed - gtmsecshr unable to determine invocation path",
 	"gtmsecshr startup failed - gtmsecshr not named gtmsecshr",
-<<<<<<< HEAD
-	"gtmsecshr startup failed - $ydb_dist not same as startup path"
-=======
-	"gtmsecshr startup failed - startup path through $gtm_dist not setup correctly - check path and permissions"
->>>>>>> 91552df2... GT.M V6.3-009
+	"gtmsecshr startup failed - startup path through $ydb_dist not setup correctly - check path and permissions"
 };
 
 #define MAX_COMM_ATTEMPTS		4	/* 1 to start secshr, 2 maybe slow, 3 maybe really slow, 4 outside max */

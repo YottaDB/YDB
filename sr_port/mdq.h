@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,11 +50,7 @@
 #define dqloop(Q, N, I) DQLOOP(Q, N, I)
 #define dqinit(Q, N)	DQINIT(Q, N)
 
-<<<<<<< HEAD
-/*#define DEBUG_TRIPLES / * Uncomment this to do triple debugging, which is also tied to ydb_dbglvl, as of this writing: 0x4000 */
-=======
-/* #define DEBUG_TRIPLES / * Uncomment this to do triple debugging, which is also tied to gtmdbglvl, as of this writing: 0x4000 */
->>>>>>> 91552df2... GT.M V6.3-009
+/* #define DEBUG_TRIPLES / * Uncomment this to do triple debugging, which is also tied to ydb_dbglvl, as of this writing: 0x4000 */
 #ifndef DEBUG_TRIPLES
 #  define dqdel(X, N)		DQDEL(X, N)
 #  define dqdelchain(Q, X, N)	DQDELCHAIN(Q, X, N)
@@ -66,34 +62,20 @@
 #  include "compiler.h"
 #  include "gtm_string.h"
 #  include "gtmdbglvl.h"
-<<<<<<< HEAD
 GBLREF	uint4		ydbDebugLevel;
-/* q: head of queue to check; n: the name of queue; b: whether to check main exorder (from curtchain) and any expr_start queue */
-#  define CHKTCHAIN(q, n, b)								\
-=======
-GBLREF	uint4		gtmDebugLevel;
 /* Q: head of queue to check; N: the name of queue; B: whether to check main exorder (from curtchain) and any expr_start queue */
 #  define CHKTCHAIN(Q, N, B)								\
->>>>>>> 91552df2... GT.M V6.3-009
 MBSTART {										\
 	triple	*c;									\
 	DCL_THREADGBL_ACCESS;								\
 											\
 	SETUP_THREADGBL_ACCESS;								\
 					/* memcmp() is fast and 3 chars sufficient */	\
-<<<<<<< HEAD
- 	if ((ydbDebugLevel & GDL_DebugCompiler) && (0 == memcmp(#n, "exorder", 3)))	\
-	{										\
-		if ((triple *)-1 != (triple *)q) /* to avoid post-checking deletes */	\
-			chktchain((triple *)q);						\
-		if (b)									\
-=======
- 	if ((gtmDebugLevel & GDL_DebugCompiler) && (0 == memcmp(#N, "exorder", 3)))	\
+ 	if ((ydbDebugLevel & GDL_DebugCompiler) && (0 == memcmp(#N, "exorder", 3)))	\
 	{										\
 		if ((triple *)-1 != (triple *)(Q)) /* to avoid post-checking deletes */	\
 			chktchain((triple *)(Q));					\
 		if (B)									\
->>>>>>> 91552df2... GT.M V6.3-009
 		{									\
 			c = TREF(curtchain);						\
 			chktchain(c);		/* this might be redundant, or not! */	\
@@ -103,19 +85,6 @@ MBSTART {										\
 		}									\
 	}										\
 } MBEND
-<<<<<<< HEAD
-#  define dqdel(x, n)			\
-MBSTART {				\
-	CHKTCHAIN((x), n, FALSE);	\
-	DQDEL((x), n);			\
-	CHKTCHAIN(-1, n, TRUE);		\
-} MBEND
-#  define dqdelchain(q, x, n)		\
-MBSTART {				\
-	CHKTCHAIN((q), n, FALSE);	\
-	DQDELCHAIN((q), (x), n);	\
-	CHKTCHAIN((q), n, TRUE);	\
-=======
 #  define dqdel(X, N)		\
 MBSTART {			\
 	CHKTCHAIN(X, N, FALSE);	\
@@ -127,7 +96,6 @@ MBSTART {			\
 	CHKTCHAIN(Q, N, FALSE);	\
 	DQDELCHAIN(Q, X, N);	\
 	CHKTCHAIN(Q, N, TRUE);	\
->>>>>>> 91552df2... GT.M V6.3-009
 } MBEND
 #  define dqins(Q, N, X)	\
 MBSTART {			\

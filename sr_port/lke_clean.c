@@ -147,16 +147,9 @@ void lke_clean(void)
 						A2R(blk->value, sub);
 						A2R(sub->backpointer, blk);
 						total_len = 0;
-<<<<<<< HEAD
-						mlk_shrhash_val_build(blk,
-								&total_len, &hs);
-						ydb_mmrhash_128_result(&hs, total_len, &hashres);
-						ti = ((uint4)hashres.one) % num_buckets;
-=======
 						mlk_shrhash_val_build(blk, &total_len, &hs);
 						MLK_SUBHASH_FINALIZE(hs, total_len, hashres);
 						ti = MLK_SUBHASH_RES_VAL(hashres) % num_buckets;
->>>>>>> 91552df2... GT.M V6.3-009
 						for(int foo=0; foo < MLK_SHRHASH_NEIGHBORS + 2; foo++)
 						{
 							check_bucket = &shrhash[(ti + foo) % num_buckets];
@@ -193,16 +186,9 @@ void lke_clean(void)
 						A2R(blk->value, sub);
 						A2R(sub->backpointer, blk);
 						total_len = 0;
-<<<<<<< HEAD
-						mlk_shrhash_val_build(blk,
-								&total_len, &hs);
-						ydb_mmrhash_128_result(&hs, total_len, &hashres);
-						ti = ((uint4)hashres.one) % num_buckets;
-=======
 						mlk_shrhash_val_build(blk, &total_len, &hs);
 						MLK_SUBHASH_FINALIZE(hs, total_len, hashres);
 						ti = MLK_SUBHASH_RES_VAL(hashres) % num_buckets;
->>>>>>> 91552df2... GT.M V6.3-009
 						free_bucket = &shrhash[ti];
 						free_bucket->usedmap = 0;
 						for(int foo=0; foo < MLK_SHRHASH_NEIGHBORS + 2; foo++)
@@ -255,11 +241,7 @@ void lke_clean(void)
 							MLK_SUBHASH_INIT(&pvtblk, hs);
 							total_len = 0;
 							mlk_shrhash_val_build(shrblk, &total_len, &hs);
-<<<<<<< HEAD
-							ydb_mmrhash_128_result(&hs, total_len, &hashres);
-=======
 							MLK_SUBHASH_FINALIZE(hs, total_len, hashres);
->>>>>>> 91552df2... GT.M V6.3-009
 							/* If this triggers, it means a bucket was marked as used for a
 							 *  particular hash value, but is in fact used by a different hash
 							 *  value; we can not easily recover from this, and the safest
@@ -280,13 +262,8 @@ void lke_clean(void)
 						total_len = 0;
 						mlk_shrhash_val_build(MLK_SHRHASH_SHRBLK(pvtblk.pvtctl, search_bucket),
 									&total_len, &hs);
-<<<<<<< HEAD
-						ydb_mmrhash_128_result(&hs, total_len, &hashres);
-						ti = ((uint4)hashres.one) % num_buckets;
-=======
 						MLK_SUBHASH_FINALIZE(hs, total_len, hashres);
 						ti = MLK_SUBHASH_RES_VAL(hashres) % num_buckets;
->>>>>>> 91552df2... GT.M V6.3-009
 						check_bucket = &shrhash[ti];
 						bucket_offset = (num_buckets + fi - ti) % num_buckets;
 						if (MLK_SHRHASH_NEIGHBORS <= bucket_offset)

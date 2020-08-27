@@ -97,12 +97,9 @@ enum isvopcode
 	SV_ZRELDATE,		/* 76 */
 	SV_ZTIMEOUT,		/* 77 */
 	SV_ZAUDIT,		/* 78 */
-<<<<<<< HEAD
-	SV_ZYRELEASE,		/* 79 */
-	SV_ZYSQLNULL,		/* 80 */
-=======
 	SV_ZMLKHASH,		/* 79 */
->>>>>>> 91552df2... GT.M V6.3-009
+	SV_ZYRELEASE,		/* 80 */
+	SV_ZYSQLNULL,		/* 81 */
 	SV_NUM_SV,		/* count - should be next to last SV entry just prior to dummy entry below */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };

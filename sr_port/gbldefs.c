@@ -211,11 +211,7 @@ GBLDEF	int4		backup_close_errno,
 			restore_read_errno;
 GBLDEF	volatile int4	outofband;
 GBLDEF	int		mumps_status = SS_NORMAL;
-<<<<<<< HEAD
 GBLDEF	gtm_uint64_t	stp_array_size;
-=======
-GBLDEF	uint4		stp_array_size;
->>>>>>> 91552df2... GT.M V6.3-009
 GBLDEF	gvzwrite_datablk	*gvzwrite_block;
 GBLDEF	lvzwrite_datablk	*lvzwrite_block;
 GBLDEF	io_log_name	*io_root_log_name;
@@ -407,16 +403,10 @@ GBLDEF	fd_set			mutex_wait_on_descs;
 #endif
 GBLDEF	void			(*call_on_signal)();
 GBLDEF	enum gtmImageTypes	image_type;	/* initialized at startup i.e. in dse.c, lke.c, gtm.c, mupip.c, gtmsecshr.c etc. */
-<<<<<<< HEAD
-GBLDEF	unsigned int		invocation_mode = MUMPS_COMPILE; /* how mumps has been invoked */
-GBLDEF	char			*invocation_exe_str = NULL;	/* points to argv[0] (e.g. $ydb_dist/yottadb or $ydb_dist/mumps */
-GBLDEF	char			cli_err_str[MAX_CLI_ERR_STR] = "";   /* Parse Error message buffer */
-=======
 
-GBLDEF	parmblk_struct 		*param_list;	/* call-in parameters block (defined in unix/fgncalsp.h)*/
 GBLDEF	unsigned int		invocation_mode = MUMPS_COMPILE;	/* how mumps has been invoked */
+GBLDEF	char			*invocation_exe_str = NULL;	/* points to argv[0] (e.g. $ydb_dist/yottadb or $ydb_dist/mumps */
 GBLDEF	char			cli_err_str[MAX_CLI_ERR_STR] = "";	/* Parse Error message buffer */
->>>>>>> 91552df2... GT.M V6.3-009
 GBLDEF	char			*cli_err_str_ptr;
 GBLDEF	boolean_t		gtm_pipe_child;
 GBLDEF	io_desc			*gtm_err_dev;
@@ -476,19 +466,7 @@ GBLDEF	int	u_parhscan;			/* Number of partial scans after filled slots (debug) *
 GBLDEF	z_records	zbrk_recs;
 GBLDEF	ipcs_mesg	db_ipcs;		/* For requesting gtmsecshr to update ipc fields */
 GBLDEF	gd_region	*ftok_sem_reg;		/* Last region for which ftok semaphore is grabbed */
-<<<<<<< HEAD
 GBLDEF	int		ydb_non_blocked_write_retries; /* number of retries for non-blocked write to pipe */
-GBLDEF	boolean_t		write_after_image;	/* true for after-image jnlrecord writing by recover/rollback */
-GBLDEF	int			iott_write_error;
-GBLDEF	int4			write_filter;
-GBLDEF	boolean_t		need_no_standalone;
-GBLDEF	int4	zdir_form = ZDIR_FORM_FULLPATH; /* $ZDIR shows full path including DEVICE and DIRECTORY */
-GBLDEF	mval	dollar_zdir = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
-GBLDEF	int * volatile		var_on_cstack_ptr; /* volatile pointer to int; volatile so that nothing gets optimized out */
-GBLDEF	hash_table_int4		cw_stagnate;
-GBLDEF	boolean_t		cw_stagnate_reinitialized;
-=======
-GBLDEF	int		gtm_non_blocked_write_retries; /* number of retries for non-blocked write to pipe */
 GBLDEF	boolean_t	write_after_image;	/* true for after-image jnlrecord writing by recover/rollback */
 GBLDEF	int		iott_write_error;
 GBLDEF	int4		write_filter;
@@ -498,7 +476,6 @@ GBLDEF	mval		dollar_zdir = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
 GBLDEF	int * volatile	var_on_cstack_ptr; /* volatile pointer to int; volatile so that nothing gets optimized out */
 GBLDEF	hash_table_int4	cw_stagnate;
 GBLDEF	boolean_t	cw_stagnate_reinitialized;
->>>>>>> 91552df2... GT.M V6.3-009
 
 GBLDEF	uint4		pat_everything[] = { 0, 2, PATM_E, 1, 0, PAT_MAX_REPEAT, 0, PAT_MAX_REPEAT, 1 }; /* pattern = ".e" */
 GBLDEF	mstr_len_t	sizeof_pat_everything = SIZEOF(pat_everything);
@@ -753,11 +730,7 @@ GBLDEF	boolean_t	gvdupsetnoop = TRUE;	/* if TRUE, duplicate SETs do not change G
 						 * incremented and logical SET journal records will be written. By default, this
 						 * behavior is turned ON. GT.M has a way of turning it off with a VIEW command.
 						 */
-<<<<<<< HEAD
-GBLDEF  int4		ydb_fullblockwrites;	/* Do full (not partial) 1. file system block writes, or 2. database block writes */
-=======
-GBLDEF	int4		gtm_fullblockwrites;	/* Do full (not partial) 1. file system block writes, or 2. database block writes */
->>>>>>> 91552df2... GT.M V6.3-009
+GBLDEF	int4		ydb_fullblockwrites;	/* Do full (not partial) 1. file system block writes, or 2. database block writes */
 GBLDEF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover", used by "bt_put" and "generic_exit_handler" */
 GBLDEF	boolean_t	in_gvcst_incr;		/* set to TRUE by gvcst_incr, set to FALSE by gvcst_put
 						 * distinguishes to gvcst_put, if the current db operation is a SET or $INCR */
@@ -788,11 +761,7 @@ GBLDEF	MIDENT_DEF(module_name, 0, &module_name_buff[0]);
 GBLDEF	MIDENT_DEF(int_module_name, 0, &int_module_name_buff[0]);
 GBLDEF	char		rev_time_buf[REV_TIME_BUFF_LEN];
 GBLDEF	unsigned short	source_name_len;
-<<<<<<< HEAD
 GBLDEF	unsigned short	object_name_len;
-=======
-GBLDEF	short		object_name_len;
->>>>>>> 91552df2... GT.M V6.3-009
 GBLDEF	unsigned char	source_file_name[MAX_FN_LEN + 1];
 GBLDEF	unsigned char	object_file_name[MAX_FN_LEN + 1];
 GBLDEF	int		object_file_des;
@@ -887,7 +856,6 @@ GBLDEF	uint4	process_id;
 GBLDEF  char	*process_name = "UNKNOWN";		/* Place where process name will be stored */
 GBLDEF	uid_t	user_id = INVALID_UID, effective_user_id = INVALID_UID;
 GBLDEF	gid_t	group_id = INVALID_GID, effective_group_id = INVALID_GID;
-<<<<<<< HEAD
 /* Below is a cached copy of "getpwuid" to try avoid future system calls for the same "uid".
  * Note: We do not initialize all members of the "struct passwd" structure explicitly since the format of this structure
  * differs across the various supported platforms. All we care about is the "pw_uid" and "pw_gid" fields get set to
@@ -895,38 +863,20 @@ GBLDEF	gid_t	group_id = INVALID_GID, effective_group_id = INVALID_GID;
  * after the 4th field will automatically be null-initialized by the compiler for us.
  */
 GBLDEF	struct	passwd getpwuid_struct = {NULL, NULL, INVALID_UID, INVALID_GID};
-GBLDEF	uint4	image_count;	/* not used in UNIX but defined to preserve VMS compatibility */
-GBLDEF  size_t  totalRmalloc;                           /* Total storage currently (real) malloc'd (includes extent blocks) */
-GBLDEF  size_t  totalAlloc;                             /* Total allocated (includes allocation overhead but not free space */
-GBLDEF  size_t  totalUsed;                              /* Sum of user allocated portions (totalAlloc - overhead) */
-GBLDEF	size_t	totalRallocGta;				/* Total storage currently (real) mmap alloc'd */
-GBLDEF	size_t  totalAllocGta;                          /* Total mmap allocated (includes allocation overhead but not free space */
-GBLDEF	size_t  totalUsedGta;                           /* Sum of "in-use" portions (totalAllocGta - overhead) */
-GBLDEF	volatile char		*outOfMemoryMitigation;	/* Cache that we will freed to help cleanup if run out of memory */
-GBLDEF	uint4			outOfMemoryMitigateSize;/* Size of above cache (in Kbytes) */
-GBLDEF	int 			mcavail;
-GBLDEF	mcalloc_hdr 		*mcavailptr, *mcavailbase;
-GBLDEF	uint4			max_cache_memsize;	/* Maximum bytes used for indirect cache object code */
-GBLDEF	uint4			max_cache_entries;	/* Maximum number of cached indirect compilations */
-GBLDEF	void		(*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
-=======
-GBLDEF	struct	passwd getpwuid_struct = {NULL, NULL, INVALID_UID, INVALID_GID, NULL, NULL, NULL};
-						/* cached copy of "getpwuid" to try avoid future system calls for the same "uid" */
 GBLDEF	uint4		image_count;			/* not used in UNIX but defined to preserve VMS compatibility */
-GBLDEF	size_t		totalRmalloc;			/* Total storage currently (real) malloc'd (includes extent blocks) */
-GBLDEF	size_t		totalAlloc;			/* Total allocated (includes allocation overhead but not free space */
-GBLDEF	size_t		totalUsed;			/* Sum of user allocated portions (totalAlloc - overhead) */
+GBLDEF  size_t		totalRmalloc;			/* Total storage currently (real) malloc'd (includes extent blocks) */
+GBLDEF  size_t		totalAlloc;			/* Total allocated (includes allocation overhead but not free space */
+GBLDEF  size_t		totalUsed;			/* Sum of user allocated portions (totalAlloc - overhead) */
 GBLDEF	size_t		totalRallocGta;			/* Total storage currently (real) mmap alloc'd */
 GBLDEF	size_t		totalAllocGta;			/* Total mmap allocated (includes allocation overhead but not free space */
 GBLDEF	size_t		totalUsedGta;			/* Sum of "in-use" portions (totalAllocGta - overhead) */
 GBLDEF	volatile char	*outOfMemoryMitigation;		/* Cache that we will freed to help cleanup if run out of memory */
 GBLDEF	uint4		outOfMemoryMitigateSize;	/* Size of above cache (in Kbytes) */
-GBLDEF	int		mcavail;
-GBLDEF	mcalloc_hdr	*mcavailptr, *mcavailbase;
+GBLDEF	int 		mcavail;
+GBLDEF	mcalloc_hdr 	*mcavailptr, *mcavailbase;
 GBLDEF	uint4		max_cache_memsize;		/* Maximum bytes used for indirect cache object code */
 GBLDEF	uint4		max_cache_entries;		/* Maximum number of cached indirect compilations */
 GBLDEF	void		(*cache_table_relobjs)(void);	/* Function pointer to call cache_table_rebuild() */
->>>>>>> 91552df2... GT.M V6.3-009
 GBLDEF	ch_ret_type	(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
 GBLDEF	ch_ret_type	(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
 GBLDEF	ch_ret_type	(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
@@ -1004,24 +954,15 @@ GBLDEF	sgmnt_addrs	*reorg_encrypt_restart_csa;	/* Pointer to the region which ca
 
 #ifdef DEBUG
 /* Following definitions are related to white_box testing */
-<<<<<<< HEAD
 GBLDEF	boolean_t	ydb_white_box_test_case_enabled;
 GBLDEF	int		ydb_white_box_test_case_number;
 GBLDEF	int		ydb_white_box_test_case_count;
-GBLDEF	int 		gtm_wbox_input_test_case_count; /* VMS allows maximum 31 characters for external identifer */
-GBLDEF	boolean_t	stringpool_unusable;		/* Set to TRUE by any function that does not expect any of its function
-							 * callgraph to use/expand the stringpool. */
-GBLDEF	char		stringpool_unusable_set_at_buf[STRINGPOOL_UNUSABLE_AT_BUFFER_SIZE];
-/* Buffer of WHO last set/unset stringpool usable */
-=======
-GBLDEF	boolean_t	gtm_white_box_test_case_enabled;
-GBLDEF	int		gtm_white_box_test_case_number;
-GBLDEF	int		gtm_white_box_test_case_count;
 GBLDEF	int		gtm_wbox_input_test_case_count; /* VMS allows maximum 31 characters for external identifer */
 GBLDEF	boolean_t	stringpool_unusable;		/* Set to TRUE by any function that does not expect any of its function
 							 * callgraph to use/expand the stringpool.
 							 */
->>>>>>> 91552df2... GT.M V6.3-009
+GBLDEF	char		stringpool_unusable_set_at_buf[STRINGPOOL_UNUSABLE_AT_BUFFER_SIZE];
+/* Buffer of WHO last set/unset stringpool usable */
 GBLDEF	boolean_t	stringpool_unexpandable;	/* Set to TRUE by any function for a small period when it has ensured
 							 * enough space in the stringpool so it does not expect any more garbage
 							 * collections or expansions.
@@ -1158,13 +1099,8 @@ GBLDEF	boolean_t	argumentless_rundown;
 GBLDEF	is_anticipatory_freeze_needed_t		is_anticipatory_freeze_needed_fnptr;
 GBLDEF	set_anticipatory_freeze_t		set_anticipatory_freeze_fnptr;
 GBLDEF	boolean_t	is_jnlpool_creator;
-<<<<<<< HEAD
 GBLDEF	char		ydb_dist[YDB_PATH_MAX];		/* Value of $ydb_dist env variable */
-GBLDEF	boolean_t	ydb_dist_ok_to_use = FALSE;		/* Whether or not we can use $ydb_dist */
-=======
-GBLDEF	char		gtm_dist[GTM_PATH_MAX];		/* Value of $gtm_dist env variable */
-GBLDEF	boolean_t	gtm_dist_ok_to_use = FALSE;	/* Whether or not we can use $gtm_dist */
->>>>>>> 91552df2... GT.M V6.3-009
+GBLDEF	boolean_t	ydb_dist_ok_to_use = FALSE;	/* Whether or not we can use $ydb_dist */
 GBLDEF	semid_queue_elem	*keep_semids;		/* Access semaphores that should be kept because shared memory is up */
 GBLDEF	boolean_t		dmterm_default;		/* Retain default line terminators in the direct mode */
 GBLDEF	boolean_t	in_jnl_file_autoswitch;		/* Set to TRUE for a short window inside jnl_file_extend when we are about

@@ -24,10 +24,9 @@ INT	new %DL
 	read !,"Decimal: ",%DH read !,"Digits:  ",%DL set:""=%DL %DL=8 set %DH=$$FUNC(%DH,%DL)
 	q
 FUNC(d,l)
-<<<<<<< HEAD
 	new maxp,maxn,isn,i,h,apnd,k,fval
 	; Length by default is set to 8
-	set:'$l($g(l)) l=8
+	set l=$get(l,8)
 	; max values are one greater than actual unsigned 64/32 bit values
 	set isn=0,i=0,h="",apnd="0",k=d,maxp="18446744073709551616",maxn="9223372036854775809"
 	; Input length without sign is considered for conversion in case of signed values
@@ -35,21 +34,21 @@ FUNC(d,l)
 	set:fval="-" isn=1,k=$extract(d,2,$length(d)),apnd="F"
 	set:fval="+" k=$extract(d,2,$length(d))
 	set fval=$zextract(k,1)
-	set:fval="0" k=$$VALIDVAL(k)	; removing zero's if present
+	set:fval="0" k=$$VALIDVAL(k) ; removing zero's if present
 	; First condition: -ve Input greater than max -ve 64bit value is handled by $ZCONVERT()
 	; Second condition: +ve Input less than max unsigned 64bit value is handled by $ZCONVERT()
 	; other values are handled by M code.
-	if ((isn&(($l(k)<19)!(($l(k)=19)&(maxn]k))))!('isn&(($l(k)<20)!(($l(k)=20)&(maxp]k))))) s h=$zconvert(d,"DEC","HEX")	; $ZCONVERT() handles signed input hence d is passed
+	if ((isn&(($length(k)<19)!(($length(k)=19)&(maxn]k))))!('isn&(($length(k)<20)!(($length(k)=20)&(maxp]k))))) set h=$zconvert(d,"DEC","HEX") ; $ZCONVERT() handles signed input hence d is passed
 	else  do
 	. set h=$$CONVERTBASE^%CONVBASEUTIL(k,10,16)
-	. set:(isn&(h'="0")) h=$$CONVNEG^%CONVBASEUTIL(h,16)
-	set i=$l(h)
-	for  q:i'<l  s h=apnd_h,i=i+1
+	. set:(isn&("0"'=h)) h=$$CONVNEG^%CONVBASEUTIL(h,16)
+	set i=$length(h)
+	for  quit:i'<l  set h=apnd_h,i=i+1
 	quit h
 ; This routine removes any leading zero's in the input
 ; Returns: value without the leading zeros if any
 VALIDVAL(val)
-	new i,inv,res	; inv is used to exit the following for on occurence of a valid decimal digit
+	new i,inv,res ; inv is used to exit the following for on occurence of a valid decimal digit
 	set i=1,inv=0,res=0
 	for i=1:1:$zlength(val)  do  quit:inv=1
 	. set res=$zextract(val,i)
@@ -57,17 +56,3 @@ VALIDVAL(val)
 	. quit:inv=1
 	set:res'=0 res=$extract(val,i,$zlength(val))
 	quit res
-
-=======
-	new h,i,s
-	set h="",l=$get(l,8),s=0
-	if "0"[$get(d) set $piece(s,0,l+1)="" quit s
-	set:"-"=$extract(d) s="F",d=$extract(d,2,9999)
-	if (18>$length(d)) for  quit:'d  set h=$extract("0123456789ABCDEF",(d#16)+1)_h,d=d\16
-	else  set h=$$CONVERTBASE^%CONVBASEUTIL(d,10,16)
-	set:(("F"=s)&("0"'=h)) h=$$CONVNEG^%CONVBASEUTIL(h,16)
-	set i=$length(h)
-	quit:l'>i h
-	set $piece(s,s,l-i+1)=""
-	quit s_h
->>>>>>> 91552df2... GT.M V6.3-009

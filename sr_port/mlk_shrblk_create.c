@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,9 +30,6 @@
 #include "mlk_ops.h"
 #include "mlk_shrhash_add.h"
 
-<<<<<<< HEAD
-boolean_t mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum);
-=======
 #ifdef MLK_SHRHASH_DEBUG
 #define SHRHASH_DEBUG_ONLY(x) x
 #else
@@ -42,7 +39,6 @@ boolean_t mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum);
 #ifdef MLK_SHRHASH_DEBUG
 void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl);
 #endif
->>>>>>> 91552df2... GT.M V6.3-009
 
 #define MAX_TRIES 4
 
@@ -119,16 +115,9 @@ boolean_t mlk_shrhash_add(mlk_pvtctl *pctl, mlk_shrblk_ptr_t shr)
 	uint4			hash, num_buckets;
 	mlk_shrhash_ptr_t	shrhash, bucket;
 
-<<<<<<< HEAD
-	shrhash = p->pvtctl.shrhash;
-	num_buckets = p->pvtctl.shrhash_size;
-	hash = MLK_PVTBLK_SUBHASH(p, subnum);
-=======
-	SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(p->ctlptr));
 	shrhash = pctl->shrhash;
 	num_buckets = pctl->shrhash_size;
 	hash = shr->hash;
->>>>>>> 91552df2... GT.M V6.3-009
 	bi = hash % num_buckets;
 	bucket = &shrhash[bi];
 	assert(MLK_SHRHASH_MAP_MAX >= bucket->usedmap);
@@ -150,13 +139,8 @@ boolean_t mlk_shrhash_add(mlk_pvtctl *pctl, mlk_shrblk_ptr_t shr)
 		SET_NEIGHBOR(bucket->usedmap, 0);
 		return TRUE;
 	}
-<<<<<<< HEAD
-	fi = mlk_shrhash_find_bucket(&p->pvtctl, hash);
-	if (MLK_SHRHASH_FOUND_NO_BUCKET == fi)
-=======
 	fi = mlk_shrhash_find_bucket(pctl, hash);
-	if (fi == -1)
->>>>>>> 91552df2... GT.M V6.3-009
+	if (MLK_SHRHASH_FOUND_NO_BUCKET == fi)
 		return FALSE;
 	/* We found one close enough, so store the new data there */
 	mlk_shrhash_insert(pctl, bi, fi, MLK_SHRBLK_IDX(*pctl, shr), hash);

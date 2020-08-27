@@ -74,12 +74,7 @@ typedef enum
 
 void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *password, mval *extraarg)
 {
-<<<<<<< HEAD
-	int4			devlen, flags, len, length, save_errno, status, status2, timeout, tls_errno, errlen, errlen2;
-=======
-	int4			devlen, extrastr_len, flags, len, length, save_errno, status, status2, timeout, tls_errno;
-	int4			errlen, errlen2;
->>>>>>> 91552df2... GT.M V6.3-009
+	int4			devlen, extrastr_len, flags, len, length, save_errno, status, status2, timeout, tls_errno, errlen, errlen2;
 	io_desc			*iod;
 	d_socket_struct 	*dsocketptr;
 	socket_struct		*socketptr;
@@ -403,19 +398,11 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			if ('\0' == idstr[0])
 			{	/* create new section from initial tlsid -renegotiate */
 				charptr = ((gtm_tls_socket_t *)socketptr->tlssocket)->tlsid;
-<<<<<<< HEAD
-				len = STRLEN(charptr);
-				assertpro(MAX_TLSID_LEN >= len);
-				memcpy(idstr, charptr, len);
-				MEMCPY_LIT(&idstr[len], "-" RENEGOTIATE);	/* append dash RENEGOTIATE */
-				len += SIZEOF(RENEGOTIATE);	/* null accounts for dash */
-=======
 				assert(MAX_TLSID_LEN >= STRLEN(charptr));
 				len = SNPRINTF(idstr, SIZEOF(idstr), "%s-" RENEGOTIATE, charptr);
 				assert(SIZEOF(idstr) > len);
 				if (len >= SIZEOF(idstr))
 					len = ((int4) SIZEOF(idstr)) - 1;
->>>>>>> 91552df2... GT.M V6.3-009
 				idstr[len] = '\0';
 			} else
 				len = STRLEN(idstr);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,14 +108,9 @@ void mlk_shrhash_delete(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 	MLK_SUBHASH_INIT_PVTCTL(pctl, hs);
 	total_len = 0;
 	mlk_shrhash_val_build(d, &total_len, &hs);
-<<<<<<< HEAD
-	ydb_mmrhash_128_result(&hs, total_len, &hashres);
-	DBG_LOCKHASH_N_BITS(hashres.one);
-	hash = (uint4)hashres.one;
-=======
 	MLK_SUBHASH_FINALIZE(hs, total_len, hashres);
+	DBG_LOCKHASH_N_BITS(hashres.one);
 	hash = MLK_SUBHASH_RES_VAL(hashres);
->>>>>>> 91552df2... GT.M V6.3-009
 	assert(hash == d->hash);
 #	else
 	hash = d->hash;
@@ -198,9 +193,5 @@ void mlk_shrhash_val_build(mlk_shrblk_ptr_t d, uint4 *total_len, mlk_subhash_sta
 		mlk_shrhash_val_build((mlk_shrblk_ptr_t)R2A(d->parent), total_len, hs);
 	shrsub = (mlk_shrsub_ptr_t)R2A(d->value);
 	*total_len += shrsub->length + 1;
-<<<<<<< HEAD
-	ydb_mmrhash_128_ingest(hs, &shrsub->length, shrsub->length + 1);
-=======
 	MLK_SUBHASH_INGEST(*hs, &shrsub->length, shrsub->length + 1);
->>>>>>> 91552df2... GT.M V6.3-009
 }

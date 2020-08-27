@@ -263,21 +263,15 @@ STATICFNDCL void free_return_type(INTPTR_T ret_val, enum ydb_types typ)
 		case ydb_jbig_decimal:
 			break;
 		case ydb_string_star:
-			free((((ydb_string_t *)ret_val)->address));
+			if (NULL != (((ydb_string_t *)ret_val)->address))
+				free((((ydb_string_t *)ret_val)->address));
 			free(((ydb_string_t *)ret_val));
 			break;
 		case ydb_float_star:
 			free(((ydb_float_t *)ret_val));
 			break;
-<<<<<<< HEAD
 		case ydb_double_star:
 			free(((ydb_double_t *)ret_val));
-=======
-		case gtm_string_star:
-			if (NULL != (((gtm_string_t *)ret_val)->address))
-				free((((gtm_string_t *)ret_val)->address));
-			free(((gtm_string_t *)ret_val));
->>>>>>> 91552df2... GT.M V6.3-009
 			break;
 		case ydb_int_star:
 			free(((ydb_int_t *)ret_val));
@@ -302,16 +296,10 @@ STATICFNDCL void free_return_type(INTPTR_T ret_val, enum ydb_types typ)
 		case ydb_char_star:
 			free(((ydb_char_t *)ret_val));
 			break;
-<<<<<<< HEAD
 		case ydb_char_starstar:
-			free(*((ydb_char_t **)ret_val));
+			if (NULL != *((ydb_char_t **)ret_val))
+				free(*((ydb_char_t **)ret_val));
 			free(((ydb_char_t **)ret_val));
-=======
-		case gtm_char_starstar:
-			if (NULL != *((gtm_char_t **)ret_val))
-				free(*((gtm_char_t **)ret_val));
-			free(((gtm_char_t **)ret_val));
->>>>>>> 91552df2... GT.M V6.3-009
 			break;
 	}
 }
@@ -421,21 +409,11 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 			uns_int_num = (ydb_uint_t)(intszofptr_t)src;
 			MV_FORCE_UMVAL(dst, uns_int_num);
 			break;
-<<<<<<< HEAD
 		case ydb_int_star:
-			s_int_num = *((ydb_int_t *)src);
-			MV_FORCE_MVAL(dst, s_int_num);
+			VALIDATE_AND_CONVERT_PTR_TO_TYPE(MVAL, ydb_int_t, s_int_num, dst, src);
 			break;
 		case ydb_uint_star:
-			uns_int_num = *((ydb_uint_t *)src);
-			MV_FORCE_UMVAL(dst, uns_int_num);
-=======
-		case gtm_int_star:
-			VALIDATE_AND_CONVERT_PTR_TO_TYPE(MVAL, gtm_int_t, s_int_num, dst, src);
-			break;
-		case gtm_uint_star:
-			VALIDATE_AND_CONVERT_PTR_TO_TYPE(UMVAL, gtm_uint_t, uns_int_num, dst, src);
->>>>>>> 91552df2... GT.M V6.3-009
+			VALIDATE_AND_CONVERT_PTR_TO_TYPE(UMVAL, ydb_uint_t, uns_int_num, dst, src);
 			break;
 		case ydb_long:
 			s_long_num = (ydb_long_t)src;
@@ -445,21 +423,11 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 			uns_long_num = (ydb_ulong_t)src;
 			MV_FORCE_ULMVAL(dst, uns_long_num);
 			break;
-<<<<<<< HEAD
 		case ydb_long_star:
-			s_long_num = *((ydb_long_t *)src);
-			MV_FORCE_LMVAL(dst, s_long_num);
+			VALIDATE_AND_CONVERT_PTR_TO_TYPE(LMVAL, ydb_long_t, s_long_num, dst, src);
 			break;
 		case ydb_ulong_star:
-			uns_long_num = *((ydb_ulong_t *)src);
-			MV_FORCE_ULMVAL(dst, uns_long_num);
-=======
-		case gtm_long_star:
-			VALIDATE_AND_CONVERT_PTR_TO_TYPE(LMVAL, gtm_long_t, s_long_num, dst, src);
-			break;
-		case gtm_ulong_star:
-			VALIDATE_AND_CONVERT_PTR_TO_TYPE(ULMVAL, gtm_ulong_t, uns_long_num, dst, src);
->>>>>>> 91552df2... GT.M V6.3-009
+			VALIDATE_AND_CONVERT_PTR_TO_TYPE(ULMVAL, ydb_ulong_t, uns_long_num, dst, src);
 			break;
 #		ifdef GTM64
 		case ydb_int64:
@@ -471,12 +439,10 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 			MV_FORCE_UMVAL(dst, uns_int64_num);
 			break;
 		case ydb_int64_star:
-			s_int64_num = *((ydb_int64_t *)src);
-			MV_FORCE_MVAL(dst, s_int64_num);
+			VALIDATE_AND_CONVERT_PTR_TO_TYPE(MVAL, ydb_int64_t, s_int64_num, dst, src);
 			break;
 		case ydb_uint64_star:
-			uns_int64_num = *((ydb_uint64_t *)src);
-			MV_FORCE_UMVAL(dst, uns_int64_num);
+			VALIDATE_AND_CONVERT_PTR_TO_TYPE(UMVAL, ydb_uint64_t, uns_int64_num, dst, src);
 			break;
 #		endif
 		case ydb_string_star:
@@ -502,16 +468,11 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 					*dst = literal_null;
 			}
 			break;
-<<<<<<< HEAD
 		case ydb_float_star:
-			float2mval(dst, *((float *)src));
-=======
-		case gtm_float_star:
 			if (NULL == src) /* If the assigned pointer value is NULL, pass back a literal_null */
 				*dst = literal_null;
 			else
 				float2mval(dst, *((float *)src));
->>>>>>> 91552df2... GT.M V6.3-009
 			break;
 		case ydb_char_star:
 			cp = (char *)src;
@@ -532,29 +493,18 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 				s2pool(&dst->str);
 			}
 			break;
-<<<<<<< HEAD
 		case ydb_char_starstar:
-			if (!src)
-				dst->mvtype = 0;
-=======
-		case gtm_char_starstar:
 			if (NULL == src) /* If the assigned pointer value is NULL, pass back a literal_null */
 				*dst = literal_null;
->>>>>>> 91552df2... GT.M V6.3-009
 			else
 				extarg2mval(*((char **)src), ydb_char_star, dst, java, starred,
 						prealloc_size, m_label, ext_buff_start, ext_buff_len);
 			break;
-<<<<<<< HEAD
 		case ydb_double_star:
-			double2mval(dst, *((double *)src));
-=======
-		case gtm_double_star:
 			if (NULL == src) /* If the assigned pointer value is NULL, pass back a literal_null */
 				*dst = literal_null;
 			else
-				double2mval(dst, *((double *)src));
->>>>>>> 91552df2... GT.M V6.3-009
+			double2mval(dst, *((double *)src));
 			break;
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
@@ -1123,20 +1073,11 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	 * ydb_string_t *) the value in param_list is always a pointer inside the space buffer, where a pointer to an area inside
 	 * the string buffer is stored.
 	 */
-<<<<<<< HEAD
 	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the protection tags */
 	call_buff_size = 2 * n;
 	OP_FNFGNCAL_ALLOCATE(param_list_buff, call_buff_size + 2 * buff_boarder_len);
 	param_list = set_up_buffer(param_list_buff, 2 * n);
 	free_space_pointer = (ydb_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
-=======
-	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the proctection tags*/
-	call_buff_size = 2*n;
-	char param_list_buff[(call_buff_size + (2 * buff_boarder_len))];
-	memset(param_list_buff, 0, (call_buff_size + (2 * buff_boarder_len)));	/* zero the contents for unmodified output values */
-	param_list = set_up_buffer(param_list_buff, 2*n);
-	free_space_pointer = (gtm_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
->>>>>>> 91552df2... GT.M V6.3-009
 	free_string_pointer_start = free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
 	/* Load-up the parameter list */
 	VAR_START(var, argcnt);
