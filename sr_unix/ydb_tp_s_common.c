@@ -33,6 +33,7 @@ GBLREF	int		tprestart_state;
 GBLREF	uint4		dollar_trestart;
 GBLREF	uint4		simpleapi_dollar_trestart;
 GBLREF	boolean_t	noThreadAPI_active;
+GBLREF	boolean_t	exit_handler_active;
 #ifdef DEBUG
 GBLREF	uint4		dollar_tlevel;
 #endif
@@ -254,6 +255,14 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 			LIBYOTTADB_DONE;		/* Shutoff active rtn indicator while TP callback routine is driven */
 			/* Drive the user-specified TP callback routine */
 			tpfn_status = (*tpfn)(tpfnparm);
+			if (exit_handler_active)
+			{	/* Note if the exit handler ran during the TP callback routine, we potentially have an active
+				 * routine again so clear it again before we leave.
+				 */
+				LIBYOTTADB_DONE;	/* If there was no active routine, this macro has no effect */
+				REVERT;
+				return YDB_ERR_CALLINAFTERXIT;
+			}
 			assert(dollar_tlevel);			/* ensure "dollar_tlevel" is still non-zero */
 			TREF(libyottadb_active_rtn) = LYDB_RTN_TP; /* Restore our routine indicator (i.e. redo LIBYOTTADB_INIT) */
 		}

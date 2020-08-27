@@ -18,6 +18,7 @@ GBLREF	uint4		dollar_tlevel;
 GBLREF	uint64_t 	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
 GBLREF	uint4		simpleapi_dollar_trestart;
 GBLREF	uint4		dollar_trestart;
+GBLREF	boolean_t	exit_handler_active;
 
 /* Routine to drive ydb_tp_s() in a worker thread so YottaDB access is isolated. Note because this drives ydb_tp_s(),
  * we don't do any of the exclusive access checks here. The thread management itself takes care of most of that currently
@@ -98,6 +99,22 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 			}
 			/* Invoke the user-defined TP callback function */
 			retval = (*tpfn)(new_tptoken, errstr, tpfnparm);
+			if (exit_handler_active)
+			{	/* The most common way to get here is if a Go routine had a defer/recover() block to catch a fatal
+				 * signal panic (asynchronous as Go defines them) in a TP callback routine and then returns to the
+				 * engine from the TP callback routine. But similar things can be done in some other languages as
+				 * well. Either way, the exit handler has run so we shouldn't be using this engine. If the exit
+				 * handler was run due to a fatal signal coming in, then the engine is already unlocked so we can
+				 * just return. But if the exit handler was run for some other reason, we probably still do hold
+				 * the engine lock. At this point, only Go releases the lock but if that changes, then this code
+				 * needs to change also.
+				 */
+				SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(YDB_ERR_CALLINAFTERXIT, errstr);
+				if (YDB_MAIN_LANG_GO != ydb_main_lang)
+					threaded_api_ydb_engine_unlock(tptoken, errstr, save_active_stapi_rtn, save_errstr,
+								       get_lock);
+				return YDB_ERR_CALLINAFTERXIT;
+			}
 			if (YDB_OK == retval)
 			{	/* Commit the TP transaction by asking "ydb_tp_s_common" to do the "op_tcommit" */
 				lydbrtn = (!nested_tp ? LYDB_RTN_TP_COMMIT_TLVL0 : LYDB_RTN_TP_COMMIT);

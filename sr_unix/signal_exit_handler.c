@@ -104,7 +104,9 @@ void signal_exit_handler(char *exit_handler_name, int sig, siginfo_t *info, void
 						sig); fflush(stderr));	/* Engine no longer alive so don't use it */
 			/* This is a multi-threaded program (since "ydb_main_lang" is "YDB_MAIN_LANG_GO"). In that case, this
 			 * thread would be holding the YDB engine lock. Release that before invoking the Go panic callback
-			 * function as that would invoke "ydb_exit()" which would otherwise deadlock on this lock.
+			 * function as that would invoke "ydb_exit()" which would otherwise deadlock on this lock. Note if any
+			 * more languages besides Go ever also release the engine lock, where we check for YDB_MAIN_LANG_GO in
+			 * the routine ydb_tp_st.c and release the engine lock needs to also be revisited.
 			 */
 			assert(simpleThreadAPI_active);
 			SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutexHolderThreadId, tLevel);
