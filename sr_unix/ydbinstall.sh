@@ -919,8 +919,7 @@ fi
 if [ "Y" = $ydb_octo ] ; then
 	cd $tmpdir	# Get back to top level temporary directory as the current directory for ydb_env_set
 	export ydb_dist=${ydb_installdir}
-	curl -fSsLO https://gitlab.com/YottaDB/DBMS/YDBOcto/-/archive/master/YDBOcto-master.tar.gz
-	tar xzf YDBOcto-master.tar.gz
+	git clone https://gitlab.com/YottaDB/DBMS/YDBOcto YDBOcto-master
 	cd YDBOcto-master
 	mkdir build
 	cd build
@@ -936,7 +935,6 @@ if [ "Y" = $ydb_octo ] ; then
 	cd ../..
 	if [ "0" = $status ] ; then
 		sudo rm -R YDBOcto-master
-		sudo rm YDBOcto-master.tar.gz
 	else
 		echo "Octo build failed. The build directory ($PWD/YDBOcto-master) and the tarball ($PWD/YDBOcto-master.tar.gz) have been saved."
 		remove_tmpdir=0
