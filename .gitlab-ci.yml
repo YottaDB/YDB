@@ -35,6 +35,28 @@ build-ubuntu:
     DOCKERFILE: Dockerfile
     REPO: yottadb
 
+build-ubuntu-clang:
+  image: ubuntu:18.04
+  stage: build
+  script:
+    - apt-get update
+    - apt-get install -yq
+        clang-10
+        file
+        cmake
+        git
+        tcsh
+        libconfig-dev
+        libelf-dev
+        libgcrypt-dev
+        libgpg-error-dev
+        libgpgme11-dev
+        libicu-dev
+        libncurses-dev
+        libssl-dev
+        zlib1g-dev
+    - ci/build.sh
+
 build-ubuntu-debug:
   extends: .build
   variables:
