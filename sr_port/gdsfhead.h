@@ -3321,17 +3321,18 @@ MBSTART {										\
 	assert(GVKEY->end < GVKEY->top);						\
 	ptr = &GVKEY->base[0];								\
 	pend = ptr + GVKEY->end;							\
-	assert(DONOTCOMMIT_CODE);							\
 	for ( ; ; )	/* for loop just to break out of restart cases */		\
 	{										\
 		if (KEY_DELIMITER != *pend)						\
 		{									\
 			DEBUG_ONLY(TREF(donot_commit) |= DONOTCOMMIT_CODE;)		\
+			assert(TREF(donot_commit));					\
 			break;								\
 		}									\
 		if ((ptr != pend) && (KEY_DELIMITER != *(pend - 1)))			\
 		{									\
 			DEBUG_ONLY(TREF(donot_commit) |= DONOTCOMMIT_CODE;)		\
+			assert(TREF(donot_commit));					\
 			break;								\
 		}									\
 		prevch = KEY_DELIMITER;							\
@@ -3341,6 +3342,7 @@ MBSTART {										\
 			if ((KEY_DELIMITER == prevch) && (KEY_DELIMITER == ch))		\
 			{								\
 				DEBUG_ONLY(TREF(donot_commit) |= DONOTCOMMIT_CODE;)	\
+				assert(TREF(donot_commit));				\
 				break;							\
 			}								\
 			prevch = ch;							\

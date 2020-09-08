@@ -607,8 +607,10 @@ int m_set(void)
 					{	/* Generate test for first being <= 0 */
 						jmptrp1 = maketriple(OC_COBOOL);
 						jmptrp1->operand[0] = first->operand[0];
+						// NOTE: this passes in a dummy value for JMP_DEPTH,
+						// because it will be ignored when the 2nd macro parameter is INIT_GBL_BOOL_DEPTH.
 						ADD_BOOL_ZYSQLNULL_PARMS(jmptrp1, INIT_GBL_BOOL_DEPTH, OC_NOOP, OC_NOOP,
-							CALLER_IS_BOOL_EXPR_FALSE, IS_LAST_BOOL_OPERAND_FALSE, INIT_GBL_BOOL_DEPTH);
+							CALLER_IS_BOOL_EXPR_FALSE, IS_LAST_BOOL_OPERAND_FALSE, 0);
 						DQINSCURTARGCHAIN(jmptrp1);
 						jmptrp1 = maketriple(OC_JMPLEQ);
 						DQINSCURTARGCHAIN(jmptrp1);
@@ -643,8 +645,10 @@ int m_set(void)
 					{	/* Last is not literal. Do test if it is greater than 0 */
 						jmptrp1 = maketriple(OC_COBOOL);
 						jmptrp1->operand[0] = last->operand[0];
+						// NOTE: this passes in a dummy value for JMP_DEPTH,
+						// because it will be ignored when the 2nd macro parameter is INIT_GBL_BOOL_DEPTH.
 						ADD_BOOL_ZYSQLNULL_PARMS(jmptrp1, INIT_GBL_BOOL_DEPTH, OC_NOOP, OC_NOOP,
-							CALLER_IS_BOOL_EXPR_FALSE, IS_LAST_BOOL_OPERAND_FALSE, INIT_GBL_BOOL_DEPTH);
+							CALLER_IS_BOOL_EXPR_FALSE, IS_LAST_BOOL_OPERAND_FALSE, 0);
 						DQINSCURTARGCHAIN(jmptrp1);
 						jmptrp1 = maketriple(OC_JMPLEQ);
 						DQINSCURTARGCHAIN(jmptrp1);

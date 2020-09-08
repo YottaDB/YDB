@@ -213,8 +213,11 @@ typedef struct gtmsrc_lcl_struct
 		status = trans_log_name(&log_nam, &trans_name, temp_inst_fn, SIZEOF(temp_inst_fn), sendmsg);		\
 	if ((SS_NORMAL == status) || (inst_from_gld && (SS_NOLOGNAM == status)) && (0 != trans_name.len))		\
 	{														\
+		boolean_t path_found;											\
+															\
 		temp_inst_fn[trans_name.len] = '\0';									\
-		if (!get_full_path(trans_name.addr, trans_name.len, fn, fn_len, bufsize, &ustatus) && err_act)		\
+		path_found = get_full_path(trans_name.addr, trans_name.len, fn, fn_len, bufsize, &ustatus);		\
+		if (!path_found && (return_on_error != err_act))								\
 		{													\
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLINSTACC, 2, trans_name.len, trans_name.addr,	\
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("full path could not be found"), ustatus);		\

@@ -38,8 +38,10 @@ int m_else(void)
 	gettruth = newtriple(OC_GETTRUTH);
 	cobool = newtriple(OC_COBOOL);
 	cobool->operand[0] = put_tref(gettruth);
+	// NOTE: this passes in a dummy value for JMP_DEPTH,
+	// because it will be ignored when the 2nd macro parameter is INIT_GBL_BOOL_DEPTH.
 	ADD_BOOL_ZYSQLNULL_PARMS(cobool, INIT_GBL_BOOL_DEPTH, OC_NOOP, OC_NOOP,
-					CALLER_IS_BOOL_EXPR_FALSE, IS_LAST_BOOL_OPERAND_FALSE, INIT_GBL_BOOL_DEPTH);
+					CALLER_IS_BOOL_EXPR_FALSE, IS_LAST_BOOL_OPERAND_FALSE, 0);
 	jmpref = newtriple(OC_JMPNEQ);
 	FOR_END_OF_SCOPE(0, jmpref->operand[0]);
 	if (!linetail())

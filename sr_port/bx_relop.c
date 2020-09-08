@@ -60,7 +60,7 @@ void bx_relop(triple *t, opctype cmp, boolean_t sense, oprtype *addr, int depth,
 		jmp_opcode = sense ? OC_JMPLSS : OC_JMPGEQ;
 		break;
 	default:
-		assert(FALSE);
+		assertpro(FALSE);
 		break;
 	}
 	ref = maketriple(jmp_opcode);
