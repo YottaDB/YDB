@@ -42,6 +42,7 @@ build-ubuntu-clang:
     - apt-get update
     - apt-get install -yq
         clang-10
+        clang-tidy-10
         file
         cmake
         git
