@@ -230,22 +230,6 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			tp_change_reg();
 		}
 	}
-	/* If this is a read-only database, simply return */
-	if (csd->read_only)
-	{
-		if ((0 != sem_rmid(udi->semid)) && (EINVAL != errno))
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"), errno);
-		udi->sem_deleted = TRUE;		/* Note that we deleted the semaphore */
-		udi->grabbed_access_sem = FALSE;
-		udi->counter_acc_incremented = FALSE;
-		if ((0 != sem_rmid(udi->ftok_semid)) && (EINVAL != errno))
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"), errno);
-		udi->grabbed_ftok_sem = FALSE;
-		udi->counter_ftok_incremented = FALSE;
-		return EXIT_NRM;
-	}
 	csa->regcnt--;
 	if (csa->regcnt)
 	{	/* There is at least one more region pointing to the same db file as this region.
