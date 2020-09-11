@@ -30,16 +30,6 @@
 #include "mlk_ops.h"
 #include "mlk_shrhash_add.h"
 
-#ifdef MLK_SHRHASH_DEBUG
-#define SHRHASH_DEBUG_ONLY(x) x
-#else
-#define SHRHASH_DEBUG_ONLY(x)
-#endif
-
-#ifdef MLK_SHRHASH_DEBUG
-void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl);
-#endif
-
 #define MAX_TRIES 4
 
 mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
@@ -90,9 +80,8 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 	assert(subptr->backpointer < 0);
 	subptr->length = len;
 	memcpy(subptr->data, val, len);
-	assert(p->hash_seed == ctl->hash_seed);
 	ret->hash = MLK_PVTBLK_SUBHASH(p, p->subscript_cnt - nshrs);
-	if (mlk_shrhash_add(&p->pvtctl, ret))
+	if (mlk_shrhash_add(p, ret, p->subscript_cnt - nshrs))
 		return ret;
 	/* We failed to add the block; return the shrblk and shrsub to the free lists */
 	memset(subptr, 0, SIZEOF(mlk_shrsub));
@@ -109,15 +98,15 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 	return NULL;
 }
 
-boolean_t mlk_shrhash_add(mlk_pvtctl *pctl, mlk_shrblk_ptr_t shr)
+boolean_t mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum)
 {
 	int			bi, fi;
 	uint4			hash, num_buckets;
 	mlk_shrhash_ptr_t	shrhash, bucket;
 
-	shrhash = pctl->shrhash;
-	num_buckets = pctl->shrhash_size;
-	hash = shr->hash;
+	shrhash = p->pvtctl.shrhash;
+	num_buckets = p->pvtctl.shrhash_size;
+	hash = MLK_PVTBLK_SUBHASH(p, subnum);
 	bi = hash % num_buckets;
 	bucket = &shrhash[bi];
 	assert(MLK_SHRHASH_MAP_MAX >= bucket->usedmap);
@@ -133,16 +122,16 @@ boolean_t mlk_shrhash_add(mlk_pvtctl *pctl, mlk_shrblk_ptr_t shr)
 	if (0 == bucket->shrblk_idx)
 	{	/* Target bucket is free, so just use it. */
 		assert(!IS_NEIGHBOR(bucket->usedmap, 0));
-		bucket->shrblk_idx = MLK_SHRBLK_IDX(*pctl, shr);
+		bucket->shrblk_idx = MLK_SHRBLK_IDX(p->pvtctl, shr);
 		assert(0 < bucket->shrblk_idx);
 		bucket->hash = hash;
 		SET_NEIGHBOR(bucket->usedmap, 0);
 		return TRUE;
 	}
-	fi = mlk_shrhash_find_bucket(pctl, hash);
+	fi = mlk_shrhash_find_bucket(&p->pvtctl, hash);
 	if (MLK_SHRHASH_FOUND_NO_BUCKET == fi)
 		return FALSE;
 	/* We found one close enough, so store the new data there */
-	mlk_shrhash_insert(pctl, bi, fi, MLK_SHRBLK_IDX(*pctl, shr), hash);
+	mlk_shrhash_insert(&p->pvtctl, bi, fi, MLK_SHRBLK_IDX(p->pvtctl, shr), hash);
 	return TRUE;
 }

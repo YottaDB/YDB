@@ -129,7 +129,7 @@ void lke_clean(void)
 				WBTEST_ONLY(WBTEST_TRASH_HASH_NO_RECOVER,
 						mlk_shrblk_ptr_t	newfreehead;
 
-						MLK_SUBHASH_INIT(&pvtblk, hs);
+						HASH128_STATE_INIT(hs, 0);
 						sub = malloc(SIZEOF(mlk_shrsub) + 23);
 						sub->length = 24;
 						memcpy(sub->data, "A12345670123456776543210", 24);
@@ -166,7 +166,7 @@ void lke_clean(void)
 				WBTEST_ONLY(WBTEST_TRASH_HASH_RECOVER,
 						mlk_shrblk_ptr_t	newfreehead;
 
-						MLK_SUBHASH_INIT(&pvtblk, hs);
+						HASH128_STATE_INIT(hs, 0);
 						sub = malloc(SIZEOF(mlk_shrsub) + 32);
 						sub->length = 33;
 						memcpy(sub->data, "A12345678901234567890123456789012", 33);
@@ -238,7 +238,7 @@ void lke_clean(void)
 							}
 							shrblk = MLK_SHRHASH_SHRBLK(pvtblk.pvtctl, check_bucket);
 							assert(0 != shrblk->value);
-							MLK_SUBHASH_INIT(&pvtblk, hs);
+							HASH128_STATE_INIT(hs, 0);
 							total_len = 0;
 							mlk_shrhash_val_build(shrblk, &total_len, &hs);
 							MLK_SUBHASH_FINALIZE(hs, total_len, hashres);
@@ -258,7 +258,7 @@ void lke_clean(void)
 					}
 					if (0 != search_bucket->shrblk_idx)
 					{	/* Verify that the value in this bucket should be in this bucket */
-						MLK_SUBHASH_INIT(&pvtblk, hs);
+						HASH128_STATE_INIT(hs, 0);
 						total_len = 0;
 						mlk_shrhash_val_build(MLK_SHRHASH_SHRBLK(pvtblk.pvtctl, search_bucket),
 									&total_len, &hs);

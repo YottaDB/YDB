@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -85,6 +88,5 @@ void mlk_shr_init(sm_uc_ptr_t base,
 	if (read_write)
 		csa->hdr->trans_hist.lock_sequence = 0;
 	ctl->hash_shmid = 0;
-	ctl->hash_seed = 0;
 	return;
 }

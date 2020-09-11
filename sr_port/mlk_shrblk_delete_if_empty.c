@@ -105,7 +105,7 @@ void mlk_shrhash_delete(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 	shrhash = pctl->shrhash;
 	num_buckets = pctl->shrhash_size;
 #	ifdef DEBUG
-	MLK_SUBHASH_INIT_PVTCTL(pctl, hs);
+	HASH128_STATE_INIT(hs, 0);
 	total_len = 0;
 	mlk_shrhash_val_build(d, &total_len, &hs);
 	MLK_SUBHASH_FINALIZE(hs, total_len, hashres);

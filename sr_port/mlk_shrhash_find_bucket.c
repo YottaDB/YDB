@@ -106,6 +106,7 @@ int mlk_shrhash_find_bucket(mlk_pvtctl_ptr_t pctl, uint4 hash)
 			assert(0 > fi);
 			break;
 		}
+		pctl->hash_fail_cnt = 0;
 		/* Move the bucket from the mapped bucket to the free bucket */
 		move_bucket = &shrhash[mi];
 		free_bucket = &shrhash[fi];
