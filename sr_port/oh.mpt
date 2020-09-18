@@ -23,7 +23,7 @@ INT	read !,"Octal: ",%OH set %OH=$$FUNC(%OH)
 	write:%OH="" !,"Input must be an octal number"
 	quit
 FUNC(o)
-	quit:"-"=$zextract(o,1) ""
+	quit:"0"[$get(o) 0
 	quit:"-"=$extract(o) ""
 	quit:(o[8)!(o[9) ""
 	new c,d,h,l
