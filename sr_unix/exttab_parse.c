@@ -68,7 +68,7 @@ STATICFNDCL int scan_array_bound(char **b,int curr_type);
 STATICFNDCL char *read_table(char *b, int l, FILE *f);
 STATICFNDCL void put_mstr(mstr *src, mstr *dst);
 STATICFNDCL uint4 array_to_mask(boolean_t ar[MAX_ACTUALS], int n);
-STATICFNDCL void ext_stx_error(int in_error, ...);
+STATICFNDCL void ext_stx_error(int in_error, char *ext_table_name);
 
 const int parm_space_needed[] =
 {
@@ -996,16 +996,10 @@ callin_entry_list *citab_parse(boolean_t internal_use, const char *fname)
 	return entry_ptr;
 }
 
-STATICFNDEF void ext_stx_error(int in_error, ...)
+STATICFNDEF void ext_stx_error(int in_error, char *ext_table_name)
 {
-	va_list	args;
-	char	*ext_table_name;
 	char	buf[MAX_SRC_LINE], *b;
 	int	num_tabs, num_spaces;
-
-	va_start(args, in_error);
-	ext_table_name = va_arg(args, char *);
-	va_end(args);
 
 	num_tabs = ext_source_column/TABLEN;
 	num_spaces = ext_source_column%TABLEN;
