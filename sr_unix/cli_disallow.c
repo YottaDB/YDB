@@ -3,6 +3,9 @@
  * Copyright (c) 2002-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -144,8 +147,10 @@ boolean_t cli_check_any2(int argcnt, ...)
 	oper = 0;
 	while(argcnt)
 	{
-		if (va_arg(var, VA_ARG_TYPE_BOOL) && 1 < ++state)
+		if (va_arg(var, VA_ARG_TYPE_BOOL) && 1 < ++state) {
+			va_end(var);
 			return TRUE;
+		}
 		argcnt--;
 	}
 	va_end(var);
