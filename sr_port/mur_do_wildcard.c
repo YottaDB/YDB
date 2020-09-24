@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -30,13 +33,15 @@
 
 boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len)
 {
-	bool	escaped_chars[pat_len], asterisk_not_seen=TRUE;
+	bool	*escaped_chars, asterisk_not_seen=TRUE;
 	int	pat_counter=0, pat_str_escaped_counter=0, count=0, jnl_counter=0, i, j=0, k=0, p, q, index1, count1=0, index2;
 	int     sav_jnl=0, pcount=0, jcount=0, escaped_chars_length=0, pat_str_escaped_len=0;
-	char	pat_str_escaped[pat_len];
+	char	*pat_str_escaped;
 
+	escaped_chars = (bool *)malloc(pat_len * SIZEOF(bool));
+	pat_str_escaped = (char *)malloc((pat_len + 1) * SIZEOF(char));
 	/* Adjust the pattern string, to remove the escape chars and make the array of indices to be escaped */
-	memset(escaped_chars, 0, SIZEOF(escaped_chars)*SIZEOF(bool));
+	memset(escaped_chars, 0, pat_len * SIZEOF(bool)); /* Set boolean array to all false */
 	index1 = index2 = 0;
 	while (index1 < pat_len)
 	{
@@ -61,7 +66,11 @@ boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len
 		{
 			asterisk_not_seen = TRUE;
 			if ( *(jnl_str + jnl_counter) != *(pat_str_escaped + pat_counter) )
+			{
+				free(escaped_chars);
+				free(pat_str_escaped);
 				return(FALSE);  /* characters do not match */
+			}
 			else  /* go to next char */
 			{
 				jnl_counter++;
@@ -87,9 +96,17 @@ boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len
 			if (i == pat_str_escaped_len)  /* no asterisk found after the current one */
 			{
 				if ((i - pat_counter) > jnl_len)
+				{
+					free(escaped_chars);
+					free(pat_str_escaped);
 					return(FALSE);
+				}
 				if (!memcmp(jnl_str + (jnl_len - (i-pat_counter)), pat_str_escaped + pat_counter, i - pat_counter))
+				{
+					free(escaped_chars);
+					free(pat_str_escaped);
 					return(TRUE);
+				}
 				else    /* maybe they do not match or else it contains percent character */
 				{
 					index1 = i - pat_counter;
@@ -108,6 +125,8 @@ boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len
 							count++;
 						}
 					}
+					free(escaped_chars);
+					free(pat_str_escaped);
 					if (pat_counter == pat_str_escaped_len)
 						return(TRUE);
 					else
@@ -139,6 +158,8 @@ boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len
 							index2++;
 						}
 					}
+					free(escaped_chars);
+					free(pat_str_escaped);
 					if (jcount == pcount)
 						return(TRUE);
 					else
@@ -152,10 +173,16 @@ boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len
 						&& ((escaped_chars[pat_counter] || *(pat_str_escaped + pat_counter) != '%')))
 					jnl_counter++;
 				if (jnl_counter == jnl_len) /* if unable to synchronize */
+				{
+					free(escaped_chars);
+					free(pat_str_escaped);
 					return(FALSE);
+				}
 			}
 		}
 	}
+	free(escaped_chars);
+	free(pat_str_escaped);
 	if ((jnl_counter == jnl_len) && (pat_counter == pat_str_escaped_len))
 		return TRUE;
 	else
