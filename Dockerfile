@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -26,9 +26,11 @@ FROM ubuntu:${OS_VSN} as ydb-release-builder
 ARG CMAKE_BUILD_TYPE=Release
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
                     file \
                     cmake \
+                    make \
+                    gcc \
                     git \
                     tcsh \
                     libconfig-dev \
@@ -64,7 +66,7 @@ FROM ubuntu:${OS_VSN} as ydb-release
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
                     file \
                     binutils \
                     libelf-dev \

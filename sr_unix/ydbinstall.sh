@@ -462,7 +462,7 @@ if [ "N" = "$ydb_force_install" ]; then
 	# Use the OS variables just defined to determine if we are running on Ubuntu 18.10 or greater and make sure libtinfo5 is installed
 	if [ "ubuntu" = "${osid}" -a 1 = `expr "$osmajorver" ">" "18"` ] || [ 1 = `expr "$osmajorver" "=" "18"` -a 1 = `expr "$osminorver" ">=" "10"` ] ; then
 		if [ ! -f /lib/x86_64-linux-gnu/libtinfo.so.5 ] ; then
-			echo "libtinfo5 package is required to be installed on Ubuntu 18.10 or greater using 'sudo apt-get install libtinfo5'"
+			echo "libtinfo5 package is required to be installed on Ubuntu 18.10 or greater using 'sudo apt-get install --no-install-recommends libtinfo5'"
 			err_exit
 		fi
 	fi

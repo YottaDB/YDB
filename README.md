@@ -35,7 +35,7 @@ At least cmake version 3 is required.
 
 ```
 # Ubuntu or Debian-like distro
-sudo apt-get install cmake
+sudo apt-get install --no-install-recommends cmake
 # CentOS
 sudo yum install cmake3
 ```
@@ -48,14 +48,14 @@ install the Clang/LLVM packages for your distribution in addition to the package
 listed below. For example for Ubuntu Linux:
 
 ```sh
- sudo apt-get install clang llvm lld
+ sudo apt-get install --no-install-recommends clang llvm lld
  ```
 
 - Install prerequisite packages
 
   ```sh
   Ubuntu Linux OR Raspbian Linux OR Beagleboard Debian
-  sudo apt-get install cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev binutils
+  sudo apt-get install --no-install-recommends cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev binutils
 
   Arch Linux
   sudo pacman -S cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,gpgme,icu,ncurses,openssl,zlib} binutils
@@ -185,7 +185,7 @@ docker run --rm -it yottadb/yottadb # you can add a specific version after a ":"
   This indicates that the libtinfo5 package isn't installed and libtinfo6 is not backwards compatible with libtinfo5. This has been observed on Ubutntu 18.10 and could possibly apply to outher Linux distributions as well. To resolve the issue, libtinfo5 can be installed via the following command:
 
   ```bash
-  sudo apt-get install libtinfo5
+  sudo apt-get install --no-install-recommends libtinfo5
   ```
 - YottaDB compilation fails with plugin needed to handle lto object
 

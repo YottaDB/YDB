@@ -26,9 +26,12 @@ FROM debian:${OS_VSN} as ydb-release-builder
 ARG CMAKE_BUILD_TYPE=Release
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
                     file \
                     cmake \
+                    make \
+                    gcc \
+                    pkg-config \
                     git \
                     tcsh \
                     libconfig-dev \
@@ -64,20 +67,19 @@ FROM debian:${OS_VSN} as ydb-release
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
                     file \
                     binutils \
+                    ca-certificates \
                     libelf-dev \
                     libicu-dev \
                     locales \
                     wget \
                     vim \
-		    procps \
-		    make \
-		    golang \
-		    git \
-		    clang \
-		    cargo \
+                    procps \
+                    make \
+                    git \
+                    pkg-config\
                     && \
     apt-get clean
 RUN locale-gen en_US.UTF-8
@@ -103,8 +105,7 @@ ENV ydb_dir=/data \
 # Accordingly, the following series of `echo`s, `sed`, and `apt` calls below are to:
 #	1. Install the latest Go version from Debian testing, i.e. 1.13+, and
 #	2. Enable apt pinning to allow forward updates of the installed Go package
-RUN . /opt/yottadb/current/ydb_env_set \
- && sed -i 's/buster/stable/g' /etc/apt/sources.list \
+RUN sed -i 's/buster/stable/g' /etc/apt/sources.list \
  && echo "Package: *" >> /etc/apt/preferences.d/preferences \
  && echo "Pin: release a=stable" >> /etc/apt/preferences.d/preferences \
  && echo "Pin-Priority: 900" >> /etc/apt/preferences.d/preferences \
@@ -113,14 +114,15 @@ RUN . /opt/yottadb/current/ydb_env_set \
  && echo "Pin: release o=testing" >> /etc/apt/preferences.d/preferences \
  && echo "Pin-Priority: -10" >> /etc/apt/preferences.d/preferences \
  && echo "deb http://deb.debian.org/debian/ testing main" >> /etc/apt/sources.list \
- && echo "deb-src http://deb.debian.org/debian/ testing main" >> /etc/apt/sources.list \
- && apt update -y \
- && apt install -t testing golang -y \
+ && echo "deb-src http://deb.debian.org/debian/ testing main" >> /etc/apt/sources.list
+RUN apt update -y \
+ && apt install -t testing golang libclang-10-dev cargo -y
+RUN . /opt/yottadb/current/ydb_env_set \
  && go version \
  && go get -t -d lang.yottadb.com/go/yottadb \
  && cd $GOPATH/src/lang.yottadb.com/go/yottadb \
  && git checkout develop \
- && go test lang.yottadb.com/go/yottadb \
+ && go test -v lang.yottadb.com/go/yottadb \
  && cd - \
  && git clone https://gitlab.com/oesiman/yottadb-perl.git \
  && cd yottadb-perl \
