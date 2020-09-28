@@ -28,10 +28,7 @@ GPG_KEYS=(
     "74B3BE040ED458D6F32AADE46321D94F6FD1C8BB"
 )
 gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "${GPG_KEYS[@]}"
-# verify-commit was only introduced in 2.5: https://stackoverflow.com/a/32038784/7669110
-# If git is not recent enough for the check, just skip it
-MAJOR_GIT_VERSION="$(git --version | cut -d ' ' -f 3 | cut -d '.' -f 1)"
-if [ $MAJOR_GIT_VERSION -ge 2 ] && ! git verify-commit HEAD; then
+if ! git verify-commit HEAD; then
     echo " -> The commit was not signed with a known GPG key!"
     exit 1
 fi
