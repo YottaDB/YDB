@@ -417,7 +417,7 @@ int gc_update_passwd(ydbenvindx_t envindx, char *suffix, passwd_entry_t **ppwent
 		{
 			if (env_value != lpasswd)
 			{	/* env_value was malloc()ed for len + 1 bytes */
-				strncpy(env_value, lpasswd, len);	/* Store the hexadecimal representation in environment */
+				memcpy(env_value, lpasswd, len);	/* Store the hexadecimal representation in environment */
 				env_value[len] = '\0';
 			}
 			passwd[len / 2] = '\0';		/* null-terminate the password string */
