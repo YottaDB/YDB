@@ -26,6 +26,8 @@ GPG_KEYS=(
     "CC9A13F429C7F9231E4DFB2832655C57E597CF83"
     # David Wicksell
     "74B3BE040ED458D6F32AADE46321D94F6FD1C8BB"
+    # Srijan Pandey
+    "7C9A96B7539C80903AE5FEB1F963F9C6E941578F"
 )
 gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "${GPG_KEYS[@]}"
 if ! git verify-commit HEAD; then
