@@ -1,6 +1,23 @@
 #!/usr/bin/env bash
+#################################################################
+#								#
+# Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+if [ $# -eq 0 ] || [ -z "$1" ]; then
+	echo "Need to pass target/upstream project URL as the first argument"
+	exit 1
+fi
 
 echo "# Check for a commit that was not gpg-signed"
+
 # If you need to add a new key ID, add it to the below list.
 # The key will also have to be on a public key server.
 # If you have never published it before, you can do so with
@@ -30,9 +47,33 @@ GPG_KEYS=(
     "7C9A96B7539C80903AE5FEB1F963F9C6E941578F"
 )
 gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "${GPG_KEYS[@]}"
-if ! git verify-commit HEAD; then
-    echo " -> The commit was not signed with a known GPG key!"
-    exit 1
+
+echo "# Add $1 as remote"
+if ! git remote | grep -q upstream_repo; then
+	git remote add upstream_repo "$1"
+	git fetch upstream_repo
+else
+	echo "Unable to add $1 as remote, remote name upstream_repo already exists"
+	exit 1
 fi
 
+echo "# Set target/upstream branch"
+if [ -z "$2" ]; then
+	ydb_branch=master
+else
+	ydb_branch="$2"
+fi
+echo "target/upstream branch set to: $ydb_branch"
 
+echo "# Fetch all commit ids only present in MR by comparing to target/upstream $ydb_branch branch"
+COMMIT_IDS=`git rev-list upstream_repo/$ydb_branch..HEAD`
+echo "${COMMIT_IDS[@]}"
+
+echo "# Verify commits"
+for id in $COMMIT_IDS
+do
+    if ! git verify-commit "$id"; then
+        echo " -> The commit $id was not signed with a known GPG key!"
+	exit 1
+    fi
+done
