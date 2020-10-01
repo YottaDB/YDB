@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -286,6 +286,7 @@ boolean_t	tp_tend()
 #	endif
 	int4			tprestart_syslog_delta;
         int4			event_type, param_val;
+	uint4			pvt_total_blks;
         void (*set_fn)(int4 param);
 	DCL_THREADGBL_ACCESS;
 
@@ -332,10 +333,11 @@ boolean_t	tp_tend()
 		sgm_info_ptr = si;
 		*prev_tp_si_by_ftok = si;
 		prev_tp_si_by_ftok = &si->next_tp_si_by_ftok;
-		if ((WC_BLOCK_RECOVER ==  cnl->wc_blocked) || (is_mm && (csa->total_blks != csd->trans_hist.total_blks)))
+		pvt_total_blks = csa->total_blks;	/* See similar code in t_end.c for comment on why this is needed */
+		if ((WC_BLOCK_RECOVER ==  cnl->wc_blocked) || (is_mm && (pvt_total_blks != csd->trans_hist.total_blks)))
 		{	/* If blocked, or we have MM and file has been extended, force repair */
 			status = cdb_sc_helpedout; /* special status to prevent punishing altruism */
-			assert((CDB_STAGNATE > t_tries) || !is_mm || (csa->total_blks == csd->trans_hist.total_blks));
+			assert((CDB_STAGNATE > t_tries) || !is_mm || (pvt_total_blks == csd->trans_hist.total_blks));
 			TP_TRACE_HIST(CR_BLKEMPTY, NULL);
 			goto failed_skip_revert;
 		}
@@ -565,6 +567,7 @@ boolean_t	tp_tend()
 			is_mm = (dba_mm == csd->acc_meth);
 			if (tprestart_syslog_delta)
 				n_blkmods = n_pvtmods = 0;
+			pvt_total_blks = csa->total_blks;	/* See similar code in t_end.c for comment on why this is needed */
 			/* If we already hold crit (possible if we are in the final retry), do not invoke grab_crit as it will
 			 * invoke wcs_recover unconditionally if cnl->wc_blocked is set to TRUE. In that case, we want to
 			 * restart with a helped out code because the cache recovery will most likely result in a restart of
@@ -578,7 +581,7 @@ boolean_t	tp_tend()
 				status = cdb_sc_helpedout;
 				goto failed;
 			}
-			if (is_mm && ((csa->hdr != csd) || (csa->total_blks != csd->trans_hist.total_blks)))
+			if (is_mm && ((csa->hdr != csd) || (pvt_total_blks != csd->trans_hist.total_blks)))
 			{       /* If MM, check if wcs_mm_recover was invoked as part of the grab_crit done above OR if
 				 * the file has been extended. If so, restart.
 				 */
@@ -850,6 +853,8 @@ boolean_t	tp_tend()
 					 * less the same as a BT. when the mmblk_rec becomes as fully functional as BT, we
 					 * can use the killtn optimization for MM also.
 					 */
+					assert((t1->buffaddr) >= csa->db_addrs[0]);
+					assert((t1->buffaddr) < csa->db_addrs[1]);
 					if (t1->tn <= ((blk_hdr_ptr_t)t1->buffaddr)->tn)
 					{
 						assert(CDB_STAGNATE > t_tries);

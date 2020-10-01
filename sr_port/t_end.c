@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -255,6 +255,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	jbuf_rsrv_struct_t	*jrs;
 	jrec_rsrv_elem_t	*first_jre, *jre, *jre_top;
         int4			event_type, param_val;
+	uint4			pvt_total_blks;
         void (*set_fn)(int4 param);
 	DCL_THREADGBL_ACCESS;
 
@@ -318,10 +319,15 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	assert((inctn_invalid_op == inctn_opcode) || mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog || update_trans);
 	assert(!need_kip_incr || update_trans || TREF(in_gvcst_redo_root_search));
 	cti = csa->ti;
-	if ((WC_BLOCK_RECOVER == cnl->wc_blocked) || (is_mm && (csa->total_blks != cti->total_blks)))
+	pvt_total_blks = csa->total_blks;	/* Note down csa->total_blks BEFORE we grab crit for MM. This is because as part
+						 * of "grab_crit()" we could call "wcs_mm_recover()" and update "csa->total_blks"
+						 * and hence we cannot use that to compare against "cti->total_blks" to decide
+						 * whether it is safer to restart the transaction.
+						 */
+	if ((WC_BLOCK_RECOVER == cnl->wc_blocked) || (is_mm && (pvt_total_blks != cti->total_blks)))
 	{	/* If blocked, or we have MM and file has been extended, force repair */
 		status = cdb_sc_helpedout;	/* force retry with special status so philanthropy isn't punished */
-		assert((CDB_STAGNATE > t_tries) || !is_mm || (csa->total_blks == cti->total_blks));
+		assert((CDB_STAGNATE > t_tries) || !is_mm || (pvt_total_blks == cti->total_blks));
 		goto failed_skip_revert;
 	}
 	if (!update_trans)
@@ -722,7 +728,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	DEBUG_ONLY(prev_status = LAST_RESTART_CODE);
 	assert((cdb_sc_normal == prev_status) || ((cdb_sc_onln_rlbk1 != prev_status) && (cdb_sc_onln_rlbk2 != prev_status))
 		|| (!TREF(in_gvcst_bmp_mark_free) || mu_reorg_process));
-	if (is_mm && ((csa->hdr != csd) || (csa->total_blks != cti->total_blks)))
+	if (is_mm && ((csa->hdr != csd) || (pvt_total_blks != cti->total_blks)))
         {       /* If MM, check if wcs_mm_recover was invoked as part of the grab_crit done above OR if
                  * the file has been extended. If so, restart.
                  */
@@ -869,6 +875,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		{
 			if (is_mm)
 			{
+				assert((t1->buffaddr) >= csa->db_addrs[0]);
+				assert((t1->buffaddr) < csa->db_addrs[1]);
 				if (t1->tn <= ((blk_hdr_ptr_t)(t1->buffaddr))->tn)
 				{
 					assert(CDB_STAGNATE > t_tries);

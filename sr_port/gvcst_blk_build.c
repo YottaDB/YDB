@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -154,7 +154,14 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 		seg = cse->first_copy ? array + 1: array + 2;
 		ptr = base_addr + SIZEOF(blk_hdr);
 		if (!cse->first_copy)
+		{
 			ptr += ((blk_segment *)(array + 1))->len;
+			/* Assert that if this is not a private block build (i.e. this is a block build that is happening in the
+			 * commit logic), and "cse->first_copy" is TRUE, the corresponding update array points to valid database
+			 * shared memory (in case of BG) or mapped memory (in case of MM).
+			 */
+			assert((NULL != base_addr) || ASSERT_IS_WITHIN_SHM_BOUNDS(((blk_segment *)(array + 1))->addr, cs_addrs));
+		}
 		for ( ; seg <= stop_ptr; )
 		{
 			assert(0L <= ((INTPTR_T)seg->len));
