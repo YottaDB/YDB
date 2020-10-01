@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -118,7 +118,7 @@ error_def(ERR_ARCTLMAXLOW);
 void	gtm_env_init_sp(void)
 {	/* Unix only environment initializations */
 	mstr		trans;
-	int4		status, index, len, hrtbt_cntr_delta, stat_res;
+	int4		index, len, hrtbt_cntr_delta, stat_res;
 	size_t		cwdlen;
 	boolean_t	ret, is_defined, is_ydb_env_match, novalidate;
 	char		buf[MAX_SRCLINE + 1], *token, cwd[YDB_PATH_MAX];
@@ -153,7 +153,7 @@ void	gtm_env_init_sp(void)
 #	endif
 	assert(YDB_PATH_MAX <= MAX_SRCLINE);
 	/* Validate $ydb_tmp if specified, else that default is available */
-	if ((SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_TMP, &trans, buf, YDB_PATH_MAX, IGNORE_ERRORS_TRUE, NULL)))
+	if ((SS_NORMAL != ydb_trans_log_name(YDBENVINDX_TMP, &trans, buf, YDB_PATH_MAX, IGNORE_ERRORS_TRUE, NULL))
 		|| (0 == trans.len))
 	{	/* Nothing for $ydb_tmp either - use DEFAULT_GTM_TMP which is already a string */
 		MEMCPY_LIT(buf, DEFAULT_GTM_TMP);
@@ -182,8 +182,8 @@ void	gtm_env_init_sp(void)
 	if (YDB_CMPLVL_OUT_OF_RANGE(ydb_zlib_cmp_level))
 		ydb_zlib_cmp_level = ZLIB_CMPLVL_MIN;	/* no compression in this case */
 	ydb_principal_editing_defaults = 0;
-	if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_PRINCIPAL_EDITING, &trans, buf, YDB_PATH_MAX,
-												IGNORE_ERRORS_TRUE, NULL)))
+	if (SS_NORMAL == ydb_trans_log_name(YDBENVINDX_PRINCIPAL_EDITING, &trans, buf, YDB_PATH_MAX,
+												IGNORE_ERRORS_TRUE, NULL))
 	{
 		assert(trans.len < YDB_PATH_MAX);
 		trans.addr[trans.len] = '\0';
@@ -221,32 +221,34 @@ void	gtm_env_init_sp(void)
 			token = STRTOK_R(NULL, ":", &strtokptr);
 		}
 	}
-	if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_CHSET, &trans, buf, YDB_PATH_MAX, IGNORE_ERRORS_TRUE, NULL))
+	if (SS_NORMAL == ydb_trans_log_name(YDBENVINDX_CHSET, &trans, buf, YDB_PATH_MAX, IGNORE_ERRORS_TRUE, NULL)
 	    && STR_LIT_LEN(UTF8_NAME) == trans.len)
 	{
 		if (!strncasecmp(buf, UTF8_NAME, STR_LIT_LEN(UTF8_NAME)))
 		{
+			int status;
+
 			is_ydb_chset_utf8 = TRUE;
 #			ifdef __MVS__
-			if ((SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_CHSET_LOCALE, &trans, buf, YDB_PATH_MAX,
-													IGNORE_ERRORS_TRUE, NULL)))
+			if ((SS_NORMAL == ydb_trans_log_name(YDBENVINDX_CHSET_LOCALE, &trans, buf, YDB_PATH_MAX,
+													IGNORE_ERRORS_TRUE, NULL))
 				&& (0 < trans.len))
 			{	/* full path to 64 bit ASCII UTF-8 locale object */
 				gtm_utf8_locale_object = malloc(trans.len + 1);
 				STRNCPY_STR(gtm_utf8_locale_object, buf, trans.len);
 				gtm_utf8_locale_object[trans.len] = '\0';
 			}
-			if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_DONT_TAG_UTF8_ASCII, &trans, buf, YDB_PATH_MAX,
-													IGNORE_ERRORS_TRUE, NULL)))
+			if (SS_NORMAL == ydb_trans_log_name(YDBENVINDX_DONT_TAG_UTF8_ASCII, &trans, buf, YDB_PATH_MAX,
+													IGNORE_ERRORS_TRUE, NULL))
 			{	/* We to tag UTF8 files as ASCII so we can read them, this var disables that */
-				if (status = ydb_logical_truth_value(YDBENVINDX_DONT_TAG_UTF8_ASCII, FALSE, &is_defined)
+				if (ydb_logical_truth_value(YDBENVINDX_DONT_TAG_UTF8_ASCII, FALSE, &is_defined)
 						&& is_defined)
 					gtm_tag_utf8_as_ascii = FALSE;
 			}
 #			endif
 			/* Initialize $ZPATNUMERIC only if $ZCHSET is "UTF-8" */
-			if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_PATNUMERIC, &trans, buf, YDB_PATH_MAX,
-													IGNORE_ERRORS_TRUE, NULL))
+			if (SS_NORMAL == ydb_trans_log_name(YDBENVINDX_PATNUMERIC, &trans, buf, YDB_PATH_MAX,
+												IGNORE_ERRORS_TRUE, NULL)
 			    && STR_LIT_LEN(UTF8_NAME) == trans.len
 			    && !strncasecmp(buf, UTF8_NAME, STR_LIT_LEN(UTF8_NAME)))
 			{
@@ -283,8 +285,8 @@ void	gtm_env_init_sp(void)
 	else
 		TREF(dbinit_max_delta_secs) = hrtbt_cntr_delta;
 	/* Initialize variable that controls the location of GT.M custom errors file (used for anticipatory freeze) */
-	if ((SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_CUSTOM_ERRORS, &trans, buf, YDB_PATH_MAX,
-											IGNORE_ERRORS_TRUE, NULL)))
+	if ((SS_NORMAL == ydb_trans_log_name(YDBENVINDX_CUSTOM_ERRORS, &trans, buf, YDB_PATH_MAX,
+											IGNORE_ERRORS_TRUE, NULL))
 		&& (0 < trans.len))
 	{
 		assert(YDB_PATH_MAX > trans.len);
@@ -299,18 +301,18 @@ void	gtm_env_init_sp(void)
 	}
 	/* See if ydb_link is set */
 	TREF(relink_allowed) = LINK_NORECURSIVE; /* default */
-	if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_LINK, &trans, buf, YDB_PATH_MAX, IGNORE_ERRORS_TRUE, NULL)))
+	if (SS_NORMAL == ydb_trans_log_name(YDBENVINDX_LINK, &trans, buf, YDB_PATH_MAX, IGNORE_ERRORS_TRUE, NULL))
 	{
 		init_relink_allowed(&trans); /* set TREF(relink_allowed) */
 	}
 #	ifdef AUTORELINK_SUPPORTED
 	if (!IS_GTMSECSHR_IMAGE)
 	{	/* Set default or supplied value for $ydb_linktmpdir */
-		if (SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_LINKTMPDIR, &trans, buf, YDB_PATH_MAX,
-												IGNORE_ERRORS_TRUE, NULL)))
+		if (SS_NORMAL != ydb_trans_log_name(YDBENVINDX_LINKTMPDIR, &trans, buf, YDB_PATH_MAX,
+												IGNORE_ERRORS_TRUE, NULL))
 		{	/* Else use default $ydb_tmp value or its default */
-			if ((SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_TMP, &trans, buf, YDB_PATH_MAX,
-												IGNORE_ERRORS_TRUE, NULL)))
+			if ((SS_NORMAL != ydb_trans_log_name(YDBENVINDX_TMP, &trans, buf, YDB_PATH_MAX,
+												IGNORE_ERRORS_TRUE, NULL))
 					|| (0 == trans.len))
 			{	/* Nothing for $ydb_tmp either - use DEFAULT_GTM_TMP which is already a string */
 				trans.addr = DEFAULT_GTM_TMP;
@@ -432,13 +434,15 @@ void	gtm_env_init_sp(void)
 	/* If ydb_locale is defined, reset the locale for this process - but only for UTF8 mode */
 	if (is_ydb_chset_utf8)
 	{
-		if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_LOCALE, &trans, buf, YDB_PATH_MAX,
-											IGNORE_ERRORS_TRUE, &is_ydb_env_match)))
+		if (SS_NORMAL == ydb_trans_log_name(YDBENVINDX_LOCALE, &trans, buf, YDB_PATH_MAX,
+											IGNORE_ERRORS_TRUE, &is_ydb_env_match))
 		{
 			if ((0 < trans.len) && (YDB_PATH_MAX > trans.len))
 			{	/* Something was specified - need to clear LC_ALL and set LC_CTYPE but need room in buf[]
 				 * for string-ending null.
 				 */
+				int status;
+
 				putenv("LC_ALL");			/* Clear LC_ALL before LC_CTYPE can take effect */
 				buf[trans.len] = '\0';
 				status = setenv("LC_CTYPE", buf, TRUE);
@@ -472,15 +476,17 @@ void	gtm_env_init_sp(void)
 	 * set it so it is always resolvable.
 	 */
 	/* Using MAX_FN_LEN below instead of YDB_PATH_MAX because csa->nl->statsdb_fname[] size is MAX_FN_LEN + 1 */
-	if ((SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_STATSDIR, &trans, buf, MAX_STATSDIR_LEN,
-											IGNORE_ERRORS_TRUE, NULL)))
+	if ((SS_NORMAL != ydb_trans_log_name(YDBENVINDX_STATSDIR, &trans, buf, MAX_STATSDIR_LEN,
+											IGNORE_ERRORS_TRUE, NULL))
 			|| (0 == trans.len))
 	{	/* Either no translation for $ydb_statsdir or the current and/or expanded value of $ydb_statsdir exceeds the
 		 * max path length. For either case $ydb_statsdir needs to be (re)set so try to use $ydb_tmp instead - note
 		 * from here down we'll (re)set $ydb_statsdir so it ALWAYS has a (valid) value for mu_cre_file() to later use.
 		 */
-		if ((SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_TMP, &trans, buf, MAX_STATSDIR_LEN,
-											IGNORE_ERRORS_TRUE, NULL)))
+		int status;
+
+		if ((SS_NORMAL != ydb_trans_log_name(YDBENVINDX_TMP, &trans, buf, MAX_STATSDIR_LEN,
+											IGNORE_ERRORS_TRUE, NULL))
 				|| (0 == trans.len))
 		{	/* Nothing for $ydb_tmp - use DEFAULT_GTM_TMP instead */
 			trans.addr = DEFAULT_GTM_TMP;

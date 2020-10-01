@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -411,7 +414,7 @@ void		gtmrecv_reinit_logseqno(void);
 int		gtmrecv_helpers_init(int n_readers, int n_writers);
 int		gtmrecv_start_helpers(int n_readers, int n_writers);
 void		gtmrecv_reap_helpers(boolean_t wait);
-int		gtmrecv_end_helpers(boolean_t is_rcvr_srvr);
+void		gtmrecv_end_helpers(boolean_t is_rcvr_srvr);
 void		gtmrecv_onln_rlbk_clnup(void);
 
 #endif

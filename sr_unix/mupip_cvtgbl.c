@@ -67,7 +67,7 @@ void mupip_cvtgbl(void)
 	char		fn[MAX_FN_LEN + 1], *line1_ptr, *line3_ptr;
 	gtm_int64_t	begin_i8, end_i8;
 	int		dos, i, file_format, line1_len, line3_len, utf8;
-	uint4	        begin, cli_status, end, max_rec_size;
+	uint4	        begin, end, max_rec_size;
 	unsigned char	buff[MAX_ONERROR_VALUE_LEN];
 	unsigned short	fn_len, len;
 	boolean_t	ignore_chset;
@@ -106,7 +106,7 @@ void mupip_cvtgbl(void)
 	if (mupip_error_occurred)
 		EXIT(-1);
 	mu_outofband_setup();
-	if ((cli_status = cli_present("BEGIN")) == CLI_PRESENT)
+	if (cli_present("BEGIN") == CLI_PRESENT)
 	{
 	        if (!cli_get_int64("BEGIN", &begin_i8))
 			mupip_exit(ERR_MUPCLIERR);
@@ -120,7 +120,7 @@ void mupip_cvtgbl(void)
 		begin = 1;
 		begin_i8 = 1;
 	}
-	if ((cli_status = cli_present("END")) == CLI_PRESENT)
+	if (cli_present("END") == CLI_PRESENT)
 	{
 	        if (!cli_get_int64("END", &end_i8))
 			mupip_exit(ERR_MUPCLIERR);
@@ -133,7 +133,7 @@ void mupip_cvtgbl(void)
 		end = (uint4) end_i8;
 	} else
 		end = MAXUINT4;
-	if ((cli_status = cli_present("FILL_FACTOR")) == CLI_PRESENT)
+	if (cli_present("FILL_FACTOR") == CLI_PRESENT)
 	{
 		assert(SIZEOF(gv_fillfactor) == SIZEOF(int4));
 	        if (!cli_get_int("FILL_FACTOR", (int4 *)&gv_fillfactor))

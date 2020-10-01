@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1547,7 +1547,6 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 CONDITION_HANDLER(mu_rndwn_file_ch)
 {
 	unix_db_info	*udi;
-	sgmnt_addrs	*csa;
 
 	START_CH(TRUE);
 	PRN_ERROR;
@@ -1555,7 +1554,6 @@ CONDITION_HANDLER(mu_rndwn_file_ch)
 	if (NULL != rundown_reg)
 	{
 		udi = FILE_INFO(rundown_reg);
-		csa = &udi->s_addrs;
 		DEBUG_ONLY(in_mu_rndwn_file = FALSE);
 		TREF(donot_write_inctn_in_wcs_recover) = FALSE;
 		if (udi->counter_acc_incremented)

@@ -3,6 +3,9 @@
  * Copyright (c) 2014, 2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -40,7 +43,7 @@ typedef struct sockaddr_un *sockun_ptr;
 
 bool	same_device_check (mstr tname, char *buf)
 {
-	int			fstat_res, gsn_stat;
+	int			fstat_res;
 	struct stat		outbuf1, outbuf2;
 	GTM_SOCKLEN_TYPE	socknamelen1;
 	GTM_SOCKLEN_TYPE	socknamelen2;
@@ -82,7 +85,7 @@ bool	same_device_check (mstr tname, char *buf)
 	{
 		/* if here then both 0,1 are sockets */
 		socknamelen1 = SIZEOF(sockname1);
-		if (-1 == (gsn_stat = getsockname(0, (struct sockaddr *)&sockname1, (GTM_SOCKLEN_TYPE *)&socknamelen1)))
+		if (-1 == getsockname(0, (struct sockaddr *)&sockname1, (GTM_SOCKLEN_TYPE *)&socknamelen1))
 		{
 			save_errno = errno;
 			if (IS_SOCKNAME_UNIXERROR(save_errno))
@@ -99,7 +102,7 @@ bool	same_device_check (mstr tname, char *buf)
 		}
 
 		socknamelen2 = SIZEOF(sockname2);
-		if (-1 == (gsn_stat = getsockname(1, (struct sockaddr *)&sockname2, (GTM_SOCKLEN_TYPE *)&socknamelen2)))
+		if (-1 == getsockname(1, (struct sockaddr *)&sockname2, (GTM_SOCKLEN_TYPE *)&socknamelen2))
 		{
 			save_errno = errno;
 			if (IS_SOCKNAME_UNIXERROR(save_errno))
@@ -143,8 +146,8 @@ bool	same_device_check (mstr tname, char *buf)
 				return FALSE;
 
 			psocknamelen1 = SIZEOF(psockname1);
-			if (-1 == (gsn_stat = getpeername(0, (struct sockaddr *)&psockname1,
-							   (GTM_SOCKLEN_TYPE *)&psocknamelen1)))
+			if (-1 == getpeername(0, (struct sockaddr *)&psockname1,
+							   (GTM_SOCKLEN_TYPE *)&psocknamelen1))
 			{
 				save_errno = errno;
 				errptr = (char *)STRERROR(save_errno);
@@ -154,8 +157,8 @@ bool	same_device_check (mstr tname, char *buf)
 
 
 			psocknamelen2 = SIZEOF(psockname2);
-			if (-1 == (gsn_stat = getpeername(1, (struct sockaddr *)&psockname2,
-							   (GTM_SOCKLEN_TYPE *)&psocknamelen2)))
+			if (-1 == getpeername(1, (struct sockaddr *)&psockname2,
+							   (GTM_SOCKLEN_TYPE *)&psocknamelen2))
 			{
 				save_errno = errno;
 				errptr = (char *)STRERROR(save_errno);

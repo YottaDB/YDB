@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,7 +134,6 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	sgmnt_data_ptr_t	csd, pvt_csd;
 	tp_region		*rptr, single;
 	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
-	gd_segment		*seg;
 	uint4			fsb_size, reservedDBFlags;
 	uint4			reorg_sleep_nsec;
 	ZOS_ONLY(int 		realfiletag;)
@@ -828,7 +827,6 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					LEN_AND_LIT(" has MM access method;"), LEN_AND_LIT("enable ASYNCIO"));
 				reg_exit_stat |= EXIT_WRN;
 			}
-			seg = gv_cur_region->dyn.addr;
 			/* AIO = ON, implies we need to use O_DIRECT. Check for db vs fs blksize alignment issues. */
 			fsb_size = get_fs_block_size(got_standalone ? fd : FILE_INFO(gv_cur_region)->fd);
 			if (0 != (csd->blk_size % fsb_size))

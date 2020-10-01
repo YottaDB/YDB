@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -564,7 +564,6 @@ STATICFNDEF void do_flow_control(uint4 write_pos)
 
 	recvpool_ctl_ptr_t	recvpool_ctl;
 	upd_proc_local_ptr_t	upd_proc_local;
-	gtmrecv_local_ptr_t	gtmrecv_local;
 	long			space_used;
 	unsigned char		*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
 	int			tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
@@ -577,7 +576,6 @@ STATICFNDEF void do_flow_control(uint4 write_pos)
 	SETUP_THREADGBL_ACCESS;
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
-	gtmrecv_local = recvpool.gtmrecv_local;
 	space_used = 0;
 	if (recvpool_ctl->wrapped)
 		space_used = write_pos + recvpool_size - (read_pos = upd_proc_local->read);
@@ -644,12 +642,10 @@ STATICFNDEF void do_flow_control(uint4 write_pos)
 
 STATICFNDEF int gtmrecv_est_conn(void)
 {
-	recvpool_ctl_ptr_t	recvpool_ctl;
-	upd_proc_local_ptr_t	upd_proc_local;
 	gtmrecv_local_ptr_t	gtmrecv_local;
 	boolean_t     		keepalive;
 	GTM_SOCKLEN_TYPE	optlen;
-	int			status, keepalive_opt, optval, save_errno;
+	int			keepalive_opt, optval, save_errno;
 	int			send_buffsize, recv_buffsize, tcp_r_bufsize;
 	struct  linger  	disable_linger = {0, 0};
 	char			print_msg[1024];
@@ -659,8 +655,6 @@ STATICFNDEF int gtmrecv_est_conn(void)
 
 	SETUP_THREADGBL_ACCESS;
 	/* Wait for a connection from a Source Server. The Receiver Server is an iterative server. */
-	recvpool_ctl = recvpool.recvpool_ctl;
-	upd_proc_local = recvpool.upd_proc_local;
 	gtmrecv_local = recvpool.gtmrecv_local;
 	/* Create a listen socket */
 	gtmrecv_comm_init((in_port_t)gtmrecv_local->listen_port);
@@ -678,6 +672,8 @@ STATICFNDEF int gtmrecv_est_conn(void)
 	{
 		while (TRUE)
 		{
+			int status;
+
 			if (0 < (status = fd_ioready(gtmrecv_listen_sock_fd, REPL_POLLIN, REPL_POLL_WAIT)))
 				break;
 			if (-1 == status)
@@ -758,10 +754,12 @@ STATICFNDEF int gtmrecv_est_conn(void)
 	if (optval)
 		repl_log(gtmrecv_log_fp, FALSE, TRUE, "TCP_KEEPINTVL is %d.\n", optval);
 #	endif
-	if (0 != (status = get_send_sock_buff_size(gtmrecv_sock_fd, &send_buffsize)))
+	if (0 != get_send_sock_buff_size(gtmrecv_sock_fd, &send_buffsize))
 		ISSUE_REPLCOMM_ERROR("Error getting socket send buffsize", errno);
 	if (send_buffsize < GTMRECV_TCP_SEND_BUFSIZE)
 	{
+		int status;
+
 		if (0 != (status = set_send_sock_buff_size(gtmrecv_sock_fd, GTMRECV_TCP_SEND_BUFSIZE)))
 		{
 			if (send_buffsize < GTMRECV_MIN_TCP_SEND_BUFSIZE)
@@ -773,12 +771,14 @@ STATICFNDEF int gtmrecv_est_conn(void)
 			}
 		}
 	}
-	if (0 != (status = get_send_sock_buff_size(gtmrecv_sock_fd, &repl_max_send_buffsize))) /* may have changed */
+	if (0 != get_send_sock_buff_size(gtmrecv_sock_fd, &repl_max_send_buffsize)) /* may have changed */
 		ISSUE_REPLCOMM_ERROR("Error getting socket send buffsize", errno);
-	if (0 != (status = get_recv_sock_buff_size(gtmrecv_sock_fd, &recv_buffsize)))
+	if (0 != get_recv_sock_buff_size(gtmrecv_sock_fd, &recv_buffsize))
 		ISSUE_REPLCOMM_ERROR("Error getting socket recv buffsize", errno);
 	if (recv_buffsize < GTMRECV_TCP_RECV_BUFSIZE)
 	{
+		int status;
+
 		for (tcp_r_bufsize = GTMRECV_TCP_RECV_BUFSIZE;
 		     tcp_r_bufsize >= MAX(recv_buffsize, GTMRECV_MIN_TCP_RECV_BUFSIZE)
 		     &&  0 != (status = set_recv_sock_buff_size(gtmrecv_sock_fd, tcp_r_bufsize));
@@ -793,7 +793,7 @@ STATICFNDEF int gtmrecv_est_conn(void)
 					ERR_TEXT, 2, LEN_AND_STR(print_msg));
 		}
 	}
-	if (0 != (status = get_recv_sock_buff_size(gtmrecv_sock_fd, &repl_max_recv_buffsize))) /* may have changed */
+	if (0 != get_recv_sock_buff_size(gtmrecv_sock_fd, &repl_max_recv_buffsize)) /* may have changed */
 		ISSUE_REPLCOMM_ERROR("Error getting socket recv buffsize", errno);
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection established, using TCP send buffer size %d receive buffer size %d\n",
 			repl_max_send_buffsize, repl_max_recv_buffsize);
@@ -1633,7 +1633,7 @@ STATICFNDEF void process_tr_buff(int msg_type)
 	uint4				in_size, out_size, upd_read, max_strm_histinfo;
 	boolean_t			filter_pass = FALSE, is_new_histrec, is_repl_cmpc;
 	uchar_ptr_t			save_buffp, save_filter_buff, in_buff;
-	int				idx, status, num_strm_histinfo;
+	int				idx, num_strm_histinfo;
 	qw_num				msg_total;
 	repl_old_triple_jnl_t		old_triple_content;
 	uLongf				destlen;
@@ -1719,6 +1719,8 @@ STATICFNDEF void process_tr_buff(int msg_type)
 	}
 	do
 	{
+		int status;
+
 		assert(remote_side->endianness_known);	/* only then is remote_side->cross_endian reliable */
 		if (is_repl_cmpc)
 		{
@@ -1750,8 +1752,8 @@ STATICFNDEF void process_tr_buff(int msg_type)
 		assert(remote_side->jnl_ver);
 		if (ENDIAN_CONVERSION_NEEDED(is_new_histrec, this_side->jnl_ver, remote_side->jnl_ver, remote_side->cross_endian))
 		{
-			if (SS_NORMAL != (status = repl_tr_endian_convert_rcvr(remote_side->jnl_ver,
-							recvpool.recvdata_base + write_off, write_len)))
+			if (SS_NORMAL != repl_tr_endian_convert_rcvr(remote_side->jnl_ver,
+							recvpool.recvdata_base + write_off, write_len))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLXENDIANFAIL, 3, LEN_AND_LIT("Replicating"),
 						&recvpool.upd_proc_local->read_jnl_seqno);
 		}
@@ -3730,8 +3732,6 @@ STATICFNDEF void gtmrecv_main_loop(boolean_t crash_restart)
 void gtmrecv_process(boolean_t crash_restart)
 {
 	recvpool_ctl_ptr_t	recvpool_ctl;
-	upd_proc_local_ptr_t	upd_proc_local;
-	gtmrecv_local_ptr_t	gtmrecv_local;
 
 	if (ZLIB_CMPLVL_NONE != ydb_zlib_cmp_level)
 		gtm_zlib_init();	/* Open zlib shared library for compression/decompression */
@@ -3743,8 +3743,6 @@ void gtmrecv_process(boolean_t crash_restart)
 	}
 #	endif
 	recvpool_ctl = recvpool.recvpool_ctl;
-	upd_proc_local = recvpool.upd_proc_local;
-	gtmrecv_local = recvpool.gtmrecv_local;
 
 	/* Check all message sizes are the same size (32 bytes = MIN_REPL_MSGLEN) except for the REPL_OLD_TRIPLE message
 	 * (repl_histrec_msg_t structure) which is 8 bytes more. Pre-supplementary, the receiver server knew to handle

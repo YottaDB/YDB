@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -166,7 +166,7 @@ boolean_t utfcgr_scanforcharN(int char_num, utfscan_parseblk *utf_parse_blk)
 	int		char_idx, tcharcnt, tbyteidx, gcharcnt, gbytecnt, bytecnt, skip, bidx;
 	int		lchar_byteidx, lchar_charcnt;
 	unsigned int	utfcgrepcnt, utfcgridx, chartype, lchar_typflags;
-	boolean_t	noslots, lastcharbad, cachemod, scaneol;
+	boolean_t	noslots, cachemod, scaneol;
 	unsigned char	*scantop, *scanptr;
 	mval		*mv;
 	utfcgr		*utfcgrp;
@@ -663,7 +663,6 @@ boolean_t utfcgr_scanforcharN(int char_num, utfscan_parseblk *utf_parse_blk)
 	 *   utf_parse_blk - Pointer to parse block where results are stored for return to user.
 	 */
 	DBGUTFC((stderr, "  utfcgr_scanforcharN: Begin non-cacheing scan with skip=%d\n", skip));
-	lastcharbad = FALSE;
 	for (; (0 < skip) && (scanptr < scantop); skip--, scanptr += bytecnt, tcharcnt++)
 	{	/* Advance the string to locate the desired character */
 		if ((!UTF8_VALID(scanptr, scantop, bytecnt)) && utf_parse_blk->stoponbadchar)
@@ -678,6 +677,8 @@ boolean_t utfcgr_scanforcharN(int char_num, utfscan_parseblk *utf_parse_blk)
 	utf_parse_blk->scan_char_count = tcharcnt;
 	if ((0 == skip) && (scanptr < scantop))
 	{	/* Character position was found */
+		boolean_t lastcharbad;
+
 		assert(tcharcnt == char_idx);
 		if ((lastcharbad = !UTF8_VALID(scanptr, scantop, bytecnt)) && utf_parse_blk->stoponbadchar) /* Note assignment */
 		{	/* Spotted a BADCHAR and we aren't tolerating those at this time */

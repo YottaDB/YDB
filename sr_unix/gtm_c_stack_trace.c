@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,6 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 	int		save_errno;
 	mstr		trans;
 	char		buf[YDB_PATH_MAX];
-	int		status;
 #	ifdef _BSD
 	union wait      wait_stat;
 #	else
@@ -60,8 +59,8 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 	arr_len = GTM_MAX_DIR_LEN + messagelen + (3 * MAX_PIDSTR_LEN) + 5;	/* 4 spaces and a terminator */
 	if (!(TREF(gtm_waitstuck_script)).len)
 	{	/* uninitialized buffer - translate logical and move it to the buffer */
-		if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_PROCSTUCKEXEC, &trans,
-								buf, SIZEOF(buf), IGNORE_ERRORS_TRUE, NULL)))
+		if (SS_NORMAL == ydb_trans_log_name(YDBENVINDX_PROCSTUCKEXEC, &trans,
+								buf, SIZEOF(buf), IGNORE_ERRORS_TRUE, NULL))
 		{	/* the environmental variable is defined */
 			assert(SIZEOF(buf) > trans.len);
 			if (0 != trans.len)
@@ -90,6 +89,8 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 	}
 	if (0 != (TREF(gtm_waitstuck_script)).len)
 	{	/* have a command and a message */
+		int		status;
+
 		command = (TREF(gtm_waitstuck_script)).addr;
 		currpos = command + trans.len;
 		memcpy(currpos, message, messagelen);

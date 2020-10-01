@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -119,7 +119,6 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	int		i, status;
 	uint4		lits_pad_size, object_pad_size, lnr_pad_size, lnkname_pad_size;
 	int4		offset;
-	int4		old_code_size;
 	rhdtyp		rhead;
 	mline		*mlx, *mly;
 	gtm_uint16	objhash;
@@ -154,7 +153,6 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	code_size = curr_addr;
 	cg_phase = CGP_ADDR_OPT;
 	comp_lits(&rhead);
-	old_code_size = code_size;
 	shrink_trips();
 	if ((cmd_qlf.qlf & CQ_MACHINE_CODE))
 	{

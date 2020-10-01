@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -147,7 +147,7 @@ void mupip_reorg_encrypt(void)
 {
 	char			key[YDB_PATH_MAX], hash[GTMCRYPT_HASH_LEN];
 	char			*db_name, *bml_lcl_buff;
-	int			db_name_len, gtmcrypt_errno, status, reg_status, status1;
+	int			db_name_len, gtmcrypt_errno, status, status1;
 	int			reg_count, i, total_blks, cycle, lcnt, bml_status;
 	int4			blk_seg_cnt, blk_size, mapsize;	/* needed for BLK_INIT,BLK_SEG and BLK_FINI macros */
 	unsigned short		key_len;
@@ -173,7 +173,6 @@ void mupip_reorg_encrypt(void)
 	jnl_private_control	*jpc;
 #	ifdef DEBUG
 	uint4			reencryption_count;
-	uint4			initial_blk_cnt;
 #	endif
 	unix_db_info		*udi;
 	DCL_THREADGBL_ACCESS;
@@ -254,6 +253,8 @@ void mupip_reorg_encrypt(void)
 	/* Start processing regions one by one. */
 	for (i = 0, rptr = grlist; NULL != rptr; rptr = rptr->fPtr, i++)
 	{
+		int reg_status;
+
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
 			break;
 		reg_status = SS_NORMAL;
@@ -264,7 +265,7 @@ void mupip_reorg_encrypt(void)
 		if (reg_cmcheck(reg))
 		{
 			util_out_print("Region !AD : MUPIP REORG ENCRYPT cannot run across network", TRUE, REG_LEN_STR(reg));
-			status = reg_status = ERR_MUNOFINISH;
+			status = ERR_MUNOFINISH;
 			continue;
 		}
 		mu_reorg_process = TRUE;	/* "gvcst_init" will use this value to use ydb_poollimit settings. */
@@ -374,9 +375,6 @@ void mupip_reorg_encrypt(void)
 		}
 		curr_tn = csd->trans_hist.curr_tn;
 		total_blks = csd->trans_hist.total_blks;
-#		ifdef DEBUG
-		initial_blk_cnt = total_blks;
-#		endif
 		blk_size = csd->blk_size;	/* "blk_size" is used by the BLK_FINI macro */
 		send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MUREENCRYPTSTART, 4, DB_LEN_STR(reg), process_id, &curr_tn);
 		if (UNSTARTED == csd->encryption_hash_cutoff)
@@ -455,7 +453,11 @@ void mupip_reorg_encrypt(void)
 				break;
 			}
 			assert(!csa->now_crit);
-			bml_sm_buff = t_qread(curbmp, (sm_int_ptr_t)&cycle, &cr); /* bring block into the cache outside of crit */
+			// NOTE: return code is intentionally ignored.
+			// t_qread() could return NULL because we are not holding the critical section lock. And it is
+			// not an error. Later we grab the critical section lock and redo the same t_qread(). Then we do
+			// not expect a NULL return and so the rts_error() is valid in that case.
+			t_qread(curbmp, (sm_int_ptr_t)&cycle, &cr); /* bring block into the cache outside of crit */
 			/* ++++++++++++++++++++++++++ IN CRIT ++++++++++++++++++++++++++ */
 			grab_crit_encr_cycle_sync(reg); /* needed so t_qread does not return NULL below */
 			/* Safeguard against someone concurrently changing the database file header. It is unsafe to continue. */
@@ -732,7 +734,7 @@ void mupip_reorg_encrypt(void)
 			{
 				util_out_print("Region !AD : Timed out waiting for concurrent reads to finish2",
 						TRUE, REG_LEN_STR(reg));
-				reg_status = ERR_MUNOFINISH;
+				status = ERR_MUNOFINISH;
 				break;
 			}
 			/* Same for writers. */
@@ -740,7 +742,7 @@ void mupip_reorg_encrypt(void)
 			{
 				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_BUFFLUFAILED, 4,
 						LEN_AND_LIT("MUPIP REORG ENCRYPT3"), db_name_len, db_name);
-				reg_status = ERR_MUNOFINISH;
+				status = ERR_MUNOFINISH;
 				break;
 			}
 			/* We are not resetting encryption_hash2_start_tn because we do not want the

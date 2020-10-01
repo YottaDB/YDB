@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,7 @@ error_def(ERR_TEXT);
 
 int gtmsource_get_opt(void)
 {
-	boolean_t	connect_parms_badval, dotted_notation, log, log_interval_specified, plaintext_fallback, secondary;
+	boolean_t	connect_parms_badval, log, log_interval_specified, plaintext_fallback, secondary;
 	boolean_t	is_ydb_env_match;
 	char		*c, *connect_parm, *connect_parms_str, *connect_parm_token_str;
 	char		tmp_connect_parms_str[GTMSOURCE_CONN_PARMS_LEN + 1];
@@ -80,7 +80,7 @@ int gtmsource_get_opt(void)
 	char		statslog_val[SIZEOF("OFF")]; /* "ON" or "OFF" */
 	char		update_val[SIZEOF("DISABLE")]; /* "ENABLE" or "DISABLE" */
 	gtm_int64_t	buffsize;
-	int		connect_parms_index, errcode, index = 0, port_len, renegotiate_interval, status, tries, timeout_status;
+	int		connect_parms_index, errcode, index = 0, renegotiate_interval, status, tries, timeout_status;
 	mstr		trans_name;
 	struct hostent	*sec_hostentry;
 	unsigned short	connect_parms_str_len, filter_cmd_len, freeze_comment_len, freeze_val_len, inst_name_len, log_file_len;
@@ -182,7 +182,6 @@ int gtmsource_get_opt(void)
 			/* Parse secondary_sys into secondary_host
 			 * and secondary_port */
 			c = secondary_sys;
-			dotted_notation = TRUE;
 			if ('[' == *c)
 			{
 				ip_end = strchr(++c, ']');
@@ -206,7 +205,7 @@ int gtmsource_get_opt(void)
 				util_out_print("Secondary port number should be specified", TRUE);
 				return(-1);
 			}
-			port_len = strlen(++c);
+			++c;
 			errno = 0;
 			if (((0 == (gtmsource_options.secondary_port = ATOI(c))) && (0 != errno))
 				|| (0 >= gtmsource_options.secondary_port))

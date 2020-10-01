@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -178,7 +178,7 @@ int	gtmrecv_ipc_cleanup(boolean_t auto_shutdown, int *exit_status)
 		status = grab_sem(RECV, RECV_SERV_COUNT_SEM);
 	else
 		status = 0;
-	if (0 == status && 0 > (status = grab_sem(RECV, UPD_PROC_COUNT_SEM)))
+	if (0 == status && 0 > grab_sem(RECV, UPD_PROC_COUNT_SEM))
 	{
 		save_errno = errno;
 		status = rel_sem(RECV, RECV_SERV_COUNT_SEM);

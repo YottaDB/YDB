@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1288,7 +1288,6 @@ int gtmsource_process(void)
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sent REPL_RESYNC_SEQNO message with SEQNO "
 					INT8_FMT" "INT8_FMTX"\n",
 					(*(seq_num *)&reply_msgp->start_seqno[0]), (*(seq_num *)&reply_msgp->start_seqno[0]));
-				region_top = gd_header->regions + gd_header->n_regions;
 				assert(NULL != jnlpool->jnlpool_dummy_reg);
 				grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 				if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)

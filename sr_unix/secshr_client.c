@@ -175,8 +175,7 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	ssize_t			num_chars_recvd, num_chars_sent;
 	int 			save_errno, ret_code = 0, init_ret_code = 0;
 	int			loop_count = 0;
-	int			recv_complete, send_complete;
-	boolean_t		retry = FALSE;
+	int			recv_complete;
 	size_t			server_proc_len;
 	int			semop_res;
 	int			selstat, status;
@@ -262,7 +261,6 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		mesg.pid = process_id;			/* Process id of client */
 		mesg.seqno = ++cur_seqno;
 		send_ptr = (char *)&mesg;
-		send_complete = FALSE;
 		SENDTO_SOCK(gtmsecshr_sockfd, send_ptr, send_len, 0, (struct sockaddr *)&gtmsecshr_sock_name,
 			    (GTM_SOCKLEN_TYPE)gtmsecshr_sockpath_len, num_chars_sent);	/* This form handles EINTR internally */
 		save_errno = errno;
@@ -344,7 +342,6 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		{	/* Timeout, connection issues, bad descriptor block - retry */
 			gtmsecshr_sock_cleanup(CLIENT);
 			gtmsecshr_sock_init(CLIENT);
-			retry = TRUE;
 			if (client_timer_popped)
 			{
 				START_SERVER;

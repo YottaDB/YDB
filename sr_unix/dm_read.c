@@ -164,7 +164,6 @@ void	dm_read (mval *v)
 	fd_set		input_fd;
 	int		backspace, cl, cur_cl, cur_value, delete, down, hist, histidx, index, insert_key, keypad_len, left;
 	int		delchar_width;		/* display width of deleted char */
-	int		delta_width;		/* display width change for replaced char */
 	int		dx, dx_start;		/* local dollar X, starting value */
 	int		dx_instr, dx_outlen;	/* wcwidth of string to insert point, whole string */
 	int		dx_prev, dx_cur, dx_next;/* wcwidth of string to char BEFORE, AT and AFTER the insert point */
@@ -182,12 +181,11 @@ void	dm_read (mval *v)
 	uint4		mask;
 	unsigned int	exp_length, len, length;
 	unsigned char	*buffer_start;		/* beginning of non UTF8 buffer */
-	unsigned char	*current_ptr;		/* insert next character into buffer here */
 	unsigned char	escape_sequence[ESC_LEN];
 	unsigned char	inbyte, *outptr, *outtop, *ptr, *ptrnext, *ptrtop;
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
 	unsigned short	escape_length = 0;
-	wint_t		*buffer_32_start, codepoint, *current_32_ptr, inchar, *ptr32;
+	wint_t		*buffer_32_start, codepoint, inchar, *ptr32;
 #	ifdef __MVS__
 	wint_t		asc_inchar;
 #	endif
@@ -229,7 +227,6 @@ void	dm_read (mval *v)
 		if (mv_zintdev && mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid)
 		{
 			buffer_start = (unsigned char *)mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr;
-			current_ptr = buffer_start;
 			mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 			mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 			if (mv_chain == mv_zintdev)
@@ -244,7 +241,6 @@ void	dm_read (mval *v)
 						!= ((unsigned char *)tt_state->buffer_32_start - tt_state->buffer_start)))
 					memmove(buffer_32_start, buffer_start + ((unsigned char *)tt_state->buffer_32_start
 						- tt_state->buffer_start), (SIZEOF(wint_t) * length));
-				current_32_ptr = buffer_32_start;
 				utf8_more = tt_state->utf8_more;
 				if (utf8_more)
 				{
@@ -274,12 +270,11 @@ void	dm_read (mval *v)
 	if (!zint_restart)
 	{
 		ENSURE_STP_FREE_SPACE(exp_length);
-		buffer_start = current_ptr = stringpool.free;
+		buffer_start = stringpool.free;
 		if (utf8_active)
 		{
 			buffer_32_start = (wint_t *)ROUND_UP2((INTPTR_T)(stringpool.free + (GTM_MB_LEN_MAX * length)),
 					SIZEOF(gtm_int64_t));
-			current_32_ptr = buffer_32_start;
 		}
 		instr = outlen = 0;
 		dx_instr = dx_outlen = 0;
@@ -484,7 +479,6 @@ void	dm_read (mval *v)
 				if (mask & TRM_CONVERT)
 					NATIVE_CVT2UPPER(inbyte, inbyte);
 				inchar = inbyte;
-				inchar_width = 1;
 #			ifdef UTF8_SUPPORTED
 			}
 #			endif
@@ -796,7 +790,6 @@ void	dm_read (mval *v)
 							else
 							{
 								GTM_IO_WCWIDTH(GET_OFF(instr), delchar_width);
-								delta_width = inchar_width - delchar_width;
 							}
 							STORE_OFF(inchar, instr);
 							/* First write spaces on all the display columns that the current string
@@ -881,7 +874,7 @@ void	dm_read (mval *v)
 					if (utf8_active)
 					{
 						len = comline_base[cl].len;
-						instr = dx_instr = 0;
+						instr = 0;
 						outtop = (unsigned char *)comline_base[cl].addr + len;
 						for (outptr = (unsigned char *)comline_base[cl].addr; outptr < outtop; )
 						{
@@ -945,6 +938,8 @@ void	dm_read (mval *v)
 	if (utf8_active)
 	{
 		int	i;
+		wint_t *current_32_ptr;
+
 		outptr = buffer_start;
 		outtop = ((unsigned char *)buffer_32_start);
 		current_32_ptr = buffer_32_start;

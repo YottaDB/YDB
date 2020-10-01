@@ -3,7 +3,7 @@
  * Copyright (c) 2017-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,7 +31,7 @@ int gtm_confstr(char *command, int maxsize)
 	char 		pathbuf[MAX_FN_LEN];
 	char 		*cmd_path, *path_tok, *path_tokptr, *cmd_ptr;
 	size_t 		n;
-	int 		tok_len, status, i, cmdlen;
+	int 		tok_len, status, cmdlen;
 	struct stat 	sb;
 
 	n = confstr(_CS_PATH, NULL, (size_t) 0);
@@ -45,7 +45,6 @@ int gtm_confstr(char *command, int maxsize)
 						LEN_AND_LIT("Path for system utilities not defined"));
 		return -1;
 	}
-	i = 0;
 	cmdlen = strlen(command);
 	path_tok = STRTOK_R(pathbuf, ":", &path_tokptr);
 	assert(cmdlen && (path_tok != NULL));

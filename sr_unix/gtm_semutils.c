@@ -131,7 +131,6 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 				if (EAGAIN == save_errno)
 				{
 					*bypass = TRUE;
-					save_errno = 0;
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_RESRCINTRLCKBYPAS, 10,
 						 LEN_AND_STR((IS_LKE_IMAGE ? "LKE" : "DSE")), process_id,
 						 LEN_AND_STR(sem_names[semtype]), REG_LEN_STR(reg), DB_LEN_STR(reg), sem_pid);

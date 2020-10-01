@@ -701,7 +701,6 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 	int		num1;
 	int		num2;
 	char		ch, *ptr;
-	char		*ptr1;
 	char		*save_dst_ptr;
 	int		save_len;
 	char		*start_dst_ptr;
@@ -804,7 +803,6 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 						return FALSE;
 					}
 					UPDATE_DST(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
-					ptr1 = ptr;
 					alternation = FALSE;
 					while ((0 < len) && ((',' != *ptr) || alternation) && ((')' != *ptr) || alternation)
 					       && (';' != *ptr))
@@ -950,6 +948,8 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 						return FALSE;
 					} else
 					{	/* A range with no lower end - just scan the numeric or string */
+						char	*ptr1;
+
 						ptr1 = ptr;
 						if (IS_NUMERIC_SUBSCRIPT(ch))
 							PROCESS_NUMERIC(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
@@ -1182,7 +1182,7 @@ STATICFNDEF boolean_t process_pieces(char *piece_str, uint4 *piece_len)
 			CONV_STR_AND_PRINT("Invalid PIECE entry - ", *piece_len, piece_str);
 		return FALSE;
 	}
-	have_num = have_low_num = have_num_in_str = FALSE;
+	have_low_num = have_num_in_str = FALSE;
 	ptr = piece_str;
 	len = 0;
 	for (i = 0; i < MAX_PIECE_INT; i++)
@@ -1202,7 +1202,6 @@ STATICFNDEF boolean_t process_pieces(char *piece_str, uint4 *piece_len)
 					bit++;
 					continue;
 				}
-				have_num = TRUE;
 				have_low_num = TRUE;
 				low = i * BITS_PER_INT + bit;
 				if (have_num_in_str)

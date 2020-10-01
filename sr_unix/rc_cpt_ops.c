@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,7 +81,7 @@ int rc_cpt_entry(int blk)
 	{
 		errno = 0;
 		i = semctl(rc_sem,0,GETVAL);
-		if (errno)   /* invalid semaphore */
+		if (-1 == i)   /* invalid semaphore */
 		{
 			rc_sem = 0;
 			/* detach shared memory segment as well */
@@ -201,7 +201,6 @@ static int rc_init_ipc(void)
 
 static void rc_cpt_unlock(void)
 {	struct sembuf	sop[2];
-	int		rv;
 	int		semop_rv;
 
 	sop[0].sem_num = 0;
@@ -213,7 +212,7 @@ static void rc_cpt_unlock(void)
 	{
 		if (errno == EINVAL)
 		{	/* try reinitializing semaphore... */
-			if (!(rv=rc_init_ipc()))
+			if (!rc_init_ipc())
 			{
 				SEMOP(rc_sem, sop, 1, semop_rv, NO_WAIT);
 				if (-1 != semop_rv)
@@ -235,7 +234,6 @@ static void rc_cpt_unlock(void)
 static void rc_cpt_lock(void)
 {
 	struct sembuf	sop[2];
-	int		rv;
 	int		semop_rv;
 
 /* WARNING:  To prevent deadlocks, never attempt to acquire a database critical section while holding this semaphore */
@@ -249,7 +247,7 @@ static void rc_cpt_lock(void)
 	{
 		if (errno == EINVAL)
 		{	/* try reinitializing semaphore... */
-			if (!(rv=rc_init_ipc()))
+			if (!rc_init_ipc())
 			{
 				SEMOP(rc_sem, sop, 2, semop_rv, FORCED_WAIT);
 				if (-1 != semop_rv)

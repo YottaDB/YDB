@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -606,12 +606,10 @@ static	int force_file_read(repl_ctl_element *ctl)
 	 */
 	repl_buff_t		*rb;
 	repl_buff_desc		*b;
-	repl_file_control_t	*fc;
 	enum jnl_record_type	rectype;
 
 	rb = ctl->repl_buff;
 	b = &rb->buff[REPL_MAINBUFF];
-	fc = rb->fc;
 	if (b->reclen == 0 || b->recaddr == b->readaddr || b->buffremaining == 0 || b->buffremaining == REPL_BLKSIZE(rb))
 	{	/* A file read will be forced anyway */
 		return (SS_NORMAL);
@@ -695,7 +693,6 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 		dskread -= REPL_BLKSIZE(rb);
 	max_seqno = 0;
 	max_seqno_addr = 0;
-	max_seqno_found = FALSE;
 	do
 	{
 		/* Ignore the existing contents of scratch buffer */
@@ -846,7 +843,6 @@ static	int first_read(repl_ctl_element *ctl)
 	enum jnl_record_type	rectype;
 	repl_buff_t		*rb;
 	repl_buff_desc		*b;
-	repl_file_control_t	*fc;
 	boolean_t		min_seqno_found;
 	unsigned char		seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
 	gtmsource_state_t	gtmsource_state_sav;
@@ -855,7 +851,6 @@ static	int first_read(repl_ctl_element *ctl)
 	rb = ctl->repl_buff;
 	assert(rb->buffindex == REPL_MAINBUFF);
 	b = &rb->buff[rb->buffindex];
-	fc = rb->fc;
 	/* Ignore the existing contents of the buffer */
 	b->buffremaining = REPL_BLKSIZE(rb);
 	b->recbuff = b->base;
@@ -961,7 +956,6 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 	 */
 	repl_buff_t		*rb;
 	repl_buff_desc		*b;
-	repl_file_control_t	*fc;
 	int			readlen;
 	seq_num			rec_jnl_seqno;
 	enum jnl_record_type	rectype;
@@ -975,7 +969,6 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 	rb = ctl->repl_buff;
 	assert(rb->buffindex == REPL_MAINBUFF);
 	b = &rb->buff[rb->buffindex];
-	fc = rb->fc;
 	repl_rctl = ctl->repl_rctl;
 	assert(FALSE == repl_rctl->read_complete);
 	csa = &FILE_INFO(ctl->reg)->s_addrs;
@@ -1180,7 +1173,6 @@ static	tr_search_state_t do_binary_search(repl_ctl_element *ctl, uint4 lo_addr, 
 	repl_buff_t		*rb;
 	repl_buff_desc		*b;
 	repl_file_control_t	*fc;
-	tr_search_state_t	found;
 	uint4			low, high, mid, new_mid, mid_further, stop_at;
 	uint4			srch_half_lo_addr, srch_half_hi_addr, othr_half_lo_addr, othr_half_hi_addr;
 	uint4			hi_addr_mod, hi_addr_diff, mid_mod, mid_diff;
@@ -1208,8 +1200,10 @@ static	tr_search_state_t do_binary_search(repl_ctl_element *ctl, uint4 lo_addr, 
 		hi_addr_mod = REPL_BLKSIZE(rb); /* avoid including additional block if already aligned */
 	hi_addr_diff = fc->eof_addr - hi_addr;
 	high = hi_addr + MIN(REPL_BLKSIZE(rb) - hi_addr_mod, hi_addr_diff);
-	for (found = TR_NOT_FOUND, mid = ROUND_DOWN((low >> 1) + (high >> 1), REPL_BLKSIZE(rb)); ; )
+	for (mid = ROUND_DOWN((low >> 1) + (high >> 1), REPL_BLKSIZE(rb)); ; )
 	{
+		tr_search_state_t	found;
+
 		mid_mod = mid % REPL_BLKSIZE(rb);
 		mid_diff = fc->eof_addr - mid;
 		assert(0 != mid_diff);

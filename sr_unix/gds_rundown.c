@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -153,7 +153,6 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	node_local_ptr_t	cnl;
 	struct shmid_ds		shm_buf;
 	struct sembuf		sop[2], ftok_sop[2];
-	uint4           	jnl_status;
 	unix_db_info		*udi;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
@@ -174,7 +173,6 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	jnl_status = 0;
 	reg = gv_cur_region;			/* Local copy */
 	/* Early out for cluster regions
 	 * to avoid tripping the assert below.
@@ -323,7 +321,6 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	{
 		if (-1 == (ftok_semval = semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))) /* Check # of procs counted on FTOK */
 		{
-			save_errno = errno;
 			assert(FALSE);
 			rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
 				      RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get ftok_semval"), CALLFROM, errno);
@@ -658,6 +655,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 						grab_crit(reg);
 					if (JNL_ENABLED(csd))
 					{
+						uint4 jnl_status;
 						SET_GBL_JREC_TIME;	/* jnl_ensure_open/jnl_write_pini/pfin/jnl_file_close
 									 * all need it.
 									 */
@@ -1032,7 +1030,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		} else if (bypassed_ftok)
 		{
 			if (!ftok_counter_halted)
-				if (0 != (save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, SEM_UNDO)))
+				if (0 != do_semop(udi->ftok_semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, SEM_UNDO))
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 		} else if (!ftok_sem_release(reg, !ftok_counter_halted, FALSE))
 		{

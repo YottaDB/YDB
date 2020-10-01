@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -325,7 +325,6 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 	sgm_info		*save_sgm_info_ptr;
 	jnlpool_addrs_ptr_t	save_jnlpool;
 	sgmnt_addrs		*csa, *regcsa;
-	sgmnt_data_ptr_t	csd;
 	boolean_t		db_trigger_cycle_mismatch, ztrig_cycle_mismatch, needs_reload = FALSE;
 	DCL_THREADGBL_ACCESS;
 
@@ -378,8 +377,6 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 			gbl.addr = gvt->gvname.var_name.addr;
 			gbl.len = gvt->gvname.var_name.len;
 			TP_CHANGE_REG_IF_NEEDED(gvt->gd_csa->region);
-			csa = cs_addrs;
-			csd = csa->hdr;
 			COMPUTE_HASH_MNAME(&gvt->gvname);
 			GV_BIND_NAME_ONLY(gd_header, &gvt->gvname, gvnh_reg);	/* does tp_set_sgm() */
 			if (((NULL == gvnh_reg->gvspan) && (gv_cur_region != reg))
@@ -408,6 +405,8 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 	{	/* Have a routine header addr. From that we can get the gv_trigger_t descriptor and from that, the
 		 * gvt_trigger and other necessities.
 		 */
+		sgmnt_data_ptr_t	csd;
+
 		DBGTRIGR((stderr, "trigger_source_raov: routine header found, now load it\n"));
 		trigdsc = (gv_trigger_t *)rtn_vector->trigr_handle;
 		gvt_trigger = trigdsc->gvt_trigger;			/* We now know our base block now */

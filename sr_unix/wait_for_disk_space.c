@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,7 +51,6 @@ error_def(ERR_ENOSPCQIODEFER);
 void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char *buf, size_t count, int *save_errno)
 {
 	boolean_t	was_crit;
-	gd_region	*reg;
 	int		fn_len, tmp_errno;
 	boolean_t	freeze_cleared;
 	char		wait_comment[MAX_FREEZE_COMMENT_LEN];
@@ -86,7 +85,6 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	assert(NULL != jnlpool);
 	repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
 	was_crit = repl_csa->now_crit;
-	reg = csa->region;
 	if (!was_crit)
 	{	/* Setting the instance freeze requires the journal pool lock (grab_lock). However, we need to be careful
 		 * to avoid a deadlock. A deadlock is possible if we hold the io_in_prog_latch, and meanwhile another

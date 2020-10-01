@@ -3,7 +3,7 @@
  * Copyright (c) 2016 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,14 +41,12 @@ int	wcs_wt_restart(unix_db_info *udi, cache_state_rec_ptr_t csr)
 {
 	int			save_errno;
 	blk_hdr_ptr_t		bp, save_bp;
-	sgmnt_data_ptr_t	csd;
 	cache_que_head_ptr_t	ahead;
 	sgmnt_addrs		*csa;
 
 	assert(0 > SYNCIO_MORPH_SUCCESS); /* save_errno should be positive in all cases except when == SYNCIO_MORPH_SUCCESS */
 	csa = &udi->s_addrs;
 	BG_TRACE_PRO_ANY(csa, wcs_wt_restart_invoked);
-	csd = csa->hdr;
 	bp = (blk_hdr_ptr_t)(GDS_ANY_REL2ABS(csa, csr->buffaddr));
 	if (!csr->wip_is_encr_buf)
 		save_bp = bp;
@@ -83,4 +81,3 @@ int	wcs_wt_restart(unix_db_info *udi, cache_state_rec_ptr_t csr)
 	}
 	return save_errno;
 }
-

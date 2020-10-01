@@ -203,7 +203,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	char			*tempfilename, eof_marker[EOF_MARKER_SIZE], tempdir_trans_buffer[YDB_PATH_MAX];
 	char			tempdir_full_buffer[YDB_PATH_MAX], tempnamprefix[MAX_FN_LEN + 1];
 	char			time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
-	enum db_acc_method	acc_meth;
 	gtm_uint64_t		db_file_size, native_size;
 	int			dsk_addr = 0;
 	int			fclose_res, fstat_res, group_id, perm, pwrite_res, retries;
@@ -220,7 +219,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	snapshot_filhdr_ptr_t	ss_filhdr_ptr;
 	struct perm_diag_data	pdd;
 	struct stat		stat_buf;
-	uint4			crit_counter, fstat_status, prev_ss_shmsize, tempnamprefix_len, tot_blks;
+	uint4			crit_counter, fstat_status, tempnamprefix_len, tot_blks;
 	void			*ss_shmaddr;
 	intrpt_state_t		prev_intrpt_state;
 
@@ -229,7 +228,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
-	acc_meth = csd->acc_meth;
 	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
 	/* Create a context containing default information pertinent to this initiate invocation */
 	lcl_ss_ctx = malloc(SIZEOF(snapshot_context_t)); /* should be free'd by ss_release */
@@ -318,7 +316,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		}
 	}
 	/* Verify if we can stat the temporary directory */
-	if (FILE_STAT_ERROR == (fstat_res = gtm_file_stat(&tempdir_trans, NULL, &tempdir_full, FALSE, &fstat_status)))
+	if (FILE_STAT_ERROR == gtm_file_stat(&tempdir_trans, NULL, &tempdir_full, FALSE, &fstat_status))
 	{
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_SSTMPDIRSTAT, 2, tempdir_trans.len, tempdir_trans.addr, fstat_status);
 		UNFREEZE_REGION_IF_NEEDED(csd, reg);
@@ -440,10 +438,12 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	grab_crit(reg);
 	INCR_INHIBIT_KILLS(cnl);
 	kip_pids_arr_ptr = cnl->kip_pid_array;
-	prev_ss_shmsize = ss_shmsize = 0;
+	ss_shmsize = 0;
 	crit_counter = 1;
 	for (retries = 0; MAX_TRY_FOR_TOT_BLKS >= retries; ++retries)
 	{
+		uint4 prev_ss_shmsize;
+
 		final_retry = (MAX_TRY_FOR_TOT_BLKS == retries);
 		/* On all but the 4th retry (inclusive of retries = -1), release crit */
 		if (!final_retry)

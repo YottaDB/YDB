@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,7 +86,6 @@ STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval 
 {
 	char			parm_string[8];
 	int4			argcnt, i;
-	int			rc;
 	job_setup_op		setup_op;
 	boolean_t		setup_done = FALSE;
 	job_params_msg		params;
@@ -110,6 +109,8 @@ STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval 
 		g_args->callargs = 0;
 	while(!setup_done)
 	{
+		int	rc;
+
 		DOREADRC(setup_fd, &setup_op, SIZEOF(setup_op), rc);
 		if (rc < 0)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("setup operation"), errno, 0);
@@ -236,7 +237,7 @@ STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval 
 		receive_child_locals_finalize(&local_buff);
 	/* Keep the pipe alive until local transfer is done which is done at the second call to this function */
 	if (local_trans_done == setup_op)
-		if ((rc = close(setup_fd)) < 0)
+		if (close(setup_fd) < 0)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, setup_fd, errno, 0);
 }
 

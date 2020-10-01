@@ -249,12 +249,10 @@ STATICFNDCL int io_getevents_internal(aio_context_t ctx)
  */
 STATICFNDCL void clean_wip_queue(unix_db_info *udi)
 {
-	int 			spins, maxspins, retries, ret;
-	int4			max_sleep_mask;
+	int 			spins, retries, ret;
 	cache_que_head_ptr_t	que_head;
 	cache_state_rec_ptr_t   cstt;
 	struct aiocb 		*aiocbp;
-	sgmnt_data_ptr_t	csd;
 	sgmnt_addrs		*csa;
 	struct gd_info		*gdi;
 	node_local_ptr_t	cnl;
@@ -270,10 +268,7 @@ STATICFNDCL void clean_wip_queue(unix_db_info *udi)
 	gdi = udi->owning_gd->gd_runtime->thread_gdi;
 	assert(gdi->num_ios > 0); 	/* caller should have ensured this */
 	csa = &udi->s_addrs;
-	csd = csa->hdr;
 	cnl = csa->nl;
-	max_sleep_mask = -1;	/* initialized to -1 to defer memory reference until needed */
-	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
 	que_head = &csa->acc_meth.bg.cache_state->cacheq_wip;
 	/* Grab the WIP queue lock, similarly to wcs_get_space.c where we lock the active queue header. */
 	for (num_tries = 0, done = FALSE; !done && (num_tries < MAX_WIP_TRIES); num_tries++)
@@ -397,7 +392,7 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 		return -1;
 	}
 	/* Sets up the AIO context */
-	if (-1 == (ret = aio_shim_setup(&tmp_gdi.ctx)))
+	if (-1 == aio_shim_setup(&tmp_gdi.ctx))
 	{	/* The only "allowed" error is EAGAIN. The errstr should have been set by
 		 * aio_shim_setup().
 		 */

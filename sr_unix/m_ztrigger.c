@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -33,7 +36,7 @@ int m_ztrigger(void)
 		case TK_CIRCUMFLEX:
 			if (!gvn())
 				return FALSE;
-			ref = newtriple(OC_ZTRIGGER);
+			newtriple(OC_ZTRIGGER);
 			break;
 		case TK_ATSIGN:
 			if (!indirection(&tmparg))

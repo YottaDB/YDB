@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,7 +116,7 @@ int gtmrecv(void)
 	uint4			gtmrecv_pid;
 	int			idx, semval, status, save_upd_status, upd_start_status, upd_start_attempts;
 	char			print_msg[REPL_MSG_SIZE], tmpmsg[REPL_MSG_SIZE];
-	pid_t			pid, procgp;
+	pid_t			pid;
 	int			exit_status, waitpid_res, save_errno;
 	int			log_init_status;
 	int			updresync_instfile_fd;	/* fd of the instance file name specified in -UPDATERESYNC= */
@@ -382,8 +382,10 @@ int gtmrecv(void)
 	{
 		if (gtmrecv_options.updateonly)
 			gtmrecv_exit(gtmrecv_endupd() - NORMAL_SHUTDOWN);
-		if (gtmrecv_options.helpers)
-			gtmrecv_exit(gtmrecv_end_helpers(FALSE) - NORMAL_SHUTDOWN);
+		if (gtmrecv_options.helpers) {
+			gtmrecv_end_helpers(FALSE);
+			gtmrecv_exit(0);
+		}
 		gtmrecv_exit(gtmrecv_shutdown(FALSE, NORMAL_SHUTDOWN) - NORMAL_SHUTDOWN);
 	} else if (gtmrecv_options.changelog)
 		gtmrecv_exit(gtmrecv_changelog() - NORMAL_SHUTDOWN);
@@ -470,7 +472,7 @@ int gtmrecv(void)
 	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmrecv_log_fd, gtmrecv_options.log_file);
 	assert(SS_NORMAL == log_init_status);
 	repl_log_fd2fp(&gtmrecv_log_fp, gtmrecv_log_fd);
-	if (-1 == (procgp = setsid()))
+	if (-1 == setsid())
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			  RTS_ERROR_LITERAL("Receiver server error in setsid"), errno);
 	gtmrecv_local->recv_serv_pid = process_id;
@@ -580,7 +582,7 @@ int gtmrecv(void)
 	gtmrecv_filter = NO_FILTER;
 	if ('\0' != gtmrecv_local->filter_cmd[0])
 	{
-		if (SS_NORMAL == (status = repl_filter_init(gtmrecv_local->filter_cmd)))
+		if (SS_NORMAL == repl_filter_init(gtmrecv_local->filter_cmd))
 			gtmrecv_filter |= EXTERNAL_FILTER;
 		else
 			gtmrecv_exit(ABNORMAL_SHUTDOWN);

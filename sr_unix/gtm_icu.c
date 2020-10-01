@@ -222,7 +222,7 @@ void gtm_icu_init(void)
 	void_ptr_t	handle;
 	char_ptr_t	err_str;
 	icu_func_t	fptr;
-	int		findx, ver;
+	int		findx;
 	boolean_t	icu_getversion_found = FALSE, ydb_icu_ver_defined, symbols_renamed;
 	UVersionInfo	icu_version;
 	int		iculdflags = ICU_LIBFLAGS;
@@ -337,7 +337,9 @@ void gtm_icu_init(void)
 			if ((2 == strlen(pieceptr)) && (('0' <= pieceptr[0]) && ('9' >= pieceptr[0]))
 					&& (('0' <= pieceptr[1]) && ('9' >= pieceptr[1])))
 			{
-				icusymver_len = ver = 0;
+				int ver;
+
+				icusymver_len = 0;
 				cptr = pieceptr;
 				A2I(cptr, pieceptr+2, ver);
 				assert(0 <= ver);	/* Already validated above */

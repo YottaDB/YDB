@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -228,18 +228,17 @@ STATICFNDEF char *parse_SSL_options(struct gtm_ssl_options *opt_table, size_t op
 STATICFNDEF char *parse_SSL_options(struct gtm_ssl_options *opt_table, size_t opt_table_size, const char *options, long *current,
 					long *clear)
 {
-	int		negate;
 	size_t		num_options, index, optionlen;
 	long		bitmask;
 	const char	*charptr, *optionend;
 
 	if (NULL == options)
 		return 0;
-	negate = 0;
 	bitmask = *current;
 	num_options = opt_table_size/SIZEOF(struct gtm_ssl_options);
 	for (charptr = options; *charptr; charptr = optionend)
 	{
+		int negate;
 		if (OPTIONEND == *charptr)
 			if ('\0' == *++charptr)
 				break;
@@ -1512,7 +1511,7 @@ STATICFNDEF int gtm_tls_renegotiate_options_config(char *idstr, int flags, confi
 			int *verify_depth_set, int *verify_mode, int *verify_mode_set, int *verify_level, int *verify_level_set,
 			int *session_id_len, unsigned char *session_id_string, const char **CAfile)
 {
-	int			rv, parse_len;
+	int			parse_len;
 	config_setting_t	*tlsid, *tlssect, *cfg_setting;
 	char			cfg_path[MAX_CONFIG_LOOKUP_PATHLEN];
 	long			options_mask, options_current, options_clear, verify_long, level_long, level_clear;
@@ -1569,7 +1568,11 @@ STATICFNDEF int gtm_tls_renegotiate_options_config(char *idstr, int flags, confi
 		*verify_level_set = TRUE;
 	}
 	SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.CAfile", idstr);
-	rv = config_lookup_string(cfg, cfg_path, CAfile);
+	if (CONFIG_TRUE != config_lookup_string(cfg, cfg_path, CAfile)) {
+		UPDATE_ERROR_STRING("In TLSID: %s - CAfile not found or invalid type", idstr);
+		tls_errno = -1;
+		return -1;
+	}
 	SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.session-id-hex", idstr);
 	if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &session_id_hex))
 	{	/* convert hex to char and set len */

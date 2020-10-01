@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -386,7 +386,6 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 CONDITION_HANDLER(mu_rndwn_repl_instance_ch)
 {
 	unix_db_info	*udi;
-	sgmnt_addrs	*csa;
 	gd_region	*reg;
 
 	START_CH(TRUE);
@@ -397,7 +396,6 @@ CONDITION_HANDLER(mu_rndwn_repl_instance_ch)
 	if (NULL != reg)
 	{
 		udi = FILE_INFO(reg);
-		csa = &udi->s_addrs;
 		if (udi->grabbed_ftok_sem)
 			ftok_sem_release(reg, udi->counter_ftok_incremented, TRUE);
 	}

@@ -129,7 +129,6 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, uint8 *nsec_timeout,
 
 	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
-	status = 0;
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
 	fildes = rm_ptr->fildes;
 

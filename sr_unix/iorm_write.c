@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -121,7 +121,7 @@ void iorm_write_utf(mstr *v)
 	wint_t		utf_code;
 	io_desc		*iod;
 	d_rm_struct	*rm_ptr;
-	unsigned char	*inptr, *top, *nextmb, *outptr, *nextoutptr, *outstart, temppad, temppadarray[2];
+	unsigned char	*inptr, *top, *nextmb, *outptr, *outstart, temppad, temppadarray[2];
 	char		*out_ptr;
 	boolean_t	utf8_active = TRUE;		/* needed by GTM_IO_WCWIDTH macro */
 	boolean_t	stream, wrap;
@@ -157,7 +157,7 @@ void iorm_write_utf(mstr *v)
 	outbytes = 0;
 	if (CHSET_UTF8 != iod->ochset)
 	{
-		outstart = nextoutptr = outptr = &rm_ptr->outbuf[rm_ptr->out_bytes];
+		outstart = outptr = &rm_ptr->outbuf[rm_ptr->out_bytes];
 		/* In case the CHSET changes from non-UTF-16 to UTF-16 and a read has already been done,
 		 * there's no way to read the BOM bytes & to determine the variant. So default to UTF-16BE.
 		 */
@@ -225,6 +225,8 @@ void iorm_write_utf(mstr *v)
 			}
 			if (CHSET_UTF8 != iod->ochset)
 			{
+				unsigned char *nextoutptr;
+
 				if (CHSET_UTF16BE == iod->ochset)
 					nextoutptr = UTF16BE_WCTOMB(utf_code, outptr);
 				else
@@ -334,7 +336,7 @@ void iorm_write_utf(mstr *v)
 				outbytes = usedwidth = 0;
 			} else
 			{
-				outstart = nextoutptr = outptr = &rm_ptr->outbuf[rm_ptr->out_bytes];
+				outstart = outptr = &rm_ptr->outbuf[rm_ptr->out_bytes];
 				outbytes = usedwidth = 0;
 				continue;
 			}
@@ -360,7 +362,6 @@ void iorm_write(mstr *v)
 	char		*out, *out_ptr;
 	int		inlen, outlen, status, len;
 	d_rm_struct	*rm_ptr;
-	int		flags;
 	int		fcntl_res;
 	boolean_t	stream, wrap;
 	struct stat	statbuf;
@@ -423,7 +424,8 @@ void iorm_write(mstr *v)
 	   then set it.  A read will turn it off */
 	if (rm_ptr->fifo && (2 < rm_ptr->fildes) && (RM_WRITE != rm_ptr->lastop))
 	{
-		flags = 0;
+		int		flags;
+
 		FCNTL2(rm_ptr->fildes, F_GETFL, flags);
 		if (0 > flags)
 		{

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -45,7 +48,7 @@
 /* #GTM_THREAD_SAFE : The below function (gtm_putmsg_list) is thread-safe because caller ensures serialization with locks */
 void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 {
-	int		i, msg_id, fao_actual, fao_count, dummy, freeze_msg_id;
+	int		i, msg_id, fao_actual, fao_count, freeze_msg_id;
 	char		msg_buffer[1024];
 	mstr		msg_string;
 	const err_msg	*msg;
@@ -126,7 +129,7 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 			 */
 			for (i = fao_count;  i < fao_actual;  ++i)
 			{
-				dummy = va_arg(var, int);
+				va_arg(var, int);
 				--arg_count;
 			}
 			va_end(TREF(last_va_list_ptr));

@@ -75,14 +75,14 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	struct addrinfo		*ai_ptr, *localhost_ai_ptr, *temp_ai_ptr, hints;
 	mstr			trans, tmp, symlinkfile;
 	int			status, diff;
-	uint4			local_node_len, query_node_len, node_name_len;
+	uint4			local_node_len, query_node_len;
 	parse_blk		def, symlink_pblk;
 	char			local_node_name[MAX_HOST_NAME_LEN + 1], query_node_name[MAX_HOST_NAME_LEN + 1];
 	char			*base, *ptr, *top, *del, *node, *name, *ext, ch;
 	char			**hostaddrlist;
 	char			def_string[MAX_FN_LEN + 1], symlink_pblk_string[MAX_FN_LEN + 1];
 	char			symlink_path[YDB_PATH_MAX]; /* buffer holding the target file name in case of a symbolic link */
-	boolean_t		hasnode, hasdir, hasname, hasext, wilddir, wildname;
+	boolean_t		hasdir, hasname, hasext, wilddir, wildname;
 	enum parse_state	state;
 	struct sockaddr_storage	query_sas;
 	struct sockaddr		localhost_sa, *localhost_sa_ptr;
@@ -121,10 +121,9 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 		if (def.b_name)	def.fnb |= F_HAS_NAME;
 		if (def.b_ext)	def.fnb |= F_HAS_EXT;
 	}
-	wildname = wilddir = hasnode = hasdir = hasname = hasext = FALSE;
+	wildname = wilddir = hasdir = hasname = hasext = FALSE;
 	node = base = ptr = trans.addr;
 	top = ptr + trans.len;
-	node_name_len = (uint4)trans.len;
 	if ((0 == trans.len) || ('/' != *ptr))
 	{	/* No file given, no full path given, or a nodename was specified */
 		setzdir(NULL, &def_trans); /* Default current directory if none given */
@@ -133,6 +132,8 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 				&& (0 == memcmp(def_trans.str.addr, dollar_zdir.str.addr, def_trans.str.len))));
 		if (pblk->fop & F_PARNODE)
 		{	/* What we have could be a nodename */
+			boolean_t hasnode;
+
 			assert(pblk->fop & F_SYNTAXO);
 			/* A file specification could be any of the the following forms
 			 *	<filepath>
@@ -165,6 +166,8 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 			}
 			if (node < top)
 			{
+				uint4 node_name_len;
+
 				assert(':' == ch);
 				hasnode = TRUE;
 				base = node;				/* Update pointers past node name */
@@ -185,7 +188,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 					{
 						memcpy((sockaddr_ptr)&query_sas, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
 						CLIENT_HINTS(hints);
-						if (0 == (errcode = dogetaddrinfo(LOCALHOSTNAME, NULL, &hints, &localhost_ai_ptr))
+						if (0 == dogetaddrinfo(LOCALHOSTNAME, NULL, &hints, &localhost_ai_ptr)
 							&& (0 == memcmp(localhost_ai_ptr->ai_addr, (sockaddr_ptr)&query_sas,
 												localhost_ai_ptr->ai_addrlen)))
 						{
@@ -371,7 +374,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 			}
 			assert((del >= base) && ('/' == *del));
 			del++;
-			ptr = top = del;
+			ptr = del;
 			name = ptr;
 		}
 	}

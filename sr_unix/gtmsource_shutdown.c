@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -246,7 +246,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 			LONG_SLEEP(10);
 		}
 #		endif
-		if (0 > (status = grab_sem(SOURCE, JNL_POOL_ACCESS_SEM)))
+		if (0 > grab_sem(SOURCE, JNL_POOL_ACCESS_SEM))
 		{
 			save_errno = errno;
 			repl_log(stderr, TRUE, TRUE, "Could not acquire Journal Pool access control semaphore : %s. "
@@ -257,7 +257,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 			return ABNORMAL_SHUTDOWN;
 		}
 		/* Now that the locks are re-acquired, decrease the counter sempahore */
-		if (sem_incremented && (0 > (status = decr_sem(SOURCE, SRC_SERV_COUNT_SEM))))
+		if (sem_incremented && (0 > decr_sem(SOURCE, SRC_SERV_COUNT_SEM)))
 		{
 			save_errno = errno;
 			repl_log(stderr, TRUE, TRUE, "Could not decrement Journal Pool counter semaphore : %s."
@@ -335,4 +335,3 @@ void gtmsource_sigstop(void)
 		gtmsource_stop(FALSE);
 	return;
 }
-

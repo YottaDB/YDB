@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -237,7 +237,6 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	gtmsrc_lcl_ptr_t	gtmsrclcl_ptr;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr, reuse_slot_ptr;
 	uint4			gtmsource_pid, gtmrecv_pid;
-	gtmsource_state_t	gtmsource_state;
 	seq_num			reuse_slot_seqnum, instfilehdr_seqno;
 	repl_histinfo		last_histinfo;
 	jnlpool_ctl_ptr_t	tmp_jnlpool_ctl;
@@ -826,7 +825,6 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 				reuse_slot_ptr = gtmsourcelocal_ptr;
 			if (0 == STRCMP(gtmsource_options.secondary_instname, gtmsourcelocal_ptr->secondary_instname))
 			{	/* Found matching slot */
-				gtmsource_state = gtmsourcelocal_ptr->gtmsource_state;
 				gtmsource_pid = gtmsourcelocal_ptr->gtmsource_pid;
 				/* Check if source server is already running for this secondary instance */
 				if ((0 != gtmsource_pid) && is_proc_alive(gtmsource_pid, 0))
@@ -902,7 +900,6 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 					gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
 					for (index = 0; index < NUM_GTMSRC_LCL; index++, gtmsourcelocal_ptr++)
 					{
-						gtmsource_state = gtmsourcelocal_ptr->gtmsource_state;
 						gtmsource_pid = gtmsourcelocal_ptr->gtmsource_pid;
 						if ((0 == gtmsource_pid) || !is_proc_alive(gtmsource_pid, 0))
 						{	/* Slot can be reused */
@@ -1309,4 +1306,3 @@ void jnlpool_detach(void)
 		DETACH_FROM_JNLPOOL_IF_NEEDED(jnlpool, rts_error_csa);
 	}
 }
-

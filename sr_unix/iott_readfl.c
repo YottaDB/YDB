@@ -144,19 +144,17 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 {
 	boolean_t	ret, nonzerotimeout, timed, insert_mode, edit_mode, utf8_active, zint_restart, buffer_moved;
 	uint4		mask;
-	wint_t		inchar, *current_32_ptr, *buffer_32_start, switch_char;
+	wint_t		inchar, *buffer_32_start, switch_char;
 	unsigned char	inbyte, *outptr, *outtop;
 #ifdef __MVS__
 	wint_t		asc_inchar;
 #endif
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
-	unsigned char	*current_ptr;		/* insert next character into buffer here */
 	unsigned char	*buffer_start;		/* beginning of non UTF8 buffer */
 	int		msk_in, msk_num, rdlen, save_errno, selstat, status, ioptr_width, i, utf8_more, utf8_seen;
 	int		exp_length;
 	int		inchar_width;		/* display width of inchar */
 	int		delchar_width;		/* display width of deleted char */
-	int		delta_width;		/* display width change for replaced char */
 	int		dx, dx_start;		/* local dollar X, starting value */
 	int		dx_instr, dx_outlen;	/* wcwidth of string to insert point, whole string */
 	int		dx_prev, dx_cur, dx_next;/* wcwidth of string to char BEFORE, AT and AFTER the insert point */
@@ -213,7 +211,6 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 		if (NULL != mv_zintdev && mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid)
 		{	/* looks good so use it */
 			buffer_start = (unsigned char *)mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr;
-			current_ptr = buffer_start;
 			mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 			mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 			if (mv_chain == mv_zintdev)
@@ -228,7 +225,6 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 						!= ((unsigned char *)tt_state->buffer_32_start - tt_state->buffer_start)))
 					memmove(buffer_32_start, buffer_start + ((unsigned char *)tt_state->buffer_32_start
 						- tt_state->buffer_start), (SIZEOF(wint_t) * length));
-				current_32_ptr = buffer_32_start;
 				utf8_more = tt_state->utf8_more;
 				if (utf8_more)
 				{
@@ -267,12 +263,11 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 	if (!zint_restart)
 	{
 		ENSURE_STP_FREE_SPACE(exp_length);
-		buffer_start = current_ptr = stringpool.free;
+		buffer_start = stringpool.free;
 		if (utf8_active)
 		{
 			buffer_32_start = (wint_t *)ROUND_UP2((INTPTR_T)(stringpool.free + (GTM_MB_LEN_MAX * length)),
 					SIZEOF(gtm_int64_t));
-			current_32_ptr = buffer_32_start;
 		}
 		instr = outlen = 0;
 		dx_instr = dx_outlen = 0;
@@ -871,7 +866,6 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 								else if (edit_mode && !insert_mode)
 								{	/* only needed if edit && !insert_mode && not at end */
 									GTM_IO_WCWIDTH(GET_OFF(instr), delchar_width);
-									delta_width = inchar_width - delchar_width;
 								}
 							}
 							STORE_OFF(inchar, instr);
@@ -1212,6 +1206,8 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 #	ifdef UTF8_SUPPORTED
 	if (utf8_active)
 	{
+		wint_t *current_32_ptr;
+
 		outptr = buffer_start;
 		outtop = ((unsigned char *)buffer_32_start);
 		current_32_ptr = buffer_32_start;

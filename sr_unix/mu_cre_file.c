@@ -211,7 +211,7 @@ unsigned char mu_cre_file(void)
 	}
 	pblk.def1_buf = DEF_DBEXT;
 	pblk.def1_size = SIZEOF(DEF_DBEXT) - 1;
-	if (ERR_PARNORMAL != (retcode = parse_file(&file, &pblk)))	/* Note assignment */
+	if (ERR_PARNORMAL != parse_file(&file, &pblk))
 	{
 		PUTMSG_ERROR_CSA(cs_addrs, 4, ERR_FNTRANSERROR, 2, REG_LEN_STR(gv_cur_region));
 		return EXIT_ERR;

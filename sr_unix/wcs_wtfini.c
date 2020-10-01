@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,14 +77,14 @@ error_def(ERR_DBCCERR);
 int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t cr2flush)
 {
 	boolean_t		new_pid, pid_alive;
-	cache_que_head_ptr_t	ahead, whead;
+	cache_que_head_ptr_t	whead;
 	cache_rec_ptr_t		cr;
 #	ifdef DEBUG
 	cache_rec_ptr_t		cr_lo, cr_hi;
 #	endif
 	cache_state_rec_ptr_t	csr, start_csr;
 	int			requeue, ret_value;
-	int			restart_errno, status;
+	int			status;
 	int			aio_errno, aio_retval;
 	int4			n;
 	node_local_ptr_t	cnl;
@@ -112,7 +112,6 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 	BG_TRACE_PRO_ANY(csa, wcs_wtfini_invoked);
 	wtfini_in_prog++;
 	cnl->wtfini_in_prog = process_id;
-	ahead = &csa->acc_meth.bg.cache_state->cacheq_active;
 	whead = &csa->acc_meth.bg.cache_state->cacheq_wip;
 	n_bts = csd->n_bts;
 #	ifdef DEBUG
@@ -239,7 +238,6 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 						RTS_ERROR_LITERAL("aio_error()"), CALLFROM, aio_errno);
 		}
-		restart_errno = 0;
 		requeue = REQUEUE_TO_WIP;
 		epid = csr->epid;
 		if (EINPROGRESS == aio_errno)
@@ -332,6 +330,8 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 				 * if the process that was doing the AIO got killed (and so the OS decided to abandon the IO).
 				 * Assert accordingly.
 				 */
+				int restart_errno;
+
 				assert((0 < aio_errno)
 					|| ((0 == aio_errno) && (!dbg_skip_wcs_wt_restart || (epid && !is_proc_alive(epid, 0)))));
 				WCS_OPS_TRACE(csa, process_id, wcs_ops_wtfini3, cr->blk, GDS_ANY_ABS2REL(csa,cr),	\
@@ -392,6 +392,8 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 			CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
 		} else
 		{
+			cache_que_head_ptr_t ahead;
+
 			assert(REQUEUE_TO_ACTIVE == requeue);
 			CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
 			ahead = &csa->acc_meth.bg.cache_state->cacheq_active;

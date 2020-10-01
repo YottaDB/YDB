@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -438,7 +438,7 @@ gd_region *dbfilopn(gd_region *reg)
 	int			status;
 	boolean_t		raw;
 	boolean_t		open_read_only;
-	int			stat_res, rc, save_errno, len;
+	int			stat_res, rc, len;
 	sgmnt_addrs		*csa;
 	sgmnt_data		tsdbuff;
 	sgmnt_data_ptr_t        tsd;
@@ -565,7 +565,6 @@ gd_region *dbfilopn(gd_region *reg)
 					{
 						ftok_sem_release(tmp_reg, FALSE, FALSE);
 						MU_GV_CUR_REG_FREE(tmp_reg, save_gv_cur_region);
-						save_errno = TREF(mu_cre_file_openrc);
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 					}
 					memcpy(tmpbuff, seg->fname, seg->fname_len + 1); /* + 1 to include terminating '\0' */
@@ -574,6 +573,8 @@ gd_region *dbfilopn(gd_region *reg)
 					/* Rename "tmp.dat_%YGTM" to "tmp.dat" */
 					if (-1 == RENAME(tmpbuff, (char *)seg->fname))
 					{
+						int save_errno;
+
 						save_errno = errno;
 						ftok_sem_release(tmp_reg, FALSE, FALSE);
 						MU_GV_CUR_REG_FREE(tmp_reg, save_gv_cur_region);
@@ -603,6 +604,8 @@ gd_region *dbfilopn(gd_region *reg)
 			OPENFILE_DB(fnptr, O_RDONLY, udi, seg);
 			if (FD_INVALID == udi->fd)
 			{
+				int save_errno;
+
 				save_errno = errno;
 				if (!IS_GTCM_GNP_SERVER_IMAGE)
 				{
@@ -649,6 +652,8 @@ gd_region *dbfilopn(gd_region *reg)
 	FSTAT_FILE(udi->fd, &buf, stat_res);
         if (-1 == stat_res)
         {
+		int save_errno;
+
         	save_errno = errno;
         	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
         }
@@ -1235,7 +1240,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		dbsecspc(reg, tsd, &sec_size); 	/* Find db segment size */
 		/* Create new shared memory using IPC_PRIVATE. System guarantees a unique id */
 		GTM_WHITE_BOX_TEST(WBTEST_FAIL_ON_SHMGET, sec_size, GTM_UINT64_MAX);
-		if (-1 == (status_l = udi->shmid = shmget(IPC_PRIVATE, sec_size, RWDALL | IPC_CREAT)))
+		if (-1 == (udi->shmid = shmget(IPC_PRIVATE, sec_size, RWDALL | IPC_CREAT))) /* Warning: assignment */
 		{
 			udi->shmid = (int)INVALID_SHMID;
 			status_l = INVALID_SHMID;
@@ -1792,7 +1797,6 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		/* Release control lockout now that it is init'd */
 		if (0 != (save_errno = do_semop(udi->semid, DB_CONTROL_SEM, -1, SEM_UNDO)))
 		{
-			save_errno = errno;
 			RTS_ERROR(VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,	\
 					RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
 		}

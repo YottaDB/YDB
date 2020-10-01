@@ -206,7 +206,6 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t immediate)
 	assert(!udi->grabbed_ftok_sem || (FALSE != process_exiting));
 	assert((NULL == ftok_sem_reg) || (FALSE != process_exiting));
 	assert(INVALID_SEMID != udi->ftok_semid);
-	ftok_sopcnt = 0;
 	if (!udi->grabbed_ftok_sem)
 	{	/* Guarantee no one else accesses database file header while we update semid/shmid fields in the file header */
 		ftok_sop[0].sem_num = DB_CONTROL_SEM; ftok_sop[0].sem_op = 0;	/* Wait for 0 (unlocked) */

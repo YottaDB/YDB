@@ -778,8 +778,6 @@ void relinkctl_lock_exclu(open_relinkctl_sgm *linkctl)
 	}
 	else if (0 != status)
 	{
-		relinkctl_data	hdr_copy = *linkctl->hdr;	/* Keep a copy in case we core */
-
 		assert(EINVAL != status);
 		ISSUE_RELINKCTLERR_TEXT(&linkctl->zro_entry_name, "lock attempt failed", status);
 	}

@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -98,8 +98,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 	sgm_info		*save_sgm_info_ptr;
 	jnlpool_addrs_ptr_t	save_jnlpool;
 	rhdtyp			*rtn_vector;
-	sgmnt_addrs		*csa, *regcsa;
-	sgmnt_data_ptr_t	csd;
+	sgmnt_addrs		*regcsa;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -201,8 +200,6 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 			gbl.addr = gvt->gvname.var_name.addr;
 			gbl.len = gvt->gvname.var_name.len;
 			TP_CHANGE_REG_IF_NEEDED(gvt->gd_csa->region);
-			csa = cs_addrs;
-			csd = csa->hdr;
 			COMPUTE_HASH_MNAME(&gvt->gvname);
 			GV_BIND_NAME_ONLY(gd_header, &gvt->gvname, gvnh_reg);	/* does tp_set_sgm() */
 			if (((NULL == gvnh_reg->gvspan) && (gv_cur_region != reg))
@@ -213,7 +210,6 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 				break;
 		}
 	}
-	csa = NULL;
 	if (NULL == rtn_vector)
 	{	/* If runtime disambiguator was specified and routine is not found, look no further.
 		 * Otherwise, look for it in the #t global of any (or specified) region in current gbldir.
@@ -234,6 +230,9 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 	{	/* Have a routine header addr. From that we can get the gv_trigger_t descriptor and from that, the
 		 * gvt_trigger and other necessities.
 		 */
+		sgmnt_addrs		*csa;
+		sgmnt_data_ptr_t	csd;
+
 		DBGTRIGR((stderr, "trigger_locate_andor_load: routine header found\n"));
 		trigdsc = (gv_trigger_t *)rtn_vector->trigr_handle;
 		gvt_trigger = trigdsc->gvt_trigger;			/* We now know our base block now */

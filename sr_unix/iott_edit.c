@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,6 @@ int	iott_write_raw(int fildes, void *str832, unsigned int len)
 	wint_t		*str32, temp32;
 	int		written, this_write, outlen;
 	io_desc		*io_ptr = io_curr_device.in;
-	d_tt_struct	*tt_ptr;
 	boolean_t	utf8_active;
 	boolean_t	ch_set;
 	DCL_THREADGBL_ACCESS;
@@ -61,7 +60,6 @@ int	iott_write_raw(int fildes, void *str832, unsigned int len)
 	if (0 == len)
 		return 0;
 	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
-	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	if (!utf8_active)
 	{
@@ -124,7 +122,6 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 	unsigned char	*str, string[TTDEF_BUF_SZ], *outptr, *outtop, *strstart, *nextptr;
 	wint_t		*str32, temp32;
 	io_desc		*io_ptr = io_curr_device.in;
-	d_tt_struct	*tt_ptr;
 	boolean_t	utf8_active, writenewline;
 	boolean_t	ch_set;
 	DCL_THREADGBL_ACCESS;
@@ -132,7 +129,6 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 	SETUP_THREADGBL_ACCESS;
 	assert(width);
 	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
-	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	if (utf8_active && !multibyte)
 		str32 = (wint_t *)str832;

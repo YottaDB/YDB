@@ -103,7 +103,6 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	save_errno = 0;
 	csa = cs_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;

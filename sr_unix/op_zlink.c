@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -137,7 +137,7 @@ ZOS_ONLY(error_def(ERR_BADTAG);)
  */
 void op_zlink (mval *v, mval *quals)
 {
-	boolean_t		compile, expdir, obj_found, src_found;
+	boolean_t		compile, obj_found, src_found;
 	char			*err_code, *fname,
 				ceprep_file[MAX_FN_LEN + 1],
 				inputf[MAX_FN_LEN + 1],
@@ -146,7 +146,7 @@ void op_zlink (mval *v, mval *quals)
 				objnamebuf[MAX_FN_LEN + 1],
 				srcnamebuf[MAX_FN_LEN + 1];
 	command_qualifier	save_qlf;
-	int			initial_object_file_des, qlf, save_errno, status, tslash;
+	int			qlf, save_errno, status, tslash;
 	linktyp			type;
 	mstr			srcstr, objstr, file;
 	mval			qualifier;
@@ -169,9 +169,10 @@ void op_zlink (mval *v, mval *quals)
 	DBGARLNK((stderr, "op_zlink: Call to (re)link routine %.*s\n", v->str.len, v->str.addr));
 	object_file_des = FD_INVALID;
 	srcdir = objdir = NULL;
-	expdir = FALSE;
 	if (quals)
 	{	/* Explicit ZLINK from generated code or from gtm_trigger() */
+		boolean_t expdir;
+
 		memset(&pblk, 0, SIZEOF(pblk));
 		pblk.buff_size = MAX_FN_LEN;
 		pblk.buffer = inputf;
@@ -392,7 +393,6 @@ void op_zlink (mval *v, mval *quals)
 		src_found = obj_found = compile = FALSE;
 		if (SRC != type)
 		{	/* Object or NO file extension specified - check object file exists */
-			initial_object_file_des = object_file_des;
 			OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, object_file_des);
 			if (FD_INVALID == object_file_des)
 			{

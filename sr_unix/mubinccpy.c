@@ -139,10 +139,10 @@ bool	mubinccpy (backup_reg_list *list)
 	char_ptr_t		outptr, data_ptr;
 	char 			*c, addr[SA_MAXLEN + 1];
 	sgmnt_data_ptr_t	header;
-	uint4			total_blks, bplmap, gds_ratio, save_blks;
+	uint4			total_blks, bplmap, save_blks;
 	int4			status;
 	int4			size1, bsize, bm_num, hint, lmsize, rsize, timeout, outsize,
-				blks_per_buff, counter, i, write_size, read_size, match;
+				blks_per_buff, counter, i, write_size, read_size;
 	size_t			copysize;
 	off_t			copied, read_offset;
 	int			db_fd, exec_fd;
@@ -247,7 +247,7 @@ bool	mubinccpy (backup_reg_list *list)
 			backup->blksiz = DISK_BLOCK_SIZE;
 			backup->remaining = 0; /* number of zeros to be added in the end, just use this field */
 			/* parse it first */
-			switch (match = SSCANF(file->addr, "%[^:]:%hu", addr, &port))
+			switch (SSCANF(file->addr, "%[^:]:%hu", addr, &port))
 			{
 				case 1 :
 					port = DEFAULT_BKRS_PORT;
@@ -303,7 +303,6 @@ bool	mubinccpy (backup_reg_list *list)
 	}
 	/* ============================ read/write appropriate blocks =============================== */
 	bsize		= header->blk_size;
-	gds_ratio	= bsize / DISK_BLOCK_SIZE;
 	blks_per_buff	= BACKUP_READ_SIZE / bsize;	/* Worse case holds one block */
 	read_size	= blks_per_buff * bsize;
 	outsize		= SIZEOF(muinc_blk_hdr) + bsize;

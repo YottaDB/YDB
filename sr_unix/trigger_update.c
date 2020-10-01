@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -535,7 +535,7 @@ boolean_t check_unique_trigger_name_full(char **values, uint4 *value_len, mval *
 	sgm_info		*save_sgm_info_ptr;
 	jnlpool_addrs_ptr_t	save_jnlpool;
 	int			set_index, kill_index;
-	boolean_t		db_matched_set, db_matched_kill, full_match, trigger_exists;
+	boolean_t		db_matched_set, db_matched_kill, full_match;
 	mval			setname, killname;
 	DCL_THREADGBL_ACCESS;
 
@@ -569,7 +569,7 @@ boolean_t check_unique_trigger_name_full(char **values, uint4 *value_len, mval *
 		if (this_name_found)
 		{
 			overall_name_found = TRUE;
-			trigger_exists = trigger_already_exists(trigvn, trigvn_len, values, value_len,
+			trigger_already_exists(trigvn, trigvn_len, values, value_len,
 								set_trigger_hash, kill_trigger_hash,
 								&set_index, &kill_index, &db_matched_set, &db_matched_kill,
 								&full_match, &setname, &killname);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -125,7 +125,7 @@ int gtmsource()
 	gd_region		*reg, *region_top;
 	sgmnt_addrs		*csa, *repl_csa;
 	boolean_t		all_files_open, isalive, ftok_counter_halted;
-	pid_t			pid, ppid, procgp;
+	pid_t			pid;
 	seq_num			read_jnl_seqno, jnl_seqno;
 	unix_db_info		*udi;
 	gtmsource_local_ptr_t	gtmsource_local;
@@ -326,11 +326,10 @@ int gtmsource()
 	 */
 	assert(mutex_per_process_init_pid && (mutex_per_process_init_pid != process_id));
 	mutex_per_process_init();
-	ppid = getppid();
 	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, gtmsource_options.log_file);
 	assert(SS_NORMAL == log_init_status);
 	repl_log_fd2fp(&gtmsource_log_fp, gtmsource_log_fd);
-	if (-1 == (procgp = setsid()))
+	if (-1 == setsid())
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Source server error in setsid"), errno);
 #	endif /* REPL_DEBUG_NOBACKGROUND */

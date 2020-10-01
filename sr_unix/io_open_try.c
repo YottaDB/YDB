@@ -103,7 +103,6 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 	GTM_SOCKLEN_TYPE	socknamelen;
 	struct sockaddr_storage	sockname;
 	GTM_SOCKLEN_TYPE	sockoptlen;
-	boolean_t	ichset_specified, ochset_specified;
 	int		errcode;
 	unsigned int	port_len;
 	char		port_buffer[NI_MAXSERV], *port_ptr;
@@ -329,7 +328,6 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 	{
 		oflag |= (O_RDWR | O_CREAT | O_NOCTTY);
 		p_offset = 0;
-		ichset_specified = ochset_specified = FALSE;
 		while(iop_eol != *(pp->str.addr + p_offset))
 		{
 			assert((params) *(pp->str.addr + p_offset) < (params)n_iops);

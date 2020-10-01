@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -136,7 +136,6 @@ int4 mu_size_arsample(glist *gl_ptr, uint4 M, int seed)
 	enum cdb_sc		status;
 	int			k, h;
 	stat_t			rstat;
-	trans_num		ret_tn;
 	unsigned int		lcl_t_tries;
 	DCL_THREADGBL_ACCESS;
 
@@ -172,7 +171,7 @@ int4 mu_size_arsample(glist *gl_ptr, uint4 M, int seed)
 			gv_target->clue.end = 0;
 			gv_target->hist.h[0] = gv_target->hist.h[1];				/* No level 0 block to validate */
 			DEBUG_ONLY(lcl_t_tries = t_tries);
-			if ((trans_num)0 == (ret_tn = t_end(&gv_target->hist, NULL, TN_NOT_SPECIFIED)))	/* WARNING: assignment */
+			if ((trans_num)0 == t_end(&gv_target->hist, NULL, TN_NOT_SPECIFIED))
 			{
 				ABORT_TRANS_IF_GBL_EXIST_NOMORE(lcl_t_tries, tn_aborted);
 				if (tn_aborted)

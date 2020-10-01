@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -388,7 +388,6 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 			  ERR_TEXT, 2, RTS_ERROR_TEXT(rtnname), save_errno);
 	}
 	assert(0 < rtnfd);	/* Verify file descriptor */
-	rc = 0;
 #	ifdef GEN_TRIGCOMPFAIL_ERROR
 	{	/* Used ONLY to generate an error in a trigger compile by adding some junk in a previous line */
 		DOWRITERC(rtnfd, ERROR_CAUSING_JUNK, strlen(ERROR_CAUSING_JUNK), rc); /* BYPASSOK */

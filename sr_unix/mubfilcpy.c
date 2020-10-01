@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -232,7 +232,6 @@ bool	mubfilcpy (backup_reg_list *list)
 		}
 		ntries++;
 	}
-	tmplen = gv_cur_region->dyn.addr->fname_len;
 	/* basename() may modify the argument passed to it. so pass it a temp string */
 	memcpy(tmpsrcfname, gv_cur_region->dyn.addr->fname, gv_cur_region->dyn.addr->fname_len);
 	tmpsrcfname[gv_cur_region->dyn.addr->fname_len] = 0;
@@ -493,14 +492,14 @@ bool	mubfilcpy (backup_reg_list *list)
 			CLEANUP_AND_RETURN_FALSE;
 		}
 
-		if (0 < (filesize = stat_buf.st_size))
+		if (0 < stat_buf.st_size)
 		{
 			rsize = (int4)(SIZEOF(muinc_blk_hdr) + header_cpy->blk_size);
 			sblkh_p = (muinc_blk_hdr_ptr_t)malloc(rsize);
 			/* Do not use LSEEKREAD macro here because of dependence on setting filepointer for
 			   subsequent reads.
 			*/
-			if (-1 != (status = (ssize_t)lseek(list->backup_fd, 0, SEEK_SET)))
+			if (-1 != (ssize_t)lseek(list->backup_fd, 0, SEEK_SET))
 			{
 				DOREADRC(list->backup_fd, (sm_uc_ptr_t)sblkh_p, rsize, status);
 			} else

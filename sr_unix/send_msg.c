@@ -90,7 +90,7 @@ void send_msg_csa(void *csa, int arg_count, ...)
 /* #GTM_THREAD_SAFE : The below function (send_msg_va) is thread-safe */
 void send_msg_va(void *csa, int arg_count, va_list var)
 {
-        int		dummy, fao_actual, fao_count, i, msg_id, freeze_msg_id;
+        int		dummy, fao_count, i, msg_id, freeze_msg_id;
         char    	msg_buffer[1024];
         mstr    	msg_string;
 	char		*save_util_outptr;
@@ -166,16 +166,15 @@ void send_msg_va(void *csa, int arg_count, va_list var)
                 gtm_getmsg(msg_id, &msg_string);
                 if (0 < arg_count)
                 {
-                        fao_actual = (int) va_arg(var, VA_ARG_TYPE);
+                        fao_count = (int) va_arg(var, VA_ARG_TYPE);
                         --arg_count;
-                        fao_count = fao_actual;
                         if (fao_count > MAX_FAO_PARMS)
 			{
 				assert(FALSE);
 				fao_count = MAX_FAO_PARMS;
 			}
                 } else
-                        fao_actual = fao_count = 0;
+                        fao_count = 0;
                 util_out_print_vaparm(msg_string.addr, NOFLUSH, var, fao_count);
 		va_end(var);	/* need this before used as dest in copy */
 		VAR_COPY(var, TREF(last_va_list_ptr));

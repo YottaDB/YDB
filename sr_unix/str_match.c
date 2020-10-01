@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -20,7 +23,6 @@ char *mystrstr(char *o, unsigned short olen, char *t, unsigned short tlen);
 char *mystrstr(char *o, unsigned short olen, char *t, unsigned short tlen)
 {
         char            *ptr;
-        unsigned short  length;
         bool            matched = FALSE;
 
         if (olen < tlen)
@@ -28,7 +30,8 @@ char *mystrstr(char *o, unsigned short olen, char *t, unsigned short tlen)
 
         for (ptr = o; ptr <= o + olen - tlen; ptr++)
         {
-                length = 0;
+		unsigned short  length;
+
                 matched = TRUE;
                 for (length = 0; length < tlen; length++)
                 {

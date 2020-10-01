@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -450,7 +450,6 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		STAT_FILE(pshell, &sb, ret_stat);
 		if (-1 == ret_stat || !(S_ISREG(sb.st_mode)) || !(sb.st_mode & (S_IXOTH | S_IXGRP | S_IXUSR)))
 		{
-			save_errno = errno;
 			assert(GTM_MAX_DIR_LEN - 1 >= STRLEN(pshell));
 			SNPRINTF(error_str, MAXDEVPARLEN + STR_LIT_LEN(INVALID_CMD2), "Invalid shell: %s", pshell);
 			PIPE_ERROR_INIT();
@@ -822,7 +821,6 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		}
 		d_rm->stderr_child = stderr_iod;
 	}
-	flags = 0;
 	FCNTL2(file_des_write, F_GETFL, flags);
 	if (0 > flags)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);

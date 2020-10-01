@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved. *
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -214,7 +214,7 @@ int	dm_audit_connect(void)
 			/* If tls socket was not initialized, we need to create one */
 			if (NULL == audit_conn->tls_sock)
 			{	/* gtm_tls_loadlibrary() must be called before gtm_tls_init() */
-				if(SS_NORMAL != (status = gtm_tls_loadlibrary()))
+				if (SS_NORMAL != gtm_tls_loadlibrary())
 				{
 					close(audit_conn->sock_fd);
 					audit_conn->sock_fd = FD_INVALID;

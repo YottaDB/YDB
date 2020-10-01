@@ -359,7 +359,6 @@ STATICFNDEF void gvtr_db_tpwrap_helper(sgmnt_addrs *csa, int err_code, boolean_t
 		assert(ERR_GVPUTFAIL != err_code); /* for SET, gvcst_put does the root search anyways. So, don't do it here */
 		ASSERT_BEGIN_OF_FRESH_TP_TRANS; /* ensures gvcst_root_search is the first thing done in the restarted transaction */
 		GVCST_ROOT_SEARCH; /* any t_retry from gvcst_root_search will transfer control back to gvtr_tpwrap_ch */
-		root_srch_needed = FALSE; /* just to be safe */
 	}
 	gvtr_db_read_hasht(csa);
 	DEBUG_ONLY(save_gv_target = gv_target;)
@@ -405,7 +404,6 @@ boolean_t	gvtr_get_hasht_gblsubs(mval *subs_mval, mval *ret_mval)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	is_defined = FALSE;
 	curend = gv_currkey->end; /* note down gv_currkey->end before changing it so we can restore it before function returns */
 	assert(KEY_DELIMITER == gv_currkey->base[curend]);
 	assert(gv_target->gd_csa == cs_addrs);
@@ -1329,8 +1327,7 @@ void	gvtr_free(gv_namehead *gvt)
 void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_code)
 {
 	sgmnt_addrs		*csa;
-	sgmnt_data_ptr_t	csd;
-	uint4			lcl_t_tries, save_t_tries, loopcnt;
+	uint4			lcl_t_tries, loopcnt;
 	uint4			cycle_start;
 	boolean_t		root_srch_needed;
 	enum cdb_sc		failure;
@@ -1340,7 +1337,6 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 	assert(dollar_tlevel);		/* A TP wrap should have been done by the caller if needed */
 	assert(!skip_dbtriggers);	/* should not come here if triggers are not supposed to be invoked */
 	assert(gv_target == gvt);
-	save_t_tries = t_tries; /* note down the value of t_tries at the entry to this function */
 	csa = gvt->gd_csa;
 	assert(NULL != csa);	/* database for this gvt better be opened at this point */
 	/* The directory tree corresponds to a non-existent global which does not have any triggers so in this case
@@ -1353,7 +1349,6 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 	 */
 	if (gvt == csa->hasht_tree)
 		return;
-	csd = csa->hdr;
 	assert((gvt->db_trigger_cycle != cycle) || (gvt->db_dztrigger_cycle != csa->db_dztrigger_cycle));
 	root_srch_needed = FALSE;
 	/* Check if TP was in turn an implicit TP (e.g. created by the GVTR_INIT_AND_TPWRAP_IF_NEEDED macro). */
@@ -1479,7 +1474,6 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	gv_trigger_t		*trigdsc, *trigstop, *trigstart;
 	int			gtm_trig_status, tfxb_status, num_triggers_invoked, trigmax, trig_list_offset;
 	mstr			*ztupd_mstr;
-	mval			*keysub_mval;
 	mval			*lvvalarray[MAX_GVSUBSCRIPTS + 1];
 	mval			*ztupd_mval, dummy_mval;
 	uint4			*lvindexarray;
@@ -1614,6 +1608,8 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 				lvindexarray = trigdsc->lvindexarray;
 				for (curlvsub = 0; curlvsub < numlvsubs; curlvsub++)
 				{
+					mval	*keysub_mval;
+
 					lvvalindex = lvindexarray[curlvsub];
 					assert(lvvalindex < keysubs);
 					/* lvval not already computed. Do so by reverse transforming subscript to
@@ -1622,7 +1618,6 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 					 * recomputations of the same across the many triggers to be checked for
 					 * the given key.
 					 */
-					keysub_mval = lvvalarray[lvvalindex];
 					KEYSUB_S2POOL_IF_NEEDED(keysub_mval, lvvalindex, thissub);
 				}
 			}

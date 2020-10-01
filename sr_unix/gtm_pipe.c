@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -67,7 +70,7 @@ int gtm_pipe(char *command, pipe_type pt)
 		 * exit_handler.  So both child and parent will do exit handling. This can make ref_cnt < 0, or, it can release
 		 * semaphores, which we should not release until parent exists. So we just call UNDERSCORE_EXIT(EXIT_SUCCESS).
 		 */
-		rc = SYSTEM(command);
+		SYSTEM(command);
 		UNDERSCORE_EXIT(EXIT_SUCCESS); /* just exit from here */
 	} else
 	{	/* parent process */

@@ -262,7 +262,6 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 		status = 0;
 		do
 		{
-			status2 = 0;
 			if (0 != status)
 			{
 				fds.fd = socketptr->sd;

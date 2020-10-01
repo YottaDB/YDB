@@ -353,7 +353,7 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			if (0 != status)
 				zl_error(RECENT_ZHIST, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
 #			endif
-			if (-1 != (status = (ssize_t)lseek(*file_desc, NATIVE_HDR_LEN, SEEK_SET)))
+			if (-1 != (ssize_t)lseek(*file_desc, NATIVE_HDR_LEN, SEEK_SET))
 			{
 				ZOS_ONLY(extract_text(*file_desc, &total_length));
 				DOREADRC_OBJFILE(*file_desc, hdr, SIZEOF(rhdtyp), status);
@@ -470,7 +470,7 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			rtnname_off = (size_t)hdr->literal_text_adr + (size_t)rtnname.addr;	/* Offset into object of rtnname */
 			ZOS_ONLY(assertpro(FALSE /* Read file pointer being reset - recode for ZOS */));
 			/* Read the routine name from the object file */
-			if (-1 != (status = (ssize_t)lseek(*file_desc, rtnname_off + NATIVE_HDR_LEN, SEEK_SET)))
+			if (-1 != (ssize_t)lseek(*file_desc, rtnname_off + NATIVE_HDR_LEN, SEEK_SET))
 			{
 				DOREADRC_OBJFILE(*file_desc, rtnname_buf, rtnname.len, status);
 			} else

@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,6 @@ int gtm_fprintf(FILE *stream, const char *format, ...)
 	char		*buf, tmpbuf[256];
 	intrpt_state_t	prev_intrpt_state;
 
-	retval = 0;
 	va_start(printargs, format);
 	VAR_COPY(pa_copy, printargs);
 	VSNPRINTF(NULL, 0, format, pa_copy, buflen);	/* C99: NULL string just returns size */

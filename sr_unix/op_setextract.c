@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -44,7 +47,7 @@ void op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 	int		pfxlen, sfxoff, sfxlen, skip, bytelen, srclen, char_len;
 	unsigned char	*srcptr, *srcbase, *srctop, *straddr;
 
-	padlen = pfxlen = sfxlen = 0;
+	padlen = sfxlen = 0;
 	MV_FORCE_STR(expr);	/* Expression to put into piece place */
 	if (MV_DEFINED(src))
 	{

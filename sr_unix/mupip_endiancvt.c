@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -173,7 +173,6 @@ void mupip_endiancvt(void)
 	enum mdb_ver		swap_mdbver;
 	trans_num		curr_tn;
 	block_id		blk_num;
-	uint4			cli_status;
 	int			i, db_fd, outdb_fd, mastermap_size;
 	unsigned short		n_len, outdb_len, t_len;
 	boolean_t		outdb_specified, endian_native, swap_boolean, got_standalone, override_specified;
@@ -186,7 +185,7 @@ void mupip_endiancvt(void)
 	int			gtmcrypt_errno;
 	ZOS_ONLY(int 		realfiletag;)
 
-	if (CLI_PRESENT == (cli_status = cli_present("OUTDB")))
+	if (CLI_PRESENT == cli_present("OUTDB"))
 	{
 		outdb_specified = TRUE;
 		outdb_len = SIZEOF(outdb) - 1;
@@ -233,7 +232,7 @@ void mupip_endiancvt(void)
 		CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
 		mupip_exit(ERR_MUNOACTION);
 	}
-	override_specified = (CLI_PRESENT == (cli_status = cli_present("OVERRIDE")));
+	override_specified = (CLI_PRESENT == cli_present("OVERRIDE"));
 	check_error = NULL;
 	endian_check.word32 = (uint4)old_data->minor_dbver;
 #ifdef BIGENDIAN

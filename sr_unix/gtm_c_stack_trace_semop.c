@@ -36,9 +36,9 @@ GBLREF  sgmnt_addrs     *cs_addrs;
 #endif
 int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 {
-	int                     stuckcnt, loopcount;
+	int                     stuckcnt;
 	int                     semop_pid, save_errno;
-	int                     last_sem_trace, rc;
+	int                     rc;
 #	ifdef DEBUG
 	node_local_ptr_t        cnl = NULL;
 #	endif
@@ -50,9 +50,7 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 		cnl = cs_addrs->nl;
 #	endif
 	stuckcnt = 0;
-	loopcount = -1;
 	save_errno = 0;
-	last_sem_trace = -1;
 	TREF(semwait2long) = TRUE;
 	do
 	{
@@ -73,6 +71,8 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 		/* Timer popped, get C-stack trace */
 		if (TREF(semwait2long))
 		{
+			int	loopcount, last_sem_trace;
+
 			stuckcnt++;
 			last_sem_trace = -1;
 			for (loopcount = 0; loopcount < nsops; loopcount++)
@@ -92,7 +92,6 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 #							endif
 					} else if (-1 == semop_pid)
 					{
-						rc = -1;
 						save_errno = errno;
 						break;
 					}

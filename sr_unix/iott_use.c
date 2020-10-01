@@ -92,7 +92,7 @@ void iott_use(io_desc *iod, mval *pp)
 	struct sigaction	act;
 	struct termios		t;
 	mstr			chset_mstr;
-	gtm_chset_t		temp_chset, old_ochset, old_ichset;
+	gtm_chset_t		temp_chset, old_ichset;
 	uint4			mask_in;
 	unsigned char		ch, len;
 	boolean_t		ch_set;
@@ -128,7 +128,6 @@ void iott_use(io_desc *iod, mval *pp)
 		temp_ptr = (d_tt_struct *)d_in->dev_sp;
 		mask_in = temp_ptr->term_ctrl;
 		mask_term = temp_ptr->mask_term;
-		old_ochset = iod->ochset;
 		old_ichset = iod->ichset;
 		while (*(pp->str.addr + p_offset) != iop_eol)
 		{

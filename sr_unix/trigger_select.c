@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -154,7 +154,7 @@ LITREF	char 			*trigger_subs[];
 	}										\
 }
 
-#define INVALID_NAME_ERROR(ERR_STR, PTR, ERR_VAR, POS)					\
+#define INVALID_NAME_ERROR(ERR_STR, PTR, ERR_VAR)					\
 {											\
 	int		lcl_len;							\
 											\
@@ -538,7 +538,6 @@ STATICFNDEF void dump_all_triggers(void)
 {
 	mval			curr_gbl_name, val;
 	gd_region		*reg;
-	gv_namehead		*save_gvtarget;
 	int			reg_index;
 	char			global[MAX_MIDENT_LEN];
 	int			gbl_len;
@@ -546,7 +545,6 @@ STATICFNDEF void dump_all_triggers(void)
 
 	SETUP_THREADGBL_ACCESS;
 	assert(NULL != gd_header);
-	save_gvtarget = gv_target;
 	for (reg_index = 0, reg = gd_header->regions; reg_index < gd_header->n_regions; reg_index++, reg++)
 	{
 		if (IS_STATSDB_REGNAME(reg))
@@ -638,7 +636,6 @@ boolean_t trigger_select_tpwrap(char *select_list, uint4 select_list_len, char *
 	save_io_curr_device = io_curr_device;
 	op_use(&op_val, &op_pars);
 	TREF(ztrig_use_io_curr_device) = TRUE;
-	select_status = TRIG_SUCCESS;
 	ts_mv.mvtype = MV_STR;
 	ts_mv.str.len = 0;
 	ts_mv.str.addr = NULL;
@@ -777,7 +774,6 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 		dump_all_triggers();
 	else
 	{
-		len = select_list_len;
 		sel_ptr = STRTOK_R(save_select_list, ",", &strtok_ptr);
 		do
 		{
@@ -794,7 +790,7 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 				{
 					badpos = len1;
 					INVALID_NAME_ERROR("Invalid global variable name in SELECT list: ", sel_ptr,
-						select_status, badpos);
+						select_status);
 					continue;
 				}
 				gbl_len = NAM_LEN(sel_ptr + 1, (int)(ptr1 - sel_ptr) - 1);
@@ -858,9 +854,9 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 				}
 			} else
 			{
-				if (len1 != (badpos = validate_input_trigger_name(ptr1, len1, NULL))) /* assignment is intended */
+				if (len1 != validate_input_trigger_name(ptr1, len1, NULL))
 				{ /* is the input name valid */
-					INVALID_NAME_ERROR("Invalid name entry in SELECT list: ", sel_ptr, select_status, badpos);
+					INVALID_NAME_ERROR("Invalid name entry in SELECT list: ", sel_ptr, select_status);
 					continue;
 				}
 				if (TRIGNAME_SEQ_DELIM == *(sel_ptr + (len1 - 1)))

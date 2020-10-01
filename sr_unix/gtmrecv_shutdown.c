@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,7 +101,7 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 		 * issues. However, to ensure that a concurrent argument-less rundown doesn't remove these semaphores (in case they
 		 * are orphaned), increment the counter semaphore.
 		 */
-		if (0 != (status = incr_sem(RECV, RECV_SERV_COUNT_SEM)))
+		if (0 != incr_sem(RECV, RECV_SERV_COUNT_SEM))
 		{
 			save_errno = errno;
 			repl_log(stderr, TRUE, TRUE, "Could not acquire Receive Pool counter semaphore : %s. "
@@ -116,7 +116,7 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 			assert(0 == status);
 			return ABNORMAL_SHUTDOWN;
 		}
-		if (0 != (status = rel_sem(RECV, RECV_POOL_ACCESS_SEM)))
+		if (0 != rel_sem(RECV, RECV_POOL_ACCESS_SEM))
 		{
 			save_errno = errno;
 			repl_log(stderr, TRUE, TRUE, "Could not release Receive Pool access control semaphore : %s. "
@@ -155,7 +155,7 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 			LONG_SLEEP(10);
 		}
 #		endif
-		if (0 != (status = grab_sem(RECV, RECV_POOL_ACCESS_SEM)))
+		if (0 != grab_sem(RECV, RECV_POOL_ACCESS_SEM))
 		{
 			save_errno = errno;
 			repl_log(stderr, TRUE, TRUE, "Could not acquire Receive Pool access control semaphore : %s. "
@@ -166,7 +166,7 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 			return ABNORMAL_SHUTDOWN;
 		}
 		/* Now that semaphores are acquired, decrement the counter semaphore */
-		if (0 != (status = decr_sem(RECV, RECV_SERV_COUNT_SEM)))
+		if (0 != decr_sem(RECV, RECV_SERV_COUNT_SEM))
 		{
 			save_errno = errno;
 			repl_log(stderr, TRUE, TRUE, "Could not release Receive Pool counter semaphore : %s. "

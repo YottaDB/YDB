@@ -227,7 +227,6 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 	   turn if off.  A write will turn it on.  The default is RM_NOOP. */
 	if (rm_ptr->fifo && (0 != rm_ptr->fildes) && (RM_WRITE == rm_ptr->lastop))
 	{
-		flags = 0;
 		FCNTL2(rm_ptr->fildes, F_GETFL, flags);
 		if (0 > flags)
 		{
@@ -1866,7 +1865,6 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 					bytes2read = (CHSET_UTF8 == chset) ? 1 : 2;
 				} else
 				{
-					inchar = 0;
 					if (errno == 0)
 					{
 						tot_bytes_read = 0;

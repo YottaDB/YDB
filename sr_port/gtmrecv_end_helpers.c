@@ -2,6 +2,8 @@
  *								*
  * Copyright (c) 2005-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +38,7 @@
 
 GBLREF recvpool_addrs	recvpool;
 
-int gtmrecv_end_helpers(boolean_t is_rcvr_srvr)
+void gtmrecv_end_helpers(boolean_t is_rcvr_srvr)
 { /* Set flag in recvpool telling the receiver server to stop all reader and writer helpers.
    * Wait for receiver server to complete the processs - all processes shut down, or some error occurred
    */
@@ -59,5 +61,4 @@ int gtmrecv_end_helpers(boolean_t is_rcvr_srvr)
 		else
 			upd_helper_ctl->reap_helpers = HELPER_REAP_NONE;
 	}
-	return NORMAL_SHUTDOWN;
 }

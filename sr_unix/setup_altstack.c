@@ -73,7 +73,7 @@ void setup_altstack()
 			{
 				save_errno = errno;
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("mprotect()"), CALLFROM,
-					      errno);
+					      save_errno);
 			}
 			newaltstack.ss_sp = altstackptr + OS_PAGE_SIZE;
 			newaltstack.ss_flags = 0;

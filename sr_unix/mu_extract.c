@@ -218,7 +218,6 @@ void mu_extract(void)
 	mval				val, curr_gbl_name, op_val, op_pars;
 	mstr				chset_mstr;
 	mname_entry			gvname;
-	gtm_chset_t 			saved_out_set;
 	coll_hdr			extr_collhdr;
 	int				bin_header_size;
 	boolean_t			any_file_encrypted, any_file_uses_non_null_iv, null_iv;
@@ -537,10 +536,8 @@ void mu_extract(void)
 #			ifdef KEEP_zOS_EBCDIC
 			/* extract ascii header for binary by default */
 			/* Do we need to restore it somewhere? */
-			saved_out_set = (io_curr_device.out)->out_code_set;
 			(io_curr_device.out)->out_code_set = DEFAULT_CODE_SET;
 #			else
-			saved_out_set = (io_curr_device.out)->ochset;
 			(io_curr_device.out)->ochset = CHSET_M;
 #			endif
 		}

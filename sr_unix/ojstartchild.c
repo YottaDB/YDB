@@ -492,7 +492,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		}
 
 		joberr = joberr_sp;
-		if (-1 == (rc = socketpair(AF_UNIX, SOCK_STREAM, 0, setup_fds)))
+		if (-1 == socketpair(AF_UNIX, SOCK_STREAM, 0, setup_fds))
 		{
 			job_errno = errno;
 			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);

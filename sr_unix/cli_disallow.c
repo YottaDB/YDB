@@ -3,7 +3,7 @@
  * Copyright (c) 2002-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -141,10 +141,9 @@ boolean_t d_c_cli_negated(char *str)
 boolean_t cli_check_any2(int argcnt, ...)
 {
 	va_list var;
-	int oper, state = 0;
+	int state = 0;
 
 	VAR_START(var, argcnt);
-	oper = 0;
 	while(argcnt)
 	{
 		if (va_arg(var, VA_ARG_TYPE_BOOL) && 1 < ++state) {

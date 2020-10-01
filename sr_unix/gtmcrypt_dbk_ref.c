@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -836,7 +836,7 @@ STATICFNDEF int read_database_section(config_t *cfgp)
 			return -1;
 		}
 		/* Duplicate names with different keys are allowed for databases, though they are prohibited for files. */
-		if (NULL != (node = keystore_lookup_by_keyname_plus(key_name, path_array, SEARCH_BY_KEYPATH)))
+		if (NULL != keystore_lookup_by_keyname_plus(key_name, path_array, SEARCH_BY_KEYPATH))
 			continue;
 		insert_unresolved_key_link(key_name, path_array, i + 1, UNRES_KEY_UNRES_DB);
 	}

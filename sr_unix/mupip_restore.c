@@ -127,7 +127,6 @@ void mupip_restore(void)
 	uint4			ii;
 	block_id		blk_num;
 	boolean_t		extend;
-	uint4			cli_status;
 	BFILE			*in;
 	int			i, db_fd;
 	uint4			old_blk_size, orig_size, size, old_tot_blks, bplmap, old_bit_maps, new_bit_maps;
@@ -139,14 +138,14 @@ void mupip_restore(void)
 	unsigned char		tcp[5];
 	backup_type		type;
 	unsigned short		port;
-	int4			timeout, cut, match;
+	int4			timeout, cut;
 	void			(*common_read)();
 	char			*errptr;
 	pid_t			waitpid_res;
 	muinc_blk_hdr_ptr_t	sblkh_p;
 	int			rc;
 	char			*inptr;
-	int			in_len, gtmcrypt_errno;
+	int			in_len;
 	boolean_t		same_encr_settings;
 	boolean_t		check_mdb_ver, bad_mdb_ver;
 	boolean_t		in_is_encrypted, in_to_be_encrypted;
@@ -163,7 +162,7 @@ void mupip_restore(void)
 	SETUP_THREADGBL_ACCESS;
 	inbuf = NULL;
 	extend = TRUE;
-	if (CLI_NEGATED == (cli_status = cli_present("EXTEND")))
+	if (CLI_NEGATED == cli_present("EXTEND"))
 		extend = FALSE;
 	mu_outofband_setup();
 	mu_gv_cur_reg_init();
@@ -290,7 +289,7 @@ void mupip_restore(void)
 			case backup_to_tcp:
 				common_read = tcp_read;
 				/* parse the input */
-				switch (match = SSCANF(ptr->input_file.addr, "%[^:]:%hu", addr, &port))
+				switch (SSCANF(ptr->input_file.addr, "%[^:]:%hu", addr, &port))
 				{
 					case 1 :
 						port = DEFAULT_BKRS_PORT;
@@ -355,6 +354,8 @@ void mupip_restore(void)
 		}
 		if (!SAME_ENCRYPTION_SETTINGS(&inhead, &old_data))
 		{
+			int gtmcrypt_errno;
+
 			same_encr_settings = FALSE;
 			INIT_PROC_ENCRYPTION(gtmcrypt_errno);
 			if (0 != gtmcrypt_errno)
@@ -561,7 +562,8 @@ void mupip_restore(void)
 			in_len = MIN(old_blk_size, size) - SIZEOF(blk_hdr);
 			if (!same_encr_settings && IS_BLK_ENCRYPTED(((blk_hdr_ptr_t)blk_ptr)->levl, in_len))
 			{
-				gtmcrypt_errno = 0;
+				int gtmcrypt_errno;
+
 				in_use_new_key = in_to_be_encrypted
 					&& (((blk_hdr_ptr_t)blk_ptr)->tn >= inhead.encryption_hash2_start_tn);
 				if (in_use_new_key || in_is_encrypted)

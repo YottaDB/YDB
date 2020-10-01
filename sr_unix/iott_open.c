@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,7 +58,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	int		save_errno;
 	int		p_offset;
 	mstr		chset_mstr;
-	gtm_chset_t	temp_chset, old_ichset, old_ochset;
+	gtm_chset_t	temp_chset, old_ichset;
 	boolean_t	empt = FALSE;
 	boolean_t	ch_set;
 	DCL_THREADGBL_ACCESS;
@@ -84,7 +84,6 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 	p_offset = 0;
 	old_ichset = ioptr->ichset;
-	old_ochset = ioptr->ochset;
 	while (*(pp->str.addr + p_offset) != iop_eol)
 	{
 		if ((ch = *(pp->str.addr + p_offset++)) == iop_exception)

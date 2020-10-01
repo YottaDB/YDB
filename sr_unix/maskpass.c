@@ -2,7 +2,7 @@
  *								*
  * Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,7 @@ int main()
 	/* Since the obfuscated password depends on $USER and the inode of $ydb_dist/mumps, make sure all the pre-requisites are
 	 * available to this process.
 	 */
-	if (NULL == (env_ptr = ydb_getenv(YDBENVINDX_GENERIC_USER, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
+	if (NULL == ydb_getenv(YDBENVINDX_GENERIC_USER, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))
 	{
 		printf(ENV_UNDEF_ERROR "\n", USER_ENV);
 		exit(EXIT_FAILURE);

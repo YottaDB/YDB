@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -43,7 +46,7 @@
 void sgtm_putmsg(char *out_str, size_t out_str_len, ...)
 {
 	va_list	var;
-	int	arg_count, dummy, fao_actual, fao_count, i, msg_id;
+	int	arg_count, dummy, fao_count, i, msg_id;
 	char	msg_buffer[OUT_BUFF_SIZE];
 	mstr	msg_string;
 	size_t	util_outbufflen;
@@ -68,17 +71,16 @@ void sgtm_putmsg(char *out_str, size_t out_str_len, ...)
 
 		if (arg_count > 0)
 		{
-			fao_actual = (int) va_arg(var, VA_ARG_TYPE);
+			fao_count = (int) va_arg(var, VA_ARG_TYPE);
 			--arg_count;
 
-			fao_count = fao_actual;
 			if (fao_count > MAX_FAO_PARMS)
 			{
 				assert(FALSE);
 				fao_count = MAX_FAO_PARMS;
 			}
 		} else
-			fao_actual = fao_count = 0;
+			fao_count = 0;
 
 		util_out_print_vaparm(msg_string.addr, NOFLUSH, var, fao_count);
 		va_end(var);	/* need before using as dest in va_copy */

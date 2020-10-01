@@ -185,14 +185,13 @@ int4 mu_size_scan(glist *gl_ptr, int4 level)
 enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skiprecs)
 {
 	block_id			nBlkId;
-	boolean_t			next_endtree, first_iter, last_rec, next_skiprecs;
+	boolean_t			next_endtree, last_rec, next_skiprecs;
 	cache_rec_ptr_t			cr;
 	enum cdb_sc			status;
 	int				curroff, incr_recs = 0, incr_scans = 0;
 	int4				child_nLevl, i, rCnt;
 	sm_uc_ptr_t			pTop, pRec, child_pBlkBase;
 	srch_hist			sibhist;
-	trans_num			ret_tn;
 	unsigned short			nRecLen;
 
 	assert(total_scans < MAX_SCANS);
@@ -216,10 +215,11 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 		incr_scans = 1;
 	} else if (lvl > targ_levl)
 	{	/* visit each child */
-		first_iter = TRUE;
 		gv_target->hist.h[lvl - targ_levl].curr_rec.offset = saveoff[lvl];
 		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen)
 		{
+			boolean_t first_iter;
+
 			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId);
 			if (cdb_sc_normal != status)
 			{
@@ -240,12 +240,11 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 			status = dfs(lvl - 1, child_pBlkBase, next_endtree, next_skiprecs);
 			if (status != cdb_sc_normal)
 				return status;
-			first_iter = FALSE;
 		}
 	}
 	/* make sure we can really move on from this block to the next: validate all blocks down to here */
 	memcpy(&sibhist.h[0], &gv_target->hist.h[lvl], SIZEOF(srch_blk_status) * (gv_target->hist.depth - lvl + 2));
-	if ((trans_num)0 == (ret_tn = t_end(&sibhist, NULL, TN_NOT_SPECIFIED)))
+	if ((trans_num)0 == t_end(&sibhist, NULL, TN_NOT_SPECIFIED))
 		return cdb_sc_restarted;
 	total_recs += incr_recs;
 	total_scans += incr_scans;

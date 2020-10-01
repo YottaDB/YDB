@@ -133,7 +133,6 @@ int dlopen_libyottadb(int argc, char **argv, char **envp, char *main_func)
 			FPRINTF(stderr, "%%YDB-E-TEXT, %s\n", tmpptr);
 		return ERR_DLLNOOPEN;
 	}
-	status = 0;
 	exe_main = (exe_main_t)dlsym(handle, main_func);
 	if (NULL == exe_main)
 	{

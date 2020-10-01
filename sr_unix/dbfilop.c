@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -55,7 +58,6 @@ uint4 dbfilop(file_control *fc)
 	off_t			offset;
 	gd_segment		*seg;
 	sgmnt_addrs		*csa;
-	sgmnt_data_ptr_t	csd;
 	ZOS_ONLY(int		realfiletag;)
 
 	udi = FC2UDI(fc);
@@ -80,7 +82,6 @@ uint4 dbfilop(file_control *fc)
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBNOTGDS, 2, LEN_AND_STR(udi->fn));
 				if (0 == memcmp(fc->op_buff, GDS_LABEL, GDS_LABEL_SZ - 1))	/* current GDS */
 				{
-					csd = (sgmnt_data_ptr_t)fc->op_buff;
 					if (offsetof(sgmnt_data, minor_dbver) < fc->op_len)
 						CHECK_DB_ENDIAN((sgmnt_data_ptr_t)fc->op_buff, strlen(udi->fn),
 													udi->fn); /* BYPASSOK */

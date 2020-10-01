@@ -109,7 +109,7 @@ boolean_t wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t        cnl;
-	cache_que_head_ptr_t	q0, base, crwipq = NULL;
+	cache_que_head_ptr_t	q0, crwipq = NULL;
 	int4			count, dummy_errno, flsh_trigger, i, k, max_count, n, save_errno = 0;
 	uint4			lcnt, size, to_wait, to_msg, this_idx;
 	wcs_conflict_trace_t	wcs_conflict_trace[WCS_CONFLICT_TRACE_ARRAYSIZE];
@@ -198,7 +198,6 @@ boolean_t wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	{	/* Wait for a specific buffer to be flushed. */
 		assert(csa->now_crit);		/* must be crit to play with queues when not the writer */
 		BG_TRACE_PRO_ANY(csa, spcfc_buffer_flush);
-		base = &csa->acc_meth.bg.cache_state->cacheq_active;
 		if (asyncio)
 			crwipq = &csa->acc_meth.bg.cache_state->cacheq_wip;
 		/* If another process is concurrently finishing up phase2 of commit, wait for that to complete first. */

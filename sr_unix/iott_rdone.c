@@ -74,7 +74,6 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 	io_desc		*io_ptr;
 	d_tt_struct	*tt_ptr;
 	tt_interrupt	*tt_state;
-	TID		timer_id;
 	int		rdlen, selstat, status, utf8_more, utf8_seen, inchar_width;
 	uint4		mask;
 	int		msk_in, msk_num;
@@ -94,7 +93,6 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 	iott_flush(io_curr_device.out);
 	tt_ptr = (d_tt_struct*) io_ptr->dev_sp;
 	SETTERM_IF_NEEDED(io_ptr, tt_ptr);
-	timer_id = (TID) iott_rdone;
 	*v = -1;
 	dc1 = (char) 17;
 	dc3 = (char) 19;

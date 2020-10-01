@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
+ *	Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ *	All rights reserved.					*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -68,14 +71,14 @@ int gtm_bintim(char *toscan, jnl_proc_time *timep)
 	num = SSCANF(toscan, "%d %d", &day, &hour);
 	if (2 == num)
 	{	/* delta time format. note: this is the same code as in VMS gtm_bintim.c */
-		num = SSCANF(toscan, "%d %d:%d:%d%n", &day, &hour, &min, &sec, &matched);
+		SSCANF(toscan, "%d %d:%d:%d%n", &day, &hour, &min, &sec, &matched);
 		if (matched < len)
 		{
-			num = SSCANF(toscan, "%d %d:%d:%d:%*d%n", &day, &hour, &min, &sec, &matched);
+			SSCANF(toscan, "%d %d:%d:%d:%*d%n", &day, &hour, &min, &sec, &matched);
 			if (matched < len)
 			{
 				sec = 0;
-				num = SSCANF(toscan, "%d %d:%d%n", &day, &hour, &min, &matched);
+				SSCANF(toscan, "%d %d:%d%n", &day, &hour, &min, &matched);
 				if (matched < len)
 					return -1;
 			}
@@ -87,31 +90,31 @@ int gtm_bintim(char *toscan, jnl_proc_time *timep)
 		*month = '\0';
 		now = time((time_t *) 0);
 		GTM_LOCALTIME(now_tm, &now);
-		num = SSCANF(toscan, "%d-%[" monthalphas "]-%d %d:%d:%d%n", &day, month, &year, &hour, &min, &sec, &matched);
+		SSCANF(toscan, "%d-%[" monthalphas "]-%d %d:%d:%d%n", &day, month, &year, &hour, &min, &sec, &matched);
 		if (matched < len)
 		{
-			num = SSCANF(toscan, "%d-%[" monthalphas "]-%d %d:%d:%d:%*d%n",
+			SSCANF(toscan, "%d-%[" monthalphas "]-%d %d:%d:%d:%*d%n",
 				&day, month, &year, &hour, &min, &sec, &matched);
 			if (matched < len)
 			{
 				sec = 0;
-				num = SSCANF(toscan, "%d-%[" monthalphas "]-%d %d:%d%n", &day, month, &year, &hour, &min, &matched);
+				SSCANF(toscan, "%d-%[" monthalphas "]-%d %d:%d%n", &day, month, &year, &hour, &min, &matched);
 				if (matched < len)
 				{
 					hour = min = sec = 0;
-					num = SSCANF(toscan, "%d-%[" monthalphas "]-%d%n", &day, month, &year, &matched);
+					SSCANF(toscan, "%d-%[" monthalphas "]-%d%n", &day, month, &year, &matched);
 					if (matched < len)
 					{
 						day = now_tm->tm_mday;
 						year = now_tm->tm_year + 1900;
-						num = SSCANF(toscan, "-- %d:%d:%d%n", &hour, &min, &sec, &matched);
+						SSCANF(toscan, "-- %d:%d:%d%n", &hour, &min, &sec, &matched);
 						if (matched < len)
 						{
-							num = SSCANF(toscan, "-- %d:%d:%d:%*d%n", &hour, &min, &sec, &matched);
+							SSCANF(toscan, "-- %d:%d:%d:%*d%n", &hour, &min, &sec, &matched);
 							if (matched < len)
 							{
 								sec = 0;
-								num = SSCANF(toscan, "-- %d:%d%n", &hour, &min, &matched);
+								SSCANF(toscan, "-- %d:%d%n", &hour, &min, &matched);
 								if (matched < len)
 									return -1;
 							}

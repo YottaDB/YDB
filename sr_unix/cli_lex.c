@@ -126,7 +126,7 @@ static int tok_string_extract(void)
 		break;
 	}
 	ch = 0;
-	out_sp = CLI_PUT_CHAR(out_sp, ch);
+	CLI_PUT_CHAR(out_sp, ch);
 	cli_lex_in_ptr->tp = (char *)in_sp;
 
 	return (token_len);
@@ -356,7 +356,7 @@ static int	tok_extract (void)
 		}
 	}
 	ch = 0;
-	out_sp = CLI_PUT_CHAR(out_sp, ch);
+	CLI_PUT_CHAR(out_sp, ch);
 	cli_lex_in_ptr->tp = (char *)in_sp;
 	return(token_len);
 }

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,7 @@ GBLREF gv_key		*gv_altkey;
 /* Routine to extract subscripts from gv_altkey and store references to those subscripts in TREF(sapi_query_node_subs) */
 void sapi_save_targ_key_subscr_nodes(void)
 {
-	mstr		*subcur, *subtop, opstr;
+	mstr		*subcur, opstr;
 	unsigned char	*gvkey_char_ptr, *gvkey_top_ptr, work_buff[MAX_ZWR_KEY_SZ], *work_top;
 	boolean_t	is_string;
 	int		subs_cnt;
@@ -48,7 +48,6 @@ void sapi_save_targ_key_subscr_nodes(void)
 	if (NULL == TREF(sapi_query_node_subs))
 		TREF(sapi_query_node_subs) = malloc(SIZEOF(mstr) * YDB_MAX_SUBS);	/* Allocate mstr array we need */
 	subcur = TREF(sapi_query_node_subs);
-	subtop = subcur + TREF(sapi_query_node_subs_cnt);
 	gvkey_char_ptr = gv_altkey->base;
 	gvkey_top_ptr = gvkey_char_ptr + gv_altkey->end;
 	/* Ensure input key is well-formed (i.e. double null terminated) */

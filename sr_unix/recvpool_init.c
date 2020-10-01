@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -161,7 +161,6 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		jnlpool = save_jnlpool;
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RECVPOOLSETUP);
 	}
-	save_errno = errno;
 	repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));	/* uses jnlpool */
 	/* At this point, we might not have yet attached to the jnlpool so we do not know if the ftok counter got halted
 	 * previously or not. So be safe and assume it has halted in case the jnlpool_shmid indicates it is up and running.

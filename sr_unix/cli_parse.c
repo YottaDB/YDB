@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -738,14 +738,13 @@ int parse_cmd(void)
 	int 	res, cmd_ind;
 	char 	*cmd_str;
 	int 	opt_cnt;
-	int 	eof, cmd_err;
+	int 	eof;
         DCL_THREADGBL_ACCESS;
 
         SETUP_THREADGBL_ACCESS;
 	opt_cnt = 0;
 	gpqual_root = NULL;
 	func = 0;
-	cmd_err = 0;
 	TREF(parms_cnt) = 0;			/* Parameters count */
 	*cli_err_str = 0;
 
@@ -1102,14 +1101,12 @@ boolean_t cli_get_parm(char *entry, char val_buf[])
 int parse_triggerfile_cmd(void)
 {
 	int 		res, cmd_ind;
-	int 		opt_cnt;
 	int 		eof;
 	char		cmd[] = "TRIGGER";
 	char		*ptr, *nextptr;
         DCL_THREADGBL_ACCESS;
 
         SETUP_THREADGBL_ACCESS;
-	opt_cnt = 0;
 	gpqual_root = 0;
 	func = 0;
 	TREF(parms_cnt) = 0;			/* Parameters count */

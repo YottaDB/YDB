@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -183,7 +183,7 @@ gpgme_error_t gc_pk_get_decrypted_key(const char *cipher_file, unsigned char *pl
 int gc_pk_gpghome_has_permissions()
 {
 	char		pathname[YDB_PATH_MAX], *ptr;
-	int		gnupghome_set, perms, pathlen;
+	int		gnupghome_set, pathlen;
 
 	/* See if GNUPGHOME is set in the environment */
 	if (!(ptr = ydb_getenv(YDBENVINDX_GENERIC_GNUPGHOME, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
@@ -212,7 +212,7 @@ int gc_pk_gpghome_has_permissions()
 		memcpy(pathname, ptr, pathlen);
 		pathname[pathlen] = '\0';
 	}
-	if (-1 != (perms = access(pathname, R_OK | X_OK)))
+	if (-1 != access(pathname, R_OK | X_OK))
 		return 0;
 	else if (EACCES == errno)
 	{

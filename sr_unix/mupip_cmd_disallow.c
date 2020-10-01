@@ -3,7 +3,7 @@
  * Copyright (c) 2002-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -360,6 +360,7 @@ boolean_t cli_disallow_mupip_replic_receive(void)
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (!(d_c_cli_present("START") || d_c_cli_present("SHUTDOWN") || d_c_cli_present("CHECKHEALTH"))
 				&& d_c_cli_present("HELPERS"));
+	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (d_c_cli_present("LISTENPORT") && d_c_cli_present("UPDATEONLY"));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (d_c_cli_present("UPDATEONLY") && d_c_cli_present("HELPERS"));

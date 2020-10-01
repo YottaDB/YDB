@@ -1061,7 +1061,6 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 	if (0 < cmdbufln)
 	{	/* Normalize the directory via realpath so comparison possible */
 		cmdbuf[cmdbufln] = rpcmdbuf[0] = '\0';
-		csrv = realpath(cmdbuf, rpcmdbuf);
 		cmdbufln = STRLEN(rpcmdbuf);
 		if ((cmdbufln == rundir_len) && (0 == memcmp(rundir, rpcmdbuf, cmdbufln)))
 		{

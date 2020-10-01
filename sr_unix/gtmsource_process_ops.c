@@ -1394,7 +1394,6 @@ boolean_t gtmsource_exchange_tls_info(void)
 boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_num *strm_jnl_seqno)
 {
 	char			print_msg[1024];
-	gtmsource_local_ptr_t	gtmsource_local;
 	int			status;
 	repl_instinfo_msg_t	instinfo_msg;
 	repl_needinst_msg_t	needinst_msg;
@@ -1402,7 +1401,6 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_
 	repl_old_needinst_msg_t	old_needinst_msg;
 
 	assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));	/* journal pool should be set up */
-	gtmsource_local = jnlpool->gtmsource_local;
 	assert(REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver);
 	if (REPL_PROTO_VER_SUPPLEMENTARY > remote_side->proto_ver)
 	{	/* Use pre-supplementary protocol to communicate */

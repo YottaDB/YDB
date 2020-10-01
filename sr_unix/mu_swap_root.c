@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -180,7 +183,7 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr)
 		DEBUG_ONLY(lcl_t_tries = t_tries);
 		TREF(in_mu_swap_root_state) = MUSWP_INCR_ROOT_CYCLE;
 		assert(!TREF(in_gvcst_redo_root_search));
-		if ((trans_num)0 == (ret_tn = t_end(gvt_hist_ptr, dir_hist_ptr, TN_NOT_SPECIFIED)))
+		if ((trans_num)0 == t_end(gvt_hist_ptr, dir_hist_ptr, TN_NOT_SPECIFIED))
 		{
 			TREF(in_mu_swap_root_state) = MUSWP_NONE;
 			need_kip_incr = FALSE;
@@ -252,7 +255,7 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr)
 				WAIT_ON_INHIBIT_KILLS(cnl, MAXWAIT2KILL);
 			DEBUG_ONLY(lcl_t_tries = t_tries);
 			TREF(in_mu_swap_root_state) = MUSWP_DIRECTORY_SWAP;
-			if ((trans_num)0 == (ret_tn = t_end(dir_hist_ptr, NULL, TN_NOT_SPECIFIED)))
+			if ((trans_num)0 == t_end(dir_hist_ptr, NULL, TN_NOT_SPECIFIED))
 			{
 				TREF(in_mu_swap_root_state) = MUSWP_NONE;
 				need_kip_incr = FALSE;
@@ -278,9 +281,8 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 {
 	sgmnt_data_ptr_t	csd;
 	sgmnt_addrs		*csa;
-	node_local_ptr_t	cnl;
 	srch_blk_status		bmlhist, freeblkhist;
-	block_id		hint_blk_num, free_blk_id, parent_blk_id;
+	block_id		hint_blk_num, free_blk_id;
 	boolean_t		free_blk_recycled;
 	int4			master_bit, num_local_maps, free_bit, hint_bit, maxbitsthismap;
 	uint4			total_blks;
@@ -300,7 +302,6 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	SETUP_THREADGBL_ACCESS;
 	csd = cs_data;
 	csa = cs_addrs;
-	cnl = csa->nl;
 	blk_size = csd->blk_size;
 	/* Find a free/recycled block for new block location. */
 	hint_blk_num = 0;
@@ -344,7 +345,6 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	 * 	4. Child block gets marked recycled in bitmap. (GVCST_BMP_MARK_FREE)
 	 */
 	parent_blk_ptr = dir_hist_ptr->h[parent_blk_lvl].buffaddr; /* parent_blk_lvl is 0 iff we're moving a gvt root block */
-	parent_blk_id = dir_hist_ptr->h[parent_blk_lvl].blk_num;
 	CHECK_AND_RESET_UPDATE_ARRAY;
 	if (free_blk_recycled)
 	{	/* Otherwise, it's a completely free block, in which case no need to read. */

@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -344,7 +344,6 @@ boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats)
 	char			trigvn[MAX_MIDENT_LEN + 1];
 	int			trigvn_len;
 	int			trig_indx;
-	int			badpos;
 	boolean_t		wildcard;
 	char			utilprefix[1024];
 	int			utilprefixlen;
@@ -361,14 +360,12 @@ boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	badpos = 0;
 	orig_name_len = trigger_name_len = trigger_rec->str.len - 1;
 	trigger_name = trigger_rec->str.addr + 1;
 	if ((0 == trigger_name_len)
-		|| (trigger_name_len != (badpos = validate_input_trigger_name(trigger_name, trigger_name_len, &wildcard))))
+		|| (trigger_name_len != validate_input_trigger_name(trigger_name, trigger_name_len, &wildcard)))
 	{	/* is the input name valid */
 		CONV_STR_AND_PRINT("Invalid trigger NAME string: ", orig_name_len, trigger_name);
-		/* badpos is the string position where the bad character was found, pretty print it */
 		trig_stats[STATS_ERROR_TRIGFILE]++;
 		return TRIG_FAILURE;
 	}
@@ -522,7 +519,6 @@ boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats)
 		/* below is needed to set update_trans TRUE on this region even if NO db updates happen to ^#t nodes */
 		T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_TRIGLOADFAIL);
 		jnl_format(JNL_LGTRIG, NULL, trigger_rec, 0);
-		jnl_format_done = TRUE;
 	}
 	if (wildcard)
 	{
@@ -558,7 +554,6 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 	mval			*mv_val_ptr;
 	char			*ptr1;
 	int4			result;
-	int4			retval;
 	stringkey		kill_hash, set_hash;
 	int			sub_indx;
 	char			tmp_trig_str[MAX_BUFF_SIZE];
@@ -759,12 +754,12 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 				return PUT_SUCCESS;
 			set_hash.hash_code = (uint4)MV_FORCE_UINT(mv_val_ptr);
 			/* update hash values from above */
-			if (VAL_TOO_LONG == (retval = update_trigger_hash_value(trigvn, trigvn_len, tt_val, tt_val_len,
-					&set_hash, &kill_hash, count, index)))
+			if (VAL_TOO_LONG == update_trigger_hash_value(trigvn, trigvn_len, tt_val, tt_val_len,
+					&set_hash, &kill_hash, count, index))
 				return VAL_TOO_LONG;
 			/* fix the value ^#t("#TNAME",^#t(GVN,index,"#TRIGNAME")) to point to the correct "index" */
-			if (VAL_TOO_LONG == (retval = update_trigger_name_value(tt_val[TRIGNAME_SUB],
-					tt_val_len[TRIGNAME_SUB], index)))
+			if (VAL_TOO_LONG == update_trigger_name_value(tt_val[TRIGNAME_SUB],
+					tt_val_len[TRIGNAME_SUB], index))
 				return VAL_TOO_LONG;
 			/* kill ^#t(GVN,COUNT) which was just shifted to trigger_index */
 			BUILD_HASHT_SUB_MSUB_CURRKEY(trigvn, trigvn_len, *trigger_count);

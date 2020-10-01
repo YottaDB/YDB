@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -104,7 +104,7 @@ int gtmrecv_endupd(void)
 	/* Wait for the Update Process to detach */
 	if (0 == grab_sem(RECV, UPD_PROC_COUNT_SEM))
 	{
-		if (0 != (status = rel_sem(RECV, UPD_PROC_COUNT_SEM)))
+		if (0 != rel_sem(RECV, UPD_PROC_COUNT_SEM))
 		{
 			save_errno = errno;
 			repl_log(stderr, TRUE, TRUE, "Error releasing the Update Process Count semaphore : %s\n",
@@ -130,7 +130,7 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	exit_status = gtmrecv_end_helpers(TRUE);
+	gtmrecv_end_helpers(TRUE);
 	exit_status = gtmrecv_endupd();
 	log_seqno = recvpool.recvpool_ctl->jnl_seqno;
 	log_seqno1 = recvpool.upd_proc_local->read_jnl_seqno;

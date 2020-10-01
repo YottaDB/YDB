@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -49,7 +52,6 @@ error_def		(ERR_PARFILSPC);
 void ojparams (char *p, job_params_type *job_params)
 {
 	unsigned char		ch;
-	int4			status;
 	mstr_len_t		handle_len;
 	FILE			*curlvn_out;
 
@@ -187,8 +189,8 @@ void ojparams (char *p, job_params_type *job_params)
 					job_params->params.input.len, job_params->params.input.buffer);
 	}
 	else
-		if (!(status = ojchkfs (job_params->params.input.buffer,
-					job_params->params.input.len, TRUE)))
+		if (!ojchkfs (job_params->params.input.buffer,
+					job_params->params.input.len, TRUE))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "INPUT",
 					job_params->params.input.len, job_params->params.input.buffer);
 
@@ -212,8 +214,8 @@ void ojparams (char *p, job_params_type *job_params)
 					job_params->params.output.len, job_params->params.output.buffer);
 	}
 	else
-		if (!(status = ojchkfs (job_params->params.output.buffer,
-					job_params->params.output.len, FALSE)))
+		if (!ojchkfs (job_params->params.output.buffer,
+					job_params->params.output.len, FALSE))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 6,
 					"OUTPUT", job_params->params.output.len, job_params->params.output.buffer);
 /*
@@ -236,8 +238,8 @@ void ojparams (char *p, job_params_type *job_params)
 				job_params->params.error.len, job_params->params.error.buffer);
 	}
 	else
-		if (!(status = ojchkfs (job_params->params.error.buffer,
-					job_params->params.error.len, FALSE)))
+		if (!ojchkfs (job_params->params.error.buffer,
+					job_params->params.error.len, FALSE))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "ERROR",
 					job_params->params.error.len, job_params->params.error.buffer);
 /*
@@ -250,30 +252,32 @@ void ojparams (char *p, job_params_type *job_params)
 		memcpy(job_params->params.gbldir.buffer, dollar_zgbldir.str.addr, dollar_zgbldir.str.len);
 	}
 	else
-		if (!(status = ojchkfs (job_params->params.gbldir.buffer,
-					job_params->params.gbldir.len, FALSE)))
+		if (!ojchkfs (job_params->params.gbldir.buffer,
+					job_params->params.gbldir.len, FALSE))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 6, "GBLDIR",
 					job_params->params.gbldir.len, job_params->params.gbldir.buffer);
 /*
  * Startup
  */
 	if (job_params->params.startup.len)
-		if (!(status = ojchkfs (job_params->params.startup.buffer,
-					job_params->params.startup.len, TRUE)))
+		if (!ojchkfs (job_params->params.startup.buffer,
+					job_params->params.startup.len, TRUE))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 7, "STARTUP",
 					job_params->params.startup.len, job_params->params.startup.buffer);
 /*
  * Default Directory
  */
 	if (job_params->params.directory.len)
-		if (!(status = ojchkfs (job_params->params.directory.buffer,
-					job_params->params.directory.len, FALSE)))
+		if (!ojchkfs (job_params->params.directory.buffer,
+					job_params->params.directory.len, FALSE))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 7, "DEFAULT",
 					job_params->params.directory.len, job_params->params.directory.buffer);
 
 	/* Gather local variables to pass */
 	if (job_params->passcurlvn)
 	{	/* Create a "memory file" to store the job_set_locals messages for later transmission by the middle child. */
+		int4	status;
+
 		curlvn_out = open_memstream(&job_params->curlvn_buffer_ptr, &job_params->curlvn_buffer_size);
 		local_variable_marshalling(curlvn_out);
 		FCLOSE(curlvn_out, status);	/* Force "written" messages into the buffer */
