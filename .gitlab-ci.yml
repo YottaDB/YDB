@@ -38,9 +38,15 @@ build-ubuntu:
 build-ubuntu-clang:
   image: ubuntu:18.04
   stage: build
+  artifacts:
+    paths:
+      - build/warnings/
+    when: always
+    expire_in: 1 month
   script:
-    - apt-get update
-    - apt-get install -yq
+    - apt-get update -q
+    - apt-get -q install -y --no-install-recommends >/dev/null
+        ca-certificates
         clang-10
         clang-tidy-10
         file
@@ -55,6 +61,7 @@ build-ubuntu-clang:
         libicu-dev
         libncurses-dev
         libssl-dev
+        moreutils
         zlib1g-dev
     - ci/build.sh
 

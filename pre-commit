@@ -156,7 +156,7 @@ foreach file ($filelist)
 	endif
 	set extension = $file:e
 	# A few file extensions do not have copyright
-	if (("hlp" == $extension) || ("list" == $extension) || ("exp" == $extension) || ("md" == $extension)) then
+	if (("hlp" == $extension) || ("list" == $extension) || ("exp" == $extension) || ("md" == $extension) || ("ref" == $extension)) then
 		continue
 	endif
 	# A few specific filenames do not have copyright as they are generated
