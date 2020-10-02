@@ -79,13 +79,20 @@ echo "target/upstream branch set to: $ydb_branch"
 echo "# Fetch all commit ids only present in MR by comparing to target/upstream $ydb_branch branch"
 COMMIT_IDS=`git rev-list upstream_repo/$ydb_branch..HEAD`
 error_check "failed to fetch commit" $?
+
+if [ -z "$COMMIT_IDS" ]; then
+	# Only occurs when MR is merged and the pipeline execution is happening on upstream_repo
+	COMMIT_IDS=`git rev-list HEAD~1..HEAD`
+	error_check "failed to fetch HEAD commit" $?
+fi
+
 echo "${COMMIT_IDS[@]}"
 
 echo "# Verify commits"
 for id in $COMMIT_IDS
 do
-    if ! git verify-commit "$id"; then
-        echo " -> The commit $id was not signed with a known GPG key!"
-	exit 1
-    fi
+	if ! git verify-commit "$id"; then
+		echo " -> The commit $id was not signed with a known GPG key!"
+		exit 1
+	fi
 done
