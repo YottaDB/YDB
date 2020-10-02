@@ -65,6 +65,14 @@ build-ubuntu-debug:
     REPO: yottadb-debug
     ARGS: --build-arg CMAKE_BUILD_TYPE=Debug
 
+gpgkey-commit-verify:
+  image: ubuntu:18.04
+  stage: build
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git wget gnupg
+  script:
+    - ci/commit_gpgkey_verify.sh https://gitlab.com/YottaDB/DB/YDB
+
 build-centos:
   extends: .build
   variables:

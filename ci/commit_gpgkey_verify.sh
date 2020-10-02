@@ -11,6 +11,15 @@
 #								#
 #################################################################
 
+error_check() {
+	msg="$1"
+	result="$2"
+	if [ $result -ne 0 ]; then
+		echo $msg
+		exit 1
+	fi
+}
+
 if [ $# -eq 0 ] || [ -z "$1" ]; then
 	echo "Need to pass target/upstream project URL as the first argument"
 	exit 1
@@ -51,7 +60,9 @@ gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "${GPG_KEYS[@]}"
 echo "# Add $1 as remote"
 if ! git remote | grep -q upstream_repo; then
 	git remote add upstream_repo "$1"
+	error_check "git remote add failed for upstream_repo $1" $?
 	git fetch upstream_repo
+	error_check "git fetch failed for upstream_repo" $?
 else
 	echo "Unable to add $1 as remote, remote name upstream_repo already exists"
 	exit 1
@@ -67,6 +78,7 @@ echo "target/upstream branch set to: $ydb_branch"
 
 echo "# Fetch all commit ids only present in MR by comparing to target/upstream $ydb_branch branch"
 COMMIT_IDS=`git rev-list upstream_repo/$ydb_branch..HEAD`
+error_check "failed to fetch commit" $?
 echo "${COMMIT_IDS[@]}"
 
 echo "# Verify commits"

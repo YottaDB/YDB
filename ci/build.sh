@@ -5,9 +5,6 @@ set -euv
 # If any command in a pipeline fails, count the entire pipeline as failed
 set -o pipefail
 
-# This is quick to execute, so do it first without having to wait for a full build
-./ci/commit_gpgkey_verify.sh https://gitlab.com/YottaDB/DB/YDB/
-
 echo "# Randomly choose to build Debug or Release build"
 if [[ $(( $RANDOM % 2)) -eq 0 ]]; then
 	build_type="Debug"
