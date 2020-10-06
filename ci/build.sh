@@ -78,5 +78,5 @@ compare ../../ci/warnings.ref sorted_warnings.txt make_warnings.txt
 cd ..
 ../ci/create_tidy_warnings.sh warnings .
 
-# NOTE: If this command fails, you can download `sorted_warnings.txt` to `ci/tidy_warnings.ref`
-compare ../ci/tidy_warnings.ref warnings/{sorted_warnings.txt,tidy_warnings.txt}
+# NOTE: If this command fails, you can download `sorted_warnings.txt` to `ci/tidy_warnings_debug.ref`
+compare ../ci/tidy_warnings_debug.ref warnings/{sorted_warnings.txt,tidy_warnings.txt}
