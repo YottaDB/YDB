@@ -848,6 +848,7 @@ GBLDEF	boolean_t		dse_all_dump;		/* TRUE if DSE ALL -DUMP is specified */
 GBLDEF	int			socketus_interruptus;	/* How many times socket reads have been interrutped */
 GBLDEF	int4			pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
 GBLDEF	uint4	process_id;
+GBLDEF  char	*process_name;				/* Place where process name will be stored */
 GBLDEF	uid_t	user_id = INVALID_UID, effective_user_id = INVALID_UID;
 GBLDEF	gid_t	group_id = INVALID_GID, effective_group_id = INVALID_GID;
 /* Below is a cached copy of "getpwuid" to try avoid future system calls for the same "uid".

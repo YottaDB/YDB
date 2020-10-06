@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 
 #include "gtm_unistd.h"
 #include "getjobnum.h"
+#include "get_comm_info.h"
 
 GBLREF	uint4	process_id;
 GBLREF	uid_t	user_id;
@@ -28,4 +29,5 @@ void getjobnum(void)
 	SETUP_THREADGBL_ACCESS;
 	SET_PROCESS_ID;
 	user_id = (uint4)getuid();
+	get_comm_info();
 }

@@ -73,6 +73,7 @@ GBLREF	uint4			is_updhelper;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	uint4			process_id;
 GBLREF	VSIG_ATOMIC_T		forced_exit;
+GBLREF	char			*process_name;
 
 error_def(ERR_REPLINSTACC);
 error_def(ERR_TEXT);
@@ -676,7 +677,7 @@ void	util_out_send_oper(char *addr, unsigned int len)
 		switch (image_type)
 		{
 			case GTM_IMAGE:
-				img_type = "MUMPS";
+				img_type = process_name;
 				break;
 			case MUPIP_IMAGE:
 				if (is_src_server)
