@@ -150,35 +150,24 @@ set filelist = `git diff --name-only HEAD`	# recompute "filelist" in case Step (
 set fixlist = ""
 set curyear = `date +%Y`
 foreach file ($filelist)
-	if (! -e $file) then
-		# If file is being deleted as part of this commit, skip copyright check on it
-		continue
-	endif
-	set extension = $file:e
-	# A few file extensions do not have copyright
-	if (("hlp" == $extension) || ("list" == $extension) || ("exp" == $extension) || ("md" == $extension) || ("ref" == $extension)) then
-		continue
-	endif
-	# A few specific filenames do not have copyright as they are generated
-	if (("GTMDefinedTypesInitRelease.m" == $file:t) || ("GTMDefinedTypesInitDebug.m" == $file:t)) then
-		continue
-	endif
-	# Below is a list of specific files that do not have a copyright so ignore them
-	set skiplist = "COPYING LICENSE README.md sr_port/gdeinitsz.m sr_port/md5hash.c sr_port/md5hash.h"
-	set skiplist = "$skiplist sr_unix/custom_errors_sample.txt sr_unix/gtmgblstat.xc"
-	set skiplist = "$skiplist sr_port/copyright.txt"
-	set skip = 0
-	foreach skipfile ($skiplist)
-		if ($file == $skipfile) then
-			set skip = 1
-			break
-		endif
-	end
-	if ($skip) then
-		continue
-	endif
-	grep 'Copyright (c) .*'$curyear' YottaDB LLC' $file >& /dev/null
+	ci/needs_copyright.sh $file
 	if ($status != 0) then
+		continue
+	endif
+	# Optimization: don't run the python script unless necessary
+	grep 'Copyright (c) .*'$curyear' YottaDB LLC' $file >& /dev/null
+	if ($status == 0) then
+		continue
+	endif
+	# Try to automatically add a copyright to the file
+	set tempfile = `mktemp`
+	ci/copyright.py < $file > $tempfile
+	set copyright_status = $status
+	if ($copyright_status == 1) then
+		echo "note: automatically committing copyright updates to $file"
+		mv $tempfile $file
+		git add $file
+	else if ($copyright_status != 0) then
 		set fixlist = "$fixlist $file"
 	endif
 end

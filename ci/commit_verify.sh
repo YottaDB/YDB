@@ -11,19 +11,17 @@
 #								#
 #################################################################
 
-error_check() {
-	msg="$1"
-	result="$2"
-	if [ $result -ne 0 ]; then
-		echo $msg
-		exit 1
-	fi
-}
+set -euv
+set -o pipefail
 
-if [ $# -eq 0 ] || [ -z "$1" ]; then
-	echo "Need to pass target/upstream project URL as the first argument"
+if [ $# -lt 1 ] || [ -z "$1" ]; then
+	echo "usage: $0 <needs_copyright.sh> [comparison branch] [remote URL]"
 	exit 1
 fi
+
+needs_copyright="$1"
+target_branch="${2:-${CI_EXTERNAL_PULL_REQUEST_TARGET_BRANCH_NAME:-$CI_MERGE_REQUEST_TARGET_BRANCH_NAME}}"
+upstream_repo="${3:-${CI_EXTERNAL_PULL_REQUEST_TARGET_REPOSITORY:-$CI_REPOSITORY_URL}}"
 
 echo "# Check for a commit that was not gpg-signed"
 
@@ -57,42 +55,54 @@ GPG_KEYS=(
 )
 gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "${GPG_KEYS[@]}"
 
-echo "# Add $1 as remote"
+echo "# Add $upstream_repo as remote"
 if ! git remote | grep -q upstream_repo; then
-	git remote add upstream_repo "$1"
-	error_check "git remote add failed for upstream_repo $1" $?
+	git remote add upstream_repo "$upstream_repo"
 	git fetch upstream_repo
-	error_check "git fetch failed for upstream_repo" $?
 else
-	echo "Unable to add $1 as remote, remote name upstream_repo already exists"
+	echo "Unable to add $upstream_repo as remote, remote name upstream_repo already exists"
 	exit 1
 fi
 
-echo "# Set target/upstream branch"
-if [ -z "$2" ]; then
-	ydb_branch=master
-else
-	ydb_branch="$2"
-fi
-echo "target/upstream branch set to: $ydb_branch"
+echo "target/upstream branch set to: $target_branch"
 
-echo "# Fetch all commit ids only present in MR by comparing to target/upstream $ydb_branch branch"
-COMMIT_IDS=`git rev-list upstream_repo/$ydb_branch..HEAD`
-error_check "failed to fetch commit" $?
+echo "# Fetch all commit ids only present in MR by comparing to target/upstream $target_branch branch"
+COMMIT_IDS=`git rev-list upstream_repo/$target_branch..HEAD`
 
 if [ -z "$COMMIT_IDS" ]; then
 	# Only occurs when MR is merged and the pipeline execution is happening on upstream_repo
 	COMMIT_IDS=`git rev-list HEAD~1..HEAD`
-	error_check "failed to fetch HEAD commit" $?
 fi
 
 echo "${COMMIT_IDS[@]}"
 
-echo "# Verify commits"
+echo "# Verify commits and copyrights"
+
+missing_files=""
+
 for id in $COMMIT_IDS
 do
 	if ! git verify-commit "$id"; then
-		echo " -> The commit $id was not signed with a known GPG key!"
+		echo "  --> Error: commit $id was not signed with a known GPG key!"
 		exit 1
 	fi
+
+	filelist="$(git show --pretty="" --name-only "$id")"
+	curyear="$(date +%Y)"
+
+	for file in $filelist; do
+		if $needs_copyright $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
+			# Print these out only at the end so they're all shown at once
+			missing_files="$missing_files $file"
+		fi
+	done
 done
+
+if [ -n "$missing_files" ]; then
+	echo "  --> Error: some files are missing a YottaDB Copyright notice and/or current year $curyear"
+	# Don't give duplicate errors for the same file
+	for file in $(echo $missing_files | tr ' ' '\n' | sort -u); do
+		echo "	$file"
+	done
+	exit 1
+fi
