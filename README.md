@@ -55,13 +55,13 @@ listed below. For example for Ubuntu Linux:
 
   ```sh
   Ubuntu Linux OR Raspbian Linux OR Beagleboard Debian
-  sudo apt-get install --no-install-recommends cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev binutils
+  sudo apt-get install --no-install-recommends tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev binutils
 
   Arch Linux
-  sudo pacman -S cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,gpgme,icu,ncurses,openssl,zlib} binutils
+  sudo pacman -S tcsh {libconfig,libelf,libgcrypt,libgpg-error,gpgme,icu,ncurses,openssl,zlib} binutils
 
   CentOS Linux OR RedHat Linux
-  sudo yum install git gcc cmake tcsh {libconfig,gpgme,libicu,libgpg-error,libgcrypt,ncurses,openssl,zlib,elfutils-libelf}-devel binutils
+  sudo yum install git gcc tcsh {libconfig,gpgme,libicu,libgpg-error,libgcrypt,ncurses,openssl,zlib,elfutils-libelf}-devel binutils
   ```
 
   There may be other library dependencies or the packages may have different names.
@@ -182,7 +182,7 @@ docker run --rm -it yottadb/yottadb # you can add a specific version after a ":"
   %YDB-E-TEXT, libtinfo.so.5: cannot open shared object file: No such file or directory
   ```
 
-  This indicates that the libtinfo5 package isn't installed and libtinfo6 is not backwards compatible with libtinfo5. This has been observed on Ubutntu 18.10 and could possibly apply to outher Linux distributions as well. To resolve the issue, libtinfo5 can be installed via the following command:
+  This indicates that the libtinfo5 package isn't installed and libtinfo6 is not backwards compatible with libtinfo5. This has been observed on Ubutntu 18.10 and could possibly apply to other Linux distributions as well. To resolve the issue, libtinfo5 can be installed via the following command:
 
   ```bash
   sudo apt-get install --no-install-recommends libtinfo5
