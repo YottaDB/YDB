@@ -210,7 +210,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			 */
 			/* Make sure we have crit when updating early_tn */
 			if (FALSE == ((was_crit = cs_addrs->now_crit)))
-				grab_crit(gv_cur_region);
+				grab_crit(gv_cur_region, WS_44);
 			cs_addrs->ti->early_tn--;
 			if (!was_crit)
 				rel_crit(gv_cur_region);

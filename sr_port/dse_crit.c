@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,7 @@ void dse_crit(void)
 			return;
 		}
 		UPDATE_CRASH_COUNT(cs_addrs, crash_count);
-		grab_crit_encr_cycle_sync(gv_cur_region);
+		grab_crit_encr_cycle_sync(gv_cur_region, WS_58);
 		cs_addrs->hold_onto_crit = TRUE;	/* need to do this AFTER grab_crit */
 		cs_addrs->dse_crit_seize_done = TRUE;
 		util_out_print("!/Seized write critical section.!/", TRUE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -735,7 +735,7 @@ void	wcs_mm_recover(gd_region *reg)
 	assert(!cs_addrs->hdr->clustered);
 	assert(!cs_addrs->hold_onto_crit || cs_addrs->now_crit);
 	if (!(was_crit = cs_addrs->now_crit))
-		grab_crit(gv_cur_region);
+		grab_crit(gv_cur_region, WS_11);
 	SET_TRACEABLE_VAR(cs_addrs->nl->wc_blocked, WC_UNBLOCK);
 	assert((NULL != cs_addrs->db_addrs[0]) || process_exiting);
 	if ((cs_addrs->total_blks == cs_addrs->ti->total_blks) || (NULL == cs_addrs->db_addrs[0]))

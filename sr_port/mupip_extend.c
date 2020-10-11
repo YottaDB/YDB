@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -153,8 +153,8 @@ void mupip_extend(void)
 	{
 		case dba_bg:
 		case dba_mm:
-			grab_crit(gv_cur_region);
-			GRAB_UNFROZEN_CRIT(gv_cur_region, cs_addrs);
+			grab_crit(gv_cur_region, WS_67);
+			GRAB_UNFROZEN_CRIT(gv_cur_region, cs_addrs, WS_68);
 			old_total = cs_addrs->ti->total_blks;
 			if ((uint4)NO_FREE_SPACE == (status = GDSFILEXT(blocks, old_total, TRANS_IN_PROG_FALSE)))
 			{

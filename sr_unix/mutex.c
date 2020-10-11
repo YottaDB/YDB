@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,7 +78,7 @@
 		BG_TRACE_PRO_ANY(CSA, EVENT);					\
 }
 
-#define	ONE_MUTEX_TRY(CSA, ADDR, CRASH_CNT, PID, LOCK_TYPE, SPINS, SPIN_CNT, YIELDS, YIELD_CNT, Q_SLPS, IN_EPOCH, ATSTART)	\
+#define	ONE_MUTEX_TRY(CSA, ADDR, CRASH_CNT, PID, LOCK_TYPE, SPINS, SPIN_CNT, YIELDS, YIELD_CNT, Q_SLPS, IN_EPOCH, ATSTART, STATE) \
 MBSTART {															\
 	ABS_TIME 		ATEND;												\
 	enum cdb_sc		STATUS;												\
@@ -116,7 +116,7 @@ MBSTART {															\
 			INCR_GVSTATS_COUNTER((CSA), CNL, n_crits_in_epch, FAILED_LOCK_ATTEMPTS);				\
 		INCR_GVSTATS_COUNTER((CSA), CNL, n_crit_failed, FAILED_LOCK_ATTEMPTS);						\
 		INCR_GVSTATS_COUNTER((CSA), CNL, sq_crit_failed, FAILED_LOCK_ATTEMPTS * FAILED_LOCK_ATTEMPTS);			\
-		if (YIELDS)												\
+		if (YIELDS)													\
 		{														\
 			INCR_GVSTATS_COUNTER((CSA), CNL, n_crit_yields, (YIELDS));						\
 			INCR_GVSTATS_COUNTER((CSA), CNL, sq_crit_yields, (YIELDS) * (YIELDS));					\
@@ -137,6 +137,7 @@ MBSTART {															\
 		}														\
 		if (save_jnlpool != jnlpool)											\
 			jnlpool = save_jnlpool;											\
+		UPDATE_PROC_WAIT_STATE(CSA, STATE, -1);										\
 		return STATUS;													\
 	}															\
 } MBEND
@@ -691,7 +692,7 @@ void	gtm_mutex_init(gd_region *reg, int n, bool crash)
 enum cdb_sc gtm_mutex_lock(gd_region *reg,
 			      mutex_spin_parms_ptr_t mutex_spin_parms,
 			      int crash_count,
-			      mutex_lock_t mutex_lock_type)
+			      mutex_lock_t mutex_lock_type, wait_state state)
 {
 	sgmnt_addrs		*csa;
 	node_local		*cnl;
@@ -742,6 +743,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 	/* Do a trylock first. If we are locking immediate, we are done. Otherwise we have the opportunity to update
 	 * stats before doing a longer timed lock attempt.
 	 */
+	UPDATE_PROC_WAIT_STATE(csa, state, 1);
 	status = pthread_mutex_trylock(&csa->critical->mutex);
 	do
 	{
@@ -800,9 +802,11 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 				}
 				INCR_GVSTATS_COUNTER(csa, cnl, n_crit_success, 1);
 				csa->critical->crit_cycle++;
+				UPDATE_PROC_WAIT_STATE(csa, state, -1);
 				return cdb_sc_normal;
 			case EBUSY:
 				assert(MUTEX_LOCK_WRITE_IMMEDIATE == mutex_lock_type);
+				UPDATE_PROC_WAIT_STATE(csa, state, -1);
 				return cdb_sc_nolock;
 			case ETIMEDOUT:
 				mutex_deadlock_check(csa->critical, csa); /* Timed out: See if any deadlocks and fix if detected */
@@ -844,6 +848,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 	assertpro(!status);
 	return cdb_sc_nolock;		/* To keep compiler happy; should never happen. */
 #	else
+	UPDATE_PROC_WAIT_STATE(csa, state, 1);
 	save_jnlpool = jnlpool;
 	optimistic_attempts = MUTEX_MAX_OPTIMISTIC_ATTEMPTS;
 	queue_sleeps = csa->probecrit_rec.p_crit_que_full = 0;
@@ -856,7 +861,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 	if (csa->crit_probe)
 	{	/* run the active queue to find how many slots are left */
 		csa->probecrit_rec.p_crit_que_slots = (gtm_uint64_t)addr->queslots;		/* free = total number of slots */
-		csa->probecrit_rec.p_crit_que_slots -= verify_queue_lock((que_head_ptr_t)&addr->prochead); /* less used slots */
+		csa->probecrit_rec.p_crit_que_slots -= verify_queue_lock((que_head_ptr_t)&addr->prochead, csa); /* less used slots*/
 		sys_get_curr_time(&atstart);							/* start time for the probecrit */
 	}
 	do
@@ -869,7 +874,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 			for (status = cdb_sc_nolock, hard_spin_cnt = -1; hard_spin_cnt; --hard_spin_cnt)
 			{	/* hard spin loop for the master lock - don't admit any MUTEX_LOCK_WRITE_IMMEDIATE to try a bit '*/
 				ONE_MUTEX_TRY(csa, addr, crash_count, process_id, MUTEX_LOCK_WRITE, spins, hard_spin_cnt,
-					yields, sleep_spin_cnt, queue_sleeps, epoch_count, atstart);
+					yields, sleep_spin_cnt, queue_sleeps, epoch_count, atstart, state);
 				if (try_recovery)
 				{
 					mutex_salvage(reg);
@@ -902,7 +907,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 			(MUTEX_LOCK_WRITE == mutex_lock_type) ? "" : "IMMEDIATE ", addr->semaphore.u.parts.latch_pid);
 		if (MUTEX_LOCK_WRITE_IMMEDIATE == mutex_lock_type)	/* immediate gets 1 last try which returns regardless */
 			ONE_MUTEX_TRY(csa, addr, crash_count, process_id, mutex_lock_type,	/* use real lock type here */
-				spins, (gtm_int64_t)-1, yields, (gtm_int64_t)-1, queue_sleeps, epoch_count, atstart);
+				spins, (gtm_int64_t)-1, yields, (gtm_int64_t)-1, queue_sleeps, epoch_count, atstart, state);
 		try_recovery = FALSE;		/* only try recovery once per MUTEXLCKALERT */
 		assert(cdb_sc_nolock == status);
 		time(&curr_time);
@@ -922,6 +927,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 				{	/* This is just a precaution - shouldn't ever happen and has no code to maintain gvstats */
 					assert(FALSE);
 					SET_CSA_NOW_CRIT_TRUE(csa);
+					UPDATE_PROC_WAIT_STATE(csa, state, -1);
 					return (cdb_sc_normal);
 				}
 				if (in_crit_pid && (in_crit_pid == cnl->in_crit) && is_proc_alive(in_crit_pid, 0))
@@ -977,13 +983,14 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 				MUTEX_TRACE_CNTR(mutex_trc_mutex_slp_fn_noslp);
 				if (cdb_sc_normal == mutex_wakeup(addr, mutex_spin_parms))
 					continue;
+				UPDATE_PROC_WAIT_STATE(csa, state, -1);
 				return (cdb_sc_dbccerr);
 			}
 		}
 		for (redo_cntr = MUTEX_MAX_WAIT_FOR_PROGRESS_CNTR; redo_cntr;)
 		{	/* loop on getting a slot on the queue - every time through, if crit is available, grab it and go */
 			ONE_MUTEX_TRY(csa, addr, crash_count, process_id, mutex_lock_type,	/* lock type is MUTEX_LOCK_WRITE */
-				spins, (gtm_int64_t)-1, yields, (gtm_int64_t)-1, queue_sleeps, epoch_count, atstart);
+				spins, (gtm_int64_t)-1, yields, (gtm_int64_t)-1, queue_sleeps, epoch_count, atstart, state);
 			free_slot = (mutex_que_entry_ptr_t)REMQHI((que_head_ptr_t)&addr->freehead);
 #			ifdef MUTEX_MSEM_WAKE
 			msem_slot = free_slot;
@@ -1053,6 +1060,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 					{
 						if (save_jnlpool != jnlpool)
 							jnlpool = save_jnlpool;
+						UPDATE_PROC_WAIT_STATE(csa, state, -1);
 						return (cdb_sc_dbccerr);	/* Too many failures */
 					}
 					assert(!csa->now_crit);
@@ -1089,6 +1097,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 			}
 		} while (redo_cntr);
 	} while (TRUE);
+	UPDATE_PROC_WAIT_STATE(csa, state, -1);
 #	endif
 }
 
@@ -1299,7 +1308,7 @@ void mutex_clean_dead_owner(gd_region* reg, uint4 holder_pid)
 					if (jbp->dskaddr > start_freeaddr)
 					{
 						assert(!GLOBAL_LATCH_HELD_BY_US(&jbp->io_in_prog_latch));
-						grab_latch(&jbp->io_in_prog_latch, GRAB_LATCH_INDEFINITE_WAIT);
+						grab_latch(&jbp->io_in_prog_latch, GRAB_LATCH_INDEFINITE_WAIT, WS_35, csa);
 						/* Fix jbp->dskaddr & jbp->dsk while holding io latch */
 						assert(orig_freeaddr > start_freeaddr);
 						jbp->dskaddr = start_freeaddr;
@@ -1321,7 +1330,8 @@ void mutex_clean_dead_owner(gd_region* reg, uint4 holder_pid)
 						{
 							/* Fix jbp->fsync_dskaddr while holding fsync io latch */
 							assert(!GLOBAL_LATCH_HELD_BY_US(&jbp->fsync_in_prog_latch));
-							grab_latch(&jbp->fsync_in_prog_latch, GRAB_LATCH_INDEFINITE_WAIT);
+							grab_latch(&jbp->fsync_in_prog_latch, GRAB_LATCH_INDEFINITE_WAIT,
+								WS_36, csa);
 							jbp->fsync_dskaddr = start_freeaddr;
 							rel_latch(&jbp->fsync_in_prog_latch);
 						}

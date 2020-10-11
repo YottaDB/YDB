@@ -865,7 +865,9 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 #	undef TAB_DB_CSH_ACCT_REC
 	/************* GVSTATS_REC RELATED FIELDS ***********/
 #	define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)	SWAP_SD8(gvstats_rec.COUNTER);
+#	define IS_CSD_STATS 1
 #	include "tab_gvstats_rec.h"
+#	undef IS_CSD_STATS
 #	undef TAB_GVSTATS_REC
 	/************* INTERRUPTED RECOVERY RELATED FIELDS continued ****************/
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)

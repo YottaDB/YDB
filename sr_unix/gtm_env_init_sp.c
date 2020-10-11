@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2019 Fidelity National Information	*
+ * Copyright (c) 2004-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -175,6 +175,9 @@ void	gtm_env_init_sp(void)
 		/* Either the directory doesn't exist or the specified or defaulted entity is not a directory */
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4)	ERR_INVTMPDIR, 2, trans.len, trans.addr);
 	}
+	(TREF(gtm_tmpdir)).addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
+	(TREF(gtm_tmpdir)).len = trans.len;
+	memcpy((TREF(gtm_tmpdir)).addr, trans.addr, trans.len + 1);
 	/* Check for and and setup gtm_quiet_halt if specified */
 	val.addr = GTM_QUIET_HALT;
 	val.len = SIZEOF(GTM_QUIET_HALT) - 1;

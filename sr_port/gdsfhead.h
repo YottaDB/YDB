@@ -28,6 +28,8 @@
 #include "gtmcrypt.h" /* for gtmcrypt_key_t */
 #include "gtm_libaio.h"
 #include "gtm_reservedDB.h"
+#include "proc_wait_stat.h"
+#include "region_freeze_multiproc.h"
 
 #define CACHE_STATE_OFF SIZEOF(que_ent)
 
@@ -266,7 +268,6 @@ typedef cache_rec	**cache_rec_ptr_ptr_t;
 typedef cache_state_rec	*cache_state_rec_ptr_t;
 typedef cache_que_heads	*cache_que_heads_ptr_t;
 
-gtm_uint64_t verify_queue_lock(que_head_ptr_t qhdr);
 gtm_uint64_t verify_queue(que_head_ptr_t qhdr);
 
 #ifdef DB64
@@ -276,11 +277,11 @@ gtm_uint64_t verify_queue(que_head_ptr_t qhdr);
 #endif
 
 #ifdef DEBUG_QUEUE
-#define VERIFY_QUEUE(base)		(void)verify_queue(base)
-#define VERIFY_QUEUE_LOCK(base,latch)	(void)verify_queue_lock(base,latch)
+#define VERIFY_QUEUE(base)			(void)verify_queue(base)
+#define VERIFY_QUEUE_LOCK(base,latch,CSA)	(void)verify_queue_lock(base,latch,CSA)
 #else
 #define VERIFY_QUEUE(base)
-#define VERIFY_QUEUE_LOCK(base,latch)
+#define VERIFY_QUEUE_LOCK(base,latch,CSA)
 #endif
 
 #define BLK_ZERO_OFF(start_vbn)		(((start_vbn) - 1) * DISK_BLOCK_SIZE)
@@ -1566,13 +1567,13 @@ MBSTART {                                                                       
 	assert(FALSE == reg->read_only);                                               				\
 	csd = csa->hdr;													\
 	if (JNL_ENABLED(csd))												\
-	{                                                                      					\
-		was_crit = csa->now_crit;                                        					\
-		if (!was_crit)                                                 					\
-			grab_crit(reg);                                        					\
-		jnl_status = JNL_ENABLED(csd) ? jnl_ensure_open(reg, csa) : 0;   	                            	\
-		if (!was_crit)                                                 					\
-			rel_crit(reg);                                         					\
+	{                                                                       					\
+		was_crit = csa->now_crit;                                         					\
+		if (!was_crit)                                                  					\
+			grab_crit(reg, WS_2);                                         					\
+		jnl_status = JNL_ENABLED(csd) ? jnl_ensure_open(reg, csa) : 0;    	                             	\
+		if (!was_crit)                                                  					\
+			rel_crit(reg);                                          					\
 		if (0 != jnl_status)											\
 		{													\
 			jpc = csa->jnl;											\
@@ -1697,25 +1698,31 @@ MBSTART {														\
 	/* else : "gd_load" would have already set RDBF_NOSTATS etc. so don't override that */				\
 } MBEND
 
-/* Clear everything from the end of the encryption section up to the ntrpt_recov_resync_strm_seqno array, which includes all
- * bg_trc_rec_tn, all bg_trc_rec_cntr, all db_csh_acct_rec, all gvstats as well as any intervening filler; also clear
- * tp_cdb_sc_blkmod.
+/* Although this macro is called CLRGVSTATS, it clears a number of other fields as well.  Originally, these were
+ * mostly grouped together in the header and could be cleared as a block.  Now that the gvstats area has moved to the end
+ * of the header, the clear must be done in several steps:
+ *   Clear everything from the end of the encryption section up to the start of the abandoned gvstats area
+ *   (gvstats_rec_old_now_filler).  This skips clearing the area previously occupied by gvstats, which is now available for reuse,
+ *   but continues to clear bg_trc_rec_tn, all bg_trc_rec_cntr, & all db_csh_acct_rec as well as any intervening filler.
+ *   Clear tp_cdb_sc_blkmod explicitly.
+ *   Clear the new gvstats area explicitly.
  *
- * This means we MUST NOT insert anything in the file header between the encryption section and intrpt_recov_resync_strm_seqno
- * nor move either of those end points without appropriately adjusting this macro.
+ * This means we MUST NOT insert anything in the file header between the encryption section and the start of
+ * gvstats_rec_old_now_filler nor move either of those end points without appropriately adjusting this macro.
  */
-#define	CLRGVSTATS(CSA)									\
-MBSTART {										\
-	char			*CHPTR;							\
-	int			CLRLEN;							\
-	sgmnt_data_ptr_t	CSD;							\
-											\
-	CSD = CSA->hdr;									\
-	CHPTR = (char *)CSD->filler_encrypt + SIZEOF(CSD->filler_encrypt);		\
-	CLRLEN = (char *)&CSD->intrpt_recov_resync_strm_seqno - CHPTR;			\
-	memset(CHPTR, 0, CLRLEN);							\
-	gvstats_rec_csd2cnl(CSA);	/* we update gvstats in cnl */			\
-	memset((char *)&CSD->tp_cdb_sc_blkmod, 0, SIZEOF(CSD->tp_cdb_sc_blkmod));	\
+#define	CLRGVSTATS(CSA)										\
+MBSTART {											\
+	char			*CHPTR;								\
+	int			CLRLEN;								\
+	sgmnt_data_ptr_t	CSD;								\
+												\
+	CSD = CSA->hdr;										\
+	CHPTR = (char *)CSD->filler_encrypt + SIZEOF(CSD->filler_encrypt);			\
+	CLRLEN = (char *)&CSD->gvstats_rec_old_now_filler[0] - CHPTR;				\
+	memset(CHPTR, 0, CLRLEN);								\
+	memset((char *)&CSD->tp_cdb_sc_blkmod, 0, SIZEOF(CSD->tp_cdb_sc_blkmod));		\
+	memset((char *)&CSD->gvstats_rec, 0, SIZEOF(CSD->gvstats_rec));				\
+	gvstats_rec_csd2cnl(CSA);	/* we update gvstats in cnl */				\
 } MBEND
 
 #if defined(DEBUG) || defined(DEBUG_DB_CSH_COUNTER)
@@ -1833,7 +1840,7 @@ MBSTART {														\
 		{	/* Return value of "grab_latch" does not need to be checked because we pass			\
 			 * in GRAB_LATCH_INDEFINITE_WAIT as the timeout.						\
 			 */												\
-			grab_latch(&(CSA)->nl->freeze_latch, GRAB_LATCH_INDEFINITE_WAIT);				\
+			grab_latch(&(CSA)->nl->freeze_latch, GRAB_LATCH_INDEFINITE_WAIT, WS_63, CSA);			\
 		}													\
 		if (CHILLED_AUTORELEASE(CSA) && !CHILLED_AUTORELEASE_REPORTED(CSA))					\
 		{													\
@@ -2082,7 +2089,7 @@ typedef struct sgmnt_data_struct
 							 * with encryption_hash2. */
 	char		filler_encrypt[80];
 	/***************************************************/
-	/* The CLRGVSTATS macro wipes out everything from here through the GVSTATS fields up to intrpt_recov_resync_strm_seqno
+	/* The CLRGVSTATS macro wipes out everything from here through the GVSTATS fields up to gvstats_rec_old_now_filler
 	 * starting from the end of the space reserved for the encryption_hash above - DO NOT insert anthing in this range or move
 	 * those two end points without appropriately adjusting that macro
 	 */
@@ -2103,13 +2110,15 @@ typedef struct sgmnt_data_struct
 #	undef TAB_DB_CSH_ACCT_REC
 	char		db_csh_acct_rec_filler_4k[248 - (SIZEOF(db_csh_acct_rec) * n_db_csh_acct_rec_types)];
 
-	/************* GVSTATS_REC RELATED FIELDS ***********/
-	gvstats_rec_t	gvstats_rec;
-	char		gvstats_rec_filler_4k_plus_512[512 - SIZEOF(gvstats_rec_t)];
-	char		filler_4k_plus_512[368];	/* Note: this filler array should START at offset 4K+512. So any additions
-							 * of new fields should happen at the END of this filler array and
-							 * the filler array size correspondingly adjusted.
-							 */
+	/************* FORMER GVSTATS_REC RELATED FIELDS ***********/
+	/* gvstats_rec has been moved to the end of the header,    */
+	/* leaving filler here.  This can be reused in the future  */
+	char			gvstats_rec_old_now_filler[496];
+	char			gvstats_rec_filler_4k_plus_512[16];
+	char			filler_4k_plus_512[368];	/* Note: this filler array should START at offset 4K+512.
+								 * So any additions of new fields should happen at the END of this
+								 * filler array and the filler array size correspondingly adjusted.
+							 	 */
 	/************* INTERRUPTED RECOVERY RELATED FIELDS continued ****************/
 	seq_num		intrpt_recov_resync_strm_seqno[MAX_SUPPL_STRMS];/* resync/fetchresync jnl_seqno of interrupted rollback
 									 * corresponding to each non-supplementary stream.
@@ -2147,8 +2156,16 @@ typedef struct sgmnt_data_struct
 	uint4		basedb_fname_len;		/* byte length of filename stored in "basedb_fname[]" */
 	unsigned char	basedb_fname[256]; /* full path filaneme of corresponding baseDB if this is a statsDB */
 	boolean_t	read_only;		/* If TRUE, GT.M uses a process-private mmap instead of IPC */
-	char		filler_7k[440];
-	char		filler_8k[1024];
+	/************* GVSTATS_REC RELATED FIELDS ***********/
+	/* gvstats_rec has outgrown its previous space.  There is enough space here at the end of the record
+	 * for all the new GTM-8863 stats if we don't save the 'A' versions (which arguably doesn't make
+	 * sense anyway.  This means that gvstats_rec_csd_t is smaller than
+	 * gvstats_rec_t (but the structs are identical up to the end of gvstats_rec_cst_t).  Note also that we
+	 * are pushing the 8k barrier on sgmnt_data now, but are not critically  pressed for space in the future
+	 * because the former GVSTATS area (above) will be available for reuse.
+	 */
+	gvstats_rec_csd_t	gvstats_rec;	/* As of GTM-8863 1304 bytes == 163 counters */
+	char			filler_8k[1464 - SIZEOF(gvstats_rec_csd_t)];
 	/********************************************************/
 	/* Master bitmap immediately follows. Tells whether the local bitmaps have any free blocks or not. */
 } sgmnt_data;
@@ -2721,11 +2738,29 @@ typedef struct gd_gblname_struct
 
 #define	INVALID_STATSDB_REG_INDEX	(MAXUINT4)	/* this has to be maintained in parallel with TWO(32)-1 in gdeput.m  */
 
-/* Define macros that provide a connection between statsdb initialization code in GDE & GT.M */
-#define	STATSDB_BLK_SIZE	1024	/* the BLK_SIZE computed by GDE for every statsdb region */
-#define	STATSDB_ALLOCATION	2050	/* the ALLOCATION computed by GDE for every statsdb region */
-#define	STATSDB_EXTENSION	2050	/* the EXTENSION computed by GDE for every statsdb region */
-#define	STATSDB_MAX_KEY_SIZE	64	/* the MAX_KEY_SIZE computed by GDE for every statsdb region */
+/* Define macros that provide a connection between statsdb initialization code in GDE & GT.M
+ * sr_unix/gdeput.m calculates STATSDB_BLK_SIZE by
+ *  SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + max_padded_key_size + SIZEOF(gvstats_rec_t)
+ *  all rounded up to the next highest multiple of 512 (if the computed size is not already a multiple thereof).
+ *  The max_padded_key_size involves a $zcollate() M step which we can't do here, but the results should be,
+ *  in effect, a constant value (possibly differing on AIX vs Linux since the max possible PID is involved in the calculation).
+ *  Allowing for that, the value computed here should track GDE's unless something fundamental changes, in which case,
+ *  we still have an assert to catch a value mismatch
+ */
+/* As it happens, both AIX & Linux currently round up from (50 & 49) to 56 */
+#if defined(_AIX)
+#define MAX_PADDED_STATSDB_KEY_SIZE (56)
+#elif defined(__linux)
+#define MAX_PADDED_STATSDB_KEY_SIZE (56)
+#else
+#error UNSUPPORTED PLATFORM
+#endif
+
+					/* the BLK_SIZE computed by GDE for every statsdb region (sync with sr_unix/gdeput.m) */
+#define STATSDB_BLK_SIZE ROUND_UP((SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + MAX_PADDED_STATSDB_KEY_SIZE+SIZEOF(gvstats_rec_t)),512)
+#define	STATSDB_ALLOCATION	2050	/* the ALLOCATION computed by GDE for every statsdb region (sync with sr_unix/gdeput.m) */
+#define	STATSDB_EXTENSION	2050	/* the EXTENSION computed by GDE for every statsdb region (sync with sr_unix/gdeput.m) */
+#define	STATSDB_MAX_KEY_SIZE	64	/* the MAX_KEY_SIZE computed by GDE for every statsdb region (sync with sr_port/gdeinit.m)*/
 #define	STATSDB_MAX_REC_SIZE	(STATSDB_BLK_SIZE - SIZEOF(blk_hdr)) /* the MAX_REC_SIZE computed by GDE for every statsdb region */
 
 /* The following struct is built into a separate list for each transaction because it is not thrown away if a transaction restarts.
@@ -3837,7 +3872,7 @@ MBSTART {														\
  * don't need that functionality but it does not hurt them so we leave it at that instead of forking this
  * macro into two versions (one using "grab_crit" and another using "grab_crit_encr_cycle_sync").
  */
-#define	GRAB_UNFROZEN_CRIT(reg, csa)					\
+#define	GRAB_UNFROZEN_CRIT(reg, csa, wstate)				\
 MBSTART {								\
 	int	lcnt;							\
 									\
@@ -3849,7 +3884,7 @@ MBSTART {								\
 			break;						\
 		rel_crit(reg);						\
 		WAIT_FOR_REGION_TO_UNFREEZE(csa);			\
-		grab_crit_encr_cycle_sync(reg);				\
+		grab_crit_encr_cycle_sync(reg, wstate);			\
 	}								\
 	assert(!FROZEN_HARD(csa) && csa->now_crit);			\
 } MBEND
@@ -5056,9 +5091,9 @@ void		bt_init(sgmnt_addrs *cs);
 void		bt_malloc(sgmnt_addrs *csa);
 void		bt_refresh(sgmnt_addrs *csa, boolean_t init);
 void		db_common_init(gd_region *reg, sgmnt_addrs *csa, sgmnt_data_ptr_t csd);
-void		grab_crit(gd_region *reg);
-boolean_t	grab_crit_encr_cycle_sync(gd_region *reg);
-boolean_t	grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover);
+void		grab_crit(gd_region *reg, wait_state state);
+boolean_t	grab_crit_encr_cycle_sync(gd_region *reg, wait_state state);
+boolean_t	grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover, wait_state state);
 boolean_t	grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_action);
 void		gv_init_reg(gd_region *reg, gd_addr *addr);
 void		gvcst_init(gd_region *greg, gd_addr *addr);
@@ -5070,7 +5105,7 @@ boolean_t	region_init(bool cm_regions);
 freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t override, boolean_t wait_for_kip,
 				uint4 online, boolean_t flush_sync);
 freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t override, boolean_t wait_for_kip,
-					uint4 online, boolean_t flush_sync);
+					uint4 online, boolean_t flush_sync, freeze_reg_mp_state *pfrms);
 freeze_status	region_freeze_post(gd_region *region);
 void		rel_crit(gd_region *reg);
 void		rel_lock(gd_region *reg);
@@ -5130,6 +5165,7 @@ void	gvstats_rec_upgrade(sgmnt_addrs *csa);
 
 void act_in_gvt(gv_namehead *gvt);
 
+gtm_uint64_t verify_queue_lock(que_head_ptr_t qhdr, sgmnt_addrs *csa);
 #define FILE_TYPE_REPLINST	"replication instance"
 #define FILE_TYPE_DB		"database"
 

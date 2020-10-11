@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,7 +140,7 @@ error_def(ERR_TEXT);
 	if (new_ipc)												\
 	{													\
 		assert(!IS_GTM_IMAGE);	/* Since "gtm_putmsg" is done below ensure it is never GT.M */		\
-		assert((NULL != JNLPOOL) && (NULL != JNLPOOL->jnlpool_ctl));					\
+		assert(NULL != JNLPOOL);									\
 		DETACH_FROM_JNLPOOL_IF_NEEDED(JNLPOOL, gtm_putmsg_csa);						\
 		assert(INVALID_SHMID != udi->shmid);								\
 		if (0 != shm_rmid(udi->shmid))									\

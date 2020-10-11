@@ -102,12 +102,5 @@ if ("TRUE" == "$is_utf8_support") then
 	unsetenv gtm_chset	# switch back to "M" mode
 endif
 
-# Don't deliver the GDE sources except with a dbg release.
-if ( "$gtm_exe" != "$gtm_dbg" ) then
-	\rm -f GDE*.m	# use \rm to avoid rm from asking for confirmation (in case it has been aliased so)
-	if (-e utf8) then
-		\rm -f utf8/GDE*.m # use \rm to avoid rm from asking for confirmation (if it has been aliased so)
-	endif
-endif
 popd
 exit $buildaux_gde_status

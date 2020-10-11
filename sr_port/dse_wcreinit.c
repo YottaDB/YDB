@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,7 +61,7 @@ void dse_wcreinit (void)
 	}
 	was_crit = cs_addrs->now_crit;
 	if (!was_crit)
-		grab_crit_encr_cycle_sync(gv_cur_region);
+		grab_crit_encr_cycle_sync(gv_cur_region, WS_62);
 	DSE_WCREINIT(cs_addrs);
 	if (!was_crit)
 		rel_crit (gv_cur_region);

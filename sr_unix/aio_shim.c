@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2019 Fidelity National Information	*
+ * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -293,7 +293,7 @@ STATICFNDCL void clean_wip_queue(unix_db_info *udi)
 	/* Grab the WIP queue lock, similarly to wcs_get_space.c where we lock the active queue header. */
 	for (num_tries = 0, done = FALSE; !done && (num_tries < MAX_WIP_TRIES); num_tries++)
 	{
-		if (grab_latch(&que_head->latch, WT_LATCH_TIMEOUT_SEC))
+		if (grab_latch(&que_head->latch, WT_LATCH_TIMEOUT_SEC, WS_23, csa))
 		{	/* walk the WIP queue and strike all csr's that have our epid and file descriptor,
 			 * and if aio_shim_error(aiocbp) == EINPROGRESS.
 			 */

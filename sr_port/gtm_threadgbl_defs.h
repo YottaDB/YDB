@@ -259,6 +259,7 @@ THREADGBLDEF(gtm_environment_init,		boolean_t)			/* indicates GT.M development e
 										 * than a production environment */
 THREADGBLFPTR(gtm_sigusr1_handler,		void, 		(void))		/* SIGUSR1 signal handler function ptr */
 THREADGBLDEF(gtm_linktmpdir,			mstr)				/* Directory to use for relinkctl files */
+THREADGBLDEF(gtm_tmpdir,			mstr)				/* Directory to use for tmp files */
 THREADGBLDEF(gtm_trigger_etrap,			mval)				/* $etrap - for use in triggers */
 THREADGBLDEF(gtm_trctbl_cur,			trctbl_entry *)			/* Current gtm trace table entry */
 THREADGBLDEF(gtm_trctbl_end,			trctbl_entry *)			/* End of gtm trace table (last entry + 1) */

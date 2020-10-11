@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,8 +85,8 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 			ksb = &ks->blk[cnt];
 			if (0 != ksb->level)
 			{
-				if (!(was_crit = csa->now_crit))
-					grab_crit_encr_cycle_sync(gv_cur_region); /* needed so t_qread does not return NULL below */
+				if (!(was_crit = csa->now_crit)) /* needed so t_qread does not return NULL below */
+					grab_crit_encr_cycle_sync(gv_cur_region, WS_13);
 #				ifdef UNIX
 				if (csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle)
 				{	/* Concurrent online rollback. We don't want to continue with rest of the logic to add more

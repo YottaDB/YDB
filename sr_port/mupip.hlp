@@ -1435,11 +1435,15 @@
    FTOK
 
    Produces the "public" (system generated) IPC Keys (essentially hash
-   values) of a given file.
+   values) of a given file-list or the journal/receiver pool in a table form.
 
    The format of the MUPIP FTOK command is:
 
-   FT[OK] [-DB] [-JNLPOOL] [-RECVPOOL] file-name
+   FT[OK] [-DB] [-JNLPOOL] [-RECVPOOL] [-ID] [-ONLY] [-[NO]HEADER] file-list
+
+     o file-list a space delimited list of files, such as that provided by
+       the use of the * and ? shell wildcard characters.
+     o With -JNLPOOL or -RECVPOOL, MUPIP FTOK ignores any files in the list.
 
 3 DB
    DB
@@ -1458,6 +1462,26 @@
 
    Specifies that the reported key is for the Receive Pool of the instance
    created by the current Global Directory.
+
+3 ID
+   ID
+
+   Specifies the signature use for the ftok; if unspecified, it defaults to
+   the signature for a GT.M database file.
+
+3 ONLY
+   ONLY
+
+   Restricts the output to only the FTOK Key; if a file is not valid and
+   accessible, FTOK reports -1 values. -ONLY does not report the table header
+   even when -HEADER is specified. If the database file is unavailable, the
+   utility defaults to the -ONLY behavior.
+
+3 HEADER
+   HEADER
+
+   Displays or omits the header of the table. By default, MUPIP FTOK displays
+   the header.
 
 2 HASH
    HASH
@@ -3139,6 +3163,15 @@
    associated with this one directory. It prints a RLNKCTLRNDWNSUC message on
    a successful rundown and a RLNKCTLRNDWNFL message on a failure (usually
    because live processes are still accessing the Relinkctl file).
+
+2 SEMAPHORE
+   SEMAPHORE
+
+   Reports the details of a space delimited list of semaphores IDs.
+
+   The format of the MUPIP SEMAPHORE command is:
+
+   MUPIP SEMAPHORE <sem-ids-list>
 
 2 SET
    SET
@@ -6650,8 +6683,8 @@
    Specifies the instance name that uniquely identifies the instance and is
    immutable. The instance name can be from 1 to 16 characters. GT.M takes
    the instance name (not the same as instance file name) from the
-   environment variable gtm_repl_instname. If gtm_repl_instname is not set
-   and -name is not specified, GT.M produces an error.
+   environment variable gtm_repl_instname. If either gtm_repl_instname is not
+   set or -name is not specified, GT.M produces an error.
 
    -noreplace
 
@@ -6994,24 +7027,62 @@
    replication logic logs a DLLNOOPEN error and continues with no
    compression.
 
-   -connectparams=<hard tries>,<hard tries period>, <soft tries
-   period>,<alert time>,<heartbeat period><max heartbeat wait>
+   -connectparams=<hard tries>,<hard tries period>,<soft tries
+   period>,<REPLALERT time>,<heartbeat period>,<max heartbeat wait>
 
    Specifies the connection parameters as a comma delimited series of integer
-   values. If the connection between the Source and Receiver Servers is
-   broken or the Source Server fails to connect to the Receiver Server at
-   startup, the Source Server applies these parameters to the reconnection
+   values. If the connection between the Source and Receiver Servers breaks
+   or the Source Server fails to connect to the Receiver Server at startup,
+   the Source uses the first four parameters for reconnection attempts as
+   follows:
+
+     o It makes the number of new connection attempts specified by the <hard
+       tries> value every <hard tries period> milliseconds.
+     o Then, the Source Server attempts connection every <soft tries period>
+       seconds and logs the REPLALERT message every <alert time> seconds.
+     o The only difference between hard and soft connection attempts is their
+       interval duration measurement units (milliseconds vs. seconds) and the
+       association of the REPLALERT message with failed soft connection
+       attempts.
+     o The presence of the REPLALERT message in the Source Server log file
+       can be used with a monitoring tool to alert the operator about an
+       unaccessible Receiver Server.
+     o Specifying 0 for <alert time> disables the REPLALERT messages. By
+       default, REPLAERT messages are disabled. Specifying 0 for <hard tries>
+       disables making hard connection attempts which is useful in a
+       situation where the early of logging of the REPLALERT messages is
+       relevant.
+
+   The Source Server uses the fifth and sixth parameters when the connection
+   is established with the Receiver Server. It send a heartbeat message to
+   the Receiver Server every <heartbeat period> seconds and expects a
+   response back from the Receiver Server within <max heartbeat wait>
+   seconds. If the response does not arrive within <max heartbeat wait>, the
+   Source Server closes the connection and starts to establish a new
+   conection using the first four parameters. The Source Server temporarily
+   stalls the heartbeat message interchange mechanism during events such as
+   secured renegotiation or online rollback. The stalling of heartbeat
+   connection attempts may also occur when the Receiver Server is not started
+   or is not accessible on the network.
+
+   GT.M automatically adjusts the values for <soft tries period> and <hard
+   tries period> to about half of the GT.M determined shutdown wait time.
+   GT.M logs these adjustments in the Source Server log file. This helps
+   prevent inadvertent timeouts of a Source Server shutdown due to high <soft
+   tries period> and/or <hard tries period> and prevents out-of-design
+   conditions.
+
+   The default -CONNECTPARAMS values are 5,500,5,0,15,60. With this setting,
+   the Source Server makes 5 hard connection attempts in 500 milliseconds
+   intervals, and then makes soft connection attempts every 5 seconds without
+   logging the REPLALERT message. Once the connection is established, the
+   Source Server sends a heartbeat messages every 15 seconds and closes the
+   connection if a response does not arrive in 60 seconds. Then, the Source
+   Server starts establishings a new connection with hard connection
    attempts.
 
-   First, the Source Server makes the number of connection attempts specified
-   by the <hard tries> value every <hard tries period> milliseconds. Then,
-   the Source Server attempts connection every <soft tries period> seconds
-   and logs an alert message every <alert time> seconds. If the specified
-   <alert time> value is less than <hard tries>*<hard tries period>/1000 +
-   <soft tries period>, it is set to the larger value. The Source Server
-   sends a heartbeat message to the Receiver Server every <heartbeat period>
-   seconds and expects a response back from the Receiver Server within <max
-   heartbeat wait>seconds. The default value string is 5,500,5,30,15,60.
+   You can specify up to six parameters with -CONNECTPARAMS. MUPIP uses the
+   defaults for the parameters not specified.
 
    Journal Pool Setup Qualifiers:
 
@@ -7019,15 +7090,14 @@
 
    Specifies the size of the Journal Pool. The server rounds the size up or
    down to suit to align with other specified or implicit requirements. Any
-   size less than 1 MiB is rounded up to 1 MiB. If you do not specify a
-   qualifier, the size defaults to the GT.M default value of 64 MiB. Remember
-   that you cannot exceed the system-provided maximum shared memory. For
-   systems with high update rates, specify a larger buffer size to avoid the
-   overflows and file I/O that occur when the Source Server reads journal
-   records from journal files. The maximum value is 4294967288(4GiB-8). MUPIP
-   REPLICATE -SOURCE ignores -BUFFSIZE if the Journal Pool is already set up.
-   The first Source Server process started on an instance sets up the Journal
-   Pool.
+   size less than 1 MiB is rounded up to 1 MiB. If -BUFFSIZE is not
+   specified, MUPIP sets the Journal Pool size to 64 MiB. Remember that you
+   cannot exceed the system-provided maximum shared memory. For systems with
+   high update rates, specify a larger buffer size to avoid the overflows and
+   file I/O that occur when the Source Server reads journal records from
+   journal files. The maximum value is 68719476736 (64GiB). MUPIP REPLICATE
+   -SOURCE ignores -BUFFSIZE if the Journal Pool is already set up. The first
+   Source Server process started on an instance sets up the Journal Pool.
 
    -[no]jnlfileonly
 

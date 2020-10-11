@@ -36,4 +36,5 @@ ENUM_ENTRY(GDSMV63001),		/* New "asyncio" option; New reservedDBFlags field */
 ENUM_ENTRY(GDSMV63003),		/* New field read_only to indicate a read-only database */
 ENUM_ENTRY(GDSMV63007),		/* Reuse abandoned field for use controlled stable flush_trigger_top */
 ENUM_ENTRY(GDSMV63012),		/* New fullblklwrt option */
+ENUM_ENTRY(GDSMV63014),		/* GTM-8863 stats added to file header: GVSTATS moved, upsized */
 ENUM_ENTRY(GDSMVLAST)

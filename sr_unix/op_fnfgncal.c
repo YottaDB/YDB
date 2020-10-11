@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,8 @@
 #include "callintogtmxfer.h"
 #include "min_max.h"
 #include "have_crit.h"
-#include "gtm_malloc.h"		/* for verifyAllocatedStorage */
+#include "gtmdbglvl.h"		/* for gtm_malloc.h */
+#include "gtm_malloc.h"		/* for VERIFY_STORAGE_CHAINS */
 #include "send_msg.h"
 
 /******************************************************************************
@@ -193,6 +194,7 @@ STATICFNDCL void verify_buffer(char *p_list, int len, char *m_label)
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_EXTCALLBOUNDS, 1, m_label);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_EXTCALLBOUNDS, 1, m_label);
 	}
+	VERIFY_STORAGE_CHAINS;
 }
 
 STATICFNDCL void free_return_type(INTPTR_T ret_val, enum gtm_types typ)
@@ -788,16 +790,14 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	assert((char *)free_space_pointer <= free_string_pointer_start);
 	va_end(var_copy);
 	param_list->n = argcnt + 3;		/* Take care of the three implicit parameters. */
-#ifdef DEBUG
-	verifyAllocatedStorage();		/* GTM-8669 verify that argument placement did not trash allocated memory */
-#endif
+	VERIFY_STORAGE_CHAINS;
 	save_mumps_status = mumps_status; 	/* Save mumps_status as a callin from external call may change it. */
 	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);	/* Expected for DEFERRED_EXIT_HANDLING_CHECK below */
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
 	TREF(in_ext_call) = FALSE;
-	check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
 	verify_buffer((char *)param_list, n, entry_ptr->entry_name.addr);
+	check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
 	mumps_status = save_mumps_status;
 	/* The first byte of the type description argument gets set to 0xFF in case error happened in JNI glue code,
 	 * so check for that and act accordingly.
@@ -1180,13 +1180,14 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	assert((char *)free_space_pointer <= free_string_pointer_start);
 	va_end(var);
 	param_list->n = argcnt;
+	VERIFY_STORAGE_CHAINS;
 	save_mumps_status = mumps_status; /* Save mumps_status as a callin from external call may change it */
 	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);              /* Expected for DEFERRED_EXIT_HANDLING_CHECK below */
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
 	TREF(in_ext_call) = FALSE;
-	check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
 	verify_buffer((char *)param_list, (2*n), entry_ptr->entry_name.addr);
+	check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
 	mumps_status = save_mumps_status;
 	/* Exit from the residual call-in environment(SFF_CI and base frames) which might
 	 * still exist on M stack when the externally called function in turn called

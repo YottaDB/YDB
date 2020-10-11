@@ -92,9 +92,13 @@ error_def(ERR_ZTIMEOUT);
 	{													\
 		free((TREF(dollar_ztimeout)).ztimeout_vector.str.addr);						\
 		memcpy(&(TREF(dollar_ztimeout)).ztimeout_vector, &literal_null, SIZEOF(mval));			\
-		ztimeout_vector.str.addr = NULL;								\
-		ztimeout_vector.str.len = 0;									\
 	}													\
+}
+
+#define NULLIFY_VECTOR_LOCAL			\
+{						\
+	ztimeout_vector.str.addr = NULL;	\
+	ztimeout_vector.str.len = 0;		\
 }
 
 void check_and_set_ztimeout(mval * inp_val)
@@ -112,10 +116,11 @@ void check_and_set_ztimeout(mval * inp_val)
 	int4		msec_timeout = -1;   /* no change to timeout in milliseconds */
 	mval		*interim_ptr;
 	mval		ztimeout_vector, ztimeout_seconds;
-	boolean_t	is_negative = FALSE;
+	boolean_t	is_negative = FALSE, change_vec = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 	local_str_val = (char *)malloc(inp_val->str.len + 1);
 	memcpy(local_str_val, inp_val->str.addr, inp_val->str.len);
 	local_str_end = local_str_val + inp_val->str.len;
@@ -123,15 +128,15 @@ void check_and_set_ztimeout(mval * inp_val)
 	colon_ptr = strchr(local_str_val, ':');
 	ztimeout_vector = (TREF(dollar_ztimeout)).ztimeout_vector;
 	ztimeout_seconds = (TREF(dollar_ztimeout)).ztimeout_seconds;
-	(!colon_ptr) ? (max_read_len = inp_val->str.len)
-			: ((colon_ptr == local_str_val) ? (max_read_len = inp_val->str.len - 1)
-				: (max_read_len = (local_str_end - colon_ptr - 1)));
+	max_read_len = (!colon_ptr) ? inp_val->str.len : (colon_ptr == local_str_val) ?
+		(inp_val->str.len - 1) : (local_str_end - colon_ptr - 1);
 	if (max_read_len > MAX_SRCLINE)
 		max_read_len = MAX_SRCLINE;
 	if (colon_ptr == local_str_val) /*Starting with colon, change the vector only*/
 	{
+		change_vec = TRUE;
 		tok_ptr = STRTOK_R(local_str_val, ":", &strtokptr);
-		NULLIFY_VECTOR;
+		NULLIFY_VECTOR_LOCAL;
 		if (colon_ptr != (local_str_end - 1)) /* Not an empty string */
 		{
 			vector_ptr = (char *)malloc(max_read_len + 1);
@@ -147,12 +152,21 @@ void check_and_set_ztimeout(mval * inp_val)
 	{	/* Some form of timeout specified */
 		if (inp_val->m[1] < 0) /* Negative timeout specified, cancel the timer */
 		{
-			TREF(in_ztimeout) = FALSE;
+#ifdef DEBUG
+			if (WBTEST_ENABLED(WBTEST_ZTIM_EDGE))
+			{
+				SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
+				LONG_SLEEP(4); /*Allow ztimeout timer to pop */
+				DBGFPF((stdout,"Sleep over\n"));
+				SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
+			}
+#endif
 			is_negative = TRUE;
+			cancel_timer(ZTIMEOUT_TIMER_ID);
 			DBGDFRDEVNT((stderr,"Cancelling the timer with ID : %ld\n", ZTIMEOUT_TIMER_ID));
+			TREF(in_ztimeout) = FALSE;
 			/* All negative values transformed to -1 */
 			memcpy(&ztimeout_seconds, &literal_minusone, SIZEOF(mval));
-			cancel_timer(ZTIMEOUT_TIMER_ID);
 		}
 		tok_ptr = STRTOK_R(local_str_val, ":", &strtokptr);
 		if (!colon_ptr || (colon_ptr == (local_str_end - 1))) /* Only time -out specified */
@@ -167,7 +181,10 @@ void check_and_set_ztimeout(mval * inp_val)
 				interim_ptr = &ztimeout_seconds;
 				MV_FORCE_MSTIMEOUT(interim_ptr, msec_timeout, ZTIMEOUTSTR);
 				if (colon_ptr == (local_str_end - 1)) /* Form : timeout: */
+				{
+					NULLIFY_VECTOR_LOCAL;
 					NULLIFY_VECTOR;
+				}
 				/* Done with the contents of ztimeout_seconds */
 				ztimeout_seconds.str.addr = NULL;
 				ztimeout_seconds.str.len = 0;
@@ -193,7 +210,8 @@ void check_and_set_ztimeout(mval * inp_val)
 			 */
 			if (!only_timeout)
 			{ /* Change both */
-				NULLIFY_VECTOR;
+				change_vec = TRUE;
+				NULLIFY_VECTOR_LOCAL;
 				vector_ptr = (char *)malloc(max_read_len + 1);
 				tok_ptr = STRTOK_R(NULL, ":", &strtokptr); /* Next token is the vector */
 				memcpy(vector_ptr, tok_ptr, max_read_len);
@@ -206,13 +224,18 @@ void check_and_set_ztimeout(mval * inp_val)
 			}
 		}
 	}
-	if (ztimeout_vector.str.len)
+	if (change_vec && (ztimeout_vector.str.len))
 	{
+		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 		op_commarg(&ztimeout_vector, indir_linetail);
 		op_unwind();
+		SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 	}
-	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
-	(TREF(dollar_ztimeout)).ztimeout_vector = ztimeout_vector;
+	if (change_vec)
+	{
+		NULLIFY_VECTOR;
+		(TREF(dollar_ztimeout)).ztimeout_vector = ztimeout_vector;
+	}
 	(TREF(dollar_ztimeout)).ztimeout_seconds = ztimeout_seconds;
 	if (!is_negative)
 	{
@@ -259,7 +282,8 @@ void ztimeout_expire_now(void)
 #ifdef DEBUG
 	if (gtm_white_box_test_case_enabled &&
 				((WBTEST_ZTIMEOUT_TRACE == gtm_white_box_test_case_number)
-					|| (WBTEST_ZTIME_DEFER_CRIT == gtm_white_box_test_case_number)))
+					|| (WBTEST_ZTIME_DEFER_CRIT == gtm_white_box_test_case_number)
+					|| (WBTEST_ZTIM_EDGE == gtm_white_box_test_case_number)))
 	DBGFPF((stderr,"Ztimeout expired, setting xfer handlers\n"));
 #endif
 	TREF(ztimeout_set_xfer) = xfer_set_handlers(outofband_event, &ztimeout_set, 0, FALSE);
@@ -301,6 +325,10 @@ void ztimeout_set(int4 dummy_param)
                 FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
                 FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
 		DBGDFRDEVNT((stderr, "ztimeout_set: Set the xfer entries for ztimeout\n"));
+#ifdef DEBUG
+		if (gtm_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == gtm_white_box_test_case_number))
+			DBGFPF((stderr,"ztimeout_set: Set the xfer entries for ztimeout\n"));
+#endif
 	} else
 	{
 		DBGDFRDEVNT((stderr, "ztimeout_set: ztimeout outofband already set\n"));
@@ -372,7 +400,6 @@ void ztimeout_process()
         return;
 }
 
-
 /* Clear the timer */
 void ztimeout_clear_timer(void)
 {
@@ -388,16 +415,23 @@ void ztimeout_clear_timer(void)
 		cancel_timer(ZTIMEOUT_TIMER_ID);
 		REMOVE_QUEUE_ENTRY(ZTIMEOUT_QUEUE_ID);
 		TREF(in_ztimeout) = FALSE;
-		/* -----------------------------------------------------
-		 * Should clear xfer settings only if set them.
-		 * -----------------------------------------------------
-	 	*/
-		if (TREF(ztimeout_set_xfer))
-		{
-			ztimeout_check = xfer_reset_if_setter(outofband_event);
-			DBGDFRDEVNT((stderr, "ztimeout_clear_timer: Resetting the xfer entries for ztimeout\n"));
-			assert(ztimeout_check);
-			TREF(ztimeout_set_xfer) = FALSE;
-		}
+	}
+	/* -----------------------------------------------------
+	 * Should clear xfer settings only if set them.
+	 * -----------------------------------------------------
+	*/
+	/* Called either by ztimeout_action when starting to process the ztimeout timeout
+	 * Or by outofband_clear when clearing the ctrlc or ctrlv outofbands
+ 	 */
+	if (TREF(ztimeout_set_xfer))
+	{
+		ztimeout_check = xfer_reset_if_setter(outofband_event);
+		DBGDFRDEVNT((stderr, "ztimeout_clear_timer: Resetting the xfer entries for ztimeout\n"));
+#ifdef DEBUG
+		if (gtm_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == gtm_white_box_test_case_number))
+			DBGFPF((stderr,"ztimeout_clear_timer: Resetting the xfer entries for ztimeout\n"));
+#endif
+		assert(ztimeout_check);
+		TREF(ztimeout_set_xfer) = FALSE;
 	}
 }

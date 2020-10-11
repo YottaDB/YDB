@@ -284,9 +284,9 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 		assert(udi->counter_ftok_incremented);
 		if (DECR_CNT_SAFE != decr_cnt)
 		{
-			if ((-1 == (ftok_semval = semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL)))
+			if ((-1 == (ftok_semval = semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL)))	/* WARNING: assign */
 				&& !((EINVAL == (save_errno = errno) || (EIDRM == save_errno))		/* WARNING: assign */
-				&& (!udi->s_addrs.hdr || udi->s_addrs.hdr->read_only)))
+				&& !udi->shm_created))							/* stand-in for read_only */
 			{	/* an mm read_only database file maps process-private, so we don't care if the semaphore is gone */
 				GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
 				ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
@@ -317,9 +317,18 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 		}
 		udi->counter_ftok_incremented = FALSE;
 	}
-	if ((0 != (save_errno = do_semop(udi->ftok_semid, DB_CONTROL_SEM, -1, semflag)))    		/* WARNING: assign */
-		&& !(((EINVAL == save_errno)  || (EIDRM == save_errno)) && (!udi->s_addrs.hdr || udi->s_addrs.hdr->read_only)))
-	{	/* an mm read_only database file maps process-private, so we don't care if the semaphore is gone */
+	while (TRUE)
+	{
+		save_errno = do_semop(udi->ftok_semid, DB_CONTROL_SEM, -1, semflag);
+		if ((0 == save_errno) || (!udi->shm_created && ((EINVAL == save_errno) || (EIDRM == save_errno))))
+			break;	/* either success or read_only db and indications it's already gone, in which case we don't care */
+		if ((NULL != jnlpool) && (reg == jnlpool->jnlpool_dummy_reg) && (EAGAIN == save_errno))
+		{	/* journal pool ftok, in which case keep trying with more patience */
+			while (EAGAIN == (save_errno = do_semop(udi->ftok_semid, DB_CONTROL_SEM, -1, SEM_UNDO)))
+				;
+			if (0 == save_errno)
+				break;
+		}
 		GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
 		ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
 	}

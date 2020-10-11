@@ -145,7 +145,8 @@ SHOW(wkstat,stat)
 	. . set:'$zlength(stat)!("*"=stat) stat=%YGS("*")                               ; default is all statistics
 	. . set ret="",tmp=%YGS("*") for i=1:1:%YGS(0) do
 	. . . set nextstat=$zpiece(tmp,",",i)
-	. . . do:stat[nextstat
+	. . . ; Test must consider stats that are proper substrings like DEX/DEXA, WS1/WS15 etc so add terminal comma on both sides
+	. . . do:(stat_",")[(nextstat_",")
 	. . . . set offset=%YGS(nextstat)
 	. . . . set r=$&gblstat.toulong(.num,$zextract(wkstat,offset,offset+7))
 	. . . . set ret=ret_nextstat_":"_num_","

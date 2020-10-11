@@ -231,7 +231,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 			return RC_FILEACCESS;
 		}
 		assert(!cs_addrs->hold_onto_crit);	/* this ensures we can safely do unconditional grab_crit and rel_crit */
-		grab_crit(gv_cur_region);
+		grab_crit(gv_cur_region, NOT_APPLICABLE);
 		cs_data->rc_srv_cnt++;
 		if (!cs_data->dsid)
 		{

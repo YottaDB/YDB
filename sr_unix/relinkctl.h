@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2018 Fidelity National Information	*
+ * Copyright (c) 2013-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,17 +59,17 @@ error_def(ERR_RLNKRECLATCH);	/* needed for the RELINKCTL_CYCLE_INCR macro */
  * initializes its private cycle to 0 at relinkctl file open time and we want to make sure the private-cycle == shared-cycle
  * check fails always the first time for a process.
  */
-#define RELINKCTL_CYCLE_INCR(RELINKREC, LINKCTL)						\
-{												\
-	if (!grab_latch(&(RELINKREC)->rtnobj_latch, RLNKREC_LATCH_TIMEOUT_SEC))			\
-	{											\
-		assert(FALSE);									\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_RLNKRECLATCH, 3,			\
-			RELINKREC->rtnname_fixed.c, RTS_ERROR_MSTR(&LINKCTL->zro_entry_name));	\
-	}											\
-	if (0 == ++(RELINKREC)->cycle)								\
-		++(RELINKREC)->cycle;								\
-	rel_latch(&(RELINKREC)->rtnobj_latch);							\
+#define RELINKCTL_CYCLE_INCR(RELINKREC, LINKCTL)							\
+{													\
+	if (!grab_latch(&(RELINKREC)->rtnobj_latch, RLNKREC_LATCH_TIMEOUT_SEC, NOT_APPLICABLE, NULL))	\
+	{												\
+		assert(FALSE);										\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_RLNKRECLATCH, 3,				\
+			RELINKREC->rtnname_fixed.c, RTS_ERROR_MSTR(&LINKCTL->zro_entry_name));		\
+	}												\
+	if (0 == ++(RELINKREC)->cycle)									\
+		++(RELINKREC)->cycle;									\
+	rel_latch(&(RELINKREC)->rtnobj_latch);								\
 }
 
 /* A routine buffer is stored a shared memory segment. Since shm sizes are fixed, if ever we cannot fit in a given routine

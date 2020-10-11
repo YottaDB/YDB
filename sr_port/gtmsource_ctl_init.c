@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -217,7 +217,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		jpc->channel = NOJNL; /* Not to close the prev gener file */
 		was_crit = csa->now_crit;
 		if (!was_crit)
-			grab_crit(reg);
+			grab_crit(reg, NOT_APPLICABLE);
 #		ifdef UNIX
 		if (csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle)
 		{	/* Concurrent online rollback. Possible only if we are called from gtmsource_update_zqgblmod_seqno_and_tn

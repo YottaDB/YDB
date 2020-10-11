@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -150,7 +150,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			&& (0 == TREF(crit_reg_count))
 			&& ((NULL == check_csaddrs) || !T_IN_COMMIT_OR_WRITE(check_csaddrs))
 			&& !T_IN_COMMIT_OR_WRITE(csa)
-			&& (FALSE != grab_crit_immediate(reg, OK_FOR_WCS_RECOVER_FALSE)))
+			&& (FALSE != grab_crit_immediate(reg, OK_FOR_WCS_RECOVER_FALSE, NOT_APPLICABLE)))
 		{ 	/* Note that if we are here, we have obtained crit using grab_crit_immediate. */
 			assert(csa->ti->early_tn == csa->ti->curr_tn);
 			/* Do not invoke wcs_flu if the database has a newer journal file than what this process had open

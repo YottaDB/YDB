@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,6 +47,7 @@
 #include "warn_db_sz.h"
 #include "mu_getkey.h"
 
+error_def(ERR_INTEGERRS);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUPCLIERR);
@@ -289,27 +290,21 @@ STATICDEF void mupip_size_check_error(void)
  /* Performs a random traversal for the sampling methods */
 enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 {
-	sm_uc_ptr_t			pVal, pTop, pRec, pBlkBase;
-	block_id			nBlkId;
-	block_id			valBlk[MAX_RECS_PER_BLK];	/* valBlk[j] := value in j-th record of current block */
-	boolean_t			is_mm;
+	boolean_t			first_key = TRUE;
+	boolean_t			musz_range_done, is_mm;
+	block_id			nBlkId, valBlk[MAX_RECS_PER_BLK]; /* valBlk[j] := value in j-th record of current block */
 	cache_rec_ptr_t			cr;
 	enum cdb_sc			status;
-	int				cycle;
-	int4				random;
-	int4				rCnt;				/* number of entries in valBlk */
-	int4				musz_rec = 0;
+	int				blk_size, buff_length, cycle, key_size, name_len, rec_len;
+	int4				cmp_key, musz_rec, random, rCnt;	/* rCnt : number of entries in valBlk */
 	register gv_namehead		*pTarg;
 	register srch_blk_status	*pCurr;
 	register srch_hist		*pTargHist;
+	sm_uc_ptr_t			pVal, pTop, pRec, pBlkBase;
 	trans_num			tn;
-	unsigned char			nLevl;
-	unsigned short			nRecLen;
-	unsigned char			buff[MAX_KEY_SZ + 1];
-	boolean_t			first_key = TRUE, musz_range_done;
-	int				name_len, key_size, buff_length, rec_len, blk_size;
-	unsigned short			rec_cmpc;
 	uchar_ptr_t			key_base, ptr;
+	unsigned char			buff[MAX_KEY_SZ + 1], nLevl;
+	unsigned short			nRecLen, rec_cmpc;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -363,16 +358,16 @@ enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 				{
 					GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key,
 							name_len, key_size,buff, buff_length, rec_len);
+					if (0 == key_size)
+						continue;	/* indication of trouble parsing the block - don't use it */
+					cmp_key = memcmp(buff, mu_start_key->base, mu_start_key->end + 1);
 					if (mu_end_key)
 					{
-						if (memcmp(buff, mu_end_key->base, mu_end_key->end + 1) > 0)
+						if (0 < memcmp(buff, mu_end_key->base, mu_end_key->end + 1))
 							musz_range_done = TRUE;
-					} else
-					{
-						if (memcmp(buff, mu_start_key->base, mu_start_key->end + 1) > 0)
-							musz_range_done = TRUE;
-					}
-					if (memcmp(buff, mu_start_key->base, mu_start_key->end + 1) < 0)
+					} else if (0 < cmp_key)
+						musz_range_done = TRUE;
+					if (0 > cmp_key)
 						continue;
 				}
 				valBlk[musz_rec] = nBlkId;

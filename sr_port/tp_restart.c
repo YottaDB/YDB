@@ -349,7 +349,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 						 * tp_tend and decided to restart.
 						 */
 						assert(!csa->hold_onto_crit);
-						grab_crit(sgm_info_ptr->gv_cur_region);
+						grab_crit(sgm_info_ptr->gv_cur_region, WS_52);
 						rel_crit(sgm_info_ptr->gv_cur_region);
 					} else
 					{	/* Some non-crit holding process set wc_blocked to TRUE causing us to

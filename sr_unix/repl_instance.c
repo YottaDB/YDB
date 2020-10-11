@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -265,7 +265,7 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 			}
 		}
 	}
-	assert((0 == status) || in_repl_inst_edit);
+	assert((0 == status) || in_repl_inst_edit || in_mupip_ftok);
 	if (0 != status)
 	{
 		if (-1 == status)
@@ -1337,7 +1337,7 @@ int4	repl_inst_reset_zqgblmod_seqno_and_tn(void)
 		 * rare operation, we decided to play it safe.
 		 */
 		assert(!cs_addrs->hold_onto_crit);	/* this ensures we can safely do unconditional grab_crit and rel_crit */
-		grab_crit(reg);
+		grab_crit(reg, WS_37);
 		if (cs_addrs->onln_rlbk_cycle != cs_addrs->nl->onln_rlbk_cycle)
 		{	/* concurrent online rollback */
 			assert(is_rcvr_server);

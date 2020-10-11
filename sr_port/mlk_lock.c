@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,17 +72,15 @@ error_def(ERR_GCAFTER);
  *	> 0 - number of times blocked process was woken up
  * ------------------------------------------------------
  */
-uint4 mlk_lock(mlk_pvtblk *p,
-	       UINTPTR_T  auxown,
-	       bool       new)
+gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 {
+	boolean_t		blocked, was_crit, added;
+	connection_struct	*curr_entry;	/* for GT.CM GNP server */
+	gtm_uint64_t		retval;
+	int			siz, status;
 	mlk_ctldata_ptr_t	ctl;
 	mlk_shrblk_ptr_t	d;
-	int			siz, retval, status;
-	uint4 old_gc;
-	boolean_t		blocked, was_crit, added;
 	sgmnt_addrs		*csa;
-	connection_struct	*curr_entry;	/* for GT.CM GNP server */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

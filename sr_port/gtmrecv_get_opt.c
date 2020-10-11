@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,10 +120,10 @@ int gtmrecv_get_opt(void)
 			}
 			if (MIN_RECVPOOL_SIZE > buffsize)
 				gtmrecv_options.buffsize = MIN_RECVPOOL_SIZE;
-			else if ((gtm_int64_t)MAX_RECVPOOL_SIZE < buffsize)
-				gtmrecv_options.buffsize = (uint4)MAX_RECVPOOL_SIZE;
+			else if ((gtm_uint64_t)MAX_RECVPOOL_SIZE < buffsize)
+				gtmrecv_options.buffsize = (gtm_uint64_t)MAX_RECVPOOL_SIZE;
 			else
-				gtmrecv_options.buffsize = (uint4)buffsize;
+				gtmrecv_options.buffsize = (gtm_uint64_t)buffsize;
 		} else
 			gtmrecv_options.buffsize = DEFAULT_RECVPOOL_SIZE;
 		/* Check if -autorollback is specified (default is -noautorollback) */

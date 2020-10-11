@@ -207,8 +207,8 @@ set dist = "$gtm_ver/dist"
 set tmp_dist = "$gtm_ver/tmp_dist"
 set install = "$gtm_ver/install"
 set dist_prefix = "${product}_${version}_${osname}_${arch}"
-set mnotdistributed = '{CHK2LEV,CHKOP,GENDASH,GENOUT,GETNEAR,GTMDEFINEDTYPESTODB,GTMHLPLD,GTMTHREADGBLASM,LOAD,LOADOP,LOADVX,MSG,TTTGEN,TTTSCAN,UNLOAD}.[om]' #BYPASSOKLENGTH
-set notdistributed = '_*.o GDE*.m *.log map obj plugin/libgtm* plugin/gpgagent.tab plugin/gtmcrypt/maskpass plugin/r plugin/o'
+set mnotdistributed = '{CHK2LEV,CHKOP,GENDASH,GENOUT,GETNEAR,GTMDEFINEDTYPESTODB,GTMHLPLD,GTMTHREADGBLASM,LOAD,LOADOP,LOADVX,MSG,TTTGEN,TTTSCAN,UNLOAD}.[om] GDE*.m' #BYPASSOKLENGTH
+set notdistributed = '_*.o *.log map obj plugin/libgtm* plugin/gpgagent.tab plugin/gtmcrypt/maskpass plugin/r plugin/o'
 set utf8_notdistributed = '_*.o *.m *.log map obj [a-z]*'
 
 if (-d $dist || -d $tmp_dist || -d $install) then
@@ -227,7 +227,9 @@ else
 	mkdir $dist || exit 4
 endif
 
+
 foreach image ($imagetype)
+	set rm_from_dist = ""
 	echo ""
 	echo "Creating ${tmp_dist}/${image}"
 	mkdir -p ${tmp_dist}/${image} || exit 5
@@ -243,7 +245,8 @@ foreach image ($imagetype)
 	set debug_symbol_dir = "${tmp_dist}/${image}_DBG/"
 	mkdir -p "$debug_symbol_dir"
 	if ( -f ${tmp_dist}/${image}/mumps.debug ) then
-		mv ${tmp_dist}/${image}/*.debug $debug_symbol_dir
+		set rm_from_dist = "$rm_from_dist `echo *.debug`"
+		mv *.debug $debug_symbol_dir
 		pushd $debug_symbol_dir
 		set dist_file = "${dist}/${product}-debug_${version}_${osname}_${arch}_${image}.${package_ext}"
 		echo ""
@@ -260,6 +263,7 @@ foreach image ($imagetype)
 	endif
 	echo ""
 	echo "Removing files that are not distributed (${notdistributed} ${mnotdistributed})"
+	set rm_from_dist = "$rm_from_dist `echo $mnotdistributed`"
 	/bin/rm -rf ${notdistributed} ${mnotdistributed} || exit 9
 	if (-e utf8) then
 		cd utf8
@@ -297,6 +301,7 @@ foreach image ($imagetype)
 			rm -f COPYING || exit 9
 		endif
 		echo "Removing dbcertify"
+		set rm_from_dist = "$rm_from_dist `echo dbcertify V5CBSU.*`"
 		rm -f dbcertify V5CBSU.* || exit 9
 		if (-e utf8) then
 			cd utf8
@@ -330,6 +335,7 @@ foreach image ($imagetype)
 			rm -f COPYING || exit 9
 		endif
 		echo "Removing GTMDefinedTypesInit"
+		set rm_from_dist = "$rm_from_dist `echo GTMDefinedTypesInit.*`"
 		rm -f GTMDefinedTypesInit.* || exit 9
 		if (-e utf8) then
 			cd utf8
@@ -375,6 +381,7 @@ foreach image ($imagetype)
 		gzip $dist_file || exit 11
 		rm -f COPYING || exit 9
 	endif
+	set not_in_dist_${image} = `echo $rm_from_dist | sed 's/ /|/g'`
 end
 echo ""
 
@@ -522,14 +529,9 @@ CONFIGURE_EOF
 		if ("pro" == ${image}) then
 			# create the build.dir.  Only have to do it once
 			cd $gtm_ver || exit 14
-			# insert "pro:" for non Linux/Solaris
-			echo pro: > ${tmp_dist}/build.dir
-			ls -l pro >> ${tmp_dist}/build.dir
-			if (aix == ${osname}) then
-				# insert a newline before "pro/gtmsecshrdir:" on AIX
-				mv ${tmp_dist}/build.dir ${tmp_dist}/tbuild.dir
-				awk '/^pro.gtmsecshrdir:$/{print ""}{print $0}' ${tmp_dist}/tbuild.dir > ${tmp_dist}/build.dir
-			endif
+			# Filter away files not distributed
+			ls -l pro pro/gtmsecshrdir | grep -vEw "$not_in_dist_pro|obj|map|lowerc_cp|arch|configure|gtminstall" | \
+					awk '{if (NF > 2) print $1,$NF}' >> ${tmp_dist}/build.dir
 
 			# make a defgroup directory under ${tmp_dist} and copy in the build.dir for use in
 			# first iteration of the while loop
@@ -539,40 +541,27 @@ CONFIGURE_EOF
 			set defgroup = "defgroup"
 			@ both = 0
 			# Exclude files that are created only during installation and not in regular builds
-			set install_only_files = "README.txt|custom_errors_sample.txt|gdedefaults|gtmbase|gtm|gtmcshrc"
-			set install_only_files = "$install_only_files|gtmprofile|gtmprofile_preV54000|libgtmutil.so"
+			set install_only_files = "README.txt|custom_errors_sample.txt|libgtmutil.so"
 			while (2 > $both)
 				# create the install.dir from both installations
 				cd ${install}/$defgroup
-				# insert "pro:" for non Linux/Solaris
-				echo pro: > ${tmp_dist}/$defgroup/install.dir
-				ls -l pro |& grep -vEw "$install_only_files" >> ${tmp_dist}/$defgroup/install.dir
-				if (aix == ${osname}) then
-					# insert a newline before "pro/gtmsecshrdir:" on AIX
-					mv ${tmp_dist}/$defgroup/install.dir ${tmp_dist}/$defgroup/tinstall.dir
-					awk '/^pro.gtmsecshrdir:$/{print ""}{print $0}' ${tmp_dist}/$defgroup/tinstall.dir \
-						 > ${tmp_dist}/$defgroup/install.dir
-				endif
+				ls -l pro pro/gtmsecshrdir |& grep -vEw "$install_only_files" | \
+					awk '{if (NF > 2) print $1,$NF}' >> ${tmp_dist}/$defgroup/install.dir
 				cd ${tmp_dist}/${image}
-				set comp="$gtm_tools/gtm_compare_dir.csh ${install} ${tmp_dist}/$defgroup $gtm_tools/bdelete.txt"
-				set adddir=$gtm_tools/badd.txt
-				set deldir=$gtm_tools/bdeldir.txt
-				if (("linux" == ${osname}) && ("i586" == ${arch})) then
-					set adddir=$gtm_tools/linuxi686_badd.txt
-				endif
-				$comp $adddir $deldir ${osname}
+				env defgroup=$defgroup $gtm_tools/gtm_compare_dir.csh ${install} ${tmp_dist}/$defgroup
 				set teststat = $status
 				if ($teststat) then
 					echo ""
 					echo "Comparison of build and install directories failed."
 					echo "Look in ${tmp_dist}/$defgroup/dircompare/diff.out"
-					echo "$comp $adddir $deldir ${osname}"
 					chmod -R ugo+rwx ${tmp_dist}/$defgroup/dircompare
 					exit 16
 				endif
 				# to simplify the code to do the gtm_compare_dir.csh for both restricted and unrestricted group
 				# installations in a loop, we set defgroup to null for the second pass.  This takes advantage of
 				# the unix/linux path interpretation where dir//subdir is the same as dir/subdir
+				# Also, if the value of $defgroup is "" (in the second round), dircompare.m removes
+				# all world permissions from dev file listing
 				set defgroup = ""
 				@ both = $both + 1
 			end

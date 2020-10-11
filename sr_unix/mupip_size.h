@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,7 @@
 
 #define GET_KEY_CPY_BUFF(KEY_BASE, REC_CMPC, PTR, FIRST_KEY, NAME_LEN, KEY_SIZE, BUFF, BUFF_LENGTH, REC_LEN)	\
 MBSTART {													\
-		for (PTR = key_base;  ;)									\
+		for (PTR = key_base; ;)										\
 		{												\
 			if (KEY_DELIMITER == *PTR++)								\
 			{											\
@@ -50,9 +50,14 @@ MBSTART {													\
 			}											\
 		}												\
 		KEY_SIZE = (int)(PTR - KEY_BASE);								\
-		memcpy(BUFF + REC_CMPC, KEY_BASE, KEY_SIZE);							\
-		BUFF_LENGTH = REC_CMPC + KEY_SIZE;								\
-		REC_LEN = BUFF_LENGTH;										\
+		if (KEY_SIZE + REC_CMPC > MAX_KEY_SZ)								\
+			KEY_SIZE = 0;	/* user should check and skip */					\
+		else												\
+		{												\
+			memcpy(BUFF + REC_CMPC, KEY_BASE, KEY_SIZE);						\
+			BUFF_LENGTH = REC_CMPC + KEY_SIZE;							\
+			REC_LEN = BUFF_LENGTH;									\
+		}												\
 } MBEND
 
 #define CHECK_COLL_KEY(GL_PTR, NULL_COLL_KEY)						\

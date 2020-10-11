@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2017 Fidelity National Information	*
+ * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,8 +34,8 @@ void	repl_phase2_salvage(jnlpool_addrs *jpa, jnlpool_ctl_ptr_t jpl, jpl_phase2_i
 {
 	struct_jrec_null	null_rec;
 	qw_off_t		start_write_addr, rsrv_write_addr;
-	uint4			jnlpool_size, write;
-	uint4			dstlen, rlen;
+	gtm_uint64_t		jnlpool_size, write;
+	gtm_uint64_t		dstlen, rlen;
 	uchar_ptr_t		jnlrecptr;
 	jnldata_hdr_ptr_t	jnl_header;
 	sm_uc_ptr_t		jnldata_base;

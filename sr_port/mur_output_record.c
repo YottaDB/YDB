@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -361,7 +361,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 			if (mur_options.notncheck || (rec->jrec_inctn.prefix.tn >= csd->trans_hist.curr_tn))
 			{
 				if (FALSE == ((was_crit = csa->now_crit)))
-					grab_crit(reg);
+					grab_crit(reg, WS_74);
 				CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 				csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
 				INCREMENT_CURR_TN(csd);
@@ -401,7 +401,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		if (jnl_enabled)
 		{
 			if (FALSE == ((was_crit = csa->now_crit)))
-				grab_crit(reg);
+				grab_crit(reg, WS_75);
 			/* MUPIP RECOVER should be the only one updating the database so journal state not expected to changes */
 			assert(JNL_ENABLED(csd));
 			jnl_status = jnl_ensure_open(reg, csa);

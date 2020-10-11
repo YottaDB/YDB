@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -147,7 +147,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			 * However, a grab_crit() here may result in a deadlock, so just do a grab_crit_immediate() and proceed.
 			 */
 			if (!was_crit)
-				grab_crit_immediate(jpc->region, TRUE);
+				grab_crit_immediate(jpc->region, TRUE, NOT_APPLICABLE);
 			/* If no one home, try to clear the latch. */
 			if (((FALSE == is_proc_alive(writer, jb->image_count))
 				DEBUG_ONLY(&& !(WBTEST_ENABLED(WBTEST_JNLPROCSTUCK_FORCE))))
@@ -268,7 +268,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 					 * process which was kill -9ed in phase2 of its jnl commit. Not doing this check would
 					 * cause the process in gds_rundown to be indefinitely stuck in "jnl_wait".
 					 */
-					if (grab_crit_immediate(jpc->region, OK_FOR_WCS_RECOVER_TRUE))
+					if (grab_crit_immediate(jpc->region, OK_FOR_WCS_RECOVER_TRUE, NOT_APPLICABLE))
 					{
 						JNL_PHASE2_CLEANUP_IF_POSSIBLE(csa, jb); /* phase2 commits in progress.
 											  * Clean them up if possible.
@@ -306,7 +306,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			else
 			{
 				assertpro(0 == have_crit(CRIT_HAVE_ANY_REG));
-				grab_crit(jpc->region);	/* jnl_write_attempt has an assert about have_crit that this relies on */
+				grab_crit(jpc->region, WS_4); /*jnl_write_attempt has assert about have_crit that this relies on */
 			}
 			jnlfile_lost = FALSE;
 			assert(TREF(gtm_test_fake_enospc) || WBTEST_ENABLED(WBTEST_JNL_FILE_LOST_DSKADDR)

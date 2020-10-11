@@ -230,17 +230,16 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	/* If this is a read-only database, simply return */
 	if (csd->read_only)
 	{
-		if ((0 != sem_rmid(udi->semid)) && (EINVAL != errno))
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"), errno);
+		if (INVALID_SEMID != udi->semid)
+			semctl(udi->semid, 0, IPC_RMID);
 		udi->sem_deleted = TRUE;		/* Note that we deleted the semaphore */
 		udi->grabbed_access_sem = FALSE;
 		udi->counter_acc_incremented = FALSE;
-		if ((0 != sem_rmid(udi->ftok_semid)) && (EINVAL != errno))
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"), errno);
-		udi->grabbed_ftok_sem = FALSE;
+		assert(FALSE == udi->grabbed_ftok_sem);
+		if (INVALID_SEMID != udi->ftok_semid)
+			semctl(udi->ftok_semid, 0, IPC_RMID);
 		udi->counter_ftok_incremented = FALSE;
+		udi->semid = udi->ftok_semid = INVALID_SEMID;
 		return EXIT_NRM;
 	}
 	csa->regcnt--;
@@ -528,7 +527,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			 */
 			assert(mupip_jnl_recover && !jgbl.onlnrlbk && !safe_mode);
 			if (!was_crit)
-				grab_crit(reg);
+				grab_crit(reg, WS_40);
 			SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 			BG_TRACE_PRO_ANY(csa, wcb_gds_rundown1);
                         send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_gds_rundown1"),
@@ -655,7 +654,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				 */
 				do_jnlwait = FALSE;
 				if (!was_crit)
-					grab_crit(reg);
+					grab_crit(reg, WS_41);
 				if (JNL_ENABLED(csd))
 				{
 					SET_GBL_JREC_TIME; /* jnl_ensure_open/jnl_write_pini/pfin/jnl_file_close all need it */
@@ -729,7 +728,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		if (we_are_last_writer && !FROZEN_CHILLED(csa))
 		{	/* Flush the fileheader last and harden the file to disk */
 			if (!was_crit)
-				grab_crit(reg);			/* To satisfy crit requirement in fileheader_sync() */
+				grab_crit(reg, WS_42);			/* To satisfy crit requirement in fileheader_sync() */
 			memset(csd->machine_name, 0, MAX_MCNAMELEN); /* clear the machine_name field */
 			if (we_are_last_user && !CHILLED_AUTORELEASE(csa))
 			{

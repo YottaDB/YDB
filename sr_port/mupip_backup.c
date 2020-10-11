@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -920,7 +920,7 @@ repl_inst_bkup_done1:
 			assert(!cs_addrs->hold_onto_crit); /* DSE/Rollback can never reach here */
 			if (online)
 			{
-				grab_crit(gv_cur_region);
+				grab_crit(gv_cur_region, WS_10);
 				DEBUG_ONLY(reg_count++);
 				INCR_INHIBIT_KILLS(cs_addrs->nl);
 				if (cs_data->kill_in_prog)
@@ -930,7 +930,7 @@ repl_inst_bkup_done1:
 				 * same timestamp in journal records across ALL regions (in wcs_flu below). We will
 				 * release crit as soon as the wcs_flu across all regions is done.
 				 */
-				grab_crit(gv_cur_region);
+				grab_crit(gv_cur_region, WS_65);
 				DEBUG_ONLY(reg_count++);
 			}
 			if (FROZEN_CHILLED(cs_addrs))
@@ -1010,7 +1010,7 @@ repl_inst_bkup_done1:
 			if (rptr->not_this_time > keep_going)
 				continue;
 			TP_CHANGE_REG(rptr->reg);
-			grab_crit(gv_cur_region);
+			grab_crit(gv_cur_region, WS_66);
 			/* Now that we have crit, check if this region is actively journaled and if gbl_jrec_time needs to be
 			 * adjusted (to ensure time ordering of journal records within this region's journal file).
 			 * This needs to be done BEFORE writing any journal records for this region. The value of

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -124,7 +124,7 @@ void	gtmsource_rootprimary_init(seq_num start_seqno)
 			change_reg();		/* sets cs_addrs/cs_data (needed by jnl_ensure_open) */
 			if (!JNL_ENABLED(cs_addrs))
 				continue;
-			grab_crit(gv_cur_region);
+			grab_crit(gv_cur_region, WS_84);
 			jpc = cs_addrs->jnl;
 			/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl
 			 * records. This needs to be done BEFORE the jnl_ensure_open as that could write journal records

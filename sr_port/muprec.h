@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -657,6 +657,9 @@ typedef struct reg_ctl_list_struct
 	int			extr_fn_len_orig[TOT_EXTR_TYPES];	/* fn_len before the region-name suffix was added */
 	boolean_t		last_jext_logical_rec[TOT_EXTR_TYPES];/* Whether corresponding last_jext_rec[] is logical record */
 	dio_buff_t		dio_buff;	/* Used for O_DIRECT IO in case this region has asyncio=TRUE */
+	int			region_index;	/* Per-region index value, aligned to the order the region appears in grlist.
+						 * Used by mupip_freeze()
+						 */
 } reg_ctl_list;
 
 typedef struct redirect_list_struct
@@ -1156,7 +1159,7 @@ typedef struct {
 		if (multi_proc_in_use)												\
 		{														\
 			mp_hdr = multi_proc_shm_hdr;	/* Note: "mp_hdr" is usable only if "multi_proc_in_use" is TRUE */	\
-			if (!grab_latch(&mp_hdr->multi_proc_latch, MULTI_PROC_LATCH_TIMEOUT_SEC))				\
+			if (!grab_latch(&mp_hdr->multi_proc_latch, MULTI_PROC_LATCH_TIMEOUT_SEC, NOT_APPLICABLE, NULL))		\
 			{													\
 				assert(FALSE);											\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4)							\

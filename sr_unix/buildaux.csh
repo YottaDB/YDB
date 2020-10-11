@@ -20,7 +20,7 @@
 #		$1 -	version number or code
 #		$2 -	image type (b[ta], d[bg], or p[ro])
 #		$3 -	target directory
-#		$4 -	[auxillaries to build] e.g. dse mupip ftok gtcm_pkdisp gtcm_server etc.
+#		$4 -	[auxillaries to build] e.g. dse mupip gtcm_pkdisp gtcm_server etc.
 #			Special value "shr" implies build "mumps" and ALL auxillaries
 #
 ###########################################################################################
@@ -72,7 +72,7 @@ if ( $buildaux_status ) then
 endif
 
 set buildaux_auxillaries = "gde gtmsecshr dse lke mupip gtcm_server gtcm_gnp_server gtmcrypt"
-set buildaux_utilities = "semstat2 ftok gtcm_pkdisp gtcm_shmclean gtcm_play dbcertify"
+set buildaux_utilities = "gtcm_pkdisp gtcm_shmclean gtcm_play dbcertify"
 set buildaux_executables = "$buildaux_auxillaries $buildaux_utilities"
 set buildaux_validexecutable = 0
 
@@ -170,7 +170,7 @@ if (! $skip_auxillaries) then
 	set double_quote = '"'
 	set args3 = "$gt_image ${double_quote}${gt_ld_options}${double_quote} $3"
 	set args3exelist = "gtmsecshr dse lke mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean"
-	set args3exelist = "$args3exelist semstat2 ftok dbcertify"
+	set args3exelist = "$args3exelist dbcertify"
 	foreach exe ($args3exelist)
 		set bg = '&'
 		set val = `eval echo '${'buildaux_${exe}'}'`

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,33 +32,30 @@
 #include "crit_wake.h"
 #include "ccp_cluster_lock_wake.h"
 #include "mlk_prcblk_delete.h"
+#include "wbox_test_init.h"
 
 GBLREF uint4 process_id;
 
 #define NODENUMBER 0xFFE00000
-#define DO_CRIT_WAKE										\
-{												\
-	crit_wake_res = pr->process_id ? crit_wake((sm_uint_ptr_t)&pr->process_id) : GONE;	\
-	if (GONE == crit_wake_res)								\
-	{											\
-		pr->ref_cnt = 1;								\
-		mlk_prcblk_delete(pctl, d, *((sm_uint_ptr_t)&pr->process_id));			\
-	}											\
-}
 
 void mlk_wake_pending(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 {
-	mlk_prcblk_ptr_t	next, pr;
-	sm_uint_ptr_t 		empty_slot, ctop;
-	sgmnt_addrs		*csa;
 	boolean_t		remote_pid;
-	int 			crit_wake_res; /* also used in macro DO_CRIT_WAKE */
-	int 			lcnt;
+	int 			crit_wake_res, lcnt;
+	mlk_prcblk_ptr_t	next, pr;
+	sgmnt_addrs		*csa;
+	sm_uint_ptr_t 		empty_slot, ctop;
 
 	csa = pctl->csa;
 	if (!d->pending)
 		return;
+#	ifdef DEBUG
+	if (gtm_white_box_test_case_enabled && (WBTEST_LCKWAKEOVRFLO == gtm_white_box_test_case_number))
+		pctl->ctl->wakeups = (0xFFFFFFFFF > pctl->ctl->wakeups) ? 0xFFFFFFFFF :  0xFFFFFFFFFFFFFFFFLL;
+#	endif
 	pctl->ctl->wakeups++;
+	if (!pctl->ctl->wakeups)	/* mlk_lock returns 0 as success, and otherwise return this for use by gtmcm logic */
+		 pctl->ctl->wakeups++;	/* hence guard against wrap, as unlikely as that should be */
 	/* Before updating d->sequence ensure there is no process owning this lock, since otherwise when the owner process attempts
 	 * to release the lock it will fail as its private copy of "p->sequence" will not match the shared memory "d->sequence".
 	*/
@@ -68,10 +65,13 @@ void mlk_wake_pending(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 	for (pr = (mlk_prcblk_ptr_t)R2A(d->pending), lcnt = pctl->ctl->max_prccnt; lcnt; lcnt--)
 	{
 		next = (pr->next) ? (mlk_prcblk_ptr_t)R2A(pr->next) : 0;	/* in case it's deleted */
-		DO_CRIT_WAKE;
-
-		/* Wake one process to keep things orderly, if it loses its way, others
-		 * will jump in after a timeout */
+		crit_wake_res = pr->process_id ? crit_wake((sm_uint_ptr_t)&pr->process_id) : GONE;
+		if (GONE == crit_wake_res)
+		{
+			pr->ref_cnt = 1;
+			mlk_prcblk_delete(pctl, d, *((sm_uint_ptr_t)&pr->process_id));
+		}
+		/* Wake one process to keep things orderly, if it loses its way, others will jump in after a timeout */
 		if (GONE == crit_wake_res && next)
 			pr = next;
 		else

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,7 @@ error_def(ERR_CRITRESET);
 error_def(ERR_DBCCERR);
 error_def(ERR_DBFLCORRP);
 
-boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover)
+boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover, wait_state state)
 {
 	unix_db_info 		*udi;
 	sgmnt_addrs  		*csa;
@@ -63,7 +63,7 @@ boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover)
 		DEFER_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 		DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 		mutex_spin_parms = (mutex_spin_parms_ptr_t)&csd->mutex_spin_parms;
-		status = gtm_mutex_lock(reg, mutex_spin_parms, crash_count, MUTEX_LOCK_WRITE_IMMEDIATE);
+		status = gtm_mutex_lock(reg, mutex_spin_parms, crash_count, MUTEX_LOCK_WRITE_IMMEDIATE, state);
 		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 		if (status != cdb_sc_normal)
 		{

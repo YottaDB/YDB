@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,7 @@ void mlk_unpend(mlk_pvtblk *p)
 	csa = p->pvtctl.csa;
 	GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
 	mlk_prcblk_delete(&p->pvtctl, p->nodptr, process_id);
-	p->pvtctl.ctl->wakeups++;
+	/* p->pvtctl.ctl->wakeups++; removed, which might matter to gtcml_chkreg, seems unneeded, certainly within LOCK crit */
 	REL_LOCK_CRIT(p->pvtctl, was_crit);
 	return;
 }

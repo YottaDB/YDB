@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2019 Fidelity National Information	*
+ * Copyright (c) 2015-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -296,7 +296,7 @@ void mupip_reorg_encrypt(void)
 				IS_ERROR, gtm_putmsg_csa, (CSA_ARG(csa) VARLSTCNT(4) ERR_DBRDONLY, 2, db_name_len, db_name));
 		}
 		/* ++++++++++++++++++++++++++ IN CRIT ++++++++++++++++++++++++++ */
-		grab_crit(reg);
+		grab_crit(reg, WS_91);
 		if (!csd->fully_upgraded)
 		{
 			CONTINUE_TO_NEXT_REGION(csa, csd, cnl, reg, reg_status, status,
@@ -453,7 +453,7 @@ void mupip_reorg_encrypt(void)
 			assert(!csa->now_crit);
 			bml_sm_buff = t_qread(curbmp, (sm_int_ptr_t)&cycle, &cr); /* bring block into the cache outside of crit */
 			/* ++++++++++++++++++++++++++ IN CRIT ++++++++++++++++++++++++++ */
-			grab_crit_encr_cycle_sync(reg); /* needed so t_qread does not return NULL below */
+			grab_crit_encr_cycle_sync(reg, WS_92); /* needed so t_qread does not return NULL below */
 			/* Safeguard against someone concurrently changing the database file header. It is unsafe to continue. */
 			if (start_tn != csd->encryption_hash2_start_tn)
 			{
@@ -721,7 +721,7 @@ void mupip_reorg_encrypt(void)
 		if (SS_NORMAL == reg_status)
 		{
 			get_ftok_semaphore(reg, csa);
-			grab_crit(reg);
+			grab_crit(reg, WS_93);
 			/* Wait for all the readers to complete to prevent them from attempting to digest an
 			 * encrypted block or decrypt a block with a wrong key in case MUPIP REORG -ENCRYPT has
 			 * concurrently processed that block.
@@ -765,7 +765,7 @@ void mupip_reorg_encrypt(void)
 		if (!csa->now_crit)
 		{
 			get_ftok_semaphore(reg, csa);
-			grab_crit(reg);
+			grab_crit(reg, WS_94);
 		}
 		assert(csa->now_crit);
 		assert(UNSTARTED == csd->encryption_hash_cutoff || (SS_NORMAL != reg_status));

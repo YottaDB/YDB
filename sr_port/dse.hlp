@@ -2482,8 +2482,6 @@
    Specifies the starting offset, in bytes, of the portion of the block to
    shift.
 
-   -SPawn
-
 2 SPawn
    SPawn
 

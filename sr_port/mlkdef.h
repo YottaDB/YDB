@@ -147,12 +147,12 @@ typedef struct	mlk_ctldata_struct	/* this describes the entire shared lock secti
 	ptroff_t	subbase;		/* relative pointer to the base of the mlk_shrsub area */
 	ptroff_t	subfree;		/* relative pointer to the first free cell in the shrsub area */
 	ptroff_t	subtop;			/* relative pointer to the top of the shrsub area */
+	gtm_uint64_t	wakeups;		/* lock wakeup counter */
 	uint4		max_prccnt;		/* maximum number of entries in the prcfree chain */
 	uint4		max_blkcnt;		/* maximum number of entries in the blkfree chain */
 	uint4		num_blkhash;		/* number of hash buckets */
 	int4		prccnt;			/* number of entries in the prcfree chain */
 	int4		blkcnt;			/* number of entries in the blkfree chain */
-	unsigned int	wakeups;		/* lock wakeup counter */
 	boolean_t	lockspacefull_logged;	/* whether LOCKSPACEFULL has been issued since last being below threshold */
 	boolean_t	gc_needed;		/* whether we've determined that a garbage collection is needed */
 	boolean_t	resize_needed;		/* whether we've determined that a hash table resize is needed */
@@ -374,7 +374,7 @@ typedef struct mlk_stats_struct
 							 */
 
 /* macros to grab and release a critical section (either shared with DB or not) for LOCK operations */
-#define GRAB_LOCK_CRIT_AND_SYNC(PCTL, RET_WAS_CRIT)								\
+#define GRAB_LOCK_CRIT_AND_SYNC(PCTL, RET_WAS_CRIT)						\
 		grab_lock_crit_and_sync(&(PCTL), &(RET_WAS_CRIT))
 #define GRAB_LOCK_CRIT_INTL(PCTL, RET_WAS_CRIT)							\
 		grab_lock_crit_intl(&(PCTL), &(RET_WAS_CRIT))

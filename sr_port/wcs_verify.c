@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -103,7 +103,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		assert(!csa->hold_onto_crit);
 		ret = FALSE;
 		SEND_MSG_CSA(VARLSTCNT(8) ERR_DBFHEADERR4, 6, DB_LEN_STR(reg), RTS_ERROR_TEXT("now_crit"), csa->now_crit, TRUE);
-		grab_crit(reg);		/* what if it has it but lost track of it ??? should there be a crit reset ??? */
+		grab_crit(reg, WS_22);		/* what if it has it but lost track of it ??? should there be a crit reset ??? */
 	}
 	if (dba_mm != csd->acc_meth)
 	{

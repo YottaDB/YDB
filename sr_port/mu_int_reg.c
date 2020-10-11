@@ -178,7 +178,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_
 	{	/* Take a copy of the file-header. To ensure it is consistent, do it while holding crit. */
 		was_crit = csa->now_crit;
 		if (!was_crit)
-			grab_crit(gv_cur_region);
+			grab_crit(gv_cur_region, WS_6);
 		memcpy((uchar_ptr_t)&mu_int_data, (uchar_ptr_t)csd, SIZEOF(sgmnt_data));
 		if (!was_crit)
 			rel_crit(gv_cur_region);

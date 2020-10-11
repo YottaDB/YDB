@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,8 @@ void		gtm_mutex_init(gd_region *reg, int n, bool crash);
 enum cdb_sc gtm_mutex_lock(gd_region *reg,
 			      mutex_spin_parms_ptr_t mutex_spin_parms,
 			      int crash_count,
-			      mutex_lock_t mutex_lock_type);
+			      mutex_lock_t mutex_lock_type,
+			      wait_state state);
 
 /* mutex_unlockw - unlock write access to mutex for region reg */
 enum	cdb_sc	mutex_unlockw(gd_region *reg, int crash_count);

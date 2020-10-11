@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,16 +55,18 @@ GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	repl_tls_info_t		repl_tls;
 #endif
 GBLREF	volatile boolean_t	timer_in_handler;
+GBLREF  gd_addr                 *gd_header;
 
-error_def(ERR_GETADDRINFO);
+error_def(ERR_BADCONNECTPARAM);
+error_def(ERR_BADPARAMCOUNT);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_REPLINSTSECLEN);
 error_def(ERR_REPLINSTSECUNDF);
-error_def(ERR_TEXT);
 
 int gtmsource_get_opt(void)
 {
-	boolean_t	connect_parms_badval, dotted_notation, log, log_interval_specified, plaintext_fallback, secondary;
+	boolean_t	connect_parms_badval, connect_parm_digit, dotted_notation, log, log_interval_specified;
+	boolean_t	plaintext_fallback, secondary;
 	char		*c, *connect_parm, *connect_parms_str, *connect_parm_token_str;
 	char		tmp_connect_parms_str[GTMSOURCE_CONN_PARMS_LEN + 1];
 	char		freeze_comment[SIZEOF(gtmsource_options.freeze_comment)];
@@ -74,7 +76,9 @@ int gtmsource_get_opt(void)
 	char		statslog_val[SIZEOF("OFF")]; /* "ON" or "OFF" */
 	char		update_val[SIZEOF("DISABLE")]; /* "ENABLE" or "DISABLE" */
 	gtm_int64_t	buffsize;
-	int		connect_parms_index, errcode, index = 0, port_len, renegotiate_interval, status, tries, timeout_status;
+	unsigned short	connect_parms_index, counter;
+	int 		index = 0, port_len, renegotiate_interval, status;
+	int		timeout_status;
 	mstr		log_nam, trans_name;
 	struct hostent	*sec_hostentry;
 	unsigned short	connect_parms_str_len, filter_cmd_len, freeze_comment_len, freeze_val_len, inst_name_len, log_file_len;
@@ -208,41 +212,132 @@ int gtmsource_get_opt(void)
 		}
 		if (CLI_PRESENT == cli_present("CONNECTPARAMS"))
 		{
+			gtmsource_options.connect_parms[GTMSOURCE_CONN_HARD_TRIES_COUNT] = REPL_CONN_HARD_TRIES_COUNT;
+			gtmsource_options.connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD] = REPL_CONN_HARD_TRIES_PERIOD;
+			gtmsource_options.connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD] = REPL_CONN_SOFT_TRIES_PERIOD;
+			gtmsource_options.connect_parms[GTMSOURCE_CONN_ALERT_PERIOD] = REPL_CONN_ALERT_ALERT_PERIOD;
+			gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD] = REPL_CONN_HEARTBEAT_PERIOD;
+			gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT] = REPL_CONN_HEARTBEAT_MAX_WAIT;
 			connect_parms_str_len = GTMSOURCE_CONN_PARMS_LEN + 1;
 			if (!cli_get_str("CONNECTPARAMS", tmp_connect_parms_str, &connect_parms_str_len))
 			{
 				util_out_print("Error parsing CONNECTPARAMS qualifier", TRUE);
-				return(-1);
+				return -1;
 			}
 			connect_parms_str = &tmp_connect_parms_str[0];
-			for (connect_parms_index =
-					GTMSOURCE_CONN_HARD_TRIES_COUNT,
+			for (connect_parms_index = 0,
 			     connect_parms_badval = FALSE,
 			     connect_parm_token_str = connect_parms_str;
 			     !connect_parms_badval &&
-			     connect_parms_index < GTMSOURCE_CONN_PARMS_COUNT &&
+			     connect_parms_index <= GTMSOURCE_CONN_PARMS_COUNT &&
 			     (connect_parm = STRTOK_R(connect_parm_token_str, GTMSOURCE_CONN_PARMS_DELIM, &strtokptr)) != NULL;
 			     connect_parms_index++,
 			     connect_parm_token_str = NULL)
 			{
-				errno = 0;
-				if ((0 == (gtmsource_options.connect_parms[connect_parms_index] = ATOI(connect_parm))
-						&& 0 != errno) || 0 >= gtmsource_options.connect_parms[connect_parms_index])
-					connect_parms_badval = TRUE;
+				if (GTMSOURCE_CONN_PARMS_COUNT > connect_parms_index)
+				{
+					errno = 0;
+					if ((0 == (gtmsource_options.connect_parms[connect_parms_index] = ATOI(connect_parm))
+							&& (0 != errno)) /* WARNING assignment above */
+							|| (0 >= gtmsource_options.connect_parms[connect_parms_index]))
+						connect_parms_badval = TRUE;
+				}
+				connect_parm_digit = TRUE;
+				for (counter = 0; counter < strlen(connect_parm); counter++)
+					if (!ISDIGIT_ASCII(connect_parm[counter]))
+					{
+						connect_parm_digit = FALSE;
+						connect_parms_badval = TRUE;
+						break;
+					}
+				if (connect_parms_badval)
+				{
+					switch(connect_parms_index)
+					{/*Addition validation and error reporting for each param in -CONNECTPARAM */
+						 case GTMSOURCE_CONN_HARD_TRIES_COUNT:
+							if ((connect_parm_digit) && (0 == ATOI(connect_parm)))
+							{
+								connect_parms_badval = FALSE;
+								break;
+							} else
+							{
+								gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (8) ERR_BADCONNECTPARAM,
+									2, LEN_AND_LIT("number of hard connection attempts"),
+									ERR_TEXT, 2,
+									LEN_AND_LIT("Specify either the number of hard connection"
+									" attempts or 0 to disable hard connection attempts")) ;
+								return -1;
+							}
+						case GTMSOURCE_CONN_HARD_TRIES_PERIOD:
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (8) ERR_BADCONNECTPARAM,
+								2, LEN_AND_LIT("wait time for hard connection attempts"),
+								ERR_TEXT, 2,
+								LEN_AND_LIT("Specify the wait time in milliseconds"));
+							return -1;
+						case GTMSOURCE_CONN_SOFT_TRIES_PERIOD:
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (8) ERR_BADCONNECTPARAM,
+								2, LEN_AND_LIT("wait time for soft connection attempts"),
+								ERR_TEXT, 2,
+								LEN_AND_LIT("Specify the wait time in seconds"));
+							return -1;
+						case GTMSOURCE_CONN_ALERT_PERIOD:
+							if ((connect_parm_digit) && (0 == ATOI(connect_parm)))
+							{
+								connect_parms_badval = FALSE;
+								break;
+							}
+							else
+							{
+								gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (8) ERR_BADCONNECTPARAM,
+									2, LEN_AND_LIT("alert period for REPLALERT messages"),
+									ERR_TEXT, 2,
+									LEN_AND_LIT("Specify the approximate alert period (in "
+									"seconds) for REPLALERT messages or 0 to disable "
+									"REPLALERT messages"));
+								return -1;
+							}
+						 case GTMSOURCE_CONN_HEARTBEAT_PERIOD:
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (8) ERR_BADCONNECTPARAM,
+								2, LEN_AND_LIT("heartbeat interval"),
+								ERR_TEXT, 2,
+								LEN_AND_LIT("Specify the interval (in seconds) between "
+								"heartbeats to the Receiver Server"));
+							return -1;
+						case GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT:
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (8) ERR_BADCONNECTPARAM,
+								2, LEN_AND_LIT("maximum heartbeat wait period"),
+								ERR_TEXT, 2,
+								LEN_AND_LIT("Specify the maximum period (in seconds) for "
+								"which the Source Server should wait to receive a heartbeat "
+								"response from the Receiver Server"));
+							return -1;
+					}
+				}
 			}
-			if (connect_parms_badval)
+			if (GTMSOURCE_CONN_PARMS_COUNT < connect_parms_index)
 			{
-				util_out_print("Error parsing or invalid value parameter in CONNECTPARAMS", TRUE);
-				return(-1);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) ERR_BADPARAMCOUNT);
+				return -1;
 			}
-			if (GTMSOURCE_CONN_PARMS_COUNT != connect_parms_index)
+			if ((0 != gtmsource_options.connect_parms[GTMSOURCE_CONN_ALERT_PERIOD]) &&
+				(gtmsource_options.connect_parms[GTMSOURCE_CONN_ALERT_PERIOD]<
+					gtmsource_options.connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]))
 			{
-				util_out_print(
-					"All CONNECTPARAMS - HARD TRIES, HARD TRIES PERIOD, "
-					"SOFT TRIES PERIOD, "
-					"ALERT TIME, HEARTBEAT INTERVAL, "
-					"MAX HEARBEAT WAIT should be specified", TRUE);
-				return(-1);
+
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (8) ERR_BADCONNECTPARAM,
+					2, LEN_AND_LIT("alert period for REPLALERT messages"),
+					ERR_TEXT, 2,
+					LEN_AND_LIT("Alert period cannot be less than soft connection attempts period"));
+				return -1;
+			}
+			if (gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT] <
+				gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD])
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (8) ERR_BADCONNECTPARAM,
+					2, LEN_AND_LIT("maximum heartbeat wait period"),
+					ERR_TEXT, 2,
+					LEN_AND_LIT("Maximum heartbeat wait period cannot be less than heartbeat interval"));
+				return -1;
 			}
 		} else
 		{
@@ -253,15 +348,7 @@ int gtmsource_get_opt(void)
 			gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD] = REPL_CONN_HEARTBEAT_PERIOD;
 			gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT] = REPL_CONN_HEARTBEAT_MAX_WAIT;
 		}
-		if (gtmsource_options.connect_parms[GTMSOURCE_CONN_ALERT_PERIOD]<
-				gtmsource_options.connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD])
-			gtmsource_options.connect_parms[GTMSOURCE_CONN_ALERT_PERIOD] =
-				gtmsource_options.connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD];
-		if (gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT] <
-				gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD])
-			gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT] =
-				gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD];
-	}
+	}	/* End of -START || -ACTIVATE */
 	if (gtmsource_options.start || gtmsource_options.statslog || gtmsource_options.changelog || gtmsource_options.activate)
 	{
 		log = (cli_present("LOG") == CLI_PRESENT);
@@ -304,9 +391,9 @@ int gtmsource_get_opt(void)
 			if (MIN_JNLPOOL_SIZE > buffsize)
 				gtmsource_options.buffsize = MIN_JNLPOOL_SIZE;
 			else if ((gtm_int64_t)MAX_JNLPOOL_SIZE < buffsize)
-				gtmsource_options.buffsize = (uint4)MAX_JNLPOOL_SIZE;
+				gtmsource_options.buffsize = (gtm_uint64_t)MAX_JNLPOOL_SIZE;
 			else
-				gtmsource_options.buffsize = (uint4)buffsize;
+				gtmsource_options.buffsize = (gtm_uint64_t)buffsize;
 		} else
 			gtmsource_options.buffsize = DEFAULT_JNLPOOL_SIZE;
 		/* Round up buffsize to the nearest (~JNL_WRT_END_MASK + 1) multiple */

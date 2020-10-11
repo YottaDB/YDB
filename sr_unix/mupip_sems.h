@@ -10,9 +10,9 @@
  *								*
  ****************************************************************/
 
-#ifndef MLK_LOCK_INCLUDED
-#define MLK_LOCK_INCLUDED
+#ifndef MUPIP_SEMS_INCLUDED
+#define MUPIP_SEMS_INCLUDED
 
-gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new);
+void mupip_sems(void);
 
-#endif /* MLK_LOCK_INCLUDED */
+#endif /* MUPIP_SEMS_INCLUDED */

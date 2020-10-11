@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -125,7 +125,7 @@ void    op_ztcommit(int4 n)
 		assert(csa == cs_addrs);
 		csd = csa->hdr;
 		if (!csa->hold_onto_crit)
-			grab_crit(gv_cur_region);
+			grab_crit(gv_cur_region, NOT_APPLICABLE);
 		assert(csa->now_crit);
 		if (JNL_ENABLED(csd))
 		{

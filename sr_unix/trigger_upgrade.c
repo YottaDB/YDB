@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2019 Fidelity National Information	*
+ * Copyright (c) 2014-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -211,7 +211,7 @@ void	trigger_upgrade(gd_region *reg)
 	 * cut AFTER the transaction commits but before anyone else can sneak in to do any more updates.
 	 * Since most often we expect databases to be journaled, we do this hold_onto_crit even for the non-journaled case.
 	 */
-	grab_crit(reg);
+	grab_crit(reg, WS_100);
 	csa->hold_onto_crit = TRUE;
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	assert(!donot_INVOKE_MUMTSTART);
@@ -578,7 +578,7 @@ void	trigger_upgrade(gd_region *reg)
 		}
 		csa->hold_onto_crit = FALSE;
 	} else
-		grab_crit(reg);
+		grab_crit(reg, WS_101);
 	csa->hdr->hasht_upgrade_needed = FALSE;
 	rel_crit(reg);
 	return;	/* if any errors happen during upgrade (e.g. TRANS2BIG), we will not reach here */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Copyright (c) 2003-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -548,7 +548,7 @@ uint4 mur_open_files(boolean_t retry)
 				tmpcsa = &FILE_INFO(reg)->s_addrs;
 				tmpcsd = tmpcsa->hdr;
 				GRAB_ACCESS_CONTROL(rl);
-				grab_crit(reg);
+				grab_crit(reg, WS_73);
 				DO_CHILLED_AUTORELEASE(tmpcsa, tmpcsd);
 				if (FROZEN(tmpcsd))
 				{

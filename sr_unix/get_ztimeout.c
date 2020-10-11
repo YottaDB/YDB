@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 Fidelity National Information	*
+ * Copyright (c) 2018-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,8 +41,7 @@ int get_ztimeout(mval *result)
 	ztimeout_vector_ptr = (TREF(dollar_ztimeout)).ztimeout_vector.str.addr;
 	ztimeout_vector_len = (TREF(dollar_ztimeout)).ztimeout_vector.str.len;
 	if (ztimeout_vector_len) ztimeout_vector_len--;
-	if ((((TREF(dollar_ztimeout)).ztimeout_seconds.m[1] / MV_BIAS) == -1)
-			&& (NULL == ztimeout_vector_ptr))
+	if ((((TREF(dollar_ztimeout)).ztimeout_seconds.m[1] / MV_BIAS) == -1))
 		time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, "%d", ((TREF(dollar_ztimeout)).ztimeout_seconds.m[1] / MV_BIAS));
 	else
 	{

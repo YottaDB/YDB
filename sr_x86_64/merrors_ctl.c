@@ -651,7 +651,7 @@ LITDEF	err_msg merrors[] = {
 	{ "LISTENPASSBND", "Controlmnemonic LISTEN can be applied to PASSIVE socket in the state BOUND only", 0, 0 },
 	{ "DBCLNUPINFO", "Database file !AD !/!AD", 4, 0 },
 	{ "MUNODWNGRD", "Database not downgraded because of preceding errors", 0, 0 },
-	{ "REPLTRANS2BIG", "Transaction !16@XQ of size !UL (pre-filter size !UL) too large to be accommodated in the !AD pool", 5, 0 },
+	{ "REPLTRANS2BIG", "Transaction !16@XQ of size !@ZQ (pre-filter size !@ZQ) too large to be accommodated in the !AD pool", 5, 0 },
 	{ "RDFLTOOLONG", "Length specified for fixed length read exceeds the maximum string size", 0, 0 },
 	{ "MUNOFINISH", "MUPIP unable to finish all requested actions", 0, 0 },
 	{ "DBFILEXT", "Database file !AD extended from 0x!XL blocks to 0x!XL at transaction 0x!16@XQ", 5, 0 },
@@ -1544,6 +1544,9 @@ LITDEF	err_msg merrors[] = {
 	{ "MUTRUNCNOSPKEEP", "Region !AD has insufficient space to meet truncate target percentage of !UL with keep at !UL blocks", 4, 0 },
 	{ "TERMHANGUP", "Terminal has disconnected", 0, 0 },
 	{ "DBFILNOFULLWRT", "Disabling fullblock writes. !AD !AD !UL", 5, 0 },
+	{ "BADCONNECTPARAM", "Error parsing or invalid !AD", 2, 0 },
+	{ "BADPARAMCOUNT", "-CONNECTPARAMS accepts one to six parameter values", 0, 0 },
+	{ "REPLALERT", "Source Server could not connect to replicating instance [!AZ] for !UL seconds", 2, 0 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -3077,6 +3080,9 @@ LITDEF	int ERR_MUKEEPNOTRUNC = 150384578;
 LITDEF	int ERR_MUTRUNCNOSPKEEP = 150384587;
 LITDEF	int ERR_TERMHANGUP = 150384594;
 LITDEF	int ERR_DBFILNOFULLWRT = 150384600;
+LITDEF	int ERR_BADCONNECTPARAM = 150384610;
+LITDEF	int ERR_BADPARAMCOUNT = 150384618;
+LITDEF	int ERR_REPLALERT = 150384624;
 
 
 LITDEF	int merrors_undocarr[] = {
@@ -3113,7 +3119,7 @@ GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1531,
+	1534,
 	&merrors_undocarr[0],
 	26
 };

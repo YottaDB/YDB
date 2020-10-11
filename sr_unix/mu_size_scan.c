@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,23 +86,23 @@ STATICFNDCL enum cdb_sc read_block(block_id nBlkId, sm_uc_ptr_t *pBlkBase_ptr, i
 #define ANY_ROOT_LEVL		(MAX_BT_DEPTH + 5)	/* overload invalid level value */
 #define	MAX_SCANS		200000000		/* catch infinite loops */
 
-/* No MBSTART and MBEND below as the macro uses, continue and break. */
+/* No MBSTART and MBEND below as the macro uses a continue command */
 #define CHECK_KEY_RANGE(MUSZ_START_KEY, MUSZ_END_KEY, BUFF, RCNT, MUSZ_RANGE_DONE)		\
 {												\
-		if (MUSZ_END_KEY)								\
-		{										\
-			if (memcmp(BUFF, MUSZ_END_KEY->base, MUSZ_END_KEY->end + 1) > 0)	\
-				MUSZ_RANGE_DONE = TRUE;						\
-		} else										\
-		{										\
-			if (memcmp(BUFF, MUSZ_START_KEY->base, MUSZ_START_KEY->end + 1) > 0)	\
+	int4	CMP_KEY;									\
+												\
+	CMP_KEY = memcmp(BUFF, MUSZ_START_KEY->base, MUSZ_START_KEY->end + 1);			\
+	if (MUSZ_END_KEY)									\
+	{											\
+		if (memcmp(BUFF, MUSZ_END_KEY->base, MUSZ_END_KEY->end + 1) > 0)		\
 			MUSZ_RANGE_DONE = TRUE;							\
-		}										\
-		if (memcmp(BUFF, MUSZ_START_KEY->base, MUSZ_START_KEY->end + 1) < 0)		\
-		{										\
-			RCNT--;									\
-			continue;								\
-		}										\
+	} else if (0 < CMP_KEY)									\
+		MUSZ_RANGE_DONE = TRUE;								\
+	if (0 > CMP_KEY)									\
+	{											\
+		RCNT--;										\
+		continue;									\
+	}											\
 }
 
 int4 mu_size_scan(glist *gl_ptr, int4 level)
@@ -240,7 +240,6 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 	int				name_len, key_size, buff_length, rec_len;
 	unsigned char			buff[MAX_KEY_SZ + 1];
 
-
 	assert(mu_size_cumulative[lvl][BLK] < MAX_SCANS);
 	if (lvl == targ_levl)
 	{	/* reached the bottom. count records in this block and validate */
@@ -256,13 +255,15 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 				CHECK_ADJACENCY(nBlkId, lvl -1, mu_int_adj[lvl - 1]);
 			rec_cmpc = EVAL_CMPC((rec_hdr_ptr_t)pRec);
 			key_base = pRec + SIZEOF(rec_hdr);
-			GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key, name_len, key_size,buff, buff_length, rec_len);
+			GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key, name_len, key_size, buff, buff_length, rec_len);
+			if (0 == key_size)
+				continue;	/* indication of trouble parsing the block - don't use it */
 			if (mu_subsc) /* Subscript option chosen */
 			{
 				CHECK_KEY_RANGE(mu_start_key, mu_end_key, buff, rCnt, musz_range_done);
 				if (musz_range_done)
 				{
-					if (!lvl) /* Dont count at data level */
+					if (!lvl)	/* Dont count at data level */
 						break;
 					else
 						continue;
@@ -297,12 +298,12 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 					continue;	/* skip these guys, we've already counted over there */
 			} else
 			{
-				GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key, name_len,
-								key_size,buff, buff_length, rec_len);
+				GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key, name_len, key_size, buff, buff_length,
+					rec_len);
+				if (0 == key_size)
+					continue;	/* indication of trouble parsing the block - don't use it */
 				if (mu_subsc) /* Subscript option chosen */
-				{
 					CHECK_KEY_RANGE(mu_start_key, mu_end_key, buff, rCnt, musz_range_done);
-				}
 				if (skiprecs && (curroff < saveoff[lvl]))
 					continue;	/* skip these guys, we've already counted over there */
 			}

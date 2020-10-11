@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016 Fidelity National Information 		*
+ * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,7 @@ GBLREF	uint4		dollar_tlevel;
  * Returns: TRUE if new-encryption-handles were opened (i.e. "process_reorg_encrypt_restart" was invoked) at least once.
  *          FALSE otherwise.
  */
-boolean_t grab_crit_encr_cycle_sync(gd_region *reg)
+boolean_t grab_crit_encr_cycle_sync(gd_region *reg, wait_state state)
 {
 	boolean_t		sync_needed;
 	enc_info_t		*encr_ptr;
@@ -58,7 +58,7 @@ boolean_t grab_crit_encr_cycle_sync(gd_region *reg)
 
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
-	grab_crit(reg);
+	grab_crit(reg, state);
 	encr_ptr = csa->encr_ptr;
 	sync_needed = FALSE;
 	if (NULL != encr_ptr)
@@ -79,7 +79,7 @@ boolean_t grab_crit_encr_cycle_sync(gd_region *reg)
 			assert(csa == reorg_encrypt_restart_csa);
 			process_reorg_encrypt_restart();
 			assert(NULL == reorg_encrypt_restart_csa);
-			grab_crit(reg);
+			grab_crit(reg, state);
 		}
 	}
 	return sync_needed;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +13,7 @@
 #ifndef GTCML_H_INCLUDED
 #define GTCML_H_INCLUDED
 
-void gtcml_blklck(cm_region_list *region, mlk_pvtblk *lock, uint4 wake);
+void gtcml_blklck(cm_region_list *region, mlk_pvtblk *lock,gtm_uint64_t wake);
 void gtcml_chklck(cm_lckblkreg *reg, bool timed);
 void gtcml_chkprc(cm_lckblklck *lck);
 void gtcml_chkreg(void);

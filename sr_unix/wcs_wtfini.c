@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2019 Fidelity National Information	*
+ * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -119,20 +119,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 	ret_value = 0;
 	CHECK_ERROR_IN_WORKER_THREAD(reg, udi);
 	if (do_is_proc_alive_check)
-	{	/* Check if process is alive. But avoid calling "is_proc_alive" more than once per pid
-		 * (system call) by maintaining a hash table of pids that we have already called for.
-		 * Use hashtable if pid is found. If not use "is_proc_alive".
-		 * This way if there are thousands of cache-records in the WIP queue corresponding to dead
-		 * pids, we will not do thousands of "kill" system calls while holding crit in "wcs_wtfini".
-		 */
-		/* Reinitialize hash table if not cleared from previous invocation of "wcs_wtfini" */
-		if (!wtfini_pid_ht_reinitialized)
-		{
-			reinitialize_hashtab_int4(&wtfini_pid_ht);
-			wtfini_pid_ht_reinitialized = TRUE;
-		} else if (0 == wtfini_pid_ht.size)
-			init_hashtab_int4(&wtfini_pid_ht, WTFINI_PID_ALIVE_HT_INITIAL_SIZE, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
-	}
+		init_hashtab_int4(&wtfini_pid_ht, WTFINI_PID_ALIVE_HT_INITIAL_SIZE, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
 	for (lcnt = cr2flush ? 0 : n_bts, start_csr = NULL; lcnt >= 0; lcnt--)
 	{
 		/* we will be attempting to take a cr off the wip queue for processing. We do not need the wbuf_dqd protection
@@ -150,7 +137,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 				 * (checked after the grab_latch below) would imply it is in the wip queue.
 				 */
 				++fast_lock_count; /* Disable wcs_stale for duration */
-				if (grab_latch(&whead->latch, WT_LATCH_TIMEOUT_SEC))
+				if (grab_latch(&whead->latch, WT_LATCH_TIMEOUT_SEC, WS_25, csa))
                        		{
 					cr = cr2flush;
 					csr = (cache_state_rec_ptr_t)((sm_uc_ptr_t)cr + SIZEOF(cr->blkque));
@@ -243,6 +230,12 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 		{
 			if (do_is_proc_alive_check && (process_id != epid))
 			{
+				/* Check if process is alive. But avoid calling "is_proc_alive" more than once per pid
+				 * (system call) by maintaining a hash table of pids that we have already called for.
+				 * Use hashtable if pid is found. If not use "is_proc_alive".
+				 * This way if there are thousands of cache-records in the WIP queue corresponding to dead
+				 * pids, we will not do thousands of "kill" system calls while holding crit in "wcs_wtfini".
+				 */
 				assert(SIZEOF(process_id) == SIZEOF(uint4));
 				/* hashtab_int4 routines do not handle 0 value so bump return value from is_proc_alive
 				 * (TRUE or FALSE) by 1 when storing and decrement by 1 after lookup.

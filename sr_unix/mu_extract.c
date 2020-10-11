@@ -158,7 +158,7 @@ CONDITION_HANDLER(mu_extract_handler)
 		{
 			reg = opened_regions[i];
 			cnl = (&FILE_INFO(reg)->s_addrs)->nl;
-			grab_crit(reg);
+			grab_crit(reg, WS_85);
 			cnl->mupip_extract_count--;
 			rel_crit(reg);
 		}
@@ -369,7 +369,7 @@ void mu_extract(void)
 				csa = &FILE_INFO(reg)->s_addrs;
 				csd = csa->hdr;
 				cnl = csa->nl;
-				grab_crit(reg);
+				grab_crit(reg, WS_86);
 				pid = cnl->reorg_encrypt_pid;
 				if (pid && is_proc_alive(pid, 0))
 				{

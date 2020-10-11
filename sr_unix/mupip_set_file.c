@@ -749,7 +749,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 			csd = cs_data;
 			assert(!cs_addrs->hold_onto_crit); /* this ensures we can safely do unconditional grab_crit and rel_crit */
-			grab_crit(gv_cur_region);
+			grab_crit(gv_cur_region, WS_95);
 			if (FROZEN_CHILLED(cs_addrs))
 			{
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2,

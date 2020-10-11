@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,8 @@ GBLREF	gtmsource_state_t	gtmsource_state;
 
 int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_t read_multiple, qw_num stop_read_at)
 {
-	uint4 			jnldata_len, read_size, jnlpool_size, avail_data;
+	size_t 			jnldata_len, read_size, avail_data;
+	gtm_uint64_t		jnlpool_size;
 	uint4			first_tr_len, num_tr_read, orig_first_tr_len, orig_tr_len, tr_len;
 	int64_t			read, wrap_size; /* This can be negative. Must handle a signed 4G value */
 	uchar_ptr_t		buf_top, tr_p;

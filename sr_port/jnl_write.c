@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Copyright (c) 2003-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -302,7 +302,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 				{	/* Return value of "grab_latch" does not need to be checked
 					 * because we pass GRAB_LATCH_INDEFINITE_WAIT as timeout.
 					 */
-					grab_latch(&jb->phase2_commit_latch, GRAB_LATCH_INDEFINITE_WAIT);
+					grab_latch(&jb->phase2_commit_latch, GRAB_LATCH_INDEFINITE_WAIT, WS_29, csa);
 				}
 				SET_JBP_FREEADDR(jb, lcl_freeaddr);
 				if (!was_latch_owner)

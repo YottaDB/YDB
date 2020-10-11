@@ -27,7 +27,7 @@
 #define MAX_FILTER_CMD_LEN		512
 #define DEFAULT_JNLPOOL_SIZE		(2 << 25)		/* 64MiB */
 #define MIN_JNLPOOL_SIZE		(2 << 19)		/* 1MiB */
-#define MAX_JNLPOOL_SIZE		0xFFFFFFF8LL		/* 4GiB - 8 == JNL_WRT_END_MASK */
+#define MAX_JNLPOOL_SIZE		0x1000000000LL	/* 64GB - This should be a multiple of (~JNL_WRT_END_MASK + 1) */
 #define MAX_FREEZE_COMMENT_LEN		1024
 /* We need space in the journal pool to let other processes know which error messages should trigger anticipatory freeze.
  * Instead of storing them as a list, allocate one byte for each error message. Currently, the only piece of information
@@ -163,9 +163,11 @@ typedef struct
 	/* The offsets of the above fields in this structure should not change as "mu_rndwn_replpool" relies on that.
 	 * If they change, the macro GDS_RPL_LABEL needs to be changed as well (to effect a journal pool format change).
 	 */
-	uint4			jnldata_base_off;	/* Journal pool offset from where journal data starts */
-	uint4			jnlpool_size;		/* Available space for journal data in bytes */
-	seq_num			start_jnl_seqno;	/* The sequence number with which operations started */
+	seq_num			start_jnl_seqno;	/* The sequence number with which operations started.
+							 * Needs to be on 8 byte boundary
+							 */
+	gtm_uint64_t		jnldata_base_off;	/* Journal pool offset from where journal data starts */
+	gtm_uint64_t           	jnlpool_size;		/* Available space for journal data in bytes */
 	volatile seq_num 	jnl_seqno;		/* Sequence number for transactions. Updated by GTM process */
 	volatile seq_num	last_histinfo_seqno;	/* Starting seqno of the last histinfo in the instance file.
 							 * Set to 0 if there are no histinfo records in the instance file.
@@ -225,7 +227,7 @@ typedef struct
 	boolean_t		ftok_counter_halted;
 	uint4			phase2_commit_index1;
 	uint4			phase2_commit_index2;
-	char			filler_16bytealign1[8];
+	char			filler_16bytealign1[16];
 	/************* JPL_TRC_REC RELATED FIELDS -- begin -- ***********/
 #	define TAB_JPL_TRC_REC(A,B)	jpl_trc_rec_t	B;
 #	include "tab_jpl_trc_rec.h"
@@ -290,7 +292,7 @@ typedef jnldata_hdr_struct 	*jnldata_hdr_ptr_t;
 #define REPL_CONN_HARD_TRIES_COUNT		5	/* Default number of connection hard tries */
 #define REPL_CONN_HARD_TRIES_PERIOD		500	/* msec Default connection hard try period */
 #define REPL_CONN_SOFT_TRIES_PERIOD		5	/* sec Default connection soft try period*/
-#define REPL_CONN_ALERT_ALERT_PERIOD		30	/* sec Default alert period*/
+#define REPL_CONN_ALERT_ALERT_PERIOD		0	/* sec Default no logging of the REPLALERT message */
 #define REPL_CONN_HEARTBEAT_PERIOD		15	/* sec Default heartbeat period */
 #define REPL_CONN_HEARTBEAT_MAX_WAIT		60	/* sec Default heartbeat maximum waiting period */
 #define REPL_MAX_CONN_HARD_TRIES_PERIOD		1000    /* ms */
@@ -425,7 +427,7 @@ typedef struct
 	int4			repl_zlib_cmp_level;	/* zlib compression level currently used across the replication pipe */
 	unsigned char		filler1_align_8[4];
 	int4			read_state;  	/* From where to read - pool or the file(s)? */
-	uint4			read; 		/* Offset relative to jnldata_base_off of the next journal record from the pool */
+	qw_off_t		read; 		/* Offset relative to jnldata_base_off of the next journal record from the pool */
 	repl_conn_info_t	remote_side;	/* Details of the remote side connection */
 	qw_off_t		read_addr; 	/* Virtual address of the next journal record in the merged journal file to read */
 	seq_num			read_jnl_seqno; /* Next jnl_seqno to be read (corresponds to "gtmsrc_lcl->resync_seqno") */
@@ -481,7 +483,7 @@ typedef struct
 	uint4			next_renegotiate_time;	/* Time (in future) at which the next SSL/TLS renegotiation happens. */
 	int4			num_renegotiations;	/* Number of SSL/TLS renegotiations that happened so far. */
 #	endif
-	int4			filler_8byte_align;	/* Keep size % 8 == 0 */
+	GTM64_ONLY(int4		filler_8byte_align;)	/* Keep size % 8 == 0 */
 } gtmsource_local_struct;
 
 #if defined(__osf__) && defined(__alpha)
@@ -673,7 +675,7 @@ typedef struct
 	boolean_t	zerobacklog;   	/* TRUE if -ZEROBACKLOG was specified, FALSE otherwise */
 	int4		cmplvl;
 	int4		shutdown_time;
-	uint4		buffsize;
+	gtm_uint64_t	buffsize;
 	int4		mode;
 	int4		secondary_port;
 	uint4		src_log_interval;
@@ -729,7 +731,7 @@ void		gtmsource_exit(int exit_status);
 void		gtmsource_seqno_init(boolean_t this_side_std_null_coll);
 void		gtmsource_stop(boolean_t exit);
 void		gtmsource_sigstop(void);
-boolean_t	jnlpool_hasnt_overflowed(jnlpool_ctl_ptr_t jctl, uint4 jnlpool_size, qw_num read_addr);
+boolean_t	jnlpool_hasnt_overflowed(jnlpool_ctl_ptr_t jctl, gtm_uint64_t jnlpool_size, qw_num read_addr);
 void		jnlpool_detach(void);
 void		jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t *jnlpool_creator, gd_addr *gd_ptr);
 int		gtmsource_init_heartbeat(void);

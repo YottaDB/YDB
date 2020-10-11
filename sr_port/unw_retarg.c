@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -194,9 +194,10 @@ int unw_retarg(mval *src, boolean_t alias_return)
 		trg->mvtype |= MV_RETARG;
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	USHBIN_ONLY(CLEANUP_COPIED_RECURSIVE_RTN(rtnhdr));
-	/* We just unwound a frame. May have been either a zintrupt frame and/or may have unwound a NEW'd ZTRAP or even cleared
-	 * our error state. If we have a deferred timeout and none of the deferral conditions are anymore in effect, release
-	 * the hounds.
+	/* We just unwound a frame. May have been either a zintrupt frame and/or may have
+	 * unwound a NEW'd ZTRAP or even cleared our error state. If we have a deferred timeout
+	 * and none of the deferral conditions are anymore in effect, release the hounds.
+	 * Below part of code should be kept in sync with unw_mv_ent.
 	 */
 	if ((TREF(save_xfer_root)))
 	{
@@ -211,7 +212,7 @@ int unw_retarg(mval *src, boolean_t alias_return)
 				POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
 				xfer_set_handlers(event_type, set_fn, param_val, TRUE);
 			}
-		} else
+		} else if (!dollar_zininterrupt)
 		{
 			POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
 			xfer_set_handlers(event_type, set_fn, param_val, TRUE);

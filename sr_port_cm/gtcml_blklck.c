@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +22,7 @@
 GBLREF cm_lckblkreg		*blkdlist;
 GBLREF connection_struct	*curr_entry;
 
-void gtcml_blklck(cm_region_list *region, mlk_pvtblk *lock, uint4 wake)
+void gtcml_blklck(cm_region_list *region, mlk_pvtblk *lock, gtm_uint64_t wake)
 {
 	cm_lckblkreg	*b, *b1;
 	cm_lckblklck	*l, *l1, *l2, *tl1;

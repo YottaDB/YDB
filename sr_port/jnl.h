@@ -109,7 +109,7 @@ error_def(ERR_JNLENDIANLITTLE);
 									 */
 
 #define	JNL_WRT_END_MODULUS	8
-#define JNL_WRT_END_MASK	((uint4)~(JNL_WRT_END_MODULUS - 1))
+#define JNL_WRT_END_MASK	((gtm_uint64_t)~(JNL_WRT_END_MODULUS - 1))
 
 #define JNL_MIN_ALIGNSIZE	(1 << 12)	/*    4096 disk blocks effectively    2M alignsize */
 #define JNL_DEF_ALIGNSIZE	(1 << 12)	/*    4096 disk blocks effectively    2M alignsize */
@@ -1846,7 +1846,7 @@ MBSTART {											\
 	{											\
 		was_crit = CSA->now_crit;							\
 		if (!was_crit)									\
-			grab_crit(REG);								\
+			grab_crit(REG, WS_3);						\
 		DSKADDR = jbp->dskaddr;								\
 		FREEADDR = jbp->freeaddr;							\
 		RSRV_FREEADDR = jbp->rsrv_freeaddr;						\

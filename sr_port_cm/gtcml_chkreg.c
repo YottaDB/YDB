@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,8 @@ GBLDEF ABS_TIME chkreg_time;
 
 void gtcml_chkreg(void)
 {
-	cm_lckblkreg *reg, *reg1;
+	cm_lckblkreg	*reg, *reg1;
+	gtm_uint64_t	wakeup;
 
 	sys_get_curr_time(&chkreg_time);	/* just once per pass */
 	reg1 = reg = blkdlist;
@@ -40,39 +41,43 @@ void gtcml_chkreg(void)
 	while (reg)
 	{
 		gv_cur_region = reg->region->reg;
-		if (reg->region->refcnt == 0)
+		if (0 == reg->region->refcnt)
 		{
-			gtcml_chklck(reg,FALSE);
-			assert (reg->lock == 0);
-		}
-		else if (reg->region->wakeup < ((mlk_ctldata *)FILE_INFO(gv_cur_region)->s_addrs.mlkctl)->wakeups)
+			gtcml_chklck(reg, FALSE);
+			assert (0 == reg->lock);
+		} else
 		{
-			gtcml_chklck(reg,FALSE);
-			reg->region->wakeup = ((mlk_ctldata *)FILE_INFO(gv_cur_region)->s_addrs.mlkctl)->wakeups;
-			reg->pass = CM_BLKPASS;
+			/* the following avoids repeated dereferencing on the asumption that a slightly stale value (picked up
+			 * outside of LOCK crit) is not a big deal - reconsider on any evidence to the contrary and if so check
+			 * mlk_unpend as well
+			 */
+			wakeup = ((mlk_ctldata *)FILE_INFO(gv_cur_region)->s_addrs.mlkctl)->wakeups;
+			assert(wakeup);
+			if (reg->region->wakeup < wakeup)
+			{
+				gtcml_chklck(reg, FALSE);
+				reg->pass = CM_BLKPASS;
+			} else if (0 == --reg->pass)
+			{
+				gtcml_chklck(reg, TRUE);
+				reg->pass = CM_BLKPASS;
+			}
+			reg->region->wakeup = wakeup;	/* done for both cases above due to possibility of wakeup rollover */
 		}
-		else if (--reg->pass == 0)
-		{
-			gtcml_chklck(reg,TRUE);
-			reg->pass = CM_BLKPASS;
-		}
-
-		if (reg->lock == 0)
+		if (0 == reg->lock)
 		{
 			if (reg == blkdlist)
 			{
 				blkdlist = reg->next;
 				free(reg);
 				reg = reg1 = blkdlist;
-			}
-			else
+			} else
 			{
 				reg1->next = reg->next;
 				free(reg);
 				reg = reg1->next;
 			}
-		}
-		else
+		} else
 		{
 			reg1 = reg;
 			reg = reg->next;

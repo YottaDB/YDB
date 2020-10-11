@@ -80,7 +80,7 @@ enum dse_fmt
 		if (NOCRIT_PRESENT)										\
 			CS_ADDRS->now_crit = TRUE;								\
 		else												\
-			grab_crit_encr_cycle_sync(GV_CUR_REGION);						\
+			grab_crit_encr_cycle_sync(GV_CUR_REGION, WS_55);					\
 		WAS_HOLD_ONTO_CRIT = CS_ADDRS->hold_onto_crit;							\
 		CS_ADDRS->hold_onto_crit = TRUE;								\
 	}													\

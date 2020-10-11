@@ -430,7 +430,7 @@ void mupip_reorg(void)
 			csa = cs_addrs;
 			cnl = csa->nl;
 			/* Ensure only one truncate process at a time operates on given region */
-			grab_crit(gv_cur_region);
+			grab_crit(gv_cur_region, WS_69);
 			lcl_pid = cnl->trunc_pid;
 			if (lcl_pid && is_proc_alive(lcl_pid, 0))
 			{
@@ -444,7 +444,7 @@ void mupip_reorg(void)
 			rel_crit(gv_cur_region);
 			if (!mu_truncate(truncate_percent, &keep_mval))
 				mupip_exit(ERR_MUTRUNCFAIL);
-			grab_crit(gv_cur_region);
+			grab_crit(gv_cur_region, WS_70);
 			assert(cnl->trunc_pid == process_id);
 			cnl->trunc_pid = 0;
 			rel_crit(gv_cur_region);
