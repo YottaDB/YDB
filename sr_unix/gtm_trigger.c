@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -125,6 +125,7 @@ LITREF	int			alphanumeric_table_len;
 STATICDEF int4			gtm_trigger_comp_prev_run_time;
 
 error_def(ERR_ASSERT);
+error_def(ERR_FILENOTFND);
 error_def(ERR_GTMASSERT);
 error_def(ERR_GTMASSERT2);
 error_def(ERR_GTMCHECK);
@@ -312,7 +313,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 				    + SIZEOF(EMBED_SOURCE_PARM)];
 	mstr		save_zsource;
 	int		rtnfd, rc, lenobjname, len, retry, save_errno;
-	char		*mident_suffix_p1, *mident_suffix_p2, *mident_suffix_top, *namesub1, *namesub2;
+	char		*error_desc, *mident_suffix_p1, *mident_suffix_p2, *mident_suffix_top, *namesub1, *namesub2;
 	char		*zcomp_parms_ptr, *zcomp_parms_top;
 	mval		zlfile, zcompprm;
 	DCL_THREADGBL_ACCESS;
@@ -368,9 +369,15 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	}
 	/* Write trigger execute string out to temporary file and compile it */
 	assert(MAX_XECUTE_LEN >= trigdsc->xecute_str.str.len);
+<<<<<<< HEAD
 	rc = SNPRINTF(rtnname_template, YDB_PATH_MAX, "%s/trgtmpXXXXXX", DEFAULT_GTM_TMP);
 	assert(0 < rc);					/* Note rc is return code aka length - we expect a non-zero length */
 	assert(YDB_PATH_MAX >= rc);
+=======
+	assert(GTM_PATH_MAX >= (TREF(gtm_tmpdir)).len + SIZEOF("/trgtmpXXXXXX" + 1));
+	rc = SNPRINTF(rtnname_template, GTM_PATH_MAX, "%.*s/trgtmpXXXXXX", (TREF(gtm_tmpdir)).len, (TREF(gtm_tmpdir)).addr);
+	assert(0 < rc);					/* Note rc is return code aka length - we expect a non-zero length */
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 	/* The mkstemp() routine is known to bogus-fail for no apparent reason at all especially on AIX 6.1. In the event
 	 * this shortcoming plagues other platforms as well, we add a low-cost retry wrapper.
 	 */
@@ -383,9 +390,9 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	if (-1 == rtnfd)
 	{
 		save_errno = errno;
-		assert(FALSE);
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("mkstemp()"), CALLFROM,
-			  ERR_TEXT, 2, RTS_ERROR_TEXT(rtnname), save_errno);
+		error_desc = STRERROR(save_errno);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_FILENOTFND, 2, RTS_ERROR_TEXT(rtnname), ERR_TEXT, 2,
+			LEN_AND_STR(error_desc));
 	}
 	assert(0 < rtnfd);	/* Verify file descriptor */
 #	ifdef GEN_TRIGCOMPFAIL_ERROR
@@ -394,7 +401,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		if (0 != rc)
 		{
 			UNLINK(rtnname);
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 		}
 	}
 #	endif
@@ -402,7 +409,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	if (0 != rc)
 	{
 		UNLINK(rtnname);
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 	}
 	if (NULL == memchr(trigdsc->xecute_str.str.addr, '\n', trigdsc->xecute_str.str.len))
 	{
@@ -410,14 +417,14 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		if (0 != rc)
 		{
 			UNLINK(rtnname);
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 		}
 	}
 	CLOSEFILE(rtnfd, rc);
 	if (0 != rc)
 	{
 		UNLINK(rtnname);
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, rc);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, rc);
 	}
 	assert(MAX_MIDENT_LEN > trigdsc->rtn_desc.rt_name.len);
 	zcomp_parms_ptr = zcomp_parms;
@@ -456,11 +463,11 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("TRIGCOMPFAIL"), TREF(dollar_zcstatus)));
 		if (-1 == UNLINK(objname))	/* Delete the object file first since rtnname is the unique key */
-			DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
+			DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(11) ERR_SYSCALL, 5,
 						RTS_ERROR_LITERAL("unlink(objname)"), CALLFROM,
 						ERR_TEXT, 2, LEN_AND_STR(objname), errno));
 		if (-1 == UNLINK(rtnname))	/* Delete the source file */
-			DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
+			DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(11) ERR_SYSCALL, 5,
 						RTS_ERROR_LITERAL("unlink(rtnname)"), CALLFROM,
 						ERR_TEXT, 2, LEN_AND_STR(rtnname), errno));
 		return ERR_TRIGCOMPFAIL;
@@ -502,11 +509,11 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		assert(FALSE); 	/* This mv_stent should be the one we just pushed */
 	/* Remove temporary files created */
 	if (-1 == UNLINK(objname))	/* Delete the object file first since rtnname is the unique key */
-		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
+		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(11) ERR_SYSCALL, 5,
 					RTS_ERROR_LITERAL("unlink(objname)"), CALLFROM,
 					ERR_TEXT, 2, LEN_AND_STR(objname), errno));
 	if (-1 == UNLINK(rtnname))	/* Delete the source file */
-		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
+		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(11) ERR_SYSCALL, 5,
 					RTS_ERROR_LITERAL("unlink(rtnname)"), CALLFROM,
 					ERR_TEXT, 2, LEN_AND_STR(rtnname), errno));
 	run_time = gtm_trigger_comp_prev_run_time;

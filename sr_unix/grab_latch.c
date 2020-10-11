@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2018 Fidelity National Information	*
+ * Copyright (c) 2014-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -39,7 +39,7 @@ GBLREF	volatile int4	fast_lock_count;		/* Stop interrupts while we have our part
  * originally intended to protect verify_queue which only runs in debug
  * but adopted by some auto-relink code - not clear that's appropriate
  */
-boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs)
+boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs, wait_state state, sgmnt_addrs *csa)
 {
 	ABS_TIME	cur_time, end_time, remain_time;
 	int		maxspins, retries, spins;
@@ -65,6 +65,7 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs)
 	}
 	/* Define number of hard-spins the inner loop does */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
+	UPDATE_PROC_WAIT_STATE(csa, state, 1);
 	for (retries = 1; ; retries++)
 	{
 		++fast_lock_count;	/* Disable interrupts (i.e. wcs_stale) for duration to avoid potential deadlocks */
@@ -75,6 +76,7 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs)
 			{
 				--fast_lock_count;
 				assert(0 <= fast_lock_count);
+				UPDATE_PROC_WAIT_STATE(csa, state, -1);
 				return TRUE;
 			}
 		}
@@ -93,6 +95,7 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs)
 			SLEEP_FOR_LATCH(latch, retries);
 		}
 	}
+	UPDATE_PROC_WAIT_STATE(csa, state, -1);
 	assert(0 <= fast_lock_count);
 	assert(FALSE);
 	return FALSE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2019 Fidelity National Information	*
+ * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -161,7 +161,7 @@ int wcs_wtstart_fini(gd_region *reg, int nbuffs, cache_rec_ptr_t cr2flush)
 		prewtfinifreedlevel = cnl->wcs_buffs_freed; /* get a base line to see if wtfini is making progress */
 		was_crit = csa->now_crit;
 		if (!was_crit)
-			grab_crit(reg);
+			grab_crit(reg, WS_27);
 		/* Reap our i/os (and maybe some others).
 		 * If we tried to flush, were unable to, and there is something on the wip queue: a process with an outstanding
 		 * i/o may have died and is blocking our ability to initiate i/os; ask wcs_wtfini() to see if all of the processes

@@ -170,7 +170,7 @@ MBSTART {										\
 	}										\
 	if (SEM_INCREMENTED)								\
 	{										\
-		do_semop(udi->semid, DB_CONTROL_SEM, -1, IPC_NOWAIT | SEM_UNDO);	\
+		do_semop(UDI->semid, DB_CONTROL_SEM, -1, IPC_NOWAIT | SEM_UNDO);	\
 		SEM_INCREMENTED = FALSE;						\
 	}										\
 	if (SEM_CREATED)								\
@@ -1359,7 +1359,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				}
 				if (NULL != jpc)
 				{	/* this swaplock should probably be a mutex */
-					grab_crit(gv_cur_region);
+					grab_crit(gv_cur_region, WS_87);
 					/* If we own it or owner died, clear the fsync lock */
 					if (process_id == jpc->jnl_buff->fsync_in_prog_latch.u.parts.latch_pid)
 					{

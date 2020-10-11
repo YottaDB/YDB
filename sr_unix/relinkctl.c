@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2018 Fidelity National Information	*
+ * Copyright (c) 2014-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -1132,14 +1132,14 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 					/* Check that ALL reference counts are zero */
 					for (linkrec = linkctl->rec_base, linktop = &linkrec[hdr->n_records];
 						linkrec < linktop; linkrec++)
-					{
-						assert(grab_latch(&linkrec->rtnobj_latch, 0));	/* 0 => do not wait for latch */
+					{ 	/* 0 => do not wait for latch */
+						assert(grab_latch(&linkrec->rtnobj_latch, 0, NOT_APPLICABLE, NULL));
 						DEBUG_ONLY(rtnobj_shm_offset = linkrec->rtnobj_shm_offset;)
 						assert(NULL_RTNOBJ_SM_OFF_T == rtnobj_shm_offset);
 						assert(0 == linkrec->objLen);
 						assert(0 == linkrec->usedLen);
 					}
-					grab_latch(&shm_hdr->relinkctl_latch, 0);	/* 0 => do not wait for latch */
+					grab_latch(&shm_hdr->relinkctl_latch, 0, NOT_APPLICABLE, NULL);	/*0=> don't wait for latch*/
 				}
 				/* No need to release latch as we will be deleting the shared memory anyways */
 #				endif

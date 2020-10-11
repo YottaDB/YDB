@@ -56,7 +56,7 @@ error_def(ERR_CRITRESET);
 error_def(ERR_DBCCERR);
 error_def(ERR_DBFLCORRP);
 
-void	grab_crit(gd_region *reg)
+void	grab_crit(gd_region *reg, wait_state state)
 {
 	unix_db_info		*udi;
 	sgmnt_addrs		*csa;
@@ -118,7 +118,7 @@ void	grab_crit(gd_region *reg)
 		TREF(grabbing_crit) = reg;
 		DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 		mutex_spin_parms = (mutex_spin_parms_ptr_t)&csd->mutex_spin_parms;
-		status = gtm_mutex_lock(reg, mutex_spin_parms, crash_count, MUTEX_LOCK_WRITE);
+		status = gtm_mutex_lock(reg, mutex_spin_parms, crash_count, MUTEX_LOCK_WRITE, state);
 		assert((NULL == local_jnlpool) || (local_jnlpool == jnlpool));
 #		ifdef DEBUG
 		if (ydb_white_box_test_case_enabled

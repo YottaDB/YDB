@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -47,7 +47,7 @@ static inline boolean_t WCS_GET_SPACE(gd_region *reg, int needed, cache_rec_ptr_
 	{
 		was_latch = FREEZE_LATCH_HELD(csa);
 		if (!was_latch)
-			grab_latch(&csa->nl->freeze_latch, GRAB_LATCH_INDEFINITE_WAIT);
+			grab_latch(&csa->nl->freeze_latch, GRAB_LATCH_INDEFINITE_WAIT, WS_21, csa);
 		wc_in_free_copy = csa->nl->wc_in_free;
 		if (!was_latch)
 			rel_latch(&csa->nl->freeze_latch);

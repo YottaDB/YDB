@@ -170,15 +170,15 @@ bool	mubfilcpy (backup_reg_list *list)
 	file->addr[file->len] = '\0';
 	header_cpy = list->backup_hdr;
 	hdrsize = (int4)ROUND_UP(SIZEOF_FILE_HDR(header_cpy), DISK_BLOCK_SIZE);
-#	ifdef DEBUG
-	if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND)
-		&& !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT") && !cs_addrs->nl->wbox_test_seq_num)
-	{
-		printf ("reached here\n");
-		cs_addrs->nl->wbox_test_seq_num = 1;
-		while (1 == cs_addrs->nl->wbox_test_seq_num)
-			SHORT_SLEEP(1);	/* wait for signal from gdsfilext that mupip backup can continue */
-	}
+#	ifdef DEBUG /* This code is shared by two WB tests */
+	if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) ||
+		(WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == gtm_white_box_test_case_count)))
+		if (!MEMCMP_LIT(gv_cur_region->rname, "DEFAULT") && !cs_addrs->nl->wbox_test_seq_num)
+		{
+			cs_addrs->nl->wbox_test_seq_num = 1;
+			while (1 == cs_addrs->nl->wbox_test_seq_num)
+				SHORT_SLEEP(1);	/* wait for signal from gdsfilext that mupip backup can continue */
+		}
 #	endif
 	/* the temporary file should be located in the destination directory */
 	ptr = file->addr + file->len - 1;
@@ -438,7 +438,7 @@ bool	mubfilcpy (backup_reg_list *list)
 		 * backup.
 		 */
 		assert(!cs_addrs->hold_onto_crit);	/* this ensures we can safely do unconditional grab_crit and rel_crit */
-		grab_crit(gv_cur_region);
+		grab_crit(gv_cur_region, WS_89);
 		assert(cs_data == cs_addrs->hdr);
 		if (dba_bg == cs_data->acc_meth)
 		{	/* Now that we have crit, wait for any pending phase2 updates to finish. Since phase2 updates happen

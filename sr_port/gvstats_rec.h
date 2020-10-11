@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2008-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +33,17 @@ typedef struct gvstats_rec_struct
 #define	TAB_GVSTATS_REC(A,B,C)	gtm_uint64_t	A;
 #include "tab_gvstats_rec.h"
 } gvstats_rec_t;
+#undef TAB_GVSTATS_REC
+
+typedef struct gvstats_rec_csd_struct
+{
+#define	TAB_GVSTATS_REC(A,B,C)	gtm_uint64_t	A;
+/* Uncomment define below to not store a group of statistics in the fileheader.  See tab_gvstats_rec.h for details.  This
+ * allows us the ability to generate a shorter "stored statistics" structure from the same code when header space is tight */
+/*#define IS_CSD_STATS 1*/
+#include "tab_gvstats_rec.h"
+} gvstats_rec_csd_t;
+#undef IS_CSD_STATS
 #undef TAB_GVSTATS_REC
 
 #endif

@@ -80,9 +80,9 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 		/* This assumes that mutex_spin_parms_t is located immediately after the crit structures */
 		/* As of 10/07/98, crashcnt field in mutex_struct is not changed by any function for the dummy  region */
 		if (is_blocking_wait)
-			status = gtm_mutex_lock(reg, mutex_spin_parms, 0, MUTEX_LOCK_WRITE);
+			status = gtm_mutex_lock(reg, mutex_spin_parms, 0, MUTEX_LOCK_WRITE, NOT_APPLICABLE);
 		else
-			status = gtm_mutex_lock(reg, mutex_spin_parms, 0, MUTEX_LOCK_WRITE_IMMEDIATE);
+			status = gtm_mutex_lock(reg, mutex_spin_parms, 0, MUTEX_LOCK_WRITE_IMMEDIATE, NOT_APPLICABLE);
 		DEBUG_ONLY(locknl = NULL);	/* restore "locknl" to default value */
 		if (status != cdb_sc_normal)
 		{

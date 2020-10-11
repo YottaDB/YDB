@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> e9a1c121 (GT.M V6.3-014)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,9 +43,10 @@ int omi_prc_lock(omi_conn *cptr, char *xend, char *buff, char *bend)
     GBLREF mlk_pvtblk	*mlk_pvt_root;
 
     char		*bptr;
-    omi_li		 li;
-    int			 rv;
-    omi_si		 si;
+    gtm_uint64_t	wake_cnt;
+    int			rv;
+    omi_li		li;
+    omi_si		si;
     mlk_pvtblk		*next, **prior;
     DCL_THREADGBL_ACCESS;
 
@@ -90,12 +96,12 @@ int omi_prc_lock(omi_conn *cptr, char *xend, char *buff, char *bend)
     }
 
     mlk_pvt_root->trans = 0;
-    if (!(rv = mlk_lock(mlk_pvt_root, (UINTPTR_T)cptr, FALSE)))
+    if (!(wake_cnt = mlk_lock(mlk_pvt_root, (UINTPTR_T)cptr, FALSE)))
     {	    /* Lock succeeded; inform the client */
 	mlk_pvt_root->granted = TRUE;
 	mlk_pvt_root->level++;
     }
-    rv = !rv;
+    rv = !wake_cnt;
 
     if (!mlk_pvt_root->nodptr || mlk_pvt_root->nodptr->owner != omi_pid)
     {

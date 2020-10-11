@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -323,7 +323,7 @@ boolean_t wcs_flu(uint4 options)
 	if (!(was_crit = csa->now_crit))	/* Caution: assignment */
 	{
 		DO_JNL_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jpc->jnl_buff);
-		grab_crit_encr_cycle_sync(reg);
+		grab_crit_encr_cycle_sync(reg, WS_24);
 		/* If it is safe to invoke "wcs_recover" (indicated by the in_commit variable being 0), do that right away
 		 * to fix any dead phase2 commits if needed.
 		 */

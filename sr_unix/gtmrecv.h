@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2019 Fidelity National Information	*
+ * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
@@ -91,7 +91,7 @@ enum
 #define RECVPOOL_SEGMENT		'R'
 #define DEFAULT_RECVPOOL_SIZE		(2 << 25)		/* 64MiB */
 #define MIN_RECVPOOL_SIZE		(2 << 19)		/* 1MiB */
-#define MAX_RECVPOOL_SIZE		(0xffffffffll)		/* 4GiB - 1*/
+#define MAX_RECVPOOL_SIZE		(0x1000000000LL)	/* 64GB */
 
 #define GTMRECV_MIN_TCP_SEND_BUFSIZE	(512)		/* anything less than this, issue a warning */
 #define GTMRECV_TCP_SEND_BUFSIZE	(1024)		/* not much outbound traffic, we can live with a low limit */
@@ -119,11 +119,11 @@ typedef struct
 			    	 		 * server. Updated by Receiver Server */
 	seq_num			old_jnl_seqno;	/* Stores the value of jnl_seqno before it is set to 0 when upd crash/shut */
 	repl_conn_info_t	this_side;	/* Replication connection details of this side/instance */
-	uint4			recvdata_base_off; 	/* Receive pool offset from where journal data starts */
-	uint4			recvpool_size; 	/* Available space for journal data in bytes */
-	volatile uint4 		write;		/* Relative offset from recvdata_base_off for for the next journal record to be
+	gtm_uint64_t		recvdata_base_off; 	/* Receive pool offset from where journal data starts */
+	gtm_uint64_t		recvpool_size; 	/* Available space for journal data in bytes */
+	volatile gtm_uint64_t	write;		/* Relative offset from recvdata_base_off for for the next journal record to be
 						 * written. Updated by Receiver Server */
-	volatile uint4		write_wrap;	/* Relative offset from recvdata_base_off where write was wrapped by recvr srvr */
+	volatile gtm_uint64_t	write_wrap;	/* Relative offset from recvdata_base_off where write was wrapped by recvr srvr */
 	volatile uint4		wrapped;	/* Boolean, set by Receiver Server when it wraps. Reset by Update Process when it
 						 * wraps. Used for detecting space used in the receive pool */
 	uint4			initialized;	/* Boolean, has receive pool been initialized? */
@@ -191,7 +191,7 @@ typedef struct
 	uint4		upd_proc_pid;		/* Process identification of update server */
 	uint4		upd_proc_pid_prev;      /* Save for reporting old pid if we fail */
 	volatile seq_num read_jnl_seqno;	/* Next jnl_seqno to be read; keep aligned at 8 byte boundary for performance */
-	volatile uint4	read; 			/* Relative offset from recvdata_base_off of the next journal record to be
+	volatile gtm_uint64_t	read; 		/* Relative offset from recvdata_base_off of the next journal record to be
 						 * read from the receive pool */
 	volatile uint4	upd_proc_shutdown;      /* Used to communicate shutdown related values between Receiver and Update */
 	volatile int4	upd_proc_shutdown_time; /* Time allowed for update process to shut down */
@@ -355,7 +355,7 @@ typedef struct
 	boolean_t	updateonly;
 	boolean_t	stopsourcefilter;
 	boolean_t	changelog;
-	uint4		buffsize;
+	gtm_uint64_t	buffsize;
 	int4		shutdown_time;
 	int4		listen_port;
 	boolean_t	updateresync;

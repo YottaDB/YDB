@@ -43,7 +43,13 @@ echo "arguments: '$1' '$2' '$3' '$4'"
 echo ""
 
 source $gtm_tools/gtm_env.csh
-setenv gtm_curpro `source $gtm_tools/versions.csh ; echo $gtm_curpro`
+if (! $?gtm_curpro) then
+	# The tools and test system relies on $gtm_curpro defined in the environment for greater flexibility
+	# Some day we need to eliminate versions.csh and expect $gtm_curpro to be defined in the environment.
+	# setenv gtm_curpro `source $gtm_tools/versions.csh ; echo $gtm_curpro`
+	echo 'COMLIST-E-CURPRO: gtm_curpro not defined. comlist expects gtm_curpro to be defined and exist in $gtm_root'
+	exit 1
+endif
 echo "-------------------------"
 echo "locale output at start"
 echo "-------------------------"

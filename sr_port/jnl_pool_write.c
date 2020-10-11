@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2017 Fidelity National Information	*
+ * Copyright (c) 2007-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -53,14 +53,19 @@ void	jnl_pool_write(sgmnt_addrs *csa, enum jnl_record_type rectype, jnl_record *
 {
 	boolean_t		pool_overflow;
 	int			max_iters, num_iters, num_participants;
-	uint4			dstlen, rlen;
-	uint4			jnlpool_size, tot_jrec_len;
+	gtm_uint64_t		dstlen, rlen;
+	gtm_uint64_t		jnlpool_size, tot_jrec_len;
 	uchar_ptr_t		jnlrecptr;
 	jnlpool_addrs_ptr_t	local_jnlpool;
 	jnlpool_ctl_ptr_t	jctl;
 	jpl_rsrv_struct_t	*jrs;
+<<<<<<< HEAD
 	uint4			write, write_total;
 	qw_off_t		cur_write_addr;
+=======
+	gtm_uint64_t		write, write_total;
+	qw_off_t		cur_write_addr, end_write_addr;
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 	gtm_int64_t		wait_write_addr;	/* needed signed because of subtraction happening below */
 
 	assert(is_replicator);

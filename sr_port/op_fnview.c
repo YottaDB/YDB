@@ -465,7 +465,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			if (NULL != csa->hdr)
 			{
 				if (VTK_GRABCRIT == vtp->keycode)
-					grab_crit(reg);
+					grab_crit(reg, WS_76);
 				else if (VTK_RELCRIT == vtp->keycode)
 					rel_crit(reg);
 				else if (VTK_GRABLOCK == vtp->keycode)
@@ -479,14 +479,16 @@ void	op_fnview(int numarg, mval *dst, ...)
 					if (jnlpool)
 						rel_lock(jnlpool->jnlpool_dummy_reg);
 				} else if (VTK_GRABJNLPH2 == vtp->keycode)
-					grab_latch(&csa->jnl->jnl_buff->phase2_commit_latch, GRAB_LATCH_INDEFINITE_WAIT);
+					grab_latch(&csa->jnl->jnl_buff->phase2_commit_latch, GRAB_LATCH_INDEFINITE_WAIT,
+						WS_30, csa);
 				else if (VTK_RELJNLPH2 == vtp->keycode)
 					rel_latch(&csa->jnl->jnl_buff->phase2_commit_latch);
 				else if (VTK_GRABJNLPOOLPH2 == vtp->keycode)
 				{
 					assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl));
 					if (jnlpool && jnlpool->jnlpool_ctl)
-						grab_latch(&jnlpool->jnlpool_ctl->phase2_commit_latch, GRAB_LATCH_INDEFINITE_WAIT);
+						grab_latch(&jnlpool->jnlpool_ctl->phase2_commit_latch, GRAB_LATCH_INDEFINITE_WAIT,
+							WS_31, csa);
 				} else if (VTK_RELJNLPOOLPH2 == vtp->keycode)
 				{
 					assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl));
@@ -516,7 +518,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			if (NULL != csa->hdr)
 			{
 				csa->crit_probe = TRUE;
-				grab_crit(reg);
+				grab_crit(reg, WS_77);
 				csa->crit_probe = FALSE;
 				if (!WBTEST_ENABLED(WBTEST_HOLD_CRIT_ENABLED))
 					rel_crit(reg);

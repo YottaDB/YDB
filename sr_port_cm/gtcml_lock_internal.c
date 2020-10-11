@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> e9a1c121 (GT.M V6.3-014)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,8 +35,9 @@ GBLDEF unsigned short		cm_cmd_lk_ct;
 
 char gtcml_lock_internal(cm_region_list *reg, unsigned char action)
 {
+	gtm_uint64_t	wakeup;
 	mlk_pvtblk	*x, *y;
-	unsigned int	wakeup, status;
+	uint		status;
 	unsigned short	locks_done, locks_bckout;
 
 	ASSERT_IS_LIBGNPSERVER;
@@ -53,7 +59,7 @@ char gtcml_lock_internal(cm_region_list *reg, unsigned char action)
 					x->zalloc = TRUE;
 					break;
 				default:
-					GTMASSERT;
+					assertpro(FALSE && action);
 			}
 			x->granted = TRUE;
 		} else

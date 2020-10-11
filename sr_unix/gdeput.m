@@ -166,12 +166,14 @@ gblstatmap:
 
 BLKSIZ(regnm)
 	; Calculate minimum block size for ^%YGS(regnm)
+	; Note that this function is always called with regnm set to a string of 32 'x' chars
 	new bhdsz,helpgld,maxksz,maxkpad,maxpid,minksz,minkpad,minreq,rhdsz,statsz,tmp
+	; The key thing here is that the AIX max has one more digit than the Linux max
 	set tmp=$piece($zversion," ",3),maxpid=$select("AIX"=tmp:2**26-2,"Linux"=tmp:2**22-1,1:2**16)
 	set maxksz=$zlength($zcollate("%YGS("""_regnm_""","""_maxpid_""")",0))	; max key size for statistics record
 	set minksz=$zlength($zcollate("%YGS("""_regnm_""",1)",0))		; min key size for statistics record
-	set maxkpad=maxksz#8,maxkpad=$select(tmp:8-tmp,1:0)			; padding to align statistics of largest record
-	set minkpad=minksz#8,minkpad=$select(tmp:8-tmp,1:0)			; padding to align statistics of smallest record
+	set maxkpad=maxksz#8,maxkpad=$select(maxkpad:8-maxkpad,1:0)		; padding to align statistics of largest record
+	set minkpad=minksz#8,minkpad=$select(minkpad:8-minkpad,1:0)		; padding to align statistics of smallest record
 	set tmp=maxksz+maxkpad set:minksz+minkpad>tmp tmp=minksz+minkpad
 	set minreq=SIZEOF("blk_hdr")+SIZEOF("rec_hdr")+tmp+SIZEOF("gvstats")
 	quit $select(minreq#512:minreq\512+1*512,1:minreq)			; actual block size must round up to multiple of 512

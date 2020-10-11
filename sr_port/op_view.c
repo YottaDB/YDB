@@ -763,7 +763,7 @@ void	op_view(int numarg, mval *keyword, ...)
 			if (ydb_white_box_test_case_enabled
 				&& (WBTEST_HOLD_CRIT_TILL_LCKALERT == ydb_white_box_test_case_number))
 			{	/* Hold crit for a long enough interval to generate lock alert which then does a continue_proc */
-				grab_crit(gv_cur_region);
+				grab_crit(gv_cur_region, WS_78);
 				icnt = TREF(continue_proc_cnt);
 				DBGGSSHR((LOGFLAGS, "op_view: Pid %d, initial icnt: %d\n", process_id, icnt));
 				for (lcnt = 0; (MUTEXLCKALERT_INTERVAL * 12) > lcnt; lcnt++)
@@ -1060,7 +1060,7 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 					{
 						was_crit = csa->now_crit;
 						if (!was_crit)
-							grab_crit(reg);
+							grab_crit(reg, NOT_APPLICABLE);
 						if (JNL_ENABLED(csd))
 							csa->jnl->error_reported = FALSE;
 						if (!was_crit)
@@ -1076,7 +1076,7 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 					JNLPOOL_INIT_IF_NEEDED(cs_addrs, cs_data, cs_addrs->nl, SCNDDBNOUPD_CHECK_FALSE);
 					was_crit = csa->now_crit;
 					if (!was_crit)
-						grab_crit(reg);
+						grab_crit(reg, WS_32);
 					if (JNL_ENABLED(csd))
 					{
 						jnl_status = jnl_ensure_open(reg, csa);

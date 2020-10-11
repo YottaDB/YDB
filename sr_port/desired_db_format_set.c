@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2019 Fidelity National Information	*
+ * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,7 +92,7 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 	}
 	was_crit = csa->now_crit;
 	if (FALSE == was_crit)
-		grab_crit(reg);
+		grab_crit(reg, WS_1);
 	/* if MM and desired_db_format is not V5, gvcst_init would have issued MMNODYNDWNGRD error. assert that. */
 	assert((dba_bg == csd->acc_meth) || ((dba_mm == csd->acc_meth) && (GDSV6 == csd->desired_db_format)));
 	if (csd->desired_db_format == new_db_format)

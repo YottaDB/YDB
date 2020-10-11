@@ -367,7 +367,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			 * the cycles while holding crit (hopefully rare case so it is okay to hold crit for a heavyweight call).
 			 */
 			if (!was_crit)
-				grab_crit(gv_cur_region);
+				grab_crit(gv_cur_region, WS_14);
 			/* Now that we have crit, sync them up by copying the new keys inside crit and opening the key handles
 			 * outside crit (a potentially long running operation).
 			 */
@@ -439,7 +439,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				 * above. But in case a MUPIP REORG ENCRYPT concurrently sneaked in between these lines we
 				 * need to resync.
 				 */
-				sync_needed = grab_crit_encr_cycle_sync(gv_cur_region);
+				sync_needed = grab_crit_encr_cycle_sync(gv_cur_region, WS_15);
 				assert(NULL == reorg_encrypt_restart_csa);
 				assert(!sync_needed || (NULL != encr_ptr));
 				if (sync_needed && IS_NOT_SAFE_TO_SYNC_NEW_KEYS(dollar_tlevel, update_trans))
@@ -694,7 +694,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							if (!was_crit)
 							{
 								assert(!hold_onto_crit);
-								grab_crit_encr_cycle_sync(gv_cur_region);
+								grab_crit_encr_cycle_sync(gv_cur_region, WS_16);
 								if (blocking_pid == cr->in_tend)
 								{
 									wcs_recover(gv_cur_region);
@@ -733,7 +733,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				if (!csa->now_crit)
 				{
 					assert(!hold_onto_crit);
-					grab_crit_encr_cycle_sync(gv_cur_region);
+					grab_crit_encr_cycle_sync(gv_cur_region, WS_17);
 				}
 				if (cr->read_in_progress < -1)
 				{	/* outside of design; clear to known state */
@@ -825,7 +825,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		 */
 		assertpro((BAD_LUCK_ABOUNDS - was_crit) >= ocnt);
 		if (!csa->now_crit && !hold_onto_crit)
-			grab_crit_encr_cycle_sync(gv_cur_region);
+			grab_crit_encr_cycle_sync(gv_cur_region, WS_18);
 	} while (TRUE);
 	assert(set_wc_blocked && (cnl->wc_blocked || !csa->now_crit));
 	SET_CACHE_FAIL_STATUS(rdfail_detail, csd);

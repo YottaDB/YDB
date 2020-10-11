@@ -1226,7 +1226,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		}
 	}
 	RESET_CR_IN_TEND_AFTER_PHASE2_COMMIT(cr, csa, csd); /* resets cr->in_tend & cr->in_cw_set (for older twin too if needed) */
-	VERIFY_QUEUE_LOCK(&cache_state->cacheq_active, &cnl->db_latch);
+	VERIFY_QUEUE_LOCK(&cache_state->cacheq_active, &cnl->db_latch, csa);
 	cs->old_mode = -cs->old_mode;	/* negate it back to indicate phase2 is complete for this cse (used by secshr_db_clnup) */
 	assert(0 < cs->old_mode);
 	return cdb_sc_normal;

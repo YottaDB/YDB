@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2008-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,14 +21,22 @@
 #include "gdsfhead.h"
 #include "gvstats_rec.h"
 
+/* Copy header stats to shared or private */
 void	gvstats_rec_csd2cnl(sgmnt_addrs *csa)
 {
-	memcpy(&csa->nl->gvstats_rec, &csa->hdr->gvstats_rec, SIZEOF(gvstats_rec_t));
+	memcpy(&csa->nl->gvstats_rec, &csa->hdr->gvstats_rec, SIZEOF(gvstats_rec_csd_t));
 }
 
+/* Copy shared or private back to header stats.  Note that we do not copy ("save") the WS stats */
 void	gvstats_rec_cnl2csd(sgmnt_addrs *csa)
 {
-	memcpy(&csa->hdr->gvstats_rec, &csa->nl->gvstats_rec, SIZEOF(gvstats_rec_t));
+	size_t ws_stats_size;
+
+	ws_stats_size = ((char *) &(csa->nl->gvstats_rec.WS_STATS_END) - (char *) &(csa->nl->gvstats_rec.WS_STATS_BEGIN))
+		+ SIZEOF(gtm_uint64_t);
+
+	/* This assumes no savable stats after the WS_* stats.  Address that here if this changes */
+	memcpy(&csa->hdr->gvstats_rec, &csa->nl->gvstats_rec, SIZEOF(gvstats_rec_csd_t) - ws_stats_size);
 }
 
 void	gvstats_rec_upgrade(sgmnt_addrs *csa)

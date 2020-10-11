@@ -204,7 +204,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			exit_status |= EXIT_RDONLY;
 			continue;
 		}
-		grab_crit(gv_cur_region);  /* corresponding rel_crit() is done in mupip_set_jnl_cleanup() */
+		grab_crit(gv_cur_region, WS_71);  /* corresponding rel_crit() is done in mupip_set_jnl_cleanup() */
 		if (FROZEN_CHILLED(cs_addrs))
 		{	/* While a FREEZE -ONLINE was in place, all processes exited, leaving the
 			 * shared memory up.

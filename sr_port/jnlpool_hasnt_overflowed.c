@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,7 @@
 #endif
 #include "gtmsource.h"
 
-boolean_t jnlpool_hasnt_overflowed(jnlpool_ctl_ptr_t jctl, uint4 jnlpool_size, qw_num read_addr)
+boolean_t jnlpool_hasnt_overflowed(jnlpool_ctl_ptr_t jctl, gtm_uint64_t jnlpool_size, qw_num read_addr)
 { /* the advantage of passing the three arguments is they are likely (on most platforms) to be scratch registers that can also
    * be used for computation. Also, besides all callers would have already loaded jctl and jnlpool_size */
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -182,7 +182,7 @@ tp_region	*insert_region(	gd_region	*reg,
 		 * 	tp_restart() (invoked through t_retry from gvcst_init) will open "reg" as well as get crit on it for us.
 		 */
 		DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE;)
-		t_retry_needed = (FALSE == grab_crit_immediate(reg, OK_FOR_WCS_RECOVER_TRUE));	/* Attempt lockdown now */
+		t_retry_needed = (FALSE == grab_crit_immediate(reg, OK_FOR_WCS_RECOVER_TRUE, NOT_APPLICABLE)); /*Try lockdown now */
 		if (!t_retry_needed)
 		{	/* The "grab_crit_immediate" returned successfully. Check if encryption cycles match.
 			 * If they dont, we need to do "grab_crit_encr_cycle_check" but that uses grab_crit and

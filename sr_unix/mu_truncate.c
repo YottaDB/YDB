@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -338,7 +338,7 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 	assert(!csa->now_crit);
 	for (;;)
 	{ /* wait for FREEZE, we don't want to truncate a frozen database */
-		grab_crit(gv_cur_region);
+		grab_crit(gv_cur_region, WS_88);
 		if (FROZEN_CHILLED(cs_addrs))
 			DO_CHILLED_AUTORELEASE(csa, cs_data);
 		if (!FROZEN(cs_data) && !IS_REPL_INST_FROZEN)

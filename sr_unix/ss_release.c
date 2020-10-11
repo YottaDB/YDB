@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2019 Fidelity National Information	*
+ * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -168,7 +168,7 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 		 * or a change in cnl->ss_shmid and cnl->ss_shmcycle in which case it will restart itself in t_end or tp_tend.
 		 */
 		if (!was_crit)
-			grab_crit(gv_cur_region);
+			grab_crit(gv_cur_region, WS_99);
 		assert(cs_data == cs_addrs->hdr);
 		if (dba_bg == cs_data->acc_meth)
 		{

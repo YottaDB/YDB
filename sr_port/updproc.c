@@ -1,5 +1,6 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
@@ -533,7 +534,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 {
 	mval			ts_mv, val_mv;
 	jnl_record		*rec;
-	uint4			temp_write, temp_read;
+	gtm_uint64_t		temp_write, temp_read;
 	enum jnl_record_type	rectype;
 	int4			upd_rec_seqno = 0; /* the total no of journal records excluding TCOM records */
 	int4			tupd_num; /* the number of tset/tkill/tzkill records encountered */
@@ -571,7 +572,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	jnl_private_control	*jpc;
 	gld_dbname_list		*curr;
 	gd_region		*save_reg, *dummy_reg;
-	uint4			write_wrap, cntr, last_nullsubs, last_subs, keyend;
+	uint4			cntr, last_nullsubs, last_subs, keyend;
+	gtm_uint64_t		write_wrap;
 #	ifdef GTM_TRIGGER
 	uint4			nodeflags;
 	boolean_t		primary_has_trigdef, secondary_has_trigdef;
@@ -870,7 +872,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					{
 						TP_CHANGE_REG(curr->gd);
 						assert(!gv_cur_region->read_only);
-						grab_crit(gv_cur_region);
+						grab_crit(gv_cur_region, WS_19);
 						if (cs_addrs->onln_rlbk_cycle != cs_addrs->nl->onln_rlbk_cycle)
 							UPDPROC_ONLN_RLBK_CLNUP(gv_cur_region); /* No return */
 						cs_data->strm_reg_seqno[histinfo.strm_index] = strm_seqno;
@@ -1261,7 +1263,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						upd_helper_ctl->first_done = FALSE;
 						upd_helper_ctl->pre_read_offset =
 							((temp_read + rec_len) >= write_wrap) ? 0 : temp_read + rec_len;
-						REPL_DPRINT2("pre_read_offset = %x\n", upd_helper_ctl->pre_read_offset);
+						REPL_DPRINT2("pre_read_offset = %lx\n", upd_helper_ctl->pre_read_offset);
 						csa->n_pre_read_trigger = (int)((csd->n_bts * (float)csd->reserved_for_upd /
 						csd->avg_blks_per_100gbl) * csd->pre_read_trigger_factor / 100.0);
 					} else

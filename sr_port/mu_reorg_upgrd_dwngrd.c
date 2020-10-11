@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2019 Fidelity National Information	*
+ * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -233,7 +233,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		}
 		assert(GDSVCURR == GDSV6); /* so we trip this assert in case GDSVCURR changes without a change to this module */
 		new_db_format = (upgrade ? GDSV6 : GDSV4);
-		grab_crit(reg);
+		grab_crit(reg, WS_8);
 		curr_tn = csd->trans_hist.curr_tn;
 		/* set the desired db format in the file header to the appropriate version, increment transaction number */
 		status1 = desired_db_format_set(reg, new_db_format, reorg_command);
@@ -336,7 +336,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			assert(!csa->now_crit);
 			bml_sm_buff = t_qread(curbmp, (sm_int_ptr_t)&cycle, &cr); /* bring block into the cache outside of crit */
 			reorg_stats.blks_read_from_disk_bmp++;
-			grab_crit_encr_cycle_sync(reg); /* needed so t_qread does not return NULL below */
+			grab_crit_encr_cycle_sync(reg, WS_64); /* needed so t_qread does not return NULL below */
 			if (mu_reorg_upgrd_dwngrd_start_tn != csd->desired_db_format_tn)
 			{	/* csd->desired_db_format changed since reorg started. discontinue the reorg */
 				/* see later comment on "csd->reorg_upgrd_dwngrd_restart_block" for why the assignment
@@ -649,7 +649,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		}
 	stop_reorg_on_this_reg:
 		/* even though ctrl-c occurred, update file-header fields to store reorg's progress before exiting */
-		grab_crit(reg);
+		grab_crit(reg, WS_9);
 		blocks_left = 0;
 		assert(csd->trans_hist.total_blks >= csd->blks_to_upgrd);
 		actual_blks2upgrd = csd->blks_to_upgrd;

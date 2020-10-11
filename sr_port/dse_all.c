@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -184,14 +184,14 @@ void dse_all(void)
 			if (seize)
 			{
 				if (!was_crit)	/* No point seizing crit if WE already have it held */
-					grab_crit_encr_cycle_sync(gv_cur_region);
+					grab_crit_encr_cycle_sync(gv_cur_region, WS_56);
 				cs_addrs->hold_onto_crit = TRUE; /* Need to do this AFTER grab_crit */
 				cs_addrs->dse_crit_seize_done = TRUE;
 			}
 			if (wc)
 			{
 				if (!was_crit && !seize)
-					grab_crit_encr_cycle_sync(gv_cur_region);
+					grab_crit_encr_cycle_sync(gv_cur_region, WS_57);
 				DSE_WCREINIT(cs_addrs);
 				if (!was_crit && (!seize || release))
 					rel_crit(gv_cur_region);

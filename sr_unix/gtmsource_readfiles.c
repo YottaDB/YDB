@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2019 Fidelity National Information	*
+ * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -570,9 +570,9 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 	} else
 	{
 		REPL_DPRINT2("Update EOF : New EOF addr will be found from jnl file hdr for %s\n", ctl->jnl_fn);
-		REPL_DPRINT4("Update EOF : FC ID IS %u %d %u\n", fc->id.inode, fc->id.device, fc->id.st_gen);
-		REPL_DPRINT4("Update EOF : csa->nl->jnl_file.u (unreliable) is %u %d %u\n", csa->nl->jnl_file.u.inode,
-			     csa->nl->jnl_file.u.device,  csa->nl->jnl_file.u.st_gen);
+		REPL_DPRINT3("Update EOF : FC ID IS %u %d\n", fc->id.inode, fc->id.device);
+		REPL_DPRINT3("Update EOF : csa->nl->jnl_file.u (unreliable) is %u %d\n", csa->nl->jnl_file.u.inode,
+			     csa->nl->jnl_file.u.device);
 		if (!ctl->eof_addr_final)
 		{
 			F_READ_BLK_ALIGNED(fc->fd, 0, fc->jfh, ROUND_UP2(REAL_JNL_HDR_LEN, fc->fs_block_size), status);
@@ -1986,13 +1986,13 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 
 int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, boolean_t read_multiple)
 {
-	int4			read_size, read_state, first_tr_len, tot_tr_len, loopcnt;
+	size_t			read_size, read_state, first_tr_len, tot_tr_len, loopcnt;
 	unsigned char		*orig_msgp, seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
 	jnlpool_ctl_ptr_t	jctl;
 	gtmsource_local_ptr_t	gtmsource_local;
 	seq_num			read_jnl_seqno, max_read_seqno;
 	qw_num			read_addr;
-	uint4			jnlpool_size;
+	gtm_uint64_t		jnlpool_size;
 	boolean_t		file2pool;
 	unsigned int		start_heartbeat;
 	boolean_t		stop_bunching;
@@ -2138,7 +2138,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 		if (jctl->write_addr < read_addr)
 			repl_phase2_cleanup(jnlpool);
 		assert(jctl->write_addr >= read_addr);
-		gtmsource_local->read = (uint4)(read_addr % jnlpool_size) ;
+		gtmsource_local->read = read_addr % jnlpool_size;
 		gtmsource_local->read_state = read_state = READ_POOL;
 	} else
 		read_state = gtmsource_local->read_state;
@@ -2235,7 +2235,7 @@ int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 		 */
 		assert(!csa->hold_onto_crit);
 		if (FALSE == (was_crit = csa->now_crit))
-			grab_crit(ctl->reg);
+			grab_crit(ctl->reg, WS_34);
 		if (csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle)
 		{
 			assert(process_id != jnlpool->gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);

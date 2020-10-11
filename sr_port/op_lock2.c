@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -328,6 +328,7 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 			{	/* if time expired || control-c, tptimeout, or jobinterrupt encountered */
 				if (outofband || !mlk_check_own(pvt_ptr1))
 				{	/* If CTL-C, check lock owner */
+					UPDATE_PROC_WAIT_STATE(pvt_ptr1->pvtctl.csa, WS_39, -1);
 					if (pvt_ptr1->nodptr)		/* Get off pending list to be sent a wake */
 						mlk_unpend(pvt_ptr1);
 					/* Cancel all remote locks obtained so far */
@@ -376,10 +377,15 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 			 * in mlk_shrblk_find. If mlk_lock is invoked for the second (or higher) time in op_lock2 for the
 			 * same lock resource, "mlk_shrblk_find" assumes a sleep has happened in between two locking attempts.
 			 */
+<<<<<<< HEAD
 			hiber_start_wait_any(sleep_msec);
 			sleep_msec = sleep_msec * 2;
 			if (LOCK_SELF_WAKE_MAX <= sleep_msec)
 				sleep_msec = LOCK_SELF_WAKE_START;
+=======
+			UPDATE_PROC_WAIT_STATE(pvt_ptr1->pvtctl.csa, WS_39, 1);
+			hiber_start_wait_any(LOCK_SELF_WAKE);
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 			/* Every reattempt at a blocking lock needs crit which could be a bottleneck. So minimize reattempts.
 			 * The "blk_sequence" check below serves that purpose. If the sequence number is different between
 			 * the shared and private copies, it means the lock state in shared memory has changed since last we
@@ -403,6 +409,7 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 			 */
 			if (!mlk_lock(pvt_ptr1, 0, FALSE))
 			{	/* If we got the lock, break out of timer loop */
+				UPDATE_PROC_WAIT_STATE(pvt_ptr1->pvtctl.csa, WS_39, -1);
 				blocked = FALSE;
 				if (MLK_FAIRNESS_DISABLED != TREF(mlk_yield_pid))
 					TREF(mlk_yield_pid) = 0; /* Allow yielding for the other locks */

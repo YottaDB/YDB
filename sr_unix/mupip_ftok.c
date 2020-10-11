@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -16,13 +16,15 @@
 #include "mdef.h"
 
 #include <errno.h>
+#include "gtm_ipc.h"
 #include "gtm_unistd.h"
 #include "gtm_fcntl.h" /* for O_RDONLY */
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
-
+#include "gtm_sizeof.h"
 #include "cli.h"
+#include "parse_file.h"
 #include "gtm_stat.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -47,34 +49,44 @@ error_def(ERR_MUNOACTION);
 error_def(ERR_TEXT);
 
 /*
- * This reads file header and prints the semaphore/shared memory id
- * This is different than ftok utility.
+ * By default. this reads file header and prints the semaphore/shared memory id
  * This is needed because GTM/MUPIP creates semaphore for database access control and
  * shared memory segment using IPC_CREATE flag. GTM saves that ids in database file header.
  * In case of a crash we may need to get those ids. Specially for debugging/testing this is very useful
- * Format is same as ftok output.
+ * Format is filename ftok::ftok for the -only case, bases 10 & 16 respectively,
+ * and described by the optional headers below for the others.
  */
-void mupip_ftok (void)
+void mupip_ftok(void)
 {
-	boolean_t	jnlpool, recvpool;
+	boolean_t	fd, jnlpool, only, recvpool, showheader;
+	char		fn[MAX_FN_LEN + 1], instfilename[MAX_FN_LEN + 1], replf[MAX_FN_LEN + 1];
+	gd_id		fid;
+	int		index, ispool, semid, shmid;
+	int4            id, status;
+	key_t           semkey;
+	mstr		file;
+	parse_blk	pblk;
+	repl_inst_hdr	repl_instance;
 	sgmnt_data	header;
-	int		semid, shmid;
+	sm_uc_ptr_t	fid_ptr, fid_top;
 	unsigned int	full_len;
 	unsigned short	fn_len; /* cli library expects unsigned short */
+<<<<<<< HEAD
 	char		fn[MAX_FN_LEN + 1];
 	repl_inst_hdr	repl_instance;
 	gd_id		fid;
 	sm_uc_ptr_t	fid_ptr, fid_top;
+=======
+	DCL_THREADGBL_ACCESS;
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 
-	fn_len = MAX_FN_LEN;
-	if (FALSE == cli_get_str("FILE", fn, &fn_len))
-	{
-		rts_error_csa(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
-		mupip_exit(ERR_MUPCLIERR);
-	}
-	fn[fn_len] = 0;
+	SETUP_THREADGBL_ACCESS;
+	if (FALSE == cli_get_int("ID", &id))
+		id = GTM_ID;
+	only = (CLI_PRESENT == cli_present("ONLY"));
 	jnlpool = (CLI_PRESENT == cli_present("JNLPOOL"));
 	recvpool = (CLI_PRESENT == cli_present("RECVPOOL"));
+<<<<<<< HEAD
 	if (jnlpool || recvpool)
 	{
 		in_mupip_ftok = TRUE;
@@ -84,26 +96,93 @@ void mupip_ftok (void)
 		{
 			semid = repl_instance.jnlpool_semid;
 			shmid = repl_instance.jnlpool_shmid;
+=======
+	ispool = jnlpool + recvpool;
+	if (ispool)						/* forget any parameters and use parms_cnt as loop control*/
+		TREF(parms_cnt) = ispool + 1;
+	showheader = (!cli_negated("HEADER"));
+	index = (only && ispool);				/* if only, skip the instance file  */
+	for (; index < TREF(parms_cnt); index++)
+	{	/*  in order to handle multiple files, this loop directly uses the array built by cli */
+		if (ispool)
+		{	/* ispool idicates we're precessing based on the replication instance file */
+			if (only == index)
+			{	/* first pass - process the instance file */
+				if (!repl_inst_get_name(instfilename, &full_len, SIZEOF(instfilename), issue_rts_error, NULL))
+					assertpro(NULL == instfilename);	/* otherwise, repl_inst_get_name issues rts_error */
+				in_mupip_ftok = TRUE;	/* this flag implicitly relies on mupip ftok being once and done */
+				repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
+				in_mupip_ftok = FALSE;	/* no condition hander to reset this in case of error - see comment above */
+				memset(&pblk, 0, SIZEOF(pblk));
+				pblk.buff_size = MAX_FN_LEN;
+				pblk.buffer = replf;
+				pblk.fop = F_SYNTAXO;
+				file.addr = instfilename;
+				file.len = full_len;
+				status = parse_file(&file, &pblk);	/* this gets us to just the name and extension */
+				fn_len = pblk.b_name + pblk.b_ext;
+				memcpy(fn, pblk.l_name, fn_len);
+				fn[fn_len] = 0;
+				semkey = FTOK(fn, REPLPOOL_ID);
+				semid = shmid = -1;			/* not relevant for the file */
+			}
+			if (jnlpool && (1 == index))
+			{	/* goes first if also -recvpool */
+				semid = repl_instance.jnlpool_semid;
+				shmid = repl_instance.jnlpool_shmid;
+				fn_len = SIZEOF("jnlpool");
+				strncpy(fn, "jnlpool", fn_len);
+			} else if (recvpool && ((jnlpool ? 2 : 1) == index))
+			{	/* last or sole */
+				semid = repl_instance.recvpool_semid;
+				shmid = repl_instance.recvpool_shmid;
+				fn_len = SIZEOF("recvpool");
+				strncpy(fn, "recvpool", fn_len);
+			}
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 		} else
-		{
-			semid = repl_instance.recvpool_semid;
-			shmid = repl_instance.recvpool_shmid;
+		{	/* not instance file based */
+			strncpy(fn, TAREF1(parm_ary, index), MAX_FN_LEN);
+			semkey = FTOK(fn, id);
+			assert(semkey);
+			if (!only)
+			{	/* try as a database file */
+				OPENFILE(fn, O_RDONLY, fd); /* if OPEN works, file_head_read takes care of close if other issues */
+				if ((FD_INVALID == fd) || (!file_head_read(fn, &header, SIZEOF(header))))
+				{
+					FPRINTF(stderr, "%s is not a database file\n",fn);
+					FPRINTF(stderr, "This and any subsequent files are treated as -only\n");
+					only = TRUE;
+				} else
+				{
+					semid = header.semid;
+					shmid = header.shmid;
+				}
+			}
 		}
-	} else
-	{
-		if (!file_head_read(fn, &header, SIZEOF(header)))
-			mupip_exit(ERR_MUNOACTION);
-		semid = header.semid;
-		shmid = header.shmid;
+		if (!only || ispool)
+		{
+			if (showheader)
+			{
+				FPRINTF(stderr, "%20s :: %23s :: %23s :: %23s :: %34s\n", "File", "Semaphore Id",
+					"Shared Memory Id", "FTOK Key", "FileId");
+				FPRINTF(stderr, "-----------------------------------------------------------------------------");
+				FPRINTF(stderr, "--------------------------------------------------------------\n");
+				showheader = FALSE;
+			}
+			if (!ispool || !index)
+			{	/* it's a file */
+				FPRINTF(stderr, "%20s :: %10d [0x%.8x] :: %10d [0x%.8x] :: %10d [0x%.8x] :: 0x", fn, semid, semid,
+					shmid, shmid, semkey, semkey);
+				fid_ptr = (sm_uc_ptr_t)&fid;
+				filename_to_id((gd_id_ptr_t)fid_ptr, fn);
+				for (fid_top = fid_ptr + SIZEOF(fid) ; fid_ptr < fid_top; fid_ptr++)
+					FPRINTF(stderr, "%.2x", *(sm_uc_ptr_t)fid_ptr);
+			} else
+				FPRINTF(stderr, "%20s :: %10d [0x%.8x] :: %10d [0x%.8x]", fn, semid, semid, shmid, shmid);
+			FPRINTF(stderr, "\n");
+		} else		/* simple legacy format */
+			FPRINTF(stderr, "%20s  ::  %10d  [ 0x%8x ]\n", fn, semkey, semkey);
 	}
-	PRINTF("%20s  ::  %23s  ::  %23s  ::  %20s\n", "File", "Semaphore Id", "Shared Memory Id", "FileId");
-	PRINTF("---------------------------------------------------------------------------------------------------------------\n");
-	PRINTF("%20s  ::  %10d [0x%.8x]  ::  %10d [0x%.8x]  ::  0x", fn, semid, semid, shmid, shmid);
-	fid_ptr = (sm_uc_ptr_t)&fid;
-	filename_to_id((gd_id_ptr_t)fid_ptr, fn);
-	fid_top = fid_ptr + SIZEOF(fid);
-	for ( ; fid_ptr < fid_top; fid_ptr++)
-		PRINTF("%.2x", *(sm_uc_ptr_t)fid_ptr);
-	PRINTF("\n");
 	mupip_exit(SS_NORMAL);
 }

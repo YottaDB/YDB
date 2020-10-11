@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -463,7 +463,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 		assert(!csa->hold_onto_crit);
 		was_crit = csa->now_crit;
 		if (!was_crit)
-			grab_crit(gv_cur_region);
+			grab_crit(gv_cur_region, WS_51);
 		status = cdb_sc_gvtrootmod2;
 		if (MISMATCH_ONLN_RLBK_CYCLES(csa, cnl))
 		{

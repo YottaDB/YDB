@@ -401,7 +401,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			 */
 			assert(!csa->now_crit);
 			DEBUG_ONLY(tmp_jnlpool = jnlpool;)
-			grab_crit(reg);
+			grab_crit(reg, WS_45);
 			rel_crit(reg);
 			assert(tmp_jnlpool == jnlpool);
 		}
@@ -413,7 +413,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 			was_crit = csa->now_crit;
 			if (!was_crit)
-				grab_crit(reg);
+				grab_crit(reg, WS_46);
 			status = cdb_sc_gvtrootmod2;
 			if (MISMATCH_ONLN_RLBK_CYCLES(csa, cnl))
 			{
@@ -669,7 +669,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		for (;;)
 		{
 			DEBUG_ONLY(tmp_jnlpool = jnlpool;)
-			grab_crit(reg);	/* Step CMT01 (see secshr_db_clnup.c for CMTxx step descriptions) */
+			grab_crit(reg, WS_47);	/* Step CMT01 (see secshr_db_clnup.c for CMTxx step descriptions) */
 			if (!FROZEN_HARD(csa))
 			{
 				assert(tmp_jnlpool == jnlpool);

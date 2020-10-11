@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2017 Fidelity National Information	*
+ * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,7 @@ void	jnl_phase2_cleanup(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp)
 	was_latch_owner = GLOBAL_LATCH_HELD_BY_US(&jbp->phase2_commit_latch);
 	if (!was_latch_owner)
 	{	/* Return value of "grab_latch" does not need to be checked because we pass GRAB_LATCH_INDEFINITE_WAIT as timeout */
-		grab_latch(&jbp->phase2_commit_latch, GRAB_LATCH_INDEFINITE_WAIT);
+		grab_latch(&jbp->phase2_commit_latch, GRAB_LATCH_INDEFINITE_WAIT, WS_28, csa);
 	}
 	index1 = jbp->phase2_commit_index1;
 	ASSERT_JNL_PHASE2_COMMIT_INDEX_IS_VALID(index1, JNL_PHASE2_COMMIT_ARRAY_SIZE);

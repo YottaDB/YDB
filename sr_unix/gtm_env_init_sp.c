@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2019 Fidelity National Information	*
+ * Copyright (c) 2004-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -172,8 +172,18 @@ void	gtm_env_init_sp(void)
 		/* Either the directory doesn't exist or the specified or defaulted entity is not a directory */
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4)	ERR_INVTMPDIR, 2, trans.len, trans.addr);
 	}
+<<<<<<< HEAD
 	/* Check for and and setup ydb_quiet_halt if specified */
 	ret = ydb_logical_truth_value(YDBENVINDX_QUIET_HALT, FALSE, &is_defined);
+=======
+	(TREF(gtm_tmpdir)).addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
+	(TREF(gtm_tmpdir)).len = trans.len;
+	memcpy((TREF(gtm_tmpdir)).addr, trans.addr, trans.len + 1);
+	/* Check for and and setup gtm_quiet_halt if specified */
+	val.addr = GTM_QUIET_HALT;
+	val.len = SIZEOF(GTM_QUIET_HALT) - 1;
+	ret = logical_truth_value(&val, FALSE, &is_defined);
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 	if (is_defined)
 		ydb_quiet_halt = ret;
 	/* Initialize local variable null subscripts allowed flag */

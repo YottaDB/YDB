@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2019 Fidelity National Information	*
+ * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -111,10 +111,10 @@ inline static int wait_for_wip_queue_to_clear(node_local_ptr_t cnl, cache_que_he
 		if (!crwipq->fl)
 			break;
 		DEBUG_ONLY(dbg_wtfini_lcnt = lcnt);     /* used by "wcs_wtfini" */
-		ret = wcs_wtfini(reg, CHECK_IS_PROC_ALIVE_TRUE_OR_FALSE(lcnt, BUF_OWNER_STUCK), cr);
+		ret = wcs_wtfini(reg, CHECK_IS_PROC_ALIVE_TRUE_OR_FALSE(lcnt, MAX_WIP_QWAIT), cr);
 		if (ret || (cr && (0 == cr->dirty)))
 			break;
-		if (0 == (lcnt % (MAX_WIP_QWAIT AIX_ONLY(* 4))))
+		if (0 == (lcnt = (lcnt % (MAX_WIP_QWAIT AIX_ONLY(* 4)))))
 		{
 			send_msg_csa(CSA_ARG(REG2CSA(reg)) VARLSTCNT(7) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 					ERR_AIOQUEUESTUCK, 2, (lcnt / SLEEP_ONE_MIN), (cr ? cr->blk : 0));

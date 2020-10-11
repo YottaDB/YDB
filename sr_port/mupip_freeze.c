@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -32,6 +32,10 @@
 #include "gdskill.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
+#include "muprec.h"
 #include "tp.h"
 #include "util.h"
 #include "gt_timer.h"
@@ -47,6 +51,7 @@
 #include "mupip_freeze.h"
 #include "interlock.h"
 #include "sleep_cnt.h"
+#include "region_freeze_multiproc.h"
 
 GBLREF	bool		mu_ctrly_occurred;
 GBLREF	bool		mu_ctrlc_occurred;
@@ -60,6 +65,9 @@ GBLREF	bool		error_mupip;
 GBLREF	boolean_t	debug_mupip;
 GBLREF	boolean_t	jnlpool_init_needed;
 GBLREF	jnl_gbls_t	jgbl;
+GBLREF	uint4		parallel_freeze_online;
+
+freeze_multiproc_state	*parallel_shm_hdr;
 
 #define INTERRUPTED	(mu_ctrly_occurred || mu_ctrlc_occurred)
 #define PRINT_FREEZEERR 													\
@@ -82,19 +90,136 @@ error_def(ERR_OFRZNOTHELD);
 error_def(ERR_KILLABANDONED);
 error_def(ERR_FREEZEERR);
 
+uint4 freeze_online_multi_proc_init(reg_ctl_list *rctl);
+uint4 freeze_online_multi_proc(reg_ctl_list *rctl);
+uint4 freeze_online_multi_proc_finish(reg_ctl_list *rctl);
+
+/* This initialization function is called by gtm_multi_proc after shared memory creation */
+uint4 freeze_online_multi_proc_init(reg_ctl_list *rctl)
+{
+	multi_proc_shm_hdr_t	*mp_hdr;	/* Pointer to "multi_proc_shm_hdr_t" structure in shared memory */
+
+	assert(multi_proc_in_use);
+	mp_hdr = multi_proc_shm_hdr;
+	parallel_shm_hdr = (freeze_multiproc_state *)((sm_uc_ptr_t)mp_hdr->shm_ret_array
+							+ (SIZEOF(void *) * mp_hdr->ntasks));
+	parallel_shm_hdr->ntasks = mp_hdr->ntasks;
+	return SS_NORMAL;
+}
+
+uint4 freeze_online_multi_proc(reg_ctl_list *rctl)
+{
+	gd_region		*reg;
+	freeze_status		freeze_ret;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
+	boolean_t		release_latch;
+	freeze_reg_mp_state	fr_multiproc;
+
+	reg = rctl->gd;
+	csa = &FILE_INFO(reg)->s_addrs;
+	csd = csa->hdr;
+	assert(multi_proc_in_use);
+	fr_multiproc.region_index = rctl->region_index;
+	fr_multiproc.pfms = parallel_shm_hdr;
+	MUR_SET_MULTI_PROC_KEY(rctl, multi_proc_key);
+	if (FROZEN_CHILLED(csa) || !IS_REG_BG_OR_MM(reg) || reg_cmcheck(reg) || reg->was_open ||
+	       reg->read_only || dba_mm == csd->acc_meth)
+	{	/* Mark as already frozen */
+		while (fr_multiproc.region_index > fr_multiproc.pfms->grab_crit_counter)
+			SLEEP_USEC(10, FALSE);
+		grab_crit(reg, WS_102);
+		INCR_CNT(&fr_multiproc.pfms->grab_crit_counter, &fr_multiproc.pfms->region_frozen_latch);
+		INCR_CNT(&fr_multiproc.pfms->region_frozen_counter, &fr_multiproc.pfms->region_frozen_latch);
+		rel_crit(reg);
+		fr_multiproc.pfms->freeze_ret_array[fr_multiproc.region_index] = REG_ALREADY_FROZEN;
+		return SS_NORMAL;
+	}
+	/* Flush the right region when using gtm_multi_proc */
+	TP_CHANGE_REG(reg);
+	/* Stash the return values in a shared memory array */
+	fr_multiproc.pfms->freeze_ret_array[fr_multiproc.region_index] =
+				region_freeze_main(reg, TRUE, FALSE, TRUE, parallel_freeze_online, TRUE, &fr_multiproc);
+	while (REG_FREEZE_SUCCESS != fr_multiproc.pfms->freeze_ret_array[fr_multiproc.region_index])
+	{
+		switch (fr_multiproc.pfms->freeze_ret_array[fr_multiproc.region_index])
+		{
+			case REG_ALREADY_FROZEN:
+				/* Exit normally do not retry to freeze an already frozen region */
+				return SS_NORMAL;
+			case REG_HAS_KIP:
+				/* Return REG_HAS_KIP status only when the retries exceed MAX_CRIT_TRY */
+				GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
+				assert(release_latch);
+				util_out_print("Kill in progress indicator is set for database file !AD", TRUE,
+						DB_LEN_STR(reg));
+				REL_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
+				multi_proc_key = NULL;  /* reset key until it can be set to rctl's region-name again */
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_MUNOFINISH);
+				break;
+			case REG_FLUSH_ERROR:
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("MUPIP FREEZE"),
+						DB_LEN_STR(reg));
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_MUNOFINISH);
+				break;
+			case REG_JNL_OPEN_ERROR:
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_JNLFILOPN, 4, JNL_LEN_STR(csd),
+						DB_LEN_STR(reg), csa->jnl->status);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_MUNOFINISH);
+				break;
+			case REG_JNL_SWITCH_ERROR:
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_JNLEXTEND, 2, JNL_LEN_STR(csd));
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_MUNOFINISH);
+				break;
+			default:
+				assert(FALSE);
+		}
+	}
+	GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
+	assert(release_latch);
+	util_out_print("Region !AD is now FROZEN", TRUE, REG_LEN_STR(reg));
+	REL_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
+	multi_proc_key = NULL;  /* reset key until it can be set to rctl's region-name again */
+	return SS_NORMAL;
+}
+
+/* Return the "worst" freeze status from the stashed array from freeze_online_multi_proc */
+uint4 freeze_online_multi_proc_finish(reg_ctl_list *rctl)
+{
+	int			regno;
+
+	assert(multi_proc_in_use);
+	for (regno=0 ; regno < parallel_shm_hdr->ntasks ; regno++)
+	{	/* Look for a non-zero freeze status */
+		if (0 != parallel_shm_hdr->freeze_ret_array[regno])
+			return ERR_MUNOFINISH;
+	}
+	return SS_NORMAL;
+}
+
 void	mupip_freeze(void)
 {
 	int4			status;
 	bool			record;
 	tp_region		*rptr, *rptr1;
-	boolean_t		freeze, override;
+	boolean_t		freeze, override, parallel = FALSE;
 	uint4			online;
 	freeze_status		freeze_ret;
+<<<<<<< HEAD
 	int			dummy_errno;
 	const char 		*msg1[] = { "unfreeze", "freeze" };
 	const char 		*msg2[] = { "UNFROZEN", "FROZEN" };
 	const char 		*msg3[] = { "unfrozen", "frozen" };
 	DCL_THREADGBL_ACCESS;
+=======
+	int			dummy_errno, regno, reg_total = 0;
+	const char 		*msg1[] = { "unfreeze", "freeze" } ;
+	const char 		*msg2[] = { "UNFROZEN", "FROZEN" } ;
+	const char 		*msg3[] = { "unfrozen", "frozen" } ;
+	reg_ctl_list		*parallel_ctl;
+	void			**ret_array;		/* "gtm_multi_thread" related field */
+	size_t			shm_size;
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 
 	SETUP_THREADGBL_ACCESS;
 	status = SS_NORMAL;
@@ -145,6 +270,9 @@ void	mupip_freeze(void)
 	}
 	halt_ptr = grlist;
 	ESTABLISH(mu_freeze_ch);
+	/* Count the regions in a case of a parallel freeze */
+	for (rptr = grlist;  NULL != rptr;  rptr = rptr->fPtr)
+		reg_total++;
 	for (rptr = grlist;  NULL != rptr;  rptr = rptr->fPtr)
 	{
 		if (INTERRUPTED)
@@ -206,8 +334,14 @@ void	mupip_freeze(void)
 					TRUE, REG_LEN_STR(gv_cur_region));
 			status = ERR_OFRZNOTHELD;
 		}
+		if ((reg_total > 1) && online && !cs_addrs->hdr->asyncio)
+		{	/* Use gtm_multi_proc for FREEZE -ONLINE */
+			parallel = TRUE;
+			parallel_freeze_online = online;
+			continue;
+		}
 		while (REG_FREEZE_SUCCESS !=
-				(freeze_ret = region_freeze_main(gv_cur_region, freeze, override, TRUE, online, TRUE)))
+				(freeze_ret = region_freeze_main(gv_cur_region, freeze, override, TRUE, online, TRUE, NULL)))
 		{
 			if (REG_ALREADY_FROZEN == freeze_ret)
 			{
@@ -250,10 +384,29 @@ void	mupip_freeze(void)
 		else
 			PRINT_FREEZEERR;
 	}
+	if (parallel)
+	{
+		ret_array = (void **)malloc(SIZEOF(void *) * reg_total);
+		parallel_ctl = (reg_ctl_list *)malloc(SIZEOF(reg_ctl_list) * reg_total);
+		memset(parallel_ctl, 0, SIZEOF(reg_ctl_list) * reg_total);
+		shm_size = (size_t)(SIZEOF(freeze_multiproc_state)
+				+ (SIZEOF(int) * reg_total));
+		for (rptr = grlist, regno = 0;  NULL != rptr;  rptr = rptr->fPtr, regno++)
+		{
+			parallel_ctl[regno].region_index = regno;
+			parallel_ctl[regno].gd = rptr->reg;
+		}
+		status = gtm_multi_proc((gtm_multi_proc_fnptr_t)&freeze_online_multi_proc, reg_total,
+				0, ret_array, (void *)parallel_ctl, SIZEOF(reg_ctl_list), shm_size,
+				(gtm_multi_proc_fnptr_t)&freeze_online_multi_proc_init,
+				(gtm_multi_proc_fnptr_t)&freeze_online_multi_proc_finish);
+	}
 	for (rptr = grlist;  NULL != rptr;  rptr = rptr->fPtr)
 	{
 		gv_cur_region = rptr->reg;
 		change_reg();
+		if (parallel)
+			cs_addrs->persistent_freeze = TRUE;
 		freeze_ret = region_freeze_post(rptr->reg);
 		if (REG_FREEZE_SUCCESS != freeze_ret)
 		{

@@ -102,7 +102,7 @@ typedef enum {
 	WBTEST_HOLD_SEM_BYPASS,			/* 60 : Hold access and FTOK semaphores so that LKE/DSE can bypass it. */
 	WBTEST_UTIL_OUT_BUFFER_PROTECTION,	/* 61 : Start a timer that would mess with util_out buffers by frequently
 						 *	printing long messages via util_out_print */
-	WBTEST_SET_WC_BLOCKED,			/* 62 : Set the wc_blocked when searching the tree to start wcs_recover process*/
+	WBTEST_WSSTATS_PAUSE,			/* 62 : Pause in GTM-8863 stat testing for sync (Reused WBTEST_SET_WC_BLOCKED)*/
 	WBTEST_REORG_DEBUG,			/* 63 : mupip reorg Will print GTMPOOLLIMIT value */
 	WBTEST_WCS_FLU_IOERR,			/* 64 : Force an I/O error (other than ENOSPC) when wcs_wtstart is invoked from
 						 *      wcs_flu */
@@ -123,7 +123,7 @@ typedef enum {
 	WBTEST_ANTIFREEZE_GVORDERFAIL,		/* 77 :  */
 	WBTEST_ANTIFREEZE_GVQUERYFAIL,		/* 78 :  */
 	WBTEST_ANTIFREEZE_GVQUERYGETFAIL,	/* 79 :  */
-	WBTEST_ANTIFREEZE_GVZTRIGFAIL,		/* 80 :  */
+	WBTEST_UNUSED_80,			/* 80 :  was WBTEST_ANTIFREEZE_GVZTRIGFAIL */
 	WBTEST_ANTIFREEZE_OUTOFSPACE,		/* 81 :  */
 	/* End ANTIFREEZE related white box test cases */
 	WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP,	/* 82 : Send SIGTSTP to self if wcs_timers is 0 */
@@ -218,6 +218,12 @@ typedef enum {
 	WBTEST_FULLBLKWRT_DB,			/* 167 : Full disk blk writes for new blocks */
 	WBTEST_OPENFILE_DB,			/* 168 : Make OPENFILE_DB fail on a RW db */
 	WBTEST_REPL_TLS_RECONN,			/* 169 : Try reconnect in case of transient TLS errors */
+<<<<<<< HEAD
+=======
+	WBTEST_ZTIM_EDGE,			/* 170 : Timeout when trying to reset the timer */
+	WBTEST_LCKWAKEOVRFLO,			/* 171 : Force LOCK wakeups to almost overflow */
+	WBTEST_FAKE_SS_SHMDT_WINDOW		/* 172 : skip lcl_ss_ctx->shdw_fd = FD_INVALID to create "double" SHMDT */
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.

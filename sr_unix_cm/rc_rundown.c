@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> e9a1c121 (GT.M V6.3-014)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +58,7 @@ void rc_rundown(void)
 			if (fdi_ptr->dsid != RC_NSPACE_DSID)
 			{
 			    assert(!cs_addrs->hold_onto_crit);	/* so we can safely do unconditional grab_crit and rel_crit */
-			    grab_crit(gv_cur_region);
+			    grab_crit(gv_cur_region, NOT_APPLICABLE);
 			    if (--cs_data->rc_srv_cnt <= 0)
 			    {
 				cs_data->rc_node = cs_data->dsid = 0;

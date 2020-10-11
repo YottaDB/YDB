@@ -182,7 +182,7 @@ boolean_t	tp_crit_all_regions()
 #			endif
 			assert(!tmpcsa->hold_onto_crit);
 			if (!tmpcsa->now_crit)
-				grab_crit(reg);	/* In "t_retry", we used "grab_crit_encr_cycle_sync" to ensure encryption
+				grab_crit(reg, WS_53);	/* In "t_retry", we used "grab_crit_encr_cycle_sync" to ensure encryption
 						 * cycles are in sync and crit is obtained. We cannot do that here as with TP
 						 * and multiple regions, we might end up calling "grab_crit_encr_cycle_sync"
 						 * for a region while holding crit on one or more previous regions and the
@@ -576,7 +576,7 @@ boolean_t	tp_tend()
 			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 			if (!csa->now_crit)
 			{
-				grab_crit(gv_cur_region); /* Step CMT01 (see secshr_db_clnup.c for CMTxx step descriptions) */
+				grab_crit(gv_cur_region, WS_54); /*Step CMT01 (see secshr_db_clnup.c for CMTxx step descriptions) */
 			} else if (cnl->wc_blocked)
 			{
 				status = cdb_sc_helpedout;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
@@ -36,6 +36,7 @@
 		v[J] = 0;							\
 }
 
+<<<<<<< HEAD
 #define	RETURN_IF_ABNORMAL_STATUS(STATUS)		\
 {							\
 	if (cdb_sc_normal != STATUS)			\
@@ -84,6 +85,32 @@ MBSTART {														\
 		}													\
 	}														\
 	/* else: Did not find a valid key within record limits. Return abnormal status. */				\
+=======
+#define GET_KEY_CPY_BUFF(KEY_BASE, REC_CMPC, PTR, FIRST_KEY, NAME_LEN, KEY_SIZE, BUFF, BUFF_LENGTH, REC_LEN)	\
+MBSTART {													\
+		for (PTR = key_base; ;)										\
+		{												\
+			if (KEY_DELIMITER == *PTR++)								\
+			{											\
+				if (FIRST_KEY)									\
+				{										\
+					FIRST_KEY = FALSE;							\
+					NAME_LEN = (int)(PTR - key_base);					\
+				}										\
+				if (KEY_DELIMITER == *PTR++)							\
+					break;									\
+			}											\
+		}												\
+		KEY_SIZE = (int)(PTR - KEY_BASE);								\
+		if (KEY_SIZE + REC_CMPC > MAX_KEY_SZ)								\
+			KEY_SIZE = 0;	/* user should check and skip */					\
+		else												\
+		{												\
+			memcpy(BUFF + REC_CMPC, KEY_BASE, KEY_SIZE);						\
+			BUFF_LENGTH = REC_CMPC + KEY_SIZE;							\
+			REC_LEN = BUFF_LENGTH;									\
+		}												\
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 } MBEND
 
 #define CHECK_COLL_KEY(GL_PTR, NULL_COLL_KEY)						\

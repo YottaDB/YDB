@@ -43,6 +43,7 @@
 #include "have_crit.h"
 #include "anticipatory_freeze.h"
 #include "gtmio.h"
+#include "region_freeze_multiproc.h"
 
 #ifdef DEBUG_FREEZE
 GBLREF	boolean_t	caller_id_flag;
@@ -85,7 +86,7 @@ freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t overr
 {
 	freeze_status		rval;
 
-	rval = region_freeze_main(region, freeze, override, wait_for_kip, online, flush_sync);
+	rval = region_freeze_main(region, freeze, override, wait_for_kip, online, flush_sync, NULL);
 
 	if (REG_FREEZE_SUCCESS == rval)
 		rval = region_freeze_post(region);
@@ -94,7 +95,7 @@ freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t overr
 }
 
 freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t override, boolean_t wait_for_kip,
-					uint4 online, boolean_t flush_sync)
+					uint4 online, boolean_t flush_sync, freeze_reg_mp_state *pfrms)
 {
 	uint4			freeze_id, sleep_counter;
 	sgmnt_addrs		*csa;
@@ -130,24 +131,47 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 				SET_GBL_JREC_TIME;
 				JNL_ENSURE_OPEN_WCS_WTSTART(csa, region, csd->n_bts, NULL, FALSE, dummy_errno);
 			}
-			grab_crit(region);
+			if (pfrms)
+			{	/* Grab crit in parallel is not safe.
+				 * We need to grab crit in a specific order to avoid deadlocks.
+				 */
+				while (pfrms->region_index > pfrms->pfms->grab_crit_counter)
+				{	/* Keep flushing while waiting to grab crit in a specific order. */
+					JNL_ENSURE_OPEN_WCS_WTSTART(csa, region, csd->n_bts, NULL, FALSE, dummy_errno);
+				}
+			}
+			grab_crit(region, WS_79);
 		}
 		INCR_INHIBIT_KILLS(cnl);
 		if (OWNERSHIP)
 		{
 			DECR_INHIBIT_KILLS(cnl);
 			if (!was_crit)
+			{
+				if (pfrms)
+				{
+					INCR_CNT(&pfrms->pfms->grab_crit_counter, &pfrms->pfms->region_frozen_latch);
+					INCR_CNT(&pfrms->pfms->region_frozen_counter, &pfrms->pfms->region_frozen_latch);
+				}
 				rel_crit(region);
+			}
 			return REG_FREEZE_SUCCESS;
 		}
 		if (!override && csd->freeze)
 		{
 			DECR_INHIBIT_KILLS(cnl);
 			if (!was_crit)
+			{
+				if (pfrms)
+				{
+					INCR_CNT(&pfrms->pfms->grab_crit_counter, &pfrms->pfms->region_frozen_latch);
+					INCR_CNT(&pfrms->pfms->region_frozen_counter, &pfrms->pfms->region_frozen_latch);
+				}
 				rel_crit(region);
+			}
 			return REG_ALREADY_FROZEN;
 		}
-		/* If override is TRUE we need not wait for KIP to become zero */
+		/* If override is TRUE we don't need to wait for KIP to become zero */
 		sleep_counter = 1;
 		if (!override && wait_for_kip && (0 < csd->kill_in_prog))
 		{
@@ -163,7 +187,7 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 			do
 			{
 				if (!was_crit)
-					grab_crit(region);
+					grab_crit(region, WS_80);
 				if (!csd->kill_in_prog)
 					break;
 				if (!was_crit)
@@ -177,12 +201,20 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 					       CTIME_BEFORE_NL, time_str);
 			}
 		}
+		if (pfrms)
+		{	/* Increment counter and grab the next crit */
+			INCR_CNT(&pfrms->pfms->grab_crit_counter, &pfrms->pfms->region_frozen_latch);
+		}
 		/* if can't ever be true when override is true. */
 		if (MAX_CRIT_TRY <= sleep_counter)
 		{
 			DECR_INHIBIT_KILLS(cnl);
 			if (!was_crit)
+			{
+				if (pfrms)
+					INCR_CNT(&pfrms->pfms->region_frozen_counter, &pfrms->pfms->region_frozen_latch);
 				rel_crit(region);
+			}
 			return REG_HAS_KIP;
 		}
 		if (online && !was_crit && !standalone)
@@ -192,7 +224,7 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 			JNL_ENSURE_OPEN_WCS_WTSTART(csa, region, csd->n_bts, NULL, FALSE, dummy_errno);
 		}
 		/* Return value of "grab_latch" does not need to be checked because we pass GRAB_LATCH_INDEFINITE_WAIT as timeout */
-		grab_latch(&cnl->freeze_latch, GRAB_LATCH_INDEFINITE_WAIT);
+		grab_latch(&cnl->freeze_latch, GRAB_LATCH_INDEFINITE_WAIT, WS_81, csa);
 		rval = REG_FREEZE_SUCCESS;
 		jnl_switch_done = FALSE;
 		jpc = csa->jnl;
@@ -232,7 +264,11 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 		if (REG_FREEZE_SUCCESS != rval)
 		{
 			if (!was_crit)
+			{
+				if (pfrms)
+					INCR_CNT(&pfrms->pfms->region_frozen_counter, &pfrms->pfms->region_frozen_latch);
 				rel_crit(region);
+			}
 			rel_latch(&cnl->freeze_latch);
 			return rval;
 		}
@@ -252,7 +288,15 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 			assert((freeze_id == csd->freeze) && (FREEZE_MATCH == csd->image_count));
 		}
 		if (!was_crit)
+		{
+			if (pfrms)
+			{
+				INCR_CNT(&pfrms->pfms->region_frozen_counter, &pfrms->pfms->region_frozen_latch);
+				while (pfrms->pfms->region_frozen_counter < pfrms->pfms->ntasks)
+					SLEEP_USEC(10, FALSE);
+			}
 			rel_crit(region);
+		}
 		if (flush_sync)
 		{
 			assert(!csa->now_crit);
@@ -269,7 +313,7 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 	}
 	/* !freeze */
 	/* Return value of "grab_latch" does not need to be checked because we pass GRAB_LATCH_INDEFINITE_WAIT as timeout */
-	grab_latch(&cnl->freeze_latch, GRAB_LATCH_INDEFINITE_WAIT);
+	grab_latch(&cnl->freeze_latch, GRAB_LATCH_INDEFINITE_WAIT, WS_82, csa);
 	/* If there is no freeze, but there is a freeze_online, then there was an autorelease, which needs to be cleaned up
 	 * by the normal unfreeze procedure. However, we only do it in MUPIP FREEZE -OFF to ensure that the user gets a warning.
 	 */
@@ -332,7 +376,7 @@ freeze_status region_freeze_post(gd_region *region)
 		{	/* Do an extra journal file switch to undo the epoch_interval override above. */
 			jpc = csa->jnl;
 			if (!was_crit)
-				grab_crit(region);
+				grab_crit(region, WS_83);
 			/* If another freeze managed to sneak in after we dropped the latch, skip the switch. */
 			if (!FROZEN(csd))
 			{

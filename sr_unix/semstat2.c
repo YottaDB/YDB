@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -56,11 +56,12 @@ static void	usage (char *prog)
 
 int main (int argc, char *argv[])
 {
-	int 		i, j;
+	const char 	*statname[]	= {"sempid",	"semzcnt", "semncnt",   "semval"};
+	const int 	stat[]		= { GETPID,	GETZCNT,   GETNCNT,	GETVAL};
 	char 		s[OUT_LINE];
-	int 		sem, semval, semncnt, semzcnt, sempid;
-	struct	 	sembuf sop;
-	struct semid_ds		semstat;
+	int 		i, j, k, sem, semval;
+	struct sembuf	sop;
+	struct semid_ds	semstat;
 	union semun	semarg;
 
 	if (argc == 1)
@@ -69,11 +70,11 @@ int main (int argc, char *argv[])
 		EXIT(EXIT_FAILURE);
 	}
 	semarg.buf = &semstat;
-	for(i=1; i< argc; i++)
+	for (i = 1; i < argc; i++)
 	{
 
 		sem = ATOI(argv[i]);
-		if ( semctl(sem, 0, IPC_STAT, semarg) == -1 )
+		if (-1 == semctl(sem, 0, IPC_STAT, semarg))
 		{
 			FPRINTF(stderr, "Error obtaining semaphore status.\n");
 			SNPRINTF(s, OUT_LINE, "semctl(%d)", sem);
@@ -81,41 +82,20 @@ int main (int argc, char *argv[])
 			continue;
 		}
 		PRINTF("semid %d: %hu semaphores in the set\n", sem, (unsigned short int)semarg.buf->sem_nsems);
-		for(j=0; j < semarg.buf->sem_nsems; j++)
+		for (j = 0; j < semarg.buf->sem_nsems; j++)
 		{
-
-			if ( (semval = semctl(sem, j, GETVAL)) == -1 )
+			PRINTF("sem %2d: (", j);
+			for (k = 3; 0 <= k ; k--)
 			{
-				FPRINTF(stderr, "Error obtaining semaphore %d value.\n", j);
-				SNPRINTF(s, OUT_LINE, "semctl(%d)", sem);
-				PERROR(s);
-				continue;
+				if (-1 == (semval = semctl(sem, j, stat[k])))
+				{
+					FPRINTF(stderr, "Error obtaining semaphore %d %s.\n", j, statname[k]);
+					SNPRINTF(s, OUT_LINE, "semctl(%d)", sem);
+					PERROR(s);
+					continue;
+				}
+				PRINTF("%s=%d%s", statname[k], semval, (k ? ", " : ")\n"));
 			}
-			PRINTF("sem %d: (semval=%d, ", j, semval);
-			if ( (semncnt = semctl(sem, j, GETNCNT)) == -1 )
-			{
-				FPRINTF(stderr, "\nError obtaining semaphore %d ncnt.\n", j);
-				SNPRINTF(s, OUT_LINE, "semctl(%d)", sem);
-				PERROR(s);
-				continue;
-			}
-			PRINTF("semncnt=%d, ", semncnt);
-			if ( (semzcnt = semctl(sem, j, GETZCNT)) == -1 )
-			{
-				FPRINTF(stderr, "\nError obtaining semaphore %d zcnt.\n", j);
-				SNPRINTF(s, OUT_LINE, "semctl(%d)", sem);
-				PERROR(s);
-				continue;
-			}
-			PRINTF("semzcnt=%d, ", semzcnt);
-			if ( (sempid= semctl(sem, j, GETPID)) == -1 )
-			{
-				FPRINTF(stderr, "\nError obtaining semaphore %d PID.\n", j);
-				SNPRINTF(s, OUT_LINE, "semctl(%d)", sem);
-				PERROR(s);
-				continue;
-			}
-			PRINTF("sempid=%d)\n", sempid);
 		}
 	}
 	EXIT(EXIT_SUCCESS);

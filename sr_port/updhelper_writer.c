@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2018 Fidelity National Information	*
+ * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -159,7 +159,7 @@ int updhelper_writer(void)
 						&& !FROZEN_CHILLED(csa))
 					{
 						DO_JNL_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jbp);
-						if (grab_crit_immediate(reg, OK_FOR_WCS_RECOVER_TRUE))
+						if (grab_crit_immediate(reg, OK_FOR_WCS_RECOVER_TRUE, NOT_APPLICABLE))
 						{
 							if ((jbp->next_epoch_time - UPDHELPER_EARLY_EPOCH) <= jgbl.gbl_jrec_time)
 							{

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +28,10 @@
 #include "interlock.h"
 #include "mu_int_wait_rdonly.h"
 
+error_def(ERR_BUFFLUFAILED);
+error_def(ERR_DBRDONLY);
+error_def(ERR_TEXT);
+
 #define	 NO_WRITE_ACCESS_ERR_STRING	"Database requires flushing, which can't be performed without write access"
 /* If a database is read-only then, wcs_flu cannot be called as the database is read-only. In such cases, we might
  * want to wait for sometime for all the active writers to empty their write queues.
@@ -41,10 +46,6 @@ boolean_t	mu_int_wait_rdonly(sgmnt_addrs *csa, char *waiting_process)
 	)
 	boolean_t			ok, was_crit;
 
-	error_def(ERR_BUFFLUFAILED);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_TEXT);
-
 	reg = csa->region;
 	crq = &csa->acc_meth.bg.cache_state->cacheq_active;
 	VMS_ONLY(crqwip = &csa->acc_meth.bg.cache_state->cacheq_wip;)
@@ -56,13 +57,14 @@ boolean_t	mu_int_wait_rdonly(sgmnt_addrs *csa, char *waiting_process)
 		{
 			was_crit = csa->now_crit;
 			if (!was_crit)
-				grab_crit(reg);
+				grab_crit(reg, WS_7);
 			ok = wcs_wtfini(reg);
 			if (!was_crit)
 				rel_crit(reg);
 			if (!ok)
 			{
-				gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_STR(waiting_process), DB_LEN_STR(reg));
+				gtm_putmsg_csa(csa, VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_STR(waiting_process),
+					DB_LEN_STR(reg));
 				return FALSE;
 			}
 		}
@@ -73,7 +75,8 @@ boolean_t	mu_int_wait_rdonly(sgmnt_addrs *csa, char *waiting_process)
 	}
 	if (0 != crq->fl VMS_ONLY(|| 0 != crqwip->fl))
 	{	/* Cannot proceed for read-only data files */
-		gtm_putmsg(VARLSTCNT(8) ERR_DBRDONLY, 2, DB_LEN_STR(reg), ERR_TEXT, 2, LEN_AND_LIT(NO_WRITE_ACCESS_ERR_STRING));
+		gtm_putmsg_csa(csa, VARLSTCNT(8) ERR_DBRDONLY, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
+			LEN_AND_LIT(NO_WRITE_ACCESS_ERR_STRING));
 		return FALSE;
 	}
 	return TRUE;

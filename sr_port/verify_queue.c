@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,12 +36,12 @@ GBLREF	volatile int4	fast_lock_count;
 /* Lock the given queue and verify its elements are well formed before releasing the lock. Returns the count of
  * queue elements.
  */
-gtm_uint64_t verify_queue_lock(que_head_ptr_t qhdr)
+gtm_uint64_t verify_queue_lock(que_head_ptr_t qhdr, sgmnt_addrs *csa)
 {
 	gtm_uint64_t	i;
 
 	++fast_lock_count;	/* grab_latch() doesn't keep fast_lock_count incremented across rel_latch() */
-	if (!grab_latch(&qhdr->latch, LOCK_TIMEOUT_SECS))
+	if (!grab_latch(&qhdr->latch, LOCK_TIMEOUT_SECS, WS_20, csa))
 	{
 		fast_lock_count--;
 		assert(0 <= fast_lock_count);

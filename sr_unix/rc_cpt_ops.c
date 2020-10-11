@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -562,7 +562,7 @@ void rc_send_cpt(rc_xblk_hdr *head, rc_rsp_page *last_aq)	/* Zero if no read op 
 		int4 blknum;
 
 		assert(!cs_addrs->hold_onto_crit);	/* this ensures we can safely do unconditional grab_crit and rel_crit */
-		grab_crit(gv_cur_region); /* DBP Need to verify that block hasn't changed since copied.  look in BT? */
+		grab_crit(gv_cur_region, NOT_APPLICABLE); /* DBP Need to verify block hasn't changed since copied. look in BT? */
 		rc_cpt_lock();
 		GET_LONG(blknum, last_aq->pageaddr);
 		if ((b = bt_get(blknum)) ? rc_read_stamp <= b->tn :

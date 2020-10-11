@@ -118,7 +118,7 @@ ZOS_ONLY(error_def(ERR_TEXT);)
 
 #define GET_CRIT_AND_DECR_INHIBIT_KILLS(REG, CNL)				\
 {										\
-	grab_crit(REG);								\
+	grab_crit(REG, WS_96);							\
 	if (!(TREF(in_mupip_integ) && TREF(instance_frozen_crit_skipped)))	\
 	{									\
 		DECR_INHIBIT_KILLS(CNL);					\
@@ -441,7 +441,7 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 	assert(NULL != util_ss_ptr);
 	assert(NULL != util_ss_ptr->master_map);
 	assert(NULL != util_ss_ptr->header);
-	grab_crit(reg);
+	grab_crit(reg, WS_97);
 	INCR_INHIBIT_KILLS(cnl);
 	kip_pids_arr_ptr = cnl->kip_pid_array;
 	ss_shmsize = 0;
@@ -549,7 +549,7 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 					CTIME_BEFORE_NL, time_str, DB_LEN_STR(reg));
 			}
 		}
-		grab_crit(reg);
+		grab_crit(reg, WS_98);
 		/* After we have created the shared memory and before we grab crit, another process can add new blocks to the
 		 * database, in which case csd->trans_hist.total_blks is no longer the value as we noted down above. Check if this
 		 * is the case and if so, retry to obtain a consistent copy of the total number of blocks.

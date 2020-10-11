@@ -159,6 +159,7 @@ GBLDEF	io_log_name	*dollar_principal;	/* pointer to log name GTM$PRINCIPAL if de
 GBLDEF	boolean_t	prin_dm_io;		/* used by op_dmode so mdb_condition_handler and iorm_readfl know it's active */
 GBLDEF	boolean_t	prin_in_dev_failure;	/* used in I/O to perform NOPRINCIO detection on input */
 GBLDEF	boolean_t	prin_out_dev_failure;	/* used in I/O to perform NOPRINCIO detection on output */
+GBLDEF	uint4		parallel_freeze_online;
 GBLDEF	io_desc		*active_device;
 GBLDEF	bool		error_mupip,
 			file_backed_up,

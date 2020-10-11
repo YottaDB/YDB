@@ -1546,4 +1546,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUTRUNCNOSPKEEP */
 	   0,	/* TERMHANGUP */
 	   0,	/* DBFILNOFULLWRT */
+	   0,	/* BADCONNECTPARAM */
+	   0,	/* BADPARAMCOUNT */
+	   0,	/* REPLALERT */
 	};

@@ -108,14 +108,14 @@ GBLREF	boolean_t		disk_blk_read;
 GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
 #endif
 
-static	uint4			last_pre_read_offset;
+static	gtm_uint64_t		last_pre_read_offset;
 
 error_def(ERR_DBCCERR);
 error_def(ERR_ERRCALL);
 
 int updhelper_reader(void)
 {
-	uint4			pre_read_offset;
+	gtm_uint64_t		pre_read_offset;
 	int			lcnt;
 	boolean_t		continue_reading;
 
@@ -145,8 +145,13 @@ int updhelper_reader(void)
 boolean_t updproc_preread(void)
 {
 	boolean_t		good_record, was_wrapped;
+<<<<<<< HEAD
 	uint4			pre_read_offset;
 	int			rec_len, cnt, retries, spins, maxspins, maxtries, key_len;
+=======
+	gtm_uint64_t		pre_read_offset;
+	int			rec_len, cnt, retries, spins, maxspins, key_len;
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 	enum jnl_record_type	rectype;
 	mstr_len_t		val_len;
 	mname_entry		gvname;
@@ -171,7 +176,7 @@ boolean_t updproc_preread(void)
 	gvnh_reg_t		*gvnh_reg;
 #	ifdef REPL_DEBUG
 	unsigned char 		buff[MAX_ZWR_KEY_SZ], *end;
-	uint4			lcl_write, write_wrap;
+	gtm_uint64_t		lcl_write, write_wrap;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -196,7 +201,7 @@ boolean_t updproc_preread(void)
 		}
 		if (recvpool_ctl->write == upd_proc_local->read)
 		{
-			REPL_DPRINT4("Wait: write==read::pre_read_offset = %x read = %x write = %x\n",
+			REPL_DPRINT4("Wait: write==read::pre_read_offset = %lx read = %lx write = %lx\n",
 				pre_read_offset, upd_proc_local->read, recvpool_ctl->write);
 			return TRUE;
 		}
@@ -235,7 +240,7 @@ boolean_t updproc_preread(void)
 #		endif
 		if (pre_read_offset >= recvpool_ctl->write_wrap)
 		{
-			REPL_DPRINT4("Wrapped: pre_read_offset = %x write_wrap = %x write = %x\n",
+			REPL_DPRINT4("Wrapped: pre_read_offset = %lx write_wrap = %lx write = %lx\n",
 				pre_read_offset, write_wrap, lcl_write);
 			pre_read_offset = 0;
 		}
@@ -281,12 +286,12 @@ boolean_t updproc_preread(void)
 				} else
 					break;
 			}
-			REPL_DPRINT3("First one::pre_read_offset = %x read %x\n", pre_read_offset, upd_proc_local->read);
+			REPL_DPRINT3("First one::pre_read_offset = %lx read %lx\n", pre_read_offset, upd_proc_local->read);
 			upd_helper_ctl->first_done = TRUE;
 		} else
 		{
 			pre_read_offset = upd_helper_ctl->next_read_offset;
-			REPL_DPRINT3("Non-first::pre_read_offset = %x read %x\n", pre_read_offset, upd_proc_local->read);
+			REPL_DPRINT3("Non-first::pre_read_offset = %lx read %lx\n", pre_read_offset, upd_proc_local->read);
 			if (NULL != csa)
 			{
 				REPL_DPRINT2("Enough read::csa->nl->n_pre_read is %x\n", csa->nl->n_pre_read);
@@ -405,9 +410,9 @@ boolean_t updproc_preread(void)
 											   MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 								end = &buff[MAX_ZWR_KEY_SZ - 1];
 							util_out_print(
-							       "readaddrs = !XJ pre_read_offset = !XL write_wrap = !XL write = !XL",
-								FALSE, readaddrs, pre_read_offset,
-								recvpool_ctl->write_wrap, recvpool_ctl->write);
+							       "readaddrs = !XJ pre_read_offset = !ZQ write_wrap = !ZQ write = !ZQ",
+								FALSE, readaddrs, &pre_read_offset,
+								&recvpool_ctl->write_wrap, &recvpool_ctl->write);
 							util_out_print(
 								" Seqno = 0x!16@XQ Rectype = !SL gv_currkey = !AD status = !SL",
 								TRUE, &recvpool.recvpool_ctl->jnl_seqno,
@@ -423,9 +428,9 @@ boolean_t updproc_preread(void)
 		if (!good_record)
 		{
 #			ifdef REPL_DEBUG
-			REPL_DPRINT6("Skipping record: pre_read_offset = %x read = %x write_wrap = %x write = %x reclen = %x\n",
+			REPL_DPRINT6("Skipping record: pre_read_offset = %lx read = %lx write_wrap = %lx write = %lx reclen = %x\n",
 				pre_read_offset, upd_proc_local->read, write_wrap, lcl_write, rec_len);
-			REPL_DPRINT3("New values: write_wrap = %x write = %x\n",
+			REPL_DPRINT3("New values: write_wrap = %lx write = %lx\n",
 					recvpool_ctl->write_wrap, recvpool_ctl->write);
 #			endif
 			return TRUE;

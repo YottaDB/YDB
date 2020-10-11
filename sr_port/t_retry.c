@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -364,7 +364,7 @@ void t_retry(enum cdb_sc failure)
 					rel_crit(gv_cur_region);
 					process_reorg_encrypt_restart();
 					assert(NULL == reorg_encrypt_restart_csa);
-					grab_crit_encr_cycle_sync(gv_cur_region);
+					grab_crit_encr_cycle_sync(gv_cur_region, WS_48);
 				}
 			}
 		}
@@ -378,7 +378,7 @@ void t_retry(enum cdb_sc failure)
 			 * while holding crit).
 			 */
 			if (!csa->hold_onto_crit)
-				grab_crit_encr_cycle_sync(gv_cur_region);
+				grab_crit_encr_cycle_sync(gv_cur_region, WS_49);
 			else if (WC_BLOCK_RECOVER == cnl->wc_blocked)
 			{	/* Possible ONLY for online rollback or DSE that grabs crit during startup and never grabs again.
 				 * In such cases grab_crit (such as above) is skipped. As a result wcs_recover is also skipped.
@@ -423,9 +423,13 @@ void t_retry(enum cdb_sc failure)
 				{	/* Final retry on an update transaction and region is frozen.
 					 * Wait for it to be unfrozen and only then grab crit.
 					 */
+<<<<<<< HEAD
 					DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE;)
 					GRAB_UNFROZEN_CRIT(gv_cur_region, csa);
 					DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE;)
+=======
+					GRAB_UNFROZEN_CRIT(gv_cur_region, csa, WS_50);
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 				}
 			} else
 			{

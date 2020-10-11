@@ -285,13 +285,14 @@ enum cdb_sc	op_tcommit(void)
 				is_mm = (dba_mm == csa->hdr->acc_meth);
 				csa->tp_hint = 0;	/* will be set to non-zero later if we invoke "bm_getfree" */
 				si->cr_array_index = 0;
-#				ifdef DEBUG
-				if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND)
-					&& !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT") && !csa->nl->wbox_test_seq_num)
-				{
-					while (0 == csa->nl->wbox_test_seq_num)
-						SHORT_SLEEP(1);	/* wait for signal from mubfilcpy that it has reached sync point */
-				}
+#				ifdef DEBUG /* This code is shared by two WB tests */
+				if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) ||
+					(WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == gtm_white_box_test_case_count)))
+					if (!MEMCMP_LIT(gv_cur_region->rname, "DEFAULT") && !csa->nl->wbox_test_seq_num)
+					{
+						while (0 == csa->nl->wbox_test_seq_num)
+						SHORT_SLEEP(1); /* wait for signal from mubfilcpy that it has reached sync point */
+					}
 #				endif
 				if (!is_mm && (si->cr_array_size < (si->num_of_blks + (si->cw_set_depth * 2))))
 				{	/* reallocate a bigger cr_array. We need atmost read-set (si->num_of_blks) +

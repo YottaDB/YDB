@@ -88,13 +88,17 @@ static inline void grab_lock_crit_intl(mlk_pvtctl_ptr_t pctl, boolean_t *ret_was
 	{
 		UPDATE_CRASH_COUNT(csa, crash_count);
 		if (!(*ret_was_crit = csa->now_crit))		/* WARNING assignment */
-			grab_crit(pctl->region);
+			grab_crit(pctl->region, WS_5);
 	} else
 	{	/* Return value of "grab_latch" does not need to be checked because we pass
 		 * in GRAB_LATCH_INDEFINITE_WAIT as the timeout.
 		 */
+<<<<<<< HEAD
 		grab_latch(&csa->nl->lock_crit, GRAB_LATCH_INDEFINITE_WAIT);
 		*ret_was_crit = FALSE;				/* Initialize to keep code analyzer happy */
+=======
+		grab_latch(&csa->nl->lock_crit, GRAB_LATCH_INDEFINITE_WAIT, WS_38, csa);
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 	}
 }
 

@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2019 Fidelity National Information		#
+# Copyright (c) 2001-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
@@ -69,7 +69,13 @@ endif
 
 source $gtm_root/$gtm_verno/tools/gtm_cshrc.csh
 source $gtm_root/$gtm_verno/tools/gtm_env.csh
-setenv gtm_curpro `source $gtm_root/$gtm_verno/tools/versions.csh ; echo $gtm_curpro`
+if (! $?gtm_curpro) then
+	# The tools and test system relies on $gtm_curpro defined in the environment for greater flexibility
+	# Some day we need to eliminate versions.csh and expect $gtm_curpro to be defined in the environment.
+	# setenv gtm_curpro `source $gtm_root/$gtm_verno/tools/versions.csh ; echo $gtm_curpro`
+	echo 'RUNALL-E-CURPRO: gtm_curpro not defined. runall expects gtm_curpro to be defined and exist in $gtm_root'
+	exit 1
+endif
 
 \unalias unalias >& /dev/null  # TCSH does not let you alias unalias
 unalias cd chown rm touch echo grep sed awk sort cat mv ls

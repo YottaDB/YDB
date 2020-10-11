@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2016 Fidelity National Information	*
+ * Copyright (c) 2015-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,24 +33,24 @@ error_def(ERR_MULTIPROCLATCH);
 #define	MULTI_PROC_MAX_PROCS		1000	/* We expect max # of tasks to execute to be in the hundreds, not thousands */
 #define	MULTI_PROC_LATCH_TIMEOUT_SEC	(4 * 60)        /* Define latch timeout as being 4 mins */
 
-#define	GRAB_MULTI_PROC_LATCH_IF_NEEDED(RELEASE_LATCH)								\
-{														\
-	GBLREF	uint4	process_id;										\
-														\
-	if (multi_proc_in_use)											\
-	{													\
-		RELEASE_LATCH = FALSE;										\
-		if (process_id != multi_proc_shm_hdr->multi_proc_latch.u.parts.latch_pid)			\
-		{												\
-			if (!grab_latch(&multi_proc_shm_hdr->multi_proc_latch, MULTI_PROC_LATCH_TIMEOUT_SEC))	\
-			{											\
-				assert(FALSE);									\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4)					\
-					ERR_MULTIPROCLATCH, 2, LEN_AND_LIT("GRAB_MULTI_PROC_LATCH_IF_NEEDED"));	\
-			}											\
-			RELEASE_LATCH = TRUE;									\
-		}												\
-	}													\
+#define	GRAB_MULTI_PROC_LATCH_IF_NEEDED(RELEASE_LATCH)										\
+{																\
+	GBLREF	uint4	process_id;												\
+																\
+	if (multi_proc_in_use)													\
+	{															\
+		RELEASE_LATCH = FALSE;												\
+		if (process_id != multi_proc_shm_hdr->multi_proc_latch.u.parts.latch_pid)					\
+		{														\
+			if (!grab_latch(&multi_proc_shm_hdr->multi_proc_latch, MULTI_PROC_LATCH_TIMEOUT_SEC, NOT_APPLICABLE,NULL)) \
+			{													\
+				assert(FALSE);											\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4)							\
+					ERR_MULTIPROCLATCH, 2, LEN_AND_LIT("GRAB_MULTI_PROC_LATCH_IF_NEEDED"));			\
+			}													\
+			RELEASE_LATCH = TRUE;											\
+		}														\
+	}															\
 }
 
 #define	REL_MULTI_PROC_LATCH_IF_NEEDED(RELEASE_LATCH)						\

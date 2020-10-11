@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +13,6 @@
 #ifndef MLK_LOCK_INCLUDED
 #define MLK_LOCK_INCLUDED
 
-uint4 mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, bool new);
+gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new);
 
 #endif /* MLK_LOCK_INCLUDED */

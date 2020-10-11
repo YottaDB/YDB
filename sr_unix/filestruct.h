@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
@@ -138,14 +138,8 @@ typedef struct unix_file_info_struct
 #define	FI_FN(file_info)	((unix_file_info *)(file_info))->fn
 #define	FI_FN_LEN(file_info)	((unix_file_info *)(file_info))->fn_len
 
-#if defined(__osf__) || defined(_AIX)
-#define REG_EQUAL(fileinfo,reg) ((fileinfo)->fileid.inode == FILE_INFO(reg)->fileid.inode		\
-					&& (fileinfo)->fileid.device == FILE_INFO(reg)->fileid.device	\
-					&& (fileinfo)->fileid.st_gen == FILE_INFO(reg)->fileid.st_gen)
-#else
 #define REG_EQUAL(fileinfo,reg) ((fileinfo)->fileid.inode == FILE_INFO(reg)->fileid.inode		\
 					&& (fileinfo)->fileid.device == FILE_INFO(reg)->fileid.device)
-#endif
 
 #define CSD2UDI(CSD, UDI)				\
 MBSTART {						\

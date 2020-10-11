@@ -820,7 +820,7 @@ SOCKETEXIST	<Socket !AD already exists>/error/fao=2!/ansi=79
 LISTENPASSBND	<Controlmnemonic LISTEN can be applied to PASSIVE socket in the state BOUND only>/error/fao=0!/ansi=76
 DBCLNUPINFO	<Database file !AD !/!AD>/info/fao=4!/ansi=0
 MUNODWNGRD	<Database not downgraded because of preceding errors>/error/fao=0!/ansi=0
-REPLTRANS2BIG	<Transaction !16@XQ of size !UL (pre-filter size !UL) too large to be accommodated in the !AD pool>/error/fao=5!/ansi=0
+REPLTRANS2BIG	<Transaction !16@XQ of size !@ZQ (pre-filter size !@ZQ) too large to be accommodated in the !AD pool>/error/fao=5!/ansi=0
 RDFLTOOLONG	<Length specified for fixed length read exceeds the maximum string size>/error/fao=0!/ansi=0
 MUNOFINISH	<MUPIP unable to finish all requested actions>/error/fao=0!/ansi=0
 DBFILEXT	<Database file !AD extended from 0x!XL blocks to 0x!XL at transaction 0x!16@XQ>/info/fao=5!/ansi=0
@@ -1715,6 +1715,9 @@ MUKEEPNOTRUNC	<Keep issued without -truncate>/error/fao=0!/ansi=0
 MUTRUNCNOSPKEEP	<Region !AD has insufficient space to meet truncate target percentage of !UL with keep at !UL blocks>/info/fao=4!/ansi=0
 TERMHANGUP	<Terminal has disconnected>/error/fao=0!/ansi=0
 DBFILNOFULLWRT	<Disabling fullblock writes. !AD !AD !UL>/warning/fao=5!/ansi=0
+BADCONNECTPARAM	<Error parsing or invalid !AD>/error/fao=2!/ansi=0
+BADPARAMCOUNT	<-CONNECTPARAMS accepts one to six parameter values>/error/fao=0!/ansi=0
+REPLALERT	<Source Server could not connect to replicating instance [!AZ] for !UL seconds>/warning/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

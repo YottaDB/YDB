@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Copyright (c) 2003-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -442,7 +442,7 @@ boolean_t mur_close_files(void)
 				 */
 				was_crit = csa->now_crit;
 				if (!was_crit)
-					grab_crit(reg);
+					grab_crit(reg, WS_72);
 				assert(JNL_ENABLED(csd));
 				jnl_status = jnl_ensure_open(reg, csa);
 				assert(0 == jnl_status);

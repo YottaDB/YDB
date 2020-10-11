@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2019 Fidelity National Information	*
+ * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -154,14 +154,19 @@ STATICDEF int			gtmrecv_repl_cmpmsglen;
 STATICDEF int			gtmrecv_repl_uncmpmsglen;
 
 STATICFNDCL	void	gtmrecv_repl_send_loop_error(int status, char *msgtypestr);
+<<<<<<< HEAD
 STATICFNDCL	int	repl_tr_endian_convert_rcvr(unsigned char remote_jnl_ver, uchar_ptr_t jnl_buff, uint4 jnl_len);
 #if defined(GTM_REPLIC_FLOW_CONTROL_ENABLED)
 STATICFNDCL	void	do_flow_control(uint4 write_pos);
 #endif
+=======
+STATICFNDCL	int	repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t jnl_buff, uint4 jnl_len);
+STATICFNDCL	void	do_flow_control(gtm_uint64_t write_pos);
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 STATICFNDCL	int	gtmrecv_est_conn(void);
 STATICFNDCL	int	gtmrecv_start_onln_rlbk(void);
-STATICFNDCL	void	prepare_recvpool_for_write(int datalen, int pre_filter_write_len);
-STATICFNDCL	void	copy_to_recvpool(uchar_ptr_t databuff, int datalen);
+STATICFNDCL	void	prepare_recvpool_for_write(gtm_uint64_t datalen, gtm_uint64_t pre_filter_write_len);
+STATICFNDCL	void	copy_to_recvpool(uchar_ptr_t databuff, gtm_uint64_t datalen);
 STATICFNDCL	void	wait_for_updproc_to_clear_backlog(void);
 STATICFNDCL	void	process_tr_buff(int msg_type);
 STATICFNDCL	void	gtmrecv_updresync_histinfo_find_seqno(seq_num input_seqno, int4 strm_num, repl_histinfo *histinfo);
@@ -205,19 +210,19 @@ typedef enum
 } gtmrecv_buff_t;
 
 static	unsigned char	*buffp, *buff_start, *msgbuff;
-static	int		buff_unprocessed;
-static	int		buffered_data_len;
-static	int		max_recv_bufsiz;
-static	int		data_len;
-static	int		exp_data_len;
+static	gtm_uint64_t	buff_unprocessed;
+static	gtm_uint64_t	buffered_data_len;
+static	gtm_uint64_t	max_recv_bufsiz;
+static	gtm_uint64_t	data_len;
+static	gtm_uint64_t	exp_data_len;
 static	boolean_t	xoff_sent;
 static	repl_msg_t	xon_msg, xoff_msg;
 static	int		xoff_msg_log_cnt = 0;
 static	long		recvpool_high_watermark, recvpool_low_watermark;
-static	uint4		write_loc, write_wrap;
-static	uint4		write_off;
+static	gtm_uint64_t	write_loc, write_wrap;
+static	gtm_uint64_t	write_off;
 static	double		time_elapsed;
-static	uint4		recvpool_size;
+static	gtm_uint64_t	recvpool_size;
 static	int		heartbeat_period;
 #ifdef REPL_CMP_SOLVE_TESTING
 static	boolean_t	repl_cmp_solve_timer_set;
@@ -534,8 +539,12 @@ STATICFNDEF int repl_tr_endian_convert_rcvr(unsigned char remote_jnl_ver, uchar_
 	return status;
 }
 
+<<<<<<< HEAD
 #if defined(GTM_REPLIC_FLOW_CONTROL_ENABLED)
 STATICFNDEF void do_flow_control(uint4 write_pos)
+=======
+STATICFNDEF void do_flow_control(gtm_uint64_t write_pos)
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 {
 	/* Check for overflow before writing */
 
@@ -546,7 +555,7 @@ STATICFNDEF void do_flow_control(uint4 write_pos)
 	int			tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int			torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
 	int			status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
-	int			read_pos;
+	gtm_uint64_t		read_pos;
 	seq_num			temp_seq_num;
 	DCL_THREADGBL_ACCESS;
 
@@ -579,8 +588,8 @@ STATICFNDEF void do_flow_control(uint4 write_pos)
 		}
 		CHECK_REPL_SEND_LOOP_ERROR(status, "REPL_XOFF");
 		if (gtmrecv_logstats)
-			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Space used = %ld, High water mark = %d Low water mark = %d, "
-					"Updproc Read = %d, Recv Write = %d, Sent XOFF\n", space_used, recvpool_high_watermark,
+			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Space used = %ld, High water mark = %ld Low water mark = %ld, "
+					"Updproc Read = %ld, Recv Write = %ld, Sent XOFF\n", space_used, recvpool_high_watermark,
 					recvpool_low_watermark, read_pos, write_pos);
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_XOFF sent as receive pool has %ld bytes transaction data yet to be "
 				"processed\n", space_used);
@@ -606,8 +615,8 @@ STATICFNDEF void do_flow_control(uint4 write_pos)
 		}
 		CHECK_REPL_SEND_LOOP_ERROR(status, "REPL_XON");
 		if (gtmrecv_logstats)
-			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Space used now = %ld, High water mark = %d, "
-				 "Low water mark = %d, Updproc Read = %d, Recv Write = %d, Sent XON\n", space_used,
+			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Space used now = %ld, High water mark = %ld, "
+				 "Low water mark = %ld, Updproc Read = %ld, Recv Write = %ld, Sent XON\n", space_used,
 				 recvpool_high_watermark, recvpool_low_watermark, read_pos, write_pos);
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_XON sent as receive pool has %ld bytes free space to buffer transaction "
 				"data\n", recvpool_size - space_used);
@@ -1507,7 +1516,7 @@ void gtmrecv_send_histinfo(repl_histinfo *cur_histinfo)
 	repl_dump_histinfo(log_fp, TRUE, FALSE, "History sent", cur_histinfo);
 }
 
-STATICFNDEF void prepare_recvpool_for_write(int datalen, int pre_filter_write_len)
+STATICFNDEF void prepare_recvpool_for_write(gtm_uint64_t datalen, gtm_uint64_t pre_filter_write_len)
 {
 	recvpool_ctl_ptr_t	recvpool_ctl;
 
@@ -1515,7 +1524,7 @@ STATICFNDEF void prepare_recvpool_for_write(int datalen, int pre_filter_write_le
 	if (datalen > recvpool_size)
 	{	/* Too large a transaction to be accommodated in the Receive Pool */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLTRANS2BIG, 5, &recvpool_ctl->jnl_seqno,
-				datalen, pre_filter_write_len, LEN_AND_LIT("Receive"));
+				&datalen, &pre_filter_write_len, LEN_AND_LIT("Receive"));
 	}
 	if ((write_loc + datalen) > recvpool_size)
 	{
@@ -1561,10 +1570,10 @@ STATICFNDEF void prepare_recvpool_for_write(int datalen, int pre_filter_write_le
 	DO_FLOW_CONTROL(write_loc);
 }
 
-STATICFNDEF void copy_to_recvpool(uchar_ptr_t databuff, int datalen)
+STATICFNDEF void copy_to_recvpool(uchar_ptr_t databuff, gtm_uint64_t datalen)
 {
-	uint4			upd_read;
-	uint4			future_write;
+	gtm_uint64_t		upd_read;
+	gtm_uint64_t		future_write;
 	upd_proc_local_ptr_t	upd_proc_local;
 	recvpool_ctl_ptr_t	recvpool_ctl;
 
@@ -1874,14 +1883,14 @@ STATICFNDEF void process_tr_buff(int msg_type)
 		{
 			if (!filter_pass)
 			{
-				repl_log(gtmrecv_log_fp, FALSE, FALSE, "Tr : "INT8_FMT"  Size : %d  Write : %d  "
+				repl_log(gtmrecv_log_fp, FALSE, FALSE, "Tr : "INT8_FMT"  Size : %d  Write : %ld  "
 					 "Total : "INT8_FMT"\n", recvpool_ctl->jnl_seqno, write_len,
 					 write_off, repl_recv_data_processed);
 			} else
 			{
 				assert(!is_new_histrec);
 				repl_log(gtmrecv_log_fp, FALSE, FALSE, "Tr : "INT8_FMT"  Pre filter Size : %d  "
-					"Post filter Size  : %d  Pre filter Write : %d  Post filter Write : %d  "
+					"Post filter Size  : %d  Pre filter Write : %d  Post filter Write : %ld  "
 					"Pre filter Total : "INT8_FMT"  Post filter Total : "INT8_FMT"\n",
 					recvpool_ctl->jnl_seqno, pre_filter_write_len, write_len,
 					pre_filter_write, write_off, repl_recv_data_processed,
@@ -2908,11 +2917,11 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 		}
 #		endif
 		/* Something on the replication pipe - read it */
-		REPL_DPRINT3("Pending data len : %d  Prev buff unprocessed : %d\n", data_len, buff_unprocessed);
+		REPL_DPRINT3("Pending data len : %d  Prev buff unprocessed : %ld\n", data_len, buff_unprocessed);
 		buff_unprocessed += recvd_len;
 		repl_recv_data_recvd += (qw_num)recvd_len;
 		if (gtmrecv_logstats)
-			repl_log(gtmrecv_log_fp, FALSE, FALSE, "Recvd : %d  Total : %d\n", recvd_len, repl_recv_data_recvd);
+			repl_log(gtmrecv_log_fp, FALSE, FALSE, "Recvd : %d  Total : %ld\n", recvd_len, repl_recv_data_recvd);
 		while (msghdrlen <= buff_unprocessed)
 		{
 			buffp_start = buffp;

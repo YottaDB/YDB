@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -812,6 +812,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 			tbp = exttab_scan_space(tbp);
 		}
 		entry_ptr = get_memory(SIZEOF(*entry_ptr));
+		memset(entry_ptr->ext_call_behaviors, 0, SIZEOF(entry_ptr->ext_call_behaviors));
 		/* note fills out part of entry_ptr */
 		scan_behavioral_words(tbp, entry_ptr);
 		entry_ptr->next_entry = pak->first_entry;

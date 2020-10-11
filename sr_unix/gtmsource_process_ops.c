@@ -121,15 +121,33 @@ GBLREF	unsigned char		*gtmsource_tcombuff_start;
 GBLREF	gtmsource_options_t	gtmsource_options;
 #endif
 
+<<<<<<< HEAD
+=======
+error_def(ERR_REPLALERT);
+error_def(ERR_REPL2OLD);
+error_def(ERR_REPLCOMM);
+error_def(ERR_REPLFTOKSEM);
+error_def(ERR_REPLINSTNOHIST);
+error_def(ERR_REPLINSTSECMTCH);
+error_def(ERR_REPLNOXENDIAN);
+error_def(ERR_SECNOTSUPPLEMENTARY);
+error_def(ERR_STRMNUMMISMTCH1);
+error_def(ERR_STRMNUMMISMTCH2);
+error_def(ERR_TEXT);
+error_def(ERR_TLSCONVSOCK);
+error_def(ERR_TLSHANDSHAKE);
+
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 int gtmsource_est_conn()
 {
 	char			print_msg[PROC_OPS_PRINT_MSG_LEN], msg_str[1024], *errmsg;
-	int			connection_attempts, alert_attempts, save_errno, comminit_retval, status;
+	int			connection_attempts, max_heartbeat_wait, save_errno, comminit_retval, status;
 	int			send_buffsize, recv_buffsize, tcp_s_bufsize;
 	int 			logging_period, logging_interval; /* logging period = soft_tries_period*logging_interval */
-	int			hardtries_period, hardtries_count;
-	int 			logging_attempts;
+	int			alert_period, hardtries_count, hardtries_period;
+	int 			max_shutdown_wait, max_sleep, soft_tries_period;
 	int			secondary_addrlen;
+	time_t			alert_time_start = 0, noconnection_time = 0; /* For logging the REPLALERT message */
 	boolean_t		throw_errors = TRUE;
 	sockaddr_ptr		secondary_sa;
 	gtmsource_local_ptr_t	gtmsource_local;
@@ -151,67 +169,111 @@ int gtmsource_est_conn()
 	/* Connect to the secondary - use hard tries, soft tries ... */
 	connection_attempts = 0;
 	comminit_retval = gtmsource_comm_init(throw_errors); /* set up gtmsource_local.secondary_ai */
+	max_shutdown_wait = GTMSOURCE_MAX_SHUTDOWN_WAITLOOP(gd_header);
+	soft_tries_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD];
 	hardtries_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD];
 	hardtries_count = gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_COUNT];
-	repl_log(gtmsource_log_fp, TRUE, TRUE, "Connect hard tries count = %d, Connect hard tries period = %d\n",
-				hardtries_count, hardtries_period);
-	do
+	alert_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_ALERT_PERIOD];
+	max_heartbeat_wait = gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT];
+	max_sleep = DIVIDE_ROUND_UP(max_shutdown_wait, 2);
+	if (hardtries_period > (max_sleep * 1000))
 	{
+		hardtries_period = max_sleep * 1000;
+		repl_log(gtmsource_log_fp, TRUE, TRUE,
+			"Hard tries period cannot be more than half of maximum shutdown wait time of %d seconds. "
+			"Reducing hard tries period to %d milliseconds \n", max_shutdown_wait,
+			hardtries_period);
+	}
+	repl_log(gtmsource_log_fp, TRUE, TRUE, "Connect hard tries count = %d, Connect hard tries period = %d milliseconds\n",
+		hardtries_count, hardtries_period);
+
+	while (++connection_attempts < (hardtries_count + 1))
+	{
+		if (0 == noconnection_time)
+			time(&noconnection_time);
 		if ((FD_INVALID == gtmsource_sock_fd) || (0 != comminit_retval))
 		{ /* gtmsource_comm_init failed to initialize the socket. Report error and retry gtmsource_comm_init. */
 			repl_log(gtmsource_log_fp, TRUE, TRUE,
 				 "%d hard connection attempt failed : Error with source server connection initiation\n",
-					connection_attempts + 1);
+					connection_attempts);
 		} else
 		{
 			secondary_sa = (sockaddr_ptr)(&gtmsource_local->secondary_inet_addr);
 			secondary_addrlen = gtmsource_local->secondary_addrlen;
 			CONNECT_SOCKET(gtmsource_sock_fd, secondary_sa, secondary_addrlen, status);
 			if (0 == status)
+			{
+				noconnection_time = 0;
 				break;
-			repl_log(gtmsource_log_fp, TRUE, TRUE, "%d hard connection attempt failed : %s\n", connection_attempts + 1,
+			}
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "%d hard connection attempt failed : %s\n", connection_attempts,
 				 STRERROR(errno));
 			repl_close(&gtmsource_sock_fd);
 		}
+<<<<<<< HEAD
 		/* Pause (very briefly as this is a hard spin loop) before trying the connection again then check if any
 		 * interrupting conditions occurred before retrying the connection.
 		 */
 		SLEEP_FOR_MSEC(hardtries_period);
+=======
+		if (REPL_MAX_CONN_HARD_TRIES_PERIOD > hardtries_period)
+		{
+			SHORT_SLEEP(hardtries_period);
+		}
+		else
+			LONG_SLEEP_MSEC(hardtries_period);
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 		gtmsource_poll_actions(FALSE);
 		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 			return (SS_NORMAL);
 		/* Check for network resolution issues if the socket is invalid */
 		if (FD_INVALID == gtmsource_sock_fd)
 			comminit_retval = gtmsource_comm_init(throw_errors);
-	} while (++connection_attempts < hardtries_count);
+	} /* end of while*/
 	gtmsource_poll_actions(FALSE);
 	if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 		return (SS_NORMAL);
 
 	if (hardtries_count <= connection_attempts)
+<<<<<<< HEAD
 	{	/* Initialize logging period related variables */
 		logging_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD];
+=======
+	{	/*Initialize variables to gradually reduce soft_try_attempts period logging*/
+		logging_period = soft_tries_period;
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 		logging_interval = 1;
-		logging_attempts = 0;
 
-		alert_attempts = DIVIDE_ROUND_DOWN(gtmsource_local->connect_parms[GTMSOURCE_CONN_ALERT_PERIOD],
-							gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]);
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Soft tries period = %d, Alert period = %d\n",
-			 gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD],
-			 alert_attempts * gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]);
+		if (soft_tries_period > max_sleep)
+		{
+			soft_tries_period = max_sleep;
+			repl_log(gtmsource_log_fp, TRUE, TRUE,
+			"Soft tries period cannot be more than half of the maximum shutdown wait time of %d seconds. "
+			"Reducing soft tries period to %d seconds \n",
+				max_shutdown_wait, soft_tries_period);
+		}
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Soft tries period = %d seconds, REPLALERT message period = %d seconds\n",
+			 soft_tries_period, alert_period);
 		connection_attempts = 0;
 		do
 		{
 			if ((FD_INVALID == gtmsource_sock_fd) || (0 != comminit_retval))
+<<<<<<< HEAD
 			{	/* gtmsource_comm_init() failed to initialize the socket. Report error and retry
 				 * gtmsource_comm_init().
 				 */
+=======
+			{ /* gtmsource_comm_init failed to initialize the socket. Report error and retry gtmsource_comm_init. */
+				if (0 == alert_time_start)
+					time(&alert_time_start);
+				if (0 == noconnection_time)
+					noconnection_time = alert_time_start;
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 				if (0 == (connection_attempts + 1) % logging_interval)
 				{
 					repl_log(gtmsource_log_fp, TRUE, TRUE,
 					"%d soft connection attempt failed : Error with source server connection initiation\n",
 						 connection_attempts + 1);
-					logging_attempts++;
 					throw_errors = TRUE;
 				} else /* Decrease the frequency of showing the connection failure error messages */
 					throw_errors = FALSE;
@@ -221,17 +283,27 @@ int gtmsource_est_conn()
 				secondary_addrlen = gtmsource_local->secondary_addrlen;
 				CONNECT_SOCKET(gtmsource_sock_fd, secondary_sa, secondary_addrlen, status);
 				if (0 == status)
+				{
+					noconnection_time = 0;
 					break;
+				}
+				if (0 == alert_time_start)
+					time(&alert_time_start);
+				if (0 == noconnection_time)
+					noconnection_time = alert_time_start;
 				save_errno = errno;
 				repl_close(&gtmsource_sock_fd);
 				if (0 == (connection_attempts + 1) % logging_interval)
 				{
 					repl_log(gtmsource_log_fp, TRUE, TRUE, "%d soft connection attempt failed : %s\n",
 						 connection_attempts + 1, STRERROR(save_errno));
-					logging_attempts++;
 					throw_errors = TRUE;
 				} else /* Decrease the frequency of showing the connection failure error messages */
 					throw_errors = FALSE;
+<<<<<<< HEAD
+=======
+				LONG_SLEEP(soft_tries_period);
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 			}
 			/* Pause before trying the connection again then check if any interrupting conditions occurred
 			 * before retrying the connection.
@@ -244,14 +316,13 @@ int gtmsource_est_conn()
 			if (FD_INVALID == gtmsource_sock_fd)
 				comminit_retval = gtmsource_comm_init(throw_errors);
 			connection_attempts++;
-			if (0 == (connection_attempts % logging_interval) && 0 == (logging_attempts % alert_attempts))
-			{ 	/* Log ALERT message */
-				SNPRINTF(msg_str, SIZEOF(msg_str),
-					 "GTM Replication Source Server : Could not connect to secondary in %d seconds\n",
-					connection_attempts *
-					gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]);
-				sgtm_putmsg(print_msg, PROC_OPS_PRINT_MSG_LEN, VARLSTCNT(4) ERR_REPLWARN, 2, LEN_AND_STR(msg_str));
+			if ((0 != alert_period) && ((double)alert_period <= difftime(time(NULL), alert_time_start)))
+			{ 	/* Log the REPLALERT message */
+				sgtm_putmsg(print_msg, PROC_OPS_PRINT_MSG_LEN, VARLSTCNT(4) ERR_REPLALERT, 2,
+						jnlpool->gtmsource_local->secondary_instname,
+						(UINTPTR_T)difftime(time(NULL), noconnection_time));
 				repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
+				alert_time_start = 0;
 			}
 			if (logging_period <= REPL_MAX_LOG_PERIOD)
 			{	 /* the maximum real_period can reach 2*REPL_MAX_LOG_PERIOD) */
@@ -679,7 +750,7 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 {
 	seq_num			cur_read_jnl_seqno;
 	qw_off_t		cur_read_addr;
-	uint4			cur_read, prev_read, prev_tr_size, jnlpool_size;
+	gtm_uint64_t		cur_read, prev_read, prev_tr_size, jnlpool_size;
 	int			save_lastwrite_len;
 	unsigned char		seq_num_str[32], *seq_num_ptr;
 	jnlpool_ctl_ptr_t	jctl;
@@ -758,7 +829,7 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 					assert(cur_read == QWMODDW(cur_read_addr, jnlpool_size));
 					REPL_DPRINT2("Srch restart : No more input in jnlpool, backing off to read_jnl_seqno : "
 							  INT8_FMT, INT8_PRINT(cur_read_jnl_seqno));
-					REPL_DPRINT3(" read_addr : "INT8_FMT" read : %d\n", INT8_PRINT(cur_read_addr), cur_read);
+					REPL_DPRINT3(" read_addr : "INT8_FMT" read : %ld\n", INT8_PRINT(cur_read_addr), cur_read);
 				}
 			}
 			if (QWEQ(cur_read_addr, jctl->write_addr))
@@ -807,7 +878,7 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 				QWDECRBYDW(cur_read_jnl_seqno, 1);
 				REPL_DPRINT2("Srch restart : No overflow yet, backing off to read_jnl_seqno : "INT8_FMT,
 						  INT8_PRINT(cur_read_jnl_seqno));
-				REPL_DPRINT3(" read_addr : "INT8_FMT" read : %d\n", INT8_PRINT(cur_read_addr), cur_read);
+				REPL_DPRINT3(" read_addr : "INT8_FMT" read : %ld\n", INT8_PRINT(cur_read_addr), cur_read);
 				continue;
 			}
 			break;
@@ -821,13 +892,13 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 		{
 			REPL_DPRINT2("Srch restart : Now in READ_POOL state read_jnl_seqno : "INT8_FMT,
 					  INT8_PRINT(cur_read_jnl_seqno));
-			REPL_DPRINT3(" read_addr : "INT8_FMT" read : %d\n",INT8_PRINT(cur_read_addr), cur_read);
+			REPL_DPRINT3(" read_addr : "INT8_FMT" read : %ld\n",INT8_PRINT(cur_read_addr), cur_read);
 		} else
 		{
 			/* Overflow, or requested seqno too far back to be in pool */
 			REPL_DPRINT2("Srch restart : Now in READ_FILE state. Changing sync point to read_jnl_seqno : "INT8_FMT,
 					  INT8_PRINT(cur_read_jnl_seqno));
-			REPL_DPRINT3(" read_addr : "INT8_FMT" read : %d ", INT8_PRINT(cur_read_addr), cur_read);
+			REPL_DPRINT3(" read_addr : "INT8_FMT" read : %ld ", INT8_PRINT(cur_read_addr), cur_read);
 			REPL_DPRINT2("save_read_jnl_seqno : "INT8_FMT"\n", INT8_PRINT(gtmsource_save_read_jnl_seqno));
 
 			QWASSIGN(gtmsource_save_read_jnl_seqno, cur_read_jnl_seqno);
@@ -868,9 +939,9 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 	repl_log(gtmsource_log_fp, TRUE, FALSE, "Source server will start sending from seqno %llu [0x%llx]\n",
 		recvd_jnl_seqno, recvd_jnl_seqno);
 	if (READ_POOL == gtmsource_local->read_state)
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server now reading from the journal POOL\n");
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server now reading from journal pool\n");
 	else
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server now reading from the journal FILES\n");
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server now reading from journal files\n");
 	/* Finally set "gtmsource_local->read_jnl_seqno" to be "recvd_jnl_seqno" and flush changes to instance file on disk */
 	gtmsource_flush_fh(recvd_jnl_seqno);
 	assert(GTMSOURCE_HANDLE_ONLN_RLBK != gtmsource_state);
@@ -1217,10 +1288,10 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 		return FALSE;
 	} else if (msgtype != msg->type)
 	{
-		assert(FALSE);
 		repl_log(gtmsource_log_fp, TRUE, FALSE, "UNKNOWN msg (type = %d) received when waiting for msg (type = %d)"
 							 ". Closing connection.\n", msg->type, msgtype);
 		repl_close(&gtmsource_sock_fd);
+		assert(FALSE);
 		SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 		gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 		return FALSE;

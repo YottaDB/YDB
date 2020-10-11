@@ -517,7 +517,7 @@ bool	mubinccpy (backup_reg_list *list)
 		 * backup.
 		 */
 		assert(!cs_addrs->hold_onto_crit); /* this ensures we can safely do unconditional grab_crit and rel_crit */
-		grab_crit(gv_cur_region);
+		grab_crit(gv_cur_region, WS_90);
 		assert(cs_data == cs_addrs->hdr);
 		if (dba_bg == cs_data->acc_meth)
 		{	/* Now that we have crit, wait for any pending phase2 updates to finish. Since phase2 updates happen

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2017 Fidelity National Information	*
+ * Copyright (c) 2014-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -386,7 +386,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 	has_relinkctl_lock = FALSE;
 	assert(!linkctl->locked);
 	assert(!linkctl->hdr->file_deleted);
-	if (!grab_latch(&relinkrec->rtnobj_latch, RLNKREC_LATCH_TIMEOUT_SEC))
+	if (!grab_latch(&relinkrec->rtnobj_latch, RLNKREC_LATCH_TIMEOUT_SEC, NOT_APPLICABLE, NULL))
 	{
 		assert(FALSE);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
@@ -400,7 +400,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 			 * for one last time.
 			 */
 			assert(!has_relinkctl_lock);
-			if (!grab_latch(&shm_hdr->relinkctl_latch, RLNKSHM_LATCH_TIMEOUT_SEC))
+			if (!grab_latch(&shm_hdr->relinkctl_latch, RLNKSHM_LATCH_TIMEOUT_SEC, NOT_APPLICABLE, NULL))
 			{
 				assert(FALSE);
 				rel_latch(&relinkrec->rtnobj_latch);
@@ -477,7 +477,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 		 */
 		if (!has_relinkctl_lock)
 		{
-			if (!grab_latch(&shm_hdr->relinkctl_latch, RLNKSHM_LATCH_TIMEOUT_SEC))
+			if (!grab_latch(&shm_hdr->relinkctl_latch, RLNKSHM_LATCH_TIMEOUT_SEC, NOT_APPLICABLE, NULL))
 			{
 				assert(FALSE);
 				rel_latch(&relinkrec->rtnobj_latch);
@@ -902,7 +902,7 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 	}
 	assert(dbg_shm_index < max_index);
 #	endif
-	if (!latch_grabbed && !grab_latch(&relinkrec->rtnobj_latch, RLNKREC_LATCH_TIMEOUT_SEC))
+	if (!latch_grabbed && !grab_latch(&relinkrec->rtnobj_latch, RLNKREC_LATCH_TIMEOUT_SEC, NOT_APPLICABLE, NULL))
 	{
 		assert(FALSE);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
@@ -959,7 +959,7 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 	assert(sizeIndex <= maxObjIndex);
 	elemSize = origElemSize = ((gtm_uint64_t)1 << (sizeIndex + MIN_RTNOBJ_SIZE_BITS));
 	/* Now that we need to unload the object from shared memory, get a shared memory lock */
-	if (!grab_latch(&shm_hdr->relinkctl_latch, RLNKSHM_LATCH_TIMEOUT_SEC))
+	if (!grab_latch(&shm_hdr->relinkctl_latch, RLNKSHM_LATCH_TIMEOUT_SEC, NOT_APPLICABLE, NULL))
 	{
 		assert(FALSE);
 		rel_latch(&relinkrec->rtnobj_latch);

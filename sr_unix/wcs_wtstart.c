@@ -284,7 +284,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			if (cr2flush->dirty && !cr2flush->epid)
 			{ 	/* if it is in the active queue */
 				++fast_lock_count; /* Disable wcs_stale for duration */
-				if (grab_latch(&ahead->latch, WT_LATCH_TIMEOUT_SEC))
+				if (grab_latch(&ahead->latch, WT_LATCH_TIMEOUT_SEC, WS_26, csa))
 				{
 					cr = cr2flush;
 					csr = (cache_state_rec_ptr_t)((sm_uc_ptr_t)cr + SIZEOF(cr->blkque));
@@ -448,7 +448,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			 * Also we are meddling with active queue now so we cannot risk a "wcs_recover" call inside
 			 * "grab_crit_immediate" hence the OK_FOR_WCS_RECOVER_FALSE usage below.
 			 */
-			if (!wtfini_called_once && (was_crit || grab_crit_immediate(region, OK_FOR_WCS_RECOVER_FALSE)))
+			if (!wtfini_called_once &&
+				(was_crit || grab_crit_immediate(region, OK_FOR_WCS_RECOVER_FALSE, NOT_APPLICABLE)))
 			{
 				if (csr->twin)
 				{

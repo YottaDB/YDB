@@ -49,6 +49,9 @@ void db_auto_upgrade(gd_region *reg)
 #	ifdef DEBUG
 	gtm_uint64_t		file_size;
 #	endif
+	int 			i;
+	gtm_uint64_t		*old_stats, *new_stats;
+	node_local_ptr_t	cnl;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -205,6 +208,7 @@ void db_auto_upgrade(gd_region *reg)
 				/* GT.M V63012 added fullblkwrt option */
 				csd->write_fullblk = 0;
 			case GDSMV63012:
+<<<<<<< HEAD
 			case GDSMR126:
 				/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support nanosecond timers */
 				csd->flush_time = csd->flush_time * NANOSECS_IN_MSEC;
@@ -236,6 +240,18 @@ void db_auto_upgrade(gd_region *reg)
 		 *    than the older YottaDB GDSMVCURR value (e.g. in case of YottaDB r1.32) and so those GT.M switch/case
 		 *    code paths above will not be reached for upgrades from an older YottaDB release to a newer YottaDB release.
 		 */
+=======
+				/* Copy the 62 pre GTM-8863 stats from the old header location to the new one */
+				cnl = csa->nl;
+				old_stats = (gtm_uint64_t *) &csd->gvstats_rec_old_now_filler[0];
+				new_stats = (gtm_uint64_t *) &cnl->gvstats_rec;
+				for (i = 0; i < SIZEOF(csd->gvstats_rec_old_now_filler)/SIZEOF(gtm_uint64_t); i++)
+				{
+					new_stats[i] = old_stats[i];
+				}
+				break;
+			case GDSMV63014:
+>>>>>>> e9a1c121 (GT.M V6.3-014)
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
