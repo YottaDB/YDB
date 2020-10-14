@@ -17,6 +17,9 @@
 
 set -euv
 
+# Make sure that `sort` behaves consistently
+export LC_ALL=C
+
 # This script stores files in `$output_dir` so they can be downloaded from the pipeline without downloading the build artifacts.
 # ${a+x} avoids an error from `set -u`: https://stackoverflow.com/a/13864829/7669110
 if [ -z "${1+x}" ]; then

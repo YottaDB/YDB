@@ -19,8 +19,12 @@ set -o pipefail
 # `sort` has different output depending on the locale
 export LC_ALL=C
 
-# TODO(#644): occasionally run clang-tidy in release mode
-build_type="Debug"
+echo "# Randomly choose to build Debug or Release build"
+if [[ $(( $RANDOM % 2)) -eq 0 ]]; then
+	build_type="Debug"
+else
+	build_type="RelWithDebInfo"
+fi
 echo " -> build_type = $build_type"
 
 echo "# Run the build using clang"
@@ -73,10 +77,19 @@ compare() {
 		[ $(wc -c < "$actual") = 0 ]
 	fi
 }
-compare ../../ci/warnings.ref sorted_warnings.txt make_warnings.txt
+
+if [ $build_type = Debug ]; then
+	compare ../../ci/warnings.ref sorted_warnings.txt make_warnings.txt
+else
+	compare ../../ci/warnings_rel.ref sorted_warnings.txt make_warnings.txt
+fi
 
 cd ..
 ../ci/create_tidy_warnings.sh warnings .
 
 # NOTE: If this command fails, you can download `sorted_warnings.txt` to `ci/tidy_warnings_debug.ref`
-compare ../ci/tidy_warnings_debug.ref warnings/{sorted_warnings.txt,tidy_warnings.txt}
+if [ $build_type = Debug ]; then
+	compare ../ci/tidy_warnings_debug.ref warnings/{sorted_warnings.txt,tidy_warnings.txt}
+else
+	compare ../ci/tidy_warnings_release.ref warnings/{sorted_warnings.txt,tidy_warnings.txt}
+fi
