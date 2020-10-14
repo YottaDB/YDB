@@ -78,17 +78,7 @@ commit-verify:
   before_script:
     - apt-get update -qq && apt-get install -y -qq git wget gnupg
   script:
-    - ci/commit_verify.sh ci/needs_copyright.sh
-  # This section is necessary in order for the following environment variables to be set, which `commit_verify.sh` depends on:
-  # - CI_EXTERNAL_PULL_REQUEST_TARGET_BRANCH_NAME
-  # - CI_MERGE_REQUEST_TARGET_BRANCH_NAME
-  # - CI_EXTERNAL_PULL_REQUEST_TARGET_REPOSITORY
-  # - CI_REPOSITORY_URL
-  # See the documentation at https://docs.gitlab.com/ee/ci/variables/predefined_variables.html for more information.
-  rules:
-    # `external_pull_request` indicates an MR from another GitLab repository (usually a fork).
-    # `merge_request_event` indicates an MR from the current repository.
-    - if: '$CI_PIPELINE_SOURCE == "external_pull_request" || $CI_PIPELINE_SOURCE == "merge_request_event"'
+    - ci/commit_verify.sh ci/needs_copyright.sh https://gitlab.com/YottaDB/DB/YDB
 
 build-centos:
   extends: .build

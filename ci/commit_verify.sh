@@ -15,13 +15,13 @@ set -euv
 set -o pipefail
 
 if [ $# -lt 1 ] || [ -z "$1" ]; then
-	echo "usage: $0 <needs_copyright.sh> [comparison branch] [remote URL]"
+	echo "usage: $0 <needs_copyright.sh> <remote URL> [comparison branch]"
 	exit 1
 fi
 
 needs_copyright="$1"
-target_branch="${2:-${CI_EXTERNAL_PULL_REQUEST_TARGET_BRANCH_NAME:-$CI_MERGE_REQUEST_TARGET_BRANCH_NAME}}"
-upstream_repo="${3:-${CI_EXTERNAL_PULL_REQUEST_TARGET_REPOSITORY:-$CI_REPOSITORY_URL}}"
+upstream_repo="$2"
+target_branch="${3:-master}"
 
 echo "# Check for a commit that was not gpg-signed"
 
