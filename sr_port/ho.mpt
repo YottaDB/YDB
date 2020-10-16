@@ -3,6 +3,9 @@
 ; Copyright (c) 1987-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -22,7 +25,7 @@ FUNC(h)
 	quit:"-"=$extract(h) ""		; 0>h risks NUMOFLOW
 	new c,d,dg,l,o
 	set l=$length(h)
-	quit:(15<l) $$CONVERTBASE^%CONVBASEUTIL(h,16,8)
+	quit:(14<l) $$CONVERTBASE^%CONVBASEUTIL(h,16,8)
 	set d=0,h=$translate(h,"abcdef","ABCDEF"),o=""
 	for c=1:1:l set dg=$find("0123456789ABCDEF",$e(h,c)) q:'dg  s d=(d*16)+(dg-2)
 	for  quit:'d  set o=d#8_o,d=d\8
