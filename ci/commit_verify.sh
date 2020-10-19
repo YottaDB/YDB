@@ -87,7 +87,8 @@ do
 		exit 1
 	fi
 
-	filelist="$(git show --pretty="" --name-only "$id")"
+	# Use --diff-filter=d to omit deleted files from copyright check
+	filelist="$(git show --pretty="" --name-only --diff-filter=d "$id")"
 	curyear="$(date +%Y)"
 
 	for file in $filelist; do
