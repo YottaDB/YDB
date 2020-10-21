@@ -79,7 +79,9 @@ RUN apt-get update && \
                     procps \
                     make \
                     git \
-                    pkg-config\
+                    pkg-config \
+                    clang \
+                    cargo \
                     && \
     apt-get clean
 RUN locale-gen en_US.UTF-8
@@ -116,7 +118,7 @@ RUN sed -i 's/buster/stable/g' /etc/apt/sources.list \
  && echo "deb http://deb.debian.org/debian/ testing main" >> /etc/apt/sources.list \
  && echo "deb-src http://deb.debian.org/debian/ testing main" >> /etc/apt/sources.list
 RUN apt update -y \
- && apt install -t testing golang libclang-10-dev cargo -y
+ && apt install -t testing golang -y --no-install-recommends
 RUN . /opt/yottadb/current/ydb_env_set \
  && go version \
  && go get -t -d lang.yottadb.com/go/yottadb \
