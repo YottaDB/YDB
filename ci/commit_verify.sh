@@ -88,17 +88,19 @@ do
 		echo "  --> Error: commit $id was not signed with a known GPG key!"
 		exit 1
 	fi
+done
 
-	# Use --diff-filter=rd to omit renamed and deleted files from copyright check
-	filelist="$(git show --pretty="" --name-only --diff-filter=rd "$id")"
-	curyear="$(date +%Y)"
+# Get file list from all commits at once, rather than per-commit
+commit_list=$(echo $COMMIT_IDS | sed 's/$/ /g')
+filelist="$(git show --pretty="" --name-only $commit_list | sort -u)"
+curyear="$(date +%Y)"
 
-	for file in $filelist; do
-		if $needs_copyright $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
-			# Print these out only at the end so they're all shown at once
-			missing_files="$missing_files $file"
-		fi
-	done
+for file in $filelist; do
+	# Deleted files don't need a copyright notice, hence -e check
+	if [ -e $file ] && $needs_copyright $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
+		# Print these out only at the end so they're all shown at once
+		missing_files="$missing_files $file"
+	fi
 done
 
 if [ -n "$missing_files" ]; then
