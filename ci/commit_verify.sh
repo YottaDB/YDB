@@ -89,8 +89,8 @@ do
 		exit 1
 	fi
 
-	# Use --diff-filter=d to omit deleted files from copyright check
-	filelist="$(git show --pretty="" --name-only --diff-filter=d "$id")"
+	# Use --diff-filter=rd to omit renamed and deleted files from copyright check
+	filelist="$(git show --pretty="" --name-only --diff-filter=rd "$id")"
 	curyear="$(date +%Y)"
 
 	for file in $filelist; do
