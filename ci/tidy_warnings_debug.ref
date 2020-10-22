@@ -368,6 +368,7 @@ mur_get_options.c:warning: Dereference of undefined pointer value [clang-analyze
 mur_get_options.c:warning: Dereference of undefined pointer value [clang-analyzer-core.NullDereference]
 mur_get_options.c:warning: Dereference of undefined pointer value [clang-analyzer-core.NullDereference]
 mur_get_options.c:warning: Dereference of undefined pointer value [clang-analyzer-core.NullDereference]
+mur_get_options.c:warning: Dereference of undefined pointer value [clang-analyzer-core.NullDereference]
 mur_get_pini.c:warning: Although the value stored to 'status' is used in the enclosing expression, the value is never actually read from 'status' [clang-analyzer-deadcode.DeadStores]
 mur_open_files.c:warning: Access to field 'now_crit' results in a dereference of a null pointer [clang-analyzer-core.NullDereference]
 mur_open_files.c:warning: Access to field 'repl_inst_filehdr' results in a dereference of a null pointer (loaded from variable 'jnlpool') [clang-analyzer-core.NullDereference]

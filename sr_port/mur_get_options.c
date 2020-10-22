@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,7 +93,7 @@ void	mur_get_options(void)
 	char		*file_name_specified, *file_name_expanded;
 	unsigned int 	file_name_specified_len, file_name_expanded_len;
 	int		extr_type, cnt, top, onln_rlbk_val, status2;
-	io_pair		io_save_device, io_gvpatfile_device;
+	io_pair		io_save_device;
 	boolean_t	global_exclude;
 	long_list	*ll_ptr, *ll_ptr1;
 	long_long_list	*seqno_list, *seqno_list1;
@@ -687,7 +687,6 @@ void	mur_get_options(void)
 			mupip_exit(ERR_MUPCLIERR);
 		} else
 			assert(memcmp(&io_save_device, &io_curr_device, SIZEOF(io_curr_device)));
-		io_gvpatfile_device = io_curr_device;
 		while ((0 == io_curr_device.in->dollar.zeof) && (0 <= (pattern_len = file_input_get(&gvpatline, MAX_LINE))))
 		{
 			if (pattern_len < 0)
