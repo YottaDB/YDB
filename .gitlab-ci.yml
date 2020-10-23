@@ -35,8 +35,12 @@ build-ubuntu:
     DOCKERFILE: Dockerfile
     REPO: yottadb
 
-build-ubuntu-clang:
+test-clang-tidy:
   image: ubuntu:18.04
+  # NOTE: conceptually this is a test and not a build, because it has no
+  # artifacts.  However, if we make it part of the `test` stage, it will only
+  # run after all other builds succeed.  Since it already takes a half-hour to
+  # execute, run it in parallel with all other build jobs instead.
   stage: build
   artifacts:
     paths:
