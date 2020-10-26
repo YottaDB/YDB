@@ -735,6 +735,7 @@ STATICFNDEF void exec_read(BFILE *bf, char *buf, int nbytes)
 #	endif
 	while (0 != (got = (int)(read(bf->fd, curr, needed))))
 	{
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (got == needed)
 			break;
 		else if (got > 0)
@@ -758,6 +759,7 @@ STATICFNDEF void exec_read(BFILE *bf, char *buf, int nbytes)
 			eintr_handling_check();
 		wcs_sleep(100);
 	}
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	return;
 }
 
@@ -785,6 +787,7 @@ STATICFNDEF void tcp_read(BFILE *bf, char *buf, int nbytes)
 		 */
 		save_nap = nap;
 		status = select(bf->fd + 1, (void *)(&fs), (void *)0, (void *)0, &nap);
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		nap = save_nap;
 		if (status > 0)
 		{

@@ -434,6 +434,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 		 */
 		save_input_timeval = input_timeval;	/* take a copy and pass it because select() below might change it */
 		selstat = select(tt_ptr->fildes + 1, (void *)&input_fd, (void *)NULL, (void *)NULL, &save_input_timeval);
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (selstat < 0)
 		{
 			if (EINTR != errno)
@@ -452,6 +453,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 			continue;	/* select() timeout; keep going */
 		} else if (0 < (rdlen = (int)(read(tt_ptr->fildes, &inbyte, 1))))	/* This read is protected */
 		{
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));
 			/* --------------------------------------------------
 			 * set prin_in_dev_failure to FALSE to indicate that
@@ -951,6 +953,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 			assert(!edit_mode || dx_outlen == compute_dx(BUFF_ADDR(0), outlen, ioptr_width, dx_start));
 		} else if (0 == rdlen)
 		{
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (0 < selstat)
 			{	/* this should be the only possibility */
 				io_ptr->dollar.zeof = TRUE;
@@ -995,6 +998,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 			}
 		} else if (EINTR != errno)	/* rdlen < 0 */
 		{
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			term_error_line = __LINE__;
 			goto term_error;
 		} else

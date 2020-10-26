@@ -98,6 +98,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 	cc =(int)(&cptr->buff[cptr->bsiz] - &cptr->bptr[cptr->blen]);
 	while (!servtime_expired && (cc = (int)(read(cptr->fd, &cptr->bptr[cptr->blen], cc))) < 0  &&  errno == EINTR)
 		eintr_handling_check();
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	save_errno = errno;
 	if (servtime_expired)
 		return -1;
@@ -423,6 +424,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 	{
 		while(!servtime_expired && (cc = (int)(write(cptr->fd, bptr, blen))) < 0)
 			;
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		save_errno = errno;
 		if (cc < 0)
 		{

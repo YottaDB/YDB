@@ -165,6 +165,8 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 					break;
 				if (EINTR == save_errno)
 					eintr_handling_check();
+				else
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				if (ERANGE == save_errno)
 				{
 					if (!(*sem_halted))
@@ -175,6 +177,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 					}
 				}
 			} while (((EINTR == save_errno) || (ERANGE == save_errno)) && (indefinite_wait || !*timedout));
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (-1 != status)
 				return TRUE;
 			/* someone else is holding it and we are done waiting */
@@ -191,12 +194,14 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 			status = semop(semid, sop, sopcnt);
 			if (-1 != status)
 			{
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				SENDMSG_SEMOP_SUCCESS_IF_NEEDED(stacktrace_issued, semtype);
 				return TRUE;
 			}
 			save_errno = errno;
 			if ((ERANGE == save_errno) && !(*sem_halted))
 			{
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				sopcnt = 2;	/* ignore the increment operation */
 				*sem_halted = TRUE;
 				loopcnt--;	/* do not count this attempt */
@@ -229,6 +234,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 			break;
 
 		} while (indefinite_wait || !*timedout);
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if ((0 == loopcnt) || (EINTR == save_errno))
 		{	/* the timer has expired */
 			if (!indefinite_wait && !TREF(ydb_environment_init))

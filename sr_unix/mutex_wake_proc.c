@@ -150,6 +150,7 @@ mutex_wake_proc(msemaphore *mutex_wake_msem_ptr)
 			break;
 		eintr_handling_check();
 	} while (TRUE);
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	if (0 > rc)
 	{
 		assert(FALSE);

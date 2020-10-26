@@ -279,6 +279,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 						status2 = 0;
 					}
 				}
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			} else
 				status2 = 1;	/* do accept/connect first time */
 			if (0 < status2)

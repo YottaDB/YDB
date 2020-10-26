@@ -84,6 +84,7 @@ cmi_status_t cmi_open(struct CLB *lnk)
 		return save_errno;
 	}
 	rval = connect(new_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen);		/* BYPASSOK(connect) */
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	if ((-1 == rval) && ((EINTR == errno) || (EINPROGRESS == errno)
 #	if (defined(__osf__) && defined(__alpha)) || defined(__sun) || defined(__vms)
 			     || (EWOULDBLOCK == errno)
@@ -100,6 +101,7 @@ cmi_status_t cmi_open(struct CLB *lnk)
 			FD_ZERO(&writefds);
 			FD_SET(new_fd, &writefds);
 			rval = select(new_fd + 1, NULL, &writefds, NULL, NULL);
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (-1 == rval && EINTR == errno)
 			{
 				eintr_handling_check();

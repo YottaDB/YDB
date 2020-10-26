@@ -274,6 +274,7 @@ int main(int argc, char_ptr_t argv[])
 			else
 				eintr_handling_check();
 		} while (!recv_complete);
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		cancel_timer(timer_id);
 		assert(0 < num_chars_recd);
 		service_request(&mesg, num_chars_recd, rundir, rundir_len);
@@ -298,6 +299,7 @@ int main(int argc, char_ptr_t argv[])
 				else
 					eintr_handling_check();
 			} while (!send_complete);
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			cancel_timer(timer_id);
 		} else
 			DBGGSSHR((LOGFLAGS, "gtmsecshr: SENDTO reply skipped due to mesg.code = INVALID_COMMAND\n"));

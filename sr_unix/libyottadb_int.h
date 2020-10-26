@@ -781,8 +781,11 @@ MBSTART {													\
 			msg.addr[0] = '\0';									\
 		} else												\
 			assert('\0' == msg.addr[msg.len]);	/* assert null termination */			\
-		/* Copy message to user's buffer depending on available room */					\
-		SNPRINTF((ERRSTR)->buf_addr, (ERRSTR)->len_alloc, "%d,%s,%s", ERRNUM,				\
+		/* Copy message to user's buffer depending on available room.					\
+		 * Note: Cannot use SNPRINTF as it is not multi-thread-safe (invokes "eintr_handling_check()"	\
+		 * or "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL").							\
+		 */												\
+		snprintf((ERRSTR)->buf_addr, (ERRSTR)->len_alloc, "%d,%s,%s", ERRNUM,				\
 			 (noThreadAPI_active ? SIMPLEAPI_M_ENTRYREF : SIMPLETHREADAPI_M_ENTRYREF), msg.addr);	\
 	}													\
 }

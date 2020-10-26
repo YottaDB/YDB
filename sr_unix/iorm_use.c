@@ -441,6 +441,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 								break;
 							eintr_handling_check();
 						} while (TRUE);
+						HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 						if (-1 == newfd)
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 								RTS_ERROR_LITERAL("dup"), CALLFROM, save_errno);

@@ -169,9 +169,13 @@ STATICFNDCL void *io_getevents_multiplexer(void *arg)
 	INIT_POLLFD(fds[LAIO_EFD], gdi->laio_efd);
 	INIT_POLLFD(fds[EXIT_EFD], gdi->exit_efd);
 	do
-	{	/* we poll on the file descriptors */
+	{	/* We poll on the file descriptors.
+		 * Note: "eintr_handling_check()" or "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" are not invoked here since this
+		 * function is executed inside a thread and those calls are not multi-thread safe. Besides, any signal
+		 * handling is the responsibility of the main thread and not this aio multiplexing thread.
+		 */
 		while ((-1 == (ret = poll(fds, ARRAYSIZE(fds), -1))) && (EINTR == errno))
-			eintr_handling_check();
+			;
 		assert(-1 != ret);
 		if (-1 == ret)
 			RECORD_ERROR_IN_WORKER_THREAD_AND_EXIT(gdi, "worker_thread::poll()", errno);
@@ -215,8 +219,12 @@ STATICFNDCL int io_getevents_internal(aio_context_t ctx)
 
 	do
 	{	/* Loop on EINTR. */
+		/* Note: "eintr_handling_check()" or "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" are not invoked here since this
+		 * function is executed inside a thread and those calls are not multi-thread safe. Besides, any signal
+		 * handling is the responsibility of the master process and not this aio multiplexing thread.
+		 */
 		while (-1 == (ret = io_getevents(ctx, 0, MAX_EVENTS, event, &timeout)) && (EINTR == errno))
-			eintr_handling_check();
+			;
 		assert(ret >= 0);
 		if (-1 == ret)
 			return -1;

@@ -422,10 +422,13 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 						      process_id, heartbeat_counter);
 				} else
 				{
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 						RTS_ERROR_TEXT("Error with mutex wake msem"), save_errno);
 				}
 			}
+			if (wakeup_status)
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			TIMEOUT_DONE(msem_timedout);
 			/* wakeup_status is set to true, if I was able to lock...somebody woke me up;
 			 * wakeup_status is set to false, if I timed out and should go to recovery.
@@ -464,8 +467,11 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 						break;
 					}
 				} else
+				{
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_TEXT, 2,
 						RTS_ERROR_TEXT("Error with mutex select. Running in degraded mode"), errno);
+				}
 				timeout_val >>= 1;
 				timeout.tv_sec = timeout_val / E_6;
 				timeout.tv_usec = (gtm_tv_usec_t)(timeout_val % E_6);
@@ -478,6 +484,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 			}
 			if (1 == sel_stat) /* Somebody woke me up */
 			{
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				mutex_woke_me_proc_len = SIZEOF(struct sockaddr_un);
 				RECVFROM_SOCK(mutex_sock_fd, (void *)&mutex_wake_msg[0], SIZEOF(mutex_wake_msg), 0,
 					(struct sockaddr *)&mutex_woke_me_proc,
@@ -502,6 +509,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 				MUTEX_TRACE_CNTR(mutex_trc_xplct_dlyd_wkup);
 			} else if (0 == sel_stat) /* Timed out */
 			{
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				MUTEX_DPRINT2("%d: Sleep done, go wake others\n", process_id);
 				MUTEX_TRACE_CNTR(mutex_trc_slp_tmout);
 				wakeup_status = FALSE;
@@ -1011,6 +1019,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 						break;
 					eintr_handling_check();
 				} while (TRUE);
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 #				endif
 				/*
 				 * Significance of mutex_wake_instance field : After queueing itself, a process might go to

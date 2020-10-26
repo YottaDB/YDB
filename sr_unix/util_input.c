@@ -78,6 +78,7 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 					break;
 				eintr_handling_check();
 			} while (TRUE);
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (NULL == uc_fgets_ret)
 			{
 				if (!u_feof(u_fp))
@@ -132,6 +133,7 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 				break;
 			eintr_handling_check();
 		} while (TRUE);
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (NULL != retptr)
 		{
 			if (remove_leading_spaces)

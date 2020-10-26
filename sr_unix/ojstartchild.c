@@ -901,6 +901,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				break;
 			eintr_handling_check();
 		} while (TRUE);
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (done_pid == child_pid)
 			return (wait_status);
 		else if ((0 > done_pid) && (EINTR == errno) && ojtimeout)

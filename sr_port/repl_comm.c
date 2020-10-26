@@ -166,10 +166,18 @@ int fd_ioready(int sock_fd, int poll_direction, int timeout)
 				repl_log(stderr, TRUE, TRUE, "Communication subsytem warning: System appears to be resource "
 						"starved. EAGAIN returned from poll() %d times\n", EAGAIN_cnt);
 			}
+			/* No need of "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" call as "rel_quant()" checks for
+			 * deferred signals already (invokes "DEFERRED_SIGNAL_HANDLING_CHECK").
+			 */
 			rel_quant();	/* this seems legit */
 		} else
+		{
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			return -1;
+		}
 	}
+	if (-1 != status)
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	return status;
 }
 
@@ -226,6 +234,7 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 				assert(0 < bytes_sent);
 				*send_len = (int)bytes_sent;
 				REPL_DPRINT2("repl_send: returning with send_len %ld\n", bytes_sent);
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				return SS_NORMAL;
 			}
 #			ifdef GTM_TLS
@@ -235,6 +244,7 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 				 * for the TCP/IP pipe to be ready for an I/O.
 				 */
 				*poll_direction = (GTMTLS_WANT_READ == bytes_sent) ? REPL_POLLIN : REPL_POLLOUT;
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				return SS_NORMAL;
 			}
 			/* handle error */
@@ -244,6 +254,7 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 				 * Set error status to ERR_TLSIOERROR and let caller handle it appropriately.
 				 */
 				assert(repl_tls.enabled);
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				errptr = gtm_tls_get_error();
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"), ERR_TEXT, 2,
 						LEN_AND_STR(errptr));
@@ -257,6 +268,7 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 				eintr_handling_check();
 				continue;
 			}
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (EMSGSIZE == save_errno)
 			{
 				if (send_size > REPL_COMM_MIN_SEND_SIZE)
@@ -341,6 +353,7 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 				/* Trace last REPL_RECV_TRACE_BUFF_SIZE bytes received. */
 				REPL_TRACE_BUFF(repl_recv_trace_buff, repl_recv_trace_buff_pos, buff, bytes_recvd,
 							REPL_RECV_TRACE_BUFF_SIZE);
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				return (SS_NORMAL); /* always process the received buffer before dealing with any errno */
 			}
 #			ifdef GTM_TLS
@@ -350,6 +363,7 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 				 * for the TCP/IP pipe to be ready for an I/O.
 				 */
 				*poll_direction = (GTMTLS_WANT_READ == bytes_recvd) ? REPL_POLLIN : REPL_POLLOUT;
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				return SS_NORMAL;
 			}
 			/* handle error */
@@ -359,6 +373,7 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 				 * Set error status to ERR_TLSIOERROR and let caller handle it appropriately.
 				 */
 				assert(repl_tls.enabled);
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				errptr = gtm_tls_get_error();
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("recv"), ERR_TEXT, 2,
 						LEN_AND_STR(errptr));
@@ -386,6 +401,7 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 								" Socket recv() returned EWOULDBLOCK\n");	/* BYPASSOK(recv) */
 				save_errno = errno = ETIMEDOUT; /* will be treated as a bad connection and the connection closed */
 			}
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			break;
 		}
 		repl_errno = EREPL_RECV;

@@ -34,6 +34,7 @@
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define GTM_SEM_TRYWAIT(POSIX_SEM, RC)				\
@@ -45,6 +46,7 @@
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 /* "sem_post" does not return EINTR so no do/while loop needed like for "sem_wait" */

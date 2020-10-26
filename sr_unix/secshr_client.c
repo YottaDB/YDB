@@ -295,6 +295,7 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 			 */
 			num_chars_recvd = RECVFROM(gtmsecshr_sockfd, recv_ptr, GTM_MESG_HDR_SIZE, 0, (struct sockaddr *)0,
 						   (GTM_SOCKLEN_TYPE *)0);
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			save_errno = errno;
 			DBGGSSHR((LOGFLAGS, "secshr_client: recvfrom rc: %d  errno: %d (only important if rc=-1)\n",
 				  (int)num_chars_recvd, save_errno));
@@ -481,6 +482,7 @@ int create_server(void)
 		{
 			/* To prevent a warning message that the compiler issues */
 			done_pid = wait(&CSTAT);
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (done_pid == child_pid)
 			{
 				status = WEXITSTATUS(CSTAT);

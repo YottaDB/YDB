@@ -94,10 +94,10 @@ MBSTART {											\
 		SNPRINTF(TARGET + i, LEN + 1 - i, "%02X", (unsigned char)SOURCE[i / 2]);	\
 } MBEND
 
-/* Note: eintr_handling_check() is not used in case of EINTR errno inside the encryption plugin code (gtmcrypt_util.h
- * and gtmcrypt_util.c) because the plugin does not have access to the function code. We do not expect the process to be
- * indefinitely in the plugin (e.g. waiting for user input or IO etc.) and so it is considered okay not to do this check
- * for now while still inside the plugin.
+/* Note: "eintr_handling_check()" or "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" are not used (whether or not errno is EINTR) inside
+ * the encryption plugin code (gtmcrypt_util.h and gtmcrypt_util.c) because the plugin does not have access to the function code.
+ * We do not expect the process to be indefinitely in the plugin (e.g. waiting for user input or IO etc.) and so it is
+ * considered okay not to do this check for now while still inside the plugin.
  */
 #define SNPRINTF(SRC, LEN, ...)							\
 {										\

@@ -53,6 +53,7 @@
 	while (!outofband && !out_of_time && (xf_buflen > xf_xfercnt))					\
 	{												\
 		xf_rval = (XFOP)(xf_fd, xf_buf + xf_xfercnt, xf_buflen - xf_xfercnt, 0);		\
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;							\
 		if (-1 == xf_rval) 									\
 		{											\
 			if (EINTR == errno)								\
@@ -244,6 +245,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, uint8 nsec_timeout, int argcnt
 			break;
 		eintr_handling_check();
 	} while (TRUE);
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	if (-1 == rval)
 		goto ioerr;
 	assert(rval == iov.iov_len);
@@ -436,6 +438,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, uint8 nsec
 			break;
 		eintr_handling_check();
 	} while (TRUE);
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	if (0 == rval)
 	{
 		rval = -1;

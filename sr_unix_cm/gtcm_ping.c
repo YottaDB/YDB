@@ -165,6 +165,7 @@ int icmp_ping(int conn)
 	icp->icmp_cksum = in_cksum((u_short *)icp, ICMP_MINLEN + SIZEOF(int));
 	while (cc = sendto(pingsock, (char *)pingsend, ICMP_MINLEN + SIZEOF(int), 0, (struct sockaddr *)&paddr, paddr_len) < 0)
 	{
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (errno == EINTR)
 		{
 			eintr_handling_check();
@@ -173,6 +174,7 @@ int icmp_ping(int conn)
 		perror("ping: sendto");
 		continue;
 	}
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 #ifdef DEBUG_PING
 	{
 		char host[SA_MAXLEN];
@@ -216,6 +218,7 @@ int get_ping_rsp(void)
 	while ((cc = (int)(recvfrom(pingsock, (char *)pingrcv, IP_MAXPACKET, 0, (struct sockaddr *)&from,
 					(GTM_SOCKLEN_TYPE *)&fromlen))) < 0)
 	{
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (errno == EINTR)
 		{
 			eintr_handling_check();
@@ -224,6 +227,7 @@ int get_ping_rsp(void)
 		perror("ping: recvfrom");
 		continue;
 	}
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	ip = (struct ip *) pingrcv;
 	icp = (struct icmp *)(pingrcv + ((ip->ip_hl) << 2));
 #ifdef DEBUG_PING

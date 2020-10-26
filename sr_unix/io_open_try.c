@@ -420,6 +420,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 		 */
 		while ((-1 == (file_des = OPEN3(buf, SETOCLOEXEC(oflag), umask_creat))) && !out_of_time)
 		{
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (timed && (0 == nsec_timeout))
 				out_of_time = TRUE;
 			if (outofband)
@@ -439,6 +440,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 			else
 				break;
 		}
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		SETFDCLOEXEC(file_des);
 		if (timed && !out_of_time)
 			cancel_timer(timer_id);

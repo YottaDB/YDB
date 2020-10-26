@@ -36,6 +36,7 @@ void cmj_incoming_call(struct NTD *tsk)
 	ASSERT_IS_LIBCMISOCKETTCP;
 	while ((-1 == (rval = ACCEPT(tsk->listen_fd, (struct sockaddr *)&sas, (GTM_SOCKLEN_TYPE *)&sz))) && EINTR == errno)
 		eintr_handling_check();
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	while (rval >= 0)
 	{
 		status = cmj_setupfd(rval);
@@ -77,5 +78,6 @@ void cmj_incoming_call(struct NTD *tsk)
 		while ((-1 == (rval = ACCEPT(tsk->listen_fd, (struct sockaddr *)&sas, (GTM_SOCKLEN_TYPE *)&sz)))
 				&& (EINTR == errno))
 			eintr_handling_check();
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	}
 }

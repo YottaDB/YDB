@@ -36,6 +36,24 @@
 #include "wbox_test_init.h"
 #endif
 
+/* This macro is there to handle the case a signal interrupt happened outside of system call code. This ensures any deferred
+ * events (e.g. timer handler function invocations could get deferred on receipt of a SIGALRM) get handled in a timely fashion
+ * (if safe to do so). Note that we do a relatively quick check of whether any signal handling was deferred (using a global
+ * variable) and then invoke a function if necessary. That does the heavyweight job of actually invoking the signal handler
+ * if it is safe to do so. This keeps the overhead of the below macro minimal in the caller's code path for the most common
+ * case (which is no interrupted/deferred signals).
+ */
+#define	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL							\
+{												\
+	GBLREF	global_latch_t deferred_signal_handling_needed;					\
+												\
+	if (GLOBAL_LATCH_VALUE(&deferred_signal_handling_needed))				\
+		eintr_handling_check();								\
+}
+
+/* Note: The "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" macro is invoked at the end of the do/while loop in the below macros in case
+ * these macros are used inside a do/while (or for) loop in a caller function.
+ */
 #define ACCEPT_SOCKET(SOCKET, ADDR, LEN, RC)			\
 {								\
 	do							\
@@ -45,6 +63,7 @@
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define CHG_OWNER(PATH, OWNER, GRP, RC)				\
@@ -56,6 +75,7 @@
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define CLOSE(FD, RC)									\
@@ -71,6 +91,7 @@
 			break;								\
 		eintr_handling_check();							\
 	} while (TRUE);									\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;						\
 }
 
 #define CLOSEDIR(DIR, RC)					\
@@ -82,10 +103,16 @@
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
-#define CONNECT_SOCKET(SOCKET, ADDR, LEN, RC)			\
-	RC = gtm_connect(SOCKET, ADDR, LEN)
+#define CONNECT_SOCKET(SOCKET, ADDR, LEN, RC)					\
+{										\
+	RC = gtm_connect(SOCKET, ADDR, LEN);					\
+	/* Note: HANDLE_EINTR_OUTSIDE_SYSTEM_CALL is done inside "gtm_connect"	\
+	 * so no need to do it again here.					\
+	 */									\
+}
 
 #define CREATE_FILE(PATHNAME, MODE, RC)				\
 {								\
@@ -96,6 +123,7 @@
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define DOREAD_A_NOINT(FD, BUF, SIZE, RC)			\
@@ -107,6 +135,7 @@
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define DUP2(FDESC1, FDESC2, RC)				\
@@ -118,6 +147,7 @@
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define FCLOSE(STREAM, RC)								\
@@ -133,6 +163,7 @@
 			break;								\
 		eintr_handling_check();							\
 	} while (TRUE);									\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;						\
 }
 
 #define	FLOCK(FD, FLAGS, RC)					\
@@ -144,6 +175,7 @@
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define FCNTL2(FDESC, ACTION, RC)				\
@@ -155,6 +187,7 @@
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define FCNTL3(FDESC, ACTION, ARG, RC)				\
@@ -166,6 +199,7 @@
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define FGETS_FILE(BUF, LEN, FP, RC)							\
@@ -177,6 +211,7 @@
 			break;								\
 		eintr_handling_check();							\
 	} while (TRUE);									\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;						\
 }
 
 #define FSTAT_FILE(FDESC, INFO, RC)						\
@@ -192,6 +227,7 @@
 			break;							\
 		eintr_handling_check();						\
 	} while (TRUE);								\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;					\
 }
 
 #define FSTATVFS_FILE(FDESC, FSINFO, RC)			\
@@ -203,6 +239,7 @@
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define FTRUNCATE(FDESC, LENGTH, RC)				\
@@ -214,6 +251,7 @@
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 /* GTM_FREAD is an EINTR-safe versions of "fread". Retries on EINTR. Returns number of elements read in NREAD.
@@ -247,7 +285,7 @@ MBSTART {											\
 		RC = errno;									\
 		if (EINTR != errno)								\
 			break;									\
-		/* Note that the DEFERRED_SIGNAL_HANDLING_CHECK invocation inside the		\
+		/* Note that the HANDLE_EINTR_OUTSIDE_SYSTEM_CALL invocation inside the		\
 		 * eintr_handling_check() function below will be a no-op since we still have	\
 		 * not done the ENABLE_INTERRUPTS. But that is okay since we are not waiting	\
 		 * for user input indefinitely here and so this will eventually return.		\
@@ -258,6 +296,10 @@ MBSTART {											\
 	}											\
 	NREAD = NELEMS - elems_to_read;								\
 	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);				\
+	/* Note: No "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" call needed here like is done in other	\
+	 * macros because the "ENABLE_INTERRUPTS" call above does the same thing		\
+	 * (invoke "DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED" eventually).			\
+	 */											\
 } MBEND
 
 #define GTM_FSYNC(FD, RC)					\
@@ -269,6 +311,7 @@ MBSTART {											\
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 /* GTM_FWRITE is an EINTR-safe versions of "fwrite". Retries on EINTR. Returns number of elements written in NWRITTEN.
@@ -309,6 +352,10 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	}
 	*nwritten = nelems - elems_to_write;
 	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);
+	/* Note: No "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" call needed here like is done in other
+	 * macros because the "ENABLE_INTERRUPTS" call above does the same thing
+	 * (invoke "DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED" eventually).
+	 */
 	return rc;
 }
 
@@ -321,6 +368,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define MSGSND(MSGID, MSGP, MSGSZ, FLG, RC)			\
@@ -332,6 +380,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define OPENAT(PATH, FLAGS, MODE, RC)				\
@@ -343,6 +392,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define OPEN_PIPE(FDESC, RC)					\
@@ -354,6 +404,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define READ_FILE(FD, BUF, SIZE, RC)				\
@@ -365,6 +416,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define RECV(SOCKET, BUF, LEN, FLAGS, RC)			\
@@ -376,6 +428,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define RECVFROM_SOCK(SOCKET, BUF, LEN, FLAGS,			\
@@ -389,6 +442,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define SELECT(FDS, INLIST, OUTLIST, XLIST, TIMEOUT, RC)	\
@@ -403,6 +457,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 
@@ -415,6 +470,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define SENDTO_SOCK(SOCKET, BUF, LEN, FLAGS,			\
@@ -428,6 +484,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define STAT_FILE(PATH, INFO, RC)				\
@@ -439,32 +496,41 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #if defined(DEBUG)
-#define SYSCONF(PARM, RC)							\
-{										\
-	intrpt_state_t		prev_intrpt_state;				\
-										\
-	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);			\
-	if (ydb_white_box_test_case_enabled					\
-		&& (WBTEST_SYSCONF_WRAPPER == ydb_white_box_test_case_number))	\
-		{									\
-			DBGFPF((stderr, "will sleep indefinitely now\n"));		\
-			while (TRUE)							\
-				LONG_SLEEP(60);						\
-		}									\
-		RC = sysconf(PARM);							\
-		ENABLE_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);		\
+#define SYSCONF(PARM, RC)									\
+{												\
+	intrpt_state_t		prev_intrpt_state;						\
+												\
+	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);					\
+	if (ydb_white_box_test_case_enabled							\
+		&& (WBTEST_SYSCONF_WRAPPER == ydb_white_box_test_case_number))			\
+		{										\
+			DBGFPF((stderr, "will sleep indefinitely now\n"));			\
+			while (TRUE)								\
+				LONG_SLEEP(60);							\
+		}										\
+	RC = sysconf(PARM);									\
+	ENABLE_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);				\
+	/* Note: No "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" call needed here like is done in other	\
+	 * macros because the "ENABLE_INTERRUPTS" call above does the same thing		\
+	 * (invoke "DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED" eventually).			\
+	 */											\
 }
 #else
-#define SYSCONF(PARM, RC)							\
-{										\
-	intrpt_state_t		prev_intrpt_state;				\
-										\
-	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);			\
-	RC = sysconf(PARM);							\
-	ENABLE_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);		\
+#define SYSCONF(PARM, RC)									\
+{												\
+	intrpt_state_t		prev_intrpt_state;						\
+												\
+	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);					\
+	RC = sysconf(PARM);									\
+	ENABLE_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);				\
+	/* Note: No "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" call needed here like is done in other	\
+	 * macros because the "ENABLE_INTERRUPTS" call above does the same thing		\
+	 * (invoke "DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED" eventually).			\
+	 */											\
 }
 #endif
 
@@ -477,6 +543,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define CHANGE_TERM_TRUE TRUE
@@ -502,6 +569,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	terminal_settings_changed_fd = (CHANGE_TERM_FALSE != CHANGE_TERM) ? (FDESC + 1) : 0;		\
 	ERRNO = errno;											\
 	SIGPROCMASK(SIG_SETMASK, &oldset, NULL, rc);							\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;								\
 }
 
 #define TRUNCATE_FILE(PATH, LENGTH, RC)				\
@@ -513,6 +581,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define WAIT(STATUS, RC)					\
@@ -524,6 +593,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define WAITPID(PID, STATUS, OPTS, RC)											\
@@ -541,6 +611,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			break;												\
 		eintr_handling_check();											\
 	} while (TRUE);													\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;										\
 }
 
 #endif

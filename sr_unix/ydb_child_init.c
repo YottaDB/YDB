@@ -218,6 +218,7 @@ STATICFNDEF void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_t
 				for ( ; ; )
 				{
 					status = semop(udi->ftok_semid, sop, sopcnt);
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 					if (-1 != status)
 					{
 						udi->counter_ftok_incremented = TRUE;
@@ -305,6 +306,7 @@ STATICFNDEF void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_t
 				for ( ; ; )
 				{
 					status = semop(udi->semid, sop, sopcnt);
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 					if (-1 != status)
 					{
 						udi->counter_acc_incremented = TRUE;
@@ -394,6 +396,7 @@ STATICFNDEF void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_t
 				for ( ; ; )
 				{
 					status = semop(udi->ftok_semid, sop, sopcnt);
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 					if (-1 != status)
 					{
 						udi->counter_ftok_incremented = TRUE;

@@ -276,6 +276,7 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 		 * wrapper macros, since the select/read is not retried on EINTR.
 		 */
 		selstat = select(tt_ptr->fildes + 1, (void *)&input_fd, (void *)NULL, (void *)NULL, &input_timeval);
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (0 > selstat)
 		{
 			if (EINTR != errno)
@@ -297,6 +298,7 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 			continue;	/* select() timeout; try again */
 		} else if ((rdlen = (int)(read(tt_ptr->fildes, &inbyte, 1))) == 1)	/* This read is protected */
 		{
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			assert(FD_ISSET(tt_ptr->fildes, &input_fd) != 0);
 			/* --------------------------------------------------
 			 * set prin_in_dev_failure to FALSE to indicate that
@@ -463,6 +465,7 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 		{
 			if (EINTR != errno)
 			{
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				io_ptr->dollar.za = 9;
 				if (timed && (0 == nsec_timeout))
 					iott_rterm(io_ptr);

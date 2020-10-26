@@ -315,6 +315,7 @@ void iorm_close(io_desc *iod, mval *pp)
 						break;
 					eintr_handling_check();
 				} while (!out_of_time);
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				if (((pid_t)-1 == done_pid) && (!out_of_time))
 				{
 					save_errno = errno;

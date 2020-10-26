@@ -93,6 +93,7 @@ MBSTART {						\
 			break;				\
 		eintr_handling_check();			\
 	} while (TRUE);					\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;		\
 	if (-1 != RC)					\
 		RC = 0;					\
 	else						\
@@ -108,6 +109,7 @@ MBSTART {						\
 			break;				\
 		eintr_handling_check();			\
 	} while (TRUE);					\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;		\
 } MBEND
 
 #define OPENFILE3(FNAME, FFLAGS, FMODE, FDESC)		\
@@ -119,6 +121,7 @@ MBSTART {						\
 			break;				\
 		eintr_handling_check();			\
 	} while (TRUE);					\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;		\
 } MBEND
 
 /* OPENFILE4 not needed - io_open_try handles interrupts */
@@ -155,6 +158,7 @@ MBSTART {								\
 			break;						\
 		eintr_handling_check();					\
 	} while (TRUE);							\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;				\
 } MBEND
 #define OPENFILE_CLOEXEC(FNAME, FFLAGS, FDESC)  OPENFILE(FNAME, FFLAGS | O_CLOEXEC, FDESC);
 #define OPENFILE_SYNC_CLOEXEC(FNAME, FFLAGS, FDESC)	OPENFILE_SYNC(FNAME, FFLAGS | O_CLOEXEC, FDESC);
@@ -300,6 +304,7 @@ MBSTART {							\
 			break;					\
 		eintr_handling_check();				\
 	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 	if (-1 == RC)	/* Had legitimate error - return it */	\
 		RC = errno;					\
 } MBEND
@@ -344,6 +349,7 @@ MBSTART {											\
 			break;									\
 		eintr_handling_check();								\
 	}											\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;							\
 	if (0 == gtmioBuffLen)									\
 		RC = 0;										\
 	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */			\
@@ -386,6 +392,7 @@ MBSTART {											\
 			break;									\
 		eintr_handling_check();								\
 	}											\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;							\
 	(ACTUAL_READLEN) = (FBUFF_LEN) - gtmioBuffLen;						\
 	if (0 == gtmioBuffLen)									\
 		RC = 0;										\
@@ -452,6 +459,7 @@ MBSTART {											\
 			break;									\
 		eintr_handling_check();								\
 	}											\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;							\
 	if (0 == gtmioBuffLen)									\
 		RC = 0;										\
 	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */			\
@@ -479,6 +487,7 @@ MBSTART {											\
 			break;									\
 		eintr_handling_check();								\
 	}											\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;							\
 	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
 		RC = errno;									\
 	else if (0 == gtmioBuffLen)								\
@@ -506,6 +515,7 @@ MBSTART {											\
 			break;									\
 		eintr_handling_check();								\
 	}											\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;							\
 	if (-1 != gtmioStatus)									\
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually read */	\
 	else						/* Had legitimate error - return it */	\
@@ -566,6 +576,7 @@ MBSTART {													\
 				}										\
 				eintr_handling_check();								\
 			}											\
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;							\
 		}												\
 		/* if we didn't read 1 character or it's an error don't read anymore now */			\
 		if (skip_read)											\
@@ -590,6 +601,7 @@ MBSTART {													\
 		if (PIPE_OR_FIFO && outofband)									\
 			break;											\
 	}													\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;									\
 	if (-1 != gtmioStatus)											\
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen);		/* Return length actually read */		\
 	else						/* Had legitimate error - return it */			\
@@ -620,7 +632,7 @@ MBSTART {										\
 			break;								\
 		eintr_handling_check();							\
 	}										\
-	/* assertpro(FALSE)? */								\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;						\
 } MBEND
 
 #define DOWRITERC_RM(RM, FBUFF, FBUFF_LEN, RC)									\
@@ -660,6 +672,7 @@ MBSTART {													\
 			}											\
 			eintr_handling_check();									\
 		}												\
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;								\
 		if (0 == gtmioBuffLen)										\
 			RC = 0;											\
 		else												\
@@ -695,6 +708,7 @@ MBSTART {											\
 		}										\
 		eintr_handling_check();								\
 	}											\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;							\
 	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
 		RC = errno;									\
 	else if (0 == gtmioBuffLen)								\
@@ -741,6 +755,7 @@ MBSTART {													\
 			}											\
 			eintr_handling_check();									\
 		}												\
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;								\
 		if (0 < gtmioStatus)										\
 			RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually written */		\
 		else						/* Had legitimate error - return it */		\
@@ -778,6 +793,7 @@ MBSTART {											\
 		}										\
 		eintr_handling_check();								\
 	}											\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;							\
 	if (-1 != gtmioStatus)									\
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually written */	\
 	else						/* Had legitimate error - return it */	\
@@ -848,6 +864,7 @@ MBSTART {											\
 		}										\
 		eintr_handling_check();								\
 	}											\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;							\
 	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
 		RC = errno;									\
 	else if (0 == gtmioBuffLen)								\

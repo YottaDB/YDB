@@ -66,6 +66,7 @@ cmi_status_t cmj_write_start(struct CLB *lnk)
 	 */
 	while ((-1 == (rval = sendmsg(lnk->mun, &msg, 0))) && EINTR == errno)
 		eintr_handling_check();
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	if (-1 == rval)
 	{
 		save_errno = errno;
@@ -120,6 +121,7 @@ cmi_status_t cmj_write_urg_start(struct CLB *lnk)
 	lnk->sta = CM_CLB_WRITE_URG;
 	while ((-1 == (rval = send(lnk->mun, (void *)&lnk->urgdata, 1, MSG_OOB))) && EINTR == errno)
 		eintr_handling_check();
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	if (-1 == rval && !CMI_IO_WOULDBLOCK(errno))
 		return errno;
 	if (1 == rval)
@@ -144,6 +146,7 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
 	{
 		while ((-1 == (rval = send(lnk->mun, (void *)&lnk->urgdata, 1, MSG_OOB))) && EINTR == errno)
 			eintr_handling_check();
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (-1 == rval)
 		{
 			save_errno = errno;
@@ -169,6 +172,7 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
 		while ((-1 == (rval = send(lnk->mun, (void *)(lnk->ios.u.lenbuf + lnk->ios.len_len),
 					CMI_TCP_PREFIX_LEN - lnk->ios.len_len, 0))) && EINTR == errno)
 			eintr_handling_check();
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (-1 == rval)
 		{
 			save_errno = errno;
@@ -200,6 +204,7 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
 		while ((-1 == (rval = send(lnk->mun, (void *)(lnk->mbf + lnk->ios.xfer_count),
 					(int)(lnk->ios.u.len - lnk->ios.xfer_count), 0))) && EINTR == errno)
 			eintr_handling_check();
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (-1 == rval && !CMI_IO_WOULDBLOCK(errno))
 		{
 			cmj_err(lnk, CMI_REASON_STATUS, (cmi_status_t)errno);

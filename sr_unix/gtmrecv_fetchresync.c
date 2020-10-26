@@ -195,9 +195,13 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 				FD_SET(gtmrecv_listen_sock_fd, &input_fds);
 				continue;
 			} else
+			{
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("Error in select on listen socket"), errno);
+			}
 		}
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (status == 0)
 		{
 			repl_log(stdout, TRUE, TRUE, "Waited about %d seconds for connection from primary source server\n",

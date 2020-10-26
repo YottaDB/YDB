@@ -67,8 +67,8 @@ char *ydb_getenv(ydbenvindx_t envindx, mstr *suffix, boolean_t *is_ydb_env_match
 									envstr, suffix->len, suffix->addr);
 				if ((-1 != nbytes) || (EINTR != errno))
 					break;
-				/* The following macro invocation is commented out because "ydb_getenv" is also used by the
-				 * encryption plugin and therefore does not have access to the below macro.
+				/* The following function invocation is commented out because "ydb_getenv" is also used by the
+				 * encryption plugin which does not have access to the below function.
 				 * That said, it is okay not to invoke it since there is no indefinite sleep loop here
 				 * that can cause a process to not terminate in a timely fashion even though it was say
 				 * sent a process-terminating signal like SIGTERM.
@@ -76,6 +76,11 @@ char *ydb_getenv(ydbenvindx_t envindx, mstr *suffix, boolean_t *is_ydb_env_match
 				 * eintr_handling_check();
 				 */
 			} while (TRUE);
+			/* For the same reasons mentioned above for "eintr_handling_check()", the following macro is also not
+			 * invoked here. But needs to be invoked by the caller of "ydb_getenv()".
+			 *
+			 * DEFERRED_SIGNAL_HANDLING_CHECK;
+			 */
 			if ((0 > nbytes) || (nbytes >= sizeof(envwithsuffix)))
 			{	/* Error return from SNPRINTF or output was truncated. Move on to next env var */
 				continue;

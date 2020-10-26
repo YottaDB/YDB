@@ -64,7 +64,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 {
 	int		temp_1, flags, flags_orig;
 	char		*errptr;
-	int4		errlen, last_errno, save_errno;
+	int		errlen, save_errno;
 	int		d_socket_struct_len, res, nfds, sockerror;
 	fd_set		writefds;
 	boolean_t	no_time_left = FALSE;
@@ -132,9 +132,10 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 		add_uint8_to_abs_time(&cur_time, nsec_timeout, &end_time);
 	}
 	real_sockintr->end_time_valid = sockintr->end_time_valid = FALSE;
-	last_errno = 0;
-
 	remote_ai_ptr = (struct addrinfo*)(&(sockptr->remote.ai));
+	flags_orig = 0;	/* Not needed but helps avoid a false "clang-analyzer-core.uninitialized.Assign" warning
+			 * below in the line "flags = flags_orig".
+			 */
 	do
 	{
 		/* If the connect was failed, we may have already changed the remote.
@@ -375,6 +376,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 						break;
 				}
 			} /* if connect failed */
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
 			{
 				sockptr->nonblocking = FALSE;
@@ -432,7 +434,6 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 							if (ECONNREFUSED == sockerror || ETIMEDOUT == sockerror
 								|| ENOENT == sockerror)
 							{	/* try until timeout */
-								last_errno = sockerror;
 								save_errno = 0;
 								need_socket = need_connect = TRUE;
 								need_select = FALSE;
@@ -465,6 +466,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					}
 				}
 			} while (TRUE); /* do select */
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;	/* See similar usage in SELECT macro ("eintr_wrappers.h") */
 		}
 		if (save_errno)
 		{

@@ -32,12 +32,8 @@ int	gtm_connect(int socket, struct sockaddr *address, size_t address_len)
 	fd_set			writefds;
 
 	res = connect(socket, address, (GTM_SOCKLEN_TYPE)address_len);
-	if ((-1 == res) && ((EINTR == errno) || (EINPROGRESS == errno)
-#if (defined(__osf__) && defined(__alpha)) || defined(__sun) || defined(__vms)
-			|| (EWOULDBLOCK == errno)
-#endif
-			 ))
-	{/* connection attempt will continue so wait for completion */
+	if ((-1 == res) && ((EINTR == errno) || (EINPROGRESS == errno)))
+	{	/* connection attempt will continue so wait for completion */
 		do
 		{	/* a plain connect will usually timeout after 75 seconds with ETIMEDOUT */
 			FD_ZERO(&writefds);
@@ -62,6 +58,6 @@ int	gtm_connect(int socket, struct sockaddr *address, size_t address_len)
 		} while (TRUE);
 	} else if (-1 == res && EISCONN == errno)
 		res = 0;		/* socket is already connected */
-
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	return(res);
 }

@@ -414,6 +414,7 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 					break;
 				eintr_handling_check();
 			} while (TRUE);
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (NULL == uc_fgets_ret)
 			{
 				u_fclose(u_fp);

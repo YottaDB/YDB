@@ -48,6 +48,7 @@ cmi_status_t cmj_read_start(struct CLB *lnk)
 
 	while ((-1 == (rval = recv(lnk->mun, (void *)lnk->ios.u.lenbuf, CMI_TCP_PREFIX_LEN, 0))) && EINTR == errno)
 		eintr_handling_check();
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	/*
 	 * rval == 0 --> eof
 	 * rval == 2 --> entire length read (2 == CMI_TCP_PREFIX_LEN)
@@ -77,6 +78,7 @@ cmi_status_t cmj_read_start(struct CLB *lnk)
 
 		while ((-1 == (rval = recv(lnk->mun, (void *)lnk->mbf, (int)lnk->ios.u.len, 0))) && EINTR == errno)
 			eintr_handling_check();
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (0 > rval && !CMI_IO_WOULDBLOCK(errno))
 		{
 			save_errno = errno;
@@ -133,6 +135,7 @@ void cmj_read_interrupt(struct CLB *lnk, int signo)
 		/* just peek to see if a 0 or error comes back */
 		while ((-1 == (rval = recv(lnk->mun, (void *)&peekchar, 1, MSG_PEEK))) && EINTR == errno)
 			eintr_handling_check();
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (0 == rval)
 			cmj_err(lnk, CMI_REASON_STATUS, (cmi_status_t)ECONNRESET);
 		else
@@ -165,6 +168,7 @@ void cmj_read_interrupt(struct CLB *lnk, int signo)
 
 	while ((-1 == (rval = recvmsg(lnk->mun, &msg, 0))) && EINTR == errno)
 		eintr_handling_check();
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	/* weed out the bad things first */
 	if (0 == rval)
 	{

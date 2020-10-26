@@ -75,6 +75,8 @@ MBSTART {											\
 			if (MT_SAFE)								\
 			{	/* Check if any signal handling got deferred during the sleep.	\
 				 * If so handle it safely outside of the signal handler.	\
+				 * No need of "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" call because	\
+				 * the below does the same thing.				\
 				 */								\
 				DEFERRED_SIGNAL_HANDLING_CHECK;					\
 			}									\

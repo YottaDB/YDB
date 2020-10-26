@@ -169,6 +169,7 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, uint8 *nsec_timeout,
 	{
 		/* in follow mode a read will return an EOF if no more bytes are available*/
 		status = read(fildes, &rm_ptr->bom_buf[rm_ptr->bom_buf_cnt], bom_bytes2read - rm_ptr->bom_buf_cnt);
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (0 < status) /* we read some chars */
 		{	/* Decrypt the BOM bytes. */
 			if (rm_ptr->input_encrypted)
@@ -377,6 +378,7 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, uint8 *nsec_timeout, boo
 		{
 			/* in follow mode a read will return an EOF if no more bytes are available */
 			status = read(fildes, temp, (int)bytes2read - bytes_count);
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (0 < status) /* we read some chars */
 			{	/* Decrypt whatever we read. */
 				if (rm_ptr->input_encrypted)
@@ -611,7 +613,9 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 		{
 			if (EINTR == errno)
 			{
-				eintr_handling_check();
+				/* Note: No need to call "eintr_handling_check()" or "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL"
+				 * here as it would have been handled inside the "DOREADRLTO2" macro invoked above.
+				 */
 				if (out_of_time)
 					status = -2;
 			}

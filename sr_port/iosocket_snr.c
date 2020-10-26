@@ -293,8 +293,13 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			DBGSOCK_ONLY2(real_errno = errno);
 			DBGSOCK2((stdout, "socsnrupb: Buffer empty - bytes read: %d  errno: %d\n", bytesread, real_errno));
 			DBGSOCK_ONLY2(errno = real_errno);
+			/* Note: Both "eintr_handling_check()" and "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" ensure "errno"
+			 * is untouched so it is safe to use "errno" after the call to examine the pre-call value.
+			 */
 			if ((-1 == bytesread) && (EINTR == errno))
 				eintr_handling_check();
+			else
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		} while ((((-1 == bytesread) && (EINTR == errno)) || (0 == bytesread && wait_for_input))
 			 && !out_of_time && (0 == outofband));
 		if (out_of_time || (0 != outofband))
@@ -397,9 +402,11 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 						continue;
 					else
 						return 0;	/* timeout indicator */
-				}
+				} else
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				return bytesread;
 			}
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (out_of_time)
 				return 0;
 			socketptr->buffered_length += bytesread;

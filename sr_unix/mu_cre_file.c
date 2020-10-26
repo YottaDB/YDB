@@ -243,6 +243,7 @@ unsigned char mu_cre_file(void)
 			break;
 		eintr_handling_check();
 	} while (TRUE);
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	if (FD_INVALID == mu_cre_file_fd)
 	{	/* Avoid error message if file already exists (another process created it) for AUTODBs that are NOT also
 		 * STATSDBs.

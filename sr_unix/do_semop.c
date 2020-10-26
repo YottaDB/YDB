@@ -45,6 +45,10 @@ int do_semop(int sems, int num, int op, int flg)
 	{
 		while (-1 == (rv = semop(sems, sop, 1)) && EINTR == errno)
 			eintr_handling_check();
+		/* Note: Both "eintr_handling_check()" and "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" ensure "errno"
+		 * is untouched so it is safe to use "errno" after the call to examine the pre-call value.
+		 */
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		return (-1 == rv) ? errno : 0;
 	}
 }

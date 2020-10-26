@@ -565,6 +565,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 				{
 					/* in follow mode a read will return an EOF if no more bytes are available. */
 					status = read(fildes, temp, width - bytes_count);
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 					if (0 < status) /* we read some chars */
 					{
 						if (rm_ptr->input_encrypted)
@@ -670,7 +671,10 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						bytes_count = 0;
 					if (EINTR == errno)
 					{
-						eintr_handling_check();
+						/* Note: No need to call "eintr_handling_check()" or
+						 * "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" here as it would have been handled
+						 * inside the "DOREADRLTO2" macro invoked above.
+						 */
 						if (out_of_time)
 							status = -2;
 					}
@@ -770,6 +774,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 					{
 						/* In follow mode a read returns an EOF if no more bytes are available. */
 						status = read(fildes, rm_ptr->tmp_buffer, CHUNK_SIZE);
+						HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 						if (0 < status)
 						{
 							if (rm_ptr->input_encrypted)
@@ -989,7 +994,9 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						status = 0;
 					} else if (EINTR == errno)
 					{
-						eintr_handling_check();
+						/* Note: No need to call "eintr_handling_check()" again as it was already
+						 * done above right after the "read()" system call happened.
+						 */
 						if (out_of_time)
 							status = -2;
 						else
@@ -1028,7 +1035,9 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 					bytes_count = 0;
 					if (EINTR == errno)
 					{
-						eintr_handling_check();
+						/* Note: No need to call "eintr_handling_check()" again as it would have already
+						 * been done in the "iorm_get()" or "iorm_get_fol()" calls above.
+						 */
 						if (out_of_time)
 							buff_len = -2;
 					}
@@ -1298,6 +1307,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						{
 							/* In follow mode a read returns an EOF if no more bytes are available. */
 							status = read(fildes, rm_ptr->tmp_buffer, CHUNK_SIZE);
+							HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 							if (0 < status)
 							{
 								if (rm_ptr->input_encrypted)
@@ -1871,7 +1881,9 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						status = 0;
 					} else if (EINTR == errno)
 					{
-						eintr_handling_check();
+						/* Note: No need to call "eintr_handling_check()" again as it was already
+						 * done above right after the "read()" system call happened.
+						 */
 						if (out_of_time)
 							status = -2;
 						else
@@ -1908,8 +1920,10 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
 			}
 			ret = FALSE;
-		} else
-			eintr_handling_check();
+		}
+		/* else: No need to call "eintr_handling_check()" again as it was already
+		 * done above right after the "read()" system call happened.
+		 */
 	}
 	if (timed)
 	{	/* No timer if nsec_timeout is zero, so handle the timer in the else. */

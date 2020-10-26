@@ -809,12 +809,14 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 			} else if (!more_data)
 				break;
 		}
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	}
 	if (EINTR == real_errno)
 	{
 		eintr_handling_check();
 		status = 0;	/* Don't treat a <CTRL-C> or timeout as an error */
-	}
+	} else
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	if (timed)
 	{
 		if (0 < nsec_timeout)

@@ -556,6 +556,7 @@ static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len, boole
 			eintr_handling_check();
 			continue;
 		}
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		break;
 	} while (TRUE);
 	if (0 > sent_len)
@@ -658,10 +659,12 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 							continue;
 						} else
 						{
+							HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 							repl_errno = EREPL_FILTERRECV;
 							return errno;
 						}
-					}
+					} else
+						HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 					if (0 == status) /* timeout */
 					{
 						return MORE_TO_TRANSFER;
@@ -681,12 +684,20 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 			{
 				r_len = read(repl_filter_srv_fd[READ_END], srv_read_end, buff_remaining);
 				if (0 <= r_len)
+				{
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 					break;
+				}
 				save_errno = errno;
 				if ((ENOMEM != save_errno) && (EINTR != save_errno))
+				{
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 					break;
+				}
 				if (EINTR == save_errno)
 					eintr_handling_check();
+				else
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				/* EINTR/ENOMEM -- check if it's time to take the stack trace. */
 				if (send_done)
 				{
@@ -923,10 +934,12 @@ int repl_filter(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize
 						continue;
 					} else
 					{
+						HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 						repl_errno = EREPL_FILTERSEND;
 						return errno;
 					}
-				}
+				} else
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				if (0 == status) /* timeout */
 				{
 					try_recv = TRUE;
@@ -980,10 +993,12 @@ int repl_filter(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize
 						continue;
 					} else
 					{
+						HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 						repl_errno = EREPL_FILTERRECV;
 						return errno;
 					}
-				}
+				} else
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				if (0 == status) /* timeout */
 				{
 					try_send = TRUE;

@@ -41,6 +41,7 @@ void cmj_select(int signo)
 	do
 	{
 		count = select(n, &myrs, &myws, &myes, &t);
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if ((0 <= count) || ((EINTR != errno) && (EAGAIN != errno)))
 			break;
 		if (EINTR == errno)
@@ -91,6 +92,7 @@ void cmj_select(int signo)
 		do
 		{
 			count = select(n, &myrs, &myws, NULL, &t);
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if ((0 <= count) || ((EINTR != errno) && (EAGAIN != errno)))
 				break;
 			if (EINTR == errno)

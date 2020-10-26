@@ -122,6 +122,7 @@ void gtcm_loop(omi_conn_ll *cll)
 	nfds++;
 	if ((nfds = select(nfds, &r_fds, (fd_set *)0, (fd_set *)0, tp)) < 0)
 	{
+	    HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	    if (errno == EINTR) {
 		eintr_handling_check();
 		if (!omi_exitp)
@@ -135,6 +136,7 @@ void gtcm_loop(omi_conn_ll *cll)
 		gtcm_rep_err("select() call failed", errno);
 	    break;
 	}
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 
 	now = (int)time(0);
 

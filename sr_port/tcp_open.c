@@ -198,6 +198,7 @@ int tcp_open(char *host, unsigned short port, uint8 timeout, boolean_t passive) 
 					}
 				}
 			}
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (0 == rv)
 			{	/* Timeout */
 				CLOSEFILE(lsock, rc);

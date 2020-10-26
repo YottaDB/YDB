@@ -372,20 +372,27 @@ void	dm_read (mval *v)
 		 */
 		selstat = select(tt_ptr->fildes + 1, (void *)&input_fd, (void *)NULL, (void *)NULL, &input_timeval);
 		if (0 > selstat)
+		{
 			if (EINTR != errno)
+			{
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
-			else
+			} else
 			{
 				eintr_handling_check();
 				continue;
 			}
-		else if (0 == selstat)
+		} else if (0 == selstat)
+		{
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			continue;	/* timeout but still not ready for reading, try again */
+		}
 		/* selstat > 0; try reading something */
 		else if (0 > (status = (int)read(tt_ptr->fildes, &inbyte, 1)))
 		{	/* Error return from read(). */
 			if (EINTR != errno)
 			{	/* If error was EINTR, go to the top of the loop to check for outofband. */
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				tt_ptr->discard_lf = FALSE;
 				io_ptr->dollar.za = 9;
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
@@ -396,6 +403,7 @@ void	dm_read (mval *v)
 			}
 		} else if (0 == status)
 		{	/* select() says there's something to read, but read() found zero characters; assume connection dropped. */
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (io_curr_device.in == io_std_device.in)
 			{
 				if (!prin_in_dev_failure)
@@ -405,9 +413,9 @@ void	dm_read (mval *v)
 			}
 			tt_ptr->discard_lf = FALSE;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
-		}
-		else if (0 < status)
+		} else if (0 < status)
 		{	/* select() says it's ready to read and read() found some data */
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));
 			/* set prin_in_dev_failure to FALSE in case it was set to TRUE in the previous read which may have failed */
 			prin_in_dev_failure = FALSE;

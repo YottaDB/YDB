@@ -282,7 +282,10 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout)
 						utimeout.tv_nsec = cur_time.tv_nsec;
 					}
 				} else
+				{
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 					break;	/* either other error or done */
+				}
 			}
 			if ((rv == 0) && (0 == rconnected) && (0 == rlisten))
 			{	/* none selected or prior pending event */

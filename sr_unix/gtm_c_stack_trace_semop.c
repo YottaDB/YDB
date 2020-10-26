@@ -99,6 +99,7 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 			}
 		}
 	} while (TRUE);
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	cancel_timer((TID)semwt2long_handler);
 	return (-1 == rc) ? save_errno : 0;
 }

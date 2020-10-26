@@ -170,11 +170,9 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 		{
 			real_errno = errno;
 			no_time_left = TRUE;
+			assert(EINTR != real_errno); /* According to man pages "bind()" can never set errno to EINTR. */
 			switch (real_errno)
 			{
-				case EINTR:
-					eintr_handling_check();
-					break;
 				case EADDRINUSE:
 					if (NO_M_TIMEOUT != nsec_timeout)
 					{
@@ -192,7 +190,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 						no_time_left = FALSE;	/* retry */
 					if (socket_local != socketptr->protocol)
 						break;
-					/* fall through for LOCAL sockets since it unlikely the file will go away */
+					/* fall through for LOCAL sockets since it is unlikely the file will go away */
 				default:
 					if (ioerror)
 						SOCKET_FREE(socketptr);

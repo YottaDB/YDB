@@ -330,11 +330,12 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 		umask_orig = umask(000);	/* determine umask (destructive) */
 		(void)umask(umask_orig);	/* reset umask */
 		umask_creat = 0666 & ~umask_orig;
-		/* the check for EINTR below is valid and should not be converte d to an EINTR
+		/* the check for EINTR below is valid and should not be converted to an EINTR
 		 * wrapper macro, due to the other errno values being checked.
 		 */
 		while ((-1 == (file_des = OPEN3(buf, oflag, umask_creat))))
 		{
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (EINTR == errno)
 			{
 				eintr_handling_check();
@@ -345,6 +346,7 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 			else
 				break;
 		}
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (-1 == file_des)
 			return FALSE;
 	}

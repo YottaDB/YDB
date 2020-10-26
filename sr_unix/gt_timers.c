@@ -453,10 +453,9 @@ STATICFNDEF void start_timer_int(TID tid, uint8 time_to_expir, void (*handler)()
 	newt = add_timer(&at, tid, time_to_expir, handler, hdata_len, hdata, safe_timer);	/* Put new timer in the queue. */
 	DUMP_TIMER_INFO("After invoking add_timer()");
 	if ((timeroot->tid == tid) || !timer_active
-			|| (timer_active
-				&& ((newt->expir_time.tv_sec < sys_timer_at.tv_sec)
+			|| ((newt->expir_time.tv_sec < sys_timer_at.tv_sec)
 					|| ((newt->expir_time.tv_sec == sys_timer_at.tv_sec)
-						&& (newt->expir_time.tv_nsec < sys_timer_at.tv_nsec)))))
+						&& (newt->expir_time.tv_nsec < sys_timer_at.tv_nsec))))
 		start_first_timer(&at, IS_OS_SIGNAL_HANDLER_FALSE);
 }
 
@@ -683,7 +682,17 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 	 * multi-threaded program. Therefore we can safely set the global variable "in_os_signal_handler".
 	 */
 	if (is_os_signal_handler)
+	{
 		INCREMENT_IN_OS_SIGNAL_HANDLER;
+		/* Now that we know it is the OS that delivered this "SIGALRM" signal to us, clear the global variable
+		 * "timer_active" as the most common cause of this signal is the system timer that this process had
+		 * already established. But note that it is possible this signal was sent externally (e.g. another process)
+		 * in which case clearing the global variable is not accurate. But it is okay since the consequence of this
+		 * is that we would try to start a new system timer when one already exists (the effect of that would be to
+		 * overwrite the active timer with the new one thereby resulting still in one system timer in the end).
+		 */
+		timer_active = FALSE;				/* timer has popped; system timer not active anymore */
+	}
 	assert(gtm_is_main_thread() || gtm_jvm_process || simpleThreadAPI_active);
 	DUMP_TIMER_INFO("At the start of timer_handler()");
 #	ifdef DEBUG
@@ -719,7 +728,6 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
 	save_errno = errno;
 	save_error_condition = error_condition;		/* aka SIGNAL */
-	timer_active = FALSE;				/* timer has popped; system timer not active anymore */
 	sys_get_curr_time(&at);
 	tpop = (GT_TIMER *)timeroot;
 	timer_defer_cnt = 0;				/* reset the deferred timer count, since we are in timer_handler */

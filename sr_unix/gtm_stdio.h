@@ -109,7 +109,7 @@
 /* Note: eintr_handling_check() is used below inside a UNIX_ONLY macro. This is so if the caller is a
  * standalone or test system module (UNIX macro is not defined in that case as mdef.h would not be included)
  * we do not use this macro which would cause a compile time error. This macro should only be used inside the
- * YottaDB runtime. Hence the UNIX_ONLY macro use.
+ * YottaDB runtime. Hence the UNIX_ONLY macro use. Same explanation for HANDLE_EINTR_OUTSIDE_SYSTEM_CALL macro use too.
  */
 #define VPRINTF(FORMAT, VALUE, RC)				\
 {								\
@@ -120,6 +120,7 @@
 			break;					\
 		UNIX_ONLY(eintr_handling_check());		\
 	} while (TRUE);						\
+	UNIX_ONLY(HANDLE_EINTR_OUTSIDE_SYSTEM_CALL);		\
 }
 #define VFPRINTF(STREAM, FORMAT, VALUE, RC)			\
 {								\
@@ -130,6 +131,7 @@
 			break;					\
 		UNIX_ONLY(eintr_handling_check());		\
 	} while (TRUE);						\
+	UNIX_ONLY(HANDLE_EINTR_OUTSIDE_SYSTEM_CALL);		\
 }
 #define VSPRINTF(STRING, FORMAT, VALUE, RC)			\
 {								\
@@ -140,6 +142,7 @@
 			break;					\
 		UNIX_ONLY(eintr_handling_check());		\
 	} while (TRUE);						\
+	UNIX_ONLY(HANDLE_EINTR_OUTSIDE_SYSTEM_CALL);		\
 }
 #define VSNPRINTF(STRING, SIZE, FORMAT, VALUE, RC)		\
 {								\
@@ -150,6 +153,7 @@
 			break;					\
 		UNIX_ONLY(eintr_handling_check());		\
 	} while (TRUE);						\
+	UNIX_ONLY(HANDLE_EINTR_OUTSIDE_SYSTEM_CALL);		\
 }
 
 #define VSCANF(FORMAT, POINTER, RC)				\
@@ -161,6 +165,7 @@
 			break;					\
 		UNIX_ONLY(eintr_handling_check());		\
 	} while (TRUE);						\
+	UNIX_ONLY(HANDLE_EINTR_OUTSIDE_SYSTEM_CALL);		\
 }
 #define VSSCANF(STRING, FORMAT, POINTER, RC)			\
 {								\
@@ -171,6 +176,7 @@
 			break;					\
 		UNIX_ONLY(eintr_handling_check());		\
 	} while (TRUE);						\
+	UNIX_ONLY(HANDLE_EINTR_OUTSIDE_SYSTEM_CALL);		\
 }
 #define VFSCANF(STREAM, FORMAT, POINTER, RC)			\
 {								\
@@ -181,6 +187,7 @@
 			break;					\
 		UNIX_ONLY(eintr_handling_check());		\
 	} while (TRUE);						\
+	UNIX_ONLY(HANDLE_EINTR_OUTSIDE_SYSTEM_CALL);		\
 }
 
 #define SNPRINTF_ENV_NUM(BUFF, LEN, ENV_VAR, ENV_VAL, ENV_IND)						\

@@ -195,8 +195,12 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 				break;
 			}
 			if (EAGAIN == save_errno)
+			{
+				/* No need of "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" call as "rel_quant()" checks for
+				 * deferred signals already (invokes "DEFERRED_SIGNAL_HANDLING_CHECK").
+				 */
 				rel_quant();	/* seems like a legitimate rel_quant */
-			else if (EINTR != save_errno)
+			} else if (EINTR != save_errno)
 			{
 				status = -1;
 				break;
@@ -204,6 +208,7 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 				eintr_handling_check();
 			continue;
 		}
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 #		ifdef GTM_TLS
 		if (socketptr->tlsenabled)
 		{
