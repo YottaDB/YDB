@@ -84,16 +84,25 @@ echo "# Verify commits and copyrights"
 
 missing_files=""
 
+commit_list=""
 for id in $COMMIT_IDS
 do
 	if ! git verify-commit "$id"; then
 		echo "  --> Error: commit $id was not signed with a known GPG key!"
 		exit 1
 	fi
+	# Get commit message from id
+	COMMIT_MESSAGE=`git log --format=%B -n 1 $id`
+	# Skip the copyright check if the commit message contains
+	# "merge GT.M Vx.x-xxx into YottaDB mainline (with conflicts)"
+	if [[ "$COMMIT_MESSAGE" =~ .*Merge[[:space:]]GT\.M[[:space:]]V[0-9]\.[0-9]-[0=9]{3}[[:space:]]into[[:space:]]YottaDB[[:space:]]mainline[[:space:]]\(with[[:space:]]conflicts\).* ]]; then
+		echo "skipped copyright check for merge GT.M Vx.x-xxx into YottaDB mainline (with conflicts) commit"
+	else
+		commit_list="$commit_list $id"
+	fi
 done
 
 # Get file list from all commits at once, rather than per-commit
-commit_list=$(echo $COMMIT_IDS | sed 's/$/ /g')
 filelist="$(git show --pretty="" --name-only $commit_list | sort -u)"
 curyear="$(date +%Y)"
 
