@@ -62,14 +62,23 @@ compare() {
 		diff -Z "$expected" "$actual" &> differences.txt || true
 
 		if [ $(wc -l differences.txt | awk '{print $1}') -gt 0 ]; then
-			echo " -> Expected warnings differ from actual warnings! diff output follows"
-			echo " -> note: '<' indicates an expected warning, '>' indicates an actual warning"
-			cat differences.txt
-			echo
-			grep -Ev '^(Database file |%YDB-I-DBFILECREATED, |%GDE-I-|YDB-MUMPS\[)' $original_warnings \
-				| grep -v '\.gld$' > $original_warnings.stripped || true;
-			echo " -> note: the original warnings are available in $original_warnings.stripped"
-			echo " -> note: the expected warnings are available in $expected"
+			{
+				echo " -> Expected warnings differ from actual warnings! diff output follows"
+				echo " -> note: '<' indicates an expected warning, '>' indicates an actual warning"
+				cat differences.txt
+				echo
+				grep -Ev '^(Database file |%YDB-I-DBFILECREATED, |%GDE-I-|YDB-MUMPS\[)' $original_warnings \
+					| grep -v '\.gld$' > $original_warnings.stripped || true;
+				echo " -> note: the original warnings are available in $original_warnings.stripped"
+				echo " -> note: the expected warnings are available in $expected"
+				if [ $build_type = Debug ]; then
+					other_job=RelWithDebInfo
+				else
+					other_job=Debug
+				fi
+				echo " -> warning: since the $build_type job failed, the $other_job job will likely also fail. Make sure you update the relevant warnings for both."
+			} > warnings/summary.txt
+			cat warnings/summary.txt
 			exit 1
 		fi
 	else
