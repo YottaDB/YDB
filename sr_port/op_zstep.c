@@ -62,7 +62,7 @@ void op_zstep(uint4 code, mval *action)
 		case ZSTEP_OUTOF:
 
 			for (fp = frame_pointer; fp && !(fp->type & SFT_COUNT); fp = fp->old_frame_pointer)
-				; /* don't place in a non VM frame if we are in one */
+				; /* skip uncounted frames (if any) in storing "zstep_level" (when ZSTEP OVER/OUTOF action needs to kick in) */
 			zstep_level = (unsigned char *)fp;
 			if (ZSTEP_OVER == code)
 			{
