@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,14 +65,6 @@ boolean_t mu_int_init(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	mu_region_found = TRUE;
-	mu_gv_cur_reg_init();	/* Creates a dummy segment with seg->asyncio FALSE so no DIO alignment issues to worry about
-				 * in the FC_OPEN/FC_READ below
-				 */
-	/* get filename */
-	gv_cur_region->dyn.addr->fname_len = SIZEOF(gv_cur_region->dyn.addr->fname);
-	if (!cli_get_str("WHAT", (char *)gv_cur_region->dyn.addr->fname, &gv_cur_region->dyn.addr->fname_len))
-		mupip_exit(ERR_MUNODBNAME);
 	if (!STANDALONE(gv_cur_region))
 	{
 		csa = &FILE_INFO(gv_cur_region)->s_addrs;

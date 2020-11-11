@@ -97,8 +97,6 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 				/* If supplied with a control-C handler, install it now. */
 				if (NULL != ctrlc_handler)
 					sigaction(sig, &ctrlc_action, NULL);
-				else
-					sigaction(sig, &ignore, NULL);
 				break;
 			case SIGCONT:
 				/* Special handling for SIGCONT. */

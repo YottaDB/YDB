@@ -301,7 +301,18 @@ void mupip_integ(void)
 			error_mupip = FALSE;
 		rptr = grlist;
 	} else
+	{
 		GVKEY_INIT(gv_altkey, DBKEYSIZE(MAX_KEY_SZ));	/* used by code below */
+		mu_region_found = TRUE;
+		mu_gv_cur_reg_init();	/* Creates a dummy segment with seg->asyncio FALSE so no DIO
+					 * alignment issues to worry about in the FC_OPEN/FC_READ below*/
+
+		/* get filename */
+		gv_cur_region->dyn.addr->fname_len = SIZEOF(gv_cur_region->dyn.addr->fname);
+		if (!cli_get_str("WHAT", (char *)gv_cur_region->dyn.addr->fname, &gv_cur_region->dyn.addr->fname_len))
+			mupip_exit(ERR_MUNODBNAME);
+	}
+
 	online_integ = ((TRUE != cli_negated("ONLINE")) && region); /* Default option for INTEG is -ONLINE */
 	preserve_snapshot = (CLI_PRESENT == cli_present("PRESERVE")); /* Should snapshot file be preserved ? */
 	assert(!online_integ || (region && !tn_reset_specified));
