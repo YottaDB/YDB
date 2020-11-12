@@ -543,8 +543,16 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		return NULL;
 	}
 	SSL_CTX_set_options(ctx, DEPRECATED_SSLTLS_PROTOCOLS);
+#	ifdef GTM_ONLY
+	/* Note: The below code is inherited from GT.M V6.3-008
+	 * (http://tinco.pair.com/bhaskar/gtm/doc/articles/GTM_V6.3-008_Release_Notes.html#GTM-9084).
+	 * And sets the connection to not use TLS 1.3 by default. This is because GT.M does not yet
+	 * support TLS 1.3. But YottaDB does support it (fixed as part of YDB#376). Therefore
+	 * keep the below code commented out.
+	 */
 	if (0 != SSL_OP_NO_TLSv1_3)
 		SSL_CTX_set_options(ctx, SSL_OP_NO_TLSv1_3);	/* until changes made to handle TLSv1.3 ciphers */
+#	endif
 	/* Read the configuration file for more configuration parameters. */
 	cfg = &gtm_tls_cfg;
 	config_init(cfg);
