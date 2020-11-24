@@ -181,8 +181,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					sockptr->remote.ai_head = NULL;
 				}
 				assertpro(-2 != real_errno);
-				errptr = (char *)STRERROR(real_errno);
-				errlen = STRLEN(errptr);
+				SET_ERRPTR_AND_ERRLEN(real_errno, errptr, errlen);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
 				return FALSE;
 			}
@@ -201,8 +200,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					&temp_1, SIZEOF(temp_1)))
 				{
 					save_errno = errno;
-					errptr = (char *)STRERROR(save_errno);
-					errlen = STRLEN(errptr);
+					SET_ERRPTR_AND_ERRLEN(save_errno, errptr, errlen);
 					if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
 					{
 						sockptr->nonblocking = FALSE;
@@ -226,8 +224,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					IPPROTO_TCP, TCP_NODELAY, &temp_1, SIZEOF(temp_1)))
 				{
 					save_errno = errno;
-					errptr = (char *)STRERROR(save_errno);
-					errlen = STRLEN(errptr);
+					SET_ERRPTR_AND_ERRLEN(save_errno, errptr, errlen);
 					if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
 					{
 						sockptr->nonblocking = FALSE;
@@ -252,8 +249,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 						     SOL_SOCKET, SO_RCVBUF, &sockptr->bufsiz, SIZEOF(sockptr->bufsiz)))
 					{
 						save_errno = errno;
-						errptr = (char *)STRERROR(save_errno);
-						errlen = STRLEN(errptr);
+						SET_ERRPTR_AND_ERRLEN(save_errno, errptr, errlen);
 						if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
 						{
 							sockptr->nonblocking = FALSE;
@@ -278,8 +274,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 						     SOL_SOCKET, SO_RCVBUF, &sockptr->bufsiz, &sockbuflen))
 					{
 						save_errno = errno;
-						errptr = (char *)STRERROR(save_errno);
-						errlen = STRLEN(errptr);
+						SET_ERRPTR_AND_ERRLEN(save_errno, errptr, errlen);
 						if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
 						{
 							sockptr->nonblocking = FALSE;
@@ -486,7 +481,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 				freeaddrinfo(sockptr->remote.ai_head);
 				sockptr->remote.ai_head = NULL;
 			}
-			errptr = (char *)STRERROR(save_errno);
+			SET_ERRPTR_AND_ERRLEN(save_errno, errptr, errlen);
 			if (dev_open == iod->state)
 			{
 				iod->dollar.za = 9;
@@ -601,8 +596,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 		if (-1 == getsockname(sockptr->sd, SOCKET_LOCAL_ADDR(sockptr), &tmp_addrlen))
 		{
 			save_errno = errno;
-			errptr = (char *)STRERROR(save_errno);
-			errlen = STRLEN(errptr);
+			SET_ERRPTR_AND_ERRLEN(save_errno, errptr, errlen);
 			if (FD_INVALID != sockptr->sd)
 			{
 				if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */

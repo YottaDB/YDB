@@ -263,7 +263,6 @@ iorm_readfl.c:warning: Assigned value is garbage or undefined [clang-analyzer-co
 iorm_readfl.c:warning: Division by zero [clang-analyzer-core.DivideZero]
 iorm_readfl.c:warning: Value stored to 'rm_ptr' is never read [clang-analyzer-deadcode.DeadStores]
 iorm_wteol.c:warning: Value stored to 'res_size' is never read [clang-analyzer-deadcode.DeadStores]
-iosocket_connect.c:warning: 7th function call argument is an uninitialized value [clang-analyzer-core.CallAndMessage]
 iosocket_connect.c:warning: Value stored to 'save_errno' is never read [clang-analyzer-deadcode.DeadStores]
 iosocket_iocontrol.c:warning: Although the value stored to 'len' is used in the enclosing expression, the value is never actually read from 'len' [clang-analyzer-deadcode.DeadStores]
 iosocket_iocontrol.c:warning: Although the value stored to 'len' is used in the enclosing expression, the value is never actually read from 'len' [clang-analyzer-deadcode.DeadStores]

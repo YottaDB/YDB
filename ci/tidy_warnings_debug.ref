@@ -161,7 +161,6 @@ ionl_use.c:warning: Value stored to 'd_in' is never read [clang-analyzer-deadcod
 iorm_readfl.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
 iorm_readfl.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
 iorm_readfl.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
-iosocket_connect.c:warning: 7th function call argument is an uninitialized value [clang-analyzer-core.CallAndMessage]
 iosocket_connect.c:warning: Value stored to 'save_errno' is never read [clang-analyzer-deadcode.DeadStores]
 iosocket_iocontrol.c:warning: Although the value stored to 'len' is used in the enclosing expression, the value is never actually read from 'len' [clang-analyzer-deadcode.DeadStores]
 iosocket_iocontrol.c:warning: Although the value stored to 'len' is used in the enclosing expression, the value is never actually read from 'len' [clang-analyzer-deadcode.DeadStores]

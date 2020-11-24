@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -249,6 +249,12 @@ enum socket_pass_type
 		else if (sockpass_data == (SOCKPTR)->passtype)			\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SOCKPASSDATAMIX, 0);	\
 	}                                                                      \
+}
+
+#define SET_ERRPTR_AND_ERRLEN(SAVE_ERRNO, ERRPTR, ERRLEN)	\
+{								\
+	ERRPTR = (char *)STRERROR(SAVE_ERRNO);			\
+	ERRLEN = STRLEN(ERRPTR);				\
 }
 
 enum socket_state
