@@ -40,7 +40,7 @@ error_def(ERR_CTRLC);
 
 mlk_shrblk_ptr_t mlk_shrblk_sort(mlk_shrblk_ptr_t head);
 
-void lke_show_memory(mlk_shrblk_ptr_t bhead, char *prefix)
+void lke_show_memory(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t bhead, char *prefix)
 {
 	mlk_shrblk_ptr_t	b, bnext, parent, children;
 	mlk_shrsub_ptr_t	dsub;
@@ -64,7 +64,7 @@ void lke_show_memory(mlk_shrblk_ptr_t bhead, char *prefix)
 		PRINTF("%s%s : [shrblk] %p : [shrsub] %p (len=%d) : [shrhash] %x : [parent] %p : [children] %p : [pending] %p : "
 				"[owner] %u : [auxowner] %" PRIuPTR "\n",
 			prefix, temp, b, dsub, dsub->length, b->hash, parent, children, pending, b->owner, b->auxowner);
-		HASH128_STATE_INIT(hs, 0);
+		MLK_SUBHASH_INIT_PVTCTL(pctl, hs);
 		total_len = 0;
 		mlk_shrhash_val_build(b, &total_len, &hs);
 		MLK_SUBHASH_FINALIZE(hs, total_len, hashres);
@@ -73,7 +73,7 @@ void lke_show_memory(mlk_shrblk_ptr_t bhead, char *prefix)
 			PRINTF("\t\t: [computed shrhash] %x\n", hash);
 		FFLUSH(stdout);
 		if (b->children)
-			lke_show_memory((mlk_shrblk_ptr_t)R2A(b->children), new_prefix);
+			lke_show_memory(pctl, (mlk_shrblk_ptr_t)R2A(b->children), new_prefix);
 		bnext = (mlk_shrblk_ptr_t)R2A(b->rsib);
 	}
 }
@@ -99,6 +99,8 @@ void lke_show_hashtable(mlk_pvtctl_ptr_t pctl)
 		FFLUSH(stdout);
 	}
 	PRINTF("\t: [num_buckets] %d\n", num_buckets);
+	if (0 != pctl->ctl->hash_seed)
+		PRINTF("\t: [seed] %" PRIu64 "\n", pctl->ctl->hash_seed);
 	FFLUSH(stdout);
 }
 
@@ -130,7 +132,7 @@ bool	lke_showtree(struct CLB 	*lnk,
 	tree = (mlk_shrblk_ptr_t)R2A(ctl->blkroot);
 	if (memory)
 	{
-		lke_show_memory(tree, "	");
+		lke_show_memory(pctl, tree, "	");
 		if (shr_sub_size)
 			(*shr_sub_size) = ctl->subfree - ctl->subbase;
 		lke_show_hashtable(pctl);

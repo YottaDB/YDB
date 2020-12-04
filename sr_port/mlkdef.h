@@ -45,6 +45,12 @@ typedef hash128_state_t				mlk_subhash_state_t;
 typedef gtm_uint8				mlk_subhash_seed_t;
 typedef gtm_uint16				mlk_subhash_res_t;
 typedef uint4					mlk_subhash_val_t;
+#define MLK_SUBHASH_INIT(PVTBLK, STATEVAR)							\
+MBSTART {											\
+	assert(NULL != (PVTBLK)->pvtctl.ctl);							\
+	(PVTBLK)->hash_seed = (PVTBLK)->pvtctl.ctl->hash_seed;					\
+	HASH128_STATE_INIT(STATEVAR, (PVTBLK)->hash_seed);					\
+} MBEND
 #define MLK_SUBHASH_INIT_PVTCTL(PVTCTL, STATEVAR)	HASH128_STATE_INIT(STATEVAR, (PVTCTL)->ctl->hash_seed)
 #define MLK_SUBHASH_INGEST(STATEVAR, DATA, SIZE)	ydb_mmrhash_128_ingest(&(STATEVAR), (DATA), (SIZE))
 #define MLK_SUBHASH_FINALIZE(STATEVAR, LENGTH, RESVAR)	ydb_mmrhash_128_result(&(STATEVAR), LENGTH, &(RESVAR))
@@ -157,7 +163,9 @@ typedef struct	mlk_ctldata_struct	/* this describes the entire shared lock secti
 	boolean_t	lockspacefull_logged;	/* whether LOCKSPACEFULL has been issued since last being below threshold */
 	boolean_t	gc_needed;		/* whether we've determined that a garbage collection is needed */
 	boolean_t	resize_needed;		/* whether we've determined that a hash table resize is needed */
+	boolean_t	rehash_needed;		/* whether we've determined that a hash table rehash is needed */
 	global_latch_t	lock_gc_in_progress;	/* pid of the process doing the GC, or 0 if none */
+	mlk_subhash_seed_t	hash_seed;		/* seed value to use to initialize hash */
 	int		hash_shmid;		/* shared memory id of hash table, or undefined if internal (see blkhash) */
 } mlk_ctldata;
 
@@ -227,6 +235,7 @@ typedef struct	mlk_pvtblk_struct	/* one of these entries exists for each nref wh
 	uint4			sequence;		/* shrblk sequence for nodptr node (node we want) */
 	uint4			blk_sequence;		/* shrblk sequence for blocked node (node preventing our lock) */
 	mlk_tp			*tp;			/* pointer to saved tp information */
+	mlk_subhash_seed_t	hash_seed;		/* seed used to initialize hash */
 	uint4			nref_length;		/* the length of the nref portion of the 'value' string. */
 	unsigned short		subscript_cnt;		/* the number of subscripts (plus one for the name) in this nref */
 	unsigned		level : 9;		/* incremental lock level */
@@ -344,6 +353,17 @@ MBSTART {													\
 		DBG_LOCKHASH_N_BITS(hashres.one);								\
 		MLK_PVTBLK_SUBHASH(PVTBLK, hi) = (uint4)hashres.one;						\
 	}													\
+} MBEND
+
+/* ensure that the seed is correct before using pvtblk hashes */
+#define MLK_PVTBLK_SUBHASH_SYNC(PVTBLK)							\
+MBSTART {										\
+	assert(NULL != (PVTBLK)->pvtctl.ctl);						\
+	if ((PVTBLK)->hash_seed != (PVTBLK)->pvtctl.ctl->hash_seed)			\
+	{										\
+		MLK_PVTBLK_SUBHASH_GEN(PVTBLK);						\
+		assert((PVTBLK)->hash_seed == (PVTBLK)->pvtctl.ctl->hash_seed);		\
+	}										\
 } MBEND
 
 /* compute the address immediately after the pvtblk */

@@ -9,4 +9,4 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-boolean_t mlk_shrhash_add(mlk_pvtctl *pctl, mlk_shrblk_ptr_t shr);
+void mlk_rehash(mlk_pvtctl_ptr_t pctl);
