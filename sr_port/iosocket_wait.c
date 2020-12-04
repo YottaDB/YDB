@@ -23,13 +23,15 @@
  * timeout		     -- set $Test to 1
  */
 #include "mdef.h"
+
 #include <errno.h>
 #include "gtm_socket.h"
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gtm_unistd.h"
-#include <sys/poll.h>
+#include "gtm_poll.h"
+
 #include "io_params.h"
 #include "gt_timer.h"
 #include "io.h"

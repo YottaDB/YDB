@@ -40,6 +40,7 @@
  * 		-- if the device buffer is used, move it over to the return buffer and update the device buffer pointer
  */
 #include "mdef.h"
+
 #include <sys/types.h>
 #include <errno.h>
 #include "gtm_stdio.h"
@@ -53,10 +54,11 @@ static int fcntl_res;
 #include <sys/time.h>		/* for gettimeofday */
 #endif
 #ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-#include <sys/poll.h>
+#include "gtm_poll.h"
 #endif
 #endif
 #include "gtm_select.h"
+
 #include "eintr_wrappers.h"
 #include "gt_timer.h"
 #include "io.h"

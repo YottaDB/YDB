@@ -68,7 +68,7 @@ elif [ "linux" = $arch ] ; then
 	if [ "$isarm_ydb" -eq 1 ] ; then
 		ldcmd="cc" # On Linux/ARM only cc (not ld) creates a valid ELF header when compiling M routines
 	else
-		ldcmd="ld" # Linux - all platforms
+		ldcmd="ld.gold" # Linux - all platforms
 	fi
 else echo "Shared libary ldflags not set for this platform"; exit 1
 fi

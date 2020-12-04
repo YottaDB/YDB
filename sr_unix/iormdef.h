@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,8 +85,11 @@ error_def(ERR_CRYPTBADWRTPOS);
 	int		fclose_res, rc, save_fd;							\
 													\
 	if (NULL != D_RM->FILSTR)									\
-	{	/* Since FCLOSE also closes the fd, reset FILDES (no need to close it separately). */	\
-		LINUX_ONLY(assert(D_RM->FILDES == D_RM->FILSTR->_fileno);)				\
+	{	/* Since FCLOSE also closes the fd, reset FILDES (no need to close it separately). 	\
+		 * Note this assert is bypassed on non-GLIBC platforms as the _fileno field does not	\
+		 * exist there.										\
+		 */											\
+		GLIBC_ONLY(assert(D_RM->FILDES == D_RM->FILSTR->_fileno));				\
 		if (!process_exiting)									\
 		{	/* Only do the actual FCLOSE() if the process is not exiting because a) the OS	\
 			 * takes care of opened file descriptors anyway; and b) we might have received	\

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -486,7 +486,7 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	 * are setup nor (potentially) most of the GTM runtime.
 	 */
 	assert(MINTWO == TwoTable[0]);
-#	if defined(__linux__) && !defined(__i386)
+#	if defined(__linux__) && !defined(__i386) && !defined(__MUSL)
         /* This will make sure that all the memory allocated using 'malloc' will be in heap and no 'mmap' is used.
          * This is needed to make sure that the offset calculation that we do at places(que_ent, chache_que, etc..)
          * using 2 'malloc'ed memory can be hold in an integer. Though this will work without any problem as the
@@ -494,7 +494,7 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
          * offset fields to long and make sure all other related application logic works fine.
          */
 	mallopt(M_MMAP_MAX, 0);
-#	endif /* __linux__ && !__i386 */
+#	endif /* __linux__ && !__i386 && !__MUSL */
 	/* Check that the storage queue offset in a storage element has sufficient reach
 	 * to cover an extent.
 	 */

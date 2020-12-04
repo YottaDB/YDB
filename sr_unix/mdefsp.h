@@ -100,7 +100,12 @@ typedef uint4 mach_inst;	/* machine instruction */
 typedef unsigned short	in_port_t;
 #endif
 #ifndef VAR_COPY
-#define VAR_COPY(dst,src) __va_copy(dst, src)
+  /* Extra check for va_copy is because Alpine/musl does this differently than does glibc */
+  #ifndef va_copy
+    #define VAR_COPY(dst,src) __va_copy(dst, src)
+  #else
+    #define VAR_COPY(dst,src) va_copy(dst, src)
+  #endif
 #endif
 #ifdef __s390__
 #ifndef Linux390

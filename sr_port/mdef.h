@@ -27,7 +27,31 @@
 #endif
 
 #ifdef __linux__
-#define CRIT_USE_PTHREAD_MUTEX
+# include <features.h>  /* Needed to define __GLIBC__ if it exists */
+# define CRIT_USE_PTHREAD_MUTEX
+# if defined(__GLIBC__)
+#  define GLIBC_ONLY(X) X
+#  define NON_GLIBC_ONLY(X)
+# else
+#  if !defined(__CYGWIN__)
+     /* Note: MUSL's lack of a way to definitelively identify it (no #define) has generated significant discussion
+      * on MUSL discussion threads but to date, none exists. So our methodology here is if it isn't GLIBC and isn't
+      * CYGWIN, then it must be Alpine/MUSL. Best we can do under the circumstances.
+      */
+#    define __MUSL
+     /* Define this to bypass the redefine of memcpy() as a macro. This causes problems when pthread.h includes sched.h
+      * on Alpine Linux as it has a declaration for memcpy in it that causes major conflicts with the override of memcpy()
+      * in gtm_string.h
+      */
+#    define BYPASS_MEMCPY_OVERRIDE
+#  endif
+#  define GLIBC_ONLY(X)
+#  define NON_GLIBC_ONLY(X) X
+# endif
+#else
+  /* For non-Linux builds, treat as if GLIBC */
+# GLIBC_ONLY(X) X
+# NON_GLIBC_ONLY(X)
 #endif
 
 #  define MSTR_CONST(name, string)		mstr name = {0, LEN_AND_LIT(string)}
@@ -205,11 +229,13 @@ typedef UINTPTR_T uintszofptr_t;
 #ifdef __linux__
 #	define LINUX_ONLY(X) X
 #	define NON_LINUX_ONLY(X)
-#	define YDB_USE_POSIX_TIMERS
+#	if !defined(__MUSL)
+#	  /* Verify Alpine/MUSL can't use POSIX timers ##ALPINE_TODO## */
+#	  define YDB_USE_POSIX_TIMERS
+#	endif
 #else
 #	define LINUX_ONLY(X)
 #	define NON_LINUX_ONLY(X) X
-#	undef  YDB_USE_POSIX_TIMERS
 #endif
 
 #ifdef __MVS__

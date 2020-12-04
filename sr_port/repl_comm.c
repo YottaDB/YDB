@@ -18,8 +18,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <errno.h>
-# include <sys/poll.h>
-
+#include "gtm_poll.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gtm_socket.h"

@@ -3,6 +3,9 @@
  * Copyright (c) 2008-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -29,7 +32,8 @@
 
 #include "gtm_stdlib.h"
 #include "gtm_signal.h"
-#ifndef __CYGWIN__
+/* Note the use of __GLIBC__ here precludes this include on CYGWIN and Alpine(MUSL environments */
+#ifdef __GLIBC__
 #include <execinfo.h>
 #endif
 
@@ -74,16 +78,16 @@ caddr_t caller_id(void)
 	if (blocksig_initialized)
 		SIGPROCMASK(SIG_BLOCK, &block_sigsent, &savemask, rc);
 	caller_id_reent = TRUE;
-	#ifndef __CYGWIN__
+	#ifdef __GLIBC__
 	trace_size = backtrace(trace, MAX_TRACE_DEPTH);
 	#else
-	/* Cygwin does not support backtrace() */
+	/* Neither Cygwin (newlib based libc) or Alpine (musl libc) support backtrace() which is a GNU extension */
 	trace_size = 0;
 	#endif
 	caller_id_reent = FALSE;
 	if (blocksig_initialized)
 		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
-	/* backtrace will return call stack with address.*/
+	/* Backtrace will return call stack with address */
 	if (RETURN_ADDRESS_DEPTH <= trace_size)
 		return (caddr_t)trace[RETURN_ADDRESS_DEPTH];
 	else

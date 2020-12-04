@@ -12,9 +12,11 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+#include "mdef.h"
+
 #include "gtm_filter_command.h"
 #include "gtm_string.h"
-#include "mdef.h"
+
 #include "gtmmsg.h"
 #include "send_msg.h"
 #include "gtm_threadgbl.h"
