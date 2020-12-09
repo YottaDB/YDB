@@ -345,11 +345,15 @@ boolean_t wcs_flu(uint4 options)
 			if (jb->fsync_dskaddr != jb->freeaddr)
 			{	/* The only known case of this is if a kill -9 occurred in "jnl_file_close" after
 				 * jb->last_eof_written was set to TRUE but before "jnl_fsync" finished executing.
-				 * Assert that this be a crash test and that the current caller is indeed MUPIP RUNDOWN
-				 * or MUPIP RECOVER or MUPIP ROLLBACK (all of which set "in_mu_rndwn_file" in dbg mode).
+				 * Assert that this be a crash test.
 				 */
 				assert(WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number);
-				assert(in_mu_rndwn_file);
+				/* Also assert that the current caller is MUPIP RUNDOWN or MUPIP RECOVER or MUPIP ROLLBACK.
+				 * All of them set "in_mu_rndwn_file" in dbg mode. The only exception is MUPIP ROLLBACK -online
+				 * (i.e. online rollback) which does not set "in_mu_rndwn_file" but sets jgbl.onlnrlbk so check
+				 * for that too.
+				 */
+				assert(in_mu_rndwn_file || jgbl.onlnrlbk);
 				jnl_fsync(reg, jb->dskaddr);
 			}
 			assert((dba_bg != csd->acc_meth) || !csd->jnl_before_image
