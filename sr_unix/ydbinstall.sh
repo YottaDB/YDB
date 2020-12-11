@@ -833,27 +833,12 @@ if [ "Y" = $ydb_posix ] ; then
 	make -j `grep -c ^processor /proc/cpuinfo` && sudo make install
 	# Get the exit code for the make command to save the build directory if it is an error (not 0)
 	status=$?
-	status_utf8=0
-	cd ..
-	if [ "Y" = $ydb_utf8 ] ; then
-		mkdir build_UTF8 && cd build_UTF8
-		cmake -DM_UTF8_MODE=1 ..
-		make && sudo make install
-		status_utf8=$?
-		cd ..
-	fi
-	cd ../..
+	cd ../../..
 	. ${ydb_installdir}/ydb_env_unset
-	if [ "0" = $status -a "0" = $status_utf8 ] ; then
+	if [ "0" = $status ] ; then
 		sudo rm -R posix_tmp
-	elif ["0" != $status -a "0" != $status_utf8] ; then
-		echo "POSIX plugin build failed in both M and UTF8 modes. The build directory ($PWD/posix_tmp) has been saved."
-		remove_tmpdir=0
-	elif ["0" != $status] ; then
-		echo "POSIX plugin build failed in M mode. The build directory ($PWD/posix_tmp) has been saved."
-		remove_tmpdir=0
 	else
-		echo "POSIX plugin build failed in UTF8 mode. The build directory ($PWD/posix_tmp) has been saved."
+		echo "POSIX plugin build failed. The build directory ($PWD/posix_tmp) has been saved."
 		remove_tmpdir=0
 	fi
 fi
