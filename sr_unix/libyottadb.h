@@ -94,6 +94,10 @@ enum
 #define	YDB_LOCK_TIMEOUT	(YDB_INT_MAX - 4)	/* 0x7ffffffb */
 #define YDB_DEFER_HANDLER	(YDB_INT_MAX - 5)	/* 0x7ffffffa - defer this signal handler (used in Go wrapper) */
 
+/* Constants used by wrappers for initial buffer sizes typically for return values in Go's EasyAPI and in the Python wrapper */
+#define DEFAULT_DATA_SIZE	32	/* Allocation for the actual data value */
+#define DEFAULT_SUBSCR_CNT	2	/* Default number of subscripts to allocate */
+#define	DEFAULT_SUBSCR_SIZE	16	/* Default size of each subscript value */
 
 /* Miscellaneous defines */
 #ifndef TRUE
