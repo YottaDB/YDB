@@ -93,6 +93,7 @@ GBLREF boolean_t		dmterm_default;
 GBLREF mstr			extnam_str;
 GBLREF mstr			env_ydb_gbldir_xlate;
 GBLREF mval			dollar_zgbldir;
+GBLREF boolean_t		ydb_ztrigger_output;
 
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_GBLNOMAPTOREG);
@@ -882,6 +883,9 @@ void	op_fnview(int numarg, mval *dst, ...)
 				s2pool_concat(dst, &commastr);
 				s2pool_concat(dst, &tmpstr);
 			}
+			break;
+		case VTK_ZTRIGGER_OUTPUT:
+			*dst = (ydb_ztrigger_output ? literal_one : literal_zero);
 			break;
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWFN, 2, strlen((const char *)vtp->keyword), vtp->keyword);

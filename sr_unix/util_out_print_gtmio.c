@@ -3,6 +3,8 @@
  * Copyright (c) 2014-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -23,6 +25,7 @@
 #include "gtmimagename.h"	/* for IS_MCODE_RUNNING */
 
 GBLREF	uint4			dollar_tlevel;
+GBLREF	boolean_t		ydb_ztrigger_output;
 
 #define	ZTRIGBUFF_INIT_ALLOC		1024	/* start at 1K */
 #define	ZTRIGBUFF_INIT_MAX_GEOM_ALLOC	1048576	/* stop geometric growth at this value */
@@ -41,6 +44,10 @@ void	util_out_print_gtmio(caddr_t message, int flush, ...)
 
 	SETUP_THREADGBL_ACCESS;
 	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
+	if (!ydb_ztrigger_output) {
+		/* Application does not want $ZTRIGGER output to be printed. Skip this step. */
+		return;
+	}
 	/* we expect all trigger operations (SELECT, LOAD, etc.) to happen inside TP. exceptions should set TREF variable */
 	assert(dollar_tlevel || TREF(gtmio_skip_tlevel_assert));
 	va_start(var, flush);
@@ -95,6 +102,7 @@ void	util_out_print_gtmio(caddr_t message, int flush, ...)
 	}
 	va_end(TREF(last_va_list_ptr));
 	va_end(var);
+	return;
 }
 
 void	tp_ztrigbuff_print(void)

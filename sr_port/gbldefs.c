@@ -1403,3 +1403,7 @@ GBLDEF	boolean_t (*xfer_set_handlers_fnptr)(int4, void (*callback)(int4), int4 p
 GBLDEF	void (*deferred_signal_set_fnptr)(int4 dummy_val);	/* Function pointer to "deferred_signal_set()". Like the above,
 								 * this exists only to keep "gtmsecshr" executable size small.
 								 */
+GBLDEF	boolean_t		ydb_ztrigger_output = TRUE;	/* If TRUE, $ZTRIGGER() function calls output whether the trigger
+								 * got added or not. If FALSE, the printing is skipped. Default
+								 * value is TRUE. VIEW "ZTRIGGER_OUTPUT":0 resets it to FALSE.
+								 */

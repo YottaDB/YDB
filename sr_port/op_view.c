@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,8 +116,9 @@ GBLREF	boolean_t		is_updproc;
 GBLREF	uint4			process_id;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	boolean_t		dmterm_default;
-GBLREF mstr			extnam_str;
+GBLREF	mstr			extnam_str;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	boolean_t		ydb_ztrigger_output;
 DEBUG_ONLY(GBLREF  tp_region	*tp_reg_list;)	/* Ptr to list of tp_regions for a TP transaction */
 
 error_def(ERR_ACTRANGE);
@@ -911,6 +912,9 @@ void	op_view(int numarg, mval *keyword, ...)
 					lvmon_release();			/* No vars specified - free what have if any */
 				TREF(lvmon_active) = FALSE;			/* No monitoring active now */
 			}
+			break;
+		case VTK_ZTRIGGER_OUTPUT:
+			ydb_ztrigger_output = (0 != MV_FORCE_INT(parmblk.value));
 			break;
 		default:
 			va_end(var);

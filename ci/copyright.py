@@ -36,8 +36,8 @@ def look_for_copyrights():
         # This assumes that 'This source code ...' comes after all copyrights.
         elif 'This source code contains the intellectual' in line:
             start, end = (" *", "*") if line.startswith(" *") else ("#", "#")
-            print(start, " Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	", end)
-            print(start, "								", end)
+            print(start, " Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	", end, sep='')
+            print(start, "								", end, sep='')
             print(line, end="")
             return True
         else:
