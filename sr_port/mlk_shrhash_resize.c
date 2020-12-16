@@ -45,6 +45,7 @@ boolean_t mlk_shrhash_resize(mlk_pvtctl_ptr_t pctl)
 	shrhash_size_old = pctl->ctl->num_blkhash;
 	shrhash_mem_new = NEW_SHRHASH_MEM(shrhash_size_old);
 	shrhash_size_new = shrhash_mem_new / SIZEOF(mlk_shrhash);
+
 	do
 	{
 		shmid_new = shmget(IPC_PRIVATE, shrhash_mem_new, RWDALL | IPC_CREAT);
@@ -82,7 +83,7 @@ boolean_t mlk_shrhash_resize(mlk_pvtctl_ptr_t pctl)
 			nbi = hash % shrhash_size_new;
 			new_bucket = &shrhash_new[nbi];
 			fi = mlk_shrhash_find_bucket(&pctl_new, hash);
-			if (MLK_SHRHASH_FOUND_NO_BUCKET == fi)
+			if (-1 == fi)
 			{	/* Hash insert failure. Try a larger hash table. */
 				status = SHMDT(shrhash_new);
 				if (-1 == status)

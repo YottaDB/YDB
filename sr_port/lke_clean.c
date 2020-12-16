@@ -271,7 +271,7 @@ void lke_clean(void)
 								  bucket; not in the right neighborhood -- try moving it */
 							mi = mlk_shrhash_find_bucket(&pvtblk.pvtctl, MLK_SUBHASH_RES_VAL(hashres));
 							shr = MLK_SHRHASH_SHRBLK(pvtblk.pvtctl, search_bucket);
-							if (mi == MLK_SHRHASH_FOUND_NO_BUCKET)
+							if (mi == -1)
 							{	/* If this triggers, it mean the hash table is full and things are
 								 * out of position; very bad
 								 * Emit a critical warning and carry on

@@ -99,7 +99,6 @@ void mlk_shrhash_delete(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 	mlk_shrhash_map_t	usedmap;
 	mlk_shrblk_ptr_t	search_shrblk;
 	int			bi, si, bitnum;
-	boolean_t		bitnum_set;
 	mlk_shrhash_ptr_t	shrhash, bucket, search_bucket;
 
 	shrhash = pctl->shrhash;
@@ -118,62 +117,25 @@ void mlk_shrhash_delete(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 	bi = hash % num_buckets;
 	bucket = &shrhash[bi];
 	usedmap = bucket->usedmap;
-	bitnum_set = FALSE;
-	assert(usedmap);
-	if (0 == (usedmap & (1U << MLK_SHRHASH_HIGHBIT)))
-	{	/* High bit is not set. We can use Hopscotch hash algorithm to speedily search. */
-		for (si = bi ; 0 != usedmap ; (si = (si + 1) % num_buckets), (usedmap >>= 1))
-		{
-			if (0 == (usedmap & 1U))
-				continue;
-			search_bucket = &shrhash[si];
-			if (search_bucket->hash != hash)
-				continue;
-			assert(0 != search_bucket->shrblk_idx);
-			search_shrblk = MLK_SHRHASH_SHRBLK(*pctl, search_bucket);
-			if (d != search_shrblk)
-				continue;
-			bitnum = (num_buckets + si - bi) % num_buckets;
-			bitnum_set = TRUE;
-			assert(MLK_SHRHASH_HIGHBIT > bitnum);
-			break;
-		}
-		assert(usedmap);
-	} else
-	{	/* This is a bucket full situation. We need to do a slower linear search across entire hash bucket array. */
-		for (si = bi; ; )
-		{
-			search_bucket = &shrhash[si];
-			if (search_bucket->hash == hash)
-			{
-				assert(0 != search_bucket->shrblk_idx);
-				search_shrblk = MLK_SHRHASH_SHRBLK(*pctl, search_bucket);
-				if (d == search_shrblk)
-				{	/* Note that it is possible bitnum is less than MLK_SHRHASH_HIGHBIT in which case we
-					 * need to clear the neighbor bit (using CLEAR_NEIGHBOR macro) below. Hence the need
-					 * to break after setting "bitnum".
-					 */
-					bitnum = (num_buckets + si - bi) % num_buckets;
-					bitnum_set = TRUE;
-					break;
-				}
-			}
-			si = (si + 1) % num_buckets;
-			assert(si != bi); /* We should have seen the shrblk BEFORE the end of one full scan of the hash array */
-		}
-	}
-	assert(bitnum_set);
-	if (bitnum_set)
+	for (si = bi ; 0 != usedmap ; (si = (si + 1) % num_buckets), (usedmap >>= 1))
 	{
-		search_bucket->shrblk_idx = 0;
-		search_bucket->hash = 0;
-		if (MLK_SHRHASH_HIGHBIT > bitnum)
-		{	/* Clear neighbor bit as long as it is within a the valid list of neighbor bits */
-			assert(IS_NEIGHBOR(bucket->usedmap, bitnum));
-			CLEAR_NEIGHBOR(bucket->usedmap, bitnum);
-		} else
-			assert(bucket->usedmap & (1U << MLK_SHRHASH_HIGHBIT));
+		if (0 == (usedmap & 1U))
+			continue;
+		search_bucket = &shrhash[si];
+		if (search_bucket->hash != hash)
+			continue;
+		assert(0 != search_bucket->shrblk_idx);
+		search_shrblk = MLK_SHRHASH_SHRBLK(*pctl, search_bucket);
+		if (d == search_shrblk)
+		{
+			assert(IS_NEIGHBOR(bucket->usedmap, (num_buckets + si - bi) % num_buckets));
+			search_bucket->shrblk_idx = 0;
+			search_bucket->hash = 0;
+			CLEAR_NEIGHBOR(bucket->usedmap, (num_buckets + si - bi) % num_buckets);
+			return;
+		}
 	}
+	assert(usedmap);
 	return;
 }
 

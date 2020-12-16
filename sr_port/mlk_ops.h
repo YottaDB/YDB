@@ -3,9 +3,8 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
+ *  Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	 *
+ * 								 *
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -22,7 +21,6 @@
 
 #include "interlock.h"
 #include "do_shmat.h"
-#include "mlk_shrhash_find_bucket.h"	/* for MLK_SHRHASH_FOUND_NO_BUCKET */
 
 static inline void mlk_pvtctl_set_ctl(mlk_pvtctl_ptr_t pctl, mlk_ctldata_ptr_t ctl)
 {
@@ -51,35 +49,18 @@ static inline void mlk_shrhash_insert(mlk_pvtctl_ptr_t pctl, int bucket_idx, int
 {
 	mlk_shrhash_ptr_t	bucket, target_bucket;
 	uint4			num_buckets;
-	boolean_t		bucket_full;
-	int			bitnum;
 
-	assert(0 <= bucket_idx);
 	num_buckets = pctl->shrhash_size;
 	bucket = &pctl->shrhash[bucket_idx];
-	if (0 > target_idx)
-	{	/* Negative value is a special value indicating a bucket full situation encountered in
-		 * "mlk_shrhash_find_bucket". Undo the "fi = -(fi + 1)" done there to get at the positive "fi".
-		 */
-		target_idx = -(target_idx + 1);
-		bucket_full = TRUE;
-	} else
-		bucket_full = FALSE;
-	assert(MLK_SHRHASH_FOUND_NO_BUCKET != target_idx);
 	target_bucket = &pctl->shrhash[target_idx];
+	assert(!IS_NEIGHBOR(bucket->usedmap, (num_buckets + target_idx - bucket_idx) % num_buckets));
 	assert(0 == target_bucket->shrblk_idx);
 	target_bucket->shrblk_idx = shrblk_idx;
 	assert(0 < target_bucket->shrblk_idx);
+	assert(MLK_SHRHASH_NEIGHBORS > ((num_buckets + target_idx - bucket_idx) % num_buckets));
 	target_bucket->hash = hash;
-	if (!bucket_full)
-	{
-		bitnum = (num_buckets + target_idx - bucket_idx) % num_buckets;
-		assert(!IS_NEIGHBOR(bucket->usedmap, bitnum));
-		assert(MLK_SHRHASH_NEIGHBORS > bitnum);
-	} else
-		bitnum = MLK_SHRHASH_HIGHBIT;
 	/* Note the new neighbor of the original bucket */
-	SET_NEIGHBOR(bucket->usedmap, bitnum);
+	SET_NEIGHBOR(bucket->usedmap, (num_buckets + target_idx - bucket_idx) % num_buckets);
 }
 
 static inline void rel_lock_crit(mlk_pvtctl_ptr_t pctl, boolean_t was_crit)
