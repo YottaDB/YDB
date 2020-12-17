@@ -18,7 +18,7 @@
 # Use with data persistence:
 #   $ docker run --rm -e ydb_chset=utf-8 -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
 
-ARG OS_VSN=18.04
+ARG OS_VSN=20.04
 
 # Stage 1: YottaDB build image
 FROM ubuntu:${OS_VSN} as ydb-release-builder
@@ -71,7 +71,9 @@ RUN apt-get update && \
                     binutils \
                     libelf-dev \
                     libicu-dev \
+                    libtinfo5 \
                     locales \
+                    pkg-config \
                     wget \
                     vim \
                     && \
