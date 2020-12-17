@@ -2,6 +2,35 @@
 #
 # License: MIT
 # Source: https://raw.githubusercontent.com/andrew-hardin/cmake-git-version-tracking/master/git_watcher.cmake
+#
+# Copyright (c) 2019 Andrew Hardin
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.
+# All rights reserved.
+#
+#	This source code contains the intellectual property
+#	of its copyright holder(s), and is made available
+#	under a license.  If you do not know the terms of
+#	the license, please stop and do not read further.
+#################################################################
 
 
 # This file defines the functions and targets needed to monitor
@@ -184,10 +213,12 @@ endfunction()
 #              check the state of git before every build. If the state has
 #              changed, then a file is configured.
 function(SetupGitMonitoring)
-    add_custom_target(check_git_repository
-        ALL
-        DEPENDS ${PRE_CONFIGURE_FILE}
-        BYPRODUCTS ${POST_CONFIGURE_FILE}
+    execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse --git-dir OUTPUT_VARIABLE GIT_DIR)
+    # strip trailing newline
+    string(STRIP ${GIT_DIR} GIT_DIR)
+    add_custom_command(
+        OUTPUT ${POST_CONFIGURE_FILE}
+        DEPENDS ${PRE_CONFIGURE_FILE} ${GIT_DIR}/index
         COMMENT "Checking the git repository for changes..."
         COMMAND
             ${CMAKE_COMMAND}
@@ -198,6 +229,8 @@ function(SetupGitMonitoring)
             -DPRE_CONFIGURE_FILE=${PRE_CONFIGURE_FILE}
             -DPOST_CONFIGURE_FILE=${POST_CONFIGURE_FILE}
             -P "${CMAKE_CURRENT_LIST_FILE}")
+    # Hack to avoid rebuilding git file when it's not necessary (so that libmumps can have an explicit dependency)
+    add_custom_target(check_git_repository DEPENDS ${POST_CONFIGURE_FILE})
 endfunction()
 
 
