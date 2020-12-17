@@ -45,7 +45,28 @@ RUN apt-get update && \
                     && \
     apt-get clean
 
-ADD . /tmp/yottadb-src
+RUN mkdir /tmp/yottadb-src
+ADD CMakeLists.txt /tmp/yottadb-src
+# We want to copy the directories themselves, not their contents.
+# Unfortunately, there is no way to do this with globs, so we have to specify each directory individually.
+# c.f. <https://docs.docker.com/engine/reference/builder/#add>, <https://stackoverflow.com/questions/26504846>
+
+# This list was generated with `ls sr* -d | tr ' ' '\n' | xargs -n1 -i printf 'ADD %s /tmp/yottadb-src/%s\n' {} {}`.
+ADD cmake /tmp/yottadb-src/cmake
+ADD sr_aarch64 /tmp/yottadb-src/sr_aarch64
+ADD sr_armv7l /tmp/yottadb-src/sr_armv7l
+ADD sr_i386 /tmp/yottadb-src/sr_i386
+ADD sr_linux /tmp/yottadb-src/sr_linux
+ADD sr_port /tmp/yottadb-src/sr_port
+ADD sr_port_cm /tmp/yottadb-src/sr_port_cm
+ADD sr_unix /tmp/yottadb-src/sr_unix
+ADD sr_unix_cm /tmp/yottadb-src/sr_unix_cm
+ADD sr_unix_gnp /tmp/yottadb-src/sr_unix_gnp
+ADD sr_unix_nsb /tmp/yottadb-src/sr_unix_nsb
+ADD sr_x86_64 /tmp/yottadb-src/sr_x86_64
+ADD sr_x86_regs /tmp/yottadb-src/sr_x86_regs
+ADD .git /tmp/yottadb-src/.git
+
 RUN mkdir -p /tmp/yottadb-build \
  && cd /tmp/yottadb-build \
  && test -f /tmp/yottadb-src/.yottadb.vsn || \
