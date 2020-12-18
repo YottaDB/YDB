@@ -182,9 +182,8 @@ typedef mlk_shrsub	*mlk_shrsub_ptr_t;
 typedef mlk_ctldata	*mlk_ctldata_ptr_t;
 typedef mlk_shrhash	*mlk_shrhash_ptr_t;
 
-/* Uncomment the below line if you want to turn on lock hash debugging.
- * #define MLK_SHRHASH_DEBUG
- */
+/* Uncomment the below line if you want to turn on lock hash debugging */
+//#define MLK_SHRHASH_DEBUG
 #ifdef MLK_SHRHASH_DEBUG
 #	define SHRHASH_DEBUG_ONLY(x) x
 	void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl);
@@ -337,18 +336,18 @@ MBSTART {													\
 MBSTART {													\
 	unsigned char		*cp;										\
 	int			hi;										\
-	hash128_state_t		accstate, tmpstate;								\
-	gtm_uint16		hashres;									\
+	mlk_subhash_state_t	accstate, tmpstate;								\
+	mlk_subhash_res_t	hashres;									\
 														\
-	HASH128_STATE_INIT(accstate, 0);									\
+	MLK_SUBHASH_INIT(PVTBLK, accstate);									\
 	for (cp = (PVTBLK)->value, hi = 0; hi < (PVTBLK)->subscript_cnt; hi++)					\
 	{													\
-		ydb_mmrhash_128_ingest(&accstate, cp, *cp + 1);							\
+		MLK_SUBHASH_INGEST(accstate, cp, *cp + 1);							\
 		cp += *cp + 1;											\
 		tmpstate = accstate;										\
-		ydb_mmrhash_128_result(&tmpstate, (cp - (PVTBLK)->value), &hashres);				\
+		MLK_SUBHASH_FINALIZE(tmpstate, (cp - (PVTBLK)->value), hashres);				\
 		DBG_LOCKHASH_N_BITS(hashres.one);								\
-		MLK_PVTBLK_SUBHASH(PVTBLK, hi) = (uint4)hashres.one;						\
+		MLK_PVTBLK_SUBHASH(PVTBLK, hi) = MLK_SUBHASH_RES_VAL(hashres);					\
 	}													\
 } MBEND
 

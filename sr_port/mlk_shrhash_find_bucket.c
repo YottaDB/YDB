@@ -12,9 +12,9 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-#include <stddef.h>
 #include "mdef.h"
 
+#include <stddef.h>
 #include "gtm_string.h"
 
 #include "mlkdef.h"
@@ -28,14 +28,14 @@ error_def(ERR_MLKHASHTABERR);
 
 /**
  * Moves buckets starting at (hash % ctl->num_blkhash) to see if we can make room; returns the index of the new available bucket
- *   within range of goal bucket if such a bucket was found, or -1 if it could not be created
+ *   within range of goal bucket if such a bucket was found, or MLK_SHRHASH_FOUND_NO_BUCKET if it could not be created
  *
  * @param [in] ctl LOCK control structure used for assertions and finding offset
  * @param [in] shrhash pointer to the shrhash data structure in the shared memory region
  * @param [in] hash to try and place
  * @param [in] region region to try performing garbage collection on if needed
  * @param [in] try_gc if true, a garbage collection is performed if we can't find space for the hash. Requires region to be defined
- * @returns the index of the slot available, or -1 if no such slot could be found
+ * @returns the index of the slot available, or MLK_SHRHASH_FOUND_NO_BUCKET if no such slot could be found
  */
 int mlk_shrhash_find_bucket(mlk_pvtctl_ptr_t pctl, uint4 hash)
 {
@@ -57,7 +57,7 @@ int mlk_shrhash_find_bucket(mlk_pvtctl_ptr_t pctl, uint4 hash)
 		if ((fi + 1) % num_buckets == bi)
 		{	/* Table full */
 			assert((fi + 1) % num_buckets != bi);
-			return -1;
+			return MLK_SHRHASH_FOUND_NO_BUCKET;
 		}
 	}
 	/* While free bucket is out of the neighborhood, find a closer one that can be moved into it. */
@@ -97,10 +97,18 @@ int mlk_shrhash_find_bucket(mlk_pvtctl_ptr_t pctl, uint4 hash)
 #			endif
 			if (0 == pctl->hash_fail_cnt)
 				pctl->ctl->gc_needed = TRUE;
-			else
-				pctl->ctl->resize_needed = TRUE;
+			else if (1 == pctl->hash_fail_cnt)
+			{
+				if (pctl->ctl->num_blkhash > (pctl->ctl->max_blkcnt - pctl->ctl->blkcnt) * 2)
+				{	/* We have more than twice as many hash buckets as we have active shrblks,
+					 * indicating something pathological, so try rehashing.
+					 */
+					pctl->ctl->rehash_needed = TRUE;
+				} else
+					pctl->ctl->resize_needed = TRUE;
+			}
 			pctl->hash_fail_cnt++;
-			return -1;
+			return MLK_SHRHASH_FOUND_NO_BUCKET;
 		}
 		/* Move the bucket from the mapped bucket to the free bucket */
 		move_bucket = &shrhash[mi];
@@ -124,5 +132,6 @@ int mlk_shrhash_find_bucket(mlk_pvtctl_ptr_t pctl, uint4 hash)
 		/* The moved neighbor is now free */
 		fi = mi;
 	}
+	assert((MLK_SHRHASH_FOUND_NO_BUCKET != fi) && (-(MLK_SHRHASH_FOUND_NO_BUCKET + 1) != fi));
 	return fi;
 }

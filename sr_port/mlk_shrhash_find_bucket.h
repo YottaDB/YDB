@@ -3,8 +3,9 @@
  * Copyright (c) 2018 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- *  Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	 *
- * 								 *
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -20,6 +21,8 @@
 #include "gdsblk.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+
+#define MLK_SHRHASH_FOUND_NO_BUCKET     MAXINT4 /* special value to indicate out-of-design situation seen */
 
 int mlk_shrhash_find_bucket(mlk_pvtctl_ptr_t pctl, uint4 hash);
 

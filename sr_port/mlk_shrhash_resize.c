@@ -83,7 +83,7 @@ boolean_t mlk_shrhash_resize(mlk_pvtctl_ptr_t pctl)
 			nbi = hash % shrhash_size_new;
 			new_bucket = &shrhash_new[nbi];
 			fi = mlk_shrhash_find_bucket(&pctl_new, hash);
-			if (-1 == fi)
+			if (MLK_SHRHASH_FOUND_NO_BUCKET == fi)
 			{	/* Hash insert failure. Try a larger hash table. */
 				status = SHMDT(shrhash_new);
 				if (-1 == status)

@@ -117,6 +117,7 @@ boolean_t mlk_shrhash_add(mlk_pvtctl *pctl, mlk_shrblk_ptr_t shr)
 	char			*str_ptr;
 	mlk_shrsub_ptr_t	sub;
 
+	SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(p->ctlptr));
 	shrhash = pctl->shrhash;
 	num_buckets = pctl->shrhash_size;
 	hash = shr->hash;
