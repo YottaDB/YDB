@@ -870,11 +870,18 @@ Halt")
   list(APPEND files_to_place ${help}help.dat)
   install(FILES ${YDB_BINARY_DIR}/${help}help.dat DESTINATION ${YDB_INSTALL_DIR})
   install(FILES ${YDB_BINARY_DIR}/${help}help.gld DESTINATION ${YDB_INSTALL_DIR})
+
+  # Set help files to read-only after installing.
+  # By default variables are not inherited. Pass the ones that are needed for installing.
+  install(CODE "set(YDB_BUILD_DIR \"${YDB_BUILD_DIR}\")")
+  install(CODE "set(YDB_INSTALL_DIR \"${CMAKE_INSTALL_PREFIX}/${YDB_INSTALL_DIR}\")")
+  install(CODE "set(help \"${help}\")")
+  install(SCRIPT ${YDB_SOURCE_DIR}/cmake/set-help-read-only.cmake)
 endforeach()
 if (GTMDefinedTypesInit${defined_types_tail}_found)
 add_custom_command(
   OUTPUT GTMDEFINEDTYPESTODB.o
-  DEPENDS gtmhelp.dat gtmhelp.gld GTMDefinedTypesInit${defined_types_tail}.m ${YDB_BINARY_DIR}/gtmhelp.dat_noro
+  DEPENDS gtmhelp.dat gtmhelp.gld GTMDefinedTypesInit${defined_types_tail}.m
   COMMAND ${CMAKE_COMMAND} -E copy GTMDefinedTypesInit${defined_types_tail}.m ${YDB_BINARY_DIR}/GTMDefinedTypesInit.m
   COMMAND ${CMAKE_COMMAND}
     -D ydb_dist=${YDB_BINARY_DIR}
@@ -887,57 +894,6 @@ add_custom_command(
   )
 list(APPEND files_to_place GTMDEFINEDTYPESTODB.o)
 endif(GTMDefinedTypesInit${defined_types_tail}_found)
-
-foreach(help gtm gde mupip dse lke)
-  set(CMAKE_CONFIGURABLE_FILE_CONTENT
-    "SET -ACC=MM -READ_ONLY -reg \"*\"
-exit")
-  configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
-                 ${YDB_BINARY_DIR}/${help}help.in3)
-  set(env
-    -D ydb_dist=${YDB_BINARY_DIR}
-    -D ydb_routines=.
-    -D ydb_gbldir=${YDB_BINARY_DIR}/${help}help
-    )
-  add_custom_command(
-    OUTPUT ${YDB_BINARY_DIR}/${help}help.dat_ro
-    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake yottadb mupip
-            ${YDB_BINARY_DIR}/${help}help.in3
-            ${help}help.dat ${help}help.gld ${help}help.dat_noro
-    COMMAND ${CMAKE_COMMAND} ${env}
-      -D mumps=$<TARGET_FILE:mupip>
-      -D input_file=${YDB_BINARY_DIR}/${help}help.in3
-      -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
-    VERBATIM
-    )
-    list(APPEND targets_to_run ${YDB_BINARY_DIR}/${help}help.dat_ro)
-endforeach()
-
-foreach(help gtm gde mupip dse lke)
-  set(CMAKE_CONFIGURABLE_FILE_CONTENT
-    "SET -ACC=MM -NOREAD_ONLY -reg \"*\"
-exit")
-  configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
-                 ${YDB_BINARY_DIR}/${help}help.in4)
-  set(env
-    -D ydb_dist=${YDB_BINARY_DIR}
-    -D ydb_routines=.
-    -D ydb_gbldir=${YDB_BINARY_DIR}/${help}help
-    )
-  add_custom_command(
-    OUTPUT ${YDB_BINARY_DIR}/${help}help.dat_noro
-    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake yottadb mupip
-            ${YDB_BINARY_DIR}/${help}help.in4
-            ${help}help.dat ${help}help.gld
-    COMMAND ${CMAKE_COMMAND} ${env}
-      -D mumps=$<TARGET_FILE:mupip>
-      -D input_file=${YDB_BINARY_DIR}/${help}help.in4
-      -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
-    VERBATIM
-    )
-    list(APPEND targets_to_run ${YDB_BINARY_DIR}/${help}help.dat_noro)
-endforeach()
-#-----------------------------------------------------------------------------
 
 configure_file(sr_unix/gpgagent.tab.in plugin/gpgagent.tab @ONLY)
 set(YDB_TOP "$ENV{PWD}/${YDB_INSTALL_DIR}")
