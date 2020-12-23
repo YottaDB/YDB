@@ -282,7 +282,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	gd_region		*dummy_reg, *reg_ptr = NULL;
 	sub_num			subtocheck;
 	sgmnt_data_ptr_t	csd;
-	boolean_t		discard_nullcoll_mismatch_record, update_nullcoll_mismatch_record;
+	boolean_t		discard_nullcoll_mismatch_record;
 	unsigned char		subscript, *r_ptr;
 	unsigned int		null_subscript_cnt, k, sub_index[MAX_GVSUBSCRIPTS];
 	static unsigned char	key_buffer[MAX_ZWR_KEY_SZ];
@@ -1054,7 +1054,6 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 					ok_to_put = FALSE;
 				}
 				discard_nullcoll_mismatch_record = FALSE;
-				update_nullcoll_mismatch_record = FALSE;
 				if (0 < null_subscript_cnt && gv_target->root)
 				{
 					if (NULL == val)
@@ -1063,8 +1062,8 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 						DEBUG_ONLY(save_msp = msp);
 						val = &mv_chain->mv_st_cont.mvs_mval;
 					}
-					if (csd->std_null_coll ? SUBSCRIPT_STDCOL_NULL
-								: STR_SUB_PREFIX != gv_currkey->base[sub_index[0]])
+					if ((csd->std_null_coll ? SUBSCRIPT_STDCOL_NULL
+								: STR_SUB_PREFIX) != gv_currkey->base[sub_index[0]])
 					{
 						for (k = 0; k < null_subscript_cnt; k++)
 							gv_currkey->base[sub_index[k]] = coll_typr_char;
@@ -1073,25 +1072,16 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 						for (k = 0; k < null_subscript_cnt; k++)
 							gv_currkey->base[sub_index[k]] = (csd->std_null_coll) ? STR_SUB_PREFIX
 										: SUBSCRIPT_STDCOL_NULL;
-					} else
-					{
-						if (gvcst_get(val))
-							update_nullcoll_mismatch_record = TRUE;
 					}
 				}
-				if (discard_nullcoll_mismatch_record || update_nullcoll_mismatch_record)
+				if (discard_nullcoll_mismatch_record)
 				{
 					temp = (unsigned char *)format_targ_key(key_buffer, MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
 					fmtd_key_len = (int)(temp - key_buffer);
 					key_buffer[fmtd_key_len] = '\0';
-					if (discard_nullcoll_mismatch_record)
-						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBDUPNULCOL, 4,
-							LEN_AND_STR(key_buffer), v.str.len, v.str.addr);
-					else
-						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBDUPNULCOL, 4,
-							LEN_AND_STR(key_buffer), val->str.len, val->str.addr);
-					if (discard_nullcoll_mismatch_record)
-						ok_to_put = FALSE;
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBDUPNULCOL, 4,
+						LEN_AND_STR(key_buffer), v.str.len, v.str.addr);
+					ok_to_put = FALSE;
 				}
 				gv_currkey = orig_gv_currkey_ptr;
 			}
@@ -1145,11 +1135,8 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 					putting_a_sn = FALSE;
 				else
 				{
-					if (!(discard_nullcoll_mismatch_record || update_nullcoll_mismatch_record))
-					{
-						key_count++;
-						global_key_count++;
-					}
+					key_count++;
+					global_key_count++;
 				}
 			}
 		}
