@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,10 +44,17 @@ void suspend(int sig)
 	 */
 	if (!(sig == SIGTTOU || ((sig == SIGTTIN) && (NULL != io_std_device.out) && (tt == io_std_device.out->type))))
 		flush_pio();
+	/* If on a terminal, reset terminal for shell and indicate that we are reset
+	 * by clearing the ttptr->setterm_done_by flag. */
 	if (NULL != io_std_device.in && tt == io_std_device.in->type)
 		resetterm(io_std_device.in);
 	sig_count = 0;
 	status = kill(process_id, SIGSTOP);
 	assert(0 == status);
+	/* If on a terminal, call Tcsetattr to set the correct attributes for direct
+	 * mode. Also update ttptr->setterm_done_by to indicate that the terminal is
+	 * now set-up for direct mode. */
+	if (NULL != io_std_device.in && tt == io_std_device.in->type)
+		setterm(io_std_device.in);
 	return;
 }
