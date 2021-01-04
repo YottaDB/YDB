@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #################################################################
 #								#
-# Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -76,8 +76,17 @@ echo "# Fetch all commit ids only present in MR by comparing to target/upstream 
 COMMIT_IDS=`git rev-list upstream_repo/$target_branch..HEAD`
 
 if [ -z "$COMMIT_IDS" ]; then
-	# Only occurs when MR is merged and the pipeline execution is happening on upstream_repo
+	# This is not the normal case. Only occurs when MR is merged and pipeline happens in the master branch on upstream repo.
+	# In this case, do commit verification on the latest 1 commit (i.e. HEAD).
 	COMMIT_IDS=`git rev-list HEAD~1..HEAD`
+	# In this case, it is possible that when the master branch pipeline runs the date has moved forward by 1 year
+	# relative to when the latest 1 commit got merged. In that case, the copyright check should use the year of the
+	# commit instead of the current year. Hence the below code to retrieve that year from the latest commit.
+	curyear=$(git show --summary --oneline --pretty=format:'%cd' --date=format:%Y HEAD)
+else
+	# This is the normal case when the pipeline runs as part of an open MR in origin repo.
+	# Use the current year for copyright checks.
+	curyear="$(date +%Y)"
 fi
 
 echo "${COMMIT_IDS[@]}"
@@ -106,7 +115,6 @@ done
 
 # Get file list from all commits at once, rather than per-commit
 filelist="$(git show --pretty="" --name-only $commit_list | sort -u)"
-curyear="$(date +%Y)"
 
 for file in $filelist; do
 	# Deleted files don't need a copyright notice, hence -e check
