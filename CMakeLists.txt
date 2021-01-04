@@ -3,7 +3,7 @@
 # Copyright (c) 2012-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -711,7 +711,6 @@ foreach(f
   libyottadb.h
   libydberrors.h
   libydberrors2.h
-  main_pragma.h
   mmrhash.h
   ydb_tls_interface.h
   ydbcrypt_interface.h
