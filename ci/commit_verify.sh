@@ -82,7 +82,9 @@ if [ -z "$COMMIT_IDS" ]; then
 	# In this case, it is possible that when the master branch pipeline runs the date has moved forward by 1 year
 	# relative to when the latest 1 commit got merged. In that case, the copyright check should use the year of the
 	# commit instead of the current year. Hence the below code to retrieve that year from the latest commit.
-	curyear=$(git show --summary --oneline --pretty=format:'%cd' --date=format:%Y HEAD)
+	# If the commit contains some newly created files, there will be additional lines output of the form "create mode 100644"
+	# for each newly created file. We do not want that. Hence filter that out using "head -1".
+	curyear=$(git show --summary --pretty=format:'%cd' --date=format:%Y HEAD | head -1)
 else
 	# This is the normal case when the pipeline runs as part of an open MR in origin repo.
 	# Use the current year for copyright checks.
