@@ -2,7 +2,7 @@
 #
 #################################################################
 #                                                               #
-# Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.       #
+# Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.       #
 # All rights reserved.                                          #
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -27,16 +27,16 @@ def look_for_copyrights():
         matches = YOTTADB.search(line)
         if matches is not None:
             # Already up to date, no need to run.
-            if matches.group("start_date") == "2020" or matches.group("end_date") == "-2020":
+            if matches.group("start_date") == "2021" or matches.group("end_date") == "-2021":
                 print(line, end="")
                 return False
-            print(YOTTADB.sub("Copyright (c) \g<start_date>-2020 YottaDB", line), end="")
+            print(YOTTADB.sub("Copyright (c) \g<start_date>-2021 YottaDB", line), end="")
             return True
         # More difficult case: no YottaDB copyrights in the file, so we have to add them.
         # This assumes that 'This source code ...' comes after all copyrights.
         elif 'This source code contains the intellectual' in line:
             start, end = (" *", "*") if line.startswith(" *") else ("#", "#")
-            print(start, " Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	", end, sep='')
+            print(start, " Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	", end, sep='')
             print(start, "								", end, sep='')
             print(line, end="")
             return True
