@@ -2,7 +2,7 @@
 ;								;
 ; Copyright 2001, 2014 Fidelity Information Services, Inc	;
 ;								;
-; Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -1092,6 +1092,9 @@ OC_FNZYHASH:	pushab	val.0
 		pushl	val.2
 		pushab	val.1
 		calls	#2,xfer.xf_fnzyhash
+OC_FNZYSUFFIX:	pushab	val.0			; /* destination mval */
+		pushab	val.1     						; /* input string */
+		calls	#2,xfer.xf_fnzysuffix		; /* call func w 2 params */
 OC_ANDOR:	pushl	val.1
 		calls	#1,xfer.xf_bool_andor
 OC_BOOLEXPRSTART:	calls	#0,xfer.xf_boolexprstart

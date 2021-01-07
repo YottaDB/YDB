@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -917,6 +917,7 @@ int		f_zwidth(oprtype *a, opctype op);
 int		f_zwrite(oprtype *a, opctype op);
 int		f_zyhash(oprtype *a, opctype op);
 int		f_zyissqlnull(oprtype *a, opctype op);
+int		f_zysuffix(oprtype *a, opctype op);
 mlabel		*get_mladdr(mident *c);
 mvar		*get_mvaddr(mident *c);
 int		glvn(oprtype *a);

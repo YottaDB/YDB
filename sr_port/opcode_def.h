@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -353,6 +353,7 @@ OPCODE_DEF(OC_GVQ2, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_INDQ2, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZYHASH, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZYISSQLNULL, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_FNZYSUFFIX, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_ANDOR, (OCT_BOOL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_BXRELOP, (OCT_BOOL | OCT_REL))
 OPCODE_DEF(OC_BOOLEXPRSTART, (OCT_BOOL | OCT_EXPRLEAF))

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -251,6 +251,7 @@ XFER(xf_fnzchar, op_fnzchar),
 XFER(xf_fnzextract, op_fnzextract),
 XFER(xf_fnzfind, op_fnzfind),
 XFER(xf_fnzyhash, op_fnzyhash),
+XFER(xf_fnzysuffix, op_fnzysuffix),
 XFER(xf_fnzj2, op_fnzj2),
 XFER(xf_fnzlength, op_fnzlength),
 XFER(xf_fnzpopulation, op_fnzpopulation),
