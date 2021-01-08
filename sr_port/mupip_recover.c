@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -167,7 +167,7 @@ seq_num	mur_get_max_strm_reg_seqno(int strm_num)
 
 void	mupip_recover(void)
 {
-	bool			mur_open_files_status;
+	int4			mur_open_files_status;
 	boolean_t		all_gen_properly_closed, apply_pblk, ztp_broken, intrrupted_recov_processing;
 	char			histdetail[HIST_LEN];
 	enum jnl_record_type	rectype;

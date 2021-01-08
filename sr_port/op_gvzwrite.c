@@ -2,6 +2,8 @@
  *								*
  *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -31,7 +33,7 @@
 void op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
 {
 	va_list		var;
-	bool		flag;
+	int		flag;
 	int4		subsc, arg;
 	INTPTR_T	arg1, arg2;
 	VMS_ONLY(int4	count;)

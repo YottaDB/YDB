@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1106,6 +1106,7 @@ GBLREF	int4		pin_fail_wcs_active_lvl;	/* Number of entries in active queue when 
 GBLREF	int4		pin_fail_ref_cnt;		/* Reference count when we failed to pin */
 GBLREF	int4		pin_fail_in_wtstart;		/* Count of processes in wcs_wtstart when we failed to pin */
 GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 commit when we failed to pin */
+
 /* Macro to be used whenever cr->in_cw_set needs to be set (PIN) outside of a TP transaction */
 #define	PIN_CACHE_RECORD(cr, crarray, crarrayindex)							\
 MBSTART {												\
@@ -2551,7 +2552,7 @@ typedef struct	gd_region_struct
 							 *	corresponding base region.
 							 */
 	bool			epoch_taper;
-	bool			reservedDBFlags; 	/* Flags for reservedDB types and/or features */
+	unsigned char		reservedDBFlags; 	/* Flags for reservedDB types and/or features */
 	bool			lock_crit_with_db;	/* controls whether LOCK crit is separate (0) or shared with DB (1) */
 	/* All fields before this point are relied upon by GDE. All fields after this point are relied upon only by
 	 * the runtime logic (i.e. it is one big filler/padding area as far as GDE is concerned).
