@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -336,14 +336,6 @@ static	boolean_t	repl_cmp_solve_timer_set;
 	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)		\
 		return;								\
 }
-#define WACKY_MESSAGE(MSG, SOCK_FD, TYPE)								\
-MBSTART {	/* If the header is wacky, assume it's a rogue transmission and reset the connection */	\
-	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received UNKNOWN message (type = %d / %d). "		\
-	"Discarding it and resetting connection.\n", MSG & REPL_TR_CMP_MSG_TYPE_MASK, TYPE);		\
-	repl_connection_reset = TRUE;									\
-	repl_close(SOCK_FD);										\
-	return;												\
-} MBEND
 
 /* The below macro is used (within this module) to check for errors (and issue appropriate message) after REPL_SEND_LOOP
  * returns.
@@ -2700,7 +2692,7 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
 STATICFNDEF void do_main_loop(boolean_t crash_restart)
 {
 	/* The work-horse of the Receiver Server */
-	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc;
+	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc, is_wacky_message;
 	boolean_t			uncmpfail, send_cross_endian, recvpool_prepared, copied_to_recvpool;
 	gtmrecv_local_ptr_t		gtmrecv_local;
 	gtm_time4_t			ack_time;
@@ -2949,8 +2941,9 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				{
 					remote_side->endianness_known = TRUE;
 			                msg_type = ((repl_msg_ptr_t)buffp)->type;
-					if (!((REPL_MSGTYPE_LAST > msg_type) || (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(msg_type))))
-						WACKY_MESSAGE(msg_type, &gtmrecv_sock_fd, 1);	/* impossible message type */
+					CHECK_FOR_WACKY_MESSAGE(msg_type, gtmrecv_log_fp, is_wacky_message);
+					if (is_wacky_message)
+						return;
 					if ((REPL_MSGTYPE_LAST < msg_type) && (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(msg_type)))
 					{
 						remote_side->cross_endian = TRUE;
@@ -2973,7 +2966,10 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					hdr_msg_len = ((repl_msg_ptr_t)buffp)->len;
 				}
 				if (0 >= hdr_msg_len)
-					WACKY_MESSAGE(hdr_msg_type, &gtmrecv_sock_fd, 2);	/* invalid length - overflow */
+				{
+					WACKY_MESSAGE(hdr_msg_type, &gtmrecv_sock_fd, 2, gtmrecv_log_fp);	/* invalid length - overflow */
+					return;
+				}
 				msg_type = hdr_msg_type & REPL_TR_CMP_MSG_TYPE_MASK;
 				if (REPL_TR_CMP_JNL_RECS == msg_type)
 				{
@@ -3673,7 +3669,10 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					break;
 #				endif
 				default:
-					WACKY_MESSAGE(msg_type, &gtmrecv_sock_fd, 3);	/* undefined message type */
+				{
+					WACKY_MESSAGE(msg_type, &gtmrecv_sock_fd, 3, gtmrecv_log_fp);	/* undefined message type */
+					return;
+				}
 			}
 			if (repl_connection_reset)
 				return;

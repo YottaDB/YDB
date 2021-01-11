@@ -2,6 +2,8 @@
  *								*
  *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -75,6 +77,26 @@ for (msg_ptr = (unsigned char *)(BUFF), recvd_len = 0, recvd_this_iter = torecv_
 #define REPL_INVALID_POLL_DIRECTION	-1
 #define REPL_POLLIN			1
 #define REPL_POLLOUT			2
+
+#define CHECK_FOR_WACKY_MESSAGE(MSG_TYPE, OUTPUT, IS_WACKY)								\
+MBSTART {														\
+	if (!(((REPL_MSGTYPE_LAST > MSG_TYPE) && (0 <= MSG_TYPE))							\
+		|| ((REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(MSG_TYPE)) && (0 <= GTM_BYTESWAP_32(MSG_TYPE)))))		\
+	{														\
+		WACKY_MESSAGE(MSG_TYPE, &gtmrecv_sock_fd, 1, OUTPUT);	/* impossible message type */			\
+		IS_WACKY = TRUE;											\
+	}														\
+	else														\
+		IS_WACKY = FALSE;											\
+} MBEND
+
+#define WACKY_MESSAGE(MSG, SOCK_FD, TYPE, OUTPUT)							\
+MBSTART {	/* If the header is wacky, assume it's a rogue transmission and reset the connection */	\
+	repl_log(OUTPUT, TRUE, TRUE, "Received UNKNOWN message (type = %d / %d). "			\
+	"Discarding it and resetting connection.\n", MSG & REPL_TR_CMP_MSG_TYPE_MASK, TYPE);		\
+	repl_connection_reset = TRUE;									\
+	repl_close(SOCK_FD);										\
+} MBEND
 
 /* Replication communcation subsystem function prototypes */
 int fd_ioready(int sock_fd, int poll_direction, int timeout);

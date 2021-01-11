@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -132,6 +132,7 @@ CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 
 int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 {
+	boolean_t			is_wacky_message;
 	repl_resync_msg_t		resync_msg;
 	repl_msg_t			msg;
 	uchar_ptr_t			msgp;
@@ -272,6 +273,9 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 		if (!remote_side->endianness_known)
 		{
 			remote_side->endianness_known = TRUE;
+			CHECK_FOR_WACKY_MESSAGE(msg.type, stdout, is_wacky_message);
+			if (is_wacky_message)
+				return ERR_REPLCOMM;
 			if ((REPL_MSGTYPE_LAST < msg.type) && (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(msg.type)))
 			{
 				remote_side->cross_endian = TRUE;
