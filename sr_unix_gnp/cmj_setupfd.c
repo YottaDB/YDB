@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,13 +55,11 @@ cmi_status_t cmj_setupfd(int fd)
 			(const void *)&on, SIZEOF(on));
 	if (rval < 0)
 		return (cmi_status_t)errno;
-#ifdef TCP_NODELAY
 	/* z/OS only does setsockop on SOL and IP */
 	rval = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
 			(const void *)&on, SIZEOF(on));
 	if (rval < 0)
 		return (cmi_status_t)errno;
-#endif
 #ifndef GTCM_KEEP_DEFAULT_BUFLEN /* if you want to test with system allocated default buflen, define this and rebuild */
 	optlen = SIZEOF(buflen);
 	if (-1 == (rval = getsockopt(fd, SOL_SOCKET, SO_SNDBUF, (void *)&snd_buflen, (GTM_SOCKLEN_TYPE *)&optlen)) ||

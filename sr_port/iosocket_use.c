@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -637,7 +637,6 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			iosocket_flush(iod);	/* buffered output if any */
 		if (bfsize_specified)
 			newsocket.buffer_size = bfsize;
-#		ifdef TCP_NODELAY
 		if (socket_local != newsocket.protocol)
 		{
 			nodelay = newsocket.nodelay ? 1 : 0;
@@ -652,7 +651,6 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				return;
 			}
 		}
-#		endif
 		if ((socketptr->bufsiz != newsocket.bufsiz)
 			&& (-1 == setsockopt(newsocket.sd, SOL_SOCKET, SO_RCVBUF, &newsocket.bufsiz, SIZEOF(newsocket.bufsiz))))
 		{

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -96,7 +96,6 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 					RTS_ERROR_LITERAL("SO_REUSEADDR"), real_errno, errlen, errptr);
 				return FALSE;
 			}
-#			ifdef TCP_NODELAY
 			temp_1 = socketptr->nodelay ? 1 : 0;
 			if (-1 == setsockopt(socketptr->sd,
 				IPPROTO_TCP, TCP_NODELAY, &temp_1, SIZEOF(temp_1)))
@@ -109,7 +108,6 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 					RTS_ERROR_LITERAL("TCP_NODELAY"), real_errno, errlen, errptr);
 				return FALSE;
 			}
-#			endif
 			if (update_bufsiz)
 			{
 				if (-1 == setsockopt(socketptr->sd,
