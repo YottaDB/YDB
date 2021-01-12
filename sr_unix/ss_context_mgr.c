@@ -2,7 +2,7 @@
  *								*
  * Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -158,7 +158,8 @@ boolean_t	ss_create_context(snapshot_context_ptr_t lcl_ss_ctx, int ss_shmcycle)
 
 boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 {
-	int				status;
+	int	status;
+	char	buf[128];
 
 	assert(NULL != lcl_ss_ctx);
 	if (FD_INVALID != lcl_ss_ctx->shdw_fd)
@@ -171,7 +172,9 @@ boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 		{
 			status = errno;
 			assert(FALSE);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmdt"), CALLFROM, status);
+			SNPRINTF(buf, sizeof(buf), "Shared segment address: 0x"lvaddr, lcl_ss_ctx->start_shmaddr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_SYSCALL, 5, LEN_AND_LIT("shmdt()"), CALLFROM,
+				      ERR_TEXT, 2, STRLEN(buf), buf, status);
 		}
 	}
 	/* Invalidate the context */
