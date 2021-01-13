@@ -1,0 +1,184 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+; Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%YDBAIM
+	; Top level entry not supported
+	do etrap		; set error trap
+	set $ecode=",U255,"	; top level entry not supported
+	quit			; should never get here
+
+err	; Error handler
+	new stderr
+	set tmp1=$zpiece($ecode,",",2),tmp2=$text(@tmp1)
+	set:'$zlength(tmp2) tmp2=$text(U251)
+	set stderr="/proc/self/fd/2"
+	open stderr
+	use stderr
+	write $text(+0),@$zpiece(tmp2,";",2,$zlength(tmp2,";")),!
+	zhalt +$extract(tmp1,2,$zlength(tmp1))
+
+; Set error trap. The first action the error trap does is set a failsafe error
+; trap (e.g., if $zroutines is not correct). Thereafter, it jumps to the actual
+; error trap to print an error message and terminate, with a return code.
+etrap
+	set $etrap="set $etrap=""open """"/proc/self/fd/2"""" use """"/proc/self/fd/2"""" write $zstatus,! zshow """"*"""" zhalt 1""  goto err^"_$text(+0)
+	quit
+
+; Creates triggers to maintain cross references and computes cross references
+; for a global variable at a specified subscript level.
+;
+; Usage: $$XREFDATA^%YDBAIM(gbl,nsubs,sep,pnum,nmonly)
+; Parameters:
+; - gbl is the global variable name, e.g., "^ABC"
+; - nsubs is the number of subscripts at the level for which the xref is desired
+; - sep is the piece separator for values at that node; if unspecified or the
+;   empty string, xref is for entire node value
+; - pnum is a comma-separated list of piece numbers for which cross references
+;   should exist; ignored for xrefs of entire node values
+; - nmonly, if 1, means just return the xref global variable name but don't set
+;   triggers or compute xrefs
+; Return value: name of global variable with cross reference
+; e.g., "^%ydbAIMDZzUmfwxt80MHPiWLZNtq4"
+;
+; $data($$XREFDATA^%YDBAIM(gbl,nsubs,sep,pnum,1))=11 means triggers are in place
+; and cross referencing is complete
+; Since the function uses $PIECE(), sep is interpreted according to whether the
+; process is in M mode or UTF-8 mode.  While cross references for entire nodes
+; are the same for M and UTF-8 modes, there are separate cross references for
+; pieces of nodes.  Cross references are in global variables such as
+; ^%ydbAIMDZzUmfwxt80MHPiWLZNtq4, which are derived from a prefix of "^%ydbAIMD"
+; and a suffix of a 128-bit hash of the variable name, number of subscripts and
+; piece separator, as well as $zchset if the piece separator is not the empty
+; string, rendered using an alphabet of 64-characters to create a legal YottaDB
+; global variable name.  The subscripts of cross reference variables are:
+; - (pnum,value,sub[,sub]) where pnum is a positive integer for cross references
+;   of pieces of nodes; and
+; - (value,sub[,sub]) for cross references of entire nodes.
+; A limitation of this technique is that the values being cross referenced plus
+; the subscripts must have a total length within the limit of YottaDB global
+; keys (currently 1019 bytes). Another is that $char(10) is problematic as
+; the piece separator.
+; The approach is to first create triggers to maintain cross references, and
+; then scan the global variable to generate cross references. This way, any
+; global variable changes will have cross references maintained by the triggers,
+; and when returning to caller, the cross reference is complete, and will remain
+; Consistent thereafter.  ^%ydbAIMD* global variables should be mapped to a
+; region with NULL_SUBSCRIPTS set to EXISTING or ALWAYS. Although no xrefs use
+; null subscripts, calls to $data() will use null subscripts if $ZTOLDVAL is the
+; empty string and need to succeed.
+; Just as cross references are metadata for application global variables,
+; metadata for the cross reference global variables are stored in the xref
+; global variables as follows:
+; - root node is the application global variable
+; - (0) node is $zut, a space, and $zyrelease
+; - (1) node is the number of subscripts
+; - (2) node is the piece separator, "" for an xref of entire nodes
+; - (3) node is the piece numbers, in the format used for specifying triggers
+; - (4) node and up are triggers for this cross reference
+; Since the cross references themselves must have at least two subscripts, any
+; node with one subscript is metadata for the cross reference.
+XREFDATA(gbl,nsubs,sep,pnum,nmonly)
+	new i,io,name,rootval,stderr,sub,tmp,trigfile,trigdel,trigdelx,trigprefix,trigset,trigsub,trigsuffix
+	set io=$io
+	set stderr="/proc/self/fd/2" open stderr
+	; Uncomment next line for development / debugging; comment for
+	; production use to rely on application error trap
+	; do etrap
+	; 1 for development/debugging; 0 for production use
+	view "ztrigger_output":0
+	; extended references are not supported
+	set:""'=$qsubscript(gbl,-1) $ecode=",U254,"
+	; xrefs are only supported for global variables
+	set:"^"'=$zextract(gbl,1) $ecode=",U252,"
+	; coerce number of subscripts to a number
+	set nsubs=+$get(nsubs)
+	; must have at least one subscript to xref
+	set:+$get(nsubs)<1 $ecode=",U253,"
+	; Derive subscript specification for trigger definitions from parameters
+	set sub="sub1",trigsub="sub1=:"
+	for i=2:1:nsubs set tmp=",sub"_i,sub=sub_tmp,trigsub=trigsub_tmp_"=:"
+	; Generate name of cross reference global variable
+	set sep=$get(sep),name="^%ydbAIMD"_$zysuffix(gbl_nsubs_sep_$select($zlength(sep):$zchset,1:""))
+	; $data()=11 means xref exists and nothing more is needed
+	quit:$data(@name)\10 name
+	; TODO: remove locks if/when safety of parallel execution is confirmed
+	lock +@name
+	set trigfile="/tmp/"_$text(+0)_"_"_$job_"_"_$zut_".trig"
+	; Create a temp file in which to generate triggers, load triggers from
+	; temp file and delete temp file Then compute xrefs for existing data,
+	; either pieces or whole nodes, and set root node to indicate
+	; completion.
+	; temporary file to store triggers for $ztrigger()
+	open trigfile:newversion
+	set trigprefix="+"_gbl_"("_trigsub_") -command="
+	; Put trigger options here when validated
+	set trigsuffix=""
+	; Piece separator is specified; xref specified pieces
+	if $zlength(sep) do
+	.						; Place holder for xrefs of pieces
+	. ; No piece separator specified; xref entire node
+	else  do
+	. set trigset=trigprefix_"set -xecute=""zkill:$data("_name_"($ztoldval,"_sub_"))#10 ^(sub"_nsubs_") set:'$data("_name_"($ztvalue,"_sub_")) ^(sub"_nsubs_")="""""""""""_trigsuffix
+	. set trigdel=trigprefix_"kill -xecute=""kill:$data("_name_"($ztoldval,"_sub_")) ^(sub"_nsubs_")"""_trigsuffix
+	. set trigdelx=trigprefix_"zkill -xecute=""zkill:$data("_name_"($ztoldval,"_sub_"))#10 ^(sub"_nsubs_")"""_trigsuffix
+	. use trigfile
+	. write trigset,!,trigdel,!,trigdelx,!
+	. use stderr
+	. set tmp=$ztrigger("file",trigfile)
+	. use io
+	. ; Comment :delete for development / debugging
+	. close trigfile:delete
+	. ; Compute xrefs for whole nodes
+	. do xrefdata(gbl,nsubs)
+	. ; Add metadata to indicate completion
+	. tstart ()
+	. set @name=gbl,@name@(0)=$zut_" "_$zyrelease,^(1)=nsubs,(^(2),^(3))=""
+	. set ^(4)=trigset,^(5)=trigdel,^(6)=trigdelx
+	. tcommit
+	. lock -@name
+	quit name
+
+; This label is intended to only be called internally from XREFDATA, and
+; accesses that label's local variables.  Generate cross references for nodes at
+; the specified subscript level. It goes through the global at each level with
+; fewer subscripts than the cross reference calls for, and where a subtree is
+; found, recursively calls itself on that subtree till it reaches the specified
+; level, whereon it generates the cross references. Since triggers are set
+; before calling this routine, they will take care of cross references for any
+; node deletions. This label only needs to be concerned with setting cross
+; references for nodes that don't already have cross references, which is done
+; in a transaction to ensure Consistency.
+; NOTE: xrefdata() is intended to be an extention of XREFDATA() rather than
+; stand-alone functionality. It uses the variable name from XREFDATA().
+xrefdata:(gblref,nsubs)
+	new i,lastsub,sublist,thissub,xref
+	set thissub=""
+	if nsubs>1 do
+	. for  set thissub=$order(@gblref@(thissub)) quit:""=thissub  do:$data(@gblref@(thissub))\10 xrefdata($select($qlength(gblref):$zextract(gblref,1,$zlength(gblref)-1)_",",1:gblref_"(")_$zwrite(thissub)_")",nsubs-1)
+	else  for  set thissub=$order(@gblref@(thissub)) quit:""=thissub  do
+	. tstart ()
+	. do:$data(@gblref@(thissub))#10
+	. . set sublist=$zwrite(@gblref@(thissub))
+	. . for i=1:1:$qlength($reference) set sublist=sublist_","_$zwrite($qsubscript($reference,i))
+	. . set lastsub=$qsubscript($reference,$qlength($reference))
+	. . set xref=name_"("_sublist_")"
+	. . ; Uncomment for development / debugging
+	. . ; write xref," ",lastsub," ",$data(@xref),!
+	. . set:'$data(@xref)#10 ^(lastsub)=""
+	. tcommit
+	quit
+
+;	Error message texts
+U251	;"-F-UNKNERR """_tmp1_""" is not a recognized error code"
+U252	;"-F-NOTAGBL Variable """_gbl_""" is not a global variable"
+U253	;"-F-NOSUBS Need at least 1 subscript to cross reference; nsubs="_nsubs
+U254	;"-F-NOEXTREF Extended reference in "_var_" is not supported"
+U255	;"-F-BADINVOCATION Top level invocation of "_$text(+0)_" not supported; must invoke a label"
