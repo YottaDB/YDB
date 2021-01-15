@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -142,6 +142,7 @@ static readonly char zusedstor_text[] = "$ZUSEDSTOR";
 static readonly char zversion_text[] = "$ZVERSION";
 static readonly char zreldate_text[] = "$ZRELDATE";
 static readonly char zyerror_text[] = "$ZYERROR";
+static readonly char zyintrsig_text[] = "$ZYINTRSIG";
 static readonly char zyrelease_text[] = "$ZYRELEASE";
 static readonly char zysqlnull_text[] = "$ZYSQLNULL";
 static readonly char zonlnrlbk_text[] = "$ZONLNRLBK";
@@ -192,6 +193,7 @@ GBLREF spdesc		stringpool;
 GBLREF mstr		dollar_zpin;
 GBLREF mstr		dollar_zpout;
 GBLREF mlk_subhash_val_t	mlk_last_hash;
+GBLREF	int			jobinterrupt_sig_num;
 
 LITREF mval		literal_zero, literal_one, literal_null, literal_sqlnull;
 LITREF char		gtm_release_name[];
@@ -922,6 +924,24 @@ void zshow_svn(zshow_out *output, int one_sv)
 			var.mvtype = MV_STR;
 			var.str = dollar_zyerror.str;
 			ZS_VAR_EQU(&x, zyerror_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
+		case SV_ZYINTRSIG:
+			if (dollar_zininterrupt)
+			{	/* At this point, there are only 2 signals that can trigger the $ZINTERRUPT mechanism.
+				 * They are "SIGUSR1" or "SIGUSR2". Hence the below check. This will need to be revised if
+				 * more signals are added to this list.
+				 */
+				var.mvtype = MV_STR;
+				var.str.addr = ((SIGUSR1 == jobinterrupt_sig_num) ? "SIGUSR1" : "SIGUSR2");
+				var.str.len = strlen(var.str.addr);
+			} else
+			{	/* We are not inside $ZINTERRUPT code. So this ISV should be set to "". */
+				var = literal_null;
+			}
+			ZS_VAR_EQU(&x, zyintrsig_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;

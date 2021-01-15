@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -125,6 +125,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_STATSHARE,                  "$ydb_statshare",
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_STDXKILL,                   "$ydb_stdxkill",                   "$gtm_stdxkill")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_STRING_POOL_LIMIT,          "$ydb_string_pool_limit",          "$gtm_string_pool_limit")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_SYSID,                      "$ydb_sysid",                      "$gtm_sysid")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TREAT_SIGUSR2_LIKE_SIGUSR1, "$ydb_treat_sigusr2_like_sigusr1", "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TLS_PASSWD_PREFIX,          "$ydb_tls_passwd_",                "$gtmtls_passwd_")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDEX_DOLLAR_TEST,               "$ydb_dollartest",                 "")
 /* Like YDBENVINDX_DIST and YDBENVINDX_DIST_ONLY, we have the below two lines.

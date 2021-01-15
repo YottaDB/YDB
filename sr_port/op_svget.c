@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -103,6 +103,7 @@ GBLREF mstr		dollar_zpin;
 GBLREF mstr		dollar_zpout;
 GBLREF int		process_exiting;
 GBLREF mlk_subhash_val_t	mlk_last_hash;
+GBLREF	int			jobinterrupt_sig_num;
 
 #ifdef GTM_TRIGGER
 GBLREF	mstr		*dollar_ztname;
@@ -416,6 +417,20 @@ void op_svget(int varnum, mval *v)
 			v->mvtype = MV_STR;
 			v->str.addr = (char *)gtm_release_name;
 			v->str.len = gtm_release_name_len;
+			break;
+		case SV_ZYINTRSIG:
+			if (dollar_zininterrupt)
+			{	/* At this point, there are only 2 signals that can trigger the $ZINTERRUPT mechanism.
+				 * They are "SIGUSR1" or "SIGUSR2". Hence the below check. This will need to be revised if
+				 * more signals are added to this list.
+				 */
+				v->mvtype = MV_STR;
+				v->str.addr = ((SIGUSR1 == jobinterrupt_sig_num) ? "SIGUSR1" : "SIGUSR2");
+				v->str.len = strlen(v->str.addr);
+			} else
+			{	/* We are not inside $ZINTERRUPT code. So this ISV should be set to "". */
+				*v = literal_null;
+			}
 			break;
 		case SV_ZYRELEASE:
 			v->mvtype = MV_STR;

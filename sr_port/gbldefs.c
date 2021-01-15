@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1407,3 +1407,7 @@ GBLDEF	boolean_t		ydb_ztrigger_output = TRUE;	/* If TRUE, $ZTRIGGER() function c
 								 * got added or not. If FALSE, the printing is skipped. Default
 								 * value is TRUE. VIEW "ZTRIGGER_OUTPUT":0 resets it to FALSE.
 								 */
+GBLDEF	boolean_t	ydb_treat_sigusr2_like_sigusr1;	/* set based on env var "ydb_treat_sigusr2_like_sigusr1" */
+GBLDEF	int		jobinterrupt_sig_num;		/* Set to signal number that caused $ZINTERRUPT (SIGUSR1/SIGUSR2).
+							 * Used to derive the value of the ISV $ZYINTRSIG.
+							 */

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,6 +43,7 @@ GBLREF	xfer_entry_t		xfer_table[];
 GBLREF	volatile int4 		outofband;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
 GBLREF	struct sigaction	orig_sig_action[];
+GBLREF	int			jobinterrupt_sig_num;
 
 /* Routine called when an interrupt event occurs (signaled by mupip intrpt or other future method
  * of signaling interrupts). This code is driven as a signal handler on Unix where it intercepts the posix signal.
@@ -55,7 +56,7 @@ void jobinterrupt_event(int sig, siginfo_t *info, void *context)
 	}
 	/* Note the (presently unused) args are to match signature for signal handlers in Unix */
 	if (!dollar_zininterrupt)
-		(void)xfer_set_handlers(outofband_event, &jobinterrupt_set, 0, FALSE);
+		(void)xfer_set_handlers(outofband_event, &jobinterrupt_set, sig, FALSE);
 	/* If we are in SIMPLEAPI mode and the original handler was neither SIG_DFL or SIG_IGN, drive the originally
 	 * defined handler before we replaced them.
 	 */
@@ -66,11 +67,16 @@ void jobinterrupt_event(int sig, siginfo_t *info, void *context)
 }
 
 /* Call back routine from xfer_set_handlers to complete outofband setup */
-void jobinterrupt_set(int4 dummy_val)
+void jobinterrupt_set(int4 sig_num)
 {
 	DBGDFRDEVNT((stderr, "jobinterrupt_set: Setting jobinterrupt outofband\n"));
 	if (jobinterrupt != outofband)
 	{	/* We need jobinterrupt out of band processing at our earliest convenience */
 		SET_OUTOFBAND(jobinterrupt);
+		assert((SIGUSR1 == sig_num) || (SIGUSR2 == sig_num));
+		/* Note down the signal number that triggered $ZINTERRUPT processing.
+		 * This is used later to retrieve the value of the ISV $ZYINTRSIG.
+		 */
+		jobinterrupt_sig_num = sig_num;
 	}
 }

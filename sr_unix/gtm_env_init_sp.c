@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,6 +85,7 @@ GBLREF	boolean_t		ipv4_only;		/* If TRUE, only use AF_INET. */
 ZOS_ONLY(GBLREF	char		*gtm_utf8_locale_object;)
 ZOS_ONLY(GBLREF	boolean_t	gtm_tag_utf8_as_ascii;)
 GBLREF	volatile boolean_t	timer_in_handler;
+GBLREF	boolean_t		ydb_treat_sigusr2_like_sigusr1;
 #ifdef USE_LIBAIO
 GBLREF	char			io_setup_errstr[IO_SETUP_ERRSTR_ARRAYSIZE];
 #endif
@@ -504,4 +505,9 @@ void	gtm_env_init_sp(void)
 	assert(FALSE == TREF(ydb_recompile_newer_src));
 	if (is_defined)
 		TREF(ydb_recompile_newer_src) = ret;
+	/* Read in env var $ydb_treat_sigusr2_like_sigusr1 (if defined) */
+	ret = ydb_logical_truth_value(YDBENVINDX_TREAT_SIGUSR2_LIKE_SIGUSR1, FALSE, &is_defined);
+	assert(FALSE == ydb_treat_sigusr2_like_sigusr1);
+	if (is_defined)
+		ydb_treat_sigusr2_like_sigusr1 = ret;
 }
