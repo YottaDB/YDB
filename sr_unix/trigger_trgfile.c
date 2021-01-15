@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -127,7 +127,12 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 		io_curr_device = io_save_device;
 		record_num++;
 		if ((0 != len) && (COMMENT_LITERAL != trigptr[0]))
-			util_out_print_gtmio("File !AD, Line !UL: ", NOFLUSH, trigger_filename_len, trigger_filename, record_num);
+		{
+			if (0 == trigger_filename_len)
+				util_out_print_gtmio("STDIN, Line !UL: ", NOFLUSH, record_num);
+			else
+				util_out_print_gtmio("File !AD, Line !UL: ", NOFLUSH, trigger_filename_len, trigger_filename, record_num);
+		}
 		trigger_rec->str.len = len;
 		trigger_rec->str.addr = trigptr;
 		trigger_status = trigger_update_rec(trigger_rec, noprompt, trig_stats, &io_trigfile_device, &record_num);
@@ -140,8 +145,10 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 	if ((-1 == len) && (!io_curr_device.in->dollar.zeof))
 	{
 		io_curr_device = io_save_device;
-		util_out_print_gtmio("File !AD, Line !UL: Line too long", FLUSH, trigger_filename_len, trigger_filename,
-			++record_num);
+			if (0 == trigger_filename_len)
+				util_out_print_gtmio("STDIN, Line !UL: Line too long", FLUSH, ++record_num);
+			else
+				util_out_print_gtmio("File !AD, Line !UL: Line too long", FLUSH, trigger_filename_len, trigger_filename, ++record_num);
 		io_curr_device = io_trigfile_device;
 	}
 	file_input_close();
@@ -193,7 +200,13 @@ boolean_t trigger_trgfile_tpwrap(char *trigger_filename, uint4 trigger_filename_
 	ts_mv.str.addr = NULL;
 	/* Do sanity checks on the filename and the file's accessibility. */
 	assert('\0' == trigger_filename[trigger_filename_len]); /* should have been made sure by caller */
-	if (-1 == Stat(trigger_filename, &statbuf))
+	/* -STDIN supplied */
+	if (0 == trigger_filename_len)
+	{
+		assert(-1 != fcntl(fileno(stdin), F_GETFD));
+	}
+	/* Regular file, or so we think... let's check */
+	else if (-1 == Stat(trigger_filename, &statbuf))
 	{
 		DEBUG_ONLY(TREF(gtmio_skip_tlevel_assert) = TRUE;)
 		util_out_print_gtmio("Invalid file name: !AD: !AZ",

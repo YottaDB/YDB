@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,20 +62,27 @@ void mupip_trigger(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (CLI_PRESENT == cli_present("TRIGGERFILE"))
+	if (CLI_PRESENT == cli_present("TRIGGERFILE") || CLI_PRESENT == cli_present("STDIN"))
 	{
-		noprompt = (CLI_PRESENT == cli_present("NOPROMPT"));
-		if (!cli_get_str("TRIGGERFILE", trigger_file_name, &trigger_file_len))
+		/* Handle STDIN; otherwise, it's an input file using TRIGGERFILE.
+		 * NOPROMPT is true by default as we cannot prompt if we are receiving
+		 * input from STDIN.
+		 */
+		if (CLI_PRESENT == cli_present("STDIN"))
 		{
-			util_out_print("Error parsing TRIGGERFILE name", TRUE);
-			mupip_exit(ERR_MUPCLIERR);
-		}
-		assert('\0' == trigger_file_name[trigger_file_len]); /* should have been made sure by caller */
-		if (0 == trigger_file_len)
+			trigger_file_len = 0;
+			trigger_file_name[0] = '\0';
+			noprompt = TRUE;
+		} else /* TRIGGERFILE, not STDIN. Check NOPROMPT. */
 		{
-			util_out_print("Missing input file name", TRUE);
-			mupip_exit(ERR_MUPCLIERR);
+			if (!cli_get_str("TRIGGERFILE", trigger_file_name, &trigger_file_len))
+			{
+				util_out_print("Error parsing TRIGGERFILE name", TRUE);
+				mupip_exit(ERR_MUPCLIERR);
+			}
+			noprompt = (CLI_PRESENT == cli_present("NOPROMPT"));
 		}
+		assert('\0' == trigger_file_name[trigger_file_len]); /* should have been made sure by lines above */
 		if (RESTRICTED(trigger_mod))
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "MUPIP TRIGGER -TRIGGERFILE");
@@ -91,22 +98,36 @@ void mupip_trigger(void)
 		if (FALSE == cli_get_str("SELECT", select_list, &select_list_len))
 			mupip_exit(ERR_MUPCLIERR);
 		sf_name_len = MAX_FN_LEN;
-		if (FALSE == cli_get_str("FILE", select_file_name, &sf_name_len))
-			mupip_exit(ERR_MUPCLIERR);
-		if (0 == sf_name_len)
+		/* Handle FILE or STDOUT
+		 * Is -STDOUT supplied?
+		 */
+		if (CLI_PRESENT == cli_present("STDOUT"))
+		{
+			sf_name_len = 0;
 			select_file_name[0] = '\0';
-		else if (-1 == Stat((char *)select_file_name, &statbuf))
+		}
+		/* Otherwise, we either get the file name if supplied as -select file.name
+		 * or we prompt for it.
+		 */
+		else
 		{
-			if (ENOENT != errno)
+			if (FALSE == cli_get_str("FILE", select_file_name, &sf_name_len))
+				mupip_exit(ERR_MUPCLIERR);
+			if (0 == sf_name_len)
+				select_file_name[0] = '\0';
+			else if (-1 == Stat((char *)select_file_name, &statbuf))
 			{
-				local_errno = errno;
-				perror("Error opening output file");
-				mupip_exit(local_errno);
+				if (ENOENT != errno)
+				{
+					local_errno = errno;
+					perror("Error opening output file");
+					mupip_exit(local_errno);
+				}
+			} else
+			{
+				util_out_print("Error opening output file: !AD -- File exists", TRUE, sf_name_len, select_file_name);
+				mupip_exit(ERR_MUNOACTION);
 			}
-		} else
-		{
-			util_out_print("Error opening output file: !AD -- File exists", TRUE, sf_name_len, select_file_name);
-			mupip_exit(ERR_MUNOACTION);
 		}
 		trigger_error = trigger_select_tpwrap(select_list, (uint4)select_list_len, select_file_name, (uint4)sf_name_len);
 		if (trigger_error)

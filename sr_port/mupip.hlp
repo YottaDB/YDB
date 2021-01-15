@@ -3893,8 +3893,10 @@
    Examines or loads trigger definitions. The format of the MUPIP TRIGGER
    command is:
 
-   TRIGGER {-TRIG[GERFILE]=<trigger_definitions_file>
-   [-NOPR[OMPT]]|[-SELE[CT][=name-list|*][<select-output-file>]|-UPGRADE}
+   TRIGGER {-TRIG[GERFILE]=<trigger_definitions_file> [-NOPR[OMPT]]
+   |[-STDIN]
+   |[-SELE[CT][=name-list|*] [<select-output-file>|-STDOUT]
+   |-UPGRADE}
 
    Before you run the MUPIP TRIGGER command:
 
@@ -3960,13 +3962,20 @@
    those are functionally additions or deletions of separate trigger
    definitions.
 
+   STDIN
+
+   Loads trigger definitions from standard input into the database. All the
+   rules that apply to TRIGGERFILE apply to STDIN, with the addition that
+   NOPROMPT is implied when using STDIN as you cannot be prompted on deletions
+   with standard input. STDIN cannot be combined with TRIGGERFILE.
+
    SELECT=name-list
 
    Provides a facility to examine the current trigger definition. SELECT
    produces a list of the current triggers for a comma-separate list of
    global variables or trigger names. The format of the SELECT qualifier is:
 
-   -SELE[CT][=name-list*][ <select-output-file>]
+   -SELE[CT][=name-list*] [<select-output-file>|-STDOUT]
 
      o Name-list can include global names, delimited with a leading caret
        (^), and/or trigger names (user-defined or auto-generated) with no
@@ -3974,8 +3983,9 @@
      o With no arguments specified, YottaDB treats -SELECT as -SELECT="*" and
        extracts a list of all current triggers.
      o Optionally, you can specify a file name to redirect the output of the
-       command. If you do not specify a file name, MUPIP TRIGGER prompts for
-       a file name. If you respond with an empty string (RETURN), MUPIP
+       command, or you can supply -STDOUT to print to STDOUT. If you do not
+       specify a file name and don't specifiy -STDOUT, MUPIP TRIGGER prompts
+       for a file name. If you respond with an empty string (RETURN), MUPIP
        TRIGGER directs the output to STDOUT.
      o MUPIP TRIGGER -SELECT displays all output including errors on STDOUT.
      o For Trigger definition reporting operations, $ZTRIGGER("SELECT") and

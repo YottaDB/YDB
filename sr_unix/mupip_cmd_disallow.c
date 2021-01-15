@@ -3,7 +3,7 @@
  * Copyright (c) 2002-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -587,8 +587,40 @@ boolean_t cli_disallow_mupip_trigger(void)
 
 	*cli_err_str_ptr = 0;
 
-	/* any MUPIP TRIGGER command has to have either SELECT or TRIGGERFILE or UPGRADE */
-	disallow_return_value = !(d_c_cli_present("SELECT") || d_c_cli_present("TRIGGERFILE") || d_c_cli_present("UPGRADE"));
+	/* any MUPIP TRIGGER command has to have either SELECT or TRIGGERFILE or UPGRADE or STDIN */
+	disallow_return_value = !(d_c_cli_present("SELECT") || d_c_cli_present("TRIGGERFILE") || d_c_cli_present("UPGRADE") || d_c_cli_present("STDIN"));
+	CLI_DIS_CHECK_N_RESET;
+	/* Extra flags checks first: NOPROMPT and STDOUT
+	 * 1. NOPROMPT can only be used with TRIGGERFILE */
+	disallow_return_value = d_c_cli_present("NOPROMPT") && !(d_c_cli_present("TRIGGERFILE"));
+	CLI_DIS_CHECK_N_RESET;
+	/* 2. STDOUT can only be used with SELECT */
+	disallow_return_value = d_c_cli_present("STDOUT") && !(d_c_cli_present("SELECT"));
+	CLI_DIS_CHECK_N_RESET;
+	/* SELECT Checks
+	 * 1. cannot be used with any of the others above */
+	disallow_return_value = d_c_cli_present("SELECT") && (d_c_cli_present("UPGRADE") || d_c_cli_present("TRIGGERFILE") || d_c_cli_present("STDIN"));
+	CLI_DIS_CHECK_N_RESET;
+	/* 2. STDOUT can only be used with SELECT
+	 * --> See above for Extra flags
+	 * TRIGGERFILE Checks
+	 * 1. NOPROMPT can only be used with TRIGGERFILE
+	 * --> See above for Extra flags
+	 * 2. Cannot be used with STDIN */
+	disallow_return_value = d_c_cli_present("TRIGGERFILE") && d_c_cli_present("STDIN");
+	CLI_DIS_CHECK_N_RESET;
+	/* 3. Cannot be used with SELECT
+	 * --> See above for SELECT
+	 * 4. Cannot be used with UPGRADE
+	 * --> See below for UPGRADE
+	 * STDIN Checks
+	 * 1. Cannot be combined with SELECT
+	 * --> See above for SELECT
+	 * 2. Cannot be used together with TRIGGERFILE
+	 * --> See above for TRIGGERFILE
+	 * 3. Cannot be combined with UPGRADE taken care of below
+	 * UPGRADE cannot be used with anything else */
+	disallow_return_value = d_c_cli_present("UPGRADE") && ((d_c_cli_present("SELECT")) || d_c_cli_present("TRIGGERFILE") || d_c_cli_present("STDIN"));
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }

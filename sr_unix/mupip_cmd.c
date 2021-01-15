@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -774,6 +774,8 @@ static readonly CLI_PARM mup_trig_sel_parm[] = {
 static 	CLI_ENTRY	mup_trigger_qual[] = {
 { "NOPROMPT",    mupip_trigger, 0, 0,                 0, 0, 0, VAL_NOT_REQ,     0, NON_NEG, VAL_STR,  0 },
 { "SELECT",      mupip_trigger, 0, mup_trig_sel_parm, 0, 0, 0, VAL_NOT_REQ,     1, NON_NEG, VAL_STR,  0 },
+{ "STDIN",       mupip_trigger, 0, 0,                 0, 0, 0, VAL_DISALLOWED,  0, NON_NEG, VAL_N_A,  0 },
+{ "STDOUT",      mupip_trigger, 0, 0,                 0, 0, 0, VAL_DISALLOWED,  0, NON_NEG, VAL_N_A,  0 },
 { "TRIGGERFILE", mupip_trigger, 0, 0,                 0, 0, 0, VAL_REQ,         0, NON_NEG, VAL_STR,  0 },
 { "UPGRADE",     mupip_trigger, 0, 0,                 0, 0, 0, VAL_DISALLOWED,  0, NON_NEG, VAL_N_A,  0 },
 { "" }
