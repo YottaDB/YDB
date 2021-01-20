@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson.			*
@@ -152,6 +152,24 @@ int4	time();
 
 #define	IS_KNOWN_UNSAFE_TIMER_HANDLER(HNDLR)	((wcs_stale_fptr == HNDLR) || (wcs_clean_dbsync_fptr == HNDLR))
 
+/* Macros to set the global timer_from_OS - is set when timer_handler() is entered as an OS call instead of as a dummy
+ * deferred interrupt type call. Cleared when timer_handler exits.
+ */
+#define SET_TIMER_FROM_OS							\
+MBSTART {									\
+	assert(!timer_from_OS);			/* Shouldn't be on already */	\
+	timer_from_OS = TRUE;							\
+} MBEND
+
+#define CLEAR_TIMER_FROM_OS_IF_NEEDED(IS_OS_SIG_HANDLER)					\
+MBSTART {											\
+	if (IS_OS_SIG_HANDLER)									\
+	{											\
+		assert(timer_from_OS);		/* Should be on if going to clear */		\
+		timer_from_OS = FALSE;								\
+	}											\
+} MBEND
+
 STATICDEF volatile GT_TIMER *timeroot = NULL;	/* chain of pending timer requests in time order */
 STATICDEF boolean_t first_timeset = TRUE;
 STATICDEF struct sigaction prev_alrm_handler;	/* save previous SIGALRM handler, if any */
@@ -189,12 +207,19 @@ STATICDEF GT_TIMER	trc_timerpop_array[MAX_TIMER_POP_TRACE_SZ];
 /* Flag signifying timer is active. Especially useful when the timer handlers get nested. This has not been moved to a
  * threaded framework because we do not know how timers will be used with threads.
  */
-GBLDEF	volatile boolean_t	timer_active = FALSE;
-GBLDEF	volatile int4		timer_stack_count = 0;
-GBLDEF	volatile boolean_t	timer_in_handler = FALSE;
+GBLDEF	volatile boolean_t	timer_active;
+GBLDEF	volatile int4		timer_stack_count;		/* Records that we are already in timer processing */
+GBLDEF	volatile boolean_t	timer_in_handler;
 GBLDEF	void			(*wcs_clean_dbsync_fptr)();	/* Reference to wcs_clean_dbsync() to be used in gt_timers.c */
 GBLDEF	void			(*wcs_stale_fptr)();		/* Reference to wcs_stale() to be used in gt_timers.c */
 
+/* The timer_from_OS global indicates a SIGALRM from OS has occurred blocking further SIGALRMs. Note this is a boolean instead
+ * of a counter as once we come in via SIGALRM, other SIGALRM interrupts are blocked. Note this var differs from the global
+ * in_os_signal_handler (managed by the INCREMENT_IN_OS_SIGNAL_HANDLER/DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED macros) in that
+ * it is only set for SIGALRM signals and indicates SIGALRMs are blocked whereas in_os_signal_handler is incremented for other
+ * signals too so cannot provide the same information.
+ */
+GBLDEF	volatile boolean_t	timer_from_OS;
 
 GBLREF	boolean_t		blocksig_initialized;		/* Set to TRUE when blockalrm, block_ttinout, and block_sigsent are
 								 * initialized. */
@@ -308,7 +333,7 @@ void prealloc_gt_timers(void)
 	 * Allocate them with 8 bytes of possible data each.
 	 * If more timer blocks are needed, we will allocate them as needed.
 	 */
-	gt_timers_alloc();
+	gt_timers_alloc();			/* No preventing SIGALRMS here this early in initialization */
 	/* Now initialize the safe timers. Must be done dynamically to avoid the situation where this module always references all
 	 * possible safe timers thus pulling extra stuff into executables that don't need or want it.
 	 *
@@ -416,10 +441,10 @@ void start_timer(TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len
 		assert(FALSE);
 		return;
 	}
-	if (1 > timer_stack_count)
+	if (!timer_from_OS)
 		SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
 	start_timer_int(tid, time_to_expir, handler, hdata_len, hdata, safe_timer);
-	if (1 > timer_stack_count)
+	if (!timer_from_OS)
 		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);		/* reset signal handlers */
 	DUMP_TIMER_INFO("At the end of start_timer()");
 }
@@ -453,9 +478,9 @@ STATICFNDEF void start_timer_int(TID tid, uint8 time_to_expir, void (*handler)()
 	newt = add_timer(&at, tid, time_to_expir, handler, hdata_len, hdata, safe_timer);	/* Put new timer in the queue. */
 	DUMP_TIMER_INFO("After invoking add_timer()");
 	if ((timeroot->tid == tid) || !timer_active
-			|| ((newt->expir_time.tv_sec < sys_timer_at.tv_sec)
-					|| ((newt->expir_time.tv_sec == sys_timer_at.tv_sec)
-						&& (newt->expir_time.tv_nsec < sys_timer_at.tv_nsec))))
+	    || ((newt->expir_time.tv_sec < sys_timer_at.tv_sec)
+		|| ((newt->expir_time.tv_sec == sys_timer_at.tv_sec)
+		    && (newt->expir_time.tv_nsec < sys_timer_at.tv_nsec))))
 		start_first_timer(&at, IS_OS_SIGNAL_HANDLER_FALSE);
 }
 
@@ -469,7 +494,7 @@ void cancel_timer(TID tid)
 	boolean_t	first_timer;
 	int		rc;
 
-	if (1 > timer_stack_count)
+	if (!timer_from_OS)
 		SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
 	DUMP_TIMER_INFO("At the start of cancel_timer()");
 	sys_get_curr_time(&at);
@@ -482,7 +507,7 @@ void cancel_timer(TID tid)
 		else if (timer_active)
 			sys_canc_timer();
 	}
-	if (1 > timer_stack_count)
+	if (!timer_from_OS)
 		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 	DUMP_TIMER_INFO("At the end of cancel_timer()");
 }
@@ -494,6 +519,8 @@ void clear_timers(void)
 	int		rc;
 
 	DUMP_TIMER_INFO("At the start of clear_timers()");
+	if (!timer_from_OS)
+		SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
 	if (NULL == timeroot)
 	{	/* If no timers have been initialized in this process, take fast path (avoid system call) */
 		/* If the only timer popped, and we got a SIGTERM while its handler was active, the timeroot
@@ -504,17 +531,17 @@ void clear_timers(void)
 		assert(FALSE == timer_active);
 		assert(FALSE == oldjnlclose_started);
 		assert(!GET_DEFERRED_TIMERS_CHECK_NEEDED);
+		if (!timer_from_OS)
+			SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 		return;
 	}
-	if (1 > timer_stack_count)
-		SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
 	while (timeroot)
 		remove_timer(timeroot->tid);
 	timer_in_handler = FALSE;
 	timer_active = FALSE;
 	oldjnlclose_started = FALSE;
 	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
-	if (1 > timer_stack_count)
+	if (!timer_from_OS)
 		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 	DUMP_TIMER_INFO("After invoking clear_timers()");
 	return;
@@ -683,6 +710,7 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 	 */
 	if (is_os_signal_handler)
 	{
+		SET_TIMER_FROM_OS;		/* Record that we were driven by an OS supplied signal */
 		INCREMENT_IN_OS_SIGNAL_HANDLER;
 		/* Now that we know it is the OS that delivered this "SIGALRM" signal to us, clear the global variable
 		 * "timer_active" as the most common cause of this signal is the system timer that this process had
@@ -716,6 +744,7 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 	{
 		SET_DEFERRED_TIMERS_CHECK_NEEDED;
 		INTERLOCK_ADD(&timer_stack_count, -1);
+		CLEAR_TIMER_FROM_OS_IF_NEEDED(is_os_signal_handler);
 #		ifdef SIGNAL_PASSTHRU
 		if (!USING_ALTERNATE_SIGHANDLING && ((SIGALRM == orig_why) || signal_forwarded))
 		{	/* Only drive this handler if we have an actual signal - not a dummy call */
@@ -784,8 +813,8 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 		 *    Hence the "TREF(in_ext_call)" check below.
 		 */
 		if (tpop->safe || (safe_for_timer_pop
-					&& ((!in_os_signal_handler && !TREF(in_ext_call))
-						|| !IS_KNOWN_UNSAFE_TIMER_HANDLER(tpop->handler))))
+				   && ((!in_os_signal_handler && !TREF(in_ext_call))
+				       || !IS_KNOWN_UNSAFE_TIMER_HANDLER(tpop->handler))))
 		{
 			if (NULL != tpop_prev)
 				tpop_prev->next = tpop->next;
@@ -898,6 +927,7 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 	SET_ERROR_CONDITION(save_error_condition);	/* restore error_condition & severity */
 	errno = save_errno;			/* restore mainline errno by similar reasoning as mainline error_condition */
 	INTERLOCK_ADD(&timer_stack_count, -1);
+	CLEAR_TIMER_FROM_OS_IF_NEEDED(is_os_signal_handler);
 #	ifdef DEBUG
 	if (safe_for_timer_pop)
 		in_nondeferrable_signal_handler = save_in_nondeferrable_signal_handler;
@@ -1106,7 +1136,7 @@ void cancel_unsafe_timers(void)
 
 	SETUP_THREADGBL_ACCESS;
 	DUMP_TIMER_INFO("At the start of cancel_unsafe_timers()");
-	if (1 > timer_stack_count)
+	if (!timer_from_OS)
 		SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
 	active = curr = (GT_TIMER *)timeroot;
 	while (curr)
@@ -1140,7 +1170,7 @@ void cancel_unsafe_timers(void)
 		DBGFPF((stderr, " Timers canceled: %d\n", cnt));
 	}
 #	endif
-	if (1 > timer_stack_count)
+	if (!timer_from_OS)
 		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 	DUMP_TIMER_INFO("After invoking cancel_unsafe_timers()");
 }
@@ -1254,10 +1284,10 @@ GT_TIMER *find_timer_intr_safe(TID tid, GT_TIMER **tprev)
 	 * examining the very same queue. This could cause all sorts of invalid returns (of tcur and tprev)
 	 * from the find_timer call below.
 	 */
-	if (1 > timer_stack_count)
+	if (!timer_from_OS)
 		SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 	tcur = find_timer(tid, tprev);
-	if (1 > timer_stack_count)
+	if (!timer_from_OS)
 		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 	return tcur;
 }
