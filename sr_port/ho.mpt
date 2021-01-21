@@ -3,7 +3,7 @@
 ; Copyright (c) 1987-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -20,9 +20,10 @@
 	set %HO=$$FUNC(%HO)
 	quit
 INT	read !,"Hexadecimal: ",%HO set %HO=$$FUNC(%HO)
-	q
+	quit
 FUNC(h)
 	quit:"-"=$extract(h) ""		; 0>h risks NUMOFLOW
+	new e set e=$zextract(h,1,2) set:("0x"=e)!("0X"=e) h=$zextract(h,3,$zlength(h))
 	new c,d,dg,l,o
 	set l=$length(h)
 	quit:(14<l) $$CONVERTBASE^%CONVBASEUTIL(h,16,8)
