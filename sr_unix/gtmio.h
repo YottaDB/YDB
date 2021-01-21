@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -309,10 +309,36 @@ MBSTART {							\
 		RC = errno;					\
 } MBEND
 
+/* This macro is similar to CLOSEFILE except that it can be called from threads that do not hold the YottaDB engine multi-thread
+ * lock. An example is the AIO multiplexing thread in aio_shim.c. Such threads cannot invoke the YottaDB engine and therefore
+ * cannot call "eintr_handling_check()" like the CLOSEFILE macro does. The EINTR handling check will be taken care of by the
+ * main thread that holds the YottaDB engine lock.
+ */
+#define CLOSEFILE_MULTI_THREAD_SAFE(FDESC, RC)			\
+MBSTART {							\
+	do							\
+	{							\
+		RC = close(FDESC);				\
+		if ((-1 != RC) || (EINTR != errno))		\
+			break;					\
+	} while (TRUE);						\
+	if (-1 == RC)	/* Had legitimate error - return it */	\
+		RC = errno;					\
+} MBEND
+
 #define	CLOSEFILE_RESET(FDESC, RC)	\
 MBSTART {				\
 	CLOSEFILE(FDESC, RC);		\
 	FDESC = FD_INVALID;		\
+} MBEND
+
+/* This macro is similar to CLOSEFILE_RESET except that it can be called from threads like the AIO multiplexing thread.
+ * See comment before CLOSEFILE_MULTI_THREAD_SAFE for details.
+ */
+#define	CLOSEFILE_RESET_MULTI_THREAD_SAFE(FDESC, RC)	\
+MBSTART {						\
+	CLOSEFILE_MULTI_THREAD_SAFE(FDESC, RC);		\
+	FDESC = FD_INVALID;				\
 } MBEND
 
 /* Close file only if we have it open. Use FCNTL to check if we have it open */
@@ -488,6 +514,35 @@ MBSTART {											\
 		eintr_handling_check();								\
 	}											\
 	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;							\
+	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
+		RC = errno;									\
+	else if (0 == gtmioBuffLen)								\
+		RC = 0;										\
+	else											\
+		RC = -1;		/* Something kept us from reading what we wanted */	\
+} MBEND
+
+/* This macro is similar to DOREADRC except that it can be called from threads like the AIO multiplexing thread.
+ * See comment before CLOSEFILE_MULTI_THREAD_SAFE for details.
+ */
+#define DOREADRC_MULTI_THREAD_SAFE(FDESC, FBUFF, FBUFF_LEN, RC)					\
+MBSTART {											\
+	ssize_t		gtmioStatus;								\
+	size_t		gtmioBuffLen;								\
+	sm_uc_ptr_t	gtmioBuff;								\
+	gtmioBuffLen = FBUFF_LEN;								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
+	for (;;)										\
+	{											\
+		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen)))			\
+		{										\
+			gtmioBuffLen -= gtmioStatus;						\
+			if (0 == gtmioBuffLen || 0 == gtmioStatus)				\
+				break;								\
+			gtmioBuff += gtmioStatus;						\
+		} else if (EINTR != errno)							\
+			break;									\
+	}											\
 	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
 		RC = errno;									\
 	else if (0 == gtmioBuffLen)								\
@@ -709,6 +764,44 @@ MBSTART {											\
 		eintr_handling_check();								\
 	}											\
 	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;							\
+	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
+		RC = errno;									\
+	else if (0 == gtmioBuffLen)								\
+		RC = 0;										\
+	else											\
+		RC = -1;		/* Something kept us from writing what we wanted */	\
+} MBEND
+
+/* This macro is similar to DOWRITERC except that it can be called from threads like the AIO multiplexing thread.
+ * See comment before CLOSEFILE_MULTI_THREAD_SAFE for details.
+ */
+#define DOWRITERC_MULTI_THREAD_SAFE(FDESC, FBUFF, FBUFF_LEN, RC)				\
+MBSTART {											\
+	GBLREF	int	ydb_non_blocked_write_retries;						\
+	ssize_t		gtmioStatus;								\
+	size_t		gtmioBuffLen;								\
+	sm_uc_ptr_t	gtmioBuff;								\
+	int		block_cnt = 0;								\
+	gtmioBuffLen = FBUFF_LEN;								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
+	for (;;)										\
+	{											\
+		if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen)))		\
+		{										\
+			gtmioBuffLen -= gtmioStatus;						\
+			if (0 == gtmioBuffLen)							\
+				break;								\
+			gtmioBuff += gtmioStatus;						\
+		} else if ((EINTR != errno) && (EAGAIN != errno))				\
+			break;									\
+		else if (EAGAIN == errno)							\
+		{										\
+			if (ydb_non_blocked_write_retries <= block_cnt)				\
+				break;								\
+			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
+			block_cnt++;								\
+		}										\
+	}											\
 	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
 		RC = errno;									\
 	else if (0 == gtmioBuffLen)								\

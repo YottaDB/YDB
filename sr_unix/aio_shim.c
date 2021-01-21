@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,12 +101,12 @@ MBSTART {								\
 	save_errno = errno;						\
 	if (FD_INVALID != (GDI).exit_efd)				\
 	{								\
-		CLOSEFILE_RESET((GDI).exit_efd, ret);			\
+		CLOSEFILE_RESET_MULTI_THREAD_SAFE((GDI).exit_efd, ret);	\
 		assert(0 == ret);					\
 	}								\
 	if (FD_INVALID != (GDI).laio_efd)				\
 	{								\
-		CLOSEFILE_RESET((GDI).laio_efd, ret);			\
+		CLOSEFILE_RESET_MULTI_THREAD_SAFE((GDI).laio_efd, ret);	\
 		assert(0 == ret);					\
 	}								\
 	if (0 != (GDI).ctx)						\
@@ -182,7 +182,7 @@ STATICFNDCL void *io_getevents_multiplexer(void *arg)
 		/* Service the IO's if they completed */
 		if (EVENTFD_NOTIFIED(fds, LAIO_EFD))
 		{	/* flush the eventfd (though we don't care about the value) */
-			DOREADRC(fds[LAIO_EFD].fd, &dummy, SIZEOF(dummy), ret);
+			DOREADRC_MULTI_THREAD_SAFE(fds[LAIO_EFD].fd, &dummy, SIZEOF(dummy), ret);
 			assert(0 == ret);
 			if (-1 == ret)
 				RECORD_ERROR_IN_WORKER_THREAD_AND_EXIT(gdi, "worker_thread::read()", errno);
@@ -198,9 +198,9 @@ STATICFNDCL void *io_getevents_multiplexer(void *arg)
 		/* Exit if we have been notified via the exit eventfd */
 		if (EVENTFD_NOTIFIED(fds, EXIT_EFD))
 		{
-			CLOSEFILE_RESET(gdi->laio_efd, ret);
+			CLOSEFILE_RESET_MULTI_THREAD_SAFE(gdi->laio_efd, ret);
 			assert(0 == ret);
-			CLOSEFILE_RESET(gdi->exit_efd, ret);
+			CLOSEFILE_RESET_MULTI_THREAD_SAFE(gdi->exit_efd, ret);
 			assert(0 == ret);
 			return NULL;
 		}
@@ -466,7 +466,7 @@ void aio_shim_destroy(gd_addr *gd)
 	}
 	/* We notify the thread to exit; note we only need to write 8 bytes (exactly) to the fd. */
 	assert(EVENTFD_SZ == STRLEN(eventfd_str));
-	DOWRITERC(gdi->exit_efd, eventfd_str, EVENTFD_SZ, ret);
+	DOWRITERC_MULTI_THREAD_SAFE(gdi->exit_efd, eventfd_str, EVENTFD_SZ, ret);
 	assert(0 == ret);
 	if (-1 == ret)
 		ISSUE_SYSCALL_RTS_ERROR_WITH_GD(gd, "aio_shim_destroy::write", errno);
