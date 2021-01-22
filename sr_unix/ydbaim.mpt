@@ -109,8 +109,8 @@ XREFDATA(gbl,nsubs,sep,pnum,nmonly)
 	set sep=$get(sep),name="^%ydbAIMD"_$zysuffix(gbl_nsubs_sep_$select($zlength(sep):$zchset,1:""))
 	; $data()=11 means xref exists and nothing more is needed
 	quit:$data(@name)\10 name
-	; TODO: remove locks if/when safety of parallel execution is confirmed
-	lock +@name
+	; uncomment next line for development/debugging
+	; lock +@name
 	set trigfile="/tmp/"_$text(+0)_"_"_$job_"_"_$zut_".trig"
 	; Create a temp file in which to generate triggers, load triggers from
 	; temp file and delete temp file Then compute xrefs for existing data,
@@ -143,7 +143,8 @@ XREFDATA(gbl,nsubs,sep,pnum,nmonly)
 	. set @name=gbl,@name@(0)=$zut_" "_$zyrelease,^(1)=nsubs,(^(2),^(3))=""
 	. set ^(4)=trigset,^(5)=trigdel,^(6)=trigdelx
 	. tcommit
-	. lock -@name
+	. ; uncomment next line for development/debugging
+	. ; lock -@name
 	quit name
 
 ; This label is intended to only be called internally from XREFDATA, and
