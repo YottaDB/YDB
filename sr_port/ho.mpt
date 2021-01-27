@@ -28,6 +28,6 @@ FUNC(h)
 	set l=$length(h)
 	quit:(14<l) $$CONVERTBASE^%CONVBASEUTIL(h,16,8)
 	set d=0,h=$translate(h,"abcdef","ABCDEF"),o=""
-	for c=1:1:l set dg=$find("0123456789ABCDEF",$e(h,c)) q:'dg  s d=(d*16)+(dg-2)
+	for c=1:1:l set dg=$find("0123456789ABCDEF",$extract(h,c)) quit:'dg  set d=(d*16)+(dg-2)
 	for  quit:'d  set o=d#8_o,d=d\8
 	quit $select(0<o:o,1:0)

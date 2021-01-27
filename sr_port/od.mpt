@@ -3,7 +3,7 @@
 ; Copyright (c) 1987-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -24,8 +24,9 @@ INT	read !,"Octal: ",%OD set %OD=$$FUNC(%OD)
 FUNC(o)
 	quit:"-"=$zextract(o,1) ""
 	quit:"-"=$extract(o) ""
-	new c,d,l
+	set:"+"=$extract(o) o=$extract(o,2,9999)
+	new c,d,dg,l
 	set d=0,l=$length(o)
 	quit:(18<l) $$CONVERTBASE^%CONVBASEUTIL(o,8,10)
-	for c=1:1:l set d=d*8+$extract(o,c)
+	for c=1:1:l set dg=$find("01234567",$extract(o,c)) quit:'dg  set d=(d*8)+(dg-2)
 	quit d
