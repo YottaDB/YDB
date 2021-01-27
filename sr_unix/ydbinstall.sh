@@ -1,9 +1,9 @@
 #!/bin/sh -
 #################################################################
-# Copyright (c) 2014-2017 Fidelity National Information         #
+# Copyright (c) 2014-2019 Fidelity National Information         #
 # Services, Inc. and/or its subsidiaries. All rights reserved.  #
 #								#
-# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson.				#
@@ -130,6 +130,7 @@ help_exit()
     echo "--distrib dirname or URL -> source directory for YottaDB/GT.M distribution tarball, local or remote"
     echo "--dry-run                -> do everything short of installing YottaDB, including downloading the distribution"
     echo "--encplugin              -> compile and install the encryption plugin"
+    echo "--filename filename      -> name of YottaDB distribution tarball"
     echo "--force-install          -> install even if the current platform is not supported"
     echo "--group group            -> group that should own the YottaDB installation"
     echo "--group-restriction      -> limit execution to a group; defaults to unlimited if not specified"
@@ -272,6 +273,13 @@ while [ $# -gt 0 ] ; do
             shift ;;
         --dry-run) gtm_dryrun="Y" ; shift ;;
 	--encplugin) ydb_encplugin="Y" ; shift ;;
+	--filename) tmp=`echo $1 | cut -s -d = -f 2-`
+	    if [ -n "$tmp" ] ; then ydb_filename=$tmp
+	    else if [ 1 -lt "$#" ] ; then ydb_filename=$2 ; shift
+		else echo "--filename needs a value" ; err_exit
+		fi
+	    fi
+	    shift ;;
 	--force-install) ydb_force_install="Y" ; shift ;;
         --gtm)
             gtm_gtm="Y"
@@ -558,8 +566,10 @@ if [ -f "${ydb_distrib}/yottadb" ] ; then gtm_tmpdir=$ydb_distrib
 elif [ -f "${ydb_distrib}/mumps" ] ; then gtm_tmpdir=$ydb_distrib
 else
     tmp=`echo $ydb_version | tr -d .-`
-    ydb_filename=""
-    if [ "Y" = "$gtm_gtm" ] ; then ydb_filename=gtm_${tmp}_${gtm_hostos}_${ydb_flavor}_${gtm_buildtype}.tar.gz ; fi
+    if [ -z "$ydb_filename" ] ; then
+	ydb_filename=""
+	if [ "Y" = "$gtm_gtm" ] ; then ydb_filename=gtm_${tmp}_${gtm_hostos}_${ydb_flavor}_${gtm_buildtype}.tar.gz ; fi
+    fi
     case $ydb_distrib in
         http://sourceforge.net/projects/fis-gtm | https://sourceforge.net/projects/fis-gtm)
             if [ "Y" = "$gtm_verbose" ] ; then

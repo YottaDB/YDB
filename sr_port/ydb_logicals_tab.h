@@ -119,6 +119,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_REPL_INSTNAME,              "$ydb_repl_instna
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_REPL_INSTSECONDARY,         "$ydb_repl_instsecondary",         "$gtm_repl_instsecondary")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_ROUTINES,                   "$ydb_routines",                   "$gtmroutines")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_SIDE_EFFECTS,               "$ydb_side_effects",               "$gtm_side_effects")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_SOCKET_KEEPALIVE_IDLE,      "$ydb_socket_keepalive_idle",      "$gtm_socket_keepalive_idle")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_SNAPTMPDIR,                 "$ydb_snaptmpdir",                 "$gtm_snaptmpdir")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_STATSDIR,                   "$ydb_statsdir",                   "$gtm_statsdir")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_STATSHARE,                  "$ydb_statshare",                  "$gtm_statshare")
