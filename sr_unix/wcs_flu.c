@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -213,6 +213,51 @@ MBSTART {													\
 		}												\
 	}													\
 } MBEND
+
+/* The below macro checks if the journal buffer contents are not in sync with the journal file contents on disk yet
+ * and if so takes care of that by flushing any unflushed data first ("jnl_flush()") and then fsync all of it ("jnl_fsync()")
+ * in the journal file. Note: This cannot use an inline function because it does a "return" in some cases which would
+ * effectively return from the function that calls this macro whereas if it were an inline function the "return" would
+ * only return from the inline function which is not the intended effect.
+ */
+#define	JNL_FLUSH_AND_FSYNC_IF_NEEDED_RETURN_ON_ERROR(REG, CSA, CNL, JB, WAS_CRIT)						\
+{																\
+	uint4			fsyncDskaddr;											\
+																\
+	fsyncDskaddr = JB->fsync_dskaddr;	/* take a local copy as it could change concurrently */				\
+	if (fsyncDskaddr != JB->rsrv_freeaddr)											\
+	{															\
+		uint4	jnlStatus;												\
+		char	fileAndLine[256];											\
+																\
+		assert((fsyncDskaddr <= JB->dskaddr) || WBTEST_ENABLED(WBTEST_JNL_FILE_LOST_DSKADDR));				\
+		if (SS_NORMAL != (jnlStatus = jnl_flush(REG)))									\
+		{														\
+			assert(NOJNL == CSA->jnl->channel); /* jnl file lost */							\
+			/* Send a syslog message for this unexpected event so we record it */					\
+			/* Need to do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */				\
+			SNPRINTF(fileAndLine, SIZEOF(fileAndLine), "File %s, Line %d", __FILE__, __LINE__);			\
+			send_msg_csa(CSA_ARG(CSA) VARLSTCNT(8) ERR_WCSFLUFAILED, 5,						\
+					LEN_AND_STR(fileAndLine), &CSA->ti->curr_tn, DB_LEN_STR(REG),				\
+					jnlStatus);										\
+			REL_CRIT_BEFORE_RETURN(CNL, REG, WAS_CRIT);								\
+			/* Even though we issue a WCSFLUFAILED error to the syslog, also keep the JNLFLUSH error		\
+			 * below as it is part of the default custom errors file (`custom_errors_sample.txt`) and		\
+			 * could cause an instance freeze. We do not want to change that behavior because of the		\
+			 * addition of the WCSFLUFAILED error in the syslog.							\
+			 */													\
+			send_msg_csa(CSA_ARG(CSA) VARLSTCNT(4) ERR_JNLFLUSH, 2, JNL_LEN_STR(CSA->hdr));				\
+			return FALSE;												\
+		}														\
+		assert((ydb_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number))	\
+			|| ((JB->rsrv_freeaddr == JB->dskaddr) && (JB->rsrv_freeaddr == JB->freeaddr)));			\
+		jnl_fsync(REG, JB->dskaddr);											\
+		/* Use JB->fsync_dskaddr (instead of "fsync_dskaddr") below as the shared memory copy is more up to date	\
+		 * (could have been updated by "jnl_fsync" call above).								\
+		 */														\
+		assert(JB->fsync_dskaddr == JB->dskaddr);									\
+	}															\
+}
 
 boolean_t wcs_flu(uint4 options)
 {
@@ -425,38 +470,7 @@ boolean_t wcs_flu(uint4 options)
 			} else if (epoch_already_current)
 				jb->next_epoch_time = jgbl.gbl_jrec_time + jb->epoch_interval;
 		}
-		fsync_dskaddr = jb->fsync_dskaddr;	/* take a local copy as it could change concurrently */
-		if (fsync_dskaddr != jb->rsrv_freeaddr)
-		{
-			assert((fsync_dskaddr <= jb->dskaddr) || WBTEST_ENABLED(WBTEST_JNL_FILE_LOST_DSKADDR));
-			if (SS_NORMAL != (jnl_status = jnl_flush(reg)))
-			{
-				assert(NOJNL == jpc->channel); /* jnl file lost */
-				/* Send a syslog message for this unexpected event so we record it */
-				/* Need to do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCSFLUFAILED, 5,
-						LEN_AND_LIT("JNL_FLUSH_FAILED1"), &csa->ti->curr_tn, DB_LEN_STR(reg),
-						jnl_status);
-				REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
-				/* Even though we issue a WCSFLUFAILED error to the syslog, also keep the JNLFLUSH error
-				 * below as it is part of the default custom errors file (`custom_errors_sample.txt`) and
-				 * could cause an instance freeze. We do not want to change that behavior because of the
-				 * addition of the WCSFLUFAILED error in the syslog.
-				 */
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
-					ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush during wcs_flu1"), jnl_status);
-				return FALSE;
-			}
-#			ifdef DEBUG
-			if (!ydb_white_box_test_case_enabled || (WBTEST_JNL_FILE_LOST_DSKADDR != ydb_white_box_test_case_number))
-			{
-				assert(jb->rsrv_freeaddr == jb->dskaddr);
-				assert(jb->rsrv_freeaddr == jb->freeaddr);
-			}
-#			endif
-			jnl_fsync(reg, jb->dskaddr);
-			assert(jb->fsync_dskaddr == jb->dskaddr);
-		}
+		JNL_FLUSH_AND_FSYNC_IF_NEEDED_RETURN_ON_ERROR(reg, csa, cnl, jb, was_crit);
 		if (return_early)
 		{
 			REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
@@ -519,6 +533,10 @@ boolean_t wcs_flu(uint4 options)
 				wcs_recover(reg);
 				assert(!cnl->wcs_phase2_commit_pidcnt || is_src_server);
 					/* source server does not do "wcs_recover" */
+				if (jnl_enabled)
+				{	/* "wcs_recover" would have written an INCTN record. So flush/sync it. */
+					JNL_FLUSH_AND_FSYNC_IF_NEEDED_RETURN_ON_ERROR(reg, csa, cnl, jb, was_crit);
+				}
 			}
 			if (cnl->wcs_phase2_commit_pidcnt)
 			{	/* Send a syslog message for this unexpected event so we record it */
@@ -726,42 +744,8 @@ boolean_t wcs_flu(uint4 options)
 					}
 					wcs_recover(reg);
 					if (jnl_enabled)
-					{
-						fsync_dskaddr = jb->fsync_dskaddr;
-							/* take a local copy as it could change concurrently */
-						if (fsync_dskaddr != jb->rsrv_freeaddr)
-						{	/* an INCTN record should have been written above */
-							assert(fsync_dskaddr <= jb->dskaddr);
-							assert((jb->rsrv_freeaddr - fsync_dskaddr) >= INCTN_RECLEN);
-							/* above assert has a >= instead of == due to possible
-							 * ALIGN record in between */
-							if (SS_NORMAL != (jnl_status = jnl_flush(reg)))
-							{
-								assert(NOJNL == jpc->channel); /* jnl file lost */
-								/* Send a syslog message for this abnormal event so we record it */
-								/* Do this BEFORE REL_CRIT_BEFORE_RETURN due to CSA->ti->curr_tn */
-								send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,
-										LEN_AND_LIT("JNL_FLUSH_FAILED2"), &csa->ti->curr_tn,
-										DB_LEN_STR(reg));
-								REL_CRIT_BEFORE_RETURN(cnl, reg, was_crit);
-								/* See previous ERR_JNLFLUSH usage for why this is done in
-								 * addition to WCSFLUFAILED error.
-								 */
-								send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2,
-									JNL_LEN_STR(csd), ERR_TEXT, 2,
-									RTS_ERROR_TEXT("Error with journal flush during wcs_flu2"),
-									jnl_status);
-								return FALSE;
-							}
-							assert(jb->freeaddr == jb->dskaddr);
-							assert(jb->freeaddr == jb->rsrv_freeaddr);
-							jnl_fsync(reg, jb->dskaddr);
-							/* Use jb->fsync_dskaddr (instead of "fsync_dskaddr") below as the
-							 * shared memory copy is more uptodate (could have been updated by
-							 * "jnl_fsync" call above).
-							 */
-							assert(jb->fsync_dskaddr == jb->dskaddr);
-						}
+					{	/* "wcs_recover" would have written an INCTN record. So flush/sync it. */
+						JNL_FLUSH_AND_FSYNC_IF_NEEDED_RETURN_ON_ERROR(reg, csa, cnl, jb, was_crit);
 					}
 					/* After the "wcs_recover" call above, it is possible a dirty cache-record which was
 					 * in the wip queue and corresponded to a dead pid got re-inserted into the wip
