@@ -100,16 +100,21 @@ missing_files=""
 commit_list=""
 for id in $COMMIT_IDS
 do
-	if ! git verify-commit "$id"; then
+	if ! git verify-commit "$id" > /dev/null 2>&1; then
 		echo "  --> Error: commit $id was not signed with a known GPG key!"
 		exit 1
 	fi
 	# Get commit message from id
 	COMMIT_MESSAGE=`git log --format=%B -n 1 $id`
-	# Skip the copyright check if the commit message contains
-	# "merge GT.M Vx.x-xxx into YottaDB mainline (with conflicts)"
-	if [[ "$COMMIT_MESSAGE" =~ .*Merge[[:space:]]GT\.M[[:space:]]V[0-9]\.[0-9]-[0=9]{3}[[:space:]]into[[:space:]]YottaDB[[:space:]]mainline[[:space:]]\(with[[:space:]]conflicts\).* ]]; then
-		echo "skipped copyright check for merge GT.M Vx.x-xxx into YottaDB mainline (with conflicts) commit"
+	# 1) Skip the copyright check if the commit message contains
+	#    "Merge GT.M Vx.x-xxx into YottaDB mainline (with conflicts)"
+	# 2) Check for any "git revert" commits. Those have the case-sensitive string 'Revert ' somewhere in the commit title.
+	#    Those can undo changes and so can result in a file having a copyright notice that is not the current year.
+	#    Therfore skip the copyright check in those commits too.
+	if [[ "$COMMIT_MESSAGE" =~ .*Merge[[:space:]]GT\.M[[:space:]]V[0-9]\.[0-9]-[0-9]{3}[[:space:]]into[[:space:]]YottaDB[[:space:]]mainline[[:space:]]\(with[[:space:]]conflicts\).* ]]; then
+		echo "Skipping copyright check for commit : $id as it contains [Merge GT.M Vx.x-xxx into YottaDB mainline (with conflicts)]"
+	elif [[ "$COMMIT_MESSAGE" =~ "Revert " ]]; then
+		echo "Skipping copyright check for commit : $id as it contains [Revert ] in the title"
 	else
 		commit_list="$commit_list $id"
 	fi
