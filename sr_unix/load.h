@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.                                         *
  *								*
  *	This source code contains the intellectual property	*
@@ -50,13 +50,8 @@
 void		bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_len);
 void		go_call_db(int routine, char *parm1, int parm2, int val_off1, int val_len1);
 int		go_get(char **in_ptr, int max_len, uint4 max_rec_size);
-<<<<<<< HEAD
-void		go_load(uint4 begin, uint4 end, unsigned char *recbuf, char *line3_ptr, int line3_len, uint4 max_rec_size, int fmt,
-			int dos);
-=======
 void		go_load(gtm_uint64_t begin, gtm_uint64_t end, unsigned char *recbuf, char *line3_ptr, int line3_len,
-			uint4 max_rec_size, int fmt, int utf8_extract, int dos);
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+			uint4 max_rec_size, int fmt, int dos);
 void		goq_load(void);
 int		get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *line3_len, uint4 *max_rec_size,
 			int *utf8_extract, int *dos, boolean_t ignore_chset);

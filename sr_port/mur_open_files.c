@@ -147,45 +147,6 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			process_id;
 
-error_def(ERR_CRITSEMFAIL);
-error_def(ERR_DBFILOPERR);
-error_def(ERR_DBFRZRESETFL);
-error_def(ERR_DBFRZRESETSUC);
-error_def(ERR_DBJNLNOTMATCH);
-error_def(ERR_DBRDONLY);
-error_def(ERR_FILENOTFND);
-error_def(ERR_FILEPARSE);
-error_def(ERR_JNLBADRECFMT);
-error_def(ERR_JNLDBTNNOMATCH);
-error_def(ERR_JNLDBSEQNOMATCH);
-error_def(ERR_JNLFILEDUP);
-error_def(ERR_JNLFILEOPNERR);
-error_def(ERR_JNLNMBKNOTPRCD);
-error_def(ERR_JNLSTATEOFF);
-error_def(ERR_JNLTNOUTOFSEQ);
-error_def(ERR_MUKILLIP);
-error_def(ERR_MUPCLIERR);
-error_def(ERR_MUPJNLINTERRUPT);
-error_def(ERR_MUSTANDALONE);
-error_def(ERR_NOPREVLINK);
-error_def(ERR_NOSTARFILE);
-error_def(ERR_NOTALLJNLEN);
-error_def(ERR_NOTALLREPLON);
-error_def(ERR_ORLBKFRZOVER);
-error_def(ERR_ORLBKFRZPROG);
-error_def(ERR_ORLBKNOV4BLK);
-error_def(ERR_ORLBKSTART);
-error_def(ERR_REPLSTATEOFF);
-error_def(ERR_RLBKNOBIMG);
-error_def(ERR_ROLLBKINTERRUPT);
-error_def(ERR_STARFILE);
-error_def(ERR_SYSCALL);
-error_def(ERR_TEXT);
-error_def(ERR_WCBLOCKED);
-error_def(ERR_ORLBKRESTART);
-error_def(ERR_ORLBKREL);
-error_def(ERR_REPLPOOLINST);
-
 #define		STAR_QUOTE "\"*\""
 
 /* Release all locks, in general follow the direction of mur_close_files. We do not reset fields
@@ -265,12 +226,7 @@ void release_all_locks(unix_db_info *udi, gtmsource_local_ptr_t gtmsourcelocal_p
 		assert(FALSE);
 }
 
-<<<<<<< HEAD
-
 int4 mur_open_files(boolean_t retry)
-=======
-uint4 mur_open_files(boolean_t retry)
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 {
 	boolean_t			interrupted_rollback;
 	int                             jnl_total, jnlno, regno, max_reg_total, errcode;

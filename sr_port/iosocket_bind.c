@@ -35,14 +35,6 @@
 #define	BOUND	"BOUND"
 #define IPV6_UNCERTAIN 2
 
-error_def(ERR_GETNAMEINFO);
-error_def(ERR_GETSOCKNAMERR);
-error_def(ERR_GETSOCKOPTERR);
-error_def(ERR_SETSOCKOPTERR);
-error_def(ERR_SOCKBIND);
-error_def(ERR_SOCKINIT);
-error_def(ERR_TEXT);
-
 boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t update_bufsiz, boolean_t newversion)
 {
 	int			temp_1 = 1;
@@ -253,7 +245,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 		if (0 == socketptr->local.port)
 			socketptr->local.port = actual_port;
 		assert(socketptr->local.port == actual_port);
-		keepalive_opt = TREF(gtm_socket_keepalive_idle);	/* deviceparameter would give more granular control */
+		keepalive_opt = TREF(ydb_socket_keepalive_idle);	/* deviceparameter would give more granular control */
 		if (keepalive_opt && !iosocket_tcp_keepalive(socketptr, keepalive_opt, action))
 			return FALSE;				/* iosocket_tcp_keepalive issues rts_error rather than return */
 	} else

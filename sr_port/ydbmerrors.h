@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -137,7 +137,7 @@
 #define ERR_MBXWRTONLY 150373330
 #define ERR_MEMORY 150373340
 #define ERR_DONOBLOCK 150373344
-#define ERR_UNUSEDMSG306 150373354
+#define ERR_ZATRANSCOL 150373354
 #define ERR_UNUSEDMSG307 150373362
 #define ERR_UNUSEDMSG308 150373370
 #define ERR_UNUSEDMSG309 150373378
@@ -491,7 +491,7 @@
 #define ERR_INVBITSTR 150376162
 #define ERR_INVBITPOS 150376170
 #define ERR_PARNORMAL 150376177
-#define ERR_PARBUFSM 150376186
+#define ERR_FILEPATHTOOLONG 150376186
 #define ERR_RMWIDTHTOOBIG 150376194
 #define ERR_PATTABNOTFND 150376202
 #define ERR_OBJFILERR 150376210
@@ -610,7 +610,7 @@
 #define ERR_MEMORYRECURSIVE 150377116
 #define ERR_FREEZEID 150377123
 #define ERR_BLKWRITERR 150377131
-#define ERR_UNUSEDMSG781 150377138
+#define ERR_DSEINVALBLKID 150377138
 #define ERR_PINENTRYERR 150377146
 #define ERR_BCKUPBUFLUSH 150377154
 #define ERR_NOFORKCORE 150377160
@@ -1074,8 +1074,8 @@
 #define ERR_BKUPTMPFILOPEN 150380826
 #define ERR_BKUPTMPFILWRITE 150380834
 #define ERR_UNUSEDMSG1244 150380842
-#define ERR_LOADBGSZ2 150380850
-#define ERR_LOADEDSZ2 150380858
+#define ERR_UNUSEDMSG1245 150380850
+#define ERR_UNUSEDMSG1246 150380858
 #define ERR_REPLINSTMISMTCH 150380866
 #define ERR_REPLINSTREAD 150380874
 #define ERR_REPLINSTDBMATCH 150380882

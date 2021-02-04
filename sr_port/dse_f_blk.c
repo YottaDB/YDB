@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,10 +47,6 @@ GBLDEF short int	patch_dir_path_count, patch_path_count;
 
 static boolean_t	was_crit, was_hold_onto_crit, nocrit_present;
 
-error_def(ERR_CTRLC);
-error_def(ERR_DSEBLKRDFAIL);
-error_def(ERR_DSEINVALBLKID);
-
 void dse_f_blk(void)
 {
 	block_id		last, look;
@@ -63,11 +59,8 @@ void dse_f_blk(void)
 	int4			dummy_int;
 	long			blk_id_size;
 	short int		count, rsize, size;
-<<<<<<< HEAD
-	DCL_THREADGBL_ACCESS;
-=======
 	sm_uc_ptr_t		blk_id, bp, b_top, key_top, rp, r_top, sp, srp, s_top;
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	if (BADDSEBLK == (patch_find_blk = dse_getblk("BLOCK", DSENOBML, DSEBLKCUR)))		/* WARNING: assignment */
@@ -651,4 +644,3 @@ CONDITION_HANDLER(dse_f_blk_ch)
 		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	NEXTCH;
 }
-

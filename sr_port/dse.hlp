@@ -2979,11 +2979,8 @@
    date; such information is subject to change without notice.  YottaDB is
    not responsible for any errors or defects.
 
-<<<<<<< HEAD
    **Note**
 
    This help file is a concise representation of the revision r1.30 of the
    Administration and Operations Guide. To obtain a copy of the current
    revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
-=======
->>>>>>> 3d3cd0dd... GT.M V6.3-010

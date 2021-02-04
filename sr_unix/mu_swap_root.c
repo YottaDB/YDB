@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,12 +78,6 @@ GBLREF	gv_key			*gv_altkey;
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	uint4			update_array_size;
 GBLREF	inctn_opcode_t		inctn_opcode;
-
-error_def(ERR_DBRDONLY);
-error_def(ERR_GBLNOEXIST);
-error_def(ERR_MAXBTLEVEL);
-error_def(ERR_MUREORGFAIL);
-error_def(ERR_MUTRUNCNOTBG);
 
 #define RETRY_SWAP		(0)
 #define ABORT_SWAP		(1)
@@ -282,11 +276,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	sgmnt_data_ptr_t	csd;
 	sgmnt_addrs		*csa;
 	srch_blk_status		bmlhist, freeblkhist;
-<<<<<<< HEAD
-	block_id		hint_blk_num, free_blk_id, total_blks, num_local_maps, master_bit;
-=======
-	block_id		hint_blk_num, free_blk_id, parent_blk_id, total_blks, num_local_maps, master_bit, temp_blk;
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+	block_id		hint_blk_num, free_blk_id, total_blks, num_local_maps, master_bit, temp_blk;
 	boolean_t		free_blk_recycled;
 	int4			free_bit, hint_bit, maxbitsthismap;
 	int			blk_seg_cnt, blk_size;

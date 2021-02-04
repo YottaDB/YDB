@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2019 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	!
+! Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -432,13 +432,8 @@ FILENOTFND	<File !AD not found>/error/fao=2!/ansi=0
 MUFILRNDWNFL	<File !AD rundown failed>/error/fao=2!/ansi=0
 JNLTMQUAL1	<Time qualifier BEFORE_TIME="!AZ" is less than SINCE_TIME="!AZ">/error/fao=2!/ansi=0
 FORCEDHALT	<Image HALTed by MUPIP STOP>/fatal/fao=0!/ansi=0
-<<<<<<< HEAD
-LOADEOF		<Load error: EOF reached prior to BEGIN record !UL.  No records loaded.>/error/fao=1!/ansi=0
-WILLEXPIRE	<This copy of YottaDB will expire within one week>/info/fao=0!/ansi=0
-=======
 LOADEOF		<Load error: EOF reached prior to BEGIN record !@UQ.  No records loaded.>/error/fao=1!/ansi=0
-WILLEXPIRE	<This copy of GT.M will expire within one week>/info/fao=0!/ansi=0
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+WILLEXPIRE	<This copy of YottaDB will expire within one week>/info/fao=0!/ansi=0
 LOADEDBG	<Load error: END smaller than BEGIN.  No records loaded.>/error/fao=0!/ansi=0
 LABELONLY	<Routine !AD was compiled for label-only entry>/error/fao=2!/ansi=0
 MUREORGFAIL	<MUPIP REORG failed.  Failure code: !AD.>/error/fao=2!/ansi=0
@@ -783,11 +778,7 @@ KRNLKILL	<Process was terminated by SIGDANGER signal from the system -- System s
 MEMORYRECURSIVE	<Memory Subsystem called recursively>/fatal/fao=0!/ansi=0
 FREEZEID	<Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ>/info/fao=7!/ansi=0
 BLKWRITERR	<Unable to queue disk write for block 0x!XL.  Will keep trying.>/info/fao=1!/ansi=0
-<<<<<<< HEAD
-UNUSEDMSG781	<STOPTIMEOUT last used in V6.3-000A>/error/fao=0!/ansi=0
-=======
 DSEINVALBLKID	<Trying to edit DB with 64-bit block IDs using pre-V7 DSE>/error/fao=0!/ansi=0
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 PINENTRYERR	<Custom pinentry program failure>/error/fao=0!/ansi=0
 BCKUPBUFLUSH	<Unable to flush buffer for online backup>/error/fao=0!/ansi=0
 NOFORKCORE	<Unable to fork off process to create core.  Core creation postponed.>/warning/fao=0!/ansi=0
@@ -934,35 +925,19 @@ DBUNDACCMT	<!AD Cannot determine access method; trying with BG>/info/fao=2!/ansi
 DBTNNEQ		<!AD Current tn and early tn are not equal>/info/fao=2!/ansi=0/T
 MUPGRDSUCC	<Database file !AD successfully !AD to !AD>/success/fao=6!/ansi=0
 DBDSRDFMTCHNG	<Database file !AD, Desired DB Format set to !AD by !AD with pid !UL [0x!XL] at transaction number [0x!16@XQ]>/info/fao=9!/ansi=0
-<<<<<<< HEAD
-DBFGTBC		<!AD File size larger than block count would indicate>/warning/fao=2!/ansi=0
-DBFSTBC		<!AD File size smaller than block count would indicate>/error/fao=2!/ansi=0
-DBFSTHEAD	<!AD File smaller than database header>/error/fao=2!/ansi=0
-DBCREINCOMP	<!AD Header indicates database file creation was interrupted before completion>/error/fao=2!/ansi=0
-DBFLCORRP	<!AD Header indicates database file is corrupt>/error/fao=2!/ansi=0
-DBHEADINV	<!AD Header size not valid for database>/error/fao=2!/ansi=0
-DBINCRVER	<!AD Incorrect version of YottaDB database>/error/fao=2!/ansi=0
-DBINVGBL	<!AD Invalid mixing of global names>/error/fao=2!/ansi=0
-DBKEYGTIND	<!AD Key greater than index key>/error/fao=2!/ansi=0
-DBGTDBMAX	<!AD Key larger than database maximum>/error/fao=2!/ansi=0
-DBKGTALLW	<!AD Key larger than maximum allowed length>/error/fao=2!/ansi=0
-DBLTSIBL	<!AD Keys less than sibling's index key>/error/fao=2!/ansi=0
-DBLRCINVSZ	<!AD Last record of block has invalid size>/error/fao=2!/ansi=0
-=======
 DBFGTBC		<!AD File size larger than block count would indicate>/warning/fao=2!/ansi=0/T
 DBFSTBC		<!AD File size smaller than block count would indicate>/error/fao=2!/ansi=0/D
 DBFSTHEAD	<!AD File smaller than database header>/error/fao=2!/ansi=0/A
 DBCREINCOMP	<!AD Header indicates database file creation was interrupted before completion>/error/fao=2!/ansi=0/A
 DBFLCORRP	<!AD Header indicates database file is corrupt>/error/fao=2!/ansi=0/A
 DBHEADINV	<!AD Header size not valid for database>/error/fao=2!/ansi=0/A
-DBINCRVER	<!AD Incorrect version of GT.M database>/error/fao=2!/ansi=0/A
+DBINCRVER	<!AD Incorrect version of YottaDB database>/error/fao=2!/ansi=0/A
 DBINVGBL	<!AD Invalid mixing of global names>/error/fao=2!/ansi=0/I
 DBKEYGTIND	<!AD Key greater than index key>/error/fao=2!/ansi=0/I
 DBGTDBMAX	<!AD Key larger than database maximum>/error/fao=2!/ansi=0/I
 DBKGTALLW	<!AD Key larger than maximum allowed length>/error/fao=2!/ansi=0/I
 DBLTSIBL	<!AD Keys less than sibling's index key>/error/fao=2!/ansi=0/I
 DBLRCINVSZ	<!AD Last record of block has invalid size>/error/fao=2!/ansi=0/I
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 MUREUPDWNGRDEND	<Region !AD : MUPIP REORG UPGRADE/DOWNGRADE finished by pid !UL [0x!XL] at transaction number [0x!16@XQ]>/info/fao=5!/ansi=0
 DBLOCMBINC	<!AD Local bit map incorrect>/warning/fao=2!/ansi=0/B
 DBLVLINC	<!AD Local bitmap block level incorrect>/warning/fao=2!/ansi=0/B
@@ -994,11 +969,7 @@ DBTOTBLK	<File header indicates total blocks is 0x!XL but file size indicates to
 DBTN		<Block TN is 0x!16@XQ>/info/fao=1!/ansi=0
 DBNOREGION	<None of the database regions accessible>/error/fao=0!/ansi=0/T
 DBTNRESETINC	<WARNING: tn_reset for database is incomplete due to integrity errors>/warning/fao=0!/ansi=0
-<<<<<<< HEAD
-DBTNLTCTN	<Transaction numbers greater than or equal to the current transaction were found>/error/fao=0!/ansi=0
-=======
-DBTNLTCTN	<Transaction numbers greater than the current transaction were found>/error/fao=0!/ansi=0/T
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+DBTNLTCTN	<Transaction numbers greater than or equal to the current transaction were found>/error/fao=0!/ansi=0/T
 DBTNRESET	<Cannot reset transaction number for this region>/error/fao=0!/ansi=0
 MUTEXRSRCCLNUP	<Mutex subsystem leftover resource !AD removed>/info/fao=2!/ansi=0
 SEMWT2LONG	<Process !UL waited !UL second(s) for the !AD lock for region !AD, lock held by pid !UL>/error/fao=7!/ansi=0
@@ -1270,15 +1241,9 @@ OMISERVHANG	<GTCM OMI server is hung>/info/fao=0!/ansi=0
 RSVDBYTE2HIGH	<Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and Reserved bytes (!UL)>/error/fao=5!/ansi=0
 BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0
 BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0
-<<<<<<< HEAD
 UNUSEDMSG1244	<VMSMEMORY2 nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
-LOADBGSZ2	<Load error: BEGIN too large.  No records loaded.>/error/fao=0!/ansi=0
-LOADEDSZ2	<Load error: END too large.  No records loaded.>/error/fao=0!/ansi=0
-=======
-VMSMEMORY2	<Central storage exhausted during allocation of dynamic file descriptor with !UL bytes - check page file quota and page file size>/error/fao=1!/ansi=0
-UNUSEDMSG1243	<LOADBGSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
-UNUSEDMSG1244	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+UNUSEDMSG1245	<LOADBGSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
+UNUSEDMSG1246	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
 REPLINSTMISMTCH	<Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)>/error/fao=8!/ansi=0
 REPLINSTREAD	<Error reading [0x!XL] bytes at offset [0x!16@XQ] from replication instance file !AD>/error/fao=4!/ansi=0
 REPLINSTDBMATCH	<Replication instance file !AD has seqno [0x!16@XQ] while database has a different seqno [0x!16@XQ]>/error/fao=4!/ansi=0

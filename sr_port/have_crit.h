@@ -88,17 +88,11 @@ typedef enum
 	INTRPT_IN_DB_JNL_LSEEKWRITE,	/* Deferring interrupts in DB_/JNL_LSEEKWRITE() call */
 	INTRPT_IN_JNL_QIO,		/* Deferring interrupts in journal qio, replacing jnl_qio_in_prog. */
 	INTRPT_IN_MLK_CLEANUP,		/* Deferring interrupts around lock table cleanup code */
-<<<<<<< HEAD
 	INTPRT_IN_DO_GETADDRINFO,	/* Deferring interrupts around getaddrinfo() while in dogetaddrinfo() */
-<<<<<<< HEAD
 	INTRPT_IN_FRAME_POINTER_NULL,	/* Deferring interrupts around code that can temporarily set "frame_pointer" to NULL
 					 * so that "ydb_exit()" does not see a NULL frame_pointer as part of handling a SIG-15.
 					 */
-=======
-=======
 	INTRPT_IN_JNL_FSYNC,		/* Deferring interrupts in jnl_fsync() while holding the latch */
->>>>>>> 3d3cd0dd... GT.M V6.3-010
->>>>>>> [V63010] Merge GT.M V6.3-010 into YottaDB mainline (with conflicts)
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 

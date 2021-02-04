@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,21 +66,6 @@ GBLREF int4             error_condition;
 
 LITREF	mval		literal_notimeout;
 LITREF	mval		literal_zero;
-
-error_def(ERR_LOADCTRLY);
-error_def(ERR_LOADEOF);
-error_def(ERR_LOADFILERR);
-error_def(ERR_MUNOFINISH);
-error_def(ERR_PREMATEOF);
-error_def(ERR_RECLOAD);
-error_def(ERR_TRIGDATAIGNORE);
-error_def(ERR_FAILEDRECCOUNT);
-error_def(ERR_LOADRECCNT);
-error_def(ERR_DBFILERR);
-error_def(ERR_STATSDBNOTSUPP);
-error_def(ERR_JNLFILOPN);
-error_def(ERR_DBPRIVERR);
-error_def(ERR_GBLOFLOW);
 
 #define GO_PUT_SUB		0
 #define GO_PUT_DATA		1
@@ -152,13 +137,8 @@ STATICFNDEF boolean_t get_mname_from_key(char *ptr, int key_length, char *key, g
 	return TRUE;
 }
 
-<<<<<<< HEAD
-void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, int line3_len, uint4 max_rec_size, int fmt,
-	int dos)
-=======
 void go_load(gtm_uint64_t begin, gtm_uint64_t end, unsigned char *rec_buff, char *line3_ptr, int line3_len, uint4 max_rec_size,
-		int fmt, int utf8_extract, int dos)
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+		int fmt, int dos)
 {
 	boolean_t	format_error = FALSE, hasht_ignored = FALSE, hasht_gbl = FALSE;
 	boolean_t	is_setextract, mu_load_error = FALSE, switch_db, go_format_val_read;
@@ -205,21 +185,16 @@ void go_load(gtm_uint64_t begin, gtm_uint64_t end, unsigned char *rec_buff, char
 	key_count = 0;
 	des.len = max_data_len = max_subsc_len = num_of_reg = 0;
 	des.addr = (char *)rec_buff;
-<<<<<<< HEAD
-	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, key_count, 4294967196U); /* (2**32)-100=4294967196 */
+	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, key_count, saved_begin);
+	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, begin, saved_begin);
 	reg_list = (gd_region **) malloc(gd_header->n_regions * SIZEOF(gd_region *));
 	for (index = 0; index < gd_header->n_regions; index++)
 		reg_list[index] = NULL;
 	failed_record_count = 0;
 	first_failed_rec_count = 0;
-	for (iter = begin - 1; ;)
-=======
-	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, key_count, saved_begin);
-	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, begin, saved_begin);
 	iter = begin - 1; /* WARNING: iter can never be zero because begin can never be less than 3 */
 	util_out_print("Beginning LOAD at record number: !@UQ\n", TRUE, &begin);
 	while (TRUE)
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 	{
 		if ((++iter > end) || (0 == iter))
 			break;

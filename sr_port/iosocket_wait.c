@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,17 +57,6 @@ GBLREF stack_frame  	        *frame_pointer;
 GBLREF unsigned char            *stackbase, *stacktop, *msp, *stackwarn;
 GBLREF mv_stent			*mv_chain;
 GBLREF int			dollar_truth;
-
-error_def(ERR_GETNAMEINFO);
-error_def(ERR_GETSOCKNAMERR);
-error_def(ERR_SETSOCKOPTERR);
-error_def(ERR_SOCKACPT);
-error_def(ERR_SOCKWAIT);
-error_def(ERR_TEXT);
-error_def(ERR_SOCKMAX);
-error_def(ERR_ZINTRECURSEIO);
-error_def(ERR_STACKCRIT);
-error_def(ERR_STACKOFLOW);
 
 boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout)
 {
@@ -442,15 +431,6 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	char			port_buffer[NI_MAXSERV], ipaddr[SA_MAXLEN + 1];
 	struct pollfd		poll_fds;
 	int			poll_fd;
-<<<<<<< HEAD
-	struct timeval		utimeout;
-	GTM_SOCKLEN_TYPE	size, addrlen;
-=======
-#endif
-#ifdef USE_SELECT
-	fd_set			select_fdset;
-#endif
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 	socket_struct		*newsocketptr;
 	struct sockaddr		*peer_sa_ptr;
 	struct sockaddr_storage	peer;           /* socket address + port */
@@ -458,12 +438,8 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	static readonly char 	action[] = "ACCEPT";
 	DCL_THREADGBL_ACCESS;
 
-<<<<<<< HEAD
-	if (ydb_max_sockets <= dsocketptr->n_socket)
-=======
 	SETUP_THREADGBL_ACCESS;
-	if (gtm_max_sockets <= dsocketptr->n_socket)
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+	if (ydb_max_sockets <= dsocketptr->n_socket)
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, ydb_max_sockets);
 		return -1;
@@ -559,7 +535,7 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 		if (NULL != newsocketptr->local.saddr_ip)
 			free(newsocketptr->local.saddr_ip);
 		STRNDUP(ipaddr, SA_MAXLEN, newsocketptr->local.saddr_ip);
-		keepalive_opt = TREF(gtm_socket_keepalive_idle);	/* deviceparameter would give more granular control */
+		keepalive_opt = TREF(ydb_socket_keepalive_idle);	/* deviceparameter would give more granular control */
 		if (keepalive_opt && !iosocket_tcp_keepalive(newsocketptr, keepalive_opt, action))
 			return -1;				/* iosocket_tcp_keepalive issues rts_error rather than return */
 	}

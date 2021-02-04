@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,23 +50,12 @@
 #include "warn_db_sz.h"
 #include "mu_getkey.h"
 
-error_def(ERR_MUNOACTION);
-error_def(ERR_MUNOFINISH);
-error_def(ERR_MUPCLIERR);
-error_def(ERR_MUSIZEINVARG);
-error_def(ERR_NOSELECT);
-
 GBLREF bool			error_mupip;
 GBLREF bool			mu_ctrlc_occurred;
 GBLREF bool			mu_ctrly_occurred;
 GBLREF int			muint_adj;
-<<<<<<< HEAD
 GBLREF uint4			mu_int_adj[MAX_BT_DEPTH + 1];
-GBLREF	sgmnt_data_ptr_t	cs_data;
-=======
-GBLREF int4			mu_int_adj[MAX_BT_DEPTH + 1];
 GBLREF sgmnt_data_ptr_t		cs_data;
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 GBLREF tp_region		*grlist;
 GBLREF unsigned char		rdfail_detail;
 GBLDEF boolean_t mu_subsc	= FALSE;

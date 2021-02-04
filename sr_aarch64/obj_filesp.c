@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -91,10 +91,6 @@ static char static_string_tbl[] = {
 #define STR_SEC_STRTAB_OFFSET 7
 #define STR_SEC_SYMTAB_OFFSET 15
 
-#define SEC_TEXT_INDX 1
-#define SEC_STRTAB_INDX 2
-#define SEC_SYMTAB_INDX 3
-
 GBLREF mliteral 	literal_chain;
 GBLREF unsigned char	source_file_name[];
 GBLREF unsigned short 	source_name_len;
@@ -131,7 +127,7 @@ void create_object_file(rhdtyp *rhead)
  */
 void finish_object_file(void)
 {
-	int		i, status;
+	int		i, status, non_local_symidx;
 	size_t		bufSize;
 	ssize_t		actualSize;
 	char		*gtm_obj_code, *string_tbl;
@@ -248,7 +244,7 @@ void finish_object_file(void)
 	strtab_data->d_align = 1;
 	strtab_data->d_buf = string_tbl;
 	strtab_data->d_off = 0LL;
-	strtab_data->d_size = SPACE_STRING_ALLOC_LEN;
+	strtab_data->d_size = symIndex + module_name.len + 1;
 	strtab_data->d_type = ELF_T_BYTE;
 	strtab_data->d_version = EV_CURRENT;
 	if (NULL == (strtab_shdr = elf64_getshdr(strtab_scn)))
@@ -272,7 +268,7 @@ void finish_object_file(void)
 	symEntries[i].st_name = STR_SEC_TEXT_OFFSET;
 	symEntries[i].st_info = ELF64_ST_INFO(STB_LOCAL, STT_SECTION);
 	symEntries[i].st_other = STV_DEFAULT;
-	symEntries[i].st_shndx = SEC_TEXT_INDX; /* index of the .text */
+	symEntries[i].st_shndx = elf_ndxscn(text_scn); /* index of the .text */
 	symEntries[i].st_size = 0;
 	symEntries[i].st_value = 0;
 	i++;
@@ -280,7 +276,7 @@ void finish_object_file(void)
 	symEntries[i].st_name = symIndex;
 	symEntries[i].st_info = ELF64_ST_INFO(STB_GLOBAL, STT_FUNC);
 	symEntries[i].st_other = STV_DEFAULT;
-	symEntries[i].st_shndx = SEC_TEXT_INDX;
+	symEntries[i].st_shndx = elf_ndxscn(text_scn);
 	symEntries[i].st_size = gtm_object_size;
 	symEntries[i].st_value = 0;
 	i++;
@@ -302,7 +298,7 @@ void finish_object_file(void)
 	symtab_shdr->sh_name = STR_SEC_SYMTAB_OFFSET;
 	symtab_shdr->sh_type = SHT_SYMTAB;
 	symtab_shdr->sh_entsize = SIZEOF(Elf64_Sym);
-	symtab_shdr->sh_link = SEC_STRTAB_INDX;
+	symtab_shdr->sh_link = elf_ndxscn(strtab_scn);
 	symtab_shdr->sh_info = YDB_MAX_LCLSYM_INDX_P1;	/* Highest local value symtab index used + 1 */
 	elf_flagehdr(elf, ELF_C_SET, ELF_F_DIRTY);
 	if (0 > elf_update(elf, ELF_C_WRITE))

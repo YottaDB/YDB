@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,15 +47,6 @@ GBLREF	boolean_t	skip_dbtriggers;
 GBLREF	mstr		sys_input;
 GBLDEF	int		onerror;
 
-error_def(ERR_LDBINFMT);
-error_def(ERR_LOADBGSZ);
-error_def(ERR_LOADINVCHSET);
-error_def(ERR_LOADEDBG);
-error_def(ERR_LOADEDSZ);
-error_def(ERR_MAXSTRLEN);
-error_def(ERR_MUNOFINISH);
-error_def(ERR_MUPCLIERR);
-
 #define CHAR_TO_READ_LINE1_BIN	STR_LIT_LEN("d0GDS BINARY")  /* read first 12 characters to check file is binary [d\0GDS BINARY] */
 #define	MAX_ONERROR_VALUE_LEN	STR_LIT_LEN("INTERACTIVE") /* PROCEED, STOP, INTERACTIVE are the choices with INTERACTIVE as max */
 #define	MAX_FORMAT_VALUE_LEN	STR_LIT_LEN("BINARY") /* ZWR, BINARY, GO, GOQ are the choices with BINARY being the longest */
@@ -65,11 +56,7 @@ void mupip_cvtgbl(void)
 	char		fn[MAX_FN_LEN + 1], *line1_ptr, *line3_ptr;
 	gtm_uint64_t	begin, end;
 	int		dos, i, file_format, line1_len, line3_len, utf8;
-<<<<<<< HEAD
-	uint4	        begin, end, max_rec_size;
-=======
-	uint4	        cli_status, max_rec_size;
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+	uint4	        max_rec_size;
 	unsigned char	buff[MAX_ONERROR_VALUE_LEN];
 	unsigned short	fn_len, len;
 	boolean_t	ignore_chset;
@@ -127,13 +114,8 @@ void mupip_cvtgbl(void)
 		if (end < begin)
 			mupip_exit(ERR_LOADEDBG);
 	} else
-<<<<<<< HEAD
-		end = MAXUINT4;
-	if (cli_present("FILL_FACTOR") == CLI_PRESENT)
-=======
 		end = MAXUINT8;
-	if ((cli_status = cli_present("FILL_FACTOR")) == CLI_PRESENT)
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+	if (cli_present("FILL_FACTOR") == CLI_PRESENT)
 	{
 		assert(SIZEOF(gv_fillfactor) == SIZEOF(int4));
 	        if (!cli_get_int("FILL_FACTOR", (int4 *)&gv_fillfactor))

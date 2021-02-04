@@ -279,13 +279,8 @@ static	CLI_PARM	mup_extract_parm[] = {
 };
 
 static readonly CLI_PARM mup_extr_label_parm[] = {
-<<<<<<< HEAD
-	{ "LABEL", "YottaDB MUPIP EXTRACT", PARM_REQ},
-	{ "", "" }
-=======
-{ "LABEL", "GT.M MUPIP EXTRACT", PARM_REQ},
+{ "LABEL", "YottaDB MUPIP EXTRACT", PARM_REQ},
 { "", "" }
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 };
 
 static	CLI_ENTRY	mup_extract_qual[] = {
@@ -469,26 +464,15 @@ static readonly CLI_PARM mup_load_onerror_parm[] = {
 };
 
 static	CLI_ENTRY	mup_load_qual[] = {
-<<<<<<< HEAD
-	{ "BEGIN",         mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
-	{ "BLOCK_DENSITY", mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_NUM, 0 },
-	{ "END",           mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
-	{ "FILL_FACTOR",   mupip_cvtgbl, 0, mup_load_ff_parm,      0,                     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_NUM, 0 },
-	{ "FORMAT",        mupip_cvtgbl, 0, mup_load_fmt_parm,     mup_load_fmt_qual,     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
-	{ "IGNORECHSET",   mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
-	{ "ONERROR",       mupip_cvtgbl, 0, mup_load_onerror_parm, mup_load_onerror_qual, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
-	{ "STDIN",         mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
-	{ "" }
-=======
 { "BEGIN",         mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
 { "BLOCK_DENSITY", mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_NUM, 0 },
 { "END",           mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
 { "FILL_FACTOR",   mupip_cvtgbl, 0, mup_load_ff_parm,      0,                     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_NUM, 0 },
 { "FORMAT",        mupip_cvtgbl, 0, mup_load_fmt_parm,     mup_load_fmt_qual,     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
+{ "IGNORECHSET",   mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "ONERROR",       mupip_cvtgbl, 0, mup_load_onerror_parm, mup_load_onerror_qual, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
 { "STDIN",         mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "" }
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 };
 
 static readonly CLI_PARM mup_reorg_ff_parm[] = {
@@ -725,49 +709,6 @@ static readonly CLI_PARM mup_set_ftime_parm[] = {
 };
 
 static	CLI_ENTRY	mup_set_qual[] = {
-<<<<<<< HEAD
-{ "ACCESS_METHOD",        mupip_set, 0, 0,			mup_set_acc_qual,		0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0 },
-{ "ASYNCIO",              mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
-{ "BYPASS",               mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
-{ "DBFILENAME",           mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0 },
-{ "DEFER_ALLOCATE",       mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
-{ "DEFER_TIME",           mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0 },
-{ "ENCRYPTABLE",          mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
-{ "ENCRYPTIONCOMPLETE",   mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
-{ "EPOCHTAPER",           mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
-{ "EXTENSION_COUNT",      mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
-{ "FILE",                 mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
-{ "FLUSH_TIME",           mupip_set, 0, mup_set_ftime_parm,	0,				0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_TIME, 0 },
-{ "GLOBAL_BUFFERS",       mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
-{ "HARD_SPIN_COUNT",      mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "INST_FREEZE_ON_ERROR", mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
-{ "JNLFILE",              mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
-{ "JOURNAL",              mupip_set, 0, 0,			mup_set_journal_qual,		0, 0, VAL_NOT_REQ,    1, NEG,     VAL_STR,  0 },
-{ "KEY_SIZE",             mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
-{ "LCK_SHARES_DB_CRIT",   mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
-{ "LOCK_SPACE",           mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
-{ "MUTEX_SLOTS",          mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
-{ "NULL_SUBSCRIPTS",      mupip_set, 0, 0,			mup_null_subs_qual,		0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0 },
-{ "PARTIAL_RECOV_BYPASS", mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
-{ "PREVJNLFILE",          mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0 },
-{ "QDBRUNDOWN",           mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
-{ "READ_ONLY",            mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
-{ "RECORD_SIZE",          mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
-{ "REGION",               mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
-{ "REORG_SLEEP_NSEC",     mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "REPLICATION",          mupip_set, 0, 0,			mup_repl_qual,			0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0 },
-{ "REPL_STATE",           mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0 },
-{ "RESERVED_BYTES",       mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
-{ "SLEEP_SPIN_COUNT",     mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
-{ "SPIN_SLEEP_MASK",      mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "STANDALONENOT",        mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
-{ "STATS",                mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
-{ "STDNULLCOLL",          mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,	  VAL_N_A,  0 },
-{ "TRIGGER_FLUSH_LIMIT",  mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
-{ "VERSION",              mupip_set, 0, 0,			mup_set_dbver_qual,		0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0 },
-{ "WAIT_DISK",            mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
-{ "WRITES_PER_FLUSH",     mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
-=======
 { "ACCESS_METHOD",        mupip_set, 0, 0,                  mup_set_acc_qual,     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0       },
 { "ASYNCIO",              mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0       },
 { "BYPASS",               mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0       },
@@ -796,6 +737,7 @@ static	CLI_ENTRY	mup_set_qual[] = {
 { "READ_ONLY",            mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0       },
 { "RECORD_SIZE",          mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0       },
 { "REGION",               mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0       },
+{ "REORG_SLEEP_NSEC",     mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  VAL_DCM },
 { "REPLICATION",          mupip_set, 0, 0,                  mup_repl_qual,        0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0       },
 { "REPL_STATE",           mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0       },
 { "RESERVED_BYTES",       mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0       },
@@ -808,7 +750,6 @@ static	CLI_ENTRY	mup_set_qual[] = {
 { "VERSION",              mupip_set, 0, 0,                  mup_set_dbver_qual,   0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0       },
 { "WAIT_DISK",            mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0       },
 { "WRITES_PER_FLUSH",     mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0       },
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 { "" }
 };
 
@@ -833,19 +774,12 @@ static readonly CLI_PARM mup_trig_sel_parm[] = {
 };
 
 static 	CLI_ENTRY	mup_trigger_qual[] = {
-<<<<<<< HEAD
-{ "NOPROMPT",    mupip_trigger, 0, 0,                 0, 0, 0, VAL_NOT_REQ,     0, NON_NEG, VAL_STR,  0 },
-{ "SELECT",      mupip_trigger, 0, mup_trig_sel_parm, 0, 0, 0, VAL_NOT_REQ,     1, NON_NEG, VAL_STR,  0 },
-{ "STDIN",       mupip_trigger, 0, 0,                 0, 0, 0, VAL_DISALLOWED,  0, NON_NEG, VAL_N_A,  0 },
-{ "STDOUT",      mupip_trigger, 0, 0,                 0, 0, 0, VAL_DISALLOWED,  0, NON_NEG, VAL_N_A,  0 },
-{ "TRIGGERFILE", mupip_trigger, 0, 0,                 0, 0, 0, VAL_REQ,         0, NON_NEG, VAL_STR,  0 },
-{ "UPGRADE",     mupip_trigger, 0, 0,                 0, 0, 0, VAL_DISALLOWED,  0, NON_NEG, VAL_N_A,  0 },
-=======
 { "NOPROMPT",    mupip_trigger, 0, 0,                 0, 0, 0, VAL_NOT_REQ,    0, NON_NEG, VAL_STR, 0 },
 { "SELECT",      mupip_trigger, 0, mup_trig_sel_parm, 0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
+{ "STDIN",       mupip_trigger, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+{ "STDOUT",      mupip_trigger, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 { "TRIGGERFILE", mupip_trigger, 0, 0,                 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
 { "UPGRADE",     mupip_trigger, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 { "" }
 };
 #endif

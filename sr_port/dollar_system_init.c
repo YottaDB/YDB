@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2002, 2009 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2002-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+ *								*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,10 +27,7 @@
 #define	SYSTEM_LITERAL	"47,"
 
 GBLREF	mval	dollar_system;
-GBLREF spdesc	stringpool;
-
-error_def(ERR_LOGTOOLONG);
-error_def(ERR_TRNLOGFAIL);
+GBLREF	spdesc	stringpool;
 
 void dollar_system_init(struct startup_vector *svec)
 {
@@ -42,13 +35,7 @@ void dollar_system_init(struct startup_vector *svec)
 	mstr		tn;
 	char		buf[MAX_TRANS_NAME_LEN];
 
-<<<<<<< HEAD
-	error_def(ERR_LOGTOOLONG);
-	error_def(ERR_TRNLOGFAIL);
-
 	ENSURE_STP_FREE_SPACE(MAX_TRANS_NAME_LEN + STR_LIT_LEN(SYSTEM_LITERAL));
-=======
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 	dollar_system.mvtype = MV_STR;
 	dollar_system.str.addr = (char *)stringpool.free;
 	dollar_system.str.len = STR_LIT_LEN("47,");
@@ -68,15 +55,6 @@ void dollar_system_init(struct startup_vector *svec)
 		memcpy(stringpool.free, svec->sysid_ptr->addr, svec->sysid_ptr->len);
                 stringpool.free += svec->sysid_ptr->len ;
 	}
-<<<<<<< HEAD
-=======
-#	ifdef UNIX
-	else if (SS_LOG2LONG == status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(SYSID), SIZEOF(buf) - 1);
-#	endif
-	else
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(SYSID), status);
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 	assert(stringpool.free < stringpool.top);	/* it's process initialization after all */
 	return;
 }

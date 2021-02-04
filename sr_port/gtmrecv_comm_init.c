@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,10 +45,6 @@
 
 GBLDEF	int		gtmrecv_listen_sock_fd = FD_INVALID;
 
-error_def(ERR_GETADDRINFO);
-error_def(ERR_REPLCOMM);
-error_def(ERR_TEXT);
-
 /* Initialize communication stuff */
 int gtmrecv_comm_init(in_port_t port)
 {
@@ -60,9 +56,6 @@ int gtmrecv_comm_init(in_port_t port)
 	char			port_buffer[NI_MAXSERV];
 	int			port_buffer_len;
 	int			temp_sock_fd;
-<<<<<<< HEAD
-	int			af, save_errno;
-=======
 	int			af;
 	char			err_buffer[512];
 	struct sockaddr_in 	local;
@@ -71,7 +64,6 @@ int gtmrecv_comm_init(in_port_t port)
 	char                    local_port_buffer[NI_MAXSERV];
 	unsigned int		save_errno;
 	GTM_SOCKLEN_TYPE        len;
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 
 	if (FD_INVALID != gtmrecv_listen_sock_fd) /* Initialization done already */
 		return (0);
@@ -118,32 +110,13 @@ int gtmrecv_comm_init(in_port_t port)
 	}
 	if ((0 > BIND(gtmrecv_listen_sock_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen)) || (WBTEST_ENABLED(WBTEST_REPL_INIT_ERR)) )
 	{
-<<<<<<< HEAD
 		save_errno = ERRNO;
 		freeaddrinfo(ai_ptr);
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				 RTS_ERROR_LITERAL("Could not bind local address"), save_errno);
+				 RTS_ERROR_STRING(err_buffer), save_errno);
 		return (-1);
 	}
-	if (0 > listen(gtmrecv_listen_sock_fd, 5))
-	{
-		save_errno = ERRNO;
-		freeaddrinfo(ai_ptr);
-		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				 RTS_ERROR_LITERAL("Could not listen"), save_errno);
-=======
-		GTM_WHITE_BOX_TEST(WBTEST_REPL_INIT_ERR, errno, 98);
-		SNPRINTF(err_buffer, 512, "Could not bind local address. Local Port : %hu", port);
-		SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_buffer));
-		freeaddrinfo(ai_ptr);
-		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				RTS_ERROR_STRING(err_buffer), ERRNO);
-		return (-1);
-	}
-
 	if ((0 > listen(gtmrecv_listen_sock_fd, 5)) || (WBTEST_ENABLED(WBTEST_REPL_INIT_ERR2)))
 	{
 		save_errno = ERRNO;
@@ -158,7 +131,6 @@ int gtmrecv_comm_init(in_port_t port)
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				 RTS_ERROR_STRING(err_buffer), save_errno);
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 		return (-1);
 	}
 	freeaddrinfo(ai_ptr);

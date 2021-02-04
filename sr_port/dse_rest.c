@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2014 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+ *								*
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,13 +52,6 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF srch_hist	dummy_hist;
 GBLREF uint4		patch_save_count, update_array_size;
-
-error_def(ERR_AIMGBLKFAIL);
-error_def(ERR_DBRDONLY);
-error_def(ERR_DSEBLKRDFAIL);
-error_def(ERR_DSEFAIL);
-error_def(ERR_DSENOTOPEN);
-error_def(ERR_NOREGION);
 
 void dse_rest(void)
 {

@@ -3,6 +3,8 @@
  * Copyright (c) 2019 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -20,11 +22,10 @@
 #define DUMMY_GLOBAL_VARIABLE           "%D%DUMMY_VARIABLE"
 #define DUMMY_GLOBAL_VARIABLE_LEN       SIZEOF(DUMMY_GLOBAL_VARIABLE)
 
-GBLDEF gv_key *mu_start_key;
-GBLDEF gv_key *mu_end_key;
-GBLDEF int mu_start_keyend;
-GBLDEF int mu_end_keyend;
+GBLREF gv_key *mu_start_key;
+GBLREF gv_key *mu_end_key;
+GBLREF int mu_start_keyend;
+GBLREF int mu_end_keyend;
 
 int mu_getkey(unsigned char *key_buff, int keylen);
 #endif
-

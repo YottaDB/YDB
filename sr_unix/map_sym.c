@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2013 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+ *								*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,8 +32,6 @@
 	fgn_closepak(handle, INFO);		\
 	return FALSE;				\
 }
-
-error_def(ERR_COLLFNMISSING);
 
 /* Maps all the collation related symbols from the act shared library.
  * Return TRUE/FALSE based on mapping success.
@@ -121,7 +115,7 @@ boolean_t map_collseq(int act, collseq *ret_collseq)
 	 * The xutil routine is only needed for the -2/2
 	 * zatransform collation functionality.  Other operations do not use it.
 	 */
-	if (!(ret_collseq->xutil = fgn_getrtn(handle, &xutil_sym, SUCCESS)))
+	if (!(ret_collseq->xutil = fgn_getrtn(handle, &xutil_sym, SUCCESS, FGN_ERROR_IF_NOT_FOUND)))
 	{
 		ret_collseq->xutil = NULL;
 	}

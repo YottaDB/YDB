@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2014 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+ *								*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,12 +71,10 @@ void op_xnew(unsigned int argcnt_arg, mval *s_arg, ...)
 	stack_frame		*fp;
 	va_list			var;
 	var_tabent		lvent;
+	DCL_THREADGBL_ACCESS;
 
-<<<<<<< HEAD
-	argcnt = argcnt_arg;		/* need to preserve stack copy on i386 */
-=======
+	SETUP_THREADGBL_ACCESS;
 	argcnt = argcnt_arg;
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 	htold = &curr_symval->h_symtab;
 	shift = symbinit();
 	DBGRFCT((stderr, "\n\n****op_xnew: **** New symbol table (0x"lvaddr") replaced previous table (0x"lvaddr")\n\n",

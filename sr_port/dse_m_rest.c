@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,19 +50,8 @@
 #include "t_qread.h"
 
 GBLREF sgmnt_addrs	*cs_addrs;
-error_def(ERR_DSEBLKRDFAIL);
-error_def(ERR_DSEINVALBLKID);
 
-<<<<<<< HEAD
-#define MAX_UTIL_LEN 64
-
-error_def(ERR_DSEBLKRDFAIL);
-
-void dse_m_rest (
-		 block_id	blk,		/* block number */
-=======
 void dse_m_rest	(block_id	blk,		/* block number */
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 		 unsigned char	*bml_list,	/* start of local list of local bit maps */
 		 int4		bml_size,	/* size of each entry in *bml_list */
 		 sm_vuint_ptr_t	blks_ptr,	/* total free blocks */
@@ -74,16 +63,9 @@ void dse_m_rest	(block_id	blk,		/* block number */
 	int4		dummy_int, bplmap, util_len;
 	long		blk_id_size;
 	short		level, rsize;
-<<<<<<< HEAD
-	int4		bplmap;
-
-	if(!(bp = t_qread (blk, &dummy_int, &dummy_cr)))
-=======
 	sm_uc_ptr_t	bp, b_top, rp, r_top, bml_ptr, np, ptr;
 	unsigned char	util_buff[MAX_UTIL_LEN];
-
 	if (!(bp = t_qread (blk, &dummy_int, &dummy_cr)))
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
@@ -91,16 +73,6 @@ void dse_m_rest	(block_id	blk,		/* block number */
 		b_top = bp + SIZEOF(blk_hdr);
 	else
 		b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
-<<<<<<< HEAD
-	level = ((blk_hdr_ptr_t)bp)->levl;
-	bplmap = cs_addrs->hdr->bplmap;
-	for (rp = bp + SIZEOF(blk_hdr); rp < b_top; rp = r_top)
-	{
-		if (in_dir_tree || level > 1)	/* reread block because it may have been flushed from read	*/
-		{
-			if (!(np = t_qread(blk, &dummy_int, &dummy_cr))) /* cache due to LRU buffer scheme and reads in recursive */
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);	/* calls to dse_m_rest.	*/
-=======
 	if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER) /* Check blk version to see if using 32 or 64 bit block_id */
 	{
 #		ifdef BLK_NUM_64BIT
@@ -116,14 +88,12 @@ void dse_m_rest	(block_id	blk,		/* block number */
 	}
 	level = ((blk_hdr_ptr_t)bp)->levl;
 	bplmap = cs_addrs->hdr->bplmap;
-
-	for (rp = bp + SIZEOF(blk_hdr); rp < b_top ;rp = r_top)
+	for (rp = bp + SIZEOF(blk_hdr); rp < b_top; rp = r_top)
 	{
-		if (in_dir_tree || level > 1)	/* reread block because it may have been flushed from read */
+		if (in_dir_tree || level > 1)	/* reread block because it may have been flushed from read	*/
 		{
-			if (!(np = t_qread(blk,&dummy_int,&dummy_cr))) /* cache due to LRU buffer scheme and reads in recursive */
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);	/* calls to dse_m_rest. */
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+			if (!(np = t_qread(blk, &dummy_int, &dummy_cr))) /* cache due to LRU buffer scheme and reads in recursive */
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);	/* calls to dse_m_rest.	*/
 			if (np != bp)
 			{
 				b_top = np + (b_top - bp);
@@ -157,13 +127,6 @@ void dse_m_rest	(block_id	blk,		/* block number */
 				if (*ptr++ == 0 && *ptr++ == 0)
 					break;
 			}
-<<<<<<< HEAD
-			GET_LONG(next, ptr);
-		} else
-			GET_LONG(next, r_top - SIZEOF(block_id));
-		if (next < 0 || next >= cs_addrs->ti->total_blks ||
-			(next / bplmap * bplmap == next))
-=======
 			if (long_blk_id == TRUE)
 #				ifdef BLK_NUM_64BIT
 				GET_BLK_ID_64(next,ptr);
@@ -185,7 +148,6 @@ void dse_m_rest	(block_id	blk,		/* block number */
 				GET_BLK_ID_32(next, r_top - SIZEOF(block_id_32));
 		}
 		if ((next < 0) || (next >= cs_addrs->ti->total_blks) || ((next / bplmap) * bplmap == next))
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 		{
 			memcpy(util_buff,"Invalid pointer in block ",25);
 			util_len = 25;
@@ -204,7 +166,6 @@ void dse_m_rest	(block_id	blk,		/* block number */
 		bml_index = next / bplmap;
 		bml_ptr = bml_list + (bml_index * bml_size);
 		if (bml_busy(next - ((next / bplmap) * bplmap), bml_ptr + SIZEOF(blk_hdr)))
-<<<<<<< HEAD
 		{	*blks_ptr = *blks_ptr - 1;
 			if (((blk_hdr_ptr_t)bp)->levl > 1)
 				dse_m_rest(next, bml_list, bml_size, blks_ptr, in_dir_tree);
@@ -212,16 +173,6 @@ void dse_m_rest	(block_id	blk,		/* block number */
 			{
 				assert(((blk_hdr_ptr_t) bp)->levl == 0 || ((blk_hdr_ptr_t) bp)->levl == 1);
 				dse_m_rest(next, bml_list, bml_size, blks_ptr, ((blk_hdr_ptr_t)bp)->levl);
-=======
-		{
-			*blks_ptr = *blks_ptr - 1;
-			if (((blk_hdr_ptr_t) bp)->levl > 1)
-				dse_m_rest (next, bml_list, bml_size, blks_ptr, in_dir_tree);
-			else if (in_dir_tree)
-			{
-				assert(((blk_hdr_ptr_t) bp)->levl == 0 || ((blk_hdr_ptr_t) bp)->levl == 1);
-				dse_m_rest (next, bml_list, bml_size, blks_ptr, ((blk_hdr_ptr_t)bp)->levl);
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 			}
 		}
 	}

@@ -275,24 +275,15 @@ void	gtm_env_init(void)
 		if (is_defined)
 			ydb_dbfilext_syslog_disable = ret; /* if the logical is not defined, we want to take default value */
 		/* Initialize maximum sockets in a single socket device createable by this process */
-<<<<<<< HEAD
 		ydb_max_sockets = MAX_N_SOCKET;
 		if ((tmsock = ydb_trans_numeric(YDBENVINDX_MAX_SOCKETS, &is_defined, IGNORE_ERRORS_TRUE, NULL))
 							&& MAX_MAX_N_SOCKET > tmsock) /* Note assignment!! */
 			ydb_max_sockets = tmsock;
-=======
-		gtm_max_sockets = MAX_N_SOCKET;
-		val.addr = GTM_MAX_SOCKETS;
-		val.len = SIZEOF(GTM_MAX_SOCKETS) - 1;
-		if ((tmsock = trans_numeric(&val, &is_defined, TRUE)) && MAX_MAX_N_SOCKET > tmsock) /* Note assignment!! */
-			gtm_max_sockets = tmsock;
 		/* Initialize TCP_KEEPIDLE and by implication SO_KEEPALIVE */
-		val.addr = GTM_SOCKET_KEEPALIVE_IDLE;
-		val.len = SIZEOF(GTM_SOCKET_KEEPALIVE_IDLE) - 1;
-		TREF(gtm_socket_keepalive_idle) = trans_numeric(&val, &is_defined, TRUE);
-		if (0 > TREF(gtm_socket_keepalive_idle))
-			TREF(gtm_socket_keepalive_idle) = 0;
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+		TREF(ydb_socket_keepalive_idle) = ydb_trans_numeric(YDBENVINDX_SOCKET_KEEPALIVE_IDLE, &is_defined,
+											IGNORE_ERRORS_TRUE, NULL);
+		if (0 > TREF(ydb_socket_keepalive_idle))
+			TREF(ydb_socket_keepalive_idle) = 0;
 		/* Initialize storage to allocate and keep in our back pocket in case run out of memory */
 		outOfMemoryMitigateSize = GTM_MEMORY_RESERVE_DEFAULT;
 		reservesize = ydb_trans_numeric(YDBENVINDX_MEMORY_RESERVE, &is_defined, IGNORE_ERRORS_TRUE, NULL);

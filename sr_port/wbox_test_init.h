@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -212,7 +212,7 @@ typedef enum {
 	WBTEST_REPLCOMM_SEND_SRC,		/* 162 : Communication error in send at source side */
 	WBTEST_SOCKET_KEEPALIVE,		/* 163 : shorten keepalive parameters so test fails fast */
 	WBTEST_FETCHCOMM_ERR,			/* 164 : Communication error during fetchresync rollback */
-	WBTEST_FETCHCOMM_HISTINFO		/* 165 : Communication error during fetchresync rollback HISTINFO */
+	WBTEST_FETCHCOMM_HISTINFO,		/* 165 : Communication error during fetchresync rollback HISTINFO */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.
@@ -225,13 +225,8 @@ typedef enum {
 	WBTEST_YDB_RENAMEFAIL,			/* 202 : Exercise RENAMEFAIL error codepath in "cre_jnl_file_intrpt_rename" */
 } wbtest_code_t;
 
-<<<<<<< HEAD
-#ifdef DEBUG
-/* Make sure to setenv ydb_white_box_test_case_count if you are going to use GTM_WHITE_BOX_TEST */
-=======
 #if defined (DEBUG) && !defined (STATIC_ANALYSIS)
-/* Make sure to setenv gtm_white_box_test_case_count if you are going to use GTM_WHITE_BOX_TEST */
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+/* Make sure to setenv ydb_white_box_test_case_count if you are going to use GTM_WHITE_BOX_TEST */
 #define GTM_WHITE_BOX_TEST(input_test_case_num, lhs, rhs)						\
 {													\
 	if (ydb_white_box_test_case_enabled && (ydb_white_box_test_case_number == input_test_case_num))	\
@@ -256,13 +251,8 @@ typedef enum {
 #define WBTEST_ONLY(WBTEST_NUMBER, ...)
 #endif
 
-<<<<<<< HEAD
-#ifdef DEBUG
-#define WBTEST_ENABLED(WBTEST_NUMBER)	(ydb_white_box_test_case_enabled && (WBTEST_NUMBER == ydb_white_box_test_case_number))
-=======
 #if defined (DEBUG) && !defined (STATIC_ANALYSIS)
-#define WBTEST_ENABLED(WBTEST_NUMBER)	(gtm_white_box_test_case_enabled && (WBTEST_NUMBER == gtm_white_box_test_case_number))
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+#define WBTEST_ENABLED(WBTEST_NUMBER)	(ydb_white_box_test_case_enabled && (WBTEST_NUMBER == ydb_white_box_test_case_number))
 #define ENABLE_WBTEST_ABANDONEDKILL									\
 {													\
 	int	sleep_counter;										\

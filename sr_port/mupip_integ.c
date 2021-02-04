@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,44 +140,14 @@ GBLREF boolean_t		debug_mupip;
 GBLREF gd_region		*gv_cur_region;
 GBLREF gv_key			*gv_altkey;
 GBLREF gv_key			*gv_currkey;
-<<<<<<< HEAD
-GBLREF gv_key			*muint_end_key;
-GBLREF gv_key			*muint_start_key;
+GBLREF gv_key			*mu_end_key;
+GBLREF boolean_t		mu_key;
+GBLREF gv_key			*mu_start_key;
 GBLREF gv_namehead		*gv_target;
 GBLREF sgmnt_addrs		*cs_addrs;
 GBLREF short			crash_count;
 GBLREF tp_region		*grlist;
 GBLREF util_snapshot_ptr_t	util_ss_ptr;
-=======
-GBLREF sgmnt_addrs		*cs_addrs;
-GBLREF tp_region		*grlist;
-GBLREF bool			region;
-GBLREF boolean_t		debug_mupip;
-GBLREF gv_key			*mu_end_key;
-GBLREF boolean_t		mu_key;
-GBLREF gv_key			*mu_start_key;
->>>>>>> 3d3cd0dd... GT.M V6.3-010
-
-error_def(ERR_CTRLC);
-error_def(ERR_CTRLY);
-error_def(ERR_DBBTUFIXED);
-error_def(ERR_DBBTUWRNG);
-error_def(ERR_DBNOREGION);
-error_def(ERR_DBRBNLBMN);
-error_def(ERR_DBRBNNEG);
-error_def(ERR_DBRBNTOOLRG);
-error_def(ERR_DBRDONLY);
-error_def(ERR_DBSPANCHUNKORD);
-error_def(ERR_DBSPANGLOINCMP);
-error_def(ERR_DBTNLTCTN);
-error_def(ERR_DBTNRESET);
-error_def(ERR_DBTNRESETINC);
-error_def(ERR_INTEGERRS);
-error_def(ERR_MUNOACTION);
-error_def(ERR_MUNOFINISH);
-error_def(ERR_MUNOTALLINTEG);
-error_def(ERR_MUPCLIERR);
-error_def(ERR_REGFILENOTFOUND);
 
 void mupip_integ(void)
 {

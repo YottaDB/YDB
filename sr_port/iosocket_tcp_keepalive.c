@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+*								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -31,8 +34,6 @@
 #include "iosocketdef.h"
 #include "gtmio.h"
 
-error_def(ERR_SETSOCKOPTERR);
-
 boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, char *act)
 {
 	char			*errptr;
@@ -51,7 +52,7 @@ boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, ch
 	{
 #	endif
 		flush_pio();
-		printf("%s gtm_socket_keepalive_idle: %d\n", act, keepalive_opt);
+		printf("%s ydb_socket_keepalive_idle: %d\n", act, keepalive_opt);
 		FFLUSH(stdout);
 		printf("%s setting SO_KEEPALIVE\n", act);
 		FFLUSH(stdout);
@@ -112,7 +113,7 @@ real_errno = 0;
 		keepalive_opt = 2;		/* while in a whitebox case, a single value suffices*/
 		flush_pio();
 		printf("%s setting TCP_KEEP options\n wb enabled: %d, wb #: %d. opt: %d\n",
-		       act, gtm_white_box_test_case_enabled, gtm_white_box_test_case_number, keepalive_opt);
+		       act, ydb_white_box_test_case_enabled, ydb_white_box_test_case_number, keepalive_opt);
 		FFLUSH(stdout);
 		if (-1 == setsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPCNT, &keepalive_opt, SIZEOF(keepalive_opt)))
 			assert(FALSE);		/* while a white box case, we can ignore errors */

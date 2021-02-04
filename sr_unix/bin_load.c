@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,29 +75,6 @@ GBLREF int4		error_condition;
 LITREF boolean_t mu_int_possub[16][16];
 LITREF boolean_t mu_int_negsub[16][16];
 LITREF boolean_t mu_int_exponent[256];
-
-error_def(ERR_CORRUPTNODE);
-error_def(ERR_GVIS);
-error_def(ERR_TEXT);
-error_def(ERR_LDBINFMT);
-error_def(ERR_LOADCTRLY);
-error_def(ERR_LOADEOF);
-error_def(ERR_MUNOFINISH);
-error_def(ERR_COLLTYPVERSION);
-error_def(ERR_COLLATIONUNDEF);
-error_def(ERR_OLDBINEXTRACT);
-error_def(ERR_LDSPANGLOINCMP);
-error_def(ERR_RECLOAD);
-error_def(ERR_GVFAILCORE);
-error_def(ERR_NULSUBSC);
-error_def(ERR_DBDUPNULCOL);
-error_def(ERR_FAILEDRECCOUNT);
-error_def(ERR_LOADRECCNT);
-error_def(ERR_DBFILERR);
-error_def(ERR_STATSDBNOTSUPP);
-error_def(ERR_JNLFILOPN);
-error_def(ERR_DBPRIVERR);
-error_def(ERR_GBLOFLOW);
 
 #define	BIN_PUT		0
 #define	BIN_BIND	1
@@ -444,12 +421,8 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	{
 		if (!(len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base, DO_RTS_ERROR_TRUE)))
 		{
-<<<<<<< HEAD
 			FREE_MALLOCS;
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LOADEOF, 1, begin);
-=======
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LOADEOF, 1, &begin);
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 			util_out_print("Error reading record number: !@UQ\n", TRUE, &iter);
 			mupip_error_occurred = TRUE;
 			return;
@@ -473,19 +446,15 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	max_data_len = max_subsc_len = 0;
 	extr_collseq = db_collseq = NULL;
 	gvnh_reg = NULL;
-<<<<<<< HEAD
 	failed_record_count = 0;
 	first_failed_rec_count = 0;
 	val = NULL;
-	for ( ; !mupip_DB_full; )
-=======
 	need_xlation = FALSE;
 	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, key_count, saved_begin);
 	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, begin, saved_begin);
 	iter = begin - 1; /* WARNING: iter can never be zero because begin can never be less than 2 */
 	util_out_print("Beginning LOAD at record number: !@UQ\n", TRUE, &begin);
 	while (!mupip_DB_full)
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 	{
 		if ((++iter > end) || (0 == iter))
 			break;

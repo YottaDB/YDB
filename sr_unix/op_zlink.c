@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -104,32 +104,13 @@ MBSTART{															\
 	cmd_qlf.object_file.str.addr[cmd_qlf.object_file.str.len] = 0;								\
 } MBEND
 
-
-<<<<<<< HEAD
-GBLREF unsigned char		object_file_name[];
-=======
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 GBLREF command_qualifier	cmd_qlf;
 GBLREF int			object_file_des;
 GBLREF mident			module_name, routine_name;
 GBLREF mval			dollar_zsource;
-<<<<<<< HEAD
-GBLREF unsigned short		object_name_len;
-=======
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF unsigned char		object_file_name[];
 GBLREF unsigned short		object_name_len;
-
-error_def(ERR_FILENOTFND);
-error_def(ERR_FILEPARSE);
-error_def(ERR_SYSCALL);
-error_def(ERR_TEXT);
-error_def(ERR_VERSION);
-error_def(ERR_WILDCARD);
-error_def(ERR_ZLINKFILE);
-error_def(ERR_ZLNOOBJECT);
-ZOS_ONLY(error_def(ERR_BADTAG);)
 
 /* Routine to locate object files, or source and compile to an object file if necessary, and drive the linker to link the file
  * into this process appropriately. Three types of linking are currently supported on UNIX platforms (excepting Linux i386 which
@@ -155,12 +136,7 @@ void op_zlink (mval *v, mval *quals)
 				obj_file[MAX_FN_LEN + 1],
 				objnamebuf[MAX_FN_LEN + 1],
 				srcnamebuf[MAX_FN_LEN + 1];
-<<<<<<< HEAD
-	command_qualifier	save_qlf;
 	int			qlf, save_errno, status, tslash;
-=======
-	int			initial_object_file_des, qlf, save_errno, status, tslash;
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 	linktyp			type;
 	mstr			srcstr, objstr, file;
 	parse_blk		pblk;
@@ -183,27 +159,6 @@ void op_zlink (mval *v, mval *quals)
 	assert((SIZEOF(DOTM) == SIZEOF(DOTOBJ)) && (SIZEOF(srcnamebuf) == SIZEOF(objnamebuf)));
 	object_file_des = FD_INVALID;
 	srcdir = objdir = NULL;
-<<<<<<< HEAD
-	if (quals)
-	{	/* Explicit ZLINK from generated code or from gtm_trigger() */
-		boolean_t expdir;
-
-		memset(&pblk, 0, SIZEOF(pblk));
-		pblk.buff_size = MAX_FN_LEN;
-		pblk.buffer = inputf;
-		pblk.fop = F_SYNTAXO;
-		status = parse_file(&v->str, &pblk);
-		if (!(status & 1))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, v->str.len, v->str.addr, status);
-		if (pblk.fnb & F_WILD)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
-				ERR_WILDCARD, 2, v->str.len, v->str.addr);
-		/* 4SCA: file.len is bounded by MAX_FN_LEN in parse_file() */
-		file.addr = pblk.buffer;
-		file.len = pblk.b_esl;
-		type = NOTYPE;
-=======
-	expdir = FALSE;
 	module_name.len = object_name_len = 0;
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buff_size = MAX_FN_LEN;
@@ -244,7 +199,7 @@ void op_zlink (mval *v, mval *quals)
 	}
 	if (NULL != quals)
 	{	/* Explicit ZLINK from generated code or from gtm_trigger() */
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+		boolean_t expdir;
 		expdir = (0 != (pblk.fnb & F_HAS_DIR));
 		if (!expdir)
 		{	/* if the directory was not explicit, skip past it */
@@ -385,12 +340,9 @@ void op_zlink (mval *v, mval *quals)
 		if (srcdir)
 		{	/* A source directory containing routine was found by zro_search() */
 			assert(ZRO_TYPE_OBJLIB != objdir->type);
-<<<<<<< HEAD
-=======
 			if ((srcdir->str.len + srcnamelen) > (SIZEOF(srcnamebuf) - 1))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
 					      RTS_ERROR_LITERAL("Filename/path exceeds max length"));
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 			if (srcdir->str.len)
 			{
 				tslash = ('/' == srcdir->str.addr[srcdir->str.len - 1]) ? 0 : 1; /* for possible '/' in between */
@@ -495,7 +447,6 @@ void op_zlink (mval *v, mval *quals)
 						rts_error_csa(CSA_ARG(NULL)VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
 							ERR_TEXT, 2, LEN_AND_STR(err_code));
 					}
-<<<<<<< HEAD
 					/* Check if recompile is needed.
 					 * a) If $ydb_recompile_newer_src env var is not set to TRUE, then we check if
 					 *	src_stat.mtim is newer than or equal to obj_stat.mtime.
@@ -515,11 +466,6 @@ void op_zlink (mval *v, mval *quals)
 							|| (TREF(ydb_recompile_newer_src)
 								&& IS_STAT1_MTIME_OLDER_THAN_STAT2(obj_stat, src_stat)));
 					if (compile)
-=======
-					if ((src_stat.st_mtime > obj_stat.st_mtime) || ((src_stat.st_mtime == obj_stat.st_mtime)
-						&& (src_stat.st_nmtime > obj_stat.st_nmtime)))
-					{
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 						CLOSE_OBJECT_FD(object_file_des, status);
 				} else
 				{

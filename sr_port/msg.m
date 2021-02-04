@@ -3,7 +3,7 @@
 ; Copyright (c) 2001-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -221,7 +221,6 @@
  Write $Char(9),"&"_undocarr_"[0],",!
  Write $Char(9),undocmsgcnt,!,"};",!!
  If ansiopen Use outansi Write $Char(9),"};",! Close outansi
-<<<<<<< HEAD
  ;
  ; Now that we know all the error codes, write them out to the header file associated with the error file we read
  ;
@@ -240,12 +239,10 @@
  . for i=1:1:cnt write "#define YDB_ERR_",outmsg(i)," -",outmsg(i,"code"),!
  . write:("merrors"=fn) !,"#include ""libydberrors2.h""",!	; Daisy chain this to the file created for ydberrors.msg
  . close libydberrorsfn
-=======
  ; 3 following lines produce a sorted list & count of mupip integ errors that have been categorized for the table in the A&O guide
  ;zwrite integ
  ;set x="",ival=0 for  set x=$o(integ(x)) quit:'$length(x)  if $increment(ival)
  ;zwrite ival
->>>>>>> 3d3cd0dd... GT.M V6.3-010
  Quit
 
 ;

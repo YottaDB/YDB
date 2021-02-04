@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -112,16 +112,6 @@ STATICDEF int repl_recv_trace_buff_pos = 0;
 STATICDEF unsigned char * repl_recv_trace_buff = 0;
 STATICDEF int repl_recv_size_trace_pos = 0;
 STATICDEF int repl_recv_size_trace[REPL_RECV_SIZE_TRACE_SIZE];
-
-error_def(ERR_GETADDRINFO);
-error_def(ERR_GETNAMEINFO);
-error_def(ERR_GETSOCKNAMERR);
-error_def(ERR_TEXT);
-error_def(ERR_TLSCLOSE);
-error_def(ERR_TLSDLLNOOPEN);
-error_def(ERR_TLSINIT);
-error_def(ERR_TLSIOERROR);
-error_def(ERR_TLSCONNINFO);
 
 #define REPL_TRACE_BUFF(TRACE_BUFF, TRACE_BUFF_POS, IO_BUFF, IO_SIZE, MAX_TRACE_SIZE)			\
 {													\
@@ -400,14 +390,10 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 #			endif
 			if (0 == bytes_recvd)
 				save_errno = ECONNRESET;
-<<<<<<< HEAD
-			if (EINTR == save_errno)
+			if ((EINTR == save_errno) && !((WBTEST_ENABLED(WBTEST_FETCHCOMM_ERR)) ||
+				(WBTEST_ENABLED(WBTEST_FETCHCOMM_HISTINFO))))
 			{
 				eintr_handling_check();
-=======
-			if ((EINTR == save_errno) && !((WBTEST_ENABLED(WBTEST_FETCHCOMM_ERR)) ||
-					(WBTEST_ENABLED(WBTEST_FETCHCOMM_HISTINFO))))
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 				continue;
 			} else if (ETIMEDOUT == save_errno)
 			{

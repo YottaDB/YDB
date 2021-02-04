@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,20 +120,6 @@ GBLREF	unsigned char		*gtmsource_tcombuff_start;
 #ifdef GTM_TLS
 GBLREF	gtmsource_options_t	gtmsource_options;
 #endif
-
-error_def(ERR_REPL2OLD);
-error_def(ERR_REPLCOMM);
-error_def(ERR_REPLFTOKSEM);
-error_def(ERR_REPLINSTNOHIST);
-error_def(ERR_REPLINSTSECMTCH);
-error_def(ERR_REPLNOXENDIAN);
-error_def(ERR_REPLWARN);
-error_def(ERR_SECNOTSUPPLEMENTARY);
-error_def(ERR_STRMNUMMISMTCH1);
-error_def(ERR_STRMNUMMISMTCH2);
-error_def(ERR_TEXT);
-error_def(ERR_TLSCONVSOCK);
-error_def(ERR_TLSHANDSHAKE);
 
 int gtmsource_est_conn()
 {
@@ -1003,11 +989,8 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 	int			tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int			status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
 	char			err_string[1024];
-<<<<<<< HEAD
 	gtmsource_local_ptr_t	gtmsource_local;
-=======
 	boolean_t		close_retry = FALSE;
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 
 	assert((REPL_MULTISITE_MSG_START > msg->type) || (REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver));
 	if (MAX_SEQNO != optional_seqno)
@@ -1029,7 +1012,6 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 	/* Check for error status from the REPL_SEND */
 	if (SS_NORMAL != status)
 	{
-<<<<<<< HEAD
 		assert((EREPL_SEND == repl_errno) || (EREPL_SELECT == repl_errno));
 		if (EREPL_SEND == repl_errno)
 		{
@@ -1044,21 +1026,9 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 			if (REPL_CONN_RESET(status))
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while sending %s. Status = %d ; %s\n",
-						msgtypestr, status, STRERROR(status));
-=======
-		if (EREPL_SEND == repl_errno)
-		{
-			if (REPL_CONN_RESET(status))
-			{
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while sending %s. Status = %d ; %s\n",
 					msgtypestr, status, STRERROR(status));
 				close_retry = TRUE;
-			} else
-#			ifdef _AIX
-			if (ENETUNREACH == status)
-#			else
-			if (ECOMM == status) /*Communication error in send */
-#			endif
+			} else if (ECOMM == status) /*Communication error in send */
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE,	"Error sending %s message. "
 				"Error in send : %s\n", msgtypestr, STRERROR(status));
@@ -1069,7 +1039,6 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 			}
 			if (close_retry)
 			{
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 				repl_close(&gtmsource_sock_fd);
 				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 				gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
@@ -1078,17 +1047,10 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 			{
 				SNPRINTF(err_string, SIZEOF(err_string), "Error sending %s message. "
 					"Error in send : %s", msgtypestr, STRERROR(status));
-<<<<<<< HEAD
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
-			}
-		} else if (EREPL_SELECT == repl_errno)
-=======
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						LEN_AND_STR(err_string));
 			}
-		}
-		if (EREPL_SELECT == repl_errno)
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+		} else if (EREPL_SELECT == repl_errno)
 		{
 			SNPRINTF(err_string, SIZEOF(err_string), "Error sending %s message. "
 				"Error in select : %s", msgtypestr, STRERROR(status));

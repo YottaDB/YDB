@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD:sr_port/mu_int_getkey.c
- * Copyright 2001, 2013 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 3d3cd0dd... GT.M V6.3-010:sr_unix/mu_getkey.c
+ *								*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +29,10 @@
 #include "mupip_size.h"
 #include "mu_getkey.h"
 
+GBLDEF gv_key *mu_start_key;
+GBLDEF gv_key *mu_end_key;
+GBLDEF int mu_start_keyend;
+GBLDEF int mu_end_keyend;
 
 GBLREF	boolean_t	mu_subsc;
 GBLREF	boolean_t	mu_key;

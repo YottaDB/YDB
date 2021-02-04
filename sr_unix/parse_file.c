@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,14 +38,6 @@
 #include "gtm_stdlib.h"
 #define LOCALHOSTNAME "localhost"
 #define LOCALHOSTNAME6 "::1"
-
-error_def(ERR_FILENOTFND);
-error_def(ERR_GETADDRINFO);
-error_def(ERR_GETNAMEINFO);
-error_def(ERR_FILEPATHTOOLONG);
-error_def(ERR_PARNORMAL);
-error_def(ERR_SYSCALL);
-error_def(ERR_TEXT);
 
 /*
  *  Assert ensures that SRC.FIELD is within the bounds of SRC.buffer. This way when we do the SRC.FIELD - SRC.Buffer,
@@ -114,11 +106,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 		def.def1_buf = pblk->def2_buf;
 		tmp.len = pblk->def1_size;
 		tmp.addr = pblk->def1_buf;
-<<<<<<< HEAD
-		if (ERR_PARNORMAL != (status = parse_file(&tmp, &def)))
-=======
 		if (ERR_PARNORMAL != (status = parse_file(&tmp, &def)))	/* Note Assignment */
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 			return status;
 		assert(!def.b_node);
 		if (def.b_dir)	def.fnb |= F_HAS_DIR;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,13 +44,6 @@ GBLREF	unsigned char		object_file_name[], source_file_name[];
 GBLREF	unsigned short		object_name_len, source_name_len;
 
 STATICDEF uint4		save_qlf;
-
-error_def(ERR_COMPILEQUALS);
-error_def(ERR_FILEPARSE);
-error_def(ERR_NOTMNAME);
-error_def(ERR_WILDCARD);
-error_def(ERR_ZLINKFILE);
-error_def(ERR_ZLNOOBJECT);
 
 void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned short *srclen, boolean_t last)
 {
@@ -163,7 +156,6 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 				;       /* scan back from end for rtn name & triggerness */
 			ci += ci ? 1 : 0;
 			clen = object_name_len - ci;
-<<<<<<< HEAD
 			if (2 <= clen)
 			{
 				if ('o' != object_file_name[ci + --clen])
@@ -178,13 +170,6 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 				else if ('.' != object_file_name[ci + --clen])
 					clen++;
 			}
-			clen = MIN(clen, MAX_MIDENT_LEN);
-			memcpy(routine_name.addr, &object_file_name[ci], clen);
-=======
-			if (('o' != object_file_name[ci + --clen])
-					|| ('.' != object_file_name[ci + --clen]))
-				clen = object_name_len - ci;
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 			SET_OBJ(object_file_name, object_name_len);
 			clen = object_name_len = MIN(clen, MAX_MIDENT_LEN);
 			memcpy(routine_name.addr, &object_file_name[ci], clen);

@@ -196,33 +196,6 @@ GBLREF	mur_gbls_t		murgbl;
 GBLREF	repl_conn_info_t	*this_side, *remote_side;
 GBLREF	int4			strm_index;
 
-error_def(ERR_INSNOTJOINED);
-error_def(ERR_INSROLECHANGE);
-error_def(ERR_INSUNKNOWN);
-error_def(ERR_JNLNEWREC);
-error_def(ERR_JNLSETDATA2LONG);
-error_def(ERR_NOSUPPLSUPPL);
-error_def(ERR_PRIMARYNOTROOT);
-error_def(ERR_RCVRMANYSTRMS);
-error_def(ERR_REPL2OLD);
-error_def(ERR_REPLCOMM);
-error_def(ERR_REPLINSTNOHIST);
-error_def(ERR_REPLINSTREAD);
-error_def(ERR_REPLNOTLS);
-error_def(ERR_REPLTRANS2BIG);
-error_def(ERR_REPLXENDIANFAIL);
-error_def(ERR_RESUMESTRMNUM);
-error_def(ERR_REUSEINSTNAME);
-error_def(ERR_SECONDAHEAD);
-error_def(ERR_STRMNUMIS);
-error_def(ERR_SUPRCVRNEEDSSUPSRC);
-error_def(ERR_SYSCALL);
-error_def(ERR_TEXT);
-error_def(ERR_TLSCONVSOCK);
-error_def(ERR_TLSHANDSHAKE);
-error_def(ERR_UNIMPLOP);
-error_def(ERR_UPDSYNCINSTFILE);
-
 typedef enum
 {
 	GTM_RECV_POOL,
@@ -2912,13 +2885,9 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				}
 			} else if (EREPL_SELECT == repl_errno)
 			{
-<<<<<<< HEAD
+				repl_log(gtmrecv_log_fp, TRUE, TRUE, "Error in receiving from source."
+					 " Error in select: %d ; %s\n", status, STRERROR(status));
 				ISSUE_REPLCOMM_ERROR("Error in receiving from source. Error in select", status);
-=======
-					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Error in receiving from source."
-						 " Error in select: %d ; %s\n", status, STRERROR(status));
-					ISSUE_REPLCOMM_ERROR("Error in receiving from source. Error in select", status);
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 			}
 			repl_connection_reset = TRUE;
 			repl_close(&gtmrecv_sock_fd);

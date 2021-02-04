@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -230,17 +230,6 @@ STATICDEF	boolean_t	renegotiation_pending = FALSE;
 #endif
 
 #define	OUT_LINE	(256 + 1)
-
-error_def(ERR_JNLNEWREC);
-error_def(ERR_JNLSETDATA2LONG);
-error_def(ERR_REPLCOMM);
-error_def(ERR_REPLFTOKSEM);
-error_def(ERR_REPLINSTNOHIST);
-error_def(ERR_REPLNOTLS);
-error_def(ERR_REPLXENDIANFAIL);
-error_def(ERR_TRIG2NOTRIG);
-error_def(ERR_TLSRENEGOTIATE);
-error_def(ERR_TEXT);
 
 STATICFNDCL void repl_tr_endian_convert_src(repl_msg_ptr_t send_msgp, int send_tr_len, seq_num pre_read_seqno);
 
@@ -1747,7 +1736,6 @@ int gtmsource_process(void)
 							break; /* the outerloop will continue */
 						if (EREPL_SEND == repl_errno)
 						{
-<<<<<<< HEAD
 #							ifdef GTM_TLS
 							if (ERR_TLSIOERROR == status)
 							{
@@ -1755,27 +1743,16 @@ int gtmsource_process(void)
 								break;
 							} else
 #							endif
-=======
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 							if (REPL_CONN_RESET(status))
 							{
 								repl_log(gtmsource_log_fp, TRUE, TRUE,
 									"Connection reset while sending seqno data from "
 									INT8_FMT" "INT8_FMTX" to "INT8_FMT" "INT8_FMTX
-<<<<<<< HEAD
-									". Status = %d ; %s\n", pre_read_seqno, pre_read_seqno,
-									post_read_seqno, post_read_seqno, status, STRERROR(status));
-=======
 									". Status = %d ; %s\n", pre_read_seqno,
 									pre_read_seqno, post_read_seqno, post_read_seqno,
 									 status, STRERROR(status));
 								close_retry = TRUE;
-							} else
-# 							ifdef _AIX
-							if (ENETUNREACH == status)
-#							else
-							if (ECOMM == status) /*Communication error in send */
-#							endif
+							} else if (ECOMM == status) /*Communication error in send */
 							{
 								repl_log(gtmsource_log_fp, TRUE, TRUE,
 									"Error sending DATA"
@@ -1792,30 +1769,20 @@ int gtmsource_process(void)
 							}
 							if (close_retry)
 							{
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 								repl_close(&gtmsource_sock_fd);
 								SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 								gtmsource_state = gtmsource_local->gtmsource_state
 									= GTMSOURCE_WAITING_FOR_CONNECTION;
-<<<<<<< HEAD
-=======
 								close_retry = FALSE;
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 								break;
 							} else
 							{
 								SNPRINTF(err_string, SIZEOF(err_string),
-<<<<<<< HEAD
-									"Error sending DATA. Error in send : %s", STRERROR(status));
-								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0,
-											ERR_TEXT, 2, LEN_AND_STR(err_string));
-=======
                                                                 	"Error sending DATA. Error in send : %s",
 										STRERROR(status));
 								SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_string));
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0,
 									 ERR_TEXT, 2, LEN_AND_STR(err_string));
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 							}
 						}
 						assert(EREPL_SELECT == repl_errno);

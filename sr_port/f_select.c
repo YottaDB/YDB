@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,9 +25,6 @@
 #include "stringpool.h"
 
 GBLREF	triple		t_orig;
-
-error_def(ERR_COLON);
-error_def(ERR_SELECTFALSE);
 
 LITREF octabstruct oc_tab[];
 
@@ -79,13 +76,8 @@ int f_select(oprtype *a, opctype op)
 	TREF(side_effect_depth) = INITIAL_SIDE_EFFECT_DEPTH;
 	TREF(side_effect_base) = malloc(SIZEOF(boolean_t) * TREF(side_effect_depth));
 	memset((char *)(TREF(side_effect_base)), 0, SIZEOF(boolean_t) * TREF(side_effect_depth));
-<<<<<<< HEAD
 	if (shifting = (save_shift && (!save_saw_side || (YDB_BOOL == TREF(ydb_fullbool)))))	/* WARNING assignment */
-	{
-=======
-	if (shifting = (save_shift && (!save_saw_side || (GTM_BOOL == TREF(gtm_fullbool)))))	/* WARNING assignment */
 	{	/* shift in progress or needed so use a temporary chain */
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 		dqinit(&tmpchain, exorder);
 		oldchain = setcurtchain(&tmpchain);
 		INCREMENT_EXPR_DEPTH;	/* Don't want to hit bottom with each expression, so start at 1 rather than 0 */
@@ -98,12 +90,7 @@ int f_select(oprtype *a, opctype op)
 					 */
 	first_time = TRUE;
 	got_true = throwing = FALSE;
-<<<<<<< HEAD
 	endtrip = put_tjmp(noop);
-	cnd = NULL;
-=======
-	endtrip = put_tjmp(r);
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 	savechain = NULL;
 	for (;;)
 	{
@@ -135,28 +122,20 @@ int f_select(oprtype *a, opctype op)
 			return FALSE;
 		}
 		advancewindow();
-<<<<<<< HEAD
 		triptr = (TREF(curtchain))->exorder.bl;
 		boolexprfinish = (OC_BOOLEXPRFINISH == triptr->opcode) ? triptr : NULL;
 		if (NULL != boolexprfinish)
 			triptr = triptr->exorder.bl;
-		for ( ; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
-			;	/* get back, get back to where we once belonged - to find an indicator of the actual result */
-		if (!got_true && OC_LIT == triptr->opcode)
-		{	/* it is a literal not following an already optimizing TRUE, so optimize it */
-			v = &triptr->operand[0].oprval.mlit->v;
-=======
 		assert((got_true ? &dmpchain : (shifting ? &tmpchain : oldchain)) == TREF(curtchain));
 		if (shifting)	/* if shifting return to supression of side effect games for the expression */
 			TREF(shift_side_effects) = TREF(saw_side_effect) = FALSE;
-		for (triptr = (TREF(curtchain))->exorder.bl; !got_true; triptr = triptr->exorder.bl)
+		for ( ; !got_true; triptr = triptr->exorder.bl)
 		{	/* get back, get back to where we once belonged - to find an indicator of the actual result */
 			if (OC_NOOP == triptr->opcode)
 				continue;				/* keep looking */
 			if (OC_LIT != triptr->opcode)
 				break;					/* Boolean was not a literal */
 			v = &triptr->operand[0].oprval.mlit->v;		/* Boolean was a literal, so optimize it */
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 			dqdel(triptr, exorder);
 			/* Remove OC_BOOLEXPRSTART and OC_BOOLEXPRFINISH opcodes too */
 			REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish);	/* Note: Will set "boolexprfinish" to NULL */
@@ -240,17 +219,6 @@ int f_select(oprtype *a, opctype op)
 				ref->operand[1] = put_tref(tmparg.oprval.tref->operand[0].oprval.tref);
 			}
 		}
-<<<<<<< HEAD
-		if (!got_true)
-		{	/* jump to the end in case the run time value should turn out to be (the first) TRUE */
-			ref = newtriple(OC_JMP);
-			ref->operand[0] = endtrip;
-			INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
-			*cnd = put_tjmp(boolexprfinish2);
-			/* No need for INSERT_OC_JMP_BEFORE_OC_BOOLEXPRFINISH since OC_JMP has been inserted already above */
-		}
-=======
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 		if (TK_COMMA != TREF(window_token))
 			break;
 		advancewindow();
@@ -308,14 +276,10 @@ int f_select(oprtype *a, opctype op)
 	}
 	assert(shifting ? (&tmpchain == TREF(curtchain)) : (oldchain == TREF(curtchain)));
 	if (OC_PASSTHRU == r->opcode)
-<<<<<<< HEAD
 	{
 		ins_triple(noop);
-		ins_triple(r);
-	}
-=======
 		ins_triple(r);					/* 1st arg was not literal:literal */
->>>>>>> 3d3cd0dd... GT.M V6.3-010
+	}
 	saw_se_in_select = TREF(saw_side_effect);		/* note this down before it gets reset by DECREMENT_EXPR_DEPTH */
 	if (shifting)
 		DECREMENT_EXPR_DEPTH;				/* clean up */

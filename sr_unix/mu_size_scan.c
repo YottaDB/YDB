@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,10 +57,6 @@
 #include "longset.h"            /* needed for cws_insert.h */
 #include "cws_insert.h"
 #include <math.h>
-
-error_def(ERR_GBLNOEXIST);
-error_def(ERR_MUSIZEFAIL);
-error_def(ERR_MUSIZEINVARG);
 
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
@@ -278,14 +274,10 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 		incr_scans = 1;
 	} else if (lvl > targ_levl)
 	{	/* visit each child */
-<<<<<<< HEAD
-=======
 		/* Assumption on the fact that level > 0 is always true for this case,
 		 * since lowest the level can go is 0 and is checked before callign dfs.
 		 */
 		assert(lvl);
-		first_iter = TRUE;
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 		gv_target->hist.h[lvl - targ_levl].curr_rec.offset = saveoff[lvl];
 		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen, musz_range_done)
 		{
@@ -334,11 +326,8 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 					mu_size_cumulative[lvl][BLK]++;
 				}
 				return status;
-<<<<<<< HEAD
-=======
 			}
 			first_iter = FALSE;
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 		}
 		incr_recs = rCnt;
 		incr_scans = 1;

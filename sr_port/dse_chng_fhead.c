@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,12 +63,6 @@ GBLREF	uint4		image_count;
 LITREF	char		*gtm_dbversion_table[];
 
 #define	OUT_LINE	(256 + 1)
-
-error_def(ERR_FREEZE);
-error_def(ERR_BLKSIZ512);
-error_def(ERR_DBRDONLY);
-error_def(ERR_SIZENOTVALID8);
-error_def(ERR_FREEZECTRL);
 
 void dse_chng_fhead(void)
 {
@@ -462,19 +456,11 @@ void dse_chng_fhead(void)
 	if ((CLI_PRESENT == cli_present("TRIGGER_FLUSH")) && (cli_get_int("TRIGGER_FLUSH", &x)))
 		cs_data->flush_trigger = cs_data->flush_trigger_top = x;
 	if ((CLI_PRESENT == cli_present("GOT2V5ONCE")) && (cli_get_int("GOT2V5ONCE", &x)))
-<<<<<<< HEAD
                 cs_data->db_got_to_v5_once = (boolean_t)x;
 	change_fhead_timer_ms("STALENESS_TIMER", cs_data->staleness, 5000, TRUE);
 	change_fhead_timer_ms("TICK_INTERVAL", cs_data->ccp_tick_interval, 100, TRUE);
 	change_fhead_timer_ms("QUANTUM_INTERVAL", cs_data->ccp_quantum_interval, 1000, FALSE);
 	change_fhead_timer_ms("RESPONSE_INTERVAL", cs_data->ccp_response_interval, 60000, FALSE);
-=======
-		cs_data->db_got_to_v5_once = (boolean_t)x;
-	change_fhead_timer("STALENESS_TIMER", cs_data->staleness, 5000, TRUE);
-	change_fhead_timer("TICK_INTERVAL", cs_data->ccp_tick_interval, 100, TRUE);
-	change_fhead_timer("QUANTUM_INTERVAL", cs_data->ccp_quantum_interval, 1000, FALSE);
-	change_fhead_timer("RESPONSE_INTERVAL", cs_data->ccp_response_interval, 60000, FALSE);
->>>>>>> 3d3cd0dd... GT.M V6.3-010
 	if ((CLI_PRESENT == cli_present("B_BYTESTREAM")) && (cli_get_hex64("B_BYTESTREAM", &tn)))
 		cs_data->last_inc_backup = tn;
 	if ((CLI_PRESENT == cli_present("B_COMPREHENSIVE")) && (cli_get_hex64("B_COMPREHENSIVE", &tn)))

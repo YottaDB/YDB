@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -612,11 +612,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MEMORYRECURSIVE */
 	   0,	/* FREEZEID */
 	   0,	/* BLKWRITERR */
-<<<<<<< HEAD:sr_port/merrors_ansi.h
-	   0,	/* UNUSEDMSG781 */
-=======
 	   0,	/* DSEINVALBLKID */
->>>>>>> 3d3cd0dd... GT.M V6.3-010:sr_i386/merrors_ansi.h
 	   0,	/* PINENTRYERR */
 	   0,	/* BCKUPBUFLUSH */
 	   0,	/* NOFORKCORE */
@@ -1079,15 +1075,9 @@ const static readonly int error_ansi[] = {
 	   0,	/* RSVDBYTE2HIGH */
 	   0,	/* BKUPTMPFILOPEN */
 	   0,	/* BKUPTMPFILWRITE */
-<<<<<<< HEAD:sr_port/merrors_ansi.h
 	   0,	/* UNUSEDMSG1244 */
-	   0,	/* LOADBGSZ2 */
-	   0,	/* LOADEDSZ2 */
-=======
-	   0,	/* VMSMEMORY2 */
-	   0,	/* UNUSEDMSG1243 */
-	   0,	/* UNUSEDMSG1244 */
->>>>>>> 3d3cd0dd... GT.M V6.3-010:sr_i386/merrors_ansi.h
+	   0,	/* UNUSEDMSG1245 */
+	   0,	/* UNUSEDMSG1246 */
 	   0,	/* REPLINSTMISMTCH */
 	   0,	/* REPLINSTREAD */
 	   0,	/* REPLINSTDBMATCH */
