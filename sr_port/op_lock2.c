@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -174,6 +174,7 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 	ABS_TIME		cur_time, end_time, remain_time;
 	mv_stent		*mv_zintcmd;
 	uint4			sleep_msec;
+	mlk_pvtctl_ptr_t	pctl;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -234,36 +235,56 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 		 * the end of op_lock2()
 		 */
 		for (pvt_ptr1 = mlk_pvt_root, locks_done = 0;  locks_done < lks_this_cmd;  pvt_ptr1 = pvt_ptr1->next, locks_done++)
-		{	/* Go thru the list of all locks to be obtained attempting to lock
-			 * each one. If any lock could not be obtained, break out of the loop
-			 * If the lock is already obtained, then skip that lock.
+		{	/* Go thru the list of all locks to be obtained attempting to lock each one. If any lock could not be
+			 * obtained (and cannot be retried immediately), break out of the loop. If the lock is already obtained,
+			 * then skip that lock.
 			 */
-			if ((pvt_ptr1 == already_locked) || !mlk_lock(pvt_ptr1, 0, TRUE))
-			{	/* If lock is obtained */
-				pvt_ptr1->granted = TRUE;
-				switch (laflag)
-				{
-				case CM_LOCKS:
-					pvt_ptr1->level = 1;
-					break;
-				case INCREMENTAL:
-					if (pvt_ptr1->level < 511) /* The same lock can not be incremented more than 511 times. */
-						pvt_ptr1->level += pvt_ptr1->translev;
-					else
-						level_err(pvt_ptr1);
-					break;
-				case CM_ZALLOCATES:
-					pvt_ptr1->zalloc = TRUE;
-					break;
-				default:
-					assertpro(FALSE && laflag);
-					break;
-				}
-			} else
+			while (TRUE)
 			{
-				blocked = TRUE;
+				pctl = &pvt_ptr1->pvtctl;
+				pctl->gc_needed = FALSE;	/* Initialize flags for this lock pass - Can be set to TRUE.. */
+				pctl->rehash_needed = FALSE;	/* .. in mlk_shrhash_find_bucket.c */
+				pctl->resize_needed = FALSE;
+				if ((pvt_ptr1 == already_locked) || !mlk_lock(pvt_ptr1, 0, TRUE))
+				{	/* If lock is obtained */
+					pvt_ptr1->granted = TRUE;
+					switch (laflag)
+					{
+						case CM_LOCKS:
+							pvt_ptr1->level = 1;
+							break;
+						case INCREMENTAL:
+							/* The same lock can not be incremented more than 511 times. */
+							if (pvt_ptr1->level < 511)
+								pvt_ptr1->level += pvt_ptr1->translev;
+							else
+								level_err(pvt_ptr1);
+							break;
+						case CM_ZALLOCATES:
+							pvt_ptr1->zalloc = TRUE;
+							break;
+						default:
+							assertpro(FALSE && laflag);
+							break;
+					}
+				} else
+				{	/* Lock was not obtained - see if we are eligible to immediately retry this lock. The
+					 * required conditions are:
+					 *   1. One of pctl->gc_needed || pctl->rehash_needed || pctl->resize_needed} is set.
+					 *   2. pctl->hash_fail_cnt is less than or equal to MAX_LOCK_GC_REHASH_RESIZE_RETRYS.
+					 * If not, normal lock-blocked processing happens (sleep a bit before retry)..
+					 */
+					if ((pctl->gc_needed || pctl->rehash_needed || pctl->resize_needed)
+					    && (MAX_LOCK_GC_REHASH_RESIZE_RETRYS >= pctl->hash_fail_cnt))
+						/* Conditions met for a retry */
+						continue;
+					/* Else do a retry after some cleanup and a short nap */
+					blocked = TRUE;
+				}
 				break;
 			}
+			if (blocked)
+				break;
 		}
 		/* If we did not get blocked, we are all done */
 		if (!blocked)

@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,8 +36,9 @@ error_def(ERR_MLKHASHRESIZEFAIL);
 boolean_t mlk_shrhash_resize(mlk_pvtctl_ptr_t pctl)
 {
 	mlk_shrhash_ptr_t	shrhash_old, shrhash_new, old_bucket, new_bucket, free_bucket;
+	mlk_subhash_val_t	hash;
 	int			obi, shmid_new, shmid_old, nbi, fi, save_errno, status;
-	uint4			shrhash_size_old, shrhash_size_new, hash;
+	uint4			shrhash_size_old, shrhash_size_new;
 	size_t			shrhash_mem_new;
 	mlk_pvtctl		pctl_new;
 

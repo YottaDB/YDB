@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -98,7 +98,7 @@ void mlk_shrhash_delete(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 	uint4			total_len, num_buckets;
 	mlk_shrhash_map_t	usedmap;
 	mlk_shrblk_ptr_t	search_shrblk;
-	int			bi, si, bitnum;
+	int			bi, si;
 	mlk_shrhash_ptr_t	shrhash, bucket, search_bucket;
 
 	shrhash = pctl->shrhash;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,6 +79,7 @@ uint4 mlk_lock(mlk_pvtblk *p,
 	       UINTPTR_T  auxown,
 	       bool       new)
 {
+	mlk_pvtctl_ptr_t	pctl;
 	mlk_ctldata_ptr_t	ctl;
 	mlk_shrblk_ptr_t	d;
 	int			siz, retval, status;
@@ -89,17 +90,18 @@ uint4 mlk_lock(mlk_pvtblk *p,
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (p->pvtctl.region->dyn.addr->acc_meth != dba_usr)
+	pctl = &p->pvtctl;
+	if (pctl->region->dyn.addr->acc_meth != dba_usr)
 	{
-		csa = p->pvtctl.csa;
-		ctl = p->pvtctl.ctl;
+		csa = pctl->csa;
+		ctl = pctl->ctl;
 		if (dollar_tlevel)
 		{
 			assert((CDB_STAGNATE > t_tries) || csa->now_crit || !csa->lock_crit_with_db);
 			/* make sure this region is in the list in case we end up retrying */
-			insert_region(p->pvtctl.region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
+			insert_region(pctl->region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
 		}
-		GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
+		GRAB_LOCK_CRIT_AND_SYNC(*pctl, was_crit);
 		retval = ctl->wakeups;
 		assert(retval);
 		/* this calculation is size of basic mlk_shrsub blocks plus the padded value length
@@ -110,16 +112,16 @@ uint4 mlk_lock(mlk_pvtblk *p,
 		assert(siz >= 0);
 		assert(ctl->blkcnt >= 0);
 		if (ctl->gc_needed || ctl->resize_needed || ctl->rehash_needed
-			|| (ctl->subtop - ctl->subfree < siz) || (ctl->blkcnt < p->subscript_cnt))
+		    || (ctl->subtop - ctl->subfree < siz) || (ctl->blkcnt < p->subscript_cnt))
 		{
-			REL_LOCK_CRIT(p->pvtctl, was_crit);
-			prepare_for_gc(&p->pvtctl);
-			GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
+			REL_LOCK_CRIT(*pctl, was_crit);
+			prepare_for_gc(pctl);
+			GRAB_LOCK_CRIT_AND_SYNC(*pctl, was_crit);
 			assert(ctl->lock_gc_in_progress.u.parts.latch_pid == process_id);
 			if (ctl->rehash_needed)
-				mlk_rehash(&p->pvtctl);
+				mlk_rehash(pctl);
 			if (ctl->resize_needed)
-				mlk_shrhash_resize(&p->pvtctl);
+				mlk_shrhash_resize(pctl);
 			else if (ctl->gc_needed || (ctl->subtop - ctl->subfree < siz) || (ctl->blkcnt < p->subscript_cnt))
 				mlk_garbage_collect(p, siz, FALSE);
 			assert(ctl->lock_gc_in_progress.u.parts.latch_pid == process_id);
@@ -138,12 +140,10 @@ uint4 mlk_lock(mlk_pvtblk *p,
 				} else
 				{	/* Someone else has it. Block on it */
 					assert(blocked);
-					added = TRUE;
 					/* If we get a new prcblk, we should update the values
 					 *   if we attempt to get a new prcblk and fail, we should update the transaction number
 					 *   but take no further action */
-					if (new)
-						added = mlk_prcblk_add(p->pvtctl.region, ctl, d, process_id);
+					added = new ? mlk_prcblk_add(pctl->region, ctl, d, process_id) : TRUE;
 					if (added)
 					{
 						p->nodptr = d;
@@ -155,9 +155,7 @@ uint4 mlk_lock(mlk_pvtblk *p,
 			{	/* Lock was not previously owned */
 				if (blocked)
 				{	/* We can't have it right now because of child or parent locks */
-					added = TRUE;
-					if (new)
-						added = mlk_prcblk_add(p->pvtctl.region, ctl, d, process_id);
+					added = new ? mlk_prcblk_add(pctl->region, ctl, d, process_id) : TRUE;
 					if (added)
 					{
 						p->nodptr = d;
@@ -167,7 +165,7 @@ uint4 mlk_lock(mlk_pvtblk *p,
 				} else
 				{	/* The lock is graciously granted */
 					if (!new)
-						mlk_prcblk_delete(&p->pvtctl, d, process_id);
+						mlk_prcblk_delete(pctl, d, process_id);
 					d->owner = process_id;
 					d->auxowner = auxown;
 					if (auxown && IS_GTCM_GNP_SERVER_IMAGE)
@@ -191,13 +189,13 @@ uint4 mlk_lock(mlk_pvtblk *p,
 			 * LOCK_SPACE_FULL_SYSLOG_THRESHOLD.
 			 */
 			ctl->lockspacefull_logged = TRUE;
-			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_LOCKSPACEFULL, 2, DB_LEN_STR(p->pvtctl.region));
-			send_msg_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(p->pvtctl.region),
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_LOCKSPACEFULL, 2, DB_LEN_STR(pctl->region));
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(pctl->region),
 					(ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
 					(ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt,
 					(ctl->subfree - ctl->subbase), (ctl->subtop - ctl->subbase));
 		}
-		REL_LOCK_CRIT(p->pvtctl, was_crit);
+		REL_LOCK_CRIT(*pctl, was_crit);
 		if (!retval)
 		{
 			INCR_GVSTATS_COUNTER(csa, csa->nl, n_lock_success, 1);
@@ -206,6 +204,6 @@ uint4 mlk_lock(mlk_pvtblk *p,
 			INCR_GVSTATS_COUNTER(csa, csa->nl, n_lock_fail, 1);
 		}
 	} else	/* acc_meth = dba_usr */
-		retval = gvusr_lock(p->nref_length, &p->value[0], p->pvtctl.region);
+		retval = gvusr_lock(p->nref_length, &p->value[0], pctl->region);
 	return retval;
 }

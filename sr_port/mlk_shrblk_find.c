@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -206,10 +206,11 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 
 mlk_shrblk_ptr_t mlk_shrhash_find(mlk_pvtblk *p, int subnum, unsigned char *subval, unsigned char sublen, mlk_shrblk_ptr_t parent)
 {
+	int			bi, si;
+	uint4			num_buckets;
 	mlk_shrblk_ptr_t	res = NULL, search_shrblk;
 	mlk_shrsub_ptr_t	search_sub;
-	int			bi, si;
-	uint4			hash, num_buckets;
+	mlk_subhash_val_t	hash;
 	mlk_shrhash_map_t	usedmap;
 	mlk_shrhash_ptr_t	shrhash, bucket, search_bucket;
 

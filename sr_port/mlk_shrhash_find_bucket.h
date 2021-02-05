@@ -3,7 +3,7 @@
  * Copyright (c) 2018 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,6 @@
 
 #define MLK_SHRHASH_FOUND_NO_BUCKET     MAXINT4 /* special value to indicate out-of-design situation seen */
 
-int mlk_shrhash_find_bucket(mlk_pvtctl_ptr_t pctl, uint4 hash);
+int mlk_shrhash_find_bucket(mlk_pvtctl_ptr_t pctl, mlk_subhash_val_t hash);
 
 #endif

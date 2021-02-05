@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,8 @@ static inline void mlk_pvtctl_init(mlk_pvtctl_ptr_t pctl, struct gd_region_struc
 	pctl->hash_fail_cnt = 0;
 }
 
-static inline void mlk_shrhash_insert(mlk_pvtctl_ptr_t pctl, int bucket_idx, int target_idx, uint4 shrblk_idx, uint4 hash)
+static inline void mlk_shrhash_insert(mlk_pvtctl_ptr_t pctl, int bucket_idx, int target_idx, uint4 shrblk_idx,
+				      mlk_subhash_val_t hash)
 {
 	mlk_shrhash_ptr_t	bucket, target_bucket;
 	uint4			num_buckets;
@@ -93,6 +94,7 @@ static inline void grab_lock_crit_intl(mlk_pvtctl_ptr_t pctl, boolean_t *ret_was
 		 * in GRAB_LATCH_INDEFINITE_WAIT as the timeout.
 		 */
 		grab_latch(&csa->nl->lock_crit, GRAB_LATCH_INDEFINITE_WAIT);
+		*ret_was_crit = FALSE;				/* Initialize to keep code analyzer happy */
 	}
 }
 

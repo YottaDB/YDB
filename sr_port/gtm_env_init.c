@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,6 +52,7 @@
 #include "cli.h"
 #include "repl_filter.h"
 #include "gds_blk_upgrade.h"
+#include "mlkdef.h"
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -215,8 +216,8 @@ void	gtm_env_init(void)
 		TREF(ydb_lockhash_n_bits) = ydb_trans_numeric(YDBENVINDX_LOCKHASH_N_BITS, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		if (!is_defined)
 			TREF(ydb_lockhash_n_bits) = 0;	/* Do not tamper with hash value in dbg */
-		else if (32 < TREF(ydb_lockhash_n_bits))
-			TREF(ydb_lockhash_n_bits) = 32;	/* Keep all 32-bits of hash value in dbg */
+		else if ((SIZEOF(mlk_subhash_val_t) * BITS_PER_UCHAR) < TREF(ydb_lockhash_n_bits))
+			TREF(ydb_lockhash_n_bits) = SIZEOF(mlk_subhash_val_t) * BITS_PER_UCHAR;	/* Keep all bits of hash val */
 		/* else Keep only at most N bits of hash value in dbg where TREF(ydb_lockhash_n_bits) == N */
 		/* ydb_dirtree_collhdr_always environment/logical */
 		assert(FALSE == TREF(ydb_dirtree_collhdr_always));	/* should have been set to FALSE by gtm_threadgbl_defs */

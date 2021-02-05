@@ -3,6 +3,9 @@
  * Copyright (c) 2019 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -26,9 +29,9 @@ GBLREF	uint4	process_id;
 
 error_def(ERR_MLKREHASH);
 
-int mlk_rehash_tree(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t head, mlk_subhash_state_t parent_state, uint4 parent_len);
+STATICFNDCL int mlk_rehash_tree(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t head, mlk_subhash_state_t parent_state, uint4 parent_len);
 
-int mlk_rehash_tree(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t head, mlk_subhash_state_t parent_state, uint4 parent_len)
+STATICFNDEF int mlk_rehash_tree(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t head, mlk_subhash_state_t parent_state, uint4 parent_len)
 {
 	int			count = 0, child_count;
 	mlk_shrblk_ptr_t	node;
@@ -53,7 +56,7 @@ int mlk_rehash_tree(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t head, mlk_subhash_st
 		if (0 != node->children)
 		{
 			child_count = mlk_rehash_tree(pctl, (mlk_shrblk_ptr_t)R2A(node->children),
-							node_state, parent_len + node_len);
+						      node_state, parent_len + node_len);
 			if (0 > child_count)
 				return -1;
 			count += child_count;
@@ -80,7 +83,10 @@ void mlk_rehash(mlk_pvtctl_ptr_t pctl)
 			MLK_SUBHASH_INIT_PVTCTL(pctl, hs);
 			count = mlk_rehash_tree(pctl, root, hs, 0);
 		} else
+		{
+			count = 0;		/* Initialize if no blocks to rehash */
 			break;
+		}
 	} while (count < 0);
 	assert((pctl->ctl->max_blkcnt - pctl->ctl->blkcnt) == count);
 	pctl->ctl->gc_needed = FALSE;

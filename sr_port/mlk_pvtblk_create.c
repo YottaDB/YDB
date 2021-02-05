@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,7 +79,7 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 	boolean_t		do_hash;
 
 	/* Get count of mvals including extgbl1 */
-	assert (subcnt >= 2);
+	assert(2 <= subcnt);
 	subcnt--;
 	/* compiler gives us extgbl1 always, even if the nref is not an extended ref */
 	if (NULL == extgbl1)
@@ -139,7 +139,10 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 	r->nref_length = len + subcnt;
 	/* Keep the hash code generation here in sync with MLK_PVTBLK_SUBHASH_GEN() */
 	if (do_hash)
+	{
 		MLK_SUBHASH_INIT(r, accstate);
+		hashres = (mlk_subhash_res_t){0, 0};
+	}
 	cp = &r->value[0];
 	/* Copy all strings into the buffer one after another */
 	for (i = 0, VAR_COPY(mp, subptr);  i < subcnt;  i++)

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ * 								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -48,8 +51,12 @@ void mlk_shr_init(sm_uc_ptr_t base,
 	/* Split shrblock space into blocks and hash buckets.
 	 * Hopscotch hashing works reasonably well with a high load factor, but leaving a little space avoids the worst case,
 	 * and more buckets helps avoid excess collisions, so allocate up to 1/4 more hash buckets than shrblks.
+	 *
+	 * Note shrblk_adj can be increased in small fractional steps to compensate for an increase in mlk_shrblk size that
+	 * results in a disproportionate decrease in the number of mlk_shrblks relative to the other block types.
+	 *
 	 */
-	shrblk_adj = 1;
+	shrblk_adj = 1.1;
 	shrhash_adj = 1 + MLK_HASH_EXCESS;
 	nr_blocks = (shrblk_adj * shr_size) / (shrblk_adj * SIZEOF(mlk_shrblk) + shrhash_adj * SIZEOF(mlk_shrhash));
 	nr_buckets = (shrhash_adj * shr_size) / (shrblk_adj * SIZEOF(mlk_shrblk) + shrhash_adj * SIZEOF(mlk_shrhash));

@@ -3,7 +3,7 @@
 ; Copyright (c) 2001-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ; Copyright (c) 2017-2018 Stephen L Johnson.			;
@@ -203,7 +203,7 @@ GDEINIT
 	s defseg("ENCRYPTION_FLAG")=0
 	s defseg("EXTENSION_COUNT")=100
 	s defseg("FILE_TYPE")="DYNAMIC"
-	s defseg("LOCK_SPACE")=40
+	s defseg("LOCK_SPACE")=220	; If this changes, need to also change DEF_LOCK_SIZE macro in mlkdef.h
 	s defseg("MUTEX_SLOTS")=1024 ; keep this in sync with DEFAULT_NUM_CRIT_ENTRY in gdsbt.h
 	s defseg("RESERVED_BYTES")=0
 	s defseg("WINDOW_SIZE")=""

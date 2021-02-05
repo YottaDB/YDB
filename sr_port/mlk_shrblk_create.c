@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -111,11 +111,13 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 boolean_t mlk_shrhash_add(mlk_pvtctl *pctl, mlk_shrblk_ptr_t shr)
 {
 	int			bi, fi, si, mi, loop_cnt, tries = 0;
-	uint4			hash, num_buckets, usedmap;
+	uint4			num_buckets;
+	char			*str_ptr;
 	mlk_shrhash_ptr_t	shrhash, bucket, free_bucket, search_bucket, move_bucket;
 	mlk_shrblk_ptr_t	move_shrblk;
-	char			*str_ptr;
 	mlk_shrsub_ptr_t	sub;
+	mlk_shrhash_map_t	usedmap;
+	mlk_subhash_val_t	hash;
 
 	SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(p->ctlptr));
 	shrhash = pctl->shrhash;

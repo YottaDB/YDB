@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,6 +18,7 @@
 
 /* mlkdef.h */
 
+#include <stddef.h>	/* For offsetof() */
 #include <sys/types.h>
 
 #include "mmrhash.h"
@@ -40,11 +41,43 @@ typedef struct				/* One of these nodes is required for each process which is bl
 	short		filler_4byte;
 } mlk_prcblk;
 
+/* Types and structures for shrblk lookup hash table - These configuration options are not set by a header file so
+ * these definitions supply the value types and formatting macros for when the values are printed. If we (or anyone)
+ * want to do a quick build with a 64 bit subhash map (max neighborhood size of 32 instead of 64) for testing purposes,
+ * we need only include it as a build option to get it to build that way. Alternatively, if we want to change the size
+ * of one of these blocks permanently, changing 32 to 64 or vice versa is all we need to do in the macros below.
+ */
+#if !defined(MLK_SHRHASH_MAP_32) && !defined(MLK_SHRHASH_MAP_64)
+#	define	MLK_SHRHASH_MAP_32
+#endif
+#if !defined(MLK_SUBHASH_VAL_32) && !defined(MLK_SUBHASH_VAL_64)
+#	define	MLK_SUBHASH_VAL_64
+#endif
+
+/* Note these macro use PRI prefixed macros defined by [g]cc as printf() format types for however large the
+ * fields are being defined. This allows the fields to be printed by [f]printf() calls.
+ */
+#ifdef MLK_SHRHASH_MAP_32
+	typedef uint4				mlk_shrhash_map_t;
+#	define MLK_SHRHASH_MAP_MAX		MAXUINT4
+#	define PRIUSEDMAP			PRIx32
+#elif defined(MLK_SHRHASH_MAP_64)
+	typedef gtm_uint8			mlk_shrhash_map_t;
+#	define MLK_SHRHASH_MAP_MAX		MAXUINT8
+#	define PRIUSEDMAP			PRIx64
+#endif
+#ifdef MLK_SUBHASH_VAL_32
+	typedef uint4				mlk_subhash_val_t;
+#	define PRIUSEDHASH			PRIx32
+#elif defined(MLK_SUBHASH_VAL_64)
+	typedef gtm_uint8			mlk_subhash_val_t;
+#	define PRIUSEDHASH			PRIx64
+#endif
+
 /* Types and macros for computing subscript hash values */
 typedef hash128_state_t				mlk_subhash_state_t;
 typedef gtm_uint8				mlk_subhash_seed_t;
 typedef gtm_uint16				mlk_subhash_res_t;
-typedef uint4					mlk_subhash_val_t;
 #define MLK_SUBHASH_INIT(PVTBLK, STATEVAR)							\
 MBSTART {											\
 	assert(NULL != (PVTBLK)->pvtctl.ctl);							\
@@ -54,6 +87,7 @@ MBSTART {											\
 #define MLK_SUBHASH_INIT_PVTCTL(PVTCTL, STATEVAR)	HASH128_STATE_INIT(STATEVAR, (PVTCTL)->ctl->hash_seed)
 #define MLK_SUBHASH_INGEST(STATEVAR, DATA, SIZE)	ydb_mmrhash_128_ingest(&(STATEVAR), (DATA), (SIZE))
 #define MLK_SUBHASH_FINALIZE(STATEVAR, LENGTH, RESVAR)	ydb_mmrhash_128_result(&(STATEVAR), LENGTH, &(RESVAR))
+/* Macro to extract 64 bits of hash from a 128 bit hash value */
 #define MLK_SUBHASH_RES_VAL(RES)			((mlk_subhash_val_t)(RES).one)
 
 typedef struct				/* lock node.  The member descriptions below are correct if the entry
@@ -79,29 +113,19 @@ typedef struct				/* lock node.  The member descriptions below are correct if th
 					 * and its parents. Copied from a mlk_pvtblk via MLK_PVTBLK_SUBHASH().
 					 */
 	int4		auxpid;		/* If non-zero auxowner, this is the pid of the client that is holding the lock */
+#	if defined(MLK_SUBHASH_VAL_64) && defined(GTM64)
+	uint4		unused;		/* Add for alignment when the hash is 8 bytes and next field is 8 byte aligned */
+#	endif
 	UINTPTR_T	auxowner;	/* For gt.cm, this contains information on the remote owner of the lock.*/
 	unsigned char	auxnode[16];	/* If non-zero auxowner, this is the nodename of the client that is holding the lock */
 } mlk_shrblk;
 
-/* Types and structures for shrblk lookup hash table */
-#if !defined(MLK_SHRHASH_MAP_32) && !defined(MLK_SHRHASH_MAP_64)
-#define	MLK_SHRHASH_MAP_32
-#endif
-
-#if defined(MLK_SHRHASH_MAP_32)
-	typedef uint4				mlk_shrhash_map_t;
-#	define MLK_SHRHASH_MAP_MAX		MAXUINT4
-#	define PRIUSEDMAP			PRIx32
-#endif
-#if defined(MLK_SHRHASH_MAP_64)
-	typedef gtm_uint8			mlk_shrhash_map_t;
-#	define MLK_SHRHASH_MAP_MAX		MAXUINT8
-#	define PRIUSEDMAP			PRIx64
-#endif
-
 typedef struct mlk_shrhash_struct
 {
 	uint4			shrblk_idx;	/* Index to shrblk referenced by this hash bucket, or zero for empty. */
+#	ifdef MLK_SHRHASH_MAP_64
+	uint4			unused1;	/* Alignment for 64 bit field following (if it is 64 bit) */
+#	endif
 	mlk_shrhash_map_t	usedmap;	/* Bitmap representing the bucket neighborhood, with bit N set
 						 * if (bucket+N) % nbuckets is associated with this bucket, i.e.,
 						 * part of this bucket's neighborhood.
@@ -110,6 +134,9 @@ typedef struct mlk_shrhash_struct
 						 * Compare the hash value before comparing the pvtblk value against the
 						 * shrblk/shrsub chain
 						 */
+#	if defined(MLK_SUBHASH_VAL_32) && defined(MLK_SHRHASH_MAP_64)
+	uint4			unused2;	/* Alignment for 64 bit field following (if it is 64 bit) */
+#	endif
 } mlk_shrhash;
 
 #define MLK_SHRHASH_NEIGHBORS		(SIZEOF(mlk_shrhash_map_t) * BITS_PER_UCHAR)
@@ -120,6 +147,12 @@ typedef struct mlk_shrhash_struct
  * The number of extra buckets is specified as a fraction of the number of shrblks by the following.
  */
 #define MLK_HASH_EXCESS		(1.0/2.0)
+/* From the time we attempt to get a lock until the time we actually get it, we are allowed to immediately retry a
+ * failed lock attempt calling mlk_lock() under the following circumstances:
+ *  - The lock attempt set ctl->gc_needed or ctl->rehash_needed or ctl->resize_needed
+ *  - There have been fewer than MAX_LOCK_GC_REHASH_RESIZE_RETRYS defined below.
+ */
+#define MAX_LOCK_GC_REHASH_RESIZE_RETRYS 2
 
 typedef struct				/* the subscript value of a single node in a tree.  Stored separately so that
 					 * the mlk_shrblk's can all have fixed positions, and yet we can
@@ -161,7 +194,7 @@ typedef struct	mlk_ctldata_struct	/* this describes the entire shared lock secti
 	boolean_t	resize_needed;		/* whether we've determined that a hash table resize is needed */
 	boolean_t	rehash_needed;		/* whether we've determined that a hash table rehash is needed */
 	global_latch_t	lock_gc_in_progress;	/* pid of the process doing the GC, or 0 if none */
-	mlk_subhash_seed_t	hash_seed;		/* seed value to use to initialize hash */
+	mlk_subhash_seed_t hash_seed;		/* seed value to use to initialize hash */
 	int		hash_shmid;		/* shared memory id of hash table, or undefined if internal (see blkhash) */
 } mlk_ctldata;
 
@@ -201,13 +234,18 @@ typedef mlk_shrhash	*mlk_shrhash_ptr_t;
 
 typedef struct mlk_pvtctl_struct
 {
-	struct gd_region_struct		*region;	/* pointer to the database region */
-	struct sgmnt_addrs_struct	*csa;		/* pointer to the database cs_addrs */
-	mlk_ctldata_ptr_t		ctl;		/* pointer to the shared mlk_ctldata */
-	mlk_shrblk_ptr_t		shrblk;		/* pointer to the base of the shrblk array (indexed from one) */
-	mlk_shrhash_ptr_t		shrhash;	/* pointer to the hash array */
-	uint4				shrhash_size;	/* number of hash buckets */
-	uint4				hash_fail_cnt;	/* number of consecutive hash insert failures */
+	struct gd_region_struct		*region;		/* pointer to the database region */
+	struct sgmnt_addrs_struct	*csa;			/* pointer to the database cs_addrs */
+	mlk_ctldata_ptr_t		ctl;			/* pointer to the shared mlk_ctldata */
+	mlk_shrblk_ptr_t		shrblk;			/* pointer to the base of the shrblk array (indexed from one) */
+	mlk_shrhash_ptr_t		shrhash;		/* pointer to the hash array */
+	uint4				shrhash_size;		/* number of hash buckets */
+	uint4				hash_fail_cnt;		/* number of consecutive hash insert failures */
+	unsigned int			gc_needed : 1;		/* Copy of gc_needed/rehash_needed/resize_needed from mlk_ctldata */
+	unsigned int			rehash_needed : 1;	/* .. copied here so can test these flags outside of lock to avoid */
+	unsigned int			resize_needed : 1;	/* .. missing a gc/rehash/resize due to concurent action. */
+	unsigned int			unused : 29;		/* ** Unused ** available for use */
+	GTM64_ONLY(uint4		unused2;)		/* Align the block to 8 bytes */
 } mlk_pvtctl;
 
 typedef mlk_pvtctl	*mlk_pvtctl_ptr_t;
@@ -231,6 +269,7 @@ typedef struct	mlk_pvtblk_struct	/* one of these entries exists for each nref wh
 	uint4			sequence;		/* shrblk sequence for nodptr node (node we want) */
 	uint4			blk_sequence;		/* shrblk sequence for blocked node (node preventing our lock) */
 	mlk_tp			*tp;			/* pointer to saved tp information */
+	mlk_subhash_val_t	*hash_array;		/* Hash table pointer for this lock's subscripts */
 	mlk_subhash_seed_t	hash_seed;		/* seed used to initialize hash */
 	uint4			nref_length;		/* the length of the nref portion of the 'value' string. */
 	unsigned short		subscript_cnt;		/* the number of subscripts (plus one for the name) in this nref */
@@ -246,20 +285,21 @@ typedef struct	mlk_pvtblk_struct	/* one of these entries exists for each nref wh
 	unsigned char		trans;			/* boolean indicating whether already in list */
 	unsigned char		translev;		/* level for transaction (accounting for redundancy) */
 	unsigned char		old;			/* oldness boolean used for backing out zallocates */
-	unsigned char		filler[5];		/* Fill out to align data on word boundary */
+	unsigned char		filler[5];		/* Fill out to align data on address boundary */
 #	ifdef DEBUG
 	size_t			alloc_size;
 	uint4			alloc_nref_len;
 	uint4			alloc_sub_cnt;
 	uint4			alloc_aux_size;
+	GTM64_ONLY(uint4	filler2;)
 #	endif
 	unsigned char		value[1];		/* Actually, an array unsigned char value[N], where N is based on the
 							 * nref_length, subscript_cnt, and possibly a client id. The initial
 							 * portion consists of the nref's subscripts, each preceded by the length
 							 * of the subscript, held as a single byte. For example, ^A(45), would be
 							 * represented as 02 5E 41 02 34 35, and total length would be 5.
-							 * Following that (aligned to uint4) is an array of subscript_cnt uint4
-							 * hash values.
+							 * Following that (aligned to caddr_t) is an array of subscript_cnt
+							 * hash values (mlk_shrhash_val_t).
 							 * For GT.CM servers, the hash values are followed by a client id length
 							 * as a single byte followed by server-specific data of that length.
 							 * The MLK_PVTBLK_SIZE() macro determines the total size of the block,
@@ -282,30 +322,37 @@ typedef struct	mlk_pvtblk_struct	/* one of these entries exists for each nref wh
 #define MLK_SHRHASH_SHRBLK_CHECK(PCTL, SHRHASH)	((SHRHASH)->shrblk_idx ? MLK_SHRHASH_SHRBLK(PCTL, SHRHASH) : NULL)
 
 /* compute the true size of a mlk_pvtblk, excluding any GT.CM id */
-#define MLK_PVTBLK_SIZE(NREF_LEN, SUBCNT) (ROUND_UP(SIZEOF(mlk_pvtblk) - 1 + (NREF_LEN), SIZEOF(uint4))		\
-						+ SIZEOF(mlk_subhash_val_t) * (SUBCNT))
+#define MLK_PVTBLK_SIZE(NREF_LEN, SUBCNT) (ROUND_UP(OFFSETOF(mlk_pvtblk, value) + (NREF_LEN), SIZEOF(caddr_t))	\
+					   + SIZEOF(mlk_subhash_val_t) * (SUBCNT))
 
-#define MLK_PVTBLK_ALLOC(NREF_LEN, SUBCNT, AUX_LEN, RET)							\
-MBSTART {													\
-	mlk_pvtblk	*ret;											\
-	size_t		alloc_size;										\
-	uint4		alloc_nref_len = (NREF_LEN);								\
-	uint4		alloc_sub_cnt = (SUBCNT);								\
-	uint4		alloc_aux_size = (AUX_LEN);								\
-														\
-	alloc_size = MLK_PVTBLK_SIZE(NREF_LEN, SUBCNT) + (AUX_LEN);						\
-	ret = (mlk_pvtblk*)malloc(alloc_size);									\
-	memset(ret, 0, SIZEOF(mlk_pvtblk) - 1);									\
-	DEBUG_ONLY(ret->alloc_size = alloc_size);								\
-	DEBUG_ONLY(ret->alloc_nref_len = alloc_nref_len);							\
-	DEBUG_ONLY(ret->alloc_sub_cnt = alloc_sub_cnt);								\
-	DEBUG_ONLY(ret->alloc_aux_size = alloc_aux_size);							\
-	(RET) = ret;												\
+/* Allocates 3 pieces of storage in one block:
+ *  1. mlk_pvtblk
+ *  2. buffer (starting at mlk_pvtblk.value) for text subscripts each preceded by a
+ *     one byte length.
+ *  3. array of 0 or more mlk_subhash_val_t blocks containing subscript hash values.
+ */
+#define MLK_PVTBLK_ALLOC(NREF_LEN, SUBCNT, AUX_LEN, RET)				\
+MBSTART {										\
+	mlk_pvtblk	*ret;								\
+	size_t		alloc_size;							\
+	uint4		alloc_nref_len = (NREF_LEN);					\
+	uint4		alloc_sub_cnt = (SUBCNT);					\
+	uint4		alloc_aux_size = (AUX_LEN);					\
+											\
+	alloc_size = MLK_PVTBLK_SIZE(NREF_LEN, SUBCNT) + (AUX_LEN);			\
+	ret = (mlk_pvtblk *)malloc(alloc_size);						\
+	memset(ret, 0, OFFSETOF(mlk_pvtblk, value));					\
+	ret->hash_array = (mlk_subhash_val_t *)((caddr_t)ret				\
+		+ ROUND_UP(OFFSETOF(mlk_pvtblk, value) + (NREF_LEN), SIZEOF(caddr_t)));	\
+	DEBUG_ONLY(ret->alloc_size = alloc_size);					\
+	DEBUG_ONLY(ret->alloc_nref_len = alloc_nref_len);				\
+	DEBUG_ONLY(ret->alloc_sub_cnt = alloc_sub_cnt);					\
+	DEBUG_ONLY(ret->alloc_aux_size = alloc_aux_size);				\
+	(RET) = ret;									\
 } MBEND
 
 /* compute the location of the Nth subscript's hash */
-#define MLK_PVTBLK_SUBHASH(PVTBLK, N)												\
-		(((mlk_subhash_val_t *)&(PVTBLK)->value[ROUND_UP((PVTBLK)->nref_length, SIZEOF(mlk_subhash_val_t))])[N])
+#define MLK_PVTBLK_SUBHASH(PVTBLK, N) ((PVTBLK)->hash_array[N])
 
 #ifdef DEBUG
 # define	DBG_LOCKHASH_N_BITS(HASH)						\
@@ -387,7 +434,11 @@ MBSTART {													\
 #define MLK_PVTBLK_SHRSUB_SIZE(PVTBLK, SHRSUBNEED) \
 (SHRSUBNEED * (OFFSETOF(mlk_shrsub, data[0]) + SIZEOF(ptroff_t) - 1) + PVTBLK->nref_length)
 
-#define DEF_LOCK_SIZE OS_PAGELET_SIZE * 200
+/* Default lock size if a 0 lock space size is specified - GDE prevents this from happening but it can happen that lock
+ * space size can be zeroed in which case, this much is allocated. This value (currently 220) should be kept in sync
+ * with the value GDE uses in sr_port/gdeinit.m when it sets defseg("LOCK_SPACE").
+ */
+#define DEF_LOCK_SIZE OS_PAGELET_SIZE * 220
 
 typedef struct mlk_stats_struct
 {
