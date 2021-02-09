@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -113,11 +113,15 @@ void signal_exit_handler(char *exit_handler_name, int sig, siginfo_t *info, void
 			thisThreadId = pthread_self();
 			assert(!tLevel);
 			assert(pthread_equal(mutexHolderThreadId, thisThreadId));
+			/* Clear the global variable indicating current YDB action before panic call and certainly before we
+			 * release the lock else another goroutine could grab the lock before we've cleared the call-in-process
+			 * flag.
+			 */
+			LIBYOTTADB_DONE;
 			lockIndex = 0;
 			ydb_engine_threadsafe_mutex_holder[lockIndex] = 0;
 			lclStatus = pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[lockIndex]);
 			assert(0 == lclStatus);
-			LIBYOTTADB_DONE;	/* Also clear the global variable indicating current YDB action before panic call */
 			/* Invoke the Go panic callback function */
 			(*go_panic_callback)(sig);
 			assert(FALSE);			/* Should not return */
