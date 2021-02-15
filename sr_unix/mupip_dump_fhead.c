@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -62,16 +62,22 @@ void mupip_dump_fhead(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+<<<<<<< HEAD
 	/* Verify ydb_dist, and make sure there is a parameter. */
 	if (!ydb_dist_ok_to_use)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_YDBDISTUNVERIF, 4, LEN_AND_STR(ydb_dist));
+=======
+	/* Verify gtm_dist, and make sure there is a parameter. */
+	if (!gtm_dist_ok_to_use)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_GTMDISTUNVERIF, 4, LEN_AND_STR(gtm_dist));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	if (CLI_PRESENT == cli_present("REGION"))
 	{	/* region */
 		status = SS_NORMAL;
 		gvinit();
 		mu_getlst("WHAT", SIZEOF(tp_region));
 		if (!grlist)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBNOREGION);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DBNOREGION);
 		for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)
 		{
 			util_out_print("Fileheader dump of region !AD", TRUE, REG_LEN_STR(rptr->reg));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -150,7 +150,8 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 			jb->strm_end_seqno[idx] = csd->strm_reg_seqno[idx];
 	}
-	epoch_record.filler = 0;
+	epoch_record.filler0 = 0;
+	epoch_record.filler1 = 0;
 	epoch_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
 								(unsigned char *)&epoch_record, SIZEOF(struct_jrec_epoch));
 	jnl_write(jpc, JRT_EPOCH, (jnl_record *)&epoch_record, NULL);

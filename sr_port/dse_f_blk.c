@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -76,7 +76,7 @@ void dse_f_blk(void)
 	do
 	{
 		if (!(bp = t_qread(look, &dummy_int, &dummy_cr)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 		if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER) /* Check blk version to see if using 32 or 64 bit block_id */
 		{
 #			ifdef BLK_NUM_64BIT
@@ -85,7 +85,7 @@ void dse_f_blk(void)
 #			else
 			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 			REVERT;
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #			endif
 		} else
 		{
@@ -127,7 +127,7 @@ void dse_f_blk(void)
 #			else
 			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 			REVERT;
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #			endif
 		} else
 			GET_BLK_ID_32(look, blk_id);
@@ -142,8 +142,8 @@ void dse_f_blk(void)
 		{
 			if (patch_find_sibs)
 			{
-				util_out_print("!/!_Left sibling!_Current block!_Right sibling", TRUE);
-				util_out_print("!_none!_!_0x!XL!_none",TRUE, patch_find_blk);
+				util_out_print("!/!_Left sibling!_!_Current block!_!_Right sibling", TRUE);
+				util_out_print("!_none!_!_!_0x!16@XQ!_none",TRUE, &patch_find_blk);
 			} else
 			{
 				assert(1 == patch_path[0]);	/* OK to assert because pro prints */
@@ -166,8 +166,8 @@ void dse_f_blk(void)
 				{
 					if (patch_find_sibs)
 					{
-						util_out_print("!/!_Left sibling!_Current block!_Right sibling", TRUE);
-						util_out_print("!_none!_!_0x!XL!_none",TRUE, patch_find_blk);
+						util_out_print("!/!_Left sibling!_!_Current block!_!_Right sibling", TRUE);
+						util_out_print("!_none!_!_!_0x!16@XQ!_none",TRUE, &patch_find_blk);
 					} else
 					{
 						patch_path_count--;
@@ -268,14 +268,14 @@ void dse_f_blk(void)
 	}
 	if (patch_find_sibs)
 	{	/* the cross-branch sib action could logically go in dse_order but is here 'cause it only gets used when needed */
-		util_out_print("!/!_Left sibling!_Current block!_Right sibling", TRUE);
+		util_out_print("!/!_Left sibling!_!_Current block!_!_Right sibling", TRUE);
 		if (!patch_left_sib)
 		{
 			for (last = 0, lvl = (patch_find_root_search ? patch_dir_path_count : patch_path_count) - 1; 0 <= --lvl;)
 			{
 				if (!(sp = t_qread(patch_find_root_search ? patch_path[lvl] : patch_path1[lvl], &dummy_int,
 					&dummy_cr)))
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 				if (((blk_hdr_ptr_t)sp)->bver > BLK_ID_32_VER) /* Check to see if using 32 or 64 bit block_id */
 				{
 #					ifdef BLK_NUM_64BIT
@@ -284,7 +284,7 @@ void dse_f_blk(void)
 					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 							nocrit_present, cs_addrs, gv_cur_region);
 					REVERT;
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #					endif
 				} else
 				{
@@ -294,8 +294,8 @@ void dse_f_blk(void)
 					s_top = sp + cs_addrs->hdr->blk_size;
 				else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)sp)->bsiz)
 				{
-					util_out_print("Error: sibling search hit problem blk 0x!XL",
-						TRUE, patch_find_root_search ? patch_path[lvl] : patch_path1[lvl]);
+					util_out_print("Error: sibling search hit problem blk 0x!16@XQ",
+						TRUE, patch_find_root_search ? &(patch_path[lvl]) : &(patch_path1[lvl]));
 					lvl = -1;
 					break;
 				} else
@@ -311,7 +311,7 @@ void dse_f_blk(void)
 					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 							nocrit_present, cs_addrs, gv_cur_region);
 					REVERT;
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #					endif
 				} else
 					GET_BLK_ID_32(look, srp - SIZEOF(block_id_32));
@@ -336,28 +336,28 @@ void dse_f_blk(void)
 						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 								nocrit_present, cs_addrs, gv_cur_region);
 						REVERT;
-						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+						RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #						endif
 					} else
 						GET_BLK_ID_32(look, srp - SIZEOF(block_id_32));
 				}
 				if ((patch_find_root_search ? patch_path[lvl] : patch_path1[lvl]) != look)
 				{
-					util_out_print("Error: sibling search hit problem blk 0x!XL",
-						TRUE, patch_find_root_search ? patch_path[lvl] : patch_path1[lvl]);
+					util_out_print("Error: sibling search hit problem blk 0x!16@XQ",
+						TRUE, patch_find_root_search ? &(patch_path[lvl]) : &(patch_path1[lvl]));
 					last = 0;
 					lvl = (patch_find_root_search ? patch_dir_path_count : patch_path_count);
 				} else if (last >= cs_addrs->ti->total_blks)
 				{	/* should never come here as block was previously OK, but this is dse so be careful */
-					util_out_print("Error: sibling search got 0x!XL which exceeds total blocks 0x!XL",
-						       TRUE, last, cs_addrs->ti->total_blks);
+					util_out_print("Error: sibling search got 0x!16@XQ which exceeds total blocks 0x!16@XQ",
+						       TRUE, &last, &(cs_addrs->ti->total_blks));
 					last = 0;
 					lvl = (patch_find_root_search ? patch_dir_path_count : patch_path_count);
 				}
 				for (lvl++; lvl < (patch_find_root_search ? patch_dir_path_count : patch_path_count); lvl++)
 				{
 					if (!(sp = t_qread(last, &dummy_int, &dummy_cr)))
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 					if (((blk_hdr_ptr_t)sp)->bver > BLK_ID_32_VER) /* Check if using 32 or 64 bit block_id */
 					{
 #						ifdef BLK_NUM_64BIT
@@ -366,7 +366,7 @@ void dse_f_blk(void)
 						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 								nocrit_present, cs_addrs, gv_cur_region);
 						REVERT;
-						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+						RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #						endif
 					} else
 					{
@@ -376,7 +376,7 @@ void dse_f_blk(void)
 						s_top = sp + cs_addrs->hdr->blk_size;
 					else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)sp)->bsiz)
 					{
-						util_out_print("Error: sibling search hit problem blk 0x!XL", TRUE, last);
+						util_out_print("Error: sibling search hit problem blk 0x!16@XQ", TRUE, &last);
 						last = 0;
 						break;
 					} else
@@ -395,14 +395,15 @@ void dse_f_blk(void)
 						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 								nocrit_present, cs_addrs, gv_cur_region);
 						REVERT;
-						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+						RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #						endif
 					} else
 						GET_BLK_ID_32(last, s_top - SIZEOF(block_id_32));
 					if (last >= cs_addrs->ti->total_blks)
 					{
-						util_out_print("Error: sibling search got 0x!XL which exceeds total blocks 0x!XL",
-							TRUE, last, cs_addrs->ti->total_blks);
+						util_out_print(
+							"Error: sibling search got 0x!16@XQ which exceeds total blocks 0x!16@XQ",
+							TRUE, &last, &(cs_addrs->ti->total_blks));
 						break;
 					}
 				}
@@ -410,17 +411,17 @@ void dse_f_blk(void)
 			patch_left_sib = last;
 		}
 		if (patch_left_sib)
-			util_out_print("!_0x!XL", FALSE, patch_left_sib);
+			util_out_print("!_0x!16@XQ", FALSE, &patch_left_sib);
 		else
-			util_out_print("!_none!_", FALSE);
-		util_out_print("!_0x!XL!_", FALSE, patch_find_blk);
+			util_out_print("!_none!_!_", FALSE);
+		util_out_print("!_0x!16@XQ!_", FALSE, &patch_find_blk);
 		if (!patch_right_sib)
 		{
 			for (lvl = (patch_find_root_search ? patch_dir_path_count : patch_path_count) - 1; 0 <= --lvl;)
 			{
 				if (!(sp = t_qread(patch_find_root_search ? patch_path[lvl] : patch_path1[lvl], &dummy_int,
 					&dummy_cr)))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 				if (((blk_hdr_ptr_t)sp)->bver > BLK_ID_32_VER) /* Check to see if using 32 or 64 bit block_id */
 				{
 #					ifdef BLK_NUM_64BIT
@@ -429,7 +430,7 @@ void dse_f_blk(void)
 					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 							nocrit_present, cs_addrs, gv_cur_region);
 					REVERT;
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #					endif
 				} else
 				{
@@ -439,8 +440,8 @@ void dse_f_blk(void)
 					s_top = sp + cs_addrs->hdr->blk_size;
 				else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)sp)->bsiz)
 				{
-					util_out_print("Error: sibling search hit problem blk 0x!XL",
-						TRUE, patch_find_root_search ? patch_path[lvl] : patch_path1[lvl]);
+					util_out_print("Error: sibling search hit problem blk 0x!16@XQ",
+						TRUE, patch_find_root_search ? &(patch_path[lvl]) : &(patch_path1[lvl]));
 					lvl = -1;
 					break;
 				} else
@@ -453,14 +454,14 @@ void dse_f_blk(void)
 					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 							nocrit_present, cs_addrs, gv_cur_region);
 					REVERT;
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #					endif
 				} else
 					GET_BLK_ID_32(look, s_top - SIZEOF(block_id_32));
 				if (look >= cs_addrs->ti->total_blks)
 				{
-					util_out_print("Error: sibling search got 0x!XL which exceeds total blocks 0x!XL",
-						       TRUE, look, cs_addrs->ti->total_blks);
+					util_out_print("Error: sibling search got 0x!16@XQ which exceeds total blocks 0x!16@XQ",
+						       TRUE, &look, &(cs_addrs->ti->total_blks));
 					lvl = -1;
 					break;
 				}
@@ -486,28 +487,29 @@ void dse_f_blk(void)
 						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 								nocrit_present, cs_addrs, gv_cur_region);
 						REVERT;
-						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+						RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #						endif
 					} else
 						GET_BLK_ID_32(look, srp - SIZEOF(block_id_32));
 					if (look >= cs_addrs->ti->total_blks)
 					{
-						util_out_print("Error: sibling search got 0x!XL which exceeds total blocks 0x!XL",
-							       TRUE, look, cs_addrs->ti->total_blks);
+						util_out_print(
+							"Error: sibling search got 0x!16@XQ which exceeds total blocks 0x!16@XQ",
+							TRUE, &look, &(cs_addrs->ti->total_blks));
 						break;
 					}
 				}
 				if ((patch_find_root_search ? patch_path[lvl] : patch_path1[lvl]) != last)
 				{
-					util_out_print("Error: sibling search hit problem blk 0x!XL",
-						TRUE, patch_find_root_search ? patch_path[lvl] : patch_path1[lvl]);
+					util_out_print("Error: sibling search hit problem blk 0x!16@XQ",
+						TRUE, patch_find_root_search ? &(patch_path[lvl]) : &(patch_path1[lvl]));
 					look = 0;
 					lvl = (patch_find_root_search ? patch_dir_path_count : patch_path_count);
 				}
 				for (lvl++; lvl < (patch_find_root_search ? patch_dir_path_count : patch_path_count); lvl++)
 				{
 					if (!(sp = t_qread(look, &dummy_int, &dummy_cr)))	/* NOTE assignment */
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 					if (((blk_hdr_ptr_t)sp)->bver > BLK_ID_32_VER) /* Check if using 32 or 64 bit block_id */
 					{
 #						ifdef BLK_NUM_64BIT
@@ -516,7 +518,7 @@ void dse_f_blk(void)
 						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 								nocrit_present, cs_addrs, gv_cur_region);
 						REVERT;
-						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+						RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #						endif
 					} else
 					{
@@ -546,7 +548,7 @@ void dse_f_blk(void)
 						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 								nocrit_present, cs_addrs, gv_cur_region);
 						REVERT;
-						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+						RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #						endif
 					} else
 						GET_BLK_ID_32(look, srp - SIZEOF(block_id_32));
@@ -563,7 +565,7 @@ void dse_f_blk(void)
 			patch_right_sib = look;
 		}
 		if (patch_right_sib)
-			util_out_print("0x!XL!/", TRUE, patch_right_sib);
+			util_out_print("0x!16@XQ!/", TRUE, &patch_right_sib);
 		else
 			util_out_print("none!/", TRUE);
 		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);

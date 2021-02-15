@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
   * Copyright (c) 2001-2020 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -93,7 +97,7 @@ void	op_commarg(mval *v, unsigned char argcode)
 					advancewindow();
 				if (TK_EOL == TREF(window_token))
 					break;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INDEXTRACHARS);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INDEXTRACHARS);
 			}
 		}
 		if (EXPR_FAIL == comp_fini(rval, obj, OC_RET, NULL, NULL, v->str.len))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -262,7 +262,7 @@ void	dm_read (mval *v)
 		{
 			tt_ptr->mupintr = FALSE;
 			tt_state->who_saved = ttwhichinvalid;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTDIRECT);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTDIRECT);
 		}
 		assert(length == tt_state->length);
 		assertpro(dmread == tt_state->who_saved);	/* ZINTRECURSEIO should have caught */
@@ -449,8 +449,14 @@ void	dm_read (mval *v)
 			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ tt not socket */
 			tt_ptr->discard_lf = FALSE;
+<<<<<<< HEAD
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 		} else if (0 < status)
+=======
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
+		}
+		else if (0 < status)
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		{	/* select() says it's ready to read and read() found some data */
 			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
@@ -43,6 +43,7 @@ void op_unlock(void)
 
 	/* if there were any old locks before TSTART, they can't be unlocked */
 	if (mlk_pvt_root && tp_pointer && tp_pointer->old_locks)
+<<<<<<< HEAD
 	{
 		if (!process_exiting)
 		{
@@ -61,6 +62,9 @@ void op_unlock(void)
 			 */
 		}
 	}
+=======
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPLOCK);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	lks_this_cmd = 0;
 	op_lkinit();
 	/* must deal with cm */

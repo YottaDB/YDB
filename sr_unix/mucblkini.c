@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -53,6 +53,7 @@ GBLREF sgmnt_data_ptr_t        cs_data;
 error_def(ERR_AUTODBCREFAIL);
 error_def(ERR_FILECREERR);
 
+/* This function is only called during the creation of a new region so it only needs to create V7 blocks */
 void mucblkini(void)
 {
 	uchar_ptr_t		c, bmp;
@@ -93,13 +94,13 @@ void mucblkini(void)
 		return;
 	}
 	rp = (rec_hdr_ptr_t)((uchar_ptr_t)bp1 + SIZEOF(blk_hdr));
-	BSTAR_REC(rp);
+	bstar_rec((sm_uc_ptr_t)rp, TRUE); /* This function is creating a new region so it will always be making V7 blocks */
 	c = CST_BOK(rp);
 	blk = DIR_DATA;
 	PUT_BLK_ID(c, blk);
 	bp1->bver = GDSVCURR;
 	bp1->levl = 1;
-	bp1->bsiz = BSTAR_REC_SIZE + SIZEOF(blk_hdr);
+	bp1->bsiz = bstar_rec_size(TRUE) + SIZEOF(blk_hdr);
 	bp1->tn = 0;
 	bp2->bver = GDSVCURR;
 	bp2->levl =0;
@@ -110,11 +111,17 @@ void mucblkini(void)
 	if (0 != status)
 	{
 		if (IS_MUMPS_IMAGE)
+<<<<<<< HEAD
 		{
 			free(bp2);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_AUTODBCREFAIL, 4, DB_LEN_STR(gv_cur_region),
 				      REG_LEN_STR(gv_cur_region), status);
 		} else
+=======
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_AUTODBCREFAIL, 4, DB_LEN_STR(gv_cur_region),
+				REG_LEN_STR(gv_cur_region), status);
+		else
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		{
 			PERROR("Error writing to disk");
 			free(bp2);
@@ -126,8 +133,8 @@ void mucblkini(void)
 	if (0 != status)
 	{
 		if (IS_MUMPS_IMAGE)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_AUTODBCREFAIL, 4, DB_LEN_STR(gv_cur_region),
-				      REG_LEN_STR(gv_cur_region), status);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_AUTODBCREFAIL, 4, DB_LEN_STR(gv_cur_region),
+				REG_LEN_STR(gv_cur_region), status);
 		else
 		{
 			PERROR("Error writing to disk");

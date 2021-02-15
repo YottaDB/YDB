@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -248,8 +248,14 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 				 * Set error status to ERR_TLSIOERROR and let caller handle it appropriately.
 				 */
 				assert(repl_tls.enabled);
+<<<<<<< HEAD
 				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				save_errno = ERR_TLSIOERROR;
+=======
+				errptr = gtm_tls_get_error();
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"), ERR_TEXT, 2,
+					LEN_AND_STR(errptr));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 #			else
 			save_errno = ERRNO;
@@ -391,9 +397,15 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 				 * Set error status to ERR_TLSIOERROR and let caller handle it appropriately.
 				 */
 				assert(repl_tls.enabled);
+<<<<<<< HEAD
 				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				save_errno = ERR_TLSIOERROR;
 				bytes_recvd = -1;	/* to ensure "save_errno" does not get overwritten a few lines later */
+=======
+				errptr = gtm_tls_get_error();
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("recv"), ERR_TEXT, 2,
+					LEN_AND_STR(errptr));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 #			else
 			save_errno = ERRNO;
@@ -618,7 +630,7 @@ void repl_do_tls_init(FILE *logfp)
 	if (SS_NORMAL != (status = gtm_tls_loadlibrary()))
 	{
 		if (!PLAINTEXT_FALLBACK)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSDLLNOOPEN, 0, ERR_TEXT, 2, LEN_AND_STR(dl_err));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSDLLNOOPEN, 0, ERR_TEXT, 2, LEN_AND_STR(dl_err));
 		else
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSDLLNOOPEN), 0, ERR_TEXT, 2,
 					LEN_AND_STR(dl_err));
@@ -626,7 +638,7 @@ void repl_do_tls_init(FILE *logfp)
 	} else if (NULL == (tls_ctx = gtm_tls_init(GTM_TLS_API_VERSION, 0)))
 	{
 		if (!PLAINTEXT_FALLBACK)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
 		else
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSINIT), 0, ERR_TEXT, 2,
 					LEN_AND_STR(gtm_tls_get_error()));

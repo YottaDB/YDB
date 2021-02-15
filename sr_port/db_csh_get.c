@@ -23,7 +23,7 @@
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF unsigned int	t_tries;
-GBLREF boolean_t        mu_reorg_process;
+GBLREF boolean_t	mu_reorg_process;
 
 #define ENOUGH_TRIES_TO_FALL_BACK 17
 
@@ -90,5 +90,5 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 		 * termination check) instead of storing it in a local variable at the beginning of the do loop */
 	} while (ocnt < (csa->now_crit ? 1 : ENOUGH_TRIES_TO_FALL_BACK));
 	INCR_GVSTATS_COUNTER(csa, cnl, n_buffer_scarce, 1);
-	return (TRUE == csa->now_crit ? (cache_rec_ptr_t)CR_NOTVALID : (cache_rec_ptr_t) NULL);
+	return (TRUE == csa->now_crit ? (cache_rec_ptr_t)CR_NOTVALID : (cache_rec_ptr_t)NULL);
 }

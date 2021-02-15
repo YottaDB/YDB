@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -113,7 +113,7 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 
 		DOREADRC(setup_fd, &setup_op, SIZEOF(setup_op), rc);
 		if (rc < 0)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("setup operation"), errno, 0);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("setup operation"), errno, 0);
 		switch(setup_op)
 		{
 		case job_done:
@@ -123,7 +123,7 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		case job_set_params:
 			DOREADRC(setup_fd, &jparms->params, SIZEOF(jparms->params), rc);
 			if (rc < 0)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("job parameters"), errno, 0);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("job parameters"), errno, 0);
 			/* Validate the routine and label */
 			MSTR_DEF(routine_mstr, jparms->params.routine.len, jparms->params.routine.buffer);
 			MSTR_DEF(label_mstr, jparms->params.label.len, jparms->params.label.buffer);
@@ -137,21 +137,21 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 				/* Ignore rc, as it is more important to report the underlying error than it is
 				 * to report problems reporting it.
 				 */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_JOBLABOFF, 0);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(2) ERR_JOBLABOFF, 0);
 			}
 			REVERT;
 			/* Send routine status */
 			joberr = joberr_ok;
 			DOWRITERC(setup_fd, &joberr, SIZEOF(joberr), rc);
 			if (rc < 0)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("routine status"), errno, 0);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("routine status"), errno, 0);
 			break;
 		case job_set_parm_list:
 			DOREADRC(setup_fd, &arg_count, SIZEOF(arg_count), rc);
 			if (rc < 0)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("argument count"), errno, 0);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("argument count"), errno, 0);
 			if (arg_count > MAX_ACTUALS)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXACTARG);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXACTARG);
 			g_args->callargs = arg_count + PUSH_PARM_OVERHEAD;
 			g_args->truth = 1;
 			g_args->retval = 0;
@@ -162,8 +162,8 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 			{
 				DOREADRC(setup_fd, &arg_msg.len, SIZEOF(arg_msg.len), rc);
 				if (rc < 0)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("argument length"),
-						      errno, 0);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("argument length"),
+						errno, 0);
 				if (0 > arg_msg.len)
 					g_args->argval[i] = op_nullexp();	/* negative len indicates null arg */
 				else
@@ -198,8 +198,8 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 			assertpro(buffer_size <= socketptr->buffer_size);
 			DOREADRC(setup_fd, socketptr->buffer, buffer_size, rc);
 			if (rc < 0)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2,
-					      LEN_AND_LIT("input buffer"), errno, 0);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBSETUP, 2,
+					LEN_AND_LIT("input buffer"), errno, 0);
 			socketptr->buffered_length = buffer_size;
 			socketptr->buffered_offset = 0;
 			break;
@@ -214,8 +214,8 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 			command_str->str.addr = local_buff;
 			DOREADRC(setup_fd, &buffer_size, SIZEOF(buffer_size), rc);
 			if (rc < 0)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2,
-					      LEN_AND_LIT("receive buffer size"), errno, 0);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBSETUP, 2,
+					LEN_AND_LIT("receive buffer size"), errno, 0);
 			if(buffer_size > MAX_STRLEN)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JOBLVN2LONG, 2, MAX_STRLEN, buffer_size);
 			assert(buffer_size > 0);
@@ -237,8 +237,13 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		receive_child_locals_finalize(&local_buff);
 	/* Keep the pipe alive until local transfer is done which is done at the second call to this function */
 	if (local_trans_done == setup_op)
+<<<<<<< HEAD
 		if (close(setup_fd) < 0)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, setup_fd, errno, 0);
+=======
+		if ((rc = close(setup_fd)) < 0)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_CLOSEFAIL, 1, setup_fd, errno, 0);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 }
 
 STATICFNDEF void receive_child_locals_init(char **local_buff, mval **command_str)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2018 Fidelity National Information	*
+ * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -218,16 +218,16 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		{
 			stat = trans_log_name(&devicename->str, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
 			if (SS_NORMAL != stat)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IONOTOPEN);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IONOTOPEN);
 			else
 			{
 				if (0 == (tl = get_log_name(&tn, NO_INSERT)))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IONOTOPEN);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IONOTOPEN);
 				nl = tl;
 			}
 		}
 		if (!nl->iod || (dev_open != nl->iod->state))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IONOTOPEN);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IONOTOPEN);
 		iod = nl->iod;
 	}
 	/* if iod is standard in device and it is a split device and it is $ZPOUT set iod to output device */
@@ -235,12 +235,12 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		iod = io_std_device.out;
 	if (gtmsocket != iod->type)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSOCKETNOTSOCK);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZSOCKETNOTSOCK);
 	}
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	if ((zsocket_item = namelook(zsocket_indextab, zsocket_names, keyword->str.addr, keyword->str.len)) < 0)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZSOCKETATTR, 2, keyword->str.len, keyword->str.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZSOCKETATTR, 2, keyword->str.len, keyword->str.addr);
 	}
 	zsocket_type = zsocket_types[zsocket_item];
 	if ((level_socket == zsocket_level[zsocket_item]) && (zsocket_index != zsocket_item))
@@ -638,7 +638,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			numret = socketptr->bufsiz;
 			break;
 		default:
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZSOCKETATTR, 2, keyword->str.len, keyword->str.addr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZSOCKETATTR, 2, keyword->str.len, keyword->str.addr);
 	}
 	dst->mvtype = zsocket_type;
 	if (MV_NM == dst->mvtype)

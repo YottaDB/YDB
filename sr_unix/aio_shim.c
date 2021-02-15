@@ -95,7 +95,7 @@ enum
 
 #define CLEANUP_AIO_SHIM_THREAD_INIT(GDI)				\
 MBSTART {								\
-	int 	ret, save_errno;					\
+	int 	ret, save_errno, local_errno;				\
 									\
 	save_errno = errno;						\
 	if (FD_INVALID != (GDI).exit_efd)				\
@@ -111,6 +111,8 @@ MBSTART {								\
 	if (0 != (GDI).ctx)						\
 	{								\
 		ret = io_destroy((GDI).ctx);				\
+		if (0 != ret)						\
+			local_errno = errno;				\
 		assert(0 == ret);					\
 	}								\
 	errno = save_errno;						\
@@ -163,7 +165,7 @@ STATICFNDCL void *io_getevents_multiplexer(void *arg)
 	struct gd_info		*gdi = (struct gd_info *)arg;
 	struct pollfd		fds[2];
 	uint64_t		dummy;
-	int			ret, num_ios;
+	int			ret, num_ios, local_errno;
 
 	INIT_POLLFD(fds[LAIO_EFD], gdi->laio_efd);
 	INIT_POLLFD(fds[EXIT_EFD], gdi->exit_efd);
@@ -175,16 +177,18 @@ STATICFNDCL void *io_getevents_multiplexer(void *arg)
 		 */
 		while ((-1 == (ret = poll(fds, ARRAYSIZE(fds), -1))) && (EINTR == errno))
 			;
+		if (-1 == ret)
+			local_errno = errno;
 		assert(-1 != ret);
 		if (-1 == ret)
-			RECORD_ERROR_IN_WORKER_THREAD_AND_EXIT(gdi, "worker_thread::poll()", errno);
+			RECORD_ERROR_IN_WORKER_THREAD_AND_EXIT(gdi, "worker_thread::poll()", local_errno);
 		/* Service the IO's if they completed */
 		if (EVENTFD_NOTIFIED(fds, LAIO_EFD))
 		{	/* flush the eventfd (though we don't care about the value) */
 			DOREADRC_MULTI_THREAD_SAFE(fds[LAIO_EFD].fd, &dummy, SIZEOF(dummy), ret);
 			assert(0 == ret);
-			if (-1 == ret)
-				RECORD_ERROR_IN_WORKER_THREAD_AND_EXIT(gdi, "worker_thread::read()", errno);
+			if (0 != ret)
+				RECORD_ERROR_IN_WORKER_THREAD_AND_EXIT(gdi, "worker_thread::read()", ret);
 			/* we subtract from num_ios all the IOs gleaned by
 			 * io_getevents_internal().
 			 */
@@ -212,7 +216,7 @@ STATICFNDCL int io_getevents_internal(aio_context_t ctx)
 {
 	struct timespec 	timeout = { 0, 0 };
 	struct io_event 	event[MAX_EVENTS];
-	int 			ret, i;
+	int 			ret, i, local_errno;
 	struct aiocb		*aiocbp;
 	int			num_ios = 0;
 
@@ -224,6 +228,8 @@ STATICFNDCL int io_getevents_internal(aio_context_t ctx)
 		 */
 		while (-1 == (ret = io_getevents(ctx, 0, MAX_EVENTS, event, &timeout)) && (EINTR == errno))
 			;
+		if (0 > ret)
+			local_errno = errno;
 		assert(ret >= 0);
 		if (-1 == ret)
 			return -1;
@@ -367,7 +373,7 @@ STATICFNDCL int	aio_shim_setup(aio_context_t *ctx)
 /* Initializes the multiplexing thread and the shutdown eventfd. */
 STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 { 	/* Sets up the AIO context, two eventfd's and the multiplexing thread */
-	int		ret, ret2;
+	int		ret, ret2, local_errno;
 	struct gd_info	*gdi, tmp_gdi;
 	sigset_t	savemask;
 
@@ -384,6 +390,7 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 		tmp_gdi.exit_efd = ret;
 	else
 	{
+		local_errno = errno;
 		assert(FALSE);
 		aio_shim_errstr = "eventfd(EXIT_EFD)";
 		return -1;
@@ -393,6 +400,7 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 		tmp_gdi.laio_efd = ret;
 	else
 	{
+		local_errno = errno;
 		assert(FALSE);
 		CLEANUP_AIO_SHIM_THREAD_INIT(tmp_gdi);
 		aio_shim_errstr = "eventfd(LAIO_EFD)";
@@ -403,8 +411,9 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 	{	/* The only "allowed" error is EAGAIN. The errstr should have been set by
 		 * aio_shim_setup().
 		 */
+		local_errno = errno;
 		assert(NULL != aio_shim_errstr);
-		assert(EAGAIN == errno || (WBTEST_ENABLED(WBTEST_LOW_MEMORY) && ENOMEM == errno));
+		assert(EAGAIN == local_errno || (WBTEST_ENABLED(WBTEST_LOW_MEMORY) && ENOMEM == local_errno));
 		CLEANUP_AIO_SHIM_THREAD_INIT(tmp_gdi);
 		return -1;
 	}
@@ -456,7 +465,7 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 void aio_shim_destroy(gd_addr *gd)
 {
 	struct gd_info 	*gdi;
-	int		ret;
+	int		ret, local_errno;
 	char 		*eventfd_str = "GTMROCKS";
 	mstr		*gldname;
 	gd_addr		*addr_ptr;
@@ -481,9 +490,11 @@ void aio_shim_destroy(gd_addr *gd)
 		ISSUE_SYSCALL_RTS_ERROR_WITH_GD(gd, "aio_shim_destroy::pthread_join", errno);
 	/* Destroy the kernel context */
 	ret = io_destroy(gdi->ctx);
+	if (0 != ret)
+		local_errno = errno;
 	assert(0 == ret);
 	if (-1 == ret)
-		ISSUE_SYSCALL_RTS_ERROR_WITH_GD(gd, "aio_shim_destroy::io_destroy", errno);
+		ISSUE_SYSCALL_RTS_ERROR_WITH_GD(gd, "aio_shim_destroy::io_destroy", local_errno);
 	/* If there was at least one region with reg->was_open = TRUE, then it is possible regions in other glds
 	 * (different from "gd" have a "udi" with "udi->owning_gd" == "gd". So we would need to look at all regions
 	 * across all glds opened by this process. If no was_open region was ever seen by this process, then it is
@@ -535,7 +546,7 @@ int aio_shim_write(gd_region *reg, struct aiocb *aiocbp)
 	unix_db_info 	*udi;
 	struct gd_info 	*gdi;
 	gd_addr		*owning_gd;
-	int		ret;
+	int		ret, local_errno;
 	struct iocb 	*iocbp;
 	struct iocb 	*cb[1];
 	int		save_errno;
@@ -546,7 +557,9 @@ int aio_shim_write(gd_region *reg, struct aiocb *aiocbp)
 	if (NULL == (gdi = owning_gd->gd_runtime->thread_gdi))
 	{	/* No thread is servicing this global directory -- set it up. */
 		ret = aio_shim_thread_init(owning_gd);
-		assert((0 == ret) || (EAGAIN == errno));
+		if (0 != ret)
+			local_errno = errno;
+		assert((0 == ret) || (EAGAIN == local_errno));
 		if (-1 == ret)
 		{	/* aio_shim_thread_init() should set aio_shim_errstr */
 			assert(NULL != aio_shim_errstr);
@@ -569,8 +582,14 @@ int aio_shim_write(gd_region *reg, struct aiocb *aiocbp)
 	ATOMIC_ADD_FETCH(&gdi->num_ios, 1);
 	ret = io_submit(gdi->ctx, 1, cb);
 	/* the only acceptable error is EAGAIN in our case */
+<<<<<<< HEAD
 	DEBUG_ONLY(save_errno = errno);
 	assert((1 == ret) || (EAGAIN == save_errno));
+=======
+	if (0 > ret)
+		local_errno = errno;
+	assert((1 == ret) || (EAGAIN == errno));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	if (1 == ret)
 		return 0;
 	/* we need to rescind the write */

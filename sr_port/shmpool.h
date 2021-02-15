@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,6 +41,7 @@ typedef struct shmpool_blk_hdr_struct
 	 */
 	que_ent		sm_que;			/* Main queue fields */
 	volatile enum shmblk_type blktype;	/* free, backup or reformat? */
+	int4		filler2;		/* Make 8 byte alignment explicit */
 	block_id	blkid;			/* block number */
 	union
 	{
@@ -72,6 +73,7 @@ typedef struct muinc_blk_hdr_struct
 
 	char		filler_8byte[8];	/* Main queue fields */
 	volatile enum shmblk_type blktype;	/* free, backup or reformat? */
+	int4		filler1;		/* Make 8-byte alignment explicit */
 	block_id	blkid;			/* block number */
 	union
 	{

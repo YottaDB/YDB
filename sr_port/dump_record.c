@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -82,7 +82,7 @@ sm_uc_ptr_t dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr_
 		long_blk_id = TRUE;
 		blk_id_size = SIZEOF(block_id_64);
 #		else
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #		endif
 	} else
 	{
@@ -146,11 +146,11 @@ sm_uc_ptr_t dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr_
 #				ifdef BLK_NUM_64BIT
 				GET_BLK_ID_64(blk_id, key_top);
 #				else
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #				endif
 			else
 				GET_BLK_ID_32(blk_id, key_top);
-			if ((((blk_hdr_ptr_t)bp)->levl) || (blk_id <= cs_addrs->ti->total_blks))
+			if ((((blk_hdr_ptr_t)bp)->levl) || (((ublock_id)blk_id) <= cs_addrs->ti->total_blks))
 			{
 				MEMCPY_LIT(util_buff, "Ptr ");
 				util_len = SIZEOF("Ptr ") - 1;

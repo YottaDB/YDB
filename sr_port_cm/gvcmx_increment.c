@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2004 Sanchez Computer Associates, Inc.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2004-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,25 +35,32 @@
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gv_key		*gv_currkey;
 
+error_def(ERR_GVIS);
+error_def(ERR_TEXT);
+error_def(ERR_UNIMPLOP);
+
 /* returns FALSE if gv_currkey is undefined in the server end and undef_inhibit is turned OFF */
 void	gvcmx_increment(mval *increment, mval *result)
 {
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 	mval		tmpmval;
 
+<<<<<<< HEAD
 	error_def(ERR_UNIMPLOP);
 	error_def(ERR_TEXT);
 	error_def(ERR_GVIS);
 
 	ASSERT_IS_LIBGNPCLIENT;
+=======
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	if (!((link_info *)gv_cur_region->dyn.addr->cm_blk->usr)->server_supports_dollar_incr)
 	{
 		assert(dba_cm == gv_cur_region->dyn.addr->acc_meth); /* we should've covered all other access methods elsewhere */
 		end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
-		rts_error(VARLSTCNT(14) ERR_UNIMPLOP, 0,
-					ERR_TEXT, 2, LEN_AND_LIT("GT.CM server does not support $INCREMENT operation"),
-					ERR_GVIS, 2, end - buff, buff,
-					ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
+		RTS_ERROR_ABT(VARLSTCNT(14) ERR_UNIMPLOP, 0,
+			ERR_TEXT, 2, LEN_AND_LIT("GT.CM server does not support $INCREMENT operation"),
+			ERR_GVIS, 2, end - buff, buff,
+			ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
 	}
 	/* gvcmz_doop() currently accepts only one argument.
 	 * It serves as an input argument for SET.

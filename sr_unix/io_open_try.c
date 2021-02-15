@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -328,13 +328,20 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 	{
 		oflag |= (O_RDWR | O_CREAT | O_NOCTTY);
 		p_offset = 0;
+<<<<<<< HEAD
 		while(iop_eol != *(pp->str.addr + p_offset))
+=======
+		ichset_specified = ochset_specified = FALSE;
+		while ((iop_eol != *(pp->str.addr + p_offset)) && (pp->str.len > p_offset))
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		{
+			assert((0 <= p_offset) && (p_offset < MAXPOSINT4));
 			assert((params) *(pp->str.addr + p_offset) < (params)n_iops);
 			switch ((ch = *(pp->str.addr + p_offset++)))
 			{
 				case iop_exception:
 				{
+					assert((0 < p_offset) && ((1 + p_offset) < MAXPOSINT4));
 					DEF_EXCEPTION(pp, p_offset, iod);
 					break;
 				}
@@ -395,7 +402,19 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 				default:
 					break;
 			}
+<<<<<<< HEAD
 			UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
+=======
+			if (IOP_VAR_SIZE == io_params_size[ch])
+			{
+				assert((0 < p_offset) && (p_offset < (MAXPOSINT4 - 255)));
+				p_offset += (unsigned char)*(pp->str.addr + p_offset) + 1;
+			} else
+			{
+				assert((0 < p_offset) && (p_offset < (MAXPOSINT4 - io_params_size[ch])));
+				p_offset += io_params_size[ch];
+			}
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		}
 		/* Check the saved error from mknod() for fifo, also saved error from fstat() or stat()
 		   so error handler (if set)  can handle it */
@@ -406,8 +425,12 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DEVOPENFAIL, 2, LEN_AND_STR(buf), save_stat_err);
 		/* Error from trying to open a dir */
 		if (dir_err)
+<<<<<<< HEAD
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, LEN_AND_STR(buf),
 										ERR_GTMEISDIR, 2, LEN_AND_STR(buf));
+=======
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_GTMEISDIR, 2, LEN_AND_STR(buf));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		if (timed)
 			start_timer(timer_id, nsec_timeout, wake_alarm, 0, NULL);
 		/* RW permissions for owner and others as determined by umask. */

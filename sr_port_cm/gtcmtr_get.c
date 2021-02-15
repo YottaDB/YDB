@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +51,7 @@ cm_op_t gtcmtr_get(void)
 	assert(CMMS_Q_GET == *ptr);
 	ptr++;
 	GET_USHORT(len, ptr);
-	ptr += SIZEOF(unsigned short);
+	ptr += sizeof(unsigned short);
 	regnum = *ptr++;
 	len--;	/* subtract size of regnum */
 	reg_ref = gtcm_find_region(curr_entry, regnum);
@@ -61,12 +66,12 @@ cm_op_t gtcmtr_get(void)
 					       SIZEOF(temp_short) + /* size of length of $GET return value */
 					       temp_short) /* length of $GET return value */
 		{ /* resize buffer */
-			cmi_realloc_mbf(curr_entry->clb_ptr, 1 + SIZEOF(temp_short) + temp_short);
+			cmi_realloc_mbf(curr_entry->clb_ptr, 1 + sizeof(temp_short) + temp_short);
 			ptr = curr_entry->clb_ptr->mbf;
 		}
 		*ptr++ = CMMS_R_GET;
 		PUT_USHORT(ptr, temp_short);
-		ptr += SIZEOF(unsigned short);
+		ptr += sizeof(unsigned short);
 		memcpy(ptr, v.str.addr, temp_short);
 		ptr += temp_short;
 	} else

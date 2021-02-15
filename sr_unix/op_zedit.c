@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -64,7 +64,7 @@ void op_zedit(mval *v, mval *p)
 		edt = ydb_getenv(YDBENVINDX_GENERIC_EDITOR, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
 		if (!edt)
 			edt = "editor";
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOEDITOR, 2, LEN_AND_STR(edt));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NOEDITOR, 2, LEN_AND_STR(edt));
 	}
 	MV_FORCE_STR(v);
 	MV_FORCE_STR(p);
@@ -171,7 +171,7 @@ void op_zedit(mval *v, mval *p)
 	}
 
 	if (RESTRICTED(zedit_op))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZEDIT");
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZEDIT");
 
 	flush_pio();
 	ret = gtm_system_internal(editor.addr, es, NULL, NULL);

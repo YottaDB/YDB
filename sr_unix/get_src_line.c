@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -285,7 +285,8 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 	char			srcnamebuf[SIZEOF(mident_fixed) + STR_LIT_LEN(DOTM) + 1];
 	FILE			*fp;
 	gtm_rtn_src_chksum_ctx	checksum_ctx;
-	int			fclose_res, fdd, fsd, line_indx, *lt_ptr, rc, size, srcfilnamlen, srcrecs;
+	int			fclose_res, fdd, fsd, line_indx, *lt_ptr, rc, srcfilnamlen, srcrecs;
+	unsigned int		size;
 	mstr			*base, *current, src, *top;
 	off_t			srcsize;
 	routine_source		*src_tbl;
@@ -359,8 +360,8 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 			if (0 != rc)
 			{
 				free(srcfile_name);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL,
-						5, LEN_AND_LIT("stat"), CALLFROM, rc);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL,
+					5, LEN_AND_LIT("stat"), CALLFROM, rc);
 			}
 			srcsize = srcfile_stat.st_size;
 		} else
@@ -406,7 +407,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 				}
 			} else
 			{
-				size = (int)STRLEN(buff);
+				size = strlen(buff);
 				prev_srcptr = srcptr;
 				srcptr += size;
 				if ((NULL == src_tbl->srcbuff) || (srcptr > srcptr_max))
@@ -416,7 +417,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 					size = 0;
 				} else
 				{	/* Read size fits in the destination buffer */
-					memcpy(prev_srcptr, buff, size);
+					memcpy((void *)prev_srcptr, (void *)buff, (size_t)size);
 					/* Strip trailing '\n' if any (if at least one byte was read in) */
 					if (size && ('\n' == buff[size - 1]))
 						size--;
@@ -430,7 +431,8 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 		if (size)
 		{
 			assert((prev_srcptr + size) <= srcptr_max);
-			current->len = size;
+			assert(MAXPOSINT4 >= size);
+			current->len = (mstr_len_t)size;
 			current->addr = (char *)prev_srcptr;
 		} else
 		{

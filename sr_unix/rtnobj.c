@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2020 Fidelity National Information	*
+ * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -391,8 +391,8 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 	if (!grab_latch(&relinkrec->rtnobj_latch, RLNKREC_LATCH_TIMEOUT_SEC, NOT_APPLICABLE, NULL))
 	{
 		assert(FALSE);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
-				ERR_RLNKRECLATCH, 3, relinkrec->rtnname_fixed.c, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5)
+			ERR_RLNKRECLATCH, 3, relinkrec->rtnname_fixed.c, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
 	}
 	do
 	{
@@ -406,8 +406,8 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 			{
 				assert(FALSE);
 				rel_latch(&relinkrec->rtnobj_latch);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4)
-						ERR_RLNKSHMLATCH, 2, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4)
+					ERR_RLNKSHMLATCH, 2, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
 			}
 			has_relinkctl_lock = TRUE;
 		}
@@ -483,8 +483,8 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 			{
 				assert(FALSE);
 				rel_latch(&relinkrec->rtnobj_latch);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4)
-						ERR_RLNKSHMLATCH, 2, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4)
+					ERR_RLNKSHMLATCH, 2, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
 			}
 			has_relinkctl_lock = TRUE;
 		}
@@ -569,11 +569,11 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 				rel_latch(&shm_hdr->relinkctl_latch);
 				rel_latch(&relinkrec->rtnobj_latch);
 				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10 + PERMGENDIAG_ARG_COUNT)
-						ERR_RELINKCTLERR, 2, RTS_ERROR_MSTR(&linkctl->zro_entry_name),
-						ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("rtnobj"),
-						RTS_ERROR_MSTR(&linkctl->zro_entry_name),
-						PERMGENDIAG_ARGS(pdd));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10 + PERMGENDIAG_ARG_COUNT)
+					ERR_RELINKCTLERR, 2, RTS_ERROR_MSTR(&linkctl->zro_entry_name),
+					ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("rtnobj"),
+					RTS_ERROR_MSTR(&linkctl->zro_entry_name),
+					PERMGENDIAG_ARGS(pdd));
 			}
 			if (-1 == shmctl(shmid, IPC_STAT, &shmstat))
 			{
@@ -907,8 +907,8 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 	if (!latch_grabbed && !grab_latch(&relinkrec->rtnobj_latch, RLNKREC_LATCH_TIMEOUT_SEC, NOT_APPLICABLE, NULL))
 	{
 		assert(FALSE);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
-				ERR_RLNKRECLATCH, 3, relinkrec->rtnname_fixed.c, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5)
+			ERR_RLNKRECLATCH, 3, relinkrec->rtnname_fixed.c, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
 	}
 	assert(0 < rtnobj->refcnt);
 	assert(TREF(ydb_autorelink_keeprtn) || (REFCNT_INACCURATE != rtnobj->refcnt));
@@ -965,7 +965,7 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 	{
 		assert(FALSE);
 		rel_latch(&relinkrec->rtnobj_latch);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RLNKSHMLATCH, 2, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_RLNKSHMLATCH, 2, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
 	}
 	assert(rtnobj->objLen <= rtnobj_shm_hdr->real_len);
 	assert(elemSize <= rtnobj_shm_hdr->used_len);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -59,9 +59,9 @@ void op_gvput(mval *var)
 	 */
 	if (((RESERVED_NAMESPACE_LEN <= gv_currkey->end) && (0 == MEMCMP_LIT(gv_currkey->base, RESERVED_NAMESPACE)))
 			&& (!IS_STATSDB_REGNAME(gv_cur_region) || gv_cur_region->read_only))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PCTYRESERVED);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_PCTYRESERVED);
 	if (gv_cur_region->read_only)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	if ((TREF(gv_last_subsc_null) || TREF(gv_some_subsc_null)) && (ALWAYS != gv_cur_region->null_subs))
 		sgnl_gvnulsubsc(NONULLSUBS);
 	is_trigger = (STRNCMP_LIT((char *) gv_currkey->base, "#t") == 0) ? TRUE : FALSE;
@@ -115,8 +115,8 @@ void op_gvput(mval *var)
 		if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 			end = &buff[MAX_ZWR_KEY_SZ - 1];
 		gv_currkey->end = 0;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_REC2BIG, 4, var->str.len, (int4)gv_cur_region->max_rec_size,
-			  REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, end - buff, buff);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_REC2BIG, 4, var->str.len, (int4)gv_cur_region->max_rec_size,
+			REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, end - buff, buff);
 	}
 }
 

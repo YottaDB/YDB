@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2019 Fidelity National Information	*
+ * Copyright (c) 2007-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -93,7 +93,7 @@ boolean_t	wcs_write_in_progress_wait(node_local_ptr_t cnl, cache_rec_ptr_t cr, w
 						 */
 						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_WRITEWAITPID, 6, process_id,
 								DEBUG_ONLY(TWICE) PRO_ONLY(ONCE),
-								cr->epid, cr->blk, DB_LEN_STR(gv_cur_region));
+								cr->epid, &(cr->blk), DB_LEN_STR(gv_cur_region));
 						GET_C_STACK_FROM_SCRIPT("WRITEWAITPID", process_id, cr->epid,
 									DEBUG_ONLY(TWICE) PRO_ONLY(ONCE));
 						if (cr->dirty && cr->epid && !is_proc_alive(cr->epid, 0))

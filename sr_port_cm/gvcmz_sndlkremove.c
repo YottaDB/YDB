@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,15 +28,20 @@
 
 GBLDEF unsigned char	cmlk_num;
 
+error_def(ERR_BADSRVRNETMSG);
+
 void gvcmz_sndlkremove(struct CLB *lnk, unsigned char oper, unsigned char cancel)
 {
 	uint4		status,count;
 	unsigned char	*ptr;
 	mlk_pvtblk	*temp,*temp1;
 
+<<<<<<< HEAD
 	error_def(ERR_BADSRVRNETMSG);
 
 	ASSERT_IS_LIBGNPCLIENT;
+=======
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	ptr = lnk->mbf;
 	*ptr++ = cancel;
 	*ptr++ = oper;
@@ -77,7 +87,7 @@ void gvcmz_sndlkremove(struct CLB *lnk, unsigned char oper, unsigned char cancel
 	if (*(lnk->mbf) != CMMS_M_LKDELETED)
 	{
 		if (*(lnk->mbf) != CMMS_E_ERROR)
-			rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+			RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
 		gvcmz_errmsg(lnk,FALSE);
 	}
 }

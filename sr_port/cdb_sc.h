@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,8 @@
 
 #ifndef CDB_SC
 #define CDB_SC
+
+#include "gdsroot.h"
 
 /*********************************  WARNING:  ***********************************
 *   Several of these codes are concurrently defined in GVCST_BLK_SEARCH.MAR,	*
@@ -61,7 +63,7 @@ MBSTART {															\
 	{	/* next 4 lines of code are identical to TP_TRACE_HIST (below), but repetion saves an if when it matters */	\
 		assert(dollar_tlevel);												\
 		TAREF1(t_fail_hist_blk, t_tries) = ((block_id)BLK_NUM);								\
-		TAREF1(tp_fail_hist, t_tries) = (gv_namehead *)(((int)BLK_NUM & ~(-BLKS_PER_LMAP)) ? BLK_TARGET : NULL);	\
+		TAREF1(tp_fail_hist, t_tries) = (gv_namehead *)(((block_id)BLK_NUM & ~(-BLKS_PER_LMAP)) ? BLK_TARGET : NULL);	\
 		TAREF1(tp_fail_hist_reg, t_tries) = gv_cur_region;								\
 		(CSD)->tp_cdb_sc_blkmod[(N)]++;											\
 		TREF(blkmod_fail_level) = (LEVEL);										\
@@ -93,7 +95,7 @@ MBSTART {															\
 	{															\
 		assert(dollar_tlevel);												\
 		TAREF1(t_fail_hist_blk, t_tries) = ((block_id)BLK_NUM);								\
-		TAREF1(tp_fail_hist, t_tries) = (gv_namehead *)(((int)BLK_NUM & ~(-BLKS_PER_LMAP)) ? BLK_TARGET : NULL);	\
+		TAREF1(tp_fail_hist, t_tries) = (gv_namehead *)(((block_id)BLK_NUM & ~(-BLKS_PER_LMAP)) ? BLK_TARGET : NULL);	\
 		TAREF1(tp_fail_hist_reg, t_tries) = gv_cur_region;								\
 	}															\
 } MBEND

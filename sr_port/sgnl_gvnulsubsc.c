@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -39,6 +39,6 @@ void sgnl_gvnulsubsc(char *place)
 	gv_currkey->end = 0;
 	if (NULL == place)
 		place = NONULLSUBS;
-	rts_error_csa(NULL, VARLSTCNT(10) ERR_NULSUBSC, 4, STRLEN(place), place, DB_LEN_STR(gv_cur_region),
+	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_NULSUBSC, 4, STRLEN(place), place, DB_LEN_STR(gv_cur_region),
 		ERR_GVIS, 2, end - &buff[0], &buff[0]);
 }

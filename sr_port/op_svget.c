@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -531,7 +531,7 @@ void op_svget(int varnum, mval *v)
 			}
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTDATA:
 #			ifdef GTM_TRIGGER
@@ -542,7 +542,7 @@ void op_svget(int varnum, mval *v)
 			memcpy(v, (NULL != dollar_ztdata) ? dollar_ztdata : &literal_null, SIZEOF(mval));
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTDELIM:
 #			ifdef GTM_TRIGGER
@@ -553,7 +553,7 @@ void op_svget(int varnum, mval *v)
 				memcpy(v, dollar_ztdelim, SIZEOF(mval));
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTOLDVAL:
 #			ifdef GTM_TRIGGER
@@ -564,7 +564,7 @@ void op_svget(int varnum, mval *v)
 			memcpy(v, (NULL != dollar_ztoldval) ? dollar_ztoldval : &literal_null, SIZEOF(mval));
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTRIGGEROP:
 #			ifdef GTM_TRIGGER
@@ -573,7 +573,7 @@ void op_svget(int varnum, mval *v)
 			memcpy(v, (NULL != dollar_ztriggerop) ? dollar_ztriggerop : &literal_null, SIZEOF(mval));
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTUPDATE:
 #			ifdef GTM_TRIGGER
@@ -584,7 +584,7 @@ void op_svget(int varnum, mval *v)
 				   : &literal_null), SIZEOF(mval));
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTVALUE:
 #			ifdef GTM_TRIGGER
@@ -595,7 +595,7 @@ void op_svget(int varnum, mval *v)
 			memcpy(v, (NULL != dollar_ztvalue) ? dollar_ztvalue : &literal_null, SIZEOF(mval));
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTWORMHOLE:
 #			ifdef GTM_TRIGGER
@@ -610,7 +610,7 @@ void op_svget(int varnum, mval *v)
 			write_ztworm_jnl_rec = TRUE;
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTSLATE:
 #			ifdef GTM_TRIGGER
@@ -621,14 +621,14 @@ void op_svget(int varnum, mval *v)
 			memcpy(v, mvp, SIZEOF(mval));
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTLEVEL:
 #			ifdef GTM_TRIGGER
 			MV_FORCE_MVAL(v, gtm_trigger_depth);
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZONLNRLBK:
 #			ifdef UNIX
@@ -636,7 +636,7 @@ void op_svget(int varnum, mval *v)
 			MV_FORCE_MVAL(v, count);
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZCLOSE:
 #			ifdef UNIX
@@ -644,7 +644,7 @@ void op_svget(int varnum, mval *v)
 			MV_FORCE_MVAL(v, count);
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZKEY:
 			get_dlr_zkey(v);
@@ -662,7 +662,7 @@ void op_svget(int varnum, mval *v)
 			i2usmval(v, mlk_last_hash);
 			break;
 		default:
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSVN);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVSVN);
 	}
 	if (!(MVTYPE_IS_SQLNULL(v->mvtype)))
 	{

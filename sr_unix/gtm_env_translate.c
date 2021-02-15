@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -77,17 +77,17 @@ mval *gtm_env_translate(mval *val1, mval *val2, mval *val_xlated)
 		val_xlated->str.len = (mstr_len_t)out.length;
 		val_xlated->str.addr = out.address;
 		if (MAX_DBSTRLEN < val_xlated->str.len)
-			rts_error(VARLSTCNT(4) ERR_XTRNRETVAL, 2, val_xlated->str.len, MAX_DBSTRLEN);
+			RTS_ERROR_ABT(VARLSTCNT(4) ERR_XTRNRETVAL, 2, val_xlated->str.len, MAX_DBSTRLEN);
 		if (0 != ret_gtm_env_xlate)
 		{
 			if ((val_xlated->str.len) && (val_xlated->str.addr))
-				rts_error(VARLSTCNT(6) ERR_XTRNTRANSERR, 0, ERR_TEXT,  2,
-					  val_xlated->str.len, val_xlated->str.addr);
+				RTS_ERROR_ABT(VARLSTCNT(6) ERR_XTRNTRANSERR, 0, ERR_TEXT,  2,
+					val_xlated->str.len, val_xlated->str.addr);
 			else
-				rts_error(VARLSTCNT(1) ERR_XTRNTRANSERR);
+				RTS_ERROR_ABT(VARLSTCNT(1) ERR_XTRNTRANSERR);
 		}
 		if ((NULL == val_xlated->str.addr) && (0 != val_xlated->str.len))
-			rts_error(VARLSTCNT(1)ERR_XTRNRETSTR);
+			RTS_ERROR_ABT(VARLSTCNT(1)ERR_XTRNRETSTR);
 		val_xlated->mvtype = MV_STR;
 		val1 = val_xlated;
 	}

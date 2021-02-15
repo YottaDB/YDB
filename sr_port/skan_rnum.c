@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
@@ -51,7 +51,7 @@ sm_uc_ptr_t skan_rnum(sm_uc_ptr_t bp, bool over_run)
 #		ifdef BLK_NUM_64BIT
 		blk_id_size = SIZEOF(block_id_64);
 #		else
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #		endif
 	} else
 	{

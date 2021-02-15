@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -105,7 +110,7 @@ void finish_object_file(void)
 	if (emit_buff_used)
 		buff_emit();
 	if ((off_t)-1 == lseek(object_file_des, (off_t)0, SEEK_SET))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 }
 
 void drop_object_file(void)
@@ -114,8 +119,10 @@ void drop_object_file(void)
 
         if (FD_INVALID != object_file_des)
         {
-		UNLINK(object_file_name);
+		rc = UNLINK(object_file_name);
+		assert(!rc);
 		CLOSEFILE_RESET(object_file_des, rc);	/* resets "object_file_des" to FD_INVALID */
+		assert(!rc);
         }
 }
 
@@ -219,7 +226,7 @@ void emit_immed(char *source, uint4 size)
 	if (run_time)
 	{
 		if (!IS_STP_SPACE_AVAILABLE(size))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STRINGOFLOW);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STRINGOFLOW);
 		memcpy(stringpool.free, source, size);
 		stringpool.free += size;
 	} else
@@ -248,7 +255,7 @@ void buff_emit(void)
 	uint4 stat;
 
 	if (-1 == write(object_file_des, emit_buff, emit_buff_used))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 	emit_buff_used = 0;
 }
 

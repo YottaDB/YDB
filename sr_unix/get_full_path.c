@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -29,13 +29,23 @@
 error_def(ERR_FILENAMETOOLONG);
 
 /* Gets the full path name for a given file name. Prepends the CWD, even if the file does not exist. */
-boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, unsigned int *full_len, int max_len, uint4 *status)
+boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, unsigned int *full_len,
+		unsigned int max_len, uint4 *status)
 {
+<<<<<<< HEAD
 	char	*cptr, *c1;
 	char	cwdbuf[YDB_PATH_MAX];
 	int	cwd_len;
 	int	i, length;
 	char	*getcwd_res;
+=======
+	char		*cptr, *c1;
+	char		cwdbuf[GTM_PATH_MAX];
+	unsigned int	cwd_len, dir_len, newfn_len, trim_len;
+	int		i;
+	char		*getcwd_res;
+	unsigned int	length;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 
 	if ('/' == *orig_fn)
 	{	/* The original path is already complete */
@@ -55,7 +65,7 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 			*status = errno;
 			return FALSE;
 		}
-		cwd_len = STRLEN(cwdbuf);
+		cwd_len = strlen(cwdbuf);
 		cptr = orig_fn;
 		if (('.' == *cptr)  &&  ('.' == *(cptr + 1)))
 		{
@@ -69,26 +79,37 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 			for (c1 = &cwdbuf[cwd_len - 1];  i > 0;  --i)
 				while ('/' != *c1)
 					--c1;
-			if ((length = (int)((c1 - cwdbuf) + orig_len - (cptr - orig_fn))) + 1 > max_len) /* Warning - assignment */
+			assert(c1 >= cwdbuf);
+			dir_len = (unsigned int)(c1 - cwdbuf);
+			assert(cptr >= orig_fn);
+			trim_len = (unsigned int)(cptr - orig_fn);
+			assert(orig_len >= trim_len);
+			newfn_len = orig_len - trim_len;
+			length = dir_len + newfn_len;
+			if (max_len < (length + 1))
 			{
 				*status = ERR_FILENAMETOOLONG;
 				return FALSE;
 			}
-			memcpy(full_fn, cwdbuf, MIN((c1 - cwdbuf), max_len)); /* 4SCA: max_len is the sizeof full_fn */
-			memcpy(full_fn + (c1 - cwdbuf), cptr, MIN((orig_len - (cptr - orig_fn)), (max_len - (c1 - cwdbuf))));
+			memcpy(full_fn, cwdbuf, dir_len);
+			memcpy(full_fn + dir_len, cptr, newfn_len);
 		} else
 		{
 			if ('.' == *cptr && '/' == (*(cptr + 1)))
 				cptr += 2;
-			if (((length = (int)(cwd_len + 1 + orig_len - (cptr - orig_fn))) + 1) > max_len) /* Warning - assignment */
+			assert(cptr >= orig_fn);
+			trim_len = (unsigned int)(cptr - orig_fn);
+			assert(orig_len >= trim_len);
+			newfn_len = orig_len - trim_len;
+			length = cwd_len + 1 + newfn_len;
+			if (max_len < (length + 1))
 			{
 				*status = ERR_FILENAMETOOLONG;
 				return FALSE;
 			}
 			memcpy(full_fn, cwdbuf, cwd_len);
-			full_fn[cwd_len] = '/';
-			memcpy(full_fn + cwd_len + 1, cptr,	/* 4SCA: max_len is the sizeof full_fn */
-								MIN((orig_len - (cptr - orig_fn)), (max_len - cwd_len - 1)));
+			full_fn[cwd_len++] = '/';
+			memcpy(full_fn + cwd_len, cptr, newfn_len);
 		}
 	}
 	*full_len = length;

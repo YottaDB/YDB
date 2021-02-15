@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2006-2019 Fidelity National Information		;
+; Copyright (c) 2006-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	;
@@ -169,8 +169,8 @@ key2blk:
 	; the computation below allows for at least 1 max-key record in a data OR index block.
 	; since an index block always contains a *-key, we need to account for that too.
 	; bs:block size, y:supportable max key size, f:size of reserved bytes, ks:key size
-	set len("block_id")=4	;size of block_id
-	set len("bstar_rec")=8	;size for bstar record
+	set len("block_id")=8	;size of block_id
+	set len("bstar_rec")=12	;size for bstar record
 	if REGION="TEMPLATE" quit  ; do not do keysize/blksize check for TEMPLATE region as this is not a real region
 	set y=bs-f-SIZEOF("blk_hdr")-SIZEOF("rec_hdr")-len("block_id")-len("bstar_rec")
 	if ks>y set verified=0 do message^GDE(gdeerr("KEYSIZIS"),$zwrite(ks)),message^GDE(gdeerr("KEYFORBLK"),$zwrite(bs)_":"_$zwrite(f)_":"_$zwrite(y)),message^GDE(gdeerr("REGIS"),$zwrite(REGION))
@@ -201,7 +201,12 @@ RQUALS(rquals)
 	for  set s=$order(rquals(s)) quit:'$length(s)  do regelm
 	quit:'verified verified
 	if $data(rquals("FILE_NAME")),$zlength(rquals("FILE_NAME"))>(SIZEOF("file_spec")-1) set verified=0
+<<<<<<< HEAD
 	if  do message^GDE($$info(gdeerr("VALTOOLONG")),$zwrite(rquals("FILE_NAME"))_":"_$zwrite(SIZEOF("file_spec")-1)_":""Journal filename""") do message^GDE(gdeerr("REGIS"),$zwrite(REGION))
+=======
+	if  do
+	. zmessage $$info(gdeerr("VALTOOLONG")):rquals("FILE_NAME"):SIZEOF("file_spec")-1:"Journal filename",gdeerr("REGIS"):REGION
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	set ks="KEY_SIZE",ks=$select($data(rquals(ks)):rquals(ks),$data(regs(REGION,ks)):regs(REGION,ks),1:tmpreg(ks))
 	set x="RECORD_SIZE",x=$select($data(rquals(x)):rquals(x),$data(regs(REGION,x)):regs(REGION,x),1:tmpreg(x))
 	do allocchk(.rquals)
@@ -255,4 +260,3 @@ TRQUALS(rquals)
 TSQUALS(am,squals)
 	n REGION,SEGMENT s (REGION,SEGMENT)="TEMPLATE"
 	q $$SQUALS(am,.squals)
-

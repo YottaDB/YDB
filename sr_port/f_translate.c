@@ -71,7 +71,11 @@ int f_translate(oprtype *a, opctype op)
 			&& (TRIP_REF == args[0]->operand[1].oprval.tref->operand[1].oprclass));
 	/* If the second and third parameters are literals, pre-calculate the translation table and store it in the stringpool */
 	if ((OC_LIT == args[1]->operand[0].oprval.tref->opcode) && (OC_LIT == args[2]->operand[0].oprval.tref->opcode))
+<<<<<<< HEAD
 	{	/* we only do this if we have search and replace literals */
+=======
+	{	/* we only do this if we have search and reolace literals */
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		srch_mval = &args[1]->operand[0].oprval.tref->operand[0].oprval.mlit->v;
 		rplc_mval = &args[2]->operand[0].oprval.tref->operand[0].oprval.mlit->v;
 		assert(MV_STR & srch_mval->mvtype);

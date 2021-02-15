@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
@@ -107,8 +107,27 @@
 /* The macro to perform 64-bit multiplication without losing precision due to overflow with 32-bit
  * multiplication. With the increase of PAT_MAX_REPEAT from 32K to 1MB, the values of result and
  * the expression value can potentially be as large as (1MB * 1MB).
- * NOTE: The macro expects result to be declared with type gtm_uint64_t */
-#define BOUND_MULTIPLY(X, Y, RESULT) 	(((RESULT = (((gtm_uint64_t)X) * ((gtm_uint64_t)Y))) >= (gtm_uint64_t)PAT_MAX_REPEAT) ? PAT_MAX_REPEAT : (int)(RESULT))	/* BYPASSOKLENGTH */
+ */
+#define OLD_BOUND_MULTIPLY(X, Y, RESULT) 	(((RESULT = (((gtm_uint64_t)X) * ((gtm_uint64_t)Y))) >= (gtm_uint64_t)PAT_MAX_REPEAT) ? PAT_MAX_REPEAT : (int)(RESULT))	/* BYPASSOKLENGTH */
+#define BOUND_MULTIPLY(X, Y, RESULT) 	(int)(bound_multiply(X, Y, PAT_MAX_REPEAT))
+#ifndef INLINE_BOUND_MULTIPLY
+#define INLINE_BOUND_MULTIPLY
+/* Inline function replacement of the above macro that handles overflows in 32-bit multiplication
+ * of 1MiB integers in a type safe way visible by external static code analyzers. */
+static inline gtm_int64_t bound_multiply(gtm_int64_t x, gtm_int64_t y, gtm_int64_t limit)
+{
+	gtm_int64_t bound, oldresult;
+	gtm_int64_t result;
+
+	assert((0 <= x) && (0 <= y));
+	oldresult = OLD_BOUND_MULTIPLY(x, y, bound);
+	result = (x * y);
+	if (limit <= result)
+		result = limit;
+	assert(oldresult == result);
+	return result;
+}
+#endif
 
 /*  Compiled Pattern
  *  -----------------

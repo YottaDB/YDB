@@ -218,6 +218,14 @@ boolean_t clean_mum_tstart(void);
  */
 boolean_t clean_mum_tstart(void)
 {
+<<<<<<< HEAD
+=======
+	stack_frame	*save_zyerr_frame, *fp, *fpprev;
+	boolean_t	save_check_flag;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	if (NULL != zyerr_frame)
 	{
 		while ((NULL != frame_pointer) && (NULL != zyerr_frame))
@@ -231,6 +239,7 @@ boolean_t clean_mum_tstart(void)
 			indr_stringpool = stringpool;
 			stringpool = rts_stringpool;
 		}
+		TREF(compile_time) = FALSE;	/* Switching back to run-time */
 		return TRUE;
 	}
 	return (NULL != err_act);
@@ -251,6 +260,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 	jnlpool_addrs_ptr_t	local_jnlpool;
 	sgmnt_addrs		*csa;
 	stack_frame		*fp;
+<<<<<<< HEAD
+=======
+	boolean_t		error_in_zyerror;
+	boolean_t		compile_time;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	boolean_t		repeat_error, etrap_handling, reset_mpc;
 	int			level, rc;
 	boolean_t		reserve_sock_dev = FALSE;
@@ -611,6 +625,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 #	endif
  	err_dev = active_device;
 	active_device = (io_desc *)NULL;
+<<<<<<< HEAD
 	/* Determine if the error occurred on a action from direct mode. */
 	if (prin_dm_io)
 	{	/* "prin_dm_io" is TRUE implies we got an error while writing in direct mode. No more checks needed. */
@@ -647,6 +662,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 			assert(NULL != fp->old_frame_pointer);
 		}
 	}
+=======
+	compile_time = TREF(compile_time);
+	dm_action = (prin_dm_io || (frame_pointer->old_frame_pointer->type & SFT_DM)
+		|| (compile_time && (frame_pointer->type & SFT_DM)));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	/* The errors are said to be transcendental when they occur during compilation/execution
 	 * of the error trap ({z,e}trap, device exception) or $zinterrupt. The errors in other
 	 * indirect code frames (zbreak, zstep, xecute etc.) aren't defined to be trancendental
@@ -1158,7 +1178,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		if (dm_action)
 		{
 			PRN_ERROR;
-			if (TREF(compile_time) && (((int)ERR_LABELMISSING) != SIGNAL))
+			if (compile_time && (((int)ERR_LABELMISSING) != SIGNAL))
 				show_source_line(TRUE);
 		}
 	}

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +34,7 @@ void	op_indlvarg(mval *v, mval *dst)
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(v);
 	if (v->str.len < 1)
-		rts_error(VARLSTCNT(1) ERR_VAREXPECTED);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_VAREXPECTED);
 	if (valid_mname(&v->str))
 	{
 		*dst = *v;
@@ -41,7 +42,7 @@ void	op_indlvarg(mval *v, mval *dst)
 		return;
 	}
 	if (*v->str.addr != '@')
-		rts_error(VARLSTCNT(1) ERR_VAREXPECTED);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_VAREXPECTED);
 	indir_src.str = v->str;
 	indir_src.code = indir_lvarg;
 	if (NULL == (obj = cache_get(&indir_src)))

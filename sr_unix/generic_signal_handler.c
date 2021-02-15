@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -155,8 +155,8 @@ static inline void check_for_statsdb_memerr()
 		TREF(statsdb_memerr) = TRUE;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STATSDBMEMERR, 2, gv_cur_region->dyn.addr->fname_len,
 				gv_cur_region->dyn.addr->fname);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STATSDBMEMERR, 2, gv_cur_region->dyn.addr->fname_len,
-				gv_cur_region->dyn.addr->fname);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_STATSDBMEMERR, 2, gv_cur_region->dyn.addr->fname_len,
+			gv_cur_region->dyn.addr->fname);
 	}
 }
 

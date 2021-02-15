@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +34,7 @@ void op_indname(mval *dst, mval *target, mval *subs)
 	ENSURE_STP_FREE_SPACE(MAX_SRCLINE);
 	start = out = stringpool.free;
 	if ((target->str.len + subs->str.len) > MAX_SRCLINE)
-		rts_error(VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
+		RTS_ERROR_ABT(VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
 	memcpy(out, target->str.addr, target->str.len);
 	out += target->str.len;
 	if (*start == '@')

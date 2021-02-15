@@ -113,7 +113,7 @@ void dse_dmp_fhead (void)
 	csa = cs_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
-        jnl_state = (enum jnl_state_codes)csd->jnl_state;
+	jnl_state = (enum jnl_state_codes)csd->jnl_state;
 	jnl_buff_open = (0 != cnl->jnl_file.u.inode);
 	activeque_cnt = cnl->wcs_active_lvl;
 	wipque_cnt = cnl->wcs_wip_lvl;
@@ -127,124 +127,133 @@ void dse_dmp_fhead (void)
 		util_out_print("Date/Time       !AD [$H = !AD]", TRUE, zdate_mval.str.len, zdate_mval.str.addr,
 				dollarh_mval.str.len, dollarh_mval.str.addr);
 		is_mm = (csd->acc_meth == dba_mm);
-		util_out_print("  Access method                          !AD", FALSE, 2, is_mm ? "MM" : "BG");
-		util_out_print("  Global Buffers        !12UL", TRUE, csd->n_bts);
-		util_out_print("  Reserved Bytes        !19UL", FALSE, csd->reserved_bytes);
-		util_out_print("  Block size (in bytes) !12UL", TRUE, csd->blk_size);
-		util_out_print("  Maximum record size   !19UL", FALSE, csd->max_rec_size);
-		util_out_print("  Starting VBN          !12UL", TRUE, csd->start_vbn);
-		util_out_print("  Maximum key size      !19UL", FALSE, csd->max_key_size);
-		util_out_print("  Total blocks            0x!XL", TRUE, csa->ti->total_blks);
-		util_out_print("  Null subscripts              !AD", FALSE, 12,
+		util_out_print("  Access method                                  !AD", FALSE, 2, is_mm ? "MM" : "BG");
+		util_out_print("  Global Buffers                !12UL", TRUE, csd->n_bts);
+		util_out_print("  Reserved Bytes                !19UL", FALSE, csd->reserved_bytes);
+		util_out_print("  Block size (in bytes)         !12UL", TRUE, csd->blk_size);
+		util_out_print("  Maximum record size           !19UL", FALSE, csd->max_rec_size);
+		util_out_print("  Starting VBN                  !12UL", TRUE, csd->start_vbn);
+		util_out_print("  Maximum key size              !19UL", FALSE, csd->max_key_size);
+		util_out_print("  Total blocks            0x!16@XQ", TRUE, &(csa->ti->total_blks));
+		util_out_print("  Null subscripts                      !AD", FALSE, 12,
 			(csd->null_subs == ALWAYS) ? "      ALWAYS" : (csd->null_subs == ALLOWEXISTING) ? "    EXISTING" :
 				"       NEVER" );
-		util_out_print("  Free blocks             0x!XL", TRUE, csa->ti->free_blocks);
+		util_out_print("  Free blocks             0x!16@XQ", TRUE, &(csa->ti->free_blocks));
 
-		/*
-		   NOTE: Currently Std Null Collation is the only entry in one line,
-		   For 64bit TN project, when some other fields will be added, this can
-		   be adjusted then - MM Oct 04
-		*/
-		util_out_print("  Standard Null Collation       !AD", FALSE, 11,
+		util_out_print("  Standard Null Collation               !AD", FALSE, 11,
 			(csd->std_null_coll) ? "       TRUE" : "      FALSE");
-		util_out_print("  Free space              0x!XL", TRUE, csd->free_space);
-		util_out_print("  Last Record Backup     0x!16@XQ", FALSE, &csd->last_rec_backup);
-		util_out_print ("  Extension Count       !12UL", TRUE, csd->extension_size);
-		util_out_print("  Last Database Backup   0x!16@XQ", FALSE, &csd->last_com_backup);
+		util_out_print("  Free space                      0x!XL", TRUE, csd->free_space);
+		util_out_print("  Last Record Backup             0x!16@XQ", FALSE, &csd->last_rec_backup);
+		util_out_print("  Extension Count               !12UL", TRUE, csd->extension_size);
+		util_out_print("  Last Database Backup           0x!16@XQ", FALSE, &csd->last_com_backup);
+		/* Eventually the number of local maps field will have to be extended to accommodate the increased
+		 * DB capacity
+		 */
 		if (csd->bplmap > 0)
-			util_out_print("  Number of local maps  !12UL", TRUE,
+			util_out_print("  Number of local maps          !12UL", TRUE,
 				(csa->ti->total_blks + csd->bplmap - 1) / csd->bplmap);
 		else
-			util_out_print("  Number of local maps            ??", TRUE);
-		util_out_print("  Last Bytestream Backup 0x!16@XQ", FALSE, &csd->last_inc_backup);
-		util_out_print("  Lock space              0x!XL", TRUE, csd->lock_space_size / OS_PAGELET_SIZE);
-		util_out_print("  In critical section            0x!XL", FALSE, cnl->in_crit);
-		util_out_print("  Timers pending        !12UL", TRUE, cnl->wcs_timers + 1);
+			util_out_print("  Number of local maps                    ??", TRUE);
+		util_out_print("  Last Bytestream Backup         0x!16@XQ", FALSE, &csd->last_inc_backup);
+		util_out_print("  Lock space                      0x!XL", TRUE, csd->lock_space_size / OS_PAGELET_SIZE);
+		util_out_print("  In critical section                    0x!XL", FALSE, cnl->in_crit);
+		util_out_print("  Timers pending                !12UL", TRUE, cnl->wcs_timers + 1);
 		if (FROZEN_BY_ROOT == csd->freeze)
-			util_out_print("  Cache freeze id            FROZEN BY ROOT", FALSE);
+			util_out_print("  Cache freeze id                    FROZEN BY ROOT", FALSE);
 		else
+<<<<<<< HEAD
 			util_out_print("  Cache freeze id                0x!XL", FALSE, (csd->freeze)? csd->freeze : 0);
 		dse_puttime(&csd->flush_time, "  Flush timer            !AD", TRUE);
 		util_out_print("  Freeze match                   0x!XL", FALSE, csd->image_count ? csd->image_count : 0);
 		util_out_print("  Flush trigger         !12UL", TRUE, csd->flush_trigger);
 		util_out_print("  Freeze online                 !AD", FALSE, 11,
+=======
+			util_out_print("  Cache freeze id                        0x!XL", FALSE, (csd->freeze)? csd->freeze : 0);
+		dse_puttime(csd->flush_time, "  Flush timer                    !AD", TRUE);
+		util_out_print("  Freeze match                           0x!XL", FALSE, csd->image_count ? csd->image_count : 0);
+		util_out_print("  Flush trigger                 !12UL", TRUE, csd->flush_trigger);
+		util_out_print("  Freeze online                         !AD", FALSE, 11,
+>>>>>>> 451ab477 (GT.M V7.0-000)
 					(cnl->freeze_online) ? "       TRUE" : "      FALSE");
-		util_out_print("  Freeze online autorelease    !AD", TRUE, 5,
+		util_out_print("  Freeze online autorelease            !AD", TRUE, 5,
 					(cnl->freeze_online & CHILLED_AUTORELEASE_MASK) ? " TRUE" : "FALSE");
-		util_out_print("  Current transaction    0x!16@XQ", FALSE, &csa->ti->curr_tn);
-		util_out_print("  No. of writes/flush   !12UL", TRUE, csd->n_wrt_per_flu);
-		util_out_print("  Maximum TN             0x!16@XQ", FALSE, &csd->max_tn);
+		util_out_print("  Current transaction            0x!16@XQ", FALSE, &csa->ti->curr_tn);
+		util_out_print("  No. of writes/flush           !12UL", TRUE, csd->n_wrt_per_flu);
+		util_out_print("  Maximum TN                     0x!16@XQ", FALSE, &csd->max_tn);
 		if (GDSVLAST > csd->certified_for_upgrade_to)
-			util_out_print("  Certified for Upgrade to        !AD", TRUE,
+			util_out_print("  Certified for Upgrade to                !AD", TRUE,
 				LEN_AND_STR(gtm_dbversion_table[csd->certified_for_upgrade_to]));
 		else	/* out of range so print hex */
-			util_out_print("  Certified for Upgrade to 0x!XL", TRUE, csd->certified_for_upgrade_to);
-		util_out_print("  Maximum TN Warn        0x!16@XQ", FALSE, &csd->max_tn_warn);
+			util_out_print("  Certified for Upgrade to         0x!XL", TRUE, csd->certified_for_upgrade_to);
+		util_out_print("  Maximum TN Warn                0x!16@XQ", FALSE, &csd->max_tn_warn);
 		if (GDSVLAST > csd->desired_db_format)
-			util_out_print("  Desired DB Format               !AD", TRUE,
+			util_out_print("  Desired DB Format                       !AD", TRUE,
 				       LEN_AND_STR(gtm_dbversion_table[csd->desired_db_format]));
 		else	/* out of range so print hex */
-			util_out_print("  Desired DB Format       0x!XL", TRUE, csd->desired_db_format);
-		util_out_print("  Master Bitmap Size           !12UL", FALSE, csd->master_map_len / DISK_BLOCK_SIZE);
-		util_out_print("  Blocks to Upgrade       0x!XL", TRUE, csd->blks_to_upgrd);
+			util_out_print("  Desired DB Format               0x!XL", TRUE, csd->desired_db_format);
+		util_out_print("  Master Bitmap Size                   !12UL", FALSE, csd->master_map_len / DISK_BLOCK_SIZE);
+		util_out_print("  Blocks to Upgrade       0x!16@XQ", TRUE, &(csd->blks_to_upgrd));
 		if (csd->def_coll)
 		{
-			util_out_print("  Default Collation     !19UL", FALSE, csd->def_coll);
-			util_out_print("  Collation Version     !12UL", TRUE, csd->def_coll_ver);
+			util_out_print("  Default Collation             !19UL", FALSE, csd->def_coll);
+			util_out_print("  Collation Version             !12UL", TRUE, csd->def_coll_ver);
 		}
-		util_out_print("  Create in progress           !AD", FALSE, 12, (csd->createinprogress) ?
+		util_out_print("  Create in progress                   !AD", FALSE, 12, (csd->createinprogress) ?
 			"        TRUE" : "       FALSE");
-		util_out_print("  Modified cache blocks !12UL", TRUE, activeque_cnt);
-		util_out_print("  Reference count       !19UL", FALSE, cnl->ref_cnt);
-		util_out_print("  Wait Disk             !12UL", TRUE, csd->wait_disk_space);
-		util_out_print("  Journal State               !AD", (jnl_notallowed == jnl_state), 13,
+		util_out_print("  Modified cache blocks         !12UL", TRUE, activeque_cnt);
+		util_out_print("  Reference count               !19UL", FALSE, cnl->ref_cnt);
+		util_out_print("  Wait Disk                     !12UL", TRUE, csd->wait_disk_space);
+		util_out_print("  Journal State                       !AD", (jnl_notallowed == jnl_state), 13,
 				(jnl_notallowed != jnl_state) ?
 				((jnl_closed == jnl_state) ? "          OFF"
 				 : (jnl_buff_open ? "           ON" : "[inactive] ON")) : "     DISABLED");
 		if (jnl_notallowed != jnl_state)
 		{
-			util_out_print("  Journal Before imaging       !AD", TRUE,
+			util_out_print("  Journal Before imaging               !AD", TRUE,
 				5, (csd->jnl_before_image) ? " TRUE" : "FALSE");
-			util_out_print("  Journal Allocation    !19UL", FALSE, csd->jnl_alq);
-			util_out_print("  Journal Extension     !12UL", TRUE, csd->jnl_deq);
-			util_out_print("  Journal Buffer Size   !19UL", FALSE, csd->jnl_buffer_size);
-			util_out_print("  Journal Alignsize     !12UL", TRUE, csd->alignsize / DISK_BLOCK_SIZE);
-			util_out_print("  Journal AutoSwitchLimit !17UL", FALSE, csd->autoswitchlimit);
-			util_out_print("  Journal Epoch Interval!12UL", TRUE, EPOCH_SECOND2SECOND(csd->epoch_interval));
-			util_out_print("  Journal Yield Limit   !19UL", FALSE, csd->yield_lmt);
-			util_out_print("  Journal Sync IO              !AD", TRUE, 5,
+			util_out_print("  Journal Allocation            !19UL", FALSE, csd->jnl_alq);
+			util_out_print("  Journal Extension             !12UL", TRUE, csd->jnl_deq);
+			util_out_print("  Journal Buffer Size           !19UL", FALSE, csd->jnl_buffer_size);
+			util_out_print("  Journal Alignsize             !12UL", TRUE, csd->alignsize / DISK_BLOCK_SIZE);
+			util_out_print("  Journal AutoSwitchLimit         !17UL", FALSE, csd->autoswitchlimit);
+			util_out_print("  Journal Epoch Interval        !12UL", TRUE, EPOCH_SECOND2SECOND(csd->epoch_interval));
+			util_out_print("  Journal Yield Limit           !19UL", FALSE, csd->yield_lmt);
+			util_out_print("  Journal Sync IO                      !AD", TRUE, 5,
 				(csd->jnl_sync_io ? " TRUE" : "FALSE"));
 			util_out_print("  Journal File: !AD", TRUE, JNL_LEN_STR(csd));
 		}
 		if (BACKUP_NOT_IN_PROGRESS != cnl->nbb)
-			util_out_print("  Online Backup NBB     !19UL", TRUE, cnl->nbb);
+			util_out_print("  Online Backup NBB             !19UL", TRUE, cnl->nbb);
 		/* Mutex Stuff */
-		util_out_print("  Mutex Hard Spin Count !19UL", FALSE, csd->mutex_spin_parms.mutex_hard_spin_count);
-		util_out_print("  Mutex Sleep Spin Count!12UL", TRUE, csd->mutex_spin_parms.mutex_sleep_spin_count);
-		util_out_print("  Mutex Queue Slots     !19UL", FALSE, NUM_CRIT_ENTRY(csd));
-		util_out_print("  KILLs in progress     !12UL", TRUE, (csd->kill_in_prog + csd->abandoned_kills));
-		util_out_print("  Replication State           !AD", FALSE, 13,
+		util_out_print("  Mutex Hard Spin Count         !19UL", FALSE, csd->mutex_spin_parms.mutex_hard_spin_count);
+		util_out_print("  Mutex Sleep Spin Count        !12UL", TRUE, csd->mutex_spin_parms.mutex_sleep_spin_count);
+		util_out_print("  Mutex Queue Slots             !19UL", FALSE, NUM_CRIT_ENTRY(csd));
+		util_out_print("  KILLs in progress             !12UL", TRUE, (csd->kill_in_prog + csd->abandoned_kills));
+		util_out_print("  Replication State                   !AD", FALSE, 13,
 			(csd->repl_state == repl_closed ? "          OFF"
 			: (csd->repl_state == repl_open ? "           ON" : " [WAS_ON] OFF")));
-		util_out_print("  Region Seqno    0x!16@XQ", TRUE, &csd->reg_seqno);
-		util_out_print("  Zqgblmod Seqno         0x!16@XQ", FALSE, &csd->zqgblmod_seqno);
-		util_out_print("  Zqgblmod Trans  0x!16@XQ", TRUE, &csd->zqgblmod_tn);
-		util_out_print("  Endian Format                      !6AZ", FALSE, ENDIANTHISJUSTIFY);
-		util_out_print("  Commit Wait Spin Count!12UL", TRUE, csd->wcs_phase2_commit_wait_spincnt);
-		util_out_print("  Database file encrypted             !AD", FALSE, 5,
+		util_out_print("  Region Seqno            0x!16@XQ", TRUE, &csd->reg_seqno);
+		util_out_print("  Zqgblmod Seqno                 0x!16@XQ", FALSE, &csd->zqgblmod_seqno);
+		util_out_print("  Zqgblmod Trans          0x!16@XQ", TRUE, &csd->zqgblmod_tn);
+		util_out_print("  Endian Format                              !6AZ", FALSE, ENDIANTHISJUSTIFY);
+		util_out_print("  Commit Wait Spin Count        !12UL", TRUE, csd->wcs_phase2_commit_wait_spincnt);
+		util_out_print("  Database file encrypted                     !AD", FALSE, 5,
 				  IS_ENCRYPTED(csd->is_encrypted) ? " TRUE" : "FALSE");
-		util_out_print("  Inst Freeze on Error         !AD", TRUE, 5, csd->freeze_on_fail ? " TRUE" : "FALSE");
-		util_out_print("  Spanning Node Absent                !AD", FALSE, 5, csd->span_node_absent ? " TRUE" : "FALSE");
-		util_out_print("  Maximum Key Size Assured     !AD", TRUE, 5, csd->maxkeysz_assured ? " TRUE" : "FALSE");
-		util_out_print("  Defer allocation                    !AD", FALSE, 5, csd->defer_allocate ? " TRUE" : "FALSE");
-		util_out_print("  Spin sleep time mask    0x!8XL", TRUE, SPIN_SLEEP_MASK(csd));
-		util_out_print("  Async IO                              !AD", FALSE, 3, csd->asyncio ? " ON" : "OFF");
+		util_out_print("  Inst Freeze on Error                 !AD", TRUE, 5, csd->freeze_on_fail ? " TRUE" : "FALSE");
+		util_out_print("  Spanning Node Absent                        !AD", FALSE, 5,
+				csd->span_node_absent ? " TRUE" : "FALSE");
+		util_out_print("  Maximum Key Size Assured             !AD", TRUE, 5, csd->maxkeysz_assured ? " TRUE" : "FALSE");
+		util_out_print("  Defer allocation                            !AD", FALSE, 5,
+				csd->defer_allocate ? " TRUE" : "FALSE");
+		util_out_print("  Spin sleep time mask            0x!8XL", TRUE, SPIN_SLEEP_MASK(csd));
+		util_out_print("  Async IO                                      !AD", FALSE, 3, csd->asyncio ? " ON" : "OFF");
 		assert(!is_mm || (0 == (activeque_cnt + wipque_cnt + freeque_cnt)));
-		util_out_print("  WIP queue cache blocks!12UL", TRUE, wipque_cnt);
-		util_out_print("  DB is auto-created                  !AD", FALSE, 5,
+		util_out_print("  WIP queue cache blocks        !12UL", TRUE, wipque_cnt);
+		util_out_print("  DB is auto-created                          !AD", FALSE, 5,
 				  (RDBF_AUTODB & csd->reservedDBFlags) ? " TRUE" : "FALSE");
-		util_out_print("  DB shares gvstats            !AD", TRUE, 5,
+		util_out_print("  DB shares gvstats                    !AD", TRUE, 5,
 				  ! (RDBF_NOSTATS & csd->reservedDBFlags) ? " TRUE" : "FALSE");
+<<<<<<< HEAD
 		util_out_print("  LOCK shares DB critical section     !AD", FALSE, 5, csd->lock_crit_with_db ? " TRUE" : "FALSE");
 		util_out_print("  Read Only                      !AD", TRUE, 3, csd->read_only ? " ON" : "OFF");
 		util_out_print("  Recover interrupted                 !AD", FALSE, 5, (csd->recov_interrupted ? " TRUE" : "FALSE"));
@@ -252,24 +261,32 @@ void dse_dmp_fhead (void)
 		util_out_print("  Max conc proc time !22UL", FALSE, csd->max_procs.time);
 		util_out_print("  Max Concurrent processes !9UL", TRUE, csd->max_procs.cnt);
 		util_out_print("  Reorg Sleep Nanoseconds !17UL", TRUE, csd->reorg_sleep_nsec);
+=======
+		util_out_print("  LOCK shares DB critical section             !AD", FALSE, 5,
+				csd->lock_crit_with_db ? " TRUE" : "FALSE");
+		util_out_print("  Read Only                              !AD", TRUE, 3, csd->read_only ? " ON" : "OFF");
+		util_out_print("  Recover interrupted                         !AD", FALSE, 5,
+				(csd->recov_interrupted ? " TRUE" : "FALSE"));
+		util_out_print("  Full Block Write                         !UL", TRUE, csd->write_fullblk);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump if -/ALL as if part of above display */
-                util_out_print(0, TRUE);
-		util_out_print("                                           ", FALSE);
-		util_out_print("  DB Current Minor Version      !4UL", TRUE, csd->minor_dbver);
-		util_out_print("  Blks Last Record Backup        0x!XL", FALSE, csd->last_rec_bkup_last_blk);
-		util_out_print("  Last GT.M Minor Version       !4UL", TRUE, csd->last_mdb_ver);
-		util_out_print("  Blks Last Stream Backup        0x!XL", FALSE, csd->last_inc_bkup_last_blk);
-		util_out_print("  DB Creation Version             !AD", TRUE,
-			       LEN_AND_STR(gtm_dbversion_table[csd->creation_db_ver]));
-		util_out_print("  Blks Last Comprehensive Backup 0x!XL", FALSE, csd->last_com_bkup_last_blk);
-		util_out_print("  DB Creation Minor Version     !4UL", TRUE, csd->creation_mdb_ver);
-                util_out_print(0, TRUE);
-		util_out_print("  Total Global Buffers           0x!XL", FALSE, csd->n_bts);
-		util_out_print("  Phase2 commit pid count 0x!XL", TRUE, cnl->wcs_phase2_commit_pidcnt);
-		util_out_print("  Dirty Global Buffers           0x!XL", FALSE, activeque_cnt);
-		util_out_print("  Write cache timer count 0x!XL", TRUE, cnl->wcs_timers);
+		util_out_print(0, TRUE);
+		util_out_print("                                                   ", FALSE);
+		util_out_print("  DB Current Minor Version              !4UL", TRUE, csd->minor_dbver);
+		util_out_print("  Blks Last Record Backup        0x!16@XQ", FALSE, &(csd->last_rec_bkup_last_blk));
+		util_out_print("  Last GT.M Minor Version               !4UL", TRUE, csd->last_mdb_ver);
+		util_out_print("  Blks Last Stream Backup        0x!16@XQ", FALSE, &(csd->last_inc_bkup_last_blk));
+		util_out_print("  DB Creation Version                     !AD", TRUE,
+				LEN_AND_STR(gtm_dbversion_table[csd->creation_db_ver]));
+		util_out_print("  Blks Last Comprehensive Backup 0x!16@XQ", FALSE, &(csd->last_com_bkup_last_blk));
+		util_out_print("  DB Creation Minor Version             !4UL", TRUE, csd->creation_mdb_ver);
+		util_out_print(0, TRUE);
+		util_out_print("  Total Global Buffers                   0x!XL", FALSE, csd->n_bts);
+		util_out_print("  Phase2 commit pid count         0x!XL", TRUE, cnl->wcs_phase2_commit_pidcnt);
+		util_out_print("  Dirty Global Buffers                   0x!XL", FALSE, activeque_cnt);
+		util_out_print("  Write cache timer count         0x!XL", TRUE, cnl->wcs_timers);
 		new_line = FALSE;
 		for (index = 0; MAX_WT_PID_SLOTS > index; index++)
 		{
@@ -282,20 +299,30 @@ void dse_dmp_fhead (void)
 			}
 		}
 		util_out_print(0, new_line);
+<<<<<<< HEAD
 		util_out_print("  Free Global Buffers            0x!XL", FALSE, freeque_cnt);
 		util_out_print("  wcs_wtstart pid count   0x!XL", TRUE, cnl->in_wtstart);
 		util_out_print("  Write Cache is Blocked              !AD", TRUE, 5, (cnl->wc_blocked ? " TRUE" : "FALSE"));
 		util_out_print("  Write Cache to be recovered         !AD", FALSE, 5,
+=======
+		util_out_print("  Free Global Buffers                    0x!XL", FALSE, freeque_cnt);
+		util_out_print("  wcs_wtstart pid count           0x!XL", TRUE, cnl->in_wtstart);
+		util_out_print("  Write Cache is Blocked                      !AD", FALSE, 5,
+				(cnl->wc_blocked ? " TRUE" : "FALSE"));
+		util_out_print("  wcs_wtstart intent cnt          0x!XL", TRUE, cnl->intent_wtstart);
+		util_out_print("  Write Cache to be recovered                 !AD", TRUE, 5,
+>>>>>>> 451ab477 (GT.M V7.0-000)
 				((WC_BLOCK_RECOVER == cnl->wc_blocked) ? " TRUE" : "FALSE"));
-		util_out_print("  wcs_wtstart intent cnt  0x!XL", TRUE, cnl->intent_wtstart);
 		util_out_print(0, TRUE);
-		util_out_print("  Quick database rundown is active    !AD", TRUE, 5, (csd->mumps_can_bypass ? " TRUE" : "FALSE"));
-		util_out_print("  Access control counter halted       !AD", FALSE,
-									5, cnl->access_counter_halted ? " TRUE" : "FALSE");
-		util_out_print("  FTOK counter halted          !AD", TRUE, 5, cnl->ftok_counter_halted ? " TRUE" : "FALSE");
-		util_out_print("  Access control rundown bypasses !9UL", FALSE, cnl->dbrndwn_access_skip);
-		util_out_print("  FTOK rundown bypasses   !10UL", TRUE, cnl->dbrndwn_ftok_skip);
-		util_out_print("  Epoch taper                         !AD", TRUE, 5, (csd->epoch_taper ? " TRUE" : "FALSE"));
+		util_out_print("  Quick database rundown is active            !AD", TRUE, 5,
+				(csd->mumps_can_bypass ? " TRUE" : "FALSE"));
+		util_out_print("  Access control counter halted               !AD", FALSE,
+				5, cnl->access_counter_halted ? " TRUE" : "FALSE");
+		util_out_print("  FTOK counter halted                  !AD", TRUE, 5, cnl->ftok_counter_halted ? " TRUE" : "FALSE");
+		util_out_print("  Access control rundown bypasses         !9UL", FALSE, cnl->dbrndwn_access_skip);
+		util_out_print("  FTOK rundown bypasses           !10UL", TRUE, cnl->dbrndwn_ftok_skip);
+		util_out_print("  Epoch taper                                 !AD", TRUE, 5,
+				(csd->epoch_taper ? " TRUE" : "FALSE"));
 		new_line = FALSE;
 		for (index = 0; MAX_WTSTART_PID_SLOTS > index; index++)
 		{
@@ -309,30 +336,30 @@ void dse_dmp_fhead (void)
 		}
 		/* Additional information regarding kills that are in progress, abandoned and inhibited */
 		util_out_print(0, TRUE);
-		util_out_print("  Actual kills in progress     !12UL", FALSE, csd->kill_in_prog);
-		util_out_print("  Abandoned Kills       !12UL", TRUE, csd->abandoned_kills);
-		util_out_print("  Process(es) inhibiting KILLs        !5UL", FALSE, cnl->inhibit_kills);
-		util_out_print("  DB is a StatsDB              !AD", TRUE, 5, IS_RDBF_STATSDB(csd) ? " TRUE" : "FALSE");
+		util_out_print("  Actual kills in progress             !12UL", FALSE, csd->kill_in_prog);
+		util_out_print("  Abandoned Kills               !12UL", TRUE, csd->abandoned_kills);
+		util_out_print("  Process(es) inhibiting KILLs                !5UL", FALSE, cnl->inhibit_kills);
+		util_out_print("  DB is a StatsDB                      !AD", TRUE, 5, IS_RDBF_STATSDB(csd) ? " TRUE" : "FALSE");
 		util_out_print(0, TRUE);
-		util_out_print("  DB Trigger cycle of ^#t      !12UL", TRUE, csd->db_trigger_cycle);
+		util_out_print("  DB Trigger cycle of ^#t              !12UL", TRUE, csd->db_trigger_cycle);
 		util_out_print(0, TRUE);
-		util_out_print("  MM defer_time                       !5SL", TRUE, csd->defer_time);
+		util_out_print("  MM defer_time                               !5SL", TRUE, csd->defer_time);
 		/* Print various database encryption information */
 		util_out_print(0, TRUE);
-		util_out_print("  DB is (re)encryptable               !AD", TRUE, 5,
+		util_out_print("  DB is (re)encryptable                       !AD", TRUE, 5,
 				TO_BE_ENCRYPTED(csd->is_encrypted) ? " TRUE" : "FALSE");
-		util_out_print("  DB encryption null IV mode          !AD", TRUE, 5,
+		util_out_print("  DB encryption null IV mode                  !AD", TRUE, 5,
 				(csd->non_null_iv ? "FALSE" : " TRUE"));
-		util_out_print("  DB encryption hash cutoff    !12SL", TRUE, csd->encryption_hash_cutoff);
-		util_out_print("  DB encr hash2 start TN 0x!16@XQ", TRUE, &csd->encryption_hash2_start_tn);
+		util_out_print("  DB encryption hash cutoff            !12SL", TRUE, csd->encryption_hash_cutoff);
+		util_out_print("  DB encr hash2 start TN         0x!16@XQ", TRUE, &csd->encryption_hash2_start_tn);
 		GET_HASH_IN_HEX(csd->encryption_hash, outbuf, GTMCRYPT_HASH_HEX_LEN);
-		util_out_print("  Database file encryption hash           !AD", TRUE, GTMCRYPT_HASH_HEX_LEN, outbuf);
+		util_out_print("  Database file encryption hash                   !AD", TRUE, GTMCRYPT_HASH_HEX_LEN, outbuf);
 		GET_HASH_IN_HEX(csd->encryption_hash2, outbuf, GTMCRYPT_HASH_HEX_LEN);
-		util_out_print("  Database file encryption hash2          !AD", TRUE, GTMCRYPT_HASH_HEX_LEN, outbuf);
+		util_out_print("  Database file encryption hash2                  !AD", TRUE, GTMCRYPT_HASH_HEX_LEN, outbuf);
 	}
 	if (NEED_TO_DUMP("SUPPLEMENTARY"))
 	{
-                util_out_print(0, TRUE);
+		util_out_print(0, TRUE);
 		assert(MAX_SUPPL_STRMS == ARRAYSIZE(csd->strm_reg_seqno));
 		for (index = 0; index < MAX_SUPPL_STRMS; index++)
 		{
@@ -342,35 +369,35 @@ void dse_dmp_fhead (void)
 	}
 	if (NEED_TO_DUMP("ENVIRONMENT"))
 	{
-		util_out_print("  Full Block Write Len  !12UL", TRUE, csa->fullblockwrite_len);
+		util_out_print("  Full Block Write Len          !12UL", TRUE, csa->fullblockwrite_len);
 	}
 	if (NEED_TO_DUMP("DB_CSH"))
 	{
-                util_out_print(0, TRUE);
+		util_out_print(0, TRUE);
 #		define TAB_DB_CSH_ACCT_REC(COUNTER,TEXT1,TEXT2)	SHOW_DB_CSH_STAT(csd, COUNTER, TEXT1, TEXT2)
 #		include "tab_db_csh_acct_rec.h"
 #		undef TAB_DB_CSH_ACCT_REC
 	}
 	if (NEED_TO_DUMP("GVSTATS"))
 	{
-                util_out_print(0, TRUE);
+		util_out_print(0, TRUE);
 #		define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)	SHOW_GVSTATS_STAT(cnl, COUNTER, TEXT1, TEXT2)
 #		include "tab_gvstats_rec.h"
 #		undef TAB_GVSTATS_REC
 	}
 	if (NEED_TO_DUMP("TPBLKMOD"))
 	{
-                util_out_print(0, TRUE);
+		util_out_print(0, TRUE);
 		assert(n_tp_blkmod_types < ARRAYSIZE(csd->tp_cdb_sc_blkmod));
-                util_out_print("  TP blkmod nomod       !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_nomod]);
-                util_out_print("  TP blkmod gvcst_srch  !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_gvcst_srch]);
-                util_out_print("  TP blkmod t_qread     !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_t_qread]);
-                util_out_print("  TP blkmod tp_tend     !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_tp_tend]);
-                util_out_print("  TP blkmod tp_hist     !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_tp_hist]);
+		util_out_print("  TP blkmod nomod                      !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_nomod]);
+		util_out_print("  TP blkmod gvcst_srch                 !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_gvcst_srch]);
+		util_out_print("  TP blkmod t_qread                    !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_t_qread]);
+		util_out_print("  TP blkmod tp_tend                    !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_tp_tend]);
+		util_out_print("  TP blkmod tp_hist                    !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_tp_hist]);
 	}
 	if (NEED_TO_DUMP("BG_TRC"))
 	{
-                util_out_print(0, TRUE);
+		util_out_print(0, TRUE);
 		/* print out all the BG_TRACE accounting fields */
 #		define TAB_BG_TRC_REC(A,B)	SHOW_STAT(A,B);
 #		include "tab_bg_trc_rec.h"
@@ -480,27 +507,28 @@ void dse_dmp_fhead (void)
 		bptr = csa->shmpool_buffer;
 		/* --------------------------- online backup buffer ---------------------------------- */
 		util_out_print(0, TRUE);
-		util_out_print("  Free blocks           !12UL", FALSE, bptr->free_cnt);
-		util_out_print("      ", FALSE);
-		util_out_print("  Backup blocks         !12UL", TRUE, bptr->backup_cnt);
-		util_out_print("  Reformat blocks       !12UL", FALSE, bptr->reformat_cnt);
-		util_out_print("      ", FALSE);
-		util_out_print("  Total blocks          !12UL", TRUE, bptr->total_blks);
-		util_out_print("  Shmpool blocked              !AD", FALSE, 5, (bptr->shmpool_blocked ? " TRUE" : "FALSE"));
-		util_out_print("      ", FALSE);
-		util_out_print("  File Offset     0x!16@XQ", TRUE, &bptr->dskaddr);
-		util_out_print("  Shmpool crit holder   !12UL", FALSE, bptr->shmpool_crit_latch.u.parts.latch_pid);
-		util_out_print("      ", FALSE);
-		util_out_print("  Backup_errno          !12UL", TRUE, bptr->backup_errno);
-		util_out_print("  Backup Process ID     !12UL", FALSE, bptr->backup_pid);
-		util_out_print("      ", FALSE);
-		util_out_print("  Backup TN       0x!16@XQ", TRUE, &bptr->backup_tn);
-		util_out_print("  Inc Backup TN   0x!16@XQ", FALSE, &bptr->inc_backup_tn);
-		util_out_print("      ", FALSE);
-		util_out_print("  Process Failed        !12UL", TRUE, bptr->failed);
-		util_out_print("  Allocs since check    !12UL", FALSE, bptr->allocs_since_chk);
-		util_out_print("      ", FALSE);
-		util_out_print("  Backup Image Count    !12UL", TRUE, bptr->backup_image_count);
+		util_out_print("  Free blocks                          !12UL", FALSE, bptr->free_cnt);
+		//util_out_print("  ", FALSE);
+		util_out_print("  Backup blocks                 !12UL", TRUE, bptr->backup_cnt);
+		util_out_print("  Reformat blocks                      !12UL", FALSE, bptr->reformat_cnt);
+		//util_out_print("  ", FALSE);
+		util_out_print("  Total blocks                  !12UL", TRUE, bptr->total_blks);
+		util_out_print("  Shmpool blocked                             !AD", FALSE, 5,
+				(bptr->shmpool_blocked ? " TRUE" : "FALSE"));
+		//util_out_print("  ", FALSE);
+		util_out_print("  File Offset             0x!16@XQ", TRUE, &bptr->dskaddr);
+		util_out_print("  Shmpool crit holder                  !12UL", FALSE, bptr->shmpool_crit_latch.u.parts.latch_pid);
+		//util_out_print("  ", FALSE);
+		util_out_print("  Backup_errno                  !12UL", TRUE, bptr->backup_errno);
+		util_out_print("  Backup Process ID                    !12UL", FALSE, bptr->backup_pid);
+		//util_out_print("  ", FALSE);
+		util_out_print("  Backup TN               0x!16@XQ", TRUE, &bptr->backup_tn);
+		util_out_print("  Inc Backup TN                  0x!16@XQ", FALSE, &bptr->inc_backup_tn);
+		//util_out_print("  ", FALSE);
+		util_out_print("  Process Failed                !12UL", TRUE, bptr->failed);
+		util_out_print("  Allocs since check                   !12UL", FALSE, bptr->allocs_since_chk);
+		//util_out_print("  ", FALSE);
+		util_out_print("  Backup Image Count            !12UL", TRUE, bptr->backup_image_count);
 		util_out_print("  Temp File:    !AD", TRUE, LEN_AND_STR(&bptr->tempfilename[0]));
 	}
 	if (NEED_TO_DUMP("MIXEDMODE"))
@@ -510,41 +538,41 @@ void dse_dmp_fhead (void)
 			TRUE, 5, (csd->fully_upgraded ? " TRUE" : "FALSE"));
 		util_out_print("  Database WAS ONCE Fully Upgraded from V4  : !AD",
 			TRUE, 5, (csd->db_got_to_v5_once ? " TRUE" : "FALSE"));
-		util_out_print("  Blocks to Upgrade subzero(negative) error : 0x!XL", TRUE, csd->blks_to_upgrd_subzero_error);
+		util_out_print("  Blocks to Upgrade subzero(negative) error : 0x!16@XQ", TRUE, &(csd->blks_to_upgrd_subzero_error));
 		util_out_print("  TN when Blocks to Upgrade last became 0   : 0x!16@XQ", TRUE, &csd->tn_upgrd_blks_0);
 		util_out_print("  TN when Desired DB Format last changed    : 0x!16@XQ", TRUE, &csd->desired_db_format_tn);
 		util_out_print("  TN when REORG upgrd/dwngrd changed dbfmt  : 0x!16@XQ", TRUE, &csd->reorg_db_fmt_start_tn);
 		util_out_print(0, TRUE);
-		util_out_print("  Block Number REORG upgrd/dwngrd will restart from : 0x!XL",
-			TRUE, csd->reorg_upgrd_dwngrd_restart_block);
+		util_out_print("  REORG upgrd/dwngrd will restart from blk  : 0x!16@XQ",
+			TRUE, &(csd->reorg_upgrd_dwngrd_restart_block));
 	}
 	if (NEED_TO_DUMP("UPDPROC"))
 	{
 		util_out_print(0, TRUE);
-		util_out_print("  Upd reserved area [% global buffers]  !3UL", FALSE, csd->reserved_for_upd);
-		util_out_print("  Avg blks read per 100 records !4UL", TRUE, csd->avg_blks_per_100gbl);
-		util_out_print("  Pre read trigger factor [% upd rsrvd] !3UL", FALSE, csd->pre_read_trigger_factor);
-		util_out_print("  Upd writer trigger [%flshTrgr] !3UL", TRUE, csd->writer_trigger_factor);
+		util_out_print("  Upd reserved area [% global buffers]          !3UL", FALSE, csd->reserved_for_upd);
+		util_out_print("  Avg blks read per 100 records         !4UL", TRUE, csd->avg_blks_per_100gbl);
+		util_out_print("  Pre read trigger factor [% upd rsrvd]         !3UL", FALSE, csd->pre_read_trigger_factor);
+		util_out_print("  Upd writer trigger [%flshTrgr]         !3UL", TRUE, csd->writer_trigger_factor);
 	}
 	if (NEED_TO_DUMP("SNAPSHOT"))
 	{
 		util_out_print(0, TRUE);
-		util_out_print("  Snapshot in progress                 !AD", FALSE, 5,
+		util_out_print("  Snapshot in progress                        !AD", FALSE, 5,
 			(cnl->snapshot_in_prog ? " TRUE" : "FALSE"));
-		util_out_print("   Number of active snapshots                 !12UL", TRUE, cnl->num_snapshots_in_effect);
-		util_out_print("  Snapshot cycle                 !12UL", FALSE, cnl->ss_shmcycle);
+		util_out_print("  Number of active snapshots         !12UL", TRUE, cnl->num_snapshots_in_effect);
+		util_out_print("  Snapshot cycle                       !12UL", FALSE, cnl->ss_shmcycle);
 		/* SS_MULTI: Note that if we have multiple snapshots, then we have to run through each active
 		 * snapshot region and dump their informations respectively
 		 */
 		ss_shm_ptr = (shm_snapshot_ptr_t)(SS_GETSTARTPTR(csa));
-		util_out_print("  Active snapshot PID                        !12UL", TRUE, ss_shm_ptr->ss_info.ss_pid);
-		util_out_print("  Snapshot TN                    !12UL", FALSE, ss_shm_ptr->ss_info.snapshot_tn);
-		util_out_print("  Total blocks                               !12UL", TRUE, ss_shm_ptr->ss_info.total_blks);
-		util_out_print("  Free blocks                    !12UL", FALSE, ss_shm_ptr->ss_info.free_blks);
-		util_out_print("  Process failed                             !12UL", TRUE, ss_shm_ptr->failed_pid);
-		util_out_print("  Failure errno                  !12UL", FALSE, ss_shm_ptr->failure_errno);
-		util_out_print("  Snapshot shared memory identifier          !12SL", TRUE, ss_shm_ptr->ss_info.ss_shmid);
+		util_out_print("  Active snapshot PID                !12UL", TRUE, ss_shm_ptr->ss_info.ss_pid);
+		util_out_print("  Snapshot TN                  !20@UQ", FALSE, &(ss_shm_ptr->ss_info.snapshot_tn));
+		util_out_print("  Total blocks               !20@UQ", TRUE, &(ss_shm_ptr->ss_info.total_blks));
+		util_out_print("  Free blocks                  !20@UQ", FALSE, &(ss_shm_ptr->ss_info.free_blks));
+		util_out_print("  Process failed                     !12UL", TRUE, ss_shm_ptr->failed_pid);
+		util_out_print("  Failure errno                        !12UL", FALSE, ss_shm_ptr->failure_errno);
+		util_out_print("  Snapshot shared memory identifier  !12SL", TRUE, ss_shm_ptr->ss_info.ss_shmid);
 		util_out_print("  Snapshot file name                   !AD", TRUE, LEN_AND_STR(ss_shm_ptr->ss_info.shadow_file));
 	}
-        return;
+	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -87,7 +87,7 @@ void zro_load(mstr *str)
 	boolean_t		arlink_thisdir_enable, arlink_enabled;
 	mstr			tok, transtr;
 	char			*lp, *top;
-	zro_ent			array[ZRO_MAX_ENTS], *op;
+	zro_ent			array[ZRO_MAX_ENTS], *op, *zro_root_ptr;
 	int			oi, si, total_ents;
 	struct  stat		outbuf;
 	int			stat_res;
@@ -95,6 +95,7 @@ void zro_load(mstr *str)
 	int			exp_len_used, exp_alloc_len;
 	char			*exp_buff;
 	parse_blk		pblk;
+	size_t			root_alloc_size;	/* For SCI */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -124,10 +125,10 @@ void zro_load(mstr *str)
 		for (oi = 1;;)
 		{
 			if (ZRO_IDN != toktyp)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FSEXP);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FSEXP);
 			if (ZRO_MAX_ENTS <= (oi + 1))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_MAXARGCNT, 1,
-					      ZRO_MAX_ENTS);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_MAXARGCNT, 1,
+					ZRO_MAX_ENTS);
 			/* We have type ZRO_IDN (an identifier/name of some sort). See if token has a "*" (ZRO_ALF) at the end
 			 * of it indicating that it is supposed to (1) be a directory and not a shared library and (2) that the
 			 * user desires this directory to have auto-relink capability.
@@ -145,34 +146,34 @@ void zro_load(mstr *str)
 				assert(0 <= tok.len);
 			}
 			if (SIZEOF(tranbuf) <= tok.len)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
-					      ERR_FILEPARSE, 2, tok.len, tok.addr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
+					ERR_FILEPARSE, 2, tok.len, tok.addr);
 			/* Run specified directory through parse_file to fill in any missing pieces and get some info on it */
 			pblk.buff_size = MAX_FN_LEN;	/* Don't count null terminator here */
 			pblk.fnb = 0;
 			status = parse_file(&tok, &pblk);
 			if (!(status & 1))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
-					      ERR_FILEPARSE, 2, tok.len, tok.addr, status);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
+					ERR_FILEPARSE, 2, tok.len, tok.addr, status);
 			tranbuf[pblk.b_esl] = 0;		/* Needed for some subsequent STAT_FILE */
 			STAT_FILE(tranbuf, &outbuf, stat_res);
 			if (-1 == stat_res)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
-					      ERR_FILEPARSE, 2, tok.len, tok.addr, errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
+					ERR_FILEPARSE, 2, tok.len, tok.addr, errno);
 			if (S_ISREG(outbuf.st_mode))
 			{	/* Regular file - a shared library file */
 				if (arlink_thisdir_enable)
 					/* Auto-relink indicator on shared library not permitted */
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
-						      ERR_FILEPARSE, 2, tok.len, tok.addr);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
+						ERR_FILEPARSE, 2, tok.len, tok.addr);
 				array[oi].shrlib = zro_shlibs_find(tranbuf);
 				array[oi].type = ZRO_TYPE_OBJLIB;
 				si = oi + 1;
 			} else
 			{
 				if (!S_ISDIR(outbuf.st_mode))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
-						      ERR_INVZROENT, 2, tok.len, tok.addr);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
+						ERR_INVZROENT, 2, tok.len, tok.addr);
 				array[oi].type = ZRO_TYPE_OBJECT;
 				array[oi + 1].type = ZRO_TYPE_COUNT;
 				si = oi + 2;
@@ -215,42 +216,48 @@ void zro_load(mstr *str)
 			if (ZRO_LBR == toktyp)
 			{
 				if (ZRO_TYPE_OBJLIB == array[oi].type)
+<<<<<<< HEAD
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr,
 						      ERR_NOLBRSRC);
 				toktyp = zro_gettok(&lp, top, &tok);
+=======
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr,
+						ERR_NOLBRSRC);
+				toktyp = GETTOK;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 				if (ZRO_DEL == toktyp)
 					toktyp = zro_gettok(&lp, top, &tok);
 				if ((ZRO_IDN != toktyp) && (ZRO_RBR != toktyp))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr,
-						      ERR_QUALEXP);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr,
+						ERR_QUALEXP);
 				array[oi + 1].count = 0;
 				for (;;)
 				{
 					if (ZRO_RBR == toktyp)
 						break;
 					if (ZRO_IDN != toktyp)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr,
-							      ERR_FSEXP);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr,
+							ERR_FSEXP);
 					if (ZRO_MAX_ENTS <= si)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr,
-							      ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr,
+							ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
 					if (SIZEOF(tranbuf) <= tok.len)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
-							      ERR_FILEPARSE, 2, tok.len, tok.addr);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
+							ERR_FILEPARSE, 2, tok.len, tok.addr);
 					pblk.buff_size = MAX_FN_LEN;
 					pblk.fnb = 0;
 					status = parse_file(&tok, &pblk);
 					if (!(status & 1))
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
-							      ERR_FILEPARSE, 2, tok.len, tok.addr, status);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
+							ERR_FILEPARSE, 2, tok.len, tok.addr, status);
 					tranbuf[pblk.b_esl] = 0;
 					STAT_FILE(tranbuf, &outbuf, stat_res);
 					if (-1 == stat_res)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
-							      ERR_FILEPARSE, 2, tok.len, tok.addr, errno);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
+							ERR_FILEPARSE, 2, tok.len, tok.addr, errno);
 					if (!S_ISDIR(outbuf.st_mode))
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
-							      ERR_DIRONLY, 2, tok.len, tok.addr);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
+							ERR_DIRONLY, 2, tok.len, tok.addr);
 					array[oi + 1].count++;
 					array[si].type = ZRO_TYPE_SOURCE;
 					array[si].str = tok;
@@ -265,8 +272,8 @@ void zro_load(mstr *str)
 				if ((ZRO_TYPE_OBJLIB != array[oi].type) && ((ZRO_DEL == toktyp) || (ZRO_EOL == toktyp)))
 				{
 					if (ZRO_MAX_ENTS <= si)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr,
-							      ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr,
+							ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
 					array[oi + 1].count = 1;
 					array[si] = array[oi];
 					array[si].type = ZRO_TYPE_SOURCE;
@@ -278,7 +285,7 @@ void zro_load(mstr *str)
 			if (ZRO_DEL == toktyp)
 				toktyp = zro_gettok(&lp, top, &tok);
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZROSYNTAX, 2, str->len, str->addr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZROSYNTAX, 2, str->len, str->addr);
 			oi = si;
 		}
 	}
@@ -306,8 +313,11 @@ void zro_load(mstr *str)
 		}
 		free(TREF(zro_root));
 	}
-	TREF(zro_root) = (zro_ent *)malloc(total_ents * SIZEOF(zro_ent));
-	memcpy((uchar_ptr_t)TREF(zro_root), (uchar_ptr_t)array, total_ents * SIZEOF(zro_ent));
+	root_alloc_size = total_ents * SIZEOF(zro_ent);	/* For SCI */
+	zro_root_ptr = (zro_ent *)malloc(root_alloc_size);
+	assert(NULL != zro_root_ptr);
+	memcpy((uchar_ptr_t)zro_root_ptr, (uchar_ptr_t)array, root_alloc_size);
+	TREF(zro_root) = zro_root_ptr;
 	assert(ZRO_TYPE_COUNT == (TREF(zro_root))->type);
 	oi = (TREF(zro_root))->count;
 	assert(oi);
@@ -323,6 +333,7 @@ void zro_load(mstr *str)
 			pblk.fnb = 0;
 			status = parse_file(&op->str, &pblk);
 			if (!(status & 1))
+<<<<<<< HEAD
 			{
 				free(exp_buff);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
@@ -332,6 +343,10 @@ void zro_load(mstr *str)
 			COPY_ZROENT_AS_APPROPRIATE(op, pblk, exp_buff, exp_len_used, exp_alloc_len);
 			if (NULL != op->relinkctl_sgmaddr)
 				COPY_TO_EXP_BUFF("*", 1, exp_buff, exp_len_used, exp_alloc_len);	/* Add "*" to objdir */
+=======
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
+					ERR_FILEPARSE, 2, op->str.len, op->str.addr, status);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			op->str.addr = (char *)malloc(pblk.b_esl + 1);
 			op->str.len = pblk.b_esl;
 			memcpy(op->str.addr, pblk.buffer, pblk.b_esl);
@@ -345,6 +360,7 @@ void zro_load(mstr *str)
 			COPY_TO_EXP_BUFF("(", 1, exp_buff, exp_len_used, exp_alloc_len);
 			for (; 0 < si--; op++)
 			{
+<<<<<<< HEAD
 				assert(ZRO_TYPE_SOURCE == op->type);
 				if (op->str.len)
 				{
@@ -373,6 +389,18 @@ void zro_load(mstr *str)
 				{	/* Add space before next srcdir */
 					COPY_TO_EXP_BUFF(" ", 1, exp_buff, exp_len_used, exp_alloc_len);
 				}
+=======
+				pblk.buff_size = MAX_FN_LEN;
+				pblk.fnb = 0;
+				status = parse_file(&op->str, &pblk);
+				if (!(status & 1))
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
+						ERR_FILEPARSE, 2, op->str.len, op->str.addr, status);
+				op->str.addr = (char *)malloc(pblk.b_esl + 1);
+				op->str.len = pblk.b_esl;
+				memcpy(op->str.addr, pblk.buffer, pblk.b_esl);
+				op->str.addr[pblk.b_esl] = 0;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 			COPY_TO_EXP_BUFF(")", 1, exp_buff, exp_len_used, exp_alloc_len);
 		}

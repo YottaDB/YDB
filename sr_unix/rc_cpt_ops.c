@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -59,13 +59,14 @@ static int rc_init_ipc(void);
 static void rc_cpt_unlock(void);
 static void rc_cpt_lock(void);
 
-#define HIGH_WORD_SHIFT 0x00010000
-#define HIGH_4BIT_SHIFT 0x10000000
+#define HIGH_WORD_SHIFT	0x00010000
+#define HIGH_4BIT_SHIFT	0x10000000
 #define LOW_WORD_MASK	0x0000FFFF
 #define LOW_BYTE_MASK	0x000000FF
-#define HIGH_BYTE_MASK  0x0000FF00
+#define HIGH_BYTE_MASK	0x0000FF00
 
-int rc_cpt_entry(int blk)
+/* This function was not maintained during the 64-bit block_id conversion */
+int rc_cpt_entry(block_id blk)
 {
 	key_t		rc_key;
 	int4		entry;
@@ -73,16 +74,28 @@ int rc_cpt_entry(int blk)
 	mstr		fpath1, fpath2;
 	struct sembuf	sop[2];
 	bool		found;
+#	ifdef DEBUG
+	int4	entry2, blk2 = (int4)blk;
+#	endif
+
+	/* This function was not maintained during the 64-bit block_id conversion so add this to
+	 * catch any uses of it in test
+	 */
+	assert(FALSE);
 
 #	ifdef DEBUG_CPT
-	FPRINTF(stderr,"\trc_cpt_entry(%d)",blk);
+	FPRINTF(stderr,"\trc_cpt_entry(%lld)",blk);
 #	endif
 	/* test any existing RC semaphore first */
 	if (rc_sem)
 	{
 		errno = 0;
 		i = semctl(rc_sem,0,GETVAL);
+<<<<<<< HEAD
 		if (-1 == i)   /* invalid semaphore */
+=======
+		if (errno)	/* invalid semaphore */
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		{
 			rc_sem = 0;
 			/* detach shared memory segment as well */
@@ -103,6 +116,13 @@ int rc_cpt_entry(int blk)
 	 */
 /*	entry = (((cs_data->dsid / 256) * 9) % LOW_BYTE_MASK) + (blk % LOW_WORD_MASK) + (cs_data->rc_node * HIGH_WORD_SHIFT); */
 	entry = ((cs_data->dsid / 256 * 9 + blk) & LOW_BYTE_MASK) + (blk & HIGH_BYTE_MASK)  + (cs_data->rc_node * HIGH_WORD_SHIFT);
+#ifdef DEBUG
+	entry2 = ((cs_data->dsid / 256 * 9 + blk2) & LOW_BYTE_MASK)
+			+ (blk2 & HIGH_BYTE_MASK) + (cs_data->rc_node * HIGH_WORD_SHIFT);
+#endif
+	assert(entry == entry2);	/* This code was not maintained during the 64-bit block_id conversion.
+					 * This assert is for testing but if it fails it can be removed.
+					 */
 	found = FALSE;
 	rc_cpt_lock();
 	i = rc_cpt->index - (rc_cpt->cpsync - rc_cpt->cpvfy);
@@ -131,9 +151,9 @@ int rc_cpt_entry(int blk)
 	}
 #	ifdef DEBUG_CPT
 	if (found)
-	    FPRINTF(stderr," exists");
+		FPRINTF(stderr," exists");
 	else
-	    FPRINTF(stderr," add");
+		FPRINTF(stderr," add");
 #	endif
 	if (!found)
 	{
@@ -224,8 +244,8 @@ static void rc_cpt_unlock(void)
 			}
 		}
 		if (gv_cur_region)
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(9) ERR_DBFILERR,2, DB_LEN_STR(gv_cur_region),
-					ERR_TEXT, 2, LEN_AND_LIT("Error with rc semaphore unlock"), errno);
+			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(9) ERR_DBFILERR,2, DB_LEN_STR(gv_cur_region),
+				ERR_TEXT, 2, LEN_AND_LIT("Error with rc semaphore unlock"), errno);
 		else
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
 					LEN_AND_LIT("Error with rc semaphore unlock"), errno);
@@ -260,8 +280,8 @@ static void rc_cpt_lock(void)
 			}
 		}
 		if (gv_cur_region)
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(9) ERR_DBFILERR,2, DB_LEN_STR(gv_cur_region),
-					ERR_TEXT, 2, LEN_AND_LIT("Error with rc semaphore lock"), errno);
+			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(9) ERR_DBFILERR,2, DB_LEN_STR(gv_cur_region),
+				ERR_TEXT, 2, LEN_AND_LIT("Error with rc semaphore lock"), errno);
 		else
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
 					LEN_AND_LIT("Error with rc semaphore lock"), errno);
@@ -550,6 +570,10 @@ void rc_send_cpt(rc_xblk_hdr *head, rc_rsp_page *last_aq)	/* Zero if no read op 
 {	char		*ptr;
 	int		cpt_size, copy_size;
 	bt_rec_ptr_t	b;
+
+	/*This code is probably not being maintained as part of the v7 change so put this assert here to see
+	 * if we are even hitting this code during testing*/
+	assert(FALSE);
 
 	if (!rc_cpt)
 	{

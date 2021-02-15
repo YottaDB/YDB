@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  * 								*
  * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidaries.	*
@@ -89,7 +89,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 	if (-1 == (index = verify_case(&kase->str)))
 	{
 		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCASECODE, 2, kase->str.len, kase->str.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCASECODE, 2, kase->str.len, kase->str.addr);
 	}
 
 	MV_FORCE_STR(src);
@@ -134,9 +134,16 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 			if (U_ILLEGAL_CHAR_FOUND == status || U_INVALID_CHAR_FOUND == status)
 				utf8_len_strict((unsigned char *)src->str.addr, src->str.len);	/* to report BADCHAR error */
 			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+<<<<<<< HEAD
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ICUERROR,
 						1, status); /* ICU said bad, we say good or don't recognize error */
 		} else
+=======
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ICUERROR,
+				1, status); /* ICU said bad, we say good or don't recognize error*/
+		}
+		else
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		{	/* BADCHAR should not be possible after the above validations */
 			status = U_ZERO_ERROR;
 			dst_ustr_ptr = dst_ustr;
@@ -151,8 +158,8 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 			{
 				RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
 				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ICUERROR,
-					      1, status);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ICUERROR,
+					1, status);
 			}
 			/* Fake the conversion from UTF-16 to UTF-8 to compute the required buffer size */
 			status = U_ZERO_ERROR;
@@ -163,7 +170,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 			{
 				RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
 				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 			}
 			ENSURE_STP_FREE_SPACE(dstlen);
 			dstbase = (char *)stringpool.free;
@@ -175,8 +182,8 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 				RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
 				RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
 				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ICUERROR,
-					      1, status); /* ICU said bad, but same call above just returned OK */
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ICUERROR,
+					1, status); /* ICU said bad, but same call above just returned OK */
 			}
 			assertpro(ulen == dstlen);
 			RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
@@ -384,6 +391,7 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 	conv_type	inp_type;
 
 	MV_FORCE_STR(src);
+<<<<<<< HEAD
 	MV_FORCE_STR(ichset);
         MV_FORCE_STR(ochset);
 	/* Get the input and output CHSET index to chset_names table.
@@ -488,4 +496,23 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 	} else	/* In a NON-UTF mode UTF Family of CHSET is used */
 		/* Report error as the input and output categories are not supported in this context */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVZCONVERT);
+=======
+	if (!gtm_utf8_mode)
+	{ /* UTF8 not enabled, report error rather than silently ignoring the conversion */
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_INVFCN, 0, ERR_TEXT, 2,
+			LEN_AND_LIT("Three-argument form of $ZCONVERT() is not allowed in the current $ZCHSET"));
+	}
+	MV_FORCE_STR(ichset);
+	MV_FORCE_STR(ochset);
+	/* The only supported names are: "UTF-8", "UTF-16", "UTF-16LE" and "UTF-16BE */
+	if (NULL == (from = get_chset_desc(&ichset->str)))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2, ichset->str.len, ichset->str.addr);
+	if (NULL == (to = get_chset_desc(&ochset->str)))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2, ochset->str.len, ochset->str.addr);
+
+	dstlen = gtm_conv(from, to, &src->str, NULL, NULL);
+	assert(-1 != dstlen);
+	MV_INIT_STRING(dst, dstlen, stringpool.free);
+	stringpool.free += dst->str.len;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 }

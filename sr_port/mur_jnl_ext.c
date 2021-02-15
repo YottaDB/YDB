@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Copyright (c) 2003-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -43,7 +43,7 @@
 #include "gtmmsg.h"
 
 GBLREF	gv_key		*gv_currkey;
-GBLREF 	mur_gbls_t	murgbl;
+GBLREF	mur_gbls_t	murgbl;
 GBLREF	mur_opt_struct	mur_options;
 GBLREF	boolean_t	is_updproc;
 GBLREF	char		muext_code[][2];
@@ -53,12 +53,13 @@ error_def(ERR_JNLBADRECFMT);
 error_def(ERR_MUINFOUINT4);
 error_def(ERR_TEXT);
 
-#define LAB_LEN 	7
+#define LAB_LEN		7
 #define LAB_TERM	"\\"
 #define LAB_TERM_SZ	(SIZEOF(LAB_TERM) - 1)
 
 /* This routine formats and outputs journal extract records
-   corresponding to M SET, KILL, ZKILL, TSTART, ZTSTART, and ZTRIGGER commands, $ZTRIGGER function (LGTRIG) and $ZTWORMHOLE */
+ * corresponding to M SET, KILL, ZKILL, TSTART, ZTSTART, and ZTRIGGER commands, $ZTRIGGER function (LGTRIG) and $ZTWORMHOLE
+ */
 void	mur_extract_set(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
 	enum jnl_record_type	rectype;
@@ -265,6 +266,13 @@ void	mur_extract_blk(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *r
 	int	extract_len;
 	blk_hdr	pblk_head;
 	char	*ptr;
+#ifdef DEBUG
+	int		val_extr_len, in_len, gtmcrypt_errno;
+	unsigned short	lcl_bsiz;
+	boolean_t	use_new_key;
+	blk_hdr_ptr_t	bp;
+	long_long_list	*lll_ptr;
+#endif
 
 	if (!mur_options.detail)
 		return;
@@ -274,11 +282,12 @@ void	mur_extract_blk(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *r
 	if (mur_options.detail)
 		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
-	EXTINT(rec->jrec_pblk.blknum);
+	EXTQWX(rec->jrec_pblk.blknum);
 	EXTINT(rec->jrec_pblk.bsiz);
 	memcpy((char *)&pblk_head, (char *)&rec->jrec_pblk.blk_contents[0], SIZEOF(blk_hdr));
 	EXTQW(pblk_head.tn);
 	EXTINT(rec->jrec_pblk.ondsk_blkver);
+<<<<<<< HEAD
 	assert((JRT_PBLK == rec->prefix.jrec_type) || (JRT_AIMG == rec->prefix.jrec_type));
 	if (JRT_AIMG == rec->prefix.jrec_type)
 	{	/* Also extract the DSE COMMAND that caused the AIMG record */
@@ -287,6 +296,39 @@ void	mur_extract_blk(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *r
 		extract_len += rec->jrec_aimg.cmdstrlen;
 		murgbl.extr_buff[extract_len++] = '\\';
 	}
+=======
+#ifdef DEBUG
+	for (lll_ptr = mur_options.blocklist; NULL != lll_ptr;  lll_ptr = lll_ptr->next)
+	{
+		/* Block ID match */
+		if (lll_ptr->u.blk == rec->jrec_pblk.blknum)
+			break;
+	}
+	if ((NULL != lll_ptr) || (TRUE == mur_options.dump_all_blocks))
+	{
+		ptr = &murgbl.extr_buff[extract_len];
+		val_extr_len = murgbl.max_extr_record_length - extract_len;
+		bp = (blk_hdr_ptr_t)&rec->jrec_pblk.blk_contents;
+		lcl_bsiz = rec->jrec_pblk.bsiz;
+		use_new_key = NEEDS_NEW_KEY(jctl->jfh, bp->tn);
+		in_len = (int)bp->bsiz - SIZEOF(*bp);
+		if ((0 < in_len) && (IS_ENCRYPTED(jctl->jfh->is_encrypted) || use_new_key))
+		{
+			ASSERT_ENCRYPTION_INITIALIZED;
+			GTMCRYPT_DECRYPT(NULL, (use_new_key ? TRUE : jctl->jfh->non_null_iv),
+					(use_new_key ? jctl->encr_key_handle2 : jctl->encr_key_handle),
+					(char *)(bp + 1), in_len, NULL, bp, SIZEOF(blk_hdr), gtmcrypt_errno);
+			if (0 != gtmcrypt_errno)
+			{
+				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, jctl->jnl_fn_len, jctl->jnl_fn);
+			}
+		}
+		format2zwr((sm_uc_ptr_t)bp, lcl_bsiz, (unsigned char *)ptr, &val_extr_len);
+		extract_len += val_extr_len;
+		murgbl.extr_buff[extract_len++] = '\\';	/* Trailing slash is removed */
+	}
+#endif
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
@@ -306,9 +348,9 @@ void	mur_extract_epoch(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record 
 	EXTPID(plst);
 	assert((0 == rec->jrec_epoch.fully_upgraded) || (1 == rec->jrec_epoch.fully_upgraded));
 	EXTQW(rec->jrec_epoch.jnl_seqno);
-	EXTINT(rec->jrec_epoch.blks_to_upgrd);
-	EXTINT(rec->jrec_epoch.free_blocks);
-	EXTINT(rec->jrec_epoch.total_blks);
+	EXTQW(rec->jrec_epoch.blks_to_upgrd);
+	EXTQW(rec->jrec_epoch.free_blocks);
+	EXTQW(rec->jrec_epoch.total_blks);
 	EXTINT(rec->jrec_epoch.fully_upgraded); /* actually boolean_t */
 	/* Extract upto 16 strm_seqno only if they are non-zero */
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
@@ -323,17 +365,17 @@ void	mur_extract_epoch(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record 
 	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
-void    mur_extract_inctn(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
+void	mur_extract_inctn(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
-        int		extract_len;
-        char		*ptr;
+	int		extract_len;
+	char		*ptr;
 	inctn_detail_t	*detail;
 	unsigned short	opcode;
 
 	if (!mur_options.detail)
 		return;
 	EXT_DET_PREFIX(jctl);
-        EXTTIME(rec->prefix.time);
+	EXTTIME(rec->prefix.time);
 	EXTQW(rec->prefix.tn);
 	if (mur_options.detail)
 		EXTINT(rec->prefix.checksum);
@@ -351,12 +393,12 @@ void    mur_extract_inctn(jnl_ctl_list *jctl, enum broken_type recstat, jnl_reco
 		case inctn_blkdwngrd_fmtchng:
 		case inctn_blkmarkfree:
 		case inctn_blkreencrypt:
-			EXTINT(rec->jrec_inctn.detail.blknum_struct.blknum);
+			EXTQWX(rec->jrec_inctn.detail.blknum_struct.blknum);
 			break;
 		case inctn_gdsfilext_gtm:
 		case inctn_gdsfilext_mu_reorg:
 		case inctn_db_format_change:
-			EXTINT(rec->jrec_inctn.detail.blks2upgrd_struct.blks_to_upgrd_delta);
+			EXTQW(rec->jrec_inctn.detail.blks2upgrd_struct.blks_to_upgrd_delta);
 			break;
 		default:
 			EXTINT(0);	/* nothing to extract in this case */
@@ -367,8 +409,8 @@ void    mur_extract_inctn(jnl_ctl_list *jctl, enum broken_type recstat, jnl_reco
 
 void	mur_extract_eof(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
-	int			extract_len = 0;
-	char			*ptr;
+	int	extract_len = 0;
+	char	*ptr;
 
 	if (!mur_options.detail)
 	{
@@ -386,7 +428,7 @@ void	mur_extract_eof(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *r
 	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
-void    mur_extract_trunc(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
+void	mur_extract_trunc(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
 	int		extract_len = 0;
 	char		*ptr;
@@ -399,9 +441,9 @@ void    mur_extract_trunc(jnl_ctl_list *jctl, enum broken_type recstat, jnl_reco
 	if (mur_options.detail)
 		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
-	EXTINT(rec->jrec_trunc.orig_total_blks);
-	EXTINT(rec->jrec_trunc.orig_free_blocks);
-	EXTINT(rec->jrec_trunc.total_blks_after_trunc);
+	EXTQW(rec->jrec_trunc.orig_total_blks);
+	EXTQW(rec->jrec_trunc.orig_free_blocks);
+	EXTQW(rec->jrec_trunc.total_blks_after_trunc);
 	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 
@@ -429,7 +471,7 @@ void	mur_extract_pfin(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *
 void	mur_extract_pini(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *rec, pini_list_struct *plst)
 {
 	int	extract_len = 0;
-	char			*ptr;
+	char	*ptr;
 
 	if (!mur_options.detail)
 	{
@@ -485,8 +527,8 @@ void	mur_extract_tcom(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *
 
 int extract_process_vector(jnl_process_vector *pv, int extract_len)
 {
-	int			actual;
-	char			*ptr;
+	int	actual;
+	char	*ptr;
 
 	/* EXTTIME(MID_TIME(pv->jpv_time)); */
 	EXTINT(pv->jpv_pid);

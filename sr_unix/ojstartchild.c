@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -266,7 +266,7 @@ void ojpassvar_hook(void)
 	setup_op = job_set_locals;
 	rc = gtm_fwrite(&setup_op, 1, SIZEOF(setup_op), setup_file, &written);
 	if (0 < rc)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fwrite(op)"), CALLFROM, errno, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fwrite(op)"), CALLFROM, errno, 0);
 	/* Crop the ' ;*' string at the end of the aliases */
 	if (zwr_output->buff[buffer_size - 1] == '*' && zwr_output->buff[buffer_size - 2] == ';'
 	    && zwr_output->buff[buffer_size - 3] == ' ')
@@ -274,12 +274,12 @@ void ojpassvar_hook(void)
 	/* Always send the buffer size. If it is bigger than MAX_STRLEN, the child will handle this as a JOBLVN2LONG */
 	rc = gtm_fwrite(&buffer_size, 1, SIZEOF(buffer_size), setup_file, &written);
 	if (0 < rc)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fwrite(size)"), CALLFROM, errno, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fwrite(size)"), CALLFROM, errno, 0);
 	if (buffer_size > MAX_STRLEN)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JOBLVN2LONG, 2, MAX_STRLEN, buffer_size);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_JOBLVN2LONG, 2, MAX_STRLEN, buffer_size);
 	rc = gtm_fwrite(zwr_output->buff, 1, buffer_size, setup_file, &written);
 	if (0 < rc)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fwrite(buf)"), CALLFROM, errno, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fwrite(buf)"), CALLFROM, errno, 0);
 	zwr_output->ptr = zwr_output->buff;
 	return;
 }
@@ -381,6 +381,12 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 	/* Do the fork and exec but BEFORE that do a FFLUSH(NULL) to make sure any fclose (done in io_rundown
 	 * in the child process) does not affect file offsets in this (parent) process' file descriptors
 	 */
+<<<<<<< HEAD
+=======
+	if (!gtm_dist_ok_to_use)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+			gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	FFLUSH(NULL);
 	FORK(child_pid);
 	if (0 > child_pid)
@@ -671,8 +677,8 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		DOREADRC(mproc_fds[0], &decision, SIZEOF(decision), pipe_status);
 		if (pipe_status)	 /* We failed to read the communication from middle process */
 		{
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
-						LEN_AND_LIT("Error reading from pipe"), errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
+				LEN_AND_LIT("Error reading from pipe"), errno);
 		} else
 		{
 			if (JOB_EXIT == decision)
@@ -725,7 +731,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		string_len = STRLEN("%s=%d") + STRLEN(CHILD_FLAG_ENV) + MAX_NUM_LEN - 4;
 		if (string_len >= MAX_YOTTADB_EXE_PATH_LEN)
 		{
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBPARTOOLONG);
 		}
 		c1 = (char *)malloc(string_len + 1);
 #ifdef KEEP_zOS_EBCDIC
@@ -830,6 +836,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			strcpy(c2, exe_str);
 		} else
 		{
+<<<<<<< HEAD
 			/* If "string_len" is 0, it means MAX_YOTTADB_EXE_PATH_LEN (i.e. 8192 bytes)
 			 * was not enough to store the full path of the executable name derived from the parent.
 			 * This is impossible hence the below assert.
@@ -837,6 +844,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			assert(string_len);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, string_len, c1,
 				SIZEOF(tbuff) - strlen(exe_str));
+=======
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, string_len, c1,
+				SIZEOF(tbuff) - SIZEOF(MUMPS_EXE_STR));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		}
 #		ifdef KEEP_zOS_EBCDIC_	/* use real strcpy to preserve env in native code set */
 #		pragma convlit(suspend)
@@ -851,7 +862,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		{
 			if (jparms->cmdline.len >= TEMP_BUFF_SIZE)
 			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			}
 			memcpy(cmdbuff, jparms->cmdline.buffer, jparms->cmdline.len);
 			*(cmdbuff + jparms->cmdline.len) = 0;
@@ -877,9 +888,13 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		EXECVPE(tbuff, argv, env_ary);
 		assert(FALSE);
 		/* if we got here, error starting the Job */
+<<<<<<< HEAD
 		save_errno = errno;
 		SNPRINTF(tbuff2, SIZEOF(tbuff2), "Error from EXECVPE(\"%s\")", tbuff);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_STR(tbuff2), save_errno);
+=======
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Exec error in Job"), errno);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		REVERT;
 	} else
 	{

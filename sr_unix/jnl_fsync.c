@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -146,7 +146,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 					ENABLE_INTERRUPTS(INTRPT_IN_JNL_FSYNC, prev_intrpt_state);
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
 						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), save_errno);
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
 						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), save_errno);
 				} else
 				{

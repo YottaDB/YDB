@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -476,7 +476,7 @@ static int patcmp(unsigned char *str1,unsigned char *str2)
 static void pattab_error(int name_len,char *file_name,int linenum)
 {
 	close_patfile();
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_PATTABSYNTAX, 3, name_len, file_name, linenum);
+	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_PATTABSYNTAX, 3, name_len, file_name, linenum);
 }
 
 int setpattab(mstr *table_name)

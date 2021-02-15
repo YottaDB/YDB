@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -106,7 +106,7 @@ void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, 
 				continue;
 			}
 			if ((op->str.len + objstr->len + 2) > SIZEOF(objfn))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFILENMTOOLONG, 2, op->str.len, op->str.addr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZFILENMTOOLONG, 2, op->str.len, op->str.addr);
 			obp = &objfn[0];
 			if (op->str.len)
 			{
@@ -121,6 +121,7 @@ void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, 
 			if (-1 == stat_res)
 			{
 				if (errno != ENOENT)
+<<<<<<< HEAD
 				{
 					char	statbuff[512];
 					int	save_errno;
@@ -130,6 +131,10 @@ void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, 
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(statbuff),
 							CALLFROM, save_errno);
 				}
+=======
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("stat"), CALLFROM,
+						errno);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			} else
 				op_result = op;
 		}
@@ -147,7 +152,7 @@ void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, 
 			{
 				assert(sp->type == ZRO_TYPE_SOURCE);
 				if (sp->str.len + srcstr->len + 2 > SIZEOF(srcfn)) /* Extra 2 for '/' & null */
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFILENMTOOLONG, 2, sp->str.len, sp->str.addr);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZFILENMTOOLONG, 2, sp->str.len, sp->str.addr);
 				sbp = &srcfn[0];
 				if (sp->str.len)
 				{
@@ -162,6 +167,7 @@ void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, 
 				if (-1 == stat_res)
 				{
 					if (ENOENT != errno)
+<<<<<<< HEAD
 					{
 						char	statbuff[512];
 						int	save_errno;
@@ -171,6 +177,10 @@ void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, 
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(statbuff),
 								CALLFROM, save_errno);
 					}
+=======
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("stat"),
+							CALLFROM, errno);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 				} else
 				{
 					sp_result = sp;
@@ -235,10 +245,10 @@ zro_hist *zro_search_hist(char *objnamebuf, zro_ent **objdir)
 	pblk.fop = F_SYNTAXO;				/* Just a syntax parse */
 	status = parse_file(&objstr, &pblk);
 	if (!(status & 1))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, objstr.len, objstr.addr, status);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2, objstr.len, objstr.addr, status);
 	if (pblk.fnb & F_WILD)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, objstr.len, objstr.addr,
-			      ERR_WILDCARD, 2, objstr.len, objstr.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, objstr.len, objstr.addr,
+			ERR_WILDCARD, 2, objstr.len, objstr.addr);
 	dirpath.len = pblk.b_dir;			/* Create mstr describing the object file's dirpath */
 	dirpath.addr = pblk.l_dir;
 	/* Remove any trailing '/' in the directory name since the directories in the zro_ent blocks have none

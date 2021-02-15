@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
@@ -163,7 +163,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 		{
 			dsocketptr->mupintr = FALSE;
 			sockintr->who_saved = sockwhich_invalid;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		}
 		assertpro(sockwhich_connect == sockintr->who_saved);	/* ZINTRECURSEIO should have caught */
 		mv_zintdev = io_find_mvstent(dsocketptr->iod, FALSE);
@@ -210,7 +210,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					if (((MAX_DELIM_LEN + 1) * MAX_N_DELIMITER) >= delimiter_len)
 						memcpy(delimiter_buffer, (pp->str.addr + p_offset + 1), delimiter_len);
 					else
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DELIMSIZNA);
 					break;
 				case iop_ipchset:
 					UTF8_ONLY(
@@ -292,13 +292,13 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 				case iop_zbfsize:
 					GET_ULONG(bfsize, pp->str.addr + p_offset);
 					if ((0 == bfsize) || (MAX_SOCKET_BUFFER_SIZE < bfsize))
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, bfsize);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, bfsize);
 					break;
 				case iop_zibfsize:
 					ibfsize_specified = TRUE;
 					GET_ULONG(ibfsize, pp->str.addr + p_offset);
 					if ((0 == ibfsize) || (MAX_INTERNAL_SOCBUF_SIZE < ibfsize))
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, bfsize);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, bfsize);
 					break;
 				case iop_zlisten:
 					listen_specified = TRUE;
@@ -306,10 +306,11 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					if (len < SA_MAXLITLEN)
 					{
 						memset(sockaddr, 0, SIZEOF(sockaddr));
+						assert((0 < len) && (SIZEOF(sockaddr) >= len));
 						memcpy(sockaddr, pp->str.addr + p_offset + 1, len);
 					} else
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ADDRTOOLONG, 4, len,
-								 pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_ADDRTOOLONG, 4, len,
+							pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
 					break;
 				case iop_connect:
 					connect_specified = TRUE;
@@ -317,10 +318,11 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					if (len < SA_MAXLITLEN)
 					{
 						memset(sockaddr, 0, SIZEOF(sockaddr));
+						assert((0 < len) && (SIZEOF(sockaddr) >= len));
 						memcpy(sockaddr, pp->str.addr + p_offset + 1, len);
 					} else
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ADDRTOOLONG, 4,
-								 len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_ADDRTOOLONG, 4,
+							len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
 					break;
 				case iop_ioerror:
 					ioerror_specified = TRUE;
@@ -334,16 +336,17 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					handle_len = (int)(unsigned char)(*(pp->str.addr + p_offset));
 					if (handle_len > MAX_HANDLE_LEN)
 						handle_len = MAX_HANDLE_LEN;
+					assert((0 < handle_len) && (SIZEOF(sock_handle) >= handle_len));
 					memcpy(sock_handle, pp->str.addr + p_offset + 1, handle_len);
 					break;
 				case iop_socket:
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARINAP);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVPARINAP);
 					break;
 				case iop_zff:
 					if (MAX_ZFF_LEN >= (zff_len = (int4)(unsigned char)(*(pp->str.addr + p_offset))))
 						memcpy(zff_buffer, (char *)(pp->str.addr + p_offset + 1), zff_len);
 					else
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFF2MANY, 2, zff_len, MAX_ZFF_LEN);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZFF2MANY, 2, zff_len, MAX_ZFF_LEN);
 					break;
 				case iop_znoff:
 					zff_len = 0;
@@ -360,10 +363,10 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					if (-1 == moreread_timeout)
 						moreread_timeout = DEFAULT_MOREREAD_TIMEOUT;
 					else if (-1 > moreread_timeout)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVPARMNEG);
 					else if (MAX_MOREREAD_TIMEOUT < moreread_timeout)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MRTMAXEXCEEDED, 1,
-								 MAX_MOREREAD_TIMEOUT);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_MRTMAXEXCEEDED, 1,
+							MAX_MOREREAD_TIMEOUT);
 					moreread_specified = TRUE;
 					break;
 				case iop_newversion:
@@ -470,6 +473,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 			if (MAX_HANDLE_LEN < handle_len)
 				handle_len = MAX_HANDLE_LEN;
 			socketptr->handle_len = handle_len;
+			assert((0 < handle_len) && (SIZEOF(socketptr->handle) >= handle_len));
 			memcpy(socketptr->handle, sock_handle, handle_len);
 			/* connects newdsocket and socketptr (the new socket) */
 			if (ydb_max_sockets <= newdsocket->n_socket)
@@ -528,6 +532,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 				assert(NULL != curr_socketptr->ozff.addr);
 				free(curr_socketptr->ozff.addr);	/* prevent leak of prior converted form */
 			}
+			assert((0 < zff_len) && (MAX_ZFF_LEN >= zff_len));
 			memcpy(curr_socketptr->zff.addr, zff_buffer, zff_len);
 			curr_socketptr->ozff = curr_socketptr->zff;	/* will contain converted UTF-16 form if needed */
 		} else if (curr_socketptr && (0 == zff_len))

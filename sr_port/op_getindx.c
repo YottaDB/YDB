@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,6 +75,7 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			/* If input "key" is $ZYSQLNULL, then do not do NULLSUBS checks or collation transformations */
 			if (!is_sqlnull)
 			{
+<<<<<<< HEAD
 				if ((0 == key->str.len) && (LVNULLSUBS_NEVER == TREF(lv_null_subs)))
 				{
 					va_end(var);
@@ -87,6 +93,22 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 					s2pool(&(tmp_sbs.str));
 					key = &tmp_sbs;
 				}
+=======
+				va_end(var);
+				RTS_ERROR_ABT(VARLSTCNT(1) ERR_LVNULLSUBS);
+			}
+			if (TREF(local_collseq))
+			{
+				ALLOC_XFORM_BUFF(key->str.len);
+				tmp_sbs.mvtype = MV_STR;
+				tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
+				assert(NULL != TREF(lcl_coll_xform_buff));
+				tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
+				do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
+				tmp_sbs.str.len = length;
+				s2pool(&(tmp_sbs.str));
+				key = &tmp_sbs;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 			lv = lvAvlTreeLookupStr(lvt, key, &parent);
 		} else
@@ -119,7 +141,11 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			VAR_START(var, start);
 			end = undx(start, var, arg1, buff, SIZEOF(buff));
 			va_end(var);
+<<<<<<< HEAD
 			rts_error(VARLSTCNT(4) ERR_LVUNDEF, 2, end - buff, buff);
+=======
+			RTS_ERROR_ABT(VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		}
 	}
 	return (lv_val *)lv;

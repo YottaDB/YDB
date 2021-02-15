@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,8 +68,8 @@ viewtab_entry *viewkeys(mstr *v)
 		}
 	}
 	if (vt_ptr == (viewtab_entry *)-1L)
-		rts_error(VARLSTCNT(4) ERR_VIEWAMBIG, 2, v->len, v->addr);
+		RTS_ERROR_ABT(VARLSTCNT(4) ERR_VIEWAMBIG, 2, v->len, v->addr);
 	else if (!vt_ptr || vt_ptr >= vt_top)
-		rts_error(VARLSTCNT(4) ERR_VIEWNOTFOUND, 2, v->len, v->addr);
+		rts_error_csa(NULL, VARLSTCNT(4) ERR_VIEWNOTFOUND, 2, v->len, v->addr);
 	return (viewtab_entry *)vt_ptr;
 }

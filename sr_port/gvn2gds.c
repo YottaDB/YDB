@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
@@ -103,7 +103,7 @@ unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 	{
 		csp = ready_collseq(act);
 		if (NULL == csp)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, act);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, act);
 	} else
 		csp = NULL;	/* Do not issue COLLATIONUNDEF for 0 collation */
 	retn = TRUE;
@@ -117,7 +117,7 @@ unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 	if (!parse_gv_name_and_subscripts(gvn, &subscript, start, stop, &contains_env))
 		NOCANONICNAME_ERROR(gvn);
 	if (stop[contains_env] - start[contains_env] > gvkey->top)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GVSUBOFLOW);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GVSUBOFLOW);
  	memcpy(key, gvn->str.addr + start[contains_env], stop[contains_env] - start[contains_env]);
 	key += stop[contains_env] - start[contains_env];
 	*key++ = KEY_DELIMITER;
@@ -152,7 +152,7 @@ unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 	REVERT;
 	RESTORE_GBL_VARS_BEFORE_FUN_RETURN;
 	if (!retn || !CAN_APPEND_HIDDEN_SUBS(gvkey))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GVSUBOFLOW);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GVSUBOFLOW);
 	*key++ = KEY_DELIMITER;	/* add double terminating null byte */
 	assert(key <= key_top);
 	return key;
@@ -303,7 +303,7 @@ unsigned char *gds2gvn(mval *gds, unsigned char *buff, int col)
 	{
 		csp = ready_collseq(col);
 		if (NULL == csp)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, col);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, col);
 	} else
 		csp = NULL; /* Do not issue COLLATIONUNDEF for 0 collation */
 	/* Temporarily repoint global variables "gv_target" and "transform".

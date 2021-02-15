@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "filestruct.h"
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
@@ -79,13 +80,15 @@ boolean_t file_head_read(char *fn, sgmnt_data_ptr_t header, int4 len)
 		return FALSE;
 	}
 	LSEEKREAD(fd, 0, header, header_size, save_errno);
+	if (0 == memcmp(header->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+		db_header_upconv(header);
 	if (0 != save_errno)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
  		CLOSEFILE_RESET(fd, save_errno);	/* resets "fd" to FD_INVALID */
 		return FALSE;
 	}
-	if (memcmp(header->label, GDS_LABEL, GDS_LABEL_SZ - 1))
+	if (memcmp(header->label, GDS_LABEL, GDS_LABEL_SZ - 1) && memcmp(header->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBNOTGDS, 2, LEN_AND_STR(fn));
  		CLOSEFILE_RESET(fd, save_errno);	/* resets "fd" to FD_INVALID */

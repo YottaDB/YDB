@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -71,15 +71,16 @@ void mupip_extend(void)
 {
 	unsigned short	r_len;
 	char		regionname[MAX_RN_LEN];
-	uint4		bplmap, i, status;
-	block_id	blocks, bit_maps, tblocks, total, old_total;
+	uint4		bplmap, i;
+	int4		status;
+	block_id	blocks, bit_maps, tblocks, total, old_total, temp1, temp2;
 	int		fd;
 	boolean_t	defer_alloc;
 
 	r_len = SIZEOF(regionname);
 	jnlpool_init_needed = TRUE;
 	if (cli_get_str("REG_NAME", regionname, &r_len) == FALSE)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUNODBNAME);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUNODBNAME);
 	gvinit();
 	for (i = 0, gv_cur_region = gd_header->regions; i < gd_header->n_regions; i++, gv_cur_region++)
 	{
@@ -124,7 +125,7 @@ void mupip_extend(void)
 	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 	cs_data = cs_addrs->hdr;
 	defer_alloc = cs_data->defer_allocate;
-	if (cli_get_int("BLOCKS",&tblocks))
+	if (cli_get_int64("BLOCKS",&tblocks))
 	{	/* tblocks can be 0 if defer_alloc is FALSE because the goal is to fully allocate an existing database */
 		if ((tblocks < 0) || (defer_alloc && (tblocks == 0)))
 		{
@@ -158,6 +159,7 @@ void mupip_extend(void)
 	old_total = cs_addrs->ti->total_blks;
 	if ((uint4)NO_FREE_SPACE == (status = GDSFILEXT(blocks, old_total, TRANS_IN_PROG_FALSE)))
 	{
+<<<<<<< HEAD
 		rel_crit(gv_cur_region);
 		util_out_print("The extension failed on file !AD; check disk space and permissions.", TRUE,
 			DB_LEN_STR(gv_cur_region));
@@ -171,6 +173,34 @@ void mupip_extend(void)
 	rel_crit(gv_cur_region);
 	util_out_print("Extension successful, file !AD extended by !UL blocks.  Total blocks = !UL.",TRUE,
 		DB_LEN_STR(gv_cur_region), total - old_total - bit_maps, total - DIVIDE_ROUND_UP(total, bplmap));
+=======
+		case dba_bg:
+		case dba_mm:
+			grab_crit(gv_cur_region, WS_67);
+			GRAB_UNFROZEN_CRIT(gv_cur_region, cs_addrs, WS_68);
+			old_total = cs_addrs->ti->total_blks;
+			if (NO_FREE_SPACE == (status = GDSFILEXT(blocks, old_total, TRANS_IN_PROG_FALSE)))
+			{
+				rel_crit(gv_cur_region);
+				util_out_print("The extension failed on file !AD; check disk space and permissions.", TRUE,
+					DB_LEN_STR(gv_cur_region));
+				DB_IPCS_RESET(gv_cur_region);
+				mupip_exit(ERR_MUNOACTION);
+			} else
+				assert(SS_NORMAL == status);
+			total = cs_addrs->ti->total_blks;
+			bplmap = cs_addrs->hdr->bplmap;
+			bit_maps = DIVIDE_ROUND_UP(total, bplmap) - DIVIDE_ROUND_UP(old_total, bplmap);
+			rel_crit(gv_cur_region);
+			break;
+		default:
+			assertpro(IS_REG_BG_OR_MM(gv_cur_region));
+	}
+	temp1 = total - old_total - bit_maps;
+	temp2 = total - DIVIDE_ROUND_UP(total, bplmap);
+	util_out_print("Extension successful, file !AD extended by !@UQ blocks.  Total blocks = !@UQ.",TRUE,
+		DB_LEN_STR(gv_cur_region), &temp1, &temp2);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	DB_IPCS_RESET(gv_cur_region); /* final cleanup (for successful case) before exit */
 	mupip_exit(SS_NORMAL);
 }

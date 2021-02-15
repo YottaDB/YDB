@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -61,7 +61,7 @@ cm_op_t gtcmtr_kill(void)
 	CM_GET_GVCURRKEY(ptr, len);
 	gtcm_bind_name(reg_ref->reghead, TRUE);
 	if (gv_cur_region->read_only)
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	if (JNL_ALLOWED(cs_addrs))
 	{	/* we need to copy client's specific prc_vec into the global variable in order that the gvcst* routines
 		 *	do the right job. actually we need to do this only if JNL_ENABLED(cs_addrs), but since it is not

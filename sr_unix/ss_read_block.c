@@ -70,7 +70,7 @@ void	ss_read_block(snapshot_context_ptr_t lcl_ss_ctx, block_id blk, sm_uc_ptr_t 
 	{
 		if (-1 == pread_res)
 		{
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_SSPREMATEOF, 5, blk, blk_size, blk_offset,
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_SSPREMATEOF, 5, &blk, blk_size, blk_offset,
 				LEN_AND_STR(ss_shm_ptr->ss_info.shadow_file));
 		} else
 		{

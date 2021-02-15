@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -76,10 +76,10 @@ boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover, wait
 				case cdb_sc_nolock:
 					return(FALSE);
 				case cdb_sc_critreset:
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
 					break;	/* Keep syntax checkers happy */
 				case cdb_sc_dbccerr:
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
 					break;	/* Keep syntax checkers happy */
 				default:
 					/* An out-of-design return value. assertpro(FALSE) but spell out the failing condition
@@ -110,7 +110,7 @@ boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover, wait
 	/* Assert that MUPIP RECOVER/ROLLBACK has TREF(skip_file_corrupt_check)=TRUE and so does not issue DBFLCORRP error */
 	assert(!mupip_jnl_recover || TREF(skip_file_corrupt_check));
 	if (csd->file_corrupt && !TREF(skip_file_corrupt_check))
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
 	if (WC_BLOCK_RECOVER == cnl->wc_blocked)
 	{
 		if (ok_for_wcs_recover)
@@ -126,4 +126,3 @@ boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover, wait
 	}
 	return(TRUE);
 }
-

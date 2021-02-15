@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2020 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -110,7 +110,7 @@ error_def(ERR_UNIMPLOP);
 
 void op_ztrigger(void)
 {
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 }
 #else
 void op_ztrigger(void)
@@ -140,7 +140,7 @@ void op_ztrigger(void)
 	DCL_THREADGBL_ACCESS;
 
 	if (gv_cur_region->read_only)
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_ZTRIGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_ZTRIGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;
 	csd = csa->hdr;

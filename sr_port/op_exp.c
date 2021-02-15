@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
@@ -45,7 +45,9 @@ void op_exp(mval *u, mval* v, mval *p)
 	mval		w, zmv;
 	int4		n, n1;
 	int4		z1_rnd, z2_rnd, pten;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	u1_p = &u1;
 	memcpy(u1_p, u, SIZEOF(mval));
 	MV_FORCE_NUM(u1_p);
@@ -63,11 +65,13 @@ void op_exp(mval *u, mval* v, mval *p)
 			if (0 == u1_p->m[1])
 			{
 				if (0 <= n)
-				{	/* 0**anything non-negative = 0 */
+					*p = literal_zero;	/* 0**anything non-negative = 0 */
+				else if (TREF(compile_time))
+				{	/* create "impossible" value flag for compiler */
 					*p = literal_zero;
-					return;
-				}
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DIVZERO);
+					p->sgn = 1;		/* negative zero == oxymoron */
+				} else
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DIVZERO);
 				return;
 			}
 		} else
@@ -119,11 +123,14 @@ void op_exp(mval *u, mval* v, mval *p)
 			if (0 == u1_p->m[1])
 			{
 				if (!v->sgn)
-				{	/* 0**anything non-negative = 0 */
+					*p = literal_zero;	/* 0**anything non-negative = 0 */
+				else if (TREF(compile_time))
+				{	/* create "impossible" value flag for compiler */
 					*p = literal_zero;
-					return;
-				}
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DIVZERO);
+					p->sgn = 1;		/* negative zero == oxymoron */
+				} else
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DIVZERO);
+				return;
 			}
 			if (0 > u1_p->m[1])
 			{	/* Base is negative - make positive but record was negative */

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2010-2016 Fidelity National Information		#
+# Copyright (c) 2010-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
@@ -23,8 +23,6 @@
 
 if ($HOSTOS == "AIX") then
 	setenv LIBPATH
-else if ($HOSTOS == "SunOS") then
-	setenv LD_LIBRARY_PATH /usr/local/lib64:/usr/local/lib
 else
 # Its worth noting that SuSE+RedHat, Debian & Ubuntu handle the lib32 vs lib64 differently
 # Debian way: 		/lib		32bit		points to /emul/ia32-linux/lib
@@ -42,7 +40,6 @@ else
 		exit
 	endif
 
-	# Please keep in sync with sr_unix/gtm_test_install.csh && sr_unix/configure.gtc
 	if (( -e $gtm_inc/s390.h ) || ( -e $gtm_inc/x86_64.h )) then
 		setenv LD_LIBRARY_PATH "/usr/local/lib64:/usr/local/lib:/usr/lib64:/usr/lib:/usr/lib/x86_64-linux-gnu"
 	else

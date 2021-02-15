@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 Fidelity National Information		*
+ * Copyright (c) 2018-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
@@ -53,11 +53,15 @@ GBLREF boolean_t	is_tracing_on;
 	{													\
 		ydb_zstatus(&err_str[0], 2 * OUT_BUFF_SIZE);							\
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COMMFILTERERR, 4,					\
-							LEN_AND_LIT(ROUTINE), strlen(err_str), err_str);	\
+							LEN_AND_LIT(ROUTINE), LEN_AND_STR(err_str));		\
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COMMFILTERERR, 4, LEN_AND_LIT(ROUTINE), 		\
-							strlen(err_str), err_str);				\
+							LEN_AND_STR(err_str));					\
 		returned_command.length = 0;									\
+<<<<<<< HEAD
 		if (frame_pointer->type & SFT_CI)								\
+=======
+		if (frame_pointer->flags & SFF_CI)								\
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			ci_ret_code_quit();									\
 	}													\
 }
@@ -77,7 +81,7 @@ ydb_string_t gtm_filter_command(char * command, char * caller_name)
 	{
 		TREF(comm_filter_init) = FALSE;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOFILTERNEST);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOFILTERNEST);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOFILTERNEST);
 	}
 	if (!STRCMP(caller_name, "PIPE"))
 		CALL_ROUTINE_N_CHECK_ERR("gtmpipeopen", command, returned_command);

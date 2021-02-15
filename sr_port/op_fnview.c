@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -138,7 +138,7 @@ LITREF	mval		literal_null;
 }
 
 void	op_fnview(int numarg, mval *dst, ...)
-{	boolean_t	save_transform;
+{	boolean_t	save_transform, n_int8 = FALSE;
 	char		instfilename[MAX_FN_LEN + 1 + 1];	/* 1 for possible flag character */
 	collseq		*csp;
 	gd_binding	*map, *start_map, *end_map;
@@ -149,7 +149,12 @@ void	op_fnview(int numarg, mval *dst, ...)
 	gv_namehead	temp_gv_target;
 	gvnh_reg_t	*gvnh_reg;
 	gvnh_spanreg_t	*gvspan;
+<<<<<<< HEAD
 	int		n, tl, newlevel, res, reg_index, collver, nct, act, ver, trigdepth, cidepth;
+=======
+	int		n, tl, newlevel, res, reg_index, collver, nct, act, ver;
+	block_id	n2 = 0;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	lv_val		*lv;
 	mstr		tmpstr, commastr, *gblnamestr;
 	mval		*arg1, *arg2, tmpmval;
@@ -435,7 +440,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_NOISOLATION:
 			if (NOISOLATION_NULL != parmblk.ni_list.type || NULL == parmblk.ni_list.gvnh_list
 			    || NULL != parmblk.ni_list.gvnh_list->next)
-				rts_error_csa(CSA_ARG(NULL)
+				RTS_ERROR_CSA_ABT(NULL,
 					VARLSTCNT(4) ERR_VIEWFN, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			n = parmblk.ni_list.gvnh_list->gvnh->noisolation;
 			break;
@@ -625,8 +630,10 @@ void	op_fnview(int numarg, mval *dst, ...)
 				gv_init_reg(parmblk.gv_ptr);
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			if (NULL != csa->hdr)
-				n = csa->hdr->trans_hist.free_blocks;
-			else
+			{
+				n2 = csa->hdr->trans_hist.free_blocks;
+				n_int8 = TRUE;
+			} else
 				n = -1;
 			break;
 		case VTK_BLTOTAL:
@@ -636,8 +643,9 @@ void	op_fnview(int numarg, mval *dst, ...)
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			if (NULL != csa->hdr)
 			{
-				n = csa->hdr->trans_hist.total_blks;
-				n -= (n + csa->hdr->bplmap - 1) / csa->hdr->bplmap;
+				n2 = csa->hdr->trans_hist.total_blks;
+				n2 -= (n2 + csa->hdr->bplmap - 1) / csa->hdr->bplmap;
+				n_int8 = TRUE;
 			} else
 				n = -1;
 			break;
@@ -752,7 +760,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			break;
 		case VTK_YDIRTREE:
 			if (!parmblk.value->str.len)
-				rts_error_csa(CSA_ARG(NULL)
+				RTS_ERROR_CSA_ABT(NULL,
 					VARLSTCNT(4) ERR_VIEWFN, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			n = extnam_str.len;		/* internal use of op_gvname should not disturb extended reference */
 			op_gvname(VARLSTCNT(1) parmblk.value);
@@ -767,7 +775,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 				if (((NULL != gvspan) && !gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg))
 					|| ((NULL == gvspan) && (reg != gv_cur_region)))
 				{
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GBLNOMAPTOREG, 4,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GBLNOMAPTOREG, 4,
 						parmblk.value->str.len, parmblk.value->str.addr, REG_LEN_STR(reg));
 				}
 				if (NULL != gvspan)
@@ -1036,9 +1044,15 @@ void	op_fnview(int numarg, mval *dst, ...)
 			*dst = (ydb_ztrigger_output ? literal_one : literal_zero);
 			break;
 		default:
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWFN, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWFN, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 	}
-	dst->mvtype = vtp->restype;
-	if (MV_NM == vtp->restype)
-		MV_FORCE_MVAL(dst, n);
+
+	if(MV_NM == vtp->restype)
+	{
+		if(n_int8 == TRUE)
+			MV_FORCE_LMVAL(dst, n2);
+		else
+			MV_FORCE_MVAL(dst, n);
+	} else
+		dst->mvtype = vtp->restype;
 }

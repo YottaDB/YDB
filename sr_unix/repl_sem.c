@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -103,6 +103,7 @@ int grab_sem(int set_index, int sem_num)
 {
 	int rc;
 
+	assert((SOURCE == set_index) || (RECV == set_index));
 	assert((int)NUM_SRC_SEMS == (int)NUM_RECV_SEMS); /* holds_sem[][] relies on this as it uses NUM_SRC_SEMS for array bounds */
 	assert(!holds_sem[set_index][sem_num]);
 	ASSERT_SET_INDEX;

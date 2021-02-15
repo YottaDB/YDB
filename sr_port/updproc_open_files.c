@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2017 Fidelity National Information	*
+ * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -100,7 +100,7 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 			if (-1 == this_side_std_null_coll)
 				this_side_std_null_coll = csd->std_null_coll;
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NULLCOLLDIFF);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NULLCOLLDIFF);
 		}
 		assert(DBKEYSIZE(csd->max_key_size) <= gv_keysize);
 		SET_CSA_DIR_TREE(csa, reg->max_key_size, reg);

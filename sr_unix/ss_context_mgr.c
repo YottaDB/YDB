@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2020 Fidelity National Information	*
+ * Copyright (c) 2009-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -146,7 +146,7 @@ boolean_t	ss_create_context(snapshot_context_ptr_t lcl_ss_ctx, int ss_shmcycle)
 		{
 			status = errno;
 			assert(FALSE);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmdt"), CALLFROM, status);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmdt"), CALLFROM, status);
 		}
 		lcl_ss_ctx->attach_shmid = lcl_ss_ctx->nl_shmid = INVALID_SHMID; /* reset shmid since we failed */
 		lcl_ss_ctx->cur_state = SHADOW_FIL_OPEN_FAIL;

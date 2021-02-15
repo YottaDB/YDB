@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,15 +38,24 @@ GBLREF gv_key			*gv_currkey;
 GBLREF gv_namehead		*gv_target;
 GBLREF gd_region		*gv_cur_region;
 
+<<<<<<< HEAD
 cm_op_t gtcmtr_zwithdraw(void)
+=======
+error_def(ERR_DBPRIVERR);
+
+bool gtcmtr_zwithdraw(void)
+>>>>>>> 451ab477 (GT.M V7.0-000)
 {
 	cm_region_list	*reg_ref;
 	unsigned char	*ptr, regnum;
 	unsigned short	top, len;
 
+<<<<<<< HEAD
 	error_def(ERR_DBPRIVERR);
 
 	ASSERT_IS_LIBGNPSERVER;
+=======
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(*ptr == CMMS_Q_ZWITHDRAW);
 	ptr++;
@@ -53,7 +67,7 @@ cm_op_t gtcmtr_zwithdraw(void)
 	CM_GET_GVCURRKEY(ptr, len);
 	gtcm_bind_name(reg_ref->reghead, TRUE);
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
+		RTS_ERROR_ABT(VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	if (gv_target->root)
 		gvcst_kill(FALSE);
 	ptr = curr_entry->clb_ptr->mbf;

@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,11 +59,11 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	if (!((link_info *)lnk->usr)->server_supports_long_names && (PRE_V5_MAX_MIDENT_LEN < strlen((char *)gv_currkey->base)))
 	{
 		end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
-		rts_error(VARLSTCNT(14) ERR_UNIMPLOP, 0,
-					ERR_TEXT, 2,
-					LEN_AND_LIT("GT.CM server does not support global names longer than 8 characters"),
-					ERR_GVIS, 2, end - buff, buff,
-					ERR_TEXT, 2, DB_LEN_STR(gv_cur_region));
+		RTS_ERROR_ABT(VARLSTCNT(14) ERR_UNIMPLOP, 0,
+			ERR_TEXT, 2,
+			LEN_AND_LIT("GT.CM server does not support global names longer than 8 characters"),
+			ERR_GVIS, 2, end - buff, buff,
+			ERR_TEXT, 2, DB_LEN_STR(gv_cur_region));
 	}
 	lnk->ast = 0;	/* all database queries are sync */
 	lnk->cbl = 1 + /* HDR */
@@ -148,7 +153,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		if (reply_code != *ptr)
 		{
 			if (*ptr != CMMS_E_ERROR)
-				rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+				RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			gvcmz_errmsg(lnk,FALSE);
 		}
 		return;
@@ -158,7 +163,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		if ((CMMS_R_UNDEF != *ptr) || ((CMMS_Q_GET != query_code) && (CMMS_Q_INCREMENT != query_code)))
 		{
 			if (CMMS_E_ERROR != *ptr)
-				rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+				RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			gvcmz_errmsg(lnk, FALSE);
 		}
 		if (CMMS_Q_INCREMENT == query_code)
@@ -170,7 +175,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	{
 		CM_GET_SHORT(temp_short, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 		if (1 != temp_short)
-			rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+			RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
 		ptr += SIZEOF(short);
 		status = *ptr;	/* Temp assignment to status gets rid of compiler warning in MV_FORCE_MVAL macro */
 		MV_FORCE_MVAL(v, status);
@@ -186,9 +191,14 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		else
 		{
 			if (*ptr++ != gv_cur_region->cmx_regnum)
+<<<<<<< HEAD
 				rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			keylen = (len - 1 - (3 * SIZEOF(unsigned short)));	/* 3 for gv_key->top, prev, end */
 #			ifdef DEBUG
+=======
+				RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+#ifdef DEBUG
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			CM_GET_USHORT(srv_buff_size, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 			assert(srv_buff_size == gv_altkey->top);
 			/* Check gv_altkey has enough size allocated for the data to be copied */

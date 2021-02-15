@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,9 +21,6 @@
 #include "gtm_inet.h"
 #ifdef UNIX
 #include <sys/sem.h>
-#endif
-#ifdef VMS
-#include <descrip.h> /* Required for gtmrecv.h */
 #endif
 
 #include "gdsroot.h"
@@ -46,15 +44,8 @@
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	gtmrecv_options_t	gtmrecv_options;
 error_def(ERR_REPLLOGOPN);
-#ifdef VMS
-error_def(ERR_UNIMPLOP);
-error_def(ERR_TEXT);
-#endif
 int gtmrecv_statslog(void)
 {
-#ifdef VMS
-	rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2, LEN_AND_LIT("Statistics logging not supported on VMS"));
-#endif
 	/* Grab the recvpool option write lock */
 	if (0 > grab_sem(RECV, RECV_SERV_OPTIONS_SEM))
 	{

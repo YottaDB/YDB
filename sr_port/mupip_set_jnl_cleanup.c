@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -84,5 +84,5 @@ void mupip_set_jnl_cleanup(void)
 	}
 
 	if (EXIT_NRM != rundown_status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTALLDBRNDWN);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOTALLDBRNDWN);
 }

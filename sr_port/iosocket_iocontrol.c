@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -223,7 +223,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 		iosocket_tls(option, (int)(nsec_timeout / NANOSECS_IN_MSEC), tlsid, password, extraarg);
 #	endif
 	} else
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVCTLMNE);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVCTLMNE);
 
 	return;
 }

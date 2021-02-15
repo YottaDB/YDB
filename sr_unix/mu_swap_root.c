@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -56,48 +56,48 @@
 #include "t_write.h"
 #include "change_reg.h"
 
-GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	boolean_t		mu_reorg_process;
+GBLREF	boolean_t		need_kip_incr;
+GBLREF	char			*update_array, *update_array_ptr;
+GBLREF	cw_set_element		cw_set[];
 GBLREF	gd_region		*gv_cur_region;
+GBLREF	gv_key			*gv_altkey;
 GBLREF	gv_key			*gv_currkey, *gv_altkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	gv_namehead		*reorg_gv_target;
-GBLREF	unsigned char		cw_map_depth;
-GBLREF	unsigned char		cw_set_depth;
-GBLREF	cw_set_element		cw_set[];
-GBLREF	uint4			t_err;
-GBLREF	unsigned int		t_tries;
-GBLREF	unsigned char		rdfail_detail;
+GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	kill_set		*kill_set_tail;
+GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_addrs		*kip_csa;
-GBLREF	boolean_t		mu_reorg_process;
-GBLREF	boolean_t		need_kip_incr;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	uint4			t_err;
 GBLREF	uint4			update_trans;
-GBLREF	gv_key			*gv_altkey;
-GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	uint4			update_array_size;
-GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	unsigned char		cw_map_depth;
+GBLREF	unsigned char		cw_set_depth;
+GBLREF	unsigned char		rdfail_detail;
+GBLREF	unsigned int		t_tries;
 
 #define RETRY_SWAP		(0)
 #define ABORT_SWAP		(1)
 
 void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr)
 {
-	sgmnt_data_ptr_t	csd;
-	sgmnt_addrs		*csa;
-	node_local_ptr_t	cnl;
-	srch_hist		*dir_hist_ptr, *gvt_hist_ptr;
-	gv_namehead		*save_targ;
 	block_id		root_blk_id, child_blk_id, free_blk_id;
-	sm_uc_ptr_t		root_blk_ptr, child_blk_ptr;
-	kill_set		kill_set_list;
-	trans_num		curr_tn, ret_tn;
-	int			level, root_blk_lvl;
 	block_id		save_root;
 	boolean_t		tn_aborted;
-	unsigned int		lcl_t_tries;
 	enum cdb_sc		status;
+	gv_namehead		*save_targ;
+	int			level, root_blk_lvl;
+	kill_set		kill_set_list;
+	node_local_ptr_t	cnl;
+	sgmnt_data_ptr_t	csd;
+	sgmnt_addrs		*csa;
+	sm_uc_ptr_t		root_blk_ptr, child_blk_ptr;
+	srch_hist		*dir_hist_ptr, *gvt_hist_ptr;
+	trans_num		curr_tn, ret_tn;
+	unsigned int		lcl_t_tries;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -273,6 +273,7 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr)
 block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, srch_hist *dir_hist_ptr, block_id child_blk_id,
 		sm_uc_ptr_t child_blk_ptr, kill_set *kill_set_list, trans_num curr_tn)
 {
+<<<<<<< HEAD
 	sgmnt_data_ptr_t	csd;
 	sgmnt_addrs		*csa;
 	srch_blk_status		bmlhist, freeblkhist;
@@ -281,20 +282,34 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	int4			free_bit, hint_bit, maxbitsthismap;
 	int			blk_seg_cnt, blk_size;
 	sm_uc_ptr_t		parent_blk_ptr, bn_ptr, saved_blk;
+=======
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	blk_segment		*bs1, *bs_ptr;
+	block_id		hint_blk_num, free_blk_id, parent_blk_id, total_blks, num_local_maps, master_bit,
+				free_bit, temp_blk;
+	boolean_t		free_blk_recycled, child_long_blk_id, parent_long_blk_id;
+	cw_set_element		*tmpcse;
+	int			blk_seg_cnt, blk_size;
 	int			parent_blk_size, child_blk_size, bsiz;
 	int			rec_size1, curr_offset, bpntr_end, hdr_len;
-	int			tmp_cmpc;
-	cw_set_element		*tmpcse;
+	int			tmp_cmpc, child_blk_id_sz, parent_blk_id_sz;
+	int4			hint_bit, maxbitsthismap;
 	jnl_buffer_ptr_t	jbbp; /* jbbp is non-NULL only if before-image journaling */
-	unsigned short		temp_ushort;
+	node_local_ptr_t	cnl;
+	sgmnt_data_ptr_t	csd;
+	sgmnt_addrs		*csa;
+	sm_uc_ptr_t		parent_blk_ptr, bn_ptr, saved_blk;
+	srch_blk_status		bmlhist, freeblkhist;
 	unsigned char		save_cw_set_depth;
+	unsigned short		temp_ushort;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	csd = cs_data;
 	csa = cs_addrs;
 	blk_size = csd->blk_size;
+	child_long_blk_id = IS_64_BLK_ID(child_blk_ptr);
+	child_blk_id_sz = SIZEOF_BLK_ID(child_long_blk_id);
 	/* Find a free/recycled block for new block location. */
 	hint_blk_num = 0;
 	total_blks = csa->ti->total_blks;
@@ -339,6 +354,12 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	 * 	4. Child block gets marked recycled in bitmap. (GVCST_BMP_MARK_FREE)
 	 */
 	parent_blk_ptr = dir_hist_ptr->h[parent_blk_lvl].buffaddr; /* parent_blk_lvl is 0 iff we're moving a gvt root block */
+<<<<<<< HEAD
+=======
+	parent_blk_id = dir_hist_ptr->h[parent_blk_lvl].blk_num;
+	parent_long_blk_id = IS_64_BLK_ID(parent_blk_ptr);
+	parent_blk_id_sz = SIZEOF_BLK_ID(parent_long_blk_id);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	CHECK_AND_RESET_UPDATE_ARRAY;
 	if (free_blk_recycled)
 	{	/* Otherwise, it's a completely free block, in which case no need to read. */
@@ -391,7 +412,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	curr_offset = dir_hist_ptr->h[parent_blk_lvl].curr_rec.offset;
 	parent_blk_size = ((blk_hdr_ptr_t)parent_blk_ptr)->bsiz;
 	GET_RSIZ(rec_size1, (parent_blk_ptr + curr_offset));
-	if ((parent_blk_size < rec_size1 + curr_offset) || (BSTAR_REC_SIZE > rec_size1))
+	if ((parent_blk_size < rec_size1 + curr_offset) || (bstar_rec_size(parent_long_blk_id) > rec_size1))
 	{
 		assert(t_tries < CDB_STAGNATE);
 		t_retry(cdb_sc_blkmod);
@@ -402,12 +423,12 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		/* There can be collation stuff in the record value after the block pointer. See gvcst_root_search. */
 		hdr_len = SIZEOF(rec_hdr) + gv_altkey->end + 1 - EVAL_CMPC((rec_hdr_ptr_t)(parent_blk_ptr + curr_offset));
 	else
-		hdr_len = rec_size1 - SIZEOF(block_id);
-	bpntr_end = curr_offset + hdr_len + SIZEOF(block_id);
+		hdr_len = rec_size1 - parent_blk_id_sz;
+	bpntr_end = curr_offset + hdr_len + parent_blk_id_sz;
 	BLK_SEG(bs_ptr, parent_blk_ptr + SIZEOF(blk_hdr), curr_offset + hdr_len - SIZEOF(blk_hdr));
-	BLK_ADDR(bn_ptr, SIZEOF(block_id), unsigned char);
-	PUT_BLK_ID(bn_ptr, free_blk_id);
-	BLK_SEG(bs_ptr, bn_ptr, SIZEOF(block_id));
+	BLK_ADDR(bn_ptr, parent_blk_id_sz, unsigned char);
+	WRITE_BLK_ID(parent_long_blk_id, free_blk_id, bn_ptr);
+	BLK_SEG(bs_ptr, bn_ptr, parent_blk_id_sz);
 	BLK_SEG(bs_ptr, parent_blk_ptr + bpntr_end, parent_blk_size - bpntr_end);
 	assert(blk_seg_cnt == parent_blk_size);
 	if (!BLK_FINI(bs_ptr, bs1))
@@ -420,7 +441,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	/* To indicate later snapshot file writing process during fast_integ not to skip writing the block to snapshot file */
 	BIT_SET_DIR_TREE(cw_set[cw_set_depth-1].blk_prior_state);
 	/* 3. Free block's corresponding bitmap reflects above change. */
-	PUT_LONG(update_array_ptr, free_bit);
+	PUT_BLK_ID(update_array_ptr, free_bit);
 	save_cw_set_depth = cw_set_depth; /* Bit maps go on end of cw_set (more fake acquired) */
 	assert(!cw_map_depth);
 	t_write_map(&bmlhist, (uchar_ptr_t)update_array_ptr, curr_tn, 1);

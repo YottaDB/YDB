@@ -17,7 +17,11 @@
 #define TP_H
 
 #include <sys/types.h>
-#include "hashtab_int4.h"
+#include "hashtab_int8.h"
+#include "gdskill.h"
+#include "gdscc.h"
+#include "buddy_list.h"
+#include "jnl.h"
 
 error_def(ERR_TPNOTACID);
 
@@ -119,7 +123,7 @@ typedef struct sgm_info_struct
 				*next_tp_si_by_ftok;	 /* List of ALL     regions in the TP transaction sorted on ftok order */
 	srch_blk_status		*first_tp_hist,
 				*last_tp_hist;
-	hash_table_int4		*blks_in_use;
+	hash_table_int8		*blks_in_use;
 	trans_num		start_tn;
 	gd_region		*gv_cur_region;	/* Backpointer to the region; Note that it is not necessarily unique since
 						 * multiple regions could point to the same csa (and hence same sgm_info
@@ -170,26 +174,88 @@ typedef struct sgm_info_struct
 
 /* Define macros to reflect the size of cw_index and next_off in the off_chain structure.
  * If the structure layout changes, these formulas might need corresponding adjustment.
- * Note that ideally we should be using SIZEOF(off_chain) * 8 instead of 32 in the NEXT_OFF_MAX_BITS definition
+ * We are using 32 in the NEXT_OFF_MAX_BITS formula since we off_chain is still functionally a 32-bit struct,
+ * with filler being used to extend the struct up to a 64-bit size.
  * (currently commented due to a gengtmdeftypes issue). But that introduces a cyclic dependency causing a compiler error.
  */
 #define	CW_INDEX_MAX_BITS	15
 /* Remove the next line and uncomment the following line once gengtmdeftypes is fixed to allow expressions in bitfield members */
 #define	NEXT_OFF_MAX_BITS	16
 /* #define	NEXT_OFF_MAX_BITS	(32 - CW_INDEX_MAX_BITS - 1) */
+/* Remove the next define and uncomment the following one once gengtmdeftypes is fixed to allow expressions in bitfield members */
+#define OFF_CHAIN_FILLER_BITS	32	/* This is the number of filler bits needed between cw_index and flag in order to make
+					 * off_chain 64-bit
+					 */
+/* #define	OFF_CHAIN_FILLER_BITS	(64 - CW_INDEX_MAX_BITS - NEXT_OFF_MAX_BITS - 1) */
+
+/* Code that uses the off_chain struct is sensitive to it's layout. This is because we
+ * cast instances of this struct back and forth between the off_chain struct and the block_id type.
+ * The block_id type only uses the lower 62-bits when it is actually storing a block_id, and the code can
+ * check if an instance of block_id should be cast to off_chain by looking at
+ * the most significant bit (the flag field in the off_chain struct). A simple way of checking this is to see
+ * if the block_id value is negative since the most significant bit being high means a signed value is negative.
+ *
+ * The reason the off_chain struct is switched between off_chain and block_id types is that it is inserted into
+ * blocks during transactions in place of an actual block_id, and then the off_chain reference is used to
+ * resolve a block_id both during and at the end of a transaction.  The fields each represent:
+ * flag: If this bit is 1 then the value is actually an off_chain or blk_ident (see gdskill.h) instance
+ * filler: Inserted to extend off_chain to 64-bit so that it matches the extended block_id type
+ * cw_index: This is an index into the cw_set used when resolving the off_chain into an actual block_id
+ * next_off: This is the offset to the next off_chain instance in a block
+ */
+typedef struct
+{
+#ifdef	BIGENDIAN
+	gtm_uint8	flag     : 1;
+	gtm_uint8	filler   : OFF_CHAIN_FILLER_BITS;
+	gtm_uint8	cw_index : CW_INDEX_MAX_BITS;
+	gtm_uint8	next_off : NEXT_OFF_MAX_BITS;
+#else
+	gtm_uint8	next_off : NEXT_OFF_MAX_BITS;
+	gtm_uint8	cw_index : CW_INDEX_MAX_BITS;
+	gtm_uint8	filler   : OFF_CHAIN_FILLER_BITS;
+	gtm_uint8	flag     : 1;
+#endif
+} off_chain;
 
 typedef struct
 {
 #ifdef	BIGENDIAN
-	unsigned	flag	 : 1;
-	unsigned	cw_index : CW_INDEX_MAX_BITS;
-	unsigned	next_off : NEXT_OFF_MAX_BITS;
+	uint4	flag     : 1;
+	uint4	cw_index : CW_INDEX_MAX_BITS;
+	uint4	next_off : NEXT_OFF_MAX_BITS;
 #else
-	unsigned	next_off : NEXT_OFF_MAX_BITS;
-	unsigned	cw_index : CW_INDEX_MAX_BITS;
-	unsigned	flag	 : 1;
+	uint4	next_off : NEXT_OFF_MAX_BITS;
+	uint4	cw_index : CW_INDEX_MAX_BITS;
+	uint4	flag     : 1;
 #endif
-} off_chain;
+} v6_off_chain;
+
+static inline void WRITE_OFF_CHAIN(boolean_t long_blk_id, off_chain* chain, v6_off_chain* v6_chain, sm_uc_ptr_t ptr)
+{
+	if (long_blk_id)
+		GET_BLK_ID_64P(ptr, chain);
+	else
+	{
+		v6_chain->flag = chain->flag;
+		v6_chain->cw_index = chain->cw_index;
+		v6_chain->next_off = chain->next_off;
+		GET_BLK_ID_32P(ptr, v6_chain);
+	}
+}
+
+static inline void READ_OFF_CHAIN(boolean_t long_blk_id, off_chain* chain, v6_off_chain* v6_chain, sm_uc_ptr_t ptr)
+{
+	if (long_blk_id)
+		GET_BLK_ID_64P(chain, ptr);
+	else
+	{
+		GET_BLK_ID_32P(v6_chain, ptr);
+		chain->flag = v6_chain->flag;
+		chain->cw_index = v6_chain->cw_index;
+		chain->next_off = v6_chain->next_off;
+	}
+}
 
 #ifdef	DEBUG
 /* Macro to check that the tp_reg_list linked list is sorted properly on the file-id */

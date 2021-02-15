@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -807,7 +807,7 @@ void mupip_backup(void)
 		{	/* pool_init is only set if the source server has setup shared memory */
 			assert(NULL != jnlpool);
 			if (!repl_inst_available)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLINSTUNDEF);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_REPLINSTUNDEF);
 			if (!jnlpool)
 			{	/* jnlpool_init should have provided but be safe */
 				jnlpool = malloc(SIZEOF(jnlpool_addrs));
@@ -1458,7 +1458,7 @@ repl_inst_bkup_done2:
 				shmpool_unlock_hdr(gv_cur_region);
 				/* Signal to GT.M processes to start backing up before-images of any GDS block that gets changed
 				 * starting now. To do that set "nbb" to -1 as that is smaller than every valid block number in db
-				 * (starting from 0 upto a max. of 2^28-1 which is lesser than 2^31-1=BACKUP_NOT_IN_PROGRESS)
+				 * (starting from 0 upto a max. of 2^62-1 which is lesser than 2^63-1=BACKUP_NOT_IN_PROGRESS)
 				 */
 				cs_addrs->nl->nbb = -1; /* start */
 				/* Decerement counter so that inhibited KILLs can now proceed */

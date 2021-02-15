@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -116,7 +116,7 @@ int gdsfilext_nojnl(gd_region* reg, block_id new_total, block_id old_total)
 	}
 	/* initialize the bitmap tn's to 0. */
 	newmap = (char *)malloc(blk_size);
-	bml_newmap((blk_hdr *)newmap, BM_SIZE(BLKS_PER_LMAP), 0);
+	bml_newmap((blk_hdr *)newmap, BM_SIZE(BLKS_PER_LMAP), 0, csd->desired_db_format);
 	if (udi->fd_opened_with_o_direct)
 	{
 		aligned_buff = diobuff->aligned;

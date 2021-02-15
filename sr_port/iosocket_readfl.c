@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -357,9 +357,9 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 				iod->dollar.za = 9;
 				save_errno = errno;
 				errptr = (char *)STRERROR(errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
-						LEN_AND_LIT("F_GETFL FOR NON BLOCKING I/O"),
-					  	save_errno, LEN_AND_STR(errptr));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
+					LEN_AND_LIT("F_GETFL FOR NON BLOCKING I/O"),
+					save_errno, LEN_AND_STR(errptr));
 			}
 			FCNTL3(socketptr->sd, F_SETFL, flags & (~(O_NDELAY | O_NONBLOCK)), fcntl_res);
 			if (fcntl_res < 0)
@@ -367,9 +367,9 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 				iod->dollar.za = 9;
 				save_errno = errno;
 				errptr = (char *)STRERROR(errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
-						LEN_AND_LIT("F_SETFL FOR NON BLOCKING I/O"),
-						save_errno, LEN_AND_STR(errptr));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+					LEN_AND_LIT("F_SETFL FOR NON BLOCKING I/O"),
+					save_errno, LEN_AND_STR(errptr));
 			}
 			sys_get_curr_time(&cur_time);
 			if (!sockintr->end_time_valid)
@@ -573,11 +573,11 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 							if (CHSET_UTF16LE == ichset)
 							{
 								iod->dollar.za = 9;
-								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BOMMISMATCH, 4,
-									  chset_names[CHSET_UTF16BE].len,
-									  chset_names[CHSET_UTF16BE].addr,
-									  chset_names[CHSET_UTF16LE].len,
-									  chset_names[CHSET_UTF16LE].addr);
+								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BOMMISMATCH, 4,
+									chset_names[CHSET_UTF16BE].len,
+									chset_names[CHSET_UTF16BE].addr,
+									chset_names[CHSET_UTF16LE].len,
+									chset_names[CHSET_UTF16LE].addr);
 							} else
 							{
 								iod->ichset = ichset = CHSET_UTF16BE;
@@ -591,7 +591,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 							if (CHSET_UTF16BE == ichset)
 							{
 								iod->dollar.za = 9;
-								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BOMMISMATCH, 4,
+								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BOMMISMATCH, 4,
 									chset_names[CHSET_UTF16LE].len,
 									chset_names[CHSET_UTF16LE].addr,
 									chset_names[CHSET_UTF16BE].len,
@@ -694,7 +694,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 		if (bytes_read > MAX_STRLEN)
 		{
 			iod->dollar.za = 9;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 		}
 		orig_bytes_read = bytes_read;
 		if (0 != bytes_read)
@@ -828,9 +828,9 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 				iod->dollar.za = 9;
 				save_errno = errno;
 				errptr = (char *)STRERROR(errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
-						LEN_AND_LIT("F_SETFL FOR RESTORING SOCKET OPTIONS"),
-						save_errno, LEN_AND_STR(errptr));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+					LEN_AND_LIT("F_SETFL FOR RESTORING SOCKET OPTIONS"),
+					save_errno, LEN_AND_STR(errptr));
 			}
 			if (out_of_time)
 			{
@@ -936,7 +936,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 		if (socketptr->ioerror && (prin_in_dev_failure || (0 < iod->error_handler.len) || iod->dollar.zeof))
 		{	/* no delay if permitting errors and we lost the device or have and EXCEPTION handler */
 			iod->dollar.zeof = TRUE;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, errlen, errptr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, errlen, errptr);
 		}
 		iod->dollar.zeof = TRUE;
 	}

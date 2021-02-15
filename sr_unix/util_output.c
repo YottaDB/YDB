@@ -115,16 +115,16 @@ error_def(ERR_TEXT);
  *
  *		!mSB	!mSW	!mSL
  *
- *		!mUB	!mUW	!mUL    !m@UJ   !m@UQ
+ *		!mUB	!mUW	!mUL	!m@UJ	!m@UQ
  *
- *		!mXB	!mXW	!mXL    !mXJ    !m@XJ   !m@XQ
+ *		!mXB	!mXW	!mXL	!mXJ	!m@XJ	!m@XQ
  *
  *		!mZB	!mZW	!mZL
  *
  *		!n*c
  *
  *		!@ZJ	!@XJ		!@ZJ	!@ZQ
- #
+ *
  *	Where `m' is an optional field width, `n' is a repeat count, and `c' is a single character.
  *	`m' or `n' may be specified as the '#' character, in which case the value is taken from the next parameter.
  *
@@ -147,7 +147,7 @@ error_def(ERR_TEXT);
  *
  *	One important caveat in using !mXJ variant is that the input value is expected to be 4-byte on 32-bit platforms and 8-byte
  *	on 64-bit platforms. Passing an 8-byte quantity on a 32-bit platform can cause SIGSEGV. If a field is always 8-bytes on both
- * 	the 32 and 64 bit platforms (like transaction numbers), use 0x!16@XQ variant instead.
+ *	the 32 and 64 bit platforms (like transaction numbers), use 0x!16@XQ variant instead.
  *
  *	In addition, this routine also implements another set of directives
  *
@@ -701,9 +701,6 @@ void	util_out_send_oper(char *addr, unsigned int len)
 				break;
 			case LKE_IMAGE:
 				img_type = "LKE";
-				break;
-			case DBCERTIFY_IMAGE:
-				img_type = "DBCERTIFY";
 				break;
 			case GTCM_SERVER_IMAGE:
 				img_type = "GTCM";

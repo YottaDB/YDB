@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -104,7 +104,7 @@ error_def(ERR_TEXT);
 	if (NULL == BT)										\
 	{	/* NULL value is only possible if wcs_get_space in bt_put fails */		\
 		send_msg_csa(CSA_ARG(CSA) VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(REG),	\
-			CR, CR->blk, RTS_ERROR_TEXT("Non-zero bt"), BT, TRUE, CALLFROM);	\
+			CR, &(CR->blk), RTS_ERROR_TEXT("Non-zero bt"), BT, TRUE, CALLFROM);	\
 		assert(FALSE);									\
 		continue;									\
 	}											\
@@ -377,7 +377,7 @@ void wcs_recover(gd_region *reg)
 			 */
 			if (!jgbl.mur_rollback)
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->data_invalid, cr->data_invalid,
-						DB_LEN_STR(reg), cr->blk);
+						DB_LEN_STR(reg), &(cr->blk));
 			assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
 			cr->data_invalid = 0;
 			if (!cr->tn)
@@ -393,7 +393,7 @@ void wcs_recover(gd_region *reg)
 			{	/* always check the block and return - no assertpro, so last argument is FALSE */
 				if (!jgbl.mur_rollback)
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->stopped, cr->stopped,
-						DB_LEN_STR(reg), cr->blk);
+						DB_LEN_STR(reg), &(cr->blk));
 				/* The only tests that we know which can produce a DBDANGER are the crash tests (which have
 				 * WBTEST_CRASH_SHUTDOWN_EXPECTED white-box enabled. But there are two exceptions:
 				 * The v62000/gtm6348 subtest, which uses WBTEST_BG_UPDATE_BTPUTNULL & dse to trigger a DBDANGER.
@@ -496,7 +496,7 @@ void wcs_recover(gd_region *reg)
 			 */
 			if (!jgbl.mur_rollback)
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->in_tend, cr->in_tend,
-						DB_LEN_STR(reg), cr->blk);
+						DB_LEN_STR(reg), &(cr->blk));
 			assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
 			cr->in_tend= 0;
 			blk_ptr = (blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr);
@@ -788,10 +788,15 @@ void	wcs_mm_recover(gd_region *reg)
 		if (!was_crit)
 			rel_crit(gv_cur_region);
 		assert(WBTEST_ENABLED(WBTEST_MEM_MAP_SYSCALL_FAIL));
+<<<<<<< HEAD
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
 				LEN_AND_STR(syscall), CALLFROM, save_errno);
 		mmap_retaddr = NULL;	/* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
 		mmap_sz = 0;		/* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
+=======
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
+			LEN_AND_STR(syscall), CALLFROM, save_errno);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 #	if defined(_AIX)
 	mmap_retaddr = (sm_uc_ptr_t)mmap_retaddr + BLK_ZERO_OFF(cs_data->start_vbn);

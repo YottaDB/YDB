@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -187,7 +187,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	/* don't allow a read from a writeonly fifo */
 	if (((d_rm_struct *)io_ptr->dev_sp)->write_only)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVICEWRITEONLY);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVICEWRITEONLY);
 #	ifdef __MVS__
 	/* on zos if it is a fifo device then point to the pair.out for $X and $Y */
 	if (((d_rm_struct *)io_ptr->dev_sp)->fifo)
@@ -239,7 +239,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 			save_errno = errno;
 			SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
 			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ, not socket*/
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, save_errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, save_errno);
 		}
 		if (flags & O_NONBLOCK)
 		{
@@ -249,7 +249,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 				save_errno = errno;
 				SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
 				ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);	/* FALSE, FALSE: READ, not socket*/
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
 					save_errno);
 			}
 		}
@@ -265,8 +265,8 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 			save_errno = errno;
 			SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
 			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ, not socket*/
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
-				      RTS_ERROR_LITERAL("iorm_readfl()"), CALLFROM, save_errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
+				RTS_ERROR_LITERAL("iorm_readfl()"), CALLFROM, save_errno);
 		} else
 			rm_ptr->file_pos = cur_position;
 		*dollary_ptr = 0;
@@ -294,8 +294,8 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 					save_errno = errno;
 					SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
 					ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);	/* FALSE, FALSE: READ, not socket*/
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
-						      CALLFROM, save_errno);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
+						CALLFROM, save_errno);
 				}
 				assert(UTF16BE_BOM_LEN < UTF8_BOM_LEN);
 				if ((CHSET_UTF8 == io_ptr->ichset) && (statbuf.st_size >= UTF8_BOM_LEN))
@@ -311,10 +311,10 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						save_errno = errno;
 						SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
 						ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE); /* FALSE, FALSE: READ, not socket*/
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-							      RTS_ERROR_LITERAL("lseek"), RTS_ERROR_LITERAL(
-								      "Error setting file pointer to beginning of file"),
-							      CALLFROM, save_errno);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7,
+							RTS_ERROR_LITERAL("lseek"), RTS_ERROR_LITERAL(
+							"Error setting file pointer to beginning of file"),
+							CALLFROM, save_errno);
 					}
 					rm_ptr->bom_num_bytes = open_get_bom(io_ptr, bom_size_toread);
 					/* move back to previous file position */
@@ -323,9 +323,9 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						save_errno = errno;
 						SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
 						ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE); /* FALSE, FALSE: READ, not socket*/
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-							      RTS_ERROR_LITERAL("lseek"), RTS_ERROR_LITERAL(
-								      "Error restoring file pointer"), CALLFROM, save_errno);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7,
+							RTS_ERROR_LITERAL("lseek"), RTS_ERROR_LITERAL(
+							"Error restoring file pointer"), CALLFROM, save_errno);
 					}
 				}
 				rm_ptr->bom_checked = TRUE;
@@ -339,7 +339,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 		assertpro(pipewhich_invalid != pipeintr->who_saved);      /* Interrupt should never have an invalid save state */
 		/* check we aren't recursing on this device */
 		if (dollar_zininterrupt)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		if (pipewhich_readfl != pipeintr->who_saved)
 			assertpro(FALSE);      /* ZINTRECURSEIO should have caught */
 		PIPE_DEBUG(PRINTF("piperfl: *#*#*#*#*#*#*#  Restarted interrupted read\n"); DEBUGPIPEFLUSH);
@@ -521,7 +521,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 				save_errno = errno;
 				SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
 				ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ, not socket*/
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
 					save_errno);
 			}
 			FCNTL3(fildes, F_SETFL, (flags | O_NONBLOCK), fcntl_res);
@@ -530,7 +530,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 				save_errno = errno;
 				SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
 				ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);	/* FALSE, FALSE: READ, not socket*/
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
 					save_errno);
 			}
 			blocked_in = FALSE;
@@ -1950,8 +1950,8 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 					save_errno = errno;
 					SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
 					ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE); /* FALSE, FALSE: READ, not socket*/
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"),
-						      CALLFROM, save_errno);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"),
+						CALLFROM, save_errno);
 				}
 			}
 			if ((rm_ptr->is_pipe && (0 == status)) || (rm_ptr->fifo && (0 == status || real_errno == EAGAIN)))
@@ -1986,10 +1986,10 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 			SET_DOLLARDEVICE_ERRSTR(io_ptr, ONE_COMMA_DEV_DET_EOF);
 		ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);	/* FALSE, FALSE: READ, not socket*/
 		if (!prin_dm_io && (TRUE == io_ptr->dollar.zeof) && (RM_READ == saved_lastop))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 		io_ptr->dollar.zeof = TRUE;
 		if (!prin_dm_io && (0 < io_ptr->error_handler.len))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 		if ((pipe_zero_timeout || rm_ptr->fifo) && out_of_time)
 		{
 			ret = TRUE;

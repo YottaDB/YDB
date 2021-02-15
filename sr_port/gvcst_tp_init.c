@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Copyright (c) 2003-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
@@ -27,7 +27,7 @@
 #include "gdskill.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"
+#include "hashtab_int8.h"
 #include "tp.h"
 #include "tp_timeout.h"
 #include "gvcst_protos.h"	/* for gvcst_tp_init prototype */
@@ -47,8 +47,8 @@ void gvcst_tp_init(gd_region *greg)
 		si->tp_hist_size = TP_MAX_MM_TRANSIZE;
 		si->cur_tp_hist_size = INIT_CUR_TP_HIST_SIZE;	/* should be very much less than si->tp_hist_size */
 		assert(si->cur_tp_hist_size <= si->tp_hist_size);
-		si->blks_in_use = (hash_table_int4 *)malloc(SIZEOF(hash_table_int4));
-		init_hashtab_int4(si->blks_in_use, BLKS_IN_USE_INIT_ELEMS, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
+		si->blks_in_use = (hash_table_int8 *)malloc(SIZEOF(hash_table_int8));
+		init_hashtab_int8(si->blks_in_use, BLKS_IN_USE_INIT_ELEMS, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
 		/* See comment in tp.h about cur_tp_hist_size for details */
 		si->first_tp_hist = si->last_tp_hist =
 			(srch_blk_status *)malloc(SIZEOF(srch_blk_status) * si->cur_tp_hist_size);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "copy.h"
+#include "tp.h"
 
 /* Include prototypes */
 #include "t_qread.h"
@@ -46,7 +47,8 @@ enum cdb_sc	gvcst_rtsib(srch_hist *full_hist, int level)
 	block_id	blk;
 	unsigned short	rec_size, temp_short;
 	sm_uc_ptr_t	buffer_address;
-	int4		cycle;
+	int4		blk_id_sz, cycle;
+	boolean_t	long_blk_id;
 
 	new_base = &full_hist->h[level];
 	old = old_base = &gv_target->hist.h[level];
@@ -100,6 +102,7 @@ enum cdb_sc	gvcst_rtsib(srch_hist *full_hist, int level)
 		return cdb_sc_rmisalign;
 	}
 	rp = (rec_hdr_ptr_t)(old->buffaddr + temp_short);
+	long_blk_id = IS_64_BLK_ID(old->buffaddr);
 	while (--new >= new_base)
 	{
 		--old;
@@ -109,11 +112,12 @@ enum cdb_sc	gvcst_rtsib(srch_hist *full_hist, int level)
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_rmisalign;
 		}
-		GET_BLK_ID(blk, (sm_uc_ptr_t)rp + rec_size - SIZEOF(block_id));
+		READ_BLK_ID(long_blk_id, &blk, (sm_uc_ptr_t)rp + rec_size - SIZEOF_BLK_ID(long_blk_id));
 		new->tn = cs_addrs->ti->curr_tn;
 		new->cse = NULL;
 		if (NULL == (buffer_address = t_qread(blk, &new->cycle, &new->cr)))
 			return((enum cdb_sc)rdfail_detail);
+		long_blk_id = IS_64_BLK_ID(buffer_address);
 		new->first_tp_srch_status = first_tp_srch_status;
 		assert(new->level == old->level);
 		assert(new->blk_target == old->blk_target);

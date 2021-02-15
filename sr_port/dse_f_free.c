@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,8 +36,7 @@ error_def(ERR_DSEBLKRDFAIL);
 
 void dse_f_free(void)
 {
-	block_id	blk, master_bit, mmap_hint, lmap_hint;
-	block_cnt	total_blks;
+	block_id	blk, lmap_hint, master_bit, mmap_hint, total_blks;
 	boolean_t	in_last_bmap, was_crit, was_hold_onto_crit;
 	cache_rec_ptr_t	dummy_cr;
 	char		util_buff[MAX_UTIL_LEN];
@@ -64,7 +63,7 @@ void dse_f_free(void)
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if (!(lmap_base = t_qread(master_bit * bplmap, &dummy_int, &dummy_cr)))
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (master_bit == mmap_hint)
 		lmap_hint = blk - ((blk / bplmap) * bplmap);
 	else

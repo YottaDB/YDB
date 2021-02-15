@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,8 +45,8 @@ void iott_wtone(int v)
 		temp.len = INTCAST(up - utf_buf);
 		temp.addr = (char *)&utf_buf[0];
 	} else
-		rts_error(VARLSTCNT(4) ERR_BADCHSET, 2, chset_names[io_curr_device.out->ochset].len,
-				chset_names[io_curr_device.out->ochset].addr);
+		RTS_ERROR_ABT(VARLSTCNT(4) ERR_BADCHSET, 2, chset_names[io_curr_device.out->ochset].len,
+			chset_names[io_curr_device.out->ochset].addr);
 #endif
 	iott_write(&temp);
 	return;

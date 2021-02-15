@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +45,8 @@ GBLREF	stack_frame		*error_frame;
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 GBLREF	dollar_stack_type	dollar_stack;			/* structure containing $STACK related information */
 
+error_def(ERR_INVSTACODE);
+
 #define	GET_FRAME_INFO(level, mode, cur_zlevel, result)					\
 {											\
 	assert(level < cur_zlevel);							\
@@ -53,7 +60,7 @@ GBLREF	dollar_stack_type	dollar_stack;			/* structure containing $STACK related 
 			get_frame_place_mcode(level, mode, cur_zlevel, result);		\
 			break;								\
 		default:								\
-			GTMASSERT;							\
+			assertpro(FALSE);						\
 	}										\
 }
 
@@ -62,8 +69,6 @@ void op_fnstack2(int level, mval *info, mval *result)
  	int		cur_zlevel;
 	stack_mode_t	mode;
  	unsigned char	info_upper[SIZEOF("MCODE")];
-
-	error_def(ERR_INVSTACODE);
 
 	mode = DOLLAR_STACK_INVALID;
 	/* make sure that info is one of the three valid strings */
@@ -79,7 +84,7 @@ void op_fnstack2(int level, mval *info, mval *result)
 			mode = DOLLAR_STACK_PLACE;
 	}
 	if (DOLLAR_STACK_INVALID == mode)
-		rts_error(VARLSTCNT(4) ERR_INVSTACODE, 2, info->str.len, info->str.addr);
+		RTS_ERROR_ABT(VARLSTCNT(4) ERR_INVSTACODE, 2, info->str.len, info->str.addr);
 	result->mvtype = MV_STR;
 	result->str.len = 0;	/* set result to null string before any processing */
 	cur_zlevel = dollar_zlevel();

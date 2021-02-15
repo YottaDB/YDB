@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,10 +52,10 @@ cm_op_t gtcmtr_initreg(void)
 
 	if (region->reg->max_rec_size > 32767)
 	{
-		rts_error(VARLSTCNT(10) ERR_UNIMPLOP, 0,
-		ERR_TEXT, 2,
-		LEN_AND_LIT("Client does not support spanning nodes"),
-		ERR_TEXT, 2, DB_LEN_STR(region->reg));
+		RTS_ERROR_ABT(VARLSTCNT(10) ERR_UNIMPLOP, 0,
+			ERR_TEXT, 2,
+			LEN_AND_LIT("Client does not support spanning nodes"),
+			ERR_TEXT, 2, DB_LEN_STR(region->reg));
 	 }
 
 	if (region->reg->max_rec_size + CM_BUFFER_OVERHEAD > curr_entry->clb_ptr->mbl)
@@ -63,14 +68,14 @@ cm_op_t gtcmtr_initreg(void)
 	{
 		if (ALLOWEXISTING == region->reg->null_subs)
 		{
-			rts_error(VARLSTCNT(10) ERR_UNIMPLOP, 0,
+			RTS_ERROR_ABT(VARLSTCNT(10) ERR_UNIMPLOP, 0,
 				ERR_TEXT, 2,
 				LEN_AND_LIT("Client does not support ALLOWEXISTING for null subscripts"),
 				ERR_TEXT, 2, DB_LEN_STR(region->reg));
 		}
 		if ( 0 != region->reg->std_null_coll)
 		{
-			rts_error(VARLSTCNT(10) ERR_UNIMPLOP, 0,
+			RTS_ERROR_ABT(VARLSTCNT(10) ERR_UNIMPLOP, 0,
 				ERR_TEXT, 2,
 				LEN_AND_LIT("Client does not support standard null collation for null subscripts"),
 				ERR_TEXT, 2, DB_LEN_STR(region->reg));

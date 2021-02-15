@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -153,10 +153,15 @@ typedef struct cache_rec_struct
 					 * in progress. This is used by wcs_recover to decide whether to place a cr into
 					 * the active or wip queue.
 					 */
+<<<<<<< HEAD
 	bool		needs_first_write;	/* If this block needs to be written to disk for the first time, then
 						 * flag it (note only applicable for FULLBLKWRT={1|2})
 						 */
 	/* bool		filler4bytealign[1];	 Note: Make sure any changes here are reflected in "cache_state_rec" too */
+=======
+	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
+						 *  note it (only applicable for fullblockwrites) */
+>>>>>>> 451ab477 (GT.M V7.0-000)
 } cache_rec;
 
 /* A note about cache line separation of the latches contained in these blocks. Because this block is duplicated
@@ -243,16 +248,21 @@ typedef struct
 					 * in progress. This is used by wcs_recover to decide whether to place a cr into
 					 * the active or wip queue.
 					 */
+<<<<<<< HEAD
 	bool		needs_first_write;	/* If this block needs to be written to disk for the first time, then
 						 * flag it (note only applicable for FULLBLKWRT={1|2})
 						 */
 	/*bool		filler4bytealign[1];	 Note: Make sure any changes here are reflected in "cache_state_rec" too */
+=======
+	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
+						 *  note it (only applicable for fullblockwrites) */
+>>>>>>> 451ab477 (GT.M V7.0-000)
 } cache_state_rec;
 
 #define		CR_BLKEMPTY		-1
 #define		MBR_BLKEMPTY		-1
 #define		FROZEN_BY_ROOT		(uint4)(0xFFFFFFFF)
-#define		BACKUP_NOT_IN_PROGRESS	0x7FFFFFFF
+#define		BACKUP_NOT_IN_PROGRESS	0x7FFFFFFFFFFFFFFF
 #define		DB_CSH_RDPOOL_SZ	0x20	/* These many non-dirty buffers exist at all points in time in shared memory */
 
 typedef struct
@@ -1419,45 +1429,79 @@ MBSTART {											\
 #define	TP_IS_CDB_SC_BLKMOD(cr, t1) (((NULL != (cr)) && (cr)->in_tend) || ((t1)->tn <= ((blk_hdr_ptr_t)(t1)->buffaddr)->tn))
 #define	TP_IS_CDB_SC_BLKMOD3(cr, t1, blktn) (((NULL != (cr)) && (cr)->in_tend) || ((t1)->tn <= blktn))
 
-#define MM_ADDR(SGD)		((sm_uc_ptr_t)(((sgmnt_data_ptr_t)SGD) + 1))
-#define MASTER_MAP_BLOCKS_DFLT		496				/* 496 gives 992M possible blocks */
-#define MASTER_MAP_BLOCKS_V5		112				/* 112 gives 224M possible blocks */
-#define MASTER_MAP_BLOCKS_V4		32				/* 32 gives 64M possible blocks  */
-#define MASTER_MAP_BLOCKS_MAX		MASTER_MAP_BLOCKS_DFLT		/* 496 gives 992M possible blocks  */
-#define MASTER_MAP_BLOCKS_V5_OLD	64				/* V5 database previous master map block size */
-#define MASTER_MAP_SIZE_V5_OLD	(MASTER_MAP_BLOCKS_V5_OLD * DISK_BLOCK_SIZE)
-#define MASTER_MAP_SIZE_V4	(MASTER_MAP_BLOCKS_V4 * DISK_BLOCK_SIZE)	/* MUST be a multiple of DISK_BLOCK_SIZE */
-#define MASTER_MAP_SIZE_MAX	(MASTER_MAP_BLOCKS_MAX * DISK_BLOCK_SIZE)	/* MUST be a multiple of DISK_BLOCK_SIZE */
-#define MASTER_MAP_SIZE_DFLT	(MASTER_MAP_BLOCKS_DFLT * DISK_BLOCK_SIZE)	/* MUST be a multiple of DISK_BLOCK_SIZE */
-#define MASTER_MAP_SIZE_V5	(MASTER_MAP_BLOCKS_V5 * DISK_BLOCK_SIZE)	/* MUST be a multiple of DISK_BLOCK_SIZE */
-#define MASTER_MAP_SIZE(SGD)	(((sgmnt_data_ptr_t)SGD)->master_map_len)
-#define SGMNT_HDR_LEN		SIZEOF(sgmnt_data)
-#define SIZEOF_FILE_HDR(SGD)	(SGMNT_HDR_LEN + MASTER_MAP_SIZE(SGD))
-#define SIZEOF_FILE_HDR_DFLT	(SGMNT_HDR_LEN + MASTER_MAP_SIZE_DFLT)
-#define SIZEOF_FILE_HDR_V5	(SGMNT_HDR_LEN + MASTER_MAP_SIZE_V5)
-#define SIZEOF_FILE_HDR_MIN	(SGMNT_HDR_LEN + MASTER_MAP_SIZE_V4)
-#define SIZEOF_FILE_HDR_MAX	(SGMNT_HDR_LEN + MASTER_MAP_SIZE_MAX)
-#define MM_BLOCK		(SGMNT_HDR_LEN / DISK_BLOCK_SIZE + 1)	/* gt.m numbers blocks from 1 */
-#define TH_BLOCK		1
+/* The following macros describe the Master Bit Map (MBM):
+ * MM_ADDR(SGD) -> returns a pointer the MBM using a pointer to sgmnt_data structure
+ *
+ * MASTER_MAP_BLOCKS_V# -> the number of database blocks the MBM uses
+ *	-This constrains the total number of blocks in the database with the
+ *	 total possible number of blocks determined by the formula
+ *		MASTER_MAP_BLOCKS_V# * 512 * 8 * 512 = POSSIBLE_BLOCKS
+ *	 where
+ *		MASTER_MAP_BLOCKS_V# -> number of blocks the MBM uses
+ *		512 -> number of bytes per block
+ *			-corresponds to the DISK_BLOCK_SIZE macro
+ *		  8 -> number of Local Bit Maps (LBM) per byte of MBM
+ *			-the MBM can track 1 LBM per bit, unlike the LBM which requires 2 bits per data block
+ *		512 -> number of blocks per LBM
+ *			-since the first block in a LBM is the LBM itself replace this with 511 if calculating
+ *			 the number of usable data blocks
+ *
+ * MASTER_MAP_SIZE_V# -> the size of the MBM on disk
+ */
+#define MM_ADDR(SGD)			((sm_uc_ptr_t)(((sgmnt_data_ptr_t)SGD) + 1))
+#define MASTER_MAP_BLOCKS_V4		  32LL			/*   32 gives   67M possible blocks */
+#define MASTER_MAP_BLOCKS_V5_OLD	  64LL			/* V5 database previous master map block size (134M) */
+#define MASTER_MAP_BLOCKS_V5		 112LL			/*  112 gives  234M possible blocks */
+#define MASTER_MAP_BLOCKS_V6		 496LL			/*  496 gives 992Mi (1038M) possible blocks */
+#define MASTER_MAP_BLOCKS_V7		8176LL			/* 8176 gives  16Gi (17.1B) possible blocks */
+#define MASTER_MAP_BLOCKS_DFLT		MASTER_MAP_BLOCKS_V7	/* this represents the default for the current version */
+#define MASTER_MAP_BLOCKS_MAX		MASTER_MAP_BLOCKS_V7	/* this represents the version with the most possible blocks */
+#define MASTER_MAP_SIZE_V4		(MASTER_MAP_BLOCKS_V4 * DISK_BLOCK_SIZE)	/* MUST be a multiple of DISK_BLOCK_SIZE */
+#define MASTER_MAP_SIZE_V5_OLD		(MASTER_MAP_BLOCKS_V5_OLD * DISK_BLOCK_SIZE)
+#define MASTER_MAP_SIZE_V5		(MASTER_MAP_BLOCKS_V5 * DISK_BLOCK_SIZE)	/* MUST be a multiple of DISK_BLOCK_SIZE */
+#define MASTER_MAP_SIZE_V6		(MASTER_MAP_BLOCKS_V6 * DISK_BLOCK_SIZE)
+#define MASTER_MAP_SIZE_V7		(MASTER_MAP_BLOCKS_V7 * DISK_BLOCK_SIZE)
+#define MASTER_MAP_SIZE_DFLT		(MASTER_MAP_BLOCKS_DFLT * DISK_BLOCK_SIZE)	/* MUST be a multiple of DISK_BLOCK_SIZE */
+#define MASTER_MAP_SIZE_MAX		(MASTER_MAP_BLOCKS_MAX * DISK_BLOCK_SIZE)	/* MUST be a multiple of DISK_BLOCK_SIZE */
+#define MASTER_MAP_SIZE(SGD)		(((sgmnt_data_ptr_t)SGD)->master_map_len)
 
-#define JNL_NAME_SIZE	        256  /* possibly expanded when opened. Macro value should not change as it is used in db file hdr */
+#define SGMNT_HDR_LEN			SIZEOF(sgmnt_data)
+#define SIZEOF_FILE_HDR(SGD)		(SGMNT_HDR_LEN + MASTER_MAP_SIZE(SGD))
+#define SIZEOF_FILE_HDR_DFLT		(SGMNT_HDR_LEN + MASTER_MAP_SIZE_DFLT)
+#define SIZEOF_FILE_HDR_V7		(SGMNT_HDR_LEN + MASTER_MAP_SIZE_V7)
+#define SIZEOF_FILE_HDR_V5		(SGMNT_HDR_LEN + MASTER_MAP_SIZE_V5)
+#define SIZEOF_FILE_HDR_MIN		(SGMNT_HDR_LEN + MASTER_MAP_SIZE_V4)
+#define SIZEOF_FILE_HDR_MAX		(SGMNT_HDR_LEN + MASTER_MAP_SIZE_MAX)
+#define MM_BLOCK			(SGMNT_HDR_LEN / DISK_BLOCK_SIZE + 1)	/* gt.m numbers blocks from 1 */
+/* This macro defines which block (of size DISK_BLOCK_SIZE not the database block size) the trans_hist field of
+ * the header resides in. This can be calculated by taking the offset of trans_hist, dividing by 512 and adding 1.
+ * TH_BLOCK = (offsetof(trans_hist) / DISK_BLOCK_SIZE) + 1
+ * Currently the offset of trans_hist is 4920 and DISK_BLOCK_SIZE is 512, so
+ * TH_BLOCK = (4920/512) + 1 = 10.61
+ */
+#define TH_BLOCK			10
+
+#define JNL_NAME_SIZE		256  /* possibly expanded when opened. Macro value should not change as it is used in db file hdr */
 #define JNL_NAME_EXP_SIZE	1024 /* MAXPATHLEN, before jnl_buffer in shared memory */
 
 #define BLKS_PER_LMAP		512
 #define MAXTOTALBLKS_V4		(MASTER_MAP_SIZE_V4 * 8 * BLKS_PER_LMAP)
-#define MAXTOTALBLKS_V5		(MASTER_MAP_SIZE_MAX * 8 * BLKS_PER_LMAP)
-#define MAXTOTALBLKS_V6		(MASTER_MAP_SIZE_MAX * 8 * BLKS_PER_LMAP)
+#define MAXTOTALBLKS_V5		(MASTER_MAP_SIZE_V5 * 8 * BLKS_PER_LMAP)
+#define MAXTOTALBLKS_V6		(MASTER_MAP_SIZE_V6 * 8 * BLKS_PER_LMAP)
+#define MAXTOTALBLKS_V7		(MASTER_MAP_SIZE_V7 * 8 * BLKS_PER_LMAP)
 #define MAXTOTALBLKS_MAX	(MASTER_MAP_SIZE_MAX * 8 * BLKS_PER_LMAP)
 #define MAXTOTALBLKS(SGD)	(MASTER_MAP_SIZE(SGD) * 8 * BLKS_PER_LMAP)
 #define	IS_BITMAP_BLK(blk)	(ROUND_DOWN2(blk, BLKS_PER_LMAP) == blk)	/* TRUE if blk is a bitmap */
-/*	V6 - 8K fileheader (= 16 blocks) + 248K mastermap (= 496 blocks) + 1
- *	V5 - 8K fileheader (= 16 blocks) + 56K mastermap (= 112 blocks) + 1
- *	V4 - 8K fileheader (= 16 blocks) + 16K mastermap (= 32 blocks) + 1
+/*	V4 - 8K fileheader (= 16 blocks) +   16K mastermap (=   32 blocks) + 1
+ *	V5 - 8K fileheader (= 16 blocks) +   56K mastermap (=  112 blocks) + 1
+ *	V6 - 8K fileheader (= 16 blocks) +  248K mastermap (=  496 blocks) + 1
+ *	v7 - 8k fileheader (= 16 blocks) + 4186k mastermap (= 8176 blocks) + 1
  */
-#define START_VBN_V6		513
-#define START_VBN_V5		129
-#define	START_VBN_V4		 49
-#define START_VBN_CURRENT	START_VBN_V6
+#define START_VBN_V4		  49
+#define START_VBN_V5		 129
+#define START_VBN_V6		 513
+#define START_VBN_V7		8193
+#define START_VBN_CURRENT	START_VBN_V7
 
 #define	STEP_FACTOR			64			/* the factor by which flush_trigger is incremented/decremented */
 #define	MIN_FLUSH_TRIGGER(n_bts)	((n_bts) / 8)		/* the minimum flush_trigger as a function of n_bts */
@@ -1501,7 +1545,7 @@ MBSTART {	/* We need to ensure that an uptodate value of cnl->intent_wtstart is 
 	 * WRITERS_ACTIVE macro every iteration of the loop hence the read memory barrier.	\
 	 */											\
 	SHM_READ_MEMORY_BARRIER;								\
-	for (lcnt=1; WRITERS_ACTIVE(cnl) && (lcnt <= maxiters);  lcnt++)			\
+	for (lcnt=1; WRITERS_ACTIVE(cnl) && (lcnt <= maxiters); lcnt++)				\
 	{	/* wait for any processes INSIDE or at ENTRY of wcs_wtstart to finish */	\
 		wcs_sleep(lcnt);								\
 		SHM_READ_MEMORY_BARRIER;							\
@@ -1541,25 +1585,25 @@ MBSTART {								\
 	/* else possible if wcs_verify had reset this flag */		\
 } MBEND
 
-#define ENSURE_JNL_OPEN(csa, reg)                                                					\
-MBSTART {                                                                              				\
-	boolean_t		was_crit;                                              				\
+#define ENSURE_JNL_OPEN(csa, reg)											\
+MBSTART {														\
+	boolean_t		was_crit;										\
 	jnl_private_control	*jpc;											\
 	sgmnt_data_ptr_t	csd;											\
 	uint4			jnl_status;										\
 															\
-	assert(cs_addrs == csa);                                                       				\
-	assert(gv_cur_region == reg);                                                  				\
-	assert(FALSE == reg->read_only);                                               				\
+	assert(cs_addrs == csa);											\
+	assert(gv_cur_region == reg);											\
+	assert(FALSE == reg->read_only);										\
 	csd = csa->hdr;													\
 	if (JNL_ENABLED(csd))												\
-	{                                                                       					\
-		was_crit = csa->now_crit;                                         					\
-		if (!was_crit)                                                  					\
-			grab_crit(reg, WS_2);                                         					\
-		jnl_status = JNL_ENABLED(csd) ? jnl_ensure_open(reg, csa) : 0;    	                             	\
-		if (!was_crit)                                                  					\
-			rel_crit(reg);                                          					\
+	{														\
+		was_crit = csa->now_crit;										\
+		if (!was_crit)												\
+			grab_crit(reg, WS_2);										\
+		jnl_status = JNL_ENABLED(csd) ? jnl_ensure_open(reg, csa) : 0;						\
+		if (!was_crit)												\
+			rel_crit(reg);											\
 		if (0 != jnl_status)											\
 		{													\
 			jpc = csa->jnl;											\
@@ -1571,14 +1615,14 @@ MBSTART {                                                                       
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),		\
 						DB_LEN_STR(gv_cur_region));						\
 		}													\
-	}                                                                      					\
+	}														\
 } MBEND
 
 #define JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, num_bufs, cr2flush, CHILLWAIT, RET)		\
-MBSTART {      										\
+MBSTART {											\
 	if ((CHILLWAIT) && !FREEZE_LATCH_HELD(csa))						\
 		WAIT_FOR_REGION_TO_UNCHILL(csa, csa->hdr);					\
-	ENSURE_JNL_OPEN(csa, reg);                             				\
+	ENSURE_JNL_OPEN(csa, reg);								\
 	if (csa->hdr->asyncio)									\
 		RET = wcs_wtstart_fini(reg, num_bufs, cr2flush);				\
 	else											\
@@ -1589,7 +1633,7 @@ MBSTART {      										\
  * We should hold crit on the region in all cases except for one when we are in MUPIP CREATE (but we are still standalone here).
  * Therefore we need not use any interlocks to update this field. This is asserted below.
  * Although we can derive "csd" from "csa", we pass them as two separate arguments for performance reasons.
- * Use local variables to record shared memory information doe debugging purposes in case of an assert failure.
+ * Use local variables to record shared memory information for debugging purposes in case of an assert failure.
  */
 #define INCR_BLKS_TO_UPGRD(csa, csd, delta)						\
 MBSTART {										\
@@ -1864,19 +1908,26 @@ MBSTART {														\
 #define	SGMNT_DATA_OFFSET_R134_max_procs	7176	/* offset of "max_procs" prior to YottaDB r1.36 */
 
 /* This is the structure describing a segment. It is used as a database file header (for MM or BG access methods).
- * The overloaded fields for MM and BG are n_bts, bt_buckets. */
+ * The overloaded fields for MM and BG are n_bts, bt_buckets.
+ */
 
 /* ***NOTE*** If the field minor_dbver is updated, please also update gdsdbver.h and db_auto_upgrade.c appropriately
-   (see db_auto_upgrade for reasons and description). SE 5/2006
-*/
+ * (see db_auto_upgrade for reasons and description). SE 5/2006
+ */
+
+/* Fields prepened with v6_ are the fields from the V6 header version.  They were just renamed in order to simplify
+ * support for conversion between V6 and V7 headers. For the actual fields that are used in the code look at
+ * the FIELDS EXTENDED IN V7 HEADER group.  Once V6 DBs are no longer supported the v6_ fields can be converted in
+ * to their new 8-byte size and the FIELDS EXTENDED IN V7 HEADER group can be converted to filler.
+ */
 typedef struct sgmnt_data_struct
 {
 	/************* MOSTLY STATIC DATABASE STATE FIELDS **************************/
 	unsigned char	label[GDS_LABEL_SZ];
 	int4		blk_size;		/* Block size for the file. Static data defined at db creation time */
-	int4		master_map_len;		/* Length of master map */
+	int4		v6_master_map_len;	/* Length of master map in V6 header */
 	int4		bplmap;			/* Blocks per local map (bitmap). static data defined at db creation time */
-	int4		start_vbn;		/* starting virtual block number. */
+	block_id_32	v6_start_vbn;		/* starting virtual block number in V6 header */
 	enum db_acc_method acc_meth;		/* Access method (BG or MM) */
 	uint4		max_bts;		/* Maximum number of bt records allowed in file */
 	int4		n_bts;			/* number of cache record/blocks */
@@ -1923,10 +1974,10 @@ typedef struct sgmnt_data_struct
 	trans_num	last_inc_backup;
 	trans_num	last_com_backup;
 	trans_num	last_rec_backup;
-	block_id	last_inc_bkup_last_blk;	/* Last block in the database at time of last incremental backup */
-	block_id	last_com_bkup_last_blk;	/* Last block in the database at time of last comprehensive backup */
-	block_id	last_rec_bkup_last_blk;	/* Last block in the database at time of last record-ed backup */
-	block_id	reorg_restart_block;
+	block_id_32	v6_last_inc_bkup_last_blk;	/* Last block in the DB at time of last incremental backup (V6 header)*/
+	block_id_32	v6_last_com_bkup_last_blk;	/* Last block in the DB at time of last comprehensive backup (V6 header)*/
+	block_id_32	v6_last_rec_bkup_last_blk;	/* Last block in the DB at time of last record-ed backup (V6 header)*/
+	block_id_32	v6_reorg_restart_block;		/* This is a V6 header field */
 	char		filler_256[8];
 	/************* FIELDS SET WHEN DB IS OPEN ********************************/
 	char		now_running[MAX_REL_NAME];/* for active version stamp */
@@ -1944,10 +1995,12 @@ typedef struct sgmnt_data_struct
 						 */
 	trans_num	desired_db_format_tn;	/* Database tn when last db format change occurred */
 	trans_num	reorg_db_fmt_start_tn;	/* Copy of desired_db_format_tn when MUPIP REORG UPGRADE/DOWNGRADE started */
-	block_id	reorg_upgrd_dwngrd_restart_block;	/* Block numbers lesser than this were last upgraded/downgraded by
-								 * MUPIP REORG UPGRADE|DOWNGRADE before being interrupted */
-	int4		blks_to_upgrd;			/* Blocks not at current block version level */
-	int4		blks_to_upgrd_subzero_error;	/* number of times "blks_to_upgrd" potentially became negative */
+	block_id_32	v6_reorg_upgrd_dwngrd_restart_block;	/* Block numbers lesser than this were last upgraded/downgraded by
+								 * MUPIP REORG UPGRADE|DOWNGRADE before being interrupted.
+								 * This is a V6 header field.
+								 */
+	block_id_32	v6_blks_to_upgrd;			/* Blocks not at current block version level (V6 header)*/
+	block_id_32	v6_blks_to_upgrd_subzero_error;	/* number of times "blks_to_upgrd" potentially became negative (V6 header)*/
 	enum db_ver	desired_db_format;	/* Output version for database blocks (normally current version) */
 	boolean_t	fully_upgraded;		/* Set to TRUE by MUPIP REORG UPGRADE when ALL blocks (including RECYCLED blocks)
 						 * have been examined and upgraded (if necessary) and blks_to_upgrd is set to 0;
@@ -1971,14 +2024,17 @@ typedef struct sgmnt_data_struct
 	boolean_t	opened_by_gtmv53;	/* Set to TRUE the first time this database is opened by GT.M V5.3-000 and higher */
 	char		filler_384[12];
 	/************* FIELDS RELATED TO DB TRANSACTION HISTORY *****************************/
-	th_index	trans_hist;		/* transaction history - if moved from 1st filehdr block, change TH_BLOCK */
+	char		v6_trans_hist[56];	/* This is the V6 transaction history. It is a char[] since the V7 header
+						 * doesn't need to know how to read this field and this keeps from having
+						 * to define the v6_th_index struct outside of v6_gdsfhead.h
+						 */
 	/************* FIELDS RELATED TO WRITE CACHE FLUSHING *******************************/
 	int4		write_fullblk;
 	char		filler[4];
 	uint8		flush_time;
 	int4		flush_trigger;
 	int4		n_wrt_per_flu;		/* Number of writes per flush call. Overloaded for BG and MM */
-	int4		wait_disk_space;        /* seconds to wait for diskspace before giving up on a db block write */
+	int4		wait_disk_space;	/* seconds to wait for diskspace before giving up on a db block write */
 	int4		defer_time;		/* defer write
 						 *	 0 => immediate,
 						 *	-1 => indefinite defer,
@@ -2072,11 +2128,10 @@ typedef struct sgmnt_data_struct
 	int4		intrpt_recov_jnl_state;	/* journaling state at start of interrupted recover/rollback */
 	int4		intrpt_recov_repl_state;/* replication state at start of interrupted recover/rollback */
 	/************* TRUNCATE RELATED FIELDS ****************/
-	uint4		before_trunc_total_blks;	/* Used in recover_truncate to detect interrupted truncate */
-	uint4		after_trunc_total_blks;		/* All these fields are used to repair interrupted truncates */
-	uint4		before_trunc_free_blocks;
-	uint4		filler_trunc;			/* Previously before_trunc_file_size, which is no longer used */
-	char		filler_1k[24];
+	block_id_32	v6_before_trunc_total_blks;	/* Used in recover_truncate to detect interrupted truncate (V6 header)*/
+	block_id_32	v6_after_trunc_total_blks;	/* All these fields are used to repair interrupted truncates (V6 header)*/
+	block_id_32	v6_before_trunc_free_blocks;	/* V6 header field */
+	char		filler_1k[28];
 	/************* POTENTIALLY LARGE CHARACTER ARRAYS **************/
 	unsigned char	jnl_file_name[JNL_NAME_SIZE];	/* journal file name */
 	unsigned char	reorg_restart_key[OLD_MAX_KEY_SZ + 1];	/* 1st key of a leaf block where reorg was done last time.
@@ -2087,19 +2142,19 @@ typedef struct sgmnt_data_struct
 	/* Prior to the introduction of encryption_hash and, subsequently, other encryption fields, this space was occupied by a
 	 * char filler_2k[256]. Now that the encryption fields consume a part of that space, the filler has been reduced in size.
 	 */
-	char            encryption_hash[GTMCRYPT_RESERVED_HASH_LEN];
+	char		encryption_hash[GTMCRYPT_RESERVED_HASH_LEN];
 	char		encryption_hash2[GTMCRYPT_RESERVED_HASH_LEN];
 	boolean_t	non_null_iv;
-	block_id	encryption_hash_cutoff;		/* Points to the first block to be encrypted by MUPIP REORG -ENCRYPT with
+	block_id_32	v6_encryption_hash_cutoff;	/* Points to the first block to be encrypted by MUPIP REORG -ENCRYPT with
 							 * encryption_hash2. The value of -1 indicates that no (re)encryption is
-							 * happening. */
+							 * happening. This is a V6 header field */
 	trans_num	encryption_hash2_start_tn;	/* Indicates the lowest transaction number at which a block is encrypted
 							 * with encryption_hash2. */
 	char		filler_encrypt[80];
 	/***************************************************/
 	/* The CLRGVSTATS macro wipes out everything from here through the GVSTATS fields up to gvstats_rec_old_now_filler
-	 * starting from the end of the space reserved for the encryption_hash above - DO NOT insert anthing in this range or move
-	 * those two end points without appropriately adjusting that macro
+	 * starting from the end of the space reserved for the encryption_hash above - DO NOT insert anything in this range or
+	 * move those two end points without appropriately adjusting that macro
 	 */
 	/************* BG_TRC_REC RELATED FIELDS ***********/
 #	define TAB_BG_TRC_REC(A,B)	bg_trc_rec_tn	B##_tn;
@@ -2121,12 +2176,39 @@ typedef struct sgmnt_data_struct
 	/************* FORMER GVSTATS_REC RELATED FIELDS ***********/
 	/* gvstats_rec has been moved to the end of the header,    */
 	/* leaving filler here.  This can be reused in the future  */
-	char			gvstats_rec_old_now_filler[496];
-	char			gvstats_rec_filler_4k_plus_512[16];
-	char			filler_4k_plus_512[368];	/* Note: this filler array should START at offset 4K+512.
-								 * So any additions of new fields should happen at the END of this
-								 * filler array and the filler array size correspondingly adjusted.
-							 	 */
+	char		gvstats_rec_old_now_filler[496];
+	char		gvstats_rec_filler_4k_plus_512[16];
+	char		filler_4k_plus_512[208];	/* Note: this filler array should START at offset 4K+512.
+							 * So any additions of new fields should happen at the END of this
+							 * filler array and the filler array size correspondingly adjusted.
+							 */
+	/************* FIELDS EXTENDED IN V7 HEADER ********************************/
+	/* The sub-headers indicate where these fields were originally located */
+	/*MOSTLY STATIC DATABASE STATE FIELDS*/
+	gtm_int8	master_map_len;			/* Length of master map */
+	block_id	start_vbn;			/* starting virtual block number. */
+	/*FIELDS SET BY MUPIP BACKUP/REORG*/
+	block_id	last_inc_bkup_last_blk;		/* Last block in the database at time of last incremental backup */
+	block_id	last_com_bkup_last_blk;		/* Last block in the database at time of last comprehensive backup */
+	block_id	last_rec_bkup_last_blk;		/* Last block in the database at time of last record-ed backup */
+	block_id	reorg_restart_block;
+	/* FIELDS USED IN V4 <==> V5 COMPATIBILITY MODE */
+	block_id	reorg_upgrd_dwngrd_restart_block;	/* Block numbers lesser than this were last upgraded/downgraded by
+								 * MUPIP REORG UPGRADE|DOWNGRADE before being interrupted
+								 */
+	block_id	blks_to_upgrd;			/* Blocks not at current block version level */
+	block_id	blks_to_upgrd_subzero_error;	/* number of times "blks_to_upgrd" potentially became negative */
+	/* TRUNCATE RELATED FIELDS */
+	block_id	before_trunc_total_blks;	/* Used in recover_truncate to detect interrupted truncate */
+	block_id	after_trunc_total_blks;		/* All these fields are used to repair interrupted truncates */
+	block_id	before_trunc_free_blocks;
+	/* ENCRYPTION-RELATED FIELDS */
+	block_id	encryption_hash_cutoff;		/* Points to the first block to be encrypted by MUPIP REORG -ENCRYPT with
+							 * encryption_hash2. The value of -1 indicates that no (re)encryption is
+							 * happening.
+							 */
+	/* FIELDS RELATED TO DB TRANSACTION HISTORY */
+	th_index	trans_hist;		/* transaction history - if moved from 10th filehdr block, change TH_BLOCK */
 	/************* INTERRUPTED RECOVERY RELATED FIELDS continued ****************/
 	seq_num		intrpt_recov_resync_strm_seqno[MAX_SUPPL_STRMS];/* resync/fetchresync jnl_seqno of interrupted rollback
 									 * corresponding to each non-supplementary stream.
@@ -2221,7 +2303,6 @@ typedef struct
 #define MAX_NM_LEN	MAX_MIDENT_LEN
 #define MIN_RN_LEN	1
 #define MAX_RN_LEN	MAX_MIDENT_LEN
-#define V4_MAX_RN_LEN	31	/* required for dbcertify.h */
 #define MIN_SN_LEN	1
 #define MAX_SN_LEN	MAX_MIDENT_LEN
 #define STR_SUB_PREFIX  0x0FF
@@ -2262,7 +2343,7 @@ typedef struct
 
 #define DO_BADDBVER_CHK(REG, TSD)								\
 MBSTART {											\
-	if (MEMCMP_LIT(TSD->label, GDS_LABEL))							\
+	if (MEMCMP_LIT(TSD->label, GDS_LABEL) && MEMCMP_LIT(TSD->label, V6_GDS_LABEL))		\
 	{											\
 		if (memcmp(TSD->label, GDS_LABEL, GDS_LABEL_SZ - 3))				\
 			rts_error_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(4) ERR_DBNOTGDS, 2,	\
@@ -2312,13 +2393,14 @@ typedef struct
 	uint4		reorg_encrypt_cycle;
 	uint4		is_encrypted;
 	boolean_t	non_null_iv;
+	uint4		filler_0;			/* Make 8 byte alignment explicit */
 	block_id	encryption_hash_cutoff;
 	trans_num	encryption_hash2_start_tn;
-	char            encryption_hash[GTMCRYPT_HASH_LEN];
+	char		encryption_hash[GTMCRYPT_HASH_LEN];
 	char		encryption_hash2[GTMCRYPT_HASH_LEN];
 	boolean_t	issued_db_init_crypt_warning;	/* Indicates whether we issued a warning-severity encryption-setup-related
 							 * message in db_init for a non-mumps process */
-	uint4		filler;
+	uint4		filler_1;			/* Make 8 byte alignment explicit */
 } enc_info_t;
 
 /* Macro to copy the encryption information into an enc_info_t structure. */
@@ -2331,7 +2413,8 @@ MBSTART {												\
 	(DST)->encryption_hash2_start_tn = (SRC)->encryption_hash2_start_tn;				\
 	memcpy((DST)->encryption_hash, (SRC)->encryption_hash, GTMCRYPT_HASH_LEN);			\
 	memcpy((DST)->encryption_hash2, (SRC)->encryption_hash2, GTMCRYPT_HASH_LEN);			\
-	DEBUG_ONLY((DST)->filler = 0;)									\
+	DEBUG_ONLY((DST)->filler_0 = 0;)								\
+	DEBUG_ONLY((DST)->filler_1 = 0;)								\
 } MBEND													\
 
 /* Macro to copy the encryption information into an enc_info_t structure. */
@@ -2516,8 +2599,8 @@ typedef struct	gd_segment_struct
 
 typedef union
 {
-	int4             offset;  /* relative offset to segment  */
-	gd_segment       *addr;   /* absolute address of segment */
+	int4		offset;	/* relative offset to segment  */
+	gd_segment	*addr;	/* absolute address of segment */
 } gd_seg_addr;
 
 typedef struct	gd_region_struct
@@ -2530,7 +2613,7 @@ typedef struct	gd_region_struct
 	gd_seg_addr		stat;
 	bool			open;
 	bool			lock_write;	/* Field is not currently used by GT.M */
-	char           	null_subs;	/* 0 ->NEVER(previous NO), 1->ALWAYS(previous YES), 2->ALLOWEXISTING
+	char			null_subs;	/* 0 ->NEVER(previous NO), 1->ALWAYS(previous YES), 2->ALLOWEXISTING
 						* i.e. will allow read null subs but prohibit set */
 	unsigned char		jnl_state;
 	/* deleted gbl_lk_root and lcl_lk_root, obsolete fields */
@@ -2618,7 +2701,8 @@ typedef struct	sgmnt_addrs_struct
 	struct sgm_info_struct			*sgm_info_ptr;
 	gd_region				*region;		/* the region corresponding to this csa */
 	struct hash_table_mname_struct		*gvt_hashtab;		/* NON-NULL only if regcnt > 1;
-									 * Maintains all gv_targets mapped to this db file */
+									 * Maintains all gv_targets mapped to this db file
+									 */
 	void					*miscptr;	/* pointer to rctl for this region (if jgbl.forw_phase_recovery)
 								 * pointer to gvt_hashtab for this region (if DSE_IMAGE)
 								 * pointer to repl_rctl for this region (if source server)
@@ -2647,21 +2731,23 @@ typedef struct	sgmnt_addrs_struct
 	cache_rec_ptr_t	our_midnite;		/* anchor if we are using a gbuff_limit */
 	size_t		fullblockwrite_len;	/* Length of a full block write */
 	sm_off_t	our_lru_cache_rec_off;	/* last used cache pointer for when we are using a gbuff_limit */
-	uint4		total_blks;		/* Last we knew, file was this big. Used to signal MM processing file was
+	block_id	total_blks;		/* Last we knew, file was this big. Used to signal MM processing file was
 						 * extended and needs to be remapped. In V55000 was used with BG to detect
 						 * file truncates. It is no longer used for that purpose: it was not necessary
 						 * in the first place because bitmap block validations in t_end/tp_tend prevent
 						 * updates from trying to commit past the end of the file.
 						 * See mu_truncate.c for more details.
 						 */
-	uint4		prev_free_blks;
+	block_id	prev_free_blks;
 	/* The following uint4's are treated as bools but must be 4 bytes to avoid interaction between
-	   bools in interrupted routines and possibly lost data */
-	volatile uint4	timer;                  /* This process has a timer for this region */
+	 * bools in interrupted routines and possibly lost data
+	 */
+	volatile uint4	timer;			/* This process has a timer for this region */
 	volatile uint4	in_wtstart;		/* flag we are busy writing */
 	volatile uint4	now_crit;		/* This process has the critical write lock */
 	volatile uint4	wbuf_dqd;		/* A write buffer has been dequeued - signals that
-						   extra cleanup required if die while on */
+						 * extra cleanup required if die while on
+						 */
 	uint4		stale_defer;		/* Stale processing deferred this region */
 	boolean_t	freeze;
 	volatile boolean_t	dbsync_timer;	/* whether a timer to sync the filehdr (and write epoch) is active */
@@ -2768,9 +2854,9 @@ typedef struct gd_binding_struct
 
 typedef struct gd_gblname_struct
 {
-        unsigned char   gblname[MAX_NM_LEN + 1];
-        uint4           act;    /* alternative collation sequence # */
-        uint4           ver;	/* version of collation library used at gld creation time */
+	unsigned char	gblname[MAX_NM_LEN + 1];
+	uint4		act;	/* alternative collation sequence # */
+	uint4		ver;	/* version of collation library used at gld creation time */
 } gd_gblname;
 
 #define	INVALID_STATSDB_REG_INDEX	(MAXUINT4)	/* this has to be maintained in parallel with TWO(32)-1 in gdeput.m  */
@@ -2809,7 +2895,7 @@ typedef struct gd_gblname_struct
  */
 
 /* The structure backup_region_list defined in mupipbckup.h needs to have its first four fields
-   identical to the first three fields in this structure */
+ * identical to the first three fields in this structure */
 typedef struct tp_region_struct
 {
 	struct	tp_region_struct *fPtr;		/* Next in list */
@@ -2830,11 +2916,10 @@ typedef struct
 typedef struct srch_blk_status_struct
 {
 	cache_rec_ptr_t	cr;
-	sm_uc_ptr_t     buffaddr;
+	sm_uc_ptr_t	buffaddr;
 	block_id	blk_num;
 	trans_num	tn;
-	srch_rec_status	prev_rec,
-			curr_rec;
+	srch_rec_status	prev_rec, curr_rec;
 	int4		cycle;
 	int4		level;
 	struct cw_set_element_struct	*cse;
@@ -2948,14 +3033,15 @@ typedef struct	gv_namehead_struct
 	sgmnt_addrs	*gd_csa;			/* Pointer to Segment corresponding to this key */
 	srch_hist	*alt_hist;			/* alternate history. initialized once per gv_target */
 	struct collseq_struct	*collseq;		/* pointer to a linked list of user supplied routine addresses
-							   for internationalization */
+							 * for internationalization */
 	trans_num	read_local_tn;			/* local_tn of last reference for this global */
 	GTMTRIG_ONLY(trans_num trig_local_tn;)		/* local_tn of last trigger driven for this global */
 	GTMTRIG_ONLY(trans_num trig_read_tn;)		/* local_tn when triggers for this global (^#t records) were read from db */
 	gv_key		*prev_key;			/* Points to fully expanded previous key. Used by $zprevious.
 							 * Valid only if clue->end is non-zero.
 							 */
-	boolean_t	noisolation;    		/* whether isolation is turned on or off for this global */
+	boolean_t	noisolation;			/* whether isolation is turned on or off for this global */
+	char		filler_8byte_align0[4];
 	block_id	root;				/* Root of global variable tree */
 	mname_entry	gvname;				/* the name of the global */
 	srch_hist	hist;				/* block history array */
@@ -3400,7 +3486,7 @@ MBSTART {												\
 		GV_SET_LAST_SUBSCRIPT_INCOMPLETE(fmtBuff, endBuff); /* Note: might update "endBuff" */	\
 	if (GVKEY == gv_currkey)									\
 		gv_currkey->end = 0;	/* to show the key is not valid */				\
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2,			\
+	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2,				\
 			endBuff - fmtBuff, fmtBuff);							\
 } MBEND
 
@@ -3412,6 +3498,7 @@ MBSTART {													\
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;							\
 	int			len;										\
 	mstr			opstr;										\
+	size_t			stlen;										\
 														\
 	was_null |= is_null;											\
 	if (mvarg->mvtype & MV_SUBLIT)										\
@@ -3436,7 +3523,10 @@ MBSTART {													\
 			len = mvarg->str.len;									\
 			if (gv_currkey->end + len - 1 >= gv_currkey->top)					\
 				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_FALSE);				\
-			memcpy((gv_currkey->base + gv_currkey->end), mvarg->str.addr, len);			\
+			stlen = len;										\
+			assert(((gv_currkey->base) + (gv_currkey->end) + stlen) <= 				\
+				((gv_currkey->base) + gv_currkey->top));					\
+			memcpy((gv_currkey->base + gv_currkey->end), mvarg->str.addr, stlen);			\
 			if (is_null && 0 != reg->std_null_coll)							\
 				gv_currkey->base[gv_currkey->end] = SUBSCRIPT_STDCOL_NULL;			\
 			gv_currkey->prev = gv_currkey->end;							\
@@ -3679,14 +3769,16 @@ typedef enum
 } inctn_opcode_t;
 
 /* macros to check curr_tn */
-#define MAX_TN_V4	((trans_num)(MAXUINT4 - TN_HEADROOM_V4))
-#define MAX_TN_V6	(MAXUINT8 - TN_HEADROOM_V6)
-#define MAX_TN_DFLT	MAX_TN_V6	/* Max TN of current version */
-#define MAX_TN_ANY	MAX_TN_V6	/* Greatest MAX_TN of all versions*/
-#define TN_INVALID	(MAXUINT8)	/* impossible db tn */
 #define TN_HEADROOM_V4	(2 * MAXTOTALBLKS_V4)
 #define TN_HEADROOM_V6	(2 * MAXTOTALBLKS_V6)
-#define	HEADROOM_FACTOR	4
+#define TN_HEADROOM_V7	(2 * MAXTOTALBLKS_V7)
+#define MAX_TN_V4	((trans_num)(MAXUINT4 - TN_HEADROOM_V4))
+#define MAX_TN_V6	(MAXUINT8 - TN_HEADROOM_V6)
+#define MAX_TN_V7	(MAXUINT8 - TN_HEADROOM_V7)
+#define MAX_TN_DFLT	MAX_TN_V7	/* Max TN of current version */
+#define MAX_TN_ANY	MAX_TN_V6	/* Greatest MAX_TN of all versions*/
+#define TN_INVALID	(MAXUINT8)	/* impossible db tn */
+#define HEADROOM_FACTOR	4
 
 /* the following macro checks that curr_tn < max_tn_warn <= max_tn.
  * if not, it adjusts max_tn_warn accordingly to ensure the above.
@@ -3730,7 +3822,10 @@ MBSTART {									\
 MBSTART {												\
 	trans_num	headroom;									\
 													\
-	headroom = (gtm_uint64_t)(GDSV4 == (CSD)->desired_db_format ? TN_HEADROOM_V4 : TN_HEADROOM_V6);	\
+	if (GDSV7 == (CSD)->desired_db_format)								\
+		headroom = TN_HEADROOM_V7;								\
+	else if((GDSV5 == (CSD)->desired_db_format) || (GDSV6 == (CSD)->desired_db_format))		\
+		headroom = TN_HEADROOM_V6;								\
 	headroom *= HEADROOM_FACTOR;									\
 	(ret_warn_tn) = (CSD)->trans_hist.curr_tn;							\
 	if ((headroom < (CSD)->max_tn) && ((ret_warn_tn) < ((CSD)->max_tn - headroom)))			\
@@ -4141,7 +4236,7 @@ MBSTART {											\
 	if (bp != cr->buffaddr)									\
 	{											\
 		send_msg_csa(CSA_ARG(csa) VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),	\
-				cr, cr->blk, RTS_ERROR_TEXT("cr->buffaddr"),			\
+				cr, &(cr->blk), RTS_ERROR_TEXT("cr->buffaddr"),			\
 				cr->buffaddr, bp, CALLFROM);					\
 		cr->buffaddr = bp;								\
 	}											\

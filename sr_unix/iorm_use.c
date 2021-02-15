@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -266,7 +266,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 		case iop_length:
 			GET_LONG(length, (pp->str.addr + p_offset));
 			if (length < 0)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVPARMNEG);
 			iod->length = length;
 			break;
 		case iop_w_protection:
@@ -290,7 +290,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			{
 				GET_LONG(padchar, (pp->str.addr + p_offset));
 				if (!IS_PADCHAR_VALID(iod->ochset, padchar))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_PADCHARINVALID, 0);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(2) ERR_PADCHARINVALID, 0);
 				rm_ptr->padchar = padchar;
 			}
 			break;
@@ -312,9 +312,9 @@ void	iorm_use(io_desc *iod, mval *pp)
 			{	/* only if not open, not UTF, or no reads or writes yet */
 				GET_LONG(recordsize, (pp->str.addr + p_offset));
 				if (recordsize <= 0)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RMWIDTHPOS);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RMWIDTHPOS);
 				else if (MAX_STRLEN < recordsize)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RMWIDTHTOOBIG);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RMWIDTHTOOBIG);
 				rm_ptr->recordsize = recordsize;
 				rm_ptr->def_recsize = FALSE;
 				/* for sequential device in fixed M mode, recordsize defines initial width */
@@ -341,7 +341,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			{
 				if ((off_t)-1 == lseek(rm_ptr->fildes, 0, SEEK_SET))
 				{
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
 						RTS_ERROR_LITERAL("REWIND"), CALLFROM, errno);
 				}
 				/* need to do FSTAT_FILE to get file size if not already done */
@@ -414,7 +414,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 				if ((0 != rm_ptr->file_pos) && (!iod->dollar.zeof)
 					&& rm_ptr->output_encrypted && rm_ptr->write_occurred)
 				{
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOTRUNC, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_CRYPTNOTRUNC, 2,
 						dev_name->len, dev_name->dollar_io);
 				}
 				/* If already open, truncate, close, and reopen the device. */
@@ -426,7 +426,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 						cur_position = lseek(rm_ptr->fildes, 0, SEEK_CUR);
 						if ((off_t)-1 == cur_position)
 						{
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7,
 								RTS_ERROR_LITERAL("lseek"),
 								RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
 						} else
@@ -435,7 +435,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 					FTRUNCATE(rm_ptr->fildes, rm_ptr->file_pos, ftruncate_res);
 					if (0 != ftruncate_res)
 					{
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7,
 							RTS_ERROR_LITERAL("ftruncate"),
 							RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
 					}
@@ -456,7 +456,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 						} while (TRUE);
 						HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 						if (-1 == newfd)
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 								RTS_ERROR_LITERAL("dup"), CALLFROM, save_errno);
 						if (TRUE == rm_ptr->read_only)
 						{
@@ -477,14 +477,14 @@ void	iorm_use(io_desc *iod, mval *pp)
 				{
 					if ((off_t)-1 == fseeko(rm_ptr->filstr, rm_ptr->file_pos, SEEK_SET))
 					{
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7,
 							RTS_ERROR_LITERAL("fseeko"),
 							RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
 					}
 				}
 				if ((off_t)-1 == lseek(rm_ptr->fildes, rm_ptr->file_pos, SEEK_SET))
 				{
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
 						RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
 				}
 				/* if not open then do the truncate here */
@@ -493,7 +493,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 					FTRUNCATE(rm_ptr->fildes, rm_ptr->file_pos, ftruncate_res);
 					if (0 != ftruncate_res)
 					{
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7,
 							RTS_ERROR_LITERAL("ftruncate"),
 							RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
 					}
@@ -557,12 +557,12 @@ void	iorm_use(io_desc *iod, mval *pp)
 			assert(iod->state == dev_open);
 			GET_LONG(width, (pp->str.addr + p_offset));
 			if (0 > width || (0 == width && !IS_UTF_CHSET(iod->ochset)))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RMWIDTHPOS);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RMWIDTHPOS);
 			else if (MAX_STRLEN < width)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RMWIDTHTOOBIG);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RMWIDTHTOOBIG);
 			/* Do not allow a WIDTH of 1 if either ICHSET or OCHSET is UTF-* */
 			if ((1 == width) && gtm_utf8_mode && ((IS_UTF_CHSET(iod->ochset)) || (IS_UTF_CHSET(iod->ichset))))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_WIDTHTOOSMALL);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_WIDTHTOOSMALL);
 			if (IS_UTF_CHSET(iod->ochset) && rm_ptr->fixed)
 				iorm_cond_wteol(iod);	/* Need to insert a newline if $X is non-zero. */
 			rm_ptr->def_width = FALSE;
@@ -638,7 +638,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 				CHECK_UTF16_VARIANT_AND_SET_CHSET(rm_ptr->ochset_utf16_variant, iod->ochset, temp_chset);
 				ochset_specified = TRUE;
 				if (gtm_utf8_mode && !IS_PADCHAR_VALID(iod->ochset, rm_ptr->padchar))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_PADCHARINVALID, 0);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(2) ERR_PADCHARINVALID, 0);
 			}
 		}
 		break;
@@ -653,7 +653,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 				CHECK_UTF16_VARIANT_AND_SET_CHSET(rm_ptr->ichset_utf16_variant, iod->ichset, temp_chset);
 				CHECK_UTF16_VARIANT_AND_SET_CHSET(rm_ptr->ochset_utf16_variant, iod->ochset, temp_chset);
 				if (gtm_utf8_mode && !IS_PADCHAR_VALID(iod->ochset, rm_ptr->padchar))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_PADCHARINVALID, 0);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(2) ERR_PADCHARINVALID, 0);
 				ochset_specified = ichset_specified = TRUE;
 			}
 		}
@@ -715,7 +715,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 						cur_position = lseek(rm_ptr->fildes, 0, SEEK_CUR);
 						if ((off_t)-1 == cur_position)
 						{
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7,
 								RTS_ERROR_LITERAL("lseek"),
 								RTS_ERROR_LITERAL("SEEK"), CALLFROM, errno);
 						} else
@@ -743,13 +743,13 @@ void	iorm_use(io_desc *iod, mval *pp)
 						if (0 < bom_size_toread)
 						{
 							if ((off_t)-1 == lseek(rm_ptr->fildes, 0, SEEK_SET))
-								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
+								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7,
 									RTS_ERROR_LITERAL("lseek"),
 									RTS_ERROR_LITERAL("SEEK"), CALLFROM, errno);
 							rm_ptr->bom_num_bytes = open_get_bom(iod, bom_size_toread);
 							/* move back to previous file position */
 							if ((off_t)-1 == lseek(rm_ptr->fildes, rm_ptr->file_pos, SEEK_SET))
-								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
+								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7,
 									RTS_ERROR_LITERAL("lseek"),
 									RTS_ERROR_LITERAL("SEEK"), CALLFROM, errno);
 						}
@@ -839,7 +839,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 						int	save_errno;
 
 						save_errno = errno;
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7,
 							RTS_ERROR_LITERAL("lseek"),
 							RTS_ERROR_LITERAL("SEEK"), CALLFROM, save_errno);
 					}
@@ -955,7 +955,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 				assert(DEF_RM_RECORDSIZE == 32767);
 				rm_ptr->recordsize = ROUND_DOWN2(rm_ptr->recordsize, 4);
 			} else if (0 != rm_ptr->recordsize % 2)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECSIZENOTEVEN, 1, rm_ptr->recordsize);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RECSIZENOTEVEN, 1, rm_ptr->recordsize);
 		}
 	}
 	/* Now that recordsize and CHSET parms have been handled (if any), set WIDTH if necessary */
@@ -1026,7 +1026,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 				if (KEY_CHANGED(input, input_key, rm_ptr) || IV_CHANGED(input, input_iv, rm_ptr))
 				{	/* Requested a new IV or KEY; only allow if no reads have happened. */
 					if (rm_ptr->read_occurred)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTNOOVERRIDE);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CRYPTNOOVERRIDE);
 					else
 						reset_input_encryption = init_input_encryption = TRUE;
 				}
@@ -1035,9 +1035,9 @@ void	iorm_use(io_desc *iod, mval *pp)
 				 * a non-empty IV cannot be specified at this time.
 				 */
 				if (rm_ptr->read_occurred)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTNOOVERRIDE);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CRYPTNOOVERRIDE);
 				else if (0 != input_iv.len)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTNOKEYSPEC);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CRYPTNOKEYSPEC);
 				else
 				{
 					rm_ptr->input_encrypted = FALSE;
@@ -1058,11 +1058,11 @@ void	iorm_use(io_desc *iod, mval *pp)
 			if (input_key_not_empty)
 			{	/* Initialize encryption unless some unencrypted reads have occurred. */
 				if (rm_ptr->read_occurred)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTNOOVERRIDE);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CRYPTNOOVERRIDE);
 				else
 					init_input_encryption = TRUE;
 			} else if (0 != input_iv.len)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTNOKEYSPEC);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CRYPTNOKEYSPEC);
 		}
 	}
 	if (rm_ptr->output_encrypted)
@@ -1074,7 +1074,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 				if (KEY_CHANGED(output, output_key, rm_ptr) || IV_CHANGED(output, output_iv, rm_ptr))
 				{	/* Requested a new IV or KEY; only allow if no writes have happened. */
 					if (rm_ptr->write_occurred)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTNOOVERRIDE);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CRYPTNOOVERRIDE);
 					else
 						reset_output_encryption = init_output_encryption = TRUE;
 				}
@@ -1083,9 +1083,9 @@ void	iorm_use(io_desc *iod, mval *pp)
 				 * a non-empty IV cannot be specified at this time.
 				 */
 				if (rm_ptr->write_occurred)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTNOOVERRIDE);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CRYPTNOOVERRIDE);
 				else if (0 != output_iv.len)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTNOKEYSPEC);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CRYPTNOKEYSPEC);
 				else
 				{
 					rm_ptr->output_encrypted = FALSE;
@@ -1106,18 +1106,18 @@ void	iorm_use(io_desc *iod, mval *pp)
 			if (output_key_not_empty)
 			{	/* Initialize encryption unless some unencrypted writes have occurred. */
 				if (rm_ptr->write_occurred)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTNOOVERRIDE);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CRYPTNOOVERRIDE);
 				else
 					init_output_encryption = TRUE;
 			} else if (0 != output_iv.len)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTNOKEYSPEC);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CRYPTNOKEYSPEC);
 		}
 	}
 	assert((!reset_input_encryption) || rm_ptr->input_encrypted);
 	assert((!reset_output_encryption) || rm_ptr->output_encrypted);
 	if ((rm_ptr->input_encrypted || init_input_encryption || reset_input_encryption
 			|| rm_ptr->output_encrypted || init_output_encryption || reset_output_encryption) && seek_specified)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOSEEK, 2, dev_name->len, dev_name->dollar_io);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_CRYPTNOSEEK, 2, dev_name->len, dev_name->dollar_io);
 	if (init_input_encryption || init_output_encryption)
 	{	/* First time the device is getting encryption turned on. Initialize encryption and setup the keys. */
 		INIT_PROC_ENCRYPTION(rv);

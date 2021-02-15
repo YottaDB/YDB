@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2018 Fidelity National Information	*
+ * Copyright (c) 2002-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
@@ -34,15 +34,17 @@ GBLREF char	*cli_err_str_ptr;
 /* to check lengths and update cli_err_str*/
 void cli_err_strcat(char *str)
 {
-	int lencli, lenstr;
+	size_t lencli, lenstr;
 
 
-	lencli = STRLEN(cli_err_str);
-	lenstr = STRLEN(str);
+	lencli = strlen(cli_err_str);
+	lenstr = strlen(str);
 
 	/* No error string should be longer than MAX_CLI_ERR_STR */
-	assert(MAX_CLI_ERR_STR > lencli + lenstr + 2);
+	assert(MAX_CLI_ERR_STR > (lencli + lenstr + 2));
+	assert(MAX_CLI_ERR_STR > lencli);	/* For SCI on the theory a one var expr is more easily tracked */
 	memcpy(cli_err_str + lencli," ",1);
+	assert(MAX_CLI_ERR_STR > lencli + 1);	/* For SCI on the theory a one var expr is more easily tracked */
 	memcpy(cli_err_str + lencli + 1, str, lenstr);
 	*(cli_err_str + lencli + lenstr + 1) = '\0';
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,7 @@ void op_fnchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...)
 			if (tmpptr != outptr)
 				++char_len; /* yet another valid character. update the character length */
 			else if (!badchar_inhibit)
-				rts_error(VARLSTCNT(3) ERR_INVDLRCVAL, 1, ch);
+				RTS_ERROR_ABT(VARLSTCNT(3) ERR_INVDLRCVAL, 1, ch);
 			outptr = tmpptr;
 		}
 	}

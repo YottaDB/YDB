@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -14,12 +14,6 @@
  ****************************************************************/
 
 #include "mdef.h"
-
-#ifdef VMS
-#  include <descrip.h>
-#  include <ssdef.h>
-#endif
-
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -59,6 +53,7 @@ static struct CLB		*clb;
 int		v010_jnl_process_vector_size(void);
 void		v010_jnl_prc_vector(void *);
 
+<<<<<<< HEAD
 CONDITION_HANDLER(gvcmz_netopen_ch)
 {
 	/* This condition handler is established only for VMS. In VMS, we do not do CONTINUE for INFO/SUCCESS severity.
@@ -76,6 +71,8 @@ CONDITION_HANDLER(gvcmz_netopen_ch)
 	UNWIND(NULL, NULL);
 }
 
+=======
+>>>>>>> 451ab477 (GT.M V7.0-000)
 void gvcmz_netopen_attempt(struct CLB *c)
 {
 	unsigned char	*ptr, *proto_str;
@@ -116,20 +113,20 @@ void gvcmz_netopen_attempt(struct CLB *c)
 	if (CMI_ERROR(status))
 	{
 		gvcmy_close(c);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
 	}
 	status = cmi_read(c);	/* return message should be same size */
 	if (CMI_ERROR(status))
 	{
 		gvcmy_close(c);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
 	}
 	if (CMMS_T_INITPROC != *c->mbf)
 	{
 		if (CMMS_E_ERROR != *c->mbf)
 		{
 			gvcmy_close(c);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, ERR_BADSRVRNETMSG);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_NETDBOPNERR, 0, ERR_BADSRVRNETMSG);
 		}
 		gvcmz_errmsg(c, FALSE);
 	}
@@ -144,48 +141,40 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 	int			len, i;
 	uint4			status;
 	protocol_msg		*server_proto;
+	size_t			sizt_len;
 
+<<<<<<< HEAD
 	ASSERT_IS_LIBGNPCLIENT;
 	c = UNIX_ONLY(cmi_alloc_clb())VMS_ONLY(cmu_makclb());
+=======
+	c = cmi_alloc_clb();
+	assert(NULL != c);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	c->usr = malloc(SIZEOF(link_info));
+	assert(NULL != c->usr);
 	li = c->usr;
 	memset(li, 0, SIZEOF(*li));
 	c->err = gvcmz_neterr_set;
-#ifdef VMS
-	c->nod.dsc$b_dtype = c->tnd.dsc$b_dtype = DSC$K_DTYPE_T;
-	c->nod.dsc$b_class = c->tnd.dsc$b_class = DSC$K_CLASS_S;
-	c->nod.dsc$w_length = node->dsc$w_length;
-	c->nod.dsc$a_pointer = malloc(c->nod.dsc$w_length);
-	memcpy(c->nod.dsc$a_pointer, node->dsc$a_pointer, node->dsc$w_length);
-	c->tnd.dsc$w_length = task->dsc$w_length;
-	c->tnd.dsc$a_pointer = malloc(c->tnd.dsc$w_length);
-	memcpy(c->tnd.dsc$a_pointer, task->dsc$a_pointer, task->dsc$w_length);
-	for (i = 0; i < 2; i++) /* This retry should really be pushed down into cmi_open */
-	{
-		status = cmi_open(c);
-		if (!CMI_ERROR(status))
-			break;
-		hiber_start_wait_any(10);
-	}
-#elif defined(UNIX)
-	c->nod.addr = malloc(node->len);
+	sizt_len = node->len;
+	c->nod.addr = malloc(sizt_len);
+	assert(NULL != c->nod.addr);
 	c->nod.len = node->len;
-	memcpy(c->nod.addr, node->addr, node->len);
+	assert(INT_MAX >= sizt_len); /* For SCI, prevent wraparound */
+	memcpy(c->nod.addr, node->addr, sizt_len);
+	sizt_len = task->len;
 	c->tnd.len = task->len;
-	c->tnd.addr = malloc(c->tnd.len);
-	memcpy(c->tnd.addr, task->addr, task->len);
+	c->tnd.addr = malloc(sizt_len);
+	assert(NULL != c->tnd.addr);
+	assert(INT_MAX >= sizt_len); /* For SCI, prevent wraparound */
+	memcpy(c->tnd.addr, task->addr, sizt_len);
 	status = cmi_open(c);
-#else
-#error Unsupported platform
-#endif
 	if (CMI_ERROR(status))
 	{
 		free(c->usr);
-		free(VMS_ONLY(c->nod.dsc$a_pointer) UNIX_ONLY(c->nod.addr));
-		free(VMS_ONLY(c->tnd.dsc$a_pointer) UNIX_ONLY(c->tnd.addr));
-		VMS_ONLY(lib$free_vm(&SIZEOF(*c), &c, 0);)
-		UNIX_ONLY(cmi_free_clb(c));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
+		free(c->nod.addr);
+		free(c->tnd.addr);
+		cmi_free_clb(c);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
 	}
 	if (0 == ntd_root)
 		ntd_root = cmu_ntdroot();
@@ -199,13 +188,13 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 	if (S_HDRSIZE + S_PROTSIZE + 2 != c->cbl)
 	{
 		gvcmy_close(c);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, ERR_BADSRVRNETMSG);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_NETDBOPNERR, 0, ERR_BADSRVRNETMSG);
 	}
 	server_proto = (protocol_msg *)(c->mbf + 1);
 	if (!gtcm_protocol_match(server_proto, &myproto))
 	{
 		gvcmy_close(c);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, CMERR_INVPROT);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_NETDBOPNERR, 0, CMERR_INVPROT);
 	}
 	li->convert_byteorder = (gtcm_is_big_endian(&myproto) != gtcm_is_big_endian(server_proto));
 	li->query_is_queryget = gtcm_is_query_queryget(server_proto, &myproto);
@@ -216,8 +205,8 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 	if (!(li->err_compat = gtcm_err_compat((protocol_msg *)(c->mbf + 1), &myproto)))
 	{
 		gvcmy_close(c);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NETDBOPNERR, 0, ERR_TEXT, 2,
-				LEN_AND_LIT("GTCM functionality not implemented between UNIX and VMS yet"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_NETDBOPNERR, 0, ERR_TEXT, 2,
+			LEN_AND_LIT("GTCM functionality not implemented between UNIX and VMS yet"));
 	}
 	gtcm_connection = TRUE;
 	CM_GET_USHORT(li->procnum, (c->mbf + S_HDRSIZE + S_PROTSIZE), li->convert_byteorder);

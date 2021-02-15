@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -97,6 +97,7 @@ CONDITION_HANDLER(zyerr_ch)
 		UNWIND(NULL, NULL); /* ignore $ZYERROR compile time errors; continue with $ZTRAP (or DEV exception) action */
 	} else
 	{
+		TREF(compile_time) = FALSE;
 		NEXTCH; /* serious error, can't ignore; handle error appropriately */
 	}
 }
@@ -120,6 +121,7 @@ void trans_code_finish(void)
 		assert(NULL == zyerr_frame);
 		zyerr_frame = frame_pointer;
 	}
+	TREF(compile_time) = FALSE;	/* Switching back to run-time */
 	return;
 }
 

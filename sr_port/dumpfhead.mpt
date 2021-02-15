@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2016-2017 Fidelity National Information		;
+; Copyright (c) 2016-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	;
@@ -46,6 +46,7 @@ getfields(fldarray,dbname)
 	set typeconvert("int32_t")="int"
 	set typeconvert("int4")="int"
 	set typeconvert("int64_t")="hex"
+	set typeconvert("gtm_int8")="int"
 	set typeconvert("long")="hex"
 	set typeconvert("short")="int"
 	set typeconvert("size_t")="hex"
@@ -102,19 +103,26 @@ getfields(fldarray,dbname)
 	; always at offset 0, with len=12
 	;
 	set label=$$formatfld($zextract(fhead,1,12),"char")
-	if (label'["GDSDYNUNX02")&(label'["GDSDYNUNX03") do
+	if ((label'["GDSDYNUNX03")&(label'["GDSDYNUNX04")) do
 	. write "GETFIELDS: Error - invalid fileheader format from ",dbname,!
 	. set $etrap="zgoto 0"
 	. zhalt 1
 	;
 	; Now parse out the fields
 	;
+<<<<<<< HEAD
 	set $zgbldir="$ydb_dist/gtmhelp.gld"
 	set skey="sgmnt_data"
+=======
+	set $zgbldir="$gtm_dist/gtmhelp.gld"
+	if (label["GDSDYNUNX04") set skey="sgmnt_data"
+	else  if (label["GDSDYNUNX03") set skey="v6_sgmnt_data"
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	for fldnum=1:1:^gtmtypes(skey,0) do
 	. set fldtype=^gtmtypes(skey,fldnum,"type")
 	. quit:(0=$data(typeconvert(fldtype)))		; Ignore unknown types (likely a sub-struct header)
 	. set fldname=^gtmtypes(skey,fldnum,"name")
+	. if (label["GDSDYNUNX03") set fldname=$EXTRACT(fldname,4,$LENGTH(fldname))
 	. quit:(fldname["filler")
 	. set fldoff=^gtmtypes(skey,fldnum,"off")
 	. set fldlen=^gtmtypes(skey,fldnum,"len")

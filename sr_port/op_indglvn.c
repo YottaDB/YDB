@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +63,11 @@ void	op_indglvn(mval *v,mval *dst)
 					*dst = literal_null;
 					return;
 				} else
+<<<<<<< HEAD
 					rts_error(VARLSTCNT(4) ERR_LVUNDEF, 2, v->str.len, v->str.addr);
+=======
+					RTS_ERROR_ABT(VARLSTCNT(4) ERR_UNDEF, 2, v->str.len, v->str.addr);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 			*dst = ((lv_val *)tabent->value)->v;
 			dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */

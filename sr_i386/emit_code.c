@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -128,7 +128,7 @@ void trip_gen(triple *ct)
 			}
 			*sopr++ = opr;
 			if (sopr >= ARRAYTOP(saved_opr))	/* user-visible max args is MAX_ARGS - 3 */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS - 3);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS - 3);
 		}
 		opr++;
 	}
@@ -777,7 +777,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 						temp_reg = I386_REG_ECX;
 						break;
 					default:
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 						break;
 					}
 					pc_value_idx = code_idx + 5;
@@ -819,7 +819,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 						code_idx += 1 + SIZEOF(int4);
 					break;
 				default:
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 					break;
 				}
 				break;
@@ -922,7 +922,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 					emit_base_offset(use_reg, base_reg, offset);
 				break;
 			default:
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 				break;
 			}
 			break;
@@ -952,7 +952,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 						temp_reg = I386_REG_ECX;
 						break;
 					default:
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 						break;
 					}
 					code_buf[code_idx++] = I386_INS_CALL_Jv;
@@ -1014,7 +1014,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 					}
 					break;
 				default:
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 					break;
 				}
 				break;
@@ -1124,7 +1124,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 					emit_base_offset(use_reg, base_reg, offset);
 				break;
 			default:
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 				break;
 			}
 			break;
@@ -1196,7 +1196,7 @@ void emit_op_base_offset(generic_op op, short base_reg, int offset, short use_re
 		code_buf[code_idx++] = 0;
 		break;
 	default:
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 		break;
 	}
 }
@@ -1262,7 +1262,7 @@ void emit_op_alit (generic_op op, unsigned char use_reg)
 		code_buf[code_idx++] = I386_INS_PUSH_Iv;
 		break;
 	default:
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 		break;
 	}
 }

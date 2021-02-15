@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2020 Fidelity National Information	*
+ * Copyright (c) 2008-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -293,16 +293,24 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 						REPL_CLOSE_CONNECTION(gtmrecv_sock_fd, repl_connection_reset, curr_conn_state,	\
 													gtmrecv_send_cmp2uncmp);
 
+<<<<<<< HEAD
 					} else
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0,
 							ERR_TEXT, 2, LEN_AND_LIT("Error sending XOFF msg due to BAD_TRANS or UPD"
 									" crash/shutdown. Error in send"), status);
 				} else
+=======
+				} else if (EREPL_SEND == repl_errno)
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+						LEN_AND_LIT("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
+						"Error in send"), status);
+				else
+>>>>>>> 451ab477 (GT.M V7.0-000)
 				{
 					assert(EREPL_SELECT == repl_errno);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
-								"Error in select"), status);
+						"Error in select"), status);
 				}
 			} else
 			{
@@ -453,12 +461,12 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 												gtmrecv_send_cmp2uncmp);
 					return_status = STOP_POLL;
 				} else
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("Error while draining replication pipe. Error in recv"), status);
 			} else
 			{
 				assert(EREPL_SELECT == repl_errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Error while draining replication pipe. Error in select"), status);
 			}
 		}
@@ -509,6 +517,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 #				endif
 				if (REPL_CONN_RESET(status))
 				{
+<<<<<<< HEAD
 					if (curr_conn_state.send_cmp2uncmp)
 					{
 						repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending REPL_CMP2UNCMP. "
@@ -525,9 +534,21 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("Error sending REPL_BADTRANS/REPL_CMP2UNCMP. Error in send"), status);
 			} else
+=======
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending REPL_BADTRANS. "
+							"Status = %d ; %s\n", status, STRERROR(status));
+				}
+				repl_close(&gtmrecv_sock_fd);
+				repl_connection_reset = TRUE;
+				return_status = STOP_POLL;
+			} else if (EREPL_SEND == repl_errno)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+					LEN_AND_LIT("Error sending REPL_BADTRANS/REPL_CMP2UNCMP. Error in send"), status);
+			else
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			{
 				assert(EREPL_SELECT == repl_errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Error sending REPL_BADTRANS/REPL_CMP2UNCMP. Error in select"), status);
 			}
 		}

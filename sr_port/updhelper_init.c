@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,8 +106,8 @@ void updhelper_init(recvpool_user who)
 	OPERATOR_LOG_MSG;
 	if (helper == helper_top)
 	{ /* did not find my entry possibly due to startup directly from command line as opposed to the desired via-rcvr server */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				LEN_AND_LIT("Invalid startup, start helper via receiver server"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			LEN_AND_LIT("Invalid startup, start helper via receiver server"));
 	}
 	helper_entry = helper;
 	gvinit();

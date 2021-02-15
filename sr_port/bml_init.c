@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,7 @@ int4 bml_init(block_id bml)
 	else
 		blktn = cs_data->trans_hist.curr_tn;
 
-	bml_newmap(ptr, size, blktn);
+	bml_newmap(ptr, size, blktn, cs_data->desired_db_format);
 	/* status holds the status of any error return from DSK_WRITE_NOCACHE */
 	DSK_WRITE_NOCACHE(gv_cur_region, bml, (sm_uc_ptr_t)ptr, cs_data->desired_db_format, status);
 	free(ptr);

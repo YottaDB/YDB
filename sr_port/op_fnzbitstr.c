@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -34,6 +35,13 @@ void op_fnzbitstr(mval *bitstr, int size, int truthval)
 	n = (size + 7) / 8;
 	ENSURE_STP_FREE_SPACE(n + 1);
 	byte_1 = (unsigned char *)stringpool.free;
+<<<<<<< HEAD
+=======
+	if ((size <= 0) || (size > 253952))
+	{
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITLEN);
+	}
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	*byte_1 = n * 8 - size;
 	if (truthval)
 	{

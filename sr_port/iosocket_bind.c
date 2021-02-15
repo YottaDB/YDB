@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -205,7 +205,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 				if (ioerror)
 				{
 					SOCKET_FREE(socketptr);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, real_errno, errlen, errptr);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_SOCKINIT, 3, real_errno, errlen, errptr);
 				}
 				return FALSE;
 			}
@@ -221,7 +221,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 		if (ioerror)
 		{
 			SOCKET_FREE(socketptr);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, real_errno, errlen, errptr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, real_errno, errlen, errptr);
 		}
 		return FALSE;
 	}
@@ -237,7 +237,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 			if (ioerror)
 			{
 				SOCKET_FREE(socketptr);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GETNAMEINFO, 0, ERR_TEXT, 2, errlen, errptr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GETNAMEINFO, 0, ERR_TEXT, 2, errlen, errptr);
 			}
 			return FALSE;
 		}
@@ -265,7 +265,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 				if (ioerror)
 				{
 					SOCKET_FREE(socketptr);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_SOCKINIT, 3, real_errno, errlen,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_SOCKINIT, 3, real_errno, errlen,
 						errptr, ERR_TEXT, 2, RTS_ERROR_LITERAL("setting protection"));
 				}
 				return FALSE;
@@ -282,7 +282,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 				if (ioerror)
 				{
 					SOCKET_FREE(socketptr);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_SOCKINIT, 3, real_errno, errlen,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_SOCKINIT, 3, real_errno, errlen,
 						errptr, ERR_TEXT, 2, RTS_ERROR_LITERAL("setting ownership"));
 				}
 				return FALSE;

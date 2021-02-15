@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016 Fidelity National Information	*
+ * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,10 +51,9 @@ void wcs_wtfini_nocrit(gd_region *reg, wtstart_cr_list_t *cr_list_ptr)
 			if (0 == lcnt % SLEEP_ONE_MIN)
 			{	/* let them know we have been waiting a while */
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-					ERR_AIOBUFSTUCK, 5, (lcnt / SLEEP_ONE_MIN), cr->epid, cr->blk, cr->blk, EINPROGRESS);
+					ERR_AIOBUFSTUCK, 5, (lcnt / SLEEP_ONE_MIN), cr->epid, &(cr->blk), &(cr->blk), EINPROGRESS);
 			}
 			wcs_sleep(lcnt); /* so wait a while */
 		}
 	}
 }
-

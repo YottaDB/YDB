@@ -54,25 +54,33 @@
 #include "gtm_time.h"
 #include "mvalconv.h"
 #include "t_qread.h"
-#include "longset.h"            /* needed for cws_insert.h */
+#include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
+#include "tp.h"
 #include <math.h>
 
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
 GBLREF	gv_namehead		*gv_target;
+<<<<<<< HEAD
 GBLREF	uint4			process_id;
 GBLREF	inctn_opcode_t          inctn_opcode;
 GBLREF	unsigned char           rdfail_detail;
 GBLREF	uint4			mu_int_adj[];
+=======
+GBLREF	int4			process_id;
+GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	unsigned char		rdfail_detail;
+GBLREF	int4			mu_int_adj[];
+>>>>>>> 451ab477 (GT.M V7.0-000)
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	unsigned int		t_tries;
 GBLREF	boolean_t		mu_subsc;
-GBLREF	block_id                mu_int_adj_prev[MAX_BT_DEPTH + 1];
+GBLREF	block_id		mu_int_adj_prev[MAX_BT_DEPTH + 1];
 GBLREF	boolean_t		mu_key;
 GBLREF	boolean_t		null_coll_key;
-GBLREF  gv_key			*mu_start_key;
+GBLREF	gv_key			*mu_start_key;
 GBLREF	gv_key			*mu_end_key;
 
 STATICDEF	uint4		mu_size_cumulative[MAX_BT_DEPTH + 1][CUMULATIVE_TYPE_MAX];
@@ -82,7 +90,7 @@ STATICDEF	INTPTR_T	saveoff[MAX_BT_DEPTH + 1];
 STATICFNDCL enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skiprecs);
 STATICFNDCL enum cdb_sc read_block(block_id nBlkId, sm_uc_ptr_t *pBlkBase_ptr, int *nLevl_ptr, int desired_levl);
 
-#define ANY_ROOT_LEVL		(MAX_BT_DEPTH + 5)	/* overload invalid level value */
+#define	ANY_ROOT_LEVL		(MAX_BT_DEPTH + 5)	/* overload invalid level value */
 #define	MAX_SCANS		200000000		/* catch infinite loops */
 
 /* No MBSTART and MBEND below as the macro uses a continue command */
@@ -224,7 +232,11 @@ int4 mu_size_scan(glist *gl_ptr, int4 level)
 enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skiprecs)
 {
 	block_id			nBlkId;
+<<<<<<< HEAD
 	boolean_t			next_endtree, last_rec, next_skiprecs;
+=======
+	boolean_t			next_endtree, first_iter, last_rec, next_skiprecs, long_blk_id;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	cache_rec_ptr_t			cr;
 	enum cdb_sc			status;
 	int				curroff, incr_recs = 0, incr_scans = 0;
@@ -232,19 +244,36 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 	sm_uc_ptr_t			pTop, pRec, child_pBlkBase;
 	srch_hist			sibhist;
 	unsigned short			nRecLen;
+<<<<<<< HEAD
 	boolean_t			musz_range_done = FALSE;
+=======
+	unsigned short			rec_cmpc;
+	uchar_ptr_t			key_base, ptr;
+	boolean_t			first_key = TRUE, musz_range_done = FALSE;
+	int				name_len, key_size, buff_length, rec_len, bstar_rec_sz;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	unsigned char			buff[MAX_KEY_SZ + 1];
 
 	assert(mu_size_cumulative[lvl][BLK] < MAX_SCANS);
+	long_blk_id = IS_64_BLK_ID(pBlkBase);
 	if (lvl == targ_levl)
 	{	/* reached the bottom. count records in this block and validate */
 		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen, musz_range_done)
 		{
+<<<<<<< HEAD
 			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId);
 			RETURN_IF_ABNORMAL_STATUS(status);
 			assert((MAX_BT_DEPTH + 1) > lvl);	/* this assert ensures that the CHECK_ADJACENCY macro
 			 					 * does not overrun the boundaries of the mu_int_adj array.
 								 */
+=======
+			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId, long_blk_id);
+			if (cdb_sc_normal != status)
+			{
+				assert(CDB_STAGNATE > t_tries);
+				return status;
+			}
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			if (lvl)
 			{
 				CHECK_ADJACENCY(nBlkId, lvl -1, mu_int_adj[lvl - 1]);
@@ -276,12 +305,14 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 	} else if (lvl > targ_levl)
 	{	/* visit each child */
 		/* Assumption on the fact that level > 0 is always true for this case,
-		 * since lowest the level can go is 0 and is checked before callign dfs.
+		 * since lowest the level can go is 0 and is checked before calling dfs.
 		 */
 		assert(lvl);
 		gv_target->hist.h[lvl - targ_levl].curr_rec.offset = saveoff[lvl];
+		bstar_rec_sz = bstar_rec_size(long_blk_id);
 		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen, musz_range_done)
 		{
+<<<<<<< HEAD
 			boolean_t first_iter;
 
 			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId);
@@ -289,6 +320,19 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 			curroff = (INTPTR_T)(pRec - pBlkBase);
 			gv_target->hist.h[lvl - targ_levl].curr_rec.offset = curroff;
 			if ((((rec_hdr *)pRec)->rsiz) == BSTAR_REC_SIZE) /* Found the star key */
+=======
+			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId, long_blk_id);
+			if (cdb_sc_normal != status)
+			{
+				assert(CDB_STAGNATE > t_tries);
+				return status;
+			}
+			curroff = (INTPTR_T)(pRec - pBlkBase);
+			gv_target->hist.h[lvl - targ_levl].curr_rec.offset = curroff;
+			rec_cmpc = EVAL_CMPC((rec_hdr_ptr_t)pRec);
+			key_base = pRec + SIZEOF(rec_hdr);
+			if ((((rec_hdr *)pRec)->rsiz) == bstar_rec_sz) /* Found the star key */
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			{
 				if (skiprecs && (curroff < saveoff[lvl]))
 					continue;	/* skip these guys, we've already counted over there */

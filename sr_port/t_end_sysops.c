@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2020 Fidelity National Information	*
+ * Copyright (c) 2007-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -30,6 +30,7 @@
 #include "gdsbml.h"
 #include "gdsblk.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "gdskill.h"
 #include "gdscc.h"
 #include "gdsblkops.h"
@@ -154,7 +155,7 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLREF	int			gv_fillfactor, rc_set_fragment;	/* Contains offset within data at which data fragment starts */
-GBLREF	jnl_format_buffer       *non_tp_jfb_ptr;
+GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		exit_handler_active;
@@ -185,10 +186,25 @@ void fileheader_sync(gd_region *reg)
 	assert(csa->now_crit);	/* only way high water mark code works is if in crit */
 				/* Adding lock code to it would remove this restriction */
 	assert(csa->orig_read_write);
-	assert(0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1));
+	assert((0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))
+		|| (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1)));
 	cnl = csa->nl;
 	gvstats_rec_cnl2csd(csa);	/* Periodically transfer statistics from database shared-memory to file-header */
 	high_blk = cnl->highest_lbm_blk_changed;
+<<<<<<< HEAD
+=======
+	if (0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))
+		cnl->highest_lbm_blk_changed = GDS_CREATE_BLK_MAX;	/* Reset to initial value */
+	else DEBUG_ONLY(if (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1)))
+		cnl->highest_lbm_blk_changed = V6_GDS_CREATE_BLK_MAX;
+#ifdef DEBUG
+	else
+	{
+		assert((0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))
+			|| (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1)));
+	}
+#endif
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	flush_len = SGMNT_HDR_LEN;
 	if (0 <= high_blk)					/* If not negative, flush at least one master map block */
 		flush_len += ((high_blk / csd->bplmap / DISK_BLOCK_SIZE / BITS_PER_UCHAR) + 1) * DISK_BLOCK_SIZE;
@@ -202,10 +218,12 @@ void fileheader_sync(gd_region *reg)
 		flush_len = ROUND_UP2(flush_len, DIO_ALIGNSIZE(udi));
 	assert(flush_len <= BLK_ZERO_OFF(csd->start_vbn));	/* assert that we never overwrite GDS block 0's offset */
 	assert(flush_len <= SIZEOF_FILE_HDR(csd));	/* assert that we never go past the mastermap end */
+	if (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+		db_header_dwnconv(csd);
 	DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, 0, (sm_uc_ptr_t)csd, flush_len, save_errno);
 	if (0 != save_errno)
 	{
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 			ERR_TEXT, 2, RTS_ERROR_TEXT("Error during FileHeader Flush"), save_errno);
 	}
 	/* Reset shared memory value to initial value now that we have successfully flushed all of the needed master map.
@@ -218,7 +236,7 @@ void fileheader_sync(gd_region *reg)
 }
 
 /* update a bitmap */
-void	bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
+void bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 {
 	int4				bml_full, bplmap;
 	boolean_t			change_bmm;
@@ -241,7 +259,7 @@ void	bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 	else
 		total_blks = bplmap;
 	reference_cnt = cs->reference_cnt;
-	assert(0 <= (int)(cti->free_blocks - reference_cnt));
+	assert(0 <= (block_id)(cti->free_blocks - reference_cnt));
 	cti->free_blocks -= reference_cnt;
 	change_bmm = FALSE;
 	/* assert that cs->reference_cnt is 0 if we are in MUPIP REORG UPGRADE/DOWNGRADE */
@@ -259,7 +277,7 @@ void	bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 			change_bmm = TRUE;
 			if ((0 == csd->extension_size)	/* no extension and less than a bit map or less than 1/32 (3.125%) */
 				&& ((BLKS_PER_LMAP > cti->free_blocks) || ((cti->total_blks >> 5) > cti->free_blocks)))
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_FREEBLKSLOW, 4, cti->free_blocks, cti->total_blks,
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_FREEBLKSLOW, 4, &(cti->free_blocks), &(cti->total_blks),
 					 DB_LEN_STR(gv_cur_region));
 		}
 	} else if (0 > reference_cnt)
@@ -289,13 +307,15 @@ void	bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 	return;
 }
 
-enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn, sgm_info *si)
+enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn, sgm_info *si)
 {
 	block_id		blkid;
 	cw_set_element		*cs_ptr, *nxt;
 	off_chain		chain;
+	v6_off_chain		v6_chain;
 	sm_uc_ptr_t		chain_ptr, db_addr[2];
-	boolean_t 		write_to_snapshot_file;
+	boolean_t		write_to_snapshot_file, long_blk_id;
+	int4			blk_id_sz;
 	snapshot_context_ptr_t	lcl_ss_ctx;
 #	ifdef DEBUG
 	jbuf_rsrv_struct_t	*jrs;
@@ -313,7 +333,7 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	INCR_DB_CSH_COUNTER(cs_addrs, n_bgmm_updates, 1);
 	blkid = cs->blk;
 	assert((0 <= blkid) && (blkid < cs_addrs->ti->total_blks));
-	db_addr[0] = MM_BASE_ADDR(cs_addrs) + (sm_off_t)cs_data->blk_size * (blkid);
+	db_addr[0] = MM_BASE_ADDR(cs_addrs) + ((sm_off_t)cs_data->blk_size * (blkid));
 	/* check for online backup -- ATTN: this part of code is similar to the BG_BACKUP_BLOCK macro */
 	if ((blkid >= cs_addrs->nl->nbb) && (NULL != cs->old_block)
 		&& (0 == cs_addrs->shmpool_buffer->failed)
@@ -349,7 +369,7 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	{
 		assert(0 == (blkid & (BLKS_PER_LMAP - 1)));
 		if (FALSE == cs->done)
-			gvcst_map_build((uint4 *)cs->upd_addr, db_addr[0], cs, effective_tn);
+			gvcst_map_build((block_id *)cs->upd_addr, db_addr[0], cs, effective_tn);
 		else
 		{	/* It has been built; Update tn in the block and copy from private memory to shared space. */
 			assert(write_after_image);
@@ -374,6 +394,8 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 				((blk_hdr_ptr_t)db_addr[0])->tn = ((blk_hdr_ptr_t)cs->new_buff)->tn = ctn;
 			memcpy(db_addr[0], cs->new_buff, ((blk_hdr_ptr_t)cs->new_buff)->bsiz);
 		}
+		long_blk_id = IS_64_BLK_ID(db_addr[0]);
+		blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 		assert(SIZEOF(blk_hdr) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
 		assert((int)(((blk_hdr_ptr_t)db_addr[0])->bsiz) > 0);
 		assert((int)(((blk_hdr_ptr_t)db_addr[0])->bsiz) <= cs_data->blk_size);
@@ -384,8 +406,8 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 				assert(0 <= (short)cs->index);
 				assert(&cw_set[cs->index] < cs);
 				assert((SIZEOF(blk_hdr) + SIZEOF(rec_hdr)) <= cs->ins_off);
-				assert((cs->ins_off + SIZEOF(block_id)) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
-				PUT_BLK_ID(db_addr[0] + cs->ins_off, cw_set[cs->index].blk);
+				assert((cs->ins_off + blk_id_sz) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
+				WRITE_BLK_ID(long_blk_id, cw_set[cs->index].blk, db_addr[0] + cs->ins_off);
 				if (((nxt = cs + 1) < &cw_set[cw_set_depth]) && (gds_t_write_root == nxt->mode))
 				{	/* If the next cse is a WRITE_ROOT, it contains a second block pointer
 					 * to resolve though it operates on the current cse's block.
@@ -393,8 +415,8 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 					assert(0 <= (short)nxt->index);
 					assert(&cw_set[nxt->index] < nxt);
 					assert((SIZEOF(blk_hdr) + SIZEOF(rec_hdr)) <= nxt->ins_off);
-					assert((nxt->ins_off + SIZEOF(block_id)) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
-					PUT_BLK_ID(db_addr[0] + nxt->ins_off, cw_set[nxt->index].blk);
+					assert((nxt->ins_off + blk_id_sz) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
+					WRITE_BLK_ID(long_blk_id, cw_set[nxt->index].blk, db_addr[0] + nxt->ins_off);
 				}
 			}
 		} else
@@ -403,14 +425,14 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 			{	/* TP resolve pointer references to new blocks */
 				for (chain_ptr = db_addr[0] + cs->first_off; ; chain_ptr += chain.next_off)
 				{
-					GET_BLK_IDP(&chain, chain_ptr);
+					READ_OFF_CHAIN(long_blk_id, &chain, &v6_chain, chain_ptr);
 					assert(1 == chain.flag);
-					assert((int)(chain_ptr - db_addr[0] + chain.next_off + SIZEOF(block_id))
+					assert((int)(chain_ptr - db_addr[0] + chain.next_off + blk_id_sz)
 							<= (int)(((blk_hdr_ptr_t)db_addr[0])->bsiz));
 					assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 					assert((int)chain.cw_index < sgm_info_ptr->cw_set_depth);
 					tp_get_cw(si->first_cw_set, (int)chain.cw_index, &cs_ptr);
-					PUT_BLK_ID(chain_ptr, cs_ptr->blk);
+					WRITE_BLK_ID(long_blk_id, cs_ptr->blk, chain_ptr);
 					if (0 == chain.next_off)
 						break;
 				}
@@ -422,7 +444,7 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 }
 
 /* update buffered global database */
-enum cdb_sc	bg_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn, sgm_info *si)
+enum cdb_sc bg_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn, sgm_info *si)
 {
 	enum cdb_sc		status;
 
@@ -433,7 +455,7 @@ enum cdb_sc	bg_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	return status;
 }
 
-enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
+enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 {
 	boolean_t		twinning_on;
 	int			dummy;
@@ -442,7 +464,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	bt_rec_ptr_t		bt;
 	cache_rec_ptr_t		cr, cr_new, save_cr;
 	boolean_t		read_finished, wait_for_rip, write_finished, intend_finished;
-	boolean_t		read_before_image;
+	boolean_t		read_before_image, v7_db_mode, v6_db_mode;
 	block_id		blkid;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -458,6 +480,9 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;		/* Local access copies */
 	csd = csa->hdr;
+	v7_db_mode = (0 == MEMCMP_LIT(csd->label, GDS_LABEL));
+	v6_db_mode = (0 == MEMCMP_LIT(csd->label, V6_GDS_LABEL));
+	assert((v7_db_mode || v6_db_mode) && (v7_db_mode != v6_db_mode));
 	cnl = csa->nl;
 	assert(csd == cs_data);
 	mode = cs->mode;
@@ -466,7 +491,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	assert(csa->now_crit);
 	blkid = cs->blk;
 	/* assert changed to assertpro 2/15/2012. can be changed back once reorg truncate has been running for say 3 to 4 years */
-	assertpro((0 <= blkid) && (blkid < csa->ti->total_blks));
+	assert((0 <= blkid) && (blkid < csa->ti->total_blks));
 	INCR_DB_CSH_COUNTER(csa, n_bgmm_updates, 1);
 	bt = bt_put(gv_cur_region, blkid);
 	GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_BTPUTNULL, bt, NULL);
@@ -900,11 +925,13 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	 * For created blocks that have NULL cs->old_blocks, t_create should have set format to GDSVCURR. Assert that too.
 	 */
 	assert(!read_before_image || (NULL == cs->old_block) || (cs->ondsk_blkver == cr->ondsk_blkver));
-	assert((gds_t_acquired != mode) || (NULL != cs->old_block) || (GDSVCURR == cs->ondsk_blkver));
+	assert((gds_t_acquired != mode) || (NULL != cs->old_block)
+		|| ((GDSVCURR == cs->ondsk_blkver) && v7_db_mode)
+		|| ((BLK_ID_32_VER == cs->ondsk_blkver) && v6_db_mode));
 	desired_db_format = csd->desired_db_format;
 	/* assert that appropriate inctn journal records were written at the beginning of the commit in t_end */
-	assert((inctn_blkupgrd_fmtchng != inctn_opcode) || (GDSV4 == cr->ondsk_blkver) && (GDSV6 == desired_db_format));
-	assert((inctn_blkdwngrd_fmtchng != inctn_opcode) || (GDSV6 == cr->ondsk_blkver) && (GDSV4 == desired_db_format));
+	assert((inctn_blkupgrd_fmtchng != inctn_opcode) || ((GDSV6 == cr->ondsk_blkver) && (GDSV7 == desired_db_format)));
+	assert((inctn_blkdwngrd_fmtchng != inctn_opcode) || ((GDSV7 == cr->ondsk_blkver) && (GDSV6 == desired_db_format)));
 	assert(!(JNL_ENABLED(csa) && csa->jnl_before_image) || !mu_reorg_nosafejnl
 		|| (inctn_blkupgrd != inctn_opcode) || (cr->ondsk_blkver == desired_db_format));
 	assert(!mu_reorg_upgrd_dwngrd_in_prog || !mu_reorg_encrypt_in_prog || (gds_t_acquired != mode));
@@ -912,25 +939,34 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	assert((gds_t_write_recycled != mode) || mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog);
 	if (gds_t_acquired == mode)
 	{	/* It is a created block. It should inherit the desired db format. This is done as a part of call to
-		 * SET_ONDSK_BLKVER in bg_update_phase1 and bg_update_phase2. Also, if that format is V4, increase blks_to_upgrd.
+		 * SET_ONDSK_BLKVER in bg_update_phase1 and bg_update_phase2.
+		 * Also, if this is a V7 DB and that format is V6, increase blks_to_upgrd.
 		 */
-		if (GDSV4 == desired_db_format)
+		if ((GDSV6 == desired_db_format) && v7_db_mode)
 		{
 			INCR_BLKS_TO_UPGRD(csa, csd, 1);
 		}
 	} else if (cr->ondsk_blkver != desired_db_format)
-	{	/* Some sort of state change in the block format is occuring */
+	{	/* Some sort of state change in the block format is occurring */
 		switch(desired_db_format)
 		{
+			case GDSV7:
+				/* V6 -> V7 transition */
+				if (gds_t_write_recycled != mode)
+					if (v7_db_mode)
+						DECR_BLKS_TO_UPGRD(csa, csd, 1);
+					else
+					{
+						assert(FALSE);
+					}
+				break;
 			case GDSV6:
 				/* V4 -> V5 transition */
 				if (gds_t_write_recycled != mode)
-					DECR_BLKS_TO_UPGRD(csa, csd, 1);
-				break;
-			case GDSV4:
-				/* V5 -> V4 transition */
-				if (gds_t_write_recycled != mode)
-					INCR_BLKS_TO_UPGRD(csa, csd, 1);
+					if (v7_db_mode)
+						INCR_BLKS_TO_UPGRD(csa, csd, 1);
+					/*else
+						DECR_BLKS_TO_UPGRD(csa, csd, 1);*/
 				break;
 			default:
 				assertpro(FALSE);
@@ -985,22 +1021,23 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	return cdb_sc_normal;
 }
 
-enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effective_tn, sgm_info *si)
+enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effective_tn, sgm_info *si)
 {
-	int4			n;
+	int4			n, blk_id_sz;
 	off_chain		chain;
+	v6_off_chain		v6_chain;
 	sm_uc_ptr_t		blk_ptr, backup_blk_ptr, chain_ptr;
 	cw_set_element		*cs_ptr, *nxt;
 	cache_rec_ptr_t		cr, backup_cr;
 	boolean_t		recycled;
-	boolean_t		bmp_status;
+	boolean_t		bmp_status, long_blk_id;
 	block_id		blkid;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	node_local_ptr_t        cnl;
+	node_local_ptr_t	cnl;
 	enum gds_t_mode		mode;
 	cache_que_heads_ptr_t	cache_state;
-	boolean_t 		write_to_snapshot_file;
+	boolean_t		write_to_snapshot_file;
 	snapshot_context_ptr_t	lcl_ss_ctx;
 #	ifdef DEBUG
 	jbuf_rsrv_struct_t	*jrs;
@@ -1093,7 +1130,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		assert(csa->now_crit);	/* at this point, bitmap blocks are built while holding crit */
 		assert(0 == (blkid & (BLKS_PER_LMAP - 1)));
 		if (FALSE == cs->done)
-			gvcst_map_build((uint4 *)cs->upd_addr, blk_ptr, cs, effective_tn);
+			gvcst_map_build((block_id *)cs->upd_addr, blk_ptr, cs, effective_tn);
 		else
 		{	/* It has been built; Update tn in the block and copy from private memory to shared space */
 			assert(write_after_image);
@@ -1132,6 +1169,8 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		assert(SIZEOF(blk_hdr) <= ((blk_hdr_ptr_t)blk_ptr)->bsiz);
 		assert((int)((blk_hdr_ptr_t)blk_ptr)->bsiz > 0);
 		assert((int)((blk_hdr_ptr_t)blk_ptr)->bsiz <= csd->blk_size);
+		long_blk_id = IS_64_BLK_ID(blk_ptr);
+		blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 		if (!dollar_tlevel)
 		{
 			if (0 != cs->ins_off)
@@ -1139,8 +1178,8 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 				assert(0 <= (short)cs->index);
 				assert(cs - cw_set > cs->index);
 				assert((SIZEOF(blk_hdr) + SIZEOF(rec_hdr)) <= cs->ins_off);
-				assert((cs->ins_off + SIZEOF(block_id)) <= ((blk_hdr_ptr_t)blk_ptr)->bsiz);
-				PUT_BLK_ID((blk_ptr + cs->ins_off), cw_set[cs->index].blk);
+				assert((cs->ins_off + blk_id_sz) <= ((blk_hdr_ptr_t)blk_ptr)->bsiz);
+				WRITE_BLK_ID(long_blk_id, cw_set[cs->index].blk, (blk_ptr + cs->ins_off));
 				if (((nxt = cs + 1) < &cw_set[cw_set_depth]) && (gds_t_write_root == nxt->mode))
 				{	/* If the next cse is a WRITE_ROOT, it contains a second block pointer
 					 * to resolve though it operates on the current cse's block.
@@ -1149,7 +1188,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 					assert(nxt - cw_set > nxt->index);
 					assert(SIZEOF(blk_hdr) <= nxt->ins_off);
 					assert(nxt->ins_off <= ((blk_hdr_ptr_t)blk_ptr)->bsiz);
-					PUT_BLK_ID((blk_ptr + nxt->ins_off), cw_set[nxt->index].blk);
+					WRITE_BLK_ID(long_blk_id, cw_set[nxt->index].blk, blk_ptr + nxt->ins_off);
 				}
 			}
 		} else
@@ -1158,14 +1197,14 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 			{	/* TP - resolve pointer references to new blocks */
 				for (chain_ptr = blk_ptr + cs->first_off; ; chain_ptr += chain.next_off)
 				{
-					GET_BLK_IDP(&chain, chain_ptr);
+					READ_OFF_CHAIN(long_blk_id, &chain, &v6_chain, chain_ptr);
 					assert(1 == chain.flag);
-					assert((int)(chain_ptr - blk_ptr + chain.next_off + SIZEOF(block_id))
+					assert((int)(chain_ptr - blk_ptr + chain.next_off + blk_id_sz)
 							<= (int)((blk_hdr_ptr_t)blk_ptr)->bsiz);
 					assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 					assert((int)chain.cw_index < sgm_info_ptr->cw_set_depth);
 					tp_get_cw(si->first_cw_set, (int)chain.cw_index, &cs_ptr);
-					PUT_BLK_ID(chain_ptr, cs_ptr->blk);
+					WRITE_BLK_ID(long_blk_id, cs_ptr->blk, chain_ptr);
 					if (0 == chain.next_off)
 						break;
 				}
@@ -1233,7 +1272,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 }
 
 /* Used to prevent staleness of buffers. Start timer to call wcs_stale to do periodic flushing */
-void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
+void wcs_timer_start(gd_region *reg, boolean_t io_ok)
 {
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -1313,7 +1352,7 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 }
 
 /* A timer has popped. Some buffers are stale -- start writing to the database */
-void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
+void wcs_stale(TID tid, int4 hd_len, gd_region **region)
 {
 	boolean_t		need_new_timer;
 	gd_region		*save_region;

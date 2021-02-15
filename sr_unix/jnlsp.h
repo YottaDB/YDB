@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,7 @@
 /* Start jnlsp.h - platform-specific journaling definitions.  */
 
 #include <errno.h>
+#include "filestruct.h" /* needed for unix_file_info */
 
 typedef gtm_int64_t		jnl_proc_time;
 typedef	int			fd_type;

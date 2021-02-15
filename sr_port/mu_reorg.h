@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,28 +29,45 @@
 /*********************************************************************
 	block_number is used for swap
  *********************************************************************/
-#define INCR_BLK_NUM(block_number)      		\
-	(block_number)++; 				\
-        if (IS_BITMAP_BLK(block_number)) 		\
+#define INCR_BLK_NUM(block_number)			\
+	(block_number)++;				\
+	if (IS_BITMAP_BLK(block_number))		\
 		(block_number)++;			\
 	assert(!IS_BITMAP_BLK(block_number));
 
 /* DECR_BLK_NUM has no check for bit-map because it is always followed by INCR_BLK_NUM */
-#define DECR_BLK_NUM(block_number)      (block_number)--
+#define DECR_BLK_NUM(block_number)	((block_number)--)
 
 /*
  *	If INVALID_RECORD evaluates to TRUE, it means some necessary record/key relations are incongruent, and we cannot proceed
  *	with update array calculations. Restart.
- * 	Input:
+ *	Input:
  *		LEVEL :=	level of current block
- * 		REC_SIZE :=	record size
+ *		REC_SIZE :=	record size
  *		KEYLEN := 	key length
  *		KEYCMPC :=	key compression count
+ *		LONG_BLK_ID :=	TRUE->64-bit block_id  FALSE->32-bit block_id
+ *
+ *	The conditions that denote an invalid record are
+ *		1)MAX_KEY_SZ < (KEYLEN + KEYCMPC) - key length exceeds maximum
+ *		2)(0 != LEVEL) && (bstar_rec_size(LONG_BLK_ID) > REC_SIZE) - the minimum size for index records,
+ *			all non level 0 records, is the size of a B* records, which is just a record header and block id
+ *		3)(0 == LEVEL) && (3 > KEYLEN) - GT.M uses 2 0x00 characters to mark the end of a key in a record, which are
+ *			treated as part of the key when determining the key length. This makes the minimum key length 3 for
+ *			level 0 records, this does not apply to non level 0 records since it is possible for index
+ *			records to not have a key (ex. B* records).
+ *		4)(0 == LEVEL) && (bstar_rec_size(LONG_BLK_ID) > ((REC_SIZE) + (LONG_BLK_ID ? 5 : 1))) -
+ *			the minimum size for data records, level 0 records, happens when a global with a single character key
+ *			has no associated value.  This causes a data record with a record header, the minimum key, and no value.
+ *			An easy way to check the size of a minimum record is to compare it to the minimum bstar record size
+ *			and add the difference between the minimum key size (3) and the block_id size (5 or 1 depending on
+ *			if you are working with 64- or 32-bit block_ids)
  */
-#define INVALID_RECORD(LEVEL, REC_SIZE, KEYLEN, KEYCMPC)			\
-	(	   (MAX_KEY_SZ < ((int)(KEYLEN) + (KEYCMPC)))			\
-		|| (BSTAR_REC_SIZE > ((REC_SIZE) + (0 == (LEVEL) ? 1 : 0)))	\
-		|| ((0 == (LEVEL)) && (2 >= (KEYLEN)))				\
+#define INVALID_RECORD(LEVEL, REC_SIZE, KEYLEN, KEYCMPC, LONG_BLK_ID)					\
+	(	   (MAX_KEY_SZ < ((int)(KEYLEN) + (KEYCMPC)))							\
+		|| ((0 != (LEVEL)) && (bstar_rec_size(LONG_BLK_ID) > (REC_SIZE)))				\
+		|| ((0 == (LEVEL)) && (3 > (KEYLEN)))								\
+		|| ((0 == (LEVEL)) && (bstar_rec_size(LONG_BLK_ID) > ((REC_SIZE) + (LONG_BLK_ID ? 5 : 1))))	\
 	)
 
 /* Key allocation better be big enough. We can check array sizes, so we do. But we can't check arbitrary pointers, so if a pointer

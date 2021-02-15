@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2009-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,10 +63,65 @@ error_def(ERR_CRYPTDLNOOPEN);
 /* Including gtmcrypt.h in this module results in conflicting GBLDEF/GBLREFs. So, re-define the function prototype here to
  * silent the compiler.
  */
-uint4 gtmcrypt_entry(void);
+int4 gtmcrypt_entry(void);
 boolean_t verify_lib_loadpath(const char *libname, char *loadpath);
 
+<<<<<<< HEAD
 uint4 gtmcrypt_entry()
+=======
+#ifdef _AIX
+/* On AIX, there is no known way to specify that dependent libraries (in this case "libgtmcryptutil.so") should also be searched in
+ * the same directory from which the parent library is loaded ($ORIGIN on Linux, HP-UX and Solaris). To work-around that, we
+ * explicitly prefix LIBPATH with "$gtm_dist/plugin" before invoking dlopen. But, to ensure that "libgtmcryptutil.so" was indeed
+ * loaded from "$gtm_dist/plugin", we use loadquery to get the list of loaded modules along with the path from which they are loaded
+ * from and verify against it.
+ */
+boolean_t verify_lib_loadpath(const char *libname, char *loadpath)
+{
+	struct ld_xinfo		*ldxinfo;
+	char			*bufptr, *ptr, cmpptr[GTM_PATH_MAX], buf[GTM_PATH_MAX];
+	int			ret, cmplen, buflen, save_errno;
+
+	buflen = GTM_PATH_MAX;
+	bufptr = &buf[0];
+	while (-1 == loadquery(L_GETXINFO, bufptr, buflen))
+	{
+		save_errno = errno;
+		if (ENOMEM != save_errno)
+		{
+			assert(FALSE);
+			SNPRINTF(dl_err, MAX_ERRSTR_LEN, "System call `loadquery' failed. %s", STRERROR(save_errno));
+			return FALSE;
+		}
+		if (bufptr != &buf[0])
+			free(bufptr);
+		buflen *= 2;
+		bufptr = malloc(buflen);
+	}
+	ldxinfo = (struct ld_xinfo *)bufptr;
+	ret = FALSE;
+	SNPRINTF(cmpptr, GTM_PATH_MAX, "%s/%s", loadpath, libname);
+	while (ldxinfo->ldinfo_next)
+	{
+		/* Point to the offset at which the path of the loaded module is present. */
+		ptr = (char *)ldxinfo + ldxinfo->ldinfo_filename;
+		if (is_file_identical(cmpptr, ptr))
+		{
+			ret = TRUE;
+			break;
+		}
+		ldxinfo = (struct ld_xinfo *)((sm_long_t)ldxinfo + ldxinfo->ldinfo_next);
+	}
+	if (bufptr != &buf[0])
+		free(bufptr);
+	if (!ret)
+		SNPRINTF(dl_err, MAX_ERRSTR_LEN, "Dependent shared library %s was not loaded relative to %s.", libname, loadpath);
+	return ret;
+}
+#endif
+
+int4 gtmcrypt_entry()
+>>>>>>> 451ab477 (GT.M V7.0-000)
 {
 	/* Initialize the table of symbol names to be used in dlsym() */
 #	define GTMCRYPT_DEF(x) #x,

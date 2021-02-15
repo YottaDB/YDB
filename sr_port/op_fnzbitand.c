@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +16,8 @@
 
 GBLREF spdesc stringpool;
 
+error_def(ERR_INVBITSTR);
+
 void op_fnzbitand(mval *dst, mval *bitstr1, mval *bitstr2)
 {
 	int 		n, str_len1, str_len2, new_str_len;
@@ -22,21 +25,19 @@ void op_fnzbitand(mval *dst, mval *bitstr1, mval *bitstr2)
 	unsigned char	*byte1_1, *byte1_n, byte1_len;
 	unsigned char	*byte2_1, *byte2_n, byte2_len;
 
-	error_def(ERR_INVBITSTR);
-
 	MV_FORCE_STR(bitstr1);
 	MV_FORCE_STR(bitstr2);
 
 	if (!bitstr1->str.len || !bitstr2->str.len)
-		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
 	byte1_len = *(unsigned char *)bitstr1->str.addr;
 	str_len1 = (bitstr1->str.len - 1) * 8;
 	if (7 < byte1_len)
-		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
 	byte2_len = *(unsigned char *)bitstr2->str.addr;
 	str_len2 = (bitstr2->str.len - 1) * 8;
 	if (7 < byte2_len)
-		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
 	if (str_len1 - byte1_len > str_len2 - byte2_len)
 		new_str_len = str_len2 - byte2_len;
 	else

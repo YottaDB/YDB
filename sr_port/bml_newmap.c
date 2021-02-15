@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,11 +22,11 @@
 #include "gtm_multi_thread.h"
 
 /* #GTM_THREAD_SAFE : The below function (bml_newmap) is thread-safe */
-void bml_newmap(blk_hdr_ptr_t ptr, uint4 size, trans_num curr_tn)
+void bml_newmap(blk_hdr_ptr_t ptr, uint4 size, trans_num curr_tn, enum db_ver ondsk_blkver)
 {
 	sm_uc_ptr_t bptr;
 
-	ptr->bver = GDSVCURR;
+	ptr->bver = ondsk_blkver;
 	ptr->bsiz = size;
 	ptr->levl = LCL_MAP_LEVL;
 	ptr->tn = curr_tn;

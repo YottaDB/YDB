@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -37,7 +37,7 @@
 #include "gdscc.h"
 #include "copy.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"
+#include "hashtab_int8.h"
 #include "tp.h"
 #include "rc_oflow.h"
 #include "repl_msg.h"
@@ -147,7 +147,7 @@ GBLREF	sgm_info		*first_sgm_info;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	enum gtmImageTypes	image_type;
-GBLREF	boolean_t 		span_nodes_disallowed;
+GBLREF	boolean_t		span_nodes_disallowed;
 
 error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVIS);
@@ -350,7 +350,7 @@ void	gvcst_put(mval *val)
 				 * as in the case of implicit TP for triggers, we issue a DBROLLEDBACK error that the application
 				 * programmer can catch.
 				 */
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DBROLLEDBACK);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DBROLLEDBACK);
 		}
 		tp_set_sgm();
 		GVCST_ROOT_SEARCH;
@@ -438,16 +438,11 @@ void	gvcst_put(mval *val)
 
 void	gvcst_put2(mval *val, span_parms *parms)
 {
-	sgmnt_addrs		*csa;
-	sgmnt_data_ptr_t	csd;
-	node_local_ptr_t	cnl;
-	int4			blk_size, blk_fill_size, blk_reserved_bytes;
-	const char		zeroes_blkid[SIZEOF(block_id)] = {0};
-	const char		zeroes_blkid_collhdr[SIZEOF(block_id) + COLL_SPEC_LEN] = {0};
-	boolean_t		jnl_format_done, is_dummy, needfmtjnl, fits, lcl_span_status, want_root_search = FALSE;
 	blk_segment		*bs1, *bs_ptr, *new_blk_bs;
 	block_id		allocation_clue, tp_root, gvt_for_root, blk_num, last_split_blk_num[MAX_BT_DEPTH];
+	block_id		lcl_root, last_split_bnum;
 	block_index		left_hand_index, ins_chain_index, root_blk_cw_index, next_blk_index;
+<<<<<<< HEAD
 	block_offset		ins_off1, ins_off2, old_curr_chain_next_off;
 	cw_set_element		*cse, *cse_new, *old_cse;
 	gv_namehead		*save_targ, *split_targ, *dir_tree;
@@ -482,6 +477,16 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	sgm_info		*si;
 	uint4			nodeflags;
 	boolean_t		write_logical_jnlrecs, blk_match, is_split_dir_left;
+=======
+	block_offset		next_offset, first_offset, ins_off1, ins_off2, old_curr_chain_next_off;
+	boolean_t		jnl_format_done, is_dummy, needfmtjnl, fits, lcl_span_status, want_root_search = FALSE;
+	boolean_t		copy_extra_record, level_0, new_rec, no_pointers, succeeded, key_exists;
+	boolean_t		make_it_null, gbl_target_was_set, duplicate_set, new_rec_goes_to_right, need_extra_block_split;
+	boolean_t		db_long_blk_id, long_blk_id;	/* db_long_blk_id is based on csd->desired_db_ver,
+								 * while long_blk_id is based on bp->bver
+								 */
+	boolean_t		write_logical_jnlrecs, can_write_logical_jnlrecs, blk_match, is_split_dir_left;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	boolean_t		split_to_right;	/* FALSE if a block split creates a new block on the left of the split point.
 						 *	In this case, a "t_create" is needed for the new block on the left
 						 *	and a "t_write" is needed for the current block (right side of split).
@@ -491,54 +496,78 @@ void	gvcst_put2(mval *val, span_parms *parms)
 						 *	right ("t_create" is needed for that).
 						 */
 	boolean_t		prev_split_to_right; /* copy of "split_to_right" after child level split (used in parent split) */
-	int			split_depth;
-	mval			*ja_val;
-	int			rc;
-	int4			cse_first_off;
+	char			*va, last_split_direction[MAX_BT_DEPTH];
+	const char		zeroes_blkid[SIZEOF(block_id_64)] = {0};
+	const char		zeroes_blkid_collhdr[SIZEOF(block_id_64) + COLL_SPEC_LEN] = {0};
+	const char		v6_zeroes_blkid[SIZEOF(block_id_32)] = {0};
+	const char		v6_zeroes_blkid_collhdr[SIZEOF(block_id_32) + COLL_SPEC_LEN] = {0};
+	enum cdb_sc		status, status2;
 	enum split_dir		last_split_dir;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
+	node_local_ptr_t	cnl;
+	int4			blk_size, blk_fill_size, blk_reserved_bytes;
+	cw_set_element		*cse, *cse_new, *old_cse;
+	gv_key			*temp_key, *src_key;
+	static gv_key		*gv_altkey2;
+	gv_namehead		*save_targ, *split_targ, *dir_tree;
+	ht_ent_int8		*tabent;
+	int			cur_blk_size, blk_seg_cnt, delta, i, j, left_hand_offset, n, ins_chain_offset,
+				new_blk_size_l, new_blk_size_r, new_blk_size_single, new_blk_size, blk_reserved_size,
+				last_possible_left_offset, new_rec_size, next_rec_shrink, next_rec_shrink1, start_len,
+				offset_sum, rec_cmpc, tmp_cmpc, target_key_size, tp_lev, undo_index, cur_val_offset,
+				curr_offset, bh_level, blk_id_sz, off_chain_sz;
+	int			rc;
+	int			split_depth;
+	int4			cse_first_off;
 	int4			data_len;
+	jnl_action		*ja;
+	jnl_format_buffer	*jfb, *ztworm_jfb;
+	key_cum_value		*tempkv;
+	mstr			value;
+	mval			*set_val;	/* actual right-hand-side value of the SET or $INCR command */
+	mval			*val_forjnl;
+	mval			*ja_val;
+	off_chain		chain1, curr_chain, prev_chain, chain2;
+	v6_off_chain		v6_chain;
+	rec_hdr_ptr_t		curr_rec_hdr, extra_rec_hdr, next_rec_hdr, new_star_hdr, rp, tmp_rp;
+	srch_blk_status		*bh, *bq, *tp_srch_status;
+	srch_hist		*dir_hist;
+	sm_uc_ptr_t		cp1, cp2, curr;
+	sm_uc_ptr_t		buffaddr;
+	sgm_info		*si;
+	uchar_ptr_t		subrec_ptr;
+	uint4			segment_update_array_size, key_top, cp2_len, bs1_2_len, bs1_3_len;
+	uint4			nodeflags;
+	uint4			no_4byte_collhdr;
+	unsigned short		extra_record_blkid_off, rec_size, tmp_rsiz;
+	unsigned int		prev_rec_offset, prev_rec_match, curr_rec_offset, curr_rec_match;
+	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, old_ch, new_ch;
 #	ifdef GTM_TRIGGER
 	boolean_t		is_tpwrap;
+	boolean_t		lcl_implicit_tstart;		/* local copy of the global variable "implicit_tstart" */
+	boolean_t		lcl_is_dollar_incr;		/* local copy of is_dollar_incr taken at start of module.
+								 * used to restore is_dollar_incr in case of TP restarts */
 	boolean_t		ztval_gvcst_put_redo, skip_hasht_read;
 	gtm_trigger_parms	trigparms;
 	gvt_trigger_t		*gvt_trigger;
 	gvtr_invoke_parms_t	gvtr_parms;
 	int			gtm_trig_status;
-	unsigned char		*save_msp;
-	mv_stent		*save_mv_chain;
-	mval			*ztold_mval = NULL;
-	mval			*ztval_mval;
 	mint			dlr_data;
-	boolean_t		lcl_implicit_tstart;		/* local copy of the global variable "implicit_tstart" */
+	mv_stent		*save_mv_chain;
 	mval			lcl_increment_delta_mval;	/* local copy of "increment_delta_mval" */
-	boolean_t		lcl_is_dollar_incr;		/* local copy of is_dollar_incr taken at start of module.
-								 * used to restore is_dollar_incr in case of TP restarts */
 	mval			*lcl_post_incr_mval;		/* local copy of "post_incr_mval" at function entry.
 								 * used to restore "post_incr_mval" in case of TP restarts */
 	mval			*lcl_val;			/* local copy of "val" at function entry.
 								 * used to restore "val" in case of TP restarts */
 	mval			*lcl_val_forjnl;
 	mval			*pval;				/* copy of "value" (an mstr), protected from stp gcol */
+	mval			*ztold_mval = NULL;
+	mval			*ztval_mval;
+	unsigned char		*save_msp;
 	DEBUG_ONLY(enum cdb_sc	save_cdb_status;)
 #	endif
-	uint4			no_4byte_collhdr;
 #	ifdef DEBUG
-	char			dbg_valbuff[256];
-	mstr_len_t		dbg_vallen;
-	mval			*dbg_lcl_val;
-	int			dbg_num_iters = -1;	/* number of iterations through gvcst_put */
-	int			lcl_dollar_tlevel, lcl_t_tries;
-	typedef struct
-	{
-		unsigned int	t_tries;
-		int		retry_line;
-		boolean_t	is_fresh_tn_start;
-		boolean_t	is_dollar_incr;
-		boolean_t	ztval_gvcst_put_redo;
-		boolean_t	is_extra_block_split;
-		mval		*val;
-		boolean_t	lcl_implicit_tstart;
-	} dbg_trace;
 	/* We want to capture all pertinent information across each iteration of gvcst_put.
 	 * There are 3 things that can contribute to a new iteration.
 	 * 	a) restarts from the primary set.
@@ -552,10 +581,26 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	 * 	Total of 16 max iterations. If ever a transaction goes for more than this # of iterations (theoretically
 	 * 		possible in non-TP if a lot of extra block splits occur), we assert fail.
 	 */
-	dbg_trace		dbg_trace_array[16];
 	boolean_t		is_fresh_tn_start;
 	boolean_t		is_mm;
+	char			dbg_valbuff[256];
+	int			dbg_num_iters = -1;	/* number of iterations through gvcst_put */
+	int			lcl_dollar_tlevel, lcl_t_tries;
+	mstr_len_t		dbg_vallen;
+	mval			*dbg_lcl_val;
 	mval			tmpmval, *random_mval = &tmpmval;
+	typedef struct
+	{
+		unsigned int	t_tries;
+		int		retry_line;
+		boolean_t	is_fresh_tn_start;
+		boolean_t	is_dollar_incr;
+		boolean_t	ztval_gvcst_put_redo;
+		boolean_t	is_extra_block_split;
+		mval		*val;
+		boolean_t	lcl_implicit_tstart;
+	} dbg_trace;
+	dbg_trace		dbg_trace_array[16];
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -579,6 +624,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	}
 #	endif
 	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl, SCNDDBNOUPD_CHECK_TRUE);
+	db_long_blk_id = BLK_ID_32_VER < csd->desired_db_format;
 	blk_size = csd->blk_size;
 	blk_reserved_bytes = parms->blk_reserved_bytes;
 	blk_fill_size = (blk_size * gv_fillfactor) / 100 - blk_reserved_bytes;
@@ -771,8 +817,9 @@ tn_restart:
 		{
 			tmp_rp = (rec_hdr_ptr_t)(dir_hist->h[0].buffaddr + dir_hist->h[0].curr_rec.offset);
 			EVAL_CMPC2(tmp_rp, tmp_cmpc);
-			GET_BLK_ID(tp_root, dir_hist->h[0].buffaddr + SIZEOF(rec_hdr)
-						+ dir_hist->h[0].curr_rec.offset + gv_altkey->end + 1 - tmp_cmpc);
+			READ_BLK_ID(IS_64_BLK_ID(dir_hist->h[0].buffaddr), &tp_root,
+					dir_hist->h[0].buffaddr + dir_hist->h[0].curr_rec.offset
+					+ SIZEOF(rec_hdr) + gv_altkey->end + 1 - tmp_cmpc);
 			if (dollar_tlevel)
 			{
 				gvt_for_root = dir_hist->h[0].blk_num;
@@ -781,7 +828,7 @@ tn_restart:
 					tp_get_cw(si->first_cw_set, curr_chain.cw_index, &cse);
 				else
 				{
-					if (NULL != (tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&gvt_for_root)))
+					if (NULL != (tabent = lookup_hashtab_int8(si->blks_in_use, (ublock_id *)&gvt_for_root)))
 						tp_srch_status = tabent->value;
 					else
 						tp_srch_status = NULL;
@@ -865,14 +912,27 @@ tn_restart:
 		}
 		assert(new_blk_bs[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
 		/* Create the index block */
+		/* Since we are making a new block we are using the version indicated by the desired_db_format in sgmnt_data
+		 * to determine the block_id size
+		 */
 		BLK_ADDR(curr_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
-		curr_rec_hdr->rsiz = BSTAR_REC_SIZE;
+		curr_rec_hdr->rsiz = bstar_rec_size(db_long_blk_id);
 		SET_CMPC(curr_rec_hdr, 0);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, SIZEOF(rec_hdr));
+<<<<<<< HEAD
 		BLK_ADDR(null_block_id, SIZEOF(block_id), block_id);
 		*null_block_id = 0;
 		BLK_SEG(bs_ptr, (unsigned char *)null_block_id, SIZEOF(block_id));
+=======
+		if (db_long_blk_id)
+		{
+			BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid, SIZEOF(block_id_64));
+		} else
+		{
+			BLK_SEG(bs_ptr, (unsigned char *)&v6_zeroes_blkid, SIZEOF(block_id_32));
+		}
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		if (0 == BLK_FINI(bs_ptr, bs1))
 		{
 			assert(CDB_STAGNATE > t_tries);
@@ -935,16 +995,33 @@ tn_restart:
 #		endif
 		if (no_4byte_collhdr)
 		{	/* No 4-byte collation header */
-			value.addr = (char *)&zeroes_blkid;
-			value.len = SIZEOF(block_id);
-			assert(SIZEOF(zeroes_blkid) == value.len);
+			if (db_long_blk_id)
+			{
+				value.addr = (char *)&zeroes_blkid;
+				value.len = SIZEOF(block_id_64);
+				assert(SIZEOF(zeroes_blkid) == value.len);
+			} else
+			{
+				value.addr = (char *)&v6_zeroes_blkid;
+				value.len = SIZEOF(block_id_32);
+				assert(SIZEOF(v6_zeroes_blkid) == value.len);
+			}
 		} else
 		{
-			value.addr = (char *)&zeroes_blkid_collhdr;
-			value.len = SIZEOF(block_id) + COLL_SPEC_LEN;
-			assert(SIZEOF(zeroes_blkid_collhdr) == value.len);
 			/* The "block_id" will be filled in later. Fill the 4-byte collation header now */
-			subrec_ptr = (unsigned char *)value.addr + SIZEOF(block_id);
+			if (db_long_blk_id)
+			{
+				value.addr = (char *)&zeroes_blkid_collhdr;
+				value.len = SIZEOF(block_id_64) + COLL_SPEC_LEN;
+				assert(SIZEOF(zeroes_blkid_collhdr) == value.len);
+				subrec_ptr = (unsigned char *)value.addr + SIZEOF(block_id_64);
+			} else
+			{
+				value.addr = (char *)&v6_zeroes_blkid_collhdr;
+				value.len = SIZEOF(block_id_32) + COLL_SPEC_LEN;
+				assert(SIZEOF(v6_zeroes_blkid_collhdr) == value.len);
+				subrec_ptr = (unsigned char *)value.addr + SIZEOF(block_id_32);
+			}
 			assert(COLL_NCT_OFFSET > 0);
 			assert(COLL_ACT_OFFSET > 0);
 			assert(COLL_VER_OFFSET > 0);
@@ -1105,6 +1182,16 @@ tn_restart:
 	for (succeeded = FALSE; !succeeded; no_pointers = level_0 = FALSE)
 	{
 		buffaddr = bh->buffaddr;
+		long_blk_id = IS_64_BLK_ID(buffaddr);
+		blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
+		if (long_blk_id)
+			off_chain_sz = SIZEOF(off_chain);
+		else
+			off_chain_sz = SIZEOF(v6_off_chain);
+		/* The off_chain struct used should be the same as the block_id type being used,
+		 * but we will use off_chain_sz as a separate value for code readability.
+		 */
+		assert(off_chain_sz == blk_id_sz);
 		cur_blk_size = ((blk_hdr_ptr_t)buffaddr)->bsiz;
 		target_key_size = temp_key->end + 1;
 		/* Potential size of a block containing just the new/updated record */
@@ -1271,12 +1358,22 @@ tn_restart:
 				assert(0 == ins_chain_index);
 			} else			/* index or directory level block */
 			{	/* In case a new GVT is being created, it is possible 4-byte collation information is being
-				 * added to the leaf level directory tree record for this global name (after the 4-byte block_id).
+				 * added to the leaf level directory tree record for this global name (after the 8-byte block_id).
 				 * Irrespective of the collation header, make sure ins_chain_offset points to the block_id part.
 				 */
-				assert(((char *)&zeroes_blkid == value.addr)
+				if (db_long_blk_id)
+				{
+					assert(((char *)&zeroes_blkid == value.addr)
 						|| ((char *)&zeroes_blkid_collhdr == value.addr));
-				assert((SIZEOF(zeroes_blkid) == value.len) || (SIZEOF(zeroes_blkid_collhdr) == value.len));
+					assert((SIZEOF(zeroes_blkid) == value.len)
+						|| (SIZEOF(zeroes_blkid_collhdr) == value.len));
+				} else
+				{
+					assert(((char *)&v6_zeroes_blkid == value.addr)
+						|| ((char *)&v6_zeroes_blkid_collhdr == value.addr));
+					assert((SIZEOF(v6_zeroes_blkid) == value.len)
+						|| (SIZEOF(v6_zeroes_blkid_collhdr) == value.len));
+				}
 				ins_chain_offset = (int)(curr_rec_offset + new_rec_size - value.len);
 			}
 			BLK_INIT(bs_ptr, bs1);
@@ -1334,7 +1431,7 @@ tn_restart:
 									 */
 						assert(((sm_uc_ptr_t)rp + rec_size) <= (buffaddr + cur_blk_size));
 							/* or else we would have restarted above with "cdb_sc_mkblk" */
-						assert(SIZEOF(block_id) == value.len);
+						assert(blk_id_sz == value.len);
 						memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
 					}
 				}
@@ -1420,7 +1517,7 @@ tn_restart:
 						/* find chain records before and after the new one */
 						for ( ; ; curr += curr_chain.next_off)
 						{	/* try to make offset_sum identify the 1st chain entry after new record */
-							GET_BLK_IDP(&curr_chain, curr);
+							READ_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
 							assert(1 == curr_chain.flag);
 							if (0 == curr_chain.next_off)
 								break;
@@ -1442,19 +1539,21 @@ tn_restart:
 							/* 			   ---|---------------v
 							 * [blk_hdr]...[existing rec ( )]...[new rec ( )]... */
 							curr_chain.next_off = ins_chain_offset - offset_sum;
-							GET_BLK_IDP(curr, &curr_chain);
+							WRITE_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
 						} else
 						{	/* update the chain record before the new one */
 							/* 			   ---|---------------v--------------------v
 							 * [blk_hdr]...[existing rec ( )]...[new rec ( )]...[existing rec ( )] */
+							assert((1ULL << NEXT_OFF_MAX_BITS)
+								> (ins_chain_offset - (curr - buffaddr)));
 							curr_chain.next_off = (unsigned int)(ins_chain_offset - (curr - buffaddr));
-							GET_BLK_IDP(curr, &curr_chain);
+							WRITE_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
 							cse->next_off = value.len
 								+ (offset_sum - curr_rec_offset - next_rec_shrink1);
 						}
 					}
 					assert((ins_chain_offset + (int)cse->next_off)
-						 <= (delta + (sm_long_t)cur_blk_size - SIZEOF(off_chain)));
+						 <= (delta + (sm_long_t)cur_blk_size - off_chain_sz));
 				} else if (mu_reorg_process || mu_reorg_upgrd_dwngrd_in_prog)
 				{	/* turn off t_end (non-TP) optimization while outside of crit */
 					cse->recompute_list_head = cse->recompute_list_tail = NULL;
@@ -1493,8 +1592,24 @@ tn_restart:
 				if (cse && gv_target->noisolation && !cse->write_type && !need_extra_block_split
 					&& (dollar_tlevel || !is_dollar_incr))
 				{
+<<<<<<< HEAD
 					if ((NULL == cse->recompute_list_tail)
 						|| (0 != memcmp(gv_currkey->base, cse->recompute_list_tail->keybuf.split.base, gv_currkey->top)))
+=======
+					if (is_dollar_incr)
+					{
+						assert(dollar_tlevel);
+						/* See comment in ENSURE_VALUE_WITHIN_MAX_REC_SIZE macro
+						 * definition for why the below macro call is necessary.
+						 */
+						ADD_TO_GVT_TP_LIST(gv_target, RESET_FIRST_TP_SRCH_STATUS_FALSE);
+						RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_GVINCRISOLATION, 2,
+							gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr);
+					}
+					if (NULL == cse->recompute_list_tail ||
+						0 != memcmp(gv_currkey->base, cse->recompute_list_tail->keybuf.split.base,
+							gv_currkey->top))
+>>>>>>> 451ab477 (GT.M V7.0-000)
 					{
 						tempkv = (dollar_tlevel ? (key_cum_value *)get_new_element(si->recompute_list, 1)
 									: &(TREF(non_tp_noiso_key_n_value)));
@@ -1638,10 +1753,10 @@ tn_restart:
 						 */
 						BLK_SEG(bs_ptr, buffaddr + SIZEOF(blk_hdr), prev_rec_offset - SIZEOF(blk_hdr));
 						BLK_ADDR(new_star_hdr, SIZEOF(rec_hdr), rec_hdr);
-						new_star_hdr->rsiz = BSTAR_REC_SIZE;
+						new_star_hdr->rsiz = bstar_rec_size(long_blk_id);
 						SET_CMPC(new_star_hdr, 0);
 						BLK_SEG(bs_ptr, (sm_uc_ptr_t)new_star_hdr, SIZEOF(rec_hdr));
-						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp - SIZEOF(block_id), SIZEOF(block_id));
+						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp - blk_id_sz, blk_id_sz);
 					}
 					new_blk_bs = bs1;
 					if (0 == BLK_FINI(bs_ptr, bs1))
@@ -1753,7 +1868,7 @@ tn_restart:
 									 */
 						assert(((sm_uc_ptr_t)rp + rec_size) <= (buffaddr + cur_blk_size));
 							/* or else we would have restarted above with "cdb_sc_mkblk" */
-						assert(SIZEOF(block_id) == value.len);
+						assert(blk_id_sz == value.len);
 						memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
 					}
 				}
@@ -1793,8 +1908,8 @@ tn_restart:
 					 * depending on the patterns of updates.
 					 */
 					assert(new_rec);
-					copy_extra_record = ((BSTAR_REC_SIZE != rec_size)
-									&& ((new_blk_size_l + BSTAR_REC_SIZE) <= blk_fill_size));
+					copy_extra_record = ((bstar_rec_size(long_blk_id) != rec_size)
+							&& ((new_blk_size_l + bstar_rec_size(long_blk_id)) <= blk_fill_size));
 				} else
 					copy_extra_record = ((0 == prev_rec_offset) && (NEWREC_DIR_LEFT == last_split_dir)
 								&& new_rec && (SIZEOF(blk_hdr) < cur_blk_size));
@@ -1886,17 +2001,17 @@ tn_restart:
 						/* Do "prev_split_to_right" processing for "copy_extra_record" case */
 						if (prev_split_to_right)
 						{	/* Do block# adjustment like done above (searchstr "if (split_to_right)") */
-							left_hand_offset += BSTAR_REC_SIZE;
+							left_hand_offset += bstar_rec_size(long_blk_id);
 							assert(((sm_uc_ptr_t)rp + rec_size) <= (buffaddr + cur_blk_size));
 								/* or else we would have restarted above with "cdb_sc_mkblk" */
-							assert(SIZEOF(block_id) == value.len);
+							assert(blk_id_sz == value.len);
 							memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
 						}
-						new_blk_size_l += BSTAR_REC_SIZE;
+						new_blk_size_l += bstar_rec_size(long_blk_id);
 					} else
-						new_blk_size_l = curr_rec_offset + BSTAR_REC_SIZE;
+						new_blk_size_l = curr_rec_offset + bstar_rec_size(long_blk_id);
 					BLK_ADDR(new_star_hdr, SIZEOF(rec_hdr), rec_hdr);
-					new_star_hdr->rsiz = BSTAR_REC_SIZE;
+					new_star_hdr->rsiz = bstar_rec_size(long_blk_id);
 					SET_CMPC(new_star_hdr, 0);
 					BLK_SEG(bs_ptr, (sm_uc_ptr_t)new_star_hdr, SIZEOF(rec_hdr));
 					if (!copy_extra_record)
@@ -1908,22 +2023,26 @@ tn_restart:
 							 * Adjust accordingly.
 							 */
 							ins_chain_index = left_hand_index;
-							ins_chain_offset = SIZEOF(blk_hdr) + rec_size + rec_cmpc - SIZEOF(block_id);
+							ins_chain_offset = SIZEOF(blk_hdr) + rec_size + rec_cmpc - blk_id_sz;
 							left_hand_index = left_hand_offset = 0;
-							assert(SIZEOF(block_id) == value.len);
+							assert(blk_id_sz == value.len);
 							BLK_ADDR(va, value.len, char);
 							assert(((sm_uc_ptr_t)rp + rec_size) <= (buffaddr + cur_blk_size));
 								/* or else we would have restarted above with "cdb_sc_mkblk" */
 							memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
 							BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
 						} else
+<<<<<<< HEAD
 						{
 							BLK_ADDR(null_block_id, SIZEOF(block_id), block_id);
 							*null_block_id = 0;
 							BLK_SEG(bs_ptr, (unsigned char *)null_block_id, SIZEOF(block_id));
 						}
+=======
+							BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid, blk_id_sz);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 					} else
-						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + rec_size - SIZEOF(block_id), SIZEOF(block_id));
+						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + rec_size - blk_id_sz, blk_id_sz);
 				}
 				new_blk_bs = bs1;
 				if (0 == BLK_FINI(bs_ptr, bs1))
@@ -2014,7 +2133,7 @@ tn_restart:
 					tp_get_cw(si->first_cw_set, curr_chain.cw_index, &cse);
 				else
 				{
-					if (NULL != (tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&blk_num)))
+					if (NULL != (tabent = lookup_hashtab_int8(si->blks_in_use, (ublock_id *)&blk_num)))
 						tp_srch_status = tabent->value;
 					else
 						tp_srch_status = NULL;
@@ -2036,7 +2155,7 @@ tn_restart:
 					cse_first_off = (int4)cse->first_off;
 					offset_sum = cse_first_off;
 					curr = buffaddr + offset_sum;
-					GET_BLK_IDP(&curr_chain, curr);
+					READ_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
 					assert(1 == curr_chain.flag);
 					/* Determine "last_possible_left_offset" and "extra_record_blkid_off" */
 					copy_extra_record = (!new_rec_goes_to_right && copy_extra_record);
@@ -2048,16 +2167,21 @@ tn_restart:
 						if (level_0)
 						{	/* Directory Tree leaf level block. Determine the offset within the
 							 * extra record where "block_id" is stored. It is guaranteed to be
-							 * the last 4-bytes of the record for all GVT index and DT index blocks
-							 * but not for DT leaf blocks where it is the first 4-bytes (after the key)
-							 * and a 4-byte collation header could optionally follow it.
+							 * the last 4/8-bytes of the record for all GVT index and DT index blocks
+							 * but not for DT leaf blocks where it is the first 4/8-bytes
+							 * (after the key) and a 4-byte collation header could optionally
+							 * follow it.
 							 */
 							extra_record_blkid_off = SIZEOF(rec_hdr) + temp_key->end + 1 - tmp_cmpc;
-							assert(((tmp_rsiz - extra_record_blkid_off) == SIZEOF(off_chain))
+							assert(((tmp_rsiz - extra_record_blkid_off) == off_chain_sz)
 								|| ((tmp_rsiz - extra_record_blkid_off)
-									== SIZEOF(off_chain) + COLL_SPEC_LEN));
+									== off_chain_sz + COLL_SPEC_LEN));
 						} else
+<<<<<<< HEAD
 							extra_record_blkid_off = tmp_rsiz - SIZEOF(off_chain);
+=======
+						extra_record_blkid_off = tmp_rsiz - off_chain_sz;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 						assert(extra_record_blkid_off);
 						last_possible_left_offset = curr_rec_offset + extra_record_blkid_off;
 					} else
@@ -2079,19 +2203,19 @@ tn_restart:
 									if ((KEY_DELIMITER == *cp1++) && (KEY_DELIMITER == *cp1))
 										break;
 								}
-								if (++cp1 > ((sm_uc_ptr_t)rp - SIZEOF(off_chain)))
+								if (++cp1 > ((sm_uc_ptr_t)rp - off_chain_sz))
 								{
 									assert(CDB_STAGNATE > t_tries);
 									status = cdb_sc_mkblk;
 									GOTO_RETRY;
 								}
-								assert(((cp1 + SIZEOF(off_chain)) == (sm_uc_ptr_t)rp)
-									|| ((cp1 + SIZEOF(off_chain) + COLL_SPEC_LEN)
+								assert(((cp1 + off_chain_sz) == (sm_uc_ptr_t)rp)
+									|| ((cp1 + off_chain_sz + COLL_SPEC_LEN)
 													== (sm_uc_ptr_t)rp));
 							}
 						}
 						last_possible_left_offset = level_0 ? INTCAST(cp1 - buffaddr)
-											: curr_rec_offset - SIZEOF(off_chain);
+											: curr_rec_offset - off_chain_sz;
 					}
 					if (offset_sum <= last_possible_left_offset)
 					{	/* the split falls within or after the chain; otherwise entire chain stays right */
@@ -2111,10 +2235,10 @@ tn_restart:
 							assert(0 == cse_new->next_off);
 						}
 						if (level_0)	/* if no *-key issue stop after, rather than at, a match */
-							last_possible_left_offset += SIZEOF(off_chain);
+							last_possible_left_offset += off_chain_sz;
 						if (offset_sum < last_possible_left_offset)
 						{	/* it's not an immediate hit */
-							for ( ; ; curr += curr_chain.next_off, GET_BLK_IDP(&curr_chain, curr))
+							for (;;)
 							{	/* follow chain upto split point */
 								assert(1 == curr_chain.flag);
 								if (0 == curr_chain.next_off)
@@ -2122,11 +2246,15 @@ tn_restart:
 								offset_sum += curr_chain.next_off;
 								if (offset_sum >= last_possible_left_offset)
 									break;
+
+								/* Increment curr_chain to the next element */
+								curr += curr_chain.next_off;
+								READ_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
 							}	/* end of search chain loop */
 						}
 						assert(curr >= (buffaddr + cse_first_off));
 						if (level_0)	/* restore match point to "normal" */
-							last_possible_left_offset -= SIZEOF(off_chain);
+							last_possible_left_offset -= off_chain_sz;
 						if ((offset_sum == last_possible_left_offset) && !level_0)
 						{	/* The last record in the left side of the pre-split block is where
 							 * the search stopped. If no extra record copy was done, then this
@@ -2150,7 +2278,7 @@ tn_restart:
 								if (!extra_record_blkid_off && (offset_sum != cse_first_off))
 								{	/* bring curr up to the match */
 									curr += curr_chain.next_off;
-									GET_BLK_IDP(&curr_chain, curr);
+									READ_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
 								}
 								curr_offset = curr - buffaddr;
 								undo_index = 0;
@@ -2161,11 +2289,11 @@ tn_restart:
 									 */
 									prev_chain = curr_chain;
 									assert(extra_record_blkid_off
-										|| (BSTAR_REC_SIZE
+										|| (bstar_rec_size(long_blk_id)
 											== (left_hand_offset - curr_offset)));
 									prev_chain.next_off = left_hand_offset - curr_offset;
 									assert((curr_offset + prev_chain.next_off)
-										<= (new_blk_size_l - SIZEOF(off_chain)));
+										<= (new_blk_size_l - off_chain_sz));
 									if (dollar_tlevel != cse->t_level)
 									{
 										assert(dollar_tlevel > cse->t_level);
@@ -2177,7 +2305,7 @@ tn_restart:
 										cse->undo_offset[0] = (block_offset)curr_offset;
 										undo_index = 1;
 									}
-									GET_BLK_IDP(curr, &prev_chain);
+									WRITE_OFF_CHAIN(long_blk_id, &prev_chain, &v6_chain, curr);
 								}
 								if (extra_record_blkid_off)
 								{
@@ -2185,7 +2313,8 @@ tn_restart:
 									{	/* bring curr up to the match */
 										curr += curr_chain.next_off;
 										curr_offset += curr_chain.next_off;
-										GET_BLK_IDP(&curr_chain, curr);
+										READ_OFF_CHAIN(long_blk_id, &curr_chain,
+												&v6_chain, curr);
 									}
 									if (dollar_tlevel != cse->t_level)
 									{
@@ -2199,8 +2328,8 @@ tn_restart:
 									}
 									prev_chain = curr_chain;
 									prev_chain.next_off = 0;
-									GET_BLK_IDP(curr, &prev_chain);
-									cse_new->next_off = BSTAR_REC_SIZE;
+									WRITE_OFF_CHAIN(long_blk_id, &prev_chain, &v6_chain, curr);
+									cse_new->next_off = bstar_rec_size(long_blk_id);
 								}
 								offset_sum += curr_chain.next_off;
 							} else
@@ -2222,9 +2351,14 @@ tn_restart:
 									prev_chain = curr_chain;
 									assert((offset_sum - prev_chain.next_off) /* check old */
 										== (curr - buffaddr)); /* method equivalent */
-									prev_chain.next_off = (unsigned int)(
+									assert(((prev_rec_offset + (unsigned int)(SIZEOF(rec_hdr))
+										 - (curr - buffaddr))) == (uint4)
+										((prev_rec_offset + (unsigned int)(SIZEOF(rec_hdr))
+										 - (curr - buffaddr))));
+									prev_chain.next_off = (uint4)(
 										(prev_rec_offset + (unsigned int)(SIZEOF(rec_hdr))
 										 - (curr - buffaddr)));
+<<<<<<< HEAD
 									/* See first occurrence of tag
 									 * BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW in this
 									 * C file for why the below assert is disabled.
@@ -2234,6 +2368,12 @@ tn_restart:
 									 *	? new_blk_size_l : blk_reserved_size)
 									 *	- SIZEOF(off_chain)));
 									 */
+=======
+									assert((curr - buffaddr + prev_chain.next_off)
+										<= ((new_blk_size_l < blk_reserved_size
+										? new_blk_size_l : blk_reserved_size)
+										- off_chain_sz));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 									if (dollar_tlevel != cse->t_level)
 									{
 										assert(dollar_tlevel > cse->t_level);
@@ -2246,10 +2386,10 @@ tn_restart:
 														     buffaddr);
 										undo_index = 1;
 									}
-									GET_BLK_IDP(curr, &prev_chain);
+									WRITE_OFF_CHAIN(long_blk_id, &prev_chain, &v6_chain, curr);
 									/* bring curr up to the match */
 									curr += curr_chain.next_off;
-									GET_BLK_IDP(&curr_chain, curr);
+									READ_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
 								}
 								offset_sum += curr_chain.next_off;
 								if (dollar_tlevel != cse->t_level)
@@ -2262,7 +2402,7 @@ tn_restart:
 														      buffaddr);
 								}
 								curr_chain.next_off = 0;
-								GET_BLK_IDP(curr, &curr_chain);
+								WRITE_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
 							}
 						} else
 						{	/* found the split and no *-key issue: just terminate before the split */
@@ -2290,6 +2430,7 @@ tn_restart:
 												- curr_offset);
 							} else
 								curr_chain.next_off = 0;
+<<<<<<< HEAD
 							/* See first occurrence of tag BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW
 							 * in this C file for why the below assert is disabled.
 							 *
@@ -2297,6 +2438,11 @@ tn_restart:
 							 *		<= ((new_blk_size_l < blk_reserved_size
 							 *		? new_blk_size_l : blk_reserved_size) - SIZEOF(off_chain)));
 							 */
+=======
+							assert((curr - buffaddr + curr_chain.next_off)
+									<= ((new_blk_size_l < blk_reserved_size
+									? new_blk_size_l : blk_reserved_size) - off_chain_sz));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 							if (dollar_tlevel != cse->t_level)
 							{
 								assert(dollar_tlevel > cse->t_level);
@@ -2305,8 +2451,9 @@ tn_restart:
 								cse->undo_next_off[0] = old_curr_chain_next_off;
 								cse->undo_offset[0] = (block_offset)(curr - buffaddr);
 							}
-							GET_BLK_IDP(curr, &curr_chain);
+							WRITE_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
 						}	/* end of *-key or not alternatives */
+<<<<<<< HEAD
 						/* See first occurrence of tag BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW
 						 * in this C file for why the below assert is disabled.
 						 *
@@ -2314,6 +2461,11 @@ tn_restart:
 						 *	((new_blk_size_l < blk_reserved_size ? new_blk_size_l : blk_reserved_size)
 						 *		- SIZEOF(off_chain)));
 						 */
+=======
+						assert((left_hand_offset + (int)cse_new->next_off) <=
+							((new_blk_size_l < blk_reserved_size ? new_blk_size_l : blk_reserved_size)
+								- off_chain_sz));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 					}	/* end of buffer and cse_new adjustments */
 					prev_first_off = cse_first_off;
 					if (ins_chain_offset)
@@ -2350,6 +2502,7 @@ tn_restart:
 								+ rec_cmpc + SIZEOF(blk_hdr));
 						assert(cse->first_off >= (SIZEOF(blk_hdr) + SIZEOF(rec_hdr)));
 					}
+<<<<<<< HEAD
 					/* See first occurrence of tag BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW
 					 * in this C file for why the below assert is disabled.
 					 *
@@ -2357,6 +2510,11 @@ tn_restart:
 					 * 	((new_blk_size_r < blk_reserved_size ? new_blk_size_r : blk_reserved_size)
 					 * 		- SIZEOF(off_chain)));
 					 */
+=======
+					assert((ins_chain_offset + (int)cse->next_off) <=
+						((new_blk_size_r < blk_reserved_size ? new_blk_size_r : blk_reserved_size)
+							- off_chain_sz));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 				}	/* end of of split processing */
 			}	/* end of tp only code */
 			if (!dollar_tlevel)
@@ -2555,8 +2713,15 @@ tn_restart:
 				/* else left-side (i.e. current) block was untouched and new contents went into right block
 				 * so no need to invoke "t_write".
 				 */
-				value.len = SIZEOF(block_id);
-				value.addr = (char *)&zeroes_blkid;
+				if (long_blk_id)
+				{
+					value.len = SIZEOF(block_id_64);
+					value.addr = (char *)&zeroes_blkid;
+				} else
+				{
+					value.len = SIZEOF(block_id_32);
+					value.addr = (char *)&v6_zeroes_blkid;
+				}
 				++bh;
 				ins_chain_index = next_blk_index;
 			} else
@@ -2568,8 +2733,8 @@ tn_restart:
 						status = cdb_sc_maxlvl;
 						GOTO_RETRY;
 					}
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MAXBTLEVEL, 4, gv_target->gvname.var_name.len,
-					 	gv_target->gvname.var_name.addr, REG_LEN_STR(gv_cur_region));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_MAXBTLEVEL, 4, gv_target->gvname.var_name.len,
+						gv_target->gvname.var_name.addr, REG_LEN_STR(gv_cur_region));
 				}
 				ins_chain_index = t_create(blk_num, (uchar_ptr_t)bs1, ins_chain_offset, ins_chain_index, bh_level);
 				make_it_null = FALSE;
@@ -2582,9 +2747,9 @@ tn_restart:
 					cse_new->blk_target = cse->blk_target;
 					cse_new->first_off = cse->first_off;
 					cse_new->next_off = cse->next_off;
-							/* to be able to incrementally rollback, we need another copy of new_buff,
-							 * pointer copying wouldn't suffice
-							 */
+					/* to be able to incrementally rollback, we need another copy of new_buff,
+					 * pointer copying wouldn't suffice
+					 */
 					cse_new->new_buff = (unsigned char *)get_new_free_element(si->new_buff_list);
 					memcpy(cse_new->new_buff, cse->new_buff, ((blk_hdr_ptr_t)cse->new_buff)->bsiz);
 					cse_new->old_block = NULL;
@@ -2610,18 +2775,30 @@ tn_restart:
 				target_key_size = temp_key->end + 1;
 				BLK_INIT(bs_ptr, bs1);
 				BLK_ADDR(curr_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
-				curr_rec_hdr->rsiz = target_key_size + SIZEOF(rec_hdr) + SIZEOF(block_id);
+				curr_rec_hdr->rsiz = target_key_size + SIZEOF(rec_hdr) + blk_id_sz;
 				SET_CMPC(curr_rec_hdr, 0);
 				BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, SIZEOF(rec_hdr));
 				BLK_ADDR(cp1, target_key_size, unsigned char);
 				memcpy(cp1, temp_key->base, target_key_size);
 				BLK_SEG(bs_ptr, cp1, target_key_size);
-				BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid, SIZEOF(block_id));
+				if (long_blk_id)
+				{
+					BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid, SIZEOF(block_id_64));
+				} else
+				{
+					BLK_SEG(bs_ptr, (unsigned char *)&v6_zeroes_blkid, SIZEOF(block_id_32));
+				}
 				BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
-				next_rec_hdr->rsiz = BSTAR_REC_SIZE;
+				next_rec_hdr->rsiz = bstar_rec_size(long_blk_id);
 				SET_CMPC(next_rec_hdr, 0);
 				BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
-				BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid, SIZEOF(block_id));
+				if (long_blk_id)
+				{
+					BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid, SIZEOF(block_id_64));
+				} else
+				{
+					BLK_SEG(bs_ptr, (unsigned char *)&v6_zeroes_blkid, SIZEOF(block_id_32));
+				}
 				if (0 == BLK_FINI(bs_ptr, bs1))
 				{
 					assert(CDB_STAGNATE > t_tries);
@@ -2630,7 +2807,7 @@ tn_restart:
 				}
 				assert(bs1[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
 				ins_off1 = (block_offset)(SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + target_key_size);
-				ins_off2 = (block_offset)(SIZEOF(blk_hdr) + (2 * SIZEOF(rec_hdr)) + SIZEOF(block_id) +
+				ins_off2 = (block_offset)(SIZEOF(blk_hdr) + (2 * SIZEOF(rec_hdr)) + blk_id_sz +
 							  target_key_size);
 				assert(ins_off1 < ins_off2);
 				/* Since a new root block is not created but two new children are created, this update to the
@@ -2663,7 +2840,7 @@ tn_restart:
 					curr_chain.cw_index = ins_chain_index;
 					curr_chain.next_off = 0;
 					curr = cse->new_buff + ins_off2;
-					GET_BLK_IDP(curr, &curr_chain);
+					WRITE_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
 					cse->done = TRUE;
 					gv_target->clue.end = 0;
 				}
@@ -3027,7 +3204,7 @@ retry:
 		 * Issue DBROLLEDBACK error that the application programmer can catch and do the necessary stuff.
 		 */
 		assert(gtm_trigger_depth == tstart_trigger_depth);
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DBROLLEDBACK);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DBROLLEDBACK);
 	}
 	/* Note: In case of cdb_sc_onln_rlbk1, the restart logic will take care of doing the root search */
 #	endif

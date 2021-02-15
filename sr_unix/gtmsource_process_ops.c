@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2020 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -192,10 +192,19 @@ int gtmsource_est_conn()
 				 STRERROR(errno));
 			repl_close(&gtmsource_sock_fd);
 		}
+<<<<<<< HEAD
 		/* Pause (very briefly as this is a hard spin loop) before trying the connection again then check if any
 		 * interrupting conditions occurred before retrying the connection.
 		 */
 		SLEEP_FOR_MSEC(hardtries_period);
+=======
+		if (MILLISECS_IN_SEC > hardtries_period)
+		{
+			SHORT_SLEEP(hardtries_period);
+		}
+		else
+			LONG_SLEEP_MSEC(hardtries_period);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		gtmsource_poll_actions(FALSE);
 		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 			return (SS_NORMAL);
@@ -265,9 +274,12 @@ int gtmsource_est_conn()
 				} else /* Decrease the frequency of showing the connection failure error messages */
 					throw_errors = FALSE;
 			}
+<<<<<<< HEAD
 			/* Pause before trying the connection again then check if any interrupting conditions occurred
 			 * before retrying the connection.
 			 */
+=======
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			LONG_SLEEP(soft_tries_period);
 			gtmsource_poll_actions(FALSE);
 			if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
@@ -297,7 +309,7 @@ int gtmsource_est_conn()
 	if (0 != (status = get_send_sock_buff_size(gtmsource_sock_fd, &send_buffsize)))
 	{
 		SNPRINTF(msg_str, SIZEOF(msg_str), "Error getting socket send buffsize : %s", STRERROR(status));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
 	}
 	if (send_buffsize < GTMSOURCE_TCP_SEND_BUFSIZE)
 	{
@@ -317,14 +329,14 @@ int gtmsource_est_conn()
 	if (0 != (status = get_send_sock_buff_size(gtmsource_sock_fd, &repl_max_send_buffsize))) /* may have changed */
 	{
 		SNPRINTF(msg_str, SIZEOF(msg_str), "Error getting socket send buffsize : %s", STRERROR(status));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
 	}
 	if (0 != (status = get_recv_sock_buff_size(gtmsource_sock_fd, &recv_buffsize)))
 	{
 		errmsg = STRERROR(status);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				LEN_AND_LIT("Error getting socket recv buffsize"),
-				ERR_TEXT, 2, LEN_AND_STR(errmsg));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+			LEN_AND_LIT("Error getting socket recv buffsize"),
+			ERR_TEXT, 2, LEN_AND_STR(errmsg));
 	}
 	if (recv_buffsize < GTMSOURCE_TCP_RECV_BUFSIZE)
 	{
@@ -342,7 +354,7 @@ int gtmsource_est_conn()
 	if (0 != (status = get_recv_sock_buff_size(gtmsource_sock_fd, &repl_max_recv_buffsize))) /* may have changed */
 	{
 		SNPRINTF(msg_str, SIZEOF(msg_str), "Error getting socket recv buffsize : %s", STRERROR(status));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
 	}
 	repl_log(gtmsource_log_fp, TRUE, TRUE, "Connected to secondary, using TCP send buffer size %d receive buffer size %d\n",
 			repl_max_send_buffsize, repl_max_recv_buffsize);
@@ -629,7 +641,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				remote_side->proto_ver = ((repl_start_msg_ptr_t)&msg)->proto_ver;
 			} else
 			{	/* Issue REPL2OLD error because receiver is dual-site */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPL2OLD, 4, LEN_AND_STR(UNKNOWN_INSTNAME),
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPL2OLD, 4, LEN_AND_STR(UNKNOWN_INSTNAME),
 					LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
 			}
 			assert(*start_flags & START_FLAG_HASINFO); /* V4.2+ versions have jnl ver in the start msg */
@@ -1111,14 +1123,14 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 			{
 				SNPRINTF(err_string, SIZEOF(err_string), "Error sending %s message. "
 					"Error in send : %s", msgtypestr, STRERROR(status));
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-						LEN_AND_STR(err_string));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+					LEN_AND_STR(err_string));
 			}
 		} else if (EREPL_SELECT == repl_errno)
 		{
 			SNPRINTF(err_string, SIZEOF(err_string), "Error sending %s message. "
 				"Error in select : %s", msgtypestr, STRERROR(status));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
 		}
 	}
 }
@@ -1199,16 +1211,16 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 					SNPRINTF(err_string, SIZEOF(err_string),
 							"Error receiving %s message from Receiver. Error in recv : %s",
 							msgtypestr, STRERROR(status));
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-							 LEN_AND_STR(err_string));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+						LEN_AND_STR(err_string));
 				}
 			} else if (EREPL_SELECT == repl_errno)
 			{
 				SNPRINTF(err_string, SIZEOF(err_string),
 						"Error receiving %s message from Receiver. Error in select : %s",
 						msgtypestr, STRERROR(status));
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-						 LEN_AND_STR(err_string));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+					LEN_AND_STR(err_string));
 			}
 		}
 		assert(SS_NORMAL == status);
@@ -1415,7 +1427,7 @@ boolean_t gtmsource_exchange_tls_info(void)
 	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmsource_sock_fd, repl_tls.id, flags)))
 	{
 		if (!PLAINTEXT_FALLBACK)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSCONVSOCK), 0,
 				ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
 	} else
@@ -1442,7 +1454,7 @@ boolean_t gtmsource_exchange_tls_info(void)
 		}
 		errp = (-1 == status) ? (char *)gtm_tls_get_error() : STRERROR(status);
 		if (!PLAINTEXT_FALLBACK)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSHANDSHAKE, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSHANDSHAKE), 0, ERR_TEXT, 2, LEN_AND_STR(errp));
 	}
 	repl_log(gtmsource_log_fp, TRUE, TRUE, "Plaintext fallback enabled. Closing and reconnecting without TLS/SSL.\n");
@@ -1490,7 +1502,7 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_
 		if (jnlpool->repl_inst_filehdr->is_supplementary)
 		{	/* Issue REPL2OLD error because this is a supplementary instance and remote side runs
 			 * on a GT.M version that does not understand the supplementary protocol */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPL2OLD, 4, LEN_AND_STR(old_instinfo_msg.instname),
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPL2OLD, 4, LEN_AND_STR(old_instinfo_msg.instname),
 				LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
 		}
 		/* Check if instance name in the REPL_OLD_INSTANCE_INFO message matches that in the source server command line */
@@ -1541,7 +1553,7 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_
 			{	/* Issue SECNOTSUPPLEMENTARY error because this is a supplementary primary and secondary
 				 * is not a supplementary instance.
 				 */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SECNOTSUPPLEMENTARY, 4,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_SECNOTSUPPLEMENTARY, 4,
 					LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname),
 					LEN_AND_STR(instinfo_msg.instname));
 			}
@@ -1701,12 +1713,12 @@ boolean_t	gtmsource_check_remote_strm_histinfo(seq_num seqno, boolean_t *rollbac
 		if (!lcl_strm_valid && remote_strm_valid)
 		{
 			assert(FALSE);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_STRMNUMMISMTCH1, 1, idx);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_STRMNUMMISMTCH1, 1, idx);
 		}
 		else if (lcl_strm_valid && !remote_strm_valid)
 		{
 			assert(FALSE);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_STRMNUMMISMTCH2, 1, idx);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_STRMNUMMISMTCH2, 1, idx);
 		}
 	}
 	/* Now that we know both sides have the exact set of known streams, verify history record for each stream matches */

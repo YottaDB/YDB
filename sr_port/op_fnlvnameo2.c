@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +23,7 @@ void op_fnlvnameo2(mval *src,mval *dst,mval *direct)
 	MV_FORCE_STR(src);
 	MV_FORCE_NUM(direct);
 	if (!MV_IS_TRUEINT(direct, &dummy_intval) || (direct->m[1] != (1 * MV_BIAS) && direct->m[1] != (-1 * MV_BIAS)))
-		rts_error(VARLSTCNT(1) ERR_ORDER2);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_ORDER2);
 	else
 	{	if (direct->m[1] == (1 * MV_BIAS))
 			op_fnlvname(src, FALSE, dst);

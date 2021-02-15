@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,7 @@ void op_lkinit(void)
 	if (lks_this_cmd)
 	{
 		lks_this_cmd = 0;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_BADLOCKNEST);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADLOCKNEST);
 	}
 	if (remlkreq)
 	{

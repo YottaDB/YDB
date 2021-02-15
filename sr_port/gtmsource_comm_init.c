@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -105,7 +105,7 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 			freeaddrinfo(ai_head); /* prevent mem-leak */
 			SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket create : %s",
 				 STRERROR(err_status));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
 		}
 		assert(NULL != ai_ptr);
 		assert(SIZEOF(gtmsource_local->secondary_inet_addr) >= ai_ptr->ai_addrlen);
@@ -121,7 +121,7 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 			err_status = ERRNO;
 			SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket disable linger : %s",
 					STRERROR(err_status));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
 		}
 	}
 	return(errcode);

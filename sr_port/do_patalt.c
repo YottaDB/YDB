@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -172,7 +172,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 	unsigned char	*strtmp, *strnext;
 
 	if (PTE_MAX_ENTRIES <= repcnt)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_PATALTER2LARGE, 1, PTE_MAX_ENTRIES);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_PATALTER2LARGE, 1, PTE_MAX_ENTRIES);
 	if (PTE_MAX_CURALT_DEPTH > curalt_depth)
 	{	/* try to find it in the current pattern evaluation cache (cur_pte_csh_array) itself */
 		tmp_do_patalt_calls = ++do_patalt_calls[curalt_depth];
@@ -340,4 +340,3 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 		pte_csh_insert((char *)firstalt, (char *)strptr, totchar, repcnt, match);
 	return match;
 }
-

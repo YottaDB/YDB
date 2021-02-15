@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2020 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -136,11 +136,11 @@ void	gtmsource_rootprimary_init(seq_num start_seqno)
 			if (0 == jnl_status)
 			{
 				if (EXIT_ERR == SWITCH_JNL_FILE(jpc))
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLEXTEND, 2, JNL_LEN_STR(cs_data));
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_JNLEXTEND, 2, JNL_LEN_STR(cs_data));
 			} else
 			{
 				if (SS_NORMAL != jpc->status)
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(cs_data),
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(cs_data),
 							DB_LEN_STR(gv_cur_region), jpc->status);
 				else
 					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data),

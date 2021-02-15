@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,8 +63,7 @@ error_def(ERR_DSEFAIL);
 void dse_maps(void)
 {
 	blk_segment		*bs1, *bs_ptr;
-	block_id		blk, bml_blk, bml_index, blk_index;
-	block_cnt		total_blks, bml_list_size;
+	block_id		blk, blk_index, bml_blk, bml_index, bml_list_size, total_blks;
 	boolean_t		was_crit;
 	cache_rec_ptr_t		dummy_cr;
 	char			util_buff[MAX_UTIL_LEN];
@@ -83,7 +82,7 @@ void dse_maps(void)
 		CLI_PRESENT == cli_present("MASTER") || CLI_PRESENT == cli_present("RESTORE_ALL"))
 	{
 		if (gv_cur_region->read_only)
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	}
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	assert(&FILE_INFO(gv_cur_region)->s_addrs == csa);
@@ -106,7 +105,8 @@ void dse_maps(void)
 		bml_list_size = ((total_blks + bplmap - 1) / bplmap) * bml_size;
 		bml_list = (unsigned char *)malloc(bml_list_size);
 		for (blk_index = 0, bml_index = 0;  blk_index < total_blks; blk_index += bplmap, bml_index++)
-			bml_newmap((blk_hdr_ptr_t)(bml_list + bml_index * bml_size), bml_size, csa->ti->curr_tn);
+			bml_newmap((blk_hdr_ptr_t)(bml_list + bml_index * bml_size),
+					bml_size, csa->ti->curr_tn, csd->desired_db_format);
 		if (!was_crit)
 		{
 			grab_crit_encr_cycle_sync(gv_cur_region, WS_59);
@@ -128,7 +128,7 @@ void dse_maps(void)
 			blk_ptr = bml_list + (bml_index * bml_size);
 			blkhist.blk_num = blk_index;
 			if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 			BLK_INIT(bs_ptr, bs1);
 			BLK_SEG(bs_ptr, blk_ptr + SIZEOF(blk_hdr), bml_size - SIZEOF(blk_hdr));
 			BLK_FINI(bs_ptr, bs1);
@@ -190,7 +190,7 @@ void dse_maps(void)
 		{
 			assert(dba_bg == csd->acc_meth);
 			if (!(bp = t_qread(bml_blk, &dummy_int, &dummy_cr)))
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 		}
 		if ((csa->ti->total_blks / bplmap) * bplmap == bml_blk)
 			total_blks = (csa->ti->total_blks - bml_blk);

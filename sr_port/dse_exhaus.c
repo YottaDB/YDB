@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,14 +57,14 @@ void dse_exhaus(int4 pp, int4 op)
 	last = 0;
 	patch_path_count++;
 	if (!(bp = t_qread(patch_path[pp - 1], &dummy_int, &dummy_cr)))
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER) /* Check blk version to see if using 32 or 64 bit block_id */
 	{
 #		ifdef BLK_NUM_64BIT
 		long_blk_id = TRUE;
 		blk_id_size = SIZEOF(block_id_64);
 #		else
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #		endif
 	} else
 	{
@@ -96,7 +96,7 @@ void dse_exhaus(int4 pp, int4 op)
 #				ifdef BLK_NUM_64BIT
 				GET_BLK_ID_64(patch_path[pp], (r_top - SIZEOF(block_id_64)));
 #				else
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #				endif
 			else
 				GET_BLK_ID_32(patch_path[pp], (r_top - SIZEOF(block_id_32)));
@@ -108,7 +108,7 @@ void dse_exhaus(int4 pp, int4 op)
 #				ifdef BLK_NUM_64BIT
 				GET_BLK_ID_64(patch_path[pp], ptr);
 #				else
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #				endif
 			else
 				GET_BLK_ID_32(patch_path[pp], ptr);
@@ -119,7 +119,7 @@ void dse_exhaus(int4 pp, int4 op)
 			if (!patch_exh_found)
 			{
 				if (patch_find_sibs)
-					util_out_print("!/!_Left sibling!_Current block!_Right sibling", TRUE);
+					util_out_print("!/!_Left sibling!_!_Current block!_!_Right sibling", TRUE);
 				patch_exh_found = TRUE;
 			}
 			if (patch_find_sibs)
@@ -139,7 +139,7 @@ void dse_exhaus(int4 pp, int4 op)
 #								ifdef BLK_NUM_64BIT
 								GET_BLK_ID_64(patch_right_sib, (nr_top - SIZEOF(block_id_64)));
 #								else
-								rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+								RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #								endif
 							else
 								GET_BLK_ID_32(patch_right_sib, (nr_top - SIZEOF(block_id_32)));
@@ -151,7 +151,7 @@ void dse_exhaus(int4 pp, int4 op)
 #								ifdef BLK_NUM_64BIT
 								GET_BLK_ID_64(patch_right_sib, ptr);
 #								else
-								rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+								RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #								endif
 							else
 								GET_BLK_ID_32(patch_right_sib, ptr);
@@ -160,12 +160,12 @@ void dse_exhaus(int4 pp, int4 op)
 				} else
 					patch_right_sib = 0;
 				if (patch_left_sib)
-					util_out_print("!_0x!XL", FALSE, patch_left_sib);
+					util_out_print("!_0x!16@XQ", FALSE, &patch_left_sib);
 				else
 					util_out_print("!_none!_", FALSE);
-				util_out_print("!_0x!XL!_", FALSE, patch_find_blk);
+				util_out_print("!_0x!16@XQ!_", FALSE, &patch_find_blk);
 				if (patch_right_sib)
-					util_out_print("0x!XL!/", TRUE, patch_right_sib);
+					util_out_print("0x!16@XQ!/", TRUE, &patch_right_sib);
 				else
 					util_out_print("none!/", TRUE);
 			} else  /* !patch_find_sibs */

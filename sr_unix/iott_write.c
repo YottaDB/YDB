@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -102,7 +102,7 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 		} else 	/* (0 != status) */
 		{
 			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, TRUE, FALSE);		/* TRUE, FALSE: WRITE, not socket */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TERMWRITE, 0, status);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_TERMWRITE, 0, status);
 		}
 	}
 	REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
@@ -133,7 +133,7 @@ void iott_write(mstr *v)
 		io_ptr = io_curr_device.out;
 		tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
 		if (tt_ptr->mupintr)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		ESTABLISH_GTMIO_CH(&io_curr_device, ch_set);
 		UTF8_ONLY(utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ochset) : FALSE;)
 		for (; ;)
@@ -175,7 +175,7 @@ void iott_write(mstr *v)
 							io_ptr->dollar.x = io_ptr->width;	/* force wrap */
 							continue;
 						} else
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TERMWRITE);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TERMWRITE);
 					}
 				}
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,7 @@ long dollarh(time_t intime, uint4 *days, time_t *seconds)
 #	endif
 	seconds_since_m_epoch = (intime - offset) + (1LL * DAYS * ONEDAY);
 	if (seconds_since_m_epoch < 0)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_WEIRDSYSTIME);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_WEIRDSYSTIME);
 	*days = (uint4)(seconds_since_m_epoch / ONEDAY);		/* after adjusting for UTC we can get the days */
 	return offset;
 }

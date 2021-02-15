@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -105,7 +105,7 @@ int gtm_conv(UConverter* from, UConverter* to, mstr *src, char* dstbuff, int* bu
 		if (U_BUFFER_OVERFLOW_ERROR == status)
 		{	/* translation requires more space than the maximum allowed GT.M string size */
 			if (NULL == dstbuff)
-				rts_error_csa(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 			else
 			{
 				/* Insufficient buffer passed. Return the required buffer length */

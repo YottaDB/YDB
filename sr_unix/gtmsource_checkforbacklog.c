@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,17 +47,16 @@
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
 
-
 seq_num gtmsource_checkforbacklog(void)
 {
-	seq_num			seq_num, jnl_seqno, read_jnl_seqno, backlog_count = 0;
+	seq_num			seq_num, heartbeat_jnl_seqno, jnl_seqno, read_jnl_seqno, backlog_count = 0;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
-	int4			index;
+	int4	 		index;
 	boolean_t		srv_alive;
 	uint4			gtmsource_pid;
 
 	jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
-	if (NULL != jnlpool->gtmsource_local)	/* Show backlog for a specific source server */
+	if (NULL != jnlpool->gtmsource_local)
 		gtmsourcelocal_ptr = jnlpool->gtmsource_local;
 	else
 		gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
@@ -69,14 +68,19 @@ seq_num gtmsource_checkforbacklog(void)
 			continue;
 		}
 		gtmsource_pid = gtmsourcelocal_ptr->gtmsource_pid;
+		/* 0 == gtmsource_pid evaluates to TRUE when a Source Server has been shut down */
 		if ((NULL == jnlpool->gtmsource_local) && (0 == gtmsource_pid))
 			continue;
 		read_jnl_seqno = gtmsourcelocal_ptr->read_jnl_seqno;
+		heartbeat_jnl_seqno = gtmsourcelocal_ptr->heartbeat_jnl_seqno;
 		/* jnl_seqno >= read_jnl_seqno is the most common case; see gtmsource_readpool() for when the rare case can occur */
 		seq_num = (jnl_seqno >= read_jnl_seqno) ? jnl_seqno - read_jnl_seqno : 0;
+		/* read_jnl_seqno is 1 for empty databases */
+		if ((seq_num == 0) && (read_jnl_seqno != 1))
+			seq_num = (read_jnl_seqno > heartbeat_jnl_seqno) ? 1 : 0;
 		backlog_count += seq_num;
 		if (NULL != jnlpool->gtmsource_local)
 			break;
 	}
-	return backlog_count;
+	return backlog_count; /* backlog_count is non-zero when any one Source Server has a backlog and -INST is not specified. */
 }

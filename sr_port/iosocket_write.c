@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -138,7 +138,7 @@ void iosocket_buffer_error(socket_struct *socketptr)
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr, errlen);
 		ISSUE_NOPRINCIO_IF_NEEDED(iod, TRUE, !socketptr->ioerror);	/* TRUE indicates WRITE */
 		if (socketptr->ioerror)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"),
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"),
 				ERR_TEXT, 2, errlen, errptr);
 		if (!prin_out_dev_failure)
 			socketptr->obuffer_errno = 0;
@@ -368,7 +368,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 		if (iod == io_std_device.out)
 			ionl_write(v);
 		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOSOCKETINDEV);
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
@@ -378,7 +378,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 		return;
 	}
 	if (dsocketptr->mupintr)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 	ENSURE_DATA_SOCKET(socketptr);
 #ifdef MSG_NOSIGNAL
@@ -428,7 +428,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 			new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset], &socketptr->zff, NULL,
 						NULL);
 			if (MAX_ZFF_LEN < new_len)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFF2MANY, 2, new_len, MAX_ZFF_LEN);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZFF2MANY, 2, new_len, MAX_ZFF_LEN);
 			socketptr->ozff.addr = (char *)malloc(MAX_ZFF_LEN);	/* should not need */
 			socketptr->ozff.len = new_len;
 			UTF8_ONLY(socketptr->ozff.char_len = 0); /* don't care */

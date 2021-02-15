@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
@@ -91,8 +91,13 @@ void gvzwr_fini(zshow_out *out, int pat)
 			}
 		} else	/* Old (naked) reference. Keep previous gv_target reference */
 		{
+<<<<<<< HEAD
 			if (IS_ILLEGAL_GVNAKED(gv_currkey))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GVNAKED);
+=======
+			if (gv_currkey->prev == 0)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GVNAKED);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			gv_currkey->end = gv_currkey->prev;
 			gv_currkey->base[gv_currkey->end] = 0;
 			gv_currkey->prev = 0;
@@ -134,12 +139,12 @@ void gvzwr_fini(zshow_out *out, int pat)
 				}
 			}
 			op_gvorder(&local);
-			if (local.str.len)
+			if (0 < local.str.len)
 			{
-				assert(local.str.len <= MAX_MIDENT_LEN + 1);
+				assert(local.str.len <= (MAX_MIDENT_LEN + 1));
 				local.str.addr++;
 				local.str.len--;
-				memcpy(&m[0], local.str.addr, local.str.len);
+				memcpy(&m[0], local.str.addr, (size_t)local.str.len);
 				local.str.addr = &m[0];
 			} else
 				break;

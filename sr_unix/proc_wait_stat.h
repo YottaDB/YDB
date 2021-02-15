@@ -17,111 +17,112 @@
 
 /* This code tracks the entrance/exit of the various crit states and keeps the statistic counters
  * (including those built up from components) updated.  During white box testing, it calls a function
- * to coordinate with test scripts.  States which are visible to the user have names and comments. */
+ * to coordinate with test scripts.  States which are visible to the user have names and comments.
+ * This file is based on information from tab_gvstats_rec.h. */
 typedef enum
 {
-	WS_1,
-	WS_2,	/* JOPA: wait flag for journal open in prog */
-	WS_3,
-	WS_4,
-	WS_5,
-	WS_6,
-	WS_7,
-	WS_8,
-	WS_9,
-	WS_10,
-	WS_11,
-	WS_12,	/* AFRA: wait flag for auto freeze release */
-	WS_13,
-	WS_14,
-	WS_15,	/* BREA: wait flag for blk rd encryp cycle sync */
-	WS_16,
-	WS_17,
-	WS_18,
-	WS_19,
-	WS_20,
-	WS_21,
-	WS_22,
-	WS_23,
-	WS_24,
-	WS_25,
-	WS_26,
-	WS_27,
-	WS_28,
-	WS_29,
-	WS_30,
-	WS_31,
-	WS_32,
-	WS_33,
-	WS_34,
-	WS_35,
-	WS_36,
-	WS_37,
-	WS_38,
-	WS_39,	/* MLBA: wait flag for mlk acquire blocked */
-	WS_40,
-	WS_41,
-	WS_42,
-	WS_43,
-	WS_44,
-	WS_45,
-	WS_46,
-	WS_47,	/* TRGA: wait flag for grab region for trans */
-	WS_48,
-	WS_49,
-	WS_50,
-	WS_51,
-	WS_52,
-	WS_53,
-	WS_54,
-	WS_55,
-	WS_56,
-	WS_57,
-	WS_58,
-	WS_59,
-	WS_60,
-	WS_61,
-	WS_62,
-	WS_63,
-	WS_64,
-	WS_65,
-	WS_66,
-	WS_67,
-	WS_68,
-	WS_69,
-	WS_70,
-	WS_71,
-	WS_72,
-	WS_73,
-	WS_74,
-	WS_75,
-	WS_76,
-	WS_77,
-	WS_78,
-	WS_79,
-	WS_80,
-	WS_81,
-	WS_82,
-	WS_83,
-	WS_84,
-	WS_85,
-	WS_86,
-	WS_87,
-	WS_88,
-	WS_89,
-	WS_90,
-	WS_91,
-	WS_92,
-	WS_93,
-	WS_94,
-	WS_95,
-	WS_96,
-	WS_97,
-	WS_98,
-	WS_99,
-	WS_100,
-	WS_101,
-	WS_102,
+	WS_1,	/* (In ZAD) [desired_db_format_set.c] */
+	WS_2,	/* JOPA:  (In JNL) [gdsfhead.h] */
+	WS_3,	/* (In JNL) [jnl.h] */
+	WS_4,	/* (In JNL) [jnl_write_attempt.c] */
+	WS_5,	/* (In MLK) [mlk_ops.h] */
+	WS_6,	/* (In ZAD) [mu_int_reg.c] */
+	WS_7,	/* (In ZAD) [mu_int_wait_rdonly.c] */
+	WS_8,	/* (In ZAD) [mu_reorg_upgrd_dwngrd.c] */
+	WS_9,	/* (In ZAD) [mu_reorg_upgrd_dwngrd.c] */
+	WS_10,	/* (In ZAD) [mupip_backup.c] */
+	WS_11,	/* (In DEXA) [wcs_recover.c] */
+	WS_12,	/* AFRA:  (In DEXA) [gdsfilext.c] */
+	WS_13,	/* (In GLB) [gvcst_expand_free_subtree.c] */
+	WS_14,	/* (In GLB) [t_qread.c] */
+	WS_15,	/* BREA:  (In GLB) [t_qread.c] */
+	WS_16,	/* (In GLB) [t_qread.c] */
+	WS_17,	/* (In GLB) [t_qread.c] */
+	WS_18,	/* (In GLB) [t_qread.c] */
+	WS_19,	/* (In GLB) [updproc.c] */
+	WS_20,	/* (In GLB) [verify_queue.c] */
+	WS_21,	/* (In GLB) [wcs_get_space.h] */
+	WS_22,	/* (In GLB) [wcs_verify.c] */
+	WS_23,	/* (In GLB) [aio_shim.c] */
+	WS_24,	/* (In GLB) [wcs_flu.c] */
+	WS_25,	/* (In GLB) [wcs_wtfini.c] */
+	WS_26,	/* (In GLB) [wcs_wtstart.c] */
+	WS_27,	/* (In GLB) [wcs_wtstart_fini.c] */
+	WS_28,	/* (In JNL) [jnl_phase2_cleanup.c] */
+	WS_29,	/* (In JNL) [jnl_write.c] */
+	WS_30,	/* (In JNL) [op_fnview.c] */
+	WS_31,	/* (In JNL) [op_fnview.c] */
+	WS_32,	/* (In JNL) [op_view.c] */
+	WS_33,	/* (In JNL) [repl_phase2_cleanup.c] */
+	WS_34,	/* (In JNL) [gtmsource_readfiles.c] */
+	WS_35,	/* (In JNL) [mutex.c] */
+	WS_36,	/* (In JNL) [mutex.c] */
+	WS_37,	/* (In JNL) [repl_instance.c] */
+	WS_38,	/* (In MLK) [mlk_ops.h] */
+	WS_39,	/* MLBA:  (In MLK) [op_lock2.c] */
+	WS_40,	/* (In PRC) [gds_rundown.c] */
+	WS_41,	/* (In PRC) [gds_rundown.c] */
+	WS_42,	/* [gds_rundown.c] */
+	WS_43,	/* (In TRX) [t_begin_crit.c] */
+	WS_44,	/* (In TRX) [t_commit_cleanup.c] */
+	WS_45,	/* (In TRX) [t_end.c] */
+	WS_46,	/* (In TRX) [t_end.c] */
+	WS_47,	/* TRGA:  (In TRX) [t_end.c] */
+	WS_48,	/* (In TRX) [t_retry.c] */
+	WS_49,	/* (In TRX) [t_retry.c] */
+	WS_50,	/* (In TRX) [t_retry.c] */
+	WS_51,	/* (In TRX) [tp_hist.c] */
+	WS_52,	/* (In TRX) [tp_restart.c] */
+	WS_53,	/* (In TRX) [tp_tend.c] */
+	WS_54,	/* (In TRX) [tp_tend.c] */
+	WS_55,	/* (In ZAD) [dse.h] */
+	WS_56,	/* (In ZAD) [dse_all.c] */
+	WS_57,	/* (In ZAD) [dse_all.c] */
+	WS_58,	/* (In ZAD) [dse_crit.c] */
+	WS_59,	/* (In ZAD) [dse_maps.c] */
+	WS_60,	/* (In ZAD) [dse_maps.c] */
+	WS_61,	/* (In ZAD) [dse_maps.c] */
+	WS_62,	/* (In ZAD) [dse_wcreinit.c] */
+	WS_63,	/* (In ZAD) [gdsfhead.h] */
+	WS_64,	/* (In ZAD) [mu_reorg_upgrd_dwngrd.c] */
+	WS_65,	/* (In ZAD) [mupip_backup.c] */
+	WS_66,	/* (In ZAD) [mupip_backup.c] */
+	WS_67,	/* (In ZAD) [mupip_extend.c] */
+	WS_68,	/* (In ZAD) [mupip_extend.c] */
+	WS_69,	/* (In ZAD) [mupip_reorg.c] */
+	WS_70,	/* (In ZAD) [mupip_reorg.c] */
+	WS_71,	/* (In ZAD) [mupip_set_journal.c] */
+	WS_72,	/* (In ZAD) [mur_close_files.c] */
+	WS_73,	/* (In ZAD) [mur_open_files.c] */
+	WS_74,	/* (In ZAD) [mur_output_record.c] */
+	WS_75,	/* (In ZAD) [mur_output_record.c] */
+	WS_76,	/* (In ZAD) [op_fnview.c] */
+	WS_77,	/* (In ZAD) [op_fnview.c] */
+	WS_78,	/* (In ZAD) [op_view.c] */
+	WS_79,	/* (In ZAD) [region_freeze.c] */
+	WS_80,	/* (In ZAD) [region_freeze.c] */
+	WS_81,	/* (In ZAD) [region_freeze.c] */
+	WS_82,	/* (In ZAD) [region_freeze.c] */
+	WS_83,	/* (In ZAD) [region_freeze.c] */
+	WS_84,	/* (In ZAD) [gtmsource_rootprimary_init.c] */
+	WS_85,	/* (In ZAD) [mu_extract.c] */
+	WS_86,	/* (In ZAD) [mu_extract.c] */
+	WS_87,	/* (In ZAD) [mu_rndwn_file.c] */
+	WS_88,	/* (In ZAD) [mu_truncate.c] */
+	WS_89,	/* (In ZAD) [mubfilcpy.c] */
+	WS_90,	/* (In ZAD) [mubinccpy.c] */
+	WS_91,	/* (In ZAD) [mupip_reorg_encrypt.c] */
+	WS_92,	/* (In ZAD) [mupip_reorg_encrypt.c] */
+	WS_93,	/* (In ZAD) [mupip_reorg_encrypt.c] */
+	WS_94,	/* (In ZAD) [mupip_reorg_encrypt.c] */
+	WS_95,	/* (In ZAD) [mupip_set_file.c] */
+	WS_96,	/* (In ZAD) [ss_initiate.c] */
+	WS_97,	/* (In ZAD) [ss_initiate.c] */
+	WS_98,	/* (In ZAD) [ss_initiate.c] */
+	WS_99,	/* (In ZAD) [ss_release.c] */
+	WS_100,	/* (In ZAD) [trigger_upgrade.c] */
+	WS_101,	/* (In ZAD) [trigger_upgrade.c] */
+	WS_102,	/* (In ZAD) [mupip_freeze.c] */
 	NOT_APPLICABLE
 } wait_state;
 
@@ -445,6 +446,9 @@ MBSTART {                                                                       
 				++ZAD;                                                                          \
 				break;                                                                          \
 			case WS_101 :  /* For aggregate ZAD */                                                  \
+				++ZAD;                                                                          \
+				break;                                                                          \
+			case WS_102 :  /* For aggregate ZAD */                                                  \
 				++ZAD;                                                                          \
 				break;                                                                          \
 			default : /* It is not an error for some instrumentation to be ignored */               \

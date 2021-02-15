@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -106,7 +106,7 @@ void bm_setmap(block_id bml, block_id blk, int4 busy)
 		cse = (cw_set_element *)(&cw_set[0]);
 		cse->new_buff = (unsigned char *)non_tp_jfb_ptr->buff;
 		memcpy(cse->new_buff, bmp, ((blk_hdr_ptr_t)bmp)->bsiz);
-		gvcst_map_build((uint4 *)cse->upd_addr, (uchar_ptr_t)cse->new_buff, cse, cs_addrs->ti->curr_tn);
+		gvcst_map_build((block_id *)cse->upd_addr, (uchar_ptr_t)cse->new_buff, cse, cs_addrs->ti->curr_tn);
 		cse->done = TRUE;
 	}
 	/* Call t_end till it succeeds or aborts (error will be reported) */

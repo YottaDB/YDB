@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -18,7 +18,7 @@
 #include "gtm_string.h"
 #include "urx.h"
 
-void urx_putlab (char *lab, int lablen, urx_rtnref *rtn, char *addr)
+void urx_putlab (char *lab, unsigned int lablen, urx_rtnref *rtn, char *addr)
 {
 	urx_labref	*lp0, *lp1, *tmplp;
 	boolean_t	found;
@@ -62,7 +62,7 @@ void urx_putlab (char *lab, int lablen, urx_rtnref *rtn, char *addr)
 	{	/* Add new label name to list */
 		tmplp = (urx_labref *)malloc(SIZEOF(urx_labref) + lablen);
 		tmplp->len = lablen;
-		memcpy(&tmplp->name[0], lab, lablen);
+		memcpy(&tmplp->name[0], lab, tmplp->len);
 		tmplp->addr = 0;
 		tmplp->next = lp1;
 		if (lp0 == (urx_labref *)rtn)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -64,8 +64,13 @@
 #include "fork_init.h"
 #include "gtmio.h"
 #include "util.h"
+<<<<<<< HEAD
 #include "io.h"
 #include "getjobnum.h"		/* for SET_PROCESS_ID */
+=======
+#include "mu_outofband_setup.h"
+#include "mupip_exit.h"
+>>>>>>> 451ab477 (GT.M V7.0-000)
 #ifdef GTM_TLS
 #include "gtm_repl.h"
 #endif
@@ -104,12 +109,19 @@ GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
 GBLREF	uint4			mutex_per_process_init_pid;
+<<<<<<< HEAD
 GBLREF	io_pair			io_std_device;
+=======
+GBLREF bool                     mu_ctrlc_occurred;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 
 error_def(ERR_JNLPOOLSETUP);
 error_def(ERR_MUPCLIERR);
+error_def(ERR_REPLNORESP);
 error_def(ERR_NOTALLDBOPN);
 error_def(ERR_NULLCOLLDIFF);
+error_def(ERR_REPL0BACKLOG);
+error_def(ERR_REPLBACKLOG);
 error_def(ERR_REPLCOMM);
 error_def(ERR_REPLERR);
 error_def(ERR_REPLINFO);
@@ -117,6 +129,9 @@ error_def(ERR_REPLINSTFREEZECOMMENT);
 error_def(ERR_REPLINSTFROZEN);
 error_def(ERR_REPLOFFJNLON);
 error_def(ERR_TEXT);
+error_def(ERR_SHUT2QUICK);
+error_def(ERR_CTRLC);
+error_def(ERR_MUNOFINISH);
 
 int gtmsource()
 {
@@ -125,55 +140,152 @@ int gtmsource()
 	gd_region		*reg, *region_top;
 	sgmnt_addrs		*csa, *repl_csa;
 	boolean_t		all_files_open, isalive, ftok_counter_halted;
+<<<<<<< HEAD
 	pid_t			pid;
 	seq_num			read_jnl_seqno, jnl_seqno;
+=======
+	pid_t			pid, ppid, procgp;
+	seq_num			chkbklogresult, read_jnl_seqno, jnl_seqno;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	unix_db_info		*udi;
 	gtmsource_local_ptr_t	gtmsource_local;
-	boolean_t		this_side_std_null_coll;
+	boolean_t		hrtbt_recvd = FALSE, iszerobacklog = FALSE, this_side_std_null_coll, wasshut2quick = FALSE;
 	int			null_fd, rc;
-	uint4			shutdowntime = 0;
+	uint4			gtmsource_pid;
+	int			shutdowntime = 0;
+	int4			index;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	call_on_signal = gtmsource_sigstop;
 	ESTABLISH_RET(gtmsource_ch, SS_NORMAL);
 	if (-1 == gtmsource_get_opt())
+<<<<<<< HEAD
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
 	gvinit();
 	assert(NULL != gd_header);
+=======
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	if (gtmsource_options.shut_down)
 	{
+		mu_outofband_setup();
+		shutdowntime = gtmsource_options.shutdown_time;
 		if (gtmsource_options.zerobacklog)
 		{
+<<<<<<< HEAD
 			gtmsource_options.shut_down = FALSE; /* for getbacklog need init but can't hold ftok for time */
 			jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator, gd_header);
 			gtmsource_options.shut_down = TRUE; /* restore actual value after the jnlpool_init */
 			if (0 < gtmsource_options.shutdown_time)
+=======
+			if (0 < shutdowntime)
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			{
-				for (shutdowntime = gtmsource_options.shutdown_time; shutdowntime; shutdowntime--)
+				repl_log(stdout, TRUE, TRUE, "Initiating ZEROBACKLOG shutdown operation. "
+						"Waiting for up to %d second(s) for backlog to clear\n", shutdowntime);
+				jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator, NULL);
+				if (NULL != jnlpool->gtmsource_local)
+					gtmsource_local = jnlpool->gtmsource_local; /* if -INST is specified */
+				else
+					gtmsource_local = &jnlpool->gtmsource_local_array[0];/* if -INST is not specified */
+				/* Loop across all Source Server(s) or the selected Source Server and set hrtbt_recvd to FALSE */
+				for (index = 0; index < NUM_GTMSRC_LCL; index++, gtmsource_local++)
 				{
-					if (0 == gtmsource_checkforbacklog())
+					if ('\0' == gtmsource_local->secondary_instname[0])
 					{
-						repl_log(stdout, TRUE, TRUE, "Shutting down with zero backlog\n");
+						assert(NULL == jnlpool->gtmsource_local);
+						continue;
+					}
+					gtmsource_pid = gtmsource_local->gtmsource_pid;
+					/* gtmsource_pid is 0 for Source Servers that were shut down */
+					if ((NULL == jnlpool->gtmsource_local) && (0 == gtmsource_pid))
+						continue;
+					/* Set hrtbt_recvd to FALSE. If it turns TRUE later, we have a heartbeat confirmation */
+					gtmsource_local->hrtbt_recvd = FALSE;
+					if (NULL != jnlpool->gtmsource_local)
+						break;
+				}
+				chkbklogresult = 1;
+				for (; shutdowntime; shutdowntime--)
+				{
+					LONG_SLEEP(1);
+					if (mu_ctrlc_occurred)
+					{
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
+						mupip_exit(ERR_MUNOFINISH);
+					}
+					chkbklogresult = gtmsource_checkforbacklog();
+					if (0 == chkbklogresult)
+					{
+						/* There is no backlog. Stop waiting and proceed with the shut down */
+						iszerobacklog = TRUE;
 						break;
 					}
-					LONG_SLEEP(1);
 				}
-				if (0 == shutdowntime)
+				/* Check and report those Source Servers where there was no heartbeat detected */
+				if (!iszerobacklog)
 				{
-					repl_log(stdout, TRUE, TRUE, "Shutting down with a backlog due to timeout\n");
+					if (NULL != jnlpool->gtmsource_local)
+						gtmsource_local = jnlpool->gtmsource_local;
+					else
+						gtmsource_local = &jnlpool->gtmsource_local_array[0];
+					for (index = 0; index < NUM_GTMSRC_LCL; index++, gtmsource_local++)
+					{
+						if ('\0' == gtmsource_local->secondary_instname[0])
+						{
+							assert(NULL == jnlpool->gtmsource_local);
+							continue;
+						}
+						gtmsource_pid = gtmsource_local->gtmsource_pid;
+						if ((NULL == jnlpool->gtmsource_local) && (0 == gtmsource_pid))
+							continue;
+						if (!gtmsource_local->hrtbt_recvd)
+						{
+							sgtm_putmsg(print_msg, OUT_BUFF_SIZE - 1, VARLSTCNT(6) ERR_REPLNORESP,
+									4, LEN_AND_STR(gtmsource_local->secondary_instname),
+									gtmsource_options.shutdown_time);
+							repl_log(stdout, TRUE, TRUE, print_msg);
+							if (gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD] >
+									gtmsource_options.shutdown_time)
+							{
+								sgtm_putmsg(print_msg, OUT_BUFF_SIZE - 1,
+										VARLSTCNT(6) ERR_SHUT2QUICK, 4,
+										gtmsource_options.shutdown_time,
+										gtmsource_local->
+										connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD],
+										LEN_AND_STR(gtmsource_local->secondary_instname));
+								repl_log(stdout, TRUE, TRUE, print_msg);
+							}
+						}
+						/* If there is only one instance to process,
+						   break for loop in the first iteration */
+						if (NULL != jnlpool->gtmsource_local)
+							break;
+					}
+
+					sgtm_putmsg(print_msg, OUT_BUFF_SIZE - 1, VARLSTCNT(1) ERR_REPLBACKLOG);
+					repl_log(stdout, TRUE, TRUE, print_msg);
+				}
+				else
+				{
+					sgtm_putmsg(print_msg, OUT_BUFF_SIZE - 1, VARLSTCNT(1) ERR_REPL0BACKLOG);
+					repl_log(stdout, TRUE, TRUE, print_msg);
 				}
 			}
-			jnlpool_detach(); /* reattach below so as to hold the semaphores */
-			if (0 != (save_errno = rel_sem(SOURCE, JNL_POOL_ACCESS_SEM)))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
-					ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("Error from rel_sem in Source Server shutdown attempt"), save_errno);
 		} else if (0 < gtmsource_options.shutdown_time)
 		{
 			repl_log(stdout, TRUE, TRUE, "Waiting for %d second(s) before forcing shutdown\n",
 					gtmsource_options.shutdown_time);
-			LONG_SLEEP(gtmsource_options.shutdown_time);
+			for (; shutdowntime; shutdowntime--)
+				{
+					LONG_SLEEP(1);
+					if (mu_ctrlc_occurred)
+					{
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
+						mupip_exit(ERR_MUNOFINISH);
+					}
+				}
 		} else
 			repl_log(stdout, TRUE, TRUE, "Forcing immediate shutdown\n");
 	} else if (gtmsource_options.start)
@@ -198,11 +310,21 @@ int gtmsource()
 			gtmsource_exit(ABNORMAL_SHUTDOWN);
 		}
 	}
+<<<<<<< HEAD
 	assert((NULL == jnlpool) || !jnlpool->pool_init);
 	jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator, gd_header);
 	/* is_jnlpool_creator == TRUE ==> this process created the journal pool
 	 * is_jnlpool_creator == FALSE ==> journal pool already existed and this process simply attached to it.
 	 */
+=======
+	if (!holds_sem[SOURCE][JNL_POOL_ACCESS_SEM])
+	{
+		jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator, NULL);
+		/* is_jnlpool_creator == TRUE ==> this process created the journal pool
+		 * is_jnlpool_creator == FALSE ==> journal pool already existed and this process simply attached to it.	 */
+	}
+
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	assert(jnlpool && jnlpool->pool_init);
 	if (gtmsource_options.shut_down)
 		gtmsource_exit(gtmsource_shutdown(FALSE, NORMAL_SHUTDOWN) - NORMAL_SHUTDOWN);
@@ -243,7 +365,7 @@ int gtmsource()
 	if (0 > pid)
 	{
 		save_errno = errno;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
 			ERR_TEXT, 2, RTS_ERROR_LITERAL("Could not fork source server"), save_errno);
 	} else if (0 < pid)
 	{	/* Parent. Wait until child sets "child_server_running" to FALSE. That is an indication that the child
@@ -262,7 +384,7 @@ int gtmsource()
 		if (isalive)
 		{	/* Child process is alive and started with no issues */
 			if (0 != (save_errno = rel_sem(SOURCE, JNL_POOL_ACCESS_SEM)))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in rel_sem"), save_errno);
 			/* If the child source server process got a ftok counter overflow, it would have recorded that in
 			 * jnlpool->jnlpool_ctl->ftok_counter_halted. Decrement the ftok counter only if neither we nor the
@@ -332,6 +454,26 @@ int gtmsource()
 	if (-1 == setsid())
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Source server error in setsid"), errno);
+<<<<<<< HEAD
+=======
+	/* Point stdin to /dev/null */
+	OPENFILE("/dev/null", O_RDONLY, null_fd);
+	if (0 > null_fd)
+		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
+	assert(null_fd > 2);
+	/* Detached from the initiating process, now detach from the starting IO */
+	io_rundown(NORMAL_RUNDOWN);
+	FSTAT_FILE(gtmsource_log_fd, &stat_buf, log_init_status);
+	assertpro(!log_init_status);	/* io_rundown should not affect the log file */
+	DUP2(null_fd, 0, rc);
+	if (0 > rc)
+		RTS_ERROR_CSA_ABT(NULL, ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
+	/* Re-init IO now that we have opened the log file and set stdin to /dev/null */
+	io_init(IS_MUPIP_IMAGE);
+	CLOSEFILE(null_fd, rc);
+	if (0 > rc)
+		RTS_ERROR_CSA_ABT(NULL, ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 #	endif /* REPL_DEBUG_NOBACKGROUND */
 	if (ZLIB_CMPLVL_NONE != ydb_zlib_cmp_level)
 		gtm_zlib_init();	/* Open zlib shared library for compression/decompression */
@@ -401,19 +543,19 @@ int gtmsource()
 	 */
 	assert(jnlpool && jnlpool->pool_init);
 	if (!ftok_sem_incrcnt(jnlpool->jnlpool_dummy_reg, FILE_TYPE_REPLINST, &ftok_counter_halted))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	/* Increment the source server count semaphore */
 	status = incr_sem(SOURCE, SRC_SERV_COUNT_SEM);
 	if (0 != status)
 	{
 		save_errno = errno;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Counter semaphore increment failure in child source server"), save_errno);
 	}
 #	else
 	if (0 != (save_errno = rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM)))
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error in rel_sem_immediate"), save_errno);
 	}
 #	endif /* REPL_DEBUG_NOBACKGROUND */
@@ -512,8 +654,8 @@ int gtmsource()
 		}
 		rel_lock(jnlpool->jnlpool_dummy_reg);
 		if (SS_NORMAL != (status = gtmsource_alloc_tcombuff()))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				  RTS_ERROR_LITERAL("Error allocating initial tcom buffer space. Malloc error"), status);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				RTS_ERROR_LITERAL("Error allocating initial tcom buffer space. Malloc error"), status);
 		gtmsource_filter = NO_FILTER;
 		if ('\0' != gtmsource_local->filter_cmd[0])
 		{

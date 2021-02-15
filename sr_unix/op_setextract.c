@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
@@ -103,7 +103,7 @@ void op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 	/* Calculate total string len */
 	dstlen = (size_t)pfxlen + padlen + (size_t)expr->str.len + (size_t)sfxlen;
 	if (MAX_STRLEN < dstlen)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 	ENSURE_STP_FREE_SPACE((int)dstlen);
 	srcbase = (unsigned char *)src->str.addr;
 	straddr = stringpool.free;

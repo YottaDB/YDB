@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -119,8 +119,14 @@ void	gvcmz_neterr(gparam_list *err_plist)
 			err_plist->n = count;
 			callg_signal(err_plist);
 		} else
+<<<<<<< HEAD
 			rts_error_csa(NULL, VARLSTCNT(1) ERR_LCKSCANCELLED);
 	} else  if (NULL != err_plist)
 		callg_signal(err_plist);
+=======
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LCKSCANCELLED);
+	} else  if (NULL != err)
+		callg_signal(err);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -64,9 +64,22 @@ LITREF	char		*gtm_dbversion_table[];
 
 #define	OUT_LINE	(256 + 1)
 
+#define GET_VALUE_INTO_X					\
+	base = 10;						\
+	if (('0' == buf[0]) && ('X' == buf[1]))			\
+	{							\
+		buf_len -= 2;					\
+		memmove(buf, buf+2, buf_len);			\
+		buf[buf_len] = 0;				\
+		base = 16;					\
+	}							\
+	x = STRTOUL(buf, NULL, base);				\
+	if ((0 == x) && ('0' != buf[0]))			\
+		x = -2;	/* Indicates Error (Invalid value) */
+
 void dse_chng_fhead(void)
 {
-	block_cnt	blkcnt;
+	block_id	blkcnt;
 #	ifndef BLK_NUM_64BIT
 	block_id_64	blkcnt2;
 #	endif
@@ -76,7 +89,7 @@ void dse_chng_fhead(void)
 	const char	*freeze_msg[] = { "UNFROZEN", "FROZEN" };
 	gtm_uint64_t	value, old_value;
 	int		gethostname_res, gtmcrypt_errno;
-	int4		x, index_x, save_x, fname_len, nocrit_present, location_present, value_present, size_present, size;
+	int4		base, x, index_x, save_x, fname_len, nocrit_present, location_present, value_present, size_present, size;
 	seq_num		seq_no;
 	sm_uc_ptr_t	chng_ptr;
 	trans_num	tn, prev_tn, max_tn_old, max_tn_warn_old, curr_tn_old, max_tn_new, max_tn_warn_new, curr_tn_new;
@@ -86,7 +99,7 @@ void dse_chng_fhead(void)
 
 	SETUP_THREADGBL_ACCESS;
 	if (gv_cur_region->read_only)
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	memset(temp_str, 0, OUT_LINE);
 	memset(temp_str1, 0, OUT_LINE);
 	memset(buf, 0, MAX_LINE);
@@ -186,7 +199,7 @@ void dse_chng_fhead(void)
 			(SIZEOF(gtm_int64_t) == size)))
 		{
 			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SIZENOTVALID8);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_SIZENOTVALID8);
 		}
 		if ((0 > (int4)size) || ((uint4)SGMNT_HDR_LEN < (uint4)location)
 				|| ((uint4)SGMNT_HDR_LEN < ((uint4)location + (uint4)size)))
@@ -586,15 +599,8 @@ void dse_chng_fhead(void)
 				cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
 			else
 			{
-				if (('0' == buf[0]) && ('\0' == buf[1]))
-					x = 0;
-				else
-				{
-					x = ATOI(buf);
-					if (0 == x)
-						x = -2;
-				}
-				if (x < -1)
+				GET_VALUE_INTO_X;
+				if (-1 > x)
 					util_out_print("Invalid value for online_nbb qualifier", TRUE);
 				else
 					cs_addrs->nl->nbb = x;
@@ -611,15 +617,8 @@ void dse_chng_fhead(void)
 				cs_data->abandoned_kills = 0;
 			else
 			{
-				if (('0' == buf[0]) && ('\0' == buf[1]))
-					x = 0;
-				else
-				{
-					x = ATOI(buf);
-					if (0 == x)
-						x = -1;
-				}
-				if (0 > x)
+				GET_VALUE_INTO_X;
+				if (-1 > x)
 					util_out_print("Invalid value for abandoned_kills qualifier", TRUE);
 				else
 					cs_data->abandoned_kills = x;
@@ -636,15 +635,8 @@ void dse_chng_fhead(void)
 				cs_data->kill_in_prog = 0;
 			else
 			{
-				if (('0' == buf[0]) && ('\0' == buf[1]))
-					x = 0;
-				else
-				{
-					x = ATOI(buf);
-					if (0 == x)
-						x = -1;
-				}
-				if (0 > x)
+				GET_VALUE_INTO_X;
+				if (-1 > x)
 					util_out_print("Invalid value for kill_in_prog qualifier", TRUE);
 				else
 					cs_data->kill_in_prog = x;

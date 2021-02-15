@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -105,13 +105,13 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 		implicit_trollback = FALSE;
 	}
 	if (!dollar_tlevel)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TLVLZERO);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TLVLZERO);
 	if (0 > rb_levels)
 	{
 		if (dollar_tlevel < -rb_levels)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TROLLBK2DEEP, 2, -rb_levels, dollar_tlevel);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TROLLBK2DEEP, 2, -rb_levels, dollar_tlevel);
 	} else if (dollar_tlevel <= rb_levels)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVROLLBKLVL, 2, rb_levels, dollar_tlevel);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_INVROLLBKLVL, 2, rb_levels, dollar_tlevel);
 	newlevel = (0 > rb_levels) ? dollar_tlevel + rb_levels : rb_levels;
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	save_cur_region = gv_cur_region;

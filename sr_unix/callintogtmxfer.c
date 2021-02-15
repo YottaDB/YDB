@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,6 +75,7 @@ void init_callin_functable(void)
 	envnamestr[1] = (char *)(gtmenvname[YDBENVINDX_CALLIN_START] + 1);	/* + 1 to skip the $ */
 	for (i = 0; i < 2; i++)
 	{
+<<<<<<< HEAD
 		len = strlen(envnamestr[i]);
 		ptr = env_top;
 		memcpy(ptr, envnamestr[i], len);
@@ -88,5 +94,9 @@ void init_callin_functable(void)
 		env_top = ptr;	/* Cannot use same "env_top" for next iteration since PUTENV does not take a copy of pointer
 				 * like "setenv" does.
 				 */
+=======
+		save_errno = errno;
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("putenv"), CALLFROM, save_errno);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2018 Fidelity National Information	*
+ * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -269,7 +269,9 @@ typedef struct v15_sgmnt_data_struct
 #undef TAB_DB_CSH_ACCT_REC
 	unsigned char	reorg_restart_key[256];         /* 1st key of a leaf block where reorg was done last time */
 	uint4		alignsize;		/* alignment size for JRT_ALIGN */
-	block_id	reorg_restart_block;
+	block_id_32	reorg_restart_block;	/* This field was of type block_id, but was changed to block_id_32 when
+						 * the typedef changed
+						 */
 	/******* following three members (filler_{jnl_file,dbfid}, filler_ino_t) together occupy 64 bytes on all platforms *******/
 	/* this area which was previously used for the field "jnl_file" is now moved to node_local */
 	union

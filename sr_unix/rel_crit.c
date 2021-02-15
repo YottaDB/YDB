@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -70,11 +70,11 @@ void	rel_crit(gd_region *reg)
 			csa->now_crit = FALSE;
 			ENABLE_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 			if (status == cdb_sc_critreset)
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
 			else
 			{
 				assert(status == cdb_sc_dbccerr);
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
 			}
 			return;
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -31,7 +31,7 @@
 #include "interlock.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"
+#include "hashtab_int8.h"
 #include "tp.h"
 #include "gdsbgtr.h"
 #include "sleep_cnt.h"
@@ -143,7 +143,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	enum db_ver		ondsk_blkver;
 	int4			dummy_errno, gtmcrypt_errno;
 	boolean_t		already_built, is_mm, reset_first_tp_srch_status, set_wc_blocked, sleep_invoked;
-	ht_ent_int4		*tabent;
+	ht_ent_int8		*tabent;
 	srch_blk_status		*blkhist;
 	trans_num		dirty, blkhdrtn;
 	sm_uc_ptr_t		buffaddr;
@@ -185,7 +185,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		assert(sgm_info_ptr);
 		if (0 != sgm_info_ptr->cw_set_depth)
 		{
-			chain1 = *(off_chain *)&blk;
+			PUT_BLK_ID(&chain1, blk);
 			if (1 == chain1.flag)
 			{
 				assert(sgm_info_ptr->cw_set_depth);
@@ -200,7 +200,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				}
 			} else
 			{
-				if (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use, (uint4 *)&blk)))
+				if (NULL != (tabent = lookup_hashtab_int8(sgm_info_ptr->blks_in_use, (ublock_id *)&blk)))
 					first_tp_srch_status = tabent->value;
 				else
 					first_tp_srch_status = NULL;
@@ -281,7 +281,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			}
 		} else
 		{
-			if (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use, (uint4 *)&blk)))
+			if (NULL != (tabent = lookup_hashtab_int8(sgm_info_ptr->blks_in_use, (ublock_id *)&blk)))
 				first_tp_srch_status = tabent->value;
 			else
 				first_tp_srch_status = NULL;
@@ -311,15 +311,26 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				 * as part of the final retry we maintain a hash-table "cw_stagnate" that holds the blocks that
 				 * have been read as part of the current mini-action until now.
 				 */
-				assert(CDB_STAGNATE > t_tries || (NULL == lookup_hashtab_int4(&cw_stagnate, (uint4 *)&blk)));
+				assert(CDB_STAGNATE > t_tries || (NULL == lookup_hashtab_int8(&cw_stagnate, (ublock_id *)&blk)));
 				reset_first_tp_srch_status = TRUE;
 			}
 		}
 	}
-	if ((uint4)blk >= (uint4)csa->ti->total_blks)
+	if ((ublock_id)blk >= (ublock_id)(csa->ti->total_blks))
 	{	/* Requested block out of range; could occur because of a concurrency conflict. mm_read and dsk_read assume blk is
 		 * never negative or greater than the maximum possible file size. If a concurrent REORG truncates the file, t_qread
 		 * can proceed despite blk being greater than total_blks. But dsk_read handles this fine; see comments below.
+		 *
+		 * There are two conditions that signify a block is out of range.
+		 *	1. blk >= total_blks - we are trying to access a blk out of the range of the current DB
+		 *	2. ((off_chain)blk).flag == 1 - we are trying to use a place holder block_id which should have been
+		 *		handled by the transaction processing above. this can be checked without casting the blk variable
+		 *		to a off_chain type by seeing if the value is negative, since the flag corresponds to the
+		 *		most significant bit which denotes a negative value in a signed type.
+		 *
+		 * These two conditions can be checked concurrently by casting both blk and total_blk to unsigned types.  This
+		 * works because a negative signed value when cast to an unsigned value will always be greater then largest
+		 * positive value you can represent in a signed value of the same length.
 		 */
 		assert((&FILE_INFO(gv_cur_region)->s_addrs == csa) && (csd == cs_data));
 		assert(!csa->now_crit);
@@ -514,8 +525,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						if (was_crit)
 						{
 							assert(FALSE);
-							rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) status, 3, blk,
-									DB_LEN_STR(gv_cur_region));
+							RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_DYNUPGRDFAIL, 3, &blk,
+								DB_LEN_STR(gv_cur_region));
 						} else
 						{
 							rdfail_detail = cdb_sc_lostcr;
@@ -547,15 +558,15 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						 * distinguishes the two possibilities.
 						 */
 						assertpro((&FILE_INFO(gv_cur_region)->s_addrs == csa) && (csd == cs_data));
-						rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region),
-								status);
+						RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region),
+							status);
 					}
 				}
 				disk_blk_read = TRUE;
 				assert(0 <= cr->read_in_progress);
 				assert(0 == cr->dirty);
 				/* Only set in cache if read was success */
-				cr->ondsk_blkver = (lcl_blk_free ? GDSVCURR : ondsk_blkver);
+				cr->ondsk_blkver = (lcl_blk_free ? csd->desired_db_format : ondsk_blkver);
 				cr->r_epid = 0;
 				RELEASE_BUFF_READ_LOCK(cr);
 				TREF(block_now_locked) = NULL;
@@ -768,8 +779,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2,
 									DB_LEN_STR(gv_cur_region));
 							send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_BUFOWNERSTUCK, 7, process_id,
-									blocking_pid, cr->blk, cr->blk, (lcnt / BUF_OWNER_STUCK),
-								 	cr->read_in_progress, cr->rip_latch.u.parts.latch_pid);
+									blocking_pid, &(cr->blk), &(cr->blk),
+									(lcnt / BUF_OWNER_STUCK), cr->read_in_progress,
+									cr->rip_latch.u.parts.latch_pid);
 							stuck_cnt++;
 							GET_C_STACK_FROM_SCRIPT("BUFOWNERSTUCK", process_id, blocking_pid,
 										stuck_cnt);

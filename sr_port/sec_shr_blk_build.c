@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,7 @@ void	sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, cw_set_element *c
 	array = (blk_segment *)cse->upd_addr;
 	assert(csa->read_write);
 	/* block transaction number needs to be modified first. see comment in gvcst_blk_build as to why */
-	((blk_hdr_ptr_t)base_addr)->bver = GDSVCURR;
+	((blk_hdr_ptr_t)base_addr)->bver = csd->desired_db_format;
 	assert(csa->now_crit || (ctn < csd->trans_hist.curr_tn));
 	assert(!csa->now_crit || (ctn == csd->trans_hist.curr_tn));
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;

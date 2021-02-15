@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -161,7 +161,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		enc_save_buff = GDS_ANY_ENCRYPTGLOBUF(buff, csa);
 		DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, enc_save_buff);
 	}
-	DB_LSEEKREAD(udi, udi->fd, (BLK_ZERO_OFF(csd->start_vbn) + (off_t)blk * size), enc_save_buff, size, save_errno);
+	DB_LSEEKREAD(udi, udi->fd, (BLK_ZERO_OFF(csd->start_vbn) + ((off_t)blk * size)), enc_save_buff, size, save_errno);
 	assert((0 == save_errno) || (-1 == save_errno));
 	WBTEST_ASSIGN_ONLY(WBTEST_PREAD_SYSCALL_FAIL, save_errno, EIO);
 	if ((enc_save_buff != buff) && (0 == save_errno))
@@ -227,12 +227,23 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		/* Block must be converted to current version (if necessary) for use by internals.
 		 * By definition, all blocks are converted from/to their on-disk version at the IO point.
 		 */
-		GDS_BLK_UPGRADE_IF_NEEDED(blk, buff, save_buff, csd, &tmp_ondskblkver, save_errno, fully_upgraded);
+		if (!MEMCMP_LIT(csd->label, GDS_LABEL))
+		{
+			GDS_BLK_UPGRADE_IF_NEEDED(blk, buff, save_buff, csd, &tmp_ondskblkver, save_errno, fully_upgraded);
+			save_errno = SS_NORMAL;
+			tmp_ondskblkver = GDSV7;
+		} else if (!MEMCMP_LIT(csd->label, V6_GDS_LABEL))
+		{/* V6 databases should never have to have blocks upgraded when opened in V7 */
+			save_errno = SS_NORMAL;
+			tmp_ondskblkver = GDSV6;
+		}
 		DEBUG_DYNGRD_ONLY(
 			if (GDSVCURR != tmp_ondskblkver)
 				PRINTF("DSK_READ: Block %d being dynamically upgraded on read\n", blk);
 		)
-		assert((GDSV6 == tmp_ondskblkver) || (NULL != save_buff));	/* never read a V4 block directly into cache */
+		assert(((GDSV7 == tmp_ondskblkver) && (!MEMCMP_LIT(csd->label, GDS_LABEL)))
+			|| ((GDSV6 == tmp_ondskblkver) && (!MEMCMP_LIT(csd->label, V6_GDS_LABEL)))
+			|| (NULL != save_buff));
 		if (NULL != ondsk_blkver)
 			*ondsk_blkver = tmp_ondskblkver;
 		/* a bitmap block should never be short of space for a dynamic upgrade. assert that. */

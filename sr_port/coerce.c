@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -35,9 +35,14 @@ void coerce(oprtype *a, enum octype_t new_type)
 	opctype		conv, old_op;
 	stringkey	litkey;
 	triple		*coerc, *ref;
+<<<<<<< HEAD
 
 	assert((OCT_MVAL == new_type) || (OCT_MINT == new_type) || (OCT_BOOL == new_type));
 	assert(TRIP_REF == a->oprclass);
+=======
+	assert ((OCT_MVAL == new_type) || (OCT_MINT == new_type) || (OCT_BOOL == new_type));
+	assert (TRIP_REF == a->oprclass);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	ref = a->oprval.tref;
 	old_op = ref->opcode;
 	if (new_type & oc_tab[old_op].octype)
@@ -54,7 +59,11 @@ void coerce(oprtype *a, enum octype_t new_type)
 			{	/* compiler generated literals should include their numeric form - no need to coerce */
 				MV_FORCE_NUMD(&ref->operand[0].oprval.tref->operand[0].oprval.mlit->v);
 			}
+<<<<<<< HEAD
 			ref->opcode = OC_NOOP;			/* dqdel of OC_FORCENUM causes chain troubles */
+=======
+			ref->opcode = OC_NOOP;					/* dqdel of OC_FORCENUM causes chain troubles */
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			ref->operand[0].oprclass = NO_REF;
 			ref = ref->operand[0].oprval.tref;
 			old_op = ref->opcode;

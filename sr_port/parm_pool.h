@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -95,7 +95,7 @@ typedef struct
 {
 	uint4		capacity;
 	uint4		start_idx;
-	parm_slot	parms[1];
+	parm_slot	parms[];
 } parm_pool;
 
 void push_parm(unsigned int totalcnt, int truth_value, ...);

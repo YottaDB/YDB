@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "filestruct.h"
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
@@ -48,11 +49,10 @@ error_def(ERR_TEXT);
  */
 boolean_t file_head_write(char *fn, sgmnt_data_ptr_t header, int4 len)
 {
-	int 		save_errno, fd, header_size;
+	int		save_errno, fd;
 	ZOS_ONLY(int	realfiletag;)
 
-	header_size = (int)SIZEOF_FILE_HDR(header);
-	assert(SGMNT_HDR_LEN == len || header_size == len);
+	assert(SGMNT_HDR_LEN == len || SIZEOF_FILE_HDR(header) == len);
 	OPENFILE(fn, O_RDWR, fd); /* udi not available so OPENFILE_DB not used */
 	if (FD_INVALID == fd)
 	{
@@ -64,6 +64,8 @@ boolean_t file_head_write(char *fn, sgmnt_data_ptr_t header, int4 len)
 	if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
 		TAG_POLICY_GTM_PUTMSG(fn, errno, realfiletag, TAG_BINARY);
 #	endif
+	if (0 == memcmp(header->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+		db_header_dwnconv(header);
 	DB_LSEEKWRITE(NULL, ((unix_db_info *)NULL), NULL, fd, 0, header, len, save_errno);
 	if (0 != save_errno)
 	{

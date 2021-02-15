@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -43,8 +43,8 @@ boolean_t job_addr(mstr *rtn, mstr *label, int4 offset, char **hdr, char **labad
 		op_zlink(&rt, NULL);
 		rt_hdr = find_rtn_hdr(rtn);
 		if (NULL == rt_hdr)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, rtn->len, rtn->addr,
-				      ERR_ZLMODULE, 2, STRLEN(&zlink_mname.c[0]), &zlink_mname);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, rtn->len, rtn->addr,
+				ERR_ZLMODULE, 2, STRLEN(&zlink_mname.c[0]), &zlink_mname);
 		*hdr = (char *)rt_hdr;
 	}
 	lp = NULL;

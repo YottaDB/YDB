@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -210,8 +210,13 @@ void zshow_output(zshow_out *out, const mstr *str)
 				/* make sure another subscript will fit */
 				is_base_var = LV_IS_BASE_VAR(lv);
 				LV_SBS_DEPTH(lv, is_base_var, sbs_depth);
+<<<<<<< HEAD
 				if (MAX_LVSUBSCRIPTS <= sbs_depth)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+=======
+				if (MAX_LVSUBSCRIPTS <= (sbs_depth + 1))
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 				/* add the subscript for the "code" */
 				lv_child = op_putindx(VARLSTCNT(2) lv, mv_child);
 				lv_child->v.mvtype = 0; /* don't want a node so make it undef'd */
@@ -219,18 +224,24 @@ void zshow_output(zshow_out *out, const mstr *str)
 					NULL != (piecestr = STRTOK_R(tempstr, ".", &strtokptr)); /* WARNING assignment in test */
 					tempstr = NULL)
 				{
-					len = MIN(strlen(piecestr), MAX_MIDENT_LEN);
+					len = (ssize_t)strnlen(piecestr, MAX_MIDENT_LEN);
+					assert((0 < len) && (MAX_MIDENT_LEN >= len));
 					/* create the mval for the next subscript */
 					ENSURE_STP_FREE_SPACE(len);
 					mv_child->str.addr = (char *)stringpool.free;
 					stringpool.free +=len;
-					strncpy(mv_child->str.addr, piecestr, len);
+					strncpy(mv_child->str.addr, piecestr, (size_t)len);
 					mv_child->str.len = len;
 					/* make sure the subscript will fit */
 					is_base_var = LV_IS_BASE_VAR(lv_child);
 					LV_SBS_DEPTH(lv_child, is_base_var, sbs_depth);
+<<<<<<< HEAD
 					if (MAX_LVSUBSCRIPTS <= sbs_depth)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+=======
+					if (MAX_LVSUBSCRIPTS <= (sbs_depth + 1))
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 					/* add the subscript */
 					lv_child = op_putindx(VARLSTCNT(2) lv_child, mv_child);
 					lv_child->v.mvtype = 0; /* if it is not the last one, no node */
@@ -265,8 +276,13 @@ void zshow_output(zshow_out *out, const mstr *str)
 				/* Check if we can add two more subscripts 1) out->code & 2) out->line_num */
 				is_base_var = LV_IS_BASE_VAR(lv);
 				LV_SBS_DEPTH(lv, is_base_var, sbs_depth);
+<<<<<<< HEAD
 				if (MAX_LVSUBSCRIPTS <= (sbs_depth + 1))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+=======
+				if (MAX_LVSUBSCRIPTS <= (sbs_depth + 2))
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 				out->out_var.lv.child = op_putindx(VARLSTCNT(2) lv, mv);
 				DEBUG_ONLY(LV_SBS_DEPTH(out->out_var.lv.child, FALSE, dbg_sbs_depth);)
 				assert(MAX_LVSUBSCRIPTS > dbg_sbs_depth);
@@ -369,11 +385,12 @@ void zshow_output(zshow_out *out, const mstr *str)
 				NULL != (piecestr = STRTOK_R(tempstr, ".", &strtokptr)); /* WARNING assignment in test */
 				tempstr = NULL)
 			{
-				len = MIN(strlen(piecestr), MAX_MIDENT_LEN);
+				len = (ssize_t)strnlen(piecestr, MAX_MIDENT_LEN);
+				assert((0 < len) && (MAX_MIDENT_LEN >= len));
 				ENSURE_STP_FREE_SPACE(len);
 				mv_child->str.addr = (char *)stringpool.free;
 				stringpool.free +=len;
-				strncpy(mv_child->str.addr, piecestr, len);
+				strncpy(mv_child->str.addr, piecestr, (size_t)len);
 				mv_child->str.len = len;
 				mval2subsc(mv_child, gv_currkey, gv_cur_region->std_null_coll);
 				GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,7 +80,7 @@ int4 mur_blocks_free(reg_ctl_list *rctl)
 		db_ctl->op_pos = cs_data->start_vbn + ((gtm_int64_t)cs_data->blk_size / DISK_BLOCK_SIZE * bnum);
 		status = dbfilop(db_ctl);
 		if (SYSCALL_ERROR(status))
-			rts_error_csa(CSA_ARG(rctl->csa) VARLSTCNT(5) ERR_DBRDERR, 2, DB_LEN_STR(gv_cur_region), status);
+			RTS_ERROR_CSA_ABT(rctl->csa, VARLSTCNT(5) ERR_DBRDERR, 2, DB_LEN_STR(gv_cur_region), status);
 		GDS_BLK_UPGRADE_IF_NEEDED(bnum, disk, disk, cs_data, &dummy_ondskblkver, status, cs_data->fully_upgraded);
 		if (SS_NORMAL != status)
 			if (ERR_DYNUPGRDFAIL == status)

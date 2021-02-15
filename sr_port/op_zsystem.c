@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -78,7 +78,7 @@ void op_zsystem(mval *v)
 
 	SETUP_THREADGBL_ACCESS;
 	if (RESTRICTED(zsystem_op))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, ZSYSTEMSTR);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, ZSYSTEMSTR);
 	TPNOTACID_CHECK(ZSYSTEMSTR);
 	MV_FORCE_STR(v);
 	flush_pio();
@@ -132,7 +132,7 @@ void op_zsystem(mval *v)
 	dollar_zsystem = SYSTEM(cmd_buf);
 	CHECK_N_FREE;
 	if (-1 == dollar_zsystem)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("system"), CALLFROM, errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("system"), CALLFROM, errno);
 #ifdef _BSD
 	assert(SIZEOF(wait_stat) == SIZEOF(int4));
 	wait_stat.w_status = dollar_zsystem;

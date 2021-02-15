@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -352,17 +352,4 @@ typedef struct
 			GET_LONG((LVAR), (PTR)); \
 	}
 
-#define CM_GET_GVCURRKEY(PTR, LEN) 								\
-	/* fetch gvcurrkey fields from message buffer; side effect : PTR is modified		\
-	 * to point to the byte after gv_currkey */						\
-	/* if we want to keep gv_currkey->top, why bother changing it; vinu Jul 17, 2000 */	\
-	/* top = gv_currkey->top; */								\
-	/* GET_USHORT(gv_currkey->top, ptr); */							\
-	(PTR) += SIZEOF(unsigned short);							\
-	GET_USHORT(gv_currkey->end, (PTR));							\
-	(PTR) += SIZEOF(unsigned short);							\
-	GET_USHORT(gv_currkey->prev, (PTR));							\
-	(PTR) += SIZEOF(unsigned short);							\
-	memcpy(gv_currkey->base, (PTR), (LEN) - 6);						\
-	(PTR) += ((LEN) - 6);									\
-	/* gv_currkey->top = top; */
+#define CM_GET_GVCURRKEY(PTR, LEN)	PTR = gtcmtr_get_key(gv_currkey, PTR, LEN);

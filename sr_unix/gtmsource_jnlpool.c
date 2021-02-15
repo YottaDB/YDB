@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,7 @@ int gtmsource_jnlpool(void)
 	if (CLI_PRESENT == cli_present("NAME"))
 	{
 		util_out_print("Error: NAME cannot be used with JNLPOOL", TRUE);
-		rts_error_csa(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
 	}
 	if (CLI_PRESENT == cli_present("SHOW"))
 	{
@@ -78,7 +78,7 @@ int gtmsource_jnlpool(void)
 		{
 			util_out_print("Error: SIZE specified [0x!XL] is greater than size of journal pool [0x!XL]", TRUE,
 				size, jnlpool->jnlpool_ctl->jnlpool_size);
-			rts_error_csa(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
 		}
 		mupcli_edit_offset_size_value(&((sm_uc_ptr_t)jnlpool->jnlpool_ctl)[offset], offset, size, value, value_present);
 	}

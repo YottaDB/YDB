@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2017 Fidelity National Information	*
+ * Copyright (c) 2015-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -119,9 +119,15 @@ void mur_write_header_extfmt(jnl_ctl_list *jctl, FILE *fp, char *fname, int recs
 			assert(save_errno);
 			SNPRINTF(errstr, SIZEOF(errstr),
 				"fwrite() : %s : Expected = %lld : Actual = %lld",
+<<<<<<< HEAD
 						(stdout == fp) ? "-STDOUT" : fname, (long long)extrlen, (long long)ret_size);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
 						ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
+=======
+						(stdout == fp) ? "-STDOUT" : fname, extrlen, ret_size);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8)
+				ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		}
 	}
 }

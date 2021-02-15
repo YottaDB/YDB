@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +58,7 @@ bool unwind_nocounts(void)
 		unwind++;
 	}
 	if (tp_pointer && tp_pointer->fp < fp)
-		rts_error(VARLSTCNT(1) ERR_TPQUIT);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_TPQUIT);
 	while (unwind-- > 0)
 	{
 		assert(error_frame != frame_pointer);	/* make sure op_unwind() won't call error_ret() */

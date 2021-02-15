@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -48,10 +48,19 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 	unsigned char	*ch, *cp, *ff, *ff_top, fncode, sign, *t, sepchar, decptchar;
 	mval		*t_src_p;
 
+<<<<<<< HEAD
 	MV_FORCE_DEFINED(src);
 	PUSH_MV_STENT(MVST_MVAL);			/* Create a temporary on M stack so garbage collection can see it */
 	t_src_p = &mv_chain->mv_st_cont.mvs_mval;	/* Operate on copy of src so can modify without changing original */
 	*t_src_p = *src;
+=======
+	if (!MV_DEFINED(fmt))		/* catch this up front so noundef mode can't cause trouble - so fmt no empty context */
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(2) ERR_FNUMARG, 0);
+	/* if the dst will be different than the src we'll build the new value in the string pool and repoint dst there,
+	 * otherwise, dst will anyway become the same as src, therefore we can safely use dst as a "temporary" copy of src
+	 */
+	*dst = *src;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	if (use_fract)
 		op_fnj3(t_src_p, 0, fract, t_src_p);
 	else
@@ -105,6 +114,7 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 				fncode |= PAREN;
 				break;
 			default:
+<<<<<<< HEAD
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FNUMARG, 4, fmt->str.len, fmt->str.addr, 1, --ff);
 				break;
 		}
@@ -119,6 +129,15 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 	sign = 0;
 	paren = FALSE;
 	if ('-' == *ch)
+=======
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_FNUMARG, 4, fmt->str.len, fmt->str.addr, 1, --ff);
+			break;
+		}
+	}
+	if ((0 != (fncode & PAREN)) && (0 != (fncode & FNERROR)))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_FNARGINC, 2, fmt->str.len, fmt->str.addr);
+	else
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	{
 		sign = '-';
 		ch++;

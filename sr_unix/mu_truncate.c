@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2020 Fidelity National Information	*
+ * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -128,9 +128,10 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 	int			bml_status, sigkill;
 	int			save_errno;
 	int			ftrunc_status;
-	uint4			jnl_status, trunc_blocks, keep_blocks;
+	uint4			jnl_status;
 	block_id		old_total, new_total,
-				old_free, new_free;
+				old_free, new_free,
+				keep_blocks, trunc_blocks;
 	int4			blks_in_lmap, blk, end_blocks;
 	gtm_uint64_t		before_trunc_file_size;
 	off_t			trunc_file_size;
@@ -160,7 +161,7 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCNOTBG, 2, REG_LEN_STR(gv_cur_region));
 		return TRUE;
 	}
-	if ((GDSVCURR != csd->desired_db_format) || (csd->blks_to_upgrd != 0))
+	if (((GDSVCURR != csd->desired_db_format) && (BLK_ID_32_VER != csd->desired_db_format)) || (csd->blks_to_upgrd != 0))
 	{
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCNOV4, 2, REG_LEN_STR(gv_cur_region));
 		return TRUE;
@@ -173,13 +174,13 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 	}
 	if (keep_mval->str.addr)
 	{	/* Some value was defined by the user*/
-		keep_blocks = MIN(MV_FORCE_UINT(keep_mval), MAXTOTALBLKS(csd));
+		keep_blocks = MIN(MV_FORCE_ULONG(keep_mval), MAXTOTALBLKS(csd));
 		if (keep_blocks && ('%' == keep_mval->str.addr[keep_mval->str.len - 1]))
 			keep_blocks = (csa->ti->total_blks * keep_blocks) / 100;
 		if ((csa->ti->total_blks - trunc_blocks) < keep_blocks) /*No truncate*/
 		{
 			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MUTRUNCNOSPKEEP, 4,
-					REG_LEN_STR(gv_cur_region), truncate_percent, keep_blocks);
+					REG_LEN_STR(gv_cur_region), truncate_percent, &keep_blocks);
 			return FALSE;
 		}
 	}
@@ -269,7 +270,7 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 					update_trans = UPDTRNS_DB_UPDATED_MASK;
 					*((block_id *)update_array_ptr) = blk;
 					update_array_ptr += SIZEOF(block_id);
-					*(int *)update_array_ptr = 0;
+					*(block_id *)update_array_ptr = 0;
 					alt_hist.h[1].blk_num = 0;
 					alt_hist.h[0].level = 0;
 					alt_hist.h[0].cse = NULL;
@@ -374,7 +375,9 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_MUTRUNCNOSPACE, 3, REG_LEN_STR(gv_cur_region), truncate_percent);
 		rel_crit(gv_cur_region);
 		return TRUE;
-	} else if (GDSVCURR != csd->desired_db_format || csd->blks_to_upgrd != 0 || !csd->fully_upgraded)
+	} else if (((GDSVCURR != csd->desired_db_format) && (BLK_ID_32_VER != csd->desired_db_format))
+			|| csd->blks_to_upgrd != 0
+			|| !csd->fully_upgraded)
 	{
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCNOV4, 2, REG_LEN_STR(gv_cur_region));
 		rel_crit(gv_cur_region);
@@ -462,7 +465,7 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 	if (0 != ftrunc_status)
 	{
 		err_msg = (char *)STRERROR(errno);
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MUTRUNCERROR, 4, REG_LEN_STR(gv_cur_region), LEN_AND_STR(err_msg));
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_MUTRUNCERROR, 4, REG_LEN_STR(gv_cur_region), LEN_AND_STR(err_msg));
 		/* should go through recover_truncate now, which will again try to FTRUNCATE */
 		return FALSE;
 	}
@@ -485,9 +488,10 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 	ENABLE_INTERRUPTS(INTRPT_IN_TRUNC, prev_intrpt_state);
 	curr_tn = csa->ti->curr_tn;
 	rel_crit(gv_cur_region);
-	send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_MUTRUNCSUCCESS, 5, DB_LEN_STR(gv_cur_region), old_total, new_total, &curr_tn);
-	util_out_print("Truncated region: !AD. Reduced total blocks from [!UL] to [!UL]. Reduced free blocks from [!UL] to [!UL].",
-					FLUSH, REG_LEN_STR(gv_cur_region), old_total, new_total, old_free, new_free);
+	send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_MUTRUNCSUCCESS, 5, DB_LEN_STR(gv_cur_region), &old_total, &new_total, &curr_tn);
+	util_out_print(
+		"Truncated region: !AD. Reduced total blocks from [!@UQ] to [!@UQ]. Reduced free blocks from [!@UQ] to [!@UQ].",
+			FLUSH, REG_LEN_STR(gv_cur_region), &old_total, &new_total, &old_free, &new_free);
 	return TRUE;
 } /* END of mu_truncate() */
 

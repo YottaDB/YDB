@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2018-2019 Fidelity National Information	*
+ * Copyright (c) 2018-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved. *
  *								*
  * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -314,9 +314,10 @@ int	dm_audit_connect(void)
 int	dm_audit_init(char *host_info, boolean_t is_tls)
 {
 	char			host[SA_MAXLEN + 1];
-        struct addrinfo		*remote_ai_head, hints;
-        char			port_buffer[NI_MAXSERV + 1];
-        int			host_len, port_len;
+	struct addrinfo		*remote_ai_head, hints;
+	char			port_buffer[NI_MAXSERV + 1];
+	int			host_len, port_len;
+	unsigned int		host_info_len;
 	int			errcode;
 	int			fields, port;
 	char			tlsid[MAX_TLSID_LEN + 1];
@@ -379,7 +380,8 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 	{	/* Assume host_info contains path to unix domain socket
 		 * if number of fields is 1 or is more than 3.
 		 */
-		if (is_tls || (MAX_SOCKADDR_UN_PATH <= STRLEN(host_info)))
+		host_info_len = strlen(host_info);
+		if (is_tls || (MAX_SOCKADDR_UN_PATH <= host_info_len))
 		{	/* If the "TLS" option is specified but no IP/port info provided or path to socket file is too long */
 			free_dm_audit_info();
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_APDINITFAIL, 0, ERR_INVADDRSPEC);
@@ -387,7 +389,8 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 		}
 		audit_conn->conn_type = AUDIT_CONN_UN;
 		(audit_conn->un_addr).sun_family = AF_UNIX;
-		STRNCPY_STR((audit_conn->un_addr).sun_path, host_info, MAX_SOCKADDR_UN_PATH - 1);
+		memcpy((audit_conn->un_addr).sun_path, host_info, host_info_len);
+		(audit_conn->un_addr).sun_path[host_info_len] = '\0';
 	}
 	audit_conn->initialized = TRUE;
 	return 0;

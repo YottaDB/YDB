@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2005-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,35 +76,47 @@ GBLREF	boolean_t	dse_running;
 	 *															\
 	 * Note the clearing of srcbuffptr is done as a flag that gds_blk_upgrd was run (used by dsk_read).			\
 	 */															\
+<<<<<<< HEAD
 	assert((UPGRADE_IF_NEEDED == ydb_blkupgrade_flag) || (UPGRADE_NEVER == ydb_blkupgrade_flag)				\
 								|| (UPGRADE_ALWAYS == ydb_blkupgrade_flag));			\
 	if (!dse_running || (UPGRADE_IF_NEEDED == ydb_blkupgrade_flag))								\
+=======
+	assert(GDSVCURR == GDSV7);	/* Assert should fail if GDSVCURR changes */						\
+	if (!dse_running || (UPGRADE_IF_NEEDED == gtm_blkupgrade_flag))								\
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	{															\
-		if ((fully_upgraded) || (SIZEOF(v15_blk_hdr) > ((v15_blk_hdr_ptr_t)(srcbuffptr))->bsiz))			\
+		if ((fully_upgraded))												\
 		{														\
 			upgrdstatus = SS_NORMAL;										\
 			if (NULL != (void *)(ondskblkver))									\
-				*(ondskblkver) = GDSV6;										\
+				*(ondskblkver) = ((blk_hdr_ptr_t)(srcbuffptr))->bver;						\
 		} else														\
 		{														\
 			upgrdstatus = gds_blk_upgrade((sm_uc_ptr_t)(srcbuffptr), (sm_uc_ptr_t)(trgbuffptr),			\
 						      (curcsd)->blk_size, (ondskblkver));					\
-                        if (srcbuffptr != trgbuffptr)										\
-                                srcbuffptr = NULL;										\
+			if (srcbuffptr != trgbuffptr)										\
+				srcbuffptr = NULL;										\
 		}														\
 	} else if (UPGRADE_NEVER == ydb_blkupgrade_flag)									\
 	{															\
 		upgrdstatus = SS_NORMAL;											\
 		if (NULL != (void *)(ondskblkver))										\
+<<<<<<< HEAD
 			*(ondskblkver) = GDSV6;											\
 	} else															\
+=======
+			*(ondskblkver) = ((blk_hdr_ptr_t)(srcbuffptr))->bver;							\
+	} else if (UPGRADE_ALWAYS == gtm_blkupgrade_flag)									\
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	{															\
+		/*This code path is not currently supported since it requires upgrading blocks*/				\
+		assert(FALSE);													\
 		upgrdstatus = gds_blk_upgrade((sm_uc_ptr_t)(srcbuffptr), (sm_uc_ptr_t)(trgbuffptr),				\
 					      (curcsd)->blk_size, (ondskblkver));						\
 		if (NULL != (void *)(ondskblkver))										\
 			*(ondskblkver) = GDSV4;											\
-                if (srcbuffptr != trgbuffptr)											\
-                        srcbuffptr = NULL;											\
+		if (srcbuffptr != trgbuffptr)											\
+			srcbuffptr = NULL;											\
 	}															\
 }
 

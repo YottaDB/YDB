@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,7 +59,9 @@ void recover_truncate(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg)
 		csa->nl->trunc_pid = 0;
 	if (!csd->before_trunc_total_blks)
 		return;
-	assert((GDSVCURR == csd->desired_db_format) && (csd->blks_to_upgrd == 0) && (dba_mm != csd->acc_meth));
+	assert(((GDSVCURR == csd->desired_db_format) || (BLK_ID_32_VER == csd->desired_db_format))
+			&& (csd->blks_to_upgrd == 0)
+			&& (dba_mm != csd->acc_meth));
 	/* If called from db_init, assure we've grabbed the access semaphor and are the only process attached to the database.
 	 * Otherwise, we should have crit when called from wcs_recover. */
 	udi = FILE_INFO(reg);
@@ -103,7 +105,7 @@ void recover_truncate(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg)
 		/* In either case, the db file is in a consistent state, so no need to do anything further */
 		assert((old_total == cur_total && old_size == cur_size) || (new_total == cur_total && new_size == cur_size));
 		if (!((old_total == cur_total && old_size == cur_size) || (new_total == cur_total && new_size == cur_size)))
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 	}
 	csd->before_trunc_total_blks = 0; /* indicate CONSISTENT */
 }

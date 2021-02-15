@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -225,14 +225,14 @@ int gtm_main(int argc, char **argv, char **envp)
 					{
 						if (SS_NORMAL != (status = gtm_tls_loadlibrary()))
 						{
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSDLLNOOPEN, 0,
-									ERR_TEXT, 2, LEN_AND_STR(dl_err));
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSDLLNOOPEN, 0,
+								ERR_TEXT, 2, LEN_AND_STR(dl_err));
 						}
 						if (NULL == (tls_ctx = gtm_tls_init(GTM_TLS_API_VERSION,
 											GTMTLS_OP_INTERACTIVE_MODE)))
 						{
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSINIT, 0,
-									ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSINIT, 0,
+								ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
 						}
 					}
 					assert(NULL != tls_ctx);

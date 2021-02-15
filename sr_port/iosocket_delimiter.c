@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -178,7 +178,7 @@ void iosocket_odelim_conv(socket_struct *socketptr, gtm_chset_t to_chset)
 			conv_buff = malloc(MAX_DELIM_LEN);
 		conv_len = MAX_DELIM_LEN;
 		new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[to_chset], &socketptr->delimiter[0], conv_buff, &conv_len);
-		assert(MAX_DELIM_LEN > new_len);
+		assert((0 < new_len) && (MAX_DELIM_LEN > new_len));
 		if (MAX_DELIM_LEN < new_len)
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);

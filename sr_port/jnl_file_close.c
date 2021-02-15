@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -197,7 +197,7 @@ void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch)
 			if (SYSCALL_ERROR(jpc->status))
 			{
 				assert(FALSE);
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
 			}
 			GTM_JNL_FSYNC(csa, jpc->channel, rc);
 			if (-1 == rc)
@@ -206,7 +206,7 @@ void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch)
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
 					ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync during jnl_file_close"), save_errno);
 				assert(FALSE);
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
 					ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync during jnl_file_close"), save_errno);
 			}
 		}
@@ -226,6 +226,6 @@ void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch)
 	{
 		status = jpc->status;	/* jnl_send_oper resets jpc->status, so save it */
 		jnl_send_oper(jpc, ERR_JNLCLOSE);
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLCLOSE, 2, JNL_LEN_STR(csd), status);
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_JNLCLOSE, 2, JNL_LEN_STR(csd), status);
 	}
 }

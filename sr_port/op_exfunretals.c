@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,9 +48,8 @@ void op_exfunretals(mval *retval)
 	savtyp = retval->mvtype;
 	retval->mvtype &= ~MV_RETARG;
 	if (0 == (MV_RETARG & savtyp))
-		rts_error(VARLSTCNT(1) ERR_QUITARGREQD);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_QUITARGREQD);
 	if (0 == (MV_ALIASCONT & savtyp))
-		rts_error(VARLSTCNT(1) ERR_ALIASEXPECTED);
+		rts_error_csa(NULL, VARLSTCNT(1) ERR_ALIASEXPECTED);
 	assert(NULL != alias_retarg);
 }
-

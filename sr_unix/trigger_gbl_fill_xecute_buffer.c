@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -152,8 +152,8 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 				trgindx = mval2i(&index);
 				SET_PARAM_STRING(util_buff, util_len, trgindx, ",\"XECUTE\"");
-				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-						trigvn_len, trigvn, util_len, util_buff);
+				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+					trigvn_len, trigvn, util_len, util_buff);
 			}
 		}
 		/* Multi-line triggers exist */
@@ -169,8 +169,8 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 			trgindx = mval2i(&index);
 			SET_PARAM_STRING(util_buff, util_len, trgindx, ",\"XECUTE\"");
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-					trigvn_len, trigvn, util_len, util_buff);
+			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+				trigvn_len, trigvn, util_len, util_buff);
 		}
 		val_ptr = &key_val;
 		xecute_buff_len = mval2i(val_ptr);
@@ -194,8 +194,8 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 					t_retry(cdb_sc_triggermod);
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 				SET_PARAM_STRING(util_buff, util_len, num, ",\"XECUTE\"");
-				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-						trigvn_len, trigvn, util_len, util_buff);
+				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+					trigvn_len, trigvn, util_len, util_buff);
 			}
 			memcpy(xecute_buff_ptr, key_val.str.addr, key_val.str.len);
 			xecute_buff_ptr += key_val.str.len;

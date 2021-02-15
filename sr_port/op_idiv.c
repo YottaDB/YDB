@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +28,7 @@ LITREF int4	ten_pwr[];
 LITREF mval	literal_zero;
 LITREF mval	literal_sqlnull;
 
+error_def(ERR_DIVZERO);
 error_def(ERR_NUMOFLOW);
 error_def(ERR_DIVZERO);
 
@@ -33,6 +39,7 @@ void	op_idiv(mval *u, mval *v, mval *q)
 	mval		w, y;
 	int		u_mvtype, v_mvtype;
 
+<<<<<<< HEAD
 	/* If u or v is $ZYSQLNULL, the result is $ZYSQLNULL */
 	if (MV_IS_SQLNULL(u) || MV_IS_SQLNULL(v))
 	{
@@ -49,6 +56,13 @@ void	op_idiv(mval *u, mval *v, mval *q)
 	if ((v_mvtype & MV_INT) && (0 == v->m[1]))
 		rts_error(VARLSTCNT(1) ERR_DIVZERO);
 	if (u_mvtype & MV_INT & v_mvtype)
+=======
+	MV_FORCE_NUM(u);
+	MV_FORCE_NUM(v);
+	if ((v->mvtype & MV_INT)  &&  v->m[1] == 0)
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_DIVZERO);
+	if (u->mvtype & MV_INT & v->mvtype)
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	{
 		promo = eb_int_div(u->m[1], v->m[1], q->m);
 		if (!promo)
@@ -105,7 +119,7 @@ void	op_idiv(mval *u, mval *v, mval *q)
 		{
 			assert(EXPLO <= exp);
 			if (EXPHI <= exp)
-				rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
+				rts_error_csa(NULL, VARLSTCNT(1) ERR_NUMOFLOW); /* BYPASSRTSABT */
 			q->e = exp;
 			q->sgn = u->sgn ^ v->sgn;
 			q->mvtype = MV_NM;

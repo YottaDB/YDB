@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -36,6 +36,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "filestruct.h"
 #include "iosp.h"
 #include "mutex.h"
@@ -209,11 +210,11 @@ int mu_rndwn_all(void)
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MURNDWNARGLESS, 4, process_id, user_id,
 									dollar_zdir.str.len, dollar_zdir.str.addr);
 	if (NULL == (pf = POPEN(IPCS_CMD_STR ,"r")))
-        {
+	{
 		save_errno = errno;
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("POPEN()"), CALLFROM, save_errno);
-                return ERR_MUNOTALLSEC;
-        }
+		return ERR_MUNOTALLSEC;
+	}
 	fname = (char *)malloc(MAX_FN_LEN + 1);
 	while (NULL != (FGETS(entry, SIZEOF(entry), pf, fgets_res)) && entry[0] != '\n')
 	{
@@ -282,13 +283,15 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 	fname[MAX_FN_LEN] = '\0';			/* make sure the fname is null terminated */
 	fname_len = STRLEN(fname);
 	msgbuff[0] = '\0';
-	if (memcmp(nl_addr->label, GDS_LABEL, GDS_LABEL_SZ - 1))
+	/* memcmp returns 0 on a match, so use && to see if both return a non-0 value meaning it isn't one of the expected labels */
+	if (memcmp(nl_addr->label, GDS_LABEL, GDS_LABEL_SZ - 1) && memcmp(nl_addr->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
 	{
 		if (!memcmp(nl_addr->label, GDS_LABEL, GDS_LABEL_SZ - 3))
 		{
 			util_out_print("Cannot rundown shmid = !UL for database !AD as it has format !AD "
-				"but this mupip uses format !AD", TRUE, shmid,
-				fname_len, fname, GDS_LABEL_SZ - 1, nl_addr->label, GDS_LABEL_SZ - 1, GDS_LABEL);
+				"but this mupip uses formats !AD and !AD", TRUE, shmid,
+				fname_len, fname, GDS_LABEL_SZ - 1, nl_addr->label,
+				GDS_LABEL_SZ - 1, GDS_LABEL, GDS_LABEL_SZ - 1, V6_GDS_LABEL);
 			*exit_stat = ERR_MUNOTALLSEC;
 		}
 		shmdt((void *)start_addr);
@@ -351,6 +354,8 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 		udi = FILE_INFO(gv_cur_region);
 		assert(!udi->fd_opened_with_o_direct);
 		DB_LSEEKREAD(udi, udi->fd, 0, &tsd, SIZEOF(sgmnt_data), status);
+		if (0 == memcmp(tsd.label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+			db_header_upconv(&tsd);
 		if (0 != status)
 		{
 			save_errno = errno;

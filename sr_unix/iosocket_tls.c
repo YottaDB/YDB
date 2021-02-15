@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2019 Fidelity National Information	*
+ * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -104,7 +104,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 		return;
 	}
 	if (dsocketptr->mupintr)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	ENSURE_DATA_SOCKET(socketptr);
@@ -187,8 +187,13 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				errp = gtm_tls_get_error();
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 				if (socketptr->ioerror)
+<<<<<<< HEAD
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
 				if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
+=======
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, errlen, errp);
+				if (NO_M_TIMEOUT != msec_timeout)
+>>>>>>> 451ab477 (GT.M V7.0-000)
 					dollar_truth = FALSE;
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
@@ -253,8 +258,13 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			errp = gtm_tls_get_error();
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 			if (socketptr->ioerror)
+<<<<<<< HEAD
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
 			if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
+=======
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
+			if (NO_M_TIMEOUT != msec_timeout)
+>>>>>>> 451ab477 (GT.M V7.0-000)
 				dollar_truth = FALSE;
 			REVERT_GTMIO_CH(&iod->pair, ch_set);
 			return;
@@ -303,9 +313,15 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				socketptr->tlsenabled = FALSE;
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 				if (socketptr->ioerror)
+<<<<<<< HEAD
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSHANDSHAKE, 0,
 						      ERR_TEXT, 2, LEN_AND_STR(errp));
 				if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
+=======
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0,
+						ERR_TEXT, 2, errlen, errp);
+				if (NO_M_TIMEOUT != msec_timeout)
+>>>>>>> 451ab477 (GT.M V7.0-000)
 					dollar_truth = FALSE;
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
@@ -366,8 +382,14 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			errp = UNREAD_INPUT;
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 			if (socketptr->ioerror)
+<<<<<<< HEAD
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,	ERR_TEXT, 2, LEN_AND_STR(errp));
 			if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
+=======
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
+					ERR_TEXT, 2, errlen, errp);
+			if (NO_M_TIMEOUT != msec_timeout)
+>>>>>>> 451ab477 (GT.M V7.0-000)
 				dollar_truth = FALSE;
 			REVERT_GTMIO_CH(&iod->pair, ch_set);
 			return;
@@ -384,9 +406,15 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 					errp2 = (char *)STRERROR(socketptr->obuffer_errno);
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR1_ERRSTR2(iod, errp, errlen, errp2, errlen2);
 				if (socketptr->ioerror)
+<<<<<<< HEAD
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_TLSRENEGOTIATE, 0,
 						      ERR_TEXT, 2, LEN_AND_STR(errp), ERR_TEXT, 2, LEN_AND_STR(errp2));
 				if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
+=======
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_TLSRENEGOTIATE, 0,
+						ERR_TEXT, 2, errlen, errp, ERR_TEXT, 2, errlen2, errp2);
+				if (NO_M_TIMEOUT != msec_timeout)
+>>>>>>> 451ab477 (GT.M V7.0-000)
 					dollar_truth = FALSE;
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
@@ -428,15 +456,21 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				errp = STRERROR(tls_errno);
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 			if (socketptr->ioerror)
+<<<<<<< HEAD
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
 					      ERR_TEXT, 2, LEN_AND_STR(errp));
 			if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
+=======
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
+					ERR_TEXT, 2, errlen, errp);
+			if (NO_M_TIMEOUT != msec_timeout)
+>>>>>>> 451ab477 (GT.M V7.0-000)
 				dollar_truth = FALSE;
 			REVERT_GTMIO_CH(&iod->pair, ch_set);
 			return;
 		}
 	} else
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSPARAM, 4, LEN_AND_STR(optionstr),
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSPARAM, 4, LEN_AND_STR(optionstr),
 			LEN_AND_LIT("not a valid option"));
 	if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
 		dollar_truth = TRUE;

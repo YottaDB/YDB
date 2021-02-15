@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -74,8 +74,8 @@ void iott_close(io_desc *v, mval *pp)
 	if (0 != status)
 	{
 		assert(status == errno);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-				RTS_ERROR_LITERAL("iott_close(CLOSEFILE)"), CALLFROM, status);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			RTS_ERROR_LITERAL("iott_close(CLOSEFILE)"), CALLFROM, status);
 	}
 	if (NULL != ttptr->recall_array)
 	{	/* Free up structures allocated in "iott_recall_array_add" */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2017 Fidelity National Information	*
+ * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -155,7 +155,6 @@ void	jnl_phase2_salvage(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp, jbuf_phase2_in_p
 		inctn_rec.prefix.checksum = INIT_CHECKSUM_SEED;
 		inctn_rec.prefix.tn = deadCmt->curr_tn;
 		inctn_rec.detail.blknum_struct.opcode = inctn_jnlphase2salvage;
-		inctn_rec.detail.blknum_struct.filler_uint4 = 0;
 		inctn_rec.detail.blknum_struct.filler_short = 0;
 		inctn_rec.detail.blknum_struct.suffix.backptr = INCTN_RECLEN;
 		inctn_rec.detail.blknum_struct.suffix.suffix_code = JNL_REC_SUFFIX_CODE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2019 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -129,10 +129,17 @@ int gtmrecv(void)
 	ESTABLISH_RET(gtmrecv_ch, SS_NORMAL);
 	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool));
 	if (-1 == gtmrecv_get_opt())
+<<<<<<< HEAD
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
 	if (!ydb_dist_ok_to_use)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+=======
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
+	if (!gtm_dist_ok_to_use)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+			gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	if (gtmrecv_options.start || gtmrecv_options.shut_down)
 	{	/* Use "gd_header" for consistency across all "jnlpool_init" usages in the codebase
 		 * even though it is NULL in the case of the receiver server.
@@ -150,14 +157,14 @@ int gtmrecv(void)
 		if (gtmrecv_options.updateresync && jnlpool->repl_inst_filehdr->num_histinfo
 				&& !(jnlpool->repl_inst_filehdr->is_supplementary && !jnlpool->jnlpool_ctl->upd_disabled))
 			/* replication instance file is NOT empty. Issue error */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UPDSYNC2MTINS);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UPDSYNC2MTINS);
 		if (gtmrecv_options.noresync)
 		{	/* If -NORESYNC was specified on a non-supplementary receiver instance, issue an error */
 			if (!jnlpool->repl_inst_filehdr->is_supplementary)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NORESYNCSUPPLONLY);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NORESYNCSUPPLONLY);
 			/* If -NORESYNC was specified on a receiver instance where updates are disabled, issue an error */
 			if (jnlpool->jnlpool_ctl->upd_disabled)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NORESYNCUPDATERONLY);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NORESYNCUPDATERONLY);
 		}
 	}
 	if (gtmrecv_options.shut_down)
@@ -192,19 +199,19 @@ int gtmrecv(void)
 			if (SRV_ALIVE == (status = is_recv_srv_alive()) && 0 != gtmrecv_options.listen_port)
 			{
 				rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-					  RTS_ERROR_LITERAL("Receiver Server already exists"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Receiver Server already exists"));
 			} else if (SRV_DEAD == status && 0 == gtmrecv_options.listen_port)
 			{
 				rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-					  RTS_ERROR_LITERAL("Receiver server does not exist. Start it first"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Receiver server does not exist. Start it first"));
 			} else if (SRV_ERR == status)
 			{
 				status = errno;
 				rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-					  RTS_ERROR_LITERAL("Receiver server semaphore error"), status);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Receiver server semaphore error"), status);
 			}
 			if (gtmrecv_options.updateonly)
 			{
@@ -227,21 +234,21 @@ int gtmrecv(void)
 			if (FD_INVALID == updresync_instfile_fd)
 			{
 				rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTOPEN, 2,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTOPEN, 2,
 					LEN_AND_STR(gtmrecv_options.updresync_instfilename), errno);
 			}
 			LSEEKREAD(updresync_instfile_fd, 0, &updresync_inst_hdr, SIZEOF(updresync_inst_hdr), status);
 			if (0 != status)
 			{	/* Encountered an error reading the full file header */
 				rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("Input file does not even have a full instance file header"));
 			}
 			/* Check if it is the right version */
 			if (memcmp(updresync_inst_hdr.label, GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ - 1))
 			{
 				rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_UPDSYNCINSTFILE, 0,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_UPDSYNCINSTFILE, 0,
 					ERR_REPLINSTFMT, 6, LEN_AND_STR(gtmrecv_options.updresync_instfilename),
 					GDS_REPL_INST_LABEL_SZ - 1, GDS_REPL_INST_LABEL,
 					GDS_REPL_INST_LABEL_SZ - 1, updresync_inst_hdr.label);
@@ -263,8 +270,8 @@ int gtmrecv(void)
 			if (updresync_inst_hdr.crash)
 			{	/* The instance file cannot be used for updateresync if it was not cleanly shutdown */
 				rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
-					  RTS_ERROR_LITERAL("Input instance file was not cleanly shutdown"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Input instance file was not cleanly shutdown"));
 			}
 			if (cross_endian)
 			{
@@ -282,9 +289,9 @@ int gtmrecv(void)
 				if (!updresync_inst_hdr.jnl_seqno)
 				{	/* The instance file cannot be used for updateresync if it has a ZERO seqno */
 					rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
-						  RTS_ERROR_LITERAL("Non-supplementary input instance file cannot be used"
-						  " on supplementary instance when it is empty (has seqno of 0)"));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
+						RTS_ERROR_LITERAL("Non-supplementary input instance file cannot be used"
+						" on supplementary instance when it is empty (has seqno of 0)"));
 				}
 			}
 			/* else similar checks of the jnl_seqno and num_histinfo for other types of connections (i.e.
@@ -298,8 +305,8 @@ int gtmrecv(void)
 			if (IS_REPL_INST_UUID_NULL(updresync_inst_hdr.lms_group_info))
 			{	/* The input instance has a NULL LMS group. Cannot be used to fill in current instance */
 				rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
-					  RTS_ERROR_LITERAL("Input instance file has NULL LMS group"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Input instance file has NULL LMS group"));
 			}
 			if (updresync_inst_hdr.is_supplementary)
 			{	/* The input instance file is supplementary. Allow it only if the current instance is
@@ -316,9 +323,9 @@ int gtmrecv(void)
 				if (!jnlpool->jnlpool_ctl->upd_disabled)
 				{
 					rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
-						  LEN_AND_LIT("Input instance file must be non-supplementary"
-							  	" as current instance is a supplementary root primary"));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
+						LEN_AND_LIT("Input instance file must be non-supplementary"
+						" as current instance is a supplementary root primary"));
 				}
 			} else if (jnlpool->repl_inst_filehdr->is_supplementary)
 			{
@@ -327,14 +334,14 @@ int gtmrecv(void)
 					 * instance is non-supplementary or if it is a supplementary root primary.
 					 */
 					rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
-						  LEN_AND_LIT("Input instance file must be supplementary"
-								" to match current instance"));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
+						LEN_AND_LIT("Input instance file must be supplementary"
+						" to match current instance"));
 				}
 				if (!gtmrecv_options.resume_specified && !gtmrecv_options.initialize_specified)
 				{
 					rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INITORRESUME);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INITORRESUME);
 				}
 			}
 			if (!jnlpool->repl_inst_filehdr->is_supplementary || jnlpool->jnlpool_ctl->upd_disabled)
@@ -342,13 +349,13 @@ int gtmrecv(void)
 				if (gtmrecv_options.resume_specified)
 				{
 					rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RESUMESTRMNUM, 0, ERR_TEXT, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_RESUMESTRMNUM, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("RESUME allowed only on root primary supplementary instance"));
 				}
 				if (gtmrecv_options.reuse_specified)
 				{
 					rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REUSEINSTNAME, 0, ERR_TEXT, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REUSEINSTNAME, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("REUSE allowed only on root primary supplementary instance"));
 				}
 			}
@@ -374,8 +381,8 @@ int gtmrecv(void)
 		} else if (0 > pid)
 		{
 			status = errno;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				  RTS_ERROR_LITERAL("Unable to fork"), status);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+				RTS_ERROR_LITERAL("Unable to fork"), status);
 		}
 #		endif
 	} else if (gtmrecv_options.shut_down)
@@ -474,9 +481,32 @@ int gtmrecv(void)
 	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmrecv_log_fd, gtmrecv_options.log_file);
 	assert(SS_NORMAL == log_init_status);
 	repl_log_fd2fp(&gtmrecv_log_fp, gtmrecv_log_fd);
+<<<<<<< HEAD
 	if (-1 == setsid())
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			  RTS_ERROR_LITERAL("Receiver server error in setsid"), errno);
+=======
+	if (-1 == (procgp = setsid()))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			RTS_ERROR_LITERAL("Receiver server error in setsid"), errno);
+	/* Point stdin to /dev/null */
+	OPENFILE("/dev/null", O_RDONLY, null_fd);
+	if (0 > null_fd)
+		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
+	assert(null_fd > 2);
+	/* Detached from the initiating process, now detach from the starting IO */
+	io_rundown(NORMAL_RUNDOWN);
+	FSTAT_FILE(gtmrecv_log_fd, &stat_buf, log_init_status);
+	assertpro(!log_init_status);	/* io_rundown should not affect the log file */
+	DUP2(null_fd, 0, rc);
+	if (0 > rc)
+		RTS_ERROR_CSA_ABT(NULL, ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
+	/* Re-init IO now that we have opened the log file and set stdin to /dev/null */
+	io_init(IS_MUPIP_IMAGE);
+	CLOSEFILE(null_fd, rc);
+	if (0 > rc)
+		RTS_ERROR_CSA_ABT(NULL, ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	gtmrecv_local->recv_serv_pid = process_id;
 	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl));
 	jnlpool->jnlpool_ctl->gtmrecv_pid = process_id;
@@ -504,8 +534,8 @@ int gtmrecv(void)
 		/* Signal the update process to check for the update. */
 		PTHREAD_COND_SIGNAL(&recvpool.recvpool_ctl->write_updated, status);
 		if (0 != status)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("pthread_cond_signal"), CALLFROM, status, 0);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("pthread_cond_signal"), CALLFROM, status, 0);
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Attached to existing recvpool with shmid = [%d] and semid = [%d]\n",
 				jnlpool->repl_inst_filehdr->recvpool_shmid, jnlpool->repl_inst_filehdr->recvpool_semid);
 	}
@@ -557,8 +587,8 @@ int gtmrecv(void)
 		/* Signal the update process to check for the update. */
 		PTHREAD_COND_SIGNAL(&recvpool.recvpool_ctl->write_updated, status);
 		if (0 != status)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("pthread_cond_signal"), CALLFROM, status, 0);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("pthread_cond_signal"), CALLFROM, status, 0);
 	}
 	if (gtmrecv_options.helpers)
 		gtmrecv_helpers_init(gtmrecv_options.n_readers, gtmrecv_options.n_writers);
@@ -569,13 +599,13 @@ int gtmrecv(void)
 	 * that. Do that while the parent is still waiting for our okay.
 	 */
 	if (!ftok_sem_incrcnt(recvpool.recvpool_dummy_reg, FILE_TYPE_REPLINST, &dummy_ftok_counter_halted))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RECVPOOLSETUP);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RECVPOOLSETUP);
 	/* Lock the receiver server count semaphore. Its value should be atmost 1. */
 	if (0 > grab_sem_immediate(RECV, RECV_SERV_COUNT_SEM))
 	{
 		save_errno = errno;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Receive pool semop failure"), save_errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			RTS_ERROR_LITERAL("Receive pool semop failure"), save_errno);
 	}
 #	ifdef REPL_DEBUG_NOBACKGROUND
 	rel_sem(RECV, RECV_SERV_OPTIONS_SEM);

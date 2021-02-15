@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -31,6 +31,10 @@
  *
  * This file might have lines longer than 132 characters
  * since the command tables are being initialized.
+ *
+ * Ensure all the command lines (statements of the form: *CLI_ENTRY.*_qual[]),
+ * Contain a comment on the same line indicating the exact MUPIP command it represents.
+ * The test framework uses this to validate input for the values.
  *********************************************************************/
 
 #include "mupip_backup.h"
@@ -69,7 +73,7 @@
 #include "mupip_rctldump.h"
 #include "mu_rndwn_rlnkctl.h"
 
-static CLI_ENTRY mup_set_journal_qual[] = {
+static CLI_ENTRY mup_set_journal_qual[] = {	/* SET -JOURNAL */
 { "ALIGNSIZE",       0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
 { "ALLOCATION",      0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
 { "AUTOSWITCHLIMIT", 0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
@@ -87,7 +91,7 @@ static CLI_ENTRY mup_set_journal_qual[] = {
 { "" }
 };
 
-static CLI_ENTRY mub_since_qual[] = {
+static CLI_ENTRY mub_since_qual[] = {		/* BACKUP -SINCE */
 { "BYTESTREAM",    0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "COMPREHENSIVE", 0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "DATABASE",      0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
@@ -96,19 +100,19 @@ static CLI_ENTRY mub_since_qual[] = {
 { "" }
 };
 
-static CLI_ENTRY mup_set_acc_qual[] = {
+static CLI_ENTRY mup_set_acc_qual[] = {		/* SET -ACC_METH */
 { "BG", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "MM", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "" }
 };
 
-static CLI_ENTRY mup_set_dbver_qual[] = {
+static CLI_ENTRY mup_set_dbver_qual[] = {	/* SET -DBVER */
 { "V4", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 { "V6", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 { "" }
 };
 
-static CLI_ENTRY mup_crypt_type_qual[] = {
+static CLI_ENTRY mup_crypt_type_qual[] = {	/* CRYPT -TYPE */
 { "DB_IV",            0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "DB_NO_IV",         0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "JNL_LOG_IV",       0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
@@ -118,7 +122,7 @@ static CLI_ENTRY mup_crypt_type_qual[] = {
 { "" }
 };
 
-static CLI_ENTRY mup_downgrade_dbver_qual[] = {
+static CLI_ENTRY mup_downgrade_dbver_qual[] = {		/* DOWNGRADE -DBVER */
 { "V4",      0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 { "V5",      0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 { "V63000A", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
@@ -130,25 +134,25 @@ static	CLI_PARM mup_dumpfhead_parm[] = {
 { "", "",           		PARM_REQ}
 };
 
-static CLI_ENTRY mup_dumpfhead_qual[] = {
+static CLI_ENTRY mup_dumpfhead_qual[] = {		/* DUMP -FHEAD */
 { "FILE",   mupip_dump_fhead, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "REGION", mupip_dump_fhead, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "" }
 };
 
-static CLI_ENTRY mup_extract_format_qual[] = {
+static CLI_ENTRY mup_extract_format_qual[] = {		/* EXTRACT -FORMAT */
 { "BINARY", 0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "GO",     0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "ZWR",    0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "" }
 };
 
-static CLI_ENTRY mup_convert_format_qual[] = {
+static CLI_ENTRY mup_convert_format_qual[] = {		/* CONVER -FORMAT */
 { "RO", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "" }
 };
 
-static CLI_ENTRY mup_jnl_show_qual[] = {
+static CLI_ENTRY mup_jnl_show_qual[] = {		/* JOURNAL -SHOW */
 { "ACTIVE_PROCESSES",    0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "ALL",                 0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "BROKEN_TRANSACTIONS", 0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
@@ -158,28 +162,28 @@ static CLI_ENTRY mup_jnl_show_qual[] = {
 { "" }
 };
 
-static CLI_ENTRY mup_load_fmt_qual[] = {
+static CLI_ENTRY mup_load_fmt_qual[] = {		/* LOAD -FORMAT */
 { "BINARY", 0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "GO",     0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "ZWR",    0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "" }
 };
 
-static CLI_ENTRY mup_load_onerror_qual[] = {
+static CLI_ENTRY mup_load_onerror_qual[] = {		/* LOAD -ONERR */
 { "INTERACTIVE", 0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "PROCEED",     0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "STOP",        0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "" }
 };
 
-static CLI_ENTRY mup_jnl_fences_qual[] = {
+static CLI_ENTRY mup_jnl_fences_qual[] = {		/* JOURNAL -FENCES */
 { "ALWAYS",  0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 { "NONE",    0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 { "PROCESS", 0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 { "" }
 };
 
-static CLI_ENTRY mup_null_subs_qual[] = {
+static CLI_ENTRY mup_null_subs_qual[] = {		/* NULLSUBS */
 { "ALWAYS",   0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_STR, 0 },
 { "EXISTING", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_STR, 0 },
 { "FALSE",    0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_STR, 0 },
@@ -188,7 +192,7 @@ static CLI_ENTRY mup_null_subs_qual[] = {
 { "" }
 };
 
-static CLI_ENTRY mup_repl_qual[] = {
+static CLI_ENTRY mup_repl_qual[] = {			/* REPLIC */
 { "OFF", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 { "ON",  0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 { "" }
@@ -200,13 +204,13 @@ static CLI_PARM	mup_backup_parm[] = {
 { "", "" }
 };
 
-static CLI_ENTRY mub_njnl_val_qual[] = {
+static CLI_ENTRY mub_njnl_val_qual[] = {		/* BACKUP -NJNL */
 { "PREVLINK", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "SYNC_IO",  0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "" }
 };
 
-static CLI_ENTRY mub_dbjnl_val_qual[] = {
+static CLI_ENTRY mub_dbjnl_val_qual[] = {		/* BACKUP -DBJNL */
 { "DISABLE", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NEG, VAL_N_A, 0 },
 { "OFF",     0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NEG, VAL_N_A, 0 },
 { "" }
@@ -217,7 +221,7 @@ static readonly CLI_PARM mub_njnl_parm[] = {
 { "", "" }
 };
 
-static	CLI_ENTRY	mup_backup_qual[] = {
+static	CLI_ENTRY	mup_backup_qual[] = {		/* BACKUP */
 { "BKUPDBJNL",     mupip_backup, 0, 0,             mub_dbjnl_val_qual, 0, 0, VAL_REQ,        2, NON_NEG, VAL_STR, 0       },
 { "BYTESTREAM",    mupip_backup, 0, 0,             0,                  0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0       },
 { "COMPREHENSIVE", mupip_backup, 0, 0,             0,                  0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0       },
@@ -242,12 +246,12 @@ static	CLI_PARM	mup_convert_parm[] = {
 { "", "",                 PARM_REQ}
 };
 
-static	CLI_ENTRY	mup_convert_qual[] = {
+static	CLI_ENTRY	mup_convert_qual[] = {		/* CONVERT */
 { "FORMAT", mupip_cvtpgm, 0, 0, mup_convert_format_qual, 0, 0, VAL_REQ, 2, NON_NEG, VAL_STR, 0 },
 { "" }
 };
 
-static	CLI_ENTRY	mup_create_qual[] = {
+static	CLI_ENTRY	mup_create_qual[] = {		/* CREATE */
 { "REGION", mupip_create, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0 },
 { "" }
 };
@@ -257,7 +261,7 @@ static readonly	CLI_PARM mup_endian_parm[] = {
 { "", "",		    PARM_REQ}
 };
 
-static readonly	CLI_ENTRY mup_endian_qual[] = {
+static readonly	CLI_ENTRY mup_endian_qual[] = {		/* ENDIAN */
 { "OUTDB",    0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 { "OVERRIDE", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "" }
@@ -268,7 +272,7 @@ static	CLI_PARM	mup_extend_parm[] = {
 { "", "",		  PARM_REQ}
 };
 
-static	CLI_ENTRY	mup_extend_qual[] = {
+static	CLI_ENTRY	mup_extend_qual[] = {		/* EXTEND */
 { "BLOCKS", mupip_extend, 0, 0, 0, 0, 0, VAL_REQ, 1, NON_NEG, VAL_NUM, 0 },
 { "" }
 };
@@ -284,7 +288,7 @@ static readonly CLI_PARM mup_extr_label_parm[] = {
 { "", "" }
 };
 
-static	CLI_ENTRY	mup_extract_qual[] = {
+static	CLI_ENTRY	mup_extract_qual[] = {		/* EXTRACT */
 { "FORMAT",   mu_extract, 0, 0,                   mup_extract_format_qual, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 { "FREEZE",   mu_extract, 0, 0,                   0,                       0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "LABEL",    mu_extract, 0, mup_extr_label_parm, 0,                       0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
@@ -303,7 +307,7 @@ static	CLI_PARM	mup_freeze_parm[] = {
 { "", "",                 PARM_REQ}
 };
 
-static	CLI_ENTRY	mup_freeze_qual[] = {
+static	CLI_ENTRY	mup_freeze_qual[] = {		/* FREEZE */
 { "AUTORELEASE", mupip_freeze, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 { "DBG",         mupip_freeze, 0, 0, 0, 0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0 },
 { "OFF",         mupip_freeze, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
@@ -319,7 +323,7 @@ static	CLI_PARM	mup_ftok_parm[] = {
 { "", "",}
 };
 
-static	CLI_ENTRY	mup_ftok_qual[] = {
+static	CLI_ENTRY	mup_ftok_qual[] = {		/* FTOK */
 { "DB",       mupip_ftok, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "HEADER",   mupip_ftok, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 { "ID",       mupip_ftok, 0, 0, 0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_NUM, 0 },
@@ -339,7 +343,7 @@ static readonly CLI_PARM mup_integ_map_parm[] = {
 { "", "" }
 };
 
-static	CLI_ENTRY	mup_integ_qual[] = {
+static	CLI_ENTRY	mup_integ_qual[] = {		/* INTEG */
 { "ADJACENCY",   mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0       },
 { "ANALYZE",     mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
 { "BLOCK",       mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, VAL_HEX },
@@ -391,13 +395,13 @@ static readonly CLI_PARM mup_jnl_fences_parm[] = {
 { "", "" }
 };
 
-static CLI_ENTRY mur_jnl_lookback_qual[] = {
+static CLI_ENTRY mur_jnl_lookback_qual[] = {		/* JOURNAL -LOOKBACK */
 { "OPERATIONS", 0, 0, 0, 0, 0, 0,            VAL_REQ, 0, NON_NEG, VAL_NUM, 0 },
 { "TIME",       0, 0, 0, 0, 0, DEFA_PRESENT, VAL_REQ, 0, NON_NEG, VAL_STR, 0 },
 { "" }
 };
 
-static CLI_ENTRY mup_trans_qual[] = {
+static CLI_ENTRY mup_trans_qual[] = {			/* TRANS */
 { "KILL", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "SET",  0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
 { "" }
@@ -408,11 +412,14 @@ static readonly CLI_PARM mup_jnl_show_parm[] = {
 { "", "" }
 };
 
-static	CLI_ENTRY	mup_journal_qual[] = {
+static	CLI_ENTRY	mup_journal_qual[] = {		/* JOURNAL */
 { "AFTER",             mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 { "APPLY_AFTER_IMAGE", mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 { "BACKWARD",          mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "BEFORE",            mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
+#ifdef DEBUG
+{ "BLOCKID",           mupip_recover, 0, 0,                     0,                     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
+#endif
 { "BROKENTRANS",       mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NEG,     VAL_STR, 0 },
 { "CHAIN",             mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 { "CHECKTN",           mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
@@ -467,7 +474,7 @@ static readonly CLI_PARM mup_load_onerror_parm[] = {
 { "", "" }
 };
 
-static	CLI_ENTRY	mup_load_qual[] = {
+static	CLI_ENTRY	mup_load_qual[] = {			/* LOAD */
 { "BEGIN",         mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
 { "BLOCK_DENSITY", mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_NUM, 0 },
 { "END",           mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
@@ -485,7 +492,7 @@ static readonly CLI_PARM mup_reorg_ff_parm[] = {
 };
 
 /* USER_DEFINED_REORG is currently undocumented */
-static  CLI_ENTRY       mup_reorg_qual[] = {
+static  CLI_ENTRY       mup_reorg_qual[] = {		/* REORG */
 { "DOWNGRADE",          mupip_reorg, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 { "ENCRYPT",            mupip_reorg, 0, 0,                 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
 { "EXCLUDE",            mupip_reorg, 0, 0,                 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
@@ -510,7 +517,7 @@ static  CLI_ENTRY       mup_reorg_qual[] = {
 /*
  * MUPIP SIZE
  */
-static CLI_ENTRY mup_size_heuristic_qual[] = {
+static CLI_ENTRY mup_size_heuristic_qual[] = {		/* SIZE -HEURISTIC */
 { "ARSAMPLE",  0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0      },
 { "IMPSAMPLE", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0      },
 { "LEVEL",     0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0      }, /* VAL_STR to be able to get negative values */
@@ -519,7 +526,7 @@ static CLI_ENTRY mup_size_heuristic_qual[] = {
 { "SEED",      0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, VAL_DCM},
 { "" }
 };
-static  CLI_ENTRY	mup_size_qual[] = {
+static  CLI_ENTRY	mup_size_qual[] = {		/* SIZE */
 { "ADJACENCY", 0, 0, 0, 0,                       0, 0, VAL_REQ, 1, NON_NEG, VAL_NUM, 0	},
 { "HEURISTIC", 0, 0, 0, mup_size_heuristic_qual, 0, 0, VAL_REQ, 1, NON_NEG, VAL_STR, 0	},
 { "REGION",    0, 0, 0, 0,                       0, 0, VAL_REQ, 1, NON_NEG, VAL_STR, 0	},
@@ -539,7 +546,7 @@ static readonly CLI_PARM gtmrecv_helpers_parm[] = {
 {"", "",                             PARM_REQ}
 };
 
-static	CLI_ENTRY	inst_edit_qual[] = {
+static	CLI_ENTRY	inst_edit_qual[] = {		/* INSTEDIT */
 {"CHANGE",     0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_STR, 0       },
 {"CLEANSLOTS", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0       },
 {"DETAIL",     0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
@@ -552,12 +559,12 @@ static	CLI_ENTRY	inst_edit_qual[] = {
 { "" }
 };
 
-static CLI_ENTRY	inst_freeze_qual[] = {
+static CLI_ENTRY	inst_freeze_qual[] = {	/* instance -freeze */
 {"COMMENT", 0, 0, 0, 0, 0, 0, VAL_NOT_REQ, 0, NEG, VAL_STR, 0 },
 { "" }
 };
 
-static CLI_ENTRY	gtmsource_qual[] = {
+static CLI_ENTRY	gtmsource_qual[] = {	/* REPLIC -SOURCE */
 {"ACTIVATE",             0, 0,                0,                      0, 0,                                  0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 {"BUFFSIZE",             0, 0,                0,                      0, 0,                                  0, VAL_REQ,        0, NON_NEG, VAL_NUM, 0 },
 {"CHANGELOG",            0, 0,                0,                      0, 0,                                  0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
@@ -600,12 +607,12 @@ static readonly CLI_PARM gtmrecv_timeout_parm[] = {
 {"", "",          PARM_REQ}
 };
 
-static CLI_ENTRY gtmrecv_autorlbk_qual[] = {
+static CLI_ENTRY gtmrecv_autorlbk_qual[] = {	/* REPLIC -RECEIVE -AUTOROLLBACK */
 { "VERBOSE", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 { "" }
 };
 
-static CLI_ENTRY	gtmrecv_qual[] = {
+static CLI_ENTRY	gtmrecv_qual[] = {	/* REPLIC -RECEIVE */
 {"AUTOROLLBACK",       0, 0, 0,                    gtmrecv_autorlbk_qual, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_STR, 0 },
 {"BUFFSIZE",           0, 0, 0,                    0,                     0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, 0 },
 {"CHANGELOG",          0, 0, 0,                    0,                     0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
@@ -634,11 +641,11 @@ static CLI_ENTRY	gtmrecv_qual[] = {
 { "" }
 };
 
-static CLI_ENTRY	updproc_qual[] = {
+static CLI_ENTRY	updproc_qual[] = {	/* UPDPROC */
 { "" }
 };
 
-static	CLI_ENTRY	inst_cre_qual[] = {
+static	CLI_ENTRY	inst_cre_qual[] = {	/* -INSTANCE_CREATE */
 {"NAME",          0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
 {"NOREPLACE",     0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 {"QDBRUNDOWN",    0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG,     VAL_N_A, 0 },
@@ -651,7 +658,7 @@ static	CLI_PARM	mup_reorg_parm[] = {
 { "", "", PARM_REQ}
 };
 
-static	CLI_ENTRY	updhelp_qual[] = {
+static	CLI_ENTRY	updhelp_qual[] = {	/* UPDATE_HELPER */
 { "READER", (void(*)(void))updhelper_reader, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 { "WRITER", (void(*)(void))updhelper_writer, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 { "" }
@@ -663,7 +670,7 @@ static	CLI_PARM	mup_replicate_parm[] = {
 { "", "" , PARM_REQ}
 };
 
-static	CLI_ENTRY	mup_replicate_qual[] = {
+static	CLI_ENTRY	mup_replicate_qual[] = {	/* REPLICATE */
 { "EDITINSTANCE",    repl_inst_edit,           inst_edit_qual, 0, 0, cli_disallow_mupip_replic_editinst,  0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "INSTANCE_CREATE", repl_inst_create,         inst_cre_qual,  0, 0, 0,                                   0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 { "RECEIVER",        (void(*)(void))gtmrecv,   gtmrecv_qual,   0, 0, cli_disallow_mupip_replic_receive,   0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
@@ -679,7 +686,7 @@ static	CLI_PARM	mup_restore_parm[] = {
 { "", "" , PARM_REQ}
 };
 
-static	CLI_ENTRY	mup_restore_qual[] = {
+static	CLI_ENTRY	mup_restore_qual[] = {	/* RESTORE */
 { "EXTEND",     mupip_restore, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "NETTIMEOUT", mupip_restore, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
 { "" }
@@ -693,7 +700,7 @@ static	CLI_PARM	mup_rundown_parm[] = {
 /* Note: "R" is a duplicate of "REGION". It is there so -R usages continue to be treated as -REGION and not have an
  * ambiguity with "RELINKCTL".
  */
-static	CLI_ENTRY	mup_rundown_qual[] = {
+static	CLI_ENTRY	mup_rundown_qual[] = {		/* RUNDOWN */
 { "CLEANJNL",  mupip_rundown,    0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 }, /* DBG-only qualifier */
 { "FILE",      mupip_rundown,    0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "OVERRIDE",  mupip_rundown,    0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
@@ -718,7 +725,7 @@ static readonly CLI_PARM mup_set_ftime_parm[] = {
 { "", "" }
 };
 
-static	CLI_ENTRY	mup_set_qual[] = {
+static	CLI_ENTRY	mup_set_qual[] = {		/* SET */
 { "ACCESS_METHOD",        mupip_set, 0, 0,                  mup_set_acc_qual,     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0       },
 { "ASYNCIO",              mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0       },
 { "BYPASS",               mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0       },
@@ -764,7 +771,7 @@ static	CLI_ENTRY	mup_set_qual[] = {
 { "" }
 };
 
-static 	CLI_ENTRY	mup_crypt_qual[] = {
+static 	CLI_ENTRY	mup_crypt_qual[] = {		/* CRYPT */
 { "DECRYPT", mupip_crypt, 0, 0, 0,                   0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "FILE",    mupip_crypt, 0, 0, 0,                   0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 { "LENGTH",  mupip_crypt, 0, 0, 0,                   0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
@@ -784,7 +791,7 @@ static readonly CLI_PARM mup_trig_sel_parm[] = {
 { "", "" }
 };
 
-static 	CLI_ENTRY	mup_trigger_qual[] = {
+static 	CLI_ENTRY	mup_trigger_qual[] = {		/* TRIGGER */
 { "NOPROMPT",    mupip_trigger, 0, 0,                 0, 0, 0, VAL_NOT_REQ,    0, NON_NEG, VAL_STR, 0 },
 { "SELECT",      mupip_trigger, 0, mup_trig_sel_parm, 0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
 { "STDIN",       mupip_trigger, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
@@ -810,7 +817,7 @@ static	CLI_PARM	mup_downgrade_parm[] = {
 { "", "",           PARM_REQ}
 };
 
-static	CLI_ENTRY	mup_downgrade_qual[] = {
+static	CLI_ENTRY	mup_downgrade_qual[] = {	/* DOWNGRADE */
 { "VERSION", mupip_downgrade, 0, 0, mup_downgrade_dbver_qual, 0, 0, VAL_REQ, 1, NON_NEG, VAL_STR, 0 },
 { "" }
 };

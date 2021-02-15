@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -123,5 +123,5 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 		free(last);
 	}
 	if (EXIT_NRM != rundown_status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTALLDBRNDWN);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOTALLDBRNDWN);
 }

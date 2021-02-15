@@ -30,7 +30,7 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"
+#include "hashtab_int8.h"
 #include "tp.h"
 #include "gvcst_blk_build.h"
 #include "t_qread.h"
@@ -89,8 +89,13 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	cw_set_element		*cse;
 	off_chain		chain1, chain2;
 	srch_blk_status		*tp_srch_status, *srch_status, *leaf_blk_hist;
+<<<<<<< HEAD
 	boolean_t		already_built, expand_prev_key, is_mm, skip_search_blk;
 	ht_ent_int4		*tabent;
+=======
+	boolean_t		already_built, is_mm, long_blk_id;
+	ht_ent_int8		*tabent;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	sm_uc_ptr_t		buffaddr;
 	trans_num		blkhdrtn, oldest_hist_tn;
 	int			hist_size;
@@ -196,11 +201,11 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 				tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain1.cw_index, &cse);
 			} else
 			{
-				nBlkId = (block_id)leaf_blk_hist->blk_num;
+				nBlkId = leaf_blk_hist->blk_num;
 				tp_srch_status = leaf_blk_hist->first_tp_srch_status;
 				if ((NULL == tp_srch_status)
-						&& (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use,
-											(uint4 *)&leaf_blk_hist->blk_num))))
+						&& (NULL != (tabent = lookup_hashtab_int8(sgm_info_ptr->blks_in_use,
+											(ublock_id *)&leaf_blk_hist->blk_num))))
 					tp_srch_status = tabent->value;
 				ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(tp_srch_status, sgm_info_ptr);
 				cse = (NULL != tp_srch_status) ? tp_srch_status->cse : NULL;
@@ -454,6 +459,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	tn = cs_addrs->ti->curr_tn;
 	if (NULL == (pBlkBase = t_qread(nBlkId, (sm_int_ptr_t)&cycle, &cr)))
 		return (enum cdb_sc)rdfail_detail;
+	long_blk_id = IS_64_BLK_ID(pBlkBase);
 	nLevl = ((blk_hdr_ptr_t)pBlkBase)->levl;
 	if (MAX_BT_DEPTH <= (int)nLevl)
 	{
@@ -524,7 +530,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_rmisalign;
 		}
-		GET_BLK_ID(nBlkId, pRec + n0 - SIZEOF(block_id));
+		READ_BLK_ID(long_blk_id, &nBlkId, pRec + n0 - SIZEOF_BLK_ID(long_blk_id));
 		if (is_mm)
 		{
 			PUT_BLK_ID(&chain2, nBlkId);
@@ -536,12 +542,16 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 					return cdb_sc_blknumerr;
 			}
 		}
-		if (BSTAR_REC_SIZE != n0)
+		if (bstar_rec_size(long_blk_id) != n0)
 			pNonStar = pCurr;
 		pCurr--;
 		pCurr->tn = cs_addrs->ti->curr_tn;
 		if (NULL == (pBlkBase = t_qread(nBlkId, (sm_int_ptr_t)&pCurr->cycle, &pCurr->cr)))
 			return (enum cdb_sc)rdfail_detail;
+		/* Recalculating long_blk_id when a new block is read accounts for a DB with a mix of
+		 * V7 and V6 blocks which will be necessary for the V6->V7 upgrade
+		 */
+		long_blk_id = IS_64_BLK_ID(pBlkBase);
 		pCurr->first_tp_srch_status = first_tp_srch_status;
 		if (((blk_hdr_ptr_t)pBlkBase)->levl != --nLevl)
 		{

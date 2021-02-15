@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,6 +14,10 @@
 
 #include "gtm_string.h"
 #include "gtm_signal.h"
+#include "gtm_fcntl.h"
+#include "gtm_stat.h"
+
+#include <sys/mman.h>
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -25,6 +29,7 @@
 #include "cli.h"
 #include "dse.h"
 #include "util.h"
+#include "eintr_wrappers.h"
 
 /* Include prototypes */
 #include "t_qread.h"
@@ -48,9 +53,8 @@ error_def(ERR_DSEBLKRDFAIL);
 boolean_t dse_b_dmp(void)
 {
 	cache_rec_ptr_t	cr;
-	block_id	blk, lmap_num;
-	block_cnt	count;
-	boolean_t	free, invalid_bitmap = FALSE, is_mm, was_crit, was_hold_onto_crit;
+	block_id	blk, count, lmap_num;
+	boolean_t	bm_free, invalid_bitmap = FALSE, is_mm, was_crit, was_hold_onto_crit;
 	enum db_ver	ondsk_blkver;
 #	ifndef BLK_NUM_64BIT
 	gtm_int8	count2;
@@ -58,6 +62,11 @@ boolean_t dse_b_dmp(void)
 	int4		bplmap, dummy_int, head, iter1, iter2, len, mapsize, nocrit_present, util_len, lmap_indx, mask2;
 	sm_uc_ptr_t	bp, b_top, mb, rp;
 	unsigned char	mask, util_buff[MAX_UTIL_LEN];
+	char		image_fn[MAX_FN_LEN + 1];
+	unsigned short	image_fn_len = SIZEOF(image_fn);
+	int		image_fd, image_status;
+	struct stat     image_stat_buf;
+	boolean_t	use_image = FALSE;
 
 	head = cli_present("HEADER");
 	if (BADDSEBLK == (blk = dse_getblk("BLOCK", DSEBMLOK, DSEBLKCUR)))		/* WARNING: assignment */
@@ -80,6 +89,34 @@ boolean_t dse_b_dmp(void)
 			return FALSE;
 	} else
 		count = 1;
+#ifdef DEBUG
+	if (CLI_PRESENT == cli_present("IMAGE"))
+	{
+		if (FALSE == cli_get_str("IMAGE", image_fn, &image_fn_len))
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		image_fn[image_fn_len] = '\0';
+		image_fd = OPEN(image_fn, O_RDONLY);
+		if (FD_INVALID == image_fd)
+		{
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(13) ERR_SYSCALL, 5, LEN_AND_LIT("open"), CALLFROM,
+				errno, 0, ERR_TEXT, 2, image_fn_len, image_fn);
+		}
+		FSTAT_FILE(image_fd, &image_stat_buf, image_status);
+		if (-1 == image_status)
+		{
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(13) ERR_SYSCALL, 5, LEN_AND_LIT("fstat"), CALLFROM,
+				errno, 0, ERR_TEXT, 2, image_fn_len, image_fn);
+		}
+		bp = (sm_uc_ptr_t)mmap(NULL, image_stat_buf.st_size, PROT_READ, MAP_PRIVATE, image_fd, 0);
+		if (NULL == bp)
+		{
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(13) ERR_SYSCALL, 5, LEN_AND_LIT("mmap"), CALLFROM,
+				errno, 0, ERR_TEXT, 2, image_fn_len, image_fn);
+		}
+		util_out_print(0, TRUE);
+		use_image = TRUE;
+	}
+#endif
 	util_out_print(0, TRUE);
 	bplmap = cs_addrs->hdr->bplmap;
 	is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
@@ -90,13 +127,17 @@ boolean_t dse_b_dmp(void)
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	for ( ; ; )
 	{
+		if (!use_image && !(bp = t_qread(blk, &dummy_int, &cr)))
+		{
+			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		}
+#ifdef DEBUG
+		else if (use_image)
+			util_out_print("Dumping contents of !AD", TRUE, image_fn_len, image_fn);
+#endif
 		if (((blk / bplmap) * bplmap) != blk)
 		{
-			if (!(bp = t_qread(blk, &dummy_int, &cr)))
-			{
-				DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
-			}
 			if (((blk_hdr_ptr_t) bp)->levl && patch_is_fdmp)
 			{
 				DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
@@ -122,7 +163,13 @@ boolean_t dse_b_dmp(void)
 				util_len += i2hexl_nofill(((blk_hdr_ptr_t)bp)->tn, &util_buff[util_len], MAX_HEX_INT8);
 				memcpy(&util_buff[util_len], " ", 1);
 				util_len++;
-				ondsk_blkver = (!is_mm ? cr->ondsk_blkver : GDSV6);
+#ifdef DEBUG
+				if (use_image)
+					ondsk_blkver = ((blk_hdr_ptr_t)bp)->bver;
+				else
+#endif
+				ondsk_blkver = (0 < ((blk_hdr_ptr_t)bp)->bsiz) ?
+						((blk_hdr_ptr_t)bp)->bver : cs_addrs->hdr->desired_db_format;
 				len = STRLEN(gtm_dbversion_table[ondsk_blkver]);
 				memcpy(&util_buff[util_len], gtm_dbversion_table[ondsk_blkver], len);
 				util_len += len;
@@ -147,11 +194,6 @@ boolean_t dse_b_dmp(void)
 				util_out_print(0, TRUE);
 		} else if (!patch_is_fdmp)
 		{
-			if (!(bp = t_qread(blk, &dummy_int, &cr)))
-			{
-				DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
-			}
 			if (CLI_NEGATED != head)
 			{
 				if (0 == bplmap)
@@ -171,10 +213,10 @@ boolean_t dse_b_dmp(void)
 					util_out_print((caddr_t)util_buff, TRUE );
 				} else
 				{
-					mb = cs_addrs->bmm + blk / (8 * bplmap);
+					mb = cs_addrs->bmm + (blk / (8 * bplmap));
 					lmap_num = blk / bplmap;
 					mask = 1 << (lmap_num - ((lmap_num / 8) * 8));
-					free = mask & *mb;
+					bm_free = mask & *mb;
 					memcpy(util_buff, "Block ", 6);
 					util_len = 6;
 					util_len += i2hexl_nofill(blk, &util_buff[util_len], MAX_HEX_INT8);
@@ -186,9 +228,8 @@ boolean_t dse_b_dmp(void)
 					util_len += i2hexl_nofill(((blk_hdr_ptr_t)bp)->tn, &util_buff[util_len], MAX_HEX_INT8);
 					memcpy(&util_buff[util_len], " ", 1);
 					util_len++;
-					ondsk_blkver = (!is_mm ? cr->ondsk_blkver : GDSV6);
-					len = STRLEN(gtm_dbversion_table[ondsk_blkver]);
-					memcpy(&util_buff[util_len], gtm_dbversion_table[ondsk_blkver], len);
+					len = STRLEN(gtm_dbversion_table[((blk_hdr_ptr_t)bp)->bver]);
+					memcpy(&util_buff[util_len], gtm_dbversion_table[((blk_hdr_ptr_t)bp)->bver], len);
 					util_len += len;
 					util_buff[util_len] = 0;
 					util_out_print((caddr_t)util_buff, FALSE, ((blk_hdr_ptr_t)bp)->levl );
@@ -196,7 +237,7 @@ boolean_t dse_b_dmp(void)
 					memcpy(&util_buff[util_len], "   Master Status: !AD!/",23);
 					util_len = 23;
 					util_buff[util_len] = 0;
-					util_out_print((caddr_t)util_buff, TRUE, free ? 10 : 4, free ? "Free Space" : "Full");
+					util_out_print((caddr_t)util_buff, TRUE, bm_free ? 10 : 4, bm_free ? "Free Space" : "Full");
 				}
 			}
 			if (CLI_PRESENT != head)
@@ -249,7 +290,7 @@ boolean_t dse_b_dmp(void)
 				{
 					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs,
 									gv_cur_region);
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_BITMAPSBAD);
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_BITMAPSBAD);
 				}
 			}
 		}

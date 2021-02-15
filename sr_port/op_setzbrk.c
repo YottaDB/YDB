@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -94,7 +94,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt, boolean_t 
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZBRKCNTNEGATIVE, 1, cnt);
 	}
 	if (RESTRICTED(zbreak_op))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZBREAK");
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZBREAK");
 
 	MV_FORCE_STR(rtn);
 	MV_FORCE_STR(lab);
@@ -112,7 +112,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt, boolean_t 
 #		ifdef GTM_TRIGGER
 		IS_TRIGGER_RTN(&rtn->str, is_trigger);
 		if (is_trigger && (RESTRICTED(trigger_mod)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZBREAK");
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZBREAK");
 		DBGIFTRIGR((stderr, "op_setzbrk: Setting/clearing a zbreak in a trigger\n"));
 #		endif
 		flush_pio();
@@ -140,13 +140,13 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt, boolean_t 
 				op_zlink(rtn, NULL);
 				routine = find_rtn_hdr(&rtn->str);
 				if (NULL == routine)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, rtn->str.len, rtn->str.addr,
-						  ERR_ZLMODULE, 2, mid_len(&zlink_mname), &zlink_mname.c[0]);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, rtn->str.len, rtn->str.addr,
+						ERR_ZLMODULE, 2, mid_len(&zlink_mname), &zlink_mname.c[0]);
 			}
 		}
 		lab_name = NULL;
 		if (NULL == (line_offset_addr = find_line_addr(routine, &lab->str, offset, &lab_name)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPLACE);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOPLACE);
 		else if (CANCEL_ONE == cnt)	/* Cancel ZBREAK */
 		{
 			addr = (zb_code *)LINE_NUMBER_ADDR(CURRENT_RHEAD_ADR(routine), line_offset_addr);
@@ -168,7 +168,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt, boolean_t 
 #			endif
 			MEMVCMP(GTM_DMOD, (SIZEOF(GTM_DMOD) - 1), routine->routine_name.addr, routine->routine_name.len, sstatus);
 			if (!sstatus)				/* sstatus == 0 meaning this is the GTM$DMOD routine - error out */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVZBREAK);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVZBREAK);
 			op_commarg(act, indir_linetail); 	/* This puts entry in stack and also increments refcnt field */
 			indir_src.str = act->str;
 			indir_src.code = indir_linetail;

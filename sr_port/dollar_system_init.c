@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2019 Fidelity National Information	*
+ * Copyright (c) 2002-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -54,6 +54,15 @@ void dollar_system_init(struct startup_vector *svec)
 		memcpy(stringpool.free, svec->sysid_ptr->addr, svec->sysid_ptr->len);
                 stringpool.free += svec->sysid_ptr->len ;
 	}
+<<<<<<< HEAD
+=======
+#	ifdef UNIX
+	else if (SS_LOG2LONG == status)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(SYSID), SIZEOF(buf) - 1);
+#	endif
+	else
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(SYSID), status);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	assert(stringpool.free < stringpool.top);	/* it's process initialization after all */
 	return;
 }

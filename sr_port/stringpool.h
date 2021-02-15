@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -81,10 +81,10 @@ MBSTART {											\
 
 #define	ENSURE_STP_FREE_SPACE(SPC)						\
 {										\
-	int	lcl_spc_needed;							\
+	uint4	lcl_spc_needed;							\
 										\
 	/* Note down space needed in local to avoid multiple computations */	\
-	lcl_spc_needed = SPC;							\
+	lcl_spc_needed = (uint4)SPC;						\
 	if (!IS_STP_SPACE_AVAILABLE(lcl_spc_needed))				\
 		INVOKE_STP_GCOL(lcl_spc_needed);				\
 	assert(IS_STP_SPACE_AVAILABLE(lcl_spc_needed));				\

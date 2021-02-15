@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,23 +48,33 @@ GBLREF struct NTD *ntd_root;
 GBLREF struct CLB *proc_to_clb[];	/* USHRT_MAX + 1 so procnum can wrap */
 GBLREF jnl_process_vector *originator_prc_vec;
 
+<<<<<<< HEAD
 cm_op_t gtcmtr_initproc(void)
+=======
+error_def(CMERR_INVPROT);
+error_def(ERR_TOOMANYCLIENTS);
+
+bool gtcmtr_initproc(void)
+>>>>>>> 451ab477 (GT.M V7.0-000)
 {
 	unsigned char *reply;
         unsigned short beginprocnum;
         size_t jpv_size;
 	protocol_msg myproto;
 
+<<<<<<< HEAD
 	error_def(CMERR_INVPROT);
         error_def(ERR_TOOMANYCLIENTS);
 
 	ASSERT_IS_LIBGNPSERVER;
+=======
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	reply = curr_entry->clb_ptr->mbf;
 	assert(*reply == CMMS_S_INITPROC);
 	reply++;
 	gtcm_protocol(&myproto);
 	if (!gtcm_protocol_match((protocol_msg *)reply, &myproto))
-		rts_error(VARLSTCNT(1) CMERR_INVPROT);
+		RTS_ERROR_ABT(VARLSTCNT(1) CMERR_INVPROT);
 	curr_entry->query_is_queryget = gtcm_is_query_queryget((protocol_msg *)reply, &myproto);
 	curr_entry->err_compat = gtcm_err_compat((protocol_msg *)reply, &myproto);
 	curr_entry->cli_supp_allowexisting_stdnullcoll = (0 <= memcmp(reply + CM_LEVEL_OFFSET, CMM_STDNULLCOLL_MIN_LEVEL, 3));
@@ -98,7 +113,7 @@ cm_op_t gtcmtr_initproc(void)
         {
 		procnum++;	/* OK to wrap since proc_to_clb is proper size */
 		if (beginprocnum == procnum)
-			rts_error(VARLSTCNT(1) ERR_TOOMANYCLIENTS);
+			RTS_ERROR_ABT(VARLSTCNT(1) ERR_TOOMANYCLIENTS);
 	}
 	curr_entry->procnum = procnum;
         proc_to_clb[procnum] = curr_entry->clb_ptr;

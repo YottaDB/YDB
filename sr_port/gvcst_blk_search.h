@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2018 Fidelity National Information	*
+ * Copyright (c) 2015-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -61,6 +61,7 @@ GBLREF	uint4			dollar_tlevel;
 	register int		nFlg, nTargLen, nMatchCnt, nTmp;
 	sm_uc_ptr_t		pBlkBase, pRecBase, pTop, pRec, pPrevRec;
 	unsigned char		*pCurrTarg, *pTargKeyBase;
+	boolean_t		long_blk_id;
 #	ifdef GVCST_SEARCH_TAIL
 	unsigned char		*pOldKeyBase, *pCurrTargPos;
 	int			tmp_cmpc;
@@ -109,6 +110,7 @@ GBLREF	uint4			dollar_tlevel;
 	 */
 	DBG_CHECK_SRCH_HIST_AND_CSE_BUFFER_MATCH(pStat);
 	pBlkBase = pStat->buffaddr;
+	long_blk_id = IS_64_BLK_ID(pBlkBase);
 #	ifndef GVCST_SEARCH_EXPAND_PREVKEY
 #		ifdef GVCST_SEARCH_BLK
 		level0 = (0 == ((blk_hdr_ptr_t)pBlkBase)->levl);
@@ -346,7 +348,7 @@ GBLREF	uint4			dollar_tlevel;
 			if (nTmp < nMatchCnt)
 			{	/* Terminate on compression count < previous match, this key is after the target */
 #				ifdef GVCST_SEARCH_BLK
-				if ((BSTAR_REC_SIZE == nRecLen) && !level0)
+				if ((bstar_rec_size(long_blk_id) == nRecLen) && !level0)
 					/* Star key has size of SIZEOF(rec_hdr) + SIZEOF(block_id), make match = 0 */
 					nTargLen = 0;
 				else
@@ -371,7 +373,7 @@ GBLREF	uint4			dollar_tlevel;
 			else
 			{	/* Key is after target*/
 #				ifdef GVCST_SEARCH_BLK
-				if ((BSTAR_REC_SIZE == nRecLen) && !level0)
+				if ((bstar_rec_size(long_blk_id) == nRecLen) && !level0)
 					/* Star key has size of SIZEOF(rec_hdr) + SIZEOF(block_id), make match = 0 */
 					nTargLen = 0;
 				else

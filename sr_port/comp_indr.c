@@ -1,10 +1,15 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2013 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,9 +65,9 @@ void comp_indr(mstr *obj)
 		if (msp <= stacktop)
 		{
 			msp = save_msp;
-			rts_error(VARLSTCNT(1) ERR_STACKOFLOW);
+			RTS_ERROR_ABT(VARLSTCNT(1) ERR_STACKOFLOW);
 		} else
-			rts_error(VARLSTCNT(1) ERR_STACKCRIT);
+			RTS_ERROR_ABT(VARLSTCNT(1) ERR_STACKCRIT);
 	}
 	syms = msp;
 	*sf = *frame_pointer;

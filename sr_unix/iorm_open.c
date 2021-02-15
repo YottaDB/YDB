@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -154,16 +154,16 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		d_rm->fildes = fd;
 		FSTAT_FILE(fd, &statbuf, fstat_res);
 		if (-1 == fstat_res)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
-				      dev_name->dollar_io, ERR_TEXT, 2,	LEN_AND_LIT("Error in fstat"), errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
+				dev_name->dollar_io, ERR_TEXT, 2,	LEN_AND_LIT("Error in fstat"), errno);
 		for (p_offset = 0; iop_eol != *(pp->str.addr + p_offset); )
 		{
 			if (iop_append == (ch = *(pp->str.addr + p_offset++)))
 			{
 				if (!d_rm->fifo && !d_rm->is_pipe && (off_t)-1 == (size = lseek(fd, 0, SEEK_END)))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
-						      dev_name->dollar_io,
-						      ERR_TEXT, 2, LEN_AND_LIT("Error setting file pointer to end of file"), errno);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
+						dev_name->dollar_io,
+						ERR_TEXT, 2, LEN_AND_LIT("Error setting file pointer to end of file"), errno);
 				if (0 < statbuf.st_size)
 				{	/* Only disable BOM writing if there is something in the file already (not empty) */
 					d_rm->done_1st_read = FALSE;
@@ -198,15 +198,15 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 
 				/* lseek to file position for nodestroy */
 				if ((off_t)-1 == (size =lseek (fd, new_position, SEEK_SET)))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
-						      dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
-						      LEN_AND_LIT("Error setting file pointer to the current position"), errno);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
+						dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
+						LEN_AND_LIT("Error setting file pointer to the current position"), errno);
 			} else
 			{
 				if ((off_t)-1 == (size = lseek(fd, 0, SEEK_CUR)))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
-						      dev_name->dollar_io, ERR_TEXT, 2,
-						      LEN_AND_LIT("Error setting file pointer to the current position"), errno);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
+						dev_name->dollar_io, ERR_TEXT, 2,
+						LEN_AND_LIT("Error setting file pointer to the current position"), errno);
 				/* clear some status if the close was nodestroy but not saving state.  The file pointer
 				 will be at the beginning or at the end if append is TRUE */
 				if (closed_nodestroy)
@@ -246,8 +246,8 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 			if (NULL == d_rm->filstr)
 				FDOPEN(d_rm->filstr, fd, "w");	/* Try open WO */
 			if (NULL == d_rm->filstr)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
-					      dev_name->dollar_io, ERR_TEXT, 2, LEN_AND_LIT("Error in stream open"), errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
+					dev_name->dollar_io, ERR_TEXT, 2, LEN_AND_LIT("Error in stream open"), errno);
 		}
 	} else
 		assert((dev_open == iod->state) && (-2 == fd));	/* caller "io_open_try" should have ensured this */
@@ -262,8 +262,8 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 #		ifdef __MVS__
 		/* need to get file tag info before set policy which can change what is returned */
 		if (-1 == gtm_zos_check_tag(fd, &file_tag, &text_tag))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io, ERR_TEXT,
-				      2, LEN_AND_LIT("Error in check_tag fstat"), errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io, ERR_TEXT,
+				2, LEN_AND_LIT("Error in check_tag fstat"), errno);
 		SET_CHSET_FROM_TAG(file_tag, iod->file_chset);
 		iod->text_flag = text_tag;
 		if (!d_rm->is_pipe && 2 < fd)
@@ -282,9 +282,9 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 				if (-1 == gtm_zos_set_tag(fd, file_tag, text_tag, TAG_FORCE, &realfiletag))
 				{
 					errmsg = STRERROR(errno);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_BADTAG, 4, dev_name->len,
-						      dev_name->dollar_io, realfiletag, file_tag, ERR_TEXT, 2,
-						      RTS_ERROR_STRING(errmsg));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_BADTAG, 4, dev_name->len,
+						dev_name->dollar_io, realfiletag, file_tag, ERR_TEXT, 2,
+						RTS_ERROR_STRING(errmsg));
 				}
 				if (gtm_utf8_mode && gtm_tag_utf8_as_ascii && (CHSET_UTF8 == iod->ochset))
 					iod->process_chset = iod->ochset;
@@ -303,8 +303,8 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 				if (-1 == (obtained_tag = gtm_zos_tag_to_policy(fd, file_tag, &realfiletag)))
 				{
 					errmsg = STRERROR(errno);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_BADTAG, 4, dev_name->len, dev_name->dollar_io,
-						      realfiletag, file_tag, ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_BADTAG, 4, dev_name->len, dev_name->dollar_io,
+						realfiletag, file_tag, ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 				}
 				SET_CHSET_FROM_TAG(obtained_tag, iod->process_chset);
 			}
@@ -325,7 +325,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		 */
 		if (d_rm->output_encrypted && append && (!newversion) && (0 != statbuf.st_size) &&
 				(!d_rm->no_destroy || !iod->dollar.zeof))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOAPPEND, 2, dev_name->len, dev_name->dollar_io);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_CRYPTNOAPPEND, 2, dev_name->len, dev_name->dollar_io);
 	}
 
 	if (!d_rm->bom_checked && !d_rm->fifo && !d_rm->is_pipe && (2 < fd) && IS_UTF_CHSET(iod->ochset))
@@ -342,13 +342,13 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 			/* get the file size again in case it was truncated */
 			FSTAT_FILE(fd, &statbuf, fstat_res);
 			if (-1 == fstat_res)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
-					      dev_name->dollar_io, ERR_TEXT, 2,	LEN_AND_LIT("Error in fstat"), errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
+					dev_name->dollar_io, ERR_TEXT, 2,	LEN_AND_LIT("Error in fstat"), errno);
 
 			/* and is not empty generate and error */
 			if (0 < statbuf.st_size)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-					      ERR_TEXT, 2, LEN_AND_LIT("Cannot read BOM from non-empty WRITEONLY file"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+					ERR_TEXT, 2, LEN_AND_LIT("Cannot read BOM from non-empty WRITEONLY file"));
 
 			/* it is empty so set bom_checked as it will be 0 for all
 			   but UTF-16 which will be set in iorm_write.c on the first write */
@@ -369,17 +369,17 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 				if (0 < bom_size_toread)
 				{
 					if ((off_t)-1 == lseek(fd, 0, SEEK_SET))
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
-							      dev_name->dollar_io, ERR_TEXT, 2,
-							      LEN_AND_LIT("Error setting file pointer to beginning of file"),
-							      errno);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
+							dev_name->dollar_io, ERR_TEXT, 2,
+							LEN_AND_LIT("Error setting file pointer to beginning of file"),
+							errno);
 					d_rm->bom_num_bytes = open_get_bom(iod, bom_size_toread);
 					/* move back to previous file position */
 					if ((off_t)-1 == lseek(fd, d_rm->file_pos, SEEK_SET))
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
-							      dev_name->dollar_io, ERR_TEXT, 2,
-							      LEN_AND_LIT("Error setting file pointer to previous file position"),
-							      errno);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
+							dev_name->dollar_io, ERR_TEXT, 2,
+							LEN_AND_LIT("Error setting file pointer to previous file position"),
+							errno);
 
 				}
 				d_rm->bom_checked = TRUE;
@@ -417,9 +417,9 @@ int	open_get_bom(io_desc *io_ptr, int bom_size)
 	DOREADRL(rm_ptr->fildes, &rm_ptr->bom_buf[0], bom_size, status);
 	if (0 > status)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-			      RTS_ERROR_LITERAL("read"),
-			      RTS_ERROR_LITERAL("READING BOM"), CALLFROM, errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7,
+			RTS_ERROR_LITERAL("read"),
+			RTS_ERROR_LITERAL("READING BOM"), CALLFROM, errno);
 	} else if (0 == status)
 	{
 		num_bom_bytes = 0;

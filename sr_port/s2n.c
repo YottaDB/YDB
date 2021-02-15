@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -176,9 +176,13 @@ char *s2n(mval *u)
 			{
 				u->mvtype &= ~NUM_MASK;
 				if (!TREF(compile_time))
+<<<<<<< HEAD
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
 				else
 					TREF(s2n_intlit) = 0;	/* "advancewindow" relies on this */
+=======
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NUMOFLOW);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			} else
 			{
 				u->e = x;

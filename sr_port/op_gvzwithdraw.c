@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -60,11 +60,11 @@ void op_gvzwithdraw(void)
 	SETUP_THREADGBL_ACCESS;
 	/* If specified var name is global ^%Y*, the name is illegal to use in a SET or KILL command, only GETs are allowed */
 	if ((RESERVED_NAMESPACE_LEN <= gv_currkey->end) && (0 == MEMCMP_LIT(gv_currkey->base, RESERVED_NAMESPACE)))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PCTYRESERVED);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_PCTYRESERVED);
 	if (gv_cur_region->read_only)
 	{
 		assert(cs_addrs == &FILE_INFO(gv_cur_region)->s_addrs);
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	}
 	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc(NONULLSUBS);

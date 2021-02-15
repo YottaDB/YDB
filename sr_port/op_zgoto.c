@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2017 Fidelity National Information	*
+ * Copyright (c) 2011-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -61,13 +61,13 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
         if (0 > level)
 	{	/* Negative level specified, means to use relative level change */
 		if ((-level) > curlvl)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOLTZERO);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGOTOLTZERO);
 		level += curlvl;	/* Compute relative desired level */
 	} else
 	{	/* Else level is the level we wish to achieve - compute unrolls necessary */
 		if (0 > (curlvl - level))
 			/* Couldn't get to the level we were trying to unwind to */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOTOOBIG);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGOTOTOOBIG);
 	}
 	/* Migrate mval parm contents to private buffers since the mvals could die as we unwind things */
 	MV_FORCE_STR(rtn_name);
@@ -89,7 +89,7 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 		 * was NULL.
 		 */
 		if ((0 == lblname.str.len) && !offset)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RTNNAME);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RTNNAME);
 		rtnhdr = frame_pointer->rvector;
 		ARLINK_ONLY(TADR(lnk_proxy)->rtnhdr_adr = rtnhdr);
 		DBGINDCOMP((stderr, "op_zgoto: routine resolved to 0x"lvaddr" (1)\n", rtnhdr));
@@ -117,13 +117,30 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 	lnrptr = op_labaddr(rtnhdr, &lblname, offset);
 #	endif
 	assert(NULL != lnrptr);
+<<<<<<< HEAD
+=======
+#	ifdef VMS
+	/* VMS does not support unlink so any level 0 request that passes earlier checks just generates an error
+	 * since the base frame cannot be rewritten as a GTM frame.
+	 */
+	if (0 == level)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGOTOINVLVL2);
+#	endif
+#	ifdef GTM_TRIGGER
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	if (!IS_GTM_IMAGE && (1 >= level))
 		/* In MUPIP (or other utility that gets trigger support in the future), levels 0 and 1 refer to
 		 * the pseudo baseframe and initial stack levels which are not rewritable (in the case where an
 		 * entry ref was coded) and are not resume-able (if no entry ref were specified) so we cannot
 		 * permit ZGOTOs to these levels in a utility.
 		 */
+<<<<<<< HEAD
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZGOTOINVLVL, 3, GTMIMAGENAMETXT(image_type), level);
+=======
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_ZGOTOINVLVL, 3, GTMIMAGENAMETXT(image_type), level);
+#	endif
+#	ifdef UNIX
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	/* One last check if we are unlinking, make sure no call-in frames exist on our stack */
 	if (0 == level)
 	{
@@ -132,9 +149,15 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 			fpprev = fp->old_frame_pointer;
 			if (!(fp->type & SFT_COUNT))
 				continue;
+<<<<<<< HEAD
 			if (fp->type & SFT_CI)
 				/* We have a call-in base frame - cannot do unlink */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOCALLOUTIN);
+=======
+			if (fp->flags & SFF_CI)
+				/* We have a call-in frame - cannot do unlink */
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGOCALLOUTIN);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			if (NULL == fpprev)
 			{	/* Next frame is some sort of base frame */
 				if (fp->type & SFT_TRIGR)

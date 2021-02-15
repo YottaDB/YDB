@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD:sr_port/merrors_ansi.h
  * Copyright (c) 2001-2022 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information 	*
+>>>>>>> 451ab477 (GT.M V7.0-000):sr_i386/merrors_ansi.h
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.*
@@ -140,17 +144,17 @@ const static readonly int error_ansi[] = {
 	   0,	/* MEMORY */
 	   0,	/* DONOBLOCK */
 	   0,	/* ZATRANSCOL */
-	   0,	/* UNUSEDMSG307 */
-	   0,	/* UNUSEDMSG308 */
-	   0,	/* UNUSEDMSG309 */
-	   0,	/* UNUSEDMSG310 */
-	   0,	/* UNUSEDMSG311 */
-	   0,	/* UNUSEDMSG312 */
+	   0,	/* VIEWREGLIST */
+	   0,	/* NUMERR */
+	   0,	/* NUM64ERR */
+	   0,	/* UNUM64ERR */
+	   0,	/* HEXERR */
+	   0,	/* HEX64ERR */
 	   0,	/* UNUSEDMSG313 */
 	   0,	/* UNUSEDMSG314 */
 	   0,	/* JNLTMQUAL3 */
 	  57,	/* MULTLAB */
-	   0,	/* BLKCNT */
+	   0,	/* GTMCURUNSUPP */
 	   0,	/* CCEDUMPOFF */
 	   0,	/* NOPLACE */
 	   0,	/* JNLCLOSE */
@@ -204,7 +208,7 @@ const static readonly int error_ansi[] = {
 	   6,	/* LVUNDEF */
 	   0,	/* UNIMPLOP */
 	  39,	/* VAREXPECTED */
-	   0,	/* VARRECBLKSZ */
+	   0,	/* UNUSEDMSG371 */
 	   0,	/* MAXARGCNT */
 	   0,	/* GTMSECSHRSEMGET */
 	   0,	/* VIEWARGCNT */
@@ -378,7 +382,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NETLCKFAIL */
 	   0,	/* TTINVFILTER */
 	   0,	/* UNUSEDMSG544 */
-	   0,	/* UNUSEDMSG545 */
+	   0,	/* WCSFLUFAIL */
 	   0,	/* BADTRNPARAM */
 	   0,	/* DSEONLYBGMM */
 	   0,	/* DSEINVLCLUSFN */
@@ -611,7 +615,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* KRNLKILL */
 	   0,	/* MEMORYRECURSIVE */
 	   0,	/* FREEZEID */
-	   0,	/* BLKWRITERR */
+	   0,	/* UNUSEDMSG778 */
 	   0,	/* DSEINVALBLKID */
 	   0,	/* PINENTRYERR */
 	   0,	/* BCKUPBUFLUSH */
@@ -786,7 +790,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBMBPFRDLBM */
 	   0,	/* DBMBPFRINT */
 	   0,	/* DBMAXKEYEXC */
-	   0,	/* DBMXRSEXCMIN */
+	   0,	/* UNUSEDMSG953 */
 	   0,	/* MUPIPSET2SML */
 	   0,	/* DBREADBM */
 	   0,	/* DBCOMPTOOLRG */
@@ -843,7 +847,11 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOTALLDBOPN */
 	   0,	/* MUSELFBKUP */
 	   0,	/* DBDANGER */
+<<<<<<< HEAD:sr_port/merrors_ansi.h
 	   0,	/* UNUSEDMSG1012 */
+=======
+	   0,	/* UNUSEDMSG1010 */
+>>>>>>> 451ab477 (GT.M V7.0-000):sr_i386/merrors_ansi.h
 	   0,	/* TCGETATTR */
 	   0,	/* TCSETATTR */
 	   0,	/* IOWRITERR */
@@ -884,7 +892,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* FILTERBADCONV */
 	   0,	/* PRIMARYISROOT */
 	   0,	/* GVQUERYGETFAIL */
-	   0,	/* DBCREC2BIGINBLK */
+	   0,	/* UNUSEDMSG1051 */
 	  19,	/* MERGEDESC */
 	   0,	/* MERGEINCOMPL */
 	   0,	/* DBNAMEMISMATCH */
@@ -948,7 +956,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLALIGNSZCHG */
 	   0,	/* SEFCTNEEDSFULLB */
 	   0,	/* GVFAILCORE */
-	   0,	/* DBCDBNOCERTIFY */
+	   0,	/* UNUSEDMSG1115 */
 	   0,	/* DBFRZRESETSUC */
 	   0,	/* JNLFILEXTERR */
 	   0,	/* JOBEXAMDONE */
@@ -1045,18 +1053,18 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBBTUWRNG */
 	   0,	/* DBBTUFIXED */
 	   0,	/* DBMAXREC2BIG */
-	   0,	/* DBCSCNNOTCMPLT */
-	   0,	/* DBCBADFILE */
-	   0,	/* DBCNOEXTND */
-	   0,	/* DBCINTEGERR */
+	   0,	/* UNUSEDMSG1212 */
+	   0,	/* UNUSEDMSG1213 */
+	   0,	/* UNUSEDMSG1214 */
+	   0,	/* UNUSEDMSG1215 */
 	   0,	/* DBMINRESBYTES */
-	   0,	/* DBCNOTSAMEDB */
-	   0,	/* DBCDBCERTIFIED */
-	   0,	/* DBCMODBLK2BIG */
-	   0,	/* DBCREC2BIG */
-	   0,	/* DBCCMDFAIL */
-	   0,	/* DBCKILLIP */
-	   0,	/* DBCNOFINISH */
+	   0,	/* UNUSEDMSG1217 */
+	   0,	/* UNUSEDMSG1218 */
+	   0,	/* UNUSEDMSG1219 */
+	   0,	/* UNUSEDMSG1220 */
+	   0,	/* UNUSEDMSG1221 */
+	   0,	/* UNUSEDMSG1222 */
+	   0,	/* UNUSEDMSG1223 */
 	   0,	/* DYNUPGRDFAIL */
 	   0,	/* MMNODYNDWNGRD */
 	   0,	/* MMNODYNUPGRD */
@@ -1549,4 +1557,9 @@ const static readonly int error_ansi[] = {
 	   0,	/* BADCONNECTPARAM */
 	   0,	/* BADPARAMCOUNT */
 	   0,	/* REPLALERT */
+	   0,	/* SHUT2QUICK */
+	   0,	/* REPLNORESP */
+	   0,	/* REPL0BACKLOG */
+	   0,	/* REPLBACKLOG */
+	   0,	/* INVSHUTDOWN */
 	};

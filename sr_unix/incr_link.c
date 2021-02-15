@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -453,10 +453,10 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		}
 #		endif
 		if ((lcl_compiler_qlf & CQ_UTF8) && !gtm_utf8_mode)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVOBJFILE, 2, fname_len, fname, ERR_TEXT, 2,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_INVOBJFILE, 2, fname_len, fname, ERR_TEXT, 2,
 				LEN_AND_LIT("Object compiled with CHSET=UTF-8 which is different from $ZCHSET"));
 		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVOBJFILE, 2, fname_len, fname, ERR_TEXT, 2,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_INVOBJFILE, 2, fname_len, fname, ERR_TEXT, 2,
 				LEN_AND_LIT("Object compiled with CHSET=M which is different from $ZCHSET"));
 	}
 	/* We need to check if this is a relink of an already linked routine. To do that, we need to be able to fetch
@@ -566,7 +566,7 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			 */
 			ZOS_FREE_TEXT_SECTION;
 			zl_error_hskpng(linktyp, file_desc, RECENT_ZHIST);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, fname_len, fname, ERR_TEXT, 2,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, fname_len, fname, ERR_TEXT, 2,
 				LEN_AND_LIT("Object file size > 4Gb cannot be auto-relinked"));
 		}
 		shdr = rtnobj_shm_malloc(recent_zhist, *file_desc, hdr->object_len, hdr->objhash);
@@ -912,7 +912,8 @@ STATICFNDEF boolean_t addr_fix(int file, unsigned char *shdr, linktype linktyp, 
 	res_list		*res_root, *new_res, *res_temp, *res_temp1;
 	unsigned char		*symbols, *sym_temp, *sym_temp1, *symtop, *res_addr;
 	struct relocation_info	rel[RELREAD], *rel_ptr;
-	int			numrel, rel_read, string_size, sym_size, i;
+	int			numrel, rel_read, string_size, i;
+	unsigned int		sym_size;
 	ssize_t			status;
 	mident_fixed		rtnid, labid;
 	mstr			rtn_str;
@@ -1057,7 +1058,8 @@ STATICFNDEF boolean_t addr_fix(int file, unsigned char *shdr, linktype linktyp, 
 				return FALSE;
 			}
 		}
-		sym_size = (int)(sym_temp1 - sym_temp);
+		assert(sym_temp1 >= sym_temp);
+		sym_size = (unsigned int)(sym_temp1 - sym_temp);
 		assert(sym_size <= MAX_MIDENT_LEN);
 		memcpy(&rtnid.c[0], sym_temp, sym_size);
 		rtnid.c[sym_size] = 0;
@@ -1083,7 +1085,8 @@ STATICFNDEF boolean_t addr_fix(int file, unsigned char *shdr, linktype linktyp, 
 					return FALSE;
 				}
 			}
-			sym_size = (int)(sym_temp1 - sym_temp);
+			assert(sym_temp1 >= sym_temp);
+			sym_size = (unsigned int)(sym_temp1 - sym_temp);
 			assert(sym_size <= MAX_MIDENT_LEN);
 			memcpy(&labid.c[0], sym_temp, sym_size);
 			labid.c[sym_size] = 0;
@@ -1101,7 +1104,7 @@ STATICFNDEF boolean_t addr_fix(int file, unsigned char *shdr, linktype linktyp, 
 			{	/* Look our target label up in the routines label table */
 				label = rtn->labtab_adr;
 				labtop = label + rtn->labtab_len;
-				for (; label < labtop && ((sym_size != label->lab_name.len) ||
+				for (; label < labtop && ((sym_size != (unsigned int)label->lab_name.len) ||
 							  memcmp(&labid.c[0], label->lab_name.addr, sym_size)); label++)
 					;
 				if (label < labtop)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2020 Fidelity National Information	*
+ * Copyright (c) 2015-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -496,7 +496,7 @@ void mupip_reorg_encrypt(void)
 			csd->encryption_hash_cutoff = curbmp;
 			bml_sm_buff = t_qread(curbmp, (sm_int_ptr_t)&cycle, &cr); /* now that in crit, note down stable buffer */
 			if (NULL == bml_sm_buff)
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 			/* Take a copy of the shared memory bitmap buffer into process-private memory before releasing crit. We are
 			 * interested in those blocks that are currently marked as USED in the bitmap. It is possible that once we
 			 * release crit, concurrent updates change the bitmap state of those blocks. In that case, those updates
@@ -881,7 +881,7 @@ void release_ftok_semaphore(gd_region *reg, sgmnt_addrs *csa, sgmnt_data_ptr_t c
 	 * releasing the ftok in the middle of the reorg encrypt process and we do not want to modify the counter in those cases.
 	 */
 	if (!ftok_sem_release(reg, FALSE, FALSE))
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 	FTOK_TRACE(csa, csd->trans_hist.curr_tn, ftok_ops_release, process_id);
 	udi->grabbed_ftok_sem = FALSE;
 }
@@ -904,7 +904,7 @@ void switch_journal_file(sgmnt_addrs *csa, sgmnt_data_ptr_t csd)
 	if (0 == jnl_status)
 	{
 		if (EXIT_ERR == SWITCH_JNL_FILE(jpc))
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_JNLEXTEND, 2, JNL_LEN_STR(csd));
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_JNLEXTEND, 2, JNL_LEN_STR(csd));
 	} else
 	{
 		if (SS_NORMAL != jpc->status)

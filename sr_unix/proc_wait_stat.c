@@ -79,6 +79,9 @@ void wb_gtm8863_lock_pause(void *csa_generic, wait_state ws, int incval)
 
 	if( (ws == ydb_white_box_test_case_count) && never_fired)
 	{
+		if ((WS_11 == gtm_white_box_test_case_count) && IS_MUPIP_IMAGE) /* Don't step on mupip during this test */
+			return;
+
 		close(creat("gtm8863.lck", 0666));
 		while(0 == stat("gtm8863.lck", &statbuf))
 		{

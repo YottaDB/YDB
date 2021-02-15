@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -62,7 +62,7 @@ void gvcmz_errmsg(struct CLB *c, bool close)
 	if (1 != msgnum)	/* Need to start with msg 1 for severity and signal values */
 	{
 		assert(FALSE);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_BADSRVRNETMSG);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADSRVRNETMSG);
 	}
 	CM_GET_SHORT(msglen, bufptr, li->convert_byteorder);
 	bufptr += SIZEOF(short);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -91,7 +91,7 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 				do_all = TRUE;
 				break;
 			default:
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSHOWBADFUNC);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZSHOWBADFUNC);
 		}
 	}
 	if (do_all)

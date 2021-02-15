@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +19,9 @@
 
 GBLREF spdesc stringpool;
 
+error_def(ERR_INVBITPOS);
+error_def(ERR_INVBITSTR);
+
 static unsigned char	mask[8] = {1,128,64,32,16,8,4,2};
 
 void op_fnzbitset(mval *dst, mval *bitstr, int pos, int truthval)
@@ -25,20 +29,17 @@ void op_fnzbitset(mval *dst, mval *bitstr, int pos, int truthval)
 	int		mp, np, str_len;
 	unsigned char	*byte_1, *dist_byte, byte_len;
 
-	error_def(ERR_INVBITSTR);
-	error_def(ERR_INVBITPOS);
-
 	MV_FORCE_STR(bitstr);
 
 	if (!bitstr->str.len)
-		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
 
 	byte_len = *(unsigned char *)bitstr->str.addr;
 	str_len = (bitstr->str.len - 1) * 8;
 	if (7 < byte_len)
-		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
 	if ((1> pos) || (pos > str_len - byte_len))
-		rts_error(VARLSTCNT(1) ERR_INVBITPOS);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITPOS);
 	ENSURE_STP_FREE_SPACE(bitstr->str.len);
 	dist_byte = (unsigned char *)stringpool.free;
 	byte_1 = (unsigned char *)bitstr->str.addr;

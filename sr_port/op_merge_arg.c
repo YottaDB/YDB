@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -113,10 +113,10 @@ void op_merge_arg(int m_opr_type, lv_val *lvp)
 		   * operation won't work */
 			assert(dba_cm == gv_cur_region->dyn.addr->acc_meth); /* we should've covered all access methods */
 			end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(14) ERR_UNIMPLOP, 0,
-				  	        ERR_TEXT, 2, LEN_AND_LIT("GT.CM server does not support MERGE operation"),
-				  		ERR_GVIS, 2, end - buff, buff,
-				  		ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(14) ERR_UNIMPLOP, 0,
+				ERR_TEXT, 2, LEN_AND_LIT("GT.CM server does not support MERGE operation"),
+				ERR_GVIS, 2, end - buff, buff,
+				ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
 		}
 		break;
 	default:

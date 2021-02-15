@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -105,7 +105,7 @@ void	op_dmode(void)
 	{	/* Tried and failed 2x to write to principal device */
 		kill = TRUE;
 		prin_out_dev_failure = TRUE;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TERMWRITE, 0, old_errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_TERMWRITE, 0, old_errno);
 	}
 	++loop_cnt;
 	old_errno = errno;

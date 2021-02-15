@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -223,9 +223,9 @@ boolean_t merge_desc_check(void)
 		if (0 == (end2 = format_targ_key(buff2, MAX_ZWR_KEY_SZ, gvkey2, TRUE)))
 			end2 = &buff2[MAX_ZWR_KEY_SZ - 1];
 		if (gvkey1->end > gvkey2->end)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MERGEDESC, 4, end1 - buff1, buff1, end2 - buff2, buff2);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_MERGEDESC, 4, end1 - buff1, buff1, end2 - buff2, buff2);
 		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MERGEDESC, 4, end2 - buff2, buff2, end1 - buff1, buff1);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_MERGEDESC, 4, end2 - buff2, buff2, end1 - buff1, buff1);
 	} else if (MARG1_IS_LCL(merge_args) && MARG2_IS_LCL(merge_args))
 	{
 		dst = mglvnp->lclp[IND1];
@@ -244,14 +244,14 @@ boolean_t merge_desc_check(void)
 			if (0 == dollardata_src)
 				return 0; /* NOOP - merge x(subs)=x, but x is undefined */
 			end2 = format_key_lv_val(src, buff2, SIZEOF(buff2));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MERGEDESC, 4, end1 - buff1, buff1, end2 - buff2, buff2);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_MERGEDESC, 4, end1 - buff1, buff1, end2 - buff2, buff2);
 		}
 		if (lcl_arg1_is_desc_of_arg2(src, dst))
 		{
 			/* No need of UNDO_ACTIVE_LV since src is a descendant of dst and so $data(dst) is != 0 */
 			end1 = format_key_lv_val(dst, buff1, SIZEOF(buff1));
 			end2 = format_key_lv_val(src, buff2, SIZEOF(buff2));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MERGEDESC, 4, end2 - buff2, buff2, end1 - buff1, buff1);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_MERGEDESC, 4, end2 - buff2, buff2, end1 - buff1, buff1);
 		}
 		if (LV_IS_BASE_VAR(src))
 		{	/* source is unsubscripted. check if source is empty */

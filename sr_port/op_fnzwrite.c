@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
@@ -38,6 +38,7 @@ void op_fnzwrite(boolean_t direction, mval* src, mval* dst)
 	{
 		done = FALSE;
 		if (direction)
+<<<<<<< HEAD
 		{	/* Check if it is the special string $ZYSQLNULL. If so transform it back to the mval `literal_sqlnull` */
 			if ((DOLLAR_ZYSQLNULL_STRLEN == src->str.len)
 				&& !memcmp(src->str.addr, DOLLAR_ZYSQLNULL_STRING, DOLLAR_ZYSQLNULL_STRLEN))
@@ -49,6 +50,21 @@ void op_fnzwrite(boolean_t direction, mval* src, mval* dst)
 		{	/* Source mval is $ZYSQLNULL. Convert it to the string literal $ZYSQLNULL and return. */
 			ENSURE_STP_FREE_SPACE(DOLLAR_ZYSQLNULL_STRLEN);
 			MEMCPY_LIT(stringpool.free, DOLLAR_ZYSQLNULL_STRING);
+=======
+		{
+			tmp_mstr.addr = (char *)stringpool.free;
+			ok = zwr2format(&src->str, &tmp_mstr);
+			dst_len = ok ? tmp_mstr.len : 0;
+			dst->str.addr = tmp_mstr.addr;
+			DBG_MARK_STRINGPOOL_EXPANDABLE;
+		} else
+		{
+			dst_len = str_len;
+			format2zwr((sm_uc_ptr_t)src->str.addr, src->str.len, (uchar_ptr_t)stringpool.free, &dst_len);
+			DBG_MARK_STRINGPOOL_EXPANDABLE;
+			if (MAX_STRLEN < dst_len)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			dst->str.addr = (char *)stringpool.free;	/* deferred in case dst == str */
 			dst->str.len = DOLLAR_ZYSQLNULL_STRLEN;
 			dst->mvtype = MV_STR;

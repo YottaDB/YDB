@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2020 Fidelity National Information	*
+ * Copyright (c) 2017-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -86,12 +86,17 @@ GBLREF	boolean_t			ydb_dist_ok_to_use;
 GBLREF	char				ydb_dist[YDB_PATH_MAX];
 GBLREF	boolean_t			dollar_zaudit;
 
+<<<<<<< HEAD
 STATICFNDCL void append_filter(char *fpath, char *c_call_name, char *m_ref_name);
 
+=======
+>>>>>>> 451ab477 (GT.M V7.0-000)
 error_def(ERR_RESTRICTSYNTAX);
+error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_APDINITFAIL);
 
+<<<<<<< HEAD
 #define	PUT_FLNAME_IN_MAPPING_FILE(RPATH, FPATH, C_CALL_NAME, M_REF_NAME, CREATED_NOW, CREATED_NOW_INITIALIZED)		\
 {															\
 	uint4		dummy_stat_rm;											\
@@ -162,15 +167,65 @@ void	append_filter(char *fpath, char *c_call_name, char *m_ref_name)
 	if (0 != fclose_res)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("append_filter() fclose() for" COMM_FILTER_FILENAME), CALLFROM, errno);
+=======
+static inline boolean_t OPEN_MAPPING_FILE(struct stat *stat, char *fpath, FILE **fp, int *save_errno, char *errstr, int errstrlen)
+{
+	int		status;
+	struct stat	filtercmdStat;
+	boolean_t	createnow = FALSE;
+
+	/* File must not already be open */
+	assert(NULL == *fp);
+	Fopen(*fp, fpath, "a");
+	if (*fp)
+	{	/* If this created the file, current position will be zero */
+		createnow = (0 == ftell(*fp));
+		/* Check if restriction file timestamp changed and refresh as needed */
+		FSTAT_FILE(fileno(*fp), &filtercmdStat, status);
+		if (stat->st_mtime > filtercmdStat.st_mtime)
+		{
+			freopen(fpath, "w", *fp);
+			if (NULL == *fp)
+			{
+				*save_errno = errno;
+				SNPRINTF(errstr, errstrlen, "freopen() : %s", COMM_FILTER_FILENAME);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+							 LEN_AND_STR(errstr), CALLFROM, *save_errno);
+			} else
+				createnow = TRUE;
+		}
+	} else	/* (NULL == *fp) */
+	{	/* File append/create failed */
+		*save_errno = errno;
+		if ((EACCES != *save_errno) && (EROFS != *save_errno))
+		{	/* Not having permissions to write the file is common, avoid flooding syslog */
+			SNPRINTF(errstr, errstrlen, "fopen() : %s", COMM_FILTER_FILENAME);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, *save_errno);
+		}
+	}
+
+	return createnow;
+}
+
+#define	UPDATE_FILTCMDMAP_FILE(FP, CREATENOW, C_CALL_NAME, M_REF_NAME)						\
+{														\
+	if (CREATENOW)	/* Append entry to newly created file */						\
+		fprintf(FP, "%s : gtm_long_t* %s(I:gtm_char_t*, O:gtm_string_t*)\n", C_CALL_NAME, M_REF_NAME);	\
+>>>>>>> 451ab477 (GT.M V7.0-000)
 }
 
 void restrict_init(void)
 {
+<<<<<<< HEAD
 	char		rfpath[YDB_PATH_MAX], rcfpath[YDB_PATH_MAX];
+=======
+	char		restrictpath[GTM_PATH_MAX], filtcmdpath[GTM_PATH_MAX];
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	char		logger_info[MAX_LOGGER_INFO_LEN + 1];
 	char		linebuf[MAX_READ_SZ + 1], *lbp, facility[MAX_FACILITY_LEN + 1], group_or_flname[MAX_GROUP_LEN + 1];
 	char		*host_info, *opt_strt, *apd_opts_strt, *apd_opts_end;
 	int		save_errno, fields, status, lineno, logger_info_len, opt_len;
+<<<<<<< HEAD
 	FILE		*rfp;
 	boolean_t	restrict_one, restrict_all = FALSE;
 	struct group	grp, *grpres;
@@ -238,46 +293,139 @@ void restrict_init(void)
 									|| ('\0' == *(apd_opts_end + 1)))
 							{	/* End of options list was not found
 								 * or reached end of line - parse error
+=======
+	FILE		*restrictfp, *filtcmdfp = NULL;
+	boolean_t	restrict_one, restrict_default = FALSE, restrict_all = FALSE;
+	struct group	grp, *grpres;
+	char		*grpbuf = NULL;
+	size_t		grpbufsz, audit_prefix_len = 0;
+	boolean_t	created_now = FALSE, tls = FALSE, audit_opread = FALSE;
+	struct stat 	restrictStat;
+	uid_t		euid, fuid;
+	gid_t		egid, fgid;
+	int		rest_owner_perms, rest_group_perms, rest_other_perms;
+
+	assert(!restrict_initialized);
+	assert(gtm_dist_ok_to_use);
+	SNPRINTF(restrictpath, GTM_PATH_MAX, "%s/%s", gtm_dist, RESTRICT_FILENAME);
+	SNPRINTF(filtcmdpath, GTM_PATH_MAX, "%s/%s", gtm_dist, COMM_FILTER_FILENAME);
+
+	Fopen(restrictfp, restrictpath, "r");
+	if (NULL == restrictfp)
+	{	/* No read access or the file does not exist */
+		save_errno = errno;
+		if (ENOENT == save_errno)	/* No file implies unrestricted */
+			restrict_all = FALSE;
+		else if (EACCES == save_errno)	/* Can't read implies no access */
+			restrict_all = TRUE;
+		else if (ENAMETOOLONG == save_errno)	/* Also a hinky "Can't read" situation */
+			restrict_all = TRUE;
+		else 				/* Some other reason which we don't expect */
+		{
+			/* Catch-22: Can't call assert (which is not libc assert()) without setting restrict_initialized */
+			restrict_initialized = TRUE;
+			restrict_all = TRUE;
+			assert(FALSE);
+		}
+	} else
+	{	/* The file exists, check permissions */
+		euid = GETEUID();
+		egid = GETEGID();
+		FSTAT_FILE(fileno(restrictfp), &restrictStat, status);
+		if (-1 != status)
+		{
+			rest_owner_perms = (0200 & restrictStat.st_mode);
+			rest_group_perms = (0020 & restrictStat.st_mode);
+			rest_other_perms = (0002 & restrictStat.st_mode);
+			/* Anyone with write permissions sets the restriction default to FALSE */
+			restrict_default = !(rest_other_perms || (rest_owner_perms && (euid == restrictStat.st_uid))
+					|| (rest_group_perms
+					&& ((egid == restrictStat.st_gid)
+						|| (gtm_member_group_id(euid, restrictStat.st_gid, NULL)))));
+		} else	/* Treat a stat failure as full restrictions */
+			restrict_default = TRUE;
+		/* Read the file, line by line. */
+		lineno = 0;
+		do
+		{
+			FGETS_FILE(linebuf, MAX_READ_SZ, restrictfp, lbp);
+			if (NULL != lbp)
+			{
+				lineno++;
+				fields = SSCANF(linebuf, FACILITY_FMTSTR " : " GROUP_FMTSTR,
+									facility, group_or_flname);
+				if (0 == fields)
+					continue;	/* Ignore blank lines */
+				else if (0 == STRNCASECMP(facility, APD_ENABLE, STRLEN(APD_ENABLE)))
+				{	/* Direct mode auditing entry found */
+					if (!IS_MUMPS_IMAGE)
+						continue;	/* Skip direct mode auditing entry
+								 * when mumps image isn't running
+>>>>>>> 451ab477 (GT.M V7.0-000)
 								 */
-								send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5)
-										ERR_RESTRICTSYNTAX, 3,
-										LEN_AND_STR(rfpath), lineno);
-							}
-							host_info = apd_opts_end + 1;	/* Head of logger connection info */
-							/* Iterate through comma-separated string of options for auditing */
-							while (apd_opts_strt < apd_opts_end)
-							{
-								while ((apd_opts_strt < apd_opts_end) && ((',' == *apd_opts_strt)
-											|| (' ' == *apd_opts_strt)
-											|| ('\t' == *apd_opts_strt)))
-									apd_opts_strt++;	/* Ignore white space and commas */
-								/* Now have start of a direct mode auditing option token */
-								opt_strt = apd_opts_strt;
-								/* Look for token terminator */
-								while ((apd_opts_strt < apd_opts_end) && (',' != *apd_opts_strt)
-										&& ('\t' != *apd_opts_strt)
-										&& (' ' != *apd_opts_strt))
-									apd_opts_strt++;	/* Skip char not space or comma */
-								/* Have end of token */
-								opt_len = apd_opts_strt - opt_strt;
-								if (0 == opt_len)
-									break;	/* Can happen if value had trailing
-										 * space(s) and/or comma(s)
-										 */
-								if ((apd_opts_strt < apd_opts_end) && (',' == *apd_opts_strt))
-									apd_opts_strt++;           /* forward space past comma */
-								/* See if this is a valid dmode auditing option */
-								if ((AUDIT_OPT_OPREAD_LEN == opt_len)
-										&& (0 == STRNCASECMP(opt_strt,
-													AUDIT_OPT_OPREAD,
-													AUDIT_OPT_OPREAD_LEN)))
-									audit_opread = TRUE;
+					fields = SSCANF(linebuf, FACILITY_FMTSTR " : %s",
+										facility, logger_info);
+					logger_info_len = STRLEN(logger_info);
+					if (MAX_LOGGER_INFO_LEN <= logger_info_len)
+					{	/* The line is longer than we can store - treat as parse error */
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9)
+								ERR_RESTRICTSYNTAX, 3,
+								LEN_AND_STR(restrictpath), lineno,
+								ERR_TEXT, 2,
+								LEN_AND_LIT("Line too long"));
+					}
+					apd_opts_strt = (char *)logger_info;	/* Head of comma-separated string */
+					/* Look for end (':') of comma-separated options string */
+					apd_opts_end = apd_opts_strt;
+					while ((apd_opts_strt + logger_info_len > apd_opts_end)
+							&& (':' != *apd_opts_end))
+						apd_opts_end++;	/* Ignore everything until ':' found */
+					if ((apd_opts_strt + logger_info_len <= apd_opts_end)
+							|| (':' != *apd_opts_end)
+							|| ('\0' == *(apd_opts_end + 1)))
+					{	/* End of options list was not found
+						 * or reached end of line - parse error
+						 */
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5)
+								ERR_RESTRICTSYNTAX, 3,
+								LEN_AND_STR(restrictpath), lineno);
+					}
+					host_info = apd_opts_end + 1;	/* Head of logger connection info */
+					/* Iterate through comma-separated string of options for auditing */
+					while (apd_opts_strt < apd_opts_end)
+					{
+						while ((apd_opts_strt < apd_opts_end) && ((',' == *apd_opts_strt)
+									|| (' ' == *apd_opts_strt)
+									|| ('\t' == *apd_opts_strt)))
+							apd_opts_strt++;	/* Ignore white space and commas */
+						/* Now have start of a direct mode auditing option token */
+						opt_strt = apd_opts_strt;
+						/* Look for token terminator */
+						while ((apd_opts_strt < apd_opts_end) && (',' != *apd_opts_strt)
+								&& ('\t' != *apd_opts_strt)
+								&& (' ' != *apd_opts_strt))
+							apd_opts_strt++;	/* Skip char not space or comma */
+						/* Have end of token */
+						opt_len = apd_opts_strt - opt_strt;
+						if (0 == opt_len)
+							break;	/* Can happen if value had trailing
+								 * space(s) and/or comma(s)
+								 */
+						if ((apd_opts_strt < apd_opts_end) && (',' == *apd_opts_strt))
+							apd_opts_strt++;           /* forward space past comma */
+						/* See if this is a valid dmode auditing option */
+						if ((AUDIT_OPT_OPREAD_LEN == opt_len)
+								&& (0 == STRNCASECMP(opt_strt,
+											AUDIT_OPT_OPREAD,
+											AUDIT_OPT_OPREAD_LEN)))
+							audit_opread = TRUE;
 #								ifdef GTM_TLS
-								else if ((AUDIT_OPT_TLS_LEN == opt_len)
-										&& (0 == STRNCASECMP(opt_strt, AUDIT_OPT_TLS,
-													AUDIT_OPT_TLS_LEN)))
-									tls = TRUE;
+						else if ((AUDIT_OPT_TLS_LEN == opt_len)
+								&& (0 == STRNCASECMP(opt_strt, AUDIT_OPT_TLS,
+											AUDIT_OPT_TLS_LEN)))
+							tls = TRUE;
 #								endif
+<<<<<<< HEAD
 								else
 								{	/* Invalid option - parse error and restrict everything */
 									send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9)
@@ -390,37 +538,160 @@ void restrict_init(void)
 						else if (0 == STRNCASECMP(facility, RESTRICT_LOGDENIALS,
 								SIZEOF(RESTRICT_LOGDENIALS)))
 							restrictions.logdenials = restrict_one;
+=======
+>>>>>>> 451ab477 (GT.M V7.0-000)
 						else
-						{	/* Parse error - restrict everything */
-							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_RESTRICTSYNTAX, 3,
-									LEN_AND_STR(rfpath), lineno);
+						{	/* Invalid option - parse error and restrict everything */
+							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9)
+									ERR_RESTRICTSYNTAX, 3,
+									LEN_AND_STR(restrictpath), lineno,
+									ERR_TEXT, 2,
+									LEN_AND_LIT("Invalid auditing option"));
 							restrict_all = TRUE;
 							break;
 						}
 					}
-				} while (!restrict_all && !feof(rfp));
-				FCLOSE(rfp, status);
-				if (NULL != grpbuf)
-					free(grpbuf);
+					if (restrict_all)
+						break;
+					/* Initialize Direct Mode Auditing with the provided info */
+					if (0 > dm_audit_init(host_info, tls))
+					{	/* Treat error in auditing initialization as parse error. */
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RESTRICTSYNTAX, 3,
+								LEN_AND_STR(restrictpath), lineno, ERR_APDINITFAIL);
+						restrict_all = TRUE;
+						break;
+					}
+					if (audit_opread)
+						restrictions.dm_audit_enable = AUDIT_ENABLE_DMRDMODE;
+					else
+						restrictions.dm_audit_enable = AUDIT_ENABLE_DMODE;
+					dollar_zaudit = TRUE;
+					continue;
+				}
+				else if (1 == fields)
+					restrict_one = restrict_default;
+				else if (2 == fields)
+				{
+					if (NULL == grpbuf)
+					{
+						SYSCONF(_SC_GETGR_R_SIZE_MAX, grpbufsz);
+						grpbuf = malloc(grpbufsz);
+					}
+					assert(NULL != grpbuf);
+					if (0 == STRNCASECMP(facility, ZSYSTEM_FILTER, SIZEOF(ZSYSTEM_FILTER)))
+					{
+						restrictions.zsy_filter = TRUE;
+						if (NULL == filtcmdfp)
+							created_now = OPEN_MAPPING_FILE(&restrictStat, filtcmdpath, &filtcmdfp,
+									&save_errno, errstr, MAX_FN_LEN);
+						UPDATE_FILTCMDMAP_FILE(filtcmdfp, created_now, ZSY_C_CALL_NAME, group_or_flname);
+						continue;
+					}
+					if (0 == STRNCASECMP(facility, PIPE_FILTER, SIZEOF(PIPE_FILTER)))
+					{
+						restrictions.pipe_filter = TRUE;
+						if (NULL == filtcmdfp)
+							created_now = OPEN_MAPPING_FILE(&restrictStat, filtcmdpath, &filtcmdfp,
+									&save_errno, errstr, MAX_FN_LEN);
+						UPDATE_FILTCMDMAP_FILE(filtcmdfp, created_now, PIPE_C_CALL_NAME, group_or_flname);
+						continue;
+					}
+					status = getgrnam_r(group_or_flname, &grp, grpbuf, grpbufsz, &grpres);
+					if (0 == status)
+					{
+						if (NULL == grpres)
+						{	/* Treat error in group lookup as parse error. */
+							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9)
+									ERR_RESTRICTSYNTAX, 3,
+									LEN_AND_STR(restrictpath), lineno, ERR_TEXT, 2,
+									LEN_AND_LIT("Unknown group"));
+							restrict_all = TRUE;
+							break;
+						} else if ((GETEGID() == grp.gr_gid) || GID_IN_GID_LIST(grp.gr_gid))
+							restrict_one = FALSE;
+						else
+							restrict_one = restrict_default;
+					} else
+					{	/* Treat error in group lookup as parse error. */
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_RESTRICTSYNTAX, 3,
+								LEN_AND_STR(restrictpath), lineno, ERR_SYSCALL, 5,
+								RTS_ERROR_LITERAL("getgrnam_r"), CALLFROM, status);
+						restrict_all = TRUE;
+						break;
+					}
+				} else
+				{
+					restrict_all = TRUE;	/* Parse error - restrict everything */
+					break;
+				}
+				if (0 == STRNCASECMP(facility, RESTRICT_BREAK, SIZEOF(RESTRICT_BREAK)))
+					restrictions.break_op = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_ZBREAK, SIZEOF(RESTRICT_ZBREAK)))
+					restrictions.zbreak_op = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_ZEDIT, SIZEOF(RESTRICT_ZEDIT)))
+					restrictions.zedit_op = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_ZSYSTEM, SIZEOF(RESTRICT_ZSYSTEM)))
+					restrictions.zsystem_op = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_PIPEOPEN, SIZEOF(RESTRICT_PIPEOPEN)))
+					restrictions.pipe_open = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_TRIGMOD, SIZEOF(RESTRICT_TRIGMOD)))
+					restrictions.trigger_mod = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_CENABLE, SIZEOF(RESTRICT_CENABLE)))
+					restrictions.cenable = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_DSE, SIZEOF(RESTRICT_DSE)))
+					restrictions.dse = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_DIRECT_MODE,
+						SIZEOF(RESTRICT_DIRECT_MODE)))
+					restrictions.dmode = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_ZCMDLINE, SIZEOF(RESTRICT_ZCMDLINE)))
+					restrictions.zcmdline = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_HALT, SIZEOF(RESTRICT_HALT)))
+					restrictions.halt_op = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_ZHALT, SIZEOF(RESTRICT_ZHALT)))
+					restrictions.zhalt_op = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_LIBRARY, SIZEOF(RESTRICT_LIBRARY)))
+					restrictions.library_load_path = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_LOGDENIALS,
+						SIZEOF(RESTRICT_LOGDENIALS)))
+					restrictions.logdenials = restrict_one;
+				else
+				{	/* Parse error - restrict everything */
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_RESTRICTSYNTAX, 3,
+							LEN_AND_STR(restrictpath), lineno);
+					restrict_all = TRUE;
+					break;
+				}
 			}
-		}
-		if (restrict_all)
-		{
-			restrictions.break_op = TRUE;
-			restrictions.zbreak_op = TRUE;
-			restrictions.zedit_op = TRUE;
-			restrictions.zsystem_op = TRUE;
-			restrictions.pipe_open = TRUE;
-			restrictions.trigger_mod = TRUE;
-			restrictions.cenable = TRUE;
-			restrictions.dse = TRUE;
-			restrictions.dmode = TRUE;
-			restrictions.zcmdline = TRUE;
-			restrictions.halt_op = TRUE;
-			restrictions.zhalt_op = TRUE;
-			restrictions.library_load_path = TRUE;
-			restrictions.logdenials = TRUE;
-		}
+		} while (!restrict_all && !feof(restrictfp));
+		if (NULL != grpbuf)
+			free(grpbuf);
+		/* Do we have write perms for unrestricted access? */
+		if ((0x1 & rest_other_perms)	/* Other has write access */
+			|| ((0x1 & rest_owner_perms) && (euid == restrictStat.st_uid)) /* euid is owner with write access */
+			|| ((0x1 & rest_group_perms) &&
+				(gtm_member_group_id(euid, restrictStat.st_gid, NULL)))) /* euid in file group with write access */
+			restrict_all = FALSE;
 	}
+	if (restrict_all)
+	{
+		restrictions.break_op = TRUE;
+		restrictions.zbreak_op = TRUE;
+		restrictions.zedit_op = TRUE;
+		restrictions.zsystem_op = TRUE;
+		restrictions.pipe_open = TRUE;
+		restrictions.trigger_mod = TRUE;
+		restrictions.cenable = TRUE;
+		restrictions.dse = TRUE;
+		restrictions.dmode = TRUE;
+		restrictions.zcmdline = TRUE;
+		restrictions.halt_op = TRUE;
+		restrictions.zhalt_op = TRUE;
+		restrictions.library_load_path = TRUE;
+		restrictions.logdenials = TRUE;
+	}
+	if (restrictfp)
+		FCLOSE(restrictfp, status);
+	if (filtcmdfp)
+		FCLOSE(filtcmdfp, status);
 	restrict_initialized = TRUE;
 }

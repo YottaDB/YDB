@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -90,9 +90,9 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 			switch(status)
 			{
 				case cdb_sc_critreset: /* As of 10/07/98, this return value is not possible */
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
 				case cdb_sc_dbccerr:
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
 				case cdb_sc_nolock:
 					return FALSE;
 				default:
@@ -115,8 +115,8 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 			 */
 			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Instance file header has file_corrupt field set to TRUE");
 			/* No need to do rel_lock before rts_error (mupip_exit_handler will do it for us) - BYPASSOK rts_error */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn),
-					ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn),
+				ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 		}
 		/* If ASSERT_NO_ONLINE_ROLLBACK, then no concurrent online rollbacks can happen at this point. So, the jnlpool
 		 * should be in in sync. There are two exceptions. If this is GT.CM GNP Server and the last client disconnected, the

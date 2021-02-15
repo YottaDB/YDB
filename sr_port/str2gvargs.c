@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2018 Fidelity National Information	*
+ * Copyright (c) 2002-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -77,7 +77,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 	spt = subsc;
 	count = 0;
 	if (0 >= len || '^' != *cp++)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOTGBL, 2, (len > 0) ? len : 0, c_ref);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NOTGBL, 2, (len > 0) ? len : 0, c_ref);
 	spt->mvtype = MV_STR;
 	spt->str.addr = cp;
 	ch = *cp;
@@ -89,12 +89,12 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 	{
 		cp++;
 		if (!(VALFIRSTCHAR_WITH_TRIG(ch)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GVINVALID, 2, len, c_ref);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_GVINVALID, 2, len, c_ref);
 		for ( ; cp < c_top && *cp != '('; )
 		{
 			ch = *cp++;
 			if (!ISALPHA_ASCII(ch) && !ISDIGIT_ASCII(ch))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GVINVALID, 2, len, c_ref);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_GVINVALID, 2, len, c_ref);
 		}
 		spt->str.len = INTCAST(cp - spt->str.addr);
 		op_gvargs->args[count] = spt;
@@ -105,7 +105,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 	if (cp < c_top)
 	{
 		if ('(' != *cp++)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LPARENREQD, 2, len, c_ref);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_LPARENREQD, 2, len, c_ref);
 		for (; ;)
 		{
 			spt->mvtype = MV_STR;
@@ -122,7 +122,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 				for (; ;)
 				{
 					if (cp == c_top)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STRUNXEOR, 2, len, c_ref);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_STRUNXEOR, 2, len, c_ref);
 					if ('\"' == *cp)
 						if ('\"' != *++cp)
 							break;
@@ -151,7 +151,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 				if (!isdolar)
 					isdolar = (5 <= c_top - cp && 'Z' == chtmp && 'C' == cp[1] && 'H' == cp[2] && '(' == cp[3]);
 				if (!isdolar)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
 
 				if ('Z' == chtmp)
 				{
@@ -166,7 +166,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 				{
 					A2I(cp, c_top, chcode);
 					if (0 > chcode)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
 
 					dstptr = (!concat) ? subsc_ptr : p1;
 
@@ -175,10 +175,10 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 						if (255 < chcode)
 						{
 							if (dollarzch)
-								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DLRCTOOBIG, 4,
+								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_DLRCTOOBIG, 4,
 									len, c_ref, LEN_AND_LIT("$CHAR()"));
 							else
-								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DLRCTOOBIG, 4,
+								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_DLRCTOOBIG, 4,
 									len, c_ref, LEN_AND_LIT("$ZCHAR()"));
 						}
 						*dstptr = chcode;
@@ -189,7 +189,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 						strnext = (char *)UTF8_WCTOMB(chcode, dstptr);
 						chlen = INTCAST(strnext - dstptr);
 						if (0 == chlen)
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DLRCILLEGAL, 3,
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DLRCILLEGAL, 3,
 								len, c_ref, chcode);
 					}
 #					endif
@@ -209,11 +209,11 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 					{
 						concat = TRUE;
 						if (++cp == c_top)
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
 						continue;
 					}
 					if (')' != *cp)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
 					break;
 				}
 				cp++;
@@ -227,7 +227,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 			{
 				dot_seen = FALSE;
 				if (!ISDIGIT_ASCII(ch) && '.' != ch && '-' != ch && '+' != ch)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
 				if (!concat)
 				{
 					spt->str.addr = subsc_ptr;
@@ -238,7 +238,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 				for (; ;)
 				{
 					if (cp == c_top)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
 					if (!ISDIGIT_ASCII(*cp))
 					{
 						if ('.' != *cp)
@@ -246,7 +246,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 						else if (!dot_seen)
 							dot_seen = TRUE;
 						else
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
 					}
 					*p1++ = *cp++;
 				}
@@ -275,9 +275,9 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 			cp++;
 		}
 		if (')' != *cp++)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RPARENREQD, 2, len, c_ref);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_RPARENREQD, 2, len, c_ref);
 		if (cp < c_top)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_EORNOTFND, 2, len, c_ref);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_EORNOTFND, 2, len, c_ref);
 	}
 	op_gvargs->count = count;
 	return naked;

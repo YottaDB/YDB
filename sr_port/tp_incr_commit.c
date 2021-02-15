@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,7 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"
+#include "hashtab_int8.h"
 #include "tp.h"
 #include "copy.h"
 #include "tp_incr_commit.h"
@@ -45,7 +45,7 @@ void tp_incr_commit(void)
 	tlevel_info		*tli, *prev_tli = NULL, *last_prev_tli = NULL;
 	global_tlvl_info 	*gtli, *prev_gtli;
 	srch_blk_status		*tp_srch_status;
-	ht_ent_int4		*tabent;
+	ht_ent_int8		*tabent;
 
 	for (si = first_sgm_info;  si != NULL;  si = si->next_sgm_info)
 	{
@@ -94,8 +94,8 @@ void tp_incr_commit(void)
 							|| (gds_t_write == cse->mode) || (kill_t_write == cse->mode));
 						if ((gds_t_create != cse->mode) && (kill_t_create != cse->mode))
 						{
-							if (NULL != (tabent = lookup_hashtab_int4(si->blks_in_use,
-													(uint4 *)&cse->blk)))
+							if (NULL != (tabent = lookup_hashtab_int8(si->blks_in_use,
+													(ublock_id *)&cse->blk)))
 								tp_srch_status = tabent->value;
 							else
 								tp_srch_status = NULL;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2018 Fidelity National Information	*
+ * Copyright (c) 2008-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -381,11 +381,11 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	{
 		PIPE_ERROR_INIT();
 		if (0 == sparams[PCOMMAND])
-		    rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-			      ERR_TEXT, 2, LEN_AND_LIT("Missing command string"));
+	    	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+	    		ERR_TEXT, 2, LEN_AND_LIT("Missing command string"));
 		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-				  ERR_TEXT, 2, LEN_AND_LIT("Command string has no value"));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+				ERR_TEXT, 2, LEN_AND_LIT("Command string has no value"));
 	} else
 	{
 		pcommand = malloc(slen[PCOMMAND] + 1);
@@ -400,16 +400,23 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 					SNPRINTF(error_str, MAX_DISPLAYED_DEVPARLEN + STR_LIT_LEN(INVALID_CMD2),
 						"%s%s", INVALID_CMD, ret_token);
 				else
+<<<<<<< HEAD
 					SNPRINTF(error_str, MAX_DISPLAYED_DEVPARLEN + STR_LIT_LEN(INVALID_CMD2),
 						"%s%s", INVALID_CMD2, ret_token);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 					  ERR_TEXT, 2, LEN_AND_STR(error_str));
+=======
+					SNPRINTF(error_str, MAXDEVPARLEN + STR_LIT_LEN(INVALID_CMD2), "%s%s", INVALID_CMD2,
+						ret_token);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+					ERR_TEXT, 2, LEN_AND_STR(error_str));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 		}
 	}
 	/* The above code is just syntax checking. Any actual operation should be below here. */
 	if (RESTRICTED(pipe_open))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "OPEN PIPE");
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "OPEN PIPE");
 	/*Filter the command first, if required*/
 	if (RESTRICTED(pipe_filter))
 	{
@@ -421,8 +428,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 				PIPE_ERROR_INIT();
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COMMFILTERERR, 4, LEN_AND_LIT(PIPEOPENSTR),
 					LEN_AND_LIT("Empty return command"));
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COMMFILTERERR, 4,
-						LEN_AND_LIT(PIPEOPENSTR),LEN_AND_LIT("Empty return command"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_COMMFILTERERR, 4,
+					LEN_AND_LIT(PIPEOPENSTR),LEN_AND_LIT("Empty return command"));
 			}
 			free(pcommand);
 			pcommand = (char*)malloc(filtered_command.length+1);
@@ -441,8 +448,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	if (sparams[PSHELL] && (0 == slen[PSHELL]))
 	{
 		PIPE_ERROR_INIT();
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-			  ERR_TEXT, 2, LEN_AND_LIT("SHELL parameter has no value"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+			ERR_TEXT, 2, LEN_AND_LIT("SHELL parameter has no value"));
 	} else if (0 != slen[PSHELL])
 	{
 		pshell = malloc(slen[PSHELL] + 1);
@@ -455,8 +462,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 			assert(GTM_MAX_DIR_LEN - 1 >= STRLEN(pshell));
 			SNPRINTF(error_str, MAX_DISPLAYED_DEVPARLEN + STR_LIT_LEN(INVALID_CMD2), "Invalid shell: %s", pshell);
 			PIPE_ERROR_INIT();
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-				  ERR_TEXT, 2, LEN_AND_STR(error_str));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+				ERR_TEXT, 2, LEN_AND_STR(error_str));
 		}
 		pshell_name = basename(pshell);
 	}
@@ -466,8 +473,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	if (sparams[PSTDERR] && (0 == slen[PSTDERR]))
 	{
 		PIPE_ERROR_INIT();
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-			  ERR_TEXT, 2, LEN_AND_LIT("STDERR parameter has no value"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+			ERR_TEXT, 2, LEN_AND_LIT("STDERR parameter has no value"));
 	} else if (0 != slen[PSTDERR])
 	{
 		pstderr = malloc(slen[PSTDERR] + 1);
@@ -481,8 +488,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	{
 		save_errno = errno;
 		PIPE_ERROR_INIT();
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-			  ERR_TEXT, 2, LEN_AND_LIT("PIPE - pipe(pfd_write) failed"), save_errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+			ERR_TEXT, 2, LEN_AND_LIT("PIPE - pipe(pfd_write) failed"), save_errno);
 	} else
 	{
 #ifdef __MVS__
@@ -501,8 +508,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		{
 			save_errno = errno;
 			PIPE_ERROR_INIT();
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - pipe(pfd_read) failed"), save_errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+				ERR_TEXT, 2, LEN_AND_LIT("PIPE - pipe(pfd_read) failed"), save_errno);
 		} else
 		{
 #ifdef __MVS__
@@ -521,8 +528,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		{
 			save_errno = errno;
 			PIPE_ERROR_INIT();
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - pipe(pfd_read_stderr) failed"), save_errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+				ERR_TEXT, 2, LEN_AND_LIT("PIPE - pipe(pfd_read_stderr) failed"), save_errno);
 		} else
 		{
 #ifdef __MVS__
@@ -544,8 +551,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	{
 		save_errno = errno;
 		PIPE_ERROR_INIT();
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-			  ERR_TEXT, 2, LEN_AND_LIT("PIPE - fork() failed"), save_errno);	/* BYPASSOK */
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+			ERR_TEXT, 2, LEN_AND_LIT("PIPE - fork() failed"), save_errno);	/* BYPASSOK */
 	}
 	if (0 == cpid)
 	{
@@ -708,8 +715,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 			{
 				save_errno = errno;
 				PIPE_ERROR_INIT();
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-					  ERR_TEXT, 2, LEN_AND_LIT("Error in stream open"), save_errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+					ERR_TEXT, 2, LEN_AND_LIT("Error in stream open"), save_errno);
 			}
 			d_rm->read_fildes = file_des_read;
 		} else
@@ -826,7 +833,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	}
 	FCNTL2(file_des_write, F_GETFL, flags);
 	if (0 > flags)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
 	FCNTL3(file_des_write, F_SETFL, (flags | O_NONBLOCK), fcntl_res);
 	if (0 > fcntl_res)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -67,7 +67,7 @@ boolean_t region_init(bool cm_regions)
 	if (NULL == first_nonstatsdb_reg)
 	{
 		gv_cur_region = NULL;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBNOREGION);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DBNOREGION);
 	}
 	/* Fill in db file name of statsdb regions now that basedb has been opened in above "for" loop */
 	for (reg = gd_header->regions; reg < reg_top; reg++)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -38,6 +38,7 @@ GBLDEF	bool		region;
 GBLREF	bool		error_mupip;
 GBLREF	boolean_t	jnlpool_init_needed;
 
+error_def(ERR_GTMCURUNSUPP);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNODBNAME);
 
@@ -47,7 +48,7 @@ void mupip_set(void)
 	char		db_fn[MAX_FN_LEN + 1], jnl_fn[JNL_NAME_SIZE + 1];
 	unsigned short	db_fn_len, jnl_fn_len;
 	uint4		status;
-	int 		cli_stat;
+	int		cli_stat;
 	boolean_t	set_journal, set_replication;
 
 	jnlpool_init_needed = TRUE;
@@ -80,6 +81,10 @@ void mupip_set(void)
 		jnl_fn[jnl_fn_len] = '\0';
 		status = mupip_set_jnlfile(jnl_fn, SIZEOF(jnl_fn));
 		mupip_exit(status);
+	}
+	if(CLI_PRESENT == cli_present("VERSION"))
+	{
+		mupip_exit(ERR_GTMCURUNSUPP);
 	}
 	if ((CLI_PRESENT == cli_present("ACCESS_METHOD"))
 		|| (CLI_PRESENT == cli_present("ASYNCIO"))

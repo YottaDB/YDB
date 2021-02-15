@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2017 Fidelity National Information	*
+ * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -53,12 +53,17 @@
 #include "anticipatory_freeze.h"
 #include "mu_all_version_standalone.h"
 
-#define	GTM_VER_LIT		"GT.M "
-#define	MAX_VERSION_LEN		16	/* 16 bytes enough to hold V63000A, longest -VERSION= value possible */
+#define GTM_VER_LIT		"GT.M "
+#define MAX_VERSION_LEN		16	/* 16 bytes enough to hold V63000A, longest -VERSION= value possible */
 
+<<<<<<< HEAD
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		exit_handler_complete;
 GBLREF	sem_info		*sem_inf;
+=======
+LITREF char		gtm_release_name[];
+LITREF int4		gtm_release_name_len;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 
 STATICFNDCL void mupip_downgrade_cleanup(void);
 
@@ -67,8 +72,8 @@ error_def(ERR_DBFILOPERR);
 error_def(ERR_DBNOTGDS);
 error_def(ERR_DBOPNERR);
 error_def(ERR_DBPREMATEOF);
-error_def(ERR_PREMATEOF);
 error_def(ERR_DBRDONLY);
+error_def(ERR_GTMCURUNSUPP);
 error_def(ERR_MUINFOUINT4);
 error_def(ERR_MUINFOUINT8);
 error_def(ERR_MUPGRDSUCC);
@@ -78,6 +83,7 @@ error_def(ERR_MUDWNGRDTN);
 error_def(ERR_MUDWNGRDNOTPOS);
 error_def(ERR_MUDWNGRDNRDY);
 error_def(ERR_MUSTANDALONE);
+error_def(ERR_PREMATEOF);
 error_def(ERR_STATSDBNOTSUPP);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
@@ -94,25 +100,30 @@ void mupip_downgrade(void)
 	int		fstat_res, idx, dwngrd_ver_len;
 	int4		status, rc;
 	uint4		status2;
-	off_t 		file_size;
+	off_t		file_size;
 	v15_sgmnt_data	v15_csd;
 	sgmnt_data	csd;
 	boolean_t	recovery_interrupted;
- 	struct stat    	stat_buf;
+	struct stat	stat_buf;
 	ZOS_ONLY(int	realfiletag;)
 	unsigned char	new_master_map[MASTER_MAP_SIZE_V4];
 	enum db_ver	desired_dbver;
 	int		ftrunc_status;
+	block_id	temp_cnt;
 
+<<<<<<< HEAD
 	/* Initialization */
 	DEFINE_EXIT_HANDLER(mupip_downgrade_cleanup, TRUE);
+=======
+	mupip_exit(ERR_GTMCURUNSUPP);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	/* Structure checks .. */
 	assert((24 * 1024) == SIZEOF(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
 	sem_inf = (sem_info *)malloc(SIZEOF(sem_info) * FTOK_ID_CNT);
 	memset(sem_inf, 0, SIZEOF(sem_info) * FTOK_ID_CNT);
 	db_fn_len = SIZEOF(db_fn) - 1;
 	if (!cli_get_str("FILE", db_fn, &db_fn_len))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUNODBNAME);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUNODBNAME);
 	db_fn[db_fn_len] = '\0';	/* Null terminate */
 	if (cli_present("VERSION"))
 	{
@@ -333,8 +344,8 @@ void mupip_downgrade(void)
 		if (csd.blks_to_upgrd != (csd.trans_hist.total_blks - csd.trans_hist.free_blocks))
 		{
 			F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MUDWNGRDNRDY, 3, db_fn_len, db_fn,
-				   (csd.trans_hist.total_blks - csd.trans_hist.free_blocks - csd.blks_to_upgrd));
+			temp_cnt = csd.trans_hist.total_blks - csd.trans_hist.free_blocks - csd.blks_to_upgrd;
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MUDWNGRDNRDY, 3, db_fn_len, db_fn, &temp_cnt);
 			mupip_exit(ERR_MUNODWNGRD);
 		}
 		if (MASTER_MAP_SIZE_V4 < csd.master_map_len || MAXTOTALBLKS_V4 < csd.trans_hist.total_blks)

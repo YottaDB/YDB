@@ -148,14 +148,13 @@ void mu_int_maps(void)
 			mu_int_err(ERR_DBMBSIZMX, 0, 0, 0, 0, 0, 0, level);
 			continue;
 		}
+		if (((blk_hdr_ptr_t)blk_base)->bver != mu_int_data.desired_db_format)
+			mu_int_blks_to_upgrd++;
 		if (tn_reset_this_reg)
 		{
 			((blk_hdr_ptr_t)blk_base)->tn = 0;
 			mu_int_write(blkno, blk_base);
-			if (GDSVCURR != mu_int_data.desired_db_format)
-				mu_int_blks_to_upgrd++;
-		} else if (GDSVCURR != ondsk_blkver)
-			mu_int_blks_to_upgrd++;
+		}
 		map_tn = ((blk_hdr_ptr_t)blk_base)->tn;
 		if (map_tn >= mu_int_data.trans_hist.curr_tn)
 		{

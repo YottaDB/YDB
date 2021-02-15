@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -184,7 +184,7 @@ error_def(ERR_GTMASSERT);
 
 void gtm_threadgbl_init(void)
 {
-	void	*lcl_gtm_threadgbl;
+	void	*lcl_gtm_threadgbl;	/* DCL_THREADGBL_ACCESS */
 
 	if (NULL != gtm_threadgbl)
 	{	/* Has already been initialized. Return right away. Caller will later invoke "common_startup_init"
@@ -199,7 +199,7 @@ void gtm_threadgbl_init(void)
 		FPRINTF(stderr, "YDB-F-GTMASSERT gtm_threadgbl_true_t and gtm_threadgbl_t are different sizes\n");
 		EXIT(ERR_GTMASSERT);
 	}
-	gtm_threadgbl = lcl_gtm_threadgbl = malloc(size_gtm_threadgbl_struct);
+	gtm_threadgbl = malloc(size_gtm_threadgbl_struct);
 	if (NULL == gtm_threadgbl)
 	{	/* Storage was not allocated for some reason - no error handling yet still */
 		perror("YDB-F-MEMORY Unable to allocate startup thread structure");
@@ -207,6 +207,7 @@ void gtm_threadgbl_init(void)
 	}
 	memset(gtm_threadgbl, 0, size_gtm_threadgbl_struct);
 	gtm_threadgbl_true = (gtm_threadgbl_true_t *)gtm_threadgbl;
+	lcl_gtm_threadgbl = gtm_threadgbl;	/* SETUP_THREADGBL_ACCESS */
 
 	/* Add specific initializations if other than 0s here using the TREF() family of macros: */
 	(TREF(director_ident)).addr = TADR(director_string);

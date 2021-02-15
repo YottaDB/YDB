@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -237,7 +237,7 @@ void	op_view(int numarg, mval *keyword, ...)
 			if (!(~(BREAK_MASK_END - 1) & msk))
 				break_message_mask = msk;
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWCMD, 2, RTS_ERROR_MVAL(parmblk.value));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWCMD, 2, RTS_ERROR_MVAL(parmblk.value));
 			break;
 		case VTK_DEBUG1:
 			outval.mvtype = MV_STR;
@@ -280,11 +280,19 @@ void	op_view(int numarg, mval *keyword, ...)
 		case VTK_NOFULLBOOL:
 
 			if ((VTK_NOFULLBOOL == vtp->keycode) && (OLD_SE != TREF(side_effect_handling)))
+<<<<<<< HEAD
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SEFCTNEEDSFULLB);
 			old_bool = TREF(ydb_fullbool);
 			TREF(ydb_fullbool) = (VTK_FULLBOOL == vtp->keycode) ? FULL_BOOL
 				: (VTK_FULLBOOLWARN == vtp->keycode) ? FULL_BOOL_WARN : YDB_BOOL;
 			if (old_bool != TREF(ydb_fullbool))
+=======
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_SEFCTNEEDSFULLB);
+			old_bool = TREF(gtm_fullbool);
+			TREF(gtm_fullbool) = (VTK_FULLBOOL == vtp->keycode) ? FULL_BOOL
+				: (VTK_FULLBOOLWARN == vtp->keycode) ? FULL_BOOL_WARN : GTM_BOOL;
+			if (old_bool != TREF(gtm_fullbool))
+>>>>>>> 451ab477 (GT.M V7.0-000)
 				cache_table_rebuild();
 			break;
 		case VTK_GDSCERT:
@@ -383,8 +391,8 @@ void	op_view(int numarg, mval *keyword, ...)
 			if (0 == status)
 			{
 				va_end(var);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PATTABNOTFND, 2, parmblk.value->str.len,
-						parmblk.value->str.addr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_PATTABNOTFND, 2, parmblk.value->str.len,
+					parmblk.value->str.addr);
 			}
 			break;
 		case VTK_RESETGVSTATS:
@@ -459,14 +467,14 @@ void	op_view(int numarg, mval *keyword, ...)
 			else
 			{
 				va_end(var);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REQDVIEWPARM);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_REQDVIEWPARM);
 			}
 			if (0 == lct)
 				break;	/* 0 value of collation is always good */
 			if ((lct < MIN_COLLTYPE) || (lct > MAX_COLLTYPE))
 			{
 				va_end(var);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ACTRANGE, 1, lct);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ACTRANGE, 1, lct);
 			}
 			was_skip_gtm_putmsg = TREF(skip_gtm_putmsg);
 			TREF(skip_gtm_putmsg) = TRUE;	/* To avoid ready_collseq from doing gtm_putmsg in case of errors.
@@ -477,7 +485,7 @@ void	op_view(int numarg, mval *keyword, ...)
 			if (0 == new_lcl_collseq)
 			{
 				va_end(var);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
 			}
 			break;
 		case VTK_YDIRTVAL:
@@ -497,7 +505,7 @@ void	op_view(int numarg, mval *keyword, ...)
 			if ((MAX_YDIRTSTR < TREF(view_ydirt_str_len)) || (0 >=  TREF(view_ydirt_str_len)))
 			{
 				va_end(var);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_YDIRTSZ, 1, TREF(view_ydirt_str_len));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_YDIRTSZ, 1, TREF(view_ydirt_str_len));
 			}
 			if (TREF(view_ydirt_str_len) > 0)
 				memcpy(TREF(view_ydirt_str), parmblk.value->str.addr, TREF(view_ydirt_str_len));
@@ -509,14 +517,14 @@ void	op_view(int numarg, mval *keyword, ...)
 			 * a YDIRTREE update is performed
 			 */
 			if ((MAX_YDIRTSTR < TREF(view_ydirt_str_len)) || (0 >=  TREF(view_ydirt_str_len)))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_YDIRTSZ, 1, TREF(view_ydirt_str_len));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_YDIRTSZ, 1, TREF(view_ydirt_str_len));
 			if (!parmblk.value->str.len)
-				rts_error_csa(CSA_ARG(NULL)
+				RTS_ERROR_CSA_ABT(NULL,
 					VARLSTCNT(4) ERR_VIEWCMD, 2, parmblk.value->str.len, parmblk.value->str.addr);
 			size = extnam_str.len;		/* internal use of op_gvname should not disturb extended reference */
 			op_gvname(VARLSTCNT(1) parmblk.value);
 			extnam_str.len = size;
-			gvnh_reg = TREF(gd_targ_gvnh_reg);     						/* Set up by op_gvname */
+			gvnh_reg = TREF(gd_targ_gvnh_reg);						/* Set up by op_gvname */
 			arg = (numarg > 1) ? va_arg(var, mval *) : NULL;
 			if (NULL != arg)
 			{
@@ -525,7 +533,7 @@ void	op_view(int numarg, mval *keyword, ...)
 			} else
 				reg = (NULL != gvnh_reg) ? gvnh_reg->gd_reg : gv_cur_region;
 			if (!(IS_ACC_METH_BG_OR_MM(cs_data->acc_meth)))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBREMOTE, 2, REG_LEN_STR(reg));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DBREMOTE, 2, REG_LEN_STR(reg));
 			gvspan = (NULL == gvnh_reg) ? NULL : gvnh_reg->gvspan;
 			if (NULL != gvspan)
 			{
@@ -542,8 +550,12 @@ void	op_view(int numarg, mval *keyword, ...)
 					lct = 0;
 			}
 			if (!found_reg)
+<<<<<<< HEAD
 			{
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GBLNOMAPTOREG, 4,
+=======
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GBLNOMAPTOREG, 4,
+>>>>>>> 451ab477 (GT.M V7.0-000)
 					parmblk.value->str.len, parmblk.value->str.addr, REG_LEN_STR(reg));
 				lct = 0;	/* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
 			}
@@ -571,7 +583,7 @@ void	op_view(int numarg, mval *keyword, ...)
 			else
 			{
 				va_end(var);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REQDVIEWPARM);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_REQDVIEWPARM);
 			}
 			nextarg = NULL;
 			ncol = -1;
@@ -595,7 +607,7 @@ void	op_view(int numarg, mval *keyword, ...)
 				if ((lct < MIN_COLLTYPE) || (lct > MAX_COLLTYPE))
 				{
 					va_end(var);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ACTRANGE, 1, lct);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ACTRANGE, 1, lct);
 				}
 			}
 			/* At this point, verify that there is no local data with subscripts */
@@ -610,7 +622,7 @@ void	op_view(int numarg, mval *keyword, ...)
 						if (lv && LV_HAS_CHILD(lv))
 						{
 							va_end(var);
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COLLDATAEXISTS, 4,
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_COLLDATAEXISTS, 4,
 								LEN_AND_LIT("subscripted "), LEN_AND_LIT("local"));
 						}
 					}
@@ -624,7 +636,7 @@ void	op_view(int numarg, mval *keyword, ...)
 					if (0 == new_lcl_collseq)
 					{
 						va_end(var);
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
 					}
 					TREF(local_collseq) = new_lcl_collseq;
 				} else
@@ -648,8 +660,8 @@ void	op_view(int numarg, mval *keyword, ...)
 			if (!load_pattern_table(parmblk.value->str.len, parmblk.value->str.addr))
 			{
 				va_end(var);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PATLOAD, 2, parmblk.value->str.len,
-						parmblk.value->str.addr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_PATLOAD, 2, parmblk.value->str.len,
+					parmblk.value->str.addr);
 			}
 			break;
 		case VTK_NOUNDEF:
@@ -666,7 +678,7 @@ void	op_view(int numarg, mval *keyword, ...)
 			if (zdefactive)
 			{
 				va_end(var);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZDEFACTIVE);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZDEFACTIVE);
 			}
 			zdefactive = TRUE;
 			tmpzdefbufsiz = MV_FORCE_INT(parmblk.value);
@@ -693,7 +705,7 @@ void	op_view(int numarg, mval *keyword, ...)
 				if (2 > numarg)
 				{
 					va_end(var);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRACEON);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TRACEON);
 				}
 				arg = va_arg(var, mval *);
 				MV_FORCE_STR(arg);
@@ -883,7 +895,7 @@ void	op_view(int numarg, mval *keyword, ...)
 						TREF(lvmon_vars_anchor) = NULL;
 						TREF(lvmon_vars_count) = 0;
 						TREF(lvmon_active) = FALSE;			/* No monitoring active now */
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWLVN, 2, arg->str.len,
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWLVN, 2, arg->str.len,
 							arg->str.addr);
 					}
 					lvmon_var_p->lvmv.var_name.len = arg->str.len;
@@ -948,7 +960,11 @@ void	op_view(int numarg, mval *keyword, ...)
 			break;
 		default:
 			va_end(var);
+<<<<<<< HEAD
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWCMD, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
+=======
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWCMD, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 	va_end(var);
 	return;
@@ -1145,7 +1161,7 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 				{
 					cs_addrs->reservedDBFlags &= ~RDBF_NOSTATS;
 					if (0 < dollar_tlevel)		/* Can't do this in TP */
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPNOSTATSHARE);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPNOSTATSHARE);
 					gvcst_init_statsDB(reg, DO_STATSDB_INIT_TRUE);
 				}
 				break;
@@ -1156,7 +1172,7 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 				if (statsDBreg->statsDB_setup_completed)
 				{	/* Don't bother to opt-out if not set up - it just confuses things */
 					if (0 < dollar_tlevel)		/* Can't do this in TP */
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPNOSTATSHARE);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPNOSTATSHARE);
 					gvcst_remove_statsDB_linkage(reg);
 				}
 				break;

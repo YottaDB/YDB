@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2020 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
@@ -324,8 +324,8 @@ STATICFNDEF void utf8_badchar_real(utf8_err_type err_type, int len, unsigned cha
 		switch(err_type)
 		{
 			case err_rts:
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BADCHAR, 4, (outstr - &errtxt[0]), &errtxt[0],
-					      chset_len, chset);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BADCHAR, 4, (outstr - &errtxt[0]), &errtxt[0],
+					chset_len, chset);
 				break;		/* Never get here but keeps compiler happy */
 			case err_stx:
 				assert(NULL != stx_error_fptr);
@@ -346,8 +346,8 @@ STATICFNDEF void utf8_badchar_real(utf8_err_type err_type, int len, unsigned cha
 		switch(err_type)
 		{
 			case err_rts:
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BADCHAR, 4, (outstr - &errtxt[0]), &errtxt[0],
-					      LEN_AND_LIT(UTF8_NAME));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BADCHAR, 4, (outstr - &errtxt[0]), &errtxt[0],
+					LEN_AND_LIT(UTF8_NAME));
 				break;		/* Never get here but keeps compiler happy */
 			case err_stx:
 				assert(NULL != stx_error_fptr);

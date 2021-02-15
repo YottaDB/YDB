@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2020 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
@@ -166,7 +166,14 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	SETUP_THREADGBL_ACCESS;
 	/* $ZTRIGGER() is not allowed while already inside the trigger frame */
 	if (0 < gtm_trigger_depth)
+<<<<<<< HEAD
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DZTRIGINTRIG, 2, dollar_ztname->len, dollar_ztname->addr);
+=======
+	{
+		DEBUG_ONLY(in_op_fnztrigger = FALSE);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DZTRIGINTRIG, 2, dollar_ztname->len, dollar_ztname->addr);
+	}
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	assert(rts_stringpool.base == stringpool.base); /* because stp management and trigger compilation have a history */
 	MV_FORCE_STR(func);
 	MV_FORCE_STR(arg1);
@@ -178,19 +185,19 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	{
 		DEBUG_ONLY(in_op_fnztrigger = FALSE;)
 		/* We have a wrong-sized keyword */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 1);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 1);
 	}
 	if (0 > (index = namelook(ztrprm_index, ztrprm_names, func->str.addr, inparm_len)))	/* Note assignment */
 	{
 		DEBUG_ONLY(in_op_fnztrigger = FALSE);
 		/* Specified parm was not found */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 1);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 1);
 	}
 	if ((0 < arg1->str.len) && (0 == arg1->str.addr[0]))
 	{
 		DEBUG_ONLY(in_op_fnztrigger = FALSE);
 		/* 2nd parameter is invalid */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 2);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 2);
 	}
 	save_gd_header = gd_header;
 	save_gv_target = gv_target;
@@ -227,12 +234,12 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	{
 		case ZTRP_FILE:
 			if (RESTRICTED(trigger_mod))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "$ZTRIGGER(FILE)");
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "$ZTRIGGER(FILE)");
 			/* If 2nd parameter is empty, do nothing (but dont issue error) */
 			if (arg1->str.len)
 			{
 				if (MAX_FN_LEN < arg1->str.len)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_FILENAMETOOLONG);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_FILENAMETOOLONG);
 				/* The file name is in string pool so make a local copy in case GC happens */
 				strncpy(filename, arg1->str.addr, arg1->str.len);
 				filename_len = arg1->str.len;
@@ -243,7 +250,7 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 			break;
 		case ZTRP_ITEM:
 			if (RESTRICTED(trigger_mod))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "$ZTRIGGER(ITEM)");
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "$ZTRIGGER(ITEM)");
 			/* If 2nd parameter is empty, do nothing (but dont issue error) */
 			failed = (arg1->str.len) ? trigger_update(arg1) : FALSE;
 			break;
@@ -271,6 +278,6 @@ error_def(ERR_UNIMPLOP);
 
 void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 {
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 }
 #endif

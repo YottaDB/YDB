@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -344,7 +344,8 @@ LITDEF int4 ydb_product_len       = SIZEOF(YDB_PRODUCT) - 1;
 LITDEF char *gtm_dbversion_table[] =
 {
 	"V4",
-	"V6"
+	"V6",
+	"V7"
 };
 
 LITDEF int4 ten_pwr[NUM_DEC_DG_1L+1] = {1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000};

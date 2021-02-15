@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -324,7 +324,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			if (cdb_sc_blkmod != status)
 			{
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(18) ERR_TPRESTART, 16, reg_mstr.len, reg_mstr.addr,
-					c, &fail_hist, TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len,
+					c, &fail_hist, &(TAREF1(t_fail_hist_blk, t_tries)), gvname_mstr.len,
 					gvname_mstr.addr, 0, 0, 0, tp_blkmod_nomod,
 					(NULL != sgm_info_ptr) ? sgm_info_ptr->num_of_blks : 0,
 					(NULL != sgm_info_ptr) ? sgm_info_ptr->cw_set_depth : 0, &local_tn,
@@ -333,7 +333,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			{
 				assert((tp_blkmod_nomod < TREF(blkmod_fail_type)) && (n_tp_blkmod_types > TREF(blkmod_fail_type)));
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(18) ERR_TPRESTART, 16, reg_mstr.len, reg_mstr.addr,
-					c, &fail_hist, TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len,
+					c, &fail_hist, &(TAREF1(t_fail_hist_blk, t_tries)), gvname_mstr.len,
 					gvname_mstr.addr, n_pvtmods, n_blkmods, TREF(blkmod_fail_level), TREF(blkmod_fail_type),
 					sgm_info_ptr->num_of_blks, sgm_info_ptr->cw_set_depth, &local_tn,
 					(TREF(tp_restart_entryref)).str.len, (TREF(tp_restart_entryref)).str.addr);
@@ -856,9 +856,9 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRESTNOT);		/* Separate msgs so we get both */
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRESTLOC, 4, beganHere.str.len, beganHere.str.addr,
 				(TREF(tp_restart_entryref)).str.len, (TREF(tp_restart_entryref)).str.addr);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TRESTNOT, 0, ERR_TRESTLOC, 4,
-					beganHere.str.len, beganHere.str.addr,
-					(TREF(tp_restart_entryref)).str.len, (TREF(tp_restart_entryref)).str.addr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_TRESTNOT, 0, ERR_TRESTLOC, 4,
+				beganHere.str.len, beganHere.str.addr,
+				(TREF(tp_restart_entryref)).str.len, (TREF(tp_restart_entryref)).str.addr);
 		} else
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRESTNOT);
 		return 0; /* for the compiler only -- never executed */
@@ -881,7 +881,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	 */
 	assert(cdb_sc_normal != status);
 	if (is_updproc && ((cdb_sc_onln_rlbk1 == status) || (cdb_sc_onln_rlbk2 == status)))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLONLNRLBK);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_REPLONLNRLBK);
 	if (handle_errors_internally)
 		REVERT;
 	TREF(expand_prev_key) = FALSE; /* in case we did a "t_retry" in the middle of "gvcst_zprevious2" or "gvcst_reversequery2" */

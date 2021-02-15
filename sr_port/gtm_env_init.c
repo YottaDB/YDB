@@ -210,9 +210,25 @@ void	gtm_env_init(void)
 		assert(FALSE == TREF(ydb_gvundef_fatal));	/* should have been set to FALSE by gtm_threadgbl_defs */
 		ret = ydb_logical_truth_value(YDBENVINDX_GVUNDEF_FATAL, FALSE, &is_defined);
 		if (is_defined)
+<<<<<<< HEAD
 			TREF(ydb_gvundef_fatal) = ret; /* if logical is not defined, ydb_gvundef_fatal takes the default value */
 		/* ydb_lockhash_n_bits environment/logical */
 		TREF(ydb_lockhash_n_bits) = ydb_trans_numeric(YDBENVINDX_LOCKHASH_N_BITS, &is_defined, IGNORE_ERRORS_TRUE, NULL);
+=======
+			TREF(gtm_gvundef_fatal) = ret; /* if logical is not defined, gtm_gvundef_fatal takes the default value */
+		/* GTM_DIRTREE_COLLHDR_ALWAYS environment/logical */
+		val.addr = GTM_DIRTREE_COLLHDR_ALWAYS;
+		val.len = SIZEOF(GTM_DIRTREE_COLLHDR_ALWAYS) - 1;
+		assert(FALSE == TREF(gtm_dirtree_collhdr_always));	/* should have been set to FALSE by gtm_threadgbl_defs */
+		ret = logical_truth_value(&val, FALSE, &is_defined);
+		if (is_defined)
+			TREF(gtm_dirtree_collhdr_always) = ret; /* if logical is not defined, the TREF takes the default value */
+#		endif
+		/* Initialize variable that controls TP allocation clue (for created blocks) */
+		val.addr = GTM_TP_ALLOCATION_CLUE;
+		val.len = SIZEOF(GTM_TP_ALLOCATION_CLUE) - 1;
+		gtm_tp_allocation_clue = (block_id)trans_numeric_64(&val, &is_defined, TRUE);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		if (!is_defined)
 			TREF(ydb_lockhash_n_bits) = 0;	/* Do not tamper with hash value in dbg */
 		else if ((SIZEOF(mlk_subhash_val_t) * BITS_PER_UCHAR) < TREF(ydb_lockhash_n_bits))

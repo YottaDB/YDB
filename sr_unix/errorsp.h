@@ -439,7 +439,7 @@ MBSTART {													\
 
 /* Should never unwind a condition handler established with ESTABLISH_NOUNWIND. Currently t_ch and dbinit_ch are the only ones.
  * Use function pointer (t_ch_fnptr global variable) instead of &tch (and likewise for dbinit_ch) as it will otherwise bloat
- * executables that don't need to pull in t_ch/dbinit_ch (e.g. ftok/gtcm_shmclean/dbcertify).
+ * executables that don't need to pull in t_ch/dbinit_ch (e.g. gtcm_shmclean).
  */
 #define UNWINDABLE(unw_ch)	((t_ch_fnptr != unw_ch->ch) && (dbinit_ch_fnptr != unw_ch->ch))
 /* Note, since we are not initially changing the assembler ESTABLISH version to also include deferring/enabling of interrupts,

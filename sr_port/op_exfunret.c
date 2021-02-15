@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +67,7 @@ void op_exfunret(mval *retval)
 		{
 			assert(0 == (MV_ALIASCONT & savtyp));
 			assert(NULL == alias_retarg);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_QUITARGREQD);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_QUITARGREQD);
 		}
 	}
 	if (0 != (MV_ALIASCONT & savtyp))
@@ -77,8 +82,7 @@ void op_exfunret(mval *retval)
 		DECR_CREFCNT(srclvc);
 		DECR_BASE_REF_NOSYM(srclvc, FALSE);
 		alias_retarg = NULL;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_QUITALSINV);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_QUITALSINV);
 	}
 	assert(NULL == alias_retarg);
 }
-

@@ -270,7 +270,7 @@ boolean_t	dse_is_blk_free(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t 
 int		dse_is_blk_in(sm_uc_ptr_t rp, sm_uc_ptr_t r_top, short size);
 int		dse_ksrch(block_id srch, block_id_ptr_t pp, int4 *off, char *targ_key, int targ_len);
 int4		dse_lm_blk_free(int4 blk, sm_uc_ptr_t base_addr);
-void		dse_m_rest(block_id blk, unsigned char *bml_list, int4 bml_size, sm_vuint_ptr_t blks_ptr, bool in_dir_tree);
+void		dse_m_rest(block_id blk, unsigned char *bml_list, int4 bml_size, v_block_id_ptr_t blks_ptr, bool in_dir_tree);
 void		dse_maps(void);
 void		dse_open (void);
 int		dse_order(block_id srch, block_id_ptr_t pp, int4 *op, char *targ_key, short int targ_len, bool dir_data_blk);

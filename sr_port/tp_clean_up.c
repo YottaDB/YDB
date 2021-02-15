@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -28,7 +28,7 @@
 #include "copy.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
+#include "hashtab_int8.h"	/* needed for tp.h, cws_insert.h, and tp_clean_up.c itself */
 #include "tp.h"
 #include "tp_change_reg.h"
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized */
@@ -371,7 +371,7 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 				 */
 				assert(si->num_of_blks == si->blks_in_use->count
 					|| process_exiting && (si->num_of_blks == (si->blks_in_use->count - 1)));
-				reinitialize_hashtab_int4(si->blks_in_use);
+				reinitialize_hashtab_int8(si->blks_in_use);
 				si->num_of_blks = 0;
 			}
 			si->cr_array_index = 0;			/* reinitialize si->cr_array */

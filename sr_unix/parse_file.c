@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -167,6 +167,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 				node_name_len = (uint4)(node - trans.addr);	/* Scanned node including ':' */
 				if (!donot_short_circuit)
 				{
+<<<<<<< HEAD
 					query_node_len = node_name_len - 1;		/* Pure name length, no ':' on end */
 					assert(MAX_HOST_NAME_LEN >= query_node_len);
 					assert(0 < query_node_len);
@@ -174,6 +175,17 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 					memcpy(query_node_name, trans.addr, query_node_len);
 					query_node_name[query_node_len] = 0;
 					localhost_sa_ptr = NULL; /* Null value needed if not find query node (remote default) */
+=======
+					localhost_sa_ptr = localhost_ai_ptr->ai_addr;
+				}
+				FREEADDRINFO(localhost_ai_ptr);
+				if (ai_ptr && !localhost_sa_ptr)
+				{	/* Have not yet established this is not a local node -- check further */
+					GETHOSTNAME(local_node_name, MAX_HOST_NAME_LEN, status);
+					if (-1 == status)
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+							LEN_AND_LIT("gethostname"), CALLFROM, errno);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 					CLIENT_HINTS(hints);
 					errcode = dogetaddrinfo(query_node_name, NULL, &hints, &ai_ptr);
 					if (0 == errcode)

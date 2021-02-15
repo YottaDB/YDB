@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-! Copyright (c) 2001-2020 Fidelity National Information		!
+! Copyright (c) 2001-2021 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 ! Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	!
@@ -264,7 +264,7 @@ GVSUBOFLOW	<Maximum combined length of subscripts exceeded>/error/fao=0!/ansi=0
 GVUNDEF		<Global variable undefined: !AD>/error/fao=2!/ansi=7
 TRANSNEST	<Maximum transaction nesting levels exceeded>/error/fao=0!/ansi=0
 INDEXTRACHARS	<Indirection string contains extra trailing characters>/error/fao=0!/ansi=0
-CORRUPTNODE	<Corrupt input in Record # !UL, Key #!UL; resuming with next global node>/error/fao=2!/ansi=0
+CORRUPTNODE	<Corrupt input in Record #!UL, Key #!UL; resuming with next global node>/error/fao=2!/ansi=0
 INDRMAXLEN	<Maximum length !UL of an indirection argument was exceeded>/error/fao=1!/ansi=0
 UNUSEDMSG268	<INSFFBCNT nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 INTEGERRS	<Database integrity errors>/error/fao=0!/ansi=0
@@ -307,17 +307,17 @@ MBXWRTONLY	<Mailbox is write only, cannot read from it>/error/fao=0!/ansi=0//1
 MEMORY		<Central memory exhausted during request for !UJ bytes from 0x!XJ>/fatal/fao=2!/ansi=0
 DONOBLOCK	<Argumentless DO not followed by a block>/warning/fao=0!/ansi=0
 ZATRANSCOL	<The collation requested has no implementation for the requested operation>/error/fao=0!/ansi=0
-UNUSEDMSG307	<MTFIXRECSZ last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
-UNUSEDMSG308	<MTIS last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
-UNUSEDMSG309	<MTRDBADBLK last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
-UNUSEDMSG310	<MTRDONLY last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
-UNUSEDMSG311	<MTRDTHENWRT last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
-UNUSEDMSG312	<MTRECGTRBLK last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+VIEWREGLIST	<$VIEW() only handles the first region subparameter>/warning/fao=0!/ansi=0
+NUMERR		<Error: cannot convert !AD value to decimal or hexadecimal number>/error/fao=2!/ansi=0
+NUM64ERR	<Error: cannot convert !AD value to 64 bit decimal or hexadecimal number>/error/fao=2!/ansi=0
+UNUM64ERR	<Error: cannot convert !AD value to 64 bit unsigned decimal or hexadecimal number>/error/fao=2!/ansi=0
+HEXERR		<Error: cannot convert !AD value to hexadecimal number>/error/fao=2!/ansi=0
+HEX64ERR	<Error: cannot convert !AD value to 64 bit hexadecimal number>/error/fao=2!/ansi=0
 UNUSEDMSG313	<MTRECTOOBIG last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
 UNUSEDMSG314	<MTRECTOOSM last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
 JNLTMQUAL3	<Time qualifier BEFORE_TIME="!AZ" is less than the journal file(s) minimum timestamp="!AZ">/error/fao=2!/ansi=0
 MULTLAB		<This label has been previously defined>/error/fao=0!/ansi=57
-BLKCNT		<Last LOAD Block/RMS Record number: !UL>/info/fao=1!/ansi=0
+GTMCURUNSUPP	<The requested operation is unsupported in this version of GT.M>/error/fao=0!/ansi=0
 CCEDUMPOFF	<>/fatal/fao=0!/ansi=0
 NOPLACE		<Line specified in a ZBREAK cannot be found>/error/fao=0!/ansi=0
 JNLCLOSE	<Error closing journal file !AD>/error/fao=2!/ansi=0
@@ -371,7 +371,7 @@ UIDSND		<Unidentified sender PID>/error/fao=0!/ansi=0
 LVUNDEF		<Undefined local variable: !AD>/error/fao=2!/ansi=6
 UNIMPLOP	<Unimplemented construct encountered>/error/fao=0!/ansi=0
 VAREXPECTED	<Variable expected in this context>/error/fao=0!/ansi=39
-VARRECBLKSZ	<Blocksize must be at least record size + 4 bytes>/error/fao=0!/ansi=0
+UNUSEDMSG371	<VARRECBLKSZ last used in V6.3-004 Mar. 2018>/error/fao=0!/ansi=0
 MAXARGCNT	<Maximum number of arguments !UL exceeded>/error/fao=1!/ansi=0
 GTMSECSHRSEMGET	<semget error errno = !UL>/fatal/fao=1!/ansi=0
 VIEWARGCNT	<View parameter !AD has inappropriate number of subparameters>/error/fao=2!/ansi=0
@@ -545,7 +545,7 @@ NETFAIL		<Failure of Net operation>/error/fao=0!/ansi=0
 NETLCKFAIL	<Lock operation across Net failed>/error/fao=0!/ansi=0
 TTINVFILTER	<Invalid FILTER argument>/info/fao=0!/ansi=0
 UNUSEDMSG544	<MTANSILAB last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
-UNUSEDMSG545	<MTANSIFOR last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+WCSFLUFAIL	<Error flushing buffers -- called from module !AD at line !UL>/error/fao=3!/ansi=0
 BADTRNPARAM	<!AD is not a legal parameter to $ZTRNLNM>/error/fao=2!/ansi=0
 DSEONLYBGMM	<!AD is supported only for BG/MM access methods>/warning/fao=2!/ansi=0
 DSEINVLCLUSFN	<Specified function is invalid for clustered databases>/warning/fao=0!/ansi=0
@@ -706,12 +706,12 @@ TIMEROVFL	<Timer overflow; interval probably too large> /error /fao=0!/ansi=0
 GTMASSERT	<!AD - Assert failed !AD line !UL>/fatal/fao=5!/ansi=0
 DBFHEADERR4	<Database file !AD: control problem: !AD was 0x!XL expecting 0x!XL> /info /fao=6!/ansi=0
 DBADDRANGE	<Database file !AD, element location 0x!XJ: blk = 0x!XL: control 0x!XJ was outside !AD range 0x!XJ to 0x!XJ> /info /fao=9!/ansi=0
-DBQUELINK	<Database file !AD, element location 0x!XJ: blk = 0x!XL: control !AD queue problem: was 0x!XJ, expecting 0x!XJ> /info /fao=8!/ansi=0
-DBCRERR		<Database file !AD, cr location 0x!XJ blk = 0x!XL error: !AD was 0x!XL, expecting 0x!XL -- called from module !AD at line !UL> /info /fao=11!/ansi=0
+DBQUELINK	<Database file !AD, element location 0x!XJ: blk = 0x!16@XQ: control !AD queue problem: was 0x!XJ, expecting 0x!XJ> /info /fao=8!/ansi=0
+DBCRERR		<Database file !AD, cr location 0x!XJ blk = 0x!16@XQ error: !AD was 0x!XL, expecting 0x!XL -- called from module !AD at line !UL> /info /fao=11!/ansi=0
 MUSTANDALONE	<Could not get exclusive access to !AD> /info /fao=2!/ansi=0/A
 MUNOACTION	<MUPIP unable to perform requested action> /error /fao=0!/ansi=0
 RMBIGSHARE	<File with BIGRECORD specified may only be shared if READONLY>/error/fao=0!/ansi=0
-TPRESTART	<Database !AD; code: !AD; blk: 0x!XL in glbl: ^!AD; pvtmods: !UL, blkmods: !UL, blklvl: !UL, type: !UL, readset: !UL, writeset: !UL, local_tn: 0x!16@XQ, zpos: !AD> /info /fao=16!/ansi=0
+TPRESTART	<Database !AD; code: !AD; blk: 0x!16@XQ in glbl: ^!AD; pvtmods: !UL, blkmods: !UL, blklvl: !UL, type: !UL, readset: !UL, writeset: !UL, local_tn: 0x!16@XQ, zpos: !AD> /info /fao=16!/ansi=0
 SOCKWRITE	<Write to a socket failed> /error /fao=0!/ansi=0
 DBCNTRLERR	<Database file !AD: control error suspected but not found> /info /fao=2!/ansi=0
 NOTERMENV	<Environment variable TERM not set.  Assuming "unknown."> /info /fao=0!/ansi=0
@@ -757,7 +757,7 @@ MUTEXFRCDTERM	<Mutual Exclusion subsystem detected forced termination of process
 GTMSECSHR	<!UL : Error during gtmsecshr operation>/error/fao=1!/ansi=0
 GTMSECSHRSRVFID	<!AD: !UL - Attempt to service request failed.!/ client id: !UL, mesg type: !UL, mesg data: !UL>/warning/fao=6!/ansi=0
 GTMSECSHRSRVFIL	<!AD: !UL - Attempt to service request failed.!/ client id: !UL, mesg type: !UL!/file: !AD>/warning/fao=7!/ansi=0
-FREEBLKSLOW	<Only !UL free blocks left out of !UL total blocks for !AD>/warning/fao=4!/ansi=0
+FREEBLKSLOW	<Only !@UQ free blocks left out of !@UQ total blocks for !AD>/warning/fao=4!/ansi=0
 PROTNOTSUP	<Protocol !AD not supported>/error/fao=2!/ansi=0
 DELIMSIZNA	<Delimiter size is not appropriate>/error/fao=0!/ansi=0
 INVCTLMNE	<Invalid control mnemonics>/error/fao=0!/ansi=0
@@ -778,7 +778,7 @@ CALLERID	<Routine !AD called from 0x!XJ>/info/fao=3!/ansi=0
 KRNLKILL	<Process was terminated by SIGDANGER signal from the system -- System swap space is too low -- Report to System Administrator>/fatal/fao=0!/ansi=0
 MEMORYRECURSIVE	<Memory Subsystem called recursively>/fatal/fao=0!/ansi=0
 FREEZEID	<Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ>/info/fao=7!/ansi=0
-BLKWRITERR	<Unable to queue disk write for block 0x!XL.  Will keep trying.>/info/fao=1!/ansi=0
+UNUSEDMSG778	<BLKWRITERR last used in V6.3-001A May 2017>/error/fao=0!/ansi=0
 DSEINVALBLKID	<Trying to edit DB with 64-bit block IDs using pre-V7 DSE>/error/fao=0!/ansi=0
 PINENTRYERR	<Custom pinentry program failure>/error/fao=0!/ansi=0
 BCKUPBUFLUSH	<Unable to flush buffer for online backup>/error/fao=0!/ansi=0
@@ -823,12 +823,12 @@ MUNODWNGRD	<Database not downgraded because of preceding errors>/error/fao=0!/an
 REPLTRANS2BIG	<Transaction !16@XQ of size !@ZQ (pre-filter size !@ZQ) too large to be accommodated in the !AD pool>/error/fao=5!/ansi=0
 RDFLTOOLONG	<Length specified for fixed length read exceeds the maximum string size>/error/fao=0!/ansi=0
 MUNOFINISH	<MUPIP unable to finish all requested actions>/error/fao=0!/ansi=0
-DBFILEXT	<Database file !AD extended from 0x!XL blocks to 0x!XL at transaction 0x!16@XQ>/info/fao=5!/ansi=0
+DBFILEXT	<Database file !AD extended from 0x!16@XQ blocks to 0x!16@XQ at transaction 0x!16@XQ>/info/fao=5!/ansi=0
 JNLFSYNCERR	<Error synchronizing journal file !AD to disk>/error/fao=2!/ansi=0
 ICUNOTENABLED	<ICU libraries not loaded>/warning/fao=0!/ansi=0
 ZCPREALLVALINV	<The pre-allocation value exceeded the maximum string length>/error/fao=0!/ansi=0
 NEWJNLFILECREAT	<Journal file !AD nearing maximum size.  New journal file created.>/info/fao=2!/ansi=0
-DSKSPACEFLOW	<Disk Space for file !AD nearing maximum size.  !UL blocks available.>/info/fao=3!/ansi=0
+DSKSPACEFLOW	<Disk Space for file !AD nearing maximum size.  !@UQ blocks available.>/info/fao=3!/ansi=0
 GVINCRFAIL	<Global variable $INCR failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 ISOLATIONSTSCHN	<Error changing NOISOLATION status for global ^!AD within a TP transaction from !UL to !UL>/error/fao=4!/ansi=0
 UNUSEDMSG833	<REPLGBL2LONG nixed in r1.24>/error/fao=0!/ansi=0
@@ -953,7 +953,7 @@ DBMBPFLDIS	<!AD Master bit map shows this map full, in disagreement with both di
 DBMBPFRDLBM	<!AD Master bit map shows this map has space, agreeing with disk local map>/warning/fao=2!/ansi=0/B
 DBMBPFRINT	<!AD Master bit map shows this map has space, agreeing with MUPIP INTEG>/warning/fao=2!/ansi=0/B
 DBMAXKEYEXC	<!AD Maximum key size for database exceeds design maximum>/error/fao=2!/ansi=0
-DBMXRSEXCMIN	<!AD Maximum record size for database is less than the design minimum>/error/fao=2!/ansi=0
+UNUSEDMSG953	<DBMXRSEXCMIN last used in V5.5-000 Feb 2012>/error/fao=0!/ansi=0
 MUPIPSET2SML	<!UL too small, minimum !AD allowed is !UL>/warning/fao=4!/ansi=0
 DBREADBM	<!AD Read error on bit map>/error/fao=2!/ansi=0/D
 DBCOMPTOOLRG	<!AD Record has too large compression count>/error/fao=2!/ansi=0/I
@@ -966,7 +966,7 @@ DBRLEVLTONE	<!AD Root level less than one>/error/fao=2!/ansi=0/D
 DBSVBNMIN	<!AD Start VBN smaller than possible>/error/fao=2!/ansi=0/A
 DBTTLBLK0	<!AD Total blocks equal zero>/error/fao=2!/ansi=0/A
 DBNOTDB		<!AD File does not have a valid GDS file header>/error/fao=2!/ansi=0
-DBTOTBLK	<File header indicates total blocks is 0x!XL but file size indicates total blocks would be 0x!XL>/error/fao=2!/ansi=0
+DBTOTBLK	<File header indicates total blocks is 0x!16@XQ but file size indicates total blocks would be 0x!16@XQ>/error/fao=2!/ansi=0
 DBTN		<Block TN is 0x!16@XQ>/info/fao=1!/ansi=0
 DBNOREGION	<None of the database regions accessible>/error/fao=0!/ansi=0/T/1
 DBTNRESETINC	<WARNING: tn_reset for database is incomplete due to integrity errors>/warning/fao=0!/ansi=0
@@ -977,9 +977,9 @@ SEMWT2LONG	<Process !UL waited !UL second(s) for the !AD lock for region !AD, lo
 REPLINSTOPEN	<Error opening replication instance file !AD>/error/fao=2!/ansi=0//1
 REPLINSTCLOSE	<Error closing replication instance file !AD>/error/fao=2!/ansi=0
 JOBSETUP	<Error receiving !AD from parent process>/error/fao=2!/ansi=0
-DBCRERR8	<Database file !AD, cr location 0x!XJ blk = 0x!XL error: !AD was 0x!16@XQ, expecting 0x!16@XQ -- called from module !AD at line !UL> /info /fao=11!/ansi=0
+DBCRERR8	<Database file !AD, cr location 0x!XJ blk = 0x!16@XQ error: !AD was 0x!16@XQ, expecting 0x!16@XQ -- called from module !AD at line !UL> /info /fao=11!/ansi=0
 NUMPROCESSORS	<Could not determine number of processors>/warning/fao=0!/ansi=0
-DBADDRANGE8	<Database file !AD, element location 0x!XJ: blk = 0x!XL: control 0x!16@XQ was outside !AD range 0x!16@XQ to 0x!16@XQ> /info /fao=9!/ansi=0
+DBADDRANGE8	<Database file !AD, element location 0x!XJ: blk = 0x!16@XQ: control 0x!16@XQ was outside !AD range 0x!16@XQ to 0x!16@XQ> /info /fao=9!/ansi=0
 RNDWNSEMFAIL	<Attempting to acquire gds_rundown semaphore when it is already owned>/info/fao=0!/ansi=0
 GTMSECSHRSHUTDN	<gtmsecshr process has received a shutdown request -- shutting down>/info/fao=0!/ansi=0
 NOSPACECRE	<Not enough space to create database file !AD.  !@ZQ blocks are needed, only !@ZQ available.>/error/fao=4!/ansi=0
@@ -987,7 +987,7 @@ LOWSPACECRE	<Disk space for database file !AD is not enough for !UL future exten
 WAITDSKSPACE	<Process 0x!XL will wait !UL seconds for necessary disk space to become available for !AD >/info/fao=4!/ansi=0
 OUTOFSPACE	<Database file !AD ran out of disk space.  Detected by process !UL.  !/Exit without clearing shared memory due to the disk space constraints.  !/Make space and then perform mupip rundown to ensure database integrity.>/fatal/fao=3!/ansi=0
 JNLPVTINFO	<Pid 0x!XL cycle 0x!XL fd_mismatch 0x!XL channel 0x!XL sync_io 0x!XL pini_addr 0x!XL qio_active 0x!XL old_channel 0x!XL>/info/fao=8!/ansi=0
-NOSPACEEXT	<Not enough disk space for file !AD to extend.  !UL blocks needed.  !UL blocks available.>/error/fao=4!/ansi=0
+NOSPACEEXT	<Not enough disk space for file !AD to extend.  !@UQ blocks needed.  !@UQ blocks available.>/error/fao=4!/ansi=0
 WCBLOCKED	<Field !AD is set by process !UL at transaction number 0x!16@XQ for database file !AD>/warning/fao=6!/ansi=0
 REPLJNLCLOSED	<Replication in jeopardy as journaling got closed for database file !AD. Current region seqno is !@ZQ [0x!16@XQ] and system seqno is !@ZQ [0x!16@XQ]>/error/fao=6!/ansi=0
 RENAMEFAIL	<Rename of file !AD to !AD failed>/warning/fao=4!/ansi=0
@@ -1009,13 +1009,18 @@ DBRNDWN		<Error during global database rundown for region !AD.!/Notify those res
 MUDESTROYFAIL	<Global section (!AD) corresponding to file !AD failed to be destroyed>/info/fao=4!/ansi=0
 NOTALLDBOPN	<Not all required database files were opened>/fatal/fao=0!/ansi=0
 MUSELFBKUP	<Database file !AD can not be backed upon itself>/error/fao=2!/ansi=0
+<<<<<<< HEAD
 DBDANGER	<Process !UL [0x!XL] killed while committing update for database file !AD.  Possibility of damage to block 0x!XL.>/warning/fao=5!/ansi=0
 UNUSEDMSG1012	<TRUNCATEFAIL nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
+=======
+DBDANGER	<Process !UL [0x!XL] killed while committing update for database file !AD.  Possibility of damage to block 0x!16@XQ.>/warning/fao=5!/ansi=0
+UNUSEDMSG1010	<TRUNCATEFAIL last used in V6.3-001A May 2017>/error/fao=0!/ansi=0
+>>>>>>> 451ab477 (GT.M V7.0-000)
 TCGETATTR	<Error while getting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 TCSETATTR	<Error while setting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 IOWRITERR	<IO Write by pid 0x!XL to blk 0x!XL of database file !AD failed.  Pid 0x!XL retrying the IO.>/error/fao=5!/ansi=0
 REPLINSTWRITE	<Error writing [0x!XL] bytes at offset [0x!16@XQ] in replication instance file !AD>/error/fao=4!/ansi=0//1
-DBBADFREEBLKCTR	<Database !AD free blocks counter in file header: 0x!XL appears incorrect, should be 0x!XL.  Auto-corrected.>/warning/fao=4!/ansi=0/B
+DBBADFREEBLKCTR	<Database !AD free blocks counter in file header: 0x!16@XQ appears incorrect, should be 0x!16@XQ.  Auto-corrected.>/warning/fao=4!/ansi=0/B
 REQ2RESUME	<Request to resume suspended processing received from process !UL owned by userid !UL>/info/fao=2!/ansi=0
 TIMERHANDLER	<Incorrect SIGALRM handler (0x!XJ) found by !AD>/warning/fao=3!/ansi=0
 FREEMEMORY	<Error occurred freeing memory from 0x!XJ>/error/fao=1!/ansi=0
@@ -1040,7 +1045,7 @@ DSENOFINISH	<DSE unable to finish all requested actions>/error/fao=0!/ansi=0
 LKENOFINISH	<LKE unable to finish all requested actions>/error/fao=0!/ansi=0
 NOCHLEFT	<Unhandled condition exception (all handlers exhausted) - process terminating>/fatal/fao=0!/ansi=0
 MULOGNAMEDEF	<Logical name !AD, needed to start replication server is already defined for this job.  !/Check for an existing or improperly terminated server.>/error/fao=2!/ansi=0
-BUFOWNERSTUCK	<Pid !UL waiting for Pid !UL to finish disk-read of block !UL [0x!XL].!/Been waiting for !UL minutes.  read_in_progress=!UL : rip_latch = !UL.>/error/fao=7!/ansi=0
+BUFOWNERSTUCK	<Pid !UL waiting for Pid !UL to finish disk-read of block !@UQ [0x!16@XQ].!/Been waiting for !UL minutes.  read_in_progress=!UL : rip_latch = !UL.>/error/fao=7!/ansi=0
 ACTIVATEFAIL	<Cannot activate passive source server on instance !AD while a receiver server and/or update process is running>/error/fao=2!/ansi=0
 DBRNDWNWRN	<Global section of database file !AD not rundown successfully by pid !UL [0x!XL].  Global section was not removed.>/warning/fao=4!/ansi=0
 DLLNOOPEN	<Failed to load external dynamic library !AD>/error/fao=2!/ansi=0
@@ -1051,7 +1056,7 @@ FILTERCOMM	<Error communicating seqno !16@XQ with the filter>/error/fao=1!/ansi=
 FILTERBADCONV	<Bad conversion of seqno !16@XQ by filter>/error/fao=1!/ansi=0
 PRIMARYISROOT	<Attempted operation not valid on root primary instance !AD>/error/fao=2!/ansi=0
 GVQUERYGETFAIL	<Global variable QUERY and GET failed.  Failure code: !AD.>/error/fao=2!/ansi=0
-DBCREC2BIGINBLK	<A Record in block 0x!XL has a length greater than the maximum (!UL) in database !AD>/error/fao=4!/ansi=0
+UNUSEDMSG1051	<DBCREC2BIGINBLK removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 MERGEDESC	<Merge operation not possible.  !AD is descendent of !AD.>/error/fao=4!/ansi=19
 MERGEINCOMPL	<Error encountered during MERGE; operation may be incomplete>/warning/fao=0!/ansi=0
 DBNAMEMISMATCH	<Database file !AD points to shared memory (id = !UL) which in turn points to an inaccessible database file !AZ>/error/fao=4!/ansi=0
@@ -1103,7 +1108,7 @@ ECLOSTMID	<$ECODE overflow, the first and last ecodes are retained, but some int
 ZFF2MANY	<Number of characters specified for ZFF deviceparameter (!UL) is more than the maximum allowed (!UL)>/error/fao=2!/ansi=0
 JNLFSYNCLSTCK	<Journaling fsync lock is stuck in journal file !AD>/warning/fao=2!/ansi=0
 DELIMWIDTH	<Delimiter length !UL exceeds device width !UL>/error/fao=2!/ansi=0
-DBBMLCORRUPT	<Database !AD : Bitmap blk [0x!XL] is corrupt (size = [0x!XL], levl = [0x!XL], tn = [0x!16@XQ]) : Dbtn = [0x!16@XQ] : Database integrity errors likely>/error/fao=7!/ansi=0
+DBBMLCORRUPT	<Database !AD : Bitmap blk [0x!16@XQ] is corrupt (size = [0x!XL], levl = [0x!XL], tn = [0x!16@XQ]) : Dbtn = [0x!16@XQ] : Database integrity errors likely>/error/fao=7!/ansi=0
 DLCKAVOIDANCE	<Possible deadlock detected: Database !AD : Dbtn [0x!16@XQ] : t_tries [0x!XL] : dollar_trestart [0x!XL] : now_crit [0x!XL] : TP transaction restarted>/error/fao=6!/ansi=0
 WRITERSTUCK	<Buffer flush stuck waiting for [0x!XL] concurrent writers to finish writing to database file !AD>/error/fao=3!/ansi=0
 PATNOTFOUND	<Current pattern table has no characters with pattern code !AD>/error/fao=2!/ansi=0
@@ -1115,7 +1120,7 @@ INVMNEMCSPC	<Unsupported mnemonicspace !AD>/error/fao=2!/ansi=35
 JNLALIGNSZCHG	<Journal ALIGNSIZE is rounded up to !UL blocks (closest next higher power of two)>/info/fao=1!/ansi=0
 SEFCTNEEDSFULLB	<Current side effect setting does not permit full Boolean to be turned off>/error/fao=0!/ansi=0
 GVFAILCORE	<A core file is being created for later analysis if necessary>/error/fao=0!/ansi=0
-DBCDBNOCERTIFY	<Database !AD HAS NOT been certified due to the preceding errors - rerun DBCERTIFY SCAN>/error/fao=2!/ansi=0
+UNUSEDMSG1115	<DBCDBNOCERTIFY removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 DBFRZRESETSUC	<Freeze released successfully on database file !AD>/info/fao=2!/ansi=0
 JNLFILEXTERR	<Error during extension of journal file !AD>/error/fao=2!/ansi=0
 JOBEXAMDONE	<YottaDB process !UL completed job examine to !AD>/info/fao=3!/ansi=0
@@ -1203,31 +1208,31 @@ RESOLVESEQNO	<Resolving until sequence number !@ZQ [0x!16@XQ]>/info/fao=2!/ansi=
 BOVTNGTEOVTN	<Journal file !AD has beginning transaction [0x!16@XQ] which is greater than end transaction [0x!16@XQ]>/error/fao=4!/ansi=0
 BOVTMGTEOVTM	<Journal file !AD has beginning timestamp [0x!16@XQ] greater than end timestamp [0x!16@XQ]>/error/fao=4!/ansi=0
 BEGSEQGTENDSEQ	<Journal file !AD has beginning sequence number [0x!16@XQ] greater than end sequence number [0x!16@XQ]>/error/fao=4!/ansi=0
-DBADDRALIGN	<Database file !AD, element location 0x!XJ: blk = 0x!XL: [!AD] control 0x!XJ was unaligned relative to base 0x!XJ and element size 0x!XL>/info/fao=9!/ansi=0
+DBADDRALIGN	<Database file !AD, element location 0x!XJ: blk = 0x!16@XQ: [!AD] control 0x!XJ was unaligned relative to base 0x!XJ and element size 0x!XL>/info/fao=9!/ansi=0
 DBWCVERIFYSTART	<Database file !AD, write cache verification started by pid !UL [0x!XL] at transaction number 0x!16@XQ>/info/fao=5!/ansi=0
 DBWCVERIFYEND	<Database file !AD, write cache verification finished by pid !UL [0x!XL] at transaction number 0x!16@XQ>/info/fao=5!/ansi=0
 MUPIPSIG	<!AD (signal !UL) issued from process !UL [0x!XL] to process !UL [0x!XL]>/info/fao=7!/ansi=0
 HTSHRINKFAIL	<Hash table compaction failed to allocate new smaller table due to lack of memory>/warning/fao=0!/ansi=0
 STPEXPFAIL	<Stringpool expansion failed. It could not expand to !UL bytes.>/error/fao=1!/ansi=0
-DBBTUWRNG	<The blocks-to-upgrade file-header field is incorrect. Expected 0x!XL, found 0x!XL>/warning/fao=2!/ansi=0/T
+DBBTUWRNG	<The blocks-to-upgrade file-header field is incorrect. Expected 0x!16@XQ, found 0x!16@XQ>/warning/fao=2!/ansi=0/T
 DBBTUFIXED	<The blocks-to-upgrade file-header field has been changed to the correct value>/info/fao=0!/ansi=0
 DBMAXREC2BIG	<Maximum record size (!UL) is too large for this block size (!UL) - Maximum is !UL>/error/fao=3!/ansi=0
-DBCSCNNOTCMPLT	<Specified DBCERTIFY SCAN output file is not complete - Rerun scan>/error/fao=0!/ansi=0
-DBCBADFILE	<Source file !AD does not appear to have been generated by DBCERTIFY SCAN - rerun SCAN or specify correct file>/error/fao=2!/ansi=0
-DBCNOEXTND	<Unable to extend database !AD>/error/fao=2!/ansi=0
-DBCINTEGERR	<Encountered integrity error in database !AD>/error/fao=2!/ansi=0
+UNUSEDMSG1212	<DBCSCNNOTCMPLT removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1213	<DBCBADFILE removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1214	<DBCNOEXTND removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1215	<DBCINTEGERR removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 DBMINRESBYTES	<Minimum RESERVED BYTES value required for certification/upgrade is !UL - Currently is !UL>/error/fao=2!/ansi=0
-DBCNOTSAMEDB	<Database has been moved or restored since DBCERTIFY SCAN - Rerun scan>/error/fao=0!/ansi=0
-DBCDBCERTIFIED	<Database !AD has been certified for use with !AD>/info/fao=4!/ansi=0
-DBCMODBLK2BIG	<Block 0x!XL has been modified since DBCERTIFY SCAN but is still too large or now has an earlier TN than in the scan phase - Rerun scan phase>/error/fao=1!/ansi=0
-DBCREC2BIG	<Record with key !AD is length !UL in block 0x!XL which is greater than the maximum length !UL in database !AD>/error/fao=7!/ansi=0
-DBCCMDFAIL	<Executed command failed with return code !SL: !AD which executed !AD !AD>/error/fao=7!/ansi=0
-DBCKILLIP	<Cannot proceed with kill in progress indicator set for database !AD -- Run MUPIP INTEG first>/error/fao=2!/ansi=0
-DBCNOFINISH	<DBCERTIFY unable to finish all requested actions>/error/fao=0!/ansi=0
-DYNUPGRDFAIL	<Unable to dynamically upgrade block 0x!XL in database !AD due to lack of free space in block>/error/fao=3!/ansi=0
+UNUSEDMSG1217	<DBCNOTSAMEDB removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1218	<DBCDBCERTIFIED removed from code in V7.0-000 Nov 2020>/info/fao=0!/ansi=0
+UNUSEDMSG1219	<DBCMODBLK2BIG removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1220	<DBCREC2BIG removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1221	<DBCCMDFAIL removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1222	<DBCKILLIP removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1223	<DBCNOFINISH removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+DYNUPGRDFAIL	<Unable to dynamically upgrade block 0x!16@XQ in database !AD due to lack of free space in block>/error/fao=3!/ansi=0
 MMNODYNDWNGRD	<Unable to use dynamic downgrade with MM access method for region !AD. Use BG access method for downgrade>/error/fao=2!/ansi=0
 MMNODYNUPGRD	<Unable to use MM access method for region !AD until all database blocks are upgraded>/error/fao=2!/ansi=0
-MUDWNGRDNRDY	<Database !AD is not ready to downgrade - still !UL database blocks to downgrade>/error/fao=3!/ansi=0
+MUDWNGRDNRDY	<Database !AD is not ready to downgrade - still !@UQ database blocks to downgrade>/error/fao=3!/ansi=0
 MUDWNGRDTN	<Transaction number 0x!16@XQ in database !AD is too big for MUPIP [REORG] DOWNGRADE. Renew database with MUPIP INTEG TN_RESET>/error/fao=3!/ansi=0
 MUDWNGRDNOTPOS	<Start VBN value is [!UL] while downgraded YottaDB version can support only [!UL]. Downgrade not possible>/error/fao=2!/ansi=0
 MUUPGRDNRDY	<Database !AD has not been certified as being ready to upgrade to !AD format>/error/fao=4!/ansi=0
@@ -1274,8 +1279,13 @@ BADCHAR		<$ZCHAR(!AD) is not a valid character in the !AD encoding form>/error/f
 DLRCILLEGAL	<!_!AD!/!_!_!_Illegal $CHAR() value !UL>/error/fao=3!/ansi=0
 NONUTF8LOCALE	<Locale has character encoding (!AD) which is not compatible with UTF-8 character set>/error/fao=2!/ansi=0
 INVDLRCVAL	<Invalid $CHAR() value !UL>/error/fao=1!/ansi=0
+<<<<<<< HEAD
 DBMISALIGN	<File header indicates total blocks is 0x!XL but file size indicates total blocks would be between 0x!XL and 0x!XL. Reconstruct the database from a backup or extend it by at least !UL blocks.>/error/fao=4!/ansi=0
 LOADINVCHSET	<Extract file CHSET (!AD) is incompatible with ydb_chset/gtm_chset>/error/fao=2!/ansi=0
+=======
+DBMISALIGN	<File header indicates total blocks is 0x!16@XQ but file size indicates total blocks would be between 0x!16@XQ and 0x!16@XQ. Reconstruct the database from a backup or extend it by at least !@UQ blocks.>/error/fao=4!/ansi=0
+LOADINVCHSET	<Extract file CHSET (!AD) is incompatible with gtm_chset>/error/fao=2!/ansi=0
+>>>>>>> 451ab477 (GT.M V7.0-000)
 DLLCHSETM	<Routine !AD in library !AD was compiled with CHSET=M which is different from $ZCHSET. Recompile with CHSET=UTF-8 and re-link.>/error/fao=4!/ansi=0
 DLLCHSETUTF8	<Routine !AD in library !AD was compiled with CHSET=UTF-8 which is different from $ZCHSET. Recompile with CHSET=M and re-link.>/error/fao=4!/ansi=0
 BOMMISMATCH	<!AD Byte Order Marker found when !AD character set specified>/error/fao=4!/ansi=0
@@ -1297,8 +1307,13 @@ GTMSECSHRTMPPATH	<gtmsecshr path is !AD>/info/fao=2!/ansi=0
 UNUSEDMSG1296	<GTMERREXIT nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 INVMEMRESRV	<Could not allocate YottaDB memory reserve (!AD)>/warning/fao=2!/ansi=0
 OPCOMMISSED	<!UL errors and !UL MBFULLs sending prior operator messages>/info/fao=2!/ansi=0
+<<<<<<< HEAD
 COMMITWAITSTUCK	<Pid !UL waited !UL minute(s) for !UL concurrent YottaDB process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0
 COMMITWAITPID	<Pid !UL waited !UL minute(s) for pid !UL to finish commits to block 0x!XL in database file !AD>/error/fao=6!/ansi=0
+=======
+COMMITWAITSTUCK	<Pid !UL waited !UL minute(s) for !UL concurrent GT.M process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0
+COMMITWAITPID	<Pid !UL waited !UL minute(s) for pid !UL to finish commits to block 0x!16@XQ in database file !AD>/error/fao=6!/ansi=0
+>>>>>>> 451ab477 (GT.M V7.0-000)
 UPDREPLSTATEOFF	<Error replicating global ^!AD as it maps to database !AD which has replication turned OFF>/error/fao=4!/ansi=0
 LITNONGRAPH	<M standard requires graphics in string literals; found non-printable: $ZCHAR(!AD)>/warning/fao=2!/ansi=0
 DBFHEADERR8	<Database file !AD: control problem: !AD was 0x!16@XQ expecting 0x!16@XQ> /info /fao=6!/ansi=0
@@ -1337,7 +1352,7 @@ SSV4NOALLOW	<Database snapshots are supported only on fully upgraded V5 database
 SSTMPDIRSTAT	<Cannot access temporary directory !AD>/error/fao=2!/ansi=0//1
 SSTMPCREATE	<Cannot create the temporary file in directory !AD for the requested snapshot>/error/fao=2!/ansi=0//1
 JNLFILEDUP	<Journal files !AD and !AD are the same>/error/fao=4!/ansi=0
-SSPREMATEOF	<Premature end of file while reading block !UL of size: !UL bytes at offset: !UL from !AD>/error/fao=5!/ansi=0
+SSPREMATEOF	<Premature end of file while reading block !@UQ of size: !UL bytes at offset: !UL from !AD>/error/fao=5!/ansi=0
 SSFILOPERR	<Error while doing !AD operation on file !AD>/error/fao=4!/ansi=0
 REGSSFAIL	<Process !UL encountered error !UL contributing to the snapshot for region !AD - the snapshot is no longer valid>/error/fao=4!/ansi=0
 SSSHMCLNUPFAIL	<Error while doing snapshot shared memory cleanup. Operation -- !AD. Identifier -- !UL>/error/fao=3!/ansi=0
@@ -1380,7 +1395,7 @@ DZTRIGINTRIG	<$ZTRIGGER() is not allowed inside trigger context. Trigger name: !
 LSINSERTED	<Line !UL, source module !AD exceeds maximum source line length; line seperator inserted, terminating scope of any prior IF, ELSE, or FOR>/warning/fao=3!/ansi=0
 BOOLSIDEFFECT	<Extrinsic ($$), External call ($&) or $INCREMENT() with potential side effects in Boolean expression>/warning/fao=0!/ansi=0
 DBBADUPGRDSTATE	<Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.>/warning/fao=4!/ansi=0
-WRITEWAITPID	<PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD>/error/fao=6!/ansi=0
+WRITEWAITPID	<PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!16@XQ in database file !AD>/error/fao=6!/ansi=0
 ZGOCALLOUTIN	<ZGOTO level 0 with entry ref not valid when using call-ins>/error/fao=0!/ansi=0
 UNUSEDMSG1384	<REPLNOXENDIAN nixed in r1.24 because oldest supported version is V6.0-000 which supports cross-endian replication>/error/fao=0!/ansi=0
 REPLXENDIANFAIL	<!AD side encountered error while doing endian conversion at journal sequence number 0x!16@XQ>/error/fao=3!/ansi=0
@@ -1455,10 +1470,10 @@ MUTRUNCERROR	<Truncate of region !AD encountered service error !AD>/error/fao=4!
 MUTRUNCFAIL	<Truncate failed after reorg>/error/fao=0!/ansi=0
 MUTRUNCNOSPACE	<Region !AD has insufficient space to meet truncate target percentage of !UL>/info/fao=3!/ansi=0
 MUTRUNCNOTBG	<Region !AD does not have access method BG >/error/fao=2!/ansi=0
-MUTRUNCNOV4	<Region !AD is not fully upgraded from V4 format.>/error/fao=2!/ansi=0
+MUTRUNCNOV4	<Region !AD is not fully upgraded from V4 format.>/fatal/fao=2!/ansi=0
 MUTRUNCPERCENT	<Truncate threshold percentage should be from 0 to 99>/error/fao=0!/ansi=0
 MUTRUNCSSINPROG	<Truncate detected concurrent snapshot in progress for region !AD>/info/fao=2!/ansi=0
-MUTRUNCSUCCESS	<Database file !AD truncated from 0x!XL blocks to 0x!XL at transaction 0x!16@XQ>/info/fao=5!/ansi=0
+MUTRUNCSUCCESS	<Database file !AD truncated from 0x!16@XQ blocks to 0x!16@XQ at transaction 0x!16@XQ>/info/fao=5!/ansi=0
 RSYNCSTRMSUPPLONLY	<RSYNC_STRM qualifier only supported for Supplementary Instances>/error/fao=0!/ansi=0
 STRMNUMIS	<Stream # is !2UL>/info/fao=1!/ansi=0
 STRMNUMMISMTCH1	<Stream !2UL exists on the receiver instance file but is unknown on the source instance>/error/fao=1!/ansi=0
@@ -1566,10 +1581,15 @@ ZSOCKETATTR	<Attribute "!AD" invalid for $ZSOCKET function>/error/fao=2!/ansi=0
 ZSOCKETNOTSOCK	<$ZSOCKET function called but device is not a socket>/error/fao=0!/ansi=0
 CHSETALREADY	<Socket device already contains sockets with iCHSET=!AD, oCHSET=!AD>/error/fao=4!/ansi=0
 DSEMAXBLKSAV	<DSE cannot SAVE another block as it already has the maximum of !UL>/error/fao=1!/ansi=0
-BLKINVALID	<!XL is not a valid block as database file !AD has !XL total blocks>/error/fao=4!/ansi=0
+BLKINVALID	<0x!16@XQ is not a valid block as database file !AD has 0x!16@XQ total blocks>/error/fao=4!/ansi=0
 CANTBITMAP	<Can't perform this operation on a bit map (block at a 200 hexadecimal boundary)>/error/fao=0!/ansi=0
+<<<<<<< HEAD
 AIMGBLKFAIL	<After image build for block !XL in region !AD failed in DSE or MUPIP>/error/fao=3!/ansi=0
 YDBDISTUNVERIF	<Environment variable $ydb_dist (!AD) could not be verified against the executables path (!AD)>/error/fao=4!/ansi=0
+=======
+AIMGBLKFAIL	<After image build for block 0x!16@XQ in region !AD failed in DSE or MUPIP>/error/fao=3!/ansi=0
+GTMDISTUNVERIF	<Environment variable $gtm_dist (!AD) could not be verified against the executables path (!AD)>/error/fao=4!/ansi=0
+>>>>>>> 451ab477 (GT.M V7.0-000)
 CRYPTNOAPPEND	<APPEND disallowed on the encrypted file !AD>/error/fao=2!/ansi=0
 CRYPTNOSEEK	<SEEK disallowed on the encrypted file !AD>/error/fao=2!/ansi=0
 CRYPTNOTRUNC	<Not positioned at file start or EOF. TRUNCATE disallowed on the encrypted file !AD>/error/fao=2!/ansi=0
@@ -1606,7 +1626,7 @@ INVZBREAK	<Cannot set ZBREAK in direct mode routine (GTM$DMOD)>/error/fao=0!/ans
 INVTMPDIR	<Value or default for $ydb_tmp/$gtm_tmp is either not found or not a directory (!AD) - Reverting to default value>/error/fao=2!/ansi=0
 ARCTLMAXHIGH	<The environment variable !AD = !UL is too high. Assuming the maximum acceptable value of !UL>/warning/fao=4!/ansi=0
 ARCTLMAXLOW	<The environment variable !AD = !UL is too low. Assuming the minimum acceptable value of !UL>/warning/fao=4!/ansi=0
-NONTPRESTART	<Database !AD; code: !AD; blk: 0x!XL in glbl: ^!AD; blklvl: !UL, type: !UL, zpos: !AD>/info/fao=11!/ansi=0
+NONTPRESTART	<Database !AD; code: !AD; blk: 0x!16@XQ in glbl: ^!AD; blklvl: !UL, type: !UL, zpos: !AD>/info/fao=11!/ansi=0
 PBNPARMREQ	<A first parameter value !AD requires a second parameter specified containing !AD>/error/fao=4!/ansi=0
 PBNNOPARM	<First parameter !AD does not support a second parameter>/error/fao=2!/ansi=0
 PBNUNSUPSTRUCT	<$ZPEEK() does not support structure !AD>/error/fao=2!/ansi=0
@@ -1639,7 +1659,7 @@ OFRZAUTOREL	<Online Freeze automatically released for database file !AD>/warning
 OFRZCRITREL	<Proceeding with a write to region !AD after Online Freeze while holding crit>/warning/fao=2!/ansi=0
 OFRZCRITSTUCK	<Unable to proceed with a write to region !AD with Online Freeze while holding crit. Region stuck until freeze is removed.>/warning/fao=2!/ansi=0
 OFRZNOTHELD	<Online Freeze had been automatically released for at least one region>/warning/fao=0!/ansi=0
-AIOBUFSTUCK	<Waited !UL minutes for PID: !UL to finish AIO disk write of block: !UL [0x!XL] aio_error=!UL>/error/fao=5!/ansi=0
+AIOBUFSTUCK	<Waited !UL minutes for PID: !UL to finish AIO disk write of block: !@UQ [0x!16@XQ] aio_error=!UL>/error/fao=5!/ansi=0
 DBDUPNULCOL	<Discarding !AD=!AD key due to duplicate null collation record>/error/fao=4!/ansi=0
 CHANGELOGINTERVAL	<!AD Server is now logging to !AD every !UL transactions>/info/fao=5!/ansi=0
 DBNONUMSUBS	<!AD Key contains a numeric form of subscript in a global defined to collate all subscripts as strings>/error/fao=2!/ansi=0/B
@@ -1679,7 +1699,7 @@ SYSUTILCONF	<Error determining the path for system utility. !AD>/error/fao=2!/an
 MSTACKSZNA	<User-specified M stack size of !UL KiB not appropriate; must be between !UL KiB and !UL KiB; reverting to !UL KiB>/info/fao=4!/ansi=0
 JNLEXTRCTSEQNO	<Journal Extracts based on sequence numbers are restricted to a single region when replication is OFF>/error/fao=0!/ansi=0
 INVSEQNOQUAL	<Invalid SEQNO qualifier value !AD>/error/fao=2!/ansi=0
-LOWSPC		<WARNING: Database !AD has !UL% or less of the total block space remaining. Blocks Used: !UL Total Blocks Available: !UL>/info/fao=5!/ansi=0
+LOWSPC		<WARNING: Database !AD has !UL% or less of the total block space remaining. Blocks Used: !@UQ Total Blocks Available: !@UQ>/info/fao=5!/ansi=0
 FAILEDRECCOUNT	<LOAD unable to process !@UQ records>/error/fao=1!/ansi=0
 LOADRECCNT	<Last EXTRACT record processed by LOAD: !@UQ>/info/fao=1!/ansi=0
 COMMFILTERERR	<Error executing the command filter for !AD. !AD>/error/fao=4!/ansi=0
@@ -1712,12 +1732,17 @@ MLKREHASH	<LOCK hash table rebuilt for region !AD (seed = !UJ)>/info/fao=3!/ansi
 MUKEEPPERCENT	<Keep threshold percentage should be from 0 to 99>/error/fao=0!/ansi=0
 MUKEEPNODEC	<Expected decimal integer input for keep>/error/fao=0!/ansi=0
 MUKEEPNOTRUNC	<Keep issued without -truncate>/error/fao=0!/ansi=0
-MUTRUNCNOSPKEEP	<Region !AD has insufficient space to meet truncate target percentage of !UL with keep at !UL blocks>/info/fao=4!/ansi=0
+MUTRUNCNOSPKEEP	<Region !AD has insufficient space to meet truncate target percentage of !UL with keep at !@UQ blocks>/info/fao=4!/ansi=0
 TERMHANGUP	<Terminal has disconnected>/error/fao=0!/ansi=0
 DBFILNOFULLWRT	<Disabling fullblock writes. !AD !AD !UL>/warning/fao=5!/ansi=0
 BADCONNECTPARAM	<Error parsing or invalid !AD>/error/fao=2!/ansi=0
 BADPARAMCOUNT	<-CONNECTPARAMS accepts one to six parameter values>/error/fao=0!/ansi=0
 REPLALERT	<Source Server could not connect to replicating instance [!AZ] for !UL seconds>/warning/fao=2!/ansi=0
+SHUT2QUICK	<Shutdown timeout [!UL] shorter than the heartbeat period [!UL]; cannot confirm the backlog at the replicating instance [!AD]>/warning/fao=4!/ansi=0
+REPLNORESP	<No sequence number confirmation from the replicating instance [!AD] after waiting for [!UL] second(s)>/warning/fao=3!/ansi=0
+REPL0BACKLOG	<Total backlog for the specified replicating instance(s) is 0>/success/fao=0!/ansi=0
+REPLBACKLOG	<Timeout occurred while there was a backlog>/error/fao=0!/ansi=0
+INVSHUTDOWN	<Shutdown timeout should be from 0 to 3600 seconds>/error/fao=0!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

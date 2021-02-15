@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -65,8 +65,8 @@ GBLREF	bool		error_mupip;
 GBLREF	boolean_t	debug_mupip;
 GBLREF	boolean_t	jnlpool_init_needed;
 GBLREF	jnl_gbls_t	jgbl;
-GBLREF	uint4		parallel_freeze_online;
 
+uint4			parallel_freeze_online;
 freeze_multiproc_state	*parallel_shm_hdr;
 
 #define INTERRUPTED	(mu_ctrly_occurred || mu_ctrlc_occurred)
@@ -98,12 +98,38 @@ uint4 freeze_online_multi_proc_finish(reg_ctl_list *rctl);
 uint4 freeze_online_multi_proc_init(reg_ctl_list *rctl)
 {
 	multi_proc_shm_hdr_t	*mp_hdr;	/* Pointer to "multi_proc_shm_hdr_t" structure in shared memory */
+	int			status;
 
 	assert(multi_proc_in_use);
 	mp_hdr = multi_proc_shm_hdr;
 	parallel_shm_hdr = (freeze_multiproc_state *)((sm_uc_ptr_t)mp_hdr->shm_ret_array
 							+ (SIZEOF(void *) * mp_hdr->ntasks));
 	parallel_shm_hdr->ntasks = mp_hdr->ntasks;
+
+	status = pthread_mutexattr_init(&parallel_shm_hdr->reg_frozen_mutex_attr);
+	if (0 != status)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_mutexattr_init"), CALLFROM, status, 0);
+	status = pthread_condattr_init(&parallel_shm_hdr->reg_frozen_cond_attr);
+	if (0 != status)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_condattr_init"), CALLFROM, status, 0);
+	status = pthread_mutexattr_setpshared(&parallel_shm_hdr->reg_frozen_mutex_attr, PTHREAD_PROCESS_SHARED);
+	if (0 != status)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_mutexattr_setpshared"), CALLFROM, status, 0);
+	status = pthread_condattr_setpshared(&parallel_shm_hdr->reg_frozen_cond_attr, PTHREAD_PROCESS_SHARED);
+	if (0 != status)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_condattr_setpshared"), CALLFROM, status, 0);
+	status = pthread_mutex_init(&parallel_shm_hdr->reg_frozen_mutex, &parallel_shm_hdr->reg_frozen_mutex_attr);
+	if (0 != status)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_mutex_init"), CALLFROM, status, 0);
+	status = pthread_cond_init(&parallel_shm_hdr->reg_frozen_cond, &parallel_shm_hdr->reg_frozen_cond_attr);
+	if (0 != status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("pthread_cond_init"), CALLFROM, status, 0);
 	return SS_NORMAL;
 }
 
@@ -115,11 +141,15 @@ uint4 freeze_online_multi_proc(reg_ctl_list *rctl)
 	sgmnt_data_ptr_t	csd;
 	boolean_t		release_latch;
 	freeze_reg_mp_state	fr_multiproc;
+	unix_db_info		*udi;
 
 	reg = rctl->gd;
 	csa = &FILE_INFO(reg)->s_addrs;
+	udi = FILE_INFO(reg);
 	csd = csa->hdr;
 	assert(multi_proc_in_use);
+	assert(udi->owning_gd);
+	udi->owning_gd->thread_gdi = NULL;
 	fr_multiproc.region_index = rctl->region_index;
 	fr_multiproc.pfms = parallel_shm_hdr;
 	MUR_SET_MULTI_PROC_KEY(rctl, multi_proc_key);
@@ -129,8 +159,8 @@ uint4 freeze_online_multi_proc(reg_ctl_list *rctl)
 		while (fr_multiproc.region_index > fr_multiproc.pfms->grab_crit_counter)
 			SLEEP_USEC(10, FALSE);
 		grab_crit(reg, WS_102);
-		INCR_CNT(&fr_multiproc.pfms->grab_crit_counter, &fr_multiproc.pfms->region_frozen_latch);
-		INCR_CNT(&fr_multiproc.pfms->region_frozen_counter, &fr_multiproc.pfms->region_frozen_latch);
+		INCR_CNT(&fr_multiproc.pfms->grab_crit_counter, &fr_multiproc.pfms->grab_crit_latch);
+		INCR_REG_FROZEN_COUNT(fr_multiproc.pfms, FALSE);
 		rel_crit(reg);
 		fr_multiproc.pfms->freeze_ret_array[fr_multiproc.region_index] = REG_ALREADY_FROZEN;
 		return SS_NORMAL;
@@ -156,21 +186,21 @@ uint4 freeze_online_multi_proc(reg_ctl_list *rctl)
 						DB_LEN_STR(reg));
 				REL_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
 				multi_proc_key = NULL;  /* reset key until it can be set to rctl's region-name again */
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_MUNOFINISH);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_MUNOFINISH);
 				break;
 			case REG_FLUSH_ERROR:
 				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("MUPIP FREEZE"),
 						DB_LEN_STR(reg));
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_MUNOFINISH);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_MUNOFINISH);
 				break;
 			case REG_JNL_OPEN_ERROR:
 				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_JNLFILOPN, 4, JNL_LEN_STR(csd),
 						DB_LEN_STR(reg), csa->jnl->status);
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_MUNOFINISH);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_MUNOFINISH);
 				break;
 			case REG_JNL_SWITCH_ERROR:
 				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_JNLEXTEND, 2, JNL_LEN_STR(csd));
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_MUNOFINISH);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_MUNOFINISH);
 				break;
 			default:
 				assert(FALSE);
@@ -191,6 +221,10 @@ uint4 freeze_online_multi_proc_finish(reg_ctl_list *rctl)
 	int			regno;
 
 	assert(multi_proc_in_use);
+	pthread_mutexattr_destroy(&parallel_shm_hdr->reg_frozen_mutex_attr);
+	pthread_condattr_destroy(&parallel_shm_hdr->reg_frozen_cond_attr);
+	pthread_mutex_destroy(&parallel_shm_hdr->reg_frozen_mutex);
+	pthread_cond_destroy(&parallel_shm_hdr->reg_frozen_cond);
 	for (regno=0 ; regno < parallel_shm_hdr->ntasks ; regno++)
 	{	/* Look for a non-zero freeze status */
 		if (0 != parallel_shm_hdr->freeze_ret_array[regno])
@@ -329,7 +363,7 @@ void	mupip_freeze(void)
 					TRUE, REG_LEN_STR(gv_cur_region));
 			status = ERR_OFRZNOTHELD;
 		}
-		if ((reg_total > 1) && online && !cs_addrs->hdr->asyncio)
+		if ((reg_total > 1) && online)
 		{	/* Use gtm_multi_proc for FREEZE -ONLINE */
 			parallel = TRUE;
 			parallel_freeze_online = online;
@@ -349,24 +383,24 @@ void	mupip_freeze(void)
 				util_out_print("Kill in progress indicator is set for database file !AD", TRUE,
 					DB_LEN_STR(gv_cur_region));
 				PRINT_UNFROZEN_MSG;
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_MUNOFINISH);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_MUNOFINISH);
 			} else if (REG_FLUSH_ERROR == freeze_ret)
 			{
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("MUPIP FREEZE"),
 										DB_LEN_STR(gv_cur_region));
 				PRINT_UNFROZEN_MSG;
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_MUNOFINISH);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_MUNOFINISH);
 			} else if (REG_JNL_OPEN_ERROR == freeze_ret)
 			{
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_JNLFILOPN, 4, JNL_LEN_STR(cs_data),
 						DB_LEN_STR(gv_cur_region), cs_addrs->jnl->status);
 				PRINT_UNFROZEN_MSG;
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_MUNOFINISH);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_MUNOFINISH);
 			} else if (REG_JNL_SWITCH_ERROR == freeze_ret)
 			{
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLEXTEND, 2, JNL_LEN_STR(cs_data));
 				PRINT_UNFROZEN_MSG;
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_MUNOFINISH);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_MUNOFINISH);
 			} else
 				assert(FALSE);
 		}
@@ -392,8 +426,8 @@ void	mupip_freeze(void)
 			parallel_ctl[regno].gd = rptr->reg;
 		}
 		status = gtm_multi_proc((gtm_multi_proc_fnptr_t)&freeze_online_multi_proc, reg_total,
-				0, ret_array, (void *)parallel_ctl, SIZEOF(reg_ctl_list), shm_size,
-				(gtm_multi_proc_fnptr_t)&freeze_online_multi_proc_init,
+				MULTI_PROC_ONE_PER_REG, ret_array, (void *)parallel_ctl, SIZEOF(reg_ctl_list),
+				shm_size, (gtm_multi_proc_fnptr_t)&freeze_online_multi_proc_init,
 				(gtm_multi_proc_fnptr_t)&freeze_online_multi_proc_finish);
 	}
 	for (rptr = grlist;  NULL != rptr;  rptr = rptr->fPtr)
@@ -410,18 +444,18 @@ void	mupip_freeze(void)
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("MUPIP FREEZE"),
 										DB_LEN_STR(gv_cur_region));
 				PRINT_UNFROZEN_MSG;
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_MUNOFINISH);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_MUNOFINISH);
 			} else if (REG_JNL_OPEN_ERROR == freeze_ret)
 			{
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_JNLFILOPN, 4, JNL_LEN_STR(cs_data),
 						DB_LEN_STR(gv_cur_region), cs_addrs->jnl->status);
 				PRINT_UNFROZEN_MSG;
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_MUNOFINISH);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_MUNOFINISH);
 			} else if (REG_JNL_SWITCH_ERROR == freeze_ret)
 			{
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLEXTEND, 2, JNL_LEN_STR(cs_data));
 				PRINT_UNFROZEN_MSG;
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_MUNOFINISH);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_MUNOFINISH);
 			} else
 				assert(FALSE);
 		}

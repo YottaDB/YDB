@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +15,7 @@
 #include "iottdef.h"
 #ifdef KEEP_zOS_EBCDIC
 #include "gtm_unistd.h"
+error_def(ERR_ASC2EBCDICCONV);
 #endif
 
 uchar_ptr_t iott_escape(uchar_ptr_t strin, uchar_ptr_t strtop, io_desc *io_ptr)
@@ -21,9 +23,8 @@ uchar_ptr_t iott_escape(uchar_ptr_t strin, uchar_ptr_t strtop, io_desc *io_ptr)
 	unsigned char *str;
 	unsigned char esc_type;
 #ifdef KEEP_zOS_EBCDIC
-	error_def(ERR_ASC2EBCDICCONV);
 	if ((DEFAULT_CODE_SET != io_ptr->in_code_set) && ( -1 == __etoa_l((char *)strin, strtop - strin) ))
-		rts_error(VARLSTCNT(4) ERR_ASC2EBCDICCONV, 2, LEN_AND_LIT("__etoa_l"));
+		RTS_ERROR_ABT(VARLSTCNT(4) ERR_ASC2EBCDICCONV, 2, LEN_AND_LIT("__etoa_l"));
 #endif
 
 	str = strin;
@@ -86,7 +87,7 @@ uchar_ptr_t iott_escape(uchar_ptr_t strin, uchar_ptr_t strtop, io_desc *io_ptr)
 				esc_type = BADESC;
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE);
 		}
 		if (esc_type == BADESC || ++str >= strtop)
 			break;
@@ -94,7 +95,7 @@ uchar_ptr_t iott_escape(uchar_ptr_t strin, uchar_ptr_t strtop, io_desc *io_ptr)
 	io_ptr->esc_state = esc_type;
 #ifdef KEEP_zOS_EBCDIC
 	if ((DEFAULT_CODE_SET != io_ptr->in_code_set) && ( -1 == __atoe_l((char *)strin, strtop - strin) ))
-		rts_error(VARLSTCNT(4) ERR_ASC2EBCDICCONV, 2, LEN_AND_LIT("__atoe_l"));
+		RTS_ERROR_ABT(VARLSTCNT(4) ERR_ASC2EBCDICCONV, 2, LEN_AND_LIT("__atoe_l"));
 #endif
 	return str;
 }

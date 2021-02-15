@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -120,10 +120,17 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	recvpool.upd_proc_local->upd_proc_shutdown = NO_SHUTDOWN;
 
 #ifdef UNIX
+<<<<<<< HEAD
 	if (!ydb_dist_ok_to_use)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	if (WBTEST_ENABLED(WBTEST_MAXYDBDIST_UPDATE_PROCESS))
+=======
+	if (!gtm_dist_ok_to_use)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+			gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+	if (WBTEST_ENABLED(WBTEST_MAXGTMDIST_UPDATE_PROCESS))
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	{
 		memset(ydb_dist, 'a', YDB_PATH_MAX-2);
 		ydb_dist[YDB_PATH_MAX-1] = '\0';
@@ -143,39 +150,45 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	pthread_mutex_destroy(&recvpool.recvpool_ctl->write_updated_ctl);
 	status = pthread_mutexattr_init(&write_updated_ctl_attr);
 	if (0 != status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-				LEN_AND_LIT("pthread_mutexattr_init"), CALLFROM, status, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_mutexattr_init"), CALLFROM, status, 0);
 	status = pthread_mutexattr_settype(&write_updated_ctl_attr, PTHREAD_MUTEX_ERRORCHECK);
 	if (0 != status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-				LEN_AND_LIT("pthread_mutexattr_settype"), CALLFROM, status, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_mutexattr_settype"), CALLFROM, status, 0);
 	status = pthread_mutexattr_setpshared(&write_updated_ctl_attr, PTHREAD_PROCESS_SHARED);
 	if (0 != status)
+<<<<<<< HEAD
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("pthread_mutexattr_setpshared"), CALLFROM, status, 0);
 #	ifdef PTHREAD_MUTEX_ROBUST_SUPPORTED
+=======
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_mutexattr_setpshared"), CALLFROM, status, 0);
+#	if PTHREAD_MUTEX_ROBUST_SUPPORTED
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	status = pthread_mutexattr_setrobust(&write_updated_ctl_attr, PTHREAD_MUTEX_ROBUST);
 	if (0 != status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-				LEN_AND_LIT("pthread_mutexattr_setrobust"), CALLFROM, status, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_mutexattr_setrobust"), CALLFROM, status, 0);
 #	endif
 	status = pthread_mutex_init(&recvpool.recvpool_ctl->write_updated_ctl, &write_updated_ctl_attr);
 	if (0 != status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-				LEN_AND_LIT("pthread_mutex_init"), CALLFROM, status, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_mutex_init"), CALLFROM, status, 0);
 	memset(&recvpool.recvpool_ctl->write_updated, 0, SIZEOF(recvpool.recvpool_ctl->write_updated));
 	status = pthread_condattr_init(&write_updated_attr);
 	if (0 != status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-				LEN_AND_LIT("pthread_condattr_init"), CALLFROM, status, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_condattr_init"), CALLFROM, status, 0);
 	status = pthread_condattr_setpshared(&write_updated_attr, PTHREAD_PROCESS_SHARED);
 	if (0 != status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-				LEN_AND_LIT("pthread_condattr_setpshared"), CALLFROM, status, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_condattr_setpshared"), CALLFROM, status, 0);
 	status = pthread_cond_init(&recvpool.recvpool_ctl->write_updated, &write_updated_attr);
 	if (0 != status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-				LEN_AND_LIT("pthread_cond_init"), CALLFROM, status, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_cond_init"), CALLFROM, status, 0);
 	FORK(upd_pid);
 	if (0 > upd_pid)
 	{

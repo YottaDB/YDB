@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017 Fidelity National Information		*
+ * Copyright (c) 2017-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,6 @@ void jnl_set_fd_prior(int jnl_fd, sgmnt_addrs* csa, sgmnt_data* csd, jnl_file_he
 		if (SS_NORMAL == status1)
 		{
 			CHECK_JNL_FILE_IS_USABLE(&header, status1, FALSE, 0, NULL);
-			assert(SS_NORMAL == status1);
 			if ((SS_NORMAL == status1) && !header.is_not_latest_jnl)
 				jfh_checked = &header;
 		}

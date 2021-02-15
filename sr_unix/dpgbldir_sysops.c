@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -74,7 +74,7 @@ mstr *get_name(mstr *ms)
 	pblk.def1_size = SIZEOF(DEF_GDR_EXT) - 1;
 	status = parse_file(ms,&pblk);
 	if (!(status & 1))
-		rts_error_csa(CSA_ARG(NULL)
+		RTS_ERROR_CSA_ABT(NULL,
 			VARLSTCNT(9) ERR_ZGBLDIRACC, 6, ms->len, ms->addr, LEN_AND_LIT(""), LEN_AND_LIT(""), status);
 	new = (mstr *)malloc(SIZEOF(mstr));
 	new->len = pblk.b_esl;
@@ -114,7 +114,7 @@ void *open_gd_file(mstr *v)
 				LEN_AND_LIT(".  Cannot continue"), LEN_AND_LIT(""), errno);
 			assert(FALSE);
 		}
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, temp.len, temp.addr, LEN_AND_LIT(".  Retaining "),
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZGBLDIRACC, 6, temp.len, temp.addr, LEN_AND_LIT(".  Retaining "),
 			dollar_zgbldir.str.len, dollar_zgbldir.str.addr, errno);
 	}
 #ifdef __MVS__
@@ -144,7 +144,7 @@ void fill_gd_addr_id(gd_addr *gd_ptr, file_pointer *file_ptr)
 	gd_ptr->id = (gd_id *)malloc(SIZEOF(gd_id));
 	FSTAT_FILE(file_ptr->fd, &buf, fstat_res);
 	if (-1 == fstat_res)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr,
 			LEN_AND_LIT(""), LEN_AND_LIT(""), errno);
 	set_gdid_from_stat(gd_ptr->id, &buf);
 	return;
@@ -166,7 +166,7 @@ void file_read(file_pointer *file_ptr, int4 size, uchar_ptr_t buff, int4 pos)
 	LSEEKREAD(file_ptr->fd, (off_t)(pos - 1 ) * DISK_BLOCK_SIZE, buff, size, save_errno);
 	if (0 != save_errno)
 		if (-1 == save_errno)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 		else
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr,
 				LEN_AND_LIT(""), LEN_AND_LIT(""), save_errno);

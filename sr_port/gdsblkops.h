@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,19 +39,26 @@ typedef struct
  * 2 extra space            ---> cs_data->blk_size + BSTAR_REC_SIZE		(needed in case of global-variable creation)
  * Bitmap BLK_ADDR space    ---> (MAX_BT_DEPTH + 1) * (SIZEOF(block_id) * (BLKS_PER_LMAP + 1))
  *
+ * In the above calculations SIZEOF(block_id) and BSTAR_REC_SIZE are placeholders for the Macro/Function calls
+ * that will return different values depending on whether the DB is V6 or V7
  */
 
-#define	UPDATE_ELEMENT_ALIGN_SIZE	8
-#define	UPDATE_ARRAY_ALIGN_SIZE		(1 << 14)		/* round up the update array to a 16K boundary */
-#define	MAX_BITMAP_UPDATE_ARRAY_SIZE	((MAX_BT_DEPTH + 1) * ROUND_UP2(SIZEOF(block_id) * (BLKS_PER_LMAP + 1), 		\
-												UPDATE_ELEMENT_ALIGN_SIZE))
+#define	UPDATE_ELEMENT_ALIGN_SIZE		8
+#define	UPDATE_ARRAY_ALIGN_SIZE			(1 << 14)		/* round up the update array to a 16K boundary */
+#define	MAX_BITMAP_UPDATE_ARRAY_SIZE(csd)											\
+		((MAX_BT_DEPTH + 1)												\
+		 * ROUND_UP2(SIZEOF_BLK_ID(BLK_ID_32_VER < csd->desired_db_format) * (BLKS_PER_LMAP + 1),			\
+				UPDATE_ELEMENT_ALIGN_SIZE))
+
 #define MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd)											\
 		(CDB_CW_SET_SIZE * ROUND_UP2(BLK_SEG_ARRAY_SIZE * SIZEOF(blk_segment), UPDATE_ELEMENT_ALIGN_SIZE)		\
 		 + 2 * ROUND_UP2(csd->blk_size, UPDATE_ELEMENT_ALIGN_SIZE)							\
 		 + (MAX_BT_DEPTH - 1) * 											\
-			(3 * ROUND_UP2(SIZEOF(rec_hdr), UPDATE_ELEMENT_ALIGN_SIZE) 						\
-				+ 2 * ROUND_UP2(SIZEOF(block_id), UPDATE_ELEMENT_ALIGN_SIZE) + 2 * ROUND_UP2(MAX_KEY_SZ, 8))	\
-		 + ROUND_UP2(csd->blk_size, UPDATE_ELEMENT_ALIGN_SIZE) + ROUND_UP2(BSTAR_REC_SIZE, UPDATE_ELEMENT_ALIGN_SIZE))
+			(3 * ROUND_UP2(SIZEOF(rec_hdr), UPDATE_ELEMENT_ALIGN_SIZE)						\
+				+ 2 * ROUND_UP2(SIZEOF_BLK_ID(BLK_ID_32_VER < csd->desired_db_format), UPDATE_ELEMENT_ALIGN_SIZE)\
+				+ 2 * ROUND_UP2(MAX_KEY_SZ, 8))									\
+		 + ROUND_UP2(csd->blk_size, UPDATE_ELEMENT_ALIGN_SIZE)								\
+		 + ROUND_UP2(bstar_rec_size(BLK_ID_32_VER < csd->desired_db_format), UPDATE_ELEMENT_ALIGN_SIZE))
 
 #define UA_SIZE(X)		(uint4)(X->max_update_array_size)
 #define UA_NON_BM_SIZE(X)	(uint4)(X->max_non_bm_update_array_size)

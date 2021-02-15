@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -1193,6 +1193,7 @@ void backfill(unsigned char *ptr, gtm_msize_t len)
 			unalgnLen = ChunkSize - unalgnLen;	/* How far to go to get to alignment point */
 			unalgnLen = MIN(unalgnLen, len);	/* Make sure not going too far */
 			c = backfillMarkC;
+			assert((0 < len) && (0 < unalgnLen) && (unalgnLen <= len));
 			len -= unalgnLen;
 			do
 			{
@@ -1247,6 +1248,7 @@ boolean_t backfillChk(unsigned char *ptr, gtm_msize_t len)
 			unalgnLen = ChunkSize - unalgnLen;	/* How far to go to get to alignment point */
 			unalgnLen = MIN(unalgnLen, len);	/* Make sure not going too far */
 			c = backfillMarkC;
+			assert((0 < len) && (0 < unalgnLen) && (unalgnLen <= len));
 			len -= unalgnLen;
 			do
 			{

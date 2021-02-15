@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,13 +37,13 @@
 #include "iob.h"
 #include "gtmio.h"
 
+error_def(ERR_IOEOF);
+
 void iob_flush(BFILE *bf)
 {
 	ssize_t	nwritten, nrewritten;
 	ssize_t	nbytes;
 	int	rc;
-
-	error_def(ERR_IOEOF);
 
 	if (!bf->write_mode)
 		return;
@@ -77,33 +78,32 @@ void iob_flush(BFILE *bf)
 				nwritten = 0;
 			else
 			{
-				rts_error(VARLSTCNT(1) errno);
+				rts_error_csa(NULL, VARLSTCNT(1) errno);
 				return;
 			}
 		}
 #else
 		if (nwritten == -1)
 		{
-			rts_error(VARLSTCNT(1) errno);
+			rts_error_csa(NULL, VARLSTCNT(1) errno);
 			return;
 		}
 #endif
-		rts_error(VARLSTCNT(1) ERR_IOEOF);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 		/* if we continued from here, assume that this is a magnetic
 		   tape and we have loaded the next volume. Re-open and
 		   finish the write operation.
 		   */
 		while (FD_INVALID == (bf->fd = OPEN3(bf->path,bf->oflag,bf->mode)))
-			rts_error(VARLSTCNT(1) errno);
+			rts_error_csa(NULL, VARLSTCNT(1) errno);
 		DOWRITERL(bf->fd, bf->buf + nwritten, nbytes - nwritten, nrewritten);
 #ifdef DEBUG_IOB
 		PRINTF("iob_flush:\t\twrite(%d, %x, %d) = %d\n", bf->fd, bf->buf, nbytes, nwritten);
 #endif
 		if (nrewritten < nbytes - nwritten)
 		{
-			rts_error(VARLSTCNT(1) errno);
+			rts_error_csa(NULL, VARLSTCNT(1) errno);
 			return;
 		}
 	}
 }
-

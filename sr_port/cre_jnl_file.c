@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -248,7 +248,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 			ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
 			PERMGENDIAG_ARGS(pdd));
 		if (IS_GTM_IMAGE)
-			rts_error_csa(CSA_ARG(info->csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+			RTS_ERROR_CSA_ABT(info->csa, VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
 				PERMGENDIAG_ARGS(pdd));
 		else
@@ -332,9 +332,10 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	epoch_record->prefix.pini_addr = JNL_HDR_LEN;
 	epoch_record->prefix.time = jgbl.gbl_jrec_time;
 	epoch_record->blks_to_upgrd = info->blks_to_upgrd;
-	epoch_record->free_blocks   = info->free_blocks;
-	epoch_record->total_blks    = info->total_blks;
+	epoch_record->free_blocks = info->free_blocks;
+	epoch_record->total_blks = info->total_blks;
 	epoch_record->fully_upgraded = info->csd->fully_upgraded;
+	epoch_record->filler0 = 0;
 	epoch_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 	epoch_record->jnl_seqno = info->reg_seqno;
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
@@ -343,7 +344,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	{	/* If MUPIP JOURNAL -ROLLBACK, might need some adjustment. See macro definition for comments */
 		MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(info->csd, epoch_record->strm_seqno);
 	}
-	epoch_record->filler = 0;
+	epoch_record->filler1 = 0;
 	epoch_record->prefix.checksum = INIT_CHECKSUM_SEED;
 	temp_checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)epoch_record, SIZEOF(struct_jrec_epoch));
 	temp_offset = JNL_HDR_LEN + PINI_RECLEN;

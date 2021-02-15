@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2012 Fidelity Information Services, Inc		*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidaries.  	*
  * All rights reserved. 					*
+=======
+ * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,13 +60,13 @@ UConverter* get_chset_desc(const mstr* chset)
 		status = U_ZERO_ERROR;
 		chset_desc[chset_indx] = ucnv_open(chset_names[chset_indx].addr, &status);
 		if (U_FAILURE(status))
-			rts_error(VARLSTCNT(3) ERR_ICUERROR, 1, status);	/* strange and unexpected ICU unhappiness */
+			RTS_ERROR_ABT(VARLSTCNT(3) ERR_ICUERROR, 1, status);	/* strange and unexpected ICU unhappiness */
 		/* Initialize the callback for illegal/invalid characters, so that conversion
 		 * stops at the first illegal character rather than continuing with replacement */
 		status = U_ZERO_ERROR;
 		ucnv_setToUCallBack(chset_desc[chset_indx], &callback_stop, NULL, NULL, NULL, &status);
 		if (U_FAILURE(status))
-			rts_error(VARLSTCNT(3) ERR_ICUERROR, 1, status);	/* strange and unexpected ICU unhappiness */
+			RTS_ERROR_ABT(VARLSTCNT(3) ERR_ICUERROR, 1, status);	/* strange and unexpected ICU unhappiness */
 	}
 	return chset_desc[chset_indx];
 }

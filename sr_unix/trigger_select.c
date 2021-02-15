@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2020 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -257,9 +257,15 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 		{	/* There has to be a #LABEL */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
+<<<<<<< HEAD
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
 					gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#LABEL\""));
+=======
+			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
+				gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#LABEL\""));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		}
 		skip_chars = 1;
 		if ((trigger_value.str.len != STRLEN(HASHT_GBL_CURLABEL))
@@ -274,9 +280,15 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 		{	/* There has to be a #CYCLE */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
+<<<<<<< HEAD
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
 					gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#CYCLE\""));
+=======
+			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
+				gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#CYCLE\""));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		}
 		cycle_len = MIN(trigger_value.str.len, MAX_DIGITS_IN_INT);
 		memcpy(cycle, trigger_value.str.addr, cycle_len);
@@ -296,9 +308,15 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 			{	/* There has to be a #NAME */
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
+<<<<<<< HEAD
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
 						gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#NAME\""));
+=======
+				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
+					gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#NAME\""));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 
 			}
 			*out_rec_ptr++ = COMMENT_LITERAL;
@@ -498,10 +516,17 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 			{	/* We expect $c(0) in the middle of addr. If we dont find it, this is a restartable situation */
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
+<<<<<<< HEAD
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
 						LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
 						mv_trigger_val.str.len, mv_trigger_val.str.addr);
+=======
+				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
+					LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
+					mv_trigger_val.str.len, mv_trigger_val.str.addr);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 			ptr++;
 			A2I(ptr, mv_trigger_val.str.addr + mv_trigger_val.str.len, indx);
@@ -509,10 +534,17 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 			{	/* We expect a valid index */
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
+<<<<<<< HEAD
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
 						LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
 						mv_trigger_val.str.len, mv_trigger_val.str.addr);
+=======
+				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
+					LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
+					mv_trigger_val.str.len, mv_trigger_val.str.addr);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 			/* Use a local buffer to avoid possible garbage collection issues from write_out_trigger below */
 			memcpy(curr_gbl, mv_trigger_val.str.addr, trigvn_len);
@@ -568,7 +600,7 @@ STATICFNDEF void dump_all_triggers(void)
 		{
 			/* If ^#t needs to be upgraded, issue error. Cannot read older ^#t format */
 			if (cs_addrs->hdr->hasht_upgrade_needed)
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_NEEDTRIGUPGRD, 2, DB_LEN_STR(gv_cur_region));
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_NEEDTRIGUPGRD, 2, DB_LEN_STR(gv_cur_region));
 			op_gvdata(&val);
 			if ((literal_ten.m[0] == val.m[0]) && (literal_ten.m[1] == val.m[1]))
 			{	/* $DATA(^#t) is 10 - get first subscript (trigger's global) */
@@ -676,7 +708,7 @@ boolean_t trigger_select_tpwrap(char *select_list, uint4 select_list_len, char *
 				|| !gv_target || !gv_target->root);
 			assert((cdb_sc_onln_rlbk2 != failure) || !IS_GTM_IMAGE || TREF(dollar_zonlnrlbk));
 			if (cdb_sc_onln_rlbk2 == failure)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBROLLEDBACK);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DBROLLEDBACK);
 			/* else if (cdb_sc_onln_rlbk1 == status) we don't need to do anything other than trying again. Since this
 			 * is ^#t global, we don't need to GVCST_ROOT_SEARCH before continuing with the next restart because the
 			 * trigger load logic already takes care of doing INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED before doing the

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -58,18 +58,30 @@ typedef uint4		trans_num_4byte;
 typedef int4		block_id_32;	/* block_id type used pre-V7 kept for compatibility with old DBs
 					 * allows for GDS block #s to have 32 bits but see GDS_MAX_BLK_BITS below
 					 */
+typedef uint4		ublock_id_32;	/* unsigned type of the same length as block_id_32 */
 typedef gtm_int8	block_id_64;	/* block_id type used in V7+
 					 * allows for GDS block #s to have 64 bits but see GDS_MAX_BLK_BITS below
 					 */
-typedef block_id_32	block_id;	/* default block id type used in current release
-					 * NOTE : GDEVERIF.m assumes block_id to be int4. Fix that if this changes
+typedef gtm_uint8	ublock_id_64;	/* unsigned type of the same length as block_id_64 */
+typedef block_id_64	block_id;	/* default block id type used in current release
+					 * NOTE: This definition is duplicated in rc_cpt_ops.h
+					 * 	and if changed should be changed there as well
+					 * NOTE: GDEVERIF.m assumes block_id to be int8.
+					 * NOTE: GBLDEF.m assumes block_id to be int8.
 					 */
-typedef block_id_32	block_cnt;	/* type for storing a count of blocks (ex. the total number of blocks) */
+typedef ublock_id_64	ublock_id;	/* unsigned type of the same length as the default block_id in the current release */
 
-#undef BLK_NUM_64BIT			/* Disable 64-bit block ID handling in DSE */
+#define BLK_NUM_64BIT			/* Enables 64-bit block ID handling in DSE */
+
+/* Returns size of block_id type based on result of IS_64_BLK_ID (See gdsdbver.h) */
+#define SIZEOF_BLK_ID(X)	((X) ? SIZEOF(block_id_64) : SIZEOF(block_id_32))
 
 /* These are memory access macros relabeled for explicit block_id references */
-#define PUT_BLK_ID_32(X,Y)	PUT_LONG(X,Y)
+#define PUT_BLK_ID_32(X,Y)			\
+{						\
+	assert((block_id_32)(Y) == (Y));	\
+	PUT_LONG(X,(block_id_32)Y);		\
+}
 #define GET_BLK_ID_32(X,Y)	GET_LONG(X,Y)
 #define GET_BLK_ID_32P(X,Y)	GET_LONGP(X,Y)
 #define PUT_BLK_ID_64(X,Y)	PUT_LLONG(X,Y)
@@ -79,16 +91,37 @@ typedef block_id_32	block_cnt;	/* type for storing a count of blocks (ex. the to
 /* These are memory access macros for general case block_id references
  * instead of a specific block_id width
  */
-#define PUT_BLK_ID(X,Y)		PUT_BLK_ID_32(X,Y)
-#define GET_BLK_ID(X,Y)		GET_BLK_ID_32(X,Y)
-#define GET_BLK_IDP(X,Y)	GET_BLK_ID_32P(X,Y)
+#define PUT_BLK_ID(X,Y)		PUT_BLK_ID_64(X,Y)
+#define GET_BLK_ID(X,Y)		GET_BLK_ID_64(X,Y)
+#define GET_BLK_IDP(X,Y)	GET_BLK_ID_64P(X,Y)
+
+static inline void WRITE_BLK_ID(boolean_t long_blk_id, block_id blkid, sm_uc_ptr_t ptr)
+{
+	if (long_blk_id)
+		PUT_BLK_ID_64(ptr, blkid);
+	else
+		PUT_BLK_ID_32(ptr, blkid);
+}
+
+static inline void READ_BLK_ID(boolean_t long_blk_id, block_id* blkid, sm_uc_ptr_t ptr)
+{
+	if (long_blk_id)
+		GET_BLK_ID_64(*blkid, ptr);
+	else
+		GET_BLK_ID_32(*blkid, ptr);
+}
 
 /* This is the byte swap macro used for endian changing relabeled for block_id references */
-#define BLK_ID_BYTESWAP(X)	GTM_BYTESWAP_32(X)
+#define BLK_ID_32_BYTESWAP(X)	GTM_BYTESWAP_32(X)
+#define BLK_ID_64_BYTESWAP(X)	GTM_BYTESWAP_64(X)
+#define BLK_ID_BYTESWAP(X)	BLK_ID_64_BYTESWAP(X)
 
-#define GDS_MAX_BLK_BITS	30	/* see blk_ident structure in gdskill.h for why this cannot be any greater */
+#define GDS_MAX_BLK_BITS	62	/* see blk_ident structure in gdskill.h for why this cannot be any greater */
 #define GDS_MAX_VALID_BLK	(1<<GDS_MAX_BLK_BITS - 1)	/* the maximum valid block # that a GT.M database can have */
-#define GDS_CREATE_BLK_MAX	(block_id)(-1)	/* i.e. 0xFFFFFFFF which also has 31st bit 1 indicating it is a created block */
+#define GDS_CREATE_BLK_MAX	(block_id)(-1)	/* i.e. 0xFFFFFFFFFFFFFFFF which also has 63rd bit set to 1 indicating
+						 * it is a created block
+						 */
+#define V6_GDS_CREATE_BLK_MAX	(block_id_32)(-1)
 
 enum db_acc_method
 {	dba_rms,
@@ -110,8 +143,12 @@ typedef struct
 	unsigned short fid[3];
 } gds_file_id;		/* VMS artifact baked into things that would need care to change */
 
+<<<<<<< HEAD
 /* Note the below is not the same size on all platforms but must be less than or equal to gds_file_id */
 typedef struct gd_id_struct
+=======
+typedef struct gd_id_struct  /* note this is not the same size on all platforms but must be less than or equal to gds_file_id */
+>>>>>>> 451ab477 (GT.M V7.0-000)
 {
 	ino_t	inode;
 	dev_t	device;
@@ -130,7 +167,8 @@ typedef union
 
 
 /* Since it is possible that a block_id/unix_file_id/gd_id may live in shared memory, define a
-   shared memory pointer type to it so the pointer will be 64 bits if necessary. */
+ * shared memory pointer type to it so the pointer will be 64 bits if necessary.
+ */
 
 #ifdef DB64
 # ifdef __osf__
@@ -142,8 +180,9 @@ typedef union
 #endif
 
 typedef block_id	*block_id_ptr_t;
+typedef volatile block_id	*v_block_id_ptr_t;
 typedef unix_file_id	*unix_file_id_ptr_t;
-typedef	gd_id		*gd_id_ptr_t;
+typedef gd_id		*gd_id_ptr_t;
 
 #ifdef DB64
 # ifdef __osf__
@@ -180,6 +219,6 @@ typedef struct
 /* Prototypes below */
 block_id get_dir_root(void);
 boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, unsigned int *full_len,
-										int max_len, uint4 *status);
+										unsigned int max_len, uint4 *status);
 void gvinit(void);
 #endif

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -55,8 +56,8 @@ void setzdir(mval *newdir, mval *full_path_of_newdir)
 			 * executable. Vinaya, 08/22/2001.
 			 */
 			err_str = STRERROR(errno);
-			rts_error(VARLSTCNT(8) ERR_SETZDIR, 2, newdir->str.len, newdir->str.addr, ERR_TEXT, 2,
-					LEN_AND_STR(err_str));
+			RTS_ERROR_ABT(VARLSTCNT(8) ERR_SETZDIR, 2, newdir->str.len, newdir->str.addr, ERR_TEXT, 2,
+				LEN_AND_STR(err_str));
         	}
 	}
 	/* We need to find the full path of the current working directory because newdir might be a relative path, in which case
@@ -72,7 +73,8 @@ void setzdir(mval *newdir, mval *full_path_of_newdir)
 		} else
 		{
 			err_str = STRERROR(errno);
-			rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, LEN_AND_LIT("getcwd"), CALLFROM, ERR_TEXT, 2, LEN_AND_STR(err_str));
+			RTS_ERROR_ABT(VARLSTCNT(11) ERR_SYSCALL,
+				5, LEN_AND_LIT("getcwd"), CALLFROM, ERR_TEXT, 2, LEN_AND_STR(err_str));
 		}
 		full_path_of_newdir->mvtype = MV_STR;
 		full_path_of_newdir->str.addr = directory_buffer;

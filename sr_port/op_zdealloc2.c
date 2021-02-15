@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -68,7 +68,7 @@ void op_zdealloc2(mval *timeout, UINTPTR_T auxown)
 				if ((*prior)->granted && (*prior)->zalloc && (*prior)->tp && (*prior)->tp->zalloc)
 				{
 					lks_this_cmd = 0;
-					rts_error_csa(NULL, VARLSTCNT(1) ERR_TPLOCK);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPLOCK);
 				}
 				prior = &((*prior)->next);
 			}
@@ -99,7 +99,7 @@ void op_zdealloc2(mval *timeout, UINTPTR_T auxown)
 		if (mlk_pvt_root && tp_pointer && tp_pointer->old_locks)
 		{
 			lks_this_cmd = 0;
-			rts_error_csa(NULL, VARLSTCNT(1) ERR_TPLOCK);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPLOCK);
 		}
 		specific = FALSE;
 		for (prior = &mlk_pvt_root;  *prior;)

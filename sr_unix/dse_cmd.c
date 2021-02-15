@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -260,6 +260,9 @@ static readonly CLI_ENTRY dse_dump_qual[] = {
 { "FILEHEADER", dse_dmp_fhead, dse_fdmp_qual, 0, 0, 0, 0, VAL_N_A, 0, 0,       0,       0       },
 { "GLO",        0,             0,             0, 0, 0, 0, VAL_N_A, 0, NON_NEG, 0,       0       },
 { "HEADER",     0,             0,             0, 0, 0, 0, VAL_N_A, 0, NEG,     0,       0       },
+#ifdef DEBUG
+{ "IMAGE",      0,             0,             0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0       },
+#endif
 { "OFFSET",     0,             0,             0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "RECORD",     0,             0,             0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "ZWR",        0,             0,             0, 0, 0, 0, VAL_N_A, 0, NON_NEG, 0,       0       },

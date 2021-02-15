@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,13 +40,14 @@ GBLREF struct NTD	*ntd_root;
 GBLREF bool		zdefactive;
 GBLREF int4		outofband;
 
+error_def(ERR_BADSRVRNETMSG);
+
 void gvcmz_zflush(void)
 {
 	int4		status;
 	struct CLB	*p;
 	link_info	*usr;
 	unsigned short	sav_mbl;
-	error_def(ERR_BADSRVRNETMSG);
 
 	ASSERT_IS_LIBGNPCLIENT;
 	if (!zdefactive)
@@ -88,7 +94,7 @@ void gvcmz_zflush(void)
 		else
 		{
 			if (CMMS_E_ERROR != *(zdeferr->mbf))
-				rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+				RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			else
 				gvcmz_errmsg(zdeferr, FALSE);
 		}

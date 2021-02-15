@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,7 +66,7 @@ void	op_trestart_set_cdb_code(void)
 			 * message text. The assert below is a reminder for this case.
 			 */
 			assert(1 == (MAX_TP_FINAL_RETRY_TRESTART_CNT - 1));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRESTMAX);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TRESTMAX);
 		}
 	}
 	t_fail_hist[t_tries] = cdb_sc_optrestart;

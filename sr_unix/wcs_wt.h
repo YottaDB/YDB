@@ -71,7 +71,8 @@ enum dbg_wtfini_lcnt_t {
 	dbg_wtfini_wcs_recover = 32769,
 	dbg_wtfini_wcs_get_space1 = 32770,
 	dbg_wtfini_wcs_get_space2 = 32771,
-	dbg_wtfini_wcs_wtstart = 32772
+	dbg_wtfini_wcs_wtstart = 32772,
+	dbg_wtfini_wcs_get_space3 = 32773
 };
 
 GBLREF	enum dbg_wtfini_lcnt_t	dbg_wtfini_lcnt;	/* "lcnt" value for WCS_OPS_TRACE tracking purposes */

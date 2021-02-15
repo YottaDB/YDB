@@ -484,35 +484,38 @@ typedef struct jnl_ctl_list_struct
 	unsigned char			jnl_fn[JNL_NAME_SIZE];	/* Journal file name */
 	unsigned int			jnl_fn_len;		/* Length of journal fine name string */
 	jnl_file_header			*jfh;			/* journal file header */
-	jnl_tm_t 			lvrec_time;		/* Last Valid Journal Record's Time Stamp */
-	off_jnl_t 			lvrec_off;		/* Last Valid Journal Record's Offset */
-	off_jnl_t 			rec_offset;		/* Last processed record's offset */
+	jnl_tm_t			lvrec_time;		/* Last Valid Journal Record's Time Stamp */
+	off_jnl_t			lvrec_off;		/* Last Valid Journal Record's Offset */
+	off_jnl_t			rec_offset;		/* Last processed record's offset */
 	off_jnl_t			os_filesize;		/* OS file size in bytes  */
 	off_jnl_t			eof_addr;		/* Offset of end of last valid record of the journal */
-	off_jnl_t 			apply_pblk_stop_offset;	/* Offset where last PBLK was applied. Updated by both
+	off_jnl_t			apply_pblk_stop_offset;	/* Offset where last PBLK was applied. Updated by both
 								 * mur_apply_pblk() and mur_back_process()
 								 */
-	off_jnl_t 			turn_around_offset; 	/* Turn around point journal record's offset for each region */
+	off_jnl_t			turn_around_offset; 	/* Turn around point journal record's offset for each region */
 	jnl_tm_t			turn_around_time; 	/* Turn around time for this region */
-	boolean_t 			properly_closed;	/* TRUE if journal was properly closed, having written EOF;
-									FALSE otherwise */
-        boolean_t                       tail_analysis;		/* true for mur_fread_eof */
-        boolean_t                       after_end_of_data;	/* true for record offset more than end_of_data */
-        boolean_t                       read_only;		/* TRUE if read_only for extract/show/verify */
+	boolean_t			properly_closed;	/* TRUE if journal was properly closed, having written EOF;
+								 * FALSE otherwise
+								 */
+	boolean_t			tail_analysis;		/* true for mur_fread_eof */
+	boolean_t			after_end_of_data;	/* true for record offset more than end_of_data */
+	boolean_t			read_only;		/* TRUE if read_only for extract/show/verify */
 	int				jnlrec_cnt[JRT_RECTYPES];/* Count of each type of record found in this journal  */
 	int4				status;			/* Last status of the last operation done on this journal */
 	uint4				status2;		/* Last secondary status of the last operation done on
-									this journal */
+								 * this journal
+								 */
 	fd_type				channel;
 	gd_id				fid;
 	hash_table_int4			pini_list;		/* hash table of pini_addr to pid list */
 	struct reg_ctl_list_struct	*reg_ctl;		/* Back pointer to this region's reg_ctl_list */
-	struct jnl_ctl_list_struct 	*next_gen;		/* next generation journal file */
-	struct jnl_ctl_list_struct 	*prev_gen;		/* previous generation journal file */
+	struct jnl_ctl_list_struct	*next_gen;		/* next generation journal file */
+	struct jnl_ctl_list_struct	*prev_gen;		/* previous generation journal file */
 	gtmcrypt_key_t			encr_key_handle;
 	gtmcrypt_key_t			encr_key_handle2;
 	boolean_t			same_encryption_settings;	/* to indicate whether the db and the jnl file share
-								 	 * the same encryption settings */
+								 	 * the same encryption settings
+								 	 */
 	boolean_t			turn_around_fullyupgraded; /* EPOCH record's fully_upgraded field */
 } jnl_ctl_list;
 
@@ -520,7 +523,7 @@ typedef struct jnl_ctl_list_struct
 typedef struct
 {
 	jnl_ctl_list	*jctl;
-	seq_num 	rec_token_seq;
+	seq_num	rec_token_seq;
 	boolean_t	first_epoch;
 	uint4		status;
 } mur_back_opt_t;
@@ -530,9 +533,9 @@ typedef struct
 	unsigned char		*base;		/* Pointer to the buffer base of this mur_buff_desc */
 	unsigned char		*top;		/* Pointer to the buffer top of this mur_buff_desc */
 	off_jnl_t		blen;		/* Length of the buffer till end of valid data  */
-	off_jnl_t		dskaddr;   	/* disk offset from which this buffer was read */
+	off_jnl_t		dskaddr;	/* disk offset from which this buffer was read */
 	boolean_t		read_in_progress;/* Asynchronous read requested and in progress */
-	struct aiocb 		*aiocbp;
+	struct aiocb		*aiocbp;
 	int			rip_channel;	/* channel that has the aio read (for this mur_buff_desc_t) in progress.
 						 * valid only if "read_in_progress" field is TRUE.
 						 * this is a copy of the active channel "jctl->channel" while issuing the AIO.
@@ -568,28 +571,31 @@ typedef struct reg_ctl_list_struct
 	struct gd_region_struct	*gd;			/* region info */
 	sgmnt_addrs		*csa;			/* cs_addrs of this region */
 	struct sgm_info_struct	*sgm_info_ptr;		/* sgm_info_ptr of this region */
-	file_control 		*db_ctl;		/* To do dbfilop() */
-	jnl_ctl_list 		*jctl;			/* Current generation journal file control info */
-	jnl_ctl_list 		*jctl_head;		/* For forward recovery starting (earliest) generation
-							   journal file to be processed. */
+	file_control		*db_ctl;		/* To do dbfilop() */
+	jnl_ctl_list		*jctl;			/* Current generation journal file control info */
+	jnl_ctl_list		*jctl_head;		/* For forward recovery starting (earliest) generation
+							 * journal file to be processed.
+							 * */
 	jnl_ctl_list		*jctl_apply_pblk;	/* Journal file where PBLK application last stopped.
 							 * Updated by mur_apply_pblk() and mur_back_process()
 							 */
 	jnl_ctl_list		*jctl_turn_around;	/* final pass turn around point journal file */
-	jnl_ctl_list 		*jctl_alt_head;		/* For backward recovery turn around point
-							   journal file of interrupted recovery. */
+	jnl_ctl_list		*jctl_alt_head;		/* For backward recovery turn around point
+							 * journal file of interrupted recovery.
+							 */
 	jnl_ctl_list		*jctl_error;		/* jctl where an error occurred during mur_back_process */
-	hash_table_mname	gvntab;     		/* Used for gv_target info for globals in mur_output_record() */
-	jnl_tm_t 		lvrec_time;		/* Last Valid Journal Record's Time Stamp across all generations */
+	hash_table_mname	gvntab;			/* Used for gv_target info for globals in mur_output_record() */
+	jnl_tm_t		lvrec_time;		/* Last Valid Journal Record's Time Stamp across all generations */
 	int			jnl_state;
 	int			repl_state;
-	int4 			lookback_count;
-	boolean_t 		before_image;		/* True if the database has before image journaling enabled */
+	int4			lookback_count;
+	boolean_t		before_image;		/* True if the database has before image journaling enabled */
 	boolean_t		standalone;		/* If standalone access was acheived for the region */
 	boolean_t		recov_interrupted;	/* A copy of csd->recov_interrupted before resetting it to TRUE */
 	boolean_t		jfh_recov_interrupted;	/* Whether latest generation journal file was created by recover */
-	int4			blks_to_upgrd_adjust;	/* Delta to adjust turn around point's blks_to_upgrd counter with.
-							 * This will include all bitmaps created in V4 format by gdsfilext */
+	block_id		blks_to_upgrd_adjust;	/* Delta to adjust turn around point's blks_to_upgrd counter with.
+							 * This will include all bitmaps created in V4 format by gdsfilext
+							 */
 	struct pini_list	*mur_plst;		/* pini_addr hash-table entry of currently simulating GT.M process
 						 	 * for this region (used only if jgbl.forw_phase_recovery) */
 	mur_read_desc_t		*mur_desc;		/* Region specific structure storing last mur_read_file* context.
@@ -623,10 +629,11 @@ typedef struct reg_ctl_list_struct
 							 * an interrupt in mur_open_files before the journaling and/or replication
 							 * fields in rctl got initialized took us to mur_close_files which
 							 * unconditionally used those to restore the corresponding csd fields
-							 * resulting in journaling/replication getting incorrectly turned OFF. */
+							 * resulting in journaling/replication getting incorrectly turned OFF.
+							 */
 #	ifdef DEBUG
 	boolean_t		deleted_from_unprocessed_list;
-	jnl_ctl_list 		*last_processed_jctl;
+	jnl_ctl_list		*last_processed_jctl;
 	uint4			last_processed_rec_offset;
 	seq_num			last_processed_jnl_seqno;	/* last jnl_seqno processed in this region */
 #	endif
@@ -644,7 +651,7 @@ typedef struct reg_ctl_list_struct
 							 * for the # of elements so we limit this as well. When GTM-8469 is fixed
 							 * this can be changed to be an 8-byte quantity.
 							 */
-	buddy_list     		*jnlext_multi_list[TOT_EXTR_TYPES];	/* Buddy list for jnlext_write */
+	buddy_list		*jnlext_multi_list[TOT_EXTR_TYPES];	/* Buddy list for jnlext_write */
 	struct jnlext_multi_struct *last_jext_rec[TOT_EXTR_TYPES]; /* Pointer to last "jext_rec" obtained from previous call to
 								    * get_new_element(rctl->jnlext_multi_list)
 								    */
@@ -687,7 +694,11 @@ typedef struct long_list_struct
 typedef struct long_long_list_struct
 {
 	struct long_long_list_struct *next;
-	seq_num			seqno;
+	union
+	{
+		seq_num			seqno;
+		block_id		blk;
+	} u;
 	boolean_t		exclude;
 } long_long_list;
 
@@ -724,6 +735,7 @@ typedef struct
 				detail,
 				extract_full,
 				show_head_only,
+				dump_all_blocks,
 				extr[TOT_EXTR_TYPES];
 	char			transaction;
 	redirect_list		*redirect;
@@ -734,6 +746,7 @@ typedef struct
 				*process;
 	long_list		*id;
 	long_long_list		*seqno;
+	long_long_list		*blocklist;
 	char			*extr_fn[TOT_EXTR_TYPES];
 	int			extr_fn_len[TOT_EXTR_TYPES];
 	boolean_t		extr_fn_is_stdout[TOT_EXTR_TYPES];
@@ -1268,7 +1281,7 @@ uint4 			mur_back_processing(jnl_tm_t alt_tp_resolve_time);
 uint4			mur_back_phase1(reg_ctl_list *rctl);
 uint4			mur_back_phase2(reg_ctl_list *rctl);
 uint4			mur_back_processing_one_region(mur_back_opt_t *mur_back_options);
-uint4 			mur_block_count_correct(reg_ctl_list *rctl);
+int4 			mur_block_count_correct(reg_ctl_list *rctl);
 int4			mur_blocks_free(reg_ctl_list *rctl);
 boolean_t		mur_close_files(void);
 int4			mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat);

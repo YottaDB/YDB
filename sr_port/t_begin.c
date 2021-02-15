@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,8 +82,8 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 	csa = cs_addrs;
 	if ((NULL == csa->db_addrs[0]) && (dba_mm == csa->hdr->acc_meth))
 	{
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MMREGNOACCESS, 4, REG_LEN_STR(csa->region),
-					DB_LEN_STR(csa->region));
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_MMREGNOACCESS, 4, REG_LEN_STR(csa->region),
+			DB_LEN_STR(csa->region));
 	}
 	/* If we use a clue then we must consider the oldest tn in the search history to be the start tn for this transaction */
         /* start_tn manipulation for TP taken care of in tp_hist */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2020 Fidelity National Information	*
+ * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -95,6 +95,7 @@ error_def(ERR_DBFILERR);
 error_def(ERR_DBRDONLY);
 error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_DYNUPGRDFAIL);
+error_def(ERR_GTMCURUNSUPP);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUREORGFAIL);
@@ -147,6 +148,9 @@ void	mu_reorg_upgrd_dwngrd(void)
 	unsigned char		save_cw_set_depth;
 	uint4			lcl_update_trans;
 	unix_db_info		*udi;
+
+	mupip_exit(ERR_GTMCURUNSUPP);
+
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -365,7 +369,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			}
 			bml_sm_buff = t_qread(curbmp, (sm_int_ptr_t)&cycle, &cr); /* now that in crit, note down stable buffer */
 			if (NULL == bml_sm_buff)
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 			ondsk_blkver = cr->ondsk_blkver;	/* note down db fmt on disk for bitmap block */
 			/* Take a copy of the shared memory bitmap buffer into process-private memory before releasing crit.
 			 * We are interested in those blocks that are currently marked as USED in the bitmap.
@@ -722,7 +726,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_converted_nonbmp);
 		if (reorg_entiredb && (SS_NORMAL == status1) && (0 != blocks_left))
 		{	/* file-header counter does not match what reorg on the entire database expected to see */
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBBTUWRNG, 2, expected_blks2upgrd, actual_blks2upgrd);
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBBTUWRNG, 2, &expected_blks2upgrd, &actual_blks2upgrd);
 			util_out_print("Region !AD : Run MUPIP INTEG (without FAST qualifier) to fix the counter",
 				TRUE, REG_LEN_STR(reg));
 			status1 = ERR_MUNOFINISH;

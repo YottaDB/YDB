@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2018 Fidelity National Information	*
+ * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -108,7 +108,7 @@ void op_zrupdate(int argcnt, ...)
 	pblk.fop = F_SYNTAXO;				/* Syntax check only - bypass directory / file existence check. */
 	status = parse_file(&objfilespec->str, &pblk);
 	if (ERR_PARNORMAL != status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, objfilespec->str.len, objfilespec->str.addr, status);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2, objfilespec->str.len, objfilespec->str.addr, status);
 	wildcarded = (pblk.fnb & F_WILD);		/* Our error logic is different depending on the presence of wildcards. */
 	invalid = FALSE;
 	if (0 != pblk.b_name)
@@ -136,8 +136,8 @@ void op_zrupdate(int argcnt, ...)
 	} else if (!wildcarded)
 		invalid = TRUE;
 	if (invalid)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_FILEPARSE, 2, objfilespec->str.len, objfilespec->str.addr,
-			      ERR_TEXT, 2, RTS_ERROR_TEXT("Filename is not a valid routine name"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_FILEPARSE, 2, objfilespec->str.len, objfilespec->str.addr,
+			ERR_TEXT, 2, RTS_ERROR_TEXT("Filename is not a valid routine name"));
 	/* Do a simlar check for the file type */
 	seenfext = FALSE;
 	if (0 != pblk.b_ext)
@@ -160,8 +160,8 @@ void op_zrupdate(int argcnt, ...)
 	} else if (!wildcarded)
 		invalid = TRUE;
 	if (invalid)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_FILEPARSE, 2, objfilespec->str.len, objfilespec->str.addr,
-				ERR_TEXT, 2, RTS_ERROR_TEXT("Unsupported filetype specified"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_FILEPARSE, 2, objfilespec->str.len, objfilespec->str.addr,
+			ERR_TEXT, 2, RTS_ERROR_TEXT("Unsupported filetype specified"));
 	zsrch_clr(STRM_ZRUPDATE);	/* Clear any existing search cache */
 	object_count = 0;
 	do
@@ -219,8 +219,8 @@ void op_zrupdate(int argcnt, ...)
 			if (wildcarded)
 				continue;
 			else if (ENOENT != errno)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2,
-						objfilespec->str.len, objfilespec->str.addr, errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2,
+					objfilespec->str.len, objfilespec->str.addr, errno);
 		} else if (!S_ISREG(outbuf.st_mode))
 		{	/* We are only interested in regular files. */
 			continue;
@@ -248,8 +248,8 @@ void op_zrupdate(int argcnt, ...)
 			{	/* Note that the below errno value should come from the realpath() call in relinkctl_attach()
 				 * invoked above, so we need to make sure nothing gets called in between.
 				 */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2,
-						objfilespec->str.len, objfilespec->str.addr, errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2,
+					objfilespec->str.len, objfilespec->str.addr, errno);
 			}
 		}
 		if (!wildcarded)

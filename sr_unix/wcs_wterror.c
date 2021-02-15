@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2017 Fidelity National Information	*
+ * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -34,7 +34,6 @@
 #include "is_proc_alive.h"
 #include "anticipatory_freeze.h"
 #include "add_inter.h"
-#include "gtm_multi_proc.h"	/* for "multi_proc_in_use" GBLREF */
 #include "wcs_wt.h"
 #include "compswap.h"
 

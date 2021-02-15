@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -56,9 +56,9 @@ void	op_fnzparse (mval *file, mval *field, mval *def1, mval *def2, mval *type, m
 	MV_FORCE_STR(type);
 
 	if (def1->str.len > MAX_FN_LEN)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, def1->str.len, MAX_FN_LEN);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_INVSTRLEN, 2, def1->str.len, MAX_FN_LEN);
 	if (def2->str.len > MAX_FN_LEN)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, def2->str.len, MAX_FN_LEN);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_INVSTRLEN, 2, def2->str.len, MAX_FN_LEN);
 
 	if (field->str.len == 0)
 	{
@@ -105,7 +105,7 @@ void	op_fnzparse (mval *file, mval *field, mval *def1, mval *def2, mval *type, m
 			}
 		}
 		if (field_type == 0)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZPARSFLDBAD, 2, field->str.len, field->str.addr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZPARSFLDBAD, 2, field->str.len, field->str.addr);
 	}
 
 	memset(&pblk, 0, SIZEOF(pblk));
@@ -121,7 +121,7 @@ void	op_fnzparse (mval *file, mval *field, mval *def1, mval *def2, mval *type, m
 		} else if (type->str.len <= STR_LIT_LEN("SYMLINK") && !memcmp(&type_buf[0], "SYMLINK" , type->str.len))
 			pblk.symlink = TRUE;
 		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZPARSETYPE, 2, type->str.len, type->str.addr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZPARSETYPE, 2, type->str.len, type->str.addr);
 	}
 
 	pblk.buffer = result;

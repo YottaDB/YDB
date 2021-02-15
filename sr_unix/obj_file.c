@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -76,7 +76,8 @@ void drop_object_file(void)
 		assert(!rc);
 		CLOSE_OBJECT_FILE(object_file_des, rc);		/* Resets "object_file_des" to FD_INVALID */
 		assert(!rc);
-		(void)UNLINK(TADR(tmp_object_file_name));	/* Just in case the temp file was in play */
+		rc = UNLINK(TADR(tmp_object_file_name));	/* Just in case the temp file was in play */
+		assert(!rc);
 	}
 }
 
@@ -124,7 +125,7 @@ void emit_immed(char *source, uint4 size)
 	{
 		assert(rts_stringpool.base == stringpool.base);
 		if (!IS_STP_SPACE_AVAILABLE_PRO(size))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STRINGOFLOW);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STRINGOFLOW);
 		memcpy(stringpool.free, source, size);
 		stringpool.free += size;
 	} else
@@ -159,7 +160,7 @@ void buff_emit(void)
 	ydb_mmrhash_128_ingest(TADR(objhash_state), emit_buff, emit_buff_used);
 	DOWRITERC(object_file_des, emit_buff, emit_buff_used, stat);
 	if (0 != stat)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, stat);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, stat);
 	emit_buff_used = 0;
 }
 
@@ -448,7 +449,7 @@ void emit_literals(void)
 		offset += SIZEOF(mstr);
 	}
 	padsize = (uint4)(PADLEN(offset, NATIVE_WSIZE));
-	if (padsize)
+	if (padsize && (offset < (offset + padsize)))
 	{
 		emit_immed(PADCHARS, padsize);
 		offset += padsize;

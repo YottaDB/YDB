@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -157,6 +157,13 @@ void bx_boollit(triple *t, int depth)
 		for (j = 0;  j < ARRAYSIZE(v); j++)
 		{	/* both arguments are literals, so try the operation at compile time */
 			v[j] = &optrip[j]->operand[0].oprval.mlit->v;
+			MV_FORCE_NUMD(v[j]);
+			if (!(MV_NM & v[j]->mvtype))
+			{	/* if we don't have a useful number the Boolean conversion won't be valid */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
+				assert(TREF(rts_error_in_parse));
+				return;
+			}
 			tv[j] = MV_FORCE_BOOL(v[j]);
 		}
 		switch (t->opcode)

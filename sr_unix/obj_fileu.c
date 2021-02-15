@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2018 Fidelity National Information	*
+ * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -66,8 +66,8 @@ int mk_tmp_object_file(const unsigned char *object_fname, int object_fname_len)
 	SETUP_THREADGBL_ACCESS;
 	/* Make sure room in buffer for addition of unique-ifying MKSTEMP_MASK on end of file name */
 	if ((object_fname_len + SIZEOF(MKSTEMP_MASK) - 1) > TLEN(tmp_object_file_name))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_OBJFILERR, 2, object_fname_len, object_fname, ERR_TEXT,
-			      2, RTS_ERROR_TEXT("Object file name exceeds buffer size"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_OBJFILERR, 2, object_fname_len, object_fname, ERR_TEXT,
+			2, RTS_ERROR_TEXT("Object file name exceeds buffer size"));
 	/* The mkstemp() routine is known to bogus-fail for no apparent reason at all especially on AIX 6.1. In the event
 	 * this shortcoming plagues other platforms as well, we add a low-cost retry wrapper.
 	 */
@@ -80,7 +80,7 @@ int mk_tmp_object_file(const unsigned char *object_fname, int object_fname_len)
 		MKSTEMP(TADR(tmp_object_file_name), fdesc);
 	} while ((FD_INVALID == fdesc) && (EEXIST == errno) && (0 < --retry));
 	if (FD_INVALID == fdesc)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_fname_len, object_fname, errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_OBJFILERR, 2, object_fname_len, object_fname, errno);
 	umask_orig = umask(000);	/* Determine umask (destructive) */
 	(void)umask(umask_orig);	/* Reset umask */
 	umask_creat = 0666 & ~umask_orig;
@@ -110,7 +110,7 @@ void rename_tmp_object_file(const unsigned char *object_fname)
 	SETUP_THREADGBL_ACCESS;
 	status = rename(TADR(tmp_object_file_name), (char *)object_fname);
 	if (-1 == status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("rename()"), CALLFROM, errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("rename()"), CALLFROM, errno);
 	memset(TADR(tmp_object_file_name), 0, GTM_PATH_MAX);
 }
 
@@ -147,7 +147,7 @@ void init_object_file_name(void)
 	pblk.def1_buf = obj_name;
 	status = parse_file(&fstr, &pblk);
 	if (0 == (status & 1))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, fstr.len, fstr.addr, status);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2, fstr.len, fstr.addr, status);
 	object_name_len = pblk.b_esl;
 	object_file_name[object_name_len] = '\0';
 }

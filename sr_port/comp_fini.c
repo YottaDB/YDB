@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -100,6 +100,7 @@ int comp_fini(int status, mstr *obj, opctype retcode, oprtype *retopr, oprtype *
 		TREF(compile_time) = FALSE;
 		cg_phase = CGP_NOSTATE;
 	}
+	assert(!TREF(compile_time));
 	TREF(transform) = TRUE;
 	COMPILE_HASHTAB_CLEANUP;
 	mcfree();

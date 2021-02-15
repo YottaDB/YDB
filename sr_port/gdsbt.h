@@ -85,13 +85,11 @@ typedef struct
 	trans_num	curr_tn;
 	trans_num	early_tn;
 	trans_num	last_mm_sync;		/* Last tn where a full mm sync was done */
-	char		filler_8byte[8];	/* previously header_open_tn but no longer used.
-						 * cannot remove as this is part of database file header */
 	trans_num	mm_tn;			/* Used to see if CCP must update master map */
 	uint4		lock_sequence;		/* Used to see if CCP must update lock section */
 	uint4		ccp_jnl_filesize;	/* Passes size of journal file if extended */
-	volatile uint4	total_blks;		/* Placed here so can be passed to other machines on cluster */
-	volatile uint4	free_blocks;
+	volatile block_id	total_blks;	/* Placed here so can be passed to other machines on cluster */
+	volatile block_id	free_blocks;
 } th_index;
 
 typedef struct
@@ -101,18 +99,18 @@ typedef struct
 		sm_off_t 		fl;
 		sm_off_t		bl;	/* self-relative queue entry */
 	} blkque, tnque;		/* for block number hash, lru queue */
-	trans_num	tn;		/* transaction # #*/
+	trans_num	tn;		/* transaction #*/
 	trans_num	killtn;		/* last transaction when this block was updated as part of an M-kill */
 	block_id	blk;		/* block #*/
 	int4		cache_index;
 	bool		flushing;	/* buffer is being flushed after a machine switch on a cluster */
-	char		filler[3];
-	int4		filler_int4;	/* maintain 8 byte alignment */
+	char		filler[3];	/* maintain 8 byte alignment */
 } bt_rec;				/* block table record */
 
 /* This structure is used to access the transaction queue.  It points at all but the
-   first two longwords of a bt_rec.  CAUTION:  there is no such thing as a queue of
-   th_recs, they are always bt_recs, and the extra two longwords are always there */
+ * first two longwords of a bt_rec.  CAUTION:  there is no such thing as a queue of
+ * th_recs, they are always bt_recs, and the extra two longwords are always there
+ */
 typedef struct
 {
 	struct
@@ -125,12 +123,12 @@ typedef struct
 	block_id	blk;
 	int4		cache_index;
 	bool		flushing;
-	char		filler[3];
-	int4		filler_int4;	/* maintain 8 byte alignment */
+	char		filler[3];	/* maintain 8 byte alignment */
 } th_rec;
 
 /* This structure is used to maintain all cache records.  The BT queue contains
-   a history of those blocks that have been updated.	*/
+ * a history of those blocks that have been updated.
+ */
 
 /*
  *	Definitions for GT.M Mutex Control
@@ -176,7 +174,11 @@ typedef struct
 {
 	FILL8DCL(uint4, crit_cycle, 1);
 	global_latch_t	semaphore;
+<<<<<<< HEAD
 	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 2);		/* 8 for the FILL8DCL */
+=======
+	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 2)	/* 8 for the FILL8DCL */
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	FILL8DCL(latch_t, crashcnt, 3);
 	global_latch_t	crashcnt_latch;
 	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 4);	/* 8 for the FILL8DCL */
@@ -288,8 +290,8 @@ enum ftok_ops
 typedef struct
 {
 	enum ftok_ops	ftok_oper;
-	uint4           process_id;
-	trans_num       cr_tn;
+	uint4		process_id;
+	trans_num	cr_tn;
 } ftokhist;
 
 #define	DSKREAD_OPS_ARRAY_SIZE		 512
@@ -330,8 +332,8 @@ typedef struct
 {
 	uint4		is_encrypted;
 	uint4		reorg_encrypt_cycle;
-	char            hash[GTMCRYPT_HASH_LEN];
-	char            hash2[GTMCRYPT_HASH_LEN];
+	char		hash[GTMCRYPT_HASH_LEN];
+	char		hash2[GTMCRYPT_HASH_LEN];
 	block_id	encryption_hash_cutoff;
 } trans_update_t;
 
@@ -350,8 +352,8 @@ typedef struct blk_info_struct
 	uint4		cnl_reorg_encrypt_cycle;
 	block_id	encryption_hash_cutoff;
 	trans_num	encryption_hash2_start_tn;
-	char            hash[GTMCRYPT_HASH_LEN];
-	char            hash2[GTMCRYPT_HASH_LEN];
+	char		hash[GTMCRYPT_HASH_LEN];
+	char		hash2[GTMCRYPT_HASH_LEN];
 	char		region[100];
 	char		where[100];
 	info_t		info;
@@ -558,7 +560,7 @@ typedef struct max_procs
 /* Mapped space local to each node on the cluster */
 typedef struct node_local_struct
 {
-	unsigned char   label[GDS_LABEL_SZ];			/* 12	signature for GDS shared memory */
+	unsigned char	label[GDS_LABEL_SZ];			/* 12	signature for GDS shared memory */
 	unsigned char	fname[MAX_FN_LEN + 1];			/* 256	filename of corresponding database */
 	char		now_running[MAX_REL_NAME];		/* 36	current active YottaDB version stamp */
 	char		machine_name[MAX_MCNAMELEN];		/* 256	machine name for clustering */
@@ -576,13 +578,13 @@ typedef struct node_local_struct
 	int4		in_reinit;
 	unsigned short	ccp_cycle;
 	unsigned short	filler;					/* Align for ccp_cycle. Not changing to int
-								   as that would perturb to many things at this point */
+								 * as that would perturb to many things at this point
+								 */
 	boolean_t	ccp_crit_blocked;
 	int4		ccp_state;
 	boolean_t	ccp_jnl_closed;
 	boolean_t	glob_sec_init;
 	uint4		wtstart_pid[MAX_WTSTART_PID_SLOTS];	/* Maintain pids of wcs_wtstart processes */
-
 	volatile int4 wc_blocked;				/* WC_UNBLOCK = do not block write cache
 								 * WC_BLOCK_ONLY = block write cache and do not attempt any
 								 * cleanup (used for region freeze operations)
@@ -594,13 +596,22 @@ typedef struct node_local_struct
 								 * process grabbing crit will do cache recovery.  In MM mode,
 								 * it is used to call wcs_recover during a file extension.
 								 * Setting to WC_BLOCK_ONLY or WC_BLOCK_RECOVER stops all
+<<<<<<< HEAD
 								 * concurrent writers from working on the cache. */
 	global_latch_t	wc_var_lock;                            /* latch used for access to various wc_* ref counters */
 	CACHELINE_PAD(SIZEOF(global_latch_t), 1);		/* Keep these two latches in separate cache lines */
 	global_latch_t	db_latch;                               /* latch for interlocking on hppa and tandem */
 	CACHELINE_PAD(SIZEOF(global_latch_t), 2);
+=======
+								 * concurrent writers from working on the cache.
+								 */
+	global_latch_t	wc_var_lock;				/* latch used for access to various wc_* ref counters */
+	CACHELINE_PAD(SIZEOF(global_latch_t), 1)		/* Keep these two latches in separate cache lines */
+	global_latch_t	db_latch;				/* latch for interlocking on hppa and tandem */
+	CACHELINE_PAD(SIZEOF(global_latch_t), 2)
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	int4		cache_hits;
-	int4		wc_in_free;                             /* number of write cache records in free queue */
+	int4		wc_in_free;				/* number of write cache records in free queue */
 	/* All counters below (declared using CNTR4DCL) are 2 or 4-bytes, depending on platform, but always stored in 4 bytes.
 	 * CACHELINE_PAD doesn't use SIZEOF because misses any padding added by CNTR4DCL. We want to keep the counters in
 	 * separate cachelines on load-lock/store-conditional platforms particularly and on other platforms too, just to be safe.
@@ -623,11 +634,12 @@ typedef struct node_local_struct
 	CACHELINE_PAD(4, 10);
 	volatile int4	wtfini_in_prog;				/* whether wcs_wtfini() is in progress at this time */
 	boolean_t	freezer_waited_for_kip;			/* currently used only in dbg code */
-	int4            mm_extender_pid;			/* pid of the process executing gdsfilext in MM mode */
-	int4            highest_lbm_blk_changed;                /* Records highest local bit map block that
-									changed so we know how much of master bit
-									map to write out. Modified only under crit */
-	int4		nbb;                                    /* Next backup block -- for online backup */
+	int4		mm_extender_pid;			/* pid of the process executing gdsfilext in MM mode */
+	block_id	highest_lbm_blk_changed;		/* Records highest local bit map block that
+								 * changed so we know how much of master bit
+								 * map to write out. Modified only under crit
+								 */
+	block_id	nbb;					/* Next backup block -- for online backup */
 	int4		lockhist_idx;				/* (DW alignment) "circular" index into lockhists array */
 	int4		crit_ops_index;				/* "circular" index into crit_ops_array */
 	int4		dskread_ops_index;			/* "circular" index into dskread_ops_array */
@@ -639,16 +651,16 @@ typedef struct node_local_struct
 	wcs_ops_trace_t	wcs_ops_array[WCS_OPS_ARRAY_SIZE];	/* space for WCS_OPS_TRACE macro to record info */
 	unique_file_id	unique_id;
 	uint4		owner_node;
-	volatile int4   wcsflu_pid;				/* pid of the process executing wcs_flu in BG mode */
+	volatile int4	wcsflu_pid;				/* pid of the process executing wcs_flu in BG mode */
 	int4		creation_date_time4;			/* Lower order 4-bytes of database's creation time to be
 								 * compared at sm attach time */
 	int4		inhibit_kills;				/* inhibit new KILLs while MUPIP BACKUP, INTEG or FREEZE are
-					 			 * waiting for kill-in-progress to become zero
-					 			 */
+								 * waiting for kill-in-progress to become zero
+								 */
 	boolean_t	remove_shm;				/* can this shm be removed by the last process to rundown */
 	union
 	{
-		gds_file_id	jnl_file_id;  	/* needed on UNIX to hold space */
+		gds_file_id	jnl_file_id;	/* needed on UNIX to hold space */
 		unix_file_id	u;		/* from gdsroot.h even for VMS */
 	} jnl_file;	/* Note that in versions before V4.3-001B, "jnl_file" used to be a member of sgmnt_data.
 			 * Now it is a filler there and rightly used here since it is non-zero only when shared memory is active.
@@ -666,18 +678,19 @@ typedef struct node_local_struct
 	global_latch_t	snapshot_crit_latch;	/* To be acquired by any process that wants to clean up an orphaned snapshot or
 						 * initiate a new snapshot
 						 */
-	long		ss_shmid;		 /* Identifier of the shared memory for the snapshot that started
-						  * recently.
-						  */
-	uint4		ss_shmcycle;	 	 /* incremented everytime a new snapshot creates a new shared memory identifier */
-	boolean_t	snapshot_in_prog;	 /* Tells GT.M if any snapshots are in progress */
-	uint4		num_snapshots_in_effect; /* how many snapshots are currently in place for this region */
-	uint4		wbox_test_seq_num;	 /* used to coordinate with sequential testing steps */
-	uint4		freeze_online;		 /* for online db freezing, a.k.a. chill.  */
+	long		ss_shmid;		/* Identifier of the shared memory for the snapshot that started
+						 * recently.
+						 */
+	uint4		ss_shmcycle;	 	/* incremented everytime a new snapshot creates a new shared memory identifier */
+	boolean_t	snapshot_in_prog;	/* Tells GT.M if any snapshots are in progress */
+	uint4		num_snapshots_in_effect;	/* how many snapshots are currently in place for this region */
+	uint4		wbox_test_seq_num;	/* used to coordinate with sequential testing steps */
+	uint4		freeze_online;		/* for online db freezing, a.k.a. chill.  */
 	uint4		kip_pid_array[MAX_KIP_PID_SLOTS];	/* Processes actively doing kill (0 denotes empty slots) */
 	gtm_uint64_t	sec_size;	/* Upon going to larger shared memory sizes, we realized that this does not	*/
 					/* need	to be in the file header but the node local since it can be calculated	*/
-					/* from info in the file header.						*/
+					/* from info in the file header.
+					 */
 	int4		jnlpool_shmid;	/* copy of jnlpool->repl_inst_filehdr->jnlpool_shmid to prevent mixing of multiple
 					 * journal pools within the same database.
 					 */
@@ -689,11 +702,13 @@ typedef struct node_local_struct
 	volatile uint4	db_onln_rlbkd_cycle;	/* incremented everytime an online rollback takes the database back in time */
 	volatile uint4	onln_rlbk_pid;		/* process ID of currently running online rollback. */
 	uint4		dbrndwn_ftok_skip;	/* # of processes that skipped FTOK semaphore in gds_rundown due to too many MUMPS
-						   processes */
+						 * processes
+						 */
 	uint4		dbrndwn_access_skip;	/* # of processes that skipped access control semaphore in gds_rundown due to a
-						   concurrent online rollback or too many MUMPS processes */
+						 * concurrent online rollback or too many MUMPS processes
+						 */
 	boolean_t	fastinteg_in_prog;	/* Tells GT.M if fast integrity is in progress */
-	uint4           wtstart_errcnt;
+	uint4		wtstart_errcnt;
 	/* Note that although the below fields are dbg-only, they are defined for pro since we want to keep the shared
 	 * memory layout the same for both pro and dbg. There is some code that relies on this assumption.
 	 */
@@ -709,10 +724,11 @@ typedef struct node_local_struct
 								 */
 	uint4		reorg_encrypt_pid;	/* indicates whether a MUPIP REORG -ENCRYPT is in progress */
 	uint4		reorg_encrypt_cycle;	/* reflects the cycle of database encryption status in a series of
-						   MUPIP REORG -ENCRYPTs */
+						 * MUPIP REORG -ENCRYPTs
+						 */
 	uint4		mupip_extract_count;	/* count of currently running MUPIP EXTRACTs; to be improved with GTM-8488 */
 	/* Below 4 values are cached from the original DB file header that created the shared memory segment. Used by DSE only */
-	enum db_acc_method      saved_acc_meth;
+	enum db_acc_method	saved_acc_meth;
 	int4			saved_blk_size;
 	uint4			saved_lock_space_size;
 	int4			saved_jnl_buffer_size;
@@ -972,7 +988,7 @@ MBSTART {										\
 
 #define FTOK_TRACE(CSA, CR_TN, FTOK_OPER, PID)				\
 MBSTART {								\
-	node_local_ptr_t        cnl;                                    \
+	node_local_ptr_t	cnl;					\
 	int4 			foindx;					\
 	assert(NULL != CSA);						\
 	if (cnl = (CSA->nl))						\
@@ -1024,12 +1040,12 @@ MBSTART {															\
 		NUM_CRIT_ENTRY(CSD) = DEFAULT_NUM_CRIT_ENTRY;									\
 } MBEND
 
-#define ETGENTLE  2
-#define ETSLOW    8
-#define ETQUICK   16
-#define ETFAST    64
-#define EPOCH_TAPER_TIME_PCT_DEFAULT 32
-#define EPOCH_TAPER_JNL_PCT_DEFAULT 13
+#define ETGENTLE	 2
+#define ETSLOW		 8
+#define ETQUICK		16
+#define ETFAST		64
+#define EPOCH_TAPER_TIME_PCT_DEFAULT	32
+#define EPOCH_TAPER_JNL_PCT_DEFAULT	13
 
 #define EPOCH_TAPER_IF_NEEDED(CSA, CSD, CNL, REG, DO_FSYNC, BUFFS_PER_FLUSH, FLUSH_TARGET)					\
 MBSTART	{															\

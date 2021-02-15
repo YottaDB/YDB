@@ -38,6 +38,8 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "v6_gdsfhead.h"
+#include "db_header_conversion.h"
 #include "gdsblk.h"
 #include "filestruct.h"
 #include "jnl.h"
@@ -87,15 +89,15 @@ error_def(ERR_MUSTANDALONE);
 error_def(ERR_NOENDIANCVT);
 error_def(ERR_TEXT);
 
+#define ABANDONED_KILLS		"abandoned kills present"
+#define DBCREATE		"database creation in progress"
+#define DBCORRUPT		"the database is corrupted"
+#define GTCMSERVERACTIVE	"a GT.CM server accessing the database"
+#define KILLINPROG		"kills in progress"
 #define NOTCURRDBFORMAT		"database format is not the current version"
 #define NOTCURRMDBFORMAT	"minor database format is not the current version"
 #define NOTFULLYUPGRADED	"some blocks are not upgraded to the current version"
-#define KILLINPROG		"kills in progress"
-#define ABANDONED_KILLS		"abandoned kills present"
-#define GTCMSERVERACTIVE	"a GT.CM server accessing the database"
 #define	RECOVINTRPT		"recovery was interrupted"
-#define DBCREATE		"database creation in progress"
-#define DBCORRUPT		"the database is corrupted"
 
 #define MAX_CONF_RESPONSE	30
 
@@ -139,11 +141,13 @@ typedef struct
 } endian_info;
 
 void		endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native);
+void		v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_native);
 int4		endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_data, boolean_t override_specified);
 void		endian_cvt_blk_hdr(blk_hdr_ptr_t blkhdr, boolean_t new_is_native, boolean_t make_empty);
 void		endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhdr, block_id blknum);
 char		*endian_read_dbblk(endian_info *info, block_id blk_to_get);
-void		endian_find_key(endian_info *info, end_gv_key *gv_key, char *rec_p, int rec_len, int blk_levl);
+void		endian_find_key(endian_info *info, end_gv_key *gv_key, char *rec_p, int rec_len,
+		                int blk_levl, boolean_t long_blk_id);
 boolean_t	endian_match_key(end_gv_key *gv_key1, int blk_levl, end_gv_key *key2);
 block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key);
 
@@ -164,25 +168,30 @@ block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key);
 
 void mupip_endiancvt(void)
 {
-	char			db_name[MAX_FN_LEN + 1], *t_name;
-	sgmnt_data		*old_data, *new_data;
-	int4			status, save_errno;
-	int			rc;
-	uint4			swap_uint4;
-	enum db_ver		swap_dbver;
-	enum mdb_ver		swap_mdbver;
-	trans_num		curr_tn;
 	block_id		blk_num;
+<<<<<<< HEAD
 	int			i, db_fd, outdb_fd, mastermap_size;
 	unsigned short		n_len, outdb_len, t_len;
+=======
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	boolean_t		outdb_specified, endian_native, swap_boolean, got_standalone, override_specified;
+	char			db_name[MAX_FN_LEN + 1], *t_name;
 	char			outdb[MAX_FN_LEN + 1], conf_buff[MAX_CONF_RESPONSE + 1], *response;
-
 	char			*errptr, *check_error, *mastermap;
 	char			*from_endian, *to_endian;
-	endian32_struct		endian_check;
 	endian_info		info;
+	endian32_struct		endian_check;
+	enum db_ver		swap_dbver;
+	enum mdb_ver		swap_mdbver;
+	int			rc;
+	int			i, db_fd, outdb_fd, mastermap_size;
 	int			gtmcrypt_errno;
+	int4			status, save_errno;
+	sgmnt_data		*old_data, *new_data;
+	trans_num		curr_tn;
+	uint4			swap_uint4;
+	uint4			cli_status;
+	unsigned short		n_len, outdb_len, t_len;
 	ZOS_ONLY(int		realfiletag;)
 
 	if (CLI_PRESENT == cli_present("OUTDB"))
@@ -212,6 +221,8 @@ void mupip_endiancvt(void)
 #	endif
 	old_data = (sgmnt_data *)malloc(SIZEOF(sgmnt_data));
 	LSEEKREAD(db_fd, 0, old_data, SIZEOF(sgmnt_data), save_errno);
+	if (0 == memcmp(old_data, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+		db_header_upconv(old_data);
 	if (0 != save_errno)
 	{
 		free(old_data);
@@ -225,7 +236,7 @@ void mupip_endiancvt(void)
 		} else
 			mupip_exit(ERR_IOEOF);
 	}
-	if (MEMCMP_LIT(&old_data->label[0], GDS_LABEL))
+	if (MEMCMP_LIT(&old_data->label[0], GDS_LABEL) && MEMCMP_LIT(&old_data->label[0], V6_GDS_LABEL))
 	{
 		util_out_print("Database file !AD has an unrecognizable format", TRUE, n_len, db_name);
 		free(old_data);
@@ -250,7 +261,7 @@ void mupip_endiancvt(void)
 		if (!override_specified)
 		{
 			swap_mdbver = (enum mdb_ver)GTM_BYTESWAP_32(old_data->minor_dbver);
-			if (GDSMVCURR != swap_mdbver)
+			if ((GDSMVCURR != swap_mdbver) && (BLK_ID_32_MVER != swap_mdbver))
 			{
 				check_error = NOTCURRMDBFORMAT;
 				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
@@ -275,7 +286,7 @@ void mupip_endiancvt(void)
 			}
 		}
 		swap_dbver = (enum db_ver)GTM_BYTESWAP_32(old_data->desired_db_format);
-		if (GDSVCURR != swap_dbver)
+		if ((GDSVCURR != swap_dbver) && (BLK_ID_32_VER != swap_dbver))
 		{
 			check_error = NOTCURRDBFORMAT;
 			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
@@ -324,6 +335,8 @@ void mupip_endiancvt(void)
 		 * And redo the checks that we did before getting standalone access to make sure nothing changed.
 		 */
 		LSEEKREAD(db_fd, 0, old_data, SIZEOF(sgmnt_data), save_errno);
+		if (0 == memcmp(old_data, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+			db_header_upconv(old_data);
 		if (0 != save_errno)
 		{
 			assert(FALSE);
@@ -339,7 +352,7 @@ void mupip_endiancvt(void)
 			} else
 				mupip_exit(ERR_IOEOF);
 		}
-		if (MEMCMP_LIT(&old_data->label[0], GDS_LABEL))
+		if (MEMCMP_LIT(&old_data->label[0], GDS_LABEL) && MEMCMP_LIT(&old_data->label[0], V6_GDS_LABEL))
 		{
 			assert(FALSE);
 			DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
@@ -368,7 +381,7 @@ void mupip_endiancvt(void)
 		}
 		if (!override_specified)
 		{
-			if (GDSMVCURR != old_data->minor_dbver)
+			if ((GDSMVCURR != old_data->minor_dbver) && (BLK_ID_32_MVER != old_data->minor_dbver))
 			{
 				check_error = NOTCURRMDBFORMAT;
 				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
@@ -389,7 +402,7 @@ void mupip_endiancvt(void)
 				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 			}
 		}
-		if (GDSVCURR != old_data->desired_db_format)
+		if ((GDSVCURR != old_data->desired_db_format) && (BLK_ID_32_VER != old_data->desired_db_format))
 		{
 			check_error = NOTCURRDBFORMAT;
 			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
@@ -499,7 +512,11 @@ void mupip_endiancvt(void)
 	info.dtblk.buff = info.dtblk.dtrbuff = NULL;
 	info.dtblk.blkid = -1;			/* invalid block number */
 	info.dtblk.count = 0;
-	endian_header(new_data, old_data, !endian_native); /* convert file header fields */
+	if (0 == memcmp(new_data->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+	{	/* convert V6 file header fields */
+		v6_endian_header((v6_sgmnt_data_ptr_t)new_data, (v6_sgmnt_data_ptr_t)old_data, !endian_native);
+	} else
+		endian_header(new_data, old_data, !endian_native); /* convert file header fields */
 	if (outdb_specified)
 	{
 		OPENFILE3(outdb, O_RDWR | O_CREAT | O_EXCL, 0666, outdb_fd);
@@ -520,7 +537,12 @@ void mupip_endiancvt(void)
 			TAG_POLICY_GTM_PUTMSG(outdb, realfiletag, TAG_BINARY, errno);
 #		endif
 		new_data->file_corrupt = endian_native ? GTM_BYTESWAP_32(TRUE) : TRUE;
-		LSEEKWRITE(outdb_fd, 0, new_data, SIZEOF(sgmnt_data), save_errno);
+		if (0 == memcmp(new_data->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+		{
+			db_header_dwnconv(new_data);
+			LSEEKWRITE(outdb_fd, 0, new_data, SIZEOF(sgmnt_data), save_errno);
+		}else
+			LSEEKWRITE(outdb_fd, 0, new_data, SIZEOF(sgmnt_data), save_errno);
 		if (0 != save_errno)
 		{
 			free(new_data);
@@ -604,10 +626,16 @@ void mupip_endiancvt(void)
 	new_data->file_corrupt = endian_native ? GTM_BYTESWAP_32(FALSE) : FALSE;
 	if (outdb_specified)
 	{
+		if (0 == memcmp(new_data->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+			db_header_dwnconv(new_data);
 		LSEEKWRITE(outdb_fd, 0, new_data, SIZEOF(sgmnt_data), save_errno);
 	} else
+	{
+		if (0 == memcmp(new_data->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+			db_header_dwnconv(new_data);
 		DB_LSEEKWRITE((sgmnt_addrs *)NULL, ((unix_db_info *)NULL), (char *)NULL, db_fd, 0,
-									new_data, SIZEOF(sgmnt_data), save_errno);
+				new_data, SIZEOF(sgmnt_data), save_errno);
+	}
 	if (0 != save_errno)
 	{
 		free(new_data);
@@ -657,12 +685,24 @@ void mupip_endiancvt(void)
 		CLOSEFILE_RESET(outdb_fd, rc);	/* resets "outdb_fd" to FD_INVALID */
 	/* Display success message only after all data has been synced to disk and the file descriptors closed */
 	GTM_PUTMSG_CSA(VARLSTCNT(7) ERR_ENDIANCVT, 5, n_len, db_name, from_endian, to_endian, ENDIANTHIS);
- 	mupip_exit(SS_NORMAL);
+	mupip_exit(SS_NORMAL);
 }
 
-#define SWAP_SD4(FIELD)	new->FIELD = GTM_BYTESWAP_32(old->FIELD)
-#define SWAP_SD4_CAST(FIELD, castType)	new->FIELD = (castType)GTM_BYTESWAP_32(old->FIELD)
-#define SWAP_SD8(FIELD)	new->FIELD = GTM_BYTESWAP_64(old->FIELD)
+#define SWAP_SD4(FIELD)					\
+{							\
+	assert(SIZEOF(int4) == SIZEOF(old->FIELD));	\
+	new->FIELD = GTM_BYTESWAP_32(old->FIELD);	\
+}
+#define SWAP_SD4_CAST(FIELD, castType)				\
+{								\
+	assert(SIZEOF(int4) == SIZEOF(old->FIELD));		\
+	new->FIELD = (castType)GTM_BYTESWAP_32(old->FIELD);	\
+}
+#define SWAP_SD8(FIELD)					\
+{							\
+	assert(SIZEOF(gtm_int8) == SIZEOF(old->FIELD));	\
+	new->FIELD = GTM_BYTESWAP_64(old->FIELD);	\
+}
 
 void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 {
@@ -671,12 +711,9 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 
 	/************* MOSTLY STATIC DATABASE STATE FIELDS **************************/
 	SWAP_SD4(blk_size);
-	assert(SIZEOF(int4) == SIZEOF(old->master_map_len));
-	SWAP_SD4(master_map_len);
+	SWAP_SD4(v6_master_map_len);
 	SWAP_SD4(bplmap);
-	assert(SIZEOF(int4) == SIZEOF(old->start_vbn));
-	SWAP_SD4(start_vbn);
-	assert(SIZEOF(int4) == SIZEOF(old->acc_meth));		/* enum */
+	SWAP_SD4(v6_start_vbn);
 	SWAP_SD4_CAST(acc_meth, enum db_acc_method);
 	SWAP_SD4(max_bts);
 	SWAP_SD4(n_bts);
@@ -689,7 +726,6 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(def_coll);
 	SWAP_SD4(def_coll_ver);
 	SWAP_SD4(write_fullblk);
-	assert(SIZEOF(int4) == SIZEOF(old->std_null_coll));	/* boolean_t */
 	SWAP_SD4(std_null_coll);
 	SWAP_SD4(null_subs);
 	SWAP_SD4(free_space);
@@ -700,11 +736,9 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(max_update_array_size);
 	SWAP_SD4(max_non_bm_update_array_size);
 	/* SWAP_SD4(file_corrupt); is set in main routine	*/
-	assert(SIZEOF(int4) == SIZEOF(old->minor_dbver));	/* enum */
 	SWAP_SD4_CAST(minor_dbver, enum mdb_ver);
 	SWAP_SD4(jnl_checksum);
 	SWAP_SD4(wcs_phase2_commit_wait_spincnt);
-	assert(SIZEOF(int4) == SIZEOF(old->last_mdb_ver));	/* enum */
 	SWAP_SD4_CAST(last_mdb_ver, enum mdb_ver);
 	/************* FIELDS SET AT CREATION TIME ********************************/
 	/* SWAP_SD4(createinprogress);	checked above as FALSE so no need */
@@ -715,14 +749,254 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	if (!new_is_native)
 		SWAP_SD4(creation_time4);
 	/************* FIELDS USED BY TN WARN PROCESSING *************************/
-	assert(SIZEOF(gtm_int64_t) == SIZEOF(old->max_tn));	/* trans_num */
 	SWAP_SD8(max_tn);
 	SWAP_SD8(max_tn_warn);
 	/************* FIELDS SET BY MUPIP BACKUP/REORG *************************/
 	SWAP_SD8(last_inc_backup);
 	SWAP_SD8(last_com_backup);
 	SWAP_SD8(last_rec_backup);
-	assert(SIZEOF(int4) == SIZEOF(old->last_inc_bkup_last_blk));	/* block_id */
+	SWAP_SD4(v6_last_inc_bkup_last_blk);
+	SWAP_SD4(v6_last_com_bkup_last_blk);
+	SWAP_SD4(v6_last_rec_bkup_last_blk);
+	SWAP_SD4(v6_reorg_restart_block);
+	/************* FIELDS SET WHEN DB IS OPEN ********************************/
+	new->image_count = 0;		/* should be zero when db is not open so reset it unconditionally */
+	new->freeze = 0;		/* should be zero when db is not open so reset it unconditionally */
+	SWAP_SD4(kill_in_prog);
+	SWAP_SD4(abandoned_kills);
+	/************* FIELDS USED IN V4 <==> V5 COMPATIBILITY MODE ****************/
+	SWAP_SD8(tn_upgrd_blks_0);
+	SWAP_SD8(desired_db_format_tn);
+	SWAP_SD8(reorg_db_fmt_start_tn);
+	SWAP_SD4(v6_reorg_upgrd_dwngrd_restart_block);
+	SWAP_SD4(v6_blks_to_upgrd);
+	SWAP_SD4(v6_blks_to_upgrd_subzero_error);
+	SWAP_SD4_CAST(desired_db_format, enum db_ver);
+	SWAP_SD4(fully_upgraded);	/* should be TRUE */
+	assert(new->fully_upgraded);
+	/* Since the source database is fully upgraded and since all RECYCLED blocks will be marked as FREE, we are guaranteed
+	 * there are NO V4 format block that is too full to be upgraded to V5 format (i.e. will cause DYNUPGRDFAIL error).
+	 */
+	new->db_got_to_v5_once = TRUE;	/* should be TRUE */
+	new->opened_by_gtmv53 = TRUE;	/* should be TRUE */
+	/************* FIELDS RELATED TO DB TRANSACTION HISTORY *****************************/
+	SWAP_SD8(trans_hist.curr_tn);
+	SWAP_SD8(trans_hist.early_tn);
+	SWAP_SD8(trans_hist.last_mm_sync);
+	SWAP_SD8(trans_hist.mm_tn);
+	SWAP_SD4(trans_hist.lock_sequence);
+	SWAP_SD4(trans_hist.ccp_jnl_filesize);
+	SWAP_SD8(trans_hist.total_blks);
+	SWAP_SD8(trans_hist.free_blocks);
+	/************* FIELDS RELATED TO WRITE CACHE FLUSHING *******************************/
+	SWAP_SD4(flush_time[0]);
+	SWAP_SD4(flush_time[1]);
+	SWAP_SD4(flush_trigger);
+	SWAP_SD4(n_wrt_per_flu);
+	SWAP_SD4(wait_disk_space);
+	SWAP_SD4(defer_time);
+	SWAP_SD4(mumps_can_bypass);
+	SWAP_SD4(epoch_taper);
+	SWAP_SD4(epoch_taper_time_pct);
+	SWAP_SD4(epoch_taper_jnl_pct);
+	SWAP_SD4(asyncio);
+	/************* FIELDS Used for update process performance improvement. Some may go away in later releases ********/
+	SWAP_SD4(reserved_for_upd);
+	SWAP_SD4(avg_blks_per_100gbl);
+	SWAP_SD4(pre_read_trigger_factor);
+	SWAP_SD4(writer_trigger_factor);
+	/************* FIELDS USED ONLY BY UNIX ********************************/
+	/* Solaris complains about swapping -1
+	 * assert(INVALID_SEMID == GTM_BYTESWAP_32(INVALID_SEMID));
+	 * assert(INVALID_SHMID == GTM_BYTESWAP_32(INVALID_SHMID));
+	 */
+	assert(-1 == INVALID_SEMID);
+	assert(-1 == INVALID_SHMID);
+	if (new_is_native)
+	{	/* Since we have standalone access, reset volatile fields in the database file header */
+		new->semid = INVALID_SEMID;
+		new->shmid = INVALID_SHMID;
+		new->gt_sem_ctime.ctime = 0;
+		new->gt_shm_ctime.ctime = 0;
+		memset(new->machine_name, 0, MAX_MCNAMELEN);
+	}
+	/************* ACCOUNTING INFORMATION ********************************/
+	/************* CCP/RC RELATED FIELDS (CCP STUFF IS NOT USED CURRENTLY BY GT.M) *************/
+	SWAP_SD4(staleness[0]);
+	SWAP_SD4(staleness[1]);
+	SWAP_SD4(ccp_tick_interval[0]);
+	SWAP_SD4(ccp_tick_interval[1]);
+	SWAP_SD4(ccp_quantum_interval[0]);
+	SWAP_SD4(ccp_quantum_interval[1]);
+	SWAP_SD4(ccp_response_interval[0]);
+	SWAP_SD4(ccp_response_interval[1]);
+	SWAP_SD4(ccp_jnl_before);
+	SWAP_SD4(clustered);
+	SWAP_SD4(unbacked_cache);
+	/* RC server related fields sb zero when not active	*/
+	SWAP_SD4(rc_srv_cnt);
+	SWAP_SD4(dsid);
+	SWAP_SD4(rc_node);
+	/************* REPLICATION RELATED FIELDS ****************/
+	SWAP_SD8(reg_seqno);
+	SWAP_SD8(pre_multisite_resync_seqno);
+	/* Note some of the following names were added or renamed in V5.1 but should be of no issue for V5.0 builds
+	 * since we will be swapping unused fields.
+	*/
+	SWAP_SD8(zqgblmod_tn);
+	SWAP_SD8(zqgblmod_seqno);
+	new->repl_state = repl_closed;
+	if (!new_is_native)
+		SWAP_SD4(repl_state);
+	SWAP_SD4(multi_site_open);
+	/************* TP RELATED FIELDS ********************/
+	for (idx = 0; idx < ARRAYSIZE(old->tp_cdb_sc_blkmod); idx++)
+		new->tp_cdb_sc_blkmod[idx] = 0;
+	/************* JOURNALLING RELATED FIELDS ****************/
+	SWAP_SD4(jnl_alq);
+	SWAP_SD4(jnl_deq);
+	SWAP_SD4(jnl_buffer_size);
+	SWAP_SD4(jnl_before_image);
+	new->jnl_state = jnl_closed;
+	if (!new_is_native)
+		SWAP_SD4(jnl_state);
+	SWAP_SD4(jnl_file_len);
+	SWAP_SD4(autoswitchlimit);
+	SWAP_SD4(epoch_interval);
+	SWAP_SD4(alignsize);
+	SWAP_SD4(jnl_sync_io);
+	SWAP_SD4(yield_lmt);
+	SWAP_SD4(turn_around_point);
+	SWAP_SD8(jnl_eovtn);
+	/************* INTERRUPTED RECOVERY RELATED FIELDS ****************/
+	SWAP_SD8(intrpt_recov_resync_seqno);
+	SWAP_SD4(intrpt_recov_tp_resolve_time);
+	SWAP_SD4(recov_interrupted);
+	SWAP_SD4(intrpt_recov_jnl_state);
+	SWAP_SD4(intrpt_recov_repl_state);
+	/************* TRUNCATE RELATED FIELDS ****************/
+	SWAP_SD4(v6_before_trunc_total_blks);
+	SWAP_SD4(v6_after_trunc_total_blks);
+	SWAP_SD4(v6_before_trunc_free_blocks);
+	/************* POTENTIALLY LARGE CHARACTER ARRAYS **************/
+	/************* ENCRYPTION-RELATED FIELDS **************/
+	SWAP_SD4(non_null_iv);
+	SWAP_SD4(v6_encryption_hash_cutoff);
+	SWAP_SD8(encryption_hash2_start_tn);
+	/************* BG_TRC_REC RELATED FIELDS ***********/
+	/* Convert "bg_trc_rec_cntr_filler" and "bg_trc_rec_tn_filler" */
+#	define TAB_BG_TRC_REC(A,B)	new->B##_cntr = (bg_trc_rec_cntr) 0; new->B##_tn = (bg_trc_rec_tn) 0;
+#	include "tab_bg_trc_rec.h"
+#	undef TAB_BG_TRC_REC
+	/************* DB_CSH_ACCT_REC RELATED FIELDS ***********/
+	/* Convert "db_csh_acct_rec_filler_4k" */
+#	define TAB_DB_CSH_ACCT_REC(A,B,C)	new->A.cumul_count = new->A.curr_count = 0;
+#	include "tab_db_csh_acct_rec.h"
+#	undef TAB_DB_CSH_ACCT_REC
+	/************* GVSTATS_REC RELATED FIELDS ***********/
+#	define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)	SWAP_SD8(gvstats_rec.COUNTER);
+#	define IS_CSD_STATS 1
+#	include "tab_gvstats_rec.h"
+#	undef IS_CSD_STATS
+#	undef TAB_GVSTATS_REC
+	/************* FIELDS EXTENDED IN V7 HEADER ********************************/
+	SWAP_SD8(master_map_len);
+	SWAP_SD8(start_vbn);
+	SWAP_SD8(last_inc_bkup_last_blk);
+	SWAP_SD8(last_com_bkup_last_blk);
+	SWAP_SD8(last_rec_bkup_last_blk);
+	SWAP_SD8(reorg_restart_block);
+	SWAP_SD8(reorg_upgrd_dwngrd_restart_block);
+	SWAP_SD8(blks_to_upgrd);
+	SWAP_SD8(blks_to_upgrd_subzero_error);
+	SWAP_SD8(before_trunc_total_blks);
+	SWAP_SD8(after_trunc_total_blks);
+	SWAP_SD8(before_trunc_free_blocks);
+	SWAP_SD8(encryption_hash_cutoff);
+	/************* INTERRUPTED RECOVERY RELATED FIELDS continued ****************/
+	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+		SWAP_SD8(intrpt_recov_resync_strm_seqno[idx]);
+	/************* DB CREATION AND UPGRADE CERTIFICATION FIELDS ***********/
+	SWAP_SD4_CAST(creation_db_ver, enum db_ver);
+	SWAP_SD4_CAST(creation_mdb_ver, enum mdb_ver);
+	SWAP_SD4_CAST(certified_for_upgrade_to, enum db_ver);
+	/************* SECSHR_DB_CLNUP RELATED FIELDS (now moved to node_local) ***********/
+	/* "secshr_ops_index_filler" and "secshr_ops_array_filler" need not be converted (they are fillers) */
+	/********************************************************/
+	/* "next_upgrd_warn" isn't valid since the database is fully_upgraded and the latch values differ by platform
+	 * and since we don't know where the db will be used, we will ignore it.
+	 */
+	SWAP_SD4(is_encrypted);
+	SWAP_SD4(db_trigger_cycle);
+	/************* SUPPLEMENTARY REPLICATION INSTANCE RELATED FIELDS ****************/
+	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+	{
+		SWAP_SD8(strm_reg_seqno[idx]);
+		SWAP_SD8(save_strm_reg_seqno[idx]);
+	}
+	/************* MISCELLANEOUS FIELDS ****************/
+	SWAP_SD4(freeze_on_fail);
+	SWAP_SD4(span_node_absent);
+	SWAP_SD4(maxkeysz_assured);
+	SWAP_SD4(hasht_upgrade_needed);
+	SWAP_SD4(defer_allocate);
+}
+
+void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_native)
+{
+	int	idx;
+	time_t	ctime;
+
+	/* convert the header back down to V6 format  */
+	db_header_dwnconv((sgmnt_data_ptr_t)old);
+	db_header_dwnconv((sgmnt_data_ptr_t)new);
+
+	/************* MOSTLY STATIC DATABASE STATE FIELDS **************************/
+	SWAP_SD4(blk_size);
+	SWAP_SD4(master_map_len);
+	SWAP_SD4(bplmap);
+	SWAP_SD4(start_vbn);
+	SWAP_SD4_CAST(acc_meth, enum db_acc_method);
+	SWAP_SD4(max_bts);
+	SWAP_SD4(n_bts);
+	SWAP_SD4(bt_buckets);
+	SWAP_SD4(reserved_bytes);
+	SWAP_SD4(max_rec_size);
+	SWAP_SD4(max_key_size);
+	SWAP_SD4(lock_space_size);
+	SWAP_SD4(extension_size);
+	SWAP_SD4(def_coll);
+	SWAP_SD4(def_coll_ver);
+	SWAP_SD4(write_fullblk);
+	SWAP_SD4(std_null_coll);
+	SWAP_SD4(null_subs);
+	SWAP_SD4(free_space);
+	SWAP_SD4(mutex_spin_parms.mutex_hard_spin_count);	/* gdsbt.h */
+	SWAP_SD4(mutex_spin_parms.mutex_sleep_spin_count);
+	SWAP_SD4(mutex_spin_parms.mutex_spin_sleep_mask);
+	SWAP_SD4(mutex_spin_parms.mutex_que_entry_space_size);
+	SWAP_SD4(max_update_array_size);
+	SWAP_SD4(max_non_bm_update_array_size);
+	/* SWAP_SD4(file_corrupt); is set in main routine	*/
+	SWAP_SD4_CAST(minor_dbver, enum mdb_ver);
+	SWAP_SD4(jnl_checksum);
+	SWAP_SD4(wcs_phase2_commit_wait_spincnt);
+	SWAP_SD4_CAST(last_mdb_ver, enum mdb_ver);
+	/************* FIELDS SET AT CREATION TIME ********************************/
+	/* SWAP_SD4(createinprogress);	checked above as FALSE so no need */
+	assert(SIZEOF(int4) == SIZEOF(old->creation_time4));
+	time(&ctime);
+	assert(SIZEOF(ctime) >= SIZEOF(int4));
+	new->creation_time4 = (int4)ctime;/* Take only lower order 4-bytes of current time */
+	if (!new_is_native)
+		SWAP_SD4(creation_time4);
+	/************* FIELDS USED BY TN WARN PROCESSING *************************/
+	SWAP_SD8(max_tn);
+	SWAP_SD8(max_tn_warn);
+	/************* FIELDS SET BY MUPIP BACKUP/REORG *************************/
+	SWAP_SD8(last_inc_backup);
+	SWAP_SD8(last_com_backup);
+	SWAP_SD8(last_rec_backup);
 	SWAP_SD4(last_inc_bkup_last_blk);
 	SWAP_SD4(last_com_bkup_last_blk);
 	SWAP_SD4(last_rec_bkup_last_blk);
@@ -739,7 +1013,6 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(reorg_upgrd_dwngrd_restart_block);
 	SWAP_SD4(blks_to_upgrd);
 	SWAP_SD4(blks_to_upgrd_subzero_error);
-	assert(SIZEOF(int4) == SIZEOF(old->desired_db_format));	/* enum */
 	SWAP_SD4_CAST(desired_db_format, enum db_ver);
 	SWAP_SD4(fully_upgraded);	/* should be TRUE */
 	assert(new->fully_upgraded);
@@ -805,7 +1078,6 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(rc_srv_cnt);
 	SWAP_SD4(dsid);
 	SWAP_SD4(rc_node);
-	assert(SIZEOF(gtm_int64_t) == SIZEOF(old->reg_seqno));	/* seq_num */
 	/************* REPLICATION RELATED FIELDS ****************/
 	SWAP_SD8(reg_seqno);
 	SWAP_SD8(pre_multisite_resync_seqno);
@@ -837,10 +1109,8 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(yield_lmt);
 	SWAP_SD4(turn_around_point);
 	SWAP_SD8(jnl_eovtn);
-	assert(SIZEOF(gtm_int64_t) == SIZEOF(old->intrpt_recov_resync_seqno));
 	/************* INTERRUPTED RECOVERY RELATED FIELDS ****************/
 	SWAP_SD8(intrpt_recov_resync_seqno);
-	assert(SIZEOF(int4) == SIZEOF(old->intrpt_recov_tp_resolve_time));
 	SWAP_SD4(intrpt_recov_tp_resolve_time);
 	SWAP_SD4(recov_interrupted);
 	SWAP_SD4(intrpt_recov_jnl_state);
@@ -897,25 +1167,30 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(maxkeysz_assured);
 	SWAP_SD4(hasht_upgrade_needed);
 	SWAP_SD4(defer_allocate);
+
+
+	/* convert the header back up to V7 format  */
+	db_header_upconv((sgmnt_data_ptr_t)old);
+	db_header_upconv((sgmnt_data_ptr_t)new);
 }
 
 int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_data, boolean_t override_specified)
 {	/* returns 0 for success
 	   This routine based on mubinccpy and dbcertify_scan_phase
 	*/
-	int4		startvbn;
-	int		save_errno, bsize, lbm_status;
-	int		buff_native, buff_old, buff_new;
-	int		lm_offset;
-	int4		bplmap;
-	off_t		dbptr;
+	blk_hdr_ptr_t	bp_new, bp_native, bp_old;
 	block_id	blk_num, totblks, last_blk_written, mm_offset,
 			lbm_done, busy_done, recycled_done, free_done, lbmap_cnt;
 	boolean_t	new_is_native;
-	char		*blk_buff[2], *lbmap_buff[2], *errptr;
-	int		crypt_blk_size, gtmcrypt_errno;
-	blk_hdr_ptr_t	bp_new, bp_native, bp_old;
 	boolean_t	blk_needs_encryption, non_null_iv, use_old_key, use_new_key;
+	char		*blk_buff[2], *lbmap_buff[2], *errptr;
+	int		save_errno, bsize, lbm_status;
+	int		buff_native, buff_old, buff_new;
+	int		lm_offset;
+	int		crypt_blk_size, gtmcrypt_errno;
+	int4		startvbn;
+	int4		bplmap;
+	off_t		dbptr;
 	trans_num	encryption_hash2_start_tn;
 	DCL_THREADGBL_ACCESS;
 
@@ -1201,15 +1476,15 @@ void endian_cvt_blk_hdr(blk_hdr_ptr_t blkhdr, boolean_t new_is_native, boolean_t
 
 char *endian_read_dbblk(endian_info *info, block_id blk_to_get)
 {
-	off_t		blkoff;
-	int		save_errno;
+	blk_hdr_ptr_t	bp;
+	boolean_t	use_old_key, use_new_key;
 	boolean_t	blk_is_native;
 	char		*buff;
+	char		*inbuf;
+	int		save_errno;
 	int		gtmcrypt_errno;
 	int		req_dec_blk_size;
-	char		*inbuf;
-	boolean_t	use_old_key, use_new_key;
-	blk_hdr_ptr_t	bp;
+	off_t		blkoff;
 
 	if (DIR_ROOT == blk_to_get)
 	{
@@ -1285,14 +1560,14 @@ char *endian_read_dbblk(endian_info *info, block_id blk_to_get)
 	return buff;
 }
 
-void endian_find_key(endian_info *info, end_gv_key *targ_gv_key, char *rec_p, int rec_len, int blk_levl)
+void endian_find_key(endian_info *info, end_gv_key *targ_gv_key, char *rec_p, int rec_len, int blk_levl, boolean_t long_blk_id)
 {	/* find the key for the record and set targ_gv_key */
+	char		*rec_key;
 	int		cmpc;
 	int		tmp_cmpc;
 	unsigned char	*targ_key;
-	char		*rec_key;
 
-	if (BSTAR_REC_SIZE == rec_len && 0 < blk_levl)
+	if (bstar_rec_size(long_blk_id) == rec_len && 0 < blk_levl)
 	{	/* no key for star key records */
 		targ_gv_key->end = 0;
 		return;
@@ -1321,8 +1596,8 @@ void endian_find_key(endian_info *info, end_gv_key *targ_gv_key, char *rec_p, in
 
 boolean_t	endian_match_key(end_gv_key *gv_key1, int blk_levl, end_gv_key *gv_key2)
 {
-	unsigned char	*key1, *key2;
 	int	key1_len, key2_len, key_len;
+	unsigned char	*key1, *key2;
 
 	key1 = gv_key1->key;
 	key2 = gv_key2->key;
@@ -1351,13 +1626,14 @@ boolean_t	endian_match_key(end_gv_key *gv_key1, int blk_levl, end_gv_key *gv_key
 block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key)
 {
 	block_id	blk_to_get, blk_ptr;
+	block_id_32	temp_32_id;
+	boolean_t	blk_is_native, long_blk_id;
+	char		*buff, *blk_top, *rec_p;
+	end_gv_key	found_gv_key;
 	int		save_errno, rec_len, blk_levl, ptroffset;
 	int		tmp_cmpc;
-	boolean_t	blk_is_native;
-	char		*buff, *blk_top, *rec_p;
-	unsigned short	us_rec_len;
-	end_gv_key	found_gv_key;
 	unsigned char	found_gv_key_buff[MAX_KEY_SZ + 1];
+	unsigned short	us_rec_len;
 
 	info->dtblk.count++;
 	found_gv_key.key = found_gv_key_buff;
@@ -1371,6 +1647,7 @@ block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key)
 	{
 		blk_top = buff + ((blk_hdr_ptr_t)buff)->bsiz;
 		blk_levl = ((blk_hdr_ptr_t)buff)->levl;
+		long_blk_id = IS_64_BLK_ID(buff);
 		rec_p = buff + SIZEOF(blk_hdr);
 		while (rec_p < blk_top)
 		{
@@ -1380,25 +1657,47 @@ block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key)
 			rec_len = us_rec_len;
 			if (0 >= rec_len)
 				return -1;
-			if (0 != blk_levl && BSTAR_REC_SIZE == rec_len)
+			if ((0 != blk_levl) && (bstar_rec_size(long_blk_id) == rec_len))
 			{	/* down to the next level */
-				GET_BLK_ID(blk_ptr, rec_p + SIZEOF(rec_hdr));
+				READ_BLK_ID(long_blk_id, &blk_ptr, (sm_uc_ptr_t)(rec_p + SIZEOF(rec_hdr)));
 				if (!blk_is_native)
-					blk_ptr = BLK_ID_BYTESWAP(blk_ptr);
+				{
+					if(long_blk_id)
+						blk_ptr = BLK_ID_64_BYTESWAP(blk_ptr);
+					else
+					{
+						assert(blk_ptr == (block_id_32)blk_ptr);
+						temp_32_id = (block_id_32)blk_ptr;
+						temp_32_id = BLK_ID_32_BYTESWAP(temp_32_id);
+						blk_ptr = temp_32_id;
+					}
+					assert(0 <= blk_ptr);
+				}
 				if (blk_ptr > info->tot_blks)
 					return -1;	/* past end of database */
 				blk_to_get = blk_ptr;
 				break;
 			}
-			endian_find_key(info, &found_gv_key, rec_p, rec_len, blk_levl);
+			endian_find_key(info, &found_gv_key, rec_p, rec_len, blk_levl, long_blk_id);
 			if (endian_match_key(&found_gv_key, blk_levl, gv_key))
 			{
 				if (0 == blk_levl)
 					return blk_to_get;	/* found dtleaf block we are looking for */
 				ptroffset = found_gv_key.end - EVAL_CMPC((rec_hdr *)rec_p) + 1;
-				GET_BLK_ID(blk_ptr, rec_p + SIZEOF(rec_hdr) + ptroffset);
+				READ_BLK_ID(long_blk_id, &blk_ptr, (sm_uc_ptr_t)(rec_p + SIZEOF(rec_hdr) + ptroffset));
 				if (!blk_is_native)
-					blk_ptr = BLK_ID_BYTESWAP(blk_ptr);
+				{
+					if(long_blk_id)
+						blk_ptr = BLK_ID_64_BYTESWAP(blk_ptr);
+					else
+					{
+						assert(blk_ptr == (block_id_32)blk_ptr);
+						temp_32_id = (block_id_32)blk_ptr;
+						temp_32_id = BLK_ID_32_BYTESWAP(temp_32_id);
+						blk_ptr = temp_32_id;
+					}
+					assert(0 <= blk_ptr);
+				}
 				if (blk_ptr > info->tot_blks)
 					return -1;	/* past end of database */
 				blk_to_get = blk_ptr;
@@ -1418,20 +1717,25 @@ block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key)
 void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhdr, block_id blknum)
 {	/* convert records in new_block, could be data, index, or directory
 	   use converted header fields from blkhdr which is in native format */
+	block_id	ptr2blk, ptr2blk_swap, dtblk;
+	block_id_32	temp_32_id;
+	boolean_t	new_is_native, have_dt_blk;
+	boolean_t	have_gvtleaf;
+	boolean_t	long_blk_id;
+	end_gv_key	gv_key;
 	int		rec1_len, rec1_gvn_len, rec2_cmpc, rec2_len;
 	int		tmp_cmpc;
 	int		blk_levl;
-	block_id	ptr2blk, ptr2blk_swap, dtblk;
-	boolean_t	new_is_native, have_dt_blk;
+	int		blk_id_sz;
 	unsigned short	us_rec_len, us_rec_len_swap;
 	unsigned char	*rec1_ptr, *rec2_ptr, *blk_top, *key_top;
-	boolean_t	have_gvtleaf;
-	end_gv_key	gv_key;
 
 	if (SIZEOF(v15_blk_hdr) <= blkhdr->bver)
 		return;		/* pre V5 version so ignore records */
 	new_is_native = !info->endian_native;
 	blk_levl = blkhdr->levl;
+	long_blk_id = IS_64_BLK_ID(blkhdr);
+	blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 	blk_top = (unsigned char *)new_block + blkhdr->bsiz;
 	rec1_ptr = (unsigned char *)new_block + SIZEOF(blk_hdr);
 	GET_USHORT(us_rec_len, &((rec_hdr *)rec1_ptr)->rsiz);
@@ -1482,18 +1786,35 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 	else
 	{	/* only one record and level is 0 */
 		/* if subscripts at level 0, it must be gvtleaf */
-		/* find key_top to check if it has four bytes of data which look like a valid pointer */
+		/* find key_top to check if it has four/eight bytes (depends on V6 or V7 block)
+		 * of data which look like a valid pointer */
 		/* note dtleaf may have collation info after the pointer */
 		for (key_top = rec1_ptr + SIZEOF(rec_hdr); *key_top && key_top < (rec1_ptr + rec1_len); key_top++)
 			;
 		if (*++key_top)
 			have_gvtleaf = TRUE;		/* gdsblk_gvtleaf subscript so must be */
+<<<<<<< HEAD
 		else if (SIZEOF(block_id) <= ((rec1_ptr + rec1_len) - ++key_top) &&
 			 (SIZEOF(block_id) + COLL_SPEC_LEN) >= ((rec1_ptr + rec1_len) - key_top))
+=======
+		else if (blk_id_sz <= ((rec1_ptr + rec1_len) - ++key_top) &&
+			 (blk_id_sz + MAX_SPEC_TYPE_LEN) >= ((rec1_ptr + rec1_len) - key_top))
+>>>>>>> 451ab477 (GT.M V7.0-000)
 		{	/* record value long enough for block_id but not longer than block_id plus collation information */
-			GET_BLK_ID(ptr2blk, key_top);
+			READ_BLK_ID(long_blk_id, &ptr2blk, key_top);
 			if (new_is_native)
-				ptr2blk = BLK_ID_BYTESWAP(ptr2blk);
+			{
+				if(long_blk_id)
+					ptr2blk = BLK_ID_64_BYTESWAP(ptr2blk);
+				else
+				{
+					assert(ptr2blk == (block_id_32)ptr2blk);
+					temp_32_id = (block_id_32)ptr2blk;
+					temp_32_id = BLK_ID_32_BYTESWAP(temp_32_id);
+					ptr2blk = temp_32_id;
+				}
+				assert(0 <= ptr2blk);
+			}
 			if (ptr2blk <= info->tot_blks)
 			{	/* might be a pointer so need to check the hard way */
 				gv_key.key = rec1_ptr + SIZEOF(rec_hdr);
@@ -1518,7 +1839,7 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 		if (!have_gvtleaf)
 		{	/* fix up pointers as well */
 			key_top = rec1_ptr + SIZEOF(rec_hdr);
-			if (BSTAR_REC_SIZE != rec1_len || 0 == blk_levl)
+			if (bstar_rec_size(long_blk_id) != rec1_len || 0 == blk_levl)
 			{	/* find pointer after subscripts */
 				unsigned char	*r_top;
 
@@ -1531,14 +1852,26 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 						break;		/* 2 nulls is end of subscripts */
 				}
 			} else
-				assert((key_top + SIZEOF(block_id) == blk_top) || blk_levl);	/* must be last if not leaf */
-			assert((key_top + SIZEOF(block_id)) <= (rec1_ptr + rec1_len));
-			GET_BLK_ID(ptr2blk, key_top);
-			ptr2blk_swap = BLK_ID_BYTESWAP(ptr2blk);
-			PUT_BLK_ID(key_top, ptr2blk_swap);
+				assert((key_top + blk_id_sz == blk_top) || blk_levl);	/* must be last if not leaf */
+			assert((key_top + blk_id_sz) <= (rec1_ptr + rec1_len));
+			if(long_blk_id)
+			{
+				GET_BLK_ID_64(ptr2blk, key_top);
+				ptr2blk_swap = BLK_ID_64_BYTESWAP(ptr2blk);
+				PUT_BLK_ID_64(key_top, ptr2blk_swap);
+			} else
+			{
+				GET_BLK_ID_32(ptr2blk, key_top);
+				assert(ptr2blk == (block_id_32)ptr2blk);
+				temp_32_id = (block_id_32)ptr2blk;
+				temp_32_id = BLK_ID_32_BYTESWAP(temp_32_id);
+				ptr2blk_swap = temp_32_id;
+				PUT_BLK_ID_32(key_top, ptr2blk_swap);
+			}
 #ifdef DEBUG
 			if (new_is_native)
 				ptr2blk = ptr2blk_swap;
+			assert(0 <= ptr2blk);
 			assert(ptr2blk <= info->tot_blks);
 #endif
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -64,7 +64,7 @@ void op_newintrinsic(int intrtype)
 		case SV_ZTRAP:
 #			ifdef GTM_TRIGGER
 			if (0 < gtm_trigger_depth)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOZTRAPINTRIG);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOZTRAPINTRIG);
 #			endif
 			assert(!ztrap_explicit_null || (0 == (TREF(dollar_ztrap)).str.len));
 			DEBUG_ONLY(stored_explicit_null = FALSE;)

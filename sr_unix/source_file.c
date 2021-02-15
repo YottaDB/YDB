@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -176,8 +176,8 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 		{
 			CLOSEFILE_RESET(object_file_des, rc);	/* resets "object_file_des" to FD_INVALID */
 			if (-1 == rc)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2,
-					      object_name_len, object_file_name, errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_OBJFILERR, 2,
+					object_name_len, object_file_name, errno);
 		}
 		if (tt_so_do_once)
 			break;
@@ -201,7 +201,7 @@ CONDITION_HANDLER(source_ch)
 }
 
 
-boolean_t open_source_file(void)
+void open_source_file(void)
 {
 	mstr		fstr;
 	int		status, n;
@@ -223,7 +223,7 @@ boolean_t open_source_file(void)
 	fstr.len = source_name_len;
 	status = parse_file(&fstr, &pblk);
 	if (!(status & 1))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, fstr.len, fstr.addr, status);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2, fstr.len, fstr.addr, status);
 	pars.mvtype = MV_STR;
 	pars.str.len = SIZEOF(open_params_list);
 	pars.str.addr = (char *)open_params_list;
@@ -265,7 +265,7 @@ boolean_t open_source_file(void)
 	GTM_CTIME(p, &clock);
 	memcpy(rev_time_buf, p + 4, REV_TIME_BUFF_LEN);
 	io_curr_device = dev_in_use;	/*	set it back to make open_list_file save the device	*/
-	return TRUE;
+	return;
 }
 
 

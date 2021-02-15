@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,7 +64,8 @@ void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_t
 			hist2 = gvt->alt_hist;
 			for (hist = hist1; (NULL != hist); hist = (hist == hist1) ? hist2 : NULL)
 			{
-				for (hist_index = 0;  HIST_TERMINATOR != hist->h[hist_index].blk_num;  hist_index++)
+				for (hist_index = 0;  (ARRAYSIZE(hist->h) > hist_index)
+					&& (HIST_TERMINATOR != hist->h[hist_index].blk_num);  hist_index++)
 				{
 					assert(MAX_BT_DEPTH >= hist_index);
 					buffaddr = hist->h[hist_index].buffaddr;

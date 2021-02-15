@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
@@ -42,8 +42,13 @@ void comp_init(mstr *src, oprtype *dst)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+<<<<<<< HEAD
 	if ((MAX_SRCLINE < (unsigned)src->len) && ((TREF(source_buffer)).addr == (char *)aligned_source_buffer))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);	/* no error if it's ojchildparms */
+=======
+	if ((MAX_SRCLINE < (unsigned)src->len) && ((TREF(source_buffer)).addr == (char *)&aligned_source_buffer))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);	/* no error if it's ojchildparms */
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	memcpy((TREF(source_buffer)).addr,src->addr,src->len);
 	(TREF(source_buffer)).len = src->len + 1;
 	*((TREF(source_buffer)).addr + src->len) = *((TREF(source_buffer)).addr + src->len + 1) = '\0';

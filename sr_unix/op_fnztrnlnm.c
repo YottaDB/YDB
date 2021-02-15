@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -62,12 +62,12 @@ void op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blin
 
 	MV_FORCE_STR(name);
 	if (name->str.len >= MAX_TRANS_NAME_LEN)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, name->str.len, MAX_TRANS_NAME_LEN - 1);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_INVSTRLEN, 2, name->str.len, MAX_TRANS_NAME_LEN - 1);
 	MV_FORCE_STR(item);
 	if (item->str.len)
 	{
 		if ((item_code = namelook(trnitm_index, trnitm_table, item->str.addr, item->str.len)) < 0) /* NOTE assignment */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADTRNPARAM,2,item->str.len,item->str.addr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADTRNPARAM,2,item->str.len,item->str.addr);
 	} else
 		item_code = VALUE;
 	ret->mvtype = MV_STR;
@@ -82,7 +82,7 @@ void op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blin
 			{
 				retlen = (uint4)STRLEN(status);
 				if (MAX_STRLEN < retlen)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 				ENSURE_STP_FREE_SPACE(retlen);
 				ret->str.addr = (char *)stringpool.free;
 				ret->str.len = retlen;

@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2011 Fidelity Information Services, Inc		*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2011-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,7 +89,7 @@ void parse_trctbl_groups(mstr *grps)
 		}
 		if (LAST_TRACE_GROUP == grpindx)
 			/* We didn't find the group - raise error */
-			rts_error(VARLSTCNT(4) ERR_INVTRCGRP, 2, grplen, grpstrt);
+			RTS_ERROR_ABT(VARLSTCNT(4) ERR_INVTRCGRP, 2, grplen, grpstrt);
 	}
 #	endif
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2019 Fidelity National Information	*
+ * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
@@ -163,7 +163,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, uint8 nsec_timeout, int argcnt
 		return;
 	}
 	if (dsocketptr->mupintr)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 	if (socket_local != socketptr->protocol)
 	{
@@ -294,7 +294,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, uint8 nsec_timeout, int argcnt
 		errptr = PROTOCOL_ERROR;
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr, errlen);
 		if (socketptr->ioerror)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKPASS, 0, ERR_TEXT, 2, errlen, errptr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_SOCKPASS, 0, ERR_TEXT, 2, errlen, errptr);
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
@@ -325,7 +325,7 @@ ioerr:
 	iod->dollar.za = 9;
 	SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 	if (socketptr->ioerror)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKPASS, 0, save_errno, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_SOCKPASS, 0, save_errno, 0);
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }
@@ -371,7 +371,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, uint8 nsec
 		return;
 	}
 	if (dsocketptr->mupintr)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 	if (socket_local != socketptr->protocol)
 	{
@@ -460,7 +460,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, uint8 nsec
 		errptr = PROTOCOL_ERROR;
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr, errlen);
 		if (socketptr->ioerror)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKACCEPT, 0, ERR_TEXT, 2, errlen, errptr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_SOCKACCEPT, 0, ERR_TEXT, 2, errlen, errptr);
 	}
 	cmsg = CMSG_FIRSTHDR(&msg);
 	while((cmsg != NULL) && ((SOL_SOCKET != cmsg->cmsg_level) || (SCM_RIGHTS != cmsg->cmsg_type)))
@@ -565,7 +565,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, uint8 nsec
 		errptr = PROTOCOL_ERROR;
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr, errlen);
 		if (socketptr->ioerror)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKACCEPT, 0, ERR_TEXT, 2, errlen, errptr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_SOCKACCEPT, 0, ERR_TEXT, 2, errlen, errptr);
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
@@ -620,7 +620,7 @@ ioerr:
 		iod->dollar.za = 9;
 		SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 		if (socketptr->ioerror)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKACCEPT, 0, save_errno, 0);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_SOCKACCEPT, 0, save_errno, 0);
 	}
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;

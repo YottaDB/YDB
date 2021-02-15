@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,5 +18,5 @@
 
 void op_zattach(mval *v)
 {	error_def(ERR_UNIMPLOP);
-	rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+	RTS_ERROR_ABT(VARLSTCNT(1) ERR_UNIMPLOP);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,7 @@
 
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	cw_set_element		cw_set[];
-GBLREF 	unsigned char    	cw_set_depth;
+GBLREF	unsigned char		cw_set_depth;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	unsigned char		rdfail_detail;
@@ -89,7 +89,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 	enum db_ver		ondsk_blkver;
 	enum cdb_sc		status;
 	boolean_t		mark_level_as_special;
-	inctn_opcode_t          saved_inctn_opcode;
+	inctn_opcode_t		saved_inctn_opcode;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -130,8 +130,8 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				continue;
 			}
 			assert(0 < blk->block);
-			assert((int4)blk->block < cs_addrs->ti->total_blks);
-			bit_map = ROUND_DOWN2((int)blk->block, BLKS_PER_LMAP);
+			assert((block_id)blk->block < cs_addrs->ti->total_blks);
+			bit_map = ROUND_DOWN2((block_id)blk->block, BLKS_PER_LMAP);
 			next_bm = bit_map + BLKS_PER_LMAP;
 			CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 			/* Scan for the next local bitmap */
@@ -148,8 +148,8 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 			alt_hist.h[0].blk_num = 0;			/* need for calls to T_END for bitmaps */
 			alt_hist.h[0].blk_target = NULL;		/* need to initialize for calls to T_END */
 			/* the following assumes SIZEOF(blk_ident) == SIZEOF(int) */
-			assert(SIZEOF(blk_ident) == SIZEOF(int));
-			*(int *)update_array_ptr = 0;
+			assert(SIZEOF(blk_ident) == SIZEOF(block_id));
+			*(block_id *)update_array_ptr = 0;
 			t_begin(ERR_GVKILLFAIL, UPDTRNS_DB_UPDATED_MASK);
 			for (;;)
 			{
@@ -258,9 +258,9 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 		if (0 != blk->flag)
 			continue;
 		assert(0 < blk->block);
-		assert((int4)blk->block < cs_addrs->ti->total_blks);
+		assert((block_id)blk->block < cs_addrs->ti->total_blks);
 		assert(!IS_BITMAP_BLK(blk->block));
-		bit_map = ROUND_DOWN2((int)blk->block, BLKS_PER_LMAP);
+		bit_map = ROUND_DOWN2((block_id)blk->block, BLKS_PER_LMAP);
 		assert(dba_bg == cs_addrs->hdr->acc_meth);
 		/* We need to check each block we are deleting to see if it is in the format of a previous version.
 		 * If it is, then "csd->blks_to_upgrd" needs to be correspondingly adjusted.
@@ -274,8 +274,8 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 		*((block_id *)update_array_ptr) = ((block_id)blk->block - bit_map);
 		update_array_ptr += SIZEOF(blk_ident);
 		/* the following assumes SIZEOF(blk_ident) == SIZEOF(int) */
-		assert(SIZEOF(blk_ident) == SIZEOF(int));
-		*(int *)update_array_ptr = 0;
+		assert(SIZEOF(blk_ident) == SIZEOF(block_id));
+		*(block_id *)update_array_ptr = 0;
 		t_begin(ERR_GVKILLFAIL, UPDTRNS_DB_UPDATED_MASK);
 		for (;;)
 		{
@@ -312,7 +312,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 			ondsk_blkver = cr->ondsk_blkver;	/* Get local copy in case cr->ondsk_blkver changes between
 								 * first and second part of the ||
 								 */
-			assert((GDSV6 == ondsk_blkver) || (GDSV4 == ondsk_blkver));
+			assert((GDSV7 == ondsk_blkver) || (GDSV6 == ondsk_blkver));
 			if (GDSVCURR != ondsk_blkver)
 				inctn_detail.blknum_struct.blknum = blk->block;
 			else
@@ -352,4 +352,3 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 	TREF(in_gvcst_bmp_mark_free) = FALSE;
 	return ret_tn;
 }
-

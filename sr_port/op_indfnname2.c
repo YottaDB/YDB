@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,7 @@ void op_indfnname2(mval *finaldst, mval *depthval, mval *prechomp)
 	MV_FORCE_STR(prechomp);
 	depth = MV_FORCE_INT(depthval);
 	if (depth < 0)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_FNNAMENEG);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_FNNAMENEG);
 	subscripts = depth + 1;
 	*finaldst = *prechomp;
 	if (subscripts > MAX_LVSUBSCRIPTS)

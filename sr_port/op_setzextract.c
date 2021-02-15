@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +78,7 @@ void op_setzextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 	/* Calculate total string len. delim_cnt has needed padding delimiters for null fields */
 	strlen = (size_t)pfxlen + padlen + (size_t)expr->str.len + (size_t)sfxlen;
 	if (MAX_STRLEN < strlen)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 	ENSURE_STP_FREE_SPACE((int)strlen);
 
 	pfx = (unsigned char *)src->str.addr;

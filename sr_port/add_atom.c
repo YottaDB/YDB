@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +40,7 @@ boolean_t add_atom(int	*count,
 	uint4		**lastpatptr_ptr)
 {
 	uint4		*patmaskptr;
-	gtm_uint64_t	bound;
+	gtm_int64_t	bound;
 	int4		bytelen;
 
 	if ((pattern_mask & PATM_STRLIT) && !strlit_buff->bytelen && *count)

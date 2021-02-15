@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -498,18 +498,22 @@ boolean_t cli_numeric_check(CLI_ENTRY *pparm, char *val_str)
 	if (VAL_NUM == pparm->val_type)
 	{
 		if (pparm->hex_num)
-		{
+		{	/* It can ONLY be a HEX number. */
 			if (!cli_is_hex(val_str))
 			{
 				SNPRINTF(cli_err_str, MAX_CLI_ERR_STR,
-				  "Unrecognized value: %s, HEX number expected",
+				  "Unrecognized value: %s, A non-negative hexadecimal integer required",
 				  val_str);
 				retval = FALSE;
 			}
-		} else if (!cli_is_dcm(val_str))
+		} else if (!cli_is_dcm(val_str) && !cli_is_hex_explicit(val_str))
 		{
 			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR,
+<<<<<<< HEAD
 			  "Unrecognized value: %s, Decimal integer expected",
+=======
+			  "Unrecognized value: %s, A non-negative decimal or hexadecimal integer required",
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			  val_str);
 			retval = FALSE;
 		}
@@ -581,8 +585,9 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 	CLI_ENTRY 	*pparm_qual, *pparm1;
 	char		local_str[MAX_LINE], tmp_str[MAX_LINE + 1], *tmp_str_ptr;
 	char 		*ptr_next_val, *ptr_next_comma, *ptr_equal;
-	int		len_str, neg_flg, ptr_equal_len;
+	int		neg_flg;
 	boolean_t	val_flg, has_a_qual;
+	size_t		len_str, ptr_equal_len;
 
 	has_a_qual = FALSE;
 	pparm_qual = pparm->qual_vals;
@@ -590,12 +595,21 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 		return TRUE;
 	if ((VAL_STR == pparm->val_type) || (VAL_LIST == pparm->val_type))
 	{
-		STRNCPY_STR(local_str, pparm->pval_str, SIZEOF(local_str) - 1);
+		len_str = strlen(pparm->pval_str);
+		if (len_str >= sizeof(local_str))	/* BYPASSOK: both size_t */
+			len_str = sizeof(local_str) - 1;
+		memcpy(local_str, pparm->pval_str, len_str);
+		local_str[len_str] = '\0';
 		ptr_next_val = local_str;
 		while (NULL != ptr_next_val)
+<<<<<<< HEAD
 		{
 			len_str= STRLEN(ptr_next_val);
 			memcpy(tmp_str, ptr_next_val, len_str);
+=======
+		{	/* WARNING assignment below */
+			STRNCPY_STR(tmp_str, ptr_next_val, (len_str = MIN(strlen(ptr_next_val), sizeof(tmp_str))));
+>>>>>>> 451ab477 (GT.M V7.0-000)
 			tmp_str[len_str] = 0;
 			tmp_str_ptr = tmp_str;
 			ptr_next_comma = strchr(tmp_str_ptr, ',');
@@ -621,7 +635,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 			if (-1 == (neg_flg = cli_check_negated( &tmp_str_ptr, pparm_qual, &pparm1)))
 				return FALSE;
 			if (1 == neg_flg)
-				len_str -=  STRLEN(NO_STRING);
+				len_str -=  strlen(NO_STRING);
 
 			if ((ptr_equal) && (ptr_equal + 1 < ptr_next_comma))
 				val_flg = TRUE;
@@ -673,7 +687,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 					MALLOC_CPY_STR(pparm1->pval_str, pparm1->parm_values->prompt);
 				if (val_flg)
 				{
-					ptr_equal_len = STRLEN(ptr_equal + 1);
+					ptr_equal_len = strlen(ptr_equal + 1);
 					pparm1->pval_str = malloc(ptr_equal_len + 1);
 					STRNCPY_STR(pparm1->pval_str, ptr_next_val + (ptr_equal - tmp_str_ptr) + 1, ptr_equal_len);
 					pparm1->pval_str[ptr_equal_len] = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -372,7 +372,7 @@ void mu_extract(void)
 						reg_std_null_coll = reg->std_null_coll;
 					else
 					{
-						rts_error_csa(CSA_ARG(REG2CSA(reg)) VARLSTCNT(1) ERR_NULLCOLLDIFF);
+						RTS_ERROR_CSA_ABT(REG2CSA(reg), VARLSTCNT(1) ERR_NULLCOLLDIFF);
 						mupip_exit(ERR_NULLCOLLDIFF);
 					}
 				}
@@ -383,8 +383,8 @@ void mu_extract(void)
 				pid = cnl->reorg_encrypt_pid;
 				if (pid && is_proc_alive(pid, 0))
 				{
-					rts_error_csa(CSA_ARG(REG2CSA(reg)) VARLSTCNT(8) ERR_ENCRYPTCONFLT, 6,
-					RTS_ERROR_LITERAL("MUPIP EXTRACT -FORMAT=BIN"), REG_LEN_STR(reg), DB_LEN_STR(reg));
+					RTS_ERROR_CSA_ABT(REG2CSA(reg), VARLSTCNT(8) ERR_ENCRYPTCONFLT, 6,
+						RTS_ERROR_LITERAL("MUPIP EXTRACT -FORMAT=BIN"), REG_LEN_STR(reg), DB_LEN_STR(reg));
 					mupip_exit(ERR_ENCRYPTCONFLT);
 				}
 				cnl->mupip_extract_count++;
@@ -392,9 +392,9 @@ void mu_extract(void)
 				rel_crit(reg);
 				if (!freeze && !override && (!csd->span_node_absent || USES_NEW_KEY(csd)))
 				{
-					rts_error_csa(CSA_ARG(REG2CSA(reg)) VARLSTCNT(8) ERR_EXTRINTEGRITY, 2, DB_LEN_STR(reg),
-							ERR_TEXT, 2, LEN_AND_LIT("Use the -FREEZE qualifier to freeze the "
-							"database(s) or -OVERRIDE qualifier to proceed without a freeze"));
+					RTS_ERROR_CSA_ABT(REG2CSA(reg), VARLSTCNT(8) ERR_EXTRINTEGRITY, 2, DB_LEN_STR(reg),
+						ERR_TEXT, 2, LEN_AND_LIT("Use the -FREEZE qualifier to freeze the "
+						"database(s) or -OVERRIDE qualifier to proceed without a freeze"));
 					mupip_exit(ERR_EXTRINTEGRITY);
 				}
 				if (IS_ENCRYPTED(csd->is_encrypted))
@@ -433,7 +433,7 @@ void mu_extract(void)
 		is_extract_stdout = TRUE;
 	else if (FALSE == cli_get_str("FILE", outfilename, &n_len))
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
 		mupip_exit(ERR_MUPCLIERR);
 	} else if (-1 == Stat((char *)outfilename, &statbuf))
 	{	/* Redirect to file */

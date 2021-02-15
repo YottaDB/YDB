@@ -43,13 +43,7 @@ GBLREF gv_namehead	*gv_target;
 GBLREF sgmnt_addrs	*cs_addrs;
 #endif
 
-#ifdef UNIX
 void gtm_fetch(unsigned int cnt_arg, unsigned int indxarg, ...)
-#elif defined(VMS)
-void gtm_fetch(unsigned int indxarg, ...)
-#else
-#error unsupported platform
-#endif
 {
 	ht_ent_mname	**htepp;
 	stack_frame	*fp;
@@ -61,6 +55,7 @@ void gtm_fetch(unsigned int indxarg, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(!TREF(compile_time));	/* Should not be in compile time */
 	assert(!process_exiting);	/* Verify that no process unwound the exit frame and continued */
 	assert(!TREF(expand_prev_key));	/* Verify that this global variable never stays TRUE
 					 * outside of a $zprevious or reverse $query action.
@@ -96,8 +91,7 @@ void gtm_fetch(unsigned int indxarg, ...)
 	}
 #	endif
 	VAR_START(var, indxarg);
-	VMS_ONLY(va_count(cnt));
-	UNIX_ONLY(cnt = cnt_arg);	/* need to preserve stack copy on i386 */
+	cnt = cnt_arg;	/* need to preserve stack copy on i386 */
 	fp = frame_pointer;
 	if (0 < cnt)
 	{	/* All generated code comes here to verify instantiation

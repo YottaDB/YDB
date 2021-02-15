@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -211,6 +211,7 @@ int resolve_ref(int errknt)
 						opnd->oprval.tref = tripref;
 						opnd->oprclass = TJMP_REF;
 					}
+<<<<<<< HEAD
 					break;
 				case MFUN_REF:;
 					triple	*chktrip_error;
@@ -218,6 +219,12 @@ int resolve_ref(int errknt)
 					assert(!run_time);
 					assert(OC_JMP == looptrip->opcode);
 					chktrip = looptrip->exorder.bl;
+=======
+					continue;
+				case MFUN_REF:
+					assert(OC_JMP == curtrip->opcode);
+					chktrip = curtrip->exorder.bl;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 					assert((OC_EXCAL == chktrip->opcode) || (OC_EXFUN == chktrip->opcode));
 					assert(TRIP_REF == chktrip->operand[1].oprclass);
 					chktrip_error = chktrip;	/* needed later for ERR_FMLLSTMISSING error context */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -68,7 +68,7 @@ cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 	memcpy(buff, fname, len);
 	STAT_FILE((char *)buff, &stat_buf, status);
 	if ((uint4)-1 == status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBOPNERR, 2, len, fname, errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBOPNERR, 2, len, fname, errno);
 	last = reglist;
 	for (ptr = reglist ; ptr ; ptr = ptr->next)
 	{

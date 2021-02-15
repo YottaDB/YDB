@@ -177,7 +177,7 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *fr
 	GDS_BLK_UPGRADE_IF_NEEDED(blk, tmp_ptr, tmp_ptr, &mu_int_data, ondsk_blkver, status, mu_int_data.fully_upgraded);
 	if (SS_NORMAL != status)
 		if (ERR_DYNUPGRDFAIL == status)
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) status, 3, blk, DB_LEN_STR(gv_cur_region));
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) status, 3, &blk, DB_LEN_STR(gv_cur_region));
 		else
 			rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) status);
 	return tmp_ptr;

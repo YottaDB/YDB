@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -29,6 +29,7 @@
 #include "gdsblk.h"
 #include "gtmio.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "filestruct.h"
 #include "io.h"
 #include "iosp.h"
@@ -70,7 +71,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 	unix_db_info		*udi;
 	gd_region		*temp_region;
 	sgmnt_data		old_data;
-	sgmnt_addrs             *csa;
+	sgmnt_addrs		*csa;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -102,11 +103,19 @@ boolean_t db_ipcs_reset(gd_region *reg)
 	status = dbfilop(fc);
 	gv_cur_region = temp_region;
 	if (SS_NORMAL != status)
+<<<<<<< HEAD
 	{	/* A DBOPNERR error message would have already been issued inside "dbfilop()" */
                 return FALSE;
+=======
+	{
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+		return FALSE;
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 	csd = !udi->fd_opened_with_o_direct ? &old_data : (sgmnt_data_ptr_t)(TREF(dio_buff)).aligned;
 	DB_LSEEKREAD(udi, udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);
+	if (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+		db_header_upconv(csd);
 	if (0 != status)
 	{
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
@@ -158,6 +167,8 @@ boolean_t db_ipcs_reset(gd_region *reg)
 			csd->shmid = INVALID_SHMID;
 			csd->gt_sem_ctime.ctime = 0;
 			csd->gt_shm_ctime.ctime = 0;
+			if (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+				db_header_dwnconv(csd);
 			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);
 			if (0 != status)
 			{

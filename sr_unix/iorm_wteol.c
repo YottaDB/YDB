@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -84,13 +84,13 @@ void iorm_wteol(int4 x,io_desc *iod)
 		rm_ptr = (d_rm_struct *)iod->dev_sp;
 	}
 	if (rm_ptr->read_only)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVICEREADONLY);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVICEREADONLY);
 	if ((!rm_ptr->fifo) && (!rm_ptr->is_pipe) && rm_ptr->output_encrypted)
 	{
 		if (!iod->dollar.zeof)
 		{
 	 		iod->dollar.za = 9;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTTOEOFONPUT);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOTTOEOFONPUT);
 		} else
 		{	/* If there have not been any writes, and input encryption attributes are different from those for output,
 			 * and the file is not empty, disallow the write.
@@ -108,13 +108,13 @@ void iorm_wteol(int4 x,io_desc *iod)
 				{
 					save_errno = errno;
 					SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
 						CALLFROM, save_errno);
 				}
 				if (0 != statbuf.st_size)
 				{
 					SET_DOLLARDEVICE_ERRSTR(iod, ONE_COMMA_CRYPTBADWRTPOS);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTBADWRTPOS);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CRYPTBADWRTPOS);
 				}
 			}
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -134,13 +134,13 @@ STATICFNDEF int extend_wait_for_write(unix_db_info *udi, int blk_size, off_t new
 	return save_errno;
 }
 
-uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
+int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 {
 	sm_uc_ptr_t		old_base[2], mmap_retaddr;
 	boolean_t		was_crit, is_mm;
 	int			fd, result, save_errno, status, to_msg, to_wait, wait_period;
 	DEBUG_ONLY(int		first_save_errno);
-	block_id		new_bit_maps, bplmap, map, new_blocks, new_total, max_tot_blks, old_total;
+	block_id		new_bit_maps, bplmap, map, new_blocks, new_total, max_tot_blks, old_total, temp_blk;
 	uint4			jnl_status;
 	gtm_uint64_t		avail_blocks, mmap_sz;
 	off_t			new_eof, new_size, old_size;
@@ -165,14 +165,12 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
 #	if !defined(MM_FILE_EXT_OK)
 	if (!udi->grabbed_access_sem && is_mm)
-		return (uint4)(NO_FREE_SPACE); /* should this be changed to show extension not allowed ? */
+		return NO_FREE_SPACE; /* should this be changed to show extension not allowed ? */
 #	endif
-	/* Both blocks and total blocks are unsigned ints so make sure we aren't asking for huge numbers that will
-	 * overflow and end up doing silly things.
-	 */
+	/* Make sure that there is enough space left in the database to add the requested blocks */
 	assert((blocks <= (MAXTOTALBLKS(cs_data) - cs_data->trans_hist.total_blks)) || WBTEST_ENABLED(WBTEST_FILE_EXTEND_ERROR));
 	if (!blocks && (cs_data->defer_allocate || (TRANS_IN_PROG_TRUE == trans_in_prog)))
-		return (uint4)(NO_FREE_SPACE); /* should this be changed to show extension not enabled ? */
+		return NO_FREE_SPACE; /* should this be changed to show extension not enabled ? */
 	bplmap = cs_data->bplmap;
 	/* New total of non-bitmap blocks will be number of current, non-bitmap blocks, plus new blocks desired
 	 * There are (bplmap - 1) non-bitmap blocks per bitmap, so add (bplmap - 2) to number of non-bitmap blocks
@@ -190,12 +188,12 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	{
 		assert(WBTEST_ENABLED(WBTEST_FILE_EXTEND_ERROR));
 		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_TOTALBLKMAX);
-		return (uint4)(NO_FREE_SPACE);
+		return NO_FREE_SPACE;
 	}
 	if (0 != (save_errno = disk_block_available(udi->fd, &avail_blocks, FALSE)))
 	{
 		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
 	} else
 	{
 		if (!(ydbDebugLevel & GDL_IgnoreAvailSpace))
@@ -205,16 +203,19 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 			avail_blocks = avail_blocks / (cs_data->blk_size / DISK_BLOCK_SIZE);
 			if ((blocks * EXTEND_WARNING_FACTOR) > avail_blocks)
 			{
-				if (blocks > (uint4)avail_blocks)
+				if (blocks > avail_blocks)
 				{
 					if (!INST_FREEZE_ON_NOSPC_ENABLED(cs_addrs, local_jnlpool))
-						return (uint4)(NO_FREE_SPACE);
+						return NO_FREE_SPACE;
 					else
 						send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_NOSPACEEXT), 4,
-							DB_LEN_STR(gv_cur_region), new_blocks, (uint4)avail_blocks);
+							DB_LEN_STR(gv_cur_region), &new_blocks, &avail_blocks);
 				} else
+				{
+					temp_blk = avail_blocks - ((new_blocks <= avail_blocks) ? new_blocks : 0);
 					send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, DB_LEN_STR(gv_cur_region),
-						 (uint4)(avail_blocks - ((new_blocks <= avail_blocks) ? new_blocks : 0)));
+						&temp_blk);
+				}
 			}
 		}
 	}
@@ -281,7 +282,7 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 		 */
 		assert(CDB_STAGNATE <= t_tries);
 		GDSFILEXT_CLNUP;
-		return (uint4)FINAL_RETRY_FREEZE_PROG;
+		return FINAL_RETRY_FREEZE_PROG;
 	} else
 		WAIT_FOR_REGION_TO_UNCHILL(cs_addrs, cs_data);
 	assert(!cs_addrs->jnlpool || (cs_addrs->jnlpool == jnlpool));
@@ -289,7 +290,7 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	{
 		assert(CDB_STAGNATE <= t_tries);
 		GDSFILEXT_CLNUP;
-		return (uint4)FINAL_RETRY_INST_FREEZE;
+		return FINAL_RETRY_INST_FREEZE;
 	}
 	assert(cs_addrs->ti->total_blks == cs_data->trans_hist.total_blks);
 	old_total = cs_data->trans_hist.total_blks;
@@ -300,14 +301,14 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 		assert((old_total > filesize) || !is_mm);
 		/* For BG, someone else could have truncated or extended - we have no idea */
 		GDSFILEXT_CLNUP;
-		return (SS_NORMAL);
+		return SS_NORMAL;
 	}
 	if (trans_in_prog && SUSPICIOUS_EXTEND)
 	{
 		if (!was_crit)
 		{
 			GDSFILEXT_CLNUP;
-			return (uint4)(EXTEND_SUSPECT);
+			return EXTEND_SUSPECT;
 		}
 		/* If free_blocks counter is not ok, then correct it. Do the check again. If still fails, then it means we held
 		 * crit through bm_getfree into gdsfilext and still didn't get it right.
@@ -330,7 +331,7 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 		{
 			GDSFILEXT_CLNUP;
 			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
-			return (uint4)(NO_FREE_SPACE);	/* should have better return status */
+			return NO_FREE_SPACE;	/* should have better return status */
 		}
 	}
 	if (is_mm)
@@ -353,7 +354,7 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 			GDSFILEXT_CLNUP;
 			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region),
 					ERR_SYSCALL, 5, LEN_AND_STR(MEM_UNMAP_SYSCALL), CALLFROM, save_errno);
-			return (uint4)(NO_FREE_SPACE);
+			return NO_FREE_SPACE;
 		}
 	} else
 	{	/* Due to concurrency issues, it is possible some process had issued a disk read of the GDS block# corresponding
@@ -407,7 +408,7 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 			if (ENOSPC != save_errno)
 				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_PREALLOCATEFAIL, 2, DB_LEN_STR(gv_cur_region),
 					save_errno);
-			return (uint4)(NO_FREE_SPACE);
+			return NO_FREE_SPACE;
 		}
 	}
 	save_errno = db_write_eof_block(udi, udi->fd, cs_data->blk_size, new_eof, &(TREF(dio_buff)));
@@ -418,7 +419,7 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 		GDSFILEXT_CLNUP;
 		if (ENOSPC != save_errno)
 			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
-		return (uint4)(NO_FREE_SPACE);
+		return NO_FREE_SPACE;
 	}
 	if (WBTEST_ENABLED(WBTEST_FILE_EXTEND_INTERRUPT_1))
 	{
@@ -437,7 +438,7 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 			GDSFILEXT_CLNUP;
 			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_DBFILERR, 5,
 				RTS_ERROR_LITERAL("fsync1()"), CALLFROM, status);
-			return (uint4)(NO_FREE_SPACE);
+			return NO_FREE_SPACE;
 		}
 	}
 	if (WBTEST_ENABLED(WBTEST_FILE_EXTEND_INTERRUPT_2))
@@ -485,7 +486,7 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 			{
 				GDSFILEXT_CLNUP;
 				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
-				return (uint4)(NO_FREE_SPACE);
+				return NO_FREE_SPACE;
 			}
 		}
 		assert(0 == new_bit_maps);
@@ -507,7 +508,7 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 			GDSFILEXT_CLNUP;
 			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_DBFILERR, 5, RTS_ERROR_LITERAL("fsync2()"), CALLFROM,
 				     status);
-			return (uint4)(NO_FREE_SPACE);
+			return NO_FREE_SPACE;
 		}
 	}
 	if (WBTEST_ENABLED(WBTEST_FILE_EXTEND_INTERRUPT_4))
@@ -516,8 +517,8 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 		assert(FALSE); /* Should be killed before that */
 	}
 	assert(cs_data->blks_to_upgrd == (inctn_detail.blks2upgrd_struct.blks_to_upgrd_delta + prev_extend_blks_to_upgrd));
-	assert(0 < (int)blocks || (!cs_data->defer_allocate && (0 == new_blocks)));
-	assert(0 < (int)(cs_addrs->ti->free_blocks + blocks));
+	assert((0 < blocks) || (!cs_data->defer_allocate && (0 == new_blocks)));
+	assert(0 < (cs_addrs->ti->free_blocks + blocks));
 	cs_addrs->ti->free_blocks += blocks;
 	cs_addrs->total_blks = cs_addrs->ti->total_blks = new_total;
 	blocks = old_total;
@@ -567,7 +568,7 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 			GDSFILEXT_CLNUP;
 			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region),
 					ERR_SYSCALL, 5, LEN_AND_STR(MEM_MAP_SYSCALL), CALLFROM, save_errno);
-			return (uint4)(NO_FREE_SPACE);
+			return NO_FREE_SPACE;
 		}
 		/* In addition to updating the internal map values, gds_map_moved sets cs_data to point to the remapped file */
 #		if defined(_AIX)
@@ -581,10 +582,10 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_db_extends, 1);
 	if (!ydb_dbfilext_syslog_disable)
 	{
-		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_DBFILEXT, 5, DB_LEN_STR(gv_cur_region), blocks, new_total,
+		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_DBFILEXT, 5, DB_LEN_STR(gv_cur_region), &blocks, &new_total,
 			&curr_tn);
 		db_file_name = (char *)gv_cur_region->dyn.addr->fname;
 		warn_db_sz(db_file_name, blocks, new_total, MAXTOTALBLKS(cs_data));
 	}
-	return (SS_NORMAL);
+	return SS_NORMAL;
 }

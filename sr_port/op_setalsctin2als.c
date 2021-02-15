@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2009-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 451ab477 (GT.M V7.0-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +64,7 @@ void op_setalsctin2als(lv_val *srclv, int destindx)
 	assert(srclv);
 	assert(!LV_IS_BASE_VAR(srclv));	/* Verify subscripted var */
 	if (!(srclv->v.mvtype & MV_ALIASCONT))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ALIASEXPECTED);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ALIASEXPECTED);
 	srclvc = (lv_val *)srclv->v.str.addr;
 	assert(srclvc);
 	assert(LV_IS_BASE_VAR(srclvc));	/* Verify base var */

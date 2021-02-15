@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
@@ -75,10 +75,10 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 
 	MV_FORCE_STR(kwd);
 	if (kwd->str.len == 0)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADJPIPARAM, 2, 4, "Null");
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADJPIPARAM, 2, 4, "Null");
 
 	if (MAX_KEY < kwd->str.len)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
 
 	lower_to_upper((uchar_ptr_t)upcase, (uchar_ptr_t)kwd->str.addr, (int)kwd->str.len);
 
@@ -91,6 +91,7 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 	while (key[keywd_indx][0] && (0 != STRNCMP_STR(upcase, key[keywd_indx], kwd->str.len)))
 		keywd_indx++;
 
+<<<<<<< HEAD
 	if (!key[keywd_indx][0])
                  rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
 	if (0 == jpid)
@@ -178,6 +179,12 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 		unsigned long	field15;	/* stime %lu */
 		long		field16;	/* cutime %ld */
 		long		field17;	/* cstime %ld */
+=======
+	if( !key[keywd_indx][0] )
+        {
+	 	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
+        }
+>>>>>>> 451ab477 (GT.M V7.0-000)
 
 		sprintf(filename, "/proc/%d/stat", jpid);
 		Fopen(fp, filename, "r");

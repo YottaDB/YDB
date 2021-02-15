@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2020 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -331,7 +331,7 @@ static	int repl_next(repl_buff_t *rb)
 				MEMCPY_LIT(err_string, READ_ERR_STR);
 			else
 				MEMCPY_LIT(err_string, UNKNOWN_ERR_STR);
-			rts_error_csa(CSA_ARG(&FILE_INFO(backctl->reg)->s_addrs) VARLSTCNT(9) ERR_REPLFILIOERR, 2,
+			RTS_ERROR_CSA_ABT(&FILE_INFO(backctl->reg)->s_addrs, VARLSTCNT(9) ERR_REPLFILIOERR, 2,
 				backctl->jnl_fn_len, backctl->jnl_fn, ERR_TEXT, 2, LEN_AND_STR(err_string), status);
 		}
 	}
@@ -480,7 +480,7 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 		jnl_fn[jnl_fn_len] = '\0';
 		if ('\0' == jnl_fn[0])
 		{ /* prev link has been cut, can't follow path back from latest generation jnlfile to the latest we had opened */
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_NOPREVLINK, 2, new_ctl->jnl_fn_len, new_ctl->jnl_fn);
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_NOPREVLINK, 2, new_ctl->jnl_fn_len, new_ctl->jnl_fn);
 		}
 		if (is_gdid_file_identical(reg_ctl_end_id, jnl_fn, jnl_fn_len))
 			break;
@@ -577,8 +577,8 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 		{
 			F_READ_BLK_ALIGNED(fc->fd, 0, fc->jfh, ROUND_UP2(REAL_JNL_HDR_LEN, fc->fs_block_size), status);
 			if (SS_NORMAL != status)
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_REPLFILIOERR, 2, ctl->jnl_fn_len, ctl->jnl_fn, ERR_TEXT,
-						2, LEN_AND_LIT("Error reading journal fileheader to update EOF address"), status);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(9) ERR_REPLFILIOERR, 2, ctl->jnl_fn_len, ctl->jnl_fn, ERR_TEXT,
+					2, LEN_AND_LIT("Error reading journal fileheader to update EOF address"), status);
 			REPL_DPRINT2("Update EOF : Jnl file hdr refreshed from file for %s\n", ctl->jnl_fn);
 			ctl->eof_addr_final = TRUE; /* No more updates to fc->eof_addr for this journal file */
 		}
@@ -749,7 +749,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 					{
 						assert(FALSE);
 						gtm_fork_n_core();
-						rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLRECINCMPL, 4,
+						RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_JNLRECINCMPL, 4,
 							b->recaddr, ctl->jnl_fn_len, ctl->jnl_fn, &ctl->seqno);
 					}
 					break;
@@ -788,7 +788,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 			} else
 			{
 				assertpro(EREPL_JNLRECFMT == status);
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLBADRECFMT, 3,
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_JNLBADRECFMT, 3,
 					ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
 			}
 		}
@@ -906,7 +906,7 @@ static	int first_read(repl_ctl_element *ctl)
 		} else
 		{
 			if (status == EREPL_JNLRECFMT)
-				rts_error_csa(CSA_ARG(&FILE_INFO(ctl->reg)->s_addrs) VARLSTCNT(5)
+				RTS_ERROR_CSA_ABT(&FILE_INFO(ctl->reg)->s_addrs, VARLSTCNT(5)
 					ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
 		}
 	}
@@ -946,8 +946,8 @@ static void increase_buffer(unsigned char **buff, int *buflen, int buffer_needed
 	old_msgp = (unsigned char *)gtmsource_msgp;
 	if ((alloc_status = gtmsource_alloc_msgbuff(newbuffsize, FALSE)) != SS_NORMAL)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			  LEN_AND_LIT("Error extending buffer space while reading files. Malloc error"), alloc_status);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+			LEN_AND_LIT("Error extending buffer space while reading files. Malloc error"), alloc_status);
 	}
 	REPL_DPRINT3("Old gtmsource_msgp = 0x%llx; New gtmsource_msgp = 0x%llx\n", old_msgp, gtmsource_msgp);
 	REPL_DPRINT2("Old *buff = 0x%llx\n", *buff);
@@ -1048,8 +1048,8 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 			} else if (rectype == JRT_EOF)
 			{
 				assert(FALSE);
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_REPLBRKNTRANS, 1, &read_jnl_seqno,
-						ERR_TEXT, 2, LEN_AND_LIT("Early EOF found"));
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(7) ERR_REPLBRKNTRANS, 1, &read_jnl_seqno,
+					ERR_TEXT, 2, LEN_AND_LIT("Early EOF found"));
 			}
 		} else if (status == EREPL_JNLRECINCMPL)
 		{	/* Log warning message for every certain number of attempts. There might have been a crash and the file
@@ -1062,7 +1062,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 			{
 				assert(FALSE);
 				gtm_fork_n_core();
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLRECINCMPL, 4,
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_JNLRECINCMPL, 4,
 					b->recaddr, ctl->jnl_fn_len, ctl->jnl_fn, &ctl->seqno);
 			}
 			if (gtmsource_recv_ctl_nowait())
@@ -1095,7 +1095,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 		} else
 		{
 			assertpro(status == EREPL_JNLRECFMT);
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
 		}
 	}
 	/* Try positioning next read to the next seqno. Leave it as is if operation blocks (has to wait for records) */
@@ -1165,8 +1165,8 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 		} else if (status == EREPL_JNLRECINCMPL)
 			found = TR_FIND_WOULD_BLOCK;
 		else if (status == EREPL_JNLRECFMT)
-			rts_error_csa(CSA_ARG(&FILE_INFO(ctl->reg)->s_addrs) VARLSTCNT(5)
-					ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
+			RTS_ERROR_CSA_ABT(&FILE_INFO(ctl->reg)->s_addrs, VARLSTCNT(5)
+				ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
 	}
 	REPL_DPRINT2("do_linear_search: returning %s\n", (found == TR_NOT_FOUND) ? "TR_NOT_FOUND" :
 							 (found == TR_FOUND) ? "TR_FOUND" :
@@ -1579,7 +1579,7 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 		if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
 			return 0;
 		if (brkn_trans)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_REPLBRKNTRANS, 1, &read_jnl_seqno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_REPLBRKNTRANS, 1, &read_jnl_seqno);
 		total_read += read_len;
 		assert(total_read % JNL_WRT_END_MODULUS == 0);
 	}
@@ -2213,7 +2213,7 @@ int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 							"Abandoning gtmsource_update_zqgblmod_seqno_and_tn (open_prev_gener)\n");
 					return (SS_NORMAL);
 				}
-				rts_error_csa(CSA_ARG(&FILE_INFO(ctl->reg)->s_addrs)
+				RTS_ERROR_CSA_ABT(&FILE_INFO(ctl->reg)->s_addrs,
 					VARLSTCNT(4) ERR_NOPREVLINK, 2, ctl->jnl_fn_len, ctl->jnl_fn);
 			}
 			assert(old_ctl->next == ctl);

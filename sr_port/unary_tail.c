@@ -158,7 +158,6 @@ void unary_tail(oprtype *opr, int depth)
 					v = mv;
 					put_lit_s(v, t);
 				}
-				assert((MV_NM & v->mvtype) && (MV_STR & v->mvtype));
 				break;
 			case OC_NOOP:
 				if (OC_COMVAL == t->opcode)

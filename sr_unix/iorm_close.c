@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -195,7 +195,7 @@ void iorm_close(io_desc *iod, mval *pp)
 			case iop_timeout:
 				GET_LONG(pipe_timeout, (pp->str.addr + p_offset));
 				if (1 > pipe_timeout)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMTOOSMALL);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVPARMTOOSMALL);
 				break;
 			default:
 				break;
@@ -221,9 +221,9 @@ void iorm_close(io_desc *iod, mval *pp)
 			{
 				save_errno = errno;
 				SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-					      RTS_ERROR_LITERAL("lseek"),
-					      RTS_ERROR_LITERAL("iorm_close()"), CALLFROM, save_errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7,
+					RTS_ERROR_LITERAL("lseek"),
+					RTS_ERROR_LITERAL("iorm_close()"), CALLFROM, save_errno);
 			} else
 				rm_ptr->file_pos = cur_position;
 		}
@@ -318,8 +318,8 @@ void iorm_close(io_desc *iod, mval *pp)
 					if (use_timer)
 						cancel_timer(timer_id);
 					SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-						      RTS_ERROR_LITERAL("waitpid"), CALLFROM, save_errno);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+						RTS_ERROR_LITERAL("waitpid"), CALLFROM, save_errno);
 				}
 				if (out_of_time || (!use_timer && (0 == done_pid)))
 				{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -140,7 +140,7 @@ void op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_t
 			if (TREF(compile_time))
 				stx_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 		}
 	}
 	MV_INIT_STRING(dst, dstlen, stringpool.free);
@@ -156,7 +156,10 @@ void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 	static int4		xlate_array[NUM_CHARS];
 	static unsigned int 	prev_gcols = -1;
 	static mstr		prev_srch = {0, 0}, prev_rplc = {0, 0};
+<<<<<<< HEAD
 	static mval		xlate_table;
+=======
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

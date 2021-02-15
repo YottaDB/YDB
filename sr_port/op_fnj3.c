@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -24,7 +25,14 @@ GBLREF spdesc stringpool;
 
 LITREF int4 ten_pwr[];
 
+<<<<<<< HEAD
 void op_fnj3(mval *src, int width, int fract, mval *dst)
+=======
+error_def(ERR_JUSTFRACT);
+error_def(ERR_MAXSTRLEN);
+
+void op_fnj3(mval *src,int width,int fract,mval *dst)
+>>>>>>> 451ab477 (GT.M V7.0-000)
 {
 	int4 n, n1, m;
 	int w, digs, digs_used;
@@ -32,22 +40,27 @@ void op_fnj3(mval *src, int width, int fract, mval *dst)
 	static readonly int4 fives_table[9] =
 	{ 500000000, 50000000, 5000000, 500000, 50000, 5000, 500, 50, 5};
 	unsigned char *cp;
-	error_def(ERR_JUSTFRACT);
-	error_def(ERR_MAXSTRLEN);
 
 	if (0 > width)
 		width = 0;
+<<<<<<< HEAD
 	else if (MAX_STRLEN < width)
 		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 	if (0 > fract)
 		rts_error(VARLSTCNT(1) ERR_JUSTFRACT);
 	else if (MAX_STRLEN < fract)
 		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+=======
+	else	if (width > MAX_STRLEN)
+			RTS_ERROR_ABT(VARLSTCNT(1) ERR_MAXSTRLEN);
+	if (fract < 0)
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_JUSTFRACT);
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	w = width + MAX_NUM_SIZE + 2 + fract;
 	/* the literal two above accounts for the possibility
 	of inserting a zero and/or a minus with a width of zero */
 	if  (w > MAX_STRLEN)
-		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_MAXSTRLEN);
 	MV_FORCE_NUM(src);
 	/* need to guarantee that the n2s call will not cause string pool overflow */
 	ENSURE_STP_FREE_SPACE(w);

@@ -322,7 +322,10 @@ chmod +x {lowerc,ydbinstall}*
 
 cp $gtm_tools/*.xc .
 cp $gtm_tools/*.gtc .
-mv configure{.gtc,}
+# Fix the copyright year in configure
+set yyyy = `date +%Y`
+sed 's/Copyright 2009-YYYY/Copyright 2009-'$yyyy'/' configure.gtc >&! configure
+rm -f configure.gtc
 
 cp $gtm_inc/gtm_common_defs.h .
 cp $gtm_inc/gtmxc_types.h .
@@ -580,11 +583,11 @@ foreach i ( $comlist_liblist )
 
 		# Exclude files that define the same externals
 		# (e.g., "main" and the VMS CLI [command line interpreter] emulator arrays):
-		set exclude = "^gtm\.o|^gtm_main\.o|^lke\.o|^lke_cmd\.o|^dse\.o|^dse_cmd\.o|^dbcertify\.o"
+		set exclude = "^gtm\.o|^gtm_main\.o|^lke\.o|^lke_cmd\.o|^dse\.o|^dse_cmd\.o"
 		set exclude = "$exclude|^mupip\.o|^mupip_cmd\.o|^gtmsecshr\.o|^gtmsecshr_wrapper\.o"
-		set exclude = "$exclude|^semstat2\.o|^ftok\.o|^msg\.o|^gtcm_main\.o|^gtcm_play\.o|^gtcm_pkdisp\.o|^gtcm_shmclean\.o"
+		set exclude = "$exclude|^msg\.o|^gtcm_main\.o|^gtcm_play\.o|^gtcm_pkdisp\.o|^gtcm_shmclean\.o"
 		set exclude = "$exclude|^omi_srvc_xct\.o|^omi_sx_play\.o"
-		set exclude = "$exclude|^gtcm_gnp_server\.o|^dbcertify_cmd\.o"
+		set exclude = "$exclude|^gtcm_gnp_server\.o"
 		set exclude = "$exclude|^dummy_gtmci\.o"
 		/bin/ls | egrep '\.o$' | egrep -v "$exclude" | \
 			xargs -n50 $shell -f $gtm_tools/gt_ar.csh $gt_ar_option_create lib$i.a >>& ar$i.log
@@ -776,10 +779,17 @@ $gtm_com/IGS $ydb_dist/gtmsecshr UNHIDE
 set distfiles_log = "dist_files.`basename $gtm_exe`.log"
 find $ydb_dist -type f >&! $gtm_log/$distfiles_log
 if ($?scan_image) then
+<<<<<<< HEAD
 	tar cvf $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar dse ftok gtmsec* gtcm* libgtmshr.so lke mumps mupip
 	tar rvf $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar plugin/libgtm* plugin/gtmcrypt/maskpass
 	tar rvf $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar /usr/lib64/lib{config,gpgme,gpg-error,crypt,ssl,icu*,z,elf}.so*
 	gzip    $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar
+=======
+	tar cvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar dse gtmsec* gtcm* libgtmshr.so lke mumps mupip
+	tar rvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar plugin/libgtm* plugin/gtmcrypt/maskpass
+	tar rvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar /usr/lib64/lib{config,gpgme,gpg-error,crypt,ssl,icu*,z,elf}.so*
+	gzip    $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar
+>>>>>>> 451ab477 (GT.M V7.0-000)
 endif
 $gtm_com/IGS $ydb_dist/gtmsecshr CHOWN
 awk 'BEGIN {dlen=length(ENVIRON["ydb_dist"]);stat=0} {if ((length($0)-dlen)>50) {stat=1}} END {exit stat}' $gtm_log/$distfiles_log

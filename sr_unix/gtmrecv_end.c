@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -81,8 +81,8 @@ int gtmrecv_endupd(void)
 	/* Signal the update process to check for the update. */
 	PTHREAD_COND_SIGNAL(&recvpool.recvpool_ctl->write_updated, status);
 	if (0 != status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-				LEN_AND_LIT("pthread_cond_signal"), CALLFROM, status, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_cond_signal"), CALLFROM, status, 0);
 	/* Wait for update process to shut down */
 	while((SHUTDOWN == recvpool.upd_proc_local->upd_proc_shutdown)
 		&& (0 < (savepid = (pid_t)recvpool.upd_proc_local->upd_proc_pid)) && is_proc_alive(savepid, 0))

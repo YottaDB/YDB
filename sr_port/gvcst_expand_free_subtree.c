@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,11 +55,11 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 	blk_hdr_ptr_t		bp;
 	blk_ident		*ksb;
 	block_id		blk, temp_blk;
-	boolean_t		flush_cache = FALSE, was_crit;
+	boolean_t		flush_cache = FALSE, was_crit, long_blk_id;
 	bt_rec_ptr_t		bt;
 	cache_rec_ptr_t		cr;
 	inctn_opcode_t		save_inctn_opcode;
-	int4			cnt, cycle, kill_error;
+	int4			cnt, cycle, kill_error, blk_id_sz;
 	kill_set		*ks;
 	off_chain		chain;
 	rec_hdr_ptr_t		rp, rp1, rtop;
@@ -104,7 +104,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 				{
 					chain.flag = 1;
 					chain.next_off = 0;
-					assert(ksb->block < (1 << CW_INDEX_MAX_BITS));
+					assert(ksb->block < (1LL << CW_INDEX_MAX_BITS));
 					chain.cw_index = ksb->block;
 					assert(SIZEOF(chain) == SIZEOF(blk));
 					blk = *(block_id *)&chain;
@@ -112,8 +112,10 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 					blk = ksb->block;
 				if (!(bp = (blk_hdr_ptr_t)t_qread(blk, (sm_int_ptr_t)&cycle, &cr)))
 				{	/* This should have worked because t_qread was done in crit */
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GVKILLFAIL, 2, 1, &rdfail_detail);
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_GVKILLFAIL, 2, 1, &rdfail_detail);
 				}
+				long_blk_id = IS_64_BLK_ID(bp);
+				blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 				if (NULL != cr)
 				{	/* It is possible that t_qread returned a buffer from first_tp_srch_status.
 					 * In that case, t_qread does not wait for cr->in_tend to be zero since
@@ -141,13 +143,13 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 				{
 					GET_USHORT(temp_ushort, &rp->rsiz);
 					rp1 = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + temp_ushort);
-					if ((sm_uc_ptr_t)rp1 < (sm_uc_ptr_t)(rp + 1) + SIZEOF(block_id))
+					if ((sm_uc_ptr_t)rp1 < ((sm_uc_ptr_t)(rp + 1) + blk_id_sz))
 					{	/* This should have worked because a local copy was made while crit */
 						assert(FALSE);
 						kill_error = cdb_sc_rmisalign;
-						rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GVKILLFAIL, 2, 1, &kill_error);
+						RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_GVKILLFAIL, 2, 1, &kill_error);
 					}
-					GET_BLK_ID(temp_blk, (sm_uc_ptr_t)rp1 - SIZEOF(block_id));
+					READ_BLK_ID(long_blk_id, &temp_blk, (sm_uc_ptr_t)rp1 - blk_id_sz);
 					if (dollar_tlevel)
 					{
 						assert(sgm_info_ptr->tp_csa == cs_addrs);

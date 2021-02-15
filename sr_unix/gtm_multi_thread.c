@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015 Fidelity National Information 		*
+ * Copyright (c) 2015-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -102,16 +102,28 @@ int	gtm_multi_thread(gtm_pthread_fnptr_t fnptr, int ntasks, int max_threads,
 		return final_ret;
 	}
 #	ifdef GTM_PTHREAD
+<<<<<<< HEAD
 	INITIALIZE_THREAD_MUTEX_IF_NEEDED; /* Initialize thread-mutex variables if not already done */
+=======
+	/* Initialize thread-mutex variables if not already done */
+	if (!thread_mutex_initialized)
+	{
+		rc = pthread_mutex_init(&thread_mutex, NULL);
+		if (rc)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8)
+				ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_mutex_init()"), CALLFROM, rc);
+		thread_mutex_initialized = TRUE;
+	}
+>>>>>>> 451ab477 (GT.M V7.0-000)
 	/* Initialize and set thread-is-joinable attribute */
 	rc = pthread_attr_init(&attr);
 	if (rc)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
-				ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_attr_init()"), CALLFROM, rc);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8)
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_attr_init()"), CALLFROM, rc);
 	rc = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	if (rc)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
-				ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_attr_setdetachstate()"), CALLFROM, rc);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8)
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_attr_setdetachstate()"), CALLFROM, rc);
 	RESET_FORCED_THREAD_EXIT;	/* reset "forced_thread_exit" from a previous call to "gtm_multi_thread" */
 	multi_thread_in_use = TRUE;
 	/* Temporarily block external signals. That way the threads we create inherit a signal-mask that has those
@@ -173,8 +185,8 @@ int	gtm_multi_thread(gtm_pthread_fnptr_t fnptr, int ntasks, int max_threads,
 	DEFERRED_SIGNAL_HANDLING_CHECK; /* Now that all threads have terminated, check for need of deferred signal/exit handling */
 	rc = pthread_attr_destroy(&attr);	/* Free attribute */
 	if (rc)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
-				ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_attr_destroy()"), CALLFROM, rc);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8)
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_attr_destroy()"), CALLFROM, rc);
 	/* Now that there are no thread usages in this process, ideally we should be doing the following.
 	 *	pthread_mutex_destroy(&thread_mutex);
 	 * But it is possible the process uses threads again (e.g. journal rollback uses threads in various stages of the process).

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2020 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -688,7 +688,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	if (csa->hdr->hasht_upgrade_needed)
 	{	/* ^#t needs to be upgraded first before reading it. Cannot proceed. */
 		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_NEEDTRIGUPGRD, 2, DB_LEN_STR(gv_cur_region));
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_NEEDTRIGUPGRD, 2, DB_LEN_STR(gv_cur_region));
 	}
 	/* ^#t global exists.
 	 * Initialize gv_target->gvt_trigger from ^#t(<gbl>,...) where <gbl> is the global corresponding to save_gvtarget.
@@ -1114,7 +1114,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 			SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
 			SAVE_RTN_NAME(save_rtn_name, save_rtn_name_len, trigdsc);
 			GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TRIGINVCHSET, 6, save_rtn_name_len, save_rtn_name,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_TRIGINVCHSET, 6, save_rtn_name_len, save_rtn_name,
 				save_var_name_len, save_var_name, ret_mval->str.len, ret_mval->str.addr);
 		}
 		/* Defer loading xecute string until time to compile it */
@@ -1422,7 +1422,7 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 				} else if (cdb_sc_onln_rlbk2 == failure)
 				{
 					assert(tstart_trigger_depth == gtm_trigger_depth);
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBROLLEDBACK);
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DBROLLEDBACK);
 				}
 				/* update lcl_t_tries to reflect the fact that a restart happened */
 				lcl_t_tries = t_tries;
@@ -1679,7 +1679,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 					if (MAX_XECUTE_LEN <= trigdsc->xecute_str.str.len)
 					{
 						assert(FALSE);
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_XECUTE_LEN);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_XECUTE_LEN);
 					}
 				}
 				gtm_trig_status = gtm_trigger(trigdsc, trigparms);

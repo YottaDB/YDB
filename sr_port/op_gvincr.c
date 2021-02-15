@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2019 Fidelity National Information	*
+ * Copyright (c) 2004-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,9 +46,9 @@ void	op_gvincr(mval *increment, mval *result)
 	SETUP_THREADGBL_ACCESS;
 	/* If specified var name is global ^%Y*, the name is illegal to use in a SET or KILL command, only GETs are allowed */
 	if ((RESERVED_NAMESPACE_LEN <= gv_currkey->end) && (0 == MEMCMP_LIT(gv_currkey->base, RESERVED_NAMESPACE)))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PCTYRESERVED);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_PCTYRESERVED);
 	if (gv_cur_region->read_only)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	if ((TREF(gv_last_subsc_null) || TREF(gv_some_subsc_null)) && (ALWAYS != gv_cur_region->null_subs))
 		sgnl_gvnulsubsc(NONULLSUBS);
 	assert(gv_currkey->end + 1 <= gv_cur_region->max_key_size);
@@ -66,10 +66,10 @@ void	op_gvincr(mval *increment, mval *result)
 			/* $INCR not supported for DDP/USR access method */
 			if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 				end = &buff[MAX_ZWR_KEY_SZ - 1];
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_UNIMPLOP, 0,
-				      ERR_TEXT, 2, LEN_AND_LIT("GTCM DDP server does not support $INCREMENT"),
-				      ERR_GVIS, 2, end - buff, buff,
-				      ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_UNIMPLOP, 0,
+				ERR_TEXT, 2, LEN_AND_LIT("GTCM DDP server does not support $INCREMENT"),
+				ERR_GVIS, 2, end - buff, buff,
+				ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
 			break;
 		default:
 			assertpro(FALSE);

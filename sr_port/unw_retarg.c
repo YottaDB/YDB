@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -117,7 +117,7 @@ int unw_retarg(mval *src, boolean_t alias_return)
 			if (!LV_IS_BASE_VAR(srclv))
 			{	/* Have a potential container var - verify */
 				if (!(MV_ALIASCONT & srclv->v.mvtype))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ALIASEXPECTED);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ALIASEXPECTED);
 				ret_value = *src;
 				srclvc = (lv_val *)srclv->v.str.addr;
 				assert(LV_IS_BASE_VAR(srclvc));	/* Verify base var */
@@ -174,7 +174,7 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	}
 	/* do not throw an error if return value is expected from a non-extrinsic, but dollar_zquit_anyway is true */
 	if (!dollar_zquit_anyway && !got_ret_target)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTEXTRINSIC);	/* Routine not invoked as an extrinsic function */
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOTEXTRINSIC);	/* Routine not invoked as an extrinsic function */
 	/* Note that error_ret() should be invoked only after the rts_error() of TPQUIT and NOTEXTRINSIC.
 	 * This is so the TPQUIT/NOTEXTRINSIC error gets noted down in $ECODE (which wont happen if error_ret() is called before).
 	 */

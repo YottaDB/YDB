@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -174,7 +174,8 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code)
 	res_list 	*res_root, *new_res, *res_temp, *res_temp1;
 	char 		*symbols, *sym_temp, *sym_temp1, *symtop, *res_addr;
 	struct relocation_info rel[RELREAD];
-	int		numrel, rel_read, i, string_size, sym_size;
+	int		numrel, rel_read, i, string_size;
+	unsigned int	sym_size;
 	size_t		status;
 	mident_fixed	rtnid, labid;
 	mstr		rtn_str;
@@ -302,7 +303,8 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code)
 			}
 			sym_temp1++;
 		}
-		sym_size = sym_temp1 - sym_temp;
+		assert(sym_temp1 >= sym_temp);
+		sym_size = (unsigned int)(sym_temp1 - sym_temp);
 		assert(sym_size <= MAX_MIDENT_LEN);
 		memcpy(&rtnid.c[0], sym_temp, sym_size);
 		rtnid.c[sym_size] = 0;
@@ -310,7 +312,7 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code)
 			rtnid.c[0] = '%';
 		assert((sym_size != mid_len(&zlink_mname)) || (0 != memcmp(&zlink_mname.c[0], &rtnid.c[0], sym_size)));
 		rtn_str.addr = &rtnid.c[0];
-		rtn_str.len = sym_size;
+		rtn_str.len = (mstr_len_t)sym_size;
 		rtn = find_rtn_hdr(&rtn_str); /* Routine already resolved? */
 		sym_size = 0;
 		labsym = FALSE;
@@ -328,7 +330,8 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code)
 				}
 				sym_temp1++;
 			}
-			sym_size = sym_temp1 - sym_temp;
+			assert(sym_temp1 >= sym_temp);
+			sym_size = (unsigned int)(sym_temp1 - sym_temp);
 			assert(sym_size <= MAX_MIDENT_LEN);
 			memcpy(&labid.c[0], sym_temp, sym_size);
 			labid.c[sym_size] = 0;

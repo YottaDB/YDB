@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2017 Fidelity National Information	*
+ * Copyright (c) 2008-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -133,8 +133,8 @@ void	iopi_dlr_zkey(mstr *d)
 			{
 				save_errno = errno;
 				SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
-					      RTS_ERROR_LITERAL("iopi_dlr_zkey()"), CALLFROM, save_errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
+					RTS_ERROR_LITERAL("iopi_dlr_zkey()"), CALLFROM, save_errno);
 			} else
 				d_rm->file_pos = cur_position;
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -82,8 +82,8 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 	int		cw_set_top, depth;
 	unsigned int	n_decrements = 0;
 	trans_num	ctn;
-	int4		free_bit, map_size;
-	uint4		space_needed, status;
+	int4		free_bit, map_size, status;
+	uint4		space_needed;
 	srch_blk_status	blkhist;
 
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
@@ -105,7 +105,7 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 				continue;
 			}
 			if (SS_NORMAL != (status = GDSFILEXT(cs_data->extension_size, total_blks, TRANS_IN_PROG_TRUE)))
-				return (status);
+				return status;
 			if (dba_mm == cs_data->acc_meth)
 				return (FILE_EXTENDED);
 			hint = total_blks;
@@ -158,7 +158,7 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 			}
 		} else
 		{
-			for (depth = *cw_depth_ptr - 1; depth >= cw_work;  depth--)
+			for (depth = *cw_depth_ptr - 1; depth >= cw_work; depth--)
 			{	/* do non-tp back to front, because of adjacency */
 				if (bml == (cs + depth)->blk)
 				{
@@ -203,7 +203,7 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 			free_bit = NO_FREE_SPACE;
 		if (NO_FREE_SPACE != free_bit)
 			break;
-		if ((hint = bml + BLKS_PER_LMAP) >= total_blks)		/* if map is full, start at 1st blk in next map */
+		if ((hint = (bml + BLKS_PER_LMAP)) >= total_blks)	/* if map is full, start at 1st blk in next map */
 		{	/* wrap - second one should force an extend for sure */
 			hint = 1;
 			if (hint_cycled)
@@ -241,12 +241,12 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 		}
 		BLK_ADDR(b_ptr, space_needed, block_id);
 		memset(b_ptr, 0, space_needed);
-		*b_ptr = free_bit;
+		*b_ptr = (block_id)free_bit;
 		blkhist.blk_num = bml;
 		blkhist.buffaddr = bmp;	/* cycle and cr have already been assigned from t_qread */
 		t_write_map(&blkhist, (uchar_ptr_t)b_ptr, ctn, 1); /* last parameter 1 is what cs->reference_cnt gets set to */
 	}
-	return bml + free_bit;
+	return (bml + free_bit);
 }
 
 /* This routine returns whether the free_blocks counter in the file-header is ok (TRUE) or not (FALSE).
@@ -300,7 +300,7 @@ boolean_t	is_free_blks_ctr_ok(void)
 	if (cs_addrs->ti->free_blocks != free_blocks)
 	{
 		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_DBBADFREEBLKCTR, 4, DB_LEN_STR(gv_cur_region),
-				cs_addrs->ti->free_blocks, free_blocks);
+				&(cs_addrs->ti->free_blocks), &free_blocks);
 		cs_addrs->ti->free_blocks = free_blocks;
 		return FALSE;
 	}

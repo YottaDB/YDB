@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -184,5 +184,5 @@ void	lke_show(void)
 		}
 	}
 	if (!match && (0 != regname.len))
-		rts_error_csa(NULL, VARLSTCNT(4) ERR_NOREGION, 2, regname.len, regname.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NOREGION, 2, regname.len, regname.addr);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,7 +78,7 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 	unsigned char	*temp_cp;
 
 	if (seq < -1)	/* error "Cannot return subscript number ###" */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NOSUBSCRIPT, 1, seq);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_NOSUBSCRIPT, 1, seq);
 	subs_count = seq;
 	if (!is_canonic_name(src, &subs_count, &isrc, &stop))
 		NOCANONICNAME_ERROR(src);

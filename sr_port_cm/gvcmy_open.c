@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -77,9 +77,9 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	ASSERT_IS_LIBGNPCLIENT;
 	ESTABLISH(gvcmy_open_ch);
 	if (reg->is_spanned)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REMOTEDBNOSPGBL, 2, REG_LEN_STR(reg));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_REMOTEDBNOSPGBL, 2, REG_LEN_STR(reg));
 	if (!pb->b_node)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVNETFILNM);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVNETFILNM);
 	fn = (unsigned char *)pb->l_dir;
 	top = fn + pb->b_esl - pb->b_node; 	/* total length except node gives end of string */
 	/* The "task" value for unix comes from an env var of the form ydb_cm_<hostname> or GTCM_<hostname>.
@@ -95,8 +95,8 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	{
 		status = SS_NORMAL;
 		task2.len = STRLEN(trans_name);
-		if (SIZEOF(buff) > task2.len)
-			memcpy(task2.addr, trans_name, task2.len);
+		if ((SIZEOF(buff) > task2.len) && (0 < task2.len))
+			memcpy(task2.addr, trans_name, (size_t)task2.len);
 		else
 			status = SS_LOG2LONG;
 	} else
@@ -106,6 +106,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 		if (SS_NORMAL != status)
 		{
 			if (SS_LOG2LONG == status)
+<<<<<<< HEAD
 			{
 				char	*tmpptr;
 
@@ -119,6 +120,11 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 							LEN_AND_LIT("SNPRINTF(gvcmy_open)"), CALLFROM, errno);
 			} else
+=======
+				RTS_ERROR_CSA_ABT(NULL,
+					VARLSTCNT(5) ERR_LOGTOOLONG, 3, task1.len, task1.addr, SIZEOF(buff) - 1);
+			else
+>>>>>>> 451ab477 (GT.M V7.0-000)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
 		task.addr = (char *)task2.addr;
@@ -152,14 +158,14 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	{
 		if (new)
 			gvcmy_close(clb_ptr);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
 	}
 	status = cmi_read(clb_ptr);
 	if (CMI_ERROR(status))
 	{
 		if (new)
 			gvcmy_close(clb_ptr);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
 	}
 	if (CMMS_T_REGNUM != *clb_ptr->mbf)
 	{
@@ -167,7 +173,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 		{
 			if (new)
 				gvcmy_close(clb_ptr);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, ERR_BADSRVRNETMSG);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_NETDBOPNERR, 0, ERR_BADSRVRNETMSG);
 		}
 		gvcmz_errmsg(clb_ptr, new);
 	}

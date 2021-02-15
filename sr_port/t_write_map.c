@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,12 +29,13 @@
 #include "min_max.h"
 #include "jnl_get_checksum.h"
 
-GBLREF cw_set_element	cw_set[];
-GBLREF unsigned char	cw_set_depth;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgm_info		*sgm_info_ptr;
-GBLREF uint4		dollar_tlevel;
-GBLREF unsigned int	t_tries;
+GBLREF	cw_set_element		cw_set[];
+GBLREF	unsigned char		cw_set_depth;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	uint4			dollar_tlevel;
+GBLREF	unsigned int		t_tries;
 
 void t_write_map (
 		srch_blk_status	*blkhist,	/* Search History of the block to be written. Currently the
@@ -45,7 +46,7 @@ void t_write_map (
 						 *	    "cycle"		--> cycle when block was read by t_qread (BG only)
 						 *	    "cr->ondsk_blkver"	--> Actual block version on disk
 						 */
-		unsigned char 	*upd_addr,	/* Address of the update array containing list of blocks to be cleared in bitmap */
+		unsigned char	*upd_addr,	/* Address of the update array containing list of blocks to be cleared in bitmap */
 		trans_num	tn,		/* Transaction Number when this block was read. Used for cdb_sc_blkmod validation */
 		int4		reference_cnt)	/* Same meaning as cse->reference_cnt (see gdscc.h for comments) */
 {
@@ -55,8 +56,11 @@ void t_write_map (
 	sgmnt_addrs		*csa;
 	blk_hdr_ptr_t		old_block;
 	unsigned int		bsiz;
+
+#ifdef DEBUG
 	block_id		blkid;
-	uint4			*updptr;
+	block_id		*updptr;
+#endif
 
 	csa = cs_addrs;
 	if (!dollar_tlevel)
@@ -98,7 +102,7 @@ void t_write_map (
 	 * thankfully, in MM, we do not allow GDSV4 type blocks, so we can safely assign GDSV6 (or GDSVCURR) to this field.
 	 */
 	assert((NULL != cr) || (dba_mm == csa->hdr->acc_meth));
-	cs->ondsk_blkver = (NULL == cr) ? GDSVCURR : cr->ondsk_blkver;
+	cs->ondsk_blkver = ((NULL == cr) ? cs_data->desired_db_format : cr->ondsk_blkver);
 	cs->ins_off = 0;
 	cs->index = 0;
 	assert(reference_cnt < csa->hdr->bplmap);	/* Cannot allocate more blocks than a bitmap holds */
@@ -110,7 +114,7 @@ void t_write_map (
 		if (reference_cnt < 0)
 			reference_cnt = -reference_cnt;
 		/* Check that all block numbers are relative to the bitmap block number (i.e. bit number) */
-		updptr = (uint4 *)upd_addr;
+		updptr = (block_id *)upd_addr;
 		while (reference_cnt--)
 		{
 			blkid = *updptr;

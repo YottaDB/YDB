@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,24 +14,25 @@
 #include "mvalconv.h"
 #include "op.h"
 
+error_def(ERR_INVBITSTR);
+
 void op_fnzbitfind(mval *dst, mval *bitstr, int truthval, int pos)
 {
 	int str_len, find_bit;
 	unsigned char *byte_1, *byte_n, byte_0;
 	int m, n, mp, np, i, i1, j;
 	static const unsigned char mask[8] = {0x80,0x40,0x20,0x10,0x8,0x4,0x2,0x1};
-	error_def(ERR_INVBITSTR);
 
 	MV_FORCE_STR(bitstr);
 
 	if (!bitstr->str.len)
-		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
 
 	byte_1 = (unsigned char *)bitstr->str.addr;
 	str_len = (bitstr->str.len -1) * 8;
 	if (*byte_1 > 7)
 	{
-		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
 	}
 	if (pos < 1)
 	{

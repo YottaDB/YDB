@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,14 +58,14 @@ int dse_order(block_id srch,
 	last = 0;
 	patch_path_count++;
 	if (!(bp = t_qread(srch, &dummy_int, &dummy_cr)))
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER)
 	{
 #		ifdef BLK_NUM_64BIT
 		long_blk_id = TRUE;
 		blk_id_size = SIZEOF(block_id_64);
 #		else
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #		endif
 	} else
 	{
@@ -98,7 +98,7 @@ int dse_order(block_id srch,
 #					ifdef BLK_NUM_64BIT
 					GET_BLK_ID_64(*pp,ptr);
 #					else
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #					endif
 				else
 					GET_BLK_ID_32(*pp,ptr);
@@ -107,7 +107,7 @@ int dse_order(block_id srch,
 #					ifdef BLK_NUM_64BIT
 					GET_BLK_ID_64(*pp,b_top - SIZEOF(block_id_64));
 #					else
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #					endif
 				else
 					GET_BLK_ID_32(*pp,b_top - SIZEOF(block_id_32));
@@ -138,7 +138,7 @@ int dse_order(block_id srch,
 #				ifdef BLK_NUM_64BIT
 				GET_BLK_ID_64(*pp, key_top);
 #				else
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #				endif
 			else
 				GET_BLK_ID_32(*pp, key_top);
@@ -164,7 +164,7 @@ int dse_order(block_id srch,
 #					ifdef BLK_NUM_64BIT
 					GET_BLK_ID_64(patch_right_sib, r_top - SIZEOF(block_id_64));
 #					else
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #					endif
 				else
 					GET_BLK_ID_32(patch_right_sib, r_top - SIZEOF(block_id_32));

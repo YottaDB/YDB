@@ -15,7 +15,6 @@
 
 #ifndef GTMSOURCE_H
 #define GTMSOURCE_H
-
 /* for in_addr_t typedef on Linux */
 #include "gtm_inet.h"
 #include "min_max.h"
@@ -299,7 +298,6 @@ typedef jnldata_hdr_struct 	*jnldata_hdr_ptr_t;
 #define REPL_CONN_ALERT_ALERT_PERIOD		0	/* sec Default no logging of the REPLALERT message */
 #define REPL_CONN_HEARTBEAT_PERIOD		15	/* sec Default heartbeat period */
 #define REPL_CONN_HEARTBEAT_MAX_WAIT		60	/* sec Default heartbeat maximum waiting period */
-#define REPL_MAX_CONN_HARD_TRIES_PERIOD		1000    /* ms */
 #define REPL_MAX_LOG_PERIOD		        150     /* sec Maximum logging period */
 
 enum
@@ -429,7 +427,7 @@ typedef struct
 						 * sync with the source server specific private global variable "gtmsource_state" */
 	int4			gtmsrc_lcl_array_index;	/* Index of THIS struct in the array of gtmsource_local_struct in jnlpool */
 	int4			repl_zlib_cmp_level;	/* zlib compression level currently used across the replication pipe */
-	unsigned char		filler1_align_8[4];
+	unsigned char		filler1_align_8[3];
 	int4			read_state;  	/* From where to read - pool or the file(s)? */
 	qw_off_t		read; 		/* Offset relative to jnldata_base_off of the next journal record from the pool */
 	repl_conn_info_t	remote_side;	/* Details of the remote side connection */
@@ -439,6 +437,8 @@ typedef struct
 							 * Used to determine least recently used slot for reuse. Is maintained in
 							 * parallel with the same field in the corresponding "gtmsrc_lcl" structure
 							 */
+	seq_num			heartbeat_jnl_seqno; 	/* ack_seqno from the receiver server */
+	boolean_t		hrtbt_recvd;		/* whether heartbeat was received from the receiver server */
 	int4			num_histinfo;		/* Index of the last histinfo in the instance file as known to THIS source
 							 * server. Usually kept in sync with "repl_inst_filehdr->num_histinfo".
 							 * Note that whenever a histinfo record gets added to the instance file,
@@ -487,9 +487,13 @@ typedef struct
 	uint4			next_renegotiate_time;	/* Time (in future) at which the next SSL/TLS renegotiation happens. */
 	int4			num_renegotiations;	/* Number of SSL/TLS renegotiations that happened so far. */
 #	endif
+<<<<<<< HEAD
 	boolean_t		trigupdate;		/* TRUE if -TRIGUPDATE was specified, FALSE otherwise */
 	boolean_t		filler_8byte_align1;
 	GTM64_ONLY(int4		filler_8byte_align2;)	/* Keep size % 8 == 0 */
+=======
+	int4			filler_8byte_align;	/* Keep size % 8 == 0 */
+>>>>>>> 451ab477 (GT.M V7.0-000)
 } gtmsource_local_struct;
 
 #if defined(__osf__) && defined(__alpha)
