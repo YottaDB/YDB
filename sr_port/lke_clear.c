@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,5 +120,5 @@ void	lke_clear(void)
 		}
 	}
 	if (!match  &&  regname.len != 0)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, regname.len, regname.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NOREGION, 2, regname.len, regname.addr);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,7 @@ void iott_wteol(int4 val, io_desc *io_ptr)
 #ifdef UNIX
 	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
 	if (tt_ptr->mupintr)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 #endif
 	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
 	io_ptr->esc_state = START;

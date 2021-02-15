@@ -83,84 +83,37 @@ endif
 
 cd $gtm_dist
 
-# keep the utf8 libicu search code below in synch with configure.gtc!
-
-set is64bit_gtm = `file mumps | grep -c 64`
-
-# Please keep in sync with sr_unix/set_library_path.csh and sr_unix/configure.gtc
-if ( $is64bit_gtm == 1 ) then
-	set library_path = "/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib/x86_64-linux-gnu /usr/lib"
-else
-	set library_path = "                 /usr/local/lib /usr/lib32 /usr/lib/i386-linux-gnu   /usr/lib"
-endif
-
-set is64bit_icu = 0
-# Set the appropriate extensions for ICU libraries depending on the platforms
-set icu_ext = ".so"
-if ( $arch == "ibm" ) then
-	set icu_ext = ".a"
-endif
-
-# Check the presence of gtm_icu_version
-set gtm_icu_version_set = "FALSE"
+# If gtm_icu_version is empty, consider it equivalent to not set
 if ($?gtm_icu_version) then
 	if ("" != $gtm_icu_version) then
-		set gtm_icu_version_set = "TRUE"
+		unsetenv gtm_icu_version
+	endif
+endif
+set icu_version = ""
+set libpath = ""
+if (! $?gtm_icu_version) then
+	# icu-config is deprecated. So try "pkg-config icu-io" first, followed by "icu-config" and "pkg-config icu"
+	if ( (-X pkg-config) && ( { pkg-config --exists icu-io } ) ) then
+		set versioncmd = "pkg-config --modversion icu-io"
+		set libcmd="pkg-config --variable=libdir icu-io"
+	else if (-X icu-config) then
+		set versioncmd = "icu-config --version"
+		set libcmd="icu-config --libdir"
+	else if ( (-X pkg-config) && ( { pkg-config --exists icu } ) ) then
+		set versioncmd = "pkg-config --modversion icu"
+		set libcmd="pkg-config --variable=libdir icu"
+	endif
+	if ($?versioncmd) then
+		# pkg-config/icu-config can report versions like 4.2.1 but we want just the 4.2 part for GT.M
+		set icu_version = `$versioncmd | awk '{ver=+$0;if(ver>5){ver=ver/10}printf("%.1f\n",ver);exit}'`
+		set libpath=`$libcmd`
+		if ( "linux" == "$arch" ) then
+			# We do not recommend setting gtm_icu_version on AIX
+			setenv gtm_icu_version "$icu_version"
+		endif
 	endif
 endif
 
-foreach libpath ($library_path)
-	set icu_lib_found = 0
-	if ( "FALSE" == "$gtm_icu_version_set" && ( -f "$libpath/libicuio$icu_ext" ) ) then
-		set icu_lib_found = 1
-		# Find the actual version'ed library to which libicuio.{so,sl,a} points to
-		set icu_versioned_lib = `ls -l $libpath/libicuio$icu_ext | awk '{print $NF}'`
-		# Find out vital parameters
-		if ( "$arch" == "ibm" ) then
-			# From the version'ed library(eg. libicuio36.0.a) extract out
-			# 36.0.a
-			set full_icu_ver_string = `echo $icu_versioned_lib | sed 's/libicuio//g'`
-			# Extract 36 from 36.0.a
-			set majmin=`echo $full_icu_ver_string | cut -f 1 -d '.'`
-		else
-			set full_icu_ver_string=`echo $icu_versioned_lib | sed 's/libicuio\.//g'`
-			set majmin=`echo $full_icu_ver_string | cut -f 2 -d '.'`
-		endif
-	else if ( "TRUE" == "$gtm_icu_version_set" ) then
-		set majmin = `echo $gtm_icu_version | sed 's/\.//'`
-		if ( -f "$libpath/libicuio$majmin$icu_ext" || -f "$libpath/libicuio$icu_ext.$majmin" ) then
-			set icu_lib_found = 1
-		else
-			set icu_lib_found = 0
-		endif
-
-	endif
-	if ( $icu_lib_found ) then
-		# Figure out the object mode(64 bit or 32 bit) of ICU libraries on the target machine
-		if ( "linux" == "$arch" ) then
-			set icu_full_ver_lib = `sh -c "ls -l $libpath/libicuio$icu_ext.$majmin 2>/dev/null" | awk '{print $NF}'`
-			set is64bit_icu = `sh -c "file $libpath/$icu_full_ver_lib 2>/dev/null | grep -c 64"`
-		else if ( "ibm" == "$arch" ) then
-			set icu_full_ver_lib = `sh -c "ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null" | awk '{print $NF}'`
-			set is64bit_icu = `sh -c "nm -X64 $libpath/$icu_full_ver_lib 2>/dev/null | head -n 1 | wc -l"`
-		endif
-		# Make sure both GTM and ICU are in sync with object mode compatibility (eg both are 32 bit/64 bit)
-		if ( ( "$is64bit_gtm" == 1 ) && ( "$is64bit_icu" != 0 ) ) then
-			set found_icu = 1
-		else if ( ( "$is64bit_gtm" != 1 ) && ( "$is64bit_icu" == 0 ) ) then
-			set found_icu = 1
-		else
-			set found_icu = 0
-		endif
-		if ( "$found_icu" == 1 && "$majmin" >= 36 ) then
-			set save_icu_libpath = $libpath
-			set majorver = `expr $majmin / 10`
-			set minorver = `expr $majmin % 10`
-			setenv gtm_icu_version "$majorver.$minorver"
-			break
-		endif
-	endif
-end
 # No files are supposed to have write permissions enabled. However part of the kit install
 # test leaves a few files writeable. The list of known writeable files is:
 # 	.:
@@ -280,18 +233,17 @@ cd $save_gtm_dist
 
 # strip off the copyright lines
 tail -n +11 $gtm_tools/gtm_test_install.txt > gtm_test_install.txt
-# remove white space at end of created output so it looks like version after ftpput is run
-echo ':%s/[ 	][ 	]*$//g:wall\!:q' | vim -n gtm_test_install.out >& /dev/null
-
-\diff gtm_test_install.txt gtm_test_install.out >& /dev/null
+# remove white space at end of created output
+sed 's/[ 	][ 	]*$//' gtm_test_install.out >&! gtm_test_install.out_stripspaces
+cmp gtm_test_install.txt gtm_test_install.out_stripspaces
 if ($status) then
 	echo "---------"
-	echo "GTM_TEST_INSTALL-E-ERROR the output is not as expected."
-	\diff gtm_test_install.txt gtm_test_install.out
+	echo "GTM_TEST_INSTALL-E-ERROR the output is not as expected. Check $PWD"
+	diff gtm_test_install.txt gtm_test_install.out_stripspaces
 	set exitstat = 1
 	echo "---------"
 else
-	echo "The test succeeded, the output is in "`pwd`/gtm_test_install.out
+	echo "The test succeeded, the output is in $PWD/gtm_test_install.out"
 	set exitstat = 0
 endif
 

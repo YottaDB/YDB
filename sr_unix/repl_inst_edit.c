@@ -1,6 +1,6 @@
 /****************************************************************
 *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,26 +53,26 @@ error_def(ERR_SIZENOTVALID8);
 void	mupcli_get_offset_size_value(uint4 *offset, uint4 *size, gtm_uint64_t *value, boolean_t *value_present)
 {
 	if (!cli_get_hex("OFFSET", offset))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
 	if (!cli_get_hex("SIZE", size))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
 	if (!((SIZEOF(char) == *size) || (SIZEOF(short) == *size) || (SIZEOF(int4) == *size) || (SIZEOF(gtm_int64_t) == *size)))
-                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SIZENOTVALID8);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_SIZENOTVALID8);
 	if (0 > (int4)*size)
 	{
 		util_out_print("Error: SIZE specified cannot be negative", TRUE);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
 	}
 	if (0 != (*offset % *size))
 	{
 		util_out_print("Error: OFFSET [0x!XL] should be a multiple of Size [!UL]", TRUE, *offset, *size);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
 	}
 	if (CLI_PRESENT == cli_present("VALUE"))
 	{
 		*value_present = TRUE;
 		if (!cli_get_hex64("VALUE", value))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
 	} else
 		*value_present = FALSE;
 }
@@ -159,7 +159,7 @@ void	repl_inst_edit(void)
 							 */
 	inst_fn_len = MAX_FN_LEN;
 	if (!cli_get_str("INSTFILE", inst_fn, &inst_fn_len) || (0 == inst_fn_len))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
 	inst_fn[inst_fn_len] = '\0';
 	buff = &buff_unaligned[0];
 	buff = (char *)ROUND_UP2((INTPTR_T)buff, 8);
@@ -223,7 +223,7 @@ void	repl_inst_edit(void)
 			{
 				save_errno = errno;
 				ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("Error with journal pool access semaphore, no changes were made"),
 					save_errno);
 			}
@@ -268,7 +268,7 @@ void	repl_inst_edit(void)
 			if (MAX_INSTNAME_LEN == instname_len)
 			{
 				util_out_print("Error: Instance name length can be at most 15", TRUE);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
 			}
 		}
 		repl_inst_read(inst_fn, (off_t)0, (sm_uc_ptr_t)buff, REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "gdsblk.h"
 #include "gdscc.h"
 #include "gdskill.h"
@@ -85,6 +86,7 @@ error_def(ERR_DBFILOPERR);
 error_def(ERR_DBPREMATEOF);
 error_def(ERR_DBRDERR);
 error_def(ERR_DBRDONLY);
+error_def(ERR_GTMCURUNSUPP);
 error_def(ERR_INVACCMETHOD);
 error_def(ERR_MMNODYNDWNGRD);
 error_def(ERR_MUPIPSET2BIG);
@@ -113,14 +115,15 @@ MBSTART {									\
 int4 mupip_set_file(int db_fn_len, char *db_fn)
 {
 	boolean_t		bypass_partial_recov, flush_buffers = FALSE, got_standalone, need_standalone = FALSE,
-				acc_meth_changing;
+				acc_meth_changing, long_blk_id;
 	char			acc_spec[MAX_ACC_METH_LEN + 1], *command = "MUPIP SET VERSION", *errptr, exit_stat, *fn,
 				ver_spec[MAX_DB_VER_LEN + 1];
 	enum db_acc_method	access, access_new;
 	enum db_ver		desired_dbver;
-	uint4                   fbwsize;
+	uint4			fbwsize;
 	int4			dblksize;
 	gd_region		*temp_cur_region;
+	gd_segment		*seg;
 	int			asyncio_status, defer_allocate_status, defer_status, disk_wait_status, encryptable_status,
 				encryption_complete_status, epoch_taper_status, extn_count_status, fd, fn_len, glbl_buff_status,
 				gtmcrypt_errno, hard_spin_status, inst_freeze_on_error_status, key_size_status, locksharesdbcrit,
@@ -134,9 +137,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				read_only_status, new_full_blkwrt;
 	sgmnt_data_ptr_t	csd, pvt_csd;
 	tp_region		*rptr, single;
-	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
-	gd_segment		*seg;
 	uint4			fsb_size, reservedDBFlags;
+	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
 	ZOS_ONLY(int 		realfiletag;)
 	DCL_THREADGBL_ACCESS;
 
@@ -259,13 +261,13 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		need_standalone = TRUE;
 	}
 	if (hard_spin_status = cli_present("HARD_SPIN_COUNT"))
-        {	/* No min or max tests needed because mupip_cmd enforces min of 0 and no max requirement is documented*/
-                if (!cli_get_int("HARD_SPIN_COUNT", &new_hard_spin))
-                {
-                        gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("HARD_SPIN_COUNT"));
-                        exit_stat |= EXIT_ERR;
-                }
-        }
+	{	/* No min or max tests needed because mupip_cmd enforces min of 0 and no max requirement is documented*/
+		if (!cli_get_int("HARD_SPIN_COUNT", &new_hard_spin))
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("HARD_SPIN_COUNT"));
+			exit_stat |= EXIT_ERR;
+		}
+	}
 	inst_freeze_on_error_status = cli_present("INST_FREEZE_ON_ERROR");
 	if (key_size_status = cli_present("KEY_SIZE"))
 	{
@@ -340,7 +342,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	if (null_subs_status = cli_present("NULL_SUBSCRIPTS"))
 	{
 		if (-1 == (new_null_subs = cli_n_a_e("NULL_SUBSCRIPTS")))
-                        exit_stat |= EXIT_ERR;
+			exit_stat |= EXIT_ERR;
 		need_standalone = TRUE;
 	}
 	if (qdbrundown_status = cli_present("QDBRUNDOWN"))
@@ -402,7 +404,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		} else
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("SPIN_SLEEP_MASK"));
-                      	exit_stat |= EXIT_ERR;
+			exit_stat |= EXIT_ERR;
 		}
 	}
 	if (stats_status = cli_present("STATS"))
@@ -414,10 +416,16 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		cli_get_str("VERSION", ver_spec, &ver_spec_len);
 		ver_spec[ver_spec_len] = '\0';
 		cli_strupper(ver_spec);
-		if (0 == memcmp(ver_spec, "V4", ver_spec_len + 1))
-			desired_dbver = GDSV4;
-		else  if (0 == memcmp(ver_spec, "V6", ver_spec_len + 1))
+		if (0 == memcmp(ver_spec, "V7", ver_spec_len + 1))
+			desired_dbver = GDSV7;
+		else if (0 == memcmp(ver_spec, "V6", ver_spec_len + 1))
 			desired_dbver = GDSV6;
+		else if (0 == memcmp(ver_spec, "V4", ver_spec_len + 1))
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMCURUNSUPP);
+			exit_stat |= EXIT_ERR;
+			desired_dbver = GDSV4;
+		}
 		else
 			assertpro(FALSE);		/* CLI should prevent us ever getting here */
 		flush_buffers = TRUE;
@@ -499,6 +507,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				TAG_POLICY_GTM_PUTMSG(fn, realfiletag, TAG_BINARY, errno);
 #			endif
 			LSEEKREAD(fd, 0, pvt_csd, SIZEOF(sgmnt_data), status);
+			if (0 == memcmp(pvt_csd->label, V6_GDS_LABEL, GDS_LABEL_SZ -1))
+				db_header_upconv(pvt_csd);
 			if (0 != status)
 			{
 				save_errno = errno;
@@ -580,7 +590,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
 					reg_exit_stat |= EXIT_WRN;
 				}
-				if (GDSVCURR != pvt_csd->desired_db_format)
+				if ((GDSVCURR != pvt_csd->desired_db_format) && (BLK_ID_32_VER != pvt_csd->desired_db_format))
 				{
 					util_out_print("MM access method cannot be set in DB compatibility mode",
 						TRUE);
@@ -639,8 +649,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 			if (key_size_status)
 			{
-				key_size_status = pvt_csd->blk_size - SIZEOF(blk_hdr) - SIZEOF(rec_hdr) - SIZEOF(block_id)
-					- BSTAR_REC_SIZE - pvt_csd->reserved_bytes;
+				long_blk_id = BLK_ID_32_VER < pvt_csd->desired_db_format;
+				key_size_status = pvt_csd->blk_size - SIZEOF(blk_hdr) - SIZEOF(rec_hdr) -
+						SIZEOF_BLK_ID(long_blk_id) - bstar_rec_size(long_blk_id) - pvt_csd->reserved_bytes;
 				if (key_size_status < new_key_size)
 				{	/* too big for block */
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_MUPIPSET2BIG, 4, new_key_size,
@@ -677,10 +688,11 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 			if (rsrvd_bytes_status)
 			{
-				if (reserved_bytes > MAX_RESERVE_B(pvt_csd))
+				long_blk_id = BLK_ID_32_VER < pvt_csd->desired_db_format;
+				if (reserved_bytes > MAX_RESERVE_B(pvt_csd, long_blk_id))
 				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, reserved_bytes,
-						LEN_AND_LIT("RESERVED_BYTES"), MAX_RESERVE_B(pvt_csd));
+						LEN_AND_LIT("RESERVED_BYTES"), MAX_RESERVE_B(pvt_csd, long_blk_id));
 					reg_exit_stat |= EXIT_WRN;
 				}
 				pvt_csd->reserved_bytes = reserved_bytes;
@@ -936,9 +948,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			else if (CLI_PRESENT == inst_freeze_on_error_status)
 				util_out_print("Database file !AD now has inst freeze on fail flag set to TRUE",
 					TRUE, fn_len, fn);
-                        if (hard_spin_status)
+			if (hard_spin_status)
 				util_out_print("Database file !AD now has hard spin count !UL",
-                                        TRUE, fn_len, fn, HARD_SPIN_COUNT(csd));
+					TRUE, fn_len, fn, HARD_SPIN_COUNT(csd));
 			if (sleep_cnt_status)
 				util_out_print("Database file !AD now has sleep spin count !UL",
 					TRUE, fn_len, fn, SLEEP_SPIN_CNT(csd));
@@ -971,7 +983,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 			if (got_standalone)
 			{
-				DB_LSEEKWRITE(NULL, ((unix_db_info *)NULL), NULL, fd, 0, pvt_csd, SIZEOF(sgmnt_data), status);
+				if (0 == memcmp(pvt_csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+					db_header_dwnconv(pvt_csd);
+				DB_LSEEKWRITE(NULL,((unix_db_info *)NULL),NULL,fd,0,pvt_csd,SIZEOF(sgmnt_data),status);
 				if (0 != status)
 				{
 					save_errno = errno;
@@ -979,7 +993,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					util_out_print("write : !AZ", TRUE, errptr);
 					util_out_print("Error writing header of file", TRUE);
 					util_out_print("Database file !AD not changed: ", TRUE, fn_len, fn);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
 				}
 
 				if (defer_status && (dba_mm == pvt_csd->acc_meth))
@@ -1011,7 +1025,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 							"EXISTING" : "NEVER   ");
 				if (qdbrundown_status)
 					util_out_print("Database file !AD now has quick database rundown flag set to !AD", TRUE,
-						       fn_len, fn, 5, (pvt_csd->mumps_can_bypass ? " TRUE" : "FALSE"));
+							fn_len, fn, 5, (pvt_csd->mumps_can_bypass ? " TRUE" : "FALSE"));
 				if (rec_size_status)
 					util_out_print("Database file !AD now has maximum record size !UL",
 							TRUE, fn_len, fn, pvt_csd->max_rec_size);
@@ -1020,7 +1034,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 							TRUE, fn_len, fn, pvt_csd->reserved_bytes);
 				if (stats_status)
 					util_out_print("Database file !AD now has sharing of gvstats set to !AD", TRUE,
-						       fn_len, fn, 5, (CLI_PRESENT == stats_status) ? " TRUE" : "FALSE");
+							fn_len, fn, 5, (CLI_PRESENT == stats_status) ? " TRUE" : "FALSE");
 				if (stdnullcoll_status)
 					util_out_print("Database file !AD is now using !AD", TRUE, fn_len, fn,
 							strlen("M standard null collation"),

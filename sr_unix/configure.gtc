@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-# Copyright (c) 2009-2019 Fidelity National Information		#
+# Copyright (c) 2009-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -57,7 +57,7 @@ else echo "Shared libary ldflags not set for this platform"; exit 1
 fi
 
 # Binaries
-binaries="mupip mumps libgtmshr$ext lke dse ftok semstat2"
+binaries="mupip mumps libgtmshr$ext lke dse"
 
 # Normal scripts - executed by anyone
 nscripts="gtmbase lowerc_cp"
@@ -91,8 +91,8 @@ if [ "`whoami`" != "root" ] ; then
 fi
 
 $echo "                     GT.M Configuration Script"
-$echo "Copyright 2009, 2014 Fidelity Information Services, Inc. Use of this"
-$echo "software is restricted by the provisions of your license agreement."
+$echo "Copyright 2009-YYYY Fidelity Information Services, Inc. and/or its subsidiaries."
+$echo "Use of this software is restricted by the provisions of your license agreement."
 $echo ""
 
 # Native super user and group
@@ -172,6 +172,8 @@ else
 fi
 read resp
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+	mkdir -p        $gtmdist
+	chmod ug-s,-t   $gtmdist
 	mkdir -p        $gtmdist/plugin/r $gtmdist/plugin/o
 	chmod 0755      $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
 	chown $owner    $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
@@ -193,136 +195,64 @@ $echo ""
 
 is64bit_gtm=`file mumps | grep -c 64.bit`
 
-# Create $gtmdist/utf8 if this platform can support "UTF-8" mode.
-
-# keep the utf8 libicu search code in gtm_test_install.csh in sync with the following!
 if [ -d "utf8" ]; then
-	unset gtm_icu_version
+	unset icu_version
+	doutf8=1
 	# If package has utf8 directory, see if system has libicu and locale
-	# Setup library path (in prep for looking for libicu and crypto libs)
-	# Please keep in sync with sr_unix/set_library_path.csh and sr_unix/gtm_test_install.csh
-	if [ $is64bit_gtm -eq 1 ] ; then
-		library_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu"
-	else
-		library_path="                 /usr/local/lib /usr/lib32 /usr/lib /usr/lib/i386-linux-gnu"
-	fi
 	$echo "Should UTF-8 support be installed? (y or n) \c"
 	read resp
 	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-		would_like_utf8=1
-		$echo "Should an ICU version other than the default be used? (y or n) \c"
-		read resp
-		if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-			$echo "Enter ICU version (at least ICU version 3.6 is required. Enter as <major-ver>.<minor-ver>): \c"
-			read gtm_icu_version
-			maj=`$echo $gtm_icu_version | cut -f 1 -d "."`
+		if [ -x "$(command -v pkg-config)" -a $(pkg-config --exists icu-io; echo $?) -eq 0 ]; then
+			versioncmd="pkg-config --modversion icu-io"
+			libcmd="pkg-config --variable=libdir icu-io"
+		elif [ -x "$(command -v icu-config)" ] ; then
+			versioncmd="icu-config --version"
+			libcmd="icu-config --libdir"
+		elif [ -x "$(command -v pkg-config)" -a $(pkg-config --exists icu; echo $?) -eq 0 ]; then
+			versioncmd="pkg-config --modversion icu"
+			libcmd="pkg-config --variable=libdir icu"
+		fi
+		if [ -n "$versioncmd" ]; then
+			icu_version=`$versioncmd | awk '{ver=+$0;if(ver>5){ver=ver/10}printf("%.1f\n",ver);exit}'`
+			extendlibpath=`$libcmd`
+		fi
+		if [ "$icu_version" != "" ] ; then
+			maj=`$echo $icu_version | cut -f 1 -d "."`
 			if [ "$maj" -ge "49" ] ; then
 				# Assuming the input is of the form 52.1. As of ICU 49 (aka 4.9),
 				# the version reported by icu-config --version is <major><minor>.<milli> and not <major>.<minor>
 				majmin=$maj
 			else
 				# Assuming the input is of the form 4.2.1
-				majmin=`$echo $gtm_icu_version | cut -d "." -f 1,2 | sed 's/\.//'`
+				majmin=`$echo $icu_version | cut -d "." -f 1,2 | sed 's/\.//'`
 			fi
 			if [ "$majmin" -lt "36" ] ; then
-				$echo "WARNING: ICU version $gtm_icu_version is less than 3.6. \c"
-				$echo "UTF-8 support will not be installed"
-				would_like_utf8=0
+				$echo "ICU version version found : $icu_version"
+				$echo "Install ICU version 3.6 or above to enable UTF-8 support."
 				doutf8=0
 			fi
-		fi
-	else
-		would_like_utf8=0
-		doutf8=0
-	fi
-	# Look for libicu libraries
-	found_icu=0
-	icu_ext=".so"
-	if [ $arch = "ibm" ] ; then
-		icu_ext=".a"
-	fi
-	if [ "$would_like_utf8" -eq 1 ] ; then
-		for libpath in $library_path
-		do
-			icu_lib_found=0
-			if [ "$gtm_icu_version" = "" -a -f "$libpath/libicuio$icu_ext" ] ; then
-				icu_lib_found=1
-				# Find the actual version'ed library to which libicuio.{so,sl,a} points to
-				icu_versioned_lib=`ls -l $libpath/libicuio$icu_ext | awk '{print $NF}'`
-				# Find out vital parameters
-				if [ "$libpath/libicuio$icu_ext" = "$icu_versioned_lib" ]; then
-					majmin=""
-				elif [ $arch = "ibm" ]; then
-					# From the version'ed library(eg. libicuio36.0.a) extract out
-					# 36.0.a
-					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio//g'`
-					# Extract 36 from 36.0.a
-					majmin=`$echo $full_icu_ver_string | cut -f 1 -d '.'`
-				else
-					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio\.//g'`
-					majmin=`$echo $full_icu_ver_string | cut -f 2 -d '.'`
-				fi
-			elif [ "$gtm_icu_version" != "" ] ; then
-				# If the user specified a desired version number, then check if the ICU
-				# library with that version number exists.
-				# AIX and z/OS reference ICU as libicuioVERSION.{so,a}
-				# The other platforms reference the libraries as libicuio.{sl,so}.VERSION
-				if [ -f "$libpath/libicuio$majmin$icu_ext" -o -f "$libpath/libicuio$icu_ext.$majmin" ] ; then
-					icu_lib_found=1
-				else
-					icu_lib_found=0
-				fi
-			fi
-			if [ $icu_lib_found -eq 1 ] ; then
-				# Figure out the object mode(64 bit or 32 bit)  of ICU libraries on the target machine
-				if [ $arch = "linux" ] ; then
-					icu_full_ver_lib=`ls -l $libpath/libicuio$icu_ext.$majmin 2>/dev/null | awk '{print $NF}'`
-					is64bit_icu=`file $libpath/$icu_full_ver_lib 2>/dev/null | grep "64-bit" | wc -l`
-				elif [ $arch = "ibm" ] ; then
-					icu_full_ver_lib=`ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null | awk '{print $NF}'`
-					icu_full_ver_lib=`basename $icu_full_ver_lib`
-					is64bit_icu=`nm -X64 $libpath/$icu_full_ver_lib 2>/dev/null | head -n 1 | wc -l`
-				fi
-				# Make sure both GTM and ICU are in sync with object mode compatibility (eg both are 32 bit/64 bit )
-				if [ "$is64bit_gtm" -eq 1 -a "$is64bit_icu" -ne 0 ] ; then
-					found_icu=1
-				elif [ "$is64bit_gtm" -ne 1 -a "$is64bit_icu" -eq 0 ] ; then
-					found_icu=1
-				else
-					found_icu=0
-				fi
-				# The default ICU library on AIX is unversioned
-				if [ "$found_icu" -eq 1 -a "$majmin" = "" ] ; then majmin=0; fi
-				# If we have everything we want, then save the libpath that contains the proper ICU library and
-				# set the gtm_icu_version
-				if [ "$found_icu" -eq 1 -a "$majmin" -ge 36 ] ; then
-					save_icu_libpath="$libpath"
-					minorver=`expr $majmin % 10`
-					majorver=`expr $majmin / 10`
-					gtm_icu_version="$majorver.$minorver"
-					export gtm_icu_version
-					break
-				fi
-			fi
-		done
-		if [ "$found_icu" -eq 0 ] ; then
-			if [ "$majmin" != "" ] ; then
-				$echo "WARNING: ICU version $gtm_icu_version not found. Not installing UTF-8 support."
-			else
-				$echo "WARNING: Default ICU version not found. Not installing UTF-8 support."
-			fi
+		else
+			$echo "Could not find ICU version in the default location."
+			doutf8=0
 		fi
 		# Look for locale
 		utflocale=`locale -a | grep $binaryopt -iE '\.utf.?8$' | head -n1`
 		if [ "$utflocale" = "" ] ; then
-			$echo "WARNING: UTF8 locale not found. Not installing UTF-8 support."
-		fi
-		# If both libicu and locale are on system then install UTF-8 support
-		if [ "$found_icu" -ne 0  -a "$utflocale" != "" ] ; then
-			doutf8=1
-		else
+			$echo "UTF-8 locale not found."
 			doutf8=0
 		fi
+		if [ "$doutf8" -eq 0 ] ; then
+			$echo "UTF-8 support was requested, but not all dependencies were satisfied."
+			$echo "Please fix the above and re-run installation."
+			exit 1
+		fi
+		if [ "$doutf8" -eq 1 -a "linux" = $arch ]; then
+			# We do not recommend setting gtm_icu_version on AIX
+			gtm_icu_version=$icu_version
+			export gtm_icu_version
+		fi
+	else
+		doutf8=0
 	fi
 else
 	# If utf8 dir does not exist in package, can't install UTF-8 support
@@ -349,7 +279,7 @@ do
 	if [ "$doutf8" -ne 0 ]; then
 		cd utf8
 		if ( test -f "$dest" ) then rm $dest; fi
-		ln -s ../$dest $dest
+		ln -fs ../$dest $dest
 		cd ..
 	fi
 done
@@ -367,7 +297,7 @@ file=COPYING
 if [ -f $file ]; then
 	cp -p $file $gtmdist
 	if [ "$doutf8" -ne 0 ]; then
-		ln -s ../$file $gtmdist/utf8/$file
+		ln -fs ../$file $gtmdist/utf8/$file
 	fi
 fi
 
@@ -376,7 +306,7 @@ file=README.txt
 if [ -f $file ]; then
 	cp -p $file $gtmdist
 	if [ "$doutf8" -ne 0 ]; then
-		ln -s ../$file $gtmdist/utf8/$file
+		ln -fs ../$file $gtmdist/utf8/$file
 	fi
 fi
 
@@ -385,7 +315,7 @@ file=custom_errors_sample.txt
 if [ -f $file ]; then
 	cp -p $file $gtmdist
 	if [ "$doutf8" -ne 0 ]; then
-		ln -s ../$file $gtmdist/utf8/$file
+		ln -fs ../$file $gtmdist/utf8/$file
 	fi
 fi
 # Install the .cshrc and .profile files
@@ -546,12 +476,12 @@ if [ "$doutf8" -ne 0 ]; then
 				rm -f $gtmdist/utf8/"$file"
 			fi
 			if [ -f $gtmdist/"$file" ]; then
-				ln -s ../"$file" $gtmdist/utf8/"$file"
+				ln -fs ../"$file" $gtmdist/utf8/"$file"
 			fi
 		fi
 	done
 	if [ "$dogtmcrypt" -ne 0 ]; then
-		ln -s ../plugin $gtmdist/utf8/plugin
+		ln -fs ../plugin $gtmdist/utf8/plugin
 	fi
 	cd ..
 fi
@@ -562,7 +492,7 @@ $echo "You can create lowercase copies of these routines if you wish, but"
 $echo "to avoid problems with compatibility in the future, consider keeping"
 $echo "only the uppercase versions of the files."
 $echo ""
-$echo "Do you want uppercase and lowercase versions of the MUMPS routines? (y or n)\c"
+$echo "Do you want uppercase and lowercase versions of the MUMPS routines? (y or n) \c"
 read resp
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	$echo ""
@@ -609,9 +539,9 @@ if [ "$doutf8" -ne 0 ]; then
 		gtm_chset="UTF-8"
 		export gtm_chset
 		if [ $arch = "ibm" ]; then
-			export LIBPATH=$save_icu_libpath
+			export LIBPATH=$extendlibpath
 		else
-			LD_LIBRARY_PATH=$save_icu_libpath
+			LD_LIBRARY_PATH=$extendlibpath
 			export LD_LIBRARY_PATH
 		fi
 		(gtm_dist=$gtmdist/utf8; export gtm_dist; cd $gtm_dist; ./mumps -noignore *.m; $echo $?>>$gtmdist/compstat; \
@@ -700,7 +630,7 @@ fi
 
 # Install real gtmsecshr with special permissions in $gtmdist/gtmsecshrdir
 tgtmsecshrdir=$gtmdist/gtmsecshrdir
-mkdir $tgtmsecshrdir
+mkdir -p $tgtmsecshrdir
 chmod 700 $tgtmsecshrdir
 chgrp $bingroup $tgtmsecshrdir
 
@@ -728,8 +658,8 @@ if [ -d $gtmdist/utf8 ]; then
 	if [ -f $gtmdist/utf8/gtmsecshr -o -h $gtmdist/utf8/gtmsecshr ]; then
 		rm -f $gtmdist/utf8/gtmsecshr
 	fi
-	ln $gtmdist/gtmsecshr $gtmdist/utf8/gtmsecshr || \
-		echo ln $gtmdist/gtmsecshr $gtmdist/utf8/gtmsecshr
+	ln -f $gtmdist/gtmsecshr $gtmdist/utf8/gtmsecshr || \
+		echo ln -f $gtmdist/gtmsecshr $gtmdist/utf8/gtmsecshr
 
 	# Delete the gtmsecshrdir symlink
 	if [ -f $gtmdist/utf8/gtmsecshrdir -o -h $gtmdist/utf8/gtmsecshrdir ]; then
@@ -737,8 +667,8 @@ if [ -d $gtmdist/utf8 ]; then
 	fi
 	mkdir -p $gtmdist/utf8/gtmsecshrdir
 	chmod 0500 $gtmdist/utf8/gtmsecshrdir
-	ln $gtmdist/gtmsecshrdir/gtmsecshr $gtmdist/utf8/gtmsecshrdir/gtmsecshr || \
-		echo ln $gtmdist/gtmsecshrdir/gtmsecshr $gtmdist/utf8/gtmsecshrdir/gtmsecshr
+	ln -f $gtmdist/gtmsecshrdir/gtmsecshr $gtmdist/utf8/gtmsecshrdir/gtmsecshr || \
+		echo ln -f $gtmdist/gtmsecshrdir/gtmsecshr $gtmdist/utf8/gtmsecshrdir/gtmsecshr
 
 fi
 
@@ -760,15 +690,18 @@ if [ 0 != `grep -c '[1-9]' $gtm_dist/compstat` ]; then
 	$echo ""
 	$echo "GT.M installation FAILED – please review error messages"
 	$echo ""
-	chmod -R a-x $gtmdist
+	( cd $gtm_dist && find . -type f -exec chmod a-x {} + )
 	exit 1
 fi
 
 rm -f $gtmdist/compstat
 
+if [ "$gtm_icu_version" != "" ] ; then
+	icumessage=" Used gtm_icu_version=$gtm_icu_version for UTF-8 installation."
+fi
 $echo ""
-$echo "Installation completed. Would you like all the temporary files"
-$echo "removed from this directory? (y or n) \c"
+$echo "Installation completed.$icumessage"
+$echo "Would you like all the temporary files removed from this directory? (y or n) \c"
 read resp
 
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
@@ -779,4 +712,16 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	if [ -d utf8 ]; then
 		\rm -rf utf8
 	fi
+fi
+
+# Save long listing of files, including permissions and sha256 for future reference
+find $gtmdist -type f \! -name install_permissions.log  -exec ls -l {} \; > $gtmdist/install_permissions.log
+chmod 0444 $gtmdist/install_permissions.log
+chown ${owner}:${bingroup} $gtmdist/install_permissions.log
+OPENSSL=$(command -p command -v openssl)
+if [ -x "$OPENSSL" ]; then
+	find $gtmdist -type f \! -name install_sha256_checksum.log -exec $OPENSSL sha256 {} \; \
+									> $gtmdist/install_sha256_checksum.log
+	chmod 0444 $gtmdist/install_sha256_checksum.log
+	chown ${owner}:${bingroup} $gtmdist/install_sha256_checksum.log
 fi

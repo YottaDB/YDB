@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2019 Fidelity National Information	*
+ * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,6 +14,7 @@
 #define DB_SNAPSHOT_H
 
 #include "gtm_limits.h"
+#include "gdsroot.h"
 
 #define	SNAPSHOT_HDR_LABEL	"SNAPSHOTV1"
 
@@ -37,14 +38,15 @@ typedef enum
 typedef struct snapshot_info_struct
 {
 	uint4		ss_pid;				/* PID of the process doing the snapshot */
-	trans_num	snapshot_tn;			/* Transaction number at which the snapshot started */
 	uint4		db_blk_size; 			/* Database block size */
-	uint4		free_blks;			/* Free blocks at the time of snapshot */
-	uint4		total_blks;			/* Total blocks at the time of snapshot */
+	trans_num	snapshot_tn;			/* Transaction number at which the snapshot started */
+	block_id	free_blks;			/* Free blocks at the time of snapshot */
+	block_id	total_blks;			/* Total blocks at the time of snapshot */
 	char		shadow_file[GTM_PATH_MAX];	/* Temporary file that will contain the before images */
-	int4		shadow_vbn;			/* Starting VBN of the shadow file */
+	char		filler[7];			/* so as to make 8-byte allignment explicit */
+	block_id	shadow_vbn;			/* Starting VBN of the shadow file */
 	long		ss_shmid;			/* Shared memory identifier created by snapshot initiating process */
-	int		ss_shmsize;			/* Size of the shared memory newly created by snapshot initiating process */
+	block_id	ss_shmsize;			/* Size of the shared memory newly created by snapshot initiating process */
 } snapshot_info_t;
 
 typedef struct shm_snapshot_struct
@@ -80,7 +82,7 @@ typedef	struct snapshot_context_struct
 	shm_snapshot_ptr_t	ss_shm_ptr;
 	sm_uc_ptr_t		start_shmaddr;
 	void			*bitmap_addr;
-	int4			shadow_vbn;
+	block_id		shadow_vbn;
 	char			shadow_file[GTM_PATH_MAX];
 	ss_proc_status		cur_state;
 	/* the property of process triggering snapshot. At present only last bit is used to indicate property of integ process:
@@ -94,7 +96,7 @@ typedef struct snapshot_filehdr_struct
 	char		label[SIZEOF(SNAPSHOT_HDR_LABEL) - 1];
 	snapshot_info_t	ss_info;
 	int4		shadow_file_len;
-	unsigned char	filler[976];
+	unsigned char	filler[964];
 } snapshot_filhdr_t;
 
 typedef	snapshot_filhdr_t	*snapshot_filhdr_ptr_t;

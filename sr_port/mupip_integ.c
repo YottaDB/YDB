@@ -315,7 +315,7 @@ void mupip_integ(void)
 	}
 	if (CLI_PRESENT == cli_present("BLOCK"))
 	{
-		if (0 == cli_get_hex("BLOCK", (uint4 *)&muint_block))
+		if (0 == cli_get_hex64("BLOCK", (gtm_uint8 *)&muint_block))
 			mupip_exit(SS_NORMAL);
 		block = TRUE;
 		disp_map_errors = 0;
@@ -672,7 +672,7 @@ void mupip_integ(void)
 			if (!muint_fast && (mu_int_blks_to_upgrd != csd->blks_to_upgrd))
 			{
 				gtm_putmsg_csa(CSA_ARG(csa)
-					VARLSTCNT(4) ERR_DBBTUWRNG, 2, mu_int_blks_to_upgrd, csd->blks_to_upgrd);
+					VARLSTCNT(4) ERR_DBBTUWRNG, 2, &mu_int_blks_to_upgrd, &(csd->blks_to_upgrd));
 				if (gv_cur_region->read_only || mu_int_errknt)
 					mu_int_errknt++;
 				else

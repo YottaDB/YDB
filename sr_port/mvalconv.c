@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -187,8 +187,9 @@ void xi82mval(mval *v, gtm_uint64_t i)
 				exp--;
 			}
 			v->e = exp;
-			v->m[0] = low;
-			v->m[1] = high;
+			assert((MAXPOSINT4 >= low) && (MAXPOSINT4 >= high));
+			v->m[0] = (int4)low;
+			v->m[1] = (int4)high;
 		} else if (i < (gtm_uint64_t)MANT_HI * MANT_HI)
 		{
 			low = i % MANT_HI;
@@ -201,8 +202,9 @@ void xi82mval(mval *v, gtm_uint64_t i)
 				exp--;
 			}
 			v->e = exp;
-			v->m[0] = low;
-			v->m[1] = high;
+			assert((MAXPOSINT4 >= low) && (MAXPOSINT4 >= high));
+			v->m[0] = (int4)low;
+			v->m[1] = (int4)high;
 		} else
 		{	/* The value won't fit in 18 digits, so return a string. */
 			if (v->sgn)

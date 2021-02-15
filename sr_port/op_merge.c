@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -169,7 +169,7 @@ void op_merge(void)
 			gvt1 = gblp1->s_gv_target;
 			gvt2 = gblp2->s_gv_target;
 			if (gvt2->nct != gvt1->nct)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NCTCOLLDIFF);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NCTCOLLDIFF);
 			if (!merge_desc_check()) /* will not proceed if one is descendant of another */
 			{	/* 0 return implies self merge i.e. NOOP */
 				gvname_env_restore(gblp1);	 /* store destination as naked indicator in gv_currkey */

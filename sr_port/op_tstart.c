@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -169,9 +169,9 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		 */
 		tphold_noshift = TRUE;
 	if (0 != jnl_fence_ctl.level)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TPMIXUP, 2, "An M", "a fenced logical");
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TPMIXUP, 2, "An M", "a fenced logical");
 	if (dollar_tlevel + 1 >= TP_MAX_NEST)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPTOODEEP);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPTOODEEP);
 	va_start(varlst, implicit_flag);	/* no argument count first */
 	serial = va_arg(varlst, int);
 	tid = va_arg(varlst, mval *);
@@ -312,9 +312,9 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			if (msp <= stacktop)
 			{
 				msp = old_sp;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
 			} else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
 		}
 		memmove(msp, old_sp, top - (unsigned char *)old_sp);	/* Shift stack w/possible overlapping ranges */
 		mv_st_ent = (mv_stent *)(top - shift_size);

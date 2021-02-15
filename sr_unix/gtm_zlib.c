@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2019 Fidelity National Information	*
+ * Copyright (c) 2008-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,7 @@ error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TEXT);
 
 GBLREF char		gtm_dist[GTM_PATH_MAX];
+GBLREF boolean_t	gtm_dist_ok_to_use;
 
 void gtm_zlib_init(void)
 {
@@ -59,6 +60,7 @@ void gtm_zlib_init(void)
 	if (RESTRICTED(library_load_path))
 	{
 		lpath = librarypath;
+		assert(gtm_dist_ok_to_use);
 		SNPRINTF(librarypath, GTM_PATH_MAX, GTM_PLUGIN_FMT_SHORT ZLIB_AIXLIBNAME, gtm_dist);
 	} else
 		lpath = ZLIB_AIXLIBNAME;

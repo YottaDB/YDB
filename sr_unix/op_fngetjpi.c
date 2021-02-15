@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,10 +71,10 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 
 	MV_FORCE_STR(kwd);
 	if (kwd->str.len == 0)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADJPIPARAM, 2, 4, "Null");
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADJPIPARAM, 2, 4, "Null");
 
 	if (MAX_KEY < kwd->str.len)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
 
 	lower_to_upper((uchar_ptr_t)upcase, (uchar_ptr_t)kwd->str.addr, (int)kwd->str.len);
 
@@ -89,7 +89,7 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 
 	if( !key[keywd_indx][0] )
         {
-                 rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
+	 	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
         }
 
 	if ((kw_isprocalive != keywd_indx) && ((unsigned int)-1 == times(&proc_times)))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -220,7 +220,7 @@ void	dm_read (mval *v)
 		{
 			tt_ptr->mupintr = FALSE;
 			tt_state->who_saved = ttwhichinvalid;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTDIRECT);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTDIRECT);
 		}
 		assert(length == tt_state->length);
 		assertpro(dmread == tt_state->who_saved);	/* ZINTRECURSEIO should have caught */
@@ -384,7 +384,7 @@ void	dm_read (mval *v)
 		{	/* select() says there's something to read, but read() found zero characters; assume connection dropped. */
 			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ tt not socket */
 			tt_ptr->discard_lf = FALSE;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 		}
 		else if (0 < status)
 		{	/* select() says it's ready to read and read() found some data */

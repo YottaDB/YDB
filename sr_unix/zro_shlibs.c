@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,7 +75,8 @@ void zro_shlibs_unlink_all(void)
 		{
 			dlerr = dlerror();
 			len = STRLEN(dlerr);
-			rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("dlclose()"), CALLFROM, ERR_TEXT, 2, len, dlerr);
+			RTS_ERROR_ABT(VARLSTCNT(11) ERR_SYSCALL,
+				5, RTS_ERROR_LITERAL("dlclose()"), CALLFROM, ERR_TEXT, 2, len, dlerr);
 		}
 		free(oshlb);
 	}

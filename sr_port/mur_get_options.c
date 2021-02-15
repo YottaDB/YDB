@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Copyright (c) 2003-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,6 +64,10 @@ error_def(ERR_RSYNCSTRMVAL);
 #define EXCLUDE_CHAR	'~'
 #define STR2PID		asc2i
 #define STR2SEQNO	asc2l
+#define HEXSTR2SEQNO(X)	STRTOL(X, NULL, 16)
+#define HEXSTR2BLKNO(X)	STRTOL(X, NULL, 16)
+#define HEXSTR2PID(X)	STRTOL(X, NULL, 16)
+#define STR2BLKNO	asc2l
 #define	MAX_PID_LEN	10	/* maximum number of decimal digits in the process-id */
 #define REDIRECT_STR	"specify as \"old-file-name=new-file-name,...\""
 #define	WILDCARD_CHAR1	'*'
@@ -94,6 +98,9 @@ void	mur_get_options(void)
 	boolean_t	global_exclude;
 	long_list	*ll_ptr, *ll_ptr1;
 	long_long_list	*seqno_list, *seqno_list1;
+#ifdef DEBUG
+	long_long_list	*blocklist_list, *blocklist_list1;
+#endif
 	redirect_list	*rl_ptr, *rl_ptr1, *tmp_rl_ptr;
 	select_list	*sl_ptr, *sl_ptr1;
 	boolean_t	interactive, parse_error, uniqname_error = FALSE;
@@ -290,7 +297,10 @@ void	mur_get_options(void)
 			mur_options.lookback_opers_specified = TRUE;
 			length = MAX_LINE;
 			cli_get_str("LOOKBACK_LIMIT.OPERATIONS", qual_buffer, &length);
-			mur_options.lookback_opers = asc2i((uchar_ptr_t)qual_buffer, (int4)length);
+			if (cli_is_hex_explicit((char_ptr_t)qual_buffer))
+				mur_options.lookback_opers = STRTOL((char_ptr_t)qual_buffer, NULL, 16);
+			else
+				mur_options.lookback_opers = asc2i((uchar_ptr_t)qual_buffer, (int4)length);
 		}
 		if (CLI_PRESENT == cli_present("LOOKBACK_LIMIT.TIME"))
 		{
@@ -741,6 +751,85 @@ void	mur_get_options(void)
 		free(file_name_specified);
 		free(file_name_expanded);
 	}
+#ifdef DEBUG
+	/*-----		-BLOCKID=(list of block numbers)	-----*/
+	while (cli_present("BLOCKID") == CLI_PRESENT)
+	{
+		mur_options.dump_all_blocks = TRUE;
+		length = MAX_LINE;
+		if (!CLI_GET_STR_ALL("BLOCKID", qual_buffer, &length))
+			break;
+		mur_options.dump_all_blocks = FALSE;
+		qual_buffer_ptr = qual_buffer;
+		global_exclude = FALSE;
+		if ('"' == *qual_buffer_ptr )
+		{
+			++qual_buffer_ptr;
+			--length;
+			if ('"' == qual_buffer_ptr[length-1])
+				qual_buffer_ptr[--length] = '\0';
+		}
+		if (EXCLUDE_CHAR == *qual_buffer_ptr)
+		{
+			global_exclude = TRUE;
+			++qual_buffer_ptr;
+			--length;
+		}
+		if ('(' == *qual_buffer_ptr)
+		{
+			++qual_buffer_ptr;
+			--length;
+		} else if (global_exclude)
+		{
+			--qual_buffer_ptr;
+			++length;
+			global_exclude = FALSE;
+		}
+		if (')' == qual_buffer_ptr[length - 1])
+			qual_buffer_ptr[--length] = '\0';
+		for (ctop = qual_buffer_ptr + length; qual_buffer_ptr < ctop;)
+		{
+			if (!cli_get_str_ele(qual_buffer_ptr, entry, &length, FALSE))
+				mupip_exit(ERR_MUPCLIERR);
+			qual_buffer_ptr += length;
+			assert(',' == *qual_buffer_ptr || !(*qual_buffer_ptr));	/* either comma separator or end of option list */
+			if (',' == *qual_buffer_ptr)
+				qual_buffer_ptr++;  /* skip separator */
+			entry_ptr = entry;
+			blocklist_list1 = (long_long_list *)malloc(SIZEOF(long_long_list));
+			blocklist_list1->next = NULL;
+			if (NULL == mur_options.blocklist)
+				mur_options.blocklist = blocklist_list1;
+			else
+				blocklist_list->next = blocklist_list1;
+			blocklist_list = blocklist_list1;
+			if ('"' == entry_ptr[length - 1])
+				--length;
+			if ('"' == *entry_ptr)
+			{
+				entry_ptr++;
+				length--;
+			}
+			if (EXCLUDE_CHAR == *entry_ptr)
+			{
+				++entry_ptr;
+				length--;
+				blocklist_list->exclude = TRUE;
+			} else
+				blocklist_list->exclude = FALSE;
+			if (global_exclude)
+				blocklist_list->exclude = !blocklist_list->exclude;
+			if ((cli_is_hex_explicit((char_ptr_t)entry_ptr) ?	/* Warning : assignment */
+				((blocklist_list->u.blk = HEXSTR2BLKNO((char_ptr_t)entry_ptr+2)) == (seq_num) - 1)
+				: ((blocklist_list->u.blk = STR2BLKNO((uchar_ptr_t)entry_ptr, length)) == (seq_num) - 1)))
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSEQNOQUAL, 2, length, entry_ptr);
+				mupip_exit(ERR_MUPCLIERR);
+			}
+		}
+		break;
+	}
+#endif
 	/*-----		-SEQNO=(list of sequence numbers)	-----*/
 	if (cli_present("SEQNO") == CLI_PRESENT)
 	{
@@ -806,7 +895,9 @@ void	mur_get_options(void)
 				seqno_list->exclude = FALSE;
 			if (global_exclude)
 				seqno_list->exclude = !seqno_list->exclude;
-			if ((seqno_list->seqno = STR2SEQNO((uchar_ptr_t)entry_ptr, length)) == (seq_num) - 1)
+			if ((cli_is_hex_explicit((char_ptr_t)entry_ptr) ?	/* Warning : assignment */
+				((seqno_list->u.seqno = HEXSTR2SEQNO((char_ptr_t)entry_ptr+2)) == (seq_num) - 1)
+				: ((seqno_list->u.seqno = STR2SEQNO((uchar_ptr_t)entry_ptr, length)) == (seq_num) - 1)))
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSEQNOQUAL, 2, length, entry_ptr);
 				mupip_exit(ERR_MUPCLIERR);
@@ -880,7 +971,9 @@ void	mur_get_options(void)
 			if (global_exclude)
 				ll_ptr->exclude = !ll_ptr->exclude;
 			if ((MAX_PID_LEN < length) ||
-			    ((ll_ptr->num = STR2PID((uchar_ptr_t)entry_ptr, length)) == (unsigned int) - 1))
+				((cli_is_hex_explicit((char_ptr_t)entry_ptr) ?	/* Warning : assignment */
+				((ll_ptr->num = HEXSTR2PID((char_ptr_t)entry_ptr+2)) == (unsigned int) - 1)
+				: ((ll_ptr->num = STR2PID((uchar_ptr_t)entry_ptr, length)) == (unsigned int) - 1))))
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVIDQUAL, 2, length, entry_ptr);
 				mupip_exit(ERR_MUPCLIERR);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,7 +81,7 @@
 #include "gdskill.h"		/* needed for tp.h */
 #include "gdscc.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
+#include "hashtab_int8.h"	/* needed for tp.h and gds_rundown.c itself */
 #include "tp.h"
 #include "mlkdef.h"
 #include "mlk_ops.h"
@@ -104,9 +104,9 @@ GBLREF	int			process_exiting;
 GBLREF	boolean_t		ok_to_UNWIND_in_exit_handling;
 GBLREF	gv_namehead		*gv_target_list;
 
-LITREF  char                    gtm_release_name[];
-LITREF  int4                    gtm_release_name_len;
-LITREF gtmImageName		gtmImageNames[];
+LITREF	char			gtm_release_name[];
+LITREF	int4			gtm_release_name_len;
+LITREF	gtmImageName		gtmImageNames[];
 
 error_def(ERR_AIOCANCELTIMEOUT);
 error_def(ERR_ASSERT);
@@ -150,7 +150,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	node_local_ptr_t	cnl;
 	struct shmid_ds		shm_buf;
 	struct sembuf		sop[2], ftok_sop[2];
-	uint4           	jnl_status;
+	uint4			jnl_status;
 	unix_db_info		*udi;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
@@ -176,7 +176,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	 * Note:
 	 *	This early out is consistent with VMS.  It has been
 	 *	noted that all of the gtcm assignments
-	 *      to gv_cur_region should use the TP_CHANGE_REG
+	 *	to gv_cur_region should use the TP_CHANGE_REG
 	 *	macro.  This would also avoid the assert problem
 	 *	and should be done eventually.
 	 */
@@ -319,8 +319,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		{
 			save_errno = errno;
 			assert(FALSE);
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
-				      RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get ftok_semval"), CALLFROM, errno);
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
+				RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get ftok_semval"), CALLFROM, errno);
 		}
 		may_bypass_ftok = CAN_BYPASS(ftok_semval, csa, inst_is_frozen); /* Do we need a blocking wait? */
 		/* We need to guarantee that no one else access database file header when semid/shmid fields are reset.
@@ -333,10 +333,10 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				bypassed_ftok = TRUE;
 				holder_pid = semctl(udi->ftok_semid, DB_CONTROL_SEM, GETPID);
 				if ((uint4)-1 == holder_pid)
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-						      ERR_SYSCALL, 5,
-						      RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get holder_pid"),
-						      CALLFROM, errno);
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
+						ERR_SYSCALL, 5,
+						RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get holder_pid"),
+						CALLFROM, errno);
 				if (!IS_GTM_IMAGE) /* MUMPS processes should not flood syslog with bypass messages. */
 				{
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_RESRCINTRLCKBYPAS, 10,
@@ -348,7 +348,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			} else
 			{	/* We did a blocking wait but something bad happened. */
 				FTOK_TRACE(csa, csa->ti->curr_tn, ftok_ops_lock, process_id);
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 			}
 		}
 		sop[0].sem_num = DB_CONTROL_SEM; sop[0].sem_op = 0;	/* Wait for 0 */
@@ -369,8 +369,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 					return EXIT_NRM;
 				}
 				assert(FALSE);
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL,
-					      5, RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get semval"), CALLFROM, save_errno);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL,
+					5, RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get semval"), CALLFROM, save_errno);
 			}
 			bypassed_access = CAN_BYPASS(semval, csa, inst_is_frozen) || onln_rlbk_pid || csd->file_corrupt;
 			/* Before attempting again in the blocking mode, see if the holding process is an online rollback.
@@ -382,8 +382,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			{
 				save_errno = errno;
 				assert(FALSE);
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
-					      RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get holder_pid"), CALLFROM, save_errno);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
+					RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get holder_pid"), CALLFROM, save_errno);
 			}
 			if (!bypassed_access)
 			{	/* We couldn't get it in one shot-- see if we already have it */
@@ -399,18 +399,18 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				if (EAGAIN != save_errno)
 				{
 					assert(FALSE);
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-						      ERR_SYSCALL, 5,
-						      RTS_ERROR_TEXT("gds_rundown SEMOP on access control semaphore"),
-						      CALLFROM, save_errno);
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
+						ERR_SYSCALL, 5,
+						RTS_ERROR_TEXT("gds_rundown SEMOP on access control semaphore"),
+						CALLFROM, save_errno);
 				}
 				sop[0].sem_flg = sop[1].sem_flg = SEM_UNDO;	/* Try again - blocking this time */
 				SEMOP(udi->semid, sop, 2, status, FORCED_WAIT);
 				if (-1 == status)			/* We couldn't get it at all.. */
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-						      ERR_SYSCALL, 5,
-						      RTS_ERROR_TEXT("gds_rundown SEMOP on access control semaphore"),
-						      CALLFROM, errno);
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
+						ERR_SYSCALL, 5,
+						RTS_ERROR_TEXT("gds_rundown SEMOP on access control semaphore"),
+						CALLFROM, errno);
 			} else if (!IS_GTM_IMAGE)
 			{
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_RESRCINTRLCKBYPAS, 10,
@@ -461,15 +461,15 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	if (-1 == shmctl(udi->shmid, IPC_STAT, &shm_buf))
 	{
 		save_errno = errno;
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
-			      RTS_ERROR_TEXT("gds_rundown shmctl"), CALLFROM, save_errno);
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
+			RTS_ERROR_TEXT("gds_rundown shmctl"), CALLFROM, save_errno);
 	} else
 		we_are_last_user =  (1 == shm_buf.shm_nattch) && !vermismatch && !safe_mode;
 	/* recover => one user except ONLINE ROLLBACK, or standalone with frozen instance */
 	assert(!have_standalone_access || we_are_last_user || jgbl.onlnrlbk || inst_is_frozen);
 	if (-1 == (semval = semctl(udi->semid, DB_COUNTER_SEM, GETVAL)))
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
-			      RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get semval"), CALLFROM, errno);
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
+			RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get semval"), CALLFROM, errno);
 	/* There's one writer left and I am it */
 	assert(reg->read_only || semval >= 0);
 	unsafe_last_writer = (DB_COUNTER_SEM_INCR == semval) && (FALSE == reg->read_only) && !vermismatch;
@@ -480,8 +480,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	assert(!(have_standalone_access && !reg->read_only) || we_are_last_writer || jgbl.onlnrlbk || inst_is_frozen);
 	GTM_WHITE_BOX_TEST(WBTEST_ANTIFREEZE_JNLCLOSE, we_are_last_writer, 1); /* Assume we are the last writer to invoke wcs_flu */
 	if (!have_standalone_access && (-1 == (ftok_semval = semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))))
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
-			      RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get ftok_semval"), CALLFROM, errno);
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
+			RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get ftok_semval"), CALLFROM, errno);
 	if (NULL != csa->ss_ctx)
 	{
 		ss_destroy_context(csa->ss_ctx);
@@ -530,7 +530,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				grab_crit(reg, WS_40);
 			SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 			BG_TRACE_PRO_ANY(csa, wcb_gds_rundown1);
-                        send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_gds_rundown1"),
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_gds_rundown1"),
 				     process_id, &csa->ti->curr_tn, DB_LEN_STR(reg));
 			csa->wbuf_dqd = 0;
 			wcs_recover(reg);
@@ -602,7 +602,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			 * sure that's true.
 			 */
 			assert(csd == csa->hdr);
-			assert(0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1));
+			assert((0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))
+				|| (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1)));
 		} else if (((csa->canceled_flush_timer && (0 > cnl->wcs_timers)) || canceled_dbsync_timer)
 				&& !inst_is_frozen)
 		{	/* If we canceled a pending dbsync timer in "gds_rundown" OR canceled a db flush timer in "gds_rundown"
@@ -748,8 +749,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				GTM_DB_FSYNC(csa, udi->fd, rc);		/* Sync it all */
 				if (-1 == rc)
 				{
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-						      ERR_TEXT, 2, RTS_ERROR_TEXT("Error during file sync at close"), errno);
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+						ERR_TEXT, 2, RTS_ERROR_TEXT("Error during file sync at close"), errno);
 				}
 			} else
 			{	/* Now do final MM file sync before exit */
@@ -761,9 +762,9 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				if (-1 == MSYNC((caddr_t)csa->db_addrs[0], (caddr_t)csa->db_addrs[1]))
 #				endif
 					{
-						rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-							      ERR_TEXT, 2, RTS_ERROR_TEXT("Error during file sync at close"),
-							      errno);
+						RTS_ERROR_CSA_ABT(csa, VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+							ERR_TEXT, 2, RTS_ERROR_TEXT("Error during file sync at close"),
+							errno);
 					}
 			}
 		} else if (unsafe_last_writer && !cnl->lastwriterbypas_msg_issued)
@@ -789,14 +790,14 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		db_ipcs.fn_len = seg->fname_len;
 		memcpy(db_ipcs.fn, seg->fname, seg->fname_len);
 		db_ipcs.fn[seg->fname_len] = 0;
- 		/* request gtmsecshr to flush. read_only cannot flush itself */
+		/* request gtmsecshr to flush. read_only cannot flush itself */
 		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
 		if (!csa->read_only_fs && !csd->read_only)
 		{
 			secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
 			if (0 != secshrstat)
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-					      ERR_TEXT, 2, RTS_ERROR_TEXT("gtmsecshr failed to update database file header"));
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+					ERR_TEXT, 2, RTS_ERROR_TEXT("gtmsecshr failed to update database file header"));
 		}
 	}
 	if (!is_mm && csd->asyncio)
@@ -831,8 +832,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 	if (-1 == rc)
 	{
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-			      ERR_TEXT, 2, LEN_AND_LIT("Error during file close"), errno);
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+			ERR_TEXT, 2, LEN_AND_LIT("Error during file close"), errno);
 	}
 	if (NULL != csa->db_addrs[0])
 	{
@@ -918,12 +919,12 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			if (INVALID_SHMID != csa->mlkhash_shmid)
 			{
 				if (0 != shm_rmid(csa->mlkhash_shmid))
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-						      ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove lock shared memory"));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+						ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove lock shared memory"));
 			}
 			if (0 != shm_rmid(udi->shmid))
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-					      ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove shared memory"));
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+					ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove shared memory"));
 			/* Note that this process deleted shared memory. Currently only used by rollback. */
 			udi->shm_deleted = TRUE;
 			/* mupip recover/rollback don't release the semaphore here, but do it later in "db_ipcs_reset"
@@ -932,8 +933,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			if (!have_standalone_access)
 			{
 				if (0 != sem_rmid(udi->semid))
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-						      ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"), errno);
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+						ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"), errno);
 				udi->sem_deleted = TRUE;		/* Note that we deleted the semaphore */
 				udi->grabbed_access_sem = FALSE;
 				udi->counter_acc_incremented = FALSE;
@@ -962,10 +963,10 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				{
 					save_errno = do_semop(udi->semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, SEM_UNDO);
 					if (0 != save_errno)
-						rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-							      ERR_SYSCALL, 5,
-							      RTS_ERROR_TEXT("gds_rundown access control semaphore decrement"),
-							      CALLFROM, save_errno);
+						RTS_ERROR_CSA_ABT(csa, VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
+							ERR_SYSCALL, 5,
+							RTS_ERROR_TEXT("gds_rundown access control semaphore decrement"),
+							CALLFROM, save_errno);
 				}
 				udi->counter_acc_incremented = FALSE;
 			}
@@ -974,10 +975,10 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			if (!bypassed_access)
 			{
 				if (0 != (save_errno = do_semop(udi->semid, DB_CONTROL_SEM, -1, SEM_UNDO)))
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-						      ERR_SYSCALL, 5,
-						      RTS_ERROR_TEXT("gds_rundown access control semaphore release"),
-						      CALLFROM, save_errno);
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
+						ERR_SYSCALL, 5,
+						RTS_ERROR_TEXT("gds_rundown access control semaphore release"),
+						CALLFROM, save_errno);
 				udi->grabbed_access_sem = FALSE;
 			}
 		} /* else access control semaphore will be released in db_ipcs_reset */
@@ -988,11 +989,11 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		{
 			if (!ftok_counter_halted)
 				if (0 != (save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, SEM_UNDO)))
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 		} else if (!ftok_sem_release(reg, !ftok_counter_halted, FALSE))
 		{
 			FTOK_TRACE(csa, csa->ti->curr_tn, ftok_ops_release, process_id);
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 		}
 		udi->grabbed_ftok_sem = FALSE;
 		udi->counter_ftok_incremented = FALSE;
@@ -1041,7 +1042,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			PROBE_FREEUP_BUDDY_LIST(si->cw_set_list);
 			if (NULL != si->blks_in_use)
 			{
-				free_hashtab_int4(si->blks_in_use);
+				free_hashtab_int8(si->blks_in_use);
 				free(si->blks_in_use);
 				si->blks_in_use = NULL;
 			}

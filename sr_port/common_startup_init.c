@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2018 Fidelity National Information	*
+ * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,12 +33,12 @@ GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	boolean_t 		span_nodes_disallowed;
 GBLREF	char			gtm_dist[GTM_PATH_MAX];
+GBLREF	unsigned int		gtm_dist_len;
 
 void	common_startup_init(enum gtmImageTypes img_type)
 {
 	boolean_t		is_gtcm;
 	char			*dist;
-	int			len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -51,11 +51,10 @@ void	common_startup_init(enum gtmImageTypes img_type)
 	/* Read gtm_dist. */
 	if (NULL != (dist = GETENV(GTM_DIST)))
 	{
-		len = STRLEN(dist);
-		len = (GTM_PATH_MAX < len) ? GTM_PATH_MAX : len;
-		memcpy(gtm_dist, dist, len);
-		len = MIN(len, PATH_MAX);
-		gtm_dist[len] = '\0';
+		gtm_dist_len = strnlen(dist, PATH_MAX);
+		assert(GTM_PATH_MAX > gtm_dist_len);
+		memcpy(gtm_dist, dist, gtm_dist_len);
+		gtm_dist[gtm_dist_len] = '\0';
 	} else
 		gtm_dist[0] = '\0';
 	/* Setup global variables corresponding to signal blocks. */
@@ -95,4 +94,3 @@ void	common_startup_init(enum gtmImageTypes img_type)
 	}
 	return;
 }
-

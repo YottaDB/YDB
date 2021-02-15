@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +42,7 @@ void do_xform(collseq *csp, int fc_type, mstr *input, mstr *output, int *length)
 		if (MAX_STRLEN_32K < input->len)
 		{
 			DEBUG_ONLY(in_do_xform = FALSE;)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLARGLONG, 1, csp->act);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_COLLARGLONG, 1, csp->act);
 		}
 		insub.type = DSC_K_DTYPE_T;
 		insub.len = input->len;
@@ -62,7 +63,7 @@ void do_xform(collseq *csp, int fc_type, mstr *input, mstr *output, int *length)
 		if (*length > output->len)
 		{
 			DEBUG_ONLY(in_do_xform = FALSE;)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLTRANSSTR2LONG, 1, csp->act);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_COLTRANSSTR2LONG, 1, csp->act);
 		}
 		/* If collation routine has changed outbuff.val (which it will if it cannot store the transformed
 		 * result in the buffer that is passed in), the transformed value is stored in the buffer allocated
@@ -96,7 +97,7 @@ void do_xform(collseq *csp, int fc_type, mstr *input, mstr *output, int *length)
 		if (*length > output->len)
 		{
 			DEBUG_ONLY(in_do_xform = FALSE;)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLTRANSSTR2LONG, 1, csp->act);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_COLTRANSSTR2LONG, 1, csp->act);
 		}
 		/* If collation routine has changed outbuff1.val (which it will if it cannot store the transformed
 		 * result in the buffer that is passed in), the transformed value is stored in the buffer allocated

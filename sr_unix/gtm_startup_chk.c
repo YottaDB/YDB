@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,6 +50,7 @@
 #include "gtm_post_startup_check_init.h"
 
 GBLREF	char		gtm_dist[GTM_PATH_MAX];
+GBLREF	unsigned int	gtm_dist_len;
 GBLREF	boolean_t	gtm_dist_ok_to_use;
 LITREF	gtmImageName	gtmImageNames[];
 GBLREF	uint4		process_id;
@@ -70,7 +71,6 @@ int gtm_chk_dist(char *image)
 	char		*exename;
 	int		exename_len;
 	int		path_len;
-	int		gtm_dist_len;
 	boolean_t	status;
 	boolean_t	is_gtcm_image;
 	char		image_real_path[GTM_PATH_MAX];
@@ -94,13 +94,13 @@ int gtm_chk_dist(char *image)
 		{
 			if (is_gtcm_image)
 				return 0;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, GTM_DIST_PATH_MAX);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_DISTPATHMAX, 1, GTM_DIST_PATH_MAX);
 		}
 	} else
 	{
 		if (is_gtcm_image)
 			return 0;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GTMDISTUNDEF);
 	}
 
 	/* Get the executable name and length */
@@ -130,11 +130,11 @@ int gtm_chk_dist(char *image)
 	{
 		if (is_gtcm_image)
 			return 0;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, LEN_AND_STR(gtm_dist), LEN_AND_STR(image));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, LEN_AND_STR(gtm_dist), LEN_AND_STR(image));
 	}
 
 	if (IS_GTM_IMAGE && memcmp(exename, GTM_IMAGE_NAME, GTM_IMAGE_NAMELEN))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_IMAGENAME, 4, LEN_AND_LIT(GTM_IMAGE_NAME), LEN_AND_STR(exename));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_IMAGENAME, 4, LEN_AND_LIT(GTM_IMAGE_NAME), LEN_AND_STR(exename));
 	gtm_post_startup_check_init();
 	return 0;
 }

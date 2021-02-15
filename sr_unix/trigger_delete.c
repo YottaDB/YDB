@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2020 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -203,7 +203,7 @@ STATICFNDEF int4 update_trigger_name_value(char *trig_name, int trig_name_len, i
 		if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 			t_retry(cdb_sc_triggermod);
 		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
 			trig_name_len - 1, trig_name);
 	}
 	ptr = trig_gbl.str.addr;
@@ -215,7 +215,7 @@ STATICFNDEF int4 update_trigger_name_value(char *trig_name, int trig_name_len, i
 		if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 			t_retry(cdb_sc_triggermod);
 		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
 			trig_name_len - 1, trig_name);
 	}
 	memcpy(name_and_index, trig_gbl.str.addr, ++len); /* inline increment intended */
@@ -273,8 +273,8 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-					LEN_AND_LIT("\"#BHASH\""), mv_hash.str.len, mv_hash.str.addr);
+			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+				LEN_AND_LIT("\"#BHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
 		memcpy(tmp_str, key_val.str.addr, len);
 		ptr = tmp_str + len;
@@ -309,8 +309,8 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 		if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 			t_retry(cdb_sc_triggermod);
 		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-		rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-				LEN_AND_LIT("\"#LHASH\""), mv_hash.str.len, mv_hash.str.addr);
+		RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+			LEN_AND_LIT("\"#LHASH\""), mv_hash.str.len, mv_hash.str.addr);
 	}
 	memcpy(tmp_str, key_val.str.addr, len);
 	ptr = tmp_str + len;
@@ -412,7 +412,7 @@ boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats)
 			if (gvcst_get(&trig_gbl))
 			{
 				if (reg->read_only)
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(reg));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(reg));
 				SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 				ptr = trig_gbl.str.addr;
 				trigvn_len = MIN(trig_gbl.str.len, MAX_MIDENT_LEN);
@@ -423,8 +423,8 @@ boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats)
 					if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 						t_retry(cdb_sc_triggermod);
 					assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
-							curr_name_len, curr_name);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
+						curr_name_len, curr_name);
 				}
 				memcpy(trigvn, trig_gbl.str.addr, trigvn_len);
 				/* the index is just beyond the length of the GVN string */
@@ -435,8 +435,8 @@ boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats)
 					if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 						t_retry(cdb_sc_triggermod);
 					assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
-							curr_name_len, curr_name);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
+						curr_name_len, curr_name);
 				}
 				SET_DISP_TRIGVN(reg, disp_trigvn, disp_trigvn_len, trigvn, trigvn_len);
 				/* $get(^#t(GVN,"COUNT") */
@@ -446,8 +446,8 @@ boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats)
 					if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 						t_retry(cdb_sc_triggermod);
 					assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-					rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
-							trigvn_len, trigvn, trigvn_len, trigvn, LEN_AND_LIT("\"#COUNT\""));
+					RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
+						trigvn_len, trigvn, trigvn_len, trigvn, LEN_AND_LIT("\"#COUNT\""));
 				}
 				if (!jnl_format_done && JNL_WRITE_LOGICAL_RECS(csa))
 				{
@@ -600,8 +600,8 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-						trigvn_len, trigvn, STRLEN(trigger_subs[sub_indx]), trigger_subs[sub_indx]);
+				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+					trigvn_len, trigvn, STRLEN(trigger_subs[sub_indx]), trigger_subs[sub_indx]);
 			}
 			tt_val[sub_indx] = NULL;
 			tt_val_len[sub_indx] = 0;
@@ -714,9 +714,9 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 						if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 							t_retry(cdb_sc_triggermod);
 						assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-						rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD,
-								6, trigvn_len, trigvn, trigvn_len, trigvn,
-								STRLEN(trigger_subs[sub_indx]), trigger_subs[sub_indx]);
+						RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD,
+							6, trigvn_len, trigvn, trigvn_len, trigvn,
+							STRLEN(trigger_subs[sub_indx]), trigger_subs[sub_indx]);
 					}
 					/* OPTIONS, PIECES and DELIM can be zero */
 					trig_len = 0;
@@ -733,9 +733,9 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 							if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 								t_retry(cdb_sc_triggermod);
 							assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-							rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD,
-									6, trigvn_len, trigvn, trigvn_len, trigvn,
-									STRLEN(trigger_subs[sub_indx]), trigger_subs[sub_indx]);
+							RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD,
+								6, trigvn_len, trigvn, trigvn_len, trigvn,
+								STRLEN(trigger_subs[sub_indx]), trigger_subs[sub_indx]);
 						}
 						memcpy(ptr1, trigger_value.str.addr, trig_len);
 						ptr1 += trig_len;
@@ -823,7 +823,7 @@ void trigger_delete_all(mval *trigger_rec, uint4 *trig_stats)
 		if (0 != gvcst_data())
 		{	/* Issue error if we dont have permissions to touch ^#t global */
 			if (reg->read_only)
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(reg));
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(reg));
 			gvcst_kill(TRUE);
 		}
 		/* Kill all descendents of ^#t(trigvn, ...) where trigvn is any global with a trigger,
@@ -897,7 +897,7 @@ void trigger_delete_all(mval *trigger_rec, uint4 *trig_stats)
 			{
 				/* Now that we know there is something to kill, check if we have permissions to touch ^#t global */
 				if (reg->read_only)
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(reg));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(reg));
 				if (!jnl_format_done && JNL_WRITE_LOGICAL_RECS(csa))
 				{
 					jnl_format(JNL_LGTRIG, NULL, trigger_rec, 0);

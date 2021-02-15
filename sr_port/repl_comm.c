@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -272,8 +272,8 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 			{	/* This indicates an error from TLS/SSL layer and not from a system call. */
 				assert(repl_tls.enabled);
 				errptr = gtm_tls_get_error();
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"), ERR_TEXT, 2,
-						LEN_AND_STR(errptr));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"), ERR_TEXT, 2,
+					LEN_AND_STR(errptr));
 			}
 #			else
 			save_errno = ERRNO;
@@ -408,8 +408,8 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 			{
 				assert(repl_tls.enabled);
 				errptr = gtm_tls_get_error();
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("recv"), ERR_TEXT, 2,
-						LEN_AND_STR(errptr));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("recv"), ERR_TEXT, 2,
+					LEN_AND_STR(errptr));
 			}
 #			else
 			save_errno = ERRNO;
@@ -630,7 +630,7 @@ void repl_do_tls_init(FILE *logfp)
 	if (SS_NORMAL != (status = gtm_tls_loadlibrary()))
 	{
 		if (!PLAINTEXT_FALLBACK)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSDLLNOOPEN, 0, ERR_TEXT, 2, LEN_AND_STR(dl_err));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSDLLNOOPEN, 0, ERR_TEXT, 2, LEN_AND_STR(dl_err));
 		else
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSDLLNOOPEN), 0, ERR_TEXT, 2,
 					LEN_AND_STR(dl_err));
@@ -638,7 +638,7 @@ void repl_do_tls_init(FILE *logfp)
 	} else if (NULL == (tls_ctx = gtm_tls_init(GTM_TLS_API_VERSION, 0)))
 	{
 		if (!PLAINTEXT_FALLBACK)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
 		else
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSINIT), 0, ERR_TEXT, 2,
 					LEN_AND_STR(gtm_tls_get_error()));

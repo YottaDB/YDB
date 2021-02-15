@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,7 +84,7 @@ int gtmsource_init_heartbeat(void)
 	REPL_DPRINT4("Initialized heartbeat, heartbeat_period = %d s, heartbeat_max_wait = %d s, num_q_entries = %d\n",
 			heartbeat_period, heartbeat_max_wait, num_q_entries);
 	if (!(repl_heartbeat_que_head = (repl_heartbeat_que_entry_t *)malloc(num_q_entries * SIZEOF(repl_heartbeat_que_entry_t))))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Error in allocating heartbeat queue"), errno);
 
 	memset(repl_heartbeat_que_head, 0, num_q_entries * SIZEOF(repl_heartbeat_que_entry_t));
@@ -209,7 +209,7 @@ int gtmsource_send_heartbeat(time_t *now)
 		return (SS_NORMAL);
 	}
 	if (EREPL_SEND == repl_errno)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Error sending HEARTBEAT message. Error in send"), status);
 	if (EREPL_SELECT == repl_errno)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
@@ -225,8 +225,16 @@ int gtmsource_process_heartbeat(repl_heartbeat_msg_ptr_t heartbeat_msg)
 	gd_region			*reg, *region_top;
 	sgmnt_addrs			*csa;
 	unsigned char			seq_num_str[32], *seq_num_ptr;
+	gtmsource_local_ptr_t           gtmsource_local;
+
+	if (NULL != jnlpool->gtmsource_local)   /* For use with -SHOWBACKLOG and -ZEROBACKLOG*/
+		gtmsource_local = jnlpool->gtmsource_local;
+	else
+		gtmsource_local = &jnlpool->gtmsource_local_array[0];
 
 	QWASSIGN(ack_seqno, *(seq_num *)&heartbeat_msg->ack_seqno[0]);
+	gtmsource_local->heartbeat_jnl_seqno = ack_seqno;
+	gtmsource_local->hrtbt_recvd = TRUE;
 	REPL_DPRINT4("HEARTBEAT received with time %ld SEQNO "INT8_FMT" at %ld\n",
 		     *(gtm_time4_t *)&heartbeat_msg->ack_time[0], INT8_PRINT(ack_seqno), time(NULL));
 

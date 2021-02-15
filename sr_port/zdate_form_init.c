@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2017 Fidelity National Information	*
+ * Copyright (c) 2002-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,9 +42,9 @@ void zdate_form_init(struct startup_vector *svec)
 		if (SS_NOLOGNAM == status)
 			return;
 		else if (SS_LOG2LONG == status)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf) - 1);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf) - 1);
 		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(ZDATE_FORM), status);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(ZDATE_FORM), status);
 	}
 	if (0 == tn.len)
 		return;

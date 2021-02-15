@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,7 @@ void	add_int_to_abs_time(ABS_TIME *atps, int4 ival,ABS_TIME *atpd)
 		 * multiplying by 1000 to convert from seconds to
 		 * milliseconds.
 		 */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TIMEROVFL);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TIMEROVFL);
 	}
 	ival_sec  = ival / MILLISECS_IN_SEC;					/* milliseconds -> seconds */
 	ival_usec = (ival - (ival_sec * MILLISECS_IN_SEC)) * MICROSECS_IN_MSEC;	/* microsecond remainder */

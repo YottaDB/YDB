@@ -28,7 +28,7 @@
 #include "gtm_utf8.h"
 #endif
 
-GBLREF	boolean_t	badchar_inhibit;
+GBLREF	boolean_t	badchar_inhibit, gtm_utf8_mode;
 
 LITREF mval literal_null;
 
@@ -36,7 +36,7 @@ int f_translate(oprtype *a, opctype op)
 {
 	boolean_t	more_args;
 	hash_table_int4 *xlate_hash;
-	int4		i, maxLengthString, *xlate;
+	int4		i, maxLengthString;
 	mval		dst_mval, *rplc_mval, *srch_mval, *xlateTable[2];
 	sm_uc_ptr_t	nextptr;
 	triple		*args[4];
@@ -68,21 +68,24 @@ int f_translate(oprtype *a, opctype op)
 			&& (TRIP_REF == args[0]->operand[1].oprval.tref->operand[1].oprclass));
 	/* If the second and third parameters are literals, pre-calculate the translation table and store it in the stringpool */
 	if ((OC_LIT == args[1]->operand[0].oprval.tref->opcode) && (OC_LIT == args[2]->operand[0].oprval.tref->opcode))
-	{	/* We only do this if we have all literals and (not utf8, or utf8 and valid strings) */
+	{	/* we only do this if we have search and reolace literals */
 		srch_mval = &args[1]->operand[0].oprval.tref->operand[0].oprval.mlit->v;
 		rplc_mval = &args[2]->operand[0].oprval.tref->operand[0].oprval.mlit->v;
 		assert(MV_STR & srch_mval->mvtype);
 		assert(MV_STR & rplc_mval->mvtype);
-		ENSURE_STP_FREE_SPACE(NUM_CHARS * SIZEOF(int4));
-		xlate = (int4 *)stringpool.free;
-		stringpool.free += NUM_CHARS * SIZEOF(int4);
 		xlateTable[0] = (mval *)mcalloc(SIZEOF(mval));
-		xlateTable[0]->str.addr = (char *)xlate;
-		xlateTable[0]->mvtype = MV_STR;
-		xlateTable[0]->str.len = NUM_CHARS * SIZEOF(int4);
+		xlateTable[0]->mvtype = 0;	/* so stp_gcol, which may be invoked below by ENSURE..., does not get confused */
+		maxLengthString = (NUM_CHARS * SIZEOF(int4));
 		if (!gtm_utf8_mode || (OC_FNZTRANSLATE == op))
 		{	/* just doing bytes - no need for a hash table */
-			create_byte_xlate_table(srch_mval, rplc_mval, xlate);
+			if (OC_LIT == args[0]->operand[0].oprval.tref->opcode)	/* if lit src, dst can't be longer */
+				maxLengthString += args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len;
+			ENSURE_STP_FREE_SPACE(maxLengthString);
+			xlateTable[0]->str.addr = (char *)stringpool.free;
+			xlateTable[0]->mvtype = MV_STR;
+			xlateTable[0]->str.len = NUM_CHARS * SIZEOF(int4);
+			stringpool.free += NUM_CHARS * SIZEOF(int4);
+			create_byte_xlate_table(srch_mval, rplc_mval, (int *)xlateTable[0]->str.addr);
 			if (OC_LIT == args[0]->operand[0].oprval.tref->opcode)
 			{	/* the source is a literal too - lets do it all at compile time */
 				op_fnztranslate_fast(&args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v, xlateTable[0],
@@ -104,30 +107,28 @@ int f_translate(oprtype *a, opctype op)
 			dqdel(args[1], exorder);
 			dqdel(args[2], exorder);
 		} else if (gtm_utf8_mode && valid_utf_string(&srch_mval->str) && valid_utf_string(&rplc_mval->str))
-		{	/* actual UTF-8 characters, so need hashtable rather than just than code table; WARNING assignment below */
+		{	/* actual UTF-8 characters, so need hashtable rather than just than code table */
 			unuse_literal(&args[1]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
 			if (!badchar_inhibit)
-				MV_FORCE_LEN(srch_mval);      		/* needed only to validate for BADCHARs */
+				MV_FORCE_LEN(srch_mval);      				/* needed only to validate for BADCHARs */
 			else
-				MV_FORCE_LEN_SILENT(srch_mval);		/* but need some at least sorta valid length */
-			if (NUM_CHARS < (maxLengthString = MIN(rplc_mval->str.char_len, srch_mval->str.char_len)))
-			{	/* they went wild with replacement, so need more space */
-				assert((NUM_CHARS * SIZEOF(int4)) == ((int4 *)stringpool.free - xlate));
-				stringpool.free += ((maxLengthString - NUM_CHARS) * SIZEOF(int4));
-				xlateTable[0]->str.len = maxLengthString * SIZEOF(int4);
-			}
-			xlate_hash = create_utf8_xlate_table(srch_mval, rplc_mval, xlate);
+				MV_FORCE_LEN_SILENT(srch_mval);				/* but need some sorta valid length */
+			maxLengthString = xlateTable[0]->str.len = MAX(srch_mval->str.char_len, maxLengthString);
+			if (OC_LIT == args[0]->operand[0].oprval.tref->opcode)		/* if lit src, dst can't be longer */
+				maxLengthString						/* because compile puts hash in stp */
+					+= (args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len * MAX_CHAR_LEN);
+			ENSURE_STP_FREE_SPACE(maxLengthString);
+			xlateTable[0]->str.addr = (char *)stringpool.free;
+			xlateTable[0]->mvtype = MV_STR;
+			stringpool.free += xlateTable[0]->str.len;
+			xlate_hash = create_utf8_xlate_table(srch_mval, rplc_mval, &xlateTable[0]->str);
 			if (NULL != xlate_hash)
 			{
-				maxLengthString = (xlate_hash->size * SIZEOF(ht_ent_int4))
-					+ SIZEOF(hash_table_int4) + ROUND_UP(xlate_hash->size, BITS_PER_UCHAR);
-				ENSURE_STP_FREE_SPACE(maxLengthString);
 				nextptr = copy_hashtab_to_buffer_int4(xlate_hash, stringpool.free, NULL);
 				xlateTable[1] = (mval *)mcalloc(SIZEOF(mval));
 				xlateTable[1]->str.addr = (char *)stringpool.free;
 				xlateTable[1]->mvtype = MV_STR;
 				xlateTable[1]->str.len = nextptr - stringpool.free;
-				assert(maxLengthString <= xlateTable[0]->str.len);
 				stringpool.free = nextptr;
 			} else
 				xlateTable[1] = (mval *)&literal_null;
@@ -147,7 +148,7 @@ int f_translate(oprtype *a, opctype op)
 				dqdel(args[1], exorder);
 				dqdel(args[2], exorder);
 			} else
-			{	/* op_fntranslate_fast arguments; src, rplc, xlate, xlate_hash, so need one more triple */
+			{	/* op_fntranslate_fast arguments; src, rplc, m_xlate, xlate_hash, so need one more triple */
 				args[0]->opcode = OC_FNTRANSLATE_FAST;		/* note no Z */
 				assert(OC_PARAMETER == args[1]->opcode);
 				args[1]->operand[0] = args[2]->operand[0];	/* Promote the rplc string to the second argument */

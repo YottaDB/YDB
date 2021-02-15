@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -90,7 +91,7 @@ unsigned char *mval2subsc(mval *v, gv_key *g, boolean_t std_null_coll)
 			s2n(v);
 			mvt = v->mvtype;
 			if (!(mvt & MV_NM))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NUMOFLOW);
 		}
 		else
 		{
@@ -116,7 +117,7 @@ unsigned char *mval2subsc(mval *v, gv_key *g, boolean_t std_null_coll)
 		{
 			if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, g, TRUE)))
 				end = &buff[MAX_ZWR_KEY_SZ - 1];
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 		}
 		if (n > 0)
 		{
@@ -133,7 +134,7 @@ unsigned char *mval2subsc(mval *v, gv_key *g, boolean_t std_null_coll)
 						{
 							end = &buff[MAX_ZWR_KEY_SZ - 1];
 						}
-						rts_error_csa(CSA_ARG(NULL)
+						RTS_ERROR_CSA_ABT(NULL,
 							VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 					}
 					ch++;	/* promote character */
@@ -291,7 +292,7 @@ ALLDONE:
 	{	/* take of extra space and one for last zero */
 		if ((end = format_targ_key(buff, MAX_ZWR_KEY_SZ, g, TRUE)) == 0)
 			end = &buff[MAX_ZWR_KEY_SZ - 1];
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 	}
 	return out_ptr;
 }

@@ -35,6 +35,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "filestruct.h"
 #include "gdsblk.h"
 #include "gdsbml.h"
@@ -273,7 +274,7 @@ bool	mubinccpy (backup_reg_list *list)
 
 	/* ============================= write inc_header =========================================== */
 	outbuf = (inc_header *)malloc(SIZEOF(inc_header));
-	MEMCPY_LIT(&outbuf->label[0], INC_HEADER_LABEL_V7);
+	MEMCPY_LIT(&outbuf->label[0], INC_HEADER_LABEL_DFLT);
 	stringpool.free = stringpool.base;
 	op_zhorolog(&val, FALSE);
 	stringpool.free = stringpool.base;
@@ -596,6 +597,8 @@ bool	mubinccpy (backup_reg_list *list)
 		COMMON_WRITE(backup, (char *)&rsize, SIZEOF(int4));
 		COMMON_WRITE(backup, END_MSG, SIZEOF(END_MSG));
 
+		if (0 == MEMCMP_LIT(header->label, V6_GDS_LABEL))
+			db_header_dwnconv(header);
 		ptr1 = (uchar_ptr_t)header;
 		ptr1_top = ptr1 + ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE);
 		for ( ;  ptr1 < ptr1_top;  ptr1 += size1)

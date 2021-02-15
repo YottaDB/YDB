@@ -48,10 +48,12 @@ GBLREF	jnl_gbls_t		jgbl;
 void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 {
 	blk_segment	*seg, *stop_ptr, *array;
+	boolean_t	long_blk_id;
+	int4		offset, blk_id_sz, off_chain_sz;
 	off_chain	chain;
+	v6_off_chain	v6_chain;
 	sm_uc_ptr_t	ptr, ptrtop, c;
 	sm_ulong_t	n;
-	int4		offset;
 	trans_num	blktn;
 #	ifdef DEBUG
 	boolean_t	integ_error_found;
@@ -71,9 +73,12 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	assert((dba_mm != cs_data->acc_meth) || dollar_tlevel || cs_addrs->now_crit);
 	assert(cse->mode != gds_t_writemap);
 	array = (blk_segment *)cse->upd_addr;
+	long_blk_id = BLK_ID_32_VER < cse->ondsk_blkver;
+	blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
+	off_chain_sz = blk_id_sz; /* the off_chain struct should be the same size as the block_id in the current block */
 	assert(array->len >= SIZEOF(blk_hdr));
 	assert(array->len <= cs_data->blk_size);
-	assert((cse->ins_off + SIZEOF(block_id)) <= array->len);
+	assert((cse->ins_off + blk_id_sz) <= array->len);
 	assert((short)cse->index >= 0);
 	assert(!cse->undo_next_off[0] && !cse->undo_offset[0]);
 	assert(!cse->undo_next_off[1] && !cse->undo_offset[1]);
@@ -86,7 +91,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 		base_addr = cse->new_buff = (unsigned char *)get_new_free_element(sgm_info_ptr->new_buff_list);
 		cse->first_copy = TRUE;
 	} else
-   		assert(0 == ((sm_ulong_t)base_addr & 3));	/* word aligned at least */
+		assert(0 == ((sm_ulong_t)base_addr & 3));	/* word aligned at least */
 
 	/* The block-transaction-number is modified before the contents of the block are modified. This is
 	 *     done so as to allow a cdb_sc_blkmod check (done in t_qread, gvcst_search, gvcst_put and tp_hist)
@@ -133,7 +138,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	 * That could then fail this assert (GTM-8523). Account for that with the AIX_ONLY condition below.
 	 */
 	assert((ctn < cs_addrs->ti->early_tn) || write_after_image AIX_ONLY(|| (cs_data->acc_meth == dba_mm)));
-	((blk_hdr_ptr_t)base_addr)->bver = GDSVCURR;
+	((blk_hdr_ptr_t)base_addr)->bver = cse->ondsk_blkver;
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	((blk_hdr_ptr_t)base_addr)->bsiz = UINTCAST(array->len);
 	((blk_hdr_ptr_t)base_addr)->levl = cse->level;
@@ -173,14 +178,16 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 		{	/* if the cw set has a reference to resolve, move it to the block */
 			assert(cse->index < sgm_info_ptr->cw_set_depth);
 			assert((int)cse->ins_off >= (int)(SIZEOF(blk_hdr) + SIZEOF(rec_hdr)));
-			assert((int)(cse->next_off + cse->ins_off + SIZEOF(block_id)) <= array->len);
+			assert((int)(cse->next_off + cse->ins_off + blk_id_sz) <= array->len);
 			if (cse->first_off == 0)
 				cse->first_off = cse->ins_off;
-			chain.flag = 1;
-			chain.cw_index = cse->index;
-			chain.next_off = cse->next_off;
 			ptr = base_addr + cse->ins_off;
-			GET_BLK_IDP(ptr, &chain);
+			chain.flag = 1;
+			assert((1 << CW_INDEX_MAX_BITS) > cse->index);
+			chain.cw_index = cse->index;
+			assert((1LL << NEXT_OFF_MAX_BITS) > cse->next_off);
+			chain.next_off = cse->next_off;
+			WRITE_OFF_CHAIN(long_blk_id, &chain, &v6_chain, ptr);
 			cse->index = 0;
 			cse->ins_off = 0;
 			cse->next_off = 0;
@@ -214,7 +221,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 					c = ptr;
 					c += SIZEOF(rec_hdr);
 					/* The *-key does not have a key. Everything else has one. Account for that. */
-					if (BSTAR_REC_SIZE != nRecLen)
+					if (bstar_rec_size(long_blk_id) != nRecLen)
 					{
 						for ( ; (c < ptrtop) && ((*c++ != KEY_DELIMITER) || (*c != KEY_DELIMITER)); )
 							;
@@ -229,8 +236,8 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 					ptr += nRecLen;
 					if (c == chainptr)
 					{
-						if (((ptr - SIZEOF(off_chain)) != chainptr)
-							&& ((ptr - SIZEOF(off_chain) - COLL_SPEC_LEN) != chainptr))
+						if (((ptr - off_chain_sz) != chainptr)
+							&& ((ptr - off_chain_sz - COLL_SPEC_LEN) != chainptr))
 						{
 							assert(NULL == input_base_addr);
 							integ_error_found = TRUE;
@@ -243,7 +250,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 						integ_error_found = TRUE;
 						break;
 					}
-					GET_BLK_IDP(&chain, c);
+					READ_OFF_CHAIN(long_blk_id, &chain, &v6_chain, c);
 					if (chain.flag)
 					{
 						assert(NULL == input_base_addr);
@@ -255,7 +262,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 					break;
 				if (chainptr < ptrtop)
 				{
-					GET_BLK_IDP(&chain, chainptr);
+					READ_OFF_CHAIN(long_blk_id, &chain, &v6_chain, chainptr);
 					assert(1 == chain.flag || (skip_block_chain_tail_check && (0 == chain.next_off)));
 					assert(chain.cw_index < sgm_info_ptr->cw_set_depth);
 					offset = chain.next_off;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,8 +19,9 @@
 GBLDEF bool zdefactive;
 GBLDEF unsigned short zdefbufsiz;
 
+error_def(ERR_UNIMPLOP);
+
 void gvcmz_bunch(mval *v)
 {
-	error_def(ERR_UNIMPLOP);
-	rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 }

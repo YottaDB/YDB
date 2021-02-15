@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,7 @@ sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 		long_blk_id = TRUE;
 		blk_id_size = SIZEOF(block_id_64);
 #		else
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #		endif
 	} else
 	{

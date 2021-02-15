@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,21 +16,21 @@
 
 GBLREF spdesc stringpool;
 
+error_def(ERR_INVBITSTR);
+
 void op_fnzbitnot(mval *dst,mval *bitstr)
 {
 	int		n, str_len;
 	unsigned char	*byte_1, *byte_n, *dist_byte, byte_len;
 
-	error_def(ERR_INVBITSTR);
-
 	MV_FORCE_STR(bitstr);
 	if (!bitstr->str.len)
-		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
 
 	byte_len = *(unsigned char *)bitstr->str.addr;
 	str_len = (bitstr->str.len - 1) * 8;
 	if (7 < byte_len)
-		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
 
 	ENSURE_STP_FREE_SPACE(bitstr->str.len);
 	byte_1 = (unsigned char *)bitstr->str.addr;

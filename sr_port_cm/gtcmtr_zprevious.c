@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -128,7 +128,7 @@ bool gtcmtr_zprevious(void)
 									 * and two <NUL> delimiters */
 			if ((PRE_V5_MAX_MIDENT_LEN < strlen((char *)gv_altkey->base)) && !curr_entry->client_supports_long_names)
 			{
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("GT.CM client does not support global names greater than 8 characters"));
 			}
 			save_key = gv_currkey;

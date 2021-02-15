@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,7 +75,7 @@ int m_xecute(void)
 			src = &x.oprval.tref->operand[0].oprval.mlit->v.str;
 			dqinit(&tmpchain, exorder);
 			if (MAX_SRCLINE < (unsigned)src->len)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
 			/* save the parse state, point the compiler at the literal and see what happens */
 			if (NULL == parse_state_ptr)
 				parse_state_ptr = malloc(SIZEOF(parse_save_block));

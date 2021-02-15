@@ -1,7 +1,7 @@
 #! /usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2001-2019 Fidelity National Information		#
+# Copyright (c) 2001-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -42,9 +42,6 @@ alias mv 'mv -f \!:* >& /dev/null'		# some moves may be null moves. we dont want
 alias chmod 'chmod \!:* >& /dev/null'		# some chmods may be null chmods. we dont want error messages coming out.
 
 set platform_name = `uname | sed 's/-//g' | sed 's=/==g' | tr '[A-Z]' '[a-z]'`
-if ($platform_name == "sunos") then
-	alias grep /usr/xpg4/bin/grep		# for -E option to work on sparky
-endif
 
 set build_types        = "pro dbg bta"
 set build_dirs         = "map obj"
@@ -70,15 +67,7 @@ if !(-e $dst_top_dir) then
 endif
 
 set preserve_time = "-p"	# while doing the copy, let us preserve time by default
-if ($platform_name == "hpux") then
-	# We want to preserve time (by default) in the cp but there is an issue.
-	# In HPUX, cp -pf does not work with differing source and destination owner usernames. Avoid -p in that platform.
-	set srcuid = `ls -ld $cms_dir | awk '{print $3}'`
-	set dstuid = `whoami`
-	if ($srcuid != $dstuid) then
-		set preserve_time = ""
-	endif
-else if ("os390" == "$platform_name") then
+if ("os390" == "$platform_name") then
 	set preserve_time = "-m"	# only preserve times
 endif
 
@@ -116,10 +105,10 @@ if (-e $dst_ver) then
 	if ($?move_args)  then
 		set save_ver = `ls -ld ${gtm_root}/$dst_ver | \
 			awk '{if (length($7)==1) $7="0"_$7; time=$6"_"$7"_"$8; print toupper(time)}' | sed 's/://g'`
-		echo "Renaming ${gtm_root}/${dst_ver} to ${gtm_root}/${dst_ver}_${save_ver}"
+		echo "# Renaming ${gtm_root}/${dst_ver} to ${gtm_root}/${dst_ver}_${save_ver}"
 		mv ${gtm_root}/$dst_ver ${gtm_root}/${dst_ver}_${save_ver}
 	else if (! $mods_only) then
-		echo "Deleting existing $dst_dir directory structure"
+		echo "# Deleting existing $dst_dir directory structure"
 		foreach image (pro bta dbg)
 			# remove root-owned gtmsecshr* files/dirs
 			if (-e $gtm_root/$dst_ver/$image/gtmsecshrdir) then
@@ -134,14 +123,14 @@ if (-e $dst_ver) then
 			exit $status
 		endif
 	else
-		echo "Updating $dst_dir directory structure"
+		echo "# Updating $dst_dir directory structure"
 	endif
 endif
 
 ############## Create $dst_dir and subdirectories ##################
 
 if (! -e $dst_ver) then
-	echo "Creating -------> $dst_dir Directory Structure ..."
+	echo "# Creating -------> $dst_dir Directory Structure ..."
 	mkdir -p $dst_ver
 	if ($status != 0) then
 		exit $status
@@ -210,7 +199,7 @@ endif
 ########### Copy sources from platform-specific directories into appropriate version-subdirectories ############
 
 cd $cms_dir
-echo "Copying files from $cms_dir"
+echo "# Copying files from $cms_dir"
 set ref_libs = `set | grep "^gtm_s_${platform_library}[ 	]" | sed 's/^gtm_s_'${platform_library}'[ 	][ 	]*//g'`
 foreach ref_library ( $ref_libs )
     if ( -d $ref_library ) then
@@ -222,7 +211,7 @@ foreach ref_library ( $ref_libs )
 			set nfiles = `\ls -1 | grep "\.$ftype"'$' | wc -l | sed 's/^[ ]*//g'`
 			if ($nfiles != 0) then
 				if ($mods_only == 0) then
-					echo "Copying $nfiles files of type .$ftype from $ref_library to ${gtm_ver}/${dir}"
+					echo "# Copying $nfiles files of type .$ftype from $ref_library to ${gtm_ver}/${dir}"
 					\ls -1 | grep "\.$ftype"'$' | xargs -i cp -f $preserve_time {} $gtm_ver/${dir}
 				else
 					# @ n_modfiles=0
@@ -251,7 +240,7 @@ foreach ref_library ( $ref_libs )
 							continue	# assume up-to-date release_name.h
 						endif
 						if (! { cmp -s ${srcfile} ${gtm_ver}/${dir}/${dstfile} } ) then
-							echo "Copying differing $srcfile from $ref_library to $gtm_ver/${dir}"
+							echo "# Copying differing $srcfile from $ref_library to $gtm_ver/${dir}"
 							cp -f $preserve_time $srcfile $gtm_ver/${dir}
 							# @ n_modfiles++
 						endif
@@ -263,7 +252,7 @@ foreach ref_library ( $ref_libs )
 			endif
 			set nfiles=`ls -1 *.${ftype}nix | wc -l | sed 's/^[ ]*//g'`
 			if ($nfiles != 0) then
-				echo "Restoring $nfiles NIXed files of type .$ftype in directory ${gtm_ver}/${dir}"
+				echo "# Restoring $nfiles NIXed files of type .$ftype in directory ${gtm_ver}/${dir}"
 				ls -1 *.${ftype}nix |\
 				awk '{printf "cp -f $preserve_time %s %s/%s\n", $1, '\"${gtm_ver}/${dir}\"', $1}' |\
 				sed 's/nix$//g' | sh
@@ -272,7 +261,7 @@ foreach ref_library ( $ref_libs )
 	end
 	cd ..
     else
-	echo "Skipping missing library $ref_library"
+	echo "# Skipping missing library $ref_library"
     endif
 end
 cp sr_unix_cm/makefile* $gtm_ver/tools
@@ -284,13 +273,14 @@ if (! $?gtmpcat_dir && -d $ggtools/gtmpcat_tools/gtmpcat) then
 endif
 
 if ($?gtmpcat_dir) then
+	echo "# Copying gtmpcat related files from $gtmpcat_dir"
 	cp $gtmpcat_dir/gtmpcat{{,fldbld}.m,_{field_def,sh}.txt} ${gtm_root}/${dst_ver}/tools
 endif
 
 ######################## Rename .mpt files to _*.m files #######################
 
 if ($mods_only == 0) then
-	echo "Renaming .mpt files to _*.m in $gtm_ver/pct"
+	echo "# Renaming .mpt files to _*.m in $gtm_ver/pct"
 	cd $gtm_ver/pct
 	ls -1 *.mpt | awk '{printf "mv %s _%s\n", $1, $1}' | sed 's/mpt$/m/g' | sh
 
@@ -303,7 +293,7 @@ if ($mods_only == 0) then
 		foreach file (*)
 			iconv -T -f IBM-1047 -t ISO8859-1 $file > $gtm_ver/pct/$file
 			if (0 != $status) then
-				echo "Error converting $file (with iconv) -- return status: $status"
+				echo "# Error converting $file (with iconv) -- return status: $status"
 			endif
 			touch -r $file $gtm_ver/pct/$file
 		end
@@ -311,7 +301,7 @@ if ($mods_only == 0) then
 	endif
 ######################## Edit release_name.h ####################################
 
-	echo "Modifying release_name.h"
+	echo "# Modifying release_name.h"
 	$btc_tools/edrelnam.csh $dst_ver # Do we care if this fails?
 endif
 

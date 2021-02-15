@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -240,7 +240,7 @@ boolean_t trigger_trgfile_tpwrap(char *trigger_filename, uint4 trigger_filename_
 				|| !gv_target || !gv_target->root);
 			assert((cdb_sc_onln_rlbk2 != failure) || !IS_GTM_IMAGE || TREF(dollar_zonlnrlbk));
 			if (cdb_sc_onln_rlbk2 == failure)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBROLLEDBACK);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DBROLLEDBACK);
 			/* else if (cdb_sc_onln_rlbk1 == status) we don't need to do anything other than trying again. Since this
 			 * is ^#t global, we don't need to GVCST_ROOT_SEARCH before continuing with the next restart because the
 			 * trigger load logic already takes care of doing INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED before doing the

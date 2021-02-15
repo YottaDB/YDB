@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,6 @@ error_def(ERR_DBBPLNOT512);
 error_def(ERR_DBTTLBLK0);
 error_def(ERR_DBTNNEQ);
 error_def(ERR_DBMAXKEYEXC);
-error_def(ERR_DBMXRSEXCMIN);
 error_def(ERR_DBUNDACCMT);
 error_def(ERR_DBHEADINV);
 error_def(ERR_DBFGTBC);
@@ -82,11 +81,11 @@ boolean_t mu_int_fhead(void)
 	trans_num		temp_tn, max_tn_warn;
 	sgmnt_data_ptr_t	mu_data;
 	gd_segment		*seg;
-	block_id		actual_tot_blks, should_be_tot_blks, maps;
+	block_id		actual_tot_blks, should_be_tot_blks, maps, temp_blk, temp_blk2;
 	int			gtmcrypt_errno;
 
 	mu_data = &mu_int_data;
-	if (MEMCMP_LIT(mu_data->label, GDS_LABEL))
+	if (MEMCMP_LIT(mu_data->label, GDS_LABEL) && MEMCMP_LIT(mu_data->label, V6_GDS_LABEL))
 	{
 		if (memcmp(mu_data->label, GDS_LABEL, SIZEOF(GDS_LABEL) - 2))
 			mu_int_err(ERR_DBNOTDB, 0, 0, 0, 0, 0, 0, 0);
@@ -227,12 +226,14 @@ boolean_t mu_int_fhead(void)
 		should_be_tot_blks = (native_size - (mu_data->start_vbn - 1)) / block_factor - 1;
 		if ((((should_be_tot_blks + 1) * block_factor) + (mu_data->start_vbn - 1)) == native_size)
 		{	/* The database file size is off but is off by N GDS blocks where N is an integer */
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBTOTBLK, 2, actual_tot_blks, should_be_tot_blks);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBTOTBLK, 2, &actual_tot_blks, &should_be_tot_blks);
 		} else
 		{	/* The database file size is off but is off by a fractional GDS block. Issue different error (alignment) */
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBMISALIGN, 4, actual_tot_blks,
-				should_be_tot_blks, should_be_tot_blks + 1,
-				((should_be_tot_blks + 1 - actual_tot_blks) <= 0) ? 1 : (should_be_tot_blks + 1 - actual_tot_blks));
+			temp_blk = should_be_tot_blks + 1;
+			temp_blk2 = ((should_be_tot_blks + 1 - actual_tot_blks) <= 0)
+					? 1 : (should_be_tot_blks + 1 - actual_tot_blks);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBMISALIGN, 4, &actual_tot_blks,
+				&should_be_tot_blks, &temp_blk, &temp_blk2);
 		}
 	}
 	/* make working space for all local bitmaps */

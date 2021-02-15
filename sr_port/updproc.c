@@ -1,7 +1,7 @@
 /****************************************************************
  *								*
 <<<<<<< HEAD
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -400,7 +400,7 @@ int updproc(void)
 	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool)); /* For util_base_ch and mupip_exit */
 	if (updproc_init(&gld_db_files, &start_jnl_seqno) == UPDPROC_EXISTS) /* we got the global directory header already */
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_RECVPOOLSETUP, 0,
 			ERR_TEXT, 2, RTS_ERROR_LITERAL("Update Process already exists"));
 	}
 	OPERATOR_LOG_MSG;
@@ -494,14 +494,14 @@ int updproc(void)
 		/* We should be the only one acquiring the lock, so a single try should be sufficient. */
 		status = pthread_mutex_trylock(&recvpool.recvpool_ctl->write_updated_ctl);
 		if (0 != status)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("pthread_mutex_trylock"), CALLFROM, status, 0);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("pthread_mutex_trylock"), CALLFROM, status, 0);
 		while (updproc_continue && !set_onln_rlbk_flg)
 			updproc_actions(gld_db_files);
 		status = pthread_mutex_unlock(&recvpool.recvpool_ctl->write_updated_ctl);
 		if (0 != status)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("pthread_mutex_unlock"), CALLFROM, status, 0);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("pthread_mutex_unlock"), CALLFROM, status, 0);
 		if (set_onln_rlbk_flg)
 		{	/* A concurrent online rollback happened which drove the updproc_ch and called us. Need to let the receiver
 			 * server know about it and set up the sequence numbers
@@ -689,8 +689,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				/* the 0 == check takes care of the startup case where jnl_seqno is 0 in the recvpool_ctl */
 			status = clock_gettime(CLOCK_REALTIME, &waketime);
 			if (0 != status)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-						LEN_AND_LIT("clock_gettime"), CALLFROM, errno, 0);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("clock_gettime"), CALLFROM, errno, 0);
 			waketime.tv_sec += 4;
 			PTHREAD_COND_TIMEDWAIT(&recvpool.recvpool_ctl->write_updated,
 						&recvpool.recvpool_ctl->write_updated_ctl,
@@ -698,8 +698,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			if ((0 != status) && (ETIMEDOUT != status))
 			{
 				assert(EINVAL != status);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-						LEN_AND_LIT("pthread_cond_timedwait"), CALLFROM, status, 0);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("pthread_cond_timedwait"), CALLFROM, status, 0);
 			}
 			if (!upd_proc_local->onln_rlbk_flg && (repl_csa->onln_rlbk_cycle != jnlpool->jnlpool_ctl->onln_rlbk_cycle))
 			{	/* A concurrent online rollback happened. Start afresh */
@@ -1027,8 +1027,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					&& (repl_csa->onln_rlbk_cycle == jnlpool->jnlpool_ctl->onln_rlbk_cycle))
 				{
 					assert(FALSE);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_STRMSEQMISMTCH, 3,
-							strm_index, &rec_strm_seqno, &strm_seqno);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_STRMSEQMISMTCH, 3,
+						strm_index, &rec_strm_seqno, &strm_seqno);
 				}
 			}
 			if (JRT_NULL == rectype)
@@ -1352,8 +1352,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						if (NULL != gv_failed_key)	/* Free memory if it has been used */
 							free(gv_failed_key);
 						assert(NULL != tmpcsa);
-						rts_error_csa(CSA_ARG(tmpcsa) VARLSTCNT(6) ERR_GVSUBOFLOW, 0,
-									ERR_GVIS, 2, endBuff - fmtBuff, fmtBuff);
+						RTS_ERROR_CSA_ABT(tmpcsa, VARLSTCNT(6) ERR_GVSUBOFLOW, 0,
+							ERR_GVIS, 2, endBuff - fmtBuff, fmtBuff);
 						break;
 					case upd_bad_val_size:
 						if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ,
@@ -1362,7 +1362,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						if (NULL != gv_failed_key)	/* Free memory if it has been used */
 							free(gv_failed_key);
 						assert(NULL != tmpcsa);
-						rts_error_csa(CSA_ARG(tmpcsa) VARLSTCNT(10) ERR_REC2BIG, 4, val_mv.str.len,
+						RTS_ERROR_CSA_ABT(tmpcsa, VARLSTCNT(10) ERR_REC2BIG, 4, val_mv.str.len,
 							(int4)(tmpcsa->region)->max_rec_size, REG_LEN_STR(tmpcsa->region),
 							ERR_GVIS, 2, end - buff, buff);
 						break;

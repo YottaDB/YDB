@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 #define GTM_STRINGH
 
 #include <string.h>
+#define MAX_CHAR_LEN		4	/* bytes - e.g. translate can turn a 1 byte character into an up to 4 byte character */
 
 #define	STRERROR	strerror
 #define	STRCPY(DEST, SOURCE)		strcpy((char *)(DEST), (char *)(SOURCE))
@@ -41,20 +42,10 @@
 #  endif
 #  define memcpy(TARGET, SRC, LEN) gtm_memcpy_validate_and_execute((void *)(TARGET), (const void *)(SRC), (LEN))
 #endif
-/* The strnlen() function is POSIX-2008 so not widely avaiable yet so use it or our own critter as appropriate */
-#if (defined(__linux__) || defined(AIX))
-# define STRNLEN(str, maxlen, rslt) rslt = strnlen(str, maxlen)
-#else
-# define STRNLEN(str, maxlen, rslt)						\
-{										\
-	unsigned char	*c, *cend;						\
-										\
-	for (c = (unsigned char *)str, cend = c + maxlen; c < cend; ++c)	\
-		if ('\0' == *c)							\
-			break;							\
-	rslt = c - (unsigned char *)str;					\
-}
-#endif
+/* The strnlen() function is POSIX-2008 */
+#define STRNLEN(STR, MAXLEN, RSLT) RSLT = strnlen(STR, (size_t)MAXLEN)
+/* Returns the (int) casted result */
+#define SSTRNLEN(STR, MAXLEN, RSLT) RSLT = (int)strnlen(STR, (size_t)MAXLEN)
 #define STRNDUP(STR, MAXLEN, DST)						\
 {										\
 	size_t local_len;							\

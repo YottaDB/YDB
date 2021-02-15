@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +23,8 @@
 LITREF mval	literal_zero;
 LITREF int4	ten_pwr[];
 
+error_def(ERR_DIVZERO);
+
 void	flt_mod (mval *u, mval *v, mval *q)
 {
 	int	exp;
@@ -30,14 +33,13 @@ void	flt_mod (mval *u, mval *v, mval *q)
 	mval	y;			/* temporary mval for extended precision promotion
 					   to prevent modifying caller's data */
 	mval	*u_orig;		/* original (caller's) value of u */
-	error_def(ERR_DIVZERO);
 
 	u_orig = u;
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
 
 	if ((v->mvtype & MV_INT) != 0  &&  v->m[1] == 0)
-		rts_error(VARLSTCNT(1) ERR_DIVZERO);
+		rts_error_csa(NULL, VARLSTCNT(1) ERR_DIVZERO); /* BYPASSRTSABT */
 
 	if ((u->mvtype & MV_INT & v->mvtype) != 0)
 	{

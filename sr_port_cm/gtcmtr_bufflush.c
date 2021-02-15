@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +36,10 @@ GBLREF gv_key		*gv_currkey;
 GBLREF connection_struct *curr_entry;
 GBLREF jnl_process_vector *originator_prc_vec;
 
+error_def(ERR_GVIS);
+error_def(ERR_KEY2BIG);
+error_def(ERR_REC2BIG);
+
 bool gtcmtr_bufflush(void)
 {
 	cm_region_list	*reg_ref;
@@ -44,10 +49,6 @@ bool gtcmtr_bufflush(void)
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 	unsigned char	*ptr, regnum, len, cc, prv;
 	static readonly gds_file_id file;
-
-	error_def(ERR_KEY2BIG);
-	error_def(ERR_REC2BIG);
-	error_def(ERR_GVIS);
 
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(*ptr == CMMS_B_BUFFLUSH);
@@ -62,17 +63,17 @@ bool gtcmtr_bufflush(void)
 		len = *ptr++;
 		cc = *ptr++;
 		prv = *ptr++;
-		assert (len + cc - 1 < gv_currkey->top);
+		assert((unsigned short)(len + cc - 1) < gv_currkey->top);
 		memcpy(&gv_currkey->base[cc], ptr, len);
 		ptr += len;
-		gv_currkey->end = len + cc - 1;
-		gv_currkey->prev = prv;
-		assert(prv < gv_currkey->end);
+		gv_currkey->end = (unsigned short)(len + cc - 1);
+		gv_currkey->prev = (unsigned short)prv;
+		assert((unsigned short)prv < gv_currkey->end);
 		if ((n = gv_currkey->end + 1) > gv_cur_region->max_key_size)
 		{
 			if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
 				end = &buff[MAX_ZWR_KEY_SZ - 1];
-			rts_error(VARLSTCNT(11) ERR_KEY2BIG, 4, n, (int4)gv_cur_region->max_key_size,
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(11) ERR_KEY2BIG, 4, n, (int4)gv_cur_region->max_key_size,
 				REG_LEN_STR(gv_cur_region), 0, ERR_GVIS, 2, end - buff, buff);
 		}
 		gtcm_bind_name(reg_ref->reghead, TRUE);
@@ -89,7 +90,8 @@ bool gtcmtr_bufflush(void)
 		{
 			if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
 				end = &buff[MAX_ZWR_KEY_SZ - 1];
-			rts_error(VARLSTCNT(11) ERR_REC2BIG, 4, n + v.str.len + SIZEOF(rec_hdr), (int4)gv_cur_region->max_rec_size,
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(11) ERR_REC2BIG,
+				4, n + v.str.len + SIZEOF(rec_hdr), (int4)gv_cur_region->max_rec_size,
 				REG_LEN_STR(gv_cur_region), 0, ERR_GVIS, 2, end - buff, buff);
 		}
 		gvcst_put(&v);

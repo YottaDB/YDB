@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -192,7 +192,7 @@ STATICFNDCL void verify_buffer(char *p_list, int len, char *m_label)
 		|| (0 != memcmp((p_list - buff_boarder_len), buff_front_boarder, buff_boarder_len)))
 	{
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_EXTCALLBOUNDS, 1, m_label);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_EXTCALLBOUNDS, 1, m_label);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_EXTCALLBOUNDS, 1, m_label);
 	}
 	VERIFY_STORAGE_CHAINS;
 }
@@ -283,7 +283,7 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 				 */
 				s_int_num = (gtm_int_t)(intszofptr_t)src;
 				if (0 != s_int_num)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCSTATUSRET);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZCSTATUSRET);
 				MV_FORCE_MVAL(dst, s_int_num);
 				break;
 			case gtm_jboolean:
@@ -316,7 +316,7 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 				sp = (struct extcall_string *)src;
 				dst->mvtype = MV_STR;
 				if (sp->len > MAX_STRLEN)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 				if ((0 < sp->len) && (NULL != sp->addr))
 				{
 					dst->str.len = (mstr_len_t)sp->len;
@@ -331,7 +331,7 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 					*dst = literal_null;
 				break;
 			default:
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 				break;
 		}
 		return;
@@ -349,7 +349,7 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 			 */
 			s_int_num = (gtm_int_t)(intszofptr_t)src;
 			if (0 != s_int_num)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCSTATUSRET);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZCSTATUSRET);
 			MV_FORCE_MVAL(dst, s_int_num);
 			break;
 		case gtm_int:
@@ -388,12 +388,12 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 			{
 				dst->mvtype = MV_STR;
 				if (sp->len > MAX_STRLEN)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 				if ((0 <= prealloc_size) && (sp->len > prealloc_size)
 						&& (sp->addr >= (char *)ext_buff_start)
 						&& (sp->addr < ((char *)ext_buff_start + ext_buff_len)))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_EXCEEDSPREALLOC, 3,
-							prealloc_size, m_label, sp->len);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_EXCEEDSPREALLOC, 3,
+						prealloc_size, m_label, sp->len);
 				if ((0 < sp->len) && (NULL != sp->addr))
 				{
 					dst->str.len = (mstr_len_t)sp->len;
@@ -419,10 +419,10 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 				dst->mvtype = MV_STR;
 				str_len = STRLEN(cp);
 				if (str_len > MAX_STRLEN)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 				if ((0 <= prealloc_size) && (str_len > prealloc_size))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_EXCEEDSPREALLOC,
-									3, prealloc_size, m_label, str_len);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_EXCEEDSPREALLOC,
+						3, prealloc_size, m_label, str_len);
 				dst->str.len = (mstr_len_t)str_len;
 				dst->str.addr = cp;
 				s2pool(&dst->str);
@@ -442,7 +442,7 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 				double2mval(dst, *((double *)src));
 			break;
 		default:
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 			break;
 	}
 	return;
@@ -532,7 +532,7 @@ STATICFNDEF int extarg_getsize(void *src, enum gtm_types typ, mval *dst, struct 
 			return (int)(sp->len);
 			break;
 		default:
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 			break;
 	}
 
@@ -568,7 +568,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	 * sure we are not trying to pass more than callg can handle.
 	 */
 	if (MAX_ACTUALS < argcnt + 3)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCMAXPARAM);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZCMAXPARAM);
 	VAR_COPY(var_copy, var);
 	/* Compute size of parameter block */
 	n = entry_ptr->parmblk_size + (3 * SIZEOF(void *));	/* This is enough for the parameters and the fixed length entries */
@@ -646,7 +646,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 #		endif
 		jtype_char = entry_ptr->parms[j] - gtm_jtype_start_idx;
 		if ((0 > jtype_char) || (gtm_jtype_count <= jtype_char))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 		else
 			*types_descr_dptr = gtm_jtype_chars[MASK_BIT_ON(m2) ? (gtm_jtype_count + jtype_char) : jtype_char];
 		types_descr_dptr++;
@@ -778,7 +778,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 				break;
 			default:
 				va_end(var_copy);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 				break;
 		}
 		assert(((char *)free_string_pointer <= ((char *)param_list + n * 2))
@@ -807,9 +807,9 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 		error_in_xc = TRUE;
 		jni_err_buf = *(char **)((char *)param_list->arg[0] + SIZEOF(char *));
 		if (NULL != jni_err_buf)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNI, 2, LEN_AND_STR(jni_err_buf));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_JNI, 2, LEN_AND_STR(jni_err_buf));
 		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCSTATUSRET);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZCSTATUSRET);
 	}
 	free(types_descr_ptr);
 	/* Exit from the residual call-in environment(SFF_CI and base frames) which might still exist on M stack when the externally
@@ -874,10 +874,10 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 				{ 	/* Environment variable for the package not found. This part of code is for more safety.
 					 * We should not come into this path at all.
 					 */
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
 				}
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_XCVOIDRET, 4,
-					  LEN_AND_STR(entry_ptr->call_name.addr), LEN_AND_STR(xtrnl_table_name));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_XCVOIDRET, 4,
+					LEN_AND_STR(entry_ptr->call_name.addr), LEN_AND_STR(xtrnl_table_name));
 			}
 		}
 	} else if (dst && (gtm_void != entry_ptr->return_type))
@@ -942,7 +942,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	}
 	/* Entry not found */
 	if ((NULL == entry_ptr) || (NULL == entry_ptr->fcn) || (NULL == entry_ptr->call_name.addr))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCRTENOTF, 2, extref->str.len, extref->str.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCRTENOTF, 2, extref->str.len, extref->str.addr);
 	/* Detect a call-out to Java. */
 	if (!strncmp(entry_ptr->call_name.addr, "gtm_xcj", 7))
 	{
@@ -951,7 +951,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	}
 	/* It is an error to have more actual parameters than formal parameters */
 	if (argcnt > entry_ptr->argcnt)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCARGMSMTCH, 2, argcnt, entry_ptr->argcnt);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCARGMSMTCH, 2, argcnt, entry_ptr->argcnt);
 	VAR_START(var, argcnt);
 	if (java)
 	{
@@ -1060,10 +1060,10 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				{
 					if (0 == package->str.len)
 						/* Default package - do not display package name */
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i + 1,
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i + 1,
 							RTS_ERROR_LITERAL("<DEFAULT>"), extref->str.len, extref->str.addr);
 					else
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i + 1,
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i + 1,
 							package->str.len, package->str.addr, extref->str.len, extref->str.addr);
 				}
 				break;
@@ -1130,13 +1130,13 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				{
 					if (0 == package->str.len)
 						/* Default package - do not display package name */
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i + 1,
-							  RTS_ERROR_LITERAL("<DEFAULT>"),
-							  extref->str.len, extref->str.addr);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i + 1,
+							RTS_ERROR_LITERAL("<DEFAULT>"),
+							extref->str.len, extref->str.addr);
 					else
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i + 1,
-							  package->str.len, package->str.addr,
-							  extref->str.len, extref->str.addr);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i + 1,
+							package->str.len, package->str.addr,
+							extref->str.len, extref->str.addr);
 				}
 				break;
 			case gtm_float_star:
@@ -1173,7 +1173,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				break;
 			default:
 				va_end(var);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 				break;
 		}
 	}
@@ -1241,10 +1241,10 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 			{	/* Environment variable for the package not found. This part of code is for more safety.
 				 * We should not come into this path at all.
 				 */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
 			}
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_XCVOIDRET, 4,
-				  LEN_AND_STR(entry_ptr->call_name.addr), LEN_AND_STR(xtrnl_table_name));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_XCVOIDRET, 4,
+				LEN_AND_STR(entry_ptr->call_name.addr), LEN_AND_STR(xtrnl_table_name));
 		}
 	}
 	free_return_type(status, entry_ptr->return_type);

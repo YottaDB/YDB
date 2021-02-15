@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -244,8 +244,8 @@ enum cdb_sc	op_tcommit(void)
 			 * trigger invocation to be done before completing the explicit (outside-trigger) update.
 			 * Cannot commit such a transaction. Issue error.
 			 */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGTCOMMIT, 2, gtm_trigger_depth,
-					tstart_trigger_depth);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TRIGTCOMMIT, 2, gtm_trigger_depth,
+				tstart_trigger_depth);
 		}
 		if (tp_pointer->cannot_commit)
 		{	/* If this TP transaction was implicit, any unhandled error when crossing the trigger boundary
@@ -254,7 +254,7 @@ enum cdb_sc	op_tcommit(void)
 			 * transaction so we should never see an implicit TP inside op_tcommit.
 			 */
 			assert(!tp_pointer->implicit_tstart);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TCOMMITDISALLOW);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TCOMMITDISALLOW);
 		}
 #		endif
 		save_cur_region = gv_cur_region;
@@ -433,7 +433,7 @@ enum cdb_sc	op_tcommit(void)
 							}
 							cse->blk = new_blk;
 							cse->mode = gds_t_acquired;
-							assert(GDSVCURR == cse->ondsk_blkver);
+							assert((GDSVCURR == cse->ondsk_blkver) || (GDSV6 == cse->ondsk_blkver));
 							/* Assert that in final retry total_blks (private and shared) are in sync */
 							assert((CDB_STAGNATE > t_tries) || !is_mm
 									|| (csa->total_blks == csa->ti->total_blks));
@@ -489,7 +489,7 @@ enum cdb_sc	op_tcommit(void)
 				{
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLOFLOW, 2,
 						DB_LEN_STR(cse->blk_target->gd_csa->region));
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLOFLOW, 2,
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_GBLOFLOW, 2,
 						DB_LEN_STR(cse->blk_target->gd_csa->region));
 				} else if (!skip_invoke_restart)
 					INVOKE_RESTART;

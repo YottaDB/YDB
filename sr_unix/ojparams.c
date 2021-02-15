@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -183,14 +183,14 @@ void ojparams (char *p, job_params_type *job_params)
 		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->params.input.len);
 		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->params.input.buffer),
 									&handle_len, FALSE, socket_pool)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "INPUT",
-					job_params->params.input.len, job_params->params.input.buffer);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "INPUT",
+				job_params->params.input.len, job_params->params.input.buffer);
 	}
 	else
 		if (!(status = ojchkfs (job_params->params.input.buffer,
 					job_params->params.input.len, TRUE)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "INPUT",
-					job_params->params.input.len, job_params->params.input.buffer);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "INPUT",
+				job_params->params.input.len, job_params->params.input.buffer);
 
 /*
  * Output file
@@ -208,14 +208,14 @@ void ojparams (char *p, job_params_type *job_params)
 		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->params.output.len);
 		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->params.output.buffer),
 									&handle_len, FALSE, socket_pool)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "OUTPUT",
-					job_params->params.output.len, job_params->params.output.buffer);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "OUTPUT",
+				job_params->params.output.len, job_params->params.output.buffer);
 	}
 	else
 		if (!(status = ojchkfs (job_params->params.output.buffer,
 					job_params->params.output.len, FALSE)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 6,
-					"OUTPUT", job_params->params.output.len, job_params->params.output.buffer);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_PARFILSPC, 4, 6,
+				"OUTPUT", job_params->params.output.len, job_params->params.output.buffer);
 /*
  * Error file
  */
@@ -232,14 +232,14 @@ void ojparams (char *p, job_params_type *job_params)
 		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->params.error.len);
 		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->params.error.buffer),
 									&handle_len, FALSE, socket_pool)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "ERROR",
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "ERROR",
 				job_params->params.error.len, job_params->params.error.buffer);
 	}
 	else
 		if (!(status = ojchkfs (job_params->params.error.buffer,
 					job_params->params.error.len, FALSE)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "ERROR",
-					job_params->params.error.len, job_params->params.error.buffer);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "ERROR",
+				job_params->params.error.len, job_params->params.error.buffer);
 /*
  * Global Directory
  */
@@ -252,24 +252,24 @@ void ojparams (char *p, job_params_type *job_params)
 	else
 		if (!(status = ojchkfs (job_params->params.gbldir.buffer,
 					job_params->params.gbldir.len, FALSE)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 6, "GBLDIR",
-					job_params->params.gbldir.len, job_params->params.gbldir.buffer);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_PARFILSPC, 4, 6, "GBLDIR",
+				job_params->params.gbldir.len, job_params->params.gbldir.buffer);
 /*
  * Startup
  */
 	if (job_params->params.startup.len)
 		if (!(status = ojchkfs (job_params->params.startup.buffer,
 					job_params->params.startup.len, TRUE)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 7, "STARTUP",
-					job_params->params.startup.len, job_params->params.startup.buffer);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_PARFILSPC, 4, 7, "STARTUP",
+				job_params->params.startup.len, job_params->params.startup.buffer);
 /*
  * Default Directory
  */
 	if (job_params->params.directory.len)
 		if (!(status = ojchkfs (job_params->params.directory.buffer,
 					job_params->params.directory.len, FALSE)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 7, "DEFAULT",
-					job_params->params.directory.len, job_params->params.directory.buffer);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_PARFILSPC, 4, 7, "DEFAULT",
+				job_params->params.directory.len, job_params->params.directory.buffer);
 
 	/* Gather local variables to pass */
 	if (job_params->passcurlvn)

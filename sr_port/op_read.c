@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,7 +91,7 @@ int op_read(mval *v, mval *timeout)
 	{
 		/* Logging has failed so terminate */
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_APDLOGFAIL);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_APDLOGFAIL);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_APDLOGFAIL);
 	}
 	return ((NO_M_TIMEOUT != msec_timeout) ? stat : FALSE);
 }

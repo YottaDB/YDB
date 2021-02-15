@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,28 +26,16 @@
 
 /* mstr needs to be defined before including "mdefsp.h".  */
 typedef int mstr_len_t;
-#ifndef __vms
 typedef struct
 {
 	unsigned int	char_len;	/* Character length */
 	mstr_len_t	len;
 	char		*addr;
 } mstr;
-#  define MSTR_CONST(name, string)		mstr name = {0, LEN_AND_LIT(string)}
-#  define MSTR_DEF(name, length, string)	mstr name = {0, length, string}
-#  define MIDENT_CONST(name, string)	    mident name = {0, LEN_AND_LIT(string)}
-#  define MIDENT_DEF(name, length, string)      mident name = {0, length, string}
-#else
-typedef struct
-{
-	mstr_len_t	len;		/* Byte length */
-	char		*addr;
-} mstr;
-#  define MSTR_CONST(name, string)		mstr name = {LEN_AND_LIT(string)}
-#  define MSTR_DEF(name, length, string)	mstr name = {length, string}
-#  define MIDENT_CONST(name, string)	    mident name = {LEN_AND_LIT(string)}
-#  define MIDENT_DEF(name, length, string)      mident name = {length, string}
-#endif
+#define MSTR_CONST(name, string)		mstr name = {0, LEN_AND_LIT(string)}
+#define MSTR_DEF(name, length, string)		mstr name = {0, length, string}
+#define MIDENT_CONST(name, string)		mident name = {0, LEN_AND_LIT(string)}
+#define MIDENT_DEF(name, length, string)	mident name = {0, length, string}
 
 #define GET_MSTR_LEN(X, Y)	GET_ULONG(X, Y)
 #define PUT_MSTR_LEN(X, Y)	PUT_ULONG(X, Y)
@@ -165,14 +153,9 @@ static inline int gtm_abrt() { abort(); return 0;}
 #	define	GTM_FD_TRACE_ONLY(X)
 #endif
 
-/* Define what is an invalid file descriptor in UNIX and VMS. */
-#if defined(UNIX)
-#	define	FD_INVALID		-1	/* fd of -1 is invalid in UNIX posix calls */
-#	define	FD_INVALID_NONPOSIX	FD_INVALID
-#else
-#	define	FD_INVALID		-1	/* fd of -1 is invalid in VMS if using POSIX interface (open/close etc.) */
-#	define	FD_INVALID_NONPOSIX	 0	/* fd of 0 is invalid in VMS if using RMS sys$open calls (non-posix interface) */
-#endif
+/* Define what is an invalid file descriptor */
+#define	FD_INVALID		-1	/* fd of -1 is invalid in UNIX posix calls */
+#define	FD_INVALID_NONPOSIX	FD_INVALID
 
 #if defined(UNIX)
 #	define	USE_POLL
@@ -506,6 +489,10 @@ mval *underr_strict(mval *start, ...);
 #define MV_FORCE_INTD(M)	(DBG_ASSERT(MV_DEFINED(M)) (M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2i(M))
 #define MV_FORCE_UINT(M)	(MV_FORCE_DEFINED(M), MV_FORCE_UINTD(M))
 #define MV_FORCE_UINTD(M)	(DBG_ASSERT(MV_DEFINED(M)) (M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2ui(M))
+#define MV_FORCE_LONG(M)	(MV_FORCE_DEFINED(M), MV_FORCE_LONGD(M))
+#define MV_FORCE_LONGD(M)	(DBG_ASSERT(MV_DEFINED(M)) (M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2i8(M))
+#define MV_FORCE_ULONG(M)	(MV_FORCE_DEFINED(M), MV_FORCE_ULONGD(M))
+#define MV_FORCE_ULONGD(M)	(DBG_ASSERT(MV_DEFINED(M)) (M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2ui8(M))
 #define MV_FORCE_UMVAL(M,I)	(((I) >= 1000000) ? i2usmval((M),(int)(I)) : \
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS ))
 #define MV_FORCE_MVAL(M,I)	(((I) >= 1000000 || (I) <= -1000000) ? i2mval((M),(int)(I)) : \
@@ -692,10 +679,6 @@ int	rts_error(int argcnt, ...)			CLANG_SCA_ANALYZER_NORETURN;
 int	rts_error_csa(void *csa, int argcnt, ...)	CLANG_SCA_ANALYZER_NORETURN;	/* Use CSA_ARG(CSA) for portability */
 #define CSA_ARG(CSA)	(CSA),
 void	dec_err(uint4 argcnt, ...);
-#elif defined(VMS)
-#define rts_error_csa	rts_error
-#define CSA_ARG(CSA)	/* no csa arg on VMS */
-void dec_err(int4 msgnum, ...);
 #else
 #error unsupported platform
 #endif
@@ -704,6 +687,23 @@ void stx_error_va(int in_error, va_list args);
 void ins_errtriple(int4 in_error);
 
 int4 timeout2msec(int4 timeout);
+
+/* These two macros add an assert(FALSE) to follow the standard
+ * rts_error_csa() & rts_error() functions so that static analysis knows that there
+ * is no coming back from an invocation (and thus that code after an rts call will
+ * not be executed). These macros should only be used for fatal calls
+ * (ie: not for "info" level errors) */
+#define RTS_ERROR_CSA_ABT(CSA, ...)		\
+MBSTART {					\
+	rts_error_csa(CSA, __VA_ARGS__);	\
+	assert(FALSE);				\
+} MBEND
+
+#define RTS_ERROR_ABT(...)			\
+MBSTART {					\
+	rts_error(__VA_ARGS__);			\
+	assert(FALSE);				\
+} MBEND
 
 /* the RTS_ERROR_TEXT macro will stay till all existing references to it have been renamed to RTS_ERROR_{LITERAL,STRING} */
 #define	RTS_ERROR_TEXT(STRING)		LENGTH_AND_STRING(STRING)
@@ -828,11 +828,7 @@ void m_usleep(int useconds);
 
 #define OS_PAGE_SIZE		gtm_os_page_size
 #define OS_PAGE_SIZE_DECLARE	GBLREF int4 gtm_os_page_size;
-#ifdef VMS
-#	define MAX_IO_BLOCK_SIZE	DISK_BLOCK_SIZE
-#else
-#	define MAX_IO_BLOCK_SIZE	65536
-#endif
+#define MAX_IO_BLOCK_SIZE	65536
 
 #ifndef GTM_INT64T_DEFINED
 #define GTM_INT64T_DEFINED
@@ -1215,17 +1211,12 @@ typedef INTPTR_T  ptroff_t;
 #  define OFF_T(name,fillnum) FILL8DCL(off_t,name,fillnum)
 #endif
 
-/* Type for offsets in journal files.  VMS uses uint4 to get a full 32 bit
-   offset for large journal files (OK since doesn't use lseek/etc. for IO.) */
+/* Type for offsets in journal files. */
 
 #ifdef OFF_T_LONG
 #  define JNL_OFF_T(name,fillnum) off_t	    name
 #else
-#  ifdef VMS
-#    define JNL_OFF_T(name,fillnum) FILL8DCL(uint4,name,fillnum)
-#  else
-#    define JNL_OFF_T(name,fillnum) FILL8DCL(off_t,name,fillnum)
-#  endif
+#  define JNL_OFF_T(name,fillnum) FILL8DCL(off_t,name,fillnum)
 #endif
 
 /* Need to define a consistently sized counter that is controlled by interlocks. The counter
@@ -1454,11 +1445,7 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define STR_LEN_OF_E_9		10
 #define ASSERT_IN_RANGE(low, x, high)	assert((low <= x) && (x <= high))
 
-#if defined(VMS)
-#define DAYS		6530  /* adjust VMS returned days by this amount; GTM zero time Dec 31, 1840, VMS zero time 7-NOV-1858 */
-#define VARLSTCNT1(CNT)			VARLSTCNT(CNT)
-#define PUT_SYS_ERRNO(SYS_ERRNO) 	SYS_ERRNO
-#elif defined(UNIX)
+#if defined(UNIX)
 #define DAYS		47117 /* adjust UNIX returned days (seconds converted to days); UNIX zero time 1970 */
 #define VARLSTCNT1(CNT)			VARLSTCNT(CNT + 1)
 #define PUT_SYS_ERRNO(SYS_ERRNO) 	0, SYS_ERRNO
@@ -1474,7 +1461,6 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define EXIT_MASK 	7
 #define MIN_FN_LEN	1
 #define MAX_FN_LEN	255
-#define V4_MAX_FN_LEN	255	/* required for dbcertify.h */
 #define MAX_TRANS_NAME_LEN	257
 
 typedef uint4 		jnl_tm_t;

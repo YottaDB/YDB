@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,7 @@ void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl);
 
 mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 				   unsigned char *val,		/* the subscript */
-				   int len,			/* subscript's length */
+				   unsigned char len,		/* subscript's length */
 				   mlk_shrblk_ptr_t par,	/* pointer to the parent (zero if top level) */
 				   ptroff_t *ptr,		/* parent's pointer to us (zero if we are not the eldest child) */
 				   int nshrs)			/* number of shrblks remaining to be created for this operation */
@@ -85,7 +85,7 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 	A2R(subptr->backpointer, ret);
 	assert(subptr->backpointer < 0);
 	subptr->length = len;
-	memcpy(subptr->data, val, len);
+	memcpy(subptr->data, val, (size_t)subptr->length);
 	assert(p->hash_seed == ctl->hash_seed);
 	ret->hash = MLK_PVTBLK_SUBHASH(p, p->subscript_cnt - nshrs);
 	if (mlk_shrhash_add(&p->pvtctl, ret))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -284,14 +284,14 @@ static	void	clean_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 #		  else
 		if ((NULL == (status = msem_init(&q_free_entry->mutex_wake_msem, MSEM_LOCKED))) || ((msemaphore *)-1 == status))
 #		  endif
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 				RTS_ERROR_TEXT("Error with mutex wait memory semaphore initialization"), errno);
 #		endif
 		/* Initialize fl,bl links to 0 before INSQTI as it (gtm_insqti in relqueopi.c) asserts this */
 		DEBUG_ONLY(((que_ent_ptr_t)q_free_entry)->fl = 0;)
 		DEBUG_ONLY(((que_ent_ptr_t)q_free_entry)->bl = 0;)
 		if (INTERLOCK_FAIL == INSQTI((que_ent_ptr_t)q_free_entry++, (que_head_ptr_t)&addr->freehead))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 				RTS_ERROR_TEXT("Interlock instruction failure in mutex initialize"));
 	}
 	SET_LATCH_GLOBAL(&addr->semaphore, LOCK_AVAILABLE);
@@ -417,7 +417,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 						      process_id, heartbeat_counter);
 				} else
 				{
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 						RTS_ERROR_TEXT("Error with mutex wake msem"), save_errno);
 				}
 			}
@@ -643,42 +643,42 @@ void	gtm_mutex_init(gd_region *reg, int n, bool crash)
 		status = pthread_mutex_destroy(&csa->critical->mutex);
 		if (0 != status)
 		{
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutex_destroy"),
-					CALLFROM, status);
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutex_destroy"),
+				CALLFROM, status);
 		}
 	}
 	/* Set up mutex for new file */
 	status = pthread_mutexattr_init(&crit_attr);
 	if (0 != status)
 	{
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_init"),
-				CALLFROM, status);
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_init"),
+			CALLFROM, status);
 	}
 	status = pthread_mutexattr_settype(&crit_attr, PTHREAD_MUTEX_ERRORCHECK);
 	if (0 != status)
 	{
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_settype"),
-				CALLFROM, status);
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_settype"),
+			CALLFROM, status);
 	}
 	status = pthread_mutexattr_setpshared(&crit_attr, PTHREAD_PROCESS_SHARED);
 	if (0 != status)
 	{
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_setpshared"),
-				CALLFROM, status);
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_setpshared"),
+			CALLFROM, status);
 	}
 #	if PTHREAD_MUTEX_ROBUST_SUPPORTED
 	status = pthread_mutexattr_setrobust(&crit_attr, PTHREAD_MUTEX_ROBUST);
 	if (0 != status)
 	{
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_setrobust"),
-				CALLFROM, status);
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_setrobust"),
+			CALLFROM, status);
 	}
 #	endif
 	status = pthread_mutex_init(&csa->critical->mutex, &crit_attr);
 	if (0 != status)
 	{
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutex_init"),
-				CALLFROM, status);
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutex_init"),
+			CALLFROM, status);
 	}
 #	else
 	if (!crash)
@@ -757,8 +757,8 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 			local_stuck_cycle = csa->critical->stuck_cycle;
 			status = clock_gettime(CLOCK_REALTIME, &timeout);
 			if (0 != status)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-						LEN_AND_LIT("clock_gettime"), CALLFROM, errno, 0);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("clock_gettime"), CALLFROM, errno, 0);
 			timeout.tv_sec += MUTEX_CONST_TIMEOUT_VAL;
 			status = pthread_mutex_timedlock(&csa->critical->mutex, &timeout);
 		}
@@ -784,8 +784,8 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 #				if PTHREAD_MUTEX_CONSISTENT_SUPPORTED
 				status = pthread_mutex_consistent(&csa->critical->mutex);
 				if (0 != status)
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5,
-							LEN_AND_LIT("pthread_mutex_consistent"), CALLFROM, status);
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5,
+						LEN_AND_LIT("pthread_mutex_consistent"), CALLFROM, status);
 #				endif
 				/* fall through */
 			case 0:

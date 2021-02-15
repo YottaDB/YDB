@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,6 +120,6 @@ int gtm_close(int fd);
 int gtm_pipe1(int pipefd[2]);
 int gtm_dup(int oldfd);
 int gtm_dup2(int oldfd, int newfd);
-int gtm_confstr(char *command, int maxsize);
+int gtm_confstr(char *command, unsigned int maxsize);
 
 #endif

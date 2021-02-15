@@ -176,7 +176,7 @@ foreach i ( $lintgtm_liblist )
 		# Exclude files that define the same externals (e.g., "main" and the VMS CLI [command line interpreter]
 		# emulator arrays):
 		pwd
-		rm -f gtm.c lke.c lke_cmd.c dse.c dse_cmd.c mupip.c mupip_cmd.c daemon.c gtmsecshr.c semstat2.c ftok.c
+		rm -f gtm.c lke.c lke_cmd.c dse.c dse_cmd.c mupip.c mupip_cmd.c daemon.c gtmsecshr.c
 		gt_lint ${gt_lint_option_output}$i $gt_lint_options $gt_lint_options_library *.c >>& llib-l$i.log
 		rm *.c
 		breaksw
@@ -205,12 +205,6 @@ gt_lint $gt_lint_options {lke,lke_cmd}.c llib-l{lke,mumps,stub}.ln $gt_lint_sysl
 
 cp $gtm_src/{mupip,mupip_cmd}.c .
 gt_lint $gt_lint_options {mupip,mupip_cmd}.c llib-l{mupip,mumps,stub,dse}.ln $gt_lint_syslibs >& lint.mupip.log
-
-cp $gtm_src/semstat2.c .
-gt_lint $gt_lint_options semstat2.c $gt_lint_syslibs >& lint.semstat2.log
-
-cp $gtm_src/ftok.c .
-gt_lint $gt_lint_options ftok.c $gt_lint_syslibs >& lint.ftok.log
 
 chmod +w *.c
 rm *.h *.c

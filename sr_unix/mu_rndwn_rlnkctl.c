@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,7 @@ void mu_rndwn_rlnkctl(void)
 		assert(1 == TREF(parms_cnt));
 		param_len = SIZEOF(objdir) - 1;
 		if (!cli_get_str("WHAT", objdir, &param_len))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
 		objdir[param_len] = '\0';
 		dir.addr = objdir;
 		dir.len = param_len;
@@ -79,7 +79,7 @@ void mu_rndwn_rlnkctl(void)
 				 * proper length needs to be restored.
 				 */
 				dir.len = param_len;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, RTS_ERROR_MSTR(&dir), errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2, RTS_ERROR_MSTR(&dir), errno);
 			} else
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RLNKCTLRNDWNSUC, 2, RTS_ERROR_MSTR(&dir));
 		} else

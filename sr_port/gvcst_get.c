@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -184,7 +184,7 @@ boolean_t gvcst_get2(mval *v, unsigned char *sn_ptr)
 	assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 	for (;;)
 	{
-#		if defined(DEBUG)
+#		ifdef DEBUG
 		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVGETFAIL == gtm_white_box_test_case_number)
 			&& !IS_STATSDB_REG(gv_cur_region))
 		{

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,17 +27,17 @@
  * since this is the first environment variable that will be passed to trans_log_name and needs
  * to be translated BEFORE doing any mallocs hence the initial static allocation of MAX_TRANS_NAME_LEN bytes.
  */
-STATICDEF char	trans_log_name_startbuff[MAX_TRANS_NAME_LEN];
-STATICDEF int	trans_log_name_buflen = MAX_TRANS_NAME_LEN - 1;	/* length of buffer currently allocated */
-STATICDEF char	*trans_log_name_buff = &trans_log_name_startbuff[0];
+STATICDEF char		trans_log_name_startbuff[MAX_TRANS_NAME_LEN];
+STATICDEF unsigned int	trans_log_name_buflen = MAX_TRANS_NAME_LEN - 1;	/* length of buffer currently allocated */
+STATICDEF char		*trans_log_name_buff = &trans_log_name_startbuff[0];
+
+error_def(ERR_LOGTOOLONG);
 
 int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, translog_act do_sendmsg)
 {
-	char	*s_start, *s_ptr, *s_top, *tran_buff, *b_ptr, *b_top, ch;
-	int	len, s_len;
-	int4	ret;
-
-	error_def(ERR_LOGTOOLONG);
+	char		*s_start, *s_ptr, *s_top, *tran_buff, *b_ptr, *b_top, ch;
+	unsigned int	s_len;
+	int4		ret;
 
 	ret = SS_NOLOGNAM; /* assume we don't find it */
 	b_ptr = buffer; /* b_ptr is points to next place to fill in in output buffer */
@@ -52,7 +53,7 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 			/* For non-initial pass copy any non-env var text that we have passed over into output buffer
 			 * and update output buffer pointer. Before that check if output buffer can hold that data.
 			 */
-			s_len = (int)(s_ptr - s_start);
+			s_len = (unsigned int)(s_ptr - s_start);
 			if ((b_ptr + s_len) >= b_top)
 			{
 				ret = SS_LOG2LONG;
@@ -60,13 +61,12 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 			}
 			memcpy(b_ptr, s_start, s_len);
 			b_ptr += s_len;
-			assert(b_ptr < b_top);
 			/* Move forward in input buffer (over text just processed) */
 			s_start = s_ptr++;
 			/* Get the env var name. Take care not to exceed input string length */
 			for ( ; (s_ptr < s_top) && (ch = *s_ptr, ('_' == ch) || ISALNUM_ASCII(ch)); s_ptr++)
 				;
-			s_len = (int)(s_ptr - s_start) - 1;
+			s_len = (unsigned int)(s_ptr - s_start) - 1;
 			/* Copy it into "temporary-buffer" so we can null-terminate it and pass to GETENV */
 			if (trans_log_name_buflen <= s_len)
 			{	/* Currently allocated buffer is not enough. Expand it. */
@@ -75,6 +75,7 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 					free(trans_log_name_buff);
 				trans_log_name_buff = malloc(s_len + 1);
 				trans_log_name_buflen = s_len + 1;
+				assert(NULL != trans_log_name_buff); /* gird against malloc failure */
 			}
 			memcpy(trans_log_name_buff, s_start + 1, s_len);
 			trans_log_name_buff[s_len] = 0;
@@ -82,11 +83,11 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 			if (NULL != (tran_buff = GETENV(trans_log_name_buff)))
 			{
 				s_start = tran_buff;
-				s_len = STRLEN(tran_buff);
+				s_len = strlen(tran_buff);
 				ret = SS_NORMAL;
 			} else
 			{	/* if there is no env var then just copy the name of the env var name including $ */
-				s_len = (int)(s_ptr - s_start);
+				s_len = (unsigned int)(s_ptr - s_start);
 			}
 			if ((b_ptr + s_len) >= b_top)
 			{
@@ -103,7 +104,7 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 	}
 	if (SS_LOG2LONG != ret)
 	{	/* if there is anything left after the last env var name, copy it */
-		s_len = (int)(s_ptr - s_start);
+		s_len = (unsigned int)(s_ptr - s_start);
 		if ((b_ptr + s_len) >= b_top)
 			ret = SS_LOG2LONG;
 		else
@@ -123,6 +124,7 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 	 */
 	trans->addr[trans->len] = '\0';
 	if (do_sendmsg && (SS_LOG2LONG == ret))
-		send_msg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log->len, log->addr, buffer_len - 1);	/* - 1 for terminating null byte */
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG,
+				3, log->len, log->addr, buffer_len - 1);	/* - 1 for terminating null byte */
 	return ret;
 }

@@ -1163,7 +1163,7 @@
 
    Example:
 
-   DSE> change -fileheader -reserved_bytes=8 -record_max_size=496
+   DSE> change -fileheader -record_max_size=496
 
    This command sets the maximum record size as 496 for the default region.
 
@@ -1805,7 +1805,7 @@
 
    Use Alone.
 
-   -S[IBLINGS]
+   -SI[BLINGS]
 
    Displays the block number of the specified block and its logical siblings
    in hexadecimal format.
@@ -2859,7 +2859,7 @@
    | -           | -R[EGION][=region]                 | Use alone           |
    |-------------+------------------------------------+---------------------|
    |             |                                    | Incompatible with   |
-   | -           | -S[BLINGS]                         | -FREEBLOCK, -HINT,  |
+   | -           | -SI[BLINGS]                        | -FREEBLOCK, -HINT,  |
    |             |                                    | -KEY, -REGION       |
    |-------------+------------------------------------+---------------------|
    | H[ELP]      | [help topic]                       | -                   |
@@ -2952,7 +2952,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2020
+   Copyright 2021
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

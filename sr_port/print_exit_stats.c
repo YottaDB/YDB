@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,9 +49,10 @@ void print_exit_stats(void)
 	DBGMCALC_ONLY(int		mcblkcnt = 0;)
 	DBGMCALC_ONLY(ssize_t		mcblktot = 0;)
 	DBGMCALC_ONLY(mcalloc_hdr	*mcptr;)
-	char				pmap_buf[64] = PMAPSTR;
+	char				pmap_buf[MAX_FN_LEN] = PMAPSTR;
 	char				systembuff[MAX_FN_LEN];
 	char				*cmdptr;
+	int				rc;
 
 	if ((GDL_SmStats | GDL_SmDumpTrace | GDL_SmDump) & gtmDebugLevel)
 	{
@@ -81,13 +82,14 @@ void print_exit_stats(void)
 		cmdptr = &systembuff[0];
 		MEMCPY_LIT(cmdptr, UNALIAS);
 		cmdptr += STR_LIT_LEN(UNALIAS);
-		CONFSTR(pmap_buf, 64);
+		CONFSTR(pmap_buf, MAX_FN_LEN);
 		memcpy(cmdptr, pmap_buf, STRLEN(pmap_buf));
 		cmdptr += STRLEN(pmap_buf);
 		cmdptr = (char *)i2asc((uchar_ptr_t)cmdptr, getpid());
 		*cmdptr = '\0';
 		assert(cmdptr <= ARRAYTOP(systembuff));
-		SYSTEM(systembuff);
+		rc = SYSTEM(systembuff);
+		assert(0 == rc);
 	}
 #	ifdef DEBUG_MCALC
 	/* Find out how many plus total size of mcalloc() blocks exist and print the stats */

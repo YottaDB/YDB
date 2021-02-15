@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2019 Fidelity National Information	*
+ * Copyright (c) 2008-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@ error_def(ERR_COMMITWAITSTUCK);
 		STUCK_CNT++;											\
 		GET_C_STACK_FROM_SCRIPT("COMMITWAITPID", process_id, BLOCKING_PID, STUCK_CNT);			\
 		send_msg_csa(CSA_ARG(CSA) VARLSTCNT(8) ERR_COMMITWAITPID, 6,					\
-			process_id, 1, BLOCKING_PID, CR->blk, DB_LEN_STR(CSA->region));				\
+			process_id, 1, BLOCKING_PID, &(CR->blk), DB_LEN_STR(CSA->region));			\
 	}													\
 }
 

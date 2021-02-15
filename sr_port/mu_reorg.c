@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -704,17 +704,19 @@ void reorg_finish(block_id dest_blk_id, block_id blks_processed, block_id blks_k
 {
 	t_abort(gv_cur_region, cs_addrs);
 	file_extended = cs_data->trans_hist.total_blks - file_extended;
-	util_out_print("Blocks processed    : !SL ", FLUSH, blks_processed);
-	util_out_print("Blocks coalesced    : !SL ", FLUSH, blks_coalesced);
-	util_out_print("Blocks split        : !SL ", FLUSH, blks_split);
-	util_out_print("Blocks swapped      : !SL ", FLUSH, blks_swapped);
-	util_out_print("Blocks freed        : !SL ", FLUSH, blks_killed);
-	util_out_print("Blocks reused       : !SL ", FLUSH, blks_reused);
+	util_out_print("Blocks processed    : !@UQ ", FLUSH, &blks_processed);
+	util_out_print("Blocks coalesced    : !@UQ ", FLUSH, &blks_coalesced);
+	util_out_print("Blocks split        : !@UQ ", FLUSH, &blks_split);
+	util_out_print("Blocks swapped      : !@UQ ", FLUSH, &blks_swapped);
+	util_out_print("Blocks freed        : !@UQ ", FLUSH, &blks_killed);
+	util_out_print("Blocks reused       : !@UQ ", FLUSH, &blks_reused);
 	if (0 > lvls_reduced)
-		util_out_print("Levels Increased    : !SL ", FLUSH, -lvls_reduced);
-	else if (0 < lvls_reduced)
-		util_out_print("Levels Eliminated   : !SL ", FLUSH, lvls_reduced);
-	util_out_print("Blocks extended     : !SL ", FLUSH, file_extended);
+	{
+		lvls_reduced = -1 * lvls_reduced;
+		util_out_print("Levels Increased    : !@UQ ", FLUSH, &lvls_reduced);
+	} else if (0 < lvls_reduced)
+		util_out_print("Levels Eliminated   : !@UQ ", FLUSH, &lvls_reduced);
+	util_out_print("Blocks extended     : !@UQ ", FLUSH, &file_extended);
 	cs_addrs->reorg_last_dest = dest_blk_id;
 	/* next attempt for this global will start from the beginning, if RESUME option is present */
 	cs_data->reorg_restart_block = 0;

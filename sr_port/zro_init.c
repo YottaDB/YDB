@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,9 +40,9 @@ void zro_init(void)
 	if ((SS_NORMAL != status) && (SS_NOLOGNAM != status))
 	{
 		if (SS_LOG2LONG == status)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf1) - 1);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf1) - 1);
 		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) status);
 	}
 	if ((0 == tn.len) || (SS_NOLOGNAM == status))
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -141,7 +141,7 @@ int	op_job(int4 argcnt, ...)
 	if (-1 == pipe_status)
 	{
 		va_end(var);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Error creating pipe"), errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Error creating pipe"), errno);
 	}
 	jobcnt++;
 	command.addr = &combuf[0];
@@ -158,7 +158,7 @@ int	op_job(int4 argcnt, ...)
 	if (!job_params.params.routine.len)
 	{
 		va_end(var);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JOBFAIL, 0, ERR_NULLENTRYREF, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_JOBFAIL, 0, ERR_NULLENTRYREF, 0);
 	}
 	/* Start the timer */
 	ojtimeout = timed = FALSE;
@@ -224,15 +224,15 @@ int	op_job(int4 argcnt, ...)
 		{
 			DOREADRC(pipe_fds[0], &job_errno, SIZEOF(job_errno), pipe_status);
 			if (0 < pipe_status)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, joberrs[exit_stat].len,
-										joberrs[exit_stat].msg, 2, errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, joberrs[exit_stat].len,
+					joberrs[exit_stat].msg, 2, errno);
 			if (ERR_JOBLVN2LONG == job_errno)
 			{	/* This message takes buffer_size as argument so take it before closing the pipe */
 				DOREADRC(pipe_fds[0], &buffer_size, SIZEOF(buffer_size), pipe_status);
 				if (0 < pipe_status)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
-						      LEN_AND_LIT("Error reading buffer_size from pipe after a JOBLVN2LONG error"),
-						      errno);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
+						LEN_AND_LIT("Error reading buffer_size from pipe after a JOBLVN2LONG error"),
+						errno);
 			}
 		}
 	}
@@ -240,8 +240,8 @@ int	op_job(int4 argcnt, ...)
 	DOREADRC(pipe_fds[0], &zjob_pid, SIZEOF(zjob_pid), pipe_status);
 	/* empty pipe (pipe_status == -1) is ignored and not reported as error */
 	if (0 < pipe_status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
-					LEN_AND_LIT("Error reading zjobid from pipe"), errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
+			LEN_AND_LIT("Error reading zjobid from pipe"), errno);
 	/* release the pipe; also resets "pipe_fds[0]" to FD_INVALID */
 	CLOSEFILE_RESET(pipe_fds[0], pipe_status);
 	if (status)
@@ -251,7 +251,7 @@ int	op_job(int4 argcnt, ...)
 		if (non_exit_return)
 		{
 			if (TIMEOUT_ERROR != status) 		/* one of errno returns, not the wait_status/timeout situation */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_JOBFAIL, 0, status);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_JOBFAIL, 0, status);
 			else
 				return FALSE;
 		} else							/* wait_status from the child */
@@ -262,47 +262,47 @@ int	op_job(int4 argcnt, ...)
 				memcpy(buff, joberrs[joberr_sig].msg, joberrs[joberr_sig].len);
 				c = i2asc(&buff[joberrs[joberr_sig].len], term_sig);
 				assert(FALSE);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2, c - buff, buff);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2, c - buff, buff);
 			} else if (WIFSTOPPED(wait_stat))		/* child was STOPped */
 			{
 				stop_sig =  WSTOPSIG(wait_stat);	/* signal that caused the stop */
 				memcpy(buff, joberrs[joberr_stp].msg, joberrs[joberr_stp].len);
 				c = i2asc(&buff[joberrs[joberr_stp].len], stop_sig);
 				assert(FALSE);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2, c - buff, buff);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2, c - buff, buff);
 			} else if (WIFEXITED(wait_stat))			/* child EXITed normally */
 			{
 				if (exit_stat < joberr_stp)		/* one of our EXITs */
 				{
 					if ((-1 == job_errno) || (0 == job_errno))
 					{
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
-							  joberrs[exit_stat].len,
-							  joberrs[exit_stat].msg);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
+							joberrs[exit_stat].len,
+							joberrs[exit_stat].msg);
 					} else if (ERR_JOBLVN2LONG == job_errno)
 					{
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JOBLVN2LONG, 2, MAX_STRLEN,
-							      buffer_size);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_JOBLVN2LONG, 2, MAX_STRLEN,
+							buffer_size);
 					} else
 					{
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
-							  joberrs[exit_stat].len,
-							  joberrs[exit_stat].msg,
-							  job_errno);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
+							joberrs[exit_stat].len,
+							joberrs[exit_stat].msg,
+							job_errno);
 					}
 				} else					/* unknown exit status */
 				{
 					assert(FALSE);
 					util_out_print("Unknown exit status !UL (status = !UL)", TRUE, exit_stat, status);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
-						  joberrs[joberr_gen].len, joberrs[joberr_gen].msg);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
+						joberrs[joberr_gen].len, joberrs[joberr_gen].msg);
 				}
 			} else
 			{
 				assert(FALSE);
 				util_out_print("Unknown wait status !UL", TRUE, status);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
-						joberrs[joberr_gen].len, joberrs[joberr_gen].msg);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
+					joberrs[joberr_gen].len, joberrs[joberr_gen].msg);
 			}
 		}
 	} else

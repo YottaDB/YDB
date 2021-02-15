@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,18 +50,18 @@ error_def(ERR_NOTGBL);
 error_def(ERR_VIEWARGCNT);
 error_def(ERR_VIEWGVN);
 error_def(ERR_VIEWLVN);
+error_def(ERR_VIEWREGLIST);
 
 void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *parmblk, boolean_t is_dollar_view)
 {
-	char			*cptr;
-	char			*strtokptr;
+	char			*cptr, *strtokptr;
 	gd_binding		*gd_map;
 	gd_region		*gd_reg_start, *r_ptr, *r_top;
 	gvnh_reg_t		*gvnh_reg;
 	gvnh_spanreg_t		*gvspan;
 	gv_namehead		*tmp_gvt;
 	ht_ent_mname		*tabent;
-	int			cmp, done, n, reg_index;
+	int			cmp, n, reg_index, targ;
 	mident_fixed		lcl_buff;
 	mname_entry		gvent, lvent;
 	mstr			namestr, tmpstr;
@@ -75,7 +75,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 	{
 		case VTP_NULL:
 			if (parm != 0)
-				rts_error_csa(CSA_ARG(NULL)
+				RTS_ERROR_CSA_ABT(NULL,
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			break;
 		case (VTP_NULL | VTP_VALUE):
@@ -87,7 +87,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			/* caution:  fall through */
 		case VTP_VALUE:
 			if ((NULL == parm) && (VTK_JNLERROR != vtp->keycode))
-				rts_error_csa(CSA_ARG(NULL)
+				RTS_ERROR_CSA_ABT(NULL,
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			parmblk->value = parm;
 			if (is_dollar_view || (VTK_JNLERROR != vtp->keycode))
@@ -140,30 +140,37 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			}/* WARNING: possible fall through - to operate on 1 or more selected regions */
 		case VTP_DBREGION:
 			if ((NULL == parm) && (VTK_JNLERROR != vtp->keycode))
-				rts_error_csa(CSA_ARG(NULL)
+				RTS_ERROR_CSA_ABT(NULL,
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			if (!gd_header)							/* IF GD_HEADER == 0 THEN OPEN GBLDIR */
 				gvinit();
 			if (!parm->str.len)
 			{								/* No region */
 				if (vtp->keycode != VTK_GVNEXT)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, LEN_AND_LIT("\"\""));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NOREGION, 2, LEN_AND_LIT("\"\""));
 				parmblk->gv_ptr = gd_header->regions;	 		/* "" => 1st region */
 			} else
 			{
 				namestr.addr = &lcl_buff.c[0];
-				for (cptr = parm->str.addr, done = n = 0; n < parm->str.len; cptr++)
+				for (cptr = parm->str.addr, targ = n = 0; n < parm->str.len; cptr++)
 				{
-					lcl_buff.c[n++] = TOUPPER(*cptr);		/* Region names are upper-case ASCII */
+					lcl_buff.c[targ++] = TOUPPER(*cptr);		/* Region names are upper-case ASCII */
+					n++;
 					if (',' == *cptr)
-						namestr.len = n - 1 - done;		/* back off the comma */
+						namestr.len = targ - 1;			/* back off the comma */
 					else if (n == parm->str.len)
-						namestr.len = n - done;
-					else
+						namestr.len = targ;
+					else if (MAX_MIDENT_LEN > targ)
 						continue;
+					else
+					{	/* time to truncate */
+						namestr.len = targ;
+						for (cptr++, n++; (n < parm->str.len) && (',' != *cptr); cptr++, n++)
+							;	/* step past truncated characters */
+					}
 					for (r_ptr = gd_header->regions, r_top = r_ptr + gd_header->n_regions; ; r_ptr++)
 					{
-						if ((r_ptr >= r_top) || (done && is_dollar_view))
+						if (r_ptr >= r_top)
 						{
 							PUSH_MV_STENT(MVST_MVAL);
 							tmpmv = &mv_chain->mv_st_cont.mvs_mval;
@@ -175,7 +182,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 								(uchar_ptr_t)stringpool.free, &n);
 							stringpool.free += n;
 							tmpmv->str.len = n;
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, n,
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NOREGION, 2, n,
 								tmpmv->str.addr);
 						}
 						tmpstr.len = r_ptr->rname_len;
@@ -195,23 +202,24 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					}
 					if (n == parm->str.len)
 						break;
-					namestr.addr = &lcl_buff.c[n];
-					done = n;
+					if (is_dollar_view)
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VIEWREGLIST);
+					targ = 0;
 				}
 				parmblk->gv_ptr = is_dollar_view ? r_ptr : (gd_region *)TREF(view_region_list);
 			}
 			break;
 		case VTP_DBKEY:
 			if (NULL == parm)
-				rts_error_csa(CSA_ARG(NULL)
+				RTS_ERROR_CSA_ABT(NULL,
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			if (!parm->str.len)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOTGBL, 2, parm->str.len, NULL);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NOTGBL, 2, parm->str.len, NULL);
 			if (!gd_header)		/* IF GD_HEADER ==0 THEN OPEN GBLDIR */
 				gvinit();
 			c = (unsigned char *)parm->str.addr;
 			if ('^' != *c)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOTGBL, 2, parm->str.len, c);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NOTGBL, 2, parm->str.len, c);
 			c_top = c + parm->str.len;
 			c++;				/* skip initial '^' */
 			parmblk->str.addr = (char *)c;
@@ -233,12 +241,12 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, (uchar_ptr_t)stringpool.free, &n);
 				stringpool.free += n;
 				tmpmv->str.len = n;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, tmpmv->str.addr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, n, tmpmv->str.addr);
 			}
 			break;
 		case VTP_RTNAME:
 			if (NULL == parm)
-				rts_error_csa(CSA_ARG(NULL)
+				RTS_ERROR_CSA_ABT(NULL,
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			memset(&parmblk->ident.c[0], 0, SIZEOF(parmblk->ident));
 			if (parm->str.len > 0)
@@ -255,7 +263,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			/* caution : explicit fall through */
 		case VTP_DBKEYLIST:
 			if (NULL == parm)
-				rts_error_csa(CSA_ARG(NULL)
+				RTS_ERROR_CSA_ABT(NULL,
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			if (!gd_header)
 				gvinit();
@@ -288,7 +296,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 						break;
 				}
 				if (!tmpstr.len)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, tmpstr.len, NULL);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, tmpstr.len, NULL);
 				memcpy(global_names, tmpstr.addr, tmpstr.len);
 				global_names[tmpstr.len] = '\0';
 				src = (unsigned char *)STRTOK_R((char *)global_names, ",", &strtokptr);
@@ -314,7 +322,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 							memcpy(&lcl_buff.c[0], src, nextsrc - src - 1);
 							n = MAX_PARMS;
 							format2zwr((sm_uc_ptr_t)&lcl_buff.c, nextsrc - src - 1, global_names, &n);
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
 						}
 					} else
 					{
@@ -329,7 +337,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 								(uchar_ptr_t)stringpool.free, &n);
 						stringpool.free += n;
 						tmpmv->str.len = n;
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, tmpmv->str.addr);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, n, tmpmv->str.addr);
 					}
 					tmp_gvt = NULL;
 					gvent.var_name.addr = &lcl_buff.c[0];
@@ -381,11 +389,11 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					}
 				}
 			} else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, tmpstr.len, tmpstr.addr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, tmpstr.len, tmpstr.addr);
 			break;
 		case VTP_LVN:
 			if (NULL == parm)
-				rts_error_csa(CSA_ARG(NULL)
+				RTS_ERROR_CSA_ABT(NULL,
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			if (0 < parm->str.len)
 			{
@@ -397,16 +405,16 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				{
 					n = MAX_PARMS;
 					format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, global_names, &n);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWLVN, 2, n, global_names);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWLVN, 2, n, global_names);
 				}
 			} else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWLVN, 2, parm->str.len, parm->str.addr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWLVN, 2, parm->str.len, parm->str.addr);
 			/* Now look up the name.. */
 			COMPUTE_HASH_MNAME(&lvent);
 			if ((tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &lvent)) && (NULL != tabent->value))
 				parmblk->value = (mval *)tabent->value;	/* Return lv_val ptr */
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWLVN, 2, parm->str.len, parm->str.addr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWLVN, 2, parm->str.len, parm->str.addr);
 			break;
 		default:
 			assertpro(FALSE && vtp_parm);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +28,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "filestruct.h"
 #include "eintr_wrappers.h"
 #include "gtmio.h"
@@ -38,7 +39,7 @@
 #include "jnl.h"
 #include "get_fs_block_size.h"
 
-GBLREF	gd_region	*gv_cur_region;
+GBLREF	gd_region		*gv_cur_region;
 
 error_def(ERR_DBFILERDONLY);
 error_def(ERR_DBFILOPERR);
@@ -56,7 +57,6 @@ uint4 dbfilop(file_control *fc)
 	off_t			offset;
 	gd_segment		*seg;
 	sgmnt_addrs		*csa;
-	sgmnt_data_ptr_t	csd;
 	ZOS_ONLY(int		realfiletag;)
 
 	udi = FC2UDI(fc);
@@ -70,33 +70,39 @@ uint4 dbfilop(file_control *fc)
 			if (0 != save_errno)
 			{
 				if (-1 == save_errno)
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBPREMATEOF, 2, LEN_AND_STR(udi->fn));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBPREMATEOF, 2, LEN_AND_STR(udi->fn));
 				else
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(udi->fn),
-														save_errno);
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(udi->fn),
+						save_errno);
 			}
 			if (1 == fc->op_pos)
 			{
 				if (0 != memcmp(fc->op_buff, GDS_LABEL, GDS_LABEL_SZ - 3))
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBNOTGDS, 2, LEN_AND_STR(udi->fn));
-				if (0 == memcmp(fc->op_buff, GDS_LABEL, GDS_LABEL_SZ - 1))	/* current GDS */
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBNOTGDS, 2, LEN_AND_STR(udi->fn));
+				if ((0 == memcmp(fc->op_buff, GDS_LABEL, GDS_LABEL_SZ - 1))	/* current GDS */
+					|| (0 == memcmp(fc->op_buff, V6_GDS_LABEL, GDS_LABEL_SZ - 1)))	/* V6 GDS*/
 				{
-					csd = (sgmnt_data_ptr_t)fc->op_buff;
+					if(0 == memcmp(fc->op_buff, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+						db_header_upconv((sgmnt_data_ptr_t)fc->op_buff);
 					if (offsetof(sgmnt_data, minor_dbver) < fc->op_len)
-						CHECK_DB_ENDIAN((sgmnt_data_ptr_t)fc->op_buff, strlen(udi->fn),
-													udi->fn); /* BYPASSOK */
+						CHECK_DB_ENDIAN((sgmnt_data_ptr_t)fc->op_buff,
+								strlen(udi->fn), udi->fn); /* BYPASSOK */
 				}
 			}
 			break;
 		case FC_WRITE:
-			assertpro((1 != fc->op_pos) || ((0 == memcmp(fc->op_buff, GDS_LABEL, GDS_LABEL_SZ - 1))
-					&& (0 != ((sgmnt_data_ptr_t)fc->op_buff)->acc_meth)));
+			assertpro((1 != fc->op_pos) ||
+				(((0 == memcmp(fc->op_buff, GDS_LABEL, GDS_LABEL_SZ - 1))
+				|| (0 == memcmp(fc->op_buff, V6_GDS_LABEL, GDS_LABEL_SZ - 1)))
+				&& (0 != ((sgmnt_data_ptr_t)fc->op_buff)->acc_meth)));
 			assert((1 != fc->op_pos) || (fc->op_len <= SIZEOF_FILE_HDR(fc->op_buff)));
 			assert(!gv_cur_region->read_only);
 			offset = (off_t)(fc->op_pos - 1) * DISK_BLOCK_SIZE;
+			if (0 == memcmp(fc->op_buff, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+				db_header_dwnconv((sgmnt_data_ptr_t)(fc->op_buff));
 			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, offset, fc->op_buff, fc->op_len, save_errno);
 			if (0 != save_errno)
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(udi->fn), save_errno);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(udi->fn), save_errno);
 			break;
 		case FC_OPEN:
 			gv_cur_region->read_only = FALSE;	/* maintain csa->read_write simultaneously */
@@ -145,7 +151,7 @@ uint4 dbfilop(file_control *fc)
 		case FC_CLOSE:
 			CLOSEFILE_RESET(udi->fd, save_errno);	/* resets "udi->fd" to FD_INVALID */
 			if (0 != save_errno)
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(udi->fn), save_errno);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(udi->fn), save_errno);
 			udi->fd_opened_with_o_direct = FALSE;
 			break;
 		default:

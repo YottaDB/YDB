@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +20,7 @@
 LITREF int4	ten_pwr[];
 LITREF mval	literal_zero;
 
+error_def(ERR_DIVZERO);
 error_def(ERR_NUMOFLOW);
 
 void	op_idiv(mval *u, mval *v, mval *q)
@@ -27,12 +29,10 @@ void	op_idiv(mval *u, mval *v, mval *q)
 	int4		z, c, exp;
 	mval		w, y;
 
-	error_def	(ERR_DIVZERO);
-
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
 	if ((v->mvtype & MV_INT)  &&  v->m[1] == 0)
-		rts_error(VARLSTCNT(1) ERR_DIVZERO);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_DIVZERO);
 	if (u->mvtype & MV_INT & v->mvtype)
 	{
 		promo = eb_int_div(u->m[1], v->m[1], q->m);
@@ -90,7 +90,7 @@ void	op_idiv(mval *u, mval *v, mval *q)
 		{
 			assert(EXPLO <= exp);
 			if (EXPHI <= exp)
-				rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
+				rts_error_csa(NULL, VARLSTCNT(1) ERR_NUMOFLOW); /* BYPASSRTSABT */
 			q->e = exp;
 			q->sgn = u->sgn ^ v->sgn;
 			q->mvtype = MV_NM;

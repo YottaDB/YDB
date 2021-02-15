@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,7 +49,7 @@ void setterm(io_desc *ioptr)
 	if (0 != status)
 	{
 		if (gtm_isanlp(tt_ptr->fildes) == 0)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 	}
 	return;
 }

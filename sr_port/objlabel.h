@@ -32,7 +32,7 @@
  * If the 32bit platform limit would be exceeded, start bumping the OBJ_PLATFORM_LABEL value - but only for 32 bit Linux.
  */
 
-#define OBJ_UNIX_LABEL	40
+#define OBJ_UNIX_LABEL	41
 #define	OBJ_PLATFORM_LABEL	0
 
 #ifdef USHBIN_SUPPORTED

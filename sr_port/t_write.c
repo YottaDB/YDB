@@ -25,27 +25,28 @@
 #include "filestruct.h"
 #include "copy.h"
 #include "jnl.h"
-#include "hashtab_int4.h"
+#include "hashtab_int8.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "t_write.h"
 #include "min_max.h"
 #include "jnl_get_checksum.h"
 
-GBLREF	cw_set_element	cw_set[];
-GBLREF	unsigned char	cw_set_depth;
-GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	sgm_info	*sgm_info_ptr;
-GBLREF	uint4		dollar_tlevel;
-GBLREF	trans_num	local_tn;	/* transaction number for THIS PROCESS */
-GBLREF	gv_namehead	*gv_target;
-GBLREF	uint4		t_err;
-GBLREF	unsigned int	t_tries;
-GBLREF	boolean_t	horiz_growth;
-GBLREF	int4		prev_first_off, prev_next_off;
-GBLREF	boolean_t	mu_reorg_process;
-GBLREF	boolean_t	dse_running;
-GBLREF 	jnl_gbls_t	jgbl;
+GBLREF	cw_set_element		cw_set[];
+GBLREF	unsigned char		cw_set_depth;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	uint4			dollar_tlevel;
+GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
+GBLREF	gv_namehead		*gv_target;
+GBLREF	uint4			t_err;
+GBLREF	unsigned int		t_tries;
+GBLREF	boolean_t		horiz_growth;
+GBLREF	int4			prev_first_off, prev_next_off;
+GBLREF	boolean_t		mu_reorg_process;
+GBLREF	boolean_t		dse_running;
+GBLREF 	jnl_gbls_t		jgbl;
 
 cw_set_element *t_write (
 			srch_blk_status	*blkhist,	/* Search History of the block to be written. Currently the
@@ -70,7 +71,7 @@ cw_set_element *t_write (
 	off_chain		chain;
 	uint4			iter;
 	srch_blk_status		*tp_srch_status;
-	ht_ent_int4		*tabent;
+	ht_ent_int8		*tabent;
 	block_id		blk;
 	cache_rec_ptr_t		cr;
 	boolean_t		new_cse;	/* TRUE if we had to create a new cse for the input block */
@@ -112,7 +113,7 @@ cw_set_element *t_write (
 			blk = cse->blk;
 		} else
 		{
-			if (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use, (uint4 *)&blk)))
+			if (NULL != (tabent = lookup_hashtab_int8(sgm_info_ptr->blks_in_use, (ublock_id *)&blk)))
 				tp_srch_status = (srch_blk_status *)tabent->value;
 			else
 				tp_srch_status = NULL;
@@ -212,7 +213,7 @@ cw_set_element *t_write (
 		 */
 		cr = blkhist->cr;
 		assert((NULL != cr) || (dba_mm == csa->hdr->acc_meth));
-		cse->ondsk_blkver = (NULL == cr) ? GDSVCURR : cr->ondsk_blkver;
+		cse->ondsk_blkver = (NULL == cr) ? cs_data->desired_db_format : cr->ondsk_blkver;
 		/* For uninitialized gv_target, initialize the in_tree status as IN_DIR_TREE */
 		assert (NULL != gv_target || dse_running || jgbl.forw_phase_recovery);
 		if (NULL == gv_target || 0 == gv_target->root)

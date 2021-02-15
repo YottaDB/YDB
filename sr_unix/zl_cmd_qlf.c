@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,7 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 
 	SETUP_THREADGBL_ACCESS;
 	if (quals->len + SIZEOF(COMMAND) > MAX_LINE)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_COMPILEQUALS, 2, quals->len, quals->addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_COMPILEQUALS, 2, quals->len, quals->addr);
 	MEMCPY_LIT(cbuf, COMMAND);
 	memcpy(cbuf + SIZEOF(COMMAND) - 1, quals->addr, quals->len);
 	cbuf[SIZEOF(COMMAND) - 1 + quals->len] = 0;
@@ -107,7 +107,7 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 		{
 			if (save_qlf)
 				glb_cmd_qlf.qlf = save_qlf;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, *srclen, srcstr, status);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2, *srclen, srcstr, status);
 		}
 		assert(pblk.b_name);
 		file.addr = pblk.l_name;
@@ -147,15 +147,17 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 		object_name_len = MAX_FN_LEN;
 		cli_get_str("OBJECT", (char *)object_file_name, &object_name_len);
 		cmd_qlf.object_file.mvtype = MV_STR;
+		assert((0 < object_name_len) && (MAX_FN_LEN >= object_name_len));
 		if (!(CQ_NAMEOFRTN & cmd_qlf.qlf))
 		{
-			for (ci = object_name_len - 1; ci && ('/' != object_file_name[ci]); ci--)
+			for (ci = object_name_len - 1; (0 < ci) && ('/' != object_file_name[ci]); ci--)
 				;       /* scan back from end for rtn name & triggerness */
-			ci += ci ? 1 : 0;
+			ci += (0 < ci) ? 1 : 0;
+			assert(object_name_len >= ci);
 			clen = object_name_len - ci;
-			if (('o' != object_file_name[ci + --clen])
-					|| ('.' != object_file_name[ci + --clen]))
-				clen = object_name_len - ci;
+			if ((2 <= clen) && ('o' == object_file_name[ci + clen - 1])
+					&& ('.' == object_file_name[ci + clen - 2]))
+				clen -= 2;	/* Strip trailing ".o" */
 			SET_OBJ(object_file_name, object_name_len);
 			clen = object_name_len = MIN(clen, MAX_MIDENT_LEN);
 			memcpy(routine_name.addr, &object_file_name[ci], clen);
@@ -166,7 +168,7 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 	{       /* Routine name specified - name wins over object */
 		clen = MAX_MIDENT_LEN;
 		cli_get_str("NAMEOFRTN", routine_name.addr, &clen);
-		assert(MAX_MIDENT_LEN >= clen);
+		assert((0 < clen) && (MAX_MIDENT_LEN >= clen));
 		cmd_qlf.qlf &= ~CQ_NAMEOFRTN;   /* Can only be used for first module in list */
 		if (CLI_PRESENT != cli_present("OBJECT"))
 		{
@@ -185,7 +187,7 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 		{
 			if (save_qlf)
 				glb_cmd_qlf.qlf = save_qlf;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NOTMNAME, 2, RTS_ERROR_MSTR(&routine_name), ERR_ZLNOOBJECT);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_NOTMNAME, 2, RTS_ERROR_MSTR(&routine_name), ERR_ZLNOOBJECT);
 		}
 		module_name.len = int_module_name.len = clen;
 		memcpy(int_module_name.addr, routine_name.addr, clen);

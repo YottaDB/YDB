@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
 	gt_timers_add_safe_hndlrs();
 	initialize_pattern_table();
 	if (RESTRICTED(dse))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "DSE");
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "DSE");
 	gvinit();
 	region_init(FALSE);
 	util_out_print("!/File  !_!AD", TRUE, DB_LEN_STR(gv_cur_region));

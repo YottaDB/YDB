@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,7 +93,7 @@ void gvcmz_bunch(mval *v)
 		if (*lnk->mbf != CMMS_C_BUFRESIZE)
 		{
 			if (*lnk->mbf != CMMS_E_ERROR)
-				rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+				RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			gvcmz_errmsg(lnk,FALSE);
 			return;
 		}
@@ -185,11 +185,10 @@ void gvcmz_bunch(mval *v)
 		new_space = newrec_len;
 	}
 	if (usr->buffer_used + new_space >= usr->buffer_size)
-		VMS_ONLY(rts_error(VARLSTCNT(4) ERR_ZDEFOFLOW, 2, lnk->nod.dsc$w_length, lnk->nod.dsc$a_pointer);)
-		UNIX_ONLY(rts_error(VARLSTCNT(4) ERR_ZDEFOFLOW, 2, lnk->nod.len, lnk->nod.addr);)
+		RTS_ERROR_ABT(VARLSTCNT(4) ERR_ZDEFOFLOW, 2, lnk->nod.len, lnk->nod.addr);
 
 	memcpy(buffptr + new_space, buffptr, bufftop - buffptr);	/* shuffle buffer to make room for new record */
-	memcpy(insert_record, &nrec, SIZEOF(nrec) - 1);
+	memcpy(insert_record, &nrec, SIZEOF(nrec) - 1);	/* BYPASSOK (macroizing makes this less clear */
 	insert_record += SIZEOF(nrec) - 1;
 	memcpy(insert_record, &gv_currkey->base[cc], nrec.len);
 	insert_record += nrec.len;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2020 Fidelity National Information	*
+ * Copyright (c) 2011-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -258,7 +258,7 @@ int trigger_source_read_andor_verify(mstr *trigname, rhdtyp **rtn_vec)
 				|| !gv_target || !gv_target->root);
 			assert((cdb_sc_onln_rlbk2 != failure) || TREF(dollar_zonlnrlbk));
 			if (cdb_sc_onln_rlbk2 == failure)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBROLLEDBACK);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DBROLLEDBACK);
 			/* else if (cdb_sc_onln_rlbk1 == status) we don't need to do anything other than proceeding with the next
 			 * retry. Even though online rollback restart resets root block to zero for all gv_targets, ^#t root is
 			 * always established in gvtr_db_read_hasht (called below). We don't care about the root block being reset
@@ -494,8 +494,8 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 		if (0 != gtm_trigger_complink(trigdsc, TRUE))
 		{
 			PRN_ERROR;	/* Flush out any compiler messages for compile record */
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGCOMPFAIL, 2,
-				      trigdsc->rtn_desc.rt_name.len - 1, trigdsc->rtn_desc.rt_name.addr);
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_TRIGCOMPFAIL, 2,
+				trigdsc->rtn_desc.rt_name.len - 1, trigdsc->rtn_desc.rt_name.addr);
 		}
 		assert(trigdsc->rtn_desc.rt_adr);
 		assert(trigdsc->rtn_desc.rt_adr == CURRENT_RHEAD_ADR(trigdsc->rtn_desc.rt_adr));

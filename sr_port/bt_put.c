@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,7 +88,7 @@ bt_rec_ptr_t bt_put(gd_region *reg, block_id block)
 			q0 = (bt_rec_ptr_t)((sm_uc_ptr_t)bt + bt->blkque.fl);
 			q1 = (bt_rec_ptr_t)remqt((que_ent_ptr_t)q0);
 			if (EMPTY_QUEUE == (sm_long_t)q1)
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(3) ERR_BTFAIL, 1, 1);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(3) ERR_BTFAIL, 1, 1);
 			bt->blk = block;
 			bt->killtn = lcl_tn;
 			insqt((que_ent_ptr_t)bt, (que_ent_ptr_t)hdr);
@@ -118,9 +118,9 @@ bt_rec_ptr_t bt_put(gd_region *reg, block_id block)
 			break;
 		}
 		if (0 == bt->blkque.fl)
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(3) ERR_BTFAIL, 1, 2);
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(3) ERR_BTFAIL, 1, 2);
 		if (lcnt >= csd->n_bts)
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(3) ERR_BTFAIL, 1, 3);
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(3) ERR_BTFAIL, 1, 3);
 	}
 	insqt((que_ent_ptr_t)th, (que_ent_ptr_t)csa->th_base);
 	bt->tn = lcl_tn;

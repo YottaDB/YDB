@@ -47,7 +47,8 @@
 #endif
 
 #define MAX_SECONDARY_LEN 		(MAX_HOST_NAME_LEN + 11) /* +11 for ':' and port number */
-#define DEFAULT_SHUTDOWN_TIMEOUT	30
+#define DEFAULT_SHUTDOWN_TIMEOUT	120
+#define MAX_SHUTDOWN_TIMEOUT		3600 /* 1 hour */
 #define GTMSOURCE_CONN_PARMS_LEN 	((10 + 1) * GTMSOURCE_CONN_PARMS_COUNT - 1)
 
 GBLREF	gtmsource_options_t	gtmsource_options;
@@ -62,6 +63,7 @@ error_def(ERR_BADPARAMCOUNT);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_REPLINSTSECLEN);
 error_def(ERR_REPLINSTSECUNDF);
+error_def(ERR_INVSHUTDOWN);
 
 int gtmsource_get_opt(void)
 {
@@ -467,10 +469,10 @@ int gtmsource_get_opt(void)
 				util_out_print("Error parsing TIMEOUT qualifier", TRUE);
 				return(-1);
 			}
-			if (DEFAULT_SHUTDOWN_TIMEOUT < gtmsource_options.shutdown_time || 0 > gtmsource_options.shutdown_time)
+			if (MAX_SHUTDOWN_TIMEOUT < gtmsource_options.shutdown_time || 0 > gtmsource_options.shutdown_time)
 			{
-				gtmsource_options.shutdown_time = DEFAULT_SHUTDOWN_TIMEOUT;
-				util_out_print("shutdown TIMEOUT changed to !UL", TRUE, gtmsource_options.shutdown_time);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSHUTDOWN);
+				return (-1);
 			}
 		} else if (CLI_NEGATED == timeout_status)
 			gtmsource_options.shutdown_time = -1;

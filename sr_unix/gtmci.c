@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,6 +101,7 @@ GBLREF	pthread_t		gtm_main_thread_id;
 GBLREF	boolean_t		gtm_main_thread_id_set;
 #endif
 GBLREF	char			gtm_dist[GTM_PATH_MAX];
+GBLREF	unsigned int		gtm_dist_len;
 GBLREF boolean_t		gtm_dist_ok_to_use;
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
 LITREF  gtmImageName            gtmImageNames[];
@@ -260,7 +261,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 				 * if this failed, would lead to a nested error which we'd like to avoid */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	if (!c_rtn_name)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CIRCALLNAME);
 	if (!TREF(ci_table))	/* Load the call-in table only once from env variable GTMCI. */
 	{
 		TREF(ci_table) = citab_parse(FALSE);
@@ -284,11 +285,11 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		}
 	}
 	if (!(entry = get_entry(c_rtn_name, FALSE)))	/* c_rtn_name not found in the table. */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
 	/* The 3rd argument is NULL because we will get lnr_adr via TABENT_PROXY. */
 	if (!job_addr(&routine, &label, 0, (char **)&base_addr, NULL))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBLABOFF);
 	memset(&param_blk, 0, SIZEOF(param_blk));
 	param_blk.rtnaddr = (void *)(ARLINK_ONLY(0) NON_ARLINK_ONLY(base_addr));
 	/* lnr_entry below is a pointer to the code offset for this label from the
@@ -300,9 +301,9 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	/* Assign the address for line number entry storage, so that the adjacent address holds has_parms value. */
 	param_blk.labaddr = (void *)(ARLINK_ONLY(-1) NON_ARLINK_ONLY(&(TABENT_PROXY).LABENT_LNR_OFFSET));
 	if (MAX_ACTUALS < entry->argcnt)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXACTARG);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXACTARG);
 	if (entry->argcnt < count)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ACTLSTTOOLONG, 2, (int)label.len, label.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ACTLSTTOOLONG, 2, (int)label.len, label.addr);
 	param_blk.argcnt = count;
 	has_return = (gtm_void != entry->return_type);
 	if (has_return)
@@ -368,7 +369,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 					mstr_parm = *(gtm_string_t **)arg_blob_ptr;
 					arg_mval.mvtype = MV_STR;
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 					arg_mval.str.len = (mstr_len_t)mstr_parm->length;
 					arg_mval.str.addr = mstr_parm->address;
 					s2pool(&arg_mval.str);
@@ -381,7 +382,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 					mstr_parm = *(gtm_string_t **)arg_blob_ptr;
 					arg_mval.mvtype = MV_STR;
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 					arg_mval.str.len = (mstr_len_t)mstr_parm->length;
 					arg_mval.str.addr = mstr_parm->address;
 					s2pool(&arg_mval.str);
@@ -394,7 +395,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 					mstr_parm = *(gtm_string_t **)arg_blob_ptr;
 					arg_mval.mvtype = MV_STR;
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 					arg_mval.str.len = (mstr_len_t)mstr_parm->length;
 					arg_mval.str.addr = mstr_parm->address;
 					s2pool(&arg_mval.str);
@@ -578,7 +579,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 				 * if this failed, would lead to a nested error which we'd like to avoid */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	if (!c_rtn_name)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CIRCALLNAME);
 	if (!internal_use)
 	{
 		if (!TREF(ci_table))	/* load the call-in table only once from env variable GTMCI  */
@@ -632,7 +633,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	if (NULL == callin_handle)
 	{
 		if (!(entry = get_entry(c_rtn_name, internal_use)))	/* c_rtn_name not found in the table */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
 		if (populate_handle)
 			callin_handle = entry;
 	} else
@@ -640,7 +641,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
 	/* 3rd argument is NULL because we will get lnr_adr via TABENT_PROXY */
 	if (!job_addr(&routine, &label, 0, (char **)&base_addr, NULL))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBLABOFF);
 	memset(&param_blk, 0, SIZEOF(param_blk));
 	param_blk.rtnaddr = (void *)(ARLINK_ONLY(0) NON_ARLINK_ONLY(base_addr));
 	/* lnr_entry below is a pointer to the code offset for this label from the
@@ -782,7 +783,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 					if (MAX_STRLEN < arg_mval.str.len)
 					{
 						va_end(var);
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 					}
 					s2pool(&arg_mval.str);
 					break;
@@ -792,7 +793,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
 					{
 						va_end(var);
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 					}
 					arg_mval.str.len = (mstr_len_t)mstr_parm->length;
 					arg_mval.str.addr = mstr_parm->address;
@@ -1024,9 +1025,8 @@ int gtm_init()
 	rhdtyp          	*base_addr;
 	unsigned char   	*transfer_addr;
 	char			*dist;
-	unsigned int		dist_len;
 	char			gtmsecshr_path[GTM_PATH_MAX];
-	int			gtmsecshr_path_len;
+	unsigned int		gtmsecshr_path_len;
 	struct stat		stat_buf;
 	char			file_perm[MAX_PERM_LEN];
 	DCL_THREADGBL_ACCESS;
@@ -1053,35 +1053,33 @@ int gtm_init()
 		UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 		/* Ensure that $gtm_dist exists */
 		if (NULL == (dist = (char *)GETENV(GTM_DIST)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GTMDISTUNDEF);
 		/* Ensure that $gtm_dist is non-zero and does not exceed GTM_DIST_PATH_MAX */
-		dist_len = (unsigned int)STRLEN(dist);
-		if (!dist_len)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
-		else if (GTM_DIST_PATH_MAX <= dist_len)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, GTM_DIST_PATH_MAX);
+		gtm_dist_len = (unsigned int)strlen(dist);
+		if (!gtm_dist_len)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GTMDISTUNDEF);
+		else if (GTM_DIST_PATH_MAX <= gtm_dist_len)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_DISTPATHMAX, 1, GTM_DIST_PATH_MAX);
 		/* Verify that $gtm_dist/gtmsecshr is available with setuid root */
-		memcpy(gtmsecshr_path, gtm_dist, dist_len);
-		gtmsecshr_path[dist_len] =  '/';
-		memcpy(gtmsecshr_path + dist_len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
-		gtmsecshr_path_len = dist_len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
-		assertpro(GTM_PATH_MAX > gtmsecshr_path_len);
-		gtmsecshr_path[gtmsecshr_path_len] = '\0';
+		memcpy(gtmsecshr_path, dist, gtm_dist_len);
+		gtmsecshr_path[gtm_dist_len] =  '/';
+		memcpy(gtmsecshr_path + gtm_dist_len + 1, GTMSECSHR_EXECUTABLE, sizeof(GTMSECSHR_EXECUTABLE)); /* Includes null */
+		gtmsecshr_path_len = gtm_dist_len + sizeof(GTMSECSHR_EXECUTABLE); /* Includes null, so don't add 1 for the slash */
 		if (-1 == Stat(gtmsecshr_path, &stat_buf))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("stat for $gtm_dist/gtmsecshr"), CALLFROM, errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("stat for $gtm_dist/gtmsecshr"), CALLFROM, errno);
 		/* Ensure that the call-in can execute $gtm_dist/gtmsecshr. This not sufficient for security purposes */
 		if ((ROOTUID != stat_buf.st_uid) || !(stat_buf.st_mode & S_ISUID))
 		{
 			SNPRINTF(file_perm, SIZEOF(file_perm), "%04o", stat_buf.st_mode & PERMALL);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GTMSECSHRPERM, 5,
-					gtmsecshr_path_len, gtmsecshr_path,
-					RTS_ERROR_STRING(file_perm), stat_buf.st_uid);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_GTMSECSHRPERM, 5,
+				gtmsecshr_path_len, gtmsecshr_path,
+				RTS_ERROR_STRING(file_perm), stat_buf.st_uid);
 		}
 		else
 		{	/* $gtm_dist validated */
 			gtm_dist_ok_to_use = TRUE;
-			memcpy(gtm_dist, dist, dist_len);
+			memcpy(gtm_dist, dist, gtm_dist_len);
 			gtm_post_startup_check_init();
 		}
 		cli_lex_setup(0, NULL);
@@ -1116,14 +1114,14 @@ int gtm_init()
 		TREF(temp_fgncal_stack) = msp;
 		/* Generate CIMAXLEVELS error if gtmci_nested_level > CALLIN_MAX_LEVEL */
 		if (CALLIN_MAX_LEVEL < TREF(gtmci_nested_level))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CIMAXLEVELS, 1, TREF(gtmci_nested_level));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_CIMAXLEVELS, 1, TREF(gtmci_nested_level));
 		/* Disallow call-ins within a TP boundary since TP restarts are not supported
 		 * currently across nested call-ins. When we implement TP restarts across call-ins,
 		 * this error needs be changed to a Warning or Notification. Tp allowed if a filter
 		 * call is being made from inside GT.M.
 		 */
 		if (dollar_tlevel && ((!TREF(comm_filter_init)) || (TREF(gtmci_nested_level))))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CITPNESTED);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CITPNESTED);
 		base_addr = make_cimode();
 		transfer_addr = PTEXT_ADR(base_addr);
 		gtm_init_env(base_addr, transfer_addr);
@@ -1160,7 +1158,7 @@ int gtm_exit()
 	assert(NULL != frame_pointer);
 	/* Do not allow gtm_exit() to be invoked from external calls */
 	if (!(SFF_CI & frame_pointer->flags) || !(MUMPS_CALLIN & invocation_mode) || (1 < TREF(gtmci_nested_level)))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVGTMEXIT);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVGTMEXIT);
 	/* Now get rid of the whole M stack - end of GT.M environment */
 	while (NULL != frame_pointer)
 	{

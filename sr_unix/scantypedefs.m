@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2010-2019 Fidelity National Information		;
+; Copyright (c) 2010-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ; 								;
 ; 	This source code contains the intellectual property	;
@@ -371,6 +371,7 @@
 	Do AddInclude("fileinfo.h")
 	Do AddInclude("gdsbt.h")
 	Do AddInclude("gdsfhead.h")
+	Do AddInclude("v6_gdsfhead.h")
 	Do AddInclude("filestruct.h")
 	Do AddInclude("gdscc.h")
 	Do AddInclude("comline.h")

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,7 +92,7 @@ int mu_op_open(mval *v, mval *p, mval *t, mval *mspace)
 			tl = naml;
 			break;
 		case SS_LOG2LONG:
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, SIZEOF(buf1) - 1);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, SIZEOF(buf1) - 1);
 			break;
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) stat);
@@ -160,9 +160,9 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 				if (-1 == fstat_res)
 				{
 					save_errno = errno;
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-						  RTS_ERROR_LITERAL("fstat()"),
-						  CALLFROM, save_errno);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+						RTS_ERROR_LITERAL("fstat()"),
+						CALLFROM, save_errno);
 				}
 			} else
 			{
@@ -173,9 +173,9 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 					if (-1 == fstat_res)
 					{
 						save_errno = errno;
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-							  RTS_ERROR_LITERAL("fstat()"),
-							  CALLFROM, save_errno);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+							RTS_ERROR_LITERAL("fstat()"),
+							CALLFROM, save_errno);
 					}
 				} else if (0 == memvcmp(tn.addr, tn.len, "/dev/null", 9))
 					iod->type = nl;
@@ -190,9 +190,9 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 					else
 					{
 						save_errno = errno;
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-							  RTS_ERROR_LITERAL("fstat()"),
-							  CALLFROM, save_errno);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+							RTS_ERROR_LITERAL("fstat()"),
+							CALLFROM, save_errno);
 					}
 				}
 			}
@@ -229,10 +229,11 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 		oflag |= (O_RDWR | O_CREAT | O_NOCTTY);
 		p_offset = 0;
 		ichset_specified = ochset_specified = FALSE;
-		while(iop_eol != *(pp->str.addr + p_offset))
+		while ((iop_eol != *(pp->str.addr + p_offset)) && (pp->str.len > p_offset))
 		{
-			assert((params) *(pp->str.addr + p_offset) < (params)n_iops);
-			switch ((ch = *(pp->str.addr + p_offset++)))
+			ch = *(pp->str.addr + p_offset++);
+			assert((params)ch < (params)n_iops);
+			switch (ch)
 			{
 				case iop_append:
 					if (rm == iod->type)
@@ -355,9 +356,9 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 	/* smw 99/12/18 not possible to be -1 here */
 	if (-1 == file_des)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-			  RTS_ERROR_LITERAL("open()"),
-			  CALLFROM, save_errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			RTS_ERROR_LITERAL("open()"),
+			CALLFROM, save_errno);
 	}
 	if (n_io_dev_types == iod->type)
 	{

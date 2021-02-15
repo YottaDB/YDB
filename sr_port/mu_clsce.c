@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,15 +62,17 @@ Description:
 #include "t_write.h"
 #include "mupip_reorg.h"
 
-GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF char		*update_array, *update_array_ptr;
-GBLREF uint4		update_array_size;	/* for the BLK_* macros */
-GBLREF uint4            t_err;
-GBLREF unsigned int     t_tries;
-GBLREF gd_region        *gv_cur_region;
-GBLREF gv_namehead	*gv_target;
-GBLREF gv_key           *gv_currkey;
-GBLREF gv_key           *gv_currkey_next_reorg;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	char		*update_array, *update_array_ptr;
+GBLREF	uint4		update_array_size;	/* for the BLK_* macros */
+GBLREF	uint4		t_err;
+GBLREF	unsigned int	t_tries;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	gv_namehead	*gv_target;
+GBLREF	gv_key		*gv_currkey;
+GBLREF	gv_key		*gv_currkey_next_reorg;
+
+error_def(ERR_GTMCURUNSUPP);
 
 /*************************************************************************************************
 Input Parameters:
@@ -93,7 +95,9 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			star_only_merge = FALSE,
 			blk2_ances_star_only = FALSE,
 			delete_all_blk2_ances = TRUE,
-			levelp_next_is_star, forward_process;
+			levelp_next_is_star, forward_process,
+			old_blk1_long_blk_id, old_blk2_long_blk_id,
+			long_blk_id;
 	unsigned char	oldblk1_prev_key[MAX_KEY_SZ+1],
 			old_levelp_cur_prev_key[MAX_KEY_SZ+1],
 			old_levelp_cur_key[MAX_KEY_SZ+1]; /* keys in private memory */
@@ -102,7 +106,8 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			oldblk1_last_cmpc, newblk1_mid_cmpc, newblk1_last_cmpc;
 	int		tmp_cmpc;
 	int		levelp, level2;
-	int		old_blk1_sz, old_blk2_sz;
+	int		old_blk1_sz, old_blk2_sz,
+			bstar_rec_sz, blkid_sz;
 	int		old_levelp_cur_prev_keysz,
 			old_levelp_cur_keysz,
 			old_levelp_cur_next_keysz,
@@ -119,12 +124,12 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	int		rec_size, piece_len, tkeylen, old_levelp_rec_offset;
 	int		blk_seg_cnt, blk_size;
 	enum cdb_sc	status;
-	sm_uc_ptr_t 	oldblk1_last_key, old_levelp_cur_next_key,
+	sm_uc_ptr_t	oldblk1_last_key, old_levelp_cur_next_key,
 			newblk1_last_key, newblk2_first_key, new_blk2_ances_first_key; /* shared memory keys */
-	sm_uc_ptr_t 	rec_base, old_levelp_blk_base,
+	sm_uc_ptr_t	rec_base, old_levelp_blk_base,
 			bn_ptr1, bn_ptr2, blk2_ances_remain, old_blk1_base, old_blk2_base,
 			new_blk1_top, new_blk2_first_rec_base, new_blk2_remain; /* shared memory pointers */
-	sm_uc_ptr_t 	rPtr1, rPtr2;
+	sm_uc_ptr_t	rPtr1, rPtr2;
 	rec_hdr_ptr_t	star_rec_hdr, old_last_rec_hdr1, new_rec_hdr1, new_rec_hdr2,
 			blk2_ances_hdr, new_levelp_cur_hdr, new_levelp_cur_next_hdr;
 	blk_segment	*bs_ptr1, *bs_ptr2;
@@ -140,9 +145,23 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	old_blk1_base = old_blk1_stat->buffaddr;
 	old_blk2_stat = &blk2ptr->h[level];
 	old_blk2_base = old_blk2_stat->buffaddr;
+	if (((blk_hdr_ptr_t)old_blk1_base)->bver != ((blk_hdr_ptr_t)old_blk2_base)->bver)
+	{
+		assert(t_tries < CDB_STAGNATE);
+		NONTP_TRACE_HIST_MOD(old_blk1_stat, t_blkmod_mu_clsce);
+		return cdb_sc_blkmod;
+	}
 	old_blk1_sz = ((blk_hdr_ptr_t)old_blk1_base)->bsiz;
 	old_blk2_sz = ((blk_hdr_ptr_t)old_blk2_base)->bsiz;
-	if (0 != level && SIZEOF(blk_hdr) + BSTAR_REC_SIZE == old_blk1_sz)
+	old_blk1_long_blk_id = (BLK_ID_32_VER < ((blk_hdr_ptr_t)old_blk1_base)->bver);
+	old_blk2_long_blk_id = (BLK_ID_32_VER < ((blk_hdr_ptr_t)old_blk2_base)->bver);
+	if(old_blk1_long_blk_id != old_blk2_long_blk_id)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GTMCURUNSUPP);
+	long_blk_id = old_blk1_long_blk_id;
+	bstar_rec_sz = bstar_rec_size(long_blk_id);
+	blkid_sz = long_blk_id ? SIZEOF(block_id_64) : SIZEOF(block_id_32);
+
+	if ((0 != level) && ((SIZEOF(blk_hdr) + bstar_rec_sz) == old_blk1_sz))
 		old_ref_star_only = TRUE;
 	/* Search an ancestor block at levelp >= level+1,
 	which has a real key value corresponding to the working block.
@@ -161,7 +180,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		old_levelp_rec_offset = blk1ptr->h[levelp].curr_rec.offset;
 		rec_base = old_levelp_blk_base + old_levelp_rec_offset;
 		GET_RSIZ(rec_size, rec_base);
-	} while (BSTAR_REC_SIZE == rec_size); /* search ancestors to get a real value */
+	} while (bstar_rec_sz == rec_size); /* search ancestors to get a real value */
 
 	/*
 	old_levelp_cur_prev_key = real value of the key before the curr_key at levelp
@@ -249,11 +268,11 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		we need to remove the *-key at the end of working block
 		and replace with actual key value (with required compression).
 		We will get the real value of *-rec from its ancestor at levelp */
-                memcpy (oldblk1_last_key, &old_levelp_cur_key[0], old_levelp_cur_keysz);
+		memcpy (oldblk1_last_key, &old_levelp_cur_key[0], old_levelp_cur_keysz);
 		if (!old_ref_star_only) /* if the index block is not a *-key only block) */
 		{
 			if (cdb_sc_normal != (status = gvcst_expand_any_key (old_blk1_stat,
-				old_blk1_base + old_blk1_sz - BSTAR_REC_SIZE, &oldblk1_prev_key[0],
+				old_blk1_base + old_blk1_sz - bstar_rec_sz, &oldblk1_prev_key[0],
 				&rec_size, &tkeylen, &tkeycmpc, NULL)))
 			{
 				assert(t_tries < CDB_STAGNATE);
@@ -268,10 +287,10 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			/* get key value from ancestor blocks key */
 			oldblk1_last_keylen = old_levelp_cur_keysz;
 			oldblk1_last_cmpc = 0;
-        	}
-                BLK_ADDR(old_last_rec_hdr1, SIZEOF(rec_hdr), rec_hdr);
-                old_last_rec_hdr1->rsiz = BSTAR_REC_SIZE + oldblk1_last_keylen;
-                SET_CMPC(old_last_rec_hdr1, oldblk1_last_cmpc);
+		}
+		BLK_ADDR(old_last_rec_hdr1, SIZEOF(rec_hdr), rec_hdr);
+		old_last_rec_hdr1->rsiz = bstar_rec_sz + oldblk1_last_keylen;
+		SET_CMPC(old_last_rec_hdr1, oldblk1_last_cmpc);
 	}
 
 	/*
@@ -289,11 +308,11 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			level, old_blk2_stat, rec_base);
 	if (cdb_sc_starrecord == status) /* rtsib index block has *-record only */
 	{
-		if (old_blk1_sz + oldblk1_last_keylen + BSTAR_REC_SIZE > i_max_fill ) /* cannot fit even one record */
+		if (old_blk1_sz + oldblk1_last_keylen + bstar_rec_sz > i_max_fill ) /* cannot fit even one record */
 			return cdb_sc_oprnotneeded;
 		star_only_merge = TRUE;
 		complete_merge = TRUE;
-		rec_base = old_blk2_base + SIZEOF(blk_hdr) + BSTAR_REC_SIZE;
+		rec_base = old_blk2_base + SIZEOF(blk_hdr) + bstar_rec_sz;
 	} else if (cdb_sc_normal != status)
 	{
 		assert(t_tries < CDB_STAGNATE);;
@@ -310,9 +329,9 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 				return cdb_sc_oprnotneeded;
 		} else /* else an index block */
 		{
-			if (old_blk1_sz + oldblk1_last_keylen + BSTAR_REC_SIZE > i_max_fill ) /* cannot fit even one record */
+			if (old_blk1_sz + oldblk1_last_keylen + bstar_rec_sz > i_max_fill ) /* cannot fit even one record */
 				return cdb_sc_oprnotneeded;
-			if (old_blk1_sz + oldblk1_last_keylen + piece_len + BSTAR_REC_SIZE > i_max_fill )
+			if (old_blk1_sz + oldblk1_last_keylen + piece_len + bstar_rec_sz > i_max_fill )
 					star_only_merge = TRUE; /* can fit only a *-record */
 		}
 		rec_base += rec_size;
@@ -364,7 +383,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			while (rec_base < old_blk2_base + old_blk2_sz)
 			{
 				GET_RSIZ(rec_size, rec_base);
-				if (BSTAR_REC_SIZE == rec_size)
+				if (bstar_rec_sz == rec_size)
 				{
 					rec_base += rec_size;
 					piece_len += rec_size;
@@ -381,7 +400,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 				newblk1_last_keysz = newblk1_last_keylen + newblk1_last_cmpc;
 				rec_base += rec_size;
 				piece_len += rec_size;
-				if (old_blk1_sz + oldblk1_last_keylen + piece_len + BSTAR_REC_SIZE > i_max_fill )
+				if (old_blk1_sz + oldblk1_last_keylen + piece_len + bstar_rec_sz > i_max_fill )
 				{
 					complete_merge = FALSE;
 					break;
@@ -435,7 +454,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	{
 		for (level2 = level + 1; level2 < levelp; level2++)
 		{
-			if (SIZEOF(blk_hdr) + BSTAR_REC_SIZE == ((blk_hdr_ptr_t)blk2ptr->h[level2].buffaddr)->bsiz)
+			if (SIZEOF(blk_hdr) + bstar_rec_sz == ((blk_hdr_ptr_t)blk2ptr->h[level2].buffaddr)->bsiz)
 			{
 				kill_set_ptr->blk[kill_set_ptr->used].flag = 0;
 				kill_set_ptr->blk[kill_set_ptr->used].level = 0;
@@ -468,7 +487,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 				rec_base += rec_size;
 				READ_RECORD(status, &rec_size, &tkeycmpc, &tkeylen, new_blk2_ances_first_key,
 						level2, &blk2ptr->h[level2], rec_base);
-				blk2_ances_remain = rec_base + rec_size - SIZEOF(block_id);
+				blk2_ances_remain = rec_base + rec_size - blkid_sz;
 				if (cdb_sc_starrecord == status)
 					blk2_ances_star_only = TRUE;
 				else if (cdb_sc_normal != status)
@@ -480,7 +499,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 				{
 					new_blk2_ances_first_keysz = tkeylen + tkeycmpc;
 					BLK_ADDR(blk2_ances_hdr, SIZEOF(rec_hdr), rec_hdr); /* new 1st record's header */
-					blk2_ances_hdr->rsiz = new_blk2_ances_first_keysz + BSTAR_REC_SIZE;
+					blk2_ances_hdr->rsiz = new_blk2_ances_first_keysz + bstar_rec_sz;
 					SET_CMPC(blk2_ances_hdr, 0);
 				}
 				break;
@@ -510,7 +529,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		in the upper index block
 		*/
 		BLK_ADDR(new_levelp_cur_hdr, SIZEOF(rec_hdr), rec_hdr);
-		new_levelp_cur_hdr->rsiz = BSTAR_REC_SIZE + new_levelp_cur_keylen;
+		new_levelp_cur_hdr->rsiz = bstar_rec_sz + new_levelp_cur_keylen;
 		SET_CMPC(new_levelp_cur_hdr, new_levelp_cur_cmpc);
 	}
 	/* else  old_levelp_cur_key will be deleted */
@@ -548,7 +567,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		in the upper index block
 		*/
 		BLK_ADDR(new_levelp_cur_next_hdr, SIZEOF(rec_hdr), rec_hdr);
-		new_levelp_cur_next_hdr->rsiz = BSTAR_REC_SIZE + new_levelp_cur_next_keylen;
+		new_levelp_cur_next_hdr->rsiz = bstar_rec_sz + new_levelp_cur_next_keylen;
 		SET_CMPC(new_levelp_cur_next_hdr, new_levelp_cur_next_cmpc);
 	} else
 	{
@@ -561,7 +580,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	}
 
 	BLK_ADDR(star_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
-	star_rec_hdr->rsiz = BSTAR_REC_SIZE;
+	star_rec_hdr->rsiz = bstar_rec_sz;
 	SET_CMPC(star_rec_hdr, 0);
 	/* ------------------------
 	 * Working block's t_write
@@ -578,20 +597,20 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			      piece_len - SIZEOF(rec_hdr), &blk1ptr->h[level]);
 	} else
 	{	/* if an index block */
-		BLK_ADDR(bn_ptr1, SIZEOF(block_id), unsigned char);
-		memcpy(bn_ptr1, old_blk1_base + old_blk1_sz - SIZEOF(block_id), SIZEOF(block_id));
+		BLK_ADDR(bn_ptr1, blkid_sz, unsigned char);
+		memcpy(bn_ptr1, old_blk1_base + old_blk1_sz - blkid_sz, blkid_sz);
 		/* Keep whatever was there in working block */
-		BLK_SEG(bs_ptr2,  old_blk1_base + SIZEOF(blk_hdr), old_blk1_sz - SIZEOF(blk_hdr) - BSTAR_REC_SIZE);
+		BLK_SEG(bs_ptr2,  old_blk1_base + SIZEOF(blk_hdr), old_blk1_sz - SIZEOF(blk_hdr) - bstar_rec_sz);
 		/* last record was a *-key for index block, so replace with its real value */
 		BLK_SEG(bs_ptr2, (sm_uc_ptr_t)old_last_rec_hdr1, SIZEOF(rec_hdr) );
 		BLK_SEG(bs_ptr2, oldblk1_last_key + oldblk1_last_cmpc, oldblk1_last_keylen);
-		BLK_SEG(bs_ptr2, bn_ptr1, SIZEOF(block_id) );
+		BLK_SEG(bs_ptr2, bn_ptr1, blkid_sz);
 		/* Now join data from right sibling */
 		if (star_only_merge)
 		{	/* May be a complete_merge too */
 			/* write a new *-rec only */
 			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, SIZEOF(rec_hdr) );
-			REORG_BLK_SEG(bs_ptr2, new_blk1_top - SIZEOF(block_id), SIZEOF(block_id), &blk1ptr->h[level]);
+			REORG_BLK_SEG(bs_ptr2, new_blk1_top - blkid_sz, blkid_sz, &blk1ptr->h[level]);
 		} else
 		{
 			if (complete_merge)
@@ -605,15 +624,15 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			{	/* First key from rtsib had cmpc=0. After coalesce it will be nonzero.
 				 * Remainings from rtsib will be appened without change.
 				 * However last record will be written as a *-key record
-				 * (newblk1_last_keylen + BSTAR_REC_SIZE) = old length of the last record appended
+				 * (newblk1_last_keylen + bstar_rec_sz) = old length of the last record appended
 				 */
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1, SIZEOF(rec_hdr));
 				REORG_BLK_SEG(bs_ptr2, old_blk2_base + SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + newblk1_mid_cmpc,
-					      piece_len - (newblk1_last_keylen + BSTAR_REC_SIZE) - SIZEOF(rec_hdr),
+					      piece_len - (newblk1_last_keylen + bstar_rec_sz) - SIZEOF(rec_hdr),
 					      &blk1ptr->h[level]);
 				/* write a new *-rec only */
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, SIZEOF(rec_hdr) );
-				REORG_BLK_SEG(bs_ptr2, new_blk1_top - SIZEOF(block_id), SIZEOF(block_id),
+				REORG_BLK_SEG(bs_ptr2, new_blk1_top - blkid_sz, blkid_sz,
 					      &blk1ptr->h[level]);
 			}
 		}
@@ -641,7 +660,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		{
 			/* write a new *-rec only */
 			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, SIZEOF(rec_hdr) );
-			BLK_SEG(bs_ptr2, old_blk2_base + old_blk2_sz - SIZEOF(block_id), SIZEOF(block_id));
+			BLK_SEG(bs_ptr2, old_blk2_base + old_blk2_sz - blkid_sz, blkid_sz);
 		}
 		if (!BLK_FINI(bs_ptr2,bs_ptr1))
 		{
@@ -662,8 +681,8 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	 * --------------------------
 	 * bn_ptr2 = child of levelp ancestor block of currkey
 	 */
-	BLK_ADDR(bn_ptr2, SIZEOF(block_id), unsigned char);
-	memcpy(bn_ptr2, old_levelp_blk_base + old_levelp_rec_offset + SIZEOF(rec_hdr) + old_levelp_cur_keylen, SIZEOF(block_id));
+	BLK_ADDR(bn_ptr2, blkid_sz, unsigned char);
+	memcpy(bn_ptr2, old_levelp_blk_base + old_levelp_rec_offset + SIZEOF(rec_hdr) + old_levelp_cur_keylen, blkid_sz);
 
 	BLK_INIT(bs_ptr2, bs_ptr1);
 	/* data up to cur_rec */
@@ -679,12 +698,12 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			/* new key value of curr_next_key */
 			BLK_SEG(bs_ptr2, old_levelp_cur_next_key + new_levelp_cur_next_cmpc, new_levelp_cur_next_keylen);
 			/* new child is the working block (= descendent of levelp ancestor of currkey) */
-			BLK_SEG(bs_ptr2, bn_ptr2, SIZEOF(block_id) );
+			BLK_SEG(bs_ptr2, bn_ptr2, blkid_sz);
 			/* remaining records after levelp cur_next */
 			BLK_SEG(bs_ptr2, old_levelp_blk_base + old_levelp_rec_offset +
-				old_levelp_cur_keylen + BSTAR_REC_SIZE + old_levelp_cur_next_keylen + BSTAR_REC_SIZE,
+				old_levelp_cur_keylen + bstar_rec_sz + old_levelp_cur_next_keylen + bstar_rec_sz,
 				((blk_hdr_ptr_t)old_levelp_blk_base)->bsiz - old_levelp_rec_offset -
-				(old_levelp_cur_keylen + BSTAR_REC_SIZE + old_levelp_cur_next_keylen + BSTAR_REC_SIZE));
+				(old_levelp_cur_keylen + bstar_rec_sz + old_levelp_cur_next_keylen + bstar_rec_sz));
 			forward_process = TRUE;
 		} else
 		{ /* old_levelp_curr_key will be replaced by newblk1_last_key and old_levelp_cur_next_key will be inserted there */
@@ -695,16 +714,16 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			/* new key value for cur_rec of levelp  */
 			BLK_SEG(bs_ptr2, newblk1_last_key + new_levelp_cur_cmpc, new_levelp_cur_keylen);
 			/* new child is old child */
-			BLK_SEG(bs_ptr2, bn_ptr2, SIZEOF(block_id) );
+			BLK_SEG(bs_ptr2, bn_ptr2, blkid_sz);
 			/* new header for next record after cur_rec of levelp */
 			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_levelp_cur_next_hdr, SIZEOF(rec_hdr) );
 			/* new key value for cur_next of levelp  */
 			BLK_SEG(bs_ptr2, old_levelp_cur_next_key + new_levelp_cur_next_cmpc, new_levelp_cur_next_keylen);
 			/* copy old contents after old_levelp_cur_key */
 			BLK_SEG(bs_ptr2, old_levelp_blk_base + old_levelp_rec_offset +
-				BSTAR_REC_SIZE + old_levelp_cur_keylen + SIZEOF(rec_hdr) + old_levelp_cur_next_keylen,
+				bstar_rec_sz + old_levelp_cur_keylen + SIZEOF(rec_hdr) + old_levelp_cur_next_keylen,
 				((blk_hdr_ptr_t)old_levelp_blk_base)->bsiz - old_levelp_rec_offset -
-				(BSTAR_REC_SIZE + old_levelp_cur_keylen + SIZEOF(rec_hdr) + old_levelp_cur_next_keylen));
+				(bstar_rec_sz + old_levelp_cur_keylen + SIZEOF(rec_hdr) + old_levelp_cur_next_keylen));
 			forward_process = FALSE;
 		}
 	} else /* there is *-rec after old_levelp_cur_key */
@@ -712,7 +731,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		if (complete_merge && delete_all_blk2_ances)
 		{	/* delete old old_levelp_cur_key and *-key and write new *-key */
 			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, SIZEOF(rec_hdr));
-			BLK_SEG(bs_ptr2, bn_ptr2, SIZEOF(block_id) );
+			BLK_SEG(bs_ptr2, bn_ptr2, blkid_sz);
 			forward_process = TRUE;
 		} else
 		{	/* new header for new cur_rec of levelp */
@@ -720,10 +739,10 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			/* new key value for cur_rec of levelp  */
 			BLK_SEG(bs_ptr2, newblk1_last_key + new_levelp_cur_cmpc, new_levelp_cur_keylen);
 			/* new child is old child */
-			BLK_SEG(bs_ptr2, bn_ptr2, SIZEOF(block_id) );
+			BLK_SEG(bs_ptr2, bn_ptr2, blkid_sz);
 			/* old *-rec */
-			BLK_SEG(bs_ptr2, old_levelp_blk_base + ((blk_hdr_ptr_t)old_levelp_blk_base)->bsiz - BSTAR_REC_SIZE,
-				BSTAR_REC_SIZE);
+			BLK_SEG(bs_ptr2, old_levelp_blk_base + ((blk_hdr_ptr_t)old_levelp_blk_base)->bsiz - bstar_rec_sz,
+				bstar_rec_sz);
 			forward_process = FALSE;
 		}
 	}

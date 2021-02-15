@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2017 Fidelity National Information	*
+ * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,8 +56,8 @@
 #include "mu_all_version_standalone.h"
 #include "db_write_eof_block.h"
 
-LITREF  char            	gtm_release_name[];
-LITREF  int4           		gtm_release_name_len;
+LITREF char	gtm_release_name[];
+LITREF int4	gtm_release_name_len;
 
 UNIX_ONLY(static sem_info	*sem_inf;)
 
@@ -71,7 +71,7 @@ error_def(ERR_DBNOTGDS);
 error_def(ERR_DBOPNERR);
 error_def(ERR_DBPREMATEOF);
 error_def(ERR_DBRDONLY);
-error_def(ERR_PREMATEOF);
+error_def(ERR_GTMCURUNSUPP);
 error_def(ERR_MUINFOUINT4);
 error_def(ERR_MUINFOUINT8);
 error_def(ERR_MUNODBNAME);
@@ -79,6 +79,7 @@ error_def(ERR_MUNOUPGRD);
 error_def(ERR_MUPGRDSUCC);
 error_def(ERR_MUSTANDALONE);
 error_def(ERR_MUUPGRDNRDY);
+error_def(ERR_PREMATEOF);
 error_def(ERR_STATSDBNOTSUPP);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
@@ -92,14 +93,16 @@ void mupip_upgrade(void)
 	int		fstat_res;
 	int4		status, rc;
 	uint4		status2;
-	off_t 		v15_file_size;
+	off_t		v15_file_size;
 	v15_sgmnt_data	v15_csd;
 	sgmnt_data	csd;
 	struct stat	stat_buf;
 	unsigned char	new_v5_master_map[MASTER_MAP_SIZE_DFLT - MASTER_MAP_SIZE_V5_OLD];
 	ZOS_ONLY(int	realfiletag;)
-	DEBUG_ONLY(int norm_vbn;)
+	DEBUG_ONLY(int	norm_vbn;)
 	unsigned char	new_master_map[MASTER_MAP_SIZE_V4];
+
+	mupip_exit(ERR_GTMCURUNSUPP);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -110,7 +113,7 @@ void mupip_upgrade(void)
 	atexit(mupip_upgrade_cleanup);
 	db_fn_len = SIZEOF(db_fn);
 	if (!cli_get_str("FILE", db_fn, &db_fn_len))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUNODBNAME);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUNODBNAME);
 	db_fn_len = MIN(db_fn_len, MAX_FN_LEN);
 	db_fn[db_fn_len] = '\0';	/* Null terminate */
 	/* Need to find out if this is a statsDB file. This necessitates opening the file to read the sgmnt_data
@@ -281,8 +284,8 @@ void mupip_upgrade(void)
 	if (v15_csd.max_rec_size > max_max_rec_size)
 	{
 		F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBMAXREC2BIG, 3,
-				v15_csd.max_rec_size, v15_csd.blk_size, max_max_rec_size);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBMAXREC2BIG, 3,
+			v15_csd.max_rec_size, v15_csd.blk_size, max_max_rec_size);
 		mupip_exit(ERR_MUNOUPGRD);
 	}
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Old file header size"),

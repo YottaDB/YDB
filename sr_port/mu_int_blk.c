@@ -36,6 +36,7 @@
 #include "filestruct.h"		/* For gtmsource.h */
 #include "gtmsource.h"		/* for jnlpool_addrs_ptr_t */
 #include "anticipatory_freeze.h"
+#include "tp.h"
 #ifdef GTM_TRIGGER
 #include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
@@ -279,7 +280,8 @@ boolean_t mu_int_blk(
 	uchar_ptr_t	c0, c2, c_base, blk_base, blk_base2, blk_top, key_base, ptr, rec_base, rec_top, span_key;
 	unsigned short	temp_ushort;
 	boolean_t	first_key, is_top, pstar, valid_gbl, hasht_global, instance_frozen;
-	boolean_t	muint_range_done = FALSE, nct_checked = FALSE;
+	boolean_t	muint_range_done = FALSE, nct_checked = FALSE, long_blk_id;
+	int4		blk_id_sz;
 	int		blk_size, buff_length, b_index, cmcc, comp_length, key_size, len, name_len,
 			num_len, rec_size, s_index, start_index, sub_start_index, hdr_len, idx;
 	int		tmp_cmpc, tmp_numsubs, max_allowed_key_size;
@@ -318,22 +320,23 @@ boolean_t mu_int_blk(
 		blk_base = mu_int_read(blk, &ondsk_blkver, &free_blk_base);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
 	if (!blk_base)
 		return FALSE;	/* Only occurs on malloc failure, so don't worry about mu_int_plen. */
+	long_blk_id = IS_64_BLK_ID(blk_base);
+	blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 	blk_size = (int)((blk_hdr_ptr_t)blk_base)->bsiz;
 	if (!muint_fast)
 	{
+		if (((blk_hdr_ptr_t)blk_base)->bver != mu_int_data.desired_db_format)
+			mu_int_blks_to_upgrd++;
 		if (tn_reset_this_reg)
 		{
 			((blk_hdr_ptr_t)blk_base)->tn = 1;
 			mu_int_write(blk, blk_base);
-			if (GDSVCURR != mu_int_data.desired_db_format)
-				mu_int_blks_to_upgrd++;
-		} else if (GDSVCURR != ondsk_blkver)
-			mu_int_blks_to_upgrd++;
+		}
 	}
 	/* pstar indicates that the current block is a (root block with only a star key) or not.
 		This is passed into mu_int_blk() as eb_ok */
-	pstar = (is_root && (SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + SIZEOF(block_id) == blk_size));
-	if (blk_size < (SIZEOF(blk_hdr) + (eb_ok ? 0 : (SIZEOF(rec_hdr) + (level ? SIZEOF(block_id) : MIN_DATA)))))
+	pstar = (is_root && (SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + blk_id_sz == blk_size));
+	if (blk_size < (SIZEOF(blk_hdr) + (eb_ok ? 0 : (SIZEOF(rec_hdr) + (level ? blk_id_sz : MIN_DATA)))))
 	{
 		MU_INT_RETRY_ERR_RETURN(ERR_DBBSIZMN, TRUE, TRUE, bot_key, bot_len, top_key, top_len,
 				(unsigned int)((blk_hdr_ptr_t)blk_base)->levl);
@@ -433,7 +436,7 @@ boolean_t mu_int_blk(
 		if (level && (rec_top == blk_top))
 		{
 			is_top = TRUE;
-			if (SIZEOF(rec_hdr) + SIZEOF(block_id) != rec_size)
+			if ((SIZEOF(rec_hdr) + blk_id_sz) != rec_size)
 			{
 				MU_INT_RETRY_ERR_RETURN(ERR_DBLRCINVSZ, TRUE, TRUE, buff, comp_length, top_key, top_len,
 											(unsigned int)blk_levl);
@@ -512,7 +515,7 @@ boolean_t mu_int_blk(
 				}
 			}
 			key_size = (int)(ptr - key_base);
-			if (level && (rec_size - SIZEOF(block_id) - SIZEOF(rec_hdr) != key_size))
+			if (level && ((rec_size - blk_id_sz - SIZEOF(rec_hdr)) != key_size))
 			{
 				MU_INT_RETRY_ERR_RETURN(ERR_DBKEYMN, TRUE, TRUE, buff, comp_length, top_key, top_len,
 						(unsigned int)blk_levl);
@@ -901,7 +904,7 @@ boolean_t mu_int_blk(
 		}
 		if (level)
 		{
-			GET_BLK_ID(child, ptr);
+			READ_BLK_ID(long_blk_id, &child, ptr);
 			if (child < 0)
 			{
 				MU_INT_RETRY_ERR_RETURN(ERR_DBPTRNOTPOS, TRUE, TRUE, buff, comp_length, top_key, top_len,
@@ -955,8 +958,8 @@ boolean_t mu_int_blk(
 					MU_INT_RETRY_ERR_RETURN(ERR_DBKEYMX, TRUE, TRUE, buff, comp_length, top_key, top_len,
 							(unsigned int)blk_levl);
 				}
-				GET_BLK_ID(root_pointer, c0 + 2);
-				if (root_pointer > mu_int_data.trans_hist.total_blks || root_pointer < 2)
+				READ_BLK_ID(long_blk_id, &root_pointer, c0 + 2);
+				if ((root_pointer > mu_int_data.trans_hist.total_blks) || (root_pointer < 2))
 				{	/* 0=master map, 1=dir root*/
 					MU_INT_RETRY_INCR_PLEN(ERR_DBBADPNTR, TRUE, TRUE, buff, comp_length, top_key,
 							top_len, (unsigned int)blk_levl);
@@ -1014,10 +1017,10 @@ boolean_t mu_int_blk(
 				/* +2 in the above hdr_len calculation is to take into account
 				   two \0's after the end of the key
 				*/
-				if (rec_size > hdr_len + SIZEOF(block_id))
+				if (rec_size > (hdr_len + blk_id_sz))
 				{
-					subrec_ptr = get_spec((sm_uc_ptr_t)rec_base + hdr_len + SIZEOF(block_id),
-									(int)(rec_size - (hdr_len + SIZEOF(block_id))), COLL_SPEC);
+					subrec_ptr = get_spec((sm_uc_ptr_t)rec_base + hdr_len + blk_id_sz,
+									(int)(rec_size - (hdr_len + blk_id_sz)), COLL_SPEC);
 					if (subrec_ptr)
 					{
 						trees_tail->nct = *(subrec_ptr + COLL_NCT_OFFSET);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,13 +101,13 @@ int op_open(mval *device, mval *devparms, mval *timeout, mval *mspace)
 			if (!memvcmp(c1, nlen, &(device->str.addr[0]), nlen))
 			{
 				if (!memvcmp(dollar_zpin.addr, dollar_zpin.len, &(device->str.addr[nlen]), dollar_zpin.len))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, device->str.len,
-						      device->str.addr, ERR_TEXT, 2,
-						      LEN_AND_LIT("The value of $P followed by \"< /\" is an invalid device name"));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DEVOPENFAIL, 2, device->str.len,
+						device->str.addr, ERR_TEXT, 2,
+						LEN_AND_LIT("The value of $P followed by \"< /\" is an invalid device name"));
 				else if (!memvcmp(dollar_zpout.addr, dollar_zpout.len, &(device->str.addr[nlen]), dollar_zpout.len))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, device->str.len,
-						      device->str.addr, ERR_TEXT, 2,
-						      LEN_AND_LIT("The value of $P followed by \"> /\" is an invalid device name"));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DEVOPENFAIL, 2, device->str.len,
+						device->str.addr, ERR_TEXT, 2,
+						LEN_AND_LIT("The value of $P followed by \"> /\" is an invalid device name"));
 			}
 		}
 	}
@@ -115,7 +115,7 @@ int op_open(mval *device, mval *devparms, mval *timeout, mval *mspace)
 			(0 == STRNCMP_LIT(device->str.addr, SOCKETPOOLNAME)))
 	{
 		if (!TREF(is_socketpool))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DEVNAMERESERVED, 2, device->str.len, device->str.addr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DEVNAMERESERVED, 2, device->str.len, device->str.addr);
 	}
 	naml = get_log_name(&device->str, INSERT);
 	if (naml->iod != 0)
@@ -148,8 +148,8 @@ int op_open(mval *device, mval *devparms, mval *timeout, mval *mspace)
 				}
 			}
 			if (SS_LOG2LONG == stat)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, device->str.len,
-					      device->str.addr, SIZEOF(buf1) - 1);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, device->str.len,
+					device->str.addr, SIZEOF(buf1) - 1);
 			else
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) stat);
 		}

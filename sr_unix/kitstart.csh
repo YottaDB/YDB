@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2011-2020 Fidelity National Information		#
+# Copyright (c) 2011-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -278,40 +278,6 @@ foreach image ($imagetype)
 		$gtm_com/IGS gtmsecshr "UNHIDE"	# make root-owned gtmsecshrdir world-readable
 		chmod u+w gtmsecshrdir
 	endif
-	if (-x dbcertify && -f V5CBSU.m) then
-		set dist_file = "${dist}/dbcertify_${version}_${osname}_${arch}_${image}.${package_ext}"
-		echo ""
-		echo "Creating $dist_file"
-		$package $dist_file README.txt dbcertify V5CBSU.m || exit 10
-		echo "Gzipping $dist_file"
-		gzip $dist_file || exit 11
-		if (1 == $open_source) then
-			echo ""
-			echo "Creating dbcertify distribution for open source (includes GNU License)"
-			echo ""
-			echo "Copying $GNU_COPYING_license to $cwd"
-			/bin/cp $GNU_COPYING_license . || exit 8
-			set dist_file="${opensource_dist}/dbcertify_${version}_${osname}_${arch}_${image}.${package_ext}"
-			echo ""
-			echo "Creating $dist_file"
-			$package $dist_file README.txt COPYING dbcertify V5CBSU.m || exit 10
-			echo ""
-			echo "Gzipping $dist_file"
-			gzip $dist_file || exit 11
-			rm -f COPYING || exit 9
-		endif
-		echo "Removing dbcertify"
-		set rm_from_dist = "$rm_from_dist `echo dbcertify V5CBSU.*`"
-		rm -f dbcertify V5CBSU.* || exit 9
-		if (-e utf8) then
-			cd utf8
-			rm -f dbcertify V5CBSU.* || exit 9
-			cd ..
-		endif
-	else
-		echo ""
-		echo "No dbcertify or V5CBSU.m"
-	endif
 	if (-e GTMDefinedTypesInit.m) then
 		set dist_file = "${dist}/GTMDefinedTypesInit_${version}_${osname}_${arch}_${image}.${package_ext}"
 		echo ""
@@ -458,7 +424,6 @@ y
 y
 n
 n
-n
 CONFIGURE_EOF
 			else
 				sh ./configure << CONFIGURE_EOF
@@ -468,7 +433,6 @@ n
 ${install}/defgroup/${image}
 y
 y
-n
 n
 y
 n
@@ -494,7 +458,6 @@ ${install}/${image}
 y
 y
 n
-n
 y
 CONFIGURE_EOF
 			else
@@ -505,7 +468,6 @@ y
 ${install}/${image}
 y
 y
-n
 n
 y
 y
@@ -542,6 +504,7 @@ CONFIGURE_EOF
 			@ both = 0
 			# Exclude files that are created only during installation and not in regular builds
 			set install_only_files = "README.txt|custom_errors_sample.txt|libgtmutil.so"
+			set install_only_files = "$install_only_files|install_permissions.log|install_sha256_checksum.log"
 			while (2 > $both)
 				# create the install.dir from both installations
 				cd ${install}/$defgroup

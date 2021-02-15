@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2018 Fidelity National Information	*
+ * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,7 +106,7 @@ STATICFNDEF void parm_pool_init(unsigned int init_capacity)
 	assert(!TREF(parm_pool_ptr));
 	init_capacity = MAX(init_capacity, PARM_POOL_INIT_CAP);	/* Update the minimum initial capacity if needed. */
 	CAPACITY_ROUND_UP2(capacity, init_capacity);		/* Bump up the initial capacity to the first larger power of two. */
-	TREF(parm_pool_ptr) = (parm_pool *)malloc(SIZEOF(parm_pool) + (SIZEOF(lv_val *) * (capacity - 1) * LV_VALS_PER_SLOT));
+	TREF(parm_pool_ptr) = (parm_pool *)malloc(SIZEOF(parm_pool) + (SIZEOF(lv_val *) * (capacity) * LV_VALS_PER_SLOT));
 	(TREF(parm_pool_ptr))->capacity = capacity;
 	(TREF(parm_pool_ptr))->start_idx = 0;
 	(*(TREF(parm_pool_ptr))->parms).mask_and_cnt.actualcnt = SAFE_TO_OVWRT;
@@ -211,6 +211,7 @@ STATICFNDEF void parm_pool_expand(int slots_needed, int slots_copied)
 	parm_pool	*pool_ptr;
 	uint4		pool_capacity;
 	DCL_THREADGBL_ACCESS;
+	size_t		sizt_len;	/* For SCI */
 
 	SETUP_THREADGBL_ACCESS;
 	assert(TREF(parm_pool_ptr));
@@ -218,9 +219,14 @@ STATICFNDEF void parm_pool_expand(int slots_needed, int slots_copied)
 	pool_capacity = (TREF(parm_pool_ptr))->capacity;
 	CAPACITY_ROUND_UP2(pool_capacity, slots_needed);			/* Calculate the new capacity. */
 	assert(MAX_TOTAL_SLOTS > pool_capacity);				/* In debug, ensure we are not growing endlessly. */
-	pool_ptr = (parm_pool *)malloc(SIZEOF(parm_pool) + SIZEOF(lv_val *) * (pool_capacity - 1) * LV_VALS_PER_SLOT);
+	sizt_len = sizeof(parm_pool) + sizeof(lv_val *) * (pool_capacity) * LV_VALS_PER_SLOT;
+	pool_ptr = (parm_pool *)malloc(sizt_len);
+	assert(NULL != pool_ptr);
 	if (0 != slots_copied)							/* Copy only previously saved parameters. */
-		memcpy(pool_ptr->parms, (TREF(parm_pool_ptr))->parms, SIZEOF(lv_val *) * slots_copied * LV_VALS_PER_SLOT);
+	{
+		sizt_len = sizeof(lv_val *) * slots_copied * LV_VALS_PER_SLOT;
+		memcpy(pool_ptr->parms, (TREF(parm_pool_ptr))->parms, sizt_len);
+	}
 	pool_ptr->start_idx = (TREF(parm_pool_ptr))->start_idx;			/* Restore start_idx. */
 	pool_ptr->capacity = pool_capacity;					/* Update the capacity. */
 	free(TREF(parm_pool_ptr));

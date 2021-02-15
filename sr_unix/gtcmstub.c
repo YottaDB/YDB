@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +28,9 @@
 #include "gvcmz.h"
 #include "mvalconv.h"
 
+error_def(ERR_TEXT);
+error_def(ERR_UNIMPLOP);
+
 void gvcmy_rundown(void)
 {
 	return;
@@ -34,10 +38,7 @@ void gvcmy_rundown(void)
 
 void gvcmy_open(gd_region *reg, parse_blk *nb)
 {
-	error_def(ERR_UNIMPLOP);
-	error_def(ERR_TEXT);
-
-	rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT,
+	RTS_ERROR_ABT(VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT,
 		2, LEN_AND_LIT("This utility does not support remote database operations"));
 }
 
@@ -96,4 +97,3 @@ void	gvcmx_increment(mval *increment, mval *result)
 	assert(FALSE);
 	return;
 }
-

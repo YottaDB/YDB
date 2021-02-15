@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,6 @@ int m_zmessage (void)
 	case EXPR_INDR:
 		if (TK_COLON != TREF(window_token))
 		{
-			coerce(&arg, OCT_MVAL);
 			make_commarg(&arg, indir_zmess);
 			return TRUE;
 		}

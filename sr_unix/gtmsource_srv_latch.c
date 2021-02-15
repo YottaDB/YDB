@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2018 Fidelity National Information	*
+ * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,8 +86,8 @@ boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeou
 					/* No need to release the latch before rts_error_csa (mupip_exit_handler will do it for
 					 * us).
 					 */
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn),
-						      ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn),
+						ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 				}
 				cycle_mismatch = (repl_csa->onln_rlbk_cycle != jnlpool->jnlpool_ctl->onln_rlbk_cycle);
 				assert((ASSERT_NO_ONLINE_ROLLBACK != onln_rlbk_action) || !cycle_mismatch);

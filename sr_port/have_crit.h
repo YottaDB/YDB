@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -117,10 +117,9 @@ GBLREF	boolean_t	deferred_timers_check_needed;
 /* Set the value of forced_exit to 2. This should indicate that we are already in the exit processing, and do not want to handle any
  * deferred events, from timers or other interrupts, anymore. Ensure that forced_exit state does not regress by asserting that the
  * current value is 0 or 1 before setting it to 2. Note that on UNIX forced_exit can progress to 2 only from 1, while on VMS it is
- * possible to generic_exit_handler or dbcertify_exit_handler to change forced_exit from 0 to 2 directly. This design ensures that
- * on VMS we will not invoke sys$exit from DEFERRED_EXIT_HANDLING_CHECK after we started exit processing; on UNIX process_exiting
- * flag servs the same purpose (and is also checked by DEFERRED_EXIT_HANDLING_CHECK), so it is not necessary for either
- * generic_signal_handler or dbcertify_signal_handler to set forced_exit to 2.
+ * possible to generic_exit_handler to change forced_exit from 0 to 2 directly. This design ensures that on VMS we will not invoke
+ * sys$exit from DEFERRED_EXIT_HANDLING_CHECK after we started exit processing; on UNIX process_exiting flag servs the same purpose
+ * (and is also checked by DEFERRED_EXIT_HANDLING_CHECK), so it is not necessary for generic_signal_handler to set forced_exit to 2.
  */
 #define SET_FORCED_EXIT_STATE_ALREADY_EXITING							\
 {												\

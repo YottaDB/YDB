@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2020 Fidelity National Information	*
+ * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -127,11 +127,11 @@ open_relinkctl_sgm *relinkctl_attach(mstr *obj_container_name, mstr *objpath, in
 			 * so this error is "just-in-case".
 			 */
 			if (NULL != objpath)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2,
-						objpath->len, objpath->addr, save_errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2,
+					objpath->len, objpath->addr, save_errno);
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-						RTS_ERROR_LITERAL("realpath()"), CALLFROM, save_errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+					RTS_ERROR_LITERAL("realpath()"), CALLFROM, save_errno);
 		}
 	}
 	objdir.addr = pathptr;
@@ -276,7 +276,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				}
 				if (!gtm_permissions(&dir_stat_buf, &user_id, &group_id, &perm, PERM_IPC, &pdd))
 				{
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10 + PERMGENDIAG_ARG_COUNT) ERR_RELINKCTLERR, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10 + PERMGENDIAG_ARG_COUNT) ERR_RELINKCTLERR, 2,
 						RTS_ERROR_MSTR(&linkctl->zro_entry_name), ERR_PERMGENFAIL, 4,
 						RTS_ERROR_STRING("relinkctl"), RTS_ERROR_MSTR(&linkctl->zro_entry_name),
 						PERMGENDIAG_ARGS(pdd));
@@ -409,8 +409,8 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			{
 				relinkctl_unlock_exclu(linkctl);
 				relinkctl_unmap(linkctl);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REQRLNKCTLRNDWN, 3,
-						linkctl->relinkctl_path, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REQRLNKCTLRNDWN, 3,
+					linkctl->relinkctl_path, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
 			}
 			DBGARLNK((stderr, "relinkctl_open: file first open\n"));
 			hdr->n_records = 0;
@@ -591,8 +591,8 @@ int relinkctl_get_key(char key[GTM_PATH_MAX], mstr *zro_entry_name)
 	hexstr[32] = '\0';
 	/* If the cumulative path to the relinkctl file exceeds GTM_PATH_MAX, it will be inaccessible, so no point continuing. */
 	if (GTM_PATH_MAX < (TREF(gtm_linktmpdir)).len + SLASH_GTM_RELINKCTL_LEN + SIZEOF(hexstr))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RELINKCTLERR, 2, RTS_ERROR_MSTR(zro_entry_name),
-				ERR_TEXT, 2, RTS_ERROR_LITERAL("Path to the relinkctl file is too long"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_RELINKCTLERR, 2, RTS_ERROR_MSTR(zro_entry_name),
+			ERR_TEXT, 2, RTS_ERROR_LITERAL("Path to the relinkctl file is too long"));
 	key_ptr = key;
 	memcpy(key_ptr, (TREF(gtm_linktmpdir)).addr, (TREF(gtm_linktmpdir)).len);
 	key_ptr += (TREF(gtm_linktmpdir)).len;
@@ -814,8 +814,8 @@ relinkrec_t *relinkctl_insert_record(open_relinkctl_sgm *linkctl, mstr *rtnname)
 			if (linkctl->hdr->relinkctl_max_rtn_entries == linkctl->hdr->n_records)
 			{
 				relinkctl_unlock_exclu(linkctl);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_RELINKCTLFULL, 3, linkctl->zro_entry_name.len,
-					      linkctl->zro_entry_name.addr, linkctl->hdr->relinkctl_max_rtn_entries);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_RELINKCTLFULL, 3, linkctl->zro_entry_name.len,
+					linkctl->zro_entry_name.addr, linkctl->hdr->relinkctl_max_rtn_entries);
 			}
 			base = linkctl->rec_base;
 			rec = base + nrec;

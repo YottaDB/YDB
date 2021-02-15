@@ -27,7 +27,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version ${V6.3-014})
+set(version ${V7.0-000})
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -204,7 +204,6 @@ endmacro()
 
 # Assign sources to libraries.
 load_source_list(libcmisockettcp sr_unix_gnp/libcmisockettcp.list)
-load_source_list(libdbcertify    sr_unix/libdbcertify.list)
 load_source_list(libdse          sr_unix/libdse.list)
 load_source_list(libgnpclient    sr_unix_gnp/libgnpclient.list)
 load_source_list(libgnpserver    sr_unix_gnp/libgnpserver.list)
@@ -215,9 +214,7 @@ load_source_list(libstub         sr_unix/libstub.list)
 
 # Assign sources to executables.
 set_source_list(gtm_threadgbl_deftypes gtm_threadgbl_deftypes)
-set_source_list(dbcertify        dbcertify dbcertify_cmd)
 set_source_list(dse              dse dse_cmd)
-set_source_list(ftok             ftok)
 set_source_list(gtcm_gnp_server  gtcm_gnp_server)
 set_source_list(gtcm_pkdisp      gtcm_pkdisp)
 set_source_list(gtcm_play        gtcm_play omi_srvc_xct)
@@ -232,7 +229,6 @@ set_source_list(lke              lke lke_cmd)
 set_source_list(maskpass         maskpass gtmcrypt_util)
 set_source_list(mumps            gtm)
 set_source_list(mupip            mupip mupip_cmd)
-set_source_list(semstat2         semstat2)
 
 #-----------------------------------------------------------------------------
 # libmumps gets leftover sources, so compute the remaining list.
@@ -388,7 +384,6 @@ foreach(lib
   cmisockettcp
   gnpclient
   gnpserver
-  dbcertify
   dse
   lke
   mupip
@@ -414,9 +409,6 @@ target_link_libraries(mumps		libmumps)
 add_executable(dse			${dse_SOURCES})
 target_link_libraries(dse		libdse libmumps libstub)
 list(APPEND with_export dse)
-
-add_executable(dbcertify		${dbcertify_SOURCES})
-target_link_libraries(dbcertify		libdbcertify libmupip libmumps libstub)
 
 add_executable(gtmsecshr		${gtmsecshr_SOURCES})
 add_dependencies(gtmsecshr		gen_gtm_threadgbl_deftypes)
@@ -455,12 +447,6 @@ target_link_libraries(gtcm_pkdisp	libgtcm libmumps libstub)
 
 add_executable(gtcm_shmclean 		${gtcm_shmclean_SOURCES})
 target_link_libraries(gtcm_shmclean	libgtcm libmumps libstub)
-
-add_executable(semstat2		 	${semstat2_SOURCES})
-add_dependencies(semstat2		gen_gtm_threadgbl_deftypes)
-
-add_executable(ftok 			${ftok_SOURCES})
-target_link_libraries(ftok 		libmumps libstub)
 
 add_library(libgtmshr MODULE ${libgtmshr_SOURCES})
 set_property(TARGET libgtmshr PROPERTY OUTPUT_NAME gtmshr)
@@ -597,8 +583,6 @@ install(TARGETS
   gtcm_pkdisp
   gtcm_play
   gtcm_shmclean
-  semstat2
-  ftok
   gtmsecshr
   mupip
   libgtmshr

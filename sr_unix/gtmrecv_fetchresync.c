@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -171,45 +171,45 @@ void gtmrecv_fetchresync_connect(int port)
 	FD_ZERO(&input_fds);
 	FD_SET(gtmrecv_listen_sock_fd, &input_fds);
 	while (TRUE)
-        {
-                t1 = time(NULL);
-                repl_poll_wait.tv_sec = MAX_WAIT_FOR_FETCHRESYNC_CONN;
-                repl_poll_wait.tv_usec = 0;
-                while (0 > (status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &repl_poll_wait)))
-                {
-                        if ((EINTR == errno)  || (EAGAIN == errno))
-                        {
-                                t2 = time(NULL);
-                                if (0 >= (int)(repl_poll_wait.tv_sec = (MAX_WAIT_FOR_FETCHRESYNC_CONN - (int)difftime(t2, t1))))
-                                {
-                                        status = 0;
-                                        break;
-                                }
-                                repl_poll_wait.tv_usec = 0;
-                                FD_SET(gtmrecv_listen_sock_fd, &input_fds);
-                                continue;
-                        } else
-                                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-                                                LEN_AND_LIT("Error in select on listen socket"), errno);
-                }
-                if (status == 0)
-                {
-                        repl_log(stdout, TRUE, TRUE, "Waited about %d seconds for connection from primary source server\n",
-                                        MAX_WAIT_FOR_FETCHRESYNC_CONN);
-                        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-                                        LEN_AND_LIT("Waited too long to get a connection request. Check if primary is alive."));
-                }
-                ACCEPT_SOCKET(gtmrecv_listen_sock_fd, primary_ai.ai_addr,
-                                        (GTM_SOCKLEN_TYPE *)&primary_ai.ai_addrlen, gtmrecv_sock_fd);
+	{
+		t1 = time(NULL);
+		repl_poll_wait.tv_sec = MAX_WAIT_FOR_FETCHRESYNC_CONN;
+		repl_poll_wait.tv_usec = 0;
+		while (0 > (status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &repl_poll_wait)))
+		{
+			if ((EINTR == errno)  || (EAGAIN == errno))
+			{
+				t2 = time(NULL);
+				if (0 >= (int)(repl_poll_wait.tv_sec = (MAX_WAIT_FOR_FETCHRESYNC_CONN - (int)difftime(t2, t1))))
+				{
+					status = 0;
+					break;
+				}
+				repl_poll_wait.tv_usec = 0;
+				FD_SET(gtmrecv_listen_sock_fd, &input_fds);
+				continue;
+			} else
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+					LEN_AND_LIT("Error in select on listen socket"), errno);
+		}
+		if (status == 0)
+		{
+			repl_log(stdout, TRUE, TRUE, "Waited about %d seconds for connection from primary source server\n",
+				MAX_WAIT_FOR_FETCHRESYNC_CONN);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				LEN_AND_LIT("Waited too long to get a connection request. Check if primary is alive."));
+		}
+		ACCEPT_SOCKET(gtmrecv_listen_sock_fd, primary_ai.ai_addr,
+			(GTM_SOCKLEN_TYPE *)&primary_ai.ai_addrlen, gtmrecv_sock_fd);
 		if (FD_INVALID != gtmrecv_sock_fd)
 			break;
 		save_errno = errno;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0,
 			ERR_TEXT, 2, LEN_AND_LIT("Error accepting connection from Source Server"), save_errno);
-        }
-        /* Connection established */
-        repl_close(&gtmrecv_listen_sock_fd); /* Close the listener socket */
-        repl_connection_reset = FALSE;
+	}
+	/* Connection established */
+	repl_close(&gtmrecv_listen_sock_fd); /* Close the listener socket */
+	repl_connection_reset = FALSE;
 	return;
 }
 
@@ -250,7 +250,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 	if (0 != (status = get_send_sock_buff_size(gtmrecv_sock_fd, &repl_max_send_buffsize))
 		|| 0 != (status = get_recv_sock_buff_size(gtmrecv_sock_fd, &repl_max_recv_buffsize)))
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Error getting socket send/recv buffsizes"), status);
 	}
 	repl_log(stdout, TRUE, TRUE, "Connection established, using TCP send buffer size %d receive buffer size %d\n",
@@ -286,8 +286,8 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 				if (0 != (status = get_send_sock_buff_size(gtmrecv_sock_fd, &repl_max_send_buffsize))
 				|| 0 != (status = get_recv_sock_buff_size(gtmrecv_sock_fd, &repl_max_recv_buffsize)))
 				{
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					LEN_AND_LIT("Error getting socket send/recv buffsizes"), status);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+						LEN_AND_LIT("Error getting socket send/recv buffsizes"), status);
 				}
 				repl_log(stdout, TRUE, TRUE,
 				"Connection established, using TCP send buffer size %d receive buffer size %d\n",
@@ -328,9 +328,9 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 				if (jnlpool->repl_inst_filehdr->is_supplementary)
 				{	/* Issue REPL2OLD error because this is a supplementary instance and remote side runs
 					 * on a GT.M version that does not understand the supplementary protocol */
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPL2OLD, 4,
-							LEN_AND_STR(old_need_instinfo_msg->instname),
-							LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPL2OLD, 4,
+						LEN_AND_STR(old_need_instinfo_msg->instname),
+						LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
 				}
 				remote_side->proto_ver = old_need_instinfo_msg->proto_ver;
 				assert(REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver);
@@ -344,7 +344,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 				gtmrecv_repl_send((repl_msg_ptr_t)&old_instinfo_msg, REPL_OLD_INSTANCE_INFO,
 							MIN_REPL_MSGLEN, "REPL_OLD_INSTANCE_INFO", MAX_SEQNO);
 				if (old_instinfo_msg.was_rootprimary && !old_need_instinfo_msg->is_rootprimary)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PRIMARYNOTROOT, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_PRIMARYNOTROOT, 2,
 						LEN_AND_STR((char *)old_need_instinfo_msg->instname));
 				break;
 
@@ -431,7 +431,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 				if (REPL_PROTO_VER_UNINITIALIZED == remote_side->proto_ver)
 				{	/*  Issue REPL2OLD error because primary is dual-site */
 					assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPL2OLD, 4, LEN_AND_STR(UNKNOWN_INSTNAME),
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPL2OLD, 4, LEN_AND_STR(UNKNOWN_INSTNAME),
 						LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
 				}
 				assert(REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver);
@@ -483,7 +483,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 			default:
 				repl_log(stdout, TRUE, TRUE, "Message of unknown type (%d) received\n", msg.type);
 				assert(FALSE);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLCOMM);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_REPLCOMM);
 				break;
 		}
 	} while (!repl_connection_reset && (REPL_RESYNC_SEQNO != msg.type));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@
 int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, boolean_t *used)
 {
 	int4		bits;
-	sm_uc_ptr_t 	ptr, top;
+	sm_uc_ptr_t	ptr, top;
 	unsigned char	valid;
 
 	assert(hint < total_bits);
@@ -33,8 +33,8 @@ int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, boolean_t *u
 	 */
 	if (hint)
 	{
-		ptr = base_addr + (hint * BML_BITS_PER_BLK) / 8;
-		top = base_addr + (total_bits + 7) / 8 - 1;
+		ptr = base_addr + ((hint * BML_BITS_PER_BLK) / 8);
+		top = base_addr + ((total_bits + 7) / 8) - 1;
 		if (ptr == top)
 		{
 			bits = total_bits % 8;
@@ -51,12 +51,12 @@ int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, boolean_t *u
 			valid = *ptr;
 		switch (hint % (8 / BML_BITS_PER_BLK))
 		{
-		        case 0:	break;
+			case 0:	break;
 			case 1:	valid = valid & 252;
 				break;
-			case 2: valid = valid & 240;
+			case 2:	valid = valid & 240;
 				break;
-			case 3: valid = valid & 192;
+			case 3:	valid = valid & 192;
 				break;
 		}
 		if (valid)

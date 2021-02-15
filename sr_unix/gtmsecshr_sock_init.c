@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -169,9 +169,10 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 int4 gtmsecshr_sock_init(int caller)
 {
 	int			ret_status = 0;
-	int			save_errno, gtmsecshr_cli_sockpath_end;
+	int			save_errno;
 	int			id_str_len;
 	int4			init_pathname_status;
+	unsigned int		gtmsecshr_cli_sockpath_end;
 	unsigned char		id_str[MAX_ID_LEN+1], suffix;
 	unsigned char		pid_str[2 * SIZEOF(pid_t) + 1];
 	int			i2hex_nofill(int , uchar_ptr_t, int);
@@ -201,9 +202,9 @@ int4 gtmsecshr_sock_init(int caller)
 	gtmsecshr_sockpath_len = (int)(SUN_LEN(&gtmsecshr_sock_name));
 	if (FD_INVALID == (gtmsecshr_sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)))
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
-				RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"),
-				process_id, ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr socket create"), errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
+			RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"),
+			process_id, ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr socket create"), errno);
 		ret_status = SOCKETERR;
 	}
 	if (SERVER == caller)
@@ -227,10 +228,10 @@ int4 gtmsecshr_sock_init(int caller)
 		{
 			if (0 > BIND(gtmsecshr_sockfd, (struct sockaddr *)&gtmsecshr_sock_name, gtmsecshr_sockpath_len))
 			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
-					  RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,
-					  ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr socket bind"),
-			  		errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
+					RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,
+					ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr socket bind"),
+					errno);
 				ret_status = BINDERR;
 			}
 		}
@@ -245,7 +246,9 @@ int4 gtmsecshr_sock_init(int caller)
 					if (!suffix)
 					{
 						suffix = 'a';
-						gtmsecshr_cli_sockpath_end = STRLEN(gtmsecshr_cli_sock_name.sun_path);
+						gtmsecshr_cli_sockpath_end = strnlen(gtmsecshr_cli_sock_name.sun_path,
+								sizeof(gtmsecshr_cli_sock_name.sun_path));
+						assert(sizeof(gtmsecshr_cli_sock_name.sun_path) > gtmsecshr_cli_sockpath_end);
 						gtmsecshr_cli_sock_name.sun_path[gtmsecshr_cli_sockpath_end + 1] = '\0';
 #						ifdef EXACT_SIZE_SOCKNAME
 						gtmsecshr_cli_sockpath_len++; /* Account for socket name growth (suffix) */
@@ -277,9 +280,9 @@ int4 gtmsecshr_sock_init(int caller)
 		{
 			if (0 > BIND(gtmsecshr_sockfd, (struct sockaddr *)&gtmsecshr_cli_sock_name, gtmsecshr_cli_sockpath_len))
 			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
-					  RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,
-					  ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr_cli socket bind"), errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
+					RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,
+					ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr_cli socket bind"), errno);
 				ret_status = BINDERR;
 			} else if ('\0' != suffix)
 				ret_status = ONETIMESOCKET;
@@ -292,14 +295,14 @@ int4 gtmsecshr_sock_init(int caller)
 				lib_gid = gtm_get_group_id(&dist_stat_buff);
 				if ((-1 != lib_gid) && (dist_stat_buff.st_mode & 04))
 					lib_gid = -1; /* don't change it */
-				if ((-1 != lib_gid)
+				if ((-1 != lib_gid)	/* 4SCA: TOCTOU cannot use fchmod/fchown on socket files */
 				    && (-1 == CHMOD(gtmsecshr_cli_sock_name.sun_path, 0660)
 					|| ((lib_gid != GETGID())
 					    && (-1 == CHOWN(gtmsecshr_cli_sock_name.sun_path, -1, lib_gid)))))
 				{
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
-						  RTS_ERROR_STRING("Caller"), process_id, ERR_TEXT, 2,
-						  RTS_ERROR_LITERAL("Error changing socket permissions/group"), errno);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
+						RTS_ERROR_STRING("Caller"), process_id, ERR_TEXT, 2,
+						RTS_ERROR_LITERAL("Error changing socket permissions/group"), errno);
 				}
 			}
 		}

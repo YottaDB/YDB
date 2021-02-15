@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,14 +100,14 @@ void jobchild_init(void)
 			jparms.params.startup.buffer[jparms.params.startup.len] = '\0';
 			status = SYSTEM(jparms.params.startup.buffer);
 			if (-1 == status)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_JOBSTARTCMDFAIL, 0, errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_JOBSTARTCMDFAIL, 0, errno);
 			else if (0 != status)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_JOBSTARTCMDFAIL, 0);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(2) ERR_JOBSTARTCMDFAIL, 0);
 		}
 		MSTR_DEF(routine_mstr, jparms.params.routine.len, jparms.params.routine.buffer);
 		MSTR_DEF(label_mstr, jparms.params.label.len, jparms.params.label.buffer);
 		if (!job_addr(&routine_mstr, &label_mstr, jparms.params.offset, (char **)&base_addr, (char **)&transfer_addr))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBLABOFF);
 		/* Set process priority */
 		if (jparms.params.baspri)
 		{	/* send message to system log if nice fails */
@@ -124,10 +124,10 @@ void jobchild_init(void)
 		{
 			arg_len = FILE_NAME_SIZE;
 			if (!cli_get_str("INFILE", run_file_name, &arg_len))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RUNPARAMERR);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RUNPARAMERR);
 			lref_parse((uchar_ptr_t)run_file_name, &routine, &label, &offset);
 			if (!job_addr(&routine, &label, offset, (char **)&base_addr, (char **)&transfer_addr))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBLABOFF);
 		} else if (MUMPS_CALLIN & invocation_mode) /* call-in mode */
 		{
 			base_addr = make_cimode();

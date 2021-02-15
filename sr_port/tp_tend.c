@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -415,7 +415,7 @@ boolean_t	tp_tend()
 				/* check if current TP transaction's jnl size needs are greater than max jnl file size */
 				if (si->tot_jrec_size > csd->autoswitchlimit)
 					/* can't fit in current transaction's journal records into one journal file */
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLTRANS2BIG, 4, si->tot_jrec_size,
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_JNLTRANS2BIG, 4, si->tot_jrec_size,
 						JNL_LEN_STR(csd), csd->autoswitchlimit);
 			}
 			if (REPL_ALLOWED(csa))
@@ -468,8 +468,8 @@ boolean_t	tp_tend()
 			{
 				if (save_jnlpool != jnlpool)
 					jnlpool = save_jnlpool;
-				rts_error_csa(CSA_ARG(REG2CSA(save_gv_cur_region)) VARLSTCNT(4) ERR_REPLOFFJNLON, 2,
-						DB_LEN_STR(save_gv_cur_region));
+				RTS_ERROR_CSA_ABT(REG2CSA(save_gv_cur_region), VARLSTCNT(4) ERR_REPLOFFJNLON, 2,
+					DB_LEN_STR(save_gv_cur_region));
 			}
 			/* If caller does NOT want this update to be replicated, turn "replication" local variable off.
 			 * The only such caller known at this time is "trigger_upgrade" - 2014/05/02.
@@ -1966,7 +1966,8 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 		if ((gds_t_acquired != cse->mode) || (ROUND_DOWN2(cse->blk, BLKS_PER_LMAP) != bml))
 			continue;
 		assert(gds_t_acquired == cse->mode);
-		assert(GDSVCURR == cse->ondsk_blkver);
+		assert((GDSVCURR == cse->ondsk_blkver) || (BLK_ID_32_VER == cse->ondsk_blkver));
+		assert((GDSVCURR == cse->ondsk_blkver) || ((bml == (block_id_32)bml) && (total_blks == (block_id_32)total_blks)));
 		assert(*b_ptr == (cse->blk - bml));
 		do
 		{
@@ -2041,7 +2042,8 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 				 * therefore, fix it to point to the reallocated block's buffer address
 				 */
 				cse->old_block = t_qread(cse->blk, (sm_int_ptr_t)&cse->cycle, &cse->cr);
-				assert(GDSVCURR == cse->ondsk_blkver);	/* should have been already initialized in t_write_map */
+				/* should have been already initialized in t_write_map */
+				assert((GDSVCURR == cse->ondsk_blkver) || (BLK_ID_32_VER == cse->ondsk_blkver));
 				old_block = (blk_hdr_ptr_t)cse->old_block;
 				if (NULL == old_block)
 					return ((enum cdb_sc)rdfail_detail);

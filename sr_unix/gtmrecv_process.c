@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2020 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -416,12 +416,12 @@ STATICFNDEF void gtmrecv_repl_send_loop_error(int status, char *msgtypestr)
 	{
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Error sending %s message. Error in send : %s",
 				msgtypestr, STRERROR(status));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 	} else if (EREPL_SELECT == repl_errno)
 	{
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Error sending %s message. Error in select : %s",
 				msgtypestr, STRERROR(status));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 	}
 }
 
@@ -494,11 +494,11 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 				rec->jrec_null.strm_seqno = GTM_BYTESWAP_64(rec->jrec_null.strm_seqno);
 			}
 			if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
-			{	/* This code will need changes in case the jnl-ver changes from V27 to V28 so add an assert to
+			{	/* This code will need changes in case the jnl-ver changes from V28 to V29 so add an assert to
 				 * alert to that possibility. Once the code is fixed for the new jnl format, change the assert
 				 * to reflect the new latest jnl-ver.
 				 */
-				assert(JNL_VER_THIS == V27_JNL_VER);
+				assert(JNL_VER_THIS == V28_JNL_VER);
 				/* To better understand the logic below (particularly the use of hardcoded offsets), see comment
 				 * in repl_filter.c (search for "struct_jrec_upd layout" for the various jnl versions we support).
 				 */
@@ -1121,9 +1121,9 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 			if (memcmp(&recvpool.gtmrecv_local->updresync_lms_group,
 						&need_instinfo_msg->lms_group_info, SIZEOF(inst_hdr->lms_group_info)))
 			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Specified input instance file does not have same "
-						"LMS Group information as source server instance"));
+					"LMS Group information as source server instance"));
 			}
 		}
 	} else if (IS_REPL_INST_UUID_NON_NULL(need_instinfo_msg->lms_group_info))
@@ -1182,8 +1182,8 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 			if (strm_info == strm_top)
 			{	/* -REUSE specified an instance name that is not present in any of the 15 strm_group slots */
 				rel_lock(jnlpool->jnlpool_dummy_reg);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REUSEINSTNAME, 0, ERR_TEXT, 2,
-					  LEN_AND_LIT("Instance name in REUSE does not match any of 15 slots in instance file"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REUSEINSTNAME, 0, ERR_TEXT, 2,
+					LEN_AND_LIT("Instance name in REUSE does not match any of 15 slots in instance file"));
 			}
 			assert(reuse_slot);
 		}
@@ -1221,7 +1221,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 				{
 					if (grab_lock_needed)
 						rel_lock(jnlpool->jnlpool_dummy_reg);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("No empty slot found. Specify REUSE to choose one for reuse"));
 				}
 			} else
@@ -1251,13 +1251,13 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 		{	/* If -RESUME was specified, then the slot it matched must be same as slot found without its use */
 			assert(is_rcvr_srvr);
 			rel_lock(jnlpool->jnlpool_dummy_reg);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RESUMESTRMNUM, 0, ERR_TEXT, 2, LEN_AND_LIT("Source side LMS "
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_RESUMESTRMNUM, 0, ERR_TEXT, 2, LEN_AND_LIT("Source side LMS "
 				"group is found in instance file but RESUME specifies different stream number"));
 		} else if (reuse_slot && (reuse_slot != strm_index))
 		{	/* If -REUSE was specified, then the slot it matched must be same as slot found without its use */
 			assert(is_rcvr_srvr);
 			rel_lock(jnlpool->jnlpool_dummy_reg);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REUSEINSTNAME, 0, ERR_TEXT, 2, LEN_AND_LIT("Source side LMS "
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REUSEINSTNAME, 0, ERR_TEXT, 2, LEN_AND_LIT("Source side LMS "
 				"group is found in instance file but REUSE specifies different instance name"));
 		}
 		assert(INVALID_SUPPL_STRM != strm_index);
@@ -1273,8 +1273,8 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 				 * update process, issue error. Note: This limitation "might" be removed in the future.
 				 */
 				rel_lock(jnlpool->jnlpool_dummy_reg);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RCVRMANYSTRMS, 2,
-						strm_index, recvpool.gtmrecv_local->strm_index);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_RCVRMANYSTRMS, 2,
+					strm_index, recvpool.gtmrecv_local->strm_index);
 			}
 			recvpool.gtmrecv_local->strm_index = strm_index;
 			repl_log(gtmrecv_log_fp, TRUE, TRUE,
@@ -1569,8 +1569,8 @@ STATICFNDEF void prepare_recvpool_for_write(gtm_uint64_t datalen, gtm_uint64_t p
 	recvpool_ctl = recvpool.recvpool_ctl;
 	if (datalen > recvpool_size)
 	{	/* Too large a transaction to be accommodated in the Receive Pool */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLTRANS2BIG, 5, &recvpool_ctl->jnl_seqno,
-				&datalen, &pre_filter_write_len, LEN_AND_LIT("Receive"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLTRANS2BIG, 5, &recvpool_ctl->jnl_seqno,
+			&datalen, &pre_filter_write_len, LEN_AND_LIT("Receive"));
 	}
 	if ((write_loc + datalen) > recvpool_size)
 	{
@@ -1786,8 +1786,8 @@ STATICFNDEF void process_tr_buff(int msg_type)
 		{
 			if (SS_NORMAL != (status = repl_tr_endian_convert(remote_side->jnl_ver,
 							recvpool.recvdata_base + write_off, write_len)))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLXENDIANFAIL, 3, LEN_AND_LIT("Replicating"),
-						&recvpool.upd_proc_local->read_jnl_seqno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLXENDIANFAIL, 3, LEN_AND_LIT("Replicating"),
+					&recvpool.upd_proc_local->read_jnl_seqno);
 		}
 		if (!is_new_histrec)
 		{
@@ -1830,12 +1830,12 @@ STATICFNDEF void process_tr_buff(int msg_type)
 					else
 					{
 						if (EREPL_INTLFILTER_DATA2LONG == repl_errno)
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNLSETDATA2LONG, 2,
-									jnl_source_datalen, jnl_dest_maxdatalen);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_JNLSETDATA2LONG, 2,
+								jnl_source_datalen, jnl_dest_maxdatalen);
 						else if (EREPL_INTLFILTER_NEWREC == repl_errno)
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNLNEWREC, 2,
-									(unsigned int)jnl_source_rectype,
-									(unsigned int)jnl_dest_maxrectype);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_JNLNEWREC, 2,
+								(unsigned int)jnl_source_rectype,
+								(unsigned int)jnl_dest_maxrectype);
 						else
 						{
 							INT_FILTER_RTS_ERROR(recvpool_ctl->jnl_seqno, repl_errno); /* no return */
@@ -2230,8 +2230,8 @@ STATICFNDEF void process_tr_buff(int msg_type)
 		/* Signal the update process to check for the update. */
 		PTHREAD_COND_SIGNAL(&recvpool_ctl->write_updated, status);
 		if (0 != status)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("pthread_cond_signal"), CALLFROM, status, 0);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("pthread_cond_signal"), CALLFROM, status, 0);
 	} while (is_repl_cmpc);
 	return;
 }
@@ -2266,13 +2266,13 @@ STATICFNDEF void	gtmrecv_updresync_histinfo_find_seqno(seq_num input_seqno, int4
 		histinfo_num = recvpool.gtmrecv_local->updresync_num_histinfo_strm[strm_num];
 	if (INVALID_HISTINFO_NUM == histinfo_num)
 	{	/* The instance file cannot be used for updateresync if it has NO history records. */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_UPDSYNCINSTFILE, 0, ERR_STRMNUMIS, 1, strm_num, ERR_TEXT, 2,
-				LEN_AND_LIT("Input instance file has NO history records"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_UPDSYNCINSTFILE, 0, ERR_STRMNUMIS, 1, strm_num, ERR_TEXT, 2,
+			LEN_AND_LIT("Input instance file has NO history records"));
 	}
 	assert(0 <= histinfo_num);
 	if (!recvpool.gtmrecv_local->updresync_jnl_seqno)
 	{	/* The instance file cannot be used for updateresync if it has a ZERO seqno */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_UPDSYNCINSTFILE, 0, ERR_STRMNUMIS, 1, strm_num,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_UPDSYNCINSTFILE, 0, ERR_STRMNUMIS, 1, strm_num,
 			ERR_TEXT, 2, LEN_AND_LIT("Input instance file has jnl_seqno of 0"));
 	}
 	if (input_seqno > recvpool.gtmrecv_local->updresync_jnl_seqno)
@@ -2280,8 +2280,8 @@ STATICFNDEF void	gtmrecv_updresync_histinfo_find_seqno(seq_num input_seqno, int4
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Seqno "INT8_FMT" "INT8_FMTX" cannot be found in input instance file "
 			" which has a max seqno of "INT8_FMT" "INT8_FMTX"\n", input_seqno, input_seqno,
 			recvpool.gtmrecv_local->updresync_jnl_seqno, recvpool.gtmrecv_local->updresync_jnl_seqno);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_UPDSYNCINSTFILE, 0,
-				ERR_STRMNUMIS, 1, strm_num, ERR_TEXT, 2, LEN_AND_STR(print_msg));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_UPDSYNCINSTFILE, 0,
+			ERR_STRMNUMIS, 1, strm_num, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 	}
 	histinfo->start_seqno = 0;
 	do
@@ -2294,12 +2294,12 @@ STATICFNDEF void	gtmrecv_updresync_histinfo_find_seqno(seq_num input_seqno, int4
 			 * error indicates to the user it is the -updateresync qualifier where the issue is so it is not a big loss.
 			 */
 			if (-1 == status)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(15) ERR_UPDSYNCINSTFILE, 0,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(15) ERR_UPDSYNCINSTFILE, 0,
 					ERR_STRMNUMIS, 1, strm_num,
 					ERR_TEXT, 2, LEN_AND_LIT("Error reading history record"),
 					ERR_REPLINSTREAD, 4, SIZEOF(repl_histinfo), (qw_off_t *)&offset, LEN_AND_LIT(""));
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(16) ERR_UPDSYNCINSTFILE, 0,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(16) ERR_UPDSYNCINSTFILE, 0,
 					ERR_STRMNUMIS, 1, strm_num,
 					ERR_TEXT, 2, LEN_AND_LIT("Error reading history record"),
 					ERR_REPLINSTREAD, 4, SIZEOF(repl_histinfo), (qw_off_t *)&offset, LEN_AND_LIT(""), status);
@@ -2314,8 +2314,8 @@ STATICFNDEF void	gtmrecv_updresync_histinfo_find_seqno(seq_num input_seqno, int4
 	SNPRINTF(print_msg, SIZEOF(print_msg),
 			"Receiver side instance seqno "INT8_FMT" "INT8_FMTX" is less than"
 			" any history record found in instance file", input_seqno, input_seqno);
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_UPDSYNCINSTFILE, 0,
-			ERR_STRMNUMIS, 1, strm_num, ERR_TEXT, 2, LEN_AND_STR(print_msg));
+	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_UPDSYNCINSTFILE, 0,
+		ERR_STRMNUMIS, 1, strm_num, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 }
 
 /* Retrieve the "index"'th history record in the instance file specified using the -UPDATERESYNC qualifier.
@@ -2342,11 +2342,11 @@ STATICFNDEF void	gtmrecv_updresync_histinfo_get(int4 index, repl_histinfo *histi
 		 * error indicates to the user it is the -updateresync qualifier where the issue is so it is not a big loss.
 		 */
 		if (-1 == status)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_UPDSYNCINSTFILE, 0,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(12) ERR_UPDSYNCINSTFILE, 0,
 				ERR_TEXT, 2, LEN_AND_LIT("Error reading history record"),
 				ERR_REPLINSTREAD, 4, SIZEOF(repl_histinfo), (qw_off_t *)&offset, LEN_AND_LIT(""));
 		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_UPDSYNCINSTFILE, 0,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(13) ERR_UPDSYNCINSTFILE, 0,
 				ERR_TEXT, 2, LEN_AND_LIT("Error reading history record"),
 				ERR_REPLINSTREAD, 4, SIZEOF(repl_histinfo), (qw_off_t *)&offset, LEN_AND_LIT(""), status);
 	}
@@ -2682,7 +2682,7 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
 	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmrecv_sock_fd, repl_tls.id, GTMTLS_OP_VERIFY_PEER)))
 	{
 		if (!PLAINTEXT_FALLBACK)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSCONVSOCK), 0,
 				ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
 	} else
@@ -2709,7 +2709,7 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
 		}
 		errp = (-1 == status) ? (char *)gtm_tls_get_error() : STRERROR(status);
 		if (!PLAINTEXT_FALLBACK)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSHANDSHAKE, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSHANDSHAKE), 0, ERR_TEXT, 2, LEN_AND_STR(errp));
 	}
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Plaintext fallback enabled. Closing and reconnecting without TLS/SSL.\n");
@@ -3191,7 +3191,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						if (jnlpool->repl_inst_filehdr->is_supplementary)
 						{	/* Issue REPL2OLD error because this is a supplementary instance and remote
 							 * side runs a GT.M version that does not know the supplementary protocol */
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPL2OLD, 4,
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPL2OLD, 4,
 								LEN_AND_STR(old_need_instinfo_msg->instname),
 								LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
 						}
@@ -3202,10 +3202,10 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						if (gtmrecv_local->updateresync
 							&& (FD_INVALID != gtmrecv_local->updresync_instfile_fd))
 						{
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0,
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0,
 								ERR_TEXT, 2,
 								LEN_AND_LIT("Source side is non-supplementary implies "
-								  	"-UPDATERESYNC needs no value specified"));
+								"-UPDATERESYNC needs no value specified"));
 						}
 						/* Initialize the remote side protocol version from "proto_ver"
 						 * field of this msg
@@ -3406,9 +3406,9 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					 */
 					if (REPL_PROTO_VER_UNINITIALIZED == remote_side->proto_ver)
 					{	/*  Issue REPL2OLD error because primary is dual-site */
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPL2OLD, 4,
-								LEN_AND_STR(UNKNOWN_INSTNAME),
-								LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPL2OLD, 4,
+							LEN_AND_STR(UNKNOWN_INSTNAME),
+							LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
 					}
 					/* Assert that endianness_known and cross_endian have already been initialized.
 					 * This ensures that remote_side->cross_endian is reliable */

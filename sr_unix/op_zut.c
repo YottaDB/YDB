@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2020 Fidelity National Information	*
+ * Copyright (c) 2015-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,7 +34,7 @@ void op_zut(mval *s)
 	assertpro(-1 != gettimeofday(&tv, NULL));
 	microseconds = (1LL * MICROSECS_IN_SEC * tv.tv_sec) + tv.tv_usec;
 	if ((microseconds < 0) && (microseconds > E_18))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_WEIRDSYSTIME);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_WEIRDSYSTIME);
 	msectmp = microseconds;
 	/* Count the number of digits */
 	for (numdigs = 0; msectmp; numdigs++, msectmp /= DECIMAL_BASE)

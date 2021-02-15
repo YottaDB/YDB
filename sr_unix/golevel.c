@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,11 +36,11 @@ void	golevel(int4 level)
         int4            unwframes, unwlevels, prevlvl;
 
         if (0 > level)
-                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOLTZERO);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGOTOLTZERO);
 	unwlevels = dollar_zlevel() - level;
         if (0 > unwlevels)
 		/* Couldn't get to the level we were trying to unwind to */
-                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOTOOBIG);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGOTOTOOBIG);
 	unwframes = 0;
         for (fp = frame_pointer; NULL != fp; fp = fpprev)
         {

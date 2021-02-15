@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,18 +19,20 @@
 #include "mvalconv.h"
 
 GBLREF int4 process_id;
+
+error_def(ERR_RANDARGNEG);
+
 double          drand48(void);
 void            srand48(long int);
 
 void op_fnrandom (int4 interval, mval *ret)
 {
 	static int4	seed = 0;
-	error_def	(ERR_RANDARGNEG);
 	int4		random;
 
 	if (interval < 1)
 	{
-		rts_error(VARLSTCNT(1) ERR_RANDARGNEG);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_RANDARGNEG);
 	}
 	if (seed == 0)
 	{

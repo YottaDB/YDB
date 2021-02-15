@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -154,8 +154,8 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 				{	/* Have not yet established this is not a local node -- check further */
 					GETHOSTNAME(local_node_name, MAX_HOST_NAME_LEN, status);
 					if (-1 == status)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-								LEN_AND_LIT("gethostname"), CALLFROM, errno);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+							LEN_AND_LIT("gethostname"), CALLFROM, errno);
 					CLIENT_HINTS(hints);
 					if (0 != (errcode = getaddrinfo(local_node_name, NULL, &hints, &localhost_ai_ptr)))
 						localhost_ai_ptr = NULL;	/* Empty address list */

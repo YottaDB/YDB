@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,8 +34,10 @@ uchar_ptr_t i2asc(uchar_ptr_t p, unsigned int n)
 			assert((9 >= n) && (0 <= n));
 			n = n + '0';
 			assert(('9' >= n) && ('0' <= n));
+			assert(ar < q);
 			*--q = (unsigned char)n;
 			n = m;
+			assert(NULL != q);
 		}
 	}
 	assert((uintszofptr_t)q >= (uintszofptr_t)ar);

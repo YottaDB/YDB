@@ -214,7 +214,7 @@ void	gtm_env_init(void)
 		/* Initialize variable that controls TP allocation clue (for created blocks) */
 		val.addr = GTM_TP_ALLOCATION_CLUE;
 		val.len = SIZEOF(GTM_TP_ALLOCATION_CLUE) - 1;
-		gtm_tp_allocation_clue = (block_id)trans_numeric(&val, &is_defined, TRUE);
+		gtm_tp_allocation_clue = (block_id)trans_numeric_64(&val, &is_defined, TRUE);
 		if (!is_defined)
 			gtm_tp_allocation_clue = (block_id)MAXTOTALBLKS_MAX;
 		/* GDS Block certification */

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +15,7 @@
 #include "gtm_stdio.h"
 #include "gtm_socket.h"
 #include "gtm_string.h"
-#include <sys/un.h>
+#include "gtm_un.h"
 #include <errno.h>
 
 #include "gdsroot.h"
@@ -109,7 +110,7 @@ mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance)
 		if ((sendto_fail_pid == *pid) && is_proc_alive(*pid, 0))
 		{
 			SNPRINTF(sendtomsg, ARRAYSIZE(sendtomsg), "sendto() to pid [%d]", *pid);
-			send_msg(VARLSTCNT(10) ERR_MUTEXERR, 0, ERR_SYSCALL, 5, LEN_AND_STR(sendtomsg), CALLFROM, status);
+			send_msg_csa(NULL, VARLSTCNT(10) ERR_MUTEXERR, 0, ERR_SYSCALL, 5, LEN_AND_STR(sendtomsg), CALLFROM, status);
 			assert(FALSE);
 		}
 		sendto_fail_pid = *pid;
@@ -147,8 +148,8 @@ mutex_wake_proc(msemaphore *mutex_wake_msem_ptr)
 	if (0 > rc)
 	{
 		assert(FALSE);
-		rts_error(VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
-			  RTS_ERROR_TEXT("Error with msem_unlock()/sem_post()"), errno);
+		RTS_ERROR_ABT(VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+			RTS_ERROR_TEXT("Error with msem_unlock()/sem_post()"), errno);
 	}
 	return;
 }

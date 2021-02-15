@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "gdsblk.h"
 #include "gdscc.h"
 #include "min_max.h"
@@ -471,7 +472,7 @@ gd_region *dbfilopn(gd_region *reg)
 			free(seg->file_cntl);
 			seg->file_cntl = NULL;
 		}
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 	}
 	assert(((int)pblk.b_esl + 1) <= SIZEOF(seg->fname));
 	memcpy(seg->fname, pblk.buffer, pblk.b_esl);
@@ -515,7 +516,7 @@ gd_region *dbfilopn(gd_region *reg)
 				 */
 				/* First check if we have enough space to do ".new" suffix addition (done a little later) */
 				if (ARRAYSIZE(seg->fname) <= seg->fname_len + STR_LIT_LEN(EXT_NEW))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 				save_gv_cur_region = gv_cur_region;
 				mu_gv_cur_reg_init();
 				tmp_reg = gv_cur_region;
@@ -528,7 +529,7 @@ gd_region *dbfilopn(gd_region *reg)
 				if (!ftok_sem_get(tmp_reg, FALSE, GTM_ID, FALSE, &ftok_counter_halted))
 				{
 					MU_GV_CUR_REG_FREE(tmp_reg, save_gv_cur_region);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 				}
 				assert(!ftok_counter_halted);	/* since we specified FALSE as the 2nd parameter ("incr_cnt") */
 				/* Now that we got the ftok lock, check if the file exists. If so skip the create. */
@@ -552,7 +553,7 @@ gd_region *dbfilopn(gd_region *reg)
 						ftok_sem_release(tmp_reg, FALSE, FALSE);
 						MU_GV_CUR_REG_FREE(tmp_reg, save_gv_cur_region);
 						save_errno = TREF(mu_cre_file_openrc);
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 					}
 					memcpy(tmpbuff, seg->fname, seg->fname_len + 1); /* + 1 to include terminating '\0' */
 					seg->fname_len -= STR_LIT_LEN(EXT_NEW);
@@ -563,8 +564,8 @@ gd_region *dbfilopn(gd_region *reg)
 						save_errno = errno;
 						ftok_sem_release(tmp_reg, FALSE, FALSE);
 						MU_GV_CUR_REG_FREE(tmp_reg, save_gv_cur_region);
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-														save_errno);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+							save_errno);
 					}
 				}
 				ftok_sem_release(tmp_reg, FALSE, FALSE);
@@ -596,7 +597,7 @@ gd_region *dbfilopn(gd_region *reg)
 					free(seg->file_cntl);
 					seg->file_cntl = NULL;
 				}
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
 			}
 			reg->read_only = TRUE;		/* maintain csa->read_write simultaneously */
 			csa->read_write = FALSE;	/* maintain reg->read_only simultaneously */
@@ -643,7 +644,7 @@ gd_region *dbfilopn(gd_region *reg)
         if (-1 == stat_res)
         {
         	save_errno = errno;
-        	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
         }
 	set_gdid_from_stat(&udi->fileid, &buf);
 	if (prev_reg = gv_match(reg))
@@ -688,38 +689,38 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd, gtm_uint64_t *sec_size)
 
 int db_init(gd_region *reg, boolean_t ok_to_bypass)
 {
-	boolean_t       	is_bg, read_only, need_stacktrace, have_standalone_access;
+	boolean_t		is_bg, read_only, need_stacktrace, have_standalone_access;
 	boolean_t		shm_setup_ok = FALSE, vermismatch = FALSE, vermismatch_already_printed = FALSE;
 	boolean_t		new_shm_ipc, replinst_mismatch, need_shmctl, need_semctl;
 	boolean_t		gld_do_crypt_init, db_do_crypt_init, semop_success, statsdb_off;
-	char            	machine_name[MAX_MCNAMELEN];
+	char			machine_name[MAX_MCNAMELEN];
 	int			gethostname_res, stat_res, user_id, group_id, perm, save_udi_semid;
-	int4            	status, dblksize, save_errno, wait_time, loopcnt, sem_pid;
-	sm_long_t       	status_l;
-	sgmnt_addrs     	*csa;
+	int4			status, dblksize, save_errno, wait_time, loopcnt, sem_pid;
+	sm_long_t		status_l;
+	sgmnt_addrs		*csa;
 	node_local_ptr_t	cnl;
 	sgmnt_data		tsdbuff;
-	sgmnt_data_ptr_t        csd, tsd;
+	sgmnt_data_ptr_t	csd, tsd;
 	jnlpool_addrs_ptr_t	save_jnlpool, local_jnlpool;
 	replpool_identifier	replpool_id;
 	unsigned int		full_len;	/* for REPL_INST_AVAILABLE */
 	gd_id			replfile_gdid, *tmp_gdid;
 	boolean_t		need_jnlpool_setup;
-	struct sembuf   	sop[3];
-	struct stat     	stat_buf;
+	struct sembuf		sop[3];
+	struct stat		stat_buf;
 	union semun		semarg;
 	struct semid_ds		semstat;
-	struct shmid_ds         shmstat;
+	struct shmid_ds		shmstat;
 	struct statvfs		dbvfs;
-	uint4           	fbwsize, sopcnt;
+	uint4			fbwsize, sopcnt;
 	uint4			max_hrtbt_delta;
 	boolean_t		sem_timedout, *sem_timedoutp = NULL,
 				sem_stacktrace_time, *sem_stacktrace_timep = NULL,
 				indefinite_wait = TRUE;
-	unix_db_info    	*udi;
+	unix_db_info		*udi;
 	char			now_running[MAX_REL_NAME];
 	int			err_ret, init_status;
-	gtm_uint64_t 		sec_size, mmap_sz;
+	gtm_uint64_t		sec_size, mmap_sz;
 	semwait_status_t	retstat;
 	struct perm_diag_data	pdd;
 	boolean_t		bypassed_ftok = FALSE, bypassed_access = FALSE, dummy_ftok_counter_halted,
@@ -735,7 +736,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	node_local_ptr_t	baseDBnl;
 #	ifdef DEBUG
 	int			i;
-	char 			*ptr;
+	char			*ptr;
 #	endif
 
 	DCL_THREADGBL_ACCESS;
@@ -1278,7 +1279,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	DEFAULT_INIT_SS_CTX((SS_CTX_CAST(csa->ss_ctx)));
 	csa->mlkctl = (struct mlk_ctldata_struct *) ((sm_uc_ptr_t)csa->shmpool_buffer + SHMPOOL_SECTION_SIZE);
 	csa->mlkctl_len = LOCK_SPACE_SIZE(tsd);
-	csa->total_blks = tsd->trans_hist.total_blks;   		/* For test to see if file has extended */
+	csa->total_blks = tsd->trans_hist.total_blks;		/* For test to see if file has extended */
 	cnl = csa->nl;
 	if (new_shm_ipc)
 	{
@@ -1384,7 +1385,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			csd->trans_hist.early_tn = csd->trans_hist.curr_tn;
 			csd->max_update_array_size = csd->max_non_bm_update_array_size
 				= (int4)(ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
-			csd->max_update_array_size += (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE));
+			csd->max_update_array_size += (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 			/* add current db_csh counters into the cumulative counters and reset the current counters */
 #			define TAB_DB_CSH_ACCT_REC(COUNTER, DUMMY1, DUMMY2)		\
 				csd->COUNTER.cumul_count += csd->COUNTER.curr_count;	\
@@ -1396,7 +1397,11 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		gvstats_rec_csd2cnl(csa);	/* should be called before "db_auto_upgrade" */
 		reg->dyn.addr->ext_blk_count = csd->extension_size;
 		mlk_shr_init((sm_uc_ptr_t)csa->mlkctl, csd->lock_space_size, csa, (FALSE == read_only));
-		db_auto_upgrade(reg);		/* should be called before "gtm_mutex_init" to ensure NUM_CRIT_ENTRY is nonzero */
+		/* should be called before "gtm_mutex_init" to ensure NUM_CRIT_ENTRY is nonzero */
+		if (!MEMCMP_LIT(csd->label, GDS_LABEL))
+			db_auto_upgrade(reg);
+		else if(!MEMCMP_LIT(csd->label, V6_GDS_LABEL))
+			v6_db_auto_upgrade(reg);
 		DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 		gtm_mutex_init(reg, NUM_CRIT_ENTRY(csd), FALSE);
 		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
@@ -1652,6 +1657,8 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			assert(csd->semid == tsd->semid);
 			assert(!memcmp(&csd->gt_sem_ctime, &tsd->gt_sem_ctime, SIZEOF(tsd->gt_sem_ctime)));
 			assert(!memcmp(&csd->gt_shm_ctime, &tsd->gt_shm_ctime, SIZEOF(tsd->gt_shm_ctime)));
+			if (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+				db_header_dwnconv(csd);
 			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, (off_t)0, (sm_uc_ptr_t)csd, SGMNT_HDR_LEN, save_errno);
 			if (0 != save_errno)
 			{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -110,7 +110,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 			if ((0 == arg1->str.len) && (i + 1 != sbscnt) && (LVNULLSUBS_NEVER == TREF(lv_null_subs)))
 			{	/* This is not the last subscript, we don't allow nulls subs and it was null */
 				va_end(var);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVNULLSUBS);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LVNULLSUBS);
 			}
 			if (is_num = MV_IS_CANONICAL(arg1))
 				MV_FORCE_NUM(arg1);

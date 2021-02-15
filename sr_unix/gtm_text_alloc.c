@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2020 Fidelity National Information	*
+ * Copyright (c) 2007-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -161,7 +161,7 @@ void *gtm_text_alloc(size_t size)
         if (ENOMEM == save_errno)
 	{
 		assert(FALSE);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MEMORY, 2, tSize, CALLERID, save_errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_MEMORY, 2, tSize, CALLERID, save_errno);
 	}
 	/* On non-allocate related error, give more general error and assertpro(FALSE) */
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(14) ERR_SYSCALL, 5, LEN_AND_LIT("gtm_text_alloc()"), CALLFROM,
@@ -336,7 +336,7 @@ void gtaSmInit(void)
 	{
 		assert(0 < twoSize);
 		TwoTable[sizeIndex] = twoSize;
-		assert(TwoTable[sizeIndex] < TwoTable[sizeIndex + 1]);
+		assert((MAXINDEX == sizeIndex) || (TwoTable[sizeIndex] < TwoTable[sizeIndex + 1]));
 	}
 	/* Need to initialize the fwd/bck ptrs in the anchors to point to themselves */
 	for (uStor = &freeStorElemQs[0], i = 0; i <= MAXINDEX; ++i, ++uStor)
@@ -445,7 +445,7 @@ void *gtm_text_alloc(size_t size)
 		{
 			--gtaSmDepth;
 			assert(FALSE);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MEMORYRECURSIVE);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MEMORYRECURSIVE);
 		}
 		INCR_CNTR(totalAllocs);
 		if (0 != size)
@@ -504,7 +504,7 @@ void gtm_text_free(void *addr)
 	{
 		--gtaSmDepth;
 		assert(FALSE);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MEMORYRECURSIVE);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MEMORYRECURSIVE);
 	}
 	INCR_CNTR(totalFrees);
 	if ((unsigned char *)addr != &NullStruct.nullStr[0])
@@ -585,6 +585,10 @@ void printAllocInfo(void)
 	{
 		for (i = 0; i <= MAXINDEX + 1; ++i)
 		{
+			assert((ARRAYSIZE(TwoTable) > i) && (ARRAYSIZE(allocCnt) > i) &&
+				(ARRAYSIZE(freeCnt) > i)  && (ARRAYSIZE(elemSplits) > i) &&
+				(ARRAYSIZE(elemCombines) > i) && (ARRAYSIZE(freeElemCnt) > i) &&
+				(ARRAYSIZE(freeElemMax) > i)); /* For SCI */
 			FPRINTF(stderr,
 				"%9d %9d %9d %9d %9d %9d %9d\n", TwoTable[i], allocCnt[i], freeCnt[i],
 				elemSplits[i], elemCombines[i], freeElemCnt[i], freeElemMax[i]);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,13 +89,13 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 
 	SETUP_THREADGBL_ACCESS;
 	if (mfunc && ((MAX_STRM_CT <= indx) || (0 > indx)))	/* Allow an out-of-range stream only if used internally. */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSRCHSTRMCT);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZSRCHSTRMCT);
 	ESTABLISH_RET(fnzsrch_ch, -1);
 	TREF(fnzsearch_nullsubs_sav) = TREF(lv_null_subs);
 	TREF(lv_null_subs) = LVNULLSUBS_OK;			/* $ZSearch processing depends on this. */
 	MV_FORCE_STR(pattern);
 	if (MAX_FN_LEN < pattern->str.len)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, pattern->str.len, MAX_FN_LEN);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_INVSTRLEN, 2, pattern->str.len, MAX_FN_LEN);
 	MV_FORCE_MVAL(((mval *)TADR(fnzsearch_sub_mval)), indx);
 	TREF(fnzsearch_lv_vars) = op_srchindx(VARLSTCNT(2) TREF(zsearch_var), (mval *)TADR(fnzsearch_sub_mval));
 	if (TREF(fnzsearch_lv_vars))
@@ -130,8 +130,8 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 					{
 						length = STRLEN(sanitized_buf);
 						if (MAX_FN_LEN < length + 1 + pblk.b_esl)
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN,
-									2, length + 1 + pblk.b_esl, MAX_FN_LEN);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_INVSTRLEN,
+								2, length + 1 + pblk.b_esl, MAX_FN_LEN);
 						sanitized_buf[length] = '/';
 					}
 					buf_ptr = sanitized_buf + length + 1;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2020 Fidelity National Information	*
+ * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,6 +58,7 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 	if (MAX_STRLEN < (messagelen = strlen(message)))
 		messagelen = MAX_STRLEN;
 	assert(SIZEOF(count) <= SIZEOF(pid_t));
+	assert(MAXUINT4 >= GTM_MAX_DIR_LEN + messagelen + (3 * MAX_PIDSTR_LEN) + 5);
 	arr_len = GTM_MAX_DIR_LEN + messagelen + (3 * MAX_PIDSTR_LEN) + 5;	/* 4 spaces and a terminator */
 	if (!(TREF(gtm_waitstuck_script)).len)
 	{	/* uninitialized buffer - translate logical and move it to the buffer */
@@ -83,8 +84,10 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 		assert(0 < trans.len);
 		if ((trans.len + arr_len) > (TREF(gtm_waitstuck_script)).len)
 		{	/* new message doesn't fit - malloc fresh space and free the old */
+			assert(0 <= arr_len); /* For SCI so it can't in theory subtract from trans.len */
 			(TREF(gtm_waitstuck_script)).len = trans.len + arr_len;
-			trans.addr = (char *)malloc((TREF(gtm_waitstuck_script)).len);
+			trans.addr = (char *)malloc(trans.len + arr_len);
+			assert(NULL != trans.addr);
 			memcpy(trans.addr, (TREF(gtm_waitstuck_script)).addr, trans.len);
 			free((TREF(gtm_waitstuck_script)).addr);
 			(TREF(gtm_waitstuck_script)).addr = trans.addr;

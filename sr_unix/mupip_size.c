@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2020 Fidelity National Information	*
+ * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,7 @@
 #include "muextr.h"
 #include "iosp.h"
 #include "cli.h"
+#include "cliif.h"
 #include "mu_reorg.h"
 #include "util.h"
 #include "filestruct.h"
@@ -76,8 +77,8 @@ GBLREF int			mu_end_keyend;
 
 typedef struct {
 	enum {arsample, scan, impsample}	heuristic;
-	int4 					samples;
-	int4 					level;
+	int4					samples;
+	int4					level;
 	int4					seed;
 } mupip_size_cfg_t;
 
@@ -92,18 +93,18 @@ STATICFNDCL void mupip_size_check_error(void);
 void mupip_size(void)
 {
 	boolean_t		restrict_reg = FALSE;
-	char 			buff[MAX_LINE], cli_buff[MAX_LINE];
-	char 			*p_end;						/* used for strtol validation */
+	boolean_t		subscr = FALSE;
+	char			buff[MAX_LINE], cli_buff[MAX_LINE];
+	char			*db_file_name;
+	char			*p_end;						/* used for strtol validation */
 	glist			exclude_gl_head, gl_head, *gl_ptr;
 	int4			reg_max_rec, reg_max_key, reg_max_blk;
 	mupip_size_cfg_t	mupip_size_cfg = { impsample, 1000, 1, 0 };	/* configuration default values */
+	sgmnt_addrs		*tcsa;
 	uint4			status = EXIT_NRM;
+	unsigned char		key_buff[2048];
 	unsigned short		BUFF_LEN = SIZEOF(buff), n_len;
-	sgmnt_addrs 		*tcsa;
-	char 			*db_file_name;
-	unsigned char           key_buff[2048];
-	unsigned short          keylen;
-	boolean_t		subscr = FALSE;
+	unsigned short		keylen;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -121,14 +122,14 @@ void mupip_size(void)
 	}
 	mupip_size_check_error();
 	if (CLI_PRESENT == cli_present("SUBSCRIPT"))
-        {
+	{
 		if (NULL == gv_target)
 			gv_target = (gv_namehead *)targ_alloc(DUMMY_GLOBAL_VARIABLE_LEN, NULL, NULL);
 		subscr = TRUE;
-                keylen = SIZEOF(key_buff);
-                if (0 == cli_get_str("SUBSCRIPT", (char *)key_buff, &keylen))
-                        mupip_exit(ERR_MUPCLIERR);
-                if (FALSE == mu_getkey(key_buff, keylen))
+		keylen = SIZEOF(key_buff);
+		if (0 == cli_get_str("SUBSCRIPT", (char *)key_buff, &keylen))
+			mupip_exit(ERR_MUPCLIERR);
+		if (FALSE == mu_getkey(key_buff, keylen))
 		{
 			error_mupip = TRUE;
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUSIZEINVARG, 2, LEN_AND_LIT("SUBSCRIPT"));
@@ -153,7 +154,7 @@ void mupip_size(void)
 		n_len = p_end - cli_buff;
 		gv_target->regcnt--;
 		gv_target = NULL;
-        }
+	}
 	/* SELECT qualifier */
 	if (!subscr)
 	{
@@ -200,7 +201,13 @@ void mupip_size(void)
 			boolean_t valid = TRUE;
 			if (cli_get_str("HEURISTIC.LEVEL", buff, &BUFF_LEN))
 			{
-				mupip_size_cfg.level = strtol(buff, &p_end, 10);
+				if (cli_is_hex_explicit(buff))
+				{	/* buff starts with 0x or -0x or +0x. Remove the 0x, and retain the +/- */
+					if (('+' == *buff) || ('-' == *buff))
+						*(buff + 2) = *buff;	/* Overwrite the X with +/- */
+					mupip_size_cfg.level = STRTOL(buff+2, &p_end, 16);
+				} else
+					mupip_size_cfg.level = STRTOL(buff, &p_end, 10);
 				valid = (*p_end == '\0');
 			}
 			else
@@ -290,12 +297,11 @@ STATICDEF void mupip_size_check_error(void)
  /* Performs a random traversal for the sampling methods */
 enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 {
-	boolean_t			first_key = TRUE;
-	boolean_t			musz_range_done, is_mm;
 	block_id			nBlkId, valBlk[MAX_RECS_PER_BLK]; /* valBlk[j] := value in j-th record of current block */
+	boolean_t			first_key = TRUE, is_mm, long_blk_id, musz_range_done;
 	cache_rec_ptr_t			cr;
 	enum cdb_sc			status;
-	int				blk_size, buff_length, cycle, key_size, name_len, rec_len;
+	int				blk_size, bstar_rec_sz, buff_length, cycle, key_size, name_len, rec_len;
 	int4				cmp_key, musz_rec, random, rCnt;	/* rCnt : number of entries in valBlk */
 	register gv_namehead		*pTarg;
 	register srch_blk_status	*pCurr;
@@ -335,6 +341,8 @@ enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 	pCurr->cr = cr;
 	for (;;)
 	{
+		long_blk_id = IS_64_BLK_ID(pBlkBase);
+		bstar_rec_sz = bstar_rec_size(long_blk_id);
 		musz_range_done = FALSE;
 		musz_rec = 0;
 		assert(pCurr->level == nLevl);
@@ -343,7 +351,7 @@ enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 		pCurr->buffaddr = pBlkBase;
 		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen, musz_range_done)
 		{	/* enumerate records in block */
-			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId);
+			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId, long_blk_id);
 			if (cdb_sc_normal != status)
 			{
 				assert(CDB_STAGNATE > t_tries);
@@ -354,7 +362,7 @@ enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 			{
 				rec_cmpc = EVAL_CMPC((rec_hdr_ptr_t)pRec);
 				key_base = pRec + SIZEOF(rec_hdr);
-				if ((((rec_hdr *)pRec)->rsiz) != BSTAR_REC_SIZE) /* Did not find the star key */
+				if ((((rec_hdr *)pRec)->rsiz) != bstar_rec_sz) /* Did not find the star key */
 				{
 					GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key,
 							name_len, key_size,buff, buff_length, rec_len);

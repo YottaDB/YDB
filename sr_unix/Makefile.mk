@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2019 Fidelity National Information		#
+# Copyright (c) 2013-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -113,6 +113,9 @@ ifneq (,$(findstring Linux,$(UNAMESTR)))
 	else
 		LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86-linux-gnu
 	endif
+	icuver_msg = "gtm_icu_version is set to (${gtm_icu_version}). "
+	icuver_msg := $(icuver_msg)"UTF-8 mode library installation may fail if gtm_icu_version is not set"
+
 endif
 
 # AIX
@@ -219,7 +222,7 @@ ifeq ($(NOT_IN_GTMCRYPTDIR),1)
 	cp -f maskpass $(GTMCRYPTDIR)/
 endif
 ifeq ($(HAVE_UTF8),0)
-	@echo "UTF-8 mode library installation may fail if gtm_icu_version (${gtm_icu_version}) is not set"
+	@echo $(icuver_msg)
 	(cd $(PLUGINDIR)/o/utf8 && env gtm_chset=UTF-8 ${gtm_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
 endif
 

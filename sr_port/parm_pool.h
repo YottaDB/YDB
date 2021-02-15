@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -90,7 +90,7 @@ typedef struct
 {
 	uint4		capacity;
 	uint4		start_idx;
-	parm_slot	parms[1];
+	parm_slot	parms[];
 } parm_pool;
 
 STATICFNDCL void parm_pool_init(unsigned int init_capacity);

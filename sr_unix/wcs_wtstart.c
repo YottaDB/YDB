@@ -60,7 +60,6 @@
 #include "min_max.h"
 #include "gtmimagename.h"
 #include "util.h"
-#include "gtm_multi_proc.h"	/* for "multi_proc_in_use" GBLREF */
 #include "wcs_backoff.h"
 #include "wcs_wt.h"
 #include "performcaslatchcheck.h"
@@ -116,6 +115,7 @@ GBLREF	uint4			update_trans;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;
 GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
 GBLREF	bool			in_mupip_freeze;
+GBLREF	boolean_t		wcs_noasyncio;
 #ifdef DEBUG
 GBLREF	volatile int		reformat_buffer_in_use;
 GBLREF	volatile int4		gtmMallocDepth;
@@ -134,13 +134,13 @@ error_def(ERR_TEXT);
 int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr, cache_rec_ptr_t cr2flush)
 {
 	blk_hdr_ptr_t		bp, save_bp;
-	boolean_t               need_jnl_sync, queue_empty, got_lock, bmp_status, do_asyncio, wtfini_called_once;
+	boolean_t		need_jnl_sync, queue_empty, got_lock, bmp_status, do_asyncio, wtfini_called_once;
 	cache_que_head_ptr_t	ahead, whead;
 	cache_state_rec_ptr_t	csr, csrfirst;
-	int4                    err_status = 0, n, n1, n2, max_ent, max_writes, save_errno;
-        size_t                  size ;
-	jnl_buffer_ptr_t        jb;
-        jnl_private_control     *jpc;
+	int4			err_status = 0, n, n1, n2, max_ent, max_writes, save_errno;
+	size_t			size ;
+	jnl_buffer_ptr_t	jb;
+	jnl_private_control	*jpc;
 	node_local_ptr_t	cnl;
 	off_t			blk_1_off, offset;
 	sgmnt_addrs		*csa;
@@ -166,7 +166,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	gd_segment		*seg;
 	boolean_t		use_new_key, skip_in_trans, skip_sync, sync_keys;
 	que_ent_ptr_t		next, prev;
-	void_ptr_t              retcsrptr;
+	void_ptr_t		retcsrptr;
 	boolean_t		keep_buff_lock, pushed_region;
 	cache_rec_ptr_t		older_twin;
 
@@ -290,15 +290,15 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 						retcsrptr = remqh((que_ent_ptr_t)((sm_uc_ptr_t)&csr->state_que
 							+ csr->state_que.bl));
 						if ((cache_state_rec_ptr_t)retcsrptr != csr)
-                                                {	/* Did not get the csr we intended so something must be wrong with cache.
+						{	/* Did not get the csr we intended so something must be wrong with cache.
 							 * Kill -9 can cause this. Assert that we were doing a crash shutdown.
 							 */
-                                                        assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
-                                                                || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
+							assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
+								|| WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
 							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
-                                                        err_status = ERR_DBCCERR;
-                                                        break;
-                                                }
+							err_status = ERR_DBCCERR;
+							break;
+						}
 						csr->state_que.fl = (sm_off_t)0;
 						csr->state_que.bl = (sm_off_t)0;
 						/* LOCK_BUFF_FOR_WRITE needs to happens AFTER the remqh just like
@@ -320,8 +320,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 					rel_latch(&ahead->latch);
 				} else
 					csr = NULL; /* did not get the lock */
-        			--fast_lock_count;
-        			assert(0 <= fast_lock_count);
+				--fast_lock_count;
+				assert(0 <= fast_lock_count);
 			}
 		} else
 		{
@@ -378,7 +378,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			got_lock = FALSE;
 			if ((csr->jnl_addr > jb->dskaddr)
 			    || (need_jnl_sync && (NOJNL == jpc->channel
-					|| (FALSE == (got_lock = GET_SWAPLOCK(&jb->fsync_in_prog_latch))))))
+			    || (FALSE == (got_lock = GET_SWAPLOCK(&jb->fsync_in_prog_latch))))))
 			{
 				WCS_OPS_TRACE(csa, process_id, wcs_ops_wtstart5, cr->blk, GDS_ANY_ABS2REL(csa,cr), cr->dirty,	\
 					need_jnl_sync, got_lock);
@@ -510,8 +510,9 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			 * even though the block-header is empty. So assert that. Note that gds_blk_downgrade has a safety
 			 * check for bver == 0 and returns immediately in that case so it is okay to call it with a 0 bver in pro.
 			 */
-			assert(((blk_hdr_ptr_t)bp)->bver
-				|| WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
+			assert((((blk_hdr_ptr_t)bp)->bver)
+			       || WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
+			       || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
 			if (IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver))
 			{	/* Need to downgrade/reformat this block back to a previous format. */
 				assert(!csd->asyncio);	/* asyncio & V4 format are not supported together */
@@ -520,24 +521,29 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				DEBUG_DYNGRD_ONLY(PRINTF("WCS_WTSTART: Block %d being dynamically downgraded on write\n", \
 							 csr->blk));
 				if (csd->blk_size > reformat_buffer_len)
-				{	/* Buffer not big enough (or does not exist) .. get a new one releasing
-					 * old if it exists
+				{	/* Buffer not big enough (or does not exist)
+					 * .. get a new one releasing old if it exists
 					 */
 					assert(0 == gtmMallocDepth);	/* should not be in a nested free/malloc */
 					if (reformat_buffer)
 						free(reformat_buffer);	/* Different blksized databases in use
-									   .. keep only largest one */
+									 * .. keep only largest one
+									 */
 					reformat_buffer = malloc(csd->blk_size);
 					reformat_buffer_len = csd->blk_size;
 				}
 				gds_blk_downgrade((v15_blk_hdr_ptr_t)reformat_buffer, (blk_hdr_ptr_t)bp);
 				bp = (blk_hdr_ptr_t)reformat_buffer;
 				size = (((v15_blk_hdr_ptr_t)bp)->bsiz + 1) & ~1;
-			} else DEBUG_ONLY(if (GDSV6 == csr->ondsk_blkver))
+			}
+			else DEBUG_ONLY(if ((GDSV7 == csr->ondsk_blkver) || (GDSV6 == csr->ondsk_blkver)))
 				size = (bp->bsiz + 1) & ~1;
 #			ifdef DEBUG
 			else
-				assert(IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver) || (GDSV6 == csr->ondsk_blkver));
+			{
+				assert(IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver) || (GDSV7 == csr->ondsk_blkver)
+						|| (GDSV6 == csr->ondsk_blkver));
+			}
 #			endif
 			if (csd->write_fullblk)
 			{	/* See similiar logic in wcs_wtstart.c */
@@ -553,7 +559,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 						(FULL_DATABASE_WRITE == csd->write_fullblk && csr->needs_first_write)
 						? csd->blk_size : csa->fullblockwrite_len);
 			}
-#                       ifdef DEBUG
+#			ifdef DEBUG
 			else if (WBTEST_ENABLED(WBTEST_FULLBLKWRT_DB) && (3 == csr->blk))
 				DBGFPF((stdout, "Not rounding the write size\n"));
 #			endif
@@ -661,12 +667,12 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			/* If online rollback has forked off child processes to operate on each region,
 			 * we have seen ASYNC IOs issued from the child process do not finish for reasons unknown.
 			 * So we disable asyncio in the forward phase of offline/online rollback/recover.
-			 * This is easily identified currently by the global variable "multi_proc_in_use" being TRUE.
+			 * This is easily identified currently by the global variable "wcs_noasyncio" being TRUE.
 			 */
 #			ifdef USE_NOAIO
 			do_asyncio = FALSE;
 #			else
-			do_asyncio = csd->asyncio && !multi_proc_in_use;
+			do_asyncio = csd->asyncio && !wcs_noasyncio;
 #			endif
 			if (udi->fd_opened_with_o_direct)
 			{
@@ -794,11 +800,11 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	}
 	csa->wbuf_dqd--;
 writes_completed:
-	DEBUG_ONLY(
+#ifdef DEBUG
 		if (0 == n2)
 			BG_TRACE_ANY(csa, wrt_noblks_wrtn);
 		assert((cnl->in_wtstart > 0) && csa->in_wtstart);
-	)
+#endif
 	SLEEP_ON_WBOX_COUNT(5);
 	if (csa->dbsync_timer && n1)
 	{	/* If we already have a dbsync timer active AND we found at least one dirty cache record in the active queue
@@ -813,7 +819,7 @@ writes_completed:
 	 * Because it is highly unlikely for an interrupt-deferred process to get killed at exactly this spot, do not test that.
 	 */
 	CLEAR_WTSTART_PID(cnl, index);
-	csa->in_wtstart = FALSE;			/* This process can write again */
+	csa->in_wtstart = FALSE;		/* This process can write again */
 	SLEEP_ON_WBOX_COUNT(6);
 	DECR_INTENT_WTSTART(cnl);
 	SLEEP_ON_WBOX_COUNT(7);

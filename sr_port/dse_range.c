@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -109,7 +109,7 @@ void dse_range(void)
 		if (!(blk % cs_addrs->hdr->bplmap))
 			continue;
 		if (!(bp = t_qread(blk, &dummy_int, &dummy_cr)))
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 		if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER)
 		{
 #			ifdef BLK_NUM_64BIT
@@ -117,7 +117,7 @@ void dse_range(void)
 			blk_id_size = SIZEOF(block_id_64);
 #			else
 			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #			endif
 		} else
 		{
@@ -195,12 +195,12 @@ void dse_range(void)
 #					else
 					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 							nocrit_present, cs_addrs, gv_cur_region);
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #					endif
 				} else
 					GET_BLK_ID_32(blk_child, key_top);
 				if (!(bp = t_qread(blk_child, &dummy_int, &dummy_cr)))
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 				if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER)
 				{
 #					ifdef BLK_NUM_64BIT
@@ -209,7 +209,7 @@ void dse_range(void)
 #					else
 					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 							nocrit_present, cs_addrs, gv_cur_region);
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #					endif
 				} else
 				{
@@ -250,7 +250,7 @@ void dse_range(void)
 		}
 		if (!cnt++)
 			util_out_print("!/Blocks in the specified key range:", TRUE);
-		util_out_print("Block:  !8XL Level: !2UL", TRUE, blk, level);
+		util_out_print("Block:  0x!16@XQ Level: !2UL", TRUE, &blk, level);
 	}
 	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if (cnt)

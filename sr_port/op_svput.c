@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -187,7 +187,7 @@ void op_svput(int varnum, mval *v)
 		case SV_ZTRAP:
 #			ifdef GTM_TRIGGER
 			if (0 < gtm_trigger_depth)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOZTRAPINTRIG);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOZTRAPINTRIG);
 #			endif
 			MV_FORCE_STR(v);
 			if (ztrap_new)
@@ -283,13 +283,13 @@ void op_svput(int varnum, mval *v)
 				if ((state != 1) || (v->str.len < 3))
 				{
 					/* error, ecode = M101 */
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVECODEVAL, 2, v->str.len, v->str.addr);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_INVECODEVAL, 2, v->str.len, v->str.addr);
 				}
 			}
 			if (v->str.len > 0)
 			{
 				ecode_add(&v->str);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SETECODE, 0);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(2) ERR_SETECODE, 0);
 			} else
 			{
 				NULLIFY_DOLLAR_ECODE;	/* reset $ECODE related variables to correspond to $ECODE = NULL state */
@@ -338,7 +338,7 @@ void op_svput(int varnum, mval *v)
 			break;
 		case SV_SYSTEM:
 			assert(FALSE);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SYSTEMVALUE, 2, v->str.len, v->str.addr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_SYSTEMVALUE, 2, v->str.len, v->str.addr);
 			break;
 		case SV_ZDIR:
 			setzdir(v, NULL); 	/* change directory to v */
@@ -370,7 +370,7 @@ void op_svput(int varnum, mval *v)
 #			ifdef GTM_TRIGGER
 			assert(!dollar_tlevel || (tstart_trigger_depth <= gtm_trigger_depth));
 			if (!dollar_tlevel || (tstart_trigger_depth == gtm_trigger_depth))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETINTRIGONLY, 2, RTS_ERROR_TEXT("$ZTVALUE"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_SETINTRIGONLY, 2, RTS_ERROR_TEXT("$ZTVALUE"));
 			if (dollar_ztriggerop != &gvtr_cmd_mval[GVTR_CMDTYPE_SET])
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETINSETTRIGONLY, 2, RTS_ERROR_TEXT("$ZTVALUE"));
 			assert(0 < gtm_trigger_depth);
@@ -380,7 +380,7 @@ void op_svput(int varnum, mval *v)
 			*ztvalue_changed_ptr = TRUE;
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTWORMHOLE:
 #			ifdef GTM_TRIGGER
@@ -388,12 +388,12 @@ void op_svput(int varnum, mval *v)
 			/* See jnl.h for why MAX_ZTWORMHOLE_SIZE should be less than minimum alignsize */
 			assert(MAX_ZTWORMHOLE_SIZE < (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE));
 			if (MAX_ZTWORMHOLE_SIZE < v->str.len)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZTWORMHOLE2BIG, 2, v->str.len, MAX_ZTWORMHOLE_SIZE);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZTWORMHOLE2BIG, 2, v->str.len, MAX_ZTWORMHOLE_SIZE);
 			dollar_ztwormhole.mvtype = MV_STR;
 			dollar_ztwormhole.str = v->str;
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTSLATE:
 #			ifdef GTM_TRIGGER
@@ -406,7 +406,7 @@ void op_svput(int varnum, mval *v)
 			dollar_ztslate.mvtype &= ~MV_ALIASCONT;	/* Make sure to shut off alias container flag on copy */
 			break;
 #			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZSTRPLLIM:
 			previous_gtm_strpllim = stringpool.strpllim;

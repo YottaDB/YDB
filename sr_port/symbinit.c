@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,9 +63,9 @@ int4 symbinit(void)
 				if (msp <= stacktop || msp > stackbase)
 		   		{
 					msp = msp_save;
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
 		   		} else
-		   			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
+				   	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
 		   	}
 			frame_pointer->l_symtab = (ht_ent_mname **)msp;
 		}
@@ -98,9 +98,9 @@ int4 symbinit(void)
 			if (msp <= stacktop)
 	   		{
 				msp = old_sp;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
 	   		} else
-	   			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
+			   	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
 	   	}
 		memmove(msp, old_sp, top - (unsigned char *)old_sp);	/* Shift stack w/possible overlapping range */
 		if (shift_size > MVST_STAB_SIZE)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,10 +51,10 @@ void outofband_action(boolean_t lnfetch_or_start)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 				break;
 			case (ctrap):
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
 				break;
 			case (sighup):
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TERMHANGUP);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TERMHANGUP);
 				break;
 			case (tptimeout):
 				/*
@@ -64,7 +64,7 @@ void outofband_action(boolean_t lnfetch_or_start)
 				(*tp_timeout_action_ptr)();
 				break;
 			case (jobinterrupt):
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBINTRRQST);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBINTRRQST);
 				break;
 			case (ztimeout): /* Following is basically rts_error */
 				(*ztimeout_action_ptr)();

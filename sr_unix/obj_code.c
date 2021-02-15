@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -289,12 +289,12 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	DBGARLNK((stderr, "obj_code: Computed hash value of 0x"lvaddr" for file %.*s\n", objhash.one, object_name_len,
 		  object_file_name));
 	if ((off_t)-1 == lseek(object_file_des, (off_t)(NATIVE_HDR_LEN + OFFSETOF(rhdtyp, objhash)), SEEK_SET))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 	emit_immed((char *)&objhash.one, SIZEOF(gtm_uint64_t));	/* Update 8 bytes of objhash in the file header */
 	buff_flush();						/* Push it out */
 	CLOSE_OBJECT_FILE(object_file_des, status);
 	if (-1 == status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, errno);
 	/* Ready to make object visible. Rename from tmp name to real routine name */
 	RENAME_TMP_OBJECT_FILE(object_file_name);
 }

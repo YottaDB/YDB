@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2020 Fidelity National Information	*
+ * Copyright (c) 2004-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -355,7 +355,7 @@ void	gtm_env_init_sp(void)
 			novalidate = TRUE;		/* Don't validate gtm_linktmpdir if is defaulting to $gtm_tmp */
 		} else
 			novalidate = FALSE;
-		assert(GTM_PATH_MAX > trans.len);
+		assert((GTM_PATH_MAX > trans.len) && (0 < trans.len));
 		REMOVE_TRAILING_SLASH_FROM_MSTR(trans); /* Remove trailing '/' from trans.addr */
 		(TREF(gtm_linktmpdir)).addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
 		(TREF(gtm_linktmpdir)).len = trans.len;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2018 Fidelity National Information	*
+ * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,6 +91,7 @@ MBSTART {											\
 		SNPRINTF(TARGET + i, LEN + 1 - i, "%02X", (unsigned char)SOURCE[i / 2]);	\
 } MBEND
 
+/* Using this macro implies that truncation errors are caught by some downstream check */
 #define SNPRINTF(SRC, LEN, ...)							\
 {										\
 	int rc;									\

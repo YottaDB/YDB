@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2019 Fidelity National Information	*
+ * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -470,18 +470,18 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	mnemonic_len = INTCAST(nptr - mnemonic);
 	mnemonic_index = namelook(zpeek_index, zpeek_names, (char *)mnemonic, mnemonic_len);
 	if (0 > mnemonic_index)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("mnemonic type"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("mnemonic type"));
 	mnemonic_opcode = zpeek_data[mnemonic_index].peekop;
 	if ((arg_supplied && !zpeek_data[mnemonic_index].allowargs) || (!arg_supplied && zpeek_data[mnemonic_index].allowargs))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("mnemonic argument"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("mnemonic argument"));
 	if (arg_supplied)
 	{	/* Parse supplied argument */
 		argptr = ++cptr;	/* Bump past ":" - if now have end-of-arg then arg is missing */
 		if (argptr == cptrend)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("mnemonic argument"));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("mnemonic argument"));
 		arglen = INTCAST(cptrend - cptr);
 		if (ARGUMENT_MAX_LEN < arglen)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("mnemonic argument"));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("mnemonic argument"));
 		switch(mnemonic_opcode)
 		{
 		case PO_CSAREG:			/* These types have a region name argument */
@@ -519,8 +519,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 					{
 						if (PASS1 == pass)
 							break;
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
-							      RTS_ERROR_LITERAL("mnemonic argument (region name)"));
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2,
+							RTS_ERROR_LITERAL("mnemonic argument (region name)"));
 					}
 					if ((r_ptr->rname_len == arglen) && (0 == memcmp(r_ptr->rname, argptr, arglen)))
 						break;
@@ -551,29 +551,29 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			{
 				gv_init_reg(r_ptr, NULL);
 				if (!r_ptr->open)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
-						      RTS_ERROR_LITERAL("mnemonic argument (region name could not be opened)"));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2,
+						RTS_ERROR_LITERAL("mnemonic argument (region name could not be opened)"));
 			}
 			break;
 		case PO_GLFREPL:		/* These types have an array index argument */
 		case PO_GSLREPL:
 			arryidx = asc2i(argptr, arglen);
 			if ((0 > arryidx) || (NUM_GTMSRC_LCL <= arryidx))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
-					      RTS_ERROR_LITERAL("mnemonic argument (array index)"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2,
+					RTS_ERROR_LITERAL("mnemonic argument (array index)"));
 			break;
 		case PO_PEEK:			/* Argument is address of form 0Xhhhhhhhh[hhhhhhhh] */
 			if (('0' != *cptr++) || ('x' != *cptr) && ('X' != *cptr))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
-					      RTS_ERROR_LITERAL("mnemonic argument (peek base address)"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2,
+					RTS_ERROR_LITERAL("mnemonic argument (peek base address)"));
 			cptr++;			/* Bump past 'x' or 'X' - rest of arg should be hex value */
 			prmpeekadr = (UINTPTR_T)GTM64_ONLY(asc_hex2l)NON_GTM64_ONLY(asc_hex2i)(cptr, arglen - 2);
 			if (-1 == (INTPTR_T)prmpeekadr)
 				/* Either an error occurred or the user specified the maximum address. So it's
 				 * either an error from the conversion routine or an otherwise useless value.
 				 */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
-					      RTS_ERROR_LITERAL("mnemonic argument (peek base address)"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2,
+					RTS_ERROR_LITERAL("mnemonic argument (peek base address)"));
 			break;
 		default:
 			assert(FALSE);		/* Only the above types should ever have an argument */
@@ -599,7 +599,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_JBFREG:
 			csa = &FILE_INFO(r_ptr)->s_addrs;
 			if (NULL == csa->jnl)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZPEEKNOJNLINFO, 2, REG_LEN_STR(r_ptr));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZPEEKNOJNLINFO, 2, REG_LEN_STR(r_ptr));
 			zpeekadr = (PO_JNLREG == mnemonic_opcode) ? (void *)csa->jnl : (void *)csa->jnl->jnl_buff;
 			break;
 		case PO_GLFREPL:	/* This set of opcodes all require the journal pool to be initialized. Verify it */
@@ -609,12 +609,12 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_RIHREPL:
 			/* Make sure jnlpool_addrs are availble */
 			if (!REPL_INST_AVAILABLE(NULL))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
 			if (!pool_init)
 			{
 				attach_success = op_fnzpeek_attach_jnlpool();
 				if (!attach_success)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
 			}
 			switch(mnemonic_opcode)
 			{
@@ -643,12 +643,12 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_UHCREPL:
 			/* Make sure recvpool_addrs are available */
 			if (!REPL_INST_AVAILABLE(NULL))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
 			if (NULL == recvpool.recvpool_ctl)
 			{
 				attach_success = op_fnzpeek_attach_recvpool();
 				if (!attach_success)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
 			}
 			switch(mnemonic_opcode)
 			{
@@ -678,12 +678,12 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	assert(NULL != zpeekadr);
 	/* Check the rest of the args */
 	if (0 > offset)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("offset"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("offset"));
 	zpeekadr = (void *)((char *)zpeekadr + offset);
 	if ((0 > len) || (MAX_STRLEN < len))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("length"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("length"));
 	if (1 < format->str.len)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("format"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("format"));
 	else if (1 == format->str.len)
 	{	/* Validate format option */
 		fmtcode = *format->str.addr;
@@ -701,7 +701,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 					 */
 				break;
 			default:
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("format"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("format"));
 		}
 	}
 	/* Block out timer calls that might trigger processing that could fail. We especially want to prevent

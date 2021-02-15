@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -211,6 +211,29 @@ void cli_strupper(char *sp)
 
 	while (c = *sp)
 		*sp++ = TOUPPER(c);
+}
+
+/*
+ * -------------------------------------------------------
+ * Check if string is a Hex number prefixed by '0X'
+ *
+ * Return:
+ *	TRUE	- identifier
+ *	FALSE	- otherwise
+ * -------------------------------------------------------
+ */
+int cli_is_hex_explicit(char *p)
+{	/* The number is HEX, and it explicitly starts with a '0x' */
+	if (('+' == *p) || ('-' == *p))
+		p++;
+	if (('0' == *p) && ('X' == TOUPPER(*(p + 1))))
+        {
+                p = p + 2;
+        } else
+		return FALSE;
+	while (*p && ISXDIGIT_ASCII(*p))
+		p++;
+	return ((*p) ? FALSE : TRUE);
 }
 
 /*

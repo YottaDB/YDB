@@ -29,6 +29,7 @@
 #include "gdsbt.h"
 #include "gdsblk.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "filestruct.h"
 #include "iosp.h"
 #include "error.h"
@@ -685,6 +686,8 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 	 * Write the database file header at an offset equal to the database shared memory size.
 	 * This is because if we want to preserve the snapshot then we would want to write the
 	 * shared memory information at the beginning of the file. */
+	if (0 == memcmp(util_ss_ptr->header->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+		db_header_dwnconv(util_ss_ptr->header);
 	LSEEKWRITE(shdw_fd, (off_t)ss_shmsize, (sm_uc_ptr_t)util_ss_ptr->header, SGMNT_HDR_LEN, pwrite_res);
 	if (0 != pwrite_res)
 	{

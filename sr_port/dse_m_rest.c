@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,11 +50,11 @@ GBLREF sgmnt_addrs	*cs_addrs;
 error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_DSEINVALBLKID);
 
-void dse_m_rest	(block_id	blk,		/* block number */
-		 unsigned char	*bml_list,	/* start of local list of local bit maps */
-		 int4		bml_size,	/* size of each entry in *bml_list */
-		 sm_vuint_ptr_t	blks_ptr,	/* total free blocks */
-		 bool		in_dir_tree)
+void dse_m_rest	(block_id		blk,		/* block number */
+		 unsigned char		*bml_list,	/* start of local list of local bit maps */
+		 int4			bml_size,	/* size of each entry in *bml_list */
+		 v_block_id_ptr_t	blks_ptr,	/* total free blocks */
+		 bool			in_dir_tree)
 {
 	block_id	next, bml_index;
 	boolean_t	long_blk_id; /* does the current block use 64-bit block ids */
@@ -66,7 +66,7 @@ void dse_m_rest	(block_id	blk,		/* block number */
 	unsigned char	util_buff[MAX_UTIL_LEN];
 
 	if (!(bp = t_qread (blk, &dummy_int, &dummy_cr)))
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
 	else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))
@@ -79,7 +79,7 @@ void dse_m_rest	(block_id	blk,		/* block number */
 		long_blk_id = TRUE;
 		blk_id_size = SIZEOF(block_id_64);
 #		else
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #		endif
 	} else
 	{
@@ -94,7 +94,7 @@ void dse_m_rest	(block_id	blk,		/* block number */
 		if (in_dir_tree || level > 1)	/* reread block because it may have been flushed from read */
 		{
 			if (!(np = t_qread(blk,&dummy_int,&dummy_cr))) /* cache due to LRU buffer scheme and reads in recursive */
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);	/* calls to dse_m_rest. */
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);	/* calls to dse_m_rest. */
 			if (np != bp)
 			{
 				b_top = np + (b_top - bp);
@@ -107,7 +107,7 @@ void dse_m_rest	(block_id	blk,		/* block number */
 					long_blk_id = TRUE;
 					blk_id_size = SIZEOF(block_id_64);
 #					else
-					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #					endif
 				} else
 				{
@@ -133,7 +133,7 @@ void dse_m_rest	(block_id	blk,		/* block number */
 #				ifdef BLK_NUM_64BIT
 				GET_BLK_ID_64(next,ptr);
 #				else
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #				endif
 			else
 				GET_BLK_ID_32(next,ptr);
@@ -144,7 +144,7 @@ void dse_m_rest	(block_id	blk,		/* block number */
 #				ifdef BLK_NUM_64BIT
 				GET_BLK_ID_64(next, r_top - SIZEOF(block_id_64));
 #				else
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #				endif
 			else
 				GET_BLK_ID_32(next, r_top - SIZEOF(block_id_32));

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,7 +72,7 @@ bool	eb_int_mul (int4 v1, int4 u1, int4 p[])
 
 int4	eb_mul (int4 v[], int4 u[], int4 p[])	/* p = u*v */
 {
-	short	i, j;
+	short	i, j, k;
 	int4	acc, carry, m1[5], m2[5], prod[9], scale;
 
 	/* Throughout, larger index => more significance. */
@@ -106,8 +107,9 @@ int4	eb_mul (int4 v[], int4 u[], int4 p[])	/* p = u*v */
 				prod[i+j] = acc % RADIX;
 				carry     = acc / RADIX;
 			}
-			if ( 9 > i+j)
-				prod[i+j] = carry;
+			k = i + j; /* Introduce new variable for SCI */
+			if ( 9 > k)
+				prod[k] = carry;
 			else
 				if (0 != carry)
 					assert(FALSE);

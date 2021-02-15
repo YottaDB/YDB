@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -185,7 +185,7 @@ static void gtcm_gnp_server_actions(void)
 		gtcm_remove_from_action_queue();
 		CMI_MUTEX_RESTORE(cmi_mutex_rc);
 		if ((connection_struct *)INTERLOCK_FAIL == curr_entry)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) CMERR_CMINTQUE);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) CMERR_CMINTQUE);
 		if ((connection_struct *)EMPTY_QUEUE != curr_entry)
 		{
 			if (1 == (curr_entry->int_cancel.laflag & 1))
@@ -290,7 +290,7 @@ static void gtcm_gnp_server_actions(void)
 					if (SS_NORMAL == status)
 					{
 						GET_LONG(status, curr_entry->clb_ptr->mbf);
-                                                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_BADGTMNETMSG, 1, status);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_BADGTMNETMSG, 1, status);
 					}
 					break;
 			}

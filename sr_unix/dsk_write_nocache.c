@@ -74,32 +74,40 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 	 */
 	assert(0 == reformat_buffer_in_use);
 	DEBUG_ONLY(reformat_buffer_in_use++;)
-	if (IS_GDS_BLK_DOWNGRADE_NEEDED(ondsk_blkver))
-	{	/* Need to downgrade/reformat this block back to the previous format */
+	/*if (IS_GDS_BLK_DOWNGRADE_NEEDED(ondsk_blkver))
+	{	* Need to downgrade/reformat this block back to the previous format *
 		DEBUG_DYNGRD_ONLY(PRINTF("DSK_WRITE_NOCACHE: Block %d being dynamically downgraded on write\n", blk));
 		if (csd->blk_size > reformat_buffer_len)
-		{	/* Buffer not big enough (or does not exist) .. get a new one releasing old if it exists */
+		{	* Buffer not big enough (or does not exist) .. get a new one releasing old if it exists *
 			if (reformat_buffer)
-				free(reformat_buffer);	/* Different blksized databases in use .. keep only largest one */
+				free(reformat_buffer);	* Different blksized databases in use .. keep only largest one *
 			reformat_buffer = malloc(csd->blk_size);
 			reformat_buffer_len = csd->blk_size;
 		}
 		gds_blk_downgrade((v15_blk_hdr_ptr_t)reformat_buffer, (blk_hdr_ptr_t)buff);
 		buff = reformat_buffer;
 		size = (((v15_blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
-		/* Represents a block state change from V5 -> V4 */
+		* Represents a block state change from V5 -> V4 *
 		INCR_BLKS_TO_UPGRD(csa, csd, 1);
 		assert(SIZEOF(v15_blk_hdr) <= size);
-	} else DEBUG_ONLY(if (GDSV6 == ondsk_blkver))
+	} else */ if (GDSV6 == ondsk_blkver)
 	{
+		size = (((blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
+		assert(SIZEOF(blk_hdr) <= size);
+		/*INCR_BLKS_TO_UPGRD(csa, csd, 1);*/
+	} else DEBUG_ONLY(if (GDSV7 == ondsk_blkver))
+	{
+		assert(GDSVCURR == ondsk_blkver);
 		size = (((blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
 		assert(SIZEOF(blk_hdr) <= size);
 		/* no adjustment to blks_to_upgrd counter is needed since the format we are going to write is GDSVCURR */
 	}
 #	ifdef DEBUG
 	else
-		assert(GDSV6 == ondsk_blkver);
+		assert(((GDSV7 == ondsk_blkver) && (!MEMCMP_LIT(csd->label, GDS_LABEL)))
+			|| ((GDSV6 == ondsk_blkver) && (!MEMCMP_LIT(csd->label, V6_GDS_LABEL))));
 #	endif
+
 	if (csd->write_fullblk) /* See similiar logic in wcs_wtstart.c */
 		size = (int)ROUND_UP(size, (FULL_DATABASE_WRITE == csd->write_fullblk)
 				? csd->blk_size : csa->fullblockwrite_len);

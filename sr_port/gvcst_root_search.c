@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,7 +68,7 @@ GBLREF	uint4		update_trans;
 GBLREF	inctn_opcode_t	inctn_opcode;
 GBLREF	uint4		t_err;
 #ifdef GTM_TRIGGER
-GBLREF	boolean_t		skip_INVOKE_RESTART;
+GBLREF	boolean_t	skip_INVOKE_RESTART;
 #endif
 
 error_def(ERR_ACTCOLLMISMTCH);
@@ -95,7 +95,7 @@ static	mstr	global_collation_mstr;
 	gv_target->clue.end = 0;								\
 	RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);				\
 	if (DONOT_RESTART)									\
-		return status; /* caller will handle the restart */				\
+		return status;	/* caller will handle the restart */				\
 	t_retry(STATUS);									\
 	save_targ->root = 0;	/* May have been found by gvcst_redo_root_search.		\
 				 * Reset and allow gvcst_root_search to find it itself.		\
@@ -233,7 +233,8 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 	unsigned short	rlen, hdr_len;
 	uchar_ptr_t	subrec_ptr;
 	enum cdb_sc	status;
-	boolean_t	gbl_target_was_set;
+	boolean_t	gbl_target_was_set, long_blk_id;
+	int4		blk_id_sz;
 	gv_namehead	*save_targ;
 	mname_entry	*gvent;
 	int		altkeylen;
@@ -282,30 +283,32 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 				 * curr_rec.match should be that size if we found the key
 				 */
 				h0 = gv_target->hist.h;
+				long_blk_id = IS_64_BLK_ID(h0->buffaddr);
+				blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 				rp = (h0->buffaddr + h0->curr_rec.offset);
 				hdr_len = SIZEOF(rec_hdr) + gv_altkey->end + 1 - EVAL_CMPC((rec_hdr_ptr_t)rp);
 				GET_USHORT(rlen, rp);
-				if (FALSE == (CHKRECLEN(rp, h0->buffaddr, rlen)) || (rlen < hdr_len + SIZEOF(block_id)))
+				if (FALSE == (CHKRECLEN(rp, h0->buffaddr, rlen)) || (rlen < hdr_len + blk_id_sz))
 				{
 					T_RETRY_AND_CLEANUP(cdb_sc_rmisalign, donot_restart);
 					continue;
 				}
-				GET_BLK_ID(lcl_root, rp + hdr_len);
-				if (rlen > (hdr_len + SIZEOF(block_id)))
+				READ_BLK_ID(long_blk_id, &lcl_root, rp + hdr_len);
+				if (rlen > (hdr_len + blk_id_sz))
 				{
 					assert(NULL != global_collation_mstr.addr || 0 == global_collation_mstr.len);
-					if (global_collation_mstr.len < rlen - (hdr_len + SIZEOF(block_id)))
+					if (global_collation_mstr.len < rlen - (hdr_len + blk_id_sz))
 					{
 						if (NULL != global_collation_mstr.addr)
 							free(global_collation_mstr.addr);
-						global_collation_mstr.len = rlen - (hdr_len + SIZEOF(block_id));
+						global_collation_mstr.len = rlen - (hdr_len + blk_id_sz);
 						global_collation_mstr.addr = (char *)malloc(global_collation_mstr.len);
 					}
 					/* the memcpy needs to be done here instead of out of for loop for
 					 * concurrency consideration. We don't use s2pool because the pointer rp is 64 bits
 					 */
-					memcpy(global_collation_mstr.addr, rp + hdr_len + SIZEOF(block_id),
-							rlen - (hdr_len + SIZEOF(block_id)));
+					memcpy(global_collation_mstr.addr, rp + hdr_len + blk_id_sz,
+							rlen - (hdr_len + blk_id_sz));
 				}
 				if (dollar_tlevel)
 				{
@@ -341,11 +344,11 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 	{
 		oldact = gv_target->act;
 		oldnct = gv_target->nct;
-		if (rlen > hdr_len + SIZEOF(block_id))
+		if (rlen > hdr_len + blk_id_sz)
 		{
 			assert(NULL != global_collation_mstr.addr);
 			subrec_ptr = get_spec((uchar_ptr_t)global_collation_mstr.addr,
-						(int)(rlen - (hdr_len + SIZEOF(block_id))), COLL_SPEC);
+						(int)(rlen - (hdr_len + blk_id_sz)), COLL_SPEC);
 			if (subrec_ptr)
 			{
 				gv_target->nct = *(subrec_ptr + COLL_NCT_OFFSET);
@@ -378,17 +381,17 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 			{	/* restore gv_target->act and gv_target->nct */
 				gv_target->act = oldact;
 				gv_target->nct = oldnct;
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_NCTCOLLSPGBL, 4, DB_LEN_STR(gv_cur_region),
-						gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(6) ERR_NCTCOLLSPGBL, 4, DB_LEN_STR(gv_cur_region),
+					gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr);
 			}
 			if (gv_target->act_specified_in_gld && (oldact != gv_target->act))
 			{
 				newact = gv_target->act;
 				gv_target->act = oldact;
 				gv_target->nct = oldnct;
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_ACTCOLLMISMTCH, 6,
-						gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr,
-						oldact, DB_LEN_STR(gv_cur_region), newact);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(8) ERR_ACTCOLLMISMTCH, 6,
+					gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr,
+					oldact, DB_LEN_STR(gv_cur_region), newact);
 			}
 		}
 	} else if (!gv_target->act_specified_in_gld)

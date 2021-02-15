@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,13 +86,13 @@ void ionl_use(io_desc *iod, mval *pp)
 		case iop_length:
 			GET_LONG(length, pp->str.addr + p_offset);
 			if (length < 0)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVPARMNEG);
 			d_out->length = length;
 			break;
 		case iop_width:
 			GET_LONG(width, pp->str.addr + p_offset);
 			if (width < 0)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVPARMNEG);
 			if (width == 0)
 			{
 				d_out->wrap = FALSE;

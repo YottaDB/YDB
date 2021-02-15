@@ -174,8 +174,6 @@ gtm mumps
 gtmsecshr gtmsecshr
 gtmsecshr_wrapper gtmsecshr
 gtm_main mumps
-semstat2 semstat2
-ftok ftok
 gtcm_main gtcm_server
 omi_srvc_xct gtcm_server
 gtcm_play gtcm_play
@@ -183,8 +181,6 @@ omi_sx_play gtcm_play
 gtcm_shmclean gtcm_shmclean
 gtcm_pkdisp gtcm_pkdisp
 gtcm_gnp_server gtcm_gnp_server
-dbcertify dbcertify
-dbcertify_cmd dbcertify
 gtmcrypt_dbk_ref gtmcrypt
 gtmcrypt_pk_ref gtmcrypt
 gtmcrypt_sym_ref gtmcrypt

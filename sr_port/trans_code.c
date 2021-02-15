@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -96,6 +96,7 @@ CONDITION_HANDLER(zyerr_ch)
 		UNWIND(NULL, NULL); /* ignore $ZYERROR compile time errors; continue with $ZTRAP (or DEV exception) action */
 	} else
 	{
+		TREF(compile_time) = FALSE;
 		NEXTCH; /* serious error, can't ignore; handle error appropriately */
 	}
 }
@@ -103,7 +104,9 @@ CONDITION_HANDLER(zyerr_ch)
 void trans_code_finish(void)
 {
 	mval		dummy;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	frame_pointer->type = proc_act_type;
 	proc_act_type = 0;
 	if (0 != dollar_zyerror.str.len)
@@ -117,6 +120,7 @@ void trans_code_finish(void)
 		assert(NULL == zyerr_frame);
 		zyerr_frame = frame_pointer;
 	}
+	TREF(compile_time) = FALSE;	/* Switching back to run-time */
 	return;
 }
 

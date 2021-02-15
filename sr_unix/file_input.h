@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,6 @@ int file_input_bin_get(char **in_ptr, off_t *file_offset, char **buff_base, bool
 int file_input_bin_read(void);
 int file_input_get_xchar(char *in_ptr, int max_chars_to_read);
 int file_input_read_xchar(char *in_ptr, int max_chars_to_read);
-int file_input_get(char **in_ptr, int max_len);
+int file_input_get(char **in_ptr, unsigned int max_len);
 
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,7 +61,7 @@ void tp_set_sgm(void)
 	assert(si->tp_csd == cs_data);
 	assert(csa->hdr == cs_data);
 	if ((NULL == csa->db_addrs[0]) && (dba_mm == cs_data->acc_meth))
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MMREGNOACCESS, 4, REG_LEN_STR(csa->region), DB_LEN_STR(csa->region));
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_MMREGNOACCESS, 4, REG_LEN_STR(csa->region), DB_LEN_STR(csa->region));
 	if (!si->tp_set_sgm_done)
 	{
 		si->next_sgm_info = first_sgm_info;

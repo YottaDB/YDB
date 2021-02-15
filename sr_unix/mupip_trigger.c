@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -133,7 +133,7 @@ void mupip_trigger(void)
 				continue;	/* ^#t already upgraded */
 			}
 			if (reg->read_only)
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(reg));
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(reg));
 			if (0 == gv_target->root)
 			{
 				util_out_print("No triggers found in region !AD and so no upgrade needed", TRUE, REG_LEN_STR(reg));

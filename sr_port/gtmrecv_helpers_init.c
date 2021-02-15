@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2015 Fidelity National Information	*
+ * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,8 +85,8 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 	save_shutdown = helper->helper_shutdown;
 	helper->helper_shutdown = NO_SHUTDOWN;
 	if (!gtm_dist_ok_to_use)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
-				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+			gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	if (WBTEST_ENABLED(WBTEST_MAXGTMDIST_HELPER_PROCESS))
 	{
 		memset(gtm_dist, 'a', GTM_PATH_MAX-2);

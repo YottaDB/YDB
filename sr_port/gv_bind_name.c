@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -118,7 +118,7 @@ gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
 		memcpy(&format_key[1], gvname->var_name.addr, gvname->var_name.len);
 		csa = &FILE_INFO(reg)->s_addrs;
 		gv_currkey->end = 0;
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_KEY2BIG, 4, keylen + 2, (int4)reg->max_key_size,
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(10) ERR_KEY2BIG, 4, keylen + 2, (int4)reg->max_key_size,
 			REG_LEN_STR(reg), ERR_GVIS, 2, 1 + gvname->var_name.len, format_key);
 	}
 	gv_target = tmp_gvt;	/* now that any rts_error possibilities are all past us, it is safe to set gv_target.

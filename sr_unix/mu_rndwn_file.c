@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,7 @@
 #include "gdsblk.h"
 #include "gtmio.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "filestruct.h"
 #include "iosp.h"
 #include "jnl.h"
@@ -105,8 +106,8 @@ static boolean_t	sem_created;
 static boolean_t	no_shm_exists;
 static boolean_t	shm_status_confirmed;
 
-LITREF char             gtm_release_name[];
-LITREF int4             gtm_release_name_len;
+LITREF char		gtm_release_name[];
+LITREF int4		gtm_release_name_len;
 
 error_def(ERR_BADDBVER);
 error_def(ERR_DBFILERR);
@@ -319,7 +320,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 {
 	int			status, save_errno, sopcnt, tsd_size, save_udi_semid = INVALID_SEMID, semop_res, stat_res, rc;
 	int			csd_size;
-	char                    now_running[MAX_REL_NAME];
+	char			now_running[MAX_REL_NAME];
 	boolean_t		is_gtm_shm, is_statsdb, rc_cpt_removed, statsDBexists;
 	boolean_t		glob_sec_init, db_shm_in_sync, remove_shmid, remove_mlk_shmid, ftok_counter_halted;
 	boolean_t		crypt_warning, do_crypt_init, need_statsdb_rundown;
@@ -332,7 +333,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	file_control		*fc;
 	unix_db_info		*statsDBudi, *udi;
 	enum db_acc_method	acc_meth;
-        struct stat     	stat_buf;
+	struct stat		stat_buf;
 	struct semid_ds		semstat;
 	union semun		semarg;
 	uint4			status_msg, ss_pid;
@@ -342,7 +343,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	int			gtmcrypt_errno;
 	boolean_t		cleanjnl_present, override_present, wcs_flu_success, prevent_mu_rndwn, need_rollback;
 	unsigned char		*fn;
-	mstr 			jnlfile;
+	mstr			jnlfile;
 	int			jnl_fd;
 	jnl_file_header		header;
 	int4			status1;
@@ -459,6 +460,8 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		}
 		if (udi->fd_opened_with_o_direct)
 			memcpy(tsd, buff, tsd_size);
+		if (0 == memcmp(tsd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+			db_header_upconv(tsd);
 		if (standalone && IS_RDBF_STATSDB(tsd))
 		{	/* Only MUPIP RUNDOWN (which has "standalone" set to FALSE) is supported for statsdb files.
 			 * All other MUPIP commands which require standalone access cannot directly operate on statsdb files.
@@ -791,7 +794,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			}
 		}
 		if (rc_cpt_removed)
-		{       /* reset RC values if we've rundown the RC CPT */
+		{	/* reset RC values if we've rundown the RC CPT */
 			/* attempt to force-write header */
 			tsd->rc_srv_cnt = tsd->dsid = tsd->rc_node = 0;
 			assert(FALSE);	/* not sure what to do here. handle it if/when it happens */
@@ -810,6 +813,8 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 					if (mupip_jnl_recover)
 						memset(tsd->machine_name, 0, MAX_MCNAMELEN);
 					ALIGN_BUFF_IF_NEEDED_FOR_DIO(udi, buff, tsd, tsd_size);	/* sets "buff" */
+					if (0 == memcmp(tsd, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+						db_header_dwnconv((sgmnt_data_ptr_t)buff);
 					DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, (off_t)0, buff, tsd_size, status);
 					if (0 != status)
 					{
@@ -889,9 +894,13 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			}
 		}
 		assert(!standalone);
-		ALIGN_BUFF_IF_NEEDED_FOR_DIO(udi, buff, tsd, tsd_size);	/* sets "buff" */
 		if (!tsd->read_only)
+		{
+			ALIGN_BUFF_IF_NEEDED_FOR_DIO(udi, buff, tsd, tsd_size);	/* sets "buff" */
+			if (0 == memcmp(tsd, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+				db_header_dwnconv((sgmnt_data_ptr_t)buff);
 			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, (off_t)0, buff, tsd_size, status);
+		}
 		else
 			status = 0;
 		if (0 != status)
@@ -923,15 +932,16 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		return FALSE;
 	}
 	/* Now we have a pre-existing shared memory section. Do some setup */
-	if (memcmp(tsd->label, GDS_LABEL, GDS_LABEL_SZ - 1))
-       	{
+	/* memcmp returns 0 on a match, so use && to see if both return a non-0 value meaning it isn't one of the expected labels */
+	if (memcmp(tsd->label, GDS_LABEL, GDS_LABEL_SZ - 1) && memcmp(tsd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+	{
 		if (memcmp(tsd->label, GDS_LABEL, GDS_LABEL_SZ - 3))
 			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBNOTGDS, 2, DB_LEN_STR(reg));
 		else
 			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_BADDBVER, 2, DB_LEN_STR(reg));
 		MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 		return FALSE;
-       	}
+	}
 	seg->acc_meth = acc_meth = tsd->acc_meth;
 	dbsecspc(reg, tsd, &sec_size);
 #	ifdef __MVS__
@@ -983,7 +993,10 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			break;
 		}
 		glob_sec_init = TRUE;
-		if (memcmp(cnl->label, GDS_LABEL, GDS_LABEL_SZ - 1))
+		/* memcmp returns 0 on a match, so use && to see if both return a non-0 value meaning
+		 * it isn't one of the expected labels
+		 */
+		if (memcmp(cnl->label, GDS_LABEL, GDS_LABEL_SZ - 1) && memcmp(cnl->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
 		{
 			if (memcmp(cnl->label, GDS_LABEL, GDS_LABEL_SZ - 3))
 				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBNOTGDS, 2, DB_LEN_STR(reg),
@@ -1167,13 +1180,15 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			csa->mlkctl_len = LOCK_SPACE_SIZE(tsd);
 			if (dba_bg == acc_meth)
 			{
-				cs_data = csd = csa->hdr = (sgmnt_data_ptr_t)((sm_uc_ptr_t)csa->mlkctl + csa->mlkctl_len
+				csd = (sgmnt_data_ptr_t)((sm_uc_ptr_t)csa->mlkctl + csa->mlkctl_len
 								+ CACHE_CONTROL_SIZE(tsd));
+				cs_data = csa->hdr = csd;
 				assert(cnl->cache_off == -CACHE_CONTROL_SIZE(csd));
 				db_csh_ini(csa);
 			} else
 			{
-				cs_data = csd = csa->hdr = (sgmnt_data_ptr_t)((sm_uc_ptr_t)csa->mlkctl + csa->mlkctl_len);
+				csd = (sgmnt_data_ptr_t)((sm_uc_ptr_t)csa->mlkctl + csa->mlkctl_len);
+				cs_data = csa->hdr = csd;
 				FSTAT_FILE(udi->fd, &stat_buf, stat_res);
 				if (-1 == stat_res)
 				{
@@ -1207,7 +1222,10 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			 * flushing garbage to the db file.
 			 * Check the label in the header - keep adding any further appropriate checks in future here.
 			 */
-			if (memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))
+			/* memcmp returns 0 on a match, so use && to see if both return a non-0 value meaning it isn't
+			 * one of the expected labels
+			 */
+			if (memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1) && memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
 			{
 				if (memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 3))
 				{
@@ -1329,7 +1347,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 							 * to bypass the error.
 							 */
 							if (standalone)
-								rts_error_csa(CSA_ARG(csa) VARLSTCNT(4)
+								RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4)
 									ERR_JNLORDBFLU, 2, DB_LEN_STR(reg));
 							else
 								rts_error_csa(CSA_ARG(csa) VARLSTCNT(8)
@@ -1409,6 +1427,8 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				assert(!udi->fd_opened_with_o_direct || DIO_BUFF_NO_OVERFLOW((TREF(dio_buff)), csd_size));
 				ALIGN_BUFF_IF_NEEDED_FOR_DIO(udi, buff, csd, csd_size);	/* sets "buff" */
 			}
+			if (0 == memcmp(csd, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+				db_header_dwnconv((sgmnt_data_ptr_t)buff);
 			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, (off_t)0, buff, csd_size, status);
 			if (0 != status)
 			{
@@ -1513,6 +1533,8 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		if (mupip_jnl_recover)
 			memset(tsd->machine_name, 0, MAX_MCNAMELEN);
 		ALIGN_BUFF_IF_NEEDED_FOR_DIO(udi, buff, tsd, tsd_size);	/* sets "buff" */
+		if (0 == memcmp(tsd, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+			db_header_dwnconv((sgmnt_data_ptr_t)buff);
 		DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, (off_t)0, buff, tsd_size, status);
 		if (0 != status)
 		{

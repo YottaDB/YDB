@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +37,7 @@ mval *underr (mval *start, ...)
 	{
 		end = format_lvname((lv_val *)start, (uchar_ptr_t)name.c, SIZEOF(name));
 		va_end(var);
-		rts_error(VARLSTCNT(4) ERR_UNDEF, 2, ((char *)end - name.c), name.c);
+		RTS_ERROR_ABT(VARLSTCNT(4) ERR_UNDEF, 2, ((char *)end - name.c), name.c);
 	}
 	return (mval *)NULL; /* To keep compiler happy */
 }

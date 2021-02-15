@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,12 +20,13 @@
 LITREF int4	ten_pwr[];
 LITREF mval	literal_zero;
 
+error_def(ERR_NUMOFLOW);
+
 void	op_mul (mval *u, mval *v, mval *p)
 {
 	bool		promo;
 	int4		c, exp;
 	mval		w, z;
-	error_def	(ERR_NUMOFLOW);
 
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
@@ -58,7 +60,7 @@ void	op_mul (mval *u, mval *v, mval *p)
 	c = eb_mul(u->m, v->m, p->m);
 	exp = u->e + v->e + c - MV_XBIAS;
 	if (EXPHI <= exp)
-		rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
+		rts_error_csa(NULL, VARLSTCNT(1) ERR_NUMOFLOW); /* BYPASSRTSABT */
 	else if (EXPLO > exp)
 		*p = literal_zero;
 	else if (exp < EXP_INT_OVERF  &&  exp > EXP_INT_UNDERF  &&  p->m[0] == 0  &&  (p->m[1]%ten_pwr[EXP_INT_OVERF-1-exp]==0))

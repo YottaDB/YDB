@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,17 +70,17 @@ lnr_tabent *op_labaddr(rhdtyp *routine, mval *label, int4 offset)
 				    label->str.len, label->str.addr, routine_hdr, offset)));
 	DBGINDCOMP((stderr, "op_labaddr: Routine containing label resolved to 0x"lvaddr"\n", routine_hdr));
 	if (!(routine_hdr->compiler_qlf & CQ_LINE_ENTRY) && (0 != offset))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LABELONLY, 2, routine_hdr->routine_name.len,
-			      routine_hdr->routine_name.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_LABELONLY, 2, routine_hdr->routine_name.len,
+			routine_hdr->routine_name.addr);
 	answer = find_line_addr(routine_hdr, &label->str, 0, NULL);
 	if (NULL == answer)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LABELMISSING, 2, label->str.len, label->str.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_LABELMISSING, 2, label->str.len, label->str.addr);
 	real_routine = CURRENT_RHEAD_ADR(routine_hdr);
 	first_line = LNRTAB_ADR(real_routine);
 	answer += offset;
 	DBGINDCOMP((stderr, "op_labaddr: label offset addr resolved to 0x"lvaddr"\n", answer));
 	if ((answer < first_line) || (answer >= (first_line + real_routine->lnrtab_len)))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OFFSETINV, 3, label->str.len, label->str.addr, offset);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_OFFSETINV, 3, label->str.len, label->str.addr, offset);
 	/* Return the index or address for line number entry pointer/offset, so that the adjacent location in memory holds
 	 * has_parms. Note that if returning index for autorelink-enabled platform, the index is negative to indicate use
 	 * of TABENT_PROXY.

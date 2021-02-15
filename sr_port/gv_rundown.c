@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -157,5 +157,5 @@ void gv_rundown(void)
 			ftok_sem_release(recvpool.recvpool_dummy_reg, FALSE, TRUE);
 	}
 	if (EXIT_NRM != rundown_status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTALLDBRNDWN);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOTALLDBRNDWN);
 }

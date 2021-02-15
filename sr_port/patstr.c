@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,7 +47,6 @@ typedef struct
 			TOPCHAR, MIN, MAX, SIZE, TOTAL_MIN, TOTAL_MAX, COUNT, LASTPATPTR, LAST_INFINITE,	\
 			MIN_DFA, ALTMIN, ALTMAX, INSTR, INCHAR, DFA)						\
 {														\
-	gtm_uint64_t		bound;										\
 	int			cursize, i;									\
 														\
 	PATMASKPTR = OUTCHAR;											\
@@ -138,7 +137,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	boolean_t		dfa, done, infinite;
 	boolean_t		dfa_fixed_len, fixed_len, prev_fixed_len, split_atom, start_dfa;
 	int4			lower_bound, upper_bound, alloclen;
-	gtm_uint64_t		bound;
+	gtm_int64_t		bound;
 	unsigned char		curchar, symbol, *inchar, *in_top, *buffptr;
 	uint4			pattern_mask, last_leaf_mask, y_max, mbit;
 	uint4			*patmaskptr;

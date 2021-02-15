@@ -154,5 +154,115 @@ TAB_GVSTATS_REC(f_ws47               , "TRGA", "wait flag for grab region for tr
  * ZAD: WS_95 WS_96 WS_97 WS_98 WS_99
  *
  * End Aggregate Stats Definition (please do not delete this)
+ *
+ * These are brief descriptions of why crit is grabbed for a particular WS
+ * In general, this command should suss the WS instances out of the code:
+ *	egrep 'WS_[0-9]+\)|WS_[0-9]+,' $work_dir/gtm/{sr_port,sr_unix}/ * | grep -v proc_wait_stat.h
+ *                                                                     ^(note no space before star when typed)
+ *
+ * Begin Non-Exposed Wait State Definitions (please do not delete this)
+ *	WS_1: Change database version
+ *	WS_2: Ensure journal file is open
+ *	WS_3: Grab latest journal for flush if needed
+ *	WS_4: Update journal for region
+ *	WS_5: Lock when lock shares DB critical section
+ *	WS_6: Copy region file header for integ
+ *	WS_7: Process IO waiting for read-only DB during mupip integ
+ *	WS_8: Mupip upgrade/downgrade
+ *	WS_9: Mupip upgrade/downgrade interrupted
+ *	WS_10: Mupip online backup
+ *	WS_11: Remap db after file ext in MM access mode
+ *	WS_12: File extension in progress
+ *	WS_13: Global variable kill expand free subtree
+ *	WS_14: Update decryption keys if needed before block read
+ *	WS_15: Update decryption keys if needed for read of block not in cache
+ *	WS_16: Recover from commit timeout during block read
+ *	WS_17: Recover from buffer blocked on pid during block read
+ *	WS_18: Final try for block read
+ *	WS_19: Update process database critical section to reset history stream related information
+ *	WS_20: Buffer flush access to queue of free buffers
+ *	WS_21: Probe crit access to waiting process queue
+ *	WS_22: Database critical section to assess BG
+ *	WS_23: Lock access to ASYNC IO Write In Progress (WIP) queue
+ *	WS_24: Recover from phase 2 commit fail
+ *	WS_25: Remove cr from wip queue.
+ *	WS_26: Flush cr from active queue.
+ *	WS_27: Reap i/o requests waiting for free buffers
+ *	WS_28: Phase 2 commit cleanup
+ *	WS_29: Check journal buffer during phase 2 commit
+ *	WS_30: $View() debug facility grab journal phase 2 commit latch
+ *	WS_31: $View() debug facility grab journal pool phase 2 commit latch
+ *	WS_32: View command JNLFLUSH facility
+ *	WS_33: Journal cleanup grab journal phase 2 commit latch
+ *	WS_34: Sync replicated database file header sequence number
+ *	WS_35: Grab journal buffer pool I/O in progress latch for mutex salvage
+ *	WS_36: Grab journal buffer pool fsync latch for mutex salvage
+ *	WS_37: Set replicated database file header values "zqgblmod_seqno" & "zqgblmod_tn" to 0
+ *	WS_38: Grab critical latch for lock operations
+ *	WS_39: Reattempt blocked lock
+ *	WS_40: Mupip journal recover orphan block
+ *	WS_41: Close journal file cleanly
+ *	WS_42: DB rundown flush fileheader to disk
+ *	WS_43: Transaction begin code for write-after images (DSE)
+ *	WS_44: Cleanup non-TP commit
+ *	WS_45: Ensure non-TP read transaction consistency
+ *	WS_46: Check for wrong root block in non-TP read transaction
+ *	WS_47: Hold up on hard freeze ahead of non-TP trans validation
+ *	WS_48: Resume crit after a reorg encrypt during transaction retry
+ *	WS_49: Sync encryption cycles during transaction retry
+ *	WS_50: Wait for unfrozen db on final transaction retry
+ *	WS_51: Sync online rollback cycles during TP transaction history validation
+ *	WS_52: Prepare for wcs_recover() in TP restart
+ *	WS_53: Grab crit for all regions of a TP transaction when needed prior to TCOMMIT
+ *	WS_54: Grab crit on all TP regions while validating transaction for commit
+ *	WS_55: Grab crit for DSE functions
+ *	WS_56: DSE 'seize crit' operation
+ *	WS_57: DSE 'renew' or 'wcinit' operation
+ *	WS_58: DSE grab critical section for write (unused?)
+ *	WS_59: DSE grab critical section for '-restore all'
+ *	WS_60: DSE grab critical section for '-master'
+ *	WS_61: DSE grab critical section to pin down free block information
+ *	WS_62: DSE grab critical section for database region cache reinitialize
+ *	WS_63: DSE grab freeze latch for chilled autorelease
+ *	WS_64: Read block for mupip upgrade/downgrade
+ *	WS_65: Write same journal timestamp for all regions
+ *	WS_66: Adjust global journal record time after KIP wait
+ *	WS_67: Lock region for mupip extend
+ *	WS_68: Ensure region unfrozen for mupip extend
+ *	WS_69: Lock region for mupip reorg truncate
+ *	WS_70: Mark mupip reorg truncate failure for region
+ *	WS_71: Lock region for mupip set journal
+ *	WS_72: Harden journal files to disk before recover/rollback
+ *	WS_73: Grab regions for online rollback
+ *	WS_74: Adjust transaction number after killed process
+ *	WS_75: Handle PFIN in mupip recover
+ *	WS_76: Explicitly invoked by 'GRABCRIT' operand for 'view'
+ *	WS_77: In 'PROBECRIT' operand for 'view'
+ *	WS_78: For WB test in 'view "STORDUMP"' grab/hold crit up to MUTEXLCKALERT_INTERVAL * 12
+ *	WS_79: Grab crit for region freeze if not already held
+ *	WS_80: Resume crit after kill in progress during region freeze
+ *	WS_81: Grab freeze latch during region freeze
+ *	WS_82: Grab freeze latch during region unfreeze
+ *	WS_83: Region journal file switch after region freeze
+ *	WS_84: Switch journal file after updating history
+ *	WS_85: Correct extract count after failed mupip extract
+ *	WS_86: Update region extract count for mupip extract
+ *	WS_87: Free journal control structure during db file rundown
+ *	WS_88: Start mupip truncate phase 2
+ *	WS_89: Allow existing phase 2 commits to complete during mupip backup
+ *	WS_90: Allow existing phase 2 commits to complete during mupip incremental backup
+ *	WS_91: Wait for concurrent i/o, update encr cyc, sync header in mupip reorg encrypt
+ *	WS_92: Note USED blocks for encryption in mupip reorg encrypt
+ *	WS_93: Mupip reorg encrypt wait for I/O completion, do post encr housekeeping
+ *	WS_94: Reseize crit on mupip reorg encrypt error, do final housekeeping
+ *	WS_95: Protect mupip set file operations when 'standalone' is not required
+ *	WS_96: Decrement the inhibit_kills counter safely
+ *	WS_97: Do shared memory housekeeping before starting snapshot
+ *	WS_98: Check if another process has added blocks before starting snapshot
+ *	WS_99: Wait for pending phase 2 updates to finish during snapshot
+ *	WS_100: Switch journal file as mupip trigger upgrade commits
+ *	WS_101: Protect ^#t upgrade flag during set if not already in crit
+ *	WS_102: Protect housekeeping variables during multiproc online freeze
+ * End Non-Exposed Wait State Definitions (please do not delete this)
  */
 #endif

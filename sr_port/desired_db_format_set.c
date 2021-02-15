@@ -176,8 +176,12 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 		case GDSV6:
 			csd->max_tn = MAX_TN_V6;
 			break;
+		case GDSV7:
+			csd->max_tn = MAX_TN_V7;
+			assert(FALSE);
+			break;
 		default:
-			assertpro((GDSV4 == new_db_format) || (GDSV6 == new_db_format));
+			assertpro((GDSV4 == new_db_format) || (GDSV6 == new_db_format) || (GDSV7 == new_db_format));
 	}
 	SET_TN_WARN(csd, csd->max_tn_warn);	/* if max_tn changed above, max_tn_warn also needs a corresponding change */
 	assert(curr_tn < csd->max_tn);	/* ensure CHECK_TN macro below will not issue TNTOOLARGE rts_error */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2020 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -498,7 +498,7 @@ boolean_t trigger_name_search(char *trigger_name, uint4 trigger_name_len, mval *
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
 				trigger_name_len, trigger_name);
 		}
 		len = ptr2 - ptr;
@@ -1555,7 +1555,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, uint4 trigvn_len, boolean_
 
 	csa = cs_addrs;
 	if (NULL == csa)	/* Remote region */
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_REMOTEDBNOTRIG, 4, trigvn_len, trigvn, REG_LEN_STR(gv_cur_region));
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_REMOTEDBNOTRIG, 4, trigvn_len, trigvn, REG_LEN_STR(gv_cur_region));
 	if (gv_cur_region->read_only)
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	assert(cs_addrs == gv_target->gd_csa);
@@ -1583,7 +1583,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, uint4 trigvn_len, boolean_
 								 * Note: It is safe to do so even if we dont hold crit.
 								 */
 		} else
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_NEEDTRIGUPGRD, 2, DB_LEN_STR(gv_cur_region));
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_NEEDTRIGUPGRD, 2, DB_LEN_STR(gv_cur_region));
 	}
 	if (!*new_name_check_done)
 	{	/* Make sure below call is done only ONCE for a global spanning multiple regions since this call goes
@@ -2089,7 +2089,7 @@ boolean_t trigger_update(mval *trigger_rec)
 				|| !gv_target || !gv_target->root);
 			assert((cdb_sc_onln_rlbk2 != failure) || !IS_GTM_IMAGE || TREF(dollar_zonlnrlbk));
 			if (cdb_sc_onln_rlbk2 == failure)
-				rts_error_csa(CSA_ARG(gv_target->gd_csa) VARLSTCNT(1) ERR_DBROLLEDBACK);
+				RTS_ERROR_CSA_ABT(gv_target->gd_csa, VARLSTCNT(1) ERR_DBROLLEDBACK);
 			/* else if (cdb_sc_onln_rlbk1 == status) we don't need to do anything other than trying again. Since this
 			 * is ^#t global, we don't need to GVCST_ROOT_SEARCH before continuing with the next restart because the
 			 * trigger load logic already takes care of doing INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED before doing the

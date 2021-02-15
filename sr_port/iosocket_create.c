@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -188,6 +188,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				}
 				/* for connection socket */
 				SNPRINTF(port_buffer, NI_MAXSERV, "%hu", port);
+				assert(last_2colon > sockaddr);
 				addrlen = last_2colon - sockaddr;
 				if ('[' == sockaddr[0])
 				{

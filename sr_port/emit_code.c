@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -181,7 +181,7 @@ void trip_gen(triple *ct)
 			}
 			*sopr++ = opr;
 			if (ARRAYTOP(saved_opr) <= sopr)	/* user-visible max args is MAX_ARGS - 3 */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS - 3);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS - 3);
 		}
 		opr++;
 	}
@@ -1748,7 +1748,7 @@ void emit_pop(int count)
 void add_to_vax_push_list(int pushes_seen)
 {	/* Make sure there's enough room */
 	if (MAX_ARGS < pushes_seen)	/* user-visible max args is MAX_ARGS - 3 */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS - 3);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS - 3);
 	push_list_index++;
 	if (PUSH_LIST_SIZE <= push_list_index)
 	{

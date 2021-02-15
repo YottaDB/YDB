@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "mupipbckup.h"
 #include "murest.h"
 #include "filestruct.h"
@@ -112,7 +113,8 @@ error_def(ERR_TEXT);
 
 void mupip_restore(void)
 {
-	static readonly char	label[] =   GDS_LABEL;
+	static readonly char	label[] = GDS_LABEL;
+	static readonly char	v6_label[] = V6_GDS_LABEL;
 	char			db_name[MAX_FN_LEN + 1], *inbuf, *p, *blk_ptr;
 	inc_list_struct		*ptr;
 	inc_header		inhead;
@@ -191,6 +193,8 @@ void mupip_restore(void)
 	murgetlst();
 	csd = !udi->fd_opened_with_o_direct ? &old_data : (sgmnt_data_ptr_t)(TREF(dio_buff)).aligned;
 	DB_LSEEKREAD(udi, db_fd, 0, csd, SGMNT_HDR_LEN, save_errno);
+	if (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+		db_header_upconv(csd);
 	if (0 != save_errno)
 	{
 		util_out_print("Error accessing output file !AD. Aborting restore.", TRUE, n_len, db_name);
@@ -204,7 +208,7 @@ void mupip_restore(void)
 	}
 	if (udi->fd_opened_with_o_direct)
 		memcpy(&old_data, csd, SGMNT_HDR_LEN);
-	if (memcmp(old_data.label, label, GDS_LABEL_SZ))
+	if (memcmp(old_data.label, label, GDS_LABEL_SZ) && memcmp(old_data.label, v6_label, GDS_LABEL_SZ))
 	{
 		util_out_print("Output file !AD has an unrecognizable format", TRUE, n_len, db_name);
 		CLNUP_AND_EXIT(ERR_MUPRESTERR, NULL);
@@ -318,6 +322,8 @@ void mupip_restore(void)
 		else if (!memcmp(inhead.label, INC_HEADER_LABEL_V6_ENCR, INC_HDR_LABEL_SZ))
 			assert(IS_ENCRYPTED(inhead.is_encrypted));
 		else if (!memcmp(inhead.label, INC_HEADER_LABEL_V7, INC_HDR_LABEL_SZ))
+			check_mdb_ver = FALSE;
+		else if (!memcmp(inhead.label, INC_HEADER_LABEL_V8, INC_HDR_LABEL_SZ))
 			check_mdb_ver = TRUE;
 		else
 		{
@@ -480,7 +486,7 @@ void mupip_restore(void)
 						newmap = (TREF(dio_buff)).aligned;
 					} else
 						newmap = (char *)malloc(old_blk_size);
-					bml_newmap((blk_hdr_ptr_t)newmap, BM_SIZE(bplmap), curr_tn);
+					bml_newmap((blk_hdr_ptr_t)newmap, BM_SIZE(bplmap), curr_tn, csd->desired_db_format);
 					for (ii = ROUND_UP(old_tot_blks, bplmap); ii < inhead.db_total_blks; ii += bplmap)
 					{
 						offset = (off_t)BLK_ZERO_OFF(old_start_vbn) + (off_t)ii * old_blk_size;
@@ -620,6 +626,8 @@ void mupip_restore(void)
 		COMMON_READ(in, &rsize, SIZEOF(rsize), inbuf);
 		assert((SGMNT_HDR_LEN + SIZEOF(int4)) == rsize);
 		COMMON_READ(in, inbuf, rsize, inbuf);
+		if (0 == memcmp(inbuf, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+			db_header_upconv((sgmnt_data_ptr_t)inbuf);
 		((sgmnt_data_ptr_t)inbuf)->start_vbn = old_start_vbn;
 		((sgmnt_data_ptr_t)inbuf)->free_space = (uint4)(BLK_ZERO_OFF(old_start_vbn) - SIZEOF_FILE_HDR(inbuf));
 		GTMCRYPT_COPY_ENCRYPT_SETTINGS(&old_data, ((sgmnt_data_ptr_t)inbuf));
@@ -642,6 +650,8 @@ void mupip_restore(void)
 			memcpy((TREF(dio_buff)).aligned, csd, SGMNT_HDR_LEN);
 			csd = (sgmnt_data_ptr_t)(TREF(dio_buff)).aligned;
 		}
+		if (0 == memcmp(csd, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+			db_header_dwnconv(csd);
 		DB_LSEEKWRITE(NULL, udi, NULL, db_fd, 0, csd, SGMNT_HDR_LEN, save_errno);
 		if (0 != save_errno)
 		{

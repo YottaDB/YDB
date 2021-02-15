@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -104,7 +104,7 @@ STATICFNDEF void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg
 		if (MAX_GVSUBSCRIPTS < (count + sbs_cnt))
 		{
 			gv_currkey->end = 0;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 		}
 	}
 	/* else naked reference will not increase number of subscripts, so do not worry about exceeding the limit */

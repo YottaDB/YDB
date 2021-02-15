@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,7 +66,10 @@ MBSTART {												\
 		CLOSEFILE_RESET(mu_cre_file_fd, rc); /* resets "mu_cre_file_fd" to FD_INVALID */	\
 	assert(NULL != mu_cre_file_path);								\
 	if (EXIT_ERR == XX)										\
-		UNLINK(mu_cre_file_path);								\
+	{												\
+		rc = UNLINK(mu_cre_file_path);								\
+		assert(0 == rc);										\
+	}												\
 } MBEND
 
 /* Macros to send warning or error messages to the correct destination:
@@ -176,7 +179,8 @@ unsigned char mu_cre_file(void)
 	gd_segment	*seg;
 	gd_region	*baseDBreg;
 	char		hash[GTMCRYPT_HASH_LEN];
-	int		gtmcrypt_errno, retcode, perms, user_id, group_id;
+	int		retcode, perms, user_id, group_id;
+	uint4		gtmcrypt_errno;
 	off_t		new_eof;
 	uint4		fsb_size;
 	boolean_t	cleanup_needed;

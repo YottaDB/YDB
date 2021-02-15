@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2020 Fidelity National Information	*
+ * Copyright (c) 2011-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,6 +25,7 @@
 {													\
 	int numsems; 											\
 													\
+	assert(sizeof(SOPS) >= NSOPS);									\
 	for (numsems = NSOPS - 1; numsems >= 0; --numsems)						\
 		CHECK_SEMVAL_GRT_SEMOP(SEMID, SOPS[numsems].sem_num, SOPS[numsems].sem_op);		\
 	if (FORCED_WAIT == TO_WAIT)									\

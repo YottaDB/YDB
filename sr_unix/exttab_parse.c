@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,7 @@
 
 GBLREF  volatile boolean_t      timer_in_handler;
 GBLREF	char 			gtm_dist[GTM_PATH_MAX];
+GBLREF	boolean_t		gtm_dist_ok_to_use;
 
 #define	CR			0x0A		/* Carriage return */
 #define	NUM_TABS_FOR_GTMERRSTR	2
@@ -509,13 +510,13 @@ struct extcall_package_list *exttab_parse(mval *package)
 	if (NULL == ext_table_file_name)
 	{
 		/* Environment variable for the package not found */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
 	}
 	Fopen(ext_table_file_handle, ext_table_file_name, "r");
 	if (NULL == ext_table_file_handle)
 	{
 		/* Package's external call table could not be found */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTOPN, 2, LEN_AND_STR(ext_table_file_name));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCCTOPN, 2, LEN_AND_STR(ext_table_file_name));
 	}
 	ext_source_line_num = 0;
 	/* Pick-up name of shareable library */
@@ -523,7 +524,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 	if (NULL == tbp)
 	{
 		/* External call table is a null file */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTNULLF, 2, package->str.len, package->str.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCCTNULLF, 2, package->str.len, package->str.addr);
 	}
 	STRNCPY_STR(str_temp_buffer, str_buffer, MAX_TABLINE_LEN);
 	val.addr = str_temp_buffer;
@@ -538,13 +539,13 @@ struct extcall_package_list *exttab_parse(mval *package)
 	if (SS_LOG2LONG == TRANS_LOG_NAME(&val, &trans, str_buffer, SIZEOF(str_buffer), dont_sendmsg_on_log2long))
 	{
 		/* Env variable expansion in the pathname caused buffer overflow */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(str_buffer) - 1);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(str_buffer) - 1);
 	}
 	pakhandle = fgn_getpak(str_buffer, INFO);
 	if (NULL == pakhandle)
 	{
 		/* Unable to obtain handle to the shared library */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCUNAVAIL, 2, package->str.len, package->str.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCUNAVAIL, 2, package->str.len, package->str.addr);
 	}
 	pak = get_memory(SIZEOF(*pak));
 	pak->first_entry = 0;
@@ -774,18 +775,19 @@ callin_entry_list* citab_parse (boolean_t internal_use)
 	{
 		ext_table_file_name = GETENV(CALLIN_ENV_NAME);
 		if (!ext_table_file_name) /* environment variable not set */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(CALLIN_ENV_NAME));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(CALLIN_ENV_NAME));
 	}
 	else
 	{
+		assert(gtm_dist_ok_to_use);
 		SNPRINTF(rcfpath, GTM_PATH_MAX, "%s/%s", gtm_dist, COMM_FILTER_FILENAME);
 		ext_table_file_name = rcfpath;
 	}
 
 	Fopen(ext_table_file_handle, ext_table_file_name, "r");
 	if (!ext_table_file_handle) /* call-in table not found */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_CITABOPN, 2, LEN_AND_STR(ext_table_file_name),
-			  ERR_SYSCALL, 5, LEN_AND_LIT("fopen"), CALLFROM, errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(11) ERR_CITABOPN, 2, LEN_AND_STR(ext_table_file_name),
+			ERR_SYSCALL, 5, LEN_AND_LIT("fopen"), CALLFROM, errno);
 	ext_source_line_num = 0;
 	while (read_table(LIT_AND_LEN(str_buffer), ext_table_file_handle))
 	{

@@ -66,8 +66,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 	 */
 
 	uint4			cnt, lcnt ;
-        ssize_t			offset ;
-        trans_num 		max_tn, tmp_8byte;
+	ssize_t			offset ;
+	trans_num		max_tn, tmp_8byte;
 	INTPTR_T		bp_lo, bp_top, bp, cr_base, cr_top, bt_top_off, bt_base_off;
 	sm_uc_ptr_t		bptmp, bp_bmp;
 	boolean_t		asyncio, do_cert_blk, ret;
@@ -85,6 +85,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 	trans_num		dummy_tn;
 	int4			bml_status, in_wtstart, intent_wtstart, wcs_phase2_commit_pidcnt;
 	block_id		curbmp;
+	gtm_int8		latch_conflict = LATCH_CONFLICT, minus1 = -1, nil = 0, bt_qhead8 = BT_QUEHEAD; /* for 64-bit addrs*/
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 #	ifdef DEBUG
@@ -309,8 +310,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			SEND_MSG_CSA(VARLSTCNT(8) ERR_DBFHEADERR4, 6, DB_LEN_STR(reg),
-				RTS_ERROR_TEXT("th_base->blk"), th->blk, BT_QUEHEAD);
+			SEND_MSG_CSA(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
+				RTS_ERROR_TEXT("th_base->blk"), &th->blk, &bt_qhead8);
 			th->blk = BT_QUEHEAD;
 		}
 		/* loop through bt tnque */
@@ -323,7 +324,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), th_prev, -1,
+				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), th_prev, &minus1,
 					RTS_ERROR_TEXT("th->tnque"), bt, bt_lo, SIZEOF(bt_rec));
 				break;
 			}
@@ -339,7 +340,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), th, th->blk,
+				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), th, &th->blk,
 						RTS_ERROR_TEXT("tnque.bl"), (UINTPTR_T)th->tnque.bl,
 						(sm_uc_ptr_t)th_prev - (sm_uc_ptr_t)th);
 			}
@@ -350,7 +351,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					assert(expect_damage);
 					ret = FALSE;
 					tmp_8byte = 1;
-					SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg), th, th->blk, &max_tn,
+					SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg), th, &th->blk, &max_tn,
 							RTS_ERROR_TEXT("tnque transaction number"), &tmp_8byte, &th->tn);
 				}
 				/* ideally, the following max_tn assignment should have been in the else part of the above if. but
@@ -366,16 +367,16 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
-					th, th->blk, th->blk, RTS_ERROR_TEXT("th->blk"), 0, csd->trans_hist.total_blks);
+				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg),
+					th, &th->blk, &th->blk, RTS_ERROR_TEXT("th->blk"), &nil, &csd->trans_hist.total_blks);
 			}
 			if (((int)(th->cache_index) != CR_NOTVALID) &&
 				(((int)(th->cache_index) < cr_base) || ((int)(th->cache_index) >= cr_top)))
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
-					th, th->blk, th->cache_index, RTS_ERROR_TEXT("th->cache_index"), cr_base, cr_top);
+				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg),
+					th, &th->blk, &th->cache_index, RTS_ERROR_TEXT("th->cache_index"), &cr_base, &cr_top);
 			}
 			if (th->flushing != FALSE) /* ??? this is a gt.cx item that may require more synchronization at the top */
 			{
@@ -389,7 +390,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				assert(expect_damage);
 				ret = FALSE;
 				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg),
-					th, th->blk, RTS_ERROR_TEXT("tnque.fl"), (UINTPTR_T)th->tnque.fl, (UINTPTR_T)-1);
+					th, &th->blk, RTS_ERROR_TEXT("tnque.fl"), (UINTPTR_T)th->tnque.fl, (UINTPTR_T)-1);
 				break;
 			}
 		}
@@ -403,7 +404,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		{	/* at this point "th" is csa->th_base and its backlink does not point to the last entry in the th queue */
 			assert(expect_damage);
 			ret = FALSE;
-			SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), th, th->blk,
+			SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), th, &th->blk,
 				RTS_ERROR_TEXT("tnque th_base"), (UINTPTR_T)th->tnque.bl, (sm_uc_ptr_t)th_prev - (sm_uc_ptr_t)th);
 		}
 		if (max_tn > csd->trans_hist.curr_tn)
@@ -422,8 +423,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(8) ERR_DBFHEADERR4, 6, DB_LEN_STR(reg),
-					RTS_ERROR_TEXT("queue head bt->blk"), bt0->blk, BT_QUEHEAD);
+				SEND_MSG_CSA(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
+					RTS_ERROR_TEXT("queue head bt->blk"), &bt0->blk, &bt_qhead8);
 				bt0->blk = BT_QUEHEAD;
 			}
 			for (bt_prev = bt0, bt = (bt_rec_ptr_t)((sm_uc_ptr_t)bt0 + bt0->blkque.fl), cnt = n_bts + 1;
@@ -434,7 +435,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				{
 					assert(expect_damage);
 					ret = FALSE;
-					SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), bt_prev, -1,
+					SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), bt_prev, &minus1,
 						RTS_ERROR_TEXT("bt->blkque"), bt, bt_lo, SIZEOF(bt_rec));
 					break;
 				}
@@ -450,7 +451,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				{
 					assert(expect_damage);
 					ret = FALSE;
-					SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), bt, bt->blk,
+					SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), bt, &bt->blk,
 						RTS_ERROR_TEXT("bt->blkque.bl"), (UINTPTR_T)bt->blkque.bl,
 						(sm_uc_ptr_t)bt_prev - (sm_uc_ptr_t)bt);
 				}
@@ -460,7 +461,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					{
 						assert(expect_damage);
 						ret = FALSE;
-						SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), bt, bt->blk,
+						SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), bt, &bt->blk,
 							RTS_ERROR_TEXT("bt hash"), (bt0 - csa->bt_header),
 							(UINTPTR_T)(bt->blk % csd->bt_buckets));
 					}
@@ -472,20 +473,22 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 						{
 							assert(expect_damage);
 							ret = FALSE;
-							SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
-								bt, bt->blk, cr, RTS_ERROR_TEXT("bt->cache_index"), cr_lo, cr_hi);
+							SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg), bt,
+								&bt->blk, &cr,
+								RTS_ERROR_TEXT("bt->cache_index"), &cr_lo, &cr_hi);
 						} else if (CR_NOT_ALIGNED(cr, cr_lo))
 						{
 							assert(expect_damage);
 							ret = FALSE;
-							SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), bt, bt->blk,
-								RTS_ERROR_TEXT("bt->cache_index"), cr, cr_lo, SIZEOF(cache_rec));
+							SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), bt,
+								&bt->blk, RTS_ERROR_TEXT("bt->cache_index"),
+								cr, cr_lo, SIZEOF(cache_rec));
 						} else if (cr->blk != bt->blk)
 						{
 							assert(expect_damage);
 							ret = FALSE;
-							SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr,
-								bt->blk, RTS_ERROR_TEXT("bt block"), cr->blk, bt->blk,
+							SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr,
+								&(bt->blk), RTS_ERROR_TEXT("bt block"), &(cr->blk), &(bt->blk),
 								CALLFROM);
 						}
 					}
@@ -495,7 +498,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				{	/* No point proceeding to next iteration as "bt + bt->blkque.fl" will be the same as "bt" */
 					assert(expect_damage);
 					ret = FALSE;
-					SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), bt, bt->blk,
+					SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), bt, &bt->blk,
 						RTS_ERROR_TEXT("bt->blkque.fl"), (UINTPTR_T)bt->blkque.fl, (UINTPTR_T)-1);
 					break;
 				}
@@ -510,7 +513,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{	/* at this point "bt" is bt0 and its backlink does not point to last entry in the bt0'th queue */
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), bt, bt->blk,
+				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), bt, &bt->blk,
 					RTS_ERROR_TEXT("btque bt_base"), (UINTPTR_T)bt->blkque.bl,
 					(sm_uc_ptr_t)bt_prev - (sm_uc_ptr_t)bt);
 			}
@@ -522,7 +525,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), bt, bt->blk,
+				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), bt, &bt->blk,
 					RTS_ERROR_TEXT("bt blkque hash"), (UINTPTR_T)-1, (UINTPTR_T)(bt->blk % csd->bt_buckets));
 			}
 		}
@@ -542,8 +545,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
-					cr, cr->blk, cr->blk, RTS_ERROR_TEXT("cr->blk"), 0, csd->trans_hist.total_blks);
+				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg),
+					cr, &cr->blk, &cr->blk, RTS_ERROR_TEXT("cr->blk"), &nil, &csd->trans_hist.total_blks);
 			}
 			if (cr->tn > csd->trans_hist.curr_tn)
 			{
@@ -551,7 +554,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				ret = FALSE;
 				tmp_8byte = 0;
 				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg),
-					cr, cr->blk, &cr->tn, RTS_ERROR_TEXT("cr->tn"), &tmp_8byte, &csd->trans_hist.curr_tn);
+					cr, &cr->blk, &cr->tn, RTS_ERROR_TEXT("cr->tn"), &tmp_8byte, &csd->trans_hist.curr_tn);
 			}
 			if (0 != cr->bt_index)
 			{
@@ -559,15 +562,15 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				{
 					assert(expect_damage);
 					ret = FALSE;
-					SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
-						cr, cr->blk, cr->bt_index, RTS_ERROR_TEXT("cr->bt_index"), bt_base_off,
-						bt_top_off);
+					SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg),
+						cr, &cr->blk, &cr->bt_index, RTS_ERROR_TEXT("cr->bt_index"), &bt_base_off,
+						&bt_top_off);
 				} else if (!IS_PTR_ALIGNED(cr->bt_index, bt_base_off, SIZEOF(bt_rec)))
 				{
 					assert(expect_damage);
 					ret = FALSE;
 					SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg),
-						cr, cr->blk, RTS_ERROR_TEXT("cr->bt_index"), cr->bt_index, bt_base_off,
+						cr, &cr->blk, RTS_ERROR_TEXT("cr->bt_index"), cr->bt_index, bt_base_off,
 						SIZEOF(bt_rec));
 				} else
 				{
@@ -576,8 +579,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					{
 						assert(expect_damage);
 						ret = FALSE;
-						SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr,
-							cr->blk, RTS_ERROR_TEXT("cr block"), cr->blk, bt->blk,
+						SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr,
+							&(cr->blk), RTS_ERROR_TEXT("cr block"), &(cr->blk), &(bt->blk),
 							CALLFROM);
 					}
 				}
@@ -586,34 +589,34 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
-					cr, cr->blk, cr->buffaddr, RTS_ERROR_TEXT("cr->buffaddr"), bp_lo, bp_top);
+				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg),
+					cr, &cr->blk, &cr->buffaddr, RTS_ERROR_TEXT("cr->buffaddr"), &bp_lo, &bp_top);
 			} else if (!IS_PTR_ALIGNED(cr->buffaddr, bp_lo, csd->blk_size))
 			{
 				assert(expect_damage);
 				ret = FALSE;
 				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->buffaddr"), cr->buffaddr, bp_lo, csd->blk_size);
+					cr, &cr->blk, RTS_ERROR_TEXT("cr->buffaddr"), cr->buffaddr, bp_lo, csd->blk_size);
 			} else if (cr->buffaddr != bp)
 			{
 				assert(expect_damage);
 				ret = FALSE;
 				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->buffaddr"), cr->buffaddr, bp, CALLFROM);
+					cr, &(cr->blk), RTS_ERROR_TEXT("cr->buffaddr"), cr->buffaddr, bp, CALLFROM);
 			}
 			if (cr->in_tend)
 			{
 				assert(expect_damage);
 				ret = FALSE;
 				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->in_tend"), cr->in_tend, FALSE, CALLFROM);
+					cr, &(cr->blk), RTS_ERROR_TEXT("cr->in_tend"), cr->in_tend, FALSE, CALLFROM);
 			}
 			if (cr->data_invalid)
 			{
 				assert(expect_damage);
 				ret = FALSE;
 				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->data_invalid"), cr->data_invalid, FALSE, CALLFROM);
+					cr, &(cr->blk), RTS_ERROR_TEXT("cr->data_invalid"), cr->data_invalid, FALSE, CALLFROM);
 			}
 			if (cr->r_epid != 0)
 			{
@@ -622,7 +625,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					assert(expect_damage);
 					ret = FALSE;
 					SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
-						cr, cr->blk, RTS_ERROR_TEXT("cr->r_epid"), cr->r_epid, 0, CALLFROM);
+						cr, &(cr->blk), RTS_ERROR_TEXT("cr->r_epid"), cr->r_epid, 0, CALLFROM);
 				}
 			} else if ((-1 == cr->read_in_progress) && !caller_is_wcs_recover
 						&& (CR_BLKEMPTY != cr->blk) && !cr->data_invalid)
@@ -678,9 +681,9 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				{
 					ret = FALSE;
 					SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
-						cr, cr->blk, RTS_ERROR_TEXT("Block certification result"),
+						cr, &(cr->blk), RTS_ERROR_TEXT("Block certification result"),
 						FALSE, TRUE, CALLFROM);
-					SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
+					SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, &(cr->blk),
 						RTS_ERROR_TEXT("Block certification result buffer"),
 						bptmp, csa->mlkctl, CALLFROM);
 					assert(expect_damage);
@@ -691,7 +694,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				assert(expect_damage);
 				ret = FALSE;
 				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->in_cw_set"), (uint4)cr->in_cw_set, 0, CALLFROM);
+					cr, &(cr->blk), RTS_ERROR_TEXT("cr->in_cw_set"), (uint4)cr->in_cw_set, 0, CALLFROM);
 			}
 			assert(!JNL_ALLOWED(csd) || (NULL != jpc) && (NULL != jbp));
 			if (JNL_ENABLED(csd))
@@ -700,23 +703,23 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				{
 					assert(expect_damage);
 					ret = FALSE;
-					SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg), cr, cr->blk,
-						(uint4)cr->jnl_addr, RTS_ERROR_TEXT("cr->jnl_addr"), 0, jbp->rsrv_freeaddr);
+					SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg), cr, &cr->blk,
+						&cr->jnl_addr, RTS_ERROR_TEXT("cr->jnl_addr"), &nil, &jbp->rsrv_freeaddr);
 				}
 			} else if (!JNL_ALLOWED(csd) && (cr->jnl_addr != 0))
 			{
 				assert(expect_damage);
 				ret = FALSE;
 				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->jnl_addr"), (uint4)cr->jnl_addr, 0, CALLFROM);
+					cr, &(cr->blk), RTS_ERROR_TEXT("cr->jnl_addr"), (uint4)cr->jnl_addr, 0, CALLFROM);
 			}
 			if ((WRITE_LATCH_VAL(cr) < LATCH_CLEAR) || (WRITE_LATCH_VAL(cr) > LATCH_CONFLICT))
 			{	/* the message would read cr->interlock.semaphore although in Unix it means cr->interlock.latch */
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg), cr, cr->blk,
-					WRITE_LATCH_VAL(cr), RTS_ERROR_TEXT("cr->interlock.semaphore"), LATCH_CLEAR,
-					LATCH_CONFLICT);
+				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg), cr, &cr->blk,
+					&WRITE_LATCH_VAL(cr), RTS_ERROR_TEXT("cr->interlock.semaphore"), &nil,
+					&latch_conflict);
 			}
 			/* "cycle" is a relative timestamp with no characteristics useful to verify. So skip that*/
 			/* If "cr->stopped" is TRUE, then "cr->twin" can be non-zero (special case for "secshr_db_clnup"
@@ -726,7 +729,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
+				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, &(cr->blk),
 					RTS_ERROR_TEXT("cr->stopped"), cr->stopped, FALSE, CALLFROM);
 			}
 			if (0 != cr->twin)
@@ -739,13 +742,13 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					{
 						assert(expect_damage);
 						ret = FALSE;
-						SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
-							cr, cr->blk, cr_tmp, RTS_ERROR_TEXT("cr->twin"), cr_lo, cr_hi);
+						SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg),
+							cr, &cr->blk, &cr_tmp, RTS_ERROR_TEXT("cr->twin"), &cr_lo, &cr_hi);
 					} else if (CR_NOT_ALIGNED(cr_tmp, cr_lo))
 					{
 						assert(expect_damage);
 						ret = FALSE;
-						SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), cr, cr->blk,
+						SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), cr, &cr->blk,
 							RTS_ERROR_TEXT("cr->twin"), cr_tmp, cr_lo, SIZEOF(cache_rec));
 					} else
 					{	/* We expect a two-way link. */
@@ -755,7 +758,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 							assert(expect_damage);
 							ret = FALSE;
 							SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr_tmp,
-								cr->blk, RTS_ERROR_TEXT("cr->twin->twin"),
+								&(cr->blk), RTS_ERROR_TEXT("cr->twin->twin"),
 								GDS_ANY_REL2ABS(csa, cr_tmp->twin),
 								cr, CALLFROM);
 						}
@@ -765,7 +768,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					assert(expect_damage);
 					ret = FALSE;
 					SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
-						 cr, cr->blk, RTS_ERROR_TEXT("cr->twin"), cr->twin, 0, CALLFROM);
+						 cr, &(cr->blk), RTS_ERROR_TEXT("cr->twin"), cr->twin, 0, CALLFROM);
 				}
 				/* One twin's bt_index has to be zero and another non-zero.
 				 * The only exception is if this is a "kill -9" situation in which case the process
@@ -788,7 +791,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				assert(expect_damage);
 				ret = FALSE;
 				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->epid"), cr->epid, 0, CALLFROM);
+					cr, &(cr->blk), RTS_ERROR_TEXT("cr->epid"), cr->epid, 0, CALLFROM);
 			}
 		}
 		/* loop through the cr blkques */
@@ -798,8 +801,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr0, cr0->blk,
-					RTS_ERROR_TEXT("queue head cr->blk"), cr0->blk, BT_QUEHEAD, CALLFROM);
+				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr0, &(cr0->blk),
+					     RTS_ERROR_TEXT("queue head cr->blk"), &(cr0->blk), &bt_qhead8, CALLFROM);
 				cr0->blk = BT_QUEHEAD;
 			}
 			for (cr_prev = cr0, cr = (cache_rec_ptr_t)((sm_uc_ptr_t)cr0 + cr0->blkque.fl), cnt = n_bts + 1;
@@ -819,14 +822,14 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					assert(expect_damage);
 					ret = FALSE;
 					SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg),
-						cr0, -1, RTS_ERROR_TEXT("cr->blkque"), cr, cr_lo, SIZEOF(cache_rec));
+						cr0, &minus1, RTS_ERROR_TEXT("cr->blkque"), cr, cr_lo, SIZEOF(cache_rec));
 					break;
 				}
 				if ((cache_rec_ptr_t)((sm_uc_ptr_t)cr + cr->blkque.bl) != cr_prev)
 				{
 					assert(expect_damage);
 					ret = FALSE;
-					SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cr, cr->blk,
+					SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cr, &cr->blk,
 						RTS_ERROR_TEXT("cr->blkque.bl"), (UINTPTR_T)cr->blkque.bl,
 						(sm_uc_ptr_t)cr_prev - (sm_uc_ptr_t)cr);
 				}
@@ -834,7 +837,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				{
 					assert(expect_damage);
 					ret = FALSE;
-					SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
+					SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, &(cr->blk),
 						RTS_ERROR_TEXT("cr hash"), cr0 - cr_qbase, cr->blk % csd->bt_buckets, CALLFROM);
 					if (caller_is_wcs_recover && !cr->stopped)
 					{	/* if cr->stopped is TRUE, then the buffer was created by "secshr_db_clnup",
@@ -868,7 +871,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				{	/* No point proceeding to next iteration as "cr + cr->blkque.fl" will be the same as "cr" */
 					assert(expect_damage);
 					ret = FALSE;
-					SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cr, cr->blk,
+					SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cr, &cr->blk,
 						RTS_ERROR_TEXT("cr->blkque.fl"), (UINTPTR_T)cr->blkque.fl, (UINTPTR_T)-1);
 					break;
 				}
@@ -877,13 +880,13 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg),
-					cr_qbase, 0, RTS_ERROR_TEXT("crque entries"), (UINTPTR_T)(n_bts + 1), (UINTPTR_T)(n_bts));
+				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cr_qbase, &nil,
+					RTS_ERROR_TEXT("crque entries"), (UINTPTR_T)(n_bts + 1), (UINTPTR_T)(n_bts));
 			} else if ((cr == cr0) && ((cache_rec_ptr_t)((sm_uc_ptr_t)cr + cr->blkque.bl) != cr_prev))
 			{	/* at this point "cr" is cr0 and its backlink does not point to last entry in the cr0'th queue */
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cr, cr->blk,
+				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cr, &cr->blk,
 					RTS_ERROR_TEXT("crque cr_base"), (UINTPTR_T)cr->blkque.bl,
 					(sm_uc_ptr_t)cr_prev - (sm_uc_ptr_t)cr);
 			}
@@ -895,7 +898,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
+				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, &(cr->blk),
 					RTS_ERROR_TEXT("cr blkque hash"), -1, cr->blk % csd->bt_buckets, CALLFROM);
 				if (caller_is_wcs_recover && !cr->stopped) /* see comment above ("cr hash") for similar handling */
 				{
@@ -909,7 +912,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), que_head, 0, RTS_ERROR_TEXT("cacheq_active"),
+			SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), que_head, &nil,
+				RTS_ERROR_TEXT("cacheq_active"),
 				que_head, ((sm_long_t)que_head / SIZEOF(que_head->fl)) * SIZEOF(que_head->fl));
 		}
 		if ((0 != que_head->fl) != (0 != que_head->bl))
@@ -918,10 +922,10 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			ret = FALSE;
 			if (que_head->fl)
 				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg),
-					que_head, 0, RTS_ERROR_TEXT("cacheq_active1"), (UINTPTR_T)que_head->fl, 0);
+					que_head, &nil, RTS_ERROR_TEXT("cacheq_active1"), (UINTPTR_T)que_head->fl, 0);
 			else
 				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg),
-					que_head, 0, RTS_ERROR_TEXT("cacheq_active2"), (UINTPTR_T)que_head->bl, 0);
+					que_head, &nil, RTS_ERROR_TEXT("cacheq_active2"), (UINTPTR_T)que_head->bl, 0);
 		}
 		/* loop through the active queue */
 		for (cstt_prev = (cache_state_rec_ptr_t)que_head,
@@ -942,7 +946,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), que_head, -1,
+				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), que_head, &minus1,
 					RTS_ERROR_TEXT("active cstt->state_que"), cr, cr_lo, SIZEOF(cache_rec));
 				break;
 			}
@@ -950,7 +954,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, cstt->blk,
+				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, &cstt->blk,
 					RTS_ERROR_TEXT("active queue.bl"), (UINTPTR_T)cstt->state_que.bl,
 					(sm_uc_ptr_t)cstt_prev - (sm_uc_ptr_t)cstt);
 			}
@@ -959,8 +963,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				assert(expect_damage);
 				ret = FALSE;
 				dummy_tn = (trans_num)TRUE;
-				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr, cstt->blk,
-					RTS_ERROR_TEXT("active cr->dirty"), &cstt->dirty, &dummy_tn, CALLFROM);
+				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr, &(cstt->blk),
+					RTS_ERROR_TEXT("active cr->dirty"), &(cstt->dirty), &dummy_tn, CALLFROM);
 			}
 			if (((0 != cstt->flushed_dirty_tn) && (cstt->dirty <= cstt->flushed_dirty_tn))
 				|| (cstt->dirty > csd->trans_hist.curr_tn))
@@ -968,7 +972,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				assert(expect_damage);
 				ret = FALSE;
 				dummy_tn = cstt->flushed_dirty_tn + 1;
-				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg), cstt + SIZEOF(que_head), cstt->blk,
+				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg), cstt + SIZEOF(que_head), &cstt->blk,
 					&cstt->dirty, RTS_ERROR_TEXT("active dirty (tn)"), &dummy_tn, &csd->trans_hist.curr_tn);
 			}
 			/* if caller_is_wcs_recover, we would have waited for all writers to stop manipulating the active/wip queues
@@ -980,7 +984,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{	/* No point proceeding to next iteration as "cstt + cstt->state_que.fl" will be same as "cstt" */
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, cstt->blk,
+				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, &cstt->blk,
 					RTS_ERROR_TEXT("active queue.fl"), (UINTPTR_T)cstt->state_que.fl, (UINTPTR_T)-1);
 				break;
 			}
@@ -990,13 +994,14 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			assert(expect_damage);
 			ret = FALSE;
 			SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg),
-				que_head, 0, RTS_ERROR_TEXT("active queue entries"), (UINTPTR_T)(n_bts + 1), (UINTPTR_T)n_bts);
+				que_head, &nil, RTS_ERROR_TEXT("active queue entries"), (UINTPTR_T)(n_bts + 1), (UINTPTR_T)n_bts);
 		} else if ((cstt == (cache_state_rec_ptr_t)que_head)
 			&& ((cache_state_rec_ptr_t)((sm_uc_ptr_t)cstt + cstt->state_que.bl) != cstt_prev))
 		{	/* at this point "cstt" is active que_head and its backlink does not point to last entry in active queue */
 			assert(expect_damage);
 			ret = FALSE;
-			SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, 0, RTS_ERROR_TEXT("active queue base"),
+			SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, &nil,
+				RTS_ERROR_TEXT("active queue base"),
 				(UINTPTR_T)cstt->state_que.bl, (sm_uc_ptr_t)cstt_prev - (sm_uc_ptr_t)cstt);
 		}
 		/* loop through the wip queue */
@@ -1005,7 +1010,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), que_head, 0, RTS_ERROR_TEXT("cacheq_wip"),
+			SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), que_head, &nil, RTS_ERROR_TEXT("cacheq_wip"),
 				que_head, ((sm_long_t)que_head / SIZEOF(que_head->fl)) * SIZEOF(que_head->fl));
 		}
 		if ((0 != que_head->fl) != (0 != que_head->bl))
@@ -1014,10 +1019,10 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			ret = FALSE;
 			if (que_head->fl)
 				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg),
-					que_head, 0, RTS_ERROR_TEXT("cacheq_wip1"), (UINTPTR_T)que_head->fl, 0);
+					que_head, &nil, RTS_ERROR_TEXT("cacheq_wip1"), (UINTPTR_T)que_head->fl, 0);
 			else
 				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg),
-					que_head, 0, RTS_ERROR_TEXT("cacheq_wip2"), (UINTPTR_T)que_head->bl, 0);
+					que_head, &nil, RTS_ERROR_TEXT("cacheq_wip2"), (UINTPTR_T)que_head->bl, 0);
 		}
 		for (cstt_prev = (cache_state_rec_ptr_t)que_head,
 				cstt = (cache_state_rec_ptr_t)((sm_uc_ptr_t)que_head + que_head->fl), cnt = n_bts;
@@ -1037,7 +1042,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), que_head, -1,
+				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), que_head, &minus1,
 					RTS_ERROR_TEXT("wip cstt->state_que"), cr, cr_lo, SIZEOF(cache_rec));
 				break;
 			}
@@ -1045,7 +1050,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, cstt->blk,
+				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, &cstt->blk,
 					RTS_ERROR_TEXT("wip queue.bl"), (UINTPTR_T)cstt->state_que.bl,
 					(sm_uc_ptr_t)cstt_prev - (sm_uc_ptr_t)cstt);
 			}
@@ -1054,15 +1059,15 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				assert(expect_damage);
 				ret = FALSE;
 				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
-					cr, cstt->blk, RTS_ERROR_TEXT("wip cr->epid"), cstt->epid, -1, CALLFROM);
+					cr, &(cstt->blk), RTS_ERROR_TEXT("wip cr->epid"), cstt->epid, -1, CALLFROM);
 			}
 			if (0 == cstt->dirty)
 			{
 				assert(expect_damage);
 				ret = FALSE;
 				dummy_tn = (trans_num)TRUE;
-				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr, cstt->blk,
-					RTS_ERROR_TEXT("wip cr->dirty"), &cstt->dirty, &dummy_tn, CALLFROM);
+				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr, &(cstt->blk),
+					RTS_ERROR_TEXT("wip cr->dirty"), &(cstt->dirty), &dummy_tn, CALLFROM);
 			}
 			if (((0 != cstt->flushed_dirty_tn) && (cstt->dirty <= cstt->flushed_dirty_tn))
 								|| (cstt->dirty > csd->trans_hist.curr_tn))
@@ -1071,7 +1076,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				ret = FALSE;
 				dummy_tn = cstt->flushed_dirty_tn + 1;
 				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg),
-					(sm_uc_ptr_t)cstt + SIZEOF(que_head), cstt->blk, &cstt->dirty,
+					(sm_uc_ptr_t)cstt + SIZEOF(que_head), &cstt->blk, &cstt->dirty,
 					RTS_ERROR_TEXT("wip dirty (tn)"), &dummy_tn, &csd->trans_hist.curr_tn);
 			}
 			/* if caller_is_wcs_recover, we would have waited for all writers to stop manipulating the active/wip queues
@@ -1083,7 +1088,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, cstt->blk,
+				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, &cstt->blk,
 					RTS_ERROR_TEXT("wip queue.fl"), (UINTPTR_T)cstt->state_que.fl, (UINTPTR_T)-1);
 				break;
 			}
@@ -1093,13 +1098,14 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			assert(expect_damage);
 			ret = FALSE;
 			SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg),
-				que_head, 0, RTS_ERROR_TEXT("wip queue entries"), (UINTPTR_T)(n_bts + 1), (UINTPTR_T)n_bts);
+				que_head, &nil, RTS_ERROR_TEXT("wip queue entries"), (UINTPTR_T)(n_bts + 1), (UINTPTR_T)n_bts);
 		} else if ((cstt == (cache_state_rec_ptr_t)que_head)
 				&& ((cache_state_rec_ptr_t)((sm_uc_ptr_t)cstt + cstt->state_que.bl) != cstt_prev))
 		{	/* at this point "cstt" is wip que_head and its backlink does not point to last entry in the wip queue */
 			assert(expect_damage);
 			ret = FALSE;
-			SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, 0, RTS_ERROR_TEXT("active queue base"),
+			SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, &nil,
+				RTS_ERROR_TEXT("active queue base"),
 				(UINTPTR_T)cstt->state_que.bl, (sm_uc_ptr_t)cstt_prev - (sm_uc_ptr_t)cstt);
 		}
 		/* if caller_is_wcs_recover, we would have waited for all writers to stop manipulating the active/wip queues
@@ -1118,10 +1124,10 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 						assert(expect_damage);
 						ret = FALSE;
 						dummy_tn = (trans_num)FALSE;
-						SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr, cr->blk,
-							RTS_ERROR_TEXT("non-state cr->dirty"), &cr->dirty, &dummy_tn, CALLFROM);
+						SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr, &(cr->blk),
+							RTS_ERROR_TEXT("non-state cr->dirty"), &(cr->dirty), &dummy_tn, CALLFROM);
 						SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
-							cr, cr->blk, RTS_ERROR_TEXT("cr->epid"), cr->epid, 0, CALLFROM);
+							cr, &(cr->blk), RTS_ERROR_TEXT("cr->epid"), cr->epid, 0, CALLFROM);
 					}
 				}
 			}

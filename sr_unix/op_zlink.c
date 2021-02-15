@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -172,11 +172,11 @@ void op_zlink (mval *v, mval *quals)
 	ARLINK_ONLY(recent_zhist = NULL);
 	MV_FORCE_STR(v);
 	if (!v->str.len)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
-			      RTS_ERROR_LITERAL("Filename/path is missing"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
+			RTS_ERROR_LITERAL("Filename/path is missing"));
 	if (MAX_FN_LEN < v->str.len)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
-			      RTS_ERROR_LITERAL("Filename/path exceeds max length"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
+			RTS_ERROR_LITERAL("Filename/path exceeds max length"));
 	DBGARLNK((stderr, "op_zlink: Call to (re)link routine %.*s\n", v->str.len, v->str.addr));
 	assert((SIZEOF(DOTM) == SIZEOF(DOTOBJ)) && (SIZEOF(srcnamebuf) == SIZEOF(objnamebuf)));
 	object_file_des = FD_INVALID;
@@ -189,10 +189,10 @@ void op_zlink (mval *v, mval *quals)
 	pblk.fop = F_SYNTAXO;
 	status = parse_file(&v->str, &pblk);
 	if (!(status & 1))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, v->str.len, v->str.addr, status);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2, v->str.len, v->str.addr, status);
 	if (pblk.fnb & F_WILD)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
-			      ERR_WILDCARD, 2, v->str.len, v->str.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
+			ERR_WILDCARD, 2, v->str.len, v->str.addr);
 	/* 4SCA: file.len is bounded by MAX_FN_LEN in parse_file() */
 	file.addr = pblk.buffer;
 	file.len = pblk.b_esl;
@@ -263,7 +263,7 @@ void op_zlink (mval *v, mval *quals)
 		if (NOTYPE == type)
 		{	/* No file extension specified - object done above, so do source */
 			if ((file.len + SIZEOF(DOTM)) > SIZEOF(srcnamebuf))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("Filename/path exceeds max length"));
 			memcpy(srcnamebuf, file.addr, file.len);
 			srcnamelen = file.len + SIZEOF(DOTM) - 1;
@@ -280,19 +280,19 @@ void op_zlink (mval *v, mval *quals)
 			{	/* Explicit ZLINK of object - don't locate source */
 				zro_search(&objstr, &objdir, NULL, NULL, SKIP_SHLIBS);
 				if (NULL == objdir)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.str.len,
-						      dollar_zsource.str.addr, ERR_FILENOTFND, 2, objnamelen, objnamebuf);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.str.len,
+						dollar_zsource.str.addr, ERR_FILENOTFND, 2, objnamelen, objnamebuf);
 			} else if (SRC == type)
 			{	/* Explicit ZLINK of source - locate both source and object*/
 				zro_search(&objstr, &objdir, &srcstr, &srcdir, SKIP_SHLIBS);
 				if (NULL == srcdir)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.str.len,
-						      dollar_zsource.str.addr, ERR_FILENOTFND,2, srcnamelen, srcnamebuf);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.str.len,
+						dollar_zsource.str.addr, ERR_FILENOTFND,2, srcnamelen, srcnamebuf);
 			} else
 			{	/* Explicit ZLINK no file type specified - locate both source and object */
 				zro_search(&objstr, &objdir, &srcstr, &srcdir, PROBE_SHLIBS);
 				if ((NULL == objdir) && (NULL == srcdir))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_ZLINKFILE, 2, dollar_zsource.str.len,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(12) ERR_ZLINKFILE, 2, dollar_zsource.str.len,
 						dollar_zsource.str.addr, ERR_FILENOTFND,2, srcnamelen, srcnamebuf,
 						ERR_FILENOTFND,2, objnamelen, objnamebuf);
 			}
@@ -315,8 +315,8 @@ void op_zlink (mval *v, mval *quals)
 		zro_search(&objstr, &objdir, &srcstr, &srcdir, PROBE_SHLIBS);
 		if (NULL == srcdir)
 			if (NULL == objdir)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
-				      ERR_FILENOTFND, 2, srcnamelen, srcnamebuf, ERR_FILENOTFND, 2, objnamelen, objnamebuf);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(12) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
+					ERR_FILENOTFND, 2, srcnamelen, srcnamebuf, ERR_FILENOTFND, 2, objnamelen, objnamebuf);
 		else if (NULL == objdir)
 			type = SRC;
 	}
@@ -326,8 +326,8 @@ void op_zlink (mval *v, mval *quals)
 		{	/* Object file found via zro_search() */
 			assert(ZRO_TYPE_OBJLIB != objdir->type);
 			if ((objdir->str.len + objnamelen + 2) > (SIZEOF(objnamebuf) - 1))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
-					      RTS_ERROR_LITERAL("Filename/path exceeds max length"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Filename/path exceeds max length"));
 			if (objdir->str.len)
 			{
 				tslash = ('/' == objdir->str.addr[objdir->str.len - 1]) ? 0 : 1;
@@ -346,13 +346,13 @@ void op_zlink (mval *v, mval *quals)
 		OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, object_file_des);
 		if (FD_INVALID == object_file_des)
 		{	/* Could not find object file */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 		}
 		/* Note - if explicit ZLINK, objdir can be NULL if link is from a directory not mentioned in $ZROUTINES */
 		CHECK_OBJECT_HISTORY(objnamebuf, objdir, RECENT_ZHIST);
 		if (IL_RECOMPILE == INCR_LINK(&object_file_des, objdir, RECENT_ZHIST, objnamelen, objnamebuf))
 		{
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_VERSION);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_VERSION);
 		}
 		CLOSE_OBJECT_FD(object_file_des, status);
 	} else
@@ -361,8 +361,8 @@ void op_zlink (mval *v, mval *quals)
 		{	/* A source directory containing routine was found by zro_search() */
 			assert(ZRO_TYPE_OBJLIB != objdir->type);
 			if ((srcdir->str.len + srcnamelen) > (SIZEOF(srcnamebuf) - 1))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
-					      RTS_ERROR_LITERAL("Filename/path exceeds max length"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Filename/path exceeds max length"));
 			if (srcdir->str.len)
 			{
 				tslash = ('/' == srcdir->str.addr[srcdir->str.len - 1]) ? 0 : 1;
@@ -390,8 +390,8 @@ void op_zlink (mval *v, mval *quals)
 				return;
 			}
 			if ((objdir->str.len + objnamelen) > (SIZEOF(objnamebuf) - 1))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
-					      RTS_ERROR_LITERAL("Filename/path exceeds max length"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Filename/path exceeds max length"));
 			if (objdir->str.len)
 			{
 				tslash = ('/' == objdir->str.addr[objdir->str.len - 1]) ? 0 : 1;
@@ -419,8 +419,8 @@ void op_zlink (mval *v, mval *quals)
 				if (ENOENT != save_errno)
 				{
 					err_code = STRERROR(save_errno);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, objnamelen, objnamebuf,
-						      ERR_TEXT, 2, LEN_AND_STR(err_code));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, objnamelen, objnamebuf,
+						ERR_TEXT, 2, LEN_AND_STR(err_code));
 				}
 			} else
 				obj_found = TRUE;
@@ -440,7 +440,7 @@ void op_zlink (mval *v, mval *quals)
 				if (FD_INVALID != object_file_des)	/* Chose object file if open, ignore error */
 					CLOSE_OBJECT_FILE(object_file_des, status);
 				err_code = STRERROR(save_errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
 					ERR_TEXT, 2, LEN_AND_STR(err_code));
 			}
 		} else
@@ -460,7 +460,7 @@ void op_zlink (mval *v, mval *quals)
 						if (FD_INVALID != object_file_des)	/* Close object file if open */
 							CLOSE_OBJECT_FILE(object_file_des, status);
 						err_code = STRERROR(save_errno);
-						rts_error_csa(CSA_ARG(NULL)VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
 							ERR_TEXT, 2, LEN_AND_STR(err_code));
 					}
 					if ((src_stat.st_mtime > obj_stat.st_mtime) || ((src_stat.st_mtime == obj_stat.st_mtime)
@@ -477,8 +477,8 @@ void op_zlink (mval *v, mval *quals)
 			} else if (!obj_found)
 			{
 				assert(FD_INVALID == object_file_des);	/* Make sure closed */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
-					      ERR_FILENOTFND, 2, objnamelen, objnamebuf);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
+					ERR_FILENOTFND, 2, objnamelen, objnamebuf);
 			}
 		}
 		if (compile)
@@ -487,7 +487,7 @@ void op_zlink (mval *v, mval *quals)
 			if (!(qlf & CQ_OBJECT) && (SRC != type))
 			{
 				assert(FD_INVALID == object_file_des);	/* Make sure no object file open */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_ZLNOOBJECT);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_ZLNOOBJECT);
 			}
 			COMBINE_OBJ_DIR_W_NAME();
 			zlcompile(srcnamelen, (uchar_ptr_t)srcnamebuf);
@@ -504,7 +504,7 @@ void op_zlink (mval *v, mval *quals)
 			{
 				save_errno = errno;
 				err_code = STRERROR(save_errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
 					ERR_ZLNOOBJECT, 0, ERR_TEXT, 2, LEN_AND_STR(err_code));
 			}
 		} else
@@ -521,7 +521,7 @@ void op_zlink (mval *v, mval *quals)
 		{	/* Failure due only to version mismatch, so recompile */
 			assertpro(!compile);
 			if (!src_found)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, ERR_FILENOTFND,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, ERR_FILENOTFND,
 					2, srcnamelen, srcnamebuf, ERR_VERSION);
 			if (!compile)
 			{

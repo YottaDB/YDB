@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2004-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +15,7 @@
 bool	gtcmtr_bufflush(void);
 bool	gtcmtr_data(void);
 bool	gtcmtr_get(void);
+unsigned char *gtcmtr_get_key(void *gvkey, unsigned char *ptr, unsigned short len);
 bool	gtcmtr_increment(void);
 bool	gtcmtr_initproc(void);
 bool	gtcmtr_initreg(void);

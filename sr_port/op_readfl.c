@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,7 +65,7 @@ int op_readfl(mval *v, int4 length, mval *timeout)
 	 */
 	b_length = (!IS_UTF_CHSET(io_curr_device.in->ichset)) ? length : (length * 4);
 	if (0 >= length)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RDFLTOOSHORT);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RDFLTOOSHORT);
 	/* This check is more useful in "M" mode. For UTF-8 mode, checks have to be done while reading */
 	if (MAX_STRLEN < length)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RDFLTOOLONG);

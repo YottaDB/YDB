@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,11 +72,11 @@ void op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label,
 	{
 #		ifdef GTM_TRIGGER
 		if ((NULL != rtn_vector) && (NULL != rtn_vector->trigr_handle))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGNAMENF, 2, rtn->str.len, rtn->str.addr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TRIGNAMENF, 2, rtn->str.len, rtn->str.addr);
 #		endif
 		/* get_src_line did not find the object file to load */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, rtn->str.len, rtn->str.addr,
-			  ERR_ZLMODULE, 2, mid_len(&zlink_mname), &zlink_mname.c[0]);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, rtn->str.len, rtn->str.addr,
+			ERR_ZLMODULE, 2, mid_len(&zlink_mname), &zlink_mname.c[0]);
 	}
 	/* In case of GTM_TRIGGER, rtn_vector would have been initialized in the call to get_src_line above.
 	 * We need to use that and not do a find_rtn_hdr as rtn->str might contain region-name disambiguator
@@ -87,10 +87,10 @@ void op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label,
 	NON_GTMTRIG_ONLY(assert(rtn_vector2 == rtn_vector);)
 	assertpro(NULL != rtn_vector);	/* If couldn't find module, should have returned OBJMODMISS */
 	if (stat1 & LABELNOTFOUND)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZPRTLABNOTFND);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZPRTLABNOTFND);
 	if (stat1 & SRCNOTFND)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILENOTFND, 2,
-				rtn_vector->src_full_name.len, rtn_vector->src_full_name.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_FILENOTFND, 2,
+			rtn_vector->src_full_name.len, rtn_vector->src_full_name.addr);
 	if (stat1 & (SRCNOTAVAIL | AFTERLASTLINE))
 		return;
 	if (stat1 & (ZEROLINE | NEGATIVELINE))
@@ -104,7 +104,7 @@ void op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label,
 	if (end_int_exp == 0 && (end_label->str.len == 0 || *end_label->str.addr == 0))
 		stat2 = AFTERLASTLINE;
 	else if ((stat2 = get_src_line(rtn, end_label, end_int_exp, &src2, NULL)) & LABELNOTFOUND)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZPRTLABNOTFND);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZPRTLABNOTFND);
 	if (stat2 & (ZEROLINE | NEGATIVELINE))
 		return;
 	if (stat2 & AFTERLASTLINE)

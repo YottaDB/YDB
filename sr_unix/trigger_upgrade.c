@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2020 Fidelity National Information	*
+ * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -370,9 +370,9 @@ void	trigger_upgrade(gd_region *reg)
 				assert(is_defined);
 				currlabel = mval2i(tmpmv);
 				if ((V19_HASHT_GBL_LABEL_INT >= currlabel) || (HASHT_GBL_CURLABEL_INT <= currlabel))
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_TRIGUPBADLABEL, 6, currlabel,
-							HASHT_GBL_CURLABEL_INT, gvname->str.len, gvname->str.addr,
-							REG_LEN_STR(reg));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_TRIGUPBADLABEL, 6, currlabel,
+						HASHT_GBL_CURLABEL_INT, gvname->str.len, gvname->str.addr,
+						REG_LEN_STR(reg));
 				/* Set ^#t(<gvn>,"#LABEL")=HASHT_GBL_CURLABEL */
 				gvtr_set_hasht_gblsubs((mval *)&literal_hashlabel, (mval *)&literal_curlabel);
 			} else

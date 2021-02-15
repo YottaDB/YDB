@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 Fidelity National Information	*
+ * Copyright (c) 2018-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -248,8 +248,8 @@ void lke_clean(void)
 									(MLK_SUBHASH_RES_VAL(hashres) != check_bucket->hash))
 							{
 								REL_LOCK_CRIT(pvtblk.pvtctl, was_crit);
-								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MLKHASHWRONG,
-										2, LEN_AND_LIT("Can't correct, exiting."));
+								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_MLKHASHWRONG,
+									2, LEN_AND_LIT("Can't correct, exiting."));
 							}
 						}
 					}
@@ -298,8 +298,8 @@ void lke_clean(void)
 							if (!IS_NEIGHBOR(usedmap, bucket_offset))
 							{
 								REL_LOCK_CRIT(pvtblk.pvtctl, was_crit);
-								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MLKHASHWRONG,
-											2, LEN_AND_LIT("Can't correct, exiting."));
+								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_MLKHASHWRONG,
+									2, LEN_AND_LIT("Can't correct, exiting."));
 							}
 						}
 					}
@@ -311,7 +311,7 @@ void lke_clean(void)
 			}
 		}
 		if (!match && (0 != regname.len))
-			rts_error_csa(NULL, VARLSTCNT(4) ERR_NOREGION, 2, regname.len, regname.addr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NOREGION, 2, regname.len, regname.addr);
 		if (!repeat)
 			break;
 		clock_gettime(CLOCK_MONOTONIC, &end_clock);

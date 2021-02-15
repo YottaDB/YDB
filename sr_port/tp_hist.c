@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,7 @@
 #include "copy.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"
+#include "hashtab_int8.h"
 #include "tp.h"
 #include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
@@ -92,7 +92,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	enum cdb_sc		status = cdb_sc_normal;
 	boolean_t		is_mm, store_history, was_crit;
 	sgm_info		*si;
-	ht_ent_int4		*tabent, *lookup_tabent;
+	ht_ent_int8		*tabent, *lookup_tabent;
 	cw_set_element		*cse;
 	cache_rec_ptr_t		cr;
 	sgmnt_addrs		*csa;
@@ -329,20 +329,20 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 			{
 				assert(si->cw_set_depth || !t1->cse);
 				local_hash_entry = t1->first_tp_srch_status;
-				DEBUG_ONLY(lookup_tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&blk));
+				DEBUG_ONLY(lookup_tabent = lookup_hashtab_int8(si->blks_in_use, (ublock_id *)&blk));
 				ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(local_hash_entry, si);
-				if ((NULL == local_hash_entry) && add_hashtab_int4(si->blks_in_use, (uint4 *)&blk,
+				if ((NULL == local_hash_entry) && add_hashtab_int8(si->blks_in_use, (gtm_uint8 *)&blk,
 									(void *)(si->last_tp_hist), &tabent))
 				{	/* not a duplicate block */
 					assert(NULL == lookup_tabent);
 					if (++si->num_of_blks > si->tp_hist_size)
 					{	/* catch the case where MUPIP recover or update process gets into this situation */
 						assert(!mupip_jnl_recover && !is_updproc);
-						delete_hashtab_int4(si->blks_in_use,(uint4 *)&blk);
+						delete_hashtab_int8(si->blks_in_use,(ublock_id *)&blk);
 						si->num_of_blks--;
 						assert(si->num_of_blks == si->tp_hist_size);
-						rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRANS2BIG, 2,
-								REG_LEN_STR(gv_cur_region));
+						RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_TRANS2BIG, 2,
+							REG_LEN_STR(gv_cur_region));
 					}
 					/* Either history has a clue or not.
 					 * If yes, then it could have been constructed in an earlier
@@ -489,7 +489,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 {
 	gv_namehead		*gvnh;
-	ht_ent_int4		*tabent, *topent;
+	ht_ent_int8		*tabent, *topent;
 	sm_long_t               delta;
 	srch_blk_status 	*new_first_tp_hist, *t1;
 	tlevel_info		*tli;
@@ -504,7 +504,7 @@ void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 	delta = (sm_long_t)((sm_uc_ptr_t)new_first_tp_hist - (sm_uc_ptr_t)si->first_tp_hist);
 	for (tabent = si->blks_in_use->base, topent = si->blks_in_use->top; tabent < topent; tabent++)
 	{
-		if (HTENT_VALID_INT4(tabent, srch_blk_status, srch_stat))
+		if (HTENT_VALID_INT8(tabent, srch_blk_status, srch_stat))
 		{
 			REPOSITION_PTR(srch_stat, srch_blk_status, delta, si->first_tp_hist, si->last_tp_hist);
 			tabent->value = (void *)srch_stat;

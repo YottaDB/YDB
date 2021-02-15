@@ -82,7 +82,7 @@ error_def(ERR_DBNONUMSUBS);
 
 #define BITS_PER_UCHAR	8
 #define BLKS_PER_UINT4	((SIZEOF(uint4) / SIZEOF(unsigned char)) * BITS_PER_UCHAR) / BML_BITS_PER_BLK
-#define BLOCK_WINDOW 8
+#define BLOCK_WINDOW MAX_HEX_DIGITS_IN_INT8
 #define LEVEL_WINDOW 2
 #define OFFSET_WINDOW 4
 
@@ -143,7 +143,8 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 	off_chain		chain;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	boolean_t		is_gvt, is_directory, first_key, full, prev_char_is_delimiter;
+	boolean_t		is_gvt, is_directory, first_key, full, prev_char_is_delimiter, long_blk_id;
+	int4			blk_id_sz;
 	unsigned int		null_subscript_cnt;
 	unsigned int		rec_num;
 	unsigned char		key_buffer[MAX_ZWR_KEY_SZ];
@@ -161,6 +162,8 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 	blk_levl = bp->levl;
 	blk_size = bp->bsiz;
 	offset_mm = blk / (block_id)bplmap;
+	long_blk_id = IS_64_BLK_ID(bp);
+	blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 	util_len=0;
 	assert((STRLEN(TEXT1) + OFFSET_WINDOW + STRLEN(TEXT2)) == STRLEN(TEXT3));
 	MEMCPY_LIT(&util_buff[util_len], TEXT0);
@@ -264,7 +267,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 		}
 	} else
 	{	/* index block */
-		if (blk_size < (uint4)(SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + SIZEOF(block_id)))
+		if (blk_size < ((uint4)(SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + blk_id_sz)))
 		{	/* must have at least one record */
 			RTS_ERROR_FUNC(csa, ERR_DBBSIZMN, util_buff, error_action, NULL);
 			return FALSE;
@@ -342,7 +345,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 		}
 		if (r_top == (rec_hdr_ptr_t)blk_top && blk_levl)
 		{	/* star key */
-			if (rec_size != SIZEOF(rec_hdr) + SIZEOF(block_id))
+			if (rec_size != bstar_rec_size(long_blk_id))
 			{
 				RTS_ERROR_FUNC(csa, ERR_DBSTARSIZ, util_buff, error_action, NULL);
 				return FALSE;
@@ -425,7 +428,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 				RTS_ERROR_FUNC(csa, ERR_DBMAXNRSUBS, util_buff, error_action, NULL);
 				return FALSE;
 			}
-			if (blk_levl && (key_size != (rec_size - SIZEOF(block_id) - SIZEOF(rec_hdr))))
+			if (blk_levl && (key_size != (rec_size - blk_id_sz - SIZEOF(rec_hdr))))
 			{
 				RTS_ERROR_FUNC(csa, ERR_DBKEYMN, util_buff, error_action, NULL);
 				return FALSE;
@@ -504,7 +507,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 		/* Check for proper child block numbers */
 		if ((0 != blk_levl) || (0 != is_directory))
 		{
-			GET_BLK_ID(child, blk_id_ptr);
+			READ_BLK_ID(long_blk_id, &child, blk_id_ptr);
 			chain = *(off_chain *)&child;
 			/* In TP, child block number can be greater than the total_blks for blocks created within TP.
 			 * Dont do any checks on such blocks.

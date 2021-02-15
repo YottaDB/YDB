@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,7 +74,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	}
 	tt_ptr = (d_tt_struct *)dev_name->iod->dev_sp;
 	if (tt_ptr->mupintr)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 	p_offset = 0;
 	old_ichset = ioptr->ichset;
 	old_ochset = ioptr->ochset;
@@ -103,7 +103,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
 			SET_ENCODING(temp_chset, &chset_mstr);
 			if (IS_UTF16_CHSET(temp_chset))		/* Not allowed for terminals */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, chset_mstr.len, chset_mstr.addr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2, chset_mstr.len, chset_mstr.addr);
 			else
 			{
 				switch(ch)
@@ -136,7 +136,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			save_errno = errno;
 			if (gtm_isanlp(tt_ptr->fildes) == 0)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		if (IS_GTM_IMAGE)
 			/* Only the true runtime runs with the modified terminal settings */

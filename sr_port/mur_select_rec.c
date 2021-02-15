@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Copyright (c) 2003-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -206,7 +206,7 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 		for (lll_ptr = mur_options.seqno;  NULL != lll_ptr;  lll_ptr = lll_ptr->next)
 		{
 			SET_FLAG_IF_INCLUDE_PATTERN_SEEN(lll_ptr);
-			if (lll_ptr->seqno == rec_token_seq)
+			if (lll_ptr->u.seqno == rec_token_seq)
 				SET_INCFLAG_OR_RETURN(lll_ptr);
 		}
 		RETURN_IF_ITEM_DOESNT_MATCH_ANY_INCLUDE_PATTERN;

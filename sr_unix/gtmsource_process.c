@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2019 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -336,8 +336,8 @@ static void repl_tr_endian_convert(repl_msg_ptr_t send_msgp, int send_tr_len, se
 		if ((-1 == status) || (0 != jlen))
 		{
 			assert(FALSE);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLXENDIANFAIL, 3,
-					LEN_AND_LIT("Originating"), &pre_read_seqno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLXENDIANFAIL, 3,
+				LEN_AND_LIT("Originating"), &pre_read_seqno);
 		}
 		/* move on to the next transaction */
 		remaining_len -= (buflen + REPL_MSG_HDRLEN);
@@ -638,8 +638,8 @@ void gtmsource_recv_ctl(void)
 					"Error receiving Control message from Receiver. Error in select : %s",
 					STRERROR(status));
 			SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_string));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					 LEN_AND_STR(err_string));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				LEN_AND_STR(err_string));
 		}
 	}
 }
@@ -839,8 +839,8 @@ int gtmsource_process(void)
 				{
 					SNPRINTF(err_string, SIZEOF(err_string),
 							"Error receiving RESTART SEQNO. Error in recv : %s", STRERROR(status));
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-							 LEN_AND_STR(err_string));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+						LEN_AND_STR(err_string));
 				}
 			} else if (EREPL_SEND == repl_errno)
 			{
@@ -875,15 +875,15 @@ int gtmsource_process(void)
 						"Error sending XOFF_ACK_ME message. Error in send : %s\n",
 							STRERROR(status));
 					SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_string));
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						LEN_AND_STR(err_string));
 				}
 			} else if (EREPL_SELECT == repl_errno)
 			{
 				SNPRINTF(err_string, SIZEOF(err_string), "Error receiving RESTART SEQNO/sending XOFF_ACK_ME.  "
 						"Error in select : %s", STRERROR(status));
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-						 LEN_AND_STR(err_string));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+					LEN_AND_STR(err_string));
 			}
 		}
 		if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
@@ -1762,8 +1762,8 @@ int gtmsource_process(void)
                                                                 	"Error sending DATA. Error in send : %s",
 										STRERROR(status));
 								SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_string));
-								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0,
-									 ERR_TEXT, 2, LEN_AND_STR(err_string));
+								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0,
+									ERR_TEXT, 2, LEN_AND_STR(err_string));
 							}
 						}
 						if (EREPL_SELECT == repl_errno)
@@ -1772,8 +1772,8 @@ int gtmsource_process(void)
 								"Error sending DATA. Error in select : %s",
 											STRERROR(status));
 							SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_string));
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-								  LEN_AND_STR(err_string));
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+								LEN_AND_STR(err_string));
 						}
 					}
 					if (intfilter_error)

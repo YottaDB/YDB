@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,12 +36,12 @@
 #include "t_write.h"
 #include "mupip_reorg.h"
 
-GBLREF gv_namehead	*gv_target;
-GBLREF sgmnt_data_ptr_t cs_data;
-GBLREF uint4		update_array_size;	/* for the BLK_* macros */
-GBLREF char		*update_array, *update_array_ptr;
-GBLREF unsigned int     t_tries;
-GBLREF uint4		t_err;
+GBLREF	gv_namehead	*gv_target;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	uint4		update_array_size;	/* for the BLK_* macros */
+GBLREF	char		*update_array, *update_array_ptr;
+GBLREF	unsigned int	t_tries;
+GBLREF	uint4		t_err;
 
 /**************************************************************************************
 	Input Parameters:
@@ -55,26 +55,26 @@ enum cdb_sc mu_reduce_level(kill_set *kill_set_ptr)
 	int		old_blk_sz;
 	int		blk_seg_cnt, blk_size;
 	blk_segment	*bs_ptr1, *bs_ptr2;
-	sm_uc_ptr_t 	old_blk_base, save_blk;
+	sm_uc_ptr_t	old_blk_base, save_blk;
 
 	level = gv_target->hist.depth;
 	if (1 == level)
 		return cdb_sc_oprnotneeded;
 
- 	blk_size = cs_data->blk_size;
+	blk_size = cs_data->blk_size;
 	kill_set_ptr->used = 0;
 	memset(kill_set_ptr, 0, SIZEOF(kill_set));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	old_blk_base = gv_target->hist.h[level].buffaddr;
 	old_blk_sz = ((blk_hdr_ptr_t)(old_blk_base))->bsiz;
-	if (SIZEOF(blk_hdr) + BSTAR_REC_SIZE != old_blk_sz)
+	if ((SIZEOF(blk_hdr) + bstar_rec_size(BLK_ID_32_VER < ((blk_hdr_ptr_t)old_blk_base)->bver)) != old_blk_sz)
 		return cdb_sc_oprnotneeded;
 	old_blk_base = gv_target->hist.h[level-1].buffaddr;
 	old_blk_sz = ((blk_hdr_ptr_t)(old_blk_base))->bsiz;
 	BLK_ADDR(save_blk, old_blk_sz - SIZEOF(blk_hdr), unsigned char);
 	memcpy(save_blk, old_blk_base + SIZEOF(blk_hdr), old_blk_sz - SIZEOF(blk_hdr));
 	BLK_INIT(bs_ptr2, bs_ptr1);
-    	BLK_SEG(bs_ptr2, save_blk, old_blk_sz - SIZEOF(blk_hdr));
+	BLK_SEG(bs_ptr2, save_blk, old_blk_sz - SIZEOF(blk_hdr));
 	if (!BLK_FINI(bs_ptr2, bs_ptr1))
 	{
 		assert(t_tries < CDB_STAGNATE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,19 +77,19 @@ void op_use(mval *v, mval *p)
 	{
 		stat = TRANS_LOG_NAME(&v->str, &tn, buf1, SIZEOF(buf1), do_sendmsg_on_log2long);
 		if (stat != SS_NORMAL)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IONOTOPEN);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IONOTOPEN);
 		else
 		{
 			if ((tl = get_log_name(&tn, NO_INSERT)) == 0)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IONOTOPEN);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IONOTOPEN);
 			if (!tl->iod)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IONOTOPEN);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IONOTOPEN);
 			nl = get_log_name(&v->str, INSERT);
 			nl->iod = tl->iod;
 		}
 	}
 	if (nl->iod->state != dev_open)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IONOTOPEN);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IONOTOPEN);
 
 	if (dollar_principal && nl->iod == dollar_principal->iod)
 	{	/* if device is a GTM_PRINCIPAL synonym */

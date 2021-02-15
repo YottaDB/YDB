@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,10 +87,10 @@ void gtm_newintrinsic(mval *intrinsic)
 			if (msp <= stacktop)
 			{
 				msp = old_sp;
-	   			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
+			   	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
 			}
 	   		else
-	   			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
+			   	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
 	   	}
 		/* Ready, set, shift the younger indirect frames to make room for mv_stent */
 		memmove(msp, old_sp, top - (unsigned char *)old_sp);

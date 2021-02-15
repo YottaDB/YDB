@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +22,8 @@ GBLREF io_pair		io_curr_device;
 GBLREF io_desc		*active_device;
 GBLREF spdesc		stringpool;
 
+error_def(ERR_INVDLRCVAL);
+
 static size_t		insize;
 static size_t		outsize;
 
@@ -29,7 +32,6 @@ void op_wtone(int c)
 	char	temp_ch[1];
 	char	*start_ptr;
 	unsigned char	*temp_ch_ptr;
-	error_def(ERR_INVDLRCVAL);
 
 	active_device = io_curr_device.out;
 
@@ -45,7 +47,7 @@ void op_wtone(int c)
 	}
 #endif
 	if (IS_UTF_CHSET(active_device->ochset) && !U_VALID_CODE(c)) /* validate code point before dev specific output */
-		rts_error(VARLSTCNT(3) ERR_INVDLRCVAL, 1, c);
+		RTS_ERROR_ABT(VARLSTCNT(3) ERR_INVDLRCVAL, 1, c);
 	(io_curr_device.out->disp_ptr->wtone)(c);
 	active_device = 0;
 }

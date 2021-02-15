@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,7 @@ error_def(ERR_SRCSRVNOTEXIST);
 
 int gtmsource_showbacklog(void)
 {
-	seq_num			seq_num, jnl_seqno, read_jnl_seqno;
+	seq_num			heartbeat_jnl_seqno, seq_num, jnl_seqno, read_jnl_seqno;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
 	int4			index;
 	boolean_t		srv_alive;
@@ -75,6 +75,7 @@ int gtmsource_showbacklog(void)
 		 * of whether a source server for that instance is alive or not. For SHOWBACKLOG on ALL secondary instances
 		 * print backlog information only for those instances that have an active or passive source server alive.
 		 */
+		heartbeat_jnl_seqno = gtmsourcelocal_ptr->heartbeat_jnl_seqno;
 		gtmsource_pid = gtmsourcelocal_ptr->gtmsource_pid;
 		if ((NULL == jnlpool->gtmsource_local) && (0 == gtmsource_pid))
 			continue;
@@ -94,6 +95,11 @@ int gtmsource_showbacklog(void)
 		if (0 != seq_num)
 			seq_num--;
 		util_out_print("!@UQ : sequence number of last transaction sent by source server", TRUE, &seq_num);
+		seq_num = heartbeat_jnl_seqno;
+		if (0 != seq_num)
+			seq_num--;
+		util_out_print("!@UQ : sequence number acknowledged by the secondary"
+			" instance [!AZ]", TRUE, &seq_num, gtmsourcelocal_ptr->secondary_instname);
 		srv_alive = (0 == gtmsource_pid) ? FALSE : is_proc_alive(gtmsource_pid, 0);
 		if (!srv_alive)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_WARNING(ERR_SRCSRVNOTEXIST), 2,

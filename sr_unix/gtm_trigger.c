@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2020 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -309,7 +309,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	char		zcomp_parms[(GTM_PATH_MAX * 2) + SIZEOF(mident_fixed) + SIZEOF(OBJECT_PARM) + SIZEOF(NAMEOFRTN_PARM)
 				    + SIZEOF(EMBED_SOURCE_PARM)];
 	mstr		save_zsource;
-	int		rtnfd, rc, lenobjname, len, retry, save_errno;
+	int		rtnfd, rc, lenobjname, len, retry, save_errno, urc;
 	char		*error_desc, *mident_suffix_p1, *mident_suffix_p2, *mident_suffix_top, *namesub1, *namesub2;
 	char		*zcomp_parms_ptr, *zcomp_parms_top;
 	mval		zlfile, zcompprm;
@@ -358,9 +358,9 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 			if (mident_suffix_p1 == mident_suffix_top)
 			{	/* Phase 3: Punt */
 				assert(WBTEST_HELPOUT_TRIGNAMEUNIQ == gtm_white_box_test_case_number);
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_TRIGNAMEUNIQ, 3,
-						trigdsc->rtn_desc.rt_name.len - 2, trigdsc->rtn_desc.rt_name.addr,
-						((alphanumeric_table_len + 1) * alphanumeric_table_len) + 1);
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(5) ERR_TRIGNAMEUNIQ, 3,
+					trigdsc->rtn_desc.rt_name.len - 2, trigdsc->rtn_desc.rt_name.addr,
+					((alphanumeric_table_len + 1) * alphanumeric_table_len) + 1);
 			}
 		}
 	}
@@ -382,7 +382,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	{
 		save_errno = errno;
 		error_desc = STRERROR(save_errno);
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_FILENOTFND, 2, RTS_ERROR_TEXT(rtnname), ERR_TEXT, 2,
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(8) ERR_FILENOTFND, 2, RTS_ERROR_TEXT(rtnname), ERR_TEXT, 2,
 			LEN_AND_STR(error_desc));
 	}
 	assert(0 < rtnfd);	/* Verify file descriptor */
@@ -392,31 +392,35 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		DOWRITERC(rtnfd, ERROR_CAUSING_JUNK, strlen(ERROR_CAUSING_JUNK), rc); /* BYPASSOK */
 		if (0 != rc)
 		{
-			UNLINK(rtnname);
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+			urc = UNLINK(rtnname);
+			assert(0 == urc);
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 		}
 	}
 #	endif
 	DOWRITERC(rtnfd, trigdsc->xecute_str.str.addr, trigdsc->xecute_str.str.len, rc);
 	if (0 != rc)
 	{
-		UNLINK(rtnname);
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+		urc = UNLINK(rtnname);
+		assert(0 == urc);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 	}
 	if (NULL == memchr(trigdsc->xecute_str.str.addr, '\n', trigdsc->xecute_str.str.len))
 	{
 		DOWRITERC(rtnfd, NEWLINE, strlen(NEWLINE), rc);			/* BYPASSOK */
 		if (0 != rc)
 		{
-			UNLINK(rtnname);
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+			urc = UNLINK(rtnname);
+			assert(0 == urc);
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 		}
 	}
 	CLOSEFILE(rtnfd, rc);
 	if (0 != rc)
 	{
-		UNLINK(rtnname);
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, rc);
+		urc = UNLINK(rtnname);
+		assert(0 == urc);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, rc);
 	}
 	assert(MAX_MIDENT_LEN > trigdsc->rtn_desc.rt_name.len);
 	zcomp_parms_ptr = zcomp_parms;
@@ -434,7 +438,8 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 				" -OBJECT=%s -EMBED_SOURCE %s", objname, rtnname);
 	if (SIZEOF(zcomp_parms) <= len)	/* overflow */
 	{
-		UNLINK(rtnname);
+		urc = UNLINK(rtnname);
+		assert(0 == urc);
 		assert(FALSE);
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_LITERAL("Compilation string too long"));
 	}
@@ -546,7 +551,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		if (0 != gtm_trigger_complink(trigdsc, TRUE))
 		{
 			PRN_ERROR;	/* Leave record of what error caused the compilation failure if any */
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TRIGCOMPFAIL, 2,
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_TRIGCOMPFAIL, 2,
 				trigdsc->rtn_desc.rt_name.len - 1, trigdsc->rtn_desc.rt_name.addr);
 		}
 	}
@@ -556,7 +561,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	if (!(frame_pointer->type & SFT_TRIGR))
 	{	/* Create new trigger base frame first that back-stops stack unrolling and return to us */
 		if (GTM_TRIGGER_DEPTH_MAX < (gtm_trigger_depth + 1))	/* Verify we won't nest too deep */
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_MAXTRIGNEST, 1, GTM_TRIGGER_DEPTH_MAX);
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(3) ERR_MAXTRIGNEST, 1, GTM_TRIGGER_DEPTH_MAX);
 		DBGTRIGR((stderr, "gtm_trigger: Invoking new trigger at frame_pointer 0x%016lx  ctxt value: 0x%016lx\n",
 			  frame_pointer, ctxt));
 		/* Protect against interrupts while we have only a trigger base frame on the stack */
@@ -741,8 +746,8 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		{	/* Our TP level was unwound during the trigger so throw an error */
 			DBGTRIGR((stderr, "gtm_trigger: $TLEVEL less than at start - throwing TRIGTLVLCHNG\n"));
 			gtm_trigger_fini(TRUE, FALSE);	/* dump this trigger level */
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TRIGTLVLCHNG, 2, trigdsc->rtn_desc.rt_name.len,
-				  trigdsc->rtn_desc.rt_name.addr);
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_TRIGTLVLCHNG, 2, trigdsc->rtn_desc.rt_name.len,
+				trigdsc->rtn_desc.rt_name.addr);
 		}
 		rc = 0;			/* Be polite and return 0 for the (hopefully common) success case */
 	} else if (ERR_TPRETRY == rc)
@@ -808,7 +813,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		assert((NULL != frame_pointer) && !(SFT_TRIGR & frame_pointer->type));
 		DBGTRIGR((stderr, "gtm_trigger: Unsupported return code (%d) - unwound %d frames and now rethrowing error\n",
 			  rc, unwinds));
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_REPEATERROR);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_REPEATERROR);
 	}
 	return rc;
 }

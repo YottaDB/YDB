@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -141,9 +141,9 @@ void	grab_crit(gd_region *reg, wait_state state)
 			switch(status)
 			{
 				case cdb_sc_critreset:
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
 				case cdb_sc_dbccerr:
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
 				default:
 					assertpro((cdb_sc_critreset == status) || (cdb_sc_dbccerr == status));
 			}
@@ -164,7 +164,7 @@ void	grab_crit(gd_region *reg, wait_state state)
 	 * NOT issue DBFLCORRP. Use skip_file_corrupt_check global variable for this purpose
 	 */
 	if (csd->file_corrupt && !TREF(skip_file_corrupt_check))
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
 	if (WC_BLOCK_RECOVER == cnl->wc_blocked)
 		wcs_recover(reg);
 #	ifdef DEBUG

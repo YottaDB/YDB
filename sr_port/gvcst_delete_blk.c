@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,7 +26,7 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"
+#include "hashtab_int8.h"
 #include "tp.h"
 #include "gvcst_blk_build.h"
 #include "gvcst_delete_blk.h"
@@ -49,7 +49,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 	off_chain	chain;
 	srch_blk_status	*tp_srch_status;
 	uint4		iter;
-	ht_ent_int4	*tabent;
+	ht_ent_int8	*tabent;
 	DEBUG_ONLY(
 	boolean_t	block_already_in_hist = FALSE;
 	)
@@ -69,7 +69,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 			tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain.cw_index, &cse);
 		} else
 		{
-			if (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use, (uint4 *)&blk)))
+			if (NULL != (tabent = lookup_hashtab_int8(sgm_info_ptr->blks_in_use, (ublock_id *)&blk)))
 				tp_srch_status = (srch_blk_status *)tabent->value;
 			cse = tp_srch_status ? tp_srch_status->cse : NULL;
 		}
@@ -98,6 +98,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 					horiz_growth = TRUE;
 					old_cse = cse;
 					cse = (cw_set_element *)get_new_free_element(sgm_info_ptr->tlvl_cw_set_list);
+					assert(NULL != cse);
 					memcpy(cse, old_cse, SIZEOF(cw_set_element));
 					cse->low_tlevel = old_cse;
 					cse->high_tlevel = NULL;

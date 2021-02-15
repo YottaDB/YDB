@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -196,7 +196,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 		{
 			tt_ptr->mupintr = FALSE;
 			tt_state->who_saved = ttwhichinvalid;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		}
 		assert(length == tt_state->length);
 		assertpro(ttread == tt_state->who_saved);	/* ZINTRECURSEIO should have caught */
@@ -431,7 +431,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 					io_ptr->dollar.y++;
 					tt_ptr->discard_lf = FALSE;
 					if (io_ptr->error_handler.len > 0)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 					break;
 				} else
 					io_ptr->dollar.zeof = FALSE;
@@ -530,7 +530,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				SEND_KEYPAD_LOCAL
 				if (!msec_timeout)
 					iott_rterm(io_ptr);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
 				break;
 			}
 			if (((0 != (mask & TRM_ESCAPE)) || edit_mode)
@@ -921,14 +921,14 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				{
 					io_ptr->dollar.za = 9;
 					SEND_KEYPAD_LOCAL
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 				} else
 				{
 					io_ptr->dollar.zeof = TRUE;
 					io_ptr->dollar.za = 0;
 					SEND_KEYPAD_LOCAL
 					if (0 < io_ptr->error_handler.len)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 				}
 				break;
 			}
@@ -940,7 +940,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				io_ptr->dollar.y++;
 				SEND_KEYPAD_LOCAL
 				if (0 < io_ptr->error_handler.len)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 				break;
 			}
 		} else if (EINTR != errno)	/* rdlen < 0 */

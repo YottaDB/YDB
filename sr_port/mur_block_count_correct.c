@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,13 +46,12 @@ error_def(ERR_DBUNDACCMT);
 error_def(ERR_TEXT);
 error_def(ERR_WAITDSKSPACE);
 
-uint4 mur_block_count_correct(reg_ctl_list *rctl)
+int4 mur_block_count_correct(reg_ctl_list *rctl)
 {
 	gtm_uint64_t		native_size, size;
 	sgmnt_data_ptr_t 	mu_data;
-	int4			mu_int_ovrhd;
+	int4			mu_int_ovrhd, status;
 	block_id		total_blks, new_blocks, new_bit_maps, tmpcnt;
-	uint4			status;
 	uint4			bplmap;
 	enum db_acc_method	acc_meth;
 
@@ -95,10 +94,10 @@ uint4 mur_block_count_correct(reg_ctl_list *rctl)
 		 * extension by count 0 as unavailability of space(NO_FREE_SPACE error). And in the following case, tmpcnt could
 		 * be '0' on AIX because in MM mode AIX increases the native_size to the nearest multiple of OS_PAGE_SIZE.
 		 * And this increase could be less than GT.M block size.*/
-		if (tmpcnt && SS_NORMAL != (status = GDSFILEXT(new_blocks - new_bit_maps, total_blks, TRANS_IN_PROG_FALSE)))
+		if (tmpcnt && (SS_NORMAL != (status = GDSFILEXT(new_blocks - new_bit_maps, total_blks, TRANS_IN_PROG_FALSE))))
 		{
 			jgbl.dont_reset_gbl_jrec_time = TRUE;
-			return (status);
+			return status;
 		}
 		jgbl.dont_reset_gbl_jrec_time = TRUE;
 #		ifdef DEBUG

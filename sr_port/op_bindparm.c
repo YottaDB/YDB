@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,7 +95,7 @@ void op_bindparm(UNIX_ONLY_COMMA(int frmc) int frmp_arg, ...)
 	{
 		if (prev_count_ptr != &((TREF(parm_pool_ptr))->start_idx))
 			*prev_count_ptr += SAFE_TO_OVWRT;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ACTLSTTOOLONG);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ACTLSTTOOLONG);
 	}
 	VAR_START(var, frmp_arg);
 	for (i = 0; i < frmc; i++, frmp = va_arg(var, int4), actp++)

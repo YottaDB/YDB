@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 Fidelity National Information	*
+ * Copyright (c) 2018-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,11 +38,11 @@ void warn_db_sz(char *db_fname, block_id prev_blocks, block_id curr_blocks, bloc
 	if (diff >= 1)
 	{
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_LOWSPC, 5, STRLEN(db_fname), db_fname, 100 - ((int)new_sz_frac),
-			curr_blocks, tot_blocks);
+			&curr_blocks, &tot_blocks);
 		if (IS_MUPIP_IMAGE)
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_LOWSPC, 5, STRLEN(db_fname), db_fname,
-				100 - ((int)new_sz_frac), curr_blocks, tot_blocks);
+				100 - ((int)new_sz_frac), &curr_blocks, &tot_blocks);
 		}
 	}
 }

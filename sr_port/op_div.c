@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +33,7 @@ void	op_div (mval *u, mval *v, mval *q)
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
 	if ((v->mvtype & MV_INT)  &&  v->m[1] == 0)
-		rts_error(VARLSTCNT(1) ERR_DIVZERO);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_DIVZERO);
 	if (u->mvtype & MV_INT & v->mvtype)
 	{
 		promo = eb_mvint_div(u->m[1], v->m[1], q->m);
@@ -60,7 +61,7 @@ void	op_div (mval *u, mval *v, mval *q)
 	c = eb_div(v->m, u->m, q->m);
 	exp = u->e - v->e + c + MV_XBIAS;
 	if (EXPHI <= exp)
-		rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
+		rts_error_csa(NULL, VARLSTCNT(1) ERR_NUMOFLOW);	/* BYPASSRTSABT */
 	else if (exp < EXPLO)
 		*q = literal_zero;
 	else if (exp < EXP_INT_OVERF  &&  exp > EXP_INT_UNDERF  &&  q->m[0] == 0  &&  (q->m[1]%ten_pwr[EXP_INT_OVERF-1-exp] == 0))

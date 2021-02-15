@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,7 +61,7 @@ void    op_ztcommit(int4 n)
 
 	assert(ZTCOM_RECLEN == ztcom_record.suffix.backptr);
         if (n < 0)
-                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRANSMINUS);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TRANSMINUS);
         if (jnl_fence_ctl.level == 0  ||  n > jnl_fence_ctl.level)
                 rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRANSNOSTART);
         assert(jnl_fence_ctl.level > 0);
@@ -154,7 +154,7 @@ void    op_ztcommit(int4 n)
 	if (replication) /* instance is replicated */
 	{
 		if (yes_jnl_no_repl) /* journal is ON but replication is OFF for a region in the replicated instance */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(save_gv_cur_region));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(save_gv_cur_region));
 	}
 	for (csa = new_fence_list; JNL_FENCE_LIST_END != csa; csa = csa->next_fenced)
 	{

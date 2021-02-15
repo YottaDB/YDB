@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,14 +16,13 @@
 #include "cmmdef.h"
 #include "gtcm_find_region.h"
 
+error_def(CMERR_REGNTFND);
+
 cm_region_list *gtcm_find_region(connection_struct *cnx, unsigned char rnum)
 {
-	error_def(CMERR_REGNTFND);
-
 	if (rnum > cnx->maxregnum || !cnx->region_array[rnum])
-		rts_error(VARLSTCNT(1) CMERR_REGNTFND);
+		RTS_ERROR_ABT(VARLSTCNT(1) CMERR_REGNTFND);
 	else
 		return cnx->region_array[rnum];
 	return NULL;
 }
-

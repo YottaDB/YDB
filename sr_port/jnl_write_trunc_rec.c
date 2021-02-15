@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,7 @@
 #include "gtmsource.h"
 #include "jnl_get_checksum.h"
 
-GBLREF  jnl_gbls_t      	jgbl;
+GBLREF	jnl_gbls_t		jgbl;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gd_region		*gv_cur_region;
 
@@ -51,6 +51,7 @@ void	jnl_write_trunc_rec(sgmnt_addrs *csa, block_id orig_total_blks,
 	trunc_rec.orig_total_blks = orig_total_blks;
 	trunc_rec.orig_free_blocks = orig_free_blocks;
 	trunc_rec.total_blks_after_trunc = total_blks_after_trunc;
+	trunc_rec.filler = 0;
 	trunc_rec.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)&trunc_rec, SIZEOF(struct_jrec_trunc));
 	jnl_write(jpc, JRT_TRUNC, (jnl_record *)&trunc_rec, NULL);
 }

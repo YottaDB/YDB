@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,7 +85,7 @@ void op_close(mval *v, mval *p)
 	}
 #	ifdef UNIX
 	else if (SS_LOG2LONG == stat)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, SIZEOF(buf) - 1);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, SIZEOF(buf) - 1);
 #	endif
 	else
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) stat);

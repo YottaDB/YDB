@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -476,6 +476,7 @@ typedef struct gvtr_invoke_parms_struct
 	GBLREF	sgmnt_data_ptr_t	cs_data;									\
 															\
 	key = &gv_currkey->base[0];											\
+	assert(gv_currkey->base + gv_currkey->end + HASHT_GBLNAME_FULL_LEN <= ((gv_currkey->base) + gv_currkey->top));	\
 	memcpy(key, HASHT_GBLNAME, HASHT_GBLNAME_FULL_LEN);	/* including terminating '\0' subscript */		\
 	key += HASHT_GBLNAME_FULL_LEN;											\
 	*key++ = '\0';		/* double '\0' for terminating key */							\

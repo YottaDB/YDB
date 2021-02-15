@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +14,8 @@
 #include "op.h"
 #include "mvalconv.h"
 
+error_def(ERR_INVBITSTR);
+
 void op_fnzbitcoun(mval *dst, mval *bitstr)
 {
 	int str_len;
@@ -20,17 +23,16 @@ void op_fnzbitcoun(mval *dst, mval *bitstr)
 	int m, n, i;
 	int bit_count;
 	static unsigned char mask[8] = {128, 64, 32, 16, 8, 4, 2, 1};
-	error_def(ERR_INVBITSTR);
 
 	MV_FORCE_STR(bitstr);
 
 	if (!bitstr->str.len)
-		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
 
 	byte_1 = (unsigned char *)bitstr->str.addr;
 	str_len = (bitstr->str.len - 1) * 8;
 	if (7 < *byte_1)
-		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
 	n = (str_len - *byte_1 + 7)/8 - 1;
 	m = (str_len - *byte_1) % 8;
 	if (0 == m)

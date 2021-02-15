@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,8 +53,8 @@ block_id dse_getblk(char *element, boolean_t nobml, boolean_t carry_curr)
 #endif
 	if ((blk < 0) || (blk >= cs_addrs->ti->total_blks))
 	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BLKINVALID, 4, blk, DB_LEN_STR(gv_cur_region),
-			cs_addrs->ti->total_blks);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BLKINVALID, 4, &blk, DB_LEN_STR(gv_cur_region),
+			&(cs_addrs->ti->total_blks));
 		return BADDSEBLK;
 	}
 	if (nobml && IS_BITMAP_BLK(blk))

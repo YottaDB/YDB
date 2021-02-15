@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -117,7 +117,7 @@ void	gvcmz_neterr(INTPTR_T *err)
 			err_buff[0] += 3;
 			callg_signal(err_buff);
 		} else
-			rts_error_csa(NULL, VARLSTCNT(1) ERR_LCKSCANCELLED);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LCKSCANCELLED);
 	} else  if (NULL != err)
 		callg_signal(err);
 

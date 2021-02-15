@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -105,7 +105,7 @@ void op_zmess(unsigned int cnt, ...)
 					fao[25], fao[26], fao[27], fao[28], fao[29], fao[30], fao[31], fao[32], fao[33]);
 			} else if (is_disallowed(errnum))
 			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4 + faocnt) ERR_SPCLZMSG, 0, errnum, faocnt, fao[0], fao[1],
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4 + faocnt) ERR_SPCLZMSG, 0, errnum, faocnt, fao[0], fao[1],
 					fao[2], fao[3], fao[4], fao[5], fao[6], fao[7], fao[8], fao[9], fao[10], fao[11], fao[12],
 					fao[13], fao[14], fao[15], fao[16], fao[17], fao[18], fao[19], fao[20], fao[21], fao[22],
 					fao[23], fao[24], fao[25], fao[26], fao[27], fao[28], fao[29], fao[30], fao[31], fao[32],

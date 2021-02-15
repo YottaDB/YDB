@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,12 +20,21 @@
 /* the following macro checks that a 1 dimensional array reference is valid i.e. array[index] is within defined limits */
 #define ASSERT_IF_1DIM_ARRAY_OVERFLOW(array, index) assert(index < ARRAYSIZE(array))
 
-/* the following macro checks that a 2 dimensional array reference is valid i.e. array[row][col] is within defined limits */
-#define ASSERT_IF_2DIM_ARRAY_OVERFLOW(array, row, col)	\
-{							\
-	assert((row) < ARRAYSIZE(array));		\
-	assert((col) < ARRAYSIZE(array[0]));		\
+/* the following macro checks that a 2 dimensional array reference is valid i.e. array[row][col] is within defined limits
+   The STATIC_ANALYSIS version works on the (speculative) theory that perhaps SCI might be happier if both indicies are
+   checked together. */
+#ifndef STATIC_ANALYSIS
+#define ASSERT_IF_2DIM_ARRAY_OVERFLOW(array, row, col)  \
+{                                                       \
+        assert((row) < ARRAYSIZE(array));               \
+        assert((col) < ARRAYSIZE(array[0]));            \
 }
+#else
+#define ASSERT_IF_2DIM_ARRAY_OVERFLOW(array, row, col)				\
+{                                                       			\
+        assert(((row) < ARRAYSIZE(array)) && ((col) < ARRAYSIZE(array[0])));	\
+}
+#endif
 
 /* Note: in various places, dfa_calc() makes a reference to the array 'typemask'.  dfa_calc() is executed at compile-time.
  * The content of the array typemask is static, but, at run-time, the pointer that is used to access the typemask array
@@ -60,6 +69,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 	int			fst[2][2], lst[2][2];
 	int4			charcls, maskcls, numexpand, count, clsnum, maxcls, clsposlis;
 	int4			state_num, node_num, sym_num, expseq, seq;
+	int4			letter_cond;
 	struct node		nodes;
 				/* EdM: comment for reviewers:
 				 * 'states' is currently defined as a boolean_t.
@@ -118,6 +128,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 				for (numexpand = 1; expand->meta_c[seq][numexpand] != leaves->letter[0][maskcls]; numexpand++)
 					;
 				ASSERT_IF_2DIM_ARRAY_OVERFLOW(expand->meta_c, seq, numexpand);
+				assert(CHAR_CLASSES > seq);
 				ASSERT_IF_1DIM_ARRAY_OVERFLOW(pos_lis, (pos_offset[seq] + numexpand));
 				for (count = 0; pos_lis[pos_offset[seq] + numexpand][count] >= 0; count++)
 					;
@@ -153,6 +164,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 		lst[LST][FST] = charcls;
 		if (!leaves->nullable[1])
 		{
+			ASSERT_IF_2DIM_ARRAY_OVERFLOW(nodes.last, 0, charcls);
 			nodes.last[0][charcls] = TRUE;
 			maxcls = charcls;
 		}
@@ -171,6 +183,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 				for (numexpand = 1; expand->meta_c[seq][numexpand] != leaves->letter[1][maskcls]; numexpand++)
 					;
 				ASSERT_IF_2DIM_ARRAY_OVERFLOW(expand->meta_c, seq, numexpand);
+				assert(CHAR_CLASSES > seq);
 				ASSERT_IF_1DIM_ARRAY_OVERFLOW(pos_lis, (pos_offset[seq] + numexpand));
 				for (count = 0; pos_lis[pos_offset[seq] + numexpand][count] >= 0; count++)
 					;
@@ -221,6 +234,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 		}
 		if (leaves->nullable[1])
 		{
+			ASSERT_IF_2DIM_ARRAY_OVERFLOW(nodes.last, 0, charcls - 1);
 			nodes.last[0][charcls - 1] = TRUE;
 			for (numexpand = lst[LST][FST]; numexpand <= lst[LST][LST]; numexpand++)
 			{
@@ -249,12 +263,17 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 			clsnum = lst[LST][FST];
 		for (node_num = 1; node_num < leaf_num; node_num++)
 		{
+			ASSERT_IF_1DIM_ARRAY_OVERFLOW(nodes.nullable, node_num);
+			ASSERT_IF_1DIM_ARRAY_OVERFLOW(leaves->nullable, node_num + 1);
 			nodes.nullable[node_num] = nodes.nullable[node_num - 1] & leaves->nullable[node_num + 1];
 			if (leaves->nullable[node_num + 1])
 			{
 				for (maskcls = 0; maskcls < charcls; maskcls++)
+				{
+					ASSERT_IF_2DIM_ARRAY_OVERFLOW(nodes.last, node_num, maskcls); /* For SCI */
+					ASSERT_IF_2DIM_ARRAY_OVERFLOW(nodes.last, node_num -1, maskcls);
 					nodes.last[node_num][maskcls] = nodes.last[node_num - 1][maskcls];
-				ASSERT_IF_2DIM_ARRAY_OVERFLOW(nodes.last, node_num, maskcls);
+				}
 			} else
 			{
 				ASSERT_IF_2DIM_ARRAY_OVERFLOW(nodes.last, node_num, charcls);
@@ -264,9 +283,13 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 			fst[LST][FST] = charcls;
 			fst[LST][LST] = charcls;
 			lst[LST][FST] = charcls;
-			for (maskcls = 0; leaves->letter[node_num + 1][maskcls] >= 0; maskcls++)
+			/* For SCI we need to factor out the loop condition so we can protect it with asserts
+			   Note this breaks if a 'continue' is ever added to short-circuit the loop */
+			ASSERT_IF_2DIM_ARRAY_OVERFLOW(leaves->letter, node_num + 1, 0);
+			letter_cond = leaves->letter[node_num + 1][0];
+			for (maskcls = 0; letter_cond >= 0; maskcls++)
 			{
-				ASSERT_IF_1DIM_ARRAY_OVERFLOW(leaves->letter[node_num + 1], maskcls);
+				ASSERT_IF_2DIM_ARRAY_OVERFLOW(leaves->letter, node_num + 1, maskcls);
 				if (!(leaves->letter[node_num + 1][maskcls] & DFABIT))
 				{
 					ASSERT_IF_2DIM_ARRAY_OVERFLOW(fpos, charcls, charcls + 1);
@@ -283,6 +306,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 						numexpand++)
 						;
 					ASSERT_IF_2DIM_ARRAY_OVERFLOW(expand->meta_c, seq, numexpand);
+					assert(CHAR_CLASSES > seq);
 					ASSERT_IF_1DIM_ARRAY_OVERFLOW(pos_lis, (pos_offset[seq] + numexpand));
 					for (count = 0; pos_lis[pos_offset[seq] + numexpand][count] >= 0; count++)
 						;
@@ -313,6 +337,8 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 						charcls++;
 					}
 				}
+				ASSERT_IF_2DIM_ARRAY_OVERFLOW(leaves->letter, node_num + 1, maskcls + 1); /* anticipate ++maskcls */
+				letter_cond = leaves->letter[node_num + 1][maskcls + 1];
 			}
 			if (nodes.nullable[node_num - 1])
 			{
@@ -320,6 +346,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 					states[state_num][numexpand] = TRUE;
 				ASSERT_IF_1DIM_ARRAY_OVERFLOW(states[state_num], numexpand);
 			}
+			ASSERT_IF_1DIM_ARRAY_OVERFLOW(leaves->nullable, node_num + 1);
 			if (leaves->nullable[node_num + 1])
 			{
 				ASSERT_IF_2DIM_ARRAY_OVERFLOW(nodes.last, node_num, charcls - 1);
@@ -336,8 +363,11 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 			{
 				ASSERT_IF_2DIM_ARRAY_OVERFLOW(fpos, numexpand, count);
 				for (count = fst[LST][FST]; count <= fst[LST][LST]; count++)
+				{
+					ASSERT_IF_2DIM_ARRAY_OVERFLOW(nodes.last, node_num - 1, numexpand);
 					if (nodes.last[node_num - 1][numexpand])
 						fpos[numexpand][count] = TRUE;
+				}
 				ASSERT_IF_2DIM_ARRAY_OVERFLOW(fpos, numexpand, count);
 			}
 			ASSERT_IF_1DIM_ARRAY_OVERFLOW(leaves->nullable, node_num + 1);
@@ -390,7 +420,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 									clsnum++)
 									;
 								ASSERT_IF_2DIM_ARRAY_OVERFLOW(c_trans.trns, seq, clsnum);
-								ASSERT_IF_1DIM_ARRAY_OVERFLOW(c_trans.p_msk[seq], clsnum);
+								ASSERT_IF_2DIM_ARRAY_OVERFLOW(c_trans.p_msk, seq, clsnum);
 								if (clsnum == c_trans.c[seq])
 								{
 									c_trans.p_msk[seq][clsnum] = classmask[maskcls];
@@ -482,7 +512,10 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 			assert(3 == PAT_STRLIT_PADDING);
 			textstring = (unsigned char *)locoutchar;	/* change pointer type */
 			for (numexpand = 0; numexpand < maskcls; numexpand++)
+			{
+				ASSERT_IF_2DIM_ARRAY_OVERFLOW(leaves->letter, 0, numexpand);
 				*textstring++ = leaves->letter[0][numexpand];
+			}
 		}
 		return maskcls;
 	}

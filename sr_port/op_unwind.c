@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,7 +82,7 @@ void op_unwind(void)
 	}
 	DBGEHND_ONLY(prevfp = frame_pointer);
 	if (tp_pointer && tp_pointer->fp <= frame_pointer)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPQUIT);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPQUIT);
 	/* Note that error_ret() should be invoked only after the rts_error() of TPQUIT.
 	 * This is so the TPQUIT error gets noted down in $ECODE (which will not happen if error_ret() is called before).
 	 */
@@ -118,7 +118,7 @@ void op_unwind(void)
 	mv_chain = mvc;
 	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
 	if (msp > stackbase)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKUNDERFLO);
 	if (SSF_NORET_VIA_MUMTSTART & frame_pointer->type)
 		DBGTRIGR((stderr, "op_unwind: Unwinding frame 0x"lvaddr" with type %d which has SSF_NORET_VIA_MUMTSTART enabled\n",
 			  frame_pointer, frame_pointer->type));

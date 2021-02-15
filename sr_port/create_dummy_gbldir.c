@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,15 +32,18 @@
 #include "hashtab.h"
 #include "dpgbldir.h"
 
-#define	DUMMY_GLD_ADD_MAP(MAP, MAPKEY_PTR, REG, WHICH_MAP)					\
-MBSTART {											\
-	MAP->gvkey.addr = MAPKEY_PTR;								\
-	MEMCPY_LIT(MAPKEY_PTR, WHICH_MAP);							\
-	MAP->reg.addr = REG;									\
-	MAP->gvname_len = DUMMY_GBLDIR_MAP_GVN_SIZE(WHICH_MAP);					\
-	MAP->gvkey_len =  DUMMY_GBLDIR_MAP_KEY_SIZE(WHICH_MAP) - 1;				\
-	MAPKEY_PTR += MAP->gvkey_len;								\
-	MAP++;											\
+#define	DUMMY_GLD_ADD_MAP(MAP, MAPKEY_PTR, REG, WHICH_MAP)									\
+MBSTART { 															\
+	size_t map_size = DUMMY_GBLDIR_SIZE - sizeof(gd_addr);	/* Calculated from malloc for "addr" + "map" init below */	\
+																\
+	assert((MAPKEY_PTR - (char *) MAP + (sizeof(WHICH_MAP) - 1)) <= map_size);						\
+	MAP->gvkey.addr = MAPKEY_PTR;												\
+	MEMCPY_LIT(MAPKEY_PTR, WHICH_MAP);											\
+	MAP->reg.addr = REG;													\
+	MAP->gvname_len = DUMMY_GBLDIR_MAP_GVN_SIZE(WHICH_MAP);									\
+	MAP->gvkey_len =  DUMMY_GBLDIR_MAP_KEY_SIZE(WHICH_MAP) - 1;								\
+	MAPKEY_PTR += MAP->gvkey_len;												\
+	MAP++;															\
 } MBEND
 
 #define	GLD_REG_INIT(REG, RNAME, ADDR)		\
@@ -70,6 +73,7 @@ gd_addr *create_dummy_gbldir(void)
 	GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX115"));)
 	NON_GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX015"));)
 	addr = (gd_addr *)malloc(DUMMY_GBLDIR_SIZE);
+	assert(NULL != addr);
 	memset(addr, 0, DUMMY_GBLDIR_SIZE);
 	addr->max_rec_size = 256;
 	addr->maps = (gd_binding *)((UINTPTR_T)addr + SIZEOF(gd_addr));

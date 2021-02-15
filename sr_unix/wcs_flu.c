@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,12 +68,12 @@ error_def(ERR_DBFSYNCERR);
 error_def(ERR_DBIOERR);
 error_def(ERR_GBLOFLOW);
 error_def(ERR_JNLFILOPN);
-error_def(ERR_JNLFLUSH);
 error_def(ERR_OUTOFSPACE);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_WAITDSKSPACE);
 error_def(ERR_WCBLOCKED);
+error_def(ERR_WCSFLUFAIL);
 error_def(ERR_WRITERSTUCK);
 
 #define	JNL_WRITE_EPOCH_REC(CSA, CNL, CLEAN_DBSYNC)					\
@@ -262,7 +262,8 @@ boolean_t wcs_flu(uint4 options)
 	assert(!jgbl.onlnrlbk || csa->hold_onto_crit || process_exiting);
 	assert(mupip_jnl_recover || !csa->nl->donotflush_dbjnl);
 	assert(!csa->hold_onto_crit || csa->now_crit);
-	assert(0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1));
+	assert((0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))
+		|| (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1)));
 	jpc = csa->jnl;
 	if (!(was_crit = csa->now_crit))	/* Caution: assignment */
 	{
@@ -291,6 +292,7 @@ boolean_t wcs_flu(uint4 options)
 			if (cnl->wcs_phase2_commit_pidcnt)
 			{
 				REL_CRIT_BEFORE_RETURN(cnl, reg);
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WCSFLUFAIL, 3, CALLFROM);
 				return FALSE;
 			}
 		}
@@ -336,6 +338,7 @@ boolean_t wcs_flu(uint4 options)
 				 * we don't want to continue processing.
 				 */
 				REL_CRIT_BEFORE_RETURN(cnl, reg);
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WCSFLUFAIL, 3, CALLFROM);
 				return FALSE;
 			}
 			jnl_enabled = FALSE;
@@ -382,8 +385,7 @@ boolean_t wcs_flu(uint4 options)
 			{
 				assert(NOJNL == jpc->channel); /* jnl file lost */
 				REL_CRIT_BEFORE_RETURN(cnl, reg);
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd), ERR_TEXT, 2,
-					RTS_ERROR_TEXT("Error with journal flush during wcs_flu1"), jnl_status);
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WCSFLUFAIL, 3, CALLFROM);
 				return FALSE;
 			}
 #			ifdef DEBUG
@@ -423,6 +425,7 @@ boolean_t wcs_flu(uint4 options)
 				REL_CRIT_BEFORE_RETURN(cnl, reg);
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
 					RTS_ERROR_TEXT("Error during file msync during flush"));
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WCSFLUFAIL, 3, CALLFROM);
 				return FALSE;
 			}
 		}
@@ -441,6 +444,7 @@ boolean_t wcs_flu(uint4 options)
 					|| (WBTEST_MURUNDOWN_KILLCMT06 == gtm_white_box_test_case_number)); /* This is same as
 												 * WBTEST_CRASH_SHUTDOWN_EXPECTED */
 			REL_CRIT_BEFORE_RETURN(cnl, reg);
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WCSFLUFAIL, 3, CALLFROM);
 			return FALSE;	/* We expect the caller to trigger cache-recovery which will fix this counter */
 		}
 		/* Now that all concurrent commits are complete, wait for these dirty buffers to be flushed to disk.
@@ -468,6 +472,7 @@ boolean_t wcs_flu(uint4 options)
 		CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
 		if (!ret)
 		{	/* We expect caller to trigger cache-recovery which will fix the wip queue */
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WCSFLUFAIL, 3, CALLFROM);
 			return FALSE;
 		}
 		WCS_OPS_TRACE(csa, process_id, wcs_ops_flu3, 0, 0, 0, 0, 0);
@@ -500,6 +505,7 @@ boolean_t wcs_flu(uint4 options)
 			CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
 			if (!ret)
 			{	/* We expect caller to trigger cache-recovery which will fix the wip queue */
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WCSFLUFAIL, 3, CALLFROM);
 				return FALSE;
 			}
 			WCS_OPS_TRACE(csa, process_id, wcs_ops_flu5, 0, 0, 0, 0, 0);
@@ -537,6 +543,7 @@ boolean_t wcs_flu(uint4 options)
 						CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
 						if (!ret)
 						{	/* We expect caller to trigger cache-recovery which will fix wip queue */
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WCSFLUFAIL, 3, CALLFROM);
 							return FALSE;
 						}
 						if (!FLUSH_NOT_COMPLETE(cnl, crq, crwipq, n_bts))
@@ -546,8 +553,8 @@ boolean_t wcs_flu(uint4 options)
 					{	/* not enough space became available after the wait */
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_OUTOFSPACE, 3,
 								DB_LEN_STR(reg), process_id);
-						rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_OUTOFSPACE, 3,
-								DB_LEN_STR(reg), process_id);
+						RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_OUTOFSPACE, 3,
+							DB_LEN_STR(reg), process_id);
 					}
 				} else
 				{	/* There are different cases we know of currently when this is possible all of which
@@ -611,6 +618,7 @@ boolean_t wcs_flu(uint4 options)
 						assert(was_crit);	/* so don't need to rel_crit */
 						cnl->doing_epoch = FALSE;
 						cnl->wcsflu_pid = 0;
+						send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WCSFLUFAIL, 3, CALLFROM);
 						return FALSE;
 					}
 					assert(!jnl_enabled || jb->fsync_dskaddr == jb->rsrv_freeaddr);
@@ -630,10 +638,8 @@ boolean_t wcs_flu(uint4 options)
 							{
 								assert(NOJNL == jpc->channel); /* jnl file lost */
 								REL_CRIT_BEFORE_RETURN(cnl, reg);
-								send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2,
-									JNL_LEN_STR(csd), ERR_TEXT, 2,
-									RTS_ERROR_TEXT("Error with journal flush during wcs_flu2"),
-									jnl_status);
+								send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WCSFLUFAIL, 3,
+										 CALLFROM);
 								return FALSE;
 							}
 							assert(jb->freeaddr == jb->dskaddr);
@@ -660,6 +666,7 @@ boolean_t wcs_flu(uint4 options)
 						CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
 						if (!ret)
 						{	/* We expect caller to trigger cache-recovery which will fix wip queue */
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WCSFLUFAIL, 3, CALLFROM);
 							return FALSE;
 						}
 						if (FLUSH_NOT_COMPLETE(cnl, crq, crwipq, n_bts))
@@ -761,6 +768,7 @@ boolean_t wcs_flu(uint4 options)
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);
 				assert(FALSE);	/* should not come here as the rts_error above should not return */
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WCSFLUFAIL, 3, CALLFROM);
 				return FALSE;
 			}
 		}

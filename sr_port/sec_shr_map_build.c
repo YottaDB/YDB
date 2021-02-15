@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,21 +25,21 @@
 #include "bit_set.h"
 #include "bit_clear.h"
 
-int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, cw_set_element *cs, trans_num ctn)
+int sec_shr_map_build(sgmnt_addrs *csa, block_id *array, unsigned char *base_addr, cw_set_element *cs, trans_num ctn)
 {
-	uint4			setbit;
 	unsigned char		*ptr;
-	uint4			bitnum, prev;
-	uint4			(*bml_func)();
-#	ifdef DEBUG
-	int4			prev_bitnum, actual_cnt = 0;
-#	endif
-	int4			bml_full;
-	sgmnt_data_ptr_t	csd;
+	block_id		blk, bitnum;
+	int4			bml_full, bplmap, total_blks;	/* total_blks here represents how many blocks are covered by a
+								 * local bit map and so will always be less then BLKS_PER_LMAP (512)
+								 */
 	node_local_ptr_t	cnl;
-	block_id		blk;
-	unsigned int		total_blks;
-	int			bplmap;
+	uint4			setbit, prev;
+	uint4			(*bml_func)();
+	sgmnt_data_ptr_t	csd;
+#	ifdef DEBUG
+	int4			actual_cnt = 0;
+	block_id		prev_bitnum = -1;
+#	endif
 
 	blk = cs->blk;
 	assert(csa->now_crit && (ctn == csa->hdr->trans_hist.curr_tn));
@@ -49,25 +49,25 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 	cnl = csa->nl;
 	bplmap = csd->bplmap;
 	DETERMINE_BML_FUNC(bml_func, cs, csa);
-	DEBUG_ONLY(prev_bitnum = -1;)
 	for (;;)
 	{
 		bitnum = *array;
-		assert((uint4)bitnum < bplmap);	/* check that bitnum is positive and within 0 to bplmap */
+		assert(bitnum == (int4)bitnum);	/* Verify cast in the next assert */
+		assert((int4)bitnum < bplmap);	/* check that bitnum is positive and within 0 to bplmap */
 		if (0 == bitnum)
 		{
 			assert(actual_cnt == cs->reference_cnt);
 			break;
 		}
-		assert((int4)bitnum > prev_bitnum);	/* assert that blocks are sorted in the update array */
-		DEBUG_ONLY(prev_bitnum = (int4)bitnum);
+		assert(bitnum > prev_bitnum);	/* assert that blocks are sorted in the update array */
+		DEBUG_ONLY(prev_bitnum = bitnum;)
 		setbit = bitnum * BML_BITS_PER_BLK;
 		ptr = base_addr + setbit / 8;
 		setbit &= 7;
 		if (bml_busy == bml_func)
 		{
 			*ptr &= ~(3 << setbit);	/* mark block as BUSY (00) */
-			DEBUG_ONLY(actual_cnt++);
+			DEBUG_ONLY(actual_cnt++;)
 		} else
 		{
 #			ifdef DEBUG
@@ -86,12 +86,12 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 		++array;
 	}
 	/* Fix the local bitmap full/free status in the mastermap */
-	/* The result of (csd->trans_hist.total_blks - blk) can be cast to uint4
+	/* The result of (csd->trans_hist.total_blks - blk) can be cast to int4
 	 * because it should never be larger then BLKS_PER_LMAP
 	 */
 	assert((BLKS_PER_LMAP >= (csd->trans_hist.total_blks - blk)) ||
 			((csd->trans_hist.total_blks / bplmap) * bplmap != blk));
-	total_blks = ((csd->trans_hist.total_blks / bplmap) * bplmap == blk) ? (uint4)(csd->trans_hist.total_blks - blk) : bplmap;
+	total_blks = ((csd->trans_hist.total_blks / bplmap) * bplmap == blk) ? (int4)(csd->trans_hist.total_blks - blk) : bplmap;
 	bml_full = bml_find_free(0, base_addr, total_blks);
 	if (NO_FREE_SPACE == bml_full)
 	{

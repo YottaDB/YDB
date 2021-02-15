@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 #define SOURCE_FILE_INCLUDED
 
 void		compile_source_file(unsigned short flen, char *faddr, boolean_t mExtReqd);
-boolean_t	open_source_file (void);
+void		open_source_file (void);
 int4		read_source_file (void);
 void		close_source_file (void);
 

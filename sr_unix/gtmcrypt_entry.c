@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +60,7 @@ error_def(ERR_CRYPTDLNOOPEN);
 /* Including gtmcrypt.h in this module results in conflicting GBLDEF/GBLREFs. So, re-define the function prototype here to
  * silent the compiler.
  */
-uint4 gtmcrypt_entry(void);
+int4 gtmcrypt_entry(void);
 boolean_t verify_lib_loadpath(const char *libname, char *loadpath);
 
 #ifdef _AIX
@@ -113,7 +114,7 @@ boolean_t verify_lib_loadpath(const char *libname, char *loadpath)
 }
 #endif
 
-uint4 gtmcrypt_entry()
+int4 gtmcrypt_entry()
 {
 	/* Initialize the table of symbol names to be used in dlsym() */
 #	define GTMCRYPT_DEF(x) #x,

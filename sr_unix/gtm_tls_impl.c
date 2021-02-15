@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2020 Fidelity National Information	*
+ * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -674,7 +674,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 			flags &= ~verify_level;
 		}
 		verify_level = (int)level_long;
-		flags = (~GTMTLS_OP_VERIFY_LEVEL_MASK & flags) | verify_level;
+		flags = (GTMTLS_OP_VERIFY_LEVEL_CMPLMNT & flags) | verify_level;
 	} else
 		flags |= GTMTLS_OP_VERIFY_LEVEL_DEFAULT;
 	rv1 = config_lookup_string(cfg, "tls.CAfile", &CAfile);
@@ -827,8 +827,9 @@ STATICFNDEF gtmtls_passwd_list_t *gtm_tls_find_pwent(const char *input_env_name)
 
 int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *obs_passwd)
 {
-	char			*env_name_ptr, env_name[PASSPHRASE_ENVNAME_MAX];
-	int			env_name_len, obs_len;
+	char			env_name[PASSPHRASE_ENVNAME_MAX];
+	size_t			env_name_idx;
+	size_t			env_name_len, obs_len;
 	gtmtls_passwd_list_t	*pwent_node;
 	passwd_entry_t		*pwent;
 
@@ -836,25 +837,27 @@ int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *
 	if (!(GTMTLS_OP_INTERACTIVE_MODE & tls_ctx->flags))
 		return 0;	/* Not running in an interactive mode. */
 	assert(NULL != tlsid);
-	env_name_len = STRLEN(tlsid);
-	assert(0 < env_name_len);
-	assert(PASSPHRASE_ENVNAME_MAX >= ((SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1) + env_name_len));
-	assert(PASSPHRASE_ENVNAME_MAX > env_name_len);
-	env_name_ptr = env_name;
-	strcpy(env_name_ptr, GTMTLS_PASSWD_ENV_PREFIX);
-	env_name_ptr += (SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1);
-	strncpy(env_name_ptr, tlsid, (PASSPHRASE_ENVNAME_MAX - (SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1)));
-	env_name[PASSPHRASE_ENVNAME_MAX - 1] = '\0';
-	obs_len = STRLEN(obs_passwd);
+	env_name_len = strlen(tlsid);
+	assert(PASSPHRASE_ENVNAME_MAX > (sizeof(GTMTLS_PASSWD_ENV_PREFIX) + env_name_len)); /* Includes null */
+	env_name_idx = 0;
+	strcpy(env_name, GTMTLS_PASSWD_ENV_PREFIX);
+	env_name_idx = (sizeof(GTMTLS_PASSWD_ENV_PREFIX) - 1);
+	assert((SIZEOF(env_name) - env_name_idx) > (env_name_len + 1));
+	assert(PASSPHRASE_ENVNAME_MAX > env_name_len + env_name_idx);
+	memcpy(&env_name[env_name_idx], tlsid, env_name_len);
+	env_name_idx += env_name_len;
+	env_name[env_name_idx] = '\0';
+	obs_len = strlen(obs_passwd);
 	pwent_node = gtm_tls_find_pwent(env_name);
 	if (NULL != pwent_node)
 	{
 		pwent = pwent_node->pwent;
-		if ((obs_len == (pwent->passwd_len * 2)) && (0 == strncmp(obs_passwd, pwent->passwd, obs_len)))
+		if ((obs_len == (size_t)(pwent->passwd_len * 2)) && (0 == strncmp(obs_passwd, pwent->passwd, obs_len)))
 			return 1;	/* already on the list */
 	}
 	/* Either no entry for tlsid or need to replace with new value */
-	pwent = MALLOC(SIZEOF(passwd_entry_t));
+	pwent = MALLOC(sizeof(passwd_entry_t));
+	assert(NULL != pwent);
 	strcpy(pwent->env_name, env_name);
 	pwent->env_value = MALLOC(obs_len + 1);
 	memcpy(pwent->env_value, obs_passwd, obs_len + 1);	/* include null */
@@ -1137,9 +1140,9 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	if (verify_mode_set)
 		SSL_set_verify(ssl, verify_mode, NULL);
 	if (verify_level_set)
-		flags = (~GTMTLS_OP_VERIFY_LEVEL_MASK & flags) | verify_level;
+		flags = (GTMTLS_OP_VERIFY_LEVEL_CMPLMNT & flags) | verify_level;
 	else
-		flags = (~GTMTLS_OP_VERIFY_LEVEL_MASK & flags) | (GTMTLS_OP_VERIFY_LEVEL_MASK & tls_ctx->flags);
+		flags = (GTMTLS_OP_VERIFY_LEVEL_CMPLMNT & flags) | (GTMTLS_OP_VERIFY_LEVEL_MASK & tls_ctx->flags);
 	if (NULL == cipher_list)
 	{	/* no cipher-list in labelled section or no section */
 		if (0 != ((GTMTLS_OP_ABSENT_CIPHER | GTMTLS_OP_DEFAULT_CIPHER) & tls_ctx->flags))
@@ -1345,9 +1348,8 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.session-id-hex", id);
 		if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &session_id_hex))
 		{	/* convert hex to char and set len */
-			session_id_len = STRLEN(session_id_hex);
-			if (MAX_SESSION_ID_LEN < session_id_len)
-				session_id_len = MAX_SESSION_ID_LEN;	/* avoid overrun */
+			session_id_len = (int)strnlen(session_id_hex, (size_t)MAX_SESSION_ID_LEN);
+			assert((0 < session_id_len) && (MAX_SESSION_ID_LEN >= session_id_len));
 			GC_UNHEX(session_id_hex, session_id_string, session_id_len);
 			if (-1 == session_id_len)
 			{
@@ -1359,10 +1361,9 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			session_id_len = session_id_len / 2;		/* bytes */
 		} else
 		{
-			session_id_len = STRLEN(id);
-			if (SSL_MAX_SSL_SESSION_ID_LENGTH <= session_id_len)
-				session_id_len = SSL_MAX_SSL_SESSION_ID_LENGTH - 1;
-			memcpy((char *)session_id_string, id, session_id_len);		/* default to tlsid */
+			session_id_len = (int)strnlen(id, (size_t)(SSL_MAX_SSL_SESSION_ID_LENGTH - 1));
+			assert((0 < session_id_len) && (SSL_MAX_SSL_SESSION_ID_LENGTH > session_id_len));
+			memcpy((char *)session_id_string, id, (size_t)session_id_len);		/* default to tlsid */
 			session_id_string[session_id_len] = '\0';
 		}
 		if (0 >= SSL_set_session_id_context(ssl, (const unsigned char *)session_id_string, (unsigned int)session_id_len))
@@ -1431,7 +1432,9 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	socket->flags = flags;
 	socket->ssl = ssl;
 	socket->gtm_ctx = tls_ctx;
-	strncpy(socket->tlsid, (const char *)id, SIZEOF(socket->tlsid));
+	session_id_len = (int)strnlen(id, (size_t)MAX_TLSID_LEN);
+	strncpy(socket->tlsid, (const char *)id, MAX_TLSID_LEN);
+	socket->tlsid[session_id_len] = '\0';
 	/* Now, store the `socket' structure in the `SSL' structure so that we can get it back in a callback that receives an
 	 * `SSL' structure. Ideally, we should be using SSL_set_ex_data/SSL_get_ex_data family of functions. But, these functions
 	 * operate on a specific index (obtained by calling SSL_get_ex_new_index). But, since the library should potentially
@@ -1671,7 +1674,7 @@ int gtm_tls_renegotiate_options(gtm_tls_socket_t *socket, int msec_timeout, char
 		if (verify_mode_set)
 			SSL_set_verify(ssl, verify_mode, NULL);
 		if (verify_level_set)
-			flags = (~GTMTLS_OP_VERIFY_LEVEL_MASK & flags) | verify_level;
+			flags = (GTMTLS_OP_VERIFY_LEVEL_CMPLMNT & flags) | verify_level;
 		if ((NULL == CAfile) && !(GTMTLS_OP_CLIENT_CA & flags))
 		{	/* check for tlsid.CAfile or tls.CAfile */
 			SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.CAfile", socket->tlsid);

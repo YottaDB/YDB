@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -279,7 +279,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 				zwr_sub->subsc_list[n].actual = (mval *)NULL;
 				lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
 				if (!undef_inhibit)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
 			}
 		}
 	} else  if (lvt = LV_GET_CHILD(lv))

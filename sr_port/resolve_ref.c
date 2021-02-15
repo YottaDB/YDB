@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -210,7 +210,6 @@ int resolve_ref(int errknt)
 					}
 					continue;
 				case MFUN_REF:
-					assert(!run_time);
 					assert(OC_JMP == curtrip->opcode);
 					chktrip = curtrip->exorder.bl;
 					assert((OC_EXCAL == chktrip->opcode) || (OC_EXFUN == chktrip->opcode));

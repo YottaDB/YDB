@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2019 Fidelity National Information	*
+ * Copyright (c) 2011-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,7 +66,7 @@ void op_zhalt(int4 retcode, boolean_t is_zhalt)
 				zhalt_time = cur_time;
 			else
 				halt_time = cur_time;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, is_zhalt ? "ZHALT" : "HALT");
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, is_zhalt ? "ZHALT" : "HALT");
 		}
 		/* if 2nd in less than SAFE_iNTERVAL, give FATAL message & GTM_FATAL file, but no core, to stop nasty loops */
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) MAKE_MSG_SEVERE(ERR_RESTRICTEDOP), 1, is_zhalt ? "ZHALT" : "HALT");

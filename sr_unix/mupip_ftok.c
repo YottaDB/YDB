@@ -97,9 +97,9 @@ void mupip_ftok(void)
 				pblk.fop = F_SYNTAXO;
 				file.addr = instfilename;
 				file.len = full_len;
-				status = parse_file(&file, &pblk);	/* this gets us to just the name and extension */
-				fn_len = pblk.b_name + pblk.b_ext;
-				memcpy(fn, pblk.l_name, fn_len);
+				status = parse_file(&file, &pblk);	/* this gets us to directory, name and extension */
+				fn_len = pblk.b_dir + pblk.b_name + pblk.b_ext;
+				memcpy(fn, pblk.l_dir, fn_len);
 				fn[fn_len] = 0;
 				semkey = FTOK(fn, REPLPOOL_ID);
 				semid = shmid = -1;			/* not relevant for the file */

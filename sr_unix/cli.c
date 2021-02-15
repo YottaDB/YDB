@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +28,11 @@
 #include "gtmmsg.h"
 
 error_def(ERR_CLISTRTOOLONG);
+error_def(ERR_NUMERR);
+error_def(ERR_NUM64ERR);
+error_def(ERR_UNUM64ERR);
+error_def(ERR_HEXERR);
+error_def(ERR_HEX64ERR);
 
 /*
  * --------------------------------------------------
@@ -52,7 +57,7 @@ boolean_t cli_get_hex(char *entry, uint4 *dst)
 	{
 		if (!cli_str_to_hex(buf, dst))
 		{
-			FPRINTF(stderr, "Error: cannot convert %s value to hex number.\n", buf);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_HEXERR, 2, LEN_AND_STR(buf));
 			return FALSE;
 		}
 		return TRUE;
@@ -83,7 +88,7 @@ boolean_t cli_get_hex64(char *entry, gtm_uint64_t *dst)
 	{
 		if (!cli_str_to_hex64(buf, dst))
 		{
-			FPRINTF(stderr, "Error: cannot convert %s value to hex number.\n", buf);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_HEX64ERR, 2, LEN_AND_STR(buf));
 			return FALSE;
 		}
 		return TRUE;
@@ -112,9 +117,9 @@ boolean_t cli_get_uint64(char *entry, gtm_uint64_t *dst)
 	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
 	if ((cli_present(local_str) == CLI_PRESENT) && cli_get_value(local_str, buf))
 	{
-		if (!cli_str_to_uint64(buf, dst))
+		if ((!cli_is_hex_explicit(buf) || !cli_str_to_hex64(buf, dst)) && !cli_str_to_uint64(buf, dst))
 		{
-			FPRINTF(stderr, "Error: cannot convert %s value to 64-bit unsigned decimal number.\n", buf);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_UNUM64ERR, 2, LEN_AND_STR(buf));
 			return FALSE;
 		}
 		return TRUE;
@@ -143,9 +148,9 @@ boolean_t cli_get_int(char *entry, int4 *dst)
 	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
 	if (cli_present(local_str) == CLI_PRESENT && cli_get_value(local_str, buf))
 	{
-		if (!cli_is_dcm(buf) || !cli_str_to_int(buf, dst))
+		if ((!cli_is_dcm(buf) || !cli_str_to_int(buf, dst)) && (!cli_is_hex_explicit(buf) || !cli_str_to_num(buf, dst)))
 		{
-			FPRINTF(stderr, "Error: cannot convert %s value to decimal number.\n", buf);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NUMERR, 2, LEN_AND_STR(buf));
 			return FALSE;
 		}
 		return TRUE;
@@ -174,9 +179,9 @@ boolean_t cli_get_int64(char *entry, gtm_int64_t *dst)
 	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
 	if (cli_present(local_str) == CLI_PRESENT && cli_get_value(local_str, buf))
 	{
-		if (!cli_is_dcm(buf) || !cli_str_to_int64(buf, dst))
+		if ((!cli_is_dcm(buf) || !cli_str_to_int64(buf, dst)) && (!cli_is_hex_explicit(buf) || !cli_str_to_num64(buf, dst)))
 		{
-			FPRINTF(stderr, "Error: cannot convert %s value to decimal number.\n", buf);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NUM64ERR, 2, LEN_AND_STR(buf));
 			return FALSE;
 		}
 		return TRUE;
@@ -207,7 +212,7 @@ boolean_t cli_get_num(char *entry, int4 *dst)
 	{
 		if (!cli_str_to_num(buf, dst))
 		{
-			FPRINTF(stderr, "Error: cannot convert %s string to number.\n", buf);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NUMERR, 2, LEN_AND_STR(buf));
 			return FALSE;
 		}
 		return TRUE;
@@ -239,7 +244,7 @@ boolean_t cli_get_num64(char *entry, gtm_int64_t *dst)
 	{
 		if (!cli_str_to_num64(buf, dst))
 		{
-			FPRINTF(stderr, "Error: cannot convert %s string to number.\n", buf);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NUM64ERR, 2, LEN_AND_STR(buf));
 			return FALSE;
 		}
 		return TRUE;
@@ -472,4 +477,3 @@ boolean_t cli_get_defertime(char *entry, int4 *dst)
 	}
 	return FALSE;
 }
-

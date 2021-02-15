@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,7 @@ int	op_decrlock(mval *timeout)
 			/* if there were any old locks before TSTART, they can't be  unlocked */
 			if ((*prior)->granted && (*prior)->tp &&
 				(*prior)->tp->level > (*prior)->level - (*prior)->translev)
-				rts_error_csa(NULL, VARLSTCNT(1) ERR_TPLOCK);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPLOCK);
 			prior = &((*prior)->next);
 		}
 	}

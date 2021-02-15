@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2017 Fidelity National Information	*
+ * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -129,7 +129,7 @@ shmpool_blk_hdr_ptr_t shmpool_blk_alloc(gd_region *reg, enum shmblk_type blktype
 		if (FALSE == shmpool_lock_hdr(reg))
 		{
 			assert(FALSE);
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(reg), ERR_ERRCALL, 3, CALLFROM);
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(reg), ERR_ERRCALL, 3, CALLFROM);
 		}
 		/* Can only verify queue *AFTER* get the lock */
 		VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_free);

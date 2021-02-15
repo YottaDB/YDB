@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2018 Fidelity National Information	*
+ * Copyright (c) 2011-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,7 @@ void op_zg1(int4 level)
         if (0 > level)
 	{	/* Negative level specified, means to use relative level change */
 		if ((-level) > curlvl)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOLTZERO);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGOTOLTZERO);
 		unwlevels = -level;	/* Level to seek relative to current level */
 		level += curlvl;
 	} else
@@ -65,7 +65,7 @@ void op_zg1(int4 level)
 		unwlevels = curlvl - level;
 		if (0 > unwlevels)
 			/* Couldn't get to the level we were trying to unwind to */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOTOOBIG);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGOTOTOOBIG);
 	}
 	/* For ZGOTO 0, if this is MUPIP, exit after sending an oplog message recording the uncommon exit method.
 	 * Otherwise, if $ZTRAP is active or ""=$ECODE return a status of 0, else return the last error in $ECODE
@@ -142,7 +142,7 @@ void op_zg1(int4 level)
 		 gtm_trigger_depth, unwtrglvls, fp));
 	if ((0 != level) && (0 < dollar_ecode.index) && (0 < gtm_trigger_depth)
 	    && ((0 >= (gtm_trigger_depth - unwtrglvls)) || ((1 == gtm_trigger_depth) && (SFT_TRIGR & fp->type))))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZGOTOINVLVL, 3, GTMIMAGENAMETXT(image_type), level);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_ZGOTOINVLVL, 3, GTMIMAGENAMETXT(image_type), level);
 #	endif
 	/* Perform actual unwinding of the frames */
 	GOFRAMES(unwframes, FALSE, TRUE);

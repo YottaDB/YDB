@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -222,7 +222,7 @@ void op_setzp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 	/* Calculate total string len. delim_cnt has needed padding delimiters for null fields */
 	str_len = (size_t)expr->str.len + (size_t)pfx_str_len + delim_cnt + (size_t)sfx_str_len;
 	if (str_len > MAX_STRLEN)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 	ENSURE_STP_FREE_SPACE((int)str_len);
 	str_addr = stringpool.free;
 	start_pfx = (unsigned char *)src->str.addr;

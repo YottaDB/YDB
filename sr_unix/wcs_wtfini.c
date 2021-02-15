@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2020 Fidelity National Information	*
+ * Copyright (c) 2016-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,6 @@
 #include "is_proc_alive.h"
 #include "anticipatory_freeze.h"
 #include "add_inter.h"
-#include "gtm_multi_proc.h"	/* for "multi_proc_in_use" GBLREF */
 #include "wcs_wt.h"
 #include "hashtab_int4.h"
 #include "performcaslatchcheck.h"
@@ -190,10 +189,6 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 		}
 		if (NULL == csr)
 			break;		/* empty queue */
-		assert(!multi_proc_in_use);	/* wcs_wtstart uses syncio for online/offline rollback/recover forward phase */
-		/* wcs_get_space relies on the fact that a cache-record that is out of either active or wip queue has its
-		 * fl and bl fields set to 0. REMQHI would have already set them to 0. Assert that.
-		 */
 		assert(0 == csr->state_que.fl);
 		assert(0 == csr->state_que.bl);
 		if (csr == start_csr)
@@ -220,8 +215,8 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 		if ((ENOSYS == aio_errno) || (EINVAL == aio_errno))
 		{
 			assert(FALSE);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-						RTS_ERROR_LITERAL("aio_error()"), CALLFROM, aio_errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+				RTS_ERROR_LITERAL("aio_error()"), CALLFROM, aio_errno);
 		}
 		restart_errno = 0;
 		requeue = REQUEUE_TO_WIP;

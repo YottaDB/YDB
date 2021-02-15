@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -170,8 +170,8 @@ boolean_t search_trigger_hash(char *trigvn, int trigvn_len, stringkey *trigger_h
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
+			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+				LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
 		ptr = key_val.str.addr;
 		ptr2 = memchr(ptr, '\0', key_val.str.len);
@@ -180,8 +180,8 @@ boolean_t search_trigger_hash(char *trigvn, int trigvn_len, stringkey *trigger_h
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
+			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+				LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
 		len = ptr2 - ptr;
 		if ((len != trigvn_len) || (0 != memcmp(trigvn, ptr, len)))
@@ -250,8 +250,8 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
+			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+				LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
 		ptr = key_val.str.addr;
 		ptr2 = memchr(ptr, '\0', key_val.str.len);
@@ -260,8 +260,8 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
+			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+				LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
 		len = ptr2 - ptr;
 		if ((len != trigvn_len) || (0 != memcmp(trigvn, ptr, len)))
@@ -271,8 +271,8 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
+			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+				LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
 		ptr += len;
 		assert(('\0' == *ptr) && (key_val.str.len > len));

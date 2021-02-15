@@ -135,7 +135,7 @@ void	op_fntranslate_fast(mval *src, mval *rplc, mval *xlate, mval *m_xlate_hash,
 void	op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_table_int4 *xlate_hash);
 void	op_fnztranslate_common(mval *src, mval *dst, int *xlate);
 void	create_byte_xlate_table(mval *srch, mval *rplc, int4 *xlate);
-hash_table_int4	*create_utf8_xlate_table(mval *srch, mval *rplc, int4 *xlate);
+hash_table_int4	*create_utf8_xlate_table(mval *srch, mval *rplc, mstr *m_xlate);
 void	op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst);
 void	op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blind, mval *item, mval *ret);
 void	op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blind, mval *item, mval *ret);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2019 Fidelity National Information	*
+ * Copyright (c) 2017-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,17 +42,21 @@ GBLREF	unsigned char		cw_set_depth;
 int secshr_blk_full_build(boolean_t is_tp, sgmnt_addrs *csa,
 	 	sgmnt_data_ptr_t csd, boolean_t is_bg, struct cw_set_element_struct *cs, sm_uc_ptr_t blk_ptr, trans_num currtn)
 {
-	boolean_t	is_write_root;
+	boolean_t	is_write_root, long_blk_id;
 	cw_set_element	*nxt, *cs_ptr;
 	off_chain	chain;
+	v6_off_chain	v6_chain;
 	sgm_info	*si, *save_si;
 	unsigned char	*chain_ptr;
 	int		numargs;
+	int4		blk_id_sz;
 	gtm_uint64_t	argarray[SECSHR_ACCOUNTING_MAX_ARGS];
 
 	if (!is_tp)
 	{	/* Non-TP */
 		sec_shr_blk_build(csa, csd, cs, blk_ptr, currtn);
+		long_blk_id = IS_64_BLK_ID(blk_ptr);
+		blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 		assert(!IS_T_WRITE_ROOT(cs));
 		is_write_root = FALSE;
 		do
@@ -62,7 +66,7 @@ int secshr_blk_full_build(boolean_t is_tp, sgmnt_addrs *csa,
 				assert(!is_write_root);
 				break;
 			}
-			if ((cs->ins_off > ((blk_hdr *)blk_ptr)->bsiz - SIZEOF(block_id))
+			if ((cs->ins_off > ((blk_hdr *)blk_ptr)->bsiz - blk_id_sz)
 				|| (cs->ins_off < (SIZEOF(blk_hdr) + SIZEOF(rec_hdr)))
 				|| (0 > (short)cs->index)
 				|| ((cs - cw_set) <= cs->index))
@@ -79,7 +83,7 @@ int secshr_blk_full_build(boolean_t is_tp, sgmnt_addrs *csa,
 				assert(FALSE);
 				return -1;
 			}
-			PUT_BLK_ID((blk_ptr + cs->ins_off), ((cw_set_element *)(cw_set + cs->index))->blk);
+			WRITE_BLK_ID(long_blk_id, ((cw_set_element *)(cw_set + cs->index))->blk, blk_ptr + cs->ins_off);
 			if (is_write_root)
 				break;
 			cs++;
@@ -93,9 +97,11 @@ int secshr_blk_full_build(boolean_t is_tp, sgmnt_addrs *csa,
 		if (0 == cs->done)
 		{
 			sec_shr_blk_build(csa, csd, cs, blk_ptr, currtn);
+			long_blk_id = IS_64_BLK_ID(blk_ptr);
+			blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 			if (0 != cs->ins_off)
 			{
-				if ((cs->ins_off > ((blk_hdr *)blk_ptr)->bsiz - SIZEOF(block_id))
+				if ((cs->ins_off > ((blk_hdr *)blk_ptr)->bsiz - blk_id_sz)
 					|| (cs->ins_off < (SIZEOF(blk_hdr) + SIZEOF(rec_hdr))))
 				{
 					numargs = 0;
@@ -119,28 +125,30 @@ int secshr_blk_full_build(boolean_t is_tp, sgmnt_addrs *csa,
 				assert(cs->index < si->cw_set_depth);
 				chain.cw_index = cs->index;
 				chain.next_off = cs->next_off;
-				GET_BLK_IDP(chain_ptr, &chain);
+				WRITE_OFF_CHAIN(long_blk_id, &chain, &v6_chain, chain_ptr);
 				cs->ins_off = cs->next_off = 0;
 			}
 		} else
 		{
 			memmove(blk_ptr, cs->new_buff, ((blk_hdr *)cs->new_buff)->bsiz);
 			((blk_hdr *)blk_ptr)->tn = currtn;
+			long_blk_id = IS_64_BLK_ID(blk_ptr);
+			blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 		}
 		if (cs->first_off)
 		{
 			for (chain_ptr = blk_ptr + cs->first_off; ; chain_ptr += chain.next_off)
 			{
-				GET_BLK_IDP(&chain, chain_ptr);
+				READ_OFF_CHAIN(long_blk_id, &chain, &v6_chain, chain_ptr);
 				if ((1 == chain.flag)
-					&& ((chain_ptr - blk_ptr + SIZEOF(block_id)) <= ((blk_hdr *)blk_ptr)->bsiz)
+					&& ((chain_ptr - blk_ptr + blk_id_sz) <= ((blk_hdr *)blk_ptr)->bsiz)
 					&& (chain.cw_index < si->cw_set_depth))
 				{
 					save_si = sgm_info_ptr;
 					sgm_info_ptr = si;	/* needed by "tp_get_cw" */
 					tp_get_cw(si->first_cw_set, chain.cw_index, &cs_ptr);
 					sgm_info_ptr = save_si;
-					PUT_BLK_ID(chain_ptr, cs_ptr->blk);
+					WRITE_BLK_ID(long_blk_id, cs_ptr->blk, chain_ptr);
 					if (0 == chain.next_off)
 						break;
 				} else

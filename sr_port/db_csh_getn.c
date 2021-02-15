@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,7 +26,7 @@
 #include "interlock.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"
+#include "hashtab_int8.h"
 #include "tp.h"
 #include "gdsbgtr.h"
 #include "min_max.h"
@@ -53,7 +53,7 @@ GBLREF uint4			process_id;
 GBLREF unsigned int		t_tries;
 GBLREF uint4			dollar_tlevel;
 GBLREF sgm_info			*sgm_info_ptr;
-GBLREF boolean_t        	mu_reorg_process;
+GBLREF boolean_t		mu_reorg_process;
 #ifdef UNIX
 GBLREF uint4 			update_trans;
 GBLREF jnlpool_addrs_ptr_t	jnlpool;
@@ -91,7 +91,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	srch_blk_status		*tp_srch_status;
-	ht_ent_int4		*tabent;
+	ht_ent_int8		*tabent;
 	boolean_t		asyncio, dont_flush_buff;
 	intrpt_state_t		prev_intrpt_state;
 #	ifdef DEBUG
@@ -251,13 +251,14 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			 *	encounter a restart due to cdb_sc_lostcr in "tp_hist" even in the fourth-retry.
 			 */
 			tp_srch_status = NULL;
-			if (dollar_tlevel && (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use, (uint4 *)&cr->blk)))
-					&& (tp_srch_status = (srch_blk_status *)tabent->value) && (tp_srch_status->cse))
+			if (dollar_tlevel
+			    && (NULL != (tabent = lookup_hashtab_int8(sgm_info_ptr->blks_in_use, (ublock_id *)&cr->blk)))
+			    && (tp_srch_status = (srch_blk_status *)tabent->value) && (tp_srch_status->cse))
 			{	/* this process is already using the block - skip it */
 				cr->refer = TRUE;
 				continue;
 			}
-			if (NULL != lookup_hashtab_int4(&cw_stagnate, (uint4 *)&cr->blk))
+			if (NULL != lookup_hashtab_int8(&cw_stagnate, (ublock_id *)&cr->blk))
 			{	/* this process is already using the block for the current gvcst_search - skip it */
 				cr->refer = TRUE;
 				continue;

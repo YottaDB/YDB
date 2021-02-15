@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -527,7 +527,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 								assert(!jnlpool_csa || (jnlpool_csa == csa));
 								jnlpool = save_jnlpool;
 							}
-							rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLOFLOW, 2,
+							RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_GBLOFLOW, 2,
 								DB_LEN_STR(csa->region));
 						}
 					}
@@ -578,7 +578,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				 */
 				assert((CDB_STAGNATE > t_tries) || (cs->blk < cti->total_blks));
 				cs->mode = gds_t_acquired;
-				assert(GDSVCURR == cs->ondsk_blkver);
+				assert((GDSVCURR == cs->ondsk_blkver) || (BLK_ID_32_VER == cs->ondsk_blkver));
 			} else if (reorg_ss_in_prog && WAS_FREE(cs->blk_prior_state))
 			{
 				assert((gds_t_acquired == cs->mode) && (NULL == cs->old_block));
@@ -720,12 +720,12 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	assert((cdb_sc_normal == prev_status) || ((cdb_sc_onln_rlbk1 != prev_status) && (cdb_sc_onln_rlbk2 != prev_status))
 		|| (!TREF(in_gvcst_bmp_mark_free) || mu_reorg_process));
 	if (is_mm && ((csa->hdr != csd) || (csa->total_blks != cti->total_blks)))
-        {       /* If MM, check if wcs_mm_recover was invoked as part of the grab_crit done above OR if
-                 * the file has been extended. If so, restart.
-                 */
-                status = cdb_sc_helpedout;      /* force retry with special status so philanthropy isn't punished */
-                goto failed;
-        }
+	{	/* If MM, check if wcs_mm_recover was invoked as part of the grab_crit done above OR if
+		 * the file has been extended. If so, restart.
+		 */
+		status = cdb_sc_helpedout;	/* force retry with special status so philanthropy isn't punished */
+		goto failed;
+	}
 #	ifdef GTM_TRIGGER
 	if (!skip_dbtriggers)
 	{

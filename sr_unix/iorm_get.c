@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,7 +76,7 @@ int	gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, in
 				if (CHSET_UTF16LE == *chset)
 				{
 					iod->dollar.za = 9;
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BOMMISMATCH, 4,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BOMMISMATCH, 4,
 						chset_names[CHSET_UTF16BE].len, chset_names[CHSET_UTF16BE].addr,
 						chset_names[CHSET_UTF16LE].len, chset_names[CHSET_UTF16LE].addr);
 				}
@@ -87,7 +87,7 @@ int	gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, in
 				if (CHSET_UTF16BE == *chset)
 				{
 					iod->dollar.za = 9;
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BOMMISMATCH, 4,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BOMMISMATCH, 4,
 						chset_names[CHSET_UTF16LE].len, chset_names[CHSET_UTF16LE].addr,
 						chset_names[CHSET_UTF16BE].len, chset_names[CHSET_UTF16BE].addr);
 				}

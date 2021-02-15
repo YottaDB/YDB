@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,6 +89,7 @@ STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_lis
 	gd_addr		*tmpgd;
 	gvnh_reg_t	*gvnh_reg;
 	gd_region	*reg;
+	size_t		st_len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -114,9 +115,13 @@ STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_lis
 		if (NULL != extnam_str.addr)
 			free(extnam_str.addr);
 		TREF(gv_extname_size) = extnam_str.len;
-		extnam_str.addr = (char *)malloc(TREF(gv_extname_size));
+		st_len = extnam_str.len;
+		extnam_str.addr = (char *)malloc(st_len);
 	}
-	memcpy(extnam_str.addr, tmp_mstr_ptr->addr, tmp_mstr_ptr->len);
+	assert(NULL != extnam_str.addr);
+	st_len = tmp_mstr_ptr->len;
+	assert((TREF(gv_extname_size) > 0) && (TREF(gv_extname_size) >= st_len));
+	memcpy(extnam_str.addr, tmp_mstr_ptr->addr, st_len);
 	assert((NULL == gv_target) || (INVALID_GV_TARGET != gv_target));
 	val = va_arg(var, mval *);
 	assertpro(MV_IS_STRING(val));

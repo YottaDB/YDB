@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,6 +61,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "filestruct.h"
 #include "mutex.h"
 #include "iosp.h"
@@ -104,6 +105,7 @@ GBLREF	uint4			process_id;
 GBLREF	boolean_t		need_core;
 GBLREF	boolean_t		first_syslog;		/* Defined in util_output.c */
 GBLREF	char			gtm_dist[GTM_PATH_MAX];
+GBLREF	unsigned int		gtm_dist_len;
 GBLREF	boolean_t		gtm_dist_ok_to_use;
 
 LITREF	char			gtm_release_name[];
@@ -241,7 +243,7 @@ int main(int argc, char_ptr_t argv[])
 		gtmsecshr_timer_popped = FALSE;
 		SELECT(gtmsecshr_sockfd + 1, (void *)&wait_on_fd, NULL, NULL, &input_timeval, selstat);
 		if (0 > selstat)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMSECSHR, 1, process_id, ERR_GTMSECSHRSCKSEL, 0, errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GTMSECSHR, 1, process_id, ERR_GTMSECSHRSCKSEL, 0, errno);
 		else if (0 == selstat)
 		{
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRTMOUT);
@@ -261,7 +263,7 @@ int main(int argc, char_ptr_t argv[])
 				  "-1)\n", gtmsecshr_timer_popped, num_chars_recd, save_errno));
 			if ((0 >= num_chars_recd) && (gtmsecshr_timer_popped || EINTR != save_errno))
 				/* Note error includes 0 return from UDP read - should never be possible with UDP */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMSECSHR, 1,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GTMSECSHR, 1,
 					process_id, ERR_GTMSECSHRRECVF, 0, save_errno);
 			if (0 < num_chars_recd)
 				recv_complete = TRUE;	/* Only complete messages received via UDP datagram */
@@ -283,7 +285,7 @@ int main(int argc, char_ptr_t argv[])
 				DBGGSSHR((LOGFLAGS, "gtmsecshr: timer-popped: %d  SENDTO rc = %d  errno = %d (only relevant if "
 					  "rc = -1)\n", gtmsecshr_timer_popped, num_chars_recd, save_errno));
 				if ((0 >= num_chars_sent) && (gtmsecshr_timer_popped || save_errno != EINTR))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMSECSHR, 1,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GTMSECSHR, 1,
 						process_id, ERR_GTMSECSHRSENDF, 0, save_errno);
 				if (0 < num_chars_sent)
 					send_complete = TRUE;
@@ -419,6 +421,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	getjobnum();
 	pid = getsid(process_id);
 	gtm_dist_ok_to_use = TRUE;
+	gtm_dist_len = strlen(gtm_dist);
 	if ((pid != process_id) && ((pid_t)-1 == setsid()))
 	{
 		save_errno = errno;
@@ -452,7 +455,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	}
 	umask(0);
 	if (0 != gtmsecshr_pathname_init(SERVER, *rundir, *rundir_len))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3, RTS_ERROR_LITERAL("Server path"),
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3, RTS_ERROR_LITERAL("Server path"),
 			process_id);
 	if (-1 == (secshr_sem = semget(gtmsecshr_key, FTOK_SEM_PER_ID, RWDALL | IPC_NOWAIT)))
 	{
@@ -486,7 +489,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 		gtmsecshr_exit(SEMAPHORETAKEN, FALSE);
 	}
 	if (0 != gtmsecshr_sock_init(SERVER))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3, RTS_ERROR_LITERAL("Server"),
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3, RTS_ERROR_LITERAL("Server"),
 			process_id);
 	if (-1 == Stat(gtmsecshr_sock_name.sun_path, &stat_buf))
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
@@ -850,6 +853,8 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			} else
 				csd = &header;
 			DB_LSEEKREAD(((unix_db_info *)NULL), fd, 0, csd, SGMNT_HDR_LEN, save_errno);
+			if (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+				db_header_upconv(csd);
 			if (0 != save_errno)
 			{
 				buf->code = save_errno;
@@ -859,8 +864,8 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 				CLOSEFILE_RESET(fd, save_errno);	/* resets "fd" to FD_INVALID */
 				break;
 			}
-			if (0 != memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))	/* Verify is GT.M database file */
-			{
+			if (memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1) && memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+			{	/* Verify is GT.M database file */
 				buf->code = ERR_DBNOTGDS;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6,
 					RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
@@ -940,6 +945,8 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			csd->gt_sem_ctime.ctime = buf->mesg.db_ipcs.gt_sem_ctime;
 			csd->gt_shm_ctime.ctime = buf->mesg.db_ipcs.gt_shm_ctime;
 			/* And flush the changes back out. */
+			if (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+				db_header_dwnconv(csd);
 			GTMSECSHR_DB_LSEEKWRITE(((unix_db_info *)NULL), fd, 0, csd, SGMNT_HDR_LEN, save_errno);
 			if (0 != save_errno)
 			{

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +28,7 @@ GBLREF	boolean_t	gtm_blkupgrade_override;
 GBLREF	uint4		gtm_blkupgrade_flag;	/* control whether dynamic upgrade is attempted or not */
 
 error_def(ERR_DYNUPGRDFAIL);
+error_def(ERR_GTMCURUNSUPP);
 
 int4 gds_blk_upgrade(sm_uc_ptr_t gds_blk_src, sm_uc_ptr_t gds_blk_trg, int4 blksize, enum db_ver *ondsk_blkver)
 {
@@ -34,6 +36,8 @@ int4 gds_blk_upgrade(sm_uc_ptr_t gds_blk_src, sm_uc_ptr_t gds_blk_trg, int4 blks
 	v15_blk_hdr_ptr_t	v15bp;
 	v15_trans_num		v15tn;
 	uint4			v15bsiz, v15levl;
+
+	return ERR_GTMCURUNSUPP;
 
 	assert(gds_blk_src);
 	assert(gds_blk_trg);

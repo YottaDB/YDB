@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,7 @@ void laberror(int lblindx)
 	assert(skiplen < lblname.len);
 	lblname.len -= skiplen;
 	lblname.addr += skiplen;
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LABELMISSING, 2, RTS_ERROR_MSTR(&lblname));
+	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_LABELMISSING, 2, RTS_ERROR_MSTR(&lblname));
 #	else
 	assertpro(FALSE);
 #	endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Copyright (c) 2013-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,18 +46,18 @@ GBLREF	unsigned int		t_tries;
 #endif
 
 /*
- * 	Get length of the global variable name contained in the key starting at KEY_BASE.
+ *	Get length of the global variable name contained in the key starting at KEY_BASE.
  *	NOTE: If keys reside outside a GDS block (e.g. in cs_data), allocated buffer should have capacity at least MAX_KEY_SZ.
- * 	Input:
- * 		BLK_BASE := 	if non-NULL, base of current block
- * 				if NULL, it means we're dealing with a key that is not within a database block
+ *	Input:
+ *		BLK_BASE :=	if non-NULL, base of current block
+ *				if NULL, it means we're dealing with a key that is not within a database block
  *		KEY_BASE :=	starting address of key
- * 	Output:
- * 		GBLNAME_LEN := 	length of global variable name
+ *	Output:
+ *		GBLNAME_LEN :=	length of global variable name
  */
 int get_gblname_len(sm_uc_ptr_t blk_base, sm_uc_ptr_t key_base)
 {
-	sm_uc_ptr_t		rPtr1, blk_end;
+	sm_uc_ptr_t	rPtr1, blk_end;
 
 	blk_end = (NULL != blk_base) ? (blk_base + cs_data->blk_size) : (key_base + MAX_KEY_SZ);
 	DBG_VERIFY_ACCESS(blk_end - 1);
@@ -72,19 +72,19 @@ int get_gblname_len(sm_uc_ptr_t blk_base, sm_uc_ptr_t key_base)
 }
 
 /*
- * 	Get length of the key starting at KEY_BASE.
+ *	Get length of the key starting at KEY_BASE.
  *	NOTE: If keys reside outside a GDS block (e.g. in cs_data), allocated buffer should have capacity at least MAX_KEY_SZ.
- * 	Currently, all get_key_len() calls take a key in shared memory; the only "allocated buffer" is csd->reorg_restart_key.
+ *	Currently, all get_key_len() calls take a key in shared memory; the only "allocated buffer" is csd->reorg_restart_key.
  *	Input:
- * 		BLK_BASE := 	if non-NULL, base of current block
- * 				if NULL, it means we're dealing with a key that is not within a database block
+ *		BLK_BASE :=	if non-NULL, base of current block
+ *				if NULL, it means we're dealing with a key that is not within a database block
  *		KEY_BASE :=	starting address of key
- * 	Output:
- * 		KEY_LEN	:= 	length of key, including 2 null bytes at the end
+ *	Output:
+ *		KEY_LEN :=	length of key, including 2 null bytes at the end
  */
 int get_key_len(sm_uc_ptr_t blk_base, sm_uc_ptr_t key_base)
 {
-	sm_uc_ptr_t		rPtr1, blk_end;
+	sm_uc_ptr_t	rPtr1, blk_end;
 
 	blk_end = (NULL != blk_base) ? (blk_base + cs_data->blk_size) : (key_base + MAX_KEY_SZ);
 	DBG_VERIFY_ACCESS(blk_end - 1);
@@ -100,12 +100,12 @@ int get_key_len(sm_uc_ptr_t blk_base, sm_uc_ptr_t key_base)
 
 /*
  *	Get compression count of SECOND_KEY with respect to FIRST_KEY.
- * 	NOTE: Each key should reside in a private buffer with capacity at least MAX_KEY_SZ.
+ *	NOTE: Each key should reside in a private buffer with capacity at least MAX_KEY_SZ.
  */
 int get_cmpc(sm_uc_ptr_t first_key, sm_uc_ptr_t second_key)
 {
-	sm_uc_ptr_t		rPtr1, rPtr2;
-	int			cmpc;
+	sm_uc_ptr_t	rPtr1, rPtr2;
+	int		cmpc;
 
 	DBG_VERIFY_ACCESS(first_key + MAX_KEY_SZ - 1);
 	DBG_VERIFY_ACCESS(second_key + MAX_KEY_SZ - 1);
@@ -123,17 +123,17 @@ int get_cmpc(sm_uc_ptr_t first_key, sm_uc_ptr_t second_key)
 }
 
 /*
- * 	Copy record info (record size and key) out of a block.
+ *	Copy record info (record size and key) out of a block.
  *	Input:
  *		LEVEL :=	level of current block
- *		BLK_BASE := 	base of current block
+ *		BLK_BASE :=	base of current block
  *		REC_BASE :=	starting address of record in current block
- * 		KEY := 		previous key; first KEY_CMPC bytes are retained in output KEY
+ *		KEY :=		previous key; first KEY_CMPC bytes are retained in output KEY
  *	Output:
- *		STATUS := 	status of read
+ *		STATUS :=	status of read
  *		REC_SIZE :=	record size
- *		KEY_CMPC := 	key compression count
- *		KEY_LEN := 	key length
+ *		KEY_CMPC :=	key compression count
+ *		KEY_LEN :=	key length
  *		KEY :=		local copy of key copied out of record
  */
 enum cdb_sc read_record(int *rec_size_ptr, int *key_cmpc_ptr, int *key_len_ptr, sm_uc_ptr_t key,
@@ -142,11 +142,12 @@ enum cdb_sc read_record(int *rec_size_ptr, int *key_cmpc_ptr, int *key_len_ptr, 
 	sm_uc_ptr_t	rPtr1, rPtr2, blk_end, rPtr1_end, rPtr2_end;
 	unsigned short	temp_ushort;
 	int		key_cmpc, rec_size, key_len;
-	boolean_t	invalid;
-	sm_uc_ptr_t blk_base;
+	boolean_t	invalid, long_blk_id;
+	sm_uc_ptr_t	blk_base;
 
 	blk_base = blk_stat->buffaddr;
 	blk_end = blk_base + cs_data->blk_size;
+	long_blk_id = IS_64_BLK_ID(blk_base);
 	DBG_VERIFY_ACCESS(blk_end - 1);
 	if (blk_end <= (rec_base + SIZEOF(rec_hdr)))
 	{
@@ -157,7 +158,7 @@ enum cdb_sc read_record(int *rec_size_ptr, int *key_cmpc_ptr, int *key_len_ptr, 
 	GET_USHORT(temp_ushort, &(((rec_hdr_ptr_t)rec_base)->rsiz));
 	rec_size = temp_ushort;
 	key_cmpc = EVAL_CMPC((rec_hdr_ptr_t)rec_base);
-	if ((0 != level) && (BSTAR_REC_SIZE == rec_size))
+	if ((0 != level) && (bstar_rec_size(long_blk_id) == rec_size))
 	{
 		key_len = 0;
 		*key_cmpc_ptr = key_cmpc;
@@ -175,7 +176,7 @@ enum cdb_sc read_record(int *rec_size_ptr, int *key_cmpc_ptr, int *key_len_ptr, 
 	}
 	*rPtr1++ = *rPtr2++;
 	key_len = (int)(rPtr2 - rec_base - SIZEOF(rec_hdr));
-	invalid = INVALID_RECORD(level, rec_size, key_len, key_cmpc);
+	invalid = INVALID_RECORD(level, rec_size, key_len, key_cmpc, long_blk_id);
 	if (invalid || ((KEY_DELIMITER != *(rPtr1 - 1)) || (KEY_DELIMITER != *(rPtr1 - 2))))
 	{
 		assert(CDB_STAGNATE > t_tries);

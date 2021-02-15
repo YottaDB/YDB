@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,7 +106,7 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 	 * Ths first byte is '^' so skip it in the comparison.
 	 */
 	if ((RESERVED_NAMESPACE_LEN <= (mp_temp->str.len - 1)) && (0 == MEMCMP_LIT(mp_temp->str.addr + 1, RESERVED_NAMESPACE)))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PCTYRESERVED);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_PCTYRESERVED);
 	reg = mlk_region_lookup((mp_temp), gld);
 	/* Add up the sizes of all MVAL strings */
 	for (len = 0, i = 0;  i < subcnt;  mp_temp=va_arg(mp, mval *), i++)

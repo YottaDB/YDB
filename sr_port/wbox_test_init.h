@@ -55,7 +55,8 @@ typedef enum {
 	WBTEST_ABANDONEDKILL,			/* 21 : MUPIP STOP a kill in progress in 2nd stage*/
 	WBTEST_ENCRYPT_INIT_ERROR,		/* 22 : Prevent encryption-initialized assert from happening */
 	WBTEST_UPD_PROCESS_ERROR,		/* 23 : Update process should issue GVSUBOFLOW error, REC2BIG error */
-	WBTEST_FILE_EXTEND_ERROR,		/* 24 : Prevent assert form mupip extend if # blocks is > 992M */
+	WBTEST_FILE_EXTEND_ERROR,		/* 24 : Prevent assert from mupip extend if # blocks is > MAXTOTALBLKS
+						 *	(see gdsfhead.h for macro definition) */
 	WBTEST_BUFOWNERSTUCK_STACK,		/* 25 : Get stack trace of the blocking pid for stuck messages*/
 	WBTEST_OINTEG_WAIT_ON_START,		/* 26 : Have online integ wait 60 after initiating the snapshot */
 	WBTEST_MUR_ABNORMAL_EXIT_EXPECTED,	/* 27 : We expect MUPIP JOURNAL RECOVER/ROLLBACK to exit with non-zero status */
@@ -90,7 +91,7 @@ typedef enum {
 	WBTEST_JNL_SWITCH_EXPECTED,		/* 51 : We expect an automatic journal file switch in jnl_file_open */
 	WBTEST_SYSCONF_WRAPPER,			/* 52 : Will sleep in SYSCONF wrapper to let us verify that first two MUPIP STOPs
 						 *	are indeed deferred in the interrupt-deferred zone, but the third isn't */
-        WBTEST_DEFERRED_TIMERS,			/* 53 : Will enter a long loop upon specific WRITE or MUPIP STOP command */
+	WBTEST_DEFERRED_TIMERS,			/* 53 : Will enter a long loop upon specific WRITE or MUPIP STOP command */
 	WBTEST_BREAKMPC,			/* 54 : Breaks the mpc of the previous frame putting 0xdeadbeef in it */
 	WBTEST_CRASH_TRUNCATE_1,		/* 55 : Issue a kill -9 before 1st fsync */
 	WBTEST_CRASH_TRUNCATE_2,		/* 56 : Issue a kill -9 after 1st fsync */
@@ -201,13 +202,13 @@ typedef enum {
 	WBTEST_ZTIMEOUT_TRACE,			/* 153 : Trace the setting/deferring of ztimeout when trigerred */
 	WBTEST_ZTIME_DEFER_CRIT,		/* 154 : Defer ZTIMEOUT when CRIT is held */
 	WBTEST_LOW_MEMORY,			/* 155 : In tests that limit vmemuse, exit gracefully when system calls,
-						   external libraries, etc.  fail to allocate more memory */
+						 * external libraries, etc.  fail to allocate more memory */
 	WBTEST_JNLPROCSTUCK_FORCE,		/* 156 : Mess with jnl_sub_write_attempt to force a JNLPROCSTUCK message */
 	WBTEST_JNLEXT_PREREMOVED,		/* 157 : During a MUR_JNLEXT_UNLINK return status that the file does not exist.*/
 	WBTEST_REPLCOMM_ERR,			/* 158 : Reconnect in case of replicaton communication errors */
 	WBTEST_REPL_INIT_ERR,			/* 159 : Error in setting up the sockets */
 	WBTEST_REPL_INIT_ERR2,			/* 160 : Error at listen */
-	WBTEST_REPLCOMM_ERR_SRC,                /* 161 : Communication error in recv source server side */
+	WBTEST_REPLCOMM_ERR_SRC,		/* 161 : Communication error in recv source server side */
 	WBTEST_REPLCOMM_SEND_SRC,		/* 162 : Communication error in send at source side */
 	WBTEST_SOCKET_KEEPALIVE,		/* 163 : shorten keepalive parameters so test fails fast */
 	WBTEST_FETCHCOMM_ERR,			/* 164 : Communication error during fetchresync rollback */
@@ -233,12 +234,10 @@ typedef enum {
 	if (gtm_white_box_test_case_enabled && (gtm_white_box_test_case_number == input_test_case_num))	\
 	{												\
 		gtm_wbox_input_test_case_count++;							\
-		/* To catch the gtm_wbox_input_test_case_count before it is
-		 * reset below and convey correctly to the TLS plugin
-		 */ \
+		/* Catch gtm_wbox_input_test_case_count before reset to convey it to the TLS plugin */	\
 		if (WBTEST_REPL_TLS_RECONN == input_test_case_num)					\
 		{											\
-			snprintf(count_num, SIZEOF(count_num), "%d", gtm_wbox_input_test_case_count);			\
+			snprintf(count_num, SIZEOF(count_num), "%d", gtm_wbox_input_test_case_count);	\
 			setenv("wbox_count", count_num, 1);						\
 		}											\
 		if (gtm_white_box_test_case_count == gtm_wbox_input_test_case_count)			\
@@ -248,7 +247,7 @@ typedef enum {
 		}											\
 	}												\
 }
-#define WBTEST_ONLY(WBTEST_NUMBER, ...)						\
+#define WBTEST_ONLY(WBTEST_NUMBER, ...)									\
 {													\
 	if (WBTEST_ENABLED(WBTEST_NUMBER))								\
 	{												\

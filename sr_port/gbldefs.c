@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -153,7 +153,7 @@ GBLDEF	io_log_name	*dollar_principal;	/* pointer to log name GTM$PRINCIPAL if de
 GBLDEF	boolean_t	prin_dm_io;		/* used by op_dmode so mdb_condition_handler and iorm_readfl know it's active */
 GBLDEF	boolean_t	prin_in_dev_failure;	/* used in I/O to perform NOPRINCIO detection on input */
 GBLDEF	boolean_t	prin_out_dev_failure;	/* used in I/O to perform NOPRINCIO detection on output */
-GBLDEF	uint4		parallel_freeze_online;
+GBLDEF	boolean_t	wcs_noasyncio;		/* used in wcs_wtstart to disable asyncio in the forward rollback/recover phase */
 GBLDEF	io_desc		*active_device;
 GBLDEF	bool		error_mupip,
 			file_backed_up,
@@ -460,7 +460,7 @@ GBLDEF	boolean_t	need_no_standalone;
 GBLDEF	int4		zdir_form = ZDIR_FORM_FULLPATH; /* $ZDIR shows full path including DEVICE and DIRECTORY */
 GBLDEF	mval		dollar_zdir = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
 GBLDEF	int * volatile	var_on_cstack_ptr; /* volatile pointer to int; volatile so that nothing gets optimized out */
-GBLDEF	hash_table_int4	cw_stagnate;
+GBLDEF	hash_table_int8	cw_stagnate;
 GBLDEF	boolean_t	cw_stagnate_reinitialized;
 
 GBLDEF	uint4		pat_everything[] = { 0, 2, PATM_E, 1, 0, PAT_MAX_REPEAT, 0, PAT_MAX_REPEAT, 1 }; /* pattern = ".e" */
@@ -1078,6 +1078,7 @@ GBLDEF	is_anticipatory_freeze_needed_t		is_anticipatory_freeze_needed_fnptr;
 GBLDEF	set_anticipatory_freeze_t		set_anticipatory_freeze_fnptr;
 GBLDEF	boolean_t	is_jnlpool_creator;
 GBLDEF	char		gtm_dist[GTM_PATH_MAX];		/* Value of $gtm_dist env variable */
+GBLDEF	unsigned int	gtm_dist_len = 0;		/* Length of validated $gtm_dist */
 GBLDEF	boolean_t	gtm_dist_ok_to_use = FALSE;	/* Whether or not we can use $gtm_dist */
 GBLDEF	semid_queue_elem	*keep_semids;		/* Access semaphores that should be kept because shared memory is up */
 GBLDEF	boolean_t		dmterm_default;		/* Retain default line terminators in the direct mode */

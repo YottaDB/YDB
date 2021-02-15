@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +55,7 @@ void lvzwr_fini(zshow_out *out, int t)
 		{
 			lvzwrite_block->subsc_count = 0;
 			if (!undef_inhibit)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_UNDEF, 2, size, lvzwrite_block->pat->str.addr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_UNDEF, 2, size, lvzwrite_block->pat->str.addr);
 		} else
 		{
 			lvzwrite_block->curr_name = &tabent->key.var_name;

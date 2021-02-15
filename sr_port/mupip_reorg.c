@@ -149,7 +149,7 @@ void mupip_reorg(void)
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUKEEPNODEC);
 					mupip_exit(ERR_MUNOACTION);
 				}
-				if (99 < MV_FORCE_UINT(keep_mval_ptr))
+				if (99 < MV_FORCE_ULONG(keep_mval_ptr))
 				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUKEEPPERCENT);
 					mupip_exit(ERR_MUNOACTION);

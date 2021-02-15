@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,7 @@ int do_patsplit(mval *str, mval *pat)
 	boolean_t	fixed[2];				/* fixed[0] is for the left, fixed[1] is for the right */
 	boolean_t	right;					/* 0 indicates processing left side, 1 indicates right side */
 	boolean_t	match;					/* match status of input pattern with input string */
-	gtm_uint64_t	bound;
+	gtm_int64_t	bound;
 	int4		index, fixed_index;			/* index of our current fixed-length pattern-atom  */
 	int4		alt, alt_rep_max, alt_rep_min, bytelen, charlen, charstoskip, count, deltalen, fixedcharlen, leftcharlen;
 	int4		max[MAX_PATTERN_ATOMS], min[MAX_PATTERN_ATOMS], size[MAX_PATTERN_ATOMS];

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2019 Fidelity National Information	*
+ * Copyright (c) 2007-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,6 +50,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gd_region		*gv_cur_region;	/* needed for the JNL_ENSURE_OPEN_WCS_WTSTART macro */
 GBLREF	int			num_additional_processors;
 GBLREF	uint4			process_id;
+GBLREF	boolean_t		multi_proc_in_use;
 
 error_def(ERR_DBFILERR);
 error_def(ERR_WAITDSKSPACE);
@@ -317,4 +318,16 @@ boolean_t wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 			|| (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == gtm_white_box_test_case_number));
 	INVOKE_C_STACK_APPROPRIATE(cr, csa, 2);
 	WCS_GET_SPACE_RETURN_FAIL(wcs_conflict_trace, cr);
+	/* Check before exiting if there are outstanding async I/Os when the child process exits */
+	if (multi_proc_in_use)
+	{
+		JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 0, NULL, TRUE, save_errno);
+		if (asyncio)
+		{
+			DEBUG_ONLY(dbg_wtfini_lcnt = dbg_wtfini_wcs_get_space3);
+			/* used by "wcs_wtfini" */
+			if (wcs_wtfini(reg, CHECK_IS_PROC_ALIVE_FALSE, cr))
+				return FALSE;
+		}
+	}
 }

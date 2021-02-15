@@ -52,6 +52,7 @@ mu_swap_blk.c:
 #include "mu_reorg.h"
 #include "cws_insert.h"
 #include "gvt_inline.h"
+#include "tp.h"
 
 /* Include prototypes */
 #include "t_qread.h"
@@ -70,13 +71,13 @@ GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF char		*update_array, *update_array_ptr;
 GBLREF uint4		update_array_size;	/* for the BLK_* macros */
 GBLREF uint4		t_err;
-GBLREF cw_set_element 	cw_set[];
-GBLREF unsigned char    cw_map_depth;
+GBLREF cw_set_element	cw_set[];
+GBLREF unsigned char	cw_map_depth;
 GBLREF unsigned char	cw_set_depth;
 GBLREF unsigned char	rdfail_detail;
-GBLREF unsigned int     t_tries;
-GBLREF gv_key 		*gv_currkey;
-GBLREF hash_table_int4	cw_stagnate;
+GBLREF unsigned int	t_tries;
+GBLREF gv_key		*gv_currkey;
+GBLREF hash_table_int8	cw_stagnate;
 
 /******************************************************************************************
 Input Parameters:
@@ -98,12 +99,12 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	int			piece_len1, piece_len2, first_offset, second_offset,
 				work_blk_size, work_parent_size, dest_blk_size, dest_parent_size;
 	int			dest_child_cycle;
-	int			blk_seg_cnt, blk_size;
+	int			blk_seg_cnt, blk_size, work_blk_id_sz, dest_blk_id_sz;
 	trans_num		ctn;
 	int			key_len, key_len_dir;
 	block_id		dest_blk_id, work_blk_id, child1, child2;
 	enum cdb_sc		status;
-	srch_hist 		*dest_hist_ptr, *dir_hist_ptr;
+	srch_hist		*dest_hist_ptr, *dir_hist_ptr;
 	cache_rec_ptr_t		dest_child_cr;
 	blk_segment		*bs1, *bs_ptr;
 	sm_uc_ptr_t		saved_blk, work_blk_ptr, work_parent_ptr, dest_parent_ptr, dest_blk_ptr,
@@ -111,10 +112,11 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	boolean_t		gbl_target_was_set, blk_was_free, deleted;
 	gv_namehead		*save_targ;
 	srch_blk_status		bmlhist, destblkhist, *hist_ptr, *work_blk_stat;
-	unsigned char    	save_cw_set_depth;
+	unsigned char		save_cw_set_depth;
 	cw_set_element		*tmpcse;
 	jnl_buffer_ptr_t	jbbp; /* jbbp is non-NULL only if before-image journaling */
 	unsigned int		bsiz;
+	boolean_t		work_long_blk_id, dest_long_blk_id, temp_long_blk_id;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -131,6 +133,8 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	work_blk_ptr = work_blk_stat->buffaddr;
 	work_blk_size = ((blk_hdr_ptr_t)work_blk_ptr)->bsiz;
 	work_blk_id = work_blk_stat->blk_num;
+	work_long_blk_id = IS_64_BLK_ID(work_blk_ptr);
+	work_blk_id_sz = SIZEOF_BLK_ID(work_long_blk_id);
 	if (blk_size < work_blk_size)
 	{
 		assert(t_tries < CDB_STAGNATE);
@@ -178,7 +182,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		/* reset whatever blocks the previous iteration of this for loop had filled in the cw_stagnate hashtable */
 		for ( ; cws_reorg_remove_index > 0; cws_reorg_remove_index--)
 		{
-			deleted = delete_hashtab_int4(&cw_stagnate, (uint4 *)&cws_reorg_remove_array[cws_reorg_remove_index]);
+			deleted = delete_hashtab_int8(&cw_stagnate, (ublock_id *)&cws_reorg_remove_array[cws_reorg_remove_index]);
 			assert(deleted);
 		}
 		/* read corresponding bitmap block before attempting to read destination  block.
@@ -204,6 +208,8 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			destblkhist.blk_num = dest_blk_id;
 			destblkhist.buffaddr = dest_blk_ptr;
 			destblkhist.level = dest_blk_level = ((blk_hdr_ptr_t)dest_blk_ptr)->levl;
+			dest_long_blk_id = IS_64_BLK_ID(dest_blk_ptr);
+			dest_blk_id_sz = SIZEOF_BLK_ID(dest_long_blk_id);
 		}
 		if (BLK_BUSY != x_blk_lmap)
 		{	/* x_blk_map is either BLK_FREE or BLK_RECYCLED both of which mean the block is not used in the bitmap */
@@ -222,9 +228,10 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		rec_base = dest_blk_ptr + SIZEOF(blk_hdr);
 		GET_RSIZ(rec_size1, rec_base);
 		tblk_ptr = dest_blk_ptr;
-		while ((BSTAR_REC_SIZE == rec_size1) && (0 != nslevel))
+		temp_long_blk_id = dest_long_blk_id;
+		while ((bstar_rec_size(temp_long_blk_id) == rec_size1) && (0 != nslevel))
 		{
-			GET_BLK_ID(child1, rec_base + SIZEOF(rec_hdr));
+			READ_BLK_ID(temp_long_blk_id, &child1, rec_base + SIZEOF(rec_hdr));
 			if (0 == child1 || child1 > cs_data->trans_hist.total_blks - 1)
 			{
 				assert(t_tries < CDB_STAGNATE);
@@ -235,6 +242,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 				assert(t_tries < CDB_STAGNATE);
 				return (enum cdb_sc)rdfail_detail;
 			}
+			temp_long_blk_id = IS_64_BLK_ID(tblk_ptr);
 			/* leaf of a killed GVT can have block header only.   Skip those blocks */
 			if (SIZEOF(blk_hdr) >= ((blk_hdr_ptr_t)tblk_ptr)->bsiz)
 				break;
@@ -308,7 +316,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		key_base = dir_hist_ptr->h[0].buffaddr + dir_hist_ptr->h[0].curr_rec.offset + SIZEOF(rec_hdr);
 		key_len_dir = get_key_len(dir_hist_ptr->h[0].buffaddr, key_base);
 		/* Get root of GVT for dest_blk_id */
-		GET_BLK_ID(gv_target->root, key_base + key_len_dir);
+		READ_BLK_ID(IS_64_BLK_ID(dir_hist_ptr->h[0].buffaddr), &(gv_target->root), key_base + key_len_dir);
 		if ((0 == gv_target->root) || (gv_target->root > (cs_data->trans_hist.total_blks - 1)))
 		{
 			assert(t_tries < CDB_STAGNATE);
@@ -340,6 +348,8 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		dest_blk_size = ((blk_hdr_ptr_t)dest_blk_ptr)->bsiz;
 		dest_parent_ptr = dest_hist_ptr->h[dest_blk_level+1].buffaddr;
 		dest_parent_size = ((blk_hdr_ptr_t)dest_parent_ptr)->bsiz;
+		dest_long_blk_id = IS_64_BLK_ID(dest_blk_ptr);
+		dest_blk_id_sz = SIZEOF_BLK_ID(dest_long_blk_id);
 		break;
 	}
 	/*===== End of infinite loop to find the destination block =====*/
@@ -361,7 +371,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		t_write(&gv_target->hist.h[level], (unsigned char *)bs1, 0, 0, dest_blk_level, TRUE, TRUE, GDS_WRITE_KILLTN);
 	}
 	/* 2: work_blk_id into dest_blk_id */
-	if (!blk_was_free && work_blk_id == dest_hist_ptr->h[dest_blk_level+1].blk_num)
+	if (!blk_was_free && (work_blk_id == dest_hist_ptr->h[dest_blk_level+1].blk_num))
 	{	/* work_blk_id will be swapped with its child.
 		 * This is the only vertical swap.  Here working block goes to its child.
 		 * Working block cannot goto its parent because of traversal
@@ -384,10 +394,11 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			return cdb_sc_blkmod;
 		}
 		piece_len1 =  first_offset + rec_size1;
-		BLK_SEG(bs_ptr, saved_blk + SIZEOF(blk_hdr), piece_len1 - SIZEOF(block_id) - SIZEOF(blk_hdr));
-		BLK_ADDR(bn_ptr, SIZEOF(block_id), unsigned char);
-		PUT_BLK_ID(bn_ptr, work_blk_id); /* since work_blk_id will now be the child of dest_blk_id */
-		BLK_SEG(bs_ptr, bn_ptr, SIZEOF(block_id));
+		BLK_SEG(bs_ptr, saved_blk + SIZEOF(blk_hdr), piece_len1 - dest_blk_id_sz - SIZEOF(blk_hdr));
+		BLK_ADDR(bn_ptr, dest_blk_id_sz, unsigned char);
+		/* since work_blk_id will now be the child of dest_blk_id */
+		WRITE_BLK_ID(dest_long_blk_id, work_blk_id, bn_ptr);
+		BLK_SEG(bs_ptr, bn_ptr, dest_blk_id_sz);
 		BLK_SEG(bs_ptr, saved_blk + piece_len1, dest_parent_size - piece_len1);
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
@@ -457,7 +468,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 					JNL_GET_CHECKSUM_ACQUIRED_BLK(tmpcse, cs_data, cs_addrs, tmpcse->old_block, bsiz);
 				}
 			}
-			assert(GDSVCURR == tmpcse->ondsk_blkver);	/* should have been set by t_create above */
+			assert(cs_data->desired_db_format == tmpcse->ondsk_blkver);	/* should have been set by t_create above */
 		} else
 		{
 			hist_ptr = &dest_hist_ptr->h[dest_blk_level];
@@ -490,27 +501,28 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			}
 			GET_RSIZ(rec_size1, dest_parent_ptr + first_offset);
 			GET_RSIZ(rec_size2, dest_parent_ptr + second_offset);
-			if (dest_parent_size < first_offset + rec_size1 ||
-				dest_parent_size < second_offset + rec_size2 ||
-				BSTAR_REC_SIZE >= rec_size1 || BSTAR_REC_SIZE > rec_size2)
+			if ((dest_parent_size < first_offset + rec_size1) ||
+				(dest_parent_size < second_offset + rec_size2) ||
+				(bstar_rec_size(dest_long_blk_id) >= rec_size1) ||
+				(bstar_rec_size(dest_long_blk_id) > rec_size2))
 			{
 				assert(t_tries < CDB_STAGNATE);
 				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 				return cdb_sc_blkmod;
 			}
-			piece_len1 =  first_offset + rec_size1 - SIZEOF(block_id);
-			piece_len2 =  second_offset + rec_size2 - SIZEOF(block_id);
-			GET_BLK_ID(child1, dest_parent_ptr + piece_len1);
-			GET_BLK_ID(child2, dest_parent_ptr + piece_len2);
+			piece_len1 =  first_offset + rec_size1 - dest_blk_id_sz;
+			piece_len2 =  second_offset + rec_size2 - dest_blk_id_sz;
+			READ_BLK_ID(dest_long_blk_id, &child1, dest_parent_ptr + piece_len1);
+			READ_BLK_ID(dest_long_blk_id, &child2, dest_parent_ptr + piece_len2);
 			BLK_SEG(bs_ptr, dest_parent_ptr + SIZEOF(blk_hdr), piece_len1 - SIZEOF(blk_hdr));
-			BLK_ADDR(bn_ptr, SIZEOF(block_id), unsigned char);
-			PUT_BLK_ID(bn_ptr, child2);
-			BLK_SEG(bs_ptr, bn_ptr, SIZEOF(block_id));
+			BLK_ADDR(bn_ptr, dest_blk_id_sz, unsigned char);
+			WRITE_BLK_ID(dest_long_blk_id, child2, bn_ptr);
+			BLK_SEG(bs_ptr, bn_ptr, dest_blk_id_sz);
 			BLK_SEG(bs_ptr, dest_parent_ptr + first_offset + rec_size1,
-				second_offset + rec_size2 - SIZEOF(block_id) - first_offset - rec_size1);
-			BLK_ADDR(bn_ptr, SIZEOF(block_id), unsigned char);
-			PUT_BLK_ID(bn_ptr, child1);
-			BLK_SEG(bs_ptr, bn_ptr, SIZEOF(block_id));
+				second_offset + rec_size2 - dest_blk_id_sz - first_offset - rec_size1);
+			BLK_ADDR(bn_ptr, dest_blk_id_sz, unsigned char);
+			WRITE_BLK_ID(dest_long_blk_id, child1, bn_ptr);
+			BLK_SEG(bs_ptr, bn_ptr, dest_blk_id_sz);
 			BLK_SEG(bs_ptr, dest_parent_ptr + second_offset + rec_size2,
 				dest_parent_size - second_offset - rec_size2);
 			if (!BLK_FINI(bs_ptr,bs1))
@@ -528,20 +540,20 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			 */
 			BLK_INIT(bs_ptr, bs1);
 			GET_RSIZ(rec_size1, dest_parent_ptr + dest_hist_ptr->h[dest_blk_level+1].curr_rec.offset);
-			if (dest_parent_size < rec_size1 +  dest_hist_ptr->h[dest_blk_level+1].curr_rec.offset ||
-				BSTAR_REC_SIZE > rec_size1)
+			if ((dest_parent_size < (rec_size1 + dest_hist_ptr->h[dest_blk_level+1].curr_rec.offset)) ||
+				(bstar_rec_size(dest_long_blk_id) > rec_size1))
 			{
 				assert(t_tries < CDB_STAGNATE);
 				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 				return cdb_sc_blkmod;
 			}
 			BLK_SEG (bs_ptr, dest_parent_ptr + SIZEOF(blk_hdr),
-			    dest_hist_ptr->h[dest_blk_level+1].curr_rec.offset + rec_size1 - SIZEOF(blk_hdr) - SIZEOF(block_id));
-			BLK_ADDR(bn_ptr, SIZEOF(block_id), unsigned char);
-			PUT_BLK_ID(bn_ptr, work_blk_id);
-			BLK_SEG(bs_ptr, bn_ptr, SIZEOF(block_id));
+			    dest_hist_ptr->h[dest_blk_level+1].curr_rec.offset + rec_size1 - SIZEOF(blk_hdr) - dest_blk_id_sz);
+			BLK_ADDR(bn_ptr, dest_blk_id_sz, unsigned char);
+			WRITE_BLK_ID(dest_long_blk_id, work_blk_id, bn_ptr);
+			BLK_SEG(bs_ptr, bn_ptr, dest_blk_id_sz);
 			BLK_SEG(bs_ptr, dest_parent_ptr + dest_hist_ptr->h[dest_blk_level+1].curr_rec.offset + rec_size1,
-				dest_parent_size - dest_hist_ptr->h[dest_blk_level+1].curr_rec.offset  - rec_size1);
+				dest_parent_size - dest_hist_ptr->h[dest_blk_level+1].curr_rec.offset - rec_size1);
 			if (!BLK_FINI(bs_ptr,bs1))
 			{
 				assert(t_tries < CDB_STAGNATE);
@@ -557,7 +569,8 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	if (blk_was_free || gv_target->hist.h[level+1].blk_num != dest_hist_ptr->h[dest_blk_level+1].blk_num)
 	{	/* Parent block of working blk should correctly point the working block. Working block went to dest_blk_id  */
 		GET_RSIZ(rec_size1, (work_parent_ptr + gv_target->hist.h[level+1].curr_rec.offset));
-		if (work_parent_size < rec_size1 +  gv_target->hist.h[level+1].curr_rec.offset || BSTAR_REC_SIZE > rec_size1)
+		if (work_parent_size < rec_size1 +  gv_target->hist.h[level+1].curr_rec.offset ||
+				bstar_rec_size(work_long_blk_id) > rec_size1)
 		{
 			assert(t_tries < CDB_STAGNATE);
 			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
@@ -565,10 +578,10 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		}
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, work_parent_ptr + SIZEOF(blk_hdr),
-			gv_target->hist.h[level+1].curr_rec.offset + rec_size1 - SIZEOF(blk_hdr) - SIZEOF(block_id));
-		BLK_ADDR(bn_ptr, SIZEOF(block_id), unsigned char);
-		PUT_BLK_ID(bn_ptr, dest_blk_id);
-		BLK_SEG(bs_ptr, bn_ptr, SIZEOF(block_id));
+			gv_target->hist.h[level+1].curr_rec.offset + rec_size1 - SIZEOF(blk_hdr) - work_blk_id_sz);
+		BLK_ADDR(bn_ptr, work_blk_id_sz, unsigned char);
+		WRITE_BLK_ID(work_long_blk_id, dest_blk_id, bn_ptr);
+		BLK_SEG(bs_ptr, bn_ptr, work_blk_id_sz);
 		BLK_SEG(bs_ptr, work_parent_ptr + gv_target->hist.h[level+1].curr_rec.offset + rec_size1,
 			work_parent_size - gv_target->hist.h[level+1].curr_rec.offset - rec_size1);
 		if (!BLK_FINI(bs_ptr, bs1))

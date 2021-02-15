@@ -10,14 +10,18 @@
  *								*
  ****************************************************************/
 
+#ifndef FILESTRUCT_H
+#define FILESTRUCT_H
+
 #ifndef dev_t
 #include <sys/types.h>
 #endif
 #include "gdsdbver.h"
 
-#define GDS_LABEL_GENERIC 	"GDSDYNUNX"
-#define GDS_LABEL 		GDS_LABEL_GENERIC GDS_CURR	/* This string must be of length GDS_LABEL_SZ */
-#define GDS_RPL_LABEL 		"GDSRPLUNX04" 	/* format of journal pool and receive pool (must be of length GDS_LABEL_SZ) */
+#define GDS_LABEL_GENERIC	"GDSDYNUNX"
+#define GDS_LABEL		GDS_LABEL_GENERIC GDS_CURR_NO_PAREN	/* This string must be of length GDS_LABEL_SZ */
+#define V6_GDS_LABEL		GDS_LABEL_GENERIC GDS_V50	/* Any changes must be copied to the definition in v6_gdsfhead.h */
+#define GDS_RPL_LABEL		"GDSRPLUNX04"	/* format of journal pool and receive pool (must be of length GDS_LABEL_SZ) */
 
 /* Check O_DIRECT alignment requirements for each supported platform */
 #define	DIO_ALIGNSIZE(udi)	((udi)->db_fs_block_size)
@@ -152,3 +156,5 @@ MBSTART {						\
 	CSD->gt_sem_ctime.ctime = UDI->gt_sem_ctime;	\
 	CSD->gt_shm_ctime.ctime = UDI->gt_shm_ctime;	\
 } MBEND
+
+#endif /* FILESTRUCT_H */

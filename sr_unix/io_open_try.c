@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -327,13 +327,15 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 		oflag |= (O_RDWR | O_CREAT | O_NOCTTY);
 		p_offset = 0;
 		ichset_specified = ochset_specified = FALSE;
-		while(iop_eol != *(pp->str.addr + p_offset))
+		while ((iop_eol != *(pp->str.addr + p_offset)) && (pp->str.len > p_offset))
 		{
+			assert((0 <= p_offset) && (p_offset < MAXPOSINT4));
 			assert((params) *(pp->str.addr + p_offset) < (params)n_iops);
 			switch ((ch = *(pp->str.addr + p_offset++)))
 			{
 				case iop_exception:
 				{
+					assert((0 < p_offset) && ((1 + p_offset) < MAXPOSINT4));
 					DEF_EXCEPTION(pp, p_offset, iod);
 					break;
 				}
@@ -394,8 +396,15 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 				default:
 					break;
 			}
-			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-				     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+			if (IOP_VAR_SIZE == io_params_size[ch])
+			{
+				assert((0 < p_offset) && (p_offset < (MAXPOSINT4 - 255)));
+				p_offset += (unsigned char)*(pp->str.addr + p_offset) + 1;
+			} else
+			{
+				assert((0 < p_offset) && (p_offset < (MAXPOSINT4 - io_params_size[ch])));
+				p_offset += io_params_size[ch];
+			}
 		}
 		/* Check the saved error from mknod() for fifo, also saved error from fstat() or stat()
 		   so error handler (if set)  can handle it */
@@ -406,7 +415,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_stat_err);
 		/* Error from trying to open a dir */
 		if (dir_err)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GTMEISDIR, 2, LEN_AND_STR(buf));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_GTMEISDIR, 2, LEN_AND_STR(buf));
 		if (timed)
 			start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);
 		/* RW permissions for owner and others as determined by umask. */

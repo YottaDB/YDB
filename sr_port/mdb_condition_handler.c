@@ -207,7 +207,9 @@ boolean_t clean_mum_tstart(void)
 {
 	stack_frame	*save_zyerr_frame, *fp, *fpprev;
 	boolean_t	save_check_flag;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (NULL != zyerr_frame)
 	{
 		while ((NULL != frame_pointer) && (NULL != zyerr_frame))
@@ -221,6 +223,7 @@ boolean_t clean_mum_tstart(void)
 			indr_stringpool = stringpool;
 			stringpool = rts_stringpool;
 		}
+		TREF(compile_time) = FALSE;	/* Switching back to run-time */
 		return TRUE;
 	}
 	return (NULL != err_act);
@@ -254,6 +257,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	sgmnt_addrs		*csa;
 	stack_frame		*fp;
 	boolean_t		error_in_zyerror;
+	boolean_t		compile_time;
 	boolean_t		repeat_error, etrap_handling, reset_mpc;
 	int			level, rc;
 	boolean_t		reserve_sock_dev = FALSE;
@@ -589,8 +593,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 #	endif
  	err_dev = active_device;
 	active_device = (io_desc *)NULL;
+	compile_time = TREF(compile_time);
 	dm_action = (prin_dm_io || (frame_pointer->old_frame_pointer->type & SFT_DM)
-		|| (TREF(compile_time) && (frame_pointer->type & SFT_DM)));
+		|| (compile_time && (frame_pointer->type & SFT_DM)));
 	/* The errors are said to be transcendental when they occur during compilation/execution
 	 * of the error trap ({z,e}trap, device exception) or $zinterrupt. The errors in other
 	 * indirect code frames (zbreak, zstep, xecute etc.) aren't defined to be trancendental
@@ -1103,7 +1108,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		if (dm_action)
 		{
 			PRN_ERROR;
-			if (TREF(compile_time) && (((int)ERR_LABELMISSING) != SIGNAL))
+			if (compile_time && (((int)ERR_LABELMISSING) != SIGNAL))
 				show_source_line(TRUE);
 		}
 	}

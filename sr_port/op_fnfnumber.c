@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,7 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 	unsigned char	*ch, *cp, *ff, *ff_top, fncode, sign, *t;
 
 	if (!MV_DEFINED(fmt))		/* catch this up front so noundef mode can't cause trouble - so fmt no empty context */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_FNUMARG, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(2) ERR_FNUMARG, 0);
 	/* if the dst will be different than the src we'll build the new value in the string pool and repoint dst there,
 	 * otherwise, dst will anyway become the same as src, therefore we can safely use dst as a "temporary" copy of src
 	 */
@@ -88,12 +88,12 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 				fncode |= PAREN;
 				break;
 			default:
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FNUMARG, 4, fmt->str.len, fmt->str.addr, 1, --ff);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_FNUMARG, 4, fmt->str.len, fmt->str.addr, 1, --ff);
 			break;
 		}
 	}
 	if ((0 != (fncode & PAREN)) && (0 != (fncode & FNERROR)))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FNARGINC, 2, fmt->str.len, fmt->str.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_FNARGINC, 2, fmt->str.len, fmt->str.addr);
 	else
 	{
 		sign = 0;

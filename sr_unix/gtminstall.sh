@@ -1,7 +1,7 @@
 #!/bin/sh -
 #################################################################
 #                                                               #
-# Copyright (c) 2014-2019 Fidelity National Information		#
+# Copyright (c) 2014-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -71,7 +71,7 @@ dump_info()
     if [ -n "$gtm_group_already" ] ; then echo gtm_group_already " : " $gtm_group_already ; fi
     if [ -n "$gtm_group_restriction" ] ; then echo gtm_group_restriction " : " $gtm_group_restriction ; fi
     if [ -n "$gtm_hostos" ] ; then echo gtm_hostos " : " $gtm_hostos ; fi
-    if [ -n "$gtm_icu_version" ] ; then echo gtm_icu_version " : " $gtm_icu_version ; fi
+    if [ -n "$gtm_install_utf8" ] ; then echo gtm_install_utf8 " : " $gtm_install_utf8 ; fi
     if [ -n "$gtm_install_flavor" ] ; then echo gtm_install_flavor " : " $gtm_install_flavor ; fi
     if [ -n "$gtm_installdir" ] ; then echo gtm_installdir " : " $gtm_installdir ; fi
     if [ -n "$gtm_keep_obj" ] ; then echo gtm_keep_obj " : " $gtm_keep_obj ; fi
@@ -119,9 +119,7 @@ err_exit()
     echo "$m1"
     echo "--ucaseonly-utils -- install only upper case utility program names; defaults to both if not specified"
     echo "--user username - user who should own GT.M installation; default is root"
-    m1="--utf8 ICU_version - install "
-    m1="$m1""UTF-8 support using specified  major.minor ICU version; specify default to use default version"
-    echo "$m1"
+    echo "--utf8 - install UTF-8 support"
     echo "--verbose - * output diagnostic information as the script executes; default is to run quietly"
     echo "options that take a value (e.g, --group) can be specified as either --option=value or --option value"
     echo "options marked with * are likely to be of interest primarily to GT.M developers"
@@ -256,13 +254,7 @@ while [ $# -gt 0 ] ; do
                 fi
             fi
             shift ;;
-        --utf8*) tmp=`echo $1 | cut -s -d = -f 2- | tr DEFAULT default`
-            if [ -n "$tmp" ] ; then gtm_icu_version=$tmp
-            else if [ 1 -lt "$#" ] ; then gtm_icu_version=`echo $2 | tr DEFAULT default`; shift
-                else echo "--utf8 needs a value" ; err_exit
-                fi
-            fi
-            shift ;;
+        --utf8*) gtm_install_utf8="Y" ; shift ;;
         --verbose) gtm_verbose="Y" ; shift ;;
         -*) echo Unrecognized option "$1" ; err_exit ;;
         *) if [ -n "$gtm_version" ] ; then echo Nothing must follow the GT.M version ; err_exit
@@ -509,12 +501,8 @@ if [ "N" = "$gtm_group_already" ] ; then
 fi
 echo $gtm_installdir >>$gtm_configure_in
 echo y >>$gtm_configure_in
-if [ -z "$gtm_icu_version" ] ; then echo n  >>$gtm_configure_in
+if [ -z "$gtm_install_utf8" ] ; then echo n  >>$gtm_configure_in
 else echo y  >>$gtm_configure_in
-    if [ "default" = $gtm_icu_version ] ; then echo n  >>$gtm_configure_in
-    else echo y >>$gtm_configure_in
-        echo $gtm_icu_version >>$gtm_configure_in
-    fi
 fi
 echo $gtm_lcase_utils >>$gtm_configure_in
 if [ "Y" = $gtm_shlib_support ] ; then echo $gtm_keep_obj >>$gtm_configure_in ; fi

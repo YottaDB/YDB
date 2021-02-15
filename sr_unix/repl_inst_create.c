@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -105,15 +105,15 @@ void repl_inst_create(void)
 								dont_sendmsg_on_log2long)))
 		{
 			if (SS_LOG2LONG == status)
-				rts_error_csa(CSA_ARG(NULL)
+				RTS_ERROR_CSA_ABT(NULL,
 					VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, SIZEOF(inst_name) - 1);
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLINSTNMUNDEF);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_REPLINSTNMUNDEF);
 		}
 		inst_name_len = trans_name.len;
 	}
 	if ((MAX_INSTNAME_LEN <= inst_name_len) || (0 == inst_name_len))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLINSTNMLEN, 2, inst_name_len, inst_name);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_REPLINSTNMLEN, 2, inst_name_len, inst_name);
 	inst_name[inst_name_len] = '\0';
 	buff_8byte_aligned = &buff_unaligned[0];
 	buff_8byte_aligned = (char *)ROUND_UP2((INTPTR_T)buff_8byte_aligned, 8);
@@ -126,7 +126,7 @@ void repl_inst_create(void)
 	if (-1 != status)
 	{
 		if (cli_present("NOREPLACE"))	/* the file exists, so error out */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILEEXISTS, 2, inst_fn_len, inst_fn);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_FILEEXISTS, 2, inst_fn_len, inst_fn);
 		in_repl_inst_create = TRUE;	/* used by an assert in the call to "repl_inst_read" below */
 		repl_inst_read(inst_fn, (off_t)0, (sm_uc_ptr_t)repl_instance, SIZEOF(repl_inst_hdr));
 		in_repl_inst_create = FALSE;
@@ -134,7 +134,7 @@ void repl_inst_create(void)
 			|| (INVALID_SEMID != repl_instance->recvpool_semid) || (INVALID_SHMID != repl_instance->recvpool_shmid))
 		{
 			assert(FALSE || WBTEST_ENABLED(WBTEST_REPLINSTSTNDALN));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLINSTSTNDALN, 2, inst_fn_len, inst_fn);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_REPLINSTSTNDALN, 2, inst_fn_len, inst_fn);
 		}
 		JNL_SHORT_TIME(now);
 		rename_fn_len = ARRAYSIZE(rename_fn);
@@ -144,10 +144,10 @@ void repl_inst_create(void)
 			gtm_putmsg_csa(CSA_ARG(NULL)
 				VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Error preparing unique name for renaming instance file"));
 			if (SS_NORMAL != status2)
-				rts_error_csa(CSA_ARG(NULL)
+				RTS_ERROR_CSA_ABT(NULL,
 					VARLSTCNT(7) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, status, 0, status2);
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, status);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, status);
 		}
 		if (SS_NORMAL != (status = gtm_rename((char *)inst_fn, (int)inst_fn_len,
 								(char *)rename_fn, rename_fn_len, &status2)))
@@ -163,7 +163,7 @@ void repl_inst_create(void)
 				VARLSTCNT(6) ERR_FILERENAME, 4, inst_fn_len, inst_fn, rename_fn_len, rename_fn);
 
 	} else if (ENOENT != errno) /* some error happened */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, errno);
 	/* The instance file consists of 3 parts.
 	 *	File header ("repl_inst_hdr" structure)
 	 *	Array of 16 "gtmsrc_lcl" structures

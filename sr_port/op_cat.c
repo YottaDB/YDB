@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +22,8 @@
 
 GBLREF spdesc stringpool;
 
+error_def(ERR_MAXSTRLEN);
+
 void op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 {
 	va_list var;
@@ -28,7 +31,6 @@ void op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 	int maxlen, i;
 	VMS_ONLY(int srcargs;)
 	unsigned char *cp, *base;
-	error_def(ERR_MAXSTRLEN);
 
 	VAR_START(var, dst);
 	VMS_ONLY(va_count(srcargs);)
@@ -45,7 +47,7 @@ void op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 		if (maxlen > MAX_STRLEN)
 		{
 			va_end(var);
-			rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+			RTS_ERROR_ABT(VARLSTCNT(1) ERR_MAXSTRLEN);
 		}
 	}
 	va_end(var);

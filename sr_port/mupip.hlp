@@ -3642,10 +3642,8 @@
    -RES[ERVED_BYTES]=size
 
      o RESERVED_BYTES may also be used as a user-managed fill factor.
-     o The minimum RESERVED_BYTES is 0 bytes. The maximum RESERVED_BYTES is
-       the block size minus the size of the block header which is 7 or 8
-       depending on your platform. Realistic determinations of this amount
-       should leave room for at least one record of maximum size.
+     o The minimum RESERVED_BYTES is 0 bytes. The maximum RESERVED_BYTES =
+       Block Size - Key Size - 40 (Block/Record header overheads).
 
 3 SLeep_spin_count
    SLeep_spin_count
@@ -7426,14 +7424,32 @@
    -timeout=<timeout in seconds>
 
    Specifies the time (in seconds) the shutdown command should wait before
-   signaling the Source Server to shut down. If you do not specify -timeout,
-   the default timeout period is 120 seconds. If you specify -timeout=0 ,
-   shutdown occurs immediately.
+   signaling the Source Server to shut down. If you specify -timeout=0, MUPIP
+   initiates the shutdown immediately. The default is 120 seconds and the
+   maximum timeout is 3600 seconds. Any value higher than 3600 produces the
+   INVSHUTDOWN error.
+
+   After initiating shutdown of the Source Server, GT.M waits up to 90 *
+   number_of_regions seconds (with a minimum of 120 seconds) for the Source
+   Server process to exit normally.
 
    -zerobacklog
 
-   Shuts down the Source Server either when the backlog goes to zero or the
-   timeout expires, whichever occurs first.
+   Restricts Journal Pool in a way that only existing processes can complete
+   their updates and shuts down the Source Server:
+
+     o with the REPL0BACKLOG message as soon as there is no backlog and the
+       Source Server has received acknowledgement of all its updates from the
+       Receiver Server.
+     o with the REPLBACKLOG message when the timeout expires while there was
+       a backlog and/or unacknowledged updates from the Receiver Server.
+
+   The REPL0BACKLOG message helps confirm that two instances are in sync
+   (seqno-wise) because all Source Server updates have reached the Receive
+   Pool at the time of shutdown and there are no-inflight updates. The
+   REPL0BACKLOG message also causes the timeout to expire prematurely. In
+   planned switchover scenarios, the REPL0BACKLOG message assists in
+   operationally preventing lost transaction file generation.
 
 2 Activate_Passive_Source_Server
    Activate Passive Source Server
@@ -7690,29 +7706,6 @@
 
    -log_interval=0 reverts the logging interval to the default value.
 
-2 Stop_Source_Server
-   Stop Source Server
-
-   Command Syntax:
-
-   mupip replic -source -shutdown [-instsecondary=<instance_name>] [-timeout=<seconds>]
-
-   Qualifiers:
-
-   -instsecondary=<instance_name>
-
-   Identifies a Source Server process.
-
-   If -instsecondary is not specified, -shutdown stops all Source Server
-   processes.
-
-   -timeout=<seconds>
-
-   Specifies the period of time (in seconds) a Source Server should wait
-   before shutting down. If you do not specify -timeout, the default timeout
-   period is 30 seconds. If you specify -timeout=0, shutdown occurs
-   immediately.
-
 2 Source_backlog
    Source backlog
 
@@ -7724,23 +7717,37 @@
 
    -showbacklog
 
-   Reports the current backlog of journal records (in terms of JNL_SEQNO) on
-   the output device (normally the standard output device). This qualifier
-   does not affect the statistics logged in the log file. The backlog is the
-   difference between the last JNL_SEQNO written to the Journal Pool and the
-   last JNL_SEQNO sent by the Source Server to the Receiver Server. In the
-   WAS_ON state, -showbacklog reports the backlog information even if the
-   Source Server is shut down.
+   Reports four fields that help determine the backlog of updates on the
+   Source Server. These fields are:
+
+    1. Current backlog of journal records (in terms of the number of
+       JNL_SEQNOs)
+    2. Last JNL_SEQNO written to the Journal Pool
+    3. Last JNL_SEQNO sent by the Source Server to the Receiver Server
+    4. Last JNL_SEQNO acknowledged by the Receiver Server
+
+   The backlog is the difference between the second and third fields. When
+   backlog is 0 and the remaining three fields have the same value, it means
+   that all Source Server updates have reached the Receiver Pool and there
+   are no in-flight updates.
+
+   **Important**
+
+   A -SHOWBACKLOG operation momentarily restricts access to the Journal Pool
+   to determine the backlog. If your operations demand frequent checking for
+   replication backlogs, FIS recommends using the ^%PEEKBYNAME function
+   instead of performing a -SHOWBACKLOG in a continuous loop. Please refer to
+   the examples for more information on using ^%PEEKBYNAME for monitoring
+   replication speed and backlog.
 
    Example:
 
    $ mupip replic -source -showbacklog -inst=INSTB
-   Wed May 19 18:58:29 2010 : Initiating SHOWBACKLOG operation on source server pid [0] for secondary
-   instance [INSTB]
-   101 : backlog number of transactions written to journal pool and yet to be sent by the source server
+   Tue Jan  5 10:36:46 2021 : Initiating SHOWBACKLOG operation on source server pid [0] for secondary instance [INSTB]
+   52 : backlog number of transactions written to journal pool and yet to be sent by the source server
    102 : sequence number of last transaction written to journal pool
-   1 : sequence number of last transaction sent by source server
-   %GTM-E-SRCSRVNOTEXIST, Source server for secondary instance INSTB is not alive
+   50 : sequence number of last transaction sent by source server
+   25 : sequence number acknowledged by the secondary instance [INSTB]
 
 2 Process_Lost_Transactions
    Process Lost Transactions
@@ -8188,8 +8195,8 @@
    gtmuser1 11951 11943 0 06:42 ? 00:00:00 /usr/library/GTM/mupip replicate -updhelper -writer
    gtmuser1 11952 11943 0 06:42 ? 00:00:00 /usr/library/GTM/mupip replicate -updhelper -writer
 
-2 Stop_Update_Process_and/or_the_Receiver_Server
-   Stop Update Process and/or the Receiver Server
+2 Stop_the_Receiver_Server_and/or_the_Update_Process
+   Stop the Receiver Server and/or the Update Process
 
    Command syntax:
 
@@ -8427,8 +8434,6 @@
    |-----------+----------------+-------------------------------------------------------+--------+----------|
    |           |                |-DA[TABASE] -REPLA[CE]                                 |        |          |
    |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-DBG                                                   |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
    |           |                |-I[NCREMENTAL]                                         |        |          |
    |-----------+----------------+-------------------------------------------------------+--------+----------|
    |           |                |-[NO]J[OURNAL][=journal-options-list]                  |        |          |
@@ -8478,9 +8483,7 @@
    |-----------+----------------+-------------------------------------------------------+--------+----------|
    |           |                |-R[EGION=region-list                                   |        |          |
    |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |F[REEZE]   |region-list     |-DBG                                                   |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-OF[F] [-OV[ERRIDE]]                                   |        |          |
+   |F[REEZE]   |region-list     |-OF[F] [-OV[ERRIDE]]                                   |        |          |
    |-----------+----------------+-------------------------------------------------------+--------+----------|
    |           |                |-ON [-[NO]ONL[INE] [-[NO]A[UTORELEASE]] [-R[ECORD]]]   |        |          |
    |-----------+----------------+-------------------------------------------------------+--------+----------|
@@ -9066,7 +9069,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2020
+   Copyright 2021
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,29 +76,52 @@ LITREF boolean_t mu_int_possub[16][16];
 LITREF boolean_t mu_int_negsub[16][16];
 LITREF boolean_t mu_int_exponent[256];
 
+error_def(ERR_COLLATIONUNDEF);
+error_def(ERR_COLLTYPVERSION);
 error_def(ERR_CORRUPTNODE);
+error_def(ERR_DBBADNSUB);
+error_def(ERR_DBCMPNZRO);
+error_def(ERR_DBDUPNULCOL);
+error_def(ERR_DBFILERR);
+error_def(ERR_DBKEYMX);
+error_def(ERR_DBPRIVERR);
+error_def(ERR_DBRSIZMN);
+error_def(ERR_DBRSIZMX);
+error_def(ERR_FAILEDRECCOUNT);
+error_def(ERR_GBLOFLOW);
+error_def(ERR_GVFAILCORE);
+error_def(ERR_GVINVALID);
 error_def(ERR_GVIS);
-error_def(ERR_TEXT);
+error_def(ERR_JNLFILOPN);
+error_def(ERR_KEY2BIG);
 error_def(ERR_LDBINFMT);
+error_def(ERR_LDSPANGLOINCMP);
 error_def(ERR_LOADCTRLY);
 error_def(ERR_LOADEOF);
-error_def(ERR_MUNOFINISH);
-error_def(ERR_COLLTYPVERSION);
-error_def(ERR_COLLATIONUNDEF);
-error_def(ERR_OLDBINEXTRACT);
 error_def(ERR_LOADINVCHSET);
-error_def(ERR_LDSPANGLOINCMP);
-error_def(ERR_RECLOAD);
-error_def(ERR_GVFAILCORE);
-error_def(ERR_NULSUBSC);
-error_def(ERR_DBDUPNULCOL);
-error_def(ERR_FAILEDRECCOUNT);
 error_def(ERR_LOADRECCNT);
-error_def(ERR_DBFILERR);
+error_def(ERR_MAXNRSUBSCRIPTS);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_NULSUBSC);
+error_def(ERR_OLDBINEXTRACT);
+error_def(ERR_REC2BIG);
+error_def(ERR_RECLOAD);
 error_def(ERR_STATSDBNOTSUPP);
-error_def(ERR_JNLFILOPN);
-error_def(ERR_DBPRIVERR);
-error_def(ERR_GBLOFLOW);
+error_def(ERR_TEXT);
+
+enum err_code
+{
+	CORRUPTNODE,
+	DBBADNSUB,
+	DBCMPNZRO,
+	DBKEYMX,
+	DBRSIZMN,
+	DBRSIZMX,
+	GVINVALID,
+	KEY2BIG,
+	MAXNRSUBSCRIPTS,
+	REC2BIG
+};
 
 #define	BIN_PUT		0
 #define	BIN_BIND	1
@@ -144,7 +167,7 @@ error_def(ERR_GBLOFLOW);
 		 * (e.g. setting gv_cur_region for spanning globals).								\
 		 */														\
 		GV_BIND_SUBSNAME_IF_GVSPAN(GVNH_REG, gd_header, gv_currkey, dummy_reg);						\
-		bin_call_db(BIN_KILL, 0, 0);											\
+		bin_call_db(BIN_KILL, 0, 0, 0, 0, NULL);									\
 		COPY_KEY(gv_currkey, sn_savekey);										\
 		sn_incmp_gbl_already_killed = TRUE;										\
 	}															\
@@ -205,7 +228,7 @@ error_def(ERR_GBLOFLOW);
  * that its size is 4 bytes and no valid data record can have length 4.
  */
 
-gvnh_reg_t	*bin_call_db(int, INTPTR_T, INTPTR_T);
+gvnh_reg_t	*bin_call_db(int, int, INTPTR_T, INTPTR_T, int, unsigned char*);
 void		zwr_out_print(char * buff, int len);
 
 #define ZWR_BASE_STRIDE 1024
@@ -309,7 +332,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base, DO_RTS_ERROR_FALSE);
 	if (0 >= len)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
 	hdr_lvl = EXTR_HEADER_LEVEL(ptr);
@@ -317,7 +340,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 		((('6' <= hdr_lvl) && ('9' >= hdr_lvl)) && (BIN_HEADER_SZ == len)) ||
 		(('4' > hdr_lvl) && (V3_BIN_HEADER_SZ == len))))
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
 	/* expecting the level in a single character */
@@ -325,7 +348,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	if (0 != memcmp(ptr, BIN_HEADER_LABEL, SIZEOF(BIN_HEADER_LABEL) - 2) || ('2' > hdr_lvl) ||
 			*(BIN_HEADER_VERSION_ENCR_IV) < hdr_lvl)
 	{	/* ignore the level check */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
 	/* check if extract was generated in UTF-8 mode */
@@ -333,9 +356,9 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	if ((utf8_extract && !gtm_utf8_mode) || (!utf8_extract && gtm_utf8_mode))
 	{ /* extract CHSET doesn't match $ZCHSET */
 		if (utf8_extract)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("UTF-8"));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("UTF-8"));
 		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
 		mupip_exit(ERR_LDBINFMT);
 	}
 	if ('4' >= hdr_lvl)
@@ -587,7 +610,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 				if (!switch_db)
 					continue;
 			}
-			gvnh_reg = bin_call_db(BIN_BIND, (INTPTR_T)gd_header, (INTPTR_T)&gvname);
+			gvnh_reg = bin_call_db(BIN_BIND, 0, (INTPTR_T)gd_header, (INTPTR_T)&gvname, 0, NULL);
 			/* "gv_cur_region" will be set at this point in case the global does NOT span regions.
 			 * For globals that do span regions, "gv_cur_region" will be set just before the call to op_gvput.
 			 * This value of "gvnh_reg" will be in effect until all records of this global are processed.
@@ -617,9 +640,24 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 			db_collhdr.nct = gv_target->nct;
 		}
 		GET_USHORT(rec_len, &rp->rsiz);
-		if ((max_rec < rec_len) || (0 != EVAL_CMPC(rp)) || (gvname.var_name.len > rec_len) || mupip_error_occurred)
+		if (max_rec < rec_len)
 		{
-			bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
+			bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
+			bin_call_db(ERR_COR, REC2BIG, rec_len, max_rec, REG_LEN_STR(gvnh_reg->gd_reg));
+		} else if (0 != EVAL_CMPC(rp))
+		{
+			bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
+			bin_call_db(ERR_COR, DBCMPNZRO, 0, 0, gvname.var_name.len, (unsigned char*)(gvname.var_name.addr));
+		} else if (gvname.var_name.len > rec_len)
+		{
+			bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
+			bin_call_db(ERR_COR, DBKEYMX, 0, 0, gvname.var_name.len, (unsigned char*)(gvname.var_name.addr));
+		} else if (mupip_error_occurred)
+		{
+			bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
+		}
+		if (mupip_error_occurred)
+		{
 			mu_gvis();
 			DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 			continue;
@@ -677,12 +715,13 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 			GET_USHORT(rec_len, &rp->rsiz);
 			if (rec_len + (unsigned char *)rp > btop)
 			{
-				bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
+				bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
+				bin_call_db(ERR_COR, DBRSIZMX, 0, 0, gvname.var_name.len, (unsigned char*)(gvname.var_name.addr));
 				mu_gvis();
 				DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 				break;
 			}
-			cp1 =  (unsigned char*)(rp + 1);
+			cp1 = (unsigned char*)(rp + 1);
 			cp2 = gv_currkey->base + EVAL_CMPC(rp);
 			current = 1;
 			for ( ; ; )
@@ -697,7 +736,8 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 					gv_currkey->end = cp2 - gv_currkey->base - 1;
 					gv_currkey->base[gv_currkey->end] = 0;
 					gv_currkey->base[gv_currkey->end - 1] = 0;
-					bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
+					bin_call_db(ERR_COR, CORRUPTNODE, (INTPTR_T)iter, (INTPTR_T)global_key_count,
+							0, NULL);
 					mu_gvis();
 					DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 					break;
@@ -771,7 +811,8 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 			}
 			if (gv_currkey->end >= max_key)
 			{
-				bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
+				bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
+				bin_call_db(ERR_COR, KEY2BIG, gv_currkey->end, max_key, REG_LEN_STR(gvnh_reg->gd_reg));
 				mu_gvis();
 				DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 				continue;
@@ -786,7 +827,8 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 			if (!valid_gblname)
 			{
 				mupip_error_occurred = TRUE;
-				bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
+				bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
+				bin_call_db(ERR_COR, GVINVALID, 0, 0, (gvn_char - gv_currkey->base), gv_currkey->base);
 				mu_gvis();
 				DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 				break;
@@ -800,7 +842,8 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 				if (MAX_GVSUBSCRIPTS < num_subscripts)
 				{
 					mupip_error_occurred = TRUE;
-					bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
+					bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
+					bin_call_db(ERR_COR, MAXNRSUBSCRIPTS, 0, 0, 0, NULL);
 					mu_gvis();
 					DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 					break;
@@ -815,8 +858,9 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 							if (!mu_int_possub[subtocheck.one][subtocheck.two])
 							{
 								mupip_error_occurred = TRUE;
-								bin_call_db(ERR_COR, (INTPTR_T)iter,
-									(INTPTR_T)global_key_count);
+								bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
+								bin_call_db(ERR_COR, DBBADNSUB, 0, 0,
+										(gvn_char - gv_currkey->base), gv_currkey->base);
 								mu_gvis();
 								DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 								break;
@@ -831,8 +875,9 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 							if (!mu_int_negsub[subtocheck.one][subtocheck.two])
 							{
 								mupip_error_occurred = TRUE;
-								bin_call_db(ERR_COR, (INTPTR_T)iter,
-									(INTPTR_T)global_key_count);
+								bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
+								bin_call_db(ERR_COR, DBBADNSUB, 0, 0,
+										(gvn_char - gv_currkey->base), gv_currkey->base);
 								mu_gvis();
 								DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 								break;
@@ -841,7 +886,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 						if (!mupip_error_occurred && ((STR_SUB_PREFIX != mych) || (*subs)))
 						{
 							mupip_error_occurred = TRUE;
-							bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
+							bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
 							mu_gvis();
 							DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 							break;
@@ -1095,9 +1140,9 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 					v.str.len = sn_hold_buff_pos;
 				}
 				if (gvnh_reg->gvspan)
-					bin_call_db(BIN_PUT_GVSPAN, (INTPTR_T)&v, (INTPTR_T)gvnh_reg);
+					bin_call_db(BIN_PUT_GVSPAN, 0, (INTPTR_T)&v, (INTPTR_T)gvnh_reg, 0, NULL);
 				else
-					bin_call_db(BIN_PUT, (INTPTR_T)&v, 0);
+					bin_call_db(BIN_PUT, 0, (INTPTR_T)&v, 0, 0, NULL);
 				if (mupip_error_occurred)
 				{
 					if ((ERR_JNLFILOPN == error_condition) || (ERR_DBPRIVERR == error_condition) ||
@@ -1112,7 +1157,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 					{
 						if (ERR_DBFILERR == error_condition)
 							failed_record_count++;
-						bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
+						bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
 						file_offset = file_offset_base + ((unsigned char *)rp - ptr_base);
 						util_out_print("!_!_at File offset : [0x!16@XQ]", TRUE, &file_offset);
 						DISPLAY_CURRKEY;
@@ -1178,14 +1223,13 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	}
 }
 
-gvnh_reg_t *bin_call_db(int routine, INTPTR_T parm1, INTPTR_T parm2)
+gvnh_reg_t *bin_call_db(int routine, int err_code, INTPTR_T parm1, INTPTR_T parm2, int strlen, unsigned char* str)
 {	/* In order to duplicate the VMS functionality, which is to trap all errors in mupip_load_ch and
 	 * continue in bin_load after they occur, it is necessary to call these routines from a
 	 * subroutine due to the limitations of condition handlers and unwinding on UNIX
 	 */
-	gvnh_reg_t	*gvnh_reg;
+	gvnh_reg_t	*gvnh_reg = NULL;
 	gd_region	*dummy_reg;
-	gvnh_reg = NULL;
 
 	DCL_THREADGBL_ACCESS;
 	SETUP_THREADGBL_ACCESS;
@@ -1206,7 +1250,44 @@ gvnh_reg_t *bin_call_db(int routine, INTPTR_T parm1, INTPTR_T parm2)
 			GV_BIND_NAME_AND_ROOT_SEARCH((gd_addr *)parm1, (mname_entry *)parm2, gvnh_reg);
 			break;
 		case ERR_COR:
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_CORRUPTNODE, 2, parm1, parm2);
+			/* We use rts_error_csa instead of gtm_putmsg_csa here even though we are eating the error with
+			 * mupip_load_ch.  This takes advantage of logic mupip_load_ch for cleaning up gv_target.
+			 * mupip_load_ch also sets the global mupip_error_occurred to TRUE, which is used in the main loop
+			 * of bin_load to indicate there was a problem with the current global node and to move onto the next
+			 * global node.
+			 */
+			switch(err_code)
+			{
+				case DBBADNSUB:
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBBADNSUB, 2, strlen, str);
+					break;
+				case DBCMPNZRO:
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBCMPNZRO, 2, strlen, str);
+					break;
+				case DBKEYMX:
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBKEYMX, 2, strlen, str);
+					break;
+				case DBRSIZMN:
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBRSIZMN, 2, strlen, str);
+					break;
+				case DBRSIZMX:
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBRSIZMX, 2, strlen, str);
+					break;
+				case GVINVALID:
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_GVINVALID, 2, strlen, str);
+					break;
+				case KEY2BIG:
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(6) ERR_KEY2BIG, 4, parm1, parm2, strlen, str);
+					break;
+				case MAXNRSUBSCRIPTS:
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+					break;
+				case REC2BIG:
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(6) ERR_REC2BIG, 4, parm1, parm2, strlen, str);
+					break;
+				default:
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_CORRUPTNODE, 2, parm1, parm2);
+			}
 		case BIN_KILL:
 			gvcst_kill(FALSE);
 			break;

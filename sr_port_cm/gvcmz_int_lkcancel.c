@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -139,7 +139,7 @@ void gvcmz_int_lkcancel(void)
 			{
 				SNPRINTF(errbuf, CM_ERRBUFF_SIZE, "gvcmz_int_lkcancel: expected CMMS_E_ERROR, got %d",
 					(int)(*(lkerrlnk->mbf)));
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2, LEN_AND_STR(errbuf));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2, LEN_AND_STR(errbuf));
 			} else
 				gvcmz_errmsg(lkerrlnk, FALSE);
 		}

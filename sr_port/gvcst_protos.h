@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2018 Fidelity National Information	*
+ * Copyright (c) 2004-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #define		DO_STATSDB_INIT_TRUE	TRUE
 
 void		db_auto_upgrade(gd_region *reg);
+void		v6_db_auto_upgrade(gd_region *reg);
 int		db_init(gd_region *reg, boolean_t ok_to_bypass);
 void		db_init_err_cleanup(boolean_t retry_dbinit);
 void		gvcst_redo_root_search(void);

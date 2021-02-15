@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,9 +14,9 @@
 #define CWS_INSERT_H_INCLUDED
 
 #include "hashtab.h"
-#include "hashtab_int4.h"
+#include "hashtab_int8.h"
 
-GBLREF	hash_table_int4	cw_stagnate;
+GBLREF	hash_table_int8	cw_stagnate;
 GBLREF	boolean_t	cw_stagnate_reinitialized;
 
 /* Usually a process does not need the cw_stagnate hash table as it is used only in the final retry.
@@ -31,7 +31,7 @@ GBLREF	boolean_t	cw_stagnate_reinitialized;
 {														\
 	if (0 == cw_stagnate.size)										\
 	{													\
-		init_hashtab_int4(&cw_stagnate, CWS_INITIAL_SIZE, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);	\
+		init_hashtab_int8(&cw_stagnate, CWS_INITIAL_SIZE, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);	\
 		cw_stagnate_reinitialized = TRUE;               						\
 	}													\
 }
@@ -51,11 +51,11 @@ GBLREF	block_id	cws_reorg_remove_array[];
 
 #define CWS_INSERT(block)									\
 {												\
-	ht_ent_int4		*dummy;								\
+	ht_ent_int8		*dummy;								\
 	boolean_t		new_entry;							\
 												\
 	cw_stagnate_reinitialized = FALSE;							\
-	new_entry = add_hashtab_int4(&cw_stagnate, (uint4 *)(&block), HT_VALUE_DUMMY, &dummy);	\
+	new_entry = add_hashtab_int8(&cw_stagnate, (ublock_id *)(&block), HT_VALUE_DUMMY, &dummy);	\
 	/* If in mu_swap_blk and a new entry was added to the hashtable, note this block number	\
 	 * in the cws_reorg_remove_array for later removal in the next iteration of the for 	\
 	 * loop in "mu_swap_blk" (see mu_swap_blk.c for more detail).				\
@@ -76,13 +76,13 @@ GBLREF	block_id	cws_reorg_remove_array[];
 }
 
 /* the use of the variable cw_stagnate_reinitialized to optimize CWS_RESET assumes that all calls to
- * add_hashtab_int4() are done through CWS_INSERT macro.
+ * add_hashtab_int8() are done through CWS_INSERT macro.
  */
 #define CWS_RESET											\
 {	/* if a transaction did not use cw_stagnate hash table, there is no need to reset it */		\
 	if (!cw_stagnate_reinitialized)									\
 	{												\
-		reinitialize_hashtab_int4(&cw_stagnate);						\
+		reinitialize_hashtab_int8(&cw_stagnate);						\
 		cw_stagnate_reinitialized = TRUE;							\
 	}												\
 }

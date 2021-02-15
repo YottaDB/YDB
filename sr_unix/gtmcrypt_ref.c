@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,10 +44,10 @@
 
 #define CHECK_IV_LENGTH(IV)									\
 {												\
-	if (IV.length > GTMCRYPT_IV_LEN)							\
+	if ((GTMCRYPT_IV_LEN < IV.length) || (0 > IV.length))					\
 	{											\
 		UPDATE_ERROR_STRING("Specified IVEC has length %ld, which is greater than "	\
-			"the maximum allowed IVEC length %d", iv.length, GTMCRYPT_IV_LEN);	\
+			"the maximum allowed IVEC length %d", IV.length, GTMCRYPT_IV_LEN);	\
 		return -1;									\
 	}											\
 }
@@ -183,10 +183,10 @@ gtm_status_t gtmcrypt_init_db_cipher_context_by_hash(gtmcrypt_key_t *handle, gtm
 	assert(NULL != entry);
 	if (NULL == entry->db_cipher_entry)
 	{	/* This cipher context is for decryption; iv is a static global. */
-		if (0 != keystore_new_cipher_ctx(entry, iv.address, iv.length, GTMCRYPT_OP_DECRYPT))
+		if (0 != keystore_new_cipher_ctx(entry, iv.address, (unsigned int)iv.length, GTMCRYPT_OP_DECRYPT))
 			return -1;
 		/* And this cipher context (inserted ahead of the first one) is for encryption. */
-		if (0 != keystore_new_cipher_ctx(entry, iv.address, iv.length, GTMCRYPT_OP_ENCRYPT))
+		if (0 != keystore_new_cipher_ctx(entry, iv.address, (unsigned int)iv.length, GTMCRYPT_OP_ENCRYPT))
 			return -1;
 		entry->db_cipher_entry = entry->cipher_head;
 	} else
@@ -227,7 +227,7 @@ gtm_status_t gtmcrypt_init_device_cipher_context_by_keyname(gtmcrypt_key_t *hand
 	if (0 != gtmcrypt_getkey_by_keyname(keyname, NULL, &entry, FALSE))
 		return -1;
 	assert(NULL != entry);
-	if (0 != keystore_new_cipher_ctx(entry, iv.address, iv.length, operation))
+	if (0 != keystore_new_cipher_ctx(entry, iv.address, (unsigned int)iv.length, operation))
 		return -1;
 	ctx = (gtm_cipher_ctx_t **)handle;
 	*ctx = entry->cipher_head;

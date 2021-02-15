@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,6 @@ void coerce(oprtype *a, unsigned short new_type)
 	opctype		conv, old_op;
 	stringkey	litkey;
 	triple		*coerc, *ref;
-
 	assert ((OCT_MVAL == new_type) || (OCT_MINT == new_type) || (OCT_BOOL == new_type));
 	assert (TRIP_REF == a->oprclass);
 	ref = a->oprval.tref;
@@ -51,7 +50,8 @@ void coerce(oprtype *a, unsigned short new_type)
 			{	/* compiler generated literals should include their numeric form - no need to coerce */
 				MV_FORCE_NUMD(&ref->operand[0].oprval.tref->operand[0].oprval.mlit->v);
 			}
-			dqdel(ref, exorder);
+			ref->opcode = OC_NOOP;					/* dqdel of OC_FORCENUM causes chain troubles */
+			ref->operand[0].oprclass = NO_REF;
 			ref = ref->operand[0].oprval.tref;
 			old_op = ref->opcode;
 			if (new_type & oc_tab[old_op].octype)

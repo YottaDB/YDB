@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -105,9 +105,9 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 			if (msp <= stacktop)
 			{
 				msp = msp_save;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
 	   		} else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
 	   	}
 		memset(msp, 0, size);
 		DBGEHND((stderr, "flush_jmp: Old msp: 0x"lvaddr"  New msp: 0x"lvaddr"\n", msp_save, msp));
@@ -162,9 +162,9 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
    		if ((unsigned char *)mv_chain + shift <= stackwarn)
    		{
 			if ((unsigned char *)mv_chain + shift <= stacktop)
-   				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
+			   	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
    			else
-   				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
+			   	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
       		}
 		DBGEHND((stderr, "flush_jmp: Shifting %d bytes of stack from 0x"lvaddr" to 0x"lvaddr" by %d bytes\n",
 			 INTCAST(top - (char *)mv_chain), mv_chain, (mv_chain + shift), shift));

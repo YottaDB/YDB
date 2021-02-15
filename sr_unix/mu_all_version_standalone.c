@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,7 +92,7 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 		{
 			save_errno = errno;
 			mu_all_version_release_standalone(sem_inf);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("ftok()"), CALLFROM, save_errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("ftok()"), CALLFROM, save_errno);
 		}
 		sem_inf[i].sem_id = semget(sem_inf[i].ftok_key, 3, RWDALL | IPC_CREAT | IPC_EXCL);
 		if (-1 == sem_inf[i].sem_id)
@@ -107,11 +107,11 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 			*/
 			if (EEXIST == save_errno || EAGAIN == save_errno || EINVAL == save_errno)
 				/* Semaphore already exists and/or is locked-- likely rundown needed */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9)
 					MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, RTS_ERROR_TEXT(db_fn),
 					save_errno, 0, ERR_FTOKKEY, 1, sem_inf[i].ftok_key);
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(12)
 					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semget()"), CALLFROM, save_errno, 0,
 					ERR_FTOKKEY, 1, sem_inf[i].ftok_key);
 		}
@@ -121,12 +121,12 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 			save_errno = errno;
 			mu_all_version_release_standalone(sem_inf);
 			if (EAGAIN == save_errno)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(12)
 					MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, RTS_ERROR_TEXT(db_fn),
-						save_errno, 0, ERR_FTOKKEY, 1, sem_inf[i].ftok_key,
+					save_errno, 0, ERR_FTOKKEY, 1, sem_inf[i].ftok_key,
 					ERR_SEMID, 1, sem_inf[i].sem_id);
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(15)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(15)
 					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno, 0,
 					ERR_FTOKKEY, 1, sem_inf[i].ftok_key, ERR_SEMID, 1, sem_inf[i].sem_id);
 		}
@@ -140,7 +140,7 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 	   the shmid field out of the file-header (it was in the same place in all versions that had the shmid). Whatever
 	   that field is (regardless of version), if we are able to attach to shared memory, then we consider standalone
 	   a failure. This is not a 100% valid check but it is good enough for the few times this will actually be run
-	   (upgrade, downgrade and dbcertify).
+	   (upgrade and downgrade).
 	*/
 	shmid = shmget(sem_inf[0].ftok_key, 0, RWDALL);
 	if (-1 == shmid)
@@ -150,7 +150,7 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 		{
 			save_errno = errno;
 			mu_all_version_release_standalone(sem_inf);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBOPNERR, 2, RTS_ERROR_TEXT(db_fn), save_errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBOPNERR, 2, RTS_ERROR_TEXT(db_fn), save_errno);
 		}
 #		ifdef __MVS__
 		if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
@@ -160,7 +160,7 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 		if (0 != rc)
 		{
 			mu_all_version_release_standalone(sem_inf);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("LSEEKREAD()"), CALLFROM, rc);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("LSEEKREAD()"), CALLFROM, rc);
 		}
 		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		if (0 != v15_csd.shmid && INVALID_SHMID != v15_csd.shmid)
@@ -169,8 +169,8 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 	if (-1 != shmid)
 	{
 		mu_all_version_release_standalone(sem_inf);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, RTS_ERROR_TEXT(db_fn),
-				save_errno, 0, ERR_FTOKKEY, 1, sem_inf[i].ftok_key);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, RTS_ERROR_TEXT(db_fn),
+			save_errno, 0, ERR_FTOKKEY, 1, sem_inf[i].ftok_key);
 	}
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -170,8 +170,8 @@ void iorm_write_utf(mstr *v)
 			{
 				save_errno = errno;
 				SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
-					      CALLFROM, save_errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
+					CALLFROM, save_errno);
 			}
 			if (CHSET_UTF16 == iod->ochset)
 			{	/* Write BOM but do not count it towards the bytes in the current record */
@@ -379,13 +379,13 @@ void iorm_write(mstr *v)
 	memcpy(iod->dollar.device, "0", SIZEOF("0"));
 
 	if (rm_ptr->read_only)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVICEREADONLY);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVICEREADONLY);
 	if ((!rm_ptr->fifo) && (!rm_ptr->is_pipe) && rm_ptr->output_encrypted)
 	{
 		if (!iod->dollar.zeof)
 		{
 	 		iod->dollar.za = 9;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTTOEOFONPUT);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOTTOEOFONPUT);
 		} else
 		{	/* If there have not been any writes, and input encryption attributes are different from those for output,
 			 * and the file is not empty, disallow the write.
@@ -403,13 +403,13 @@ void iorm_write(mstr *v)
 				{
 					save_errno = errno;
 					SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
 						CALLFROM, save_errno);
 				}
 				if (0 != statbuf.st_size)
 				{
 					SET_DOLLARDEVICE_ERRSTR(iod, ONE_COMMA_CRYPTBADWRTPOS);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTBADWRTPOS);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CRYPTBADWRTPOS);
 				}
 			}
 		}
@@ -425,7 +425,7 @@ void iorm_write(mstr *v)
 		{
 			save_errno = errno;
 			SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, save_errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, save_errno);
 		}
 		if (!(flags & O_NONBLOCK))
 		{
@@ -434,7 +434,7 @@ void iorm_write(mstr *v)
 			{
 				save_errno = errno;
 				SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
 					save_errno);
 			}
 		}
@@ -447,8 +447,8 @@ void iorm_write(mstr *v)
 		{
 			save_errno = errno;
 			SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
-				      RTS_ERROR_LITERAL("iorm_write()"), CALLFROM, save_errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
+				RTS_ERROR_LITERAL("iorm_write()"), CALLFROM, save_errno);
 		}
 	}
 
@@ -463,8 +463,8 @@ void iorm_write(mstr *v)
 		{
 			save_errno = errno;
 			SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
-				      RTS_ERROR_LITERAL("iorm_write()"), CALLFROM, save_errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
+				RTS_ERROR_LITERAL("iorm_write()"), CALLFROM, save_errno);
 		}
 	}
 

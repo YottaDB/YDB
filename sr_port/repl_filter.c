@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -413,7 +413,8 @@ GBLDEF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] 
 	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V24) */
 	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V25) */
 	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V26) */
-	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V27) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V28) */
+	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V28 to V28) */
 };
 
 GBLDEF	intlfltr_t repl_filter_old2cur[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
@@ -428,7 +429,8 @@ GBLDEF	intlfltr_t repl_filter_old2cur[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] 
 	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V24 to V27) */
 	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V25 to V27) */
 	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V26 to V27) */
-	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V27) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V28) */
+	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V28 to V28) */
 };
 
 GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
@@ -1146,19 +1148,19 @@ void repl_filter_error(seq_num filter_seqno, int why)
 	switch (repl_errno)
 	{
 		case EREPL_FILTERNOTALIVE :
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FILTERNOTALIVE, 1, &filter_seqno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FILTERNOTALIVE, 1, &filter_seqno);
 			break;
 		case EREPL_FILTERSEND :
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILTERCOMM, 1, &filter_seqno, why);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_FILTERCOMM, 1, &filter_seqno, why);
 			break;
 		case EREPL_FILTERBADCONV :
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FILTERBADCONV, 1, &filter_seqno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FILTERBADCONV, 1, &filter_seqno);
 			break;
 		case EREPL_FILTERRECV :
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILTERCOMM, 1, &filter_seqno, why);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_FILTERCOMM, 1, &filter_seqno, why);
 			break;
 		case EREPL_FILTERTIMEDOUT :
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FILTERTIMEDOUT, 1, &filter_seqno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FILTERTIMEDOUT, 1, &filter_seqno);
 			break;
 		default :
 			assertpro(repl_errno != repl_errno);
@@ -1179,7 +1181,7 @@ void repl_check_jnlver_compat(boolean_t same_endianness)
 	assert(is_src_server || is_rcvr_server);
 	assert(JNL_VER_EARLIEST_REPL <= REMOTE_JNL_VER);
 	if (JNL_VER_EARLIEST_REPL > REMOTE_JNL_VER)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Dual/Multi site replication not supported between these two GT.M versions"));
 	else if ((V18_JNL_VER > REMOTE_JNL_VER) && !same_endianness)
 	{	/* cross-endian replication is supported only from V5.3-003 onwards. Issue error and shutdown. */
@@ -1190,7 +1192,7 @@ void repl_check_jnlver_compat(boolean_t same_endianness)
 		else
 			/* repl_check_jnlver_compat is called only from source server and receiver server */
 			assertpro(is_src_server || is_rcvr_server);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLNOXENDIAN, 4, LEN_AND_STR(other_side), LEN_AND_STR(other_side));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLNOXENDIAN, 4, LEN_AND_STR(other_side), LEN_AND_STR(other_side));
 	}
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,8 @@ GBLREF char **cmd_arg;
 void get_command_line(mval *result, boolean_t zcmd_line)
 {
 	int		first_item, len, nlen, word_cnt;
-	unsigned char	*cp;
+	size_t		ulen;
+	unsigned char	*cp, *cp_top;
 
 	if (RESTRICTED(zcmdline))
 	{
@@ -79,18 +80,21 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 		return;
 	}
 	ENSURE_STP_FREE_SPACE(len);
-	cp = stringpool.free;
+	cp_top = cp = stringpool.free;
+	cp_top += len;
 	stringpool.free += len;
 	result->str.addr = (char *)cp;
 	result->str.len = len;
 	result->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
-	for (word_cnt = first_item; ; *cp++ = ' ')
+	for (word_cnt = first_item; cp <= cp_top; *cp++ = ' ')
 	{
-		len = (int)STRLEN(cmd_arg[word_cnt]);
-		memcpy(cp, cmd_arg[word_cnt], len);
+		ulen = strlen(cmd_arg[word_cnt]);
+		DEBUG_ONLY(len = (int)ulen);	/* For IS_AT_END_OF_STRINGPOOL below */
+		assert(cp_top >= (cp + ulen));
+		memcpy(cp, cmd_arg[word_cnt], ulen);
 		if (++word_cnt == cmd_cnt)
 			break;
-		cp += len;
+		cp += ulen;			/* Do not advance cp for IS_AT_END_OF_STRINGPOOL below */
 	}
 	assert(IS_AT_END_OF_STRINGPOOL(cp, len));
 	return;

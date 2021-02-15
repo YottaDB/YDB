@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -257,10 +257,10 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 				 * treat it (or any other non-zero status) as an ERROR, so force it.
 				 */
 				if (SS_NORMAL != jpc->status)
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) MAKE_MSG_TYPE(jnl_status, ERROR), 4,
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(7) MAKE_MSG_TYPE(jnl_status, ERROR), 4,
 						JNL_LEN_STR(csd), DB_LEN_STR(reg), jpc->status);
 				else
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) MAKE_MSG_TYPE(jnl_status, ERROR), 4,
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) MAKE_MSG_TYPE(jnl_status, ERROR), 4,
 						JNL_LEN_STR(csd), DB_LEN_STR(reg));
 			} else
 			{
@@ -321,10 +321,10 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		tmp_jfh = NULL;
 		tmp_jfh_base = NULL;
 		if (SS_NORMAL != status)
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_JNLFILRDOPN, 4, lcl_jnl_fn_len,
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(7) ERR_JNLFILRDOPN, 4, lcl_jnl_fn_len,
 				lcl_jnl_fn, DB_LEN_STR(reg), status);
 		else
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLNOREPL, 4, lcl_jnl_fn_len, lcl_jnl_fn, DB_LEN_STR(reg));
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_JNLNOREPL, 4, lcl_jnl_fn_len, lcl_jnl_fn, DB_LEN_STR(reg));
 	}
 	assert(SS_NORMAL == status);	/* so jnl_fs_block_size is guaranteed to have been initialized */
 	tmp_ctl->repl_buff = repl_buff_create(tmp_jfh->alignsize, jnl_fs_block_size);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,8 +71,8 @@ void iott_close(io_desc *v, mval *pp)
 	if (0 != status)
 	{
 		assert(status == errno);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-				RTS_ERROR_LITERAL("iott_close(CLOSEFILE)"), CALLFROM, status);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			RTS_ERROR_LITERAL("iott_close(CLOSEFILE)"), CALLFROM, status);
 	}
 	if (ttptr->recall_buff.addr)
 	{

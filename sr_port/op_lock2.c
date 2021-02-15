@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,7 +100,7 @@ STATICFNDCL void level_err(mlk_pvtblk *pvt_ptr)
 	MAXSTR_BUFF_DECL(buff);
 	MAXSTR_BUFF_INIT;
 	lock_str_to_buff(pvt_ptr, buff, MAX_STRBUFF_INIT);
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_LOCKINCR2HIGH, 1, pvt_ptr->level, ERR_LOCKIS, 2, LEN_AND_STR(buff));
+	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_LOCKINCR2HIGH, 1, pvt_ptr->level, ERR_LOCKIS, 2, LEN_AND_STR(buff));
 }
 STATICFNDCL void tp_warning(mlk_pvtblk *pvt_ptr)
 {
@@ -423,4 +423,3 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds 
 	mlk_stats.n_user_locks_success++;
 	return (TRUE);
 }
-

@@ -14,7 +14,7 @@
 #define JNL_H_INCLUDED
 
 #ifdef DEBUG
-#include <stddef.h>           /* for offsetof macro (see OFFSETOF usage in assert below) */
+#include <stddef.h>		/* for offsetof macro (see OFFSETOF usage in assert below) */
 #include "wbox_test_init.h"
 #endif
 
@@ -59,8 +59,8 @@ error_def(ERR_JNLENDIANLITTLE);
  * 		which needs to change to say IF_curTO17 if the earliest supported version changes to V17 or so).
  *
  */
-#define JNL_LABEL_TEXT		"GDSJNL27"	/* see above comment paragraph for todos whenever this is changed */
-#define JNL_VER_THIS		27
+#define JNL_LABEL_TEXT		"GDSJNL28"	/* see above comment paragraph for todos whenever this is changed */
+#define JNL_VER_THIS		28
 #define JNL_VER_EARLIEST_REPL	17		/* Replication filter support starts here GDSJNL17 = GT.M V5.1-000.
 						 * (even though it should be V5.0-000, since that is pre-multisite,
 						 * the replication connection with V55000 will error out at handshake
@@ -164,8 +164,8 @@ error_def(ERR_JNLENDIANLITTLE);
 #define	WCSFLU_SPEEDUP_NOBEFORE	64	/* Do not flush dirty db buffers. Just write an epoch record.
 					 * Used to speedup nobefore jnl.
 					 */
-#define	WCSFLU_CLEAN_DBSYNC    128	/* wcs_flu invoked by wcs_clean_dbsync (as opposed to t_end/tp_tend invocation) */
-#define	WCSFLU_FORCE_EPOCH     256	/* skip the optimization that writes epoch only if an epoch is not the most recently
+#define	WCSFLU_CLEAN_DBSYNC	128	/* wcs_flu invoked by wcs_clean_dbsync (as opposed to t_end/tp_tend invocation) */
+#define	WCSFLU_FORCE_EPOCH	256	/* skip the optimization that writes epoch only if an epoch is not the most recently
 					 * written record. This is necessary for some callers (e.g. update process writing
 					 * an epoch for the -noresync startup case).
 					 */
@@ -335,14 +335,14 @@ typedef union
 } token_build;
 
 /* To assist in setting token value, the following macro is supplied to handle the two token parts */
-#define TOKEN_SET(BASE, TN, PID) (((token_build_ptr_t)(BASE))->t_piece.local_tn = (uint4)(TN), \
-				     ((token_build_ptr_t)(BASE))->t_piece.process_id = (PID))
+#define TOKEN_SET(BASE, TN, PID) (((token_build_ptr_t)(BASE))->t_piece.local_tn = (uint4)(TN),		\
+					((token_build_ptr_t)(BASE))->t_piece.process_id = (PID))
 
 enum jpv_types
 {
-        CURR_JPV = 0,
-        ORIG_JPV,
-        JPV_COUNT
+	CURR_JPV = 0,
+	ORIG_JPV,
+	JPV_COUNT
 };
 /* Note we have two process verctors now for a pini record */
 typedef struct jnl_process_vector_struct	/* name needed since this is used in cmmdef.h for "pvec" member */
@@ -439,14 +439,14 @@ typedef struct
 
 typedef struct
 {
- 	trans_num		eov_tn;		/* curr_tn is saved as eov_tn by jnl_write_epoch. Used by recover/rollback */
+	trans_num		eov_tn;		/* curr_tn is saved as eov_tn by jnl_write_epoch. Used by recover/rollback */
 	volatile trans_num	epoch_tn;	/* Transaction number for current epoch */
-	seq_num			end_seqno;		/* reg_seqno saved by jnl_write_epoch. Used by recover/rollback */
+	seq_num			end_seqno;	/* reg_seqno saved by jnl_write_epoch. Used by recover/rollback */
 	seq_num			strm_end_seqno[MAX_SUPPL_STRMS]; /* used to keep jfh->strm_end_seqno up to date with each epoch.
 						 * Unused in VMS but defined so shared memory layout is similar in Unix & VMS.
 						 */
 	int4			min_write_size,	/* if unwritten data gets to this size, write it */
-				max_write_size, /* maximum size of any single write */
+				max_write_size,	/* maximum size of any single write */
 				size;		/* buffer size */
 	int4			epoch_interval;	/* Time between successive epochs in epoch-seconds */
 	boolean_t		before_images;	/* If TRUE, before-image processing is enabled */
@@ -468,11 +468,11 @@ typedef struct
 	uint4			phase2_commit_index2;
 	jbuf_phase2_in_prog_t	phase2_commit_array[JNL_PHASE2_COMMIT_ARRAY_SIZE];
 	volatile int4		blocked;
-	volatile uint4	 	fsync_dskaddr;  /* dskaddr upto which fsync is done */
+	volatile uint4		fsync_dskaddr;	/* dskaddr upto which fsync is done */
 	volatile int4		dsk;		/* relative index of 1st byte to write to disk;
 						 * if free == dsk, buffer is empty */
 	volatile int4		wrtsize;	/* size of write in progress */
-        volatile uint4		dskaddr,	/* virtual on-disk address corresponding to dsk */
+	volatile uint4		dskaddr,	/* virtual on-disk address corresponding to dsk */
 				now_writer,	/* current owner of io_in_prog (VMS-only) */
 				image_count;	/* for VMS is_proc_alive */
 	volatile struct				/* must be at least word aligned for memory coherency */
@@ -481,7 +481,7 @@ typedef struct
 		unsigned short	length;
 		int4		dev_specific;
 	}			iosb;
-	uint4         		alignsize;      	/* current alignsize (max value possible is 2Gb, not 4Gb) */
+	uint4			alignsize;		/* current alignsize (max value possible is 2Gb, not 4Gb) */
 	jnl_tm_t		eov_timestamp;		/* jgbl.gbl_jrec_time saved by jnl_write_epoch. Used by recover/rollback */
 	uint4			cycle;			/* shared copy of the number of the current journal file generation */
 	volatile int4		qiocnt,			/* Number of qio's issued */
@@ -494,7 +494,7 @@ typedef struct
 	 */
 	volatile jnl_tm_t	prev_jrec_time;		/* to ensure that time never decreases across successive jnl records */
 	volatile uint4		next_epoch_time;	/* Time when next epoch is to be written (in epoch-seconds) */
-	volatile boolean_t	need_db_fsync;          /* need an fsync of the db file */
+	volatile boolean_t	need_db_fsync;		/* need an fsync of the db file */
 	volatile int4		io_in_prog;		/* VMS only: write in progress indicator (NOTE: must manipulate
 										only with interlocked instructions */
 	uint4			enospc_errcnt;		/* number of times jb->errcnt was last incremented due to ENOSPC error
@@ -516,7 +516,7 @@ typedef struct
 	global_latch_t		io_in_prog_latch;	/* UNIX only: write in progress indicator */
 	CACHELINE_PAD(SIZEOF(global_latch_t), 1)	/* start next latch at a different cacheline than previous fields */
 	global_latch_t		fsync_in_prog_latch;	/* fsync in progress indicator */
-        CACHELINE_PAD(SIZEOF(global_latch_t), 2)	/* start next latch at a different cacheline than previous fields */
+	CACHELINE_PAD(SIZEOF(global_latch_t), 2)	/* start next latch at a different cacheline than previous fields */
 	global_latch_t		phase2_commit_latch;	/* Used by "jnl_phase2_cleanup" to update "phase2_commit_index1" */
 	CACHELINE_PAD(SIZEOF(global_latch_t), 3)	/* pad enough space so next non-filler byte falls in different cacheline */
 	/**********************************************************************************************/
@@ -698,19 +698,20 @@ typedef struct
 	uint4			alignsize;	/* align size of journal (where a valid record start) */
 	int4			epoch_interval;	/* Time between successive epochs in epoch-seconds */
 	int4			repl_state;	/* To state whether replication is turned on for this journal file */
- 	uint4			autoswitchlimit;/* Limit in disk blocks (max 4GBytes) when jnl should be auto switched */
+	uint4			autoswitchlimit;/* Limit in disk blocks (max 4GBytes) when jnl should be auto switched */
 	uint4			jnl_alq;	/* initial allocation (in blocks) */
 	uint4			jnl_deq;	/* extension (in blocks) */
 	boolean_t		filler_update_disabled;	/* obsoleted as part of multi-site replication changes */
 	int4			max_jrec_len;	/* Maximum length in bytes of a journal record.
 						 * Although computed from the database block size, we need this
 						 * stored as well in case database is not available */
-	uint4 			data_file_name_length;			/* Length of data_file_name */
-	uint4 			prev_jnl_file_name_length;		/* Length of prev_jnl_file_name */
-	uint4 			next_jnl_file_name_length;		/* Length of next_jnl_file_name */
-	uint4 			checksum;	/* Calculate from journal file id */
-	uint4			prev_recov_blks_to_upgrd_adjust;	/* amount to adjust filehdr "blks_to_upgrd" if ever
-									 * backward recovery goes back past this journal file */
+	uint4			data_file_name_length;			/* Length of data_file_name */
+	uint4			prev_jnl_file_name_length;		/* Length of prev_jnl_file_name */
+	uint4			next_jnl_file_name_length;		/* Length of next_jnl_file_name */
+	uint4			checksum;	/* Calculate from journal file id */
+	block_id		prev_recov_blks_to_upgrd_adjust;	/* amount to adjust filehdr "blks_to_upgrd" if ever
+									 * backward recovery goes back past this journal file
+									 */
 	unsigned char		data_file_name[JNL_NAME_SIZE];		/* Database file name */
 	unsigned char		prev_jnl_file_name[JNL_NAME_SIZE];	/* Previous generation journal file name */
 	unsigned char		next_jnl_file_name[JNL_NAME_SIZE];	/* Next generation journal file name */
@@ -729,7 +730,7 @@ typedef struct
 							 * at some point in time (relied upon by mur_tp_resolve_time).
 							 */
 	/* filler remaining */
-	char			filler[432];
+	char			filler[424];
 } jnl_file_header;
 
 typedef struct
@@ -741,7 +742,7 @@ typedef struct
 	sgmnt_data_ptr_t	csd;
 	seq_num			reg_seqno;
 	unsigned char		jnl[JNL_NAME_SIZE],
-		                *fn;
+				*fn;
 	uint4			max_jrec_len;
 	short			fn_len,
 				jnl_len,
@@ -749,20 +750,20 @@ typedef struct
 	bool			before_images;
 	bool			filler_bool[1];
 	uint4			alignsize;
- 	int4			autoswitchlimit;	/* limit in disk blocks (8388607 blocks)
+	int4			autoswitchlimit;	/* limit in disk blocks (8388607 blocks)
 							 * when jnl should be auto switched */
 	int4			epoch_interval;		/* Time between successive epochs in epoch-seconds */
 	char			*prev_jnl;
 	int4			prev_jnl_len;
-	int4                    jnl_state;              /* current csd->jnl_state */
+	int4			jnl_state;		/* current csd->jnl_state */
 	int4			repl_state;
 	uint4			status2;		/* for secondary error status information in VMS */
 	boolean_t		no_rename;
 	boolean_t		no_prev_link;
-	int4			blks_to_upgrd;		/* Blocks not at current block version level */
-	uint4 			checksum;
-	uint4			free_blocks;		/* free  blocks counter at time of epoch */
-	uint4			total_blks;		/* total blocks counter at time of epoch */
+	block_id		blks_to_upgrd;		/* Blocks not at current block version level */
+	block_id		free_blocks;		/* free  blocks counter at time of epoch */
+	block_id		total_blks;		/* total blocks counter at time of epoch */
+	uint4			checksum;
 	int4			is_encrypted;
 	char			encryption_hash[GTMCRYPT_RESERVED_HASH_LEN];
 	char			encryption_hash2[GTMCRYPT_RESERVED_HASH_LEN];
@@ -831,8 +832,9 @@ typedef struct jnl_format_buff_struct
 	char 				*buff;
 	uint4				checksum;
 	jnl_action			ja;
-	char				*alt_buff; /* for storing the unencrypted jnl *SET and *KILL records to be pushed
-						    * into the jnl pool. */
+	char				*alt_buff;	/* for storing the unencrypted jnl *SET and *KILL records to be pushed
+							 * into the jnl pool.
+							 */
 } jnl_format_buffer;
 
 /* All fixed size records are 8-byte-multiple size.
@@ -860,7 +862,7 @@ typedef struct	/* variable length */
 							 * Uninitialized for USET/UKILL/UZTWORM/ULGTRIG/UZTRIG records.
 							 */
 	jnl_string		mumps_node;	/* For set/kill/zkill 	: {jnl_str_len_t key_len, char key[key_len]} */
-	 					/* For set additionally : {mstr_len_t data_len, char data[data_len]} */
+						/* For set additionally : {mstr_len_t data_len, char data[data_len]} */
 } struct_jrec_upd;
 
 /* $ztwormhole record */
@@ -909,7 +911,6 @@ typedef struct	/* variable length */
 	block_id		blknum;
 	uint4			bsiz;
 	enum db_ver		ondsk_blkver;		/* Previous version of block from cache_rec */
-	int4			filler;
 	char			blk_contents[1];	/* Actually blk_contents[bsiz] */
 } struct_jrec_blk;
 
@@ -971,7 +972,6 @@ typedef struct	/* fixed length */
 typedef struct
 {
 	block_id		blknum;		/* block that got upgraded or downgraded (opcode = inctn_blk*grd) */
-	uint4			filler_uint4;
 	unsigned short		filler_short;
 	unsigned short		opcode;
 	jrec_suffix		suffix;
@@ -979,8 +979,7 @@ typedef struct
 
 typedef struct
 {
-	int4			blks_to_upgrd_delta;	/* Delta to adjust csd->blks_to_upgrade (opcode = inctn_gdsfilext_*) */
-	uint4			filler_uint4;
+	block_id		blks_to_upgrd_delta;	/* Delta to adjust csd->blks_to_upgrade (opcode = inctn_gdsfilext_*) */
 	unsigned short		filler_short;
 	unsigned short		opcode;
 	jrec_suffix		suffix;
@@ -1028,14 +1027,15 @@ typedef struct	/* fixed length */
 {
 	jrec_prefix		prefix;
 	seq_num			jnl_seqno;		/* must start at 8-byte boundary */
-	uint4			blks_to_upgrd;		/* blocks-to-upgrade counter at time of epoch */
-	uint4			free_blocks;		/* free  blocks counter at time of epoch */
-	uint4			total_blks;		/* total blocks counter at time of epoch */
+	block_id		blks_to_upgrd;		/* blocks-to-upgrade counter at time of epoch */
+	block_id		free_blocks;		/* free blocks counter at time of epoch */
+	block_id		total_blks;		/* total blocks counter at time of epoch */
 	boolean_t		fully_upgraded;		/* cs_data->fully_upgraded at the time of epoch */
+	uint4			filler0;		/* so as to make 8-byte alignment explicit */
 	seq_num			strm_seqno[MAX_SUPPL_STRMS];	/* seqno of each possible supplementary stream at epoch time.
 								 * used by rollback to restore seqnos on the database.
 								 */
-	uint4			filler;			/* so as to make the EPOCH record aligned to 8 byte boundary */
+	uint4			filler1;		/* so as to make the EPOCH record aligned to 8 byte boundary */
 	jrec_suffix		suffix;
 } struct_jrec_epoch;
 
@@ -1050,9 +1050,10 @@ typedef struct	/* fixed length */
 typedef struct	/* fixed length */
 {
 	jrec_prefix		prefix;			/* 24 bytes */
-	uint4			orig_total_blks;
-	uint4			orig_free_blocks;
-	uint4			total_blks_after_trunc;
+	block_id		orig_total_blks;
+	block_id		orig_free_blocks;
+	block_id		total_blks_after_trunc;
+	uint4			filler;			/* so as to make the TRUNC record aligned to 8 byte boundary */
 	jrec_suffix		suffix;			/* 4 bytes */
 } struct_jrec_trunc;
 
@@ -1068,7 +1069,7 @@ typedef union
 	/** All below are fixed size and above are variable size records */
 	struct_jrec_tcom		jrec_tcom;
 	struct_jrec_ztcom		jrec_ztcom;
-	struct_jrec_inctn               jrec_inctn;
+	struct_jrec_inctn		jrec_inctn;
 	struct_jrec_pini		jrec_pini;
 	struct_jrec_pfin		jrec_pfin;
 	struct_jrec_null		jrec_null;
@@ -1086,7 +1087,7 @@ typedef union
 #define	PFIN_RECLEN		SIZEOF(struct_jrec_pfin)
 #define	NULL_RECLEN		SIZEOF(struct_jrec_null)
 #define	EPOCH_RECLEN		SIZEOF(struct_jrec_epoch)
-#define	EOF_RECLEN 		SIZEOF(struct_jrec_eof)
+#define	EOF_RECLEN		SIZEOF(struct_jrec_eof)
 #define TRUNC_RECLEN		SIZEOF(struct_jrec_trunc)
 /* Macro to access variable size record's fixed part's size */
 #define FIXED_ZTWORM_RECLEN	OFFSETOF(struct_jrec_ztworm, ztworm_str)
@@ -1094,9 +1095,9 @@ typedef union
 #define FIXED_UPD_RECLEN	OFFSETOF(struct_jrec_upd, mumps_node)
 #define FIXED_ALIGN_RECLEN	SIZEOF(struct_jrec_align)
 #define MIN_ALIGN_RECLEN	(FIXED_ALIGN_RECLEN + JREC_SUFFIX_SIZE)
-#define FIXED_BLK_RECLEN 	OFFSETOF(struct_jrec_blk, blk_contents[0])
-#define FIXED_PBLK_RECLEN 	OFFSETOF(struct_jrec_blk, blk_contents[0])
-#define FIXED_AIMG_RECLEN 	OFFSETOF(struct_jrec_blk, blk_contents[0])
+#define FIXED_BLK_RECLEN	OFFSETOF(struct_jrec_blk, blk_contents[0])
+#define FIXED_PBLK_RECLEN	OFFSETOF(struct_jrec_blk, blk_contents[0])
+#define FIXED_AIMG_RECLEN	OFFSETOF(struct_jrec_blk, blk_contents[0])
 #define MIN_PBLK_RECLEN		(OFFSETOF(struct_jrec_blk, blk_contents[0]) + JREC_SUFFIX_SIZE)
 #define MIN_AIMG_RECLEN		(OFFSETOF(struct_jrec_blk, blk_contents[0]) + JREC_SUFFIX_SIZE)
 
@@ -1498,7 +1499,7 @@ MBSTART {					\
 
 #define JNL_SHARE_SIZE(X)	(JNL_ALLOWED(X) ? 							\
 				(ROUND_UP(JNL_NAME_EXP_SIZE + SIZEOF(jnl_buffer), OS_PAGE_SIZE)		\
-                                + ROUND_UP(((sgmnt_data_ptr_t)X)->jnl_buffer_size * DISK_BLOCK_SIZE, 	\
+				+ ROUND_UP(((sgmnt_data_ptr_t)X)->jnl_buffer_size * DISK_BLOCK_SIZE, 	\
 					OS_PAGE_SIZE) + OS_PAGE_SIZE) : 0)
 
 /* pass address of jnl_buffer to get address of expanded jnl file name */
@@ -1591,7 +1592,7 @@ MBSTART {								\
  */
 #define	BUILD_AIMG_IF_JNL_ENABLED(CSD, TN)									\
 {														\
-	GBLREF	cw_set_element   	cw_set[];								\
+	GBLREF	cw_set_element		cw_set[];								\
 	GBLREF	unsigned char		cw_set_depth;								\
 	GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;							\
 														\
@@ -1627,13 +1628,13 @@ MBSTART {								\
 /* this macro aligns the input size to account that journal file sizes can increase only in multiples of the extension size */
 #define	ALIGNED_ROUND_UP(tmp_tot_jrec_size, jnl_alq, jnl_deq)					\
 	(((tmp_tot_jrec_size) <= (jnl_alq) || !(jnl_deq))					\
-	 	? (jnl_alq) 									\
+		? (jnl_alq) 									\
 		: ((jnl_alq) + ROUND_UP((tmp_tot_jrec_size) - (jnl_alq), (jnl_deq))))
 
 /* this macro aligns the input size to account that journal file sizes can increase only in multiples of the extension size */
 #define	ALIGNED_ROUND_DOWN(tmp_tot_jrec_size, jnl_alq, jnl_deq)					\
 	(((tmp_tot_jrec_size) <= (jnl_alq) || !(jnl_deq))					\
-	 	? (jnl_alq) 									\
+		? (jnl_alq) 									\
 		: ((jnl_alq) + ROUND_DOWN((tmp_tot_jrec_size) - (jnl_alq), (jnl_deq))))
 
 /* the following macro uses 8-byte quantities (gtm_uint64_t) to perform additions that might cause a 4G overflow */
@@ -1875,7 +1876,7 @@ uint4	jnl_write_attempt(jnl_private_control *jpc, uint4 threshold);
 void	jnl_prc_vector(jnl_process_vector *pv);
 void	jnl_send_oper(jnl_private_control *jpc, uint4 status);
 uint4	cre_jnl_file(jnl_create_info *info);
-uint4 	cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_len);
+uint4	cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_len);
 void	cre_jnl_file_intrpt_rename(sgmnt_addrs *csa);
 void	jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header);
 uint4	jnl_ensure_open(gd_region *reg, sgmnt_addrs *csa);
@@ -1900,7 +1901,7 @@ jnl_format_buffer	*jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 
 void	wcs_defer_wipchk_ast(jnl_private_control *jpc);
 uint4	set_jnl_file_close(void);
-uint4 	jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *err_str, size_t err_str_len);
+uint4	jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *err_str, size_t err_str_len);
 uint4	jnl_file_open_switch(gd_region *reg, uint4 sts, char *err_str, size_t err_str_len);
 void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch);
 
@@ -1910,7 +1911,7 @@ uint4	mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 void	mupip_set_journal_fname(jnl_create_info *jnl_info);
 uint4	mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname);
 void	jnl_extr_init(void);
-int 	exttime(uint4 time, char *buffer, int extract_len);
+int	exttime(uint4 time, char *buffer, int extract_len);
 unsigned char *ext2jnlcvt(char *ext_buff, int4 ext_len, unsigned char **tr, int *tr_bufsiz,
 					seq_num saved_jnl_seqno, seq_num saved_strm_seqno);
 char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved_strm_seqno);

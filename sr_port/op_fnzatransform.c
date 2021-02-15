@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2020 Fidelity National Information	*
+ * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -122,7 +122,7 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 	{
 		csp = ready_collseq(col);
 		if (NULL == csp)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, col);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, col);
 	} else
 		csp = NULL; /* Do not issue COLLATIONUNDEF for 0 collation */
 
@@ -170,14 +170,14 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 		case 0:
 			/* convert to subscript format; mval2subsc returns NULL in place of GVSUBOFLOW */
 			if (MAX_KEY_SIZE < src->str.len)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZATRANSERR);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZATRANSERR);
 			/* Setup false key in case a GVSUBOFLOW occurs where format_targ_key processes the key for printing */
 			key = gvkey->base;
 			*key++ = KEY_DELIMITER;
 			gvkey->end++;
 			DEBUG_ONLY(TREF(skip_mv_num_approx_assert) = TRUE;)
 			if (NULL == (key = mval2subsc(src, gvkey, TRUE)))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZATRANSERR);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZATRANSERR);
 			COPY_ARG_TO_STRINGPOOL(dst, &gvkey->base[gvkey->end], &gvkey->base[1]);
 			DEBUG_ONLY(TREF(skip_mv_num_approx_assert) = FALSE);
 			break;
@@ -293,7 +293,7 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 		default:
 			/* convert back from subscript format; cannot exceed MAX_KEY_SZ for gvsub2str to work */
 			if (MAX_KEY_SZ < src->str.len)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZATRANSERR);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZATRANSERR);
 			memset(msrcbuff, 0, MAX_KEY_SZ);		/* Ensure null termination */
 			memcpy(msrcbuff, src->str.addr, src->str.len);
 			opstr.addr = (char *)buff;
@@ -312,11 +312,11 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 	/* Now that we have restored our state, if we failed due to no xutil helper, or xutil err: invoke an error */
 	if (coll_failxutil)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZATRANSCOL);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZATRANSCOL);
 	}
 	if (coll_noxutil)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, col);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, col);
 	}
 }
 

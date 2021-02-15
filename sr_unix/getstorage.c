@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,9 +33,9 @@ int4	getstorage(void)
         if (0 != getrlimit(RLIMIT_DATA,&rl))
         {
                 save_errno = errno;
-                rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL(ERRSTR),
-                          CALLFROM,
-                          save_errno);
+		RTS_ERROR_ABT(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL(ERRSTR),
+			CALLFROM,
+			save_errno);
         }
 #if !defined(__MVS__)
 	cur_sbrk = (UINTPTR_T)sbrk(0); /* Two step conversion to eliminate warnings */

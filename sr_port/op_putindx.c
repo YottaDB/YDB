@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -147,7 +147,7 @@ lv_val	*op_putindx(int argcnt, lv_val *start, ...)
 				if (LVNULLSUBS_OK != TREF(lv_null_subs))	/* Error for both LVNULLSUBS_{NO,NEVER} */
 				{
 					va_end(var);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVNULLSUBS);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LVNULLSUBS);
 				}
 			}
 			if (TREF(local_collseq))
@@ -221,7 +221,7 @@ lv_val	*op_putindx(int argcnt, lv_val *start, ...)
 			{
 				va_end(var);
 				SET_ACTIVE_LV(lv, (orig_subs_level == (subs_level + 1)) ? TRUE : FALSE, actlv_op_putindx1);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 			}
 		}
 	}

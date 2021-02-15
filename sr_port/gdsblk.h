@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,7 @@
 /* gdsblk.h */
 
 #include <sys/types.h>
+#include "gdsdbver.h"
 
 #define BML_LEVL ((unsigned char)-1)
 
@@ -29,15 +30,12 @@
 #define CST_BOK(r)		((uchar_ptr_t)(r) + SIZEOF(rec_hdr))
 #define CST_USAR(b, r)		((b)->bsiz - ((uchar_ptr_t(r) + (r)->rsiz - (uchar_ptr_t)(b)))
 #define CST_KSIZ		(gv_curr_key->end - gv_curr_key->base + 1)
-#define BSTAR_REC_SIZE		INTCAST((SIZEOF(rec_hdr) + SIZEOF(block_id)))
-#define BSTAR_REC(r)		((rec_hdr_ptr_t)(r))->rsiz = BSTAR_REC_SIZE; SET_CMPC((rec_hdr_ptr_t)(r), 0);
 #define IS_LEAF(b)		(0 == ((blk_hdr_ptr_t)(b))->levl)
 #define IS_BML(b)		(BML_LEVL == ((blk_hdr_ptr_t)(b))->levl)
-#define IS_BSTAR_REC(r)		((r)->rsiz == BSTAR_REC_SIZE)
 #define GAC_RSIZE(rsize,r,tob)	if ((uchar_ptr_t)(r) + ((rsize) = ((rec_hdr_ptr_t)(r))->rsiz) > tob) return(-1)
-#define MIN_DATA_SIZE           1 + 2     /*    1 byte of key + 2 nulls for terminator     */
-#define MAX_EXTN_COUNT          1048575
-#define MIN_EXTN_COUNT          0
+#define MIN_DATA_SIZE		1 + 2	/*    1 byte of key + 2 nulls for terminator     */
+#define MAX_EXTN_COUNT		1048575
+#define MIN_EXTN_COUNT		0
 #define	MAX_DB_BLK_SIZE		((1 << 16) - 512)	/* 64Kb - 512 (- 512 to take care of VMS's max I/O capabilities) */
 
 /* Note: EVAL_CMPC not to be confused with the previously existing GET_CMPC macro in mu_reorg.h!
@@ -95,23 +93,24 @@
 
 /* The following macro picks up a record from a block using PREC as the pointer to the record and validates
  * that the record length, NRECLEN, meets base criteria (is not 0 and does not exceed the top of the
- * block as identified by PTOP) and return NBLKID on the assumption the block is an index block
+ * block as identified by PTOP) and return NBLKID on the assumption the block is an index block.
+ * LONG_BLK_ID tells whether the block that PREC is part of uses 32 or 64 bit block_ids.
  */
-#define GET_AND_CHECK_RECLEN(STATUS, NRECLEN, PREC, PTOP, NBLKID)	\
-{									\
-	sm_uc_ptr_t	PVAL;						\
-									\
-	STATUS = cdb_sc_normal;						\
-	GET_USHORT(NRECLEN, &((rec_hdr_ptr_t)PREC)->rsiz);		\
-	if (NRECLEN == 0)						\
-		STATUS = cdb_sc_badoffset;				\
-	else if (PREC + NRECLEN > PTOP)					\
-		STATUS = cdb_sc_blklenerr;				\
-	else								\
-	{								\
-		PVAL = PREC + NRECLEN - SIZEOF(block_id);		\
-		GET_BLK_ID(NBLKID, PVAL);					\
-	}								\
+#define GET_AND_CHECK_RECLEN(STATUS, NRECLEN, PREC, PTOP, NBLKID, LONG_BLK_ID)	\
+{										\
+	sm_uc_ptr_t	PVAL;							\
+										\
+	STATUS = cdb_sc_normal;							\
+	GET_USHORT(NRECLEN, &((rec_hdr_ptr_t)PREC)->rsiz);			\
+	if (NRECLEN == 0)							\
+		STATUS = cdb_sc_badoffset;					\
+	else if ((PREC + NRECLEN) > PTOP)					\
+		STATUS = cdb_sc_blklenerr;					\
+	else									\
+	{									\
+		PVAL = PREC + NRECLEN - SIZEOF_BLK_ID(LONG_BLK_ID);		\
+		READ_BLK_ID(LONG_BLK_ID, &NBLKID, PVAL);			\
+	}									\
 }
 
 /* The following macro picks up a the level from a block using PBLKBASE as the pointer to the header and validates
@@ -155,14 +154,16 @@ typedef struct
 	unsigned char	levl;		/* block level. level 0 is data level. level 1 is
 					 * first index level. etc.
 					 */
-	unsigned int	bsiz;		/* block size */
+	unsigned int	bsiz;		/* number of currently used bytes in the block */
 	trans_num	tn;		/* transaction number when block was written */
 } blk_hdr;
 
 typedef struct
 {
-	unsigned short	rsiz;
-	unsigned char	cmpc;
+	unsigned short	rsiz;		/* size of the record in bytes */
+	unsigned char	cmpc;		/* compression count of the record that allows for values up to 252
+					 * (See EVAL_CMPC comments at beginning of file for explanation)
+					 */
 #	ifdef UNIX
 	unsigned char	cmpc2;		/* extra byte allows compression count up to 1020 */
 #	endif
@@ -192,8 +193,24 @@ typedef rec_hdr *rec_hdr_ptr_t;
 # endif
 #endif
 
-#define MAX_RESERVE_B(X) ((X)->blk_size - (X)->max_key_size - SIZEOF(blk_hdr) - SIZEOF(rec_hdr) \
-        - SIZEOF(block_id) - BSTAR_REC_SIZE) /* anything past key can span */
+/* Macros/Inline functions for bstar records */
+#define BSTAR_REC_SIZE_32	INTCAST((SIZEOF(rec_hdr) + SIZEOF(block_id_32)))
+#define BSTAR_REC_SIZE_64	INTCAST((SIZEOF(rec_hdr) + SIZEOF(block_id_64)))
+#define BSTAR_REC_SIZE		BSTAR_REC_SIZE_64
+
+static inline int bstar_rec_size(boolean_t long_blk_id)
+{
+	return (long_blk_id ? BSTAR_REC_SIZE_64 : BSTAR_REC_SIZE_32);
+}
+
+static inline void bstar_rec(sm_uc_ptr_t r, boolean_t long_blk_id)
+{
+	((rec_hdr_ptr_t)r)->rsiz = (unsigned short)bstar_rec_size(long_blk_id);
+	SET_CMPC((rec_hdr_ptr_t)r, 0);
+}
+
+#define MAX_RESERVE_B(X, Y) ((X)->blk_size - (X)->max_key_size - SIZEOF(blk_hdr) - SIZEOF(rec_hdr) \
+        - SIZEOF_BLK_ID(Y) - bstar_rec_size(Y)) /* anything past key can span */
 #define CHKRECLEN(r,b,n) ((unsigned int)((n) + (uchar_ptr_t)(r) - (uchar_ptr_t)(b)) <= (unsigned int)((blk_hdr_ptr_t)(b))->bsiz)
 
 /*********************************************************************
@@ -205,7 +222,7 @@ typedef rec_hdr *rec_hdr_ptr_t;
 
 int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, boolean_t *used);
 void bm_setmap(block_id bml, block_id blk, int4 busy);
-void bml_newmap(blk_hdr_ptr_t ptr, uint4 size, trans_num curr_tn);
+void bml_newmap(blk_hdr_ptr_t ptr, uint4 size, trans_num curr_tn, enum db_ver ondsk_blkver);
 
 /* End of gdsblk.h */
 

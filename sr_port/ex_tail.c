@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,8 @@
 
 LITREF mval		literal_minusone, literal_one, literal_zero;
 LITREF octabstruct	oc_tab[];
+
+error_def(ERR_NUMOFLOW);
 
 void ex_tail(oprtype *opr)
 /* work a non-leaf operand toward final form
@@ -83,6 +85,12 @@ void ex_tail(oprtype *opr)
 			MV_FORCE_NUMD(v0);
 			v1 = &t1->operand[0].oprval.mlit->v;
 			MV_FORCE_NUMD(v1);
+			if (!(MV_NM & v1->mvtype) || !(MV_NM & v0->mvtype))
+			{	/* if we don't have a useful number we can't do useful math */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
+				assert(TREF(rts_error_in_parse));
+				return;
+			}
 			v = (mval *)mcalloc(SIZEOF(mval));
 			switch (c)
 			{
@@ -91,10 +99,13 @@ void ex_tail(oprtype *opr)
 				break;
 			case OC_DIV:
 			case OC_IDIV:
+			case OC_MOD:
 				if (!(MV_NM & v1->mvtype) || (0 != v1->m[1]))
 				{
 					if (OC_DIV == c)
 						op_div(v0, v1, v);
+					else if (OC_MOD == c)
+						flt_mod(v0, v1, v);
 					else
 						op_idiv(v0, v1, v);
 				} else				/* divide by literal 0 is a technique so let it go to run time*/
@@ -102,9 +113,8 @@ void ex_tail(oprtype *opr)
 				break;
 			case OC_EXP:
 				op_exp(v0, v1, v);
-				break;
-			case OC_MOD:
-				flt_mod(v0, v1, v);
+				if ((1 == v->sgn) && (MV_INT & v->mvtype) && (0 == v->m[0]))
+					v = NULL;		/* flag value from op_exp indicates DIVZERO, so leave to run time */
 				break;
 			case OC_MUL:
 				op_mul(v0, v1, v);

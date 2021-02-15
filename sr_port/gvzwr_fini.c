@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,7 +89,7 @@ void gvzwr_fini(zshow_out *out, int pat)
 		} else	/* Old (naked) reference. Keep previous gv_target reference */
 		{
 			if (gv_currkey->prev == 0)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GVNAKED);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GVNAKED);
 			gv_currkey->end = gv_currkey->prev;
 			gv_currkey->base[gv_currkey->end] = 0;
 			gv_currkey->prev = 0;
@@ -131,12 +131,12 @@ void gvzwr_fini(zshow_out *out, int pat)
 				}
 			}
 			op_gvorder(&local);
-			if (local.str.len)
+			if (0 < local.str.len)
 			{
-				assert(local.str.len <= MAX_MIDENT_LEN + 1);
+				assert(local.str.len <= (MAX_MIDENT_LEN + 1));
 				local.str.addr++;
 				local.str.len--;
-				memcpy(&m[0], local.str.addr, local.str.len);
+				memcpy(&m[0], local.str.addr, (size_t)local.str.len);
 				local.str.addr = &m[0];
 			} else
 				break;

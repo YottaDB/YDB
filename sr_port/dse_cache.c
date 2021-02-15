@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2020 Fidelity National Information	*
+ * Copyright (c) 2003-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,7 +85,7 @@ void dse_cache(void)
 		if (!cli_get_int("SIZE",   &size))
 			return;
 		if (!((SIZEOF(char) == size) || (SIZEOF(short) == size) || (SIZEOF(int4) == size)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SIZENOTVALID4);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_SIZENOTVALID4);
 	}
 	if (value_present  && !cli_get_hex("VALUE",  &value))
 		return;

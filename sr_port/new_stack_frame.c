@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,9 +43,9 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 		if (msp <= stacktop || msp > stackbase)
 		{
 			msp = msp_save;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
 		} else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
 	}
 	assert((unsigned char *)msp < stackbase);
 	sf->old_frame_pointer = frame_pointer;
@@ -74,9 +74,9 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 		if (msp <= stacktop || msp > stackbase)
 		{
 			msp = msp_save;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
 		} else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
 	}
 	assert(msp < stackbase);
 	memset(msp, 0, x1 + x2);

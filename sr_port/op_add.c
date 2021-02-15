@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -183,7 +184,7 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 		}
 	}
 	if (EXPHI <= exp)
-		rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
+		rts_error_csa(NULL, VARLSTCNT(1) ERR_NUMOFLOW); /* BYPASSRTSABT */
 	else if (EXPLO > exp)
 		*result = literal_zero;
 	else

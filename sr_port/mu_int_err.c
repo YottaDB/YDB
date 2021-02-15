@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,8 +45,10 @@ GBLREF int		rec_len;
 
 error_def(ERR_NULSUBSC);
 
+/* Look at cert_blk.c for possible changes to macro format */
+
 #define MAX_UTIL_LEN 50
-#define BLOCK_WINDOW 8
+#define BLOCK_WINDOW MAX_HEX_DIGITS_IN_INT8
 #define LEVEL_WINDOW 3
 #define OFFSET_WINDOW 4
 
@@ -76,7 +78,7 @@ void	mu_int_err(
 		int has_bot,
 		unsigned char *top,
 		int has_top,
-	      	unsigned int level)
+		unsigned int level)
 {
 	const err_ctl		*ec;
 	const err_msg		*em;
@@ -109,13 +111,13 @@ void	mu_int_err(
 	}
 	MEMCPY_LIT(&util_buff[util_len], NEWLINE);
 	util_len += SIZEOF(NEWLINE) - 1;
-	i2hex_blkfill(mu_int_path[mu_int_plen], &util_buff[util_len], BLOCK_WINDOW);
+	i2hexl_blkfill(mu_int_path[mu_int_plen], &util_buff[util_len], BLOCK_WINDOW);
 	util_len += BLOCK_WINDOW;
 	MEMCPY_LIT(&util_buff[util_len], TEXT1);	/* OFFSET_WINDOW + 1 spaces */
-	util_len += SIZEOF(TEXT3) - 1;				/* Using TEXT1 to clear space? */
-	i2hex_nofill(mu_int_offset[mu_int_plen], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
+	util_len += SIZEOF(TEXT3) - 1;			/* TEXT1 is used to zero out the width of the OFFSET_WINDOW */
+	i2hex_nofill(mu_int_offset[mu_int_plen], &util_buff[util_len], OFFSET_WINDOW);
 	util_len += OFFSET_WINDOW + 1;
-	i2hex_blkfill(level, (uchar_ptr_t)&util_buff[util_len], LEVEL_WINDOW);
+	i2hex_blkfill(level, &util_buff[util_len], LEVEL_WINDOW);
 	util_len += LEVEL_WINDOW;
 	MEMCPY_LIT(&util_buff[util_len], TEXT2);
 	util_len += SIZEOF(TEXT2) - 1;
@@ -131,10 +133,10 @@ void	mu_int_err(
 	{
 		if (!master_dir)
 		{
-			util_out_print("                   Directory Path:  ", FALSE);
+			util_out_print("                           Directory Path:  ", FALSE);
 			for (i = 0;  trees->path[i + 1];  i++)
 			{
-				util_len = i2hex_nofill(trees->path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
+				util_len = i2hexl_nofill(trees->path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
 				MEMCPY_LIT(&util_buff[util_len], TEXT3);
 				util_len += SIZEOF(TEXT3) - 1;
 				util_len += i2hex_nofill(trees->offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
@@ -143,18 +145,18 @@ void	mu_int_err(
 				util_buff[util_len] = 0;
 				util_out_print((caddr_t)util_buff, FALSE);
 			}
-			util_len = i2hex_nofill(trees->path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
+			util_len = i2hexl_nofill(trees->path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
 			MEMCPY_LIT(&util_buff[util_len], TEXT3);
 			util_len += SIZEOF(TEXT3) - 1;
 			util_len += i2hex_nofill(trees->offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
 			util_buff[util_len] = 0;
 			util_out_print((caddr_t)util_buff, TRUE);
-			util_out_print("                   Path:  ", FALSE);
+			util_out_print("                           Path:  ", FALSE);
 		} else
-			util_out_print("                   Directory Path:  ", FALSE);
+			util_out_print("                           Directory Path:  ", FALSE);
 		for (i = 0;  i < mu_int_plen;  i++)
 		{
-			util_len = i2hex_nofill(mu_int_path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
+			util_len = i2hexl_nofill(mu_int_path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
 			MEMCPY_LIT(&util_buff[util_len], TEXT3);
 			util_len += SIZEOF(TEXT3) - 1;
 			util_len += i2hex_nofill(mu_int_offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
@@ -163,7 +165,7 @@ void	mu_int_err(
 			util_buff[util_len] = 0;
 			util_out_print((caddr_t)util_buff, FALSE);
 		}
-		util_len = i2hex_nofill(mu_int_path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
+		util_len = i2hexl_nofill(mu_int_path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
 		MEMCPY_LIT(&util_buff[util_len], TEXT3);
 		util_len += SIZEOF(TEXT3) - 1;
 		util_len += i2hex_nofill(mu_int_offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
@@ -177,7 +179,8 @@ void	mu_int_err(
 		{
 			util_out_print("^", FALSE);
 			/* in the case bot is the leftmost key of the gvtree, it needs a second null to be a properly terminated
-			 * real key for print_target. since it is a simple set, we unconditionally do it for every key */
+			 * real key for print_target. since it is a simple set, we unconditionally do it for every key
+			 */
 			temp_bot = bot[has_bot];
 			bot[has_bot] = 0;
 			print_target(bot);

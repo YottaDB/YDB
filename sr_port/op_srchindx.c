@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +57,7 @@ lv_val	*op_srchindx(UNIX_ONLY_COMMA(int argcnt) lv_val *lv, ...)
 			if ((0 == key->str.len) && (LVNULLSUBS_NEVER == TREF(lv_null_subs)))
 			{
 				va_end(var);
-				rts_error(VARLSTCNT(1) ERR_LVNULLSUBS);
+				RTS_ERROR_ABT(VARLSTCNT(1) ERR_LVNULLSUBS);
 			}
 			if (TREF(local_collseq))
 			{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,6 +33,8 @@ error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TEXT);
 
 GBLREF char		gtm_dist[GTM_PATH_MAX];
+GBLREF unsigned int	gtm_dist_len;
+GBLREF boolean_t	gtm_dist_ok_to_use;
 
 /* below comments applicable only to tru64 */
 /* dlsym() is bound to return short pointer because of -taso loader flag
@@ -63,7 +65,8 @@ void_ptr_t fgn_getpak(char *package_name, int msgtype)
 	char	 	librarypath[GTM_PATH_MAX], *lpath = NULL;
 	intrpt_state_t	prev_intrpt_state;
 
-	if ((RESTRICTED(library_load_path)) && (0 != memcmp(gtm_dist, package_name, STRLEN(gtm_dist))))
+	assert(gtm_dist_ok_to_use);
+	if ((RESTRICTED(library_load_path)) && (0 != memcmp(gtm_dist, package_name, gtm_dist_len)))
 	{	/* Restrictions in place and the path is not somewhere under $gtm_dist */
 		lpath = librarypath;
 		SNPRINTF(lpath, GTM_PATH_MAX, GTM_PLUGIN_FMT_FULL, gtm_dist, strrchr(package_name, '/'));
@@ -84,15 +87,15 @@ void_ptr_t fgn_getpak(char *package_name, int msgtype)
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3)
 							MAKE_MSG_TYPE(ERR_RESTRICTEDOP, msgtype), 1, err_str);
 				else
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3)
-							MAKE_MSG_TYPE(ERR_RESTRICTEDOP, msgtype), 1, err_str);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3)
+						MAKE_MSG_TYPE(ERR_RESTRICTEDOP, msgtype), 1, err_str);
 			}
 			COPY_DLLERR_MSG(dummy_err_str, err_str);
 			if ((INFO == msgtype))
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNOOPEN, msgtype),
 					2, LEN_AND_STR(lpath), ERR_TEXT, 2, LEN_AND_STR(err_str));
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNOOPEN, msgtype),
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNOOPEN, msgtype),
 					2, LEN_AND_STR(lpath), ERR_TEXT, 2, LEN_AND_STR(err_str));
 		}
 	}
@@ -123,7 +126,7 @@ fgnfnc fgn_getrtn(void_ptr_t package_handle, mstr *entry_name, int msgtype)
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNORTN, msgtype),
 					2, LEN_AND_STR(entry_name->addr), ERR_TEXT, 2, LEN_AND_STR(err_str));
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNORTN, msgtype),
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNORTN, msgtype),
 					2, LEN_AND_STR(entry_name->addr), ERR_TEXT, 2, LEN_AND_STR(err_str));
 		}
 	} else
@@ -135,7 +138,7 @@ fgnfnc fgn_getrtn(void_ptr_t package_handle, mstr *entry_name, int msgtype)
 			sym_addr = NULL;
 			/* always report an error irrespective of msgtype - since this code should never
 			 * have executed and/or the DLL might need to be rebuilt with 32-bit options */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DLLNORTN, 2, LEN_AND_STR(entry_name->addr),
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DLLNORTN, 2, LEN_AND_STR(entry_name->addr),
 				ERR_TEXT, 2, LEN_AND_LIT("Symbol is loaded above the lower 31-bit address space"));
 		}
 #endif
@@ -158,7 +161,7 @@ void fgn_closepak(void_ptr_t package_handle, int msgtype)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_TYPE(ERR_DLLNOCLOSE, msgtype), 0,
 				ERR_TEXT, 2, LEN_AND_STR(err_str));
 			else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_TYPE(ERR_DLLNOCLOSE, msgtype), 0,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) MAKE_MSG_TYPE(ERR_DLLNOCLOSE, msgtype), 0,
 				ERR_TEXT, 2, LEN_AND_STR(err_str));
 	}
 }

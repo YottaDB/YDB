@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -103,7 +103,7 @@ void file_input_init(char *fn, short fn_len, open_params_flags params_flag)
 	/* The mode will be set to M for reads */
 	status = (*op_open_ptr)(&val, &pars, (mval *)&literal_zero, NULL);
 	if (!status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILEOPENFAIL, 2, fn_len, fn);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_FILEOPENFAIL, 2, fn_len, fn);
 	pars.str.len = SIZEOF(iop_eol);
 	pars.str.addr = (char *)&no_param;
 	op_use(&val, &pars);
@@ -132,11 +132,12 @@ void file_input_close(void)
 void file_input_bin_init(char *line1_ptr, int line1_len)
 {
 	assert(buff1_ptr == buff1);
-	assert(line1_len < BUFF_SIZE);
+	assert((0 < line1_len) && (line1_len < BUFF_SIZE));
 	assert(buff1_end == buff1_ptr);
 	assert(0 == buff1_ptr_file_offset);
 	line1_len = MIN(line1_len, (BUFF_SIZE - 1));
 	memcpy(buff1_ptr, line1_ptr, line1_len);
+	assert(line1_len < BUFF_SIZE); /* For SCI */
 	buff1_end += line1_len;
 }
 
@@ -155,12 +156,12 @@ int file_input_bin_get(char **in_ptr, off_t *file_offset, char **buff_base, bool
 			if (buff1_end != buff1_ptr)
 			{
 				if (do_rts_error)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PREMATEOF);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_PREMATEOF);
 				ret = ERR_PREMATEOF;
 			} else if (-1 == rd_len)
 			{
 				if (do_rts_error)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADFILERR, 2, load_fn_len, load_fn_ptr);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_LOADFILERR, 2, load_fn_len, load_fn_ptr);
 				ret = ERR_LOADFILERR;
 			}
 			if (!do_rts_error || 0 == ret)
@@ -258,7 +259,7 @@ int file_input_read_xchar(char *in_ptr, int max_chars_to_read) /* uses DOREADRL 
  *	-1 (FILE_INPUT_GET_ERROR) in case of errors,
  *	-2 (FILE_INPUT_GET_LINE2LONG) in case line length of read becomes > input max_len (assuming max_len is non-zero)
  */
-int file_input_get(char **in_ptr, int max_len)
+int file_input_get(char **in_ptr, unsigned int max_len)
 {
 	char			*ptr, *tmp_ptr;
 	int			rd_len, s1;
@@ -272,7 +273,8 @@ int file_input_get(char **in_ptr, int max_len)
 	for (;;)
 	{	/* one-time only reads if in TP to avoid TPNOTACID, otherwise use untimed reads */
 		op_read(&val, (mval *)(dollar_tlevel ? &literal_zero: &literal_notimeout));
-		rd_len = val.str.len;
+		assert(0 <= val.str.len);
+		rd_len = (unsigned int)val.str.len;
 		if ((0 == rd_len) && io_curr_device.in->dollar.zeof)
 		{
 			REVERT;
@@ -294,12 +296,14 @@ int file_input_get(char **in_ptr, int max_len)
 				REVERT;
 				return FILE_INPUT_GET_ERROR;
 			}
+			assert(new_mbuff_len >= ret_len); /* For SCI */
 			memcpy(tmp_ptr, mbuff, ret_len);
 			if (mbuff != buff1)	/* do not free static array, free all later expansions (malloc buffers) */
 				free(mbuff);
 			mbuff = tmp_ptr;
 			mbuff_len = new_mbuff_len;
 		}
+		assert(mbuff_len >= (ret_len + rd_len));
 		memcpy((unsigned char *)(mbuff + ret_len), val.str.addr, rd_len);
 		ret_len += rd_len;
 		if ( !(io_curr_device.in->dollar.x) )

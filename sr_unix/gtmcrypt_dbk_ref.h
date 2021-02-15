@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -170,7 +170,7 @@ STATICFNDEF gtm_keystore_t 	*keystore_lookup_by_keyname_plus(char *keyname, char
 STATICFNDEF gtm_keystore_t 	*keystore_lookup_by_keypath(char *keypath);
 STATICFNDEF gtm_keystore_t 	*keystore_lookup_by_unres_key(char *search_field1, int search_field1_type,
 				char *search_field2, int search_field2_type, int database, int *error);
-int 				keystore_new_cipher_ctx(gtm_keystore_t *entry, char *iv, int length, int action);
+int 				keystore_new_cipher_ctx(gtm_keystore_t *entry, char *iv, unsigned int length, int action);
 int				keystore_remove_cipher_ctx(gtm_cipher_ctx_t *ctx);
 STATICFNDEF void		print_debug(void);
 

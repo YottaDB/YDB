@@ -32,6 +32,8 @@ error_def(ERR_MULTIPROCLATCH);
 														\
 #define	MULTI_PROC_MAX_PROCS		1000	/* We expect max # of tasks to execute to be in the hundreds, not thousands */
 #define	MULTI_PROC_LATCH_TIMEOUT_SEC	(4 * 60)        /* Define latch timeout as being 4 mins */
+#define	MULTI_PROC_ONE_PER_REG		0	/* One process runs parallely per region */
+#define	MULTI_PROC_NO_PARALLEL		1	/* No process-parallelization are used */
 
 #define	GRAB_MULTI_PROC_LATCH_IF_NEEDED(RELEASE_LATCH)										\
 {																\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,7 +95,7 @@ bool gvcmy_remlkmgr(unsigned short count)
 				{
 					SNPRINTF(errbuf, CM_ERRBUFF_SIZE, "gvcmy_remlkmgr 1: expected CMMS_E_ERROR, got %d",
 						(int)(*(lkerrlnk->mbf)));
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2,
 						LEN_AND_STR(errbuf));
 				} else
 					gvcmz_errmsg(lkerrlnk, FALSE);
@@ -139,7 +139,7 @@ bool gvcmy_remlkmgr(unsigned short count)
 					{
 						SNPRINTF(errbuf, CM_ERRBUFF_SIZE, "gvcmy_remlkmgr 2: expected CMMS_E_ERROR, got %d",
 							(int)(*(lkerrlnk->mbf)));
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2,
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2,
 							LEN_AND_STR(errbuf));
 					} else
 						gvcmz_errmsg(lkerrlnk, FALSE);
@@ -156,7 +156,7 @@ bool gvcmy_remlkmgr(unsigned short count)
 				{
 					SNPRINTF(errbuf, CM_ERRBUFF_SIZE, "gvcmy_remlkmgr 3: expected CMMS_E_ERROR, got %d",
 						(int)(*(lkerrlnk->mbf)));
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2,
 						LEN_AND_STR(errbuf));
 				}
 				gvcmz_errmsg(lktask_x, FALSE);
@@ -208,7 +208,7 @@ bool gvcmy_remlkmgr(unsigned short count)
 					{
 						SNPRINTF(errbuf, CM_ERRBUFF_SIZE, "gvcmy_remlkmgr 4: expected CMMS_E_ERROR, got %d",
 							(int)(*(lkerrlnk->mbf)));
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2,
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2,
 							LEN_AND_STR(errbuf));
 					} else
 						gvcmz_errmsg(lkerrlnk,FALSE);

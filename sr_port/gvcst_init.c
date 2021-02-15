@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,6 +25,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "gdsblk.h"
 #include "gdskill.h"
 #include "gdscc.h"
@@ -356,7 +357,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	ua_list			*tmp_ua;
 	time_t			curr_time;
 	uint4			curr_time_uint4, next_warn_uint4;
-	unsigned int            minus1 = (unsigned)-1;
+	gtm_uint8		minus1 = (gtm_uint8)-1;
 	enum db_acc_method	reg_acc_meth;
 	boolean_t		onln_rlbk_cycle_mismatch = FALSE;
 	boolean_t		replpool_valid = FALSE, replfilegdid_valid = FALSE, jnlpool_found = FALSE;
@@ -457,7 +458,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 			if (!ftok_sem_lock(baseDBreg, FALSE))
 			{	/* Use FTOK of the base db as a lock, the same lock obtained when statsdb is auto deleted */
 				assert(FALSE);
-				rts_error_csa(CSA_ARG(baseDBcsa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg));
+				RTS_ERROR_CSA_ABT(baseDBcsa, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg));
 			}
 			ESTABLISH(gvcst_init_autoDB_ch);	/* ch reverses the DEFER and lock in the opposite order */
 			if (0 == baseDBnl->statsdb_fname_len)
@@ -500,8 +501,8 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 				assert(TREF(gvcst_statsDB_open_ch_active));	/* below error goes to syslog and not to user */
 				baseDBreg->reservedDBFlags |= RDBF_NOSTATS;	/* Disable STATS in base DB */
 				baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg), ERR_STATSDBFNERR,
-					      2, errrsn_text_len, errrsn_text);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg), ERR_STATSDBFNERR,
+					2, errrsn_text_len, errrsn_text);
 			}
 			COPY_STATSDB_FNAME_INTO_STATSREG(reg, baseDBnl->statsdb_fname, baseDBnl->statsdb_fname_len);
 			seg = reg->dyn.addr;
@@ -575,6 +576,8 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 					}
 					/* Open worked - read file header from it*/
 					LSEEKREAD(fd, 0, (char *)&statsDBcsd, SIZEOF(sgmnt_data), rc);
+					if (0 == memcmp(statsDBcsd.label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+						db_header_upconv(&statsDBcsd);
 					if (0 > rc)
 					{	/* Wasn't enough data to be a file header - not a statsDB */
 						statsdb_rcerr = STATSDB_NOTSTATSDB;
@@ -669,8 +672,8 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 					if (!ftok_sem_release(baseDBreg, FALSE, FALSE))
 					{	/* Release the lock before unwinding back */
 						assert(FALSE);
-						rts_error_csa(CSA_ARG(baseDBcsa) VARLSTCNT(4) ERR_DBFILERR, 2,
-							      DB_LEN_STR(baseDBreg));
+						RTS_ERROR_CSA_ABT(baseDBcsa, VARLSTCNT(4) ERR_DBFILERR, 2,
+							DB_LEN_STR(baseDBreg));
 					}
 					/* For those errors that need a special error message, take care of that here
 					 * now that we've released the lock.
@@ -684,50 +687,50 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 							 * associated with that baseDB. First check if this IS a statsdb.
 							 */
 							if (IS_RDBF_STATSDB(&statsDBcsd))
-								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_STATSDBINUSE,
-									      6, DB_LEN_STR(reg),
-									      statsDBcsd.basedb_fname_len,
-									      statsDBcsd.basedb_fname,
-									      DB_LEN_STR(baseDBreg));
+								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_STATSDBINUSE,
+									6, DB_LEN_STR(reg),
+									statsDBcsd.basedb_fname_len,
+									statsDBcsd.basedb_fname,
+									DB_LEN_STR(baseDBreg));
 							else
-								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVSTATSDB,
-									      4, DB_LEN_STR(reg), REG_LEN_STR(reg));
+								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_INVSTATSDB,
+									4, DB_LEN_STR(reg), REG_LEN_STR(reg));
 							break;			/* For the compiler */
 						case STATSDB_OPNERR:
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBOPNERR, 2,
-								      DB_LEN_STR(reg), save_errno);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBOPNERR, 2,
+								DB_LEN_STR(reg), save_errno);
 							break;			/* For the compiler */
 						case STATSDB_READERR:
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2,
-								      DB_LEN_STR(reg), save_errno);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2,
+								DB_LEN_STR(reg), save_errno);
 							break;			/* For the compiler */
 						case STATSDB_NOTSTATSDB:
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVSTATSDB, 4,
-								      DB_LEN_STR(reg), REG_LEN_STR(reg));
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_INVSTATSDB, 4,
+								DB_LEN_STR(reg), REG_LEN_STR(reg));
 							break;			/* For the compiler */
 						case STATSDB_UNLINKERR:
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-								      LEN_AND_LIT("unlink()"), CALLFROM, save_errno);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+								LEN_AND_LIT("unlink()"), CALLFROM, save_errno);
 							break;			/* For the compiler */
 						case STATSDB_RECREATEERR:
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBOPNERR, 2,
-								      DB_LEN_STR(reg), save_errno);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBOPNERR, 2,
+								DB_LEN_STR(reg), save_errno);
 							break;			/* For the compiler */
 						case STATSDB_CLOSEERR:
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-								      LEN_AND_LIT("close()"), CALLFROM, save_errno);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+								LEN_AND_LIT("close()"), CALLFROM, save_errno);
 							break;			/* For the compiler */
 						case STATSDB_SHMRMIDERR:
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-								      LEN_AND_LIT("shm_rmid()"), CALLFROM, save_errno);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+								LEN_AND_LIT("shm_rmid()"), CALLFROM, save_errno);
 							break;			/* For the compiler */
 						case STATSDB_SEMRMIDERR:
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-								      LEN_AND_LIT("sem_rmid()"), CALLFROM, save_errno);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+								LEN_AND_LIT("sem_rmid()"), CALLFROM, save_errno);
 							break;			/* For the compiler */
 						case STATSDB_FTOKSEMRMIDERR:
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-								      LEN_AND_LIT("ftok sem_rmid()"), CALLFROM, save_errno);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+								LEN_AND_LIT("ftok sem_rmid()"), CALLFROM, save_errno);
 							break;			/* For the compiler */
 						default:
 							assertpro(FALSE);
@@ -736,13 +739,13 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 					{	/* Unwind back to ESTABLISH_NORET where did gvcst_init() call to open this
 						 * statsDB which now won't open.
 						 */
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DRVLONGJMP);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DRVLONGJMP);
 					} else
 					{	/* We are not nested so can give the appropriate error ourselves */
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBFILERR, 2,
-							      DB_LEN_STR(reg), ERR_TEXT, 2,
-							      RTS_ERROR_TEXT("See preceding errors written to syserr"
-									     " and/or syslog for details"));
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DBFILERR, 2,
+							DB_LEN_STR(reg), ERR_TEXT, 2,
+							RTS_ERROR_TEXT("See preceding errors written to syserr"
+							" and/or syslog for details"));
 					}
 				}
 				break;
@@ -751,7 +754,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 			if (!ftok_sem_release(baseDBreg, FALSE, FALSE))
 			{
 				assert(FALSE);
-				rts_error_csa(CSA_ARG(baseDBcsa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg));
+				RTS_ERROR_CSA_ABT(baseDBcsa, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg));
 			}
 			ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 		} else
@@ -783,7 +786,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	assert(SIZEOF(th_rec) == (SIZEOF(bt_rec) - SIZEOF(bt->blkque)));
 	assert(SIZEOF(cache_rec) == (SIZEOF(cache_state_rec) + SIZEOF(cr->blkque)));
 	DEBUG_ONLY(assert_jrec_member_offsets());
-	assert(MAX_DB_BLK_SIZE < (1 << NEXT_OFF_MAX_BITS));	/* Ensure a off_chain record's next_off member
+	assert(MAX_DB_BLK_SIZE < (1ULL << NEXT_OFF_MAX_BITS));	/* Ensure a off_chain record's next_off member
 								 * can work with all possible block sizes */
 	set_num_additional_processors();
 #	ifdef DEBUG
@@ -1010,7 +1013,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	{
 		assert(FALSE);	/* we don't know of a practical way to get errors in each of the for-loop attempts above */
 		/* "db_init" returned with an unexpected error. Issue a generic error to note this out-of-design state */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REGOPENFAIL, 4, REG_LEN_STR(reg), DB_LEN_STR(reg));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REGOPENFAIL, 4, REG_LEN_STR(reg), DB_LEN_STR(reg));
 	}
 	/* At this point, we have initialized the database, but haven't yet set reg->open to TRUE. If any rts_errors happen in
 	 * the meantime, there are no condition handlers established to handle the rts_error. More importantly, it is non-trivial

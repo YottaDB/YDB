@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,7 +47,7 @@ void mupip_rctldump(void)
 		assert(1 == TREF(parms_cnt));
 		max_len = SIZEOF(objdir);
 		if (!cli_get_str("DIRECTORY", objdir, &max_len))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
 		dir.addr = objdir;
 		dir.len = max_len;
 		linkctl = relinkctl_attach(&dir, NULL, 0);
@@ -59,4 +59,3 @@ void mupip_rctldump(void)
 	zshow_rctldump(NULL);		/* callee knows caller is mupip_rctldump type based on the NULL parameter */
 #	endif	/* AUTORELINK_SUPPORTED */
 }
-

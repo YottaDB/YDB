@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,14 +41,14 @@ void act_in_gvt(gv_namehead *gvt)
 		if (!do_verify(csp, gvt->act, gvt->ver))
 		{
 			gvt->root = 0;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_COLLTYPVERSION, 2, gvt->act, gvt->ver,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_COLLTYPVERSION, 2, gvt->act, gvt->ver,
 				ERR_GVIS, 2, gvt->gvname.var_name.len, gvt->gvname.var_name.addr);
 		}
 	} else
 	{
 		gvt->root = 0;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, gvt->act,
-				ERR_GVIS, 2, gvt->gvname.var_name.len, gvt->gvname.var_name.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, gvt->act,
+			ERR_GVIS, 2, gvt->gvname.var_name.len, gvt->gvname.var_name.addr);
 	}
 	gvt->collseq = csp;
 	return;

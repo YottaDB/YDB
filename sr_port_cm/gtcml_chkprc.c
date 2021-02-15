@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,7 +81,7 @@ void gtcml_chkprc(cm_lckblklck *lck)
 	{
 		status = gtcm_action_pending(prc->user);
 		if (INTERLOCK_FAIL == status)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) CMERR_CMINTQUE);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) CMERR_CMINTQUE);
 		prc->next->last = prc->last;
 		prc->last->next = prc->next;
 		if (prc->next == prc)

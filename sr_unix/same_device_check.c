@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014, 2015 Fidelity National Information	*
+ * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,13 +65,13 @@ bool	same_device_check (mstr tname, char *buf)
 	if (-1 == fstat_res)
 	{
 		save_errno = errno;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"), CALLFROM, save_errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"), CALLFROM, save_errno);
 	}
 	FSTAT_FILE(1, &outbuf2, fstat_res);
 	if (-1 == fstat_res)
 	{
 		save_errno = errno;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"), CALLFROM, save_errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"), CALLFROM, save_errno);
 	}
 
 	if ((S_IFMT & outbuf1.st_mode) != (S_IFMT & outbuf2.st_mode))
@@ -94,7 +94,7 @@ bool	same_device_check (mstr tname, char *buf)
 				/* process error */
 				errptr = (char *)STRERROR(save_errno);
 				tmplen = STRLEN(errptr);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
 			}
 		}
 
@@ -111,7 +111,7 @@ bool	same_device_check (mstr tname, char *buf)
 				/* process error */
 				errptr = (char *)STRERROR(save_errno);
 				tmplen = STRLEN(errptr);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
 			}
 		}
 		/* if both sockets not the same family then not the same device */
@@ -149,7 +149,7 @@ bool	same_device_check (mstr tname, char *buf)
 				save_errno = errno;
 				errptr = (char *)STRERROR(save_errno);
 				tmplen = STRLEN(errptr);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
 			}
 
 
@@ -160,7 +160,7 @@ bool	same_device_check (mstr tname, char *buf)
 				save_errno = errno;
 				errptr = (char *)STRERROR(save_errno);
 				tmplen = STRLEN(errptr);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
 			}
 
 			GETNAMEINFO((struct sockaddr *)&psockname1, psocknamelen1, phost_buffer1, NI_MAXHOST,

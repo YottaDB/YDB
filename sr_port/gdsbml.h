@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,7 @@
 		&& (WBTEST_ANTIFREEZE_DBBMLCORRUPT == gtm_white_box_test_case_number)))))				\
 	{														\
 		send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBBMLCORRUPT, 7, DB_LEN_STR(region),				\
-				blk, (bp)->bsiz, (bp)->levl, &(bp)->tn, &csa->ti->curr_tn);				\
+				&(blk), (bp)->bsiz, (bp)->levl, &(bp)->tn, &csa->ti->curr_tn);				\
 		status = FALSE;												\
 	} else														\
 		status = TRUE;												\
@@ -133,4 +133,3 @@ int4 bml_init(block_id bml);
 uint4 bml_busy(block_id setbusy, sm_uc_ptr_t map);
 uint4 bml_free(block_id setfree, sm_uc_ptr_t map);
 uint4 bml_recycled(block_id setfree, sm_uc_ptr_t map);
-

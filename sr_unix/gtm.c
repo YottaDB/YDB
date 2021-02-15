@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,7 +83,7 @@ int main (int argc, char **argv, char **envp)
 #ifndef NOLIBGTMSHR
 	char		gtmshr_file[GTM_PATH_MAX];
 	char_ptr_t	fptr;
-	int		dir_len;
+	unsigned int	dir_len;
 	void_ptr_t	handle;
 	gtm_main_t	gtm_main;
 	/* We fake the output of the following messages to appear as if they were reported by GT.M error
@@ -97,7 +98,7 @@ int main (int argc, char **argv, char **envp)
 		FPRINTF(stderr, "%%GTM-E-GTMDISTUNDEF, Environment variable $gtm_dist is not defined\n");
 		return ERR_GTMDISTUNDEF;
 	}
-	dir_len = STRLEN(fptr);
+	dir_len = strlen(fptr);
 	if (GTM_DIST_PATH_MAX <= dir_len)
 	{
 		FPRINTF(stderr, "%%GTM-E-DISTPATHMAX, $gtm_dist path is greater than maximum (%d)\n",

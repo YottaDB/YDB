@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,7 @@ error_def(ERR_DSEONLYBGMM);
 void dse_flush(void)
 {
 	if (gv_cur_region->read_only)
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 
 	switch (gv_cur_region->dyn.addr->acc_meth)
 	{

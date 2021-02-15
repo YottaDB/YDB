@@ -31,6 +31,7 @@
 #include "gdsbt.h"
 #include "gdsblk.h"
 #include "gdsfhead.h"
+#include "db_header_conversion.h"
 #include "filestruct.h"
 #include "gtmio.h"
 #include "mupipbckup.h"
@@ -575,7 +576,10 @@ bool	mubfilcpy (backup_reg_list *list)
 		}
 	}
 
+	if (0 == memcmp(header_cpy->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+		db_header_dwnconv(header_cpy);
 	LSEEKWRITE(backup_fd, 0, header_cpy, hdrsize, save_errno);
+
 	if (0 != save_errno)
 	{
 		errptr = (char *)STRERROR(save_errno);

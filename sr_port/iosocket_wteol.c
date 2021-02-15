@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,7 @@ void	iosocket_wteol(int4 val, io_desc *io_ptr)
 			ionl_wteol(val, io_ptr);
 		else
 #		endif
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOSOCKETINDEV);
 		REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 		return;
 	}

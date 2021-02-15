@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -188,7 +188,7 @@ void	obj_code (uint4 src_lines, void *checksum_ctx)
 	ENABLE_INTERRUPTS(INTRPT_IN_OBJECT_FILE_COMPILE, prev_intrpt_state);
 	CLOSE_OBJECT_FILE(object_file_des, status);
 	if (-1 == status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, errno);
 	/* Ready to make object visible. Rename from tmp name to real routine name */
 	RENAME_TMP_OBJECT_FILE(object_file_name);
 }

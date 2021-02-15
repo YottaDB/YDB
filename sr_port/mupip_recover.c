@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,6 +63,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	mur_opt_struct		mur_options;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF 	mur_gbls_t		murgbl;
+GBLREF	boolean_t		wcs_noasyncio;
 GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF  jnl_process_vector	*prc_vec;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
@@ -231,9 +232,9 @@ void	mupip_recover(void)
 			if (mur_options.corruptdb)
 			{
 				if (!REPL_ALLOWED(jctl->jfh))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLEXTRCTSEQNO);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JNLEXTRCTSEQNO);
 			} else if (!REPL_ALLOWED(rctl->csd))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLEXTRCTSEQNO);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JNLEXTRCTSEQNO);
 		}
 	}
 	all_gen_properly_closed = TRUE;
@@ -560,6 +561,8 @@ void	mupip_recover(void)
 	}
 	/* PHASE 6 : Forward processing phase */
 	JNL_PUT_MSG_PROGRESS("Forward processing started");
+	/* set do_asyncio in wcs_wtstart to FALSE */
+	wcs_noasyncio = TRUE;
 	murgbl.mur_state = MUR_STATE_FORWARD;
 	if (mur_options.rollback)
 	{	/* Pass in "losttn_seqno" determined in "mur_back_process" to "mur_process_seqno_table". That will try
@@ -592,6 +595,7 @@ void	mupip_recover(void)
 						? (jnlpool->repl_inst_filehdr->jnl_seqno != murgbl.consist_jnl_seqno)
 						: FALSE;
 	}
+	wcs_noasyncio = FALSE;
 	/* PHASE 7 : Close all files, rundown and exit */
 	murgbl.clean_exit = TRUE;
 	if (mur_options.rollback && !mur_options.rollback_losttnonly)

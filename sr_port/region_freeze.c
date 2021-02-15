@@ -133,7 +133,9 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 				 * We need to grab crit in a specific order to avoid deadlocks.
 				 */
 				while (pfrms->region_index > pfrms->pfms->grab_crit_counter)
-				{	/* Keep flushing while waiting to grab crit in a specific order. */
+				{	/* Keep pre-flushing while waiting to grab crit in a specific order, to make
+					 * parallel FREEZE -ONLINE less disruptive.
+					 */
 					JNL_ENSURE_OPEN_WCS_WTSTART(csa, region, csd->n_bts, NULL, FALSE, dummy_errno);
 				}
 			}
@@ -147,8 +149,8 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 			{
 				if (pfrms)
 				{
-					INCR_CNT(&pfrms->pfms->grab_crit_counter, &pfrms->pfms->region_frozen_latch);
-					INCR_CNT(&pfrms->pfms->region_frozen_counter, &pfrms->pfms->region_frozen_latch);
+					INCR_CNT(&pfrms->pfms->grab_crit_counter, &pfrms->pfms->grab_crit_latch);
+					INCR_REG_FROZEN_COUNT(pfrms->pfms, FALSE);
 				}
 				rel_crit(region);
 			}
@@ -161,8 +163,8 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 			{
 				if (pfrms)
 				{
-					INCR_CNT(&pfrms->pfms->grab_crit_counter, &pfrms->pfms->region_frozen_latch);
-					INCR_CNT(&pfrms->pfms->region_frozen_counter, &pfrms->pfms->region_frozen_latch);
+					INCR_CNT(&pfrms->pfms->grab_crit_counter, &pfrms->pfms->grab_crit_latch);
+					INCR_REG_FROZEN_COUNT(pfrms->pfms, FALSE);
 				}
 				rel_crit(region);
 			}
@@ -200,7 +202,7 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 		}
 		if (pfrms)
 		{	/* Increment counter and grab the next crit */
-			INCR_CNT(&pfrms->pfms->grab_crit_counter, &pfrms->pfms->region_frozen_latch);
+			INCR_CNT(&pfrms->pfms->grab_crit_counter, &pfrms->pfms->grab_crit_latch);
 		}
 		/* if can't ever be true when override is true. */
 		if (MAX_CRIT_TRY <= sleep_counter)
@@ -209,7 +211,7 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 			if (!was_crit)
 			{
 				if (pfrms)
-					INCR_CNT(&pfrms->pfms->region_frozen_counter, &pfrms->pfms->region_frozen_latch);
+					INCR_REG_FROZEN_COUNT(pfrms->pfms, FALSE);
 				rel_crit(region);
 			}
 			return REG_HAS_KIP;
@@ -263,7 +265,7 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 			if (!was_crit)
 			{
 				if (pfrms)
-					INCR_CNT(&pfrms->pfms->region_frozen_counter, &pfrms->pfms->region_frozen_latch);
+					INCR_REG_FROZEN_COUNT(pfrms->pfms, FALSE);
 				rel_crit(region);
 			}
 			rel_latch(&cnl->freeze_latch);
@@ -287,10 +289,12 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 		if (!was_crit)
 		{
 			if (pfrms)
-			{
-				INCR_CNT(&pfrms->pfms->region_frozen_counter, &pfrms->pfms->region_frozen_latch);
-				while (pfrms->pfms->region_frozen_counter < pfrms->pfms->ntasks)
-					SLEEP_USEC(10, FALSE);
+			{	/* Wait for all regions to grab crit before releasing it on ours.
+				 * This ensures that we had a point where all regions were stopped before restarting with ONLINE.
+				 */
+				INCR_REG_FROZEN_COUNT(pfrms->pfms, TRUE);
+				if (csd->asyncio)
+					wcs_wtfini(region, CHECK_IS_PROC_ALIVE_FALSE, NULL);
 			}
 			rel_crit(region);
 		}

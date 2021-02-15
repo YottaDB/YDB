@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,7 +22,7 @@
 #include "gdskill.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab_int4.h"
+#include "hashtab_int8.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "copy.h"
@@ -72,7 +72,7 @@ void tp_incr_clean_up(uint4 newlevel)
 	cw_set_element		*cse_newlvl;	/* pointer to that cse in a given horizontal list closest to "newlevel" */
 	cw_set_element 		*cse, *next_cse, *tmp_cse;
 	gv_namehead		*gvnh;
-	ht_ent_int4		*tabent;
+	ht_ent_int8		*tabent;
 	int			min_t_level;	/* t_level of the head of the horizontal-list of a given cw-set-element */
 	int4			upd_trans;
 	sgm_info 		*si;
@@ -111,7 +111,7 @@ void tp_incr_clean_up(uint4 newlevel)
 			assert((gds_t_create == cse->mode) || (kill_t_create == cse->mode)
 				|| (gds_t_write == cse->mode) || (kill_t_write == cse->mode));
 			if ((gds_t_create != cse->mode) && (kill_t_create != cse->mode)
-					&& (NULL != (tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&cse->blk))))
+					&& (NULL != (tabent = lookup_hashtab_int8(si->blks_in_use, (ublock_id *)&cse->blk))))
 				tp_srch_status = tabent->value;
 			DEBUG_ONLY(
 				tmp_cse = cse;
@@ -224,6 +224,8 @@ void restore_next_off(cw_set_element *cse)
 	sm_uc_ptr_t 	ptr;
 	int		cur_blk_size, iter;
 	off_chain	chain;
+	v6_off_chain	v6_chain;
+	boolean_t	long_blk_id;
 
 	assert(cse->done);
 	assert(cse->new_buff);
@@ -238,14 +240,23 @@ void restore_next_off(cw_set_element *cse)
 	assert(cse->undo_offset[0] < cur_blk_size);
 	assert(cse->undo_offset[1] < cur_blk_size);
 #endif
-	for (iter=0; iter<2; iter++)
+	long_blk_id = IS_64_BLK_ID(cse->new_buff);
+	for (iter = 0; iter < 2; iter++)
 	{
 		if (cse->undo_offset[iter])
 		{
 			ptr = cse->new_buff + cse->undo_offset[iter];
-			GET_BLK_IDP(&chain, ptr);
-			chain.next_off = cse->undo_next_off[iter];
-			GET_BLK_IDP(ptr, &chain);
+			if (long_blk_id)
+			{
+				GET_BLK_ID_64P(&chain, ptr);
+				chain.next_off = cse->undo_next_off[iter];
+				GET_BLK_ID_64P(ptr, &chain);
+			} else
+			{
+				GET_BLK_ID_32P(&v6_chain, ptr);
+				v6_chain.next_off = cse->undo_next_off[iter];
+				GET_BLK_ID_32P(ptr, &v6_chain);
+			}
 			cse->undo_offset[iter] = cse->undo_next_off[iter] = 0;
 		} else
 			assert(!cse->undo_next_off[iter]);
@@ -383,7 +394,7 @@ void rollbk_sgm_tlvl_info(uint4 newlevel, sgm_info *si)
 		DEBUG_ONLY(invalidate = FALSE;)
 		for (th = tli->tlvl_tp_hist_info; th != si->last_tp_hist; th++)
 		{
-			deleted = delete_hashtab_int4(si->blks_in_use, (uint4 *)&th->blk_num);
+			deleted = delete_hashtab_int8(si->blks_in_use, (ublock_id *)&th->blk_num);
 			assert(deleted);
 			si->num_of_blks--;
 #			ifdef DEBUG
@@ -416,7 +427,7 @@ void rollbk_sgm_tlvl_info(uint4 newlevel, sgm_info *si)
 		si->kill_set_head = si->kill_set_tail = NULL;
 		assert(NULL == si->kip_csa);
 		FREE_JFB_INFO_IF_NEEDED(csa, si, tli, TRUE);
-		reinitialize_hashtab_int4(si->blks_in_use);
+		reinitialize_hashtab_int8(si->blks_in_use);
 		si->num_of_blks = 0;
 		si->update_trans = 0;
 		csa->dir_tree->clue.end = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2018 Fidelity National Information	*
+ * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,9 +28,13 @@
 #include "iottdef.h"
 #include "gds_blk_downgrade.h"
 
+#include "send_msg.h"
+
 #define SPACE_NEEDED (SIZEOF(blk_hdr) - SIZEOF(v15_blk_hdr))
 
 GBLREF	boolean_t	dse_running;
+
+error_def(ERR_GTMCURUNSUPP);
 
 void gds_blk_downgrade(v15_blk_hdr_ptr_t gds_blk_trg, blk_hdr_ptr_t gds_blk_src)
 {
@@ -40,6 +44,7 @@ void gds_blk_downgrade(v15_blk_hdr_ptr_t gds_blk_trg, blk_hdr_ptr_t gds_blk_src)
 	uint4		bsiz, levl;
 	int		movesize;
 
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMCURUNSUPP);
 	/* Note that this routine is written in such a fashion that it is possible for the
 	 * source and target blocks to point to the same area.
 	 */

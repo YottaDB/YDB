@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2019 Fidelity National Information	*
+ * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -118,7 +118,7 @@ void	ss_anal_shdw_file(char	*filename, int flen)
 					return;
 				} else
 				{
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSPREMATEOF, 5, blkno,
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSPREMATEOF, 5, &blkno,
 											db_blk_size, blk_offset, flen, filename);
 					return;
 				}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2020 Fidelity National Information	*
+ * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -126,9 +126,9 @@
 #define	MALLOC_CPY_STR(DST, SRC)		\
 MBSTART {					\
 	char	*mcs_ptr;			\
-	int	mcs_len;			\
+	size_t	mcs_len;			\
 						\
-	mcs_len = (int)(STRLEN(SRC) + 1);	\
+	mcs_len = strlen(SRC) + 1;		\
 	mcs_ptr = malloc(mcs_len);		\
 	memcpy(mcs_ptr, SRC, mcs_len);		\
 	DST = mcs_ptr;				\

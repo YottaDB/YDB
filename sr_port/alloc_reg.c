@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -182,7 +182,7 @@ void alloc_reg(void)
 					for (c = 0; tempcont[r][c] && (MAX_TEMP_COUNT > c); c++)
 						;
 					if (MAX_TEMP_COUNT <= c)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TMPSTOREMAX);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TMPSTOREMAX);
 					tempcont[r][c] = 1;
 					x->destination.oprclass = r;
 					x->destination.oprval.temp = c;

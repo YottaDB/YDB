@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "copy.h"
+#include "tp.h"
 
 /* Include prototypes */
 #include "t_qread.h"
@@ -43,9 +44,11 @@ enum cdb_sc	gvcst_lftsib(srch_hist *full_hist)
 	unsigned short	rtop, temp_short;
 	sm_uc_ptr_t	buffer_address, bp;
 	int4		cycle;
+	boolean_t	long_blk_id;
 
 	new_base = &full_hist->h[0];
 	old = old_base = &gv_target->hist.h[0];
+	long_blk_id = IS_64_BLK_ID(old->buffaddr);
 	for (;;)
 	{
 		buffer_address = old->buffaddr;
@@ -87,11 +90,12 @@ enum cdb_sc	gvcst_lftsib(srch_hist *full_hist)
 	while (--new >= new_base)
 	{
 		--old;
-		GET_BLK_ID(blk, bp + rtop - SIZEOF(block_id));
+		READ_BLK_ID(long_blk_id, &blk, bp + rtop - SIZEOF_BLK_ID(long_blk_id));
 		new->tn = cs_addrs->ti->curr_tn;
 		new->cse = NULL;
 		if (NULL == (buffer_address = t_qread(blk, &new->cycle, &new->cr)))
 			return((enum cdb_sc)rdfail_detail);
+		long_blk_id = IS_64_BLK_ID(old->buffaddr);
 		new->first_tp_srch_status = first_tp_srch_status;
 		assert(new->level == old->level);
 		assert(new->blk_target == old->blk_target);

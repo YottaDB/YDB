@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,7 +77,7 @@ void dse_adrec(void)
 
 	csa = cs_addrs;
 	if (gv_cur_region->read_only)
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	if (BADDSEBLK == (blk = dse_getblk("BLOCK", DSENOBML, DSEBLKCUR)))		/* WARNING: assignment */
 		return;
@@ -92,7 +92,7 @@ void dse_adrec(void)
 	blk_size = csa->hdr->blk_size;
 	blkhist.blk_num = blk;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	lbp = (uchar_ptr_t)malloc(blk_size);
 	memcpy(lbp, blkhist.buffaddr, blk_size);
 	if (((blk_hdr_ptr_t)lbp)->bver > BLK_ID_32_VER) /* Check blk version to see if using 32 or 64 bit block_id */
@@ -103,7 +103,7 @@ void dse_adrec(void)
 #		else
 		t_abort(gv_cur_region, csa);
 		free(lbp);
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEINVALBLKID);
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #		endif
 	} else
 	{
@@ -138,7 +138,7 @@ void dse_adrec(void)
 #			else
 			t_abort(gv_cur_region, csa);
 			free(lbp);
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEINVALBLKID);
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #			endif
 		} else
 		{
@@ -171,8 +171,8 @@ void dse_adrec(void)
 		{
 			t_abort(gv_cur_region, csa);
 			free(lbp);
- 			rts_error_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_REC2BIG, 4, VMS_ONLY(key_len + ) data_len,
-				(int4)csa->hdr->max_rec_size, REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, LEN_AND_STR(key));
+		 	RTS_ERROR_CSA_ABT(csa, VARLSTCNT(10) ERR_REC2BIG, 4, VMS_ONLY(key_len + ) data_len,
+		 		(int4)csa->hdr->max_rec_size, REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, LEN_AND_STR(key));
 		}
 	}
 	if (CLI_PRESENT == cli_present("RECORD"))
@@ -266,7 +266,7 @@ void dse_adrec(void)
 	{
 		t_abort(gv_cur_region, csa);
 		free(lbp);
-		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_AIMGBLKFAIL, 3, blk, DB_LEN_STR(gv_cur_region));
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_AIMGBLKFAIL, 3, &blk, DB_LEN_STR(gv_cur_region));
 		return;
 	}
 	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);

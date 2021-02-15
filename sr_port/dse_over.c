@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,7 +85,7 @@ void dse_over(void)
 	unsigned short	name_len = 0;
 
         if (gv_cur_region->read_only)
-                rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	blk_size = cs_addrs->hdr->blk_size;
 	if (BADDSEBLK == (blk = dse_getblk("BLOCK", DSEBMLOK, DSEBLKCUR)))		/* WARNING: assignment */
@@ -144,7 +144,7 @@ void dse_over(void)
 	t_begin_crit(ERR_DSEFAIL);
 	blkhist.blk_num = blk;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	size = ((blk_hdr_ptr_t)blkhist.buffaddr)->bsiz;
 	if (size < SIZEOF(blk_hdr))
 		size = SIZEOF(blk_hdr);
@@ -200,7 +200,7 @@ void dse_over(void)
 	BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + SIZEOF(blk_hdr), (int)((blk_hdr_ptr_t)lbp)->bsiz - SIZEOF(blk_hdr));
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
-		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_AIMGBLKFAIL, 3, blk, DB_LEN_STR(gv_cur_region));
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_AIMGBLKFAIL, 3, &blk, DB_LEN_STR(gv_cur_region));
 		free(lbp);
 		t_abort(gv_cur_region, cs_addrs);
 		return;

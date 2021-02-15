@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +21,8 @@
 GBLREF spdesc stringpool;
 LITREF int4 ten_pwr[];
 
+error_def(ERR_JUSTFRACT);
+error_def(ERR_MAXSTRLEN);
 
 void op_fnj3(mval *src,int width,int fract,mval *dst)
 {
@@ -29,20 +32,18 @@ void op_fnj3(mval *src,int width,int fract,mval *dst)
 	static readonly int4 fives_table[9] =
 	{ 500000000, 50000000, 5000000, 500000, 50000, 5000, 500, 50, 5};
 	unsigned char *cp;
-	error_def(ERR_JUSTFRACT);
-	error_def(ERR_MAXSTRLEN);
 
 	if (width < 0)
 		width = 0;
 	else	if (width > MAX_STRLEN)
-			rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+			RTS_ERROR_ABT(VARLSTCNT(1) ERR_MAXSTRLEN);
 	if (fract < 0)
-		rts_error(VARLSTCNT(1) ERR_JUSTFRACT);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_JUSTFRACT);
 	w = width + MAX_NUM_SIZE + 2 + fract;
 	/* the literal two above accounts for the possibility
 	of inserting a zero and/or a minus with a width of zero */
 	if  (w > MAX_STRLEN)
-		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_MAXSTRLEN);
 	MV_FORCE_NUM(src);
 	/* need to guarantee that the n2s call will not cause string pool overflow */
 	ENSURE_STP_FREE_SPACE(w);

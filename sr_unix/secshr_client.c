@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,6 +70,7 @@ GBLREF boolean_t		gtmsecshr_sock_init_done;
 GBLREF uint4			process_id;
 GBLREF ipcs_mesg		db_ipcs;
 GBLREF char			gtm_dist[GTM_PATH_MAX];
+GBLREF unsigned int		gtm_dist_len;
 GBLREF boolean_t		gtm_dist_ok_to_use;
 
 LITREF char			gtm_release_name[];
@@ -189,14 +190,13 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	struct stat		stat_buf;
 	char			file_perm[MAX_PERM_LEN];
 	struct shmid_ds		shm_info;
-	int			len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	DBGGSSHR((LOGFLAGS, "secshr_client: New send request\n"));
 	if (!gtm_dist_ok_to_use)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
-				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+			gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	/* Create communication key (hash of release name) if it has not already been done */
 	if (0 == TREF(gtmsecshr_comkey))
 	{
@@ -205,30 +205,29 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	timer_id = (TID)send_mesg2gtmsecshr;
 	if (!gtmsecshr_file_check_done)
 	{
-		len = STRLEN(gtm_dist);
-		memcpy(gtmsecshr_path, gtm_dist, len);
-		gtmsecshr_path[len] =  '/';
-		memcpy(gtmsecshr_path + len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
+		assert(GTM_PATH_MAX >= (gtm_dist_len + 1 + sizeof(GTMSECSHR_EXECUTABLE))); /* Includes null */
+		memcpy(gtmsecshr_path, gtm_dist, gtm_dist_len);
+		gtmsecshr_path[gtm_dist_len] =  '/';
+		memcpy(gtmsecshr_path + gtm_dist_len + 1, GTMSECSHR_EXECUTABLE, sizeof(GTMSECSHR_EXECUTABLE)); /* Includes null */
 		gtmsecshr_pathname.addr = gtmsecshr_path;
-		gtmsecshr_pathname.len = len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
-		assertpro(GTM_PATH_MAX > gtmsecshr_pathname.len);
-		gtmsecshr_pathname.addr[gtmsecshr_pathname.len] = '\0';
+		gtmsecshr_pathname.len = (mstr_len_t)(gtm_dist_len + 1 + strlen(GTMSECSHR_EXECUTABLE)); /* Excludes null */
+		assert((0 < gtmsecshr_pathname.len) && (GTM_PATH_MAX > gtmsecshr_pathname.len));
 		if (-1 == Stat(gtmsecshr_pathname.addr, &stat_buf))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("stat"), CALLFROM, errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("stat"), CALLFROM, errno);
 		if ((ROOTUID != stat_buf.st_uid) || !(stat_buf.st_mode & S_ISUID))
 		{
 			SNPRINTF(file_perm, SIZEOF(file_perm), "%04o", stat_buf.st_mode & PERMALL);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GTMSECSHRPERM, 5,
-					gtmsecshr_pathname.len, gtmsecshr_pathname.addr,
-					RTS_ERROR_STRING(file_perm), stat_buf.st_uid);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_GTMSECSHRPERM, 5,
+				gtmsecshr_pathname.len, gtmsecshr_pathname.addr,
+				RTS_ERROR_STRING(file_perm), stat_buf.st_uid);
 		}
 		if (0 != ACCESS(gtmsecshr_pathname.addr, (X_OK)))
 		{
 			SNPRINTF(file_perm, SIZEOF(file_perm), "%04o", stat_buf.st_mode & PERMALL);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRPERM, 5,
-					gtmsecshr_pathname.len, gtmsecshr_pathname.addr,
-					RTS_ERROR_STRING(file_perm), stat_buf.st_uid, errno);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_GTMSECSHRPERM, 5,
+				gtmsecshr_pathname.len, gtmsecshr_pathname.addr,
+				RTS_ERROR_STRING(file_perm), stat_buf.st_uid, errno);
 		}
 		gtmsecshr_file_check_done = TRUE;
 	}
@@ -362,9 +361,9 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7, RTS_ERROR_TEXT("Client"),
 					 process_id, mesg.pid, req_code, RTS_ERROR_TEXT(mesg.mesg.path),
 					 ERR_TEXT, 2, RTS_ERROR_STRING("Communicating with wrong GT.M version"));
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(13) MAKE_MSG_ERROR(ERR_GTMSECSHRSRVFIL), 7,
-					 RTS_ERROR_TEXT("Client"), process_id, mesg.pid, req_code, RTS_ERROR_TEXT(mesg.mesg.path),
-					 ERR_TEXT, 2, RTS_ERROR_STRING("Communicating with wrong GT.M version"));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(13) MAKE_MSG_ERROR(ERR_GTMSECSHRSRVFIL), 7,
+					RTS_ERROR_TEXT("Client"), process_id, mesg.pid, req_code, RTS_ERROR_TEXT(mesg.mesg.path),
+					ERR_TEXT, 2, RTS_ERROR_STRING("Communicating with wrong GT.M version"));
 				break;	/* rts_error should not return */
 			}
 			switch(req_code)

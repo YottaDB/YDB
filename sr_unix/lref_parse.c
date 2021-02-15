@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,12 +19,13 @@
 #include "startup.h"
 #include "gtm_startup.h"
 
+error_def(ERR_RUNPARAMERR);
+
 /* parse an entry reference string into routine, label & offset */
 void lref_parse(unsigned char *label_ref, mstr* routine, mstr* label, int* offset)
 {
 	unsigned char 	ch, *c, *c1;
 	int 		i, label_len;
-	error_def	(ERR_RUNPARAMERR);
 
 	routine->addr = label->addr = (char *)label_ref;
 	*offset = 0;
@@ -39,7 +41,7 @@ void lref_parse(unsigned char *label_ref, mstr* routine, mstr* label, int* offse
 			{
 				*offset = (int)STRTOL((const char *)c, (char**)&c1, 10);
 				if (c == c1 ||*c1 != '^')
-					rts_error(VARLSTCNT(1) ERR_RUNPARAMERR);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RUNPARAMERR);
 				c = c1 + 1;
 			}
 			routine->addr = (char *)c;
@@ -54,9 +56,9 @@ void lref_parse(unsigned char *label_ref, mstr* routine, mstr* label, int* offse
 		label->len = 0;
 	}
 	if (!is_ident(routine))
-		rts_error(VARLSTCNT(1) ERR_RUNPARAMERR);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_RUNPARAMERR);
 	if (label->len && !is_ident(label))
-		rts_error(VARLSTCNT(1) ERR_RUNPARAMERR);
+		RTS_ERROR_ABT(VARLSTCNT(1) ERR_RUNPARAMERR);
 
 	routine->len = routine->len > MAX_MIDENT_LEN ? MAX_MIDENT_LEN : routine->len;
 	label->len = label->len > MAX_MIDENT_LEN ? MAX_MIDENT_LEN : label->len;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +27,8 @@ GBLREF spdesc		stringpool;
 GBLREF unsigned char	lkerror;
 GBLREF struct CLB	*lkerrlnk;
 
+error_def(ERR_BADSRVRNETMSG);
+
 #define CM_LKSUSPEND_TIME		100 /* ms */
 
 void gvcmx_susremlk(unsigned char rmv_locks)
@@ -33,8 +36,6 @@ void gvcmx_susremlk(unsigned char rmv_locks)
 	uint4		status,count,buffer;
 	unsigned char	*ptr;
 	struct CLB	*p;
-
-	error_def(ERR_BADSRVRNETMSG);
 
 	if (!ntd_root)
 		return;
@@ -83,7 +84,7 @@ void gvcmx_susremlk(unsigned char rmv_locks)
 		else
 		{
 			if (*(lkerrlnk->mbf) != CMMS_E_ERROR)
-				rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+				RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			else
 				gvcmz_errmsg(lkerrlnk, FALSE);
 		}

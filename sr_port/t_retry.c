@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -266,7 +266,7 @@ void t_retry(enum cdb_sc failure)
 			}
 			assert((cdb_sc_blkmod != t_fail_hist[t_tries]) || (0 != TAREF1(t_fail_hist_blk, t_tries)));
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_NONTPRESTART, 11, reg_mstr.len, reg_mstr.addr, c, &fail_hist,
-				TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len, gvname_mstr.addr,
+				&(TAREF1(t_fail_hist_blk, t_tries)), gvname_mstr.len, gvname_mstr.addr,
 				((cdb_sc_blkmod == failure) ? TREF(blkmod_fail_level) : 0),
 				((cdb_sc_blkmod == failure) ? TREF(blkmod_fail_type) : tp_blkmod_nomod),
 				t_restart_entryref.str.len, t_restart_entryref.str.addr);
@@ -436,7 +436,7 @@ void t_retry(enum cdb_sc failure)
 				{
 					gv_currkey->end = 0;
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLOFLOW, 2, DB_LEN_STR(csa->region));
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLOFLOW, 2, DB_LEN_STR(csa->region));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_GBLOFLOW, 2, DB_LEN_STR(csa->region));
 				}
 				if (IS_DOLLAR_INCREMENT)
 				{
@@ -500,14 +500,14 @@ void t_retry(enum cdb_sc failure)
 							 * second phase of KILL. So, assert that kip_csa is still NULL.
 							 */
 							assert(NULL == kip_csa);
-							rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBROLLEDBACK);
+							RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DBROLLEDBACK);
 						}
 					}
 					assert(!redo_root_search_done);
 					if (WANT_REDO_ROOT_SEARCH)
 						gvcst_redo_root_search();
 					if (is_updproc)
-						rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_REPLONLNRLBK);
+						RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_REPLONLNRLBK);
 				}
 #				ifdef DEBUG
 				else

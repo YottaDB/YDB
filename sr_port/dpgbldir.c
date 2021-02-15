@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -205,8 +205,8 @@ gd_addr *gd_load(mstr *v)
 		close_gd_file(file_ptr);
 		disp_len = SIZEOF(disp_head.label);
 		format2disp(temp_head.label, SIZEOF(temp_head.label), disp_head.label, &disp_len);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GDINVALID, 6, v->len, v->addr, LEN_AND_LIT(GDE_LABEL_LITERAL),
-				disp_len, disp_head.label);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_GDINVALID, 6, v->len, v->addr, LEN_AND_LIT(GDE_LABEL_LITERAL),
+			disp_len, disp_head.label);
 	}
 	size = LEGAL_IO_SIZE(temp_head.filesize);
 	header = (header_struct *)malloc(size);

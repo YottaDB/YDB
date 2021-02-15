@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,14 +74,14 @@ mlk_shrblk_ptr_t mlk_shrhash_find(mlk_pvtblk *p, int subnum, unsigned char *subv
 boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown)
 {
 	boolean_t		blocked;
-	int			i, j, slen;
+	int			i, j;
 	mlk_ctldata_ptr_t	ctl;
 	mlk_ctldata		ctl_bak;
 	mlk_prcblk_ptr_t	pr;
 	mlk_shrblk_ptr_t	pnt, d, d0, d1, dhead;
 	mlk_shrsub_ptr_t	dsub;
 	ptroff_t		*chld_of_pnt;
-	unsigned char		*cp;
+	unsigned char		*cp, slen;
 	uint4			yield_pid;
 	mlk_shrblk_ptr_t	dh;
 	DCL_THREADGBL_ACCESS;
@@ -242,4 +242,3 @@ mlk_shrblk_ptr_t mlk_shrhash_find(mlk_pvtblk *p, int subnum, unsigned char *subv
 	}
 	return res;
 }
-

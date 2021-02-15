@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,13 +31,13 @@ GBLREF gv_key			*gv_currkey;
 GBLREF gv_namehead		*gv_target;
 GBLREF gd_region		*gv_cur_region;
 
+error_def(ERR_DBPRIVERR);
+
 bool gtcmtr_zwithdraw(void)
 {
 	cm_region_list	*reg_ref;
 	unsigned char	*ptr, regnum;
 	unsigned short	top, len;
-
-	error_def(ERR_DBPRIVERR);
 
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(*ptr == CMMS_Q_ZWITHDRAW);
@@ -49,7 +50,7 @@ bool gtcmtr_zwithdraw(void)
 	CM_GET_GVCURRKEY(ptr, len);
 	gtcm_bind_name(reg_ref->reghead, TRUE);
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
+		RTS_ERROR_ABT(VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	if (gv_target->root)
 		gvcst_kill(FALSE);
 	ptr = curr_entry->clb_ptr->mbf;

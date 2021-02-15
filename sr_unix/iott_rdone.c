@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,7 +108,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		{
 			tt_ptr->mupintr = FALSE;
 			tt_state->who_saved = ttwhichinvalid;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		}
 		assertpro(ttrdone == tt_state->who_saved);	/* ZINTRECURSEIO should have caught */
 		mv_zintdev = io_find_mvstent(io_ptr, FALSE);
@@ -352,7 +352,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 					if (0 == msec_timeout)
 				  		iott_rterm(io_ptr);
 				}
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
 				ret = FALSE;
 				break;
 			}
@@ -453,13 +453,13 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 			if (io_ptr->dollar.zeof)
 			{
 				io_ptr->dollar.za = 9;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 			} else
 			{
 				io_ptr->dollar.zeof = TRUE;
 				io_ptr->dollar.za   = 0;
 				if (io_ptr->error_handler.len > 0)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 			}
 			break;
 		}

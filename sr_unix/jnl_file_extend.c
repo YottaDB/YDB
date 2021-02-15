@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	char			prev_jnl_fn[JNL_NAME_SIZE];
 	uint4			jnl_status = 0, status;
 	int			new_blocks, warn_blocks, result;
-	gtm_uint64_t		avail_blocks;
+	gtm_uint64_t		avail_blocks, temp_blk;
 	uint4			aligned_tot_jrec_size, count;
 	uint4			jnl_fs_block_size, read_write_size;
 	unix_db_info		*udi;
@@ -136,17 +136,23 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 					 */
 					if (!INST_FREEZE_ON_NOSPC_ENABLED(csa, local_jnlpool))
 					{
+						temp_blk = new_blocks;
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_NOSPACEEXT, 4,
-								JNL_LEN_STR(csd), new_blocks, avail_blocks);
+								JNL_LEN_STR(csd), &temp_blk, &avail_blocks);
 						new_blocks = -1;
 						jpc->status = ERR_NOSPACEEXT;
 						break;
 					} else
+					{
+						temp_blk = new_blocks;
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_NOSPACEEXT), 4,
-								JNL_LEN_STR(csd), new_blocks, avail_blocks);
+								JNL_LEN_STR(csd), &temp_blk, &avail_blocks);
+					}
 				} else
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, JNL_LEN_STR(csd),
-							(avail_blocks - warn_blocks));
+				{
+					temp_blk = avail_blocks - warn_blocks;
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, JNL_LEN_STR(csd), &temp_blk);
+				}
 			}
 		} else
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLFILEXTERR, 2, JNL_LEN_STR(csd), status);
@@ -295,7 +301,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 			if (SS_NORMAL != jpc->status)
 			{
 				assert(FALSE);
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLRDERR, 2, JNL_LEN_STR(csd), jpc->status);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_JNLRDERR, 2, JNL_LEN_STR(csd), jpc->status);
 			}
 			assert((header->virtual_size + new_blocks) == new_alq);
 			header->virtual_size = new_alq;
@@ -304,7 +310,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 			if (SS_NORMAL != jpc->status)
 			{
 				assert(WBTEST_RECOVER_ENOSPC == gtm_white_box_test_case_number);
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
 			}
 			jb->filesize = new_alq;	/* Actually this is virtual file size blocks */
 		}

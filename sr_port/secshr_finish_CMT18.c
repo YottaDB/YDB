@@ -140,7 +140,7 @@ int secshr_finish_CMT18(sgmnt_addrs *csa,
 		}
 	}
 	if (gds_t_writemap == cs->mode)
-		sec_shr_map_build(csa, (uint4*)cs->upd_addr, blk_ptr, cs, currtn);
+		sec_shr_map_build(csa, (block_id*)cs->upd_addr, blk_ptr, cs, currtn);
 	else if (0 != secshr_blk_full_build(dollar_tlevel, csa, csd, is_bg, cs, blk_ptr, currtn))
 		return -1;	/* commit failed for this cse; move on to next cse */
 	if (0 > cs->reference_cnt)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2020 Fidelity National Information	*
+ * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,6 +79,7 @@
 #define GTMTLS_OP_NOPWDENVVAR		0x00000800
 /* Bit mask for VERIFY_LEVEL options - one now and one planned but allow two more */
 #define GTMTLS_OP_VERIFY_LEVEL_MASK	0x0000F000
+#define GTMTLS_OP_VERIFY_LEVEL_CMPLMNT	0x7FFF0FFF /* 4SCA: 32bit complement */
 /* Check SSL_get_verify_result after SSL_connect and other useful places */
 #define GTMTLS_OP_VERIFY_LEVEL_CHECK	0x00001000
 /* Default VERIFY_LEVEL options */

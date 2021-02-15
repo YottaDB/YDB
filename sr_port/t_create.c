@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,14 +35,14 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
 
 block_index t_create (
-		      block_id	hint,			/*  A hint block number.  */
+		      block_id		hint,		/*  A hint block number.  */
 		      unsigned char	*upd_addr,	/*  address of the block segment array which contains
 							 *  update info for the block
 							 */
-		      block_offset 	ins_off,	/*  offset to the position in the buffer that is to receive a block number
+		      block_offset	ins_off,	/*  offset to the position in the buffer that is to receive a block number
 							 *  when one is created.
 							 */
-		      block_index	index,          /*  index into the create/write set.  The specified entry is always a
+		      block_index	index,		/*  index into the create/write set.  The specified entry is always a
 							 *  created entry. When the create gets assigned a block number,
 							 *  the block number is inserted into this buffer at the location
 							 *  specified by ins_off.
@@ -64,6 +64,13 @@ block_index t_create (
 	cse->mode = gds_t_create;
 	cse->blk_checksum = 0;
 	assert(hint);	/* various callers (particularly gvcst_put) rely on gds_t_create cse to have a non-zero "blk" */
+	/* Verify that one of 3 conditions is satisfied inorder to validate hint
+	 * 1) hint is a fake block ID used internally by GT.M
+	 * 	-This is indicated by the MSB of hint being 1 which can be confirmed by checking if hint is negative or not
+	 * 2) the current DB uses 64-bit block IDs
+	 * 3) hint fits within a 32-bit value
+	 */
+	assert((hint < 0) || (BLK_ID_32_VER < cs_data->desired_db_format) || ((block_id_32)hint == hint));
 	cse->blk = hint;
 	cse->upd_addr = upd_addr;
 	cse->ins_off = ins_off;
@@ -78,7 +85,7 @@ block_index t_create (
 	cse->t_level = dollar_tlevel;
 	cse->low_tlevel = NULL;
 	cse->high_tlevel = NULL;
-	cse->ondsk_blkver = GDSVCURR;
+	cse->ondsk_blkver = cs_data->desired_db_format;
 	assert (NULL != gv_target);	/* t_create is called by gvcst kill/put,mu split/swap_blk, where gv_target can't be NULL */
 	/* For uninitialized gv_target, initialize the in_tree status as IN_DIR_TREE, which later may be modified by t_write */
 	if (0 == gv_target->root)

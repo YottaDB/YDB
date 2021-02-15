@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2020 Fidelity National Information	*
+ * Copyright (c) 2008-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -255,15 +255,15 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 					send_badtrans = FALSE;
 
 				} else if (EREPL_SEND == repl_errno)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
-								"Error in send"), status);
+						"Error in send"), status);
 				else
 				{
 					assert(EREPL_SELECT == repl_errno);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
-								"Error in select"), status);
+						"Error in select"), status);
 				}
 			} else
 			{
@@ -405,12 +405,12 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 					send_badtrans = FALSE;
 					return_status = STOP_POLL;
 				} else
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("Error while draining replication pipe. Error in recv"), status);
 			} else
 			{
 				assert(EREPL_SELECT == repl_errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Error while draining replication pipe. Error in select"), status);
 			}
 		}
@@ -459,12 +459,12 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				repl_connection_reset = TRUE;
 				return_status = STOP_POLL;
 			} else if (EREPL_SEND == repl_errno)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Error sending REPL_BADTRANS/REPL_CMP2UNCMP. Error in send"), status);
 			else
 			{
 				assert(EREPL_SELECT == repl_errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Error sending REPL_BADTRANS/REPL_CMP2UNCMP. Error in select"), status);
 			}
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,6 +76,7 @@ boolean_t compiler_startup(void)
 	gtm_rtn_src_chksum_ctx	checksum_ctx;
 	mstr			str;
 	size_t			mcallocated, alloc;
+	size_t			stlen;
 	mcalloc_hdr		*lastmca, *nextmca;
 	DCL_THREADGBL_ACCESS;
 
@@ -124,15 +125,7 @@ boolean_t compiler_startup(void)
 	mstr_native_align = FALSE; /* TODO: remove this line and  uncomment the above line */
 	cg_phase = CGP_NOSTATE;
 	TREF(source_error_found) = errknt = 0;
-	if (!open_source_file())
-	{
-		mstr_native_align = save_mstr_native_align;
-		REVERT;
-		assert(indr_stringpool.base == stringpool.base);
-		indr_stringpool = stringpool;
-		stringpool = rts_stringpool;
-		return FALSE;
-	}
+	open_source_file();
 	rtn_src_chksum_init(&checksum_ctx);
 	cg_phase = CGP_PARSE;
 	creating_list_file = (cmd_qlf.qlf & CQ_LIST) || (cmd_qlf.qlf & CQ_CROSS_REFERENCE);
@@ -161,10 +154,12 @@ boolean_t compiler_startup(void)
 		/* Accumulate list of M source lines */
 		sl = (src_line_struct *)mcalloc(SIZEOF(src_line_struct));
 		dqrins(&src_head, que, sl);
-		sl->str.addr = mcalloc(n + 1);		/* +1 for zero termination */
+		stlen = n + 1;
+		sl->str.addr = mcalloc(stlen);		/* == n+1 for zero termination */
 		sl->str.len = n;
 		sl->line = TREF(source_line);
-		memcpy(sl->str.addr, (TREF(source_buffer)).addr, n + 1);
+		assert(NULL != sl->str.addr);
+		memcpy(sl->str.addr, (TREF(source_buffer)).addr, stlen);
 		total_source_len += n;
 		cp = (unsigned char *)((TREF(source_buffer)).addr + n - 1);
 		NEWLINE_TO_NULL(*cp); /* avoid SPOREOL errors due to trailing newlines */

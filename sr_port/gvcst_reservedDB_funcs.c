@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2020 Fidelity National Information	*
+ * Copyright (c) 2016-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -204,8 +204,8 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 				 * stats in the gld (OPEN_BASEREG_IF_STATSREG) use this opportunity to raise an error.
 				 */
 				if (!statsDBcsa->orig_read_write)
-					rts_error_csa(CSA_ARG(statsDBcsa) VARLSTCNT(4) ERR_DBPRIVERR, 2,
-											DB_LEN_STR(statsDBreg_located));
+					RTS_ERROR_CSA_ABT(statsDBcsa, VARLSTCNT(4) ERR_DBPRIVERR, 2,
+						DB_LEN_STR(statsDBreg_located));
 			}
 			break;
 		}
@@ -339,7 +339,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 		statsDBcsa = &FILE_INFO(statsDBreg)->s_addrs;
 		if (!statsDBcsa->orig_read_write)
 			/* Database was opened read/only as this process has no privs to write to it - raise error */
-			rts_error_csa(CSA_ARG(statsDBcsa) VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(statsDBreg));
+			RTS_ERROR_CSA_ABT(statsDBcsa, VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(statsDBreg));
 		if (!statsDBcsa->statsDB_setup_completed)
 		{	/* If initialization was never completed, do it now */
 			assert(IS_STATSDB_REG(statsDBreg));

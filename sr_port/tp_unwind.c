@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -225,13 +225,13 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 		else
 			tp_sp = (unsigned char *)tp_pointer->old_tp_frame;
 		if (tp_sp > tpstackbase)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKUNDERFLO);
 		if (tp_pointer->tp_save_all_flg)
 			--tp_pointer->sym->tp_save_all;
 		if ((NULL != (tp_pointer = tp_pointer->old_tp_frame))	/* Note assignment */
 		    && ((tp_pointer < (tp_frame *)tp_sp) || (tp_pointer > (tp_frame *)tpstackbase)
 			|| (tp_pointer < (tp_frame *)tpstacktop)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKUNDERFLO);
 	}
 	if ((0 != newlevel) && restore_lv)
 	{	/* Restore current context (without releasing) */

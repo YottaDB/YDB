@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,9 +27,8 @@
  *
  * Note for the routines that utilize signal blocks, blocksig_initialized may not be set at this point for a variety of
  * cases such one as the following:
- * 	1) If the current image is "dbcertify"
- * 	2) At startup of GTCM_SERVER or GTCM_GNP_SERVER
- * 	3) At startup of GT.M (e.g. bad command line "mumps -bad")
+ * 	1) At startup of GTCM_SERVER or GTCM_GNP_SERVER
+ * 	2) At startup of GT.M (e.g. bad command line "mumps -bad")
  * Because of this, we dont have an assert(blocksig_initialized) that similar code in dollarh.c has.
  *
  * Routines implemented:

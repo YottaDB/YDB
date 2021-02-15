@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,8 +41,8 @@ uchar_ptr_t get_spec(uchar_ptr_t spec_rec_addr, int spec_rec_len, unsigned char 
 			if (*ptr > MAX_COLL_TYPE)
 			{
 				gv_target->root = 0;
-				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(6) ERR_INVSPECREC, 0, ERR_GVIS, 2,
-						gv_altkey->end - 1, gv_altkey->base);
+				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(6) ERR_INVSPECREC, 0, ERR_GVIS, 2,
+					gv_altkey->end - 1, gv_altkey->base);
 			}
 	}
 	return (uchar_ptr_t)0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -180,14 +180,14 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 				path = ((struct sockaddr_un *)(socketptr->local.sa))->sun_path;
 				FSTAT_FILE(socketptr->sd, &fstatbuf, res);
 				if (-1 == res)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 						LEN_AND_LIT("fstat during socket delete"), CALLFROM, errno);
 				STAT_FILE(path, &statbuf, res);
 				if (-1 == res)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 						LEN_AND_LIT("stat during socket delete"), CALLFROM, errno);
 				if (UNLINK(path) == -1)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 						LEN_AND_LIT("unlink during socket delete"), CALLFROM, errno);
 			}
 			/* below is similar to iosocket_flush but socketptr may not be current socket */
@@ -238,11 +238,11 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 	}
 	if (0 != save_rc)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, save_errno);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, save_errno);
 	}
 	else if (-1 == null_fd)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FILEOPENFAIL, 2, LIT_AND_LEN("/dev/null"), save_errno, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_FILEOPENFAIL, 2, LIT_AND_LEN("/dev/null"), save_errno, 0);
 	}
 }
 

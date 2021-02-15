@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,6 +66,11 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 	assert(stage >= need_to_free_space && stage < num_of_clnup_stage);
 
 	free(stringpool.base);
+	stringpool.base = NULL;
+	stringpool.free = NULL;
+	stringpool.top = NULL;
+	stringpool.lasttop = NULL;
+	stringpool.invokestpgcollevel = NULL;
 
 	switch(stage)
 	{
@@ -125,7 +130,8 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 					if (ptr->backup_fd > 2)
 					{
 						CLOSEFILE_RESET(ptr->backup_fd, rc);	/* resets "ptr" to FD_INVALID */
-						UNLINK(ptr->backup_tempfile);
+						rc = UNLINK(ptr->backup_tempfile);
+						assert(0 == rc);
 					}
 				} else	/* defreeze the databases */
 					region_freeze(ptr->reg, FALSE, FALSE, FALSE, FALSE, FALSE);

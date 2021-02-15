@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2018 Fidelity National Information	*
+ * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -115,6 +115,7 @@ STATICFNDEF int		get_mnemonic_offset(hash_table_str **err_hashtab, char *mnemoni
 
 	msg_beg = merrors_ctl.fst_msg;
 	msg_top = msg_beg + merrors_ctl.msg_cnt;
+	assert((MAX_TAG_LEN > mnemonic_len) && (0 < mnemonic_len)); /* For SCI */
 	assert('\0' == mnemonic_buf[mnemonic_len]);
 	if (NULL == (tmp_err_hashtab = *err_hashtab))
 	{	/* create and populate hash-table for future lookups */

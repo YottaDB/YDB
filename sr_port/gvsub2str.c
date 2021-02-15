@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,7 +89,7 @@ unsigned char *gvsub2str(unsigned char *sub, mstr *opstr, boolean_t xlat_flg)
 				 * library allocated an external buffer greater than opstr->len
 				 */
 				assert(mstr_targ.addr != (char *)buf1);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GVSUBOFLOW);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GVSUBOFLOW);
 			}
 			if (!xlat_flg)
 			{

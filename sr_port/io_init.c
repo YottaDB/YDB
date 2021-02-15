@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -102,8 +102,8 @@ void io_init(boolean_t term_ctrl)
 				assert(newfd == fd);
 			}
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_SYSCALL, 5,
-						LEN_AND_LIT("fstat of std descriptor"), CALLFROM, errno, 0);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_SYSCALL, 5,
+					LEN_AND_LIT("fstat of std descriptor"), CALLFROM, errno, 0);
 		} else if (0 < fd)
 		{
 			if (1 == fd)
@@ -130,7 +130,7 @@ void io_init(boolean_t term_ctrl)
 		dollar_principal = get_log_name(&tn, INSERT);
 #	ifdef UNIX
 	else if (SS_LOG2LONG == status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, SIZEOF(buf1) - 1);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, SIZEOF(buf1) - 1);
 #	endif
 	else
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
@@ -163,7 +163,7 @@ void io_init(boolean_t term_ctrl)
 	}
 #	ifdef UNIX
 	else if (SS_LOG2LONG == status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, SIZEOF(buf1) - 1);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, SIZEOF(buf1) - 1);
 #	endif
 	else
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
@@ -181,7 +181,7 @@ void io_init(boolean_t term_ctrl)
 	{
 #		ifdef UNIX
 		if (SS_LOG2LONG == status)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, SIZEOF(buf1) - 1);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, SIZEOF(buf1) - 1);
 		else
 #		endif
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);

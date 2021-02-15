@@ -53,6 +53,10 @@ void rc_gbl_ord(rc_rsp_page *rsp)
 	srch_blk_status	*bh;
 	gvnh_reg_t	*gvnh_reg;
 
+	/*This code is probably not being maintained as part of the v7 change so put this assert here to see
+	 * if we are even hitting this code during testing*/
+	assert(FALSE);
+
 	for (;;)
 	{
 		gv_target = cs_addrs->dir_tree;

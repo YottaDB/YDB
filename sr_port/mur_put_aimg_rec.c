@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +80,8 @@ void mur_put_aimg_rec(jnl_record *rec)
 	BLK_SEG(bs_ptr, (uchar_ptr_t)aimg_blk_ptr + SIZEOF(blk_hdr), (int)((blk_hdr_ptr_t)aimg_blk_ptr)->bsiz - SIZEOF(blk_hdr));
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
-		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_AIMGBLKFAIL, 3, rec->jrec_aimg.blknum, DB_LEN_STR(gv_cur_region));
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_AIMGBLKFAIL, 3, &(rec->jrec_aimg.blknum),
+				DB_LEN_STR(gv_cur_region));
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
