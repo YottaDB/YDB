@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -214,6 +214,10 @@ boolean_t wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 		}
 		for (lcnt = 1; 0 != cr->dirty; ++lcnt)
 		{
+#			ifdef DEBUG
+			int4	cnl_in_wtstart;
+#			endif
+
 			if (0 == (lcnt % UNIX_GETSPACEWAIT))
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_BUFSPCDELAY, 3, needed, REG_LEN_STR(reg));
 			if (0 == (lcnt % LCNT_INTERVAL))
@@ -276,6 +280,7 @@ boolean_t wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 			 * But since that is quite rare and we don't lose much in that case by
 			 *   sleeping we do an unconditional sleep (only if cr is dirty).	{BYPASSOK}
 			 */
+			DEBUG_ONLY(cnl_in_wtstart = cnl->in_wtstart;)
 			if (!cr->dirty)
 				return TRUE;
 			else
@@ -289,8 +294,10 @@ boolean_t wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 				 * process of being released by a concurrent writer; This is done by
 				 * resetting 3 fields cr->epid, cr->dirty, cr->interlock; Since the write
 				 * interlock is the last field to be released, check that BEFORE dirty.
+				 * Note that the checks below use private memory ("cr_contents" and "cnl_in_wtstart")
+				 * (not shared memory which could be concurrently changing and cause false assert failures).
 				 */
-				assert(cr_contents.state_que.fl || cr_contents.epid || cnl->in_wtstart
+				assert(cr_contents.state_que.fl || cr_contents.epid || cnl_in_wtstart
 					|| cr_contents.in_tend
 					|| (LATCH_CLEAR != WRITE_LATCH_VAL(&cr_contents))
 					|| !cr_contents.dirty);
