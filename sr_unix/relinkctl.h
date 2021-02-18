@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -168,7 +168,7 @@ typedef struct relinkctl_data_struct
 					 * If nattached is 0 upon exiting, we can remove the file.
 					 * TODO: Provide fancier cleanup scheme for kill 9. two options:
 					 * 	1. SYSV semaphore (as with the db). increment in open_relinkctl
-					 * 	2. When we want to cleanup (say mupip routine -rundown), execute 'fuser'
+					 * 	2. When we want to cleanup (say mupip rundown -relinkctl), execute 'fuser'
 					 */
 	int4		relinkctl_shmid;/* ID of primary shared memory segment corresponding to the mmaped relinkctl file.
 					 * This contains the array of relinkrec_t structures as well as hash buckets to

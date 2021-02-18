@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,10 +71,6 @@ STATICFNDCL void relinkctl_map(open_relinkctl_sgm *linkctl);
 STATICFNDCL void relinkctl_unmap(open_relinkctl_sgm *linkctl);
 STATICFNDCL void relinkctl_delete(open_relinkctl_sgm *linkctl);
 
-#define SLASH_GTM_RELINKCTL	"/ydb-relinkctl-"
-#define SLASH_GTM_RELINKCTL_LEN	STRLEN(SLASH_GTM_RELINKCTL)
-#define MAX_RCTL_OPEN_RETRIES	16
-
 error_def(ERR_FILEPARSE);
 error_def(ERR_RELINKCTLERR);
 error_def(ERR_RELINKCTLFULL);
@@ -83,6 +79,36 @@ error_def(ERR_RLNKCTLRNDWNFL);
 error_def(ERR_RLNKCTLRNDWNSUC);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
+
+#define SLASH_GTM_RELINKCTL	"/ydb-relinkctl-"
+#define SLASH_GTM_RELINKCTL_LEN	STRLEN(SLASH_GTM_RELINKCTL)
+#define MAX_RCTL_OPEN_RETRIES	16
+
+/* "LINKCTL" is input parameter.
+ * "USER_ID", "GROUP_ID" and "PERM" are output parameters.
+ */
+#define	GET_USER_ID_GROUP_ID_AND_PERM(LINKCTL, USER_ID, GROUP_ID, PERM)						\
+{														\
+	struct stat		dir_stat_buf;									\
+	struct perm_diag_data	pdd;										\
+	int			stat_res;									\
+	char			errstr[256];									\
+														\
+	assert('\0' == LINKCTL->zro_entry_name.addr[LINKCTL->zro_entry_name.len]); /* For STAT_FILE. */		\
+	STAT_FILE(LINKCTL->zro_entry_name.addr, &dir_stat_buf, stat_res);					\
+	if (-1 == stat_res)											\
+	{													\
+		SNPRINTF(errstr, SIZEOF(errstr), "stat() of file %s failed", LINKCTL->zro_entry_name.addr);	\
+		ISSUE_RELINKCTLERR_SYSCALL(&LINKCTL->zro_entry_name, errstr, errno);				\
+	}													\
+	if (!gtm_permissions(&dir_stat_buf, &USER_ID, &GROUP_ID, &PERM, PERM_IPC, &pdd))			\
+	{													\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10 + PERMGENDIAG_ARG_COUNT) ERR_RELINKCTLERR, 2,		\
+			RTS_ERROR_MSTR(&LINKCTL->zro_entry_name), ERR_PERMGENFAIL, 4,				\
+			RTS_ERROR_STRING("relinkctl"), RTS_ERROR_MSTR(&LINKCTL->zro_entry_name),		\
+			PERMGENDIAG_ARGS(pdd));									\
+	}													\
+}
 
 /* Routine called to see if a relinkctl structure already exists for the given zroutines element.
  *
@@ -229,13 +255,12 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 	struct stat     	stat_buf;
 	size_t			shm_size;
 	boolean_t		is_mu_rndwn_rlnkctl, shm_removed, rctl_create_attempted, rctl_existed, need_shmctl;
+	boolean_t		hold_lock_during_shmat, initialize_hdr;
 	relinkshm_hdr_t		*shm_base;
 	rtnobjshm_hdr_t		*rtnobj_shm_hdr;
 	relinkctl_data		*hdr;
 	char			errstr[256];
-	struct stat		dir_stat_buf;
-	int			rctl_deleted_count, rctl_rundown_count, rctl_init_wait_count;
-	struct perm_diag_data	pdd;
+	int			rctl_deleted_count, rctl_rundown_count, rctl_init_wait_count, rctl_do_shmat_count;
 	struct shmid_ds		shmstat;
 	DCL_THREADGBL_ACCESS;
 
@@ -246,6 +271,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 		linkctl->relinkctl_path, linkctl->zro_entry_name.len, linkctl->zro_entry_name.addr));
 	/* Anybody that has read permissions to the object container should have write permissions to the relinkctl file. */
 	rctl_deleted_count = rctl_rundown_count = rctl_init_wait_count = 0;
+	rctl_do_shmat_count = 0;
 	is_mu_rndwn_rlnkctl = TREF(is_mu_rndwn_rlnkctl);
 	do
 	{	/* We do not need to check the existence of the actual object directory if we verify that the respective relinkctl
@@ -269,20 +295,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				/* We have to create a relinkctl file. We derive the permissions to use based on those of the object
 				 * directory.
 				 */
-				assert('\0' == linkctl->zro_entry_name.addr[linkctl->zro_entry_name.len]); /* For STAT_FILE. */
-				STAT_FILE(linkctl->zro_entry_name.addr, &dir_stat_buf, stat_res);
-				if (-1 == stat_res)
-				{
-					SNPRINTF(errstr, SIZEOF(errstr), "stat() of file %s failed", linkctl->zro_entry_name.addr);
-					ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, errno);
-				}
-				if (!gtm_permissions(&dir_stat_buf, &user_id, &group_id, &perm, PERM_IPC, &pdd))
-				{
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10 + PERMGENDIAG_ARG_COUNT) ERR_RELINKCTLERR, 2,
-						RTS_ERROR_MSTR(&linkctl->zro_entry_name), ERR_PERMGENFAIL, 4,
-						RTS_ERROR_STRING("relinkctl"), RTS_ERROR_MSTR(&linkctl->zro_entry_name),
-						PERMGENDIAG_ARGS(pdd));
-				}
+				GET_USER_ID_GROUP_ID_AND_PERM(linkctl, user_id, group_id, perm);
 				/* Attempt to create the relinkctl file with desired permissions. */
 				OPEN3_CLOEXEC(linkctl->relinkctl_path, O_CREAT | O_RDWR | O_EXCL, perm, fd);
 				rctl_create_attempted = TRUE;
@@ -374,16 +387,66 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			assert(INVALID_SHMID != shmid);
 			assert(!hdr->file_deleted);
 			INTERLOCK_ADD(&hdr->nattached, 1);
-			if (!is_mu_rndwn_rlnkctl)
+			/* Release exclusive lock before heavyweight "shmat()" system call (in "do_shmat()" function) for
+			 * performance reasons. It is possible we might notice shm has been deleted. In that case, we will
+			 * retry the loop and in the retry hold the lock during the "shmat()" as that will enable us to create
+			 * a new shmid. This way we hold the lock only if we notice the shm has been removed (a rare scenario).
+			 */
+			hold_lock_during_shmat = (is_mu_rndwn_rlnkctl || rctl_do_shmat_count);
+			if (!hold_lock_during_shmat)
 				relinkctl_unlock_exclu(linkctl);
+			initialize_hdr = FALSE;
 			if (-1 == (sm_long_t)(shm_base = (relinkshm_hdr_t *)do_shmat(shmid, 0, 0)))
 			{
 				save_errno = errno;
 				shm_removed = SHM_REMOVED(save_errno);
-				/* If shm has been removed, then direct one to use MUPIP RUNDOWN -RELINKCTL. */
-				if (!is_mu_rndwn_rlnkctl)
+				/* Get the lock back now that heavyweight "do_shmat()" is done */
+				if (!hold_lock_during_shmat)
 					relinkctl_lock_exclu(linkctl);
-				if (!shm_removed || !is_mu_rndwn_rlnkctl)
+				/* If shm has been removed, then check if we held the lock. If so, create a new shm.
+				 * If we did not hold the lock, continue the do/while loop so we hold the lock the next
+				 * iteration before we the "do_shmat()" call.
+				 */
+				if (shm_removed)
+				{
+					if (is_mu_rndwn_rlnkctl)
+					{	/* This is MUPIP RUNDOWN -RELINKCTL and shm is removed. There is no point
+						 * creating one. So invalidate the existing shmid but return with the
+						 * exclusive lock held as the * caller "mu_rndwn_rlnkctl()" expects this.
+						 */
+						DBGARLNK((stderr, "relinkctl_open: Set hdr->relinkctl_shmid to INVALID_SHMID\n"));
+						hdr->relinkctl_shmid = INVALID_SHMID;
+						return 0;
+					}
+					if (!hold_lock_during_shmat)
+					{	/* shm has been removed and we DID NOT hold the lock.
+						 * So this must be Iteration 1 of the loop where we did not hold the lock.
+						 * Continue in the do/while loop so we hold the lock for Iteration 2.
+						 */
+						/* The below ensures we hold the lock the next iteration during "do_shmat()" */
+						rctl_do_shmat_count++;
+						INTERLOCK_ADD(&hdr->nattached, -1);
+						relinkctl_unlock_exclu(linkctl);
+						relinkctl_unmap(linkctl);
+						continue;
+					} else
+					{	/* shm has been removed and we DID hold the lock.
+						 * So this must be Iteration 2 of the loop where we did hold the lock.
+						 * Since we hold the lock, it is okay to create a new shm and initialize
+						 * a fresh header. We do that by setting "initialize_hdr" to TRUE. This will
+						 * fall through to the "if (initialize_hdr)" check a few lines later.
+						 */
+						initialize_hdr = TRUE;
+						/* Below is to avoid REQRLNKCTLRNDWN error in the "if (initialize_hdr)" code
+						 * path as this an exceptional code path (creating a new shm).
+						 */
+						rctl_existed = FALSE;
+						/* Since "rctl_existed" is being artificially set to FALSE, make sure fields
+						 * which rely on this are initialized appropriately (user_id, group_id, perm).
+						 */
+						GET_USER_ID_GROUP_ID_AND_PERM(linkctl, user_id, group_id, perm);
+					}
+				} else
 				{
 					INTERLOCK_ADD(&hdr->nattached, -1);
 					relinkctl_unlock_exclu(linkctl);
@@ -392,138 +455,139 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 						shmid, (unsigned long long)shm_size, (unsigned long long)shm_size);
 					if (!shm_removed)
 						ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
-					else
-						ISSUE_REQRLNKCTLRNDWN_SYSCALL(linkctl, errstr, save_errno);
-				} else
-				{	/* This is MUPIP RUNDOWN -RELINKCTL and shm is removed. There is no point creating one. */
-					DBGARLNK((stderr, "relinkctl_open: Set hdr->relinkctl_shmid to INVALID_SHMID\n"));
-					hdr->relinkctl_shmid = INVALID_SHMID;
-					return 0;
 				}
-			}
-		} else if (!is_mu_rndwn_rlnkctl)
-		{	/* We have come here ahead of the process that has created the relinkctl file even though we have slept many
-			 * times, giving the creator a chance to grab the lock. So if we did not obtain the permissions of the
-			 * object directory, we have no permissions to apply on a shared memory segment we are about to create;
-			 * therefore, error out.
-			 */
-			if (rctl_existed)
-			{
+			} else if (!is_mu_rndwn_rlnkctl && hold_lock_during_shmat)
 				relinkctl_unlock_exclu(linkctl);
-				relinkctl_unmap(linkctl);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REQRLNKCTLRNDWN, 3,
-						linkctl->relinkctl_path, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
-			}
-			DBGARLNK((stderr, "relinkctl_open: file first open\n"));
-			hdr->n_records = 0;
-			/* Create shared memory to store hash buckets of routine names for faster search in relinkctl file */
-			shmid = shmget(IPC_PRIVATE, shm_size, RWDALL | IPC_CREAT);
-			if (-1 == shmid)
-			{
-				save_errno = errno;
-				relinkctl_delete(linkctl);
-				relinkctl_unlock_exclu(linkctl);
-				relinkctl_unmap(linkctl);
-				SNPRINTF(errstr, SIZEOF(errstr), "shmget() failed for shmsize=%llu [0x%llx]",
-							(unsigned long long)shm_size, (unsigned long long)shm_size);
-				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
-			}
-			if (-1 == shmctl(shmid, IPC_STAT, &shmstat))
-			{
-				save_errno = errno;
-				relinkctl_delete(linkctl);
-				relinkctl_unlock_exclu(linkctl);
-				relinkctl_unmap(linkctl);
-				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
-				SNPRINTF(errstr, SIZEOF(errstr), "shmctl(IPC_STAT) failed for shmid=%d shmsize=%llu [0x%llx]",
-					shmid, (unsigned long long)shm_size, (unsigned long long)shm_size);
-				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
-			}
-			/* Change uid, group-id and permissions if needed */
-			need_shmctl = FALSE;
-			if ((INVALID_UID != user_id) && (user_id != shmstat.shm_perm.uid))
-			{
-				shmstat.shm_perm.uid = user_id;
-				need_shmctl = TRUE;
-			}
-			if ((INVALID_GID != group_id) && (group_id != shmstat.shm_perm.gid))
-			{
-				shmstat.shm_perm.gid = group_id;
-				need_shmctl = TRUE;
-			}
-			if (shmstat.shm_perm.mode != perm)
-			{
-				shmstat.shm_perm.mode = perm;
-				need_shmctl = TRUE;
-			}
-			if (need_shmctl && (-1 == shmctl(shmid, IPC_SET, &shmstat)))
-			{
-				save_errno = errno;
-				relinkctl_delete(linkctl);
-				relinkctl_unlock_exclu(linkctl);
-				relinkctl_unmap(linkctl);
-				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
-				SNPRINTF(errstr, SIZEOF(errstr), "shmctl(IPC_SET) failed for shmid=%d shmsize=%llu [0x%llx]",
-					shmid, (unsigned long long)shm_size, (unsigned long long)shm_size);
-				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
-			}
-			/* Initialize shared memory header */
-			if (-1 == (sm_long_t)(shm_base = (relinkshm_hdr_t *)do_shmat(shmid, 0, 0)))
-			{
-				save_errno = errno;
-				relinkctl_delete(linkctl);
-				relinkctl_unlock_exclu(linkctl);
-				relinkctl_unmap(linkctl);
-				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
-				SNPRINTF(errstr, SIZEOF(errstr), "shmat() failed for shmid=%d shmsize=%llu [0x%llx]",
-					shmid, (unsigned long long)shm_size, (unsigned long long)shm_size);
-				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
-			}
-			hdr->relinkctl_shmid = shmid;
-			hdr->relinkctl_shmlen = shm_size;
-			assert(ARRAYSIZE(shm_base->relinkctl_fname) > strlen(linkctl->relinkctl_path));
-			assert(0 == ((UINTPTR_T)shm_base % 8));
-			assert(0 == (SIZEOF(relinkshm_hdr_t) % SIZEOF(uint4)));	/* assert SIZEOF(*sm_uint_ptr_t) alignment */
-			memset(shm_base, 0, shm_size);
-			strcpy(shm_base->relinkctl_fname, linkctl->relinkctl_path);
-			shm_base->min_shm_index = TREF(relinkctl_shm_min_index);
-			/* Since search for a routine proceeds to check all rtnobj shmids from rtnobj_min_shm_index to
-			 * rtnobj_max_shm_index, set the two to impossible values so creation of the first rtnobj shmid
-			 * (whatever its shm_index turns out to be) causes these two to be overwritten to that shm_index.
-			 * Since rtnobj_min_shm_index is overwritten only if it is greater than shm_index, we set it to
-			 * one more than the highest value possible for shm_index i.e. NUM_RTNOBJ_SHM_INDEX. Likewise for
-			 * rtnobj_max_shm_index.
-			 */
-			shm_base->rtnobj_min_shm_index = NUM_RTNOBJ_SHM_INDEX;
-			shm_base->rtnobj_max_shm_index = 0;
-			shm_base->rndwn_adjusted_nattch = FALSE;
-			DEBUG_ONLY(shm_base->skip_rundown_check = FALSE;)
-			for (i = 0; i < NUM_RTNOBJ_SHM_INDEX; i++)
-			{
-				rtnobj_shm_hdr = &shm_base->rtnobj_shmhdr[i];
-				rtnobj_shm_hdr->rtnobj_shmid = INVALID_SHMID;
-				rtnobj_shm_hdr->rtnobj_min_free_index = NUM_RTNOBJ_SIZE_BITS;
-				for (j = 0; j < NUM_RTNOBJ_SIZE_BITS; j++)
-				{
-					rtnobj_shm_hdr->freeList[j].fl = NULL_RTNOBJ_SM_OFF_T;
-					rtnobj_shm_hdr->freeList[j].bl = NULL_RTNOBJ_SM_OFF_T;
-				}
-			}
-			SET_LATCH_GLOBAL(&shm_base->relinkctl_latch, LOCK_AVAILABLE);
-			hdr->nattached = 1;
-			hdr->zro_entry_name_len = MIN(linkctl->zro_entry_name.len, ARRAYSIZE(hdr->zro_entry_name) - 1);
-			memcpy(hdr->zro_entry_name, linkctl->zro_entry_name.addr, hdr->zro_entry_name_len);
-			hdr->zro_entry_name[hdr->zro_entry_name_len] = '\0';
-			/* Shared memory initialization complete. */
-			hdr->initialized = TRUE;
-			relinkctl_unlock_exclu(linkctl);
 		} else
-		{	/* This is MUPIP RUNDOWN -RELINKCTL and relinkctl file exists but the shared memory does not. We are not
-			 * going to create the shared memory to only later run it down.
-			 */
-			DBGARLNK((stderr, "relinkctl_open: Set hdr->relinkctl_shmid to INVALID_SHMID\n"));
-			hdr->relinkctl_shmid = INVALID_SHMID;
-			return 0;
+			initialize_hdr = TRUE;
+		if (initialize_hdr)
+		{
+			if (!is_mu_rndwn_rlnkctl)
+			{
+				if (rctl_existed)
+				{	/* We have come here ahead of the process that has created the relinkctl file even though we
+					 * have slept many times, giving the creator a chance to grab the lock. So if we did not
+					 * obtain the permissions of the object directory, we have no permissions to apply on a
+					 * shared memory segment we are about to create. Therefore, error out.
+					 */
+					relinkctl_unlock_exclu(linkctl);
+					relinkctl_unmap(linkctl);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REQRLNKCTLRNDWN, 3,
+							linkctl->relinkctl_path, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
+				}
+				DBGARLNK((stderr, "relinkctl_open: file first open\n"));
+				hdr->n_records = 0;
+				/* Create shared memory to store hash of routine names for faster search in relinkctl file */
+				shmid = shmget(IPC_PRIVATE, shm_size, RWDALL | IPC_CREAT);
+				if (-1 == shmid)
+				{
+					save_errno = errno;
+					relinkctl_delete(linkctl);
+					relinkctl_unlock_exclu(linkctl);
+					relinkctl_unmap(linkctl);
+					SNPRINTF(errstr, SIZEOF(errstr), "shmget() failed for shmsize=%llu [0x%llx]",
+								(unsigned long long)shm_size, (unsigned long long)shm_size);
+					ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
+				}
+				if (-1 == shmctl(shmid, IPC_STAT, &shmstat))
+				{
+					save_errno = errno;
+					relinkctl_delete(linkctl);
+					relinkctl_unlock_exclu(linkctl);
+					relinkctl_unmap(linkctl);
+					shm_rmid(shmid);	/* if error removing shmid we created, just move on */
+					SNPRINTF(errstr, SIZEOF(errstr), "shmctl(IPC_STAT) failed for shmid=%d "
+						"shmsize=%llu [0x%llx]",
+						shmid, (unsigned long long)shm_size, (unsigned long long)shm_size);
+					ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
+				}
+				/* Change uid, group-id and permissions if needed */
+				need_shmctl = FALSE;
+				if ((INVALID_UID != user_id) && (user_id != shmstat.shm_perm.uid))
+				{
+					shmstat.shm_perm.uid = user_id;
+					need_shmctl = TRUE;
+				}
+				if ((INVALID_GID != group_id) && (group_id != shmstat.shm_perm.gid))
+				{
+					shmstat.shm_perm.gid = group_id;
+					need_shmctl = TRUE;
+				}
+				if (shmstat.shm_perm.mode != perm)
+				{
+					shmstat.shm_perm.mode = perm;
+					need_shmctl = TRUE;
+				}
+				if (need_shmctl && (-1 == shmctl(shmid, IPC_SET, &shmstat)))
+				{
+					save_errno = errno;
+					relinkctl_delete(linkctl);
+					relinkctl_unlock_exclu(linkctl);
+					relinkctl_unmap(linkctl);
+					shm_rmid(shmid);	/* if error removing shmid we created, just move on */
+					SNPRINTF(errstr, SIZEOF(errstr), "shmctl(IPC_SET) failed for shmid=%d "
+						"shmsize=%llu [0x%llx]",
+						shmid, (unsigned long long)shm_size, (unsigned long long)shm_size);
+					ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
+				}
+				/* Initialize shared memory header */
+				if (-1 == (sm_long_t)(shm_base = (relinkshm_hdr_t *)do_shmat(shmid, 0, 0)))
+				{
+					save_errno = errno;
+					relinkctl_delete(linkctl);
+					relinkctl_unlock_exclu(linkctl);
+					relinkctl_unmap(linkctl);
+					shm_rmid(shmid);	/* if error removing shmid we created, just move on */
+					SNPRINTF(errstr, SIZEOF(errstr), "shmat() failed for shmid=%d shmsize=%llu [0x%llx]",
+						shmid, (unsigned long long)shm_size, (unsigned long long)shm_size);
+					ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
+				}
+				hdr->relinkctl_shmid = shmid;
+				hdr->relinkctl_shmlen = shm_size;
+				assert(ARRAYSIZE(shm_base->relinkctl_fname) > strlen(linkctl->relinkctl_path));
+				assert(0 == ((UINTPTR_T)shm_base % 8));
+				assert(0 == (SIZEOF(relinkshm_hdr_t) % SIZEOF(uint4)));	/* SIZEOF(*sm_uint_ptr_t) alignment */
+				memset(shm_base, 0, shm_size);
+				strcpy(shm_base->relinkctl_fname, linkctl->relinkctl_path);
+				shm_base->min_shm_index = TREF(relinkctl_shm_min_index);
+				/* Since search for a routine proceeds to check all rtnobj shmids from rtnobj_min_shm_index to
+				 * rtnobj_max_shm_index, set the two to impossible values so creation of the first rtnobj shmid
+				 * (whatever its shm_index turns out to be) causes these two to be overwritten to that shm_index.
+				 * Since rtnobj_min_shm_index is overwritten only if it is greater than shm_index, we set it to
+				 * one more than the highest value possible for shm_index i.e. NUM_RTNOBJ_SHM_INDEX. Likewise for
+				 * rtnobj_max_shm_index.
+				 */
+				shm_base->rtnobj_min_shm_index = NUM_RTNOBJ_SHM_INDEX;
+				shm_base->rtnobj_max_shm_index = 0;
+				shm_base->rndwn_adjusted_nattch = FALSE;
+				DEBUG_ONLY(shm_base->skip_rundown_check = FALSE;)
+				for (i = 0; i < NUM_RTNOBJ_SHM_INDEX; i++)
+				{
+					rtnobj_shm_hdr = &shm_base->rtnobj_shmhdr[i];
+					rtnobj_shm_hdr->rtnobj_shmid = INVALID_SHMID;
+					rtnobj_shm_hdr->rtnobj_min_free_index = NUM_RTNOBJ_SIZE_BITS;
+					for (j = 0; j < NUM_RTNOBJ_SIZE_BITS; j++)
+					{
+						rtnobj_shm_hdr->freeList[j].fl = NULL_RTNOBJ_SM_OFF_T;
+						rtnobj_shm_hdr->freeList[j].bl = NULL_RTNOBJ_SM_OFF_T;
+					}
+				}
+				SET_LATCH_GLOBAL(&shm_base->relinkctl_latch, LOCK_AVAILABLE);
+				hdr->nattached = 1;
+				hdr->zro_entry_name_len = MIN(linkctl->zro_entry_name.len, ARRAYSIZE(hdr->zro_entry_name) - 1);
+				memcpy(hdr->zro_entry_name, linkctl->zro_entry_name.addr, hdr->zro_entry_name_len);
+				hdr->zro_entry_name[hdr->zro_entry_name_len] = '\0';
+				/* Shared memory initialization complete. */
+				hdr->initialized = TRUE;
+				relinkctl_unlock_exclu(linkctl);
+			} else
+			{	/* This is MUPIP RUNDOWN -RELINKCTL and relinkctl file exists but the shared memory does not.
+				 * We are not going to create the shared memory to only later run it down.
+				 */
+				DBGARLNK((stderr, "relinkctl_open: Set hdr->relinkctl_shmid to INVALID_SHMID\n"));
+				hdr->relinkctl_shmid = INVALID_SHMID;
+				return 0;
+			}
 		}
 		assert(linkctl->locked == is_mu_rndwn_rlnkctl);
 		assert(0 == ((UINTPTR_T)shm_base % 8));
