@@ -3,7 +3,7 @@
 ; Copyright (c) 2018-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -40,14 +40,16 @@ CONVERTBASE(val,fb,tb)	; converts val from base fb to base tb
 	for o=o:-1:1 set r=$$ADDVAL(.v,r,$$MULTIPLYBYNUMBER(.v,$extract(val,o),e,tb),tb),e=$$MULTIPLYBYNUMBER(.v,fb,e,tb)
 	quit r
 CONVNEG(v,base)	;Takes a base 16 or base 8 number and converts it into its two's compliment representation (flip bits and add one)
-	new c,i,n	; c - complement; i - iterator; n - negatated result
-	if 8=base set v=$translate(v,"01234567","76543210")
-	else  quit:16'=base "" set v=$translate(v,"0123456789ABCDEF","FEDCBA9876543210")
+	new i,c,n,charmap,pocharmap	; c - complement; i - iterator; n - negated result
+	if 8=base set charmap="01234567"
+	else  quit:16'=base "" set charmap="0123456789ABCDEF"
+	set pocharmap=($extract(charmap,2,$length(charmap)))_"0"
+	set v=$translate(v,charmap,$reverse(charmap))
 	set n="",c="0"
-	if 8=base for i=$length(v):-1:1 quit:("0"'=c)  set c=$translate($extract(v,i),"01234567","12345670"),n=c_n
-	else  for i=$length(v):-1:1 quit:("0"'=c)  set c=$translate($extract(v,i),"0123456789ABCDEF","123456789ABCDEF0"),n=c_n
-	set:1<i n=$extract(v,1,i)_n
-	quit $select($find($select(8=base:"0123",1:"01234567"),$extract(n)):$select(8=base:7,1:"F")_n,1:n)
+	for i=0:1:$length(v)  quit:(c'="0")  set c=$extract(v,$length(v)-i),c=$translate(c,charmap,pocharmap),n=c_n
+	set:i'=$length(v) n=$extract(v,1,$length(v)-i)_n
+	set:$find(($extract(charmap,1,(base/2))),$extract(n,1)) n=($extract(charmap,$length(charmap)))_n
+	quit n
 VALIDLEN(val,base) ;Returns length of string until which all characters are valid for the given base (works up to base 16)
 	new i,valbasechar,invalidi,len
 	set valbasechar=$extract("0123456789ABCDEF",1,base),len=$length(val)
