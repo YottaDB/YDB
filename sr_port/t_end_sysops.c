@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -167,6 +167,7 @@ GBLREF	boolean_t		unhandled_stale_timer_pop;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		is_updproc;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	boolean_t		exit_handler_active;
 
 void fileheader_sync(gd_region *reg)
 {
@@ -1238,7 +1239,6 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 	node_local_ptr_t	cnl;
 	enum db_acc_method	acc_meth;
 	int4			wtstart_errno;
-	INTPTR_T		reg_parm;
 	jnl_private_control	*jpc;
 	uint4		buffs_per_flush, flush_target;
 
@@ -1257,15 +1257,21 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 		if ((dba_bg == acc_meth) ||				/* bg mode or */
 		    (dba_mm == acc_meth && (0 < csd->defer_time)))	/* defer'd mm mode */
 		{
-			reg_parm = (UINTPTR_T)reg;
-			csa->timer = TRUE;
-			csa->canceled_flush_timer = FALSE;
-			INCR_CNT(&cnl->wcs_timers, &cnl->wc_var_lock);
-			INSERT_WT_PID(csa);
-			start_timer((TID)reg,
-				    (csd->flush_time * (dba_bg == acc_meth ? 1 : csd->defer_time)),
-				    &wcs_stale, SIZEOF(reg_parm), (char *)&reg_parm);
-			BG_TRACE_ANY(csa, stale_timer_started);
+			if (!exit_handler_active)
+			{
+				INTPTR_T		reg_parm;
+
+				csa->canceled_flush_timer = FALSE;
+				csa->timer = TRUE;
+				INCR_CNT(&cnl->wcs_timers, &cnl->wc_var_lock);
+				INSERT_WT_PID(csa);
+				reg_parm = (UINTPTR_T)reg;
+				start_timer((TID)reg,
+					    (csd->flush_time * (dba_bg == acc_meth ? 1 : csd->defer_time)),
+					    &wcs_stale, SIZEOF(reg_parm), (char *)&reg_parm);
+				BG_TRACE_ANY(csa, stale_timer_started);
+			}
+			/* else: We are already in exit processing. Do not start timers as it is unsafe (YDB#679). */
 		}
 	}
 	if (is_updproc && (cnl->wcs_timers > ((FALSE == csa->timer) ? -1 : 0)))
@@ -1424,11 +1430,8 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 		BG_TRACE_ANY(csa, stale_process_defer);
 	}
 	assert((dba_bg == acc_meth) || (0 < csd->defer_time));
-	/* If fast_lock_count is non-zero, we must go ahead and set a new timer even if we don't need one
-	 * because we cannot fall through to the DECR_CNT for wcs_timers below because we could deadlock.
-	 * If fast_lock_count is zero, then the regular tests determine if we set a new timer or not.
-	 */
-	if (0 != fast_lock_count || (need_new_timer && (0 >= cnl->wcs_timers)))
+	/* If "exit_handler_active" is TRUE, we are already in exit processing. Do not start timers as it is unsafe (YDB#679). */
+	if (!exit_handler_active && (need_new_timer && (0 >= cnl->wcs_timers)))
 	{
 		start_timer((TID)reg, (csd->flush_time * (dba_bg == acc_meth ? 1 : csd->defer_time)),
 			    &wcs_stale, SIZEOF(region), (char *)region);
@@ -1438,8 +1441,8 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 		DECR_CNT(&cnl->wcs_timers, &cnl->wc_var_lock);
 		REMOVE_WT_PID(csa);
 		csa->timer = FALSE;		/* No timer set for this region by this process anymore */
-		/* Since this is a case where we know for sure no dirty buffers remain, there is no need of
-		 * the flush timer anymore, so "csa->canceled_flush_timer" can be safely set to FALSE.
+		/* Since this is a case where we know for sure no dirty buffers remain (if "exit_handler_active" is FALSE),
+		 * there is no need of the flush timer anymore, so "csa->canceled_flush_timer" can be safely set to FALSE.
 		 */
 		assert(!csa->canceled_flush_timer);	/* should have been reset when "csa->timer = TRUE" happened */
 		csa->canceled_flush_timer = FALSE;	/* be safe in pro just in case */

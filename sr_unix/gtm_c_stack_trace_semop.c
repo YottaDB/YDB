@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,6 @@
 
 #include "gtm_c_stack_trace.h"
 #include "gtm_c_stack_trace_semop.h"
-#include "semwt2long_handler.h"
 #include "wbox_test_init.h"
 #include "gt_timer.h"
 #include "gdsroot.h"
@@ -29,7 +28,10 @@
 #include "gdsfhead.h"
 #include "eintr_wrappers.h"
 
-GBLREF uint4            process_id;
+#define MAX_SEM_WAIT_TIME_IN_SECONDS	60	/* 60 seconds */
+
+GBLREF	uint4            process_id;
+GBLREF	boolean_t	exit_handler_active;
 #ifdef DEBUG
 GBLREF	gd_region	*gv_cur_region;
 GBLREF  sgmnt_addrs     *cs_addrs;
@@ -39,6 +41,8 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 	int                     stuckcnt;
 	int                     semop_pid, save_errno;
 	int                     rc;
+	boolean_t		new_timeout, get_stack_trace;
+	ABS_TIME		start_time, end_time, remaining_time;
 #	ifdef DEBUG
 	node_local_ptr_t        cnl = NULL;
 #	endif
@@ -51,25 +55,43 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 #	endif
 	stuckcnt = 0;
 	save_errno = 0;
-	TREF(semwait2long) = TRUE;
+	new_timeout = TRUE;	/* Start a "semtimedop()" call with MAX_SEM_WAIT_TIME_IN_SECONDS second timeout */
+	/* If YottaDB exit handler is already active (i.e. "exit_handler_active" is TRUE), then it is not safe to start
+	 * timers (YDB#679). So use "semtimedop()" instead of "semop()" to achieve the effort of a timer without actually
+	 * starting one. Because "semtimedop()" does not accurately maintain the remaining timeout in case of an EINTR,
+	 * we maintain it ourselves outside of the "semtimedop()" call in a loop below using "remaining_time".
+	 */
 	do
 	{
-		/* If we are entering the loop for the first time or there was an interrupt and that 	*/
-		/* was due to the timer pop (which sets semop2long), restart the timer			*/
-		if (TREF(semwait2long))
+		if (new_timeout)
 		{
-			TREF(semwait2long) = FALSE;
-			start_timer((TID)semwt2long_handler, MAX_SEM_WAIT_TIME, semwt2long_handler, 0, NULL);
+			new_timeout = FALSE;
+			sys_get_curr_time(&start_time);
+			remaining_time.tv_sec = MAX_SEM_WAIT_TIME_IN_SECONDS;
+			remaining_time.tv_nsec = 0;
+			end_time.tv_sec = start_time.tv_sec + remaining_time.tv_sec;
+			end_time.tv_nsec = start_time.tv_nsec;
 		}
-		rc = semop(semid, sops, nsops);
+		rc = semtimedop(semid, sops, nsops, &remaining_time);
 		if (-1 != rc)
 			break;
 		save_errno = errno;
-		if (EINTR != save_errno)
+		if (EAGAIN == save_errno)
+			get_stack_trace = TRUE; /* "semtimedop()" returned because time limit was reached. Get stack trace */
+		else if (EINTR != save_errno)
 			break;
-		eintr_handling_check();
-		/* Timer popped, get C-stack trace */
-		if (TREF(semwait2long))
+		else
+		{
+			ABS_TIME	cur_time;
+
+			eintr_handling_check();
+		 	/* "semtimedop()" got an EINTR due to some other signal. Determine remaining time before next stack trace */
+			sys_get_curr_time(&cur_time);
+			remaining_time = sub_abs_time(&end_time, &cur_time);
+			get_stack_trace = ((0 > remaining_time.tv_sec)
+						|| ((0 == remaining_time.tv_sec) && (0 == remaining_time.tv_nsec)));
+		}
+		if (get_stack_trace)
 		{
 			int	loopcount, last_sem_trace;
 
@@ -97,9 +119,9 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 					}
 				}
 			}
+			new_timeout = TRUE; /* Start a new "semtimedop()" call for another MAX_SEM_WAIT_TIME_IN_SECONDS seconds */
 		}
 	} while (TRUE);
 	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-	cancel_timer((TID)semwt2long_handler);
 	return (-1 == rc) ? save_errno : 0;
 }

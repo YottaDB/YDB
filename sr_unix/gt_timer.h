@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -179,7 +179,7 @@ MBSTART {									\
 	i = 0;											\
 	while (cur_timer)									\
 	{											\
-		if ((void (*)())jnl_file_close_timer_ptr == cur_timer->handler)			\
+		if ((void (*)())jnl_file_close_timer_fptr == cur_timer->handler)		\
 			handler = s_jnl_file_close_timer;					\
 		else if ((void (*)())wcs_clean_dbsync_fptr == cur_timer->handler)		\
 			handler = s_wcs_clean_dbsync;						\

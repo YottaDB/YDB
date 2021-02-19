@@ -68,6 +68,9 @@
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	uint4			process_id;
+#ifdef DEBUG
+GBLREF	volatile int		in_os_signal_handler;
+#endif
 
 error_def(ERR_SYSCALL);
 
@@ -161,6 +164,12 @@ boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 	int	status;
 	char	buf[128];
 
+	/* The "shmdt" call done below is not async-signal-safe so assert that we are not inside an os invoked signal handler
+	 * if ever we come to this function. The only exception we know of is in the "v61000/intrpt_wcs_wtstart" subtest where
+	 * we send 3 SIGTERMs in succession to terminate the process even if it is not safe to terminate and in that case we
+	 * can reach here. But that is a white-box test case and hence the "||" in the assert below.
+	 */
+	assert(!in_os_signal_handler || (WBTEST_SLEEP_IN_WCS_WTSTART == ydb_white_box_test_case_number));
 	assert(NULL != lcl_ss_ctx);
 	if (FD_INVALID != lcl_ss_ctx->shdw_fd)
 	{

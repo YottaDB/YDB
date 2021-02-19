@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,6 +60,15 @@ error_def(ERR_FAKENOSPCLEARED);
 #define MAX_ENOSPC_TARGET		4
 #endif
 
+#define	START_TIMER(TID, TIME_TO_EXPIR, HANDLER, HDATA_LEN, HDATA)		\
+{										\
+	GBLREF	boolean_t		exit_handler_active;			\
+										\
+	if (!exit_handler_active)						\
+		start_timer(TID, TIME_TO_EXPIR, HANDLER, HDATA_LEN, HDATA);	\
+	/* else: We are exiting. Not safe to start new timers (YDB#679) */	\
+}
+
 /* This is a debug-only timer routine which is run within the source server that creates the journal pool.
  * It randomly sets flags indicating that writes to database files and/or journal files within the instance
  * should return an ENOSPC error, expecting that the custom error retry processing will handle it seamlessly
@@ -102,14 +111,14 @@ void fake_enospc(void)
 		|| (!ok_to_interrupt && ((INTRPT_IN_SHMDT == intrpt_ok_state) || !IS_REPL_INST_FROZEN)) || !CUSTOM_ERRORS_LOADED)
 	{	/* We have to skip this because we have just fallen into deferred zone or we are currently in it */
 		/* Try again in a second */
-		start_timer((TID)fake_enospc, ENOSPC_RETRY_INTERVAL, fake_enospc, 0, NULL);
+		START_TIMER((TID)fake_enospc, ENOSPC_RETRY_INTERVAL, fake_enospc, 0, NULL);
 		return;
 	}
 	assert(0 == syslog_deferred);
 	addr_ptr = get_next_gdr(NULL);
 	if (NULL == addr_ptr) /* Ensure that there is a global directory to operate on. */
 	{
-		start_timer((TID)fake_enospc, ENOSPC_GDWAIT_INTERVAL, fake_enospc, 0, NULL);
+		START_TIMER((TID)fake_enospc, ENOSPC_GDWAIT_INTERVAL, fake_enospc, 0, NULL);
 		return;
 	}
 	assert(NULL == get_next_gdr(addr_ptr));
@@ -127,16 +136,16 @@ void fake_enospc(void)
 			else
 				enospc_enable_list[i] = NONE;
 		}
-		start_timer((TID)fake_enospc, ENOSPC_FROZEN_DURATION, fake_enospc, 0, NULL);
+		START_TIMER((TID)fake_enospc, ENOSPC_FROZEN_DURATION, fake_enospc, 0, NULL);
 	} else
 	{	/* We are in a FROZEN state, and about to be UNFROZEN due to free space */
 		memset(enospc_enable_list, 0, MAX_REGIONS);
 		if (!ok_to_interrupt)
 		{
 			syslog_deferred = 1;
-			start_timer((TID)&syslog_deferred, DEFERRED_SYSLOG_INTERVAL, handle_deferred_syslog, 0, NULL);
+			START_TIMER((TID)&syslog_deferred, DEFERRED_SYSLOG_INTERVAL, handle_deferred_syslog, 0, NULL);
 		}
-		start_timer((TID)fake_enospc, ENOSPC_UNFROZEN_DURATION, fake_enospc, 0, NULL);
+		START_TIMER((TID)fake_enospc, ENOSPC_UNFROZEN_DURATION, fake_enospc, 0, NULL);
 	}
 	for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions, i = 0; r_local < r_top; r_local++, i++)
 	{
@@ -212,7 +221,7 @@ void handle_deferred_syslog(void)
 		else
 		{
 			syslog_deferred++;
-			start_timer((TID)&syslog_deferred, DEFERRED_SYSLOG_INTERVAL, handle_deferred_syslog, 0, NULL);
+			START_TIMER((TID)&syslog_deferred, DEFERRED_SYSLOG_INTERVAL, handle_deferred_syslog, 0, NULL);
 		}
 	}
 #	endif

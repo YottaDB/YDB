@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,6 @@
 #include <sys/shm.h>
 #include <sys/param.h>
 
-#include "gt_timer.h"
 #include "gtmio.h"
 #include "io.h"
 #include "gtmsecshr.h"
@@ -83,7 +82,6 @@ LITREF gtmImageName		gtmImageNames[];
 static int			secshr_sem;
 static boolean_t		gtmsecshr_file_check_done;
 static char			gtmsecshr_path[YDB_PATH_MAX];
-static volatile boolean_t	client_timer_popped;
 static unsigned long		cur_seqno;
 
 /* The below messages match up with the gtmsecshr_mesg_type codes */
@@ -112,7 +110,8 @@ const static char readonly *secshrstart_error_code[] = {
 };
 
 #define MAX_COMM_ATTEMPTS		4	/* 1 to start secshr, 2 maybe slow, 3 maybe really slow, 4 outside max */
-#define CLIENT_ACK_TIMER		(5 * (uint8)NANOSECS_IN_SEC)
+#define CLIENT_ACK_TIMEOUT_IN_SECONDS	5	/* 5 seconds timeout for RECVFROM calls in "send_mesg2gtmsecshr" */
+
 
 #define START_SERVER										\
 {												\
@@ -143,10 +142,8 @@ const static char readonly *secshrstart_error_code[] = {
 {												\
 	recv_ptr = (char *)&mesg;								\
 	recv_len = SIZEOF(mesg);								\
-	client_timer_popped = FALSE;								\
 	recv_complete = FALSE;									\
 	save_errno = 0;										\
-	start_timer(timer_id, CLIENT_ACK_TIMER, client_timer_handler, 0, NULL);			\
 }
 
 error_def(ERR_YDBDISTUNVERIF);
@@ -161,11 +158,6 @@ error_def(ERR_GTMSECSHRTMPPATH);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
-
-void client_timer_handler(void)
-{
-	client_timer_popped = TRUE;
-}
 
 int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path_len)
 {
@@ -184,13 +176,14 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	struct sembuf		sop[4];
 	fd_set			wait_on_fd;
 	gtmsecshr_mesg		mesg;
-	TID			timer_id;
 	int4			msec_timeout;
 	char			*ydb_tmp_ptr;
 	struct stat		stat_buf;
 	char			file_perm[MAX_PERM_LEN];
 	struct shmid_ds		shm_info;
 	int			len;
+	boolean_t		recvfrom_timedout;
+
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -201,7 +194,6 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	/* Create communication key (hash of release name) if it has not already been done */
 	if (0 == TREF(gtmsecshr_comkey))
 		STR_HASH((char *)ydb_release_name, ydb_release_name_len, TREF(gtmsecshr_comkey), 0);
-	timer_id = (TID)send_mesg2gtmsecshr;
 	if (!gtmsecshr_file_check_done)
 	{
 		len = STRLEN(ydb_dist);
@@ -231,8 +223,27 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		}
 		gtmsecshr_file_check_done = TRUE;
 	}
-	if (!gtmsecshr_sock_init_done && (0 < (init_ret_code = gtmsecshr_sock_init(CLIENT))))	/* Note assignment */
-		return init_ret_code;
+	if (!gtmsecshr_sock_init_done)
+	{
+		struct timeval		tv;
+
+		if (0 < (init_ret_code = gtmsecshr_sock_init(CLIENT)))	/* Note assignment */
+			return init_ret_code;
+		assert(gtmsecshr_sock_init_done);
+		/* Set receive timeout at socket level using "setsockopt()". Used by RECVFROM in later do/while loop. */
+		tv.tv_sec = CLIENT_ACK_TIMEOUT_IN_SECONDS;
+		tv.tv_usec = 0;
+		if (-1 == setsockopt(gtmsecshr_sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, SIZEOF(tv)))
+		{
+			char	*errptr;
+
+			save_errno = errno;
+			errptr = (char *)STRERROR(save_errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+				RTS_ERROR_LITERAL("SO_RCVTIMEO"), save_errno, STRLEN(errptr), errptr);
+			assert(FALSE);	/* rts_error_csa should not return */
+		}
+	}
 	DEBUG_ONLY(mesg.usesecshr = TREF(ydb_usesecshr));	/* Flag ignored in PRO build */
 	while (MAX_COMM_ATTEMPTS >= loop_count)
 	{	/* first, try the sendto */
@@ -288,11 +299,12 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 			loop_count++;
 			continue;
 		}
-		SETUP_FOR_RECV;		/* Sets timer, recvcomplete = FALSE */
+		SETUP_FOR_RECV;		/* Sets recvcomplete = FALSE */
 		do
 		{	/* Note RECVFROM does not loop on EINTR return codes so must be handled. Note also we only expect
 			 * to receive the message header back as an acknowledgement.
 			 */
+			recvfrom_timedout = FALSE;
 			num_chars_recvd = RECVFROM(gtmsecshr_sockfd, recv_ptr, GTM_MESG_HDR_SIZE, 0, (struct sockaddr *)0,
 						   (GTM_SOCKLEN_TYPE *)0);
 			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
@@ -308,7 +320,6 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 					recv_complete = TRUE;
 				else
 				{	/* Message too short or not correct sequence */
-					cancel_timer(timer_id);
 					/* Print True/False for the possibilities we failed */
 					DBGGSSHR((LOGFLAGS, "secshr_client: Message incorrect - chars: %d, seq: %d\n",
 						  (GTM_MESG_HDR_SIZE <= num_chars_recvd), (mesg.seqno == cur_seqno)));
@@ -317,8 +328,11 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 				}
 			} else
 			{	/* Something untoward happened */
-				if (client_timer_popped)
+				if ((EAGAIN == save_errno) || (EWOULDBLOCK == save_errno))
+				{	/* Receive timeout expired in "RECVFROM()" call before any data was received */
+					recvfrom_timedout = TRUE;
 					break;
+				}
 				if (EINTR == save_errno)	/* Had an irrelevant interrupt - ignore */
 				{
 					eintr_handling_check();
@@ -338,15 +352,14 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 				return save_errno;
 			}
 		} while (!recv_complete);
-		cancel_timer(timer_id);
-		if (client_timer_popped || (EBADF == save_errno) || (0 == num_chars_recvd))
+		if (recvfrom_timedout || (EBADF == save_errno) || (0 == num_chars_recvd))
 		{	/* Timeout, connection issues, bad descriptor block - retry */
 			gtmsecshr_sock_cleanup(CLIENT);
 			gtmsecshr_sock_init(CLIENT);
-			if (client_timer_popped)
+			if (recvfrom_timedout)
 			{
 				START_SERVER;
-				DBGGSSHR((LOGFLAGS, "secshr_client: Read timer popped - restarting server\n"));
+				DBGGSSHR((LOGFLAGS, "secshr_client: Receive timeout expired - restarting server\n"));
 			} else
 				DBGGSSHR((LOGFLAGS, "secshr_client: Read error - socket reset, retrying\n"));
 			loop_count++;

@@ -2,6 +2,8 @@
  *                                                              *
  *      Copyright 2011 Fidelity Information Services, Inc	*
  *                                                              *
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ *								*
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
  *      under a license.  If you do not know the terms of       *
@@ -12,7 +14,6 @@
 #ifndef SECSHR_CLIENT_HANDLER_INCLUDED
 #define SECSHR_CLIENT_HANDLER_INCLUDED
 
-void client_timer_handler(void);
 int send_mesg2gtmsecshr(unsigned int, unsigned int, char *, int);
 int create_server(void);
 

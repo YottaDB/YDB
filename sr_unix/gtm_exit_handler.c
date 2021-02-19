@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,12 +77,12 @@ LITREF	mval			literal_notimeout;
 
 enum rundown_state
 {
-	rundown_state_lock,
 	rundown_state_mprof,
+	rundown_state_lock,
 	rundown_state_statsdb,
 	rundown_state_db,
 	rundown_state_io,
-	rundown_state_last
+	rundown_state_last,
 };
 
 static	enum rundown_state	attempting;
@@ -125,6 +125,12 @@ static	enum rundown_state	attempting;
 {													\
 	SET_PROCESS_EXITING_TRUE;									\
 	CANCEL_TIMERS;			/* Cancel all unsafe timers - No unpleasant surprises */	\
+	assert(exit_handler_active);	/* From here onwards, we do not want to start any new timers	\
+					 * as there won't be any more call to CANCEL_TIMERS. This	\
+					 * assert ensures no new timers will be started as this		\
+					 * variable is checked before "start_timer()" call in various	\
+					 * places.							\
+					 */								\
 	/* Note we call secshr_db_clnup() with the flag NORMAL_TERMINATION even in an error condition	\
 	 * here because we know at this point that we aren't in the middle of a transaction commit but	\
 	 * crit	may be held in one or more regions and/or other odds/ends to cleanup.			\
@@ -204,9 +210,8 @@ void gtm_exit_handler(void)
 		DBGSIGHND_ONLY(fprintf(stderr, "gtm_exit_handler: Entered in simpleThreadAPI mode.. (thread %p) from %p\n",
 				       (void *)pthread_self(), (void *)caller_id()); fflush(stderr));
 	}
-	exit_handler_active = TRUE;
 	DEBUG_ONLY(ydb_dmp_tracetbl());
-	attempting = rundown_state_lock;
+	attempting = rundown_state_mprof;
 	actual_exi_condition = 0;
 	ESTABLISH_NORET(exi_ch, error_seen);	/* "error_seen" is initialized inside this macro */
 #	ifdef DEBUG
@@ -217,8 +222,12 @@ void gtm_exit_handler(void)
 		fast_lock_count = 0;
 	}
 #	endif
-	RUNDOWN_STEP(rundown_state_lock, rundown_state_mprof, ERR_LKRUNDOWN, LOCK_RUNDOWN_MACRO);
-	RUNDOWN_STEP(rundown_state_mprof, rundown_state_statsdb, ERR_MPROFRUNDOWN, MPROF_RUNDOWN_MACRO);
+	/* Need to do this before "exit_handler_active" is set to TRUE as this step can start timers etc. (as part of opening
+	 * the database file corresponding to the traced global name) and that is disallowed once "exit_handler_active" is TRUE.
+	 */
+	RUNDOWN_STEP(rundown_state_mprof, rundown_state_lock, ERR_MPROFRUNDOWN, MPROF_RUNDOWN_MACRO);
+	exit_handler_active = TRUE;
+	RUNDOWN_STEP(rundown_state_lock, rundown_state_statsdb, ERR_LKRUNDOWN, LOCK_RUNDOWN_MACRO);
 	/* The condition handler used in the gvcst_remove_statsDB_linkage_all() path takes care of sending errors */
 	RUNDOWN_STEP(rundown_state_statsdb, rundown_state_db, 0, gvcst_remove_statsDB_linkage_all());
 	RUNDOWN_STEP(rundown_state_db, rundown_state_io, ERR_GVRUNDOWN, gv_rundown());

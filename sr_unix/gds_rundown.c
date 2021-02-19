@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -491,9 +491,12 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			/* Assume we are the last writer to invoke wcs_flu */
 		if (NULL != csa->ss_ctx)
 		{
-			ss_destroy_context(csa->ss_ctx);
-			free(csa->ss_ctx);
+			snapshot_context_ptr_t	lcl_ss_ctx;
+
+			lcl_ss_ctx = csa->ss_ctx;
 			csa->ss_ctx = NULL;
+			ss_destroy_context(lcl_ss_ctx);
+			free(lcl_ss_ctx);
 		}
 		/* SS_MULTI: If multiple snapshots are supported, then we have to run through each of the snapshots */
 		assert(1 == MAX_SNAPSHOTS);

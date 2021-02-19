@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,6 @@
 #include "ipcrmid.h"
 #include "gtmmsg.h"
 #include "util.h"
-#include "semwt2long_handler.h"
 #include "repl_sem.h"
 #include "jnl.h"
 #include "repl_msg.h"
@@ -91,12 +90,6 @@ error_def(ERR_SYSCALL);
 	gtm_putmsg_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(REG));					\
 	gtm_putmsg_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL(FAILED_OP), CALLFROM, ERRNO);	\
 	return FALSE;														\
-}
-
-#define CANCEL_TIMER_AND_RETURN_SUCCESS(REG)										\
-{															\
-	cancel_timer((TID)semwt2long_handler);										\
-	RETURN_SUCCESS(REG);												\
 }
 
 #define RETURN_SUCCESS(REG)												\

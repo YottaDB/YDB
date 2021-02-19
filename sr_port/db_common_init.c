@@ -3,6 +3,8 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -24,11 +26,13 @@
 #include "filestruct.h"
 #include "iosp.h"
 #include "jnl.h"
-#include "wcs_clean_dbsync.h" /* for setting wcs_clean_dbsync pointer */
+#include "wcs_clean_dbsync.h"		/* for setting "wcs_clean_dbsync_fptr" */
+#include "jnl_file_close_timer.h"	/* for setting "jnl_file_close_timer_fptr" */
 
 GBLREF	jnl_process_vector	*prc_vec;
 GBLREF	void			(*wcs_stale_fptr)();
 GBLREF	void			(*wcs_clean_dbsync_fptr)();
+GBLREF	void			(*jnl_file_close_timer_fptr)();
 
 void	db_common_init(gd_region *reg, sgmnt_addrs *csa, sgmnt_data_ptr_t csd)
 {
@@ -56,4 +60,5 @@ void	db_common_init(gd_region *reg, sgmnt_addrs *csa, sgmnt_data_ptr_t csd)
 	}
 	wcs_stale_fptr = &wcs_stale;
 	wcs_clean_dbsync_fptr = &wcs_clean_dbsync;
+	jnl_file_close_timer_fptr = &jnl_file_close_timer;
 }

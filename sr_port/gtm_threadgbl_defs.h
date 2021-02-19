@@ -182,7 +182,6 @@ THREADGBLDEF(prev_gv_target,			gv_namehead *)			/* saves the last gv_target for 
 THREADGBLDEF(ready2signal_gvundef,		boolean_t)			/* TRUE if GET operation about to signal GVUNDEF */
 THREADGBLDEF(redo_rootsrch_ctxt,		redo_root_search_context)	/* context to be saved and restored during
 										 * gvcst_redo_root_search */
-THREADGBLDEF(semwait2long,			volatile boolean_t)		/* Waited too long for a semaphore */
 THREADGBLDEF(skip_file_corrupt_check,		boolean_t)			/* skip file_corrupt check in grab_crit */
 THREADGBLDEF(tpnotacidtime,			mval)				/* limit for long non-ACID ops in transactions */
 THREADGBLDEF(tp_restart_count,			uint4)				/* tp_restart counter */

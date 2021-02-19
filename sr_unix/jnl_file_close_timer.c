@@ -3,6 +3,8 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -35,7 +37,7 @@
 
 GBLREF	boolean_t	oldjnlclose_started;
 GBLREF	uint4		process_id;
-GBLREF	int		process_exiting;
+GBLREF	boolean_t	exit_handler_active;
 
 void jnl_file_close_timer(void)
 {
@@ -58,7 +60,7 @@ void jnl_file_close_timer(void)
 	 *		the midst of a journal file switch is tricky so we check if the process is in
 	 *		crit for this region and if so we skip the close this time and wait for the next heartbeat.
 	 */
-	if ((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && (!process_exiting))
+	if ((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && !exit_handler_active)
 	{
 		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 		{
@@ -90,11 +92,11 @@ void jnl_file_close_timer(void)
 	/* Only restart the timer if there are still journal files open, or if we didn't check because it wasn't safe.
 	 * Otherwise, it will be restarted on the next successful jnl_file_open(), or never, if we are exiting.
 	 */
-	if (any_jnl_open || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state))
+	if (!exit_handler_active && (any_jnl_open || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state)))
 		start_timer((TID)jnl_file_close_timer, OLDERJNL_CHECK_INTERVAL, jnl_file_close_timer, 0, NULL);
 	else
 	{
-		assert(!any_jnl_open || process_exiting);
+		assert(!any_jnl_open || exit_handler_active);
 		oldjnlclose_started = FALSE;
 	}
 }

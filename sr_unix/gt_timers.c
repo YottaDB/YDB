@@ -150,7 +150,14 @@ int4	time();
 #define	SAFE_FOR_TIMER_POP	(SAFE_FOR_ANY_TIMER && !multi_thread_in_use)
 #define	SAFE_FOR_TIMER_START	(SAFE_FOR_ANY_TIMER)
 
-#define	IS_KNOWN_UNSAFE_TIMER_HANDLER(HNDLR)	((wcs_stale_fptr == HNDLR) || (wcs_clean_dbsync_fptr == HNDLR))
+/* The below timer handler functions all invoke functions that are not listed as async-signal-safe (see "man signal-safety")
+ * and so cannot be invoked from inside an os signal handler. Instead they have to be invoked after the signal handler returns
+ * in a deferred fashion.
+ */
+#define	IS_KNOWN_UNSAFE_TIMER_HANDLER(HNDLR)									\
+	((wcs_stale_fptr == HNDLR)		/* wcs_wtstart() -> send_msg_csa() -> syslog() [UNSAFE] */	\
+	 || (wcs_clean_dbsync_fptr == HNDLR)	/* wcs_clean_dbsync() -> send_msg_csa() -> syslog() [UNSAFE] */	\
+	 || (jnl_file_close_timer_fptr == HNDLR))	/* jnl_file_close_timer() -> shmdt() [UNSAFE] */
 
 /* Macros to set the global timer_from_OS - is set when timer_handler() is entered as an OS call instead of as a dummy
  * deferred interrupt type call. Cleared when timer_handler exits.
@@ -210,8 +217,11 @@ STATICDEF GT_TIMER	trc_timerpop_array[MAX_TIMER_POP_TRACE_SZ];
 GBLDEF	volatile boolean_t	timer_active;
 GBLDEF	volatile int4		timer_stack_count;		/* Records that we are already in timer processing */
 GBLDEF	volatile boolean_t	timer_in_handler;
-GBLDEF	void			(*wcs_clean_dbsync_fptr)();	/* Reference to wcs_clean_dbsync() to be used in gt_timers.c */
+
+/* Below function pointers (indirect references to functions) exist to avoid bloating the "gtmsecshr" executable */
 GBLDEF	void			(*wcs_stale_fptr)();		/* Reference to wcs_stale() to be used in gt_timers.c */
+GBLDEF	void			(*wcs_clean_dbsync_fptr)();	/* Reference to wcs_clean_dbsync() to be used in gt_timers.c */
+GBLDEF	void			(*jnl_file_close_timer_fptr)();	/* Reference to jnl_file_close_timer() to be used in gt_timers.c */
 
 /* The timer_from_OS global indicates a SIGALRM from OS has occurred blocking further SIGALRMs. Note this is a boolean instead
  * of a counter as once we come in via SIGALRM, other SIGALRM interrupts are blocked. Note this var differs from the global
@@ -237,6 +247,8 @@ GBLREF	int			process_exiting;
 GBLREF	struct sigaction	orig_sig_action[];
 GBLREF	volatile int		stapi_signal_handler_deferred;
 GBLREF	int			ydb_main_lang;
+GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		simpleThreadAPI_active;
 #ifdef YDB_USE_POSIX_TIMERS
 GBLREF	pid_t			posix_timer_thread_id;
 GBLREF	boolean_t		posix_timer_created;
@@ -408,6 +420,19 @@ void start_timer(TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len
 	boolean_t	safe_timer = FALSE, safe_to_add = FALSE;
 	int		i, rc;
 
+	if (exit_handler_active)
+	{	/* Starting a timer while we have already started exiting can cause issues in an environment where
+		 * the main program is not YottaDB (e.g. Go program etc.). This is because YottaDB cancels its timer
+		 * at the start of exiting and so any timers started from then on will not be canceled when exit
+		 * processing is complete. These timers if they pop would land in handlers established by the main
+		 * program which would not be ready to handle them. So best would be to not start such timers.
+		 * We don't expect any such code paths since all timers that can potentially be started during exit
+		 * handling already have checks to not invoke "start_timer()" in that case. Hence the assert below.
+		 * In Release builds though, play it safe and just return.
+		 */
+		assert(FALSE);
+		return;
+	}
 	assertpro(0 <= time_to_expir);			/* Callers should verify non-zero time */
 	DUMP_TIMER_INFO("At the start of start_timer()");
 	if (NULL == handler)
@@ -423,6 +448,11 @@ void start_timer(TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len
 	{	/* Account for known instances of the above function being called from within a deferred zone. */
 		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state)
 			|| (INTRPT_IN_TRIGGER_NOMANS_LAND == intrpt_ok_state));
+		safe_to_add = TRUE;
+	} else if (jnl_file_close_timer_fptr == handler)
+	{	/* Account for known instances of the above function being called from within a deferred zone. */
+		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state)
+			|| (INTRPT_IN_GDS_RUNDOWN == intrpt_ok_state));
 		safe_to_add = TRUE;
 	} else
 	{
@@ -559,23 +589,42 @@ STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
 #	ifdef YDB_USE_POSIX_TIMERS
 	if (!posix_timer_created)
 	{	/* No posix timer has yet been created */
-		memset(&sevp, 0, sizeof(sevp));		/* Initialize parm block to eliminate garbage then fill in what we want */
-		/* When using alternate signal handling, Go is handling the signals so there is no requirement that SIGALRM be sent
-		 * to the "signal thread" (ydb_stm_thread) and in fact, that can result in a slowdown since if the signal was
-		 * instead sent to a Go thread, it wouldn't have to make an expensive runtime change to process it.
+		memset(&sevp, 0, sizeof(sevp));	/* Initialize parm block to eliminate garbage then fill in what we want */
+		/* When using alternate signal handling, Go is handling the signals so there is no requirement that SIGALRM be
+		 * sent to the "signal thread" (ydb_stm_thread) and in fact, that can result in a slowdown since if the signal
+		 * was instead sent to a Go thread, it wouldn't have to make an expensive runtime change to process it.
+		 * Note though that even if Go is the main program, if YottaDB has started exit handling, then it is better
+		 * to start timers and send it to the current thread running YottaDB exit handler code (not to a Go thread)
+		 * as Go cannot call back into YottaDB once exit handling has started. Hence the "exit_handler_active" check below.
 		 */
-		sevp.sigev_notify = (USING_ALTERNATE_SIGHANDLING ? SIGEV_SIGNAL : SIGEV_THREAD_ID);
-		if (0 == posix_timer_thread_id)
-			posix_timer_thread_id = syscall(SYS_gettid);
-		/* Note: The man pages of "timer_create" indicate we need to fill "sevp.sigev_notify_thread_id" with the thread id
-		 * but that field does not seem to be defined at least in all linux versions we currently have with the current
-		 * compilation flags we use so we define it explicitly to "sevp._sigev_un._tid" which then works as desired.
-		 */
-#		ifndef sigev_notify_thread_id
-#		define sigev_notify_thread_id _sigev_un._tid
-#		endif
-		if (!USING_ALTERNATE_SIGHANDLING)	/* No special thread selected if using alternate signal handling */
+		if (USING_ALTERNATE_SIGHANDLING && !exit_handler_active)
+			sevp.sigev_notify = SIGEV_SIGNAL;
+		else
+		{
+			sevp.sigev_notify = SIGEV_THREAD_ID;
+			/* Determine thread id to use for notification but before that initialize "posix_timer_thread_id" */
+			/* If "posix_timer_thread_id" is 0, then initialize it from the current thread id.
+			 * If it is non-zero, then use that already initialized thread id. The only exception is if this is a
+			 * SimpleThreadAPI environment and if "exit_handler_active" is TRUE. In that case, the MAIN worker thread
+			 * id that "posix_timer_thread_id" points to is in the process of terminating and so we cannot ask for that
+			 * thread to receive SIGALRM for timers started now (race condition can lead to errors about invalid timer
+			 * id in "timer_create()" call etc. Therefore, use the current thread id in that case. Note that it is okay
+			 * to do so even in a SimpleThreadAPI environment since the fact that the current thread reached here
+			 * implies it holds the YottaDB multi-thread engine lock currently and will do so until the end of exit
+			 * processing.
+			 */
+			if ((0 == posix_timer_thread_id) || (simpleThreadAPI_active && exit_handler_active))
+				posix_timer_thread_id = syscall(SYS_gettid);
+			/* Note: The man pages of "timer_create" indicate we need to fill "sevp.sigev_notify_thread_id" with the
+			 * thread id but that field does not seem to be defined at least in all linux versions we currently have
+			 * with the current compilation flags we use so we define it explicitly to "sevp._sigev_un._tid" which
+			 * then works as desired.
+			 */
+#			ifndef sigev_notify_thread_id
+#			define sigev_notify_thread_id _sigev_un._tid
+#			endif
 			sevp.sigev_notify_thread_id = posix_timer_thread_id;
+		}
 		sevp.sigev_signo = SIGALRM;
 		if (timer_create(CLOCK_MONOTONIC, &sevp, &posix_timer_id))
 		{
