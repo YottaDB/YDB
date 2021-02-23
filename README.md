@@ -66,13 +66,18 @@ listed below. For example for Ubuntu Linux:
 
   There may be other library dependencies or the packages may have different names.
 
-- Building YottaDB from source tarball
+- Fetch the latest released version of YottaDB source
 
-  The YottaDB source tarball extracts to a directory with the version number in the name, e.g. `YDB-r1.30`
+  To obtain the source code corresponding to the latest YottaDB release and build binaries from that source please use the following set of shell commands which fetches the latest tagged release by performing a git clone. After cloning YottaDB source files can be seen in the directory named `YDB`.
 
   ```sh
-  tar xzf YDB-r1.30.tar.gz
-  cd YDB-r1.30
+  ydb_distrib="https://gitlab.com/api/v4/projects/7957109/repository/tags"
+  ydb_tmpdir='tmpdir'
+  mkdir $ydb_tmpdir
+  wget -P $ydb_tmpdir ${ydb_distrib} 2>&1 1>${ydb_tmpdir}/wget_latest.log
+  ydb_version=`sed 's/,/\n/g' ${ydb_tmpdir}/tags | grep -E "tag_name|.pro.tgz" | grep -B 1 ".pro.tgz" | grep "tag_name" | sort -r | head -1 | cut -d'"' -f6`
+  git clone --depth 1 --branch $ydb_version https://gitlab.com/YottaDB/DB/YDB.git
+  cd YDB
   ```
 
   You should find this README, LICENSE, COPYING and CMakeLists.txt file and `sr_*` directories.
@@ -93,7 +98,7 @@ listed below. For example for Ubuntu Linux:
   cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
   make -j `grep -c ^processor /proc/cpuinfo`
   make install	# For known errors in this step and how to work around them, consult the FAQ section below
-  cd YDB-r1.30
+  cd yottadb_r*  # The latest release number will be seen in the directory name
   ```
 
   ### Build with Clang/LLVM
@@ -102,7 +107,7 @@ listed below. For example for Ubuntu Linux:
   cmake -D CMAKE_LINKER:PATH=/usr/bin/ld.lld -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
   make -j `grep -c ^processor /proc/cpuinfo`
   make install	# For known errors in this step and how to work around them, consult the FAQ section below
-  cd YDB-r1.30
+  cd yottadb_r*  # The latest release number will be seen in the directory name
   ```
 
   Note that the ```make install``` command above does not create the final installed YottaDB.
