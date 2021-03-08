@@ -95,8 +95,6 @@ echo "${COMMIT_IDS[@]}"
 
 echo "# Verify commits and copyrights"
 
-missing_files=""
-
 commit_list=""
 for id in $COMMIT_IDS
 do
@@ -120,22 +118,25 @@ do
 	fi
 done
 
-# Get file list from all commits at once, rather than per-commit
-filelist="$(git show --pretty="" --name-only $commit_list | sort -u)"
-
-for file in $filelist; do
-	# Deleted files don't need a copyright notice, hence -e check
-	if [ -e $file ] && $needs_copyright $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
-		# Print these out only at the end so they're all shown at once
-		missing_files="$missing_files $file"
-	fi
-done
-
-if [ -n "$missing_files" ]; then
-	echo "  --> Error: some files are missing a YottaDB Copyright notice and/or current year $curyear"
-	# Don't give duplicate errors for the same file
-	for file in $(echo $missing_files | tr ' ' '\n' | sort -u); do
-		echo "	$file"
+# First check if there is a non-zero list of commits to verify. If the commit list is empty, skip this verification step.
+if [ -n "$commit_list" ]; then
+	# Get file list from all commits at once, rather than per-commit
+	filelist="$(git show --pretty="" --name-only $commit_list | sort -u)"
+	missing_files=""
+	for file in $filelist; do
+		# Deleted files don't need a copyright notice, hence -e check
+		if [ -e $file ] && $needs_copyright $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
+			# Print these out only at the end so they're all shown at once
+			missing_files="$missing_files $file"
+		fi
 	done
-	exit 1
+	if [ -n "$missing_files" ]; then
+		echo "  --> Error: some files are missing a YottaDB Copyright notice and/or current year $curyear"
+		# Don't give duplicate errors for the same file
+		for file in $(echo $missing_files | tr ' ' '\n' | sort -u); do
+			echo "	$file"
+		done
+		exit 1
+	fi
 fi
+
