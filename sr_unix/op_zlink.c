@@ -37,8 +37,6 @@
 #endif
 #include "arlinkdbg.h"
 #include "relinkctl.h"
-#include "toktyp.h"		/* Needed for "valid_mname.h" */
-#include "valid_mname.h"
 
 typedef enum
 {
@@ -194,6 +192,13 @@ void op_zlink (mval *v, mval *quals)
 		(objnamelen - object_name_len) || memcmp(objnamebuf, object_file_name, objnamelen))
 	{	/* appear to have an object name that differs from the file name */
 		assert(MAX_MIDENT_LEN >= object_name_len);
+		if (2 <= object_name_len)
+		{
+			if (('o' == object_file_name[(object_name_len - 1)]) && ('.' == object_file_name[(object_name_len - 2)]))
+				object_name_len = object_name_len - 2;
+			if ((2 <= object_name_len) && ('m' == object_file_name[(object_name_len - 1)]) && ('.' == object_file_name[(object_name_len - 2)]))
+				object_name_len = object_name_len - 2;
+		}
 		objnamelen = object_name_len;
 		memcpy(objnamebuf, object_file_name, objnamelen);
 	}

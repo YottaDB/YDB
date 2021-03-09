@@ -158,17 +158,11 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 			clen = object_name_len - ci;
 			if (2 <= clen)
 			{
-				if ('o' != object_file_name[ci + --clen])
-					clen++;
-				else if ('.' != object_file_name[ci + --clen])
-					clen++;
-			}
-			if (2 <= clen)
-			{
-				if ('m' != object_file_name[ci + --clen])
-					clen++;
-				else if ('.' != object_file_name[ci + --clen])
-					clen++;
+
+				if (('o' == object_file_name[ci + (clen - 1)]) && ('.' == object_file_name[ci + (clen - 2)]))
+					clen = clen - 2;
+				if ((2 <= clen) && ('m' == object_file_name[ci + (clen - 1)]) && ('.' == object_file_name[ci + (clen - 2)]))
+					clen = clen - 2;
 			}
 			SET_OBJ(object_file_name, object_name_len);
 			clen = object_name_len = MIN(clen, MAX_MIDENT_LEN);
@@ -191,6 +185,16 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 	assert(!last || *srclen);
 	if (clen)
 	{
+		for (ci = object_name_len - 1; ci && ('/' != object_file_name[ci]); ci--)
+			;       /* scan back from end for rtn name & triggerness */
+		ci += ci ? 1 : 0;
+		if ((CLI_PRESENT != cli_present("OBJECT")) &&  (2 <= clen))
+		{
+			if (('o' == object_file_name[ci + (clen - 1)]) && ('.' == object_file_name[ci + (clen - 2)]))
+				clen = clen - 2;
+			if ((2 <= clen) && ('m' == object_file_name[ci + (clen - 1)]) && ('.' == object_file_name[ci + (clen - 2)]))
+				clen = clen - 2;
+		}
 		memcpy(module_name.addr, routine_name.addr, clen);
 		if ('_' == *routine_name.addr)
 			routine_name.addr[0] = '%';
