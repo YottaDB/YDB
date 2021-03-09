@@ -327,7 +327,6 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 				}
 				return status;
 			}
-			first_iter = FALSE;
 		}
 		incr_recs = rCnt;
 		incr_scans = 1;

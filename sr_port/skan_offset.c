@@ -3,6 +3,8 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -37,7 +39,6 @@ error_def(ERR_DSEINVALBLKID);
 
 sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 {
-	boolean_t	long_blk_id;
 	char		util_buff[MAX_UTIL_LEN];
 	int		tmp_cmpc;
 	long		blk_id_size;
@@ -49,14 +50,12 @@ sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 	if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER)
 	{
 #		ifdef BLK_NUM_64BIT
-		long_blk_id = TRUE;
 		blk_id_size = SIZEOF(block_id_64);
 #		else
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
 #		endif
 	} else
 	{
-		long_blk_id = FALSE;
 		blk_id_size = SIZEOF(block_id_32);
 	}
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)

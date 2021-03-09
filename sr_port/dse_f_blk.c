@@ -280,7 +280,6 @@ void dse_f_blk(void)
 				{
 #					ifdef BLK_NUM_64BIT
 					long_blk_id = TRUE;
-					blk_id_size = SIZEOF(block_id_64);
 #					else
 					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 							nocrit_present, cs_addrs, gv_cur_region);
@@ -290,7 +289,6 @@ void dse_f_blk(void)
 				} else
 				{
 					long_blk_id = FALSE;
-					blk_id_size = SIZEOF(block_id_32);
 				}
 				if (((blk_hdr_ptr_t)sp)->bsiz > cs_addrs->hdr->blk_size)
 					s_top = sp + cs_addrs->hdr->blk_size;
@@ -364,7 +362,6 @@ void dse_f_blk(void)
 					{
 #						ifdef BLK_NUM_64BIT
 						long_blk_id = TRUE;
-						blk_id_size = SIZEOF(block_id_64);
 #						else
 						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 								nocrit_present, cs_addrs, gv_cur_region);
@@ -374,7 +371,6 @@ void dse_f_blk(void)
 					} else
 					{
 						long_blk_id = FALSE;
-						blk_id_size = SIZEOF(block_id_32);
 					}
 					if (((blk_hdr_ptr_t)sp)->bsiz > cs_addrs->hdr->blk_size)
 						s_top = sp + cs_addrs->hdr->blk_size;
@@ -429,7 +425,6 @@ void dse_f_blk(void)
 				{
 #					ifdef BLK_NUM_64BIT
 					long_blk_id = TRUE;
-					blk_id_size = SIZEOF(block_id_64);
 #					else
 					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 							nocrit_present, cs_addrs, gv_cur_region);
@@ -439,7 +434,6 @@ void dse_f_blk(void)
 				} else
 				{
 					long_blk_id = FALSE;
-					blk_id_size = SIZEOF(block_id_32);
 				}
 				if (((blk_hdr_ptr_t)sp)->bsiz > cs_addrs->hdr->blk_size)
 					s_top = sp + cs_addrs->hdr->blk_size;
@@ -518,7 +512,6 @@ void dse_f_blk(void)
 					{
 #						ifdef BLK_NUM_64BIT
 						long_blk_id = TRUE;
-						blk_id_size = SIZEOF(block_id_64);
 #						else
 						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 								nocrit_present, cs_addrs, gv_cur_region);
@@ -528,7 +521,6 @@ void dse_f_blk(void)
 					} else
 					{
 						long_blk_id = FALSE;
-						blk_id_size = SIZEOF(block_id_32);
 					}
 					if (!(((blk_hdr_ptr_t)sp)->bsiz > cs_addrs->hdr->blk_size) &&
 							(SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)sp)->bsiz))

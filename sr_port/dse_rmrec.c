@@ -3,6 +3,8 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -61,7 +63,6 @@ void dse_rmrec(void)
 {
 	blk_segment	*bs1, *bs_ptr;
 	block_id	blk;
-	boolean_t	long_blk_id;
 	char		comp_key[MAX_KEY_SZ + 1];
 	int4		blk_seg_cnt, blk_size, count;
 	long		blk_id_size;
@@ -91,7 +92,6 @@ void dse_rmrec(void)
 	if (((blk_hdr_ptr_t)lbp)->bver > BLK_ID_32_VER)
 	{
 #		ifdef BLK_NUM_64BIT
-		long_blk_id = TRUE;
 		blk_id_size = SIZEOF(block_id_64);
 #		else
 		t_abort(gv_cur_region, cs_addrs);
@@ -100,7 +100,6 @@ void dse_rmrec(void)
 #		endif
 	} else
 	{
-		long_blk_id = FALSE;
 		blk_id_size = SIZEOF(block_id_32);
 	}
 	if (((blk_hdr_ptr_t)lbp)->bsiz > cs_addrs->hdr->blk_size)
