@@ -219,6 +219,14 @@ int f_select(oprtype *a, opctype op)
 				ref->operand[1] = put_tref(tmparg.oprval.tref->operand[0].oprval.tref);
 			}
 		}
+		if (!got_true)
+		{	/* jump to the end in case the run time value should turn out to be (the first) TRUE */
+			ref = newtriple(OC_JMP);
+			ref->operand[0] = endtrip;
+			INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
+			*cnd = put_tjmp(boolexprfinish2);
+			/* No need for INSERT_OC_JMP_BEFORE_OC_BOOLEXPRFINISH since OC_JMP has been inserted already above */
+		}
 		if (TK_COMMA != TREF(window_token))
 			break;
 		advancewindow();
@@ -231,12 +239,6 @@ int f_select(oprtype *a, opctype op)
 				savechain = &tmpchain;
 			throwing = TRUE;
 			continue;
-		}
-		if (OC_PASSTHRU == r->opcode)
-		{	/* Not the case where the 1st argument has both a literal Boolean and a literal result */
-			ref = newtriple(OC_JMP);		/* jump to end in case the value turns out to be (the first) TRUE */
-			ref->operand[0] = endtrip;
-			tnxtarg(cnd);
 		}
 	}
 	if (got_true)

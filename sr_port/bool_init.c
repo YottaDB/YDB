@@ -61,7 +61,7 @@ void	bool_init(void)
 	 */
 	ydb_max_boolexpr_nesting_depth = getenv("ydb_max_boolexpr_nesting_depth");
 	max_boolexpr_nesting_depth = (NULL != ydb_max_boolexpr_nesting_depth) ? atoi(ydb_max_boolexpr_nesting_depth) : 4;
-	//assert(max_boolexpr_nesting_depth > boolZysqlnull->boolexpr_nesting_depth);
+	assert(max_boolexpr_nesting_depth > boolZysqlnull->boolexpr_nesting_depth);
 #	endif
 	boolZysqlnull->frame_pointer = frame_pointer;
 	boolZysqlnull->booleval_in_prog = TRUE;
