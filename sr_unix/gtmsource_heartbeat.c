@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,6 +52,7 @@ GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	int			gtmsource_log_fd;
 GBLREF 	FILE			*gtmsource_log_fp;
 GBLREF  gtmsource_state_t       gtmsource_state;
+GBLREF	boolean_t		exit_handler_active;
 
 GBLDEF	boolean_t			heartbeat_stalled = TRUE;
 GBLDEF	repl_heartbeat_que_entry_t	*repl_heartbeat_que_head = NULL;
@@ -108,8 +109,13 @@ int gtmsource_init_heartbeat(void)
 	 * this code may have to be revisited. Also, modify the check in gtmsource_process (prev_now != (save_now = gtmsource_now))
 	 * to be something like (hearbeat_period < difftime((save_now = gtmsource_now), prev_now)). Vinaya 2003, Sep 08
 	 */
-	start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * (uint8)NANOSECS_IN_SEC, gtmsource_heartbeat_timer, SIZEOF(heartbeat_period),
-			&heartbeat_period); /* start_timer expects time interval in nanoseconds, heartbeat_period is in seconds */
+	if (!exit_handler_active)
+	{
+		start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * (uint8)NANOSECS_IN_SEC,
+			gtmsource_heartbeat_timer, SIZEOF(heartbeat_period), &heartbeat_period);
+			/* start_timer expects time interval in nanoseconds, heartbeat_period is in seconds */
+	}
+	/* else: We are already in exit processing. Do not start timers as it is unsafe (YDB#679). */
 	REPL_DPRINT4("Started heartbeat timer with %d s\tSource now is %ld\tTime now is %ld\n",
 			heartbeat_period, gtmsource_now, time(NULL));
 	heartbeat_stalled = FALSE;
