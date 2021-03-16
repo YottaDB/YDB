@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -194,7 +194,7 @@ static	boolean_t		promptanswer = TRUE;
 				assertpro(FALSE && lcl_ptr[0]);							\
 				break;										\
 		}												\
-	} while (lcl_ptr = STRTOK_R(NULL, ",", &strtok_ptr));							\
+	} while (NULL != (lcl_ptr = STRTOK_R(NULL, ",", &strtok_ptr)));						\
 }
 
 #define	COMMAND_BITMAP_TO_STR(COMMANDS, BITMAP, LEN)										\
@@ -258,7 +258,7 @@ static	boolean_t		promptanswer = TRUE;
 					assertpro(FALSE && lcl_ptr[0]);						\
 					break;									\
 			}											\
-		} while (lcl_ptr = STRTOK_R(NULL, ",", &strtok_ptr));						\
+		} while (NULL != (lcl_ptr = STRTOK_R(NULL, ",", &strtok_ptr)));					\
 }
 
 #define	OPTION_BITMAP_TO_STR(OPTIONS, BITMAP, LEN)								\
@@ -1403,10 +1403,28 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 			io_curr_device = io_save_device;
 		} else
 		{
+			char	*ptr;
+			uint4	len;
+
 			assert(memchr(trigjrec->str.addr, '\n', trigjrec->str.len) == trigjrecptr);
-			values[XECUTE_SUB] = trigjrecptr + 1;
-			value_len[XECUTE_SUB] = trigjrec->str.addr + trigjrec->str.len - (trigjrecptr + 1);
-			if ('\n' != values[XECUTE_SUB][value_len[XECUTE_SUB] - 1])
+			ptr = trigjrecptr + 1;
+			len = trigjrec->str.addr + trigjrec->str.len - ptr;
+			/* Allow for an optional trailing ">>" or ">>\n" in the xecute string that the user specifies. But remove
+			 * it (if present) before passing to "process_xecute()" as it would try to compile it as valid M code
+			 * and encounter an error.
+			 */
+			if ((XTENDED_STOP_LEN <= len) && !memcmp(ptr + len - XTENDED_STOP_LEN, XTENDED_STOP, XTENDED_STOP_LEN))
+			{
+				len -= XTENDED_STOP_LEN;
+			} else if ((XTENDED_STOP_LEN < len)
+				&& ('\n' == *(ptr + len - 1))
+				&& !memcmp(ptr + len - XTENDED_STOP_LEN - 1, XTENDED_STOP, XTENDED_STOP_LEN))
+			{
+				len -= XTENDED_STOP_LEN + 1;
+			}
+			values[XECUTE_SUB] = ptr;
+			value_len[XECUTE_SUB] = len;
+			if ('\n' != ptr[len - 1])
 			{
 				util_out_print_gtmio("Error : Multi-line xecute in $ztrigger ITEM must end in newline", FLUSH);
 				trig_stats[STATS_ERROR_TRIGFILE]++;
@@ -1426,9 +1444,8 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	{	/* If this is a not a multi-line xecute string, we dont expect newlines. The only exception is if it is
 		 * the last byte in the string.
 		 */
-		 assert(memchr(trigjrec->str.addr, '\n', trigjrec->str.len) == trigjrecptr);
-		 *trigjrecptr++;
-		if (trigjrecptr != (trigjrec->str.addr + trigjrec->str.len))
+		assert(memchr(trigjrec->str.addr, '\n', trigjrec->str.len) == trigjrecptr);
+		if (++trigjrecptr != (trigjrec->str.addr + trigjrec->str.len))
 		{
 			util_out_print_gtmio("Error : Newline allowed only inside multi-line xecute in $ztrigger ITEM", FLUSH);
 			trig_stats[STATS_ERROR_TRIGFILE]++;
