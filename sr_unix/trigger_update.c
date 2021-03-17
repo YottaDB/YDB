@@ -13,7 +13,15 @@
  *								*
  ****************************************************************/
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE		/* needed before including <string.h> for "strcasestr()" function (per man pages)
+				 * hence this is placed BEFORE all includes (including "mdef.h").
+				 */
+#endif
+
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #ifdef GTM_TRIGGER
 #include "gdsroot.h"			/* for gdsfhead.h */
@@ -1201,12 +1209,104 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	gvinit();
 	len = trigger_rec->str.len;
 	if (NULL == trigfile_device)
-	{	/* Check if this is a multi-line trigger. In that case, use just the first line for the below processing.
-		 * The rest of the lines will later be copied over into values[XECUTE_SUB].
-		 */
+	{	/* Check if this is a multi-line $ztrigger("item") specification */
 		trigjrecptr = memchr(trigger_rec->str.addr, '\n', len);
 		if (NULL != trigjrecptr)
+		{	/* Trigger definition has at least one newline in it. Check if it has a multi-line trigger specification */
+			char		*ptr, *top;
+			boolean_t	needs_reordering;
+
+			/* First check if the substring (XTENDED_STOP_NEWLINE) exists in the string and if it is
+			 * followed by a string other than an optional '\n' character. In that case, we need to do reordering.
+			 * Else we can skip the reordering.
+			 * We check for the XTENDED_STOP_NEWLINE substring by first checking for a '\n' character.
+			 * And if we find it, then we check for the substring at that offset.
+			 */
+			ptr = trigjrecptr;
+			top = trigger_rec->str.addr + len;
+			needs_reordering = FALSE;
+			/* Note: We cannot use "strstr()" as that expects a null terminated string which ptr is not.
+			 *       Hence the "for" loop below.
+			 */
+			for ( ; ; )
+			{
+				assert('\n' == *trigjrecptr);
+				if ((ptr + XTENDED_STOP_NEWLINE_LEN) > top)
+					break;
+				if (!memcmp(ptr, XTENDED_STOP_NEWLINE, XTENDED_STOP_NEWLINE_LEN))
+				{
+					ptr += XTENDED_STOP_NEWLINE_LEN;
+					/* If the XTENDED_STOP_NEWLINE string is followed only by an optional newline,
+					 * then there is no need to do any reordering. Otherwise there is.
+					 */
+					needs_reordering = ((ptr != top) && (((ptr + 1) != top) || ('\n' != *ptr)));
+					break;
+				}
+				ptr++;	/* Skip past \n */
+				/* Find next \n */
+				for ( ; ptr < top; ptr++)
+					if ('\n' == *ptr)
+						break;
+				if (ptr >= top)
+					break;
+			}
+			if (needs_reordering)
+			{	/* This is a multi-line trigger specification with non-trivial trailing string that needs to
+				 * be moved ahead of the "-xecute=<<" qualifier. So move any qualifiers specified after the
+				 * multi-line "-xecute" (e.g. "-pieces", "-delim" etc.) to before the "-xecute" as later code
+				 * in this function assumes no qualifiers follow "-xecute".
+				 * For example the multi-line trigger definition below gets changed (where \n stands for newline)
+				 *	From: +^SAMPLE -commands=S -xecute=<<\n w 123,!\n>>\n-name=abcd
+				 *	To  : +^SAMPLE -commands=S -name=abcd -xecute=<<\n w 123,!\n>>
+				 * To do that first we copy the string to the stringpool and allocate one more byte at the
+				 * end so it is null terminated (this lets use "strcasestr()"). This also guarantees us the
+				 * memory is read-write and so we can then safely proceed with moving the qualifiers around.
+				 */
+				int	tail_offset;
+				char	*xecute_ptr, *orig_ptr;
+
+				orig_ptr = trigger_rec->str.addr;
+				/* At this point, "ptr" points past the XTENDED_STOP_NEWLINE string */
+				tail_offset = ptr - orig_ptr;
+				ENSURE_STP_FREE_SPACE(len + 1);
+				memcpy(stringpool.free, orig_ptr, len);
+				ptr = (char *)stringpool.free;
+				ptr[len] = '\0';
+				stringpool.free += len + 1;
+				/* Need to use "strcasestr()" because "-xecute" specified by user is case insensitive */
+				xecute_ptr = strcasestr(ptr, XECUTE_MULTI_LINE);
+				/* Note that "needs_reordering" was based on searching for XTENDED_STOP_NEWLINE. Whereas
+				 * "xecute_ptr" is based on searching for XECUTE_MULTI_LINE. While the former usually
+				 * implies the latter, it might not necessarily be true in all cases hence the "if" check below.
+				 * If "xecute_ptr" is NULL, it means we found XTENDED_STOP_NEWLINE and decided there is likely
+				 * a need to reorder but did not find XECUTE_MULTI_LINE which is the second piece of information
+				 * needed to do the reorder. So cannot/should-not/need-not do any reordering.
+				 */
+				if (NULL != xecute_ptr)
+				{	/* Found XECUTE_STOP_NEWLINE. Do reordering. */
+					int	tail_len, xecute_len, xecute_offset;
+
+					xecute_offset = xecute_ptr - ptr;
+					assert(!memcmp(ptr + tail_offset - XTENDED_STOP_NEWLINE_LEN,
+							XTENDED_STOP_NEWLINE, XTENDED_STOP_NEWLINE_LEN));
+					/* Copy tail ahead of -xecute */
+					tail_offset--;	/* Back off newline character and replace it with space */
+					assert('\n' == ptr[tail_offset]);
+					tail_len = len - tail_offset;
+					memcpy(ptr + xecute_offset, orig_ptr + tail_offset, tail_len);
+					ptr[xecute_offset] = ' ';
+					/* Copy -xecute last */
+					xecute_len = len - tail_len - xecute_offset;
+					memcpy(ptr + xecute_offset + tail_len, orig_ptr + xecute_offset, xecute_len);
+				}
+				trigjrecptr = memchr(ptr, '\n', len);
+				trigger_rec->str.addr = ptr;
+			}
+			/* This is a multi-line $ztrigger("item") specification. In that case, use just the first line for
+			 * the below processing. The rest of the lines will later be copied over into values[XECUTE_SUB].
+			 */
 			len = trigjrecptr - trigger_rec->str.addr;
+		}
 	} else
 		assert(NULL == memchr(trigger_rec->str.addr, '\n', len));
 	if ((0 == len) || (COMMENT_LITERAL == *trigger_rec->str.addr))

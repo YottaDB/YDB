@@ -3,6 +3,8 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -72,6 +74,10 @@ typedef enum
 #define XTENDED_STOP		">>"
 #define XTENDED_START_LEN	STR_LIT_LEN(XTENDED_START)
 #define XTENDED_STOP_LEN	STR_LIT_LEN(XTENDED_STOP)
+
+#define	XTENDED_STOP_NEWLINE		"\n" XTENDED_STOP "\n"
+#define	XTENDED_STOP_NEWLINE_LEN	STR_LIT_LEN(XTENDED_STOP_NEWLINE)
+#define	XECUTE_MULTI_LINE		" -xecute=<<\n"
 
 #define	PUT_SUCCESS		0
 
