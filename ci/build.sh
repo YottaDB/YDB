@@ -2,7 +2,7 @@
 
 #################################################################
 #								#
-# Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -59,6 +59,7 @@ compare() {
 		# We do not want any failures in "diff" command below to exit the script (we want to see the actual diff a few steps later).
 		# So never count this step as failing even if the output does not match.
 		# NOTE: ignores trailing spaces, because clang-tidy outputs extra spaces but `sort_warnings.sh` strips them.
+		echo "# Running command : diff -Z $expected $actual >& differences.txt"
 		diff -Z "$expected" "$actual" &> differences.txt || true
 
 		if [ $(wc -l differences.txt | awk '{print $1}') -gt 0 ]; then
