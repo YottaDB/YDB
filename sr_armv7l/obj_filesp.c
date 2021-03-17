@@ -59,8 +59,8 @@
 
 /* Platform specific action instructions when routine called from foreign language. Returns -1 to caller */
 #define MIN_LINK_PSECT_SIZE     0
-LITDEF mach_inst jsb_action[JSB_ACTION_N_INS] = {0xe30f0fff, 0xe34f0fff, 0xe12fff1e};
 
+LITDEF mach_inst jsb_action[JSB_ACTION_N_INS] = {0xe30f0fff, 0xe34f0fff, 0xe12fff1e};
 
 GBLREF command_qualifier cmd_qlf;
 GBLREF unsigned char	object_file_name[];
@@ -81,17 +81,14 @@ static char static_string_tbl[] = {
 
 #define SPACE_STRING_ALLOC_LEN  (SIZEOF(static_string_tbl) +	\
 				 SIZEOF(YDB_LANG) +		\
-				 SIZEOF(GTM_PRODUCT) +		\
-				 SIZEOF(GTM_RELEASE_NAME) +	\
+				 SIZEOF(YDB_PRODUCT) +		\
+				 SIZEOF(YDB_RELEASE_NAME) +	\
 				 SIZEOF(mident_fixed))
 
 /* Following constants has to be in sync with above static string array(static_string_tbl) */
 #define STR_SEC_TEXT_OFFSET 1
 #define STR_SEC_STRTAB_OFFSET 7
 #define STR_SEC_SYMTAB_OFFSET 15
-
-LITREF char gtm_release_name[];
-LITREF int4 gtm_release_name_len;
 
 GBLREF mliteral 	literal_chain;
 GBLREF unsigned char 	source_file_name[];
@@ -102,7 +99,7 @@ GBLREF int4		mlmax, mvmax;
 GBLREF int4		code_size, lit_addrs, lits_size;
 GBLREF int4		psect_use_tab[];	/* bytes of each psect in this module */
 
-/* Open the object file and write out the gtm object. Actual ELF creation happens at later stage during close_object_file */
+/* Open the object file and write out the ydb object. Actual ELF creation happens at later stage during close_object_file */
 void create_object_file(rhdtyp *rhead)
 {
 	assert(!run_time);
@@ -151,11 +148,11 @@ void finish_object_file(void)
 	strEntrySize = SIZEOF(YDB_LANG);
 	memcpy((string_tbl + symIndex), YDB_LANG, strEntrySize);
 	symIndex += strEntrySize;
-	strEntrySize = SIZEOF(GTM_PRODUCT);
-	memcpy((string_tbl + symIndex), GTM_PRODUCT, strEntrySize);
+	strEntrySize = SIZEOF(YDB_PRODUCT);
+	memcpy((string_tbl + symIndex), YDB_PRODUCT, strEntrySize);
 	symIndex += strEntrySize;
-	strEntrySize = SIZEOF(GTM_RELEASE_NAME);
-	memcpy((string_tbl + symIndex), GTM_RELEASE_NAME, strEntrySize);
+	strEntrySize = SIZEOF(YDB_RELEASE_NAME);
+	memcpy((string_tbl + symIndex), YDB_RELEASE_NAME, strEntrySize);
 	symIndex += strEntrySize;
 	gtm_obj_code = (char *)malloc(bufSize);
 	/* At this point, we have only the GTM object written onto the file.
@@ -203,10 +200,10 @@ void finish_object_file(void)
 	ehdr->e_ident[EI_CLASS] = ELFCLASS32;
 	ehdr->e_ident[EI_VERSION] = EV_CURRENT;
 	ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
-	ehdr->e_ident[EI_OSABI] = ELFOSABI_SYSV;
+	ehdr->e_ident[EI_OSABI] = ELFOSABI_NONE;
 	ehdr->e_ident[EI_ABIVERSION] = 0;	/* No ABI version info defined for LINUX */
-	ehdr->e_type = ET_REL;
 	ehdr->e_machine = EM_ARM;
+	ehdr->e_type = ET_REL;
 	ehdr->e_version = EV_CURRENT;
 	ehdr->e_shoff = ROUND_UP2(SIZEOF(Elf32_Ehdr), SECTION_ALIGN_BOUNDARY);
 	ehdr->e_flags = EF_ARM_EABI_VER5;	/* Allows 32 bit executable to run under aarch64 */
@@ -236,7 +233,6 @@ void finish_object_file(void)
 	memset(&string_tbl[symIndex + module_name.len], '\0', SIZEOF(mident_fixed) - module_name.len);
 	/* Make sure we just zeroed to the end of the string table */
 	assert(SPACE_STRING_ALLOC_LEN == (symIndex + SIZEOF(mident_fixed)));
-
 	if (NULL == (strtab_scn = elf_newscn(elf)))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
 			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("elf_newscn() failed for strtab section"), CALLFROM);

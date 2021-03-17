@@ -58,8 +58,8 @@
 
 /* Platform specific action instructions when routine called from foreign language. Returns -1 to caller */
 #define MIN_LINK_PSECT_SIZE	0
-LITDEF mach_inst jsb_action[JSB_ACTION_N_INS] = {0x48, 0xc7, 0xc0, 0xff, 0xff, 0xff, 0xff, 0xc3};
 
+LITDEF mach_inst jsb_action[JSB_ACTION_N_INS] = {0x48, 0xc7, 0xc0, 0xff, 0xff, 0xff, 0xff, 0xc3};
 
 GBLREF command_qualifier cmd_qlf;
 GBLREF unsigned char	object_file_name[];
@@ -112,7 +112,6 @@ void create_object_file(rhdtyp *rhead)
 	 */
 	assert(JSB_ACTION_N_INS * SIZEOF(jsb_action[0]) == SIZEOF(jsb_action));	/* JSB_ACTION_N_INS maintained? */
 	assert(SIZEOF(jsb_action) <= SIZEOF(rhead->jsb));			/* Overflow check */
-
 	memcpy(rhead->jsb, (char *)jsb_action, SIZEOF(jsb_action));		/* Action instructions */
 	memcpy(&rhead->jsb[SIZEOF(jsb_action)], JSB_MARKER,			/* Followed by GTM_CODE marker */
 	       MIN(STR_LIT_LEN(JSB_MARKER), SIZEOF(rhead->jsb) - SIZEOF(jsb_action)));
@@ -200,7 +199,7 @@ void finish_object_file(void)
 	ehdr->e_ident[EI_CLASS] = ELFCLASS64;
 	ehdr->e_ident[EI_VERSION] = EV_CURRENT;
 	ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
-	ehdr->e_ident[EI_OSABI] = ELFOSABI_LINUX;
+	ehdr->e_ident[EI_OSABI] = ELFOSABI_NONE;
 	ehdr->e_ident[EI_ABIVERSION] = 0;	/* No ABI version info defined for LINUX */
 	ehdr->e_machine = EM_X86_64;
 	ehdr->e_type = ET_REL;

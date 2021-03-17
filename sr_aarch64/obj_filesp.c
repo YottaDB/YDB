@@ -114,7 +114,6 @@ void create_object_file(rhdtyp *rhead)
 	 */
 	assert(JSB_ACTION_N_INS * SIZEOF(jsb_action[0]) == SIZEOF(jsb_action));	/* JSB_ACTION_N_INS maintained? */
 	assert(SIZEOF(jsb_action) <= SIZEOF(rhead->jsb));			/* Overflow check */
-
   	memcpy(rhead->jsb, (char *)jsb_action, SIZEOF(jsb_action)); 		/* Action instructions */
 	memcpy(&rhead->jsb[SIZEOF(jsb_action)], JSB_MARKER,			/* Followed by GTM_CODE marker */
 	       MIN(STR_LIT_LEN(JSB_MARKER), SIZEOF(rhead->jsb) - SIZEOF(jsb_action)));
@@ -202,7 +201,7 @@ void finish_object_file(void)
 	ehdr->e_ident[EI_CLASS] = ELFCLASS64;
 	ehdr->e_ident[EI_VERSION] = EV_CURRENT;
 	ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
-	ehdr->e_ident[EI_OSABI] = ELFOSABI_SYSV;
+	ehdr->e_ident[EI_OSABI] = ELFOSABI_NONE;
 	ehdr->e_ident[EI_ABIVERSION] = 0;	/* No ABI version info defined for LINUX */
 	ehdr->e_machine = EM_AARCH64;
 	ehdr->e_type = ET_REL;
