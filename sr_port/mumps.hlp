@@ -18674,7 +18674,7 @@
    process, sends one XCRETNULLREF syslog message. If an external call sets a
    ydb_string length to a negative value, to protect the process, YottaDB turns
    any return with a negative length to an empty string value and, for the
-   first occurrence in a process, sends one XCCONVERT syslog message.
+   first occurrence in a process, sends one ZCCONVERT syslog message.
 
    libyottadb.h also includes definitions for the following entry points
    exported from libyottadb:
