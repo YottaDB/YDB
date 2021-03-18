@@ -52,7 +52,6 @@ GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	int			gtmsource_log_fd;
 GBLREF 	FILE			*gtmsource_log_fp;
 GBLREF  gtmsource_state_t       gtmsource_state;
-GBLREF	boolean_t		exit_handler_active;
 
 GBLDEF	boolean_t			heartbeat_stalled = TRUE;
 GBLDEF	repl_heartbeat_que_entry_t	*repl_heartbeat_que_head = NULL;
@@ -65,6 +64,19 @@ error_def(ERR_TEXT);
 
 static	int				heartbeat_period, heartbeat_max_wait;
 
+#define	START_GTMSOURCE_HEARTBEAT_TIMER_IF_NOT_EXITING								\
+{														\
+	GBLREF	boolean_t		exit_handler_active;							\
+														\
+	if (!exit_handler_active)										\
+	{													\
+		start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * (uint8)NANOSECS_IN_SEC,		\
+			gtmsource_heartbeat_timer, SIZEOF(heartbeat_period), &heartbeat_period);		\
+			/* start_timer expects time interval in nanoseconds, heartbeat_period is in seconds */	\
+	}													\
+	/* else: We are already in exit processing. Do not start timers as it is unsafe (YDB#679). */		\
+}
+
 void gtmsource_heartbeat_timer(TID tid, int4 interval_len, int *interval_ptr)
 {
 	assert(0 != gtmsource_now);
@@ -72,8 +84,7 @@ void gtmsource_heartbeat_timer(TID tid, int4 interval_len, int *interval_ptr)
 	gtmsource_now += heartbeat_period;			/* cannot use *interval_ptr on VMS */
 	REPL_DPRINT4("Repeating heartbeat timer with %d s\tSource now is %ld\tTime now is %ld\n", heartbeat_period,
 					gtmsource_now, time(NULL));
-	start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * (uint8)NANOSECS_IN_SEC, gtmsource_heartbeat_timer, SIZEOF(heartbeat_period),
-			&heartbeat_period); /* start_timer expects time interval in nanoseconds, heartbeat_period is in seconds */
+	START_GTMSOURCE_HEARTBEAT_TIMER_IF_NOT_EXITING;
 }
 
 int gtmsource_init_heartbeat(void)
@@ -109,13 +120,7 @@ int gtmsource_init_heartbeat(void)
 	 * this code may have to be revisited. Also, modify the check in gtmsource_process (prev_now != (save_now = gtmsource_now))
 	 * to be something like (hearbeat_period < difftime((save_now = gtmsource_now), prev_now)). Vinaya 2003, Sep 08
 	 */
-	if (!exit_handler_active)
-	{
-		start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * (uint8)NANOSECS_IN_SEC,
-			gtmsource_heartbeat_timer, SIZEOF(heartbeat_period), &heartbeat_period);
-			/* start_timer expects time interval in nanoseconds, heartbeat_period is in seconds */
-	}
-	/* else: We are already in exit processing. Do not start timers as it is unsafe (YDB#679). */
+	START_GTMSOURCE_HEARTBEAT_TIMER_IF_NOT_EXITING;
 	REPL_DPRINT4("Started heartbeat timer with %d s\tSource now is %ld\tTime now is %ld\n",
 			heartbeat_period, gtmsource_now, time(NULL));
 	heartbeat_stalled = FALSE;
@@ -147,7 +152,7 @@ boolean_t gtmsource_is_heartbeat_overdue(time_t *now, repl_heartbeat_msg_ptr_t o
 	double				time_elapsed;
 	unsigned char			seq_num_str[32], *seq_num_ptr;
 
-#ifndef REPL_DISABLE_HEARTBEAT
+#	ifndef REPL_DISABLE_HEARTBEAT
 	if (0 == earliest_sent_time ||
 	    (time_elapsed = difftime(*now, earliest_sent_time)) <= (double)heartbeat_max_wait)
 		return (FALSE);
@@ -168,9 +173,9 @@ boolean_t gtmsource_is_heartbeat_overdue(time_t *now, repl_heartbeat_msg_ptr_t o
 	insqt((que_ent_ptr_t)heartbeat_element, (que_ent_ptr_t)repl_heartbeat_free_head);
 
 	return (TRUE);
-#else
+#	else
 	return (FALSE);
-#endif
+#	endif
 }
 
 int gtmsource_send_heartbeat(time_t *now)
@@ -222,7 +227,8 @@ int gtmsource_send_heartbeat(time_t *now)
 #		endif
 		if (REPL_CONN_RESET(status))
 		{
-			repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while attempting to send heartbeat. Status = %d ; %s\n",
+			repl_log(gtmsource_log_fp, TRUE, TRUE,
+				"Connection reset while attempting to send heartbeat. Status = %d ; %s\n",
 					status, STRERROR(status));
 			repl_close(&gtmsource_sock_fd);
 			gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
