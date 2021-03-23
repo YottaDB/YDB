@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -96,7 +96,7 @@ sm_uc_ptr_t dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr_
 		util_len += i2hex_nofill(patch_rec_counter, (uchar_ptr_t)&util_buff[util_len], 4);
 		MEMCPY_LIT(&util_buff[util_len], "  Blk ");
 		util_len += SIZEOF("  Blk ") - 1;
-		util_len += i2hexl_nofill(blk, (uchar_ptr_t)&util_buff[util_len], 16);
+		util_len += i2hexl_nofill(blk, (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 		MEMCPY_LIT(&util_buff[util_len], "  Off ");
 		util_len += SIZEOF("  Off ") - 1;
 		util_len += i2hex_nofill((int)(rp - bp), (uchar_ptr_t)&util_buff[util_len], 4);
@@ -152,7 +152,7 @@ sm_uc_ptr_t dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr_
 			{
 				MEMCPY_LIT(util_buff, "Ptr ");
 				util_len = SIZEOF("Ptr ") - 1;
-				util_len += i2hexl_nofill(blk_id, (uchar_ptr_t)&util_buff[util_len], 16);
+				util_len += i2hexl_nofill(blk_id, (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 				MEMCPY_LIT(&util_buff[util_len], "  ");
 				util_len += SIZEOF("  ") - 1;
 				util_buff[util_len] = 0;

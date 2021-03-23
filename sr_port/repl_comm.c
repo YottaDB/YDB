@@ -390,12 +390,13 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 #			endif
 			if (0 == bytes_recvd)
 				save_errno = ECONNRESET;
-			if ((EINTR == save_errno) && !((WBTEST_ENABLED(WBTEST_FETCHCOMM_ERR)) ||
-				(WBTEST_ENABLED(WBTEST_FETCHCOMM_HISTINFO))))
+			if (EINTR == save_errno)
 			{
 				eintr_handling_check();
-				continue;
-			} else if (ETIMEDOUT == save_errno)
+				if(!((WBTEST_ENABLED(WBTEST_FETCHCOMM_ERR)) || (WBTEST_ENABLED(WBTEST_FETCHCOMM_HISTINFO))))
+					continue;
+			}
+			if (ETIMEDOUT == save_errno)
 			{
 				repl_log(stderr, TRUE, TRUE, "Communication subsystem warning: network may be down;"
 								" socket recv() returned ETIMEDOUT\n");		/* BYPASSOK(recv) */

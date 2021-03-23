@@ -39,7 +39,6 @@ void dollar_system_init(struct startup_vector *svec)
 	dollar_system.mvtype = MV_STR;
 	dollar_system.str.addr = (char *)stringpool.free;
 	dollar_system.str.len = STR_LIT_LEN("47,");
-	ENSURE_STP_FREE_SPACE(dollar_system.str.len);
 	memcpy(stringpool.free, "47,", dollar_system.str.len);
 	stringpool.free += dollar_system.str.len;
 	if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_SYSID, &tn, buf, SIZEOF(buf), IGNORE_ERRORS_FALSE, NULL)))

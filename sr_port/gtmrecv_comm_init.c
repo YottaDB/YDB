@@ -111,6 +111,9 @@ int gtmrecv_comm_init(in_port_t port)
 	if ((0 > BIND(gtmrecv_listen_sock_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen)) || (WBTEST_ENABLED(WBTEST_REPL_INIT_ERR)) )
 	{
 		save_errno = ERRNO;
+		GTM_WHITE_BOX_TEST(WBTEST_REPL_INIT_ERR, errno, 98);
+		SNPRINTF(err_buffer, 512, "Could not bind local address. Local Port : %hu", port);
+		SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_buffer));
 		freeaddrinfo(ai_ptr);
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,

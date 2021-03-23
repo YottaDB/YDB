@@ -58,16 +58,17 @@ GBLREF uint4			mu_int_adj[MAX_BT_DEPTH + 1];
 GBLREF sgmnt_data_ptr_t		cs_data;
 GBLREF tp_region		*grlist;
 GBLREF unsigned char		rdfail_detail;
-GBLDEF boolean_t mu_subsc	= FALSE;
-GBLDEF boolean_t mu_key		= MUKEY_FALSE;
-GBLDEF int mu_sub_idx_st	= 0;
-GBLDEF int mu_sub_idx_end	= 0;
-GBLDEF boolean_t null_coll_key	= FALSE;
 GBLREF boolean_t		null_coll_key;
 GBLREF gv_key			*mu_start_key;
 GBLREF gv_key			*mu_end_key;
 GBLREF int			mu_start_keyend;
 GBLREF int			mu_end_keyend;
+
+GBLDEF boolean_t mu_subsc	= FALSE;
+GBLDEF boolean_t mu_key		= MUKEY_FALSE;
+GBLDEF int mu_sub_idx_st	= 0;
+GBLDEF int mu_sub_idx_end	= 0;
+GBLDEF boolean_t null_coll_key	= FALSE;
 
 typedef struct {
 	enum {arsample, scan, impsample}	heuristic;

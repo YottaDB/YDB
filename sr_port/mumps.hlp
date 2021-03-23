@@ -20160,7 +20160,7 @@
    sequence. The syntax of this routine is:
 
    #include "gtm_descript.h"
-   long gtm_ac_xutil (gtm32_descriptor *in, int level, gtm32_descriptor *out, int *outlen, int op, int honor_numeric)
+   long gtm_ac_xutil(gtm32_descriptor *in, int level, gtm32_descriptor *out, int *outlen, int op, int honor_numeric)
 
 4 Input_Arguments
    Input Arguments

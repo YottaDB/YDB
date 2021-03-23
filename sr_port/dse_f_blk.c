@@ -201,7 +201,7 @@ void dse_f_blk(void)
 							memcpy(util_buff, "	", 1);
 							util_len = 1;
 							util_len += i2hexl_nofill(patch_path[count],
-								(uchar_ptr_t)&util_buff[util_len], 16);
+								(uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 							memcpy(&util_buff[util_len], ":", 1);
 							util_len += 1;
 							util_len += i2hex_nofill(patch_offset[count],
