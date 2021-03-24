@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  * 								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,7 @@ static readonly CLI_ENTRY mumps_qual[] = {
 { "LIST", 		0, 0, 0, 0, 0, 0, VAL_NOT_REQ, 	  1, NEG, 	VAL_STR, 0},
 { "MACHINE_CODE", 	0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, 	VAL_N_A, 0},
 { "NAMEOFRTN",		0, 0, 0, 0, 0, 0, VAL_REQ,	  1, NON_NEG,	VAL_STR, 0},
-{ "OBJECT", 		0, 0, 0, 0, 0, 0, VAL_NOT_REQ, 	  1, NEG, 	VAL_STR, 0},
+{ "OBJECT", 		0, 0, 0, 0, 0, 0, VAL_REQ, 	  1, NEG, 	VAL_STR, 0},
 { "RUN", 		0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, 	VAL_N_A, 0},
 { "SPACE", 		0, 0, 0, 0, 0, 0, VAL_REQ, 	  1, NON_NEG, 	VAL_NUM, 0},
 { "VERSION", 		0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, 	VAL_N_A, 0},
