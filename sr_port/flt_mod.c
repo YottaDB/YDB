@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001 Sanchez Computer Associates, Inc.		*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,24 +80,24 @@ void	flt_mod(mval *u, mval *v, mval *q)
 		promote(&w);
 	exp = w.e;
 	if (exp <= MV_XBIAS)
-	{
-		/* Magnitude of w, floor(u/v), is < 1.  */
+	{	/* Magnitude of w, floor(u/v), is < 1.  */
 		if (u->sgn != v->sgn  &&  w.m[1] != 0  &&  exp >= EXPLO)
-		{
-			/* Signs differ (=> floor(u/v) < 0) and (w != 0) and (no underflow) => floor(u/v) == -1 */
+		{	/* Signs differ (=> floor(u/v) < 0) and (w != 0) and (no underflow) => floor(u/v) == -1 */
 			w.sgn = 1;
 			w.e = MV_XBIAS + 1;
 			w.m[1] = MANT_LO;
 			w.m[0] = 0;
-		}
-		else
-		{
-			/* Signs same (=> floor(u/v) >= 0) or (w == 0) or (underflow) => floor(u/v) == 0 */
+		} else
+		{	/* Signs same (=> floor(u/v) >= 0) or (w == 0) or (underflow) => floor(u/v) == 0 */
 			*q = *u_orig;	/* u - floor(u/v)*v == u - 0*v == u */
+			/* Clear any bits other than MV_NM/MV_INT in result (e.g. MV_STR, MV_NUM_APPROX).
+			 * If "u_orig" had MV_NUM_APPROX bit set, we do not want to inherit it in the result which should
+			 * purely be a numeric value.
+			 */
+			q->mvtype &= MV_NUM_MASK;
 			return;
 		}
-	}
-	else if (exp < EXP_IDX_BIAL)
+	} else if (exp < EXP_IDX_BIAL)
 	{
 		z = ten_pwr[EXP_IDX_BIAL - exp];
 		x = (w.m[1]/z)*z;
@@ -111,14 +111,12 @@ void	flt_mod(mval *u, mval *v, mval *q)
 				w.m[1] /= 10;
 				w.e++;
 			}
-		}
-		else
+		} else
 		{
 			w.m[0] = 0;
 			w.m[1] = x;
 		}
-	}
-	else if (exp < EXP_IDX_BIAQ)
+	} else if (exp < EXP_IDX_BIAQ)
 	{
 		z = ten_pwr[EXP_IDX_BIAQ - exp];
 		x = (w.m[0]/z)*z;
