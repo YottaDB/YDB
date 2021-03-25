@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -845,6 +845,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
  */
 void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 {
+	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -852,12 +853,16 @@ void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 	 * assertpro() instead.
 	 */
 	assertpro(frame_pointer->type & SFT_TRIGR);
+	DEFER_INTERRUPTS(INTRPT_IN_FRAME_POINTER_NULL, prev_intrpt_state);
 	TREF(trig_forced_unwind) = forced_unwind;	/* used by "op_unwind" */
 	/* Unwind the trigger base frame */
 	op_unwind();
+	/* Note: "frame_pointer" can be NULL at this point hence the need for the surrounding DEFER_INTERRUPTS/ENABLE_INTERRUPTS */
 	assert(FALSE == TREF(trig_forced_unwind));	/* should have been reset by "op_unwind" */
 	/* restore frame_pointer stored at msp (see base_frame.c) */
         frame_pointer = *(stack_frame**)msp;
+	assert(NULL != frame_pointer);
+	ENABLE_INTERRUPTS(INTRPT_IN_FRAME_POINTER_NULL, prev_intrpt_state);
 	msp += SIZEOF(stack_frame *);           /* Remove frame save pointer from stack */
 	/* Remove the "do not return to me". Note this flag may have already been turned off by an earlier tp_restart if
 	 * this is not an implicit_tstart situation. Note we must ALWAYS turn this flag back off here because we're the

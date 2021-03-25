@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,6 +89,9 @@ typedef enum
 	INTRPT_IN_JNL_QIO,		/* Deferring interrupts in journal qio, replacing jnl_qio_in_prog. */
 	INTRPT_IN_MLK_CLEANUP,		/* Deferring interrupts around lock table cleanup code */
 	INTPRT_IN_DO_GETADDRINFO,	/* Deferring interrupts around getaddrinfo() while in dogetaddrinfo() */
+	INTRPT_IN_FRAME_POINTER_NULL,	/* Deferring interrupts around code that can temporarily set "frame_pointer" to NULL
+					 * so that "ydb_exit()" does not see a NULL frame_pointer as part of handling a SIG-15.
+					 */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 

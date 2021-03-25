@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -270,13 +270,18 @@ STATICFNDEF void receive_child_locals_init(char **local_buff, mval **command_str
 
 STATICFNDEF void receive_child_locals_finalize(char **local_buff)
 {
-	int i;
+	int			i;
+	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	DEFER_INTERRUPTS(INTRPT_IN_FRAME_POINTER_NULL, prev_intrpt_state);
 	/* Unwind the base frame */
 	op_unwind();
+	/* Note: "frame_pointer" can be NULL at this point hence the need for the surrounding DEFER_INTERRUPTS/ENABLE_INTERRUPTS */
 	frame_pointer = *(stack_frame**)msp;
+	assert(NULL != frame_pointer);
+	ENABLE_INTERRUPTS(INTRPT_IN_FRAME_POINTER_NULL, prev_intrpt_state);
 	msp += SIZEOF(stack_frame *);           /* Remove frame save pointer from stack */
 	free(*local_buff);
 	free((TREF(source_buffer)).addr);
