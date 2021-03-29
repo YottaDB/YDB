@@ -835,21 +835,22 @@ if [ "Y" = $ydb_posix ] ; then
 	. ${ydb_installdir}/ydb_env_set
 	mkdir posix_tmp
 	cd posix_tmp
-	curl -fSsLO https://gitlab.com/YottaDB/Util/YDBPosix/-/archive/master/YDBPosix-master.tar.gz
-	tar xzf YDBPosix-master.tar.gz
-	cd YDBPosix-master
-	mkdir build && cd build
-	cmake ..
-	make -j `grep -c ^processor /proc/cpuinfo` && sudo make install
-	# Get the exit code for the make command to save the build directory if it is an error (not 0)
-	status=$?
-	cd ../../..
-	. ${ydb_installdir}/ydb_env_unset
-	if [ "0" = $status ] ; then
-		sudo rm -R posix_tmp
+	if curl -fSsLO https://gitlab.com/YottaDB/Util/YDBPosix/-/archive/master/YDBPosix-master.tar.gz; then
+		tar xzf YDBPosix-master.tar.gz
+		cd YDBPosix-master
+		mkdir build && cd build
+		cmake ..
+		if make -j `grep -c ^processor /proc/cpuinfo` && sudo make install; then
+			# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
+			cd ../../..
+			. ${ydb_installdir}/ydb_env_unset
+			sudo rm -R posix_tmp
+		else
+			echo "POSIX plugin build failed. The build directory ($PWD/posix_tmp) has been saved."
+			remove_tmpdir=0
+		fi
 	else
-		echo "POSIX plugin build failed. The build directory ($PWD/posix_tmp) has been saved."
-		remove_tmpdir=0
+		echo "POSIX plugin build failed. Unable to download the POSIX plugin. Your internet connection and/or the gitlab servers may be down. Please try again later."
 	fi
 fi
 
@@ -860,11 +861,9 @@ if [ "Y" = $ydb_encplugin ] ; then
 	cd enc_tmp
 	sudo tar -xf ${ydb_installdir}/plugin/gtmcrypt/source.tar
 	sudo ydb_dist=${ydb_installdir} make -j `grep -c ^processor /proc/cpuinfo`
-	sudo ydb_dist=${ydb_installdir} make install
-	# Get the exit code for the make command to save the build directory if it is an error (not 0)
-	status=$?
-	cd ..
-	if [ "0" = $status ] ; then
+	if sudo ydb_dist=${ydb_installdir} make install; then
+		# Save the build directory if the make install command returns a non-zero exit code. Otherwise, remove it.
+		cd ..
 		sudo rm -R enc_tmp
 	else
 		echo "Encryption plugin build failed. The build directory ($PWD/enc_tmp) has been saved."
@@ -880,62 +879,62 @@ if [ "Y" = $ydb_zlib ] ; then
 	. ${ydb_installdir}/ydb_env_set
 	mkdir zlib_tmp
 	cd zlib_tmp
-	curl -fSsLO https://gitlab.com/YottaDB/Util/YDBZlib/-/archive/master/YDBZlib-master.tar.gz
-	tar xzf YDBZlib-master.tar.gz
-	cd YDBZlib-master
-	gcc -c -fPIC -I${ydb_installdir} gtmzlib.c
-	gcc -o libgtmzlib.so -shared gtmzlib.o
-	# Get the exit code for the make command to save the build directory if it is an error (not 0)
-	status=$?
-	sudo cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
-	sudo cp _ZLIB.m ${ydb_installdir}/plugin/r
-	${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
-	if [ "Y" = $ydb_utf8 ] ; then
-		if [ "default" = "$ydb_icu_version" ] ; then
-			ydb_icu_version=`pkg-config --modversion icu-io`
+	if curl -fSsLO https://gitlab.com/YottaDB/Util/YDBZlib/-/archive/master/YDBZlib-master.tar.gz; then
+		tar xzf YDBZlib-master.tar.gz
+		cd YDBZlib-master
+		if gcc -c -fPIC -I${ydb_installdir} gtmzlib.c && gcc -o libgtmzlib.so -shared gtmzlib.o; then
+			# Save the build directory if either of the gcc commands return a non-zero exit code. Otherwise, remove it.
+			sudo cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
+			sudo cp _ZLIB.m ${ydb_installdir}/plugin/r
+			${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
+			if [ "Y" = $ydb_utf8 ] ; then
+				if [ "default" = "$ydb_icu_version" ] ; then
+					ydb_icu_version=`pkg-config --modversion icu-io`
+				fi
+				mkdir utf8
+				cd utf8
+				export ydb_chset="UTF-8"
+				. ${ydb_installdir}/utf8/ydb_env_set
+				${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
+				sudo cp _ZLIB.o ${ydb_installdir}/plugin/o/utf8
+				. ${ydb_installdir}/ydb_env_unset
+				cd ..
+			fi
+			sudo cp _ZLIB.o ${ydb_installdir}/plugin/o
+			. ${ydb_installdir}/ydb_env_unset
+			cd ../..
+			sudo rm -R zlib_tmp
+		else
+			echo "zlib plugin build failed. The build directory ($PWD/zlib_tmp) has been saved."
+			remove_tmpdir=0
 		fi
-		mkdir utf8
-		cd utf8
-		export ydb_chset="UTF-8"
-		. ${ydb_installdir}/utf8/ydb_env_set
-		${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
-		sudo cp _ZLIB.o ${ydb_installdir}/plugin/o/utf8
-		. ${ydb_installdir}/ydb_env_unset
-		cd ..
-	fi
-	sudo cp _ZLIB.o ${ydb_installdir}/plugin/o
-	. ${ydb_installdir}/ydb_env_unset
-	cd ../..
-	if [ "0" = $status ]; then
-		sudo rm -R zlib_tmp
 	else
-		echo "zlib plugin build failed. The build directory ($PWD/zlib_tmp) has been saved."
-		remove_tmpdir=0
+		echo "zlib plugin build failed. Unable to download the zlib plugin. Your internet connection and/or the gitlab servers may be down. Please try again later."
 	fi
 fi
 
 if [ "Y" = $ydb_octo ] ; then
 	cd $tmpdir	# Get back to top level temporary directory as the current directory for ydb_env_set
 	export ydb_dist=${ydb_installdir}
-	git clone https://gitlab.com/YottaDB/DBMS/YDBOcto YDBOcto-master
-	cd YDBOcto-master
-	mkdir build
-	cd build
-	if [ "rhel" = "${osid}" -o "centos" = "${osid}" -o "sles" = "${osid}" ] ; then
-		cmake3 ${octo_cmake} ..
+	if git clone https://gitlab.com/YottaDB/DBMS/YDBOcto YDBOcto-master; then
+		cd YDBOcto-master
+		mkdir build
+		cd build
+		if [ "rhel" = "${osid}" -o "centos" = "${osid}" -o "sles" = "${osid}" ] ; then
+			cmake3 ${octo_cmake} ..
+		else
+			cmake ${octo_cmake} ..
+		fi
+		if make -j `grep -c ^processor /proc/cpuinfo` && sudo -E make install; then
+			# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
+			cd ../..
+			sudo rm -R YDBOcto-master
+		else
+			echo "Octo build failed. The build directory ($PWD/YDBOcto-master) and the tarball ($PWD/YDBOcto-master.tar.gz) have been saved."
+			remove_tmpdir=0
+		fi
 	else
-		cmake ${octo_cmake} ..
-	fi
-	make -j `grep -c ^processor /proc/cpuinfo`
-	sudo -E make install
-	# Get the exit code for the make command to save the build directory if it is an error (not 0)
-	status=$?
-	cd ../..
-	if [ "0" = $status ] ; then
-		sudo rm -R YDBOcto-master
-	else
-		echo "Octo build failed. The build directory ($PWD/YDBOcto-master) and the tarball ($PWD/YDBOcto-master.tar.gz) have been saved."
-		remove_tmpdir=0
+		echo "Octo build failed. Unable to download Octo. Your internet connection and/or the gitlab servers may be down. Please try again later."
 	fi
 fi
 
