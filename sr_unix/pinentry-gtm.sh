@@ -4,7 +4,7 @@
 # Copyright (c) 2010-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -27,10 +27,10 @@ punt=1
 
 if [ -z "$ydb_dist" ] ; then
 	# $ydb_dist is not set in the environment. See if we can use dirname to find one
-	if [ "`echo $ydb_chset | tr utf UTF`" = "UTF-8" -a -x "$dir/../../utf8/mumps" ] ; then
+	if [ "`echo $ydb_chset | tr utf UTF`" = "UTF-8" ] && [ -x "$dir/../../utf8/mumps" ] ; then
 		ydb_dist=$dir/../../utf8
 		export ydb_dist
-	elif [ "`echo $gtm_chset | tr utf UTF`" = "UTF-8" -a -x "$dir/../../utf8/mumps" ] ; then
+	elif [ "`echo $gtm_chset | tr utf UTF`" = "UTF-8" ] && [ -x "$dir/../../utf8/mumps" ] ; then
 		ydb_dist=$dir/../../utf8
 		export ydb_dist
 	elif [ -x "$dir/../../mumps" ] ; then
@@ -40,14 +40,14 @@ if [ -z "$ydb_dist" ] ; then
 	fi
 fi
 
-if [ [-n "$ydb_passwd" -o -n "$gtm_passwd"] -a -x "$ydb_dist/mumps" ] ; then
+if { [ -n "$ydb_passwd" ] || [ -n "$gtm_passwd" ]; } && [ -x "$ydb_dist/mumps" ] ; then
 	pinentry=pinentry
 	# Password and MUMPS exists, perform some extended setup checks
-	if [ [ -z "$ydb_routines" ] -a [ -z "$gtmroutines" ] ] ; then
+	if [ -z "$ydb_routines" ] && [ -z "$gtmroutines" ] ; then
 		utfodir=""
-		if [ "`echo $ydb_chset | tr utf UTF`" = "UTF-8" -a -x "$dir/../../utf8/mumps" ] ; then
+		if [ "`echo $ydb_chset | tr utf UTF`" = "UTF-8" ] && [ -x "$dir/../../utf8/mumps" ] ; then
 			utfodir="/utf8"
-		elif [ "`echo $gtm_chset | tr utf UTF`" = "UTF-8" -a -x "$dir/../../utf8/mumps" ] ; then
+		elif [ "`echo $gtm_chset | tr utf UTF`" = "UTF-8" ] && [ -x "$dir/../../utf8/mumps" ] ; then
 			utfodir="/utf8"
 		fi
 		# $ydb_routines & $gtmroutines is not set in the environment, attempt to pick it up from libyottadbutil.so,
@@ -66,13 +66,17 @@ if [ [-n "$ydb_passwd" -o -n "$gtm_passwd"] -a -x "$ydb_dist/mumps" ] ; then
 	fi
 
 	# Protect the pinentry program from other env vars (unsetenv both ydb* and corresponding gtm* names)
-	ydb_env_translate= ydb_etrap= ydb_local_collate= ydb_sysid= ydb_trace_gbl_name= ydb_zdate_form= ydb_zstep= ydb_ztrap_form=code ydb_zyerror= ydb_compile= ydb_dbglvl= LD_PRELOAD=	#BYPASSOKLENGTH
+	# Note: export of an undefined variable has no effect. It does not set the variable.
+	unset ydb_env_translate ydb_etrap ydb_local_collate ydb_sysid ydb_trace_gbl_name ydb_zdate_form ydb_zstep ydb_zyerror ydb_compile ydb_dbglvl LD_PRELOAD	#BYPASSOKLENGTH
+	ydb_ztrap_form=code
 	export ydb_env_translate ydb_etrap ydb_local_collate ydb_sysid ydb_trace_gbl_name ydb_zdate_form ydb_zstep ydb_ztrap_form ydb_zyerror ydb_compile ydb_dbglvl LD_PRELOAD		#BYPASSOKLENGTH
-	gtm_env_translate= gtm_etrap= gtm_local_collate= gtm_sysid= gtm_trace_gbl_name= gtm_zdate_form= gtm_zstep= gtm_ztrap_form=code gtm_zyerror= gtmcompile= gtmdbglvl= LD_PRELOAD=	#BYPASSOKLENGTH
+	unset gtm_env_translate gtm_etrap gtm_local_collate gtm_sysid gtm_trace_gbl_name gtm_zdate_form gtm_zstep gtm_zyerror gtmcompile gtmdbglvl LD_PRELOAD	#BYPASSOKLENGTH
+	gtm_ztrap_form=code
 	export gtm_env_translate gtm_etrap gtm_local_collate gtm_sysid gtm_trace_gbl_name gtm_zdate_form gtm_zstep gtm_ztrap_form gtm_zyerror gtmcompile gtmdbglvl LD_PRELOAD		#BYPASSOKLENGTH
 
 	# Validate ydb_routines. Redirect output or it will affect the password protocol
-	printf 'zhalt (0=$zlength($text(pinentry^'$pinentry')))' | $ydb_dist/mumps -direct >> /dev/null 2>&1
+	# shellcheck disable=2016
+	printf "%s" 'zhalt (0=$zlength($text(pinentry^'$pinentry')))' | $ydb_dist/mumps -direct >> /dev/null 2>&1
 	needsprivroutines=$?
 
 	if [ 0 -ne "${needsprivroutines}" ] ; then
@@ -83,8 +87,7 @@ if [ [-n "$ydb_passwd" -o -n "$gtm_passwd"] -a -x "$ydb_dist/mumps" ] ; then
 		else
 			tmpdir=/tmp/`basename $0`_$$.tmp ; mkdir $tmpdir
 		fi
-		trapstr="rm -rf $tmpdir"
-		trap "$trapstr" HUP INT QUIT TERM TRAP
+		trap 'rm -rf $tmpdir' HUP INT QUIT TERM TRAP
 		pinentry_in="$dir"
 		if [ -e "$ydb_dist/plugin/r/pinentry.m" ] ; then pinentry_in="$pinentry_in $ydb_dist/plugin/r"; fi
 		if [ -e "$ydb_dist/plugin/gtmcrypt/pinentry.m" ] ; then pinentry_in="$pinentry_in $ydb_dist/plugin/gtmcrypt"; fi
@@ -100,5 +103,5 @@ fi
 if [ 0 -ne $punt ] ;then
 	# Punt to the regular pinentry program
 	pinentry=`which pinentry 2>/dev/null`
-	if [ -x "$pinentry" ] ; then $pinentry $* ; else exit 1 ; fi
+	if [ -x "$pinentry" ] ; then $pinentry "$@" ; else exit 1 ; fi
 fi

@@ -1,6 +1,9 @@
+#!/bin/sh
 #################################################################
 #								#
 #	Copyright 2001, 2013 Fidelity Information Services, Inc	#
+#								#
+# Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -13,12 +16,12 @@ export SHELL
 ext=.m
 curdir=`pwd`
 utf8=`basename $curdir`
-for i in $*
+for i in "$@"
 do
 	base=`basename $i $ext`
 	if test $i != $base
 	then {
-		newf=`echo $base | tr '[A-Z]' '[a-z]'`
+		newf=`echo $base | tr '[:upper:]' '[:lower:]'`
 		if test $base != $newf
 		then {
 			dir=`dirname $i`

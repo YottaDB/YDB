@@ -4,6 +4,8 @@
 # Copyright (c) 2010-2015 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
+# Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	#
+#								#
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
 #       under a license.  If you do not know the terms of       #
@@ -57,9 +59,9 @@ case $1 in
     [0-2]) random_strength=$1 ;;
 esac
 
-while [ $random_strength -lt 0 -o $random_strength -gt 2 ] ; do
+while [ $random_strength -lt 0 ] || [ $random_strength -gt 2 ] ; do
     $ECHO $ECHO_OPTIONS "Please enter a preferred strength for the key (0/1/2/[?]):" \\c
-    read random_strength
+    read -r random_strength
     case "$random_strength" in
 	[0-2]) ;;
 	*)  random_strength=3

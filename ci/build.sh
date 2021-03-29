@@ -20,12 +20,20 @@ set -o pipefail
 export LC_ALL=C
 
 echo "# Randomly choose to build Debug or Release build"
-if [[ $(( $RANDOM % 2)) -eq 0 ]]; then
+if [[ $(( RANDOM % 2)) -eq 0 ]]; then
 	build_type="Debug"
 else
 	build_type="RelWithDebInfo"
 fi
 echo " -> build_type = $build_type"
+
+echo "# Run shellcheck on all scripts"
+if [ -x "$(command -v shellcheck)" ]; then
+	find .. -name build -prune -o -name '*.sh' -print0 | xargs -0 shellcheck -e SC1091,SC2154,SC1090,SC2086,SC2053,SC2046,SC2006,SC2164
+else
+	echo " -> Shellcheck not found!"
+	exit 1
+fi
 
 echo "# Run the build using clang"
 mkdir build
@@ -51,6 +59,7 @@ fi
 ../../ci/sort_warnings.sh make_warnings.txt
 
 # This is used for both `make` and `clang-tidy` warnings.
+# It should be run from the warnings/ directory.
 compare() {
 	expected="$1"
 	actual="$2"

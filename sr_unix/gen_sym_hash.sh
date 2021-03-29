@@ -4,6 +4,8 @@
 # Copyright (c) 2010-2015 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
+# Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	#
+#								#
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
 #       under a license.  If you do not know the terms of       #
@@ -63,11 +65,10 @@ elif [ -x "`$which gpg 2>&1`" ] ; then gpg=gpg
 else  $ECHO "Able to find neither gpg nor gpg2.  Exiting" ; exit 1 ; fi
 
 # Get passphrase for GnuPG keyring
-$ECHO $ECHO_OPTIONS Passphrase for keyring: \\c ; stty -echo ; read passphrase ; stty echo ; $ECHO ""
+$ECHO $ECHO_OPTIONS Passphrase for keyring: \\c ; stty -echo ; read -r passphrase ; stty echo ; $ECHO ""
 
 $ECHO $passphrase | $gpg --no-tty --batch --passphrase-fd 0 -d $encrypted_key_file | \
 	cat - $tmp_file | $gpg --print-md SHA512 | tr -d ' \n'
 $ECHO
 
 rm -f $tmp_file
-

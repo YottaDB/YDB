@@ -4,6 +4,8 @@
 # Copyright (c) 2010-2015 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
+# Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	#
+#								#
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
 #       under a license.  If you do not know the terms of       #
@@ -66,7 +68,7 @@ shift 3
 comment="$*" ; if [ -z "$comment" ] ; then comment="$output_file created from $input_file for $recipient by $USER `date -u`" ; fi
 
 # Get passphrase for GnuPG keyring
-$ECHO $ECHO_OPTIONS Passphrase for keyring: \\c ; stty -echo ; read passphrase ; stty echo ; $ECHO ""
+$ECHO $ECHO_OPTIONS Passphrase for keyring: \\c ; stty -echo ; read -r passphrase ; stty echo ; $ECHO ""
 
 # Yes, providing the passphrase on the command line to the second gpg command is not ideal, but that
 # is the best we can do with this reference implementation.  Otherwise it must prompt twice.

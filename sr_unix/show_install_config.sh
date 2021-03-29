@@ -3,7 +3,7 @@
 #								#
 # Copyright 2012 Fidelity Information Services, Inc		#
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -31,9 +31,11 @@ base_libname="libgtmcrypt"
 generic_libname=$base_libname$ext
 if [ "x" != x"$ydb_crypt_plugin" ]; then
 	shared_object="$ydb_dist/plugin/$ydb_crypt_plugin"
+	# shellcheck disable=SC2016
 	txt='$ydb_crypt_plugin'
 elif [ "x" != x"$gtm_crypt_plugin" ]; then
 	shared_object="$ydb_dist/plugin/$gtm_crypt_plugin"
+	# shellcheck disable=SC2016
 	txt='$gtm_crypt_plugin'
 else
 	shared_object="$ydb_dist/plugin/$generic_libname"
@@ -44,13 +46,14 @@ if [ ! -f $shared_object ] ; then
 	exit 1
 fi
 # Obtain the symbolic link (if any)
-link=`ls -l $shared_object | awk '{print $NF}'`
+# NOTE: this does not canonicalize the link, it is only followed once
+link=`readlink $shared_object`
 # Get rid of the prefix (any path associated with the link) and the extension
 basepart=`echo $link | awk -F/ '{print $NF}' | sed 's/'"$ext"'$//'`
 # Resulting $basepart should be of form -- A_B_C
 encryption_lib=`echo $basepart | cut -f2 -d'_'`
 algorithm=`echo $basepart | cut -f3 -d'_'`
-if [ "$encryption_lib" = "$algorithm" -o "" = "$algorithm" ] ; then
+if [ "$encryption_lib" = "$algorithm" ] || [ "" = "$algorithm" ] ; then
 	echo "Unable to determine encryption library name or algorithm. Please ensure that $txt has the correct format. Exiting..."
 	exit 1
 fi

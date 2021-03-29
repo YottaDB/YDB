@@ -2,7 +2,7 @@
 
 #################################################################
 #								#
-# Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -38,8 +38,8 @@ fi
 build_dir="$(realpath $build_dir)"
 
 if ! [ -e "$build_dir"/compile_commands.json ]; then
-	echo 'error: cannot run `clang-tidy` without a `compile_commands.json` file'
-	echo 'help: try running `cmake -D CMAKE_EXPORT_COMPILE_COMMANDS=ON ..`'
+	echo 'error: cannot run "clang-tidy" without a "compile_commands.json" file'
+	echo 'help: try running "cmake -D CMAKE_EXPORT_COMPILE_COMMANDS=ON .."'
 	exit 1
 fi
 
@@ -56,7 +56,7 @@ root="$(git rev-parse --show-toplevel)"
 # NOTE: discards 'x warnings generated' output since it clutters up the logs.
 cd "$root"
 mkdir -p "$output_dir"
-find -name '*.c' \
+find . -name '*.c' \
 	| grep -E 'sr_(linux|unix|port|x86_64)/.*\.c$' \
 	| xargs parallel clang-tidy-10 --quiet -p="$build_dir" '--checks=-clang-analyzer-security.insecureAPI.*' -- \
 	>"$output_dir/tidy_warnings.txt" 2>/dev/null

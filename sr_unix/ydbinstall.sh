@@ -43,7 +43,7 @@ utillist="date id grep uname mktemp cut tr dirname chmod rm mkdir cat wget sed s
 # If not error out at beginning instead of erroring out midway during the install.
 utillist="$utillist ps file wc touch chown chgrp groups getconf awk expr locale install ld strip"
 arch=`uname -m`
-if [ "armv6l" = "$arch" -o "armv7l" = "$arch" ] ; then
+if [ "armv6l" = "$arch" ] || [ "armv7l" = "$arch" ] ; then
 	# ARM platform requires cc (in configure.gtc) to use as the system linker (ld does not work yet)
 	utillist="$utillist cc"
 fi
@@ -278,9 +278,8 @@ while [ $# -gt 0 ] ; do
 	--encplugin) ydb_encplugin="Y" ; shift ;;
 	--filename) tmp=`echo $1 | cut -s -d = -f 2-`
 	    if [ -n "$tmp" ] ; then ydb_filename=$tmp
-	    else if [ 1 -lt "$#" ] ; then ydb_filename=$2 ; shift
+	    elif [ 1 -lt "$#" ] ; then ydb_filename=$2 ; shift
 		else echo "--filename needs a value" ; err_exit
-		fi
 	    fi
 	    shift ;;
 	--force-install) ydb_force_install="Y" ; shift ;;
@@ -362,7 +361,7 @@ gtm_arch=`uname -m | tr -d _`
 case $gtm_arch in
     sun*) gtm_arch="sparc" ;;
 esac
-gtm_hostos=`uname -s | tr A-Z a-z`
+gtm_hostos=`uname -s | tr '[:upper:]' '[:lower:]'`
 case $gtm_hostos in
     gnu/linux) gtm_hostos="linux" ;;
     hp-ux) gtm_hostos="hpux" ;;
@@ -393,7 +392,7 @@ if [ "N" = "$ydb_force_install" ]; then
 	osver_supported=0 # Consider platform unsupported by default
 	isdebianbusteronx8664=0	# Set current platform to not be Debian 10 buster on x86_64 by default
 	if [ -f "$osfile" ] ; then
-		osver=`grep -w VERSION_ID $osfile | cut -d= -f2 | cut -d'"' -f2`
+		osver=`grep -w VERSION_ID $osfile | tr -d \" | cut -d= -f2`
 		# Set an impossible major/minor version by default in case we do not descend down known platforms in if/else below.
 		osallowmajorver="999"
 		osallowminorver="999"
@@ -422,8 +421,8 @@ if [ "N" = "$ydb_force_install" ]; then
 				osallowminorver="04"
 			fi
 		else
-			if [ "armv6l" = "${ydb_flavor}" -o "armv7l" = "${ydb_flavor}" ] ; then
-				if [ "raspbian" = "${osid}" -o "debian" = ${osid} ] ; then
+			if [ "armv6l" = "${ydb_flavor}" ] || [ "armv7l" = "${ydb_flavor}" ] ; then
+				if [ "raspbian" = "${osid}" ] || [ "debian" = ${osid} ] ; then
 					# Raspbian/Debian 9 onwards is considered supported on ARMV7L/ARMV6L
 					osallowmajorver="9"
 					osallowminorver="0"
@@ -439,9 +438,11 @@ if [ "N" = "$ydb_force_install" ]; then
 			# in case there is no minor version field (e.g. Raspbian 9 or even Debian 10 buster/sid).
 			osminorver="0"
 		fi
-		if [ 1 = `expr "$osmajorver" ">" "$osallowmajorver"` ] ; then
+		# Some distros (particularly Arch) are missing VERSION_ID altogether.
+		# Use a default of 0, which will never be greater than the supported version.
+		if [ "${osmajorver:-0}" -gt "$osallowmajorver" ] ; then
 			osver_supported=1
-		elif [ 1 = `expr "$osmajorver" "=" "$osallowmajorver"` -a 1 = `expr "$osminorver" ">=" "$osallowminorver"` ] ; then
+		elif [ "$osmajorver" "=" "$osallowmajorver" ] && [ "$osminorver" -ge "$osallowminorver" ] ; then
 			osver_supported=1
 		else
 			if [ "999" = "$osallowmajorver" ] ; then
@@ -463,8 +464,8 @@ if [ "N" = "$ydb_force_install" ]; then
 	fi
 
 	# Use the OS variables just defined to determine if we are running on Ubuntu 18.10 or greater and make sure libtinfo5 is installed
-	if [ "ubuntu" = "${osid}" -a 1 = `expr "$osmajorver" ">" "18"` ] || [ 1 = `expr "$osmajorver" "=" "18"` -a 1 = `expr "$osminorver" ">=" "10"` ] ; then
-		if [ "x8664" = "${ydb_flavor}" -a ! -f /lib/x86_64-linux-gnu/libtinfo.so.5 ] || [ "aarch64" = "${ydb_flavor}" -a ! -f /lib/aarch64-linux-gnu/libtinfo.so.5 ] ; then
+	if { [ "ubuntu" = "${osid}" ] && [ "$osmajorver" -gt 18 ]; } || { [ "$osmajorver" "=" "18" ] && [ "$osminorver" -ge 10 ]; } ; then
+		if { [ "x8664" = "${ydb_flavor}" ] && ! [ -f /lib/x86_64-linux-gnu/libtinfo.so.5 ]; } || { [ "aarch64" = "${ydb_flavor}" ] && ! [ -f /lib/aarch64-linux-gnu/libtinfo.so.5 ]; } ; then
 			echo "libtinfo5 package is required to be installed on Ubuntu 18.10 or greater using 'sudo apt-get install --no-install-recommends libtinfo5'"
 			err_exit
 		fi
@@ -474,14 +475,17 @@ fi
 # YottaDB version is required - first see if ydbinstall and yottadb/mumps are bundled
 if [ -z "$ydb_version" ] ; then
     tmp=`dirname $0`
-    if [ \( -e "$tmp/yottadb" -o -e "$tmp/mumps" \) -a -e "$tmp/_XCMD.m" ] ; then
+    if { [ -e "$tmp/yottadb" ] || [ -e "$tmp/mumps" ]; } && [ -e "$tmp/_XCMD.m" ] ; then
         ydb_distrib=$tmp
         ydb_dist=$tmp ; export ydb_dist
         chmod +x $ydb_dist/yottadb
         tmp=`mktmpdir`
         ydb_routines="$tmp($ydb_dist)" ; export ydb_routines
-        ydb_version=`$ydb_dist/yottadb -run %XCMD 'write $piece($zyrelease," ",2)' 2>&1`
-	if [ $? -gt 0 ] ; then echo >&2 "$ydb_dist/yottadb -run %XCMD 'write $piece($zyrelease," ",2)' failed with output $ydb_version"; exit 1; fi
+        # shellcheck disable=SC2016
+        if ! ydb_version=`$ydb_dist/yottadb -run %XCMD 'write $piece($zyrelease," ",2)' 2>&1`; then
+            echo >&2 "$ydb_dist/yottadb -run %XCMD 'write $piece($zyrelease," ",2)' failed with output $ydb_version"
+            exit 1
+        fi
         rm -rf $tmp
     fi
 fi
@@ -503,7 +507,7 @@ tmpdir=`mktmpdir`
 gtm_tmpdir=$tmpdir
 mkdir $gtm_tmpdir/tmp
 latest=`echo "$ydb_version" | tr LATES lates`
-if [ -z "$ydb_version" -o "latest" = "$latest" ] ; then
+if [ -z "$ydb_version" ] || [ "latest" = "$latest" ] ; then
     case $ydb_distrib in
         http://sourceforge.net/projects/fis-gtm | https://sourceforge.net/projects/fis-gtm)
             gtm_gtm="Y"
@@ -511,7 +515,7 @@ if [ -z "$ydb_version" -o "latest" = "$latest" ] ; then
                echo wget ${ydb_distrib}/files/${gtm_sf_dirname}/latest to determine latest version
                echo Check proxy settings if wget hangs
             fi
-            if { wget $wget_flags $gtm_tmpdir ${ydb_distrib}/files/${gtm_sf_dirname}/latest 2>&1 1>${gtm_tmpdir}/wget_latest.log ; } ; then
+            if { wget $wget_flags $gtm_tmpdir ${ydb_distrib}/files/${gtm_sf_dirname}/latest 1>${gtm_tmpdir}/wget_latest.log 2>&1; } ; then
                 ydb_version=`cat ${gtm_tmpdir}/latest`
             else echo Unable to determine YottaDB/GT.M version ; err_exit
             fi ;;
@@ -520,7 +524,7 @@ if [ -z "$ydb_version" -o "latest" = "$latest" ] ; then
                echo wget $gtm_tmpdir ${ydb_distrib}/${gtm_ftp_dirname}/latest to determine latest version
                echo Check proxy settings if wget hangs
             fi
-            if { wget $wget_flags $gtm_tmpdir ${ydb_distrib}/${gtm_ftp_dirname}/latest 2>&1 1>${gtm_tmpdir}/wget_latest.log ; } ; then
+            if { wget $wget_flags $gtm_tmpdir ${ydb_distrib}/${gtm_ftp_dirname}/latest 1>${gtm_tmpdir}/wget_latest.log 2>&1; } ; then
                 ydb_version=`cat ${gtm_tmpdir}/latest`
             else echo Unable to determine YottaDB/GT.M version ; err_exit
             fi ;;
@@ -529,7 +533,7 @@ if [ -z "$ydb_version" -o "latest" = "$latest" ] ; then
                 echo wget ${ydb_distrib} to determine latest version
                 echo Check proxy settings if wget hangs
             fi
-            if { wget $wget_flags $gtm_tmpdir ${ydb_distrib} 2>&1 1>${gtm_tmpdir}/wget_latest.log ; } ; then
+            if { wget $wget_flags $gtm_tmpdir ${ydb_distrib} 1>${gtm_tmpdir}/wget_latest.log 2>&1; } ; then
 	        # Find latest mainline YottaDB release by searching for all "tag_name"s and reverse sorting them based on the
 		# release number and taking the first line (which is the most recent release). Note that the sorting will take care
 		# of the case if a patch release for a prior version is released after the most recent mainline release
@@ -572,7 +576,7 @@ else
                 echo Check proxy settings if wget hangs
             fi
             if { ! wget $wget_flags $gtm_tmpdir ${ydb_distrib}/files/${gtm_sf_dirname}/${ydb_version}/${ydb_filename} \
-                	2>&1 1>${gtm_tmpdir}/wget_dist.log ; } ; then
+                    1>${gtm_tmpdir}/wget_dist.log 2>&1; } ; then
                 echo Unable to download GT.M distribution $ydb_filename ; err_exit
             fi ;;
         https://gitlab.com/api/*)
@@ -580,14 +584,14 @@ else
                 echo wget ${ydb_distrib}/${ydb_version} and parse to download tarball
                 echo Check proxy settings if wget hangs
             fi
-            if { wget $wget_flags $gtm_tmpdir ${ydb_distrib}/${ydb_version} 2>&1 1>${gtm_tmpdir}/wget_dist.log ;} ; then
+            if wget $wget_flags $gtm_tmpdir ${ydb_distrib}/${ydb_version} 1>${gtm_tmpdir}/wget_dist.log 2>&1 ; then
 		# There might be multiple binary tarballs of YottaDB (for various architectures & platforms).
 		# If so, choose the one that corresponds to the current host.
 		yottadb_download_urls=`sed 's,/uploads/,\n&,g' ${gtm_tmpdir}/${ydb_version} | grep "^/uploads/" | cut -d')' -f1`
 		# Determine current host's architecture
 		arch=`uname -m | tr -d '_'`
 		# Determine current host's OS. We expect the OS name in the tarball.
-		platform=`uname -s | tr '[A-Z]' '[a-z]'`
+		platform=`uname -s | tr '[:upper:]' '[:lower:]'`
 		if [ $arch = "x8664" ] ; then
 			# If the current architecture is x86_64 and the distribution is RHEL (including CentOS and SLES)
 			# or Debian then set the platform to rhel or debian (not linux) as there are specific tarballs
@@ -595,9 +599,10 @@ else
 			# if the version is 20.04 or later as there is a specific tarball for newer versions of Ubuntu.
 			#
 			# To get the correct binary for CentOS, RHEL and SLES, we treat OS major version 7 as rhel and later versions as centos
-			if [ "rhel" = "${osid}" -o "centos" = "${osid}" -o "sles" = "${osid}" ] ; then
+                        case "${osid}" in
+			rhel|centos|sles)
 				# CentOS-specific releases of YottaDB for x86_64 happened only after r1.26
-				if [ "r1.26" \< "${ydb_version}" ] ; then
+				if expr r1.26 \< "${ydb_version}" >/dev/null; then
 					# If the OS major version is later than 7, treat it as centos. Otherwise, treat it as rhel.
 					osmajorver=`echo $osver | cut -d. -f1`
 					if [ 1 = `expr "$osmajorver" ">" "7"` ] ; then
@@ -607,26 +612,28 @@ else
 					fi
 				# RHEL-specific releases of YottaDB for x86_64 happened only starting r1.10 so do this
 				# only if the requested version is not r1.00 (the only YottaDB release prior to r1.10)
-				elif [ "r1.00" != ${ydb_version} ] ; then
+				elif [ "r1.00" != ${ydb_version} ]; then
 					platform="rhel"
 				fi
-			elif [ "debian" = "${osid}" ] ; then
+				;;
+			debian)
 				# Debian-specific releases of YottaDB for x86_64 happened only after r1.24
-				if [ "r1.24" \< "${ydb_version}" ]; then
+				if expr r1.24 \< "${ydb_version}" >/dev/null; then
 					platform="debian"
 				fi
-			elif [ "ubuntu" = "${osid}" ] ; then
+				;;
+			ubuntu)
 				# Starting with r1.30, there is an Ubuntu 20.04 build where the platform is ubuntu (not linux)
 				# so set the platform to ubuntu only if the requested version is r1.30 or later and the
 				# Ubuntu version is 20.04 or later.
-				if [ "r1.28" \< "${ydb_version}" ]; then
+				if expr r1.28 \< "${ydb_version}" >/dev/null; then
 					# If the OS major version is 20 or later, treat it as ubuntu. Otherwise, treat it as linux.
 					osmajorver=`echo $osver | cut -d. -f1`
-					if [ 1 = `expr "$osmajorver" ">" "19"` ] ; then
+					if [ "${osmajorver:-0}" -gt 19 ] ; then
 						platform="ubuntu"
 					fi
 				fi
-			fi
+			esac
 		fi
 		yottadb_download_url=""
 		for fullfilename in $yottadb_download_urls
@@ -659,7 +666,7 @@ else
                 echo Check proxy settings if wget hangs
             fi
             if { ! wget $wget_flags $gtm_tmpdir ${ydb_distrib}/${gtm_ftp_dirname}/${tmp}/${ydb_filename} \
-                	2>&1 1>${gtm_tmpdir}/wget_dist.log ; } ; then
+                    1>${gtm_tmpdir}/wget_dist.log 2>&1 ; } ; then
                 echo Unable to download GT.M distribution $ydb_filename ; err_exit
             fi ;;
         *)
@@ -669,24 +676,22 @@ else
             else echo Unable to locate YottaDB/GT.M distribution file ${ydb_distrib}/${ydb_filename} ; err_exit
             fi ;;
     esac
-    ( cd $gtm_tmpdir/tmp ; gzip -d < ${gtm_tmpdir}/${ydb_filename} | tar xf - 2>&1 1>${gtm_tmpdir}/tar.log )
+    ( cd $gtm_tmpdir/tmp ; gzip -d < ${gtm_tmpdir}/${ydb_filename} | tar xf - 1>${gtm_tmpdir}/tar.log 2>&1 )
 fi
 if [ "Y" = "$gtm_verbose" ] ; then echo Downloaded and unpacked YottaDB/GT.M distribution ; dump_info ; fi
 
 # Check installation settings & provide defaults as needed
 tmp=`id -un`
 if [ -z "$gtm_user" ] ; then gtm_user=$tmp
-else if [ "$gtm_user" != "`id -un $gtm_user`" ] ; then
+elif [ "$gtm_user" != "`id -un $gtm_user`" ] ; then
     echo $gtm_user is a non-existent user ; err_exit
-    fi
 fi
 if [ "root" = $tmp ] ; then
     if [ -z "$gtm_group" ] ; then gtm_group=`id -gn`
-    else if [ "root" != "$gtm_user" -a "$gtm_group" != "`id -Gn $gtm_user | xargs -n 1 | grep $gtm_group`" ] ; then
+    elif [ "root" != "$gtm_user" ] && [ "$gtm_group" != "`id -Gn $gtm_user | xargs -n 1 | grep $gtm_group`" ] ; then
         echo $gtm_user is not a member of $gtm_group ; err_exit
-        fi
     fi
- else
+else
     echo Non-root installations not currently supported
     if [ "N" = "$gtm_dryrun" ] ; then err_exit
     else echo "Continuing because --dry-run selected"
@@ -694,7 +699,7 @@ if [ "root" = $tmp ] ; then
 fi
 if [ -z "$ydb_installdir" ] ; then
     if [ "N" = "$gtm_gtm" ] ; then
-         ydbver=`echo $ydb_version | tr '[A-Z]' '[a-z]' | tr -d '.-'`
+         ydbver=`echo $ydb_version | tr '[:upper:]' '[:lower:]' | tr -d '.-'`
          ydb_installdir=/usr/local/lib/yottadb/${ydbver}
     else ydb_installdir=/usr/local/lib/fis-gtm/${ydb_version}_${gtm_install_flavor}
     fi
@@ -704,7 +709,7 @@ fi
 if [ `echo $ydb_installdir | grep -c '^/'` -eq 0 ] ; then
     ydb_installdir=`pwd`/$ydb_installdir
 fi
-if [ -d "$ydb_installdir" -a "Y" != "$gtm_overwrite_existing" ] ; then
+if [ -d "$ydb_installdir" ] && [ "Y" != "$gtm_overwrite_existing" ] ; then
     echo $ydb_installdir exists and --overwrite-existing not specified ; err_exit
 fi
 
@@ -713,26 +718,28 @@ if [ "Y" = "$gtm_verbose" ] ; then echo Finished checking options and assigning 
 # Prepare input to YottaDB configure script. The corresponding questions in configure.gtc are listed below in comments
 gtm_configure_in=${gtm_tmpdir}/configure_${timestamp}.in
 export ydb_change_removeipc			# Signal configure.gtc to set RemoveIPC=no or not, if needed
-echo $gtm_user >>$gtm_configure_in		# Response to : "What user account should own the files?"
-echo $gtm_group >>$gtm_configure_in		# Response to : "What group should own the files?"
-echo $gtm_group_restriction >>$gtm_configure_in	# Response to : "Should execution of YottaDB be restricted to this group?"
-echo $ydb_installdir >>$gtm_configure_in	# Response to : "In what directory should YottaDB be installed?"
-echo y >>$gtm_configure_in			# Response to one of two possible questions
-						#	"Directory $ydb_dist exists. If you proceed with this installation then some files will be over-written. Is it ok to proceed?"
-						#	"Directory $ydb_dist does not exist. Do you wish to create it as part of this installation? (y or n)"
-if [ -z "$ydb_icu_version" ] ; then echo n  >>$gtm_configure_in	# Response to : "Should UTF-8 support be installed?"
-else echo y  >>$gtm_configure_in		# Response to : "Should UTF-8 support be installed?"
-    if [ "default" = $ydb_icu_version ] ; then echo n  >>$gtm_configure_in	# Response to : "Should an ICU version other than the default be used?"
-    else echo y >>$gtm_configure_in		# Response to : "Should an ICU version other than the default be used?"
-        echo $ydb_icu_version >>$gtm_configure_in	# Response to : "Enter ICU version"
+{
+    echo $gtm_user		# Response to : "What user account should own the files?"
+    echo $gtm_group		# Response to : "What group should own the files?"
+    echo $gtm_group_restriction	# Response to : "Should execution of YottaDB be restricted to this group?"
+    echo $ydb_installdir	# Response to : "In what directory should YottaDB be installed?"
+    echo y			# Response to one of two possible questions
+                            #	"Directory $ydb_dist exists. If you proceed with this installation then some files will be over-written. Is it ok to proceed?"
+                            #	"Directory $ydb_dist does not exist. Do you wish to create it as part of this installation? (y or n)"
+    if [ -z "$ydb_icu_version" ] ; then echo n 	# Response to : "Should UTF-8 support be installed?"
+    else echo y 		# Response to : "Should UTF-8 support be installed?"
+        if [ "default" = $ydb_icu_version ] ; then echo n 	# Response to : "Should an ICU version other than the default be used?"
+        else echo y		# Response to : "Should an ICU version other than the default be used?"
+            echo $ydb_icu_version	# Response to : "Enter ICU version"
+        fi
     fi
-fi
-if [ "Y" = $ydb_deprecated ] ; then echo y >>$gtm_configure_in # Response to : "Should deprecated components be installed?"
-else echo n >>$gtm_configure_in			# Response to : "Should deprecated components be installed?"
-fi
-echo $gtm_lcase_utils >>$gtm_configure_in	# Response to : "Do you want uppercase and lowercase versions of the MUMPS routines?"
-if [ "Y" = $gtm_shlib_support ] ; then echo $gtm_keep_obj >>$gtm_configure_in ; fi	# Response to : "Object files of M routines placed in shared library $ydb_dist/libyottadbutil$ext. Keep original .o object files (y or n)?"
-echo n >>$gtm_configure_in			# Response to : "Installation completed. Would you like all the temporary files removed from this directory?"
+    if [ "Y" = $ydb_deprecated ] ; then echo y # Response to : "Should deprecated components be installed?"
+    else echo n			# Response to : "Should deprecated components be installed?"
+    fi
+    echo $gtm_lcase_utils	# Response to : "Do you want uppercase and lowercase versions of the MUMPS routines?"
+    if [ "Y" = $gtm_shlib_support ] ; then echo $gtm_keep_obj ; fi	# Response to : "Object files of M routines placed in shared library $ydb_dist/libyottadbutil$ext. Keep original .o object files (y or n)?"
+    echo n			# Response to : "Installation completed. Would you like all the temporary files removed from this directory?"
+} >> $gtm_configure_in
 if [ "Y" = "$gtm_verbose" ] ; then echo Prepared configuration file ; cat $gtm_configure_in ; dump_info ; fi
 
 
@@ -742,7 +749,7 @@ if [ "$ydb_distrib" != "$gtm_tmpdir" ] ; then
     cd $gtm_tmpdir/tmp
     # Starting YottaDB r1.10, unpacking the binary tarball creates an additional directory (e.g. yottadb_r122)
     # before the untar so cd into that subdirectory to get at the "configure" script from the distribution.
-    if [ "N" = "$gtm_gtm" -a "r1.00" != ${ydb_version} ] ; then
+    if [ "N" = "$gtm_gtm" ] && [ "r1.00" != ${ydb_version} ] ; then
         cd yottadb_r*
     fi
 fi
@@ -759,10 +766,13 @@ chmod +x configure.sh
 # Stop here if this is a dry run
 if [ "Y" = "$gtm_dryrun" ] ; then echo Installation prepared in $gtm_tmpdir ; exit ; fi
 
-sh -x ./configure.sh <$gtm_configure_in 1> $gtm_tmpdir/configure_${timestamp}.out 2>$gtm_tmpdir/configure_${timestamp}.err
-if [ $? -gt 0 ] ; then echo "configure.sh failed. Output follows"; cat $gtm_tmpdir/configure_${timestamp}.out $gtm_tmpdir/configure_${timestamp}.err ; exit 1; fi
+if ! sh -x ./configure.sh <$gtm_configure_in 1> $gtm_tmpdir/configure_${timestamp}.out 2>$gtm_tmpdir/configure_${timestamp}.err; then
+    echo "configure.sh failed. Output follows"
+    cat $gtm_tmpdir/configure_${timestamp}.out $gtm_tmpdir/configure_${timestamp}.err
+    exit 1
+fi
 
-rm -rf $tmpdir/*	# Now that install is successful, remove everything under temporary directory
+rm -rf ${tmpdir:?}/*	# Now that install is successful, remove everything under temporary directory
 			# We might still need this temporary directory for installing optional plugins (encplugin, posix etc.)
 			# if they have been specified in the ydbinstall.sh command line. Not having a valid current directory
 			# will cause YDB-E-SYSCALL errors from "getcwd()" in ydb_env_set calls made later.
@@ -777,18 +787,16 @@ echo $product_name version $ydb_version installed successfully at $ydb_installdi
 if [ -d "$gtm_linkenv" ] ; then
     ( cd $gtm_linkenv ; ln -s $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked env ; ls -l $gtm_linkenv ; fi
-else if [ -d "$gtm_copyenv" ] ; then
-        ( cd $gtm_copyenv ; cp -P $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
-        if [ "Y" = "$gtm_verbose" ] ; then echo Copied env ; ls -l $gtm_copyenv ; fi
-     fi
+elif [ -d "$gtm_copyenv" ] ; then
+    ( cd $gtm_copyenv ; cp -P $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
+    if [ "Y" = "$gtm_verbose" ] ; then echo Copied env ; ls -l $gtm_copyenv ; fi
 fi
 if [ -d "$gtm_linkexec" ] ; then
     ( cd $gtm_linkexec ; ln -s $ydb_installdir/ydb $ydb_installdir/gtm ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked exec ; ls -l $gtm_linkexec ; fi
-else if [ -d "$gtm_copyexec" ] ; then
-        ( cd $gtm_copyexec ; cp -P $ydb_installdir/ydb $ydb_installdir/gtm ./ )
-        if [ "Y" = "$gtm_verbose" ] ; then echo Copied exec ; ls -l $gtm_copyexec ; fi
-     fi
+elif [ -d "$gtm_copyexec" ] ; then
+    ( cd $gtm_copyexec ; cp -P $ydb_installdir/ydb $ydb_installdir/gtm ./ )
+    if [ "Y" = "$gtm_verbose" ] ; then echo Copied exec ; ls -l $gtm_copyexec ; fi
 fi
 
 # Create the pkg-config file
@@ -812,7 +820,7 @@ EOF
 # YottaDB will only ever increment versions, so a larger number indicates a newer version
 if [ ! -f ${pcfilepath}/yottadb.pc ] || {
 	existing_version=$(grep "^Version: " ${pcfilepath}/yottadb.pc | cut -s -d " " -f 2)
-	! [ $existing_version \> $(echo $ydb_version) ];
+	! expr "$existing_version" \> "$ydb_version" >/dev/null
 }; then
     cp ${ydb_installdir}/yottadb.pc ${pcfilepath}/yottadb.pc
     echo $product_name pkg-config file installed successfully at ${pcfilepath}/yottadb.pc
@@ -901,13 +909,13 @@ if [ "Y" = $ydb_zlib ] ; then
 					ydb_icu_version=`pkg-config --modversion icu-io`
 				fi
 				mkdir utf8
-				cd utf8
-				export ydb_chset="UTF-8"
-				. ${ydb_installdir}/utf8/ydb_env_set
-				${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
-				sudo cp _ZLIB.o ${ydb_installdir}/plugin/o/utf8
-				. ${ydb_installdir}/ydb_env_unset
-				cd ..
+				(
+					cd utf8
+					export ydb_chset="UTF-8"
+					. ${ydb_installdir}/utf8/ydb_env_set
+					${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
+					sudo cp _ZLIB.o ${ydb_installdir}/plugin/o/utf8
+				)
 			fi
 			sudo cp _ZLIB.o ${ydb_installdir}/plugin/o
 			. ${ydb_installdir}/ydb_env_unset
@@ -929,11 +937,10 @@ if [ "Y" = $ydb_octo ] ; then
 		cd YDBOcto-master
 		mkdir build
 		cd build
-		if [ "rhel" = "${osid}" -o "centos" = "${osid}" -o "sles" = "${osid}" ] ; then
-			cmake3 ${octo_cmake} ..
-		else
-			cmake ${octo_cmake} ..
-		fi
+		case "${osid}" in
+			rhel|centos|sles) cmake3 ${octo_cmake} ..;;
+			*) cmake ${octo_cmake} ..;;
+		esac
 		if make -j `grep -c ^processor /proc/cpuinfo` && sudo -E make install; then
 			# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
 			cd ../..

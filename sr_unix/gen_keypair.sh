@@ -4,6 +4,8 @@
 # Copyright (c) 2010-2015 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
+# Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	#
+#								#
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
 #       under a license.  If you do not know the terms of       #
@@ -70,7 +72,7 @@ else
         gtm_gpghome="$GNUPGHOME"
 fi
 
-if [ -d "$gtm_gpghome" -o -f "$gtm_gpghome" ] ; then
+if [ -d "$gtm_gpghome" ] || [ -f "$gtm_gpghome" ] ; then
     $ECHO "$gtm_gpghome already exists; cannot create a new directory" ; exit 1
 fi
 mkdir -p $gtm_gpghome
@@ -83,8 +85,8 @@ chmod go-rwx $gtm_gpghome
 # Get passphrase for new GnuPG keyring
 unset passphrase
 while [ -z "$passphrase" ] ; do
-    $ECHO $ECHO_OPTIONS Passphrase for new keyring: \\c ; stty -echo ; read passphrase ; stty echo ; $ECHO ""
-    $ECHO $ECHO_OPTIONS  Verify passphrase: \\c ; stty -echo ; read tmp ; stty echo ; $ECHO ""
+    $ECHO $ECHO_OPTIONS Passphrase for new keyring: \\c ; stty -echo ; read -r passphrase ; stty echo ; $ECHO ""
+    $ECHO $ECHO_OPTIONS  Verify passphrase: \\c ; stty -echo ; read -r tmp ; stty echo ; $ECHO ""
     if [ "$passphrase" != "$tmp" ] ; then
         $ECHO Verification does not match passphrase.  Try again. ; unset passphrase
     fi
@@ -116,8 +118,7 @@ else
 fi
 $ECHO "pinentry-program $dir/pinentry-gtm.sh" >$gtm_gpghome/gpg-agent.conf
 
-$gpg --homedir $gtm_gpghome --list-keys | grep "$email" >> $tmp_file
-if [ $? -eq 0 ]; then
+if $gpg --homedir $gtm_gpghome --list-keys | grep "$email" >> $tmp_file; then
 	$gpg --homedir $gtm_gpghome --export --armor -o $gtm_pubkey
 	$gpg --homedir $gtm_gpghome --list-keys --fingerprint
 	$ECHO "Key pair created and public key exported in ASCII to $gtm_pubkey"

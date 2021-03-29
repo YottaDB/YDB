@@ -4,6 +4,8 @@
 # Copyright (c) 2009-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -61,19 +63,19 @@ check_files()
 send_mail()
 {
 	msg=$1
-	echo $encrypt_dist_servers | grep -w $hostname > /dev/null
-	if [ $? -eq 0 ]; then
+	if echo $encrypt_dist_servers | grep -w $hostname > /dev/null; then
 		msg="Please setup the required dependencies for this distribution server.\n\n$msg"
 		msg="$msg\nAt least one of Libgcrypt or OpenSSL dependencies must be met."
 		sub="ENCRYPTSUPPORTED-E-ERROR : Distribution server $hostname will not build encryption plugin"
 	fi
-	echo "$encrypt_other_servers $encrypt_desktops" | grep -w $hostname > /dev/null
-	if [ $? -eq 0 ]; then
+	if echo "$encrypt_other_servers $encrypt_desktops" | grep -w $hostname > /dev/null; then
 		msg="This system supports encryption but does not have the required dependencies setup\n\n.$msg"
 		msg="$msg\nAt least one of Libgcrypt or OpenSSL dependencies must be met."
 		sub="ENCRYPTSUPPORTED-W-WARNING : Server $hostname will not build encryption plugin"
 	fi
-	printf "$msg" | mailx -s "$sub" gglogs
+	# sed needed below to turn `\n` into newlines
+	# Note: echo -e "$msg" cannot be used since `-e` is not supported on all shells
+	echo "$msg" | sed 's/\\n/\n/g' | mailx -s "$sub" gglogs
 }
 
 #################################
@@ -93,13 +95,12 @@ if [ -f $server_list ]; then
 		echo encrypt_dist_servers=\'\\\$encrypt_dist_servers\';
 		echo encrypt_other_servers=\'\\\$encrypt_other_servers\';
 		" || echo echo ERROR \; exit 1`
-	echo $non_encrypt_machines | grep -w $hostname > /dev/null
-	if [ $? -eq 0 ]; then
+	if echo $non_encrypt_machines | grep -w $hostname > /dev/null; then
 		this_host_noencrypt="TRUE"
 	fi
 fi
 
-if [ "OSF1" = "$hostos" -o \( "HP-UX" = "$hostos" -a "ia64" != "$machtype" \) -o "TRUE" = "$this_host_noencrypt" ]; then
+if [ "OSF1" = "$hostos" ] || { [ "HP-UX" = "$hostos" ] && [ "ia64" != "$machtype" ]; } || [ "TRUE" = "$this_host_noencrypt" ]; then
 	echo "FALSE"
 	exit 0
 fi
