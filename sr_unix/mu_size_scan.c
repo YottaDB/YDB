@@ -232,10 +232,7 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 	sm_uc_ptr_t			pTop, pRec, child_pBlkBase;
 	srch_hist			sibhist;
 	unsigned short			nRecLen;
-	unsigned short			rec_cmpc;
-	uchar_ptr_t			key_base, ptr;
-	boolean_t			first_key = TRUE, musz_range_done = FALSE;
-	int				name_len, key_size, buff_length, rec_len;
+	boolean_t			musz_range_done = FALSE;
 	unsigned char			buff[MAX_KEY_SZ + 1];
 
 
@@ -245,19 +242,14 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen, musz_range_done)
 		{
 			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId);
-			if (cdb_sc_normal != status)
-			{
-				assert(CDB_STAGNATE > t_tries);
-				return status;
-			}
+			RETURN_IF_ABNORMAL_STATUS(status);
 			assert((MAX_BT_DEPTH + 1) > lvl);	/* this assert ensures that the CHECK_ADJACENCY macro
 			 					 * does not overrun the boundaries of the mu_int_adj array.
 								 */
 			if (lvl)
 				CHECK_ADJACENCY(nBlkId, lvl -1, mu_int_adj[lvl - 1]);
-			rec_cmpc = EVAL_CMPC((rec_hdr_ptr_t)pRec);
-			key_base = pRec + SIZEOF(rec_hdr);
-			GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key, name_len, key_size,buff, buff_length, rec_len);
+			GET_KEY_CPY_BUFF(pRec, nRecLen, buff, status);
+			RETURN_IF_ABNORMAL_STATUS(status);
 			if (mu_subsc) /* Subscript option chosen */
 			{
 				CHECK_KEY_RANGE(mu_start_key, mu_end_key, buff, rCnt, musz_range_done);
@@ -284,23 +276,17 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 			boolean_t first_iter;
 
 			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId);
-			if (cdb_sc_normal != status)
-			{
-				assert(CDB_STAGNATE > t_tries);
-				return status;
-			}
+			RETURN_IF_ABNORMAL_STATUS(status);
 			curroff = (INTPTR_T)(pRec - pBlkBase);
 			gv_target->hist.h[lvl - targ_levl].curr_rec.offset = curroff;
-			rec_cmpc = EVAL_CMPC((rec_hdr_ptr_t)pRec);
-			key_base = pRec + SIZEOF(rec_hdr);
 			if ((((rec_hdr *)pRec)->rsiz) == BSTAR_REC_SIZE) /* Found the star key */
 			{
 				if (skiprecs && (curroff < saveoff[lvl]))
 					continue;	/* skip these guys, we've already counted over there */
 			} else
 			{
-				GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key, name_len,
-								key_size,buff, buff_length, rec_len);
+				GET_KEY_CPY_BUFF(pRec, nRecLen, buff, status);
+				RETURN_IF_ABNORMAL_STATUS(status);
 				if (mu_subsc) /* Subscript option chosen */
 				{
 					CHECK_KEY_RANGE(mu_start_key, mu_end_key, buff, rCnt, musz_range_done);
@@ -309,8 +295,7 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 					continue;	/* skip these guys, we've already counted over there */
 			}
 			status = read_block(nBlkId, &child_pBlkBase, &child_nLevl, lvl - 1);
-			if (status != cdb_sc_normal)
-				return status;
+			RETURN_IF_ABNORMAL_STATUS(status);
 			last_rec = ((pRec + nRecLen) == pTop);
 			if (lvl && (nBlkId != mu_int_adj_prev[lvl - 1]))
 				CHECK_ADJACENCY(nBlkId, lvl - 1, mu_int_adj[lvl - 1]);
@@ -384,11 +369,7 @@ enum cdb_sc read_block(block_id nBlkId, sm_uc_ptr_t *pBlkBase_ptr, int *nLevl_pt
 	if (NULL == (pBlkBase = t_qread(nBlkId, (sm_int_ptr_t)&cycle, &cr)))
 		return (enum cdb_sc)rdfail_detail;
 	GET_AND_CHECK_LEVL(status, nLevl, desired_levl, pBlkBase);
-	if (cdb_sc_normal != status)
-	{
-		assert(CDB_STAGNATE > t_tries);
-		return status;
-	}
+	RETURN_IF_ABNORMAL_STATUS(status);
 	pCurr = &pTargHist->h[nLevl - targ_levl];	/* No blocks to read beneath input level */
 	if (ANY_ROOT_LEVL == desired_levl)
 	{

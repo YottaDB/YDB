@@ -298,10 +298,7 @@ enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 	unsigned char			nLevl;
 	unsigned short			nRecLen;
 	unsigned char			buff[MAX_KEY_SZ + 1];
-	boolean_t			first_key = TRUE, musz_range_done;
-	int				name_len, key_size, buff_length, rec_len, blk_size;
-	unsigned short			rec_cmpc;
-	uchar_ptr_t			key_base, ptr;
+	boolean_t			musz_range_done;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -341,20 +338,14 @@ enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen, musz_range_done)
 		{	/* enumerate records in block */
 			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId);
-			if (cdb_sc_normal != status)
-			{
-				assert(CDB_STAGNATE > t_tries);
-				return status;
-			}
+			RETURN_IF_ABNORMAL_STATUS(status);
 			CHECK_ADJACENCY(nBlkId, nLevl, a[nLevl]);
-			if (mu_subsc) /*Subscript option chosen */
+			if (mu_subsc) /* Subscript option chosen */
 			{
-				rec_cmpc = EVAL_CMPC((rec_hdr_ptr_t)pRec);
-				key_base = pRec + SIZEOF(rec_hdr);
 				if ((((rec_hdr *)pRec)->rsiz) != BSTAR_REC_SIZE) /* Did not find the star key */
 				{
-					GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key,
-							name_len, key_size,buff, buff_length, rec_len);
+					GET_KEY_CPY_BUFF(pRec, nRecLen, buff, status);
+					RETURN_IF_ABNORMAL_STATUS(status);
 					if (mu_end_key)
 					{
 						if (memcmp(buff, mu_end_key->base, mu_end_key->end + 1) > 0)
