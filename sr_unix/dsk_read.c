@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,10 +106,15 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	csa = cs_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
-	/* Note: Even in snapshots, only INTEG requires dsk_read to read FREE blocks. The assert below should be modified
-	 * if we later introduce a scheme where we can figure out as to who started the snapshots and assert accordingly
+	/* Note: Only INTEG (i.e. SNAPSHOTS) requires dsk_read to read FREE blocks. So one could ideally assert the following.
+	 *	assert(!blk_free || SNAPSHOTS_IN_PROG(csa));
+	 * But it is possible that SNAPSHOTS_IN_PROG(csa) was TRUE in t_end/op_tcommit just BEFORE we read the before images
+	 * of blocks (that get allocated in the bitmap) but it gets reset to FALSE a little later in the same function before
+	 * we are done with reading all the before images (for example, as part of ENABLE_INTERRUPTS call in "db_csh_getn()",
+	 * deferred signals can be handled and "jnl_file_close_timer()" can be invoked which can invoke "SS_RELEASE_IF_NEEDED".
+	 * Therefore, it is possible we come here to read a before image while the SNAPSHOTS_IN_PROG(csa) flag does not reflect
+	 * the original value we started out the before-image reading "for" loop in t_end/op_tcommit with. Hence we do not assert.
 	 */
-	assert(!blk_free || SNAPSHOTS_IN_PROG(csa)); /* Only SNAPSHOTS require dsk_read to read a FREE block from the disk */
 	assert(0 == in_dsk_read);	/* dsk_read should never be nested. the read_reformat_buffer logic below relies on this */
 	DEBUG_ONLY(in_dsk_read++;)
 	udi = FILE_INFO(gv_cur_region);
