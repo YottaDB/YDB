@@ -173,7 +173,20 @@ boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 	assert(NULL != lcl_ss_ctx);
 	if (FD_INVALID != lcl_ss_ctx->shdw_fd)
 	{
-		CLOSEFILE_RESET(lcl_ss_ctx->shdw_fd, status);
+		int	save_fd;
+
+		/* Note: CLOSEFILE_RESET can invoke "eintr_handling_check()" after the "close()" call succeeds. And that
+		 * can in turn recurse into "ss_destroy_context()" which would call CLOSEFILE_RESET again on the same fd
+		 * and fail because the fd has already been closed. An example call stack of the recursion is
+		 *	t_end -> ss_create_context -> ss_destroy_context -> CLOSEFILE_RESET -> eintr_handling_check
+		 *		-> deferred_signal_handler -> check_for_deferred_timers -> timer_handler
+		 *		-> jnl_file_close_timer -> ss_destroy_context -> CLOSEFILE_RESET
+		 * To avoid this duplicate close, save a copy of "lcl_ss_ctx->shdw_fd" (in a local variable), then
+		 * clear it before invoking the CLOSEFILE_RESET macro.
+		 */
+		save_fd = lcl_ss_ctx->shdw_fd;
+		lcl_ss_ctx->shdw_fd = FD_INVALID;
+		CLOSEFILE_RESET(save_fd, status);
 	}
 	if (INVALID_SHMID != lcl_ss_ctx->attach_shmid)
 	{
