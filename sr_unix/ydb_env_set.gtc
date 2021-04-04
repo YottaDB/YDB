@@ -1,13 +1,13 @@
 #################################################################
-#                                                               #
-# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
+#								#
+# Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
-#                                                               #
-#       This source code contains the intellectual property     #
-#       of its copyright holder(s), and is made available       #
-#       under a license.  If you do not know the terms of       #
-#       the license, please stop and do not read further.       #
-#                                                               #
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
 #################################################################
 # Usage: source "YDBDIST"/ydb_env_set
 # Sets up environment for single-user use of YottaDB with reasonable defaults.
@@ -22,6 +22,16 @@
 # export not needed because these are only used when sourcing this file
 if [ ! -z "${ydb_passwd+isset}" ] ; then ydb_tmp_ydb_passwd=$ydb_passwd ; fi
 if [ ! -z "${gtm_passwd+isset}" ] ; then ydb_tmp_gtm_passwd=$gtm_passwd ; fi
+
+# If YottaDB has not been installed with UTF-8 support, force mode to M mode
+# and notify user to that effect.
+if [ ! -d "YDBDIST"/utf8 ] ; then
+    if [ "UTF-8" == "$ydb_chset" -o "utf-8" == "$ydb_chset" -o "UTF-8" == "$gtm_chset" -o "utf-8" == "$gtm_chset" ] ; then
+	unset gtm_chset
+	echo "UTF-8 mode requested but " "YDBDIST"/utf8 "does not exist; forcing M mode"
+    fi
+    export ydb_chset="M"
+fi
 
 # Save the character set, since the %YDBENV program always runs in M mode
 # even though it generates environment variables for either M or UTF-8 mode.
@@ -47,7 +57,7 @@ ydb_tmp_env=`mktemp -d -t ydb_env_$$_XXXXXX`
 if "YDBDIST"/yottadb -run set^%YDBENV 1>$ydb_tmp_env/out 2>$ydb_tmp_env/err ; then
     . $ydb_tmp_env/out
     if [ "UTF-8" = "$ydb_chset" ] ; then
-    	if [ -z "$ydb_icu_version" ] ; then
+	if [ -z "$ydb_icu_version" ] ; then
 		if [ -z "$gtm_icu_version" ] ; then
 			export ydb_icu_version=`pkg-config --modversion icu-io`
 			export gtm_icu_version=$ydb_icu_version
@@ -57,12 +67,10 @@ if "YDBDIST"/yottadb -run set^%YDBENV 1>$ydb_tmp_env/out 2>$ydb_tmp_env/err ; th
 	elif [ -z "$gtm_icu_version" ] ; then
 		export gtm_icu_version=$ydb_icu_version
 	fi
-
     fi
     rm -rf $ydb_tmp_env
 else
-    echo Error file at $ydb_tmp_env is:
-    cat $ydb_tmp_env/err
+    echo Error file is at $ydb_tmp_env/err
 fi
 
 # Restore ydb_passwd / gtm_passwd if either was set

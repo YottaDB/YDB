@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -24,3 +24,8 @@ else
     echo Error file at $ydb_tmp_env is:
     cat $ydb_tmp_env/err
 fi
+
+if [ ! -z "$ydb_chset_unset" ] ; then unset ydb_chset ydb_chset_unset ; fi
+if [ ! -z "$ydb_icu_version_unset" ] ; then unset ydb_icu_version ydb_icu_version_unset ; fi
+if [ ! -z "$gtm_chset_unset" ] ; then unset gtm_chset gtm_chset_unset ; fi
+if [ ! -z "$gtm_icu_version_unset" ] ; then unset gtm_icu_version gtm_icu_version_unset ; fi

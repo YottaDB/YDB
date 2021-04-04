@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -70,7 +70,7 @@
 	quit			; should never get here because previous line should terminate process
 
 set	; Intended to be the most common entry point to this routine (with unset likely not as common)
-	new chset,currenv,dist,env,file,gtmgbldir,i,io,path,ppid,setcmd,setsep,tmp1,tmp2,tmp3,tmp4,unset,unsetcmd,ydbgbldir,ydbreplinst,ydbretention,zstmp
+	new chset,currenv,dist,env,file,gtmgbldir,i,io,localeflag,path,ppid,setcmd,setsep,tmp1,tmp2,tmp3,tmp4,unset,unsetcmd,ydbgbldir,ydbreplinst,ydbretention,zstmp
 	do Etrap
 	set io=$io
 	use io:nowrap
@@ -104,7 +104,8 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	do ExportEnv("ydb_rel",env("ydb_rel")),ExportEnv("gtmver",env("gtmver"))
 	; Get the character set for the exported environment, if saved by the invoking shell. Since this program always runs in M mode
 	; the desired character set is saved by the shell prefixed by ydb_tmp_.
-	set chset=$zconvert($select($data(currenv("ydb_tmp_ydb_chset")):currenv("ydb_tmp_ydb_chset"),$data(currenv("ydb_tmp_gtm_chset")):currenv("ydb_tmp_gtm_chset"),1:""),"u")
+	; Make UTF-8 the default character set if none is specified.
+	set chset=$zconvert($select($data(currenv("ydb_tmp_ydb_chset")):currenv("ydb_tmp_ydb_chset"),$data(currenv("ydb_tmp_gtm_chset")):currenv("ydb_tmp_gtm_chset"),1:"UTF-8"),"u")
 	do:$zlength(chset)
 	. set:'("UTF-8"=chset!("M"=chset)) $ecode=",U249,"
 	. ; Since ydb_chset and gtm_chset would have been saved in environment variables prefixed by ydb_tmp_ by ydb_env_set
@@ -112,6 +113,28 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. set:$data(currenv("ydb_tmp_ydb_chset")) currenv("ydb_chset")=currenv("ydb_tmp_ydb_chset")
 	. set:$data(currenv("ydb_tmp_gtm_chset")) currenv("gtm_chset")=currenv("ydb_tmp_gtm_chset")
 	. do ExportEnv("ydb_chset",chset),ExportEnv("gtm_chset",chset)
+	. ; Ensure a UTF-8 locale is set if chset is UTF-8. If one of the
+	. ; environment variables LANG, LC_ALL, or LC_CTYPE specifies a UTF-8
+	. ; locale (with the "UTF" case insensitive and the hyphen optional),
+	. ; that suffices. Otherwise, the "locale" command with no options gives
+	. ; the default locale for the system. If one of LANG, LC_ALL, or
+	. ; LC_CTYPE specifies a UTF-8 locale, that suffices. Otherwise, the
+	. ; "locale -a" command gives a list of locales that has been defined
+	. ; and the first UTF-8 locale, if any, is assigned to the LC_CTYPE
+	. ; environment variable. If no UTF-8 locale is identified, raise
+	. ; an error.
+	. do:"UTF-8"=chset&('($ztranslate($zconvert($get(currenv("LANG")),"u"),"-")?.E1(1"UTF-8",1"UTF8")!($ztranslate($zconvert($get(currenv("LC_ALL")),"u"),"-")?.E1(1"UTF-8",1"UTF8"))!($ztranslate($zconvert($get(currenv("LC_CTYPE")),"u"),"-")?.E1(1"UTF-8",1"UTF8"))))
+	. . set localeflag=0
+	. . open "locale":(shell="/bin/sh":command="locale":readonly)::"pipe" use "locale"
+	. . for  read line quit:$zeof  set:$zfind($zconvert($ztranslate($zpiece($zpiece(line,"=",2),".",2),"-"),"u"),"UTF8") localeflag=1 quit:localeflag
+	. . use io close "locale"
+	. . if localeflag do ExportEnv("LC_CTYPE",$zpiece(line,"=",2))
+	. . else  do
+	. . . open "locale -a":(shell="/bin/sh":command="locale -a":readonly)::"pipe" use "locale -a"
+	. . . for  read line quit:$zeof  set:$zconvert(line,"u")?.E1(1"UTF-8",1"UTF8") localeflag=1 quit:localeflag
+	. . . use io close "locale a"
+	. . . if localeflag do ExportEnv("LC_CTYPE",line)
+	. . . else  set $ecode=",U244,"
 	; ydb_dist is set here after setting ydb_chset since ydb_dist may need to point to
 	; the utf8 subdirectory of the YottaDB installation directory if $ydb_dist is UTF-8.
 	do ExportEnv("ydb_dist",dist_$select("UTF-8"=$get(chset):"/utf8",1:"")),ExportEnv("gtm_dist","$ydb_dist")
@@ -341,7 +364,7 @@ ExportEnv(var,value)
 	;   unless one already exists (since invoking the set label is idempotent)
 	; Else add to the list of variables to be unset when the unset label is invoked
 	; currenv and ppid should have been set prior to calling this label
-	new envsav,envval
+	new envsav,envval,$test
 	write setcmd,var,setsep,"'",value,"'",!	; write even if already in the enviroment because it may not have been exported
 	if $data(currenv(var)) do
 	. set envsav="ydb_sav_"_ppid_"_"_var
@@ -387,7 +410,7 @@ GetCurrEnv
 	open file:readonly use file
 	set line="" for  read tmp quit:$zeof  set line=line_tmp
 	use io close file
-	for i=1:1:$zlength(line,$zchar(0)) set tmp=$zpiece(line,$zchar(0),i) if ""'=tmp s currenv($zpiece(tmp,"=",1))=$zpiece(tmp,"=",2,$zlength(tmp,"="))
+	for i=1:1:$zlength(line,$zchar(0)) set tmp=$zpiece(line,$zchar(0),i) if ""'=tmp set currenv($zpiece(tmp,"=",1))=$zpiece(tmp,"=",2,$zlength(tmp,"="))
 	quit
 
 GetDefaults
@@ -433,7 +456,7 @@ PathSame(path1,path2)
 	quit realpath1=realpath2
 
 Robustify	; rollback / recover an existing database if needed
-	new allok,cmd,cutoff,fhead,field,fname,io,jnlfile,jnlfilelist,line,region,replon,sem,semid,semkey,timestamp,year
+	new allok,cmd,cutoff,fhead,field,fname,io,jnlfile,jnlfilelist,line,region,replok,replon,sem,semid,semkey,timestamp,tmpok,ydb715flag,ydb715hack,year
 	set io=$io
 	view "setenv":"ydb_dir":env("ydb_dir"),"setenv":"ydb_rel":env("ydb_rel"),"setenv":"ydb_gbldir":ydbgbldir,"setenv":"ydb_repl_instance":ydbreplinst
 	; create files for any regions that don't have database files; they're likely temporary regions
@@ -461,43 +484,89 @@ Robustify	; rollback / recover an existing database if needed
 	. set:semkey?1"0x"."0" sem(semid)=""	; this pattern looks for a private semaphore (with a key of 0x00000000)
 	use io close "ipcs -s"
 	; Check whether every region is either not open, or open with an existing shared memory segment
-	; If all regions satisfy one or the other requirement, there is nothing for robustify to do
-	set allok=1,region=""	; In next line, verify that every region is either not open, or if open has a semaphore
-	for  set region=$order(fhead(region)) quit:'$zlength(region)  set allok=allok*((-1=fhead(region,"sgmnt_data.semid")!$data(sem(fhead(region,"sgmnt_data.semid")))))
-	do:'allok		; Rollback / recover database if not allok
+	; If all regions satisfy one or the other requirement, there is nothing for robustify to do.
+	; Note that an application could split ^%ydbAIM* global variables across multiple regions. Since
+	; $view("region",<gvn>) only works on specific global variables and not on patterns of global
+	; variables (unlike the -name specification of GDE), identifying whether AIM  global variables
+	; are spread over multiple regions would require opening database files, which this program
+	; avoids, by using MUPIP DUMPFHEAD. Therefore, the global variable ^%ydbAIM is used as a proxy
+	; for all Application Independent Metadata global variables. This is a reasonable assumption
+	; because sourcing ydb_env_set, which invokes this routine, is intended to make the out-of-box
+	; experience simple, and any application sizeable enough to distribute AIM global variables
+	; over multiple regions would have developed its own scripting instead of using ydb_env_set.
+	set allok=1,region=""
+	for  set region=$order(fhead(region)) quit:'$zlength(region)  do
+	. ; Verify that each region is clean: either not open, or if open has a semaphore
+	. set tmpok=(-1=fhead(region,"sgmnt_data.semid"))!$data(sem(fhead(region,"sgmnt_data.semid")))
+	. ; If the region for ^%ydbAIM* globals is not clean, is not journaled,
+	. ; and has AUTODB set, delete the file and consider the region clean
+	. do:'tmpok&(region="YDBAIM")&'fhead("YDBAIM","sgmnt_data.jnl_state")&(fhead("YDBAIM","sgmnt_data.reservedDBFlags")#2)
+	. . open fhead("YDBAIM","fname") close fhead("YDBAIM","fname"):delete
+	. . kill fhead("YDBAIM")
+	. . set tmpok=1
+	. set allok=allok*tmpok
+	; Rollback / recover database if not allok. This code has limitations in what it handles
+	; as it is intended to be for simple out-of-box use of YottaDB. The regions recovered
+	; / rolled back are those which were not shut down cleanly. If a transaction spans
+	; multiple regions some of which are clean and others not, the recovery / rollback will
+	; fail. Applications sophisticated enough to use multi-region transactions likely will
+	; have their own scripting, and not use ydb_env_set.
+	do:'allok
 	. set region=""
 	. for  set region=$order(fhead(region)) quit:""=region  do:-1'=fhead(region,"sgmnt_data.semid")
-	. . set:2'=fhead(region,"sgmnt_data.jnl_state") $ecode=",U248,"	; rollback/recovery ruled out because open region not before-image journaled
+	. . ; Confirm that open region has before image journaling and that journaling is on
+	. . set:(1'=fhead(region,"sgmnt_data.jnl_before_image"))!(2'=fhead(region,"sgmnt_data.jnl_state")) $ecode=",U248,"
 	. . if '$data(replok) do
 	. . . set replok=fhead(region,"sgmnt_data.repl_state")	; set replication state to that of the first region requiring rollback/recovery
-	. . . set jnlfilelist=$zpiece($zwrite(fhead(region,"sgmnt_data.jnl_file_name"),1),$zchar(0),1)	; initialize region list with first region
+	. . . set jnlfilelist=$$jnlfile(region)	; initialize region list with first region
 	. . else  do
 	. . . set:replok'=fhead(region,"sgmnt_data.repl_state") $ecode=",U247,"	; error because not all regions have same replication state
-	. . . set jnlfilelist=jnlfilelist_","_$zpiece($zwrite(fhead(region,"sgmnt_data.jnl_file_name"),1),$zchar(0),1)	; add this region's journal file to list
+	. . . set jnlfilelist=jnlfilelist_","_$$jnlfile(region)	; add this region's journal file to list
 	. set cmd="$ydb_dist/mupip journal "_$select(replok:"-rollback -backward ""*""",1:"-recover -backward "_jnlfilelist)
+	. ; Workaround till YDB#715 is fixed: create a database file for YDBAIM
+	. ; if replication is enabled and a database file does not exist. Set
+	. ; a flag to delete it later if it was created for the workaround.
+	. ; The database access to create the file must be a separate process
+	. ; because if this process opens YDBAIM, the MUPIP RECOVER/ROLLABACK
+	. ; below will fail. As this hack relies on YDB#709, YDB#715 should be
+	. ; fixed before YDB#709 is fixed.
+	. do:replok&'$data(fhead("YDBAIM","fname"))
+	. . open "ydb715hack":(shell="/bin/sh":command="$ydb_dist/yottadb -run %XCMD 'write $view(""gvfile"",""YDBAIM""),!'":readonly)::"pipe"
+	. . use "ydb715hack" read ydb715hack use io close "ydb715hack"
+	. . set ydb715flag=0
 	. open "robustify":(shell="/bin/sh":command="/bin/sh")::"pipe"
 	. use "robustify"
 	. write cmd,!
 	. write /eof
-	. for  read line quit:$zeof  use "/proc/self/fd/2" write line,! use "robustify"
+	. for  read line quit:$zeof  do
+	. . use "/proc/self/fd/2" write line,! use "robustify"
+	. . set:line'?1"%YDB-"1(1"W",1"I",1"S").E ydb715flag=1
 	. use io close "robustify"
-	. set:$zclose $ecode=",U246,"	; error - mupip journal -rollback/-recover returned non-zero status
+	. ; if workaround is used for YDB#715, don't raise an error for non-zero return code
+	. if $zlength($get(ydb715hack)) do
+	. . set:ydb715flag $ecode=",U246,"	; error - mupip journal -rollback/-recover had a message other than I, S, or W
+	. . open ydb715hack close ydb715hack:delete
+	. else  set:$zclose $ecode=",U246,"	; error - mupip journal -rollback/-recover returned non-zero status
 	; Clean up prior generation journal files older than ydbretention
 	set tmp=$zpiece($horolog,",",1)
 	set year=$zdate(tmp,"YYYY")
 	set day=$ztranslate($zjustify(tmp-$$FUNC^%DATE("1/1/"_year)+1,3)," ",0)	; day of the year left justified to three digits
 	set cutoff=year_day-ydbretention_"000000"		; journal files with a timestamp smaller than this will be deleted
 	set region=""
-	for   set region=$order(fhead(region)) quit:""=region  do
-	. set jnlfile=$zsearch($zpiece($zwrite(fhead(region,"sgmnt_data.jnl_file_name"),1),$zchar(0),1)_"_*",$increment(zstmp))
+	for   set region=$order(fhead(region)) quit:""=region  set jnlfile=$$jnlfile(region) do:$zlength(jnlfile)
+	. set jnlfile=$zsearch(jnlfile_"_*",$increment(zstmp))
 	. for  quit:""=jnlfile  do
 	. . set timestamp=$zpiece($zparse(jnlfile,"type"),"_",2)
 	. . if timestamp>cutoff set jnlfile=""	; if jnlfile is newer than cutoff, done looking for journal files
 	. . else  do		; delete old journal file and find next candidate for deletion
 	. . . open jnlfile close jnlfile:delete
 	. . . use "/proc/self/fd/2" write jnlfile," deleted",! use io
-	. . . set jnlfile=$zsearch($zpiece($zwrite(fhead(region,"sgmnt_data.jnl_file_name"),1),$zchar(0),1)_"_*",zstmp)
+	. . . set jnlfile=$zsearch($$jnlfile(region)_"_*",zstmp)
 	quit
+
+; Internally called function to get journal file name of a journaled region.
+jnlfile:(region)
+	quit $zpiece($zwrite(fhead(region,"sgmnt_data.jnl_file_name"),1),$zchar(0),1)
 
 ; End of code in routines - what follows are defaults and errors
 
@@ -509,6 +578,7 @@ Defaults
 	; gtmver:::"mkdir -p "_env(gtmvar)_"; cd "_env(gtmvar)_"; mkdir -p g o o/utf8 r ; cd ..":"ln -s "_env(ydbvar)_" "_env(gtmvar):$zpiece($zversion," ",2)_"_"_$zpiece($zversion," ",4)
 
 ;	Error message texts
+U244	;"-F-NOUTF8LOCALE UTF-8 character set specified but no UTF-8 locale found"
 U245	;"-F-DUMPFHEADERR MUPIP DUMPFHEAD reports error: ",line
 U246	;"-F-MUPIPERR command """_cmd_""" terminated with non-zero status ("_$zclose_")"
 U247	;"-F-INCONSISTENTREPL replication state "_fhead(region,"sgmnt_data.repl_state")_" for region """_region_" does not match that of prior regions"

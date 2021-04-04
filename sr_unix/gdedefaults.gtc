@@ -1,5 +1,44 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!								!
+! Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	!
+! All rights reserved.						!
+!								!
+!	This source code contains the intellectual property	!
+!	of its copyright holder(s), and is made available	!
+!	under a license.  If you do not know the terms of	!
+!	the license, please stop and do not read further.	!
+!								!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+template -region -key_size=255 -record_size=4080
 template -segment -access_method=mm -block_size=4096 -allocation=5000 -extension=10000 -global_buffer_count=1000
 template -segment -access_method=bg -block_size=4096 -allocation=5000 -extension=10000 -global_buffer_count=1000
-template -region -stdnull -key_size=255 -record_size=4080 -journal=before
-change -segment DEFAULT -block_size=4096 -allocation=5000 -extension=10000 -global_buffer_count=1000 -file_name=$ydb_dir/$ydb_rel/g/yottadb.dat
-change -region DEFAULT -stdnull -key_size=255 -record_size=4080 -journal=(before,file="$ydb_dir/$ydb_rel/g/yottadb.mjl")
+change -segment default -block_size=4096 -allocation=5000 -extension=10000 -global_buffer_count=1000 -file_name=$ydb_dir/$ydb_rel/g/yottadb.dat
+change -region default -record_size=4080 -key_size=255 -journal=(before,file="$ydb_dir/$ydb_rel/g/yottadb.mjl")
+add -region ydbaim -autodb -dynamic_segment=ydbaim -nojournal -key_size=992 -null_subscripts=always -record_size=32
+add -segment ydbaim -access_method=mm -block_size=1024 -allocation=20000 -extension=40000 -file_name="$ydb_dir/$ydb_rel/g/%ydbaim.dat"
+add -name %ydbAIM* -region=ydbaim
+add -name %ydbAIm* -region=ydbaim
+add -name %ydbAiM* -region=ydbaim
+add -name %ydbAim* -region=ydbaim
+add -name %ydbaIM* -region=ydbaim
+add -name %ydbaIm* -region=ydbaim
+add -name %ydbaiM* -region=ydbaim
+add -name %ydbaim* -region=ydbaim
+add -region ydbocto -dynamic_segment=ydbocto -null_subscripts=always -journal=(before,file_name="$ydb_dir/$ydb_rel/g/%ydbocto.mjl")
+add -segment ydbocto -file_name="$ydb_dir/$ydb_rel/g/%ydbocto.dat"
+add -name %ydbOCTO* -region=ydbocto
+add -name %ydbOCTo* -region=ydbocto
+add -name %ydbOCtO* -region=ydbocto
+add -name %ydbOCto* -region=ydbocto
+add -name %ydbOcTO* -region=ydbocto
+add -name %ydbOcTo* -region=ydbocto
+add -name %ydbOctO* -region=ydbocto
+add -name %ydbOcto* -region=ydbocto
+add -name %ydboCTO* -region=ydbocto
+add -name %ydboCTo* -region=ydbocto
+add -name %ydboCtO* -region=ydbocto
+add -name %ydboCto* -region=ydbocto
+add -name %ydbocTO* -region=ydbocto
+add -name %ydbocTo* -region=ydbocto
+add -name %ydboctO* -region=ydbocto
+add -name %ydbocto* -region=ydbocto
