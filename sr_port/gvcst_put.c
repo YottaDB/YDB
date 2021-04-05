@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1040,7 +1040,7 @@ tn_restart:
 				 * the value to set the key to has to be determined by adding the existing value
 				 * with the increment passed as the input parameter "val" (of type (mval *)) to gvcst_put
 				 */
-				if (cdb_sc_normal != (status = gvincr_compute_post_incr(bh)))
+				if (cdb_sc_normal != (status = gvincr_compute_post_incr(bh)))	/* Note: updates "post_incr_mval" */
 				{
 					assert(CDB_STAGNATE > t_tries);
 					GOTO_RETRY;
@@ -1061,7 +1061,31 @@ tn_restart:
 			 * the post-increment value is not known until here. so do the check here.
 			 */
 			ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value, gv_target);
+			if (dollar_tlevel && gv_target->noisolation)
+			{	/* We are in a TP transaction and have computed the post-increment value based on the
+				 * pre-increment value. This could be later used at commit time (in "recompute_upd_array()"
+				 * invoked by "tp_tend()") in a "cdb_sc_blkmod" case. We will later call "tp_hist()".
+				 * But "tp_hist()" ignores "cdb_sc_blkmod" scenario in case of NOISOLATION (see
+				 * "cse->recompute_list_head" check there). While this is okay to do so in case of a SET
+				 * since the target value of the gvn is provided by the caller, it is not okay to do so in
+				 * case of a $INCREMENT since the value of the node is computed based on the current value
+				 * and the increment (that is provided by the user). This is because if the block was
+				 * concurrently being updated while we read the pre-increment value, we would have computed
+				 * an incorrect post-increment value to later be used in "recompute_upd_array()" and "tp_hist()"
+				 * call later in the current function will not detect this as a restartable situation.
+				 * Therefore, do the same "TP_IS_CDB_SC_BLKMOD" check (done in "tp_hist.c") here but restart
+				 * if blk is modified even though NOISOLATION is turned on for this global.
+				 */
+				cache_rec_ptr_t	cr;
 
+				cr = bh->cr;
+				if (TP_IS_CDB_SC_BLKMOD(cr, bh))
+				{
+					status = cdb_sc_blkmod;
+					assert(CDB_STAGNATE > t_tries);
+					GOTO_RETRY;
+				}
+			}
 		} else
 			value = val->str;
 	}
@@ -1475,10 +1499,9 @@ tn_restart:
 						cse->recompute_list_tail = tempkv;
 					} else
 						tempkv = cse->recompute_list_tail;
-					assert(0 == val->str.len
-						|| ((val->str.len == bs1[4].len)
-							&& 0 == memcmp(val->str.addr, bs1[4].addr, val->str.len)));
-					tempkv->value.len = val->str.len;	/* bs1[4].addr is undefined if val->str.len is 0 */
+					assert((0 == value.len)
+						|| ((value.len == bs1[4].len) && 0 == memcmp(value.addr, bs1[4].addr, value.len)));
+					tempkv->value.len = value.len;	/* bs1[4].addr is undefined if value.len is 0 */
 					tempkv->value.addr = (char *)bs1[4].addr;/* 	but not used in that case, so ok */
 				}
 
