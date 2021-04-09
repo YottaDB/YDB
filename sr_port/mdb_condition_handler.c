@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -616,21 +616,29 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 * before then, we are in direct mode. Else we are not in direct mode.
 	 * Note that it is also possible for a compilation error before the SFF_INDCE frame is created in op_commarg.
 	 * That is also a direct mode error so take that into account separately (TREF(compile_time) usage below).
+	 *
+	 * Note that if we find a ZTIMEOUT or a ZINTERRUPT frame, these are code fragment frames being executed on
+	 * behalf of a $ZTIMEOUT or $ZINTERRUPT interrupt event. These frames are "counted frames" but because they
+	 * are also transcendental frames, stopping at this point is premature so we avoid the counted and direct
+	 * mode frame checks if a ZTIMEOUT or ZINTERRUPT frame is detected.
 	 */
 	dm_action = FALSE;
 	prev_frame_is_indce = TREF(compile_time);
 	for (fp = frame_pointer; ; fp = fp->old_frame_pointer)
 	{
 		assert(!(fp->type & SFT_COUNT) || !(fp->type & SFT_DM));
-		if (fp->type & SFT_COUNT)
-			break;
-		if (fp->type & SFT_DM)
-		{
-			if (prev_frame_is_indce)
-				dm_action = TRUE;
-			break;
+		if (!(fp->type & SFT_ZTIMEOUT) && !(fp->type & SFT_ZINTR))
+		{	/* Not a ztimeout or zinterrupt frame so do our checks for other types */
+			if (fp->type & SFT_COUNT)
+				break;
+			if (fp->type & SFT_DM)
+			{
+				if (prev_frame_is_indce)
+					dm_action = TRUE;
+				break;
+			}
 		}
-		prev_frame_is_indce = (fp->flags & SFF_INDCE);
+		prev_frame_is_indce = (0 != (fp->flags & SFF_INDCE));
 		assert(NULL != fp->old_frame_pointer);
 	}
 	/* The errors are said to be transcendental when they occur during compilation/execution
