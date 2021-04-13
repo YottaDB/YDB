@@ -247,7 +247,17 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 			 					 * does not overrun the boundaries of the mu_int_adj array.
 								 */
 			if (lvl)
+			{
 				CHECK_ADJACENCY(nBlkId, lvl -1, mu_int_adj[lvl - 1]);
+				if (BSTAR_REC_SIZE == (((rec_hdr *)pRec)->rsiz))
+				{	/* Found a star record. In this case we cannot invoke the GET_KEY_CPY_BUFF macro
+					 * as that expects a valid key (which a star record does not contain). Treat the
+					 * star record as if it is within any specified range (i.e. follow the logic as if
+					 * "musz_range_done" is FALSE.
+					 */
+					continue;
+				}
+			}
 			GET_KEY_CPY_BUFF(pRec, nRecLen, buff, status);
 			RETURN_IF_ABNORMAL_STATUS(status);
 			if (mu_subsc) /* Subscript option chosen */
