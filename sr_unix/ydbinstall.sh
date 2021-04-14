@@ -98,6 +98,7 @@ dump_info()
     if [ -n "$ydb_octo" ] ; then echo ydb_octo " : " $ydb_octo ; fi
     if [ -n "$gtm_overwrite_existing" ] ; then echo gtm_overwrite_existing " : " $gtm_overwrite_existing ; fi
     if [ -n "$ydb_posix" ] ; then echo ydb_posix " : " $ydb_posix ; fi
+    if [ -n "$ydb_aim" ] ; then echo ydb_aim " : " $ydb_aim ; fi
     if [ -n "$gtm_prompt_for_group" ] ; then echo gtm_prompt_for_group " : " $gtm_prompt_for_group ; fi
     if [ -n "$gtm_sf_dirname" ] ; then echo gtm_sf_dirname " : " $gtm_sf_dirname ; fi
     if [ -n "$gtm_tmpdir" ] ; then echo gtm_tmpdir " : " $gtm_tmpdir ; fi
@@ -123,6 +124,7 @@ help_exit()
     set +x
     echo "ydbinstall [option] ... [version]"
     echo "Options are:"
+    echo "--aim                    -> installs AIM plug-in"
     echo "--build-type buildtype   -> type of YottaDB build, default is pro"
     echo "--copyenv dirname        -> copy gtmprofile and gtmcshrc files to dirname; incompatible with linkenv"
     echo "--copyexec dirname       -> copy gtm script to dirname; incompatible with linkexec"
@@ -141,7 +143,7 @@ help_exit()
     echo "--linkenv dirname        -> create link in dirname to gtmprofile and gtmcshrc files; incompatible with copyenv"
     echo "--nodeprecated           -> do not install deprecated components, specifically %DSEWRAP"
     echo "--linkexec dirname       -> create link in dirname to gtm script; incompatible with copyexec"
-    echo "--octo parameters        -> download and install Octo; As the POSIX plugin is required for Octo, this will install the POSIX plugin; Specify optional cmake parameters for Octo as necessary"
+    echo "--octo parameters        -> download and install Octo; also installs required POSIX and AIM plugins. Specify optional cmake parameters for Octo as necessary"
     echo "--overwrite-existing     -> install into an existing directory, overwriting contents; defaults to requiring new directory"
     echo "--posix                  -> download and install the POSIX plugin"
     echo "--preserveRemoveIPC      -> do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
@@ -219,6 +221,7 @@ if [ -z "$ydb_change_removeipc" ] ; then ydb_change_removeipc="yes" ; fi
 if [ -z "$ydb_deprecated" ] ; then ydb_deprecated="Y" ; fi
 if [ -z "$ydb_encplugin" ] ; then ydb_encplugin="N" ; fi
 if [ -z "$ydb_posix" ] ; then ydb_posix="N" ; fi
+if [ -z "$ydb_aim" ] ; then ydb_aim="N" ; fi
 if [ -z "$ydb_octo" ] ; then ydb_octo="N" ; fi
 if [ -z "$ydb_zlib" ] ; then ydb_zlib="N" ; fi
 if [ -z "$ydb_utf8" ] ; then ydb_utf8="N" ; fi
@@ -322,9 +325,11 @@ while [ $# -gt 0 ] ; do
 	    if [ -n "$tmp" ] ; then octo_cmake=$tmp ; fi
 	    ydb_octo="Y" ;
 	    ydb_posix="Y" ;
+	    ydb_aim="Y";
 	    shift ;;
         --overwrite-existing) gtm_overwrite_existing="Y" ; shift ;;
 	--posix) ydb_posix="Y" ; shift ;;
+	--aim) ydb_aim="Y" ; shift ;;
         --preserveRemoveIPC) ydb_change_removeipc="no" ; shift ;; # must come before group*
         --prompt-for-group) gtm_prompt_for_group="Y" ; shift ;;
         --ucaseonly-utils) gtm_lcase_utils="N" ; shift ;;
@@ -851,6 +856,20 @@ if [ "Y" = $ydb_posix ] ; then
 		fi
 	else
 		echo "POSIX plugin build failed. Unable to download the POSIX plugin. Your internet connection and/or the gitlab servers may be down. Please try again later."
+	fi
+fi
+
+if [ "Y" = $ydb_aim ] ; then
+	cd $tmpdir
+	mkdir aim_tmp && cd aim_tmp
+	url="https://gitlab.com/YottaDB/Util/YDBAIM.git"
+	if git clone ${url} .; then
+		if ! ./install.sh; then
+			echo "YDBAIM Installation failed."
+			remove_tmpdir=0
+		fi
+	else
+		echo "Failed to download YDBAIM. Check your internet connection. URL is ${url}"
 	fi
 fi
 
