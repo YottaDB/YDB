@@ -70,7 +70,8 @@ if "YDBDIST"/yottadb -run set^%YDBENV 1>$ydb_tmp_env/out 2>$ydb_tmp_env/err ; th
     fi
     rm -rf $ydb_tmp_env
 else
-    echo Error file is at $ydb_tmp_env/err
+    echo "Error file is at $ydb_tmp_env/err"
+    grep -E "%YDB-E-|%YDB-F-|%YDBENV-E-|%YDBENV-F-" $ydb_tmp_env/err
 fi
 
 # Restore ydb_passwd / gtm_passwd if either was set
