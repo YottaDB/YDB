@@ -137,7 +137,7 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. . . else  set $ecode=",U244,"
 	; ydb_dist is set here after setting ydb_chset since ydb_dist may need to point to
 	; the utf8 subdirectory of the YottaDB installation directory if $ydb_dist is UTF-8.
-	do ExportEnv("ydb_dist",dist_$select("UTF-8"=$get(chset):"/utf8",1:"")),ExportEnv("gtm_dist","$ydb_dist")
+	do ExportEnv("ydb_dist",dist),ExportEnv("gtm_dist",dist)
 	set path=env("ydb_dir")_"/"_env("ydb_rel")
 	; ydb_repl_instance is set here. Even for unreplicated environments without
 	; a replication instance file, ydb_repl_instance is set, to facilitate turning
@@ -241,8 +241,8 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	; ydb_etrap & ydb_procstuckexec are set here, followed by miscellaneous environment variables
 	set tmp1=$select($data(currenv("ydb_etrap")):currenv("ydb_etrap"),$data(currenv("gtm_etrap")):currenv("gtm_etrap"),1:"Write:(0=$STACK) ""Error occurred: "",$ZStatus,!")
 	do ExportEnv("ydb_etrap",tmp1),ExportEnv("gtm_etrap",tmp1)
-	set tmp1=dist_$select("UTF-8"=chset:"/utf8",1:"")
-	do ExportEnv("ydb_procstuckexec",tmp1_"/yottadb -run %YDBPROCSTUCKEXEC"),ExportEnv("gtm_procstuckexec",tmp1_"/yottadb -run %YDBPROCSTUCKEXEC")
+	set tmp1=dist_"/yottadb -run %YDBPROCSTUCKEXEC"
+	do ExportEnv("ydb_procstuckexec",tmp1),ExportEnv("gtm_procstuckexec",tmp1)
 	do:'$zfind($get(currenv("LD_LIBRARY_PATH")),dist) ExportEnv("LD_LIBRARY_PATH",dist_$select($data(currenv("LD_LIBRARY_PATH")):":"_currenv("LD_LIBRARY_PATH"),1:""))
 	if $increment(zstmp)	       ; new search context for search in next line
 	for  set tmp1=$zsearch("$ydb_dist/plugin/*.xc",zstmp) quit:""=tmp1  do
