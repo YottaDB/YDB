@@ -104,8 +104,10 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	do ExportEnv("ydb_rel",env("ydb_rel")),ExportEnv("gtmver",env("gtmver"))
 	; Get the character set for the exported environment, if saved by the invoking shell. Since this program always runs in M mode
 	; the desired character set is saved by the shell prefixed by ydb_tmp_.
-	; Make UTF-8 the default character set if none is specified.
-	set chset=$zconvert($select($data(currenv("ydb_tmp_ydb_chset")):currenv("ydb_tmp_ydb_chset"),$data(currenv("ydb_tmp_gtm_chset")):currenv("ydb_tmp_gtm_chset"),1:"UTF-8"),"u")
+	; Make UTF-8 the default character set if none is specified and UTF-8
+	; support is installed.
+	set tmp=$zsearch(dist_"/utf8",$increment(zstmp))
+	set chset=$zconvert($select($data(currenv("ydb_tmp_ydb_chset")):currenv("ydb_tmp_ydb_chset"),$data(currenv("ydb_tmp_gtm_chset")):currenv("ydb_tmp_gtm_chset"),$zlength(tmp):"UTF-8",1:""),"u")
 	do:$zlength(chset)
 	. set:'("UTF-8"=chset!("M"=chset)) $ecode=",U249,"
 	. ; Since ydb_chset and gtm_chset would have been saved in environment variables prefixed by ydb_tmp_ by ydb_env_set
@@ -113,30 +115,33 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. set:$data(currenv("ydb_tmp_ydb_chset")) currenv("ydb_chset")=currenv("ydb_tmp_ydb_chset")
 	. set:$data(currenv("ydb_tmp_gtm_chset")) currenv("gtm_chset")=currenv("ydb_tmp_gtm_chset")
 	. do ExportEnv("ydb_chset",chset),ExportEnv("gtm_chset",chset)
-	. ; Ensure a UTF-8 locale is set if chset is UTF-8. If one of the
-	. ; environment variables LANG, LC_ALL, or LC_CTYPE specifies a UTF-8
-	. ; locale (with the "UTF" case insensitive and the hyphen optional),
-	. ; that suffices. Otherwise, the "locale" command with no options gives
-	. ; the default locale for the system. If one of LANG, LC_ALL, or
-	. ; LC_CTYPE specifies a UTF-8 locale, that suffices. Otherwise, the
-	. ; "locale -a" command gives a list of locales that has been defined
-	. ; and the first UTF-8 locale, if any, is assigned to the LC_CTYPE
-	. ; environment variable. If no UTF-8 locale is identified, raise
-	. ; an error.
-	. do:"UTF-8"=chset&('($ztranslate($zconvert($get(currenv("LANG")),"u"),"-")?.E1(1"UTF-8",1"UTF8")!($ztranslate($zconvert($get(currenv("LC_ALL")),"u"),"-")?.E1(1"UTF-8",1"UTF8"))!($ztranslate($zconvert($get(currenv("LC_CTYPE")),"u"),"-")?.E1(1"UTF-8",1"UTF8"))))
-	. . set localeflag=0
-	. . open "locale":(shell="/bin/sh":command="locale":readonly)::"pipe" use "locale"
-	. . for  read line quit:$zeof  set:$zfind($zconvert($ztranslate($zpiece($zpiece(line,"=",2),".",2),"-"),"u"),"UTF8") localeflag=1 quit:localeflag
-	. . use io close "locale"
-	. . if localeflag do ExportEnv("LC_CTYPE",$zpiece(line,"=",2))
-	. . else  do
-	. . . open "locale -a":(shell="/bin/sh":command="locale -a":readonly)::"pipe" use "locale -a"
-	. . . for  read line quit:$zeof  set:$zconvert(line,"u")?.E1(1"UTF-8",1"UTF8") localeflag=1 quit:localeflag
-	. . . use io close "locale a"
-	. . . if localeflag do ExportEnv("LC_CTYPE",line)
-	. . . else  set $ecode=",U244,"
-	; ydb_dist is set here after setting ydb_chset since ydb_dist may need to point to
-	; the utf8 subdirectory of the YottaDB installation directory if $ydb_dist is UTF-8.
+	. ; Ensure a UTF-8 locale is set if chset is UTF-8. Check for a UTF-8
+	. ; locale (case-insensitive, hyphen optional) locale from the LC_ALL
+	. ; or LC_CTYPE environment variables. If neither is set, look for a
+	. ; a UTF-8 locale in the LC_ALL or LC_CTYPE values output by the
+	. ; "locale" command. If neither specifies a UTF-8 locale, set LC_CTYPE
+	. ; to the first available UTF-8 locale from the "locale -a" command,
+	. ; raising an error if none is found.
+	. do:"UTF-8"=chset
+	. . do:'($ztranslate($zconvert($get(currenv("LC_ALL")),"u"),"-")?.E1"UTF8"!($ztranslate($zconvert($get(currenv("LC_CTYPE")),"u"),"-")?.E1"UTF8"))
+	. . . set localeflag=0
+	. . . open "locale":(shell="/bin/sh":command="locale":readonly)::"pipe" use "locale"
+	. . . for  read line quit:$zeof  set:line?1"LC_"1(1"ALL",1"CTYPE").E&$zfind($zconvert($ztranslate($zpiece($zpiece(line,"=",2),".",2),"-"),"u"),"UTF8") localeflag=1 quit:localeflag
+	. . . use io close "locale"
+	. . . do:'localeflag
+	. . . . open "locale -a":(shell="/bin/sh":command="locale -a":readonly)::"pipe" use "locale -a"
+	. . . . for  read line quit:$zeof  set:$zconvert(line,"u")?.E1(1"UTF-8",1"UTF8") localeflag=1 quit:localeflag
+	. . . . use io close "locale a"
+	. . . . if localeflag do ExportEnv("LC_CTYPE",line)
+	. . . . else  set $ecode=",U244,"
+	. . ; Ensure that an ICU version is set
+	. . if '($data(currenv("ydb_icu_version"))!$data(currenv("gtm_icu_version"))) do
+	. . . open "pkg-config --modversion icu-io":(shell="/bin/sh":command="pkg-config --modversion icu-io":readonly)::"pipe" use "pkg-config --modversion icu-io"
+	. . . read line use io close "pkg-config --modversion icu-io"
+	. . . set:line'?1N.E $ecode=",U243,"
+	. . . do ExportEnv("ydb_icu_version",line),ExportEnv("gtm_icu_version",line)
+	. . else  if $data(currenv("ydb_icu_version")) do ExportEnv("gtm_icu_version",currenv("ydb_icu_version"))
+	. . else  do ExportEnv("ydb_icu_version",currenv("gtm_icu_version"))
 	do ExportEnv("ydb_dist",dist),ExportEnv("gtm_dist",dist)
 	set path=env("ydb_dir")_"/"_env("ydb_rel")
 	; ydb_repl_instance is set here. Even for unreplicated environments without
@@ -578,6 +583,7 @@ Defaults
 	; gtmver:::"mkdir -p "_env(gtmvar)_"; cd "_env(gtmvar)_"; mkdir -p g o o/utf8 r ; cd ..":"ln -s "_env(ydbvar)_" "_env(gtmvar):$zpiece($zversion," ",2)_"_"_$zpiece($zversion," ",4)
 
 ;	Error message texts
+U243	;"-F-ICUNOTFIND UTF-8 character set specified but ICU version not found"
 U244	;"-F-NOUTF8LOCALE UTF-8 character set specified but no UTF-8 locale found"
 U245	;"-F-DUMPFHEADERR MUPIP DUMPFHEAD reports error: ",line
 U246	;"-F-MUPIPERR command """_cmd_""" terminated with non-zero status ("_$zclose_")"
