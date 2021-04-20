@@ -119,7 +119,7 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. ; locale (case-insensitive, hyphen optional) from the LC_ALL
 	. ; or LC_CTYPE environment variables. If neither is set, look for a
 	. ; a UTF-8 locale in the LC_ALL or LC_CTYPE values output by the
-	. ; "locale" command. If neither specifies a UTF-8 locale, set LC_CTYPE
+	. ; "locale" command. If neither specifies a UTF-8 locale, set LC_ALL
 	. ; to the first available UTF-8 locale from the "locale -a" command,
 	. ; raising an error if none is found.
 	. do:"UTF-8"=chset
