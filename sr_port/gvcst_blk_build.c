@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,7 @@
 #include "gvcst_blk_build.h"
 #include "gtmimagename.h"
 #include "spec_type.h"
+#include "memcoherency.h"
 
 #ifdef DEBUG
 GBLREF	boolean_t		skip_block_chain_tail_check;
@@ -52,6 +53,7 @@ GBLREF	jnl_gbls_t		jgbl;
 
 void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 {
+	boolean_t	is_mm;
 	blk_segment	*seg, *stop_ptr, *array;
 	off_chain	chain;
 	sm_uc_ptr_t	ptr, ptrtop, c;
@@ -71,9 +73,10 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	 * which operates outside crit. The exceptions to this are DSE (write_after_image is TRUE) or ONLINE ROLLBACK
 	 * which holds crit for the entire duration
 	 */
+	is_mm = (dba_mm == cs_data->acc_meth);
 	assert((dba_bg != cs_data->acc_meth) || dollar_tlevel || !cs_addrs->now_crit || write_after_image
 			UNIX_ONLY(|| jgbl.onlnrlbk));
-	assert((dba_mm != cs_data->acc_meth) || dollar_tlevel || cs_addrs->now_crit);
+	assert(!is_mm || dollar_tlevel || cs_addrs->now_crit);
 	assert(cse->mode != gds_t_writemap);
 	array = (blk_segment *)cse->upd_addr;
 	assert(array->len >= SIZEOF(blk_hdr));
@@ -136,18 +139,30 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	/* Assert that "curr_tn" is always less than "early_tn" in the database. There are a few exceptions.
 	 * a) With memory instruction reordering it is possible the early_tn we read in the assert below gets executed
 	 *    BEFORE the curr_tn read that happens a few lines above. That could then fail this assert (GTM-8523).
-	 *    Account for that with the dba_mm check below.
+	 *    Account for that with the is_mm check below.
 	 * b) A concurrent online rollback can take curr_tn back in time so account for that by the
 	 *    onln_rlbk_pid (non-zero implies online rollback is still running) and
 	 *    MISMATCH_ONLN_RLBK_CYCLES (TRUE return implies online rollback is finished) checks.
 	 */
-	assert((ctn < cs_addrs->ti->early_tn) || write_after_image || (cs_data->acc_meth == dba_mm)
+	assert((ctn < cs_addrs->ti->early_tn) || write_after_image || is_mm
 		|| (cs_addrs->nl->onln_rlbk_pid || MISMATCH_ONLN_RLBK_CYCLES(cs_addrs, cs_addrs->nl)));
 	((blk_hdr_ptr_t)base_addr)->bver = GDSVCURR;
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	((blk_hdr_ptr_t)base_addr)->bsiz = UINTCAST(array->len);
 	((blk_hdr_ptr_t)base_addr)->levl = cse->level;
-
+	/* At this point, we have already changed the transaction number in the block header. And are now
+	 * going to modify the block contents. It is possible a concurrent process is in "t_end.c" validating a read transaction
+	 * using the fast path. In that case, it would not get crit but instead invoke the "TP_IS_CDB_SC_BLKMOD" macro to check
+	 * if a block that it had in its read-set had changed state. On architectures where memory accesses can be reordered at
+	 * runtime (e.g. ARMV7L etc.) it is possible that the concurrent process sees the changes to the block contents BEFORE
+	 * it sees changes to the block header. This means that the validation logic would incorrectly conclude that it saw a
+	 * consistent copy of the block. To avoid this issue, insert a write memory barrier here. This is necessary for MM.
+	 * For BG though, "cr->in_tend" is checked inside the "TP_IS_CDB_SC_BLKMOD" macro and is set only after pinning the
+	 * cache-record. The act of pinning uses compswap which does the needed memory barriers so no need of a memory barrier in
+	 * the BG case. Also see similar comment in tp_tend before MM_WRITE_MEMORY_BARRIER.
+	 */
+	if (is_mm)
+		MM_WRITE_MEMORY_BARRIER;
 	if (cse->forward_process)
 	{
 		stop_ptr = (blk_segment *)array->addr;
