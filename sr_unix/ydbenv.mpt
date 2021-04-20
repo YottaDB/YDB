@@ -116,7 +116,7 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. set:$data(currenv("ydb_tmp_gtm_chset")) currenv("gtm_chset")=currenv("ydb_tmp_gtm_chset")
 	. do ExportEnv("ydb_chset",chset),ExportEnv("gtm_chset",chset)
 	. ; Ensure a UTF-8 locale is set if chset is UTF-8. Check for a UTF-8
-	. ; locale (case-insensitive, hyphen optional) locale from the LC_ALL
+	. ; locale (case-insensitive, hyphen optional) from the LC_ALL
 	. ; or LC_CTYPE environment variables. If neither is set, look for a
 	. ; a UTF-8 locale in the LC_ALL or LC_CTYPE values output by the
 	. ; "locale" command. If neither specifies a UTF-8 locale, set LC_CTYPE
@@ -132,7 +132,7 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. . . . open "locale -a":(shell="/bin/sh":command="locale -a":readonly)::"pipe" use "locale -a"
 	. . . . for  read line quit:$zeof  set:$zconvert(line,"u")?.E1(1"UTF-8",1"UTF8") localeflag=1 quit:localeflag
 	. . . . use io close "locale a"
-	. . . . if localeflag do ExportEnv("LC_CTYPE",line)
+	. . . . if localeflag do ExportEnv("LC_ALL",line)
 	. . . . else  set $ecode=",U244,"
 	. . ; Ensure that an ICU version is set
 	. . if '($data(currenv("ydb_icu_version"))!$data(currenv("gtm_icu_version"))) do
