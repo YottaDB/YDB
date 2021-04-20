@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,13 +40,14 @@
 #include "gvsub2str.h"
 #include "io.h"
 #include "gtm_descript.h"
+#include "mv_stent.h"
 
 #define MAX_KEY_SIZE	(MAX_KEY_SZ - 4)	/* internal and external maximums differ */
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;
 GBLREF spdesc 		stringpool;
-GBLREF boolean_t	save_transform;
+GBLREF mv_stent		*mv_chain;
 
 LITREF mval		literal_null;
 
@@ -65,7 +66,6 @@ CONDITION_HANDLER(op_fnzatransform_ch)
 {
 	START_CH(TRUE);
 	RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);
-	TREF(transform) = save_transform;
 	if (transform_direction)
 		DEBUG_ONLY(TREF(skip_mv_num_approx_assert) = FALSE);
 	if (ERR_ZATRANSERR != SIGNAL)
@@ -109,7 +109,7 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 	unsigned char	buff[MAX_KEY_SZ + 1], msrcbuff[MAX_KEY_SZ + 1];
 	collseq 	*csp;
 	gv_namehead	temp_gv_target;
-	mval		*src, lcl_src;
+	mval		*src;
 	mstr		opstr;
 	boolean_t	coll_noxutil = 0;
 	boolean_t	coll_failxutil = 0;
@@ -129,19 +129,16 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 	} else
 		csp = NULL; /* Do not issue COLLATIONUNDEF for 0 collation */
 
-	if (0 == msrc->str.len)
+	if (MV_IS_STRING(msrc) && (0 == msrc->str.len))
 	{	/* Null string, return it back */
-		*dst=*msrc;
+		*dst = *msrc;
 		return;
 	}
-	/* Temporarily repoint global variables "gv_target" and "transform".
-	 * They are needed by mval2subsc/gvsub2str "transform" and "gv_target->collseq".
-	 * Note that transform is usually ON, specifying that collation transformation is "enabled",
-	 * and is only shut off for minor periods when something is being critically formatted (like
-	 * we're doing here).
+	/* Ensure global variables "gv_target" and "transform" are set as they are needed by
+	 * mval2subsc/gvsub2str. "transform" is already set to TRUE (the correct value).
+	 * Assert that. So need to only set "gv_target".
 	 */
-	save_transform = TREF(transform);
-	assert(save_transform);
+	assert(TREF(transform));
 	assert(INVALID_GV_TARGET == reset_gv_target);
 	reset_gv_target = gv_target;
 	gv_target = &temp_gv_target;
@@ -151,19 +148,21 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 	gvkey->prev = 0;
 	gvkey->top = DBKEYSIZE(MAX_KEY_SZ);
 	gvkey->end = 0;
-	/* Avoid changing the characteristics of the caller's MVAL */
-	lcl_src = *msrc;
-	src = &lcl_src;
+	/* Avoid changing the characteristics of the caller's mval. Protect value of caller's value even after potential
+	 * stringpool garbage collections (which a local copy does not do. Note, we only need to pop the mv_stent we push
+	 * onto the M stack on a normal return. Error returns always unwind the current M stack frame which will also
+	 * unwind this mv_stent.
+	 */
+	PUSH_MV_STENT(MVST_MVAL);		/* Create a temporary on M stack */
+	src = &mv_chain->mv_st_cont.mvs_mval;
+	*src = *msrc;
 	if (forceStr)
 	{
-		TREF(transform) = TRUE;
 		MV_FORCE_STR(src);
-		src->mvtype |= MV_NUM_APPROX; /* Force the mval to be treated as a string */
-	} else
-		TREF(transform) = FALSE;
+		src->mvtype |= MV_NUM_APPROX;	/* Force the mval to be treated as a string */
+	}
 	ESTABLISH(op_fnzatransform_ch);
 	transform_direction = (0 == reverse);
-
 	/* Previously the code relied on all non-zero values triggering reverse mapping.
 	 * We now use a switch to catch explicit values (with a large default for the remaining non-zero cases).
 	 */
@@ -178,7 +177,7 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 			key = gvkey->base;
 			*key++ = KEY_DELIMITER;
 			gvkey->end++;
-			DEBUG_ONLY(TREF(skip_mv_num_approx_assert) = TRUE;)
+			DEBUG_ONLY(TREF(skip_mv_num_approx_assert) = TRUE);
 			if (NULL == (key = mval2subsc(src, gvkey, TRUE)))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZATRANSERR);
 			COPY_ARG_TO_STRINGPOOL(dst, &gvkey->base[gvkey->end], &gvkey->base[1]);
@@ -199,9 +198,8 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 					res = (forceStr) ? zat_mprev_chs(c) : zat_mprev_chn(c);
 					/* If we can't go down, return null string */
 					if (-1 == res)
-					{
 						*dst = literal_null;
-					} else
+					else
 					{
 						c = (unsigned char)res;
 						COPY_ARG_TO_STRINGPOOL(dst, (&c)+1, &c);
@@ -307,20 +305,15 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 				COPY_ARG_TO_STRINGPOOL(dst, key, &buff[0]);
 			break;
 	}
-	/* Restore transform and gv_target */
+	/* Pop the mv_stent pointed to by "src" then restore gv_target */
 	REVERT;
+	POP_MV_STENT();
 	RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);
-	TREF(transform) = save_transform;
-
 	/* Now that we have restored our state, if we failed due to no xutil helper, or xutil err: invoke an error */
 	if (coll_failxutil)
-	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZATRANSCOL);
-	}
 	if (coll_noxutil)
-	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, col);
-	}
 }
 
 /* The following routines implement numeric aware
@@ -375,9 +368,7 @@ static int zat_mprev_chn(unsigned char c)
 	} else
 	{			/* we are a digit */
 		if ('0' < c)
-		{
 			retval = --c;
-		}
 	}
 	return retval;
 }
