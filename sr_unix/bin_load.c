@@ -103,11 +103,6 @@ LITREF boolean_t mu_int_exponent[256];
 		GTMCRYPT_REPORT_ERROR(GTMCRYPT_ERRNO, gtm_putmsg, io_log->len, io_log->dollar_io);				\
 		mupip_error_occurred = TRUE;											\
 		FREE_MALLOCS;													\
-		if (NULL != encr_key_handles)											\
-		{														\
-			free(encr_key_handles);											\
-			encr_key_handles = NULL;										\
-		}														\
 		return;														\
 	}															\
 }
