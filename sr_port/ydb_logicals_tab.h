@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,6 +76,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_FULLBLOCKWRITES,            "$ydb_fullblockwr
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_GBLDIR,                     "$ydb_gbldir",                     "$gtmgbldir")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_GBLDIR_TRANSLATE,           "$ydb_gbldir_translate",           "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_GDSCERT,                    "$ydb_gdscert",                    "$gtm_gdscert")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_HUPENABLE,		       "$ydb_hupenable",		  "$gtm_hupenable")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_ICU_VERSION,                "$ydb_icu_version",                "$gtm_icu_version")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_IPV4_ONLY,                  "$ydb_ipv4_only",                  "$gtm_ipv4_only")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_JNL_RELEASE_TIMEOUT,        "$ydb_jnl_release_timeout",        "$gtm_jnl_release_timeout")
@@ -97,6 +98,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MSTACK_CRIT_THRESHOLD,      "$ydb_mstack_crit
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MSTACK_SIZE,                "$ydb_mstack_size",                "$gtm_mstack_size")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MUPJNL_PARALLEL,            "$ydb_mupjnl_parallel",            "$gtm_mupjnl_parallel")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_NOCENABLE,                  "$ydb_nocenable",                  "$gtm_nocenable")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_NOFFLF,		       "$ydb_nofflf",			  "$gtm_nofflf")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_NONTPRESTART_LOG_DELTA,     "$ydb_nontprestart_log_delta",     "$gtm_nontprestart_log_delta")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_NONTPRESTART_LOG_FIRST,     "$ydb_nontprestart_log_first",     "$gtm_nontprestart_log_first")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_NON_BLOCKED_WRITE_RETRIES,  "$ydb_non_blocked_write_retries",  "$gtm_non_blocked_write_retries")

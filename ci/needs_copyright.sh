@@ -2,7 +2,7 @@
 
 #################################################################
 #								#
-# Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -35,7 +35,7 @@ if [ -L "$file" ]; then
 fi
 
 # Below is a list of specific files that do not have a copyright so ignore them
-skiplist="COPYING LICENSE README.md sr_port/gdeinitsz.m sr_port/md5hash.c sr_port/md5hash.h"
+skiplist="COPYING LICENSE README.md sr_port/md5hash.c sr_port/md5hash.h"
 skiplist="$skiplist sr_unix/custom_errors_sample.txt sr_unix/gtmgblstat.xc"
 skiplist="$skiplist sr_port/copyright.txt"
 if echo "$skiplist" | grep -q -w "$file"; then
