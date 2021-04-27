@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,6 @@
 #include "real_len.h"		/* for real_len() prototype */
 #include "zshow.h"
 
-#define LNAM		24
 #define NDIM		32		/* max node name size */
 #define	CLNTNODE_LIT	" : CLNTNODE = "
 #define CLNTPID_LIT	" : CLNTPID = "
@@ -65,7 +64,6 @@ void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr* name);
 void lke_formatlocknodes(mlk_shrblk_ptr_t node, mstr* name);
 
 static	char	gnam[]    = GNAM_FMT_STR,
-		gnaml[]	  = "!AD!/!24*  ",
 		ownedby[] = "Owned by PID= " PID_FMT_STR " which is !AD!AD",
 		request[] = "Request  PID= " PID_FMT_STR " which is !AD!AD",
 		nonexpr[] = "a nonexistent process",
@@ -198,15 +196,8 @@ bool	lke_showlock(
 					f[5] = f[6] = 0;
 				if (interactive)
 				{
-					if (LNAM >= f[0])
-					{
-						msg = gnam;
-						len1 = STR_LIT_LEN(gnam);
-					} else
-					{
-						msg = gnaml;
-						len1 = STR_LIT_LEN(gnaml);
-					}
+					msg = gnam;
+					len1 = STR_LIT_LEN(gnam);
 					memcpy(format, msg, len1);
 
 					if (owned && !lock)
