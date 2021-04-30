@@ -161,7 +161,7 @@ foreach file ($filelist)
 	endif
 	# Try to automatically add a copyright to the file
 	set tempfile = `mktemp`
-	ci/copyright.py < $file > $tempfile
+	ci/copyright.py $file > $tempfile
 	set copyright_status = $status
 	if ($copyright_status == 1) then
 		echo "note: automatically committing copyright updates to $file"

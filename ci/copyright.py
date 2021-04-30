@@ -12,15 +12,26 @@
 #                                                               #
 #################################################################
 
+# File name is expected as argument to the script. For ex: ./copyright.py file.csh
+
 import re
 import sys
+import os.path
 
 YOTTADB = re.compile('Copyright \(c\) (?P<start_date>20[0-9][0-9])(?P<end_date>-20[0-9][0-9])? YottaDB')
 
-# Goes through the file one line at a time until it finds a copyright that needs to be updated.
+# Goes through the file given by f one line at a time until it finds a copyright that needs to be updated.
+# f   -> file under consideration
+# ext -> extension of the file f
 # Returns whether the copyright was updated.
-def look_for_copyrights():
-    for line in sys.stdin:
+def look_for_copyrights(f, ext):
+    # my_cc_map is a dictionary having file extension and its comment character mapping
+    # To support other file extensions include a key value pair for each file extension below
+    my_cc_map = {
+        '.m':';',
+        '.rs':'*',
+    }
+    for line in f:
         # Simple case: existing YottaDB copyright
         # If an end date exists, replace it with this year;
         # Otherwise, add this year as the end date.
@@ -35,7 +46,8 @@ def look_for_copyrights():
         # More difficult case: no YottaDB copyrights in the file, so we have to add them.
         # This assumes that 'This source code ...' comes after all copyrights.
         elif 'This source code contains the intellectual' in line:
-            start, end = (" *", "*") if line.startswith(" *") else ("#", "#")
+            char = my_cc_map.get(ext, "#")
+            start, end = (char, char)
             print(start, " Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	", end, sep='')
             print(start, "								", end, sep='')
             print(line, end="")
@@ -48,9 +60,14 @@ def look_for_copyrights():
     exit(2)
 
 def main():
-    replaced = look_for_copyrights()
-    for line in sys.stdin:
-        print(line, end="")
+    if len(sys.argv) < 2:
+        # Missing arguments
+        print("ERROR: Missing filename argument to copyright.py", file=sys.stderr)
+        exit(1)
+    with open(sys.argv[1], 'r') as f:
+        replaced = look_for_copyrights(f, os.path.splitext(sys.argv[1])[1])
+        for line in f:
+            print(line, end="")
     if replaced:
         exit(1)
 
