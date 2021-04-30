@@ -12,6 +12,8 @@
 #                                                               #
 #################################################################
 
+# NOTE: This script is duplicated in YDBTest, YDBOcto & YDBPython. Maintaining a single copy is not possible
+# as it will lead to outdated script usage by pre-commit hook.
 # File name is expected as argument to the script. For ex: ./copyright.py file.csh
 
 import re
