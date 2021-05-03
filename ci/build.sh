@@ -56,7 +56,7 @@ if ! [ $status = 0 ]; then
 fi
 
 # Check for unexpected warnings
-../../ci/sort_warnings.sh make_warnings.txt
+../../ci/sort_warnings.sh make_warnings.txt sorted_warnings.txt
 
 # This is used for both `make` and `clang-tidy` warnings.
 # It should be run from the warnings/ directory.

@@ -62,4 +62,4 @@ find . -name '*.c' \
 	>"$output_dir/tidy_warnings.txt" 2>/dev/null
 
 cd "$output_dir"
-"$root"/ci/sort_warnings.sh tidy_warnings.txt
+"$root"/ci/sort_warnings.sh tidy_warnings.txt sorted_warnings.txt
