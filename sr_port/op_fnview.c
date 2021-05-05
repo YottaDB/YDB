@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,8 @@
 #include "mdef.h"
 
 #include <stdarg.h>
+#include <wordexp.h>		/* for wordexp() */
+
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
@@ -104,6 +106,7 @@ LITREF	gtmImageName	gtmImageNames[];
 LITREF	mstr		relink_allowed_mstr[];
 LITREF	mval		literal_zero;
 LITREF	mval		literal_one;
+LITREF	mval		literal_null;
 
 /* Define possible return values for "ENVIRONMENT" */
 #define		ENV_MUMPS		"MUMPS"
@@ -884,6 +887,114 @@ void	op_fnview(int numarg, mval *dst, ...)
 				s2pool_concat(dst, &tmpstr);
 			}
 			break;
+		case VTK_WORDEXP: {
+			wordexp_t	wordexp_result;
+			int		wordexp_status;
+			mstr		spacestr, parmblk_copy_mstr;
+			int		len;
+
+			assert(NULL != parmblk.value);
+			/* Need to null terminate string before passing to "wordexp()". Copy to stringpool for that purpose. */
+			len = parmblk.value->str.len;
+			if (0 == len)
+			{	/* Empty input. Return empty output. */
+				*dst = literal_null;
+				break;
+			}
+			ENSURE_STP_FREE_SPACE(len + 1);
+			/* Note: We should not do "s2pool()" on &parmblk.value->str as parmblk.value could point to mvals
+			 * in M generated code and therefore should not be tampered with.
+			 */
+			parmblk_copy_mstr = parmblk.value->str;
+			s2pool(&parmblk_copy_mstr);
+			assert(parmblk.value->str.addr != parmblk_copy_mstr.addr);
+			parmblk_copy_mstr.addr[len] = '\0';
+			/* Note: On a successful return (0 return value), "wordexp()" allocates a buffer that needs to be
+			 * freed hence the use of "wordfree()" later in thie code block.
+			 */
+			wordexp_status = wordexp(parmblk_copy_mstr.addr, &wordexp_result, 0);
+			stringpool.free -= len; /* Undo stringpool usage in "s2pool()" call above now that "wordexp()" is done */
+			if (0 == wordexp_status)
+			{
+				/* Run through the words returned by "wordexp()" and concatenate them with a space in between.
+				 * Store this result in the stringpool. Therefore we can later free the buffer allocated by
+				 * "wordexp()" using "wordfree()".
+				 */
+				if (0 == wordexp_result.we_wordc)
+					*dst = literal_null;	/* No result words. Just return empty string. */
+				else
+				{
+					size_t	i;
+					int	dstlen;
+
+					dst->mvtype = vtp->restype;
+					tmpstr.addr = (char *)wordexp_result.we_wordv[0];
+					tmpstr.len = strlen(tmpstr.addr);
+					s2pool(&tmpstr);
+					dst->str = tmpstr;
+					spacestr.len = 1;
+					spacestr.addr = " ";
+					for (i = 1; i < wordexp_result.we_wordc; i++)
+					{
+						if (MAX_STRLEN < (dst->str.len + spacestr.len))
+						{
+							wordfree(&wordexp_result);
+							rts_error_csa(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
+						}
+						s2pool_concat(dst, &spacestr);	/* Add space between each word in result string */
+						tmpstr.addr = (char *)wordexp_result.we_wordv[i];
+						tmpstr.len = strlen(tmpstr.addr);
+						if (MAX_STRLEN < (dst->str.len + tmpstr.len))
+						{
+							wordfree(&wordexp_result);
+							rts_error_csa(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
+						}
+						s2pool_concat(dst, &tmpstr);
+					}
+				}
+			}
+			/* https://www.gnu.org/software/libc/manual/html_node/Wordexp-Example.html does a "wordfree()"
+			 * even after a WRDE_NOSPACE return from "wordexp()". Hence doing the same below.
+			 */
+			if ((0 == wordexp_status) || (WRDE_NOSPACE == wordexp_status))
+				wordfree(&wordexp_result);
+			/* Now that "wordfree()" has been done, issue runtime error if "wordexp()" failed */
+			if (0 != wordexp_status)
+			{
+				char	*errstr;
+
+				switch(wordexp_status)
+				{
+				case WRDE_BADCHAR:
+					errstr = "WRDE_BADCHAR";
+					break;
+				case WRDE_BADVAL:
+					assert(FALSE);	/* this requires us to pass WRDE_UNDEF to wordexp() which we did not */
+					errstr = "WRDE_BADVAL";
+					break;
+				case WRDE_CMDSUB:
+					assert(FALSE);	/* this requires us to pass WRDE_NOCMD to wordexp() which we did not */
+					errstr = "WRDE_CMDSUB";
+					break;
+				case WRDE_NOSPACE:
+					errstr = "WRDE_NOSPACE";
+					break;
+				case WRDE_SYNTAX:
+					errstr = "WRDE_SYNTAX";
+					break;
+				default:
+					assert(FALSE);	/* unexpected error from wordexp() */
+					errstr = "WRDE_INVALID_ERROR";
+					break;
+				}
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_WORDEXPFAILED, 3,
+					parmblk.value->str.len, parmblk.value->str.addr, errstr);
+				assert(FALSE);
+				/* Below is to avoid static analyzer warning (if any) about uninitialized "dst" */
+				*dst = literal_null;
+			}
+			break;
+		}
 		case VTK_ZTRIGGER_OUTPUT:
 			*dst = (ydb_ztrigger_output ? literal_one : literal_zero);
 			break;

@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,7 +74,8 @@ typedef enum
 	PO_GRLREPL,	/* 12 Replication information from gtmrecv_local_struct */
 	PO_UHCREPL,	/* 13 Replication information from upd_helper_ctl */
 	PO_JNLREG,	/* 14 Journal information - jnl_private_control */
-	PO_JBFREG	/* 15 Journal buffer information - jnl_buffer_ptr_t */
+	PO_JBFREG,	/* 15 Journal buffer information - jnl_buffer_ptr_t */
+	PO_GDSSEG,	/* 3 Segment information - gd_segment struct - process private structure */
 } zpeek_mnemonic;
 
 GBLREF boolean_t        	created_core;
@@ -108,27 +109,28 @@ LITDEF nametabent zpeek_names[] =
 	{3, "CSA"}, {6, "CSAREG"}	/* 0, 1 */
 	,{2, "FH"}, {5, "FHREG"}	/* 2, 3 */
 	,{3, "GDR"}, {6, "GDRREG"}	/* 4, 5 */
-	,{3, "GLF"}, {7, "GLFREPL"}	/* 6, 7 */
-	,{3, "GRL"}, {7, "GRLREPL"}	/* 8, 9 */
-	,{3, "GSL"}, {7, "GSLREPL"}	/* 10, 11 */
-	,{3, "JBF"}, {6, "JBFREG"}	/* 12, 13 */
-	,{3, "JPC"}, {7, "JPCREPL"}	/* 14, 15 */
-	,{3, "JNL"}, {6, "JNLREG"}	/* 16, 17 */
-	,{2, "NL"}, {5, "NLREG"}	/* 18, 19 */
-	,{6, "NLREPL"}			/* 20 */
-	,{4, "PEEK"}			/* 21 */
-	,{3, "RIH"}, {7, "RIHREPL"}	/* 22, 23 */
-	,{3, "RPC"}, {7, "RPCREPL"}	/* 24, 25 */
-	,{3, "UHC"}, {7, "UHCREPL"}	/* 26, 27 */
-	,{3, "UPL"}, {7, "UPLREPL"}	/* 28, 29 */
-	                                /* Total length 30 */
+	,{3, "GDS"}, {6, "GDSSEG"}	/* 6, 7 */
+	,{3, "GLF"}, {7, "GLFREPL"}	/* 8, 9 */
+	,{3, "GRL"}, {7, "GRLREPL"}	/* 10, 11 */
+	,{3, "GSL"}, {7, "GSLREPL"}	/* 12, 13 */
+	,{3, "JBF"}, {6, "JBFREG"}	/* 14, 15 */
+	,{3, "JPC"}, {7, "JPCREPL"}	/* 16, 17 */
+	,{3, "JNL"}, {6, "JNLREG"}	/* 18, 19 */
+	,{2, "NL"}, {5, "NLREG"}	/* 20, 21 */
+	,{6, "NLREPL"}			/* 22 */
+	,{4, "PEEK"}			/* 23 */
+	,{3, "RIH"}, {7, "RIHREPL"}	/* 24, 25 */
+	,{3, "RPC"}, {7, "RPCREPL"}	/* 26, 27 */
+	,{3, "UHC"}, {7, "UHCREPL"}	/* 28, 29 */
+	,{3, "UPL"}, {7, "UPLREPL"}	/* 30, 31 */
+	                                /* Total length 32 */
 };
 /* Index to first entry with given starting letter */
 LITDEF unsigned char zpeek_index[] =
 {
-	 0,  0,  0,  2,  2,  2,  4, 12, 12,	/* a b c d e f g h i */
-	12, 18, 18, 18, 18, 21, 21, 22, 22,	/* j k l m n o p q r */
-	26, 26, 26, 30, 30, 30, 30, 30, 30	/* s t u v w x y z ~ */
+	 0,  0,  0,  2,  2,  2,  4, 14, 14,	/* a b c d e f g h i */
+	14, 20, 20, 20, 20, 23, 23, 24, 24,	/* j k l m n o p q r */
+	28, 28, 28, 32, 32, 32, 32, 32, 32,	/* s t u v w x y z ~ */
 };
 /* Associated fetch code for each entry with flag for whether arguments accepted after code (e.g. CSAREG:MUMPS) */
 LITDEF zpeek_data_typ zpeek_data[] =
@@ -136,6 +138,7 @@ LITDEF zpeek_data_typ zpeek_data[] =
 	{PO_CSAREG, 1}, {PO_CSAREG, 1}
 	,{PO_FHREG, 1}, {PO_FHREG, 1}
 	,{PO_GDRREG, 1}, {PO_GDRREG, 1}
+	,{PO_GDSSEG, 1}, {PO_GDSSEG, 1}
 	,{PO_GLFREPL, 1}, {PO_GLFREPL, 1}
 	,{PO_GRLREPL, 0}, {PO_GRLREPL, 0}
 	,{PO_GSLREPL, 1}, {PO_GSLREPL, 1}
@@ -500,6 +503,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_CSAREG:			/* These types have a region name argument */
 		case PO_FHREG:
 		case PO_GDRREG:
+		case PO_GDSSEG:
 		case PO_NLREG:
 		case PO_JNLREG:
 		case PO_JBFREG:
@@ -556,11 +560,11 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 				TREF(zpeek_reg_ptr) = r_ptr;
 				break;
 			}
-			/* PO_GDRREG opcode examines only the region's fields so does not need the region to be open.
+			/* PO_GDRREG and PO_GDSSEG opcodes examine only the region's fields so does not need the region to be open.
 			 * All the rest need it to be open. If there are any errors in the open (e.g. statsdb specified
 			 * and ydb_statsdir env var is too long etc.) then handle it by issuing an error.
 			 */
-			if ((PO_GDRREG != mnemonic_opcode) && !r_ptr->open)
+			if ((PO_GDRREG != mnemonic_opcode) && (PO_GDSSEG != mnemonic_opcode) && !r_ptr->open)
 			{
 				gv_init_reg(r_ptr);
 				if (!r_ptr->open)
@@ -593,27 +597,40 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		}
 	}
 	/* Figure out the address of each block to return */
+	zpeekadr = NULL;
 	switch(mnemonic_opcode)
 	{
 		case PO_CSAREG:		/* r_ptr set from option processing */
-			zpeekadr = &FILE_INFO(r_ptr)->s_addrs;
+			if (arg_supplied)
+				zpeekadr = &FILE_INFO(r_ptr)->s_addrs;
 			break;
 		case PO_FHREG:		/* r_ptr set from option processing */
-			zpeekadr = (&FILE_INFO(r_ptr)->s_addrs)->hdr;
+			if (arg_supplied)
+				zpeekadr = (&FILE_INFO(r_ptr)->s_addrs)->hdr;
 			break;
 		case PO_GDRREG:		/* r_ptr set from option processing */
 			assert(arg_supplied);	/* 4SCA: Assigned value is garbage or undefined, even though args are required */
-			zpeekadr = r_ptr;
+			if (arg_supplied)
+				zpeekadr = r_ptr;
+			break;
+		case PO_GDSSEG:		/* r_ptr set from option processing */
+			assert(arg_supplied);	/* 4SCA: Assigned value is garbage or undefined, even though args are required */
+			if (arg_supplied)
+				zpeekadr = r_ptr->dyn.addr;
 			break;
 		case PO_NLREG:		/* r_ptr set from option processing */
-			zpeekadr = (&FILE_INFO(r_ptr)->s_addrs)->nl;
+			if (arg_supplied)
+				zpeekadr = (&FILE_INFO(r_ptr)->s_addrs)->nl;
 			break;
 		case PO_JNLREG:		/* r_ptr set from option processing */
 		case PO_JBFREG:
-			csa = &FILE_INFO(r_ptr)->s_addrs;
-			if (NULL == csa->jnl)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZPEEKNOJNLINFO, 2, REG_LEN_STR(r_ptr));
-			zpeekadr = (PO_JNLREG == mnemonic_opcode) ? (void *)csa->jnl : (void *)csa->jnl->jnl_buff;
+			if (arg_supplied)
+			{
+				csa = &FILE_INFO(r_ptr)->s_addrs;
+				if (NULL == csa->jnl)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZPEEKNOJNLINFO, 2, REG_LEN_STR(r_ptr));
+				zpeekadr = (PO_JNLREG == mnemonic_opcode) ? (void *)csa->jnl : (void *)csa->jnl->jnl_buff;
+			}
 			break;
 		case PO_GLFREPL:	/* This set of opcodes all require the journal pool to be initialized. Verify it */
 		case PO_GSLREPL:
@@ -632,10 +649,12 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			switch(mnemonic_opcode)
 			{
 				case PO_GLFREPL:	/* arryidx set by option processing */
-					zpeekadr = (jnlpool->gtmsrc_lcl_array + arryidx);
+					if (arg_supplied)
+						zpeekadr = (jnlpool->gtmsrc_lcl_array + arryidx);
 					break;
 				case PO_GSLREPL:	/* arryidx set by option processing */
-					zpeekadr = (jnlpool->gtmsource_local_array + arryidx);
+					if (arg_supplied)
+						zpeekadr = (jnlpool->gtmsource_local_array + arryidx);
 					break;
 				case PO_NLREPL:
 					zpeekadr = (&FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs)->nl;
@@ -691,7 +710,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			assert(FALSE);
 			zpeekadr = NULL; /* needed to silence [-Wsometimes-uninitialized] warning from LLVM compiler */
 	}
-	assert(NULL != zpeekadr);
+	if (NULL == zpeekadr)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("zpeekadr"));
 	/* Check the rest of the args */
 	if (0 > offset)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("offset"));

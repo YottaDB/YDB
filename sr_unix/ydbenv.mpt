@@ -50,6 +50,7 @@
 ; Note:
 ;   * This program always runs in M mode
 ;   * $increment(zstmp) used in $zsearch() to avoid inadvertent reuse of search contexts
+;	and -1 used for search context wherever we don't need to iterate with the same context.
 ;
 ; One of the challenges of the ydb_env_set and ydb_env_unset pair of
 ; files is for the latter to distinguish between environment variables
@@ -106,7 +107,7 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	; the desired character set is saved by the shell prefixed by ydb_tmp_.
 	; Make UTF-8 the default character set if none is specified and UTF-8
 	; support is installed.
-	set tmp=$zsearch(dist_"/utf8",$increment(zstmp))
+	set tmp=$zsearch(dist_"/utf8",-1)
 	set chset=$zconvert($select($data(currenv("ydb_tmp_ydb_chset")):currenv("ydb_tmp_ydb_chset"),$data(currenv("ydb_tmp_gtm_chset")):currenv("ydb_tmp_gtm_chset"),$zlength(tmp):"UTF-8",1:""),"u")
 	do:$zlength(chset)
 	. set:'("UTF-8"=chset!("M"=chset)) $ecode=",U249,"
@@ -153,8 +154,8 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	set ydbreplinst=$select($data(currenv("ydb_repl_instance")):currenv("ydb_repl_instance"),$data(currenv("gtm_repl_instance")):currenv("gtm_repl_instance"),1:"")
 	do:'$zlength(ydbreplinst)
 	. set ydbreplinst=path_"/g/yottadb.repl"
-	. do:'$zlength($zsearch(ydbreplinst,$increment(zstmp)))
-	. . set tmp1=$zsearch(path_"/g/*.repl",$increment(zstmp))
+	. do:'$zlength($zsearch(ydbreplinst,-1))
+	. . set tmp1=$zsearch(path_"/g/*.repl",-1)
 	. . set:$zlength(tmp1) ydbreplinst=tmp1
 	do ExportEnv("ydb_repl_instance",ydbreplinst),ExportEnv("gtm_repl_instance",ydbreplinst)
 	; set ydb_retention
@@ -169,10 +170,10 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	; journal files.  If no environment exsists create it here.
 	set ydbgbldir=$select($data(currenv("ydb_gbldir")):currenv("ydb_gbldir"),$data(currenv("gtmgbldir")):currenv("gtmgbldir"),1:"")
 	if '($zlength(ydbgbldir)) do					; global directory not defined in environment
-	. set ydbgbldir=path_"/g/yottadb.gld",tmp1=$zsearch(ydbgbldir,$increment(zstmp))
+	. set ydbgbldir=path_"/g/yottadb.gld",tmp1=$zsearch(ydbgbldir,-1)
 	. if $zlength(tmp1) set ydbgbldir=tmp1 do Robustify	; use existing in $ydb_dir/$ydb_rel/g/yottadb.gld
 	. else  do
-	. . set tmp1=$zsearch(path_"/g/*.gld",$increment(zstmp))	; $ydb_dir/$ydb_rel/g/yottadb.gld doesn't exist, look for ...
+	. . set tmp1=$zsearch(path_"/g/*.gld",-1)	; $ydb_dir/$ydb_rel/g/yottadb.gld doesn't exist, look for ...
 	. . if $zlength(tmp1) set ydbgbldir=tmp1 do Robustify		; any $ydb_dir/$ydb_rel/g/*.gld and use first one, if any exist.
 	. . else  do	      	  	    		 		; no global directory - need to create default global directory & database
 	. . . ; command is /bin/sh to feed lines to shell process because of YottaDB deviceparameter limit
@@ -181,7 +182,7 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. . . write "export ydb_gbldir=",ydbgbldir,!,"export gtmgbldir=$ydb_gbldir",!
 	. . . write "export ydb_dir=",env("ydb_dir"),!,"export gtmdir=",env("gtmdir"),!
 	. . . write "export ydb_rel="_env("ydb_rel"),!,"export gtmver=",env("gtmver"),!
-	. . . if $zsearch("./gdedefaults",$increment(zstmp)) write dist,"/yottadb -run GDE <gdedefaults",!
+	. . . if $zsearch("./gdedefaults",-1) write dist,"/yottadb -run GDE <gdedefaults",!
 	. . . else  write dist,"/yottadb -run GDE <"_dist,"/gdedefaults",!
 	. . . write dist,"/mupip create",!
 	. . . write dist,"/mupip set -journal=""enable,on,before"" -region ""*""",!
@@ -200,8 +201,8 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	set tmp2=$zsearch(tmp1,$increment(zstmp))
 	for  quit:""=tmp2  set path=path_" "_tmp2,tmp2=$zsearch(tmp1,zstmp)	; use the same search context to find all files
 	set tmp1=dist_$select("UTF-8"=chset:"/utf8",1:"")
-	set tmp2=$zsearch(tmp1_"/libyottadbutil.so",$increment(zstmp))	; if there is no libyottadbutil.so, check for libgtmutil.so, just ...
-	set:'$zlength(tmp2) tmp2=$zsearch(tmp1_"/libgtmutil.so",$increment(zstmp))	; in case someone is trying to run this with GT.M
+	set tmp2=$zsearch(tmp1_"/libyottadbutil.so",-1)	; if there is no libyottadbutil.so, check for libgtmutil.so, just ...
+	set:'$zlength(tmp2) tmp2=$zsearch(tmp1_"/libgtmutil.so",-1)	; in case someone is trying to run this with GT.M
 	set:$zlength(tmp2) path=path_" "_tmp2
 	do ExportEnv("ydb_routines",path),ExportEnv("gtmroutines",path)
 	; ydb_log is set here, with the directory structure created if it does not exist
@@ -213,7 +214,7 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. set tmp4=$zpiece(tmp3,tmp1,1) for i=2:1:$zlength(tmp3,tmp1) set tmp4=tmp4_env("ydb_rel")_$zpiece(tmp3,tmp1,i)
 	. set tmp3=tmp4
 	if $zlength(tmp2) set tmp4=$zpiece(tmp3,tmp2,1) for i=2:1:$zlength(tmp3,tmp2) set tmp4=tmp4_env("gtmver")_$zpiece(tmp3,tmp2,i)
-	do:""=$zsearch(tmp4,$increment(zstmp))
+	do:""=$zsearch(tmp4,-1)
 	. ; Release-specific directory (e.g. /tmp/yottadb/r1.23_x86_64) does not exist. Create it.
 	. ; Note: One might be tempted to combine the "umask" and "chmod o-rwx" commands below into one "umask command
 	. ;       But that might not be correct in case we also create /tmp/yottadb as part of the below "mkdir".
@@ -255,7 +256,7 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. do ExportEnv("ydb_xc_"_tmp2,tmp1),ExportEnv("GTM_XC_"_tmp2,tmp1)
 	set tmp1=currenv("PATH"),tmp2=":"_tmp1_":"
 	set:'$zfind(tmp2,":"_dist_":") tmp1=dist_":"_tmp1
-	set tmp3=$zsearch("$ydb_dist/plugin/bin",$increment(zstmp))
+	set tmp3=$zsearch("$ydb_dist/plugin/bin",-1)
 	set:$zlength(tmp3)&'$zfind(tmp2,":"_tmp3_":") tmp1=tmp3_":"_tmp1
 	do ExportEnv("PATH",tmp1)
 	; Set environment variables to restore ydb_dist / gtm_dist in the event they were set before invoking ydb_env_set
@@ -311,9 +312,9 @@ DirEnsure(ydbvar,gtmvar)
 	. else  do		       	   	     	; directory for ydbvar does not exist, need to create it
 	. . do:'$data(env(ydbvar,"create")) GetDefaults
 	. . set $zdirectory=$select($data(env(ydbvar,"directory")):env(ydbvar,"directory"),$data(env("ydb_dir","path")):env("ydb_dir","path"),1:$zparse(env(ydbvar),"directory"))
-	. . zsystem @env(ydbvar,"create")		; create the YottaDB directory
+	. . do createdirs(ydbvar)			; create the YottaDB directory
 	. . do FileTypeEnsure(ydbvar,1)			; verify that it exists
-	. . set:'$zlength($zsearch(env(ydbvar,"path"),$increment(zstmp))) $ecode=",U253,"
+	. . set:'$zlength($zsearch(env(ydbvar,"path"),-1)) $ecode=",U253,"
 	. . do FileTypeEnsure(gtmvar,1)
 	. . ; if $gtmvar exists and is different from ydbvar, it is an error
 	. . set:$data(env(gtmvar,"path"))&'$$PathSame(env(gtmvar,"path"),env(ydbvar,"path")) $ecode=",U251,"
@@ -326,16 +327,16 @@ DirEnsure(ydbvar,gtmvar)
 	. else  do					; directory for gtmvar does not exist, need to create it
 	. . do:'$data(env(gtmvar,"create")) GetDefaults
 	. . set $zdirectory=$select($data(env(gtmvar,"directory")):env(gtmvar,"directory"),$data(env("gtmdir","path")):env("gtmdir","path"),1:$zparse(env(gtmvar),"directory"))
-	. . zsystem @env(gtmvar,"create")		; create the gtmvar directory
+	. . do createdirs(gtmvar)			; create the gtmvar directory
 	. . do FileTypeEnsure(gtmvar,1)			; verify that it exists
-	. . set:'$zlength($zsearch(env(gtmvar,"path"),$increment(zstmp))) $ecode=",U250,"
+	. . set:'$zlength($zsearch(env(gtmvar,"path"),-1)) $ecode=",U250,"
 	. . set env(ydbvar)=$select($data(env(ydbvar,"path"))#10:env(ydbvar,"path"),1:env(gtmvar,"path"))
 	else  do
 	. ; Neither ydbvar nor gtmvar is defined
 	. do:'($data(env(ydbvar,"default"))&$data(env(gtmvar,"default"))) GetDefaults
 	. set:$data(env(ydbvar,"default"))#10 env(ydbvar)=env(ydbvar,"default")
 	. set:$data(env(gtmvar,"default"))#10 env(gtmvar)=env(gtmvar,"default")
-	. set $zdirectory=$select($data(env(ydbvar,"directory")):$zsearch(env(ydbvar,"directory"),$increment(zstmp)),$data(env("ydb_dir","path")):env("ydb_dir","path"),1:env("gtmdir","path"))
+	. set $zdirectory=$select($data(env(ydbvar,"directory")):$zsearch(env(ydbvar,"directory"),-1),$data(env("ydb_dir","path")):env("ydb_dir","path"),1:env("gtmdir","path"))
 	. do FileTypeEnsure(ydbvar,1)
 	. if $data(env(ydbvar,"path")) do		; if default directory exists for ydbvar, use it
 	. . do FileTypeEnsure(gtmvar,1)
@@ -343,18 +344,18 @@ DirEnsure(ydbvar,gtmvar)
 	. . . set:'$$PathSame(env(gtmvar,"path"),env(ydbvar,"path")) $ecode=",U251,"
 	. . else  do					; default directory for gtmvar does not exist, create link to ydbvar
 	. . . zsystem @env(gtmvar,"link")		; Link to it from the GT.M name
-	. . . set:'$zlength($zsearch(env(gtmvar,"default"),$increment(zstmp))) $ecode=",U252,"
+	. . . set:'$zlength($zsearch(env(gtmvar,"default"),-1)) $ecode=",U252,"
 	. else  do					; default directory for ydbvar does not exist
 	. . do FileTypeEnsure(gtmvar,1)
 	. . if $data(env(gtmvar,"path")) do		; if default directory exists for gtmvar, use it
 	. . . zsystem @env(ydbvar,"link")		; Link to it from the YottaDB name
-	. . . set:'$zlength($zsearch(env(ydbvar,"default"),$increment(zstmp))) $ecode=",U252,"
+	. . . set:'$zlength($zsearch(env(ydbvar,"default"),-1)) $ecode=",U252,"
 	. . else  do					; neither default exists, create ydbvar default
-	. . . zsystem @env(ydbvar,"create")		; create the YottaDB directory
+	. . . do createdirs(ydbvar)			; create the YottaDB directory
 	. . . do FileTypeEnsure(ydbvar,1)		; verify that it exists
-	. . . set:'$zlength($zsearch(env(ydbvar,"default"),$increment(zstmp))) $ecode=",U253,"
+	. . . set:'$zlength($zsearch(env(ydbvar,"default"),-1)) $ecode=",U253,"
 	. . . zsystem @env(gtmvar,"link")		; Link to it from the GT.M name
-	. . . set:'$zlength($zsearch(env(gtmvar,"default"),$increment(zstmp))) $ecode=",U252,"
+	. . . set:'$zlength($zsearch(env(gtmvar,"default"),-1)) $ecode=",U252,"
 	set $zdirectory=zdir				; Restore current directory to that at process entry
 	quit
 
@@ -398,10 +399,10 @@ FileTypeEnsure(envvar,followlink)
 	if '($data(env(envvar))#10) set env(envvar)=$get(currenv(envvar)),flag=1
 	else  set flag=0
 	if $zlength(env(envvar)) do
-	. set env(envvar,"path")=$zsearch(env(envvar),$increment(zstmp))
+	. set env(envvar,"path")=$zsearch(env(envvar),-1)
 	. if $zlength(env(envvar,"path")) do
 	. . set env(envvar,"type")=$$FileType(env(envvar,"path"),+$get(followlink))
-	. . zsy "mkdir -p "_env(envvar,"path")_"/r"
+	. . do mkdir(env(envvar,"path")_"/r")
 	. . set:"other"=env(envvar,"type") $ecode=",U254,"	; error if it exists and is not a link or a directory
 	. else  kill env(envvar,"path")	   			; path does not exist
 	else  zwithdraw:flag env(envvar)			; remove null value if set by this function
@@ -462,32 +463,40 @@ PathSame(path1,path2)
 
 Robustify	; rollback / recover an existing database if needed
 	new allok,cmd,cutoff,fhead,field,fname,io,jnlfile,jnlfilelist,line,region,replok,replon,sem,semid,semkey,timestamp,tmpok,ydb715flag,ydb715hack,year
+	new semidnotnull
 	set io=$io
 	view "setenv":"ydb_dir":env("ydb_dir"),"setenv":"ydb_rel":env("ydb_rel"),"setenv":"ydb_gbldir":ydbgbldir,"setenv":"ydb_repl_instance":ydbreplinst
 	; create files for any regions that don't have database files; they're likely temporary regions
 	; ignore stderr as mupip create will likely complain but attempt to read one line from stdin to ensure command completes
 	open "create":(shell="/bin/sh":command="$ydb_dist/mupip create":readonly)::"pipe"
 	use "create" read line use io close "create"
-	open "fhead":(shell="/bin/sh":command="$ydb_dist/mupip dumpfhead -region ""*"" 2>&1")::"pipe"
-	use "fhead"
-	for  read line quit:$zeof  do
-	. set:"%"=$zextract(line,1,1) $ecode=",U245,"	; mupip dumpfhead reports an error, e.g, a database file does not exist
-	. if 1<$zlength(line,"Fileheader dump of region ") set region=$zpiece(line,"Fileheader dump of region ",2)
-	. else  if 1<$zlength(line,"Dumping fileheader of ") set fhead(region,"fname")=$zpiece(line,"Dumping fileheader of ",2)
-	. else  set fhead(region,$zpiece(line,"""",2))=$zpiece(line,"=",2)
-	use io close "fhead"
-	; We noticed the "ipcs" utility return duplicate lines (the same line got returned anywhere from 1 to even hundreds of times)
-	; in the following version. Not sure when this will get fixed so as a work around we do the "sort -u" below.
-	;	$ ipcs --version
-	;	ipcs from util-linux 2.35.1
-	;
-	open "ipcs -s":(shell="/bin/sh":command="ipcs -s | sort -u":readonly)::"pipe"
-	use "ipcs -s"
-	for  read line quit:$zeof  do
-	. set semkey=$zpiece(line," ",1)
-	. set semid=$zpiece(line," ",2)
-	. set:semkey?1"0x"."0" sem(semid)=""	; this pattern looks for a private semaphore (with a key of 0x00000000)
-	use io close "ipcs -s"
+	set semidnotnull=0
+	set region="" for  set region=$view("GVNEXT",region)  quit:region=""  do
+	. new dumpfhead,dbfname
+	. ; Note that it is possible that the database file is crashed. Therefore we cannot use $VIEW("GVFILE",region) below
+	. ; as that will try to open the database and encounter a REQRUNDOWN/REQRECOV/REQROLLBACK type of error.
+	. ; Hence the use of PEEKBYNAME("gd_segment.fname") below (it only reads the segment file name from the gld file).
+	. ; Also note that the database file name could have env vars in it (e.g. $ydb_dir/$ydb_rel/g/%ydbaim.dat)
+	. ; hence the need to use $view("WORDEXP") below.
+	. set dbfname=$view("WORDEXP",$zpiece($$^%PEEKBYNAME("gd_segment.fname",region),$zchar(0),1))
+	. do:(""'=$zsearch(dbfname,-1))
+	. . set fhead(region,"fname")=dbfname
+	. . do getfields^%DUMPFHEAD(.dumpfhead,dbfname)
+	. . merge fhead(region)=dumpfhead
+	. . set:(-1'=fhead(region,"sgmnt_data.semid")) semidnotnull=1
+	if semidnotnull do
+	. ; We noticed the "ipcs" utility return duplicate lines (the same line got returned anywhere from 1 to even hundreds of times)
+	. ; in the following version. Not sure when this will get fixed so as a work around we do the "sort -u" below.
+	. ;	$ ipcs --version
+	. ;	ipcs from util-linux 2.35.1
+	. ;
+	. open "ipcs -s":(shell="/bin/sh":command="ipcs -s | sort -u":readonly)::"pipe"
+	. use "ipcs -s"
+	. for  read line quit:$zeof  do
+	. . set semkey=$zpiece(line," ",1)
+	. . set semid=$zpiece(line," ",2)
+	. . set:semkey?1"0x"."0" sem(semid)=""	; this pattern looks for a private semaphore (with a key of 0x00000000)
+	. use io close "ipcs -s"
 	; Check whether every region is either not open, or open with an existing shared memory segment
 	; If all regions satisfy one or the other requirement, there is nothing for robustify to do.
 	; Note that an application could split ^%ydbAIM* global variables across multiple regions. Since
@@ -571,16 +580,35 @@ Robustify	; rollback / recover an existing database if needed
 
 ; Internally called function to get journal file name of a journaled region.
 jnlfile:(region)
-	quit $zpiece($zwrite(fhead(region,"sgmnt_data.jnl_file_name"),1),$zchar(0),1)
+	quit $zpiece(fhead(region,"sgmnt_data.jnl_file_name"),$zchar(0),1)
+
+; Internally called function to create a list of directories related to a particular env var
+createdirs:(envvar)
+	new dir,dirlist,i,numpcs
+	set dirlist=env(envvar,"create"),numpcs=$zlength(dirlist,"#")
+	set var=$zpiece(dirlist,"#",1),var=@var
+	for i=1:1:numpcs do
+	. set dir=$select(1=i:"",1:$zpiece(dirlist,"#",i))
+	. do mkdir(var_dir)
+	quit
+
+; Internally called function to create one directory if it does not already exist
+mkdir:(dir)
+	if (""=$zsearch(dir,-1)) do
+	. ; Avoid zsystem. Though it is simpler to use, it is costly. Pipes are cheaper so use that instead.
+	. open "create":(shell="/bin/sh":command="mkdir -p "_dir:writeonly)::"pipe"
+	. use "create"
+	. close "create"
+	quit
 
 ; End of code in routines - what follows are defaults and errors
 
 Defaults
-	; Default values for environment variables
-	; ydb_dir:$HOME:.yottadb:"mkdir -p "_env(ydbvar,"name")_"/r":"ln -s "_env(gtmvar,"name")_" "_env(ydbvar,"name")
-	; gtmdir:$HOME:.fis-gtm:"mkdir -p "_env(gtmvar,"name")_"/r":"ln -s "_env(ydbvar,"name")_" "_env(gtmvar,"name")
-	; ydb_rel:::"mkdir -p "_env(ydbvar)_"; cd "_env(ydbvar)_"; mkdir -p g o o/utf8 r ; cd ..":"ln -s "_env(gtmvar)_" "_env(ydbvar):$zpiece($zyrelease," ",2)_"_"_$zpiece($zyrelease," ",4)
-	; gtmver:::"mkdir -p "_env(gtmvar)_"; cd "_env(gtmvar)_"; mkdir -p g o o/utf8 r ; cd ..":"ln -s "_env(ydbvar)_" "_env(gtmvar):$zpiece($zversion," ",2)_"_"_$zpiece($zversion," ",4)
+	; Default values for environment variables. See "GetDefaults" entryref for format of below lines.
+	; ydb_dir:$HOME:.yottadb:env(ydbvar,"name")#/r:"ln -s "_env(gtmvar,"name")_" "_env(ydbvar,"name")
+	; gtmdir:$HOME:.fis-gtm:env(gtmvar,"name")#/r:"ln -s "_env(ydbvar,"name")_" "_env(gtmvar,"name")
+	; ydb_rel:::env(ydbvar)#/g#/o#/o/utf8#/r:"ln -s "_env(gtmvar)_" "_env(ydbvar):$zpiece($zyrelease," ",2)_"_"_$zpiece($zyrelease," ",4)
+	; gtmver:::env(ydbvar)#/g#/o#/o/utf8#/r:"ln -s "_env(ydbvar)_" "_env(gtmvar):$zpiece($zversion," ",2)_"_"_$zpiece($zversion," ",4)
 
 ;	Error message texts
 U243	;"-F-ICUNOTFIND UTF-8 character set specified but ICU version not found"

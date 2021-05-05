@@ -3,7 +3,7 @@
 ; Copyright (c) 2015-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -58,6 +58,7 @@
 	else  if "sgmnt_addrs"=first do:""=regindex error("PARMREQ",first,aregname) set mnemonicandreg="CSAREG:"_regindex
 	else  if "sgmnt_data"=first do:""=regindex error("PARMREQ",first,aregname) set mnemonicandreg="FHREG:"_regindex
 	else  if "gd_region"=first do:""=regindex error("PARMREQ",first,aregname) set mnemonicandreg="GDRREG:"_regindex
+	else  if "gd_segment"=first do:""=regindex error("PARMREQ",first,aregname) set mnemonicandreg="GDSSEG:"_regindex
 	else  if "gtmsrc_lcl"=first do:""=regindex error("PARMREQ",first,anindexval) set mnemonicandreg="GLFREPL:"_regindex
 	else  if "gtmrecv_local_struct"=first do:""'=regindex error("NOPARM",first) set mnemonicandreg="GRLREPL"
 	else  if "gtmsource_local_struct"=first do:""=regindex error("PARMREQ",first,anindexval) do
@@ -155,6 +156,7 @@ ERRPBNNOFIELD		;150383778;"%ZPEEKBYNAME() requires a field.item in its first par
 ERRPBNUNSUPTYPE		;150383882;"$ZPEEK() does not support type "_first
 struct	;  listed below, in alphabetical order, structures currently supported by ^%PEEKBYNAME
 	;gd_region
+	;gd_segment
 	;gtmrecv_local_struct
 	;gtmsource_local_struct
 	;gtmsrc_lcl

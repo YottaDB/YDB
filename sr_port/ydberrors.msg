@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2017 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	!
+! Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -67,6 +67,7 @@ BOOLEXPRTOODEEP	<Boolean expression depth exceeds maximum supported limit of 204
 TPCALLBACKINVRETVAL     <Invalid return type for TP callback function>/error/fao=0
 INVMAINLANG	<Invalid main routine language id specified: !UL>/error/fao=1
 WCSFLUFAILED	<!AD error while flushing buffers at transaction number 0x!16@XQ for database file !AD>/info/fao=5
+WORDEXPFAILED	<wordexp() call for string [!AD] returned !AZ error. See wordexp() man pages for details>/error/fao=3
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !
