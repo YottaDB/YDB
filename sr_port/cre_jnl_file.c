@@ -443,8 +443,15 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl,
 					rename_fn_len, rename_fn);
 		STATUS_MSG(info);
-		assert(ydb_white_box_test_case_enabled && (WBTEST_YDB_FILEDELFAIL == ydb_white_box_test_case_number)
-			&& IS_MUMPS_IMAGE);
+		/* The only reason we know why the rename can fail is if we don't have permissions on the directory.
+		 * This is possible in two ways.
+		 *	a) The white-box code in the previous "if" code block explicitly turns off write permissions.
+		 *	b) We are running the v62000/gtm8086 subtest which turns off write permissions in the background
+		 *		and so can happen any time.
+		 * Assert accordingly below. This means we will fail the assert if we notice a ENOENT return from the rename() call
+		 * (which we did see once in internal testing and are not sure how it happened so the assert will help debug it).
+		 */
+		assert(EACCES == info->status);
 		return EXIT_ERR;
 	}
 	/* Following does rename of a.mjl_new to a.mjl.
@@ -465,7 +472,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		assert(0 == ret);
 	}
 #	endif
-	if (SS_NORMAL !=  (info->status = gtm_rename((char *)create_fn, create_fn_len,
+	if (SS_NORMAL != (info->status = gtm_rename((char *)create_fn, create_fn_len,
 						     (char *)info->jnl, (int)info->jnl_len, &info->status2)))
 	{
 		send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, create_fn_len, create_fn, info->jnl_len, info->jnl);
@@ -473,8 +480,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl,
 					rename_fn_len, rename_fn);
 		STATUS_MSG(info);
-		assert(ydb_white_box_test_case_enabled && (WBTEST_YDB_RENAMEFAIL == ydb_white_box_test_case_number)
-			&& IS_MUMPS_IMAGE);
+		assert(EACCES == info->status);	/* See comment before similar assert above for WHY the assert is the way it is */
 		return EXIT_ERR;
 	}
 	send_msg_csa(CSA_ARG(csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
