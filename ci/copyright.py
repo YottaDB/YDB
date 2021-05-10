@@ -29,9 +29,44 @@ YOTTADB = re.compile("Copyright \(c\) (?P<start_date>20[0-9][0-9])(?P<end_date>-
 def look_for_copyrights(f, ext):
     # my_cc_map is a dictionary having file extension and its comment character mapping
     # To support other file extensions include a key value pair for each file extension below
+    # Note:
+    # 1.
+    # Following commands are helpful to identify file extensions which can be added to this map.
+    # To list extensions with file count `find . -type f | sed -e 's/.*\.//' | sed -e 's/.*\///' | sort | uniq -c | sort -rn`.
+    # To find files with specific extension `find ./ -type f -name "*.ext"`.
+    # 2.
+    # `needs_copyright.sh` in different repo's takes care of skipping files which doesn't need the copyright related changes
+    # so even if an extension doesn't apply to that repo it should be fine to have it in the mapping. Example case is `.txt`
+    # which is excluded in YDBPython isn't in YDB.
+    # 3.
+    # All the following will be taken care by the default case in code. So no entries required for these in the map.
+    #    py start="#" end="#"
+    #    yml start="#" end="#"
+    #    toml start="#" end="#"
+    #    pyi start="#" end="#"
+    #    s start="#" end="#"
+    #    csh start="#" end="#"
+    #    si start="#" end="#"
+    #    sh start="#" end="#"
+    #    txt start="#" end="#"
+    #    gtc start="#" end="#"
+    #    awk start="#" end="#"
+    #    exp start="#" end="#"
+    #    awk start="#" end="#"
+    #    sql start="#" end="#"
+    #    in start="#" end="#"
+    #    exp start="#" end="#"
+    #    .cmake start="#" end="#"
     my_cc_map = {
         ".m": ";",
         ".rs": "*",
+        ".c": "*",
+        ".h": "*",
+        ".mpt": ";",
+        ".msg": "!",
+        ".java": "*",
+        "ctemplate": "*",
+        ".y": "*",
     }
     for line in f:
         # Simple case: existing YottaDB copyright
@@ -50,8 +85,20 @@ def look_for_copyrights(f, ext):
         elif "This source code contains the intellectual" in line:
             char = my_cc_map.get(ext, "#")
             start, end = (char, char)
-            print(start, " Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	", end, sep="")
-            print(start, "								", end, sep="")
+            if os.path.basename(f.name) == "git-watcher.cmake":
+                print(start, "Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.")
+                print(start, "All rights reserved.")
+                print(start)
+            else:
+                if ext == ".c" or ext == ".h" or ext == ".ctemplate" or ext == ".y":
+                    tmp_cc = " " + start
+                    if line.startswith(tmp_cc):
+                        start = tmp_cc
+                elif ext == ".rst":
+                    start = ".. " + start
+                print(start, " Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	", end, sep="")
+                print(start, " All rights reserved.                                     ", end, sep="")
+                print(start, "								", end, sep="")
             print(line, end="")
             return True
         else:
