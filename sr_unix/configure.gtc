@@ -4,7 +4,7 @@
 # Copyright (c) 2009-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -285,16 +285,18 @@ if [ -d "utf8" ]; then
 	# Setup library path (in prep for looking for libicu and crypto libs)
 	# Please keep in sync with sr_unix/set_library_path.csh and sr_unix/gtm_test_install.csh
 	if [ $is64bit_ydb -eq 1 ] ; then
-		library_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib"
 		if [ "$isarm_ydb" -eq 1 ] ; then
-			library_path="$library_path /usr/lib/aarch64-linux-gnu"
+			library_path="/usr/lib/aarch64-linux-gnu"
 		else
-			library_path="$library_path /usr/lib/x86_64-linux-gnu"
+			library_path="/usr/lib/x86_64-linux-gnu"
 		fi
+		library_path="$library_path /usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib"
 	elif [ "$isarm_ydb" -eq 1 ] ; then
-		library_path="/usr/local/lib32 /usr/local/lib /usr/lib32 /usr/lib /usr/lib/arm-linux-gnueabihf /lib32 /lib"
+		library_path="/usr/lib/arm-linux-gnueabihf" # this is where Raspbian has ICU installed
+		library_path="$library_path /usr/lib/arm-linux-gnueabi" # this is where Debian has ICU installed
+		library_path="$library_path /usr/local/lib32 /usr/local/lib /usr/lib32 /usr/lib /libh32 /lib"
 	else
-		library_path="                 /usr/local/lib /usr/lib32 /usr/lib /usr/lib/i386-linux-gnu"
+		library_path="/usr/local/lib /usr/lib32 /usr/lib /usr/lib/i386-linux-gnu"
 	fi
 	$echo "Should UTF-8 support be installed? (y or n) \c"
 	read resp
