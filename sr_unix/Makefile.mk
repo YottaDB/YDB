@@ -3,7 +3,7 @@
 # Copyright (c) 2013-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -117,7 +117,12 @@ ifneq (,$(findstring Linux,$(UNAMESTR)))
 	ifeq ($(BIT64),0)
 		LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86_64-linux-gnu
 	else ifneq (,$(findstring arm,$(MACHTYPE)))
-		IFLAGS += -I /usr/include/openssl -I /usr/lib/arm-linux-gnueabihf
+		IFLAGS += -I /usr/include/openssl
+		# Below is where Debian on ARM has ICU installed
+		IFLAGS += -I /usr/lib/arm-linux-gnueabi
+		LIBFLAGS += -L /usr/lib/arm-linux-gnueabi
+		# Below is where Raspbian on ARM has ICU installed
+		IFLAGS += -I /usr/lib/arm-linux-gnueabihf
 		LIBFLAGS += -L /usr/lib/arm-linux-gnueabihf
 	else
 		LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86-linux-gnu
