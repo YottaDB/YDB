@@ -2,7 +2,7 @@
  *								*
  * Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -75,11 +75,17 @@ int dollar_quit(void)
 		int		*xfer_offset_32;
 	} ptrs;
 
-	/* There was no return value - return 0 */
 	if (NULL == get_ret_targ(&sf))
-		return 0;
+		return 0;	/* There was no return value - return 0 */
 	/* There is a return value - see if they want a "regular" or alias type return argument */
 	sf = sf->old_frame_pointer;		/* Caller's frame */
+	if (SFT_CI & sf->type)
+	{	/* Call-in base frame. In this case, there is no alias type return possible. Only a "regular" return value.
+		 * Since "get_ret_targ()" returned a non-NULL value a few lines above, we are guaranteed this is a function
+		 * that has a return value. So return 1 to indicate "regular" (aka non-alias) return value.
+		 */
+		return 1;
+	}
 #	ifdef __i386
 	{
 		ptrs.instr = sf->mpc;
