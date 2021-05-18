@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -549,6 +549,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				}
 			} else
 				curr_stat_res = new_stat_res; /* new_stat_res is already set */
+			header_is_usable = FALSE;
 			if (newjnlfiles)
 			{
 				jnl_points_to_db = FALSE;
