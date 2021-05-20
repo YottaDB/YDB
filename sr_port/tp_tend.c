@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1672,8 +1672,11 @@ boolean_t	tp_tend()
 			assert(!(lcl_update_trans & ~UPDTRNS_VALID_MASK));
 			assert(!(UPDTRNS_TCOMMIT_STARTED_MASK & lcl_update_trans));
 			si->update_trans = lcl_update_trans | UPDTRNS_TCOMMIT_STARTED_MASK; /* Step CMT11 */
-			/* should never increment curr_tn on a frozen database */
-			assert(!(FROZEN_HARD(csa) || (replication && IS_REPL_INST_FROZEN_JPL(update_jnlpool))));
+			/* Should never increment curr_tn on a frozen database.
+			 * See comment in FROZEN_HARD macro definition for why it needs to be invoked twice in the assert.
+			 */
+			assert(!(FROZEN_HARD(csa) || (replication && IS_REPL_INST_FROZEN_JPL(update_jnlpool)))
+				|| !(FROZEN_HARD(csa) || (replication && IS_REPL_INST_FROZEN_JPL(update_jnlpool))));
 			/* For MM, barrier ensures blocks updates complete before incrementing db TN. Otherwise concurrent
 			 * processes could note a premature db TN value in gvcst_search and later fail to detect a block
 			 * modification.

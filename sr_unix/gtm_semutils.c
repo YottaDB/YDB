@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,6 @@
 #include "filestruct.h"
 
 GBLREF uint4			process_id;
-GBLREF bool			in_mupip_freeze;
 
 error_def(ERR_CRITSEMFAIL);
 error_def(ERR_SEMWT2LONG);
@@ -80,10 +79,10 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 	*sem_halted = FALSE;
 	/* Access control semaphore should not be increased when the process is readonly */
 	SET_YDB_SOP_ARRAY(sop, sopcnt, (incr_cnt && (IS_FTOK_SEM || !reg->read_only)), (SEM_UNDO | IPC_NOWAIT));
-	/* If DSE or LKE or MUPIP FREEZE -ONLINE, it is okay to bypass but only if input "*bypass" is TRUE.
+	/* If DSE or LKE, it is okay to bypass but only if input "*bypass" is TRUE.
 	 * If "*bypass" is FALSE, that overrides anything else.
 	 */
-	ok_to_bypass = *bypass && (IS_DSE_IMAGE || IS_LKE_IMAGE || (IS_MUPIP_IMAGE && in_mupip_freeze));
+	ok_to_bypass = *bypass && (IS_DSE_IMAGE || IS_LKE_IMAGE);
 	*bypass = FALSE;	/* set default value of "*bypass" first. Can be overridden later if needed */
 	indefinite_wait = (NULL == timedout);
 	need_stacktrace = (DEFAULT_DBINIT_MAX_DELTA_SECS <= TREF(dbinit_max_delta_secs)) && !ok_to_bypass;

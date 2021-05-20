@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -697,8 +697,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			goto failed;
 		}
 	}
-	/* We should never proceed to update a frozen database. Only exception is DSE */
-	assert(!FROZEN_HARD(csa) || IS_DSE_IMAGE);
+	/* We should never proceed to update a frozen database. Only exception is DSE.
+	 * See comment in FROZEN_HARD macro definition for why it needs to be invoked twice in the assert.
+	 */
+	assert(!FROZEN_HARD(csa) || !FROZEN_HARD(csa) || IS_DSE_IMAGE);
 	/* We never expect to come here with file_corrupt set to TRUE (in case of an online rollback) because
 	 * grab_crit done above will make sure of that. The only exception is RECOVER/ROLLBACK itself coming
 	 * here in the forward phase
@@ -1685,8 +1687,12 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	/* signal secshr_db_clnup/t_commit_cleanup, roll-back is no longer possible */
 	update_trans |= UPDTRNS_TCOMMIT_STARTED_MASK; /* Step CMT11 */
 	assert(cdb_sc_normal == status);
-	/* should never increment curr_tn on a frozen database except if DSE */
-	assert(!(FROZEN_HARD(csa) || (replication && jnlpool && jnlpool->jnlpool_ctl->freeze)) || IS_DSE_IMAGE);
+	/* Should never increment curr_tn on a frozen database except if DSE.
+	 * See comment in FROZEN_HARD macro definition for why it needs to be invoked twice in the assert.
+	 */
+	assert(!(FROZEN_HARD(csa) || (replication && jnlpool && jnlpool->jnlpool_ctl->freeze))
+		|| !(FROZEN_HARD(csa) || (replication && jnlpool && jnlpool->jnlpool_ctl->freeze))
+		|| IS_DSE_IMAGE);
 	/* To avoid confusing concurrent processes, MM requires a barrier before incrementing db TN. For BG, cr->in_tend
 	 * serves this purpose so no barrier is needed. See comment in tp_tend.
 	 */

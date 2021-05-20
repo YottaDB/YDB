@@ -1836,6 +1836,20 @@ MBSTART {												\
 } MBEND
 
 #define FROZEN(CSD)				((CSD)->freeze || FALSE)
+/* Note that MUPIP FREEZE -OFF clears CSA->hdr->freeze first and then CSA->nl->freeze_online (in sr_port/region_freeze.c)
+ * and holds the freeze latch (CSA->nl->freeze_latch) but does not hold crit. This means that it is possible that concurrent
+ * processes invoking the FROZEN_HARD macro even while holding crit can examine CSA->hdr->freeze first and see it is non-zero
+ * but before they go check CSA->nl->freeze_online (which was TRUE because we were in the middle of an online/chill freeze)
+ * a concurrent MUPIP FREEZE -OFF clears both CSA->hdr->freeze and CSA->nl->freeze_online. In that "edge case", the FROZEN_HARD
+ * macro would find CSA->nl->freeze_online set to FALSE and so incorrectly return TRUE (indicating it is a hard freeze) when it
+ * is actually a database that is UNFROZEN. But as long as callers are equipped to handle this rare incorrect TRUE return value
+ * we are fine. For example, some callers call FROZEN_HARD to check if it returns TRUE and if so go back in a loop waiting for
+ * the macro to return FALSE (e.g. t_end.c, tp_tend.c). Such callers will just go one more iteration than necessary in this
+ * rare incorrect TRUE return case but there is no correctness issue. Some callers check if it returns TRUE and if so restart
+ * the transaction. In that case, we would restart unnecessarily in rare cases so it is still okay. But there are a few callers
+ * of this macro in asserts which will fail in the incorrect return value case. Such asserts have to be modified to invoke this
+ * macro twice to ensure the edge case is handled (in the edge case, the second invocation will return a correct value of FALSE).
+ */
 #define FROZEN_HARD(CSA)			((CSA)->hdr->freeze && !(CSA)->nl->freeze_online)
 #define FROZEN_CHILLED(CSA)			((CSA)->hdr->freeze && (CSA)->nl->freeze_online)
 #define FREEZE_LATCH_HELD(CSA)			(process_id == (CSA)->nl->freeze_latch.u.parts.latch_pid)
@@ -2341,8 +2355,6 @@ MBSTART {												\
 
 #define	INITIALIZE_CSA_ENCR_PTR(CSA, CSD, UDI, DO_CRYPT_INIT, CRYPT_WARNING, DEFER_COPY)				\
 MBSTART {														\
-	GBLREF bool	in_mupip_freeze;										\
-															\
 	if (DO_CRYPT_INIT)												\
 	{														\
 		CSA->encr_ptr = (enc_info_t *)malloc(SIZEOF(enc_info_t));						\
@@ -2356,8 +2368,7 @@ MBSTART {														\
 		 * places where we do rely, we expect the users know what they are doing with these admin tools.	\
 		 * Assert accordingly.											\
 		 */													\
-		assert(UDI->grabbed_ftok_sem || UDI->grabbed_access_sem || IS_DSE_IMAGE || IS_LKE_IMAGE			\
-			|| (IS_MUPIP_IMAGE && in_mupip_freeze));							\
+		assert(UDI->grabbed_ftok_sem || UDI->grabbed_access_sem || IS_DSE_IMAGE || IS_LKE_IMAGE);		\
 		if (!(DEFER_COPY))											\
 		{													\
 			COPY_ENC_INFO(CSD, CSA->encr_ptr, CSA->nl->reorg_encrypt_cycle);				\
