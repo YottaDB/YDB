@@ -131,7 +131,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 				{
 					*bypass = TRUE;
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_RESRCINTRLCKBYPAS, 10,
-						 LEN_AND_STR((IS_LKE_IMAGE ? "LKE" : "DSE")), process_id,
+						 LEN_AND_STR(gtmImageNames[image_type].imageName), process_id,
 						 LEN_AND_STR(sem_names[semtype]), REG_LEN_STR(reg), DB_LEN_STR(reg), sem_pid);
 					/* If this is a readonly access, we don't increment access semaphore's counter. See
 					 * SET_YDB_SOP_ARRAY definition in gtm_semutils.h and how it is called from db_init().
