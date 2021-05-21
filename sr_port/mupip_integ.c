@@ -629,7 +629,8 @@ void mupip_integ(void)
 		if ((MUKEY_NULLSUBS == mu_key) && gv_cur_region->std_null_coll)
 		{	/* mu_start_key and mu_end_key have been modified for this region. Undo that change. */
 			STD2GTMNULLCOLL(mu_start_key->base, mu_start_key->end);
-			STD2GTMNULLCOLL(mu_end_key->base, mu_end_key->end);
+			if (mu_end_key)
+				STD2GTMNULLCOLL(mu_end_key->base, mu_end_key->end);
 		}
 		if (muint_all_index_blocks)
 		{
