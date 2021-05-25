@@ -399,48 +399,38 @@ if [ "N" = "$ydb_force_install" ]; then
 		osallowminorver="999"
 		if [ "x8664" = "${ydb_flavor}" ] ; then
 			if [ "ubuntu" = "${osid}" ] ; then
-				# Ubuntu 18.04 and onwards is considered supported on 64-bit x86 architecture
+				# Ubuntu 18.04 onwards is considered supported on x86_64
 				osallowmajorver="18"
 				osallowminorver="04"
 			elif [ "rhel" = "${osid}" ] ; then
-				# RHEL 7.x is considered supported on 64-bit x86 architecture
+				# RHEL 7 onwards is considered supported on x86_64
 				osallowmajorver="7"
 				osallowminorver="0"
 			elif [ "centos" = "${osid}" ] ; then
-				# CentOS 8.x is considered supported on 64-bit x86 architecture
+				# CentOS 8.x is considered supported on x86_64
 				osallowmajorver="8"
 				osallowminorver="0"
 			elif [ "debian" = "${osid}" ] ; then
-				# Only Debian 10 (buster) is considered supported on 64-bit x86 architecture for now.
-				# Note that the stable distribution is "buster" and its unstable variety is "buster/sid".
-				# We support either at this point hence the -o check below.
-				prettyname=`grep -w PRETTY_NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
-				if [ "Debian GNU/Linux buster/sid" = "${prettyname}" -o "Debian GNU/Linux 10 (buster)" = "${prettyname}" ] ; then
-					isdebianbusteronx8664=1
-					osallowmajorver="10"
-					osallowminorver="0"
-				fi
+				# Debian 10 (buster) onwards is considered supported on x86_64.
+				osallowmajorver="10"
+				osallowminorver="0"
 			fi
 		elif [ "aarch64" = "${ydb_flavor}" ] ; then
 			if [ "ubuntu" = "${osid}" ] ; then
-				# Ubuntu 18.04 and onwards is considered supported on 64-bit ARM architecture
+				# Ubuntu 18.04 onwards is considered supported on AARCH64
 				osallowmajorver="18"
 				osallowminorver="04"
 			fi
 		else
 			if [ "armv6l" = "${ydb_flavor}" -o "armv7l" = "${ydb_flavor}" ] ; then
 				if [ "raspbian" = "${osid}" -o "debian" = ${osid} ] ; then
-					# Raspbian or Debian 9 or 9.x is considered supported on 32-bit ARM architecture
+					# Raspbian/Debian 9 onwards is considered supported on ARMV7L/ARMV6L
 					osallowmajorver="9"
 					osallowminorver="0"
 				fi
 			fi
 		fi
 		osmajorver=`echo $osver | cut -d. -f1`
-		# It is possible there is no major version (e.g. Debian 10 buster/sid). In that case, set major version as 10.
-		if [ "" = "$osmajorver" -a 1 = $isdebianbusteronx8664 ] ; then
-			osmajorver="10"
-		fi
 		# It is possible there is no minor version (e.g. Raspbian 9) in which case "cut" will not work
 		# as -f2 will give us 9 again. So use awk in that case which will give us "" as $2.
 		osminorver=`echo $osver | awk -F. '{print $2}'`
