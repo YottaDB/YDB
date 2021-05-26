@@ -148,8 +148,6 @@ gvcst_reservedDB_funcs.c:warning: Although the value stored to 'sdiqeptr_next' i
 gvcst_search.c:warning: The right operand of '==' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 gvcst_search.c:warning: Value stored to 'nBlkId' is never read [clang-analyzer-deadcode.DeadStores]
 gvincr_recompute_upd_array.c:warning: Value stored to 'jfb' is never read [clang-analyzer-deadcode.DeadStores]
-gvzwr_var.c:warning: The left operand of '&' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
-gvzwr_var.c:warning: The left operand of '&' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 incr_link.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 insert_region.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
 insert_region.c:warning: The left operand of '==' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]

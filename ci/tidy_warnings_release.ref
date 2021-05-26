@@ -241,8 +241,6 @@ gvincr_recompute_upd_array.c:warning: Value stored to 'jfb' is never read [clang
 gvn2gds.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 gvn2gds.c:warning: Value stored to 'key_top' is never read [clang-analyzer-deadcode.DeadStores]
 gvt_hashtab.c:warning: Value stored to 'added' is never read [clang-analyzer-deadcode.DeadStores]
-gvzwr_var.c:warning: The left operand of '&' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
-gvzwr_var.c:warning: The left operand of '&' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 incr_link.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 insert_region.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
 insert_region.c:warning: The left operand of '==' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]

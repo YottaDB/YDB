@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -139,6 +139,7 @@ void gvzwr_var(uint4 data, int4 n)
 					 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
 					 */
 					GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gd_header, gv_currkey);
+					mv = literal_null;
 					op_gvdata(&subdata);
 					if (MV_FORCE_INTD(&subdata))
 						seen_null = 1;
