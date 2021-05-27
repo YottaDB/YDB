@@ -24,8 +24,8 @@ add -name %ydbaIM* -region=ydbaim
 add -name %ydbaIm* -region=ydbaim
 add -name %ydbaiM* -region=ydbaim
 add -name %ydbaim* -region=ydbaim
-add -region ydbocto -dynamic_segment=ydbocto -null_subscripts=always -journal=(before,file_name="$ydb_dir/$ydb_rel/g/%ydbocto.mjl")
-add -segment ydbocto -file_name="$ydb_dir/$ydb_rel/g/%ydbocto.dat"
+add -region ydbocto -record_size=1048576 -key_size=1019 -dynamic_segment=ydbocto -null_subscripts=always -journal=(before,file_name="$ydb_dir/$ydb_rel/g/%ydbocto.mjl")
+add -segment ydbocto -block_size=2048 -allocation=10000 -extension=20000 -global_buffer_count=2000 -file_name="$ydb_dir/$ydb_rel/g/%ydbocto.dat"
 add -name %ydbOCTO* -region=ydbocto
 add -name %ydbOCTo* -region=ydbocto
 add -name %ydbOCtO* -region=ydbocto
