@@ -75,14 +75,14 @@ if { [ -n "$ydb_passwd" ] || [ -n "$gtm_passwd" ]; } && [ -x "$ydb_dist/mumps" ]
 	export gtm_env_translate gtm_etrap gtm_local_collate gtm_sysid gtm_trace_gbl_name gtm_zdate_form gtm_zstep gtm_ztrap_form gtm_zyerror gtmcompile gtmdbglvl LD_PRELOAD		#BYPASSOKLENGTH
 
 	# Validate ydb_routines. Redirect output or it will affect the password protocol
-	# shellcheck disable=2016
+	# shellcheck disable=SC2016
 	printf "%s" 'zhalt (0=$zlength($text(pinentry^'$pinentry')))' | $ydb_dist/mumps -direct >> /dev/null 2>&1
 	needsprivroutines=$?
 
 	if [ 0 -ne "${needsprivroutines}" ] ; then
 		pinentry=pinentry
 		# Need to create a temporary directory for object routines
-		if [ -x "`which mktemp 2>/dev/null`" ] ; then
+		if [ -x $(command -v mktemp) ] ; then
 			tmpdir=`mktemp -d`
 		else
 			tmpdir=/tmp/`basename $0`_$$.tmp ; mkdir $tmpdir
@@ -102,6 +102,6 @@ fi
 
 if [ 0 -ne $punt ] ;then
 	# Punt to the regular pinentry program
-	pinentry=`which pinentry 2>/dev/null`
+	pinentry=$(command -v pinentry)
 	if [ -x "$pinentry" ] ; then $pinentry "$@" ; else exit 1 ; fi
 fi

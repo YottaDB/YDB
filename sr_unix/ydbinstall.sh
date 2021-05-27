@@ -390,7 +390,6 @@ if [ "N" = "$ydb_force_install" ]; then
 	# but not yet sure if the OS and/or version is supported. Since
 	# --force-install is not specified, it is okay to do the os-version check now.
 	osver_supported=0 # Consider platform unsupported by default
-	isdebianbusteronx8664=0	# Set current platform to not be Debian 10 buster on x86_64 by default
 	if [ -f "$osfile" ] ; then
 		osver=`grep -w VERSION_ID $osfile | tr -d \" | cut -d= -f2`
 		# Set an impossible major/minor version by default in case we do not descend down known platforms in if/else below.

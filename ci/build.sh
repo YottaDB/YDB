@@ -37,7 +37,7 @@ fi
 
 echo "# Run the build using clang"
 mkdir build
-cd build
+cd build || exit
 cmake -D CMAKE_C_COMPILER=clang-10 -D CMAKE_BUILD_TYPE=$build_type -D CMAKE_EXPORT_COMPILE_COMMANDS=ON ..
 mkdir warnings
 # Record the warnings, but if `make` fails, say why instead of silently exiting.
@@ -48,7 +48,7 @@ set +e
 make -j $(nproc) gen_export check_git_repository 2>warnings/make_warnings.txt
 status=$?
 set -e
-cd warnings
+cd warnings || exit
 if ! [ $status = 0 ]; then
 	echo "# make failed with exit status [$status]. make output follows below"
 	cat make_warnings.txt
