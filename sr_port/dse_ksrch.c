@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.                                     *
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -92,9 +95,11 @@ int dse_ksrch(block_id srch,
 			*pp = 0;
 			break;
 		}
-		for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top ; )
-			if (!*key_top++ && !*key_top++)
+		for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )
+		{
+			if (!*key_top++ && (key_top < r_top) && !*key_top++)
 				break;
+		}
 		if (((blk_hdr_ptr_t)bp)->levl && (key_top > (blk_id = (r_top - blk_id_size))))
 			key_top = blk_id;
 		if (EVAL_CMPC((rec_hdr_ptr_t)rp) > patch_comp_count)
@@ -127,8 +132,10 @@ int dse_ksrch(block_id srch,
 			if (patch_find_root_search)
 			{
 				for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )
-					if (!*key_top++ && !*key_top++)
+				{
+					if (!*key_top++ && (key_top < r_top) && !*key_top++)
 						break;
+				}
 				if (long_blk_id == TRUE)
 #					ifdef BLK_NUM_64BIT
 					GET_BLK_ID_64(ksrch_root, key_top);

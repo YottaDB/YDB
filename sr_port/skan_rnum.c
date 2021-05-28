@@ -92,9 +92,11 @@ sm_uc_ptr_t skan_rnum(sm_uc_ptr_t bp, bool over_run)
 			key_top = r_top - blk_id_size;
 		else
 		{
-			for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top ; )
-				if (!*key_top++ && !*key_top++)
+			for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )
+			{
+				if (!*key_top++ && (key_top < r_top) && !*key_top++)
 					break;
+			}
 		}
 		EVAL_CMPC2((rec_hdr_ptr_t)rp, tmp_cmpc);
 		if (tmp_cmpc > patch_comp_count)

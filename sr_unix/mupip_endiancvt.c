@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1517,9 +1517,16 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 			key_top = rec1_ptr + SIZEOF(rec_hdr);
 			if (BSTAR_REC_SIZE != rec1_len || 0 == blk_levl)
 			{	/* find pointer after subscripts */
-				for ( ; key_top < (rec1_ptr + rec1_len); )
-					if (!*key_top++ && !*key_top++)
+				unsigned char	*r_top;
+
+				for (r_top = (rec1_ptr + rec1_len); key_top < r_top; )
+				{
+					if (*key_top++)
+						continue;
+					assert(key_top < r_top); /* Unlike DSE, MUPIP ENDIANCVT can assume db that integs clean */
+					if (!*key_top++)
 						break;		/* 2 nulls is end of subscripts */
+				}
 			} else
 				assert((key_top + SIZEOF(block_id) == blk_top) || blk_levl);	/* must be last if not leaf */
 			assert((key_top + SIZEOF(block_id)) <= (rec1_ptr + rec1_len));

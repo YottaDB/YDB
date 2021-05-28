@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.                                     *
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -77,8 +80,10 @@ void dse_find_roots(block_id index)
 		global_roots_tail = global_roots_tail->link;
 		global_roots_tail->link = 0;
 		for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )
-			if (!*key_top++ && !*key_top++)
+		{
+			if (!*key_top++ && (key_top < r_top) && !*key_top++)
 				break;
+		}
 		if (long_blk_id == TRUE)
 #			ifdef BLK_NUM_64BIT
 			GET_BLK_ID_64(global_roots_tail->root, key_top);

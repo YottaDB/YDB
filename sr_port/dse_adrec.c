@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.                                     *
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -225,8 +228,10 @@ void dse_adrec(void)
 		else
 		{
 			for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )
-				if (!*key_top++ && !*key_top++)
+			{
+				if (!*key_top++ && (key_top < r_top) && !*key_top++)
 					break;
+			}
 		}
 		if (EVAL_CMPC((rec_hdr_ptr_t)rp) > patch_comp_count)
 			cc = patch_comp_count;

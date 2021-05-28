@@ -163,8 +163,10 @@ void dse_rmrec(void)
 		else
 		{
 			for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )
-				if (!*key_top++ && !*key_top++)
+			{
+				if (!*key_top++ && (key_top < r_top) && !*key_top++)
 					break;
+			}
 		}
 		if (EVAL_CMPC((rec_hdr_ptr_t)rp) > patch_comp_count)
 			cc = patch_comp_count;

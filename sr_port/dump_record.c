@@ -122,9 +122,11 @@ sm_uc_ptr_t dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr_
 		key_top = r_top - blk_id_size;
 	else
 	{
-		for (key_top = rp + SIZEOF(rec_hdr);  key_top < r_top;)
-			if (!*key_top++ && !*key_top++)
+		for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )
+		{
+			if (!*key_top++ && (key_top < r_top) && !*key_top++)
 				break;
+		}
 	}
 	size = key_top - rp - SIZEOF(rec_hdr);
 	if (size > SIZEOF(patch_comp_key) - 2 - cc)

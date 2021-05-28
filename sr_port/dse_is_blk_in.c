@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.                                     *
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -43,8 +46,11 @@ int dse_is_blk_in(sm_uc_ptr_t rp, sm_uc_ptr_t r_top, short size)
 		if ((0 >= patch_path[patch_path_count - 1]) || (patch_path[patch_path_count] > cs_addrs->ti->total_blks))
 			return FALSE;
 		patch_find_root_search = FALSE;
-		for (key_top = rp + SIZEOF(rec_hdr); (*key_top++ || *key_top++) && (key_top < r_top);)
-			;
+		for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )
+		{
+			if (!*key_top++ && (key_top < r_top) && !*key_top++)
+				break;
+		}
 		size = key_top - rp - SIZEOF(rec_hdr);
 		if (0 > size)
 			size = 0;
