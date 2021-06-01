@@ -346,13 +346,28 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 		}
 		relinkctl_map(linkctl);	/* linkctl->hdr is now accessible */
 		hdr = linkctl->hdr;
-		if (!hdr->initialized && rctl_existed && (MAX_RCTL_INIT_WAIT_RETRIES > rctl_init_wait_count++))
-		{	/* The creator process has not yet initialized the shared memory for the relinkctl file; give it a chance to
-			 * do so before proceeding with grabbing the lock.
+		if (!hdr->initialized && rctl_existed)
+		{
+			if (MAX_RCTL_INIT_WAIT_RETRIES > rctl_init_wait_count++)
+			{	/* The creator process has not yet initialized the shared memory for the relinkctl file.
+				 * Give it a chance to do so before proceeding with grabbing the lock.
+				 */
+				relinkctl_unmap(linkctl);
+				SLEEP_USEC(1000, FALSE);
+				continue;
+			}
+			/* Waited enough. Proceed with grabbing the lock. But before that, set a few variables so we have
+			 * enough context to be able to fall through to later code.
 			 */
-			relinkctl_unmap(linkctl);
-			SLEEP_USEC(1000, FALSE);
-			continue;
+			/* Artifically set "rctl_existed" to FALSE to avoid an ERR_REQRLNKCTLRNDWN error in the
+			 * "if (initialize_hdr)" code a little later.
+			 */
+			rctl_existed = FALSE;
+			/* Since "rctl_existed" was TRUE before it got reset in the previous line, we would not have obtained
+			 * permissions of the object directory. So get it now that way the appropriate variables
+			 * (user_id, group_id, perm) are set properly when we later go to create the shared memory segment.
+			 */
+			GET_USER_ID_GROUP_ID_AND_PERM(linkctl, user_id, group_id, perm);
 		}
 		if (!rctl_existed)
 			relinkctl_init_exclu(linkctl);
@@ -465,11 +480,10 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			if (!is_mu_rndwn_rlnkctl)
 			{
 				if (rctl_existed)
-				{	/* We have come here ahead of the process that has created the relinkctl file even though we
-					 * have slept many times, giving the creator a chance to grab the lock. So if we did not
-					 * obtain the permissions of the object directory, we have no permissions to apply on a
-					 * shared memory segment we are about to create. Therefore, error out.
+				{	/* The only 2 code paths that can eventually reach here artifically set "rctl_existed"
+					 * to FALSE so we don't know of any way to reach this line. Hence the assert below.
 					 */
+					assert(FALSE);
 					relinkctl_unlock_exclu(linkctl);
 					relinkctl_unmap(linkctl);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REQRLNKCTLRNDWN, 3,
