@@ -276,8 +276,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 	assert(NULL == alias_retarg);
 	if (NULL != alias_retarg)
 		CLEAR_ALIAS_RETARG;
-	assert(NULL == TREF(gtmci_retval));
-	TREF(gtmci_retval) = NULL;			/* Clear any dangling set */
 	bool_zysqlnull_finish_error_if_needed();	/* Clean up any in-progress boolean expression evaluation */
 	if ((int)ERR_UNSOLCNTERR == SIGNAL)
 	{

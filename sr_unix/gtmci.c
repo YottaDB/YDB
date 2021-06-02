@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -223,8 +223,6 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(NULL == TREF(gtmci_retval));
-	TREF(gtmci_retval) = NULL;
 	if (!ydb_init_complete)
 	{
 		if ((status = ydb_init()) != 0)		/* Note - sets fgncal_stack */
@@ -408,6 +406,9 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	/*				*/
 	/* Drive the call_in routine	*/
 	/*				*/
+	TREF(zhalt_retval) = 0;		/* Reset global "TREF(zhalt_retval)" before dm_start() call.
+					 * If a ZHALT is done inside that invocation, it would update this global.
+					 */
 	ESTABLISH_RET(stop_image_conditional_core, mumps_status);
 	dm_start(); 	/* Kick off execution */
 	REVERT;
@@ -415,9 +416,18 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	/* Return value processing	*/
 	/*				*/
 	assert(!stringpool_unusable);
-	TREF(gtmci_retval) = NULL;
 	intrpt_ok_state = old_intrpt_state;		/* Restore the old interrupt state. */
 	var_on_cstack_ptr = save_var_on_cstack_ptr;	/* Restore the old environment's var_on_cstack_ptr. */
+	/* Check if ZHALT with non-zero argument happened inside the "dm_start()" invocation.
+	 * If so, forward that error to caller of "ydb_cij()".
+	 */
+	if (TREF(zhalt_retval))
+	{
+		assert(1 == mumps_status);	/* SUCCESS */
+		if (ci_ret_code_quit_needed)
+			ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
+		return TREF(zhalt_retval);
+	}
 	if (1 != mumps_status)
 	{	/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
 		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
@@ -596,8 +606,6 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 		 */
 		ci_ret_code_quit_needed = TRUE;
 	}
-	assert(NULL == TREF(gtmci_retval));
-	TREF(gtmci_retval) = NULL;
 	assert(NULL == TREF(temp_fgncal_stack));
 	FGNCAL_UNWIND;		/* note - this is outside the establish since gtmci_ch calso calls fgncal_unwind() which,
 				 * if this failed, would lead to a nested error which we'd like to avoid */
@@ -842,6 +850,9 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 	/*				*/
 	/* Drive the call_in routine	*/
 	/*				*/
+	TREF(zhalt_retval) = 0;		/* Reset global "TREF(zhalt_retval)" before dm_start() call.
+					 * If a ZHALT is done inside that invocation, it would update this global.
+					 */
 	ESTABLISH_RET(stop_image_conditional_core, mumps_status);
 	dm_start(); 	/* Kick off execution */
 	REVERT;
@@ -849,9 +860,18 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 	/* Return value processing	*/
 	/*				*/
 	assert(!stringpool_unusable);
-	TREF(gtmci_retval) = NULL;
 	intrpt_ok_state = old_intrpt_state; 		/* Restore the old interrupt state */
 	var_on_cstack_ptr = save_var_on_cstack_ptr;	/* Restore the old environment's var_on_cstack_ptr */
+	/* Check if ZHALT with non-zero argument happened inside the "dm_start()" invocation.
+	 * If so, forward that error to caller of "ydb_ci_exec()".
+	 */
+	if (TREF(zhalt_retval))
+	{
+		assert(1 == mumps_status);	/* SUCCESS */
+		if (ci_ret_code_quit_needed)
+			ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
+		return TREF(zhalt_retval);
+	}
 	if (1 != mumps_status)
 	{	/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
 		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)

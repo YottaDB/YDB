@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,6 @@
 #include "mvalconv.h"
 #include "op.h"
 #include "error.h"
-#include "stringpool.h"
 #include "restrict.h"
 #include "gt_timer.h"
 #include "error.h"
@@ -60,24 +59,20 @@ void op_zhalt(int4 retcode, boolean_t is_zhalt)
 {
 	ABS_TIME		cur_time, interval;
 	GTMTRIG_ONLY(mval	zposition;)
-	mval			tmpmval, *tmpmv;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if ((0 != retcode) && (0 == (retcode & MAX_INT_IN_BYTE)))
-		retcode = MAX_INT_IN_BYTE;	/* If the truncated return code is 0, make it 255 so a non-zero
-						 * return code is returned instead if needed to the parent process.
-						 */
 	if (0 < TREF(gtmci_nested_level))
 	{	/* Need to return to caller - not halt (halting out of this call-in level) */
-		mumps_status = SUCCESS;
+		/* Treat any non-zero return code from ZHALT as an error */
 		if (is_zhalt)
-		{	/* Set retcode in TREF(gtmci_retval) (needed later by "goframes" as part of "op_zg1" call below) */
-			tmpmv = &tmpmval;
-			i2mval(tmpmv, retcode);
-			MV_FORCE_STR(tmpmv);
-			TREF(gtmci_retval) = tmpmv;
-			DBG_MARK_STRINGPOOL_UNUSABLE;	/* No GCs expected between now and when this is fetched in goframes() */
+		{	/* ZHALT case. Note down return code for later use by caller "ydb_ci_exec()" once "dm_start()" returns */
+			TREF(zhalt_retval) = retcode;
+			/* Treat ZHALT 0 as success and any non-zero ZHALT parameter as ERROR return in caller "ydb_ci()" */
+			mumps_status = (0 == retcode) ? SUCCESS : ERROR;
+		} else
+		{	/* HALT case */
+			mumps_status = SUCCESS;
 		}
 		op_zg1(0);			/* Unwind everything back to beginning of this call-in level */
 		/* The "op_zg1" would not return in most cases. An exception is if this call-in environment was created by
@@ -95,6 +90,10 @@ void op_zhalt(int4 retcode, boolean_t is_zhalt)
 		assertpro(FALSE);		/* Should not return */
 		return;				/* Previous call does not return so this is for the compiler */
 	}
+	if ((0 != retcode) && (0 == (retcode & MAX_INT_IN_BYTE)))
+		retcode = MAX_INT_IN_BYTE;	/* If the truncated return code is 0, make it 255 so a non-zero
+						 * return code is returned instead if needed to the parent process.
+						 */
 	if (IS_GTM_IMAGE && !(is_zhalt ? RESTRICTED(zhalt_op) : RESTRICTED(halt_op)))
 		EXIT(is_zhalt ? retcode : 0);
 	if (is_zhalt ? RESTRICTED(zhalt_op) : retcode ? FALSE : RESTRICTED(halt_op))

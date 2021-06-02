@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,27 +74,10 @@ void	goframes(int4 frames)
 			 * in op_unwind/mdb_condition_handler so it is actually necessary to skip it in that case.
 			 */
 			if ((NULL != ret_targ) && (NULL == alias_retarg))
-			{	/* If gtmci_retval is set, use it instead of literal_null. Existing case of this usage is
-				 * a return value from ZHALT. If other cases are added, the assert below may need to be
-				 * adjusted or removed.
-				 */
+			{
 				assert(NULL != ret_fp->ret_value);
-				assert((NULL == TREF(gtmci_retval)) || (0 < TREF(gtmci_nested_level)));
-				if (NULL == TREF(gtmci_retval))
-					*ret_targ = literal_null;
-				else
-				{
-					*ret_targ = *(TREF(gtmci_retval));
-					DBG_MARK_STRINGPOOL_USABLE;	/* Return mval now copied to a protected mval */
-				}
+				*ret_targ = literal_null;
 				ret_targ->mvtype |= MV_RETARG;
-			} else if ((NULL == ret_targ) && (NULL != TREF(gtmci_retval)))
-			{	/* No ret_targ was found but we have a return value set but evidently not expected */
-				assert(fromzgoto);
-				assert(NULL == ret_fp->ret_value);
-				DBG_MARK_STRINGPOOL_USABLE;
-				TREF(gtmci_retval) = NULL;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTEXTRINSIC);
 			}
 		}
 		skip_error_ret = TRUE;

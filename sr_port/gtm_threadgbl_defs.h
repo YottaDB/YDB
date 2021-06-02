@@ -253,7 +253,9 @@ THREADGBLDEF(fnzsearch_sub_mval,		mval)				/* op_fnzsearch subscript constuctor 
 THREADGBLDEF(fnzsearch_nullsubs_sav,		int)				/* op_fnzsearch temp for null subs control */
 THREADGBLDEF(fnzsearch_globbuf_ptr,		glob_t *)			/* op_fnzsearch temp for pointing to glob results */
 THREADGBLDEF(glvn_pool_ptr,			glvn_pool *)			/* Pointer to the glvn pool */
-THREADGBLDEF(gtmci_retval,			mval *)				/* Pointer to return value from call-in */
+THREADGBLDEF(zhalt_retval,			int)				/* Used by "ydb_cij()" and "ydb_ci_exec()" to note
+										 * down ZHALT return value.
+										 */
 #ifdef GTMDBGFLAGS_ENABLED
 THREADGBLDEF(ydb_dbgflags,			int)
 THREADGBLDEF(ydb_dbgflags_freq,			int)

@@ -126,9 +126,9 @@ gtm_putmsg.c:warning: Branch condition evaluates to a garbage value [clang-analy
 gtm_putmsg.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 gtm_putmsg_list.c:warning: Uninitialized va_list is copied [clang-analyzer-valist.Uninitialized]
 gtm_putmsg_list.c:warning: Value stored to 'i' is never read [clang-analyzer-deadcode.DeadStores]
-gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (170 padding bytes, where 2 is optimal).
+gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (166 padding bytes, where 6 is optimal).
 gtm_threadgbl_init.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]
-gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (170 padding bytes, where 2 is optimal).
+gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (166 padding bytes, where 6 is optimal).
 gtm_tls_impl.c:warning: Value stored to 'rv' is never read [clang-analyzer-deadcode.DeadStores]
 gtm_trigger.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]
 gtm_trigger.c:warning: Value stored to 'added' is never read [clang-analyzer-deadcode.DeadStores]
