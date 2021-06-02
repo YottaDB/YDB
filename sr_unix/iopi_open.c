@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,8 +75,18 @@ enum
 	PARSE_FAIL_NOPATH	/* the parse failed and $PATH is undefined in the environment */
 };
 
-#define FREE_ALL { if (NULL != copy_cmd_string) free(copy_cmd_string); if (NULL != temp) free(temp);\
-		if (NULL != buf)  free(buf); if (NULL != dir_in_path) free(dir_in_path);if (NULL != command2) free(command2); }
+#define FREE_ALL {				\
+	if (NULL != copy_cmd_string)		\
+		free(copy_cmd_string);		\
+	if (NULL != temp)			\
+		free(temp);			\
+	if (NULL != buf)			\
+		free(buf);			\
+	if (NULL != dir_in_path)		\
+		free(dir_in_path);		\
+	if (NULL != command2)			\
+		free(command2);			\
+}
 
 int parse_pipe(char *cmd_string, char *ret_token);
 
