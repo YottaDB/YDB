@@ -64,6 +64,7 @@
 #include "shmpool.h"
 #include "db_snapshot.h"
 #include "do_shmat.h"
+#include "have_crit.h"
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	enum gtmImageTypes	image_type;
@@ -161,8 +162,9 @@ boolean_t	ss_create_context(snapshot_context_ptr_t lcl_ss_ctx, int ss_shmcycle)
 
 boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 {
-	int	status;
-	char	buf[128];
+	int		save_shdw_fd, status;
+	long		save_attach_shmid;
+	intrpt_state_t	prev_intrpt_state;
 
 	/* The "shmdt" call done below is not async-signal-safe so assert that we are not inside an os invoked signal handler
 	 * if ever we come to this function. The only exception we know of is in the "v61000/intrpt_wcs_wtstart" subtest where
@@ -171,27 +173,41 @@ boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 	 */
 	assert(!in_os_signal_handler || (WBTEST_SLEEP_IN_WCS_WTSTART == ydb_white_box_test_case_number));
 	assert(NULL != lcl_ss_ctx);
-	if (FD_INVALID != lcl_ss_ctx->shdw_fd)
-	{
-		int	save_fd;
-
-		/* Note: CLOSEFILE_RESET can invoke "eintr_handling_check()" after the "close()" call succeeds. And that
-		 * can in turn recurse into "ss_destroy_context()" which would call CLOSEFILE_RESET again on the same fd
-		 * and fail because the fd has already been closed. An example call stack of the recursion is
-		 *	t_end -> ss_create_context -> ss_destroy_context -> CLOSEFILE_RESET -> eintr_handling_check
-		 *		-> deferred_signal_handler -> check_for_deferred_timers -> timer_handler
-		 *		-> jnl_file_close_timer -> ss_destroy_context -> CLOSEFILE_RESET
-		 * To avoid this duplicate close, save a copy of "lcl_ss_ctx->shdw_fd" (in a local variable), then
-		 * clear it before invoking the CLOSEFILE_RESET macro.
-		 */
-		save_fd = lcl_ss_ctx->shdw_fd;
-		lcl_ss_ctx->shdw_fd = FD_INVALID;
-		CLOSEFILE_RESET(save_fd, status);
-	}
-	if (INVALID_SHMID != lcl_ss_ctx->attach_shmid)
+	/* Note: CLOSEFILE_RESET can invoke "eintr_handling_check()" after the "close()" call succeeds. And that
+	 * can in turn recurse into "ss_destroy_context()" which would call CLOSEFILE_RESET again on the same fd
+	 * and fail because the fd has already been closed. An example call stack of the recursion is
+	 *	t_end -> ss_create_context -> ss_destroy_context -> CLOSEFILE_RESET -> eintr_handling_check
+	 *		-> deferred_signal_handler -> check_for_deferred_timers -> timer_handler
+	 *		-> jnl_file_close_timer -> ss_destroy_context -> CLOSEFILE_RESET
+	 * To avoid this duplicate close, save a copy of "lcl_ss_ctx->shdw_fd" (in a local variable), then
+	 * clear it before invoking the CLOSEFILE_RESET macro. Additionally (and more importantly), disallow timer
+	 * signals in a short window where we take a local copy and clear the global copy. This ensures the local copy
+	 * is reliable and has not been tampered with by a timer interrupt.
+	 */
+	DEFER_INTERRUPTS(INTRPT_IN_SS_INITIATE, prev_intrpt_state);
+	save_shdw_fd = lcl_ss_ctx->shdw_fd;
+	lcl_ss_ctx->shdw_fd = FD_INVALID;
+	ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE, prev_intrpt_state);
+	if (FD_INVALID != save_shdw_fd)
+		CLOSEFILE_RESET(save_shdw_fd, status);
+	/* Just like we needed to save the "shdw_fd" in a local variable above, we also need to save "attach_shmid" in a local
+	 * variable below and clear the shared/global copy before attempting the SHMDT. Otherwise, it is possible a timer
+	 * interrupt happens just before the SHMDT and as part of that "jnl_file_close_timer" gets invoked and does the actual
+	 * SHMDT in a nested call of "ss_destroy_context" and returns back to the outer "ss_destroy_context" which will then
+	 * attempt the SHMDT but will see a failure because the shmdt has already happened in a nested call.
+	 * Just like in the "shdw_fd" case, we need to disable timer interrupts in a short window where we take a local copy
+	 * and clear the global copy. This ensures the local copy is reliable and has not been tampered with by a timer interrupt.
+	 */
+	DEFER_INTERRUPTS(INTRPT_IN_SS_INITIATE, prev_intrpt_state);
+	save_attach_shmid = lcl_ss_ctx->attach_shmid;
+	lcl_ss_ctx->attach_shmid = INVALID_SHMID;
+	ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE, prev_intrpt_state);
+	if (INVALID_SHMID != save_attach_shmid)
 	{
 		if (0 != SHMDT((void *)(lcl_ss_ctx->start_shmaddr)))
 		{
+			char	buf[128];
+
 			status = errno;
 			assert(FALSE);
 			SNPRINTF(buf, sizeof(buf), "Shared segment address: 0x"lvaddr, lcl_ss_ctx->start_shmaddr);

@@ -93,6 +93,7 @@ typedef enum
 					 * so that "ydb_exit()" does not see a NULL frame_pointer as part of handling a SIG-15.
 					 */
 	INTRPT_IN_JNL_FSYNC,		/* Deferring interrupts in jnl_fsync() while holding the latch */
+	INTRPT_IN_SS_DESTROY_CONTEXT,	/* Deferring interrupts in ss_destroy_context() */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 
