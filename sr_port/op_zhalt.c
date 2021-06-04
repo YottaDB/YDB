@@ -67,6 +67,14 @@ void op_zhalt(int4 retcode, boolean_t is_zhalt)
 		/* Treat any non-zero return code from ZHALT as an error */
 		if (is_zhalt)
 		{	/* ZHALT case. Note down return code for later use by caller "ydb_ci_exec()" once "dm_start()" returns */
+			/* Ensure retcode is always a positive 4-byte integer. This way negation of this retcode can never be
+			 * equal to `YDB_TP_RESTART`. CONVERT_YDB_CI_EXEC_TO_SIMPLEAPI_RETVAL macro relies on this to avoid
+			 * confusing a ZHALT return code for a `YDB_TP_RESTART` return. This is needed as the latter will
+			 * trigger transaction restart processing in the caller of `ydb_ci()` which we do not want in the
+			 * `ZHALT -YDB_TP_RESTART` case.
+			 */
+			retcode = retcode & MAXINT4;
+			assert(YDB_TP_RESTART != -retcode);
 			TREF(zhalt_retval) = retcode;
 			/* Treat ZHALT 0 as success and any non-zero ZHALT parameter as ERROR return in caller "ydb_ci()" */
 			mumps_status = (0 == retcode) ? SUCCESS : ERROR;
