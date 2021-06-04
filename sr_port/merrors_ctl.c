@@ -827,7 +827,7 @@ LITDEF	err_msg merrors[] = {
 	{ "REPLJNLCLOSED", "Replication in jeopardy as journaling got closed for database file !AD. Current region seqno is !@ZQ [0x!16@XQ] and system seqno is !@ZQ [0x!16@XQ]", 6, 0 },
 	{ "RENAMEFAIL", "Rename of file !AD to !AD failed", 4, 0 },
 	{ "FILERENAME", "File !AD is renamed to !AD", 4, 0 },
-	{ "JNLBUFINFO", "Pid 0x!XL dsk 0x!XL free 0x!XL bytcnt 0x!XL io_in_prog 0x!XL fsync_in_prog 0x!XL dskaddr 0x!XL freeaddr 0x!XL qiocnt 0x!XL now_writer 0x!XL fsync_pid 0x!XL filesize 0x!XL cycle 0x!XL errcnt 0x!XL wrtsize 0x!XL fsync_dskaddr 0x!XL rsrv_free 0x!XL rsrv_freeaddr 0x!XL phase2_commit_index1 0x!XL phase2_commit_index2 0x!XL next_align_addr 0x!XL", 21, 0 },
+	{ "JNLBUFINFO", "Pid 0x!XL dsk 0x!XL free 0x!XL bytcnt 0x!XL io_in_prog 0x!XL fsync_in_prog 0x!XL dskaddr 0x!XL freeaddr 0x!XL qiocnt 0x!XL now_writer 0x!XL fsync_pid 0x!XL filesize 0x!XL cycle 0x!XL errcnt 0x!XL wrtsize 0x!XL fsync_dskaddr 0x!XL rsrv_free 0x!XL rsrv_freeaddr 0x!XL phase2_commit_index1 0x!XL phase2_commit_index2 0x!XL next_align_addr 0x!XL size 0x!XL", 22, 0 },
 	{ "SDSEEKERR", "Sequential device seek error - !AD", 2, 0 },
 	{ "LOCALSOCKREQ", "LOCAL socket required", 0, 0 },
 	{ "TPNOTACID", "!AD at !AD violates ACID properties of a TRANSACTION and could exceed !AD seconds; $TRESTART = !UL and indefinite RESTARTs may occur", 7, 0 },
