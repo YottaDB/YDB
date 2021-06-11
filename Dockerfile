@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -93,7 +93,6 @@ RUN apt-get update && \
                     binutils \
                     libelf-dev \
                     libicu-dev \
-                    libtinfo5 \
                     locales \
                     pkg-config \
                     wget \
