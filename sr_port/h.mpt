@@ -2,13 +2,15 @@
 ;								;
 ;	Copyright 1987, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
+; Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
 ;	the license, please stop and do not read further.	;
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%H	;GT.M %H utility - date and time conversions to and from $H format
+%H	;YottaDB %H utility - date and time conversions to and from $H format
 	;invoke with %DT in $H day format at %CDS to set %DAT mm/dd/yyyy
 	;invoke with %TM in $H time format at %CTS to set %TIM hh:mm:ss
 	;invoke with %DT in mm/dd/yy[yy] format at %CDN to set %DAT to $H form
@@ -18,8 +20,8 @@
 %CDS	S %DAT=$$CDS(%DT)
 	q
 CDS(dt)
-	i dt'<0,dt<94658 q +$zd(dt,"MM")_"/"_+$zd(dt,"DD")_$zd(dt,"/YEAR")
-	q ""
+	if dt'<0 quit +$zdate(dt,"MM")_"/"_+$zdate(dt,"DD")_$zdate(dt,"/YEAR")
+	quit ""
 	;
 %CTS	s %TIM=$$CTS(%TM)
 	q
