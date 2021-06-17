@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -504,6 +504,7 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 		/* Write EOF block in the snapshot file */
 		native_size = gds_file_size(reg->dyn.addr->file_cntl);
 		db_file_size = native_size * DISK_BLOCK_SIZE; /* Size of database file in bytes */
+		memset(eof_marker, 0, EOF_MARKER_SIZE);
 		LSEEKWRITE(shdw_fd, ((off_t)db_file_size + ss_shmsize), eof_marker, EOF_MARKER_SIZE, status);
 		if (0 != status)
 		{	/* error while writing EOF record to snapshot file */

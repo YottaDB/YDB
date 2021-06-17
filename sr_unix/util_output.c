@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -204,6 +204,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 	SETUP_THREADGBL_ACCESS;
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);
 	VAR_COPY(TREF(last_va_list_ptr), fao);
+	line_begin = FALSE;
 	if (multi_proc_in_use)
 	{
 		/* If we are about to flush the output to stdout/stderr, we better hold a latch (since we dont want

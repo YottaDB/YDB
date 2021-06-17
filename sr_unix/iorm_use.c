@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -215,6 +215,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 
 	SETUP_THREADGBL_ACCESS;
 	p_offset = 0;
+	mode = mode1 = 0;
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
 	input_key_not_empty = output_key_not_empty = FALSE;

@@ -537,6 +537,7 @@ void mupip_integ(void)
 			gv_altkey->base[gv_altkey->end] = '\0';
 			if (gv_target->act)
 				act_in_gvt(gv_target);
+			dummy = '\0';
 			if (mu_int_blk(trees->root, MAX_BT_DEPTH, TRUE, gv_altkey->base, gv_altkey->end, &dummy, 0, 0))
 			{
 				/* We are done with the INTEG CHECK for the current GVT, but if the spanning node INTEG
