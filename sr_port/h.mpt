@@ -20,7 +20,11 @@
 %CDS	S %DAT=$$CDS(%DT)
 	q
 CDS(dt)
-	if dt'<0 quit +$zdate(dt,"MM")_"/"_+$zdate(dt,"DD")_$zdate(dt,"/YEAR")
+	; This function returns any date up to 12/31/9999. Should this need to be changed to
+	; address the Year 10,000 problem, the year field will need to be expanded to support
+	; more than 4 digits. Removing the dt<2980014 below without expanding the year to 5
+	; digits will return 1/1/0000 as the day after 12/31/9999.
+	if dt'<0,dt<2980014 quit +$zdate(dt,"MM")_"/"_+$zdate(dt,"DD")_$zdate(dt,"/YEAR")
 	quit ""
 	;
 %CTS	s %TIM=$$CTS(%TM)
