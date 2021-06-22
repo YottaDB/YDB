@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -246,8 +246,6 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 		jgbl.wait_for_jnl_hard = TRUE;
 		GTMTRIG_ONLY(
 			assert(NULL == jgbl.prev_ztworm_ptr);	/* should have been cleared by tp_clean_up of previous TP */
-			assert(NULL == jgbl.save_ztworm_ptr);
-				/* should have been NULL almost always except for a small window in gvcst_put/gvcst_kill */
 			tstart_trigger_depth = gtm_trigger_depth; /* note down what trigger depth an outermost tstart occurs in */
 		)
 		tstart_gtmci_nested_level = TREF(gtmci_nested_level);

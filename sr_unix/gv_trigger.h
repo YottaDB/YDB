@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -560,109 +560,6 @@ GBLREF	int4		tstart_trigger_depth;
 									\
 	assert(!(JS_NOT_REPLICATED_MASK & NODEFLAGS));			\
 	skip_dbtriggers = (NODEFLAGS & JS_SKIP_TRIGGERS_MASK);		\
-	if (NODEFLAGS & JS_NULL_ZTWORM_MASK)				\
-		dollar_ztwormhole.str.len = 0;				\
-}
-
-#define	JNL_FORMAT_ZTWORM_IF_NEEDED(CSA, WRITE_LOGICAL_JNLRECS, JNL_OP, KEY, VAL, ZTWORM_JFB, JFB, JNL_FORMAT_DONE)	\
-{															\
-	GBLREF	mval		dollar_ztwormhole;									\
-	GBLREF	int4		gtm_trigger_depth;									\
-	GBLREF	int4		tstart_trigger_depth;									\
-	GBLREF	boolean_t	skip_dbtriggers;									\
-	GBLREF	boolean_t	explicit_update_repl_state;								\
-	GBLREF	uint4		dollar_tlevel;										\
-	GBLREF	jnl_gbls_t	jgbl;											\
-															\
-	uint4			nodeflags;										\
-															\
-	/* No need to write ZTWORMHOLE journal records for updates inside trigger since those records are not		\
-	 * replicated anyway.												\
-	 */														\
-	assert(dollar_tlevel);	/* tstart_trigger_depth is not usable otherwise */					\
-	assert(tstart_trigger_depth <= gtm_trigger_depth);								\
-	assert(!skip_dbtriggers); /* we ignore the JS_SKIP_TRIGGERS_MASK bit in nodeflags below because of this */	\
-	ZTWORM_JFB = NULL;												\
-	if (tstart_trigger_depth == gtm_trigger_depth)									\
-	{	/* explicit update so need to write ztwormhole records */						\
-		assert(WRITE_LOGICAL_JNLRECS == JNL_WRITE_LOGICAL_RECS(CSA));						\
-		nodeflags = 0;												\
-		explicit_update_repl_state = REPL_ALLOWED(CSA);								\
-		/* Write ZTWORMHOLE records only if replicating since secondary is the only one that cares about it. */	\
-		if (explicit_update_repl_state && dollar_ztwormhole.str.len)						\
-		{	/* $ZTWORMHOLE is non-NULL. Journal that BEFORE the corresponding SET record. If it is found	\
-			 * that the trigger invocation did not REFERENCE it, we will remove this from the list of	\
-			 * formatted journal records.									\
-			 */												\
-			ZTWORM_JFB = jnl_format(JNL_ZTWORM, NULL, &dollar_ztwormhole, 0);				\
-			/* Note : ztworm_jfb could be NULL if it was determined that this ZTWORMHOLE record is not	\
-			 * needed i.e. if the exact same value of ZTWORMHOLE was already written as part of the		\
-			 * previous update in this TP transaction.							\
-			 */												\
-		}													\
-	} else														\
-		nodeflags = JS_NOT_REPLICATED_MASK;									\
-	assert(!JNL_FORMAT_DONE);											\
-	/* Need to write logical SET or KILL journal records irrespective of trigger depth */				\
-	if (WRITE_LOGICAL_JNLRECS)											\
-	{														\
-		nodeflags |= JS_HAS_TRIGGER_MASK;	/* gvt_trigger is non-NULL */					\
-		if (!dollar_ztwormhole.str.len)										\
-		{													\
-			/* Set jgbl.prev_ztworm_ptr to NULL. This is needed so that any subsequent non-null ztwormhole	\
-			 * assignment which matches with the ztwormhole value before the NULL ztwormhole SHOULD write	\
-			 * ZTWORM records in the journal file. 								\
-			 */												\
-			jgbl.save_ztworm_ptr = jgbl.prev_ztworm_ptr;							\
-			jgbl.prev_ztworm_ptr = NULL;									\
-			nodeflags |= JS_NULL_ZTWORM_MASK;								\
-		}													\
-		/* Insert SET journal record now that ZTWORMHOLE (if any) has been inserted */				\
-		JFB = jnl_format(JNL_OP, KEY, VAL, nodeflags);								\
-		assert(NULL != JFB);											\
-		JNL_FORMAT_DONE = TRUE;											\
-	}														\
-}
-
-#define	REMOVE_ZTWORM_JFB_IF_NEEDED(ZTWORM_JFB, JFB, SI)								\
-{															\
-	GBLREF	boolean_t	ztwormhole_used;	/* TRUE if $ztwormhole was used by trigger code */		\
-	GBLREF	jnl_gbls_t	jgbl;											\
-															\
-	jnl_format_buffer	*tmpjfb;										\
-															\
-	if ((NULL != ZTWORM_JFB) && !ztwormhole_used)									\
-	{ 	/* $ZTWORMHOLE was non-zero before the trigger invocation and was never used inside the	trigger. We	\
-		 * need to remove the corresponding formatted journal record. We dont free up the memory occupied by	\
-		 * ZTWORM_JFB as it is not easy to free up memory in the middle of a buddy list. This memory will	\
-		 * anyway be freed up eventually at tp_clean_up time.							\
-		 * NOTE: Trigger code that does NOT use the $ZTWORMHOLE is equivalent to a trigger code that has	\
-		 * $ZTWORMHOLE set to NULL and hence should have the JS_NULL_ZTWORM_MASK set in the nodeflags. But for	\
-		 * that to happen, checksum of the SET/KILL/ZTRIG records need to be recomputed. Since this is a costly	\
-		 * operation, we don't touch the nodeflags as there is no known correctness issue.		\
-		 */													\
-		assert(NULL != JFB);											\
-		tmpjfb = ZTWORM_JFB->prev;										\
-		if (NULL != tmpjfb)											\
-		{													\
-			tmpjfb->next = JFB;										\
-			JFB->prev = tmpjfb;										\
-		} else													\
-		{													\
-			assert(SI->jnl_head == ZTWORM_JFB);								\
-			SI->jnl_head = JFB;										\
-			assert(IS_UUPD(JFB->rectype));									\
-			assert(((jnl_record *)JFB->buff)->prefix.jrec_type == JFB->rectype);				\
-			JFB->rectype--;											\
-			assert(IS_TUPD(JFB->rectype));									\
-			((jnl_record *)JFB->buff)->prefix.jrec_type = JFB->rectype;					\
-		}													\
-		jgbl.prev_ztworm_ptr = jgbl.save_ztworm_ptr;								\
-		assert(0 < jgbl.cumul_index);										\
-		DEBUG_ONLY(jgbl.cumul_index--;)										\
-		jgbl.cumul_jnl_rec_len -= ZTWORM_JFB->record_size;							\
-	}														\
-	jgbl.save_ztworm_ptr = NULL;											\
 }
 
 #define SET_PARAM_STRING(UTIL_BUFF, UTIL_LEN, TRIGIDX, PARAM)				\

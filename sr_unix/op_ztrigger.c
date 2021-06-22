@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,7 +95,7 @@ GBLREF	stack_frame		*frame_pointer;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
 GBLREF	boolean_t		skip_INVOKE_RESTART;
-GBLREF	boolean_t		ztwormhole_used;	/* TRUE if $ztwormhole was used by trigger code */
+GBLREF	boolean_t		write_ztworm_jnl_rec;
 GBLREF	mval			dollar_ztwormhole;
 #endif
 
@@ -148,12 +148,12 @@ void op_ztrigger(void)
 	DEBUG_ONLY(is_mm = (dba_mm == csd->acc_meth));
 	TRIG_CHECK_REPLSTATE_MATCHES_EXPLICIT_UPDATE(gv_cur_region, csa);
 	if (IS_EXPLICIT_UPDATE)
-	{	/* This is an explicit update. Set ztwormhole_used to FALSE. Note that we initialize this only at the
+	{	/* This is an explicit update. Set write_ztworm_jnl_rec to FALSE. Note that we initialize this only at the
 		 * beginning of the transaction and not at the beginning of each try/retry. If the application used
-		 * $ztwormhole in any retsarting try of the transaction, we consider it necessary to write the
+		 * $ztwormhole in any restarting try of the transaction, we consider it necessary to write the
 		 * TZTWORM/UZTWORM record even though it was not used in the succeeding/committing try.
 		 */
-		ztwormhole_used = FALSE;
+		write_ztworm_jnl_rec = FALSE;
 	}
 	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl, SCNDDBNOUPD_CHECK_TRUE);
 	assert(('\0' != gv_currkey->base[0]) && gv_currkey->end);
@@ -190,8 +190,11 @@ void op_ztrigger(void)
 				save_msp = msp;
 				save_mv_chain = mv_chain;
 				/* Invoke relevant trigger(s) regardless whether data exists or not (we don't even check) */
-				JNL_FORMAT_ZTWORM_IF_NEEDED(csa, write_logical_jnlrecs,
-							    JNL_ZTRIG, gv_currkey, NULL, ztworm_jfb, jfb, jnl_format_done);
+				/* Format ZTWORM (if applicable) and ZTRIG journal records.
+				 * "ztworm_jfb", "jfb" and "jnl_format_done" are set by the below macro.
+				 */
+				jnl_format_ztworm_plus_logical(csa, write_logical_jnlrecs,
+							    JNL_ZTRIG, gv_currkey, NULL, &ztworm_jfb, &jfb, &jnl_format_done);
 				/* Initialize trigger parms that dont depend on the context of the matching trigger. All of
 				 * these parms are initialized to NULL. This causes op_svget to report them as NULL strings
 				 * whichi s all we need for ZTRIGGER. Note $ztvalue is not not updateable for this type
@@ -219,7 +222,7 @@ void op_ztrigger(void)
 					cdb_status = cdb_sc_normal;	/* signal "retry:" to avoid t_retry call */
 					goto retry;
 				}
-				REMOVE_ZTWORM_JFB_IF_NEEDED(ztworm_jfb, jfb, sgm_info_ptr);
+				JNL_FORMAT_ZTWORM_REMOVE_IF_NEEDED(ztworm_jfb, sgm_info_ptr);
 				/* Instead of POP_MVALS_FROM_M_STACK_IF_NEEDED, do a stripped-down version since we don't
 				 * do anything with $ztoldval. This usually pops off 3 or more mvals saved by trigger processing.
 				 */
@@ -258,6 +261,7 @@ void op_ztrigger(void)
 				}
 				/* Write ZTRIGGER journal record */
 				jfb = jnl_format(JNL_ZTRIG, gv_currkey, NULL, nodeflags);
+				PRO_ONLY(UNUSED(jfb));
 				assert(NULL != jfb);
 			}
 		}
@@ -297,6 +301,7 @@ void op_ztrigger(void)
 			if ((NULL != save_msp) && (save_msp > msp))
 				UNW_MV_STENT_TO(save_msp, save_mv_chain);
 			rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
+			PRO_ONLY(UNUSED(rc));
 			assert(0 == rc && TPRESTART_STATE_NORMAL == tprestart_state);
 		}
 		assert(0 < t_tries);
@@ -318,6 +323,7 @@ void op_ztrigger(void)
 		/* In case this is MM and t_retry() remapped an extended database, reset csd */
 		assert(is_mm || (csd == cs_data));
 		csd = cs_data;
+		PRO_ONLY(UNUSED(csd));
 	}
 }
 #endif /* #ifdef GTM_TRIGGER */

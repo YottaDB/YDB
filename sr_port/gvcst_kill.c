@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -103,7 +103,7 @@ GBLREF	int			tprestart_state;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
 GBLREF	boolean_t		skip_INVOKE_RESTART;
-GBLREF	boolean_t		ztwormhole_used;	/* TRUE if $ztwormhole was used by trigger code */
+GBLREF	boolean_t		write_ztworm_jnl_rec;
 GBLREF	mval			dollar_ztwormhole;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 #endif
@@ -253,12 +253,12 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 	GTMTRIG_ONLY(
 		TRIG_CHECK_REPLSTATE_MATCHES_EXPLICIT_UPDATE(gv_cur_region, csa);
 		if (IS_EXPLICIT_UPDATE)
-		{	/* This is an explicit update. Set ztwormhole_used to FALSE. Note that we initialize this only at the
+		{	/* This is an explicit update. Set write_ztworm_jnl_rec to FALSE. Note that we initialize this only at the
 			 * beginning of the transaction and not at the beginning of each try/retry. If the application used
-			 * $ztwormhole in any retsarting try of the transaction, we consider it necessary to write the
+			 * $ZTWORMHOLE in any restarting try of the transaction, we consider it necessary to write the
 			 * TZTWORM/UZTWORM record even though it was not used in the succeeding/committing try.
 			 */
-			ztwormhole_used = FALSE;
+			write_ztworm_jnl_rec = FALSE;
 		}
 	)
 	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl, SCNDDBNOUPD_CHECK_TRUE);
@@ -399,12 +399,12 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 			 * Invoke triggers for ZKILL only if $data is 1 or 11 (for 10 case, ZKILL is a no-op).
 			 */
 			if (do_subtree ? dlr_data : (dlr_data & 1))
-			{	/* Either node or its descendants exists. Invoke KILL triggers for this node.
-				 * But first write journal records (ZTWORM and/or KILL) for the triggering nupdate.
+			{	/* Either node or its descendants exists. Invoke KILL triggers for this node. */
+				/* Format ZTWORM (if applicable) and KILL journal records for the triggering update.
 				 * "ztworm_jfb", "jfb" and "jnl_format_done" are set by the below macro.
 				 */
-				JNL_FORMAT_ZTWORM_IF_NEEDED(csa, write_logical_jnlrecs,
-						operation, gv_currkey, NULL, ztworm_jfb, jfb, jnl_format_done);
+				jnl_format_ztworm_plus_logical(csa, write_logical_jnlrecs,
+						operation, gv_currkey, NULL, &ztworm_jfb, &jfb, &jnl_format_done);
 				/* Initialize trigger parms that dont depend on the context of the matching trigger */
 				trigparms.ztoldval_new = ztold_mval;
 				trigparms.ztdata_new = fndata_table[dlr_data / 10][dlr_data & 1];
@@ -437,7 +437,7 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 											 * can be == CDB_STAGNATE.
 											 */
 				}
-				REMOVE_ZTWORM_JFB_IF_NEEDED(ztworm_jfb, jfb, sgm_info_ptr);
+				JNL_FORMAT_ZTWORM_REMOVE_IF_NEEDED(ztworm_jfb, sgm_info_ptr);
 			}
 			/* else : we dont invoke any KILL/ZTKILL type triggers for a node whose $data is 0 */
 			POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);
@@ -736,6 +736,7 @@ research:
 				assert(!jnl_format_done);
 				jfb = jnl_format(operation, gv_currkey, NULL, nodeflags);
 				assert(NULL != jfb);
+				PRO_ONLY(UNUSED(jfb));
 			} else if (!jnl_format_done)
 			{
 				nodeflags = 0;
@@ -759,6 +760,7 @@ research:
 				/* Write KILL journal record */
 				jfb = jnl_format(operation, gv_currkey, NULL, nodeflags);
 				assert(NULL != jfb);
+				PRO_ONLY(UNUSED(jfb));
 			}
 		}
 		flush_cache = FALSE;

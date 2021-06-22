@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,6 +80,7 @@ GBLREF mval		dollar_ztslate;
 GBLREF int4		gtm_trigger_depth;
 GBLREF int4		tstart_trigger_depth;
 GBLREF uint4		dollar_tlevel;
+GBLREF boolean_t	write_ztworm_jnl_rec;
 #endif
 
 LITREF mval		default_etrap;
@@ -407,6 +408,7 @@ void op_svput(int varnum, mval *v)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZTWORMHOLE2BIG, 2, v->str.len, MAX_ZTWORMHOLE_SIZE);
 			dollar_ztwormhole.mvtype = MV_STR;
 			dollar_ztwormhole.str = v->str;
+			write_ztworm_jnl_rec = TRUE;
 			break;
 #			else
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);

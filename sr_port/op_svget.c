@@ -116,7 +116,7 @@ GBLREF	mval		*dollar_ztupdate;
 GBLREF	mval		*dollar_ztvalue;
 GBLREF	mval		dollar_ztwormhole;
 GBLREF	int4		gtm_trigger_depth;
-GBLREF	boolean_t	ztwormhole_used;		/* TRUE if $ztwormhole was used by trigger code */
+GBLREF	boolean_t	write_ztworm_jnl_rec;
 #endif
 
 error_def(ERR_INVSVN);
@@ -607,7 +607,7 @@ void op_svget(int varnum, mval *v)
 				memcpy(v, mvp, SIZEOF(mval));
 			} else
 				memcpy(v, &literal_null, SIZEOF(mval));
-			ztwormhole_used = TRUE;
+			write_ztworm_jnl_rec = TRUE;
 			break;
 #			else
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);

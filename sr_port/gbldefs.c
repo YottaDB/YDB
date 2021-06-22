@@ -991,7 +991,11 @@ GBLDEF	uint4		trigger_name_cntr;		/* Counter from which trigger names are constr
 GBLDEF	boolean_t	*ztvalue_changed_ptr;		/* -> boolean in current gtm_trigger_parms signaling if ztvalue has
 							 *    been updated
 							 */
-GBLDEF	boolean_t	ztwormhole_used;		/* TRUE if $ztwormhole was used by trigger code */
+GBLDEF	boolean_t	write_ztworm_jnl_rec;		/* Set to TRUE if $ZTWORMHOLE ISV was read/set inside trigger code.
+							 * Set to FALSE before trigger is invoked and checked after trigger
+							 * is invoked. If TRUE and if the update is to a replicated database,
+							 * this means a ZTWORMHOLE journal record needs to be written.
+							 */
 GBLDEF	mstr		*dollar_ztname;
 GBLDEF	mval		*dollar_ztdata,
 			*dollar_ztdelim,

@@ -125,7 +125,7 @@ GBLREF	int			tprestart_state;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
 GBLREF	boolean_t		skip_INVOKE_RESTART;
-GBLREF	boolean_t		ztwormhole_used;	/* TRUE if $ztwormhole was used by trigger code */
+GBLREF	boolean_t		write_ztworm_jnl_rec;
 #endif
 #ifdef DEBUG
 GBLREF	boolean_t		skip_block_chain_tail_check;
@@ -567,12 +567,12 @@ void	gvcst_put2(mval *val, span_parms *parms)
 #	ifdef GTM_TRIGGER
 	TRIG_CHECK_REPLSTATE_MATCHES_EXPLICIT_UPDATE(gv_cur_region, csa);
 	if (IS_EXPLICIT_UPDATE)
-	{	/* This is an explicit update. Set ztwormhole_used to FALSE. Note that we initialize this only at the
+	{	/* This is an explicit update. Set write_ztworm_jnl_rec to FALSE. Note that we initialize this only at the
 		 * beginning of the transaction and not at the beginning of each try/retry. If the application used
-		 * $ztwormhole in any retsarting try of the transaction, we consider it necessary to write the
+		 * $ZTWORMHOLE in any restarting try of the transaction, we consider it necessary to write the
 		 * TZTWORM/UZTWORM record even though it was not used in the succeeding/committing try.
 		 */
-		ztwormhole_used = FALSE;
+		write_ztworm_jnl_rec = FALSE;
 	}
 #	endif
 	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl, SCNDDBNOUPD_CHECK_TRUE);
@@ -2679,6 +2679,7 @@ tn_restart:
 		{
 			jfb = jnl_format(JNL_SET, gv_currkey, (!is_dollar_incr ? val_forjnl : post_incr_mval), nodeflags);
 			assert(NULL != jfb);
+			PRO_ONLY(UNUSED(jfb));
 			jnl_format_done = TRUE;
 		}
 		succeeded = ((trans_num)0 != t_end(&gv_target->hist, dir_hist, TN_NOT_SPECIFIED));
@@ -2803,11 +2804,11 @@ tn_restart:
 				if ((NULL != gvt_trigger) && !ztval_gvcst_put_redo)
 				{
 					assert(dollar_tlevel);
-					/* Format ZTWORM and SET journal records.
+					/* Format ZTWORM (if applicable) and SET journal records.
 					 * "ztworm_jfb", "jfb" and "jnl_format_done" are set by the below macro.
 					 */
-					JNL_FORMAT_ZTWORM_IF_NEEDED(csa, write_logical_jnlrecs,
-							JNL_SET, gv_currkey, ja_val, ztworm_jfb, jfb, jnl_format_done);
+					jnl_format_ztworm_plus_logical(csa, write_logical_jnlrecs,
+							JNL_SET, gv_currkey, ja_val, &ztworm_jfb, &jfb, &jnl_format_done);
 					/* Initialize trigger parms that dont depend on the context of the matching trigger */
 					trigparms.ztoldval_new = key_exists ? ztold_mval : (mval *)&literal_null;
 					PUSH_MV_STENT(MVST_MVAL);	/* protect $ztval from stp_gcol */
@@ -2844,7 +2845,7 @@ tn_restart:
 						status = cdb_sc_normal;	/* signal "retry:" to avoid t_retry call */
 						GOTO_RETRY;
 					}
-					REMOVE_ZTWORM_JFB_IF_NEEDED(ztworm_jfb, jfb, si);
+					JNL_FORMAT_ZTWORM_REMOVE_IF_NEEDED(ztworm_jfb, si);
 					if (trigparms.ztvalue_changed)
 					{	/* At least one of the invoked triggers changed $ztval.
 						 * Redo the gvcst_put with $ztval as the right side of the SET.
@@ -2909,6 +2910,7 @@ tn_restart:
 #				endif
 				jfb = jnl_format(JNL_SET, gv_currkey, ja_val, nodeflags);
 				assert(NULL != jfb);
+				PRO_ONLY(UNUSED(jfb));
 				jnl_format_done = TRUE;
 			}
 #			ifdef GTM_TRIGGER

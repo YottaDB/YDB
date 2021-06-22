@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -71,6 +71,9 @@
 
 #define DIR_SEPARATOR		'/'
 #define UNALIAS			"unalias -a; "
+
+/* Below macro allows us to mark parameters/return-values as unused and avoid warnings from the compiler/clang-tidy etc. */
+#define UNUSED(x) (void)(x)
 
 /* the LITERAL version of the macro should be used over STRING whenever possible for efficiency reasons */
 #define	STR_LIT_LEN(LITERAL)			(SIZEOF(LITERAL) - 1)

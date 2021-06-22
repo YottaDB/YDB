@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -615,7 +615,10 @@ typedef enum
 	JNL_SET,
 	JNL_ZKILL,
 #	ifdef GTM_TRIGGER
-	JNL_ZTWORM,
+	JNL_ZTWORM,		/* Used BEFORE the trigger is invoked, to format a ZTWORMHOLE journal record */
+	JNL_ZTWORM_POST_TRIG,	/* Used AFTER  the trigger is invoked, to update the already formatted ZTWORMHOLE journal record
+				 * with any modified value of $ZTWORMHOLE after the trigger invocation.
+				 */
 	JNL_LGTRIG,
 	JNL_ZTRIG,
 #	endif
@@ -794,7 +797,12 @@ typedef struct
 #define	JS_HAS_TRIGGER_MASK	(1 << 1) /* 1 if the global being updated had at least one trigger defined (not necessarily
 					  *	invoked for this particular update)
 					  */
-#define	JS_NULL_ZTWORM_MASK	(1 << 2) /* 1 if $ZTWORMHOLE for this update should be "" string, 0 otherwise */
+#define	JS_RESERVED2_MASK	(1 << 2) /* Note: This bit was previously in use as a macro JS_NULL_ZTWORM_MASK but was nixed
+					  * as part of YDB#727 changes. This bit position needs to be left unused/reserved,
+					  * i.e. later bits (JS_SKIP_TRIGGERS_MASK etc.) cannot be moved into this bit position
+					  * as their bit positions are already documented as part of the "nodeflags" field in
+					  * the journal extract format and are a part of the journal/extract file.
+					  */
 #define	JS_SKIP_TRIGGERS_MASK	(1 << 3) /* 1 if MUPIP LOAD update so triggers are not invoked on replay by update process */
 #define	JS_IS_DUPLICATE		(1 << 4) /* 1 if this SET or KILL is a duplicate. In case of a SET, this is a duplicate set.
 					  * In case of a KILL, it is a kill of a non-existing node aka duplicate kill.
@@ -1226,8 +1234,8 @@ typedef struct
 								 *	jfb->alt_buff + FIXED_UPD_RECLEN
 								 * If no ztwormhole record is yet formatted, then points to NULL
 								 */
-	unsigned char			*save_ztworm_ptr;	/* copy of prev_ztworm_ptr saved until we know for sure whether
-								 * a ZTWORMHOLE journal record will be written or not.
+	unsigned char			*pre_trig_ztworm_ptr;	/* Pointer to value of journal format buffer containing value of
+								 * $ZTWORMHOLE before trigger is invoked.
 								 */
 #	endif
 #	ifdef DEBUG
@@ -1760,24 +1768,24 @@ MBSTART {								\
  * length our encryption plug-in supports is 16 bytes, and we only have three bytes of information suitable for an IV at the
  * encryption time (explained below), so just fit four copies of a three-byte integer into the IV array.
  */
-# define PREPARE_LOGICAL_REC_IV(REC_SIZE, IV_ARRAY)							\
-{													\
-	uint4 *iv_ptr, iv_val;										\
-													\
-	/* Encryption happens prior to grabbing crit, when the only initialized fields of a journal	\
-	 * record prefix are jrec_type and forwptr, collectively occupying the first four bytes of the	\
-	 * jrec_prefix structure. However, if a JRT_TZTWORM-type record remains unused in a particular	\
-	 * transaction, it is removed, while the preceding record's type is modified from UUPD to TUPD, \
-	 * via the REMOVE_ZTWORM_JFB_IF_NEEDED macro. Since we cannot be changing IV after encryption,	\
-	 * jrec_type does not qualify. Therefore, we are left with three bytes taken by forwptr.	\
-	 */												\
-	assert((ARRAYSIZE(IV_ARRAY) == GTM_MAX_IV_LEN) && (GTM_MAX_IV_LEN == 4 * SIZEOF(uint4)));	\
-	iv_ptr = (uint4 *)IV_ARRAY;									\
-	iv_val = REC_SIZE;										\
-	*iv_ptr++ = iv_val;										\
-	*iv_ptr++ = iv_val;										\
-	*iv_ptr++ = iv_val;										\
-	*iv_ptr = iv_val;										\
+# define PREPARE_LOGICAL_REC_IV(REC_SIZE, IV_ARRAY)								\
+{														\
+	uint4 *iv_ptr, iv_val;											\
+														\
+	/* Encryption happens prior to grabbing crit, when the only initialized fields of a journal		\
+	 * record prefix are jrec_type and forwptr, collectively occupying the first four bytes of the		\
+	 * jrec_prefix structure. However, if a JRT_TZTWORM-type record remains unused in a particular		\
+	 * transaction, it is removed, while the preceding record's type is modified from UUPD to TUPD,		\
+	 * via the remove_ztworm_jfb_if_needed function. Since we cannot be changing IV after encryption,	\
+	 * jrec_type does not qualify. Therefore, we are left with three bytes taken by forwptr.		\
+	 */													\
+	assert((ARRAYSIZE(IV_ARRAY) == GTM_MAX_IV_LEN) && (GTM_MAX_IV_LEN == 4 * SIZEOF(uint4)));		\
+	iv_ptr = (uint4 *)IV_ARRAY;										\
+	iv_val = REC_SIZE;											\
+	*iv_ptr++ = iv_val;											\
+	*iv_ptr++ = iv_val;											\
+	*iv_ptr++ = iv_val;											\
+	*iv_ptr = iv_val;											\
 }
 
 /* Decrypt a logical journal record. */
@@ -1904,6 +1912,13 @@ MBSTART {											\
 	}											\
 } MBEND
 
+/* This simple macro exists to avoid the overhead of a function call if ZTWORM_JFB is NULL */
+#define	JNL_FORMAT_ZTWORM_REMOVE_IF_NEEDED(ZTWORM_JFB, SI)		\
+MBSTART {								\
+	if (NULL != ZTWORM_JFB)						\
+		jnl_format_ztworm_remove_if_needed(ZTWORM_JFB, SI);	\
+} MBEND
+
 /* jnl_ prototypes */
 uint4	jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size);
 uint4	jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat);
@@ -1934,6 +1949,10 @@ void	jnl_write_align_rec(sgmnt_addrs *csa, uint4 align_filler_len, jnl_tm_t time
 void	jnl_write_multi_align_rec(sgmnt_addrs *csa, uint4 align_filler_len, jnl_tm_t time);
 
 jnl_format_buffer	*jnl_format(jnl_action_code opcode, gv_key *key, mval *val, uint4 nodeflags);
+void			jnl_format_ztworm_plus_logical(sgmnt_addrs *csa, boolean_t write_logical_jnlrecs, jnl_action_code jnl_op,
+							gv_key *key, mval *val, jnl_format_buffer **ztworm_jfb,
+							jnl_format_buffer **jfb, boolean_t *jnl_format_done);
+void			jnl_format_ztworm_remove_if_needed(jnl_format_buffer *ztworm_jfb, struct sgm_info_struct *si);
 
 void	wcs_defer_wipchk_ast(jnl_private_control *jpc);
 uint4	set_jnl_file_close(void);
