@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -18,7 +18,7 @@
 # Use with data persistence:
 #   $ docker run --rm -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
 
-ARG OS_VSN=buster
+ARG OS_VSN=bullseye
 
 # Stage 1: YottaDB build image
 FROM debian:${OS_VSN} as ydb-release-builder
@@ -83,7 +83,7 @@ RUN mkdir -p /tmp/yottadb-build \
  && make install
 
 # Stage 2: YottaDB release image
-FROM bitnami/minideb as ydb-release
+FROM debian:${OS_VSN} as ydb-release
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
@@ -98,6 +98,7 @@ RUN apt-get update && \
                     vim \
                     procps \
                     make \
+                    golang \
                     git \
                     pkg-config \
                     clang \
@@ -123,22 +124,6 @@ ENV ydb_dir=/data \
 # MUPIP RUNDOWN need in the following chain because otherwise ENTRYPOINT complains
 # about inability to run %XCMD and rundown needed. Cause not known, but this workaround works
 # and is otherwise benign.
-# Note that the current Go version in Debian buster is 1.10 whereas YDB requires 1.13.
-# Accordingly, the following series of `echo`s, `sed`, and `apt` calls below are to:
-#	1. Install the latest Go version from Debian testing, i.e. 1.13+, and
-#	2. Enable apt pinning to allow forward updates of the installed Go package
-RUN sed -i 's/buster/stable/g' /etc/apt/sources.list \
- && echo "Package: *" >> /etc/apt/preferences.d/preferences \
- && echo "Pin: release a=stable" >> /etc/apt/preferences.d/preferences \
- && echo "Pin-Priority: 900" >> /etc/apt/preferences.d/preferences \
- && echo >> /etc/apt/preferences.d/preferences \
- && echo "Package: *" >> /etc/apt/preferences.d/preferences \
- && echo "Pin: release o=testing" >> /etc/apt/preferences.d/preferences \
- && echo "Pin-Priority: -10" >> /etc/apt/preferences.d/preferences \
- && echo "deb http://deb.debian.org/debian/ testing main" >> /etc/apt/sources.list \
- && echo "deb-src http://deb.debian.org/debian/ testing main" >> /etc/apt/sources.list
-RUN apt update -y \
- && apt install -t testing golang -y --no-install-recommends
 RUN . /opt/yottadb/current/ydb_env_set \
  && go version \
  && go get -t -d lang.yottadb.com/go/yottadb \
