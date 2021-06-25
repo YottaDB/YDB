@@ -459,8 +459,8 @@ void gtm_icu_init(void)
 	#ifndef DEBUG
 		symbols_renamed = FALSE; /* This should not be needed because findx will be 0 on the first iteration and this
 				  	  * variable should be initialized after the first iteration but valgrind throws what
-				  	  * what we believe is a uninitialized variable warning for this so we set it to avoid
-					  * the warning.
+				  	  * what we believe is a false uninitialized variable warning for this so we set it
+					  * to avoid the warning.
 				  	  */
 	#endif
 	DEBUG_ONLY(symbols_renamed = -1;)

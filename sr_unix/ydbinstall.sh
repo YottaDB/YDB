@@ -833,10 +833,10 @@ remove_tmpdir=1	# It is okay to remove $tmpdir at the end assuming ydbinstall is
 		# Any errors while installing any plugin will set this variable to 0.
 
 if [ "Y" = $ydb_posix ] ; then
-	cd $tmpdir	# Get back to top level temporary directory as the current directory for ydb_env_set
-	. ${ydb_installdir}/ydb_env_set
+	cd $tmpdir	# Get back to top level temporary directory as the current directory
 	mkdir posix_tmp
 	cd posix_tmp
+	export ydb_dist=${ydb_installdir}
 	if curl -fSsLO https://gitlab.com/YottaDB/Util/YDBPosix/-/archive/master/YDBPosix-master.tar.gz; then
 		tar xzf YDBPosix-master.tar.gz
 		cd YDBPosix-master
@@ -845,7 +845,6 @@ if [ "Y" = $ydb_posix ] ; then
 		if make -j `grep -c ^processor /proc/cpuinfo` && sudo make install; then
 			# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
 			cd ../../..
-			. ${ydb_installdir}/ydb_env_unset
 			sudo rm -R posix_tmp
 		else
 			echo "POSIX plugin build failed. The build directory ($PWD/posix_tmp) has been saved."
@@ -871,7 +870,7 @@ if [ "Y" = $ydb_aim ] ; then
 fi
 
 if [ "Y" = $ydb_encplugin ] ; then
-	cd $tmpdir	# Get back to top level temporary directory as the current directory for ydb_env_set
+	cd $tmpdir	# Get back to top level temporary directory as the current directory
 	export ydb_icu_version=$ydb_icu_version
 	mkdir enc_tmp
 	cd enc_tmp
@@ -902,7 +901,6 @@ if [ "Y" = $ydb_zlib ] ; then
 			# Save the build directory if either of the gcc commands return a non-zero exit code. Otherwise, remove it.
 			sudo cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
 			sudo cp _ZLIB.m ${ydb_installdir}/plugin/r
-			${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
 			if [ "Y" = $ydb_utf8 ] ; then
 				if [ "default" = "$ydb_icu_version" ] ; then
 					ydb_icu_version=`pkg-config --modversion icu-io`
@@ -916,6 +914,7 @@ if [ "Y" = $ydb_zlib ] ; then
 					sudo cp _ZLIB.o ${ydb_installdir}/plugin/o/utf8
 				)
 			fi
+			${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
 			sudo cp _ZLIB.o ${ydb_installdir}/plugin/o
 			. ${ydb_installdir}/ydb_env_unset
 			cd ../..
@@ -930,7 +929,7 @@ if [ "Y" = $ydb_zlib ] ; then
 fi
 
 if [ "Y" = $ydb_octo ] ; then
-	cd $tmpdir	# Get back to top level temporary directory as the current directory for ydb_env_set
+	cd $tmpdir	# Get back to top level temporary directory as the current directory
 	export ydb_dist=${ydb_installdir}
 	if git clone https://gitlab.com/YottaDB/DBMS/YDBOcto YDBOcto-master; then
 		cd YDBOcto-master
