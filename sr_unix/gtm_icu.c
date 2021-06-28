@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -456,6 +456,13 @@ void gtm_icu_init(void)
 	 * we skip the "dlopen_handle_array_add" (and in turn "dlopen_handle_array_close" at "ydb_exit" time).
 	 */
 	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	#ifndef DEBUG
+		symbols_renamed = FALSE; /* This should not be needed because findx will be 0 on the first iteration and this
+				  	  * variable should be initialized after the first iteration but valgrind throws what
+				  	  * what we believe is a uninitialized variable warning for this so we set it to avoid
+					  * the warning.
+				  	  */
+	#endif
 	DEBUG_ONLY(symbols_renamed = -1;)
 	for (findx = 0; findx < icu_func_n; ++findx)
 	{

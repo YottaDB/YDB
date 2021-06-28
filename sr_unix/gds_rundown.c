@@ -465,6 +465,9 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			vermismatch = TRUE;
 		} else
 			vermismatch = FALSE;
+		shm_buf.shm_nattch = 0; /* Needed to address what we believe to be a false uninitialized variable warning in
+					 * valgrind for pro builds on AARCH64.
+					 */
 		if (-1 == shmctl(udi->shmid, IPC_STAT, &shm_buf))
 		{
 			save_errno = errno;
