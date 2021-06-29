@@ -178,7 +178,7 @@
 GBLDEF	repl_msg_ptr_t		gtmsource_msgp = NULL;
 GBLDEF	int			gtmsource_msgbufsiz = 0;
 GBLDEF	repl_msg_ptr_t		gtmsource_cmpmsgp = NULL;
-GBLDEF	int			gtmsource_cmpmsgbufsiz = 0;
+GBLDEF	unsigned int		gtmsource_cmpmsgbufsiz = 0;
 GBLDEF	boolean_t		gtmsource_received_cmp2uncmp_msg;
 GBLDEF	qw_num			repl_source_data_sent = 0;
 GBLDEF	qw_num			repl_source_msg_sent = 0;

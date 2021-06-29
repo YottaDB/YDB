@@ -214,8 +214,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	trans_num		valid_thru, oldest_hist_tn, dbtn, blktn, temp_tn, epoch_tn, old_block_tn;
 	unsigned char		cw_depth, cw_bmp_depth, buff[MAX_ZWR_KEY_SZ], *end;
 	jnldata_hdr_ptr_t	jnl_header;
-	uint4			total_jnl_rec_size, tmp_cw_set_depth, prev_cw_set_depth;
-	DEBUG_ONLY(unsigned int	tot_jrec_size;)
+	uint4			tmp_cw_set_depth, prev_cw_set_depth;
+	gtm_uint64_t		total_jnl_rec_size;
 	jnlpool_ctl_ptr_t	jpl;
 	jnlpool_addrs_ptr_t	save_jnlpool, tmp_jnlpool;
 	boolean_t		replication = FALSE;
@@ -620,6 +620,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	{	/* compute the total journal record size requirements before grab_crit.
 		 * there is code later that will check for state changes from now to then and if so do a recomputation
 		 */
+		DEBUG_ONLY(gtm_uint64_t	tot_jrec_size;)
+
 		assert(!cw_map_depth || cw_set_depth < cw_map_depth);
 		tmp_cw_set_depth = cw_map_depth ? cw_map_depth : cw_set_depth;
 		TOTAL_NONTPJNL_REC_SIZE(total_jnl_rec_size, non_tp_jfb_ptr, csa, tmp_cw_set_depth);
@@ -633,7 +635,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		assert((CDB_CW_SET_SIZE * MAX_MAX_NONTP_JNL_REC_SIZE + MAX_LOGI_JNL_REC_SIZE +
 			MIN_TOTAL_NONTPJNL_REC_SIZE + JNL_FILE_TAIL_PRESERVE) <= (JNL_AUTOSWITCHLIMIT_MIN * DISK_BLOCK_SIZE));
 		DEBUG_ONLY(tot_jrec_size = MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size));
-		assert(tot_jrec_size <= csd->autoswitchlimit);
+		assert(tot_jrec_size <= csd->autoswitchlimit);	/* So no need of a JNLTRANS2BIG error like is done in "tp_tend" */
 		/* The SET_GBL_JREC_TIME done below should be done before any journal writing activity
 		 * on this region's journal file. This is because all the jnl record writing routines assume
 		 * jgbl.gbl_jrec_time is initialized appropriately.
@@ -1364,7 +1366,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				supplementary = FALSE;
 			}
 			assert(jgbl.cumul_jnl_rec_len);
-			jgbl.cumul_jnl_rec_len += SIZEOF(jnldata_hdr_struct);
+			INCREMENT_JGBL_CUMUL_JNL_REC_LEN(SIZEOF(jnldata_hdr_struct));
 			/* Make sure timestamp of this seqno is >= timestamp of previous seqno. Note: The below macro
 			 * invocation should be done AFTER the ADJUST_GBL_JREC_TIME call as the below resets
 			 * jpl->prev_jnlseqno_time. Doing it the other way around would mean the reset will happen

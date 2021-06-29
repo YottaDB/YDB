@@ -1135,7 +1135,7 @@ PREVJNLLINKCUT	<Previous journal file name link set to NULL in new journal file 
 PREVJNLLINKSET	<Previous generation journal file name is changed from !AD to !AD>/info/fao=4!/ansi=0
 FILENAMETOOLONG	<File name too long>/error/fao=0!/ansi=0
 REQRECOV	<Error accessing database !AD.  Must be recovered on cluster node !AD.>/error/fao=4!/ansi=0
-JNLTRANS2BIG	<Transaction needs an estimated [!UL blocks] in journal file !AD which exceeds the AUTOSWITCHLIMIT of !UL blocks>/error/fao=4!/ansi=0
+JNLTRANS2BIG	<Transaction needs an estimated [!@ZQ blocks] in journal file !AD which exceeds the AUTOSWITCHLIMIT of !UL blocks>/error/fao=4!/ansi=0
 JNLSWITCHTOOSM	<Journal AUTOSWITCHLIMIT [!UL blocks] is less than Journal ALLOCATION [!UL blocks] for database file !AD>/error/fao=4!/ansi=0
 JNLSWITCHSZCHG	<Journal AUTOSWITCHLIMIT [!UL blocks] is rounded down to [!UL blocks] to equal the sum of Journal ALLOCATION [!UL blocks] and a multiple of Journal EXTENSION [!UL blocks] for database file !AD>/info/fao=6!/ansi=0
 NOTRNDMACC	<Only random access files are supported as backup files for non-incremental backup>/error/fao=0!/ansi=0

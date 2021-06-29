@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -163,7 +163,6 @@ typedef struct sgm_info_struct
 	boolean_t		backup_block_saved;
 	sgmnt_addrs		*kip_csa;
 	int			tmp_cw_set_depth;	/* used only #ifdef DEBUG. see comments for tmp_cw_set_depth in "tp_tend" */
-	uint4			tot_jrec_size;		/* maximum journal space needs for this transaction */
 	jbuf_rsrv_struct_t	*jbuf_rsrv_ptr;		/* Pointer to structure corresponding to reservations on the journal
 							 * buffer for this region in current TP transaction.
 							 */
@@ -461,8 +460,14 @@ typedef struct trans_restart_hist_struct
 
 #define TOTAL_TPJNL_REC_SIZE(TOTAL_JNL_REC_SIZE, SI, CSA)							\
 {														\
+	assert(8 == SIZEOF(TOTAL_JNL_REC_SIZE));	/* Need 8-byte. 4-byte can result in overflows. */	\
+	/* Note the use of "(uint4)" type cast all over this macro to avoid a 4-byte value that is greater	\
+	 * than 2GiB but less than 4GiB to be treated as a positive value instead of as a negative value	\
+	 * as the latter can result in incorrect calculations and JNLTRANS2BIG error not being issued when	\
+	 * it should have. (YDB#749)										\
+	 */													\
 	DEBUG_ONLY(SI->tmp_cw_set_depth = SI->cw_set_depth;)	/* save a copy to check later in "tp_tend" */	\
-	TOTAL_JNL_REC_SIZE = SI->total_jnl_rec_size;								\
+	TOTAL_JNL_REC_SIZE = (uint4)SI->total_jnl_rec_size;							\
 	if (CSA->jnl_before_image)										\
 		TOTAL_JNL_REC_SIZE += (SI->cw_set_depth * CSA->pblk_align_jrecsize);				\
 	/* Since we have already taken into account an align record per journal record and since the size of	\
@@ -472,7 +477,8 @@ typedef struct trans_restart_hist_struct
 	 * in case journal file close is needed 								\
 	 */													\
 	assert(JNL_FILE_TAIL_PRESERVE < (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE));					\
-	SI->total_jnl_rec_size = TOTAL_JNL_REC_SIZE = (TOTAL_JNL_REC_SIZE * 2) + (uint4)JNL_FILE_TAIL_PRESERVE;	\
+	TOTAL_JNL_REC_SIZE = (TOTAL_JNL_REC_SIZE * 2) + (uint4)JNL_FILE_TAIL_PRESERVE;				\
+	SI->total_jnl_rec_size = (uint4)TOTAL_JNL_REC_SIZE;							\
 }
 
 #define MIN_TOTAL_NONTPJNL_REC_SIZE 	(PINI_RECLEN + MIN_ALIGN_RECLEN + INCTN_RECLEN + MIN_ALIGN_RECLEN)
@@ -482,12 +488,16 @@ typedef struct trans_restart_hist_struct
  */
 #define TOTAL_NONTPJNL_REC_SIZE(TOTAL_JNL_REC_SIZE, NON_TP_JFB_PTR, CSA, TMP_CW_SET_DEPTH)			\
 {														\
-	TOTAL_JNL_REC_SIZE = (NON_TP_JFB_PTR->record_size + (uint4)MIN_TOTAL_NONTPJNL_REC_SIZE);		\
+	assert(8 == SIZEOF(TOTAL_JNL_REC_SIZE));	/* Need 8-byte. 4-byte can result in overflows. */	\
+	/* Note that this macro does not use "(uint4)" type cast (like TOTAL_TPJNL_REC_SIZE does) because we	\
+	 * don't expect 4GiB overflows in a non-TP transaction journal record requirements.			\
+	 */													\
+	TOTAL_JNL_REC_SIZE = (NON_TP_JFB_PTR->record_size + MIN_TOTAL_NONTPJNL_REC_SIZE);			\
 	if (CSA->jnl_before_image)										\
 		/* One PBLK record for each gds block changed by the transaction */				\
-		TOTAL_JNL_REC_SIZE += (TMP_CW_SET_DEPTH * CSA->pblk_align_jrecsize);			\
+		TOTAL_JNL_REC_SIZE += ((gtm_uint64_t)TMP_CW_SET_DEPTH * CSA->pblk_align_jrecsize);		\
 	if (write_after_image)											\
-		TOTAL_JNL_REC_SIZE += (uint4)MIN_AIMG_RECLEN + CSA->hdr->blk_size + (uint4)MIN_ALIGN_RECLEN;	\
+		TOTAL_JNL_REC_SIZE += MIN_AIMG_RECLEN + CSA->hdr->blk_size + MIN_ALIGN_RECLEN;			\
 	/* Since we have already taken into account an align record per journal record and since the size of	\
 	 * an align record will be < (size of the journal record written + fixed-size of align record)		\
 	 * we can be sure we won't need more than twice the computed space.					\
@@ -495,7 +505,7 @@ typedef struct trans_restart_hist_struct
 	 * in case journal file close is needed 								\
 	 */													\
 	assert(JNL_FILE_TAIL_PRESERVE < (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE));					\
-	TOTAL_JNL_REC_SIZE = TOTAL_JNL_REC_SIZE * 2 + (uint4)JNL_FILE_TAIL_PRESERVE;				\
+	TOTAL_JNL_REC_SIZE = TOTAL_JNL_REC_SIZE * 2 + JNL_FILE_TAIL_PRESERVE;					\
 }
 
 #define INVALIDATE_CLUE(CSE) 					\

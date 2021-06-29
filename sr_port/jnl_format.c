@@ -281,8 +281,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	}
 	/* else if (!dollar_tlevel) jfb->buff/jfb->alt_buff already malloced in gvcst_init. */
 	jfb->record_size = jrec_size;
-	jgbl.cumul_jnl_rec_len += jrec_size;
-	assert(0 == jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY);
+	INCREMENT_JGBL_CUMUL_JNL_REC_LEN(jrec_size);	/* Bump jgbl.cumul_jrec_len by "jrec_size" */
 	DEBUG_ONLY(jgbl.cumul_index++;)
 	jfb->rectype = rectype;
 	/* PREFIX */

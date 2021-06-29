@@ -99,7 +99,7 @@ GBLREF	FILE			*gtmsource_log_fp;
 GBLREF	gd_addr			*gd_header;
 GBLREF	gtmsource_state_t	gtmsource_state;
 GBLREF	int4			strm_index;
-GBLREF	int			gtmsource_cmpmsgbufsiz;
+GBLREF	unsigned int		gtmsource_cmpmsgbufsiz;
 GBLREF	int			gtmsource_filter;
 GBLREF	int			gtmsource_log_fd;
 GBLREF	int			gtmsource_msgbufsiz;
@@ -366,10 +366,10 @@ int gtmsource_alloc_msgbuff(int maxbuffsize, boolean_t discard_oldbuff)
 			 * Allocate extra space just in case compression actually expands the data (needed only in rare cases).
 			 */
 			oldmsgp = gtmsource_cmpmsgp;
-			gtmsource_cmpmsgp = (repl_msg_ptr_t)malloc(maxbuffsize * MAX_CMP_EXPAND_FACTOR);
+			gtmsource_cmpmsgp = (repl_msg_ptr_t)malloc((unsigned)maxbuffsize * MAX_CMP_EXPAND_FACTOR);
 			if (NULL != oldmsgp)
 				free(oldmsgp);
-			gtmsource_cmpmsgbufsiz = (maxbuffsize * MAX_CMP_EXPAND_FACTOR);
+			gtmsource_cmpmsgbufsiz = ((unsigned)maxbuffsize * MAX_CMP_EXPAND_FACTOR);
 		}
 		gtmsource_alloc_filter_buff(gtmsource_msgbufsiz);
 	}

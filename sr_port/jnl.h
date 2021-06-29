@@ -1217,7 +1217,10 @@ typedef struct
 	boolean_t			dont_reset_gbl_jrec_time;	/* Do not reset gbl_jrec_time */
 	pini_addr_reset_fnptr		mur_pini_addr_reset_fnptr;	/* function pointer to invoke "mur_pini_addr_reset" */
 	uint4				cumul_jnl_rec_len;		/* cumulative length of the replicated journal records
-									 * for the current TP or non-TP transaction */
+									 * for the current TP or non-TP transaction. We currently
+									 * only allow a max of 1Gib for this. More than that and
+									 * it leads to various problems (YDB#749).
+									 */
 	boolean_t			wait_for_jnl_hard;
 	uint4				tp_ztp_jnl_upd_num;	/* Incremented whenever a journaled update happens inside of
 								 * TP or ZTP. Copied over to the corresponding journal record
@@ -1458,6 +1461,29 @@ MBSTART {														\
 	FINISH_JNL_PHASE2_IN_JNLPOOL_IF_NEEDED(replication, JNLPOOL);	/* Step CMT17 (if BG) */			\
 } MBEND
 
+#define	MAX_TRANS_REPLJNL_SIZE	(1 << 30)	/* 1 Gib */
+
+/* This macro increments jgbl.cumul_jnl_rec_len by "SIZE" and issues an error if it goes more than 2Gb in size */
+#define	INCREMENT_JGBL_CUMUL_JNL_REC_LEN(SIZE)										\
+MBSTART {														\
+	int4	new_len;												\
+															\
+	new_len = (int4)jgbl.cumul_jnl_rec_len;										\
+	assert(0 == jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY);							\
+	assert(0 == (SIZE) % JNL_REC_START_BNDRY);									\
+	assert(MAX_TRANS_REPLJNL_SIZE > SIZE);		/* Assert that the increment is < 1Gib. */			\
+	assert(MAX_TRANS_REPLJNL_SIZE > new_len);	/* Assert that the pre-increment value is < 1Gib. */		\
+	new_len += (SIZE);												\
+	if (MAX_TRANS_REPLJNL_SIZE <= new_len)										\
+	{	/* Cumulative size of replicated journal records for this current TP transaction exceeds limit.		\
+		 * Issue error as otherwise we run into various problems (YDB#749).					\
+		 */													\
+		assert(dollar_tlevel);	/* Non-TP transactions cannot reach 1Gib limit */				\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRANSREPLJNL1GB);						\
+	}														\
+	jgbl.cumul_jnl_rec_len = new_len;										\
+} MBEND
+
 /* BEGIN : Structures used by "jnl_write_reserve" */
 typedef struct
 {
@@ -1663,8 +1689,15 @@ MBSTART {								\
 	 	? (jnl_alq) 									\
 		: ((jnl_alq) + ROUND_DOWN((tmp_tot_jrec_size) - (jnl_alq), (jnl_deq))))
 
-/* the following macro uses 8-byte quantities (gtm_uint64_t) to perform additions that might cause a 4G overflow */
-#define	DISK_BLOCKS_SUM(freeaddr, jrec_size)	DIVIDE_ROUND_UP((((gtm_uint64_t)(freeaddr)) + (jrec_size)), DISK_BLOCK_SIZE)
+/* The following macro uses 8-byte quantities (gtm_uint64_t) to perform additions that might cause a 4G overflow.
+ * The (uint4) type cast of "jrec_size" below is needed so the arithmetic happens correctly if "jrec_size" is more
+ * than 2GiB i.e. it gets treated as a huge positive number instead of a negative number if it is in the 2GiB to
+ * 4GiB range. Note that this is currently not possible because we issue a TRANSREPLJNL1GB error if the actual total
+ * logical journal record size reaches 1GiB. But in case that limit gets bumped up to 2GiB or 4GiB at a later point
+ * in time, the below check would be needed and so we keep the check even now.
+ */
+#define	DISK_BLOCKS_SUM(freeaddr, jrec_size)								\
+	DIVIDE_ROUND_UP((((gtm_uint64_t)(freeaddr)) + (uint4)(jrec_size)), DISK_BLOCK_SIZE)
 
 /* For future portability JNLBUFF_ALLOC is defined in jnl.h instead of jnlsp.h */
 #define JPC_ALLOC(csa)								\

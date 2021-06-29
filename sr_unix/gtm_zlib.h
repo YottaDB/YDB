@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,7 +87,7 @@ void gtm_zlib_init(void);
 	intrpt_state_t			prev_intrpt_state;								\
 															\
 	DEFER_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP, prev_intrpt_state);							\
-	assert(0 < (signed)(CMPLEN));											\
+	assert(0 != (CMPLEN));												\
 	assert(NULL != zlib_compress_fnptr);										\
 	RC = (*zlib_compress_fnptr)(((Bytef *)(CMPBUFF_PTR)), (uLongf *)&(CMPLEN), (const Bytef *)(UNCMPBUFF_PTR), 	\
 					(uLong)(UNCMPLEN), ZLIB_CMP_LEVEL);						\

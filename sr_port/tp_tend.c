@@ -264,7 +264,7 @@ boolean_t	tp_tend()
 	boolean_t		yes_jnl_no_repl, recompute_cksum, cksum_needed;
 	boolean_t		save_dont_reset_gbl_jrec_time;
 	uint4			jnl_status, leafmods, indexmods;
-	uint4			total_jnl_rec_size, in_tend;
+	uint4			in_tend;
 	uint4			lcl_update_trans;
 	jnlpool_addrs_ptr_t	save_jnlpool, update_jnlpool, local_jnlpool;
 	jnlpool_ctl_ptr_t	jpl;
@@ -417,14 +417,17 @@ boolean_t	tp_tend()
 			{	/* compute the total journal record size requirements before grab_crit.
 				 * there is code later that will check for state changes from now to then
 				 */
-				TOTAL_TPJNL_REC_SIZE(total_jnl_rec_size, si, csa);
+				gtm_uint64_t	tot_jrec_size;
+				gtm_uint64_t	total_jnl_rec_size;
+
+				TOTAL_TPJNL_REC_SIZE(total_jnl_rec_size, si, csa);	/* Updates si->total_jnl_rec_size */
 				/* compute current transaction's maximum journal space needs in number of disk blocks */
-				si->tot_jrec_size = MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size);
-				GTM_WHITE_BOX_TEST(WBTEST_TP_TEND_TRANS2BIG, si->tot_jrec_size, (2 * csd->autoswitchlimit));
+				tot_jrec_size = MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size);
+				GTM_WHITE_BOX_TEST(WBTEST_TP_TEND_TRANS2BIG, tot_jrec_size, (2 * csd->autoswitchlimit));
 				/* check if current TP transaction's jnl size needs are greater than max jnl file size */
-				if (si->tot_jrec_size > csd->autoswitchlimit)
+				if (tot_jrec_size > (gtm_uint64_t)csd->autoswitchlimit)
 					/* can't fit in current transaction's journal records into one journal file */
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLTRANS2BIG, 4, si->tot_jrec_size,
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLTRANS2BIG, 4, &tot_jrec_size,
 						JNL_LEN_STR(csd), csd->autoswitchlimit);
 			}
 			if (REPL_ALLOWED(csa))
@@ -1278,7 +1281,7 @@ boolean_t	tp_tend()
 			supplementary = FALSE;
 		}
 		assert(jgbl.cumul_jnl_rec_len);
-		jgbl.cumul_jnl_rec_len += TCOM_RECLEN * jnl_participants + SIZEOF(jnldata_hdr_struct);
+		INCREMENT_JGBL_CUMUL_JNL_REC_LEN(TCOM_RECLEN * jnl_participants + SIZEOF(jnldata_hdr_struct));
 		DEBUG_ONLY(jgbl.cumul_index += jnl_participants;)
 		/* Make sure timestamp of this seqno is >= timestamp of previous seqno. Note: The below macro
 		 * invocation should be done AFTER the ADJUST_GBL_JREC_TIME call as the below resets
