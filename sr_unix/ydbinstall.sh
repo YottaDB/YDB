@@ -858,6 +858,7 @@ fi
 if [ "Y" = $ydb_aim ] ; then
 	cd $tmpdir
 	mkdir aim_tmp && cd aim_tmp
+	export ydb_dist=${ydb_installdir}
 	url="https://gitlab.com/YottaDB/Util/YDBAIM.git"
 	if git clone ${url} .; then
 		if ! ./install.sh; then
