@@ -2572,7 +2572,14 @@ typedef struct	gd_region_struct
 	bool			statsDB_setup_started;
 	gd_addr			*owning_gd;
 	bool			statsDB_setup_completed;
-	char			filler[39];	/* filler to store runtime structures without changing gdeget/gdeput.m */
+	char			filler[38];	/* filler to store runtime structures without changing gdeget/gdeput.m */
+	/* All files below are YottaDB specific runtime fields. Introduced after the filler to avoid colliding with any GT.M
+	 * runtime fields that get introduced in the future (they will be added BEFORE the filler[..] field).
+	 */
+	bool			seg_fname_initialized;	/* TRUE if reg->dyn.addr->fname has been initialized by one call to
+							 * "dbfilopn()". Added to "gd_region" instead of in the more logical
+							 * "gd_segment" as the filler space is a lot more in the former.
+							 */
 } gd_region;
 
 typedef struct	sgmnt_addrs_struct

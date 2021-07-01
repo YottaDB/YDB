@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,7 @@ void		db_auto_upgrade(gd_region *reg);
 int		db_init(gd_region *reg, boolean_t ok_to_bypass);
 void		db_init_err_cleanup(boolean_t retry_dbinit);
 void		gvcst_redo_root_search(void);
-gd_region	*dbfilopn (gd_region *reg);
+gd_region	*dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return);
 void		dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd, gtm_uint64_t *sec_size);
 unsigned char	gvcst_cre_autoDB(gd_region *reg);
 mint		gvcst_data(void);

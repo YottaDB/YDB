@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -857,7 +857,7 @@ void gvcst_init(gd_region *reg)
 	owning_gd = reg->owning_gd;
 	for (loopcnt = 0; loopcnt < MAX_DBFILOPN_RETRY_CNT; loopcnt++)
 	{
-		prev_reg = dbfilopn(reg);
+		prev_reg = dbfilopn(reg, FALSE);
 		if (prev_reg != reg)
 		{	/* (gd_region *)-1 == prev_reg => cm region open attempted */
 			if (NULL == prev_reg || (gd_region *)-1L == prev_reg)

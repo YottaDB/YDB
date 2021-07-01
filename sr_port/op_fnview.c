@@ -304,8 +304,31 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_GVFILE:
 			assert(gd_header);
 			assert(parmblk.gv_ptr);
-			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr);
+			/* Note that if parmblk.gv_ptr->open is FALSE, we do not want to do a heavyweight open of the region.
+			 * All we care about is the db file name. We can skip the "gv_init_reg()" call but the only thing we
+			 * would then be missing is the db file name stored in the SEGMENT in the gld could contain '$' usages.
+			 * Those usages would be expanded using "trans_log_name()" by "gv_init_reg()" and the expanded file name
+			 * copied over into "seg->fname". To fix that, we invoke "dbfilopn()" with a second parameter of "TRUE".
+			 * Note that not opening the region has the added benefit of not unnecessarily creating a database file
+			 * if the region is an AUTODB region whose db file does not exist at this point. For performance reasons,
+			 * we want to do the "dbfilopn()" call only once per region. The "seg_fname_initialized" field in the
+			 * "gd_region" structure helps achieve this by being initialized to TRUE after the first call.
+			 * Additionally, if parmblk.gv_ptr->open is TRUE, we can skip the "dbfilopn()" call since any file name
+			 * expansion that the below "dbfilopn()" would do will have already happened at "gv_init_reg()" time when
+			 * the "open" field got set to TRUE. In fact it is necessary to skip it in this case if the seg->acc_meth
+			 * if "dba_cm" as an assert in "dbfilopn()" would fail otherwise.
+			 */
+			if (!parmblk.gv_ptr->open && !parmblk.gv_ptr->seg_fname_initialized)
+			{
+				gd_region 	*reg;
+
+				reg = dbfilopn(parmblk.gv_ptr, TRUE);	/* TRUE indicates just update "seg->fname" if needed and
+									 * return without opening the db file and/or creating
+									 * AUTODB files.
+									 */
+				UNUSED(reg);
+				assert(parmblk.gv_ptr->seg_fname_initialized);
+			}
 			tmpstr.addr = (char *)parmblk.gv_ptr->dyn.addr->fname;
 			tmpstr.len = parmblk.gv_ptr->dyn.addr->fname_len;
 			s2pool(&tmpstr);

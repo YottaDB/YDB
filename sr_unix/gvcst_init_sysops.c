@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -426,7 +426,7 @@ error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_VERMISMATCH);
 
-gd_region *dbfilopn(gd_region *reg)
+gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 {
 	unix_db_info		*tmp_udi, *udi;
 	parse_blk		pblk;
@@ -452,9 +452,6 @@ gd_region *dbfilopn(gd_region *reg)
 	db_init_region = reg;
 	seg = reg->dyn.addr;
 	assert(IS_ACC_METH_BG_OR_MM(seg->acc_meth));
-	FILE_CNTL_INIT_IF_NULL(seg);
-	udi = FILE_INFO(reg);
-	csa = &udi->s_addrs;
 	file.addr = (char *)seg->fname;
 	file.len = seg->fname_len;
 	memset(&pblk, 0, SIZEOF(pblk));
@@ -480,13 +477,16 @@ gd_region *dbfilopn(gd_region *reg)
 	 */
 	if (!(status & 1))
 	{
-		if (!IS_GTCM_GNP_SERVER_IMAGE)
-		{
-			free(seg->file_cntl->file_info);
-			free(seg->file_cntl);
-			seg->file_cntl = NULL;
+		if (!update_seg_fname_and_return)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+		else
+		{	/* There was an error trying to expand the file name in the gld. Do not update seg->fname.
+			 * Just return so caller can then use seg->fname as was stored in the gld.
+			 */
+			assert(!reg->seg_fname_initialized);
+			reg->seg_fname_initialized = TRUE;
+			return reg;
 		}
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 	}
 	assert(((int)pblk.b_esl + 1) <= SIZEOF(seg->fname));
 	/* If a remote nodename has been specified with the @ syntax, pblk.l_node points to the character past the '@'
@@ -500,6 +500,17 @@ gd_region *dbfilopn(gd_region *reg)
 	pblk.buffer[len] = 0;
 	seg->fname[len] = 0;
 	seg->fname_len = len;
+	if (update_seg_fname_and_return)
+	{	/* Caller asked for just updating seg->fname and returning. So do just that. Do not open the db file
+		 * or create a non-existent AUTODB file.
+		 */
+		assert(!reg->seg_fname_initialized);
+		reg->seg_fname_initialized = TRUE;
+		return reg;
+	}
+	FILE_CNTL_INIT_IF_NULL(seg);
+	udi = FILE_INFO(reg);
+	csa = &udi->s_addrs;
 	if (pblk.fnb & F_HAS_NODE)
 	{	/* Remote node specification given */
 		assert(pblk.b_node && pblk.l_node[pblk.b_node - 1] == ':');
