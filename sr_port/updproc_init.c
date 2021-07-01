@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,7 +92,12 @@ int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 	/* Note: dpzgbini() is already called as part of gtm_startup which in turn is invoked by init_gtm.
 	 * So no need to do this initialization.
 	 */
-	*gld_db_files = read_db_files_from_gld(gd_header);/* read all the database files to be opened in this global directory */
+	*gld_db_files = read_db_files_from_gld(gd_header, NULL);	/* Pass NULL as we are not interested in the region count */
+		/* read all the database files to be opened in this global directory */
+	if (NULL == *gld_db_files)
+	{	/* There was an error while opening all database files in the gld or all regions are AutoDB and no db files exist */
+		mupip_exit(ERR_MUNOACTION);
+	}
 	if (!updproc_open_files(gld_db_files, start_jnl_seqno)) /* open and initialize all regions */
 		mupip_exit(ERR_UPDATEFILEOPEN);
 	for (curr = *gld_db_files;  NULL != curr; curr = curr->next)

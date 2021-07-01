@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.                                     *
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -20,6 +23,6 @@ typedef struct gld_dbname_list_struct
 	struct gd_region_struct		*gd;
 } gld_dbname_list;
 
-gld_dbname_list *read_db_files_from_gld(gd_addr *addr);
+gld_dbname_list *read_db_files_from_gld(gd_addr *addr, int *max_reg_total);
 
 #endif

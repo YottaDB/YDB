@@ -311,8 +311,8 @@ int4 mur_open_files(boolean_t retry)
 	}
 	if (star_specified)
 	{
-		max_reg_total = gd_header->n_regions;
-		gld_db_files = read_db_files_from_gld(gd_header);
+		gld_db_files = read_db_files_from_gld(gd_header, &max_reg_total);
+		assert((NULL == gld_db_files) || (max_reg_total <= gd_header->n_regions));
 	} else
 		gld_db_files = mur_db_files_from_jnllist(jnl_file_list, jnl_file_list_len, &max_reg_total);
 	if (NULL == gld_db_files)
