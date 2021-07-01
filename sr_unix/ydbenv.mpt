@@ -462,7 +462,7 @@ PathSame(path1,path2)
 	quit realpath1=realpath2
 
 Robustify	; rollback / recover an existing database if needed
-	new allok,cmd,cutoff,fhead,field,fname,io,jnlfile,jnlfilelist,line,region,replok,replon,sem,semid,semkey,timestamp,tmpok,ydb715flag,ydb715hack,year
+	new allok,cmd,cutoff,fhead,field,fname,io,jnlfile,jnlfilelist,line,region,replok,replon,sem,semid,semkey,timestamp,tmpok,year
 	new semidnotnull
 	set io=$io
 	view "setenv":"ydb_dir":env("ydb_dir"),"setenv":"ydb_rel":env("ydb_rel"),"setenv":"ydb_gbldir":ydbgbldir,"setenv":"ydb_repl_instance":ydbreplinst
@@ -537,30 +537,14 @@ Robustify	; rollback / recover an existing database if needed
 	. . . set:replok'=fhead(region,"sgmnt_data.repl_state") $ecode=",U247,"	; error because not all regions have same replication state
 	. . . set jnlfilelist=jnlfilelist_","_$$jnlfile(region)	; add this region's journal file to list
 	. set cmd="$ydb_dist/mupip journal "_$select(replok:"-rollback -backward ""*""",1:"-recover -backward "_jnlfilelist)
-	. ; Workaround till YDB#715 is fixed: create a database file for YDBAIM
-	. ; if replication is enabled and a database file does not exist. Set
-	. ; a flag to delete it later if it was created for the workaround.
-	. ; The database access to create the file must be a separate process
-	. ; because if this process opens YDBAIM, the MUPIP RECOVER/ROLLABACK
-	. ; below will fail. As this hack relies on YDB#709, YDB#715 should be
-	. ; fixed before YDB#709 is fixed.
-	. do:replok&'$data(fhead("YDBAIM","fname"))
-	. . open "ydb715hack":(shell="/bin/sh":command="$ydb_dist/yottadb -run %XCMD 'write $view(""gvfile"",""YDBAIM""),!'":readonly)::"pipe"
-	. . use "ydb715hack" read ydb715hack use io close "ydb715hack"
-	. . set ydb715flag=0
 	. open "robustify":(shell="/bin/sh":command="/bin/sh")::"pipe"
 	. use "robustify"
 	. write cmd,!
 	. write /eof
 	. for  read line quit:$zeof  do
 	. . use "/proc/self/fd/2" write line,! use "robustify"
-	. . set:line'?1"%YDB-"1(1"W",1"I",1"S").E ydb715flag=1
 	. use io close "robustify"
-	. ; if workaround is used for YDB#715, don't raise an error for non-zero return code
-	. if $zlength($get(ydb715hack)) do
-	. . set:ydb715flag $ecode=",U246,"	; error - mupip journal -rollback/-recover had a message other than I, S, or W
-	. . open ydb715hack close ydb715hack:delete
-	. else  set:$zclose $ecode=",U246,"	; error - mupip journal -rollback/-recover returned non-zero status
+	. set:$zclose $ecode=",U246,"	; error - mupip journal -rollback/-recover returned non-zero status
 	; Clean up prior generation journal files older than ydbretention
 	set tmp=$zpiece($horolog,",",1)
 	set year=$zdate(tmp,"YYYY")
