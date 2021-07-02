@@ -4983,7 +4983,7 @@ Init
 	Set gtmtypfldindx("gd_inst_info","instfilename")=1
 	;
 	Set gtmtypes("gd_region")="struct"
-	Set gtmtypes("gd_region",0)=44
+	Set gtmtypes("gd_region",0)=45
 	Set gtmtypes("gd_region","len")=424
 	Set gtmtypes("gd_region",1,"name")="gd_region.rname_len"
 	Set gtmtypes("gd_region",1,"off")=0
@@ -5202,9 +5202,14 @@ Init
 	Set gtmtypfldindx("gd_region","statsDB_setup_completed")=43
 	Set gtmtypes("gd_region",44,"name")="gd_region.filler"
 	Set gtmtypes("gd_region",44,"off")=385
-	Set gtmtypes("gd_region",44,"len")=39
+	Set gtmtypes("gd_region",44,"len")=38
 	Set gtmtypes("gd_region",44,"type")="char"
 	Set gtmtypfldindx("gd_region","filler")=44
+	Set gtmtypes("gd_region",45,"name")="gd_region.seg_fname_initialized"
+	Set gtmtypes("gd_region",45,"off")=423
+	Set gtmtypes("gd_region",45,"len")=1
+	Set gtmtypes("gd_region",45,"type")="char"
+	Set gtmtypfldindx("gd_region","seg_fname_initialized")=45
 	;
 	Set gtmtypes("gd_runtime_t")="struct"
 	Set gtmtypes("gd_runtime_t",0)=2
@@ -11227,11 +11232,11 @@ Init
 	Set gtmtypes("jnl_gbls_t",16,"len")=8
 	Set gtmtypes("jnl_gbls_t",16,"type")="addr"
 	Set gtmtypfldindx("jnl_gbls_t","prev_ztworm_ptr")=16
-	Set gtmtypes("jnl_gbls_t",17,"name")="jnl_gbls_t.save_ztworm_ptr"
+	Set gtmtypes("jnl_gbls_t",17,"name")="jnl_gbls_t.pre_trig_ztworm_ptr"
 	Set gtmtypes("jnl_gbls_t",17,"off")=80
 	Set gtmtypes("jnl_gbls_t",17,"len")=8
 	Set gtmtypes("jnl_gbls_t",17,"type")="addr"
-	Set gtmtypfldindx("jnl_gbls_t","save_ztworm_ptr")=17
+	Set gtmtypfldindx("jnl_gbls_t","pre_trig_ztworm_ptr")=17
 	Set gtmtypes("jnl_gbls_t",18,"name")="jnl_gbls_t.mur_fences_none"
 	Set gtmtypes("jnl_gbls_t",18,"off")=88
 	Set gtmtypes("jnl_gbls_t",18,"len")=4
@@ -27379,7 +27384,7 @@ Init
 	Set gtmtypfldindx("sgbg_addrs","cache_state")=1
 	;
 	Set gtmtypes("sgm_info")="struct"
-	Set gtmtypes("sgm_info",0)=40
+	Set gtmtypes("sgm_info",0)=39
 	Set gtmtypes("sgm_info","len")=272
 	Set gtmtypes("sgm_info",1,"name")="sgm_info.next_sgm_info"
 	Set gtmtypes("sgm_info",1,"off")=0
@@ -27571,16 +27576,11 @@ Init
 	Set gtmtypes("sgm_info",38,"len")=4
 	Set gtmtypes("sgm_info",38,"type")="int"
 	Set gtmtypfldindx("sgm_info","tmp_cw_set_depth")=38
-	Set gtmtypes("sgm_info",39,"name")="sgm_info.tot_jrec_size"
-	Set gtmtypes("sgm_info",39,"off")=260
-	Set gtmtypes("sgm_info",39,"len")=4
-	Set gtmtypes("sgm_info",39,"type")="uint32_t"
-	Set gtmtypfldindx("sgm_info","tot_jrec_size")=39
-	Set gtmtypes("sgm_info",40,"name")="sgm_info.jbuf_rsrv_ptr"
-	Set gtmtypes("sgm_info",40,"off")=264
-	Set gtmtypes("sgm_info",40,"len")=8
-	Set gtmtypes("sgm_info",40,"type")="addr"
-	Set gtmtypfldindx("sgm_info","jbuf_rsrv_ptr")=40
+	Set gtmtypes("sgm_info",39,"name")="sgm_info.jbuf_rsrv_ptr"
+	Set gtmtypes("sgm_info",39,"off")=264
+	Set gtmtypes("sgm_info",39,"len")=8
+	Set gtmtypes("sgm_info",39,"type")="addr"
+	Set gtmtypfldindx("sgm_info","jbuf_rsrv_ptr")=39
 	;
 	Set gtmtypes("sgmm_addrs")="struct"
 	Set gtmtypes("sgmm_addrs",0)=1
