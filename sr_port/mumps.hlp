@@ -147,7 +147,7 @@
 
    **Note**
 
-   This help file is a concise representation of the revision r1.30 of the
+   This help file is a concise representation of the revision r1.32 of the
    Administration and Operations Guide. To obtain a copy of the current
    revision, go to https://docs.yottadb.com/ProgrammersGuide/index.html.
 
@@ -531,7 +531,7 @@
 
    Example:
 
-   $ /usr/local/lib/yottadb/r130/ydb -run ^killalias
+   $ /usr/local/lib/yottadb/r132/ydb -run ^killalias
    killalias ; Demonstrate Kill * of pass-by-reference
           ZPrint ; Print this program
           Set A=1,C=3
@@ -592,7 +592,7 @@
 
    Example:
 
-   $ /usr/local/lib/yottadb/r130/ydb -run ^tprestart
+   $ /usr/local/lib/yottadb/r132/ydb -run ^tprestart
    tprestart ; Transaction restart variable association also restored on restart
      zprint ; Print this program
      set A="Malvern",C="Pennsylvania",E="USA"
@@ -647,7 +647,7 @@
 
    Note that TROLLBACK does not restore alias variables:
 
-   /usr/local/lib/yottadb/r130/ydb -run ^tprollback
+   /usr/local/lib/yottadb/r132/ydb -run ^tprollback
    tprollback ;
      zprint ; Print this program
      set A(1)=1,A(2)=2,A(3)=3
@@ -709,7 +709,7 @@
 
    Example:
 
-   $ /usr/local/lib/yottadb/r130/ydb -run ^aliasexample; Extended annotated alias example
+   $ /usr/local/lib/yottadb/r132/ydb -run ^aliasexample; Extended annotated alias example
        zprint
        write "------------",!
        set x="name level",x(1)=1,x(1,2)="1,2",x("foo")="bar"
@@ -1879,7 +1879,7 @@
    Example:
 
    YDB>write $zgbldir
-   /usr/local/lib/yottadb/r130/mumps.gld
+   /usr/local/lib/yottadb/r132/mumps.gld
    YDB>set $zgbldir="test.gld"
    YDB>set a=10
    YDB>set b=a
@@ -4508,7 +4508,7 @@
 
    Example:
 
-   /usr/local/lib/yottadb/r130/ydb -run ^stackalias
+   /usr/local/lib/yottadb/r132/ydb -run ^stackalias
    stackalias ; Demonstrate New with alias
      ZPrint ; Print this program
      Set A=1,*B=A,*C(2)=A ; Create some aliases
@@ -4553,7 +4553,7 @@
    The following is essentially the same as the prior example but using an
    exclusive NEW:
 
-   $ /usr/local/lib/yottadb/r130/ydb -run ^stackalias1
+   $ /usr/local/lib/yottadb/r132/ydb -run ^stackalias1
    stackalias1 ; Demonstrate New with alias
      ZPrint ; Print this program
      Set A=1,*B=A,*C(2)=A ; Create some aliases
@@ -5871,7 +5871,7 @@
    YDB>ZLink "NOSENSE"
    %YDB-E-LABELMISSING Label referenced but
    not defined:lab
-   %YDB-I-SRCNAM in source module /home/gtmuser1/.yottadb/r130_x86_64/r/
+   %YDB-I-SRCNAM in source module /home/gtmuser1/.yottadb/r132_x86_64/r/
    NOSENSE.m
    YDB>ZPrint ^NOSENSE
    NOSENSE;
@@ -6868,7 +6868,7 @@
    NTW:203,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,TBW:2,TBR:6,
    TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,JFS:0,JBB:0,JFB:0,JFW:0,JRL:0,JRP:0,
    JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0
-   GLD:/home/gtmuser1/.yottadb/r130_x86_64/g/mumps.gld,REG:DEFAULT,SET:205,KIL:0,GET:1,
+   GLD:/home/gtmuser1/.yottadb/r132_x86_64/g/mumps.gld,REG:DEFAULT,SET:205,KIL:0,GET:1,
    DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:411,DRD:9,DWT:15,NTW:2
    03,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,TBW:2,TBR:6,TR0:0,
    TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0
@@ -7004,7 +7004,7 @@
    $ZQUIT=0
    $ZREALSTOR=694280
    $ZRELDATE="20200731 20:46 6996f60301958081b568fb2a804695d700f51c5e (dirty)"
-   $ZROUTINES=". /home/user/.yottadb/r1.30_x86_64/o*(/home/user/.yottadb/r1.30_x86_64/r /home/user/.yottadb/r) /usr/local/lib/yottadb/r130/libyottadbutil.so"
+   $ZROUTINES=". /home/user/.yottadb/r1.32_x86_64/o*(/home/user/.yottadb/r1.32_x86_64/r /home/user/.yottadb/r) /usr/local/lib/yottadb/r132/libyottadbutil.so"
    $ZSOURCE=""
    $ZSTATUS=""
    $ZSTEP="B"
@@ -7027,7 +7027,7 @@
    $ZUT=1528962650791332
    $ZVERSION="GT.M V6.3-007 Linux x86_64"
    $ZYERROR=""
-   $ZYRELEASE="YottaDB r1.30 Linux x86_64"
+   $ZYRELEASE="YottaDB r1.32 Linux x86_64"
 
    This example displays the current value of all intrinsic special
    variables.
@@ -8528,7 +8528,7 @@
 
    Example:
 
-   /usr/local/lib/yottadb/r130/ydb -run ^dstackex
+   /usr/local/lib/yottadb/r132/ydb -run ^dstackex
    dstackex;
      zprint ^dstackex
      write !,$STACK
@@ -9136,7 +9136,7 @@
    variable with an agreed prefix (e.g., "%") and its $ZAHANDLE() as a
    suffix. The handle can be returned as the value.
 
-   $ /usr/local/lib/yottadb/r130/ydb -run retval
+   $ /usr/local/lib/yottadb/r132/ydb -run retval
    retval        ; Return an array / object from a function
        ;;Data for the object array
        ;;Albert Einstein,14-March-1879
@@ -10025,10 +10025,10 @@
 
    YDB>set x=$zjobexam()
    YDB>write x
-   /home/gtmuser1/.yottadb/r130_x86_64/r/YDB_JOBEXAM.ZSHOW_DMP_28760_1
+   /home/gtmuser1/.yottadb/r132_x86_64/r/YDB_JOBEXAM.ZSHOW_DMP_28760_1
    YDB>set x=$zjobexam("test.file")
    YDB>write x
-   /home/gtmuser1/.yottadb/r130_x86_64/r/test.file
+   /home/gtmuser1/.yottadb/r132_x86_64/r/test.file
    YDB>
 
    Shows default file name and type of the files created containing the zshow
@@ -10240,7 +10240,7 @@
    Example:
 
    $ cd /usr/work/me
-   $ /usr/local/lib/yottadb/r130/ydb
+   $ /usr/local/lib/yottadb/r132/ydb
    YDB>For i="DIRECTORY","NAME","TYPE","" Write $ZPARSE("test.m",i),!
    /usr/work/me/
    test
@@ -10902,9 +10902,9 @@
    Example:
 
    YDB>write $ztrnlnm("ydb_dist")
-   /usr/local/lib/yottadb/r130/utf8
+   /usr/local/lib/yottadb/r132/utf8
    YDB>write $ztrnlnm("ydb_dist","","","","","VALUE")
-   /usr/local/lib/yottadb/r130/utf8
+   /usr/local/lib/yottadb/r132/utf8
    YDB>
 
    This uses $ZTRNLNM() to display the translation value for ydb_dist.
@@ -11618,7 +11618,7 @@
    Example:
 
    $ export ydb_chset=UTF-8
-   $ /usr/local/lib/yottadb/r130/ydb
+   $ /usr/local/lib/yottadb/r132/ydb
    YDB>write $zchset
    UTF-8
    YDB>
@@ -13140,7 +13140,7 @@
    Example:
 
    $ export sigusrval=10
-   $ /usr/local/lib/yottadb/r130/ydb
+   $ /usr/local/lib/yottadb/r132/ydb
    YDB>zprint ^ztran
    foo;
      set $ztexit=1

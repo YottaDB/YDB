@@ -65,7 +65,7 @@ enum
 	YDB_MAIN_LANG_GO = 1		/* Main routine is written in Go so handle signals differently */
 };
 
-#define	YDB_RELEASE		131	/* Corresponds to YottaDB release r1.31 (i.e. YDB_ZYRELEASE in sr_linux/release_name.h) */
+#define	YDB_RELEASE		132	/* Corresponds to YottaDB release r1.32 (i.e. YDB_ZYRELEASE in sr_linux/release_name.h) */
 
 /* Maximum values */
 #define	YDB_MAX_IDENT		31		/* Maximum size of global/local name (not including '^') */
