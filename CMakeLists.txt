@@ -120,6 +120,12 @@ if(NOT YDB_INSTALL_DIR)
   set(YDB_INSTALL_DIR .)
 endif()
 
+# Save the contents of /etc/os-release so ydbinstall.sh can determine if
+# a force-install is required
+execute_process(
+  COMMAND cp /etc/os-release build_os_release
+  )
+
 #-----------------------------------------------------------------------------
 
 # Source files are organized into subdirectories named by platform.

@@ -384,6 +384,7 @@ case ${gtm_hostos}_${gtm_arch} in
 esac
 
 osfile="/etc/os-release"
+buildosfile="../build_os_release"
 osid=`grep -w ID $osfile | cut -d= -f2 | cut -d'"' -f2`
 if [ "N" = "$ydb_force_install" ]; then
 	# At this point, we know the current machine architecture is supported by YottaDB
@@ -395,7 +396,15 @@ if [ "N" = "$ydb_force_install" ]; then
 		# Set an impossible major/minor version by default in case we do not descend down known platforms in if/else below.
 		osallowmajorver="999"
 		osallowminorver="999"
-		if [ "x8664" = "${ydb_flavor}" ] ; then
+		if [ -f $buildosfile ] ; then
+			buildosid=`grep -w ID $buildosfile | cut -d= -f2 | cut -d'"' -f2`
+			buildosver=`grep -w VERSION_ID $osfile | tr -d \" | cut -d= -f2`
+			if [ "${buildosid}" "=" "${osid}" ] && [ "${buildosver}" "=" "${osver}" ] ; then
+				# If the YottaDB build was built on this OS version, it is supported
+				osallowmajorver="-1"
+				osallowminorver="-1"
+			fi
+		elif [ "x8664" = "${ydb_flavor}" ] ; then
 			if [ "ubuntu" = "${osid}" ] ; then
 				# Ubuntu 18.04 onwards is considered supported on x86_64
 				osallowmajorver="18"
