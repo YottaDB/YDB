@@ -2,7 +2,7 @@
 
 #################################################################
 #								#
-# Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -24,8 +24,13 @@ fi
 
 file="$1"
 
-# Don't require deleted files to have a copyright
+# Don't require deleted files to need a copyright
 if ! [ -e "$file" ]; then
+       exit 1
+fi
+
+# Don't require symbolic link files to need a copyright
+if [ -L "$file" ]; then
        exit 1
 fi
 

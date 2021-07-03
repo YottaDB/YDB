@@ -63,9 +63,9 @@ GPG_KEYS=(
     # Sam Habiel
     "48A12817C70BEB6047CB45365BD24AD20D6FDEDD"
     # Ashok Bhaskar
-    "71D2337F30219A12153AB2634529231C7717E22C" 
-	# Ahmed Abdelrazek
-	"415769A05CF58DC69E01CBC4FDC033E3C88BEEBE"
+    "71D2337F30219A12153AB2634529231C7717E22C"
+    # Ahmed Abdelrazek
+    "415769A05CF58DC69E01CBC4FDC033E3C88BEEBE"
 )
 gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "${GPG_KEYS[@]}"
 
@@ -132,8 +132,7 @@ if [ -n "$commit_list" ]; then
 	filelist="$(git show --pretty="" --name-only $commit_list | sort -u)"
 	missing_files=""
 	for file in $filelist; do
-		# Deleted files don't need a copyright notice, hence -e check
-		if [ -e $file ] && $needs_copyright $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
+		if $needs_copyright $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
 			# Print these out only at the end so they're all shown at once
 			missing_files="$missing_files $file"
 		fi
