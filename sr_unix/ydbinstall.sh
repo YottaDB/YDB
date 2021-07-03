@@ -406,33 +406,33 @@ if [ "N" = "$ydb_force_install" ]; then
 			fi
 		elif [ "x8664" = "${ydb_flavor}" ] ; then
 			if [ "ubuntu" = "${osid}" ] ; then
-				# Ubuntu 18.04 onwards is considered supported on x86_64
-				osallowmajorver="18"
+				# Ubuntu 20.04 onwards is considered supported on x86_64
+				osallowmajorver="20"
 				osallowminorver="04"
 			elif [ "rhel" = "${osid}" ] ; then
 				# RHEL 7 onwards is considered supported on x86_64
 				osallowmajorver="7"
 				osallowminorver="0"
-			elif [ "centos" = "${osid}" ] ; then
-				# CentOS 8.x is considered supported on x86_64
-				osallowmajorver="8"
-				osallowminorver="0"
 			elif [ "debian" = "${osid}" ] ; then
-				# Debian 10 (buster) onwards is considered supported on x86_64.
-				osallowmajorver="10"
+				# Debian 11 (buster) onwards is considered supported on x86_64.
+				osallowmajorver="11"
 				osallowminorver="0"
 			fi
 		elif [ "aarch64" = "${ydb_flavor}" ] ; then
 			if [ "ubuntu" = "${osid}" ] ; then
-				# Ubuntu 18.04 onwards is considered supported on AARCH64
-				osallowmajorver="18"
+				# Ubuntu 20.04 onwards is considered supported on AARCH64
+				osallowmajorver="20"
 				osallowminorver="04"
+			elif [ "debian" = ${osid} ] ; then
+				# Debian 11 (buster) onwards is considered supported on AARCH64
+				osallowmajorver="11"
+				osallowminorver="0"
 			fi
 		else
-			if [ "armv6l" = "${ydb_flavor}" ] || [ "armv7l" = "${ydb_flavor}" ] ; then
-				if [ "raspbian" = "${osid}" ] || [ "debian" = ${osid} ] ; then
-					# Raspbian/Debian 9 onwards is considered supported on ARMV7L/ARMV6L
-					osallowmajorver="9"
+			if [ "armv6l" = "${ydb_flavor}" ] ; then
+				if [ "debian" = ${osid} ] ; then
+					# Debian 11 onwards is considered supported on ARMV7L/ARMV6L
+					osallowmajorver="11"
 					osallowminorver="0"
 				fi
 			fi
@@ -649,7 +649,7 @@ else
 				*)         continue ;;		# else move on to next tarball
 			esac
 			case $ydb_filename in
-				*"$platform"*) ;;		# If tarball has current architecture in its name, consider it
+				*"$platform"*) ;;		# If tarball has current platform in its name, consider it
 				*)             continue ;;	# else move on to next tarball
 			esac
 			yottadb_download_url="https://gitlab.com/YottaDB/DB/YDB${fullfilename}"
