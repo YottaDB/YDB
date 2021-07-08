@@ -944,8 +944,7 @@ if [ "Y" = $ydb_encplugin ] ; then
 fi
 
 if [ "Y" = $ydb_zlib ] ; then
-	cd $tmpdir	# Get back to top level temporary directory as the current directory for ydb_env_set
-	. ${ydb_installdir}/ydb_env_set
+	cd $tmpdir	# Get back to top level temporary directory as the current directory
 	mkdir zlib_tmp
 	cd zlib_tmp
 	if curl -fSsLO https://gitlab.com/YottaDB/Util/YDBZlib/-/archive/master/YDBZlib-master.tar.gz; then
@@ -958,19 +957,18 @@ if [ "Y" = $ydb_zlib ] ; then
 			if [ "Y" = $ydb_utf8 ] ; then
 				if [ "default" = "$ydb_icu_version" ] ; then
 					ydb_icu_version=`pkg-config --modversion icu-io`
+					export ydb_icu_version
 				fi
 				mkdir utf8
 				(
 					cd utf8
 					export ydb_chset="UTF-8"
-					. ${ydb_installdir}/utf8/ydb_env_set
 					${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
 					sudo cp _ZLIB.o ${ydb_installdir}/plugin/o/utf8
 				)
 			fi
 			${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
 			sudo cp _ZLIB.o ${ydb_installdir}/plugin/o
-			. ${ydb_installdir}/ydb_env_unset
 			cd ../..
 			sudo rm -R zlib_tmp
 		else

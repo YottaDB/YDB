@@ -26,7 +26,7 @@ if [ ! -z "${gtm_passwd+isset}" ] ; then ydb_tmp_gtm_passwd=$gtm_passwd ; fi
 # If YottaDB has not been installed with UTF-8 support, force mode to M mode
 # and notify user to that effect.
 if [ ! -d "YDBDIST"/utf8 ] ; then
-    if [ "UTF-8" == "$ydb_chset" -o "utf-8" == "$ydb_chset" -o "UTF-8" == "$gtm_chset" -o "utf-8" == "$gtm_chset" ] ; then
+    if [ "UTF-8" = "$ydb_chset" -o "utf-8" = "$ydb_chset" -o "UTF-8" = "$gtm_chset" -o "utf-8" = "$gtm_chset" ] ; then
 	unset gtm_chset
 	echo "UTF-8 mode requested but " "YDBDIST"/utf8 "does not exist; forcing M mode"
     fi
