@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -476,7 +476,12 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 		if (!was_crit)
 			rel_crit(gv_cur_region);
 	}
-	if (si->start_tn <= cnl->last_wcs_recover_tn)
+	/* Note: At this point "status" can be "cdb_sc_normal" or some other value (e.g. "cdb_sc_gvtrootmod2").
+	 * If it is the former, check for "cdb_sc_wcs_recover" possibility. If the latter, do not do this check.
+	 * This is necessary so the primary restart code does not get overwritten as it can potentially even
+	 * cause database damage(YDB#755). Hence the "cdb_sc_normal == status" check below.
+	 */
+	if ((cdb_sc_normal == status) && (si->start_tn <= cnl->last_wcs_recover_tn))
 	{	/* Note that it is possible that gvt->clue.end is non-zero even in the final retry (e.g. if we encounter
 		 * this gvt for the first time in the final retry). If so, t1->tn would be set (by "gvcst_search" done in
 		 * the caller) to the tn when the clue got set which could be stale compared to cnl->last_wcs_recover_tn

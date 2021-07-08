@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -422,7 +422,9 @@ void t_retry(enum cdb_sc failure)
 				{	/* Final retry on an update transaction and region is frozen.
 					 * Wait for it to be unfrozen and only then grab crit.
 					 */
+					DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE;)
 					GRAB_UNFROZEN_CRIT(gv_cur_region, csa);
+					DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE;)
 				}
 			} else
 			{
