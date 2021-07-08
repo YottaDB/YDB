@@ -70,6 +70,7 @@ dump_info()
 {
     set +x
     if [ -n "$gtm_arch" ] ; then echo gtm_arch " : " $gtm_arch ; fi
+    if [ -n "$ydb_branch" ] ; then echo ydb_branch " : " $ydb_branch ; fi
     if [ -n "$gtm_buildtype" ] ; then echo gtm_buildtype " : " $gtm_buildtype ; fi
     if [ -n "$gtm_configure_in" ] ; then echo gtm_configure_in " : " $gtm_configure_in ; fi
     if [ -n "$gtm_copyenv" ] ; then echo gtm_copyenv " : " $gtm_copyenv ; fi
@@ -83,6 +84,7 @@ dump_info()
     if [ -n "$ydb_filename" ] ; then echo ydb_filename " : " $ydb_filename ; fi
     if [ -n "$ydb_flavor" ] ; then echo ydb_flavor " : " $ydb_flavor ; fi
     if [ -n "$ydb_force_install" ] ; then echo ydb_force_install " : " $ydb_force_install ; fi
+    if [ -n "$ydb_from_source" ] ; then echo ydb_from_source " : " $ydb_from_source ; fi
     if [ -n "$gtm_ftp_dirname" ] ; then echo gtm_ftp_dirname " : " $gtm_ftp_dirname ; fi
     if [ -n "$gtm_group" ] ; then echo gtm_group " : " $gtm_group ; fi
     if [ -n "$gtm_group_already" ] ; then echo gtm_group_already " : " $gtm_group_already ; fi
@@ -125,6 +127,7 @@ help_exit()
     echo "ydbinstall [option] ... [version]"
     echo "Options are:"
     echo "--aim                    -> installs AIM plug-in"
+    echo "--branch branchname      -> builds YottaDB from a specific git branch; use with --from-source"
     echo "--build-type buildtype   -> type of YottaDB build, default is pro"
     echo "--copyenv dirname        -> copy gtmprofile and gtmcshrc files to dirname; incompatible with linkenv"
     echo "--copyexec dirname       -> copy gtm script to dirname; incompatible with linkexec"
@@ -134,6 +137,7 @@ help_exit()
     echo "--encplugin              -> compile and install the encryption plugin"
     echo "--filename filename      -> name of YottaDB distribution tarball"
     echo "--force-install          -> install even if the current platform is not supported"
+    echo "--from-source repo       -> builds and installs YottaDB from a git repo; defaults to building the latest master from gitlab if not specified; check README for list of prerequisites to build from source"
     echo "--group group            -> group that should own the YottaDB installation"
     echo "--group-restriction      -> limit execution to a group; defaults to unlimited if not specified"
     echo "--gtm                    -> Install GT.M instead of YottaDB"
@@ -141,8 +145,8 @@ help_exit()
     echo "--installdir dirname     -> directory where YottaDB is to be installed; defaults to /usr/local/lib/yottadb/version"
     echo "--keep-obj               -> keep .o files of M routines (normally deleted on platforms with YottaDB support for routines in shared libraries)"
     echo "--linkenv dirname        -> create link in dirname to gtmprofile and gtmcshrc files; incompatible with copyenv"
-    echo "--nodeprecated           -> do not install deprecated components, specifically %DSEWRAP"
     echo "--linkexec dirname       -> create link in dirname to gtm script; incompatible with copyexec"
+    echo "--nodeprecated           -> do not install deprecated components, specifically %DSEWRAP"
     echo "--octo parameters        -> download and install Octo; also installs required POSIX and AIM plugins. Specify optional cmake parameters for Octo as necessary"
     echo "--overwrite-existing     -> install into an existing directory, overwriting contents; defaults to requiring new directory"
     echo "--plugins-only           -> just install plugins for an existing YottaDB installation, not YottaDB"
@@ -376,6 +380,13 @@ ydb_force_install="N"
 # Process command line
 while [ $# -gt 0 ] ; do
     case "$1" in
+	--branch) tmp=`echo $1 | cut -s -d = -f 2-`
+	    if [ -n "$tmp" ] ; then ydb_branch=$tmp
+	    else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then ydb_branch=$2 ; shift
+	    else echo "--branch needs a value" ; err_exit
+		fi
+	    fi
+	    shift ;;
         --build-type*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then gtm_buildtype=$tmp
             else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then gtm_buildtype=$2 ; shift
@@ -415,6 +426,13 @@ while [ $# -gt 0 ] ; do
 	    fi
 	    shift ;;
 	--force-install) ydb_force_install="Y" ; shift ;;
+	--from-source) tmp=`echo $1 | cut -s -d = -f 2-`
+	    if [ -n "$tmp" ] ; then ydb_from_source=$tmp
+	    else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then ydb_from_source=$2 ; shift
+		else ydb_from_source="https://gitlab.com/YottaDB/DB/YDB.git"
+		fi
+	    fi
+	    shift ;;
         --gtm)
             gtm_gtm="Y"
             shift ;;
@@ -488,6 +506,106 @@ while [ $# -gt 0 ] ; do
     esac
 done
 if [ "Y" = "$gtm_verbose" ] ; then echo Processed command line ; dump_info ; fi
+
+if [ -n "$ydb_from_source" ] ; then
+	# If --from-source is selected, clone the git repo, build and invoke the build's ydbinstall
+	if [ -n "$ydb_branch" ] ; then
+		echo "Building branch $ydb_branch from repo $ydb_from_source"
+	else
+		echo "Building branch master from repo $ydb_from_source"
+	fi
+	ydbinstall_tmp=`mktemp -d`
+	cd $ydbinstall_tmp
+	#mkdir from_source && cd from_source
+	if git clone $ydb_from_source ; then
+		cd YDB
+		mkdir build && cd build
+		# Check if --branch was selected. If so, checkout that branch.
+		if [ -n "$ydb_branch" ] ; then
+			if ! git checkout $ydb_branch ; then
+				echo "branch $ydb_branch does not exist. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
+				err_exit
+			fi
+		fi
+		osid=`grep -w ID /etc/os-release | cut -d= -f2 | cut -d'"' -f2`
+		case "${osid}" in
+			rhel|centos|sles) cmake_command="cmake3";;
+			*) cmake_command="cmake";
+		esac
+		if [ "dbg" = `echo "$gtm_buildtype" | tr '[:upper:]' '[:lower:]'` ] ; then
+			# if --buildtype is dbg, tell CMake to make a dbg build
+			cmake_command="${cmake_command} -D CMAKE_BUILD_TYPE=Debug"
+		fi
+		if ! ${cmake_command} -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../ ; then
+			echo "CMake failed. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
+			err_exit
+		fi
+		if ! make -j `grep -c ^processor /proc/cpuinfo` ; then
+			echo "Build failed. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
+			err_exit
+		fi
+		if ! make install ; then
+			echo "Make install failed. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
+			err_exit
+		fi
+	else
+		echo "Cloning git repo $ydb_from_source failed. Check that the URL is correct and accessible then try again."
+		err_exit
+	fi
+	# At this point, YottaDB has been built. Next, we invoke the build's ydbinstall with the same options except --from-source and
+	# --branch. To do this, we first have to determine the version number to cd into yottadb_r*
+	builddir=`ls -d yottadb_r*`
+	cd $builddir
+	# Now we have to determine the ydbinstall options to pass to ydbinstall. We ignore the following options for the following reasons:
+	# --branch and --from-source : already executed by this block of code
+	# --build-type : If a dbg build was requested, we've already built a dbg build with cmake
+	# --distrib and --filename : conflicts with --branch and --from-source
+	# --help : If this option was selected, ydbinstall would have exited already
+	# --plugins-only: There is no need to build YottaDB from source just to add plugins to an already installed YottaDB instance.
+	install_options=""
+	if [ "Y" = "$ydb_aim" ] ; then install_options="${install_options} --aim" ; fi
+	if [ -n "$gtm_copyenv" ] ; then install_options="${install_options} --copyenv ${gtm_copyenv}" ; fi
+	if [ -n "$gtm_copyexec" ] ; then install_options="${install_options} --copyexec ${gtm_copyexec}" ; fi
+	if [ "Y" = "$ydb_debug" ] ; then install_options="${install_options} --debug" ; fi
+	if [ "Y" = "$gtm_dryrun" ] ; then install_options="${install_options} --dry-run" ; fi
+	if [ "Y" = "$ydb_encplugin" ] ; then install_options="${install_options} --encplugin" ; fi
+	if [ "Y" = "$ydb_force_install" ] ; then install_options="${install_options} --force-install" ; fi
+	if [ "Y" = "$gtm_group_restriction" ] ; then install_options="${install_options} --group-restriction" ; fi
+	if [ "no" = "$ydb_change_removeipc" ] ; then install_options="${install_options} --preserveRemoveIPC" ; fi
+	if [ -n "$gtm_group" ] ; then install_options="${install_options} --group ${gtm_group}" ; fi
+	if [ "Y" = "$gtm_gtm" ] ; then install_options="${install_options} --gtm" ; fi
+	if [ -n "$ydb_installdir" ] ; then install_options="${install_options} --installdir ${ydb_installdir}" ; fi
+	if [ "Y" = "$gtm_keep_obj" ] ; then install_options="${install_options} --keep-obj" ; fi
+	if [ -n "$gtm_linkenv" ] ; then install_options="${install_options} --linkenv ${gtm_linkenv}" ; fi
+	if [ -n "$gtm_linkexec" ] ; then install_options="${install_options} --linkexec ${gtm_linkexec}" ; fi
+	if [ "N" = "$ydb_deprecated" ] ; then install_options="${install_options} --nodeprecated" ; fi
+	if [ "Y" = "$ydb_octo" ] ; then
+		if [ -n "$octo_cmake" ] ; then
+			install_options="${install_options} --octo ${octo_cmake}"
+		else
+			install_options="${install_options} --octo"
+		fi
+	fi
+	if [ "Y" = "$gtm_overwrite_existing" ] ; then install_options="${install_options} --overwrite-existing" ; fi
+	if [ "Y" = "$ydb_posix" ] ; then install_options="${install_options} --posix" ; fi
+	if [ "Y" = "$gtm_prompt_for_group" ] ; then install_options="${install_options} --prompt-for-group" ; fi
+	if [ "N" = "$gtm_lcase_utils" ] ; then install_options="${install_options} --ucaseonly-utils" ; fi
+	if [ -n "$gtm_user" ] ; then install_options="${install_options} --user ${gtm_user}" ; fi
+	if [ "Y" = "$ydb_utf8" ] ; then install_options="${install_options} --utf8 ${ydb_icu_version}" ; fi
+	if [ "Y" = "$gtm_verbose" ] ; then install_options="${install_options} --verbose" ; fi
+	if [ "Y" = "$ydb_zlib" ] ; then install_options="${install_options} --zlib" ; fi
+
+	# Now that we have the full set of options, run ydbinstall
+	if sudo ./ydbinstall ${install_options} ; then
+	#echo "sudo ./ydbinstall ${install_options}"
+		# Install succeeded. Exit with code 0 (success)
+		rm -r $ydbinstall_tmp
+		exit 0
+	else
+		echo "Install failed. Temporary directory $ydbinstall_tmp will not be deleted."
+		err_exit
+	fi
+fi
 
 # Set environment variables according to machine architecture
 gtm_arch=`uname -m | tr -d _`
