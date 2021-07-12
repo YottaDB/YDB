@@ -145,6 +145,7 @@ help_exit()
     echo "--linkexec dirname       -> create link in dirname to gtm script; incompatible with copyexec"
     echo "--octo parameters        -> download and install Octo; also installs required POSIX and AIM plugins. Specify optional cmake parameters for Octo as necessary"
     echo "--overwrite-existing     -> install into an existing directory, overwriting contents; defaults to requiring new directory"
+    echo "--plugins-only           -> just install plugins for an existing YottaDB installation, not YottaDB"
     echo "--posix                  -> download and install the POSIX plugin"
     echo "--preserveRemoveIPC      -> do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
     echo "--prompt-for-group       -> YottaDB installation script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
@@ -206,6 +207,136 @@ isvaluevalid()
 	echo $retval
 }
 
+# This function installs the selected plugins. Before calling it, $ydb_installdir and $tmpdir need to be set so that it can
+# find the right place to install the plugins and the right place to build the plugins respectively. This function will
+# set remove_tmpdir to 0 if one or more plugin builds fail.
+install_plugins()
+{
+	if [ "Y" = $ydb_posix ] ; then
+		echo "Now installing YDBPosix"
+		cd $tmpdir	# Get back to top level temporary directory as the current directory
+		mkdir posix_tmp
+		cd posix_tmp
+		export ydb_dist=${ydb_installdir}
+		if curl -fSsLO https://gitlab.com/YottaDB/Util/YDBPosix/-/archive/master/YDBPosix-master.tar.gz; then
+			tar xzf YDBPosix-master.tar.gz
+			cd YDBPosix-master
+			mkdir build && cd build
+			cmake ..
+			if make -j `grep -c ^processor /proc/cpuinfo` && sudo make install; then
+				# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
+				cd ../../..
+				sudo rm -R posix_tmp
+			else
+				echo "POSIX plugin build failed. The build directory ($PWD/posix_tmp) has been saved."
+				remove_tmpdir=0
+			fi
+		else
+			echo "POSIX plugin build failed. Unable to download the POSIX plugin. Your internet connection and/or the gitlab servers may be down. Please try again later."
+		fi
+	fi
+
+	if [ "Y" = $ydb_aim ] ; then
+		echo "Now installing YDBAIM"
+		cd $tmpdir
+		mkdir aim_tmp && cd aim_tmp
+		export ydb_dist=${ydb_installdir}
+		url="https://gitlab.com/YottaDB/Util/YDBAIM.git"
+		if git clone ${url} .; then
+			if ! ./install.sh; then
+				echo "YDBAIM Installation failed."
+				remove_tmpdir=0
+			fi
+		else
+			echo "Failed to download YDBAIM. Check your internet connection. URL is ${url}"
+		fi
+	fi
+
+	if [ "Y" = $ydb_encplugin ] ; then
+		echo "Now installing YDBCrypt"
+		cd $tmpdir	# Get back to top level temporary directory as the current directory
+		export ydb_icu_version=$ydb_icu_version
+		mkdir enc_tmp
+		cd enc_tmp
+		sudo tar -xf ${ydb_installdir}/plugin/gtmcrypt/source.tar
+		sudo ydb_dist=${ydb_installdir} make -j `grep -c ^processor /proc/cpuinfo`
+		if sudo ydb_dist=${ydb_installdir} make install; then
+			# Save the build directory if the make install command returns a non-zero exit code. Otherwise, remove it.
+			cd ..
+			sudo rm -R enc_tmp
+		else
+			echo "Encryption plugin build failed. The build directory ($PWD/enc_tmp) has been saved."
+			remove_tmpdir=0
+		fi
+		# rename gtmcrypt to ydbcrypt and create a symbolic link for backward compatibility
+		mv ${ydb_installdir}/plugin/gtmcrypt ${ydb_installdir}/plugin/ydbcrypt
+		ln -s ${ydb_installdir}/plugin/ydbcrypt ${ydb_installdir}/plugin/gtmcrypt
+	fi
+
+	if [ "Y" = $ydb_zlib ] ; then
+		echo "Now installing YDBZlib"
+		cd $tmpdir	# Get back to top level temporary directory as the current directory
+		mkdir zlib_tmp
+		cd zlib_tmp
+		if curl -fSsLO https://gitlab.com/YottaDB/Util/YDBZlib/-/archive/master/YDBZlib-master.tar.gz; then
+			tar xzf YDBZlib-master.tar.gz
+			cd YDBZlib-master
+			if gcc -c -fPIC -I${ydb_installdir} gtmzlib.c && gcc -o libgtmzlib.so -shared gtmzlib.o; then
+				# Save the build directory if either of the gcc commands return a non-zero exit code. Otherwise, remove it.
+				sudo cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
+				sudo cp _ZLIB.m ${ydb_installdir}/plugin/r
+				if [ "Y" = $ydb_utf8 ] ; then
+					if [ "default" = "$ydb_icu_version" ] ; then
+						ydb_icu_version=`pkg-config --modversion icu-io`
+						export ydb_icu_version
+					fi
+					mkdir utf8
+					(
+						cd utf8
+						export ydb_chset="UTF-8"
+						${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
+						sudo cp _ZLIB.o ${ydb_installdir}/plugin/o/utf8
+					)
+				fi
+				${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
+				sudo cp _ZLIB.o ${ydb_installdir}/plugin/o
+				cd ../..
+				sudo rm -R zlib_tmp
+			else
+				echo "zlib plugin build failed. The build directory ($PWD/zlib_tmp) has been saved."
+				remove_tmpdir=0
+			fi
+		else
+			echo "zlib plugin build failed. Unable to download the zlib plugin. Your internet connection and/or the gitlab servers may be down. Please try again later."
+		fi
+	fi
+
+	if [ "Y" = $ydb_octo ] ; then
+		echo "Now installing YDBOcto"
+		cd $tmpdir	# Get back to top level temporary directory as the current directory
+		export ydb_dist=${ydb_installdir}
+		if git clone https://gitlab.com/YottaDB/DBMS/YDBOcto YDBOcto-master; then
+			cd YDBOcto-master
+			mkdir build
+			cd build
+			case "${osid}" in
+				rhel|centos|sles) cmake3 ${octo_cmake} ..;;
+				*) cmake ${octo_cmake} ..;;
+			esac
+			if make -j `grep -c ^processor /proc/cpuinfo` && sudo -E make install; then
+				# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
+				cd ../..
+				sudo rm -R YDBOcto-master
+			else
+				echo "Octo build failed. The build directory ($PWD/YDBOcto-master) and the tarball ($PWD/YDBOcto-master.tar.gz) have been saved."
+				remove_tmpdir=0
+			fi
+		else
+			echo "Octo build failed. Unable to download Octo. Your internet connection and/or the gitlab servers may be down. Please try again later."
+		fi
+	fi
+}
+
 # Defaults that can be over-ridden by command line options to follow
 # YottaDB prefixed versions:
 if [ -n "$ydb_buildtype" ] ; then gtm_buildtype="$ydb_buildtype" ; fi
@@ -225,6 +356,7 @@ if [ -z "$ydb_aim" ] ; then ydb_aim="N" ; fi
 if [ -z "$ydb_octo" ] ; then ydb_octo="N" ; fi
 if [ -z "$ydb_zlib" ] ; then ydb_zlib="N" ; fi
 if [ -z "$ydb_utf8" ] ; then ydb_utf8="N" ; fi
+if [ -z "$ydb_plugins_only" ] ; then ydb_plugins_only="N" ; fi
 # GTM prefixed versions (for backwards compatibility)
 if [ -z "$gtm_buildtype" ] ; then gtm_buildtype="pro" ; fi
 if [ -z "$gtm_keep_obj" ] ; then gtm_keep_obj="N" ; fi
@@ -327,6 +459,7 @@ while [ $# -gt 0 ] ; do
 	    ydb_aim="Y";
 	    shift ;;
         --overwrite-existing) gtm_overwrite_existing="Y" ; shift ;;
+	--plugins-only) ydb_plugins_only="Y" ; shift ;;
 	--posix) ydb_posix="Y" ; shift ;;
 	--aim) ydb_aim="Y" ; shift ;;
         --preserveRemoveIPC) ydb_change_removeipc="no" ; shift ;; # must come before group*
@@ -386,6 +519,71 @@ esac
 osfile="/etc/os-release"
 buildosfile="../build_os_release"
 osid=`grep -w ID $osfile | cut -d= -f2 | cut -d'"' -f2`
+
+if [ "Y" = "$ydb_plugins_only" ]; then
+	if [ ! -n "$ydb_installdir" ] ; then
+		# If --installdir was not specified, we first look to $ydb_dist for
+		# the YottaDB version. Otherwise, we check pkg-config.
+		if [ -d "$ydb_dist" ] ; then
+			ydb_installdir=$ydb_dist
+		else
+			ydb_installdir=$(pkg-config --variable=prefix yottadb)
+			ydb_dist=$ydb_installdir
+		fi
+	else
+		ydb_dist=$ydb_installdir
+	fi
+	# Check that YottaDB is actually installed by looking for the presence of a yottadb executable
+	if [ ! -e $ydb_installdir/yottadb ] ; then
+		echo "YottaDB not found at $ydb_installdir. Exiting" ; err_exit
+	fi
+	# Check if UTF8 is installed.
+	if [ -d "$ydb_installdir/utf8" ] ; then
+		ydb_utf8="Y"
+		if [ -z "$ydb_icu_version" ] ; then ydb_icu_version="default" ; fi
+	else
+		ydb_utf8="N"
+	fi
+	# Check that the plugins aren't already installed or that --overwrite-existing is selected
+	# Since selected --octo automatically selects --posix and --aim, we continue the install
+	# without overwriting if --aim and/or --posix is already installed and --octo is selected.
+	if [ "Y" != "$gtm_overwrite_existing" ] ; then
+		if [ "Y" = $ydb_encplugin ] && [ -e $ydb_installdir/plugin/libgtmcrypt.so ] ; then
+			echo "YDBCrypt already installed and --overwrite-existing not specified. Exiting." ; err_exit
+		fi
+		if [ "Y" = $ydb_posix ] && [ -e $ydb_installdir/plugin/libydbposix.so ] ; then
+			if [ "Y" = $ydb_octo ] ; then
+				echo "YDBPosix already installed. Continuing YDBOcto install. Specify --overwrite-existing to overwrite YDBPosix."
+				ydb_posix="N"
+			else
+				echo "YDBPosix already installed and --overwrite-existing not specified. Exiting." ; err_exit
+			fi
+		fi
+		if [ "Y" = $ydb_aim ] && [ -e $ydb_installdir/plugin/o/_ydbaim.so ] ; then
+			if [ "Y" = $ydb_octo ] ; then
+				echo "YDBAIM already installed. Continuing YDBOcto install. Specify --overwrite-existing to overwrite YDBAIM."
+				ydb_aim="N"
+			else
+				echo "YDBAIM already installed and --overwrite-existing not specified. Exiting." ; err_exit
+			fi
+		fi
+		if [ "Y" = $ydb_zlib ] && [ -e $ydb_installdir/plugin/libgtmzlib.so ] ; then
+			echo "YDBZlib already installed and --overwrite-existing not specified. Exiting." ; err_exit
+		fi
+
+		if [ "Y" = $ydb_octo ] && [ -d $ydb_installdir/plugin/octo ] ; then
+			echo "YDBOcto already installed and --overwrite-existing not specified. Exiting." ; err_exit
+		fi
+	fi
+	tmpdir=`mktmpdir`
+	ydb_routines="$tmp($ydb_installdir)" ; export ydb_routines
+	remove_tmpdir=1 # remove the tmpdir if the plugin installs are successful
+	install_plugins
+	if [ 0 = "$remove_tmpdir" ] ; then exit 1; fi	# error seen while installing one or more plugins
+	rm -rf $tmpdir	# Now that we know it is safe to remove $tmpdir, do that before returning normal status
+	exit 0
+fi
+
 if [ "N" = "$ydb_force_install" ]; then
 	# At this point, we know the current machine architecture is supported by YottaDB
 	# but not yet sure if the OS and/or version is supported. Since
@@ -885,124 +1083,7 @@ fi
 remove_tmpdir=1	# It is okay to remove $tmpdir at the end assuming ydbinstall is successful at installing plugins.
 		# Any errors while installing any plugin will set this variable to 0.
 
-if [ "Y" = $ydb_posix ] ; then
-	cd $tmpdir	# Get back to top level temporary directory as the current directory
-	mkdir posix_tmp
-	cd posix_tmp
-	export ydb_dist=${ydb_installdir}
-	if curl -fSsLO https://gitlab.com/YottaDB/Util/YDBPosix/-/archive/master/YDBPosix-master.tar.gz; then
-		tar xzf YDBPosix-master.tar.gz
-		cd YDBPosix-master
-		mkdir build && cd build
-		cmake ..
-		if make -j `grep -c ^processor /proc/cpuinfo` && sudo make install; then
-			# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
-			cd ../../..
-			sudo rm -R posix_tmp
-		else
-			echo "POSIX plugin build failed. The build directory ($PWD/posix_tmp) has been saved."
-			remove_tmpdir=0
-		fi
-	else
-		echo "POSIX plugin build failed. Unable to download the POSIX plugin. Your internet connection and/or the gitlab servers may be down. Please try again later."
-	fi
-fi
-
-if [ "Y" = $ydb_aim ] ; then
-	cd $tmpdir
-	mkdir aim_tmp && cd aim_tmp
-	export ydb_dist=${ydb_installdir}
-	url="https://gitlab.com/YottaDB/Util/YDBAIM.git"
-	if git clone ${url} .; then
-		if ! ./install.sh; then
-			echo "YDBAIM Installation failed."
-			remove_tmpdir=0
-		fi
-	else
-		echo "Failed to download YDBAIM. Check your internet connection. URL is ${url}"
-	fi
-fi
-
-if [ "Y" = $ydb_encplugin ] ; then
-	cd $tmpdir	# Get back to top level temporary directory as the current directory
-	export ydb_icu_version=$ydb_icu_version
-	mkdir enc_tmp
-	cd enc_tmp
-	sudo tar -xf ${ydb_installdir}/plugin/gtmcrypt/source.tar
-	sudo ydb_dist=${ydb_installdir} make -j `grep -c ^processor /proc/cpuinfo`
-	if sudo ydb_dist=${ydb_installdir} make install; then
-		# Save the build directory if the make install command returns a non-zero exit code. Otherwise, remove it.
-		cd ..
-		sudo rm -R enc_tmp
-	else
-		echo "Encryption plugin build failed. The build directory ($PWD/enc_tmp) has been saved."
-		remove_tmpdir=0
-	fi
-	# rename gtmcrypt to ydbcrypt and create a symbolic link for backward compatibility
-	mv ${ydb_installdir}/plugin/gtmcrypt ${ydb_installdir}/plugin/ydbcrypt
-	ln -s ${ydb_installdir}/plugin/ydbcrypt ${ydb_installdir}/plugin/gtmcrypt
-fi
-
-if [ "Y" = $ydb_zlib ] ; then
-	cd $tmpdir	# Get back to top level temporary directory as the current directory
-	mkdir zlib_tmp
-	cd zlib_tmp
-	if curl -fSsLO https://gitlab.com/YottaDB/Util/YDBZlib/-/archive/master/YDBZlib-master.tar.gz; then
-		tar xzf YDBZlib-master.tar.gz
-		cd YDBZlib-master
-		if gcc -c -fPIC -I${ydb_installdir} gtmzlib.c && gcc -o libgtmzlib.so -shared gtmzlib.o; then
-			# Save the build directory if either of the gcc commands return a non-zero exit code. Otherwise, remove it.
-			sudo cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
-			sudo cp _ZLIB.m ${ydb_installdir}/plugin/r
-			if [ "Y" = $ydb_utf8 ] ; then
-				if [ "default" = "$ydb_icu_version" ] ; then
-					ydb_icu_version=`pkg-config --modversion icu-io`
-					export ydb_icu_version
-				fi
-				mkdir utf8
-				(
-					cd utf8
-					export ydb_chset="UTF-8"
-					${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
-					sudo cp _ZLIB.o ${ydb_installdir}/plugin/o/utf8
-				)
-			fi
-			${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
-			sudo cp _ZLIB.o ${ydb_installdir}/plugin/o
-			cd ../..
-			sudo rm -R zlib_tmp
-		else
-			echo "zlib plugin build failed. The build directory ($PWD/zlib_tmp) has been saved."
-			remove_tmpdir=0
-		fi
-	else
-		echo "zlib plugin build failed. Unable to download the zlib plugin. Your internet connection and/or the gitlab servers may be down. Please try again later."
-	fi
-fi
-
-if [ "Y" = $ydb_octo ] ; then
-	cd $tmpdir	# Get back to top level temporary directory as the current directory
-	export ydb_dist=${ydb_installdir}
-	if git clone https://gitlab.com/YottaDB/DBMS/YDBOcto YDBOcto-master; then
-		cd YDBOcto-master
-		mkdir build
-		cd build
-		case "${osid}" in
-			rhel|centos|sles) cmake3 ${octo_cmake} ..;;
-			*) cmake ${octo_cmake} ..;;
-		esac
-		if make -j `grep -c ^processor /proc/cpuinfo` && sudo -E make install; then
-			# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
-			cd ../..
-			sudo rm -R YDBOcto-master
-		else
-			echo "Octo build failed. The build directory ($PWD/YDBOcto-master) and the tarball ($PWD/YDBOcto-master.tar.gz) have been saved."
-			remove_tmpdir=0
-		fi
-	else
-		echo "Octo build failed. Unable to download Octo. Your internet connection and/or the gitlab servers may be down. Please try again later."
-	fi
-fi
+install_plugins
 
 if [ 0 = "$remove_tmpdir" ] ; then exit 1; fi	# error seen while installing one or more plugins
 
