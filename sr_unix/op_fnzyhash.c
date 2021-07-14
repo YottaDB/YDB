@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
-* Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+* Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
 * All rights reserved.						*
 *								*
 *	This source code contains the intellectual property	*
@@ -30,7 +30,14 @@ void op_fnzyhash(mval *string, int salt, mval *ret)
 	ydb_uint16	hash_out;
 	unsigned char	*str_out;
 
-	ret->mvtype = 0; /* we initialize this string to keep the garbage collector from worrying about an incomplete string  */
+	if (ret != string)
+	{	/* We initialize this string to keep the garbage collector from worrying about an incomplete string. */
+		ret->mvtype = 0;
+	} else
+	{	/* Source and destination mvals are identical. No issues with garbage collector worrying about an incomplete
+		 * string because "ret" (which is the same as "string") is already initialized.
+		 */
+	}
 	MV_FORCE_STR(string);
 	MurmurHash3_x64_128(string->str.addr, string->str.len, salt, &hash_out);
 	ENSURE_STP_FREE_SPACE(HASHED_STRING_LEN + 2); /* need 2 more for the 0x prefix */
