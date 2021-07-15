@@ -19,6 +19,7 @@
 import re
 import sys
 import os.path
+from datetime import datetime
 
 YOTTADB = re.compile("Copyright \(c\) (?P<start_date>20[0-9][0-9])(?P<end_date>-20[0-9][0-9])? YottaDB")
 
@@ -68,6 +69,7 @@ def look_for_copyrights(f, ext):
         "ctemplate": "*",
         ".y": "*",
     }
+    current_year = datetime.now().strftime("%Y")
     for line in f:
         # Simple case: existing YottaDB copyright
         # If an end date exists, replace it with this year;
@@ -75,10 +77,10 @@ def look_for_copyrights(f, ext):
         matches = YOTTADB.search(line)
         if matches is not None:
             # Already up to date, no need to run.
-            if matches.group("start_date") == "2021" or matches.group("end_date") == "-2021":
+            if matches.group("start_date") == current_year or matches.group("end_date") == "-{}".format(current_year):
                 print(line, end="")
                 return False
-            print(YOTTADB.sub("Copyright (c) \g<start_date>-2021 YottaDB", line), end="")
+            print(YOTTADB.sub("Copyright (c) \g<start_date>-{} YottaDB".format(current_year), line), end="")
             return True
         # More difficult case: no YottaDB copyrights in the file, so we have to add them.
         # This assumes that 'This source code ...' comes after all copyrights.
@@ -86,7 +88,7 @@ def look_for_copyrights(f, ext):
             char = my_cc_map.get(ext, "#")
             start, end = (char, char)
             if os.path.basename(f.name) == "git-watcher.cmake":
-                print(start, "Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.")
+                print(start, "Copyright (c) {} YottaDB LLC and/or its subsidiaries.".format(current_year))
                 print(start, "All rights reserved.")
                 print(start)
             else:
@@ -96,7 +98,7 @@ def look_for_copyrights(f, ext):
                         start = tmp_cc
                 elif ext == ".rst":
                     start = ".. " + start
-                print(start, " Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	", end, sep="")
+                print(start, " Copyright (c) {} YottaDB LLC and/or its subsidiaries.	".format(current_year), end, sep="")
                 print(start, " All rights reserved.                                     ", end, sep="")
                 print(start, "								", end, sep="")
             print(line, end="")
