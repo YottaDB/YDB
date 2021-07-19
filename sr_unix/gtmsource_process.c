@@ -1202,8 +1202,16 @@ int gtmsource_process(void)
 									HANDLE_CONCUR_ONLINE_ROLLBACK);
 #					ifdef DEBUG
 					if (WBTEST_ENABLED(WBTEST_HOLD_GTMSOURCE_SRV_LATCH))
+					{
+						repl_log(gtmsource_log_fp, TRUE, TRUE,
+							"Grabbed LATCH that is common to source server and online rollback\n");
+						/* The above message is relied upon by the v61000_1/gtm7858 subtest to know
+						 * when to start the online rollback that will send a SIGCONT signal to this
+						 * source server and bump "TREF(continue_proc_cnt)" used below to a non-zero value.
+						 */
 						while (0 == TREF(continue_proc_cnt))
 							LONG_SLEEP(1);
+					}
 #					endif
 					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 						continue;
