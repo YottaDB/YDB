@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,10 +44,6 @@
 #include "jnl_file_close_timer.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
-#endif
-
-#ifdef	GTM_FD_TRACE
-#include "gtm_dbjnl_dupfd_check.h"
 #endif
 
 #include "wbox_test_init.h"
@@ -210,11 +206,6 @@ uint4 jnl_file_open(gd_region *reg, boolean_t init)
 					GTM_WHITE_BOX_TEST(WBTEST_JNL_FILE_OPEN_FAIL, sts, ERR_JNLFILOPN);
 					DEBUG_ONLY(if (0 == sts))
 						jpc->cycle = jb->cycle;	/* make private cycle and shared cycle in sync */
-					GTM_FD_TRACE_ONLY(
-						gtm_dbjnl_dupfd_check(); /* Check if db or jnl fds collide (D9I11-002714) */
-						/* The dupfd check above should not reset our channel. */
-						assertpro(NOJNL != jpc->channel);
-					)
 					START_JNL_FILE_CLOSE_TIMER_IF_NEEDED;
 				}  /* if jnl_state */
 			} else

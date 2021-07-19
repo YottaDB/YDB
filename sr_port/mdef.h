@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -171,8 +171,12 @@ static inline int gtm_abrt() { abort(); return 0;}
 /* Define GT.M interlude functions for open, close, pipe, creat and dup system calls. This lets GT.M trace through all file
  * descriptor activity (needed for D9I11-002714). Do this on all UNIX platforms. Note that only the macro GTM_FD_TRACE is
  * defined here. gtm_unistd.h and gtm_fcntl.h define the actual GT.M interlude functions based on this macro.
+ *
+ * Note that in YottaDB, we define GTM_FD_TRACE only in DEBUG builds as D9I11-002714 happened in 2009 and since then we have
+ * not seen any issues with db/jnl fd corruption so it is not considered worth the cost to have this overhead in Release/PRO builds.
+ * Hence the "&& defined(DEBUG)" added below only in YottaDB code (compared to GT.M code).
  */
-#if defined(UNIX) && ! defined(STATIC_ANALYSIS)
+#if defined(UNIX) && ! defined(STATIC_ANALYSIS) && defined(DEBUG)
 #	define	GTM_FD_TRACE
 #	define	GTM_FD_TRACE_ONLY(X)	X
 #else

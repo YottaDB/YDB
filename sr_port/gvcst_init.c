@@ -76,10 +76,6 @@
 #include "gtm_sem.h"
 #include "is_file_identical.h"
 
-#ifdef	GTM_FD_TRACE
-#include "gtm_dbjnl_dupfd_check.h"
-#endif
-
 /* Deferred database encryption initialization. Check the key handle and skip if already initialized  */
 #define INIT_DEFERRED_DB_ENCRYPTION_IF_NEEDED(REG, CSA, CSD)								\
 MBSTART {														\
@@ -1061,7 +1057,6 @@ void gvcst_init(gd_region *reg)
 	segment_update_array_size = UA_SIZE(csd);
 	assert(!reg->was_open);
 	SET_REGION_OPEN_TRUE(reg, WAS_OPEN_FALSE);
-	GTM_FD_TRACE_ONLY(gtm_dbjnl_dupfd_check());	/* check if any of db or jnl fds collide (D9I11-002714) */
 	if (NULL != csa->dir_tree)
 	{	/* It is possible that dir_tree has already been targ_alloc'ed. This is because GT.CM or VMS DAL
 		 * calls can run down regions without the process halting out. We don't want to double malloc.

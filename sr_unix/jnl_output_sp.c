@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,6 @@
 #include "gtm_rel_quant.h"
 #include "repl_sp.h"	/* for F_CLOSE used by the JNL_FD_CLOSE macro */
 #include "memcoherency.h"
-#include "gtm_dbjnl_dupfd_check.h"
 #include "anticipatory_freeze.h"
 
 GBLREF	volatile int4		db_fsync_in_prog;
@@ -270,21 +269,6 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 							 * jpc->status to SS_NORMAL. We need it in callers of this function
 							 * (e.g. jnl_write_attempt). */
 			}
-#			ifdef GTM_FD_TRACE
-			if ((EBADF == status) || (ESPIPE == status))
-			{	/* likely case of D9I11-002714. check if fd is valid */
-				gtm_dbjnl_dupfd_check();
-				/* If fd of this journal points to some other database or journal file opened by this process
-				 * the above call would have reset jpc->channel. If it did not get reset, then check
-				 * if the fd in itself is valid and points back to the journal file. If not reset it to NOJNL.
-				 */
-				if (NOJNL != jpc->channel)
-					gtm_check_fd_is_valid(reg, FALSE, jpc->channel);
-				/* If jpc->channel still did not get reset to NOJNL, it means the file descriptor is valid but
-				 * not sure why we are getting EBADF/ESPIPE errors. No further recovery attempted at this point.
-				 */
-			}
-#			endif
 			if (ERR_ENOSPCQIODEFER == status)
 				status = ERR_JNLWRTDEFER;
 			else
