@@ -226,7 +226,10 @@ install_plugins()
 			tar xzf YDBPosix-master.tar.gz
 			cd YDBPosix-master
 			mkdir build && cd build
-			cmake ..
+			case "${osid}" in
+				rhel|centos|sles) cmake3 ..;;
+				*) cmake ..;;
+			esac
 			if make -j `grep -c ^processor /proc/cpuinfo` && sudo make install; then
 				# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
 				cd ../../..
@@ -246,7 +249,7 @@ install_plugins()
 		mkdir aim_tmp && cd aim_tmp
 		export ydb_dist=${ydb_installdir}
 		url="https://gitlab.com/YottaDB/Util/YDBAIM.git"
-		if git clone ${url} .; then
+		if git clone -q ${url} .; then
 			if ! ./install.sh; then
 				echo "YDBAIM Installation failed."
 				remove_tmpdir=0
