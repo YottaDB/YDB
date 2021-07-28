@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -12,10 +15,26 @@
 
 #include "mdef.h"
 
-#ifdef GTM_FD_TRACE
-
 #include <sys/types.h>
 #include <errno.h>
+
+#ifdef DEBUG
+#  define FD_TRACE(OPS, FD, STATUS)						\
+{										\
+	++fd_ops_array_index;							\
+	if (FD_OPS_ARRAY_SIZE <= fd_ops_array_index)				\
+	{									\
+		fd_ops_array_num_wraps++;					\
+		fd_ops_array_index = 0;						\
+	}									\
+	fd_ops_array[fd_ops_array_index].call_from = (caddr_t)GET_CALLER_ID;	\
+	fd_ops_array[fd_ops_array_index].fd_act    = OPS;			\
+	fd_ops_array[fd_ops_array_index].fd        = FD;			\
+	fd_ops_array[fd_ops_array_index].status    = (int4)STATUS;		\
+}
+#else
+#  define FD_TRACE(OPS, FD, STATUS)
+#endif
 
 /* Before including gtm_fcntl.h, make sure we do not redefine open/creat/close etc. as this module
  * is where we are defining the interlude functions gtm_open/gtm_creat etc. to use the real system version.
@@ -23,19 +42,30 @@
  * for large file support) we want to make sure we use the system redefined versions here. So it is necessary
  * to disable any redefining of these functions that GT.M otherwise does.
  */
+#ifdef GTM_FD_TRACE /* Remember whether this was set or not before we undefine it */
+#  define GTM_FD_TRACE_DEFINED
+#else
+#  undef GTM_FD_TRACE_DEFINED
+#endif
 #undef	GTM_FD_TRACE
 
+/* Note these includes need to be added on all builds as gtm_socket() is always defined and needs some of these */
 #include "gtm_fcntl.h"
 #include "gtm_stat.h"
 #include "gtm_unistd.h"
 #include "gtm_socket.h"
+#include "gtm_string.h"
+
 #include "caller_id.h"
 #include "iosp.h"
 #include "error.h"
-#include "gtm_string.h"
 #include "send_msg.h"
 #include "gtmio.h"
 
+/* gtm_socket.h unconditionally defined socket() as gtm_socket() but we need the system socket() here */
+#undef socket
+
+#ifdef GTM_FD_TRACE_DEFINED
 /* This is a GT.M wrapper module for all system calls that open/close file descriptors.
  * This is needed to trace all files that were opened by GT.M (D9I11-002714)
  */
@@ -80,20 +110,6 @@ error_def(ERR_CALLERID);
 #else
 #	define	GET_CALLER_ID	0
 #endif
-
-#define	FD_TRACE(OPS, FD, STATUS)						\
-{										\
-	++fd_ops_array_index;							\
-	if (FD_OPS_ARRAY_SIZE <= fd_ops_array_index)				\
-	{									\
-		fd_ops_array_num_wraps++;					\
-		fd_ops_array_index = 0;						\
-	}									\
-	fd_ops_array[fd_ops_array_index].call_from = (caddr_t)GET_CALLER_ID;	\
-	fd_ops_array[fd_ops_array_index].fd_act    = OPS;			\
-	fd_ops_array[fd_ops_array_index].fd        = FD;			\
-	fd_ops_array[fd_ops_array_index].status    = (int4)STATUS;		\
-}
 
 int gtm_open(const char *pathname, int flags)
 {
@@ -154,20 +170,6 @@ int gtm_pipe1(int pipefd[2])
 	return status;
 }
 
-int gtm_socket(int family, int type, int protocol)
-{
-	int	fd;
-
-	fd = socket(family, SETSOCKCLOEXEC(type), protocol);
-	if (-1 != fd)
-	{
-		SETFDCLOEXEC(fd);
-		FD_TRACE(fd_ops_socket, fd, 0);
-	}
-	/* it is possible that fd will be -1 if the address family is not supported */
-	return fd;
-}
-
 int gtm_close(int fd)
 {
 	int	status;
@@ -186,3 +188,18 @@ int gtm_close(int fd)
 }
 
 #endif
+
+/* Open socket with O_CLOEXEC type option (for all builds) */
+int gtm_socket(int family, int type, int protocol)
+{
+	int	fd;
+
+	fd = socket(family, SETSOCKCLOEXEC(type), protocol);
+	if (-1 != fd)
+	{
+		SETFDCLOEXEC(fd);
+		FD_TRACE(fd_ops_socket, fd, 0);
+	}
+	/* it is possible that fd will be -1 if the address family is not supported */
+	return fd;
+}

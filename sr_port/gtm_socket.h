@@ -3,6 +3,9 @@
  * Copyright (c) 2001, 2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -46,15 +49,18 @@ typedef struct sockaddr	*sockaddr_ptr;
 #  define IS_SOCKNAME_UNIXERROR(ERR) 	(EOPNOTSUPP == ERR)
 #endif
 
-#ifdef GTM_FD_TRACE
 /* Just like open and close were noted down in gtm_fcntl.h, note down all macros which we are redefining here and could
  * potentially have been conflictingly defined by the system header file "socket.h". The system define will be used
  * in gtm_fd_trace.c within the implementation of the GT.M interlude function. Currently none of these functions (socket)
  * are defined by the system so it is not theoretically necessary but they could be defined in the future.
+ *
+ * Note we ALWAYS do this (pro or dbg build) because the use of gtm_socket is needed for all socket creation because it
+ * specifies the O_CLOEXEC flag needed to make sure the socket is automatically closed in a forked process that makes
+ * an execve() call. This also keeps the v63000/gtm8009 test happy (fails without this) which tests that all files in a
+ * process created by the ZSYSTEM command don't have any of the main YDB process's openfile descriptors available to it.
  */
 #	undef	socket			/* in case this is already defined by <socket.h> */
 #	define	socket	gtm_socket
-#endif
 
 int gtm_socket(int domain, int type, int protocol);
 int gtm_connect(int socket, struct sockaddr *address, size_t address_len); /* BYPASSOK(connect) */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -289,7 +289,7 @@ void process_pending_signals(void)
 		sigpblk->retCode = (*sigpblk->sigHandler)(sigpblk->sigNum);
 		/* Signal has now been processed - get the lock again, verify it has not already been posted, and post it if not,
 		 * and remove from in-process queue. It is possible it got posted as part of exit-handling rundown and this
-		 * thread just hasn't died yet but it best to do avoid double posting attempts.
+		 * thread just hasn't died yet but it best to avoid double posting attempts.
 		 */
 		rc = get_sigpend_lock(&sigPendingMutex);
 		/* Nobody to report error back to so ignore it at this point */
