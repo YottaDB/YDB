@@ -260,20 +260,23 @@ install_plugins()
 	fi
 
 	if [ "Y" = $ydb_encplugin ] ; then
-		echo "Now installing YDBCrypt"
+		echo "Now installing YDBEncrypt"
 		cd $tmpdir	# Get back to top level temporary directory as the current directory
 		export ydb_icu_version=$ydb_icu_version
-		mkdir enc_tmp
-		cd enc_tmp
-		tar -xf ${ydb_installdir}/plugin/gtmcrypt/source.tar
-		ydb_dist=${ydb_installdir} make -j `grep -c ^processor /proc/cpuinfo`
-		if ydb_dist=${ydb_installdir} make install; then
-			# Save the build directory if the make install command returns a non-zero exit code. Otherwise, remove it.
-			cd ..
-			rm -R enc_tmp
+		mkdir enc_tmp && cd enc_tmp
+		url="https://gitlab.com/YottaDB/Util/YDBEncrypt.git"
+		if git clone -q ${url} .; then
+			ydb_dist=${ydb_installdir} make -j `grep -c ^processor /proc/cpuinfo`
+			if ydb_dist=${ydb_installdir} make install; then
+				# Save the build directory if the make install command returns a non-zero exit code. Otherwise, remove it.
+				cd ..
+				sudo rm -R enc_tmp
+			else
+				echo "Encryption plugin build failed. The build directory ($PWD/enc_tmp) has been saved."
+				remove_tmpdir=0
+			fi
 		else
-			echo "Encryption plugin build failed. The build directory ($PWD/enc_tmp) has been saved."
-			remove_tmpdir=0
+			echo "Failed to download YDBEncrypt. Check your internet connection. URL is ${url}"
 		fi
 		# rename gtmcrypt to ydbcrypt and create a symbolic link for backward compatibility
 		mv ${ydb_installdir}/plugin/gtmcrypt ${ydb_installdir}/plugin/ydbcrypt
@@ -669,7 +672,7 @@ if [ "Y" = "$ydb_plugins_only" ]; then
 	# without overwriting if --aim and/or --posix is already installed and --octo is selected.
 	if [ "Y" != "$gtm_overwrite_existing" ] ; then
 		if [ "Y" = $ydb_encplugin ] && [ -e $ydb_installdir/plugin/libgtmcrypt.so ] ; then
-			echo "YDBCrypt already installed and --overwrite-existing not specified. Exiting." ; err_exit
+			echo "YDBEncrypt already installed and --overwrite-existing not specified. Exiting." ; err_exit
 		fi
 		if [ "Y" = $ydb_posix ] && [ -e $ydb_installdir/plugin/libydbposix.so ] ; then
 			if [ "Y" = $ydb_octo ] ; then

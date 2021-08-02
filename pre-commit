@@ -207,4 +207,22 @@ foreach file ($filelist)
 	endif
 end
 
+# -----------------------------------------------------------------
+# 4) Alerts if YDBEncrypt needs to be updated
+# -----------------------------------------------------------------
+set enclist = "sr_unix/Makefile.mk sr_unix/encrypt_sign_db_key.sh sr_unix/gen_keypair.sh sr_unix/gen_sym_hash.sh"
+set enclist = "$enclist sr_unix/gen_sym_key.sh sr_unix/gtm_tls_impl.c sr_unix/gtm_tls_impl.h sr_unix/gtmcrypt_dbk_ref.c"
+set enclist = "$enclist sr_unix/gtmcrypt_dbk_ref.h sr_unix/gtmcrypt_pk_ref.c sr_unix/gtmcrypt_pk_ref.h sr_unix/gtmcrypt_ref.c"
+set enclist = "$enclist sr_unix/gtmcrypt_ref.h sr_unix/gtmcrypt_sym_ref.c sr_unix/gtmcrypt_sym_ref.h sr_unix/gtmcrypt_util.c"
+set enclist = "$enclist sr_unix/gtmcrypt_util.h sr_unix/import_and_sign_key.sh sr_unix/maskpass.c sr_unix/pinentry-gtm.sh"
+set enclist = "$enclist sr_unix/pinentry.m sr_unix/show_install_config.sh sr_port/minimal_gbldefs.c sr_port/ydb_getenv.c"
+set enclist = "$enclist sr_port/ydb_getenv.h sr_port/ydb_logicals.h sr_port/ydb_logicals_tab.h sr_unix/ydb_tls_interface.h"
+set enclist = "$enclist sr_unix/ydbcrypt_interface.h"
+foreach file ($filelist)
+	foreach encfile ($enclist)
+		if ("$file" == "$encfile") then
+			echo "$file modified. Need to update equivalent file in YDBEncrypt accordingly."
+		endif
+	end
+end
 exit $exitstatus

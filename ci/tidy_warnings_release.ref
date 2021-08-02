@@ -129,14 +129,11 @@ gtm_putmsg_list.c:warning: Value stored to 'i' is never read [clang-analyzer-dea
 gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (166 padding bytes, where 6 is optimal).
 gtm_threadgbl_init.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]
 gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (166 padding bytes, where 6 is optimal).
-gtm_tls_impl.c:warning: Value stored to 'rv' is never read [clang-analyzer-deadcode.DeadStores]
 gtm_trigger.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]
 gtm_trigger.c:warning: Value stored to 'added' is never read [clang-analyzer-deadcode.DeadStores]
 gtm_trigger.c:warning: Value stored to 'rc' is never read [clang-analyzer-deadcode.DeadStores]
 gtmci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gtmci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
-gtmcrypt_util.c:warning: The left operand of '^' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
-gtmcrypt_util.c:warning: Value stored to 'have_hash' is never read [clang-analyzer-deadcode.DeadStores]
 gtmrecv.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
 gtmrecv.c:warning: Value stored to 'log_init_status' is never read [clang-analyzer-deadcode.DeadStores]
 gtmrecv_comm_init.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]

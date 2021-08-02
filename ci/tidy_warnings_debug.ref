@@ -93,7 +93,6 @@ gtm_semutils.c:warning: The right operand of '!=' is a garbage value [clang-anal
 gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (182 padding bytes, where 6 is optimal).
 gtm_threadgbl_init.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]
 gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (182 padding bytes, where 6 is optimal).
-gtm_tls_impl.c:warning: Value stored to 'rv' is never read [clang-analyzer-deadcode.DeadStores]
 gtmci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gtmci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gtmrecv.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
