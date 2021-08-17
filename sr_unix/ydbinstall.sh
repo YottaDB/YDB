@@ -230,10 +230,10 @@ install_plugins()
 				rhel|centos|sles) cmake3 ..;;
 				*) cmake ..;;
 			esac
-			if make -j `grep -c ^processor /proc/cpuinfo` && sudo make install; then
+			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
 				# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
 				cd ../../..
-				sudo rm -R posix_tmp
+				rm -R posix_tmp
 			else
 				echo "POSIX plugin build failed. The build directory ($PWD/posix_tmp) has been saved."
 				remove_tmpdir=0
@@ -265,12 +265,12 @@ install_plugins()
 		export ydb_icu_version=$ydb_icu_version
 		mkdir enc_tmp
 		cd enc_tmp
-		sudo tar -xf ${ydb_installdir}/plugin/gtmcrypt/source.tar
-		sudo ydb_dist=${ydb_installdir} make -j `grep -c ^processor /proc/cpuinfo`
-		if sudo ydb_dist=${ydb_installdir} make install; then
+		tar -xf ${ydb_installdir}/plugin/gtmcrypt/source.tar
+		ydb_dist=${ydb_installdir} make -j `grep -c ^processor /proc/cpuinfo`
+		if ydb_dist=${ydb_installdir} make install; then
 			# Save the build directory if the make install command returns a non-zero exit code. Otherwise, remove it.
 			cd ..
-			sudo rm -R enc_tmp
+			rm -R enc_tmp
 		else
 			echo "Encryption plugin build failed. The build directory ($PWD/enc_tmp) has been saved."
 			remove_tmpdir=0
@@ -290,8 +290,8 @@ install_plugins()
 			cd YDBZlib-master
 			if gcc -c -fPIC -I${ydb_installdir} gtmzlib.c && gcc -o libgtmzlib.so -shared gtmzlib.o; then
 				# Save the build directory if either of the gcc commands return a non-zero exit code. Otherwise, remove it.
-				sudo cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
-				sudo cp _ZLIB.m ${ydb_installdir}/plugin/r
+				cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
+				cp _ZLIB.m ${ydb_installdir}/plugin/r
 				if [ "Y" = $ydb_utf8 ] ; then
 					if [ "default" = "$ydb_icu_version" ] ; then
 						ydb_icu_version=`pkg-config --modversion icu-io`
@@ -302,13 +302,13 @@ install_plugins()
 						cd utf8
 						export ydb_chset="UTF-8"
 						${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
-						sudo cp _ZLIB.o ${ydb_installdir}/plugin/o/utf8
+						cp _ZLIB.o ${ydb_installdir}/plugin/o/utf8
 					)
 				fi
 				${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
-				sudo cp _ZLIB.o ${ydb_installdir}/plugin/o
+				cp _ZLIB.o ${ydb_installdir}/plugin/o
 				cd ../..
-				sudo rm -R zlib_tmp
+				rm -R zlib_tmp
 			else
 				echo "zlib plugin build failed. The build directory ($PWD/zlib_tmp) has been saved."
 				remove_tmpdir=0
@@ -330,10 +330,10 @@ install_plugins()
 				rhel|centos|sles) cmake3 ${octo_cmake} ..;;
 				*) cmake ${octo_cmake} ..;;
 			esac
-			if make -j `grep -c ^processor /proc/cpuinfo` && sudo -E make install; then
+			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
 				# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
 				cd ../..
-				sudo rm -R YDBOcto-master
+				rm -R YDBOcto-master
 			else
 				echo "Octo build failed. The build directory ($PWD/YDBOcto-master) and the tarball ($PWD/YDBOcto-master.tar.gz) have been saved."
 				remove_tmpdir=0
@@ -599,8 +599,7 @@ if [ -n "$ydb_from_source" ] ; then
 	if [ "Y" = "$ydb_zlib" ] ; then install_options="${install_options} --zlib" ; fi
 
 	# Now that we have the full set of options, run ydbinstall
-	if sudo ./ydbinstall ${install_options} ; then
-	#echo "sudo ./ydbinstall ${install_options}"
+	if ./ydbinstall ${install_options} ; then
 		# Install succeeded. Exit with code 0 (success)
 		rm -r $ydbinstall_tmp
 		exit 0
