@@ -1194,7 +1194,11 @@ EOF
 if [ ! -f ${pcfilepath}/yottadb.pc ] || {
 	existing_version=$(grep "^Version: " ${pcfilepath}/yottadb.pc | cut -s -d " " -f 2)
 	! expr "$existing_version" \> "$ydb_version" >/dev/null
-}; then
+   }; then
+    if [ ! -d $pcfilepath ]
+    then
+	mkdir $pcfilepath
+    fi
     cp ${ydb_installdir}/yottadb.pc ${pcfilepath}/yottadb.pc
     echo $product_name pkg-config file installed successfully at ${pcfilepath}/yottadb.pc
 else
