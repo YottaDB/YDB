@@ -734,6 +734,10 @@ if [ "N" = "$ydb_force_install" ]; then
 				# RHEL 7 onwards is considered supported on x86_64
 				osallowmajorver="7"
 				osallowminorver="0"
+			elif [ "centos" = "${osid}" ] ; then
+				# CentOS 8.x is considered supported on x86_64
+				osallowmajorver="8"
+				osallowminorver="0"
 			elif [ "debian" = "${osid}" ] ; then
 				# Debian 11 (buster) onwards is considered supported on x86_64.
 				osallowmajorver="11"
