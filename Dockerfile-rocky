@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -13,13 +13,13 @@
 # Simple build/running directions are below:
 #
 # Build:
-#   $ docker build -t yottadb/yottadb:latest .
+#   $ docker build -t yottadb/yottadb-rocky:latest-master -f Dockerfile-rocky .
 #
 # Use with data persistence:
-#   $ docker run --rm -e ydb_chset=utf-8 -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
+#   $ docker run --rm  -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
 
 # Stage 1: YottaDB build image
-FROM centos:7 as ydb-release-builder
+FROM rockylinux/rockylinux as ydb-release-builder
 
 RUN yum update -y || true && \
     yum install -y \
@@ -28,8 +28,8 @@ RUN yum update -y || true && \
                     make \
                     cmake \
                     tcsh \
-                    libconfig-devel \
-                    gpgme-devel \
+                    libconfig \
+                    gpgme \
                     libicu-devel \
                     libgpg-error-devel \
                     libgcrypt-devel \
@@ -38,9 +38,6 @@ RUN yum update -y || true && \
                     zlib-devel \
                     elfutils-libelf-devel \
                     binutils-devel
-
-# We need cmake3, which is only available from EPEL
-RUN yum install -y epel-release && yum install -y cmake3
 
 RUN mkdir /tmp/yottadb-src
 ADD CMakeLists.txt /tmp/yottadb-src
@@ -70,7 +67,7 @@ RUN mkdir -p /tmp/yottadb-build \
     | grep -o '\(r[0-9.]*\)' \
     | sort -u \
     > /tmp/yottadb-src/.yottadb.vsn \
- && cmake3 \
+ && cmake \
       -D CMAKE_INSTALL_PREFIX:PATH=/tmp \
       -D YDB_INSTALL_DIR:STRING=yottadb-release \
       /tmp/yottadb-src \
@@ -78,16 +75,17 @@ RUN mkdir -p /tmp/yottadb-build \
  && make install
 
 # Stage 2: YottaDB release image
-FROM centos:7 as ydb-release
+FROM rockylinux/rockylinux as ydb-release
 
 RUN yum update -y && \
     yum install -y \
                     file \
                     binutils \
-                    elfutils-libelf-devel \
+                    elfutils-libelf \
                     libicu-devel \
-                    locales \
                     wget \
+                    procps-ng \
+                    glibc-langpack-en \
                     vim
 
 WORKDIR /data
@@ -104,4 +102,5 @@ ENV gtmdir=/data \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8
+
 ENTRYPOINT ["/opt/yottadb/current/ydb"]

@@ -86,11 +86,11 @@ commit-verify:
   script:
     - ci/commit_verify.sh ci/needs_copyright.sh https://gitlab.com/YottaDB/DB/YDB
 
-build-centos:
+build-rocky:
   extends: .build
   variables:
-    DOCKERFILE: Dockerfile-centos
-    REPO: yottadb-centos
+    DOCKERFILE: Dockerfile-rocky
+    REPO: yottadb-rocky
 
 build-debian:
   extends: .build
@@ -125,10 +125,10 @@ push-ubuntu-debug:
   variables:
     REPO: yottadb-debug
 
-push-centos:
+push-rocky:
   extends: .push
   variables:
-    REPO: yottadb-centos
+    REPO: yottadb-rocky
 
 push-debian:
   extends: .push
@@ -161,10 +161,10 @@ push-release-ubuntu-debug:
   variables:
     REPO: yottadb-debug
 
-push-release-centos:
+push-release-rocky:
   extends: .push-release
   variables:
-    REPO: yottadb-centos
+    REPO: yottadb-rocky
 
 push-release-debian:
   extends: .push-release
