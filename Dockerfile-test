@@ -1,0 +1,31 @@
+#################################################################
+#                                                               #
+# Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.       #
+# All rights reserved.                                          #
+#                                                               #
+# This source code contains the intellectual property           #
+# of its copyright holder(s), and is made available             #
+# under a license.  If you do not know the terms of             #
+# the license, please stop and do not read further.             #
+#                                                               #
+#################################################################
+FROM registry.gitlab.com/yottadb/db/ydbtest
+WORKDIR /Distrib/YottaDB/V999_R999
+ADD CMakeLists.txt .
+COPY cmake ./cmake/
+COPY sr_aarch64 ./sr_aarch64/
+COPY sr_armv7l ./sr_armv7l/
+COPY sr_i386 ./sr_i386/
+COPY sr_linux ./sr_linux/
+COPY sr_port ./sr_port/
+COPY sr_port_cm ./sr_port_cm/
+COPY sr_unix ./sr_unix/
+COPY sr_unix_cm ./sr_unix_cm/
+COPY sr_unix_gnp ./sr_unix_gnp/
+COPY sr_unix_nsb ./sr_unix_nsb/
+COPY sr_x86_64 ./sr_x86_64/
+COPY sr_x86_regs ./sr_x86_regs/
+COPY .git ./.git/
+ENV GIT_DIR=/Distrib/YottaDB/V999_R999/.git
+RUN /usr/library/gtm_test/T999/docker/build_and_install_yottadb.csh
+WORKDIR /home/gtmtest

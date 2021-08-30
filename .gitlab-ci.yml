@@ -20,6 +20,7 @@ variables:
 
 stages:
  - build
+ - test
  - docker-create
  - docker-manifest
 
@@ -81,6 +82,58 @@ clang-tidy-aarch64:
     - aarch64
   only:
     - master@YottaDB/DB/YDB
+
+build-test:
+  stage: build
+  script:
+    - mkdir -p docker-images
+    - docker build -f Dockerfile-test -t ydbtest .
+    - docker save ydbtest > docker-images/ydbtest.tar
+  cache:
+    key: "$CI_PIPELINE_ID"
+    paths:
+      - docker-images
+    policy: push
+
+.test-shared:
+  stage: test
+  artifacts:
+    paths:
+      - testarea/
+    expire_in: 1 month
+    when: always
+  dependencies:
+    - build-test
+  cache:
+    key: "$CI_PIPELINE_ID"
+    paths:
+      - docker-images
+    policy: pull
+  script:
+    - mkdir testarea
+    - docker load < docker-images/ydbtest.tar
+    - docker run --init -v $PWD/testarea/:/testarea1/ -e CI_PIPELINE_ID -e CI_COMMIT_BRANCH --rm ydbtest -t ${TEST}
+    - docker run --init -v $PWD/testarea/:/testarea1/ -e CI_PIPELINE_ID -e CI_COMMIT_BRANCH --rm ydbtest -t ${TEST} -replic
+
+test-basic:
+  extends: .test-shared
+  variables:
+    TEST: basic
+
+test-r134:
+  extends: .test-shared
+  variables:
+    TEST: r134
+
+test-r138:
+  extends: .test-shared
+  variables:
+    TEST: r138
+
+test-r140:
+  extends: .test-shared
+  variables:
+    TEST: r140
 
 # Main and ONLY docker creation mechanism.
 .docker-create:
