@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,6 +108,7 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 	int		elemindx, rc;
 	lvTree		*lvt_child;
 	intrpt_state_t	prev_intrpt_state;
+	int		adjusted_newlevel;
 
 	/* We are about to clean up structures. Defer MUPIP STOP/signal handling until function end. */
 	DEFER_INTERRUPTS(INTRPT_IN_TP_UNWIND, prev_intrpt_state);
@@ -117,16 +118,26 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 #	endif
 	assert((COMMIT_INVOCATION == invocation_type) || (RESTART_INVOCATION == invocation_type)
 			|| (ROLLBACK_INVOCATION == invocation_type));
+	/* In the case of a full TP ROLLBACK, "newlevel" would be 0 whereas in the TP RESTART case, "newlevel" would be 1.
+	 * In either case though, we need to release all locks obtained after the outermost TSTART. Therefore maintain a separate
+	 * variable "adjusted_newlevel". This is the same as "newlevel" in case of a TP ROLLBACK or a TP COMMIT. But in case of
+	 * a TP RESTART, it is one less than "newlevel". This is used later to determine which locks need to be released.
+	 * And takes care of ensuring locks acquired AFTER a TSTART are released as part of a TP RESTART (YDB#775).
+	 */
 	/* If restarting or rolling back, clear active_lv (if it is non-NULL now) since it was NULL at TSTART time. */
 	if (RESTART_INVOCATION == invocation_type)
 	{
 		UNDO_ACTIVE_LV(actlv_tp_unwind_restart);
+		assert(1 == newlevel);	/* Currently all TP restarts go back to $TLEVEL=1 (i.e. no incremental TP restarts) */
+		adjusted_newlevel = (newlevel - 1);
 	} else if (ROLLBACK_INVOCATION == invocation_type)
 	{
 		UNDO_ACTIVE_LV(actlv_tp_unwind_rollback);
+		adjusted_newlevel = newlevel;
 	} else
 	{
 		ASSERT_ACTIVELV_GOOD(active_lv);
+		adjusted_newlevel = newlevel;
 		if (0 == newlevel)
 		{	/* outermost TCOMMIT. Restore active_lv to what it was at implicit TSTART time if it was non-NULL */
 			assert(NULL != tp_pointer);
@@ -270,10 +281,11 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 	{
 		if (mlkp->granted)
 		{	/* This was a pre-existing lock */
-			for (oldlock = mlkp->tp;  (NULL != oldlock) && ((int)oldlock->tplevel > newlevel);  oldlock = nextlock)
+			for (oldlock = mlkp->tp;  (NULL != oldlock) && ((int)oldlock->tplevel > adjusted_newlevel); )
 			{	/* Remove references to the lock from levels being unwound */
 				nextlock = oldlock->next;
 				free(oldlock);
+				oldlock = nextlock;
 			}
 			if (rollback_locks)
 			{
