@@ -66,6 +66,8 @@ GPG_KEYS=(
     "71D2337F30219A12153AB2634529231C7717E22C"
     # Ahmed Abdelrazek
     "415769A05CF58DC69E01CBC4FDC033E3C88BEEBE"
+    # Thammanoon Phattramarut
+    "34BEF76BD1AC8C543F6C0B4C377169AEEA0EA8CD"
 )
 gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "${GPG_KEYS[@]}"
 
