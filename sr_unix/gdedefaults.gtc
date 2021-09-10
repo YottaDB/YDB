@@ -14,8 +14,8 @@ template -segment -access_method=mm -block_size=4096 -allocation=5000 -extension
 template -segment -access_method=bg -block_size=4096 -allocation=5000 -extension=10000 -global_buffer_count=1000
 change -segment default -block_size=4096 -allocation=5000 -extension=10000 -global_buffer_count=1000 -file_name=$ydb_dir/$ydb_rel/g/yottadb.dat
 change -region default -record_size=4080 -key_size=255 -journal=(before,file="$ydb_dir/$ydb_rel/g/yottadb.mjl")
-add -region ydbaim -autodb -dynamic_segment=ydbaim -nojournal -key_size=992 -null_subscripts=always -record_size=1008
-add -segment ydbaim -access_method=mm -block_size=1024 -allocation=20000 -extension=40000 -file_name="$ydb_dir/$ydb_rel/g/%ydbaim.dat"
+add -region ydbaim -autodb -dynamic_segment=ydbaim -nojournal -key_size=1019 -null_subscripts=always -record_size=2048
+add -segment ydbaim -access_method=mm -block_size=2048 -allocation=10000 -extension=20000 -file_name="$ydb_dir/$ydb_rel/g/%ydbaim.dat"
 add -name %ydbAIM* -region=ydbaim
 add -name %ydbAIm* -region=ydbaim
 add -name %ydbAiM* -region=ydbaim
