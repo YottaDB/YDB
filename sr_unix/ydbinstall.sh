@@ -235,11 +235,12 @@ install_plugins()
 				cd ../../..
 				rm -R posix_tmp
 			else
-				echo "POSIX plugin build failed. The build directory ($PWD/posix_tmp) has been saved."
+				echo "YDBPosix build failed. The build directory ($PWD/posix_tmp) has been saved."
 				remove_tmpdir=0
 			fi
 		else
-			echo "POSIX plugin build failed. Unable to download the POSIX plugin. Your internet connection and/or the gitlab servers may be down. Please try again later."
+			echo "Unable to download YDBPosix. Your internet connection and/or the gitlab servers may be down. Please try again later."
+			remove_tmpdir=0
 		fi
 	fi
 
@@ -251,11 +252,12 @@ install_plugins()
 		url="https://gitlab.com/YottaDB/Util/YDBAIM.git"
 		if git clone -q ${url} .; then
 			if ! ./install.sh; then
-				echo "YDBAIM Installation failed."
+				echo "YDBAIM build failed. The build directory ($PWD/aim_tmp) has been saved."
 				remove_tmpdir=0
 			fi
 		else
-			echo "Failed to download YDBAIM. Check your internet connection. URL is ${url}"
+			echo "Unable to download YDBAIM. Your internet connection and/or the gitlab servers may be down. Please try again later"
+			remove_tmpdir=0
 		fi
 	fi
 
@@ -272,11 +274,12 @@ install_plugins()
 				cd ..
 				sudo rm -R enc_tmp
 			else
-				echo "Encryption plugin build failed. The build directory ($PWD/enc_tmp) has been saved."
+				echo "YDBEncrypt build failed. The build directory ($PWD/enc_tmp) has been saved."
 				remove_tmpdir=0
 			fi
 		else
-			echo "Failed to download YDBEncrypt. Check your internet connection. URL is ${url}"
+			echo "Unable to download YDBEncrypt. Your internet connection and/or the gitlab servers may be down. Please try again later."
+			remove_tmpdir=0
 		fi
 		# rename gtmcrypt to ydbcrypt and create a symbolic link for backward compatibility
 		mv ${ydb_installdir}/plugin/gtmcrypt ${ydb_installdir}/plugin/ydbcrypt
@@ -313,11 +316,12 @@ install_plugins()
 				cd ../..
 				rm -R zlib_tmp
 			else
-				echo "zlib plugin build failed. The build directory ($PWD/zlib_tmp) has been saved."
+				echo "YDBZlib build failed. The build directory ($PWD/zlib_tmp) has been saved."
 				remove_tmpdir=0
 			fi
 		else
-			echo "zlib plugin build failed. Unable to download the zlib plugin. Your internet connection and/or the gitlab servers may be down. Please try again later."
+			echo "Unable to download YDBZlib. Your internet connection and/or the gitlab servers may be down. Please try again later."
+			remove_tmpdir=0
 		fi
 	fi
 
@@ -338,11 +342,12 @@ install_plugins()
 				cd ../..
 				rm -R YDBOcto-master
 			else
-				echo "Octo build failed. The build directory ($PWD/YDBOcto-master) and the tarball ($PWD/YDBOcto-master.tar.gz) have been saved."
+				echo "YDBOcto build failed. The build directory ($PWD/YDBOcto-master) and the tarball ($PWD/YDBOcto-master.tar.gz) have been saved."
 				remove_tmpdir=0
 			fi
 		else
-			echo "Octo build failed. Unable to download Octo. Your internet connection and/or the gitlab servers may be down. Please try again later."
+			echo "Unable to download YDBOcto. Your internet connection and/or the gitlab servers may be down. Please try again later."
+			remove_tmpdir=0
 		fi
 	fi
 }
