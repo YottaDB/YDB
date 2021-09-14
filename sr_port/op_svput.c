@@ -51,6 +51,7 @@
 #include "ztimeout_routines.h"
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
+#include "util.h"
 
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
@@ -82,6 +83,7 @@ GBLREF int4		tstart_trigger_depth;
 GBLREF uint4		dollar_tlevel;
 GBLREF boolean_t	write_ztworm_jnl_rec;
 #endif
+GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 
 LITREF mval		default_etrap;
 #ifdef GTM_TRIGGER
@@ -251,6 +253,54 @@ void op_svput(int varnum, mval *v)
 			MV_FORCE_STR(v);
 			dollar_zstatus.mvtype = MV_STR;
 			dollar_zstatus.str = v->str;
+			/* If we are inside an error trap handling an error as part of a "SET $ECODE=..." user action,
+			 * then clear the current util_output buffer (which would hold the SETECODE error message)
+			 * and replace it with the $ZSTATUS value that is being set here as it will be more useful
+			 * given that the user has chosen to overwrite $ZSTATUS as part of the user defined error trap.
+			 * This is done only for the first error that triggers error handling (i.e. dollar_ecode.index == 1).
+			 */
+			if ((1 == dollar_ecode.index) && (ERR_SETECODE == dollar_ecode.error_last_ecode))
+			{
+				char	*tmp, *entryref, *errortext;
+				int	len;
+
+				/* $ZSTATUS is usually in the form ERRNUM,ENTRYREF,ERRORTEXT.
+				 * This will mirror the format of the error displayed when not in direct mode.
+				 */
+				len = dollar_zstatus.str.len;
+				tmp = (char *)malloc(len + 1);
+				memcpy(tmp, dollar_zstatus.str.addr, len);
+				tmp[len] = '\0';
+				entryref = strchr(tmp, ',');
+				errortext = (NULL != entryref) ? strchr(entryref + 1, ',') : NULL;
+				util_out_print(NULL, RESET);	/* Clear whatever message was in buffer previously */
+				if (NULL != errortext)
+				{	/* $ZSTATUS is in the form ERRNUM,ENTRYREF,ERRORTEXT.
+					 * Copy over ERRORTEXT \n \t\t ENTRYREF to the util_output buffer.
+					 * This will mirror the format of the error displayed when not in direct mode.
+					 */
+					char	*tmp2;
+
+					len = errortext - entryref;
+					tmp2 = (char *)malloc(len);
+					len--;
+					memcpy(tmp2, entryref + 1, len);
+					tmp2[len] = '\0';
+					util_out_print(errortext + 1, NOFLUSH);
+					/* The below simulates a RTSLOC error */
+					util_out_print("!/!_!_At M source location ", NOFLUSH);	/* !/ is \n, !_ is \t */
+					util_out_print(tmp2, NOFLUSH);
+					free(tmp2);
+				} else {
+					/* $ZSTATUS is not in the form ERRNUM,ENTRYREF,ERRORTEXT.
+					 * Likely because the user defined error trap is not abiding by the convention
+					 * when setting $ZSTATUS to a value. Copy over the entire $ZSTATUS text into
+					 * the util_output buffer in this case.
+					 */
+					util_out_print(tmp, NOFLUSH);
+				}
+				free(tmp);
+			}
 			break;
 		case SV_PROMPT:
 			MV_FORCE_STR(v);
