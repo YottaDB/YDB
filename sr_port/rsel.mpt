@@ -62,7 +62,7 @@ SILENT(patt,label)
 SRCDIR()
 	n i,piece,srcdir
 	s srcdir=""
-	f i=1:1:$zl($zro," ") s piece=$zpi($zro," ",i) d:piece'?.E1"so"
+	f i=1:1:$zl($zro," ") s piece=$zpi($zro," ",i) d:piece'?.E1".so"
 	. s srcdir=srcdir_" "_$zpi($zpi($zpi(piece,"(",$zl(piece,"(")),")",1),"*",1)
 	q $ze(srcdir,2,$zl(srcdir))
 init
