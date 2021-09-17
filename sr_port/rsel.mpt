@@ -3,7 +3,7 @@
 ; Copyright (c) 1987-2018 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -59,6 +59,12 @@ SILENT(patt,label)
 	d @label
 	u io
 	q
+SRCDIR()
+	n i,piece,srcdir
+	s srcdir=""
+	f i=1:1:$zl($zro," ") s piece=$zpi($zro," ",i) d:piece'?.E1"so"
+	. s srcdir=srcdir_" "_$zpi($zpi($zpi(piece,"(",$zl(piece,"(")),")",1),"*",1)
+	q $ze(srcdir,2,$zl(srcdir))
 init
 	i $zver["VMS" d
 	. s delim=",",scwc="%",from="abcdefghijklmnopqrstuvwxyz !""#$&'()+'-./;<=>?@[]\^_`{}|~",to="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
