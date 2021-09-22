@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -218,6 +218,10 @@ void db_auto_upgrade(gd_region *reg)
 		 * a) If there are any file header fields added in the new minor version, initialize the fields to default values
 		 *    in the last case (i.e. above this comment block). Do not add a "break" for the above "case" block.
 		 * b) Then, add a new "case" statement with the new minor version. The below 3 lines become part of that "case".
+		 * c) For every GT.M minor ver added since the previous YottaDB release, duplicate the relevant auto upgrade
+		 *    code in this case block. This is needed as the GT.M GDSMV* (e.g. GDSMV63012) values will be way less
+		 *    than the older YottaDB GDSMVCURR value (e.g. in case of YottaDB r1.32) and so those GT.M switch/case
+		 *    code paths above will not be reached for upgrades from an older YottaDB release to a newer YottaDB release.
 		 */
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
