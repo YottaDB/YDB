@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -11,60 +11,118 @@
 #################################################################
 # Usage: source "YDBDIST"/ydb_env_set
 # Sets up environment for single-user use of YottaDB with reasonable defaults.
-# Explicitly specify ydb_chset=UTF-8 before running this for UTF-8 mode.
+# Default is UTF-8 mode unless:
+# - $ydb_chset/$gtm_chset is M
+# - $ydb_routines/$gtmroutines is defined and points libyottadbutil.so/libgtmutil.so in $ydb_dist, not $ydb_dist/utf8
+# Explicitly specify ydb_chset=M if YottaDB is installed with UTF-8 support and M mode is desired.
 # System administrators should adapt as appropriate for more complex multi-user and production environments.
 
-# Function to save selected environment variables
+# Wrapping the work in a function allows for a return status from multiple points in the script without having
+# a temporary environment variable lingering after this is sourced.
+#   - If yottadb -run set^%YDBENV terminates with a ZHALT, that value is returned to the shell sourcing this file.
+#   -
+do_ydb_set() {
 
-# Save ydb_passwd / gtm_passwd and ydb_chset / gtm_chset if defined because
-# this script executes in M mode and makes no database accesses
-# Need to distinguish between $ydb_passwd / $gtm_passwd not set at all vs. set to null string
-# export not needed because these are only used when sourcing this file
-if [ ! -z "${ydb_passwd+isset}" ] ; then ydb_tmp_ydb_passwd=$ydb_passwd ; fi
-if [ ! -z "${gtm_passwd+isset}" ] ; then ydb_tmp_gtm_passwd=$gtm_passwd ; fi
+	local curr_gtm_dist curr_ydb_dist real_ydb_dist ydb_tmp_env ydb_tmp_gtm_chset ydb_tmp_gtm_passwd ydb_tmp_gtmroutines
+	local ydb_tmp_ydb_chset ydb_tmp_ydb_passwd ydb_tmp_routines
 
-# If YottaDB has not been installed with UTF-8 support, force mode to M mode
-# and notify user to that effect.
-if [ ! -d "YDBDIST"/utf8 ] ; then
-    if [ "UTF-8" = "$ydb_chset" -o "utf-8" = "$ydb_chset" -o "UTF-8" = "$gtm_chset" -o "utf-8" = "$gtm_chset" ] ; then
-	unset gtm_chset
-	echo "UTF-8 mode requested but " "YDBDIST"/utf8 "does not exist; forcing M mode"
-    fi
-    export ydb_chset="M"
-fi
+	# For performance and security, dereference "YDBDIST" to remove symbolic links
+	real_ydb_dist=$(realpath -e "YDBDIST")
 
-# Save the character set, since the %YDBENV program always runs in M mode
-# even though it generates environment variables for either M or UTF-8 mode.
-# Need to be exported because set^%YDBENV uses them.
-if [ ! -z "$ydb_chset" ] ; then export ydb_tmp_ydb_chset=$ydb_chset ; fi
-if [ ! -z "$gtm_chset" ] ; then export ydb_tmp_gtm_chset=$gtm_chset ; fi
+	# If $ydb_dist / $gtm_dist are set, continue only if they all refer to the same directory
+	if [ -d "$ydb_dist" ] ; then
+	    curr_ydb_dist=$(realpath -e $ydb_dist)
+	else
+	    curr_ydb_dist=$real_ydb_dist
+	fi
+	if [ -d "$gtm_dist" ] ; then
+	    curr_gtm_dist=$(realpath -e $gtm_dist)
+	else
+	    curr_gtm_dist=$real_ydb_dist
+	fi
 
-# Save ydb_routines / gtmroutines if defined because this script
-# needs to ensure that it executes the %YDBENV in $ydb_dist / $gtm_dist.
-# Need to be exported because set^%YDBENV uses them.
-if [ ! -z "$ydb_routines" ] ; then export ydb_tmp_routines="$ydb_routines" ; fi
-if [ ! -z "$gtmroutines" ] ; then export ydb_tmp_gtmroutines="$gtmroutines" ; fi
+	if [ $real_ydb_dist = $curr_ydb_dist -a $real_ydb_dist = $curr_gtm_dist ] ; then
 
-# Save ydb_dist / gtm_dist so that they can be saved by %YDBENV and restored when ydb_env_uset is run
-if [ ! -z "$ydb_dist" ] ; then export ydb_tmp_ydb_dist=$ydb_dist ; fi
-if [ ! -z "$gtm_dist" ] ; then export ydb_tmp_gtm_dist=$gtm_dist ; fi
+		# Save ydb_passwd / gtm_passwd and ydb_chset / gtm_chset if defined because
+		# this script executes in M mode and makes no database accesses
+		# Need to distinguish between $ydb_passwd / $gtm_passwd not set at all vs. set to null string
+		# export not needed because these are only used when sourcing this file
+		if [ ! -z "${ydb_passwd+isset}" ] ; then ydb_tmp_ydb_passwd=$ydb_passwd ; fi
+		if [ ! -z "${gtm_passwd+isset}" ] ; then ydb_tmp_gtm_passwd=$gtm_passwd ; fi
 
-# Clear environment variables that might interfere with correct operation of %YDBENV
-unset ydb_chset ydb_dist ydb_passwd ydb_routines gtm_chset gtm_dist gtm_passwd gtmroutines
+		# If YottaDB has not been installed with UTF-8 support, force mode to M mode
+		# and notify user to that effect.
+		if [ ! -d $real_ydb_dist/utf8 ] ; then
+			if [ "UTF-8" = "$ydb_chset" -o "utf-8" = "$ydb_chset" -o "UTF-8" = "$gtm_chset" -o "utf-8" = "$gtm_chset" ] ; then
+			    unset gtm_chset
+			    echo "UTF-8 mode requested but " $real_ydb_dist/utf8 "does not exist; forcing M mode"
+			fi
+			export ydb_chset="M" ydb_chset_unset=1
 
-# Run command to generate environment
-ydb_tmp_env=`mktemp -d -t ydb_env_$$_XXXXXX`
-if "YDBDIST"/yottadb -run set^%YDBENV 1>$ydb_tmp_env/out 2>$ydb_tmp_env/err ; then
-    . $ydb_tmp_env/out
-    rm -rf $ydb_tmp_env
-else
-    echo "Error file is at $ydb_tmp_env/err"
-    grep -E "%YDB-E-|%YDB-F-|%YDBENV-E-|%YDBENV-F-" $ydb_tmp_env/err
-fi
+		# If neither $ydb_chset nor $gtm_chset is set and $ydb_routines/$gtmroutines are
+		# set but do not include the /utf8/ subdirectory, force the character set to
+		# M mode and tell ydb_env_unset to unset ydb_chset to restore the environment.
+		elif [ -z "$ydb_chset" -a -z "$gtm_chset" ] ; then
+			if [ ! -z "$ydb_routines" ] ; then
+			    echo $ydb_routines | grep -qF /utf8/ ; ydb_tmp_stat=$?
+			elif [ ! -z "$gtmroutines" ] ; then
+			    echo $gtmroutines | grep -qF /utf8/ ; ydb_tmp_stat=$?
+			fi
+			if [ 0 -ne ${ydb_tmp_stat:-0} ] ; then export ydb_chset=M ydb_tmp_ydb_chset=M ydb_chset_unset=1 ; fi
 
-# Restore ydb_passwd / gtm_passwd if either was set
-if [ ! -z "${ydb_tmp_ydb_passwd+isset}" ] ; then export ydb_passwd=$ydb_tmp_ydb_passwd ; fi
-if [ ! -z "${ydb_tmp_gtm_passwd+isset}" ] ; then export gtm_passwd=$ydb_tmp_gtm_passwd ; fi
+		else
+			# Save the character set, since the %YDBENV program always runs in M mode
+			# even though it generates environment variables for either M or UTF-8 mode.
+			# Need to be exported because set^%YDBENV uses them.
+			if [ ! -z "$ydb_chset" ] ; then export ydb_tmp_ydb_chset=$ydb_chset ; fi
+			if [ ! -z "$gtm_chset" ] ; then export ydb_tmp_gtm_chset=$gtm_chset ; fi
+		fi
 
-# Clear temporary variables used in this file
-unset ydb_tmp_env ydb_tmp_gtm_chset ydb_tmp_gtm_passwd ydb_tmp_gtmroutines ydb_tmp_ydb_chset ydb_tmp_ydb_passwd ydb_tmp_routines
+		# Save ydb_routines / gtmroutines if defined because this script
+		# needs to ensure that it executes the %YDBENV in $ydb_dist / $gtm_dist.
+		# Need to be exported because set^%YDBENV uses them.
+		if [ ! -z "$ydb_routines" ] ; then export ydb_tmp_routines="$ydb_routines" ; fi
+		if [ ! -z "$gtmroutines" ] ; then export ydb_tmp_gtmroutines="$gtmroutines" ; fi
+
+		# Save ydb_dist / gtm_dist so that they can be saved by %YDBENV and restored when ydb_env_uset is sourced.
+		# Note that although there is a check to ensure using realpath -e that they point to the same
+		# directory as $real_ydb_dist, as they may have symbolic links, they should be restored when
+		# ydb_env_unset is sourced.
+		if [ ! -z "$ydb_dist" ] ; then export ydb_tmp_ydb_dist=$ydb_dist ; fi
+		if [ ! -z "$gtm_dist" ] ; then export ydb_tmp_gtm_dist=$gtm_dist ; fi
+
+		# Clear environment variables that might interfere with correct operation of %YDBENV
+		unset ydb_chset ydb_dist ydb_passwd ydb_routines gtm_chset gtm_dist gtm_passwd gtmroutines
+
+		# Run command to generate environment
+		export ydb_tmp_env=$(mktemp -d -t ydb_env_$$_XXXXXX)
+		$real_ydb_dist/yottadb -run set^%YDBENV 1>$ydb_tmp_env/out 2>$ydb_tmp_env/err ; ydb_tmp_stat=$?
+		if [ 0 = $ydb_tmp_stat ] ; then
+		    . $ydb_tmp_env/out
+		    rm -rf $ydb_tmp_env
+		else
+		    echo "Error file is at $ydb_tmp_env/err"
+		    grep -E "%YDB-E-|%YDB-F-|%YDBENV-E-|%YDBENV-F-" $ydb_tmp_env/err
+		fi
+
+		# Restore ydb_passwd / gtm_passwd if either was set
+		if [ ! -z "${ydb_tmp_ydb_passwd+isset}" ] ; then export ydb_passwd=$ydb_tmp_ydb_passwd ; fi
+		if [ ! -z "${ydb_tmp_gtm_passwd+isset}" ] ; then export gtm_passwd=$ydb_tmp_gtm_passwd ; fi
+
+		# Clear temporary variables used in this file
+		unset ydb_tmp_env ydb_tmp_gtm_chset ydb_tmp_gtm_passwd ydb_tmp_gtmroutines ydb_tmp_ydb_chset ydb_tmp_ydb_passwd ydb_tmp_routines
+
+	else # Report error and do nothing
+	    if [ ! $real_ydb_dist = $curr_ydb_dist ] ; then
+		echo '$ydb_dist="YDBDIST" has realpath' $real_ydb_dist but prior '$ydb_dist' has realpath $curr_ydb_dist
+		ydb_tmp_stat=1
+	    fi
+	    if [ ! $real_ydb_dist = $curr_gtm_dist ] ; then
+		echo '$ydb_dist="YDBDIST" has realpath' $real_ydb_dist but prior '$gtm_dist' has realpath $curr_gtm_dist
+		ydb_tmp_stat=$(expr "${ydb_tmp_stat-0}" + 2)
+	    fi
+	fi
+
+	return $ydb_tmp_stat
+}
+do_ydb_set

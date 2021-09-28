@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -71,7 +71,9 @@
 	quit			; should never get here because previous line should terminate process
 
 set	; Intended to be the most common entry point to this routine (with unset likely not as common)
-	new chset,currenv,dist,env,file,gtmgbldir,i,io,localeflag,path,ppid,setcmd,setsep,tmp1,tmp2,tmp3,tmp4,unset,unsetcmd,ydbgbldir,ydbreplinst,ydbretention,zstmp
+	new $test,aimflag,chset,currenv,dist,env,err,file,gtmgbldir,i,io,line,localeflag,octoflag,out,path,ppid
+	new setcmd,setsep,tmp1,tmp2,tmp3,tmp4,unset,unsetcmd,ydbgbldir,ydbreplinst,ydbretention,ydbroutines
+	new ydbtmpdir,zstmp
 	do Etrap
 	set io=$io
 	use io:nowrap
@@ -84,10 +86,11 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	else  kill currenv("gtmroutines")
 	do GetPPid	; get parent pid
 	; Get the installation directory. Although $ydb_dist/$gtm_dist would normally be set and captured by GetCurrEnv,
-	; if it is set by the mumps executable when run (vs. set in the shell environment), /proc/self/environ won't have the value
+	; if it is set by the yottadb executable when run (vs. set in the shell environment), /proc/self/environ won't have the value
 	; whereas $ztrnlnm() will.
-	set dist=$ztrnlnm("ydb_dist")
-	set:'$zlength(dist) dist=$ztrnlnm("gtm_dist")
+	set dist=$zparse($ztrnlnm("ydb_dist"),,,,"symlink")
+	set:'$zlength(dist) dist=$zparse($ztrnlnm("gtm_dist"),,,,"symlink")
+	set ydbtmpdir=currenv("ydb_tmp_env")_"/"
 	do FileTypeEnsure("ydb_dir")	; if $ydb_dir exists, ensure that it is a directory or a link
 	do:'$data(env("ydb_dir","path"))&$data(env("ydb_dir"))&$zfind(env("ydb_dir"),"/")
 	. set tmp1=$zparse(env("ydb_dir")),tmp2=$zlength(tmp1,"/")
@@ -169,41 +172,49 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	; replicated and ydb_retention to delete old prior generation
 	; journal files.  If no environment exsists create it here.
 	set ydbgbldir=$select($data(currenv("ydb_gbldir")):currenv("ydb_gbldir"),$data(currenv("gtmgbldir")):currenv("gtmgbldir"),1:"")
-	if '($zlength(ydbgbldir)) do					; global directory not defined in environment
-	. set ydbgbldir=path_"/g/yottadb.gld",tmp1=$zsearch(ydbgbldir,-1)
-	. if $zlength(tmp1) set ydbgbldir=tmp1 do Robustify	; use existing in $ydb_dir/$ydb_rel/g/yottadb.gld
-	. else  do
-	. . set tmp1=$zsearch(path_"/g/*.gld",-1)	; $ydb_dir/$ydb_rel/g/yottadb.gld doesn't exist, look for ...
-	. . if $zlength(tmp1) set ydbgbldir=tmp1 do Robustify		; any $ydb_dir/$ydb_rel/g/*.gld and use first one, if any exist.
-	. . else  do	      	  	    		 		; no global directory - need to create default global directory & database
-	. . . ; command is /bin/sh to feed lines to shell process because of YottaDB deviceparameter limit
-	. . . open "dbcreate":(shell="/bin/sh":command="/bin/sh":stderr="dbcreateerr")::"pipe"
-	. . . use "dbcreate"
-	. . . write "export ydb_gbldir=",ydbgbldir,!,"export gtmgbldir=$ydb_gbldir",!
-	. . . write "export ydb_dir=",env("ydb_dir"),!,"export gtmdir=",env("gtmdir"),!
-	. . . write "export ydb_rel="_env("ydb_rel"),!,"export gtmver=",env("gtmver"),!
-	. . . if $zsearch("./gdedefaults",-1) write dist,"/yottadb -run GDE <gdedefaults",!
-	. . . else  write dist,"/yottadb -run GDE <"_dist,"/gdedefaults",!
-	. . . write dist,"/mupip create",!
-	. . . write dist,"/mupip set -journal=""enable,on,before"" -region ""*""",!
-	. . . write /eof
-	. . . for  read tmp1 quit:$zeof			   ; read and discard stdout and stderr of "dbcreate" because we do nothing with it ...
-	. . . use "dbcreateerr" for  read tmp2 quit:$zeof  ; but should read it to avoid "dbcreate" getting stalled ...
-	. . . use io close "dbcreate"	       		   ; by a full pipe.
-	else  do Robustify						; $ydb_gbldir and/or $gtmgbldir are set - use existing values
+	set:'$zlength(ydbgbldir) ydbgbldir=path_"/g/yottadb.gld"		; Default ydbgbldir if undefined
+	if $zlength($zsearch(ydbgbldir,-1)) do Robustify			; Existing global directory, robustify database
+	else  do								; No global directory, create database
+	. ; command is /bin/sh to feed lines to shell process because of YottaDB deviceparameter limit
+	. open "dbcreate":(shell="/bin/sh":command="/bin/sh":stderr="dbcreateerr")::"pipe"
+	. use "dbcreate"
+	. write "export ydb_gbldir=",ydbgbldir,!,"export gtmgbldir=$ydb_gbldir",!
+	. write "export ydb_dir=",env("ydb_dir"),!,"export gtmdir=",env("gtmdir"),!
+	. write "export ydb_rel="_env("ydb_rel"),!,"export gtmver=",env("gtmver"),!
+	. if $zlength($zsearch("./gdedefaults",-1)) write dist,"/yottadb -run GDE <gdedefaults",!
+	. else  write dist,"/yottadb -run GDE <"_dist,"/gdedefaults",!
+	. write dist,"/mupip create",!
+	. write dist,"/mupip set -journal=""enable,on,before"" -region ""*""",!
+	. write /eof
+	. set out=ydbtmpdir_"CreateEnv.out"
+	. set err=ydbtmpdir_"CreateEnv.err"
+	. open out:newversion,err:newversion
+	. for  read line quit:$zeof  use out write line,! use "dbcreate"
+	. use "dbcreateerr" for  read line quit:$zeof  use err write line,! use "dbcreateerr"
+	. use io close "dbcreate","dbcreateerr"
 	do ExportEnv("ydb_gbldir",ydbgbldir),ExportEnv("gtmgbldir",ydbgbldir)
-	; ydb_routines is set here. The object directory is determined by both the YottaDB release as well as
-	; the character set (M/UTF-8). Shared libraries from plugins should also be included in ydb_routines,
-	; after routines in $ydb_dir, to allow routines in $ydb_dir (which may be a development environment) to
-	; take precedence over those in plugins.
-	set path=path_"/o"_$select("UTF-8"=chset:"/utf8",1:"")_"*("_env("ydb_dir")_"/"_env("ydb_rel")_"/r "_env("ydb_dir")_"/r)"
+	set $zgbldir=ydbgbldir
+	; ydb_routines is set here. The order is:
+	; - existing application routines (with a default structure under $ydb_dir, if not specified)
+	; - shared libraries of plugins
+	; - libyottadbutil.so
+	; Shared libraries provided here depend on the YottaDB release, as well as M vs. UTF-8.
+	set ydbroutines=$zpiece($select($data(currenv("ydb_routines")):currenv("ydb_routines"),$data(currenv("gtmroutines")):currenv("gtmroutines"),1:""),dist,1),tmp1=$zlength(ydbroutines)
+	; If ydbroutines ends with a space, it means that there are user defined routines, else provide the default.
+	if $zlength(ydbroutines) set path=$zextract(ydbroutines,1,tmp1-(" "=$zextract(ydbroutines,$zlength(ydbroutines))))
+	else  set path=path_"/o"_$select("UTF-8"=chset:"/utf8",1:"")_"*("_path_"/r "_env("ydb_dir")_"/r)"
+	; Append shared libraries of plugins to the path, using the same search context to find all files
 	set tmp1=dist_"/plugin/o"_$select("UTF-8"=chset:"/utf8",1:"")_"/*.so"
 	set tmp2=$zsearch(tmp1,$increment(zstmp))
-	for  quit:""=tmp2  set path=path_" "_tmp2,tmp2=$zsearch(tmp1,zstmp)	; use the same search context to find all files
+	for  quit:""=tmp2  set path=path_" "_tmp2,tmp2=$zsearch(tmp1,zstmp)
+	; Append libyottadbutil.so/libgtmutil.so to path
 	set tmp1=dist_$select("UTF-8"=chset:"/utf8",1:"")
-	set tmp2=$zsearch(tmp1_"/libyottadbutil.so",-1)	; if there is no libyottadbutil.so, check for libgtmutil.so, just ...
-	set:'$zlength(tmp2) tmp2=$zsearch(tmp1_"/libgtmutil.so",-1)	; in case someone is trying to run this with GT.M
-	set:$zlength(tmp2) path=path_" "_tmp2
+	set tmp2=$zsearch(tmp1_"/libyottadbutil.so",-1)
+	if $zlength(tmp2) set path=path_" "_tmp2
+	else  do
+	. set tmp2=$zsearch(tmp1_"/libgtmutil.so",-1)
+	. if $zlength(tmp2) set path=path_" "_tmp2
+	. else  set path=path_" "_tmp1
 	do ExportEnv("ydb_routines",path),ExportEnv("gtmroutines",path)
 	; ydb_log is set here, with the directory structure created if it does not exist
 	; ydb_tmp is set to the same value as ydb_log
@@ -276,7 +287,7 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	quit
 
 unset	; Unset the environment set by entryref set
-	new currenv,io,ppid,prefix,setcmd,setsep,startpos,unsetcmd,var
+	new $test,currenv,io,ppid,prefix,setcmd,setsep,startpos,unsetcmd,var
 	do Etrap
 	set io=$io
 	use io:nowrap
@@ -291,6 +302,82 @@ unset	; Unset the environment set by entryref set
 
 ; Utility labels, expected to be called only from within the routine
 
+CreateAIM
+	; Create YDBAIM region when it does not exist
+	new $test,defaultfhead,ydbtmpdir
+	do CreateRegion("YDBAIM")
+	quit
+
+CreateOCTO
+	; Create YDBOCTO region and journaled database, when they don't exist
+	new $test,defaultfhead,defaultjnl,defaultjnlstate,err,io,jnlbefore,jnldir,jnlstate,line,out,replstate,ydbtmpdir
+	set io=$io
+	do CreateRegion("YDBOCTO")
+	open "mupip":(shell="/bin/sh":command="/bin/sh":stderr="err")::"pipe"
+	use "mupip"
+	write "$ydb_dist/mupip create -region=YDBOCTO",!
+	set defaultjnlstate=defaultfhead("sgmnt_data.jnl_state")
+	do:defaultjnlstate
+	. set defaultjnl=$zextract(defaultfhead("sgmnt_data.jnl_file_name"),1,defaultfhead("sgmnt_data.jnl_file_len"))
+	. set jnldir=$zpiece(defaultjnl,"/",1,$zlength(defaultjnl,"/")-1)
+	. set:$zlength(jnldir) jnldir=jnldir_"/"
+	. set jnlfile=jnldir_"%ydbocto.mjl"
+	. set jnlstate=$select(2=defaultjnlstate:"on",1:"off")
+	. set jnlbefore=$select(defaultfhead("sgmnt_data.jnl_before_image"):"before",1:"nobefore")
+	. set replstate=$select(defaultfhead("sgmnt_data.repl_state"):" -replication=on",1:"")
+	. write "$ydb_dist/mupip set",replstate," -journal=""enable,",jnlstate,","_jnlbefore_",file=",jnlfile,""" -region YDBOCTO",!
+	. ; Workaround for limitation in database engine limitation disussed in thread
+	. ; https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1125#note_843861584
+	. write "$ydb_dist/mupip set",replstate," -journal=""",jnlstate,","_jnlbefore_""" -region ""*""",!
+	write /eof
+	set out=ydbtmpdir_"MUPIP_YDBOCTO.out"
+	open out:newversion
+	for  read line quit:$zeof  use out write line,! use "mupip"
+	set err=ydbtmpdir_"MUPIP_YDBOCTO.err"
+	open err:newversion use "err"
+	for  read line quit:$zeof  use err write line,! use "err"
+	use io close "err",err,"mupip",out
+	quit
+
+CreateRegion(region)
+	; Create a region (YDBAIM/YDBOCTO) that does not exist in the global directory
+	; Note that if environment variables are used in the global directory for
+	; the directory for the DEFAULT region, they should also be used for the
+	; directory for the region being created.
+	; Uses variable dist from caller
+	; Sets parent's defaultfhead & ydbtmpdir local variables
+	new $test,dbdir,defaultfile,err,gdedefault,i,io,line,out,regpatt,tmp
+	set io=$io
+	set ydbtmpdir=$ztrnlnm("ydb_tmp_env")_"/"
+	set:1=$zlength(ydbtmpdir) ydbtmpdir="/tmp/"
+	set tmp=$zpiece($$^%PEEKBYNAME("gd_segment.fname","DEFAULT"),$zchar(0),1)
+	set dbdir=$zpiece(tmp,"/",1,$zlength(tmp,"/")-1)
+	set:$zlength(dbdir) dbdir=dbdir_"/"
+	set defaultfile=$view("wordexp",tmp)
+	do getfields^%DUMPFHEAD(.defaultfhead,defaultfile)
+	set gdedefault=dist_"/gdedefaults"
+	open gdedefault:readonly
+	open "gde":(shell="/bin/sh":command="$ydb_dist/yottadb -run GDE":stderr="err")::"pipe"
+	use gdedefault
+	set regpatt="! "_region_" "
+	set tmp=1_$zwrite(regpatt_"begin")_".E" for  read line quit:line?@tmp		; skip gdedefault commands till start of region
+	set tmp=1_$zwrite(regpatt_"end")_".E" for  read line quit:(line?@tmp)!$zeof  do	; feed GDE gdedefault commands till end of region
+	. use "gde"
+	. write $zpiece(line,"$ydb_dir/$ydb_rel/g/",1)
+	. for i=2:1:$zlength(line,"$ydb_dir/$ydb_rel/g/") write dbdir,$zpiece(line,"$ydb_dir/$ydb_rel/g/",i)
+	. write !
+	. use gdedefault
+	use "gde" write "exit",! write /eof
+	; Save GDE command stdout & stderr for potential debugging
+	set out=ydbtmpdir_"GDE_"_region_".out"
+	open out:newversion
+	for  read line quit:$zeof  use out write line,! use "gde"
+	set err=ydbtmpdir_"GDE_"_region_".err"
+	open err:newversion
+	use "err" for  read line quit:$zeof  use err write line,! use "err"
+	use io close "err",err,"gde",gdedefault,out
+	quit
+
 DirEnsure(ydbvar,gtmvar)
 	; Cases
 	;   One is defined by the other is not
@@ -300,7 +387,7 @@ DirEnsure(ydbvar,gtmvar)
 	;     ydbvar default does not exist
 	;       gtmvar default exists: define both to point to it
 	;	gtmver default does not exist: create ydbvar default & define both to point to it
-	new io,tmp,zdir
+	new $test,io,tmp,zdir
 	set io=$io,zdir=$zdirectory
 	set:'$data(env(ydbvar)) env(ydbvar)=$get(currenv((ydbvar)))
 	set:'$data(env(gtmvar)) env(gtmvar)=$get(currenv((gtmvar)))
@@ -373,6 +460,7 @@ DirEnsure(ydbvar,gtmvar)
 	quit
 
 Etrap	; Set error handler to print error message and return error code to shell
+	new $test
 	open "/proc/self/fd/2" ; open stderr for output if needed
 	set $etrap="set $etrap=""use """"/proc/self/fd/2"""" write $zstatus,! zshow """"*"""" zhalt 1"" set tmp1=$zpiece($ecode,"","",2),tmp2=$text(@tmp1) if $zlength(tmp2) use ""/proc/self/fd/2"" write $text(+0),@$zpiece(tmp2,"";"",2),! zshow ""*"" zhalt +$extract(tmp1,2,$zlength(tmp1))"
 	quit
@@ -383,8 +471,8 @@ ExportEnv(var,value)
 	;   unless one already exists (since invoking the set label is idempotent)
 	; Else add to the list of variables to be unset when the unset label is invoked
 	; currenv and ppid should have been set prior to calling this label
-	new envsav,envval,$test
-	write setcmd,var,setsep,"'",value,"'",!	; write even if already in the enviroment because it may not have been exported
+	new $test,envsav,envval,$test
+	write setcmd,var,setsep,"'",value,"'",!	; write even if already in the environment because it may not have been exported
 	if $data(currenv(var)) do
 	. set envsav="ydb_sav_"_ppid_"_"_var
 	. do:'$zfind(unset," "_envsav_" ")	; variables in unset have spaces on both sides to avoid substring matches
@@ -397,7 +485,7 @@ FileType(fpath,followlink)
 	; Determine type of file at fpath (assumption is that existence is already confirmed)
 	; followlink true means dereference link if fpath is a link
 	; Future todo: use stat() instead of file command if POSIX plugin is installed
-	new io,line,type
+	new $test,io,line,type
 	set io=$io
 	open "file":(shell="/bin/sh":command="file "_$select(followlink:"-L ",1:"-h ")_fpath:readonly)::"pipe"
 	use "file" read line use io close "file"
@@ -408,7 +496,7 @@ FileTypeEnsure(envvar,followlink)
 	; Make sure environment variable envvar, if defined:
 	;   - refers to either a link or a directory if followlink is undefined or otherwise evaluates to 0
 	;   - refers to a directory otherwise
-	new flag
+	new $test,flag
 	if '($data(env(envvar))#10) set env(envvar)=$get(currenv(envvar)),flag=1
 	else  set flag=0
 	if $zlength(env(envvar)) do
@@ -424,7 +512,7 @@ FileTypeEnsure(envvar,followlink)
 GetCurrEnv
 	; Get current environment
 	; io should have been set before calling this label
-	new file,i,line,tmp
+	new $test,file,i,line,tmp
 	set file="/proc/self/environ"
 	open file:readonly use file
 	set line="" for  read tmp quit:$zeof  set line=line_tmp
@@ -434,7 +522,7 @@ GetCurrEnv
 
 GetDefaults
 	; Get default values for environment variables
-	new i,line,tmp1,tmp2,var
+	new $test,i,line,tmp1,tmp2,var
 	for i=2:1 set tmp1=$text(Defaults+i),line=$zpiece(tmp1,"; ",2,$zlength(tmp1,":")) quit:""=line  do
 	. set var=$zpiece(line,":",1)
 	. set tmp1=$zpiece(line,":",2)
@@ -451,7 +539,7 @@ GetDefaults
 GetPPid
 	; Get parent pid; initialize related variables based on parent shell type
 	; io should have been set before calling this label
-	new file,line,tmp1,tmp2
+	new $test,file,line,tmp1,tmp2
 	set file="/proc/self/stat"
 	open file:readonly use file
 	read line
@@ -468,17 +556,35 @@ GetPPid
 
 PathSame(path1,path2)
 	; determine whether path1 and path2 are the same
-	new io,realpath1,realpath2
+	new $test,io,realpath1,realpath2
 	set io=$io
 	open "realpath":(shell="/bin/sh":command="realpath "_path1_" "_path2:readonly)::"pipe"
 	use "realpath" read realpath1,realpath2 use io close "realpath"
 	quit realpath1=realpath2
 
+; Note: Robustify upgrades global directories automatically
 Robustify	; rollback / recover an existing database if needed
-	new allok,cmd,cutoff,fhead,field,fname,io,jnlfile,jnlfilelist,line,region,replok,replon,sem,semid,semkey,timestamp,tmpok,year
-	new semidnotnull
+	new $test,allok,cmd,cutoff,err,fhead,field,fname,io,jnlfile,jnlfilelist,line,out
+	new region,replok,replon,sem,semid,semkey,timestamp,tmpok,year,semidnotnull
 	set io=$io
 	view "setenv":"ydb_dir":env("ydb_dir"),"setenv":"ydb_rel":env("ydb_rel"),"setenv":"ydb_gbldir":ydbgbldir,"setenv":"ydb_repl_instance":ydbreplinst
+	; Open the global direcory file, and exit, which will automatically upgrade the global directory
+	; if it is from an older version of the software.
+	set err=ydbtmpdir_"GDE_upgrade.err"
+	set out=ydbtmpdir_"GDE_upgrade.out"
+	open err:newversion,out:newversion
+	open "gde":(shell="/bin/sh":command=dist_"/yottadb -run GDE":stderr="gdeerr")::"pipe"
+	use "gde" write "exit",! write /eof
+	for  read line quit:$zeof  use out write line,! use "gde"
+	use "gdeerr" for  read line quit:$zeof  use err write line,! use "gdeerr"
+	use io close "gde","gdeerr",err,out
+	; create YDBAIM and YDBOCTO regions if they don't exist
+	set (aimflag,octoflag)=1
+	set tmp1="" for  set tmp1=$view("gvnext",tmp1) quit:'$zlength(tmp1)  do
+	. set:"YDBAIM"=tmp1 aimflag=0
+	. set:"YDBOCTO"=tmp1 octoflag=0
+	do:aimflag CreateAIM
+	do:octoflag CreateOCTO
 	; create files for any regions that don't have database files; they're likely temporary regions
 	; ignore stderr as mupip create will likely complain but attempt to read one line from stdin to ensure command completes
 	open "create":(shell="/bin/sh":command="$ydb_dist/mupip create":readonly)::"pipe"
@@ -541,8 +647,9 @@ Robustify	; rollback / recover an existing database if needed
 	do:'allok
 	. set region=""
 	. for  set region=$order(fhead(region)) quit:""=region  do:-1'=fhead(region,"sgmnt_data.semid")
-	. . ; Confirm that open region has before image journaling and that journaling is on
+	. . ; Confirm that all open regions have before image journaling and that journaling is on
 	. . set:(1'=fhead(region,"sgmnt_data.jnl_before_image"))!(2'=fhead(region,"sgmnt_data.jnl_state")) $ecode=",U248,"
+	. for  set region=$order(fhead(region)) quit:""=region  do:-1'=fhead(region,"sgmnt_data.semid")
 	. . if '$data(replok) do
 	. . . set replok=fhead(region,"sgmnt_data.repl_state")	; set replication state to that of the first region requiring rollback/recovery
 	. . . set jnlfilelist=$$jnlfile(region)	; initialize region list with first region
@@ -581,7 +688,7 @@ jnlfile:(region)
 
 ; Internally called function to create a list of directories related to a particular env var
 createdirs:(envvar)
-	new dir,dirlist,i,numpcs
+	new $test,dir,dirlist,i,numpcs
 	set dirlist=env(envvar,"create"),numpcs=$zlength(dirlist,"#")
 	set var=$zpiece(dirlist,"#",1),var=@var
 	for i=1:1:numpcs do
@@ -591,6 +698,7 @@ createdirs:(envvar)
 
 ; Internally called function to create one directory if it does not already exist
 mkdir:(dir)
+	new $test
 	if (""=$zsearch(dir,-1)) do
 	. ; Avoid zsystem. Though it is simpler to use, it is costly. Pipes are cheaper so use that instead.
 	. open "create":(shell="/bin/sh":command="mkdir -p "_dir:writeonly)::"pipe"
