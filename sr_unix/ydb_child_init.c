@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,8 @@
 #include "add_inter.h"
 #include "eintr_wrapper_semop.h"
 #include "getjobnum.h"
+#include "mlkdef.h"
+#include "mlk_pvtblk_delete.h"
 
 typedef enum
 {
@@ -59,6 +61,7 @@ GBLREF	uint4			dollar_zjob;
 GBLREF	int			fork_after_ydb_init;
 GBLREF	boolean_t		noThreadAPI_active;
 GBLREF	boolean_t		simpleThreadAPI_active;
+GBLREF	mlk_pvtblk		*mlk_pvt_root;
 #ifdef YDB_USE_POSIX_TIMERS
 GBLREF	pid_t			posix_timer_thread_id;
 GBLREF	boolean_t		posix_timer_created;
@@ -80,6 +83,7 @@ int	ydb_child_init(void *param)
 	gd_addr			*addr_ptr;
 	gd_region		*reg_top, *reg;
 	jnlpool_addrs_ptr_t	tmp_jnlpool;
+	mlk_pvtblk 		**prior;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -139,6 +143,13 @@ int	ydb_child_init(void *param)
 	reg = recvpool.recvpool_dummy_reg;
 	if ((NULL != reg) && reg->open)
 		ydb_child_init_sem_incrcnt(reg, RECVPOOL_REG, NULL);
+	/* Free private memory structures related to LOCKs held by parent as they don't correspond to this child pid.
+	 * Not doing so will confuse the child into thinking it owns locks that are currently held by the parent.
+	 */
+	for (prior = &mlk_pvt_root ; *prior ; )
+		mlk_pvtblk_delete(prior);
+	mlk_pvt_root = NULL;
+
 	skip_exit_handler = FALSE; /* Now that the child process database state is set up correctly, it is safe to "gds_rundown" */
 	assert(NULL == ftok_sem_reg);
 	LIBYOTTADB_DONE;
