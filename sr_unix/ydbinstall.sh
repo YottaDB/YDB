@@ -42,6 +42,8 @@ utillist="date id grep uname mktemp cut tr dirname chmod rm mkdir cat wget sed s
 # Check all utilities that configure.gtc (which ydbinstall.sh calls) will additionally use and ensure they are present.
 # If not error out at beginning instead of erroring out midway during the install.
 utillist="$utillist ps file wc touch chown chgrp groups getconf awk expr locale install ld strip"
+# Check utilities used by YottaDB for normal operation
+utillist="$utillist nm"
 arch=`uname -m`
 if [ "armv6l" = "$arch" ] || [ "armv7l" = "$arch" ] ; then
 	# ARM platform requires cc (in configure.gtc) to use as the system linker (ld does not work yet)
