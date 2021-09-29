@@ -99,7 +99,7 @@ def look_for_copyrights(f, ext):
                 elif ext == ".rst":
                     start = ".. " + start
                 print(start, " Copyright (c) {} YottaDB LLC and/or its subsidiaries.	".format(current_year), end, sep="")
-                print(start, " All rights reserved.                                     ", end, sep="")
+                print(start, " All rights reserved.						", end, sep="")
                 print(start, "								", end, sep="")
             print(line, end="")
             return True
