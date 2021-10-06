@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,6 +47,8 @@ GBLREF	boolean_t	exit_handler_complete;
 GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
 #endif
+GBLREF	void		(*ydb_stm_thread_exit_fnptr)(void);
+GBLREF	void		(*ydb_stm_invoke_deferred_signal_handler_fnptr)(void);
 
 /* This is the STAPI signal thread (formerly referred to as the MAIN worker thread) that is created when a SimpleThreadAPI
  * call is done for the first time in the process.
@@ -92,7 +94,14 @@ void *ydb_stm_thread(void *dummy_parm)
 	posix_timer_thread_id = syscall(SYS_gettid);
 #	endif
 	SHM_WRITE_MEMORY_BARRIER;
-	simpleThreadAPI_active = TRUE;	/* to indicate to caller/creator thread that we are done with setup */
+	/* Initialize 2 function pointers to a non-NULL value (set to NULL in "gtm_startup()") now that we know this is a
+	 * Simple Thread API application. Do this BEFORE "simpleThreadAPI_active" is set to TRUE as that is the point at
+	 * which the caller/creator thread continues parallel execution.
+	 */
+	ydb_stm_thread_exit_fnptr = &ydb_stm_thread_exit;
+	ydb_stm_invoke_deferred_signal_handler_fnptr = &ydb_stm_invoke_deferred_signal_handler;
+	simpleThreadAPI_active = TRUE;	/* To indicate to caller/creator thread that we are done with setup and that it can
+					 * proceed with execution */
 	/* Note: This MAIN worker thread runs indefinitely till the process exits OR a "ydb_exit" OR a signal drives
 	 * the exit handler hence the check for "exit_handler_active" below (set by the exit handler when it starts).
 	 * Once the exit handler starts dismantling the engine allocations, our ability to handle signals is compromised
@@ -187,6 +196,7 @@ void	ydb_stm_thread_exit(void)
 	pthread_t	sigThreadId;
 	int		rc;
 
+	assert(simpleThreadAPI_active);
 	/* This assert checks if either we are in TP OR we hold the engine lock. We cannot easily check the engine lock when
 	 * a process is in TP because we don't have the current TP token (contains lock index) so half a check is better than none.
 	 */

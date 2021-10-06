@@ -312,15 +312,19 @@ void gtm_startup(struct startup_vector *svec)
 	lvzwr_init((enum zwr_init_types)0, (mval *)NULL);
 	TREF(in_zwrite) = FALSE;
 	curr_symval->alias_activity = FALSE;
-	/* Initialize several things to do with the YottaDB Simple Thread API (ydb_*_st() functions) */
-	/* This initialization routine does not have a return code so returning a return code back to the caller is not
-	 * currently possible. This could probably be addressed but the process-killing rts_error suffices for now.
-	 */
-	/* Allocate level 0 work queue (primary work queue) */
-	ydb_stm_thread_exit_fnptr = &ydb_stm_thread_exit;
-	ydb_stm_invoke_deferred_signal_handler_fnptr = &ydb_stm_invoke_deferred_signal_handler;
 	xfer_set_handlers_fnptr = &xfer_set_handlers;
 	deferred_signal_set_fnptr = &deferred_signal_set;
+	/* The below 2 function pointers will be set to non-NULL values in case of Simple Thread API in "ydb_stm_thread()" */
+	ydb_stm_thread_exit_fnptr = NULL;
+	ydb_stm_invoke_deferred_signal_handler_fnptr = NULL;
+	/* Initialize pthread mutex structures in anticipation for Simple Thread API (ydb_*_st()) function calls.
+	 * It is possible this process does no such calls (e.g. M or Simple API or YDBPython application).
+	 * In that case, this allocation would go waste but it is a small amount of memory so it is considered okay.
+	 * Note that it is not easy to move this allocation somewhere else only for the Simple Thread API case as the
+	 * mutexes that the very first Simple Thread API call relies on are the ones initialized here.
+	 * Note that this initialization routine does not have a return code so an error return code back to the caller
+	 * is not currently possible. This could probably be addressed but the process-killing rts_error suffices for now.
+	 */
 	for (i = 1; i < STMWORKQUEUEDIM; i++)
 	{
 		status = pthread_mutex_init(&ydb_engine_threadsafe_mutex[i], NULL);
