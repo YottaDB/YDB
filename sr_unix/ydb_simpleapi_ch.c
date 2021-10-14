@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -179,20 +179,7 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 		SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);
 		set_zstatus(&entryref, MAX_ENTRYREF_LEN, arg, NULL, FALSE);
 		errstr = TREF(stapi_errstr);
-		if (NULL != errstr)
-		{	/* We are inside a SimpleThreadAPI call and user wants us to fill error string in addition to returning
-			 * an integer error code. Do that right here after $zstatus has been filled in.
-			 */
-			assert(simpleThreadAPI_active);
-			ydb_zstatus(errstr->buf_addr, errstr->len_alloc);
-			/* The call to ydb_zstatus() won't set the message unless len_alloc is more than one byte.
-			 * Note that the returned buffer (in errstr->buf_addr) is null terminated so we can just set
-			 * the output length equal to the actual length of the error string.
-			 * If errstr->len_used > errstr->len_alloc - 1, then user knows they got a truncated error string
-			 * and need to pass in a bigger buffer to avoid truncation in future SimpleThreadAPI calls.
-			 */
-			errstr->len_used = dollar_zstatus.str.len;
-		}
+		SET_ERRSTR_FROM_ZSTATUS_IF_NOT_NULL(errstr);
 	}
 	/* Ensure gv_target and cs_addrs are in sync. If not, make them so. */
 	if (NULL != gv_target)

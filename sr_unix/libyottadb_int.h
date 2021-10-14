@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -805,6 +805,35 @@ MBSTART {													\
 	RETVAL = ((ERR_TPRETRY == RETVAL) ? YDB_TP_RESTART : -RETVAL);		\
 	assert(dollar_tlevel || (YDB_TP_RESTART != RETVAL));			\
 }
+
+/* Macro to copy $ZSTATUS into an errstr buffer. If an error has occurred and we need the text currently residing in
+ * $ZSTATUS to be copied to our errstr buffer (if errstr is not NULL), copy the text to the errstr buffer. Note there
+ * are certain "status errors" that are internal and don't get returned to the user that just simply have no text
+ * (e.g. TPRETRY, JOBINTRRETHROW, JOBINTRRQST) and others that are return code only (no text). In those cases, this
+ * macro could copy a leftover value (from a previous error) of $ZSTATUS into errstr. But that is considered okay for
+ * now because errstr is not guaranteed to be initialized for those error codes and so the caller is not supposed to
+ * be looking at errstr in those cases anyways. For example, if YDB_TP_RESTART is returned, the caller is supposed to
+ * be forwarding this status code to its caller as is.
+ */
+#define SET_ERRSTR_FROM_ZSTATUS_IF_NOT_NULL(ERRSTR)									\
+MBSTART	{														\
+	GBLREF mval dollar_zstatus;											\
+	assert((ERRSTR) == TREF(stapi_errstr));										\
+	if (NULL != (ERRSTR))												\
+	{	/* We are inside a SimpleThreadAPI call and user wants us to fill error string in addition to returning	\
+		 * an integer error code. Set the text part here after $zstatus has been filled in.			\
+		 */													\
+		assert(simpleThreadAPI_active);										\
+		ydb_zstatus((ERRSTR)->buf_addr, (ERRSTR)->len_alloc);							\
+		/* The call to ydb_zstatus() won't set the message unless len_alloc is more than one byte.		\
+		 * Note that the returned buffer (in errstr->buf_addr) is null terminated so we can just set		\
+		 * the output length equal to the actual length of the error string.					\
+		 * If errstr->len_used > errstr->len_alloc - 1, then user knows they got a truncated error string	\
+		 * and need to pass in a bigger buffer to avoid truncation in future SimpleThreadAPI calls.		\
+		 */													\
+		(ERRSTR)->len_used = dollar_zstatus.str.len;								\
+	}														\
+} MBEND
 
 /* Define routines before get to inline routine definitions */
 int	sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn);
