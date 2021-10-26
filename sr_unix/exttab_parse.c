@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -587,22 +587,33 @@ struct extcall_package_list *exttab_parse(mval *package)
 	}
 	ext_source_line_num = 0;
 	/* Pick-up name of shareable library */
-	tbp = read_table(LIT_AND_LEN(str_buffer), ext_table_file_handle);
-	if (NULL == tbp)
+	do
 	{
-		/* External call table is a null file */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTNULLF, 2, package->str.len, package->str.addr);
-	}
-	SNPRINTF(str_temp_buffer, MAX_TABLINE_LEN, "%s", str_buffer);
-	val.addr = str_temp_buffer;
-	val.len = STRLEN(str_temp_buffer);
-	/* Need to copy the str_buffer into another temp variable since
-	 * trans_log_name requires input and output buffers to be different.
-	 * If there is an env variable present in the pathname, trans_log_name
-	 * expands it and return SS_NORMAL. Else it returns SS_NOLOGNAM.
-	 * Instead of checking 2 return values, better to check against SS_LOG2LONG
-	 * which occurs if the pathname is too long after any kind of expansion.
- 	 */
+		/* We check if val.len is 0 because if the first line is a comment, it will be equal to 0 and we will
+		* need to skip to the next line to find the shareable library's name.
+		*/
+		tbp = read_table(LIT_AND_LEN(str_buffer), ext_table_file_handle);
+		if (NULL == tbp)
+		{
+			/* External call table is a null file */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTNULLF, 2, package->str.len, package->str.addr);
+		}
+		SNPRINTF(str_temp_buffer, MAX_TABLINE_LEN, "%s", str_buffer);
+		tbp = exttab_scan_comment(str_temp_buffer);
+		tbp = exttab_scan_space(tbp);
+		val.addr = str_temp_buffer;
+		val.len = STRLEN(str_temp_buffer);
+		/* Need to copy the str_buffer into another temp variable since
+	 	* trans_log_name requires input and output buffers to be different.
+	 	* If there is an env variable present in the pathname, trans_log_name
+	 	* expands it and return SS_NORMAL. Else it returns SS_NOLOGNAM.
+	 	* Instead of checking 2 return values, better to check against SS_LOG2LONG
+	 	* which occurs if the pathname is too long after any kind of expansion.
+ 	 	*/
+	} while (0 == val.len);
+	/* This is needed to allow white space between the shareable library name and comments on the same line */
+	while (ISSPACE_ASCII(val.addr[val.len - 1]))
+		val.len = (val.len - 1);
 	if (SS_LOG2LONG == trans_log_name(&val, &trans, str_buffer, SIZEOF(str_buffer), dont_sendmsg_on_log2long))
 	{
 		/* Env variable expansion in the pathname caused buffer overflow */
