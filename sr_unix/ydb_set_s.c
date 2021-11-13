@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,6 +78,7 @@ int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 	if (NULL == value)
 	{	/* Treat it as the null string */
 		null_ydb_buff.len_used = 0;
+		null_ydb_buff.len_alloc = 0;
 		null_ydb_buff.buf_addr = NULL;
 		value = &null_ydb_buff;
 	} else
