@@ -234,7 +234,7 @@ typedef UINTPTR_T uintszofptr_t;
 #	define LINUX_ONLY(X) X
 #	define NON_LINUX_ONLY(X)
 #	if !defined(__MUSL)
-#	  /* Verify Alpine/MUSL can't use POSIX timers ##ALPINE_TODO## */
+#	  /* TODO: Verify Alpine/MUSL can't use POSIX timers ##ALPINE_TODO## */
 #	  define YDB_USE_POSIX_TIMERS
 #	endif
 #else

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -116,7 +119,7 @@ MBSTART {															\
 			if (lastJbufCmt->process_id == process_id)								\
 			{	/* CMT06 finished. So undo it as a whole */							\
 				assert(lastJbufCmt->curr_tn == csd->trans_hist.curr_tn);					\
-			/* 	NARSTODO : Invoke same cleanup code as in mutex.c to reset jb->freeaddr back */			\
+				/* TODO : Invoke same cleanup code as in mutex.c to reset jb->freeaddr back */			\
 				SET_JBP_RSRV_FREEADDR(jbp, lastJbufCmt->start_freeaddr);					\
 				SHM_WRITE_MEMORY_BARRIER;/* see corresponding SHM_READ_MEMORY_BARRIER in "jnl_phase2_cleanup" */\
 				jbp->phase2_commit_index2 = index2;	/* remove last commit entry */				\
