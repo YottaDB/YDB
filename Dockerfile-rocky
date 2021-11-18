@@ -81,6 +81,7 @@ RUN yum update -y && \
     yum install -y \
                     file \
                     binutils \
+                    findutils \
                     elfutils-libelf \
                     libicu-devel \
                     wget \
