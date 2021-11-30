@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,7 +66,7 @@ LITREF	UChar32		u32_line_term[];
 GBLREF	int		AUTO_RIGHT_MARGIN, EAT_NEWLINE_GLITCH;
 GBLREF	char		*KEY_BACKSPACE, *KEY_DC;
 GBLREF	char		*KEY_DOWN, *KEY_LEFT, *KEY_RIGHT, *KEY_UP;
-GBLREF	char		*KEY_INSERT;
+GBLREF	char		*KEY_INSERT, *KEY_HOME, *KEY_END;
 GBLREF	char		*KEYPAD_LOCAL, *KEYPAD_XMIT;
 
 #ifdef __MVS__
@@ -90,6 +90,55 @@ error_def(ERR_NOPRINCIO);
 error_def(ERR_ZINTRECURSEIO);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
+
+#define IOTT_MOVE_START_OF_LINE(TT_PTR_FILDES, DX, DX_INSTR, DX_START, IOPTR_WIDTH, MASK, TERM_ERROR_LINE, INSTR)	\
+MBSTART {														\
+	int	num_lines_above;											\
+	int	num_chars_left;												\
+															\
+	num_lines_above = (dx_instr + dx_start) / ioptr_width;								\
+	num_chars_left = dx - dx_start;											\
+	if (!(mask & TRM_NOECHO))											\
+	{														\
+		if (0 != move_cursor(tt_ptr->fildes, num_lines_above, num_chars_left))					\
+		{													\
+			term_error_line = __LINE__;									\
+			goto term_error;										\
+		}													\
+	}														\
+	instr = dx_instr = 0;												\
+	dx = dx_start;													\
+} MBEND
+
+#define IOTT_MOVE_END_OF_LINE(TT_PTR_FILDES, DX, DX_INSTR, DX_START, DX_OUTLEN, IOPTR_WIDTH, MASK, TERM_ERROR_LINE, INSTR, OUTLEN)	\
+MBSTART {																\
+	int	num_lines_above;													\
+	int	num_chars_left;														\
+																	\
+	num_lines_above = (dx_instr + dx_start) / ioptr_width - (dx_outlen + dx_start) / ioptr_width;					\
+																	\
+	/* For some reason, a CURSOR_DOWN ("\n") seems to reposition the cursor								\
+	 * at the beginning of the next line rather than maintain the vertical								\
+	 * position. Therefore if we are moving down, we need to calculate								\
+	 * the num_chars_left differently to accommodate this.										\
+	 */																\
+	if (0 <= num_lines_above)													\
+		num_chars_left = dx - (dx_outlen + dx_start) % ioptr_width;								\
+	else																\
+		num_chars_left = - ((dx_outlen + dx_start) % ioptr_width);								\
+																	\
+	if (!(mask & TRM_NOECHO))													\
+	{																\
+		if (0 != move_cursor(tt_ptr->fildes, num_lines_above, num_chars_left))							\
+		{															\
+			term_error_line = __LINE__;											\
+			goto term_error;												\
+		}															\
+	}																\
+	instr = outlen;															\
+	dx_instr = dx_outlen;														\
+	dx = (dx_outlen + dx_start) % ioptr_width;											\
+} MBEND
 
 #ifdef UTF8_SUPPORTED
 
@@ -161,7 +210,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 	int		instr;			/* insert point in input string */
 	int		outlen;			/* total characters in line so far */
 	int		keypad_len, backspace, delete;
-	int		up, down, right, left, insert_key;
+	int		up, down, right, left, insert_key, home, end;
 	int		recall_index;
 	boolean_t	escape_edit, empterm, no_up_or_down_cursor_yet;
 	io_desc		*io_ptr;
@@ -692,54 +741,12 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 					{
 						case EDIT_SOL:	/* ctrl A  start of line */
 						{
-							int	num_lines_above;
-							int	num_chars_left;
-
-							num_lines_above = (dx_instr + dx_start) /
-										ioptr_width;
-							num_chars_left = dx - dx_start;
-							if (!(mask & TRM_NOECHO))
-							{
-								if (0 != move_cursor(tt_ptr->fildes, num_lines_above,
-										num_chars_left))
-								{
-									term_error_line = __LINE__;
-									goto term_error;
-								}
-							}
-							instr = dx_instr = 0;
-							dx = dx_start;
+							IOTT_MOVE_START_OF_LINE(tt_ptr->fildes, dx, dx_instr, dx_start, ioptr_width, mask, term_error_line, instr);
 							break;
 						}
 						case EDIT_EOL:	/* ctrl E  end of line */
 						{
-							int	num_lines_above;
-							int	num_chars_left;
-
-							num_lines_above =
-								(dx_instr + dx_start) / ioptr_width -
-									(dx_outlen + dx_start) / ioptr_width;
-							/* For some reason, a CURSOR_DOWN ("\n") seems to reposition the cursor
-							 * at the beginning of the next line rather than maintain the vertical
-							 * position. Therefore if we are moving down, we need to calculate
-							 * the num_chars_left differently to accommodate this.
-							 */
-							if (0 <= num_lines_above)
-								num_chars_left = dx - (dx_outlen + dx_start) % ioptr_width;
-							else
-								num_chars_left = - ((dx_outlen + dx_start) % ioptr_width);
-							if (!(mask & TRM_NOECHO))
-							{
-								if (0 != move_cursor(tt_ptr->fildes, num_lines_above,
-										num_chars_left))
-								{
-									term_error_line = __LINE__;
-									goto term_error;
-								}
-							}
-							instr = outlen;
-							dx_instr = dx_outlen;
-							dx = (dx_outlen + dx_start) % ioptr_width;
+							IOTT_MOVE_END_OF_LINE(tt_ptr->fildes, dx, dx_instr, dx_start, dx_outlen, ioptr_width, mask, term_error_line, instr, outlen);
 							break;
 						}
 						case EDIT_LEFT:	/* ctrl B  left one */
@@ -1017,6 +1024,8 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 			delete = (KEY_DC != NULL) ? strncmp((const char *)io_ptr->dollar.zb, KEY_DC, zb_len) : -1;
 			insert_key = (KEY_INSERT != NULL && '\0' != KEY_INSERT[0])
 				?  strncmp((const char *)io_ptr->dollar.zb, KEY_INSERT, zb_len) : -1;
+			home = (NULL != KEY_HOME) ? strncmp((const char *)io_ptr->dollar.zb, KEY_HOME, zb_len) : -1;
+			end = (NULL != KEY_END) ? strncmp((const char *)io_ptr->dollar.zb, KEY_END, zb_len) : -1;
 
 			if (0 == backspace || 0 == delete)
 			{
@@ -1124,35 +1133,44 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 				dx = (unsigned)(dx_instr + dx_start) % ioptr_width;
 				outlen = instr;
 				escape_edit = TRUE;
-			} else if (   !(mask & TRM_NOECHO)
-				 && !(right == 0  &&  instr == outlen)
-				 && !(left == 0   &&  instr == 0))
+			} else if (!(mask & TRM_NOECHO))
 			{
-				if (right == 0)
+				// When the cursor is at the beginning of the line, we can move it 1 position to the right or to the end of the line.
+				// I have grouped these possibilities in pair. This is more understandable and logical. Sergey Kamenev.
+				if (instr != outlen)
 				{
-					dx_next = compute_dx(BUFF_ADDR(0), instr + 1, ioptr_width, dx_start);
-					inchar_width = dx_next - dx_instr;
-					if (0 != move_cursor_right(dx, inchar_width))
+					if (0 == right)
 					{
-						term_error_line = __LINE__;
-						goto term_error;
-					}
-					instr++;
-					dx = (dx + inchar_width) % ioptr_width;
-					dx_instr += inchar_width;
+						dx_next = compute_dx(BUFF_ADDR(0), instr + 1, ioptr_width, dx_start);
+						inchar_width = dx_next - dx_instr;
+						if (0 != move_cursor_right(dx, inchar_width))
+						{
+							term_error_line = __LINE__;
+							goto term_error;
+						}
+						instr++;
+						dx = (dx + inchar_width) % ioptr_width;
+						dx_instr += inchar_width;
+					} else if (0 == end) /* End - end of line */
+						IOTT_MOVE_END_OF_LINE(tt_ptr->fildes, dx, dx_instr, dx_start, dx_outlen, ioptr_width, mask, term_error_line, instr, outlen);
 				}
-				if (left == 0)
+				// When the cursor is at the end of the line, we can move it 1 position to the left or to the beginning of the line.
+				if (0 != instr)
 				{
-					dx_prev = compute_dx(BUFF_ADDR(0), instr - 1, ioptr_width, dx_start);
-					inchar_width = dx_instr - dx_prev;
-					if (0 != move_cursor_left(dx, inchar_width))
+					if (0 == left)
 					{
-						term_error_line = __LINE__;
-						goto term_error;
-					}
-					instr--;
-					dx = (dx - inchar_width + ioptr_width) % ioptr_width;
-					dx_instr -= inchar_width;
+						dx_prev = compute_dx(BUFF_ADDR(0), instr - 1, ioptr_width, dx_start);
+						inchar_width = dx_instr - dx_prev;
+						if (0 != move_cursor_left(dx, inchar_width))
+						{
+							term_error_line = __LINE__;
+							goto term_error;
+						}
+						instr--;
+						dx = (dx - inchar_width + ioptr_width) % ioptr_width;
+						dx_instr -= inchar_width;
+					} else if (0 == home) /* Home - start of line */
+					    IOTT_MOVE_START_OF_LINE(tt_ptr->fildes, dx, dx_instr, dx_start, ioptr_width, mask, term_error_line, instr);
 				}
 			}
 			if (0 == insert_key)

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,8 @@
 #undef	KEY_LEFT
 #undef	KEY_BACKSPACE
 #undef	KEY_DC
+#undef	KEY_HOME
+#undef	KEY_END
 
 #define	MAXCOLS	132
 #define	BEL	'\007'
@@ -53,6 +55,8 @@ GBLDEF	char	*KEY_LEFT;		/* left arrow key */
 GBLDEF	char	*KEY_RIGHT;		/* right arrow key */
 GBLDEF	char	*KEY_UP;		/* up arrow key */
 GBLDEF	char	*KEY_INSERT;		/* insert key aka KEY_IC */
+GBLDEF	char	*KEY_HOME;		/* Home key */
+GBLDEF	char	*KEY_END;		/* End key */
 GBLDEF	char	*KEYPAD_LOCAL;		/* turn keypad off */
 GBLDEF	char	*KEYPAD_XMIT;		/* turn keypad on */
 GBLDEF  int	GTM_LINES;		/* number of rows */
@@ -77,6 +81,9 @@ static	char	gtm_key_left[] = "\033OD";
 static	char	gtm_key_right[] = "\033OC";
 static	char	gtm_key_up[] = "\033OA";
 static	char	gtm_key_insert[] = "";
+// default HOME/END codes for VT100+ terminals
+static	char	gtm_key_home[] = "\033OH";
+static	char	gtm_key_end[] = "\033OF";
 static	char	gtm_keypad_local[] = "\033[?1l";
 static	char	gtm_keypad_xmit[] = "\033[?1h";
 static	int	gtm_lines = 24;
@@ -159,6 +166,8 @@ int	getcaps(int fildes)
 		KEY_RIGHT = tigetstr("kcuf1");
 		KEY_UP = tigetstr("kcuu1");
 		KEY_INSERT = tigetstr("kich1");
+		KEY_HOME = tigetstr("khome");
+		KEY_END = tigetstr("kend");
 		KEYPAD_LOCAL = tigetstr("rmkx");
 		KEYPAD_XMIT = tigetstr("smkx");
 		GTM_LINES = tigetnum("lines");
@@ -199,6 +208,10 @@ int	getcaps(int fildes)
 		CAP2ASCII(KEY_UP);
 		assert((char *)-1 != KEY_INSERT);
 		CAP2ASCII(KEY_INSERT);
+		assert((char *)-1 != KEY_HOME);
+		CAP2ASCII(KEY_HOME);
+		assert((char *)-1 != KEY_END);
+		CAP2ASCII(KEY_END);
 		assert((char *)-1 != KEYPAD_LOCAL);
 		CAP2ASCII(KEYPAD_LOCAL);
 		assert((char *)-1 != KEYPAD_XMIT);
@@ -224,6 +237,8 @@ int	getcaps(int fildes)
 		KEY_RIGHT = gtm_key_right;
 		KEY_UP = gtm_key_up;
 		KEY_INSERT = gtm_key_insert;
+		KEY_HOME = gtm_key_home;
+		KEY_END = gtm_key_end;
 		KEYPAD_LOCAL = gtm_keypad_local;
 		KEYPAD_XMIT = gtm_keypad_xmit;
 		GTM_LINES = gtm_lines;

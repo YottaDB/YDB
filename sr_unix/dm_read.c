@@ -49,6 +49,7 @@ GBLREF bool		prin_in_dev_failure;
 GBLREF boolean_t	dollar_zininterrupt, gtm_utf8_mode;
 GBLREF char		*CLR_EOL, *CURSOR_DOWN, *CURSOR_LEFT, *CURSOR_RIGHT, *CURSOR_UP;
 GBLREF char		*KEY_BACKSPACE, *KEY_DC, *KEY_DOWN, *KEY_INSERT, *KEY_LEFT, *KEY_RIGHT, *KEY_UP;
+GBLREF char		*KEY_HOME, *KEY_END;
 GBLREF char		*KEYPAD_LOCAL, *KEYPAD_XMIT;
 GBLREF int		AUTO_RIGHT_MARGIN, EAT_NEWLINE_GLITCH;
 GBLDEF int		comline_index, recall_num;
@@ -120,15 +121,25 @@ if (0 < (TREF(gtmprompt)).len)													\
 } else																\
 	dx = dx_start = 0;
 
-#define	MOVE_CURSOR_LEFT_ONE_CHAR(dx, instr, dx_instr, dx_start, ioptr_width)		\
-{											\
-	dx_prev = compute_dx(BUFF_ADDR(0), instr - 1, ioptr_width, dx_start);		\
-	delchar_width = dx_instr - dx_prev;						\
-	move_cursor_left(dx, delchar_width);						\
-	dx = (dx - delchar_width + ioptr_width) % ioptr_width;				\
-	instr--;									\
-	dx_instr -= delchar_width;							\
-}
+#define	MOVE_CURSOR_LEFT_ONE_CHAR(DELCHAR_WIDTH, DX, DX_PREV, DX_INSTR, DX_START, INSTR, IOPTR_WIDTH)	\
+MBSTART {												\
+	DX_PREV = compute_dx(BUFF_ADDR(0), INSTR - 1, IOPTR_WIDTH, DX_START);				\
+	DELCHAR_WIDTH = DX_INSTR - DX_PREV;								\
+	move_cursor_left(DX, DELCHAR_WIDTH);								\
+	DX = (DX - DELCHAR_WIDTH + IOPTR_WIDTH) % IOPTR_WIDTH;						\
+	INSTR--;											\
+	DX_INSTR -= DELCHAR_WIDTH;									\
+} MBEND
+
+#define	MOVE_CURSOR_RIGHT_ONE_CHAR(INCHAR_WIDTH, DX, DX_INSTR, DX_START, DX_NEXT, INSTR, IOPTR_WIDTH)	\
+MBSTART {												\
+	DX_NEXT = compute_dx(BUFF_ADDR(0), INSTR + 1, IOPTR_WIDTH, DX_START);				\
+	INCHAR_WIDTH = DX_NEXT - DX_INSTR;								\
+	move_cursor_right(DX, INCHAR_WIDTH);								\
+	INSTR++;											\
+	DX = (DX + INCHAR_WIDTH) % IOPTR_WIDTH;								\
+	DX_INSTR += INCHAR_WIDTH;									\
+} MBEND
 
 #define	DEL_ONE_CHAR_AT_CURSOR(outlen, dx_outlen, dx, dx_instr, dx_start, ioptr_width)			\
 {													\
@@ -147,6 +158,37 @@ if (0 < (TREF(gtmprompt)).len)													\
 		dx_outlen = compute_dx(BUFF_ADDR(0), outlen, ioptr_width, dx_start);			\
 	}												\
 }
+
+#define	MOVE_CURSOR_TO_START_OF_LINE(TT_PTR_FILDES, DX, DX_INSTR, DX_START, INSTR, IOPTR_WIDTH)	\
+MBSTART {											\
+	int num_lines_above, num_chars_left;							\
+												\
+	num_lines_above = (DX_INSTR + DX_START) / IOPTR_WIDTH;					\
+	num_chars_left = DX - DX_START;								\
+	move_cursor(TT_PTR_FILDES, num_lines_above, num_chars_left);				\
+	INSTR = DX_INSTR = 0;									\
+	DX = DX_START;										\
+} MBEND
+
+#define	MOVE_CURSOR_TO_END_OF_LINE(TT_PTR_FILDES, DX, DX_INSTR, DX_START, DX_OUTLEN, INSTR, IOPTR_WIDTH, OUTLEN)\
+MBSTART {													\
+	int num_lines_above, num_chars_left;									\
+														\
+	num_lines_above = (DX_INSTR + DX_START) / IOPTR_WIDTH - (DX_OUTLEN + DX_START) / IOPTR_WIDTH;		\
+	/* For some reason, a CURSOR_DOWN ("\n") seems to reposition the cursor					\
+	 * at the beginning of the next line rather than maintain the vertical					\
+	 * position. Therefore if we are moving down, we need to calculate					\
+	 * the num_chars_left differently to accommodate this.							\
+	 */													\
+	if (0 <= num_lines_above)										\
+		num_chars_left = DX - (DX_OUTLEN + DX_START) % IOPTR_WIDTH;					\
+	else													\
+		num_chars_left = - ((DX_OUTLEN + DX_START) % IOPTR_WIDTH);					\
+	move_cursor(TT_PTR_FILDES, num_lines_above, num_chars_left);						\
+	INSTR = OUTLEN;												\
+	DX_INSTR = DX_OUTLEN;											\
+	DX = (DX_OUTLEN + DX_START) % IOPTR_WIDTH;								\
+} MBEND
 
 void	dm_read (mval *v)
 {
@@ -171,7 +213,7 @@ void	dm_read (mval *v)
 	int		instr;			/* insert point in input string */
 	int		ioptr_width;		/* display width of the IO device */
 	int		outlen;			/* total characters in line so far */
-	int		match_length, msk_in, msk_num, num_chars_left, num_lines_above, right, selstat, status, up;
+	int		match_length, msk_in, msk_num, right, selstat, status, up, home, end;
 	int		utf8_more, utf8_seen;
 	io_desc 	*io_ptr;
 	io_termmask	mask_term;
@@ -674,7 +716,7 @@ void	dm_read (mval *v)
 			{
 				if (0 < instr)
 				{
-					MOVE_CURSOR_LEFT_ONE_CHAR(dx, instr, dx_instr, dx_start, ioptr_width);
+					MOVE_CURSOR_LEFT_ONE_CHAR(delchar_width, dx, dx_prev, dx_instr, dx_start, instr, ioptr_width);
 					DEL_ONE_CHAR_AT_CURSOR(outlen, dx_outlen, dx, dx_instr, dx_start, ioptr_width);
 				}
 			} else if (NATIVE_ESC == inchar)
@@ -703,56 +745,24 @@ void	dm_read (mval *v)
 				{
 					case EDIT_SOL:
 					{	/* ctrl A - start of line */
-						num_lines_above = (dx_instr + dx_start) / ioptr_width;
-						num_chars_left = dx - dx_start;
-						move_cursor(tt_ptr->fildes, num_lines_above, num_chars_left);
-						instr = dx_instr = 0;
-						dx = dx_start;
+						MOVE_CURSOR_TO_START_OF_LINE(tt_ptr->fildes, dx, dx_instr, dx_start, instr, ioptr_width);
 						break;
 					}
 					case EDIT_EOL:
-					{	/* ctrl E- end of line */
-						num_lines_above = (dx_instr + dx_start) / ioptr_width -
-									(dx_outlen + dx_start) / ioptr_width;
-						/* For some reason, a CURSOR_DOWN ("\n") seems to reposition the cursor
-						 * at the beginning of the next line rather than maintain the vertical
-						 * position. Therefore if we are moving down, we need to calculate
-						 * the num_chars_left differently to accommodate this.
-						 */
-						if (0 <= num_lines_above)
-							num_chars_left = dx - (dx_outlen + dx_start) % ioptr_width;
-						else
-							num_chars_left = - ((dx_outlen + dx_start) % ioptr_width);
-						move_cursor(tt_ptr->fildes, num_lines_above, num_chars_left);
-						instr = outlen;
-						dx_instr = dx_outlen;
-						dx = (dx_outlen + dx_start) % ioptr_width;
+					{	/* ctrl E - end of line */
+						MOVE_CURSOR_TO_END_OF_LINE(tt_ptr->fildes, dx, dx_instr, dx_start, dx_outlen, instr, ioptr_width, outlen);
 						break;
 					}
 					case EDIT_LEFT:
 					{	/* ctrl B - left one */
 						if (0 != instr)
-						{
-							dx_prev = compute_dx(BUFF_ADDR(0), instr - 1, ioptr_width, dx_start);
-							inchar_width = dx_instr - dx_prev;
-							move_cursor_left(dx, inchar_width);
-							instr--;
-							dx = (dx - inchar_width + ioptr_width) % ioptr_width;
-							dx_instr -= inchar_width;
-						}
+							MOVE_CURSOR_LEFT_ONE_CHAR(inchar_width, dx, dx_prev, dx_instr, dx_start, instr, ioptr_width);
 						break;
 					}
 					case EDIT_RIGHT:
 					{	/* ctrl F - right one */
 						if (instr != outlen)
-						{
-							dx_next = compute_dx(BUFF_ADDR(0), instr + 1, ioptr_width, dx_start);
-							inchar_width = dx_next - dx_instr;
-							move_cursor_right(dx, inchar_width);
-							instr++;
-							dx = (dx + inchar_width) % ioptr_width;
-							dx_instr += inchar_width;
-						}
+							MOVE_CURSOR_RIGHT_ONE_CHAR(inchar_width, dx, dx_instr, dx_start, dx_next, instr, ioptr_width);
 						break;
 					}
 					case EDIT_DEOL:
@@ -765,6 +775,8 @@ void	dm_read (mval *v)
 					}
 					case EDIT_ERASE:
 					{	/* ctrl U - delete whole line */
+						int num_lines_above, num_chars_left;
+
 						num_lines_above = (dx_instr + dx_start) / ioptr_width;
 						num_chars_left = dx - dx_start;
 						move_cursor(tt_ptr->fildes, num_lines_above, num_chars_left);
@@ -843,6 +855,8 @@ void	dm_read (mval *v)
 			delete = (NULL != KEY_DC) ? strncmp((const char *)escape_sequence, KEY_DC, escape_length) : -1;
 			insert_key = ((NULL != KEY_INSERT) && ('\0' != KEY_INSERT[0]))
 				? strncmp((const char *)escape_sequence, KEY_INSERT, escape_length) : -1;
+			home = (NULL != KEY_HOME) ? strncmp((const char *)escape_sequence, KEY_HOME, escape_length) : -1;
+			end = (NULL != KEY_END) ? strncmp((const char *)escape_sequence, KEY_END, escape_length) : -1;
 			memset(escape_sequence, '\0', escape_length);
 			escape_length = 0;
 			if (BADESC == io_ptr->esc_state)
@@ -853,7 +867,7 @@ void	dm_read (mval *v)
 			if ((0 == delete) || (0 == backspace))
 			{
 				if ((0 == backspace) && (0 < instr))
-					MOVE_CURSOR_LEFT_ONE_CHAR(dx, instr, dx_instr, dx_start, ioptr_width)
+					MOVE_CURSOR_LEFT_ONE_CHAR(delchar_width, dx, dx_prev, dx_instr, dx_start, instr, ioptr_width);
 				DEL_ONE_CHAR_AT_CURSOR(outlen, dx_outlen, dx, dx_instr, dx_start, ioptr_width);
 			}
 			if (0 == insert_key)
@@ -910,25 +924,21 @@ void	dm_read (mval *v)
 					if (0 != instr)
 						write_str(BUFF_ADDR(0), instr, dx_start, TRUE, FALSE);
 				}
-			} else if (!(mask & TRM_NOECHO) && !((0 == right) && (instr == outlen)) && !((0 == left) && (0 == instr)))
+			} else if (!(mask & TRM_NOECHO))
 			{
-				if (0 == right)
+				if (instr != outlen)
 				{
-					dx_next = compute_dx(BUFF_ADDR(0), instr + 1, ioptr_width, dx_start);
-					inchar_width = dx_next - dx_instr;
-					move_cursor_right(dx, inchar_width);
-					instr++;
-					dx = (dx + inchar_width) % ioptr_width;
-					dx_instr += inchar_width;
+					if (0 == right)
+						MOVE_CURSOR_RIGHT_ONE_CHAR(inchar_width, dx, dx_instr, dx_start, dx_next, instr, ioptr_width);
+					else if (0 == end) /* End - end of line */
+						MOVE_CURSOR_TO_END_OF_LINE(tt_ptr->fildes, dx, dx_instr, dx_start, dx_outlen, instr, ioptr_width, outlen);
 				}
-				if (0 == left)
+				if (0 != instr)
 				{
-					dx_prev = compute_dx(BUFF_ADDR(0), instr - 1, ioptr_width, dx_start);
-					inchar_width = dx_instr - dx_prev;
-					move_cursor_left(dx, inchar_width);
-					instr--;
-					dx = (dx - inchar_width + ioptr_width) % ioptr_width;
-					dx_instr -= inchar_width;
+					if (0 == left)
+						MOVE_CURSOR_LEFT_ONE_CHAR(inchar_width, dx, dx_prev, dx_instr, dx_start, instr, ioptr_width);
+					else if (0 == home) /* Home - start of line */
+						MOVE_CURSOR_TO_START_OF_LINE(tt_ptr->fildes, dx, dx_instr, dx_start, instr, ioptr_width);
 				}
 			}
 			io_ptr->esc_state = START;
