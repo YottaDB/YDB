@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -664,6 +664,7 @@ void	dm_read (mval *v)
 					DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));	/* BYPASSOK */
 					WRITE_GTM_PROMPT;
 					instr = dx_instr = outlen = dx_outlen = 0;
+					err_recall = NO_ERROR;
 				}
 				continue;	/* to allow more input */
 			}
