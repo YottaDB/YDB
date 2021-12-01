@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -51,7 +54,7 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 		first_item = 1;
 		if (zcmd_line)
 		{	/* $ZCMDLINE returns the processed command line. Remove "-direct" and/or "-run <runarg>" from cmd line */
-			if (!memcmp(cmd_arg[1], "-", STRLEN(cmd_arg[1])))
+			if (!STRCMP(cmd_arg[1], "-"))
 			{
 				first_item += 2;
 				cp = (unsigned char *)cmd_arg[2];
