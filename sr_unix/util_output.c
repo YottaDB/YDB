@@ -48,6 +48,7 @@
 #include "have_crit.h"
 #include "gtm_multi_proc.h"
 #include "get_syslog_flags.h"
+#include "get_comm_info.h"
 
 #ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
@@ -73,7 +74,6 @@ GBLREF	uint4			is_updhelper;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	uint4			process_id;
 GBLREF	VSIG_ATOMIC_T		forced_exit;
-GBLREF	char			*process_name;
 
 error_def(ERR_REPLINSTACC);
 error_def(ERR_TEXT);

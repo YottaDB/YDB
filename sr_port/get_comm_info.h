@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,4 +12,9 @@
 #ifndef GET_COMM_INFO_INCLUDED
 #define GET_COMM_INFO_INCLUDED
 void get_comm_info(void);
+
+#define PROCESS_NAME_LENGTH 32 		/* estimate of max length of text in comm file */
+
+GBLREF char process_name[PROCESS_NAME_LENGTH];
+
 #endif

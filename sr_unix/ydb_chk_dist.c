@@ -53,10 +53,10 @@
 #include "gtmimagename.h"
 #include "have_crit.h"
 #include "gtm_post_startup_check_init.h"
+#include "get_comm_info.h"
 
 GBLREF	char		ydb_dist[YDB_PATH_MAX];
 GBLREF	boolean_t	ydb_dist_ok_to_use;
-GBLREF	char		*process_name;
 
 LITREF	gtmImageName	gtmImageNames[];
 
