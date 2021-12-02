@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -345,9 +345,23 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			 * The case (0 == n1) is not expected a lot (relatively) since the application may be able to optimize
 			 *	a number of reads of the same key into one read by using a local-variable to store the value.
 			 */
-			if (0 < (n1 = memcmp(pKey->base, pTarg->clue.base, nKeyLen)))
+			/* Need to compare clue against incoming key. We already have the key length ("nKeyLen").
+			 * But need the length of "pTarg->clue", "pTarg->first_rec" and "pTarg->last_rec" keys.
+			 * While the first can be obtained from "pTarg->clue.end", the other two cannot be obtained in PRO
+			 * from "pTarg->first_rec->end" and "pTarg->last_rec->end" as they are maintained only in DBG.
+			 * Since all that we care about is not exceeding the allocated length, we have that readily available
+			 * from "pTarg->clue.top" (and assert this is same as "pTarg->first_rec->top" and "pTarg->last_rec->top").
+			 * So use that for the "MIN" computation.
+			 */
+			unsigned short keyCmpLen;
+
+			assert(pTarg->first_rec->top == pTarg->clue.top);
+			assert(pTarg->last_rec->top == pTarg->clue.top);
+			keyCmpLen = pTarg->clue.top;
+			keyCmpLen = MIN(nKeyLen, keyCmpLen);
+			if (0 < (n1 = memcmp(pKey->base, pTarg->clue.base, keyCmpLen)))
 			{
-				if (memcmp(pKey->base, pTarg->last_rec->base, nKeyLen) <= 0)
+				if (memcmp(pKey->base, pTarg->last_rec->base, keyCmpLen) <= 0)
 				{
 					SET_GVCST_SEARCH_CLUE(1);
 					status = gvcst_search_tail(pKey, pTargHist->h, &pTarg->clue);
@@ -375,7 +389,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 				}
 			} else if (0 > n1)
 			{
-				if (memcmp(pKey->base, pTarg->first_rec->base, nKeyLen) >= 0)
+				if (memcmp(pKey->base, pTarg->first_rec->base, keyCmpLen) >= 0)
 				{
 					SET_GVCST_SEARCH_CLUE(3);
 					status = gvcst_search_blk(pKey, pTargHist->h);
