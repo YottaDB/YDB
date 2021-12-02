@@ -183,6 +183,7 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 		{
 			memcpy(object_file_name, routine_name.addr, clen);
 			SET_OBJ(object_file_name, clen);
+			object_name_len = clen;
 		}
 	}
 	assert(!last || *srclen);
