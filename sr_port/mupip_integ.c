@@ -561,7 +561,6 @@ void mupip_integ(void)
 							&dummy, 0, 0);
 					sndata->sn_blk_cnt += sndata->span_blk_cnt;
 					mu_int_plen = 0;
-					mu_int_plen = 0;
 					sndata->sn_type = SN_NOT;
 				}
 				if (full)
@@ -737,8 +736,9 @@ void mupip_integ(void)
 		}
 		if (largest_tn)
 		{
+			mu_int_plen = 1;
 			mu_int_err(ERR_DBTNLTCTN, 0, 0, 0, 0, 0, 0, 0);
-			mu_int_plen--;
+			assert(0 == mu_int_plen);
 			mu_int_errknt--;
 			if (trans_errors > disp_trans_errors)
 			{

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -91,6 +94,7 @@ void	mu_int_err(
 	if (!mu_int_errknt)
 		util_out_print("!/Block:Offset Level", TRUE);
 	mu_int_errknt++;
+	assert(0 < mu_int_plen);
 	mu_int_plen--;
 	util_len=0;
 	if (NULL != (ec = err_check(err)))
