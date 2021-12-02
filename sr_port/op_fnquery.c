@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,7 +82,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	mval			xform_args[MAX_LVSUBSCRIPTS];	/* for lclcol */
 	mstr			format_out, *retsub;
 	lv_val			*v;
-	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS], *parent, *node, *nullsubsnode, *nullsubsparent;
+	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS + 1], *parent, *node, *nullsubsnode, *nullsubsparent;
 	lvTree			*lvt;
 	int			i, j, nexti;
 	boolean_t		found, is_num, last_sub_null, nullsubs_implies_firstsub, is_str, push_v1, is_simpleapi_mode;
