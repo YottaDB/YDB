@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -111,16 +111,17 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 	}
 	object_file_des = FD_INVALID;
 	fstr.mvtype = MV_STR;
-	if (!MEMCMP_LIT(&faddr[flen - SIZEOF(DOTM) + 1], DOTM) || (MAX_FN_LEN < (flen + SIZEOF(DOTM) - 1)))
-	{
-		fstr.str.addr = faddr;
-		fstr.str.len = flen - (!TREF(trigger_compile_and_link) ? 0 : (SIZEOF(DOTM) - 1));
-	} else
+	if ((STR_LIT_LEN(DOTM) > flen)
+		|| (MEMCMP_LIT(&faddr[flen - STR_LIT_LEN(DOTM)], DOTM) && (MAX_FN_LEN >= (flen + STR_LIT_LEN(DOTM)))))
 	{
 		memcpy(source_file_string, faddr, flen);
 		MEMCPY_LIT(&source_file_string[flen], DOTM);
 		fstr.str.addr = (char *)source_file_string;
 		fstr.str.len = flen + SIZEOF(DOTM) - 1;
+	} else
+	{
+		fstr.str.addr = faddr;
+		fstr.str.len = flen - (!TREF(trigger_compile_and_link) ? 0 : (SIZEOF(DOTM) - 1));
 	}
 	ESTABLISH(source_ch);
 	tt_so_do_once = FALSE;
