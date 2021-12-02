@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -601,9 +601,16 @@ boolean_t mu_int_blk(
 							comp_length, top_key, top_len, (unsigned int)blk_levl);
 						mu_int_plen++;	/* continuing, so compensate for mu_int_err decrement */
 						break;
-					}
+					} else if (MAX_GVSUBSCRIPTS >= s_index)
+						mu_sub_list[s_index].index = 0;
+					/* else: s__index == (MAX_GVSUBSCRIPTS + 1). In this case, "mu_sub_list[s_index]"
+					 * is an out-of-bounds access. But we have a check of "start_index != s_index"
+					 * below before the "mu_sub_list[start_index]" access. Similarly we have a check of
+					 * "sub_start_index != s_index" below before the "mu_sub_list[sub_start_index]" access.
+					 * Therefore, there is no need to do the "mu_sub_list[s_index].index = 0" initialization
+					 * in that case.
+					 */
 					nct_checked = FALSE;
-					mu_sub_list[s_index].index = 0;
 					for (;  (start_index != s_index) && (0 != mu_sub_list[start_index].index);  start_index++)
 					{
 						if (mu_sub_list[start_index].numeric)
