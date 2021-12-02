@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,7 +87,8 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 	assert(MAX_DEVCTL_LENGTH > mn->len);
 	lower_to_upper((uchar_ptr_t)action, (uchar_ptr_t)mn->addr, mn->len);
 	length = mn->len;
-	if (0 == memcmp(action, "LISTEN", length))
+	action[length] = '\0';	/* needed for "STRCMP" below */
+	if (0 == STRCMP(action, "LISTEN"))
 	{
 		if (1 > argcnt)
 			depth = DEFAULT_LISTEN_DEPTH;
@@ -102,7 +103,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 			depth = MV_FORCE_INTD(arg);
 		}
 		iosocket_listen(io_curr_device.in, depth);
-	} else if (0 == memcmp(action, "WAIT", length))
+	} else if (0 == STRCMP(action, "WAIT"))
 	{
 		arg = (0 < argcnt) ? va_arg(args, mval *) : (mval *)&literal_notimeout;
 		if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
@@ -113,7 +114,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 			return;
 		}
 		iosocket_wait(io_curr_device.in, nsec_timeout);
-	} else if (0 == memcmp(action, "PASS", length))
+	} else if (0 == STRCMP(action, "PASS"))
 	{
 		n = argcnt;
 		if (1 <= argcnt)
@@ -136,7 +137,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 			arg = (mval *)&literal_notimeout;
 		MV_FORCE_NSTIMEOUT(arg, nsec_timeout, "/PASS");
 		iosocket_pass_local(io_curr_device.out, pid, nsec_timeout, n, args);
-	} else if (0 == memcmp(action, "ACCEPT", length))
+	} else if (0 == STRCMP(action, "ACCEPT"))
 	{
 		n = argcnt;
 		if (1 <= argcnt)
@@ -167,7 +168,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 		MV_FORCE_NSTIMEOUT(arg, nsec_timeout, "/ACCEPT");
 		iosocket_accept_local(io_curr_device.in, handlesvar, pid, nsec_timeout, n, args);
 #ifdef	GTM_TLS
-	} else if (0 == memcmp(action, "TLS", length))
+	} else if (0 == STRCMP(action, "TLS"))
 	{	/*	WRITE /TLS(option[,[nsec_timeout][,tlsid[,password]]]) */
 		if (1 <= argcnt)
 		{
