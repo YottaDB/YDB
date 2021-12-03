@@ -112,7 +112,7 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 		{	/* Move any non-".m" extension over to be part of the file name */
 			pblk.b_name += pblk.b_ext;
 			pblk.b_ext = 0;
-			if (MAX_FN_LEN >= (*srclen + SIZEOF(DOTM)))
+			if ((pblk.buffer + MAX_FN_LEN) >= (pblk.l_name + pblk.b_name + SIZEOF(DOTM)))
 			{
 				memcpy(&pblk.l_name[pblk.b_name], DOTM, SIZEOF(DOTM));
 				pblk.b_ext = (SIZEOF(DOTM) - 1);
