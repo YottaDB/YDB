@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2015 Fidelity National Information		#
+# Copyright (c) 2001-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -37,36 +37,39 @@ source $gtm_tools/gtm_env.csh
 alias	gt_cc_local	"comlist_gt_cc"
 
 set cfilelist=($*)
-set cmdfile="$gtm_log/gt_cc_$$__batch.csh"
+set cmdfile="$gtm_log/gt_cc_$$_batch.csh"
 set background="&"
 if ($HOST:r:r:r =~ {snail,turtle}) set background=""
 
 echo 'alias	gt_cc_local	"$comlist_gt_cc"' >> $cmdfile
 
 foreach cfile ($cfilelist)
-	set outfile="$gtm_log/gt_cc_$$_${cfile:t:r}.out"
+	set outfile="$gtm_log/gt_cc_local_$$_${cfile:t:r}.out"
 	set redir=">& $outfile"
-	echo "(echo $cfile ; eval 'gt_cc_local $cfile') $redir $background" >> $cmdfile
+	set errmsg = "COMLIST-E-COMPILE : compiling $cfile failed"
+	echo "(echo $cfile ; eval 'gt_cc_local $cfile' || echo '$errmsg') $redir $background" >> $cmdfile
 end
 
 echo "wait" >> $cmdfile
 
-set cmdout="$gtm_log/gt_cc_$$__batch.out"
+set cmdout="$gtm_log/gt_cc_$$_batch.out"
 source $cmdfile >& $cmdout
 
-set stat=$status
-
+set compilestat = 0
 foreach cfile ($cfilelist)
-	set outfile="$gtm_log/gt_cc_$$_${cfile:t:r}.out"
+	set outfile="$gtm_log/gt_cc_local_$$_${cfile:t:r}.out"
 	/bin/cat $outfile
-	/bin/rm $outfile
+	grep -qE 'COMLIST-E-.' $outfile
+	if (0 == $status) then
+		set compilestat = 1
+	else
+		/bin/rm $outfile
+	endif
 end
 
-if ($stat) then
-	/bin/cat $cmdout
+if ($compilestat) then
+	exit 1
 else
 	/bin/rm $cmdfile
 	/bin/rm $cmdout
 endif
-
-exit 0

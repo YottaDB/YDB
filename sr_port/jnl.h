@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
@@ -26,6 +26,7 @@
 #endif
 #include "gtmcrypt.h"
 #include "sleep.h"
+#include "is_gdid.h"
 
 error_def(ERR_JNLBADLABEL);
 error_def(ERR_JNLENDIANBIG);

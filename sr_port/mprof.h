@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -27,12 +28,10 @@
 					 * are dealing with 32-bit compiles on 64-bit machines */
 #define PROFCALLOC_DSBLKSIZE	8192	/* the size of pcalloc allocation chunks */
 
-#define POPULATE_PROFILING_TABLE() {				\
-	/* xfer_table[xf_linefetch] = op_mproflinefetch; */	\
-	/* xfer_table[xf_linefetch] = NON_IA64_ONLY((op_mproflinefetch) IA64_ONLY(CODE_ADDRESS_ASM(op_mproflinestart));*/	\
+#define POPULATE_PROFILING_TABLE()				\
+MBSTART {							\
 	FIX_XFER_ENTRY(xf_linefetch, op_mproflinefetch);	\
-	/* xfer_table[xf_linestart] = NON_IA64_ONLY(op_mproflinestart) IA64_ONLY(CODE_ADDRESS_ASM(op_mproflinestart)); */	\
-	FIX_XFER_ENTRY(xf_linestart, op_mproflinestart)		\
+	FIX_XFER_ENTRY(xf_linestart, op_mproflinestart);	\
 	FIX_XFER_ENTRY(xf_extexfun, op_mprofextexfun);		\
 	FIX_XFER_ENTRY(xf_extcall, op_mprofextcall);		\
 	FIX_XFER_ENTRY(xf_exfun, op_mprofexfun);		\
@@ -46,9 +45,10 @@
 	FIX_XFER_ENTRY(xf_forlcldow, op_mprofforlcldow);	\
 	FIX_XFER_ENTRY(xf_forlcldol, op_mprofforlcldol);	\
 	FIX_XFER_ENTRY(xf_forchk1, op_mprofforchk1);		\
-}
+} MBEND
 
-#define CLEAR_PROFILING_TABLE() {			\
+#define CLEAR_PROFILING_TABLE()				\
+MBSTART {						\
 	FIX_XFER_ENTRY(xf_linefetch, op_linefetch);	\
 	FIX_XFER_ENTRY(xf_linestart, op_linestart);	\
 	FIX_XFER_ENTRY(xf_extexfun, op_extexfun);	\
@@ -57,7 +57,6 @@
 	FIX_XFER_ENTRY(xf_callb, op_callb);		\
 	FIX_XFER_ENTRY(xf_callw, op_callw);		\
 	FIX_XFER_ENTRY(xf_calll, op_calll);		\
-	/* xfer_table[xf_exfun]     = op_exfun; */	\
 	FIX_XFER_ENTRY(xf_callspb, op_callspb);		\
 	FIX_XFER_ENTRY(xf_callspw, op_callspw);		\
 	FIX_XFER_ENTRY(xf_callspl, op_callspl);		\
@@ -65,7 +64,7 @@
 	FIX_XFER_ENTRY(xf_forlcldow, op_forlcldow);	\
 	FIX_XFER_ENTRY(xf_forlcldol, op_forlcldol);	\
 	FIX_XFER_ENTRY(xf_forchk1, op_forchk1);		\
-}
+} MBEND
 
 typedef struct ext_tms_struct
 {

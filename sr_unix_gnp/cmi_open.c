@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -26,15 +26,13 @@
 #include "cmidef.h"
 #include "gtmio.h"
 #include "eintr_wrappers.h"
-#include "outofband.h"
+#include "deferred_events_queue.h"
 
 #include "relqop.h"
 
 GBLREF struct NTD *ntd_root;
 
 GBLREF	volatile int4	outofband;
-
-error_def(CMI_NETFAIL);
 
 cmi_status_t cmi_open(struct CLB *lnk)
 {

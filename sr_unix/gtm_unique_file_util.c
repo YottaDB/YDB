@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2009-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 52a92dfd (GT.M V7.0-001)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +21,7 @@
 #include "gtmxc_types.h"
 #include "gdsroot.h"
 #include "is_file_identical.h"
+#include "is_gdid.h"
 #include "iosp.h"		/* for SS_NORMAL */
 
 /* Checks whether the two fileids passed are identical  */

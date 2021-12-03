@@ -136,6 +136,7 @@ static	CLI_PARM mup_dumpfhead_parm[] = {
 
 static CLI_ENTRY mup_dumpfhead_qual[] = {		/* DUMP -FHEAD */
 { "FILE",   mupip_dump_fhead, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
+{ "FLUSH",  mupip_dump_fhead, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "REGION", mupip_dump_fhead, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "" }
 };
@@ -236,6 +237,8 @@ static	CLI_ENTRY	mup_backup_qual[] = {		/* BACKUP */
 { "REPLACE",       mupip_backup, 0, 0,             0,                  0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0       },
 { "REPLICATION",   mupip_backup, 0, 0,             mup_repl_qual,      0, 0, VAL_REQ,        1, NEG,     VAL_STR, 0       },
 { "REPLINSTANCE",  mupip_backup, 0, 0,             0,                  0, 0, VAL_REQ,        2, NON_NEG, VAL_STR, 0       },
+{ "RETRY",         mupip_backup, 0, 0,             0,                  0, 0, VAL_REQ,        2, NON_NEG, VAL_NUM, 0       },
+{ "SHOWPROGRESS",  mupip_backup, 0, 0,             0,                  0, 0, VAL_DISALLOWED, 2, NEG,     VAL_N_A, 0       },
 { "SINCE",         mupip_backup, 0, 0,             mub_since_qual,     0, 0, VAL_REQ,        2, NON_NEG, VAL_STR, 0       },
 { "TRANSACTION",   mupip_backup, 0, 0,             0,                  0, 0, VAL_REQ,        2, NON_NEG, VAL_NUM, VAL_HEX },
 { "" }
@@ -763,6 +766,7 @@ static	CLI_ENTRY	mup_set_qual[] = {		/* SET */
 { "SPIN_SLEEP_MASK",      mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  VAL_HEX },
 { "STANDALONENOT",        mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0       },
 { "STATS",                mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0       },
+{ "STATSDB_ALLOCATION",   mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0       },
 { "STDNULLCOLL",          mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0       },
 { "TRIGGER_FLUSH_LIMIT",  mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0       },
 { "VERSION",              mupip_set, 0, 0,                  mup_set_dbver_qual,   0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0       },
@@ -771,7 +775,7 @@ static	CLI_ENTRY	mup_set_qual[] = {		/* SET */
 { "" }
 };
 
-static 	CLI_ENTRY	mup_crypt_qual[] = {		/* CRYPT */
+static	CLI_ENTRY	mup_crypt_qual[] = {		/* CRYPT */
 { "DECRYPT", mupip_crypt, 0, 0, 0,                   0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "FILE",    mupip_crypt, 0, 0, 0,                   0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 { "LENGTH",  mupip_crypt, 0, 0, 0,                   0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
@@ -791,7 +795,7 @@ static readonly CLI_PARM mup_trig_sel_parm[] = {
 { "", "" }
 };
 
-static 	CLI_ENTRY	mup_trigger_qual[] = {		/* TRIGGER */
+static	CLI_ENTRY	mup_trigger_qual[] = {		/* TRIGGER */
 { "NOPROMPT",    mupip_trigger, 0, 0,                 0, 0, 0, VAL_NOT_REQ,    0, NON_NEG, VAL_STR, 0 },
 { "SELECT",      mupip_trigger, 0, mup_trig_sel_parm, 0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
 { "STDIN",       mupip_trigger, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
@@ -807,8 +811,14 @@ static	CLI_PARM	mup_stop_parm[] = {
 { "", "",       PARM_REQ}
 };
 
+static	CLI_ENTRY	mup_upgrade_qual[] = {		/* UPGRADE */
+{ "MASTERMAP", mupip_upgrade, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0},
+{ "REGION",    mupip_upgrade, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0},
+{ "" }
+};	/* TODO: revisit file vs region vs choice? 1 function or two? names? */
+
 static	CLI_PARM	mup_upgrade_parm[] = {
-{ "FILE", "File: ", PARM_REQ},
+{ "REGION", "Region: ", PARM_REQ},
 { "", "",           PARM_REQ}
 };
 
@@ -859,6 +869,6 @@ GBLDEF	CLI_ENTRY	mupip_cmd_ary[] = {
 #ifdef GTM_TRIGGER
 { "TRIGGER",   mupip_trigger,    mup_trigger_qual,   mup_trig_parm,      0, cli_disallow_mupip_trigger,   0, VAL_DISALLOWED, 1,         0, 0, 0 },
 #endif
-{ "UPGRADE",   mupip_upgrade,    0,                  mup_upgrade_parm,   0, 0,                            0, VAL_DISALLOWED, 1,         0, 0, 0 },
+{ "UPGRADE",   mupip_upgrade,    mup_upgrade_qual,   mup_upgrade_parm,   0, 0,                            0, VAL_DISALLOWED, 1,         0, 0, 0 },
 { "" }
 };

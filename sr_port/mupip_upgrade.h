@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,5 +14,8 @@
 #define MUPIP_UPGRADE_INCLUDED
 
 void mupip_upgrade(void);
+enum cdb_sc upgrade_gvt(block_id curr_blk, int4 blk_size, gd_region *reg, mstr *root);
+enum cdb_sc upgrade_idx_block(block_id curr_blk, int4 blk_size, gd_region *reg, mstr *name);
+enum cdb_sc find_big_sib(block_id blk, int level);
 
 #endif /* MUPIP_UPGRADE_INCLUDED */

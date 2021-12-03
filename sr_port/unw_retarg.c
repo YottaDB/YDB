@@ -41,26 +41,22 @@
 #include "zr_unlink_rtn.h"
 #include "tp_timeout.h"
 #include "xfer_enum.h"
+#include "have_crit.h"
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
 #include "ztimeout_routines.h"
 #include "bool_zysqlnull.h"
 
-GBLREF	void			(*unw_prof_frame_ptr)(void);
-GBLREF	stack_frame		*frame_pointer, *zyerr_frame;
-GBLREF	unsigned char		*msp, *stackbase, *stacktop;
-GBLREF	mv_stent		*mv_chain;
-GBLREF	tp_frame		*tp_pointer;
-GBLREF	boolean_t		is_tracing_on;
-GBLREF	symval			*curr_symval;
+GBLREF	boolean_t		dollar_truth, dollar_zquit_anyway, is_tracing_on;
 GBLREF	mval			*alias_retarg;
-GBLREF	boolean_t		dollar_truth;
-GBLREF	boolean_t		dollar_zquit_anyway;
-GBLREF	boolean_t		dollar_zininterrupt;
-GBLREF	mval			dollar_ztrap;
-GBLREF	boolean_t		ztrap_explicit_null;
-GBLREF	boolean_t		tp_timeout_deferred;
-GBLREF	dollar_ecode_type	dollar_ecode;
+GBLREF	mv_stent		*mv_chain;
+GBLREF	stack_frame		*error_frame, *frame_pointer, *zyerr_frame;
+GBLREF	symval			*curr_symval;
+GBLREF	tp_frame		*tp_pointer;
+GBLREF	unsigned char		*msp, *stackbase, *stacktop;
+GBLREF	void			(*unw_prof_frame_ptr)(void);
+GBLREF volatile boolean_t	dollar_zininterrupt;
+GBLREF	volatile int4		outofband;
 
 LITREF	mval 		literal_null;
 
@@ -72,6 +68,7 @@ error_def(ERR_TPQUIT);
 /* This has to be maintained in parallel with op_unwind(), the unwind without a return argument (intrinsic quit) routine. */
 int unw_retarg(mval *src, boolean_t alias_return)
 {
+<<<<<<< HEAD
 	rhdtyp		*rtnhdr;
 	mval		ret_value, *trg;
 	boolean_t	got_ret_target;
@@ -82,6 +79,15 @@ int unw_retarg(mval *src, boolean_t alias_return)
 #	ifdef DEBUG_ERRHND
 	stack_frame	*prevfp;
 #	endif
+=======
+	boolean_t	defer_tptimeout, defer_ztimeout, got_ret_target;
+	int4		srcsymvlvl;
+	lv_val		*srclv, *srclvc, *base_lv;
+	mval		ret_value, *trg;
+	rhdtyp		*rtnhdr;
+	stack_frame	*prevfp;
+	symval		*symlv, *symlvc;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -201,27 +207,10 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	USHBIN_ONLY(CLEANUP_COPIED_RECURSIVE_RTN(rtnhdr));
 	/* We just unwound a frame. May have been either a zintrupt frame and/or may have
 	 * unwound a NEW'd ZTRAP or even cleared our error state. If we have a deferred timeout
-	 * and none of the deferral conditions are anymore in effect, release the hounds.
-	 * Below part of code should be kept in sync with unw_mv_ent.
+	 * and none of the deferral conditions are curretly in effect, release the hounds.
+	 * Below code should be kept in sync with unw_mv_ent.
 	 */
-	if ((TREF(save_xfer_root)))
-	{
-		/* If TP timeout or ztimeout , check conditions before popping out */
-		if (((TREF(save_xfer_root))->set_fn == tptimeout_set)
-			|| ((TREF(save_xfer_root))->set_fn == ztimeout_set))
-		{
-			if ((tp_timeout_deferred || TREF(ztimeout_deferred))
-				UNIX_ONLY(&& !dollar_zininterrupt) && ((0 == dollar_ecode.index)
-									|| !(ETRAP_IN_EFFECT)))
-			{
-				POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
-				xfer_set_handlers(event_type, set_fn, param_val, TRUE);
-			}
-		} else if (!dollar_zininterrupt)
-		{
-			POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
-			xfer_set_handlers(event_type, set_fn, param_val, TRUE);
-		}
-	}
+	if ((no_event == outofband) && (no_event != (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
+		TRY_EVENT_POP;
 	return 0;
 }

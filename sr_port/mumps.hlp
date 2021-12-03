@@ -214,6 +214,12 @@
    | $ZDIRectory | Contains current working directory.                      |
    +------------------------------------------------------------------------+
 
+  NOTE:
+
+   The OS services accessed by GT.M commonly treat a <NUL> character as a
+   terminator therefore any in cases where application information passes to
+   the OS as arguments an embedded <NUL> may cause non-obvious behavior.
+
 2 Debugging_Facilities
    Debugging Facilities
 
@@ -2939,6 +2945,42 @@
    the start of the command and the timeout. M does not produce any partial
    results for any of the other timed commands.
 
+3 Interrupt_Handling
+   Interrupt Handling
+
+   GT.M process execution is interruptible with the following events:
+
+   When GT.M detects any of these events, it transfers control to a vector
+   that depends on the event. For CTRAP characters and ZMAXTPTIME, GT.M uses
+   the $ETRAP or $ZTRAP vectors described in more detail in the Error
+   Processing chapter. For INTRPT and $ZTEXit, it XECUTEs the interrupt
+   handler code placed in $ZINTERRUPT. If $ZINTERRUPT is an empty string, the
+   process ignores any MUPIP INTRPT directed at it. The default value of
+   $ZINTERRUPT is "IF $ZJOBEXAM()" which redirects a dump of ZSHOW "*" to a
+   file and reports each such occasion to the operator log. For <CTRL-C> with
+   CENABLE, GT.M enters Direct Mode to give the programmer control. Without
+   CENABLE or CTRAP, GT.M ignores <CTRL-C> on a $PRINCIPAL terminal.
+
+   GT.M recognizes most of these events when they occur but transfers control
+   to the interrupt vector at the start of each M line, at each iteration of
+   a FOR loop, at certain points during the execution of commands which may
+   take a "long" time. For example, ZWRITE, HANG, LOCK, MERGE, ZSHOW "V",
+   OPEN of terminals, disk files, PIPEs, FIFOs, and SOCKETs (unless zero
+   timeout,) WRITE /WAIT for SOCKETs, and READ for terminals, SOCKETs, FIFOs,
+   PIPEs, and sequential files in FOLLOW mode.
+
+   The HANG command and timed restartable I/O commands such as timed READ for
+   terminals, SOCKETs, FIFO, PIPE, and sequential files in FOLLOW mode as
+   well as SOCKET OPEN CONNECT and WRITE /WAIT account for time spent in
+   handling the interrupt. However, the LOCK command pauses the timeout
+   countdown until the interrupt handling is complete.
+
+   If +$ZTEXIT evaluates to a truth value at the outermost TCOMMIT or
+   TROLLBACK, GT.M XECUTEs $ZINTERRUPT after completing the commit or
+   rollback. Except for <CTRL-C> GT.M recognizes CTRAP characters when READ.
+   CTRAP characters other than <CTRL-C> tend to be limited by terminal
+   configuration.
+
 2 M_Locks
    M Locks
 
@@ -3142,11 +3184,16 @@
 
    Example:
 
+<<<<<<< HEAD
    YDB>FOR p="1U.20A1"",""1U.20A",5N IF x?@p QUIT
    YDB>ELSE WRITE !,"Incorrect format" QUIT
+=======
+   GTM>FOR p="1U.20A1"",""1U.20A","5N" IF x?@p QUIT
+   GTM>ELSE WRITE !,"Incorrect format" QUIT
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
-   This example uses pattern code indirection to test x for either a name or
-   a number.
+   This example uses pattern code indirection to test x for either a name (of
+   the form Last,First) or a number.
 
 3 Name_Indirection
    Name Indirection
@@ -6701,7 +6748,7 @@
    explicitly, possibly by doing a ZSHOW "A" into a local variable before
    doing a ZSHOW "*".
 
-   B: displays active ZBREAK breakpoints
+   B: displays active ZBREAK breakpoints and their associated actions
 
    C: provides the list of loaded external call packages and their routines.
    ZSHOW "C" does not report packages that are accessible but have not been
@@ -6755,11 +6802,11 @@
    precision threshold, their use in arithmetic expressions in YottaDB results
    in loss of precision. The mnemonics are:
 
-   AFRA : 1 waiting for instance freeze to release critical sections, 0 otherwise
-   BREA : 1 waiting for block read & decryption, 0 otherwise
+   AFRA: # of waits for instance freeze to release critical sections
+   BREA: # of waits for block read & decryption
    BTD : # of database Block Transitions to Dirty
-   BTS : # times dirty cache record flushed
-   BUS : # times db_csh_get too many retries
+   BTS : # of times a dirty buffer was flushed so a BT could be reused
+   BUS : # of times db_csh_get could not determine whether a block was in cache or not
    CAT : Critical section Total Acquisitions successes
    CFE : Critical section Failed (blocked) acquisition total caused by Epochs
    CFS : Square of CFT
@@ -6770,22 +6817,22 @@
    CYS* : Critical section acquisition processor Yields sum of Squares
    CYT* : Critical section acquisition processor Yields Total
    DEX : # of Database file EXtentions
-   DEXA : 1 waiting for db extension, 0 otherwise
+   DEXA: # of waits for database extension
    DFL : # of Database FLushes of the entire set of dirty global buffers in shared memory to disk
    DFS : # of times a process does an fsync of the database file. For example: a) after writing an epoch journal record, b) as part of database file extension c) during database rundown d) as part of mupip reorg -truncate etc.
    DRD : # of Disk ReaDs from the database file (TP and non-TP, committed and rolled-back).This does not include reads that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. YottaDB always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
    DTA : # of DaTA operations (TP and non-TP)
    DWT : # of Disk WriTes to the database file (TP and non-TP, committed and rolled-back). This does not include writes that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. YottaDB always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
    GET : # of GET operations (TP and non-TP)
-   GLB : 1 waiting for bg access critical section, 0 otherwise
+   GLB : # of waits for bg access critical section
    JBB : # of Journal Buffer Bytes updated in shared memory
    JEX : # of Journal file EXtentions
    JFB : # of Journal File Bytes written to the journal file on disk. For performance reasons, YottaDB always aligns the beginning of these writes to file system block size boundaries. JFB counts all bytes including those needed for alignment in order to reflect the actual IO load on the journal file. Since the bytes required to achieve alignment may have already been counted as part of the previous JFB, processes may write the same bytes more than once, causing the JFB counter to typically be higher than JBB.
    JFL : # of Journal FLushes of all dirty journal buffers in shared memory to disk. For example: when switching journal files etc.
    JFS : # of Journal FSync operations on the journal file. For example: when writing an epoch record, switching a journal file etc.
    JFW : # of Journal File Write system calls
-   JNL : 1 waiting for journal access critical section, 0 otherwise
-   JOPA : 1 waiting for journal open critical section, 0 otherwise
+   JNL : # of waits for journal access critical section
+   JOPA: # of waits for journal open critical section
    JRE : # of Journal Regular Epoch records written to the journal file (only seen in a -detail journal extract); these are written every time an epoch-interval boundary is crossed while processing updates
    JRI : # of JouRnal Idle epoch journal records written to the journal file (only seen in a -detail journal extract); these are written when a burst of updates is followed by an idle period, around 5 seconds of no updates after the database flush timer has flushed all dirty global buffers to the database file on disk
    JRL : # of Journal Records with a Logical record type (e.g. SET, KILL etc.) written to the journal file
@@ -6794,8 +6841,8 @@
    KIL : # of KILl operations (kill as well as zwithdraw, TP and non-TP)
    LKF : # of LocK calls (mapped to this db) that Failed
    LKS : # of LocK calls (mapped to this db) that Succeeded
-   MLBA : 1 waiting for blocked LOCK, 0 otherwise
-   MLK : 1 waiting for LOCK access, 0 otherwise
+   MLBA: # of waits for blocked LOCK
+   MLK : # of waits for LOCK access
    NBR : # of Non-tp committed transaction induced Block Reads on this database
    NBW : # of Non-tp committed transaction induced Block Writes on this database
    NR0 : # of Non-tp transaction Restarts at try 0
@@ -6805,7 +6852,7 @@
    NTR : # of Non-tp committed Transactions that were Read-only on this database
    NTW : # of Non-tp committed Transactions that were read-Write on this database
    ORD : # of $ORDer(,1) (forward) operations (TP and non-TP); the count of $Order(,-1) operations are reported under ZPR.
-   PRC : 1 waiting on exit, 0 otherwise
+   PRC : # of waits on exit
    QRY : # of $QueRY() operations (TP and non-TP)
    SET : # of SET operations (TP and non-TP)
    TBR : # of Tp transaction induced Block Reads on this database
@@ -6821,12 +6868,12 @@
    TR3 : # of Tp transaction Restarts at try 3 (counted for all regions participating in restarting TP transaction)
    TR4 : # of Tp transaction Restarts at try 4 and above (restart counted for all regions participating in restarting TP transaction)
    TRB : # of Tp read-only or read-write transactions Rolled Back (excluding incremental rollbacks)
-   TRGA : 1 waiting for mini-transaction completion, 0 otherwise
-   TRX : 1 waiting for transaction in progress, 0 otherwise
+   TRGA: # of mini-transaction completion
+   TRX : # of waits for transaction in progress
    TTR : # of Tp committed Transactions that were Read-only on this database
    TTW : # of Tp committed Transactions that were read-Write on this database
-   WFR : # of Blocks needing sleep on the read
-   ZAD : 1 waiting for region freeze off, 0 otherwise
+   WFR : # of times a process slept while waiting for another process to read in a database block
+   ZAD : # of waits for region freeze off
    ZPR : # of $order(,-1) or $ZPRevious() (reverse order) operations (TP and non-TP). The count of $Order(,1) operations are reported under ORD.
    ZTR : # of ZTRigger command operations
 
@@ -10476,6 +10523,9 @@
    +------------------------------------------------------------------------+
    |    Keyword    |   Arguments   |                Returns                 |
    |---------------+---------------+----------------------------------------|
+   | BLOCKING      | index         | 1 (TRUE) for blocking otherwise 0      |
+   |               |               | (FALSE) for non-blocking WRITEs        |
+   |---------------+---------------+----------------------------------------|
    | CURRENTINDEX  |               | The index (starting at zero) of the    |
    |               |               | current socket for the SOCKET device.  |
    |---------------+---------------+----------------------------------------|
@@ -11257,6 +11307,26 @@
    used by other socket I/O commands such as READ which sets it to the
    delimiter or malformed UTF-8 character, if any, which terminated the read.
 
+   When a socket has enabled non-blocking WRITEs, additional values will show
+   if it is possible to write at least one byte to the socket. If the second
+   argument of WRITE /WAIT is omitted or specifies both "READ" and "WRITE"
+   and the socket selected by WRITE /WAIT is ready for both READ and WRITE,
+   $KEY contains:
+
+   READWRITE|<socket handle>|<address>
+
+   If the socket selected by a WRITE /WAIT which implicitly or explicitly
+   requests the write state would block on a READ but not block on WRITE,
+   $KEY contains:
+
+   WRITE|<socket handle>|<address>
+
+   If the socket selected by WRITE /WAIT which implicitly or explicitly
+   requests the read state would not block on a READ but would block on a
+   WRITE, $KEY contains:
+
+   READ|<socket handle>|<address>
+
 2 $Principal
    $Principal
 
@@ -11405,6 +11475,10 @@
    $SYSTEM in YottaDB starts with "47" followed by a comma and the evaluation of
    the environment variable ydb_sysid or gtm_sysid. If neither of the names have
    any evaluation (i.e. both are undefined), the value after the comma is gtm_sysid.
+
+   GT.M accepts SET $SYSTEM=expr, where expr appends to the initial value up
+   to the length permitted for an initial value; an empty string removes any
+   current added value.
 
 2 $Test
    $Test
@@ -11764,7 +11838,11 @@
    appear in the compilation output, so $ZCSTATUS typically contains the code
    for ERRORSUMMARY.
 
+<<<<<<< HEAD
    YottaDB does not permit the SET command to modify $ZSTATUS.
+=======
+   GT.M does not permit the SET command to modify $ZCSTATUS.
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 2 $ZCLose
    $ZCLose
@@ -12027,9 +12105,9 @@
    $ZINT[ERRUPT] specifies the code to be XECUTE'd when an interrupt (for
    example, through a MUPIP INTRPT) is processed. While a $ZINTERRUPT action
    is in process, any additional interrupt signals are discarded. When an
-   interrupt handler is invoked, the current values of $REFERENCE is saved
-   and restored when the interrupt handler returns. The current device ($IO)
-   is neither saved nor restored.
+   interrupt handler is invoked, the current value of $REFERENCE is saved and
+   restored when the interrupt handler returns. The current device ($IO) is
+   neither saved nor restored.
 
    YottaDB permits the SET command to modify the value of $ZINTERRUPT.
 
@@ -12056,6 +12134,7 @@
    function. In other words, while $ZJOBEXAM() is part of the interrupt
    handling by default, it is not an implicit part of the interrupt handling.
 
+<<<<<<< HEAD
 3 Interrupt_Handling
    Interrupt Handling
 
@@ -12085,6 +12164,9 @@
    limited by terminal configuration.
 
    The interrupt handler is executed by YottaDB when on a statement boundary or
+=======
+   The interrupt handler is executed by GT.M when on a statement boundary or
+>>>>>>> 52a92dfd (GT.M V7.0-001)
    on an appropriate boundary in a potentially long running COMMAND (in the
    same place as YottaDB recognizes <CTRL-C>). If a YottaDB process is in a long
    running external call (for example; waiting in a message queue) YottaDB does
@@ -12104,11 +12186,12 @@
    the interrupt handler executes. For the default case where the interrupt
    handler uses $ZJOBEXAM() to create a dump, the pause duration depends on
    the number of local variables in the process at the time of the dump and
-   on the speed of the disk being written to. The dumps are slower on a
-   network-mounted disk than on a disk directly connected to the local
-   system. Any interrupt driven code should be designed to account for this
-   issue.
+   on the speed of the secondary storage device. Such a dump is slower on a
+   network-mounted secondary storage device than on a storage device directly
+   connected to the local system. Design interrupt driven code to account for
+   this issue.
 
+<<<<<<< HEAD
    When an interrupt handler is invoked, YottaDB saves and restores the current
    values of $REFERENCE. However, the current device ($IO) is neither saved
    nor restored. If an interrupt handler changes $IO (via USE), ensure that
@@ -12117,15 +12200,26 @@
    specify USE without any deviceparameters. Any attempt to do IO on a device
    which was actively doing IO when the interrupt was recognized may result
    in a ZINTERCURSEIO error.
+=======
+   When GT.M uses an interrupt handler, it saves and restores the current
+   value of $REFERENCE. However, GT.M does not implicitly save or restore the
+   current device ($IO). If an interrupt handler changes $IO (via USE),
+   ensure that the interrupt handler restores the current device before
+   returning. To restore the device which was current when the interrupt
+   handler began, specify USE without any deviceparameters. Any attempt to do
+   IO on a device which was actively doing IO when the interrupt was
+   recognized may cause a ZINTERCURSEIO error.
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
    Code in $ZINTERRUPT must use routine names in any entryref argument to a
    DO, GOTO, JOB, ZGOTO or any extrinsic as the arrival of the interrupt can
    activate the code while executing an arbitrary routine in the application.
 
-   During the execution of the interrupt handling code, $ZINITERRUPT
+   During the execution of the interrupt handling code, $ZININTERRUPT
    evaluates to 1 (TRUE).
 
    If an error occurs while compiling the $ZINTERRUPT code, the error handler
+<<<<<<< HEAD
    is not invoked, YottaDB sends the YDB-E-ERRWZINTR message and the compiler
    error message to the operator log facility. If the YottaDB process is at a
    direct mode prompt or is executing a direct mode command (for example, a FOR
@@ -12133,6 +12227,15 @@
    console along with the compilation error. In both cases, the interrupted
    process resumes execution without performing any action specified by the
    defective $ZINTERRUPT vector.
+=======
+   is not invoked, GT.M sends the ERRWZINTR message and the compiler error
+   message to the operator log facility. If the GT.M process is at a direct
+   mode prompt or is executing a direct mode command (for example, a FOR
+   loop), GT.M also sends the ERRWZINTR error message to the user console
+   along with the compilation error. In both cases, the interrupted process
+   resumes execution without performing any action specified by the defective
+   $ZINTERRUPT vector.
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
    The error handler is invoked if an error occurs while executing the
    $ZINTERRUPT code. If an error occurs during execution of the interrupt
@@ -12142,17 +12245,17 @@
    errors that occur in code called by the interrupt handler are handled by
    normal error handling.
 
-   TP transaction is in progress (0<$TLEVEL), updates to globals are not safe
-   since a TP restart can be signaled at any time prior to the transaction
-   being committed - even after the interrupt handler returns. A TP restart
-   reverses all global updates and unwinds the M stack so it is as if the
-   interrupt never occurred. The interrupt handler is not redriven as part of
-   a transaction restart. Referencing (reading) globals inside an interrupt
-   handler can trigger a TP restart if a transaction is active. When
-   programming interrupt handling, either discard interrupts when 0<$TLEVEL
-   (forcing the interrupting party to try again), or use local variables that
-   are not restored by a TRESTART to defer the interrupt action until after
-   the final TCOMMIT.
+   If a TP transaction is in progress (0<$TLEVEL), updates to globals are not
+   safe since a TP restart can be signaled at any time prior to the
+   transaction being committed - even after the interrupt handler returns. A
+   TP restart reverses all global updates and unwinds the M stack so it is as
+   if the interrupt never occurred. The interrupt handler is not redriven as
+   part of a transaction restart. Referencing (reading) globals inside an
+   interrupt handler can trigger a TP restart if a transaction is active.
+   When programming interrupt handling, either discard interrupts when
+   0<$TLEVEL (forcing the interrupting party to try again), or use local
+   variables that are not restored by a TRESTART to defer the interrupt
+   action until after the final TCOMMIT.
 
    **Important**
 
@@ -12230,6 +12333,8 @@
 
    "READ|<socket_handle>|<address>"
 
+   "WRITE|<socket_handle>|<address>"
+
    If $ZKEY contains one or more "READ|<socket_handle>|<address>" entries, it
    means there are ready to READ sockets that were selected by WRITE /WAIT or
    were partially read and there is data left in their buffer. Each entry is
@@ -12240,6 +12345,12 @@
    entries, it means that there are pending connections and a USE
    s:socket=listening_socket_handle will accept a pending connection and
    remove the LISTENING|<listening_socket_handle> entry from $ZKEY.
+
+   If $ZKEY contains one or more "WRITE|<socket_handle>|<address>" entries,
+   it means that the prior WRITE /WAIT considered the non-blocking sockets
+   writeable. This is likely to be the case most of the time. If $ZKEY
+   contains one WRITE and one READ entry, it means that the non-blocking
+   socket is both readable and writeable.
 
    $ZKEY is empty if no sockets have data in the buffer and there are no
    unaccepted incoming sockets from previous WRITE /WAITs.
@@ -13259,9 +13370,41 @@
    where it can properly resume operation, such as the beginning of a line,
    when waiting on a command with a timeout, or when starting a FOR
    iteration. When a timeout occurs, if the last assignment specified no
+<<<<<<< HEAD
    vector, YottaDB uses the current $ETRAP or $ZTRAP. YottaDB rejects an attempted
    KILL of $ZTIMeout with the VAREXPECTED error and an attempted NEW of
    $ZTIMeout with the SVNONEW error.
+=======
+   vector, GT.M uses the current $ETRAP or $ZTRAP. When a $ZTIMEOUT expires,
+   it invokes one of three possible vectors:
+
+     o Its own labelref, which creates a new stack frame, from which it
+       returns to the point at which it was recognized - similar to what
+       happens for $ZINTERUPT when it recognizes a MUPIP INTRPT; see WARNING
+       below
+     o If labelref is not specified and $ETRAP is specified, it envokes the
+       $ETRAP code, which it acts like an error and operates as if in the
+       current frame, implicitly dropping the current frame when the $ETRAP
+       vector processing completes
+     o If labelref is not specified and $ZTRAP is specified, it invokes the
+       $ZTRAP code, acting like an error whose behavior is subject to
+       $gtm_ztrap_form; for additional information, refer to the $ZTRAP
+       documentation
+
+   In all cases the invoked code can alter the behavior using the tools at
+   its disposal - e.g. GOTO, ZGOTO, $ECODE, etc.
+
+   **Warning**
+
+   When none of the vectors are specified, a $ZTIMEOUT expiration results in
+   the termination of the process
+
+   Using a [Z}GOTO that stays within a $ZTIMEOUT labelref vector frame may
+   cause undefined and undesirable behavior
+
+   GT.M rejects an attempted KILL of $ZTIMeout with the VAREXPECTED error and
+   an attempted NEW of $ZTIMeout with the SVNONEW error.
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
    Example:
 
@@ -14191,8 +14334,13 @@
    |-----------------+---------+--------------------------------------------|
    | [NO]READONLY    | O       | Controls read-only file access.            |
    |-----------------+---------+--------------------------------------------|
-   | RENAME=expr     | C       | Specifies CLOSE replace name of a disk     |
-   |                 |         | file with name specified by expression.    |
+   | RENAME=expr     | C       | Specifies CLOSE rename a disk file with    |
+   |                 |         | name specified by expression.              |
+   |-----------------+---------+--------------------------------------------|
+   |                 |         | Specifies CLOSE replace(overwrite an       |
+   | REPLACE=expr    | C       | existing file if necessary) the name of a  |
+   |                 |         | disk file with the name specified by the   |
+   |                 |         | expression.                                |
    |-----------------+---------+--------------------------------------------|
    | SYSTEM=expr     | O/C     | Specifies file permissions for the owner   |
    |                 |         | of the file (same as OWNER).               |
@@ -14343,8 +14491,12 @@
    |-----------------+-----+------------------------------------------------|
    | OWNER=expr      | O/C | Specifies file permissions for owner of file.  |
    |-----------------+-----+------------------------------------------------|
-   |                 |     | Specifies that CLOSE replace the name of a     |
-   | RENAME=expr     | C   | disk file with the name specified by the       |
+   | RENAME=expr     | C   | Specifies that CLOSE rename a disk file with   |
+   |                 |     | the name specified by the expression.          |
+   |-----------------+-----+------------------------------------------------|
+   |                 |     | Specifies that CLOSE replace(overwrite an      |
+   | REPLACE=expr    | C   | existing file if necessary) the name of a disk |
+   |                 |     | file with the name specified by the            |
    |                 |     | expression.                                    |
    |-----------------+-----+------------------------------------------------|
    | SYSTEM=expr     | O/C | Specifies file permissions for owner of file   |
@@ -15202,13 +15354,25 @@
    to 1. For vendor-specific information on how to change your system's
    maximum queue length, refer to the listen manpage.
 
-   /W[AIT][(timeout)]
+   WRITE /WAIT[(timeout[,[what][,handle]])]
 
    where timeout is a numeric expression that specifies how long in seconds a
    server waits for a connection or data to become available on one of the
-   sockets in the current Socket Device.
+   sockets in the current Socket Device, what may contain a string containing
+   "READ" and/or "WRITE", and handle specifies the socket handle.
+
+   If the optional second argument only specifies "WRITE", WRITE /WAIT does
+   not check incoming connections for listening sockets.
+
+   The optional third argument to WRITE /WAIT can be used to check only a
+   single socket instead of all sockets in the current SOCKET device by
+   specifying the handle name of a socket.
 
    **Note**
+
+   In most circumstances, WRITE /WAIT or WRITE /WAIT(timeout,"WRITE") for
+   SOCKET devices which contain a non blocking socket returns immediately
+   because non blocking sockets are usually ready for writing.
 
    If the current Socket Device is $PRINCIPAL and input and output are
    different SOCKETs, WRITE /WAIT applies to the input side of the device.
@@ -15333,6 +15497,92 @@
    YottaDB buffers WRITEs to TLS enabled sockets until a subsequent USE :FLUSH,
    WRITE !, WRITE #, or an internal 400 millisecond timer expires.
 
+   WRITE /BLOCK("OFF")
+
+   WRITE /BLOCK("OFF") enables non-blocking WRITEs for the current socket of
+   the current SOCKET device. Sockets default to blocking WRITEs.
+
+   A socket must be enabled for non-blocking WRITEs before enabling it for
+   TLS if both features are desired.
+
+   For non-blocking sockets, GT.M retries a WRITE that blocks up to the
+   number of times specified by the $gtm_non_blocked_write_retries
+   environment variable with a 100 millisecond delay between each retry. The
+   default retries value is 10 times if $gtm_non_blocked_write_retries is not
+   defined.
+
+   If WRITE remains blocked after the specified retries, the WRITE sets
+   $DEVICE to "1,Resource temporarily unavailable" and issues an error if
+   IOERROR is "TRAP".
+
+   If IOERROR is not "TRAP", $DEVICE must be checked after each WRITE. An
+   attempt to WRITE to a socket after it has been blocked is an error which
+   sets $DEVICE to "1,Non blocking WRITE blocked - no further WRITEs
+   allowed". Thus the only operation permitted on a blocked socket is to
+   CLOSE it.
+
+   **Note**
+
+   Note that multi-argument WRITEs are equivalent to a series of one argument
+   WRITEs, and that GT.M turns unparenthesized concatenation within a write
+   argument into multi-argument WRITEs. Format control characters such as "!"
+   and "#" are each considered as an argument.
+
+   Note that a significant delay between bytes for any reason, including
+   blocking, especially within a multibyte character when CHSET is UTF-8, may
+   be considered an error by the receiving end of a connection. If the
+   application is unable to handle such a delay, it may result in an
+   application error.
+
+   A WRITE to a non-blocking socket, which is not enabled for TLS, may
+   terminate early on the following events:
+
+   <CTRL-C>, exceeding $ZMAXTPTIME, or $ZTIMEOUT expiring. These events
+   result in a transfer to the interrupt vector or error handler at the next
+   execution boundary as described in the "Interrupt Handling" section of the
+   GT.M Programmer's Guide.
+
+   When non-blocking WRITEs are enabled for a socket, WRITE /WAIT may check
+   if that socket would not block on WRITE in addition to READ. The optional
+   second argument may contain a string containing "READ" and/or "WRITE".
+
+   If the second argument is omitted or specifies both "READ" and "WRITE" and
+   the socket selected by WRITE /WAIT is ready for both READ and WRITE, $KEY
+   contains:
+
+   READWRITE|<socket handle>|<address>.
+
+   If the second argument is omitted or contains "WRITE", WRITE /WAIT checks
+   readiness for WRITE on non-blocking sockets, but never checks readiness to
+   WRITE on blocking sockets, even if explicitly requested.
+
+   If the socket selected by a WRITE /WAIT which implicitly or explicitly
+   requests the write state would block on a READ but not block on WRITE,
+   $KEY contains:
+
+   WRITE|<socket handle>|<address>
+
+   Note that a WRITE may still not be able to complete if it tries to write
+   more bytes than the system is ready to accept.
+
+   If the socket selected by WRITE /WAIT which implicitly or explicitly
+   requests the read state would not block on a READ but would block on a
+   WRITE, $KEY contains:
+
+   READ|<socket handle>|<address>
+
+   $ZKEY after a prior WRITE /WAIT will contain a piece of the format
+   "WRITE|sockethandle|ipaddress" if a non-blocking socket was considered
+   writable which will be the case most of the time. If a socket was also
+   readable, there will be two pieces in $ZKEY for the socket, one for WRITE
+   and the other for READ.
+
+   Whether a socket is enabled for non-blocking WRITEs may be determined by:
+
+   $ZSOCKET(device,"BLOCKING",index)
+
+   which returns either 1 (TRUE) for blocking, or 0 (FALSE) for non-blocking.
+
 3 Socket_Device_Operation
    Socket Device Operation
 
@@ -15406,9 +15656,14 @@
    | MOREREADTIME=intexpr    | O/U     | milliseconds) that a SOCKET device |
    |                         |         | uses to check for arriving packet  |
    |-------------------------+---------+------------------------------------|
-   |                         |         | Makes the socket specified by the  |
-   | SOCKET=expr             | U       | handle named in expr the current   |
-   |                         |         | socket for the Socket device.      |
+   |                         |         | With USE, makes the socket         |
+   |                         |         | specified by the handle named in   |
+   |                         |         | expr the current socket for the    |
+   | SOCKET=expr             | U/C     | Socket device.                     |
+   |                         |         |                                    |
+   |                         |         | With CLOSE, closes only the socket |
+   |                         |         | specified by the handle named in   |
+   |                         |         | expr.                              |
    |-------------------------+---------+------------------------------------|
    |                         |         | Controls buffering of data packets |
    |                         |         | by the system TCP stack using the  |
@@ -16110,14 +16365,13 @@
    $DEVICE does not have the status information when an error occurs on OPEN.
    An application should check $TEST and other ISVs for errors on OPEN.
 
-   $DEVICE holds status information only after a socket is successfully
-   ATTACHed to a socket device. To properly trap IOERRORs related to
-   connection handling, it is best to create an empty SOCKET device (with
-   something like open tcpdev::timeout:"SOCKET") before opening a socket
-   connection with the OPEN (with LISTEN or CONNECT deviceparameters)
-   command. Then, use ATTACH to bring it to the current SOCKET device. This
-   method ensures that a device exists that would update $DEVICE with status
-   information.
+   $DEVICE holds status information for a socket device. To properly trap
+   IOERRORs related to connection handling, it is best to create an empty
+   SOCKET device (with something like open tcpdev::timeout:"SOCKET") before
+   opening a socket connection with the OPEN (with LISTEN or CONNECT
+   deviceparameters) command. Then, use "USE tcpdev" to bring it to the
+   current device. This method ensures that a device exists that would update
+   $DEVICE with status information.
 
 5 KEY
    KEY
@@ -17278,9 +17532,17 @@
 
    Removes the socket identified by expr from the current socket device,
    without affecting any existing connection of that socket. The removed
+<<<<<<< HEAD
    socket is placed in the socketpool and may be attached to another socket
    device. If the socket being removed is the current socket, then YottaDB does
    the following:
+=======
+   socket is placed in the socketpool (which has the reserved name
+   "YGTMSOCKETSPOOL") and may be attached to another socket device. If the
+   socket being removed is the current socket, then GT.M does the following:
+
+   (
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
    **Note**
 
@@ -17311,7 +17573,8 @@
    At this point, the socket device "seerv" has two sockets associated with
    it.
 
-   The following command moves the "serv" socket to the "socketpool" device.
+   The following command moves the "serv" socket to the "YGTMSOCKETPOOL"
+   device.
 
    YDB>use tcp:detach="serv"
    YDB>use 0 zshow "D"
@@ -17319,12 +17582,12 @@
    seerv OPEN SOCKET TOTAL=1 CURRENT=0
        SOCKET[0]=serv2 DESC=4 LISTENING PASSIVE NOTRAP PORT=6322
             ZDELAY ZBFSIZE=1024 ZIBFSIZE=87380 NODELIMITER
-   socketpool OPEN SOCKET TOTAL=1 CURRENT=0
+   YGTMSOCKETPOOL OPEN SOCKET TOTAL=1 CURRENT=0
        SOCKET[0]=serv DESC=3 LISTENING PASSIVE NOTRAP PORT=6321
             ZDELAY ZBFSIZE=1024 ZIBFSIZE=87380 NODELIMITER
 
    Notice how socket "serv" is now associated with the pseudo socket device
-   "socketpool". Its only purpose is to hold detached sockets.
+   "YGTMSOCKETPOOL". Its only purpose is to hold detached sockets.
 
    YDB>set tcp2="s2" o tcp2:::"SOCKET"
 
@@ -17336,7 +17599,7 @@
    seerv OPEN SOCKET TOTAL=1 CURRENT=0
        SOCKET[0]=serv2 DESC=4 LISTENING PASSIVE NOTRAP PORT=6322
            ZDELAY ZBFSIZE=1024 ZIBFSIZE=87380 NODELIMITER
-   socketpool OPEN SOCKET TOTAL=1 CURRENT=0
+   YGTMSOCKETPOOL OPEN SOCKET TOTAL=1 CURRENT=0
        SOCKET[0]=serv DESC=3 LISTENING PASSIVE NOTRAP PORT=6321
            ZDELAY ZBFSIZE=1024 ZIBFSIZE=87380 NODELIMITER
 
@@ -17352,7 +17615,7 @@
    seerv OPEN SOCKET TOTAL=1 CURRENT=0
       SOCKET[0]=serv2 DESC=4 LISTENING PASSIVE NOTRAP PORT=6322
           ZDELAY ZBFSIZE=1024 ZIBFSIZE=87380 NODELIMITER
-   socketpool OPEN SOCKET TOTAL=0 CURRENT=-1
+   YGTMSOCKETPOOL OPEN SOCKET TOTAL=0 CURRENT=-1
 
 5 DOWNSCROLL
    DOWNSCROLL
@@ -17974,7 +18237,7 @@
    Device, PIPE, and Sequential Files
 
    Sets the device's logical record size and enables WRAP. The default WIDTH
-   for SOC, SD and FIFO is taken from the RECORDSIZE.
+   for SD, FIFO, and PIPE is taken from the RECORDSIZE.
 
    NOWRAP and WIDTH supersede each other. When WIDTH and NOWRAP appear
    together on the same USE command, the final one controls the device
@@ -17987,9 +18250,10 @@
    For SD and SOC which support 1MB strings, you can specify WIDTH up to
    1,048,576.
 
-   In UTF-8 mode and TRM, SOC, SD, and FIFO output, the WIDTH deviceparameter
-   is in units of display-columns and is used with $X to control truncation
-   and WRAPing for output and maintenance of $X and $Y for input.
+   In UTF-8 mode and TRM, SD, FIFO, and PIPE output, the WIDTH
+   deviceparameter is in units of display-columns and is used with $X to
+   control truncation and WRAPing for output and maintenance of $X and $Y for
+   input.
 
    In UTF-8 mode and SOC, the WIDTH deviceparameter is in units of UTF-8 code
    points and is used with $X to control truncation and wrapping for output
@@ -17997,8 +18261,8 @@
 
    In M mode if WIDTH is set to 0, YottaDB uses the default WIDTH of the TRM and
    SOC devices. USE x:WIDTH=0 is equivalent to USE
-   x:(WIDTH=<device-default>:NOWRAP. For SOC, SD and FIFO devices in M mode,
-   the device default is the RECORDSIZE.
+   x:(WIDTH=<device-default>:NOWRAP. For SD, FIFO, and PIPE devices in M
+   mode, the device default is the RECORDSIZE.
 
    YottaDB format control characters, FILTER, and the device WIDTH and WRAP also
    have an effect on $X.
@@ -18294,8 +18558,8 @@
 
    CLOSE SOCKDEV:(SOCKET="LOCALSOCK1":DELETE)
 
-   This deletes the socket file associated with LOCALSOCK1 if it is a
-   listening socket and closes only the named socket on the socket device.
+   This deletes the socket file associated with LOCALSOCK1 if it is a LOCAL
+   socket and closes only the named socket on the socket device.
 
 4 CLOSE_Deviceparameters_Table
    CLOSE Deviceparameters Table
@@ -18326,6 +18590,8 @@
    | OWNER                 |     | X  | X    |     |
    |-----------------------+-----+----+------+-----|
    | RENAME                |     | X  | X    |     |
+   |-----------------------+-----+----+------+-----|
+   | REPLACE               |     | X  | X    |     |
    |-----------------------+-----+----+------+-----|
    | REWIND                |     | X  |      |     |
    |-----------------------+-----+----+------+-----|
@@ -18420,6 +18686,8 @@
    | RECORDSIZE=intexpr | X    |     |       |
    |--------------------+------+-----+-------|
    | RENAME=expr        |      |     | X     |
+   |--------------------+------+-----+-------|
+   | REPLACE=expr       |      |     | X     |
    |--------------------+------+-----+-------|
    | [NO]RETRY          | X    | X   |       |
    |--------------------+------+-----+-------|

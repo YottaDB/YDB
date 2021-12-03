@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -12,9 +12,7 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
 #include "mdef.h"
-
 #include "gtm_fcntl.h"
 #include "gtm_stdlib.h"
 #include "gtm_unistd.h"
@@ -51,8 +49,26 @@
 #include "wcs_phase2_commit_wait.h"
 #include "wbox_test_init.h"
 #include "db_write_eof_block.h"
+<<<<<<< HEAD
 #include "mupip_exit.h"
 
+=======
+#include "mu_outofband_setup.h"
+#include "wcs_flu.h"
+#include "jnl.h"
+#ifdef __x86_64
+#	include <math.h>
+#	include "gtm_utsname.h"
+#	include <gnu/libc-version.h>
+#	include <dlfcn.h>
+#	define BUF_MAX		100
+#	define MIN_ETA		10
+#	define SHOWPERCENT	24
+#	define ADJUSTED_ETA	1.25
+#	define MEGABYTE 	1024 * 1024
+#	define GIGABYTE 	1024 *MEGABYTE
+#endif
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 #define	TMPDIR_ACCESS_MODE	R_OK | W_OK | X_OK
 #define	TMPDIR_CREATE_MODE	S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH
 #define	COMMAND_ARRAY_SIZE	1024
@@ -61,6 +77,7 @@
 #define	RMDIR_OPT		"-r "
 #define	CD_CMD			"cd "
 #define	CMD_SEPARATOR		" && "
+
 #ifdef __linux__
 #	define	CP_CMD		"cp "
 #	define	CP_OPT		"--sparse=always "
@@ -119,6 +136,13 @@
 	}											\
 	return FALSE;										\
 }
+#define	ABORTBACKUP						\
+{								\
+	if (online)						\
+		cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;	\
+	FREE_COMMAND_STR_IF_NEEDED;				\
+	CLEANUP_AND_RETURN_FALSE;				\
+}
 
 GBLREF	bool			file_backed_up;
 GBLREF	gd_region		*gv_cur_region;
@@ -128,16 +152,26 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	bool			online;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		debug_mupip;
+GBLREF bool                     mu_ctrlc_occurred;
 
+#ifdef __x86_64
+STATICDEF void		*p;
+#endif
+error_def(ERR_BKUPFILEPERM);
+error_def(ERR_BKUPPROGRESS);
 error_def(ERR_BCKUPBUFLUSH);
+error_def(ERR_BUFFLUFAILED);
 error_def(ERR_COMMITWAITSTUCK);
 error_def(ERR_DBCCERR);
 error_def(ERR_DBROLLEDBACK);
 error_def(ERR_ERRCALL);
 error_def(ERR_TEXT);
 error_def(ERR_TMPFILENOCRE);
+error_def(ERR_BACKUPDBFILE);
+error_def(ERR_BACKUPTN);
+error_def(ERR_FILENAMETOOLONG);
 
-bool	mubfilcpy (backup_reg_list *list)
+boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptcnt)
 {
 	mstr			*file, tempfile;
 	unsigned char		cmdarray[COMMAND_ARRAY_SIZE], *command = &cmdarray[0];
@@ -148,7 +182,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	block_id		blk_num;
 	int4			cmdlen, rv, save_errno, tempfilelen, tmpdirlen, tmplen;
 	int4			sourcefilelen, sourcedirlen, realpathlen;
-	struct stat		stat_buf;
+	struct stat		stat_buf, stat;
 	off_t			filesize, offset;
 	char 			*inbuf, *ptr, *errptr, *sourcefilename, *sourcedirname;
 	char			tempfilename[COMMAND_ARRAY_SIZE];	/* is sized the same as "cmdarray" because a file name
@@ -159,6 +193,8 @@ bool	mubfilcpy (backup_reg_list *list)
 									 */
 	char			tempdir[MAX_FN_LEN], prefix[MAX_FN_LEN];
 	char			tmpsrcfname[MAX_FN_LEN], tmpsrcdirname[MAX_FN_LEN], realpathname[PATH_MAX];
+	char			sourcefilepathname[GTM_PATH_MAX + MAX_FN_LEN], tempfilepathname[GTM_PATH_MAX + MAX_FN_LEN];
+	char 			tmprealpath[GTM_PATH_MAX + MAX_FN_LEN];
 	int			fstat_res, i, cmdpathlen;
 	uint4			ustatus, size;
 	muinc_blk_hdr_ptr_t	sblkh_p;
@@ -168,6 +204,24 @@ bool	mubfilcpy (backup_reg_list *list)
 	int			perm;
 	struct perm_diag_data	pdd;
 	int			ftruncate_res;
+	trans_num		ONE = 0x1;
+	boolean_t		in_kernel, usesystem = TRUE;
+#	ifdef __x86_64
+	int 			digicnt = 0, eta = MIN_ETA, infd, outfd, speedcnt = 0, transpadcnt = 0;
+	int 			csdigicnt = 0, cspadcnt = 0, speedigits = 0;
+	double			progper = 0, progfact = SHOWPERCENT;
+	size_t	 		tmpsize, transfersize, remaining;
+	ssize_t 		ret;
+	loff_t			*inoffp, *outoffp;
+	size_t			bytesspliced = 0, currspeed = 0, trans_cnt = 0, start_cnt = 0;
+	time_t			begtm, endtm, strtm;
+	char 			sizep[BUF_MAX], progperstr[BUF_MAX], padding[MAX_DIGITS_IN_INT8], fil=' ';
+	boolean_t		sizeGiB = TRUE;
+	char 			*etaptr;
+	char 			transferbuf[BUF_MAX], speedbuf[BUF_MAX], errstrbuff[BUF_MAX + GTM_PATH_MAX];
+	ssize_t			(*copy_file_range_p)(int fd_in, loff_t *off_in, int fd_out, loff_t *off_out,
+						size_t len, unsigned int flags);
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -201,6 +255,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	}
 	memset(prefix, 0, MAX_FN_LEN);
 	memcpy(prefix, gv_cur_region->rname, gv_cur_region->rname_len);
+<<<<<<< HEAD
 	/* For testing purposes, we set the pid part of the temp file name to 99999 instead of the
 	 * pid. This may be necessary if the test is testing for FILENAMETOOLONG errors such as in
 	 * the r136/ydb864 test because a process_id with fewer or more digits than expected will
@@ -212,6 +267,9 @@ bool	mubfilcpy (backup_reg_list *list)
 	else
 #	endif
 		SNPRINTF(&prefix[gv_cur_region->rname_len], MAX_FN_LEN - gv_cur_region->rname_len, "_%d_", process_id);
+=======
+	SNPRINTF(&prefix[gv_cur_region->rname_len], MAX_FN_LEN - gv_cur_region->rname_len, "_%d_", process_id);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	/* verify that we have access to the temporary directory to avoid /tmp */
 	if (0 != ACCESS(tempdir, TMPDIR_ACCESS_MODE))
 	{
@@ -224,7 +282,14 @@ bool	mubfilcpy (backup_reg_list *list)
 			       LEN_AND_STR(tempdir));
 		return FALSE;
 	}
-
+	/* verify that we have write access to the destination backup file */
+	if (0 == ACCESS(file->addr, F_OK) && (0 != ACCESS(file->addr, W_OK)))
+	{
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_BKUPFILEPERM, 2, file->len, file->addr);
+		if (online)
+			cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
+		return FALSE;
+	}
 	/* make this cp a two step process ==> cp followed by mv */
 	ntries = 0;
 	fstat_res = FILE_NOT_FOUND;
@@ -275,12 +340,18 @@ bool	mubfilcpy (backup_reg_list *list)
 	/* mkdir tempdir*/
 	if (0 != MKDIR(tempfilename, TMPDIR_CREATE_MODE))
 	{
+		save_errno = errno;
+		errptr = (char *)STRERROR(save_errno);
 		util_out_print("Temporary directory !AD could not be created.", TRUE, tempfilelen, tempfilename);
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(errptr));
 		CLEANUP_AND_RETURN_FALSE;
 	}
 	if (NULL == realpath(tempfilename, realpathname))
 	{
+		save_errno = errno;
+		errptr = (char *)STRERROR(save_errno);
 		util_out_print("Temporary directory !AD could not be found after creation.", TRUE, tempfilelen, tempfilename);
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(errptr));
 		CLEANUP_AND_RETURN_FALSE;
 	}
 	realpathlen = STRLEN(realpathname);
@@ -321,31 +392,182 @@ bool	mubfilcpy (backup_reg_list *list)
 	memcpy(&command[cmdlen], realpathname, realpathlen);
 	cmdlen += realpathlen;
 	command[cmdlen] = 0;
-	if (debug_mupip)
-		util_out_print("!/MUPIP INFO:   !AD", TRUE, cmdlen, command);
-	rv = SYSTEM((char *)command);
-	if (0 != rv)
+	/* Start prep for in-kernel copy */
+#	ifdef __x86_64
+	/* Do not use cp/pax on the first attempt */
+	in_kernel = ink_backup();
+	if (FALSE == in_kernel)
+		usesystem = TRUE;
+	else
+		usesystem = (1 < attemptcnt); /* Do not use cp on the first attempt */
+	if (!usesystem)
 	{
-		if (-1 == rv)
+		mu_outofband_setup();
+		if (NULL == realpath((char *)tmpsrcfname, sourcefilepathname))
 		{
-			save_errno = errno;
-			errptr = (char *)STRERROR(save_errno);
-			util_out_print("system : !AZ", TRUE, errptr);
+			SNPRINTF(errstrbuff, GTM_PATH_MAX, "Unable to resolve path to database file %s. "
+					"Reason: %s", sourcefilename, (char *)STRERROR(errno));
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(errstrbuff));
+			if (online)
+				cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
+			return FALSE;
 		}
-		if (online)
-			cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
-		util_out_print("Error doing !AD", TRUE, cmdlen, command);
-		FREE_COMMAND_STR_IF_NEEDED;
-		CLEANUP_AND_RETURN_FALSE;
+		if (NULL == realpath((char *)tempfilename, tmprealpath))
+		{
+			SNPRINTF(errstrbuff, GTM_PATH_MAX, "Unable to resolve path to temp file %s. "
+					"Reason: %s", tempfilename, (char *)STRERROR(errno));
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(errstrbuff));
+			if (online)
+				cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
+			return FALSE;
+		}
+		SNPRINTF(tempfilepathname, SIZEOF(tempfilepathname),"%s/%s", tmprealpath, sourcefilename);
+		infd = open(sourcefilepathname, O_RDONLY);
+		if (-1 == infd)
+		{
+			if (1 == (status = handle_err("Unable to open() the database file", errno))) /* WARNING assignment */
+				ABORTBACKUP;
+		}
+		if (-1 == fstat(infd, &stat))
+		{
+			if (1 == (status = handle_err("Error obtaining fstat() from the database file",
+					errno))) /* WARNING assignment */
+				ABORTBACKUP;
+		}
+		outfd = open(tempfilepathname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+		if (-1 == outfd)
+		{
+			if (1 == (status = handle_err("Unable to open() the backup file/location", errno))) /* WARNING assignment */
+			ABORTBACKUP;
+		}
+		/* set transfer size as maximum. Full copy-acceleration */
+		remaining = stat.st_size;
+		tmpsize = transfersize = remaining;
+		bytesspliced = 0;
+		if (GIGABYTE > tmpsize)
+			sizeGiB = FALSE;
+		tmpsize = (sizeGiB) ? DIVIDE_ROUND_UP(tmpsize, GIGABYTE) : DIVIDE_ROUND_UP(tmpsize, MEGABYTE);
+		digicnt = SNPRINTF(transferbuf, MAX_DIGITS_IN_INT8 + 7, "/ %lld %siB", tmpsize, (sizeGiB ? "G" : "M")) - 6;
+		memcpy(sizep, transferbuf, STRLEN(transferbuf) + 1);
+		begtm = time(NULL);
+		start_cnt = header_cpy->trans_hist.curr_tn;
+		if (showprogress)
+			util_out_print("Starting BACKUP for region : !AD", TRUE, REG_LEN_STR(gv_cur_region));
+		do
+		{
+			strtm = time(NULL);
+			tmpsize = remaining;
+			copy_file_range_p = p;
+			ret = copy_file_range_p(infd, inoffp, outfd, outoffp, remaining, 0);
+			if (WBTEST_ENABLED(WBTEST_BACKUP_FORCE_SLEEP))
+			{
+				util_out_print("BACKUP_STARTED", TRUE);
+				LONG_SLEEP(20);
+				showprogress = TRUE;
+			}
+			if (-1 == ret)
+			{
+				if (1 == (status = handle_err("Error occurred during the copy phase of MUPIP BACKUP",
+						 errno))) /* WARNING assignment */
+					ABORTBACKUP;
+			}
+			endtm = time(NULL);
+			bytesspliced = bytesspliced + (size_t)ret;
+			if ((endtm > strtm) && (0 < ret))
+				currspeed = DIVIDE_ROUND_UP(ret, (endtm - strtm)); /* bytes per second*/
+			remaining = remaining - ret;
+			if (showprogress)
+			{
+				if (0 < currspeed)
+					eta = (int)(DIVIDE_ROUND_UP(remaining, currspeed) * ADJUSTED_ETA); /* Increase ETA */
+				progper = ((double)bytesspliced / (double)transfersize) * 100;
+				if (progper > progfact)
+				{
+					progfact = progfact + SHOWPERCENT;
+					tmpsize = bytesspliced;
+					tmpsize = (sizeGiB) ? DIVIDE_ROUND_UP(bytesspliced, GIGABYTE) : DIVIDE_ROUND_UP
+							(bytesspliced, MEGABYTE);
+					memset(padding, '\0', 3);
+					if (100 != (int)progper)
+						memset(padding, fil, (10 > progper) ? 2 : 1); /* left pad progress percent string */
+					SNPRINTF(progperstr, BUF_MAX, "%s (%s%d%c)", sizep, padding, (int)progper, '%');
+					memset(padding, '\0', MAX_DIGITS_IN_INT8);
+					transpadcnt = digicnt - countdigits(tmpsize);
+					if (transpadcnt > 0)
+						memset(padding, fil, transpadcnt); /* left pad transferbuf string */
+					SNPRINTF(transferbuf, BUF_MAX, "%s%lld %s", padding, tmpsize, progperstr);
+					currspeed = DIVIDE_ROUND_DOWN(currspeed, 1024);
+					csdigicnt = countdigits(currspeed);
+					speedigits = (csdigicnt > speedigits) ? csdigicnt: speedigits;
+					cspadcnt = speedigits - csdigicnt;
+					memset(padding, '\0', MAX_DIGITS_IN_INT8);
+					if (cspadcnt > 0)
+						memset(padding, fil, cspadcnt); /* left pad speedbuf string */
+					SNPRINTF(speedbuf, BUF_MAX, "%s%lld", padding, currspeed);
+					if (eta > 60)
+					{
+						eta = DIVIDE_ROUND_UP(eta, 60);
+						etaptr = (1 < eta) ? "minutes": "minute";
+					}
+					else
+						etaptr = (1 < eta) ? "seconds": "second";
+					trans_cnt = cs_data->trans_hist.curr_tn - start_cnt;
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(10) ERR_BKUPPROGRESS, 8,
+						LEN_AND_STR(transferbuf), LEN_AND_STR(speedbuf), &trans_cnt,
+						eta, LEN_AND_STR(etaptr));
+					if (WBTEST_ENABLED(WBTEST_BACKUP_FORCE_SLEEP))
+						LONG_SLEEP(10);
+				}
+			}
+			if (TRUE == mu_ctrlc_occurred)
+				ABORTBACKUP;
+		} while ((0 < remaining) && (-1 < ret));
+		close(infd);
+		close(outfd);
+		if ((0 != remaining) || (ret == -1))
+			ABORTBACKUP; /* Copy failed so no need to retry */
+	}
+#	endif
+	if (TRUE == usesystem)
+	{
+		if (debug_mupip)
+			util_out_print("!/MUPIP INFO:   !AD", TRUE, cmdlen, command);
+		if (WBTEST_ENABLED(WBTEST_BACKUP_FORCE_SLEEP))
+		{
+			util_out_print("BACKUP_STARTED", TRUE);
+			LONG_SLEEP(20);
+		}
+		rv = SYSTEM((char *)command);
+		if (0 != rv)
+		{
+			if (-1 == rv)
+			{
+				save_errno = errno;
+				errptr = (char *)STRERROR(save_errno);
+				util_out_print("system : !AZ", TRUE, errptr);
+			}
+			util_out_print("Error doing !AD", TRUE, cmdlen, command);
+			ABORTBACKUP;
+		}
+		if (TRUE == mu_ctrlc_occurred)
+			ABORTBACKUP;
 	}
 	FREE_COMMAND_STR_IF_NEEDED;
 	assert(command == &cmdarray[0]);
-
-	/* tempfilename currently contains the name of temporary directory created.  *
-	 * add the DB filename (only the final filename, without the pathname) to point to tmpfilename */
+	/* tempfilename currently contains the name of temporary directory created.
+	 * add the DB filename (only the final filename, without the pathname) to point to tmpfilename.
+	 * Check that enough space is there in the buffer.
+	 */
+	if (tempfilelen + sourcefilelen + 1 > MAX_FN_LEN)	// +1 for the '/'
+	{
+		save_errno = errno;
+		errptr = (char *)STRERROR(save_errno);
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_FILENAMETOOLONG);
+		CLEANUP_AND_RETURN_FALSE;
+	}
 	tempfilename[tempfilelen++] = '/';
-	memcpy(&tempfilename[tempfilelen], sourcefilename, STRLEN(sourcefilename));
-	tempfilelen += STRLEN(sourcefilename);
+	memcpy(&tempfilename[tempfilelen], sourcefilename, sourcefilelen);
+	tempfilelen += sourcefilelen;
 	tempfilename[tempfilelen] = 0;
 	/* give temporary files the group and permissions as other shared resources - like journal files */
 	OPENFILE(tempfilename, O_RDWR, backup_fd);
@@ -494,7 +716,6 @@ bool	mubfilcpy (backup_reg_list *list)
 				shmpool_unlock_hdr(gv_cur_region);
 			}
 		}
-
 		if (0 != cs_addrs->shmpool_buffer->failed)
 		{
 			assert(EACCES == cs_addrs->shmpool_buffer->backup_errno);
@@ -504,7 +725,6 @@ bool	mubfilcpy (backup_reg_list *list)
 			util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
 			CLEANUP_AND_RETURN_FALSE;
 		}
-
 		FSTAT_FILE(list->backup_fd, &stat_buf, fstat_res);
 		if (-1 == fstat_res)
 		{
@@ -516,8 +736,12 @@ bool	mubfilcpy (backup_reg_list *list)
 			util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
 			CLEANUP_AND_RETURN_FALSE;
 		}
+<<<<<<< HEAD
 
 		if (0 < stat_buf.st_size)
+=======
+		if (0 < (filesize = stat_buf.st_size))
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 		{
 			rsize = (int4)(SIZEOF(muinc_blk_hdr) + header_cpy->blk_size);
 			sblkh_p = (muinc_blk_hdr_ptr_t)malloc(rsize);
@@ -549,9 +773,15 @@ bool	mubfilcpy (backup_reg_list *list)
 			{
 				assert(sblkh_p->valid_data);
 				blk_num = sblkh_p->blkid;
+				if (WBTEST_ENABLED(WBTEST_BACKUP_FORCE_SLEEP))
+				{
+					util_out_print("RESTORE_BLOCK_STAGE", TRUE);
+					LONG_SLEEP(10);
+				}
 				if (debug_mupip)
 					util_out_print("MUPIP INFO:     Restoring block 0x!XL from temporary file.",
 							TRUE, blk_num);
+
 				if (blk_num < header_cpy->trans_hist.total_blks)
 				{
 					inbuf = (char_ptr_t)(sblkh_p + 1);
@@ -561,6 +791,7 @@ bool	mubfilcpy (backup_reg_list *list)
 					 */
 					if (GDSV4 == sblkh_p->use.bkup.ondsk_blkver)
 					{	/* Need to downgrade this block back to a previous format. Downgrade in place. */
+						assert(GDSV4 != sblkh_p->use.bkup.ondsk_blkver); 	/* not supported */
 						gds_blk_downgrade((v15_blk_hdr_ptr_t)inbuf, (blk_hdr_ptr_t)inbuf);
 						size = (((v15_blk_hdr_ptr_t)inbuf)->bsiz + 1) & ~1;
 					} else
@@ -606,11 +837,9 @@ bool	mubfilcpy (backup_reg_list *list)
 			free(sblkh_p);
 		}
 	}
-
 	if (0 == memcmp(header_cpy->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
 		db_header_dwnconv(header_cpy);
 	LSEEKWRITE(backup_fd, 0, header_cpy, hdrsize, save_errno);
-
 	if (0 != save_errno)
 	{
 		errptr = (char *)STRERROR(save_errno);
@@ -620,7 +849,6 @@ bool	mubfilcpy (backup_reg_list *list)
 		CLEANUP_AND_RETURN_FALSE;
 	}
 	CLOSEFILE_RESET(backup_fd, status);	/* resets "backup_fd" to FD_INVALID */
-
 	/* mv it to destination */
 	/* Calculate total line length for "mv" command. If cannot fit in local variable array, malloc space */
 	assert(command == &cmdarray[0]);
@@ -645,6 +873,11 @@ bool	mubfilcpy (backup_reg_list *list)
 	if (debug_mupip)
 		util_out_print("MUPIP INFO:   !AD", TRUE, cmdlen, command);
 	rv = SYSTEM((char *)command);
+	if (WBTEST_ENABLED(WBTEST_BACKUP_FORCE_MV_RV))
+	{
+		util_out_print("Simulated mv returns an error.", TRUE);
+		rv = -1;
+	}
 	if (0 != rv)
 	{
 		if (-1 == rv)
@@ -661,22 +894,120 @@ bool	mubfilcpy (backup_reg_list *list)
 	tempdir[tmpdirlen] = 0;
 	if (0 != rmdir(tempdir))
 	{
-		util_out_print("Error removing temp dir : !AD", TRUE, tmpdirlen, tempdir);
+		save_errno = errno;
+		errptr = (char *)STRERROR(save_errno);
+		util_out_print("access : !AZ", TRUE, errptr);
+		util_out_print("Removing temp dir : !AD", TRUE, tmpdirlen, tempdir);
 		FREE_COMMAND_STR_IF_NEEDED;
 		CLEANUP_AND_RETURN_FALSE;
 	}
 	FREE_COMMAND_STR_IF_NEEDED;
 	assert(command == &cmdarray[0]);
-	util_out_print("DB file !AD backed up in file !AD", TRUE, gv_cur_region->dyn.addr->fname_len,
+	gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_BACKUPDBFILE, 4, gv_cur_region->dyn.addr->fname_len,
 			gv_cur_region->dyn.addr->fname, file->len, file->addr);
-	util_out_print("Transactions up to 0x!16@XQ are backed up.", TRUE, &header_cpy->trans_hist.curr_tn);
+	gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_BACKUPTN, 2, &ONE, &header_cpy->trans_hist.curr_tn);
 	cs_addrs->hdr->last_com_backup = header_cpy->trans_hist.curr_tn;
 	cs_addrs->hdr->last_com_bkup_last_blk = header_cpy->trans_hist.total_blks;
 	if (record)
 	{
 		cs_addrs->hdr->last_rec_backup = header_cpy->trans_hist.curr_tn;
 		cs_addrs->hdr->last_rec_bkup_last_blk = header_cpy->trans_hist.total_blks;
+		cs_addrs->hdr->last_start_backup = header_cpy->last_start_backup;
 	}
 	file_backed_up = TRUE;
+	if (TRUE == grab_crit_immediate(gv_cur_region, TRUE, NOT_APPLICABLE))
+	{
+		 if (!wcs_flu(WCSFLU_FLUSH_HDR))
+		 {
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_BUFFLUFAILED), 4,
+					LEN_AND_LIT("MUPIP BACKUP -DATABASE"), DB_LEN_STR(gv_cur_region));
+
+		 }
+		 rel_crit(gv_cur_region);
+        }
 	return TRUE;
 }
+#ifdef __x86_64
+/* error handler for copy_file_range() */
+inline int handle_err(char errorstr[], int saved_errno)
+{
+	char *customptr, *adviceptr;
+	char oserror[BUF_MAX] = "\0";
+	int status;
+	customptr = "\0";
+	switch (saved_errno)
+	{
+		case ENOSPC:
+		{
+			SNPRINTF(oserror, BUF_MAX, "%s, %s for backing up region %s", "ENOSPC",
+			(char *)STRERROR(saved_errno), gv_cur_region->rname);
+			if (NULL == getenv("gtm_baktmpdir"))
+			{
+				customptr = "As $gtm_baktmpdir is not defined, GT.M uses the backup destination "
+						"to store temporary files. Consider defining $gtm_baktmpdir to "
+						"an appropriate location.";
+			}
+			else
+				customptr = "Ensure that you have adequate space available on the backup location.";
+			break;
+		}
+		default:
+		{
+			if (0 != saved_errno)
+			{
+				SNPRINTF(oserror, BUF_MAX, "Error code: %d, %s", saved_errno,
+						(char *)STRERROR(saved_errno));
+			}
+			break;
+		}
+	}
+	if (0 < STRLEN(errorstr))
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(errorstr));
+	if (0 < STRLEN(oserror))
+	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(oserror));
+	/* Extra error information about what the error may mean to GT.M */
+	if (0 < STRLEN(customptr))
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(customptr));
+	return 1; /* In all error conditions, return 1 which initiates the CLEANUP sequence  */
+}
+/* countdigits(size_t num) returns the number of digits */
+inline int countdigits(size_t n)
+{
+	uint4	digitcnt = 0;
+	do
+	{
+		n = n / 10;
+		digitcnt++;
+	} while (n);
+	return digitcnt;
+}
+/* boolean_t ink_backup(void) performs a run-time check and returns TRUE when the copy_file_range symbol exists,
+ * Linux kernel >= 5.3 and GLIBC > 2.27.
+ * Ensure that ink_backup(void) matches com/backup_copy_type.c in the test system.
+ */
+inline boolean_t ink_backup(void)
+{
+	struct utsname relbuff;
+	char *ptr;
+	long int kernel_major, kernel_minor;
+	float glibcversion;
+	/* Check for the copy_file_range symbol */
+	p = dlsym(RTLD_DEFAULT, "copy_file_range");
+	if (NULL == p)
+		return FALSE;
+	/* Get kernel version */
+	if (uname(&relbuff) != 0)
+		return FALSE;
+	ptr = relbuff.release;
+	kernel_major = STRTOL(ptr, &ptr, 10);
+	ptr++;
+	kernel_minor = STRTOL(ptr, &ptr, 10);
+	/* Get glibc version */
+	glibcversion = ATOF(gnu_get_libc_version());
+	/* Check if Linux Kernel >= 5.3 and GLIBC > 2.27  */
+	if ((5 < kernel_major) || ((5 == kernel_major) && (3 <= kernel_minor) && ((glibcversion > 2.27))))
+		return TRUE;
+	else
+		return FALSE;
+}
+#endif

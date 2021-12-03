@@ -59,7 +59,8 @@ void recover_truncate(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg)
 		csa->nl->trunc_pid = 0;
 	if (!csd->before_trunc_total_blks)
 		return;
-	assert(((GDSVCURR == csd->desired_db_format) || (BLK_ID_32_VER == csd->desired_db_format))
+	assert(((GDSVCURR == csd->desired_db_format) || (GDSV7m == csd->desired_db_format)
+			|| (BLK_ID_32_VER > csd->desired_db_format))
 			&& (csd->blks_to_upgrd == 0)
 			&& (dba_mm != csd->acc_meth));
 	/* If called from db_init, assure we've grabbed the access semaphor and are the only process attached to the database.

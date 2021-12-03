@@ -51,7 +51,6 @@
 #include "min_max.h"
 #include "gtmimagename.h"
 #include "anticipatory_freeze.h"
-
 #include "gtmrecv.h"
 #include "deferred_exit_handler.h"
 #include "repl_instance.h"
@@ -255,9 +254,12 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	th_index_ptr_t		cti;
 	jbuf_rsrv_struct_t	*jrs;
 	jrec_rsrv_elem_t	*first_jre, *jre, *jre_top;
+<<<<<<< HEAD
         int4			event_type, param_val;
 	block_id		pvt_total_blks;
         void (*set_fn)(int4 param);
+=======
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -298,7 +300,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	 * Since we don't expect hold_onto_crit to be set by any other utility/function, the below assert is valid and is intended
 	 * to catch cases where the field is inadvertently set to TRUE.
 	 */
-	assert(!csa->hold_onto_crit || IS_DSE_IMAGE
+	assert(!csa->hold_onto_crit || IS_DSE_IMAGE || mu_reorg_upgrd_dwngrd_in_prog
 		|| jgbl.onlnrlbk || TREF(in_gvcst_redo_root_search) || TREF(in_trigger_upgrade));
 	assert(cs_data == csd);
 	assert((t_tries < CDB_STAGNATE) || csa->now_crit);
@@ -590,7 +592,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				 */
 				assert((CDB_STAGNATE > t_tries) || (cs->blk < cti->total_blks));
 				cs->mode = gds_t_acquired;
-				assert((GDSVCURR == cs->ondsk_blkver) || (BLK_ID_32_VER == cs->ondsk_blkver));
+				assert((GDSVCURR == cs->ondsk_blkver) || (GDSV7m == cs->ondsk_blkver)
+					|| (BLK_ID_32_VER > cs->ondsk_blkver)
+					|| (mu_reorg_upgrd_dwngrd_in_prog && (GDSV6p == cs->ondsk_blkver)));
 			} else if (reorg_ss_in_prog && WAS_FREE(cs->blk_prior_state))
 			{
 				assert((gds_t_acquired == cs->mode) && (NULL == cs->old_block));
@@ -1126,7 +1130,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
 		}
 	}
-	if ((0 != cw_map_depth) && (mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog))
+	if ((0 != cw_map_depth) && mu_reorg_encrypt_in_prog)
 	{	/* Bit maps from mu_reorg_upgrd_dwngrd. Bitmap history has been validated.
 		 * But we do not want bitmap cse to be considered for bg_update. Reset cw_set_depth accordingly.
 		 */
@@ -1812,8 +1816,12 @@ skip_cr_array:
 	assert(!csa->now_crit || csa->hold_onto_crit);
 	assert(cdb_sc_normal == status);
 	REVERT;	/* no need for t_ch to be invoked if any errors occur after this point */
+<<<<<<< HEAD
 	CALL_ZTIMEOUT_IF_DEFERRED;
 	DEFERRED_SIGNAL_HANDLING_CHECK; /* now that crits are released, check if deferred signal/exit handling needs to be done */
+=======
+	DEFERRED_EXIT_HANDLING_CHECK; /* now that all crits are released, check if deferred signal/exit handling needs to be done */
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	assert(update_trans);
 	if (REPL_ALLOWED(csa) && IS_DSE_IMAGE)
 	{

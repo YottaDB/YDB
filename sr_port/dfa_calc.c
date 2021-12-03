@@ -32,7 +32,8 @@
 #else
 #define ASSERT_IF_2DIM_ARRAY_OVERFLOW(array, row, col)				\
 {                                                       			\
-        assert(((row) < ARRAYSIZE(array)) && ((col) < ARRAYSIZE(array[0])));	\
+	if ((row  >= ARRAYSIZE(array)) || (col >= ARRAYSIZE(array[0])))		\
+        	assert(((row) < ARRAYSIZE(array)) && ((col) < ARRAYSIZE(array[0])));	\
 }
 #endif
 

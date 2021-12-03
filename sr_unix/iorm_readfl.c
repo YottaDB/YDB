@@ -31,7 +31,7 @@
 #include "eintr_wrappers.h"
 #include "wake_alarm.h"
 #include "min_max.h"
-#include "outofband.h"
+#include "deferred_events_queue.h"
 #include "mv_stent.h"
 #include "send_msg.h"
 #include "svnames.h"
@@ -44,13 +44,14 @@
 #include "gtm_utf8.h"
 #endif
 
-GBLREF	boolean_t       dollar_zininterrupt, gtm_utf8_mode, prin_dm_io, prin_in_dev_failure, prin_out_dev_failure;
-GBLREF	io_pair		io_curr_device, io_std_device;
-GBLREF	mval		dollar_zstatus;
-GBLREF	mv_stent      	*mv_chain;
-GBLREF	spdesc		stringpool;
-GBLREF	volatile bool	out_of_time;
-GBLREF	volatile int4	outofband;
+GBLREF	boolean_t       	gtm_utf8_mode, prin_dm_io, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF	io_pair			io_curr_device, io_std_device;
+GBLREF	mval			dollar_zstatus;
+GBLREF	mv_stent      		*mv_chain;
+GBLREF	spdesc			stringpool;
+GBLREF	volatile bool		out_of_time;
+GBLREF	volatile boolean_t      dollar_zininterrupt;
+GBLREF	volatile int4		outofband;
 #ifdef UTF8_SUPPORTED
 GBLREF	UConverter	*chset_desc[];
 LITREF mstr            chset_names[];
@@ -67,7 +68,7 @@ error_def(ERR_ZINTRECURSEIO);
 #define fl_copy(a, b) (a > b ? b : a)
 
 #define SETZACANCELTIMER					\
-		io_ptr->dollar.za = 9;				\
+		io_ptr->dollar.za = ZA_IO_ERR;				\
 		v->str.len = 0;					\
 		if (!rm_ptr->follow && timed && !out_of_time)	\
 			cancel_timer(timer_id);
@@ -646,8 +647,8 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 											      the interrupt */
 							(TREF(pipefifo_interrupt))++;
 							REVERT_GTMIO_CH(&io_curr_device, ch_set);
-							outofband_action(FALSE);
-							assertpro(FALSE);	/* Should *never* return from outofband_action */
+							async_action(FALSE);
+							assertpro(FALSE);	/* Should *never* return from async_action */
 							return FALSE;	/* For the compiler.. */
 						}
 						continue; /* for now try and read again if eof or no input ready */
@@ -725,8 +726,8 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 					stringpool.free += tot_bytes_read;	/* Don't step on our parade in the interrupt */
 					(TREF(pipefifo_interrupt))++;
 					REVERT_GTMIO_CH(&io_curr_device, ch_set);
-					outofband_action(FALSE);
-					assertpro(FALSE);	/* Should *never* return from outofband_action */
+					async_action(FALSE);
+					assertpro(FALSE);	/* Should *never* return from async_action */
 					return FALSE;	/* For the compiler.. */
 				}
 			}
@@ -871,9 +872,8 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 								stringpool.free += bytes_count;
 								(TREF(pipefifo_interrupt))++;
 								REVERT_GTMIO_CH(&io_curr_device, ch_set);
-								outofband_action(FALSE);
-								assertpro(FALSE);	/* Should *never* return from
-										   outofband_action */
+								async_action(FALSE);
+								assertpro(FALSE);	/* Should never return from async_action */
 								return FALSE;	/* For the compiler.. */
 							}
 							continue; /* for now try and read again if eof or no input
@@ -944,8 +944,8 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						stringpool.free += bytes_count;
 						(TREF(pipefifo_interrupt))++;
 						REVERT_GTMIO_CH(&io_curr_device, ch_set);
-						outofband_action(FALSE);
-						assertpro(FALSE);	/* Should *never* return from outofband_action */
+						async_action(FALSE);
+						assertpro(FALSE);	/* Should *never* return from async_action */
 						return FALSE;	/* For the compiler.. */
 					}
 					if (-1 == status)
@@ -1079,8 +1079,8 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 					rm_ptr->mupintr = TRUE;
 					(TREF(pipefifo_interrupt))++;
 					REVERT_GTMIO_CH(&io_curr_device, ch_set);
-					outofband_action(FALSE);
-					assertpro(FALSE);	/* Should *never* return from outofband_action */
+					async_action(FALSE);
+					assertpro(FALSE);	/* Should *never* return from async_action */
 					return FALSE;	/* For the compiler.. */
 				}
 				chset = io_ptr->ichset;		/* in case UTF-16 was changed */
@@ -1276,8 +1276,8 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						(TREF(pipefifo_interrupt))++;
 						PIPE_DEBUG(PRINTF(" %d utf1.1 stream outofband\n", pid); DEBUGPIPEFLUSH);
 						REVERT_GTMIO_CH(&io_curr_device, ch_set);
-						outofband_action(FALSE);
-						assertpro(FALSE);	/* Should *never* return from outofband_action */
+						async_action(FALSE);
+						assertpro(FALSE);	/* Should *never* return from async_action */
 						return FALSE;	/* For the compiler.. */
 					}
 					/* Set the UTF-16 variant if not already set, and has been determined right now */
@@ -1405,9 +1405,8 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 									stringpool.free += bytes_count;
 									(TREF(pipefifo_interrupt))++;
 									REVERT_GTMIO_CH(&io_curr_device, ch_set);
-									outofband_action(FALSE);
-									assertpro(FALSE);	/* Should *never* return from
-											   outofband_action */
+									async_action(FALSE);
+									assertpro(FALSE); /* never returns from async_action */
 									return FALSE;	/* For the compiler.. */
 								}
 								continue; /* for now try and read again if eof or no input
@@ -1478,8 +1477,8 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 							stringpool.free += bytes_count;
 							(TREF(pipefifo_interrupt))++;
 							REVERT_GTMIO_CH(&io_curr_device, ch_set);
-							outofband_action(FALSE);
-							assertpro(FALSE);	/* Should *never* return from outofband_action */
+							async_action(FALSE);
+							assertpro(FALSE);	/* Should *never* return from async_action */
 							return FALSE;	/* For the compiler.. */
 						}
 						if (-1 == status)
@@ -1918,6 +1917,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 	assert(EOF == -1);
 	if (-1 == status)
 	{
+<<<<<<< HEAD
 		if (EINTR != real_errno)
 		{
 			v->str.len = 0;
@@ -1933,6 +1933,19 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
 			}
 			ret = FALSE;
+=======
+		v->str.len = 0;
+		v->str.addr = (char *)stringpool.free;					/* ensure valid address */
+		if (EAGAIN != real_errno)
+		{	/* Cancel the timer before taking the error return */
+			if (timed && !out_of_time)
+				cancel_timer(timer_id);
+			io_ptr->dollar.za = ZA_IO_ERR;
+			/* save error in $device */
+			SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, real_errno);
+			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ, not socket*/
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 		}
 		/* else: No need to call "eintr_handling_check()" again as it was already
 		 * done above right after the "read()" system call happened.
@@ -1977,7 +1990,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 			return FALSE;
 		}
 		/* on end of file set $za to 9 */
-		io_ptr->dollar.za = 9;
+		io_ptr->dollar.za = ZA_IO_ERR;
 		*dollarx_ptr = 0;
 		(*dollary_ptr)++;
 		if (WBTEST_ENABLED(WBTEST_DOLLARDEVICE_BUFFER))

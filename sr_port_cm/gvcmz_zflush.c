@@ -32,9 +32,9 @@
 GBLDEF struct CLB	*zdeferr;
 GBLDEF int4		zdef_sent, zdef_rcv;
 
-GBLREF struct NTD	*ntd_root;
 GBLREF bool		zdefactive;
-GBLREF int4		outofband;
+GBLREF struct NTD	*ntd_root;
+GBLREF volatile int4	outofband;
 
 error_def(ERR_BADSRVRNETMSG);
 
@@ -90,7 +90,7 @@ void gvcmz_zflush(void)
 		else
 		{
 			if (CMMS_E_ERROR != *(zdeferr->mbf))
-				RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			else
 				gvcmz_errmsg(zdeferr, FALSE);
 		}

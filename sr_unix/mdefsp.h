@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -28,6 +28,7 @@ typedef uint64_t	uint8;	  	/* 8-byte unsigned integer */
 #endif
 typedef uint64_t 	gtm_uint8;	/* these two datatypes are defined because */
 typedef	int64_t		gtm_int8;	/* int8 and uint8 are system defined in AIX_64 */
+typedef	int64_t		gtm_timet;	/* Differentiate a type for this so we can dump epochs intelligently to a string */
 #define INT8_NATIVE
 
 #ifdef __s390__

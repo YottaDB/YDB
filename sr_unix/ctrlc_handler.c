@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -24,12 +24,17 @@
 
 #include "ctrlc_handler.h"
 #include "std_dev_outbndset.h"
+<<<<<<< HEAD
 #include "sig_init.h"
 #include "gtmio.h"
 #include "io.h"
 #include "invocation_mode.h"
 #include "libyottadb_int.h"
 #include "outofband.h"		/* for CTRLC and CTRLD */
+=======
+#include "have_crit.h"
+#include "deferred_events_queue.h"
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 GBLREF	struct sigaction	orig_sig_action[];
 

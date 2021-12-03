@@ -725,16 +725,13 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd, gtm_uint64_t *sec_size)
 	assert(0 == SHMPOOL_SECTION_SIZE % OS_PAGE_SIZE);
 	assert(0 == CACHE_CONTROL_SIZE(csd) % OS_PAGE_SIZE);
 	/* First compute the size based on sections common to both MM and BG */
-	tmp_sec_size = NODE_LOCAL_SPACE(csd) + JNL_SHARE_SIZE(csd) + SHMPOOL_SECTION_SIZE + LOCK_SPACE_SIZE(csd);
+	csd->free_space = (BLK_ZERO_OFF(csd->start_vbn) - SIZEOF_FILE_HDR(csd));
+	tmp_sec_size = NODE_LOCAL_SPACE(csd) + JNL_SHARE_SIZE(csd) + LOCK_SPACE_SIZE(csd) + SHMPOOL_SECTION_SIZE
+		+ SIZEOF_FILE_HDR(csd);
 	/* Now, add sections specific to MM and BG */
-	if (dba_mm == reg->dyn.addr->acc_meth)
-		tmp_sec_size += SIZEOF_FILE_HDR(csd);
-	else
-	{
-		assertpro(dba_bg == reg->dyn.addr->acc_meth);
-		tmp_sec_size += CACHE_CONTROL_SIZE(csd) + (LOCK_BLOCK(csd) * DISK_BLOCK_SIZE);
-	}
-	ADJUST_SHM_SIZE_FOR_HUGEPAGES(tmp_sec_size, *sec_size);	/* *sec_size is adjusted size */
+	if (dba_bg == reg->dyn.addr->acc_meth)
+		tmp_sec_size += CACHE_CONTROL_SIZE(csd) + (DIVIDE_ROUND_UP(BT_SIZE(csd), OS_PAGE_SIZE) * OS_PAGE_SIZE);
+	ADJUST_SHM_SIZE_FOR_HUGEPAGES(tmp_sec_size, *sec_size); /* *sec_size is adjusted size */
 	return;
 }
 
@@ -1385,7 +1382,8 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		FSTAT_FILE(udi->fd, &stat_buf, stat_res);
 		if (-1 == stat_res)
 			RTS_ERROR(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
-		mmap_sz = stat_buf.st_size - BLK_ZERO_OFF(tsd->start_vbn);
+		csd = csa->hdr = (sgmnt_data_ptr_t)((sm_uc_ptr_t)csa->mlkctl + csa->mlkctl_len);
+		mmap_sz = stat_buf.st_size - BLK_ZERO_OFF(tsd->start_vbn) - csd->free_space;
 		assert(0 < mmap_sz);
 		CHECK_LARGEFILE_MMAP(reg, mmap_sz); /* can issue rts_error MMFILETOOLARGE */
 #		ifdef _AIX
@@ -1405,7 +1403,6 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 #		endif
 		csa->db_addrs[1] = (sm_uc_ptr_t)((sm_uc_ptr_t)csa->db_addrs[0] + mmap_sz - 1);	/* '- 1' due to 0-based indexing */
 		assert(csa->db_addrs[1] > csa->db_addrs[0]);
-		csd = csa->hdr = (sgmnt_data_ptr_t)((sm_uc_ptr_t)csa->mlkctl + csa->mlkctl_len);
 	}
 	/* At this point, shm_setup_ok is TRUE so we are guaranteed that vermismatch is FALSE.  Therefore, we can safely
 	 * dereference cnl->glob_sec_init without worrying about whether or not it could be at a different offset than

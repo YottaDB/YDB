@@ -90,11 +90,12 @@ GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	cw_set_element		cw_set[];
 GBLREF	boolean_t		tp_kill_bitmaps;
+GBLREF 	boolean_t		in_timed_tn;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	unsigned int		t_tries;
 GBLREF	boolean_t		is_updproc;
-GBLREF	void			(*tp_timeout_clear_ptr)(void);
+GBLREF	void			(*tp_timeout_clear_ptr)(boolean_t toss_queued);
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	tp_region		*tp_reg_list;	/* Chained list of regions used in this transaction not cleared on tp_restart */
 GBLREF	jnl_gbls_t		jgbl;
@@ -113,9 +114,7 @@ GBLREF	boolean_t		forw_recov_lgtrig_only;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def(ERR_GBLOFLOW);
-error_def(ERR_GVIS);
 error_def(ERR_TLVLZERO);
-error_def(ERR_TPRETRY);
 #ifdef GTM_TRIGGER
 error_def(ERR_TRIGTCOMMIT);
 error_def(ERR_TCOMMITDISALLOW);
@@ -441,7 +440,8 @@ enum cdb_sc	op_tcommit(void)
 							cse->blk = new_blk;
 							csa->tp_hint = new_blk;
 							cse->mode = gds_t_acquired;
-							assert((GDSVCURR == cse->ondsk_blkver) || (GDSV6 == cse->ondsk_blkver));
+							assert((GDSVCURR == cse->ondsk_blkver) || (GDSV7m == cse->ondsk_blkver)
+								|| (GDSV6 == cse->ondsk_blkver));
 							/* Assert that in final retry total_blks (private and shared) are in sync */
 							assert((CDB_STAGNATE > t_tries) || !is_mm
 									|| (csa->total_blks == csa->ti->total_blks));
@@ -595,7 +595,8 @@ enum cdb_sc	op_tcommit(void)
 			DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 #		endif
 		/* Cancel or clear any pending TP timeout only if real commit (i.e. outermost commit) */
-		(*tp_timeout_clear_ptr)();
+		if (in_timed_tn)
+			(*tp_timeout_clear_ptr)(TRUE);
 	} else		/* an intermediate commit */
 		tp_incr_commit();
 	assert(dollar_tlevel);

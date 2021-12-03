@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -93,19 +93,11 @@
 #endif
 
 #ifdef ITIMER_REAL
-# define BSD_TIMER
 # define USER_HZ 1000
-#else
-/* check def of time() including arg - see below; should be time_t
- * (from sys/types.h) and traditionally unsigned long */
-# ifndef __osf__
-int4	time();
-# endif
 #endif
 
 #define TIMER_BLOCK_SIZE	64	/* # of timer entries allocated initially as well as at every expansion */
 #define GT_TIMER_EXPAND_TRIGGER	8	/* if the # of timer entries in the free queue goes below this, allocate more */
-#define GT_TIMER_INIT_DATA_LEN	8
 #define MAX_TIMER_POP_TRACE_SZ	32
 
 #define ADD_SAFE_HNDLR(HNDLR)									\
@@ -115,6 +107,7 @@ int4	time();
 	safe_handlers[safe_handlers_cnt++] = HNDLR;						\
 }
 
+<<<<<<< HEAD
 #ifndef BSD_TIMER
 #  error Platform does not support BSD_TIMER which this module relies on
 #endif
@@ -147,6 +140,38 @@ int4	time();
 	STATICDEF ABS_TIME		sys_timer_at;			/* Absolute time associated with sys_timer */
 	STATICDEF boolean_t		in_setitimer_error;
 #endif
+=======
+#define REPORT_SETITIMER_ERROR(TIMER_TYPE, SYS_TIMER, FATAL, ERRNO)				\
+{												\
+	char s[512];										\
+												\
+	SNPRINTF(s, 512, "Timer: %s; timer_active: %d; "					\
+		"sys_timer.it_value: [tv_sec: %ld; tv_usec: %ld]; "				\
+		"sys_timer.it_interval: [tv_sec: %ld; tv_usec: %ld]",				\
+		TIMER_TYPE, timer_active,							\
+		SYS_TIMER.it_value.tv_sec, SYS_TIMER.it_value.tv_usec,				\
+		SYS_TIMER.it_interval.tv_sec, SYS_TIMER.it_interval.tv_usec);			\
+	if (FATAL)										\
+	{											\
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7)						\
+			ERR_SETITIMERFAILED, 1, ERRNO, ERR_TEXT, 2, LEN_AND_STR(s));		\
+		in_setitimer_error = TRUE;							\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SETITIMERFAILED, 1, ERRNO);	\
+	} else											\
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7)	MAKE_MSG_WARNING(ERR_SETITIMERFAILED),	\
+			1, ERRNO, ERR_TEXT, 2, LEN_AND_STR(s));					\
+}
+
+#define SYS_SETTIMER(TIMER, DELTA)								\
+MBSTART {											\
+	sys_timer_at = (TIMER)->expir_time;							\
+	sys_settimer((TIMER)->tid, DELTA);							\
+} MBEND
+
+STATICDEF struct itimerval	sys_timer, old_sys_timer;
+STATICDEF ABS_TIME		sys_timer_at;			/* Absolute time associated with sys_timer */
+STATICDEF boolean_t		in_setitimer_error;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 #define SAFE_FOR_ANY_TIMER	((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && (FALSE == process_exiting) && !fast_lock_count)
 /* In case threads are running, we don't want any unsafe timers to be handled during a timer handler pop. This is because we
@@ -193,7 +218,6 @@ STATICDEF struct sigaction prev_alrm_handler;	/* save previous SIGALRM handler, 
 /* Chain of unused timer request blocks */
 STATICDEF volatile	GT_TIMER	*timefree = NULL;
 STATICDEF volatile 	int4		num_timers_free;		/* # of timers in the unused queue */
-STATICDEF		int4		timeblk_hdrlen;
 STATICDEF volatile 	st_timer_alloc	*timer_allocs = NULL;
 
 STATICDEF int 		safe_timer_cnt, timer_pop_cnt;			/* Number of safe timers in queue/popped */
@@ -221,6 +245,37 @@ STATICDEF GT_TIMER	trc_timerpop_array[MAX_TIMER_POP_TRACE_SZ];
 }
 #endif
 
+/* Get current clock time from the target clock when using clock_gettime()
+ * Arguments:	atp - pointer to absolute structure of time
+ * 		clockid - one of CLOCK_REALTIME or CLOCK_MONOTONIC
+ */
+#define	GET_TIME_CORE(ATP, CLOCKID)									\
+MBSTART {												\
+	struct timespec	ts;										\
+													\
+	/* Note: This code is called from timer_handler and so needs to be async-signal safe.		\
+	 * POSIX defines "clock_gettime" as safe but not "gettimeofday" so dont use the latter.		\
+	 */												\
+	clock_gettime(CLOCKID, &ts);									\
+	atp->at_sec = (int4)ts.tv_sec;									\
+	atp->at_usec = (int4)ts.tv_nsec / 1000;								\
+} MBEND
+
+/* Sleep for MS milliseconds of "clockid" time unless interrupted by RESTART processing */
+#ifdef _AIX
+/* Because of unreliability, AIX uses plain old nanosleep() */
+#define HIBER_START_CORE(MS, CLOCKID, RESTART)	SLEEP_USEC((MS * 1000), RESTART)
+#else
+#define HIBER_START_CORE(MS, CLOCKID, RESTART)				\
+MBSTART {								\
+	time_t	seconds, nanoseconds;					\
+									\
+	seconds = MS / 1000;						\
+	nanoseconds = (MS % 1000) * E_6;				\
+	CLOCK_NANOSLEEP(CLOCKID, seconds, nanoseconds, (RESTART));	\
+} MBEND
+#endif
+
 /* Flag signifying timer is active. Especially useful when the timer handlers get nested. This has not been moved to a
  * threaded framework because we do not know how timers will be used with threads.
  */
@@ -243,6 +298,7 @@ GBLDEF	volatile boolean_t	timer_from_OS;
 
 GBLREF	boolean_t		blocksig_initialized;		/* Set to TRUE when blockalrm, block_ttinout, and block_sigsent are
 								 * initialized. */
+<<<<<<< HEAD
 GBLREF	sigset_t		blockalrm;
 GBLREF	sigset_t		block_ttinout;
 GBLREF	sigset_t		block_sigsent;
@@ -263,6 +319,17 @@ GBLREF	boolean_t		noThreadAPI_active;
 GBLREF	pid_t			posix_timer_thread_id;
 GBLREF	boolean_t		posix_timer_created;
 #endif
+=======
+GBLREF	boolean_t	mu_reorg_process, oldjnlclose_started;
+GBLREF	int		process_exiting;
+GBLREF	int4		error_condition;
+GBLREF	sigset_t	blockalrm;
+GBLREF	sigset_t	block_sigsent;
+GBLREF	sigset_t	block_ttinout;
+GBLREF	sigset_t	block_worker;
+GBLREF	void		(*jnl_file_close_timer_ptr)(void);	/* Initialized only in gtm_startup(). */
+GBLREF	volatile int4	fast_lock_count, outofband;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 #ifdef DEBUG
 GBLREF	boolean_t		in_nondeferrable_signal_handler;
 GBLREF	boolean_t		gtm_jvm_process;
@@ -272,6 +339,7 @@ error_def(ERR_SETITIMERFAILED);
 error_def(ERR_TEXT);
 error_def(ERR_TIMERHANDLER);
 
+<<<<<<< HEAD
 STATICFNDCL void	gt_timers_alloc(void);
 STATICFNDCL void	start_timer_int(TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len,
 					void *hdata, boolean_t safe_timer);
@@ -282,6 +350,8 @@ STATICFNDCL GT_TIMER	*add_timer(ABS_TIME *atp, TID tid, uint8 time_to_expir, voi
 				   void *hdata, boolean_t safe_timer);
 STATICFNDCL void	remove_timer(TID tid);
 
+=======
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 /* Preallocate some memory for timers. */
 void gt_timers_alloc(void)
 {
@@ -291,8 +361,15 @@ void gt_timers_alloc(void)
 
 	/* Allocate timer blocks putting each timer on the free queue */
 	assert(1 > timer_stack_count);
-	timeblk_hdrlen = OFFSETOF(GT_TIMER, hd_data[0]);
-	timeblk = timeblks = (GT_TIMER *)malloc((timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN) * TIMER_BLOCK_SIZE);
+#	ifdef DEBUG
+	/* Allocate space for deferred timer tracking. We don't expect to need more than the initial TIMER_BLOCK_SIZE entries */
+	if (WBTEST_ENABLED(WBTEST_DEFERRED_TIMERS))
+	{
+		deferred_tids = (TID *)malloc(sizeof(TID) * TIMER_BLOCK_SIZE);
+		memset((char *)deferred_tids, (char)0xff, sizeof(TID) * TIMER_BLOCK_SIZE);
+	}
+#	endif
+	timeblk = timeblks = (GT_TIMER *)malloc((SIZEOF(GT_TIMER)) * TIMER_BLOCK_SIZE);
 	new_alloc = (st_timer_alloc *)malloc(SIZEOF(st_timer_alloc));
 	new_alloc->addr = timeblk;
 	new_alloc->next = (st_timer_alloc *)timer_allocs;
@@ -302,9 +379,9 @@ void gt_timers_alloc(void)
 		timeblk->hd_len_max = GT_TIMER_INIT_DATA_LEN;	/* Set amount it can store */
 		timeblk->next = (GT_TIMER *)timefree;		/* Put on free queue */
 		timefree = timeblk;
-		timeblk = (GT_TIMER *)((char *)timeblk + timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN);	/* Next! */
+		timeblk = (GT_TIMER *)((char *)timeblk + SIZEOF(GT_TIMER));	/* Next! */
 	}
-	assert(((char *)timeblk - (char *)timeblks) == (timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN) * TIMER_BLOCK_SIZE);
+	assert(((char *)timeblk - (char *)timeblks) == (SIZEOF(GT_TIMER)) * TIMER_BLOCK_SIZE);
 	num_timers_free += TIMER_BLOCK_SIZE;
 }
 
@@ -348,14 +425,7 @@ void set_blocksig(void)
 	sigdelset(&block_worker, SIGKILL);
 	sigdelset(&block_worker, SIGFPE);
 	sigdelset(&block_worker, SIGBUS);
-	sigemptyset(&block_sigusr);
-	sigaddset(&block_sigusr, SIGINT);
-	sigaddset(&block_sigusr, SIGQUIT);
-	sigaddset(&block_sigusr, SIGTERM);
-	sigaddset(&block_sigusr, SIGTSTP);
-	sigaddset(&block_sigusr, SIGCONT);
-	sigaddset(&block_sigusr, SIGALRM);
-	sigaddset(&block_sigusr, SIGUSR1);
+	sigaddset(&block_worker, SIGTERM);
 	blocksig_initialized = TRUE;	/* note the fact that blockalrm and block_sigsent are initialized */
 }
 
@@ -370,27 +440,36 @@ void prealloc_gt_timers(void)
 	 * possible safe timers thus pulling extra stuff into executables that don't need or want it.
 	 *
 	 * First step, fill in the safe timers contained within this module which are always available.
+	 * NOTE: Use gt_timers_add_safe_hndlrs to add safe timer handlers not visible to gtmsecshr
 	 */
+<<<<<<< HEAD
 	ADD_SAFE_HNDLR(&hiber_start_wait_any);	/* Resident in this module */
+=======
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	ADD_SAFE_HNDLR(&wake_alarm);		/* Standalone module containing only one global reference */
 }
 
-/* Get current clock time. Fill-in the structure with the absolute time of system clock.
- * Arguments:	atp - pointer to structure of absolute time
- */
+/* Get current monotonic clock time. Fill-in the structure with the monotonic time of system clock */
 void sys_get_curr_time(ABS_TIME *atp)
 {
+<<<<<<< HEAD
 	/* Note: This function is called from timer_handler and so needs to be async-signal safe.
 	 *       POSIX defines "clock_gettime" as safe but not "gettimeofday" so don't use the latter.
 	 * Note: CLOCK_MONOTONIC comes more recommended than CLOCK_REALTIME since it is immune to adjustments
 	 *       from NTP and adjtime(). So we use that.
 	 */
 	clock_gettime(CLOCK_MONOTONIC, atp);
+=======
+	GET_TIME_CORE(atp, CLOCK_MONOTONIC);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 }
 
-/* Start hibernating by starting a timer and waiting for it. */
-void hiber_start(uint4 hiber)
+/* Get current "wall" clock time. Fill-in the structure with the absolute time of system clock.
+ * WARNING: only op_hang uses this to ensure the HANG duration matches $[Z]Horlog/$ZUT time
+ */
+void sys_get_wall_time(ABS_TIME *atp)
 {
+<<<<<<< HEAD
 	SLEEP_USEC((long long)(hiber * 1000LL), !outofband);	/* Second parameter is passed as "!outofband" so we
 								 * return from macro if ever an outofband event occurs
 								 * (e.g. MUPIP INTRPT i.e. SIGUSR1 signal etc.).
@@ -404,6 +483,31 @@ void hiber_start_wait_any(uint4 hiber)	/* "hiber" is in milli-seconds */
 	SLEEP_USEC((long long)(hiber * 1000LL), FALSE);	/* FALSE passed so we return if an EINTR occurs
 							 * instead of restarting wait.
 							 */
+=======
+	GET_TIME_CORE(atp, CLOCK_REALTIME);
+}
+
+/* Sleep for milliseconds of monotonic time unless interrupted by out-of-band processing */
+void hiber_start(uint4 milliseconds)
+{
+	/* WARNING: negation of outofband is intentional */
+	HIBER_START_CORE(milliseconds, CLOCK_MONOTONIC, !outofband);
+}
+
+/* Sleep for milliseconds of "wall clock" time unless interrupted by out-of-band processing
+ * WARNING: only op_hang uses this to ensure the HANG duration matches $[Z]Horlog/$ZUT time
+ */
+void hiber_start_wall_time(uint4 milliseconds)
+{
+	/* WARNING: negation of outofband is intentional */
+	HIBER_START_CORE(milliseconds, CLOCK_REALTIME, !outofband);
+}
+
+/* Sleep for milliseconds of time unless EINTRrupted */
+void hiber_start_wait_any(uint4 milliseconds)
+{
+	HIBER_START_CORE(milliseconds, CLOCK_MONOTONIC, FALSE);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 }
 
 /* Wrapper function for start_timer() that is exposed for outside use. The function ensures that time_to_expir is positive. If
@@ -436,9 +540,12 @@ void gtm_start_timer(TID tid,
  */
 void start_timer(TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata)
 {
-	sigset_t	savemask;
-	boolean_t	safe_timer = FALSE, safe_to_add = FALSE;
-	int		i, rc;
+	sigset_t		savemask;
+	boolean_t		safe_timer = FALSE, safe_to_add = FALSE;
+	int			i, rc;
+#ifdef DEBUG
+	struct itimerval	curtimer;
+#endif
 
 	if (exit_handler_active)
 	{	/* Starting a timer while we have already started exiting can cause issues in an environment where
@@ -462,12 +569,14 @@ void start_timer(TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len
 	} else if (wcs_clean_dbsync_fptr == handler)
 	{	/* Account for known instances of the above function being called from within a deferred zone. */
 		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_WCS_WTSTART == intrpt_ok_state)
-			|| (INTRPT_IN_GDS_RUNDOWN == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state));
+			|| (INTRPT_IN_GDS_RUNDOWN == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state)
+			|| (mu_reorg_process && (INTRPT_IN_KILL_CLEANUP == intrpt_ok_state)));
 		safe_to_add = TRUE;
 	} else if (wcs_stale_fptr == handler)
 	{	/* Account for known instances of the above function being called from within a deferred zone. */
 		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state)
-			|| (INTRPT_IN_TRIGGER_NOMANS_LAND == intrpt_ok_state));
+			|| (INTRPT_IN_TRIGGER_NOMANS_LAND == intrpt_ok_state)
+			|| (mu_reorg_process && (INTRPT_IN_KILL_CLEANUP == intrpt_ok_state)));
 		safe_to_add = TRUE;
 	} else if (jnl_file_close_timer_fptr == handler)
 	{	/* Account for known instances of the above function being called from within a deferred zone. */
@@ -491,8 +600,18 @@ void start_timer(TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len
 		assert(FALSE);
 		return;
 	}
+<<<<<<< HEAD
 	if (!timer_from_OS)
+=======
+	if (1 > timer_stack_count)
+	{
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 		SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
+#ifdef DEBUG
+		if (TRUE == timer_active)	/* There had better be an active timer */
+			assert(0 == getitimer(ITIMER_REAL, &curtimer));
+#endif
+	}
 	start_timer_int(tid, time_to_expir, handler, hdata_len, hdata, safe_timer);
 	if (!timer_from_OS)
 		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);		/* reset signal handlers */
@@ -507,7 +626,10 @@ STATICFNDEF void start_timer_int(TID tid, uint8 time_to_expir, void (*handler)()
 	ABS_TIME	at;
 	GT_TIMER 	*newt;
 
- 	assert(0 <= time_to_expir);
+	assert(0 <= time_to_expir);
+	/* there is abuse of this api - hdata is a pointer, so hd_len, if supplied, should be the size of a pointer, but callers
+	 * sometimes use the size of the pointed-to data
+	 */
 	sys_get_curr_time(&at);
 	if (first_timeset)
 	{
@@ -608,6 +730,7 @@ void clear_timers(void)
  */
 STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
 {
+<<<<<<< HEAD
 	struct sigevent	sevp;
 	int		save_errno;
 
@@ -678,6 +801,8 @@ STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
 					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("timer_settime()"), CALLFROM, save_errno);
 	}
 #	else
+=======
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	if (in_setitimer_error)
 		return;
 	sys_timer.it_value.tv_sec = time_to_expir->tv_sec;
@@ -698,6 +823,17 @@ STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
 	{
 		REPORT_SETITIMER_ERROR("ITIMER_REAL", sys_timer, TRUE, errno);
 	}
+<<<<<<< HEAD
+=======
+#	ifdef TIMER_DEBUGGING
+	FPRINTF(stderr, "------------------------------------------------------\n"
+		"SETITIMER\n---------------------------------\n");
+	FPRINTF(stderr, "System timer :\n  expir_time: [at_sec: %ld; at_usec: %ld]\n",
+		sys_timer.it_value.tv_sec, sys_timer.it_value.tv_usec);
+	FPRINTF(stderr, "Old System timer :\n  expir_time: [at_sec: %ld; at_usec: %ld]\n",
+		old_sys_timer.it_value.tv_sec, old_sys_timer.it_value.tv_usec);
+	FFLUSH(stderr);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 #	endif
 	timer_active = TRUE;
 }
@@ -758,7 +894,11 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 	int4		cmp, save_error_condition;
 	GT_TIMER	*tpop, *tpop_prev = NULL;
 	ABS_TIME	at;
+<<<<<<< HEAD
 	int		save_errno, timer_defer_cnt, offset, orig_why;
+=======
+	int		save_errno, timer_defer_cnt;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	TID 		*deferred_tid;
 	boolean_t	tid_found;
 	char 		*save_util_outptr;
@@ -901,9 +1041,14 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 			if (NULL != tpop->handler)	/* if there is a handler, call it */
 			{
 #				ifdef DEBUG
+<<<<<<< HEAD
 				if (ydb_white_box_test_case_enabled
 				    && (WBTEST_DEFERRED_TIMERS == ydb_white_box_test_case_number)
 				    && ((void *)tpop->handler != (void*)jnl_file_close_timer_ptr))
+=======
+				if (WBTEST_ENABLED(WBTEST_DEFERRED_TIMERS)
+					&& ((void *)tpop->handler != (void*)jnl_file_close_timer_ptr))
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 				{
 					DBGFPF((stderr, "TIMER_HANDLER: handled a timer\n"));
 					timer_pop_cnt++;
@@ -944,39 +1089,30 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 		{
 			timer_defer_cnt++;
 #			ifdef DEBUG
+<<<<<<< HEAD
 			if (ydb_white_box_test_case_enabled
 			    && (WBTEST_DEFERRED_TIMERS == ydb_white_box_test_case_number))
+=======
+			if (WBTEST_ENABLED(WBTEST_DEFERRED_TIMERS))
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 			{
-				if (!deferred_tids)
+				tid_found = FALSE;
+				deferred_tid = deferred_tids;
+				while (-1 != *deferred_tid)
 				{
-					deferred_tids = (TID *)malloc(SIZEOF(TID) * 2);
-					*deferred_tids = tpop->tid;
-					*(deferred_tids + 1) = -1;
+					if (*deferred_tid == tpop->tid)
+					{
+						tid_found = TRUE;
+						break;
+					}
+					deferred_tid++;
+					/* WBTEST_DEFERRED_TIMERS tests do not need more than TIMER_BLOCK_SIZE entries, right? */
+					assert(TIMER_BLOCK_SIZE >= (deferred_tid - deferred_tids));
+				}
+				if (!tid_found)
+				{
+					*deferred_tid = tpop->tid;
 					DBGFPF((stderr, "TIMER_HANDLER: deferred a timer\n"));
-				} else
-				{
-					tid_found = FALSE;
-					deferred_tid = deferred_tids;
-					while (-1 != *deferred_tid)
-					{
-						if (*deferred_tid == tpop->tid)
-						{
-							tid_found = TRUE;
-							break;
-						}
-						deferred_tid++;
-					}
-					if (!tid_found)
-					{
-						offset = deferred_tid - deferred_tids;
-						deferred_tid = (TID *)malloc((offset + 2) * SIZEOF(TID));
-						memcpy(deferred_tid, deferred_tids, offset * SIZEOF(TID));
-						free(deferred_tids);
-						deferred_tids = deferred_tid;
-						*(deferred_tids + offset++) = tpop->tid;
-						*(deferred_tids + offset) = -1;
-						DBGFPF((stderr, "TIMER_HANDLER: deferred a timer\n"));
-					}
 				}
 			}
 #			endif
@@ -1085,11 +1221,12 @@ STATICFNDEF GT_TIMER *add_timer(ABS_TIME *atp, TID tid, uint8 time_to_expir, voi
 	if (NULL == ntp)
 	{
 		assert(FALSE);							/* if dbg, we should have enough already */
-		ntp = (GT_TIMER *)malloc(timeblk_hdrlen + hdata_len);		/* if we are in a timer, malloc may error out */
+		ntp = (GT_TIMER *)malloc(SIZEOF(GT_TIMER));			/* if we are in a timer, malloc may error out */
 		new_alloc = (st_timer_alloc *)malloc(SIZEOF(st_timer_alloc));	/* insert in front of the list */
 		new_alloc->addr = ntp;
 		new_alloc->next = (st_timer_alloc *)timer_allocs;
 		timer_allocs = new_alloc;
+		assert(GT_TIMER_INIT_DATA_LEN == hdata_len);
 		ntp->hd_len_max = hdata_len;
 	}
 	ntp->tid = tid;
@@ -1104,10 +1241,19 @@ STATICFNDEF GT_TIMER *add_timer(ABS_TIME *atp, TID tid, uint8 time_to_expir, voi
 	ntp->block_int = INTRPT_OK_TO_INTERRUPT;
 	ntp->hd_len = hdata_len;
 	if (0 < hdata_len)
+	{
+		assert(GT_TIMER_INIT_DATA_LEN >= hdata_len);
 		memcpy(ntp->hd_data, hdata, hdata_len);
+<<<<<<< HEAD
 	add_uint8_to_abs_time(atp, time_to_expir, &ntp->expir_time);
 	ntp->start_time.tv_sec = atp->tv_sec;
 	ntp->start_time.tv_nsec = atp->tv_nsec;
+=======
+	}
+	add_int_to_abs_time(atp, time_to_expir, &ntp->expir_time);
+	ntp->start_time.at_sec = atp->at_sec;
+	ntp->start_time.at_usec = atp->at_usec;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	tp = (GT_TIMER *)timeroot;
 	tpp = NULL;
 	while (tp)
@@ -1162,8 +1308,11 @@ STATICFNDEF void remove_timer(TID tid)
  */
 void sys_canc_timer()
 {
+<<<<<<< HEAD
 	int	save_errno;
 #	ifndef YDB_USE_POSIX_TIMERS
+=======
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	struct itimerval zero;
 
 	memset(&zero, 0, SIZEOF(struct itimerval));
@@ -1211,10 +1360,13 @@ void sys_canc_timer()
 		assert(posix_timer_thread_id);
 		posix_timer_created = FALSE;
 	}
+<<<<<<< HEAD
 #	else
 	if (-1 == setitimer(ITIMER_REAL, &zero, &old_sys_timer))
 		REPORT_SETITIMER_ERROR("ITIMER_REAL", zero, FALSE, errno);
 #	endif
+=======
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	timer_active = FALSE;		/* no timer is active now */
 }
 

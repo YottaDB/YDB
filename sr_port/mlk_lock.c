@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -38,6 +38,7 @@
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"		/* for curr_entry structure definition */
 #include "do_shmat.h"
+#include "getzposition.h"	/* for TPNOTACID_CHECK */
 
 /* Include prototypes */
 #include "mlk_ops.h"
@@ -56,6 +57,7 @@
 GBLREF	uint4		process_id;
 GBLREF	short		crash_count;
 GBLREF	uint4		dollar_tlevel;
+GBLREF	uint4		dollar_trestart;	/* for TPNOTACID_CHECK */
 GBLREF	unsigned int	t_tries;
 GBLREF	tp_region	*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
 GBLREF  tp_region	*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
@@ -64,6 +66,8 @@ error_def(ERR_LOCKSPACEFULL);
 error_def(ERR_LOCKSPACEINFO);
 error_def(ERR_GCBEFORE);
 error_def(ERR_GCAFTER);
+
+#define LOCKGCINTP		"LOCKGCINTP"	 /* Garbage collection in the third retry is TPNOTACID */
 
 /*
  * ------------------------------------------------------
@@ -112,9 +116,16 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 		if (ctl->gc_needed || ctl->resize_needed || ctl->rehash_needed
 		    || (ctl->subtop - ctl->subfree < siz) || (ctl->blkcnt < p->subscript_cnt))
 		{
+<<<<<<< HEAD
 			REL_LOCK_CRIT(*pctl, was_crit);
 			prepare_for_gc(pctl);
 			GRAB_LOCK_CRIT_AND_SYNC(*pctl, was_crit);
+=======
+			REL_LOCK_CRIT(p->pvtctl, was_crit);
+			TPNOTACID_CHECK(LOCKGCINTP);
+			prepare_for_gc(&p->pvtctl);
+			GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 			assert(ctl->lock_gc_in_progress.u.parts.latch_pid == process_id);
 			if (ctl->rehash_needed)
 				mlk_rehash(pctl);

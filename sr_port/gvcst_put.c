@@ -445,9 +445,13 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	block_offset		ins_off1, ins_off2, old_curr_chain_next_off;
 	boolean_t		copy_extra_record, level_0, new_rec, no_pointers, succeeded, key_exists;
 	boolean_t		make_it_null, gbl_target_was_set, duplicate_set, new_rec_goes_to_right, need_extra_block_split;
+<<<<<<< HEAD
 	boolean_t		write_logical_jnlrecs, blk_match, is_split_dir_left;
 	boolean_t		jnl_format_done, is_dummy, needfmtjnl, fits, lcl_span_status, want_root_search = FALSE;
 	boolean_t		db_long_blk_id, long_blk_id;	/* db_long_blk_id is based on csd->desired_db_ver,
+=======
+	boolean_t		db_long_blk_id, long_blk_id;	/* db_long_blk_id is based on csd->desired_db_format,
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 								 * while long_blk_id is based on bp->bver
 								 */
 	boolean_t		split_to_right;	/* FALSE if a block split creates a new block on the left of the split point.

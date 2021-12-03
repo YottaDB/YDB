@@ -62,6 +62,7 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 				ret = SS_LOG2LONG;
 				break;
 			}
+			assert(s_len <= buffer_len);
 			memcpy(b_ptr, s_start, s_len);
 			b_ptr += s_len;
 			/* Move forward in input buffer (over text just processed) */
@@ -77,9 +78,10 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 				if (trans_log_name_buff != trans_log_name_startbuff)	/* do not free static starting buffer */
 					free(trans_log_name_buff);
 				trans_log_name_buff = malloc(s_len + 1);
-				trans_log_name_buflen = s_len + 1;
-				assert(NULL != trans_log_name_buff); /* gird against malloc failure */
+				trans_log_name_buflen = s_len;	/* preserve our initial condition that buflen == bufsize -1 */
 			}
+			assert(NULL != trans_log_name_buff); /* gird against malloc failure */
+			assert((0 <= s_len) && (s_len < trans_log_name_buflen));
 			memcpy(trans_log_name_buff, s_start + 1, s_len);
 			trans_log_name_buff[s_len] = 0;
 			/* try to convert it */
@@ -97,6 +99,7 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 				ret = SS_LOG2LONG;
 				break;
 			}
+			assert(s_len <= buffer_len);
 			memcpy(b_ptr, s_start, s_len);
 			b_ptr += s_len;
 			assert(b_ptr < b_top);

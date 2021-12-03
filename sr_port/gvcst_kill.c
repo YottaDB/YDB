@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -127,7 +127,7 @@ LITREF	mval	literal_batch;
 
 #define	GOTO_RETRY(CDB_STATUS, SKIP_ASSERT)							\
 {												\
-	assert((CDB_STAGNATE > t_tries) || IS_FINAL_RETRY_CODE(CDB_STATUS) || SKIP_ASSERT);	\
+	assert((CDB_STAGNATE > t_tries) || is_final_retry_code(CDB_STATUS) || SKIP_ASSERT);	\
 	goto retry;										\
 }
 

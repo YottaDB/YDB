@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -126,8 +126,13 @@ void mu_int_maps(void)
 			mcnt = ydb_skip_bml_num / BLKS_PER_LMAP;
 #		endif
 		blkno = mcnt * mu_int_data.bplmap;
+<<<<<<< HEAD
 		bml_busy(0, local);
 		blk_base = mu_int_read(blkno, &ondsk_blkver, &free_blk_base);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
+=======
+		bml_busy(0, mu_int_locals + ((blkno * BML_BITS_PER_BLK) / BITS_PER_UCHAR));
+		blk_base = mu_int_read(blkno, &ondsk_blkver, &free_blk_base);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 		if (!blk_base)
 		{
 			mu_int_path[0] = blkno;
@@ -155,8 +160,8 @@ void mu_int_maps(void)
 			mu_int_err(ERR_DBMBSIZMX, 0, 0, 0, 0, 0, 0, level);
 			continue;
 		}
-		if (((blk_hdr_ptr_t)blk_base)->bver != mu_int_data.desired_db_format)
-			mu_int_blks_to_upgrd++;
+		if ((GDSVCURR != mu_int_data.creation_db_ver) && (((blk_hdr_ptr_t)blk_base)->bver != mu_int_data.desired_db_format))
+			mu_int_blks_to_upgrd++;	/* conditions of the prior if may need adjustment going forward */
 		if (tn_reset_this_reg)
 		{
 			((blk_hdr_ptr_t)blk_base)->tn = 0;

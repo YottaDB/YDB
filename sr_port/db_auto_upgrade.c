@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -138,7 +138,9 @@ void db_auto_upgrade(gd_region *reg)
 		{	/* Note that handling for any fields introduced in a version will not go in the "switch-case" block
 			 * of code introduced for the new version but will go in the PREVIOUS "switch-case" block.
 			 */
+			case GDSMV63015:	/* because we added this in case, after its number had alreay been used by V70000 */
 			case GDSMV70000:
+<<<<<<< HEAD
 				/* This is a GT.M V7.0-000 database. Apply all file header upgrade changes that happened
 				 * in YottaDB r1.2* and r1.3* releases (i.e. all releases less than YottaDB r2.0 release).
 				 */
@@ -182,6 +184,25 @@ void db_auto_upgrade(gd_region *reg)
 				 *    r1.32) and so those GT.M switch/case code paths above will not be reached for upgrades
 				 *    from an older YottaDB release to a newer YottaDB release.
 				 */
+=======
+				csd->creation_db_ver = GDSVCURR;     /* required due to renumbering of db_vers due to V6 upgrades */
+				csd->creation_mdb_ver = GDSMV70000;  /* required due to adding protection for possible V63015 */
+				csd->desired_db_format = GDSVCURR;   /* required due to renumbering of db_vers due to V6 upgrades */
+				csd->minor_dbver = GDSMV70000;       /* required due to adding protection for possible V63015 */
+				csd->statsdb_allocation = STATSDB_ALLOCATION;
+				csd->offset = 0;
+				csd->max_rec = 0;
+				csd->i_reserved_bytes = 0;
+				csd->db_got_to_V7_once = TRUE;
+				csd->last_start_backup = (gtm_timet) 0; /* GTM-8681, but this is default value anyway */
+				/*the next four lines are because gvcst_init_sysops might have used an outdated assumption */
+				csd->max_update_array_size = csd->max_non_bm_update_array_size
+					= (int4)(ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
+				csd->max_update_array_size
+					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
+				break;
+			case GDSMV70001:
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
@@ -204,8 +225,6 @@ void db_auto_upgrade(gd_region *reg)
 				assertpro(FALSE && csd->minor_dbver);
 		}
 		csd->minor_dbver = GDSMVCURR;
-		if (0 == csd->wcs_phase2_commit_wait_spincnt)
-			csd->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
 	}
 	csd->last_mdb_ver = GDSMVCURR;
 	if (csd->fully_upgraded && !csd->db_got_to_v5_once)
@@ -262,7 +281,7 @@ void v6_db_auto_upgrade(gd_region *reg)
 	 * valid so it is important that the minor db version is incremented each time the fileheader is updated and that
 	 * this routine is correspondingly updated to initialize the new fields in prior versions of the header. SE 5/2006.
 	 */
-	if (csd->minor_dbver < BLK_ID_32_MVER)
+	if (csd->minor_dbver <= BLK_ID_32_MVER)
 	{	/* In general, the method for adding new versions is:
 		 * 1) If there are no automatic updates for this version, it is optional to add the version to the switch
 		 *    statement below. Those there are more for example at this time (through V53000).
@@ -311,6 +330,9 @@ void v6_db_auto_upgrade(gd_region *reg)
 			case GDSMV52000:		/* UTF8 */
 			case GDSMV53000:		/* M-Itanium release */
 				gvstats_rec_upgrade(csa); /* Move GVSTATS information to new place in file header */
+				/* V53002 introduced wcs_phase2_commit_wait_spincnt */
+				if (0 == csd->wcs_phase2_commit_wait_spincnt)
+					csd->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
 			case GDSMV53003:		/* ZSHOW "G" release */
 				csd->is_encrypted = FALSE;
 				memset(csd->encryption_hash, 0, GTMCRYPT_RESERVED_HASH_LEN);
@@ -403,6 +425,7 @@ void v6_db_auto_upgrade(gd_region *reg)
 				/* GT.M V63012 added fullblkwrt option */
 				csd->write_fullblk = 0;
 			case GDSMV63012:
+<<<<<<< HEAD
 				/* GT.M V63014 moved the gvstats section from one location in the file header to another */
 				MOVE_GVSTATS_REC_FROM_OLD_HDR_TO_NODE_LOCAL(csa, csd);
 			case GDSMV63014:
@@ -463,13 +486,39 @@ void v6_db_auto_upgrade(gd_region *reg)
 			case GDSMR136:
 				assert(FALSE);	/* When this assert fails, it means a new GDSMV* was created, */
 				break;		/* so a new "case" needs to be added BEFORE the assert. */
+=======
+				/* Copy the 62 pre GTM-8863 stats from the old header location to the new one */
+				cnl = csa->nl;
+				old_stats = (gtm_uint64_t *) &csd->gvstats_rec_old_now_filler[0];
+				new_stats = (gtm_uint64_t *) &cnl->gvstats_rec;
+				for (i = 0; i < SIZEOF(csd->gvstats_rec_old_now_filler)/SIZEOF(gtm_uint64_t); i++)
+					new_stats[i] = old_stats[i];
+			case GDSMV63014:
+				csd->desired_db_format = GDSV6;	/* because it takes an action to move toward V7 */
+				if (0 == csd->statsdb_allocation)
+					csd->statsdb_allocation = STATSDB_ALLOCATION;	/* Initialize with statsdb default value */
+				/* we do not initialize new post GDSMV63014 field csd->last_start_backup here because if
+				   it has never been set the default (all zeroes) is OK, and if it has, we do not want to
+				   overwrite it on our way up */
+				csd->db_got_to_V7_once = FALSE;
+				csd->offset = 0;
+				csd->max_rec = 0;
+				csd->i_reserved_bytes = 0;
+				/*the next four lines are because gvcst_init_sysops might have used an outdated assumption */
+				csd->max_update_array_size = csd->max_non_bm_update_array_size
+				= (int4)(ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
+				csd->max_update_array_size
+				+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
+				break;
+			case GDSMV63015:
+				assert(FALSE);	/* if this should come to pass, add appropriate code above the assert */
+				break;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 			default:
 				/* Unrecognized version in the header */
 				assertpro(FALSE && csd->minor_dbver);
 		}
-		csd->minor_dbver = BLK_ID_32_MVER;
-		if (0 == csd->wcs_phase2_commit_wait_spincnt)
-			csd->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
+		csd->minor_dbver = BLK_ID_32_MVER;	/* applies to all pre-V7 versions and expected here by workcheck */
 	}
 	csd->last_mdb_ver = GDSMVCURR;
 	if (csd->fully_upgraded && !csd->db_got_to_v5_once)

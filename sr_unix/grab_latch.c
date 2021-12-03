@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2020 Fidelity National Information	*
+ * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -65,7 +65,7 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs, wait_
 	}
 	/* Define number of hard-spins the inner loop does */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
-	UPDATE_PROC_WAIT_STATE(csa, state, 1);
+	UPDATE_CRIT_COUNTER(csa, state);
 	for (retries = 1; ; retries++)
 	{
 		++fast_lock_count;	/* Disable interrupts (i.e. wcs_stale) for duration to avoid potential deadlocks */
@@ -76,7 +76,6 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs, wait_
 			{
 				--fast_lock_count;
 				assert(0 <= fast_lock_count);
-				UPDATE_PROC_WAIT_STATE(csa, state, -1);
 				return TRUE;
 			}
 		}
@@ -95,7 +94,6 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs, wait_
 			SLEEP_FOR_LATCH(latch, retries);
 		}
 	}
-	UPDATE_PROC_WAIT_STATE(csa, state, -1);
 	assert(0 <= fast_lock_count);
 	assert(FALSE);
 	return FALSE;

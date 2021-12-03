@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -45,7 +45,8 @@
 #include "jnl.h"
 #include "lv_val.h"
 #include "mv_stent.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "buddy_list.h"		/* needed for tp.h */
@@ -78,16 +79,24 @@
 #include "tp_change_reg.h"
 #include "alias.h"
 #include "create_fatal_error_zshow_dmp.h"
+<<<<<<< HEAD
 #include "have_crit.h"
 #include "invocation_mode.h"
+=======
+#include "ztimeout_routines.h"
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 #include "iormdef.h"
 #include "ftok_sems.h"
 #include "gtm_putmsg_list.h"
 #include "gvt_inline.h"
+<<<<<<< HEAD
 #include "ztimeout_routines.h"
+=======
+#include "deferred_events.h"
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 #ifdef GTM_TRIGGER
-# include "gv_trigger.h"
-# include "gtm_trigger.h"
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
 #endif
 #include "libyottadb.h"
 #include "setup_error.h"
@@ -142,22 +151,13 @@ GBLREF	jnl_gbls_t		jgbl;
 error_def(ERR_ASSERT);
 error_def(ERR_CTRAP);
 error_def(ERR_CTRLC);
-error_def(ERR_CTRLY);
-error_def(ERR_GTMASSERT);
-error_def(ERR_GTMASSERT2);
-error_def(ERR_GTMCHECK);
-error_def(ERR_GTMERREXIT);
 error_def(ERR_JOBINTRRETHROW);
 error_def(ERR_JOBINTRRQST);
 error_def(ERR_LABELMISSING);
 error_def(ERR_MEMORY);
 error_def(ERR_NOEXCNOZTRAP);
 error_def(ERR_NOTPRINCIO);
-error_def(ERR_OUTOFSPACE);
 error_def(ERR_REPEATERROR);
-error_def(ERR_RESTART);
-error_def(ERR_RTSLOC);
-error_def(ERR_SRCLOCUNKNOWN);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_TERMHANGUP);
@@ -168,6 +168,10 @@ error_def(ERR_TPSTACKCRIT);
 error_def(ERR_TPSTACKOFLOW);
 error_def(ERR_TPTIMEOUT);
 error_def(ERR_UNSOLCNTERR);
+<<<<<<< HEAD
+=======
+error_def(ERR_ZINTRECURSEIO);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 error_def(ERR_ZTIMEOUT);
 
 boolean_t clean_mum_tstart(void);
@@ -477,6 +481,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 *    in the local variable code which would cause immediate shutdown with no cleanup).
 		 * Note that we will bypass check 2 if GDL_ZSHOWDumpOnSignal debug flag is on
 		 */
+		outofband = no_event;
 		SET_PROCESS_EXITING_TRUE;	/* So zshow doesn't push stuff on stack to "protect" it when
 						 * we potentially already have a stack overflow */
 		CANCEL_TIMERS;			/* No unsafe interruptions now that we are dying */
@@ -608,7 +613,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 * of this writing, there are no conditions that these should validly be called in this
 		 * situation so this check is more for the future.
 		 */
-		assert(((int)ERR_CTRLY != SIGNAL) && ((int)ERR_CTRLC != SIGNAL) && ((int)ERR_CTRAP != SIGNAL)
+		assert(((int)ERR_CTRLC != SIGNAL) && ((int)ERR_CTRAP != SIGNAL)
 		       && ((int)ERR_JOBINTRRQST != SIGNAL) && ((int)ERR_JOBINTRRETHROW != SIGNAL));
 		gtm_trigger_fini(TRUE, FALSE);
 		DBGEHND((stderr, "mdb_condition_handler: Current trigger frame unwound so error is thrown"
@@ -664,21 +669,10 @@ CONDITION_HANDLER(mdb_condition_handler)
 	src_line_d.len = 0;
 	if (sighup != outofband)	/* because prin_out_dev_failure is not yet set - it will be below */
 		flush_pio();
-	if ((int)ERR_CTRLY == SIGNAL)
+	if ((int)ERR_CTRLC == SIGNAL)
 	{
-		outofband_clear();
-		/* Verify not indirect or that context is unchanged before reset context */
-		assert(NULL != frame_pointer->restart_pc);
-		assert((!(SFF_INDCE & frame_pointer->flags)) || (frame_pointer->restart_ctxt == frame_pointer->ctxt));
-		DBGEHND((stderr, "mdb_condition_handler(1): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt "
-			 "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, frame_pointer->restart_pc,
-			 frame_pointer->restart_ctxt, frame_pointer->type));
-		frame_pointer->mpc = frame_pointer->restart_pc;
-		frame_pointer->ctxt = frame_pointer->restart_ctxt;
-		MUM_TSTART;
-	} else  if ((int)ERR_CTRLC == SIGNAL)
-	{
-		outofband_clear();
+		xfer_reset_handlers(ctrlc);
+		outofband = no_event;
 		if (!trans_action && !dm_action)
 		{	/* Verify not indirect or that context is unchanged before reset context */
 			assert(NULL != frame_pointer->restart_pc);
@@ -721,12 +715,25 @@ CONDITION_HANDLER(mdb_condition_handler)
 	} else if (((int)ERR_CTRAP == SIGNAL) || ((int)ERR_TERMHANGUP == SIGNAL))
 	{
 		if (outofband && !repeat_error)
-		{	/* This has already been done if we are re-throwing the error */
-			outofband_clear();
+		{	/* don't need to do this again if re-throwing the error */
+			assert((((int)ERR_TERMHANGUP == SIGNAL) ? sighup : ctrap) == outofband);
 			if ((int)ERR_TERMHANGUP == SIGNAL)
+			{
+				SAVE_ZSTATUS_INTO_RTS_STRINGPOOL(dollar_ecode.error_last_b_line, NULL);
+				TAREF1(save_xfer_root, sighup).event_state = pending;
 				prin_in_dev_failure = prin_out_dev_failure = TRUE;
+			} else
+			{
+				TAREF1(save_xfer_root, ctrap).event_state = active;
+				real_xfer_reset(ctrap);
+			}
 		}
+<<<<<<< HEAD
 		if (!trans_action && !dm_action && !(frame_pointer->type & SFT_DM))
+=======
+		outofband = no_event;
+		if (!trans_action && !(frame_pointer->type & SFT_DM))
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 		{
 			if (!repeat_error)
 			{
@@ -857,9 +864,14 @@ CONDITION_HANDLER(mdb_condition_handler)
 			 frame_pointer->restart_ctxt, frame_pointer->type));
 		frame_pointer->mpc = frame_pointer->restart_pc;
 		frame_pointer->ctxt = frame_pointer->restart_ctxt;
-		assert(!dollar_zininterrupt);
-		dollar_zininterrupt = TRUE;	/* Note done before outofband is cleared to prevent nesting */
-		outofband_clear();
+		assert(jobinterrupt == outofband);
+		dollar_zininterrupt = TRUE;     /* Note done before outofband is cleared to prevent nesting */
+		if (no_event != TAREF1(save_xfer_root, jobinterrupt).event_state)
+		{
+			TAREF1(save_xfer_root, jobinterrupt).event_state = active;
+			xfer_reset_handlers(jobinterrupt);
+		}
+		assert(not_in_play == TAREF1(save_xfer_root, jobinterrupt).event_state);
 		proc_act_type = SFT_ZINTR | SFT_COUNT;	/* trans_code will invoke jobinterrupt_process for us */
 		MUM_TSTART;
 	} else  if ((int)ERR_JOBINTRRETHROW == SIGNAL)
@@ -877,7 +889,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 		push_stck(cp, 0, (void **)&stackwarn, MVST_STCK_SP);
 	} else if ((int)ERR_ZTIMEOUT == SIGNAL)
 	{	/* Verify not indirect or that context is unchanged before reset context */
-		if (((TREF(dollar_ztimeout)).ztimeout_vector.str.len))
+		DBGDFRDEVNT((stderr, "%d %s: ztimeout about to use vector: %s\n", __LINE__, __FILE__,
+			(TREF(dollar_ztimeout)).ztimeout_vector.str.len ? "TRUE" : "FALSE"));
+		if ((TREF(dollar_ztimeout)).ztimeout_vector.str.len)
 		{
 			assert(NULL != frame_pointer->restart_pc);
 			assert((!(SFF_INDCE & frame_pointer->flags)) || (frame_pointer->restart_ctxt == frame_pointer->ctxt));
@@ -1031,6 +1045,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 					if ((SFT_ZINTR & fp->type) && (SFF_INDCE & fp->flags))
 					{ /* Not modified by a goto or zgoto entry */
 						assert(SFF_INDCE & fp->flags);
+						assert(dollar_zininterrupt);
 						fp->mpc = fp->ctxt;
 						fp->flags &= SFF_NORET_VIA_MUMTSTART_OFF; /* Frame enterable now with mpc reset */
 						GTMTRIG_ONLY(
@@ -1179,10 +1194,15 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 */
 		DBGEHND((stderr, "mdb_condition_handler: trans_code_cleanup() or jobinterrupt_process_cleanup being "
 			 "dispatched\n"));
-		if (!(SFT_ZINTR & proc_act_type))
+		if (!(SFT_ZINTR & proc_act_type) && !(SFT_ZTIMEOUT & proc_act_type))  	/* ztimeout vector precompiled */
+		{
+			assert(!dollar_zininterrupt || ((int)ERR_ZINTRECURSEIO == SIGNAL));
 			trans_code_cleanup();
-		else
+		} else if (!(SFT_ZTIMEOUT & proc_act_type))
+		{
+			assert(dollar_zininterrupt);
 			jobinterrupt_process_cleanup();
+		}
 		MUM_TSTART_FRAME_CHECK;
 		MUM_TSTART;
 	}

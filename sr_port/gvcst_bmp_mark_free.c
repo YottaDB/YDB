@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -312,7 +312,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 			ondsk_blkver = cr->ondsk_blkver;	/* Get local copy in case cr->ondsk_blkver changes between
 								 * first and second part of the ||
 								 */
-			assert((GDSV7 == ondsk_blkver) || (GDSV6 == ondsk_blkver));
+			assert((GDSV7 == ondsk_blkver) || (GDSV7m == ondsk_blkver) || (GDSV6 == ondsk_blkver));
 			if (GDSVCURR != ondsk_blkver)
 				inctn_detail.blknum_struct.blknum = blk->block;
 			else

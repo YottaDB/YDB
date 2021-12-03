@@ -69,14 +69,17 @@ typedef struct
 		MAX[COUNT] = PAT_MAX_REPEAT;									\
 		SIZE[COUNT] = cursize;										\
 		TOTAL_MIN += BOUND_MULTIPLY(MIN[COUNT], SIZE[COUNT], bound);					\
+		assert(0 <= TOTAL_MIN);										\
 		if (TOTAL_MIN > PAT_MAX_REPEAT)									\
 			TOTAL_MIN = PAT_MAX_REPEAT;								\
 		TOTAL_MAX += BOUND_MULTIPLY(MAX[COUNT], SIZE[COUNT], bound);					\
+		assert(0 <= TOTAL_MAX);										\
 		if (TOTAL_MAX > PAT_MAX_REPEAT)									\
 			TOTAL_MAX = PAT_MAX_REPEAT;								\
 		LASTPATPTR = PATMASKPTR;									\
 		LAST_INFINITE = TRUE;										\
 		COUNT++;											\
+		assert(0 < COUNT);										\
 	} else													\
 	{													\
 		OUTCHAR = PATMASKPTR;										\

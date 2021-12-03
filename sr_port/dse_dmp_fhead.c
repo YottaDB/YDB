@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -102,11 +102,14 @@ void dse_dmp_fhead (void)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jb;
 	shmpool_buff_hdr_ptr_t	bptr;
-	boolean_t		is_dse_all;
+	boolean_t		db_shares_gvstats, is_dse_all;
 	uint4			pid;
 	boolean_t		new_line;
 	unsigned char		outbuf[GTMCRYPT_HASH_HEX_LEN + 1];
 	shm_snapshot_t		*ss_shm_ptr;
+	time_t			backup_start_tmp;
+	struct tm		backup_start_tm_tmp;
+	char			backup_start_buf[100];
 
 	is_dse_all = dse_all_dump;
 	dse_all_dump = FALSE;
@@ -243,20 +246,39 @@ void dse_dmp_fhead (void)
 		util_out_print("  WIP queue cache blocks        !12UL", TRUE, wipque_cnt);
 		util_out_print("  DB is auto-created                          !AD", FALSE, 5,
 				  (RDBF_AUTODB & csd->reservedDBFlags) ? " TRUE" : "FALSE");
+		db_shares_gvstats = ! (RDBF_NOSTATS & csd->reservedDBFlags);
 		util_out_print("  DB shares gvstats                    !AD", TRUE, 5,
-				  ! (RDBF_NOSTATS & csd->reservedDBFlags) ? " TRUE" : "FALSE");
+				  db_shares_gvstats ? " TRUE" : "FALSE");
 		util_out_print("  LOCK shares DB critical section             !AD", FALSE, 5,
 				csd->lock_crit_with_db ? " TRUE" : "FALSE");
 		util_out_print("  Read Only                              !AD", TRUE, 3, csd->read_only ? " ON" : "OFF");
 		util_out_print("  Recover interrupted                         !AD", FALSE, 5,
 				(csd->recov_interrupted ? " TRUE" : "FALSE"));
 		util_out_print("  Full Block Write                         !UL", TRUE, csd->write_fullblk);
+<<<<<<< HEAD
 		util_out_print("  Max conc proc time         !22UL", FALSE, csd->max_procs.time);
 		util_out_print("  Max Concurrent processes         !9UL", TRUE, csd->max_procs.cnt);
 		util_out_print("  Reorg Sleep Nanoseconds         !17UL", TRUE, csd->reorg_sleep_nsec);
+=======
+		if(db_shares_gvstats)
+			util_out_print("  StatsDB Allocation            !19UL", TRUE, csd->statsdb_allocation);
+
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
-	{	/* Only dump if -/ALL as if part of above display */
+	{	/* Only dump these if -/ALL as if part of above display */
+
+		if (!csd->last_start_backup)		/* Handle backup timestamp: 0 == Never backed up */
+		{
+			strncpy(backup_start_buf, "                   Never", sizeof(backup_start_buf));
+		} else
+		{
+			backup_start_tmp = (time_t) (csd->last_start_backup);	/* this will 32 squash on AIX */
+			localtime_r(&backup_start_tmp, &backup_start_tm_tmp);
+			asctime_r(&backup_start_tm_tmp, backup_start_buf);
+			backup_start_buf[strlen(backup_start_buf)-1] = '\0';
+		}
+
 		util_out_print(0, TRUE);
 		util_out_print("                                                   ", FALSE);
 		util_out_print("  DB Current Minor Version              !4UL", TRUE, csd->minor_dbver);
@@ -267,6 +289,7 @@ void dse_dmp_fhead (void)
 				LEN_AND_STR(gtm_dbversion_table[csd->creation_db_ver]));
 		util_out_print("  Blks Last Comprehensive Backup 0x!16@XQ", FALSE, &(csd->last_com_bkup_last_blk));
 		util_out_print("  DB Creation Minor Version             !4UL", TRUE, csd->creation_mdb_ver);
+		util_out_print("  Last Record Backup Start !AD", TRUE, LEN_AND_STR(backup_start_buf));
 		util_out_print(0, TRUE);
 		util_out_print("  Total Global Buffers                   0x!XL", FALSE, csd->n_bts);
 		util_out_print("  Phase2 commit pid count         0x!XL", TRUE, cnl->wcs_phase2_commit_pidcnt);

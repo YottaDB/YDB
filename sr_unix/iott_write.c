@@ -35,13 +35,13 @@
 #include "svnames.h"
 #include "op.h"
 #include "util.h"
-#include "outofband.h"
+#include "deferred_events_queue.h"
 #ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
 
-GBLREF boolean_t	gtm_utf8_mode, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF boolean_t	gtm_utf8_mode, hup_on, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF int		exi_condition, process_exiting;
 GBLREF io_pair		io_curr_device, io_std_device;
 GBLREF mval		dollar_zstatus;
@@ -65,12 +65,15 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 	tt_ptr = io_ptr->dev_sp;
 	assert(tt_ptr->write_active == FALSE);
 	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
-	if ((sighup == outofband) || ((int)ERR_TERMHANGUP == SIGNAL))
-		TERMHUP_NOPRINCIO_CHECK(TRUE);				/* TRUE for WRITE */
+	if (sighup == outofband)
+	{
+		TERMHUP_NOPRINCIO_CHECK(TRUE);					/* TRUE for WRITE */
+		return;
+	}
 	tt_ptr->write_active = TRUE;
  	buff_left = IOTT_BUFF_LEN - (int)TT_UNFLUSHED_DATA_LEN(tt_ptr);
 	assert(buff_left > IOTT_BUFF_MIN || prin_out_dev_failure);
-	if (buff_left < textlen)
+	if (!prin_out_dev_failure && (buff_left < textlen))
         {
 	        iott_flush_buffer(io_ptr, TRUE);
 		buff_left = IOTT_BUFF_LEN;
@@ -81,7 +84,7 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 		tt_ptr->tbuffp += textlen;
 		buff_left -= textlen;
 		if (buff_left <= IOTT_BUFF_MIN)
-		        iott_flush_buffer(io_ptr, FALSE);	/* tt_ptr->write_active = FALSE */
+		        iott_flush_buffer(io_ptr, FALSE);			/* tt_ptr->write_active = FALSE */
 		else
 			tt_ptr->write_active = FALSE;
         } else
@@ -90,14 +93,10 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 		tt_ptr->write_active = FALSE;
 		if (0 == status)
 		{
-			if (io_ptr == io_std_device.out)
-			{	/* ------------------------------------------------
-				 * set prin_out_dev_failure to FALSE in case it
-				 * had been set TRUE earlier and is now working.
-				 * for eg. a write fails and the next write works.
-				 * ------------------------------------------------
-				 */
+			if ((io_ptr == io_std_device.out) && (prin_out_dev_failure))
+			{	/* if it was TRUE, try flush we may have skipped above & clear flag because write worked */
 				prin_out_dev_failure = FALSE;
+				iott_flush_buffer(io_ptr, TRUE);
 			}
 		} else 	/* (0 != status) */
 		{

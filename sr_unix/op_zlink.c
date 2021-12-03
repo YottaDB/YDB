@@ -140,6 +140,7 @@ void op_zlink (mval *v, mval *quals)
 	parse_blk		pblk;
 	struct stat		obj_stat, src_stat;
 	unsigned short		objnamelen, srcnamelen;
+	size_t			cpy_len;
 	zro_ent			*srcdir, *objdir;
 	ARLINK_ONLY(zro_hist	*recent_zhist;)
 	DCL_THREADGBL_ACCESS;
@@ -213,8 +214,14 @@ void op_zlink (mval *v, mval *quals)
 		} else if (SRC != type)
 		{	/* if we have an explicit, directory shift the object name to make room and fill in the directory */
 			assert((OBJ == type) || (NOTYPE == type));
-			assert(MAX_FN_LEN > (objnamelen + pblk.b_dir));
-			memmove(&objnamebuf[pblk.b_dir], objnamebuf, objnamelen);
+			cpy_len = objnamelen;
+			assert(sizeof(objnamebuf) >= cpy_len);
+			assert(sizeof(objnamebuf) >= (cpy_len + pblk.b_dir));
+			if (sizeof(objnamebuf) < (cpy_len + pblk.b_dir)) /* 4SCA BYPASSOK */
+				cpy_len = sizeof(objnamebuf) - pblk.b_dir;
+			assert(256 >= cpy_len); /* For Veracode grins */
+			memmove(&objnamebuf[pblk.b_dir], objnamebuf, cpy_len);
+			assert(sizeof(objnamebuf) >= pblk.b_dir);
 			memcpy(objnamebuf, file.addr, pblk.b_dir);
 			objnamelen += pblk.b_dir;
 		}

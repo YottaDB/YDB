@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -94,6 +94,8 @@ error_def(ERR_COMMITWAITSTUCK);
 error_def(ERR_DBCCERR);
 error_def(ERR_DBROLLEDBACK);
 error_def(ERR_ERRCALL);
+error_def(ERR_BACKUPDBFILE);
+error_def(ERR_BACKUPTN);
 
 #ifdef DEBUG_INCBKUP
 #  define DEBUG_INCBKUP_ONLY(X) X
@@ -290,7 +292,6 @@ bool	mubinccpy (backup_reg_list *list)
 	outbuf->blk_size = header->blk_size;
 	outbuf->blks_to_upgrd = header->blks_to_upgrd;
 	GTMCRYPT_COPY_ENCRYPT_SETTINGS(header, outbuf);
-	util_out_print("MUPIP backup of database file !AD to !AD", TRUE, DB_LEN_STR(gv_cur_region), file->len, file->addr);
 	COMMON_WRITE(backup, (char *)outbuf, SIZEOF(inc_header));
 	free(outbuf);
 	cur_mdb_ver = header->minor_dbver;
@@ -692,17 +693,17 @@ bool	mubinccpy (backup_reg_list *list)
 			file->len, file->addr, DB_LEN_STR(gv_cur_region));
 	} else
 	{
-		util_out_print("DB file !AD incrementally backed up in file !AD", TRUE,
-			DB_LEN_STR(gv_cur_region), file->len, file->addr);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BACKUPDBFILE, 4, DB_LEN_STR(gv_cur_region), file->len, file->addr);
 		util_out_print("!UL blocks saved.", TRUE, save_blks);
-		util_out_print("Transactions from 0x!16@XQ to 0x!16@XQ are backed up.", TRUE,
-			&list->tn, &header->trans_hist.curr_tn);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BACKUPTN, 2, &list->tn, &header->trans_hist.curr_tn);
 		cs_addrs->hdr->last_inc_backup = header->trans_hist.curr_tn;
 		cs_addrs->hdr->last_inc_bkup_last_blk = (block_id)header->trans_hist.total_blks;
 		if (record)
 		{
 			cs_addrs->hdr->last_rec_backup = header->trans_hist.curr_tn;
 			cs_addrs->hdr->last_com_bkup_last_blk = (block_id)header->trans_hist.total_blks;
+			cs_addrs->hdr->last_start_backup = header->last_start_backup;
+
 		}
 		file_backed_up = TRUE;
 		return TRUE;

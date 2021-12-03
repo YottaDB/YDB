@@ -247,10 +247,17 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 #		endif
 	}
 #	ifdef DEBUG
+<<<<<<< HEAD
 	if ( (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) && dollar_tlevel && !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT")) ||
 	     (WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == ydb_white_box_test_case_count) &&
 	     !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT")) )
 	{
+=======
+	if (((WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) && dollar_tlevel && !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT")) ||
+	     (WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == gtm_white_box_test_case_count) &&
+	     !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT"))) && !cs_addrs->now_crit)
+	{	/* Sync with copy in bm_getfree() */
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 		/* Not clear to me why the WBTEST_MM_CONCURRENT_FILE_EXTEND doesn't need something similar, but we don't want our
 		 * child to come here.  Unsetting the env shouldn't affect the parent, it reads env just once at process startup*/
 		if(WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE))
@@ -315,7 +322,7 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	assert(!cs_addrs->jnlpool || (cs_addrs->jnlpool == jnlpool));
 	if (IS_REPL_INST_FROZEN && trans_in_prog)
 	{
-		assert(CDB_STAGNATE <= t_tries);
+		assert((CDB_STAGNATE <= t_tries) || TREF(in_bm_getfree_gdsfilext));
 		GDSFILEXT_CLNUP;
 		return FINAL_RETRY_INST_FREEZE;
 	}
@@ -332,15 +339,12 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	}
 	if (trans_in_prog && SUSPICIOUS_EXTEND)
 	{
+		assertpro(is_free_blks_ctr_ok());
 		if (!was_crit)
 		{
 			GDSFILEXT_CLNUP;
 			return EXTEND_SUSPECT;
 		}
-		/* If free_blocks counter is not ok, then correct it. Do the check again. If still fails, then it means we held
-		 * crit through bm_getfree into gdsfilext and still didn't get it right.
-		 */
-		assertpro(!is_free_blks_ctr_ok() && !SUSPICIOUS_EXTEND);
 	}
 	if (JNL_ENABLED(cs_data))
 	{

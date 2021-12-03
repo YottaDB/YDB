@@ -60,10 +60,17 @@
 #include "zwrite.h"
 #include "gtm_maxstr.h"
 #include "getzdir.h"
+<<<<<<< HEAD
 #include "ydb_logicals.h"	/* needed for GBLDIR_ENV use of "ydbenvname" */
 #include "sig_init.h"
 #include "invocation_mode.h"
 #include "ydb_chk_dist.h"
+=======
+#ifdef DEBUG
+#include <sys/time.h>
+#include <sys/resource.h>
+#endif
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 GBLREF	bool			jobpid;	/* job's output files should have the pid appended to them. */
 GBLREF	volatile boolean_t	ojtimeout;
@@ -490,15 +497,28 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			assert(FALSE);
 			UNDERSCORE_EXIT(joberr);
 		}
+#		ifdef DEBUG
+		if (WBTEST_ENABLED(WBTEST_JOBFAIL_FILE_LIM))
+		{
+			const struct rlimit	flim = {2, 2};
 
+			if (-1 == setrlimit(RLIMIT_NOFILE, &flim))
+			{	/* the white box test will fail bacause the error reported won't match expectations */
+				job_errno = errno;
+				DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
+				assert(FALSE);	/* core the middle child toward diagnosing why the white box case failed */
+			}
+		}
+#		endif
 		joberr = joberr_sp;
 		if (-1 == socketpair(AF_UNIX, SOCK_STREAM, 0, setup_fds))
 		{
 			job_errno = errno;
 			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
-			assert(FALSE);
+			assert(WBTEST_ENABLED(WBTEST_JOBFAIL_FILE_LIM));
 			UNDERSCORE_EXIT(joberr);
 		}
+		assert(!WBTEST_ENABLED(WBTEST_JOBFAIL_FILE_LIM));
 		/* Kill ourselves before we fork again */
 		if (WBTEST_ENABLED(WBTEST_SIGTERM_IN_JOB_CHILD))
 			kill(getpid(), SIGTERM);

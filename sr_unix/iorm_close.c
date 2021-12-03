@@ -35,6 +35,7 @@
 #include "wake_alarm.h"
 #include "copy.h"
 #include "error.h"
+#include "is_file_identical.h"
 
 GBLREF io_pair		io_curr_device;
 GBLREF io_pair		io_std_device;
@@ -74,6 +75,7 @@ void iorm_close(io_desc *iod, mval *pp)
 	int		path2len;
 	boolean_t	rm_destroy = TRUE;
 	boolean_t	rm_rundown = FALSE;
+	boolean_t	rn_overwrite = FALSE;
 	TID		timer_id;
 	int4		pipe_timeout = 2;	/* default timeout in sec waiting for waitpid */
 	off_t		cur_position;
@@ -140,6 +142,14 @@ void iorm_close(io_desc *iod, mval *pp)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
 					}
 				break;
+			case iop_noinsert:
+				rn_overwrite = TRUE;
+				break;
+			case iop_replace:
+				/* iop_rename is intended to protect against accidental replacement.
+				 * iop_replace(REPLACE on CLOSE) provides an overwrite functionality.
+				 */
+				rn_overwrite = TRUE;				/* WARNING fallthrough */
 			case iop_rename:
 				path = iod->trans_name->dollar_io;
 				path2 = (char*)(pp->str.addr + p_offset + 1);
@@ -169,13 +179,18 @@ void iorm_close(io_desc *iod, mval *pp)
 					stringpool.free += path2len + 1;
 					assert(stringpool.free >= stringpool.base);
 					assert(stringpool.free <= stringpool.top);
-					if (LINK(path, savepath2) == -1)
+					if (is_file_identical(path, savepath2))
+						break;					/* rename or replace to itself a noop */
+					if (rn_overwrite)
+						UNLINK(savepath2); /* overwrite deletes now, but rename alone requires delete 1st */
+test_rename_gap:
+					if (-1 == LINK(path, savepath2))
 					{
 						save_errno = errno;
 						SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
 					}
-					if (UNLINK(path) == -1)
+					if (-1 == UNLINK(path))
 					{
 						save_errno = errno;
 						SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
@@ -372,4 +387,8 @@ void iorm_close(io_desc *iod, mval *pp)
 	        remove_rms (iod);
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
+	assertpro(FALSE);	/* ensure we never reach the goto below */
+	goto test_rename_gap;	/* Dummy goto makes the compiler satisfied the label used as a breakpoint in a test is legit.
+				 * The test_rename_gap label is used by gde/gdeput test.
+				 */
 }

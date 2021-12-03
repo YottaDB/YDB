@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-# Copyright (c) 2009-2018 Fidelity National Information		#
+# Copyright (c) 2009-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	#
@@ -107,8 +107,10 @@ fi
 
 lib_search_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /lib64 /lib /usr/local/ssl/lib /usr/lib/x86_64-linux-gnu"
 lib_search_path="$lib_search_path /usr/lib/i386-linux-gnu /lib/x86_64-linux-gnu /lib/i386-linux-gnu /opt/openssl/0.9.8/lib/hpux64"
+lib_search_path="$lib_search_path /opt/freeware/lib64 /opt/freeware/lib"
 include_search_path="/usr/include /usr/local/include /usr/local/include/gpgme /usr/local/ssl/include /opt/openssl/0.9.8/include"
 include_search_path="$include_search_path /usr/include/i386-linux-gnu /usr/include/x86_64-linux-gnu"
+include_search_path="$include_search_path /opt/freeware/include"
 bin_search_path="/usr/bin /usr/local/bin /bin"
 
 mandate_headers="gpgme.h gpg-error.h"

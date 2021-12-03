@@ -50,31 +50,24 @@
 #include "gv_trigger.h"
 #endif
 #include "ztimeout_routines.h"
+#include "have_crit.h"
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
 #include "util.h"
 #include "ydb_logicals.h"
 #include "ydb_setenv.h"
 
-GBLREF gv_key		*gv_currkey;
-GBLREF gv_namehead	*gv_target;
-GBLREF gd_addr		*gd_header;
-GBLREF io_pair		io_curr_device;
-GBLREF mval		dollar_zstatus;
-GBLREF mval		dollar_zgbldir;
-GBLREF mval		dollar_zsource;
-GBLREF mval		dollar_zerror;
-GBLREF mval		dollar_zyerror;
-GBLREF mval		dollar_system;
-GBLREF mval		dollar_zinterrupt;
-GBLREF boolean_t	dollar_zininterrupt;
-GBLREF boolean_t	ztrap_new;
-GBLREF stack_frame	*error_frame;
-GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
-GBLREF mval		dollar_ztexit;
-GBLREF boolean_t	dollar_ztexit_bool;
-GBLREF boolean_t	dollar_zquit_anyway;
-GBLREF boolean_t	tp_timeout_deferred;
+GBLREF boolean_t		dollar_zquit_anyway, dollar_ztexit_bool, ztrap_new;
+GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
+GBLREF gd_addr			*gd_header;
+GBLREF gv_key			*gv_currkey;
+GBLREF gv_namehead		*gv_target;
+GBLREF io_pair			io_curr_device;
+GBLREF mval			dollar_system, dollar_system_initial, dollar_zgbldir, dollar_zerror, dollar_zinterrupt;
+GBLREF mval			dollar_zsource, dollar_zstatus, dollar_ztexit, dollar_zyerror;
+GBLREF stack_frame		*error_frame;
+GBLREF volatile int4		outofband;
+GBLREF volatile boolean_t	dollar_zininterrupt;
 #ifdef GTM_TRIGGER
 GBLREF mval		*dollar_ztvalue;
 GBLREF boolean_t	*ztvalue_changed_ptr;
@@ -106,13 +99,15 @@ error_def(ERR_ZTWORMHOLE2BIG);
 
 void op_svput(int varnum, mval *v)
 {
+<<<<<<< HEAD
 	int	i, ok, state;
 	char	*vptr, lcl_str[256], *tmp;
 	mval	lcl_mval;
+=======
+	char	*vptr;
+	int	i, ok, state;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	int4	previous_gtm_strpllim;
-	int4  	event_type, param_val;
-	void (*set_fn)(int4 param);
-
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -219,10 +214,12 @@ void op_svput(int varnum, mval *v)
 			if (ztrap_new)
 				op_newintrinsic(SV_ZTRAP);
 			if (!v->str.len)
-			{	/* Setting either $ZTRAP to empty causes any current error trapping to be canceled */
+			{	/* Setting $ZTRAP to empty causes any current error trapping to be canceled */
 				(TREF(dollar_etrap)).mvtype = (TREF(dollar_ztrap)).mvtype = MV_STR;
 				(TREF(dollar_etrap)).str = (TREF(dollar_ztrap)).str = v->str;
 				ztrap_explicit_null = TRUE;
+				if (!dollar_zininterrupt)
+					TRY_EVENT_POP;		/* not in interrupt code, so check for pending timed events */
 			} else /* Ensure that $ETRAP and $ZTRAP are not both active at the same time */
 			{
 				ztrap_explicit_null = FALSE;
@@ -247,19 +244,6 @@ void op_svput(int varnum, mval *v)
 			}
 			if (ZTRAP_POP & TREF(ztrap_form))
 				ztrap_save_ctxt();
-			if ((TREF(save_xfer_root)) && (((TREF(save_xfer_root))->set_fn == tptimeout_set)
-						|| ((TREF(save_xfer_root))->set_fn == ztimeout_set)))
-			{	/* A tp timeout was deferred. Now that $ETRAP is no longer in effect and
-				 * no job interrupt is in effect, the timeout need no longer be deferred
-				 * and can be recognized.
-				 */
-				if ((tp_timeout_deferred || TREF(ztimeout_deferred)) && !dollar_zininterrupt)
-				{
-					DBGDFRDEVNT((stderr, "op_unwind1: Calling pop_reset_xfer from op_unwind\n"));
-					POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
-					xfer_set_handlers(event_type, set_fn, param_val, TRUE);
-				}
-			}
 			break;
 		case SV_ZSTATUS:
 			MV_FORCE_STR(v);
@@ -377,17 +361,8 @@ void op_svput(int varnum, mval *v)
 				/* A tp timeout was deferred. Now that we are clear of error handling and no job interrupt
 				 * is in process, allow the timeout to be recognized.
 				 */
-				if ((TREF(save_xfer_root)) &&
-				(((TREF(save_xfer_root))->set_fn == tptimeout_set)
-					|| ((TREF(save_xfer_root))->set_fn == ztimeout_set)))
-				{
-					if ((tp_timeout_deferred || TREF(ztimeout_deferred)) && !dollar_zininterrupt)
-					{
-						DBGDFRDEVNT((stderr, "op_unwind1: Calling pop_reset_xfer from op_unwind\n"));
-						POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
-						xfer_set_handlers(event_type, set_fn, param_val, TRUE);
-					}
-				}
+				if (!dollar_zininterrupt)
+					TRY_EVENT_POP;		/* not in interrupt code, so check for pending timed events */
 			}
 			break;
 		case SV_ETRAP:
@@ -417,8 +392,20 @@ void op_svput(int varnum, mval *v)
 			dollar_zyerror.str = v->str;
 			break;
 		case SV_SYSTEM:
-			assert(FALSE);
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_SYSTEMVALUE, 2, v->str.len, v->str.addr);
+			MV_FORCE_STR(v);
+			if (0 == v->str.len)
+				dollar_system = dollar_system_initial;	/* input is empty: set back to initial value */
+			else if ((MAX_TRANS_NAME_LEN + STR_LIT_LEN("47,")) > (i = (dollar_system_initial.str.len + v->str.len)))
+			{	/* value fits, so append the value; WARNING assignment above */
+				ENSURE_STP_FREE_SPACE(i);
+				memcpy(stringpool.free, dollar_system_initial.str.addr, dollar_system_initial.str.len);
+				dollar_system.str.addr = (char *)stringpool.free;
+				stringpool.free += dollar_system_initial.str.len;
+				memcpy((stringpool.free), v->str.addr, v->str.len);
+				dollar_system.str.len = i;
+				stringpool.free += v->str.len;
+			} else
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_SYSTEMVALUE, 2, v->str.len, v->str.addr);
 			break;
 		case SV_ZDIR:
 			setzdir(v, NULL); 	/* change directory to v */

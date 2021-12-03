@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
@@ -172,6 +172,7 @@ LITDEF nametabent dev_param_names[] =
 	,{5,"READS*"}	,{8,"READSYNC"}
 	,{3,"REC*"}	,{10,"RECORDSIZE"}
 	,{3,"REN*"}	,{6,"RENAME"}
+	,{3,"REP*"}	,{7,"REPLACE"}
 	,{3,"REW*"}	,{6,"REWIND"}
 	,{3,"RFA"}				/* dead VMS placeholder */
 	,{3,"RFM"}				/* dead VMS placeholder */
@@ -244,7 +245,7 @@ LITDEF	uint4 dev_param_index[27] =
 	0,   5,   9,   27,  35,  50,  66,  68,  73,  82,  82,  83,  91,  94,
 
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	162, 170, 189, 190, 203, 223, 233, 239, 240, 255, 256, 257, 280
+	162, 170, 189, 190, 205, 225, 235, 241, 242, 257, 258, 259, 282
 };
 
 /* Offset of string within letter in dev_param_names */
@@ -421,6 +422,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_readsync ,iop_readsync
 		,iop_recordsize ,iop_recordsize
 		,iop_rename ,iop_rename
+		,iop_replace ,iop_replace
 		,iop_rewind ,iop_rewind
 		,iop_rfa
 		,iop_rfm

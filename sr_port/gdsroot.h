@@ -23,7 +23,7 @@
 #define CDB_STAGNATE 3
 #define CDB_MAX_TRIES (CDB_STAGNATE + 2) /* used in defining arrays, usage requires it must be at least 1 more than CSB_STAGNATE*/
 #define T_FAIL_HIST_DBG_SIZE 32
-#define MAX_BT_DEPTH 7
+#define MAX_BT_DEPTH 11
 #define CSE_LEVEL_DRT_LVL0_FREE (MAX_BT_DEPTH + 2) /* used to indicate a level-0 block in GV tree will be freed */
 #define GLO_NAME_MAXLEN 33	/* 1 for length, 4 for prefix, 15 for dvi, 1 for $, 12 for fid */
 #define MAX_NUM_SUBSC_LEN 10	/* one for exponent, nine for the 18 significant digits */

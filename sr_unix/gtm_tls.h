@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -34,6 +34,7 @@
 #define gtm_tls_store_passwd		(*gtm_tls_store_passwd_fptr)
 #define gtm_tls_add_config		(*gtm_tls_add_config_fptr)
 #define gtm_tls_renegotiate_options	(*gtm_tls_renegotiate_options_fptr)
+#define gtm_tls_version			(*gtm_tls_version_fptr)
 
 /* It's important that the "ydb_tls_interface.h" include should be *after* the above macro definitions. This way, the function
  * prototypes defined in the header file will automatically be expanded to function pointers saving us the trouble of explicitly
@@ -59,6 +60,7 @@
 #undef gtm_tls_store_passwd
 #undef gtm_tls_add_config
 #undef gtm_tls_renegotiate_options
+#undef gtm_tls_version
 
 /* Now, we need to define prototypes for wrapper functions that will be defined in GT.M to defer interrupts before invoking the
  * corresponding TLS function. But, to avoid redefining the prototypes, include the ydb_tls_interface.h once again to automatically
@@ -82,6 +84,7 @@
 #define gtm_tls_store_passwd		intrsafe_gtm_tls_store_passwd
 #define gtm_tls_add_config		intrsafe_gtm_tls_add_config
 #define gtm_tls_renegotiate_options	intrsafe_gtm_tls_renegotiate_options
+#define gtm_tls_version			intrsafe_gtm_tls_version
 
 #undef GTM_TLS_INTERFACE_H	/* Allows us to include ydb_tls_interface.h twice. */
 #include "ydb_tls_interface.h"	/* BYPASSOK : intentional duplicate include. */

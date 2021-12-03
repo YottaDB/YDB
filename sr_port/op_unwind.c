@@ -42,26 +42,25 @@
 # include "gtm_trigger_trc.h"
 #endif
 #include "xfer_enum.h"
+#include "have_crit.h"
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
 #include "ztimeout_routines.h"
+<<<<<<< HEAD
 #include "jobinterrupt_event.h"
 #include "bool_zysqlnull.h"
+=======
+#include "jobinterrupt_process.h"
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
-GBLREF	void			(*unw_prof_frame_ptr)(void);
-GBLREF	stack_frame		*frame_pointer, *zyerr_frame;
-GBLREF	unsigned char		*msp, *stackbase, *stacktop;
-GBLREF	mv_stent		*mv_chain;
-GBLREF	tp_frame		*tp_pointer;
-GBLREF	boolean_t		is_tracing_on;
-GBLREF	boolean_t		skip_error_ret;
-GBLREF	stack_frame		*error_frame;
-GBLREF	mval			*alias_retarg;
-GBLREF	boolean_t		tp_timeout_deferred;
-GBLREF	dollar_ecode_type	dollar_ecode;
-GBLREF	boolean_t		ztrap_explicit_null;
-GBLREF	boolean_t		dollar_zininterrupt;
-GBLREF	boolean_t		dollar_truth;
+GBLREF	boolean_t	dollar_truth, is_tracing_on, skip_error_ret;
+GBLREF	mval		*alias_retarg;
+GBLREF	mv_stent	*mv_chain;
+GBLREF	stack_frame	*error_frame, *frame_pointer, *zyerr_frame;
+GBLREF	tp_frame	*tp_pointer;
+GBLREF	unsigned char	*msp, *stackbase, *stacktop;
+GBLREF	void		(*unw_prof_frame_ptr)(void);
+GBLREF	volatile int4	outofband;
 
 error_def(ERR_STACKUNDERFLO);
 error_def(ERR_TPQUIT);
@@ -69,12 +68,18 @@ error_def(ERR_TPQUIT);
 /* This has to be maintained in parallel with unw_retarg(), the unwind with a return argument (extrinisic quit) routine. */
 void op_unwind(void)
 {
+<<<<<<< HEAD
 	rhdtyp			*rtnhdr;
 	boolean_t		trig_forced_unwind;
 	mv_stent		*mvc;
 	int4			event_type, param_val;
 	void (*set_fn)(int4 param);
 
+=======
+	boolean_t	defer_tptimeout, defer_ztimeout;
+	mv_stent	*mvc;
+	rhdtyp		*rtnhdr;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	DBGEHND_ONLY(stack_frame *prevfp;)
 	DCL_THREADGBL_ACCESS;
 
@@ -161,25 +166,7 @@ void op_unwind(void)
 	 * our error state. If we have a deferred timeout and none of the deferral conditions are anymore in effect, release
 	 * the hounds.
 	 */
-	if ((TREF(save_xfer_root)))
-	{
-		/*If TP timeout or ztimeout , check conditions before popping out */
-		if (((TREF(save_xfer_root))->set_fn == tptimeout_set) || ((TREF(save_xfer_root))->set_fn == ztimeout_set))
-		{
-			if ((tp_timeout_deferred || TREF(ztimeout_deferred))
-				UNIX_ONLY(&& !dollar_zininterrupt) && ((0 == dollar_ecode.index)
-									|| !(ETRAP_IN_EFFECT)))
-			{
-				DBGDFRDEVNT((stderr, "op_unwind1: Calling pop_reset_xfer from op_unwind\n"));
-				POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
-				xfer_set_handlers(event_type, set_fn, param_val, TRUE);
-			}
-		} else if (((TREF(save_xfer_root))->set_fn == jobinterrupt_set) UNIX_ONLY(&& !dollar_zininterrupt))
-		{
-			DBGDFRDEVNT((stderr, "op_unwind2: Calling pop_reset_xfer from op_unwind\n"));
-			POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
-			xfer_set_handlers(event_type, set_fn, param_val, TRUE);
-		}
-	}
+	if ((no_event == outofband) && (no_event != (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
+		TRY_EVENT_POP;
 	return;
 }

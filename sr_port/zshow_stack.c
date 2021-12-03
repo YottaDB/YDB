@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
@@ -17,6 +17,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_limits.h"
 
 #include "stack_frame.h"
 #include "mlkdef.h"
@@ -51,6 +52,7 @@ void zshow_stack(zshow_out *output, boolean_t show_checksum)
 	stack_frame	*fp;
 	mstr 		v;
 	unsigned char	buff[MAX_ENTRYREF_LEN + MAX_ROUTINE_CHECKSUM_DIGITS + SIZEOF(INDR_OVERFLOW)];
+	ptrdiff_t	pdiff;
 
 	v.addr = (char *)&buff[0];
 	flush_pio();
@@ -96,7 +98,10 @@ void zshow_stack(zshow_out *output, boolean_t show_checksum)
 				line_reset = FALSE;
 			} else
 				addr = fp->mpc;
-			v.len = INTCAST(symb_line(addr, &buff[0], SIZEOF(buff) - 1, 0, fp->rvector) - &buff[0]);
+			pdiff = INTCAST(symb_line(addr, &buff[0], SIZEOF(buff) - 1, 0, fp->rvector) - &buff[0]);
+			assert((0 <= pdiff) && (MSTR_LEN_MAX >= pdiff));
+			v.len = pdiff;
+			assert(0 <= v.len); /* 4SCA */
 			if (v.len == 0)
 			{
 				MEMCPY_LIT(&buff[0], UNK_LOC_MESS);

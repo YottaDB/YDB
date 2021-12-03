@@ -25,6 +25,7 @@
 #include "gtm_limits.h"
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
+#include "gtm_time.h"
 #include "send_msg.h"
 #include "iosp.h"
 #include "repl_instance.h"
@@ -1800,6 +1801,7 @@ enum tp_ntp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] *
 #define DONOTCOMMIT_TRIGGER_SELECT_XECUTE		(1 << 11) /* Restartable situation seen in trigger_select */
 #define DONOTCOMMIT_JNL_FORMAT				(1 << 12) /* Restartable situation seen in jnl_format */
 #define DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE		(1 << 13) /* Restartable situation seen in COPY_PREV_KEY_TO_GVT_CLUE */
+#define DONOTCOMMIT_DSK_READ_EMPTY_BUT_NOT_FREE		(1 << 14) /* Restartable situation seen in dsk_read */
 
 #define TAB_BG_TRC_REC(A,B)	B,
 enum bg_trc_rec_type
@@ -1930,7 +1932,7 @@ typedef struct sgmnt_data_struct
 	boolean_t	std_null_coll;		/* 0 -> GT.M null collation,i,e, null subs collate between numeric and string
 						 * 1-> standard null collation i.e. null subs collate before numeric and string */
 	int		null_subs;
-	uint4		free_space;		/* Space in file header not being used */
+	uint4		free_space;		/* bytes in fileheader not currently used between master map & start_vbn */
 	mutex_spin_parms_struct	mutex_spin_parms;
 	int4		max_update_array_size;	/* maximum size of update array needed for one non-TP set/kill */
 	int4		max_non_bm_update_array_size;/* maximum size of update array excepting bitmaps */
@@ -1966,7 +1968,7 @@ typedef struct sgmnt_data_struct
 	block_id_32	v6_last_com_bkup_last_blk;	/* Last block in the DB at time of last comprehensive backup (V6 header)*/
 	block_id_32	v6_last_rec_bkup_last_blk;	/* Last block in the DB at time of last record-ed backup (V6 header)*/
 	block_id_32	v6_reorg_restart_block;		/* This is a V6 header field */
-	char		filler_256[8];
+	gtm_timet	last_start_backup;		/* Last successful backup start (was filler). gtm_timet dumped as string */
 	/************* FIELDS SET WHEN DB IS OPEN ********************************/
 	char		now_running[MAX_REL_NAME];/* for active version stamp */
 	uint4		filler_owner_node;	/* 4-byte filler - since owner_node is maintained on VMS only */
@@ -2018,8 +2020,13 @@ typedef struct sgmnt_data_struct
 						 */
 	/************* FIELDS RELATED TO WRITE CACHE FLUSHING *******************************/
 	int4		write_fullblk;
+<<<<<<< HEAD
 	char		filler[4];
 	uint8		flush_time;
+=======
+	int4		statsdb_allocation;
+	int4		flush_time[2];
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	int4		flush_trigger;
 	int4		n_wrt_per_flu;		/* Number of writes per flush call. Overloaded for BG and MM */
 	int4		wait_disk_space;	/* seconds to wait for diskspace before giving up on a db block write */
@@ -2166,10 +2173,16 @@ typedef struct sgmnt_data_struct
 	/* leaving filler here.  This can be reused in the future  */
 	char		gvstats_rec_old_now_filler[496];
 	char		gvstats_rec_filler_4k_plus_512[16];
-	char		filler_4k_plus_512[208];	/* Note: this filler array should START at offset 4K+512.
+	char		filler_4k_plus_512[184];	/* Note: this filler array should START at offset 4K+512.
 							 * So any additions of new fields should happen at the END of this
 							 * filler array and the filler array size correspondingly adjusted.
 							 */
+	/************* FIELDS FOR V6 TO V7 UPGRADE *********************************/
+	block_id	offset;				/* offset produced by mmb extension; interim pointer adjustment */
+	int4		max_rec;			/* pessimistic extimate of what bkl_size could hold */
+	int4		i_reserved_bytes;		/* for mangement of index splits; could be retained as a characteristic */
+	boolean_t	db_got_to_V7_once;		/* set TRUE by MUPIP REORG UPGRADE once it completes all work on region */
+	char		filler[4];			/* Filler to make 8-byte alignment explicit */
 	/************* FIELDS EXTENDED IN V7 HEADER ********************************/
 	/* The sub-headers indicate where these fields were originally located */
 	/*MOSTLY STATIC DATABASE STATE FIELDS*/
@@ -2248,12 +2261,9 @@ typedef struct sgmnt_data_struct
 	unsigned char	basedb_fname[256];	/* full path filaneme of corresponding baseDB if this is a statsDB */
 	boolean_t	read_only;		/* If TRUE, GT.M uses a process-private mmap instead of IPC */
 	/************* GVSTATS_REC RELATED FIELDS ***********/
-	/* gvstats_rec has outgrown its previous space.  There is enough space here at the end of the record
-	 * for all the new GTM-8863 stats if we don't save the 'A' versions (which arguably doesn't make
-	 * sense anyway.  This means that gvstats_rec_csd_t is smaller than
-	 * gvstats_rec_t (but the structs are identical up to the end of gvstats_rec_cst_t).  Note also that we
-	 * are pushing the 8k barrier on sgmnt_data now, but are not critically  pressed for space in the future
-	 * because the former GVSTATS area (above) will be available for reuse.
+	/* gvstats_rec has outgrown its previous space.
+	 * Note also that we are pushing the 8k barrier on sgmnt_data now, but are not critically pressed for
+	 * space in the future because the former GVSTATS area (above) will be available for reuse.
 	 */
 	gvstats_rec_csd_t	gvstats_rec;	/* As of GTM-8863 1304 bytes == 163 counters */
 	char			filler_8k[1464 - SIZEOF(gvstats_rec_csd_t)];
@@ -2733,9 +2743,7 @@ typedef struct	sgmnt_addrs_struct
 	volatile uint4	timer;			/* This process has a timer for this region */
 	volatile uint4	in_wtstart;		/* flag we are busy writing */
 	volatile uint4	now_crit;		/* This process has the critical write lock */
-	volatile uint4	wbuf_dqd;		/* A write buffer has been dequeued - signals that
-						 * extra cleanup required if die while on
-						 */
+	volatile uint4	wbuf_dqd;		/* a write buffer dequeued - extra cleanup required if process dies with this on */
 	uint4		stale_defer;		/* Stale processing deferred this region */
 	boolean_t	freeze;
 	volatile boolean_t	dbsync_timer;	/* whether a timer to sync the filehdr (and write epoch) is active */
@@ -2870,7 +2878,6 @@ typedef struct gd_gblname_struct
 					/* the BLK_SIZE computed by GDE for every statsdb region (sync with sr_unix/gdeput.m) */
 #define STATSDB_BLK_SIZE ROUND_UP((SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + MAX_PADDED_STATSDB_KEY_SIZE+SIZEOF(gvstats_rec_t)),512)
 #define	STATSDB_ALLOCATION	2050	/* the ALLOCATION computed by GDE for every statsdb region (sync with sr_unix/gdeput.m) */
-#define	STATSDB_EXTENSION	2050	/* the EXTENSION computed by GDE for every statsdb region (sync with sr_unix/gdeput.m) */
 #define	STATSDB_MAX_KEY_SIZE	64	/* the MAX_KEY_SIZE computed by GDE for every statsdb region (sync with sr_port/gdeinit.m)*/
 #define	STATSDB_MAX_REC_SIZE	(STATSDB_BLK_SIZE - SIZEOF(blk_hdr)) /* the MAX_REC_SIZE computed by GDE for every statsdb region */
 
@@ -3049,7 +3056,7 @@ typedef struct	gv_namehead_struct
 							 */
 	boolean_t	split_cleanup_needed;
 	char		last_split_direction[MAX_BT_DEPTH - 1];	/* maintain last split direction for each level in the GVT */
-	char		filler_8byte_align1[6];
+	char		filler_8byte_align1[2];
 	block_id	last_split_blk_num[MAX_BT_DEPTH - 1];
 #	ifdef GTM_TRIGGER
 	struct gvt_trigger_struct *gvt_trigger;		/* pointer to trigger info for this global
@@ -3060,9 +3067,9 @@ typedef struct	gv_namehead_struct
 							 * last read/initialized from ^#t global (in gvtr_init) */
 	boolean_t	trig_mismatch_test_done;	/* whether update process has checked once if there is a mismatch
 							 * in trigger definitions between originating and replicating instance */
-	GTM64_ONLY(uint4 filler_8byte_align2;)		/* for 8-byte alignment of "clue" member. (targ_alloc relies on this) */
+	GTM64_ONLY(uint4 filler_8byte_align2;)		/* needed for 8-byte alignment of clue, which targ_alloc relies on */
 #	endif
-	unsigned short	filler_clue_end_align;		/* Avoid padding after clue */
+	unsigned short	filler_clue_end_align[1];	/* avoid padding after clue */
 	gv_key_nobase	clue;				/* Clue key, must be last in struct because of gv_key flexible array. */
 } gv_namehead;
 
@@ -3828,8 +3835,6 @@ MBSTART {												\
 #define HIST_SIZE(h)		( (SIZEOF(int4) * 2) + (SIZEOF(srch_blk_status) * ((h).depth + 1)) )
 
 /* Start of lock space in a bg file, therefore also doubles as overhead size for header, bt and wc queues F = # of wc blocks */
-#define LOCK_BLOCK(X)		(DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(X) + BT_SIZE(X), DISK_BLOCK_SIZE))
-#define LOCK_BLOCK_SIZE(X)	(DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(X) + BT_SIZE(X), OS_PAGE_SIZE))
 #define	LOCK_SPACE_SIZE(X)	(ROUND_UP2(((sgmnt_data_ptr_t)X)->lock_space_size, OS_PAGE_SIZE))
 /* In case of an encrypted database, we maintain both encrypted and decrypted versions of the block in shared memory
  * in parallel arrays of global buffers hence the doubling calculation below. Although this doubles the shared memory

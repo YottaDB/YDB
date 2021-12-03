@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
@@ -210,19 +210,28 @@ boolean_t mu_int_fhead(void)
 		case dba_bg:
 		/*** WARNING: Drop thru ***/
 		case dba_mm:
+			mu_data->free_space = BLK_ZERO_OFF(mu_data->start_vbn) - SIZEOF_FILE_HDR(mu_data);
 			mu_int_ovrhd = (int4)DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
 	}
 	assert(mu_data->blk_size == ROUND_UP(mu_data->blk_size, DISK_BLOCK_SIZE));
 	block_factor =  mu_data->blk_size / DISK_BLOCK_SIZE;
+	if (GDSMV63015 == mu_data->creation_mdb_ver)
+	{	/* required due to version renumbering to make a V6.3-015 possible and make way for V6->V7 upgrade */
+		assert((GDSV6p == mu_data->desired_db_format));
+		mu_data->creation_mdb_ver = GDSMV70000;
+		mu_data->desired_db_format = GDSV7;
+	}
 	mu_int_ovrhd += 1;
 	if (mu_int_ovrhd != mu_data->start_vbn)
 	{
 		mu_int_err(ERR_DBHEADINV, 0, 0, 0, 0, 0, 0, 0);
 		return FALSE;
 	}
-	size = (mu_int_ovrhd - 1) + (off_t)block_factor * (actual_tot_blks + 1);
+	size = (mu_int_ovrhd - 1) + (off_t)block_factor * (actual_tot_blks + 1);	/* + 1 to actual_tot_blks is EOF marker */
 	/* If ONLINE INTEG for this region is in progress, then native_size would have been calculated in ss_initiate. */
 	SET_NATIVE_SIZE(native_size);
+	if (GDSMV63001 > mu_data->creation_mdb_ver)	/* AIO changed the EOF drom DISK_BLOCK_SIZE to DB block size */
+		native_size = ROUND_UP(native_size, block_factor);
 	ALIGN_DBFILE_SIZE_IF_NEEDED(size, native_size);
 	if (native_size && (size != native_size))
 	{

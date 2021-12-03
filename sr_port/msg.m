@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2020 Fidelity National Information		;
+; Copyright (c) 2001-2021 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	;
@@ -13,8 +13,12 @@
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
+<<<<<<< HEAD
  set $etrap="use $principal write $zstats,!! kill outmsg zshow ""*"" zhalt 1"
  New ansiopen,err,fn,i1,in,lo,msg,out,outansi,severe,txt,up,vms
+=======
+ New ansiopen,err,fn,i1,in,lo,msg,out,outansi,severe,txt,up
+>>>>>>> 52a92dfd (GT.M V7.0-001)
  Set (severe("warning"),ival(0))=0
  Set (severe("success"),ival("A"))=1
  Set (severe("error"),ival("B"))=2
@@ -23,22 +27,25 @@
  Set ival("T")=5
  Set up="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
  Set lo="abcdefghijklmnopqrstuvwxyz"
+<<<<<<< HEAD
  set ydbplatform=$zpiece($zversion," ",3)
+=======
+ ; On the slowest server, this routine took less than half a second. So, there is no need to wait for more than 30 seconds.
+ Set $ztimeout="30:use $principal write ""# msg.m took longer than expected"",! zshow ""*"" zhalt 1"
+>>>>>>> 52a92dfd (GT.M V7.0-001)
  ;
- ; On Unix, start this program with .../mumps -run msg filename osname
- ; On VMS, first compile and link msg.m into msg.exe
- ;         then    $ commandname == $disk$xxx:[dir.sub]msg.exe
- ;         then    $ commandname filename osname
+ ; Run this program as $gtm_exe/mumps -run msg filename
+ ; If used in a non-build environment, pass "nohdr" as second argument to not depend on the presence of $gtm_tools/copyright.txt
+ ; (nohdr skips copyright insertion).
  ;
  Set txt=$ZCMDLINE
- Set:$TRanslate($Piece(txt," ",1),"/RUN","-run")="-run" txt=$Piece(txt," ",3,$Length(txt)+2)
  Set fn=$Piece(txt," ",1)
- Set vms=($Select($Length(txt," ")>1:$Piece(txt," ",2),1:$Piece($ZVERSION," ",3))="VMS")
+ Set nohdr=$Piece(txt," ",2)
  ;
  Set in=$ZPARSE(fn,"","",".msg")
  Set out=$ZPARSE(fn,"NAME"),txt=$ZPARSE(out,"","[]",".c")
  Set l=$Length(txt),outansi=txt
- set ext=$Select(vms:".C",1:".c"),extl=ext_";"
+ set ext=".c",extl=ext_";"
  Set:$Extract(txt,l-1,l)=ext outansi=$Extract(txt,1,l-2)
  Set:$Extract(txt,l-2,l)=extl outansi=$Extract(txt,1,l-3)
  Set out=outansi_"_ctl.c",outansi=outansi_"_ansi.h"
@@ -48,6 +55,7 @@
  Set cnt=0,undocmsgcnt=0,lineno=0
  Open in:readonly,out:newversion
  Set ansiopen=0
+<<<<<<< HEAD
  Use out Do chdr		; Create <fn>_ctl.c file and its prologue
  set ydbfn=$select("ydberrors"=fn:"ydberrors.h",1:"ydb"_fn_".h") ; Avoid naming it ydbydberrors.h
  open ydbfn:newversion		; Create ydb<fn>.h file and its prologue
@@ -69,6 +77,9 @@
  . use libydberrorsfn
  . do chdr
  ;
+=======
+ Use out Do:"nohdr"'=nohdr hdr
+>>>>>>> 52a92dfd (GT.M V7.0-001)
  For  Use in Read msg Set lineno=lineno+1 Quit:$TRanslate(msg,lo,up)?.E1".FACILITY".E
  Set err=0 Do  Quit:err
  . New i1,i2,upmsg
@@ -79,7 +90,7 @@
  . If $Extract(upmsg,i1,i1+9)'=".FACILITY " Do  Set err=1 Quit
  . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . Write !,$TRanslate(msg,$Char(9)," "),!?i1,"^-------^",!,"Expected: '.FACILITY'.",!
- . . Quit
+ . . Zhalt 1
  . For i1=i1+10:1 Quit:$Extract(upmsg,i1)'=" "
  . For i2=i1:1 Quit:$Extract(upmsg,i2)=" "
  . Set facility=$Extract(msg,i1,i2-1)
@@ -89,19 +100,19 @@
  . If facnum>2047 Do  Set err=1 Quit
  . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . Write !,"Expected a number between 1 and 2047, found """,facnum,""".",!
- . . Quit
+ . . Zhalt 1
  . For i1=i2:1 Quit:$Extract(upmsg,i1)'=" "
  . For i2=i1:1 Quit:$Extract(upmsg,i2)=" "
  . If $Extract(upmsg,i1,i2)'="PREFIX " Do  Set err=1 Quit
  . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . Write !,$TRanslate(msg,$Char(9)," "),!?i1,"^-----^",!,"Expected: 'PREFIX='.",!
- . . Quit
+ . . Zhalt 1
  . For i1=i2:1 Quit:$Extract(upmsg,i1)'=" "
  . For i2=i1:1 Quit:$Extract(upmsg,i2)=" "
  . Set prefix=$Extract(msg,i1,i2-1)
  . Use out Write "#include ""mdef.h""",!
  . Write "#include ""error.h""",!!
- . Write:'vms "LITDEF"_$Char(9)_"err_msg "_fn_"[] = {",!
+ . Write "LITDEF"_$Char(9)_"err_msg "_fn_"[] = {",!
  . Quit
  ; Read all the comments until the start of "undocumented errors" section. It assumes there are only comments upto now.
  ; Read the ".TITLE" line
@@ -112,23 +123,26 @@
  . Use $Principal Write !!,"Message file format error in ",in,":"
  . Write "Expected the section of undocumented errors starting with """_undocmsgstart_"""",!
  . Write "Line ("_lineno_") : ",comment,!
- . Quit
+ . Zhalt 1
  ; Now the "undocumented errors" section starts. Create the array of Mnemonics
  For  Use in Read comment Set lineno=lineno+1 Quit:(($ZEOF)!($Extract(comment,1)'="!")!(comment[undocmsgend))  Do
  . Set undocmsgcnt=undocmsgcnt+1  If undocmsgcnt>4095 Do  Quit
  . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . Write !,"Cannot process more than 4095 messages."
  . . Write !,"Overflow occurred at:",!,comment
+ . . Zhalt 1
  . ; Expect a line like:
  . ; !<TAB>MNEMONIC<TAB><TAB>...<error message text>
  . If $Extract(comment,1)'="!",$Extract(comment,2)'=$Char(9) Do  Quit
  . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . Write !,comment,!,"^-----^",!,"Expected: '!<TAB>'.",!
+ . . Zhalt 1
  . Set i1=$Find($TRanslate(comment,$Char(9)," "),"ERR_")
  . Set i2=$Find($TRanslate(comment,$Char(9)," ")," ",i1-1)
  . If 'i2  Do  Quit
  . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . Write !,comment,!,"      ^-----^",!,"Expected: a mnemonic starting with ERR_",!
+ . . Zhalt 1
  . Set undocmnemonic(undocmsgcnt)=$Extract(comment,i1,i2-2)
  For  Use in Quit:$ZEOF  Read msg Do:$Extract(msg,1)?1u
  . new delim,i1,lomsg,flag,mtail,mhead,msgsav
@@ -136,6 +150,7 @@
  . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . Write !,"Cannot process more than 4095 messages."
  . . Write !,"Overflow occurred at:",!,msg
+ . . Zhalt 1
  . ; Expect a line like:
  . ; MNEMONIC <error message text>/severity/fao=###!/ansi=###/integ-id/flag ! comment
  . ;   or:
@@ -163,17 +178,26 @@
  . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . Write !,"Error message specification:",!,msgsav
  . . Write !,"Bad flag ("_flag_") encountered: ",msgsav,!
- . . zhalt 1
- . . Quit
+ . . Zhalt 1
  . Set outmsg(cnt)=$Extract(msg,1,i1-1)
- . For i1=i1:1 Quit:$Extract(msg,i1)="<"  Quit:$Extract(msg,i1)=""""
+ . ; Extract the contents between "<" and ">" and store it in the local "text"
+ . For i1=i1:1:$Length(msg) Quit:$Extract(msg,i1)="<"  Quit:$Extract(msg,i1)=""""
+ . Do:(i1=$Length(msg))
+ . . Use $Principal Write !!,"Message file format error in ",in,":"
+ . . Write !,msg,!,"Did not find opening delimiter : <",!
+ . . Zhalt 1
  . Set text=""""
- . Set delim=$Extract(msg,i1) For i1=i1+1:1 Do  Quit:delim=""
+ . Set delim=$Extract(msg,i1) For i1=i1+1:1:$Length(msg) Do  Quit:delim=""
  . . If $Extract(msg,i1)=">",delim="<" Set delim="" Quit
  . . If $Extract(msg,i1)="""",delim="""",$Extract(msg,i1+1)'="""" Set delim="" Quit
  . . Set:$Extract(msg,i1)="""" text=text_"\" Set text=text_$Extract(msg,i1)
  . . Quit
+ . Do:(i1=$Length(msg))
+ . . Use $Principal Write !!,"Message file format error in ",in,":"
+ . . Write !,msg,!,"Did not find closing delimiter : >",!
+ . . Zhalt 1
  . Set text=text_""""
+ . ; Now parse the conent left after extracting <...>
  . Set (severity,fao,ival)="",ansi="none",lomsg=$TRanslate($Extract(msg,i1+1,$Length(msg)),up_$Char(9,32),lo)
  . For  Quit:lomsg=""  Do
  . . New key,ok,s,val
@@ -183,7 +207,7 @@
  . . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . . Write !,"All options must be preceded by a forward slash (/), Found:",!,msg
  . . . Write !,"Error encountered at: ",lomsg
- . . . Quit
+ . . . Zhalt 1
  . . Set ok=0
  . . For i1=2:1:$Length(lomsg)+1 Quit:$Extract(lomsg,i1)="/"
  . . If ""=ival Do  Quit
@@ -195,7 +219,7 @@
  . . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . . Write !,"Error message specification:",!,msg
  . . . Write !,"Empty keyword encountered: ",lomsg
- . . . Quit
+ . . . Zhalt 1
  . . If $Data(severe(key)) Set severity=severe(key),ok=1
  . . If 'ok,$Extract("fao",1,$Length(key))=key Set:+val=val fao=val,ok=1
  . . If 'ok,$Extract("ansi",1,$Length(key))=key Set:+val=val ansi=val,ok=1
@@ -204,43 +228,55 @@
  . . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . . Write !,"Error message specification:",!,msg
  . . . Write !,"Option not recognized: ",lomsg
- . . . Quit
+ . . . Zhalt 1
  . . Set lomsg=$Extract(lomsg,i1,$Length(lomsg))
  . . Quit
  . If severity="" Do  Quit
  . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . Write !,"Error message specification:",!,msg
  . . Write !,"Severity not specified."
- . . Quit
+ . . Zhalt 1
  . If fao="" Do  Quit
  . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . Write !,"Error message specification:",!,msg
  . . Write !,"Format item count (fao) not specified."
- . . Quit
+ . . Zhalt 1
  . Set outmsg(cnt,"code")=(flag*268435456)+((facnum+2048)*65536)+((cnt+4096)*8)+severity
  . For msgcnt=1:1:undocmsgcnt  If outmsg(cnt)=undocmnemonic(msgcnt)  Set undocmnemonic(msgcnt,"code")=cnt-1 Quit
- . If 'vms Use out Write $Char(9),"{ """,outmsg(cnt),""", ",text,", ",fao,", ",ival(ival)," },",!
+ . Use out Write $Char(9),"{ """,outmsg(cnt),""", ",text,", ",fao,", ",ival(ival)," },",!
  . If ansiopen,ansi="none" Set ansi=0 ; Make !/ansi= specification optional (except for first one)
  . Quit:ansi="none"
  . Do:'ansiopen
  . . Open outansi:newversion Use outansi
+<<<<<<< HEAD
  . . Do chdr Set ansiopen=1 Write !,"const static readonly int error_ansi[] = {",!
+=======
+ . . Do:"nohdr"'=nohdr hdr Set ansiopen=1 Write !,"const static readonly int error_ansi[] = {",!
+>>>>>>> 52a92dfd (GT.M V7.0-001)
  . . Quit
  . Set:""'=ival integ(outmsg(cnt))=ival
  . Use outansi Write $Char(9),$Justify(ansi,4),",",$Char(9),"/* ",outmsg(cnt)," */",!
  . Quit
  Use out
  Write "};",!!
+<<<<<<< HEAD
  Do
  . Use out
  . Write !!,"LITDEF"_$Char(9)_"int "_undocarr_"[] = {",!
  . For i1=1:1:undocmsgcnt  Write $char(9)_undocmnemonic(i1,"code")_","_$char(9)_"/* "_undocmnemonic(i1)_" */",!
  . Write "};",!!
  . Quit
+=======
+ For i1=1:1:cnt Write "LITDEF",$Char(9),"int ",prefix,outmsg(i1)," = ",outmsg(i1,"code"),";",!
+ Use out
+ Write !!,"LITDEF"_$Char(9)_"int "_undocarr_"[] = {",!
+ For i1=1:1:undocmsgcnt  Write $char(9)_undocmnemonic(i1,"code")_","_$char(9)_"/* "_undocmnemonic(i1)_" */",!
+ Write "};",!!
+>>>>>>> 52a92dfd (GT.M V7.0-001)
  Write !,"GBLDEF",$Char(9),"err_ctl "_fn_"_ctl = {",!
  Write $Char(9),facnum,",",!
  Write $Char(9),""""_facility_""",",!
- Write $Char(9),$Select(vms:"NULL,",1:"&"_fn_"[0],"),!
+ Write $Char(9),"&"_fn_"[0],",!
  Write $Char(9),cnt_",",!
  Write $Char(9),"&"_undocarr_"[0],",!
  Write $Char(9),undocmsgcnt,!,"};",!!
@@ -268,6 +304,7 @@
  ;set x="",ival=0 for  set x=$o(integ(x)) quit:'$length(x)  if $increment(ival)
  ;zwrite ival
  Quit
+<<<<<<< HEAD
 
 ;
 ; Routine to write C header file for the generated_ctl.c file and the C header files
@@ -276,6 +313,11 @@ chdr
  Set saveIO=$IO
  If vms Set cfile=$ztrnlnm("gtm$src")_"copyright.txt"
  If 'vms Set cfile=$ztrnlnm("gtm_tools")_"/copyright.txt"
+=======
+hdr
+ Set prevout=$IO
+ Set cfile=$ztrnlnm("gtm_tools")_"/copyright.txt"
+>>>>>>> 52a92dfd (GT.M V7.0-001)
  Set xxxx="2001"
  Set yyyy=$zdate($H,"YYYY")
  Open cfile:read

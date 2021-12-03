@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -14,30 +14,58 @@
  ****************************************************************/
 
 #include "mdef.h"
-
 #include <sys/types.h>
-
 #include "xfer_enum.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "deferred_events.h"
 #include "fix_xfer_entry.h"
+#include "op.h"
+#include "gtmio.h"
+#include "io.h"
+#include "gtmimagename.h"
 
 /* ------------------------------------------------------------------
  * Set flags and transfer table for synchronous handling of  ctrap.
  * Should be called only from set_xfer_handlers.
  * ------------------------------------------------------------------
  */
-GBLREF volatile int4 	ctrap_action_is;
-GBLREF xfer_entry_t	xfer_table[];
-GBLREF volatile int4 	outofband;
+GBLREF	boolean_t		ztrap_explicit_null;
+GBLREF	dollar_ecode_type	dollar_ecode;
+GBLREF	volatile boolean_t	dollar_zininterrupt;
+GBLREF	volatile int4 		outofband;
+GBLREF	xfer_entry_t		xfer_table[];
 
 void ctrap_set(int4 ob_char)
 {
-	int   op_fetchintrrpt(), op_startintrrpt(), op_forintrrpt();
+	DCL_THREADGBL_ACCESS;
 
+<<<<<<< HEAD
 	if (!outofband)
 	{
 		SET_OUTOFBAND((CTRLC == ob_char) ? ctrap : sighup);
 		ctrap_action_is = ob_char;
+=======
+	SETUP_THREADGBL_ACCESS;
+	assert(INTRPT_IN_EVENT_HANDLING == intrpt_ok_state);
+	if ((ctrap != outofband) || have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT) || dollar_zininterrupt
+		|| (jobinterrupt == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
+	{	/* not a good time, so save it */
+		TAREF1(save_xfer_root, ctrap).event_state = queued;
+		SAVE_XFER_QUEUE_ENTRY(ctrap, 0);
+		DBGDFRDEVNT((stderr, "%d %s: ctrap_set - ctrap queued - outofband: %d, trap: %d, intrpt: %d, crit: %d\n",
+			     __LINE__, __FILE__, outofband, ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)), dollar_zininterrupt,
+			     have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)));
+		return;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	}
+	DBGDFRDEVNT((stderr, "%d %s: ctrap_set - NOT deferred\n", __LINE__, __FILE__));
+	TAREF1(save_xfer_root, ctrap).param_val = ob_char;
+	outofband = (CTRLC == ob_char) ? ctrap : sighup;
+	DEFER_INTO_XFER_TAB;
+	DBGDFRDEVNT((stderr, "%d %s: ctrap_set - pending xfer entries for ctrap - outofband: %d\n", __LINE__, __FILE__, outofband));
+#	ifdef DEBUG
+	if (gtm_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == gtm_white_box_test_case_number))
+		DBGFPF((stderr, "# ctrap_set: set the xfer entries for ctrap\n"));
+#	endif
 }

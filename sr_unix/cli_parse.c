@@ -402,7 +402,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 				 */
 				if (pparm->parm_values)
 				{
-					MALLOC_CPY_STR(pparm->pval_str, pparm->parm_values->prompt);
+					pparm->pval_str = malloc_cpy_str(pparm->parm_values->prompt);
 					if (!cli_get_sub_quals(pparm))
 						return (-1);
 				}
@@ -449,7 +449,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 			 * Allocate memory and save value
 			 * -------------------------------
 			 */
-			MALLOC_CPY_STR(pparm->pval_str, cli_token_buf);
+			pparm->pval_str = malloc_cpy_str(cli_token_buf);
 			if (!cli_get_sub_quals(pparm))
 				return (-1);
 		}
@@ -675,7 +675,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 						free(pparm1->pval_str);
 				}
 				if ((!val_flg) && (VAL_NOT_REQ == pparm1->required) && pparm1->parm_values)
-					MALLOC_CPY_STR(pparm1->pval_str, pparm1->parm_values->prompt);
+					pparm1->pval_str = malloc_cpy_str(pparm1->parm_values->prompt);
 				if (val_flg)
 				{
 					ptr_equal_len = strlen(ptr_equal + 1);

@@ -25,7 +25,12 @@
 #include "stringpool.h"
 #include "setterm.h"
 #include "error.h"
+<<<<<<< HEAD
 #include "comline.h"
+=======
+#include "op.h"
+#include "indir_enum.h"
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 GBLREF io_pair		io_std_device;
 LITREF unsigned char	io_params_size[];
@@ -39,7 +44,10 @@ void iott_close(io_desc *v, mval *pp)
 	int		status;
 	int		p_offset;
 	boolean_t	ch_set;
+<<<<<<< HEAD
 	recall_ctxt_t	*recall, *recall_top;
+=======
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -57,12 +65,18 @@ void iott_close(io_desc *v, mval *pp)
 	while (*(pp->str.addr + p_offset) != iop_eol)
 	{
 		if ((ch = *(pp->str.addr + p_offset++)) == iop_exception)
+<<<<<<< HEAD
 		{
 			v->error_handler.len = *(pp->str.addr + p_offset);
 			v->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
 			s2pool(&v->error_handler);
 		}
 		UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
+=======
+			DEF_EXCEPTION(pp, p_offset, v);
+		p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
+			(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	}
 	if (v == io_std_device.in || (v == io_std_device.out))
 	{

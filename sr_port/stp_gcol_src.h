@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -91,8 +91,12 @@ GBLREF lvzwrite_datablk		*lvzwrite_block;
 GBLREF mliteral			literal_chain;
 GBLREF mstr			*comline_base, **stp_array;
 GBLREF mval			dollar_system, dollar_zerror, dollar_zgbldir, dollar_zstatus;
+<<<<<<< HEAD
 GBLREF mval			dollar_zyerror, zstep_action, dollar_zinterrupt, dollar_zsource, dollar_ztexit;
 GBLREF mval			dollar_testmv;
+=======
+GBLREF mval			dollar_zyerror, dollar_zinterrupt, dollar_zsource, dollar_ztexit;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 GBLREF mv_stent			*mv_chain;
 GBLREF sgm_info			*first_sgm_info;
 GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
@@ -717,7 +721,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		MVAL_STPG_ADD(&dollar_zgbldir);
 		MVAL_STPG_ADD(&dollar_zinterrupt);
 		MVAL_STPG_ADD(&(TREF(dollar_zstep)));
-		MVAL_STPG_ADD(&zstep_action);
+		MVAL_STPG_ADD(&(TREF(zstep_action)));
 		MVAL_STPG_ADD(&dollar_zerror);
 		MVAL_STPG_ADD(&dollar_ztexit);
 		MVAL_STPG_ADD(&dollar_zyerror);

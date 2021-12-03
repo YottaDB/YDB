@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 52a92dfd (GT.M V7.0-001)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +26,7 @@
 #include "gdsfhead.h"
 #include "zwrite.h"
 #include "op.h"
-#include "outofband.h"
+#include "deferred_events_queue.h"
 #include "numcmp.h"
 #include "patcode.h"
 #include "sgnl.h"
@@ -31,12 +36,12 @@
 #include "gtmimagename.h"
 #include "numcmp.h"
 
+GBLREF bool		undef_inhibit;
+GBLREF gd_addr		*gd_header;
+GBLREF gd_region	*gv_cur_region;
 GBLREF gv_key		*gv_currkey;
 GBLREF gvzwrite_datablk *gvzwrite_block;
-GBLREF int4		outofband;
-GBLREF gd_region	*gv_cur_region;
-GBLREF gd_addr		*gd_header;
-GBLREF bool		undef_inhibit;
+GBLREF volatile int4   outofband;
 
 LITREF mval		literal_null;
 
@@ -54,7 +59,7 @@ void gvzwr_var(uint4 data, int4 n)
 
 	SETUP_THREADGBL_ACCESS;
 	if (outofband)
-		outofband_action(FALSE);
+		async_action(FALSE);
 	zwr_sub = (zwr_sub_lst *)gvzwrite_block->sub;
 	if ((0 == gvzwrite_block->subsc_count) && (0 == n))
 		zwr_sub->subsc_list[n].subsc_type = ZWRITE_ASTERISK;

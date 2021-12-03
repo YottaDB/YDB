@@ -1,4 +1,4 @@
-/****************************************************************
+ /***************************************************************
  *								*
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
@@ -41,6 +41,7 @@
 #include "filestruct.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
+#include "sgtm_putmsg.h"
 #include "repl_comm.h"
 #include "jnl.h"
 #include "hashtab_mname.h"    /* needed for muprec.h */
@@ -51,6 +52,7 @@
 #include "repl_ctl.h"
 #include "repl_errno.h"
 #include "repl_dbg.h"
+#include "repl_shutdcode.h"
 #include "iosp.h"
 #include "gt_timer.h"
 #include "gtmsource_heartbeat.h"
@@ -224,14 +226,32 @@ STATICDEF	int		recvd_start_flags = START_FLAG_NONE;
 STATICDEF	int		poll_time = REPL_POLL_NOWAIT;
 #ifdef GTM_TLS
 STATICDEF	boolean_t	next_renegotiate_hrtbt = FALSE;
+STATICDEF	int4		hrtbt_cnt = 0;
+STATICDEF 	int4		renegotiate_factor = 0;
 #ifdef DEBUG
 STATICDEF	boolean_t	renegotiation_pending = FALSE;
 #endif
 #endif
 
+<<<<<<< HEAD
 #define	OUT_LINE	(256 + 1)
 
 STATICFNDCL void repl_tr_endian_convert_src(repl_msg_ptr_t send_msgp, int send_tr_len, seq_num pre_read_seqno);
+=======
+#define	OUT_LINE	256 + 1
+#define PROC_SRCOPS_PRINT_MSG_LEN	2048
+error_def(ERR_JNLNEWREC);
+error_def(ERR_JNLSETDATA2LONG);
+error_def(ERR_REPLCOMM);
+error_def(ERR_REPLFTOKSEM);
+error_def(ERR_REPLINSTNOHIST);
+error_def(ERR_REPLNOTLS);
+error_def(ERR_REPLXENDIANFAIL);
+error_def(ERR_REPLAHEAD);
+error_def(ERR_TRIG2NOTRIG);
+error_def(ERR_TLSRENEGOTIATE);
+error_def(ERR_TEXT);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 /* Endian converts the given set of journal records (possibly multiple sequence numbers) so that the secondary can consume them
  * as-is. This is done only in the case when the primary is running on a GT.M version less than the GT.M version on secondary
@@ -400,7 +420,6 @@ void gtmsource_recv_ctl(void)
 	if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 		return;
 #	ifdef GTM_TLS
-	assert(repl_tls.enabled || (REPLTLS_RENEG_STATE_NONE == repl_tls.renegotiate_state));
 	if (repl_tls.enabled && (REPLTLS_WAITING_FOR_RENEG_TIMEOUT == repl_tls.renegotiate_state) && next_renegotiate_hrtbt)
 	{	/* Time to renegotiate the TLS/SSL parameters. */
 		heartbeat_stalled = TRUE;	/* Defer heartbeats until renegotiation is done. */
@@ -432,7 +451,10 @@ void gtmsource_recv_ctl(void)
 			break;
 		gtmsource_poll_actions(TRUE);
 		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
+		{
+			poll_time = REPL_POLL_NOWAIT;
 			return;
+		}
 		else if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 			break;
 	}
@@ -552,13 +574,24 @@ void gtmsource_recv_ctl(void)
 					tmp_time4 = GTM_BYTESWAP_32(tmp_time4);
 					*(gtm_time4_t *)&heartbeat_msg->ack_time[0] = tmp_time4;
 				}
-				gtmsource_process_heartbeat((repl_heartbeat_msg_ptr_t)recv_msgp);
+				if ((!gtmsource_is_heartbeat_stalled) && (SHUTDOWN != gtmsource_local->shutdown))
+					gtmsource_process_heartbeat((repl_heartbeat_msg_ptr_t)recv_msgp);
+#				ifdef GTM_TLS
+				hrtbt_cnt++;
+				if ((0 < renegotiate_factor) && (0 == (hrtbt_cnt % renegotiate_factor))
+					&& (SHUTDOWN != gtmsource_local->shutdown))
+				{
+					next_renegotiate_hrtbt = TRUE;
+					repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_TIMEOUT;
+					poll_time = REPL_POLL_WAIT;
+				}
+#				endif
 				break;
 #			ifdef GTM_TLS
 			case REPL_RENEG_ACK:
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_RENEG_ACK received\n");
 				REPLTLS_RENEGOTIATE(repl_tls.sock, status);
-				poll_time = REPL_POLL_NOWAIT; /* because we are back to sending data */
+				poll_time = REPL_POLL_WAIT; /* because we are back to sending data */
 				if (0 != status)
 				{
 					assert(GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state);
@@ -581,7 +614,9 @@ void gtmsource_recv_ctl(void)
 					heartbeat_stalled = FALSE;
 				/* else, heartbeat_stalled will be set back to FALSE when REPL_XON is received. */
 				DEBUG_ONLY(renegotiation_pending = FALSE);
-				REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(next_renegotiate_hrtbt);
+				repl_tls.renegotiate_state = REPLTLS_RENEG_STATE_NONE;
+				next_renegotiate_hrtbt = FALSE;
+				hrtbt_cnt = 0;
 				repl_log_tls_info(gtmsource_log_fp, repl_tls.sock);
 				break;
 #			endif
@@ -696,6 +731,8 @@ int gtmsource_process(void)
 	DEBUG_ONLY(uchar_ptr_t		save_inbuff;)
 	DEBUG_ONLY(uchar_ptr_t		save_outbuff;)
 	DCL_THREADGBL_ACCESS;
+        char				print_msg_src[PROC_SRCOPS_PRINT_MSG_LEN];
+        char				print_msg_t[PROC_SRCOPS_PRINT_MSG_LEN];
 
 	SETUP_THREADGBL_ACCESS;
 	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open);
@@ -715,6 +752,18 @@ int gtmsource_process(void)
 
 	assert(REPL_POLL_WAIT < MILLISECS_IN_SEC);
 	assert(GTMSOURCE_IDLE_POLL_WAIT < REPL_POLL_WAIT);
+
+	if (0 < gtmsource_options.renegotiate_interval)
+	{
+		/* When heartbeat period is a multiple of renegotiate_interval, perform
+	           renegotiation every renegotiate_interval/heartbeat_period. */
+		renegotiate_factor = (int) DIVIDE_ROUND_DOWN(gtmsource_options.renegotiate_interval,
+				gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD]);
+		/* When heartbeat period is about as high as the renegotiate interval
+	        (1 == renegotiate_factor), perform renegotiation every other heartbeat.*/
+		if (1 == renegotiate_factor)
+			renegotiate_factor++;
+	}
 
 	gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 	gtmsource_srv_latch = &gtmsource_local->gtmsource_srv_latch;
@@ -778,6 +827,7 @@ int gtmsource_process(void)
 		gtmsource_stop_heartbeat();
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 		{
+			poll_time = REPL_POLL_NOWAIT;
 			/* Ensure we don't hold any locks at this moment */
 			assert(process_id != gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
 			assert(!have_crit(CRIT_HAVE_ANY_REG)); /* checks both journal pool lock and database crit lock */
@@ -940,23 +990,30 @@ int gtmsource_process(void)
 		secondary_ahead = FALSE;
 		grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+		{
+			poll_time = REPL_POLL_NOWAIT;
 			continue;
+		}
 		local_jnl_seqno = jctl->jnl_seqno;
 		rel_lock(jnlpool->jnlpool_dummy_reg);
 		/* Take care to set the flush parameter in repl_log calls below to FALSE until at least the first message
 		 * gets sent back. This is so the fetchresync rollback on the other side does not timeout before receiving
 		 * a response. */
+		poll_time = REPL_POLL_NOWAIT;
 		assert(0 == GET_STRM_INDEX(recvd_seqno));
 		assert(0 == GET_STRM_INDEX(local_jnl_seqno));
-		repl_log(gtmsource_log_fp, TRUE, FALSE, "Current Journal Seqno of the instance is "INT8_FMT" "INT8_FMTX"\n",
-			local_jnl_seqno, local_jnl_seqno);
 		if (recvd_seqno > local_jnl_seqno)
 		{	/* Secondary journal seqno is greater than that of the Primary. We know it is ahead of the primary. */
 			secondary_ahead = TRUE;
-			repl_log(gtmsource_log_fp, TRUE, FALSE,
-				"Secondary instance journal seqno "INT8_FMT" "INT8_FMTX" is greater than Primary "
-				"instance journal seqno "INT8_FMT" "INT8_FMTX"\n",
-				recvd_seqno, recvd_seqno, local_jnl_seqno, local_jnl_seqno);
+			REPL_DPRINT5("Secondary instance journal seqno "INT8_FMT" "INT8_FMTX" is greater than Primary "
+				"instance journal seqno "INT8_FMT" "INT8_FMTX"", recvd_seqno, recvd_seqno,
+				local_jnl_seqno, local_jnl_seqno);
+			sgtm_putmsg(print_msg_src, PROC_SRCOPS_PRINT_MSG_LEN, VARLSTCNT(4) ERR_REPLAHEAD, 2, LEN_AND_LIT(""));
+			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg_src);
+			SNPRINTF(print_msg_t, SIZEOF(print_msg_t), "Replicating instance : "INT8_FMT", Originating instance : "
+				""INT8_FMT". ",	recvd_seqno, local_jnl_seqno);
+			sgtm_putmsg(print_msg_src, PROC_SRCOPS_PRINT_MSG_LEN, VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(print_msg_t));
+			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg_src);
 			/* Since the secondary is at least multi-site, the determination of the rollback seqno involves comparing
 			 * the histinfo records between the primary and secondary starting down from "local_jnl_seqno-1"
 			 * (done below). In either case, the secondary has to roll back to at most "local_jnl_seqno".
@@ -964,6 +1021,10 @@ int gtmsource_process(void)
 			 * ahead of the primary.
 			 */
 			recvd_seqno = local_jnl_seqno;
+		}else
+		{
+			repl_log(gtmsource_log_fp, TRUE, FALSE, "Current Journal Seqno of the instance is "INT8_FMT" "INT8_FMTX"\n",
+				local_jnl_seqno, local_jnl_seqno);
 		}
 		/* Before setting "next_histinfo_seqno", check if we have at least one histinfo record in the replication instance
 		 * file. The only case when there can be no histinfo records is if this instance is a propagating primary. Assert
@@ -990,13 +1051,19 @@ int gtmsource_process(void)
 				if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 					return (SS_NORMAL);
 				else if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+				{
+					poll_time = REPL_POLL_NOWAIT;
 					break; /* Break this loop */
+				}
 				num_histinfo = jnlpool->repl_inst_filehdr->num_histinfo;
 				if (num_histinfo)	/* Number of histinfos is non-zero */
 					break;
 			} while (TRUE);
 			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+			{
+				poll_time = REPL_POLL_NOWAIT;
 				continue; /* Restart the outer loop */
+			}
 			repl_log(gtmsource_log_fp, TRUE, TRUE,
 				"First history record written by update process. Source server proceeding.\n");
 		}
@@ -1044,7 +1111,10 @@ int gtmsource_process(void)
 					 */
 					grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+					{
+						poll_time = REPL_POLL_NOWAIT;
 						continue;
+					}
 					status = repl_inst_histinfo_get(0, &local_histinfo);
 					assert(0 == status); /* Since we pass histinfo_num of 0 which is >=0 and < num_histinfo */
 					rel_lock(jnlpool->jnlpool_dummy_reg);
@@ -1060,7 +1130,10 @@ int gtmsource_process(void)
 		{	/* Find histinfo record in the local instance file corresponding to seqno "recvd_seqno-1" */
 			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+			{
+				poll_time = REPL_POLL_NOWAIT;
 				continue;
+			}
 			assert(recvd_seqno <= local_jnl_seqno);
 			assert(recvd_seqno <= jctl->jnl_seqno);
 			assert((INVALID_SUPPL_STRM == strm_index) || (0 == strm_index));
@@ -1131,7 +1204,10 @@ int gtmsource_process(void)
 						return (SS_NORMAL);
 					else if ((GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 							|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
+					{
+						poll_time = REPL_POLL_NOWAIT;
 						continue;
+					}
 					else
 					{	/* Got a REPL_XOFF_ACK_ME from receiver. Restart the initial handshake */
 						assert(GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state);
@@ -1160,6 +1236,7 @@ int gtmsource_process(void)
 			 * one seqno whose histinfo information is identical in both.
 			 * Use this as the common point to send a REPL_WILL_RESTART_WITH_INFO message.
 			 */
+			poll_time = REPL_POLL_NOWAIT;
 			if (!rollback_first && !secondary_ahead)
 				resync_seqno = recvd_seqno;
 			else if (START_FLAG_NORESYNC & recvd_start_flags)
@@ -1186,9 +1263,9 @@ int gtmsource_process(void)
 				}
 			} else
 			{	/* Ask secondary to issue a fetchresync rollback */
-				repl_log(gtmsource_log_fp, TRUE, FALSE,
-					"Secondary instance needs to first do MUPIP JOURNAL ROLLBACK FETCHRESYNC\n");
+				REPL_DPRINT1("Secondary instance needs to first do MUPIP JOURNAL ROLLBACK FETCHRESYNC\n");
 				resync_seqno = local_jnl_seqno;
+				poll_time = REPL_POLL_NOWAIT;
 				rollback_first = TRUE;
 			}
 			if (MAX_SEQNO != resync_seqno)
@@ -1214,7 +1291,10 @@ int gtmsource_process(void)
 					}
 #					endif
 					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+					{
+						poll_time = REPL_POLL_NOWAIT;
 						continue;
+					}
 					srch_status = gtmsource_srch_restart(resync_seqno, recvd_start_flags);
 					rel_gtmsource_srv_latch(&gtmsource_local->gtmsource_srv_latch);
 					assert(resync_seqno == gtmsource_local->read_jnl_seqno);
@@ -1244,6 +1324,7 @@ int gtmsource_process(void)
 				} else
 				{	/* Secondary needs to first do FETCHRESYNC rollback to synchronize with primary */
 					reply_msgp->type = REPL_ROLLBACK_FIRST;
+					poll_time = REPL_POLL_NOWAIT;
 					gtmsource_repl_send((repl_msg_ptr_t)reply_msgp, "REPL_ROLLBACK_FIRST",
 						resync_seqno, INVALID_SUPPL_STRM);
 				}
@@ -1286,14 +1367,20 @@ int gtmsource_process(void)
 		if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 			return (SS_NORMAL);	/* "gtmsource_repl_send" or "gtmsource_find_resync_seqno" did not complete */
 		if ((GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
+		{
+			poll_time = REPL_POLL_NOWAIT;
 			continue;	/* "gtmsource_repl_send" or "gtmsource_find_resync_seqno" did not complete */
+		}
 		assert(MAX_SEQNO != resync_seqno);
 		/* After having established connection, initialize a few fields in the gtmsource_local
 		 * structure and flush those changes to the instance file on disk.
 		 */
 		grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+		{
+			poll_time = REPL_POLL_NOWAIT;
 			continue;
+		}
 		gtmsource_local->connect_jnl_seqno = jctl->jnl_seqno;
 		gtmsource_local->send_losttn_complete = jctl->send_losttn_complete;
 		/* Now that "connect_jnl_seqno" has been updated, flush it to corresponding gtmsrc_lcl on disk */
@@ -1310,7 +1397,10 @@ int gtmsource_process(void)
 				assert(NULL != jnlpool->jnlpool_dummy_reg);
 				grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 				if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+				{
+					poll_time = REPL_POLL_NOWAIT;
 					continue;
+				}
 				zqgblmod_seqno = jctl->max_zqgblmod_seqno;
 				if (0 == zqgblmod_seqno)
 				{	/* If zqgblmod_seqno in all file headers is 0, it implies that this is the first
@@ -1323,6 +1413,7 @@ int gtmsource_process(void)
 					/* Reset any pending MUPIP REPLIC -SOURCE -LOSTTNCOMPLETE */
 					jctl->send_losttn_complete = FALSE;
 					gtmsource_local->send_losttn_complete = jctl->send_losttn_complete;
+					poll_time = REPL_POLL_NOWAIT;
 				}
 				rel_lock(jnlpool->jnlpool_dummy_reg);
 				REPL_DPRINT2("BEFORE FINDING RESYNC - zqgblmod_seqno is "INT8_FMT, zqgblmod_seqno);
@@ -1334,7 +1425,10 @@ int gtmsource_process(void)
 					{
 						assert(GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state);
 						if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+						{
+							poll_time = REPL_POLL_NOWAIT;
 							continue;
+						}
 					}
 					if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 						return (SS_NORMAL);
@@ -1405,7 +1499,9 @@ int gtmsource_process(void)
 			} else
 			{
 				repl_tls.enabled = TRUE; /* From here on, all communications are secured with TLS/SSL. */
-				REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(next_renegotiate_hrtbt);
+				repl_tls.renegotiate_state = REPLTLS_RENEG_STATE_NONE;
+				next_renegotiate_hrtbt = FALSE;
+				hrtbt_cnt = 0;
 			}
 		}
 #		endif
@@ -1467,7 +1563,10 @@ int gtmsource_process(void)
 		 */
 		gtmsource_flush_fh(gtmsource_local->read_jnl_seqno);
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+		{
+			poll_time = REPL_POLL_NOWAIT;
 			continue;
+		}
 		gtmsource_local->send_new_histrec = TRUE;	/* Send new histinfo unconditionally at start of connection */
 		gtmsource_local->next_histinfo_seqno = MAX_SEQNO; /* Initial value. Reset by "gtmsource_send_new_histrec" below */
 		assert(-1 == gtmsource_local->next_histinfo_num);
@@ -1480,7 +1579,10 @@ int gtmsource_process(void)
 			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 				return (SS_NORMAL);
 			else if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+			{
+				poll_time = REPL_POLL_NOWAIT;
 				break; /* The outerloop will continue */
+			}
 			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 				break;
 			if (gtmsource_local->send_losttn_complete)
@@ -1491,7 +1593,10 @@ int gtmsource_process(void)
 					MAX_SEQNO, INVALID_SUPPL_STRM);
 				grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 				if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+				{
+					poll_time = REPL_POLL_NOWAIT;
 					break; /* the outerloop will continue */
+				}
 				gtmsource_local->send_losttn_complete = FALSE;
 				rel_lock(jnlpool->jnlpool_dummy_reg);
 			}
@@ -1532,7 +1637,10 @@ int gtmsource_process(void)
 				return SS_NORMAL;
 			if ((GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 					|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
+			{
+				poll_time = REPL_POLL_NOWAIT;
 				break;
+			}
 #			ifdef GTM_TLS
 			/* If we are waiting for a REPL_RENEG_ACK from the receiver, don't send any more messages (even journal
 			 * records) before completing the renegotiation.
@@ -1560,7 +1668,10 @@ int gtmsource_process(void)
 			grab_gtmsource_srv_latch(gtmsource_srv_latch, 2 * gd_header->n_regions * max_epoch_interval,
 							HANDLE_CONCUR_ONLINE_ROLLBACK);
 			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+			{
+				poll_time = REPL_POLL_NOWAIT;
 				break; /* the outerloop will continue */
+			}
 			GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 			tot_tr_len = gtmsource_get_jnlrecs(&gtmsource_msgp->msg[0], &data_len,
 							   gtmsource_msgbufsiz - REPL_MSG_HDRLEN,
@@ -1733,15 +1844,24 @@ int gtmsource_process(void)
 						if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 							return (SS_NORMAL);
 						else if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+						{
+							poll_time = REPL_POLL_NOWAIT;
 							break;
+						}
 					}
 					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+					{
+						poll_time = REPL_POLL_NOWAIT;
 						break; /* The outerloop will continue */
+					}
 					if (SS_NORMAL != status)
 					{
 						gtmsource_flush_fh(post_read_seqno);
 						if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+						{
+							poll_time = REPL_POLL_NOWAIT;
 							break; /* the outerloop will continue */
+						}
 						if (EREPL_SEND == repl_errno)
 						{
 #							ifdef GTM_TLS
@@ -1896,7 +2016,10 @@ int gtmsource_process(void)
 				{	/* nothing to send */
 					gtmsource_flush_fh(post_read_seqno);
 					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+					{
+						poll_time = REPL_POLL_NOWAIT;
 						break; /* the outerloop will continue */
+					}
 					if ((READ_POOL == gtmsource_local->read_state)
 						&& (jctl->write_addr != jctl->rsrv_write_addr))
 					{	/* We found nothing to send in the journal pool but there is some phase2 commit

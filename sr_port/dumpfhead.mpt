@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2016-2020 Fidelity National Information		;
+; Copyright (c) 2016-2021 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	;
@@ -47,6 +47,7 @@ getfields(fldarray,dbname)
 	set typeconvert("int4")="int"
 	set typeconvert("int64_t")="hex"
 	set typeconvert("gtm_int8")="int"
+	set typeconvert("gtm_timet")="gtm_timet"	; pass through unchanged to signal dumping as a date string
 	set typeconvert("long")="hex"
 	set typeconvert("short")="int"
 	set typeconvert("size_t")="hex"
@@ -149,7 +150,75 @@ formatfld(fldval,fldtype)
 	quit:("int"=fldtype) $$BinToSInt(fldval)
 	quit:("uint"=fldtype) $$BinToUInt(fldval)
 	quit:("hex"=fldtype) $$BinToHex(fldval)
+	quit:("gtm_timet"=fldtype) $$BinToDateStr(fldval,0)	; Turn an epoch date into a ctime-like string
 	quit fldval
+
+;
+; This routine converts a Unix epoch value to an horolog, and returns a "ctime"-like
+; printable string such as "Sun Aug 15 13:37:32 2021".  It is set up to be called
+; automatically to dump values typed as "gtm_timet", but could be called for regular
+; time_t values, or anything else storing an epoch value.
+;
+; The problem complicating things is that epoch dates are reckoned in the GMT/UCT/Zulu timezone
+; while M uses Horolog dates reckoned in the local timezone.  Furthermore,
+; we do not, a priori, know the offset of the local timezone from GMT.  (The
+; TZ environment variable may not exist, and does not directly supply that
+; information if it does).
+;
+; Our strategy here then is to get both the current Epoch & Horolog times
+; and use that to compute the GMT offset which we can then apply before
+; converting our target epoch date to Horolog and rendering a date string.
+;
+; The basic identity we use here is that Epoch "0" == Horolog "47117,0" for GMT
+;
+; As a special case the epoch value '0' is rendered as "Never"
+;
+; If a GMT date string is desired, set the parameter gmt to 1.  This is probably
+; actually more useful in many real-world cases.
+;
+; @param bin -- A binary epoch value
+; @param gmt -- A flag value: 0 to return a date string in local time, 1 to return it in GMT
+; @return -- A date string in the format "Sun Aug 15 13:37:32 2021 [GMT]"
+;
+BinToDateStr(bin,gmt)
+	new epoch,i,binlen,horo,zulu,horod,horos,horoepoch,daysec,horobase,offset
+	new zlocal,zlocald,zlocals,daynames,monnames,datestr
+	set daysec=86400
+	set horobase=47117
+	set offset=0
+
+	set epoch=0,binlen=$ZLength(bin)
+	if Endian=BigEndian for i=binlen:-1:1 set epoch=$zascii(bin,i)*Hex((binlen-i)*2)+epoch
+	else  for i=1:1:binlen set epoch=$zascii(bin,i)*Hex((i-1)*2)+epoch
+
+	; If the file has never been (successfully) backed up and has a "0" epoch, render that as "Never"
+	quit:(epoch=0)&(gmt=0) "Never"
+
+	; Now we have our incoming epoch value in usable format
+	; Next, capture the current system Horolog & Epoch dates, taking care that both
+	; fall within the same second. (Also convert the zulu time from microseconds to seconds)
+	for i=1 set horo=$Horolog,zulu=$Zut\1000000 quit:horo=$Horolog
+
+	; Isolate the horolog day & second pieces and generate an epoch date from them.
+	; The difference between this constructed epoch and the real epoch is the timezone offset.
+	set horod=$piece(horo,",",1)
+	set horos=$piece(horo,",",2)
+	set horoepoch=((horod-horobase)*daysec)+horos
+	set:gmt=0 offset=horoepoch-zulu
+
+	; Apply the offset to the incoming epoch and create an horolog from it
+	set zlocal=epoch+offset
+	set zlocald=(zlocal\daysec)+47117
+	set zlocals=zlocal#daysec
+	set horolocal=zlocald_","_zlocals
+
+	; If we do not specify day and month names, we get upper case strings
+	set daynames="Sun,Mon,Tue,Wed,Thu,Fri,Sat"
+	set monnames="Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec"
+	set datestr=$zdate(horolocal,"DAY MON DD 24:60:SS YEAR",monnames,daynames)_" GMT"
+	set:gmt=0 datestr=$zdate(horolocal,"DAY MON DD 24:60:SS YEAR",monnames,daynames)
+	set:0=$extract(datestr,9) $extract(datestr,9)=" "
+	quit datestr
 
 ;
 ; Convert binary data of indeterminate length to a (printable) unsigned decimal value

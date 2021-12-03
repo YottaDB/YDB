@@ -383,8 +383,6 @@ gd_addr *gd_load(mstr *v, boolean_t force_load)
 		 */
 		assert(STATSDB_BLK_SIZE == stats_reg->dyn.addr->blk_size);
 		/* Similar asserts for a few other critical fields that are initialized in GDE & GT.M ("gvcst_init") */
-		assert(STATSDB_ALLOCATION == stats_reg->dyn.addr->allocation);
-		assert(STATSDB_EXTENSION == stats_reg->dyn.addr->ext_blk_count);
 		assert(STATSDB_MAX_KEY_SIZE == stats_reg->max_key_size);
 		assert(STATSDB_MAX_REC_SIZE == stats_reg->max_rec_size);
 		assert(stats_reg->mumps_can_bypass);

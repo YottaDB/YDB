@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
@@ -333,15 +333,16 @@ boolean_t mu_int_blk(
 		ondsk_blkver = ondsk_blkver_saved;
 		free_blk_base = NULL;
 	} else
-		blk_base = mu_int_read(blk, &ondsk_blkver, &free_blk_base);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
+		blk_base = mu_int_read(blk, &ondsk_blkver, &free_blk_base);
 	if (!blk_base)
 		return FALSE;	/* Only occurs on malloc failure, so don't worry about mu_int_plen. */
 	long_blk_id = IS_64_BLK_ID(blk_base);
 	blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 	blk_size = (int)((blk_hdr_ptr_t)blk_base)->bsiz;
+	blk_levl = ((blk_hdr_ptr_t)blk_base)->levl;
 	if (!muint_fast)
-	{
-		if (((blk_hdr_ptr_t)blk_base)->bver != mu_int_data.desired_db_format)
+	{	/* conditions of the if below may need adjustment as versions go forward */
+		if ((GDSVCURR != mu_int_data.creation_db_ver) && (((blk_hdr_ptr_t)blk_base)->bver != mu_int_data.desired_db_format))
 			mu_int_blks_to_upgrd++;
 		if (tn_reset_this_reg)
 		{
@@ -363,7 +364,6 @@ boolean_t mu_int_blk(
 			(unsigned int)((blk_hdr_ptr_t)blk_base)->levl);
 	}
 	blk_top = blk_base + blk_size;
-	blk_levl = ((blk_hdr_ptr_t)blk_base)->levl;
 	if (block && (BML_LEVL == mu_int_root_level))
 		mu_int_root_level = level = blk_levl;
 	else  if (is_root)
@@ -1052,9 +1052,16 @@ boolean_t mu_int_blk(
 				*/
 				if (rec_size > (hdr_len + blk_id_sz))
 				{
+<<<<<<< HEAD
 					GET_GVT_COLL_INFO(trees_tail, (sm_uc_ptr_t)rec_base + hdr_len + blk_id_sz,
 									(int)(rec_size - (hdr_len + blk_id_sz)), coll_ret);
 					if (!coll_ret)
+=======
+					assert(*(sm_uc_ptr_t)(rec_base + hdr_len + blk_id_sz));
+					subrec_ptr = get_spec((sm_uc_ptr_t)(rec_base + hdr_len + blk_id_sz),
+									(int)(rec_size - (hdr_len + blk_id_sz)), COLL_SPEC);
+					if (subrec_ptr)
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 					{
 						mu_int_err(ERR_INVSPECREC, TRUE, TRUE, buff, comp_length, top_key, top_len,
 								(unsigned int)blk_levl);

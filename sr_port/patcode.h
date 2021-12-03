@@ -173,10 +173,11 @@ struct leaf
 	int4		letter[MAX_SYM][MAX_DFA_STRLEN + 1];
 };
 
+typedef boolean_t	last_dfa_row_t[MAX_DFA_STATES];
 struct node
 {
 	boolean_t	nullable[MAX_SYM];
-	boolean_t	last[MAX_SYM][MAX_DFA_STATES];
+	last_dfa_row_t	last[MAX_SYM];
 };
 
 struct e_table

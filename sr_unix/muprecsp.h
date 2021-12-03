@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,5 @@
 #define EXT_MJF		".mjf"
 #define EXT_BROKEN	".broken"
 #define EXT_LOST	".lost"
-#define DEVNULL		"/dev/null"
 
 #endif

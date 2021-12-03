@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
@@ -95,9 +95,9 @@ Output Parameters:
 	*exclude_glist_ptr: List of globals not to be moved for a swap destination
 Input/Output Parameters:
 	gv_target : as working block's history
-	reorg_gv_target->hist : as desitnitions block's history
+	reorg_gv_target->hist : as destination block's history
  ******************************************************************************************/
-enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_ptr, glist *exclude_glist_ptr)
+enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_ptr, glist *exclude_glist_ptr, block_id upg_mv_block)
 {
 	unsigned char		x_blk_lmap;
 	unsigned short		temp_ushort;
@@ -140,6 +140,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	work_blk_ptr = work_blk_stat->buffaddr;
 	work_blk_size = ((blk_hdr_ptr_t)work_blk_ptr)->bsiz;
 	work_blk_id = work_blk_stat->blk_num;
+	assert(!upg_mv_block || (upg_mv_block == work_blk_id));
 	work_long_blk_id = IS_64_BLK_ID(work_blk_ptr);
 	work_blk_id_sz = SIZEOF_BLK_ID(work_long_blk_id);
 	if (blk_size < work_blk_size)
@@ -167,9 +168,13 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		 * Still a grand-child can go to its grand-parent. This is rare and following code can handle it.
 		 */
 		if (dest_blk_id == gv_target->hist.h[level+1].blk_num)
+		{
+			assert(0 == upg_mv_block);
 			continue;
+		}
 		if (cs_data->trans_hist.total_blks <= dest_blk_id || dest_blk_id == work_blk_id)
 		{
+			assert(0 == upg_mv_block);
 			*pdest_blk_id = dest_blk_id;
 			return cdb_sc_oprnotneeded;
 		}
@@ -210,12 +215,13 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_badbitmap;
 		}
-		if (BLK_FREE != x_blk_lmap)
+		if ((BLK_FREE != x_blk_lmap) || (0 != upg_mv_block))
 		{	/* x_blk_lmap is either BLK_BUSY or BLK_RECYCLED. In either case, we need to read destination block
 			 * in case we later detect that the before-image needs to be written.
 			 */
 			if (!(dest_blk_ptr = t_qread(dest_blk_id, (sm_int_ptr_t)&destblkhist.cycle, &destblkhist.cr)))
 			{
+				assert(0 == upg_mv_block);
 				assert(t_tries < CDB_STAGNATE);
 				return (enum cdb_sc)rdfail_detail;
 			}
@@ -229,7 +235,8 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		{	/* x_blk_map is either BLK_FREE or BLK_RECYCLED both of which mean the block is not used in the bitmap */
 			blk_was_free = TRUE;
 			break;
-		}
+		} else
+			assert(0 == upg_mv_block);
 		/* dest_blk_id might contain a *-record only.
 		 * So follow the pointer to go to the data/index block, which has a non-* key to search.
 		 */
@@ -266,7 +273,10 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		}
 		/* leaf of a killed GVT can have block header only.   Skip those blocks */
 		if (SIZEOF(blk_hdr) >= ((blk_hdr_ptr_t)tblk_ptr)->bsiz)
+		{
+			assert((0 == upg_mv_block) || (SIZEOF(blk_hdr) == ((blk_hdr_ptr_t)tblk_ptr)->bsiz));
 			continue;
+		}
 		/* get length of global variable name (do not read subscript) for dest_blk_id */
 		key_len_dir = get_gblname_len(tblk_ptr, rec_base + SIZEOF(rec_hdr));
 		/* key_len = length of 1st key value (including subscript) for dest_blk_id */
@@ -286,8 +296,9 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		memcpy(&((TREF(gv_reorgkey))->base[0]), rec_base + SIZEOF(rec_hdr), key_len_dir);
 		(TREF(gv_reorgkey))->base[key_len_dir] = 0;
 		(TREF(gv_reorgkey))->end = key_len_dir;
-		if (exclude_glist_ptr->next)
+		if ((NULL != exclude_glist_ptr) && exclude_glist_ptr->next)
 		{	/* exclude blocks for globals in the list of EXCLUDE option */
+			assert(0 == upg_mv_block);
 			if  (in_exclude_list(&((TREF(gv_reorgkey))->base[0]), key_len_dir - 1, exclude_glist_ptr))
 				continue;
 		}
@@ -312,19 +323,19 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		}
 		if (dir_hist_ptr->h[0].curr_rec.match != (TREF(gv_reorgkey))->end + 1)
 		{	/* may be in a kill_set of another process */
+			assert((0 == upg_mv_block) || (dir_hist_ptr->h[0].curr_rec.match == (TREF(gv_reorgkey))->end + 1));
 			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
 			continue;
 		}
-		for (wlevel = 0; wlevel <= dir_hist_ptr->depth &&
-			dir_hist_ptr->h[wlevel].blk_num != dest_blk_id; wlevel++);
+		for (wlevel = 0; (wlevel <= dir_hist_ptr->depth) && (dir_hist_ptr->h[wlevel].blk_num != dest_blk_id); wlevel++)
+			;
 		if (dir_hist_ptr->h[wlevel].blk_num == dest_blk_id)
-		{	/* do not swap a dir_tree block */
+		{	/* do not use a dir_tree block as the destination of a swap */
+			assert(0 == upg_mv_block);
 			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
 			continue;
 		}
-		/* gv_reorgkey will now have the first key from dest_blk_id,
-		 * or, from a descendant of dest_blk_id (in case it had a *-key only).
-		 */
+		/* gv_reorgkey gets the first key from dest_blk_id, or if that's a *-key, from some descendent block */
 		memcpy(&((TREF(gv_reorgkey))->base[0]), rec_base + SIZEOF(rec_hdr), key_len);
 		(TREF(gv_reorgkey))->end = key_len - 1;
 		key_base = dir_hist_ptr->h[0].buffaddr + dir_hist_ptr->h[0].curr_rec.offset + SIZEOF(rec_hdr);
@@ -342,9 +353,12 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		gv_target->clue.end = 0;
 		status = gvcst_search(TREF(gv_reorgkey), dest_hist_ptr);
 		RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
-		if (dest_blk_level >= dest_hist_ptr->depth || /* do not swap in root level */
-			dest_hist_ptr->h[dest_blk_level].blk_num != dest_blk_id) /* must be in a kill set of another process. */
+		if (dest_blk_level >= dest_hist_ptr->depth			/* do not swap in root level */
+			|| dest_hist_ptr->h[dest_blk_level].blk_num != dest_blk_id) /* must be in a kill set of another process. */
+		{
+			assert(0 == upg_mv_block);
 			continue;
+		}
 		if ((cdb_sc_normal != status) || (dest_hist_ptr->h[nslevel].curr_rec.match != ((TREF(gv_reorgkey))->end + 1)))
 		{
 			assert(t_tries < CDB_STAGNATE);
@@ -366,12 +380,13 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		dest_blk_id_sz = SIZEOF_BLK_ID(dest_long_blk_id);
 		break;
 	}
-	/*===== End of infinite loop to find the destination block =====*/
+	/*===== End of indefinite loop to find the destination block =====*/
 	/*-----------------------------------------------------
 	   Now modify blocks for swapping. Maximum of 4 blocks.
 	   -----------------------------------------------------*/
 	if (!blk_was_free)
 	{	/* 1: dest_blk_id into work_blk_id */
+		assert(0 == upg_mv_block);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, dest_blk_ptr + SIZEOF(blk_hdr), dest_blk_size - SIZEOF(blk_hdr));
 		if (!BLK_FINI (bs_ptr,bs1))
@@ -390,6 +405,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		 * This is the only vertical swap.  Here working block goes to its child.
 		 * Working block cannot goto its parent because of traversal
 		 */
+		assert((0 == upg_mv_block));
 		if (dest_blk_level + 1 != level || dest_parent_size != work_blk_size)
 		{
 			assert(t_tries < CDB_STAGNATE);
@@ -473,6 +489,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 					 * "old_block->bsiz". Restart if we ever access a buffer whose size is greater
 					 * than the db block size.
 					 */
+					 assert(0 == upg_mv_block);
 					bsiz = ((blk_hdr_ptr_t)(tmpcse->old_block))->bsiz;
 					if (bsiz > blk_size)
 					{
@@ -485,6 +502,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			assert(cs_data->desired_db_format == tmpcse->ondsk_blkver);	/* should have been set by t_create above */
 		} else
 		{
+			assert(0 == upg_mv_block);
 			hist_ptr = &dest_hist_ptr->h[dest_blk_level];
 			assert(dest_blk_id == hist_ptr->blk_num);
 			assert(dest_blk_ptr == hist_ptr->buffaddr);
@@ -493,6 +511,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	}
 	if (!blk_was_free)
 	{	/* 3: Parent of destination block (may be parent of working block too) */
+		assert(0 == upg_mv_block);
 		if (gv_target->hist.h[level+1].blk_num == dest_hist_ptr->h[dest_blk_level+1].blk_num)
 		{	/* dest parent == work_blk parent */
 			BLK_INIT(bs_ptr, bs1);
@@ -586,7 +605,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if (work_parent_size < rec_size1 +  gv_target->hist.h[level+1].curr_rec.offset ||
 				bstar_rec_size(work_long_blk_id) > rec_size1)
 		{
-			assert(t_tries < CDB_STAGNATE);
+			assert((t_tries < CDB_STAGNATE) && (0 == upg_mv_block));
 			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
@@ -641,6 +660,8 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		kill_set_ptr->blk[kill_set_ptr->used].level = 0;
 		kill_set_ptr->blk[kill_set_ptr->used++].block = work_blk_id;
 	}
+	if (0 != upg_mv_block)
+		reorg_gv_target->hist.h[dest_blk_level] = destblkhist;
 	*pdest_blk_id = dest_blk_id;
 	return cdb_sc_normal;
 }

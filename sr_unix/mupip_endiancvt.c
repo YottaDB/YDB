@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2020 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -282,7 +282,7 @@ void mupip_endiancvt(void)
 			}
 		}
 		swap_dbver = (enum db_ver)GTM_BYTESWAP_32(old_data->desired_db_format);
-		if ((GDSVCURR != swap_dbver) && (BLK_ID_32_VER != swap_dbver))
+		if (!swap_dbver || ((GDSVCURR != swap_dbver) && !(BLK_ID_32_VER > swap_dbver)))
 		{
 			check_error = NOTCURRDBFORMAT;
 			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
@@ -401,7 +401,8 @@ void mupip_endiancvt(void)
 				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 			}
 		}
-		if ((GDSVCURR != old_data->desired_db_format) && (BLK_ID_32_VER != old_data->desired_db_format))
+		if (!old_data->desired_db_format || ((GDSVCURR != old_data->desired_db_format)
+			&& !(BLK_ID_32_VER > old_data->desired_db_format)))
 		{
 			check_error = NOTCURRDBFORMAT;
 			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
@@ -726,6 +727,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(def_coll);
 	SWAP_SD4(def_coll_ver);
 	SWAP_SD4(write_fullblk);
+	SWAP_SD4(statsdb_allocation);
 	SWAP_SD4(std_null_coll);
 	SWAP_SD4(null_subs);
 	SWAP_SD4(free_space);
@@ -760,6 +762,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(v6_last_com_bkup_last_blk);
 	SWAP_SD4(v6_last_rec_bkup_last_blk);
 	SWAP_SD4(v6_reorg_restart_block);
+	SWAP_SD8(last_start_backup);
 	/************* FIELDS SET WHEN DB IS OPEN ********************************/
 	new->image_count = 0;		/* should be zero when db is not open so reset it unconditionally */
 	new->freeze = 0;		/* should be zero when db is not open so reset it unconditionally */
@@ -920,9 +923,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 #	undef TAB_DB_CSH_ACCT_REC
 	/************* GVSTATS_REC RELATED FIELDS ***********/
 #	define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)	SWAP_SD8(gvstats_rec.COUNTER);
-#	define IS_CSD_STATS 1
 #	include "tab_gvstats_rec.h"
-#	undef IS_CSD_STATS
 #	undef TAB_GVSTATS_REC
 	/************* FIELDS EXTENDED IN V7 HEADER ********************************/
 	SWAP_SD8(master_map_len);
@@ -994,6 +995,7 @@ void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_n
 	SWAP_SD4(def_coll);
 	SWAP_SD4(def_coll_ver);
 	SWAP_SD4(write_fullblk);
+	SWAP_SD4(statsdb_allocation);
 	SWAP_SD4(std_null_coll);
 	SWAP_SD4(null_subs);
 	SWAP_SD4(free_space);
@@ -1183,9 +1185,7 @@ void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_n
 #	undef TAB_DB_CSH_ACCT_REC
 	/************* GVSTATS_REC RELATED FIELDS ***********/
 #	define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)	SWAP_SD8(gvstats_rec.COUNTER);
-#	define IS_CSD_STATS 1
 #	include "tab_gvstats_rec.h"
-#	undef IS_CSD_STATS
 #	undef TAB_GVSTATS_REC
 	/************* INTERRUPTED RECOVERY RELATED FIELDS continued ****************/
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)

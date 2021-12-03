@@ -30,7 +30,7 @@
 #include "joberr.h"
 #include "gt_timer.h"
 #include "util.h"
-#include "outofband.h"
+#include "deferred_events_queue.h"
 #include "op.h"
 #include "io.h"
 #include "mvalconv.h"
@@ -64,11 +64,11 @@ GBLDEF	short			jobcnt		= 0;
 GBLDEF	int			job_errno;
 GBLDEF	volatile boolean_t	ojtimeout	= TRUE;
 
-GBLREF	uint4		dollar_trestart;
-GBLREF	int		dollar_truth;
-GBLREF	uint4		dollar_zjob;
-GBLREF	int4		outofband;
 GBLREF	d_socket_struct	*socket_pool;
+GBLREF	int		dollar_truth;
+GBLREF	uint4		dollar_trestart, dollar_zjob;
+GBLREF	volatile int4	outofband;
+
 static	int4	tid;	/* Job Timer ID */
 
 LITREF mval		skiparg;
@@ -229,7 +229,11 @@ int	op_job(int4 argcnt, ...)
 			DOREADRC(pipe_fds[0], &job_errno, SIZEOF(job_errno), pipe_status);
 			if (0 < pipe_status)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, joberrs[exit_stat].len,
+<<<<<<< HEAD
 										joberrs[exit_stat].msg, errno);
+=======
+					joberrs[exit_stat].msg, errno);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 			if (ERR_JOBLVN2LONG == job_errno)
 			{	/* This message takes buffer_size as argument so take it before closing the pipe */
 				DOREADRC(pipe_fds[0], &buffer_size, SIZEOF(buffer_size), pipe_status);
@@ -265,7 +269,7 @@ int	op_job(int4 argcnt, ...)
 				term_sig =  WTERMSIG(wait_stat);	/* signal that caused the termination */
 				memcpy(buff, joberrs[joberr_sig].msg, joberrs[joberr_sig].len);
 				c = i2asc(&buff[joberrs[joberr_sig].len], term_sig);
-				assert(FALSE);
+				assert(WBTEST_ENABLED(WBTEST_JOBFAIL_FILE_LIM));
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2, c - buff, buff);
 			} else if (WIFSTOPPED(wait_stat))		/* child was STOPped */
 			{

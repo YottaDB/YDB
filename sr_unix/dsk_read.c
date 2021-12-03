@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -50,12 +50,13 @@
 #include "tp.h"
 #include "cdb_sc.h"
 #include "mupip_reorg_encrypt.h"
+#include "mu_reorg.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	volatile int4		fast_lock_count;
-GBLREF	boolean_t		dse_running;
+GBLREF	boolean_t		dse_running, is_updhelper;
 GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			dollar_tlevel;
@@ -65,51 +66,53 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	uint4			process_id;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;
 
+<<<<<<< HEAD
 #ifdef DEBUG
 GBLREF	block_id		ydb_skip_bml_num;
 #endif
 
 error_def(ERR_DYNUPGRDFAIL);
+=======
+error_def(ERR_DSEBLKRDFAIL);	/* TODO: use more helpful error */
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolean_t blk_free)
 {
-	unix_db_info		*udi;
-	int4			size, save_errno;
+	boolean_t		buff_is_modified_after_lseekread = FALSE, db_is_encrypted, fully_upgraded, use_new_key;
+	block_id		blk_num, *blk_ptr, offset;
+	char			*in, *out;
 	enum db_ver		tmp_ondskblkver;
-	sm_uc_ptr_t		save_buff = NULL, enc_save_buff;
-	boolean_t		fully_upgraded, buff_is_modified_after_lseekread;
-	int			bsiz;
+	int			bsiz, in_len, level, gtmcrypt_errno;
+	int4			save_errno, size;
+	intrpt_state_t		prev_intrpt_state;
+	node_local_ptr_t	cnl;
+	sm_uc_ptr_t		enc_save_buff, recBase;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	node_local_ptr_t	cnl;
+	/* It is possible that an index block we read in from disk has a block_id that needs adjustment subsequent to enlargement
+	 * of the master bit map. The database block scanning routines (gvcst_*search*.c) can deal with V6 or V7 index blocks,
+	 * but only dsk_read does the offset adjustment Therefore we do not want to risk reading a potential pre-move index block
+	 * directly into the cache and then adjusting it. Instead, we read it into a private buffer, upgrade it there and then
+	 * copy it over to the cache. This uses the static variable read_reformat_buffer. We could have as well used the global
+	 * variable "reformat_buffer" for this purpose. But that would then prevent dsk_reads and concurrent dsk_writes from
+	 * proceeding. We don't want that loss of asynchronocity, hence we keep them separate. Note that while a lot of routines
+	 * use "reformat_buffer" only this routine uses "read_reformat_buffer" which is a static rather than a GBLDEF.
+	 */
+	static sm_uc_ptr_t	read_reformat_buffer;
+	unix_db_info		*udi;
+	unsigned short		temp_ushort;
 #	ifdef DEBUG
 	unsigned int		effective_t_tries;
 	boolean_t		killinprog;
-	blk_hdr_ptr_t		blk_hdr_val;
 	static int		in_dsk_read;
 #	endif
-	/* It is possible that the block that we read in from disk is a V4 format block.  The database block scanning routines
-	 * (gvcst_*search*.c) that might be concurrently running currently assume all global buffers (particularly the block
-	 * headers) are V5 format.  They are not robust enough to handle a V4 format block. Therefore we do not want to
-	 * risk reading a potential V4 format block directly into the cache and then upgrading it. Instead we read it into
-	 * a private buffer, upgrade it there and then copy it over to the cache in V5 format. This is the static variable
-	 * read_reformat_buffer. We could have as well used the global variable "reformat_buffer" for this purpose. But
-	 * that would then prevent dsk_reads and concurrent dsk_writes from proceeding. We don't want that loss of asynchronocity.
-	 * Hence we keep them separate. Note that while "reformat_buffer" is used by a lot of routines, "read_reformat_buffer"
-	 * is used only by this routine and hence is a static instead of a GBLDEF.
-	 */
-	static sm_uc_ptr_t	read_reformat_buffer;
-	static int		read_reformat_buffer_len;
-	int			in_len, gtmcrypt_errno;
-	char			*in, *out;
-	boolean_t		db_is_encrypted, use_new_key;
-	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
+<<<<<<< HEAD
 	/* Note: Only INTEG (i.e. SNAPSHOTS) requires dsk_read to read FREE blocks. So one could ideally assert the following.
 	 *	assert(!blk_free || SNAPSHOTS_IN_PROG(csa));
 	 * But it is possible that SNAPSHOTS_IN_PROG(csa) was TRUE in t_end/op_tcommit just BEFORE we read the before images
@@ -145,25 +148,34 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	 * does expect a temporary buffer to have been pre-allocated. It is ok if the value of csd->fully_upgraded
 	 * changes after we took a copy of it since we have a buffer locked for this particular block (at least in BG)
 	 * so no concurrent process could be changing the format of this block. For MM there might be an issue.
+=======
+	assert(csd == cs_data);
+	assert(NULL != cnl);
+	assert(0 == in_dsk_read);	/* dsk_read should never be nested. the read_reformat_buffer logic below relies on this */
+	DEBUG_ONLY(in_dsk_read++;)
+	assert(GDSVCURR == GDSV7);	/* assert should fail if GDSVCURR changes */
+	/* Note: Even in snapshots, only INTEG requires dsk_read to read FREE blocks. The assert below should be modified
+	 * if we later introduce a scheme where we can figure out as to who started the snapshots and assert accordingly
+	 */
+	assert(!blk_free || SNAPSHOTS_IN_PROG(csa)); /* Only SNAPSHOTS require dsk_read to read a FREE block from the disk */
+	udi = FILE_INFO(gv_cur_region);
+	assert(csd == cs_data);
+	size = csd->blk_size;
+	tmp_ondskblkver = (enum db_ver)csd->desired_db_format;
+	/* Cache csd->fully_upgraded once so that all uses work the same way. Repeatedly referencing csd->fully_upgraded could
+	 * result in different values seen through-out the function resulting in incorrect operation. For example, the code does
+	 * not allocate scratch space for the temporary pre-V7 formatted block which is needed later in the function. It is ok if
+	 * the value of csd->fully_upgraded changes after we took a copy of it since we have a buffer locked for this particular
+	 * block (in BG) so no concurrent process could be changing the format of this block. For MM, there is no such protection.
+	 * We have 2 possibilities:
+	 * - fully_upgraded is cached as FALSE but becomes TRUE before reading the block from disk. This only results in a little
+	 *   extra work since the block on disk will already have been upgraded
+	 * - fully_upgraded is cached as TRUE but becomes FALSE before reading the block from disk/mmap. There is no problem since
+	 *   the process performs NO upgrade. Some later process will take the responsiblity for such an upgrade
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	 */
 	fully_upgraded = csd->fully_upgraded;
-	if (!blk_free && !fully_upgraded) /* No V4->V5 translations required if block is FREE */
-	{
-		buff_is_modified_after_lseekread = TRUE;
-		save_buff = buff;
-		if (size > read_reformat_buffer_len)
-		{	/* do the same for the reformat_buffer used by dsk_read */
-			assert(0 == fast_lock_count);	/* this is mainline (non-interrupt) code */
-			++fast_lock_count;		/* No interrupts in free/malloc across this change */
-			if (NULL != read_reformat_buffer)
-				free(read_reformat_buffer);
-			read_reformat_buffer = malloc(size);
-			read_reformat_buffer_len = size;
-			--fast_lock_count;
-		}
-		buff = read_reformat_buffer;
-	} else
-		buff_is_modified_after_lseekread = FALSE;
+	assert(0 == (long)buff % SIZEOF(block_id));
 	assert(NULL != cnl);
 	if (dba_mm != csd->acc_meth)
 		INCR_GVSTATS_COUNTER(csa, cnl, n_dsk_read, 1);
@@ -231,6 +243,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		}
 		ENABLE_INTERRUPTS(INTRPT_IN_CRYPT_RECONFIG, prev_intrpt_state);
 	}
+<<<<<<< HEAD
 	if (!blk_free && (0 == save_errno))
 	{	/* See if block needs to be converted to current version. Assuming buffer is at least short aligned */
 		assert(0 == (long)buff % 2);
@@ -271,6 +284,49 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		 */
 		if ((NULL != save_buff) && (NULL != buff))	/* Buffer not moved by upgrade, we must move */
 			memcpy(save_buff, buff, size);
+=======
+	if (0 == save_errno)	/* this bloc is a kissing cousin to code in mm_read and the 2should be maintained in parallel */
+	{	/* see if block needs to be converted to current version */
+		if ((GDSV6p == (tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver)) && (GDSMV70000 == csd->creation_mdb_ver))
+		{       /* adjust for shift of GDSV7 id from 2 to 4 */
+			buff_is_modified_after_lseekread = TRUE;
+			tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver = GDSV7;
+		}
+		if (blk_free || (GDSV4 == tmp_ondskblkver))
+		{	/* but might be uninitialed */
+			buff_is_modified_after_lseekread = TRUE;
+#			ifdef DEBUG
+			if (!blk_free && !is_updhelper && !dse_running && !mu_reorg_encrypt_in_prog
+					&& !mu_reorg_upgrd_dwngrd_in_prog)
+				TREF(donot_commit) = DONOTCOMMIT_DSK_READ_EMPTY_BUT_NOT_FREE;	/* expected data, but got empty */
+#			endif
+			/* might not be correct, but any writer would correct it before it goes to a DB file */
+			tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver = csd->desired_db_format;
+		} else
+			assert((GDSV7 == tmp_ondskblkver) || (GDSV6 == tmp_ondskblkver)	/* vanilla cases */
+				|| ((GDSV7m == tmp_ondskblkver) && IS_64_BLK_ID(buff)) 	/* block upgrade complete from V6 */
+				|| (!fully_upgraded && (GDSV6p == tmp_ondskblkver))); /* shuffled & adjusted but still 4 byte ID */
+		if (!fully_upgraded && !blk_free && (GDSV7m != tmp_ondskblkver)) /* !fully_upgraded only during V6 -> V7 upgrade */
+		{	/* block in need of attention */
+			buff_is_modified_after_lseekread = TRUE;
+			/* data blocks & local bit maps just get a version update */
+			if ((0 == (level = (int)((blk_hdr_ptr_t)buff)->levl)) || (LCL_MAP_LEVL == level)) /* WARNING assignment */
+				tmp_ondskblkver = level ? GDSV7m : GDSV6;
+			else if ((csd->offset) && (GDSV6 == tmp_ondskblkver))
+			{	/* This is a pre-V7 index block needing its offset adjusted */
+				assert(MEMCMP_LIT(csd->label, GDS_LABEL));
+				blk_ptr_adjust(buff, csd->offset);
+				tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver = GDSV6p;	/* 4 byte block_id with offset applied */
+			} else
+				assert(GDSV6p == tmp_ondskblkver);
+		}
+		/* V7 block with V7 DB intent or V6 with V6 DB intent or V6 in transition to V7 */
+		assert(!fully_upgraded ? (GDSV7 != tmp_ondskblkver)	/* note: GDSV6p cannot exist when fully_upgraded is TRUE */
+			: (((GDSV7 == tmp_ondskblkver) || (GDSV7m == tmp_ondskblkver) && MEMCMP_LIT(csd->label, GDS_LABEL))
+			|| ((GDSV6 == tmp_ondskblkver) && (!MEMCMP_LIT(csd->label, V6_GDS_LABEL)))));
+		assert((GDSV4 != tmp_ondskblkver) && (NULL != ondsk_blkver));	/* REORG encrypt does not pass ondsk_blkver */
+		*ondsk_blkver = tmp_ondskblkver;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	}
 	if (buff_is_modified_after_lseekread)
 	{	/* Normally the disk read (done in LSEEKREAD macro) would do the necessary write memory barrier to make the
@@ -288,24 +344,20 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	}
 #	ifdef DEBUG
 	in_dsk_read--;
+	assert(0 == in_dsk_read);
 	/* Expect t_tries to be 3 if we have crit. Exceptions: gvcst_redo_root_search (where t_tries is temporarily reset
 	 * for the duration of the redo_root_search and so we should look at the real t_tries in redo_rootsrch_ctxt),
 	 * gvcst_expand_free_subtree, REORG UPGRADE/DOWNGRADE, DSE (where we grab crit before doing the t_qread irrespective
-	 * of t_tries), forward recovery (where we grab crit before doing everything) OR MUPIP TRIGGER -UPGRADE (where we
-	 * grab crit before doing the entire ^#t upgrade TP transaction).
+	 * of t_tries), forward recovery (where we grab crit before doing everything), MUPIP TRIGGER -UPGRADE (where we
+	 * grab crit before doing the entire ^#t upgrade TP transaction) OR bm_getfree (where we did a preemptive crit grab
+	 * before doing a file extension).
 	 */
 	effective_t_tries = UNIX_ONLY( (TREF(in_gvcst_redo_root_search)) ? (TREF(redo_rootsrch_ctxt)).t_tries : ) t_tries;
 	effective_t_tries = MAX(effective_t_tries, t_tries);
 	killinprog = (NULL != ((dollar_tlevel) ? sgm_info_ptr->kip_csa : kip_csa));
 	assert(dse_running || killinprog || jgbl.forw_phase_recovery || mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog
-			GTMTRIG_ONLY(|| TREF(in_trigger_upgrade)) || (csa->now_crit != (CDB_STAGNATE > effective_t_tries)));
-	if (!blk_free && csa->now_crit && !dse_running && (0 == save_errno))
-	{	/* Do basic checks on GDS block that was just read. Do it only if holding crit as we could read
-		 * uninitialized blocks otherwise. Also DSE might read bad blocks even inside crit so skip checks.
-		 */
-		blk_hdr_val = (NULL != save_buff) ? (blk_hdr_ptr_t)save_buff : (blk_hdr_ptr_t)buff;
-		GDS_BLK_HDR_CHECK(csd, blk_hdr_val, fully_upgraded);
-	}
+			GTMTRIG_ONLY(|| TREF(in_trigger_upgrade)) || TREF(in_bm_getfree_gdsfilext)
+			|| (csa->now_crit != (CDB_STAGNATE > effective_t_tries)));
 #	endif
 	return save_errno;
 }

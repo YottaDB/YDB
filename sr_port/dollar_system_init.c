@@ -26,8 +26,16 @@
 
 #define	SYSTEM_LITERAL	"47,"
 
+<<<<<<< HEAD
 GBLREF	mval	dollar_system;
 GBLREF	spdesc	stringpool;
+=======
+GBLREF	mval	dollar_system, dollar_system_initial;
+GBLREF spdesc	stringpool;
+
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_TRNLOGFAIL);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 void dollar_system_init(struct startup_vector *svec)
 {
@@ -37,8 +45,12 @@ void dollar_system_init(struct startup_vector *svec)
 
 	ENSURE_STP_FREE_SPACE(MAX_TRANS_NAME_LEN + STR_LIT_LEN(SYSTEM_LITERAL));
 	dollar_system.mvtype = MV_STR;
-	dollar_system.str.addr = (char *)stringpool.free;
 	dollar_system.str.len = STR_LIT_LEN("47,");
+<<<<<<< HEAD
+=======
+	ENSURE_STP_FREE_SPACE(dollar_system.str.len);
+	dollar_system.str.addr = (char *)stringpool.free;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	memcpy(stringpool.free, "47,", dollar_system.str.len);
 	stringpool.free += dollar_system.str.len;
 	if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_SYSID, &tn, buf, SIZEOF(buf), IGNORE_ERRORS_FALSE, NULL)))
@@ -54,6 +66,16 @@ void dollar_system_init(struct startup_vector *svec)
 		memcpy(stringpool.free, svec->sysid_ptr->addr, svec->sysid_ptr->len);
                 stringpool.free += svec->sysid_ptr->len ;
 	}
+<<<<<<< HEAD
+=======
+#	ifdef UNIX
+	else if (SS_LOG2LONG == status)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(SYSID), SIZEOF(buf) - 1);
+#	endif
+	else
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(SYSID), status);
+	dollar_system_initial = dollar_system;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	assert(stringpool.free < stringpool.top);	/* it's process initialization after all */
 	return;
 }

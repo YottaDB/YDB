@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -54,12 +54,15 @@
 #include "bmm_find_free.h"
 
 /* Include prototypes */
+#include "wcs_mm_recover.h"
 #include "t_qread.h"
 #include "t_write_map.h"
 #include "bit_clear.h"
 #include "send_msg.h"
 #include "bm_getfree.h"
 #include "gdsfilext.h"
+#include "anticipatory_freeze.h"
+#include "interlock.h"
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
@@ -69,6 +72,7 @@ GBLREF unsigned char	rdfail_detail;
 GBLREF uint4		dollar_tlevel;
 GBLREF uint4		update_array_size, cumul_update_array_size;
 GBLREF unsigned int	t_tries;
+GBLREF jnlpool_addrs_ptr_t	jnlpool;
 
 #ifdef DEBUG
 GBLREF	block_id	ydb_skip_bml_num;
@@ -77,26 +81,34 @@ GBLREF	block_id	ydb_skip_bml_num;
 error_def(ERR_DBBADFREEBLKCTR);
 error_def(ERR_DBMBMINCFREFIXED);
 
-block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw_set_element *cs, int *cw_depth_ptr)
+block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work, cw_set_element *cs, int *cw_depth_ptr)
 {
 	cw_set_element	*cs1;
 	sm_uc_ptr_t	bmp;
-	block_id	bml, hint_cycled, hint_limit, total_blks, lcnt, local_maps, offset;
+	block_id	bml, extension_size, hint, hint_cycled, hint_limit, total_blks, lcnt, local_maps, offset;
 	block_id_ptr_t	b_ptr;
+	gd_region	*baseDBreg;
 	int		cw_set_top, depth;
 	unsigned int	n_decrements = 0;
 	trans_num	ctn;
-	int4		free_bit, map_size, status;
-	uint4		space_needed;
+	int4		free_bit, map_size, new_allocation, status;
+	uint4		space_needed, was_crit;
+	sgmnt_addrs	*baseDBcsa;
 	srch_blk_status	blkhist;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
+<<<<<<< HEAD
 	if (hint >= total_blks)		/* for TP, hint can be > total_blks */
 		hint = 1;
 #	ifdef DEBUG
 	if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= hint) && (hint < ydb_skip_bml_num))
 		hint = ydb_skip_bml_num;
 #	endif
+=======
+	hint = ((hint_arg >= total_blks) ? 1 : hint_arg);		/* for TP, hint can be > total_blks */
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	hint_cycled = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
 	hint_limit = DIVIDE_ROUND_DOWN(hint, BLKS_PER_LMAP);
 	local_maps = hint_cycled + 2;	/* for (up to) 2 wraps */
@@ -116,8 +128,89 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 #				endif
 				continue;
 			}
-			if (SS_NORMAL != (status = GDSFILEXT(cs_data->extension_size, total_blks, TRANS_IN_PROG_TRUE)))
+			was_crit = cs_addrs->now_crit;
+			if (!was_crit)
+			{	/* We are working up to a file extension, which requires crit anyway, we need a consistent
+				 * view of our last minute checks, and in case we are updating statsdb_allocation we want
+				 * that to be atomic with the extension itself. Strictly speaking, statsdb_allocation isn't
+				 * associated with the current (statsdb) region, but barring a concurrent MUPIP SET this should
+				 * be sufficient.
+				 */
+#				ifdef DEBUG
+				if ((WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) && dollar_tlevel
+						&& !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT"))
+					|| (WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == gtm_white_box_test_case_count)
+						&& !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT")))
+				{	/* Sync with copy in gdsfilext()
+					 * Unset the env shouldn't affect the parent, it reads env just once at process startup.
+					 */
+					if(WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE))
+						unsetenv("gtm_white_box_test_case_enable");
+					SYSTEM("$gtm_dist/mumps -run $gtm_wbox_mrtn");
+					assert(1 == cs_addrs->nl->wbox_test_seq_num);	/* should have been set by mubfilcpy */
+					/* signal mupip backup to stop sleeping in mubfilcpy */
+					cs_addrs->nl->wbox_test_seq_num = 2;
+				}
+#				endif
+				while (!cs_addrs->now_crit)
+				{
+					grab_crit(gv_cur_region, WS_12);
+					if (FROZEN_CHILLED(cs_addrs))
+						DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
+					assert(FROZEN(cs_data) || !cs_addrs->jnlpool || (cs_addrs->jnlpool == jnlpool));
+					if (FROZEN(cs_data) || IS_REPL_INST_FROZEN)
+					{
+						rel_crit(gv_cur_region);
+						while (FROZEN(cs_data) || IS_REPL_INST_FROZEN)
+						{
+							hiber_start(1000);
+							if (FROZEN_CHILLED(cs_addrs) && CHILLED_AUTORELEASE(cs_addrs))
+								break;
+						}
+					}
+				}
+			}
+			if (total_blks != cs_addrs->ti->total_blks)
+			{	/* File extension or MM switch detected. Rather than try to reset the loop, just recurse. */
+				CHECK_MM_DBFILEXT_REMAP_IF_NEEDED(cs_addrs, gv_cur_region);
+				rel_crit(gv_cur_region);
+				return (dba_mm == cs_data->acc_meth)
+						? FILE_EXTENDED
+						: bm_getfree(hint_arg, blk_used, cw_work, cs, cw_depth_ptr);
+			}
+			if (IS_STATSDB_CSA(cs_addrs))
+			{       /* Double the allocation size for statsdb regions to reduce tp_restart calls */
+				assert(cs_addrs->total_blks == cs_addrs->ti->total_blks);
+				extension_size = cs_addrs->total_blks;
+			} else
+				extension_size = cs_data->extension_size;
+#			ifdef DEBUG
+			TREF(in_bm_getfree_gdsfilext) = TRUE;
+#			endif
+			status = GDSFILEXT(extension_size, total_blks, TRANS_IN_PROG_TRUE);
+#			ifdef DEBUG
+			TREF(in_bm_getfree_gdsfilext) = FALSE;
+#			endif
+			if (SS_NORMAL != status)
+			{
+				if (!was_crit)
+					rel_crit(gv_cur_region);
+				if (EXTEND_SUSPECT == status)
+					continue;
 				return status;
+			}
+			if (IS_STATSDB_CSA(cs_addrs))
+			{	/* Save the new allocation size to the database file header.
+				 * Use this allocation size the next time we create statsdb for the region.
+				 */
+				new_allocation = (int4)(total_blks * 2);
+				STATSDBREG_TO_BASEDBREG(gv_cur_region, baseDBreg);
+				baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
+				assert(new_allocation > baseDBcsa->hdr->statsdb_allocation);
+				baseDBcsa->hdr->statsdb_allocation = new_allocation;
+			}
+			if (!was_crit)
+				rel_crit(gv_cur_region);
 			if (dba_mm == cs_data->acc_meth)
 				return (FILE_EXTENDED);
 			hint = total_blks;

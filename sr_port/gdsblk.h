@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -39,6 +39,8 @@
 #define MIN_DATA_SIZE		1 + 2	/*    1 byte of key + 2 nulls for terminator     */
 #define MAX_EXTN_COUNT		1048575
 #define MIN_EXTN_COUNT		0
+#define STDB_ALLOC_MAX		8388607	/* Based on JNL_ALLOC_MAX */
+#define STDB_ALLOC_MIN		128	/* 128 Blocks */
 #define	MAX_DB_BLK_SIZE		((1 << 16) - 512)	/* 64Kb - 512 (- 512 to take care of VMS's max I/O capabilities) */
 
 /* Note: EVAL_CMPC not to be confused with the previously existing GET_CMPC macro in mu_reorg.h!

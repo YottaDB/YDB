@@ -150,6 +150,7 @@ static readonly char zclose_text[] = "$ZCLOSE";
 static readonly char zkey_text[] = "$ZKEY";
 static readonly char arrow_text[] = "->";
 
+<<<<<<< HEAD
 GBLREF mval		dollar_zdir;
 GBLREF mval		dollar_zproc;
 GBLREF stack_frame	*frame_pointer;
@@ -194,6 +195,27 @@ GBLREF mstr		dollar_zpin;
 GBLREF mstr		dollar_zpout;
 GBLREF mlk_subhash_val_t	mlk_last_hash;
 GBLREF	int			jobinterrupt_sig_num;
+=======
+GBLREF boolean_t		dollar_zaudit, dollar_zquit_anyway;
+GBLREF int4			dollar_zeditor, dollar_zsystem, zdir_form;
+GBLREF io_log_name		*dollar_principal, *io_root_log_name;
+GBLREF io_pair			io_curr_device, *io_std_device;;
+GBLREF mlk_subhash_val_t	mlk_last_hash;
+GBLREF mstr			dollar_zchset, dollar_zpatnumeric, dollar_zpin, dollar_zpout;
+GBLREF mval			dollar_estack_delta, dollar_job, dollar_system, dollar_zdir, dollar_zerror, dollar_zgbldir;
+GBLREF mval			dollar_zinterrupt, dollar_zproc, dollar_ztexit, dollar_zsource, dollar_zstatus, dollar_zyerror;
+GBLREF size_t			totalAlloc, totalRmalloc, totalUsed;
+GBLREF stack_frame		*frame_pointer;
+GBLREF spdesc			stringpool;
+GBLREF uint4			dollar_tlevel, dollar_trestart, dollar_zjob;
+GBLREF volatile boolean_t	dollar_zininterrupt;
+#ifdef GTM_TRIGGER
+GBLREF int4			gtm_trigger_depth;
+GBLREF mstr			*dollar_ztname;
+GBLREF mval			*dollar_ztdata, *dollar_ztdelim, *dollar_ztoldval, *dollar_ztriggerop, dollar_ztslate;
+GBLREF mval			*dollar_ztupdate, *dollar_ztvalue, dollar_ztwormhole;
+#endif
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 LITREF mval		literal_zero, literal_one, literal_null, literal_sqlnull;
 LITREF char		gtm_release_name[];

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -39,7 +39,7 @@
 #include "mupip_ftok.h"
 #include "mupip_exit.h"
 #include "file_head_read.h"	/* for file_head_read() prototype */
-#include "is_file_identical.h"	/* for filename_to_id() prototype */
+#include "is_gdid.h"	/* for filename_to_id() prototype */
 
 GBLREF	boolean_t	in_mupip_ftok;		/* Used by an assert in repl_inst_read */
 GBLREF	gd_addr		*gd_header;

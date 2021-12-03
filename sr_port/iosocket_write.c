@@ -21,11 +21,12 @@
 #include "gtm_poll.h"
 #include "gtm_socket.h"
 #include "gtm_inet.h"
-#include "gtm_stdlib.h"
 #include "gtm_stdio.h"
+#include "gtm_stdlib.h"
 #include "gtm_string.h"
 #include "eintr_wrappers.h"
-
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "io.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
@@ -39,6 +40,8 @@
 #include "rel_quant.h"
 #include "svnames.h"
 #include "op.h"
+#include "gtmio.h"
+#include "wbox_test_init.h"
 #include "util.h"
 #ifdef GTM_TLS
 #include "gtm_tls.h"
@@ -47,15 +50,15 @@
 GBLREF boolean_t		prin_in_dev_failure, prin_out_dev_failure;
 GBLREF io_pair			io_curr_device, io_std_device;
 GBLREF mstr			chset_names[];
-GBLREF	mval			dollar_zstatus;
+GBLREF mval			dollar_zstatus;
 GBLREF spdesc			stringpool;
 GBLREF UConverter		*chset_desc[];
+GBLREF volatile int4		outofband;
 #ifdef GTM_TLS
 GBLREF	gtm_tls_ctx_t		*tls_ctx;
 #endif
 
 error_def(ERR_CURRSOCKOFR);
-error_def(ERR_DELIMSIZNA);
 error_def(ERR_NOPRINCIO);
 error_def(ERR_NOSOCKETINDEV);
 error_def(ERR_SOCKPASSDATAMIX);
@@ -64,30 +67,62 @@ error_def(ERR_TEXT);
 error_def(ERR_TLSIOERROR);
 error_def(ERR_ZFF2MANY);
 error_def(ERR_ZINTRECURSEIO);
+error_def(ERR_GETSOCKOPTERR);
+error_def(ERR_SETSOCKOPTERR);
 
-#define DOTCPSEND_REAL(SOCKETPTR, SBUFF, SBUFF_LEN, SFLAGS, RC)								\
+#define SOCKBLOCK_UTF_BOM	"Non blocking WRITE error sending UTF-16 BOM"
+#define SOCKBLOCK_DELIM		"Non blocking WRITE error sending DELIMITER or ZFF"
+#define SOCKBLOCK_WRAP		"Non blocking WRITE error sending DELIMITER while wrapping"
+#define SOCKBLOCK_OUTOFBAND	"Non blocking WRITE interrupted"
+#define SOCKBLOCK_BLOCKED	"Non blocking WRITE blocked - no further WRITEs allowed"
+
+/* if non blocking writes, stop if non restartable outofband event */
+#define SEND_OOB(SOCKETPTR, BUF, LEN, FLAGS, RC)							\
+{													\
+	do												\
+	{												\
+		RC = send((SOCKETPTR)->sd, BUF, LEN, FLAGS);	/* BYPASSOK handle EINTR here */	\
+	} while ((-1 == RC) && (EINTR == errno) && (!outofband ||					\
+			((SOCKETPTR)->nonblocked_output ? (jobinterrupt == outofband) : TRUE)));	\
+}
+
+#define DOTCPSEND_REAL(SOCKETPTR, SBUFF, SBUFF_LEN, SFLAGS, WRITTEN, RC)						\
 {															\
 	ssize_t		gtmioStatus;											\
 	size_t		gtmioBuffLen;											\
 	size_t		gtmioChunk;											\
+	size_t		gtmioWritten;											\
+	uint4		gtmioRetries;											\
 	sm_uc_ptr_t	gtmioBuff;											\
 															\
 	gtmioBuffLen = SBUFF_LEN;											\
 	gtmioBuff = (sm_uc_ptr_t)(SBUFF);										\
+	gtmioWritten = gtmioRetries = 0;										\
 	for (;;)													\
         {														\
-		gtmioChunk = gtmioBuffLen;		\
-		SEND((SOCKETPTR)->sd, gtmioBuff, gtmioChunk, SFLAGS, gtmioStatus);					\
+		gtmioChunk = gtmioBuffLen;										\
+		SEND_OOB(SOCKETPTR, gtmioBuff, gtmioChunk, SFLAGS, gtmioStatus);					\
 		if ((ssize_t)-1 != gtmioStatus)										\
 	        {													\
 			gtmioBuffLen -= gtmioStatus;									\
+			gtmioWritten += gtmioStatus;									\
 			if (0 == gtmioBuffLen)										\
 				break;											\
 			gtmioBuff += gtmioStatus;									\
-	        }													\
-		else													\
+	        } else if (!(SOCKETPTR)->nonblocking)									\
+			break;												\
+		else if ((EAGAIN == errno) || (EWOULDBLOCK == errno))							\
+		{ 							 						\
+			if (++gtmioRetries > (SOCKETPTR)->max_output_retries)						\
+			{												\
+				(SOCKETPTR)->output_failures = gtmioRetries;						\
+				break;											\
+			}												\
+			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);								\
+		} else													\
 			break;												\
         }														\
+	WRITTEN = gtmioWritten;												\
 	if ((ssize_t)-1 == gtmioStatus)    	/* Had legitimate error - return it */					\
 		RC = errno;												\
 	else if (0 == gtmioBuffLen)											\
@@ -96,19 +131,24 @@ error_def(ERR_ZINTRECURSEIO);
 		RC = -1;		/* Something kept us from sending what we wanted */				\
 }
 
-#define DOTCPSEND(SOCKETPTR, SBUFF, SBUFF_LEN, SFLAGS, RC)								\
+#define DOTCPSEND(SOCKETPTR, SBUFF, SBUFF_LEN, SFLAGS, WRITTEN, RC)							\
 {															\
-	ssize_t	localstatus;													\
-	if (0 == (SOCKETPTR)->obuffer_size)										\
-		DOTCPSEND_REAL(SOCKETPTR, SBUFF, SBUFF_LEN, SFLAGS, RC)							\
+	ssize_t	localstatus, lwritten;											\
+	if (!(SOCKETPTR)->obuffer_in_use)										\
+		DOTCPSEND_REAL(SOCKETPTR, SBUFF, SBUFF_LEN, SFLAGS, WRITTEN, RC)					\
 	else														\
-	{														\
-		localstatus = iosocket_write_buffered(SOCKETPTR, SBUFF, SBUFF_LEN);						\
-		if (SBUFF_LEN == localstatus)										\
+	{	/* need to return and handle  partial write WRITTEN */							\
+		localstatus = iosocket_write_buffered(SOCKETPTR, SBUFF, SBUFF_LEN, &lwritten);				\
+		if (SBUFF_LEN == lwritten)										\
+		{													\
+			assert(0 == localstatus);									\
 			RC = 0;												\
-		else													\
-			RC = -1;											\
+		} else													\
+			RC = localstatus;										\
+		WRITTEN = lwritten;											\
 	}														\
+	if ((0 != RC) && socketptr->nonblocked_output)									\
+		socketptr->output_blocked = TRUE;									\
 }
 
 void	iosocket_write(mstr *v)
@@ -116,55 +156,58 @@ void	iosocket_write(mstr *v)
 	iosocket_write_real(v, TRUE);
 }
 
-void iosocket_buffer_error(socket_struct *socketptr)
+int iosocket_buffer_error(socket_struct *socketptr)
 {	/* output error from obuffer_errno */
-	int		errlen, devlen, save_obuffer_errno;
+	int		errlen, devlen, save_obuffer_errno, msgid;
 	io_desc		*iod;
 	d_socket_struct	*dsocketptr;
 	const char	*errptr;
 
 	if (0 == socketptr->obuffer_errno)
-		return;			/* no error */
+		return 0;			/* no error */
 	dsocketptr = socketptr->dev;
 	iod = dsocketptr->iod;
 #	ifdef GTM_TLS
 	if (socketptr->tlsenabled)
 	{
-		iod->dollar.za = 9;
 		if (-1 == socketptr->obuffer_errno)
+		{
 			errptr = gtm_tls_get_error();
-		else
+		} else
+		{
 			errptr = (char *)STRERROR(socketptr->obuffer_errno);
-		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr, errlen);
-		ISSUE_NOPRINCIO_IF_NEEDED(iod, TRUE, !socketptr->ioerror);	/* TRUE indicates WRITE */
-		if (socketptr->ioerror)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"),
-				ERR_TEXT, 2, errlen, errptr);
-		if (!prin_out_dev_failure)
-			socketptr->obuffer_errno = 0;
+		}
+		save_obuffer_errno = 0;
+		msgid = ERR_TLSIOERROR;
 	} else
 #	endif
 	{
 		save_obuffer_errno = socketptr->obuffer_errno;
-		socketptr->obuffer_errno = 0;
-		SOCKWRTERROR(iod, socketptr, ERR_SOCKWRITE, save_obuffer_errno);
+		errptr = NULL;
+		msgid = ERR_SOCKWRITE;
 	}
+	socketptr->obuffer_errno = 0;
+	SOCKWRTERROR(iod, socketptr, msgid, save_obuffer_errno, errptr, "send");
+	return -1;	/* error issued */
 }
 
-ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, boolean_t resetbuffer, boolean_t timed);
+ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, boolean_t resetbuffer,
+				boolean_t timed, ssize_t *written);
 
-ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, boolean_t resetbuffer, boolean_t timed)
-{
+ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, boolean_t resetbuffer,
+				boolean_t timed, ssize_t *written)
+{	/* note: buffer may not be socketptr->obuffer */
 	boolean_t	pollwrite;
-	ssize_t		status;
+	ssize_t		status, local_written;
 	size_t		llen;
-	int		bytessent, istatus, timeout, save_errno;
+	int		bytessent, istatus, timeout, save_errno, output_retries;
 	char		*lbuffer;
 #	ifdef GTM_TLS
-	int		tlspolldirection = 0;
+	int		tlspolldirection = 0, short_sends = 0, save_errno2 = 0;
 #	endif
 	struct pollfd	fds;
 
+	*written = local_written = 0;
 	if (!socketptr->obuffer_output_active)
 		return 0;		/* how did we get here */
 	if (timed)
@@ -173,11 +216,24 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 			return -1;	/* unprocessed error */
 		timeout = 0;		/* no waiting in poll */
 	} else
+	{
+		assert(0 != socketptr->obuffer_wait_time);
 		timeout = socketptr->obuffer_wait_time;
+<<<<<<< HEAD
+=======
+	}
+#	ifndef USE_POLL
+	FD_ZERO(&fds);
+	FD_SET(socketptr->sd, &fds);
+	timeout = timeout * 1000;	/* convert milli to micro seconds */
+	timeout_spec.tv_sec = 0;
+	timeout_spec.tv_usec = timeout;
+#	endif
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	llen = length;
-	status = 0;
+	output_retries = status = 0;
 	lbuffer = buffer;
-	while (0 < llen)
+	while ((0 == status) && (0 < llen))
 	{	/* poll/select tlspolldirection - needed if noblocking */
 #		ifdef GTM_TLS
 		if (socketptr->tlsenabled)
@@ -197,6 +253,7 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 				status = -1;
 				break;
 			}
+<<<<<<< HEAD
 			if (EAGAIN == save_errno)
 			{
 				/* No need of "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" call as "rel_quant()" checks for
@@ -204,11 +261,39 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 				 */
 				rel_quant();	/* seems like a legitimate rel_quant */
 			} else if (EINTR != save_errno)
+=======
+			if ((EAGAIN == save_errno) || (EWOULDBLOCK == save_errno))
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 			{
+				if (socketptr->nonblocking && (++output_retries > socketptr->max_output_retries))
+				{
+					socketptr->output_failures = output_retries;
+					socketptr->obuffer_errno = save_errno;
+					status = -1;
+					break;
+				}
+				rel_quant();	/* seems like a legitimate rel_quant */
+			} else if (EINTR != save_errno)
+			{
+				socketptr->obuffer_errno = save_errno;
+				status = -1;
+				break;
+			} else if (socketptr->nonblocked_output && (no_event != outofband) && (jobinterrupt != outofband))
+			{
+				socketptr->obuffer_errno = save_errno;
 				status = -1;
 				break;
 			} else
 				eintr_handling_check();
+			continue;
+		} else if (0 == istatus)
+		{	/* poll/select timedout */
+			if (socketptr->nonblocking && (++output_retries > socketptr->max_output_retries))
+			{
+				save_errno = socketptr->obuffer_errno = EAGAIN;
+				status = -1;
+				break;
+			}
 			continue;
 		}
 		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
@@ -218,9 +303,17 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 			bytessent = gtm_tls_send((gtm_tls_socket_t *)socketptr->tlssocket, lbuffer, llen);
 			if (0 < bytessent)
 			{	/* unless partial writes enabled either none or all should have been written */
+				save_errno2 = gtm_tls_errno();	/* get for debug */
+				if (llen > bytessent)
+				{
+					if (!socketptr->nonblocked_output)
+						assert(FALSE && (llen == bytessent));
+					++short_sends;
+				}
 				llen -= bytessent;
 				lbuffer += bytessent;
 				tlspolldirection = 0;
+				local_written += bytessent;
 			} else
 			{
 				switch (bytessent)
@@ -232,47 +325,95 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 						tlspolldirection = GTMTLS_WANT_WRITE;
 						break;
 					default:
-						assert(-1 == bytessent);
-						socketptr->obuffer_errno = gtm_tls_errno();
-						if (ECONNRESET == socketptr->obuffer_errno)
+						socketptr->obuffer_errno = save_errno = gtm_tls_errno();
+						if (-1 == save_errno)
+						{	/* non errno error use gtm_tls_get_error when reporting */
+							status = -1;
+							break;
+						}
+						if (!socketptr->nonblocked_output && (0 == bytessent) && (0 == save_errno))
+						{	/* should not get here */
+							assert(socketptr->nonblocked_output || (0 != bytessent) ||
+								(0 != save_errno));
+						} else if (socketptr->nonblocked_output
+							&& ((EAGAIN == save_errno) || (EWOULDBLOCK == save_errno)))
 						{
-							return (ssize_t)(-2);
+							if (socketptr->nonblocking &&
+								(++output_retries > socketptr->max_output_retries))
+							{
+								socketptr->output_failures = output_retries;
+								status = -1;
+								break;
+							} else
+								assert(!socketptr->nonblocking ||
+									(output_retries <= socketptr->max_output_retries));
+							rel_quant();
+							break;
+						} else if (socketptr->nonblocked_output &&
+							((EINTR == save_errno) &&
+							(0 != outofband) && (jobinterrupt != outofband)))
+						{	/* not JOBEXAM signal */
+							status = -1;
+							break;
 						} else
-							return (ssize_t)(-1);
+						{
+							assert(-1 == bytessent);
+							if (ECONNRESET == socketptr->obuffer_errno)
+							{
+								return (ssize_t)(-2);
+							} else
+								return (ssize_t)(-1);
+						}
+						break;
 				}
+				if (-1 == status)
+					break;
 			}
-			if (0 == llen)
-				status = length;
-			else
-				status = 0;
 		} else
 #		endif
-		{
-			DOTCPSEND_REAL(socketptr, buffer, length, 0, status);
-			if (0 != status)
+		{	/* as of 2020/8/18 buffered output is TLS only so revisit this section if non TLS buffered output added by
+			   GTM-3162 buffering on socket device */
+			DOTCPSEND_REAL(socketptr, buffer, length, 0, local_written, status);
+			if (0 != status)	/* 0=allsent -1=partial else=errno */
 			{	/* current callers do this check and return */
-				/* if timed, just return - maybe set flag in struct */
-				socketptr->obuffer_errno = status;
+				socketptr->obuffer_errno = save_errno = status;
 				status = -1;
+				/* next 13 lines need rework if non TLS buffered output */
+				if (timed)
+				{	/* called from timer so only try once */
+					break;
+				}
+				if (!socketptr->nonblocked_output && ((EAGAIN == save_errno) || (EWOULDBLOCK == save_errno)))
+				{
+					rel_quant();	/* seems like a legitimate rel_quant */
+					status = 0;
+					continue;
+				} else if (EINTR != save_errno)
+				{
+					status = -1;
+					break;
+				}
 			} else
-				status = length;
-			break;
+				status = 0;
+			break;		/* DOTCPSEND_REAL does retries so no need here */
 		}
 	}
-	if (status == length)
-	{
+	if (local_written == length)
+	{	/* all output written */
 		socketptr->obuffer_errno = 0;
 		if (resetbuffer)
 			socketptr->obuffer_length = socketptr->obuffer_offset = 0;
-	}
+	} else
+		assert(0 != status);
+	*written = local_written;
 	return status;
 }
 
 /*	prototype in iosocketdef.h since called by iosocket_flush and iosocket_close */
 ssize_t iosocket_output_buffer(socket_struct *socketptr)
 {
-	ssize_t	status;
-	status = iosocket_output(socketptr, socketptr->obuffer, socketptr->obuffer_length, TRUE, FALSE);
+	ssize_t	status, written;
+	status = iosocket_output(socketptr, socketptr->obuffer, socketptr->obuffer_length, TRUE, FALSE, &written);
 	return status;
 }
 
@@ -280,7 +421,7 @@ void iosocket_output_timed(socket_struct *socketptr);
 
 void iosocket_output_timed(socket_struct *socketptr)
 {
-	ssize_t	status;
+	ssize_t	status, written;
 	size_t	length;
 
 	socketptr->obuffer_timer_set = FALSE;
@@ -288,20 +429,22 @@ void iosocket_output_timed(socket_struct *socketptr)
 	{	/* no current writer so output the buffer */
 		socketptr->obuffer_output_active = TRUE;
 		length = socketptr->obuffer_length;
-		status = iosocket_output(socketptr, socketptr->obuffer, length, TRUE, TRUE);
+		status = iosocket_output(socketptr, socketptr->obuffer, length, TRUE, TRUE, &written);
 		socketptr->obuffer_output_active = FALSE;
+		assert((length == written) || (0 != socketptr->obuffer_errno));	/* short write */
 	}
-	/* reschedule timer if needed */
-	if ((0 < socketptr->obuffer_length) && (0 == socketptr->obuffer_errno))
+	/* reschedule timer if needed for blocking socket */
+	if ((0 < socketptr->obuffer_length) && (0 == socketptr->obuffer_errno) && !socketptr->nonblocked_output)
 	{
+		assert(0 != socketptr->obuffer_flush_time);
 		socketptr->obuffer_timer_set = TRUE;
 		start_timer((TID)socketptr, socketptr->obuffer_flush_time * (uint8)NANOSECS_IN_MSEC, iosocket_output_timed,
 			SIZEOF(socketptr), (char *)&socketptr);
 	}
 }
 
-ssize_t	iosocket_write_buffered(socket_struct *socketptr, char *buffer, size_t length);
-ssize_t	iosocket_write_buffered(socket_struct *socketptr, char *buffer, size_t length)
+ssize_t	iosocket_write_buffered(socket_struct *socketptr, char *buffer, size_t length, ssize_t *written);
+ssize_t	iosocket_write_buffered(socket_struct *socketptr, char *buffer, size_t length, ssize_t *written)
 {
 	ssize_t		status, obuffered_len;
 	int		errlen, devlen;
@@ -310,48 +453,53 @@ ssize_t	iosocket_write_buffered(socket_struct *socketptr, char *buffer, size_t l
 	const char	*errptr;
 
 	socketptr->obuffer_output_active = TRUE;	/* lock out timed writes */
-	status = (0 != socketptr->obuffer_errno) ? -1 : 0;
+	*written = 0;
+	status = socketptr->obuffer_errno;
 	if ((0 == status ) && (0 < socketptr->obuffer_length) && ((socketptr->obuffer_size - socketptr->obuffer_length) <= length))
 	{	/* more output than space left in buffer */
-		obuffered_len = socketptr->obuffer_length;
 		status = iosocket_output_buffer(socketptr);
-		if (obuffered_len == status)
-			status = 0;			/* success */
 	}
-	if ((0 == status ) && (length > socketptr->obuffer_size))
+	if ((0 == status ) && (length > (socketptr->obuffer_size - socketptr->obuffer_offset)))
 	{	/* more output than can fit in buffer so just output it now */
-		status = iosocket_output(socketptr, buffer, length, FALSE, FALSE);
-		if (status != length)
-			status = -1;			/* failure */
+		assert(0 == socketptr->obuffer_length);
+		status = iosocket_output(socketptr, buffer, length, FALSE, FALSE, written);
 	} else if (0 == status)
 	{	/* put in buffer since room is available */
 		memcpy((void *)(socketptr->obuffer + socketptr->obuffer_offset), buffer, length);
 		socketptr->obuffer_offset += length;
 		socketptr->obuffer_length += length;
-		status = length;
 		/* start timer if not active */
-		if (!socketptr->obuffer_timer_set)
+		if (!socketptr->obuffer_timer_set && (0 != socketptr->obuffer_flush_time))
 		{
+			status = 0;
+			*written = length;
 			socketptr->obuffer_timer_set = TRUE;
 			start_timer((TID)socketptr, socketptr->obuffer_flush_time * (uint8)NANOSECS_IN_MSEC, iosocket_output_timed,
 				SIZEOF(socketptr), (char *)&socketptr);
+		} else if (0 == socketptr->obuffer_flush_time)
+		{
+			obuffered_len = socketptr->obuffer_length;
+			status = iosocket_output_buffer(socketptr);
+			*written = (obuffered_len - socketptr->obuffer_length);
+			assert((length == *written) || (0 != status));
 		}
 	}
 	socketptr->obuffer_output_active = FALSE;
-	if (0 > status)
+	if ((0 > status) || (0 != socketptr->obuffer_errno))
 	{	/* report error */
-		iosocket_buffer_error(socketptr);
+		status = iosocket_buffer_error(socketptr);
 	}
 	return status;
 }
 
 void	iosocket_write_real(mstr *v, boolean_t convert_output)
-{
+{	/* convert_output is FALSE when called from wteol or wtff */
 	io_desc		*iod;
 	mstr		tempv;
-	char		*out, *c_ptr, *c_top;
+	char		*out, *c_ptr, *c_top, *errptr, *errortext;
 	int		in_b_len, b_len, status, new_len, c_len, mb_len;
-	int		flags;
+	int		flags, fcntl_flags, fcntl_res, save_errno;
+	size_t		written, total_written;
 	d_socket_struct *dsocketptr;
 	socket_struct	*socketptr;
 	boolean_t	ch_set;
@@ -373,10 +521,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 		return;
 	}
 	if (dsocketptr->n_socket <= dsocketptr->current_socket)
-	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
-		return;
-	}
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
 	if (dsocketptr->mupintr)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
@@ -388,6 +533,43 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 #endif
 	tempv = *v;
 	socketptr->lastop = TCP_WRITE;
+	if (socketptr->nonblocked_output)
+	{
+		socketptr->lastaction = dsocketptr->waitcycle;
+		socketptr->readyforwhat &= ~SOCKREADY_WRITE;
+		socketptr->pendingevent &= ~SOCKPEND_WRITE;
+		socketptr->lastarg_sent = 0;
+		if (socketptr->output_blocked)
+		{
+			SOCKWRTERROR(iod, socketptr, ERR_SOCKWRITE, 0, SOCKBLOCK_BLOCKED, "");
+			REVERT_GTMIO_CH(&iod->pair, ch_set);
+			return;
+		}
+		if (!socketptr->nonblocking)
+		{	/* set O_NONBLOCK if needed */
+			FCNTL2(socketptr->sd, F_GETFL, fcntl_flags);
+			if (fcntl_flags < 0)
+			{
+				iod->dollar.za = ZA_IO_ERR;
+				save_errno = errno;
+				errptr = (char *)STRERROR(save_errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
+						LEN_AND_LIT("F_GETFL FOR NON BLOCKING WRITE"),
+						save_errno, LEN_AND_STR(errptr));
+			}
+			FCNTL3(socketptr->sd, F_SETFL, fcntl_flags | (O_NDELAY | O_NONBLOCK), fcntl_res);
+			if (fcntl_res < 0)
+			{
+				iod->dollar.za = ZA_IO_ERR;
+				save_errno = errno;
+				errptr = (char *)STRERROR(save_errno);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+						LEN_AND_LIT("F_SETFL FOR NON BLOCKING WRITE"),
+						save_errno, LEN_AND_STR(errptr));
+			}
+			socketptr->nonblocking = TRUE;
+		}
+	}
 	/* In case the CHSET changes from non-UTF-16 to UTF-16 and a read has already been done,
 	 * there's no way to read the BOM bytes & to determine the variant. So default to UTF-16BE.
 	 */
@@ -407,15 +589,26 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 							format is unspecified */
 			dsocketptr->ochset_utf16_variant = iod->ochset;
 			get_chset_desc(&chset_names[iod->ochset]);
-			DOTCPSEND(socketptr, UTF16BE_BOM, UTF16BE_BOM_LEN, flags, status);
+			written = 0;
+			DOTCPSEND(socketptr, UTF16BE_BOM, UTF16BE_BOM_LEN, flags, written, status);
 			DBGSOCK2((stdout, "socwrite: TCP send of BOM-BE with rc %d\n", status));
 			if (0 != status)
 			{
-				SOCKWRTERROR(iod, socketptr, ERR_SOCKWRITE, status);
+				if (!socketptr->obuffer_in_use || (-1 != status))
+				{	/* if buffered and status == -1 then error was already issued */
+					if (socketptr->nonblocked_output &&
+						((EAGAIN == status) || (EWOULDBLOCK == status) || (EINTR == status)))
+					{
+						errortext = SOCKBLOCK_UTF_BOM;
+						status = 0;
+						socketptr->lastarg_sent = (size_t)-1;	/* to force need to /BLOCK(CLEAR) */
+					} else
+						errortext = NULL;
+					SOCKWRTERROR(iod, socketptr, ERR_SOCKWRITE, status, errortext, "send");
+				}
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
-			}
-			else if (iod == io_std_device.out)
+			} else if (iod == io_std_device.out)
 				prin_out_dev_failure = FALSE;
 		}
 		socketptr->first_write = FALSE;
@@ -479,6 +672,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 			}
 		}
 	}
+	total_written = 0;		/* data only this argument */
 	if (0 != (in_b_len = tempv.len))
 	{
 		DBGSOCK2((stdout, "socwrite: starting output loop (%d bytes) - iodwidth: %d  wrap: %d\n",
@@ -496,21 +690,32 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 					/* Should this really be iosocket_Wteol() (for FILTER)? IF we call iosocket_wteol(),
 					 * there will be recursion iosocket_Write -> iosocket_Wteol ->iosocket_Write */
 					if (0 < socketptr->n_delimiter)
-					{
+					{	/* delimiters from wrapping are not counted for non blocking output */
+						written = 0;
 						DOTCPSEND(socketptr, socketptr->odelimiter0.addr, socketptr->odelimiter0.len,
-								(socketptr->urgent ? MSG_OOB : 0) | flags, status);
+							(socketptr->urgent ? MSG_OOB : 0) | flags, written, status);
 						DBGSOCK2((stdout, "socwrite: TCP send of %d byte delimiter with rc %d\n",
 							  socketptr->odelimiter0.len, status));
 						if (0 != status)
 						{
-							SOCKWRTERROR(iod, socketptr, ERR_SOCKWRITE, status);
+							if (!socketptr->obuffer_in_use || (-1 != status))
+							{	/* if buffered and status == -1 then error was already issued */
+								if (socketptr->nonblocked_output && ((EAGAIN == status) ||
+									(EWOULDBLOCK == status) || (EINTR == status) ||
+									(-1 == status)))
+								{
+									errortext = SOCKBLOCK_WRAP;
+									status = 0;
+									socketptr->lastarg_sent = (size_t)-1;	/* need to CLEAR */
+								} else
+									errortext = NULL;
+								SOCKWRTERROR(iod, socketptr, ERR_SOCKWRITE, status,
+									errortext, "send");
+							}
 							REVERT_GTMIO_CH(&iod->pair, ch_set);
 							return;
-						}
-#ifdef UNIX
-						else if (iod == io_std_device.out)
+						} else if (iod == io_std_device.out)
 							prin_out_dev_failure = FALSE;
-#endif
 					}
 					iod->dollar.y++;
 					iod->dollar.x = 0;
@@ -540,16 +745,47 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 				}
 			}
 			assert(0 != b_len);
-			DOTCPSEND(socketptr, out, b_len, (socketptr->urgent ? MSG_OOB : 0) | flags, status);
-			DBGSOCK2((stdout, "socwrite: TCP data send of %d bytes with rc %d\n", b_len, status));
+			written = 0;
+			DOTCPSEND(socketptr, out, b_len, (socketptr->urgent ? MSG_OOB : 0) | flags, written, status);
+			DBGSOCK2((stdout, "socwrite: TCP data send of %d (of %d) bytes with rc %d\n", written, b_len, status));
+			total_written += written;
 			if (0 != status)
 			{
-				SOCKWRTERROR(iod, socketptr, ERR_SOCKWRITE, status);
+				if (!socketptr->obuffer_in_use || (-1 != status))
+				{	/* if buffered and status == -1 then error was already issued */
+					if (socketptr->nonblocked_output &&
+						((EAGAIN == status) || (EWOULDBLOCK == status) || (EINTR == status) ||
+						(-1 == status)))
+					{
+						if (!convert_output)
+						{	/* called from iosocket_wteol or iosocket_wtff */
+							status = 0;
+							errortext = SOCKBLOCK_DELIM;
+						} else
+						{
+							if (EINTR == status)
+							{
+								status = 0;
+								errortext = SOCKBLOCK_OUTOFBAND;
+							} else
+								errortext = NULL;
+							socketptr->lastarg_sent = (0 != total_written) ? total_written : -1;
+							if (0 < written)
+								dollarx(iod, (uchar_ptr_t)out, (uchar_ptr_t)out + written);
+						}
+					} else
+						errortext = NULL;
+					SOCKWRTERROR(iod, socketptr, ERR_SOCKWRITE, status, errortext, "send");
+				}
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
+			} else
+			{	/* no error */
+				if (iod == io_std_device.out)
+					prin_out_dev_failure = FALSE;
 			}
-			else if (iod == io_std_device.out)
-				prin_out_dev_failure = FALSE;
+			if (socketptr->nonblocked_output)
+				b_len = written;	/* update to amount actually written */
 			dollarx(iod, (uchar_ptr_t)out, (uchar_ptr_t)out + b_len);
 			DBGSOCK2((stdout, "socwrite: $x/$y updated by dollarx():  $x: %d  $y: %d  filter: %d  escape:  %d\n",
 				  iod->dollar.x, iod->dollar.y, iod->write_filter, iod->esc_state));
@@ -558,6 +794,12 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 				break;
 		}
 		iod->dollar.za = 0;
+	}
+	if (socketptr->nonblocked_output)
+	{
+		socketptr->args_written++;
+		if (tempv.len != total_written)
+			socketptr->lastarg_sent = (0 != total_written) ? total_written : -1;	/* non restartable outofband */
 	}
 	DBGSOCK2((stdout, "socwrite: <--------- Leaving iosocket_write\n"));
 	REVERT_GTMIO_CH(&iod->pair, ch_set);

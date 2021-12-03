@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,12 +10,9 @@
  *								*
  ****************************************************************/
 
-#ifndef JOBINTR_EVENT_INCLUDED
-#define JOBINTR_EVENT_INCLUDED
+#ifndef GVCMZ_NETERR_INCLUDED
+#define GVCMZ_NETERR_INCLUDED
 
-UNIX_ONLY(void jobinterrupt_event(int sig, siginfo_t *info, void *context);)
-VMS_ONLY(void jobinterrupt_event(void);)
-void jobinterrupt_set(int4 dummy);
+void gvcmz_neterr(INTPTR_T *error);	/* separate include as routine is in deferred events; don't want to drag in all of gvcmz* */
 
-#endif
-
+#endif /* GVCMZ_NETERR_INCLUDED */

@@ -513,12 +513,17 @@ void gvcst_init(gd_region *reg)
 				seg->blk_size = STATSDB_BLK_SIZE;
 				/* Similar code for a few other critical fields that need initialization before "mu_cre_file" */
 				seg->allocation = STATSDB_ALLOCATION;
-				seg->ext_blk_count = STATSDB_EXTENSION;
 				reg->max_key_size = STATSDB_MAX_KEY_SIZE;
 				reg->max_rec_size = STATSDB_MAX_REC_SIZE;
 				/* The below is directly inherited from the base db so no macro/assert like above fields */
 				seg->mutex_slots = NUM_CRIT_ENTRY(baseDBcsa->hdr);
 				reg->mumps_can_bypass = TRUE;
+			}
+			if (0 != baseDBcsa->hdr->statsdb_allocation)
+			{	/* The statsdb allocation for this region has been extended before.
+				 * Use the extended allocation size from the file header.
+				 */
+				seg->allocation = baseDBcsa->hdr->statsdb_allocation;
 			}
 			for ( ; ; )     /* for loop only to let us break from error cases without having a deep if-then-else */
 			{	/* with the ftok lock in place, check if the db is already created */
@@ -762,11 +767,16 @@ void gvcst_init(gd_region *reg)
 			{	/* see comment above on why we this initialization for a statsDB */
 				seg->blk_size = STATSDB_BLK_SIZE;
 				seg->allocation = STATSDB_ALLOCATION;
-				seg->ext_blk_count = STATSDB_EXTENSION;
 				reg->max_key_size = STATSDB_MAX_KEY_SIZE;
 				reg->max_rec_size = STATSDB_MAX_REC_SIZE;
 				seg->mutex_slots = NUM_CRIT_ENTRY(baseDBcsa->hdr);
 				reg->mumps_can_bypass = TRUE;
+			}
+			if (0 != baseDBcsa->hdr->statsdb_allocation)
+			{	/* The statsdb allocation for this region has been extended before.
+				 * Use the extended allocation size from the file header.
+				 */
+				seg->allocation = baseDBcsa->hdr->statsdb_allocation;
 			}
 		}
 	}
@@ -816,8 +826,6 @@ void gvcst_init(gd_region *reg)
 	 *	th_base (SIZEOF(que_ent) into an odd bt_rec)
 	 *	bt_base
 	 *	(n_bts * bt_rec)
-	 *	LOCK_BLOCK (lock_space)
-	 *	(lock_space_size)
 	 *	cs_addrs->acc_meth.bg.cache_state
 	 *	(cache_que_heads)
 	 *	(bt_buckets * cache_rec)
@@ -828,10 +836,10 @@ void gvcst_init(gd_region *reg)
 	 *	(node_local)
 	 *	[jnl_name
 	 *	jnl_buffer]
-	 * MM
-	 *	file contents
 	 *	LOCK_BLOCK (lock_space)
 	 *	(lock_space_size)
+	 * MM
+	 *	file contents
 	 *	cs_addrs->acc_meth.mm.mmblk_state
 	 *	(mmblk_que_heads)
 	 *	(bt_buckets * mmblk_rec)
@@ -842,6 +850,8 @@ void gvcst_init(gd_region *reg)
 	 *	(node_local)
 	 *	[jnl_name
 	 *	jnl_buffer]
+	 *	LOCK_BLOCK (lock_space)
+	 *	(lock_space_size)
 	 * high address
 	 */
  	/* Ensure first 3 members (upto now_running) of node_local are at the same offset for any version.
@@ -1059,7 +1069,7 @@ void gvcst_init(gd_region *reg)
 	if (!csd->fully_upgraded && curr_time_uint4 > next_warn_uint4
 		&& COMPSWAP_LOCK(&csd->next_upgrd_warn.time_latch, next_warn_uint4, (curr_time_uint4 + UPGRD_WARN_INTERVAL)))
 	{	/* The msg is due and we have successfully updated the next time interval */
-		if (GDSVCURR != csd->desired_db_format)
+		if (GDSVCURR != csd->desired_db_format)	/* TODO: what should this check? */
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBVERPERFWARN1, 2, DB_LEN_STR(reg));
 		else
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBVERPERFWARN2, 2, DB_LEN_STR(reg));

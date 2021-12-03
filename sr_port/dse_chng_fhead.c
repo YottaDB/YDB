@@ -539,7 +539,17 @@ void dse_chng_fhead(void)
 		cs_data->fully_upgraded = FALSE;
 	}
 	if ((CLI_PRESENT == cli_present("MBM_SIZE")) && (cli_get_int("MBM_SIZE", &x)))
-		cs_data->master_map_len = x * DISK_BLOCK_SIZE;
+	{
+		if (x < DIVIDE_ROUND_UP(BLK_ZERO_OFF(cs_data->start_vbn) - SGMNT_HDR_LEN, DISK_BLOCK_SIZE))
+		{	/* if the start_vbn needs fixing, do that first */
+			cs_data->master_map_len = x * DISK_BLOCK_SIZE;
+			cs_data->free_space = BLK_ZERO_OFF(cs_data->start_vbn) - (SGMNT_HDR_LEN + x);
+		} else
+		{
+			x = DIVIDE_ROUND_UP(BLK_ZERO_OFF(cs_data->start_vbn) - SGMNT_HDR_LEN, DISK_BLOCK_SIZE);
+			util_out_print("Error: Master map size more than !UL [0x!XL] would overrun the starting VBN", TRUE, x, x);
+		}
+	}
 	if (cs_data->clustered)
 	{
 		if (cs_addrs->ti->curr_tn == prev_tn)

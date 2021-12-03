@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
@@ -50,6 +50,7 @@ typedef struct timespec ABS_TIME;
  * The first timer in this queue is the currently
  * active timer, and expires first.
  */
+#define GT_TIMER_INIT_DATA_LEN  8
 typedef struct tag_ts
 {
 	ABS_TIME	expir_time;	/* Absolute time when timer expires */
@@ -66,7 +67,7 @@ typedef struct tag_ts
 					 */
 	int4		hd_len_max;	/* Max length this blk can hold */
 	int4		hd_len;		/* Handler data length */
-	char		hd_data[1];	/* Handler data */
+	char		hd_data[GT_TIMER_INIT_DATA_LEN];	/* Handler data */
 } GT_TIMER;
 
 /* Struct to track timefree block allocations */
@@ -219,13 +220,20 @@ void		add_uint8_to_abs_time(ABS_TIME *atps, uint8 ival, ABS_TIME *atpd);
 void		cancel_timer(TID tid);
 void		cancel_unsafe_timers(void);
 void		clear_timers(void);
+<<<<<<< HEAD
 void		hiber_start(uint4 hiber);
 void		hiber_start_wait_any(uint4 hiber);
 void		init_timers(void);
+=======
+void		hiber_start(uint4 milliseconds);
+void		hiber_start_wall_time(uint4 milliseconds);
+void		hiber_start_wait_any(uint4 milliseconds);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 void		gtm_start_timer(TID tid, int4 time_to_expir, void(* handler)(), int4 data_length, void *handler_data);
 void		start_timer(TID tid, uint8 time_to_expir, void(* handler)(), int4 data_length, void *handler_data);
 ABS_TIME	sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2);
-void		sys_get_curr_time(ABS_TIME *atp);
+void		sys_get_curr_time(ABS_TIME *tp);
+void		sys_get_wall_time(ABS_TIME *atp);
 void		prealloc_gt_timers(void);
 void		set_blocksig(void);
 void		check_for_timer_pops(boolean_t sig_handler_changed);
@@ -234,6 +242,21 @@ void		check_for_deferred_timers(void);
 void		add_safe_timer_handler(int safetmr_cnt, ...);
 void		sys_canc_timer(void);
 void 		simple_timeout_timer(TID tid, int4 hd_len, boolean_t **timedout);
+<<<<<<< HEAD
 void		timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_signal_handler);
+=======
+
+STATICFNDCL void	gt_timers_alloc(void);
+STATICFNDCL void	start_timer_int(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
+					void *hdata, boolean_t safe_timer);
+STATICFNDCL void	sys_settimer (TID tid, ABS_TIME *time_to_expir);
+STATICFNDCL void	start_first_timer(ABS_TIME *curr_time);
+STATICFNDCL void	timer_handler(int why);
+STATICFNDCL GT_TIMER	*find_timer(TID tid, GT_TIMER **tprev);
+STATICFNDCL GT_TIMER	*add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
+					void *hdata, boolean_t safe_timer);
+STATICFNDCL void	remove_timer(TID tid);
+STATICFNDCL void	init_timers(void);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 #endif

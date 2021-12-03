@@ -129,7 +129,7 @@ int resolve_ref(int errknt)
 			}
 		}
 #		endif
-		COMPDBG(PRINTF("\n\n\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> New Compilation <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");)
+		COMPDBG(PRINTF("\n\n\n############################ New Compilation ############################\n");)
 		COMPDBG(PRINTF("\n\n\n**************************** Begin resolve_ref scan ****************************\n"););
 		dqloop(&t_orig, exorder, curtrip)
 		{	/* If the optimization was not executed earlier */

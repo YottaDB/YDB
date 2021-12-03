@@ -41,6 +41,7 @@
 #include "gtm_bintim.h"
 #include "gtmmsg.h"
 #include "io.h"
+#include "gtm_stat.h"
 #include "file_input.h"
 
 GBLREF	mur_opt_struct	mur_options;
@@ -77,6 +78,13 @@ error_def(ERR_RSYNCSTRMVAL);
 #define	WILDCARD_CHAR2	'%'
 #define	ESCAPE_CHAR	'\\'
 
+#ifdef DEBUG
+/* Debug GT.M versions support the ability to dump the PBLKs in ZWRITE format in a journal extract.
+ * Use in conjuction with DSE's ability to display a block IMAGE to see the PBLK contents. See test
+ * commit PBLK2 for more information on how to use this debug-only feature. */
+#define CAN_ZWRITE_EXTRACT_PBLK
+#endif
+
 static	char	default_since_time[] = "0 0:0:00",
 		default_lookback_time[] = "0 0:5:00";
 static char	* const extr_parms[] =
@@ -101,12 +109,13 @@ void	mur_get_options(void)
 	boolean_t	global_exclude;
 	long_list	*ll_ptr, *ll_ptr1;
 	long_long_list	*seqno_list, *seqno_list1;
-#ifdef DEBUG
+#ifdef CAN_ZWRITE_EXTRACT_PBLK
 	long_long_list	*blocklist_list, *blocklist_list1;
 #endif
 	redirect_list	*rl_ptr, *rl_ptr1, *tmp_rl_ptr;
 	select_list	*sl_ptr, *sl_ptr1;
 	boolean_t	interactive, parse_error, uniqname_error = FALSE;
+	struct stat	stat_buf;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -187,6 +196,7 @@ void	mur_get_options(void)
 	{
 		mur_options.extr[extr_type] = FALSE;
 		mur_options.extr_fn_is_stdout[extr_type] = FALSE;
+		mur_options.extr_fn_is_regfile[extr_type] = TRUE;
 		mur_options.extr_fn_is_devnull[extr_type] = FALSE;
 		status = cli_present(extr_parms[extr_type]);
 		if (CLI_PRESENT == status)
@@ -199,21 +209,28 @@ void	mur_get_options(void)
 				mur_options.extr_fn[extr_type] = (char *)malloc(mur_options.extr_fn_len[extr_type] + 1);
 				strncpy(mur_options.extr_fn[extr_type], qual_buffer, length);
 				/*Remove multiple slashes from journal file*/
-                                mur_options.extr_fn_len[extr_type] = rmv_mul_slsh(mur_options.extr_fn[extr_type],length);
+				mur_options.extr_fn_len[extr_type] = rmv_mul_slsh(mur_options.extr_fn[extr_type],length);
 				mur_options.extr_fn[extr_type][mur_options.extr_fn_len[extr_type]] = '\0';
 				mur_options.extr_fn_is_stdout[extr_type] =
 					(0 == STRNCASECMP(qual_buffer, JNL_STDO_EXTR, SIZEOF(JNL_STDO_EXTR)));
 				mur_options.extr_fn_is_devnull[extr_type] = ((STR_LIT_LEN(DEVNULL) ==
 					mur_options.extr_fn_len[extr_type]) && (0 == STRNCMP_LIT(qual_buffer, DEVNULL)));
+				if (mur_options.extr_fn_is_stdout[extr_type] || mur_options.extr_fn_is_devnull[extr_type])
+					mur_options.extr_fn_is_regfile[extr_type] = FALSE;
+				else {
+					if (0 == Stat(qual_buffer, &stat_buf))
+						mur_options.extr_fn_is_regfile[extr_type] = S_ISREG(stat_buf.st_mode);
+					/* else The file does not exist, MUPIP can create it */
+				}
 				/* Check if this extract filename is same as any filename seen before
-				 * However, Allow /dev/null & -stdout to be repeated
+				 * However, This check is applicable only for regular files.
+				 * Allow the non-regular files, DEVNULL & -stdout to be repeated
 				 */
-				if (!mur_options.extr_fn_is_devnull[extr_type] && !mur_options.extr_fn_is_stdout[extr_type])
+				if (mur_options.extr_fn_is_regfile[extr_type])
 				{
 					for (cnt = 0; cnt < extr_type; cnt++)
 					{
-						if (mur_options.extr[cnt] && !mur_options.extr_fn_is_devnull[cnt] &&
- 							!mur_options.extr_fn_is_stdout[cnt] &&
+						if (mur_options.extr[cnt] &&
 							(mur_options.extr_fn_len[cnt] == mur_options.extr_fn_len[extr_type]) &&
 							(0 == STRNCMP_STR(mur_options.extr_fn[extr_type], mur_options.extr_fn[cnt],
 								mur_options.extr_fn_len[cnt])))
@@ -236,6 +253,7 @@ void	mur_get_options(void)
 			mur_options.extr_fn_len[extr_type] = STRLEN(DEVNULL);
 			mur_options.extr_fn[extr_type] = (char *)malloc(mur_options.extr_fn_len[extr_type] + 1);
 			STRNCPY_STR(mur_options.extr_fn[extr_type], DEVNULL, mur_options.extr_fn_len[extr_type] + 1);
+			mur_options.extr_fn_is_regfile[extr_type] = FALSE;
 		}
 	}
 	if (uniqname_error)
@@ -379,9 +397,9 @@ void	mur_get_options(void)
 			for (tmp_rl_ptr = mur_options.redirect; tmp_rl_ptr != NULL; tmp_rl_ptr = tmp_rl_ptr->next)
 			{
 				if (((tmp_rl_ptr->org_name_len == file_name_expanded_len) &&
-				     (0 == memcmp(tmp_rl_ptr->org_name, file_name_expanded, tmp_rl_ptr->org_name_len))) ||
+					(0 == memcmp(tmp_rl_ptr->org_name, file_name_expanded, tmp_rl_ptr->org_name_len))) ||
 				    ((tmp_rl_ptr->new_name_len == file_name_expanded_len) &&
-				     (0 == memcmp(tmp_rl_ptr->new_name, file_name_expanded, tmp_rl_ptr->new_name_len))))
+					(0 == memcmp(tmp_rl_ptr->new_name, file_name_expanded, tmp_rl_ptr->new_name_len))))
 				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVREDIRQUAL, 2,
 						LEN_AND_LIT("Duplicate or invalid specification of files"));
@@ -395,11 +413,11 @@ void	mur_get_options(void)
 			entry_ptr = cptr + 1; /* skip the = */
 			file_name_specified_len = length - file_name_specified_len - 1; /* the rest of the entry);*/
 			if (file_name_specified_len > (MAX_FN_LEN + 1))
-                        {
-                                  gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVREDIRQUAL, 2,
+			{
+				  gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVREDIRQUAL, 2,
 							LEN_AND_LIT("Redirect DB filename too long: greater than 255"));
-                                  mupip_exit(ERR_MUPCLIERR);
-                        }
+				  mupip_exit(ERR_MUPCLIERR);
+			}
 			memcpy(file_name_specified, entry_ptr, file_name_specified_len);
 			*(file_name_specified + file_name_specified_len)= '\0';
 			if (!get_full_path(file_name_specified, file_name_specified_len, file_name_expanded,
@@ -753,7 +771,7 @@ void	mur_get_options(void)
 		free(file_name_specified);
 		free(file_name_expanded);
 	}
-#ifdef DEBUG
+#ifdef CAN_ZWRITE_EXTRACT_PBLK
 	/*-----		-BLOCKID=(list of block numbers)	-----*/
 	while (cli_present("BLOCKID") == CLI_PRESENT)
 	{

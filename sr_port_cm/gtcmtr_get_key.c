@@ -29,17 +29,26 @@
 
 unsigned char *gtcmtr_get_key(void *gvkey, unsigned char *ptr, unsigned short len)
 {
+	size_t cp_len;
 	/* Fetch gv_key fields from message buffer and store into 'key' whose allocated buffer
 	 * size is key->top, the maximum length allowed and enforced by the runtime. Return
 	 * the advanced ptr which points to the byte after key */
 	gv_key *key = (gv_key *)gvkey;
+	gv_key_buf *keybuf_p = (gv_key_buf *) gvkey;	/* Make buffer size visible 4SCA */
+	assert(NULL != key);
+	assert(NULL != keybuf_p);
 	ptr += sizeof(unsigned short);
 	GET_USHORT(key->end, ptr);
 	ptr += sizeof(unsigned short);
 	GET_USHORT(key->prev, ptr);
 	ptr += sizeof(unsigned short);
 	assert((len > 6) && (key->top > (len - 6)));
-	memcpy(key->base, ptr, len - 6);
+	assert(NULL != key->base);
+	assert(NULL != ptr);
+	cp_len = len - 6;
+	assert((0 < cp_len) && (DBKEYSIZE(MAX_KEY_SZ) >= cp_len));
+	assert(NULL != (keybuf_p->split).base);
+	memcpy((keybuf_p->split).base, ptr, cp_len);
 	ptr += (len - 6);
 
 	return ptr;

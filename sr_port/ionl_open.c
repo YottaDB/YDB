@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 52a92dfd (GT.M V7.0-001)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +26,12 @@
 #include "io.h"
 #include "stringpool.h"
 #include "gtmio.h"
+<<<<<<< HEAD
 #include "copy.h"
+=======
+#include "op.h"
+#include "indir_enum.h"
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 #define DEF_NL_WIDTH 255
 #define DEF_NL_LENGTH 66
@@ -33,7 +43,9 @@ short ionl_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	unsigned char	ch;
 	io_desc		*d_out, *ioptr;
 	int		p_offset, status;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	p_offset = 0;
 	/* If UNIX, then /dev/null was actually opened by io_open_try so we have to close it
 	   since we don't use the device, we just simulate it by doing nothing on writes except
@@ -56,16 +68,25 @@ short ionl_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	ioptr->dollar.y = 0;
 	while (*(pp->str.addr + p_offset) != iop_eol)
 	{
+<<<<<<< HEAD
 		ch = *(pp->str.addr + p_offset++);
 		if (ch == iop_wrap)
 			d_out->wrap = TRUE;
 		if (ch == iop_nowrap)
 			d_out->wrap = FALSE;
 		if (ch == iop_exception)
+=======
+		switch (ch = *(pp->str.addr + p_offset++))
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 		{
-			ioptr->error_handler.len = *(pp->str.addr + p_offset);
-			ioptr->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
-			s2pool(&ioptr->error_handler);
+		case iop_wrap:
+			d_out->wrap = TRUE;
+			break;
+		case iop_nowrap:
+			d_out->wrap = FALSE;
+			break;
+		case iop_exception:
+			DEF_EXCEPTION(pp, p_offset, ioptr);
 			break;
 		}
 		UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */

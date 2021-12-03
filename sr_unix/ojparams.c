@@ -29,7 +29,7 @@
  * ---------------------------------------------------------
  */
 
-static readonly char definput[] = "/dev/null";
+static readonly char definput[] = DEVNULL;
 
 MSTR_CONST(defoutext, ".mjo");
 MSTR_CONST(deferrext, ".mje");

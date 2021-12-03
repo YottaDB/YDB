@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2018 Fidelity National Information	*
+ * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,10 +35,9 @@ boolean_t mu_upgrd_dngrd_confirmed(void)
 	mval		dummy, *input_line;
 
 	util_out_print("!AD", TRUE, LEN_AND_LIT("You must have a backup before you proceed!!"));
-	util_out_print("!AD", TRUE, LEN_AND_LIT("An abnormal termination will damage the database during the operation !!"));
+	util_out_print("!AD", TRUE, LEN_AND_LIT("An abnormal termination may damage the database files during the operation !!"));
 	util_out_print("!_!_!AD", TRUE, LEN_AND_LIT(CONTINUEMSG));
 	input_line = push_mval(&dummy);
-
 	op_read(input_line, (mval *)&literal_notimeout);
 	if (!input_line->str.len)
 		return FALSE;

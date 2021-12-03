@@ -42,6 +42,19 @@ GBLREF	unsigned int	t_tries;
 GBLREF	boolean_t	tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
 #endif
 
+/* This is not the ideal place to put this */
+static inline cw_set_element *get_new_free_cw_set_element(buddy_list *list) /* 4SCA allocator specific to cw_set_element */
+{
+	cw_set_element *p;
+
+	assert(0 < list->elemSize);
+	assert(sizeof(cw_set_element) <= (size_t)(list->elemSize));
+	p = (cw_set_element *) get_new_free_element(list);
+	assert(p);
+
+	return p;
+}
+
 void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 {
 	cw_set_element	*cse, *old_cse;
@@ -97,9 +110,11 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 					 * any changes in one should be reflected in the other */
 					horiz_growth = TRUE;
 					old_cse = cse;
-					cse = (cw_set_element *)get_new_free_element(sgm_info_ptr->tlvl_cw_set_list);
+					assert(SIZEOF(*cse) <= sgm_info_ptr->tlvl_cw_set_list->elemSize);
+					cse = (cw_set_element *)get_new_free_cw_set_element(sgm_info_ptr->tlvl_cw_set_list);
 					assert(NULL != cse);
-					memcpy(cse, old_cse, SIZEOF(cw_set_element));
+					assert(SIZEOF(*cse) >= SIZEOF(cw_set_element)); /* trying tautology 4CSA */
+					memcpy(cse, old_cse, sizeof(*cse));
 					cse->low_tlevel = old_cse;
 					cse->high_tlevel = NULL;
 					old_cse->high_tlevel = cse;

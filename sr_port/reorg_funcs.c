@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2020 Fidelity National Information	*
+ * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,19 +31,9 @@
 #include "util.h"
 #include "min_max.h"
 
+GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;
 GBLREF 	sgmnt_data_ptr_t 	cs_data;
 GBLREF	unsigned int		t_tries;
-
-#ifdef DEBUG
-# define DBG_VERIFY_ACCESS(PTR)				\
-{	/* Ensure accessible pointer (no SIG-11) */	\
-	unsigned char	c;				\
-							\
-	c = *(unsigned char *)(PTR);			\
-}
-#else
-# define DBG_VERIFY_ACCESS(PTR)
-#endif
 
 /*
  *	Get length of the global variable name contained in the key starting at KEY_BASE.
@@ -113,7 +103,7 @@ int get_cmpc(sm_uc_ptr_t first_key, sm_uc_ptr_t second_key)
 	 * we return an indeterminate value between the key length and MAX_KEY_SZ. The value depends on the garbage bytes past the
 	 * terminating null bytes. But we don't care because we don't compress a key off an identical key in the final retry.
 	 */
-	assert(first_key != second_key);
+	assert((first_key != second_key) || mu_reorg_upgrd_dwngrd_in_prog);
 	for (rPtr1 = first_key, rPtr2 = second_key, cmpc = 0; cmpc < MAX_KEY_SZ; cmpc++)
 	{
 		if (*rPtr1++ != *rPtr2++)

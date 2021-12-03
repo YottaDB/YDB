@@ -113,7 +113,6 @@ MBSTART {												\
 error_def(ERR_BUFOWNERSTUCK);
 error_def(ERR_CRYPTBADCONFIG);
 error_def(ERR_DBFILERR);
-error_def(ERR_DYNUPGRDFAIL);
 error_def(ERR_GVPUTFAIL);
 
 /**
@@ -517,22 +516,6 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					TREF(block_now_locked) = NULL;
 					assert(-1 <= cr->read_in_progress);
 					assert(was_crit == csa->now_crit);
-					if (ERR_DYNUPGRDFAIL == status)
-					{	/* if we don't hold crit on the region, it is possible due to concurrency conflicts
-						 * that this block is unused (i.e. marked free/recycled in bitmap, see comments in
-						 * gds_blk_upgrade.h). in this case we should not error out but instead restart.
-						 */
-						if (was_crit)
-						{
-							assert(FALSE);
-							RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_DYNUPGRDFAIL, 3, &blk,
-								DB_LEN_STR(gv_cur_region));
-						} else
-						{
-							rdfail_detail = cdb_sc_lostcr;
-							return (sm_uc_ptr_t)NULL;
-						}
-					}
 					if ((-1 == status) && !was_crit)
 					{	/* LSEEKREAD and, consequently, dsk_read return -1 in case pread is unable to fetch
 						 * a full database block's length of data. This can happen if the requested read is

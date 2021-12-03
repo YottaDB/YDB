@@ -12,9 +12,7 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
 #include "mdef.h"
-
 #include "gtm_fcntl.h"
 #include "gtm_stat.h"
 #include "gtm_unistd.h"
@@ -25,7 +23,6 @@
 #include "gtm_stdlib.h"
 #include "gtm_tempnam.h"
 #include "gtm_time.h"
-
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
@@ -86,19 +83,20 @@
 #include "repl_sem.h"
 #include "gtm_sem.h"
 #include "anticipatory_freeze.h"
-
 #define PATH_DELIM		'/'
+<<<<<<< HEAD
 /* Note: Use %08x for process_id in the format string below to ensure we have 8 hex digits always irrespective of the
  * actual value of process_id. Makes the length deterministic instead of %x which would
  * make the length dependent on the process_id and makes it harder for testing as well as the user.
  */
 #define	TEMP_FILE_FMT_STRING	"%.*s/%.*s_%08x_XXXXXX"
 
+=======
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 #define TMPDIR_ACCESS_MODE	(R_OK | W_OK | X_OK)
 
 GBLDEF  boolean_t	backup_started;
 GBLDEF  boolean_t	backup_interrupted;
-
 GBLREF 	bool		record;
 GBLREF 	bool		error_mupip;
 GBLREF 	bool		file_backed_up;
@@ -127,7 +125,6 @@ GBLREF	gd_addr		*gd_header;
 #ifdef DEBUG
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 #endif
-
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	backup_reg_list		*mu_repl_inst_reg_list;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
@@ -135,9 +132,15 @@ GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	int			pool_init;
+<<<<<<< HEAD
+=======
+LITREF char             gtm_release_name[];
+LITREF int4             gtm_release_name_len;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 error_def(ERR_BACKUPCTRL);
 error_def(ERR_BACKUPKILLIP);
+error_def(ERR_BKUPRETRY);
 error_def(ERR_BKUPRUNNING);
 error_def(ERR_NOMORESEMCNT);
 error_def(ERR_DBCCERR);
@@ -173,6 +176,12 @@ error_def(ERR_REPLSTATEERR);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_FILENAMETOOLONG);
+error_def(ERR_BACKUPSUCCESS);
+error_def(ERR_BACKUPFAIL);
+error_def(ERR_DIRACCESS);
+error_def(ERR_BACKUPREPL);
+error_def(ERR_BACKUPSEQNO);
+error_def(ERR_CMDERR);
 ZOS_ONLY(error_def(ERR_BADTAG);)
 
 static char	* const jnl_parms[] =
@@ -240,8 +249,13 @@ void mupip_backup(void)
 	char			tempfilename[MAX_FN_LEN + 1], *tempfilename2, *getcwd_res;
 	char			tempdir_full_buffer[MAX_FN_LEN + 1];
 	char			*jnl_str_ptr, jnl_str[256], entry[256], prev_jnl_fn[JNL_NAME_SIZE];
+<<<<<<< HEAD
 	int			index, jnl_fstat;
 	mstr			tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
+=======
+	int			index, jnl_fstat, attemptcnt, maxretry;
+	mstr			tempdir_log, tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	uint4			jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status;
 	boolean_t		jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE}, save_no_prev_link;
 	jnl_private_control	*jpc;
@@ -249,7 +263,7 @@ void mupip_backup(void)
 	jnl_tm_t		save_gbl_jrec_time;
 	gd_region		*r_save, *reg;
 	int			sync_io_status;
-	boolean_t		sync_io, sync_io_specified;
+	boolean_t		sync_io, sync_io_specified, showprogress;
 	boolean_t		dummy_ftok_counter_halted;
 	void			*repl_inst_available;
 	struct stat		stat_buf;
@@ -327,6 +341,7 @@ void mupip_backup(void)
 	}
 	online = (TRUE != cli_negated("ONLINE"));
 	record = (CLI_PRESENT == cli_present("RECORD"));
+	showprogress = (CLI_PRESENT == cli_present("SHOWPROGRESS"));
 	newjnlfiles_specified = FALSE;
 	newjnlfiles = TRUE;	/* by default */
 	keep_prev_link = TRUE;
@@ -405,7 +420,7 @@ void mupip_backup(void)
 	if (error_mupip)
 	{
 		mubclnup(NULL, need_to_free_space);
-		util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_BACKUPFAIL);
 		mupip_exit(ERR_MUNOACTION);
 	}
 	if (mu_ctrly_occurred || mu_ctrlc_occurred)
@@ -495,7 +510,7 @@ void mupip_backup(void)
 	if (TRUE == error_mupip)
 	{
 		mubclnup(NULL, need_to_free_space);
-		util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_BACKUPFAIL);
 		mupip_exit(ERR_MUNOACTION);
 	}
 	/* =========================== STEP 3. Verify the regions and grab_crit()/freeze them ============ */
@@ -669,14 +684,14 @@ void mupip_backup(void)
 				if ((NULL != tempdir_full.addr) && (0 != ACCESS(tempdir_full.addr, TMPDIR_ACCESS_MODE)))
 				{
 					status = errno;
-					util_out_print("!/Do not have full access to directory for temporary files: !AD", TRUE,
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DIRACCESS, 2,
 						tempdir_trans.len, tempdir_trans.addr);
 				} else
 					util_out_print("!/Cannot create the temporary file in directory !AD for online backup",
 						TRUE, tempdir_trans.len, tempdir_trans.addr);
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) status);
 				SET_ERROR_CONDITION(status);	/* sets "error_condition" & "severity" */
-				util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_BACKUPFAIL);
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(status);
 			}
@@ -698,7 +713,7 @@ void mupip_backup(void)
 				util_out_print("!/Error re-opening temporary file created by mkstemp()!/", TRUE);
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) status);
 				SET_ERROR_CONDITION(status);	/* sets "error_condition" & "severity" */
-				util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_BACKUPFAIL);
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(status);
 			}
@@ -742,7 +757,7 @@ void mupip_backup(void)
 				status = errno;
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) status);
 				SET_ERROR_CONDITION(status);	/* sets "error_condition" & "severity" */
-				util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_BACKUPFAIL);
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(status);
 			}
@@ -1121,7 +1136,7 @@ repl_inst_bkup_done1:
 						errptr = (char *)STRERROR(save_errno);
 						util_out_print("system : !AZ", TRUE, errptr);
 					}
-					util_out_print("Error doing !AD", TRUE, cmdptr - command, command);
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_CMDERR, 2, cmdptr - command, command);
 					error_mupip = TRUE;
 					goto repl_inst_bkup_done2;
 				}
@@ -1187,11 +1202,9 @@ repl_inst_bkup_done2:
 			}
 			if (!error_mupip)
 			{
-				util_out_print("Replication Instance file !AD backed up in file !AD", TRUE,
-					LEN_AND_STR(udi->fn),
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BACKUPREPL, 4, LEN_AND_STR(udi->fn),
 					mu_repl_inst_reg_list->backup_file.len, mu_repl_inst_reg_list->backup_file.addr);
-				util_out_print("Journal Seqnos up to 0x!16@XQ are backed up.", TRUE, &jnl_seqno);
-				util_out_print("", TRUE);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_BACKUPSEQNO, 1, &jnl_seqno);
 			} else
 				util_out_print("Error backing up replication instance file !AD. Moving on to other backups.",
 					TRUE, LEN_AND_STR(udi->fn));
@@ -1503,6 +1516,11 @@ repl_inst_bkup_done2:
 					LEN_AND_STR(jnl_state_lit[rptr->backup_hdr->jnl_state]));
 		}
 		ENABLE_AST
+		/* Set maxretry */
+		if (CLI_PRESENT == cli_present("RETRY"))
+			cli_get_int("RETRY", &maxretry);
+		else
+			maxretry = 1;
 		for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
 		{
 			if (rptr->not_this_time > keep_going)
@@ -1518,16 +1536,35 @@ repl_inst_bkup_done2:
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DBROLLEDBACK);
 				break;
 			}
-			result = (incremental ? mubinccpy(rptr) : mubfilcpy(rptr));
-			if (FALSE == result)
+
+			/* If we are doing a timestamp, this is point we take as the date of the backup */
+			if (record)
 			{
-				if (file_backed_up)
-					util_out_print("Files backed up before above error are OK.", TRUE);
-				error_mupip = TRUE;
-				break;
+				rptr->backup_hdr->last_start_backup = (gtm_timet) time(NULL);
 			}
-			if (mu_ctrly_occurred || mu_ctrlc_occurred)
-				break;
+			for (attemptcnt = 1; (attemptcnt <= maxretry) ; attemptcnt++)
+			{
+				if (1 < attemptcnt)
+				{
+					gtm_putmsg_csa(CSA_ARG(REG2CSA(rptr->reg)) VARLSTCNT(8) ERR_BKUPRETRY, 6,
+					REG_LEN_STR(gv_cur_region), DB_LEN_STR(gv_cur_region), attemptcnt, maxretry);
+				}
+				result = (incremental ? mubinccpy(rptr) : mubfilcpy(rptr, showprogress, attemptcnt));
+				if (result)
+					break;
+
+				if ((FALSE == result) && (attemptcnt == maxretry))
+				{
+					if (file_backed_up)
+						util_out_print("Files backed up before above error are OK.", TRUE);
+					error_mupip = TRUE; /* retry attempts exhausted without success. */
+					break;
+				}
+				if (mu_ctrlc_occurred)
+					break;
+			}
+			if (TRUE == error_mupip)
+				break; /* break out of outer for loop */
 		}
 	} else
 	{
@@ -1545,7 +1582,7 @@ repl_inst_bkup_done2:
 	} else if (TRUE == error_mupip)
 		ret = ERR_MUNOFINISH;
 	else
-		util_out_print("!/!/BACKUP COMPLETED.!/", TRUE);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_BACKUPSUCCESS);
 	gv_cur_region = NULL;
 	mupip_exit(ret);
 }

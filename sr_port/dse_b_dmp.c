@@ -33,6 +33,7 @@
 #include "dse.h"
 #include "util.h"
 #include "eintr_wrappers.h"
+#include "filestruct.h"
 
 /* Include prototypes */
 #include "t_qread.h"
@@ -45,6 +46,7 @@
 GBLREF gd_region	*gv_cur_region;
 GBLREF int		patch_is_fdmp, patch_rec_counter;
 GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF VSIG_ATOMIC_T	util_interrupt;
 
 LITREF char		*gtm_dbversion_table[];
@@ -52,6 +54,13 @@ LITREF char		*gtm_dbversion_table[];
 error_def(ERR_BITMAPSBAD);
 error_def(ERR_CTRLC);
 error_def(ERR_DSEBLKRDFAIL);
+
+#ifdef DEBUG
+/* Debug GT.M versions support the ability to decode a block image. This capability is useful to
+ * display PBLKs from journal extracts. See test commit PBLK2 for more information on how to use
+ * this debug-only feature. */
+#define CAN_USE_IMAGE
+#endif
 
 boolean_t dse_b_dmp(void)
 {
@@ -92,7 +101,7 @@ boolean_t dse_b_dmp(void)
 			return FALSE;
 	} else
 		count = 1;
-#ifdef DEBUG
+#ifdef CAN_USE_IMAGE
 	if (CLI_PRESENT == cli_present("IMAGE"))
 	{
 		if (FALSE == cli_get_str("IMAGE", image_fn, &image_fn_len))
@@ -134,7 +143,7 @@ boolean_t dse_b_dmp(void)
 			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 		}
-#ifdef DEBUG
+#ifdef CAN_USE_IMAGE
 		else if (use_image)
 			util_out_print("Dumping contents of !AD", TRUE, image_fn_len, image_fn);
 #endif
@@ -163,15 +172,14 @@ boolean_t dse_b_dmp(void)
 				memcpy(&util_buff[util_len], "   Level !UL   TN ", 18);
 				util_len += 18;
 				util_len += i2hexl_nofill(((blk_hdr_ptr_t)bp)->tn, &util_buff[util_len], MAX_HEX_INT8);
-				memcpy(&util_buff[util_len], " ", 1);
-				util_len++;
-#ifdef DEBUG
+				memcpy(&util_buff[util_len++], " ", 1);
+#ifdef CAN_USE_IMAGE
 				if (use_image)
 					ondsk_blkver = ((blk_hdr_ptr_t)bp)->bver;
 				else
 #endif
 				ondsk_blkver = (0 < ((blk_hdr_ptr_t)bp)->bsiz) ?
-						((blk_hdr_ptr_t)bp)->bver : cs_addrs->hdr->desired_db_format;
+					((blk_hdr_ptr_t)bp)->bver : cs_addrs->hdr->desired_db_format;
 				len = STRLEN(gtm_dbversion_table[ondsk_blkver]);
 				memcpy(&util_buff[util_len], gtm_dbversion_table[ondsk_blkver], len);
 				util_len += len;

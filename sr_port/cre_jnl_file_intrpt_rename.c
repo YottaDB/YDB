@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -29,6 +29,25 @@
 #include "jnl.h"
 #include "send_msg.h"
 #include "gtmimagename.h"
+
+#define EXT_NEW_TIME 30
+
+/* GTM-9443 - A process that detects a temporary journal file, waits for a short
+ * period of time, in order to check if its presence persists before deleting/renaming it.
+ */
+#define WAIT_FOR_EXT_NEW(FILESTR, USTATUS)                                                              \
+{                                                                                                       \
+	int		lcnt;                                                                           \
+                                                                                                        \
+	for (lcnt = EXT_NEW_TIME; lcnt; lcnt--)                                                         \
+	{                                                                                               \
+		SHORT_SLEEP(lcnt);                                                                      \
+		if (FILE_PRESENT != gtm_file_stat(FILESTR, NULL, NULL, FALSE, USTATUS))                 \
+		{	/* Leave cre_jnl_file_intrpt_rename() when the EXT_NEW file doesn't persist */  \
+			return;                                                                         \
+		}                                                                                       \
+	}                                                                                               \
+}
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	boolean_t	is_src_server;
@@ -101,6 +120,7 @@ uint4	cre_jnl_file_intrpt_rename(sgmnt_addrs *csa)
 		 */
 		if (FILE_PRESENT == status2)
 		{
+			WAIT_FOR_EXT_NEW(&filestr, &ustatus);
 			status = gtm_rename(filestr.addr, (int)filestr.len, (char *)fn, fn_len, &ustatus);
 			if (SYSCALL_ERROR(status))
 			{
@@ -122,10 +142,15 @@ uint4	cre_jnl_file_intrpt_rename(sgmnt_addrs *csa)
 	} else
 	{	/* mumps.mjl is present. This means STEP4 did not yet execute. */
 		if (FILE_PRESENT == status2)
+<<<<<<< HEAD
 		{	/* mumps.mjl_%YGTM is present. This means STEP2 is done. But since STEP4 is not yet done
 			 * we do not know if STEP3 (filling jnl file header with valid data) happened completely so
 			 * just discard this file. It will be re-created by the next process attempting the switch.
 			 */
+=======
+		{
+			WAIT_FOR_EXT_NEW(&filestr, &ustatus);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 			status = gtm_file_remove(filestr.addr, (int)filestr.len, &ustatus);
 			if (SYSCALL_ERROR(status))
 			{

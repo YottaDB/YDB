@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,7 @@
 #include <errno.h>
 #include "gtm_stat.h"
 #include "gtm_string.h"
+#include "gtm_unistd.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -38,11 +39,22 @@ GBLREF	backup_reg_list	*mu_repl_inst_reg_list;
 GBLREF 	boolean_t	is_directory;
 GBLREF 	mstr		directory;
 
+#define	SET_BACKUP_FILE_LIST(BACKUPFILE, FULLPATH, LEN)		\
+{								\
+	BACKUPFILE.len = LEN;					\
+	BACKUPFILE.addr = (char *)malloc(LEN + 1);		\
+	assert(NULL != BACKUPFILE.addr);			\
+	memcpy(BACKUPFILE.addr, FULLPATH, LEN);			\
+	*(BACKUPFILE.addr + LEN) = 0;				\
+}
+
 boolean_t mubgetfil(backup_reg_list *list, char *name, unsigned short len)
 {
-	char		tcp[5], temp;
+	char		tcp[5], temp, fullpath[GTM_PATH_MAX];
+	uint4		fullpathlen, status;
 	int		stat_res;
 	struct stat	stat_buf;
+	boolean_t	newfile = FALSE;
 
 	if (0 == len)
 		return FALSE;
@@ -52,9 +64,7 @@ boolean_t mubgetfil(backup_reg_list *list, char *name, unsigned short len)
 		{
 			len -= 1;
 			list->backup_to = backup_to_exec;
-			list->backup_file.len = len;
-			list->backup_file.addr = (char *)malloc(len + 1);
-			memcpy(list->backup_file.addr, name + 1, len);
+			SET_BACKUP_FILE_LIST(list->backup_file, name + 1, len);
 			return TRUE;
 		}
 		if (len > 5)
@@ -70,17 +80,15 @@ boolean_t mubgetfil(backup_reg_list *list, char *name, unsigned short len)
 					len--;
 					name++;
 				}
-				list->backup_file.len = len;
-				list->backup_file.addr = (char *)malloc(len + 1);
-				memcpy(list->backup_file.addr, name, len);
-				*(list->backup_file.addr + len) = 0;
+				SET_BACKUP_FILE_LIST(list->backup_file, name, len);
 				return TRUE;
 			}
 		}
 	}
 	temp = name[len];
-	name[len] = 0;
+	name[len] = '\0';
 	STAT_FILE(name, &stat_buf, stat_res);
+	get_full_path(name, len, fullpath, &fullpathlen, GTM_PATH_MAX, &status);
 	if (-1 == stat_res)
 	{
 		if (errno != ENOENT)
@@ -89,28 +97,21 @@ boolean_t mubgetfil(backup_reg_list *list, char *name, unsigned short len)
 			mupip_exit(errno);
 		} else
 		{	/* new file */
-			list->backup_file.len = len;
-			list->backup_file.addr = (char *)malloc(len + 1);
-			memcpy(list->backup_file.addr, name, len);
-			*(list->backup_file.addr + len) = 0;
+			SET_BACKUP_FILE_LIST(list->backup_file, fullpath, fullpathlen);
 		}
 	} else if (S_ISDIR(stat_buf.st_mode))
 	{
+		assert(!newfile);
 		if (!is_directory)
 		{
 			is_directory = TRUE;
-			directory.len = len;
-			directory.addr = (char *)malloc(len + 1);
-			memcpy(directory.addr, name, len);
-			*(directory.addr + len) = 0;
+			SET_BACKUP_FILE_LIST(directory, fullpath, fullpathlen);
 		}
-		mubexpfilnam(name, len, list);
+		mubexpfilnam(fullpath, fullpathlen, list);
 	} else
-	{	/* the file already exists */
-		list->backup_file.len = len;
-		list->backup_file.addr = (char *)malloc(len + 1);
-		memcpy(list->backup_file.addr, name, len);
-		*(list->backup_file.addr + len) = 0;
+	{	/* The file already exists. */
+		assert(!newfile);
+		SET_BACKUP_FILE_LIST(list->backup_file, fullpath, fullpathlen)
 	}
 	name[len] = temp;
 	return TRUE;

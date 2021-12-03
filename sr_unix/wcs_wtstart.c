@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -570,13 +570,12 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				bp = (blk_hdr_ptr_t)reformat_buffer;
 				size = (((v15_blk_hdr_ptr_t)bp)->bsiz + 1) & ~1;
 			}
-			else DEBUG_ONLY(if ((GDSV7 == csr->ondsk_blkver) || (GDSV6 == csr->ondsk_blkver)))
+			else DEBUG_ONLY(if ((GDSV7 >= csr->ondsk_blkver) && (GDSV6 <= csr->ondsk_blkver)))
 				size = (bp->bsiz + 1) & ~1;
 #			ifdef DEBUG
 			else
 			{
-				assert(IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver) || (GDSV7 == csr->ondsk_blkver)
-						|| (GDSV6 == csr->ondsk_blkver));
+				assert((GDSV7 >= csr->ondsk_blkver) && (GDSV6 <= csr->ondsk_blkver));
 			}
 #			endif
 			if (csd->write_fullblk)

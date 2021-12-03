@@ -42,12 +42,17 @@
 #include "indir_enum.h"
 #include "min_max.h"
 
-GBLREF	d_socket_struct		*socket_pool, *newdsocket;
-GBLREF	io_pair			io_std_device;	/* standard device */
 GBLREF	boolean_t		gtm_utf8_mode;
+<<<<<<< HEAD
 GBLREF	uint4			ydb_max_sockets;
 GBLREF	boolean_t		dollar_zininterrupt;
+=======
+GBLREF	d_socket_struct		*socket_pool, *newdsocket;
+GBLREF	int4			gtm_max_sockets;
+GBLREF	io_pair			io_std_device;	/* standard device */
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 GBLREF	UConverter		*chset_desc[];
+GBLREF	volatile boolean_t	dollar_zininterrupt;
 
 LITREF 	unsigned char		io_params_size[];
 LITREF	mstr			chset_names[];
@@ -60,12 +65,10 @@ error_def(ERR_DELIMSIZNA);
 error_def(ERR_DELIMWIDTH);
 error_def(ERR_DEVPARINAP);
 error_def(ERR_DEVPARMNEG);
-error_def(ERR_GETNAMEINFO);
 error_def(ERR_ILLESOCKBFSIZE);
 error_def(ERR_MRTMAXEXCEEDED);
 error_def(ERR_SOCKETEXIST);
 error_def(ERR_SOCKMAX);
-error_def(ERR_TEXT);
 error_def(ERR_ZFF2MANY);
 error_def(ERR_ZINTRECURSEIO);
 

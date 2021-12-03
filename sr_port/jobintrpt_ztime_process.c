@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -41,47 +41,48 @@
 #include "op_merge.h"
 #include "zwrite.h"
 #include "zshow.h"
+#include "ztimeout_routines.h"
 
-GBLREF stack_frame		*frame_pointer, *error_frame;
-GBLREF unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
-GBLREF spdesc			stringpool;
-GBLREF mval			dollar_zinterrupt;
-GBLREF boolean_t		dollar_zininterrupt;
-GBLREF unsigned short		proc_act_type;
-GBLREF mv_stent			*mv_chain;
-GBLREF int			dollar_truth;
-GBLREF mstr			extnam_str;
-GBLREF unsigned char		*restart_pc, *restart_ctxt;
 GBLREF dollar_ecode_type	dollar_ecode;
 GBLREF dollar_stack_type	dollar_stack;
+GBLREF int			dollar_truth;
+GBLREF mstr			extnam_str;
+GBLREF mval			dollar_zinterrupt;
+GBLREF mv_stent		*mv_chain;
+GBLREF spdesc			stringpool;
+GBLREF stack_frame		*frame_pointer, *error_frame;
+GBLREF unsigned short		proc_act_type;
+GBLREF unsigned char		*msp, *restart_ctxt, *restart_pc, *stackbase, *stacktop, *stackwarn;
+GBLREF volatile boolean_t	dollar_zininterrupt;
 
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
 
-void jobinterrupt_process(void)
+void jobintrpt_ztime_process(boolean_t ztime)
 {
 	mv_stent	*mv_st_ent;
+	DCL_THREADGBL_ACCESS;
 
-	assert(dollar_zininterrupt);
-	/* Compile and push new (counted) frame onto the stack to drive the
-	 * $zinterrupt handler.
-	 */
-	assert((SFT_COUNT | SFT_ZINTR) == proc_act_type);
-	op_commarg(&dollar_zinterrupt, indir_linetail);
+	SETUP_THREADGBL_ACCESS;
+	assert(ztime || dollar_zininterrupt);
+	/* Compile and push new (counted) frame onto the stack to drive the $zinterrupt handler */
+	assert(((ztime ? SFT_ZTIMEOUT : SFT_ZINTR) | SFT_COUNT) == proc_act_type);
+	op_commarg((ztime ? (mval *)&(TREF(dollar_ztimeout)) : (mval *)&dollar_zinterrupt), indir_linetail);
 	frame_pointer->type = proc_act_type;	/* The mark of zorro.. */
 	proc_act_type = 0;
 	/* Now we need to preserve our current environment. This MVST_ZINTR mv_stent type will hold
-	 * the items deemed necessary to preserve. All other items are the user's responsibility.
+	 * the items deemed necessary to preserve. All other items are the application's responsibility.
 	 *
 	 * Initialize the mv_stent elements processed by stp_gcol which can be called for either the
 	 * op_gvsavtarg() or extnam items. This initialization keeps stp_gcol from attempting to
 	 * process unset fields with garbage in them as valid mstr address/length pairs.
 	 */
-	PUSH_MV_STENT(MVST_ZINTR);
+	PUSH_MV_STENT(MVST_ZINTR);	/* MVST_ZTIMEOUT is identical to MVST_ZINTR with a flag to differentiate in debugging */
 	mv_st_ent = mv_chain;
 	mv_st_ent->mv_st_cont.mvs_zintr.savtarg.str.len = 0;
 	mv_st_ent->mv_st_cont.mvs_zintr.savextref.len = 0;
 	mv_st_ent->mv_st_cont.mvs_zintr.saved_dollar_truth = dollar_truth;
+	mv_st_ent->mv_st_cont.mvs_zintr.ztimeout = FALSE;
 	op_gvsavtarg(&mv_st_ent->mv_st_cont.mvs_zintr.savtarg);
 	if (extnam_str.len)
 	{

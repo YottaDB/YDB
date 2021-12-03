@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -27,24 +27,30 @@
 #include "gtm_string.h"
 #include "gtmmsg.h"
 #include "jobinterrupt_process_cleanup.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
+#include "deferred_events.h"
 
-GBLREF stack_frame		*frame_pointer;
+GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
+GBLREF mval			dollar_zstatus;
 GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
 GBLREF unsigned short		proc_act_type;
-GBLREF volatile boolean_t	dollar_zininterrupt;
-GBLREF mval			dollar_zstatus;
+GBLREF stack_frame		*frame_pointer;
 GBLREF dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
+GBLREF volatile boolean_t	dollar_zininterrupt;
+GBLREF volatile int4		outofband;
 
 error_def(ERR_ERRWZINTR);
 
 /* Counterpart to trans_code_cleanup for job interrupt errors */
 void jobinterrupt_process_cleanup(void)
 {
+	int		zstlen;
+	int4		event_type;
+	mstr            msgbuff;
 	stack_frame	*fp;
 	unsigned char	msgbuf[OUT_BUFF_SIZE], *mbptr;
 	unsigned char	*zstptr;
-	mstr		msgbuff;
-	int		zstlen;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -91,4 +97,7 @@ void jobinterrupt_process_cleanup(void)
 	{	/* Was a direct mode frame this message needs to go out to the console */
 		dec_err(VARLSTCNT(1) ERR_ERRWZINTR);
 	}
+	event_type = no_event;
+	if ((0 == dollar_ecode.index) || !(ETRAP_IN_EFFECT))
+		TRY_EVENT_POP;			/* leaving interrupt and not in error handling, so check for pending timed events */
 }

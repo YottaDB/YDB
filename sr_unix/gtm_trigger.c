@@ -710,7 +710,22 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		op_gvrectarg(&mv_st_ent->mv_st_cont.mvs_trigr.savtarg);
 		extnam_str.len = mv_st_ent->mv_st_cont.mvs_trigr.savextref.len;
 		if (extnam_str.len)
+		{
+			assert(0 < extnam_str.len);
+			/* It should be safe to free extnam_str.addr, which always looks to come from malloc(), and explicitly
+			   and visibly malloc to the correct len here */
+#ifdef STATIC_ANALYSIS
+			free(extnam_str.addr);
+			extnam_str.addr = (char *) malloc(extnam_str.len);
+#endif
+			assert(extnam_str.addr);
+			assert(mv_st_ent->mv_st_cont.mvs_trigr.savextref.addr);
 			memcpy(extnam_str.addr, mv_st_ent->mv_st_cont.mvs_trigr.savextref.addr, extnam_str.len);
+<<<<<<< HEAD
+=======
+		}
+		mumps_status = 0;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 		assert(run_time);
 		/* Note we do not reset the handlers for parallel triggers - set one time only when enter first level
 		 * trigger. After that, whatever happens in trigger world, stays in trigger world.

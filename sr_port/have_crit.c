@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,13 +86,6 @@ uint4 have_crit(uint4 crit_state)
 					if (csa->now_crit && (crit_state & CRIT_HAVE_ANY_REG))
 					{
 						crit_reg_cnt++;
-						/* It is possible that if DSE has done a CRIT REMOVE and stolen our crit, it
-						 * could be given to someone else which would cause this test to fail. The
-						 * current thinking is that the state DSE put this process is no longer viable
-						 * and it should die at the earliest opportunity, there being no way to know if
-						 * that is what happened anyway.
-						 */
-						assertpro(csa->nl->in_crit == process_id);
 						/* If we are releasing (all) regions with critical section or if special
 						 * TP case, release if the cycle number doesn't match meaning this is a
 						 * region we should not hold crit in (even if it is part of tp_reg_list).
@@ -103,6 +96,19 @@ uint4 have_crit(uint4 crit_state)
 						{
 							assert(WBTEST_HOLD_CRIT_ENABLED);
 							assert(!csa->hold_onto_crit);
+							/* It is possible that if DSE has done a CRIT REMOVE and stolen our crit, it
+							 * could be given to someone else which would cause this test to fail. The
+							 * current thinking is that the state DSE put this process is no longer
+							 * viable and it should die at the earliest opportunity, there being no way
+							 * to know if that is what happened anyway. This assertpro used to proceed
+							 * this block, however we found that asynchronous calls by signal handling
+							 * logic occasionally intertupt the grab_crit logic between the time we
+							 * update csa->now_crit and the time we establish ownership in nl->in_crit.
+							 * Hence we restrict the assertpro to the case where we need to not be in
+							 * that interlude, as the handler logic does not change crit, but rather
+							 * only checks it, and deals with what it finds.
+							 */
+							assertpro(csa->nl->in_crit == process_id);
 							rel_crit(r_local);
 							send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_MUTEXRELEASED, 6, process_id,
 								     process_id,  DB_LEN_STR(r_local), dollar_tlevel, t_tries);

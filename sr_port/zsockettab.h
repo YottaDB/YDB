@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,6 +10,7 @@
  *								*
  ****************************************************************/
 /* Any changes here must be reflected in op_fnzsocket.c especially zsocket_indextab */
+ZSOCKETITEM("BLOCKING", zsocket_blocking, MV_STR, level_socket),
 ZSOCKETITEM("CURRENTINDEX", zsocket_currindex, MV_NM, level_socdev),
 ZSOCKETITEM("DELIMITER", zsocket_delimiter, MV_STR|MV_NM, level_socket),
 ZSOCKETITEM("DESCRIPTOR", zsocket_descriptor, MV_NM, level_socket),

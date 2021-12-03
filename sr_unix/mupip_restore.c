@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -99,6 +99,7 @@ error_def(ERR_IOEOF);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_MUPRESTERR);
 error_def(ERR_TEXT);
+error_def(ERR_RESTORESUCCESS);
 
 STATICFNDCL	void	exec_read(BFILE *bf, char *buf, int nbytes);
 STATICFNDCL	void	tcp_read(BFILE *bf, char *buf, int nbytes);
@@ -743,7 +744,7 @@ void mupip_restore(void)
 				break;
 		}
 	}
-	util_out_print("!/RESTORE COMPLETED", TRUE);
+	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RESTORESUCCESS);
 	util_out_print("!UL blocks restored", TRUE, rest_blks);
 	CLNUP_AND_EXIT(SS_NORMAL, inbuf);
 }

@@ -281,10 +281,13 @@ boolean_t	tp_tend()
 	jnl_tm_t		save_gbl_jrec_time;
 	uint4			max_upd_num, prev_upd_num, upd_num, upd_num_end, upd_num_start;
 #	endif
+<<<<<<< HEAD
 	int4			tprestart_syslog_delta;
         int4			event_type, param_val;
 	block_id		pvt_total_blks;
         void (*set_fn)(int4 param);
+=======
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -334,8 +337,17 @@ boolean_t	tp_tend()
 		if ((WC_BLOCK_RECOVER ==  cnl->wc_blocked) || (is_mm && (pvt_total_blks != csd->trans_hist.total_blks)))
 		{	/* If blocked, or we have MM and file has been extended, force repair */
 			status = cdb_sc_helpedout; /* special status to prevent punishing altruism */
+<<<<<<< HEAD
 			assert((CDB_STAGNATE > t_tries) || !is_mm || (pvt_total_blks == csd->trans_hist.total_blks));
 			TP_TRACE_HIST(CR_BLKEMPTY, NULL);
+=======
+			assert((CDB_STAGNATE > t_tries) || !is_mm || (csa->total_blks == csd->trans_hist.total_blks));
+			if (IS_STATSDB_CSA(csa) && (NULL != si) && (NULL != si->first_tp_hist))
+			{	/* Report ^%YGS restart when the region is statsdb */
+				TP_TRACE_HIST(si->first_tp_hist->blk_num, si->first_tp_hist->blk_target);
+			} else
+				TP_TRACE_HIST(CR_BLKEMPTY, NULL);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 			goto failed_skip_revert;
 		}
 		/* Note that there are three ways a deadlock can occur.
@@ -1860,7 +1872,6 @@ failed:
 		 */
 		assert(jgbl.onlnrlbk || !release_crit || (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)));
 	}
-	CALL_ZTIMEOUT_IF_DEFERRED;
 	/* We have finished validation on this region. Reset transaction numbers in the gv_target
 	 * histories so they will be valid for a future access utilizing the clue field. This occurs
 	 * to improve performance (of next tn in case of commit of current tn) or the chances of commit
@@ -1985,8 +1996,9 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 		if ((gds_t_acquired != cse->mode) || (ROUND_DOWN2(cse->blk, BLKS_PER_LMAP) != bml))
 			continue;
 		assert(gds_t_acquired == cse->mode);
-		assert((GDSVCURR == cse->ondsk_blkver) || (BLK_ID_32_VER == cse->ondsk_blkver));
-		assert((GDSVCURR == cse->ondsk_blkver) || ((bml == (block_id_32)bml) && (total_blks == (block_id_32)total_blks)));
+		assert((GDSVCURR == cse->ondsk_blkver) || (BLK_ID_32_VER > cse->ondsk_blkver));
+		assert((GDSVCURR == cse->ondsk_blkver) || (GDSV7m == cse->ondsk_blkver)
+			|| ((bml == (block_id_32)bml) && (total_blks == (block_id_32)total_blks)));
 		assert(*b_ptr == (cse->blk - bml));
 		do
 		{
@@ -2062,7 +2074,7 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 				 */
 				cse->old_block = t_qread(cse->blk, (sm_int_ptr_t)&cse->cycle, &cse->cr);
 				/* should have been already initialized in t_write_map */
-				assert((GDSVCURR == cse->ondsk_blkver) || (BLK_ID_32_VER == cse->ondsk_blkver));
+				assert((GDSV7 >= cse->ondsk_blkver) || (BLK_ID_32_VER > cse->ondsk_blkver));
 				old_block = (blk_hdr_ptr_t)cse->old_block;
 				if (NULL == old_block)
 					return ((enum cdb_sc)rdfail_detail);

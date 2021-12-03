@@ -147,7 +147,12 @@ void mupip_reorg_encrypt(void)
 {
 	char			key[YDB_PATH_MAX], hash[GTMCRYPT_HASH_LEN];
 	char			*db_name, *bml_lcl_buff;
+<<<<<<< HEAD
 	int			db_name_len, gtmcrypt_errno, status, status1;
+=======
+	enum db_ver		dummy_blkver;		/*  used for dsk_read call in order to simplify a critical path */
+	int			db_name_len, gtmcrypt_errno, status, reg_status, status1;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	int			reg_count, i, cycle, lcnt, bml_status;
 	int4			blk_seg_cnt, blk_size, mapsize;	/* needed for BLK_INIT,BLK_SEG and BLK_FINI macros */
 	unsigned short		key_len;
@@ -550,7 +555,7 @@ void mupip_reorg_encrypt(void)
 					} else
 						buff = (sm_uc_ptr_t)(TREF(dio_buff)).aligned;
 					mu_reorg_encrypt_in_prog = MUPIP_REORG_IN_PROG_LOCAL_DSK_READ;
-					status1 = dsk_read(curblk, buff, NULL, FALSE);
+					status1 = dsk_read(curblk, buff, &dummy_blkver, FALSE);
 					mu_reorg_encrypt_in_prog = MUPIP_REORG_IN_PROG_TRUE;
 					if (SS_NORMAL != status1)
 					{

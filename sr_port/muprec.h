@@ -1,6 +1,6 @@
-/****************************************************************
+/***************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -751,6 +751,7 @@ typedef struct
 	int			extr_fn_len[TOT_EXTR_TYPES];
 	boolean_t		extr_fn_is_stdout[TOT_EXTR_TYPES];
 	boolean_t		extr_fn_is_devnull[TOT_EXTR_TYPES];
+	boolean_t		extr_fn_is_regfile[TOT_EXTR_TYPES];
 } mur_opt_struct;
 
 typedef struct onln_rlbk_reg_list_struct

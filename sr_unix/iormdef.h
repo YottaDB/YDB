@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -164,7 +164,7 @@ MBSTART {												\
 			SET_DOLLARDEVICE_ERRSTR(IOD, ONE_COMMA_UNAVAILABLE);				\
 		else											\
 			SET_DOLLARDEVICE_ONECOMMA_STRERROR(IOD, write_status);				\
-		IOD->dollar.za = 9;									\
+		IOD->dollar.za = ZA_IO_ERR;								\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) write_status);					\
 	}												\
 } MBEND

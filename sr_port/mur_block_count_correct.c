@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
@@ -69,6 +69,7 @@ int4 mur_block_count_correct(reg_ctl_list *rctl)
 	{
 		case dba_bg:
 		case dba_mm:
+			mu_data->free_space = BLK_ZERO_OFF(mu_data->start_vbn) - SIZEOF_FILE_HDR(mu_data);
 			mu_int_ovrhd = (int4)DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
 			break;
 		default:

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
@@ -44,7 +44,7 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 {
 	gv_namehead		*gvt, *gvt1;
 	int4			index;
-	int4			partial_size;
+	int4			partial_size = 0;
 	int4			gvn_size;
 	sgmnt_addrs		*csa;
 	ht_ent_mname		*tabent;
@@ -74,21 +74,42 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	 * gv_namehead structure are defined using MAX_BT_DEPTH macros and we want to guard against changes to this macro
 	 * that cause unintended changes to the layout/size of the gv_namehead structure.
 	 */
+<<<<<<< HEAD
 	GTM64_ONLY(
 		assert(OFFSETOF(gv_namehead, filler_8byte_align0[0]) + SIZEOF(gvt->filler_8byte_align0)
 				== OFFSETOF(gv_namehead, root));
 	)
 	assert(OFFSETOF(gv_namehead, filler_8byte_align1[0]) + SIZEOF(gvt->filler_8byte_align1)
 			== OFFSETOF(gv_namehead, last_split_blk_num[0]));
+=======
+	assert(SIZEOF(gvt->clue) == SIZEOF(gv_key));			/* gv_key_nobase should be the same size as gv_key */
+#	ifdef look_at_gv_namehead_offsets
+	printf("offseta: %d, offsetb: %d\n", (int)(SIZEOF(gv_namehead) - SIZEOF(gvt->clue)), (int)OFFSETOF(gv_namehead, clue));
+	printf("offsetc: %d, offsetd: %d\n", (int)(OFFSETOF(gv_namehead, filler_8byte_align0) + SIZEOF(gvt->filler_8byte_align0)),
+		(int)OFFSETOF(gv_namehead, root));
+	printf("offsete: %d, offsetf: %d\n", (int)(OFFSETOF(gv_namehead, filler_8byte_align1) + SIZEOF(gvt->filler_8byte_align1)),
+		(int)OFFSETOF(gv_namehead, last_split_blk_num));
+#	endif
+	assert(OFFSETOF(gv_namehead, clue) == SIZEOF(gv_namehead) - SIZEOF(gvt->clue));		/* check no padding after clue */
+	assert(OFFSETOF(gv_namehead, filler_8byte_align0) + SIZEOF(gvt->filler_8byte_align0) == OFFSETOF(gv_namehead, root));
+	assert(OFFSETOF(gv_namehead, filler_8byte_align1) + SIZEOF(gvt->filler_8byte_align1)
+		== OFFSETOF(gv_namehead, last_split_blk_num));
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 #	ifdef GTM_TRIGGER
-	assert(OFFSETOF(gv_namehead, last_split_blk_num[0]) + SIZEOF(gvt->last_split_blk_num)
-			== OFFSETOF(gv_namehead, gvt_trigger));
-	GTM64_ONLY(assert(OFFSETOF(gv_namehead, filler_8byte_align2) + SIZEOF(gvt->filler_8byte_align2)
-					+ SIZEOF(gvt->filler_clue_end_align)
-				== OFFSETOF(gv_namehead, clue));)
-	NON_GTM64_ONLY(assert(OFFSETOF(gv_namehead, trig_mismatch_test_done) + SIZEOF(gvt->trig_mismatch_test_done)
-					+ SIZEOF(gvt->filler_clue_end_align)
-				== OFFSETOF(gv_namehead, clue));)
+#	ifdef DEBUG
+	partial_size = SIZEOF(gvt->trig_mismatch_test_done) + SIZEOF(gvt->filler_clue_end_align);
+#	ifdef GTM64
+	partial_size += SIZEOF(gvt->filler_8byte_align2);
+#	endif
+#	endif
+#	ifdef look_at_gv_namehead_offsets
+	printf("offsetg: %d, offseth: %d\n", (int)(OFFSETOF(gv_namehead, last_split_blk_num) + SIZEOF(gvt->last_split_blk_num)),
+		(int)OFFSETOF(gv_namehead, gvt_trigger));
+	printf("offsetj: %d, offsetj: %d\n", (int)(OFFSETOF(gv_namehead, trig_mismatch_test_done) + partial_size),
+		(int)OFFSETOF(gv_namehead, clue));
+#	endif
+	assert(OFFSETOF(gv_namehead, last_split_blk_num) + SIZEOF(gvt->last_split_blk_num) == OFFSETOF(gv_namehead, gvt_trigger));
+	assert(OFFSETOF(gv_namehead, trig_mismatch_test_done) + partial_size == OFFSETOF(gv_namehead, clue));
 #	endif
 	csa = ((NULL != reg) && reg->open) ? &FILE_INFO(reg)->s_addrs : NULL;
 	gvt_hashtab_present = FALSE;
@@ -127,8 +148,6 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 		gvt->gvname.var_name.len = 0;
 		gvt->gvname.hash_code = 0;
 	}
-	assert(SIZEOF(gvt->clue) == SIZEOF(gv_key));			/* gv_key_nobase should be the same size as gv_key */
-	assert(OFFSETOF(gv_namehead, clue) == SIZEOF(gv_namehead) - SIZEOF(gvt->clue));		/* check no padding after clue */
 	gvt->first_rec = (gv_key *)((char *)&gvt->clue + SIZEOF(gv_key) + keysize);
 	gvt->last_rec = (gv_key *)((char *)gvt->first_rec + SIZEOF(gv_key) + keysize);
 	gvt->prev_key = NULL;

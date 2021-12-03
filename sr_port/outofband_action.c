@@ -19,25 +19,34 @@
 
 #include "io.h"
 #include "stack_frame.h"
+<<<<<<< HEAD
 #include "outofband.h"
 #include "libyottadb_int.h"
 #include "have_crit.h"
+=======
+#include "have_crit.h"
+#include "deferred_events_queue.h"
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
-GBLREF io_pair		io_std_device;
-GBLREF stack_frame	*frame_pointer;
-GBLREF unsigned char	*restart_ctxt, *restart_pc;
-GBLREF void             (*tp_timeout_action_ptr)(void);
-GBLREF volatile int4 	ctrap_action_is, outofband;
-GBLREF void		(*ztimeout_action_ptr)(void);
+GBLREF volatile boolean_t	dollar_zininterrupt;
+GBLREF io_pair			io_std_device;
+GBLREF stack_frame		*frame_pointer;
+GBLREF unsigned char		*restart_ctxt, *restart_pc;
+GBLREF void			(*tp_timeout_action_ptr)(void);
+GBLREF volatile int4		outofband;
+GBLREF void			(*ztimeout_action_ptr)(void);
 
 error_def(ERR_CTRAP);
 error_def(ERR_CTRLC);
-error_def(ERR_CTRLY);
 error_def(ERR_TERMHANGUP);
+error_def(ERR_TERMWRITE);
 error_def(ERR_JOBINTRRQST);
 
 void outofband_action(boolean_t lnfetch_or_start)
-{
+{	/* initates transfer of control using the condition handler mechanism expecting a catch by the mdeb_condition_handler */
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	if (outofband)
 	{
 		/* First check if a process terminating signal was deferred (that overloads "outofband" variable
@@ -64,6 +73,7 @@ void outofband_action(boolean_t lnfetch_or_start)
 		 */
 		switch(outofband)
 		{
+<<<<<<< HEAD
 			case (ctrly):		/* This signal is ignored in simpleAPI */
 				if (!(IS_SIMPLEAPI_MODE))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLY);
@@ -113,9 +123,32 @@ void outofband_action(boolean_t lnfetch_or_start)
 					(*ztimeout_action_ptr)();
 				else
 					outofband_clear();
+=======
+			case ctrlc:
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CTRLC);
+				break;
+			case ctrap:
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_CTRAP, 1, TAREF1(save_xfer_root, ctrap).param_val);
+				break;
+			case sighup:
+				TAREF1(save_xfer_root, sighup).event_state = pending;
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TERMHANGUP);
+				break;
+			case tptimeout:	/* following is basically an rts_error; function pointer is used for flexibility */
+				(*tp_timeout_action_ptr)();
+				break;
+			case jobinterrupt:
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBINTRRQST);
+				break;
+			case ztimeout: /* following is basically rts_error */
+				(*ztimeout_action_ptr)();
+>>>>>>> 52a92dfd (GT.M V7.0-001)
+				break;
+			case ttwriterr:
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_TERMWRITE, 0, TAREF1(save_xfer_root, ttwriterr).param_val);
 				break;
 			default:
-				assertpro(FALSE);
+				assertpro(FALSE && outofband);
 				break;
 		}
 	}

@@ -29,7 +29,8 @@
 #include "iosocketdef.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "gtm_netdb.h"
 #include "gtm_ipv6.h"
 #include "gtm_unistd.h"
@@ -40,7 +41,6 @@
 
 #define	ESTABLISHED	"ESTABLISHED"
 
-GBLREF	boolean_t		dollar_zininterrupt;
 GBLREF	d_socket_struct		*newdsocket;	/* in case jobinterrupt */
 GBLREF	int			socketus_interruptus;
 GBLREF	uint4			ydb_max_sockets;
@@ -48,8 +48,22 @@ GBLREF	mv_stent		*mv_chain;
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF	volatile int4		outofband;
+GBLREF	volatile boolean_t	dollar_zininterrupt;
 
+<<<<<<< HEAD
 boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t update_bufsiz)
+=======
+error_def(ERR_GETNAMEINFO);
+error_def(ERR_GETSOCKNAMERR);
+error_def(ERR_GETSOCKOPTERR);
+error_def(ERR_OPENCONN);
+error_def(ERR_SETSOCKOPTERR);
+error_def(ERR_SOCKINIT);
+error_def(ERR_TEXT);
+error_def(ERR_ZINTRECURSEIO);
+
+boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t update_bufsiz)
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 {
 	int		temp_1, flags, flags_orig, keepalive_opt;
 	char		*errptr;
@@ -471,7 +485,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 			SET_ERRPTR_AND_ERRLEN(save_errno, errptr, errlen);
 			if (dev_open == iod->state)
 			{
-				iod->dollar.za = 9;
+				iod->dollar.za = ZA_IO_ERR;
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(dsocketptr->iod, errptr, errlen);
 			}
 			if (sockptr->ioerror)
@@ -505,7 +519,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					close(sockptr->sd);
 					sockptr->sd = FD_INVALID;
 				}
-				outofband_action(FALSE);
+				async_action(FALSE);
 				assertpro(FALSE);
 			}
 			if (need_connect)
@@ -552,9 +566,15 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 			mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
 			socketus_interruptus++;
 			DBGSOCK((stdout, "socconn: mv_stent queued - endtime: %d/%d  interrupts: %d\n",
+<<<<<<< HEAD
 				 end_time.tv_sec, end_time.tv_nsec / NANOSECS_IN_USEC, socketus_interruptus));
 			outofband_action(FALSE);
 			assertpro(FALSE);      /* Should *never* return from outofband_action */
+=======
+				 end_time.at_sec, end_time.at_usec, socketus_interruptus));
+			async_action(FALSE);
+			assertpro(FALSE);      /* Should *never* return from async_action */
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 			return FALSE;   /* For the compiler.. */
 		}
 		hiber_start(100);

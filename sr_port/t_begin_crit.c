@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -40,7 +40,7 @@ GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			update_trans;
-GBLREF	boolean_t		write_after_image;
+GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog, write_after_image;
 GBLREF	volatile int4		fast_lock_count;
 
 void	t_begin_crit(uint4 err)	/* err - error code for current gvcst_routine */
@@ -65,9 +65,9 @@ void	t_begin_crit(uint4 err)	/* err - error code for current gvcst_routine */
 	if (non_tp_jfb_ptr)
 		non_tp_jfb_ptr->record_size = 0; /* re-initialize it to 0 since TOTAL_NONTPJNL_REC_SIZE macro uses it */
 	/* the only currently known callers of this routine are DSE and MUPIP RECOVER (mur_put_aimg_rec.c).
-	 * all of them set "write_after_image" to TRUE. hence the assert below.
+	 * they set "write_after_image" to TRUE. but mu_upgrade_bmm does not, hence the assert below.
 	 */
-	assert(write_after_image);
+	assert(write_after_image || mu_reorg_upgrd_dwngrd_in_prog);
 	update_trans = UPDTRNS_DB_UPDATED_MASK;
 	was_crit = cs_addrs->now_crit;
 	assert(!was_crit || cs_addrs->hold_onto_crit);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -31,7 +31,7 @@
 #include "subscript.h"
 #include "svnames.h"
 #include "mprof.h"
-#include "outofband.h"
+#include "deferred_events_queue.h"
 #include "op.h"
 #include "lv_val.h"		/* Needed for callg.h. */
 #include "callg.h"
@@ -50,8 +50,14 @@ STATICDEF boolean_t 		mdb_ch_set;			/* Indicates whether we can rely on mdb_cond
 STATICDEF gtm_uint64_t		child_system, child_user;	/* Store system and user CPU time for child processes. */
 STATICDEF gtm_uint64_t		process_system, process_user;	/* Store system and user CPU time for current process. */
 STATICDEF mstr			mprof_mstr;			/* Area to hold global and subscripts. */
+<<<<<<< HEAD
 STATICDEF boolean_t 		use_realtime_flag = FALSE;	/* Indicates whether clock_gettime is unable to use CLOCK_MONOTONIC
 								 * flag and so should use CLOCK_REALTIME instead. */
+=======
+#ifdef __osf__
+STATICDEF struct rusage		last_usage = {0, 0};		/* Contains the last value obtained via getrusage() on Tru64. */
+#endif
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 LITDEF  MIDENT_CONST(above_routine, "*above*");
 
@@ -109,18 +115,8 @@ STATICFNDCL void insert_total_times(boolean_t for_process);
 	(TREF(prof_fp))->rout_name = NULL;		\
 	(TREF(prof_fp))->label_name = NULL;
 
-/* Monotonic flag for clock_gettime() is defined differently on every platform. */
-#ifndef CLOCK_MONOTONIC
-#  ifdef __sparc
-#    define CLOCK_MONOTONIC CLOCK_HIGHRES
-#  else
-#    define CLOCK_MONOTONIC CLOCK_REALTIME
-#  endif
-#endif
-
 error_def(ERR_MAXNRSUBSCRIPTS);
 error_def(ERR_NOTGBL);
-error_def(ERR_STRUNXEOR);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_TRACINGON);
@@ -140,16 +136,10 @@ STATICFNDEF void times_usec(ext_tms *curr)
 	/* Also start recording the elapsed time. */
 	while (TRUE)
 	{
-		res = clock_gettime(use_realtime_flag ? CLOCK_REALTIME : CLOCK_MONOTONIC, &elp_time);
+		res = clock_gettime(CLOCK_MONOTONIC, &elp_time);
 		if (res == -1)
 		{
-			if ((EINVAL == errno) && !use_realtime_flag)
-			{
-				use_realtime_flag = TRUE;
-				continue;
-			} else
-				MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("clock_gettime"), CALLFROM, errno));
+			MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("clock_gettime"), CALLFROM, errno));
 		}
 		break;
 	}

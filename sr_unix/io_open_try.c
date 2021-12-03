@@ -40,7 +40,8 @@
 #include "eintr_wrappers.h"
 #include "mmemory.h"
 #include "gtm_caseconv.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "wake_alarm.h"
 #include "stringpool.h"
 #include "gtm_conv.h"
@@ -60,7 +61,7 @@ GBLREF	io_desc			*active_device;
 GBLREF	mstr			sys_input;
 GBLREF	mstr			sys_output;
 GBLREF	bool			out_of_time;
-GBLREF	int4			outofband;
+GBLREF	volatile int4		outofband;
 GBLREF	int4			write_filter;
 
 LITREF	mstr			chset_names[];
@@ -208,7 +209,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 					stat_err = TRUE;
 				}
 			}
-			else if (0 == memvcmp(tn.addr, tn.len, LIT_AND_LEN("/dev/null")))
+			else if (0 == memvcmp(tn.addr, tn.len, LIT_AND_LEN(DEVNULL)))
 				tl->iod->type = nl;
 			else
 			{
@@ -444,6 +445,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 			if (timed && (0 == nsec_timeout))
 				out_of_time = TRUE;
 			if (outofband)
+<<<<<<< HEAD
 			{
 				if (timed && !out_of_time)
 					cancel_timer(timer_id);
@@ -458,6 +460,62 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 			if ((ETXTBSY == errno) || (ENFILE == errno) || (EBUSY == errno) || ((mb == iod->type) && (ENXIO == errno)))
 				continue;
 			else
+=======
+				async_action(FALSE);
+			if (EINTR == errno
+					|| ETXTBSY == errno
+					|| ENFILE == errno
+					|| EBUSY == errno
+					|| ((mb == iod->type) && (ENXIO == errno)))
+				continue;
+			else
+			{
+#				ifdef __MVS__
+				if (EINVAL == errno && ff == tl->iod->type && (oflag & O_RDONLY) && (oflag & O_WRONLY))
+				{
+					int	oflag_clone;
+					int	fcntl_res;
+					/* oflag must be O_RDWR, set it to be O_RDONLY 	*/
+					oflag &= ~O_WRONLY;
+					oflag |= O_NONBLOCK;
+					while ((-1 == (file_des = OPEN3(buf, SETOCLOEXEC(oflag), umask_creat))) && !out_of_time)
+					{
+						if (0 == msec_timeout)
+							out_of_time = TRUE;
+						if (outofband)
+							async_action(FALSE);
+						if (EINTR == errno
+						       || ETXTBSY == errno
+						       || ENFILE == errno
+						       || EBUSY == errno
+						       || ((mb == iod->type) && (ENXIO == errno)))
+							continue;
+						else
+							break;
+					}
+					FCNTL2(file_des, F_GETFL, oflag_clone);
+					FCNTL3(file_des, F_SETFL, (oflag_clone & ~O_NONBLOCK), fcntl_res);
+					/* oflag was just made O_RDONLY, now set it to be O_WRONLY */
+					oflag |= O_WRONLY;
+					oflag &= ~O_RDONLY;
+					while ((-1 == (file_des_w = OPEN3(buf, SETOCLOEXEC(oflag), umask_creat))) && !out_of_time)
+					{
+						if (0 == msec_timeout)
+							out_of_time = TRUE;
+						if (outofband)
+							async_action(FALSE);
+						if (EINTR == errno
+						       || ETXTBSY == errno
+						       || ENFILE == errno
+						       || EBUSY == errno
+						       || ((mb == iod->type) && (ENXIO == errno)))
+							continue;
+						else
+							break;
+					}
+				}
+#				endif
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 				break;
 		}
 		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;

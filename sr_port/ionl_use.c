@@ -60,7 +60,7 @@ void ionl_use(io_desc *iod, mval *pp)
 			DEF_EXCEPTION(pp, p_offset, iod);
 			break;
 		case iop_filter:
-			len = *(pp->str.addr + p_offset);
+			len = (unsigned char)(*(pp->str.addr + p_offset));
 			tab = pp->str.addr + p_offset + 1;
 			if ((fil_type = namelook(filter_index, filter_names, tab, len)) < 0)
 			{

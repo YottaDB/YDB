@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -62,69 +62,66 @@
 
 GBLREF symval			*curr_symval;
 GBLREF boolean_t		dollar_truth;
-GBLREF gv_key			*gv_currkey;
-GBLREF gv_namehead		*gv_target;
-GBLREF gd_addr			*gd_header;
+GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF dollar_ecode_type	dollar_ecode;
 GBLREF dollar_stack_type	dollar_stack;
-GBLREF mval			dollar_zgbldir;
-GBLREF volatile boolean_t	dollar_zininterrupt;
-GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
-GBLREF mstr			extnam_str;
-GBLREF stack_frame		*frame_pointer, *error_frame;
-GBLREF lv_xnew_var		*xnewvar_anchor;
-#ifdef GTM_TRIGGER
-GBLREF mstr			*dollar_ztname;
-GBLREF mval			*dollar_ztdata;
-GBLREF mval			*dollar_ztdelim;
-GBLREF mval			*dollar_ztoldval;
-GBLREF mval			*dollar_ztriggerop;
-GBLREF mval			*dollar_ztupdate;
-GBLREF mval			*dollar_ztvalue;
-GBLREF boolean_t		*ztvalue_changed_ptr;
-GBLREF int			mumps_status;
-GBLREF boolean_t		run_time;
-GBLREF int4			gtm_trigger_depth;
-GBLREF symval			*trigr_symval_list;
-#  ifdef DEBUG
-GBLREF gv_trigger_t		*gtm_trigdsc_last;		/* For debugging purposes - parms gtm_trigger called with */
-GBLREF gtm_trigger_parms	*gtm_trigprm_last;
-GBLREF ch_ret_type		(*ch_at_trigger_init)();
-#  endif
-#endif
-GBLREF unsigned char		*restart_pc, *restart_ctxt;
-GBLREF mval			*alias_retarg;
-GBLREF int			merge_args;
-GBLREF uint4			zwrtacindx;
-GBLREF merge_glvn_ptr		mglvnp;
+GBLREF gd_addr			*gd_header;
+GBLREF gv_key			*gv_currkey;
+GBLREF gv_namehead		*gv_target;
 GBLREF gvzwrite_datablk		*gvzwrite_block;
+GBLREF int			merge_args;
+GBLREF lv_xnew_var		*xnewvar_anchor;
 GBLREF lvzwrite_datablk		*lvzwrite_block;
+GBLREF merge_glvn_ptr		mglvnp;
+GBLREF mstr			extnam_str;
+GBLREF mval			*alias_retarg, dollar_zgbldir;
+GBLREF stack_frame		*error_frame, *frame_pointer;
+GBLREF unsigned char		*restart_pc, *restart_ctxt;
+GBLREF uint4			zwrtacindx;
+GBLREF volatile boolean_t	dollar_zininterrupt;
+GBLREF volatile int4		outofband;
 GBLREF zshow_out		*zwr_output;
 GBLREF zwr_hash_table		*zwrhtab;
+<<<<<<< HEAD
 GBLREF boolean_t		tp_timeout_deferred;
 GBLREF mval			dollar_testmv;
 GBLREF int 			dollar_truth;
+=======
+#ifdef GTM_TRIGGER
+GBLREF boolean_t		run_time, *ztvalue_changed_ptr;
+GBLREF int			mumps_status;
+GBLREF int4			gtm_trigger_depth;
+GBLREF mstr			*dollar_ztname;
+GBLREF mval			*dollar_ztdata, *dollar_ztdelim, *dollar_ztoldval, *dollar_ztriggerop, *dollar_ztupdate;
+GBLREF mval			*dollar_ztvalue;
+GBLREF symval			*trigr_symval_list;
+#  ifdef DEBUG
+GBLREF ch_ret_type		(*ch_at_trigger_init)();
+GBLREF gtm_trigger_parms	*gtm_trigprm_last;
+GBLREF gv_trigger_t		*gtm_trigdsc_last;		/* For debugging purposes - parms gtm_trigger called with */
+#  endif
+#endif
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 #define FREEIFALLOC(ADR) if (NULL != (ADR)) free(ADR)
 
 void unw_mv_ent(mv_stent *mv_st_ent)
 {
+	boolean_t		defer_tptimeout, defer_ztimeout;
+	d_rm_struct		*rm_ptr;
+	d_socket_struct		*dsocketptr;
+	d_tt_struct		*tt_ptr;
+	intrpt_state_t		prev_intrpt_state;
+	ht_ent_mname		*hte;
 	lv_blk			*lp, *lpnext;
 	lv_val			*lvval_ptr;
-	symval			*symval_ptr, *sym;
-	ht_ent_mname		*hte;
 	lv_xnew_var		*xnewvar, *xnewvarnext;
-	d_socket_struct		*dsocketptr;
-	lvzwrite_datablk        *zwrblk, *prevzwrblk;
-	zwr_zav_blk		*zavb, *zavb_next;
-	UNIX_ONLY(d_rm_struct	*rm_ptr;)
-	socket_interrupt 	*sockintr;
+	lvzwrite_datablk	*zwrblk, *prevzwrblk;
+	socket_interrupt	*sockintr;
 	socket_struct		*socketptr;
 	zintcmd_ops		zintcmd_command;
-	intrpt_state_t		prev_intrpt_state;
-	int4			event_type, param_val;
-	void (*set_fn)		(int4 param);
-	UNIX_ONLY(d_tt_struct	*tt_ptr;)
+	symval			*symval_ptr, *sym;
+	zwr_zav_blk		*zavb, *zavb_next;
 	DBGRFCT_ONLY(mident_fixed vname;)
 	DCL_THREADGBL_ACCESS;
 
@@ -147,37 +144,15 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				{
 					(TREF(dollar_ztrap)).str.len = 0;
 					ztrap_explicit_null = TRUE;
+					if (!dollar_zininterrupt)
+					{	/* exiting error handling & not in interrupt code - check for queued timed events */
+						if ((no_event == outofband)
+								&& (no_event != (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
+							TRY_EVENT_POP;
+					}
 				} else
 					ztrap_explicit_null = FALSE;
 				(TREF(dollar_etrap)).str.len = 0;
-				if ((TREF(save_xfer_root)))
-				{
-					/* A tp timeout or ztimeout was deferred. Now that
-					 * $ETRAP is no longer in effect and we are not in a
-					 * job interrupt, the timeout can no longer be deferred
-					 * and needs to be recognized. If TP timeout or
-					 * ztimeout, check conditions before popping out.
-				 	 * Below part of code should be kept in sync
-					 * with unw_retarg()
-					 */
-					if (((TREF(save_xfer_root))->set_fn == tptimeout_set)
-						|| ((TREF(save_xfer_root))->set_fn == ztimeout_set))
-					{
-						if ((tp_timeout_deferred || TREF(ztimeout_deferred))
-							UNIX_ONLY(&& !dollar_zininterrupt) && ((0 == dollar_ecode.index)
-									|| !(ETRAP_IN_EFFECT)))
-						{
-							DBGDFRDEVNT((stderr, "Calling pop_reset_xfer from unw_mv_ent\n"));
-							POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
-							xfer_set_handlers(event_type, set_fn, param_val, TRUE);
-						}
-					} else if (!dollar_zininterrupt)
-					{
-						DBGDFRDEVNT((stderr, "Calling pop_reset_xfer from unw_mv_ent\n"));
-						POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
-						xfer_set_handlers(event_type, set_fn, param_val, TRUE);
-					}
-				}
 			} else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_zgbldir)
 			{
 				gdr_name	*name;
@@ -439,7 +414,12 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			break;
 		case MVST_ZINTCMD:
 			zintcmd_command = mv_st_ent->mv_st_cont.mvs_zintcmd.command;
-			assert((0 < zintcmd_command) && (ZINTCMD_LAST > zintcmd_command));
+			if (NULL == mv_st_ent->mv_st_cont.mvs_zintcmd.restart_pc_check)
+			{	/* not active */
+				assert(ZINTCMD_NOOP == zintcmd_command);
+				return;
+			}
+			assert((ZINTCMD_NOOP < zintcmd_command) && (ZINTCMD_LAST > zintcmd_command));
 			/* restore previous active interrupted command information */
 			TAREF1(zintcmd_active, zintcmd_command).restart_pc_last
 				= mv_st_ent->mv_st_cont.mvs_zintcmd.restart_pc_prior;
@@ -468,7 +448,8 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			error_frame = mv_st_ent->mv_st_cont.mvs_zintr.error_frame_save;
 			memcpy(&dollar_ecode, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_ecode_save, SIZEOF(dollar_ecode));
 			memcpy(&dollar_stack, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_stack_save, SIZEOF(dollar_stack));
-			/* Fall into MVST_TRIGR */
+			if (no_event != (TREF(save_xfer_root_ptr))->ev_que.fl->outofband)
+				TRY_EVENT_POP;						/* Fall into MVST_TRIGR */
 		case MVST_TRIGR:
 			dollar_truth = (boolean_t)mv_st_ent->mv_st_cont.mvs_trigr.saved_dollar_truth;
 			op_gvrectarg(&mv_st_ent->mv_st_cont.mvs_trigr.savtarg);
@@ -500,6 +481,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				TREF(dollar_ztrap) = mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save;
 				ztrap_explicit_null = mv_st_ent->mv_st_cont.mvs_trigr.ztrap_explicit_null_save;
 			}
+<<<<<<< HEAD
 			if (TREF(trig_forced_unwind))
 			{	/* This is a forced unwind of the trigger context so reset the condition handler stack too */
 				DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
@@ -548,6 +530,26 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 					xfer_set_handlers(event_type, set_fn, param_val, TRUE);
 				}
 			}
+=======
+			DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
+			CHECKHIGHBOUND(mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save);
+			CHECKLOWBOUND(mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save);
+			ctxt = mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save;
+			/* same assert as in gtm_trigger.c */
+			assert(((0 == gtm_trigger_depth)
+					&& (((ch_at_trigger_init == ctxt->ch)
+						|| ((ch_at_trigger_init == (ctxt - 1)->ch)
+							&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
+								|| (&gvcst_spr_kill_ch == ctxt->ch))))))
+				|| ((0 < gtm_trigger_depth)
+					&& (((&mdb_condition_handler == ctxt->ch)
+						|| ((&mdb_condition_handler == (ctxt - 1)->ch)
+							&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
+								|| (&gvcst_spr_kill_ch == ctxt->ch)))))));
+			active_ch = ctxt;
+			ctxt->ch_active = FALSE;
+			ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 #			endif	/* GTM_TRIGGER */
 			return;
 		case MVST_MRGZWRSV:

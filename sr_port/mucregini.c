@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -279,6 +279,7 @@ void mucregini(block_id blk_init_size)
 	time(&ctime);
 	assert(SIZEOF(ctime) >= SIZEOF(int4));
 	csd->creation_time4 = (int4)ctime;	/* Need only lower order 4-bytes of current time (in case system time is 8-bytes) */
+	csd->statsdb_allocation = STATSDB_ALLOCATION;
 	if (IS_STATSDB_REG(gv_cur_region))
 	{	/* Copy basedb fname into statsdb file header (needed by MUPIP RUNDOWN -FILE statsdb-file-name) */
 		STATSDBREG_TO_BASEDBREG(gv_cur_region, baseDBreg);

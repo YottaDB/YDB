@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -396,7 +396,7 @@ void mupip_reorg(void)
 		 */
 		root_swap_statistic = 0;
 		for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
-			mu_swap_root(gl_ptr, &root_swap_statistic);
+			mu_swap_root(gl_ptr, &root_swap_statistic, 0);
 		hasht_gl.next = NULL;
 		for (reg_iter = reg_list; reg_iter; reg_iter = reg_iter->next)
 		{
@@ -411,7 +411,7 @@ void mupip_reorg(void)
 				continue;
 			hasht_gl.reg = gv_cur_region;
 			hasht_gl.gvt = gv_target;
-			mu_swap_root(&hasht_gl, &root_swap_statistic);
+			mu_swap_root(&hasht_gl, &root_swap_statistic, 0);
 		}
 		util_out_print("Total root blocks moved: !UL", FLUSH, root_swap_statistic);
 		mu_reorg_process = FALSE;

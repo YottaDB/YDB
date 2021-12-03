@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -41,7 +41,7 @@
 #include "gvcst_expand_key.h"
 #include "gvt_inline.h"
 
-GBLREF	boolean_t		mu_reorg_process;
+GBLREF	boolean_t		mu_reorg_process, mu_reorg_upgrd_dwngrd_in_prog;
 GBLREF	char			gvcst_search_clue;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_altkey;
@@ -134,7 +134,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 		 * i.e. it nullifies the clue before calling gvcst_search. However, it doesn't reset the clue for directory tree
 		 * and so continue using the clue if called for root search. Assert accordingly.
 		 */
-		assert(!mu_reorg_process UNIX_ONLY(|| (pTarg->gd_csa->dir_tree == pTarg)));
+		assert(!mu_reorg_process || (pTarg->gd_csa->dir_tree == pTarg));
 		INCR_DB_CSH_COUNTER(cs_addrs, n_gvcst_srch_clues, 1);
 		status = cdb_sc_normal;	/* clue is usable unless proved otherwise */
 		DEBUG_ONLY(save_donot_commit = TREF(donot_commit);)
@@ -307,7 +307,8 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 				oldest_hist_tn = OLDEST_HIST_TN(cs_addrs);
 			for (srch_status = &pTargHist->h[0]; HIST_TERMINATOR != srch_status->blk_num; srch_status++)
 			{	/* Do the actual verification of each history block */
-				assert(srch_status->level == srch_status - &pTargHist->h[0]);
+				assert((srch_status->level == srch_status - &pTargHist->h[0])
+					|| (mu_reorg_upgrd_dwngrd_in_prog && (DIR_ROOT == srch_status->blk_num)));
 				assert(is_mm || (NULL == srch_status->cr) || (NULL != srch_status->buffaddr));
 				cr = srch_status->cr;
 				assert(!is_mm || (NULL == cr));

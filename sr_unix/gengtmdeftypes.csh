@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2011-2019 Fidelity National Information		#
+# Copyright (c) 2011-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -174,6 +174,9 @@ if ( ! -e GTMDefinedTypesInit.m )  then
     exit 1
 endif
 mv -f GTMDefinedTypesInit.m $ourdir
+if (-e struct_padding_warn.out) then
+	cp struct_padding_warn.out $ourdir
+endif
 popd
 rm -fr $tmpdir >& /dev/null
 echo "gengtmdeftypes.csh complete"

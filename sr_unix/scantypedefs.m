@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2010-2020 Fidelity National Information		;
+; Copyright (c) 2010-2021 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	;
@@ -204,6 +204,7 @@
 	. Set excludestructs("int8")=1		; Not defined on 32 bit platforms
 	. Set excludestructs("uint8")=1
 	. Set excludestructs("gtm_int8")=1
+	. Set excludestructs("gtm_timet")=1	; Epoch dates recognizably typed so we can dumpfhead them to a string
 	. Set excludestructs("gtm_uint8")=1
 	Do:(("HP-PA"=gtmhdw)!("AXP"=gtmhdw))	; Eliminate encryption structures
 	. Set excludestructs("gtmcrypt_init_t")=1
@@ -538,6 +539,7 @@
 	Do ExclInclude("op_fnextract.h")
 	Do ExclInclude("opcode_def.h")
 	Do ExclInclude("option.h")
+	Do ExclInclude("outofband.h")
 	Do ExclInclude("stp_gcol_src.h")
 	Do ExclInclude("tab_bg_trc_rec.h")
 	Do ExclInclude("tab_db_csh_acct_rec.h")
@@ -994,7 +996,7 @@
 	; Execute the program we just built under a pipe and process the output
 	;
 	Kill linkresults	; Not needed
-	Set pipe="offpipe",lincnt=0
+	Set pipe="offpipe",lincnt=0,nextoffset=0
 	Open pipe:(Shell="/bin/sh":Command="./"_outfile)::"PIPE"
 	Use pipe
 	Set pipeopen=TRUE
@@ -1021,6 +1023,10 @@
 	. . Set types(type,"fullexp",fullidx,"fldlen")=fldlen
 	. . Set types(type,"fullexp",fullidx,"type")=fldotyp
 	. . Set:debug types(type,"fullexp",fullidx,"basic")=(0<$Data(basetype(fldotyp)))	; Only need this when debugging
+	. . ; A very simple check to see if the structure has unnecessary implicit padding
+	. . ; current offset + size should be next offset. If the next offset is greater than that, flag it.
+	. . Set:fldoff>nextoffset padding(type)=1
+	. . Set nextoffset=fldoff+fldlen
 	. Else  If "susize"=type Do		; Define size for entire structure/union
 	. . Set type=$ZPiece(input,"|",1)
 	. . Set typlen=$ZPiece(input,"|",2)
@@ -1028,6 +1034,20 @@
 	. Else  Do Error("BADINPUT","F","Line from running routine does not start with a known record type token (field or typsz)")
 	Close pipe
 	Set pipeopen=FALSE
+	If $Data(padding) Do
+	. ; This file is compared with a standard reference by the build tools. New entries are caught.
+	. Set sdfile="struct_padding_warn.out"
+	. Open sdfile:New
+	. Use sdfile
+	. Set next=""
+	. Write "# The below structures have unnecessary paddings",!
+	. Write "# This was figured by a simple fact that the size reported by the structure is greater than the sum "
+	. Write "of the sizes of the elements of the structure",!
+	. Write "# This might be the outer structure itself or one of the inner structures",!
+	. Write "# Use offset.sh <structure> to get detailed offsets and sizes of the structures",!
+	. For  Set next=$Order(padding(next)) Quit:next=""  Write next,!
+	. Close sdfile
+
 	Set endline=" Finished running and reading results of C offset/size routine ("_lincnt_" lines read)"
 	Do DoWrite($ZDate($Horolog,"24:60:SS")_endline)
 	;

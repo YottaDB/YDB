@@ -151,7 +151,6 @@ GBLDEF	sgmnt_addrs		*cs_addrs_list;	/* linked list of csa corresponding to all c
 GBLDEF	unsigned short	proc_act_type;
 GBLDEF	volatile bool	ctrlc_pending;
 GBLDEF	bool		undef_inhibit;
-GBLDEF	volatile int4	ctrap_action_is;
 GBLDEF	bool		out_of_time;
 GBLDEF	io_pair		io_curr_device;		/* current device	*/
 GBLDEF	io_pair		io_std_device;		/* standard device	*/
@@ -186,10 +185,15 @@ GBLDEF	boolean_t	is_updproc,
 			gtcm_connection,
 			is_replicator,		/* TRUE => this process can write jnl records to the jnlpool for replicated db */
 			dollar_truth = TRUE,
+<<<<<<< HEAD
 			dollar_test_default = TRUE,
 			ydb_stdxkill,		/* TRUE => Use M Standard X-KILL - FALSE use historical GTM X-KILL (default) */
 			in_timed_tn,		/* TRUE => Timed TP transaction in progress */
 			tp_timeout_deferred;	/* TRUE => A TP timeout has occurred but is deferred */
+=======
+			gtm_stdxkill,		/* TRUE => Use M Standard X-KILL - FALSE use historical GTM X-KILL (default) */
+			in_timed_tn;		/* TRUE => Timed TP transaction in progress */
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 GBLDEF	uint4		is_updhelper;		/* = UPD_HELPER_READER if reader helper, = UPD_HELPER_WRITER if writer helper,
 						 * = 0 otherwise.
 						 */
@@ -231,8 +235,7 @@ GBLDEF	mval		dollar_zgbldir,
 			dollar_zsource = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
 			dollar_zstatus,
 			ztrap_pop2level = DEFINE_MVAL_STRING(MV_NM | MV_INT, 0, 0, 0, 0, 0, 0),
-			zstep_action,
-			dollar_system,
+			dollar_system, dollar_system_initial,
 			dollar_estack_delta = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
 			dollar_zerror = DEFINE_MVAL_STRING(MV_STR, 0, 0, DEFAULT_ZERROR_LEN, DEFAULT_ZERROR_STR, 0, 0),
 			dollar_zyerror,
@@ -240,7 +243,7 @@ GBLDEF	mval		dollar_zgbldir,
 			dollar_testmv = DEFINE_MVAL_STRING(MV_NM | MV_INT, 0, 0, 0, 0, 0, 0); /* mval copy of dollar_truth */
 GBLDEF  uint4		dollar_zjob;
 GBLDEF	mval		dollar_zinterrupt;
-GBLDEF	boolean_t	dollar_zininterrupt;
+GBLDEF	volatile boolean_t	dollar_zininterrupt;
 GBLDEF	boolean_t	dollar_ztexit_bool; /* Truth value of dollar_ztexit when coerced to boolean */
 GBLDEF	boolean_t	dollar_zquit_anyway;
 GBLDEF	mv_stent	*mv_chain;
@@ -320,8 +323,12 @@ GBLDEF	boolean_t	oldjnlclose_started;
 /* DEFERRED EVENTS */
 GBLDEF	bool		licensed = TRUE;
 
+<<<<<<< HEAD
 GBLDEF	volatile uint4		num_deferred;
 GBLDEF	volatile int4		fast_lock_count;	/* Used in wcs_stale */
+=======
+GBLDEF	volatile	int4	fast_lock_count;	/* Used in wcs_stale */
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 /* REPLICATION RELATED GLOBALS */
 GBLDEF	gtmsource_options_t	gtmsource_options;
 GBLDEF	gtmrecv_options_t	gtmrecv_options;
@@ -410,10 +417,6 @@ GBLDEF	char			cli_err_str[MAX_CLI_ERR_STR] = "";	/* Parse Error message buffer *
 GBLDEF	char			*cli_err_str_ptr;
 GBLDEF	boolean_t		gtm_pipe_child;
 GBLDEF	io_desc			*gtm_err_dev;
-/* this array is indexed by file descriptor */
-/* Latch variable for Unix implementations. Used in SUN and HP */
-GBLDEF	global_latch_t		defer_latch;
-GBLDEF	global_latch_t		outofband_queue_latch;
 GBLDEF	int			num_additional_processors;
 GBLDEF	int			gtm_errno = -1;		/* holds the errno (unix) in case of an rts_error */
 GBLDEF	int4			error_condition;
@@ -468,7 +471,6 @@ GBLDEF	ipcs_mesg	db_ipcs;		/* For requesting gtmsecshr to update ipc fields */
 GBLDEF	gd_region	*ftok_sem_reg;		/* Last region for which ftok semaphore is grabbed */
 GBLDEF	int		ydb_non_blocked_write_retries; /* number of retries for non-blocked write to pipe */
 GBLDEF	boolean_t	write_after_image;	/* true for after-image jnlrecord writing by recover/rollback */
-GBLDEF	int		iott_write_error;
 GBLDEF	int4		write_filter;
 GBLDEF	boolean_t	need_no_standalone;
 GBLDEF	int4		zdir_form = ZDIR_FORM_FULLPATH; /* $ZDIR shows full path including DEVICE and DIRECTORY */
@@ -684,6 +686,7 @@ GBLDEF	boolean_t	is_uchar_wcs_code[] =	/* uppercase failure codes that imply dat
 #undef CDB_SC_UCHAR_ENTRY
 #undef CDB_SC_LCHAR_ENTRY
 };
+GBLDEF	int	sizeof_is_uchar_wcs_code = SIZEOF(is_uchar_wcs_code);	/* 4SCA */
 GBLDEF	boolean_t	is_lchar_wcs_code[] =	/* lowercase failure codes that imply database cache related problem */
 {	/* if any of the following failure codes are seen in the final retry, wc_blocked will be set to trigger cache recovery */
 #define	CDB_SC_NUM_ENTRY(code, final_retry_ok, value)
@@ -694,6 +697,7 @@ GBLDEF	boolean_t	is_lchar_wcs_code[] =	/* lowercase failure codes that imply dat
 #undef CDB_SC_UCHAR_ENTRY
 #undef CDB_SC_LCHAR_ENTRY
 };
+GBLDEF	int	sizeof_is_lchar_wcs_code = SIZEOF(is_lchar_wcs_code);	/* 4SCA */
 GBLDEF	boolean_t	is_final_retry_code_num[] =	/* failure codes that are possible in final retry : numeric */
 {
 #define	CDB_SC_NUM_ENTRY(code, final_retry_ok, value)			final_retry_ok,
@@ -704,6 +708,7 @@ GBLDEF	boolean_t	is_final_retry_code_num[] =	/* failure codes that are possible 
 #undef CDB_SC_UCHAR_ENTRY
 #undef CDB_SC_LCHAR_ENTRY
 };
+GBLDEF	int		sizeof_is_final_retry_code_num = SIZEOF(is_final_retry_code_num);	/* 4SCA */
 GBLDEF	boolean_t	is_final_retry_code_uchar[] =	/* failure codes that are possible in final retry : upper case */
 {
 #define	CDB_SC_NUM_ENTRY(code, final_retry_ok, value)
@@ -714,6 +719,7 @@ GBLDEF	boolean_t	is_final_retry_code_uchar[] =	/* failure codes that are possibl
 #undef CDB_SC_UCHAR_ENTRY
 #undef CDB_SC_LCHAR_ENTRY
 };
+GBLDEF	int		sizeof_is_final_retry_code_uchar = SIZEOF(is_final_retry_code_uchar);	/* 4SCA */
 GBLDEF	boolean_t	is_final_retry_code_lchar[] =	/* failure codes that are possible in final retry : lower case */
 {
 #define	CDB_SC_NUM_ENTRY(code, final_retry_ok, value)
@@ -724,6 +730,7 @@ GBLDEF	boolean_t	is_final_retry_code_lchar[] =	/* failure codes that are possibl
 #undef CDB_SC_UCHAR_ENTRY
 #undef CDB_SC_LCHAR_ENTRY
 };
+GBLDEF	int		sizeof_is_final_retry_code_lchar = SIZEOF(is_final_retry_code_lchar);	/* 4SCA */
 GBLDEF	boolean_t	gvdupsetnoop = TRUE;	/* if TRUE, duplicate SETs do not change GDS block (and therefore no PBLK journal
 						 * records will be written) although the database transaction number will be
 						 * incremented and logical SET journal records will be written. By default, this
@@ -977,6 +984,7 @@ GBLDEF	boolean_t	donot_INVOKE_MUMTSTART;		/* Set to TRUE whenever an implicit TS
 							 * mdb_condition_handler (invoked by INVOKE_RESTART macro when it does
 							 * an rts_error) checks it never gets invoked while this is set.
 							 */
+GBLDEF	char		asccurtime[10];			/* used in deferred_events.h by macro SHOWTIME timestamping debug output */
 #endif
 GBLDEF	boolean_t	block_is_free;			/* Set to TRUE if the caller wants to let t_qread know that the block it is
 							 * attempting to read is actually a FREE block

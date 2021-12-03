@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2020 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -38,9 +38,10 @@
 #include "stringpool.h"	/* for IS_IN_STRINGPOOL assert */
 #endif
 
-GBLREF CLI_ENTRY                *cmd_ary;
+GBLREF	CLI_ENTRY		*cmd_ary;
 GBLREF	gd_region		*gv_cur_region;
-GBLREF CLI_ENTRY                trigger_cmd_ary[];
+GBLREF	boolean_t		is_updproc;
+GBLREF	CLI_ENTRY		trigger_cmd_ary[];
 GBLREF	volatile boolean_t	timer_in_handler;
 
 STATICFNDCL char *scan_to_end_quote(char *ptr, int len, int max_len);
@@ -76,12 +77,14 @@ STATICFNDCL boolean_t process_pieces(char *piece_str, uint4 *piece_len);
 
 #define ERROR_MSG_RETURN(STR, LEN, PTR)							\
 {											\
+	assertpro(!is_updproc); /* LGTRIG records should not have parsing errors */	\
 	CONV_STR_AND_PRINT(STR, LEN, PTR);						\
 	return FALSE;									\
 }
 
 #define ERROR_STR_RETURN(STR)								\
 {											\
+	assertpro(!is_updproc); /* LGTRIG records should not have parsing errors */	\
 	util_out_print_gtmio(STR, FLUSH);						\
 	return FALSE;									\
 }

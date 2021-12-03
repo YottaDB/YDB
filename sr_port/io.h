@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -86,7 +86,11 @@ error_def(ERR_UTF16ENDIAN);
 #define SOCKETPOOLNAME		"YGTMSOCKETPOOL"
 #define SOCDEVTYPENAME		"socket"
 
+<<<<<<< HEAD
 #define LOGNAME_LEN 255	/* Maximum possible length of name in "io_log_name.dollar_io[]". Enforced by "get_log_name". */
+=======
+#define ZA_IO_ERR	9
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 typedef unsigned char params;
 
@@ -288,7 +292,11 @@ uchar_ptr_t iott_escape(uchar_ptr_t strin, uchar_ptr_t strtop, io_desc *io_ptr);
 
 /* iosocket_ prototypes */
 boolean_t iosocket_listen(io_desc *iod, unsigned short len);
+<<<<<<< HEAD
 boolean_t iosocket_wait(io_desc *iod, uint8 timepar);
+=======
+boolean_t iosocket_wait(io_desc *iod, int4 timepar, mval *whatop, mval *handle);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 void iosocket_poolinit(void);
 void iosocket_pass_local(io_desc *iod, pid_t pid, uint8 timeout, int argcnt, va_list args);
 void iosocket_accept_local(io_desc *iod, mval *handlevar, pid_t pid, uint8 timeout, int argcnt, va_list args);
@@ -487,6 +495,7 @@ LITREF unsigned char ebcdic_spaces_block[];
 	}															\
 }
 
+<<<<<<< HEAD
 #define DEF_EXCEPTION(PP, P_OFF, IOD)							\
 MBSTART {										\
 	mval	*tmpMV;									\
@@ -512,6 +521,22 @@ MBSTART {										\
 	IOD->error_handler = tmpMV->str;						\
 	s2pool(&IOD->error_handler);							\
 	POP_MV_STENT();									\
+=======
+#define DEF_EXCEPTION(PP, P_OFF, IOD)					\
+MBSTART {								\
+	mval	MV;							\
+									\
+	MV.mvtype = MV_STR;						\
+	MV.str.len = (unsigned char)(*(PP->str.addr + P_OFF));		\
+	MV.str.addr = (char *)(PP->str.addr + P_OFF + 1);		\
+	if (!(ZTRAP_ENTRYREF & TREF(ztrap_form)))			\
+	{								\
+		op_commarg(&MV, indir_linetail);			\
+		op_unwind();						\
+	}								\
+	IOD->error_handler = MV.str;					\
+	s2pool(&IOD->error_handler);					\
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 } MBEND
 
 #define	ONE_COMMA		"1,"

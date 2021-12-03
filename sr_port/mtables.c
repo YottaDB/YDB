@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -341,10 +341,12 @@ LITDEF int4 ydb_product_len       = SIZEOF(YDB_PRODUCT) - 1;
  * the internal context of incremental/stream backup so the value should never appear where
  * this table is being indexed (suggest asserts for index being > 0 at usage points).
  */
-LITDEF char *gtm_dbversion_table[] =
+LITDEF char *gtm_dbversion_table[] =	/* gtmpcat.m has a table, dbversion, that must be maintained to mirror this one */
 {
 	"V4",
 	"V6",
+	"V6p",	/* GDSV6p - upgrading to V7 and therefore has unusual temporary characteristics */
+	"V7m",	/* GDSV7m - upgraded from V6 and therfore has different start_vbn */
 	"V7"
 };
 

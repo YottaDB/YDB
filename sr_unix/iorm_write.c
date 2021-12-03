@@ -78,7 +78,7 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 			assert(nextmb == (out + 1));
 			if (WEOF == utf_code)
 			{
-				iod->dollar.za = 9;
+				iod->dollar.za = ZA_IO_ERR;
 				UTF8_BADCHAR((int)(nextmb - out), out, top, 0, NULL);
 			}
 			if (CHSET_UTF16BE == iod->ochset)
@@ -87,7 +87,7 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 				nextoutptr = UTF16LE_WCTOMB(utf_code, outptr);
 			if (nextoutptr == outptr)
 			{	/* invalid codepoint */
-				iod->dollar.za = 9;
+				iod->dollar.za = ZA_IO_ERR;
 				UTF8_BADCHAR((int)(nextmb - out), out, top, chset_names[iod->ochset].len,
 						chset_names[iod->ochset].addr);
 			}
@@ -225,7 +225,7 @@ void iorm_write_utf(mstr *v)
 			nextmb = UTF8_MBTOWC(inptr, top, utf_code);
 			if (WEOF == utf_code)
 			{
-				iod->dollar.za = 9;
+				iod->dollar.za = ZA_IO_ERR;
 				UTF8_BADCHAR(0, inptr, top, 0, NULL);
 			}
 			if (CHSET_UTF8 != iod->ochset)
@@ -238,7 +238,7 @@ void iorm_write_utf(mstr *v)
 					nextoutptr = UTF16LE_WCTOMB(utf_code, outptr);
 				if (nextoutptr == outptr)
 				{	/* invalid codepoint */
-					iod->dollar.za = 9;
+					iod->dollar.za = ZA_IO_ERR;
 					UTF8_BADCHAR((int)((nextmb - inptr)), inptr, top, chset_names[iod->ochset].len,
 							chset_names[iod->ochset].addr);
 				}
@@ -394,7 +394,7 @@ void iorm_write(mstr *v)
 	{
 		if (!iod->dollar.zeof)
 		{
-	 		iod->dollar.za = 9;
+	 		iod->dollar.za = ZA_IO_ERR;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOTTOEOFONPUT);
 		} else
 		{	/* If there have not been any writes, and input encryption attributes are different from those for output,

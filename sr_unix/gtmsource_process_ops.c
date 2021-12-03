@@ -91,6 +91,8 @@
 
 #define PROC_OPS_PRINT_MSG_LEN	1024
 
+        char			print_msg_src[PROC_OPS_PRINT_MSG_LEN];
+        char			print_msg_t[PROC_OPS_PRINT_MSG_LEN];
 GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	boolean_t		gtmsource_pool2file_transition;
 GBLREF	boolean_t		gtmsource_received_cmp2uncmp_msg;
@@ -1060,9 +1062,16 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 	if (MAX_SEQNO != optional_seqno)
 	{
 		if (INVALID_SUPPL_STRM == optional_strm_num)
-			repl_log(gtmsource_log_fp, TRUE, FALSE, "Sending %s message with seqno %llu [0x%llx]\n", msgtypestr,
-				optional_seqno, optional_seqno);
-		else
+		{
+			if (REPL_ROLLBACK_FIRST != msg->type)
+			{
+				repl_log(gtmsource_log_fp, TRUE, FALSE,
+					"Sending %s message with seqno %llu [0x%llx]\n",msgtypestr, optional_seqno, optional_seqno);
+			} else if (REPL_ROLLBACK_FIRST == msg->type)
+ 			{
+				REPL_DPRINT1("Received REPL_ROLLBACK_FIRST message");
+			}
+		} else
 			repl_log(gtmsource_log_fp, TRUE, FALSE, "Sending %s message with seqno %llu [0x%llx] for Stream # %2d\n",
 				msgtypestr, optional_seqno, optional_seqno, optional_strm_num);
 	} else
@@ -1819,8 +1828,14 @@ boolean_t	gtmsource_is_histinfo_identical(repl_histinfo *remote_histinfo, repl_h
 				|| (local_histinfo->created_time != remote_histinfo->created_time))))
 	{	/* either the root primary instance name or the cycle did not match */
 		if (ok_to_log)
+		{
 			repl_log(gtmsource_log_fp, FALSE, FALSE, "Primary and Secondary have DIFFERING history records for "
 				"seqno %llu [0x%llx]\n", jnl_seqno - 1, jnl_seqno - 1);
+			SNPRINTF(print_msg_t, SIZEOF(print_msg_t), "Originating instance and replicating instances are"
+				" out-of-sync after sequence number : "INT8_FMT" ", jnl_seqno - 1);
+			sgtm_putmsg(print_msg_src, PROC_OPS_PRINT_MSG_LEN, VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(print_msg_t));
+			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg_src);
+		}
 		return FALSE;
 	} else
 	{

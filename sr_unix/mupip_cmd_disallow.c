@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2019 Fidelity National Information	*
+ * Copyright (c) 2002-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -34,6 +34,10 @@ boolean_t cli_disallow_mupip_backup(void)
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  (d_c_cli_present("INCREMENTAL") || d_c_cli_present("BYTESTREAM"))
 					&& (d_c_cli_present("COMPREHENSIVE") || d_c_cli_present("DATABASE"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("INCREMENTAL") || d_c_cli_present("BYTESTREAM"))
+					&& (d_c_cli_present("RETRY") || d_c_cli_present("SHOWPROGRESS"));
+
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = d_c_cli_present("TRANSACTION") && d_c_cli_present("SINCE");
 	CLI_DIS_CHECK_N_RESET;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -20,10 +20,14 @@
 */
 
 #include "mdef.h"
+<<<<<<< HEAD
 
 #include "gtm_signal.h"
+=======
+#  include <gtm_signal.h>
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 #ifdef GTM_PTHREAD
-#  include <pthread.h>
+#  include <gtm_pthread.h>
 #endif
 #include "gtm_stdio.h"
 
@@ -31,14 +35,16 @@
 #include "gtmio.h"
 #include "op.h"
 #include "xfer_enum.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "deferred_events.h"
-#include "jobinterrupt_event.h"
+#include "jobinterrupt_process.h"
 #include "fix_xfer_entry.h"
 #include "sig_init.h"
 #include "libyottadb_int.h"
 #include "invocation_mode.h"
 
+GBLREF intrpt_state_t		intrpt_ok_state;
 GBLREF	xfer_entry_t		xfer_table[];
 GBLREF	volatile int4 		outofband;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
@@ -46,6 +52,7 @@ GBLREF	struct sigaction	orig_sig_action[];
 GBLREF	int			jobinterrupt_sig_num;
 
 /* Routine called when an interrupt event occurs (signaled by mupip intrpt or other future method
+<<<<<<< HEAD
  * of signaling interrupts). This code is driven as a signal handler on Unix where it intercepts the posix signal.
  */
 void jobinterrupt_event(int sig, siginfo_t *info, void *context)
@@ -64,11 +71,21 @@ void jobinterrupt_event(int sig, siginfo_t *info, void *context)
 	{
 		drive_non_ydb_signal_handler_if_any("jobinterrupt_event", sig, info, context, FALSE);
 	}
+=======
+ * of signaling interrupts). This code is driven as a signal handler on Unix.
+ */
+void jobinterrupt_event(int sig, siginfo_t *info, void *context)
+{	/* Note the (presently unused) args are to match signature for signal handlers in Unix */
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig);
+	if (!dollar_zininterrupt)
+		(void)xfer_set_handlers(jobinterrupt, 0, FALSE);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 }
 
 /* Call back routine from xfer_set_handlers to complete outofband setup */
 void jobinterrupt_set(int4 sig_num)
 {
+<<<<<<< HEAD
 	DBGDFRDEVNT((stderr, "jobinterrupt_set: Setting jobinterrupt outofband\n"));
 	if (jobinterrupt != outofband)
 	{	/* We need jobinterrupt out of band processing at our earliest convenience */
@@ -79,4 +96,18 @@ void jobinterrupt_set(int4 sig_num)
 		 */
 		jobinterrupt_sig_num = sig_num;
 	}
+=======
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	assert(INTRPT_IN_EVENT_HANDLING == intrpt_ok_state);
+	assert(pending == TAREF1(save_xfer_root, jobinterrupt).event_state);
+	assert(jobinterrupt == outofband);
+	DBGDFRDEVNT((stderr, "%d %s: jobinterrupt_set - %sneeded\n", __LINE__, __FILE__,
+		     (jobinterrupt == outofband) ? "NOT " : ""));
+	outofband = jobinterrupt;
+	DEFER_INTO_XFER_TAB;
+	TAREF1(save_xfer_root, jobinterrupt).event_state = active;
+	DBGDFRDEVNT((stderr, "%d %s: jobinterrupt_set - set the xfer entries for jobinterrupt_event\n", __LINE__, __FILE__));
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 }

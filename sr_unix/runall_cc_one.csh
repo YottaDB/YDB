@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2015 Fidelity National Information		#
+# Copyright (c) 2015-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
@@ -67,7 +67,7 @@ if ($linkonly == 0) then
 		if ($?gtmroutines) set save_gtmroutines = "$gtmroutines"
 		setenv ydb_dist "$gtm_root/$gtm_curpro/pro"
 		setenv gtmroutines "$gtm_obj($gtm_pct)"
-		$gtm_root/$gtm_curpro/pro/mumps -run msg $gtm_src/$file.msg Unix
+		$gtm_root/$gtm_curpro/pro/mumps -run msg $gtm_src/$file.msg
 		if (0 != $status) @ runall_status = $status
 		setenv ydb_dist "$real_ydb_dist"
 		unset real_ydb_dist

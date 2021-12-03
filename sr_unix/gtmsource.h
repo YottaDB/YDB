@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2020 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
@@ -297,7 +297,7 @@ typedef jnldata_hdr_struct 	*jnldata_hdr_ptr_t;
 #define REPL_CONN_SOFT_TRIES_PERIOD		5	/* sec Default connection soft try period*/
 #define REPL_CONN_ALERT_ALERT_PERIOD		0	/* sec Default no logging of the REPLALERT message */
 #define REPL_CONN_HEARTBEAT_PERIOD		15	/* sec Default heartbeat period */
-#define REPL_CONN_HEARTBEAT_MAX_WAIT		60	/* sec Default heartbeat maximum waiting period */
+#define REPL_CONN_HEARTBEAT_MAX_WAIT		300	/* sec Default heartbeat maximum waiting period */
 #define REPL_MAX_LOG_PERIOD		        150     /* sec Maximum logging period */
 
 enum

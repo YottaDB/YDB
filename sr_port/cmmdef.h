@@ -135,13 +135,8 @@ typedef struct cs_struct
 		unsigned char			new_msg;
 		unsigned char			maxregnum;
 		bool				waiting_in_queue;
-#ifdef UNIX
-		struct timeval			connect;	/* Debugging tool -- time connection was established */
+		struct timespec			connect;	/* Debugging tool -- time connection was established */
 		time_t				lastact;	/* Debugging tool -- time of last server action */
-#else
-		uint4				connect[2];	/* Debugging tool -- time connection was established */
-		uint4				lastact[2];	/* Debugging tool -- time of last server action */
-#endif
 		uint4				stats;
 		unsigned short			procnum;
 		unsigned short			transnum;

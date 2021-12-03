@@ -106,23 +106,6 @@
 #define MBSTART		do
 #define MBEND		while (FALSE)
 
-/* Macro to copy a source string to a malloced area that is set to the destination pointer.
- * Since it is possible that DST might have multiple pointer dereferences in its usage, we
- * use a local pointer variable and finally assign it to DST thereby avoiding duplication of
- * those pointer dereferences (one for the malloc and one for the strcpy).
- * There are two macros depending on whether a string or literal is passed.
- */
-#define	MALLOC_CPY_STR(DST, SRC)		\
-MBSTART {					\
-	char	*mcs_ptr;			\
-	size_t	mcs_len;			\
-						\
-	mcs_len = strlen(SRC) + 1;		\
-	mcs_ptr = malloc(mcs_len);		\
-	memcpy(mcs_ptr, SRC, mcs_len);		\
-	DST = mcs_ptr;				\
-} MBEND
-
 #define	MALLOC_CPY_LIT(DST, SRC)		\
 MBSTART {					\
 	char	*mcs_ptr;			\

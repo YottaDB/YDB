@@ -63,6 +63,7 @@
 #define ESC_OFFSET		4
 #define MAX_COMMAND_LINE_LENGTH	255
 
+<<<<<<< HEAD
 GBLREF mval		dollar_zproc;
 GBLREF mval		dollar_zdir;
 GBLREF stack_frame	*frame_pointer;
@@ -117,10 +118,33 @@ GBLREF	mval		*dollar_ztvalue;
 GBLREF	mval		dollar_ztwormhole;
 GBLREF	int4		gtm_trigger_depth;
 GBLREF	boolean_t	write_ztworm_jnl_rec;
+=======
+GBLREF boolean_t		dollar_zquit_anyway, dollar_zaudit;
+GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
+GBLREF int			process_exiting;
+GBLREF int4			dollar_zeditor, dollar_zsystem, zdir_form;
+GBLREF io_log_name		*dollar_principal, *io_root_log_name;
+GBLREF io_pair			io_curr_device, *io_std_device;
+GBLREF mlk_subhash_val_t	mlk_last_hash;
+GBLREF mstr			dollar_zchset, dollar_zpatnumeric, dollar_zpin, dollar_zpout;
+GBLREF mval			dollar_estack_delta, dollar_job, dollar_system, dollar_zdir, dollar_zerror, dollar_zgbldir;
+GBLREF mval			dollar_zinterrupt, dollar_zproc, dollar_zsource, dollar_zstatus, dollar_ztexit, dollar_zyerror;
+GBLREF size_t			totalAlloc, totalAllocGta, totalRmalloc, totalRallocGta, totalUsed, totalUsedGta;
+GBLREF spdesc			stringpool;
+GBLREF stack_frame		*frame_pointer;
+GBLREF uint4			dollar_tlevel, dollar_trestart, dollar_zjob;
+GBLREF volatile boolean_t	dollar_zininterrupt;
+
+#ifdef GTM_TRIGGER
+GBLREF	boolean_t		ztwormhole_used;		/* TRUE if $ztwormhole was used by trigger code */
+GBLREF	int4			gtm_trigger_depth;
+GBLREF	mstr			*dollar_ztname;
+GBLREF	mval			*dollar_ztdata, *dollar_ztdelim, *dollar_ztoldval, *dollar_ztriggerop;
+GBLREF	mval			dollar_ztslate, *dollar_ztupdate, *dollar_ztvalue, dollar_ztwormhole;
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 #endif
 
 error_def(ERR_INVSVN);
-error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
 error_def(ERR_ZDIROUTOFSYNC);
 

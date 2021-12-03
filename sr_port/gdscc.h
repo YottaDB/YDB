@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,11 +20,9 @@
 /* BIG_UA is the maximum size of a single update array specified as an unsigned quantity (usages rely on this). It is 16MB. */
 #define BIG_UA  (uint4)16777216
 
-#define CDB_R_SET_SIZE		32
 #define CDB_CW_SET_SIZE 	(MAX_BT_DEPTH * 3 + 1 + 2)
-#define CDB_W_SET_SIZE		16
 
-/* CDB_CW_SET_SIZE = 24
+/* CDB_CW_SET_SIZE = 36
  *	3 for all the levels (including updated block, newly created sibling and possible bitmap update)
  *	1 extra for the root level (to take care of gds_t_write_root case)
  *	2 in the case of creation of a new global variable (1 index block with a * key and 1 data block

@@ -36,7 +36,7 @@
 #include "cmmdef.h"
 #include "eintr_wrappers.h"
 #include "copy.h"
-#include "is_file_identical.h"
+#include "is_gdid.h"
 #include "gtcmd.h"
 #include "min_max.h"
 #include "mu_gv_cur_reg_init.h"

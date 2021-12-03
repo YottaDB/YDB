@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -55,11 +55,10 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 	/*
 	 * address/port number determination:
 	 *
-	 * tnd := IP address:port for IPv4
-	 * tnd := [IP address]:port for IPv6
+	 * tnd := ip-address|hostname:port for IPv4
+	 * tnd := [ip-address|hostname]:port for IPv6
 	 *
 	 * If tnd is an empty string, get port number from services database
-	 *
 	 */
 	assert(NULL != tnd);
 	tnd_str = CMI_DESC_POINTER(tnd);
@@ -89,7 +88,7 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 			addr_str_ptr = port_str_ptr = tnd_str;
 			for (iplen = 0, cp = tnd_str; cp < tnd_str + tnd_len; cp++)
 			{
-				if (*cp != ':' && *cp != '.' && !ISDIGIT_ASCII(*cp))
+				if (*cp != ':' && *cp != '.' && !ISALNUM_ASCII(*cp))
 					return CMI_BADIPADDRPORT;
 				if (*cp == ':')
 				{

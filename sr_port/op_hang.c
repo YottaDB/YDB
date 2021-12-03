@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -23,7 +23,8 @@
 #include "gt_timer.h"
 #include "mvalconv.h"
 #include "op.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "rel_quant.h"
 #include "mv_stent.h"
 #include "find_mvstent.h"
@@ -34,8 +35,12 @@
 # include "wcs_sleep.h"
 # include "wbox_test_init.h"
 # include "gtmio.h"
+<<<<<<< HEAD
 # include "deferred_exit_handler.h"
+=======
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 # include "util.h"
+# include "deferred_signal_handler.h"
 #endif
 
 #include "gdsroot.h"
@@ -54,19 +59,14 @@
 #include "change_reg.h"
 #include "setterm.h"
 #include "getzposition.h"
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
 #include "sleep.h"
 #include "time.h"
 
-GBLREF	uint4		dollar_trestart;
 GBLREF	mv_stent	*mv_chain;
-GBLREF	int4		outofband;
-GBLREF	unsigned char	*restart_pc, *restart_ctxt;
 GBLREF	stack_frame	*frame_pointer;
-
-error_def(ERR_SYSCALL);
+GBLREF	uint4		dollar_trestart;
+GBLREF	unsigned char	*restart_pc, *restart_ctxt;
+GBLREF	volatile int4	outofband;
 
 #define HANGSTR "HANG"
 
@@ -146,7 +146,8 @@ void op_hang(mval* num)
 			return;
 		}
 #		endif
-		sys_get_curr_time(&cur_time);
+		/* WARNING: This is not the same as sys_get_curr_time() which returns time from the monotonic clock */
+		sys_get_wall_time(&cur_time);
 		mv_zintcmd = find_mvstent_cmd(ZINTCMD_HANG, frame_pointer->restart_pc, frame_pointer->restart_ctxt, FALSE);
 		if (!mv_zintcmd)
 			add_int_to_abs_time(&cur_time, ms, &end_time);
@@ -182,6 +183,7 @@ void op_hang(mval* num)
 			if (0 == ms)
 				return;		/* done with HANG */
 		}
+<<<<<<< HEAD
 		hiber_start(ms);
 		if (outofband)
 		{
@@ -205,6 +207,25 @@ void op_hang(mval* num)
 		 * Note: No outofband processing done in this case as we are done with the desired HANG.
 		 */
 		rel_quant();
+=======
+		hiber_start_wall_time(ms);
+	} else	/* the rel_quant below seems legitimate */
+		rel_quant();
+	if (outofband)
+	{
+		PUSH_MV_STENT(MVST_ZINTCMD);
+		mv_chain->mv_st_cont.mvs_zintcmd.end_or_remain = end_time;
+		mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_check = frame_pointer->restart_ctxt;
+		mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_check = frame_pointer->restart_pc;
+		/* save current information from zintcmd_active */
+		mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_prior = TAREF1(zintcmd_active, ZINTCMD_HANG).restart_ctxt_last;
+		mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_prior = TAREF1(zintcmd_active, ZINTCMD_HANG).restart_pc_last;
+		TAREF1(zintcmd_active, ZINTCMD_HANG).restart_pc_last = frame_pointer->restart_pc;
+		TAREF1(zintcmd_active, ZINTCMD_HANG).restart_ctxt_last = frame_pointer->restart_ctxt;
+		TAREF1(zintcmd_active, ZINTCMD_HANG).count++;
+		mv_chain->mv_st_cont.mvs_zintcmd.command = ZINTCMD_HANG;
+		async_action(FALSE);
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 	}
 	return;
 }

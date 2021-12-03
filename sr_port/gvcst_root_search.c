@@ -350,9 +350,26 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 		oldnct = gv_target->nct;
 		if (rlen > hdr_len + blk_id_sz)
 		{
+<<<<<<< HEAD
 			assert(NULL != global_collation_mstr.addr);
 			GET_GVT_COLL_INFO(gv_target, (uchar_ptr_t)global_collation_mstr.addr,
 					  (int)(rlen - (hdr_len + blk_id_sz)), dummy_ret);
+=======
+			assert((NULL != global_collation_mstr.addr) && (uchar_ptr_t)global_collation_mstr.addr);
+			subrec_ptr = get_spec((uchar_ptr_t)global_collation_mstr.addr,
+						(int)(rlen - (hdr_len + blk_id_sz)), COLL_SPEC);
+			if (subrec_ptr)
+			{
+				gv_target->nct = *(subrec_ptr + COLL_NCT_OFFSET);
+				gv_target->act = *(subrec_ptr + COLL_ACT_OFFSET);
+				gv_target->ver = *(subrec_ptr + COLL_VER_OFFSET);
+			} else
+			{
+				gv_target->nct = 0;
+				gv_target->act = 0;
+				gv_target->ver = 0;
+			}
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 		} else if (gv_target->act_specified_in_gld)
 		{	/* Global directory specified a collation. Directory tree did not specify any non-zero collation.
 			 * So global directory prevails.

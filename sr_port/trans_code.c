@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -190,12 +190,12 @@ void trans_code(void)
 	SETUP_THREADGBL_ACCESS;
 	if (SFT_ZINTR & proc_act_type)
 	{	/* Need different translator EP */
-		jobinterrupt_process();
+		jobintrpt_ztime_process(FALSE);	/* FALSE indicates jobinterrupt - NOT ztimeout */
 		return;
 	}
 	if ((SFT_ZTIMEOUT & proc_act_type) && ((TREF(dollar_ztimeout)).ztimeout_vector.str.len))
 	{	/* Else current ETRAP or ZTRAP is the vector */
-		ztimeout_process();
+		jobintrpt_ztime_process(TRUE);	/* TRUE indicates ztimeout */
 		return;
 	}
 	assert(err_act);

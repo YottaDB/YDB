@@ -34,7 +34,12 @@
 #include "gtm_conv.h"
 #include "gtmimagename.h"
 #include "error.h"
+<<<<<<< HEAD
 #include "ydb_getenv.h"
+=======
+#include "op.h"
+#include "indir_enum.h"
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 GBLREF int		COLUMNS, GTM_LINES, AUTO_RIGHT_MARGIN;
 GBLREF uint4		ydb_principal_editing_defaults;
@@ -88,9 +93,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	{
 		if ((ch = *(pp->str.addr + p_offset++)) == iop_exception)
 		{
-			ioptr->error_handler.len = *(pp->str.addr + p_offset);
-			ioptr->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
-			s2pool(&ioptr->error_handler);
+			DEF_EXCEPTION(pp, p_offset, ioptr);
 			break;
 		} else  if (ch == iop_canonical)
 			tt_ptr->canonical = TRUE;

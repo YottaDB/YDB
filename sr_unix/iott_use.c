@@ -42,7 +42,8 @@
 #include "error.h"
 #include "gtm_tputs.h"
 #include "gtm_tparm.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "restrict.h"
 #include "op.h"
 #include "indir_enum.h"
@@ -66,11 +67,12 @@ LITDEF unsigned char filter_index[27] =
 	,4, 4, 4
 };
 
-GBLREF boolean_t	ctrlc_on, dollar_zininterrupt, hup_on, prin_in_dev_failure, prin_out_dev_failure;
-GBLREF char		*CURSOR_ADDRESS, *CLR_EOL, *CLR_EOS;
-GBLREF io_pair		io_curr_device, io_std_device;
-GBLREF mval		dollar_zstatus;
-GBLREF void		(*ctrlc_handler_ptr)();
+GBLREF boolean_t		ctrlc_on, hup_on, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF char			*CURSOR_ADDRESS, *CLR_EOL, *CLR_EOS;
+GBLREF io_pair			io_curr_device, io_std_device;
+GBLREF mval			dollar_zstatus;
+GBLREF void			(*ctrlc_handler_ptr)();
+GBLREF volatile boolean_t	dollar_zininterrupt;
 
 LITREF unsigned char	io_params_size[];
 

@@ -143,9 +143,11 @@
     -[NO]NEWJNLFILES[=[NO]PREVLINK],[NO]S[YNC_IO]]
     -O[NLINE]
     -REC[ORD]
-    -REPL[ACE]
-    -REPLINSTANCE=target_location
-    -S[INCE]={DATABASE|BYTESTREAM|RECORD}
+    -REPLA[CE]
+    -RET[RY]=count
+    -REPLIN[STANCE]=target_location
+    -SH[OWPROGRESS]
+    -SI[NCE]={DATABASE|BYTESTREAM|RECORD}
     -T[RANSACTION]=hexadecimal_transaction_number
    ] region-list[,...] destination-list
 
@@ -431,9 +433,16 @@
    reference point for subsequent bytestream, database, or custom backup
    (SANS or disk mirror) protocols. Even though -DATABASE and -BYTESTREAM
    both mark their own relative timestamps, -RECORD provides an additional
-   timestamp option. MUPIP FREEZE also provides the -RECORD qualifier because
-   a FREEZE may be used to set the database up for a SAN or disk-mirror based
-   backup mechanism.
+   timestamp option. In addition to storing the transaction number, -RECORD
+   also stores a timestamp including the date and time of a successful backup
+   operation in the database file. MUPIP DUMPFHEAD displays this timestamp as
+   "sgmnt_data.last_start_backup" using a format such as "Sun Aug 15 13:37:32
+   2021". DSE DUMP -FILEHEADER -ALL also displays this date and time as "Last
+   Record Backup Start" using the same format. These timestamps are displayed
+   relative to the current timezone, and display as "Never" if the database
+   file has never been successfully backed up with -RECORD. MUPIP FREEZE also
+   provides the -RECORD qualifier because a FREEZE may be used to set the
+   database up for a SAN or disk-mirror based backup mechanism.
 
    The format of the RECORD qualifier is:
 
@@ -474,13 +483,38 @@
 
    -REPLI[NSTANCE]=<target_location>
 
+3 RETry
+   RETry
+
+   Makes the specified number of attempts to retry performing BACKUP if the
+   backup fails. If -RETRY is not specified, GT.M defaults -RETRY to zero
+   (0). In case of an error, retry attempts are always based on cp or pax
+   even when another copy mechanism is available.
+
+   The format of the RETRY qualifier is:
+
+   -RET[RY]=<count>
+
+3 SHowprogress
+   SHowprogress
+
+   When the backup copy mechanism supports monitoring, -SHOWPROGRESS
+   periodically displays the transfer progress, estimated time left, speed,
+   and the number of transaction applied to the database during backup.
+
+   The format of the SHOWPROGRESS qualifier is:
+
+   -SH[OWPROGRESS]
+
+   Incompatible with: -BYTESTREAM
+
 3 Since
    Since
 
    Includes blocks changed since the last specified backup. The format of the
    SINCE qualifier is:
 
-   -S[INCE]={DATABASE|BYTESTREAM|RECORD}
+   -SI[NCE]={DATABASE|BYTESTREAM|RECORD}
 
      * D[ATABASE] - Backup all changes since the last MUPIP BACKUP -DATABASE.
      * B[YTESTREAM] - Backup all changes since the last MUPIP BACKUP
@@ -734,6 +768,15 @@
 
    DU[MPFHEAD]  {-FI[LE] file-name |-REG[ION] region-list}
 
+   **Note**
+
+   MUPIP DUMPFHEAD obtains the field values from the database file header and
+   ^%PEEKBYNAME obtains field values from the shared memory. Therefore, it
+   may be possible that MUPIP DUMPFHEAD reports stale values for unflushed
+   fields. If you require more recent file header values, use the MUPIP
+   DUMPFHEAD -FLUSH which flushes file headers fields from shared memory to
+   disk before returning the file header values.
+
 3 FILE
    FILE
 
@@ -745,6 +788,19 @@
 
      o The database file name must include the absolute or relative path.
      o The -FILE qualifier is incompatible with the -REGION qualifier.
+
+3 FLUSH
+   FLUSH
+
+   Flushes the database file header flush before displaying the database file
+   header fields. While this qualifier ensures the information is recent,
+   under most production circumstances the output is sufficiently accurate
+   without -FLUSH. Use of -FLUSH makes the operation significanly more
+   heavyweight. If the database file header flush fails, MUPIP DUMPFHEAD
+   -FLUSH produces a BUFFLUFAILED warning, but still produces output. The
+   format of the FLUSH qualifier is:
+
+   -FL[USH]
 
 3 REGION
    REGION
@@ -3195,10 +3251,10 @@
     -[NO]INST[_FREEZE_ON_ERROR]
     -JN[LFILE] journal-file-name journal-file-quals
     -K[EY_SIZE]=bytes
+    -[NO]LCK_SHARES_DB_CRIT
     -L[OCK_SPACE]=integer
     -M[UTEX_SLOTS]=integer
     -N[ULL_SUBSCRIPTS]=value
-    -[NO]LCK_SHARES_DB_CRIT
     -[NO]Q[DBRUNDOWN]
     -[NO]REA[D_ONLY]
     -REC[ORD_SIZE]=bytes
@@ -3208,7 +3264,8 @@
     -SL[EEP_SPIN_COUNT]=integer
     -SPIN_SLEEP_M[ASK]=hex_mask
     -[NO]STAT[S]
-    -NO]STD[NULLCOLL]
+    -STATSD[B_ALLOCATION]=integer(no of blocks)
+    -[NO]STD[NULLCOLL]
     -T[RIGGER_FLUSH]=integer
     -V[ERSION]={V4|V6}
     -W[AIT_DISK]=integer
@@ -3486,6 +3543,17 @@
 
    -K[EY_SIZE=bytes
 
+3 Lck_shares_db_crit
+   Lck_shares_db_crit
+
+   Specifies whether LOCK actions share the same resource and management as
+   the database or use a separate resource and management. The format of the
+   LCK_SHARES_DB_CRIT qualifier is:
+
+    -[NO]LC[K_SHARES_DB_CRIT]
+
+   The default is Sep(arate)/FALSE.
+
 3 Lock_space
    Lock_space
 
@@ -3530,17 +3598,6 @@
      o Prohibiting null subscripts can restrict access to existing data and
        cause YottaDB to report errors.
      o The default value is never.
-
-3 Lck_shares_db_crit
-   Lck_shares_db_crit
-
-   Specifies whether LOCK actions share the same resource and management as
-   the database or use a separate resource and management. The format of the
-   LCK_SHARES_DB_CRIT qualifier is:
-
-    -[NO]LC[K_SHARES_DB_CRIT]
-
-   The default is Sep(arate)/FALSE.
 
 3 Qdbrundown
    Qdbrundown
@@ -3700,6 +3757,21 @@
      o A process disables itself from maintaining the shared statistics when
        it fails to open a statsDB. It does not, however, disable subsequently
        starting processes from maintaining the shared statistics.
+
+3 StatsDB_allocation
+   StatsDB_allocation
+
+   Specifies the initial number of GDS blocks for the shadow stats regions
+   when the database region is first created. This qualifier requires
+   standalone access and a file or region name. The format of the
+   STATSDB_ALLOCATION qualifier is:
+
+   -STATSD[B_ALLOCATION]=integer
+
+     o GT.M doubles the block count with each statsdb size increase.
+     o The minimum STATSDB_ALLOCATION is 128 blocks.
+     o The maximum STATSDB_ALLOCATION is 8,388,607 blocks.
+     o By default, GDE uses an STATSDB_ALLOCATION of 2050 blocks.
 
 3 STDnullcoll
    STDnullcoll
@@ -5110,7 +5182,9 @@
    format, as controlled by the time zone setting from the OS and the process
    environment for the process running the EXTRACT.
 
-   -EXTRACT takes <file-name> or -stdout as an optional argument.
+   -EXTRACT takes <file-name> or -stdout as an optional argument. <file-name>
+   may also be the name of a currently open named pipe (FIFO) set up to
+   receive the extracted records.
 
    <file-name> specifies the name of the output file. -stdout specifies that
    -EXTRACT write to standard output (stdout) instead of writing to a file.
@@ -7445,8 +7519,9 @@
    for a connection session, YottaDB never attempts to switch that connection
    session to TLS connection.
 
-   -RENEGotiate_interval=<minutes >
+   -RENEGotiate_interval=<minutes>
 
+<<<<<<< HEAD
    Specifies the time in mintues to wait before attempting to perform a TLS
    renegotiation. The default -RENEGOTIATE_INTERVAL is a little over 120
    minutes. A value of zero causes YottaDB never to attempt a renegotiation. The
@@ -7456,6 +7531,18 @@
    connection. As renegotiation requires the replication pipeline to be
    temporarily flushed, followed by the actual renegotiation, TLS
    renegotiation can cause momentary spikes in replication backlog.
+=======
+   Specifies the approximate time in minutes to wait before attempting to
+   perform a TLS renegotiation. The default -RENEGOTIATE_INTERVAL is a little
+   over 120 minutes. The minimum -RENEGOTIATE_INTERVAL is 1 minute. A value
+   of zero causes GT.M never to attempt a renegotiation. The MUPIP REPLIC
+   -SOURCE -JNLPOOL -SHOW [-DETAIL] command shows the time at which the next
+   TLS renegotiation is scheduled, and how many such renegotiations have
+   occurred thus far for a given secondary instance connection. As
+   renegotiation requires the replication pipeline to be temporarily flushed,
+   followed by the actual renegotiation, TLS renegotiation can cause
+   momentary spikes in replication backlog.
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
 2 Shutdown_Source_Server
    Shutdown Source Server
@@ -8090,6 +8177,11 @@
    instance file (-INSTANCE_CREATE) of the replicating instance to ensure
    that it bypasses the history information of the current and prior states.
 
+   When started with -updateresync, the receiver server continues trying
+   connection attempts to the source server until it gets a successful update
+   in response. Once an update goes through, subsequent connection restarts
+   behave as if the receiver was started without -updateresync.
+
    You also need use -updateresync to replace your existing replication
    instance files if a YottaDB version upgrade changes the instance file format.
    The last instance file format change was in GT.M V5.5-000 (predates YottaDB
@@ -8210,7 +8302,11 @@
      o If helper processes are already running, specifying -helpers[=m[,n]]
        again starts additional helper processes. There can be a maximum of
        128 helper processes for a receiver server.
+<<<<<<< HEAD
      o If -helpers=0[,n] is specified, YottaDB starts no helper processes.
+=======
+     o If -helpers is not specified, GT.M starts no helper processes.
+>>>>>>> 52a92dfd (GT.M V7.0-001)
      o With the HELPERS qualifier specified but neither m nor n specified,
        YottaDB starts the default number of helper processes with the default
        proportion of roles. The default number of aggregate helper processes
@@ -8508,6 +8604,7 @@ Example:
 1 Summary
    Summary
 
+<<<<<<< HEAD
    +------------------------------------------------------------------------------------------------------+
    |  COMMAND  |    OBJECTS     |                   MAIN QUALIFIER                    |  GT.M  |Standalone|
    |           |                |                                                     |version*| Access#  |
@@ -8782,6 +8879,284 @@ Example:
    |-----------+----------------+-----------------------------------------------------+--------+----------|
    |UP[GRADE]  |file-name       |-                                                    |        |Y         |
    +------------------------------------------------------------------------------------------------------+
+=======
+   +--------------------------------------------------------------------------------------------------------+
+   |  COMMAND  |    OBJECTS     |                    MAIN QUALIFIER                     |  GT.M  |Standalone|
+   |           |                |                                                       |version*| Access#  |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |B[ACKUP]   |region-name     |-BK[UPDBJNL]=DISABLE | OFF                             |        |          |
+   |           |file-name       |                                                       |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-BY[TESTREAM] -NET[TIMEOUT]=seconds                    |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-C[OMPREHENSIVE]                                       |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-DA[TABASE] -REPLA[CE]                                 |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-I[NCREMENTAL]                                         |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]J[OURNAL][=journal-options-list]                  |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-NETTIMEOUT                                            |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]NEWJNLFILES[=[NO]PREVLINK],[NO]S[YNC_IO]          |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-O[NLINE]                                              |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-RECORD                                                |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-REPLI[NSTANCE]=OFF | ON                               |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-S[INCE]={DATABASE|BYTESTREAM|RECORD}                  |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-T[RANSACTION=hexa;transaction_number]                 |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |CR[EATE]   |-               |-R[EGION]=region-name                                  |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |DO[WNGRADE]|file-name       |-V[ERION]={V4|V5}                                      |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |DU[MPFHEAD]|file-name or    |-                                                      |V6.3-001|          |
+   |           |region-list     |                                                       |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |EN[DIANCVT]|file-name       |-OUTDB=<outdb-file>                                    |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-OV[ERRIDE]                                            |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |EXI[T]     |-               |-                                                      |        |N/A       |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |EXTE[ND]   |region-name     |-B[LOCKS]=blocks                                       |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |EXTR[ACT]  |-               |-FO[RMAT]=GO|B[INARY]|Z[WR]                            |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-FR[EEZE]                                              |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-NU[LL_IV]                                             |V6.3-000|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-LA[BEL]=text                                          |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]L[OG]                                             |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-S[ELECT]=global-name-list                             |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-O[CHSET]=character-set                                |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-R[EGION=region-list                                   |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |F[REEZE]   |region-list     |-OF[F] [-OV[ERRIDE]]                                   |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-ON [-[NO]ONL[INE] [-[NO]A[UTORELEASE]] [-R[ECORD]]]   |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |FT[OK]     |File-name       |-D[B]                                                  |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-J[NLPOOL]                                             |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-R[ECVPOOL]                                            |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |H[ELP]     |command-option  |-                                                      |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |I[NTEG]    |File-name or    |-A[DJACENCY]=integer]                                  |        |          |
+   |           |region-list     |                                                       |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-BL[OCK]=hexa;block-number]                            |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-BR[IEF]                                               |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-FA[ST]                                                |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-FI[LE]                                                |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-FU[LL]                                                |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-NO]K[EYRANGES                                         |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO][MAP]=integer                                     |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]MAXK[EYSIZE]=integer                              |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-R[EGION]                                              |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]ST[ATS]                                           |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-SU[BSCRIPT]=subscript                                 |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-TN[_RESET]                                            |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]TR[ANSACTION][=integer]                           |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |IN[TRPT]   |process id      |                                                       |        |N/A       |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |J[OURNAL]  |file-name       |-EX[TRACT][=file-specification|                        |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-stdout]                                               |V5.5-000|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-REG[ION]                                              |V6.2-000|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-REC[OVER] | -RO[LLBACK]                               |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-SH[OW][=show-option-list]                             |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]V[ERIFY]                                          |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-BA[CKWARD] | -FO[RWARD]                               |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-CO[RRUPTDB]                                           |V6.3-010|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |L[OAD]     |file-name       |-BE[GIN]=integer                                       |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-BLOCK_DENSITY                                         |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-E[ND]=integer                                         |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-FI[LLFACTOR]=integer                                  |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-FO[RMAT]=GO|B[INARY]|Z[WR]                            |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-S[TDIN]                                               |V5.5-000|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-O[NERROR]                                             |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |REO[RG]    |                |-D[OWNGRADE]                                           |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-ENCR[YPT]=key                                         |V6.3-000|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-E[XCLUDE]=global-name-list                            |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-FI[LL_FACTOR]=integer                                 |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-I[NDEX_FILL_FACTOR]=integer                           |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-K[EEP]={pct%|blocks}                                  |V6.3-009|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-NOCO[ALESCE]                                          |V6.3-009|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-NOSP[LIT]                                             |V6.3-009|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-NOSW[AP]                                              |V6.3-009|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-R[ESUME]                                              |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-S[ELECT]=global-name-list                             |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-T[RUNCATE][=percentage]                               |V5.5-000|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-UP[GRADE]                                             |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-REG[ION] region-list                                  |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |REP[LICATE]|file-name       |-E[DITINSTANCE]                                        |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-N[AME]                                                |V5.5-000|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-I[NSTANCE_CREATE]                                     |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-R[ECEIVER                                             |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-S[OURCE]                                              |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-UPDA[TEPROC]                                          |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |RE[STORE]  |file-name or    |-[NO]E[XTEND]                                          |        |Y         |
+   |           |file-list       |                                                       |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |RU[NDOWN]  |file-name or    |-F[ILE]                                                |        |Y         |
+   |           |region-name     |                                                       |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-R[EGION]                                              |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-RELINKCTL [dir]                                       |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-OVERRIDE                                              |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |file-name or    |SE[T] {-FI[LE] file-name|-JN[LFILE]                    |        |          |
+   |SE[T]      |region-name     |journal-file-name|-REG[ION]                            |        |          |
+   |           |                |region-list|-REP[LICATION]={ON|OFF}}                   |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-AC[CESS_METHOD]={BG|MM}                               |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]AS[YNCIO]                                         |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]DE[FER_TIME][=seconds]                            |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]DEFER_ALLOCATE                                    |V6.2-002|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]EP[OCHTAPER]                                      |V6.2-001|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]ENCRYPTABLE                                       |V6.3-000|Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-E[XTENSION_COUNT]=integer(no of blocks)               |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-F[LUSH_TIME]=integer                                  |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-FU[LLBLKWRT]={0|1|2}                                  |V6.3-012|Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-G[LOBAL_BUFFERS]=integer                              |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-H[ARD_SPIN_COUNT]=integer                             |V6.3-003|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]INST[_FREEZE_ON_ERROR]                            |V6.0-000|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-JN[LFILE] journal-file-name                           |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-K[EY_SIZE]=bytes                                      |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]LCK_SHARES_DB_CRIT                                |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-L[OCK_SPACE]=integer                                  |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-M[UTEX_SLOTS]=integer                                 |V6.0-002|Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-N[ULL_SUBSCRIPTS]=value                               |V6.3-003|Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-PA[RTIAL_RECOV_BYPASS]                                |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]Q[DBRUNDOWN]                                      |V6.0-000|Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]REA[D_ONLY]                                       |V6.3-003|Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-REC[ORD_SIZE]=bytes                                   |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-REG[ION] region-list                                  |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-REP[LICATION]={ON|OFF}                                |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-RES[ERVED_BYTES]=integer                              |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-SLEE[P_SPIN_COUNT]=integer                            |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-SPIN[_SLEEP_MASK]=hexa_mask                           |V6.3-003|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-STAN[DALONENOT]                                       |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]STD[NULLCOLL]                                     |V6.3-003|Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-[NO]STAT[S]                                           |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-STATSD[B_ALLOCATION]=integer                          |V7.0-001|Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-V[ERSION]={V4|V6}                                     |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-W[AIT_DISK]=integer                                   |        |Y         |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |SI[ZE]     |global-name-list|-H[EURISTIC]=estimation_technique                      |V6.0-001|          |
+   |           |region-list     |                                                       |        |          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-S[ELECT]=global-name-list                             |V6.0-001|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-R[EGION]=region-list                                  |V6.0-001|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |ST[OP]     |process-id      |process-id                                             |        |N/A       |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |TRIGGER    |-               |-TRIG[GERFILE]=<trigger_definitions_file>              |V5.4-002|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-NOPR[OMPT]                                            |V5.4-002|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-SELE[CT][=name-list|*][<select-output-file>]          |V5.4-002|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |           |                |-UPGRADE                                               |V5.4-002|          |
+   |-----------+----------------+-------------------------------------------------------+--------+----------|
+   |UP[GRADE]  |file-name       |-                                                      |        |Y         |
+   +--------------------------------------------------------------------------------------------------------+
+>>>>>>> 52a92dfd (GT.M V7.0-001)
 
    The following table summarizes the qualifiers.
 
