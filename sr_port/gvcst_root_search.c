@@ -346,7 +346,7 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 		oldnct = gv_target->nct;
 		if (rlen > hdr_len + blk_id_sz)
 		{
-			assert(NULL != global_collation_mstr.addr);
+			assert((NULL != global_collation_mstr.addr) && (uchar_ptr_t)global_collation_mstr.addr);
 			subrec_ptr = get_spec((uchar_ptr_t)global_collation_mstr.addr,
 						(int)(rlen - (hdr_len + blk_id_sz)), COLL_SPEC);
 			if (subrec_ptr)

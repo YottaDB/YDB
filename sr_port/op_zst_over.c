@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,22 +13,26 @@
 #include "mdef.h"
 #include "xfer_enum.h"
 #include "op.h"
+#include "mprof.h"
 #include "fix_xfer_entry.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 
-GBLREF xfer_entry_t	xfer_table[];
 GBLREF bool 		neterr_pending;
-GBLREF int4 		outofband;
-GBLREF int 		iott_write_error;
+GBLREF boolean_t	is_tracing_on;
+GBLREF volatile int4	outofband;
+GBLREF xfer_entry_t	xfer_table[];
 
 void op_zst_over(void)
 {
-	if (!neterr_pending && 0 == outofband && 0 == iott_write_error)
+	intrpt_state_t		prev_intrpt_state;
+
+	DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
+	if (!neterr_pending && (no_event != outofband))
 	{
-                    FIX_XFER_ENTRY(xf_linefetch, op_linefetch);
-                    FIX_XFER_ENTRY(xf_linestart, op_linestart);
-                    FIX_XFER_ENTRY(xf_zbfetch, op_zbfetch);
-                    FIX_XFER_ENTRY(xf_zbstart, op_zbstart);
-                    FIX_XFER_ENTRY(xf_ret,opp_zst_over_ret);
-                    FIX_XFER_ENTRY(xf_retarg, opp_zst_over_retarg);
+		DEFER_OUT_OF_XFER_TAB(is_tracing_on);
+		FIX_XFER_ENTRY(xf_ret,opp_zst_over_ret);
+		FIX_XFER_ENTRY(xf_retarg, opp_zst_over_retarg);
 	}
+	ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
 }

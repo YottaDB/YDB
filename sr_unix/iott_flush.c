@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,12 +24,12 @@
 #include "have_crit.h"
 #include "iott_flush_time.h"
 #include "deferred_events.h"
+#include "deferred_events_queue.h"
 
 GBLREF boolean_t	prin_out_dev_failure;
 GBLREF int		process_exiting;
 GBLREF io_pair		io_curr_device, io_std_device;
 
-error_def(ERR_NOPRINCIO);
 error_def(ERR_TERMWRITE);
 
 void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
@@ -67,7 +67,7 @@ void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TERMWRITE, 0, status);
 				prin_out_dev_failure = TRUE;			/* set flag for NOPRINCIO, to give app a chance */
 			}
-			xfer_set_handlers(tt_write_error_event, tt_write_error_set, status, FALSE);
+			xfer_set_handlers(ttwriterr, status, FALSE);
 		}
 	}
 	tt_ptr->write_active = new_write_flag;

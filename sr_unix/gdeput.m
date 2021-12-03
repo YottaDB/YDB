@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2006-2020 Fidelity National Information		;
+; Copyright (c) 2006-2021 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -108,8 +108,7 @@ GDEPUT()
 	u tempfile
 	f  s record=$ze(rec,1,512),rec=$ze(rec,513,MAXSTRLEN) q:'$zl(record)  w record,!
 	u @useio
-	o file:chset="M" c file:delete
-	c tempfile:rename=file
+	c tempfile:(replace=file)		; overwrite before rename cuts delete gap but not currently documented
 	i debug,$$MAP2NAM^GDEMAP(.map),$$ALL^GDEVERIF
 	q 1
 

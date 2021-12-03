@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2020 Fidelity National Information		#
+# Copyright (c) 2001-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -88,9 +88,14 @@ endif
 # Unset gtm_custom_errors to prevent some errors, especially %GTM-E-FTOKERR if $gtm_repl_instance is set in the environment
 unsetenv gtm_custom_errors
 
+# Remove old temporary files and logs.
+set errorlog = "$gtm_log/error.`basename $gtm_exe`.log"
+rm -f $errorlog $gtm_log/gt_cc_*.{csh,out} $gtm_log/buildaux_*.{out,err,csh} $gtm_log/tttgen_*.log
+
 @ comlist_status = 0
 
 set dollar_sign = \$
+alias error_and_exit 'echo \!:1 ; echo \!:1 >> $errorlog ; @ comlist_status++ ; goto comlist.END'
 
 unalias ls rm
 
@@ -143,16 +148,13 @@ case "gtm_pro":
 	breaksw
 
 default:
-	echo "comlist-F-badp3, Third argument invalid, should be one of: gtm_bta, gtm_dbg, gtm_pro -- no action taken."
-	set comlist_status = -3
-	goto comlist.END
+	error_and_exit "COMLIST-E-BADP3 : Third argument invalid, should be one of: gtm_bta, gtm_dbg, gtm_pro -- no action taken."
 	breaksw
 
 endsw
 
 if (0 != $comlist_status) then
-	echo "version command failed -- aborting build"
-	goto comlist.END
+	error_and_exit "COMLIST-E-VERSION : version command failed -- aborting build"
 endif
 
 switch ( $gtm_verno )
@@ -195,8 +197,7 @@ endif
 
 
 if !(-o $gtm_ver) then
-	echo "COMLIST-E-NOTOWNER. $USER is not owner of $gtm_ver cannot coninue"
-	goto comlist.END
+	error_and_exit "COMLIST-E-NOTOWNER : $USER is not owner of $gtm_ver cannot coninue"
 endif
 
 #	Change the permissions on the root directory for this version to allow
@@ -248,9 +249,6 @@ else
 
 endif
 
-#	Remove old error log.
-set errorlog = "$gtm_log/error.`basename $gtm_exe`.log"
-rm $errorlog
 
 
 echo ""
@@ -313,11 +311,7 @@ chmod +w *		# this allows the rm to work without prompting for an override
 rm *
 
 cp $gtm_tools/lowerc_cp.sh lowerc_cp
-if ( "$HOSTOS" == "SunOS" ) then
-	cp $gtm_tools/gtminstall_Solaris.sh gtminstall
-else
-	cp $gtm_tools/gtminstall.sh gtminstall
-endif
+cp $gtm_tools/gtminstall.sh gtminstall
 
 chmod +x {lowerc,gtminstall}*
 
@@ -358,8 +352,12 @@ if ( ! -d ./map ) then
 endif
 cd ./obj
 
-# Remove anything that's not a library.
-find . -type f -name '*.a' -prune -o -type f -print | sort | xargs -n25 rm
+# Remove anything that's not a library.  We pass -r on Linux to suppress invoking rm with zero args (the xargs default on AIX)
+set xargs_xtra=""
+if ("Linux" == $HOSTOS) then
+	set xargs_xtra="-r"
+endif
+find . -type f -name '*.a' -prune -o -type f -print | sort | xargs $xargs_xtra -n25 rm
 
 set gi = ($gtm_inc)
 set gs = ($gtm_src)
@@ -382,6 +380,7 @@ if ( -x $gtm_root/$gtm_curpro/pro/mumps ) then
     setenv gtm_dist "$gtm_root/$gtm_curpro/pro"
     set old_gtmroutines = "$gtmroutines"
     setenv gtmroutines "$gtm_obj($gtm_pct)"
+    set msgstatus = 0
     foreach i ( *.msg )
 
 	set j = `basename $i .msg`
@@ -390,10 +389,14 @@ if ( -x $gtm_root/$gtm_curpro/pro/mumps ) then
 	# MSG.m converts a VMS-style error message MSG input file to a
 	# file with information about the messages.
 	# On unix, the C source file includes the message texts.
-	$gtm_root/$gtm_curpro/pro/mumps -run msg $i Unix
-
+	$gtm_root/$gtm_curpro/pro/mumps -run msg $i
+	if (0 != $status) then
+		echo "COMLIST-E-MSG : 'mumps -run msg $i' failed" >> $errorlog
+		@ msgstatus++
+	endif
 	if ( ! -f ${j}_ctl.c ) then
-		echo "comlist-E-MSGfail, MSG.m failed to produce output file ${j}_ctl.c" >> $errorlog
+		echo "COMLIST-E-MSG : MSG.m failed to produce output file ${j}_ctl.c" >> $errorlog
+		@ msgstatus++
 	endif
 	if ( -f ${j}_ansi.h ) then
 		mv -f ${j}_ansi.h $gtm_inc
@@ -402,14 +405,18 @@ if ( -x $gtm_root/$gtm_curpro/pro/mumps ) then
 
     #  Generate ttt.c
     $shell -f $gtm_tools/gen_ttt.csh
+    @ msgstatus = $msgstatus + $status
 
     setenv gtmroutines "$old_gtmroutines"
     unset old_gtmroutines
     setenv gtm_dist "$real_gtm_dist"
     unset real_gtm_dist
     popd
+    if ($msgstatus) then
+    	error_and_exit "COMLIST-E-MSG : Error running msg.m or gen_ttt.csh"
+    endif
 else
-    echo "comlist-E-NoMUMPS, unable to regenerate merrors.c and ttt.c due to missing $gtm_curpro/pro/mumps" >> $errorlog
+    error_and_exit "COMLIST-E-NO_MUMPS : unable to regenerate merrors.c and ttt.c due to missing $gtm_curpro/pro/mumps"
 endif
 
 #############################################################
@@ -483,6 +490,14 @@ gtm_tls_impl.c
 EOF
 find $gs[1] -name '*.c' | grep -v -f ${TMP_DIR}/exclude.lst | sort | xargs -n25 $gtm_tools/gt_cc.csh
 \rm -rf ${TMP_DIR}
+
+set nonomatch ; set compileout=($gtm_log/gt_cc_local_*.out) ; unset nonomatch
+if ("$gtm_log/gt_cc_local_*.out" != "$compileout") then
+	grep -qE 'COMLIST-E-' $gtm_log/gt_cc_local_*.out
+	if (0 == $status) then
+		error_and_exit "COMLIST-E-COMPILE : Compiling one or more source files failed -- aborting build"
+	endif
+endif
 
 # Special compilation for omi_sx_play.c
 set comlist_gt_cc_bak = "$comlist_gt_cc"
@@ -594,7 +609,7 @@ foreach i ( $comlist_liblist )
 			xargs -n50 $shell -f $gtm_tools/gt_ar.csh $gt_ar_option_create lib$i.a >>& ar$i.log
 		if ( $status ) then
 			@ comlist_status++
-			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
+			echo "COMLIST-E-ARCHIVE : Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
 			>> $errorlog
 		endif
 		breaksw
@@ -603,7 +618,7 @@ foreach i ( $comlist_liblist )
 		gt_ar $gt_ar_option_create lib$i.a `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list` >>& ar$i.log
 		if ( $status ) then
 			@ comlist_status++
-			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
+			echo "COMLIST-E-ARCHIVE : Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
 			>> $errorlog
 		endif
 		rm -f `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list`
@@ -626,34 +641,40 @@ foreach i ( $comlist_liblist )
 	echo "End of $i archive creation: `date`"
 end
 
+if (0 != $comlist_status) then
+	error_and_exit "COMLIST-E-ARCHIVE : One of the archive creations above failed -- aborting build"
+endif
 
 /bin/ls | egrep '\.o$' | egrep -v "$exclude" | xargs -n25 rm -f
 
 switch ( $3 )
 case "gtm_bta":
 	set bldtype = "Bta"
-	$shell -f $gtm_tools/buildbta.csh $p4
-	if ($status) @ comlist_status++	# done before each breaksw instead of after endsw
-	breaksw				# as $status seems to be get reset in between
+	set buildscript = "$gtm_tools/buildbta.csh"
+	set buildargs = "$p4"
+	breaksw
 
 case "gtm_dbg":
 	set bldtype = "Dbg"
-	$shell -f $gtm_tools/builddbg.csh $p4
-	if ($status) @ comlist_status++
+	set buildscript = "$gtm_tools/builddbg.csh"
+	set buildargs = "$p4"
 	breaksw
 
 case "gtm_pro":
 	set bldtype = "Pro"
-	$shell -f $gtm_tools/buildpro.csh $p4
-	if ($status) @ comlist_status++
+	set buildscript = "$gtm_tools/buildpro.csh"
+	set buildargs = "$p4"
 	breaksw
 endsw
 
+$shell -f $buildscript $buildargs
+if ($status) @ comlist_status++
+if (0 != $comlist_status) then
+	error_and_exit "COMLIST-E-BUILD : $buildscript invocation above failed -- aborting build"
+endif
+
 if ( ! -x $gtm_dist/mumps ) then
-	echo "comlist-E-nomumps, ${dollar_sign}gtm_dist/mumps is not executable" >> $errorlog
-	echo "comlist-W-nomsgverify, unable to verify error message definition files" >> $errorlog
-	echo "comlist-W-noonlinehelp, unable to generate on-line help files" >> $errorlog
-	goto comlist.END
+	error_and_exit "COMLIST-E-NOMUMPS : ${dollar_sign}gtm_dist/mumps is not executable"
 endif
 
 set mupip_size = `ls -l $gtm_exe/mupip |awk '{print $5}'`
@@ -668,17 +689,21 @@ endif
 
 # Build GTMDefinedTypesInit.m file but where to run the generation script from depends on whether our current working
 # directory has a version of it or not.
-rm -f obj/gengtmdeftypes.log* >& /dev/null
-rm -f GTMDefinedTypesInit.m >& /dev/null
+rm -f obj/gengtmdeftypes.log*
+rm -f GTMDefinedTypesInit.m
 echo "Generating GTMDefinedTypesInit.m"
 $gtm_tools/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
 @ savestatus = $status
 if ((0 != $savestatus) || (! -e GTMDefinedTypesInit.m)) then
-	set errmsg = "COMLIST-E-FAIL gengtmdeftypes.csh failed to create GTMDefinedTypesInit.m "
+	set errmsg = "COMLIST-E-GTMDEFINEDTYPES : gengtmdeftypes.csh failed to create GTMDefinedTypesInit.m "
 	set errmsg = "$errmsg - see log in $gtm_obj/gengtmdeftypes.log"
 	@ comlist_status++
 	echo $errmsg >> $errorlog
 endif
+if (-e struct_padding_warn.out) then
+	mv struct_padding_warn.out $gtm_log/struct_padding_warn.${bldtype:al}.out
+endif
+
 if (-e GTMDefinedTypesInit.m) then
 	# Need a different name for each build type as they can be different
 	cp -f GTMDefinedTypesInit.m $gtm_pct/GTMDefinedTypesInit${bldtype}.m
@@ -686,7 +711,7 @@ if (-e GTMDefinedTypesInit.m) then
 	setenv gtm_chset M
 	./mumps GTMDefinedTypesInit.m
 	if ($status) then
-		set errmsg = "COMLIST-E-FAIL Failed to compile generated $gtm_exe/GTMDefinedTypes.m"
+		set errmsg = "COMLIST-E-GTMDEFINEDTYPES : Failed to compile generated $gtm_exe/GTMDefinedTypes.m"
 		@ comlist_status++
 		echo "${errmsg}" >> $errorlog
 	endif
@@ -709,7 +734,7 @@ if (-e GTMDefinedTypesInit.m) then
 		# mumps executable not yet linked to utf8 dir so access it in parent directory
 		../mumps GTMDefinedTypesInit.m
 		if ($status) then
-			set errmsg = "COMLIST_E-FAIL Failed to compile generated $gtm_exe/utf8/GTMDefinedTypes.m"
+			set errmsg = "COMLIST-E-GTMDEFINEDTYPES : Failed to compile generated $gtm_exe/utf8/GTMDefinedTypes.m"
 			@ comlist_status++
 			echo "${errmsg}" >> $errorlog
 		endif
@@ -720,6 +745,10 @@ if (-e GTMDefinedTypesInit.m) then
 	endif
 endif
 
+if (0 != $comlist_status) then
+	error_and_exit "COMLIST-E-GTMDEFINEDTYPES : Generating GTMDefinedTypesInit.m failed -- aborting build"
+endif
+
 echo "Generating gtmpcat field build"
 set old_gtmroutines = "$gtmroutines"
 setenv gtmroutines "$gtm_obj($gtm_tools)"
@@ -728,9 +757,7 @@ chmod +w .
 rm -f gtmpcat*On*.m gtm_threadgbl_undefs.h
 $gtm_exe/mumps -r gtmpcatfldbld gtmpcat_field_def.txt ${gtm_verno}
 if ($status) then
-	set errmsg = "COMLIST-E-FAIL Failed to generate gtmpcat field build"
-	@ comlist_status++
-	echo "${errmsg}" >> $errorlog
+	error_and_exit "COMLIST-E-GTMPCAT : Failed to generate gtmpcat field build -- aborting build"
 endif
 ls -l gtmpcat*
 popd
@@ -741,7 +768,7 @@ rm $gtm_obj/gtmpcatfldbld.o
 $gtm_tools/generate_help.csh $gtm_pct $errorlog
 if ($status) then
 	@ comlist_status++
-	echo "comlist-E-hlp, Error generating hlp databases" >> $errorlog
+	echo "COMLIST-E-HLP : Error generating hlp databases" >> $errorlog
 endif
 
 chmod 775 *	# do not check $status here because we know it will be 1 since "gtmsecshr" permissions cannot be changed.
@@ -764,13 +791,13 @@ if (-e $gtm_exe/utf8) then	# would have been created by buildaux.csh while build
 			rm -rf utf8/$file
 			if ($status) then
 				@ comlist_status++
-				echo "comlist-E-rm, Error deleting utf8/$file" >> $errorlog
+				echo "COMLIST-E-RM : Error deleting utf8/$file" >> $errorlog
 			endif
 		endif
 		ln -s ../$file utf8/$file
 		if ($status) then
 			@ comlist_status++
-			echo "comlist-E-ln, Error linking $file" >> $errorlog
+			echo "COMLIST-E-LN : Error linking $file" >> $errorlog
 		endif
 	end
 	popd
@@ -789,7 +816,7 @@ $gtm_com/IGS $gtm_dist/gtmsecshr CHOWN
 awk 'BEGIN {dlen=length(ENVIRON["gtm_dist"]);stat=0} {if ((length($0)-dlen)>50) {stat=1}} END {exit stat}' $gtm_log/$distfiles_log
 if ($status) then
 	@ comlist_status++
-	echo "comlist-E-pathlength, the longest path beyond \$gtm_dist exceeds 50 bytes" >> $errorlog
+	echo "COMLIST-E-PATHLENGTH : The longest path beyond \$gtm_dist exceeds 50 bytes" >> $errorlog
 	awk 'BEGIN {dlen=length(ENVIRON["gtm_dist"]);stat=0} \
 		{if ((length($0)-dlen)>50) {print $0,"- length :",length($0)-dlen ; stat=1}} \
 		END {exit stat}' $gtm_log/$distfiles_log >>&! $errorlog
@@ -850,6 +877,9 @@ else if (-X gpg) then
 endif
 if (-X gpg-agent) then
 	gpg-agent --version |& grep -E '^gpg-agent '
+endif
+if (-X openssl) then
+	openssl version
 endif
 echo "##############################################################################"
 echo ""

@@ -13,6 +13,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_stdio.h"
 #include <math.h>
 
 #include "arit.h"
@@ -38,12 +39,14 @@ void op_exp(mval *u, mval* v, mval *p)
 	mval 		u1, *u1_p;
 	double 		accuracy, exponent;
 	double 		x, x1, y, z, z2, z3, z4, z5, id, il;
+	double		savz;
 	int		im0, im1, ie, i, j, j1;
 	boolean_t	fraction = FALSE, in = FALSE;
 	boolean_t	neg = FALSE, even = TRUE;
 	mval		w, zmv;
 	int4		n, n1;
 	int4		z1_rnd, z2_rnd, pten;
+	int		idx;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -257,6 +260,7 @@ void op_exp(mval *u, mval* v, mval *p)
 	 * Could add checks for zero/infinity here to avoid lengthy (300ish iterations) while loops below.
 	 */
 	n = 0;
+	savz = z;
 	while (1e16 <= z)
 	{
 		n += 5;
@@ -282,15 +286,20 @@ void op_exp(mval *u, mval* v, mval *p)
 	z *= 1e9;
 	z2_rnd = (int)z;
 	assert(((MANT_LO <= z1_rnd) && (MANT_HI > z1_rnd)) && ((0 <= z2_rnd) && (MANT_HI > z2_rnd)));
-	if ((0 == z2_rnd) && (-11 <= n) && (-3 >= n) && (0 == (z1_rnd % ten_pwr[-3 - n])))
-	{	/* This is a second-chance at detection an integer in case something slipped through the earlier
-		 * check. Not expecting it to ever be invoked but is here as a safety net.
-		 */
-		z1_rnd /= ten_pwr[-3-n];
-		p->e = 0;
-		p->mvtype = (MV_NM | MV_INT);
-		p->m[1] = z1_rnd;
-		return;
+	if ( (0 == z2_rnd) && (-11 <= n) && (-3 >= n))
+	{
+		idx = -3 - n;
+		assert((0 <= idx) && (9 >= idx));
+		if ((0 == (z1_rnd % ten_pwr[idx])))
+		{	/* This is a second-chance at detection an integer in case something slipped through the earlier
+		 	 * check. Not expecting it to ever be invoked but is here as a safety net.
+		 	 */
+			 z1_rnd /= ten_pwr[idx];
+			 p->e = 0;
+			 p->mvtype = (MV_NM | MV_INT);
+			 p->m[1] = z1_rnd;
+			 return;
+		}
 	}
 	exponent = MV_XBIAS + n + 9;
 	if (exponent >= EXPHI)

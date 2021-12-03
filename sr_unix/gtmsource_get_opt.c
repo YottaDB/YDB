@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2020 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -448,10 +448,17 @@ int gtmsource_get_opt(void)
 					return -1;
 				} else if ((0 < renegotiate_interval) && (renegotiate_interval < MIN_RENEGOTIATE_TIMEOUT))
 					renegotiate_interval = MIN_RENEGOTIATE_TIMEOUT;
-				renegotiate_interval = renegotiate_interval * 60;	   /* Convert to seconds. */
+				if (gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD] > renegotiate_interval * 60)
+				{	/* MUPIPERR when -CONNECTPARAMS having HEARTBEAT_PERIOD > renegotiate_interval */
+					util_out_print("RENEGOTIATE_INTERVAL [!UL] (in minutes) cannot be less than "
+							"HEARTBEAT_PERIOD [!UL]", TRUE, renegotiate_interval,
+							gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD]);
+					return -1;
+				}
+
 			} else
 				renegotiate_interval = DEFAULT_RENEGOTIATE_TIMEOUT * 60; /* Convert to seconds. */
-			gtmsource_options.renegotiate_interval = renegotiate_interval;
+			gtmsource_options.renegotiate_interval = renegotiate_interval * 60;
 			/* Check if plaintext-fallback mode is specified. Default option is NOPLAINTEXTFALLBACK. */
 			if (CLI_PRESENT == (plaintext_fallback = cli_present("PLAINTEXTFALLBACK")))
 				repl_tls.plaintext_fallback = (plaintext_fallback != CLI_NEGATED);

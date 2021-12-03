@@ -30,6 +30,8 @@
 #include "gtm_conv.h"
 #include "gtmimagename.h"
 #include "error.h"
+#include "op.h"
+#include "indir_enum.h"
 
 GBLREF int		COLUMNS, GTM_LINES, AUTO_RIGHT_MARGIN;
 GBLREF uint4		gtm_principal_editing_defaults;
@@ -56,7 +58,9 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	gtm_chset_t	temp_chset, old_ichset, old_ochset;
 	boolean_t	empt = FALSE;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ioptr = dev_name->iod;
 	ESTABLISH_RET_GTMIO_CH(&ioptr->pair, -1, ch_set);
 	if (ioptr->state == dev_never_opened)
@@ -82,9 +86,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	{
 		if ((ch = *(pp->str.addr + p_offset++)) == iop_exception)
 		{
-			ioptr->error_handler.len = *(pp->str.addr + p_offset);
-			ioptr->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
-			s2pool(&ioptr->error_handler);
+			DEF_EXCEPTION(pp, p_offset, ioptr);
 			break;
 		} else  if (ch == iop_canonical)
 			tt_ptr->canonical = TRUE;

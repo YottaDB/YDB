@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #                                                               #
-# Copyright (c) 2010-2015 Fidelity National Information		#
+# Copyright (c) 2010-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -26,14 +26,9 @@
 # Script uses $gtm_pubkey, if set for file containing exported ASCII armored public key
 
 hostos=`uname -s`
-# try to get a predictable which
-if [ "OS/390" = "$hostos" ] ; then which=whence ;
-elif [ -x "/usr/bin/which" ] ; then which=/usr/bin/which
-else which=which
-fi
 
 # temporary file
-if [ -x "`$which mktemp 2>&1`" ] ; then tmp_file=`mktemp`
+if [ -x "$(command -v mktemp)" ] ; then tmp_file=`mktemp`
 else tmp_file=/tmp/`basename $0`_$$.tmp ; fi
 touch $tmp_file
 chmod go-rwx $tmp_file
@@ -52,9 +47,9 @@ fi
 email=$1 ; shift
 
 # Identify GnuPG - it is required
-if [ -x "`$which gpg2 2>&1`" ] ; then gpg=gpg2
-elif [ -x "`$which gpg 2>&1`" ] ; then gpg=gpg
-else  $ECHO "Able to find neither gpg nor gpg2.  Exiting" ; exit 1 ; fi
+gpg=`command -v gpg2`
+if [ -z "$gpg" ] ; then gpg=`command -v gpg` ; fi
+if [ -z "$gpg" ] ; then $ECHO "Unable to find gpg2 or gpg. Exiting" ; exit 1 ; fi
 
 # Default file for exported public key, if not specified
 if [ -z "$gtm_pubkey" ] ; then gtm_pubkey="${email}_pubkey.txt" ; fi

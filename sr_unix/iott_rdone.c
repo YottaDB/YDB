@@ -29,7 +29,8 @@
 #include "gtmio.h"
 #include "eintr_wrappers.h"
 #include "send_msg.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "error.h"
 #include "std_dev_outbndset.h"
 #include "wake_alarm.h"
@@ -41,23 +42,21 @@
 #include "gtm_utf8.h"
 #endif
 
-GBLREF	bool		out_of_time;
-GBLREF	boolean_t	dollar_zininterrupt, gtm_utf8_mode, prin_in_dev_failure, prin_out_dev_failure;
-GBLREF	int4		ctrap_action_is, exi_condition;
-GBLREF	io_pair		io_curr_device, io_std_device;
-GBLREF	mval		dollar_zstatus;
-GBLREF	mv_stent	*mv_chain;
-GBLREF	stack_frame	*frame_pointer;
-GBLREF	unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
-GBLREF	volatile int4	outofband;
+GBLREF	bool			out_of_time;
+GBLREF	boolean_t		gtm_utf8_mode, hup_on, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF	int4			exi_condition;
+GBLREF	io_pair			io_curr_device, io_std_device;
+GBLREF	mval			dollar_zstatus;
+GBLREF	mv_stent		*mv_chain;
+GBLREF	stack_frame		*frame_pointer;
+GBLREF	unsigned char		*msp, *stackbase, *stacktop, *stackwarn;
+GBLREF	volatile boolean_t	dollar_zininterrupt;
+GBLREF	volatile int4		outofband;
 
 LITREF	unsigned char	lower_to_upper_table[];
 
-error_def(ERR_CTRAP);
 error_def(ERR_IOEOF);
 error_def(ERR_NOPRINCIO);
-error_def(ERR_STACKOFLOW);
-error_def(ERR_STACKCRIT);
 error_def(ERR_TERMHANGUP);
 error_def(ERR_ZINTRECURSEIO);
 
@@ -88,8 +87,12 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 
 	io_ptr = io_curr_device.in;
 	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
-	if ((sighup == outofband) || ((int)ERR_TERMHANGUP == SIGNAL))
+	if (sighup == outofband)
+	{
 		TERMHUP_NOPRINCIO_CHECK(FALSE);				/* FALSE for READ */
+		io_ptr->dollar.za = ZA_IO_ERR;
+		return FALSE;
+	}
 	assert(io_ptr->state == dev_open);
 	iott_flush(io_curr_device.out);
 	tt_ptr = (d_tt_struct*) io_ptr->dev_sp;
@@ -154,7 +157,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 			DOWRITERC(tt_ptr->fildes, &dc1, 1, status);
 			if (0 != status)
 			{
-				io_ptr->dollar.za = 9;
+				io_ptr->dollar.za = ZA_IO_ERR;
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 			}
 		}
@@ -210,7 +213,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 					iott_rterm(io_ptr);
 			}
 			REVERT_GTMIO_CH(&io_curr_device, ch_set);
-			outofband_action(FALSE);
+			async_action(FALSE);
 			break;
 		}
 		if (!first_time)
@@ -251,7 +254,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		{
 			if (EINTR != errno)
 			{
-				io_ptr->dollar.za = 9;
+				io_ptr->dollar.za = ZA_IO_ERR;
 				if (timed && (0 == msec_timeout))
 					iott_rterm(io_ptr);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
@@ -291,7 +294,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 					UTF8_MBTOWC(more_buf, more_ptr, inchar);
 					if (WEOF == inchar)
 					{	/* invalid char */
-						io_ptr->dollar.za = 9;
+						io_ptr->dollar.za = ZA_IO_ERR;
 						/* No data to return */
 						iott_readfl_badchar(NULL, NULL, 0,
 								    (int)((more_ptr - more_buf)), more_buf, more_ptr, NULL);
@@ -305,7 +308,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 					{
 						if ((0 > utf8_more) || (GTM_MB_LEN_MAX < utf8_more))
 						{	/* invalid character */
-							io_ptr->dollar.za = 9;
+							io_ptr->dollar.za = ZA_IO_ERR;
 							*more_ptr++ = inbyte;
 							 /* No data to return */
 							iott_readfl_badchar(NULL, NULL, 0, 1, more_buf, more_ptr, NULL);
@@ -322,7 +325,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 						UTF8_MBTOWC(more_buf, more_ptr, inchar);
 						if (WEOF == inchar)
 						{	/* invalid char */
-							io_ptr->dollar.za = 9;
+							io_ptr->dollar.za = ZA_IO_ERR;
 							 /* No data to return */
 							iott_readfl_badchar(NULL, NULL, 0, 1, more_buf, more_ptr, NULL);
 							utf8_badchar(1, more_buf, more_ptr, 0, NULL);   /* ERR_BADCHAR */
@@ -352,7 +355,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 					if (0 == msec_timeout)
 				  		iott_rterm(io_ptr);
 				}
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
+				async_action(FALSE);
 				ret = FALSE;
 				break;
 			}
@@ -396,7 +399,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 				} while (1 == rdlen);
 				*zb_ptr++ = 0;
 				if (rdlen != 1  &&  io_ptr->dollar.za == 0)
-					io_ptr->dollar.za = 9;
+					io_ptr->dollar.za = ZA_IO_ERR;
 				/* -------------------------------------------------
 				 * End of escape sequence...do not process further.
 				 * -------------------------------------------------
@@ -418,7 +421,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 					if (0 >= status)
 					{
 						status = errno;
-						io_ptr->dollar.za = 9;
+						io_ptr->dollar.za = ZA_IO_ERR;
 						if (timed)
 						{
 							if (0 == msec_timeout)
@@ -433,7 +436,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		{
 			if (errno != EINTR)
 			{
-				io_ptr->dollar.za = 9;
+				io_ptr->dollar.za = ZA_IO_ERR;
 				if (timed && (0 == msec_timeout))
 					iott_rterm(io_ptr);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
@@ -452,7 +455,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);	/* FALSE, FALSE: READ, not socket*/
 			if (io_ptr->dollar.zeof)
 			{
-				io_ptr->dollar.za = 9;
+				io_ptr->dollar.za = ZA_IO_ERR;
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 			} else
 			{
@@ -474,13 +477,13 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		DOWRITERC(tt_ptr->fildes, &dc3, 1, status);
 		if (0 != status)
 		{
-			io_ptr->dollar.za = 9;
+			io_ptr->dollar.za = ZA_IO_ERR;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
 	}
 	if (outofband && jobinterrupt != outofband)
 	{
-		io_ptr->dollar.za = 9;
+		io_ptr->dollar.za = ZA_IO_ERR;
 		REVERT_GTMIO_CH(&io_curr_device, ch_set);
 		return FALSE;
 	}

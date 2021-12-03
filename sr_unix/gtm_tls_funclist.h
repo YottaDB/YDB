@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,3 +32,4 @@ TLS_DEF(gtm_tls_fini)
 TLS_DEF(gtm_tls_store_passwd)
 TLS_DEF(gtm_tls_add_config)
 TLS_DEF(gtm_tls_renegotiate_options)
+TLS_DEF(gtm_tls_version)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,7 +13,8 @@
 #include "mdef.h"
 #include "io.h"
 #include "iottdef.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "deferred_events.h"
 #include "std_dev_outbndset.h"
 
@@ -41,15 +42,13 @@ void std_dev_outbndset(int4 ob_char)
 		std_dev_outbnd = TRUE;
 		mask = SHFT_MSK << ob_char;
 		if (mask & tt_ptr->enbld_outofbands.mask)
-			(void)xfer_set_handlers(outofband_event, &ctrap_set, ob_char, FALSE);
+			(void)xfer_set_handlers(ctrap, ob_char, FALSE);
 		else if (CTRLC_MSK & mask)
 		{
 			if (ctrlc_on)
-		        	(void)xfer_set_handlers(outofband_event, &ctrlc_set, 0, FALSE);
-		} else if (mask & CTRLY_MSK)
-	        	(void)xfer_set_handlers(outofband_event, &ctrly_set, 0, FALSE);
-		else if (hup_on && (SIGHUP_MSK & mask))
-			(void)xfer_set_handlers(outofband_event, &ctrap_set, ob_char, FALSE);
+				(void)xfer_set_handlers(ctrlc, 0, FALSE);
+		} else if (hup_on && (SIGHUP_MSK & mask))
+			(void)xfer_set_handlers(sighup, ob_char, FALSE);
 		else
 			assertpro((mask & tt_ptr->enbld_outofbands.mask) || (OUTOFBAND_MSK & mask));
 	}

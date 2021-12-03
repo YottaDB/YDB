@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2020 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,9 +33,10 @@
 #include "gtm_utf8.h"
 #include "gtmctype.h"
 
-GBLREF CLI_ENTRY                *cmd_ary;
+GBLREF	CLI_ENTRY		*cmd_ary;
 GBLREF	gd_region		*gv_cur_region;
-GBLREF CLI_ENTRY                trigger_cmd_ary[];
+GBLREF	boolean_t		is_updproc;
+GBLREF	CLI_ENTRY		trigger_cmd_ary[];
 GBLREF	volatile boolean_t	timer_in_handler;
 
 #define BITS_PER_INT		(SIZEOF(uint4) * 8)		/* Number of bits in an integer */
@@ -63,12 +64,14 @@ GBLREF	volatile boolean_t	timer_in_handler;
 
 #define ERROR_MSG_RETURN(STR, LEN, PTR)							\
 {											\
+	assertpro(!is_updproc); /* LGTRIG records should not have parsing errors */	\
 	CONV_STR_AND_PRINT(STR, LEN, PTR);						\
 	return FALSE;									\
 }
 
 #define ERROR_STR_RETURN(STR)								\
 {											\
+	assertpro(!is_updproc); /* LGTRIG records should not have parsing errors */	\
 	util_out_print_gtmio(STR, FLUSH);						\
 	return FALSE;									\
 }

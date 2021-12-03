@@ -81,6 +81,8 @@ GBLREF	volatile boolean_t	timer_active;
 GBLREF	sigset_t		block_sigsent;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	boolean_t		blocksig_initialized;
+GBLREF	boolean_t		mu_reorg_process;
+GBLREF	sgmnt_data_ptr_t	cs_data;
 #ifdef DEBUG
 GBLREF	boolean_t		in_nondeferrable_signal_handler;
 #endif
@@ -120,6 +122,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
 	gtm_sigcontext_t	*context_ptr;
 	void			(*signal_routine)();
+	intrpt_state_t		prev_intrpt_state;
 #	ifdef DEBUG
 	boolean_t		save_in_nondeferrable_signal_handler;
 #	endif
@@ -193,6 +196,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				 * invoke shutdown. wcs_wtstart() manipulates the active queue that a concurrent process in crit
 				 * in bt_put() might be waiting for. interrupting it can cause deadlocks (see C9C11-002178).
 				 */
+				if (mu_reorg_process && OK_TO_INTERRUPT && cs_data && cs_data->kill_in_prog)
+					DEFER_INTERRUPTS(INTRPT_IN_KILL_CLEANUP, prev_intrpt_state);	/* avoid ABANDONEDKILL */
 				if (DEFER_EXIT_PROCESSING)
 				{
 					SET_FORCED_EXIT_STATE;

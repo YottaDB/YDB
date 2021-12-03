@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -176,7 +176,7 @@ typedef struct sgm_info_struct
  * with filler being used to extend the struct up to a 64-bit size.
  * (currently commented due to a gengtmdeftypes issue). But that introduces a cyclic dependency causing a compiler error.
  */
-#define	CW_INDEX_MAX_BITS	15
+#define	CW_INDEX_MAX_BITS	15	/* TODO: expand to at least 18 for bigger TRANS2BIG limit; make coresponding adjustments */
 /* Remove the next line and uncomment the following line once gengtmdeftypes is fixed to allow expressions in bitfield members */
 #define	NEXT_OFF_MAX_BITS	16
 /* #define	NEXT_OFF_MAX_BITS	(32 - CW_INDEX_MAX_BITS - 1) */
@@ -471,11 +471,28 @@ typedef struct trans_restart_hist_struct
 		GBLREF	boolean_t	is_uchar_wcs_code[];				\
 		GBLREF	boolean_t	is_lchar_wcs_code[];				\
 			boolean_t	is_wcs_code = FALSE;				\
+		GBLREF  int		sizeof_is_uchar_wcs_code,			\
+					sizeof_is_lchar_wcs_code;			\
+			int		idx;						\
 											\
 		if (ISALPHA_ASCII(STATUS))						\
-			is_wcs_code = (STATUS > 'Z') 					\
-				? is_lchar_wcs_code[STATUS - 'a'] 			\
-				: is_uchar_wcs_code[STATUS - 'A'];			\
+		{									\
+			if (STATUS > 'Z')						\
+			{								\
+				idx = STATUS - 'a';					\
+				assert(0 <= idx);					\
+				assert((sizeof_is_lchar_wcs_code / SIZEOF(boolean_t))	\
+					> idx);						\
+				is_wcs_code =  is_lchar_wcs_code[idx];			\
+			} else								\
+			{								\
+				idx = STATUS - 'A';					\
+				assert(0 <= idx);					\
+				assert((sizeof_is_uchar_wcs_code / SIZEOF(boolean_t))	\
+					> idx);						\
+				is_wcs_code =  is_uchar_wcs_code[idx];			\
+			}								\
+		}									\
 		if (is_wcs_code)							\
 		{									\
 			SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);		\

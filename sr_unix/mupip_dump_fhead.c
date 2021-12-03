@@ -35,11 +35,15 @@
 #include "gtmmsg.h"
 #include "mupip_dump_fhead.h"
 #include "gtm_stdlib.h"
+#include "wcs_flu.h"
 
 GBLREF char			gtm_dist[GTM_PATH_MAX];
 GBLREF boolean_t		gtm_dist_ok_to_use;
 GBLREF tp_region		*grlist;
+GBLREF gd_region		*gv_cur_region;
+GBLREF sgmnt_addrs		*cs_addrs;
 
+error_def(ERR_BUFFLUFAILED);
 error_def(ERR_DBNOREGION);
 error_def(ERR_GTMDISTUNVERIF);
 error_def(ERR_MUNOFINISH);
@@ -71,6 +75,31 @@ void mupip_dump_fhead(void)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DBNOREGION);
 		for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)
 		{
+			if (CLI_PRESENT == cli_present("FLUSH"))
+			{
+				gv_init_reg(rptr->reg, NULL);
+				gv_cur_region = rptr->reg; /* required for wcs_flu */
+				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
+				if (TRUE == grab_crit_immediate(gv_cur_region, TRUE, NOT_APPLICABLE))
+				{
+					if (!wcs_flu(WCSFLU_FLUSH_HDR))
+					{
+						rel_crit(gv_cur_region);
+						gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(6)
+								MAKE_MSG_WARNING(ERR_BUFFLUFAILED), 4,
+								LEN_AND_LIT("MUPIP DUMPFHEAD -FLUSH"
+								" while flushing file header elements"),
+								DB_LEN_STR(gv_cur_region));
+					} else
+						rel_crit(gv_cur_region);
+				} else
+				{
+					gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(6)
+							MAKE_MSG_WARNING(ERR_BUFFLUFAILED), 4,
+							LEN_AND_LIT("MUPIP DUMPFHEAD -FLUSH while grabbing critical section"),
+							DB_LEN_STR(gv_cur_region));
+				}
+			}
 			util_out_print("Fileheader dump of region !AD", TRUE, REG_LEN_STR(rptr->reg));
 			util_out_print("Dumping fileheader of !AD", TRUE, DB_LEN_STR(rptr->reg));
 			status |= dumpfhead(DB_LEN_STR(rptr->reg));

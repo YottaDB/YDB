@@ -68,8 +68,20 @@ enum
 	PARSE_FAIL_NOPATH	/* the parse failed and $PATH is undefined in the environment */
 };
 
-#define FREE_ALL { if (NULL != copy_cmd_string) free(copy_cmd_string); if (NULL != temp) free(temp);\
-		if (NULL != buf)  free(buf); if (NULL != dir_in_path) free(dir_in_path);if (NULL != command2) free(command2); }
+#define FREE_ALL				\
+MBSTART {					\
+	if (NULL != copy_cmd_string)		\
+		free(copy_cmd_string);		\
+	if (NULL != temp)			\
+		free(temp);			\
+	if (NULL != buf)			\
+		free(buf);			\
+	if (NULL != dir_in_path)		\
+		free(dir_in_path);		\
+	if (NULL != command2)			\
+		free(command2);			\
+} MBEND
+
 
 int parse_pipe(char *cmd_string, char *ret_token);
 

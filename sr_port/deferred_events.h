@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -9,52 +9,38 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+#ifndef DEFERRED_EVENTS_INCLUDED
+#define DEFERRED_EVENTS_NCLUDED
 
+
+#ifdef DEBUG
 /* Uncomment below to enable tracing of deferred events */
-/*#define DEBUG_DEFERRED_EVENT*/
+/* #define DEBUG_DEFERRED_EVENT	*/
+#endif
 #ifdef DEBUG_DEFERRED_EVENT
-# define DBGDFRDEVNT(x) DBGFPF(x)
+GBLREF	volatile int4		fast_lock_count;
+#define DBGDFRDEVNT(x) if (0 == fast_lock_count) DBGFPF(x)	/* fast_lock_count check prevents unsafe output */
 #include "gtmio.h"
 #include "io.h"
+#include "gtm_time.h"
+/* If debugging timeout deferral, it is helpful to timestamp the messages. Encapsulate our debugging macro with
+ * enough processing to be able to do that.
+ */
+GBLREF char	asccurtime[10];
+#  define SHOWTIME(ASCCURTIME)								\
+MBSTART {										\
+	time_t		CT;								\
+	struct tm	*TM_STRUCT;							\
+	size_t		LEN;								\
+											\
+	CT = time(NULL);								\
+	GTM_LOCALTIME(TM_STRUCT, &CT);							\
+	STRFTIME(ASCCURTIME, SIZEOF(ASCCURTIME), "%T", TM_STRUCT, LEN);			\
+} MBEND
 #else
-# define DBGDFRDEVNT(x)
+#define DBGDFRDEVNT(x)
+#define SHOWTIME(ASCCURTIME)
 #endif
-#include "xfer_enum.h"
-/* --------------------------------------------
- * Async. events that can be deferred
- * --------------------------------------------
- */
-enum deferred_event
-{
-	no_event = 0,
-	outofband_event,
-	network_error_event,
-	zstp_or_zbrk_event,
-	tt_write_error_event,
-	DEFERRED_EVENTS
-};
-
-/* =============================================================================
- * EXPORTED VARIABLES
- * =============================================================================
- */
-
-/* -------------------------------------------------------
- * - Used by the substitute xfer_table functions.
- * - Keeping_count => should change name to num_logged.
- * - Should be made static and wrapped with a function for weaker
- * intermodule coupling; however, it's accessed from assembly
- * language => not worth the trouble to add a layer.
- * -------------------------------------------------------
- */
-#if defined(UNIX)
-GBLREF volatile uint4	num_deferred;
-#elif defined(VMS)
-GBLREF volatile short	num_deferred;
-#else
-# error "Unsupported Platform"
-#endif
-
 
 /* ------------------------------------------------------------------
  * Sets up transfer table changes needed for:
@@ -70,47 +56,15 @@ GBLREF volatile short	num_deferred;
  *         a thorough redesign or rethinking).
  * ------------------------------------------------------------------
  */
-boolean_t xfer_set_handlers(int4, void (*callback)(int4), int4 param, boolean_t popped_entry);
-
-/* ------------------------------------------------------------------
- * Reset transfer table to normal settings.
- *
- * Puts back everything that could/would have been changed, assuming
- * that no xfer_table changes have been added since it was written.
- *
- * Return value indicates success/failure. Succeeds only if event
- * type of reset is the same as event type of set.
- * ------------------------------------------------------------------
+/*  Prototypes for transfer table callback functions, only called by routine that manages xfer_table. */
+boolean_t xfer_set_handlers(int4, int4 param, boolean_t popped_entry);
+/* Reset transfer table to normal settings.
+ * Puts back most things back that could have been changed, excepting timeouts waiting for a jobinterrupt to complete
+ * Return value indicates success/failure representing whether the type of reset is the same as event type of set.
  */
 boolean_t xfer_reset_handlers(int4 event_type);
-
-/* ------------------------------------------------------------------
- * This version resets the handlers only if they were set by the
- * same event type.
- * ------------------------------------------------------------------
- */
+/* This version resets the handlers only if they were set by the same event type. */
 boolean_t xfer_reset_if_setter(int4 event_type);
-
-/* -------------------------------------------------------
- * Prototypes for transfer table callback functions.
- * Only called by routine that manages xfer_table.
- *
- * Should use these (with enums?) to ensure type checking
- * is done.
- * -------------------------------------------------------
- */
-
-void ctrap_set(int4);
-void ctrlc_set(int4);
-void ctrly_set(int4);
-void tt_write_error_set(int4);
-
-/* ------------------------------------------------------------------
- * Perform action corresponding to the first async event that
- * was logged.
- * ------------------------------------------------------------------
- */
-void async_action(bool);
-boolean_t xfer_table_changed(void);
-
-#define IS_VALID_TRAP ((set_fn == (&ctrlc_set)) || (set_fn == (&ctrap_set)) || (set_fn == (&ctrly_set)))
+/* This version resets a handler */
+boolean_t real_xfer_reset(int4 event_type);
+#endif /* DEFERRED_EVENTS_INCLUDED */

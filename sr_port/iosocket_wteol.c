@@ -70,7 +70,12 @@ void	iosocket_wteol(int4 val, io_desc *io_ptr)
 			io_ptr->dollar.x = 0; /* so that iosocket_write doesn't try to wrap (based on escape state and width) */
 			iosocket_write_real(&socketptr->odelimiter0, FALSE);
 		}
+	} else if (socketptr->nonblocked_output)
+	{	/* if no delimiter treat WRITE ! as a successful write */
+		socketptr->lastarg_sent = 0;
+		socketptr->args_written += val;		/* count each ! */
 	}
+
 	/* $X is maintained in VMS without the below assignment (resetting to 0) because the NATIVE_TTEOL is \015\012
 	 * and the <CR> (\015) triggers appropriate maintenance of $X.  In UNIX, NATIVE_TTEOL is \012, so
 	 * FILTER=CHARACTER effectively turns off all $X maintenance (except for WRAP logic).

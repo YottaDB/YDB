@@ -19,7 +19,8 @@
 #include "srcline.h"
 #include "error.h"
 #include "op.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "min_max.h"
 #ifdef GTM_TRIGGER
 # include "gtm_trigger_trc.h"
@@ -31,10 +32,10 @@
 
 #define	INFO_MSK(error)	(error & ~SEV_MSK | INFO)
 
+GBLREF mident_fixed	zlink_mname;
+GBLREF volatile int4	outofband;
 DBGTRIGR_ONLY(GBLREF	uint4		dollar_tlevel;)
 DBGTRIGR_ONLY(GBLREF	unsigned int	t_tries;)
-GBLREF int4		outofband;
-GBLREF mident_fixed	zlink_mname;
 
 error_def(ERR_FILENOTFND);
 error_def(ERR_TRIGNAMENF);
@@ -133,9 +134,9 @@ void op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label,
 		 * invoke a job interrupt which could relink an entry point so an out-of-band interrupt of any kind means
 		 * the source fetches also need to be restarted. Until these issues are address, the outofband check
 		 * remains disabled (SE - 12/2010)
+		 * if (outofband)
+		 *	async_action(FALSE);
 		 */
-		/* if (outofband)
-		  outofband_action(FALSE); */
 		print_line.str.addr = src1->addr;
 		print_line.str.len = src1->len;
 		op_write(&print_line);

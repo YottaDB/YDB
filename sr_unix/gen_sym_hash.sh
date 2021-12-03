@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #                                                               #
-# Copyright (c) 2010-2015 Fidelity National Information		#
+# Copyright (c) 2010-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -31,11 +31,6 @@ if [ $# -lt 1 ]; then
 fi
 hostos=`uname -s`
 basedir=`dirname $0`
-# try to get a predictable which
-if [ "OS/390" = "$hostos" ] ; then which=whence ;
-elif [ -x "/usr/bin/which" ] ; then which=/usr/bin/which
-else which=which
-fi
 
 if [ ! -x $basedir/show_install_config.sh ]; then
 	echo "Cannot find show_install_config.sh in $basedir. Exiting"
@@ -43,7 +38,7 @@ if [ ! -x $basedir/show_install_config.sh ]; then
 fi
 algorithm=`$basedir/show_install_config.sh | awk '/^ALGORITHM/ {print $NF}'`
 # temporary file
-if [ -x "`$which mktemp 2>&1`" ] ; then tmp_file=`mktemp`
+if [ -x "$(command -v mktemp)" ] ; then tmp_file=`mktemp`
 else tmp_file=/tmp/`basename $0`_$$.tmp ; fi
 touch $tmp_file
 chmod go-rwx $tmp_file
@@ -58,9 +53,9 @@ encrypted_key_file="$1"
 $ECHO $ECHO_OPTIONS $algorithm\\c >$tmp_file
 
 # Identify GnuPG - it is required
-if [ -x "`$which gpg2 2>&1`" ] ; then gpg=gpg2
-elif [ -x "`$which gpg 2>&1`" ] ; then gpg=gpg
-else  $ECHO "Able to find neither gpg nor gpg2.  Exiting" ; exit 1 ; fi
+gpg=`command -v gpg2`
+if [ -z "$gpg" ] ; then gpg=`command -v gpg` ; fi
+if [ -z "$gpg" ] ; then $ECHO "Unable to find gpg2 or gpg. Exiting" ; exit 1 ; fi
 
 # Get passphrase for GnuPG keyring
 $ECHO $ECHO_OPTIONS Passphrase for keyring: \\c ; stty -echo ; read passphrase ; stty echo ; $ECHO ""
@@ -70,4 +65,3 @@ $ECHO $passphrase | $gpg --no-tty --batch --passphrase-fd 0 -d $encrypted_key_fi
 $ECHO
 
 rm -f $tmp_file
-

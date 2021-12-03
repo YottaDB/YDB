@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -155,7 +155,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_REFERENCE, FALSE, ALL_SYS }, { SV_REFERENCE, FALSE, ALL_SYS }
 	,{ SV_STACK, FALSE, ALL_SYS }, { SV_STACK, FALSE, ALL_SYS }
 	,{ SV_STORAGE, FALSE, ALL_SYS }, { SV_STORAGE, FALSE, ALL_SYS }
-	,{ SV_SYSTEM, FALSE, ALL_SYS }, { SV_SYSTEM, FALSE, ALL_SYS }
+	,{ SV_SYSTEM, TRUE, ALL_SYS }, { SV_SYSTEM, TRUE, ALL_SYS }
 	,{ SV_TEST, FALSE, ALL_SYS }, { SV_TEST, FALSE, ALL_SYS }
 	,{ SV_TLEVEL, FALSE, ALL_SYS }, { SV_TLEVEL, FALSE, ALL_SYS }
 	,{ SV_TRESTART, FALSE, ALL_SYS }, { SV_TRESTART, FALSE, ALL_SYS }

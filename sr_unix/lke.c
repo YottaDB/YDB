@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,7 +73,6 @@ GBLREF VSIG_ATOMIC_T		util_interrupt;
 GBLREF bool			licensed;
 GBLREF void			(*func)(void);
 GBLREF spdesc			rts_stringpool, stringpool;
-GBLREF global_latch_t		defer_latch;
 GBLREF char			cli_err_str[];
 GBLREF CLI_ENTRY		lke_cmd_ary[];
 GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
@@ -96,7 +95,6 @@ int main (int argc, char *argv[])
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	sig_init(generic_signal_handler, lke_ctrlc_handler, suspsigs_handler, continue_handler);
 	atexit(util_exit_handler);
-	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	stp_init(STP_INITSIZE);
 	stpgc_ch = &stp_gcol_ch;
 	rts_stringpool = stringpool;
@@ -178,4 +176,3 @@ static void display_prompt(void)
 	PRINTF("LKE> ");
 	FFLUSH(stdout);
 }
-

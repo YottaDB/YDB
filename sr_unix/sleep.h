@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,16 +23,43 @@
  * delivering timed events.
  */
 
+/* SLEEP_USEC wrapper, see sleep.c for more information */
 void m_usleep(int useconds);
 
-#if !defined(_AIX) && !defined(__osf__) && !defined(__sparc) && !defined(_UWIN) && !defined(__linux__)
-#   if !defined(__MVS__) && !defined(__CYGWIN__) && !defined(__hpux)
-#      error "Unsure of support for sleep functions on this platform"
-#   endif
+#if !defined(_AIX) && !defined(__linux__) && !defined(__MVS__) && !defined(__CYGWIN__)
+# error "Unsure of support for sleep functions on this platform"
 #endif
 
-#if defined(__MVS__) || defined(__CYGWIN__) || defined(__hpux) || defined(_AIX)
-/* For HP-UX the clock_* seem to be missing; for AIX the accuracy of clock_* is currently poor */
+/* Where possible we use clock_nanosleep and clock_gettime, which, while currently no faster than gettimeofday(), do eventually
+ * promise sub-millisecond accuracy.
+ */
+#define CLOCK_NANOSLEEP(CLOCKID, SECONDS, NANOSECONDS, RESTART)					\
+MBSTART {											\
+	int 		STATUS;									\
+	struct timespec	REQTIM;									\
+												\
+	assert(0 <= (SECONDS));									\
+	assert((0 <= (NANOSECONDS)) && (E_9 > (NANOSECONDS)));					\
+	clock_gettime(CLOCKID, &REQTIM);							\
+	REQTIM.tv_sec += (long)(SECONDS);							\
+	REQTIM.tv_nsec += (long)(NANOSECONDS);							\
+	if (NANOSECS_IN_SEC <= REQTIM.tv_nsec)							\
+	{											\
+		REQTIM.tv_sec++;								\
+		REQTIM.tv_nsec -= NANOSECS_IN_SEC;						\
+	}											\
+	do											\
+	{											\
+		STATUS = clock_nanosleep(CLOCKID, TIMER_ABSTIME, &REQTIM, NULL);		\
+		if (!RESTART || (0 == STATUS))							\
+			break;									\
+		assert(EINTR == STATUS);							\
+	} while (TRUE);										\
+} MBEND
+
+/* For most UNIX platforms a combination of nanosleep() and gettimeofday() proved to be the most supported, accurate, and
+ * operationally sound approach. Alternatives for implementing high-resolution sleeps include clock_nanosleep() and nsleep()
+ */
 #define SET_EXPIR_TIME(NOW_TIMEVAL, EXPIR_TIMEVAL, SECS, USECS)				\
 MBSTART {										\
 	gettimeofday(&(NOW_TIMEVAL), NULL);						\
@@ -64,7 +91,33 @@ MBSTART {										\
 		USECS = (int)((EXPIR_TIMEVAL).tv_usec - (NOW_TIMEVAL).tv_usec);		\
 	}										\
 
-#if defined(__MVS__) || defined(__CYGWIN__)
+/* Because, as of this writing, in AIX the clock_* routines are so erratic with short times we use the functions mentioned above
+ * for most things but give the following macro a separate name so AIX can use it in op_hang.c to ensure that a 1 second sleep
+ * always puts the process in a different second as measured by $HOROLOG and the like.
+ */
+#define MICROSECOND_SLEEP_with_NANOSECOND_SLEEP(USECONDS, RESTART)			\
+MBSTART {										\
+	int 		status, usecs, save_errno;					\
+	struct timespec	req;								\
+	struct timeval	now, expir;							\
+											\
+	assert(0 < (USECONDS));								\
+	req.tv_sec = (time_t)((USECONDS) / E_6);					\
+	req.tv_nsec = (long)((usecs = (USECONDS) % E_6) * 1000); /* Assignment! */	\
+	assert(E_9 > req.tv_nsec);							\
+	/* A little wasteful for the non-restart case */				\
+	SET_EXPIR_TIME(now, expir, req.tv_sec, usecs);					\
+	do										\
+	{	/* This macro will break the loop when it is time. */			\
+		status = nanosleep(&req, NULL);						\
+		if (!(RESTART) || (0 == status))					\
+			break;								\
+		UPDATE_REM_TIME_OR_BREAK(now, expir, req.tv_sec, usecs);		\
+		req.tv_nsec = (long)(usecs * 1000);					\
+		assert(EINTR == (save_errno = errno)); /* inline assignment */		\
+	} while (TRUE);									\
+} MBEND
+
 /* On z/OS neither clock_nanosleep nor nanosleep is available, so use a combination of sleep, usleep, and gettimeofday instead.
  * Since we do not have a z/OS box presently, this implementation has not been tested, and so it likely needs some casts at the very
  * least. Another note is that sleep is unsafe to mix with timers on other platforms, but on z/OS the documentation does not mention
@@ -72,115 +125,59 @@ MBSTART {										\
  * call usleep (which, given that we have used it on z/OS before, should be safe) in a loop.
  * Due to the above stated limitations the minimum sleep on z/OS is 1 Usec
  * cywin is a mystery so assume the worst */
-#define SLEEP_USEC(MICROSECONDS, RESTART)						\
+#define MICROSECOND_SLEEP_with_SLEEP_and_USLEEP(USECONDS, RESTART)			\
 MBSTART {										\
 	int 		secs, interrupted;						\
 	useconds_t	usecs;								\
 	struct timeval	now, expir;							\
 											\
-	assert(0 < MICROSECONDS);							\
-	secs = (MICROSECONDS) / 1000;							\
-	usecs = (MICROSECONDS) % E_6;							\
+	assert(0 < (USECONDS));								\
+	secs = (USECONDS) / E_6;							\
+	usecs = (USECONDS) % E_6;							\
 	SET_EXPIR_TIME(now, expir, secs, usecs);					\
-	if (RESTART)									\
+	do										\
 	{										\
-		while (0 < secs)							\
-		{									\
-			sleep(secs);		/* BYPASSOK */				\
-			/* This macro will break the loop when it is time. */		\
-			UPDATE_REM_TIME_OR_BREAK(now, expir, secs, usecs);		\
-		}									\
-		while (0 < usecs)							\
-		{									\
-			usleep(usecs);							\
-			/* This macro will break the loop when it is time. */		\
-			UPDATE_REM_TIME_OR_BREAK(now, expir, secs, usecs);		\
-		}									\
-	} else										\
-	{										\
+		/* Sleep for seconds first */						\
 		interrupted = sleep(secs);	/* BYPASSOK */				\
-		if (!interrupted)							\
-		{	/* This macro will break the loop when it is time. */		\
-			UPDATE_REM_TIME_OR_BREAK(now, expir, secs, usecs);		\
-			usleep(usecs);							\
-		}									\
-	}										\
+		if (interrupted && !(RESTART))						\
+			break;								\
+		/* This macro will break the loop when it is time. */			\
+		UPDATE_REM_TIME_OR_BREAK(now, expir, secs, usecs);			\
+		/* Recalculate time and sleep for remaining microseconds */		\
+		interrupted = usleep(usecs);	/* BYPASSOK */				\
+		if (interrupted && !(RESTART))						\
+			break;								\
+		/* This macro will break the loop when it is time. */			\
+		UPDATE_REM_TIME_OR_BREAK(now, expir, secs, usecs);			\
+	} while ((0 < secs) || (0 < usecs));						\
 } MBEND
+
+#if defined(__MVS__) || defined(__CYGWIN__)
+/* z/OS and Cygwin use the lowest quality sleep options. Sub-millisecond nanosecond sleeps round up to 1 millisecond */
+# define SLEEP_USEC(USECONDS, RESTART)		MICROSECOND_SLEEP_with_SLEEP_and_USLEEP(USECONDS, RESTART)
+# define NANOSLEEP(NANOSECONDS, RESTART)	SLEEP_USEC((1000 > (NANOSECONDS)) ? 1 : ((NANOSECONDS) / 1000), RESTART);
+#elif defined(_AIX)
+/* Because of unreliability, AIX uses plain old nanosleep(). Sub-millisecond nanosecond sleeps round up to 1 millisecond */
+# define SLEEP_USEC(USECONDS, RESTART)		MICROSECOND_SLEEP_with_NANOSECOND_SLEEP(USECONDS, RESTART)
+# define NANOSLEEP(NANOSECONDS, RESTART)	SLEEP_USEC((1000 > (NANOSECONDS)) ? 1 : ((NANOSECONDS) / 1000), RESTART);
 #else
-
-/* For most UNIX platforms a combination of nanosleep() and gettimeofday() proved to be the most supported, accurate, and
- * operationally sound approach. Alternatives for implementing high-resolution sleeps include clock_nanosleep() and nsleep()
- */
-#  define SLEEP_USEC(MICROSECONDS, RESTART)						\
+/* All other platforms use high performance sleeps with CLOCK_NANOSLEEP */
+# define SLEEP_USEC(USECONDS, RESTART)							\
 MBSTART {										\
-	int 		status, usecs;							\
-	struct timespec	req;								\
-	struct timeval	now, expir;							\
+	time_t	seconds = (USECONDS) / E_6;						\
+	time_t	nanoseconds = (USECONDS % E_6) * NANOSECS_IN_USEC;			\
 											\
-	assert(0 < MICROSECONDS);							\
-	req.tv_sec = (time_t)((MICROSECONDS) / E_6);					\
-	req.tv_nsec = (long)((usecs = (MICROSECONDS) % E_6) * 1000); /* Assignment! */	\
-	assert(E_9 > req.tv_nsec);							\
-	if (RESTART)									\
-	{										\
-		SET_EXPIR_TIME(now, expir, req.tv_sec, usecs);				\
-		while ((-1 == (status = nanosleep(&req, NULL))) && (EINTR == errno))	\
-		{	/* This macro will break the loop when it is time. */		\
-			UPDATE_REM_TIME_OR_BREAK(now, expir, req.tv_sec, usecs);	\
-			req.tv_nsec = (long)(usecs * 1000);				\
-		}									\
-	} else										\
-		nanosleep(&req, NULL);							\
-} MBEND
-#endif
-
-# define NANOSLEEP(NANOSECONDS, RESTART)						\
-MBSTART {										\
-	SLEEP_USEC((1000 > (NANOSECONDS)) ? 1 : ((NANOSECONDS) / 1000), RESTART);	\
-} MBEND
-#endif
-#if !defined(__MVS__) && !defined(__CYGWIN__) && !defined(__hpux)
-/* Nonetheless, because we continue to press for the highest time discrimination available, where posible we use
- * clock_nanosleep and clock_gettime, which, while currently no faster than gettimeofday(), do eventually promise
- * sub-millisecond accuracy
- *
- * Because, as of this writing, in AIX the clock_* routines are so erratic with short times we use the functions above for most
- * things but give the following macro a separate name so AIX can use it in op_hang.c to ensure that a 1 second sleep always
- * puts the process in a different second as measured by $HOROLOG and the like.
- */
-# define CLOCK_NANOSLEEP(NANOSECONDS, RESTART)							\
-MBSTART {											\
-	int 		STATUS;									\
-	struct timespec	REQTIM;									\
-												\
-	assert(0 < (NANOSECONDS));								\
-	clock_gettime(CLOCK_MONOTONIC, &REQTIM);						\
-	if (E_9 <= (NANOSECONDS) + REQTIM.tv_nsec)						\
-	{											\
-		REQTIM.tv_sec += (time_t)(((NANOSECONDS) + REQTIM.tv_nsec) / NANOSECS_IN_SEC);	\
-		REQTIM.tv_nsec = ((NANOSECONDS) + REQTIM.tv_nsec) % NANOSECS_IN_SEC;		\
-	}											\
-	else											\
-		REQTIM.tv_nsec += (long)(NANOSECONDS);						\
-	do											\
-	{											\
-		STATUS = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &REQTIM, NULL);	\
-		if (!RESTART || (0 == STATUS))							\
-			break;									\
-		assertpro (EINTR == STATUS);							\
-	} while (TRUE);										\
-} MBEND
-
-#if !defined(_AIX)
-# define SLEEP_USEC(MICROSECONDS, RESTART)						\
-MBSTART {										\
-	NANOSLEEP(((MICROSECONDS) * NANOSECS_IN_USEC), RESTART);			\
+	CLOCK_NANOSLEEP(CLOCK_MONOTONIC, seconds, nanoseconds, RESTART);		\
 } MBEND
 
 # define NANOSLEEP(NANOSECONDS, RESTART)						\
 MBSTART {										\
-	CLOCK_NANOSLEEP(NANOSECONDS, RESTART);						\
+	time_t	seconds = (NANOSECONDS) / E_9;						\
+	time_t	nanoseconds = (NANOSECONDS % E_9);					\
+											\
+	/* Really shouldn't be using this macro for sleep > 1 second */			\
+	assert(E_9 >= (NANOSECONDS));							\
+	CLOCK_NANOSLEEP(CLOCK_MONOTONIC, seconds, nanoseconds, RESTART);		\
 } MBEND
-#endif
 #endif
 #endif /* SLEEP_H */

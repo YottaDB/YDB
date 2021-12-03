@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,10 +12,10 @@
 
 #include "mdef.h"
 #include "xfer_enum.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "deferred_events.h"
 #include "op.h"
-#include "iott_wrterr.h"
 #include "fix_xfer_entry.h"
 
 
@@ -23,16 +24,9 @@
  * Should be called only from xfer_set_handlers.
  * ------------------------------------------------------------------------
  */
-GBLREF int	iott_write_error;
 GBLREF xfer_entry_t     xfer_table[];
 
 void tt_write_error_set(int4 error_status)
 {
-	iott_write_error = error_status;
-	FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
-        FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);
-        FIX_XFER_ENTRY(xf_zbfetch, op_fetchintrrpt);
-        FIX_XFER_ENTRY(xf_zbstart, op_startintrrpt);
-        FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
-        FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
+	DEFER_INTO_XFER_TAB;
 }

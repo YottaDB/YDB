@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 Fidelity National Information	*
+ * Copyright (c) 2018-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,38 +15,34 @@
 typedef struct
 {
 	mval ztimeout_vector;
-	mval 	ztimeout_seconds;
+	mval ztimeout_seconds;
 	ABS_TIME end_time;
 } dollar_ztimeout_struct;
 
 
 void check_and_set_ztimeout(mval *inp_val);
 void ztimeout_action(void);
-void ztimeout_set(int4 dummy_param);
-void ztimeout_expire_now(void);
+void ztimeout_expired(void);
 void ztimeout_process(void);
 void ztimeout_clear_timer(void);
 int get_ztimeout(mval *result);
 
-
-
-#define CALL_ZTIMEOUT_IF_DEFERRED									\
-MBSTART	{												\
-	GBLREF	dollar_ecode_type	dollar_ecode;							\
-	GBLREF	boolean_t		ztrap_explicit_null;						\
-	GBLREF	boolean_t		dollar_zininterrupt;						\
-	if ((TREF(save_xfer_root)))									\
-	{												\
-		if (((TREF(save_xfer_root))->set_fn == ztimeout_set))					\
-		{	/*If ztimeout , check conditions before popping out */				\
-			if ((TREF(ztimeout_deferred))	&&						\
-				((0 == dollar_ecode.index) || !(ETRAP_IN_EFFECT)) 			\
-				&& (!dollar_zininterrupt) && (!have_crit(CRIT_HAVE_ANY_REG 		\
-										| CRIT_IN_COMMIT)))	\
-			{										\
-				POP_XFER_ENTRY(&event_type, &set_fn, &param_val);	 		\
-				xfer_set_handlers(event_type, set_fn, param_val, TRUE);			\
-			}										\
-		}											\
-	}												\
+/* TODO: should this go back in (say) op_tcommit? */
+#define CALL_ZTIMEOUT_IF_DEFERRED								\
+MBSTART	{										\
+	GBLREF	boolean_t		ztrap_explicit_null;					\
+	GBLREF	dollar_ecode_type	dollar_ecode;						\
+	GBLREF	volatile boolean_t	dollar_zininterrupt;					\
+												\
+	int4		event_type, param_val;							\
+												\
+	if (ztimeout == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband)			\
+	{	/*If ztimeout , check conditions before popping out */				\
+		if (!dollar_zininterrupt && ((0 == dollar_ecode.index) || !(ETRAP_IN_EFFECT)) 	\
+			&& (!have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)))			\
+		{										\
+			POP_XFER_QUEUE_ENTRY(&event_type, &param_val);	 			\
+			xfer_set_handlers(event_type, param_val, TRUE);				\
+		}										\
+	}											\
 } MBEND

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2015-2020 Fidelity National Information		;
+; Copyright (c) 2015-2021 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -92,7 +92,7 @@
 	.	set:""=format format=$select(type["uint":"U",type["unsigned":"U",1:"")
 	.	set:""=format format=$select(type["int":"I",1:"")
 	.	; miscellaneous whitelist of non-standard types
-	.	set:""=format format=$select("boolean_t"=type:"I","time_t"=type:"I","size_t"=type:"U",1:"")
+	.	set:""=format format=$select("boolean_t"=type:"I","time_t"=type:"I","gtm_timet"=type:"I","size_t"=type:"U",1:"")
 	.	do:""=format error("UNSUPTYPE",type)
 	set $etrap=etrap
 	; determine if this is an array

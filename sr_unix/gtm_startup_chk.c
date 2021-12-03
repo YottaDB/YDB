@@ -76,21 +76,26 @@ int gtm_chk_dist(char *image)
 	char		image_real_path[GTM_PATH_MAX];
 	char		real_gtm_dist_path[GTM_PATH_MAX];
 	char		comparison[GTM_PATH_MAX];
+	unsigned int	real_dist_len;
 
 	is_gtcm_image = (IS_GTCM_GNP_SERVER_IMAGE || IS_GTCM_SERVER_IMAGE); /* GT.CM servers defer issuing errors until startup */
 	/* Use the real path while checking the path length. If not valid, let it fail when checking is_file_identical  */
 	real_dist = realpath(gtm_dist, real_gtm_dist_path);
 	if (real_dist)
 	{
-		STRNLEN(real_dist, GTM_PATH_MAX, gtm_dist_len);
+		STRNLEN(real_dist, GTM_PATH_MAX, real_dist_len);
 	} else
 	{
-		STRNLEN(gtm_dist, GTM_PATH_MAX, gtm_dist_len);
+#		ifdef DEBUG
+		STRNLEN(gtm_dist, GTM_PATH_MAX, real_dist_len);	/* Set real_dist_len */
+		assert(real_dist_len == gtm_dist_len);
+#		endif
+		real_dist_len = gtm_dist_len;
 	}
-	if (gtm_dist_len)
+	if (real_dist_len)
 	{
 		assert(IS_VALID_IMAGE && (n_image_types > image_type));	/* assert image_type is initialized */
-		if (GTM_DIST_PATH_MAX <= gtm_dist_len)
+		if (GTM_DIST_PATH_MAX <= real_dist_len)
 		{
 			if (is_gtcm_image)
 				return 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,6 +82,8 @@ error_def(ERR_UTF16ENDIAN);
 #define UNAVAILABLE_DEVICE_MSG	"Resource temporarily unavailable"
 #define SOCKETPOOLNAME		"YGTMSOCKETPOOL"
 #define SOCDEVTYPENAME		"socket"
+
+#define ZA_IO_ERR	9
 
 typedef unsigned char params;
 
@@ -283,7 +285,7 @@ uchar_ptr_t iott_escape(uchar_ptr_t strin, uchar_ptr_t strtop, io_desc *io_ptr);
 
 /* iosocket_ prototypes */
 boolean_t iosocket_listen(io_desc *iod, unsigned short len);
-boolean_t iosocket_wait(io_desc *iod, int4 timepar);
+boolean_t iosocket_wait(io_desc *iod, int4 timepar, mval *whatop, mval *handle);
 void iosocket_poolinit(void);
 void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_list args);
 void iosocket_accept_local(io_desc *iod, mval *handlevar, pid_t pid, int4 timeout, int argcnt, va_list args);
@@ -489,7 +491,7 @@ MBSTART {								\
 	mval	MV;							\
 									\
 	MV.mvtype = MV_STR;						\
-	MV.str.len = (int)(*(PP->str.addr + P_OFF));			\
+	MV.str.len = (unsigned char)(*(PP->str.addr + P_OFF));		\
 	MV.str.addr = (char *)(PP->str.addr + P_OFF + 1);		\
 	if (!(ZTRAP_ENTRYREF & TREF(ztrap_form)))			\
 	{								\

@@ -30,7 +30,8 @@
 #include "gtmio.h"
 #include "eintr_wrappers.h"
 #include "send_msg.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "error.h"
 #include "std_dev_outbndset.h"
 #include "wake_alarm.h"
@@ -43,16 +44,17 @@
 #include "gtm_utf8.h"
 #endif
 
-GBLREF	boolean_t	dollar_zininterrupt, gtm_utf8_mode, prin_in_dev_failure, prin_out_dev_failure;
-GBLDEF	int		term_error_line;		/* record for cores */
-GBLREF	int4		ctrap_action_is, exi_condition;
-GBLREF	io_pair		io_curr_device, io_std_device;
-GBLREF	spdesc		stringpool;
-GBLREF	mval		dollar_zstatus;
-GBLREF	mv_stent	*mv_chain;
-GBLREF	volatile int4	outofband;
-GBLREF	stack_frame	*frame_pointer;
-GBLREF	unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
+GBLREF	boolean_t		gtm_utf8_mode, hup_on, prin_in_dev_failure, prin_out_dev_failure;
+GBLDEF	int			term_error_line;		/* record for cores */
+GBLREF	int4			exi_condition;
+GBLREF	io_pair			io_curr_device, io_std_device;
+GBLREF	mval			dollar_zstatus;
+GBLREF	mv_stent		*mv_chain;
+GBLREF	spdesc			stringpool;
+GBLREF	stack_frame		*frame_pointer;
+GBLREF	unsigned char		*msp, *stackbase, *stacktop, *stackwarn;
+GBLREF	volatile boolean_t	dollar_zininterrupt;
+GBLREF	volatile int4		outofband;
 
 #ifdef UTF8_SUPPORTED
 LITREF	UChar32		u32_line_term[];
@@ -79,11 +81,8 @@ static readonly char		dc1 = 17;
 static readonly char		dc3 = 19;
 static readonly unsigned char	eraser[3] = { NATIVE_BS, NATIVE_SP, NATIVE_BS };
 
-error_def(ERR_CTRAP);
 error_def(ERR_IOEOF);
 error_def(ERR_NOPRINCIO);
-error_def(ERR_STACKOFLOW);
-error_def(ERR_STACKCRIT);
 error_def(ERR_TERMHANGUP);
 error_def(ERR_ZINTRECURSEIO);
 
@@ -266,8 +265,12 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 		io_ptr->dollar.zeof = FALSE;
 		dx_start = (int)io_ptr->dollar.x;
 	}
-	if ((sighup == outofband) || ((int)ERR_TERMHANGUP == SIGNAL))
+	if (sighup == outofband)
+	{
 		TERMHUP_NOPRINCIO_CHECK(FALSE);				/* FALSE for READ */
+		io_ptr->dollar.za = ZA_IO_ERR;
+		return FALSE;
+	}
 	v->str.len = 0;
 	ret = TRUE;
 	mask = tt_ptr->term_ctrl;
@@ -283,7 +286,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 			DOWRITERC(tt_ptr->fildes, &dc1, 1, status);
 			if (0 != status)
 			{
-				io_ptr->dollar.za = 9;
+				io_ptr->dollar.za = ZA_IO_ERR;
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 			}
 		}
@@ -307,7 +310,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				DOWRITERC(tt_ptr->fildes, KEYPAD_XMIT, keypad_len, status);
 				if (0 != status)
 				{
-					io_ptr->dollar.za = 9;
+					io_ptr->dollar.za = ZA_IO_ERR;
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				}
 			}
@@ -384,7 +387,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				if (!msec_timeout)
 					iott_rterm(io_ptr);
 			}
-			outofband_action(FALSE);
+			async_action(FALSE);
 			break;
 		}
 		errno = 0;
@@ -427,7 +430,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 					 */
 					io_ptr->dollar.zeof = TRUE;
 					io_ptr->dollar.x = 0;
-					io_ptr->dollar.za = 9;
+					io_ptr->dollar.za = ZA_IO_ERR;
 					io_ptr->dollar.y++;
 					tt_ptr->discard_lf = FALSE;
 					if (io_ptr->error_handler.len > 0)
@@ -453,7 +456,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 					UTF8_MBTOWC(more_buf, more_ptr, inchar);
 					if (WEOF == inchar)
 					{	/* invalid char */
-						io_ptr->dollar.za = 9;
+						io_ptr->dollar.za = ZA_IO_ERR;
 						iott_readfl_badchar(v, buffer_32_start, outlen,
 								    (int)(more_ptr - more_buf), more_buf, more_ptr, buffer_start);
 						utf8_badchar((int)(more_ptr - more_buf), more_buf, more_ptr, 0, NULL); /* BADCHAR */
@@ -464,7 +467,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 					more_ptr = more_buf;
 					if (0 > utf8_more)
 					{	/* invalid character */
-						io_ptr->dollar.za = 9;
+						io_ptr->dollar.za = ZA_IO_ERR;
 						*more_ptr++ = inbyte;
 						iott_readfl_badchar(v, buffer_32_start, outlen,
 								1, more_buf, more_ptr, buffer_start);
@@ -472,7 +475,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 						break;
 					} else if (GTM_MB_LEN_MAX < utf8_more)
 					{	/* too big to be valid */
-						io_ptr->dollar.za = 9;
+						io_ptr->dollar.za = ZA_IO_ERR;
 						*more_ptr++ = inbyte;
 						iott_readfl_badchar(v, buffer_32_start, outlen,
 								1, more_buf, more_ptr, buffer_start);
@@ -490,7 +493,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 					UTF8_MBTOWC(more_buf, more_ptr, inchar);
 					if (WEOF == inchar)
 					{	/* invalid char */
-						io_ptr->dollar.za = 9;
+						io_ptr->dollar.za = ZA_IO_ERR;
 						iott_readfl_badchar(v, buffer_32_start, outlen,
 								1, more_buf, more_ptr, buffer_start);
 						utf8_badchar(1, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
@@ -525,12 +528,13 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 			if ((' ' > INPUT_CHAR) && (tt_ptr->enbld_outofbands.mask & (1 << INPUT_CHAR)))
 			{	/* ctrap supercedes editing so check first */
 				instr = outlen = 0;
-				io_ptr->dollar.za = 9;
+				io_ptr->dollar.za = ZA_IO_ERR;
 				std_dev_outbndset(INPUT_CHAR);	/* it needs ASCII?	*/
 				SEND_KEYPAD_LOCAL
 				if (!msec_timeout)
 					iott_rterm(io_ptr);
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
+				outofband = ctrap;
+				async_action(FALSE);
 				break;
 			}
 			if (((0 != (mask & TRM_ESCAPE)) || edit_mode)
@@ -919,7 +923,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);	/* FALSE, FALSE: READ, not socket*/
 				if (io_ptr->dollar.zeof)
 				{
-					io_ptr->dollar.za = 9;
+					io_ptr->dollar.za = ZA_IO_ERR;
 					SEND_KEYPAD_LOCAL
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 				} else
@@ -1116,7 +1120,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 		DOWRITERC(tt_ptr->fildes, &dc3, 1, status);
 		if (0 != status)
 		{
-			io_ptr->dollar.za = 9;
+			io_ptr->dollar.za = ZA_IO_ERR;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
 	}
@@ -1124,7 +1128,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 	if (outofband && (jobinterrupt != outofband))
 	{
 		v->str.len = 0;
-		io_ptr->dollar.za = 9;
+		io_ptr->dollar.za = ZA_IO_ERR;
 		REVERT_GTMIO_CH(&io_curr_device, ch_set);
 		return(FALSE);
 	}
@@ -1171,7 +1175,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 
 term_error:
 	save_errno = errno;
-	io_ptr->dollar.za = 9;
+	io_ptr->dollar.za = ZA_IO_ERR;
 	tt_ptr->discard_lf = FALSE;
 	SEND_KEYPAD_LOCAL	/* to turn keypad off if possible */
 	if (!msec_timeout)

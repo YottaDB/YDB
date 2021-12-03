@@ -29,6 +29,7 @@
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #include "gtm_conv.h"
+#include "gtmio.h"
 #include "gtm_utf8.h"
 #include "rel_quant.h"
 #include "send_msg.h"
@@ -56,6 +57,9 @@ error_def(ERR_NOSOCKETINDEV);
 error_def(ERR_SOCKPASSDATAMIX);
 error_def(ERR_TEXT);
 error_def(ERR_ZINTRECURSEIO);
+error_def(ERR_GETSOCKOPTERR);
+error_def(ERR_SETSOCKOPTERR);
+
 
 #define	MAX_TLSOPTION	12
 #define TLSLABEL	"tls: { "
@@ -77,13 +81,14 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 {
 	int4			devlen, extrastr_len, flags, len, length, save_errno, status, status2, timeout, tls_errno;
 	int4			errlen, errlen2;
+	int			fcntl_flags, fcntl_res;
 	io_desc			*iod;
 	d_socket_struct 	*dsocketptr;
 	socket_struct		*socketptr;
 	char			idstr[MAX_TLSID_LEN + SIZEOF(RENEGOTIATE) + 1], optionstr[MAX_TLSOPTION];
 	char			passwordstr[GTM_PASSPHRASE_MAX_ASCII + 1];
 	const char		*errp, *errp2;
-	char			*charptr, *extraptr, *extrastr;
+	char			*charptr, *extraptr, *extrastr, *errptr;
 	tls_option		option;
 	gtm_tls_socket_t	*tlssocket;
 	ABS_TIME		cur_time, end_time;
@@ -251,6 +256,59 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				return;
 			}
 		}
+		if (socketptr->nonblocked_output)
+		{
+			if (GTM_TLS_API_VERSION_NONBLOCK > tls_ctx->plugin_version)
+			{	/* Due to lack of gtm_tls_version(), old pre GTM_TLS_API_VERSION_NONBLOCK plugins will not even
+				 * load but include this test as an example of how to check if the plugin loaded is new enough */
+				socketptr->tlsenabled = FALSE;
+				errp = gtm_tls_get_error();
+				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
+				return;
+			}
+			flags |= GTMTLS_OP_NONBLOCK_WRITE;
+			if (!socketptr->nonblocking)
+			{	/* set O_NONBLOCK if needed before calling plugin */
+				FCNTL2(socketptr->sd, F_GETFL, fcntl_flags);
+				if (fcntl_flags < 0)
+				{
+					iod->dollar.za = 9;
+					save_errno = errno;
+					errptr = (char *)STRERROR(save_errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
+						LEN_AND_LIT("F_GETFL FOR NON BLOCKING WRITE"),
+						save_errno, LEN_AND_STR(errptr));
+					return;
+				}
+				FCNTL3(socketptr->sd, F_SETFL, fcntl_flags | (O_NDELAY | O_NONBLOCK), fcntl_res);
+				if (fcntl_res < 0)
+				{
+					iod->dollar.za = 9;
+					save_errno = errno;
+					errptr = (char *)STRERROR(save_errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+						LEN_AND_LIT("F_SETFL FOR NON BLOCKING WRITE"),
+						save_errno, LEN_AND_STR(errptr));
+					return;
+				}
+				socketptr->nonblocking = TRUE;
+#				ifdef	DEBUG
+				if (WBTEST_ENABLED(WBTEST_SOCKET_NONBLOCK) && (0 < gtm_white_box_test_case_count))
+				{
+					if (-1 == setsockopt(socketptr->sd, SOL_SOCKET, SO_SNDBUF,
+						&gtm_white_box_test_case_count, SIZEOF(gtm_white_box_test_case_count)))
+					{
+						save_errno = errno;
+						errptr = (char *)STRERROR(save_errno);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+							LEN_AND_LIT("SO_SNDBUF"), save_errno, LEN_AND_STR(errptr));
+						return;
+					}
+                                }
+#				endif
+			}
+		}
 		socketptr->tlssocket = gtm_tls_socket(tls_ctx, NULL, socketptr->sd, idstr, flags);
 		if (NULL == socketptr->tlssocket)
 		{
@@ -368,12 +426,8 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			}
 		} while ((GTMTLS_WANT_READ == status) || (GTMTLS_WANT_WRITE == status));
 		/* turn on output buffering */
-		if (0 == socketptr->obuffer_size)
-			socketptr->obuffer_size = socketptr->buffer_size;
-		socketptr->obuffer_length = socketptr->obuffer_offset = 0;
-		socketptr->obuffer_wait_time = DEFAULT_WRITE_WAIT;
-		socketptr->obuffer_flush_time = DEFAULT_WRITE_WAIT * 2;	/* until add device parameter */
-		socketptr->obuffer = malloc(socketptr->obuffer_size);
+		SOCKET_OBUFFER_INIT(socketptr, socketptr->buffer_size, DEFAULT_WRITE_WAIT, (DEFAULT_WRITE_WAIT * 2));
+		socketptr->obuffer_in_use = TRUE;
 	} else if (tlsopt_renegotiate == option)
 	{
 		if (!socketptr->tlsenabled)

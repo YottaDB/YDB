@@ -869,9 +869,8 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		 * or writing an AIMG record (possible by either DSE or MUPIP JOURNAL RECOVER),
 		 * or this is a newly created block, or we have an in-memory copy.
 		 */
-		assert(dse_running || write_after_image
-				|| ((gds_t_acquired == mode) && (!read_before_image || (NULL == cs->old_block)))
-				|| (gds_t_acquired != mode) && (0 != cs->new_buff));
+		 assert(dse_running || write_after_image || mu_reorg_upgrd_dwngrd_in_prog
+			 || ((gds_t_acquired != mode) ? (0 != cs->new_buff): (!read_before_image || (NULL == cs->old_block))));
 		if (!dollar_tlevel)		/* stuff it in the array before setting in_cw_set */
 		{
 			assert(ARRAYSIZE(cr_array) > cr_array_index);
@@ -903,12 +902,12 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	 */
 	assert(!read_before_image || (NULL == cs->old_block) || (cs->ondsk_blkver == cr->ondsk_blkver));
 	assert((gds_t_acquired != mode) || (NULL != cs->old_block)
-		|| ((GDSVCURR == cs->ondsk_blkver) && v7_db_mode)
-		|| ((BLK_ID_32_VER == cs->ondsk_blkver) && v6_db_mode));
+		|| (v7_db_mode && ((GDSV7 == cs->ondsk_blkver) || (GDSV7m == cs->ondsk_blkver)))
+		|| (v6_db_mode && ((GDSV6 == cs->ondsk_blkver) || (GDSV6p == cs->ondsk_blkver))));
 	desired_db_format = csd->desired_db_format;
 	/* assert that appropriate inctn journal records were written at the beginning of the commit in t_end */
-	assert((inctn_blkupgrd_fmtchng != inctn_opcode) || ((GDSV6 == cr->ondsk_blkver) && (GDSV7 == desired_db_format)));
-	assert((inctn_blkdwngrd_fmtchng != inctn_opcode) || ((GDSV7 == cr->ondsk_blkver) && (GDSV6 == desired_db_format)));
+	assert((inctn_blkupgrd_fmtchng != inctn_opcode) || ((GDSV6 == cr->ondsk_blkver) && (GDSV7m == desired_db_format)));
+	assert((inctn_blkdwngrd_fmtchng != inctn_opcode) || ((GDSV7m == cr->ondsk_blkver) && (GDSV6 == desired_db_format)));
 	assert(!(JNL_ENABLED(csa) && csa->jnl_before_image) || !mu_reorg_nosafejnl
 		|| (inctn_blkupgrd != inctn_opcode) || (cr->ondsk_blkver == desired_db_format));
 	assert(!mu_reorg_upgrd_dwngrd_in_prog || !mu_reorg_encrypt_in_prog || (gds_t_acquired != mode));
@@ -927,15 +926,13 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	{	/* Some sort of state change in the block format is occurring */
 		switch(desired_db_format)
 		{
-			case GDSV7:
+			case GDSV7m:
 				/* V6 -> V7 transition */
 				if (gds_t_write_recycled != mode)
 					if (v7_db_mode)
 						DECR_BLKS_TO_UPGRD(csa, csd, 1);
 					else
-					{
 						assert(FALSE);
-					}
 				break;
 			case GDSV6:
 				/* V4 -> V5 transition */
@@ -945,11 +942,15 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 					/*else
 						DECR_BLKS_TO_UPGRD(csa, csd, 1);*/
 				break;
+			case GDSV6p:		/* this is only the case for upgrade_dir_tree */
+				DECR_BLKS_TO_UPGRD(csa, csd, 1);
+				break;
 			default:
 				assertpro(FALSE);
 		}
 	}
-	assert((gds_t_writemap != mode) || dse_running /* generic dse_running variable is used for caller = dse_maps */
+	/* generic dse_running variable below is used for caller == dse_maps */
+	assert((gds_t_writemap != mode) || dse_running || mu_reorg_upgrd_dwngrd_in_prog
 		|| cr->twin || (CR_BLKEMPTY == cs->cr->blk) || (cs->cr == cr) && (cs->cycle == cr->cycle));
 	/* Before marking this cache-record dirty, record the value of cr->dirty into cr->tn.
 	 * This is used in phase2 to determine "recycled".
@@ -1128,7 +1129,8 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		/* we should NOT be in crit for phase2 except dse_maps/dse_chng_bhead OR if cse has a non-zero recompute list. The
 		 * only exception to this is ONLINE ROLLBACK or MUPIP TRIGGER -UPGRADE which holds crit for the entire duration
 		 */
-		assert(!csa->now_crit || cs->recompute_list_head || dse_running || jgbl.onlnrlbk || TREF(in_trigger_upgrade));
+		assert(!csa->now_crit || cs->recompute_list_head || dse_running || jgbl.onlnrlbk || TREF(in_trigger_upgrade)
+			|| mu_reorg_upgrd_dwngrd_in_prog);
 		if (FALSE == cs->done)
 		{	/* if the current block has not been built (from being referenced in TP) */
 			if (NULL != cs->new_buff)
@@ -1710,10 +1712,10 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 		COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(gvt, pKey, EXPAND_PREV_KEY_FALSE);
 		if (new_rec)
 			t1->curr_rec.match = gvt->clue.end + 1;	/* Keep srch_hist and clue in sync for NEXT gvcst_search */
-			/* Now that the clue is known to be non-zero, we have the potential for the first_rec part of it to be
-			 * unreliable. Reset it to be safe. See comment in similar section in tp_hist for details on why.
-			 */
-			GVT_CLUE_INVALIDATE_FIRST_REC(gvt);
+		/* Now that the clue is known to be non-zero, we have the potential for the first_rec part of it to be
+		 * unreliable. Reset it to be safe. See comment in similar section in tp_hist for details on why.
+		 */
+		GVT_CLUE_INVALIDATE_FIRST_REC(gvt);
 	}
 	if (dollar_tlevel)
 	{

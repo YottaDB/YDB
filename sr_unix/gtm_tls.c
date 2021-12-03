@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -211,3 +211,13 @@ int			intrsafe_gtm_tls_renegotiate_options(gtm_tls_socket_t *socket, int msec_ti
 	return rv;
 }
 
+int			intrsafe_gtm_tls_version(int caller_version)
+{
+	int		rv;
+	intrpt_state_t	prev_intrpt_state;
+
+	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
+	rv = (*gtm_tls_version_fptr)(caller_version);
+	ENABLE_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
+	return rv;
+}

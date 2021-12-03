@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,7 @@ uchar_ptr_t mu_int_read_buffer(block_id blk, enum db_ver *ondsk_blkver, uchar_pt
  */
 uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *free_buff)
 {
-	int4			status;
+	int			level;
 	file_control		*fc;
 	unsigned char		*tmp_ptr;
 	int			in_len, gtmcrypt_errno;
@@ -169,11 +169,17 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *fr
 			}
 		}
 	}
-	GDS_BLK_UPGRADE_IF_NEEDED(blk, tmp_ptr, tmp_ptr, &mu_int_data, ondsk_blkver, status, mu_int_data.fully_upgraded);
-	if (SS_NORMAL != status)
-		if (ERR_DYNUPGRDFAIL == status)
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) status, 3, &blk, DB_LEN_STR(gv_cur_region));
-		else
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) status);
+	if (csd->fully_upgraded && (GDSV6p == ((blk_hdr_ptr_t)tmp_ptr)->bver))
+	{	/* adjust for shift of GDSV7 id from 2 to 4 */
+		assert(GDSMV70000 == csd->creation_mdb_ver);
+		((blk_hdr_ptr_t)tmp_ptr)->bver = GDSV7;
+	}
+	if (!csd->fully_upgraded && (GDSV6 == ((blk_hdr_ptr_t)tmp_ptr)->bver)
+		&& (level = ((blk_hdr_ptr_t)tmp_ptr)->levl) && (LCL_MAP_LEVL != level))			/*WARNING assignment  */
+	{	/* prior version block needs block_id adjusted */
+		assert(csd->offset);
+		blk_ptr_adjust(tmp_ptr, csd->offset);
+		((blk_hdr_ptr_t)tmp_ptr)->bver = GDSV6p;
+	}
 	return tmp_ptr;
 }

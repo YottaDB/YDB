@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,13 +32,17 @@
 #ifdef USE_SELECT
 #include "gtm_select.h"
 #endif
+#ifdef DEBUG_SOCKWAIT
+#include "gtmio.h"
+#include "have_crit.h"		/* DBGSOCKWAIT needs for DBGFPF */
+#endif
 #include "io_params.h"
 #include "gt_timer.h"
 #include "io.h"
 #include "iotimer.h"
 #include "iosocketdef.h"
 #include "min_max.h"
-#include "outofband.h"
+#include "deferred_events_queue.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mv_stent.h"
@@ -46,31 +50,36 @@
 #include "gtm_stdlib.h"
 #include "eintr_wrappers.h"
 #include "error.h"
+#include "gtm_caseconv.h"
 
 #define	CONNECTED	"CONNECT"
-#define READ	"READ"
+#define READ		"READ"
+#define WRITE		"WRITE"
 
-GBLREF volatile int4		outofband;
+#define	WAIT_FOR_READ		1       /* or incoming connection */
+#define	WAIT_FOR_WRITE  	2
+#define	WAIT_FOR_ISDEFAULT  	4
+#define WAIT_FOR_DEFAULT        (WAIT_FOR_READ | WAIT_FOR_WRITE | WAIT_FOR_ISDEFAULT)
+
+GBLREF int			dollar_truth, socketus_interruptus;
 GBLREF int4			gtm_max_sockets;
-GBLREF int			socketus_interruptus;
-GBLREF boolean_t		dollar_zininterrupt;
+GBLREF mv_stent			*mv_chain;
 GBLREF stack_frame  	        *frame_pointer;
 GBLREF unsigned char            *stackbase, *stacktop, *msp, *stackwarn;
-GBLREF mv_stent			*mv_chain;
-GBLREF int			dollar_truth;
+GBLREF volatile boolean_t	dollar_zininterrupt;
+GBLREF volatile int4		outofband;
 
 error_def(ERR_GETNAMEINFO);
 error_def(ERR_GETSOCKNAMERR);
-error_def(ERR_SETSOCKOPTERR);
 error_def(ERR_SOCKACPT);
+error_def(ERR_SOCKNOTFND);
 error_def(ERR_SOCKWAIT);
+error_def(ERR_SOCKWAITARG);
 error_def(ERR_TEXT);
 error_def(ERR_SOCKMAX);
 error_def(ERR_ZINTRECURSEIO);
-error_def(ERR_STACKCRIT);
-error_def(ERR_STACKOFLOW);
 
-boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
+boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *handle)
 {
 	struct 	timeval  	utimeout, *utimeoutptr;
 	ABS_TIME		cur_time, end_time;
@@ -83,21 +92,25 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 #endif
 #ifdef USE_SELECT
 	int			select_max_fd;
-	fd_set			select_fdset;
+	fd_set			select_fdset, selectw_fdset;
+	boolean_t		selectw_needed;
 #endif
 	d_socket_struct 	*dsocketptr;
-	socket_struct   	*socketptr;
+	socket_struct   	*socketptr, *which_socketptr = NULL, *prev_socketptr;;
 	socket_interrupt	*sockintr;
 	char            	*errptr, *charptr;
-	int4            	errlen, ii, jj;
-	int4			nselect, nlisten, nconnected, rlisten, rconnected;
+	int4            	errlen, ii, jj, handle_index;
+	int4			nselect, nlisten, nconnected, nwrite, rlisten, rconnected, rwrite;
 	int4			oldestconnectedcycle, oldestconnectedindex;
+	int4			oldestwritecycle, oldestwriteindex;
 	int4			oldestlistencycle, oldestlistenindex;
 	int4			oldesteventcycle, oldesteventindex;
-	int			rv, max_fd, len;
+	int			rv, max_fd, len, len1;
 	boolean_t		zint_restart, retry_accept = FALSE;
 	mv_stent		*mv_zintdev;
 	int			errcode;
+	int			wait_for_what = 0;	/* bit mask */
+	char			wait_for_string[MAX_DEVCTL_LENGTH + 1];
 	boolean_t		ch_set;
 	DCL_THREADGBL_ACCESS;
 
@@ -107,12 +120,42 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	sockintr = &dsocketptr->sock_save_state;
 	ESTABLISH_RET_GTMIO_CH(&iod->pair, FALSE, ch_set);
-
 	/* Check for restart */
 	if (!dsocketptr->mupintr)
 	{
 		/* Simple path, no worries*/
 		zint_restart = FALSE;
+		if (NULL == whatop)
+			wait_for_what = WAIT_FOR_DEFAULT;
+		else
+		{
+			MV_FORCE_STR(whatop);
+			assert(sizeof(wait_for_string) > whatop->str.len);
+			lower_to_upper((uchar_ptr_t)wait_for_string, (uchar_ptr_t)whatop->str.addr,
+				MIN((sizeof(wait_for_string) - 1), whatop->str.len));
+			wait_for_string[whatop->str.len] = '\0';
+			if (strstr(wait_for_string, READ))
+				wait_for_what |= WAIT_FOR_READ;
+			if (strstr(wait_for_string, WRITE))
+				wait_for_what |= WAIT_FOR_WRITE;
+			if (0 == wait_for_what)
+			{	/* no valid value found */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKWAITARG, 4, RTS_ERROR_LITERAL("Second"),
+						RTS_ERROR_LITERAL("value is not valid"));
+				return FALSE;
+			}
+		}
+		if (NULL != handle)
+		{
+			MV_FORCE_STR(handle);
+			/* WARNING inline assignment below */
+			if (0 > (handle_index = iosocket_handle(handle->str.addr, &handle->str.len, FALSE, dsocketptr)))
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKNOTFND, 2, handle->str.len, handle->str.addr);
+				return FALSE;		/* for compiler and analyzers */
+			}
+			which_socketptr = dsocketptr->socket[handle_index];
+		}
 		dsocketptr->waitcycle++;	/* don't count restarts */
 		if (0 == dsocketptr->waitcycle)
 		{	/* wrapped so make it non zero */
@@ -131,7 +174,8 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 			if (sockintr->end_time_valid)
 				/* Restore end_time for timeout */
 				end_time = sockintr->end_time;
-
+			which_socketptr = (socket_struct *)mv_zintdev->mv_st_cont.mvs_zintdev.socketptr;
+			wait_for_what = sockintr->wait_for_what;
 			/* Done with this mv_stent. Pop it off if we can, else mark it inactive. */
 			if (mv_chain == mv_zintdev)
 				POP_MV_STENT();         /* pop if top of stack */
@@ -163,35 +207,50 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 	poll_fds = (struct pollfd *) TREF(poll_fds_buffer);
 	poll_socketptr = (socket_struct **)((char *)poll_fds + (dsocketptr->n_socket * SIZEOF(struct pollfd)));
 #endif
-	SELECT_ONLY(FD_ZERO(&select_fdset));
+#ifdef	USE_SELECT
+	FD_ZERO(&select_fdset);
+	FD_ZERO(&selectw_fdset);
+	selectw_needed = FALSE;
+#endif
+	DBGSOCKWAIT((stdout,"waitcycle= %d\n",dsocketptr->waitcycle));
 	while (TRUE)
 	{
+		DBGSOCKWAIT((stdout,"wait loop:\n"));
 		POLL_ONLY(poll_nfds = 0);
 		SELECT_ONLY(select_max_fd = 0);
-		nselect = nlisten = nconnected = rlisten = rconnected = 0;
+		nselect = nlisten = nconnected = nwrite = rlisten = rconnected = rwrite = 0;
 		rv = 0;
 		for (ii = 0; ii < dsocketptr->n_socket; ii++)
 		{
-			socketptr = dsocketptr->socket[ii];
+			if (which_socketptr)
+				socketptr = which_socketptr;
+			else
+				socketptr = dsocketptr->socket[ii];
+			socketptr->current_events = 0;
 			if ((socket_listening == socketptr->state) || (socket_connected == socketptr->state))
 			{
 				if (socket_connected == socketptr->state)
 				{ /* if buffer not empty set flag but not FD_SET */
-					nconnected++;
-					if (0 < socketptr->buffered_length)
+					nconnected++;	/* increment even if not in whatop */
+					if ((0 < socketptr->buffered_length) && (WAIT_FOR_READ & wait_for_what))
 					{	/* something in the buffer so ready now */
-						if (!socketptr->pendingevent)
+						if (!(SOCKPEND_READ & socketptr->pendingevent))
 						{
-							socketptr->pendingevent = TRUE;
+							socketptr->current_events |= SOCKPEND_BUFFER | SOCKPEND_READ;
+							DBGSOCKWAIT((stdout,"socket[%d] buffer, priorreadycycle= %d, pending= %d,"
+								" current= %d\n", ii, socketptr->readycycle,
+								socketptr->pendingevent, socketptr->current_events));
 							socketptr->readycycle = dsocketptr->waitcycle;
 						}
+						socketptr->readyforwhat |= SOCKREADY_READ;
 						rconnected++;
-						continue;
+						if (!socketptr->nonblocked_output)
+							continue;	/* no need to check if writable */
 					}
-				} else
-				{
+				} else if (WAIT_FOR_READ & wait_for_what)
+				{	/* increment n... even if not in whatop */
 					nlisten++;
-					if (socketptr->pendingevent)
+					if (SOCKPEND_READ & socketptr->pendingevent)
 					{
 						rlisten++;
 						continue;	/* ready for ACCEPT now */
@@ -199,17 +258,31 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 				}
 #ifdef USE_POLL
 				poll_fds[poll_nfds].fd = socketptr->sd;
-				poll_fds[poll_nfds].events = POLLIN;
+				poll_fds[poll_nfds].events = 0;
+				if (WAIT_FOR_READ & wait_for_what)
+					poll_fds[poll_nfds].events = POLLIN;
+				if ((socket_connected == socketptr->state) && socketptr->nonblocked_output
+					&& (WAIT_FOR_WRITE & wait_for_what))
+					poll_fds[poll_nfds].events |= POLLOUT;
 				poll_socketptr[poll_nfds] = socketptr;
 				poll_nfds++;
 #endif
 #ifdef USE_SELECT
 				assertpro(FD_SETSIZE > socketptr->sd);
-				FD_SET(socketptr->sd, &select_fdset);
+				if (WAIT_FOR_READ & wait_for_what)
+					FD_SET(socketptr->sd, &select_fdset);
+				if ((socket_connected == socketptr->state) && socketptr->nonblocked_output
+					&& (WAIT_FOR_WRITE & wait_for_what))
+				{
+					FD_SET(socketptr->sd, &selectw_fdset);
+					selectw_needed = TRUE;
+				}
 				select_max_fd = MAX(select_max_fd, socketptr->sd);
 #endif
 				nselect++;
 			}
+			if (which_socketptr)
+				break;		/* only check the one socket */
 		}
 		if (nselect)
 		{
@@ -245,7 +318,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 			for ( ; ; )
 			{
 #ifdef USE_POLL
-				if ((0 < rconnected) || (0 <rlisten))
+				if ((0 < rconnected) || (0 < rlisten) || (0 < rwrite))
 					poll_timeout = 0;
 				else if (NO_M_TIMEOUT == msec_timeout)
 					poll_timeout = -1;
@@ -257,11 +330,12 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 #endif
 #ifdef USE_SELECT
 				utimeoutptr = &utimeout;
-				if ((0 < rconnected) || (0 <rlisten))
+				if ((0 < rconnected) || (0 < rlisten) || (0 < rwrite))
 					utimeout.tv_sec = utimeout.tv_usec = 0;
 				else if (NO_M_TIMEOUT == msec_timeout)
 					utimeoutptr = (struct timeval *)NULL;
-				rv = select(select_max_fd + 1, (void *)&select_fdset, (void *)0, (void *)0, utimeoutptr);
+				rv = select(select_max_fd + 1, (void *)&select_fdset,
+						selectw_needed ? (void *)&selectw_fdset : NULL, NULL, utimeoutptr);
 #endif
 				if (0 > rv && EINTR == errno)
 				{
@@ -274,6 +348,8 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 							PUSH_MV_STENT(MVST_ZINTDEV);
 							mv_chain->mv_st_cont.mvs_zintdev.io_ptr = iod;
 							mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+							mv_chain->mv_st_cont.mvs_zintdev.socketptr = which_socketptr;
+							sockintr->wait_for_what = wait_for_what;
 							sockintr->who_saved = sockwhich_wait;
 							if (NO_M_TIMEOUT != msec_timeout)
 							{
@@ -288,8 +364,8 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 								socketus_interruptus));
 						}
 						REVERT_GTMIO_CH(&iod->pair, ch_set);
-						outofband_action(FALSE);
-						assertpro(FALSE);      /* Should *never* return from outofband_action */
+						async_action(FALSE);
+						assertpro(FALSE);      /* Should *never* return from async_action */
 						return FALSE;   /* For the compiler.. */
 					}
 					if (NO_M_TIMEOUT != msec_timeout)
@@ -310,7 +386,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 				} else
 					break;	/* either other error or done */
 			}
-			if ((rv == 0) && (0 == rconnected) && (0 == rlisten))
+			if ((rv == 0) && (0 == rconnected) && (0 == rlisten) && (0 == rwrite))
 			{	/* none selected or prior pending event */
 				iod->dollar.key[0] = '\0';
 				if (NO_M_TIMEOUT != msec_timeout)
@@ -327,7 +403,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKWAIT, 0, ERR_TEXT, 2, errlen, errptr);
 				return FALSE;
 			}
-		} else if ((0 == rlisten) && (0 == rconnected))
+		} else if ((0 == rlisten) && (0 == rconnected) && (0 == rwrite))
 		{	/* nothing to select and no pending events */
 			iod->dollar.key[0] = '\0';
 			if (NO_M_TIMEOUT != msec_timeout)
@@ -339,10 +415,12 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 				continue;
 		}
 		/* find out which sockets are ready */
-		oldestlistencycle = oldestconnectedcycle = oldesteventcycle = 0;
-		oldestlistenindex = oldestconnectedindex = oldesteventindex = -1;
+		oldestlistencycle = oldestconnectedcycle = oldestwritecycle = oldesteventcycle = 0;
+		oldestlistenindex = oldestconnectedindex = oldestwriteindex = oldesteventindex = -1;
 		for (ii = 0; ii < dsocketptr->n_socket; ii++)
 		{
+			if (which_socketptr && (which_socketptr != dsocketptr->socket[ii]))
+				continue;
 			socketptr = dsocketptr->socket[ii];
 			if ((socket_listening != socketptr->state) && (socket_connected != socketptr->state))
 				continue;	/* not a candidate for /WAIT */
@@ -357,18 +435,46 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 #endif
 #ifdef USE_SELECT
 			assertpro(FD_SETSIZE > socketptr->sd);
-			if (nselect && (0 != FD_ISSET(socketptr->sd, &select_fdset)))
+			if (nselect && ((0 != FD_ISSET(socketptr->sd, &select_fdset)
+				|| (selectw_needed && (0 != FD_ISSET(socketptr->sd, &selectw_fdset))))))
 #endif
 			{	/* set flag in socketptr and keep going */
-				socketptr->pendingevent = TRUE;
-				socketptr->readycycle = dsocketptr->waitcycle;
+				if (POLL_ONLY((POLLIN & poll_fds[jj].revents))
+					SELECT_ONLY((FD_ISSET(socketptr->sd), &select_fdset)))
+				{
+					socketptr->current_events |= SOCKPEND_READ;
+					socketptr->readyforwhat |= SOCKREADY_READ;
+					DBGSOCKWAIT((stdout,"socket[%d] pollin, priorreadycycle= %d, pending= %d, current= %d\n",
+						ii, socketptr->readycycle, socketptr->pendingevent, socketptr->current_events));
+					if (!socketptr->pendingevent && !(SOCKPEND_BUFFER & socketptr->current_events))
+						socketptr->readycycle = dsocketptr->waitcycle;
+				}
 				if (socket_listening == socketptr->state)
+				{
 					rlisten++;
-				else
+					socketptr->readycycle = dsocketptr->waitcycle;
+				} else
+				{
+					if (SELECT_ONLY(selectw_needed && (FD_ISSET(socketptr->sd, &selectw_fdset)))
+						POLL_ONLY(poll_fds[jj].revents & POLLOUT))
+
+					{
+						socketptr->current_events |= SOCKPEND_WRITE;
+						socketptr->readyforwhat |= SOCKREADY_WRITE;
+						if (!socketptr->pendingevent)
+						{
+							DBGSOCKWAIT((stdout,"socket[%d] pollout, priorreadycycle= %d, "
+								"pending= %d, current= %d\n", ii, socketptr->readycycle,
+								socketptr->pendingevent, socketptr->current_events));
+							socketptr->readycycle = dsocketptr->waitcycle;	/* newly ready */
+						}
+						rwrite++;
+					}
 					rconnected++;
+				}
 			}
-			if (socketptr->pendingevent)	/* may be from prior /WAIT */
-			{
+			if (socketptr->current_events || (SOCKPEND_READ & socketptr->pendingevent))
+			{	/* smallest readycycle is the oldest aka longest unselected */
 				if (socket_listening == socketptr->state)
 				{
 					if (0 == oldestlistencycle)
@@ -378,18 +484,68 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 					} else if (oldestlistencycle > socketptr->readycycle)
 					{	/* this socket waiting longer */
 						oldestlistencycle = socketptr->readycycle;
+						assert(0 <= oldestlistenindex);
+						prev_socketptr = dsocketptr->socket[oldestlistenindex];
+						prev_socketptr->pendingevent |= (SOCKPEND_READ & prev_socketptr->current_events);
 						oldestlistenindex = ii;
+					} else
+					{
+						DBGSOCKWAIT((stdout, "socket[%d] LISTEN priorpending= %d, current %d\n",
+							ii, socketptr->pendingevent, socketptr->current_events));
+						socketptr->pendingevent |= (SOCKPEND_READ & socketptr->current_events);
 					}
 				} else
-				{
-					if (0 == oldestconnectedcycle)
+				{	/* only select for write if ready this time */
+					if (SOCKPEND_WRITE & socketptr->current_events)
 					{
-						oldestconnectedcycle = socketptr->readycycle;
-						oldestconnectedindex = ii;
-					} else if (oldestconnectedcycle > socketptr->readycycle)
-					{	/* this socket waiting longer */
-						oldestconnectedcycle = socketptr->readycycle;
-						oldestconnectedindex = ii;
+						if (0 == oldestwritecycle)
+						{
+							oldestwritecycle = socketptr->readycycle;
+							oldestwriteindex = ii;
+							DBGSOCKWAIT((stdout,"socket[%d] oldestwrite, readycycle = %d\n",
+								ii, socketptr->readycycle));
+						} else if (oldestwritecycle > socketptr->readycycle)
+						{	/* this socket waiting longer */
+							oldestwritecycle = socketptr->readycycle;
+							DBGSOCKWAIT((stdout,"socket[%d] oldestwrite(replace), readycycle = %d\n",
+								ii, socketptr->readycycle));
+							assert(0 <= oldestwriteindex);
+							prev_socketptr = dsocketptr->socket[oldestwriteindex];
+							prev_socketptr->pendingevent
+								|= (SOCKPEND_WRITE & prev_socketptr->current_events);
+							oldestwriteindex = ii;
+						} else
+						{
+							DBGSOCKWAIT((stdout, "socket[%d] WRITE priorpending= %d, current %d\n",
+								ii, socketptr->pendingevent, socketptr->current_events));
+							socketptr->pendingevent |= (SOCKPEND_WRITE & socketptr->current_events);
+						}
+					}
+					if ((SOCKPEND_READ & socketptr->current_events)
+						|| (SOCKPEND_READ & socketptr->pendingevent))
+					{
+						if (0 == oldestconnectedcycle)
+						{
+							oldestconnectedcycle = socketptr->readycycle;
+							DBGSOCKWAIT((stdout,"socket[%d] oldestread, readycycle = %d\n",
+								ii, socketptr->readycycle));
+							oldestconnectedindex = ii;
+						} else if (oldestconnectedcycle > socketptr->readycycle)
+						{	/* this socket waiting longer */
+							oldestconnectedcycle = socketptr->readycycle;
+							DBGSOCKWAIT((stdout, "socket[%d] oldestread(replace), readycycle = %d\n",
+								ii, socketptr->readycycle));
+							assert(0 <= oldestconnectedindex);
+							prev_socketptr = dsocketptr->socket[oldestconnectedindex];
+							prev_socketptr->pendingevent
+								|= (SOCKPEND_READ & prev_socketptr->current_events);
+							oldestconnectedindex = ii;
+						} else
+						{
+							DBGSOCKWAIT((stdout, "socket[%d] READ priorpending= %d, current %d\n",
+								ii, socketptr->pendingevent, socketptr->current_events));
+							socketptr->pendingevent |= (SOCKPEND_READ & socketptr->current_events);
+						}
 					}
 				}
 			}
@@ -399,9 +555,15 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 			oldesteventcycle = oldestlistencycle;
 			oldesteventindex = oldestlistenindex;
 		} else if (0 < oldestconnectedcycle)
-		{
+		{	/* something to READ has priority over a WRITE */
 			oldesteventcycle = oldestconnectedcycle;
 			oldesteventindex = oldestconnectedindex;
+			DBGSOCKWAIT((stdout,"selected read socket[%d], cycle = %d\n", oldestconnectedindex, oldestconnectedcycle));
+		} else if (0 < oldestwritecycle)
+		{
+			oldesteventcycle = oldestwritecycle;
+			oldesteventindex = oldestwriteindex;
+			DBGSOCKWAIT((stdout,"selected write socket[%d], cycle = %d\n", oldestwriteindex, oldestwritecycle));
 		} else
 		{	/* unexpected nothing to do */
 			assert((0 < oldestlistencycle) || (0 < oldestconnectedcycle));
@@ -415,7 +577,6 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 				continue;
 		}
 		socketptr = dsocketptr->socket[oldesteventindex];
-		socketptr->pendingevent = FALSE;
 		if (socket_listening == socketptr->state)
 		{
 			rv = iosocket_accept(dsocketptr, socketptr, FALSE);
@@ -432,8 +593,21 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 		{
 			assert(socket_connected == socketptr->state);
 			dsocketptr->current_socket = oldesteventindex;
-			len = SIZEOF(READ) - 1;
-			memcpy(&iod->dollar.key[0], READ, len);
+			len = 0;
+			/* $KEY can only have one item so READWRITE if both */
+			if (socketptr->readyforwhat & SOCKREADY_READ)
+			{
+				len1 = SIZEOF(READ) - 1;
+				memcpy(&iod->dollar.key[len], READ, len1);
+				len += len1;
+			}
+			if (socketptr->readyforwhat & SOCKREADY_WRITE)
+			{
+				len1 = SIZEOF(WRITE) - 1;
+				memcpy(&iod->dollar.key[len], WRITE, len1);
+				len += len1;
+			}
+			assert(0 != len);
 			iod->dollar.key[len++] = '|';
 			memcpy(&iod->dollar.key[len], socketptr->handle, socketptr->handle_len);
 			len += socketptr->handle_len;
@@ -501,7 +675,7 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 		FD_ZERO(&select_fdset);
 		FD_SET(socketptr->sd, &select_fdset);
 		utimeout.tv_sec = utimeout.tv_usec = 0;
-		rv = select(socketptr->sd + 1, (void *)&select_fdset, (void *)0, (void *)0, &utimeout);
+		rv = select(socketptr->sd + 1, (void *)&select_fdset, NULL, NULL, &utimeout);
 #endif
 		if (0 > rv)
 		{
@@ -536,7 +710,7 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	newsocketptr->remote.ai.ai_socktype = socketptr->local.ai.ai_socktype;
 	newsocketptr->remote.ai.ai_protocol = socketptr->local.ai.ai_protocol;
 	newsocketptr->lastaction = newsocketptr->readycycle = 0;
-	newsocketptr->pendingevent = FALSE;
+	newsocketptr->pendingevent = 0;
 	newsocketptr->sd = rv;
 	if (socket_local != newsocketptr->protocol)
 	{	/* translate internal address to numeric ip address */

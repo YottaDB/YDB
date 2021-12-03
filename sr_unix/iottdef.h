@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,12 +37,12 @@
 #define TT_NOINSERT		0x2000
 #define TT_EMPTERM		0x4000
 
-#define TERMHUP_NOPRINCIO_CHECK(WRITE)					\
-MBSTART {								\
-	if ((int)ERR_TERMHANGUP == SIGNAL)				\
-		exi_condition = -ERR_TERMHANGUP;			\
-	ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, WRITE, FALSE);		\
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TERMHANGUP);	\
+#define TERMHUP_NOPRINCIO_CHECK(WRITE)								\
+MBSTART {											\
+	assert(hup_on);										\
+	exi_condition = -ERR_TERMHANGUP;							\
+	ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, WRITE, FALSE);					\
+	async_action(FALSE);									\
 } MBEND
 
 enum	tt_which

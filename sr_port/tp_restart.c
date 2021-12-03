@@ -339,7 +339,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		switch (status)
 		{
 			case cdb_sc_helpedout:
-				assert(IS_FINAL_RETRY_CODE(status));
+				assert(is_final_retry_code(status));
 				csa = sgm_info_ptr->tp_csa;
 				if (dba_bg == csa->hdr->acc_meth)
 				{
@@ -386,7 +386,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				 * virtue of it having now been referenced) has been added to tp_reg_list so all we need
 				 * now is a retry.
 				 */
-				assert(IS_FINAL_RETRY_CODE(status));
+				assert(is_final_retry_code(status));
 				assert(CDB_STAGNATE == t_tries);
 				for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 				{	/* regions might not have been opened if we t_retried in gvcst_init(). dont
@@ -431,7 +431,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				/* If retry due to M-locks, sleep so needed locks have a chance to get released */
 				break;
 			case cdb_sc_reorg_encrypt:
-				assert(IS_FINAL_RETRY_CODE(status));
+				assert(is_final_retry_code(status));
 				/* Even though the failure code is "cdb_sc_reorg_encrypt", it is possible
 				 * "process_reorg_encrypt_restart" was already called from "t_qread" which then
 				 * returned "cdb_sc_reorg_encrypt" that ended up in tp_restart. "reorg_encrypt_restart_csa" would
@@ -505,7 +505,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			case cdb_sc_phase2waitfail:
 			/* cdb_sc_wcs_recover is possible in final retry in TP (see comment in "tp_hist" */
 			case cdb_sc_wcs_recover:
-				assert(IS_FINAL_RETRY_CODE(status));
+				assert(is_final_retry_code(status));
 				if (CDB_STAGNATE <= t_tries)
 				{
 					t_tries--;
@@ -520,7 +520,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			default:
 				if (CDB_STAGNATE < ++t_tries)
 				{
-					assert(!IS_FINAL_RETRY_CODE(status));
+					assert(!is_final_retry_code(status));
 					hist_index = t_tries;
 					t_tries = 0;
 					assert(0 != have_crit(CRIT_HAVE_ANY_REG)); /* we should still be holding crit */

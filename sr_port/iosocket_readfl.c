@@ -29,7 +29,8 @@
 #include "stringpool.h"
 #include "iosocketdef.h"
 #include "min_max.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "wake_alarm.h"
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
@@ -47,7 +48,7 @@
 #endif
 
 GBLREF	bool			out_of_time;
-GBLREF	boolean_t		dollar_zininterrupt, gtm_utf8_mode, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF	boolean_t		gtm_utf8_mode, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF	int			socketus_interruptus;
 GBLREF	io_pair 		io_curr_device, io_std_device;
 GBLREF	mstr			chset_names[];
@@ -57,6 +58,7 @@ GBLREF	spdesc 			stringpool;
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	UConverter		*chset_desc[];
 GBLREF	unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
+GBLREF	volatile boolean_t	dollar_zininterrupt;
 GBLREF	volatile int4		outofband;
 
 error_def(ERR_BOMMISMATCH);
@@ -68,8 +70,6 @@ error_def(ERR_NOPRINCIO);
 error_def(ERR_NOSOCKETINDEV);
 error_def(ERR_SETSOCKOPTERR);
 error_def(ERR_SOCKPASSDATAMIX);
-error_def(ERR_STACKCRIT);
-error_def(ERR_STACKOFLOW);
 error_def(ERR_TEXT);
 error_def(ERR_ZINTRECURSEIO);
 
@@ -162,14 +162,14 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 			return result;
 		} else
 		{
-			iod->dollar.za = 9;
+			iod->dollar.za = ZA_IO_ERR;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
 			return 0;
 		}
 	}
 	if (dsocketptr->n_socket <= dsocketptr->current_socket)
 	{
-		iod->dollar.za = 9;
+		iod->dollar.za = ZA_IO_ERR;
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
 		return 0;
 	}
@@ -256,8 +256,9 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		bytes_read = 0;
 		chars_read = 0;
 		buffer_start = NULL;
-		socketptr->pendingevent = FALSE;
 		socketptr->lastaction = dsocketptr->waitcycle;
+		socketptr->readyforwhat &= ~SOCKREADY_READ;
+		socketptr->pendingevent &= ~SOCKPEND_READ;
 	} else
 	{
 		assert(bytes_read);
@@ -351,7 +352,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 			FCNTL2(socketptr->sd, F_GETFL, flags);
 			if (flags < 0)
 			{
-				iod->dollar.za = 9;
+				iod->dollar.za = ZA_IO_ERR;
 				save_errno = errno;
 				errptr = (char *)STRERROR(errno);
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
@@ -361,13 +362,14 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 			FCNTL3(socketptr->sd, F_SETFL, flags & (~(O_NDELAY | O_NONBLOCK)), fcntl_res);
 			if (fcntl_res < 0)
 			{
-				iod->dollar.za = 9;
+				iod->dollar.za = ZA_IO_ERR;
 				save_errno = errno;
 				errptr = (char *)STRERROR(errno);
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 					LEN_AND_LIT("F_SETFL FOR NON BLOCKING I/O"),
 					save_errno, LEN_AND_STR(errptr));
 			}
+			socketptr->nonblocking = FALSE;
 			sys_get_curr_time(&cur_time);
 			if (!sockintr->end_time_valid)
 				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
@@ -566,7 +568,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 						{
 							if (CHSET_UTF16LE == ichset)
 							{
-								iod->dollar.za = 9;
+								iod->dollar.za = ZA_IO_ERR;
 								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BOMMISMATCH, 4,
 									chset_names[CHSET_UTF16BE].len,
 									chset_names[CHSET_UTF16BE].addr,
@@ -584,7 +586,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 						{
 							if (CHSET_UTF16BE == ichset)
 							{
-								iod->dollar.za = 9;
+								iod->dollar.za = ZA_IO_ERR;
 								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BOMMISMATCH, 4,
 									chset_names[CHSET_UTF16LE].len,
 									chset_names[CHSET_UTF16LE].addr,
@@ -686,7 +688,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		}
 		if (bytes_read > MAX_STRLEN)
 		{
-			iod->dollar.za = 9;
+			iod->dollar.za = ZA_IO_ERR;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 		}
 		orig_bytes_read = bytes_read;
@@ -801,13 +803,15 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 			FCNTL3(socketptr->sd, F_SETFL, flags, fcntl_res);
 			if (fcntl_res < 0)
 			{
-				iod->dollar.za = 9;
+				iod->dollar.za = ZA_IO_ERR;
 				save_errno = errno;
 				errptr = (char *)STRERROR(errno);
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 					LEN_AND_LIT("F_SETFL FOR RESTORING SOCKET OPTIONS"),
 					save_errno, LEN_AND_STR(errptr));
 			}
+			if ((O_NDELAY | O_NONBLOCK) & flags)
+				socketptr->nonblocking = TRUE;
 			if (out_of_time)
 			{
 				ret = FALSE;
@@ -854,8 +858,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 								    end_time.at_sec, end_time.at_usec, msec_timeout)));
 		TRCTBL_ENTRY(SOCKRFL_OUTOFBAND, bytes_read, (INTPTR_T)chars_read, stringpool.free, NULL);	/* BYPASSOK */
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
-		outofband_action(FALSE);
-		assertpro(FALSE);	/* Should *never* return from outofband_action */
+		async_action(FALSE);
+		assertpro(FALSE);	/* Should *never* return from async_action */
 		return FALSE;	/* For the compiler.. */
 	}
 	if (0 < chars_read)
@@ -898,7 +902,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		DBGSOCK((stdout, "socrfl: Error handling triggered - status: %d\n", status));
 		if (0 == chars_read)
 			iod->dollar.x = 0;
-		iod->dollar.za = 9;
+		iod->dollar.za = ZA_IO_ERR;
 #		ifdef GTM_TLS
 		if (socketptr->tlsenabled && (0 > real_errno))
 			errptr = (char *)gtm_tls_get_error();

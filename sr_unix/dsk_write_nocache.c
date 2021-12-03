@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2020 Fidelity National Information	*
+ * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,7 +95,7 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 		size = (((blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
 		assert(SIZEOF(blk_hdr) <= size);
 		/*INCR_BLKS_TO_UPGRD(csa, csd, 1);*/
-	} else DEBUG_ONLY(if (GDSV7 == ondsk_blkver))
+	} else DEBUG_ONLY(if ((GDSV7 == ondsk_blkver) || (GDSV7m == ondsk_blkver)))
 	{
 		assert(GDSVCURR == ondsk_blkver);
 		size = (((blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
@@ -105,6 +105,7 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 #	ifdef DEBUG
 	else
 		assert(((GDSV7 == ondsk_blkver) && (!MEMCMP_LIT(csd->label, GDS_LABEL)))
+			|| ((GDSV7m == ondsk_blkver) && (!MEMCMP_LIT(csd->label, GDS_LABEL)))
 			|| ((GDSV6 == ondsk_blkver) && (!MEMCMP_LIT(csd->label, V6_GDS_LABEL))));
 #	endif
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,26 +34,5 @@ STATICFNDEF gtmtls_passwd_list_t *gtm_tls_find_pwent(const char *input_env_name)
 #define VERIFY_PEER(FLAGS)		(FLAGS & GTMTLS_OP_VERIFY_PEER)
 #define CLIENT_MODE(FLAGS)		(FLAGS & GTMTLS_OP_CLIENT_MODE)
 #define DEFAULT_SESSION_TIMEOUT		3600		/* Old sessions can be reused upto 1 hour since the creation time. */
-
-#ifdef DEBUG
-/* Verify that the socket (about to be wrapped or linked to an existing SSL object is actually of blocking type. This library
- * currently supports only blocking SSL/TLS operations. If ever this check fails, either the callee needs to be examined OR the
- * implementation needs to account for non-blocking sockets.
- */
-#define DBG_VERIFY_SOCK_IS_BLOCKING(SOCKFD)											\
-{																\
-	int		flags;													\
-																\
-	assert(0 <= SOCKFD);													\
-	flags = fcntl(SOCKFD, F_GETFL);												\
-	assert(0 == (O_NONBLOCK & flags));											\
-}
-
-#define DBG_VERIFY_AUTORETRY_SET(TLS_DESC)	assert(SSL_MODE_AUTO_RETRY & SSL_CTX_get_mode((SSL_CTX *)TLS_DESC));
-
-#else
-#define DBG_VERIFY_SOCK_IS_BLOCKING(SOCKFD)
-#define DBG_VERIFY_AUTORETRY_SET(TLS_DESC)
-#endif
 
 #endif

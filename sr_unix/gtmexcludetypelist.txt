@@ -45,6 +45,7 @@ gtm_long_t
 gtm_pointertofunc_t
 gtm_status_t
 gtm_string_t
+gtm_timet
 gtm_uint_t
 gtm_uint8
 gtm_ulong_t
@@ -56,6 +57,7 @@ gtmcrypt_encrypt_t
 gv_orig_key_array
 int2
 jrec_suffix
+last_dfa_row_t
 lockhist_ptr_t
 mach_inst
 off_chain

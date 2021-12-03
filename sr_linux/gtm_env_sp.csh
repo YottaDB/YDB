@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2020 Fidelity National Information		#
+# Copyright (c) 2001-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -66,6 +66,11 @@ if ( $?gtm_version_change == "1" ) then
         	setenv  gt_cc_compiler          "icc -i-static"            # name of C compiler
 	  endif
          endif
+	endif
+
+	# If we are doing a coverage build, use the coverage_cc compiler wrapper
+	if ( $?gcoverage_build == "1" ) then
+		setenv  gt_cc_compiler          "${gtm_tools}/coverage_cc.sh"           # name of C compiler for gcov
 	endif
 
 	# Archiver definitions:

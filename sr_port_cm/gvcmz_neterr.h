@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +10,9 @@
  *								*
  ****************************************************************/
 
-#ifndef IOTT_WRTERR_H_INCLUDED
-#define IOTT_WRTERR_H_INCLUDED
+#ifndef GVCMZ_NETERR_INCLUDED
+#define GVCMZ_NETERR_INCLUDED
 
-void iott_wrterr(void);
+void gvcmz_neterr(INTPTR_T *error);	/* separate include as routine is in deferred events; don't want to drag in all of gvcmz* */
 
-#endif /* IOTT_WRTERR_H_INCLUDED */
+#endif /* GVCMZ_NETERR_INCLUDED */

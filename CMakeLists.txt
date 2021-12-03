@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2012-2020 Fidelity National Information		#
+# Copyright (c) 2012-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -27,7 +27,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version ${V7.0-000})
+set(version ${V7.0-001})
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -414,7 +414,7 @@ add_executable(gtmsecshr		${gtmsecshr_SOURCES})
 add_dependencies(gtmsecshr		gen_gtm_threadgbl_deftypes)
 
 add_executable(gtmsecshr_real		${gtmsecshr_real_SOURCES})
-target_link_libraries(gtmsecshr_real libmumps)
+target_link_libraries(gtmsecshr_real	libmumps)
 set_target_properties(gtmsecshr_real PROPERTIES
   OUTPUT_NAME gtmsecshr
   RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/gtmsecshrdir

@@ -61,63 +61,31 @@
 #define ESC_OFFSET		4
 #define MAX_COMMAND_LINE_LENGTH	255
 
-GBLREF mval		dollar_zproc;
-GBLREF mval		dollar_zdir;
-GBLREF stack_frame	*frame_pointer;
-GBLREF mval		dollar_estack_delta;
-GBLREF spdesc		stringpool;
-GBLREF io_pair		io_curr_device;
-GBLREF io_log_name	*io_root_log_name;
-GBLREF io_log_name	*dollar_principal;
-GBLREF mval		dollar_zgbldir;
-GBLREF mval		dollar_job;
-GBLREF uint4		dollar_zjob;
-GBLREF mval		dollar_zstatus;
-GBLREF mval		dollar_zsource;
-GBLREF int4		dollar_zsystem;
-GBLREF boolean_t	dollar_zaudit;
-GBLREF int4		dollar_zeditor;
-GBLREF uint4		dollar_tlevel;
-GBLREF uint4		dollar_trestart;
-GBLREF mval		dollar_zerror;
-GBLREF mval		dollar_zyerror;
-GBLREF mval		dollar_system;
-GBLREF mval		dollar_zinterrupt;
-GBLREF boolean_t	dollar_zininterrupt;
-GBLREF int4		zdir_form;
-GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
-GBLREF mval		dollar_ztexit;
-GBLREF size_t		totalAlloc;
-GBLREF size_t		totalRmalloc;
-GBLREF size_t		totalUsed;
-GBLREF size_t		totalAllocGta;
-GBLREF size_t		totalRallocGta;
-GBLREF size_t		totalUsedGta;
-GBLREF mstr		dollar_zchset;
-GBLREF mstr		dollar_zpatnumeric;
-GBLREF boolean_t	dollar_zquit_anyway;
-GBLREF io_pair		*io_std_device;
-GBLREF mstr		dollar_zpin;
-GBLREF mstr		dollar_zpout;
-GBLREF int		process_exiting;
+GBLREF boolean_t		dollar_zquit_anyway, dollar_zaudit;
+GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
+GBLREF int			process_exiting;
+GBLREF int4			dollar_zeditor, dollar_zsystem, zdir_form;
+GBLREF io_log_name		*dollar_principal, *io_root_log_name;
+GBLREF io_pair			io_curr_device, *io_std_device;
 GBLREF mlk_subhash_val_t	mlk_last_hash;
+GBLREF mstr			dollar_zchset, dollar_zpatnumeric, dollar_zpin, dollar_zpout;
+GBLREF mval			dollar_estack_delta, dollar_job, dollar_system, dollar_zdir, dollar_zerror, dollar_zgbldir;
+GBLREF mval			dollar_zinterrupt, dollar_zproc, dollar_zsource, dollar_zstatus, dollar_ztexit, dollar_zyerror;
+GBLREF size_t			totalAlloc, totalAllocGta, totalRmalloc, totalRallocGta, totalUsed, totalUsedGta;
+GBLREF spdesc			stringpool;
+GBLREF stack_frame		*frame_pointer;
+GBLREF uint4			dollar_tlevel, dollar_trestart, dollar_zjob;
+GBLREF volatile boolean_t	dollar_zininterrupt;
 
 #ifdef GTM_TRIGGER
-GBLREF	mstr		*dollar_ztname;
-GBLREF	mval		*dollar_ztdata;
-GBLREF	mval		*dollar_ztdelim;
-GBLREF	mval		*dollar_ztoldval;
-GBLREF	mval		*dollar_ztriggerop;
-GBLREF	mval		dollar_ztslate;
-GBLREF	mval		*dollar_ztupdate;
-GBLREF	mval		*dollar_ztvalue;
-GBLREF	mval		dollar_ztwormhole;
-GBLREF	int4		gtm_trigger_depth;
-GBLREF	boolean_t	ztwormhole_used;		/* TRUE if $ztwormhole was used by trigger code */
+GBLREF	boolean_t		ztwormhole_used;		/* TRUE if $ztwormhole was used by trigger code */
+GBLREF	int4			gtm_trigger_depth;
+GBLREF	mstr			*dollar_ztname;
+GBLREF	mval			*dollar_ztdata, *dollar_ztdelim, *dollar_ztoldval, *dollar_ztriggerop;
+GBLREF	mval			dollar_ztslate, *dollar_ztupdate, *dollar_ztvalue, dollar_ztwormhole;
 #endif
 
 error_def(ERR_INVSVN);
-error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
 error_def(ERR_ZDIROUTOFSYNC);
 

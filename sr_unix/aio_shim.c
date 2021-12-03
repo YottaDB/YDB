@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2020 Fidelity National Information	*
+ * Copyright (c) 2016-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -462,8 +462,8 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 		errno = ret;	/* pthread_create() returns errno in ret. */
 		return -1;
 	}
-	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, ret);
 	multi_thread_in_use = FALSE;
+	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, ret);
 	gd->thread_gdi = gdi;
 	return 0;
 }

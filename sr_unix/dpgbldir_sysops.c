@@ -33,7 +33,7 @@
 #include "gtmio.h"
 #include "eintr_wrappers.h"
 #include "stringpool.h"
-#include "is_file_identical.h"
+#include "is_gdid.h"
 #include "dpgbldir.h"
 #include "dpgbldir_sysops.h"
 #include "gtm_logicals.h"
@@ -53,6 +53,9 @@ error_def(ERR_IOEOF);
 error_def(ERR_TEXT);
 error_def(ERR_BADTAG);
 #endif
+
+/* 30 millisec is an arbitrarily chosen value yielding a wait that seems sufficient, but not too annoying */
+#define WAIT_OUT_RENAME_GAP	30
 
 mstr *get_name(mstr *ms)
 {
@@ -81,6 +84,7 @@ void *open_gd_file(mstr *v)
 
 {
 	file_pointer	*fp;
+	int4		lcnt;
 	mstr		temp;
 	ZOS_ONLY(int	realfiletag;)
 
@@ -89,7 +93,13 @@ void *open_gd_file(mstr *v)
 	fp->v.addr = (char *)malloc(v->len + 1);
 	memcpy(fp->v.addr, v->addr, v->len);
 	*((char*)((char*)fp->v.addr + v->len)) = 0;	/* Null terminate string */
-	if (FD_INVALID == (fp->fd = OPEN(fp->v.addr, O_RDONLY)))
+	for (lcnt = WAIT_OUT_RENAME_GAP; lcnt; lcnt--)
+	{	/* try OPEN for enough time to get past any possibility the file has gone missing due to a GDE making a revision */
+		if (FD_INVALID != (fp->fd = OPEN(fp->v.addr, O_RDONLY)))
+			break;
+		SHORT_SLEEP(lcnt);
+	}
+	if (FD_INVALID == fp->fd)
 	{	/* v gets passed down through a few levels, but should be freed */
 		/* Copy the values into the stringpool so they get cleaned up later */
 		ENSURE_STP_FREE_SPACE(fp->v.len);

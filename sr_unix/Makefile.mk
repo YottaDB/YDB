@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2020 Fidelity National Information		#
+# Copyright (c) 2013-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -48,7 +48,7 @@ BIT64 = $(shell file $(FILEFLAG) $(DISTDIR)/mumps | grep -q -E '64-bit|ELF-64'; 
 
 # Determine if GPG 2.1+ is installed
 HAVE_GPG21   = 0
-HAVE_GPGCONF = $(shell which gpgconf 2> /dev/null)
+HAVE_GPGCONF = $(shell /bin/sh -c "command -v gpgconf")
 ifneq ($(HAVE_GPGCONF),)
 	GPGBIN     = $(shell gpgconf | grep 'gpg:' | cut -d: -f3)
 	GPGVER     = $(shell $(GPGBIN) --version | head -n1 | cut -d' ' -f3)
@@ -59,7 +59,7 @@ ifeq ($(HAVE_GPG21),1)
 endif
 
 # Determine if libgcrypt is installed.
-HAVE_GPGCRYPT = $(shell which libgcrypt-config 2> /dev/null)
+HAVE_GPGCRYPT = $(shell /bin/sh -c "command -v libgcrypt-config")
 
 # Default installation target. This allows for the build system to randomize `thirdparty' and `algo' thereby changing the default
 # gtmcrypt install link.
@@ -150,11 +150,13 @@ ifneq (,$(findstring AIX,$(UNAMESTR)))
 endif
 
 # Common header and library paths
-IFLAGS += -I /usr/local/include -I /usr/include -I $(gtm_dist) -I $(CURDIR)
+IFLAGS += -I /opt/freeware/include -I /usr/local/include -I /usr/include -I $(gtm_dist) -I $(CURDIR)
 ifeq ($(BIT64),0)
+	LIBFLAGS += -L /opt/freeware/lib64 -L /opt/freeware/lib
 	LIBFLAGS += -L /usr/local/lib64
 	LIBFLAGS += -L /usr/local/lib -L /usr/lib64 -L /usr/lib -L /lib64 -L /lib -L `pwd`
 else
+	LIBFLAGS += -L /opt/freeware/lib32 -L /opt/freeware/lib
 	LIBFLAGS += -L /usr/local/lib32
 	LIBFLAGS += -L /usr/local/lib -L /usr/lib32 -L /usr/lib -L /lib32 -L /lib -L `pwd`
 endif

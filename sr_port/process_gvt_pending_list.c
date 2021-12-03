@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2017 Fidelity National Information	*
+ * Copyright (c) 2008-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,7 +49,10 @@ void process_gvt_pending_list(gd_region *reg, sgmnt_addrs *csa)
 	boolean_t		added, first_wasopen;
 	ht_ent_mname		*stayent, *old_gvt_ent;
 	hash_table_mname	*gvt_hashtab;
-	gd_addr			*gd_iter;
+	gvnh_reg_t		*gvnh_reg;
+	gvnh_spanreg_t		*gvspan;
+	int			reg_index;
+	gd_region		*gd_reg_start;
 #	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
 
@@ -85,10 +88,15 @@ void process_gvt_pending_list(gd_region *reg, sgmnt_addrs *csa)
 		}
 		if (added)
 		{	/* Global name not already present in csa->gvt_hashtab. So old_gvt got added into the hashtable.
-			 * But before that, check for differing key sizes between reg and db hdr in which case we need to
-			 * allocate a new_gvt (with the bigger key size) and add new_gvt instead into csa->gvt_hashtab.
+			 * But before that, check for differing key sizes between what was allocated and database file
+			 * header. If there is a difference, we need to allocate a new_gvt (with the bigger key size)
+			 * and add new_gvt instead into csa->gvt_hashtab.
+			 * NOTE: the use of != as the comparison because the max key size in the file header could be
+			 * greater or smaller than the size in the global directory.
+			 * NOTE: targ_alloc() allocates and sets clue.top = first_rec->top = last_rec->top = DBKEYSIZE(keysize)
+			 * as the max key size from the Global Dir which should be identical to the database file header.
 			 */
-			if (reg->max_key_size != db_max_key_size)
+			if (old_gvt->clue.top != DBKEYSIZE(db_max_key_size))
 			{	/* key sizes are different, need to reallocate */
 				assert(IS_REG_BG_OR_MM(reg));
 				new_gvt = (gv_namehead *)targ_alloc(db_max_key_size, &old_gvt->gvname, reg);
@@ -117,6 +125,11 @@ void process_gvt_pending_list(gd_region *reg, sgmnt_addrs *csa)
 		}
 		if (NULL != new_gvt)
 		{
+			/* Locate prior hash table entry */
+			old_gvt_ent = (ht_ent_mname *)lookup_hashtab_mname(reg->owning_gd->tab_ptr, &old_gvt->gvname);
+			assert(NULL != old_gvt_ent);	/* Processing a pre-existing entry */
+			/* Repoint hash table entry's key variable name into the newly allocated GVT */
+			old_gvt_ent->key.var_name = new_gvt->gvname.var_name;
 			*gvtc->gvt_ptr = new_gvt;	/* change hash-table to eventually point to new gvt */
 			if (NULL != gvtc->gvt_ptr2)
 			{	/* this is true only for spanning globals. Update one more location to point to new gvt */
@@ -125,12 +138,6 @@ void process_gvt_pending_list(gd_region *reg, sgmnt_addrs *csa)
 				*gvtc->gvt_ptr2 = new_gvt;
 			}
 			assert(1 == old_gvt->regcnt); /* assert that TARG_FREE will happen below */
-			for (gd_iter = get_next_gdr(NULL); gd_iter; gd_iter = get_next_gdr(gd_iter))
-			{	/* If gd_iter->tab_ptr still has old_gvt, remove it before freeing old_gvt. */
-				old_gvt_ent = (ht_ent_mname *)lookup_hashtab_mname(gd_iter->tab_ptr, &old_gvt->gvname);
-				if (old_gvt_ent)
-					delete_hashtab_ent_mname(gd_iter->tab_ptr, old_gvt_ent);
-			}
 			TARG_FREE_IF_NEEDED(old_gvt);
 		}
 		/* else: new_gvt is NULL which means old_gvt stays as is */

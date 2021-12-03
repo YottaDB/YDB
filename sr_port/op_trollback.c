@@ -33,6 +33,7 @@
 #include "gvcst_protos.h"
 #include "repl_msg.h"			/* for gtmsource.h */
 #include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
+#include "have_crit.h"
 #include "deferred_events_queue.h"
 #include "deferred_events.h"
 #include "error_trap.h"
@@ -50,7 +51,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	void			(*tp_timeout_clear_ptr)(void);
+GBLREF	void			(*tp_timeout_clear_ptr)(boolean_t toss_queued);
 GBLREF	int			process_exiting;
 #ifdef GTM_TRIGGER
 GBLREF	int4			gtm_trigger_depth;
@@ -61,6 +62,7 @@ GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 GBLREF	unsigned char		*tpstackbase, *tpstacktop;
 #endif
 GBLREF	boolean_t		implicit_trollback;
+GBLREF	boolean_t		in_timed_tn;
 GBLREF	tp_frame		*tp_pointer;
 
 error_def(ERR_TLVLZERO);
@@ -85,8 +87,6 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 	sgmnt_addrs	*csa;
 	tp_region	*tr;
 	int		tl;
-        int4		event_type, param_val;
-        void (*set_fn)(int4 param);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -114,7 +114,8 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 	GTMTRIG_ONLY(assert(tstart_trigger_depth <= gtm_trigger_depth);) /* see similar assert in op_tcommit.c for why */
 	if (!newlevel)
 	{
-		(*tp_timeout_clear_ptr)();	/* Cancel or clear any pending TP timeout */
+		if (in_timed_tn)
+			(*tp_timeout_clear_ptr)(TRUE);	/* Cancel or clear any pending TP timeout */
 		/* Do a rollback type cleanup (invalidate gv_target clues of read as well as
 		 * updated blocks). This is typically needed for a restart.
 		 */

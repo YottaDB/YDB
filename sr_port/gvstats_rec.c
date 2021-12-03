@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2020 Fidelity National Information	*
+ * Copyright (c) 2008-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,16 +27,16 @@ void	gvstats_rec_csd2cnl(sgmnt_addrs *csa)
 	memcpy(&csa->nl->gvstats_rec, &csa->hdr->gvstats_rec, SIZEOF(gvstats_rec_csd_t));
 }
 
-/* Copy shared or private back to header stats.  Note that we do not copy ("save") the WS stats */
+/* Copy shared or private back to header stats.  Previously we did not copy all stats back to the header
+ * as the initial GTM-8863 stats were instantaneous state indicator toggles that it made no sense to save.
+ * Now that they are accumulators(GTM-9422), it makes sense to save them, and we do so. This requires that
+ * gvstats_rec_t & gvstats_rec_csd_t are now identical in size, so we assert that.*
+ */
 void	gvstats_rec_cnl2csd(sgmnt_addrs *csa)
 {
-	size_t ws_stats_size;
-
-	ws_stats_size = ((char *) &(csa->nl->gvstats_rec.WS_STATS_END) - (char *) &(csa->nl->gvstats_rec.WS_STATS_BEGIN))
-		+ SIZEOF(gtm_uint64_t);
-
-	/* This assumes no savable stats after the WS_* stats.  Address that here if this changes */
-	memcpy(&csa->hdr->gvstats_rec, &csa->nl->gvstats_rec, SIZEOF(gvstats_rec_csd_t) - ws_stats_size);
+	/* All stats are now copied to the header */
+	assert(SIZEOF(gvstats_rec_t) == SIZEOF(gvstats_rec_csd_t));
+	memcpy(&csa->hdr->gvstats_rec, &csa->nl->gvstats_rec, SIZEOF(gvstats_rec_csd_t));
 }
 
 void	gvstats_rec_upgrade(sgmnt_addrs *csa)

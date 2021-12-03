@@ -61,6 +61,11 @@ void iosocket_wtff(void)
 	ENSURE_DATA_SOCKET(socketptr);
 	if (socketptr->ozff.len)
 		iosocket_write_real(&socketptr->ozff, FALSE);
+	else if (socketptr->nonblocked_output)
+	{	/* treat WRITE # when zff not set as a successful write */
+		socketptr->lastarg_sent = 0;
+		socketptr->args_written++;
+	}
 	iosocket_flush(iod);
 	iod->dollar.x = 0;
 	iod->dollar.y = 0;

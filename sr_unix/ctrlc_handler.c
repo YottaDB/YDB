@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,7 +19,8 @@
 #endif
 #include "ctrlc_handler.h"
 #include "std_dev_outbndset.h"
-#include "outofband.h"		/* for CTRLC and CTRLD */
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 
 void ctrlc_handler(int sig)
 {

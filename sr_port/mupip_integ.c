@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -672,11 +672,14 @@ void mupip_integ(void)
 			if (!muint_fast && (mu_int_blks_to_upgrd != csd->blks_to_upgrd))
 			{
 				gtm_putmsg_csa(CSA_ARG(csa)
-					VARLSTCNT(4) ERR_DBBTUWRNG, 2, &mu_int_blks_to_upgrd, &(csd->blks_to_upgrd));
+					VARLSTCNT(4) ERR_DBBTUWRNG, 2, &(csd->blks_to_upgrd), &mu_int_blks_to_upgrd);
 				if (gv_cur_region->read_only || mu_int_errknt)
 					mu_int_errknt++;
 				else
+				{
+					csd->blks_to_upgrd = mu_int_blks_to_upgrd;
 					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBBTUFIXED);
+				}
 			}
 			if (((0 != mu_int_data.kill_in_prog) || (0 != mu_int_data.abandoned_kills)) && (!mu_map_errs) && !region
 				&& !gv_cur_region->read_only)

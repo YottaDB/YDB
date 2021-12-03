@@ -100,6 +100,7 @@ void set_sem_set_recvr(int semid)
 int grab_sem(int set_index, int sem_num)
 {
 	int rc;
+	int id;
 
 	assert((SOURCE == set_index) || (RECV == set_index));
 	assert((int)NUM_SRC_SEMS == (int)NUM_RECV_SEMS); /* holds_sem[][] relies on this as it uses NUM_SRC_SEMS for array bounds */
@@ -110,7 +111,8 @@ int grab_sem(int set_index, int sem_num)
 	sop[1].sem_op  = 1; /* lock it */
 	sop[1].sem_num = sem_num;
 	sop[0].sem_flg = sop[1].sem_flg = SEM_UNDO;
-	SEMOP(sem_set_id[set_index], sop, 2, rc, FORCED_WAIT);
+	id = sem_set_id[set_index];
+	SEMOP(id, sop, 2, rc, FORCED_WAIT);
 	if (0 == rc)
 		holds_sem[set_index][sem_num] = TRUE;
 	return rc;

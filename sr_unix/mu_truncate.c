@@ -156,7 +156,7 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCNOTBG, 2, REG_LEN_STR(gv_cur_region));
 		return TRUE;
 	}
-	if (((GDSVCURR != csd->desired_db_format) && (BLK_ID_32_VER != csd->desired_db_format)) || (csd->blks_to_upgrd != 0))
+	if (((GDSVCURR != csd->desired_db_format) && !(BLK_ID_32_VER > csd->desired_db_format)) || (csd->blks_to_upgrd != 0))
 	{
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCNOV4, 2, REG_LEN_STR(gv_cur_region));
 		return TRUE;
@@ -361,7 +361,7 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_MUTRUNCNOSPACE, 3, REG_LEN_STR(gv_cur_region), truncate_percent);
 		rel_crit(gv_cur_region);
 		return TRUE;
-	} else if (((GDSVCURR != csd->desired_db_format) && (BLK_ID_32_VER != csd->desired_db_format))
+	} else if (((GDSVCURR != csd->desired_db_format) && !(BLK_ID_32_VER > csd->desired_db_format))
 			|| csd->blks_to_upgrd != 0
 			|| !csd->fully_upgraded)
 	{

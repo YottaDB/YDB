@@ -35,16 +35,14 @@
 #include "op.h"
 #include "indir_enum.h"
 
-GBLREF 	io_pair          	io_curr_device;
-GBLREF  io_pair			io_std_device;
-GBLREF 	io_desc          	*active_device;
-GBLREF	d_socket_struct		*socket_pool;
 GBLREF	boolean_t		gtm_utf8_mode;
+GBLREF	d_socket_struct		*newdsocket, *socket_pool;
+GBLREF	int4			gtm_max_sockets;
+GBLREF	io_desc			*active_device;
+GBLREF	io_pair			io_curr_device, io_std_device;
 GBLREF	spdesc			stringpool;
 GBLREF	UConverter  		*chset_desc[];
-GBLREF	int4			gtm_max_sockets;
-GBLREF	d_socket_struct		*newdsocket;
-GBLREF	boolean_t		dollar_zininterrupt;
+GBLREF	volatile boolean_t	dollar_zininterrupt;
 
 LITREF	nametabent		filter_names[];
 LITREF	unsigned char		filter_index[27];
@@ -67,7 +65,6 @@ error_def(ERR_SETSOCKOPTERR);
 error_def(ERR_SOCKBFNOTEMPTY);
 error_def(ERR_SOCKNOTFND);
 error_def(ERR_SOCKMAX);
-error_def(ERR_TEXT);
 error_def(ERR_TTINVFILTER);
 error_def(ERR_ZFF2MANY);
 error_def(ERR_ZINTRECURSEIO);
@@ -101,6 +98,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			flush_specified = FALSE,
 			create_new_socket;
 	int4 		index, n_specified, zff_len, delimiter_len, moreread_timeout;
+	int4		n_specified_dev, n_specified_socket;
+	int4		n_incomplete_dev;	/* device level not done in iop loop */
 	int		fil_type, nodelay, p_offset = 0;
 	uint4		bfsize = DEFAULT_SOCKET_BUFFER_SIZE, ibfsize;
 	char		*tab;
@@ -116,7 +115,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	assert(iod->type == gtmsocket);
 	dsocketptr = (d_socket_struct *)(iod->dev_sp);
 	/* ---------------------------------- parse the command line ------------------------------------ */
-	n_specified = 0;
+	n_specified = n_specified_dev = n_specified_socket = n_incomplete_dev = 0;
 	zff_len = -1; /* indicates neither ZFF nor ZNOFF specified */
 	delimiter_len = -1; /* indicates neither DELIM nor NODELIM specified */
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
@@ -148,9 +147,11 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		switch (ch)
 		{
 			case iop_exception:
+				n_specified_dev++;
 				DEF_EXCEPTION(pp, p_offset, iod);
 				break;
 			case iop_filter:
+				n_specified_dev++;
 				len = *(pp->str.addr + p_offset);
 				tab = pp->str.addr + p_offset + 1;
 				if ((fil_type = namelook(filter_index, filter_names, tab, len)) < 0)
@@ -175,6 +176,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				}
 				break;
 			case iop_nofilter:
+				n_specified_dev++;
 				iod->write_filter = 0;
 				break;
 			case iop_attach:
@@ -210,21 +212,26 @@ void	iosocket_use(io_desc *iod, mval *pp)
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DELIMSIZNA);
 				break;
 			case	iop_nodelimiter:
+				n_specified++;
 				delimiter_len = 0;
 				break;
 			case	iop_zdelay:
+				n_specified_socket++;
 				delay_specified = TRUE;
 				break;
 			case	iop_znodelay:
+				n_specified_socket++;
 				nodelay_specified = TRUE;
 				break;
 			case	iop_zbfsize:
+				n_specified_socket++;
 				bfsize_specified = TRUE;
 				GET_ULONG(bfsize, pp->str.addr + p_offset);
 				if ((0 == bfsize) || (MAX_SOCKET_BUFFER_SIZE < bfsize))
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, bfsize);
 				break;
 			case	iop_zibfsize:
+				n_specified_socket++;
 				ibfsize_specified = TRUE;
 				GET_ULONG(ibfsize, pp->str.addr + p_offset);
 				if ((0 == ibfsize) || (MAX_INTERNAL_SOCBUF_SIZE < ibfsize))
@@ -254,6 +261,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				memcpy(handles, (char *)(pp->str.addr + p_offset + 1), handles_len);
 				break;
 			case iop_ipchset:
+				n_specified_dev++;
 #				if defined(KEEP_zOS_EBCDIC)
 				if ((iconv_t)0 != iod->input_conv_cd)
 					ICONV_CLOSE_CD(iod->input_conv_cd);
@@ -266,8 +274,10 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				if (!gtm_utf8_mode && IS_UTF_CHSET(temp_ichset))
 					break;	/* ignore UTF chsets if not utf8_mode */
 				ichset_specified = TRUE;
+				n_incomplete_dev++;
 				break;
 			case iop_opchset:
+				n_specified_dev++;
 #				if defined(KEEP_zOS_EBCDIC)
 				if ((iconv_t)0 != iod->output_conv_cd)
 					ICONV_CLOSE_CD(iod->output_conv_cd);
@@ -280,8 +290,10 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				if (!gtm_utf8_mode && IS_UTF_CHSET(temp_ochset))
 					break;	/* ignore UTF chsets if not utf8_mode */
 				ochset_specified = TRUE;
+				n_incomplete_dev++;
 				break;
 			case iop_chset:
+				n_specified_dev++;
 				GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
 				SET_ENCODING(temp_ochset, &chset_mstr);
 				SET_ENCODING(temp_ichset, &chset_mstr);
@@ -289,23 +301,29 @@ void	iosocket_use(io_desc *iod, mval *pp)
 					break;	/* ignore UTF chsets if not utf8_mode */
 				ochset_specified = TRUE;
 				ichset_specified = TRUE;
+				n_incomplete_dev++;
 				break;
 			case iop_zff:
-				if (MAX_ZFF_LEN >= (zff_len = (int4)(unsigned char)*(pp->str.addr + p_offset)))
+				n_specified_socket++;
+				zff_len = (int4)(unsigned char)*(pp->str.addr + p_offset);
+				if (MAX_ZFF_LEN >= zff_len)
 					memcpy(zff_buffer, (char *)(pp->str.addr + p_offset + 1), zff_len);
 				else
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZFF2MANY, 2, zff_len, MAX_ZFF_LEN);
 				break;
 			case iop_znoff:
+				n_specified_socket++;
 				zff_len = 0;
 				break;
 			case iop_length:
+				n_specified_dev++;
 				GET_LONG(length, pp->str.addr + p_offset);
 				if (length < 0)
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVPARMNEG);
 				iod->length = length;
 				break;
 			case iop_width:
+				n_specified_dev++;
 				/* SOCKET WIDTH is handled the same way as TERMINAL WIDTH */
 				GET_LONG(width, pp->str.addr + p_offset);
 				if (width < 0)
@@ -321,12 +339,15 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				}
 				break;
 			case iop_wrap:
+				n_specified_dev++;
 				iod->wrap = TRUE;
 				break;
 			case iop_nowrap:
+				n_specified_dev++;
 				iod->wrap = FALSE;
 				break;
 			case iop_morereadtime:
+				n_specified_socket++;
 				/* Time in milliseconds socket read will wait for more data before returning */
 				GET_LONG(moreread_timeout, pp->str.addr + p_offset);
 				if (-1 == moreread_timeout)
@@ -383,24 +404,40 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				 LEN_AND_LIT("OPEN"));
 		return;
 	}
-	/* ------------------ make a local copy of device structure to play with -------------------- */
-	d_socket_struct_len = SIZEOF(d_socket_struct) + (SIZEOF(socket_struct) * (gtm_max_sockets - 1));
-	memcpy(newdsocket, dsocketptr, d_socket_struct_len);
-	/* --------------- handle the two special cases attach/detach first ------------------------- */
+	/* --------------- handle the three special cases socket/attach/detach first ----------------------- */
+	if (socket_specified)
+	{
+		/* use the socket flag to identify which socket to apply changes */
+		if (0 > (index = iosocket_handle(handles, &handles_len, FALSE, dsocketptr)))
+		{
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKNOTFND, 2, handles_len, handles);
+			return;
+		}
+		dsocketptr->current_socket = index;
+		socketptr = dsocketptr->socket[index];
+		if ((1 == n_specified) && (0 == n_specified_socket) && (0 == n_incomplete_dev))
+		{	/* other device level parameters already applied so ignore */
+			if (socket_listening == socketptr->state)
+			{	/* accept a new connection if there is one */
+				socketptr->pendingevent = socketptr->current_events = 0;
+				iod->dollar.key[0] = '\0';
+				save_errno = iosocket_accept(dsocketptr, socketptr, TRUE);
+			}
+			/* return early since nothing else to do */
+			REVERT_GTMIO_CH(&iod->pair, ch_set);
+			return;
+		}
+	}
 	if (detach_specified)
 	{
-		if (1 < n_specified)
-		{
+		if ((1 < n_specified) || (0 < n_specified_socket) || (0 < n_incomplete_dev))
+		{	/* allow device level parameters already done */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ANCOMPTINC, 4, LEN_AND_LIT("DETACH"), LEN_AND_LIT("USE"));
 			return;
 		}
 		if (NULL == socket_pool)
-		{
 			iosocket_poolinit();
-			memcpy(newdsocket, dsocketptr, d_socket_struct_len);
-		}
-		iosocket_switch(handled, handled_len, newdsocket, socket_pool);
-		memcpy(dsocketptr, newdsocket, d_socket_struct_len);
+		iosocket_switch(handled, handled_len, dsocketptr, socket_pool);
 		if (0 > dsocketptr->current_socket)
 		{
 			io_curr_device.in = io_std_device.in;
@@ -415,8 +452,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		 * input still buffered, this may cause unintentional consequences in the application if I[O]CHSET changes. GT.M
 		 * does not detect (or report) a change in I[O]CHSET due to DETACH/ATTACH.
 		 */
-		if (1 < n_specified)
-		{
+		if ((1 < n_specified) || (0 < n_specified_socket) || (0 < n_incomplete_dev))
+		{	/* allow device level parameters already done */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ANCOMPTINC, 4, LEN_AND_LIT("ATTACH"), LEN_AND_LIT("USE"));
 			return;
 		}
@@ -425,11 +462,13 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKNOTFND, 2, handlea_len, handlea);
 			return;
 		}
-		iosocket_switch(handlea, handlea_len, socket_pool, newdsocket);
-		memcpy(dsocketptr, newdsocket, d_socket_struct_len);
+		iosocket_switch(handlea, handlea_len, socket_pool, dsocketptr);
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return; /* attach can only be specified by itself */
 	}
+	/* ------------------ make a local copy of device structure to play with -------------------- */
+	d_socket_struct_len = SIZEOF(d_socket_struct) + (SIZEOF(socket_struct) * (gtm_max_sockets - 1));
+	memcpy(newdsocket, dsocketptr, d_socket_struct_len);
 	/* ------------ create/identify the socket to work on and make a local copy ----------------- */
 	if (create_new_socket = (listen_specified || connect_specified))	/* real "=" */
 	{
@@ -457,25 +496,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		socketptr->uic.grp = (gid_t)-1;
 	} else
 	{
-		if (socket_specified)
-		{
-			/* use the socket flag to identify which socket to apply changes */
-			if (0 > (index = iosocket_handle(handles, &handles_len, FALSE, newdsocket)))
-			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKNOTFND, 2, handles_len, handles);
-				return;
-			}
-			newdsocket->current_socket = index;
-			socketptr = newdsocket->socket[index];
-			if ((1 == n_specified) && (socket_listening == socketptr->state))
-			{	/* accept a new connection if there is one */
-				socketptr->pendingevent = FALSE;
-				iod->dollar.key[0] = '\0';
-				save_errno = iosocket_accept(dsocketptr, socketptr, TRUE);
-				REVERT_GTMIO_CH(&iod->pair, ch_set);
-				return;
-			}
-		} else
+		if (!socket_specified)
 		{
 			if (0 >= newdsocket->n_socket)
 			{

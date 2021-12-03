@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Copyright (c) 2003-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,7 +76,7 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 	mval			op_val, op_pars;
 	boolean_t		is_stdout;	/* Output will go STDOUT?. Matters only for single-region in this function */
 	boolean_t		need_rel_latch, copy_from_shm, single_reg, release_latch, key_reset;
-	boolean_t		is_dummy_gbldir, fname_is_devnull;
+	boolean_t		is_dummy_gbldir, fname_is_devnull, is_regfile=TRUE;
 	reg_ctl_list		*rctl;
 	gd_region		*reg;
 	shm_reg_ctl_t		*shm_rctl_start, *shm_rctl;
@@ -134,6 +134,10 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 		}
 	}
 	is_stdout = single_reg && mur_options.extr_fn[recstat] && mur_options.extr_fn_is_stdout[recstat];
+	fname_is_devnull = mur_options.extr_fn_is_devnull[recstat] && mur_options.extr_fn[recstat];
+	/* Keep fname_is_regfile to be TRUE by default. FALSE only if it is sure to be something else */
+	is_regfile = mur_options.extr_fn[recstat] ? mur_options.extr_fn_is_regfile[recstat] : TRUE;
+	assert(is_regfile ? (fname_is_devnull==0 && is_stdout==0) : TRUE);
 	if (!is_stdout)
 	{
 		file_info = (void *)malloc(SIZEOF(fi_type));
@@ -181,10 +185,9 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 		}
 		rctl->file_info[recstat] = file_info;
 		rctl->extr_fn_len_orig[recstat] = file_info->fn_len;
-		fname_is_devnull = mur_options.extr_fn_is_devnull[recstat] && mur_options.extr_fn[recstat];
 		/* Now adjust the file name to be region-specific. Add a region-name suffix. If no region-name is found,
 		 * add region #. Do this only if there are at least 2 regions. Otherwise no need of a merge sort.
-		 * Also, this is not required if o/p device is DEVNULL
+		 * Also, this is not required if o/p is /dev/null
 		 */
 		if (!single_reg && !fname_is_devnull)
 		{
@@ -230,8 +233,8 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 			file_info->fn_len = tmplen;
 		}
 		rename_fn_len = ARRAYSIZE(rename_fn);
-		/* Don't rename DEVNULL */
-		if (!fname_is_devnull && (RENAME_FAILED == rename_file_if_exists(file_info->fn, file_info->fn_len, rename_fn,
+		/* Only rename regfiles... */
+		if (is_regfile && (RENAME_FAILED == rename_file_if_exists(file_info->fn, file_info->fn_len, rename_fn,
 				&rename_fn_len, &status)))
 			return status;
 		op_pars.mvtype = MV_STR;
@@ -252,9 +255,9 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 		rctl->file_info[recstat] = NULL;	/* special meaning for STDOUT */
 	if (single_reg)
 	{
-		mur_write_header_extfmt(jctl, NULL, NULL, recstat);
 		/* For multi-region, this header writing will be done later as part of "mur_merge_sort_extfmt" */
-		if (!is_stdout && !fname_is_devnull) /* We wrote to stdout or /dev/null. Suppress the message about file creation.*/
+		mur_write_header_extfmt(jctl, NULL, NULL, recstat);
+		if (is_regfile) /* Only show the message for file creation, if it were a regular file. */
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FILECREATE, 4, LEN_AND_STR(ext_file_type[recstat]),
 					file_info->fn_len, file_info->fn);
 	} else if (multi_proc_in_use)

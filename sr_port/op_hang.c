@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,7 +20,8 @@
 #include "gt_timer.h"
 #include "mvalconv.h"
 #include "op.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "rel_quant.h"
 #include "mv_stent.h"
 #include "find_mvstent.h"
@@ -32,8 +33,8 @@
 # include "wcs_sleep.h"
 # include "wbox_test_init.h"
 # include "gtmio.h"
-# include "deferred_signal_handler.h"
 # include "util.h"
+# include "deferred_signal_handler.h"
 #endif
 
 #include "gdsroot.h"
@@ -52,19 +53,14 @@
 #include "change_reg.h"
 #include "setterm.h"
 #include "getzposition.h"
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
 #include "sleep.h"
 #include "time.h"
 
-GBLREF	uint4		dollar_trestart;
 GBLREF	mv_stent	*mv_chain;
-GBLREF	int4		outofband;
-GBLREF	unsigned char	*restart_pc, *restart_ctxt;
 GBLREF	stack_frame	*frame_pointer;
-
-error_def(ERR_SYSCALL);
+GBLREF	uint4		dollar_trestart;
+GBLREF	unsigned char	*restart_pc, *restart_ctxt;
+GBLREF	volatile int4	outofband;
 
 #define HANGSTR "HANG"
 
@@ -143,7 +139,8 @@ void op_hang(mval* num)
 			return;
 		}
 #		endif
-		sys_get_curr_time(&cur_time);
+		/* WARNING: This is not the same as sys_get_curr_time() which returns time from the monotonic clock */
+		sys_get_wall_time(&cur_time);
 		mv_zintcmd = find_mvstent_cmd(ZINTCMD_HANG, frame_pointer->restart_pc, frame_pointer->restart_ctxt, FALSE);
 		if (!mv_zintcmd)
 			add_int_to_abs_time(&cur_time, ms, &end_time);
@@ -173,10 +170,7 @@ void op_hang(mval* num)
 			if (0 == ms)
 				return;		/* done HANGing */
 		}
-		if (ms < 10)
-			SLEEP_USEC(ms * 1000, TRUE);	/* Finish the sleep if it is less than 10ms. */
-		else
-			hiber_start(ms);
+		hiber_start_wall_time(ms);
 	} else	/* the rel_quant below seems legitimate */
 		rel_quant();
 	if (outofband)
@@ -192,7 +186,7 @@ void op_hang(mval* num)
 		TAREF1(zintcmd_active, ZINTCMD_HANG).restart_ctxt_last = frame_pointer->restart_ctxt;
 		TAREF1(zintcmd_active, ZINTCMD_HANG).count++;
 		mv_chain->mv_st_cont.mvs_zintcmd.command = ZINTCMD_HANG;
-		outofband_action(FALSE);
+		async_action(FALSE);
 	}
 	return;
 }

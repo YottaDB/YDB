@@ -37,13 +37,13 @@ uchar_ptr_t get_spec(uchar_ptr_t spec_rec_addr, int spec_rec_len, unsigned char 
 	{
 		if (*ptr == spec_type)
 			return ptr;
-		else
-			if (*ptr > MAX_COLL_TYPE)
-			{
-				gv_target->root = 0;
-				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(6) ERR_INVSPECREC, 0, ERR_GVIS, 2,
-					gv_altkey->end - 1, gv_altkey->base);
-			}
+		assert(spec_len[*ptr]);					/* below gives an error in pro to stop indefinite loop */
+		if ((MAX_COLL_TYPE < *ptr) || (0 == spec_len[*ptr]))
+		{	/* no match or 0 length for increment */
+			gv_target->root = 0;
+			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(6) ERR_INVSPECREC, 0, ERR_GVIS, 2,
+					  gv_altkey->end - 1, gv_altkey->base);
+		}
 	}
-	return (uchar_ptr_t)0;
+	return (uchar_ptr_t)NULL;
 }

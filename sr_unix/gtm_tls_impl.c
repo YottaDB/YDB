@@ -347,7 +347,7 @@ STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_resul
 			tls_errno = errno;
 			if (0 == tls_errno)   /* If no error at underlying socket, consisder a connecton reset */
 				tls_errno = ECONNRESET;
-			tls_sock->flags |= GTMTMLS_OP_NOSHUTDOWN;
+			tls_sock->flags |= GTMTLS_OP_NOSHUTDOWN;
 			break;
 
 		case SSL_ERROR_WANT_WRITE:
@@ -404,7 +404,7 @@ STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_resul
 					((SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC == reason_code) ||
 					(SSL_R_SSLV3_ALERT_BAD_RECORD_MAC == reason_code)))
 					tls_errno = ECONNRESET;
-				tls_sock->flags |= GTMTMLS_OP_NOSHUTDOWN;
+				tls_sock->flags |= GTMTLS_OP_NOSHUTDOWN;
 			}
 			do
 			{
@@ -542,6 +542,11 @@ const char *gtm_tls_get_error(void)
 	return gtmcrypt_err_string;
 }
 
+int gtm_tls_version(int caller_version)
+{
+	return GTM_TLS_API_VERSION;
+}
+
 gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 {
 	const char		*CAfile = NULL, *CApath = NULL, *crl, *CAptr, *cipher_list, *options_string, *verify_mode_string;
@@ -566,6 +571,12 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 	gtm_tls_ctx_t		*gtm_tls_ctx;
 
 	assert(GTM_TLS_API_VERSION >= version); /* Make sure the caller is using the right API version */
+	if (GTM_TLS_API_VERSION < version)
+	{
+		UPDATE_ERROR_STRING("Version of libgtmtls.so plugin (%d) older than needed by caller (%d).",
+					GTM_TLS_API_VERSION, version);
+		return NULL;
+	}
 	/* Initialize the SSL/TLS library, the algorithms/cipher suite and error strings. */
 	SSL_library_init();
 	SSL_load_error_strings();
@@ -732,7 +743,6 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		}
 		X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK|X509_V_FLAG_CRL_CHECK_ALL);
 	}
-	SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
 	SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_BOTH);
 	/* Set callbacks to called whenever a SSL session is added. */
 	SSL_CTX_sess_set_new_cb(ctx, new_session_callback);
@@ -802,7 +812,9 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 	gtm_tls_ctx->fips_mode = fips_enabled;
 	gtm_tls_ctx->compile_time_version = OPENSSL_VERSION_NUMBER;
 	gtm_tls_ctx->runtime_version = SSLeay();
-	gtm_tls_ctx->version = version;
+	gtm_tls_ctx->version = version;		/* GTM_TLS_API_VERSION of caller */
+	if (GTM_TLS_API_VERSION_NONBLOCK <= version)
+		gtm_tls_ctx->plugin_version = GTM_TLS_API_VERSION;
 	return gtm_tls_ctx;
 }
 
@@ -839,10 +851,9 @@ int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *
 	assert(NULL != tlsid);
 	env_name_len = strlen(tlsid);
 	assert(PASSPHRASE_ENVNAME_MAX > (sizeof(GTMTLS_PASSWD_ENV_PREFIX) + env_name_len)); /* Includes null */
-	env_name_idx = 0;
-	strcpy(env_name, GTMTLS_PASSWD_ENV_PREFIX);
 	env_name_idx = (sizeof(GTMTLS_PASSWD_ENV_PREFIX) - 1);
-	assert((SIZEOF(env_name) - env_name_idx) > (env_name_len + 1));
+	memcpy(env_name, GTMTLS_PASSWD_ENV_PREFIX, env_name_idx);
+	assert((sizeof(env_name) - env_name_idx) > (env_name_len + 1));
 	assert(PASSPHRASE_ENVNAME_MAX > env_name_len + env_name_idx);
 	memcpy(&env_name[env_name_idx], tlsid, env_name_len);
 	env_name_idx += env_name_len;
@@ -1040,7 +1051,6 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	STACK_OF(SSL_COMP)*	compression;
 #	endif
 
-	DBG_VERIFY_SOCK_IS_BLOCKING(sockfd);
 	ctx = tls_ctx->ctx;
 	cfg = &gtm_tls_cfg;
 
@@ -1299,6 +1309,17 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	compression = SSL_COMP_get_compression_methods();
 	sk_SSL_COMP_zero(compression);
 #	endif
+	/* When SSL_MODE_AUTO_RETRY is set, SSL_read, SSL_write, and others will not return when interrupted.  It can also cause
+	 * hangs when used with select()/poll() (see SSL_set_mode man page.)
+	 */
+	/* While SSL_clear_mode was't documented until OpenSSL 1.1.1, it has been defined in openssl/ssl.h since at least 1.0.1d */
+#	ifdef SSL_clear_mode
+		SSL_clear_mode(ssl, SSL_MODE_AUTO_RETRY);	/* on by default since 1.1.1 */
+#	endif
+	if (GTMTLS_OP_NONBLOCK_WRITE & flags)
+	{
+		SSL_set_mode(ssl, SSL_MODE_ENABLE_PARTIAL_WRITE);
+	}
 	if ('\0' != id[0])
 	{
 		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.ssl-options", id);
@@ -1452,7 +1473,6 @@ int gtm_tls_connect(gtm_tls_socket_t *socket)
 	long		verify_result;
 
 	assert(CLIENT_MODE(socket->flags));
-	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
 	if (NULL != socket->session)
 	{	/* Old session available. Reuse it. */
 		SSL_DPRINT(stderr, "gtm_tls_connect(1): references=%d\n", ((SSL_SESSION *)(socket->session))->references);
@@ -1477,7 +1497,6 @@ int gtm_tls_accept(gtm_tls_socket_t *socket)
 	int		rv;
 	long		verify_result;
 
-	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
 	rv = SSL_accept(socket->ssl);
 	verify_result = SSL_get_verify_result(socket->ssl);
 	if ((0 < rv) && (X509_V_OK == verify_result))
@@ -1490,7 +1509,6 @@ int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 	int		rv;
 	long		vresult;
 
-	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
 	if (0 >= (rv = SSL_renegotiate(socket->ssl)))
 		return ssl_error(socket, rv, SSL_get_verify_result(socket->ssl));
 	do
@@ -1864,7 +1882,6 @@ int gtm_tls_send(gtm_tls_socket_t *socket, char *buf, int send_len)
 	int		rv;
 	long		verify_result;
 
-	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
 	if (0 < (rv = SSL_write(socket->ssl, buf, send_len)))
 	{
 		assert(SSL_ERROR_NONE == SSL_get_error(socket->ssl, rv));
@@ -1880,7 +1897,7 @@ int gtm_tls_recv(gtm_tls_socket_t * socket, char *buf, int recv_len)
 {
 	int		rv;
 	long		verify_result;
-	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
+
 	rv = SSL_read(socket->ssl, buf, recv_len);
 #ifdef DEBUG
 	/* Emulate an error condition in case of WBTEST_REPL_TLS_RECONN white box*/
@@ -1916,14 +1933,13 @@ void gtm_tls_socket_close(gtm_tls_socket_t *socket)
 		tls_errno = 0;
 		return;
 	}
-	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
 	/* Invoke SSL_shutdown to close the SSL/TLS connection. Although the protocol (and the OpenSSL library) supports
 	 * bidirectional shutdown (which waits for the peer's "close notify" alert as well), we intend to only send the
 	 * "close notify" alert and be done with it. This is because the process is done with the connection when it calls
 	 * this function and we don't want to consume additional time waiting for a "close notify" acknowledge signal from the
 	 * other side.
 	 */
-	if (!(GTMTMLS_OP_NOSHUTDOWN & socket->flags))
+	if (!(GTMTLS_OP_NOSHUTDOWN & socket->flags))
 	{
 		tls_errno = 0;
 		SSL_shutdown(socket->ssl);

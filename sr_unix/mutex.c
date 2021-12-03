@@ -137,7 +137,6 @@ MBSTART {															\
 		}														\
 		if (save_jnlpool != jnlpool)											\
 			jnlpool = save_jnlpool;											\
-		UPDATE_PROC_WAIT_STATE(CSA, STATE, -1);										\
 		return STATUS;													\
 	}															\
 } MBEND
@@ -743,7 +742,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 	/* Do a trylock first. If we are locking immediate, we are done. Otherwise we have the opportunity to update
 	 * stats before doing a longer timed lock attempt.
 	 */
-	UPDATE_PROC_WAIT_STATE(csa, state, 1);
+	UPDATE_CRIT_COUNTER(csa, state);
 	status = pthread_mutex_trylock(&csa->critical->mutex);
 	do
 	{
@@ -802,11 +801,9 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 				}
 				INCR_GVSTATS_COUNTER(csa, cnl, n_crit_success, 1);
 				csa->critical->crit_cycle++;
-				UPDATE_PROC_WAIT_STATE(csa, state, -1);
 				return cdb_sc_normal;
 			case EBUSY:
 				assert(MUTEX_LOCK_WRITE_IMMEDIATE == mutex_lock_type);
-				UPDATE_PROC_WAIT_STATE(csa, state, -1);
 				return cdb_sc_nolock;
 			case ETIMEDOUT:
 				mutex_deadlock_check(csa->critical, csa); /* Timed out: See if any deadlocks and fix if detected */
@@ -848,7 +845,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 	assertpro(!status);
 	return cdb_sc_nolock;		/* To keep compiler happy; should never happen. */
 #	else
-	UPDATE_PROC_WAIT_STATE(csa, state, 1);
+	UPDATE_CRIT_COUNTER(csa, state);
 	save_jnlpool = jnlpool;
 	optimistic_attempts = MUTEX_MAX_OPTIMISTIC_ATTEMPTS;
 	queue_sleeps = csa->probecrit_rec.p_crit_que_full = 0;
@@ -927,7 +924,6 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 				{	/* This is just a precaution - shouldn't ever happen and has no code to maintain gvstats */
 					assert(FALSE);
 					SET_CSA_NOW_CRIT_TRUE(csa);
-					UPDATE_PROC_WAIT_STATE(csa, state, -1);
 					return (cdb_sc_normal);
 				}
 				if (in_crit_pid && (in_crit_pid == cnl->in_crit) && is_proc_alive(in_crit_pid, 0))
@@ -983,7 +979,6 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 				MUTEX_TRACE_CNTR(mutex_trc_mutex_slp_fn_noslp);
 				if (cdb_sc_normal == mutex_wakeup(addr, mutex_spin_parms))
 					continue;
-				UPDATE_PROC_WAIT_STATE(csa, state, -1);
 				return (cdb_sc_dbccerr);
 			}
 		}
@@ -1060,7 +1055,6 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 					{
 						if (save_jnlpool != jnlpool)
 							jnlpool = save_jnlpool;
-						UPDATE_PROC_WAIT_STATE(csa, state, -1);
 						return (cdb_sc_dbccerr);	/* Too many failures */
 					}
 					assert(!csa->now_crit);
@@ -1097,7 +1091,6 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 			}
 		} while (redo_cntr);
 	} while (TRUE);
-	UPDATE_PROC_WAIT_STATE(csa, state, -1);
 #	endif
 }
 

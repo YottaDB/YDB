@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -447,6 +447,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 							GVCST_BMP_MARK_FREE(&kill_set_list, ret_tn, inctn_mu_reorg,
 									inctn_bmp_mark_free_mu_reorg, inctn_opcode, cs_addrs)
 							DECR_KIP(cs_data, cs_addrs, kip_csa);
+							DEFERRED_EXIT_REORG_CHECK;
 							if (detailed_log)
 								log_detailed_log("KIL", &(gv_target->hist), NULL, level,
 									&kill_set_list, ret_tn);
@@ -541,7 +542,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				 * Histories are sent as gv_target->hist and reorg_gv_target->hist.
 				 */
 				mu_reorg_in_swap_blk = TRUE;
-				status = mu_swap_blk(level, &dest_blk_id, &kill_set_list, exclude_glist_ptr);
+				status = mu_swap_blk(level, &dest_blk_id, &kill_set_list, exclude_glist_ptr, 0); /* not upgrade */
 				mu_reorg_in_swap_blk = FALSE;
 				if (cdb_sc_oprnotneeded == status)
 				{
@@ -577,6 +578,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 						GVCST_BMP_MARK_FREE(&kill_set_list, ret_tn, inctn_mu_reorg,
 								inctn_bmp_mark_free_mu_reorg, inctn_opcode, cs_addrs)
 						DECR_KIP(cs_data, cs_addrs, kip_csa);
+						DEFERRED_EXIT_REORG_CHECK;
 						if (detailed_log)
 							log_detailed_log("KIL", &(gv_target->hist), NULL, level,
 								&kill_set_list, ret_tn);
@@ -675,6 +677,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				GVCST_BMP_MARK_FREE(&kill_set_list, ret_tn, inctn_mu_reorg,
 						inctn_bmp_mark_free_mu_reorg, inctn_opcode, cs_addrs)
 				DECR_KIP(cs_data, cs_addrs, kip_csa);
+				DEFERRED_EXIT_REORG_CHECK;
 				if (detailed_log)
 					log_detailed_log("KIL", &(gv_target->hist), NULL, level, &kill_set_list, ret_tn);
 				blks_reused += kill_set_list.used;

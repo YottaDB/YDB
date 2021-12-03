@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +32,7 @@ void	gtm_getmsg(int4 msgnum, mstr *msgbuf)
 	char_ptr_t	tag;
 	const err_msg	*msg;
 	const err_ctl	*ctl;
+	size_t		cp_len;
 
 	ctl = err_check(msgnum);
 	if (NULL != ctl)
@@ -79,7 +81,10 @@ void	gtm_getmsg(int4 msgnum, mstr *msgbuf)
 		j = faclen > top-cp ? top-cp : faclen;
 		if (j)
 		{
-			memcpy(cp, fac, j);
+			assert(0 < j);
+			cp_len = (size_t) j;
+			assert(cp_len <= (m_len - (cp - msgbuf->addr)));
+			memcpy(cp, fac, cp_len);
 			cp += j;
 		}
 		if (cp < top)
@@ -101,7 +106,10 @@ void	gtm_getmsg(int4 msgnum, mstr *msgbuf)
 		j = taglen > top-cp ? top-cp : taglen;
 		if (j)
 		{
-			memcpy(cp, tag, j);
+			assert(0 < j);
+			cp_len = j;
+			assert(cp_len <= (m_len - (cp - msgbuf->addr)));
+			memcpy(cp, tag, cp_len);
 			cp += j;
 		}
 		if (cp < top)
@@ -110,7 +118,10 @@ void	gtm_getmsg(int4 msgnum, mstr *msgbuf)
 			*cp++ = ' ';
 	}
 
-	memcpy(cp, msgp, top - cp);
+	assert( (top - cp)  <= (m_len - (cp - msgbuf->addr)));
+	assert(0 <= (top - cp));
+	cp_len = top - cp;
+	memcpy(cp, msgp, cp_len);
 	cp += top - cp;
 	msgbuf->len = m_len;
 	*cp++ = 0;

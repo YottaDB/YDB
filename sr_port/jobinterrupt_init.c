@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,8 +29,7 @@
 #include "io.h"
 #include "iosp.h"
 #include "stringpool.h"
-#include "jobinterrupt_init.h"
-#include "jobinterrupt_event.h"
+#include "jobinterrupt_process.h"
 
 GBLREF	mval	dollar_zinterrupt;
 

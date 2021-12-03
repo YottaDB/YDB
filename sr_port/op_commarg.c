@@ -35,7 +35,9 @@ GBLREF stack_frame		*frame_pointer;
 GBLREF unsigned short 		proc_act_type;
 
 error_def	(ERR_INDEXTRACHARS);
-
+error_def	(ERR_LABELEXPECTED);
+error_def	(ERR_LKNAMEXPECTED);
+error_def	(ERR_VAREXPECTED);
 void	op_commarg(mval *v, unsigned char argcode)
 {
 	int		rval;
@@ -55,22 +57,27 @@ void	op_commarg(mval *v, unsigned char argcode)
 		{	/* these characteristics could be 1 or more columns in inter.h, however it's widely used via indir_enum.h */
 		case indir_do:
 		case indir_goto:
-			if ((frame_pointer->type & SFT_COUNT) && v->str.len && (MAX_MIDENT_LEN > v->str.len) && !proc_act_type
+			if (0 == v->str.len)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LABELEXPECTED);
+			else if ((frame_pointer->type & SFT_COUNT) && (MAX_MIDENT_LEN > v->str.len) && !proc_act_type
 					&& do_indir_do(v, argcode))
-				return;
+				return;		/* fast path for indirect of a label */
 			break;
-		case indir_hang:
-		case indir_if:
-		case indir_write:
-		case indir_xecute:
-		case indir_zsystem:
-		case indir_zmess:
-		case indir_zgoto:
-		case indir_zhelp:
-		case indir_zshow:
-		case indir_trollback:
-		case indir_quit:
-		case indir_zhalt:
+		case indir_kill:	/* These 4 can be argumentless so prevent indirection from turning into that form */
+		case indir_new:
+			if (0 == v->str.len)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_VAREXPECTED);
+			break;
+		case indir_lock:
+		case indir_zdeallocate:
+			if (0 == v->str.len)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LKNAMEXPECTED);
+			break;	/* TODO: test with indir_zgoto added to the list */
+		case indir_hang:	/* Hang +"" is close enough to no Hang */
+		case indir_if:		/* treat as argumentless */
+		case indir_write:	/* WRITE "" does nothing */
+		case indir_xecute:	/* XECUTE "" does nothing */
+		case indir_zshow:	/* ZSHOW "" does nothing */
 			if (0 == v->str.len)
 				return;						/* WARNING possible fallthrough */
 		default:

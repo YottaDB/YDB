@@ -87,7 +87,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GVIS", "!_!_Global variable: !AD", 2, 0 },
 	{ "GVKILLFAIL", "Global variable kill failed.  Failure code: !AD.", 2, 0 },
 	{ "GVNAKED", "Illegal naked global reference", 0, 0 },
-	{ "UNUSEDMSG256", "GVNEXTARG removed from code in V6.3-013 June 2020; not issued for a long time prior to that", 0, 0 },
+	{ "BACKUPDBFILE", "DB file !AD backed up in file !AD", 4, 0 },
 	{ "GVORDERFAIL", "Global variable $ORDER or $NEXT function failed.  Failure code: !AD.", 2, 0 },
 	{ "GVPUTFAIL", "Global variable put failed.  Failure code: !AD.", 2, 0 },
 	{ "PATTABSYNTAX", "Error in !AD at line !UL", 3, 0 },
@@ -144,8 +144,8 @@ LITDEF	err_msg merrors[] = {
 	{ "UNUM64ERR", "Error: cannot convert !AD value to 64 bit unsigned decimal or hexadecimal number", 2, 0 },
 	{ "HEXERR", "Error: cannot convert !AD value to hexadecimal number", 2, 0 },
 	{ "HEX64ERR", "Error: cannot convert !AD value to 64 bit hexadecimal number", 2, 0 },
-	{ "UNUSEDMSG313", "MTRECTOOBIG last used in V6.3-003 Dec. 2017", 0, 0 },
-	{ "UNUSEDMSG314", "MTRECTOOSM last used in V6.3-003 Dec. 2017", 0, 0 },
+	{ "CMDERR", "Error running command : !AD", 2, 0 },
+	{ "BACKUPSUCCESS", "Backup completed successfully", 0, 0 },
 	{ "JNLTMQUAL3", "Time qualifier BEFORE_TIME=\"!AZ\" is less than the journal file(s) minimum timestamp=\"!AZ\"", 2, 0 },
 	{ "MULTLAB", "This label has been previously defined", 0, 0 },
 	{ "GTMCURUNSUPP", "The requested operation is unsupported in this version of GT.M", 0, 0 },
@@ -184,7 +184,7 @@ LITDEF	err_msg merrors[] = {
 	{ "SPOREOL", "Either a space or an end-of-line was expected but not found", 0, 0 },
 	{ "SRCLIN", "!_!AD!/!_!AD", 4, 0 },
 	{ "SRCLOC", "!_!_At column !UL, line !UL, source module !AD", 4, 0 },
-	{ "SRCLOCUNKNOWN", "!_!_M source location unknown", 0, 0 },
+	{ "UNUSEDMSG353", "SRCLOCUNKNOWN unused in V7.0-000 and for an indetermite time prior", 0, 0 },
 	{ "STACKCRIT", "Stack space critical", 0, 0 },
 	{ "STACKOFLOW", "Stack overflow", 0, 0 },
 	{ "STACKUNDERFLO", "Stack underflow", 0, 0 },
@@ -202,7 +202,7 @@ LITDEF	err_msg merrors[] = {
 	{ "UNDEF", "Undefined local variable: !AD", 2, 0 },
 	{ "UNIMPLOP", "Unimplemented construct encountered", 0, 0 },
 	{ "VAREXPECTED", "Variable expected in this context", 0, 0 },
-	{ "UNUSEDMSG371", "VARRECBLKSZ last used in V6.3-004 Mar. 2018", 0, 0 },
+	{ "BACKUPFAIL", "MUPIP cannot start backup with the above errors", 0, 0 },
 	{ "MAXARGCNT", "Maximum number of arguments !UL exceeded", 1, 0 },
 	{ "GTMSECSHRSEMGET", "semget error errno = !UL", 1, 0 },
 	{ "VIEWARGCNT", "View parameter !AD has inappropriate number of subparameters", 2, 0 },
@@ -350,9 +350,9 @@ LITDEF	err_msg merrors[] = {
 	{ "AMBISYIPARAM", "Parameter !AD is ambiguous to $ZGETSYI()", 2, 0 },
 	{ "PREVJNLNOEOF", "A previous generation journal file !AD does not have valid EOF", 2, 0 },
 	{ "LKSECINIT", "Error creating LOCK section for database !AD", 2, 0 },
-	{ "UNUSEDMSG519", "MTDOSLAB last used in V6.3-003 Dec. 2017", 0, 0 },
-	{ "UNUSEDMSG520", "MTDOSFOR last used in V6.3-003 Dec. 2017", 0, 0 },
-	{ "UNUSEDMSG521", "MTINVLAB last used in V6.3-003 Dec. 2017", 0, 0 },
+	{ "BACKUPREPL", "Replication Instance file !AD backed up in file !AD", 4, 0 },
+	{ "BACKUPSEQNO", "Journal Seqnos up to 0x!16@XQ are backed up", 1, 0 },
+	{ "DIRACCESS", "Do not have full access to directory for temporary files: !AD", 2, 0 },
 	{ "TXTSRCMAT", "M object module and source file do not match", 0, 0 },
 	{ "CCENOGROUP", "CCE does not have GROUP privilege.  Information may be incomplete.", 0, 0 },
 	{ "BADDBVER", "Incorrect database version: !AD", 2, 0 },
@@ -375,7 +375,7 @@ LITDEF	err_msg merrors[] = {
 	{ "NETFAIL", "Failure of Net operation", 0, 0 },
 	{ "NETLCKFAIL", "Lock operation across Net failed", 0, 0 },
 	{ "TTINVFILTER", "Invalid FILTER argument", 0, 0 },
-	{ "UNUSEDMSG544", "MTANSILAB last used in V6.3-003 Dec. 2017", 0, 0 },
+	{ "BACKUPTN", "Transactions from 0x!16@XQ to 0x!16@XQ are backed up", 2, 0 },
 	{ "WCSFLUFAIL", "Error flushing buffers -- called from module !AD at line !UL", 3, 0 },
 	{ "BADTRNPARAM", "!AD is not a legal parameter to $ZTRNLNM", 2, 0 },
 	{ "DSEONLYBGMM", "!AD is supported only for BG/MM access methods", 2, 0 },
@@ -593,7 +593,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DELIMSIZNA", "Delimiter size is not appropriate", 0, 0 },
 	{ "INVCTLMNE", "Invalid control mnemonics", 0, 0 },
 	{ "SOCKLISTEN", "Error listening on a socket", 0, 0 },
-	{ "UNUSEDMSG762", "LQLENGTHNA last used in V6.3-003A", 0, 0 },
+	{ "RESTORESUCCESS", "Restore completed successfully", 0, 0 },
 	{ "ADDRTOOLONG", "Socket address !AD of length !UL is longer than the maximum permissible length !UL", 4, 0 },
 	{ "GTMSECSHRGETSEMFAIL", "error getting semaphore errno = !UL", 1, 0 },
 	{ "CPBEYALLOC", "Attempt to copy beyond the allocated buffer", 0, 0 },
@@ -634,7 +634,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GBLMODFAIL", "Global variable Conflict Test failed.  Failure code: !AD.", 2, 0 },
 	{ "TTLENGTHTOOBIG", "Terminal LENGTH exceeds the maximum allowed limit", 0, 0 },
 	{ "TPTIMEOUT", "Transaction timeout", 0, 0 },
-	{ "DEFEREVENT", "Transfer table reset for event type !UL when set for type !UL", 2, 0 },
+	{ "NORTN", "Routine name missing", 0, 0 },
 	{ "JNLFILNOTCHG", "Journal file not changed", 0, 0 },
 	{ "EVENTLOGERR", "Error in event logging subsystem", 0, 0 },
 	{ "UPDATEFILEOPEN", "Update file open error", 0, 0 },
@@ -729,7 +729,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GTMSECSHRSSIDF", "gtmsecshr server setsid failed", 0, 0 },
 	{ "GTMSECSHRFORKF", "gtmsecshr server unable to fork off a child process", 0, 0 },
 	{ "DBFSYNCERR", "Error synchronizing database file !AD to disk", 2, 0 },
-	{ "SECONDAHEAD", "Secondary ahead of primary. !/ Secondary database possibly updated by process other than the update process.  First perform rollback.", 0, 0 },
+	{ "UNUSEDMSG898", "SECONDAHEAD last used in V7.0-000 Jan 2021", 0, 0 },
 	{ "SCNDDBNOUPD", "Database Updates not allowed on the secondary", 0, 0 },
 	{ "MUINFOUINT4", "!AD : !UL [0x!XL]", 4, 0 },
 	{ "NLMISMATCHCALC", "Location of !AD expected at 0x!XL, but found at 0x!XL", 4, 0 },
@@ -784,7 +784,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DBMBPFRDLBM", "!AD Master bit map shows this map has space, agreeing with disk local map", 2, 2 },
 	{ "DBMBPFRINT", "!AD Master bit map shows this map has space, agreeing with MUPIP INTEG", 2, 2 },
 	{ "DBMAXKEYEXC", "!AD Maximum key size for database exceeds design maximum", 2, 0 },
-	{ "UNUSEDMSG953", "DBMXRSEXCMIN last used in V5.5-000 Feb 2012", 0, 0 },
+	{ "REPLAHEAD", "Replicating instance is ahead of the originating instance.!AD", 2, 0 },
 	{ "MUPIPSET2SML", "!UL too small, minimum !AD allowed is !UL", 4, 0 },
 	{ "DBREADBM", "!AD Read error on bit map", 2, 3 },
 	{ "DBCOMPTOOLRG", "!AD Record has too large compression count", 2, 4 },
@@ -1413,7 +1413,7 @@ LITDEF	err_msg merrors[] = {
 	{ "UPDPROC", "Update Process error", 0, 0 },
 	{ "HLPPROC", "Helper Process error", 0, 0 },
 	{ "REPLNOHASHTREC", "Sequence number 0x!16@XQ contains trigger definition updates. !AD side must be at least V6.2-000 for replication to continue", 3, 0 },
-	{ "REMOTEDBNOTRIG", "Trigger operations on global !AD not supported as it maps to database region !AD that points to a remote file", 4, 0 },
+	{ "REMOTEDBNOTRIG", "Trigger operations are not supported on global ^!AD as it maps to database region !AD that points to a remote file", 4, 0 },
 	{ "NEEDTRIGUPGRD", "Cannot do trigger operation on database file !AD until it is upgraded; Run MUPIP TRIGGER -UPGRADE first", 2, 0 },
 	{ "REQRLNKCTLRNDWN", "Error accessing relinkctl file !AZ for $ZROUTINES directory !AD. Must be rundown", 3, 0 },
 	{ "RLNKCTLRNDWNSUC", "Relinkctl file for $ZROUTINES directory !AD successfully rundown", 2, 0 },
@@ -1552,6 +1552,13 @@ LITDEF	err_msg merrors[] = {
 	{ "REPL0BACKLOG", "Total backlog for the specified replicating instance(s) is 0", 0, 0 },
 	{ "REPLBACKLOG", "Timeout occurred while there was a backlog", 0, 0 },
 	{ "INVSHUTDOWN", "Shutdown timeout should be from 0 to 3600 seconds", 0, 0 },
+	{ "SOCKBLOCKERR", "WRITE /BLOCK error: !AD", 2, 0 },
+	{ "SOCKWAITARG", "!AD argument to WRITE /WAIT !AD", 4, 0 },
+	{ "LASTTRANS", "Last transaction sequence number !AD : !@UQ", 3, 0 },
+	{ "SRCBACKLOGSTATUS", "Instance !AD !AD !@UQ transaction(s)", 5, 0 },
+	{ "BKUPRETRY", "Retrying MUPIP BACKUP for region: !AD (database file: !AD). Attempt: #!UL of !UL", 6, 0 },
+	{ "BKUPPROGRESS", "Transfer : !AD ; Speed : !AD MiB/sec ; Transactions : !@UQ ; Estimated time left : !UL !AD", 8, 0 },
+	{ "BKUPFILEPERM", "Backup file !AD does not have write permission", 2, 0 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -1628,7 +1635,7 @@ LITDEF	int ERR_GVGETFAIL = 150372922;
 LITDEF	int ERR_GVIS = 150372931;
 LITDEF	int ERR_GVKILLFAIL = 150372938;
 LITDEF	int ERR_GVNAKED = 150372946;
-LITDEF	int ERR_UNUSEDMSG256 = 150372954;
+LITDEF	int ERR_BACKUPDBFILE = 150372955;
 LITDEF	int ERR_GVORDERFAIL = 150372962;
 LITDEF	int ERR_GVPUTFAIL = 150372970;
 LITDEF	int ERR_PATTABSYNTAX = 150372978;
@@ -1685,8 +1692,8 @@ LITDEF	int ERR_NUM64ERR = 150373378;
 LITDEF	int ERR_UNUM64ERR = 150373386;
 LITDEF	int ERR_HEXERR = 150373394;
 LITDEF	int ERR_HEX64ERR = 150373402;
-LITDEF	int ERR_UNUSEDMSG313 = 150373410;
-LITDEF	int ERR_UNUSEDMSG314 = 150373418;
+LITDEF	int ERR_CMDERR = 150373410;
+LITDEF	int ERR_BACKUPSUCCESS = 150373419;
 LITDEF	int ERR_JNLTMQUAL3 = 150373426;
 LITDEF	int ERR_MULTLAB = 150373434;
 LITDEF	int ERR_GTMCURUNSUPP = 150373442;
@@ -1725,7 +1732,7 @@ LITDEF	int ERR_SELECTFALSE = 150373698;
 LITDEF	int ERR_SPOREOL = 150373706;
 LITDEF	int ERR_SRCLIN = 150373715;
 LITDEF	int ERR_SRCLOC = 150373723;
-LITDEF	int ERR_SRCLOCUNKNOWN = 150373731;
+LITDEF	int ERR_UNUSEDMSG353 = 150373731;
 LITDEF	int ERR_STACKCRIT = 150373738;
 LITDEF	int ERR_STACKOFLOW = 150373748;
 LITDEF	int ERR_STACKUNDERFLO = 150373754;
@@ -1743,7 +1750,7 @@ LITDEF	int ERR_UIDSND = 150373842;
 LITDEF	int ERR_UNDEF = 150373850;
 LITDEF	int ERR_UNIMPLOP = 150373858;
 LITDEF	int ERR_VAREXPECTED = 150373866;
-LITDEF	int ERR_UNUSEDMSG371 = 150373874;
+LITDEF	int ERR_BACKUPFAIL = 150373874;
 LITDEF	int ERR_MAXARGCNT = 150373882;
 LITDEF	int ERR_GTMSECSHRSEMGET = 150373892;
 LITDEF	int ERR_VIEWARGCNT = 150373898;
@@ -1891,9 +1898,9 @@ LITDEF	int ERR_FNOTONSYS = 150375026;
 LITDEF	int ERR_AMBISYIPARAM = 150375034;
 LITDEF	int ERR_PREVJNLNOEOF = 150375042;
 LITDEF	int ERR_LKSECINIT = 150375050;
-LITDEF	int ERR_UNUSEDMSG519 = 150375058;
-LITDEF	int ERR_UNUSEDMSG520 = 150375066;
-LITDEF	int ERR_UNUSEDMSG521 = 150375074;
+LITDEF	int ERR_BACKUPREPL = 150375059;
+LITDEF	int ERR_BACKUPSEQNO = 150375067;
+LITDEF	int ERR_DIRACCESS = 150375074;
 LITDEF	int ERR_TXTSRCMAT = 150375082;
 LITDEF	int ERR_CCENOGROUP = 150375088;
 LITDEF	int ERR_BADDBVER = 150375098;
@@ -1916,7 +1923,7 @@ LITDEF	int ERR_SERVERERR = 150375226;
 LITDEF	int ERR_NETFAIL = 150375234;
 LITDEF	int ERR_NETLCKFAIL = 150375242;
 LITDEF	int ERR_TTINVFILTER = 150375251;
-LITDEF	int ERR_UNUSEDMSG544 = 150375258;
+LITDEF	int ERR_BACKUPTN = 150375259;
 LITDEF	int ERR_WCSFLUFAIL = 150375266;
 LITDEF	int ERR_BADTRNPARAM = 150375274;
 LITDEF	int ERR_DSEONLYBGMM = 150375280;
@@ -2134,7 +2141,7 @@ LITDEF	int ERR_PROTNOTSUP = 150376970;
 LITDEF	int ERR_DELIMSIZNA = 150376978;
 LITDEF	int ERR_INVCTLMNE = 150376986;
 LITDEF	int ERR_SOCKLISTEN = 150376994;
-LITDEF	int ERR_UNUSEDMSG762 = 150377002;
+LITDEF	int ERR_RESTORESUCCESS = 150377003;
 LITDEF	int ERR_ADDRTOOLONG = 150377010;
 LITDEF	int ERR_GTMSECSHRGETSEMFAIL = 150377016;
 LITDEF	int ERR_CPBEYALLOC = 150377026;
@@ -2175,7 +2182,7 @@ LITDEF	int ERR_REPLFILTER = 150377298;
 LITDEF	int ERR_GBLMODFAIL = 150377306;
 LITDEF	int ERR_TTLENGTHTOOBIG = 150377314;
 LITDEF	int ERR_TPTIMEOUT = 150377322;
-LITDEF	int ERR_DEFEREVENT = 150377331;
+LITDEF	int ERR_NORTN = 150377330;
 LITDEF	int ERR_JNLFILNOTCHG = 150377338;
 LITDEF	int ERR_EVENTLOGERR = 150377346;
 LITDEF	int ERR_UPDATEFILEOPEN = 418812810;
@@ -2270,7 +2277,7 @@ LITDEF	int ERR_GTMSECSHRSGIDF = 150378056;
 LITDEF	int ERR_GTMSECSHRSSIDF = 150378064;
 LITDEF	int ERR_GTMSECSHRFORKF = 150378076;
 LITDEF	int ERR_DBFSYNCERR = 150378082;
-LITDEF	int ERR_SECONDAHEAD = 150378090;
+LITDEF	int ERR_UNUSEDMSG898 = 150378090;
 LITDEF	int ERR_SCNDDBNOUPD = 150378098;
 LITDEF	int ERR_MUINFOUINT4 = 150378107;
 LITDEF	int ERR_NLMISMATCHCALC = 150378114;
@@ -2325,7 +2332,7 @@ LITDEF	int ERR_DBMBPFLDIS = 150378496;
 LITDEF	int ERR_DBMBPFRDLBM = 150378504;
 LITDEF	int ERR_DBMBPFRINT = 150378512;
 LITDEF	int ERR_DBMAXKEYEXC = 150378522;
-LITDEF	int ERR_UNUSEDMSG953 = 150378530;
+LITDEF	int ERR_REPLAHEAD = 150378530;
 LITDEF	int ERR_MUPIPSET2SML = 150378536;
 LITDEF	int ERR_DBREADBM = 150378546;
 LITDEF	int ERR_DBCOMPTOOLRG = 150378554;
@@ -3093,13 +3100,19 @@ LITDEF	int ERR_REPLNORESP = 150384640;
 LITDEF	int ERR_REPL0BACKLOG = 150384649;
 LITDEF	int ERR_REPLBACKLOG = 150384658;
 LITDEF	int ERR_INVSHUTDOWN = 150384666;
+LITDEF	int ERR_SOCKBLOCKERR = 150384674;
+LITDEF	int ERR_SOCKWAITARG = 150384682;
+LITDEF	int ERR_LASTTRANS = 150384691;
+LITDEF	int ERR_SRCBACKLOGSTATUS = 150384699;
+LITDEF	int ERR_BKUPRETRY = 150384707;
+LITDEF	int ERR_BKUPPROGRESS = 150384715;
+LITDEF	int ERR_BKUPFILEPERM = 150384722;
 
 
 LITDEF	int merrors_undocarr[] = {
 	0,	/* ACK */
 	656,	/* ASC2EBCDICCONV */
 	1444,	/* DBGLDMISMATCH */
-	621,	/* DEFEREVENT */
 	1472,	/* DRVLONGJMP */
 	44,	/* ENQ */
 	1332,	/* FAKENOSPCLEARED */
@@ -3129,8 +3142,8 @@ GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1539,
+	1546,
 	&merrors_undocarr[0],
-	26
+	25
 };
 

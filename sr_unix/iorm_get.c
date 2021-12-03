@@ -29,7 +29,7 @@
 #include "eintr_wrappers.h"
 #include "wake_alarm.h"
 #include "min_max.h"
-#include "outofband.h"
+#include "deferred_events_queue.h"
 #ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #include "gtm_conv.h"
@@ -45,8 +45,6 @@ GBLREF	volatile int4	outofband;
 LITREF	mstr		chset_names[];
 
 error_def(ERR_BOMMISMATCH);
-error_def(ERR_IOEOF);
-error_def(ERR_SYSCALL);
 
 /*	check initial len bytes of buffer for a BOM
  *	if CHSET_UTF16, set ichset to BOM or BE if no BOM
@@ -75,7 +73,7 @@ int	gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, in
 			{
 				if (CHSET_UTF16LE == *chset)
 				{
-					iod->dollar.za = 9;
+					iod->dollar.za = ZA_IO_ERR;
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BOMMISMATCH, 4,
 						chset_names[CHSET_UTF16BE].len, chset_names[CHSET_UTF16BE].addr,
 						chset_names[CHSET_UTF16LE].len, chset_names[CHSET_UTF16LE].addr);
@@ -86,7 +84,7 @@ int	gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, in
 			{
 				if (CHSET_UTF16BE == *chset)
 				{
-					iod->dollar.za = 9;
+					iod->dollar.za = ZA_IO_ERR;
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BOMMISMATCH, 4,
 						chset_names[CHSET_UTF16LE].len, chset_names[CHSET_UTF16LE].addr,
 						chset_names[CHSET_UTF16BE].len, chset_names[CHSET_UTF16BE].addr);

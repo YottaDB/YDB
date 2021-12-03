@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,6 +84,8 @@ typedef enum
 	INTRPT_IN_JNL_QIO,		/* Deferring interrupts in journal qio, replacing jnl_qio_in_prog. */
 	INTRPT_IN_MLK_CLEANUP,		/* Deferring interrupts around lock table cleanup code */
 	INTRPT_IN_JNL_FSYNC,		/* Deferring interrupts in jnl_fsync() while holding the latch */
+	INTRPT_IN_EVENT_HANDLING,	/* Deferring interrupts while managing a deferred or outofband event */
+	INTRPT_IN_KILL_CLEANUP,		/* Deferring interrupts while performing KILL cleanup - used by REORG */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 
@@ -222,7 +224,7 @@ static inline void deferred_exit_handling_check(void)
 	if (INSIDE_THREADED_CODE(rname))
 	{
 		PTHREAD_EXIT_IF_FORCED_EXIT;
-	} else if ((2 > forced_exit) && !process_exiting)
+	} else if ((2 > forced_exit) && !process_exiting && (INTRPT_IN_KILL_CLEANUP != intrpt_ok_state))
 	{	/* If forced_exit was set while in a deferred state, disregard any deferred timers and
 		 * invoke deferred_signal_handler directly.
 		 */

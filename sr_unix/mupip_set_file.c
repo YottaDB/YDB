@@ -129,12 +129,12 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				gtmcrypt_errno, hard_spin_status, inst_freeze_on_error_status, key_size_status, locksharesdbcrit,
 				lock_space_status, mutex_space_status, null_subs_status, qdbrundown_status, rec_size_status,
 				reg_exit_stat, rc, rsrvd_bytes_status, sleep_cnt_status, save_errno, stats_status, status,
-				status1, stdnullcoll_status, trigger_flush_limit_status, wrt_per_flu_status,
+				status1, stdb_alloc_status, stdnullcoll_status, trigger_flush_limit_status, wrt_per_flu_status,
 				full_blkwrt_status;
 	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_flush_trigger, new_hard_spin,
 				new_key_size, new_lock_space, new_mutex_space, new_null_subs, new_rec_size, new_sleep_cnt,
-				new_spin_sleep, new_stdnullcoll, new_wrt_per_flu, reserved_bytes, spin_sleep_status,
-				read_only_status, new_full_blkwrt;
+				new_spin_sleep, new_statsdb_alloc, new_stdnullcoll, new_wrt_per_flu, reserved_bytes,
+				spin_sleep_status, read_only_status, new_full_blkwrt;
 	sgmnt_data_ptr_t	csd, pvt_csd;
 	tp_region		*rptr, single;
 	uint4			fsb_size, reservedDBFlags;
@@ -409,6 +409,29 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	}
 	if (stats_status = cli_present("STATS"))
 		need_standalone = TRUE;
+	if (stdb_alloc_status = cli_present("STATSDB_ALLOCATION"))
+	{
+		if (cli_get_int("STATSDB_ALLOCATION", &new_statsdb_alloc))
+		{
+			if (new_statsdb_alloc > STDB_ALLOC_MAX)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_statsdb_alloc,
+					LEN_AND_LIT("STATSDB_ALLOCATION"), STDB_ALLOC_MAX);
+				exit_stat |= EXIT_ERR;
+			}
+			if (new_statsdb_alloc < STDB_ALLOC_MIN)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2SML, 4, new_statsdb_alloc,
+					LEN_AND_LIT("STATSDB_ALLOCATION"), STDB_ALLOC_MIN);
+				exit_stat |= EXIT_ERR;
+			}
+			need_standalone = TRUE;
+		} else
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("STATSDB_ALLOCATION"));
+			exit_stat |= EXIT_ERR;
+		}
+	}
 	if (stdnullcoll_status = cli_present("STDNULLCOLL"))
 		need_standalone = TRUE;
 	if (cli_present("VERSION"))
@@ -590,9 +613,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
 					reg_exit_stat |= EXIT_WRN;
 				}
-				if ((GDSVCURR != pvt_csd->desired_db_format) && (BLK_ID_32_VER != pvt_csd->desired_db_format))
-				{
-					util_out_print("MM access method cannot be set in DB compatibility mode",
+				if (pvt_csd->offset && ((GDSVCURR - 1) == pvt_csd->desired_db_format))
+				{	/* if we support downgrade, enhance the above conditions */
+					util_out_print("MM access method cannot be set during DB upgrade",
 						TRUE);
 					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
 					reg_exit_stat |= EXIT_WRN;
@@ -704,6 +727,10 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					reservedDBFlags |= RDBF_NOSTATS;
 				pvt_csd->reservedDBFlags = reservedDBFlags;
 			}
+			if (stdb_alloc_status)
+			{
+				pvt_csd->statsdb_allocation = new_statsdb_alloc;
+			}
 			if (read_only_status)
 			{
 				if (dba_mm != pvt_csd->acc_meth && CLI_NEGATED != read_only_status)
@@ -774,7 +801,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		}
 		access_new = (n_dba == access ? csd->acc_meth : access);
 		if (GDSVLAST != desired_dbver)
-		{
+		{	/* TODO: reject GDSV4 requests and figure out what to do with MM; revise desired_db_format_set */
 			if ((dba_mm != access_new) || (GDSV4 != desired_dbver))
 				(void)desired_db_format_set(gv_cur_region, desired_dbver, command);
 			else	/* for other errors desired_db_format_set prints appropriate error messages */
@@ -1035,6 +1062,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				if (stats_status)
 					util_out_print("Database file !AD now has sharing of gvstats set to !AD", TRUE,
 							fn_len, fn, 5, (CLI_PRESENT == stats_status) ? " TRUE" : "FALSE");
+				if (stdb_alloc_status)
+					util_out_print("Database file !AD now has !UL statsdb allocation",
+							TRUE, fn_len, fn, pvt_csd->statsdb_allocation);
 				if (stdnullcoll_status)
 					util_out_print("Database file !AD is now using !AD", TRUE, fn_len, fn,
 							strlen("M standard null collation"),

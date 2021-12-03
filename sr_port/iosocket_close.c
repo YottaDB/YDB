@@ -222,7 +222,7 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 		}
 		else if (!process_exiting && (3 > socketptr->sd))
 		{
-			OPENFILE("/dev/null", O_RDWR, null_fd);
+			OPENFILE(DEVNULL, O_RDWR, null_fd);
 			if (-1 == null_fd)
 			{
 				save_errno = errno;
@@ -242,7 +242,7 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 	}
 	else if (-1 == null_fd)
 	{
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_FILEOPENFAIL, 2, LIT_AND_LEN("/dev/null"), save_errno, 0);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_FILEOPENFAIL, 2, LIT_AND_LEN(DEVNULL), save_errno, 0);
 	}
 }
 

@@ -38,6 +38,7 @@
 #include "lv_val.h"
 #include <rtnhdr.h>
 #include "mv_stent.h"
+#include "find_mvstent.h"
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gtm_facility.h"
@@ -60,7 +61,8 @@
 #include "op.h"
 #include "mvalconv.h"
 #include "stringpool.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "gtmmsg.h"
 #include "format_targ_key.h"
 #include "sgnl.h"
@@ -70,18 +72,19 @@
 #include "gtmimagename.h"
 #include "gvt_inline.h"
 
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF mv_stent		*mv_chain;
-GBLREF unsigned char	*msp, *stackwarn, *stacktop;
-GBLREF int4             outofband;
-GBLREF uint4		dollar_tlevel;
-GBLREF gv_key           *gv_currkey;
 GBLREF gd_region        *gv_cur_region;
-GBLREF zshow_out        *zwr_output;
-GBLREF int              merge_args;
-GBLREF merge_glvn_ptr	mglvnp;
+GBLREF gv_key           *gv_currkey;
 GBLREF gv_namehead      *gv_target;
+GBLREF int              merge_args;
 GBLREF lvzwrite_datablk *lvzwrite_block;
+GBLREF merge_glvn_ptr	mglvnp;
+GBLREF mv_stent		*mv_chain;
+GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF stack_frame	*frame_pointer;
+GBLREF uint4		dollar_tlevel;
+GBLREF unsigned char	*msp, *stackwarn, *stacktop;
+GBLREF volatile int4	outofband;
+GBLREF zshow_out        *zwr_output;
 #ifdef DEBUG
 GBLREF lv_val		*active_lv;
 #endif
@@ -91,28 +94,25 @@ GBLREF lv_val		*active_lv;
 error_def(ERR_MAXNRSUBSCRIPTS);
 error_def(ERR_MERGEINCOMPL);
 error_def(ERR_NCTCOLLDIFF);
-error_def(ERR_STACKCRIT);
-error_def(ERR_STACKOFLOW);
 
 void op_merge(void)
 {
 	boolean_t		found, check_for_null_subs, is_base_var, nontp_and_bgormm, nospan, act_mismatch;
-	lv_val			*dst_lv;
-	mval 			*mkey, *value, *subsc, tmp_mval;
-	int			org_glvn1_keysz, org_glvn2_keysz, delta2, dollardata_src, dollardata_dst, sbs_depth;
-	int			gvn1subs, gvn2subs, nsubs, keylen;
-	unsigned char		*ptr, *ptr2, *ptr_top;
-	unsigned char  		buff[MAX_ZWR_KEY_SZ];
-	unsigned char		nullcoll_src, nullcoll_dst;
-	zshow_out		output;
 	gd_addr			*gbl1_gd_addr, *gbl2_gd_addr;
 	gd_binding		*map;
-	gd_region		*reg1, *reg2;
 	gv_key           	*key, *mergekey2;
 	gv_namehead		*gvt1, *gvt2;
-	gvnh_reg_t		*gvnh_reg1, *gvnh_reg2;
+	gd_region		*reg1, *reg2;
 	gvname_info		*gblp1, *gblp2;
+	gvnh_reg_t		*gvnh_reg1, *gvnh_reg2;
+	int			delta2, dollardata_dst, dollardata_src, gvn1subs, gvn2subs, keylen, nsubs;
+	int			org_glvn1_keysz, org_glvn2_keysz, sbs_depth;
+	lv_val			*dst_lv;
 	mstr			opstr;
+	mval 			*mkey, *value, *subsc, tmp_mval;
+	mv_stent		*mv_zintcmd;
+	unsigned char		buff[MAX_ZWR_KEY_SZ], nullcoll_src, nullcoll_dst, *ptr, *ptr2, *ptr_top;
+	zshow_out		output;
 #	ifdef DEBUG
 	lv_val			*orig_active_lv;
 #	endif
@@ -213,8 +213,8 @@ void op_merge(void)
 			{
 				if (outofband)
 				{
-					gvname_env_restore(gblp1); /* naked indicator is restored into gv_currkey */
-					outofband_action(FALSE);
+					gvname_env_restore(gblp1);       /* naked indicator is restored into gv_currkey */
+					async_action(FALSE);
 				}
 				gvname_env_restore(gblp2);	/* Restore last key under ^gvn2 we worked */
 				/* If gblp2 corresponds to a spanning global, then determine
@@ -392,8 +392,8 @@ void op_merge(void)
 			{
 				if (outofband)
 				{
-					gvname_env_restore(gblp2);	 /* naked indicator is restored into gv_currkey */
-					outofband_action(FALSE);
+					gvname_env_restore(gblp2);       /* naked indicator is restored into gv_currkey */
+					async_action(FALSE);
 				}
 				/* If gblp2 corresponds to a spanning global, then determine
 				 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.

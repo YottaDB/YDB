@@ -25,7 +25,8 @@
 #endif
 
 /* mstr needs to be defined before including "mdefsp.h".  */
-typedef int mstr_len_t;
+#define MSTR_LEN_MAX INT_MAX
+typedef int mstr_len_t;		/* Change MSTR_LEN_MAX if this changes */
 typedef struct
 {
 	unsigned int	char_len;	/* Character length */
@@ -747,15 +748,9 @@ MBSTART {					\
 # define SET_TRACEABLE_VAR(var,value) var = value
 #endif
 
-/* If this is unix, we have a faster sleep for short sleeps ( < 1 second) than doing a hiber start.
- * Take this chance to define UNIX_ONLY and VMS_ONLY macros.
- */
+/* SLEEP_USEC wrapper, see sleep.c for more information */
 void m_usleep(int useconds);
-#ifdef UNIX
-#	define SHORT_SLEEP(x) {assert(1000 > (x)); m_usleep((x) * 1000);}
-#else
-#	define SHORT_SLEEP(x) hiber_start(x);
-#endif
+#define SHORT_SLEEP(x) {assert(1000 > (x)); m_usleep((x) * 1000);}
 
 #ifdef UNIX
 #	define UNIX_ONLY(X)			X
@@ -1801,7 +1796,13 @@ typedef struct gtm_num_range_struct
 
 /* Debug FPRINTF with pre and post requisite flushing of appropriate streams */
 #ifndef DBGFPF
-# define DBGFPF(x)	{flush_pio(); FPRINTF x; FFLUSH(stderr); FFLUSH(stdout);}
+# define DBGFPF(X)		\
+MBSTART {			\
+	flush_pio();		\
+	FPRINTF X;		\
+	FFLUSH(stderr);		\
+	FFLUSH(stdout);		\
+} MBEND
 #endif
 
 /* Settings for lv_null_subs */
@@ -1874,10 +1875,24 @@ enum
 /* Ensures that the argument is defined if it was not skipped. */
 #define MV_FORCE_DEFINED_UNLESS_SKIPARG(V)	((!M_ARG_SKIPPED(V)) ? (MV_FORCE_DEFINED(V)) : (V))
 
+/* /dev/null */
+#define DEVNULL		"/dev/null"
+
 #ifdef _AIX
 #define LIBPATH_ENV		"LIBPATH"
 #else
 #define LIBPATH_ENV		"LD_LIBRARY_PATH"
+#endif
+
+#ifdef DEBUG
+# define DBG_VERIFY_ACCESS(PTR)			\
+{	/* Ensure accessible pointer (no SIG-11) */	\
+	unsigned char	c;				\
+							\
+	c = *(unsigned char *)(PTR);			\
+}
+#else
+# define DBG_VERIFY_ACCESS(PTR)
 #endif
 
 #endif /* MDEF_included */

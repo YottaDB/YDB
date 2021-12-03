@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,6 +72,7 @@ typedef struct
 	stack_frame		*error_frame_save;	/* Save/restore error_frame over $ZINTERRUPT processor */
 	dollar_ecode_type	dollar_ecode_save;	/* Save $ECODE array results */
 	dollar_stack_type	dollar_stack_save;	/* Save $STACK(...) array results */
+	boolean_t		ztimeout;		/* for debugging - differentiates between ztimeout and zinterrupt */
 } mvs_zintr_struct;
 
 typedef struct
@@ -227,7 +228,7 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 #define MVST_TVAL	9	/* Saved value of $T, to be restored upon QUITing */
 #define MVST_TPHOLD	10	/* Place holder for MUMPS stack pertaining to TSTART */
 #define	MVST_ZINTR	11	/* Environmental save for $zinterrupt */
-/* Environmental save for ZTIMEOUT, same info required as above MVST_ZINTR since transferring to a vector in both cases */
+/* Environmental save for ZTIMEOUT - almost same info required as above MVST_ZINTR - both use transfer vector */
 #define	MVST_ZTIMEOUT	11
 #define MVST_ZINTDEV	12	/* In I/O when ZINTR, mstr input to now protected */
 #define	MVST_STCK_SP	13	/* same as the MVST_STCK type except that it needs special handling in flush_jmp.c

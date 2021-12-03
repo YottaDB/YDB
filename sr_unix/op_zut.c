@@ -26,16 +26,22 @@ error_def(ERR_WEIRDSYSTIME);
 
 void op_zut(mval *s)
 {
-	struct timeval	tv;
+	struct timespec	ts;
 	gtm_int8	microseconds, msectmp;
 	int		numdigs;
 	int4		pwr;
 
-	assertpro(-1 != gettimeofday(&tv, NULL));
-	microseconds = (1LL * MICROSECS_IN_SEC * tv.tv_sec) + tv.tv_usec;
-	if ((microseconds < 0) && (microseconds > E_18))
+	assertpro(-1 != clock_gettime(CLOCK_REALTIME, &ts));
+#ifdef DEBUG
+	/* The OS should never return an invalid time */
+	if ((ts.tv_sec < 0) || (ts.tv_nsec < 0) || (ts.tv_nsec > NANOSECS_IN_SEC))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_WEIRDSYSTIME);
-	msectmp = microseconds;
+#endif
+	/* $ZUT original supported only up to microsecond granularity. While it is tempting to
+	 * expose upto nanosecond granularity, doing so is a major change to the interface.
+	 */
+	msectmp = microseconds = (1LL * MICROSECS_IN_SEC * ts.tv_sec) + (ts.tv_nsec / NANOSECS_IN_USEC);
+	assert(0 < microseconds);
 	/* Count the number of digits */
 	for (numdigs = 0; msectmp; numdigs++, msectmp /= DECIMAL_BASE)
 		;

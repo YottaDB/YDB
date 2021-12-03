@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,8 @@ static int fcntl_res;
 #include "iosocketdef.h"
 #include "min_max.h"
 #include "gtm_utf8.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #ifdef GTM_TLS
 #include "gtm_tls.h"
 #endif
@@ -74,13 +75,13 @@ static int fcntl_res;
 
 #ifdef DEBUG
 /* Hold gettimeofday before and after select to debug AIX spin */
-static	struct timeval tvbefore, tvafter;
+static	struct timespec tsbefore, tsafter;
 #endif
 
-GBLREF	io_pair 		io_curr_device;
 GBLREF	bool			out_of_time;
+GBLREF	io_pair 		io_curr_device;
 GBLREF	spdesc 			stringpool;
-GBLREF	int4			outofband;
+GBLREF	volatile int4		outofband;
 #ifdef GTM_TLS
 GBLREF	gtm_tls_ctx_t		*tls_ctx;
 #endif
@@ -170,7 +171,7 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 	DBGSOCK2((stdout, "socsnrio: Socket read request - socketptr: 0x"lvaddr"  buffer: 0x"lvaddr"  maxlength: %d  flags: %d  ",
 		  socketptr, buffer, maxlength, flags));
 	DBGSOCK2((stdout, "time_for_read->at_sec: %d  usec: %d\n", time_for_read->at_sec, time_for_read->at_usec));
-	DEBUG_ONLY(gettimeofday(&tvbefore, NULL);)
+	DEBUG_ONLY(clock_gettime(CLOCK_REALTIME, &tsbefore);)
 #ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 	assertpro(FD_SETSIZE > socketptr->sd);
 	FD_ZERO(&tcp_fd);
@@ -211,7 +212,7 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 			status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 #			endif
 			real_errno = errno;
-			DEBUG_ONLY(gettimeofday(&tvafter, NULL);)
+			DEBUG_ONLY(clock_gettime(CLOCK_REALTIME, &tsafter);)
 			DBGSOCK2((stdout, "socsnrio: Select return code: %d :: errno: %d\n", status, real_errno));
 		}
 		if (0 < status)

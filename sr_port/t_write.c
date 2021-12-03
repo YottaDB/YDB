@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -213,7 +213,8 @@ cw_set_element *t_write (
 		 */
 		cr = blkhist->cr;
 		assert((NULL != cr) || (dba_mm == csa->hdr->acc_meth));
-		cse->ondsk_blkver = (NULL == cr) ? cs_data->desired_db_format : cr->ondsk_blkver;
+		cse->ondsk_blkver = (NULL != cr) ? cr->ondsk_blkver : cs_data->desired_db_format;
+		assert(cse->ondsk_blkver);
 		/* For uninitialized gv_target, initialize the in_tree status as IN_DIR_TREE */
 		assert (NULL != gv_target || dse_running || jgbl.forw_phase_recovery);
 		if (NULL == gv_target || 0 == gv_target->root)

@@ -22,6 +22,8 @@
 #include "stringpool.h"
 #include "setterm.h"
 #include "error.h"
+#include "op.h"
+#include "indir_enum.h"
 
 GBLREF io_pair		io_std_device;
 LITREF unsigned char	io_params_size[];
@@ -35,7 +37,9 @@ void iott_close(io_desc *v, mval *pp)
 	int		status;
 	int		p_offset;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(v->type == tt);
 	if (v->state != dev_open)
 		return;
@@ -53,11 +57,7 @@ void iott_close(io_desc *v, mval *pp)
 	while (*(pp->str.addr + p_offset) != iop_eol)
 	{
 		if ((ch = *(pp->str.addr + p_offset++)) == iop_exception)
-		{
-			v->error_handler.len = *(pp->str.addr + p_offset);
-			v->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
-			s2pool(&v->error_handler);
-		}
+			DEF_EXCEPTION(pp, p_offset, v);
 		p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
 			(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 	}

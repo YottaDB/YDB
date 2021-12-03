@@ -45,6 +45,37 @@ error_def(ERR_TEXT);
  *
  ********************************************************************************************************************************/
 
+/**
+ * @brief Try to memcpy to tmp_object_file_name in a way which SCA will be happy with
+ *
+ * @param src Source buffer
+ * @param cpy_len Number of bytes to copy
+ *
+ * @return None
+ */
+static inline void mcpy_tmp_object_file_name(const char *src, size_t cpy_len)
+{
+	typedef char dst_buf[TLEN(tmp_object_file_name)];
+	typedef dst_buf *dst_buf_p;
+	dst_buf_p tmp_object_file_name;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+
+	tmp_object_file_name = (dst_buf_p) TADR(tmp_object_file_name);
+
+	assert(NULL != src);
+	assert(tmp_object_file_name != NULL);
+	assert(sizeof(*tmp_object_file_name) >= cpy_len);
+
+	memcpy((char *)tmp_object_file_name, src, cpy_len);
+
+	assert(NULL != tmp_object_file_name);
+	assert((sizeof(*tmp_object_file_name) - cpy_len) >= SIZEOF(MKSTEMP_MASK));
+
+	memcpy(((char *)tmp_object_file_name) + cpy_len, MKSTEMP_MASK, SIZEOF(MKSTEMP_MASK));
+}
+
 /* Routine to create a temporary object file. This file is created in the directory it is supposed to reside in but is created
  * with a temporary name. When complete, it is renamed to what it was meant to be replacing the previous version.
  *
@@ -72,9 +103,10 @@ int mk_tmp_object_file(const char *object_fname, int object_fname_len)
 	retry = MAX_MKSTEMP_RETRIES;
 	do
 	{
-		memcpy(TADR(tmp_object_file_name), object_fname, object_fname_len);
+		/*memcpy(TADR(tmp_object_file_name), object_fname, object_fname_len);*/
+		mcpy_tmp_object_file_name(object_fname, object_fname_len);
 		/* Note memcpy() below purposely includes null terminator */
-		memcpy(TADR(tmp_object_file_name) + object_fname_len, MKSTEMP_MASK, SIZEOF(MKSTEMP_MASK));
+		/*memcpy(TADR(tmp_object_file_name) + object_fname_len, MKSTEMP_MASK, SIZEOF(MKSTEMP_MASK));*/
 		MKSTEMP(TADR(tmp_object_file_name), fdesc);
 	} while ((FD_INVALID == fdesc) && (EEXIST == errno) && (0 < --retry));
 	if (FD_INVALID == fdesc)

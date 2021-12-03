@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 Fidelity National Information		*
+ * Copyright (c) 2020-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -96,7 +96,7 @@ typedef struct v6_sgmnt_data_struct
 	block_id_32	last_com_bkup_last_blk;	/* Last block in the database at time of last comprehensive backup */
 	block_id_32	last_rec_bkup_last_blk;	/* Last block in the database at time of last record-ed backup */
 	block_id_32	reorg_restart_block;
-	char		filler_256[8];
+	gtm_timet       last_start_backup;	/* Last (successful) backup start (was filler). gtm_timet dumped as string */
 	/************* FIELDS SET WHEN DB IS OPEN ********************************/
 	char		now_running[MAX_REL_NAME];/* for active version stamp */
 	uint4		filler_owner_node;	/* 4-byte filler - since owner_node is maintained on VMS only */
@@ -143,7 +143,7 @@ typedef struct v6_sgmnt_data_struct
 	v6_th_index	trans_hist;		/* transaction history - if moved from 1st filehdr block, change TH_BLOCK */
 	/************* FIELDS RELATED TO WRITE CACHE FLUSHING *******************************/
 	int4		write_fullblk;
-	char		filler[4];
+	int4		statsdb_allocation;
 	int4		flush_time[2];
 	int4		flush_trigger;
 	int4		n_wrt_per_flu;		/* Number of writes per flush call. Overloaded for BG and MM */
@@ -292,10 +292,16 @@ typedef struct v6_sgmnt_data_struct
 	/* leaving filler here.  This can be reused in the future  */
 	char		gvstats_rec_old_now_filler[496];
 	char		gvstats_rec_filler_4k_plus_512[16];
-	char		filler_4k_plus_512[368];	/* Note: this filler array should START at offset 4K+512.
+	char		filler_4k_plus_512[184];	/* Note: this filler array should START at offset 4K+512.
 							 * So any additions of new fields should happen at the END of this
 							 * filler array and the filler array size correspondingly adjusted.
 							 */
+	/************* FIELDS FOR V6 TO V7 UPGRADE *********************************/
+	block_id	offset;				/* offset produced by mmb extension; interim pointer adjustment */
+	int4		max_rec;			/* pessimistic estimate of what bkl_size could hold */
+	int4		i_reserved_bytes;		/* for mangement of index splits; could be retained as a characteristic */
+	boolean_t	db_got_to_V7_once;		/* set TRUE by MUPIP REORG UPGRADE once it completes all work on region */
+	char		filler[164];			/* Filler to make 8-byte alignment explicit and aligned with V7 */
 	/************* INTERRUPTED RECOVERY RELATED FIELDS continued ****************/
 	seq_num		intrpt_recov_resync_strm_seqno[MAX_SUPPL_STRMS];/* resync/fetchresync jnl_seqno of interrupted rollback
 									 * corresponding to each non-supplementary stream.
@@ -334,12 +340,9 @@ typedef struct v6_sgmnt_data_struct
 	unsigned char	basedb_fname[256]; /* full path filaneme of corresponding baseDB if this is a statsDB */
 	boolean_t	read_only;		/* If TRUE, GT.M uses a process-private mmap instead of IPC */
 	/************* GVSTATS_REC RELATED FIELDS ***********/
-	/* gvstats_rec has outgrown its previous space.  There is enough space here at the end of the record
-	 * for all the new GTM-8863 stats if we don't save the 'A' versions (which arguably doesn't make
-	 * sense anyway.  This means that gvstats_rec_csd_t is smaller than
-	 * gvstats_rec_t (but the structs are identical up to the end of gvstats_rec_cst_t).  Note also that we
-	 * are pushing the 8k barrier on sgmnt_data now, but are not critically  pressed for space in the future
-	 * because the former GVSTATS area (above) will be available for reuse.
+	/* gvstats_rec has outgrown its previous space.
+	 * Note also that we are pushing the 8k barrier on sgmnt_data now, but are not critically pressed for space in
+	 * the future because the former GVSTATS area (above) will be available for reuse.
 	 */
 	gvstats_rec_csd_t	gvstats_rec;	/* As of GTM-8863 1304 bytes == 163 counters */
 	char			filler_8k[1464 - SIZEOF(gvstats_rec_csd_t)];

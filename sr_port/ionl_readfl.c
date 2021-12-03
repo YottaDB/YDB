@@ -28,8 +28,8 @@ int ionl_readfl(mval *val, int4 width, int4 timeout)
 	if (dv->dollar.zeof || (dv->error_handler.len > 0))
 	{
 		dv->dollar.zeof = TRUE;
-		dv->dollar.za = 9;
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_IOEOF);
+		dv->dollar.za = ZA_IO_ERR;
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 	}
 	dv->dollar.za = 0;
 	dv->dollar.zeof = TRUE;

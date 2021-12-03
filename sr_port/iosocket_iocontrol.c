@@ -46,23 +46,35 @@
 #include "getzposition.h"
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
+#include "wbox_test_init.h"
 #endif
 
 GBLREF spdesc		stringpool;
 GBLREF io_pair		io_curr_device;
+GBLREF int		gtm_non_blocked_write_retries;	/* number of retries for non_blocked write to socket */
 
 LITREF	mval		skiparg;
 LITREF mval		literal_notimeout;
 
 error_def(ERR_EXPR);
 error_def(ERR_INVCTLMNE);
+error_def(ERR_CURRSOCKOFR);
+error_def(ERR_NOSOCKETINDEV);
+error_def(ERR_SOCKBLOCKERR);
+error_def(ERR_ZINTRECURSEIO);
+error_def(ERR_GETSOCKOPTERR);
+error_def(ERR_SETSOCKOPTERR);
+
 
 /* for iosocket_dlr_zkey */
 #define FORMATTIMESTR	"FORMAT"
 #define LISTENING	"LISTENING|"
+#define READ		"READ|"
+#define WRITE		"WRITE|"
 #define MAXEVENTLITLEN	(SIZEOF(LISTENING)-1)
 #define MAXZKEYITEMLEN	(MAX_HANDLE_LEN + SA_MAXLITLEN + MAXEVENTLITLEN + 2)	/* 1 pipe and a semicolon */
-#define READ		"READ|"
+
+void	iosocket_block_iocontrol(io_desc *iod, mval *option, mval *returnarg);
 
 void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 {
@@ -71,9 +83,10 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 	int		length, n;
 	int4		msec_timeout;
 	pid_t		pid;
-	mval		*arg, *handlesvar = NULL;
+	mval		*arg, *handlesvar = NULL, *option, *returnarg = NULL;
+	mval		*whatop = NULL, *handle = NULL;
 #ifdef	GTM_TLS
-	mval		*option, *tlsid, *password, *extraarg;
+	mval		*tlsid, *password, *extraarg;
 #endif
 	DCL_THREADGBL_ACCESS;
 
@@ -108,7 +121,19 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXPR);
 			return;
 		}
-		iosocket_wait(io_curr_device.in, msec_timeout);
+		if (2 <= argcnt)
+		{	/* what operation to check */
+			arg = va_arg(args, mval *);
+			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
+				whatop = arg;
+		}
+		if (3 <= argcnt)
+		{	/* which handle aka socket to check */
+			arg = va_arg(args, mval *);
+			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
+				handle = arg;
+		}
+		iosocket_wait(io_curr_device.in, msec_timeout, whatop, handle);
 	} else if (0 == memcmp(action, "PASS", length))
 	{
 		n = argcnt;
@@ -217,6 +242,25 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 			extraarg = NULL;
 		iosocket_tls(option, msec_timeout, tlsid, password, extraarg);
 #	endif
+	} else if (0 == memcmp(action, "BLOCK", length))
+	{	/* OFF, CLEAR, COUNT .lvn, SENT .lvn */
+		if (1 <= argcnt)
+		{
+			option = va_arg(args, mval *);
+			if ((NULL != option) && !M_ARG_SKIPPED(option) && MV_DEFINED(option))
+				MV_FORCE_STRD(option);
+			else
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_EXPR);
+		} else
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_SOCKBLOCKERR, 2,
+					LEN_AND_LIT("at least one option must be provided"));
+		if (2 <= argcnt)
+		{
+			arg = va_arg(args, mval *);
+			if ((NULL != arg) && !M_ARG_SKIPPED(arg))
+				returnarg = arg;
+		}
+		iosocket_block_iocontrol(io_curr_device.out, option, returnarg);
 	} else
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVCTLMNE);
 
@@ -256,7 +300,7 @@ void	iosocket_dlr_key(mstr *d)
 void iosocket_dlr_zkey(mstr *d)
 {
 	int4		ii;
-	int		len, thislen, totlen;
+	int		len, thislen, totlen, totplusthislen;
 	char		*zkeyptr, *charptr;
 	io_desc		*iod;
 	d_socket_struct	*dsocketptr;
@@ -268,7 +312,7 @@ void iosocket_dlr_zkey(mstr *d)
 	assertpro(gtmsocket == iod->type);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	zkeyptr = (char *)stringpool.free;
-	totlen = thislen = len = 0;
+	totlen = thislen = totplusthislen = len = 0;
 	for (ii = 0; ii < dsocketptr->n_socket; ii++)
 	{
 		socketptr = dsocketptr->socket[ii];
@@ -276,16 +320,21 @@ void iosocket_dlr_zkey(mstr *d)
 			continue;
 		if ((socket_connected == socketptr->state) && (0 < socketptr->buffered_length))
 		{	/* data to be read in buffer */
-			if (!socketptr->pendingevent)
+			if (!(SOCKPEND_READ & socketptr->pendingevent))
 			{	/* may have been cleared by partial READ */
-				socketptr->pendingevent = TRUE;
+				socketptr->pendingevent |= SOCKPEND_READ;
+				socketptr->readyforwhat |= SOCKREADY_READ;
 				socketptr->readycycle = dsocketptr->waitcycle;
 			}
 		}
 		if (socketptr->pendingevent)
 		{
 			thislen = len = 0;
-			if (!IS_STP_SPACE_AVAILABLE(totlen + MAXZKEYITEMLEN))
+			totplusthislen = totlen + MAXZKEYITEMLEN;
+			if ((socket_connected == socketptr->state) &&
+				(socketptr->readyforwhat == (SOCKREADY_WRITE | SOCKREADY_READ)))
+				totplusthislen += MAXZKEYITEMLEN;	/* both READ and WRITE ready */
+			if (!IS_STP_SPACE_AVAILABLE(totplusthislen))
 			{	/* d must be mstr part of mval known to stp_gcol */
 				if (totlen)
 				{
@@ -293,7 +342,7 @@ void iosocket_dlr_zkey(mstr *d)
 					d->addr = (char *)stringpool.free;
 					stringpool.free += totlen;
 				}
-				INVOKE_STP_GCOL(totlen + MAXZKEYITEMLEN);
+				INVOKE_STP_GCOL(totplusthislen);
 				if (totlen)
 				{
 					if (!IS_AT_END_OF_STRINGPOOL(d->addr, totlen))
@@ -310,15 +359,19 @@ void iosocket_dlr_zkey(mstr *d)
 				*zkeyptr++ = ';';
 				totlen++;
 			}
-			/* add READ/LISTENING|handle|remoteinfo;... */
+			/* add READ/WRITE/LISTENING|handle|remoteinfo;... */
 			if (socket_listening == socketptr->state)
 			{
 				thislen = len = STR_LIT_LEN(LISTENING);
 				memcpy(zkeyptr, LISTENING, len);
-			} else
+			} else if (socketptr->readyforwhat & SOCKREADY_READ)
 			{
 				thislen = len = STR_LIT_LEN(READ);
 				memcpy(zkeyptr, READ, len);
+			} else if (socketptr->readyforwhat & SOCKREADY_WRITE)
+			{	/* only WRITE ready */
+				thislen = len = STR_LIT_LEN(WRITE);
+				memcpy(zkeyptr, WRITE, len);
 			}
 			zkeyptr += len;
 			thislen += len;
@@ -357,11 +410,169 @@ void iosocket_dlr_zkey(mstr *d)
 			}
 			zkeyptr += len;
 			totlen += len;
+			if (socketptr->nonblocked_output && (socketptr->readyforwhat == (SOCKREADY_READ | SOCKREADY_WRITE)))
+			{	/* already have READ now add WRITE item */
+				assert(totplusthislen >= (totlen + MAXZKEYITEMLEN));
+				*zkeyptr++ = ';';
+				totlen++;
+				thislen = len = STR_LIT_LEN(WRITE);
+				memcpy(zkeyptr, WRITE, len);
+				zkeyptr += len;
+				thislen += len;
+				totlen += len;
+				memcpy(zkeyptr, socketptr->handle, socketptr->handle_len);
+				zkeyptr += socketptr->handle_len;
+				*zkeyptr++ = '|';
+				thislen += (socketptr->handle_len + 1);
+				totlen += (socketptr->handle_len + 1);
+				if (socket_local != socketptr->protocol)
+				{
+					if (NULL != socketptr->remote.saddr_ip)
+					{
+						len = STRLEN(socketptr->remote.saddr_ip);
+						memcpy(zkeyptr, socketptr->remote.saddr_ip, len);
+					} else
+						len = 0;
+				} else
+				{
+					len = STRLEN(charptr);		/* same as for READ */
+					len = MIN(len, (MAXZKEYITEMLEN - thislen));
+					memcpy(zkeyptr, charptr, len);
+				}
+				zkeyptr += len;
+				totlen += len;
+			}
 		}
 	}
 	d->addr = (char *)stringpool.free;
 	d->len = totlen;
 	stringpool.free += totlen;
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
+	return;
+}
+
+#define	BLOCKOFF		"OFF"
+#define	BLOCKCLEAR		"CLEAR"
+#define	BLOCKCOUNT		"COUNT"
+#define	BLOCKSENT		"SENT"
+#define MAX_BLOCK_OPTION	5
+
+void  iosocket_block_iocontrol(io_desc *iod, mval *option, mval *returnarg)
+{
+	int		tmpint, save_errno;
+	d_socket_struct	*dsocketptr;
+	socket_struct	*socketptr;
+	boolean_t	ch_set;
+	char		option_buf[MAX_BLOCK_OPTION + 1], *errptr;
+
+	dsocketptr = (d_socket_struct *)iod->dev_sp;
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
+	if (0 >= dsocketptr->n_socket)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+		return;
+	}
+	if (dsocketptr->n_socket <= dsocketptr->current_socket)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
+		return;
+	}
+	if (dsocketptr->mupintr)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		return;
+	}
+	socketptr = dsocketptr->socket[dsocketptr->current_socket];
+	if (NULL != option)
+	{
+		lower_to_upper((uchar_ptr_t)option_buf, (uchar_ptr_t)(option->str.addr), MIN(SIZEOF(option_buf), option->str.len));
+		if (0 == memcmp(option_buf, BLOCKOFF, option->str.len))
+		{	/* check if not already set or TLS already enabled */
+			if (socketptr->nonblocked_output)
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKBLOCKERR, 2, LEN_AND_LIT("already non blocking"));
+				return;
+			}
+			if (socket_connected != socketptr->state)
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKBLOCKERR, 2, LEN_AND_LIT("must be connected"));
+				return;
+			}
+			if (socketptr->tlsenabled)
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKBLOCKERR,
+					2, LEN_AND_LIT("TLS enabled before non blocking"));
+				return;
+			}
+			if (NULL != returnarg)
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKBLOCKERR,
+					2, LEN_AND_LIT("OFF does not take an argument"));
+				return;
+			}
+			socketptr->nonblocked_output = TRUE;
+			socketptr->max_output_retries = gtm_non_blocked_write_retries;
+			socketptr->args_written = socketptr->lastarg_size = socketptr->lastarg_sent = 0;
+			SOCKET_OBUFFER_INIT(socketptr, socketptr->buffer_size, 0, 0);
+			socketptr->obuffer_in_use = FALSE;	/* only used if actually blocked or TLS */
+#ifdef	DEBUG
+			if (WBTEST_ENABLED(WBTEST_SOCKET_NONBLOCK) && (0 < gtm_white_box_test_case_count))
+			{
+				if (-1 == setsockopt(socketptr->sd, SOL_SOCKET, SO_SNDBUF,
+					&gtm_white_box_test_case_count, SIZEOF(gtm_white_box_test_case_count)))
+				{
+					save_errno = errno;
+					errptr = (char *)STRERROR(save_errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("SO_SNDBUF"),
+						save_errno, LEN_AND_STR(errptr));
+					return;
+				}
+			}
+#endif
+		} else if (0 == memcmp(option_buf, BLOCKCLEAR, option->str.len))
+		{
+			if (socketptr->nonblocked_output)
+			{
+				if (NULL != returnarg)
+				{
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKBLOCKERR,
+						2, LEN_AND_LIT("CLEAR does not take an argument"));
+					return;
+				}
+				socketptr->args_written = socketptr->lastarg_size = socketptr->lastarg_sent = 0;
+			}
+		} else if (0 == memcmp(option_buf, BLOCKCOUNT, option->str.len))
+		{
+			if (socketptr->nonblocked_output)
+			{
+				if (NULL == returnarg)
+				{
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKBLOCKERR,
+							2, LEN_AND_LIT("COUNT requires local variable passed by reference"));
+					return;
+				}
+				tmpint = (int)socketptr->args_written;
+				MV_FORCE_UMVAL(returnarg, (unsigned int)tmpint);
+			}
+		} else if (0 == memcmp(option_buf, BLOCKSENT, option->str.len))
+		{
+			if (socketptr->nonblocked_output)
+			{
+				if (NULL == returnarg)
+				{
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKBLOCKERR,
+							2, LEN_AND_LIT("SENT requires local variable passed by reference"));
+					return;
+				}
+				tmpint = (int)socketptr->lastarg_sent;
+				MV_FORCE_MVAL(returnarg, tmpint);
+			}
+		} else
+		{
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKBLOCKERR, 2, LEN_AND_LIT("unknown option"));
+			return;
+		}
+	}
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }

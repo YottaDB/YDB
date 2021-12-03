@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -178,8 +178,8 @@ int rc_srvc_xact(omi_conn *cptr, char *xend)
 				SNPRINTF(msg, OUT_LINE, "corrupted packet, free (%x) > end.value (%x).  Dumped RC header + packet",
 					fxhdr->free.value,fxhdr->end.value);
 				gtcm_cpktdmp((char *)fxhdr, (int)(((char *)xend) - ((char *)fxhdr)),msg);
-				p = (char *)-1L;
-				*p = 1;   /*guarenteed core dump */
+				p = NULL;
+				*p = 1;   /* guaranteed core dump */
 			}
 			if (qhdr->a.len.value > fxhdr->end.value)
 			{
@@ -187,8 +187,8 @@ int rc_srvc_xact(omi_conn *cptr, char *xend)
 					"corrupted packet, qhdr.a.len.value=%x > fxhdr end (%x).  Dumped RC header + packet",
 					qhdr->a.len.value,fxhdr->end.value);
 				gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value, msg);
-				p = (char *)-1L;
-				*p = 1;   /*guarenteed core dump */
+				p = NULL;
+				*p = 1;   /* guaranteed core dump */
 			}
 			rc_nxact++;
 			if (rc_errno != RC_SUCCESS)

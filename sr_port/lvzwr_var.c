@@ -26,7 +26,7 @@
 #include "collseq.h"
 #include "stringpool.h"
 #include "op.h"
-#include "outofband.h"
+#include "deferred_events_queue.h"
 #include "do_xform.h"
 #include "numcmp.h"
 #include "patcode.h"
@@ -122,11 +122,11 @@
 		lvzwr_var((lv_val *)NODE, n + 1);						\
 }
 
-GBLREF lvzwrite_datablk	*lvzwrite_block;
-GBLREF int4		outofband;
-GBLREF zshow_out	*zwr_output;
-GBLREF int		merge_args;
 GBLREF bool		undef_inhibit;
+GBLREF lvzwrite_datablk	*lvzwrite_block;
+GBLREF int		merge_args;
+GBLREF volatile int4	outofband;
+GBLREF zshow_out	*zwr_output;
 GBLREF zwr_hash_table	*zwrhtab;			/* How we track aliases during zwrites */
 
 LITREF	mval		literal_null;
@@ -178,13 +178,13 @@ void lvzwr_var(lv_val *lv, int4 n)
 	assert(lvzwrite_block);
 	if (lv == zwr_output->out_var.lv.child)
 		return;
-	if (outofband)
-	{
-		assert(TREF(in_zwrite));	/* in_zwrite indicates we are properly set up for a zwrite and should be cleared */
-		TREF(in_zwrite) = FALSE;	/* 	here along with the below 2 because outofband_action may not return */
+	if (outofband && (sighup != outofband))
+	{	/* if there is no output, sighup doesn't matter - must deal with that case at the point of output */
+		assert(TREF(in_zwrite));        /* in_zwrite indicates properly set up for zwrite: should clear */
+		TREF(in_zwrite) = FALSE;        /* along with below 2 because async_action may not return */
 		lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
-		outofband_action(FALSE);
-		TREF(in_zwrite) = TRUE;		/* in case we come back because the outofband_action turns out to be info */
+		async_action(FALSE);
+		TREF(in_zwrite) = TRUE;         /* in case we're back because async_action turns out to be ctrlc */
 	}
 	lvzwrite_block->curr_subsc = n;
 	zwr_sub = (zwr_sub_lst *)lvzwrite_block->sub;

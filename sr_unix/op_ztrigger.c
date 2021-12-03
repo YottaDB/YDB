@@ -102,6 +102,7 @@ error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVZTRIGFAIL);
 error_def(ERR_TPRETRY);
 error_def(ERR_ZTRIGNOTRW);
+error_def(ERR_REMOTEDBNOTRIG);
 
 #ifndef GTM_TRIGGER
 error_def(ERR_UNIMPLOP);
@@ -141,6 +142,11 @@ void op_ztrigger(void)
 		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_ZTRIGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;
+	assert(('\0' != gv_currkey->base[0]) && gv_currkey->end);
+	assert(MAX_MIDENT_LEN >= strlen((char *)gv_currkey->base));	/* For Veracode to not flag strlen() below */
+	if (NULL == csa)	/* Remote region */
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_REMOTEDBNOTRIG, 4, strlen((char *)gv_currkey->base),
+							(char *)gv_currkey->base, REG_LEN_STR(gv_cur_region));
 	csd = csa->hdr;
 	cnl = csa->nl;
 	save_msp = NULL;
@@ -155,7 +161,6 @@ void op_ztrigger(void)
 		ztwormhole_used = FALSE;
 	}
 	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl, SCNDDBNOUPD_CHECK_TRUE);
-	assert(('\0' != gv_currkey->base[0]) && gv_currkey->end);
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVZTRIGFAIL);
 	lcl_implicit_tstart = FALSE;

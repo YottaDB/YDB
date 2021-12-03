@@ -455,7 +455,7 @@ int gtmrecv(void)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Receiver server error in setsid"), errno);
 	/* Point stdin to /dev/null */
-	OPENFILE("/dev/null", O_RDONLY, null_fd);
+	OPENFILE(DEVNULL, O_RDONLY, null_fd);
 	if (0 > null_fd)
 		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
 	assert(null_fd > 2);

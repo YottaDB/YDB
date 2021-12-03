@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,7 +72,6 @@ GBLREF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	bool			in_backup;
 GBLREF	bool			licensed;
 GBLREF	int			(*func)();
-GBLREF	global_latch_t		defer_latch;
 GBLREF	spdesc			rts_stringpool, stringpool;
 GBLREF	char			cli_err_str[];
 GBLREF	CLI_ENTRY		mupip_cmd_ary[];

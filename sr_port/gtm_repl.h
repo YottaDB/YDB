@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2018 Fidelity National Information	*
+ * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,16 +46,6 @@ error_def(ERR_TLSCLOSE);
 
 #define DEFAULT_RENEGOTIATE_TIMEOUT	(2 * 60) /* About 2 hours between renegotiation. */
 #define MIN_RENEGOTIATE_TIMEOUT		1
-
-#define REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(NEXT_RENEG_HRTBT)									\
-{																\
-	if (0 < gtmsource_options.renegotiate_interval)										\
-	{															\
-		repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_TIMEOUT;							\
-		TIMEOUT_DONE_NOCH(NEXT_RENEG_HRTBT);										\
-		TIMEOUT_INIT_NOCH(NEXT_RENEG_HRTBT, gtmsource_options.renegotiate_interval * MILLISECS_IN_SEC);			\
-	}															\
-}
 
 #define ISSUE_REPLNOTLS(ERRID, STR1, STR2)											\
 {																\

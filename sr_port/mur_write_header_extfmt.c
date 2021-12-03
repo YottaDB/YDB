@@ -45,6 +45,7 @@ void mur_write_header_extfmt(jnl_ctl_list *jctl, FILE *fp, char *fname, int recs
 {
 	char		*ptr;
 	int		extrlen, save_errno, tmplen;
+	boolean_t	errored_out;
 	size_t		ret_size;
 	char		errstr[1024];
 
@@ -109,16 +110,16 @@ void mur_write_header_extfmt(jnl_ctl_list *jctl, FILE *fp, char *fname, int recs
 	{
 		assert('\\' == murgbl.extr_buff[extrlen - 1]);	/* See comment before "jnlext_write" function definition for why */
 		murgbl.extr_buff[extrlen - 1] = '\n';
-		GTM_FWRITE(murgbl.extr_buff, 1, extrlen, fp, ret_size, save_errno);
+		GTM_FWRITE(murgbl.extr_buff, 1, extrlen, fp, ret_size, errored_out);
 		if (ret_size < extrlen)
 		{
 			assert(FALSE);
-			assert(save_errno);
+			assert(errored_out);
 			SNPRINTF(errstr, SIZEOF(errstr),
 				"fwrite() : %s : Expected = %lld : Actual = %lld",
 						(stdout == fp) ? "-STDOUT" : fname, extrlen, ret_size);
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8)
-				ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
+				ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, errno);
 		}
 	}
 }

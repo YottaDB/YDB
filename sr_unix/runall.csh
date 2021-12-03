@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2020 Fidelity National Information		#
+# Copyright (c) 2001-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -151,8 +151,8 @@ endif
 
 set user=`id -u -n`
 
-
-rm -f $gtm_log/error.$RUNALL_IMAGE.log >& /dev/null
+# Remove old temporary files and logs.
+rm -f $gtm_log/error.$RUNALL_IMAGE.log $gtm_log/gt_cc_*.{csh,out} $gtm_log/buildaux_*.{out,err,csh} $gtm_log/tttgen_*.log
 
 set TMP_DIR_PREFIX = "/tmp/__${user}__runall"
 setenv TMP_DIR "${TMP_DIR_PREFIX}__`date +"%y%m%d_%H_%M_%S"`_$$" # needed by runall_cc_many.csh/runall_cc_one.csh hence "setenv"

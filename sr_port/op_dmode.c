@@ -43,38 +43,38 @@
 #include "dm_audit_log.h"
 #include "svnames.h"
 #include "util.h"
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 
 #define	DIRECTMODESTR	"DIRECT MODE (any TP RESTART will fail)"
 
-GBLREF	boolean_t	prin_dm_io, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF	boolean_t	hup_on, prin_dm_io, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF	int		exi_condition;
 GBLREF	io_pair		io_curr_device, io_std_device;
 GBLREF	mval		dollar_zstatus;
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	uint4		dollar_trestart;
 GBLREF	unsigned char	*restart_ctxt, *restart_pc;
+GBLREF	volatile int4	outofband;
 
 LITREF	mval		literal_notimeout;
 
 error_def(ERR_APDLOGFAIL);
 error_def(ERR_NOPRINCIO);
 error_def(ERR_NOTPRINCIO);
+error_def(ERR_TERMHANGUP);
 error_def(ERR_TERMWRITE);
 
 void	op_dmode(void)
 {
 	d_tt_struct		*tt_ptr;
 	gd_region		*save_re;
+	io_desc			*io_ptr;
 	mval			prompt, dummy, *input_line;
 	boolean_t		xec_cmd = TRUE;			/* Determines if command should be
 								 * executed (for direct mode auditing purposes)
 								 */
 	static boolean_t	dmode_intruptd;
-	static boolean_t	kill = FALSE;
-	static int		loop_cnt = 0;
-	static int		old_errno = 0;
 	static io_pair		save_device;
 	DCL_THREADGBL_ACCESS;
 
@@ -94,28 +94,22 @@ void	op_dmode(void)
 		save_device = io_curr_device;
 	}
 	io_curr_device = io_std_device;
-	if ((prin_in_dev_failure && (TRUE == io_curr_device.in->dollar.zeof)) || kill)
-		ISSUE_NOPRINCIO_IF_NEEDED((kill ? io_curr_device.out : io_curr_device.in), kill, FALSE);    /* kill means WRITE */
-	/* The following code avoids an infinite loop when there is an error in writing to the principal device
-	 * resulting in a call to the condition handler and an eventual return to this location
-	 */
-	if ((loop_cnt > 0) && (errno == old_errno))
-	{	/* Tried and failed 2x to write to principal device */
-		kill = TRUE;
-		prin_out_dev_failure = TRUE;
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_TERMWRITE, 0, old_errno);
+	if (sighup == outofband)
+	{
+		io_ptr = io_curr_device.out;
+		TERMHUP_NOPRINCIO_CHECK(TRUE);					/* TRUE for WRITE */
+		stop_image_no_core();
 	}
-	++loop_cnt;
-	old_errno = errno;
+	if ((prin_in_dev_failure && (TRUE == io_curr_device.in->dollar.zeof)) || prin_out_dev_failure)
+		ISSUE_NOPRINCIO_IF_NEEDED((prin_out_dev_failure ? io_curr_device.out : io_curr_device.in), prin_out_dev_failure,
+			FALSE);
 	*((INTPTR_T **)&frame_pointer->restart_pc) = (INTPTR_T *)CODE_ADDRESS(call_dm);
 	*((INTPTR_T **)&frame_pointer->restart_ctxt) = (INTPTR_T *)GTM_CONTEXT(call_dm);
-	loop_cnt = 0;
-	old_errno = 0;
 	if (tt == io_curr_device.in->type)
 		tt_ptr = (d_tt_struct *)io_curr_device.in->dev_sp;
 	else
 		tt_ptr = NULL;
-	if (!tt_ptr || !tt_ptr->mupintr)
+	if (!prin_out_dev_failure && (!tt_ptr || !tt_ptr->mupintr))
 		op_wteol(1);
 	TPNOTACID_CHECK(DIRECTMODESTR);
 	if (io_curr_device.in->type == tt)

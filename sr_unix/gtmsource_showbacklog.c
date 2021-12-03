@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2020 Fidelity National Information	*
+ * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,23 +43,27 @@
 #include "util.h"
 #include "repl_log.h"
 #include "is_proc_alive.h"
+#include "min_max.h"
 
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 
+error_def(ERR_LASTTRANS);
 error_def(ERR_SRCSRVNOTEXIST);
+error_def(ERR_SRCBACKLOGSTATUS);
 
 int gtmsource_showbacklog(void)
 {
-	seq_num			heartbeat_jnl_seqno, seq_num, jnl_seqno, read_jnl_seqno;
+	seq_num			heartbeat_jnl_seqno, jnl_seqno, read_jnl_seqno, src_backlog;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
-	int4			index;
+	char * 			lasttrans[] = {"posted        ","sent          ","acknowledged  "};
+	char * 			syncstate[] = {"is behind by", "has not acknowledged", "is ahead by"};
+	int4			index, syncstateindex = 0;
 	boolean_t		srv_alive;
-	uint4			gtmsource_pid;
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
-	jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
+
 	if (NULL != jnlpool->gtmsource_local)	/* Show backlog for a specific source server */
 		gtmsourcelocal_ptr = jnlpool->gtmsource_local;
 	else
@@ -76,31 +80,41 @@ int gtmsource_showbacklog(void)
 		 * print backlog information only for those instances that have an active or passive source server alive.
 		 */
 		heartbeat_jnl_seqno = gtmsourcelocal_ptr->heartbeat_jnl_seqno;
-		gtmsource_pid = gtmsourcelocal_ptr->gtmsource_pid;
-		if ((NULL == jnlpool->gtmsource_local) && (0 == gtmsource_pid))
+
+		if ((NULL == jnlpool->gtmsource_local) && (0 == gtmsourcelocal_ptr->gtmsource_pid))
 			continue;
 		repl_log(stderr, TRUE, TRUE,
 			"Initiating SHOWBACKLOG operation on source server pid [%d] for secondary instance [%s]\n",
-			gtmsource_pid, gtmsourcelocal_ptr->secondary_instname);
-		read_jnl_seqno = gtmsourcelocal_ptr->read_jnl_seqno;
-		/* jnl_seqno >= read_jnl_seqno is the most common case; see gtmsource_readpool() for when the rare case can occur */
-		seq_num = (jnl_seqno >= read_jnl_seqno) ? jnl_seqno - read_jnl_seqno : 0;
-		util_out_print("!@UQ : backlog number of transactions written to journal pool and "
-				"yet to be sent by the source server", TRUE, &seq_num);
-		seq_num = jnl_seqno;
-		if (0 != seq_num)
-			seq_num--;
-		util_out_print("!@UQ : sequence number of last transaction written to journal pool", TRUE, &seq_num);
-		seq_num = read_jnl_seqno;
-		if (0 != seq_num)
-			seq_num--;
-		util_out_print("!@UQ : sequence number of last transaction sent by source server", TRUE, &seq_num);
-		seq_num = heartbeat_jnl_seqno;
-		if (0 != seq_num)
-			seq_num--;
-		util_out_print("!@UQ : sequence number acknowledged by the secondary"
-			" instance [!AZ]", TRUE, &seq_num, gtmsourcelocal_ptr->secondary_instname);
-		srv_alive = (0 == gtmsource_pid) ? FALSE : is_proc_alive(gtmsource_pid, 0);
+			gtmsourcelocal_ptr->gtmsource_pid, gtmsourcelocal_ptr->secondary_instname);
+		/* jnlpool->jnlpool_ctl->jnl_seqno >= gtmsourcelocal_ptr->read_jnl_seqno is the most common case;
+		 * see gtmsource_readpool() for when the rare case can occur
+		 * Within a Source Server, jnlpool->jnlpool_ctl->jnl_seqno and gtmsourcelocal_ptr->read_jnl_seqno
+		 * counters start with 1 and cannot be 0 or less. heartbeat_jnl_seqno is 0 whenever the Source Server
+		 * restarts or we have an empty database.
+		 * Use local variables for arithmetic computation to prevent adjustments to the memory structure.
+		 */
+		if (0 < jnlpool->jnlpool_ctl->jnl_seqno)
+			jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno - 1;
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LASTTRANS, 3, LEN_AND_STR(lasttrans[0]), &jnl_seqno);
+		if (0 < gtmsourcelocal_ptr->read_jnl_seqno)
+			read_jnl_seqno = gtmsourcelocal_ptr->read_jnl_seqno - 1;
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LASTTRANS, 3, LEN_AND_STR(lasttrans[1]), &read_jnl_seqno);
+		if (0 != heartbeat_jnl_seqno)
+			heartbeat_jnl_seqno--;
+		assert(0 <= heartbeat_jnl_seqno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LASTTRANS, 3, LEN_AND_STR(lasttrans[2]), &heartbeat_jnl_seqno);
+		src_backlog = MAX(jnl_seqno, read_jnl_seqno) - heartbeat_jnl_seqno;
+		if (0 == heartbeat_jnl_seqno)
+			syncstateindex = 1;
+		if (heartbeat_jnl_seqno > MIN(jnl_seqno, read_jnl_seqno))
+		{
+			src_backlog = heartbeat_jnl_seqno - MIN(jnl_seqno, read_jnl_seqno);
+			syncstateindex = 2;
+		}
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SRCBACKLOGSTATUS, 5,
+				LEN_AND_STR(gtmsourcelocal_ptr->secondary_instname),
+				LEN_AND_STR(syncstate[syncstateindex]), &src_backlog);
+		srv_alive = (0 == gtmsourcelocal_ptr->gtmsource_pid) ? FALSE : is_proc_alive(gtmsourcelocal_ptr->gtmsource_pid, 0);
 		if (!srv_alive)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_WARNING(ERR_SRCSRVNOTEXIST), 2,
 						LEN_AND_STR(gtmsourcelocal_ptr->secondary_instname));

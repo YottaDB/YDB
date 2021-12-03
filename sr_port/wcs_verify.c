@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -669,7 +669,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 						tmp_8byte = ((trans_num *)bptmp)[0];
 						if (!tmp_8byte)
 							tmp_8byte = ((trans_num *)bptmp)[1];
-						do_cert_blk = (0 != tmp_8byte);
+						do_cert_blk = ((0 != tmp_8byte)
+							&& (csd->desired_db_format != ((blk_hdr_ptr_t)bptmp)->bver));
 					}
 				} else
 				{	/* If it is a bitmap block, we could have twins so do check only on newtest twin as

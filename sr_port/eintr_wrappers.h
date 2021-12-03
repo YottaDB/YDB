@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -178,18 +178,18 @@ MBSTART {									\
 		elems_to_read -= elems_read;					\
 		if (0 == elems_to_read)						\
 			break;							\
-			RC = feof(FP);							\
-			if (RC)								\
-			{	/* Reached EOF. No error. */				\
-				RC = 0;							\
-				break;							\
-			}								\
-			RC = ferror(FP);						\
-			assert(RC);							\
-			clearerr(FP);	/* reset error set by the "fread" */		\
-			/* In case of EINTR, retry "fread" */				\
-			if (EINTR != errno)						\
-				break;							\
+		RC = feof(FP);							\
+		if (RC)								\
+		{	/* Reached EOF. No error. */				\
+			RC = 0;							\
+			break;							\
+		}								\
+		RC = ferror(FP);						\
+		assert(RC);							\
+		clearerr(FP);	/* reset error set by the "fread" */		\
+		/* In case of EINTR, retry "fread" */				\
+		if (EINTR != errno)						\
+			break;							\
 	}									\
 	NREAD = NELEMS - elems_to_read;						\
 	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);		\

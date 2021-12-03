@@ -95,7 +95,7 @@ void io_init(boolean_t term_ctrl)
 		{
 			if (EBADF == errno)
 			{
-				OPENFILE("/dev/null", ((0 == fd) ? O_RDONLY : O_RDWR), newfd);
+				OPENFILE(DEVNULL, ((0 == fd) ? O_RDONLY : O_RDWR), newfd);
 				if (-1 == newfd)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_SYSCALL, 5,
 							LEN_AND_LIT("open /dev/null on std descriptor"), CALLFROM, errno, 0);

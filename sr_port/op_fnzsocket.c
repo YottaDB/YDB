@@ -83,9 +83,9 @@ const nametabent zsocket_names[] =
 #undef ZSOCKETITEM
 const unsigned char zsocket_indextab[] =
 { /*	A  B  C  D  E  F  G  H  I  J  K  L  M  N */
-	0, 0, 0, 1, 3, 3, 3, 3, 4, 6, 6, 6, 8, 9,
+	0, 0, 1, 2, 4, 4, 4, 4, 5, 7, 7, 7, 9, 10,
   /*	O   P   Q   R   S   T   U   V   W   X   Y   Z  end */
-	10, 10, 12, 12, 14, 16, 17, 17, 17, 17, 17, 17, 21
+	11, 11, 13, 13, 15, 17, 18, 18, 18, 18, 18, 18, 22
 };
 #define ZSOCKETITEM(A,B,C,D) C
 static const int zsocket_types[] =
@@ -251,6 +251,12 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	}
 	switch (zsocket_item)
 	{
+		case zsocket_blocking:
+			if ((socket_connected == socketptr->state) && socketptr->nonblocked_output)
+				*dst = literal_zero;
+			else
+				*dst = literal_one;
+			break;
 		case zsocket_currindex:
 			numret = (int)dsocketptr->current_socket;
 			break;

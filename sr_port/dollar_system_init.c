@@ -22,7 +22,7 @@
 #include "stringpool.h"
 #include "trans_log_name.h"
 
-GBLREF	mval	dollar_system;
+GBLREF	mval	dollar_system, dollar_system_initial;
 GBLREF spdesc	stringpool;
 
 error_def(ERR_LOGTOOLONG);
@@ -35,9 +35,9 @@ void dollar_system_init(struct startup_vector *svec)
 	char		buf[MAX_TRANS_NAME_LEN];
 
 	dollar_system.mvtype = MV_STR;
-	dollar_system.str.addr = (char *)stringpool.free;
 	dollar_system.str.len = STR_LIT_LEN("47,");
 	ENSURE_STP_FREE_SPACE(dollar_system.str.len);
+	dollar_system.str.addr = (char *)stringpool.free;
 	memcpy(stringpool.free, "47,", dollar_system.str.len);
 	stringpool.free += dollar_system.str.len;
 	val.addr = SYSID;
@@ -59,6 +59,7 @@ void dollar_system_init(struct startup_vector *svec)
 #	endif
 	else
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(SYSID), status);
+	dollar_system_initial = dollar_system;
 	assert(stringpool.free < stringpool.top);	/* it's process initialization after all */
 	return;
 }

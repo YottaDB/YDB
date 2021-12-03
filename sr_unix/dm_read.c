@@ -33,7 +33,8 @@
 #include "gtmio.h"
 #include "eintr_wrappers.h"
 #include "cli.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "dm_read.h"
 #include "gtm_tputs.h"
 #include "op.h"
@@ -45,13 +46,14 @@
 #include "gtm_utf8.h"
 #endif
 
-GBLREF boolean_t		dmterm_default, dollar_zininterrupt, gtm_utf8_mode, prin_in_dev_failure,
+GBLREF boolean_t		dmterm_default, gtm_utf8_mode, prin_in_dev_failure,
 				prin_out_dev_failure;
 GBLREF char			*CLR_EOL, *CURSOR_DOWN, *CURSOR_LEFT, *CURSOR_RIGHT, *CURSOR_UP;
 GBLREF char			*KEY_BACKSPACE, *KEY_DC, *KEY_DOWN, *KEY_INSERT, *KEY_LEFT, *KEY_RIGHT, *KEY_UP;
 GBLREF char			*KEYPAD_LOCAL, *KEYPAD_XMIT;
 GBLREF int			AUTO_RIGHT_MARGIN, EAT_NEWLINE_GLITCH;
 GBLDEF int			comline_index, recall_num;
+GBLREF int4			exi_condition;
 GBLREF io_desc			*active_device;
 GBLREF io_pair			io_curr_device, io_std_device;
 GBLREF mstr			*comline_base;
@@ -61,7 +63,7 @@ GBLREF spdesc			stringpool;
 GBLREF stack_frame		*frame_pointer;
 GBLREF unsigned char		*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF volatile int4		outofband;
-GBLREF volatile boolean_t	timer_in_handler;
+GBLREF volatile boolean_t	dollar_zininterrupt, timer_in_handler;
 
 LITREF unsigned char	lower_to_upper_table[];
 #ifdef UTF8_SUPPORTED
@@ -89,10 +91,8 @@ static	unsigned char	recall_error_msg[][MAX_ERR_MSG_LEN] =
 
 error_def(ERR_IOEOF);
 error_def(ERR_NOPRINCIO);
-error_def(ERR_STACKCRIT);
-error_def(ERR_STACKOFLOW);
+error_def(ERR_TERMHANGUP);
 error_def(ERR_ZINTDIRECT);
-error_def(ERR_ZINTRECURSEIO);
 
 #define	WRITE_GTM_PROMPT													\
 if (0 < (TREF(gtmprompt)).len)													\
@@ -347,7 +347,10 @@ void	dm_read (mval *v)
 				tt_ptr->mupintr = TRUE;
 			} else
 				instr = 0;
-			outofband_action(FALSE);
+			if (sighup == outofband)
+				exi_condition = -ERR_TERMHANGUP;
+			TAREF1(save_xfer_root, outofband).event_state = pending;
+			async_action(FALSE);
 			break;
 		}
 		assertpro(FD_SETSIZE > tt_ptr->fildes);
@@ -376,7 +379,7 @@ void	dm_read (mval *v)
 			if (EINTR != errno)
 			{	/* If error was EINTR, go to the top of the loop to check for outofband. */
 				tt_ptr->discard_lf = FALSE;
-				io_ptr->dollar.za = 9;
+				io_ptr->dollar.za = ZA_IO_ERR;
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 			} else
 				continue;
@@ -408,7 +411,7 @@ void	dm_read (mval *v)
 					UTF8_MBTOWC(more_buf, more_ptr, inchar);
 					if (WEOF == inchar)
 					{	/* invalid char */
-						io_ptr->dollar.za = 9;
+						io_ptr->dollar.za = ZA_IO_ERR;
 						utf8_badchar((int)(more_ptr - more_buf), more_buf, more_ptr, 0, NULL);
 						break;
 					}
@@ -416,13 +419,13 @@ void	dm_read (mval *v)
 				{
 					if (0 > utf8_more)
 					{	/* invalid character */
-						io_ptr->dollar.za = 9;
+						io_ptr->dollar.za = ZA_IO_ERR;
 						more_buf[0] = inbyte;
 						utf8_badchar(1, more_buf, &more_buf[1], 0, NULL);	/* ERR_BADCHAR */
 						break;
 					} else if (GTM_MB_LEN_MAX < utf8_more)
 					{	/* too big to be valid */
-						io_ptr->dollar.za = 9;
+						io_ptr->dollar.za = ZA_IO_ERR;
 						more_buf[0] = inbyte;
 						utf8_badchar(1, more_buf, &more_buf[1], 0, NULL);	/* ERR_BADCHAR */
 						break;
@@ -439,7 +442,7 @@ void	dm_read (mval *v)
 					UTF8_MBTOWC(more_buf, &more_buf[1], inchar);
 					if (WEOF == inchar)
 					{	/* invalid char */
-						io_ptr->dollar.za = 9;
+						io_ptr->dollar.za = ZA_IO_ERR;
 						utf8_badchar(1, more_buf, &more_buf[1], 0, NULL);	/* ERR_BADCHAR */
 						break;
 					}

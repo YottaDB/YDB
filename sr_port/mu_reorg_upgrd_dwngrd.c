@@ -231,8 +231,8 @@ void	mu_reorg_upgrd_dwngrd(void)
 			status = ERR_MUNOFINISH;
 			continue;
 		}
-		assert(GDSVCURR == GDSV6); /* so we trip this assert in case GDSVCURR changes without a change to this module */
-		new_db_format = (upgrade ? GDSV6 : GDSV4);
+		assert(GDSVCURR >= GDSV6); /* so we trip this assert in case GDSVCURR changes without a change to this module */
+		new_db_format = (upgrade ? GDSV7m : GDSV6p);	/* this downgrade is not currently implemented  */
 		grab_crit(reg, WS_8);
 		curr_tn = csd->trans_hist.curr_tn;
 		/* set the desired db format in the file header to the appropriate version, increment transaction number */
@@ -437,7 +437,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 						{
 							if (!upgrade && (ERR_DYNUPGRDFAIL == status1))
 							{
-								assert(GDSV4 == new_db_format);
+								assert(GDSV7m == new_db_format);
 								ondsk_blkver = new_db_format;
 							} else
 							{

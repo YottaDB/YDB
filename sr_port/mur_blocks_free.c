@@ -45,14 +45,14 @@ error_def(ERR_DYNUPGRDFAIL);
 
 int4 mur_blocks_free(reg_ctl_list *rctl)
 {
-	int4		x;
 	block_id	bnum, maps;
-	int		mapsize, i, j, k, fcnt, status;
-	unsigned char	*c, *disk, *m_ptr;
-	uint4		*dskmap, map_blk_size;
-	file_control	*db_ctl;
 	enum db_ver	dummy_ondskblkver;
+	file_control	*db_ctl;
+	int		mapsize, i, j, k, fcnt, status;
+	int4		x;
+	uint4		*dskmap, map_blk_size;
 	unix_db_info	*udi;
+	unsigned char	*c, *disk, *m_ptr;
 
 	db_ctl = rctl->db_ctl;
 	cs_data = rctl->csd;
@@ -61,12 +61,12 @@ int4 mur_blocks_free(reg_ctl_list *rctl)
 	maps = (cs_data->trans_hist.total_blks + cs_data->bplmap - 1) / cs_data->bplmap;
 	map_blk_size = BM_SIZE(cs_data->bplmap);
 	udi = FC2UDI(db_ctl);
-	if (udi->fd_opened_with_o_direct)
+	if (udi->fd_opened_with_o_direct)	/* TODO: highwater mark? */
 	{	/* We need aligned buffers */
 		m_ptr = (unsigned char *)malloc(ROUND_UP2(cs_data->blk_size, DIO_ALIGNSIZE(udi)) + OS_PAGE_SIZE);
 		disk = (unsigned char *)ROUND_UP2((UINTPTR_T)m_ptr, OS_PAGE_SIZE);
 	} else
-	{
+	{	/* TODO: would it hurt to have them here as well? */
 		m_ptr = (unsigned char *)malloc(cs_data->blk_size);
 		assert(IS_PTR_8BYTE_ALIGNED(m_ptr));
 		disk = m_ptr;
@@ -74,12 +74,12 @@ int4 mur_blocks_free(reg_ctl_list *rctl)
 	db_ctl->op_buff = (uchar_ptr_t)disk;
 	db_ctl->op_len = cs_data->blk_size;
 	for (i = 0; i != maps; i++)
-	{
+	{	/* TODO: why mess with anything in bml other than version? */
 		bnum = i * cs_data->bplmap;
 		db_ctl->op = FC_READ;
 		db_ctl->op_pos = cs_data->start_vbn + ((gtm_int64_t)cs_data->blk_size / DISK_BLOCK_SIZE * bnum);
 		status = dbfilop(db_ctl);
-		if (SYSCALL_ERROR(status))
+		if (SYSCALL_ERROR(status))	/* TODO: should we move to next? is message OK? */
 			RTS_ERROR_CSA_ABT(rctl->csa, VARLSTCNT(5) ERR_DBRDERR, 2, DB_LEN_STR(gv_cur_region), status);
 		GDS_BLK_UPGRADE_IF_NEEDED(bnum, disk, disk, cs_data, &dummy_ondskblkver, status, cs_data->fully_upgraded);
 		if (SS_NORMAL != status)
@@ -88,7 +88,7 @@ int4 mur_blocks_free(reg_ctl_list *rctl)
 			else
 				rts_error_csa(CSA_ARG(rctl->csa) VARLSTCNT(1) status);
 		if (((blk_hdr *)disk)->bsiz != map_blk_size)
-		{
+		{	/* TODO: is this the appropriate course? */
 			util_out_print("Wrong size map block", TRUE);
 			continue;
 		}
@@ -120,7 +120,6 @@ int4 mur_blocks_free(reg_ctl_list *rctl)
 			j += 4;
 			c++;
 		}
-
 		x = (mapsize + 4 - j) * BML_BITS_PER_BLK;
 		for (k = 0; k < x; k += BML_BITS_PER_BLK)
 			fcnt += (*c >> k) & 1;

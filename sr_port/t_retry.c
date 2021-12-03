@@ -311,7 +311,7 @@ void t_retry(enum cdb_sc failure)
 			 */
 			assert(cdb_sc_optrestart != failure);
 			assert(cdb_sc_wcs_recover != failure);	/* This restart code is possible in final retry only in TP */
-			if (IS_FINAL_RETRY_CODE(failure))
+			if (is_final_retry_code(failure))
 			{
 				/* t_tries should never be greater than t_tries_dbg. The only exception is if this is DSE or online
 				 * rollback operates with t_tries = CDB_STAGNATE and restarts if wc_blocked is set outside crit.

@@ -94,7 +94,7 @@
 #define GTMRECV_WAIT_FOR_STARTJNLSEQNO		100 /* ms */
 
 #define GTMRECV_WAIT_FOR_UPD_PROGRESS		100 /* ms */
-
+#define PROC_RECVOPS_PRINT_MSG_LEN		2048 /* bytes*/
 /* By having different high and low watermarks, we can reduce the # of XOFF/XON exchanges */
 #define RECVPOOL_HIGH_WATERMARK_PCTG		90	/* Send XOFF when %age of receive pool space occupied goes beyond this */
 #define RECVPOOL_LOW_WATERMARK_PCTG		80	/* Send XON when %age of receive pool space occupied falls below this */
@@ -210,7 +210,7 @@ error_def(ERR_REPLTRANS2BIG);
 error_def(ERR_REPLXENDIANFAIL);
 error_def(ERR_RESUMESTRMNUM);
 error_def(ERR_REUSEINSTNAME);
-error_def(ERR_SECONDAHEAD);
+error_def(ERR_REPLAHEAD);
 error_def(ERR_STRMNUMIS);
 error_def(ERR_SUPRCVRNEEDSSUPSRC);
 error_def(ERR_SYSCALL);
@@ -405,8 +405,10 @@ STATICFNDEF void gtmrecv_repl_send_loop_error(int status, char *msgtypestr)
 	assert((EREPL_SEND == repl_errno) || (EREPL_SELECT == repl_errno));
 	if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
 	{
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection got reset while sending %s message. Status = %d ; %s\n",
+		SNPRINTF(print_msg, SIZEOF(print_msg), "Connection got reset while sending %s message. Status = %d ; %s\n",
 				msgtypestr, status, STRERROR(status));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2,
+				LEN_AND_STR(print_msg));
 		repl_connection_reset = TRUE;
 		repl_close(&gtmrecv_sock_fd);
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Closing connection on receiver side\n");
@@ -1209,6 +1211,8 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 			{
 				assert(is_rcvr_srvr);
 				strm_index = reuse_slot;
+				/* having reused the slot as specified, the qualifier has no further use & may be disruptive */
+				gtmrecv_options.reuse_specified = FALSE;
 			} else if (gtmrecv_options.resume_specified)
 			{
 				assert(is_rcvr_srvr);
@@ -1572,7 +1576,7 @@ STATICFNDEF void prepare_recvpool_for_write(gtm_uint64_t datalen, gtm_uint64_t p
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLTRANS2BIG, 5, &recvpool_ctl->jnl_seqno,
 			&datalen, &pre_filter_write_len, LEN_AND_LIT("Receive"));
 	}
-	if ((write_loc + datalen) > recvpool_size)
+	if (write_loc > (recvpool_size - datalen))
 	{
 		REPL_DEBUG_ONLY(
 			if (recvpool_ctl->wrapped)
@@ -1626,6 +1630,7 @@ STATICFNDEF void copy_to_recvpool(uchar_ptr_t databuff, gtm_uint64_t datalen)
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
 	future_write = write_loc + datalen;
+	assertpro(future_write >= write_loc); /* prepare_recvpool_for_write should have handled this */
 	upd_read = upd_proc_local->read;
 	REPL_DEBUG_ONLY(
 		if (recvpool_ctl->wrapped && (upd_read <= future_write))
@@ -2727,6 +2732,8 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 	boolean_t			uncmpfail, send_cross_endian, recvpool_prepared, copied_to_recvpool;
 	gtmrecv_local_ptr_t		gtmrecv_local;
 	gtm_time4_t			ack_time;
+        char				print_msg[PROC_RECVOPS_PRINT_MSG_LEN];
+        char				print_msg_t[PROC_RECVOPS_PRINT_MSG_LEN];
 	int4				msghdrlen, strm_num, processed_hdrlen;
 	int4				need_histinfo_num;
 	int				cmpret;
@@ -3435,16 +3442,22 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					/* Handle REPL_ROLLBACK_FIRST case (easy one) first */
 					if (REPL_ROLLBACK_FIRST == msg_type)
 					{
-						repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_ROLLBACK_FIRST message. "
-							"Secondary is out of sync with the primary. "
-							"Secondary at "INT8_FMT" "INT8_FMTX", Primary at "INT8_FMT" "INT8_FMTX". "
-							"Do ROLLBACK FIRST\n",
-							request_from, request_from, recvd_jnl_seqno, recvd_jnl_seqno);
+						REPL_DPRINT1("Received REPL_ROLLBACK_FIRST message");
+						sgtm_putmsg(print_msg, PROC_RECVOPS_PRINT_MSG_LEN, VARLSTCNT(4) ERR_REPLAHEAD, 2,
+								LEN_AND_LIT(""));
+						repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
+						SNPRINTF(print_msg_t, SIZEOF(print_msg_t), "Replicating instance : "INT8_FMT" "
+							"Originating instance : "INT8_FMT". ", request_from, recvd_jnl_seqno);
+						sgtm_putmsg(print_msg, PROC_RECVOPS_PRINT_MSG_LEN, VARLSTCNT(4) ERR_TEXT, 2,
+								 LEN_AND_STR(print_msg_t));
+						repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
+
 						if (gtmrecv_options.autorollback)
 						{
-							repl_log(gtmrecv_log_fp, TRUE, TRUE, "Receiver was started with "
-								"-AUTOROLLBACK. Initiating automatic ONLINE FETCHRESYNC "
-								"ROLLBACK\n");
+							sgtm_putmsg(print_msg, PROC_RECVOPS_PRINT_MSG_LEN, VARLSTCNT(4) ERR_TEXT, 2,
+								LEN_AND_LIT("Initiating automatic rollback to match the replicating"
+								" instance with a prior in-sync originating instance state."));
+							repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
 							repl_connection_reset = TRUE;
 							repl_close(&gtmrecv_sock_fd);
 							repl_log(gtmrecv_log_fp, TRUE, TRUE, "Closing connection before starting "
@@ -3469,8 +3482,13 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 							return;
 						} else
 						{
-							repl_log(gtmrecv_log_fp, TRUE, TRUE, "Receiver was not started with "
-									"-AUTOROLLBACK. Manual ROLLBACK required. Shutting down\n");
+							sgtm_putmsg(print_msg, PROC_RECVOPS_PRINT_MSG_LEN, VARLSTCNT(4) ERR_TEXT, 2,
+								LEN_AND_LIT(" The receiver server was not started with "
+								"-AUTOROLLBACK. Perform MUPIP JOURNAL -ROLLBACK on the replicating"
+								" instance to match the originating instance. Check the Source "
+								"Server log to determine the last in-sync sequence number."));
+							repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
+
 						}
 						gtmrecv_autoshutdown();	/* should not return */
 						assert(FALSE);

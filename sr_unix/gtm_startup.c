@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,7 @@
 #include "sig_init.h"
 #include "gtm_startup.h"
 #include "svnames.h"
-#include "jobinterrupt_init.h"
+#include "jobinterrupt_process.h"
 #include "zco_init.h"
 #include "gtm_logicals.h"	/* for DISABLE_ALIGN_STRINGS */
 #include "suspsigs_handler.h"
@@ -118,7 +118,6 @@ GBLREF spdesc			rts_stringpool;
 GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
 GBLREF lv_val			*zsrch_var, *zsrch_dir1, *zsrch_dir2;
 GBLREF symval			*curr_symval;
-GBLREF global_latch_t 		defer_latch;
 GBLREF boolean_t		is_replicator;
 GBLREF void			(*ctrlc_handler_ptr)();
 GBLREF boolean_t		mstr_native_align;
@@ -269,7 +268,6 @@ void gtm_startup(struct startup_vector *svec)
 	dollar_system_init(svec);
 	init_callin_functable();
 	gtm_env_xlate_init();
-	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	ce_init();	/* initialize compiler escape processing */
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();

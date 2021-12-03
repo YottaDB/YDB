@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +14,7 @@
 #include "mdef.h"
 
 #include "io.h"
+#include "iosocketdef.h"
 #include "iousdef.h"
 #include "op.h"
 
@@ -53,11 +55,25 @@ GBLREF io_desc		*active_device;
 void op_wttab(mint col)
 {
 	mstr		spaces;
-	int		delta;
+	int		delta, args_written;
+	boolean_t	need_to_write = FALSE, nonblocking_socket = FALSE;
 	io_desc		*iod;
+	d_socket_struct	*dsocketptr;
+	socket_struct	*socketptr;
 
 	iod = io_curr_device.out;
 	iod->esc_state = START;
+	if (gtmsocket == iod->type)
+	{
+		dsocketptr = (d_socket_struct *)iod->dev_sp;
+		if (dsocketptr->n_socket > dsocketptr->current_socket)
+		{
+			socketptr = dsocketptr->socket[dsocketptr->current_socket];
+			nonblocking_socket = socketptr->nonblocked_output;
+			if (nonblocking_socket)
+				args_written = socketptr->args_written;
+		}
+	}
 	if ((delta = col - iod->dollar.x) > 0)
 	{
 		active_device = iod;
@@ -65,6 +81,7 @@ void op_wttab(mint col)
 			(((d_us_struct*)(iod->dev_sp))->disp->wttab)(delta);
 		else
 		{
+			need_to_write = TRUE;
 			spaces.addr = (char *)SPACES_BLOCK;
 			spaces.len = TAB_BUF_SZ;
 			for (; delta > 0; delta -= spaces.len)
@@ -84,6 +101,11 @@ void op_wttab(mint col)
 		} else
 			iod->dollar.x = col;
 		active_device = NULL;
+	}
+	if (nonblocking_socket)
+	{	/* if needed to write but socketptr->args_written is unchanged there was an error */
+		if (!need_to_write || (args_written < socketptr->args_written))
+			socketptr->args_written = ++args_written;	/* always count as one */
 	}
 	return;
 }

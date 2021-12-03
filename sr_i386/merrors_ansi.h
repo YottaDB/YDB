@@ -85,7 +85,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GVIS */
 	   0,	/* GVKILLFAIL */
 	   1,	/* GVNAKED */
-	   0,	/* UNUSEDMSG256 */
+	   0,	/* BACKUPDBFILE */
 	   0,	/* GVORDERFAIL */
 	   0,	/* GVPUTFAIL */
 	   0,	/* PATTABSYNTAX */
@@ -142,8 +142,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* UNUM64ERR */
 	   0,	/* HEXERR */
 	   0,	/* HEX64ERR */
-	   0,	/* UNUSEDMSG313 */
-	   0,	/* UNUSEDMSG314 */
+	   0,	/* CMDERR */
+	   0,	/* BACKUPSUCCESS */
 	   0,	/* JNLTMQUAL3 */
 	  57,	/* MULTLAB */
 	   0,	/* GTMCURUNSUPP */
@@ -182,7 +182,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* SPOREOL */
 	   0,	/* SRCLIN */
 	   0,	/* SRCLOC */
-	   0,	/* SRCLOCUNKNOWN */
+	   0,	/* UNUSEDMSG353 */
 	   0,	/* STACKCRIT */
 	   0,	/* STACKOFLOW */
 	   0,	/* STACKUNDERFLO */
@@ -200,7 +200,7 @@ const static readonly int error_ansi[] = {
 	   6,	/* UNDEF */
 	   0,	/* UNIMPLOP */
 	  39,	/* VAREXPECTED */
-	   0,	/* UNUSEDMSG371 */
+	   0,	/* BACKUPFAIL */
 	   0,	/* MAXARGCNT */
 	   0,	/* GTMSECSHRSEMGET */
 	   0,	/* VIEWARGCNT */
@@ -348,9 +348,9 @@ const static readonly int error_ansi[] = {
 	   0,	/* AMBISYIPARAM */
 	   0,	/* PREVJNLNOEOF */
 	   0,	/* LKSECINIT */
-	   0,	/* UNUSEDMSG519 */
-	   0,	/* UNUSEDMSG520 */
-	   0,	/* UNUSEDMSG521 */
+	   0,	/* BACKUPREPL */
+	   0,	/* BACKUPSEQNO */
+	   0,	/* DIRACCESS */
 	   0,	/* TXTSRCMAT */
 	   0,	/* CCENOGROUP */
 	   0,	/* BADDBVER */
@@ -373,7 +373,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NETFAIL */
 	   0,	/* NETLCKFAIL */
 	   0,	/* TTINVFILTER */
-	   0,	/* UNUSEDMSG544 */
+	   0,	/* BACKUPTN */
 	   0,	/* WCSFLUFAIL */
 	   0,	/* BADTRNPARAM */
 	   0,	/* DSEONLYBGMM */
@@ -591,7 +591,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DELIMSIZNA */
 	   0,	/* INVCTLMNE */
 	   0,	/* SOCKLISTEN */
-	   0,	/* UNUSEDMSG762 */
+	   0,	/* RESTORESUCCESS */
 	   0,	/* ADDRTOOLONG */
 	   0,	/* GTMSECSHRGETSEMFAIL */
 	   0,	/* CPBEYALLOC */
@@ -632,7 +632,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GBLMODFAIL */
 	   0,	/* TTLENGTHTOOBIG */
 	   0,	/* TPTIMEOUT */
-	   0,	/* DEFEREVENT */
+	   0,	/* NORTN */
 	   0,	/* JNLFILNOTCHG */
 	   0,	/* EVENTLOGERR */
 	   0,	/* UPDATEFILEOPEN */
@@ -727,7 +727,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GTMSECSHRSSIDF */
 	   0,	/* GTMSECSHRFORKF */
 	   0,	/* DBFSYNCERR */
-	   0,	/* SECONDAHEAD */
+	   0,	/* UNUSEDMSG898 */
 	   0,	/* SCNDDBNOUPD */
 	   0,	/* MUINFOUINT4 */
 	   0,	/* NLMISMATCHCALC */
@@ -782,7 +782,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBMBPFRDLBM */
 	   0,	/* DBMBPFRINT */
 	   0,	/* DBMAXKEYEXC */
-	   0,	/* UNUSEDMSG953 */
+	   0,	/* REPLAHEAD */
 	   0,	/* MUPIPSET2SML */
 	   0,	/* DBREADBM */
 	   0,	/* DBCOMPTOOLRG */
@@ -1550,4 +1550,11 @@ const static readonly int error_ansi[] = {
 	   0,	/* REPL0BACKLOG */
 	   0,	/* REPLBACKLOG */
 	   0,	/* INVSHUTDOWN */
+	   0,	/* SOCKBLOCKERR */
+	   0,	/* SOCKWAITARG */
+	   0,	/* LASTTRANS */
+	   0,	/* SRCBACKLOGSTATUS */
+	   0,	/* BKUPRETRY */
+	   0,	/* BKUPPROGRESS */
+	   0,	/* BKUPFILEPERM */
 	};

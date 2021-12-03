@@ -84,7 +84,6 @@ GBLREF gv_namehead		*gv_target;
 GBLREF int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF boolean_t		dse_running;
 GBLREF spdesc			rts_stringpool, stringpool;
-GBLREF global_latch_t		defer_latch;
 GBLREF VSIG_ATOMIC_T		util_interrupt;
 GBLREF char			cli_err_str[];
 GBLREF boolean_t		write_after_image;
@@ -118,7 +117,6 @@ int main(int argc, char *argv[])
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	sig_init(generic_signal_handler, dse_ctrlc_handler, suspsigs_handler, continue_handler);
 	atexit(util_exit_handler);
-	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	stp_init(STP_INITSIZE);
 	stpgc_ch = &stp_gcol_ch;
 	rts_stringpool = stringpool;

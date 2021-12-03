@@ -84,7 +84,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 	{
 		if (!iod->dollar.zeof)
 		{
-	 		iod->dollar.za = 9;
+	 		iod->dollar.za = ZA_IO_ERR;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOTTOEOFONPUT);
 		} else
 		{	/* If there have not been any writes, and input encryption attributes are different from those for output,

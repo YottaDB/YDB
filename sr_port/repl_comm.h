@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,6 +71,7 @@ for (msg_ptr = (unsigned char *)(BUFF), recvd_len = 0, recvd_this_iter = torecv_
 
 #define REPL_COMM_MAX_INTR_CNT	3	/* # of iterations we'll let select() be interrupted before we give up and assume timeout */
 #define REPL_COMM_LOG_EAGAIN_INTERVAL	10	/* every these many times select() returns EAGAIN, we log a message */
+#define REPL_COMM_LOG_ENOMEM_INTERVAL	10	/* every these many times select() returns ENOMEM, we log a message */
 #define REPL_COMM_LOG_EWDBLCK_INTERVAL	10	/* every these many times send() returns EWOULDBLOCK, we log a message */
 #define REPL_COMM_LOG_EMSGSIZE_INTERVAL	10	/* every these many times send() returns EWOULDBLOCK, we log a message */
 #define REPL_COMM_MIN_SEND_SIZE		1024	/* try to keep the send size at least this */
@@ -82,12 +83,13 @@ for (msg_ptr = (unsigned char *)(BUFF), recvd_len = 0, recvd_this_iter = torecv_
 #define VMS_MAX_TCP_SEND_SIZE	VMS_MAX_TCP_IO_SIZE
 #define VMS_MAX_TCP_RECV_SIZE	VMS_MAX_TCP_IO_SIZE
 
-#define GTMSOURCE_IDLE_POLL_WAIT	1			/* 1ms sleep in case nothing sent to the other side */
+#define GTMSOURCE_IDLE_POLL_WAIT	10			/* 10ms sleep in case nothing sent to the other side */
 #define REPL_POLL_WAIT			(MILLISECS_IN_SEC - 1)	/* Maximum time (in ms) for select()/poll() to timeout */
 #define REPL_POLL_NOWAIT		0			/* Forces poll()/select() to return immediately */
 #define REPL_INVALID_POLL_DIRECTION	-1
 #define REPL_POLLIN			1
 #define REPL_POLLOUT			2
+#define REPL_MAXPOLLFAIL		10
 
 /* Replication communcation subsystem function prototypes */
 int fd_ioready(int sock_fd, int poll_direction, int timeout);

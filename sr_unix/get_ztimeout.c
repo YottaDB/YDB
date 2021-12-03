@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2020 Fidelity National Information	*
+ * Copyright (c) 2018-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,25 +40,24 @@ int get_ztimeout(mval *result)
  	SETUP_THREADGBL_ACCESS;
 	ztimeout_vector_ptr = (TREF(dollar_ztimeout)).ztimeout_vector.str.addr;
 	ztimeout_vector_len = (TREF(dollar_ztimeout)).ztimeout_vector.str.len;
-	if (ztimeout_vector_len) ztimeout_vector_len--;
 	if ((((TREF(dollar_ztimeout)).ztimeout_seconds.m[1] / MV_BIAS) == -1))
-		time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, "%d", ((TREF(dollar_ztimeout)).ztimeout_seconds.m[1] / MV_BIAS));
+		time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, "%s", !ztimeout_vector_len ? "-1" : "-1:");
 	else
 	{
 		sys_get_curr_time(&cur_time);
 		cur_time = sub_abs_time(&(TREF(dollar_ztimeout)).end_time, &cur_time);
 		if (0 <= cur_time.at_sec)
 		{
-			DBGDFRDEVNT((stderr,"cur_time.at_usec is: %d\n", cur_time.at_usec));
 			ms = DIVIDE_ROUND_DOWN(cur_time.at_usec, MICROSECS_IN_MSEC);
-			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, ((NULL == ztimeout_vector_ptr)? "%ld.%ld" : "%ld.%ld:"),
+			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, (!ztimeout_vector_len ? "%ld.%ld" : "%ld.%ld:"),
 					cur_time.at_sec, ms);
 		} else
-			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, ((NULL == ztimeout_vector_ptr)? "%ld" : "%ld:"), ms);
+			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, (!ztimeout_vector_len ? "%ld" : "%ld:"), ms);
 	}
 	assert((0 < time_len) && (time_len <= ZTIMEOUTSTRLEN));
 	assert(((0 == ztimeout_vector_len) && (NULL == ztimeout_vector_ptr))
 			|| ((0 < ztimeout_vector_len) && (NULL != ztimeout_vector_ptr)));
+	DBGDFRDEVNT((stderr,"%d %s: $ZTIMEOUT = %s%s\n", __LINE__, __FILE__, full_ztimeout, ztimeout_vector_ptr));
 	req_len = time_len + ztimeout_vector_len;
 	if ((process_exiting) && !(IS_STP_SPACE_AVAILABLE_PRO(req_len)))
 		return -1;	/* Process is exiting, avoid adding to the memory pressure */

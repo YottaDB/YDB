@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,8 +36,5 @@ void tp_clear_timeout(void);
 
 /* Used in transfer table for signaling exception */
 void tp_timeout_action(void);
-
-/* Used to setup tptimeout error via out-of-band */
-void tptimeout_set(int4 dummy_param);
 
 #endif

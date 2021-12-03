@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,32 +10,15 @@
  *								*
  ****************************************************************/
 
-/*
- *  Should change bool to boolean_t together on Unix and VMS
- */
-
-#define OUTOFBAND_MSK	0x02000018
-#define CTRLC_MSK	0x00000008
-#define SIGHUP_MSK	0x00000010
-#define CTRLY_MSK	0x02000000
-#define CTRLC     3
-#define CTRLD     4
-#define CTRLY	  25
-#define MAXOUTOFBAND 31
-enum outofbands
-{
-	ctrly = 1,
-	ctrlc,
-	ctrap,
-	tptimeout,
-	jobinterrupt,
-	ztimeout,
-	sighup
-};
-
-#define OUTOFBAND_RESTARTABLE(event)	(jobinterrupt == (event))
-
-void outofband_action(boolean_t line_fetch_or_start);
-
-void outofband_clear(void);
-
+D_EVENT(no_event, ctrlc_set),			/* 0; ctrlc_set is just a place holder here */
+D_EVENT(ctrlc, ctrlc_set),			/* 1 */
+D_EVENT(ctrap, ctrap_set),			/* 2 */
+D_EVENT(jobinterrupt, jobinterrupt_set),	/* 3 */
+D_EVENT(tptimeout, tptimeout_set),		/* 4 */
+D_EVENT(ztimeout, ztimeout_set),		/* 5 */
+D_EVENT(sighup, ctrap_set),			/* 6 */
+D_EVENT(neterr_action, gvcmz_neterr),		/* 7 - from here rest of the list are deferred but not outofband */
+D_EVENT(zstep_pending, op_zstep),		/* 8 */
+D_EVENT(zbreak_pending, op_setzbrk),		/* 9 */
+D_EVENT(ttwriterr, tt_write_error_set),		/* 10 */
+D_EVENT(DEFERRED_EVENTS, ctrlc_set)		/* count; ctrlc_set is just a place holder here */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,15 @@
 #define TCP_WRITE		1
 #define TCP_READ		2
 
+/* bits for readyforwhat in socket_struct */
+#define SOCKREADY_READ		1
+#define SOCKREADY_WRITE		2
+
+/* bits for pendingevent in socket_struct */
+#define SOCKPEND_READ		1	/* from poll */
+#define SOCKPEND_WRITE		2
+#define SOCKPEND_BUFFER		4	/* something in input buffer */
+
 typedef struct
 {
 	uid_t   mem;
@@ -54,6 +63,13 @@ typedef struct
 #else
 #  define DBGSOCK(X)
 #  define DBGSOCK_ONLY(X)
+#endif
+#ifdef DEBUG_SOCKWAIT
+#  define DBGSOCKWAIT(X) DBGFPF(X)
+#  define DBGSOCKWAIT_ONLY(X) X
+#else
+#  define DBGSOCKWAIT(X)
+#  define DBGSOCKWAIT_ONLY(X)
 #endif
 #define DBGSOCK2(X)
 #define DBGSOCK_ONLY2(X)
@@ -90,18 +106,28 @@ typedef struct
 /* For buffered output, wait this long for socket to be ready to output */
 #define DEFAULT_WRITE_WAIT		200
 
-#define SOCKWRTERROR(IOD, SOCKPTR, GTMERR, SYSERR) 								\
-MBSTART { 													\
+#define SOCKWRTERROR(IOD, SOCKPTR, GTMERR, SYSERR, ERRORTEXT, TLSLIT) 						\
+MBSTART {													\
 	int	ERRLEN; 											\
 	char	*ERRPTR; 											\
-	IOD->dollar.za = 9; 											\
+	IOD->dollar.za = ZA_IO_ERR; 										\
 														\
 	ISSUE_NOPRINCIO_IF_NEEDED(IOD, TRUE, !SOCKPTR->ioerror);	/* TRUE indicates WRITE */		\
-	ERRPTR = (char *)STRERROR(SYSERR); 									\
+	assert((0 != SYSERR) || (NULL != ERRORTEXT));								\
+	if (NULL == ERRORTEXT)											\
+		ERRPTR = (char *)STRERROR(SYSERR); 								\
+	else													\
+		ERRPTR = (char *)ERRORTEXT;									\
 	SET_DOLLARDEVICE_ONECOMMA_ERRSTR(IOD, ERRPTR, ERRLEN);							\
-	assert(ERR_SOCKWRITE == GTMERR);									\
+	assert((ERR_SOCKWRITE == GTMERR) || (ERR_TLSIOERROR == GTMERR));					\
 	if (SOCKPTR->ioerror)											\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) GTMERR, 0, ERR_TEXT, 2, ERRLEN, ERRPTR);		\
+	{													\
+		if (ERR_SOCKWRITE == GTMERR)									\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) GTMERR, 0, ERR_TEXT, 2, ERRLEN, ERRPTR);	\
+		else												\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT(TLSLIT),	\
+				ERR_TEXT, 2, ERRLEN, ERRPTR);							\
+	}													\
 } MBEND
 
 #define SOCKET_ALLOC(SOCKPTR)										\
@@ -141,10 +167,24 @@ MBSTART { 													\
 	SOCKPTR->buffered_length = SOCKPTR->buffered_offset = 0;		\
 }
 
+#define SOCKET_OBUFFER_INIT(SOCKETPTR, SIZE, WAIT_TIME, FLUSH_TIME)			\
+{											\
+	if (0 == SOCKETPTR->obuffer_size)						\
+	{										\
+		SOCKETPTR->obuffer_size = (0 != SIZE) ? SIZE : SOCKETPTR->buffer_size;	\
+		SOCKETPTR->obuffer = (char *)malloc(SOCKETPTR->obuffer_size);		\
+		SOCKETPTR->obuffer_length = SOCKETPTR->obuffer_offset = 0;		\
+	}										\
+	SOCKETPTR->obuffer_wait_time = WAIT_TIME;					\
+	SOCKETPTR->obuffer_flush_time = FLUSH_TIME;					\
+}
+
 #define SOCKET_FREE(SOCKPTR)							\
 {										\
 	if (NULL != SOCKPTR->buffer) 						\
 		free(SOCKPTR->buffer);						\
+	if (NULL != SOCKPTR->obuffer) 						\
+		free(SOCKPTR->obuffer);						\
 	if (NULL != SOCKPTR->zff.addr)						\
 	{									\
 		if ((NULL != SOCKPTR->ozff.addr) && (SOCKPTR->ozff.addr != SOCKPTR->zff.addr))				\
@@ -174,6 +214,7 @@ MBSTART { 													\
 		NEWSOCKPTR->buffered_length = NEWSOCKPTR->buffered_offset = 0;					\
 		NEWSOCKPTR->buffer = (char *)malloc(SOCKPTR->buffer_size);					\
 	}													\
+	assert((NULL == SOCKPTR->obuffer) && (0 == SOCKPTR->obuffer_size));					\
 	if ((0 != SOCKPTR->zff.len) && (NULL != SOCKPTR->zff.addr))						\
 	{													\
 		NEWSOCKPTR->zff.addr = (char *)malloc(MAX_ZFF_LEN);						\
@@ -323,12 +364,15 @@ typedef struct socket_struct_type
 	mstr				ozff;			/* UTF-16 if chset is UTF-16 else copy  of zff */
 	uint4				lastaction;		/* waitcycle  count */
 	uint4				readycycle;		/* when was ready */
-	boolean_t			pendingevent;		/* if listening, needs accept */
+	uint4				pendingevent;		/* bitmask, if listening, needs accept */
 	enum socket_creator		howcreated;
 	char				*parenthandle;		/* listening socket this created from */
 	size_t				obuffer_size;		/* size of the output buffer for this socket */
 	size_t				obuffer_length;		/* length of output in this buffer */
 	size_t				obuffer_offset;		/* offset of the buffered output to buffer head */
+	size_t				obuffer_stopped_at;	/* non blocking output blocked at this offset */
+	size_t				obuffer_stopped_left;	/* non blocking remaining output */
+	volatile boolean_t		obuffer_in_use;		/* obuffer should be used for TLS or non blocking */
 	volatile boolean_t		obuffer_timer_set;	/* timer scheduled to flush buffer */
 	volatile boolean_t		obuffer_output_active;	/* in buffer output now */
 	int				obuffer_flush_time;	/* flush output buffer after this many milliseconds */
@@ -343,6 +387,15 @@ typedef struct socket_struct_type
 	boolean_t			tlswriteblocked;
 	short				tlspolldirection;	/* what TLS wants */
 #endif
+	boolean_t			nonblocked_output;	/* default is blocking output */
+	boolean_t			output_blocked;		/* if set error all writes */
+	int				output_failures;	/* when nonblocked output */
+	int				max_output_retries;	/* when nonblocked output */
+	int				args_written;		/* number of WRITE arguments output since CLEAR */
+	size_t				lastarg_size;		/* number of bytes in last arg processed */
+	ssize_t				lastarg_sent;		/* number of bytes actually written */
+	int				readyforwhat;		/* bit mask SOCKREADY_READ and/or SOCKREADY_WRITE */
+	uint4				current_events;		/* bitmask SOCKPEND_ only within iosocket_wait, see pendingevent */
 } socket_struct;
 
 typedef struct socket_interrupt_type
@@ -355,6 +408,7 @@ typedef struct socket_interrupt_type
 	boolean_t                       end_time_valid;
 	boolean_t			ibfsize_specified;
 	struct d_socket_struct_type	*newdsocket;
+	int				wait_for_what;		/* bit mask */
 } socket_interrupt;
 
 typedef struct d_socket_struct_type
@@ -391,7 +445,7 @@ boolean_t iosocket_listen_sock(socket_struct *socketptr, unsigned short len);
 void iosocket_close_one(d_socket_struct *dsocketptr, int index);
 int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boolean_t selectfirst);
 ssize_t iosocket_output_buffer(socket_struct *socketptr);
-void iosocket_buffer_error(socket_struct *socketptr);
+int iosocket_buffer_error(socket_struct *socketptr);
 boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, char * act);
 #ifdef GTM_TLS
 void    iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password, mval *extraarg);

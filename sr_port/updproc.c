@@ -149,7 +149,6 @@ error_def(ERR_REC2BIG);
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_REPEATERROR);
 error_def(ERR_REPLONLNRLBK);
-error_def(ERR_SECONDAHEAD);
 error_def(ERR_STRMSEQMISMTCH);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);

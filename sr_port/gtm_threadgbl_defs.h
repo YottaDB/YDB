@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2020 Fidelity National Information	*
+ * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,12 +92,13 @@ THREADGBLDEF(xecute_literal_parse,		boolean_t)			/* flag TRUE when trying what i
 /* Database */
 THREADGBLDEF(dbinit_max_delta_secs,		uint4)				/* max time before we bail out in db_init */
 THREADGBLDEF(dollar_zmaxtptime, 		int4)				/* tp timeout in seconds */
-THREADGBLDEF(ztimeout_deferred,			boolean_t)			/* ztimeout occured but was deferred */
-THREADGBLDEF(in_ztimeout,			boolean_t)
-THREADGBLDEF(ztimeout_set_xfer,			volatile boolean_t)		/* A ztimeout set the xfer table intercepts */
-THREADGBLDEF(dollar_ztimeout,			dollar_ztimeout_struct)
-THREADGBLDEF(save_xfer_root,			volatile save_xfer_entry*)	 /*  *= NULL;*/
-THREADGBLDEF(save_xfer_tail,			volatile save_xfer_entry*) 	/*= NULL;*/
+THREADGBLAR1DEF(save_xfer_root,		save_xfer_entry, DEFERRED_EVENTS)	/* array of deferred events with the zeroth
+										 * acting as the root of a queue identified by the
+										 * _ptr item immediately following
+										 */
+THREADGBLDEF(save_xfer_root_ptr,		save_xfer_entry*) 		/* pointer to anchor; see immediately prior item */
+THREADGBLDEF(ztimeout_timer_on,		boolean_t)			/* ztimeout has a gt_timer pending */
+THREADGBLDEF(dollar_ztimeout,			dollar_ztimeout_struct)		/* holds ztimeout state info */
 THREADGBLDEF(donot_write_inctn_in_wcs_recover,	boolean_t)			/* TRUE if wcs_recover should NOT write INCTN */
 THREADGBLDEF(gbuff_limit,			mval)				/* holds a GTM_POOLLIMIT value for REORG or DBG */
 THREADGBLDEF(gd_targ_tn,			trans_num)			/* number that is incremented for every gvcst_spr*
@@ -238,7 +239,8 @@ THREADGBLDEF(dollar_zmode,			mval)				/* run mode indicator */
 THREADGBLDEF(dollar_zonlnrlbk,			int)				/* ISV (incremented for every online rollback) */
 THREADGBLDEF(dollar_zclose,			int)				/* ISV (set to close status for PIPE device) */
 THREADGBLDEF(dollar_zroutines,			mstr)				/* routine search list */
-THREADGBLDEF(dollar_zstep,			mval)				/* $zstep - zstep action */
+THREADGBLDEF(dollar_zstep,			mval)				/* $zstep - action repository for zstep */
+THREADGBLDEF(zstep_action,			mval)				/* $zstep - actual action for zstep */
 THREADGBLDEF(dollar_ztrap,			mval)				/* $ztrap - recursive try error action */
 THREADGBLDEF(error_on_jnl_file_lost,		unsigned int)			/* controls error handling done by jnl_file_lost.
 										 * 0 (default) : Turn off journaling and continue.
@@ -538,6 +540,9 @@ THREADGBLDEF(in_trigger_upgrade,		boolean_t)	/* caller is MUPIP TRIGGER -UPGRADE
 THREADGBLDEF(gtm_test_autorelink_always,	boolean_t)	/*  DEBUG-only option to enable/disable autorelink always */
 THREADGBLDEF(fork_without_child_wait,		boolean_t)	/*  we did a FORK but did not wait for child to detach from
 								 *  inherited shm so shm_nattch could be higher than we expect.
+								 */
+THREADGBLDEF(in_bm_getfree_gdsfilext,           boolean_t)	/* bm_getfree() did a preemptive crit grab before doing a
+								 * file extension.
 								 */
 #endif	/* #ifdef DEBUG */
 /* (DEBUG_ONLY relevant points reproduced from the comment at the top of this file)

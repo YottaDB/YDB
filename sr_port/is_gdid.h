@@ -10,18 +10,14 @@
  *								*
  ****************************************************************/
 
-#include "mdef.h"
-#include "iott_wrterr.h"
+#ifndef IS_GDID_H_INCLUDED
+#define IS_GDID_H_INCLUDED
 
-GBLREF int	iott_write_error;
+#include "gtm_stat.h"
+bool		is_gdid_file_identical(gd_id_ptr_t fid, char *filename, int4 filelen);
+bool		is_gdid_identical(gd_id_ptr_t fid1, gd_id_ptr_t fid2);
+bool 		is_gdid_stat_identical(gd_id_ptr_t fid, struct stat *stat_buf);
+void		set_gdid_from_stat(gd_id_ptr_t fid, struct stat *stat_buf);
+uint4	 	filename_to_id(gd_id_ptr_t fid, char *filename);
 
-error_def(ERR_TERMWRITE);
-
-void iott_wrterr(void)
-{
-	int	status;
-
-	status = iott_write_error;
-	iott_write_error = 0;
-	RTS_ERROR_ABT(VARLSTCNT(3) ERR_TERMWRITE, 0, status);
-}
+#endif

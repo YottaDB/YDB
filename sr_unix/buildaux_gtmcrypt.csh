@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2020 Fidelity National Information		#
+# Copyright (c) 2001-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -78,11 +78,8 @@ cp -pf $gtm_tools/Makefile.mk $gtm_dist_plugin/gtmcrypt/Makefile
 chmod +x $gtm_dist_plugin/gtmcrypt/*.sh
 #
 pushd $gtm_dist_plugin/gtmcrypt
-if ("HP-UX" == "$HOSTOS") then
-	set make = "gmake"
-else
-	set make = "make"
-endif
+set make = "make"
+
 if ($gtm_verno =~ V[4-8]*) then
 	# For production builds don't do any randomizations.
 	set algorithm = "AES256CFB"
@@ -129,6 +126,14 @@ endif
 # Remove pinentry routine for GTM-8668
 rm -f $gtm_dist_plugin/gtmcrypt/pinentry.m
 
+# For now we expect the below plugins to be built.
+set expected = (libgtmcrypt_gcrypt_AES256CFB.so libgtmcrypt_openssl_AES256CFB.so libgtmcryptutil.so libgtmtls.so)
+foreach so ($expected)
+	if (! -f $gtm_dist_plugin/$so) then
+		@ buildaux_gtmcrypt_status++
+		echo "buildaux-E-libgtmcrypt, $so expected but not found"	>> $gtm_log/error.${gtm_exe:t}.log
+	endif
+end
 
 popd >&! /dev/null
 exit $buildaux_gtmcrypt_status

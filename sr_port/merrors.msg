@@ -150,7 +150,6 @@
 !	ERR_ACK			internal error (not displayed to the users)
 !	ERR_ASC2EBCDICCONV	not yet documented since zOS is not officially supported
 !	ERR_DBGLDMISMATCH	used internally to rectify an gld vs database characteristic mismatch in favor of the DB
-!	ERR_DEFEREVENT		referenced only if #define DEBUG is TRUE (i.e. for debug builds only)
 !	ERR_DRVLONGJMP		used internally in condition handler management
 !	ERR_ENQ			internal error (not displayed to the users)
 !	ERR_FAKENOSPCLEARED	for internal testing only
@@ -174,6 +173,7 @@
 !	ERR_ZDEFOFLOW		functionality not documented (GT.CM related weirdness)
 !	ERR_ZLINKBYPASS		to be documented when code is enabled
 ! ----- Buffer to introduce new undocumented error messages without affecting UNUSEDMSGnnn match with corresponding line numbers.
+!
 !
 !
 !
@@ -253,7 +253,7 @@ GVGETFAIL	<Global variable retrieval failed.  Failure code: !AD.>/error/fao=2!/a
 GVIS		<!_!_Global variable: !AD>/info/fao=2!/ansi=0
 GVKILLFAIL	<Global variable kill failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 GVNAKED		<Illegal naked global reference>/error/fao=0!/ansi=1
-UNUSEDMSG256	<GVNEXTARG removed from code in V6.3-013 June 2020; not issued for a long time prior to that>/error/fao=0!/ansi=0
+BACKUPDBFILE	<DB file !AD backed up in file !AD>/info/fao=4!/ansi=0
 GVORDERFAIL	<Global variable $ORDER or $NEXT function failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 GVPUTFAIL	<Global variable put failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 PATTABSYNTAX	<Error in !AD at line !UL>/error/fao=3!/ansi=0
@@ -310,8 +310,8 @@ NUM64ERR	<Error: cannot convert !AD value to 64 bit decimal or hexadecimal numbe
 UNUM64ERR	<Error: cannot convert !AD value to 64 bit unsigned decimal or hexadecimal number>/error/fao=2!/ansi=0
 HEXERR		<Error: cannot convert !AD value to hexadecimal number>/error/fao=2!/ansi=0
 HEX64ERR	<Error: cannot convert !AD value to 64 bit hexadecimal number>/error/fao=2!/ansi=0
-UNUSEDMSG313	<MTRECTOOBIG last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
-UNUSEDMSG314	<MTRECTOOSM last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+CMDERR		<Error running command : !AD>/error/fao=2!/ansi=0
+BACKUPSUCCESS	<Backup completed successfully>/info/fao=0!/ansi=0
 JNLTMQUAL3	<Time qualifier BEFORE_TIME="!AZ" is less than the journal file(s) minimum timestamp="!AZ">/error/fao=2!/ansi=0
 MULTLAB		<This label has been previously defined>/error/fao=0!/ansi=57
 GTMCURUNSUPP	<The requested operation is unsupported in this version of GT.M>/error/fao=0!/ansi=0
@@ -350,7 +350,7 @@ SELECTFALSE	<No argument to $SELECT was true>/error/fao=0!/ansi=4
 SPOREOL		<Either a space or an end-of-line was expected but not found>/error/fao=0!/ansi=0
 SRCLIN		<!_!AD!/!_!AD>/info/fao=4!/ansi=0
 SRCLOC		<!_!_At column !UL, line !UL, source module !AD>/info/fao=4!/ansi=0
-SRCLOCUNKNOWN	<!_!_M source location unknown>/info/fao=0!/ansi=0
+UNUSEDMSG353	<SRCLOCUNKNOWN unused in V7.0-000 and for an indetermite time prior>/info/fao=0!/ansi=0
 STACKCRIT	<Stack space critical>/error/fao=0!/ansi=0
 STACKOFLOW	<Stack overflow>/fatal/fao=0!/ansi=0
 STACKUNDERFLO	<Stack underflow>/error/fao=0!/ansi=0
@@ -368,7 +368,7 @@ UIDSND		<Unidentified sender PID>/error/fao=0!/ansi=0
 UNDEF		<Undefined local variable: !AD>/error/fao=2!/ansi=6
 UNIMPLOP	<Unimplemented construct encountered>/error/fao=0!/ansi=0
 VAREXPECTED	<Variable expected in this context>/error/fao=0!/ansi=39
-UNUSEDMSG371	<VARRECBLKSZ last used in V6.3-004 Mar. 2018>/error/fao=0!/ansi=0
+BACKUPFAIL	<MUPIP cannot start backup with the above errors>/error/fao=0!/ansi=0
 MAXARGCNT	<Maximum number of arguments !UL exceeded>/error/fao=1!/ansi=0
 GTMSECSHRSEMGET	<semget error errno = !UL>/fatal/fao=1!/ansi=0
 VIEWARGCNT	<View parameter !AD has inappropriate number of subparameters>/error/fao=2!/ansi=0
@@ -516,9 +516,9 @@ FNOTONSYS	<Function or special variable is not supported by this operating syste
 AMBISYIPARAM	<Parameter !AD is ambiguous to $ZGETSYI()>/error/fao=2!/ansi=0
 PREVJNLNOEOF	<A previous generation journal file !AD does not have valid EOF>/error/fao=2!/ansi=0
 LKSECINIT	<Error creating LOCK section for database !AD>/error/fao=2!/ansi=0
-UNUSEDMSG519	<MTDOSLAB last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
-UNUSEDMSG520	<MTDOSFOR last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
-UNUSEDMSG521	<MTINVLAB last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+BACKUPREPL	<Replication Instance file !AD backed up in file !AD>/info/fao=4!/ansi=0
+BACKUPSEQNO	<Journal Seqnos up to 0x!16@XQ are backed up>/info/fao=1!/ansi=0
+DIRACCESS	<Do not have full access to directory for temporary files: !AD>/error/fao=2!/ansi=0
 TXTSRCMAT	<M object module and source file do not match>/error/fao=0!/ansi=0
 CCENOGROUP	<CCE does not have GROUP privilege.  Information may be incomplete.>/warning/fao=0!/ansi=0
 BADDBVER	<Incorrect database version: !AD>/error/fao=2!/ansi=0
@@ -541,7 +541,7 @@ SERVERERR	<Severe error on server: !AD>/error/fao=2!/ansi=0
 NETFAIL		<Failure of Net operation>/error/fao=0!/ansi=0
 NETLCKFAIL	<Lock operation across Net failed>/error/fao=0!/ansi=0
 TTINVFILTER	<Invalid FILTER argument>/info/fao=0!/ansi=0
-UNUSEDMSG544	<MTANSILAB last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+BACKUPTN	<Transactions from 0x!16@XQ to 0x!16@XQ are backed up>/info/fao=2!/ansi=0
 WCSFLUFAIL	<Error flushing buffers -- called from module !AD at line !UL>/error/fao=3!/ansi=0
 BADTRNPARAM	<!AD is not a legal parameter to $ZTRNLNM>/error/fao=2!/ansi=0
 DSEONLYBGMM	<!AD is supported only for BG/MM access methods>/warning/fao=2!/ansi=0
@@ -759,7 +759,7 @@ PROTNOTSUP	<Protocol !AD not supported>/error/fao=2!/ansi=0
 DELIMSIZNA	<Delimiter size is not appropriate>/error/fao=0!/ansi=0
 INVCTLMNE	<Invalid control mnemonics>/error/fao=0!/ansi=0
 SOCKLISTEN	<Error listening on a socket>/error/fao=0!/ansi=0
-UNUSEDMSG762	<LQLENGTHNA last used in V6.3-003A>/error/fao=0!/ansi=0
+RESTORESUCCESS	<Restore completed successfully>/info/fao=0!/ansi=0
 ADDRTOOLONG	<Socket address !AD of length !UL is longer than the maximum permissible length !UL>/error/fao=4!/ansi=0
 GTMSECSHRGETSEMFAIL	<error getting semaphore errno = !UL>/warning/fao=1!/ansi=0
 CPBEYALLOC	<Attempt to copy beyond the allocated buffer>/error/fao=0!/ansi=0
@@ -800,7 +800,7 @@ REPLFILTER	<Replication filter subsystem failure>/error/fao=0!/ansi=0
 GBLMODFAIL	<Global variable Conflict Test failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 TTLENGTHTOOBIG	<Terminal LENGTH exceeds the maximum allowed limit>/error/fao=0!/ansi=0
 TPTIMEOUT	<Transaction timeout>/error/fao=0!/ansi=0
-DEFEREVENT	<Transfer table reset for event type !UL when set for type !UL>/info/fao=2!/ansi=0
+NORTN		<Routine name missing>/error/fao=0!/ansi=0
 JNLFILNOTCHG	<Journal file not changed>/error/fao=0!/ansi=0
 EVENTLOGERR	<Error in event logging subsystem>/error/fao=0!/ansi=0
 UPDATEFILEOPEN	<Update file open error>/error/fao=0!/ansi=0//1
@@ -895,7 +895,7 @@ GTMSECSHRSGIDF	<gtmsecshr server setgid to root failed>/warning/fao=0!/ansi=0
 GTMSECSHRSSIDF	<gtmsecshr server setsid failed>/warning/fao=0!/ansi=0
 GTMSECSHRFORKF	<gtmsecshr server unable to fork off a child process>/fatal/fao=0!/ansi=0
 DBFSYNCERR	<Error synchronizing database file !AD to disk>/error/fao=2!/ansi=0
-SECONDAHEAD	<Secondary ahead of primary. !/ Secondary database possibly updated by process other than the update process.  First perform rollback.>/error/fao=0!/ansi=0
+UNUSEDMSG898	<SECONDAHEAD last used in V7.0-000 Jan 2021>/error/fao=0!/ansi=0
 SCNDDBNOUPD	<Database Updates not allowed on the secondary>/error/fao=0!/ansi=0
 MUINFOUINT4	<!AD : !UL [0x!XL]>/info/fao=4!/ansi=0
 NLMISMATCHCALC	<Location of !AD expected at 0x!XL, but found at 0x!XL>/error/fao=4!/ansi=0
@@ -950,7 +950,7 @@ DBMBPFLDIS	<!AD Master bit map shows this map full, in disagreement with both di
 DBMBPFRDLBM	<!AD Master bit map shows this map has space, agreeing with disk local map>/warning/fao=2!/ansi=0/B
 DBMBPFRINT	<!AD Master bit map shows this map has space, agreeing with MUPIP INTEG>/warning/fao=2!/ansi=0/B
 DBMAXKEYEXC	<!AD Maximum key size for database exceeds design maximum>/error/fao=2!/ansi=0
-UNUSEDMSG953	<DBMXRSEXCMIN last used in V5.5-000 Feb 2012>/error/fao=0!/ansi=0
+REPLAHEAD	<Replicating instance is ahead of the originating instance.!AD>/error/fao=2!/ansi=0
 MUPIPSET2SML	<!UL too small, minimum !AD allowed is !UL>/warning/fao=4!/ansi=0
 DBREADBM	<!AD Read error on bit map>/error/fao=2!/ansi=0/D
 DBCOMPTOOLRG	<!AD Record has too large compression count>/error/fao=2!/ansi=0/I
@@ -1581,7 +1581,7 @@ NOEDITOR	<Can't find an executable editor: !AD>/error/fao=2!/ansi=0
 UPDPROC		<Update Process error>/error/fao=0!/ansi=0
 HLPPROC		<Helper Process error>/error/fao=0!/ansi=0
 REPLNOHASHTREC	<Sequence number 0x!16@XQ contains trigger definition updates. !AD side must be at least V6.2-000 for replication to continue>/error/fao=3!/ansi=0
-REMOTEDBNOTRIG	<Trigger operations on global !AD not supported as it maps to database region !AD that points to a remote file>/error/fao=4!/ansi=0
+REMOTEDBNOTRIG	<Trigger operations are not supported on global ^!AD as it maps to database region !AD that points to a remote file>/error/fao=4!/ansi=0
 NEEDTRIGUPGRD	<Cannot do trigger operation on database file !AD until it is upgraded; Run MUPIP TRIGGER -UPGRADE first>/error/fao=2!/ansi=0
 REQRLNKCTLRNDWN	<Error accessing relinkctl file !AZ for $ZROUTINES directory !AD. Must be rundown>/error/fao=3!/ansi=0
 RLNKCTLRNDWNSUC	<Relinkctl file for $ZROUTINES directory !AD successfully rundown>/info/fao=2!/ansi=0
@@ -1720,6 +1720,13 @@ REPLNORESP	<No sequence number confirmation from the replicating instance [!AD] 
 REPL0BACKLOG	<Total backlog for the specified replicating instance(s) is 0>/success/fao=0!/ansi=0
 REPLBACKLOG	<Timeout occurred while there was a backlog>/error/fao=0!/ansi=0
 INVSHUTDOWN	<Shutdown timeout should be from 0 to 3600 seconds>/error/fao=0!/ansi=0
+SOCKBLOCKERR	<WRITE /BLOCK error: !AD>/error/fao=2!/ansi=0
+SOCKWAITARG	<!AD argument to WRITE /WAIT !AD>/error/fao=4!/ansi=0
+LASTTRANS	<Last transaction sequence number !AD : !@UQ>/info/fao=3!/ansi=0
+SRCBACKLOGSTATUS	<Instance !AD !AD !@UQ transaction(s)>/info/fao=5!/ansi=0
+BKUPRETRY	<Retrying MUPIP BACKUP for region: !AD (database file: !AD). Attempt: #!UL of !UL>/info/fao=6!/ansi=0
+BKUPPROGRESS	<Transfer : !AD ; Speed : !AD MiB/sec ; Transactions : !@UQ ; Estimated time left : !UL !AD>/info/fao=8!/ansi=0
+BKUPFILEPERM	<Backup file !AD does not have write permission>/error/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

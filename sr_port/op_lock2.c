@@ -28,7 +28,8 @@
 #include "mlk_pvtblk_delete.h"
 #include "mlk_unlock.h"
 #include "mlk_unpend.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "mlk_check_own.h"
 #include "lock_str_to_buff.h"
 #include "gvcmx.h"
@@ -60,24 +61,17 @@
 #include "is_proc_alive.h"
 #include "mvalconv.h"
 #include "min_max.h"
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
 
-GBLREF	unsigned char	cm_action;
-GBLREF	uint4		dollar_tlevel;
-GBLREF	uint4		dollar_trestart;
-GBLREF	unsigned short	lks_this_cmd;
+GBLREF	bool		out_of_time, remlkreq;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;
 GBLREF	mlk_stats_t	mlk_stats;			/* Process-private M-lock statistics */
 GBLREF	mv_stent	*mv_chain;
-GBLREF	int4		outofband;
-GBLREF	bool		out_of_time;
-GBLREF	uint4		process_id;
-GBLREF	bool		remlkreq;
-GBLREF	unsigned char	*restart_ctxt, *restart_pc;
-GBLREF	unsigned int	t_tries;
 GBLREF	stack_frame	*frame_pointer;
+GBLREF	uint4		dollar_tlevel, dollar_trestart, process_id;
+GBLREF	unsigned char	cm_action, *restart_ctxt, *restart_pc;
+GBLREF	unsigned int	t_tries;
+GBLREF	unsigned short	lks_this_cmd;
+GBLREF	volatile int4	outofband;
 
 error_def(ERR_LOCKINCR2HIGH);
 error_def(ERR_LOCKIS);
@@ -290,7 +284,6 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds 
 			{	/* if time expired || control-c, tptimeout, or jobinterrupt encountered */
 				if (outofband || !mlk_check_own(pvt_ptr1))
 				{	/* If CTL-C, check lock owner */
-					UPDATE_PROC_WAIT_STATE(pvt_ptr1->pvtctl.csa, WS_39, -1);
 					if (pvt_ptr1->nodptr)		/* Get off pending list to be sent a wake */
 						mlk_unpend(pvt_ptr1);
 					/* Cancel all remote locks obtained so far */
@@ -341,7 +334,7 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds 
 							}
 						}
 						lks_this_cmd = 0;	/* no return - clear flag that we're in LOCK processing */
-						outofband_action(FALSE);
+						async_action(FALSE);
 					}
 					break;
 				}
@@ -350,7 +343,7 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds 
 			 * in mlk_shrblk_find. If mlk_lock is invoked for the second (or higher) time in op_lock2 for the
 			 * same lock resource, "mlk_shrblk_find" assumes a sleep has happened in between two locking attempts.
 			 */
-			UPDATE_PROC_WAIT_STATE(pvt_ptr1->pvtctl.csa, WS_39, 1);
+			UPDATE_CRIT_COUNTER(pvt_ptr1->pvtctl.csa, WS_39);
 			hiber_start_wait_any(LOCK_SELF_WAKE);
 			/* Every reattempt at a blocking lock needs crit which could be a bottleneck. So minimize reattempts.
 			 * The "blk_sequence" check below serves that purpose. If the sequence number is different between
@@ -375,7 +368,6 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds 
 			 */
 			if (!mlk_lock(pvt_ptr1, 0, FALSE))
 			{	/* If we got the lock, break out of timer loop */
-				UPDATE_PROC_WAIT_STATE(pvt_ptr1->pvtctl.csa, WS_39, -1);
 				blocked = FALSE;
 				if (MLK_FAIRNESS_DISABLED != TREF(mlk_yield_pid))
 					TREF(mlk_yield_pid) = 0; /* Allow yielding for the other locks */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -117,7 +117,7 @@ void mu_int_maps(void)
 		assert(mapsize == mu_int_data.bplmap);
 		blkno = mcnt * mu_int_data.bplmap;
 		bml_busy(0, mu_int_locals + ((blkno * BML_BITS_PER_BLK) / BITS_PER_UCHAR));
-		blk_base = mu_int_read(blkno, &ondsk_blkver, &free_blk_base);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
+		blk_base = mu_int_read(blkno, &ondsk_blkver, &free_blk_base);
 		if (!blk_base)
 		{
 			mu_int_path[0] = blkno;
@@ -145,8 +145,8 @@ void mu_int_maps(void)
 			mu_int_err(ERR_DBMBSIZMX, 0, 0, 0, 0, 0, 0, level);
 			continue;
 		}
-		if (((blk_hdr_ptr_t)blk_base)->bver != mu_int_data.desired_db_format)
-			mu_int_blks_to_upgrd++;
+		if ((GDSVCURR != mu_int_data.creation_db_ver) && (((blk_hdr_ptr_t)blk_base)->bver != mu_int_data.desired_db_format))
+			mu_int_blks_to_upgrd++;	/* conditions of the prior if may need adjustment going forward */
 		if (tn_reset_this_reg)
 		{
 			((blk_hdr_ptr_t)blk_base)->tn = 0;
@@ -192,7 +192,7 @@ void mu_int_maps(void)
 						util_out_print(
 							"!/MUPIP INFO: mu_int_maps: 1st precheck failed. retrying block in buffer",
 								TRUE);
-					if (free_blk_base);
+					if (free_blk_base)
 						free(free_blk_base);
 					free_blk_base = NULL;
 					buff_blk_base = mu_int_read_buffer(blkno, &ondsk_blkver, &free_blk_base);

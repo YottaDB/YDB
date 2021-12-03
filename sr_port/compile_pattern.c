@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,8 +72,8 @@ int compile_pattern(oprtype *opr, boolean_t is_indirect)
 		memset(&retmval, 0, SIZEOF(mval));
 		retmval.mvtype = MV_STR;
 		retmval.str.len = retstr.len * SIZEOF(uint4);
-		retmval.str.addr = (char *)stringpool.free;
 		ENSURE_STP_FREE_SPACE(retmval.str.len);
+		retmval.str.addr = (char *)stringpool.free;
 		memcpy(stringpool.free, &retstr.buff[0], retmval.str.len);
 		stringpool.free += retmval.str.len;
 		*opr = put_lit(&retmval);

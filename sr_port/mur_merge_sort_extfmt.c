@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2019 Fidelity National Information	*
+ * Copyright (c) 2015-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -264,7 +264,7 @@ int mur_merge_sort_extfmt(void)
 {
 	FILE			*fp, *fp_out, **fp_array;
 	boolean_t		extr_file_created, single_reg, skip_sort;
-	boolean_t		is_dummy_gbldir;
+	boolean_t		is_dummy_gbldir, errored_out;
 	char			*buff, extr_fn[MAX_FN_LEN + 1], *fn, *fn_out;
 	char			rename_fn[MAX_FN_LEN + 1];
 	int			rename_fn_len, fn_len;
@@ -486,8 +486,8 @@ int mur_merge_sort_extfmt(void)
 						if (!mur_options.extr_fn_is_stdout[recstat])
 						{
 							rename_fn_len = ARRAYSIZE(rename_fn);
-							/* Don't rename DEVNULL */
-							if (!mur_options.extr_fn_is_devnull[recstat] && (RENAME_FAILED ==
+							/* Rename ONLY the regular files */
+							if (mur_options.extr_fn_is_regfile[recstat] && (RENAME_FAILED ==
 								rename_file_if_exists(fn_out, extr_fn_len, rename_fn,
 									 &rename_fn_len, &status)))
 							{
@@ -510,7 +510,7 @@ int mur_merge_sort_extfmt(void)
 									ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
 								goto cleanup;
 							}
-							if (!mur_options.extr_fn_is_devnull[recstat]) /* not reqd if NULL device */
+							if (mur_options.extr_fn_is_regfile[recstat]) /* Only for regular files */
 								gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FILECREATE, 4,
 									LEN_AND_STR(ext_file_type[recstat]), extr_fn_len, extr_fn);
 						} else
@@ -541,7 +541,7 @@ int mur_merge_sort_extfmt(void)
 					buff = malloc(buffsize);
 				}
 				fp = fp_array[index];
-				GTM_FREAD(buff, 1, jm_size, fp, ret_size, save_errno);
+				GTM_FREAD(buff, 1, jm_size, fp, ret_size, errored_out);
 				if ((ret_size < jm_size) && !mur_options.extr_fn_is_devnull[recstat])
 				{
 					assert(FALSE);
@@ -549,10 +549,10 @@ int mur_merge_sort_extfmt(void)
 					fn = ((fi_type *)rctl->file_info[recstat])->fn;
 					SNPRINTF(errstr, SIZEOF(errstr), "fread() : %s : Expected = %lld : Actual = %lld",
 													fn, jm_size, ret_size);
-					if (save_errno)
+					if (errored_out)
 					{	/* ERROR encountered during GTM_FREAD */
 						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
-									ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
+									ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, errno);
 						goto cleanup;
 					} else
 					{	/* EOF reached during GTM_FREAD */
@@ -562,11 +562,12 @@ int mur_merge_sort_extfmt(void)
 					}
 				}
 				buff[jm_size] = '\0';
-				GTM_FWRITE(buff, 1, jm_size, fp_out, ret_size, save_errno);
+				GTM_FWRITE(buff, 1, jm_size, fp_out, ret_size, errored_out);
 				if ((ret_size < jm_size) && !mur_options.extr_fn_is_devnull[recstat])
 				{
+					save_errno = errno;
 					assert(FALSE);
-					assert(save_errno);
+					assert(errored_out);
 					SNPRINTF(errstr, SIZEOF(errstr), "fwrite() : %s : Expected = %lld : Actual = %lld",
 												fn_out, jm_size, ret_size);
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)

@@ -1,7 +1,7 @@
 #!/bin/sh -
 #################################################################
 #                                                               #
-# Copyright (c) 2014-2020 Fidelity National Information		#
+# Copyright (c) 2014-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -41,14 +41,8 @@ if [ "Y" = "$gtm_debug" ] ; then set -x ; fi
 
 # Initialization
 timestamp=`date +%Y%m%d%H%M%S`
-if [ -x "/usr/bin/which" ] ; then which=/usr/bin/which ; else which=which ; fi
-if [ "SunOS" = `uname -s` ] ; then
-    gtm_id="/usr/xpg4/bin/id"
-    gtm_grep="/usr/xpg4/bin/grep"
-else
-    gtm_id=`which id`
-    gtm_grep=`which grep`
-fi
+gtm_id=`command -v id`
+gtm_grep=`command -v grep`
 if [ -z "$USER" ] ; then USER=`$gtm_id -un` ; fi
 
 # Functions
@@ -432,8 +426,8 @@ if [ -d "$gtm_installdir" -a "Y" != "$gtm_overwrite_existing" ] ; then
     echo $gtm_installdir exists and --overwrite-existing not specified ; err_exit
 fi
 
-issystemd=`which systemctl`
-if [ "" != "$issystemd" ] ; then
+issystemd=`command -v systemctl`
+if [ -n "$issystemd" ] ; then
 	# It is a systemd installation
 	logindconf="/etc/systemd/logind.conf"
 	removeipcopt=`awk -F = '/^RemoveIPC/ {opt=$2} END{print opt}' $logindconf`

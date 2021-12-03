@@ -44,9 +44,8 @@ STATICDEF uint4		save_qlf;
 
 error_def(ERR_COMPILEQUALS);
 error_def(ERR_FILEPARSE);
+error_def(ERR_NORTN);
 error_def(ERR_NOTMNAME);
-error_def(ERR_WILDCARD);
-error_def(ERR_ZLINKFILE);
 error_def(ERR_ZLNOOBJECT);
 
 void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned short *srclen, boolean_t last)
@@ -59,6 +58,7 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 	parse_blk	pblk;
 	short		object_name_mvtype;
 	unsigned short	clen = 0;
+	int		iclen;		/* 4SCA on clen underflows */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -103,17 +103,20 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 		fstr.addr = srcstr;
 		fstr.len = *srclen;
 		status = parse_file(&fstr, &pblk);
-		if (!(status & 1))
+		if (!(status & 1) || !pblk.b_name)
 		{
+			assert(!TREF(trigger_compile_and_link));
 			if (save_qlf)
 				glb_cmd_qlf.qlf = save_qlf;
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2, *srclen, srcstr, status);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2, *srclen, srcstr,
+				!(status & 1) ? status : ERR_NORTN);
 		}
-		assert(pblk.b_name);
 		file.addr = pblk.l_name;
 		file.len = pblk.b_name;
 		if ((0 == pblk.b_ext) && ( MAX_FN_LEN >= (*srclen + SIZEOF(DOTM))))
 		{
+			assert(0 != pblk.l_name);
+			assert(MAX_FN_LEN >= pblk.b_name);
 			memcpy(&pblk.l_name[pblk.b_name], DOTM, SIZEOF(DOTM));
 			pblk.b_ext = (SIZEOF(DOTM) - 1);
 		}
@@ -154,12 +157,14 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 				;       /* scan back from end for rtn name & triggerness */
 			ci += (0 < ci) ? 1 : 0;
 			assert(object_name_len >= ci);
-			clen = object_name_len - ci;
-			if ((2 <= clen) && ('o' == object_file_name[ci + clen - 1])
-					&& ('.' == object_file_name[ci + clen - 2]))
-				clen -= 2;	/* Strip trailing ".o" */
+			iclen = object_name_len - ci;
+			assert((iclen >= 0) && (iclen <= object_name_len));
+			if ((2 <= iclen) && ('o' == object_file_name[ci + iclen - 1])
+					&& ('.' == object_file_name[ci + iclen - 2]))
+				iclen -= 2;	/* Strip trailing ".o" */
 			SET_OBJ(object_file_name, object_name_len);
-			clen = object_name_len = MIN(clen, MAX_MIDENT_LEN);
+			assert(0 <= iclen);
+			clen = object_name_len = (unsigned short) MIN(iclen, MAX_MIDENT_LEN);
 			memcpy(routine_name.addr, &object_file_name[ci], clen);
 		}
 	}

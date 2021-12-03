@@ -37,7 +37,8 @@
 #include "eintr_wrappers.h"
 #include "mmemory.h"
 #include "gtm_caseconv.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "wake_alarm.h"
 #include "stringpool.h"
 #include "gtm_conv.h"
@@ -57,7 +58,7 @@ GBLREF	io_desc			*active_device;
 GBLREF	mstr			sys_input;
 GBLREF	mstr			sys_output;
 GBLREF	bool			out_of_time;
-GBLREF	int4			outofband;
+GBLREF	volatile int4		outofband;
 GBLREF	int4			write_filter;
 
 LITREF	mstr			chset_names[];
@@ -206,7 +207,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 					stat_err = TRUE;
 				}
 			}
-			else if (0 == memvcmp(tn.addr, tn.len, LIT_AND_LEN("/dev/null")))
+			else if (0 == memvcmp(tn.addr, tn.len, LIT_AND_LEN(DEVNULL)))
 				tl->iod->type = nl;
 			else
 			{
@@ -430,7 +431,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 			if (timed && (0 == msec_timeout))
 				out_of_time = TRUE;
 			if (outofband)
-				outofband_action(FALSE);
+				async_action(FALSE);
 			if (EINTR == errno
 					|| ETXTBSY == errno
 					|| ENFILE == errno
@@ -452,7 +453,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 						if (0 == msec_timeout)
 							out_of_time = TRUE;
 						if (outofband)
-							outofband_action(FALSE);
+							async_action(FALSE);
 						if (EINTR == errno
 						       || ETXTBSY == errno
 						       || ENFILE == errno
@@ -472,7 +473,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 						if (0 == msec_timeout)
 							out_of_time = TRUE;
 						if (outofband)
-							outofband_action(FALSE);
+							async_action(FALSE);
 						if (EINTR == errno
 						       || ETXTBSY == errno
 						       || ENFILE == errno

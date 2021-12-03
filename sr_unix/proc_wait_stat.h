@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2019-2020 Fidelity National Information	*
+ * Copyright (c) 2019-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -123,375 +123,153 @@ typedef enum
 	NOT_APPLICABLE
 } wait_state;
 
-void wb_gtm8863_lock_pause(void *,wait_state,int);
+void wb_gtm8863_lock_pause(void *,wait_state);
 
-/* INCVAL 1: set, -1 unset */											\
-#define UPDATE_PROC_WAIT_STATE(CSADDRS, WAITSTATE, INCVAL)                                                      \
+#define UPDATE_CRIT_COUNTER(CSADDRS, WAITSTATE)									\
 MBSTART {                                                                                                       \
-	int DEXA = 0;                                                                                           \
-	int GLB = 0;                                                                                            \
-	int JNL = 0;                                                                                            \
-	int MLK = 0;                                                                                            \
-	int PRC = 0;                                                                                            \
-	int TRX = 0;                                                                                            \
-	int ZAD = 0;                                                                                            \
-	assert((1 == INCVAL) || (-1 ==INCVAL));									\
-	if (CSADDRS && CSADDRS->nl)                                                                             \
+	if (CSADDRS && CSADDRS->nl)										\
 	{                                                                                                       \
 		switch(WAITSTATE)                                                                               \
 		{                                                                                               \
 			case WS_2 :                                                                             \
-				(CSADDRS)->gvstats_rec_p->f_ws2 = (1 == INCVAL) ? 1 : 0;			\
-				++JNL;                                                                          \
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_ws2, 1);				\
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_jnl_wait, 1);			\
 				break;                                                                          \
 			case WS_12 :                                                                            \
-				(CSADDRS)->gvstats_rec_p->f_ws12 = (1 == INCVAL) ? 1 : 0;			\
-				++DEXA;                                                                         \
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_ws12, 1);			\
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_dbext_wait, 1);			\
 				break;                                                                          \
 			case WS_15 :                                                                            \
-				(CSADDRS)->gvstats_rec_p->f_ws15 = (1 == INCVAL) ? 1 : 0;			\
-				++GLB;                                                                          \
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_ws15, 1);			\
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_bg_wait, 1);			\
 				break;                                                                          \
 			case WS_39 :                                                                            \
-				(CSADDRS)->gvstats_rec_p->f_ws39 = (1 == INCVAL) ? 1 : 0;			\
-				++MLK;                                                                          \
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_ws39, 1);			\
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_mlk_wait, 1);			\
 				break;                                                                          \
 			case WS_47 :                                                                            \
-				(CSADDRS)->gvstats_rec_p->f_ws47 = (1 == INCVAL) ? 1 : 0;			\
-				++TRX;                                                                          \
-				break;                                                                          \
-			case WS_1 :  /* For aggregate ZAD */                                                    \
-				++ZAD;                                                                          \
-				break;                                                                          \
-			case WS_3 :  /* For aggregate JNL */                                                    \
-				++JNL;                                                                          \
-				break;                                                                          \
-			case WS_4 :  /* For aggregate JNL */                                                    \
-				++JNL;                                                                          \
-				break;                                                                          \
-			case WS_5 :  /* For aggregate MLK */                                                    \
-				++MLK;                                                                          \
-				break;                                                                          \
-			case WS_6 :  /* For aggregate ZAD */                                                    \
-				++ZAD;                                                                          \
-				break;                                                                          \
-			case WS_7 :  /* For aggregate ZAD */                                                    \
-				++ZAD;                                                                          \
-				break;                                                                          \
-			case WS_8 :  /* For aggregate ZAD */                                                    \
-				++ZAD;                                                                          \
-				break;                                                                          \
-			case WS_9 :  /* For aggregate ZAD */                                                    \
-				++ZAD;                                                                          \
-				break;                                                                          \
-			case WS_10 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_ws47, 1);			\
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_trans_wait, 1);			\
 				break;                                                                          \
 			case WS_11 :  /* For aggregate DEXA */                                                  \
-				++DEXA;                                                                         \
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_dbext_wait, 1);			\
 				break;                                                                          \
 			case WS_13 :  /* For aggregate GLB */                                                   \
-				++GLB;                                                                          \
-				break;                                                                          \
 			case WS_14 :  /* For aggregate GLB */                                                   \
-				++GLB;                                                                          \
-				break;                                                                          \
 			case WS_16 :  /* For aggregate GLB */                                                   \
-				++GLB;                                                                          \
-				break;                                                                          \
 			case WS_17 :  /* For aggregate GLB */                                                   \
-				++GLB;                                                                          \
-				break;                                                                          \
 			case WS_18 :  /* For aggregate GLB */                                                   \
-				++GLB;                                                                          \
-				break;                                                                          \
 			case WS_19 :  /* For aggregate GLB */                                                   \
-				++GLB;                                                                          \
-				break;                                                                          \
 			case WS_20 :  /* For aggregate GLB */                                                   \
-				++GLB;                                                                          \
-				break;                                                                          \
 			case WS_21 :  /* For aggregate GLB */                                                   \
-				++GLB;                                                                          \
-				break;                                                                          \
 			case WS_22 :  /* For aggregate GLB */                                                   \
-				++GLB;                                                                          \
-				break;                                                                          \
 			case WS_23 :  /* For aggregate GLB */                                                   \
-				++GLB;                                                                          \
-				break;                                                                          \
 			case WS_24 :  /* For aggregate GLB */                                                   \
-				++GLB;                                                                          \
-				break;                                                                          \
 			case WS_25 :  /* For aggregate GLB */                                                   \
-				++GLB;                                                                          \
-				break;                                                                          \
 			case WS_26 :  /* For aggregate GLB */                                                   \
-				++GLB;                                                                          \
-				break;                                                                          \
 			case WS_27 :  /* For aggregate GLB */                                                   \
-				++GLB;                                                                          \
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_bg_wait, 1);			\
 				break;                                                                          \
+			case WS_3 :  /* For aggregate JNL */                                                    \
+			case WS_4 :  /* For aggregate JNL */                                                    \
 			case WS_28 :  /* For aggregate JNL */                                                   \
-				++JNL;                                                                          \
-				break;                                                                          \
 			case WS_29 :  /* For aggregate JNL */                                                   \
-				++JNL;                                                                          \
-				break;                                                                          \
 			case WS_30 :  /* For aggregate JNL */                                                   \
-				++JNL;                                                                          \
-				break;                                                                          \
 			case WS_31 :  /* For aggregate JNL */                                                   \
-				++JNL;                                                                          \
-				break;                                                                          \
 			case WS_32 :  /* For aggregate JNL */                                                   \
-				++JNL;                                                                          \
-				break;                                                                          \
 			case WS_33 :  /* For aggregate JNL */                                                   \
-				++JNL;                                                                          \
-				break;                                                                          \
 			case WS_34 :  /* For aggregate JNL */                                                   \
-				++JNL;                                                                          \
-				break;                                                                          \
 			case WS_35 :  /* For aggregate JNL */                                                   \
-				++JNL;                                                                          \
-				break;                                                                          \
 			case WS_36 :  /* For aggregate JNL */                                                   \
-				++JNL;                                                                          \
-				break;                                                                          \
 			case WS_37 :  /* For aggregate JNL */                                                   \
-				++JNL;                                                                          \
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_jnl_wait, 1);			\
 				break;                                                                          \
+			case WS_5 :  /* For aggregate MLK */                                                    \
 			case WS_38 :  /* For aggregate MLK */                                                   \
-				++MLK;                                                                          \
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_mlk_wait, 1);			\
 				break;                                                                          \
 			case WS_40 :  /* For aggregate PRC */                                                   \
-				++PRC;                                                                          \
-				break;                                                                          \
 			case WS_41 :  /* For aggregate PRC */                                                   \
-				++PRC;                                                                          \
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_proc_wait, 1);			\
 				break;                                                                          \
 			case WS_43 :  /* For aggregate TRX */                                                   \
-				++TRX;                                                                          \
-				break;                                                                          \
 			case WS_44 :  /* For aggregate TRX */                                                   \
-				++TRX;                                                                          \
-				break;                                                                          \
 			case WS_45 :  /* For aggregate TRX */                                                   \
-				++TRX;                                                                          \
-				break;                                                                          \
 			case WS_46 :  /* For aggregate TRX */                                                   \
-				++TRX;                                                                          \
-				break;                                                                          \
 			case WS_48 :  /* For aggregate TRX */                                                   \
-				++TRX;                                                                          \
-				break;                                                                          \
 			case WS_49 :  /* For aggregate TRX */                                                   \
-				++TRX;                                                                          \
-				break;                                                                          \
 			case WS_50 :  /* For aggregate TRX */                                                   \
-				++TRX;                                                                          \
-				break;                                                                          \
 			case WS_51 :  /* For aggregate TRX */                                                   \
-				++TRX;                                                                          \
-				break;                                                                          \
 			case WS_52 :  /* For aggregate TRX */                                                   \
-				++TRX;                                                                          \
-				break;                                                                          \
 			case WS_53 :  /* For aggregate TRX */                                                   \
-				++TRX;                                                                          \
-				break;                                                                          \
 			case WS_54 :  /* For aggregate TRX */                                                   \
-				++TRX;                                                                          \
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_trans_wait, 1);			\
 				break;                                                                          \
+			case WS_1 :  /* For aggregate ZAD */                                                    \
+			case WS_6 :  /* For aggregate ZAD */                                                    \
+			case WS_7 :  /* For aggregate ZAD */                                                    \
+			case WS_8 :  /* For aggregate ZAD */                                                    \
+			case WS_9 :  /* For aggregate ZAD */                                                    \
+			case WS_10 :  /* For aggregate ZAD */                                                   \
 			case WS_55 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_56 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_57 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_58 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_59 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_60 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_61 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_62 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_63 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_64 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_65 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_66 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_67 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_68 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_69 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_70 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_71 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_72 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_73 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_74 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_75 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_76 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_77 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_78 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_79 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_80 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_81 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_82 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_83 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_84 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_85 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_86 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_87 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_88 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_89 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_90 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_91 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_92 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_93 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_94 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_95 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_96 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_97 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_98 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_99 :  /* For aggregate ZAD */                                                   \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_100 :  /* For aggregate ZAD */                                                  \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_101 :  /* For aggregate ZAD */                                                  \
-				++ZAD;                                                                          \
-				break;                                                                          \
 			case WS_102 :  /* For aggregate ZAD */                                                  \
-				++ZAD;                                                                          \
+				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_util_wait, 1);			\
 				break;                                                                          \
 			default : /* It is not an error for some instrumentation to be ignored */               \
 				break;                                                                          \
-		}                                                                                               \
-		if (0 < DEXA)                                                                                   \
-		{                                                                                               \
-			(CSADDRS)->gvstats_rec_p->f_dbext_wait = (1 == INCVAL) ? 1 : 0;				\
-			(CSADDRS)->nl->gvstats_rec.f_dbext_wait = (CSADDRS)->gvstats_rec_p->f_dbext_wait;	\
-		}                                                                                               \
-		if (0 < GLB)                                                                                    \
-		{                                                                                               \
-			(CSADDRS)->gvstats_rec_p->f_bg_wait = (1 == INCVAL) ? 1 : 0;				\
-			(CSADDRS)->nl->gvstats_rec.f_bg_wait = (CSADDRS)->gvstats_rec_p->f_bg_wait;		\
-		}                                                                                               \
-		if (0 < JNL)                                                                                    \
-		{                                                                                               \
-			(CSADDRS)->gvstats_rec_p->f_jnl_wait = (1 == INCVAL) ? 1 : 0;				\
-			(CSADDRS)->nl->gvstats_rec.f_jnl_wait = (CSADDRS)->gvstats_rec_p->f_jnl_wait;		\
-		}                                                                                               \
-		if (0 < MLK)                                                                                    \
-		{                                                                                               \
-			(CSADDRS)->gvstats_rec_p->f_mlk_wait = (1 == INCVAL) ? 1 : 0;				\
-			(CSADDRS)->nl->gvstats_rec.f_mlk_wait = (CSADDRS)->gvstats_rec_p->f_mlk_wait;		\
-		}                                                                                               \
-		if (0 < PRC)                                                                                    \
-		{                                                                                               \
-			(CSADDRS)->gvstats_rec_p->f_proc_wait = (1 == INCVAL) ? 1 : 0;				\
-			(CSADDRS)->nl->gvstats_rec.f_proc_wait = (CSADDRS)->gvstats_rec_p->f_proc_wait;		\
-		}                                                                                               \
-		if (0 < TRX)                                                                                    \
-		{                                                                                               \
-			(CSADDRS)->gvstats_rec_p->f_trans_wait = (1 == INCVAL) ? 1 : 0;				\
-			(CSADDRS)->nl->gvstats_rec.f_trans_wait = (CSADDRS)->gvstats_rec_p->f_trans_wait;	\
-		}                                                                                               \
-		if (0 < ZAD)                                                                                    \
-		{                                                                                               \
-			(CSADDRS)->gvstats_rec_p->f_util_wait = (1 == INCVAL) ? 1 : 0;				\
-			(CSADDRS)->nl->gvstats_rec.f_util_wait = (CSADDRS)->gvstats_rec_p->f_util_wait;		\
 		}                                                                                               \
 		                                                                                                \
 		/* We use gtm_white_box_test_case_count here as a WS value.                                     \
 		The flag file lets us coordinate without timing issues. */                                      \
 		WBTEST_ONLY(WBTEST_WSSTATS_PAUSE,                                                               \
 		{                                                                                               \
-			wb_gtm8863_lock_pause(CSADDRS,WAITSTATE,INCVAL);                                        \
+			wb_gtm8863_lock_pause(CSADDRS,WAITSTATE);						\
 		});                                                                                             \
 	}                                                                                                       \
 } MBEND

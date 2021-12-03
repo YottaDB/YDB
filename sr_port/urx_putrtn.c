@@ -21,6 +21,7 @@ urx_rtnref *urx_putrtn (char *rtn, int rtnlen, urx_rtnref *anchor)
 	urx_rtnref	*rp0, *rp1, *tmp;
 	boolean_t	found;
 	int		c;
+	size_t		cpylen;
 
 	assert(anchor->len == 0);
 	assert(0 < rtnlen);
@@ -57,7 +58,9 @@ urx_rtnref *urx_putrtn (char *rtn, int rtnlen, urx_rtnref *anchor)
 		tmp = (urx_rtnref *)malloc(SIZEOF(urx_rtnref) + rtnlen);
 		assert(NULL != tmp);
 		tmp->len = (unsigned int)rtnlen;
-		memcpy(tmp->name, rtn, rtnlen);
+		assert(0 <= rtnlen);
+		cpylen = (size_t) rtnlen;
+		memcpy(tmp->name, rtn, cpylen);
 		tmp->addr = NULL;
 		tmp->lab = NULL;
 		tmp->next = rp1;

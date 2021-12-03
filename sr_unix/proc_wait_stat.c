@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2020 Fidelity National Information	*
+ * Copyright (c) 2008-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,7 @@
 #include "gtm_fcntl.h"
 
 /* This function is called only from White Box testing, so getting it inline or macro-ised is not a performance concern
- * It is called with the wait state being sent into UPDATE_PROC_WAIT_STATE() and if it is the one under test,
+ * It is called with the wait state being sent into UPDATE_CRIT_COUNTER() and if it is the one under test,
  * will coordinate a pause in execution with the test framework using a lock file.  In general it will leave the querying
  * of the statistics to the test script, but there are a few special cases where it all must be done here.
  * Note that we abuse gtm_white_box_test_case_count a bit because it is an environment variable we get for "free" and
@@ -35,19 +35,14 @@
  *
  * csa_generic: Csa pointer
  * ws: The state being entered
- * incval: Increment or decrement value for the state counter
  */
-void wb_gtm8863_lock_pause(void *csa_generic, wait_state ws, int incval)
+void wb_gtm8863_lock_pause(void *csa_generic, wait_state ws)
 {
 	static int never_fired = 1;	/* only fires once per run */
 	struct stat statbuf;
 	char buf[80];
 	int fd;
 	sgmnt_addrs *csa = (sgmnt_addrs *) csa_generic;
-
-	/* only fire for sets (incval > 0) */
-	if (0 > incval)
-		return;
 
 	/* This special case for WS_47 is unfortunate, as we hoped to leverage the automatic handling
 	 * of existing WB env vars in all cases, but that codepath fires so often that it fires in our driver M script
@@ -60,7 +55,7 @@ void wb_gtm8863_lock_pause(void *csa_generic, wait_state ws, int incval)
 	if ( (WS_41 == ws) && (ws == gtm_white_box_test_case_count) )
 	{
 		fd = creat("prc.txt", 0666);
-		snprintf(buf, SIZEOF(buf), "%lu", csa->gvstats_rec_p->f_proc_wait);
+		snprintf(buf, SIZEOF(buf), "%lu", csa->gvstats_rec_p->n_proc_wait);
 		write(fd, STR_AND_LEN(buf));
 		close(fd);
 	}
@@ -69,7 +64,7 @@ void wb_gtm8863_lock_pause(void *csa_generic, wait_state ws, int incval)
 	if ( (WS_82 == ws) && (ws == gtm_white_box_test_case_count) )
 	{
 		fd = creat("zad.txt", 0666);
-		snprintf(buf, SIZEOF(buf), "%lu", csa->gvstats_rec_p->f_util_wait);
+		snprintf(buf, SIZEOF(buf), "%lu", csa->gvstats_rec_p->n_util_wait);
 		write(fd, STR_AND_LEN(buf));
 		close(fd);
 	}

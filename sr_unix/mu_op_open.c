@@ -177,7 +177,7 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 							RTS_ERROR_LITERAL("fstat()"),
 							CALLFROM, save_errno);
 					}
-				} else if (0 == memvcmp(tn.addr, tn.len, "/dev/null", 9))
+				} else if (0 == memvcmp(tn.addr, tn.len, DEVNULL, 9))
 					iod->type = nl;
 				else if ((-1 == Stat(buf, &outbuf)) && (n_io_dev_types == iod->type))
 				{

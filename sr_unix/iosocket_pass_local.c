@@ -28,7 +28,8 @@
 #include "gtm_string.h"
 #include "eintr_wrappers.h"
 #include "stringpool.h"
-#include "outofband.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "error.h"
 
 #define MAX_PASS_FDS			256
@@ -278,7 +279,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 msec_timeout, int argcnt,
 	{
 		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 			cancel_timer(timer_id);
-		iod->dollar.za = 9;
+		iod->dollar.za = ZA_IO_ERR;
 		errptr = PROTOCOL_ERROR;
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr, errlen);
 		if (socketptr->ioerror)
@@ -309,7 +310,7 @@ ioerr:
 	}
 	if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 		cancel_timer(timer_id);
-	iod->dollar.za = 9;
+	iod->dollar.za = ZA_IO_ERR;
 	SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 	if (socketptr->ioerror)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_SOCKPASS, 0, save_errno, 0);
@@ -440,7 +441,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 	assert(rval == iov.iov_len);
 	if ((MSG_MAGIC != mdata.magic) || (MSG_PROTO_VERSION != mdata.proto_version))
 	{
-		iod->dollar.za = 9;
+		iod->dollar.za = ZA_IO_ERR;
 		errptr = PROTOCOL_ERROR;
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr, errlen);
 		if (socketptr->ioerror)
@@ -545,7 +546,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 		{
 			CLOSE(fds[fdn], rval);
 		}
-		iod->dollar.za = 9;
+		iod->dollar.za = ZA_IO_ERR;
 		errptr = PROTOCOL_ERROR;
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr, errlen);
 		if (socketptr->ioerror)
@@ -600,7 +601,7 @@ ioerr:
 	}
 	if ((EINTR != save_errno) || outofband)
 	{
-		iod->dollar.za = 9;
+		iod->dollar.za = ZA_IO_ERR;
 		SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 		if (socketptr->ioerror)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_SOCKACCEPT, 0, save_errno, 0);

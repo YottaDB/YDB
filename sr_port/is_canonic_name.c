@@ -104,7 +104,7 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 {
 	char		term;
 	int		envpart;
-	boolean_t	instring;
+	boolean_t	instring, innum;
 	int		isrc;
 	char		letter;
 	int		point;
@@ -210,8 +210,10 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 					*stop++ = isrc;
 					break;
 				}
-				if (('-' == letter) || ('.' == letter) || ISDIGIT_ASCII(letter))
-				{
+				if ((innum = ISDIGIT_ASCII(letter)) || ('-' == letter) || ('.' == letter)) /* WARNING: assignment */
+				{	/* note: innum cannot be TRUE unless dispatch state is IN_NUMBER; can be FALSE too
+					 * order of evaluation for the if matters; extra assignment wasted if only about to error
+					 */
 					if ('.' == letter)
 						point++;
 					previous = letter;
@@ -259,6 +261,7 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 					if (('-' == previous) && ('0' == letter))
 						return FALSE;
 					previous = letter;
+					innum = TRUE;
 					break;
 				}
 				if ('.' == letter)
@@ -268,7 +271,7 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 					previous = letter;
 					break;
 				}
-				if (point && ('0' == previous))
+				if (!innum || (point && ('0' == previous)))
 					return FALSE;
 				if (',' == letter)
 					state = DISPATCH_FOR_STARTING_COMPONENT;	/* next */
@@ -346,12 +349,22 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 				}
 				if ('(' != letter)
 					return FALSE;
-				for (++isrc,++cpt ;cpt < lastcpt; isrc++, cpt++)
+				for (++isrc,++cpt, innum = FALSE; cpt < lastcpt; isrc++, cpt++)
 				{
 					letter = *cpt;
 					if (ISDIGIT_ASCII(letter))
+					{
+						if (!innum && ('0' == previous))
+							return FALSE;
+						if ('0' == letter)
+							previous = letter;
+						else
+							innum = TRUE;
 						continue;
+					}
 					if (!((',' == letter) || (')' == letter)))
+						return FALSE;
+					if (!innum && ('0' != previous))
 						return FALSE;
 					previous = letter;
 					++isrc;
@@ -363,6 +376,13 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 						break;
 					if (!ISDIGIT_ASCII(letter))
 						return FALSE;
+					if ('0' == letter)
+					{
+						isrc--;
+						cpt--;
+						innum = FALSE;
+					} else
+						innum = TRUE;
 				}
 				if (cpt > lastcpt)
 					return FALSE;
