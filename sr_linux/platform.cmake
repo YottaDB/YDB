@@ -3,7 +3,7 @@
 # Copyright (c) 2013-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -107,6 +107,10 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-
 # Note: -Wuninitialized not explicitly mentioned since it is enabled by Wall
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -Wno-unused-value -Wno-unused-variable")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-char-subscripts")
+if (ENABLE_ASAN)
+    # Address sanitizer enabled. Use proper compiler/linker flags
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -fsanitize=address")
+endif()
 if (CMAKE_COMPILER_IS_GNUCC)
   # In gcc 10.1.0 we noticed the below two warnings show up at link time and not at compile time (see commit message for details).
   # Those warnings highlighted code that knew what it was doing and it was not easy to restructure the code to avoid the warning.

@@ -59,6 +59,10 @@ if ( CMAKE_COMPILER_IS_GNUCC )
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra -Waddress")
 endif()
 
+# The below option enables the address sanitizer in the build.
+# It is currently enabled only for non-production builds of YottaDB.
+option(ENABLE_ASAN "Enable address sanitizer in build?" OFF)
+
 set(install_permissions_script
   OWNER_READ OWNER_EXECUTE OWNER_WRITE
   GROUP_READ GROUP_EXECUTE
@@ -91,7 +95,8 @@ else()
   message(FATAL_ERROR "--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
-# Record what we plan to do (dump various make options)
+# Record what we plan to do (dump various cmake options)
+message("*** ENABLE_ASAN:              ${ENABLE_ASAN}")
 message("*** CMAKE_C_FLAGS:            ${CMAKE_C_FLAGS}")
 message("*** CMAKE_ASM_FLAGS:          ${CMAKE_ASM_FLAGS}")
 message("*** CMAKE_ASM_FLAGS_DEBUG:    ${CMAKE_ASM_FLAGS_DEBUG}")
@@ -410,7 +415,11 @@ endif()
 
 function(add_executable target)
   _add_executable(${target} ${ARGN})
-  set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-Map=${target}.map")
+  if (ENABLE_ASAN)
+  	set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-Map=${target}.map -fsanitize=address")
+  else()
+  	set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-Map=${target}.map")
+  endif()
   # Since all utilities now dlopen() libyottadb.so at startup, add a dependency to not build the utilities
   # until libyottadb.so was built. And that in turn relies on threadgbl_deftypes being built so add that too.
   add_dependencies(${target} libyottadb gen_gtm_threadgbl_deftypes)
