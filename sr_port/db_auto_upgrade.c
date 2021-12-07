@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -203,6 +203,7 @@ void db_auto_upgrade(gd_region *reg)
 				csd->reorg_sleep_nsec = 0;
 			case GDSMV63007:	/* Note: This is also the case for GDSMR122 */
 			case GDSMR126:
+				/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support nanosecond timers */
 				csd->flush_time = csd->flush_time * NANOSECS_IN_MSEC;
 				/* Note: This is a little-endian solution and will need to be modified if we
 				 * ever support big-endian.
@@ -212,8 +213,14 @@ void db_auto_upgrade(gd_region *reg)
 				/* Note: This ensures that the csd->flush_trigger_top field added in GT.M v63007 is set if
 				 * the old db_minorver is GDSMR122.
 				 */
-				break;
 			case GDSMR130:
+				/* YottaDB r134 introduced "max_procs" which records the maximum number of
+				 * processes accessing the database to measure system load.
+				 */
+				csd->max_procs.cnt = 0;
+				csd->max_procs.time = 0;
+				break;
+			case GDSMR134:
 		/* When adding a new minor version, the following template should be maintained
 		 * a) If there are any file header fields added in the new minor version, initialize the fields to default values
 		 *    in the last case (i.e. above this comment block). Do not add a "break" for the above "case" block.

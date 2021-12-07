@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -535,6 +535,26 @@ typedef struct blk_info_struct
 # define DBG_RECORD_CRYPT_RECEIVE(CSD, CSA, CNL, PID, TRANS_INFO)
 #endif
 
+typedef struct max_procs
+{
+	/* Since time_t is 8 bytes on 64 bit (x86_64 and AARCH64) and 4 bytes on 32 bit (ARMV6L and ARMV7L), we
+	 * declare the time first and add in 4 filler bytes on 32 bit so that the size of the structure and the
+	 * offsets of time and cnt within the structure will be the same on all builds
+	 */
+	time_t	time;
+	#if defined(__armv6l__) || defined(__armv7l__)
+	char	filler_4byte1[4];
+	#endif
+	int4	cnt;
+	char	filler_4byte2[4];	/* Needed to ensure the structure is 16 bytes on both 32 bit and 64 bit.
+					 *  Without this, it is 16 bytes on 64 bit but just 12 bytes on 32 bit.
+	 				 */
+} max_procs_t;
+
+#define MAX_PROCS_ARRAY_SIZE	MAX_DIGITS_IN_INT4 + 1 + MAX_DIGITS_IN_INT8 + 1 /* space for 4-byte "cnt" + space for "comma" + space
+										 * for 8-byte "time" + space for null byte terminator
+										 */
+
 /* Mapped space local to each node on the cluster */
 typedef struct node_local_struct
 {
@@ -715,12 +735,25 @@ typedef struct node_local_struct
 	uint4		blk_info_cnt;
 	int4		filler_8byte_align2;
 #	endif
-	global_latch_t	freeze_latch;		/* Protect freeze/freeze_online field updates */
-	gtm_uint64_t	wcs_buffs_freed; /* this is a count of the number of buffers transitioned to the free "queue" */
+	global_latch_t		freeze_latch;		/* Protect freeze/freeze_online field updates */
+	gtm_uint64_t		wcs_buffs_freed;	/* this is a count of the number of buffers transitioned to the free "queue" */
 	volatile gtm_uint64_t	dskspace_next_fire;
-	global_latch_t	lock_crit;		/* mutex for LOCK processing */
+	global_latch_t		lock_crit;		/* mutex for LOCK processing */
 	volatile block_id	tp_hint;
+	char			max_procs[MAX_PROCS_ARRAY_SIZE];
 } node_local;
+
+#define UPDATE_MAX_PROCS_STRING(NODE, MPS)	SNPRINTF(NODE->max_procs, MAX_PROCS_ARRAY_SIZE, "%d,%lu", MPS.cnt, MPS.time)
+
+#define UPDATE_MAX_PROCS(NODE, MPS)			\
+MBSTART{						\
+	if (NODE->ref_cnt > MPS.cnt)			\
+	{						\
+		MPS.cnt = NODE->ref_cnt;		\
+		MPS.time = time(NULL);			\
+		UPDATE_MAX_PROCS_STRING(NODE, MPS);	\
+	}						\
+} MBEND
 
 #define	COPY_STATSDB_FNAME_INTO_STATSREG(statsDBreg, statsDBfname, statsDBfname_len)				\
 MBSTART {													\

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -355,7 +355,8 @@ typedef UINTPTR_T uintszofptr_t;
 #define BITS_PER_UCHAR	8 /* note, C does not require this to be 8, see <limits.h> for definitions of CHAR_BIT and UCHAR_MAX */
 
 #define MAXPOSINT4		((int4)0x7fffffff)
-#define MAX_DIGITS_IN_INT	10	/* maximum number of decimal digits in a  4-byte integer */
+#define MAX_DIGITS_IN_INT4	10	/* maximum number of decimal digits in a  4-byte integer */
+#define MAX_DIGITS_IN_INT	MAX_DIGITS_IN_INT4
 #define MAX_DIGITS_IN_INT8	20	/* maximum number of decimal digits in an 8-byte integer */
 #define MAX_HEX_DIGITS_IN_SHORT	 4	/* maximum number if hexadecimal digits in a  2-byte integer */
 #define MAX_HEX_DIGITS_IN_INT	 8	/* maximum number of hexadecimal digits in a  4-byte integer */

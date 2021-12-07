@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -248,6 +248,8 @@ void dse_dmp_fhead (void)
 		util_out_print("  LOCK shares DB critical section     !AD", FALSE, 5, csd->lock_crit_with_db ? " TRUE" : "FALSE");
 		util_out_print("  Read Only                      !AD", TRUE, 3, csd->read_only ? " ON" : "OFF");
 		util_out_print("  Recover interrupted                 !AD", TRUE, 5, (csd->recov_interrupted ? " TRUE" : "FALSE"));
+		util_out_print("  Max conc proc time !22UL", FALSE, csd->max_procs.time);
+		util_out_print("  Max Concurrent processes !9UL", TRUE, csd->max_procs.cnt);
 		util_out_print("  Reorg Sleep Nanoseconds !17UL", TRUE, csd->reorg_sleep_nsec);
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
@@ -281,7 +283,7 @@ void dse_dmp_fhead (void)
 		util_out_print(0, new_line);
 		util_out_print("  Free Global Buffers            0x!XL", FALSE, freeque_cnt);
 		util_out_print("  wcs_wtstart pid count   0x!XL", TRUE, cnl->in_wtstart);
-		util_out_print("  Write Cache is Blocked              !AD", FALSE, 5, (cnl->wc_blocked ? " TRUE" : "FALSE"));
+		util_out_print("  Write Cache is Blocked              !AD", TRUE, 5, (cnl->wc_blocked ? " TRUE" : "FALSE"));
 		util_out_print("  Write Cache to be recovered         !AD", FALSE, 5,
 				((WC_BLOCK_RECOVER == cnl->wc_blocked) ? " TRUE" : "FALSE"));
 		util_out_print("  wcs_wtstart intent cnt  0x!XL", TRUE, cnl->intent_wtstart);

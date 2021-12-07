@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -290,7 +290,16 @@ void dse_chng_fhead(void)
 			cs_data->recov_interrupted = FALSE;
 	}
 	if ((CLI_PRESENT == cli_present("REFERENCE_COUNT")) && (cli_get_int("REFERENCE_COUNT", &x)))
+	{
 		cs_addrs->nl->ref_cnt = x;
+		UPDATE_MAX_PROCS(cs_addrs->nl, cs_data->max_procs);
+	}
+	if (CLI_PRESENT == cli_present("RESET_MAX_PROCS"))
+	{
+		cs_data->max_procs.cnt = 0;
+		cs_data->max_procs.time = time(NULL);
+		UPDATE_MAX_PROCS_STRING(cs_addrs->nl, cs_data->max_procs);
+	}
 	if ((CLI_PRESENT == cli_present("RESERVED_BYTES")) && (cli_get_int("RESERVED_BYTES", &x)))
 		cs_data->reserved_bytes = x;
 	if ((CLI_PRESENT == cli_present("DEF_COLLATION")) && (cli_get_int("DEF_COLLATION", &x)))

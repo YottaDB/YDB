@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -177,6 +177,7 @@ static readonly CLI_ENTRY dse_cfhead_qual[] = {
 { "REFERENCE_COUNT",           0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "REG_SEQNO",                 0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 { "RESERVED_BYTES",            0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "RESET_MAX_PROCS",           0, 0, 0,                     0,                          0, 0, VAL_N_A,     0, NON_NEG, 0,        0       },
 { "SIZE",                      0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "SLEEP_SPIN_COUNT",          0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "SPIN_SLEEP_MASK",           0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },

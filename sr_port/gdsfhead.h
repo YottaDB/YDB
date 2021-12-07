@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -2185,7 +2185,11 @@ typedef struct sgmnt_data_struct
 	char		filler_7k[440];
 	/************** YottaDB specific fields *********************/
 	uint4		reorg_sleep_nsec;	/* Time a MUPIP REORG sleeps before starting to process a GDS block */
-	char		filler_8k[1020];
+	char		filler_7k_4byte1[4];	/* Ensure 8 byte alignment for max_procs */
+	max_procs_t	max_procs;		/* count of the largest number of processes accessing the database
+						 * along with a timestamp.
+						 */
+	char		filler_8k[1000];
 	/********************************************************/
 	/* Master bitmap immediately follows. Tells whether the local bitmaps have any free blocks or not. */
 } sgmnt_data;

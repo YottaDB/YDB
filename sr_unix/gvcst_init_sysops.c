@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1580,6 +1580,13 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		if (is_bg)
 			db_csh_ini(csa);
 	}
+	if (new_shm_ipc)
+		UPDATE_MAX_PROCS_STRING(cnl, csd->max_procs);	/* We update the node_local's max_procs because we need
+								 * to make sure both cnl and csd are setup before we
+								 * update it. By updating it here, we ensure that it is
+								 * set and that it doesn't need to be updated with a call
+								 * to SNPRINTF every time we open a process.
+								 */
 	/* If this is a source server, bind this database to the journal pool shmid & instance file name that the
 	 * source server started with. Assert that jnlpool_init has already been done by the source server before
 	 * it does db_init.
@@ -1791,6 +1798,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	 * both callers. Therefore use interlocked INCR_CNT/DECR_CNT.
 	 */
 	INCR_CNT(&cnl->ref_cnt, &cnl->wc_var_lock);
+	UPDATE_MAX_PROCS(cnl, csd->max_procs);	/* Update the max_procs field if necessary since ref_cnt was incremented */
 	assert(!csa->ref_cnt);	/* Increment shared ref_cnt before private ref_cnt increment. */
 	csa->ref_cnt++;		/* Currently journaling logic in gds_rundown() in VMS relies on this order to detect last writer */
 	if (WBTEST_ENABLED(WBTEST_HOLD_SEM_BYPASS) && !IS_GTM_IMAGE)

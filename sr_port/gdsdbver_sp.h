@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,4 +63,5 @@ ENUM_ENTRY(GDSMVFILLER15),	/* Space reserved for GT.M changes to minor db format
 ENUM_ENTRY(GDSMVFILLER16),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMR126),		/* Includes GT.M V6.3-007 */
 ENUM_ENTRY(GDSMR130),
+ENUM_ENTRY(GDSMR134),		/* New field "max_procs" records max concurrent processes accessing database */
 ENUM_ENTRY(GDSMVLAST)

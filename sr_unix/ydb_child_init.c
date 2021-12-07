@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -366,6 +366,7 @@ STATICFNDEF void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_t
 		}
 		/* Bump shared memory reference count on behalf of child pid */
 		INCR_CNT(&cnl->ref_cnt, &cnl->wc_var_lock);
+		UPDATE_MAX_PROCS(cnl, csd->max_procs);	/* Update the max_procs field if necessary since ref_cnt was incremented */
 		/* Release ftok lock (if we grabbed it above) */
 		if (udi->grabbed_ftok_sem && !ftok_sem_release(reg, DECR_CNT_FALSE, IMMEDIATE_FALSE))
 		{

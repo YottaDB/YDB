@@ -1,9 +1,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2010-2017 Fidelity National Information		;
+; Copyright (c) 2010-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2020 YottaDB LLC. and/or its subsidiaries.	;
+; Copyright (c) 2017-2022 YottaDB LLC. and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -13916,6 +13916,25 @@ Init
 	Set gtmtypes("lvzwrite_datablk",10,"type")="addr"
 	Set gtmtypfldindx("lvzwrite_datablk","prev")=10
 	;
+	Set gtmtypes("max_procs_t")="struct"
+	Set gtmtypes("max_procs_t",0)=3
+	Set gtmtypes("max_procs_t","len")=16
+	Set gtmtypes("max_procs_t",1,"name")="max_procs_t.time"
+	Set gtmtypes("max_procs_t",1,"off")=0
+	Set gtmtypes("max_procs_t",1,"len")=8
+	Set gtmtypes("max_procs_t",1,"type")="time_t"
+	Set gtmtypfldindx("max_procs_t","time")=1
+	Set gtmtypes("max_procs_t",2,"name")="max_procs_t.cnt"
+	Set gtmtypes("max_procs_t",2,"off")=8
+	Set gtmtypes("max_procs_t",2,"len")=4
+	Set gtmtypes("max_procs_t",2,"type")="int32_t"
+	Set gtmtypfldindx("max_procs_t","cnt")=2
+	Set gtmtypes("max_procs_t",3,"name")="max_procs_t.filler_4byte2"
+	Set gtmtypes("max_procs_t",3,"off")=12
+	Set gtmtypes("max_procs_t",3,"len")=4
+	Set gtmtypes("max_procs_t",3,"type")="char"
+	Set gtmtypfldindx("max_procs_t","filler_4byte2")=3
+	;
 	Set gtmtypes("mcalloc_hdr")="struct"
 	Set gtmtypes("mcalloc_hdr",0)=4
 	Set gtmtypes("mcalloc_hdr","len")=24
@@ -17814,8 +17833,8 @@ Init
 	Set gtmtypfldindx("nametabent","name")=2
 	;
 	Set gtmtypes("node_local")="struct"
-	Set gtmtypes("node_local",0)=248
-	Set gtmtypes("node_local","len")=113360
+	Set gtmtypes("node_local",0)=249
+	Set gtmtypes("node_local","len")=113392
 	Set gtmtypes("node_local",1,"name")="node_local.label"
 	Set gtmtypes("node_local",1,"off")=0
 	Set gtmtypes("node_local",1,"len")=12
@@ -19066,6 +19085,11 @@ Init
 	Set gtmtypes("node_local",248,"len")=4
 	Set gtmtypes("node_local",248,"type")="int32_t"
 	Set gtmtypfldindx("node_local","tp_hint")=248
+	Set gtmtypes("node_local",249,"name")="node_local.max_procs"
+	Set gtmtypes("node_local",249,"off")=113356
+	Set gtmtypes("node_local",249,"len")=32
+	Set gtmtypes("node_local",249,"type")="char"
+	Set gtmtypfldindx("node_local","max_procs")=249
 	;
 	Set gtmtypes("noisolation_element")="struct"
 	Set gtmtypes("noisolation_element",0)=2
@@ -28133,7 +28157,7 @@ Init
 	Set gtmtypfldindx("sgmnt_addrs","mlkhash_shmid")=159
 	;
 	Set gtmtypes("sgmnt_data")="struct"
-	Set gtmtypes("sgmnt_data",0)=600
+	Set gtmtypes("sgmnt_data",0)=605
 	Set gtmtypes("sgmnt_data","len")=8192
 	Set gtmtypes("sgmnt_data",1,"name")="sgmnt_data.label"
 	Set gtmtypes("sgmnt_data",1,"off")=0
@@ -31145,11 +31169,36 @@ Init
 	Set gtmtypes("sgmnt_data",599,"len")=4
 	Set gtmtypes("sgmnt_data",599,"type")="uint32_t"
 	Set gtmtypfldindx("sgmnt_data","reorg_sleep_nsec")=599
-	Set gtmtypes("sgmnt_data",600,"name")="sgmnt_data.filler_8k"
+	Set gtmtypes("sgmnt_data",600,"name")="sgmnt_data.filler_7k_4byte1"
 	Set gtmtypes("sgmnt_data",600,"off")=7172
-	Set gtmtypes("sgmnt_data",600,"len")=1020
+	Set gtmtypes("sgmnt_data",600,"len")=4
 	Set gtmtypes("sgmnt_data",600,"type")="char"
-	Set gtmtypfldindx("sgmnt_data","filler_8k")=600
+	Set gtmtypfldindx("sgmnt_data","filler_7k_4byte1")=600
+	Set gtmtypes("sgmnt_data",601,"name")="sgmnt_data.max_procs"
+	Set gtmtypes("sgmnt_data",601,"off")=7176
+	Set gtmtypes("sgmnt_data",601,"len")=16
+	Set gtmtypes("sgmnt_data",601,"type")="max_procs_t"
+	Set gtmtypfldindx("sgmnt_data","max_procs")=601
+	Set gtmtypes("sgmnt_data",602,"name")="sgmnt_data.max_procs.time"
+	Set gtmtypes("sgmnt_data",602,"off")=7176
+	Set gtmtypes("sgmnt_data",602,"len")=8
+	Set gtmtypes("sgmnt_data",602,"type")="time_t"
+	Set gtmtypfldindx("sgmnt_data","max_procs.time")=602
+	Set gtmtypes("sgmnt_data",603,"name")="sgmnt_data.max_procs.cnt"
+	Set gtmtypes("sgmnt_data",603,"off")=7184
+	Set gtmtypes("sgmnt_data",603,"len")=4
+	Set gtmtypes("sgmnt_data",603,"type")="int32_t"
+	Set gtmtypfldindx("sgmnt_data","max_procs.cnt")=603
+	Set gtmtypes("sgmnt_data",604,"name")="sgmnt_data.max_procs.filler_4byte2"
+	Set gtmtypes("sgmnt_data",604,"off")=7188
+	Set gtmtypes("sgmnt_data",604,"len")=4
+	Set gtmtypes("sgmnt_data",604,"type")="char"
+	Set gtmtypfldindx("sgmnt_data","max_procs.filler_4byte2")=604
+	Set gtmtypes("sgmnt_data",605,"name")="sgmnt_data.filler_8k"
+	Set gtmtypes("sgmnt_data",605,"off")=7192
+	Set gtmtypes("sgmnt_data",605,"len")=1000
+	Set gtmtypes("sgmnt_data",605,"type")="char"
+	Set gtmtypfldindx("sgmnt_data","filler_8k")=605
 	;
 	Set gtmtypes("shm_forw_multi_t")="struct"
 	Set gtmtypes("shm_forw_multi_t",0)=20
@@ -31326,7 +31375,7 @@ Init
 	Set gtmtypes("shm_reg_ctl_t",9,"dim")=3
 	;
 	Set gtmtypes("shm_snapshot_t")="struct"
-	Set gtmtypes("shm_snapshot_t",0)=616
+	Set gtmtypes("shm_snapshot_t",0)=621
 	Set gtmtypes("shm_snapshot_t","len")=12368
 	Set gtmtypes("shm_snapshot_t",1,"name")="shm_snapshot_t.ss_info"
 	Set gtmtypes("shm_snapshot_t",1,"off")=0
@@ -34418,11 +34467,36 @@ Init
 	Set gtmtypes("shm_snapshot_t",615,"len")=4
 	Set gtmtypes("shm_snapshot_t",615,"type")="uint32_t"
 	Set gtmtypfldindx("shm_snapshot_t","shadow_file_header.reorg_sleep_nsec")=615
-	Set gtmtypes("shm_snapshot_t",616,"name")="shm_snapshot_t.shadow_file_header.filler_8k"
+	Set gtmtypes("shm_snapshot_t",616,"name")="shm_snapshot_t.shadow_file_header.filler_7k_4byte1"
 	Set gtmtypes("shm_snapshot_t",616,"off")=11348
-	Set gtmtypes("shm_snapshot_t",616,"len")=1020
+	Set gtmtypes("shm_snapshot_t",616,"len")=4
 	Set gtmtypes("shm_snapshot_t",616,"type")="char"
-	Set gtmtypfldindx("shm_snapshot_t","shadow_file_header.filler_8k")=616
+	Set gtmtypfldindx("shm_snapshot_t","shadow_file_header.filler_7k_4byte1")=616
+	Set gtmtypes("shm_snapshot_t",617,"name")="shm_snapshot_t.shadow_file_header.max_procs"
+	Set gtmtypes("shm_snapshot_t",617,"off")=11352
+	Set gtmtypes("shm_snapshot_t",617,"len")=16
+	Set gtmtypes("shm_snapshot_t",617,"type")="max_procs_t"
+	Set gtmtypfldindx("shm_snapshot_t","shadow_file_header.max_procs")=617
+	Set gtmtypes("shm_snapshot_t",618,"name")="shm_snapshot_t.shadow_file_header.max_procs.time"
+	Set gtmtypes("shm_snapshot_t",618,"off")=11352
+	Set gtmtypes("shm_snapshot_t",618,"len")=8
+	Set gtmtypes("shm_snapshot_t",618,"type")="time_t"
+	Set gtmtypfldindx("shm_snapshot_t","shadow_file_header.max_procs.time")=618
+	Set gtmtypes("shm_snapshot_t",619,"name")="shm_snapshot_t.shadow_file_header.max_procs.cnt"
+	Set gtmtypes("shm_snapshot_t",619,"off")=11360
+	Set gtmtypes("shm_snapshot_t",619,"len")=4
+	Set gtmtypes("shm_snapshot_t",619,"type")="int32_t"
+	Set gtmtypfldindx("shm_snapshot_t","shadow_file_header.max_procs.cnt")=619
+	Set gtmtypes("shm_snapshot_t",620,"name")="shm_snapshot_t.shadow_file_header.max_procs.filler_4byte2"
+	Set gtmtypes("shm_snapshot_t",620,"off")=11364
+	Set gtmtypes("shm_snapshot_t",620,"len")=4
+	Set gtmtypes("shm_snapshot_t",620,"type")="char"
+	Set gtmtypfldindx("shm_snapshot_t","shadow_file_header.max_procs.filler_4byte2")=620
+	Set gtmtypes("shm_snapshot_t",621,"name")="shm_snapshot_t.shadow_file_header.filler_8k"
+	Set gtmtypes("shm_snapshot_t",621,"off")=11368
+	Set gtmtypes("shm_snapshot_t",621,"len")=1000
+	Set gtmtypes("shm_snapshot_t",621,"type")="char"
+	Set gtmtypfldindx("shm_snapshot_t","shadow_file_header.filler_8k")=621
 	;
 	Set gtmtypes("shmpool_blk_hdr")="struct"
 	Set gtmtypes("shmpool_blk_hdr",0)=11
@@ -34484,7 +34558,7 @@ Init
 	Set gtmtypfldindx("shmpool_blk_hdr","image_count")=11
 	;
 	Set gtmtypes("shmpool_buff_hdr")="struct"
-	Set gtmtypes("shmpool_buff_hdr",0)=629
+	Set gtmtypes("shmpool_buff_hdr",0)=634
 	Set gtmtypes("shmpool_buff_hdr","len")=8560
 	Set gtmtypes("shmpool_buff_hdr",1,"name")="shmpool_buff_hdr.shmpool_crit_latch"
 	Set gtmtypes("shmpool_buff_hdr",1,"off")=0
@@ -37641,11 +37715,36 @@ Init
 	Set gtmtypes("shmpool_buff_hdr",628,"len")=4
 	Set gtmtypes("shmpool_buff_hdr",628,"type")="uint32_t"
 	Set gtmtypfldindx("shmpool_buff_hdr","shadow_file_header.reorg_sleep_nsec")=628
-	Set gtmtypes("shmpool_buff_hdr",629,"name")="shmpool_buff_hdr.shadow_file_header.filler_8k"
+	Set gtmtypes("shmpool_buff_hdr",629,"name")="shmpool_buff_hdr.shadow_file_header.filler_7k_4byte1"
 	Set gtmtypes("shmpool_buff_hdr",629,"off")=7540
-	Set gtmtypes("shmpool_buff_hdr",629,"len")=1020
+	Set gtmtypes("shmpool_buff_hdr",629,"len")=4
 	Set gtmtypes("shmpool_buff_hdr",629,"type")="char"
-	Set gtmtypfldindx("shmpool_buff_hdr","shadow_file_header.filler_8k")=629
+	Set gtmtypfldindx("shmpool_buff_hdr","shadow_file_header.filler_7k_4byte1")=629
+	Set gtmtypes("shmpool_buff_hdr",630,"name")="shmpool_buff_hdr.shadow_file_header.max_procs"
+	Set gtmtypes("shmpool_buff_hdr",630,"off")=7544
+	Set gtmtypes("shmpool_buff_hdr",630,"len")=16
+	Set gtmtypes("shmpool_buff_hdr",630,"type")="max_procs_t"
+	Set gtmtypfldindx("shmpool_buff_hdr","shadow_file_header.max_procs")=630
+	Set gtmtypes("shmpool_buff_hdr",631,"name")="shmpool_buff_hdr.shadow_file_header.max_procs.time"
+	Set gtmtypes("shmpool_buff_hdr",631,"off")=7544
+	Set gtmtypes("shmpool_buff_hdr",631,"len")=8
+	Set gtmtypes("shmpool_buff_hdr",631,"type")="time_t"
+	Set gtmtypfldindx("shmpool_buff_hdr","shadow_file_header.max_procs.time")=631
+	Set gtmtypes("shmpool_buff_hdr",632,"name")="shmpool_buff_hdr.shadow_file_header.max_procs.cnt"
+	Set gtmtypes("shmpool_buff_hdr",632,"off")=7552
+	Set gtmtypes("shmpool_buff_hdr",632,"len")=4
+	Set gtmtypes("shmpool_buff_hdr",632,"type")="int32_t"
+	Set gtmtypfldindx("shmpool_buff_hdr","shadow_file_header.max_procs.cnt")=632
+	Set gtmtypes("shmpool_buff_hdr",633,"name")="shmpool_buff_hdr.shadow_file_header.max_procs.filler_4byte2"
+	Set gtmtypes("shmpool_buff_hdr",633,"off")=7556
+	Set gtmtypes("shmpool_buff_hdr",633,"len")=4
+	Set gtmtypes("shmpool_buff_hdr",633,"type")="char"
+	Set gtmtypfldindx("shmpool_buff_hdr","shadow_file_header.max_procs.filler_4byte2")=633
+	Set gtmtypes("shmpool_buff_hdr",634,"name")="shmpool_buff_hdr.shadow_file_header.filler_8k"
+	Set gtmtypes("shmpool_buff_hdr",634,"off")=7560
+	Set gtmtypes("shmpool_buff_hdr",634,"len")=1000
+	Set gtmtypes("shmpool_buff_hdr",634,"type")="char"
+	Set gtmtypfldindx("shmpool_buff_hdr","shadow_file_header.filler_8k")=634
 	;
 	Set gtmtypes("show_reply")="struct"
 	Set gtmtypes("show_reply",0)=2
@@ -43706,6 +43805,7 @@ Init
 	Set gtmstructs("lv_xnewref_struct")="lv_xnew_ref"
 	Set gtmstructs("lvname_info_struct")="lvname_info"
 	Set gtmstructs("lvzwrite_datablk_struct")="lvzwrite_datablk"
+	Set gtmstructs("max_procs")="max_procs_t"
 	Set gtmstructs("mcalloc_hdr_struct")="mcalloc_hdr"
 	Set gtmstructs("mem_list_struct")="mem_list"
 	Set gtmstructs("merge_glvn_struct_type")="merge_glvn_struct"
