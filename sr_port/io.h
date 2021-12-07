@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -487,20 +487,31 @@ LITREF unsigned char ebcdic_spaces_block[];
 	}															\
 }
 
-#define DEF_EXCEPTION(PP, P_OFF, IOD)					\
-MBSTART {								\
-	mval	MV;							\
-									\
-	MV.mvtype = MV_STR;						\
-	MV.str.len = (int)(*(PP->str.addr + P_OFF));			\
-	MV.str.addr = (char *)(PP->str.addr + P_OFF + 1);		\
-	if (!(ZTRAP_ENTRYREF & TREF(ztrap_form)))			\
-	{								\
-		op_commarg(&MV, indir_linetail);			\
-		op_unwind();						\
-	}								\
-	IOD->error_handler = MV.str;					\
-	s2pool(&IOD->error_handler);					\
+#define DEF_EXCEPTION(PP, P_OFF, IOD)							\
+MBSTART {										\
+	mval	*tmpMV;									\
+											\
+	/* Note: It is possible that PP->str.addr points to the stringpool.		\
+	 * In this case, it could get relocated if a "stp_gcol" call happens		\
+	 * inside the "op_commarg" call below. We want the relocated value to		\
+	 * be stored in "IOD->error_handler" at the end of this macro. Hence		\
+	 * the push of a temporary mval onto the M-stack. Not doing this can cause	\
+	 * the "cache_put" call inside "op_commarg" to potentially store indirection	\
+	 * code that points to a stale stringpool.					\
+	 */										\
+	PUSH_MV_STENT(MVST_MVAL); /* needed to protect from stp_gcol */			\
+	tmpMV = &mv_chain->mv_st_cont.mvs_mval;						\
+	tmpMV->mvtype = MV_STR;								\
+	tmpMV->str.len = (int)(*(PP->str.addr + P_OFF));				\
+	tmpMV->str.addr = (char *)(PP->str.addr + P_OFF + 1);				\
+	if (!(ZTRAP_ENTRYREF & TREF(ztrap_form)))					\
+	{										\
+		op_commarg(tmpMV, indir_linetail);					\
+		op_unwind();								\
+	}										\
+	IOD->error_handler = tmpMV->str;						\
+	s2pool(&IOD->error_handler);							\
+	POP_MV_STENT();									\
 } MBEND
 
 #define	ONE_COMMA		"1,"

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #include "cacheflush.h"
 #include "gtm_text_alloc.h"
 #include "io.h"
+#include "stringpool.h"
 
 GBLREF	hash_table_objcode	cache_table;
 GBLREF	int			indir_cache_mem_size;
@@ -42,6 +43,7 @@ void cache_put(icode_str *src, mstr *object)
 	csp = (cache_entry *)GTM_TEXT_ALLOC(ICACHE_SIZE + object->len);
 	csp->obj.addr = (char *)csp + ICACHE_SIZE;
 	csp->refcnt = csp->zb_refcnt = 0;
+	assert(!IS_IN_UNUSED_STRINGPOOL(src->str.addr, src->str.len));
 	csp->src = *src;
 	csp->obj.len = object->len;
 	memcpy(csp->obj.addr, object->addr, object->len);

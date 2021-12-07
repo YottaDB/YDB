@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,6 +46,8 @@ GBLREF	spdesc		stringpool;
 		((((unsigned char *)PTR + (int)(LEN)) <= stringpool.top) && ((unsigned char *)PTR >= stringpool.base))
 #define	IS_AT_END_OF_STRINGPOOL(PTR, LEN)		(((unsigned char *)PTR + (int)(LEN)) == stringpool.free)
 #define	INVOKE_STP_GCOL(SPC)		stp_gcol(SPC);								/* BYPASSOK */
+#define	IS_IN_UNUSED_STRINGPOOL(PTR, LEN)		\
+		((LEN) && ((((unsigned char *)PTR + (int)(LEN)) <= stringpool.top) && ((unsigned char *)PTR >= stringpool.free)))
 
 #ifdef DEBUG
 #define STRINGPOOL_UNUSABLE_AT_BUFFER_SIZE	128
