@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,7 +55,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	struct CLB	*clb_ptr;
 	link_info	*li;
 	unsigned char	*ptr, *top, *fn, *libuff;
-	char		*trans_name, *tmpptr;
+	char		*trans_name;
 	bool		new = FALSE;
 	int		len, nbytes;
 	int4		status;
@@ -106,12 +106,14 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 		{
 			if (SS_LOG2LONG == status)
 			{
+				char	*tmpptr;
+
 				tmpptr = (char *)(is_ydb_env_match ? ydbenvname[YDBENVINDX_CM_PREFIX]
 								: gtmenvname[YDBENVINDX_CM_PREFIX]);
 				nbytes = SNPRINTF((char *)buff, SIZEOF(buff), "%s%.*s", tmpptr, node.len, node.addr);
 				if ((0 < nbytes) && (SIZEOF(buff) > nbytes))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
-								ERR_LOGTOOLONG, 3, nbytes, tmpptr, SIZEOF(buff) - 1);
+								ERR_LOGTOOLONG, 3, nbytes, buff, SIZEOF(buff) - 1);
 				else
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 							LEN_AND_LIT("SNPRINTF(gvcmy_open)"), CALLFROM, errno);
