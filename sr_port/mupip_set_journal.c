@@ -216,6 +216,9 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				exit_status |= EXIT_WRN;
 				gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE);
 				exit_status |= gds_rundown_status;
+				/* Note: cs_addrs would have been freed inside "gds_rundown" so we cannot
+				 * set (or assert) "cs_addrs->hdr" to NULL.
+				 */
 				rptr->sd = NULL;
 				rptr->state = NONALLOCATED;	/* This means do not call "gds_rundown" again for this region
 								 * and do not process this region anymore. */
@@ -230,6 +233,9 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			exit_status |= status;
 			gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE);
 			exit_status |= gds_rundown_status;
+			/* Note: cs_addrs would have been freed inside "gds_rundown" so we cannot
+			 * set (or assert) "cs_addrs->hdr" to NULL.
+			 */
 			rptr->sd = NULL;
 			rptr->state = NONALLOCATED;	/* This means do not call "gds_rundown" again for this region
 							 * and do not process this region anymore. */
@@ -269,8 +275,11 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			 */
 			gds_rundown_status = gds_rundown(CLEANUP_UDI_FALSE);
 			exit_status |= gds_rundown_status;
+			/* Note: cs_addrs would have been freed inside "gds_rundown" so we cannot
+			 * set (or assert) "cs_addrs->hdr" to NULL.
+			 */
+			rptr->sd = NULL;
 			rptr->state = NONALLOCATED;
-			rptr->sd = csd = NULL;
 			/* WARNING: The remaining code uses gv_cur_region and others
 			 * on the assumption that gds_rundown does not deallocate the space when it closes the file */
 			assert(NULL != gv_cur_region);
