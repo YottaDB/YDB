@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,9 +41,7 @@ cmi_status_t cmi_close(struct CLB *c);
 struct CLB *cmu_getclb(cmi_descriptor *node, cmi_descriptor *task);
 struct NTD *cmu_ntdroot(void);
 
-#ifndef RELQUE2PTR
-#define RELQUE2PTR(X) (((unsigned char *) &(X)) + ((int4) (X)))
-#endif
+#define RELQUE2PTR(X) (void_ptr_t)(((unsigned char *) &(X)) + ((INTPTR_T) (X)))
 #define PTR2RELQUE(DESTINATION,TARGET) (DESTINATION = (((unsigned char *) &(TARGET)) - ((unsigned char *) &(DESTINATION))))
 #define QUEENT2CLB(QP, QH) (struct CLB *)((char *)(QP) - (char *)&(((struct CLB *)(0))->QH))
 

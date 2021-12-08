@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -155,8 +155,6 @@ struct NTD
 };
 
 #include "iosp.h"
-
-#define RELQUE2PTR(X) (void_ptr_t)(((unsigned char *) &(X)) + ((int4) (X)))
 
 #define CMI_ERROR(s)		((s) != SS_NORMAL)
 #define CMI_CLB_IOSTATUS(c)	((c)->deferred_status)
