@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -216,13 +216,13 @@ unsigned char mu_cre_file(void)
 		PUTMSG_ERROR_CSA(cs_addrs, 4, ERR_FNTRANSERROR, 2, REG_LEN_STR(gv_cur_region));
 		return EXIT_ERR;
 	}
-	path[pblk.b_esl] = 0;
 	if (pblk.fnb & F_HAS_NODE)
 	{	/* Remote node specification given */
 		assert(pblk.b_node);
 		PUTMSG_ERROR_CSA(cs_addrs, 4, ERR_NOCRENETFILE, 2, LEN_AND_STR(path));
 		return EXIT_WRN;
 	}
+	path[pblk.b_esl] = 0;
 	udi = &udi_struct;
 	memset(udi, 0, SIZEOF(unix_db_info));
 	/* Check if this file is an encrypted database. If yes, do init */
