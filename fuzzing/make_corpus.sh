@@ -28,14 +28,9 @@ mkdir env
 cd env
 
 echo "Running afl-cmin..."
-#afl-cmin -m none -t 5000 -i ../NotMinCorpus/ -o inputs -- ../build-instrumented/yottadb -dir
-afl-cmin -i ../NotMinCorpus/ -o inputs -- ../build-instrumented/yottadb -dir
+afl-cmin -i ../NotMinCorpus/ -o ../inputs -- ../build-instrumented/yottadb -dir
 
 cd ..
-
-#echo "Currently, afl-cmin is having trouble processing the inputs, I'm not sure why." #TODO
-#cp -r NotMinCorpus inputs
-
 
 echo "Cleanup"
 rm -rf env
