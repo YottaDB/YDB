@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -161,7 +161,7 @@ bool gvcmy_remlkmgr(unsigned short count, uint8 nsec_timeout, ABS_TIME *end_time
 				if (CMMS_E_ERROR != *(lktask_x->mbf))
 				{
 					SNPRINTF(errbuf, CM_ERRBUFF_SIZE, "gvcmy_remlkmgr 3: expected CMMS_E_ERROR, got %d",
-						(int)(*(lkerrlnk->mbf)));
+						(int)(*(lktask_x->mbf)));
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2,
 						LEN_AND_STR(errbuf));
 				}
