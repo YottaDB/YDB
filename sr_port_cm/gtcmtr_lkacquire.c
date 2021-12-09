@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@
 
 GBLREF connection_struct *curr_entry;
 
-bool gtcmtr_lkacquire(void)
+cm_op_t gtcmtr_lkacquire(void)
 {
 	unsigned char *ptr, return_val, action, incr;
 	cm_region_list *reg_walk;
@@ -47,9 +47,8 @@ bool gtcmtr_lkacquire(void)
 		curr_entry->state |= CMMS_L_LKACQUIRE;
 		return_val = gtcml_dolock();
 
-		if ((curr_entry->transnum == curr_entry->lk_cancel) ||
-			(return_val == CMMS_M_LKBLOCKED) ||
-			(return_val == CMLCK_REQUEUE))
+		if ((curr_entry->transnum == curr_entry->lk_cancel)
+				|| (return_val == CMMS_M_LKBLOCKED) || (return_val == CMLCK_REQUEUE))
 			return CM_NOOP;
 	}
 

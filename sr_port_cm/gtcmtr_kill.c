@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,7 @@ GBLREF jnl_process_vector *originator_prc_vec;
 
 error_def(ERR_DBPRIVERR);
 
-bool gtcmtr_kill(void)
+cm_op_t gtcmtr_kill(void)
 {
 	cm_region_list	*reg_ref;
 	unsigned char	*ptr, regnum;
@@ -85,5 +85,5 @@ bool gtcmtr_kill(void)
 	ptr = curr_entry->clb_ptr->mbf;
 	*ptr++ = CMMS_R_KILL;
 	curr_entry->clb_ptr->cbl = S_HDRSIZE;
-	return TRUE;
+	return CM_WRITE;
 }

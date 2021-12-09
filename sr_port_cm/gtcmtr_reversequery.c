@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,7 @@ GBLREF gd_region        *gv_cur_region;
  * and copies the result (which is in "gv_altkey") in a message that is sent back to the client by the caller.
  * Also note that the general flow below is similar to that of "gtcmtr_query.c".
  */
-bool gtcmtr_reversequery(void)
+cm_op_t gtcmtr_reversequery(void)
 {
 	unsigned char	*ptr, *gv_key_top_ptr, regnum;
 	unsigned short	top, old_top;
@@ -104,5 +104,5 @@ bool gtcmtr_reversequery(void)
 	}
 	PUT_USHORT(gv_key_top_ptr, old_top); /* ((gv_key *)ptr)->top = old_top; */
 	curr_entry->clb_ptr->cbl = msg_len;
-	return TRUE;
+	return CM_WRITE;
 }

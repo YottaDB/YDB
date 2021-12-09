@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@
 
 GBLREF connection_struct *curr_entry;
 
-bool gtcmtr_lkreqnode(void)
+cm_op_t gtcmtr_lkreqnode(void)
 {
 	unsigned char *ptr;
 
@@ -34,5 +34,5 @@ bool gtcmtr_lkreqnode(void)
 	ptr++;
 	gtcml_lkhold();
 	gtcml_lklist();
-	return FALSE;
+	return CM_READ;
 }

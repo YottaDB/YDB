@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@
 
 GBLREF connection_struct *curr_entry;
 
-bool gtcmtr_lkresume(void)
+cm_op_t gtcmtr_lkresume(void)
 {
 	unsigned char *ptr, return_val;
 	cm_region_list *reg_walk;
@@ -42,5 +42,5 @@ bool gtcmtr_lkresume(void)
 
 	*curr_entry->clb_ptr->mbf = return_val;
 	curr_entry->clb_ptr->cbl  = 1;
-	return TRUE;
+	return CM_WRITE;
 }

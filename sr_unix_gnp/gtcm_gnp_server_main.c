@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -147,7 +147,7 @@ STATICFNDEF void gtcm_gnp_server_actions(void)
 {
 	int4			status;
 	unsigned short		value;
-	char			reply;
+	cm_op_t			reply;
 	connection_struct	*prev_curr_entry;
 	CMI_MUTEX_DECL(cmi_mutex_rc);
 	DCL_THREADGBL_ACCESS;
@@ -282,7 +282,7 @@ STATICFNDEF void gtcm_gnp_server_actions(void)
 					reply = gtcmtr_increment();
 					break;
 				default:		/* not a valid msg */
-					reply = FALSE;
+					reply = CM_READ;
 					GET_LONG(status, curr_entry->clb_ptr->mbf);	/* Fetch error value from msg */
 					if (SS_NORMAL != status)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_BADGTMNETMSG, 1, status);

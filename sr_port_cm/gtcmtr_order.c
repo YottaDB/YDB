@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@ GBLREF gd_region		*gv_cur_region;
 error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
 
-bool gtcmtr_order(void)
+cm_op_t gtcmtr_order(void)
 {
 	boolean_t		found;
 	unsigned char		*ptr, regnum;
@@ -183,5 +183,5 @@ bool gtcmtr_order(void)
 	PUT_USHORT(ptr, old_top); /* ((gv_key *)ptr)->top = old_top; */
 	curr_entry->clb_ptr->cbl = SIZEOF(unsigned char) + SIZEOF(unsigned short) + SIZEOF(unsigned char) + len;
 	reset_gv_target = INVALID_GV_TARGET;
-	return TRUE;
+	return CM_WRITE;
 }

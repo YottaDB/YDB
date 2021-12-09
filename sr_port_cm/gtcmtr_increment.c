@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@ error_def(ERR_KEY2BIG);
 error_def(ERR_GVIS);
 error_def(ERR_DBPRIVERR);
 
-bool	gtcmtr_increment(void)
+cm_op_t gtcmtr_increment(void)
 {
 	cm_region_list	*reg_ref;
 	mval		incr_delta, post_incr;
@@ -123,5 +123,5 @@ bool	gtcmtr_increment(void)
 		*ptr++ = CMMS_R_UNDEF;
 	}
 	curr_entry->clb_ptr->cbl = ptr - curr_entry->clb_ptr->mbf;
-	return TRUE;
+	return CM_WRITE;
 }

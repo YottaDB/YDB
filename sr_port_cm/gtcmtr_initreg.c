@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,7 @@ error_def(ERR_UNIMPLOP);
 error_def(ERR_TEXT);
 error_def(ERR_GVIS);
 
-bool gtcmtr_initreg(void)
+cm_op_t gtcmtr_initreg(void)
 {
 	cm_region_head	*region;
 	cm_region_list	*list_entry;
@@ -92,5 +92,5 @@ bool gtcmtr_initreg(void)
 	if (curr_entry->cli_supp_allowexisting_stdnullcoll)
 		*reply++ = region->reg->std_null_coll;
 	curr_entry->clb_ptr->cbl = reply - curr_entry->clb_ptr->mbf;
-	return TRUE;
+	return CM_WRITE;
 }

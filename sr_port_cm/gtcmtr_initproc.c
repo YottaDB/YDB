@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,7 @@ GBLREF struct NTD *ntd_root;
 GBLREF struct CLB *proc_to_clb[];	/* USHRT_MAX + 1 so procnum can wrap */
 GBLREF jnl_process_vector *originator_prc_vec;
 
-bool gtcmtr_initproc(void)
+cm_op_t gtcmtr_initproc(void)
 {
 	unsigned char *reply;
         unsigned short beginprocnum;

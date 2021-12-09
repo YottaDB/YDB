@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,9 +38,12 @@
 #define	CM_ZALLOCATES		0x80
 #define	CM_NOLKCANCEL		256
 
-#define	CM_WRITE		1
-#define	CM_READ			0
-#define	CM_NOOP			2
+typedef enum
+{
+	CM_READ = 0,
+	CM_WRITE = 1,
+	CM_NOOP = 2,
+} cm_op_t;
 
 #define CMMS_E_ERROR		1	/* [0x01] */
 #define CMMS_L_LKCANALL		2	/* [0x02] */

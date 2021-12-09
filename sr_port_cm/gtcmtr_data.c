@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,7 @@ GBLREF gv_key		*gv_currkey;
 
 LITREF mval		*fndata_table[2][2];
 
-bool gtcmtr_data(void)
+cm_op_t gtcmtr_data(void)
 {
 	cm_region_list *reg_ref;
 	unsigned char *ptr,regnum;
@@ -67,5 +67,5 @@ bool gtcmtr_data(void)
 	ptr += SIZEOF(unsigned short);
 	*ptr++ = MV_FORCE_INTD(&v);
 	curr_entry->clb_ptr->cbl = ptr - curr_entry->clb_ptr->mbf;
-	return TRUE;
+	return CM_WRITE;
 }

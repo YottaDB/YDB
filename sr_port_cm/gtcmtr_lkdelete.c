@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,7 @@ GBLREF mlk_pvtblk *mlk_cm_root;
 GBLREF unsigned short cm_cmd_lk_ct;
 GBLREF connection_struct *curr_entry;
 
-bool gtcmtr_lkdelete(void)
+cm_op_t gtcmtr_lkdelete(void)
 {
 	cm_region_list *reg_walk;
 	unsigned char *ptr, laflag;
@@ -62,5 +62,5 @@ bool gtcmtr_lkdelete(void)
 	}
 	*curr_entry->clb_ptr->mbf = CMMS_M_LKDELETED;
 	curr_entry->clb_ptr->cbl = 1;
-	return TRUE;
+	return CM_WRITE;
 }

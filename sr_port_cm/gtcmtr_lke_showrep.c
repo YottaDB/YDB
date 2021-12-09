@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,7 @@ GBLREF	connection_struct	*curr_entry;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	short			crash_count;
 
-char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
+cm_op_t gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 {
 	gd_region		*cur_region;
 	sgmnt_addrs		*csa;

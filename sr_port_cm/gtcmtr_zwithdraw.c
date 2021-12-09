@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,7 @@ GBLREF gv_key			*gv_currkey;
 GBLREF gv_namehead		*gv_target;
 GBLREF gd_region		*gv_cur_region;
 
-bool gtcmtr_zwithdraw(void)
+cm_op_t gtcmtr_zwithdraw(void)
 {
 	cm_region_list	*reg_ref;
 	unsigned char	*ptr, regnum;
@@ -59,5 +59,5 @@ bool gtcmtr_zwithdraw(void)
 	ptr = curr_entry->clb_ptr->mbf;
 	*ptr++ = CMMS_R_ZWITHDRAW;
 	curr_entry->clb_ptr->cbl = S_HDRSIZE;
-	return TRUE;
+	return CM_WRITE;
 }
