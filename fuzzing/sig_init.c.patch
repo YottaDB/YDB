@@ -1,0 +1,4 @@
+151c151
+< 				sigaction(sig, &gen_action, NULL);
+---
+> 				//sigaction(sig, &gen_action, NULL);
