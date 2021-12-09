@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,6 +13,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "cmidef.h"
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
@@ -24,13 +25,15 @@
 #include "gdsfhead.h"
 #include "gtm_string.h"
 #include "gvcmz.h"
+#include "callg.h"
 
 GBLREF gd_region *gv_cur_region;
 GBLREF gv_key *gv_currkey;
 
 void gvcmz_error(char code, uint4 status)
 {
-	INTPTR_T	err[6], *ptr;
+	void		**ptr;
+	gparam_list	err_plist;
 	bool		gv_error;
 
 	error_def(ERR_GVDATAFAIL);
@@ -64,31 +67,31 @@ void gvcmz_error(char code, uint4 status)
 			memset(gv_currkey->base,0,gv_currkey->end + 1);
 			break;
 	}
-	ptr = &err[1];
+	ptr = &err_plist.arg[0];
 	gv_error = TRUE;
 	switch(code)
 	{
 	case CMMS_Q_DATA:
-		*ptr++ = ERR_GVDATAFAIL;
+		*ptr++ = (void *)ERR_GVDATAFAIL;
 		break;
 	case CMMS_Q_GET:
-		*ptr++ = ERR_GVGETFAIL;
+		*ptr++ = (void *)ERR_GVGETFAIL;
 		break;
 	case CMMS_Q_ZWITHDRAW:
 	case CMMS_Q_KILL:
-		*ptr++ = ERR_GVKILLFAIL;
+		*ptr++ = (void *)ERR_GVKILLFAIL;
 		break;
 	case CMMS_Q_ORDER:
-		*ptr++ = ERR_GVORDERFAIL;
+		*ptr++ = (void *)ERR_GVORDERFAIL;
 		break;
 	case CMMS_Q_PUT:
-		*ptr++ = ERR_GVPUTFAIL;
+		*ptr++ = (void *)ERR_GVPUTFAIL;
 		break;
 	case CMMS_Q_QUERY:
-		*ptr++ = ERR_GVQUERYFAIL;
+		*ptr++ = (void *)ERR_GVQUERYFAIL;
 		break;
 	case CMMS_Q_PREV:
-		*ptr++ = ERR_GVZPREVFAIL;
+		*ptr++ = (void *)ERR_GVZPREVFAIL;
 		break;
 	case CMMS_L_LKCANALL:
 	case CMMS_L_LKCANCEL:
@@ -101,23 +104,23 @@ void gvcmz_error(char code, uint4 status)
 	case CMMS_L_LKSUSPEND:
 	case CMMS_U_LKEDELETE:
 	case CMMS_U_LKESHOW:
-		*ptr++ = ERR_NETLCKFAIL;
-		*ptr++ = 0;
+		*ptr++ = (void *)ERR_NETLCKFAIL;
+		*ptr++ = (void *)0;
 		gv_error = FALSE;
 		break;
 	default:
-		*ptr++ = ERR_NETFAIL;
-		*ptr++ = 0;
+		*ptr++ = (void *)ERR_NETFAIL;
+		*ptr++ = (void *)0;
 		gv_error = FALSE;
 		break;
 	}
 	if (gv_error)
 	{
-		*ptr++ = 2;
-		*ptr++ = 9;
-		*ptr++ = (INTPTR_T)"Net error";
+		*ptr++ = (void *)2;
+		*ptr++ = (void *)9;
+		*ptr++ = (void *)"Net error";
 	}
-	*ptr++  = status;
-	err[0] = ptr - err - 1;
-	gvcmz_neterr(&err[0]);
+	*ptr++ = (void *)(INTPTR_T)status;
+	err_plist.n = ptr - &err_plist.arg[0];
+	gvcmz_neterr(&err_plist);
 }

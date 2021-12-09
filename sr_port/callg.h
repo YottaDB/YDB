@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,8 +23,8 @@ typedef struct gparam_list_struct
 
 typedef	INTPTR_T (*callgfnptr)(intszofptr_t cnt, ...);
 typedef	INTPTR_T (*callgncfnptr)(void *ar1, ...);
-INTPTR_T callg(callgfnptr, gparam_list *);
-INTPTR_T callg_nc(callgncfnptr, gparam_list *);
-void callg_signal(void *);
+INTPTR_T callg(callgfnptr, gparam_list *plist);
+INTPTR_T callg_nc(callgncfnptr, gparam_list *plist);
+void callg_signal(gparam_list *plist);
 
 #endif

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,14 +40,13 @@ LITREF	mval		literal_notimeout;
 
 error_def(ERR_LCKSCANCELLED);
 
-void	gvcmz_neterr(INTPTR_T *err)
+void	gvcmz_neterr(gparam_list *err_plist)
 {
 	struct CLB	*p, *pn, *p1;
 	unsigned char	*temp, buff[512];
 	gd_addr		*gdptr;
 	gd_region	*region, *r_top;
 	uint4		count, lck_info;
-	INTPTR_T	err_buff[10];
 	boolean_t	locks = FALSE;
 
 	ASSERT_IS_LIBGNPCLIENT;
@@ -111,18 +110,17 @@ void	gvcmz_neterr(INTPTR_T *err)
 	}
 	if (locks)
 	{
-		if (NULL != err)
+		if (NULL != err_plist)
 		{
-			count = (uint4)(*err + 1);
-			memcpy(err_buff, err, count * SIZEOF(INTPTR_T));
-			err_buff[count] = 0;
-			err_buff[count + 1] = ERR_LCKSCANCELLED;
-			err_buff[count + 2] = 0;
-			err_buff[0] += 3;
-			callg_signal(err_buff);
+			count = err_plist->n;
+			err_plist->arg[count++] = (void *)0;
+			err_plist->arg[count++] = (void *)ERR_LCKSCANCELLED;
+			err_plist->arg[count++] = (void *)0;
+			err_plist->n = count;
+			callg_signal(err_plist);
 		} else
 			rts_error_csa(NULL, VARLSTCNT(1) ERR_LCKSCANCELLED);
-	} else  if (NULL != err)
-		callg_signal(err);
+	} else  if (NULL != err_plist)
+		callg_signal(err_plist);
 
 }

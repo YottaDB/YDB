@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,8 +17,8 @@
 #include "lv_val.h"	/* needed by "callg.h" */
 #include "callg.h"
 
-void callg_signal(void *arg)
+void callg_signal(gparam_list *plist)
 {
 	ASSERT_IS_LIBGNPCLIENT;
-	(void)callg((callgfnptr) rts_error, (void *)arg);
+	(void)callg((callgfnptr) rts_error, plist);
 }

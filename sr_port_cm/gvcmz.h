@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -12,8 +15,10 @@
 #ifndef GVCMZ_INCLUDED
 #define GVCMZ_INCLUDED
 
+#include "callg.h"	/* needed for "gparam_list" */
+
 void gvcmz_error(char code, uint4 status);
-void gvcmz_neterr(INTPTR_T *error);
+void gvcmz_neterr(gparam_list *err_plist);
 void gvcmz_bunch(mval *v);
 void gvcmz_clrlkreq(void);
 void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v);
