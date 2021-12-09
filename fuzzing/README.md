@@ -30,9 +30,9 @@ This is all handled inside of `instrument.sh`.
 
 ### Corpus creation
 
-To create the corpus (and to minimize the size of these changes), we clone the YDBTests repository, copy all the individual test cases into a new directory, and then (we would!) run `afl-cmin` to make sure there's no duplicates, and then use that as the input to fuzzing.
+To create the corpus (and to minimize the size of these changes), we clone the YDBTests repository, copy all the individual test cases into a new directory, and then run `afl-cmin` to make sure there's no duplicates, and then use that as the input to fuzzing.
 
-Because `afl-cmin` isn't working right now, we're just using the test suite with no cleaning.  This might lead to some minor duplication in effort, but we can overcome that by just adding more cores.
+Right at the moment because of a memory issue (and maybe you won't have this problem!) we're getting rid of every test case smaller than 1KB.  This is generally ok, because we _do_ want small inputs, but its possible that we're missing good cases.
 
 This is handled in `make_corpus.sh`.
 

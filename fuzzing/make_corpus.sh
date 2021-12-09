@@ -15,7 +15,12 @@ mkdir NotMinCorpus
 echo "Copying tests..."
 cp --no-clobber YDBTest/*/inref/*.m ./NotMinCorpus
 
-echo "Removing test directory"
+echo "Removing overly large tests..."
+cd NotMinCorpus
+find -type f -size +1k -delete
+cd ..
+
+echo "Removing tests directory..."
 rm -rf YDBTest
 
 echo "Making env..."
@@ -24,11 +29,12 @@ cd env
 
 echo "Running afl-cmin..."
 #afl-cmin -m none -t 5000 -i ../NotMinCorpus/ -o inputs -- ../build-instrumented/yottadb -dir
+afl-cmin -i ../NotMinCorpus/ -o inputs -- ../build-instrumented/yottadb -dir
 
 cd ..
 
-echo "Currently, afl-cmin is having trouble processing the inputs, I'm not sure why." #TODO
-cp -r NotMinCorpus inputs
+#echo "Currently, afl-cmin is having trouble processing the inputs, I'm not sure why." #TODO
+#cp -r NotMinCorpus inputs
 
 
 echo "Cleanup"
