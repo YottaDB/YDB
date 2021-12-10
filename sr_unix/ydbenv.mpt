@@ -223,7 +223,8 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. ;       YottaDB version gets installed with execute permissions for the world, a ydb_env_set invocation using
 	. ;       that version might not be able to access /tmp/yottadb with the restricted chmod. Hence we first do the
 	. ;       mkdir with a "umask 0" and later do a chmod of just the subdirectory /tmp/yottadb/r1.23_x86_64.
-	. zsystem "umask 0; mkdir -p "_tmp4
+	. open "mkdir":(shell="/bin/sh":command="umask 0; mkdir -p "_tmp4:readonly:writeonly)::"pipe"
+	. close "mkdir"
 	. new line,worldexecute,ydbgroup
 	. open "file":(shell="/bin/sh":command="ls -l "_dist_"/libyottadb.so":readonly)::"pipe"
 	. use "file" read line use io close "file"
@@ -231,7 +232,8 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. set ydbgroup=$zpiece(line," ",4)
 	. if "x"'=worldexecute do
 	. . ; $ydb_dist/libyottadb.so does not have world execute permissions, restrict directory access to only user and group
-	. . zsystem "chmod o-rwx "_tmp4
+	. . open "chmod":(shell="/bin/sh":command="chmod o-rwx "_tmp4:readonly:writeonly)::"pipe"
+	. . close "chmod"
 	. . ; ---------------------------------------------------------------------------------
 	. . ; If currently running user is part of the group that libyottadb.so belongs to,
 	. . ; then change the group of the created directory to the yottadb group. If not,
@@ -242,7 +244,9 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. . set user=$zpiece($zpiece(line,")",1),"(",2)
 	. . set grouplist=$zpiece(line," groups=",2)	; gets list of group names that "user" is a member of
 	. . ; Since every group is surrounded by parentheses all we need to do is check if "(ydbgroup)" exists in "grouplist"
-	. . zsystem:$zfind(grouplist,"("_ydbgroup_")") "chgrp "_ydbgroup_" "_tmp4
+	. . do:$zfind(grouplist,"("_ydbgroup_")")
+	. . . open "chgrp":(shell="/bin/sh":command="chgrp "_ydbgroup_" "_tmp4:readonly:writeonly)::"pipe"
+	. . . close "chgrp"
 	do ExportEnv("ydb_log",tmp4),ExportEnv("gtm_log",tmp4),ExportEnv("ydb_tmp",tmp4),ExportEnv("gtm_tmp",tmp4)
 	; ydb_etrap & ydb_procstuckexec are set here, followed by miscellaneous environment variables
 	set tmp1=$select($data(currenv("ydb_etrap")):currenv("ydb_etrap"),$data(currenv("gtm_etrap")):currenv("gtm_etrap"),1:"Write:(0=$STACK) ""Error occurred: "",$ZStatus,!")
@@ -296,7 +300,7 @@ DirEnsure(ydbvar,gtmvar)
 	;     ydbvar default does not exist
 	;       gtmvar default exists: define both to point to it
 	;	gtmver default does not exist: create ydbvar default & define both to point to it
-	new io,zdir
+	new io,tmp,zdir
 	set io=$io,zdir=$zdirectory
 	set:'$data(env(ydbvar)) env(ydbvar)=$get(currenv((ydbvar)))
 	set:'$data(env(gtmvar)) env(gtmvar)=$get(currenv((gtmvar)))
@@ -343,18 +347,27 @@ DirEnsure(ydbvar,gtmvar)
 	. . if $data(env(gtmvar,"path")) do		; if default directory exists for gtmvar, ensure it is the same as ydbvar
 	. . . set:'$$PathSame(env(gtmvar,"path"),env(ydbvar,"path")) $ecode=",U251,"
 	. . else  do					; default directory for gtmvar does not exist, create link to ydbvar
-	. . . zsystem @env(gtmvar,"link")		; Link to it from the GT.M name
+	. . . ; Link to it from the GT.M name
+	. . . set @("tmp="_env(gtmvar,"link"))
+	. . . open "link":(shell="/bin/sh":command=tmp:readonly:writeonly)::"pipe"
+	. . . close "link"
 	. . . set:'$zlength($zsearch(env(gtmvar,"default"),-1)) $ecode=",U252,"
 	. else  do					; default directory for ydbvar does not exist
 	. . do FileTypeEnsure(gtmvar,1)
 	. . if $data(env(gtmvar,"path")) do		; if default directory exists for gtmvar, use it
-	. . . zsystem @env(ydbvar,"link")		; Link to it from the YottaDB name
+	. . . ; Link to it from the YottaDB name
+	. . . set @("tmp="_env(ydbvar,"link"))
+	. . . open "link":(shell="/bin/sh":command=tmp:readonly:writeonly)::"pipe"
+	. . . close "link"
 	. . . set:'$zlength($zsearch(env(ydbvar,"default"),-1)) $ecode=",U252,"
 	. . else  do					; neither default exists, create ydbvar default
 	. . . do createdirs(ydbvar)			; create the YottaDB directory
 	. . . do FileTypeEnsure(ydbvar,1)		; verify that it exists
 	. . . set:'$zlength($zsearch(env(ydbvar,"default"),-1)) $ecode=",U253,"
-	. . . zsystem @env(gtmvar,"link")		; Link to it from the GT.M name
+	. . . ; Link to it from the GT.M name
+	. . . set @("tmp="_env(gtmvar,"link"))
+	. . . open "link":(shell="/bin/sh":command=tmp:readonly:writeonly)::"pipe"
+	. . . close "link"
 	. . . set:'$zlength($zsearch(env(gtmvar,"default"),-1)) $ecode=",U252,"
 	set $zdirectory=zdir				; Restore current directory to that at process entry
 	quit
