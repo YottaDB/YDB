@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,7 +86,12 @@ GBLREF	uint4			dollar_tlevel;
 	SETUP_THREADGBL_ACCESS;
 #	endif
 #	if defined(GVCST_SEARCH_TAIL) && !defined(GVCST_SEARCH_EXPAND_PREVKEY)
-	assert(0 < memcmp(pKey->base, pOldKey->base, pKey->end + 1));	/* below code assumes this is ensured by caller */
+#	ifdef DEBUG
+	int	keyCmpLen;
+
+	keyCmpLen = MIN(pKey->end + 1, pOldKey->end + 1);
+	assert(0 < memcmp(pKey->base, pOldKey->base, keyCmpLen));	/* below code assumes this is ensured by caller */
+#	endif
 	/* Before using pStat->prev_rec.offset, we need to make sure it is initialized. i.e. it never holds the value
 	 * PREV_REC_UNINITIALIZED. This is guaranteed because "gvcst_search_tail" is currently invoked only for leaf blocks.
 	 * And "gvcst_search" does not currently skip "gvcst_search_blk" for leaf blocks. The below assert captures all
