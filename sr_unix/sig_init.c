@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,6 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
         DCL_THREADGBL_ACCESS;
 
         SETUP_THREADGBL_ACCESS;
-	setup_altstack();
 	memset(&ignore, 0, SIZEOF(ignore));
 	sigemptyset(&ignore.sa_mask);
 	/* Initialize handler definitions we deal with. All signals except those setup for SIG_DFL/SIG_IGN are setup
