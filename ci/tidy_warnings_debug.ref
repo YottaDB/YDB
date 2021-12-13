@@ -537,8 +537,6 @@ trigger_parse.c:warning: Branch condition evaluates to a garbage value [clang-an
 trigger_select.c:warning: 1st function call argument is an uninitialized value [clang-analyzer-core.CallAndMessage]
 trigger_select.c:warning: Value stored to 'badpos' is never read [clang-analyzer-deadcode.DeadStores]
 trigger_update.c:warning: Array access (from variable 'ptr') results in a null pointer dereference [clang-analyzer-core.NullDereference]
-trigger_update.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
-trigger_update.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 trigger_update.c:warning: Null pointer passed to 1st parameter expecting 'nonnull' [clang-analyzer-core.NonNullParamChecker]
 unary_tail.c:warning: Value stored to 'c2' is never read [clang-analyzer-deadcode.DeadStores]
 unw_retarg.c:warning: Access to field 'mvtype' results in a dereference of a null pointer (loaded from variable 'trg') [clang-analyzer-core.NullDereference]

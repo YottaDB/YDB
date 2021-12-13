@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -45,9 +48,9 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 			     int4 *record_num);
 
 STATICFNDCL trig_stats_t trigupdrec_reg(char *trigvn, uint4 trigvn_len, boolean_t *jnl_format_done, mval *trigjrec,
-	boolean_t *new_name_check_done, boolean_t *new_name_ptr, char **values, uint4 *value_len, char add_delete,
-	stringkey *kill_trigger_hash, stringkey *set_trigger_hash, char *disp_trigvn, int disp_trigvn_len, uint4 *trig_stats,
-	boolean_t *first_gtmio, char *utilprefix, int *utilprefixlen);
+	boolean_t *new_name_check_done, boolean_t *new_match, boolean_t *new_name_ptr, char **values, uint4 *value_len,
+	char add_delete, stringkey *kill_trigger_hash, stringkey *set_trigger_hash, char *disp_trigvn, int disp_trigvn_len,
+	uint4 *trig_stats, boolean_t *first_gtmio, char *utilprefix, int *utilprefixlen);
 
 boolean_t trigger_update(mval *trigger_rec);
 #endif

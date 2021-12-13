@@ -1180,7 +1180,7 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	int			utilprefixlen, displen;
 	int			reg_index, min_reg_index, max_reg_index;
 	boolean_t		first_gtmio;
-	boolean_t		jnl_format_done, new_name_check_done, new_name, first_error;
+	boolean_t		jnl_format_done, new_name_check_done, new_name, first_error, new_match;
 	trig_stats_t		this_trig_status, overall_trig_status;
 	gv_namehead		*gvt;
 	gvnh_spanreg_t		*gvspan;
@@ -1595,7 +1595,7 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 		 * For a spanning global, they point to one of the spanned regions in each iteration of the do-while loop below.
 		 */
 		this_trig_status = trigupdrec_reg(trigvn, trigvn_len, &jnl_format_done, trigjrec,
-						&new_name_check_done, &new_name, &values[0], &value_len[0], add_delete,
+						&new_name_check_done, &new_match, &new_name, &values[0], &value_len[0], add_delete,
 						&kill_trigger_hash, &set_trigger_hash, &disp_trigvn[0], disp_trigvn_len, trig_stats,
 						&first_gtmio, utilprefix, &utilprefixlen);
 		assert((STATS_UNCHANGED_TRIGFILE == this_trig_status) || (STATS_NOERROR_TRIGFILE == this_trig_status)
@@ -1651,9 +1651,9 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 }
 
 STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, uint4 trigvn_len, boolean_t *jnl_format_done, mval *trigjrec,
-	boolean_t *new_name_check_done, boolean_t *new_name_ptr, char **values, uint4 *value_len, char add_delete,
-	stringkey *kill_trigger_hash, stringkey *set_trigger_hash, char *disp_trigvn, int disp_trigvn_len, uint4 *trig_stats,
-	boolean_t *first_gtmio, char *utilprefix, int *utilprefixlen)
+	boolean_t *new_name_check_done, boolean_t *new_match, boolean_t *new_name_ptr, char **values, uint4 *value_len,
+	char add_delete, stringkey *kill_trigger_hash, stringkey *set_trigger_hash, char *disp_trigvn, int disp_trigvn_len,
+	uint4 *trig_stats, boolean_t *first_gtmio, char *utilprefix, int *utilprefixlen)
 {
 	mval			*trigname[NUM_OPRS]; /* names of matching kill and/or set trigger */
 	boolean_t		new_name;
@@ -1664,7 +1664,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, uint4 trigvn_len, boolean_
 	boolean_t		newtrigger;
 	int			set_index, kill_index, tmp_index;
 	boolean_t		db_matched_kill, db_matched_set, tmp_matched_kill, tmp_matched_set;
-	boolean_t		full_match, new_match;
+	boolean_t		full_match;
 	boolean_t		kill_cmp, set_cmp;
 	boolean_t		is_set;
 	int			oprtype, oprstart, oprend, set_kill_bitmask;
@@ -1722,7 +1722,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, uint4 trigvn_len, boolean_
 	{	/* Make sure below call is done only ONCE for a global spanning multiple regions since this call goes
 		 * through all regions in the gld to figure out if a user-defined trigger name is unique.
 		 */
-		new_name = check_unique_trigger_name_full(values, value_len, &dummymval, &new_match,
+		new_name = check_unique_trigger_name_full(values, value_len, &dummymval, new_match,
 						trigvn, trigvn_len, set_trigger_hash, kill_trigger_hash);
 		*new_name_ptr = new_name;
 		*new_name_check_done = TRUE;
@@ -1784,7 +1784,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, uint4 trigvn_len, boolean_
 				       trigname[OPR_KILL]->str.len, trigname[OPR_KILL]->str.addr);
 			RETURN_AND_POP_MVALS(STATS_ERROR_TRIGFILE);
 		}
-		assert(new_name || !new_match || full_match);
+		assert(new_name || !*new_match || full_match);
 		if (!new_name && ('+' == add_delete) && !full_match)
 		{
 			opname = (!set_cmp ? oprname[OPR_KILL] : (!kill_cmp ? oprname[OPR_SET] : oprname[OPR_SETKILL]));
@@ -2023,7 +2023,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, uint4 trigvn_len, boolean_
 			skip_set_trigger = TRUE;
 		} else
 		{
-			if (!new_name && !new_match)
+			if (!new_name && !*new_match)
 			{
 				opname = (!set_cmp ? oprname[OPR_KILL] : (!kill_cmp ? oprname[OPR_SET] : oprname[OPR_SETKILL]));
 				TRIGGER_SAME_NAME_EXISTS_ERROR(opname, disp_trigvn_len, disp_trigvn);

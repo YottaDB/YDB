@@ -784,7 +784,6 @@ trigger_source_read_andor_verify.c:warning: Value stored to 'csd' is never read 
 trigger_source_read_andor_verify.c:warning: Value stored to 'rc' is never read [clang-analyzer-deadcode.DeadStores]
 trigger_tpwrap_ch.c:warning: Value stored to 'rc' is never read [clang-analyzer-deadcode.DeadStores]
 trigger_update.c:warning: Array access (from variable 'ptr') results in a null pointer dereference [clang-analyzer-core.NullDereference]
-trigger_update.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 trigger_update.c:warning: Null pointer passed to 1st parameter expecting 'nonnull' [clang-analyzer-core.NonNullParamChecker]
 trigger_update.c:warning: Null pointer passed to 1st parameter expecting 'nonnull' [clang-analyzer-core.NonNullParamChecker]
 trigger_upgrade.c:warning: Value stored to 'is_defined' is never read [clang-analyzer-deadcode.DeadStores]
