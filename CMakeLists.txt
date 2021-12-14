@@ -60,8 +60,12 @@ if ( CMAKE_COMPILER_IS_GNUCC )
 endif()
 
 # The below option enables the address sanitizer in the build.
-# It is currently enabled only for non-production builds of YottaDB.
+# It is recommended to enable this option only for non-production builds of YottaDB.
 option(ENABLE_ASAN "Enable address sanitizer in build?" OFF)
+
+# The below option enables the -ftrivial-auto-var-init=pattern flag in the compiler.
+# It is recommended to enable this option only for non-production builds of YottaDB.
+option(ENABLE_AUTO_VAR_INIT_PATTERN "Enable -ftrivial-auto-var-init=pattern in build?" OFF)
 
 set(install_permissions_script
   OWNER_READ OWNER_EXECUTE OWNER_WRITE
@@ -96,11 +100,12 @@ else()
 endif()
 
 # Record what we plan to do (dump various cmake options)
-message("*** ENABLE_ASAN:              ${ENABLE_ASAN}")
-message("*** CMAKE_C_FLAGS:            ${CMAKE_C_FLAGS}")
-message("*** CMAKE_ASM_FLAGS:          ${CMAKE_ASM_FLAGS}")
-message("*** CMAKE_ASM_FLAGS_DEBUG:    ${CMAKE_ASM_FLAGS_DEBUG}")
-message("*** CMAKE_ASM_COMPILE_OBJECT: ${CMAKE_ASM_COMPILE_OBJECT}")
+message("*** ENABLE_ASAN:                  ${ENABLE_ASAN}")
+message("*** ENABLE_AUTO_VAR_INIT_PATTERN: ${ENABLE_AUTO_VAR_INIT_PATTERN}")
+message("*** CMAKE_C_FLAGS:                ${CMAKE_C_FLAGS}")
+message("*** CMAKE_ASM_FLAGS:              ${CMAKE_ASM_FLAGS}")
+message("*** CMAKE_ASM_FLAGS_DEBUG:        ${CMAKE_ASM_FLAGS_DEBUG}")
+message("*** CMAKE_ASM_COMPILE_OBJECT:     ${CMAKE_ASM_COMPILE_OBJECT}")
 # Choose where to get bootstrap sources.
 set(YDB_DIST "" CACHE PATH "Existing YottaDB Distribution")
 if(YDB_DIST)
