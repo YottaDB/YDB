@@ -67,6 +67,7 @@ GBLREF	uint4			dollar_tlevel;
 #		ifdef GVCST_SEARCH_EXPAND_PREVKEY
 		gv_key		*prevKey;
 		enum cdb_sc	status;
+		boolean_t	first_iteration;
 #		endif
 #	endif
 	unsigned short		nRecLen;
@@ -168,6 +169,7 @@ GBLREF	uint4			dollar_tlevel;
 		assert(prevKey->end);
 		prevKeyCmpLen = prevKey->end - 1;
 		prevKeyUnCmp = &prevKey->base[prevKeyCmpLen];
+		first_iteration = TRUE;
 		assert(KEY_DELIMITER == prevKeyUnCmp[0]);
 		assert(KEY_DELIMITER == prevKeyUnCmp[1]);
 #		endif
@@ -242,10 +244,34 @@ GBLREF	uint4			dollar_tlevel;
 			pRec = pRecBase + nRecLen;
 #			ifdef GVCST_SEARCH_EXPAND_PREVKEY
 			if (pRecBase != pBlkBase)
-			{	/* nTmp points to the compression count corresponding to pPrevRec */
+			{	/* nTmp points to the compression count corresponding to pPrevRec.
+				 * Check if we need to copy over uncompressed key bytes from the previous record into "gv_altkey".
+				 */
 				if (nTmp > prevKeyCmpLen)
 				{
-					if (((prevKeyStart + nTmp) >= prevKeyTop) || (NULL == prevKeyUnCmp))
+#					ifdef GVCST_SEARCH_TAIL
+					assert((!first_iteration && (prevKeyUnCmp > pBlkBase) && (prevKeyUnCmp < pTop))
+						|| (first_iteration && (prevKeyUnCmp == &prevKey->base[prevKeyCmpLen])
+							&& (prevKeyCmpLen == (prevKey->end - 1))));
+#					endif
+					/* Check that "gv_altkey" (destination of "memcpy" below) has space to hold
+					 * the additional uncompressed key bytes from the current record. If not, it is
+					 * a restartable situation.
+					 */
+					if (((prevKeyStart + nTmp) >= prevKeyTop) || (NULL == prevKeyUnCmp)
+#						ifdef GVCST_SEARCH_TAIL
+						/* Check if "prevKeyUnCmp" (source of "memcpy" below) is pointing to prevKey.
+						 * This is the case in the first iteration (as asserted above). If so, the
+						 * maximum value that is allowed for "nTmp" is "prevKeyCmpLen + 1" (i.e. the
+						 * first null terminator byte for the last subscript of the previous key can
+						 * match with the next key). If not, this is a restartable situation as
+						 * "nTmp" (the compression count of the current key relative to the previous key)
+						 * cannot be greater than "prevKeyCmpLen" (the entire length of the previous key).
+						 * Hence add this condition too to the "if" check that is already in progress.
+						 */
+						|| (first_iteration && (nTmp > (prevKeyCmpLen + 1)))
+#						endif
+						)
 					{
 						if (dollar_tlevel)
 							TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch,
@@ -255,18 +281,17 @@ GBLREF	uint4			dollar_tlevel;
 							NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch);
 						return cdb_sc_blkmod;
 					}
-#					ifdef GVCST_SEARCH_TAIL
-					assert((prevKeyUnCmp > pBlkBase)
-						|| ((prevKeyUnCmp == &prevKey->base[prevKeyCmpLen])
-							&& (prevKeyCmpLen == (prevKey->end - 1))));
-#					else
-					assert(prevKeyUnCmp > pBlkBase);
+#					ifndef GVCST_SEARCH_TAIL
+					assert((prevKeyUnCmp > pBlkBase) && (prevKeyUnCmp < pTop));
 #					endif
 					memcpy(prevKeyStart + prevKeyCmpLen, prevKeyUnCmp, nTmp - prevKeyCmpLen);
 				}
 				prevKeyCmpLen = nTmp;
 				prevKeyUnCmp = pRecBase + SIZEOF(rec_hdr);
 			}
+#			ifdef GVCST_SEARCH_TAIL
+			first_iteration = FALSE;
+#			endif
 #			endif
 			if (pRec >= pTop)
 			{	/* Terminated at end of block */
