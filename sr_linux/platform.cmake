@@ -103,10 +103,13 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-
 #		set desired_warnings = ( $desired_warnings -Wconversion -Wsign-compare )
 #	We should also look into how hard these would be to restore. Some of the warnings come from generated
 #	code and macro use, making them harder to deal with.
-# Note: -Wimplicit not explicitly mentioned since it is enabled by Wall
-# Note: -Wuninitialized not explicitly mentioned since it is enabled by Wall
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -Wno-unused-value -Wno-unused-variable")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-char-subscripts")
+# Note: -Wimplicit is enabled by -Wall currently but is explicitly mentioned in case it goes out of the -Wall list in later
+# versions of the compiler.
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wimplicit")
+# Note: -Wuninitialized is not enabled by -Wall so explicitly mention that.
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wuninitialized")
 if (ENABLE_ASAN)
     # Address sanitizer enabled. Use proper compiler/linker flags
     set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -fsanitize=address")
@@ -125,26 +128,26 @@ if (CMAKE_COMPILER_IS_GNUCC)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-maybe-uninitialized -Wno-unused-but-set-variable")
   # gcc 6.3.0 is known to have -Wmisleading-indentation. And gcc 4.8.5 is known to not have that.
   # Not sure what the intermediate versions support so we add this warning flag only for versions >= 6.3.0
-  if(${CMAKE_C_COMPILER_VERSION} STRGREATER "6.3.0")
+  if(${CMAKE_C_COMPILER_VERSION} VERSION_GREATER "6.3.0")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wmisleading-indentation")
   endif()
   # TODO: Per https://gcc.gnu.org/pipermail/gcc-patches/2021-February/565514.html, gcc 12 should most likely have
   # the "-ftrivial-auto-var-init=pattern" flag (see else section below for details).
   # Need to enable the below code when that becomes available.
   # -------------------------------------------------------------------------------------------
-  # if(ENABLE_AUTO_VAR_INIT_PATTERN AND ${CMAKE_C_COMPILER_VERSION} STRGREATER_EQUAL "12.0.0")
+  # if(ENABLE_AUTO_VAR_INIT_PATTERN AND ${CMAKE_C_COMPILER_VERSION} VERSION_GREATER_EQUAL "12.0.0")
   #   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ftrivial-auto-var-init=pattern")
   # endif()
   # -------------------------------------------------------------------------------------------
 else()
-  if(${CMAKE_C_COMPILER_VERSION} STRGREATER_EQUAL "13.0.0")
+  if(${CMAKE_C_COMPILER_VERSION} VERSION_GREATER_EQUAL "13.0.0")
     # clang 13 and higher issue a lot of [Wunused-but-set-variable] warnings. They are benign and clutter the output.
     # So disable them.
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-but-set-variable")
   endif()
   # clang 10 and higher have the below flag that detects bugs due to the code assuming stack variables (automatic)
   # are initialized to 0 by default (which they are not). See https://reviews.llvm.org/D54604 for details.
-  if(ENABLE_AUTO_VAR_INIT_PATTERN AND ${CMAKE_C_COMPILER_VERSION} STRGREATER_EQUAL "10.0.0")
+  if(ENABLE_AUTO_VAR_INIT_PATTERN AND ${CMAKE_C_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.0.0")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ftrivial-auto-var-init=pattern")
   endif()
 endif()
