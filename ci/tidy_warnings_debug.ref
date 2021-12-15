@@ -60,7 +60,6 @@ find_line_addr.c:warning: Value stored to 'ptr' is never read [clang-analyzer-de
 flush_pio.c:warning: The right operand of '!=' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 format2disp.c:warning: Value stored to 'isill' is never read [clang-analyzer-deadcode.DeadStores]
 format_key_lv_val.c:warning: The right operand of '<' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
-gds_rundown.c:warning: 1st function call argument is an uninitialized value [clang-analyzer-core.CallAndMessage]
 gdsfilext.c:warning: Dereference of undefined pointer value [clang-analyzer-core.NullDereference]
 gdsfilext_nojnl.c:warning: Access to field 'aligned' results in a dereference of a null pointer (loaded from variable 'diobuff') [clang-analyzer-core.NullDereference]
 get_src_line.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]

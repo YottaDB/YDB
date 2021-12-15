@@ -52,10 +52,12 @@
 		FSTAT_FILE(rm_ptr->fildes, &statbuf, fstat_res);					\
 		if (-1 == fstat_res)									\
 		{											\
+			int	save_errno;								\
+													\
 			save_errno = errno;								\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,			\
 				RTS_ERROR_LITERAL("fstat"),						\
-			CALLFROM, save_errno);								\
+				CALLFROM, save_errno);							\
 		}											\
 		fstat_done = TRUE;									\
 	}												\
@@ -186,7 +188,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 	unsigned char	c;
 	short		mode, mode1;
 	int4		length, width, width_bytes, recordsize, recsize_before, padchar;
-	int		fstat_res, save_errno, rv;
+	int		fstat_res, rv;
 	d_rm_struct	*rm_ptr;
 	struct stat	statbuf;
 	int		p_offset;
@@ -435,11 +437,16 @@ void	iorm_use(io_desc *iod, mval *pp)
 					/* the following is only necessary for a non-split device */
 					if (iod->pair.in == iod->pair.out)
 					{
+						int	save_errno;
+
 						do
 						{
 							newfd = dup(rm_ptr->fildes);
 							if ((-1 != newfd) || (EINTR != errno))
+							{
+								save_errno = errno;
 								break;
+							}
 							eintr_handling_check();
 						} while (TRUE);
 						HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
@@ -824,6 +831,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 						new_position = statbuf.st_size;
 					if (-1 == lseek(rm_ptr->fildes, new_position, SEEK_SET))
 					{
+						int	save_errno;
+
 						save_errno = errno;
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
 							RTS_ERROR_LITERAL("lseek"),

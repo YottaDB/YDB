@@ -273,6 +273,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	CANCEL_DB_TIMERS(reg, csa, canceled_dbsync_timer);
 	we_are_last_user = FALSE;
 	inst_is_frozen = IS_REPL_INST_FROZEN && REPL_ALLOWED(csa->hdr);
+	cnl = csa->nl;
 	if (FREEZE_LATCH_HELD(csa))
 		rel_latch(&cnl->freeze_latch);
 	if (!csa->persistent_freeze)
@@ -298,7 +299,6 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	/* If we have standalone access, then ensure that a concurrent online rollback cannot be running at the same time as it
 	 * needs the access control lock as well. The only expection is we are online rollback and currently running down.
 	 */
-	cnl = csa->nl;
 	onln_rlbk_pid = cnl->onln_rlbk_pid;
 	csd_read_only = csd->read_only;
 	assert(!have_standalone_access || mupip_jnl_recover || !onln_rlbk_pid || !is_proc_alive(onln_rlbk_pid, 0));

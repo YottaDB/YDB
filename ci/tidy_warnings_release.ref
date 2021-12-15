@@ -93,7 +93,6 @@ format2disp.c:warning: Value stored to 'isill' is never read [clang-analyzer-dea
 format_key_lv_val.c:warning: The right operand of '<' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 ftok_sem_incrcnt.c:warning: Value stored to 'csa' is never read [clang-analyzer-deadcode.DeadStores]
 ftok_sems.c:warning: Value stored to 'csa' is never read [clang-analyzer-deadcode.DeadStores]
-gds_rundown.c:warning: 1st function call argument is an uninitialized value [clang-analyzer-core.CallAndMessage]
 gds_rundown.c:warning: Value stored to 'status' is never read [clang-analyzer-deadcode.DeadStores]
 gds_rundown_err_cleanup.c:warning: Value stored to 'sem_pid' is never read [clang-analyzer-deadcode.DeadStores]
 gdsfilext.c:warning: Dereference of undefined pointer value [clang-analyzer-core.NullDereference]
