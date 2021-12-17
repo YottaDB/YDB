@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -29,6 +32,7 @@ void gvinit(void)
 	{
 		v.mvtype = MV_STR;
 		v.str.len = 0;
+		v.str.addr = NULL;
 		gd_header = zgbldir(&v);
 	}
 	/* May get in here after an extended ref call OR in mupip journal recover forward processing (with
