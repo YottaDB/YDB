@@ -353,6 +353,10 @@ STATICFNDEF void scan_behavioral_words(char *c, struct extcall_entry_list *entry
 		{SIGSAFE, "SIGSAFE"}
 	};
 
+	// Initialize the memory for entry_ptr->ext_call_behaviors
+	for (j = 0;  j < ARRAYSIZE(conversion); j++)
+		entry_ptr->ext_call_behaviors[j] = FALSE;
+
 	/* scan until : or null if no list of behavioral words */
 	while(*c != ':')
 	{
@@ -371,7 +375,7 @@ STATICFNDEF void scan_behavioral_words(char *c, struct extcall_entry_list *entry
 			*temp_tok = toupper((unsigned char) *temp_tok);
 			temp_tok++;
 		}
-		for (j = 0;  j < (SIZEOF(conversion) / SIZEOF(conversion[0])); j++)
+		for (j = 0;  j < ARRAYSIZE(conversion); j++)
 		{
 			if (0 == memcmp(token, conversion[j].str, STRLEN(conversion[j].str)))
 				entry_ptr->ext_call_behaviors[j] = TRUE;
@@ -423,7 +427,7 @@ STATICFNDEF enum ydb_types scan_keyword(char **c)
 	if (!d)
 		return ydb_notfound;
 	len = (int)(d - b);
-	for (i = 0 ; i < SIZEOF(xctab) / SIZEOF(xctab[0]) ; i++)
+	for (i = 0 ; i < ARRAYSIZE(xctab); i++)
 	{
 		if ((0 == memcmp(xctab[i].nam, b, len)) && ('\0' ==  xctab[i].nam[len]))
 		{
