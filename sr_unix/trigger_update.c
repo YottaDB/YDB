@@ -1582,6 +1582,7 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 		memcpy(save_values, values, SIZEOF(values));
 	} else
 	{
+		reg_index = min_reg_index = max_reg_index = 0;
 		memcpy(disp_trigvn, trigvn, trigvn_len);
 		disp_trigvn_len = trigvn_len;
 		disp_trigvn[disp_trigvn_len] = '\0';	/* null terminate just in case */
