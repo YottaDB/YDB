@@ -329,7 +329,7 @@ install_plugins()
 		echo "Now installing YDBOcto"
 		cd $tmpdir	# Get back to top level temporary directory as the current directory
 		export ydb_dist=${ydb_installdir}
-		if git clone https://gitlab.com/YottaDB/DBMS/YDBOcto YDBOcto-master; then
+		if git clone https://gitlab.com/YottaDB/DBMS/YDBOcto.git YDBOcto-master; then
 			cd YDBOcto-master
 			mkdir build
 			cd build
