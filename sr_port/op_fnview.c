@@ -697,8 +697,12 @@ void	op_fnview(int numarg, mval *dst, ...)
 			{	/* $VIEW("YCOLLATE",coll,ver) : Check if collsequence "coll" version is compatible with "ver" */
 				if (0 == n)
 					break;	/* collation sequence # is 0, any version is compatible with it */
-				collver = mval2i(arg2);
-				n = do_verify(csp, n, collver);
+				if (NULL != csp)
+				{
+					collver = mval2i(arg2);
+					n = do_verify(csp, n, collver);
+				} else
+					n = -1;
 			}
 			break;
 		case VTK_YGLDCOLL:
