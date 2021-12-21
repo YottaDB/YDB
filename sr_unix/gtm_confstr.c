@@ -3,7 +3,7 @@
  * Copyright (c) 2017-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@ int gtm_confstr(char *command, int maxsize)
 	confstr(_CS_PATH, pathbuf, n);
 	cmdlen = strlen(command);
 	path_tok = STRTOK_R(pathbuf, ":", &path_tokptr);
-	assert(cmdlen && (path_tok != NULL));
+	assert(cmdlen && (NULL != path_tok));
 	do
 	{
 		tok_len = strlen(path_tok);

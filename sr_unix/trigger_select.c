@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -775,6 +775,8 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 	else
 	{
 		sel_ptr = STRTOK_R(save_select_list, ",", &strtok_ptr);
+		assert(0 != select_list_len);	/* or else "dump_all" would have been TRUE and we would have gone to "if" above */
+		assert(NULL != sel_ptr);	/* we are guaranteed this because of the previous assert */
 		do
 		{
 			trig_name = ('^' != *sel_ptr);

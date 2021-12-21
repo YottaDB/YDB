@@ -189,7 +189,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 		for (str2 = command2; ; str2 = NULL)
 		{
 			token2 = STRTOK_R(str2, " >&;", &saveptr2);
-			if (NULL != token2 && !strcmp(token2, "cd"))
+			if ((NULL != token2) && !strcmp(token2, "cd"))
 			{	/* if the command is cd then skip the rest before the next pipe */
 				token2 = NULL;
 				break;

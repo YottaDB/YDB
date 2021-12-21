@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -223,15 +223,14 @@ int gtmsource_get_opt(void)
 				return(-1);
 			}
 			connect_parms_str = &tmp_connect_parms_str[0];
-			for (connect_parms_index =
-					GTMSOURCE_CONN_HARD_TRIES_COUNT,
-			     connect_parms_badval = FALSE,
-			     connect_parm_token_str = connect_parms_str;
-			     !connect_parms_badval &&
-			     connect_parms_index < GTMSOURCE_CONN_PARMS_COUNT &&
-			     (connect_parm = STRTOK_R(connect_parm_token_str, GTMSOURCE_CONN_PARMS_DELIM, &strtokptr)) != NULL;
-			     connect_parms_index++,
-			     connect_parm_token_str = NULL)
+			for (connect_parms_index = GTMSOURCE_CONN_HARD_TRIES_COUNT,
+				connect_parms_badval = FALSE,
+				connect_parm_token_str = connect_parms_str;
+			     !connect_parms_badval
+				&& (GTMSOURCE_CONN_PARMS_COUNT > connect_parms_index)
+				&& (NULL != (connect_parm =	/* Warning: Assignment inside boolean expression */
+						STRTOK_R(connect_parm_token_str, GTMSOURCE_CONN_PARMS_DELIM, &strtokptr)));
+			     connect_parms_index++, connect_parm_token_str = NULL)
 			{
 				errno = 0;
 				if ((0 == (gtmsource_options.connect_parms[connect_parms_index] = ATOI(connect_parm))

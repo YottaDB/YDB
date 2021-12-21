@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -270,6 +270,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved
 			return ((char_ptr_t)rec) + NULL_RECLEN;
 		case MUEXT_TCOMMIT:
 			ptr = STRTOK_R(NULL, "\\", &strtokptr);		/* get the participants */
+			assert(NULL != ptr);
 			ptr = STRTOK_R(NULL, "\\", &strtokptr);		/* get the jnl_tid */
 			rec->jrec_tcom.jnl_tid[0] = 0;
 			if (NULL != ptr)

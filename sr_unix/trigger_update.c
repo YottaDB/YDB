@@ -156,10 +156,15 @@ static	boolean_t		promptanswer = TRUE;
 	char		lcl_cmds[MAX_COMMANDS_LEN + 1];								\
 	char		*lcl_ptr, *strtok_ptr;									\
 														\
+	assert(0 < STRLEN(COMMANDS));										\
 	assert(MAX_COMMANDS_LEN >= STRLEN(COMMANDS));								\
 	memcpy(lcl_cmds, COMMANDS, STRLEN(COMMANDS) + 1);							\
 	BITMAP = 0;												\
 	lcl_ptr = STRTOK_R(lcl_cmds, ",", &strtok_ptr);								\
+	/* STRLEN(COMMANDS) is guaranteed to be greater than 0 (asserted above)					\
+	 * and hence we are guaranteed that "lcl_ptr" is not NULL. Hence the below assert.			\
+	 */													\
+	assert(NULL != lcl_ptr);										\
 	do													\
 	{													\
 		switch (*lcl_ptr)										\
@@ -234,7 +239,9 @@ static	boolean_t		promptanswer = TRUE;
 	memcpy(lcl_options, OPTIONS, STRLEN(OPTIONS) + 1);							\
 	BITMAP = 0;												\
 	lcl_ptr = STRTOK_R(lcl_options, ",", &strtok_ptr);							\
+	/* STRLEN(OPTIONS) can be 0 and hence it is possible "lcl_ptr" is NULL */				\
 	if (NULL != lcl_ptr)											\
+	{													\
 		do												\
 		{												\
 			switch (*lcl_ptr)									\
@@ -267,6 +274,7 @@ static	boolean_t		promptanswer = TRUE;
 					break;									\
 			}											\
 		} while (NULL != (lcl_ptr = STRTOK_R(NULL, ",", &strtok_ptr)));					\
+	}													\
 }
 
 #define	OPTION_BITMAP_TO_STR(OPTIONS, BITMAP, LEN)								\

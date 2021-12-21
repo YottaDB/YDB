@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -215,8 +215,9 @@ void zshow_output(zshow_out *out, const mstr *str)
 				/* add the subscript for the "code" */
 				lv_child = op_putindx(VARLSTCNT(2) lv, mv_child);
 				lv_child->v.mvtype = 0; /* don't want a node so make it undef'd */
-				for (tempstr = str->addr; piecestr = STRTOK_R(tempstr,".", &strtokptr);
-						tempstr = NULL) /* WARNING assignment in test */
+				for (tempstr = str->addr;
+					NULL != (piecestr = STRTOK_R(tempstr, ".", &strtokptr)); /* WARNING assignment in test */
+					tempstr = NULL)
 				{
 					len = MIN(strlen(piecestr), MAX_MIDENT_LEN);
 					/* create the mval for the next subscript */
@@ -364,8 +365,9 @@ void zshow_output(zshow_out *out, const mstr *str)
 			}
 			tempstr=str->addr;
 			/* build the key by adding the rest of the subscripts */
-			for (tempstr = str->addr; piecestr = STRTOK_R(tempstr,".", &strtokptr); /* WARNING assignment in test */
-					tempstr = NULL)
+			for (tempstr = str->addr;
+				NULL != (piecestr = STRTOK_R(tempstr, ".", &strtokptr)); /* WARNING assignment in test */
+				tempstr = NULL)
 			{
 				len = MIN(strlen(piecestr), MAX_MIDENT_LEN);
 				ENSURE_STP_FREE_SPACE(len);

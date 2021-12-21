@@ -366,7 +366,7 @@ STATICFNDEF void scan_behavioral_words(char *c, struct extcall_entry_list *entry
 	}
 	c++;
 	token = STRTOK_R(c, " \t", &saveptr);
-	while (token != NULL)
+	while (NULL != token)
 	/* Make Keyword case insensitive */
 	{
 		temp_tok = token;

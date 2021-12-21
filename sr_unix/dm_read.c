@@ -199,7 +199,6 @@ void	dm_read (mval *v)
 #	endif
 	char		*argv[3];
 	char		temp_str[MAX_RECALL_NUMBER_LENGTH + 1];
-	char		*strtokptr;
 	const char	delimiter_string[] = " \t";
 	d_tt_struct 	*tt_ptr;
 	enum RECALL_ERR_CODE	err_recall = NO_ERROR;
@@ -604,7 +603,14 @@ void	dm_read (mval *v)
 					if (((strlen(REC) == match_length) || (strlen(RECALL) == match_length))
 						&& (0 == strncmp((const char *)buffer_start, RECALL, match_length)))
 					{
-						STRTOK_R((char *)buffer_start, delimiter_string, &strtokptr);
+						char	*strtokptr;
+#						ifdef DEBUG
+						char	*delim_ptr;
+
+#						endif
+						DEBUG_ONLY(delim_ptr = )
+							STRTOK_R((char *)buffer_start, delimiter_string, &strtokptr);
+						assert(NULL != delim_ptr);
 						argv[1] = STRTOK_R(NULL, "", &strtokptr);
 					} else
 						break;		/* not RECALL so end of line */
@@ -614,7 +620,7 @@ void	dm_read (mval *v)
 				index = 0;
 				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));	/* BYPASSOK */
 				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));	/* BYPASSOK */
-				if (argv[1] == NULL)
+				if (NULL == argv[1])
 				{	/* print out all the history strings */
 					for (hist = recall_num; hist > 0; hist--)
 					{
