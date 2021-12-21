@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -103,10 +103,9 @@ void check_and_set_ztimeout(mval * inp_val)
 {
 	int 		max_read_len;
 	char		*vector_ptr = NULL;
-	char		*tok_ptr;
-	char		*local_str_val = NULL, *local_str_end, *strtokptr;
+	char		*tok_ptr, *tok_ptr2;
+	char		*local_str_end, *strtokptr;
 	char		*colon_ptr = NULL;
-	boolean_t	only_timeout = FALSE;
 	sigset_t	savemask;
 	int4		rc;
 	ABS_TIME	cur_time;
@@ -114,27 +113,39 @@ void check_and_set_ztimeout(mval * inp_val)
 	mval		*interim_ptr;
 	mval		ztimeout_vector, ztimeout_seconds;
 	boolean_t	is_negative = FALSE;
+	static char	*ztimeout_local_str_val;
+	static mstr	ztimeout_local_vector;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
-	local_str_val = (char *)malloc(inp_val->str.len + 1);
-	memcpy(local_str_val, inp_val->str.addr, inp_val->str.len);
-	local_str_end = local_str_val + inp_val->str.len;
-	local_str_val[inp_val->str.len] = '\0';
-	colon_ptr = strchr(local_str_val, ':');
+	if (NULL != ztimeout_local_str_val)
+	{	/* This is left over from a previous call to "check_and_set_ztimeout()" that encountered an error
+		 * midway (e.g. inside "op_commarg()" call below) and so could not get a chance to free memory then
+		 * before returning from the function. Free that up now to avoid an accumulating memory leak.
+		 * This is why we need "ztimeout_local_str_val" to be a "static" variable.
+		 */
+		free(ztimeout_local_str_val);
+		ztimeout_local_str_val = NULL;
+	}
+	MV_FORCE_STR(inp_val);	/* needed before checking "inp_val->str" or else it could be uninitialized/garbage */
+	ztimeout_local_str_val = (char *)malloc(inp_val->str.len + 1);
+	memcpy(ztimeout_local_str_val, inp_val->str.addr, inp_val->str.len);
+	local_str_end = ztimeout_local_str_val + inp_val->str.len;
+	ztimeout_local_str_val[inp_val->str.len] = '\0';
+	colon_ptr = strchr(ztimeout_local_str_val, ':');
 	ztimeout_vector = (TREF(dollar_ztimeout)).ztimeout_vector;
 	ztimeout_seconds = (TREF(dollar_ztimeout)).ztimeout_seconds;
-	(!colon_ptr) ? (max_read_len = inp_val->str.len)
-			: ((colon_ptr == local_str_val) ? (max_read_len = inp_val->str.len - 1)
-				: (max_read_len = (local_str_end - colon_ptr - 1)));
-	if (max_read_len > MAX_SRCLINE)
+	max_read_len = ((NULL == colon_ptr)
+			? inp_val->str.len
+			: ((colon_ptr == ztimeout_local_str_val) ? (inp_val->str.len - 1) : (local_str_end - colon_ptr - 1)));
+	if (MAX_SRCLINE < max_read_len)
 		max_read_len = MAX_SRCLINE;
-	if (colon_ptr == local_str_val) /*Starting with colon, change the vector only*/
+	if (colon_ptr == ztimeout_local_str_val) /* Starting with colon, change the vector only */
 	{
-		tok_ptr = STRTOK_R(local_str_val, ":", &strtokptr);
+		tok_ptr = STRTOK_R(ztimeout_local_str_val, ":", &strtokptr);
 		NULLIFY_VECTOR;
-		if (colon_ptr != (local_str_end - 1)) /* Not an empty string */
+		if (NULL != tok_ptr) /* i.e. : is followed by a non-empty string that does not start with $c(0) */
 		{
 			vector_ptr = (char *)malloc(max_read_len + 1);
 			memcpy(vector_ptr, tok_ptr, max_read_len);
@@ -143,11 +154,10 @@ void check_and_set_ztimeout(mval * inp_val)
 			ztimeout_vector.str.len = max_read_len + 1;
 			ztimeout_vector.mvtype = MV_STR;
 		}
-		free(local_str_val);
-		local_str_val = NULL;
 		nsec_timeout = 0;
 	} else
 	{	/* Some form of timeout specified */
+		MV_FORCE_NUM(inp_val);	/* needed before checking "inp_val->m[1]" or else it could be uninitialized */
 		if (inp_val->m[1] < 0) /* Negative timeout specified, cancel the timer */
 		{
 			TREF(in_ztimeout) = FALSE;
@@ -157,15 +167,17 @@ void check_and_set_ztimeout(mval * inp_val)
 			memcpy(&ztimeout_seconds, &literal_minusone, SIZEOF(mval));
 			cancel_timer(ZTIMEOUT_TIMER_ID);
 		}
-		tok_ptr = STRTOK_R(local_str_val, ":", &strtokptr);
-		if (!colon_ptr || (colon_ptr == (local_str_end - 1))) /* Only time -out specified */
+		tok_ptr = STRTOK_R(ztimeout_local_str_val, ":", &strtokptr);
+		tok_ptr2 = STRTOK_R(NULL, ":", &strtokptr); /* Next token is the vector (if one exists) */
+		if (NULL == tok_ptr2)	/* Only timeout specified (Note: timeout:xxx is also considered
+					 * as only timeout specified if xxx starts with $c(0)).
+					 */
 		{
-			only_timeout = TRUE;
 			if (!is_negative) /* Process for positive timeout */
 			{
 				/* Construct a format for reading in the input */
-				ztimeout_seconds.str.addr = local_str_val;
-				ztimeout_seconds.str.len = STRLEN(local_str_val);
+				ztimeout_seconds.str.addr = ztimeout_local_str_val;
+				ztimeout_seconds.str.len = STRLEN(ztimeout_local_str_val);
 				ztimeout_seconds.mvtype = MV_STR;
 				interim_ptr = &ztimeout_seconds;
 				MV_FORCE_NSTIMEOUT(interim_ptr, nsec_timeout, ZTIMEOUTSTR);
@@ -174,13 +186,13 @@ void check_and_set_ztimeout(mval * inp_val)
 				/* Done with the contents of ztimeout_seconds */
 				ztimeout_seconds.str.addr = NULL;
 				ztimeout_seconds.str.len = 0;
-			}
-			else
+			} else
 				nsec_timeout = 0;
-			free(local_str_val);
-			local_str_val = NULL;
-		} else /* Both specified, extract timeout from token pointer */
+			/* If only timeout specified or timeout: or timeout:$c(0), retain the old vector */
+		} else
 		{
+			/* Both timeout and vector specified. Change both. */
+			/* Change timeout */
 			ztimeout_seconds.str.addr = tok_ptr;
 			STRNLEN(tok_ptr, MAX_SRCLINE, ztimeout_seconds.str.len);
 			ztimeout_seconds.mvtype = MV_STR;
@@ -189,28 +201,33 @@ void check_and_set_ztimeout(mval * inp_val)
 			/* Done with the contents of ztimeout_seconds */
 			ztimeout_seconds.str.addr = NULL;
 			ztimeout_seconds.str.len = 0;
-		}
-		/* If only timeout specified or timeout:,
-		 * retain the old vector
-		 */
-		if (!only_timeout)
-		{ /* Change both */
+			/* Change vector */
 			NULLIFY_VECTOR;
 			vector_ptr = (char *)malloc(max_read_len + 1);
-			tok_ptr = STRTOK_R(NULL, ":", &strtokptr); /* Next token is the vector */
-			memcpy(vector_ptr, tok_ptr, max_read_len);
+			memcpy(vector_ptr, tok_ptr2, max_read_len);
 			vector_ptr[max_read_len] = '\0';
 			ztimeout_vector.str.addr = vector_ptr;
 			ztimeout_vector.str.len = max_read_len + 1;
 			ztimeout_vector.mvtype = MV_STR;
-			free(local_str_val);
-			local_str_val = NULL;
 		}
+	}
+	if (NULL != ztimeout_local_str_val)
+	{
+		free(ztimeout_local_str_val);
+		ztimeout_local_str_val = NULL;
 	}
 	if (ztimeout_vector.str.len)
 	{
+		ztimeout_local_str_val = ztimeout_vector.str.addr;	/* Keep a pointer so we free it in the next call to
+									 * this function in case of errors in "op_commarg".
+									 * This avoids an accumulating memory leak.
+									 */
 		op_commarg(&ztimeout_vector, indir_linetail);
 		op_unwind();
+		ztimeout_local_str_val = NULL;	/* If we came here it means the M code specified was valid.
+						 * This is going to be assigned to TREF(dollar_ztimeout)
+						 * so no need to keep track of this for freeing purposes.
+						 */
 	}
 	(TREF(dollar_ztimeout)).ztimeout_vector = ztimeout_vector;
 	(TREF(dollar_ztimeout)).ztimeout_seconds = ztimeout_seconds;
@@ -235,9 +252,6 @@ void check_and_set_ztimeout(mval * inp_val)
 								nsec_timeout));
 		}
 	}
-	assert(!local_str_val);
-	if (local_str_val)
-		free(local_str_val);
 	if (vector_ptr)
 	{
 		DBGDFRDEVNT((stderr,"scanned values %s %s\n", (TREF(dollar_ztimeout)).ztimeout_seconds.str.addr, vector_ptr));
