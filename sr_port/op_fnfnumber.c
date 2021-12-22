@@ -21,6 +21,7 @@
 #include "op.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
+#include "min_max.h"
 
 #define PLUS 		0x01
 #define MINUS 		0x02
@@ -60,14 +61,17 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 	}
 	assert (stringpool.free >= stringpool.base);
 	assert (stringpool.free <= stringpool.top);
-	/* assure there is adequate space for two string forms of a number as a local
-	 * version of the src must be operated upon in order to get a canonical number
-	 */
 	MV_FORCE_STR(fmt);
 	MV_FORCE_STR(dst);
 	if (0 == fmt->str.len)
 		return;
-	ENSURE_STP_FREE_SPACE(MAX_NUM_SIZE * 2);
+	/* Reserve space in string pool to hold the destination string plus the commas,periods etc. that could get added.
+	 * Since the number of commas,periods etc. that get added is proportional to the length of the string (1/3 of the length)
+	 * to be safe, just reserve twice the space in dst->str.len. But if dst->str.len is too small, minor overheads
+	 * like adding "+" at beginning and parentheses around the value could become more than twice the length so take
+	 * MAX_NUM_SIZE in that case before doing the twice calculation. Hence the MAX usage below.
+	 */
+	ENSURE_STP_FREE_SPACE(MAX(MAX_NUM_SIZE, dst->str.len) * 2);
 	ch = (unsigned char *)dst->str.addr;
 	ct = dst->str.len;
 	cp = stringpool.free;
@@ -187,9 +191,13 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 		*cp++ = (sign != 0) ? sign : ' ';
 	if (0 != (fncode & PAREN))
 		*cp++ = paren ? ')' : ' ';
+	intlen = INTCAST(cp - stringpool.free);
+	/* Before modifying "dst" to point to the result, do MAX_STRLEN check on the result */
+	if (MAX_STRLEN < intlen)
+		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 	dst->mvtype = MV_STR;
 	dst->str.addr = (char *)stringpool.free;
-	dst->str.len = INTCAST(cp - stringpool.free);
+	dst->str.len = intlen;
 	stringpool.free = cp;
 	return;
 }
