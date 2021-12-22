@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -18,10 +21,10 @@
 #include "op.h"
 
 GBLREF spdesc stringpool;
+
 LITREF int4 ten_pwr[];
 
-
-void op_fnj3(mval *src,int width,int fract,mval *dst)
+void op_fnj3(mval *src, int width, int fract, mval *dst)
 {
 	int4 n, n1, m;
 	int w, digs, digs_used;
@@ -32,12 +35,14 @@ void op_fnj3(mval *src,int width,int fract,mval *dst)
 	error_def(ERR_JUSTFRACT);
 	error_def(ERR_MAXSTRLEN);
 
-	if (width < 0)
+	if (0 > width)
 		width = 0;
-	else	if (width > MAX_STRLEN)
-			rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
-	if (fract < 0)
+	else if (MAX_STRLEN < width)
+		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+	if (0 > fract)
 		rts_error(VARLSTCNT(1) ERR_JUSTFRACT);
+	else if (MAX_STRLEN < fract)
+		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 	w = width + MAX_NUM_SIZE + 2 + fract;
 	/* the literal two above accounts for the possibility
 	of inserting a zero and/or a minus with a width of zero */
