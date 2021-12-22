@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,11 +19,11 @@
 #include "io.h"
 #include "iousdef.h"
 
+error_def(ERR_USRIOINIT);
+
 short ious_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint8 timeout)
 {
 	io_desc *iod;
-	dev_dispatch_struct *fgn_driver;
-	error_def(ERR_USRIOINIT);
 
 	iod = dev->iod;
 	if (iod->state == dev_never_opened)
@@ -36,16 +36,18 @@ short ious_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint8 ti
 	if (iod->state != dev_open)
 	{
 		if (mspace && mspace->str.len)
-		{	fgn_driver = io_get_fgn_driver(&mspace->str);
-			((d_us_struct*)(iod->dev_sp))->disp = fgn_driver;
+		{
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVMNEMCSPC, 2, mspace->str.len, mspace->str.addr);
 		}
-		else if (!(((d_us_struct*)(iod->dev_sp))->disp->open))
-		{	rts_error(VARLSTCNT(1) ERR_USRIOINIT);
-			return FALSE;
-		}
-
-		((void(*)())(((d_us_struct*)(iod->dev_sp))->disp->open))();
-		iod->state = dev_open;
+		assert(NULL == (((d_us_struct*)(iod->dev_sp))->disp));
+		/* Ideally we should have something like the following.
+		 *
+		 *	((void(*)())(((d_us_struct*)(iod->dev_sp))->disp->open))();
+		 *	iod->state = dev_open;
+		 *
+		 * But we don't know which user device driver open function to dispatch to. So issue an error for now.
+		 */
+		rts_error(VARLSTCNT(1) ERR_USRIOINIT);
 	}
 	return TRUE;
 }

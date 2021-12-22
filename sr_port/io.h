@@ -320,8 +320,6 @@ void write_text_newline_and_flush_pio(mstr *text);
 void remove_rms(io_desc *ciod);
 void iosocket_destroy(io_desc *ciod);
 
-dev_dispatch_struct *io_get_fgn_driver(mstr *s);
-
 #define MAX_CHSET_NAME	64
 #define TAB_BUF_SZ	128
 #define READTIMESTR	"READ"
