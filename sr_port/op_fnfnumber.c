@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,8 +46,7 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 	int 		ct, x, xx, y, intlen;
 	unsigned char	*ch, *cp, *ff, *ff_top, fncode, sign, *t, sepchar, decptchar;
 
-	if (!MV_DEFINED(fmt))		/* catch this up front so noundef mode can't cause trouble - so fmt no empty context */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_FNUMARG, 0);
+	MV_FORCE_DEFINED(src);
 	/* if the dst will be different than the src we'll build the new value in the string pool and repoint dst there,
 	 * otherwise, dst will anyway become the same as src, therefore we can safely use dst as a "temporary" copy of src
 	 */
