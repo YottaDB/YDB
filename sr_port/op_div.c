@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,7 +73,7 @@ void	op_div (mval *u, mval *v, mval *q)
 		promote(&w);
 		v = &w;
 	}
-	c = eb_div(v->m, u->m, q->m);
+	EB_DIV(v, u, q, c);	/* sets "c" based on input parameters "v", "u" and "q" */
 	exp = u->e - v->e + c + MV_XBIAS;
 	if (EXPHI <= exp)
 		rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
