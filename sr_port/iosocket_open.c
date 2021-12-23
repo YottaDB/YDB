@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -127,7 +127,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 	assert(ioptr->type == gtmsocket);
 	if ((ioptr->state == dev_closed) && mspace && mspace->str.len && mspace->str.addr)
 	{
-		lower_to_upper((uchar_ptr_t)dev_type, (uchar_ptr_t)mspace->str.addr, mspace->str.len);
+		lower_to_upper((uchar_ptr_t)dev_type, (uchar_ptr_t)mspace->str.addr, MIN(mspace->str.len, SIZEOF(dev_type)));
 		if (STR_LIT_LEN("SOCKET") != mspace->str.len || 0 != memcmp(dev_type, "SOCKET", STR_LIT_LEN("SOCKET")))
 		{
 			if (ioptr->dev_sp)

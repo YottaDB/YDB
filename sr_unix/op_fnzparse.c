@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #include "gtm_caseconv.h"
 #include "stringpool.h"
 #include "op.h"
+#include "min_max.h"
 
 #define ZP_DEVICE	1
 #define ZP_DIRECTORY	2
@@ -111,8 +112,7 @@ void	op_fnzparse (mval *file, mval *field, mval *def1, mval *def2, mval *type, m
 
 	if (type->str.len != 0)
 	{
-		lower_to_upper((uchar_ptr_t)&type_buf[0], (uchar_ptr_t)type->str.addr, type->str.len);
-
+		lower_to_upper((uchar_ptr_t)&type_buf[0], (uchar_ptr_t)type->str.addr, MIN(SIZEOF(type_buf), type->str.len));
 		if (type->str.len <= SYN_LEN  &&  memcmp(&type_buf[0], "SYNTAX_ONLY", type->str.len) == 0)
 			pblk.fop |= F_SYNTAXO;
 		else if (type->str.len <= NCON_LEN  &&  memcmp(&type_buf[0], "NO_CONCEAL", type->str.len) == 0)

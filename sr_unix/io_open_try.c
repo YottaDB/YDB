@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,7 +88,6 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 	TID		timer_id;
 	struct stat	outbuf;
 	char		*buf, namebuf[LOGNAME_LEN + 1];
-	unsigned char	dev_type[MAX_DEV_TYPE_LEN];
 	iosb		io_status_blk;
 	mstr		chset_mstr;
 	int		umask_orig, umask_creat;
@@ -185,7 +184,9 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 		}
 		if ((n_io_dev_types == tl->iod->type) && mspace && mspace->str.len)
 		{
-			lower_to_upper(dev_type, (uchar_ptr_t)mspace->str.addr, mspace->str.len);
+			unsigned char	dev_type[MAX_DEV_TYPE_LEN];
+
+			lower_to_upper(dev_type, (uchar_ptr_t)mspace->str.addr, MIN(mspace->str.len, SIZEOF(dev_type)));
 			if (((SIZEOF("SOCKET") - 1) == mspace->str.len) && (0 == MEMCMP_LIT(dev_type, "SOCKET")))
 				tl->iod->type = gtmsocket;
 			else if (((SIZEOF("PIPE") - 1) == mspace->str.len) && (0 == MEMCMP_LIT(dev_type, "PIPE")))

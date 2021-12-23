@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -32,6 +35,7 @@ mlabel *get_mladdr(mident *lab_name)
 	lname = lab_name;
 	if (!(cmd_qlf.qlf & CQ_LOWER_LABELS))
 	{
+		assert(SIZEOF(upper_ident.c) > lab_name->len);
 		lower_to_upper((uchar_ptr_t)&upper_ident.c[0], (uchar_ptr_t)lab_name->addr, lab_name->len);
 		upper_lname.len = lab_name->len;
 		upper_lname.addr = &upper_ident.c[0];
