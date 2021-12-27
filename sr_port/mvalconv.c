@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -296,7 +296,7 @@ void double2mval(mval *dst, double src)
 	return;
 }
 
-/* Converts an mval into a 32-bit signed integer, or MAXPOSINT4 on overflow. */
+/* Converts an mval into a 32-bit signed integer, or MAXPOSINT4/-MAXPOSINT4 on overflow/underflow. */
 int4 mval2i(mval *v)
 {
 	int4	i;
@@ -312,7 +312,7 @@ int4 mval2i(mval *v)
 		if (exp > EXP_IDX_BIAL)
 		{
 			j = mval2double(v);
-			i = (MAXPOSINT4 >= j) ? (int4)j : MAXPOSINT4;
+			i = (((double)MAXPOSINT4 < j) ? MAXPOSINT4 : ((-(double)MAXPOSINT4 > j) ? -MAXPOSINT4 : (int4)j));
 		} else if (exp < MV_XBIAS)
 			i = 0;
 		else

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -34,6 +37,8 @@ void op_fnj2(mval *src, int len, mval *dst)
 
 	MV_FORCE_STR(src);
 	MV_FORCE_LEN(src);
+	if (0 > len)
+		len = 0;
 	n = len - src->str.char_len;
 	if (n <= 0)
 	{
@@ -64,6 +69,8 @@ void op_fnzj2(mval *src, int len, mval *dst)
 		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 
 	MV_FORCE_STR(src);
+	if (0 > len)
+		len = 0;
 	n = len - src->str.len;
 	if (n <= 0)
 	{

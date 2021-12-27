@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -60,6 +60,8 @@ l10:
 	ldr	x0, [x29, #dest]
 	mov	w15, #mval_m_str
 	strh	w15, [x0, #mval_w_mvtype]		/* Always a string */
+	cmp	w4, w2
+	b.gt	l25					/* If last < first, then return null result */
 	ldr	w3, [x1, #mval_l_strlen]		/* w12 -- src str len */
 	cmp	w3, w4					/* If left index > str len, then null result */
 	b.lt	l25

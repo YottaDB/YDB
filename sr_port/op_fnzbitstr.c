@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -18,20 +21,19 @@
 
 GBLREF spdesc	stringpool;
 
+error_def(ERR_INVBITLEN);
+
 void op_fnzbitstr(mval *bitstr, int size, int truthval)
 {
 	unsigned char 	*byte_1, *byte_n;
 	static const unsigned char mask[8]={0xFF,0xFE,0xFC,0xF8,0xF0,0xE0,0xC0,0x80};
 	int	n;
-	error_def(ERR_INVBITLEN);
 
+	if ((size <= 0) || (size > 253952))
+		rts_error(VARLSTCNT(1) ERR_INVBITLEN);
 	n = (size + 7) / 8;
 	ENSURE_STP_FREE_SPACE(n + 1);
 	byte_1 = (unsigned char *)stringpool.free;
-	if ((size <= 0) || (size > 253952))
-	{
-		rts_error(VARLSTCNT(1) ERR_INVBITLEN);
-	}
 	*byte_1 = n * 8 - size;
 	if (truthval)
 	{

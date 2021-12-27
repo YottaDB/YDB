@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,7 +60,7 @@ void OP_FNEXTRACT(int last, int first, mval *src, mval *dest)
 	MV_FORCE_STR(src);
 	if (0 >= first)
 		first = 1;
-	else if (first > src->str.len)
+	if ((first > src->str.len) || (last < first))
 	{
 		dest->mvtype = MV_STR;
 		dest->str.len = 0;

@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -55,6 +55,8 @@ l10:
 	movl	last(%rbp), %edx
 	movq	dest(%rbp), %rdi
 	movw	$mval_m_str, mval_w_mvtype(%rdi)
+	cmpl	%edx, %eax
+	jg	l25					# If last < first, then return null result
 	movl	mval_l_strlen(%rsi), %ecx
 	cmpl	%eax, %ecx				# If left index > str. len, then null result
 	jl	l25
