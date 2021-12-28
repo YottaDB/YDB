@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -325,6 +325,11 @@ LITDEF struct
 	if (NULL != oldchain)
 	{	/* for a literal 0 postconditional, we just throw the command & args away and return happiness */
 		setcurtchain(oldchain);
+		if (fetch0 != curr_fetch_trip)
+		{
+			assert(OC_FETCH == curr_fetch_trip->opcode);
+			ins_triple(curr_fetch_trip);
+		}
 		return TRUE;
 	}
 	if ((EXPR_FAIL != rval) && (NULL != cr))
