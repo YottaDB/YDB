@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,9 +23,9 @@
 #include "show_source_line.h"
 #include "hashtab_mname.h"
 
-
-
 GBLREF	boolean_t	run_time;
+
+LITREF	octabstruct	oc_tab[];
 
 error_def(ERR_EXPR);
 error_def(ERR_EXTGBLDEL);
@@ -67,7 +67,7 @@ int gvn(void)
 		if (vbar)
 			parse_status = expr(sb1++, MUMPS_EXPR);
 		else
-			parse_status = expratom(sb1++);
+			parse_status = expratom_coerce_mval(sb1++);
 		if (!parse_status)
 		{
 			stx_error(ERR_EXPR);
@@ -81,7 +81,7 @@ int gvn(void)
 			if (vbar)
 				parse_status = expr(sb1++, MUMPS_EXPR);
 			else
-				parse_status = expratom(sb1++);
+				parse_status = expratom_coerce_mval(sb1++);
 			if (!parse_status)
 			{	stx_error(ERR_EXPR);
 				if (shifting)

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,7 @@ int name_glvn(boolean_t gblvn, oprtype *a)
 			if (vbar)
 				fnname_type |= FNVBAR;
 			advancewindow();
-			if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1++)))
+			if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom_coerce_mval(sb1++)))
 				return FALSE;
 			if (TK_COMMA != TREF(window_token))
 				fnname_type |= FNEXTGBL1;
@@ -64,7 +64,7 @@ int name_glvn(boolean_t gblvn, oprtype *a)
 			{
 				fnname_type |= FNEXTGBL2;
 				advancewindow();
-				if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1++)))
+				if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom_coerce_mval(sb1++)))
 					return FALSE;
 			}
 			if ((!vbar && (TK_RBRACKET != TREF(window_token))) || (vbar && (TK_VBAR != TREF(window_token))))

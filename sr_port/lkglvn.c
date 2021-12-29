@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,7 +60,7 @@ int lkglvn(boolean_t gblvn)
 	{
 		vbar = (TK_VBAR == TREF(window_token));
 		advancewindow();
-		if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1++)))
+		if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom_coerce_mval(sb1++)))
 		{
 			stx_error(ERR_EXPR);
 			if (shifting)
@@ -70,7 +70,7 @@ int lkglvn(boolean_t gblvn)
 		if (TK_COMMA == TREF(window_token))
 		{
 			advancewindow();
-			if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1++)))
+			if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom_coerce_mval(sb1++)))
 			{
 				stx_error(ERR_EXPR);
 				if (shifting)

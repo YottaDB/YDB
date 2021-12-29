@@ -848,6 +848,7 @@ void		create_temporaries(triple *sub, opctype put_oc);
 triple		*entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_commarg, boolean_t labref, boolean_t textname);
 int		eval_expr(oprtype *a);
 int		expratom(oprtype *a);
+int		expratom_coerce_mval(oprtype *a);
 int		exfunc(oprtype *a, boolean_t alias_target);
 int		expritem(oprtype *a);
 int		expr(oprtype *a, int m_type);
