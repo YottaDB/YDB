@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -853,6 +853,8 @@ int		exfunc(oprtype *a, boolean_t alias_target);
 int		expritem(oprtype *a);
 int		expr(oprtype *a, int m_type);
 void		ex_tail(oprtype *opr, int depth);
+void		ex_arithlit_optimize(triple *t);
+mval		*ex_arithlit_compute(opctype c, mval *v0, mval *v1);
 int		extern_func(oprtype *a);
 int		f_ascii(oprtype *a, opctype op);
 int		f_char(oprtype *a, opctype op);

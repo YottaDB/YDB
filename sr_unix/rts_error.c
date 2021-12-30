@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -181,7 +181,13 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 				--(TREF(rts_error_depth));
 			return FALSE;
 		}
-		gtm_putmsg_list(csa, argcnt, var);
+		/* The currently active condition handler is "ex_arithlit_compute_ch" which we know is okay with
+		 * seeing runtime errors. In case of an error, it abandons the attempt to optimize literals and
+		 * moves on. So we don't want to overwrite global variables TREF(util_outbuff) etc. with the to-be-abandoned
+		 * error using the "gtm_putmsg_list()" call below. Hence the if check below.
+		 */
+		if ((NULL == active_ch) || (&ex_arithlit_compute_ch != active_ch->ch))
+			gtm_putmsg_list(csa, argcnt, var);
 		if (DUMPABLE)
 			created_core = dont_want_core = FALSE;		/* We can create a(nother) core now */
 		if (IS_GTMSECSHR_IMAGE)

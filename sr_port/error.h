@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,6 +88,7 @@ CONDITION_HANDLER(dbinit_ch);
 CONDITION_HANDLER(dse_dmp_handler);
 CONDITION_HANDLER(dse_f_blk_ch);
 CONDITION_HANDLER(exi_ch);
+CONDITION_HANDLER(ex_arithlit_compute_ch);
 CONDITION_HANDLER(fgncal_ch);
 CONDITION_HANDLER(fntext_ch);
 CONDITION_HANDLER(fnzsrch_ch);
