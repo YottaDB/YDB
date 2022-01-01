@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -117,7 +117,7 @@ void jobexam_process(mval *dump_file_name, mval *zshowcodes, mval *dump_file_spe
 	sigaction(SIGBUS, &new_action, &prev_action_sigbus);
 	sigaction(SIGSEGV, &new_action, &prev_action_sigsegv);
 	*dump_file_spec = empty_str_mval;
-	dev_in_use = io_curr_device;		/* Save current IO device */
+	dev_in_use = io_curr_device;            /* Save current IO device */
 	/* Save text in util_outbuff which can be detrimentally overwritten by ZSHOW.
 	 * NOTE: The following code needs to be eventually moved to jobinterrupt_process.c and replaced with
 	 * SAVE/RESTORE_UTIL_OUT_BUFFER macros, as follows:
@@ -143,14 +143,17 @@ void jobexam_process(mval *dump_file_name, mval *zshowcodes, mval *dump_file_spe
 		assert(saved_util_outbuff_len <= SIZEOF(saved_util_outbuff));
 		memcpy(saved_util_outbuff, TREF(util_outbuff_ptr), saved_util_outbuff_len);
 	}
-	jobexam_dump(input_dump_file_name, dump_file_spec, save_dump_file_name_buff, zshowcodes);
-	/* If any errors occur in job_exam_dump, the condition handler will unwind the stack to this point and return.  */
+	/* See comment inside "jobexam_dump()" for why "&dev_in_use" needs to be passed as a parameter */
+	jobexam_dump(input_dump_file_name, dump_file_spec, save_dump_file_name_buff, zshowcodes, &dev_in_use);
+	io_curr_device = dev_in_use;
+	/* If any errors occur in job_exam_dump, the condition handler will unwind the stack to this point
+	 * in the caller frame and continue execution from here.
+	 */
 	if (0 != saved_util_outbuff_len)
 	{	/* Restore util_outbuff values */
 		memcpy(TREF(util_outbuff_ptr), saved_util_outbuff, saved_util_outbuff_len);
 		TREF(util_outptr) = TREF(util_outbuff_ptr) + saved_util_outbuff_len;
 	}
-	io_curr_device = dev_in_use;		/* Restore IO device */
 	/* If we saved an mval on our stack, we need to pop it off. If there was an error while doing the
 	 * jobexam dump, zshow may have left some other mv_stent entries on the stack. Pop them all off with
 	 * just a regular POP_MV_STENT macro rather than unw_mv_ent() call because the mv_stent entries
@@ -176,10 +179,12 @@ void jobexam_process(mval *dump_file_name, mval *zshowcodes, mval *dump_file_spe
 /* This routine is broken out as another ep so we can do cleanup processing in jobexam_process if
  * we trigger the condition handler and unwind.
  */
-void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_file_name_buff, mval *zshowcodes)
+void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_file_name_buff, mval *zshowcodes, io_pair *dev_in_use)
 {
 	unsigned char		dump_file_name[DEFAULT_DUMP_FILE_TOTSIZE], *dump_file_name_ptr;
 	mval			def_file_name, parms, zshowops;
+	io_pair			lcl_dev_in_use;
+	boolean_t		in_is_curr_device, out_is_curr_device;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -215,6 +220,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
 	parms.mvtype = MV_STR;
 	parms.str.addr = (char *)dumpable_error_dump_file_parms;
 	parms.str.len = SIZEOF(dumpable_error_dump_file_parms);
+	lcl_dev_in_use = io_curr_device;		/* Save current IO device */
 	/* Open, use, and zshow into new file, then close and reset current io device */
 	op_open(dump_file_spec, &parms, (mval *)&literal_zero, 0);
 	op_use(dump_file_spec, &parms);
@@ -231,7 +237,16 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
 	op_zshow(&zshowops, ZSHOW_DEVICE, NULL);
 	parms.str.addr = (char *)dumpable_error_dump_file_noparms;
 	parms.str.len = SIZEOF(dumpable_error_dump_file_noparms);
+	SAVE_IN_OUT_IS_CURR_DEVICE(lcl_dev_in_use, in_is_curr_device, out_is_curr_device);
 	op_close(dump_file_spec, &parms);
+	RESTORE_IO_CURR_DEVICE(lcl_dev_in_use, in_is_curr_device, out_is_curr_device);
+	/* Now that "op_close()" is done and "io_curr_device" has been adjusted (if needed) by the above macro,
+	 * use this to set "*dev_in_use" as this will be used later by caller to reset "io_curr_device".
+	 * Caller needs that line because it needs to switch back the current device even if there are any errors
+	 * in say "op_zshow()" call above (in which case the condition handler "jobexam_dump_ch()" will transfer
+	 * control back to caller without having done the "op_close()" above).
+	 */
+	*dev_in_use = io_curr_device;
 	/* Notify operator dump was taken */
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_JOBEXAMDONE, 3, process_id, dump_file_spec->str.len, dump_file_spec->str.addr);
 	REVERT;

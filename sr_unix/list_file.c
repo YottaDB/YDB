@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -121,8 +121,9 @@ void open_list_file(void)
 
 void close_list_file(void)
 {
-	mval param,list_file;
-	char charspace;
+	mval		param,list_file;
+	char		charspace;
+	boolean_t	in_is_curr_device, out_is_curr_device;
 
 	param.str.len = 1;
 	charspace = (char) iop_eol;
@@ -130,8 +131,9 @@ void close_list_file(void)
 	list_file.mvtype = param.mvtype = MV_STR;
 	list_file.str.len = io_curr_device.in->trans_name->len;
 	list_file.str.addr = &io_curr_device.in->trans_name->dollar_io[0];
+	SAVE_IN_OUT_IS_CURR_DEVICE(dev_in_use, in_is_curr_device, out_is_curr_device);
 	op_close(&list_file, &param);
-	io_curr_device = dev_in_use;
+	RESTORE_IO_CURR_DEVICE(dev_in_use, in_is_curr_device, out_is_curr_device);
 }
 
 void list_head(bool newpage)

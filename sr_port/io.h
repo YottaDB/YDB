@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -606,5 +606,44 @@ MBSTART {											\
 		MSTR->addr = IOD->dollar.devicebuffer;						\
 		MSTR->len = STRLEN(IOD->dollar.devicebuffer);					\
 	}											\
+} MBEND
+
+/* The below macro is called before an "op_close" that is followed by a restore of "io_curr_device".
+ * In that case, we need to make sure the restored "io_curr_device" after the "op_close()" does not point
+ * to the just now closed/freed device. The "IN_IS_CURR_DEVICE" and "OUT_IS_CURR_DEVICE" output parameters
+ * are used by the caller after the "op_close()" to adjust "io_curr_device" as appropriate.
+ */
+#define SAVE_IN_OUT_IS_CURR_DEVICE(SAVE_DEVICE, IN_IS_CURR_DEVICE, OUT_IS_CURR_DEVICE)	\
+MBSTART {										\
+	GBLREF io_pair		io_curr_device;						\
+											\
+	IN_IS_CURR_DEVICE = (io_curr_device.in == SAVE_DEVICE.in);			\
+	OUT_IS_CURR_DEVICE = (io_curr_device.out == SAVE_DEVICE.out);			\
+} MBEND
+
+/* The below macro is invoked after an "op_close()" that is preceded by a SAVE_IN_OUT_IS_CURR_DEVICE macro call.
+ * After restoring "io_curr_device" to the "SAVE_DEVICE" input macro parameter, we check the other 2 parameters.
+ * If they are TRUE it means "SAVE_DEVICE.in" and/or "SAVE_DEVICE.out" were closed as part of the just recently
+ * done "op_close()" call and so we adjust "io_curr_device.in" and "io_curr_device.out" respectively to point to
+ * $PRINCIPAL (i.e. "io_std_device") as we do not want "io_curr_device" to point to a closed/freed device. (YDB#828)
+ */
+#define	RESTORE_IO_CURR_DEVICE(SAVE_DEVICE, IN_IS_CURR_DEVICE, OUT_IS_CURR_DEVICE)	\
+MBSTART {										\
+	GBLREF io_pair		io_curr_device, io_std_device;				\
+											\
+	/* Assert that if IN_IS_CURR_DEVICE is TRUE, that "io_curr_device.in" got	\
+	 * automatically adjusted to point to "io_std_device.in" (by "op_close()").	\
+	 */										\
+	assert(!IN_IS_CURR_DEVICE || (io_curr_device.in == io_std_device.in));		\
+	/* Similar assert for "OUT_IS_CURR_DEVICE" */					\
+	assert(!OUT_IS_CURR_DEVICE || (io_curr_device.out == io_std_device.out));	\
+	/* Restore "io_curr_device" first */						\
+	io_curr_device = SAVE_DEVICE;							\
+	/* Adjust "io_curr_device.in" if it points to a closed device. */		\
+	if (IN_IS_CURR_DEVICE)								\
+		io_curr_device.in = io_std_device.in;					\
+	/* Adjust "io_curr_device.in" if it points to a closed device. */		\
+	if (OUT_IS_CURR_DEVICE)								\
+		io_curr_device.out = io_std_device.out;					\
 } MBEND
 #endif /* IO_H */

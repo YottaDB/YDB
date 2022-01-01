@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -687,14 +687,16 @@ boolean_t trigger_select_tpwrap(char *select_list, uint4 select_list_len, char *
 	TREF(ztrig_use_io_curr_device) = FALSE;
 	if (0 != file_name_len)
 	{
+		boolean_t	in_is_curr_device, out_is_curr_device;
+
 		op_val.mvtype = op_pars.mvtype = MV_STR;
 		op_val.str.addr = (char *)file_name;;
 		op_val.str.len = file_name_len;
 		op_pars.str.len = SIZEOF(no_param);
 		op_pars.str.addr = (char *)&no_param;
+		SAVE_IN_OUT_IS_CURR_DEVICE(save_io_curr_device, in_is_curr_device, out_is_curr_device);
 		op_close(&op_val, &op_pars);
-		/* Return back to the current device */
-		io_curr_device = save_io_curr_device;
+		RESTORE_IO_CURR_DEVICE(save_io_curr_device, in_is_curr_device, out_is_curr_device);
 	}
 	return (TRIG_FAILURE == select_status);
 }

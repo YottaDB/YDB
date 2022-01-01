@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -330,6 +330,7 @@ void	close_source_file (void)
 	mval		val;
 	mval		pars;
 	unsigned char	no_param;
+	boolean_t	in_is_curr_device, out_is_curr_device;
 
 	no_param = (unsigned char)iop_eol;
 	pars.mvtype = MV_STR;
@@ -338,7 +339,9 @@ void	close_source_file (void)
 	val.mvtype = MV_STR;
 	val.str.len = source_name_len;
 	val.str.addr = (char *)source_file_name;
+	SAVE_IN_OUT_IS_CURR_DEVICE(tmp_list_dev, in_is_curr_device, out_is_curr_device);
 	op_close(&val, &pars);
-	io_curr_device = tmp_list_dev;	/*	not dev_in_use to make sure list file works	*/
+	/* Note: Use tmp_list_dev and not dev_in_use below to make sure list file works */
+	RESTORE_IO_CURR_DEVICE(tmp_list_dev, in_is_curr_device, out_is_curr_device);
 	return;
 }

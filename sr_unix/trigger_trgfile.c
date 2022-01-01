@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,6 +101,7 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 	char			*trigptr;
 	char			*values[NUM_SUBS];
 	unsigned short		value_len[NUM_SUBS];
+	boolean_t		in_is_curr_device, out_is_curr_device;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -151,8 +152,9 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 				util_out_print_gtmio("File !AD, Line !UL: Line too long", FLUSH, trigger_filename_len, trigger_filename, ++record_num);
 		io_curr_device = io_trigfile_device;
 	}
+	SAVE_IN_OUT_IS_CURR_DEVICE(io_save_device, in_is_curr_device, out_is_curr_device);
 	file_input_close();
-	io_curr_device = io_save_device;
+	RESTORE_IO_CURR_DEVICE(io_save_device, in_is_curr_device, out_is_curr_device);
 	if (trigger_error)
 	{
 		util_out_print_gtmio("=========================================", FLUSH);
