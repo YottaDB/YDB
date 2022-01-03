@@ -89,7 +89,7 @@ void io_dev_close (io_log_name *d)
 	iod = d->iod;
 	if (iod->pair.in == io_std_device.in  &&  iod->pair.out == io_std_device.out)
 	{
-		if (prin_in_dev_failure || prin_out_dev_failure)
+		if (prin_out_dev_failure || (prin_in_dev_failure && (io_std_device.in == io_std_device.out)))
 			return;
 	}
 	pp.mvtype = MV_STR;
