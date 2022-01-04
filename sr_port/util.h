@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,42 +18,6 @@
 
 boolean_t util_is_log_open(void);
 
-<<<<<<< HEAD
-#ifdef VMS
-#include <descrip.h>
-
-/* defines for util_out_send_oper in util_output.c */
-
-#define SNDOPR_TRIES 3
-#define SNDOPR_DELAY 10
-#define GTMOPCOMMISSED1 "%YDB-I-OPCOMMISSED "
-#define GTMOPCOMMISSED2 " errors and "
-#define GTMOPCOMMISSED3 " MBFULLs sending prior operator messages"
-
-/* While the maximum for OPER_LOG_SIZE is 1906 (found from experimentation), we
-   set it's maximum to 1904 being the largest 4 byte aligned size we can use. This
-   4 byte aligned size is necessary to make the header length calculation done as
-   SIZEOF(oper) - SIZEOF(oper.text) work correctly. If a size is used that is not
-   4 byte aligned, this calculation will incorrectly contain the compiler pad chars
-   causing garbage at the end of operator log lines. SE 9/2001
-*/
-#define	OPER_LOG_SIZE 1904
-
-typedef struct
-{
-	unsigned int	req_code : 8;
-	unsigned int	target   : 24;
-	uint4		mess_code;
-	char		text[OPER_LOG_SIZE];
-} oper_msg_struct;
-
-void util_in_open(struct dsc$descriptor_s *file_prompt);
-void util_out_open(struct dsc$descriptor_s *file_prompt);
-void util_log_open(char *filename, uint4 len);
-void util_out_write(unsigned char *addr, unsigned int len);
-#else /* UNIX */
-=======
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 #include "gtm_stdio.h"		/* for FILE * */
 void		util_in_open(void *);
 char		*util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leading_spaces);

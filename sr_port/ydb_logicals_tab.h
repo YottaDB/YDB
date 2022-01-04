@@ -130,7 +130,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_STRING_POOL_LIMIT,          "$ydb_string_pool
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_SYSID,                      "$ydb_sysid",                      "$gtm_sysid")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TREAT_SIGUSR2_LIKE_SIGUSR1, "$ydb_treat_sigusr2_like_sigusr1", "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TLS_PASSWD_PREFIX,          "$ydb_tls_passwd_",                "$gtmtls_passwd_")
-YDBENVINDX_TABLE_ENTRY (YDBENVINDEX_DOLLAR_TEST,               "$ydb_dollartest",                 "")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DOLLAR_TEST,                "$ydb_dollartest",                 "")
 /* Like YDBENVINDX_DIST and YDBENVINDX_DIST_ONLY, we have the below two lines.
  * YDBENVINDX_TMP is used by the wrapper gtmsecshr ($ydb_dist/gtmsecshr). But since that sets ydb_tmp in the environment,
  * the gtmsecshr process that is forked off ($ydb_dist/gtmsecshrdir/gtmsecshr) inherits this env var and so does not need

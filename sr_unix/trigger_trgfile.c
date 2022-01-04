@@ -128,17 +128,13 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 		io_curr_device = io_save_device;
 		record_num++;
 		if ((0 != len) && (COMMENT_LITERAL != trigptr[0]))
-<<<<<<< HEAD
 		{
 			if (0 == trigger_filename_len)
-				util_out_print_gtmio("STDIN, Line !UL: ", NOFLUSH, record_num);
+				util_out_print_gtmio("STDIN, Line !UL: ", NOFLUSH_OUT, record_num);
 			else
-				util_out_print_gtmio("File !AD, Line !UL: ", NOFLUSH, trigger_filename_len, trigger_filename, record_num);
+				util_out_print_gtmio("File !AD, Line !UL: ", NOFLUSH_OUT,
+							trigger_filename_len, trigger_filename, record_num);
 		}
-=======
-			util_out_print_gtmio("File !AD, Line !UL: ", NOFLUSH_OUT, trigger_filename_len, trigger_filename,
-				record_num);
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 		trigger_rec->str.len = len;
 		trigger_rec->str.addr = trigptr;
 		trigger_status = trigger_update_rec(trigger_rec, noprompt, trig_stats, &io_trigfile_device, &record_num);

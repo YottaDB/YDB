@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,17 +72,14 @@
 		TRANS.len--;						\
 }
 
-<<<<<<< HEAD
 GBLREF	uint4			ydb_principal_editing_defaults;	/* ext_cap flags if tt */
 GBLREF	boolean_t		is_ydb_chset_utf8;
 GBLREF	boolean_t		utf8_patnumeric;
 GBLREF	boolean_t		badchar_inhibit;
 GBLREF	boolean_t		ydb_quiet_halt;
 GBLREF	int			ydb_non_blocked_write_retries;	/* number for retries for non_blocked write to pipe */
-=======
-GBLREF	boolean_t		badchar_inhibit, dmterm_default, hup_on, gtm_quiet_halt, is_gtm_chset_utf8, utf8_patnumeric;
+GBLREF	boolean_t		dmterm_default, hup_on;
 GBLREF	boolean_t		ipv4_only;		/* If TRUE, only use AF_INET. */
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 GBLREF	char			*gtm_core_file;
 GBLREF	char			*gtm_core_putenv;
 GBLREF	int			gtm_non_blocked_write_retries;	/* number for retries for non_blocked write to pipe */
@@ -184,30 +181,14 @@ void	gtm_env_init_sp(void)
 		/* Not initialized enuf for errors yet so silent rejection of invalid vals */
 	TREF(lv_null_subs) = ((is_defined && (LVNULLSUBS_FIRST < ret) && (LVNULLSUBS_LAST > ret)) ? ret : LVNULLSUBS_OK);
 	/* ZLIB library compression level */
-<<<<<<< HEAD
 	ydb_zlib_cmp_level = ydb_trans_numeric(YDBENVINDX_ZLIB_CMP_LEVEL, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 	if (YDB_CMPLVL_OUT_OF_RANGE(ydb_zlib_cmp_level))
 		ydb_zlib_cmp_level = ZLIB_CMPLVL_MIN;	/* no compression in this case */
+	/* Check for and and setup gtm_hupenable if specified */
+	hup_on = ydb_logical_truth_value(YDBENVINDX_HUPENABLE, FALSE, &is_defined);
 	ydb_principal_editing_defaults = 0;
 	if (SS_NORMAL == ydb_trans_log_name(YDBENVINDX_PRINCIPAL_EDITING, &trans, buf, YDB_PATH_MAX,
 												IGNORE_ERRORS_TRUE, NULL))
-=======
-	val.addr = GTM_ZLIB_CMP_LEVEL;
-	val.len = SIZEOF(GTM_ZLIB_CMP_LEVEL) - 1;
-	gtm_zlib_cmp_level = trans_numeric(&val, &is_defined, TRUE);
-	if (GTM_CMPLVL_OUT_OF_RANGE(gtm_zlib_cmp_level))
-		gtm_zlib_cmp_level = ZLIB_CMPLVL_MIN;	/* no compression in this case */
-	/* Check for and and setup gtm_hupenable if specified */
-	val.addr = GTM_HUPENABLE;
-	val.len = SIZEOF(GTM_HUPENABLE) - 1;
-	ret = logical_truth_value(&val, FALSE, &is_defined);
-	if (is_defined)
-		hup_on = ret;
-	gtm_principal_editing_defaults = 0;
-	val.addr = GTM_PRINCIPAL_EDITING;
-	val.len = SIZEOF(GTM_PRINCIPAL_EDITING) - 1;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 	{
 		assert(trans.len < YDB_PATH_MAX);
 		trans.addr[trans.len] = '\0';

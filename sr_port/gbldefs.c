@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1242,7 +1242,7 @@ GBLDEF	boolean_t	dollar_zaudit;			/* Intrinsic that indicates whether direct mod
 							 * TRUE => Auditing is enabled.
 							 */
 GBLDEF	dm_audit_info	*audit_conn;			/* Stores the APD logger's connection information */
-<<<<<<< HEAD
+GBLDEF	boolean_t	gtm_nofflf;			/* GTM-9136 TRUE only to suppress LF after FF in "write #" */
 
 /* YottaDB global variables */
 GBLDEF	CLI_ENTRY	*cmd_ary;	/* Pointer to command table for MUMPS/DSE/LKE etc. */
@@ -1419,6 +1419,3 @@ GBLDEF	boolean_t	ydb_treat_sigusr2_like_sigusr1;	/* set based on env var "ydb_tr
 GBLDEF	int		jobinterrupt_sig_num;		/* Set to signal number that caused $ZINTERRUPT (SIGUSR1/SIGUSR2).
 							 * Used to derive the value of the ISV $ZYINTRSIG.
 							 */
-=======
-GBLDEF	boolean_t	gtm_nofflf;			/* GTM-9136 TRUE only to suppress LF after FF in "write #" */
->>>>>>> 04cc1b83 (GT.M V6.3-011)

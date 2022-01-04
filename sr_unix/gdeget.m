@@ -3,7 +3,7 @@
 ; Copyright (c) 2006-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -390,20 +390,14 @@ segment:
 	s segs(s,"FILE_NAME")=$ze(rec,rel,rel+l-1),rel=rel+SIZEOF("file_spec")
 	s segs(s,"BLOCK_SIZE")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	if (gldfmt>12) do
-	. if $$bin2num($zextract(rec,rel,rel+1))'=0 zm gdeerr("INPINTEG")
+	. if $$bin2num($zextract(rec,rel,rel+1))'=0 d message^GDE(gdeerr("INPINTEG"),"""""")
 	. set rel=rel+2 set segs(s,"EXTENSION_COUNT")=$$bin2num($zextract(rec,rel,rel+3)),rel=rel+4
 	if (gldfmt<=12) set segs(s,"EXTENSION_COUNT")=$$bin2num($zextract(rec,rel,rel+1)),rel=rel+2
 	s segs(s,"ALLOCATION")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
-<<<<<<< HEAD
 	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) d message^GDE(gdeerr("INPINTEG"),"""""")	; reserved for clb
-	s rel=rel+$s((gtm64=TRUE):12,1:4)							; padding
-	i $ze(rec,rel,rel+3)'=".DAT" d message^GDE(gdeerr("INPINTEG"),"""""")
-=======
-	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) zm gdeerr("INPINTEG")	; reserved for clb
 	if (gldfmt>12) set rel=rel+$select((gtm64=TRUE):8,1:4)							; padding
 	else  set rel=rel+$select((gtm64=TRUE):12,1:4)
-	i $ze(rec,rel,rel+3)'=".DAT" zm gdeerr("INPINTEG")
->>>>>>> 04cc1b83 (GT.M V6.3-011)
+	i $ze(rec,rel,rel+3)'=".DAT" d message^GDE(gdeerr("INPINTEG"),"""""")
 	s rel=rel+4
 	s segs(s,"DEFER")=$$bin2num($ze(rec,rel))
 	s rel=rel+1

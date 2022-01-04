@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,13 +134,9 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 	subs_count = -1;
 	*contains_env = 0;
 	subs_max = gvn ? MAX_GVSUBSCRIPTS : MAX_LVSUBSCRIPTS;
-<<<<<<< HEAD
-	for (isrc = 0; (isrc < src->str.len) && (subs_count <= subs_max);)
-=======
 	isrc = 0;
 	lastcpt = src->str.addr + src->str.len;
-	for (cpt = src->str.addr; (cpt < lastcpt) && (subs_count < subs_max);)
->>>>>>> 04cc1b83 (GT.M V6.3-011)
+	for (cpt = src->str.addr; (cpt < lastcpt) && (subs_count <= subs_max); )
 	{
 		letter = *cpt;
 		switch (state)
@@ -417,13 +413,8 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 		subs_count = 0;
 		*stop = isrc;
 	}
-<<<<<<< HEAD
 	assert((('^' == src->str.addr[0]) ? MAX_GVSUBSCRIPTS : MAX_LVSUBSCRIPTS) >= subs_count);
-	assert((0 < isrc) && (isrc == src->str.len));
-=======
-	assert((('^' == src->str.addr[0]) ? MAX_GVSUBSCRIPTS : MAX_LVSUBSCRIPTS) > subs_count);
 	assert((0 < isrc) && (isrc == src->str.len) && (cpt == lastcpt));
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 	*subscripts = subs_count;
 	return TRUE;
 }

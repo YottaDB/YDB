@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,18 +26,10 @@
 #include "setterm.h"
 #include "gtmio.h"
 
-<<<<<<< HEAD
 GBLREF	io_log_name	*io_root_log_name;
 GBLREF	int		process_exiting;
-GBLREF	uint4		process_id;
 GBLREF	io_pair		io_std_device;
-GBLREF	bool		prin_in_dev_failure;
-GBLREF	bool		prin_out_dev_failure;
-=======
-GBLREF boolean_t	prin_in_dev_failure, prin_out_dev_failure;
-GBLREF io_log_name	*io_root_log_name;
-GBLREF io_pair		io_std_device;
->>>>>>> 04cc1b83 (GT.M V6.3-011)
+GBLREF	boolean_t	prin_in_dev_failure, prin_out_dev_failure;
 
 void io_dev_close(io_log_name *d);
 

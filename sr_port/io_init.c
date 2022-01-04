@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,16 +29,10 @@
 GBLREF boolean_t	err_same_as_out, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF int		(*op_open_ptr)(mval *v, mval *p, const mval *t, mval *mspace);
 GBLREF io_log_name	*io_root_log_name;	/* root of linked list	*/
-<<<<<<< HEAD
-GBLREF mstr		sys_input;
-GBLREF mstr		sys_output;
-GBLREF boolean_t	err_same_as_out;
-=======
 GBLREF io_log_name	*dollar_principal;	/* pointer to log name GTM$PRINCIPAL if defined */
 GBLREF io_pair		io_curr_device;		/* current device	*/
 GBLREF io_pair		io_std_device;		/* standard device	*/
 GBLREF mstr		gtm_principal, sys_input, sys_output;
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 
 LITREF	mval	literal_zero;
 

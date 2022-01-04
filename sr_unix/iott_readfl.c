@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1205,13 +1205,8 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
 	}
-<<<<<<< HEAD
 	SEND_KEYPAD_LOCAL;	/* to turn keypad off if possible */
-	if (outofband && jobinterrupt != outofband)
-=======
-	SEND_KEYPAD_LOCAL	/* to turn keypad off if possible */
 	if (outofband && (jobinterrupt != outofband))
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 	{
 		v->str.len = 0;
 		io_ptr->dollar.za = 9;

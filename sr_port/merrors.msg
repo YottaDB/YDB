@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2019 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	!
+! Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -676,13 +676,8 @@ MSTACKCRIT	<User-specified M stack size critical threshold of !UL not appropriat
 GTMSECSHRSRVF	<!AD - !UL : Attempt to service request failed (retry = !UL)>/error/fao=4!/ansi=0
 FREEZECTRL	<Control Y or control C encountered during attempt to freeze the database. Aborting freeze.>/info/fao=0!/ansi=0
 JNLFLUSH	<Error flushing journal buffers to journal file !AD>/info/fao=2!/ansi=0
-<<<<<<< HEAD
 CCPSIGDMP	<CCP non fatal dump, continuing operation. Report to your YottaDB Support Channel.>/info/fao=0!/ansi=0
-NOPRINCIO	<Unable to write to principal device>/fatal/fao=0!/ansi=0
-=======
-CCPSIGDMP	<CCP non fatal dump, continuing operation. Report to your GT.M Support Channel.>/info/fao=0!/ansi=0
 NOPRINCIO	<Unable to !AD principal device: !AD at !AD due to: !AD>/fatal/fao=8!/ansi=0
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 INVPORTSPEC	<Invalid port specification>/error/fao=0!/ansi=0
 INVADDRSPEC	<Invalid IP address specification>/error/fao=0!/ansi=0
 MUREENCRYPTEND	<Database !AD : MUPIP REORG ENCRYPT finished by pid !UL at transaction number [0x!16@XQ]>/info/fao=4!/ansi=0

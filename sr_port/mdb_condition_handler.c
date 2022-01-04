@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,6 +14,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include <stdarg.h>
 
 #include "gtm_string.h"
@@ -22,12 +23,8 @@
 #include "gtm_stdio.h"
 #include "gtm_fcntl.h"	/* Needed for AIX's silly open to open64 translations */
 #include "gtm_signal.h"
-<<<<<<< HEAD
 #include "gtm_pthread.h"
-#include <stdarg.h>
 
-=======
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 #include "ast.h"
 #include "gdsroot.h"
 #include "gdsbt.h"
@@ -87,12 +84,6 @@
 #include "ftok_sems.h"
 #include "gtm_putmsg_list.h"
 #include "ztimeout_routines.h"
-<<<<<<< HEAD
-=======
-# include "iormdef.h"
-# include "ftok_sems.h"
-# include "gtm_putmsg_list.h"
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 #ifdef GTM_TRIGGER
 # include "gv_trigger.h"
 # include "gtm_trigger.h"
@@ -244,21 +235,6 @@ boolean_t clean_mum_tstart(void)
 	return (NULL != err_act);
 }
 
-<<<<<<< HEAD
-=======
-/* Routine to setup an error in util_outbuff as if rts_error had put it there. Used when we morph ERR_TPRETRY
- * to ERR_TPRESTNESTERR. Requires a va_list var containing the args so do this in this separate routine.
- */
-void setup_error(sgmnt_addrs *csa, int argcnt, ...)
-{
-	va_list		var;
-
-	VAR_START(var, argcnt);
-	gtm_putmsg_list(csa, argcnt, var);
-	va_end(var);
-}
-
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 CONDITION_HANDLER(mdb_condition_handler)
 {
 	unsigned char		*cp, *context;
@@ -391,11 +367,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 				 * active_ch[1] to get at the desired active_ch. See similar code in tp_restart.c.
 				 */
 				assert(active_ch[1].dollar_tlevel >= dollar_tlevel);
-<<<<<<< HEAD
 				DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel);
-=======
-				DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;)
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 				UNWIND(NULL, NULL);
 			}
 			/* "tp_restart" has succeeded so we have unwound back to the return point but check if the
@@ -429,12 +401,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 				/* Set mumps program counter back tstart level 1 */
 				MUM_TSTART;
 			}
-<<<<<<< HEAD
 		} else
-=======
-		}
-		else
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 		{
 			if (0 == dollar_tlevel)
 				SIGNAL = ERR_TLVLZERO;		/* TPRESTART specified but not in TP */
@@ -500,12 +467,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	{	/* Certain conditions we don't want to attempt to create the M-level ZSHOW dump.
 		 * 1) If gtmMallocDepth > 0 indicating memory manager was active and could be reentered.
 		 * 2) If we have a SIGBUS or SIGSEGV (could be likely to occur again
-<<<<<<< HEAD
-		 *    in the local variable code which would cause immediate shutdown with
-		 *    no cleanup).
-=======
 		 *    in the local variable code which would cause immediate shutdown with no cleanup).
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 		 * Note that we will bypass check 2 if GDL_ZSHOWDumpOnSignal debug flag is on
 		 */
 		SET_PROCESS_EXITING_TRUE;	/* So zshow doesn't push stuff on stack to "protect" it when
@@ -521,32 +483,19 @@ CONDITION_HANDLER(mdb_condition_handler)
 		create_fatal_error_zshow_dmp(SIGNAL);
 
 		/* If we are about to core/exit on a stack over flow, only do the core part if a debug
-<<<<<<< HEAD
-		 * flag requests this behaviour. Otherwise, supress the core and just exit.
-		 * 2008-01-29 (se): Added fatal MEMORY error so we no longer generate a core for it by
-		 * default unless the DumpOnStackOFlow flag is turned on. Since this flag is not a user-exposed
-		 * interface, I'm avoiding renaming it for now.
-		 *
-		 * Finally note that in UNIX, ch_cond_core (called by DRIVECH macro which invoked this condition
-=======
 		 * flag requests this behaviour. Otherwise, supress the core and just exit. (or not) as desired.
 		 * 2008-01-29 (se): Added fatal MEMORY error so we no longer generate a core for it by
 		 * default unless the DumpOnStackOFlow flag is turned on. Since this flag is not a user-exposed
 		 * interface, I'm avoiding renaming it for now.
+		 *
 		 * Finally note that ch_cond_core (called by DRIVECH macro which invoked this condition
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 		 * handler has likely already created the core and set the created_core flag which will prevent
 		 * this process from creating another core for the same SIGNAL. We leave this code in here in
 		 * case methods exist in the future for this module to be driven without invoking cond_core_ch first.
 		 */
-<<<<<<< HEAD
-		if (!(GDL_DumpOnStackOFlow & ydbDebugLevel) &&
-		    ((int)ERR_STACKOFLOW == SIGNAL || (int)ERR_STACKOFLOW == arg
-		     || (int)ERR_MEMORY == SIGNAL || (int)ERR_MEMORY == arg))
-=======
-		if (!(GDL_DumpOnStackOFlow & gtmDebugLevel) && (((int)ERR_STACKOFLOW == SIGNAL) || ((int)ERR_STACKOFLOW == arg)
-			|| ((int)ERR_MEMORY == SIGNAL)  || ((int)ERR_MEMORY == arg)))
->>>>>>> 04cc1b83 (GT.M V6.3-011)
+		if (!(GDL_DumpOnStackOFlow & ydbDebugLevel)
+			&& ((int)ERR_STACKOFLOW == SIGNAL || (int)ERR_STACKOFLOW == arg
+				|| (int)ERR_MEMORY == SIGNAL || (int)ERR_MEMORY == arg))
 		{
 			MUMPS_EXIT;	/* Do a clean exit rather than messy core exit */
 		}
@@ -619,10 +568,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 					assert(!udi->grabbed_ftok_sem);
 				}
 			}
-<<<<<<< HEAD
 		}
-=======
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 		/* Release crit lock on journal pool if holding it */
 		for (local_jnlpool = jnlpool_head; local_jnlpool; local_jnlpool = local_jnlpool->next)
 			if (local_jnlpool->pool_init)
@@ -664,41 +610,42 @@ CONDITION_HANDLER(mdb_condition_handler)
 #	endif
  	err_dev = active_device;
 	active_device = (io_desc *)NULL;
-<<<<<<< HEAD
-	/* Determine if the error occurred on a action from direct mode.
-	 * Go back until we find a counted frame. If we see a SFF_INDCE frame and a SFT_DM frame
-	 * before then, we are in direct mode. Else we are not in direct mode.
-	 * Note that it is also possible for a compilation error before the SFF_INDCE frame is created in op_commarg.
-	 * That is also a direct mode error so take that into account separately (TREF(compile_time) usage below).
-	 *
-	 * Note that if we find a ZTIMEOUT or a ZINTERRUPT frame, these are code fragment frames being executed on
-	 * behalf of a $ZTIMEOUT or $ZINTERRUPT interrupt event. These frames are "counted frames" but because they
-	 * are also transcendental frames, stopping at this point is premature so we avoid the counted and direct
-	 * mode frame checks if a ZTIMEOUT or ZINTERRUPT frame is detected.
-	 */
-	dm_action = FALSE;
-	prev_frame_is_indce = TREF(compile_time);
-	for (fp = frame_pointer; ; fp = fp->old_frame_pointer)
-	{
-		assert(!(fp->type & SFT_COUNT) || !(fp->type & SFT_DM));
-		if (!(fp->type & SFT_ZTIMEOUT) && !(fp->type & SFT_ZINTR))
-		{	/* Not a ztimeout or zinterrupt frame so do our checks for other types */
-			if (fp->type & SFT_COUNT)
-				break;
-			if (fp->type & SFT_DM)
-			{
-				if (prev_frame_is_indce)
-					dm_action = TRUE;
-				break;
+	/* Determine if the error occurred on a action from direct mode. */
+	if (prin_dm_io)
+	{	/* "prin_dm_io" is TRUE implies we got an error while writing in direct mode. No more checks needed. */
+		dm_action = TRUE;
+	} else
+	{	/* Need more checks to determine if we are in direct mode or not.
+		 * Go back until we find a counted frame. If we see a SFF_INDCE frame and a SFT_DM frame
+		 * before then, we are in direct mode. Else we are not in direct mode.
+		 * Note that it is also possible for a compilation error before the SFF_INDCE frame is created in op_commarg.
+		 * That is also a direct mode error so take that into account separately (TREF(compile_time) usage below).
+		 *
+		 * Note that if we find a ZTIMEOUT or a ZINTERRUPT frame, these are code fragment frames being executed on
+		 * behalf of a $ZTIMEOUT or $ZINTERRUPT interrupt event. These frames are "counted frames" but because they
+		 * are also transcendental frames, stopping at this point is premature so we avoid the counted and direct
+		 * mode frame checks if a ZTIMEOUT or ZINTERRUPT frame is detected.
+		 */
+		dm_action = FALSE;
+		prev_frame_is_indce = TREF(compile_time);
+		for (fp = frame_pointer; ; fp = fp->old_frame_pointer)
+		{
+			assert(!(fp->type & SFT_COUNT) || !(fp->type & SFT_DM));
+			if (!(fp->type & SFT_ZTIMEOUT) && !(fp->type & SFT_ZINTR))
+			{	/* Not a ztimeout or zinterrupt frame so do our checks for other types */
+				if (fp->type & SFT_COUNT)
+					break;
+				if (fp->type & SFT_DM)
+				{
+					if (prev_frame_is_indce)
+						dm_action = TRUE;
+					break;
+				}
 			}
+			prev_frame_is_indce = (0 != (fp->flags & SFF_INDCE));
+			assert(NULL != fp->old_frame_pointer);
 		}
-		prev_frame_is_indce = (0 != (fp->flags & SFF_INDCE));
-		assert(NULL != fp->old_frame_pointer);
 	}
-=======
-	dm_action = (prin_dm_io || (frame_pointer->old_frame_pointer->type & SFT_DM)
-		|| (TREF(compile_time) && (frame_pointer->type & SFT_DM)));
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 	/* The errors are said to be transcendental when they occur during compilation/execution
 	 * of the error trap ({z,e}trap, device exception) or $zinterrupt. The errors in other
 	 * indirect code frames (zbreak, zstep, xecute etc.) aren't defined to be trancendental
@@ -768,14 +715,10 @@ CONDITION_HANDLER(mdb_condition_handler)
 		if (outofband && !repeat_error)
 		{	/* This has already been done if we are re-throwing the error */
 			outofband_clear();
-<<<<<<< HEAD
-		if (!trans_action && !dm_action && !(frame_pointer->type & SFT_DM))
-=======
 			if ((int)ERR_TERMHANGUP == SIGNAL)
 				prin_in_dev_failure = prin_out_dev_failure = TRUE;
 		}
-		if (!trans_action && !(frame_pointer->type & SFT_DM))
->>>>>>> 04cc1b83 (GT.M V6.3-011)
+		if (!trans_action && !dm_action && !(frame_pointer->type & SFT_DM))
 		{
 			if (!repeat_error)
 			{
@@ -956,13 +899,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 	}
 	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
 	{
-<<<<<<< HEAD
-		/* Send out messages only in utilities or direct mode */
-=======
-		 /* Send out messages only in utilities or direct mode, this meets the GDE requirement for the
+		/* Send out messages only in utilities or direct mode, this meets the GDE requirement for the
 		 * VIEW "YCHKCOLL" command as GDE is never in direct mode
 		 */
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 		if (!IS_GTM_IMAGE || dm_action)
 			PRN_ERROR;
 		CONTINUE;
@@ -1222,14 +1161,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 				show_source_line(TRUE);
 		}
 	}
-<<<<<<< HEAD
 	/* We now have a strict no-unsolicited output from error messages policy unless dealing with a direct mode frame.
 	 * This has a dependency on a robust error_return(). Consequently, a new cleaner (from an unsolicited console output)
 	 * viewpoint is in place.
-=======
-	/* GT.M has a strict no-unsolicited output from error messages policy unless dealing with a direct mode frame.
-	 * This has a dependency on a robust error_return().
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 	 */
 	if (trans_action || dm_action)
 	{	/* If true transcendental, do trans_code_cleanup(). If our counted frame is

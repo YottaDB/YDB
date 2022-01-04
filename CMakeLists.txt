@@ -3,7 +3,7 @@
 # Copyright (c) 2012-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -33,14 +33,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-<<<<<<< HEAD
 set(version r133)
-=======
-set(version ${V6.3-011})
-if("${version}" STREQUAL "")
-        set(version V9.9-0)
-endif()
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
@@ -236,7 +229,6 @@ endmacro()
 
 # Assign sources to executables.
 set_source_list(gtm_threadgbl_deftypes gtm_threadgbl_deftypes)
-<<<<<<< HEAD
 set_source_list(dbcertify        dbcertify dlopen_libyottadb)
 set_source_list(dse              dse dlopen_libyottadb)
 set_source_list(ftok             ftok dlopen_libyottadb)
@@ -245,16 +237,6 @@ set_source_list(gtcm_pkdisp      gtcm_pkdisp omi_extstr)
 set_source_list(gtcm_play        gtcm_play dlopen_libyottadb)
 set_source_list(gtcm_server      gtcm_server dlopen_libyottadb)
 set_source_list(gtcm_shmclean    gtcm_shmclean dlopen_libyottadb)
-=======
-set_source_list(dbcertify        dbcertify dbcertify_cmd)
-set_source_list(dse              dse dse_cmd)
-set_source_list(ftok             ftok)
-set_source_list(gtcm_gnp_server  gtcm_gnp_server)
-set_source_list(gtcm_pkdisp      gtcm_pkdisp)
-set_source_list(gtcm_play        gtcm_play omi_srvc_xct)
-set_source_list(gtcm_server      gtcm_main omi_srvc_xct)
-set_source_list(gtcm_shmclean    gtcm_shmclean)
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 set_source_list(gtmsecshr        gtmsecshr_wrapper)
 set_source_list(gtmsecshr_real   gtmsecshr)
 set_source_list(libyottadb       gtm_main mupip_main mupip_cmd dse_main dse_cmd lke_main lke_cmd)
@@ -410,11 +392,7 @@ foreach(exp ydbexe yottadb)
   add_custom_command(
     OUTPUT ${out}
     DEPENDS ${in} gen_gtm_threadgbl_deftypes
-<<<<<<< HEAD
     COMMAND tcsh -f ${YDB_SOURCE_DIR}/sr_linux/genexport.csh ${in} ${out}
-=======
-    COMMAND tcsh -f ${GTM_SOURCE_DIR}/${srdir}/genexport.csh ${in} ${out}
->>>>>>> 04cc1b83 (GT.M V6.3-011)
     )
 endforeach()
 
@@ -455,19 +433,11 @@ add_executable(yottadb ${yottadb_SOURCES})
 add_executable(dse ${dse_SOURCES})
 list(APPEND with_export dse)
 
-<<<<<<< HEAD
 add_executable(dbcertify ${dbcertify_SOURCES})
 
 add_executable(gtmsecshr ${gtmsecshr_SOURCES})
 target_link_libraries(gtmsecshr libmumps) # needed for static linking since this is a setuid executable
                                           # and does not do a dlopen of libyottadb.so
-=======
-add_executable(dbcertify		${dbcertify_SOURCES})
-target_link_libraries(dbcertify		libdbcertify libmupip libmumps libstub)
-
-add_executable(gtmsecshr		${gtmsecshr_SOURCES})
-add_dependencies(gtmsecshr		gen_gtm_threadgbl_deftypes)
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 
 add_executable(gtmsecshr_real ${gtmsecshr_real_SOURCES})
 set_target_properties(gtmsecshr_real PROPERTIES
@@ -687,7 +657,6 @@ install(FILES ${scripts}
   PERMISSIONS ${install_permissions_script}
   )
 
-<<<<<<< HEAD
 find_program(PKGCONFIG NAMES pkg-config)
 if(PKGCONFIG)
   execute_process(
@@ -705,48 +674,6 @@ if(PKGCONFIG)
   endif()
 else()
   message(FATAL_ERROR "Unable to find 'pkg-config'.  Set PKGCONFIG in CMake cache.")
-=======
-if(${CMAKE_SYSTEM_NAME} STREQUAL "AIX")
-  set(gtm_icu_version "")
-else()
-  find_program(ICUCONFIG NAMES icu-config)
-  if(ICUCONFIG)
-    execute_process(
-      COMMAND ${ICUCONFIG} --version
-      OUTPUT_VARIABLE icu_version
-      RESULT_VARIABLE icu_failed
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      )
-    if(icu_failed)
-      message(FATAL_ERROR "Command\n ${ICUCONFIG} --version\nfailed (${icu_failed}).")
-    elseif("x${icu_version}" MATCHES "^x([0-9]+\\.[0-9]+)")
-      set(gtm_icu_version "${CMAKE_MATCH_1}")
-    else()
-      message(FATAL_ERROR "Command\n ${ICUCONFIG} --version\nproduced unrecognized output:\n ${icu_version}")
-    endif()
-  else()
-    include(FindPkgConfig)
-    pkg_check_modules(ICUIO icu-io)
-    if(ICUIO_FOUND)
-      if("x${ICUIO_VERSION}" MATCHES "^x([0-9]+\\.[0-9]+)")
-	set(gtm_icu_version "${CMAKE_MATCH_1}")
-      else()
-	message(FATAL_ERROR "Command\n pkg-config icu-io\nproduced unrecognized output:\n ${ICUIO_VERSION}")
-      endif()
-    else()
-      pkg_check_modules(ICU icu)
-      if(ICU_FOUND)
-	if("x${ICU_VERSION}" MATCHES "^x([0-9]+\\.[0-9]+)")
-	  set(gtm_icu_version "${CMAKE_MATCH_1}")
-	else()
-	  message(FATAL_ERROR "Command\n pkg-config icu\nproduced unrecognized output:\n ${ICU_VERSION}")
-	endif()
-      else()
-	message(FATAL_ERROR "Unable to find 'icu-config'.  Set ICUCONFIG in CMake cache.")
-      endif()
-    endif()
-  endif()
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 endif()
 
 find_program(LOCALECFG NAMES locale)

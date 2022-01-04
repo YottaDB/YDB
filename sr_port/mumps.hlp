@@ -5170,17 +5170,10 @@
    operator log.
 
    VIEW "LOGNONTP"[:intexpr] turns on logging of NONTPRESTART messages to the
-<<<<<<< HEAD
    operator log. If no intexpr is specified, YottaDB uses the value of
    environment variable ydb_nontprestart_log_delta, if it is defined, and one
-   otherwise (that is, every transaction restart will be logged). A negative
-   value of intexpr turns off the logging of NONTPRESTART messages.
-=======
-   operator log. If no intexpr is specified, GT.M uses the value of
-   environment variable gtm_nontprestart_log_delta, if it is defined, and one
-   otherwise (that is, it logs every transaction restart) A zero (0) or
-   negative value of intexpr turns off the logging of NONTPRESTART messages.
->>>>>>> 04cc1b83 (GT.M V6.3-011)
+   otherwise (that is, every transaction restart will be logged). A zero (0)
+   or negative value of intexpr turns off the logging of NONTPRESTART messages.
 
    Note that it is not possible to perform the operations of
    ydb_nontprestart_log_first with VIEW "LOGNONTP"[:intexpr].
@@ -5196,17 +5189,10 @@
    operator log.
 
    VIEW "LOGTPRESTART"[:intexpr] turns on logging of TPRESTART messages to
-<<<<<<< HEAD
    the operator log. If no intexpr is specified, YottaDB uses the value of
    environment variable ydb_tprestart_log_delta, if it is defined, and one
-   otherwise (that is, every transaction restart will be logged). A negative
-   value of intexpr turns off the logging of TPRESTART messages.
-=======
-   the operator log. If no intexpr is specified, GT.M uses the value of
-   environment variable gtm_tprestart_log_delta, if it is defined, and one
-   otherwise (that is, it logs every transaction restart). A zero (0) or
-   negative value of intexpr turns off the logging of TPRESTART messages.
->>>>>>> 04cc1b83 (GT.M V6.3-011)
+   otherwise (that is, every transaction restart will be logged). A zero (0)
+   or negative value of intexpr turns off the logging of TPRESTART messages.
 
    Note that it is not possible to perform the operations of
    ydb_tprestart_log_first with VIEW "LOGTPRESTART"[:intexpr].
@@ -14043,20 +14029,14 @@
      o An attempt to OPEN a non-zero length file WRITEONLY without either
        NEWVERSION or TRUNCATE in UTF mode produces an OPENDEVFAIL due to the
        fact that any existing BOM information cannot be verified.
-<<<<<<< HEAD
      o Note that with YottaDB SD encryption, because of the state information
        associated with encryption processing, encrypted files require the
        file to be WRITEn or READ from the beginning rather than from an
        arbitrary position.
-=======
-     o GT.M SD encryption, because of the state information associated with
-       encryption processing, requires encrypted files to be WRITEn or READ
-       from the beginning rather than from an arbitrary position.
-     o HEREDOCs in shell scripts that drive input to GT.M present to GT.M as
-       SD files, and by default terminate with a success - zero (0) status
-       unless GT.M terminates with a ZHALT that supplies an alternative
+     o HEREDOCs in shell scripts that drive input to YottaDB present to YottaDB
+       as SD files, and by default terminate with a success - zero (0) status
+       unless YottaDB terminates with a ZHALT that supplies an alternative
        status.
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 
 3 _Binary_Files
     Binary Files

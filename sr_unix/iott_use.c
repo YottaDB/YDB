@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,14 +46,11 @@
 #include "restrict.h"
 #include "op.h"
 #include "indir_enum.h"
-<<<<<<< HEAD
 #include "invocation_mode.h"
 #include "sig_init.h"
 #include "libyottadb.h"
-=======
 #include "svnames.h"
 #include "util.h"
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 
 LITDEF nametabent filter_names[] =
 {
@@ -126,10 +123,6 @@ void iott_use(io_desc *iod, mval *pp)
 		if (0 != status)
 		{
 			save_errno = errno;
-<<<<<<< HEAD
-=======
-			ISSUE_NOPRINCIO_IF_NEEDED(io_curr_device.out, FALSE, FALSE);	/* FALSE, FALSE: READ (sorta), not socket */
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		flush_input = FALSE;

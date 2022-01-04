@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -534,6 +534,8 @@ void stop_image_conditional_core(void);
 void stop_image_no_core(void);
 
 #define TERMINATE		{						\
+					GBLREF int4 exi_condition;		\
+										\
 					CHTRACEPOINT;				\
 					if (SUPPRESS_DUMP)			\
 					{					\

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -286,10 +286,10 @@ void op_svput(int varnum, mval *v)
 					len--;
 					memcpy(tmp2, entryref + 1, len);
 					tmp2[len] = '\0';
-					util_out_print(errortext + 1, NOFLUSH);
+					util_out_print(errortext + 1, NOFLUSH_OUT);
 					/* The below simulates a RTSLOC error */
-					util_out_print("!/!_!_At M source location ", NOFLUSH);	/* !/ is \n, !_ is \t */
-					util_out_print(tmp2, NOFLUSH);
+					util_out_print("!/!_!_At M source location ", NOFLUSH_OUT);	/* !/ is \n, !_ is \t */
+					util_out_print(tmp2, NOFLUSH_OUT);
 					free(tmp2);
 				} else {
 					/* $ZSTATUS is not in the form ERRNUM,ENTRYREF,ERRORTEXT.
@@ -297,7 +297,7 @@ void op_svput(int varnum, mval *v)
 					 * when setting $ZSTATUS to a value. Copy over the entire $ZSTATUS text into
 					 * the util_output buffer in this case.
 					 */
-					util_out_print(tmp, NOFLUSH);
+					util_out_print(tmp, NOFLUSH_OUT);
 				}
 				free(tmp);
 			}

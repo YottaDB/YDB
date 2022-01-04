@@ -3,7 +3,7 @@
 # Copyright (c) 2001-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -692,12 +692,6 @@ if (-e GTMDefinedTypesInit.m) then
 		if (! -e $gtm_dist/utf8/GTMDefinedTypesInit.m) then
 		    ln -s $gtm_dist/GTMDefinedTypesInit.m $gtm_dist/utf8/GTMDefinedTypesInit.m
 		endif
-<<<<<<< HEAD
-		if (! -e $ydb_dist/utf8/GDEINITSZ.m) then
-		    ln -s $ydb_dist/GDEINITSZ.m $ydb_dist/utf8/GDEINITSZ.m
-		endif
-=======
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 		pushd utf8
 		# Switch to UTF8 mode
 		if ( "OS/390" == $HOSTOS ) setenv gtm_chset_locale $utflocale      # LC_CTYPE not picked up right
@@ -778,17 +772,10 @@ $gtm_com/IGS $ydb_dist/gtmsecshr UNHIDE
 set distfiles_log = "dist_files.`basename $gtm_exe`.log"
 find $ydb_dist -type f >&! $gtm_log/$distfiles_log
 if ($?scan_image) then
-<<<<<<< HEAD
-	tar cvf $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar dbcertify dse ftok geteuid gtmsec* gtcm* libgtmshr.so lke mumps mupip
+	tar cvf $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar dbcertify dse ftok gtmsec* gtcm* libgtmshr.so lke mumps mupip
 	tar rvf $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar plugin/libgtm* plugin/gtmcrypt/maskpass
 	tar rvf $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar /usr/lib64/lib{config,gpgme,gpg-error,crypt,ssl,icu*,z,elf}.so*
-	gzidbp    $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar
-=======
-	tar cvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar dbcertify dse ftok gtmsec* gtcm* libgtmshr.so lke mumps mupip
-	tar rvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar plugin/libgtm* plugin/gtmcrypt/maskpass
-	tar rvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar /usr/lib64/lib{config,gpgme,gpg-error,crypt,ssl,icu*,z,elf}.so*
-	gzip    $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar
->>>>>>> 04cc1b83 (GT.M V6.3-011)
+	gzip    $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar
 endif
 $gtm_com/IGS $ydb_dist/gtmsecshr CHOWN
 awk 'BEGIN {dlen=length(ENVIRON["ydb_dist"]);stat=0} {if ((length($0)-dlen)>50) {stat=1}} END {exit stat}' $gtm_log/$distfiles_log

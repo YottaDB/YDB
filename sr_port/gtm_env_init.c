@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -83,14 +83,10 @@ GBLREF	uint4		max_cache_memsize;	/* Maximum bytes used for indirect cache object
 GBLREF	uint4		max_cache_entries;	/* Maximum number of cached indirect compilations */
 GBLREF	boolean_t	ydb_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
 GBLREF	boolean_t	ztrap_new;		/* Each time $ZTRAP is set it is automatically NEW'd */
-<<<<<<< HEAD
 GBLREF	size_t		ydb_max_storalloc;	/* Used for testing: creates an allocation barrier */
 GBLREF	int		ydb_repl_filter_timeout;/* # of seconds that source server waits before issuing FILTERTIMEDOUT */
 GBLREF  boolean_t 	dollar_test_default; 	/* Default value taken by dollar_truth via dollar_test_default */
-=======
-GBLREF	size_t		gtm_max_storalloc;	/* Used for testing: creates an allocation barrier */
 GBLREF	boolean_t	gtm_nofflf;		/* Used to control "write #" behavior ref GTM-9136 */
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 
 void	gtm_env_init(void)
 {
@@ -400,7 +396,6 @@ void	gtm_env_init(void)
 		/* See if ydb_repl_filter_timeout is specified */
 		ydb_repl_filter_timeout = ydb_trans_numeric(YDBENVINDX_REPL_FILTER_TIMEOUT, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		if (!is_defined)
-<<<<<<< HEAD
 			ydb_repl_filter_timeout = REPL_FILTER_TIMEOUT_DEF;
 		else if (REPL_FILTER_TIMEOUT_MIN > ydb_repl_filter_timeout)
 			ydb_repl_filter_timeout = REPL_FILTER_TIMEOUT_MIN;
@@ -408,26 +403,12 @@ void	gtm_env_init(void)
 			ydb_repl_filter_timeout = REPL_FILTER_TIMEOUT_MAX;
 		assert((REPL_FILTER_TIMEOUT_MIN <= ydb_repl_filter_timeout)
 				&& (REPL_FILTER_TIMEOUT_MAX >= ydb_repl_filter_timeout));
-		ret = ydb_logical_truth_value(YDBENVINDEX_DOLLAR_TEST, FALSE, &is_defined);
+		ret = ydb_logical_truth_value(YDBENVINDX_DOLLAR_TEST, FALSE, &is_defined);
 		dollar_test_default = (is_defined ? ret : TRUE);
-		/* Platform specific initialization */
-=======
-			gtm_mupjnl_parallel = 1;
-		/* See if $gtm_string_pool_limit is set */
-		val.addr = GTM_STRPLLIM;
-		val.len = SIZEOF(GTM_STRPLLIM) - 1;
-		temp_gtm_strpllim = trans_numeric(&val, &is_defined, TRUE);
-		if (0 < temp_gtm_strpllim)
-			TREF(gtm_strpllim) = temp_gtm_strpllim;
 		/* gtm_nofflf for GTM-9136.  Default is FALSE */
-		val.addr = GTM_NOFFLF;
-		val.len = SIZEOF(GTM_NOFFLF) - 1;
-		ret = logical_truth_value(&val, FALSE, &is_defined);
-		if (is_defined)
-		        gtm_nofflf = ret;
+		gtm_nofflf = ydb_logical_truth_value(YDBENVINDX_NOFFLF, FALSE, &is_defined);
 
 		/* Platform specific initializations */
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 		gtm_env_init_sp();
 	}
 }

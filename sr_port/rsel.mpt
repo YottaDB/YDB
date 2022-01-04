@@ -3,7 +3,7 @@
 ; Copyright (c) 1987-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -54,11 +54,7 @@ CALL
 	d main
 	q
 SILENT(patt,label)
-<<<<<<< HEAD
         n $et,io s $et=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL"),io=$io
-=======
-	n $et s $et=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL")
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 	i ""=$g(label) s label="SRC"
 	d @label
 	u io

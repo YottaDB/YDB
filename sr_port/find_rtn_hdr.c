@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2014 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 04cc1b83 (GT.M V6.3-011)
+ *								*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,11 +16,6 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-<<<<<<< HEAD
-#include "ident.h"
-=======
-#include <rtnhdr.h>
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 #include "min_max.h"
 #include "stack_frame.h"
 #include "compiler.h"	/* for WANT_CURRENT_RTN_MSTR macro */

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -176,49 +176,11 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 	for (ii = start; ii >= end; ii--)
 	{
 		socketptr = dsocketptr->socket[ii];
-<<<<<<< HEAD
-		/* Don't reap if in a child process creating a new job or pipe device */
-		if ((socket_local == socketptr->protocol) && socketptr->passive && !gtm_pipe_child && socket_delete)
-		{	/* only delete if passive/listening and caller wants us to delete this socket */
-			assertpro(socketptr->local.sa);
-			path = ((struct sockaddr_un *)(socketptr->local.sa))->sun_path;
-			FSTAT_FILE(socketptr->sd, &fstatbuf, res);
-			if (-1 == res)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("fstat during socket delete"), CALLFROM, errno);
-			STAT_FILE(path, &statbuf, res);
-			if (-1 == res)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("stat during socket delete"), CALLFROM, errno);
-			if (UNLINK(path) == -1)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("unlink during socket delete"), CALLFROM, errno);
-		}
-		/* below is similar to iosocket_flush but socketptr may not be current socket */
-		if (socketptr->obuffer_timer_set)
-		{
-			cancel_timer((TID)socketptr);
-			socketptr->obuffer_timer_set = FALSE;
-		}
-		status = 1;		/* OK value */
-		if ((0 < socketptr->obuffer_length) && (0 == socketptr->obuffer_errno))
-		{
-			socketptr->obuffer_output_active = TRUE;
-			status = iosocket_output_buffer(socketptr);
-			socketptr->obuffer_output_active = FALSE;
-		}
-		if ((0 < socketptr->obuffer_size) && ((0 >= status) || (0 != socketptr->obuffer_errno)))
-			iosocket_buffer_error(socketptr);	/* pre-existing error or error flushing buffer */
-#ifdef		GTM_TLS
-		if (socketptr->tlsenabled)
-		{
-			gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
-			socketptr->tlsenabled = FALSE;
-=======
 		if (!gtm_pipe_child)
-		{	/* Don't reap if in a child process creating a new job or pipe device */
-			if ((socket_local == socketptr->protocol) && socketptr->passive)
-			{	/* only delete if passive/listening */
+		{
+			/* Don't reap if in a child process creating a new job or pipe device */
+			if ((socket_local == socketptr->protocol) && socketptr->passive && socket_delete)
+			{	/* only delete if passive/listening and caller wants us to delete this socket */
 				assertpro(socketptr->local.sa);
 				path = ((struct sockaddr_un *)(socketptr->local.sa))->sun_path;
 				FSTAT_FILE(socketptr->sd, &fstatbuf, res);
@@ -248,14 +210,13 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 			}
 			if ((0 < socketptr->obuffer_size) && ((0 >= status) || (0 != socketptr->obuffer_errno)))
 				iosocket_buffer_error(socketptr);	/* pre-existing error or error flushing buffer */
-#			ifdef GTM_TLS
+#			ifdef	GTM_TLS
 			if (socketptr->tlsenabled)
 			{
 				gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
 				socketptr->tlsenabled = FALSE;
 			}
 #			endif
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 		}
 		CLOSE(socketptr->sd, rc);
 		if (-1 == rc)

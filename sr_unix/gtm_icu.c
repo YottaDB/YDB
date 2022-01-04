@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -448,7 +448,6 @@ void gtm_icu_init(void)
 		}
 #		endif
 	}
-<<<<<<< HEAD
 	/* Note that a call to "dlopen_handle_array_add(handle)" should normally have been placed here but
 	 * if "dlopen_handle_array_close()" happens on this handle (corresponding to libicuio.so) later and
 	 * any type of error occurs (e.g. CALLINAFTERXIT etc.), it is very likely we would end up invoking
@@ -456,7 +455,6 @@ void gtm_icu_init(void)
 	 * has already been done on libicuio.so. Since this library is so much tied with YottaDB error handling,
 	 * we skip the "dlopen_handle_array_add" (and in turn "dlopen_handle_array_close" at "ydb_exit" time).
 	 */
-	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 	#ifndef DEBUG
 		symbols_renamed = FALSE; /* This should not be needed because findx will be 0 on the first iteration and this
 				  	  * variable should be initialized after the first iteration but valgrind throws what
@@ -464,8 +462,6 @@ void gtm_icu_init(void)
 					  * to avoid the warning.
 				  	  */
 	#endif
-=======
->>>>>>> 04cc1b83 (GT.M V6.3-011)
 	DEBUG_ONLY(symbols_renamed = -1;)
 	for (findx = 0; findx < icu_func_n; ++findx)
 	{

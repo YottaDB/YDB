@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,11 +36,8 @@ enum outofbands
 	tptimeout,
 	jobinterrupt,
 	ztimeout,
-<<<<<<< HEAD
-	deferred_signal
-=======
-	sighup
->>>>>>> 04cc1b83 (GT.M V6.3-011)
+	sighup,
+	deferred_signal,
 };
 
 #define OUTOFBAND_RESTARTABLE(event)	(jobinterrupt == (event))

@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1542,5 +1542,6 @@
 #define YDB_ERR_MUKEEPNODEC -150384570
 #define YDB_ERR_MUKEEPNOTRUNC -150384578
 #define YDB_ERR_MUTRUNCNOSPKEEP -150384587
+#define YDB_ERR_TERMHANGUP -150384594
 
 #include "libydberrors2.h"
