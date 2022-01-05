@@ -682,7 +682,6 @@ repl_sort_tr_buff.c:warning: Although the value stored to 'cur_rec_idx' is used 
 repl_sort_tr_buff.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]
 repl_sort_tr_buff.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]
 repl_sort_tr_buff.c:warning: Value stored to 'prefix' is never read [clang-analyzer-deadcode.DeadStores]
-resolve_optimize.c:warning: Null pointer passed to 2nd parameter expecting 'nonnull' [clang-analyzer-core.NonNullParamChecker]
 restrict.c:warning: Value stored to 'fields' is never read [clang-analyzer-deadcode.DeadStores]
 rtnobj.c:warning: Value stored to 'freeList' is never read [clang-analyzer-deadcode.DeadStores]
 rtnobj.c:warning: Value stored to 'max_free_index' is never read [clang-analyzer-deadcode.DeadStores]
