@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -150,7 +150,7 @@ typedef struct
 LITREF	unsigned char		io_params_size[];
 GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	io_pair			io_std_device;		/* standard device	*/
-
+GBLREF	boolean_t		prin_in_dev_failure;
 
 #ifdef UTF8_SUPPORTED
 GBLREF	UConverter		*chset_desc[];
@@ -182,7 +182,7 @@ error_def(ERR_SDSEEKERR);
 
 void	iorm_use(io_desc *iod, mval *pp)
 {
-	boolean_t	seen_wrap, fstat_done, get_mode_done, outdevparam, prin_in_dev_failure;
+	boolean_t	seen_wrap, fstat_done, get_mode_done, outdevparam;
 	boolean_t	input_key_not_empty, output_key_not_empty, input_key_entry_present, output_key_entry_present;
 	boolean_t	init_input_encryption, init_output_encryption, reset_input_encryption, reset_output_encryption;
 	boolean_t	seek_specified, ichset_specified, ochset_specified, chset_allowed;
