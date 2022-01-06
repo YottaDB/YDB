@@ -123,6 +123,11 @@ void iott_use(io_desc *iod, mval *pp)
 		if (0 != status)
 		{
 			save_errno = errno;
+			/* Check if terminal is used as input or output device to decide 2nd parameter for below macro call */
+			if (iod == io_std_device.out)
+				ISSUE_NOPRINCIO_IF_NEEDED(iod, TRUE, FALSE);	/* TRUE, FALSE ==> WRITE, not socket */
+			else if (iod == io_std_device.in)
+				ISSUE_NOPRINCIO_IF_NEEDED(iod, FALSE, FALSE);	/* FALSE, FALSE ==> READ, not socket */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		flush_input = FALSE;
