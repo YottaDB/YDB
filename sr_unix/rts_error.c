@@ -186,7 +186,7 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 		 * moves on. So we don't want to overwrite global variables TREF(util_outbuff) etc. with the to-be-abandoned
 		 * error using the "gtm_putmsg_list()" call below. Hence the if check below.
 		 */
-		if ((NULL == active_ch) || (&ex_arithlit_compute_ch != active_ch->ch))
+		if ((NULL == active_ch) || !CHANDLER_EXISTS || (&ex_arithlit_compute_ch != active_ch->ch))
 			gtm_putmsg_list(csa, argcnt, var);
 		if (DUMPABLE)
 			created_core = dont_want_core = FALSE;		/* We can create a(nother) core now */
