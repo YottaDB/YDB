@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@ error_def(ERR_INVSTRLEN);
 void	op_fnzparse (mval *file, mval *field, mval *def1, mval *def2, mval *type, mval *ret)
 {
 	char 		field_type;
-	uint4 		status;
+	int4 		status;
 	char 		field_buf[DIR_LEN], type_buf[SYN_LEN], result[MAX_FN_LEN + 1];
 	parse_blk	pblk;
 
@@ -131,13 +131,17 @@ void	op_fnzparse (mval *file, mval *field, mval *def1, mval *def2, mval *type, m
 	pblk.def2_size = def2->str.len;
 	pblk.def2_buf = def2->str.addr;
 
-	if ((parse_file(&file->str, &pblk) & 1) == 0)
+	status = parse_file(&file->str, &pblk);
+	if (ERR_FILEPATHTOOLONG == status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, file->str.len, file->str.addr, status);
+	if (0 == (status & 1))
 	{
+		assert(ERR_FILENOTFND == status);
 		ret->mvtype = MV_STR;
 		ret->str.len = 0;
 		return;
 	}
-
+	assert(ERR_PARNORMAL == status);
 	ret->mvtype = MV_STR;
 	switch( field_type )
 	{

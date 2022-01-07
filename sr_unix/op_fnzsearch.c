@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -121,10 +121,16 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 	ret->mvtype = MV_STR;
 	if ((0 != pattern->str.len) && !TREF(fnzsearch_lv_vars))
 	{
+		int4	stat;
+
 		memset(&pblk, 0, SIZEOF(pblk));
 		pblk.buffer = pblk_buf;
 		pblk.buff_size = MAX_FN_LEN;
-		if (parse_file(&pattern->str, &pblk) & 1)
+		stat = parse_file(&pattern->str, &pblk);
+		if (ERR_FILEPATHTOOLONG == stat)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, pattern->str.len, pattern->str.addr, stat);
+		assert((ERR_FILENOTFND == stat) || (ERR_PARNORMAL == stat));
+		if (stat & 1)
 		{	/* Establish new search context. */
 			TREF(fnzsearch_lv_vars) = op_putindx(VARLSTCNT(2) TREF(zsearch_var), TADR(fnzsearch_sub_mval));
 			(TREF(fnzsearch_lv_vars))->v = *pattern;	/* zsearch_var(indx)=original spec */
@@ -235,6 +241,7 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 				}
 			}
 		}
+		/* else : This is a case of ERR_FILENOTFND. It is not an error. Just move on. */
 	}
 	/* If we have placed something into a local (now or in a prior invocation), obtain it. */
 	if (TREF(fnzsearch_lv_vars))
