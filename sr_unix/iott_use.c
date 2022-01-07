@@ -52,6 +52,39 @@
 #include "svnames.h"
 #include "util.h"
 
+/* This macro is used if we get an error from a tcgetattr() or tcsetattr() call on the terminal.
+ * We check if the terminal is the principal device (input or output side). If so, we issue NOPRINCIO message
+ * in the syslog if an error has already been seen (e.g. "prin_out_dev_failure" is already set before the macro
+ * call). But since the caller of this macro is going to issue an "rts_error" right after this (which will most
+ * likely terminate the process), make sure we send a NOPRINCIO message even if "prin_out_dev_failure" is not
+ * already set before this macro was invoked. This is done by reinvoking the ISSUE_NOPRINCIO_IF_NEEDED macro
+ * (in that case, the first invocation will set "prin_out_dev_failure" to TRUE and the second invocation will
+ * send the NOPRINCIO error message to the syslog).
+ */
+#define	ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(IOD)								\
+{															\
+	GBLREF io_pair		io_std_device;										\
+															\
+ 	/* Check if terminal is used as input or output device to decide 2nd parameter for below macro call. */		\
+	if (IOD == io_std_device.out)											\
+	{														\
+		boolean_t	save_prin_out_dev_failure;								\
+															\
+		save_prin_out_dev_failure = prin_out_dev_failure;							\
+		ISSUE_NOPRINCIO_IF_NEEDED(IOD, TRUE, FALSE);	/* TRUE, FALSE ==> WRITE, not socket */			\
+		if (!save_prin_out_dev_failure && prin_out_dev_failure)							\
+			ISSUE_NOPRINCIO_IF_NEEDED(IOD, TRUE, FALSE);	/* TRUE, FALSE ==> WRITE, not socket */		\
+	} else if (IOD == io_std_device.in)										\
+	{														\
+		boolean_t	save_prin_in_dev_failure;								\
+															\
+		save_prin_in_dev_failure = prin_in_dev_failure;								\
+		ISSUE_NOPRINCIO_IF_NEEDED(IOD, FALSE, FALSE);	/* FALSE, FALSE ==> READ, not socket */			\
+		if (!save_prin_in_dev_failure && prin_in_dev_failure)							\
+			ISSUE_NOPRINCIO_IF_NEEDED(IOD, FALSE, FALSE);	/* FALSE, FALSE ==> READ, not socket */		\
+	}														\
+}
+
 LITDEF nametabent filter_names[] =
 {
 	{4, "CHAR*"},
@@ -123,11 +156,7 @@ void iott_use(io_desc *iod, mval *pp)
 		if (0 != status)
 		{
 			save_errno = errno;
-			/* Check if terminal is used as input or output device to decide 2nd parameter for below macro call */
-			if (iod == io_std_device.out)
-				ISSUE_NOPRINCIO_IF_NEEDED(iod, TRUE, FALSE);	/* TRUE, FALSE ==> WRITE, not socket */
-			else if (iod == io_std_device.in)
-				ISSUE_NOPRINCIO_IF_NEEDED(iod, FALSE, FALSE);	/* FALSE, FALSE ==> READ, not socket */
+			ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(iod);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		flush_input = FALSE;
@@ -516,6 +545,7 @@ void iott_use(io_desc *iod, mval *pp)
 		if (0 != status)
 		{
 			assert(WBTEST_YDB_KILL_TERMINAL == ydb_white_box_test_case_number);
+			ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(iod);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		if (tt == d_in->type)
