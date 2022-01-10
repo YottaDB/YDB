@@ -262,7 +262,7 @@ STATICFNDEF int op_fnzpeek_stpcopy(char *zpeekadr, int len, mval *ret, char fmtc
 			STRNLEN(zpeekadr, len, len);			/* Reset len to actual len, fall into "C" processing */
 			/* warning - fall through */
 		case 'C':						/* Character area (no processing - just copy */
-			if (len > MAX_STRLEN)
+			if (MAX_STRLEN < len)
 			{	/* Requested string return is too large */
 				REVERT;
 				return ERR_MAXSTRLEN;
@@ -372,7 +372,7 @@ STATICFNDEF int op_fnzpeek_stpcopy(char *zpeekadr, int len, mval *ret, char fmtc
 			ret->str.len = INTCAST((char *)stringpool.free - ret->str.addr);
 			break;
 		case 'Z':						/* Hex format (no 0x prefix) of storage as it exists */
-			if ((len * 2) > MAX_STRLEN)
+			if (MAX_STRLEN < (len * 2))
 			{	/* Requested string return is too large */
 				REVERT;
 				return ERR_MAXSTRLEN;
@@ -466,7 +466,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	unsigned int		full_len;
 	unsigned char		argument_uc_buf[ARGUMENT_MAX_LEN];
 	sgmnt_addrs		*csa;
-	int			pass;
+	int			pass, maxlen;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -715,12 +715,74 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	}
 	if (NULL == zpeekadr)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("zpeekadr"));
-	/* Check the rest of the args */
+	/* Check "offset" parameter */
 	if (0 > offset)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("offset"));
 	zpeekadr = (void *)((char *)zpeekadr + offset);
+	/* Check "len" parameter */
 	if ((0 > len) || (MAX_STRLEN < len))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("length"));
+	switch(mnemonic_opcode)
+	{
+		case PO_CSAREG:
+			maxlen = SIZEOF(sgmnt_addrs);
+			break;
+		case PO_FHREG:
+			maxlen = SIZEOF(sgmnt_data);
+			break;
+		case PO_GDRREG:
+			maxlen = SIZEOF(gd_region);
+			break;
+		case PO_GDSSEG:
+			maxlen = SIZEOF(gd_segment);
+			break;
+		case PO_NLREG:
+			maxlen = SIZEOF(node_local);
+			break;
+		case PO_JNLREG:
+			maxlen = SIZEOF(jnl_private_control);
+			break;
+		case PO_JBFREG:
+			maxlen = SIZEOF(jnl_buffer);
+			break;
+		case PO_GLFREPL:
+			maxlen = SIZEOF(gtmsrc_lcl);
+			break;
+		case PO_GSLREPL:
+			maxlen = SIZEOF(gtmsource_local_struct);
+			break;
+		case PO_JPCREPL:
+			maxlen = SIZEOF(jnlpool_ctl_struct);
+			break;
+		case PO_NLREPL:
+			maxlen = SIZEOF(node_local);
+			break;
+		case PO_RIHREPL:
+			maxlen = SIZEOF(repl_inst_hdr);
+			break;
+		case PO_RPCREPL:
+			maxlen = SIZEOF(recvpool_ctl_struct);
+			break;
+		case PO_GRLREPL:
+			maxlen = SIZEOF(gtmrecv_local_struct);
+			break;
+		case PO_UPLREPL:
+			maxlen = SIZEOF(upd_proc_local_struct);
+			break;
+		case PO_UHCREPL:
+			maxlen = SIZEOF(upd_helper_ctl_struct);
+			break;
+		case PO_PEEK:
+			maxlen = MAX_STRLEN;
+			break;
+		default:
+			assert(FALSE);
+			maxlen = 0;
+			break;
+	}
+	if (maxlen < len)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("length"));
+	/* Check "format" parameter */
 	if (1 < format->str.len)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("format"));
 	else if (1 == format->str.len)
@@ -734,7 +796,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			case 'S':	/* String data - Same as 'C' except string is NULL terminated */
 			case 'T':	/* Time ($H) format - length must be of 4 or 8 byte unsigned int */
 			case 'U':	/* Unsigned integer format - up to 64 bits */
-			case 'X':	/* Humeric hex format: e.g. 0x12AB. Total length is (2 * bytes) + 2 */
+			case 'X':	/* Numeric hex format: e.g. 0x12AB. Total length is (2 * bytes) + 2 */
 			case 'Z':	/* Hex format - not treated as numeric. Shown as occurs in memory (subject to endian)
 					 * and is returned with no 0x prefix.
 					 */
@@ -743,6 +805,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("format"));
 		}
 	}
+	/* Now that all parameters are checked, go ahead with the actual $ZPEEK operation */
 	/* Block out timer calls that might trigger processing that could fail. We especially want to prevent
 	 * nesting of signal handlers since the longjump() function used by the UNWIND macro is undefined on
 	 * Tru64 when signal handlers are nested.
