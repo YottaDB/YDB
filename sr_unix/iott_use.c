@@ -342,8 +342,8 @@ void iott_use(io_desc *iod, mval *pp)
 						if (tt_ptr->fildes == temp_ptr->fildes)
 						{	/* if $PRINCIPAL, enable hup_handler; similar code in term_setup.c */
 							sigemptyset(&act.sa_mask);
-							act.sa_flags = 0;
-							act.sa_handler = ctrlc_handler_ptr;
+							act.sa_flags = YDB_SIGACTION_FLAGS;
+							act.sa_sigaction = ctrlc_handler_ptr;
 							sigaction(SIGHUP, &act, 0);
 							hup_on = TRUE;
 						}

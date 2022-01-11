@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -30,8 +33,8 @@ void  term_setup(boolean_t ctrlc_enable)
 	if (hup_on && (tt == io_std_device.in->type))
 	{	/* if $PRINCIPAL, enable the hup_handler - similar to iop_hupenable code in iott_use.c */
 		sigemptyset(&act.sa_mask);
-		act.sa_flags = 0;
-		act.sa_handler = ctrlc_handler_ptr;
+		act.sa_flags = YDB_SIGACTION_FLAGS;
+		act.sa_sigaction = ctrlc_handler_ptr;
 		sigaction(SIGHUP, &act, 0);
 	}
 }
