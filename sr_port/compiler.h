@@ -404,8 +404,15 @@ typedef struct
 
 #define ISSUE_SIDEEFFECTEVAL_WARNING(COLUMN)						\
 {											\
+	int	save_last_source_column;						\
+											\
+	/* Temporarily reset TREF(last_source_column) for the "show_source_line()"	\
+	 * call below to display the correct location based on the COLUMN parameter.	\
+	 */										\
+	save_last_source_column = TREF(last_source_column);				\
 	TREF(last_source_column) = (COLUMN);						\
 	show_source_line(TRUE);								\
+	TREF(last_source_column) = save_last_source_column;				\
 	dec_err(VARLSTCNT(1) ERR_SIDEEFFECTEVAL);					\
 }
 

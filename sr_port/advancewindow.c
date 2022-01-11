@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,9 +59,11 @@ void advancewindow(void)
 	unsigned char	*error, errtxt[(3 + 1) UTF8_ONLY(* GTM_MB_LEN_MAX)], x;	/* up to 3 digits/byte & a comma */
 	char		*tmp;
 	int		y, charlen;
+	int		save_last_source_column;
 #	ifdef UTF8_SUPPORTED
 	uint4		ch;
 #	endif
+
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -90,6 +92,13 @@ void advancewindow(void)
 		ENSURE_STP_FREE_SPACE((TREF(source_buffer)).len);
 		cptop = (unsigned char *)((TREF(source_buffer)).addr + (TREF(source_buffer)).len - 1);
 		cp2 = cp3 = stringpool.free;
+		/* Save global variable TREF(last_source_column) in a local as we would be modifying the global variable below
+		 * to ensure the correct source location shows up in the LITNONGRAPH and BADCHAR warnings respectively in the
+		 * "show_source_line()" and "utf8_len_dec()" calls below. In addition this is needed in case of an error return
+		 * code path (i.e. TREF(window_token) is set to TK_ERROR) as the caller needs to print the error context.
+		 * Therefore, we will only restore the global variable before returning at the end of this "case TK_QUOTE:" block.
+		 */
+		save_last_source_column = TREF(last_source_column);
 		for (cp1 = (unsigned char *)TREF(lexical_ptr) + 1; cp1 <= cptop;)
 		{
 #			ifdef UTF8_SUPPORTED
@@ -178,6 +187,7 @@ void advancewindow(void)
 			}
 		}
 #		endif
+		TREF(last_source_column) = save_last_source_column;
 		return;
 	case TK_LOWER:
 	case TK_PERCENT:
