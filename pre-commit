@@ -2,7 +2,7 @@
 #
 #################################################################
 #                                                               #
-# Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.       #
+# Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.       #
 # All rights reserved.                                          #
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -185,11 +185,25 @@ endif
 # -----------------------------------------------------------------
 # 3) Remove trailing white space
 # -----------------------------------------------------------------
+set nowhitespace_extensions = "patch"	# List of extensions that cannot have trailing white space removed.
 set filelist = `git diff --name-only HEAD`	# recompute "filelist" in case Step (1) had regenerated new files
 foreach file ($filelist)
 	if (! -e $file) then
 		# If file is being deleted as part of this commit, skip whitespace conversion on it
 		continue
+	endif
+	if ("" != "$nowhitespace_extensions") then
+		set extension = $file:e
+		set skip = 0
+		foreach ext ($nowhitespace_extensions)
+			if ($ext == $extension) then
+				set skip = 1
+				break
+			endif
+		end
+		if ($skip) then
+			continue
+		endif
 	endif
 	if ("sr_port/copyright.txt" == $file) then
 		# Skip this special file

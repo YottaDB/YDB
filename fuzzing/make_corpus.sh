@@ -14,6 +14,8 @@
 #								#
 #################################################################
 
+set -e	# exit on error
+
 if [ -d ./inputs ]; then
 	echo "corpus already exists? (directory named 'inputs' already in pwd)"
 	echo "exiting..."

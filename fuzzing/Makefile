@@ -27,8 +27,13 @@ go:
 	echo "working on it"
 
 reset:
+	patch -R ../sr_port/io.h io.h.patch
+	patch -R ../sr_port/jobexam_process.c jobexam_process.c.patch
+	patch -R ../sr_unix/ojchildioset.c ojchildioset.c.patch
 	patch -R ../sr_unix/sig_init.c sig_init.c.patch
 
-clean:
+clean: rm reset
+
+rm:
 	rm -rf build-instrumented inputs env YDBTest
-	patch -R ../sr_unix/sig_init.c sig_init.c.patch
+

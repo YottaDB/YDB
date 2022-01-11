@@ -14,8 +14,14 @@
 #								#
 #################################################################
 
+set -e	# exit on error
+
 echo "Patching..."
+patch ../sr_port/io.h io.h.patch
+patch ../sr_port/jobexam_process.c jobexam_process.c.patch
+patch ../sr_unix/ojchildioset.c ojchildioset.c.patch
 patch ../sr_unix/sig_init.c sig_init.c.patch
+
 mkdir build-instrumented
 echo "Cmaking..."
 cd build-instrumented || exit

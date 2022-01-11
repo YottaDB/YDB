@@ -1,0 +1,31 @@
+#################################################################
+#								#
+# Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+624c624
+< 	mval dev, zpos, zstatus;									\
+---
+> 	mval		zpos;										\
+634,647d633
+< 				dev.str.len = (WRITE) ? io_std_device.out->trans_name->len		\
+< 					: io_std_device.in->trans_name->len;				\
+< 				dev.str.addr = (WRITE) ? io_std_device.out->trans_name->dollar_io	\
+< 					: io_std_device.in->trans_name->dollar_io;			\
+< 				if (SOCNOERR)								\
+< 					zstatus.str = silent_soc;	/* suppressing socket errors */	\
+< 				else									\
+< 					zstatus.str = dollar_zstatus.str;				\
+< 				if (0 == zstatus.str.len)						\
+< 					zstatus.str = dm_did_it;	/* in case there's no zstatus */\
+< 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_NOPRINCIO, 8, 		\
+< 					RTS_ERROR_STRING((WRITE) ? "WRITE to" : "READ from"),		\
+< 					dev.str.len, dev.str.addr, zpos.str.len, zpos.str.addr,		\
+< 					zstatus.str.len, zstatus.str.addr);				\
