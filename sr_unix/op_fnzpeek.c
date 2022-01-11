@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -268,7 +268,10 @@ STATICFNDEF int op_fnzpeek_stpcopy(char *zpeekadr, int len, mval *ret, char fmtc
 				return ERR_MAXSTRLEN;
 			}
 			ENSURE_STP_FREE_SPACE(len);
-			memcpy(stringpool.free, zpeekadr, len);
+			/* Note: Since "zpeekadr" could be a random memory location, it is possible it overlaps with
+			 * "stringpool.free". In that case "memcpy()" cannot be used. Hence the use of "memmove()" below.
+			 */
+			memmove(stringpool.free, zpeekadr, len);
 			ret->str.addr = (char *)stringpool.free;
 			ret->str.len = len;
 			stringpool.free += len;
