@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -122,6 +122,7 @@ void remove_rms (io_desc *ciod)
 	{
 		if (rm_ptr->is_pipe)
 		{	/* free up dev_param_pairs if defined */
+			assert(MAX_DEV_PARAM_PAIRS >= rm_ptr->dev_param_pairs.num_pairs);
 			for ( i = 0; i < rm_ptr->dev_param_pairs.num_pairs; i++ )
 			{
 				if (NULL != rm_ptr->dev_param_pairs.pairs[i].name)

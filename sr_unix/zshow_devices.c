@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -391,6 +391,7 @@ void zshow_devices(zshow_out *output)
 					else
 					{
 						ZS_STR_OUT(&v,pipe_text);
+						assert(MAX_DEV_PARAM_PAIRS >= rm_ptr->dev_param_pairs.num_pairs);
 						if (rm_ptr->dev_param_pairs.num_pairs)
 						{
 							int ignore_stderr = FALSE;

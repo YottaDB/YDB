@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -190,6 +190,8 @@ enum pipe_which		/* which module saved the interrupted info */
 /* The name field will be initialized to "COMMAND=" and the definition field will be "/usr/bin/cat" */
 /* These will be output when the type is fifo.  Other device types may be modified as desired */
 
+#define	MAX_DEV_PARAM_PAIRS	3	/* == 1 for COMMAND + 1 for SHELL + 1 for STDERR (see iopi_open.c) */
+
 typedef struct dev_param_pair{
 	char *name;
 	char *definition;
@@ -197,7 +199,7 @@ typedef struct dev_param_pair{
 
 typedef	struct dev_pairs {
 	int num_pairs;
-	Dev_param_pair pairs[3];
+	Dev_param_pair pairs[MAX_DEV_PARAM_PAIRS];
 } Dev_param_pairs;
 
 typedef struct pipe_interrupt_type

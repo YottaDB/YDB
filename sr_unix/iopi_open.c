@@ -296,7 +296,6 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	d_rm_struct	*d_rm;
 	io_log_name	*stderr_naml;				/* logical record for stderr device */
 	unsigned char	ch;
-	int		param_cnt = 0;
 	int		p_offset = 0;
 	int		file_des_write;
 	int		file_des_read = 0;
@@ -353,17 +352,14 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 			case iop_shell:
 				slen[PSHELL] = (unsigned int)(unsigned char)*(pp->str.addr + p_offset);
 				sparams[PSHELL] = (char *)(pp->str.addr + p_offset + 1);
-				param_cnt++;
 				break;
 			case iop_command:
 				slen[PCOMMAND] = (unsigned int)(unsigned char)*(pp->str.addr + p_offset);
 				sparams[PCOMMAND] = (char *)(pp->str.addr + p_offset + 1);
-				param_cnt++;
 				break;
 			case iop_stderr:
 				slen[PSTDERR] = (unsigned int)(unsigned char)*(pp->str.addr + p_offset);
 				sparams[PSTDERR] = (char *)(pp->str.addr + p_offset + 1);
-				param_cnt++;
 				break;
 			case iop_independent:
 				independent = TRUE;
@@ -736,7 +732,6 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		d_rm->padchar = DEF_RM_PADCHAR;
 		d_rm->inbuf = NULL;
 		d_rm->outbuf = NULL;
-		d_rm->dev_param_pairs.num_pairs = param_cnt;
 		if (slen[PSHELL])
 		{
 			MALLOC_CPY_LIT(d_rm->dev_param_pairs.pairs[param_offset].name, "SHELL=");
@@ -758,10 +753,12 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 			MALLOC_CPY_LIT(d_rm->dev_param_pairs.pairs[param_offset].name, "STDERR=");
 			/* add quotes around the stderr field */
 			d_rm->dev_param_pairs.pairs[param_offset].definition = malloc(STRLEN(pstderr) + 5);
-			SNPRINTF(d_rm->dev_param_pairs.pairs[param_offset].definition, STRLEN(pstderr) + 5, "\"%s\"", pstderr);
+			SNPRINTF(d_rm->dev_param_pairs.pairs[param_offset++].definition, STRLEN(pstderr) + 5, "\"%s\"", pstderr);
 			if (NULL != pstderr)
 				free(pstderr);
 		}
+		assert(MAX_DEV_PARAM_PAIRS >= param_offset);
+		d_rm->dev_param_pairs.num_pairs = param_offset;
 	}
 	d_rm->is_pipe = TRUE;
 	iod->type = rm;
