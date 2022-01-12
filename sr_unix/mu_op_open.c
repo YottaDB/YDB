@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -110,7 +110,7 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 	boolean_t	ichset_specified, ochset_specified, filecreated = FALSE;
 	char		*buf, namebuf[LOGNAME_LEN + 1];
 	d_rm_struct	*d_rm;
-	int		char_or_block_special, file_des, fstat_res, oflag, p_offset, save_errno, umask_creat, umask_orig;
+	int		file_des, fstat_res, oflag, p_offset, save_errno, umask_creat, umask_orig;
 	int4		recordsize, status;
 	io_desc		*iod;
 	mstr		chset_mstr;
@@ -118,7 +118,6 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 	struct stat	outbuf;
 	unsigned char	ch;
 
-	char_or_block_special = FALSE;
 	file_des = -2;
 	oflag = 0;
 	tn.len = tl->len;
@@ -204,10 +203,6 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 		{
 			switch (outbuf.st_mode & S_IFMT)
 			{
-				case S_IFCHR:
-				case S_IFBLK:
-					char_or_block_special = TRUE;
-					break;
 				case S_IFIFO:
 					iod->type = ff;
 					break;
@@ -363,11 +358,7 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 	{
 		if (isatty(file_des))
 			iod->type = tt;
-		else if (char_or_block_special && (2 < file_des))
-		{	/* assume mag tape */
-			iod->type = mt;
-			assert(FALSE);
-		} else
+		else
 			iod->type = rm;
 	}
 	assert(iod->type < n_io_dev_types);

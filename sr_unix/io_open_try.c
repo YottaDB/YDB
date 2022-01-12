@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -489,11 +489,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 		else if (isatty(file_des))
 			iod->type = tt;
 		else if (char_or_block_special && file_des > 2)
-			if (0 == memvcmp(tn.addr, tn.len, LIT_AND_LEN("/dev/zero")))
-				tl->iod->type = rm;
-			else
-				/* assume mag tape */
-				iod->type = mt;
+			tl->iod->type = rm;
 		else
 			iod->type = rm;
 	}
