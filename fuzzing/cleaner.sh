@@ -14,7 +14,12 @@
 #								#
 #################################################################
 
-set -e	# exit on error
+# It is possible the "find" command below errors out (due to concurrent changes to files in the directory)
+# In that case, we don't want to exit the cleaner job. We want to ignore this error and move on with
+# cleaning future files that get generated. Hence we comment the below "set -e" line out which might seem
+# inconsistent with other *.sh files in the "fuzzing/" directory.
+#
+# set -e	# exit on error
 
 while true
 do
