@@ -10,9 +10,48 @@
 #								#
 #################################################################
 
-251d250
-< 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_JOBEXAMDONE, 3, process_id, dump_file_spec->str.len, dump_file_spec->str.addr);
-275d273
-< 	UNIX_ONLY(util_out_print(0, OPER));
-278d275
-< 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_JOBEXAMFAIL, 1, process_id);
+diff --git a/sr_port/jobexam_process.c b/sr_port/jobexam_process.c
+index 485a034c..b0a015c5 100644
+--- a/sr_port/jobexam_process.c
++++ b/sr_port/jobexam_process.c
+@@ -114,8 +114,8 @@ void jobexam_process(mval *dump_file_name, mval *zshowcodes, mval *dump_file_spe
+ 	sigemptyset(&new_action.sa_mask);
+ 	new_action.sa_flags = YDB_SIGACTION_FLAGS;
+ 	new_action.sa_sigaction = jobexam_signal_handler;
+-	sigaction(SIGBUS, &new_action, &prev_action_sigbus);
+-	sigaction(SIGSEGV, &new_action, &prev_action_sigsegv);
++	// sigaction(SIGBUS, &new_action, &prev_action_sigbus);
++	// sigaction(SIGSEGV, &new_action, &prev_action_sigsegv);
+ 	*dump_file_spec = empty_str_mval;
+ 	dev_in_use = io_curr_device;            /* Save current IO device */
+ 	/* Save text in util_outbuff which can be detrimentally overwritten by ZSHOW.
+@@ -170,8 +170,8 @@ void jobexam_process(mval *dump_file_name, mval *zshowcodes, mval *dump_file_spe
+ 		}
+ 	}
+ 	/* Restore the signal handlers how they were */
+-	sigaction(SIGBUS, &prev_action_sigbus, NULL);
+-	sigaction(SIGSEGV, &prev_action_sigsegv, NULL);
++	// sigaction(SIGBUS, &prev_action_sigbus, NULL);
++	// sigaction(SIGSEGV, &prev_action_sigsegv, NULL);
+ 	/* Let the timers pop again.. */
+ 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
+ }
+@@ -248,7 +248,6 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
+ 	 */
+ 	*dev_in_use = io_curr_device;
+ 	/* Notify operator dump was taken */
+-	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_JOBEXAMDONE, 3, process_id, dump_file_spec->str.len, dump_file_spec->str.addr);
+ 	REVERT;
+ }
+ 
+@@ -272,10 +271,8 @@ CONDITION_HANDLER(jobexam_dump_ch)
+ 		created_core = save_created_core;
+ 	}
+ #	endif
+-	UNIX_ONLY(util_out_print(0, OPER));
+ 	VMS_ONLY(sig->chf$l_sig_args -= 2);
+ 	VMS_ONLY(callg(send_msg, &sig->chf$l_sig_args));
+-	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_JOBEXAMFAIL, 1, process_id);
+ 	/* Stop the errors here and return to caller */
+ 	UNIX_ONLY(util_out_print("", RESET));	/* Prevent rts_error from flushing this error later */
+ 	DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE);

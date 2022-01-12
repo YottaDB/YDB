@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,7 @@ void gtm_dump_core(void)
 	act.sa_flags = 0;
 #	endif
 	act.sa_handler = SIG_DFL;
-	sigaction(SIGQUIT, &act, 0);
+	// sigaction(SIGQUIT, &act, 0);
 
 	/* We are about to generate a core file. If one already exists on the disk,
 	   make a simplistic attempt to rename it so we can get the most useful info

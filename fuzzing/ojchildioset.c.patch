@@ -10,43 +10,57 @@
 #								#
 #################################################################
 
-123,140c123
-< 		strncpy(fname_buf, jparms->params.output.buffer, jparms->params.output.len);
-< 		*(fname_buf + jparms->params.output.len) = '\0';
-< 
-< 		CREATE_FILE(fname_buf, 0666, out_fd);
-< 		if (FD_INVALID == out_fd)
-< 		{
-< 			joberr = joberr_io_stdout_creat;
-< 			job_errno = errno;
-< 			return joberr;
-< 		}
-< #		ifdef __MVS__
-< 		/* tagging as ASCII is fine now, that might change in the future for gtm_utf8_mode */
-< 		if (-1 == gtm_zos_set_tag(out_fd, TAG_ASCII, TAG_TEXT, TAG_FORCE, &realfiletag))
-< 			TAG_POLICY_SEND_MSG(fname_buf, errno, realfiletag, TAG_ASCII);
-< #		endif
-< 		CLOSEFILE_RESET(out_fd, rc);	/* resets "out_fd" to FD_INVALID */
-< 
-< 		OPENFILE(fname_buf, O_WRONLY, out_fd);
----
-> 		OPENFILE("/dev/null", O_WRONLY, out_fd);
-172,187c155
-< 		strncpy(fname_buf, jparms->params.error.buffer, jparms->params.error.len);
-< 		*(fname_buf + jparms->params.error.len) = '\0';
-< 
-< 		CREATE_FILE(fname_buf, 0666, err_fd);
-< 		if (FD_INVALID == err_fd)
-< 		{
-< 			joberr = joberr_io_stderr_creat;
-< 			job_errno = errno;
-< 			return joberr;
-< 		}
-< #		ifdef __MVS__
-< 		if (-1 == gtm_zos_set_tag(err_fd, TAG_EBCDIC, TAG_TEXT, TAG_FORCE, &realfiletag))
-< 			TAG_POLICY_SEND_MSG(fname_buf, errno, realfiletag, TAG_EBCDIC);
-< #		endif
-< 		CLOSEFILE_RESET(err_fd, rc);	/* resets "err_fd" to FD_INVALID */
-< 		OPENFILE(fname_buf, O_WRONLY, err_fd);
----
-> 		OPENFILE("/dev/null", O_WRONLY, err_fd);
+diff --git a/sr_unix/ojchildioset.c b/sr_unix/ojchildioset.c
+index 6830b067..9bd09145 100755
+--- a/sr_unix/ojchildioset.c
++++ b/sr_unix/ojchildioset.c
+@@ -120,24 +120,7 @@ int ojchildioset(job_params_type *jparms)
+ 		out_fd = dup_ret;
+ 	} else
+ 	{
+-		strncpy(fname_buf, jparms->params.output.buffer, jparms->params.output.len);
+-		*(fname_buf + jparms->params.output.len) = '\0';
+-
+-		CREATE_FILE(fname_buf, 0666, out_fd);
+-		if (FD_INVALID == out_fd)
+-		{
+-			joberr = joberr_io_stdout_creat;
+-			job_errno = errno;
+-			return joberr;
+-		}
+-#		ifdef __MVS__
+-		/* tagging as ASCII is fine now, that might change in the future for gtm_utf8_mode */
+-		if (-1 == gtm_zos_set_tag(out_fd, TAG_ASCII, TAG_TEXT, TAG_FORCE, &realfiletag))
+-			TAG_POLICY_SEND_MSG(fname_buf, errno, realfiletag, TAG_ASCII);
+-#		endif
+-		CLOSEFILE_RESET(out_fd, rc);	/* resets "out_fd" to FD_INVALID */
+-
+-		OPENFILE(fname_buf, O_WRONLY, out_fd);
++		OPENFILE("/dev/null", O_WRONLY, out_fd);
+ 		if (FD_INVALID == out_fd)
+ 		{
+ 			joberr = joberr_io_stdout_open;
+@@ -169,22 +152,7 @@ int ojchildioset(job_params_type *jparms)
+ 		err_fd = dup_ret;
+ 	} else
+ 	{
+-		strncpy(fname_buf, jparms->params.error.buffer, jparms->params.error.len);
+-		*(fname_buf + jparms->params.error.len) = '\0';
+-
+-		CREATE_FILE(fname_buf, 0666, err_fd);
+-		if (FD_INVALID == err_fd)
+-		{
+-			joberr = joberr_io_stderr_creat;
+-			job_errno = errno;
+-			return joberr;
+-		}
+-#		ifdef __MVS__
+-		if (-1 == gtm_zos_set_tag(err_fd, TAG_EBCDIC, TAG_TEXT, TAG_FORCE, &realfiletag))
+-			TAG_POLICY_SEND_MSG(fname_buf, errno, realfiletag, TAG_EBCDIC);
+-#		endif
+-		CLOSEFILE_RESET(err_fd, rc);	/* resets "err_fd" to FD_INVALID */
+-		OPENFILE(fname_buf, O_WRONLY, err_fd);
++		OPENFILE("/dev/null", O_WRONLY, err_fd);
+ 		if (FD_INVALID == err_fd)
+ 		{
+ 			joberr = joberr_io_stderr_open;

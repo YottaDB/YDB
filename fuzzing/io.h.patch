@@ -10,22 +10,37 @@
 #								#
 #################################################################
 
-624c624
-< 	mval dev, zpos, zstatus;									\
----
-> 	mval		zpos;										\
-634,647d633
-< 				dev.str.len = (WRITE) ? io_std_device.out->trans_name->len		\
-< 					: io_std_device.in->trans_name->len;				\
-< 				dev.str.addr = (WRITE) ? io_std_device.out->trans_name->dollar_io	\
-< 					: io_std_device.in->trans_name->dollar_io;			\
-< 				if (SOCNOERR)								\
-< 					zstatus.str = silent_soc;	/* suppressing socket errors */	\
-< 				else									\
-< 					zstatus.str = dollar_zstatus.str;				\
-< 				if (0 == zstatus.str.len)						\
-< 					zstatus.str = dm_did_it;	/* in case there's no zstatus */\
-< 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_NOPRINCIO, 8, 		\
-< 					RTS_ERROR_STRING((WRITE) ? "WRITE to" : "READ from"),		\
-< 					dev.str.len, dev.str.addr, zpos.str.len, zpos.str.addr,		\
-< 					zstatus.str.len, zstatus.str.addr);				\
+diff --git a/sr_port/io.h b/sr_port/io.h
+index 90946447..b6af6580 100644
+--- a/sr_port/io.h
++++ b/sr_port/io.h
+@@ -621,7 +621,7 @@ MBSTART {												\
+ 													\
+ 	GBLREF	mval	dollar_zstatus;									\
+ 													\
+-	mval dev, zpos, zstatus;									\
++	mval		zpos;										\
+ 													\
+ 	if ((IOD) == ((WRITE) ? io_std_device.out : io_std_device.in))					\
+ 	{												\
+@@ -631,20 +631,6 @@ MBSTART {												\
+ 			op_svget(SV_ZPOS, &zpos);							\
+ 			if (memcmp("+1^GTM$DMOD", zpos.str.addr, STR_LIT_LEN("+1^GTM$DMOD")))		\
+ 			{	/* not in base direct mode so do noisy exit */				\
+-				dev.str.len = (WRITE) ? io_std_device.out->trans_name->len		\
+-					: io_std_device.in->trans_name->len;				\
+-				dev.str.addr = (WRITE) ? io_std_device.out->trans_name->dollar_io	\
+-					: io_std_device.in->trans_name->dollar_io;			\
+-				if (SOCNOERR)								\
+-					zstatus.str = silent_soc;	/* suppressing socket errors */	\
+-				else									\
+-					zstatus.str = dollar_zstatus.str;				\
+-				if (0 == zstatus.str.len)						\
+-					zstatus.str = dm_did_it;	/* in case there's no zstatus */\
+-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_NOPRINCIO, 8, 		\
+-					RTS_ERROR_STRING((WRITE) ? "WRITE to" : "READ from"),		\
+-					dev.str.len, dev.str.addr, zpos.str.len, zpos.str.addr,		\
+-					zstatus.str.len, zstatus.str.addr);				\
+ 			} else if (!prin_out_dev_failure)	/* in direct mode so go quietly */	\
+ 				flush_pio();			/* unless output is still OK */		\
+ 			stop_image_no_core();								\

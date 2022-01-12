@@ -12,7 +12,16 @@
 #								#
 #################################################################
 
-151c151
-< 				sigaction(sig, &gen_action, NULL);
----
-> 				//sigaction(sig, &gen_action, NULL);
+diff --git a/sr_unix/sig_init.c b/sr_unix/sig_init.c
+index 9b986ed7..42a57471 100755
+--- a/sr_unix/sig_init.c
++++ b/sr_unix/sig_init.c
+@@ -147,7 +147,7 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
+ 			case SIGTERM:
+ 			case SIGTRAP:
+ 				/* These are all being handled by the generic_signal_handler. */
+-				sigaction(sig, &gen_action, NULL);
++				//sigaction(sig, &gen_action, NULL);
+ 				break;
+ 			case SIGKILL:
+ 			case SIGSTOP:
