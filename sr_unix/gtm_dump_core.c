@@ -46,7 +46,7 @@ void gtm_dump_core(void)
 	act.sa_flags = 0;
 #	endif
 	act.sa_handler = SIG_DFL;
-	// sigaction(SIGQUIT, &act, 0);
+	sigaction(SIGQUIT, &act, 0);
 
 	/* We are about to generate a core file. If one already exists on the disk,
 	   make a simplistic attempt to rename it so we can get the most useful info
