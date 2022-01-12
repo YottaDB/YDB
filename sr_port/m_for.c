@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -10,6 +13,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "compiler.h"
 #include "mdq.h"
 #include "opcode.h"
@@ -18,6 +22,7 @@
 #include "advancewindow.h"
 #include "cmd.h"
 #include "lv_val.h"
+#include "error.h"
 
 error_def(ERR_EQUAL);
 error_def(ERR_FOROFLOW);
@@ -101,6 +106,7 @@ int m_for(void)
 	SETUP_THREADGBL_ACCESS;
 	forpos_in_chain = TREF(pos_in_chain);
 	FOR_PUSH();
+	ESTABLISH_RET(m_for_ch, FALSE);
 	if (TK_SPACE == TREF(window_token))
 	{	/* "argumentless" form */
 		FOR_END_OF_SCOPE(1, dummy);
@@ -111,11 +117,13 @@ int m_for(void)
 			assert(TREF(source_error_found));
 			stx_error(TREF(source_error_found));
 			FOR_POP(BLOWN_FOR);
+			REVERT;
 			return FALSE;
 		}
 		SAVE_FOR_OVER_ADDR();				/* stash address of next op in the for_stack array */
 		newtriple(OC_JMP)->operand[0] = put_tjmp(ref);	/* transfer back to just before the begining of the body */
 		FOR_POP(GOOD_FOR);				/* and pop the array */
+		REVERT;
 		return TRUE;
 	}
 	for_stack_level = (TREF(for_stack_ptr) - TADR(for_stack));
@@ -124,6 +132,7 @@ int m_for(void)
 		if (!indirection(&v))
 		{
 			FOR_POP(BLOWN_FOR);
+			REVERT;
 			return FALSE;
 		}
 		need_control_rfrsh = TRUE;
@@ -139,6 +148,7 @@ int m_for(void)
 		if (!lvn(&control_variable, OC_SAVLVN, NULL))
 		{
 			FOR_POP(BLOWN_FOR);
+			REVERT;
 			return FALSE;
 		}
 		s = control_variable.oprval.tref;
@@ -161,6 +171,7 @@ int m_for(void)
 	{
 		stx_error(ERR_EQUAL);
 		FOR_POP(BLOWN_FOR);
+		REVERT;
 		return FALSE;
 	}
 	if (need_control_rfrsh)
@@ -185,6 +196,7 @@ int m_for(void)
 		{
 			stx_error(ERR_MAXFORARGS);
 			FOR_POP(BLOWN_FOR);
+			REVERT;
 			return FALSE;
 		}
 		assert((TK_COMMA == TREF(window_token)) || (TK_EQUAL == TREF(window_token)));
@@ -198,6 +210,7 @@ int m_for(void)
 		if (EXPR_FAIL == expr(&arg_value, MUMPS_EXPR))	/* starting (possibly only) value */
 		{
 			FOR_POP(BLOWN_FOR);
+			REVERT;
 			return FALSE;
 		}
 		assert(TRIP_REF == arg_value.oprclass);
@@ -215,6 +228,7 @@ int m_for(void)
 			if (EXPR_FAIL == expr(&increment[arg_cnt], MUMPS_EXPR))	/* pick up step */
 			{
 				FOR_POP(BLOWN_FOR);
+				REVERT;
 				return FALSE;
 			}
 			assert(TRIP_REF == increment[arg_cnt].oprclass);
@@ -240,6 +254,7 @@ int m_for(void)
 				if (EXPR_FAIL == expr(&terminate[arg_cnt], MUMPS_EXPR))		/* termination control value */
 				{
 					FOR_POP(BLOWN_FOR);
+					REVERT;
 					return FALSE;
 				}
 				assert(TRIP_REF == terminate[arg_cnt].oprclass);
@@ -283,6 +298,7 @@ int m_for(void)
 	{
 		stx_error(ERR_SPOREOL);
 		FOR_POP(BLOWN_FOR);
+		REVERT;
 		return FALSE;
 	}
 	if (!linetail())
@@ -291,6 +307,7 @@ int m_for(void)
 		assert(TREF(source_error_found));
 		stx_error(TREF(source_error_found));
 		FOR_POP(BLOWN_FOR);
+		REVERT;
 		return FALSE;
 	}
 	if (not_even_once_addr)		/* if above errors leave FOR remains behind, improper operval.indr explodes OC_JMPGTR */
@@ -342,5 +359,6 @@ int m_for(void)
 			newtriple(OC_JMP)->operand[0] = arg_eval_addr[arg_index + 1];
 	}
 	FOR_POP(GOOD_FOR);
+	REVERT;
 	return TRUE;
 }
