@@ -11,15 +11,21 @@
 #################################################################
 
 diff --git a/sr_unix/gtm_dump_core.c b/sr_unix/gtm_dump_core.c
-index 352581af..fa852602 100755
+index 36c185ac..47a2bee0 100755
 --- a/sr_unix/gtm_dump_core.c
 +++ b/sr_unix/gtm_dump_core.c
-@@ -46,7 +46,7 @@ void gtm_dump_core(void)
- 	act.sa_flags = 0;
- #	endif
- 	act.sa_handler = SIG_DFL;
--	sigaction(SIGQUIT, &act, 0);
-+	// sigaction(SIGQUIT, &act, 0);
+@@ -34,6 +34,14 @@ void gtm_dump_core(void)
+ 	struct stat             fs1;
+ 	sigset_t		unblock_sigquit;
  
- 	/* We are about to generate a core file. If one already exists on the disk,
- 	   make a simplistic attempt to rename it so we can get the most useful info
++	/* Treat any event that is about to dump a core file as a SIG-11 so afl-fuzz can record it as a crash.
++	 * Note that this includes fatal errors like GTMASSERT2/GTMASSERT etc. too as they invoke DUMP_CORE macro.
++	 */
++	char	*ptr, ch;
++	ptr = NULL;
++	ch = *ptr;
++	printf("ch = %d\n", ch);
++
+ 	/* Scrub any encryption related information before taking a core dump */
+ #	ifndef DEBUG_NOSCRUB
+ 	GTMCRYPT_CLOSE;

@@ -31,6 +31,8 @@ reset:
 	patch -R ../sr_port/jobexam_process.c jobexam_process.c.patch
 	patch -R ../sr_unix/ojchildioset.c ojchildioset.c.patch
 	patch -R ../sr_unix/sig_init.c sig_init.c.patch
+	patch -R ../sr_unix/gtm_dump_core.c gtm_dump_core.c.patch
+	patch -R ../sr_unix/gtm_fork_n_core.c gtm_fork_n_core.c.patch
 
 clean: rm reset
 
