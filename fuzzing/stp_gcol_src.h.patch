@@ -1,0 +1,25 @@
+#################################################################
+#								#
+# Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_port/stp_gcol_src.h b/sr_port/stp_gcol_src.h
+index 63f18667..caff9dfc 100644
+--- a/sr_port/stp_gcol_src.h
++++ b/sr_port/stp_gcol_src.h
+@@ -1016,7 +1016,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
+ 			if ((TREF(gtm_strpllimwarned)) /* previously warned */
+ 				&& (0 < TREF(gtm_strpllim)) /* watching a stp limit */
+ 				&& ((stp_incr + stringpool.top - stringpool.base) > TREF(gtm_strpllim))) /* expanding larger */
+-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STPOFLOW);
++					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) MAKE_MSG_ERROR(ERR_STPOFLOW));
+ 			expand_stp((ssize_t)(stp_incr + stringpool.top - stringpool.base));
+ #			ifdef DEBUG
+ 			/* If expansion failed and stp_gcol_ch did an UNWIND and we were already in exit handling code,
