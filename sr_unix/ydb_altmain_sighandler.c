@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,8 +23,8 @@ GBLREF	volatile int4		exit_state;
  * two NULL parms that are not used when doing alternate signal handling.
  */
 int ydb_altmain_sighandler(int signum)
-{
-	generic_signal_handler(signum, NULL, NULL, IS_OS_SIGNAL_HANDLER_FALSE);
+{	/* If we get sent a SIGHUP, morph it into a SIGINT for dealing with in generic_signal_handler() */
+	generic_signal_handler((SIGHUP == signum) ? SIGINT : signum, NULL, NULL, IS_OS_SIGNAL_HANDLER_FALSE);
 	if (IS_SIGNAL_DEFERRED)
 		return YDB_DEFER_HANDLER;
 	return YDB_OK;
