@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,7 +76,7 @@ int m_new(void)
 		ref->operand[0] = tmparg;
 		ref->operand[1] = put_ilit((mint) indir_new);
 		ins_triple(ref);
-		start_fetches(OC_FETCH);
+		MID_LINE_REFETCH;
 		return TRUE;
 	case TK_DOLLAR:
 		advancewindow();
