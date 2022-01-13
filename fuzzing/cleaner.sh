@@ -24,6 +24,7 @@
 while true
 do
 	echo "Cleaning..."
-	find . -maxdepth 1 -delete
+	# Remove all files under current directory whose modification time is older than 1 minute
+	find . -maxdepth 1 -type f -mmin +1 -delete
 	sleep 10
 done
