@@ -52,39 +52,6 @@
 #include "svnames.h"
 #include "util.h"
 
-/* This macro is used if we get an error from a tcgetattr() or tcsetattr() call on the terminal.
- * We check if the terminal is the principal device (input or output side). If so, we issue NOPRINCIO message
- * in the syslog if an error has already been seen (e.g. "prin_out_dev_failure" is already set before the macro
- * call). But since the caller of this macro is going to issue an "rts_error" right after this (which will most
- * likely terminate the process), make sure we send a NOPRINCIO message even if "prin_out_dev_failure" is not
- * already set before this macro was invoked. This is done by reinvoking the ISSUE_NOPRINCIO_IF_NEEDED macro
- * (in that case, the first invocation will set "prin_out_dev_failure" to TRUE and the second invocation will
- * send the NOPRINCIO error message to the syslog).
- */
-#define	ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(IOD)								\
-{															\
-	GBLREF io_pair		io_std_device;										\
-															\
- 	/* Check if terminal is used as input or output device to decide 2nd parameter for below macro call. */		\
-	if (IOD == io_std_device.out)											\
-	{														\
-		boolean_t	save_prin_out_dev_failure;								\
-															\
-		save_prin_out_dev_failure = prin_out_dev_failure;							\
-		ISSUE_NOPRINCIO_IF_NEEDED(IOD, TRUE, FALSE);	/* TRUE, FALSE ==> WRITE, not socket */			\
-		if (!save_prin_out_dev_failure && prin_out_dev_failure)							\
-			ISSUE_NOPRINCIO_IF_NEEDED(IOD, TRUE, FALSE);	/* TRUE, FALSE ==> WRITE, not socket */		\
-	} else if (IOD == io_std_device.in)										\
-	{														\
-		boolean_t	save_prin_in_dev_failure;								\
-															\
-		save_prin_in_dev_failure = prin_in_dev_failure;								\
-		ISSUE_NOPRINCIO_IF_NEEDED(IOD, FALSE, FALSE);	/* FALSE, FALSE ==> READ, not socket */			\
-		if (!save_prin_in_dev_failure && prin_in_dev_failure)							\
-			ISSUE_NOPRINCIO_IF_NEEDED(IOD, FALSE, FALSE);	/* FALSE, FALSE ==> READ, not socket */		\
-	}														\
-}
-
 LITDEF nametabent filter_names[] =
 {
 	{4, "CHAR*"},
@@ -570,8 +537,11 @@ void iott_use(io_desc *iod, mval *pp)
 		{
 			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
 			if (0 != status)
+			{
+				ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(iod);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("tcflush input"),
 					      CALLFROM, errno);
+			}
 		}
 	} else if (tt_ptr->mupintr && !dollar_zininterrupt)
 	{	/* The interrupted read was not properly resumed so clear it now */

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,8 +27,14 @@
 #include "eintr_wrappers.h"
 #include "setterm.h"
 #include "gtm_isanlp.h"
+#include "svnames.h"
+#include "util.h"
+#include "op.h"
+#include "send_msg.h"
 
 GBLREF	uint4		process_id;
+GBLREF	boolean_t	prin_in_dev_failure, prin_out_dev_failure;
+GBLREF	boolean_t	exit_handler_active;
 
 error_def(ERR_TCSETATTR);
 
@@ -52,7 +58,16 @@ void  resetterm(io_desc *iod)
 			assert(ENOTTY != save_errno);
 			/* Skip TCSETATTR error for ENOTTY (in case fildes is no longer a terminal) */
 			if ((ENOTTY != save_errno) && (0 == gtm_isanlp(ttptr->fildes)))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, ttptr->fildes, save_errno);
+			{
+				ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(iod);	/* just like is done in "iott_use.c" */
+				/* If we are already in the exit handler, do not issue an error for this event as this
+				 * could cause a condition handler overrun (i.e. invoke "ch_overrun()") which would create
+				 * a core file. Since this error most likely means the terminal has gone away, it is better
+				 * to terminate the process without resetting a non-existent terminal than creating a core file.
+				 */
+				if (!exit_handler_active)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, ttptr->fildes, save_errno);
+			}
 		}
 		ttptr->setterm_done_by = 0;
 	}
