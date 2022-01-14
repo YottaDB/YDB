@@ -1359,7 +1359,7 @@ GBLDEF	boolean_t		caller_func_is_stapi;	/* Set to TRUE by a SimpleThreadAPI func
 							 * distinguish whether the caller is a direct user invocation or a
 							 * SimpleThreadAPI invocation. Used to issue SIMPLEAPINOTALLOWED error.
 							 */
-GBLDEF	volatile int		stapi_signal_handler_deferred;	/* non-zero if signal handler function
+GBLDEF	global_latch_t		stapi_signal_handler_deferred;	/* non-zero if signal handler function
 								 * should be invoked in a deferred fashion.
 								 */
 GBLDEF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];

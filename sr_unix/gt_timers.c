@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson.			*
@@ -245,7 +245,6 @@ GBLREF	int4			error_condition;
 GBLREF	int4			outofband;
 GBLREF	int			process_exiting;
 GBLREF	struct sigaction	orig_sig_action[];
-GBLREF	volatile int		stapi_signal_handler_deferred;
 GBLREF	int			ydb_main_lang;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		simpleThreadAPI_active;

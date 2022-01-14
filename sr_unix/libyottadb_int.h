@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1016,7 +1016,6 @@ static inline void threaded_api_ydb_engine_unlock(uint64_t TPTOKEN, ydb_buffer_t
 {
 	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];
 	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];
-	GBLREF	volatile int	stapi_signal_handler_deferred;
 
 	int	lockIndex, lclStatus;
 	DCL_THREADGBL_ACCESS;

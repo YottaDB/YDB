@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,7 +93,7 @@ void ydb_stm_invoke_deferred_signal_handler()
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_ctrlc_handler))
 	{
 		assert((SIGINT == stapi_signal_handler_oscontext[sig_hndlr_ctrlc_handler].sig_num) || USING_ALTERNATE_SIGHANDLING);
-		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_continue_handler;
+		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_ctrlc_handler;
 		ctrlc_handler(DUMMY_SIG_NUM, NULL, NULL);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;
 	}

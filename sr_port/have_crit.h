@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -121,58 +121,13 @@ GBLREF	global_latch_t deferred_signal_handling_needed; /* a bitmask of the below
 							 * needs to be handled upon leaving deferred zone.
 							 */
 /* Note: The SET and CLEAR macros below can be invoked by multiple threads in the same process and therefore need
- * atomic operations hence the use of COMPSWAP* below. But since they need to be idempotent (i.e. SET should be a
- * no-op if bit is already set, CLEAR should be a no-op if bit is already cleared etc.), they need to do a GET to
- * check the bit value and based on that determine the course of action.
+ * atomic operations hence the use of BIT_SET_INTERLOCKED macro below. But since they need to be idempotent
+ * (i.e. SET should be a no-op if bit is already set, CLEAR should be a no-op if bit is already cleared etc.),
+ * they need to do a GET to check the bit value and based on that determine the course of action.
  */
-#define	GET_DEFERRED_CONDITION(EVENT)	 (DBG_ASSERT(0 <= GLOBAL_LATCH_VALUE(&deferred_signal_handling_needed))	\
-						GLOBAL_LATCH_VALUE(&deferred_signal_handling_needed) & EVENT)
-
-#define	SET_DEFERRED_CONDITION(EVENT)									\
-{													\
-	int4		oldvalue, newvalue, event;							\
-	boolean_t	clear_condition;								\
-													\
-	if (0 > EVENT)											\
-	{	/* This is a call from the CLEAR_DEFERRED_CONDITION macro. Invert sense. */		\
-		clear_condition = TRUE;									\
-		event = -EVENT;										\
-	} else												\
-	{												\
-		clear_condition = FALSE;								\
-		event = EVENT;										\
-	}												\
-	assert(0 < event);										\
-	for ( ; ; )											\
-	{												\
-		oldvalue = GLOBAL_LATCH_VALUE(&deferred_signal_handling_needed);			\
-		if (!clear_condition)									\
-		{											\
-			if (oldvalue & event)								\
-			{	/* Deferred condition is already set. No more action needed. */		\
-				break;									\
-			}										\
-		} else											\
-		{											\
-			if (!(oldvalue & event))							\
-			{	/* Deferred condition is already cleared. No more action needed. */	\
-				break;									\
-			}										\
-		}											\
-		newvalue = oldvalue + EVENT;	/* Note: EVENT can be positive or negative */		\
-		assert(0 <= newvalue);									\
-		if (COMPSWAP_LOCK(&deferred_signal_handling_needed, oldvalue, newvalue))		\
-			break;										\
-		/* If we are here, it means the latch value changed concurrently since we took a copy.	\
-		 * Possible for example if a timer interrupt occurs and the global variable		\
-		 * "deferred_signal_handling_needed" gets modified inside the interrupt code.		\
-		 * In that case, redo the deferred condition set based on the current global variable.	\
-		 */											\
-	}												\
-	assert(0 <= GLOBAL_LATCH_VALUE(&deferred_signal_handling_needed));				\
-}
-
-#define	CLEAR_DEFERRED_CONDITION(EVENT)		SET_DEFERRED_CONDITION(-EVENT)
+#define	GET_DEFERRED_CONDITION(EVENT)	 	(BIT_GET_INTERLOCKED(deferred_signal_handling_needed) & EVENT)
+#define	SET_DEFERRED_CONDITION(EVENT)		BIT_SET_INTERLOCKED(deferred_signal_handling_needed, EVENT)
+#define	CLEAR_DEFERRED_CONDITION(EVENT)		BIT_SET_INTERLOCKED(deferred_signal_handling_needed, -EVENT)
 
 #define	GET_DEFERRED_TIMERS_CHECK_NEEDED	GET_DEFERRED_CONDITION(DEFERRED_SIGNAL_HANDLING_TIMERS)
 #define	SET_DEFERRED_TIMERS_CHECK_NEEDED	SET_DEFERRED_CONDITION(DEFERRED_SIGNAL_HANDLING_TIMERS)

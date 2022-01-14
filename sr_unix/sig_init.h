@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,7 @@ typedef struct
 	gtm_sigcontext_t	sig_context;	/* "context" from OS signal handler invocation */
 } sig_info_context_t;
 
-GBLREF	volatile int		stapi_signal_handler_deferred;
+GBLREF	global_latch_t		stapi_signal_handler_deferred;
 GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 
@@ -69,14 +69,76 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
  */
 #define	STAPI_FAKE_TIMER_HANDLER_WAS_DEFERRED							\
 {												\
-	if (!STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_timer_handler))				\
-		INTERLOCK_ADD(&stapi_signal_handler_deferred, (1 << sig_hndlr_timer_handler));	\
+	BIT_SET_INTERLOCKED(stapi_signal_handler_deferred, (1 << sig_hndlr_timer_handler));	\
 	stapi_signal_handler_oscontext[sig_hndlr_timer_handler].sig_forwarded = TRUE;		\
 }
 #endif
 
-#define	STAPI_IS_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE)		(stapi_signal_handler_deferred & (1 << SIGHNDLRTYPE))
+#define	STAPI_IS_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE)	(BIT_GET_INTERLOCKED(stapi_signal_handler_deferred) & (1 << SIGHNDLRTYPE))
 
+/* The below macro uses interlock instructions since multiple threads could potentially invoke this at the same time
+ * (e.g. if SIGALRM and SIGTERM happen at same time, OR if multiple SIGCONT signals happen at the same time etc.)
+ * We cannot use INTERLOCK_ADD since we could double-increment in that case. Therefore, we use COMPSWAP_LOCK which
+ * checks the current value and atomically does the increment only if no other concurrent change happened to this
+ * global variable value from another thread. This macro is similar to the SET_DEFERRED_CONDITION macro in that regard.
+ */
+#define	BIT_SET_INTERLOCKED(LATCH, BITVAL)								\
+{													\
+	int4		oldvalue, newvalue, absolute_bitval;						\
+	boolean_t	clear_condition;								\
+													\
+	/* Note that BITVAL can be negative to indicate the bit has to be CLEARed and positive to	\
+	 * indicate the bit has to be SET. In that case, we use the sign to first know whether it	\
+	 * is a SET or CLEAR and then use the absolute value (stored in "absolute_bitval" local		\
+	 * variable to check if the bit is already set or not).						\
+	 */												\
+	if (0 > BITVAL)											\
+	{	/* This is a call from the CLEAR_DEFERRED_CONDITION macro. Invert sense. */		\
+		clear_condition = TRUE;									\
+		absolute_bitval = -BITVAL;								\
+	} else												\
+	{												\
+		clear_condition = FALSE;								\
+		absolute_bitval = BITVAL;								\
+	}												\
+	assert(0 < absolute_bitval);									\
+	for ( ; ; )											\
+	{												\
+		oldvalue = GLOBAL_LATCH_VALUE(&LATCH);							\
+		if (!clear_condition)									\
+		{											\
+			if (oldvalue & absolute_bitval)							\
+			{	/* Deferred condition is already set. No more action needed. */		\
+				break;									\
+			}										\
+		} else											\
+		{											\
+			if (!(oldvalue & absolute_bitval))						\
+			{	/* Deferred condition is already cleared. No more action needed. */	\
+				break;									\
+			}										\
+		}											\
+		newvalue = oldvalue + BITVAL;	/* Note: BITVAL can be positive or negative */		\
+		assert(0 <= newvalue);									\
+		if (COMPSWAP_LOCK(&LATCH, oldvalue, newvalue))						\
+			break;										\
+		/* If we are here, it means the latch value changed concurrently since we took a copy.	\
+		 * If LATCH parameter is "deferred_signal_handling_needed", this is possible for	\
+		 * example if a timer interrupt occurs and the LATCH variable gets modified inside the	\
+		 * interrupt code. In that case, redo the deferred condition set based on the current	\
+		 * global variable. Same reasoning applies for any LATCH parameter.			\
+		 */											\
+	}												\
+	assert(0 <= GLOBAL_LATCH_VALUE(&LATCH));							\
+}
+
+/* The below macro gets the latch value. It does not do any interlocked operations but is named BIT_GET_INTERLOCKED
+ * to be consistent with the related BIT_SET_INTERLOCKED macro.
+ */
+#define	BIT_GET_INTERLOCKED(LATCH) (DBG_ASSERT(0 <= GLOBAL_LATCH_VALUE(&LATCH))	GLOBAL_LATCH_VALUE(&LATCH))
+
+/* The below macro needs to invoke BIT_SET_INTERLOCKED since multliple threads can invoke it at the same time.
+ */
 #define	STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG_NUM, INFO, CONTEXT)		\
 {											\
 	SAVE_OS_SIGNAL_HANDLER_SIGNUM(SIGHNDLRTYPE, SIG_NUM);				\
@@ -85,26 +147,22 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 	SHM_WRITE_MEMORY_BARRIER;							\
 	stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded = TRUE;		\
 	SHM_WRITE_MEMORY_BARRIER;							\
-	/* Need interlocked add below since multiple threads can execute this code	\
-	 * at the same time (e.g. if SIGALRM and SIGTERM happen at same time).		\
-	 * Just like SET_DEFERRED_TIMERS_CHECK_NEEDED macro in "have_crit.h",		\
-	 * we need to check the value before doing the interlocked add.			\
+	/* Need BIT_SET_INTERLOCKED below since multiple threads can execute this code	\
+	 * at the same time (e.g. if SIGALRM and SIGTERM happen at same time,		\
+	 * OR if multiple SIGCONT signals happen at the same time etc.).		\
 	 */										\
-	if (!STAPI_IS_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE))				\
-		INTERLOCK_ADD(&stapi_signal_handler_deferred, (1 << SIGHNDLRTYPE));	\
+	BIT_SET_INTERLOCKED(stapi_signal_handler_deferred, (1 << SIGHNDLRTYPE));	\
 	SHM_WRITE_MEMORY_BARRIER;							\
 	SET_DEFERRED_STAPI_CHECK_NEEDED;						\
 }
 
-#define	STAPI_CLEAR_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE)			\
-{										\
-	/* Need interlocked add below since multiple threads can execute this code	\
-	 * at the same time (e.g. if SIGALRM and SIGTERM happen at same time).		\
-	 * Just like CLEAR_DEFERRED_TIMERS_CHECK_NEEDED macro in "have_crit.h",		\
-	 * we need to check the value before doing the interlocked add.			\
+#define	STAPI_CLEAR_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE)				\
+{											\
+	/* Need BIT_SET_INTERLOCKED below since multiple threads can execute this code	\
+	 * at the same time (e.g. if SIGALRM and SIGTERM happen at same time,		\
+	 * OR if multiple SIGCONT signals happen at the same time etc.).		\
 	 */										\
-	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE))				\
-		INTERLOCK_ADD(&stapi_signal_handler_deferred, -(1 << SIGHNDLRTYPE));	\
+	BIT_SET_INTERLOCKED(stapi_signal_handler_deferred, -(1 << SIGHNDLRTYPE));	\
 	SHM_WRITE_MEMORY_BARRIER;						\
 	stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded = FALSE;	\
 	SHM_WRITE_MEMORY_BARRIER;						\
@@ -113,40 +171,40 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 #define	OK_TO_NEST_FALSE	FALSE
 #define	OK_TO_NEST_TRUE		TRUE
 
-#define	STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED(OK_TO_NEST)					\
-{													\
-	GBLREF	void			(*ydb_stm_invoke_deferred_signal_handler_fnptr)(void);		\
-	GBLREF	enum sig_handler_t	ydb_stm_invoke_deferred_signal_handler_type;			\
-													\
-	enum sig_handler_t		lcl_stm_sighndlr_type;						\
-													\
-	if (stapi_signal_handler_deferred && (NULL != ydb_stm_invoke_deferred_signal_handler_fnptr))	\
-	{	/* It is possible that "ydb_stm_invoke_deferred_signal_handler_type" is set to a value	\
-		 * other than sig_hndlr_none at this point (for example with the following C-stack)	\
-		 *   "wait_for_repl_inst_unfreeze_nocsa_jpl"						\
-		 *    -> "ydb_stm_invoke_deferred_signal_handler"					\
-		 *      -> "timer_handler"								\
-		 *        -> "wcs_stale"								\
-		 *          -> "wcs_wtstart"								\
-		 *            -> "wait_for_repl_inst_unfreeze"						\
-		 *              -> "wait_for_repl_inst_unfreeze_nocsa_jpl"				\
-		 *                -> "STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED"			\
-		 *                  -> "ydb_stm_invoke_deferred_signal_handler"				\
-		 * In this case, we want the nested invocation to happen as it might be handling a	\
-		 * deferred SIGTERM (for example) which would terminate the process. Not doing the	\
-		 * nested invocation would cause the process to not exit in a timely fashion.		\
-		 * Hence the need to reset "ydb_stm_invoke_deferred_signal_handler_type" here (as	\
-		 * otherwise "ydb_stm_invoke_deferred_signal_handler" would return immediately).	\
-		 * Therefore, if caller says OK_TO_NEST is TRUE, then we do the reset thereby allowing	\
-		 * the nested invocation. If not, we skip the reset thereby the nested invocation will	\
-		 * return right away.									\
-		 */											\
-		lcl_stm_sighndlr_type = ydb_stm_invoke_deferred_signal_handler_type;			\
-		if (OK_TO_NEST)										\
-			ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;			\
-		(*ydb_stm_invoke_deferred_signal_handler_fnptr)();					\
-		ydb_stm_invoke_deferred_signal_handler_type = lcl_stm_sighndlr_type ;			\
-	}												\
+#define	STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED(OK_TO_NEST)								\
+{																\
+	GBLREF	void			(*ydb_stm_invoke_deferred_signal_handler_fnptr)(void);					\
+	GBLREF	enum sig_handler_t	ydb_stm_invoke_deferred_signal_handler_type;						\
+																\
+	enum sig_handler_t		lcl_stm_sighndlr_type;									\
+																\
+	if (BIT_GET_INTERLOCKED(stapi_signal_handler_deferred) && (NULL != ydb_stm_invoke_deferred_signal_handler_fnptr))	\
+	{	/* It is possible that "ydb_stm_invoke_deferred_signal_handler_type" is set to a value				\
+		 * other than sig_hndlr_none at this point (for example with the following C-stack)				\
+		 *   "wait_for_repl_inst_unfreeze_nocsa_jpl"									\
+		 *    -> "ydb_stm_invoke_deferred_signal_handler"								\
+		 *      -> "timer_handler"											\
+		 *        -> "wcs_stale"											\
+		 *          -> "wcs_wtstart"											\
+		 *            -> "wait_for_repl_inst_unfreeze"									\
+		 *              -> "wait_for_repl_inst_unfreeze_nocsa_jpl"							\
+		 *                -> "STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED"						\
+		 *                  -> "ydb_stm_invoke_deferred_signal_handler"							\
+		 * In this case, we want the nested invocation to happen as it might be handling a				\
+		 * deferred SIGTERM (for example) which would terminate the process. Not doing the				\
+		 * nested invocation would cause the process to not exit in a timely fashion.					\
+		 * Hence the need to reset "ydb_stm_invoke_deferred_signal_handler_type" here (as				\
+		 * otherwise "ydb_stm_invoke_deferred_signal_handler" would return immediately).				\
+		 * Therefore, if caller says OK_TO_NEST is TRUE, then we do the reset thereby allowing				\
+		 * the nested invocation. If not, we skip the reset thereby the nested invocation will				\
+		 * return right away.												\
+		 */														\
+		lcl_stm_sighndlr_type = ydb_stm_invoke_deferred_signal_handler_type;						\
+		if (OK_TO_NEST)													\
+			ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;						\
+		(*ydb_stm_invoke_deferred_signal_handler_fnptr)();								\
+		ydb_stm_invoke_deferred_signal_handler_type = lcl_stm_sighndlr_type ;						\
+	}															\
 }
 
 #define	SAVE_OS_SIGNAL_HANDLER_SIGNUM(SIGHNDLRTYPE, SIGNUM)	stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_num = SIGNUM

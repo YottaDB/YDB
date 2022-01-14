@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@
 GBLREF	boolean_t	simpleThreadAPI_active;
 GBLREF	pthread_t	gtm_main_thread_id;
 GBLREF	boolean_t	gtm_main_thread_id_set;
-GBLREF	volatile int	stapi_signal_handler_deferred;
+GBLREF	global_latch_t	stapi_signal_handler_deferred;
 GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];
 GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];
 GBLREF	sig_pending	sigPendingQue;				/* Queue of pending signals in alternate signal handling mode */
@@ -120,7 +120,8 @@ void *ydb_stm_thread(void *dummy_parm)
 		SLEEP_USEC_MULTI_THREAD_UNSAFE(MICROSECS_IN_SEC - 1, FALSE);
 		if (exit_handler_active)
 			break;		/* If the exit handler is running or has run, then we're done */
-		if (stapi_signal_handler_deferred || (USING_ALTERNATE_SIGHANDLING && SPQUE_NOT_EMPTY(&sigPendingQue, que)))
+		if (BIT_GET_INTERLOCKED(stapi_signal_handler_deferred)
+			|| (USING_ALTERNATE_SIGHANDLING && SPQUE_NOT_EMPTY(&sigPendingQue, que)))
 		{	/* A signal handler was deferred (or queued if using alternate signal handling). Try getting the YottaDB
 			 * engine multi-thread mutex lock to see if we can invoke the signal handler in this thread. If we cannot
 			 * get the lock, another thread will take care of it. In any case, keep retrying this in a loop periodically
