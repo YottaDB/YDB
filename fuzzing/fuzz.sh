@@ -30,6 +30,9 @@ cd env
 #	defaults (e.g., no root access to the system) and are OK with some performance loss.
 export AFL_SKIP_CPUFREQ=1
 
+# See comment in "fuzzing/instrument.sh" for why this is needed.
+export AFL_IGNORE_PROBLEMS=1
+
 # If EDITOR environment variable is set to a gui editor (e.g. gvim), ZEDIT commands that get tested by afl-fuzz below
 # would invoke lots of gvim windows in the background and clutter the desktop. Prevent that by unsetting the env var
 # in case it is set. In this case, a default editor would be chosen (usually vi) which does not open a new window.

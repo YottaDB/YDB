@@ -44,6 +44,10 @@ mkdir env
 
 (
 cd env || exit
+
+# Set env var before invoking yottadb. See comment in "fuzzing/instrument.sh" for why this is needed.
+export AFL_IGNORE_PROBLEMS=1
+
 echo "Running afl-cmin..."
 afl-cmin -i ../NotMinCorpus/ -o ../inputs -- ../build-instrumented/yottadb -dir
 )

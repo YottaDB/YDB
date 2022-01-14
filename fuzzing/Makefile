@@ -26,6 +26,15 @@ go:
 	./fuzz.sh
 	echo "working on it"
 
+patch:
+	patch ../sr_port/io.h io.h.patch
+	patch ../sr_port/jobexam_process.c jobexam_process.c.patch
+	patch ../sr_port/stp_gcol_src.h stp_gcol_src.h.patch
+	patch ../sr_unix/gtm_dump_core.c gtm_dump_core.c.patch
+	patch ../sr_unix/gtm_fork_n_core.c gtm_fork_n_core.c.patch
+	patch ../sr_unix/ojchildioset.c ojchildioset.c.patch
+	patch ../sr_unix/sig_init.c sig_init.c.patch
+
 reset:
 	patch -R ../sr_port/io.h io.h.patch
 	patch -R ../sr_port/jobexam_process.c jobexam_process.c.patch
@@ -38,5 +47,5 @@ reset:
 clean: rm reset
 
 rm:
-	rm -rf build-instrumented inputs env YDBTest
+	rm -rf build-instrumented inputs output env NotMinCorpus YDBTest
 

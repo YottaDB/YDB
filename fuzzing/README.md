@@ -22,9 +22,13 @@ At a high level, we've only made a makefile which calls three scripts in this di
 
 To fuzz something, we first need to have AFL be able to track execution, etc.  This means, of course, instrumentation.  To do that we need to make two small changes to the build process:
 
-1. We patch out the signal handlers installed for SIGBUS, SIGSEGV, SIGILL, SIGFPE, etc in `sr_unix/sig_init.c`.  This is a one line change that we do with `patch`.  This means that if you don't run `make clean` or `make reset`, _the source for YDB is modified for fuzzing_.
+1. We patch out the signal handlers installed for SIGBUS, SIGSEGV, SIGILL, SIGFPE, etc in `sr_unix/sig_init.c`.  This is a one line change that we do with `patch`.
 
-2. We change CC and CXX to use `afl-gcc-fast` and `afl-g++-fast` from the system path.
+2. We change CC and CXX to use `afl-clang-fast`/`afl-gcc-fast` and `afl-clang-fast++`/`afl-g++-fast` from the system path depending on whether the clang or gcc version of afl is available.
+
+3. We then build/instrument YottaDB.
+
+4. And finally undo the patches done in Step 1.
 
 This is all handled inside of `instrument.sh`.
 
