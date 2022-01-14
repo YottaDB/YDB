@@ -56,14 +56,11 @@ On modern version of AFL++, you can remove the input directory to make `afl-fuzz
 
 - Corpus minimization is not working.  For some reason, during testing `afl-cmin` is reporting that it cannot communicate with the forkserver.  This might be due to something foolish that I'm doing, however.
 
-- Fuzzing YDB like this creates a LOT of trash files all over the place.  Its not _that_ common, but its worth pointing out.  We get around this by running a helper script which deletes ./env/\* every once in a while, but a true fix for this would involve further patches to YDB that might shadow bugs, which we want to avoid.  See the FAQ for more information.
+- Fuzzing YDB like this creates a LOT of trash files all over the place.  Its not _that_ common, but its worth pointing out.  We get around this by running a helper script which deletes ./env/\* every once in a while, but a true fix for this would involve further patches to YDB that might shadow bugs, which we want to avoid.
 
 - You _might_ have an issue with random crashes, which has been seen during earlier campaigns.  What appears to happen is that one of the scripts effectively calls `chmod 000 env`, which then causes every AFL fuzzer to crash because it can't write to the directory.  You can pre-emptively fix this by calling `chmod 777 env; chown root:root env`, if desired.
 
 ## FAQ
-
-- I'm running out of disk space _really_ quickly, what's going on?
-  - YDB using the OS' syslog to log a lot of information.  Because we're running YDB thousands of time per second, this quickly eats disk space in the syslog file.  On Ubuntu 20.04, you can get around this by running `sudo systemctl stop rsyslog.service`, but keep in mind that this disables the syslog completely.  Similarly, the journal stored in /var/log might get filled, but in previous campaigns we simply deleted this file once every few days.
 
 - Who is responsible for this mess?
   - Zachary Minneker from Security Innovation in Seattle, WA! Check us out at securityinnovation.com!
