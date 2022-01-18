@@ -29,6 +29,7 @@
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
+#include "getzposition.h"
 
 error_def(ERR_BADCHSET);
 error_def(ERR_UTF16ENDIAN);
@@ -628,7 +629,10 @@ MBSTART {												\
 		if ((WRITE) ? prin_out_dev_failure : prin_in_dev_failure)				\
 		{											\
 			util_out_print("", RESET);	/* Reset output buffer */			\
-			op_svget(SV_ZPOS, &zpos);							\
+			/* Using "getzposition()" directly below instead of going through "op_svget()"	\
+			 * as the latter bloats the size of "gtmsecshr" (pulls in a lot more functions)	\
+			 */										\
+			getzposition(&zpos);								\
 			if (memcmp("+1^GTM$DMOD", zpos.str.addr, STR_LIT_LEN("+1^GTM$DMOD")))		\
 			{	/* not in base direct mode so do noisy exit */				\
 				dev.str.len = (WRITE) ? io_std_device.out->trans_name->len		\
