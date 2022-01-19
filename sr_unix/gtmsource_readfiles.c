@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -554,9 +554,18 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 	fc = rb->fc;
 	prev_eof_addr = fc->eof_addr;
 	*eof_change = 0;
+	/* Since we do not hold crit on the region, it is possible for a journal file switch to happen concurrently.
+	 * Therefore, we cannot note down "new_eof_addr" after the call to "is_gdid_gdid_identical()" returns TRUE
+	 * (i.e. indicating the journal file switch did not happen) as it is possible the journal file switch happens
+	 * after the call but before noting down "new_eof_addr" from "csa->jnl->jnl_buff->dskaddr". In that case, we
+	 * would be noting down "new_eof_addr" corresponding to the new journal file offset whereas "prev_eof_addr"
+	 * would correspond to the older generation journal file (i.e. a disconnect which can cause issues as we would
+	 * be incorrectly noting "new_eof_addr" down as the last valid offset of the previous generation journal file).
+	 * Hence noting "new_eof_addr" BEFORE the call to "is_gdid_gdid_identical()" below.
+	 */
+	new_eof_addr = csa->jnl->jnl_buff->dskaddr;
 	if (is_gdid_gdid_identical(&fc->id, JNL_GDID_PTR(csa)))
 	{
-		new_eof_addr = csa->jnl->jnl_buff->dskaddr;
 		REPL_DPRINT3("Update EOF : New EOF addr from SHM for %s is %u\n", ctl->jnl_fn, new_eof_addr);
 	} else
 	{
