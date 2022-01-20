@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -326,7 +326,11 @@ int tcp_open(char *host, unsigned short port, uint8 timeout, boolean_t passive) 
 				CLOSEFILE(sock, rc);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					   LEN_AND_LIT("connect()"), CALLFROM, save_errno);
-				assert(FALSE);
+				/* We are aware that EHOSTUNREACH can happen here in times of network instability but
+				 * any other error here should assert fail so we catch it and the conditions it happened
+				 * under in a core file when running a debug build.
+				 */
+				assert(EHOSTUNREACH == save_errno);
 				return -1;
 			}
 			if ((temp_1 < 0) && (NO_M_TIMEOUT != timeout))
