@@ -34,23 +34,19 @@ error_def(ERR_QUERY2);
 error_def(ERR_SIDEEFFECTEVAL);
 error_def(ERR_VAREXPECTED);
 
-/* Note: The below code is duplicated in "f_query1.c" and "f_reversequery1.c".
- * Any changes here might need to be made in those files too and vice versa.
+/* This function is basically a 1-argument $query call where the direction (2nd argument) is known to be forward query.
+ * This is basically a copy of "f_query.c" except some code removed because we know there is no 2nd argument to parse.
+ * Any changes here might need to be made in "f_query.c" and vice versa.
  */
-int f_query(oprtype *a, opctype op)
+int f_query1(oprtype *a, opctype op)
 {
 	boolean_t	ok;
 	enum order_dir	direction;
 	enum order_obj	object;
-	int4		intval;
-	opctype		gv_oc;
-	oprtype		*tmpa, *tmpa0, *tmpa1, tmpa2;
-	oprtype		control_slot, dir_opr, *dir_oprptr, *next_oprptr;
+	oprtype		*tmpa, *tmpa0, *tmpa1;
+	oprtype		*next_oprptr;
 	save_se		save_state;
-	short int	column;
-	triple		*chain2, *obp, tmpchain2;
-	triple		*oldchain, *r, *r0, *r1, *r2, *sav_dirref, *triptr;
-	triple		*sav_gv1, *sav_gvn, *sav_lvn, *sav_ref;
+	triple		*oldchain, *r, *r0, *r1, *sav_dirref, *triptr;
 	static opctype	query_opc[LAST_OBJECT][LAST_DIRECTION] =
 	{
 		/* FORWARD	BACKWARD		TBD */
@@ -117,24 +113,13 @@ int f_query(oprtype *a, opctype op)
 			r1 = r0->operand[1].oprval.tref;
 			r1->operand[1] = *tmpa;
 			*tmpa = put_tref(r0);
-			tmpa0 = &tmpa->oprval.tref->operand[0];
-			tmpa1 = &tmpa->oprval.tref->operand[1];
 		}
 		assert(OC_FNQUERY == tmpa->oprval.tref->opcode);
 		next_oprptr = &r->operand[1];
 		break;
 	case TK_CIRCUMFLEX:
 		object = GLOBAL;
-		sav_gv1 = TREF(curtchain);
 		ok = gvn();
-		sav_gvn = (TREF(curtchain))->exorder.bl;
-		if (OC_GVRECTARG == sav_gvn->opcode)
-		{	/* because of shifting if we need to find it, look in the expr_start chain */
-			assert(TREF(shift_side_effects));
-			assert(((sav_gvn->operand[0].oprval.tref) == TREF(expr_start)) && (NULL != TREF(expr_start_orig)));
-			sav_gv1 = TREF(expr_start_orig);
-			sav_gvn = TREF(expr_start);
-		}
 		next_oprptr = &r->operand[0];
 		break;
 	case TK_ATSIGN:
@@ -155,107 +140,7 @@ int f_query(oprtype *a, opctype op)
 		stx_error(ERR_VAREXPECTED);
 		return FALSE;
 	}
-	if (TK_COMMA != TREF(window_token))
-		direction = FORWARD;	/* default direction */
-	else
-	{	/* two argument form: ugly logic for direction */
-		advancewindow();
-		column = source_column;
-		dir_oprptr = (oprtype *)mcalloc(SIZEOF(oprtype));
-		dir_opr = put_indr(dir_oprptr);
-		sav_ref = newtriple(OC_GVSAVTARG);
-		DISABLE_SIDE_EFFECT_AT_DEPTH;		/* doing this here lets us know specifically if direction had SE threat */
-		if (EXPR_FAIL == expr(dir_oprptr, MUMPS_EXPR))
-		{
-			if (NULL != oldchain)
-				setcurtchain(oldchain);
-			return FALSE;
-		}
-		assert(TRIP_REF == dir_oprptr->oprclass);
-		triptr = dir_oprptr->oprval.tref;
-		if (OC_LIT == triptr->opcode)
-		{	/* if direction is a literal - pick it up and stop flailing about */
-			if (MV_IS_TRUEINT(&triptr->operand[0].oprval.mlit->v, &intval) && (1 == intval || -1 == intval))
-			{
-				direction = (1 == intval) ? FORWARD : BACKWARD;
-				sav_ref->opcode = OC_NOOP;
-				sav_ref = NULL;
-			} else
-			{	/* bad direction */
-				if (NULL != oldchain)
-					setcurtchain(oldchain);
-				stx_error(ERR_QUERY2);
-				return FALSE;
-			}
-		} else
-		{
-			direction = TBD;
-			sav_dirref = newtriple(OC_GVSAVTARG);		/* $R reflects direction eval even if we revisit 1st arg */
-			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(sav_ref);
-			switch (object)
-			{
-			case GLOBAL:		/* The direction may have had a side effect, so take copies of subscripts */
-				*next_oprptr = *dir_oprptr;
-				for (; sav_gvn != sav_gv1; sav_gvn = sav_gvn->exorder.bl)
-				{	/* hunt down the gv opcode */
-					gv_oc = sav_gvn->opcode;
-					if ((OC_GVNAME == gv_oc) || (OC_GVNAKED == gv_oc) || (OC_GVEXTNAM == gv_oc))
-						break;
-				}
-				assert((OC_GVNAME == gv_oc) || (OC_GVNAKED == gv_oc) || (OC_GVEXTNAM == gv_oc));
-				TREF(temp_subs) = TRUE;
-				create_temporaries(sav_gvn, gv_oc);
-				ins_triple(r);
-				break;
-			case LOCAL:		/* Additionally need to move OC_FNQUERY triple to after potential side effect */
-				sav_lvn = r->operand[0].oprval.tref;
-				assert(OC_FNQUERY == sav_lvn->opcode);
-				dqdel(sav_lvn, exorder);
-				ins_triple(sav_lvn);
-				assert(TRIP_REF == tmpa0->oprclass);
-				assert(OC_ILIT == tmpa0->oprval.tref->opcode);
-				assert(ILIT_REF == tmpa0->oprval.tref->operand[0].oprclass);
-				assert(3 <= tmpa0->oprval.tref->operand[0].oprval.ilit);
-				if (3 != tmpa0->oprval.tref->operand[0].oprval.ilit)
-				{	/* sav_lvn has subscripts that we need to create temporaries for */
-					TREF(temp_subs) = TRUE;
-					create_temporaries(sav_lvn, sav_lvn->opcode);
-				}
-				/* else: sav_lvn is unsubscripted. No need to create temporaries */
-				/* Insert direction in OC_FNQUERY triple to eventually go to OC_FNQ2 */
-				r2 = maketriple(OC_PARAMETER);
-				r2->operand[0] = dir_opr;
-				r2->operand[1] = *tmpa1;
-				*tmpa1 = put_tref(r2);
-				dqins(sav_lvn, exorder, r2);
-				/* Since the "lvn" call above happened with "0" as the 3rd ("parent") parameter, r->operand[1]
-				 * would not be filled in like it would in case of "f_order" so this part of the code is different
-				 * from that of "f_order" (there we need to account for temporaries for r->operand[1]).
-				 */
-				assert(&r->operand[1] == next_oprptr);
-				break;
-			case INDIRECT:		/* Save and restore the variable lookup for true left-to-right evaluation */
-				*next_oprptr = *dir_oprptr;
-				dqinit(&tmpchain2, exorder);
-				chain2 = setcurtchain(&tmpchain2);
-				INSERT_INDSAVGLVN(control_slot, r->operand[0], ANY_SLOT, 1);
-				setcurtchain(chain2);
-				obp = sav_ref->exorder.bl;	/* insert before second arg */
-				dqadd(obp, &tmpchain2, exorder);
-				r->operand[0] = control_slot;
-				ins_triple(r);
-				triptr = newtriple(OC_GLVNPOP);
-				triptr->operand[0] = control_slot;
-				break;
-			default:
-				assert(FALSE);
-			}
-			if (SE_WARN_ON && (TREF(side_effect_base))[TREF(expr_depth)])
-				ISSUE_SIDEEFFECTEVAL_WARNING(column - 1);
-			DISABLE_SIDE_EFFECT_AT_DEPTH;		/* usual side effect processing doesn't work for $QUERY() */
-		}
-	}
+	direction = FORWARD;	/* default direction */
 	if (LOCAL != object)
 	{
 		if (TBD != direction)

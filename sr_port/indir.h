@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,7 +68,7 @@ INDIR(indir_fndata,		f_data,		OC_FNDATA)
 ,INDIR(indir_zdeallocate,	m_zdeallocate,	0)
 ,INDIR(indir_lvarg,		indirection,	0)
 ,INDIR(indir_fnzprevious,	f_zprevious,	OC_FNZPREVIOUS)
-,INDIR(indir_fnquery, 		f_query,	OC_FNQUERY)
+,INDIR(indir_fnquery1, 		f_query1,	OC_FNQUERY)
 ,INDIR(indir_zhelp,		m_zhelp,	0)
 ,INDIR(indir_zshow,		m_zshow,	0)
 ,INDIR(indir_lvnamadr,		indirection,	0)
