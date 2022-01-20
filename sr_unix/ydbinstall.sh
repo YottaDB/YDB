@@ -227,7 +227,7 @@ install_plugins()
 			cd YDBPosix-master
 			mkdir build && cd build
 			case "${osid}" in
-				rhel|centos|sles) cmake3 ..;;
+				rhel|centos|sles|rocky) cmake3 ..;;
 				*) cmake ..;;
 			esac
 			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
@@ -334,7 +334,7 @@ install_plugins()
 			mkdir build
 			cd build
 			case "${osid}" in
-				rhel|centos|sles) cmake3 ${octo_cmake} ..;;
+				rhel|centos|sles|rocky) cmake3 ${octo_cmake} ..;;
 				*) cmake ${octo_cmake} ..;;
 			esac
 			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
@@ -540,7 +540,7 @@ if [ -n "$ydb_from_source" ] ; then
 		fi
 		osid=`grep -w ID /etc/os-release | cut -d= -f2 | cut -d'"' -f2`
 		case "${osid}" in
-			rhel|centos|sles) cmake_command="cmake3";;
+			rhel|centos|sles|rocky) cmake_command="cmake3";;
 			*) cmake_command="cmake";
 		esac
 		if [ "dbg" = `echo "$gtm_buildtype" | tr '[:upper:]' '[:lower:]'` ] ; then
@@ -743,6 +743,10 @@ if [ "N" = "$ydb_force_install" ]; then
 				# CentOS 8.x is considered supported on x86_64
 				osallowmajorver="8"
 				osallowminorver="0"
+			elif [ "rocky" = "${osid}" ] ; then
+				# Rocky Linux 8.x is considered supported on x86_64
+				osallowmajorver="8"
+				osallowminorver="0"
 			elif [ "debian" = "${osid}" ] ; then
 				# Debian 11 (buster) onwards is considered supported on x86_64.
 				osallowmajorver="11"
@@ -938,7 +942,7 @@ else
 			case $arch in
 			x8664)
 				case "${osid}" in
-				rhel|centos)
+				rhel|centos|rocky)
 					# For x86_64 architecture and RHEL OS, we have separate tarballs for RHEL 7 and RHEL 8.
 					# Hence the use of "osmajorver" below in the "platform" variable.
 					osmajorver=`echo $osver | cut -d. -f1`
@@ -975,7 +979,7 @@ else
 				#
 				# To get the correct binary for CentOS, RHEL and SLES, we treat OS major version 7 as rhel and later versions as centos
 				case "${osid}" in
-				rhel|centos|sles)
+				rhel|centos|sles|rocky)
 					# CentOS-specific releases of YottaDB for x86_64 happened only after r1.26
 					if expr r1.26 \< "${ydb_version}" >/dev/null; then
 						# If the OS major version is later than 7, treat it as centos. Otherwise, treat it as rhel.
