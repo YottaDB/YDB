@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -35,7 +38,6 @@ int m_zmessage (void)
 	case EXPR_INDR:
 		if (TK_COLON != TREF(window_token))
 		{
-			coerce(&arg, OCT_MVAL);
 			make_commarg(&arg, indir_zmess);
 			return TRUE;
 		}

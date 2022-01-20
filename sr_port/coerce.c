@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,7 +54,8 @@ void coerce(oprtype *a, enum octype_t new_type)
 			{	/* compiler generated literals should include their numeric form - no need to coerce */
 				MV_FORCE_NUMD(&ref->operand[0].oprval.tref->operand[0].oprval.mlit->v);
 			}
-			dqdel(ref, exorder);
+			ref->opcode = OC_NOOP;			/* dqdel of OC_FORCENUM causes chain troubles */
+			ref->operand[0].oprclass = NO_REF;
 			ref = ref->operand[0].oprval.tref;
 			old_op = ref->opcode;
 			if (new_type & oc_tab[old_op].octype)
