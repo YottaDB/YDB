@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,6 +57,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "WCSFLUFAILED", "!AD error while flushing buffers at transaction number 0x!16@XQ for database file !AD", 5, 0 },
 	{ "WORDEXPFAILED", "wordexp() call for string [!AD] returned !AZ error. See wordexp() man pages for details", 3, 0 },
 	{ "TRANSREPLJNL1GB", "Transaction can use at most 1GiB of replicated journal records across all journaled regions", 0, 0 },
+	{ "DEVPARPARSE", "Error parsing device parameter specification", 0, 0 },
 };
 
 
@@ -69,7 +70,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	40,
+	41,
 	&ydberrors_undocarr[0],
 	0
 };

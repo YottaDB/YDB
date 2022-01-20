@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,3 +53,4 @@
 #define ERR_WCSFLUFAILED 151028019
 #define ERR_WORDEXPFAILED 151028026
 #define ERR_TRANSREPLJNL1GB 151028034
+#define ERR_DEVPARPARSE 151028042

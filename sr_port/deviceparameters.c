@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -579,10 +582,14 @@ int deviceparameters(oprtype *c, char who_calls)
 	parse_warn = FALSE;
 	for (;;)
 	{
-		if ((TK_IDENT != TREF(window_token))
-			|| (0 > (n = int_namelook(dev_param_index, dev_param_names,
-						  (TREF(window_ident)).addr, (TREF(window_ident)).len))))
-		{	/* NOTE assignment above */
+		if (TK_IDENT != TREF(window_token))
+		{
+			stx_error(ERR_DEVPARPARSE);
+			return FALSE;
+		}
+		n = int_namelook(dev_param_index, dev_param_names, (TREF(window_ident)).addr, (TREF(window_ident)).len);
+		if (0 > n)
+		{
 			STX_ERROR_WARN(ERR_DEVPARUNK);	/* sets "parse_warn" to TRUE */
 			break;
 		}
