@@ -3,7 +3,7 @@
 # Copyright (c) 2014-2019 Fidelity National Information         #
 # Services, Inc. and/or its subsidiaries. All rights reserved.  #
 #								#
-# Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson.				#
@@ -272,7 +272,7 @@ install_plugins()
 			if ydb_dist=${ydb_installdir} make install; then
 				# Save the build directory if the make install command returns a non-zero exit code. Otherwise, remove it.
 				cd ..
-				sudo rm -R enc_tmp
+				rm -R enc_tmp
 			else
 				echo "YDBEncrypt build failed. The build directory ($PWD/enc_tmp) has been saved."
 				remove_tmpdir=0
