@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -30,7 +33,9 @@ void lvzwr_arg(int t, mval *a1, mval *a2)
 
 	assert(lvzwrite_block);
 	sub_idx = lvzwrite_block->subsc_count++;
-	/* it would be good to guard the array sub_idx < sizeof... */
+	/* Check if we are going to overflow allocation. See corresponding malloc in lvzwr_init.c (size = MAX_LVSUBSCRIPTS + 1) */
+	if (MAX_LVSUBSCRIPTS < sub_idx)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	if (a1)
 	{
 		MV_FORCE_DEFINED(a1);
