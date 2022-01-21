@@ -58,6 +58,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "WORDEXPFAILED", "wordexp() call for string [!AD] returned !AZ error. See wordexp() man pages for details", 3, 0 },
 	{ "TRANSREPLJNL1GB", "Transaction can use at most 1GiB of replicated journal records across all journaled regions", 0, 0 },
 	{ "DEVPARPARSE", "Error parsing device parameter specification", 0, 0 },
+	{ "SETZDIRTOOLONG", "$ZDIR value specified is !UL bytes long which is greater than the allowed maximum of !UL bytes", 2, 0 },
 };
 
 
@@ -70,7 +71,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	41,
+	42,
 	&ydberrors_undocarr[0],
 	0
 };

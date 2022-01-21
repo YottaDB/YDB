@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -41,7 +44,8 @@ void setzdir(mval *newdir, mval *full_path_of_newdir)
 	if (NULL != newdir)
 	{
 		MV_FORCE_STR(newdir);
-		assert(SIZEOF(directory) > newdir->str.len);
+		if (SIZEOF(directory) <= newdir->str.len)
+			rts_error(VARLSTCNT(4) ERR_SETZDIRTOOLONG, 2, newdir->str.len, SIZEOF(directory));
 		memcpy(directory, newdir->str.addr, newdir->str.len);
 		directory[newdir->str.len] = '\0';
 		if (-1 == CHDIR(directory))

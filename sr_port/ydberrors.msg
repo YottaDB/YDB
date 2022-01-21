@@ -70,6 +70,7 @@ WCSFLUFAILED	<!AD error while flushing buffers at transaction number 0x!16@XQ fo
 WORDEXPFAILED	<wordexp() call for string [!AD] returned !AZ error. See wordexp() man pages for details>/error/fao=3
 TRANSREPLJNL1GB	<Transaction can use at most 1GiB of replicated journal records across all journaled regions>/error/fao=0
 DEVPARPARSE	<Error parsing device parameter specification>/error/fao=0!/ansi=0
+SETZDIRTOOLONG	<$ZDIR value specified is !UL bytes long which is greater than the allowed maximum of !UL bytes>/error/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !
