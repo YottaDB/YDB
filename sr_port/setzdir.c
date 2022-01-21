@@ -45,7 +45,8 @@ void setzdir(mval *newdir, mval *full_path_of_newdir)
 	{
 		MV_FORCE_STR(newdir);
 		if (SIZEOF(directory) <= newdir->str.len)
-			rts_error(VARLSTCNT(4) ERR_SETZDIRTOOLONG, 2, newdir->str.len, SIZEOF(directory));
+			rts_error(VARLSTCNT(4) ERR_SETZDIRTOOLONG, 2, newdir->str.len, SIZEOF(directory) - 1);
+				/* - 1 above is needed to not count NULL byte towards user supplied string length */
 		memcpy(directory, newdir->str.addr, newdir->str.len);
 		directory[newdir->str.len] = '\0';
 		if (-1 == CHDIR(directory))
