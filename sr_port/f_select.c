@@ -26,7 +26,7 @@
 #include "gtmdbglvl.h"
 
 GBLREF triple		t_orig;
-GBLREF uint4		gtmDebugLevel;
+GBLREF uint4		ydbDebugLevel;
 
 LITREF octabstruct oc_tab[];
 
@@ -64,21 +64,16 @@ int f_select(oprtype *a, opctype op)
 	boolean_t	first_time, got_true, se_saw_side, shifting, throwing;
 	opctype		old_op;
 	oprtype		*cnd, endtrip, target, tmparg;
-<<<<<<< HEAD
-	triple		dmpchain, *loop_save_start, *loop_save_start_orig, *oldchain, *r, *ref, *savechain, *save_start,
-			*save_start_orig, tmpchain, *triptr, *noop;
+	triple		dmpchain, *r, *ref, *savechain, tmpchain, *triptr, *noop;
 	triple		*boolexprfinish, *boolexprfinish2;
-	uint4		save_expr_depth, save_se_depth;
-=======
-	triple		dmpchain, *loop_expr_start, *oldchain, *r, *ref, *savechain, tmpchain, *triptr;
->>>>>>> f33a273c (GT.M V6.3-012)
+	triple		*loop_expr_start, *oldchain;
 	mval		*v;
 	save_for_select	*save_state, ss;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 #	ifdef DEBUG
-	if (GDL_DebugCompiler & gtmDebugLevel)
+	if (GDL_DebugCompiler & ydbDebugLevel)
 		CHKTCHAIN(TREF(curtchain), exorder, (NULL != TREF(expr_start)));
 #	endif
 	save_state = &ss;
@@ -94,32 +89,21 @@ int f_select(oprtype *a, opctype op)
 	TREF(side_effect_depth) = INITIAL_SIDE_EFFECT_DEPTH;
 	TREF(side_effect_base) = malloc(SIZEOF(boolean_t) * TREF(side_effect_depth));
 	memset((char *)(TREF(side_effect_base)), 0, SIZEOF(boolean_t) * TREF(side_effect_depth));
-<<<<<<< HEAD
-	if (shifting = (save_shift && (!save_saw_side || (YDB_BOOL == TREF(ydb_fullbool)))))	/* WARNING assignment */
-	{	/* shift in progress or needed so use a temporary chain */
-=======
 	if (shifting = (save_state->shift_side_effects) && (NULL != save_state->expr_start) && ((!save_state->saw_side_effect)
-		|| (GTM_BOOL == TREF(gtm_fullbool))))
+		|| (YDB_BOOL == TREF(ydb_fullbool))))
 	{	/* shift in progress; WARNING assignment above */
 		TREF(expr_depth) = 1;		/* Don't want to hit bottom with each expression, so start at 1 rather than 0 */
->>>>>>> f33a273c (GT.M V6.3-012)
 		dqinit(&tmpchain, exorder);
 		oldchain = setcurtchain(&tmpchain);
 	}
 	r = maketriple(op);
-<<<<<<< HEAD
 	noop = maketriple(OC_NOOP);	/* This is the jump target. Need this to be separate from `r`. Finally before inserting
 					 * `r` in the triple chain, we first insert `noop`. This lets the caller `bool_expr()`
 					 * insert OC_BOOLEXPRSTART triples BEFORE `r` without unbalanced OC_BOOLEXPRFINISH issues.
 					 */
-	first_time = TRUE;
-	got_true = throwing = FALSE;
 	endtrip = put_tjmp(noop);
-=======
-	endtrip = put_tjmp(r);
 	first_time = TRUE;
 	got_true = throwing = FALSE;
->>>>>>> f33a273c (GT.M V6.3-012)
 	savechain = NULL;
 	for (;;)
 	{
@@ -149,21 +133,13 @@ int f_select(oprtype *a, opctype op)
 			stx_error(ERR_COLON);
 			return FALSE;
 		}
-<<<<<<< HEAD
 		advancewindow();
 		triptr = (TREF(curtchain))->exorder.bl;
 		boolexprfinish = (OC_BOOLEXPRFINISH == triptr->opcode) ? triptr : NULL;
 		if (NULL != boolexprfinish)
 			triptr = triptr->exorder.bl;
-		assert((got_true ? &dmpchain : (shifting ? &tmpchain : oldchain)) == TREF(curtchain));
-		if (shifting)	/* if shifting return to supression of side effect games for the expression */
-			TREF(shift_side_effects) = TREF(saw_side_effect) = FALSE;
-		for ( ; !got_true; triptr = triptr->exorder.bl)
-=======
-		advancewindow();					/* past the colon */
 		assert(!got_true || (&dmpchain == TREF(curtchain)));
-		for (triptr = (TREF(curtchain))->exorder.bl; !got_true; triptr = triptr->exorder.bl)
->>>>>>> f33a273c (GT.M V6.3-012)
+		for ( ; !got_true; triptr = triptr->exorder.bl)
 		{	/* get back, get back to where we once belonged - to find an indicator of the actual result */
 			if (OC_NOOP == triptr->opcode)
 				continue;				/* keep looking */
@@ -171,12 +147,9 @@ int f_select(oprtype *a, opctype op)
 				break;					/* Boolean was not a literal */
 			v = &triptr->operand[0].oprval.mlit->v;		/* Boolean was a literal, so optimize it */
 			dqdel(triptr, exorder);
-<<<<<<< HEAD
 			/* Remove OC_BOOLEXPRSTART and OC_BOOLEXPRFINISH opcodes too */
 			REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish);	/* Note: Will set "boolexprfinish" to NULL */
-=======
 			dqinit(&dmpchain, exorder);			/* both got_true and throwing use dumping */
->>>>>>> f33a273c (GT.M V6.3-012)
 			unuse_literal(v);
 			if (0 == MV_FORCE_BOOL(v))
 			{	/* Boolean FALSE: discard the corresponding value */
@@ -302,12 +275,8 @@ int f_select(oprtype *a, opctype op)
 	{
 		ins_triple(noop);
 		ins_triple(r);					/* 1st arg was not literal:literal */
-<<<<<<< HEAD
 	}
-	saw_se_in_select = TREF(saw_side_effect);		/* note this down before it gets reset by DECREMENT_EXPR_DEPTH */
-=======
 	se_saw_side = TREF(saw_side_effect);			/* note this down before it gets reset by DECREMENT_EXPR_DEPTH */
->>>>>>> f33a273c (GT.M V6.3-012)
 	if (shifting)
 		DECREMENT_EXPR_DEPTH;				/* clean up */
 	assert(!TREF(expr_depth));
@@ -325,7 +294,7 @@ int f_select(oprtype *a, opctype op)
 		triptr = newtriple(OC_GVRECTARG);		/* if redundant, later logic throws it out */
 		triptr->operand[0] = put_tref(TREF(expr_start));
 #		ifdef DEBUG
-		if (GDL_DebugCompiler & gtmDebugLevel)
+		if (GDL_DebugCompiler & ydbDebugLevel)
 		{
 			CHKTCHAIN(TREF(curtchain), exorder, TRUE);
 			CHKTCHAIN(TREF(expr_start_orig), exorder, FALSE);
