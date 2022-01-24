@@ -84,13 +84,14 @@ int f_select(oprtype *a, opctype op)
 	save_state->expr_depth = TREF(expr_depth);
 	save_state->side_effect_base = TREF(side_effect_base);
 	save_state->side_effect_depth = TREF(side_effect_depth);
-	se_saw_side = FALSE;
 	TREF(expr_depth) = 0;
 	TREF(side_effect_depth) = INITIAL_SIDE_EFFECT_DEPTH;
 	TREF(side_effect_base) = malloc(SIZEOF(boolean_t) * TREF(side_effect_depth));
 	memset((char *)(TREF(side_effect_base)), 0, SIZEOF(boolean_t) * TREF(side_effect_depth));
-	if (shifting = (save_state->shift_side_effects) && (NULL != save_state->expr_start) && ((!save_state->saw_side_effect)
-		|| (YDB_BOOL == TREF(ydb_fullbool))))
+	shifting = (save_state->shift_side_effects)
+			&& (NULL != save_state->expr_start)
+			&& ((!save_state->saw_side_effect) || (YDB_BOOL == TREF(ydb_fullbool)));
+	if (shifting)
 	{	/* shift in progress; WARNING assignment above */
 		TREF(expr_depth) = 1;		/* Don't want to hit bottom with each expression, so start at 1 rather than 0 */
 		dqinit(&tmpchain, exorder);
@@ -238,7 +239,6 @@ int f_select(oprtype *a, opctype op)
 			assert((&dmpchain == dmpchain.exorder.fl) && (&dmpchain == dmpchain.exorder.bl));
 			assert(NULL == savechain);
 			savechain = setcurtchain(&dmpchain);	/* discard arguments after a compile time TRUE */
-			loop_expr_start = TREF(expr_start);
 			TREF(expr_start) = TREF(expr_start_orig) = NULL;
 			throwing = TRUE;
 			continue;
