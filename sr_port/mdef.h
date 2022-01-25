@@ -1951,14 +1951,8 @@ enum
  */
 #define	MAX_LKNAME_LEN		ZWR_EXP_RATIO(MAX_MIDENT_LEN + 2 + (MAX_LK_SUB_LEN + 3) * (MAX_LKSUBSCRIPTS - 1))
 
-#define PUSH_PARM_OVERHEAD	4	/* This extra space in the array is needed because push_parm() is capable of handling 32
-					 * arguments, but callg needs to accomidate space for 4 items, namely argument count
-					 * (repeated twice), return value, and the truth value. As of this writing ojchildparms.c is
-					 * the only module that relies on the extra space.
-					 */
-#define	MAX_ACTUALS		32	/* Maximum number of arguments allowed in an actuallist. This value also determines
-					 * how many parameters are allowed to be passed between M and C.
-					 */
+#include "gparam_list.h"	/* Defines MAX_ACTUALS and PUSH_PARM_OVERHEAD */
+
 #if defined(DEBUG) && defined(UNIX)
 #define OPERATOR_LOG_MSG												\
 {															\

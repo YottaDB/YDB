@@ -614,6 +614,7 @@ foreach(f
   gtm_strings.h
   gtmxc_types.h
   libyottadb.h
+  gparam_list.h
   libydberrors.h
   libydberrors2.h
   mmrhash.h

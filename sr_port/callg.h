@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,11 +15,7 @@
 #ifndef CALLG_H
 #define CALLG_H
 
-typedef struct gparam_list_struct
-{
-	intszofptr_t	n;
-	void    	*arg[MAX_ACTUALS + PUSH_PARM_OVERHEAD];
-} gparam_list;
+#include "gparam_list.h"
 
 typedef	INTPTR_T (*callgfnptr)(intszofptr_t cnt, ...);
 typedef	INTPTR_T (*callgncfnptr)(void *ar1, ...);

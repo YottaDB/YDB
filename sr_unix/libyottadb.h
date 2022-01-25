@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,8 @@
 #include <inttypes.h>	/* .. ditto (defined different places in different platforms) .. */
 #include <stdlib.h>	/* For abs() */
 #include <string.h>	/* For strlen() */
+
+#include "gparam_list.h"
 
 /* Enumerated parameter values. List value of each enum (not just first in list) as it is relied upon by the YottaDB Go Wrapper */
 enum
@@ -331,7 +333,7 @@ typedef	ydb_char_t	ydb_jbig_decimal_t;
 /* Function pointer types for use in the APIs below */
 typedef	int		(*ydb_tpfnptr_t)(void *tpfnparm);					   /* For use in SimpleAPI */
 typedef	int		(*ydb_tp2fnptr_t)(uint64_t tptoken, ydb_buffer_t *errstr, void *tpfnparm); /* For use in SimpleThreadAPI */
-typedef	uintptr_t	(*ydb_vplist_func)(uintptr_t cnt, ...);
+typedef	uintptr_t	(*ydb_vplist_func)();		/* Indeterminate argument list for called variadic function */
 typedef void		(*GPCallback)(int sigtype);	/* Type of Go callback "panic" routine */
 
 #	ifdef GTM_PTHREAD
@@ -343,7 +345,9 @@ int	ydb_zstatus(char* msg, int len);
 
 
 /* Utility entry points in libyottadb.so accessible through the SimpleAPI */
-int	ydb_call_variadic_plist_func(ydb_vplist_func cgfunc, uintptr_t cvplist);	/* Used by Golang to call variadic C function */
+int	ydb_call_variadic_plist_func(ydb_vplist_func cgfunc, gparam_list *cvplist); /* Used by API wrappers for other languages to
+										     * call variadic C functions.
+										     */
 int	ydb_child_init(void *param);
 int	ydb_ci(const char *c_rtn_name, ...);				/* Call-in interface */
 int	ydb_cip(ci_name_descriptor *ci_info, ...);			/* Slightly faster "ydb_ci" */
