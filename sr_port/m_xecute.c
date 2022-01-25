@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -135,11 +135,10 @@ int m_xecute(void)
 	{
 		advancewindow();
 		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
-		if (!bool_expr(FALSE, cr))
+		if (!bool_expr(FALSE, cr, &boolexprfinish))
 			return FALSE;
 		triptr = (TREF(curtchain))->exorder.bl;
-		boolexprfinish = (OC_BOOLEXPRFINISH == triptr->opcode) ? triptr : NULL;
-		if (NULL != boolexprfinish)
+		if (boolexprfinish == triptr)
 			triptr = triptr->exorder.bl;
 		for ( ; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
 			;

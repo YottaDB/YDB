@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -260,20 +260,18 @@ LITDEF struct
 		assert(m_zinvcmd != cmd_data[x].fcn);
 		cr = NULL;
 		shifting = FALSE;
-		boolexprfinish = NULL;
 	} else
 	{
 		advancewindow();
 		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
-		if (!bool_expr(FALSE, cr))
+		if (!bool_expr(FALSE, cr, &boolexprfinish))
 		{
 			stx_error(ERR_PCONDEXPECTED);
 			return FALSE;
 		}
 		/* the next block could be simpler if done earlier, but doing it here picks up any Boolean optimizations  */
 		triptr = (TREF(curtchain))->exorder.bl;
-		boolexprfinish = (OC_BOOLEXPRFINISH == triptr->opcode) ? triptr : NULL;
-		if (NULL != boolexprfinish)
+		if (boolexprfinish == triptr)
 			triptr = triptr->exorder.bl;
 		while (OC_NOOP == triptr->opcode)
 			triptr = triptr->exorder.bl;
@@ -367,11 +365,12 @@ LITDEF struct
 					boolexprfinish2 = NULL;
 				}
 				tnxtarg(&ref0->operand[0]);
-			} else
+			} else if (NULL != boolexprfinish)
 			{
 				INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
 				*cr = put_tjmp(boolexprfinish2);
-			}
+			} else
+				boolexprfinish2 = NULL;
 		}
 		INSERT_OC_JMP_BEFORE_OC_BOOLEXPRFINISH(boolexprfinish2);
 	}

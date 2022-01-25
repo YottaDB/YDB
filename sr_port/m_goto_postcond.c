@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,11 +34,10 @@ int m_goto_postcond(triple *oldchain, triple *tmpchain)
 	SETUP_THREADGBL_ACCESS;
 	advancewindow();
 	cr = (oprtype *)mcalloc(SIZEOF(oprtype));
-	if (!bool_expr(FALSE, cr))
+	if (!bool_expr(FALSE, cr, &boolexprfinish))
 		return FALSE;
 	triptr = (TREF(curtchain))->exorder.bl;
-	boolexprfinish = (OC_BOOLEXPRFINISH == triptr->opcode) ? triptr : NULL;
-	if (NULL != boolexprfinish)
+	if (boolexprfinish == triptr)
 		triptr = triptr->exorder.bl;
 	for ( ; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
 		;

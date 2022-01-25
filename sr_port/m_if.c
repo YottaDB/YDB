@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,15 +79,14 @@ int m_if(void)
 		for (;;)
 		{
 			ta_opr = (oprtype *)mcalloc(SIZEOF(oprtype));
-			if (!bool_expr(TRUE, ta_opr))
+			if (!bool_expr(TRUE, ta_opr, &boolexprfinish))
 			{
 				if (NULL != oldchain)
 					setcurtchain(oldchain);					/* reset from discard chain */
 				 return FALSE;
 			}
 			triptr = (TREF(curtchain))->exorder.bl;
-			boolexprfinish = (OC_BOOLEXPRFINISH == triptr->opcode) ? triptr : NULL;
-			if (NULL != boolexprfinish)
+			if (boolexprfinish == triptr)
 				triptr = triptr->exorder.bl;
 			for ( ; (OC_NOOP == triptr->opcode); triptr = triptr->exorder.bl)
 				;

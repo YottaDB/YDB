@@ -835,7 +835,7 @@ MBSTART {									\
 #define	IS_LAST_BOOL_OPERAND_TRUE	TRUE
 
 int		actuallist(oprtype *opr);
-int		bool_expr(boolean_t sense, oprtype *addr);
+int		bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr);
 void		bx_boollit(triple *t, int depth);
 void		bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr, int depth,
 			opctype andor_opcode, boolean_t caller_is_bool_expr, int jmp_depth, boolean_t is_last_bool_operand);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -23,13 +23,17 @@
 
 LITREF octabstruct	oc_tab[];
 
-int bool_expr(boolean_t sense, oprtype *addr)
 /*
- * invoked to resolve expresions that are by definition coerced to Boolean, which include
+ * Invoked to resolve expresions that are by definition coerced to Boolean, which include
  * IF arguments, $SELECT() arguments, and postconditionals for both commands and arguments
  * IF is the only one that comes in with the "TRUE" sense
- * *addr winds up as an pointer to a jump operand, which the caller fills in
+ * *addr winds up as an pointer to a jump operand, which the caller fills in.
+ *
+ * On function return:
+ * -------------------
+ * *boolexprfinish_ptr is set to point to the OC_BOOLEXPRFINISH triple if one exists and NULL otherwise.
  */
+int bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr)
 {
 	mval		*v;
 	opctype		andor_opcode;
@@ -40,6 +44,7 @@ int bool_expr(boolean_t sense, oprtype *addr)
 
 	SETUP_THREADGBL_ACCESS;
 	INCREMENT_EXPR_DEPTH;
+	*boolexprfinish_ptr = NULL;
 	if (!eval_expr(&x))
 	{
 		DECREMENT_EXPR_DEPTH;
@@ -60,6 +65,7 @@ int bool_expr(boolean_t sense, oprtype *addr)
 	boolexprfinish->operand[0] = put_tref(boolexprstart);	/* This helps locate the corresponding OC_BOOLEXPRSTART
 								 * given a OC_BOOLEXPRFINISH.
 								 */
+	*boolexprfinish_ptr = boolexprfinish;
 	UNARY_TAIL(&x, 0);
 	for (t2 = t1 = x.oprval.tref; OCT_UNARY & oc_tab[t1->opcode].octype; t2 = t1, t1 = t1->operand[0].oprval.tref)
 		;
@@ -84,6 +90,7 @@ int bool_expr(boolean_t sense, oprtype *addr)
 		PUT_LITERAL_TRUTH(MV_FORCE_BOOL(v), t2);
 		dqdel(t1, exorder);
 		REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish);
+		*boolexprfinish_ptr = NULL;
 		DECREMENT_EXPR_DEPTH;
 		return TRUE;
 	}

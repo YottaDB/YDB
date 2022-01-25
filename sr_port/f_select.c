@@ -115,7 +115,7 @@ int f_select(oprtype *a, opctype op)
 			TREF(shift_side_effects) = TREF(saw_side_effect) = FALSE;
 		}
 		loop_expr_start = TREF(expr_start);
-		if (!bool_expr(FALSE, cnd))				/* process a Boolean */
+		if (!bool_expr(FALSE, cnd, &boolexprfinish))				/* process a Boolean */
 		{	/* bad Boolean */
 			SELECT_CLEANUP;
 			if (shifting)
@@ -136,8 +136,7 @@ int f_select(oprtype *a, opctype op)
 		}
 		advancewindow();
 		triptr = (TREF(curtchain))->exorder.bl;
-		boolexprfinish = (OC_BOOLEXPRFINISH == triptr->opcode) ? triptr : NULL;
-		if (NULL != boolexprfinish)
+		if (boolexprfinish == triptr)
 			triptr = triptr->exorder.bl;
 		assert(!got_true || (&dmpchain == TREF(curtchain)));
 		for ( ; !got_true; triptr = triptr->exorder.bl)
@@ -229,7 +228,7 @@ int f_select(oprtype *a, opctype op)
 			ref->operand[0] = endtrip;
 			INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
 			*cnd = put_tjmp(boolexprfinish2);
-			/* No need for INSERT_OC_JMP_BEFORE_OC_BOOLEXPRFINISH since OC_JMP has been inserted already above */
+			/* No need for INSERT_OC_JMP_BEFORE_OC_BOOLEXPRFINISH since OC_JMP has already been inserted above */
 		}
 		if (TK_COMMA != TREF(window_token))
 			break;					/* argument list end */
