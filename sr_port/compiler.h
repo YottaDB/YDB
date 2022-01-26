@@ -443,6 +443,7 @@ typedef struct
 /* complement of the above increment - uses the macro just below for assertpto and to clear the level we're leaving */
 #define DECREMENT_EXPR_DEPTH													\
 {																\
+	assert(TREF(expr_depth));												\
 	DISABLE_SIDE_EFFECT_AT_DEPTH;												\
 	if (!(--(TREF(expr_depth))))												\
 		TREF(saw_side_effect) = TREF(shift_side_effects) = FALSE;							\
@@ -454,8 +455,8 @@ typedef struct
 	unsigned int	DEPTH;													\
 																\
 	DEPTH = TREF(expr_depth);												\
-	assertpro(DEPTH);								/* expr_depth shouldn't underflow */	\
-	(TREF(side_effect_base))[DEPTH - 1] |= (TREF(side_effect_base))[DEPTH];		/* propagate down */			\
+	if (DEPTH)														\
+		(TREF(side_effect_base))[DEPTH - 1] |= (TREF(side_effect_base))[DEPTH];		/* propagate down */		\
 	(TREF(side_effect_base))[DEPTH] = FALSE;										\
 }
 
