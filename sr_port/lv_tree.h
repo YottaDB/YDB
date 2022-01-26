@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -233,6 +233,7 @@ lvTreeNode	*lvAvlTreeNodeCollatedNext(lvTreeNode *node);
 lvTreeNode	*lvAvlTreeKeyCollatedPrev(lvTree *lvt, treeKeySubscr *key);
 lvTreeNode	*lvAvlTreeNodeCollatedPrev(lvTreeNode *node);
 lvTreeNode	*lvAvlTreeCloneSubTree(lvTreeNode *node, lvTree *lvt, lvTreeNode *avl_parent, boolean_t refCntMaint);
+void		lvAvlTreeNodePrepareForDelete(lvTreeNode *node);
 
 #ifdef DEBUG
 boolean_t	lvTreeIsWellFormed(lvTree *lvt);

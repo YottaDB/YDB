@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -2041,4 +2041,27 @@ void lvAvlTreeNodeDelete(lvTree *lvt, lvTreeNode *node)
 		}
 	}
 	lvt->lastLookup.lastNodeLookedUp = NULL;	/* reset lastLookup clue since all bets are off after the delete */
+}
+
+/* This function needs to be invoked BEFORE invoking "lvAvlTreeNodeDelete()" in case we are trying to delete
+ * a lv node that was not the most recently looked up node. See UNDO_ACTIVE_LV macro for one caller that needs this.
+ * This function adjusts the "descent_dir" fields of all ancestors of the input "node" so they point to a path that
+ * leads to "node".
+ */
+void lvAvlTreeNodePrepareForDelete(lvTreeNode *node)
+{
+	lvTreeNode	*curNode, *parentNode;
+
+	assert(NULL != node);
+	curNode = node;
+	for ( ; ; )
+	{
+		parentNode = curNode->avl_parent;
+		if (NULL == parentNode)
+			break;
+		assert((curNode == parentNode->avl_left) || (curNode == parentNode->avl_right));
+		parentNode->descent_dir = ((curNode == parentNode->avl_left) ? TREE_DESCEND_LEFT : TREE_DESCEND_RIGHT);
+		curNode = parentNode;
+	}
+	return;
 }

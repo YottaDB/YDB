@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -428,24 +428,35 @@ void	set_active_lv(lv_val *newlv, boolean_t do_assert, int type);
 }
 #endif
 
-#define UNDO_ACTIVE_LV(ACTIVELV_CODE)							\
-{											\
-	GBLREF lv_val		*active_lv;						\
-											\
-	if (NULL != active_lv)								\
-	{	/* If LV_AVLNODE_PARENT is NULL, it means the node has already been	\
-		 * freed. We dont know of any such case right now so assert. In PRO	\
-		 * though we want to be safe so we skip the kill in that case but	\
-		 * reset active_lv to NULL.						\
-		 */									\
-		assert(NULL != LV_AVLNODE_PARENT(active_lv));				\
-		if (NULL != LV_AVLNODE_PARENT(active_lv))				\
-		{									\
-			if (!LV_IS_VAL_DEFINED(active_lv) && !LV_HAS_CHILD(active_lv))	\
-				op_kill(active_lv);					\
-		}									\
-		SET_ACTIVE_LV(NULL, FALSE, ACTIVELV_CODE);				\
-	}										\
+#define UNDO_ACTIVE_LV(ACTIVELV_CODE)										\
+{														\
+	GBLREF lv_val		*active_lv;									\
+														\
+	if (NULL != active_lv)											\
+	{	/* If LV_AVLNODE_PARENT is NULL, it means the node has already been				\
+		 * freed. We dont know of any such case right now so assert. In PRO				\
+		 * though we want to be safe so we skip the kill in that case but				\
+		 * reset active_lv to NULL.									\
+		 */												\
+		assert(NULL != LV_AVLNODE_PARENT(active_lv));							\
+		if (NULL != LV_AVLNODE_PARENT(active_lv))							\
+		{												\
+			/* Every call to "op_kill()" is preceded by a call to lookup the lv node		\
+			 * ("op_srchindx()" etc.) in generated code. The function "lvAvlTreeNodeDelete()"	\
+			 * relies on this (see various asserts on "descent_dir" field). But this call to	\
+			 * "op_kill()" is an exception since "active_lv" is not necessarily the latest		\
+			 * looked up node (see https://gitlab.com/YottaDB/DB/YDB/-/issues/828#note_822627531	\
+			 * for example). Therefore adjust "descent_dir" as if a lookup happened before		\
+			 * invoking "op_kill".									\
+			 */											\
+			if (!LV_IS_VAL_DEFINED(active_lv) && !LV_HAS_CHILD(active_lv))				\
+			{											\
+				lvAvlTreeNodePrepareForDelete((lvTreeNode *)active_lv);				\
+				op_kill(active_lv);								\
+			}											\
+		}												\
+		SET_ACTIVE_LV(NULL, FALSE, ACTIVELV_CODE);							\
+	}													\
 }
 
 #define	DOTPSAVE_FALSE		FALSE	/* macro to indicate parameter by name "dotpsave" is passed a value of "FALSE" */
