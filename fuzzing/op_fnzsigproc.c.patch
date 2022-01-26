@@ -1,0 +1,28 @@
+#################################################################
+#								#
+# Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_port/op_fnzsigproc.c b/sr_port/op_fnzsigproc.c
+index e2ca8890..88157430 100755
+--- a/sr_port/op_fnzsigproc.c
++++ b/sr_port/op_fnzsigproc.c
+@@ -47,10 +47,7 @@ void op_fnzsigproc(int pid, mval *sigval, mval *retcode)
+ 			return;
+ 		}
+ 	}
+-	if (-1 == kill(pid, num))
+-		rc = errno;
+-	else
+-		rc = 0;
++	rc = 0;
+ 	MV_FORCE_MVAL(retcode, rc);
+ 	return;
+ }
