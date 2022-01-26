@@ -663,7 +663,10 @@ int deviceparameters(oprtype *c, char who_calls)
 	if (parse_warn)
 	{	/* Parse the remaining arguments until the corresponding RIGHT-PAREN or SPACE or EOL is reached */
 		if (!parse_until_rparen_or_space())
+		{
+			stx_error(ERR_DEVPARPARSE);
 			return FALSE;
+		}
 		if (TK_RPAREN == TREF(window_token))
 			advancewindow();
 	}
