@@ -2,7 +2,7 @@
 
 #################################################################
 #								#
-# Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -34,6 +34,29 @@ else
 	echo " -> Shellcheck not found!"
 	exit 1
 fi
+
+echo "# Check fuzzing/*.patch list of files matches those in fuzzing/Makefile"
+(
+cd fuzzing
+set +e	# Needed to record the failures with error detail, instead of silently exiting.
+exit_status=0
+for file in *.patch
+do
+	grep 'patch --no-backup-if-mismatch' Makefile | grep $file
+	status=$?
+	if ! [ $status = 0 ]; then
+		echo "FAILED : [$file] needs to be added to the list of files in [patch] target section of [fuzzing/Makefile]"
+		exit_status=1
+	fi
+	grep 'patch --reject-file=-' Makefile | grep $file
+	status=$?
+	if ! [ $status = 0 ]; then
+		echo "FAILED : [$file] needs to be added to the list of files in [reset] target section of [fuzzing/Makefile]"
+		exit_status=1
+	fi
+done
+exit $exit_status
+)
 
 echo "# Run the build using clang"
 mkdir build

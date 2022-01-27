@@ -27,22 +27,28 @@ go:
 	echo "working on it"
 
 patch:
-	patch ../sr_port/io.h io.h.patch
-	patch ../sr_port/jobexam_process.c jobexam_process.c.patch
-	patch ../sr_port/stp_gcol_src.h stp_gcol_src.h.patch
-	patch ../sr_unix/gtm_dump_core.c gtm_dump_core.c.patch
-	patch ../sr_unix/gtm_fork_n_core.c gtm_fork_n_core.c.patch
-	patch ../sr_unix/ojchildioset.c ojchildioset.c.patch
-	patch ../sr_unix/sig_init.c sig_init.c.patch
+	patch --no-backup-if-mismatch ../sr_port/io.h io.h.patch
+	patch --no-backup-if-mismatch ../sr_port/jobexam_process.c jobexam_process.c.patch
+	patch --no-backup-if-mismatch ../sr_port/op_fnzsigproc.c op_fnzsigproc.c.patch
+	patch --no-backup-if-mismatch ../sr_port/op_hang.c op_hang.c.patch
+	patch --no-backup-if-mismatch ../sr_port/stp_gcol_src.h stp_gcol_src.h.patch
+	patch --no-backup-if-mismatch ../sr_unix/gtm_dump_core.c gtm_dump_core.c.patch
+	patch --no-backup-if-mismatch ../sr_unix/gtm_fork_n_core.c gtm_fork_n_core.c.patch
+	patch --no-backup-if-mismatch ../sr_unix/ojchildioset.c ojchildioset.c.patch
+	patch --no-backup-if-mismatch ../sr_unix/op_zmess.c op_zmess.c.patch
+	patch --no-backup-if-mismatch ../sr_unix/sig_init.c sig_init.c.patch
 
 reset:
-	patch -R ../sr_port/io.h io.h.patch
-	patch -R ../sr_port/jobexam_process.c jobexam_process.c.patch
-	patch -R ../sr_port/stp_gcol_src.h stp_gcol_src.h.patch
-	patch -R ../sr_unix/gtm_dump_core.c gtm_dump_core.c.patch
-	patch -R ../sr_unix/gtm_fork_n_core.c gtm_fork_n_core.c.patch
-	patch -R ../sr_unix/ojchildioset.c ojchildioset.c.patch
-	patch -R ../sr_unix/sig_init.c sig_init.c.patch
+	patch --reject-file=- --reverse ../sr_port/io.h io.h.patch
+	patch --reject-file=- --reverse ../sr_port/jobexam_process.c jobexam_process.c.patch
+	patch --reject-file=- --reverse ../sr_port/op_fnzsigproc.c op_fnzsigproc.c.patch
+	patch --reject-file=- --reverse ../sr_port/op_hang.c op_hang.c.patch
+	patch --reject-file=- --reverse ../sr_port/stp_gcol_src.h stp_gcol_src.h.patch
+	patch --reject-file=- --reverse ../sr_unix/gtm_dump_core.c gtm_dump_core.c.patch
+	patch --reject-file=- --reverse ../sr_unix/gtm_fork_n_core.c gtm_fork_n_core.c.patch
+	patch --reject-file=- --reverse ../sr_unix/ojchildioset.c ojchildioset.c.patch
+	patch --reject-file=- --reverse ../sr_unix/op_zmess.c op_zmess.c.patch
+	patch --reject-file=- --reverse ../sr_unix/sig_init.c sig_init.c.patch
 
 clean: rm reset
 

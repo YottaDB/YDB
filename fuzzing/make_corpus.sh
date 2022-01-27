@@ -29,12 +29,39 @@ echo "Making unminified corpus directory..."
 mkdir NotMinCorpus
 
 echo "Copying tests..."
-cp --no-clobber YDBTest/*/inref/*.m ./NotMinCorpus
+# Look for .m files under com and */inref
+# It is possible M file names are the same across different directories.
+# To avoid copying one from clobbering the other, prefix destination file name with the source directory.
+# And use split to ensure each file is not more than 1024 bytes long (helps afl with smaller input).
+for file in YDBTest/com/*.m
+do
+	base=${file##*/}
+	basename=${base%.*}
+	cp $file ./NotMinCorpus/com${basename}.m
+done
 
-echo "Removing overly large tests..."
-cd NotMinCorpus || exit
-find . -type f -size +1k -delete
-cd ..
+for file in YDBTest/*/inref/*.m
+do
+	base=${file##*/}
+	basename=${base%.*}
+	dir=${file%/*}
+	dir2=${dir%/*}
+	testname=${dir2##*/}
+	cp $file ./NotMinCorpus/${testname}${basename}.m
+done
+
+echo "Splitting overly large tests into smaller pieces..."
+(
+cd NotMinCorpus
+for file in *.m
+do
+	basename=${file%.*}
+	# --suffix-length=4 indicates use 4 digits to represent piece number at end (e.g. 0005 for 5th piece).
+	# So the file ydb546.m would be split and created as ydb5460001.m ydb5460002.m, etc.
+	split --suffix-length=4 --line-bytes=1024 --additional-suffix=.m --numeric-suffixes $file $basename
+	rm $file	# remove original file (which is a duplicate) now that we have split it into multiple pieces
+done
+)
 
 echo "Removing tests directory..."
 rm -rf YDBTest

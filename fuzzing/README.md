@@ -36,8 +36,6 @@ This is all handled inside of `instrument.sh`.
 
 To create the corpus (and to minimize the size of these changes), we clone the YDBTests repository, copy all the individual test cases into a new directory, and then run `afl-cmin` to make sure there's no duplicates, and then use that as the input to fuzzing.
 
-Right at the moment because of a memory issue (and maybe you won't have this problem!) we're getting rid of every test case smaller than 1KB.  This is generally ok, because we _do_ want small inputs, but its possible that we're missing good cases.
-
 This is handled in `make_corpus.sh`.
 
 ### Fuzzing it
@@ -57,8 +55,6 @@ Just kill the tmux server (`tmux kill-server`).
 On modern version of AFL++, you can remove the input directory to make `afl-fuzz` read from the input queue instead of from an input corpus.  Simply remove `-i inputs` from fuzz.sh, and replace it with `-i-`.  Then, rerun all the fuzzers by just calling `./fuzz.sh`.
 
 ## Issues
-
-- Corpus minimization is not working.  For some reason, during testing `afl-cmin` is reporting that it cannot communicate with the forkserver.  This might be due to something foolish that I'm doing, however.
 
 - Fuzzing YDB like this creates a LOT of trash files all over the place.  Its not _that_ common, but its worth pointing out.  We get around this by running a helper script which deletes ./env/\* every once in a while, but a true fix for this would involve further patches to YDB that might shadow bugs, which we want to avoid.
 
