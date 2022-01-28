@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -128,7 +128,7 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, col);
 	} else
 		csp = NULL; /* Do not issue COLLATIONUNDEF for 0 collation */
-
+	MV_FORCE_DEFINED(msrc);	/* issue a LVUNDEF error if undefined */
 	if (MV_IS_STRING(msrc) && (0 == msrc->str.len))
 	{	/* Null string, return it back */
 		*dst = *msrc;
