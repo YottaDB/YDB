@@ -1106,6 +1106,33 @@ if [ "Y" = "$gtm_verbose" ] ; then echo Finished checking options and assigning 
 # Prepare input to YottaDB configure script. The corresponding questions in configure.gtc are listed below in comments
 gtm_configure_in=${gtm_tmpdir}/configure_${timestamp}.in
 export ydb_change_removeipc			# Signal configure.gtc to set RemoveIPC=no or not, if needed
+issystemd=`command -v systemctl`
+if [ "" != "$issystemd" ] ; then
+	# It is a systemd installation
+	# Check if RemoveIPC=no is set. If not, set it if user hasn't specified --preserveRemoveIPC
+	logindconf="/etc/systemd/logind.conf"
+	removeipcopt=`awk -F = '/^RemoveIPC/ {opt=$2} END{print opt}' $logindconf`
+	if [ "no" != "$removeipcopt" ] ; then
+		if [ "yes" != "$ydb_change_removeipc" ] ; then
+			# shellcheck disable=SC2016
+			echo 'YottaDB needs to have setting of `RemoveIPC=no` in `/etc/systemd/logind.conf`'
+			echo 'in order to function correctly. After placing it there, you will need to restart'
+			echo 'the systemd-logind service using this command "systemctl restart systemd-logind".'
+			echo ''
+			echo 'If your Desktop session is managed by the systemd-logind service (e.g., a Gnome'
+			echo 'or Plasma desktop), restarting systemd-logind will restart your GUI. Save all'
+			echo 'your work prior to issuing "systemctl restart systemd-logind".'
+		else
+			echo 'Since you are running systemd we changed memory settings and you need to restart'
+			echo 'the systemd-logind service using this command "systemctl restart systemd-logind".'
+			echo ''
+			echo 'If your Desktop session is managed by the systemd-logind service (e.g., a Gnome'
+			echo 'or Plasma desktop), restarting systemd-logind will restart your GUI. Save all'
+			echo 'your work prior to issuing "systemctl restart systemd-logind".'
+		fi
+	fi
+fi
+
 {
     echo $gtm_user		# Response to : "What user account should own the files?"
     echo $gtm_group		# Response to : "What group should own the files?"

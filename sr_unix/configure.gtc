@@ -131,7 +131,7 @@ read_yes_no()
 issystemd=`command -v systemctl`
 if [ "" != "$issystemd" ] ; then
 	# It is a systemd installation
-	# Check if RemoveIPC=no is set. If not, prompt user for okay to set this. If user says NO, abort the install.
+	# Check if RemoveIPC=no is set. If not, prompt user for okay to set this.
 	logindconf="/etc/systemd/logind.conf"
 	removeipcopt=`awk -F = '/^RemoveIPC/ {opt=$2} END{print opt}' $logindconf`
 	if [ "no" != "$removeipcopt" ] ; then
@@ -159,20 +159,22 @@ if [ "" != "$issystemd" ] ; then
 			answer=${ydb_change_removeipc}
 		fi
 		if [ "yes" != "$answer" ] ; then
-			echo "Will abort installation"
 			echo $ipcissue1
 			echo $ipcissue2
-			echo "Please add the below two lines to $logindconf"
+			echo "YottaDB may not function correctly until the below two lines are added to $logindconf"
 			echo "   $ipcline1"
 			echo "   $ipcline2"
-			echo "and restart systemd-logind using the below command, for example or by rebooting the system"
+			echo "and systemd-logind is restarted using the below command, for example or by rebooting the system"
 			echo "   $ipccmd"
-			echo "and retry YottaDB installation"
-			exit 1
+		else
+			echo $ipcissue1
+			echo $ipcissue2
+			echo "YottaDB may not function correctly until systemd-logind is restarted using the below command,"
+			echo "for example or by rebooting the system"
+			echo "   $ipccmd"
 		fi
 		echo $ipcline1 >> $logindconf
 		echo $ipcline2 >> $logindconf
-		$ipccmd
 	fi
 fi
 # Native super user and group
