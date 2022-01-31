@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -796,10 +796,20 @@ void mupip_integ(void)
 				region_freeze(gv_cur_region, FALSE, FALSE, FALSE, FALSE, FALSE);
 			} else
 			{
+				snapshot_context_ptr_t	ss_ctx;
+
+				/* ss_release() does calls to ss_destroy_context() and free() and can be interrupted by timers
+				 * which can potentially invoke ss_destroy_context() on an already freed context structure
+				 * resulting in a [heap-use-after-free] error. So clear everything in global variables that
+				 * indicates a snapshot is in progress BEFORE the ss_release() call and then do the ss_release()
+				 * call using a local copy of the context.
+				 */
 				assert(SNAPSHOTS_IN_PROG(csa));
-				assert(NULL != csa->ss_ctx);
-				ss_release(&csa->ss_ctx);
+				ss_ctx = csa->ss_ctx;
+				assert(NULL != ss_ctx);
+				csa->ss_ctx = NULL;
 				CLEAR_SNAPSHOTS_IN_PROG(csa);
+				ss_release(&ss_ctx);
 			}
 			rptr = rptr->fPtr;
 			if (NULL == rptr)

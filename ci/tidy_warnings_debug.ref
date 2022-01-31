@@ -279,7 +279,7 @@ mupip_backup.c:warning: Value stored to 'save_errno' is never read [clang-analyz
 mupip_backup.c:warning: Value stored to 'tn_specified' is never read [clang-analyzer-deadcode.DeadStores]
 mupip_backup.c:warning: Value stored to 'tn_specified' is never read [clang-analyzer-deadcode.DeadStores]
 mupip_extend.c:warning: Value stored to 'blocks' is never read [clang-analyzer-deadcode.DeadStores]
-mupip_integ.c:warning: Access to field 'snapshot_in_prog' results in a dereference of a null pointer (loaded from variable 'csa') [clang-analyzer-core.NullDereference]
+mupip_integ.c:warning: Access to field 'ss_ctx' results in a dereference of a null pointer (loaded from variable 'csa') [clang-analyzer-core.NullDereference]
 mupip_integ.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
 mupip_integ.c:warning: Dereference of undefined pointer value [clang-analyzer-core.NullDereference]
 mupip_integ.c:warning: Dereference of undefined pointer value [clang-analyzer-core.NullDereference]
