@@ -558,7 +558,12 @@ void clear_timers(void)
 		 */
 		assert((FALSE == timer_in_handler) || process_exiting);
 		assert(FALSE == timer_active);
-		assert(FALSE == oldjnlclose_started);
+		/* Note: "oldjnlclose_started" could be TRUE in case a timer with TID=jnl_file_close_timer
+		 * was still active when the process decided to exit and cancel all unsafe
+		 * timers (CANCEL_TIMERS call in LOCK_RUNDOWN_MACRO in "gtm_exit_handler.c").
+		 * So clear this global to get it back in sync with "timeroot".
+		 */
+		oldjnlclose_started = FALSE;
 		assert(!GET_DEFERRED_TIMERS_CHECK_NEEDED);
 		if (!timer_from_OS)
 			SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
