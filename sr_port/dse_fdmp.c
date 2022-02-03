@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -46,6 +49,7 @@
 
 GBLREF enum dse_fmt	dse_dmp_format;
 GBLREF gd_region	*gv_cur_region;
+GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF char	 	patch_comp_key[MAX_KEY_SZ + 1];
 
 static unsigned char	*work_buff;
@@ -62,9 +66,9 @@ boolean_t dse_fdmp(sm_uc_ptr_t data, int len)
 	unsigned short	blk_sz;
 	mstr		opstr;
 
-	if (work_buff_length < ZWR_EXP_RATIO(gv_cur_region->max_rec_size))
+	if (work_buff_length < ZWR_EXP_RATIO(cs_data->blk_size))
 	{
-		work_buff_length = ZWR_EXP_RATIO(gv_cur_region->max_rec_size);
+		work_buff_length = ZWR_EXP_RATIO(cs_data->blk_size);
 		if (work_buff)
 			free (work_buff);
 		work_buff = (unsigned char *)malloc(work_buff_length);
