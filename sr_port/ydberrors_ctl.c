@@ -59,6 +59,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "TRANSREPLJNL1GB", "Transaction can use at most 1GiB of replicated journal records across all journaled regions", 0, 0 },
 	{ "DEVPARPARSE", "Error parsing device parameter specification", 0, 0 },
 	{ "SETZDIRTOOLONG", "$ZDIR value specified is !UL bytes long which is greater than the allowed maximum of !UL bytes", 2, 0 },
+	{ "UTF8NOTINSTALLED", "$ydb_dist does not have utf8 folder installed. Please use M mode or re-install YottaDB with UTF-8 support", 0, 0 },
 };
 
 
@@ -71,7 +72,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	42,
+	43,
 	&ydberrors_undocarr[0],
 	0
 };

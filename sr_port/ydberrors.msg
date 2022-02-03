@@ -69,8 +69,9 @@ INVMAINLANG	<Invalid main routine language id specified: !UL>/error/fao=1
 WCSFLUFAILED	<!AD error while flushing buffers at transaction number 0x!16@XQ for database file !AD>/info/fao=5
 WORDEXPFAILED	<wordexp() call for string [!AD] returned !AZ error. See wordexp() man pages for details>/error/fao=3
 TRANSREPLJNL1GB	<Transaction can use at most 1GiB of replicated journal records across all journaled regions>/error/fao=0
-DEVPARPARSE	<Error parsing device parameter specification>/error/fao=0!/ansi=0
-SETZDIRTOOLONG	<$ZDIR value specified is !UL bytes long which is greater than the allowed maximum of !UL bytes>/error/fao=2!/ansi=0
+DEVPARPARSE	<Error parsing device parameter specification>/error/fao=0
+SETZDIRTOOLONG	<$ZDIR value specified is !UL bytes long which is greater than the allowed maximum of !UL bytes>/error/fao=2
+UTF8NOTINSTALLED <$ydb_dist does not have utf8 folder installed. Please use M mode or re-install YottaDB with UTF-8 support>/error/fao=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,6 +23,8 @@
 #include "ydb_trans_log_name.h"
 #include "gtm_file_stat.h"
 
+GBLREF boolean_t		is_ydb_chset_utf8;
+
 error_def(ERR_LOGTOOLONG);
 
 #define MAX_NUMBER_FILENAMES	(256 * MAX_TRANS_NAME_LEN)
@@ -32,7 +34,9 @@ error_def(ERR_LOGTOOLONG);
  * "$ydb_dist" in the literals below. Those will be expanded by "gtm_file_stat" below.
  */
 #define	ZROUTINES_DEFAULT1	"$ydb_dist/libyottadbutil.so"
+#define	ZROUTINES_DEFAULT1UTF8	"$ydb_dist/utf8/libyottadbutil.so"
 #define	ZROUTINES_DEFAULT2	"$ydb_dist"
+#define	ZROUTINES_DEFAULT2UTF8  "$ydb_dist/utf8/"
 
 void zro_init(void)
 {
@@ -53,17 +57,39 @@ void zro_init(void)
 	{	/* "ydb_routines" env var is defined and set to "" OR undefined */
 		tn.len = 1;
 		tn.addr = buf1;
-		MSTR_CONST(def1, ZROUTINES_DEFAULT1);
 		MSTR_CONST(ext1, "");
-		if (FILE_PRESENT == gtm_file_stat(&def1, &ext1, NULL, FALSE, &ustatus))
-		{	/* "$ydb_dist/libyottadbutil.so" is present. So use it as $zroutines. */
-			tn.len = def1.len;
-			tn.addr = def1.addr;
-		} else
-		{	/* "$ydb_dist/libyottadbutil.so" is NOT present. So use "$ydb_dist" as $zroutines. */
-			MSTR_CONST(def2, ZROUTINES_DEFAULT2);
-			tn.len = def2.len;
-			tn.addr = def2.addr;
+		if (!is_ydb_chset_utf8) /* M Mode */
+		{
+			MSTR_CONST(def1, ZROUTINES_DEFAULT1);
+			if (FILE_PRESENT == gtm_file_stat(&def1, &ext1, NULL, FALSE, &ustatus))
+			{	/* "$ydb_dist/libyottadbutil.so" is present. So use it as $zroutines. */
+				tn.len = def1.len;
+				tn.addr = def1.addr;
+			} else
+			{	/* "$ydb_dist/libyottadbutil.so" is NOT present. So use "$ydb_dist" as $zroutines. */
+				MSTR_CONST(def2, ZROUTINES_DEFAULT2);
+				tn.len = def2.len;
+				tn.addr = def2.addr;
+			}
+		} else /* UTF-8 mode */
+		{
+			MSTR_CONST(def1, ZROUTINES_DEFAULT1UTF8);
+			if (FILE_PRESENT == gtm_file_stat(&def1, &ext1, NULL, FALSE, &ustatus))
+			{	/* "$ydb_dist/utf8/libyottadbutil.so" is present. So use it as $zroutines. */
+				tn.len = def1.len;
+				tn.addr = def1.addr;
+			} else
+			{	/* Try "$ydb_dist/utf8/" */
+				MSTR_CONST(def2, ZROUTINES_DEFAULT2UTF8);
+				if (FILE_PRESENT == gtm_file_stat(&def2, &ext1, NULL, FALSE, &ustatus))
+				{	/* "$ydb_dist/utf8/" is present. So use it as $zroutines. */
+					tn.len = def2.len;
+					tn.addr = def2.addr;
+				} else
+				{       /* "$ydb_dist/utf8/" does not exist. Can't use $ydb_dist since it doesn't have UTF-8 objects. */
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UTF8NOTINSTALLED) ;
+				}
+			}
 		}
 	}
 	zro_load(&tn);
