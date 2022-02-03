@@ -804,7 +804,8 @@ void zshow_devices(zshow_out *output)
 								delim_len_sm = socketptr->delimiter[jj].len;
 								memcpy(delim_buff_sm,
 								       socketptr->delimiter[jj].addr, delim_len_sm);
-								delim_len = (MAX_DELIM_LEN * MAX_ZWR_EXP_RATIO) + 11;
+								assert(delim_mstr_buff == delim.addr);
+								delim_len = SIZEOF(delim_mstr_buff);
 								format2zwr(delim_buff_sm, delim_len_sm,
 									   (uchar_ptr_t)delim.addr, &delim_len);
 								delim.len = (unsigned short)delim_len;

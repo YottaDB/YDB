@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -201,8 +201,8 @@ void zwr_out_print(char * buff, int bufflen)
 		if (buffpos)
 			FPRINTF(stderr,"_");
 		stride = (left > ZWR_BASE_STRIDE) ? ZWR_BASE_STRIDE : left;
-		zwrlen = ZWR_BASE_STRIDE * MAX_ZWR_EXP_RATIO;
-		format2zwr((sm_uc_ptr_t)(buff + buffpos), stride, (unsigned char *) zwrbuff, &zwrlen);
+		zwrlen = SIZEOF(zwrbuff);
+		format2zwr((sm_uc_ptr_t)(buff + buffpos), stride, (unsigned char *)zwrbuff, &zwrlen);
 		uopbuffpos = 0;
 		while (uopleft = zwrlen - uopbuffpos)
 		{

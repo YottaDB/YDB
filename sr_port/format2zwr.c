@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,6 +44,7 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 
 	max_len = *des_len;
 	assert(0 < max_len);
+	assert(ZWR_EXP_RATIO(src_len) <= max_len); /* assert that caller has allocated enough space for zwrite transformation */
 	dstlen = *des_len = 0;
 	nospace = FALSE;
 	if (src_len > 0)

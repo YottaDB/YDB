@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -177,8 +177,6 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					{
 						if ((r_ptr >= r_top) || ((cptr_start != parm->str.addr) && is_dollar_view))
 						{
-							assert((MAX_MIDENT_LEN * MAX_ZWR_EXP_RATIO) < ARRAYSIZE(global_names));
-								/* so below "format2zwr" is guaranteed not to overflow */
 							n = ARRAYSIZE(global_names);
 							format2zwr((sm_uc_ptr_t)namestr.addr, namestr.len, global_names, &n);
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION,2, n, global_names);
@@ -231,8 +229,6 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			if (!valid_mname(&parmblk->str)
 				&& ((VTK_REGION != vtp->keycode) || (1 != parmblk->str.len) || ('*' != *parmblk->str.addr)))
 			{
-				assert((MAX_MIDENT_LEN * MAX_ZWR_EXP_RATIO) < ARRAYSIZE(global_names));
-					/* so below "format2zwr" is guaranteed not to overflow */
 				n = ARRAYSIZE(global_names);
 				format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, global_names, &n);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
@@ -316,8 +312,6 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					namestr.len = nextsrc - src;
 					if (MAX_MIDENT_LEN < namestr.len)
 						namestr.len = MAX_MIDENT_LEN;	/* to avoid overflow in "format2zwr" */
-					assert((MAX_MIDENT_LEN * MAX_ZWR_EXP_RATIO) < ARRAYSIZE(global_names));
-						/* so below "format2zwr" is guaranteed not to overflow */
 					n = ARRAYSIZE(global_names);
 					format2zwr((sm_uc_ptr_t)namestr.addr, namestr.len, global_names, &n);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
@@ -330,8 +324,6 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					namestr.len = MAX_MIDENT_LEN;	/* to avoid overflow in "format2zwr" */
 				if (!valid_mname(&namestr))
 				{
-					assert((MAX_MIDENT_LEN * MAX_ZWR_EXP_RATIO) < ARRAYSIZE(global_names));
-						/* so below "format2zwr" is guaranteed not to overflow */
 					n = ARRAYSIZE(global_names);
 					format2zwr((sm_uc_ptr_t)namestr.addr, namestr.len, global_names, &n);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);

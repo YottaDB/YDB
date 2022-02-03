@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -228,6 +228,9 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff, char *ext_bufftop)
 		val_len = ztwormstr->length;
 		val_ptr = &ztwormstr->text[0];
 		val_extr_len = ext_bufftop - curr;
+		/* The definition of MAX_ONE_JREC_EXTRACT_BUFSIZ guarantees us "val_extr_len" is more than enough
+		 * for the "format2zwr()" call below (also asserted at entry into "format2zwr()").
+		 */
 		format2zwr((sm_uc_ptr_t)val_ptr, val_len, (uchar_ptr_t)curr, &val_extr_len);
 		curr += val_extr_len;
 		*curr++ = '\n';
@@ -257,6 +260,9 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff, char *ext_bufftop)
 		GET_MSTR_LEN(val_len, val_ptr);
 		val_ptr += SIZEOF(mstr_len_t);
 		val_extr_len = ext_bufftop - curr;
+		/* The definition of MAX_ONE_JREC_EXTRACT_BUFSIZ guarantees us "val_extr_len" is more than enough
+		 * for the "format2zwr()" call below (also asserted at entry into "format2zwr()").
+		 */
 		format2zwr((sm_uc_ptr_t)val_ptr, val_len, (uchar_ptr_t)curr, &val_extr_len);
 		curr += val_extr_len;
 	}

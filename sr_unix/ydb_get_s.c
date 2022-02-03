@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,8 +62,6 @@ int ydb_get_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 	mname_entry	var_mname;
 	mval		get_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
 	ydb_var_types	get_type;
-	unsigned char	lvundef_buff[512], *ptr;
-	unsigned int	avail_len, len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -126,6 +124,9 @@ int ydb_get_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 			}
 			if ((lv_val *)&literal_null == src_lv)	/* it is a case of LVUNDEF */
 			{
+				unsigned char	lvundef_buff[512], *ptr;
+				unsigned int	avail_len, len;
+
 				avail_len = SIZEOF(lvundef_buff);
 				ptr = &lvundef_buff[0];
 				len = MIN(avail_len, varname->len_used);
@@ -145,20 +146,27 @@ int ydb_get_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 					if (len)
 					{
 						if (val_iscan(&plist_mvals[i]))
-							memcpy(ptr, subsarray[i].buf_addr, len);
-						else
 						{
-							len = avail_len;
-							nospace = format2zwr((sm_uc_ptr_t)subsarray[i].buf_addr,
-										subsarray[i].len_used, ptr, (int *)&len);
-							assert(len <= avail_len);
-							if (nospace)
-								avail_len = len;	/* set "avail_len" so we break out of for
-											 * loop in the "1 > avail_len" check below.
-											 */
+							memcpy(ptr, subsarray[i].buf_addr, len);
+							ptr += len;
+							avail_len -= len;
+						} else
+						{
+							mval	dst;
+
+							op_fnzwrite(0, &plist_mvals[i], &dst);	/* dst points to stringpool */
+							/* Check if we have enough space in our local buffer to copy over "dst".
+							 * If so, copy. If not, copy as much space as we have and proceed to
+							 * issue LVUNDEF error. Hence the use of MIN below.
+							 */
+							assert(MVTYPE_IS_STRING(dst.mvtype));
+							len = MIN(avail_len, dst.str.len);
+							memcpy(ptr, dst.str.addr, len);
+							ptr += len;
+							avail_len -= len;
+							if (len < dst.str.len)
+								break;
 						}
-						ptr += len;
-						avail_len -= len;
 					}
 					/* Add ',' or ')' as applicable */
 					if (1 > avail_len)	/* not enough space to hold output */
