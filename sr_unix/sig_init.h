@@ -22,7 +22,6 @@
 #include "libyottadb.h"
 #include "generic_signal_handler.h"
 #include "alternate_sighandling.h"
-#include "sighnd_debug.h"
 #include "interlock.h"
 
 /* Below signal handler function types are used as the first parameter to FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED */
@@ -462,6 +461,9 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 	}															\
 }
 #endif
+
+/* Include this at the end as it needs many of the macros above defined */
+#include "sighnd_debug.h"
 
 int drain_signal_queues(ydb_buffer_t *errstr);
 void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_handler)(), void (*continue_handler)());

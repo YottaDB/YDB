@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,6 +22,7 @@
 #ifdef DEBUG_SIGNAL_HANDLING
 # define DBGSIGHND(x) DBGFPF(x)
 # define DBGSIGHND_ONLY(x) x
+GBLREF int forced_exit_sig;
 # include "gtm_stdio.h"
 # include "gtmio.h"
 # include "io.h"

@@ -101,9 +101,6 @@ GBLREF	intrpt_state_t	intrpt_ok_state;
 
 GBLREF	global_latch_t deferred_signal_handling_needed; /* a bitmask of the below DEFERRED_SIGNAL_HANDLING_NEEDED_* macros */
 
-/* Can't include sig_init.h until the interrupt definitions above were done. This included needed to define sig_pending type */
-#include "sig_init.h"
-
 #define	DEFERRED_SIGNAL_HANDLING_TIMERS	(1 << 0)	/* Bit in "deferred_signal_handling_neeed" global variable that
 							 * indicates whether deferred timer(s) needs to be handled
 							 * upon leaving deferred zone.
@@ -155,6 +152,12 @@ GBLREF	volatile int4	gtmMallocDepth;
 #define	OK_TO_INTERRUPT_TRIMMED	((0 == gtmMallocDepth) && (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)))
 
 GBLREF	volatile int	in_os_signal_handler;
+
+/* Include these routine definitions here because at least 'deferred_signal_handler()' needs to be declared before its first use
+ * in the macros below.
+ */
+uint4	have_crit(uint4 crit_state);
+void	deferred_signal_handler(void);
 
 /* Set the value of forced_exit to 1. This should indicate that we want a deferred signal handler to be invoked first upon leaving
  * the current deferred window. Since we do not want forced_exit state to ever regress, and there might be several signals delivered
@@ -313,6 +316,9 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
 	}											\
 }
 
+/* Can't include sig_init.h until the definitions above were done ([DEFER|ENABLE]_INTERRUPTS) */
+#include "sig_init.h"
+
 /* This macro used to previously check if the global variable "intrpt_ok_state" holds any of the following values.
  *
  *	INTRPT_IN_X_TIME_FUNCTION
@@ -329,8 +335,5 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
  * Hence the use of "in_os_signal_handler" global variable below.
  */
 #define	OK_TO_SEND_MSG	(!in_os_signal_handler)
-
-uint4	have_crit(uint4 crit_state);
-void	deferred_signal_handler(void);
 
 #endif /* HAVE_CRIT_H_INCLUDED */
