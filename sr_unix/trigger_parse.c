@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,11 +92,11 @@ GBLREF	volatile boolean_t	timer_in_handler;
 {											\
 	int		out_len1, out_len2;						\
 	unsigned char	out_str1[64];		/* Plenty of room for $ZCH(xxx) */ 	\
-	unsigned char	out_str2[MAX_ZWR_EXP_RATIO * OUT_BUFF_SIZE];			\
+	unsigned char	out_str2[ZWR_EXP_RATIO(OUT_BUFF_SIZE)];				\
 											\
 	out_len1 = 64;									\
 	CONV_CH(PTR1, out_str1, out_len1);						\
-	out_len2 = MAX_ZWR_EXP_RATIO * OUT_BUFF_SIZE;					\
+	out_len2 = SIZEOF(out_str2);							\
 	CONV_TO_ZWR(LEN, PTR2, out_len2, out_str2);					\
 	util_out_print_gtmio(STR, FLUSH, out_len1, out_str1, out_len2, out_str2);	\
 }
@@ -104,9 +104,9 @@ GBLREF	volatile boolean_t	timer_in_handler;
 #define CONV_NUM_AND_STR_AND_PRINT(STR, NUM, LEN, PTR)					\
 {											\
 	int		out_len;							\
-	unsigned char	out_str[MAX_ZWR_EXP_RATIO * OUT_BUFF_SIZE];			\
+	unsigned char	out_str[ZWR_EXP_RATIO(OUT_BUFF_SIZE)];				\
 											\
-	out_len = MAX_ZWR_EXP_RATIO * OUT_BUFF_SIZE;					\
+	out_len = SIZEOF(out_str);							\
 	CONV_TO_ZWR(LEN, PTR, out_len, out_str);					\
 	util_out_print_gtmio(STR, FLUSH, NUM, out_len, out_str);			\
 }

@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -107,9 +107,9 @@ typedef enum
 #define CONV_STR_AND_PRINT(STR, LEN, PTR)						\
 {											\
 	int		out_len;							\
-	unsigned char	out_str[MAX_ZWR_EXP_RATIO * OUT_BUFF_SIZE];			\
+	unsigned char	out_str[ZWR_EXP_RATIO(OUT_BUFF_SIZE)];				\
 											\
-	out_len = MAX_ZWR_EXP_RATIO * OUT_BUFF_SIZE;					\
+	out_len = SIZEOF(out_str);							\
 	CONV_TO_ZWR_AND_PRINT(STR, LEN, PTR, out_len, out_str);				\
 }
 

@@ -122,9 +122,9 @@ LITREF	char 			*trigger_subs[];
 #define MAKE_ZWR_STR(STR, STR_LEN, OUT_START, OUT_STR)					\
 {											\
 	int		lcl_len;				       			\
-	unsigned char	tmp_buff[MAX_ZWR_EXP_RATIO * MAX_BUFF_SIZE];			\
+	unsigned char	tmp_buff[ZWR_EXP_RATIO(MAX_BUFF_SIZE)];				\
 											\
-	lcl_len = MAX_ZWR_EXP_RATIO * MAX_BUFF_SIZE;					\
+	lcl_len = SIZEOF(tmp_buff);							\
 	format2zwr((sm_uc_ptr_t)STR, STR_LEN, tmp_buff, &lcl_len);			\
 	COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(OUT_START, OUT_STR, tmp_buff, lcl_len);	\
 }

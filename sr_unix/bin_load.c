@@ -190,7 +190,7 @@ void		zwr_out_print(char * buff, int len);
 
 void zwr_out_print(char * buff, int bufflen)
 {
-	char zwrbuff[ZWR_BASE_STRIDE * MAX_ZWR_EXP_RATIO], savechar;
+	char zwrbuff[ZWR_EXP_RATIO(ZWR_BASE_STRIDE)], savechar;
 	int zwrlen;
 	int buffpos, left, stride;
 	int uopbuffpos, uopleft, uopstride;

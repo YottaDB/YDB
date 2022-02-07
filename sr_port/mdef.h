@@ -533,25 +533,25 @@ MBSTART {													\
  * 		$C(1114111)_$ZCH(128)_		22			5	 6
  * 	------------------------------------------------------------------------------
  * To cover cases of odd numbers of characters, add some buffer.
+ * So ideally one would have the following definition.
+ *	#define	ZWR_EXP_RATIO(X)	(!gtm_utf8_mode ? (((X) * 6 + 7)) : ((X) * 9 + 11))
  *
- * MAX_ZWR_KEY_SZ, on the other hand, needs to be a compile-time constant since it's used in
- * temporary allocation on the stack
+ * But this needs to be a compile-time constant since it's used in temporary allocation on the stack and so
+ * we take the maximum value of the two and use it in all cases (utf8 or non-utf8 mode).
  */
-GBLREF	boolean_t		gtm_utf8_mode;
 #ifdef UTF8_SUPPORTED
-#	define	ZWR_EXP_RATIO(X)	((!gtm_utf8_mode) ? (((X) * 6 + 7)) : ((X) * 9 + 11))
-#	define	MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 9 + 11)
-#	define	MAX_ZWR_EXP_RATIO	9
-#	define	MAX_ZWR_DCHAR_DIGITS	5
+#	define	ZWR_EXP_RATIO(X)		(((X) * 9 + 11))
+#	define	MAX_ZWR_DCHAR_DIGITS		5
 #else
-#	define	ZWR_EXP_RATIO(X)	((X) * 6 + 7)
-#	define	MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 6 + 7)
-#	define	MAX_ZWR_EXP_RATIO	6
-#	define	MAX_ZWR_DCHAR_DIGITS	3
+#	define	ZWR_EXP_RATIO(X)		((X) * 6 + 7)
+#	define	MAX_ZWR_DCHAR_DIGITS		3
 #endif
-#define		MAX_ZWR_ZCHAR_DIGITS	3
+#define		MAX_ZWR_KEY_SZ			ZWR_EXP_RATIO(MAX_KEY_SZ)
+#define		MAX_ZWR_ZCHAR_DIGITS		3
 
 #define MAX_SYSERR		1000000
+
+GBLREF boolean_t               gtm_utf8_mode;
 
 unsigned char *n2s(mval *mv_ptr);
 char *s2n(mval *u);

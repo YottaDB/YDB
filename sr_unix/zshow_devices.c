@@ -78,7 +78,7 @@ void zshow_devices(zshow_out *output)
 	boolean_t	first;
 	unsigned char	delim_buff_sm[MAX_DELIM_LEN];
 	unsigned short	delim_len_sm;
-	char		delim_mstr_buff[(MAX_DELIM_LEN * MAX_ZWR_EXP_RATIO) + 11];
+	char		delim_mstr_buff[ZWR_EXP_RATIO(MAX_DELIM_LEN)];
 	mstr		delim;
 	int		delim_len, tmpport;
 	boolean_t	same_encr_settings;
