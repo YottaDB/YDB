@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -31,7 +34,7 @@ int lke_getki(char* src, int srclen, char* outbuff)
 {
 	char	*inptr, *nextptr, *intop, *outptr, *tmpptr;
 	mval	subsc = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
-	char	one_lockbuf[MAX_ZWR_KEY_SZ + 1], *one_char;
+	char	one_lockbuf[MAX_LKNAME_LEN + 1], *one_char;
 	char	*valid_char = "HAR"; /* This is used for validating characters following $ZCH and $C */
 
 	if (srclen > 1 && '"' == src[0] && '"' == src[srclen - 1])

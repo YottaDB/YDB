@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -35,8 +38,6 @@
 #include "lke_cleartree.h"
 #include "lke_clearlock.h"
 
-#define KDIM	64		/* max number of subscripts */
-
 GBLREF VSIG_ATOMIC_T	util_interrupt;
 
 error_def(ERR_CTRLC);
@@ -54,9 +55,9 @@ bool	lke_cleartree(
 		      boolean_t		exact)
 
 {
-	mlk_shrblk_ptr_t	node, oldnode, start[KDIM];
-	unsigned char	subscript_offset[KDIM];
-	static char	name_buffer[MAX_ZWR_KEY_SZ + 1];
+	mlk_shrblk_ptr_t	node, oldnode, start[MAX_LKSUBSCRIPTS];
+	int		subscript_offset[MAX_LKSUBSCRIPTS];
+	static char	name_buffer[MAX_LKNAME_LEN + 1];	/* + 1 is to store trailing null byte */
 	static MSTR_DEF(name, 0, name_buffer);
 	int		depth = 0;
 	bool		locks = FALSE, locked, deleted;

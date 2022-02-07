@@ -3,6 +3,9 @@
  * Copyright (c) 2018 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -45,7 +48,7 @@ void lke_growhash(void)
 	boolean_t		exact = TRUE, resize_status;
 	int4			pid;
 	mstr			regname, node, one_lock;
-	char			regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_KEY_SZ];
+	char			regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_LKNAME_LEN + 1];
 	gd_region		*reg;
 	int			regidx;
 	boolean_t		was_crit;

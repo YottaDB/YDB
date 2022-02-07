@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -58,7 +61,9 @@ bool	lke_clearlock(
 	int		len;
 	bool 		unlock = FALSE;
 	sgmnt_addrs	*csa;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (node->owner != 0  &&  (pid == node->owner  ||  pid == 0))
 	{
 		if (interactive)
@@ -90,8 +95,19 @@ bool	lke_clearlock(
 			if (name->addr[len] != '(')
 				++len;
 			if (lnk == NULL)
-				util_out_print("Lock removed : !AD", FLUSH, len, name->addr);
-			else
+			{	/* Cannot use "util_out_print" here since it has a 2K limit whereas len can be greater (YDB#845).
+				 * Hence using "fprintf" to stderr directly.
+				 */
+				if (TREF(util_outptr) != TREF(util_outbuff_ptr))
+				{	/* This means this is the first lock name being printed in
+					 * this region after the "util_out_print()" call in "lke_clear.c"
+					 * which set up the util_output buffers to hold the region name.
+					 * So print that out and then move on to FPRINTF calls.
+					 */
+					util_out_print("", FLUSH);
+				}
+				FPRINTF(stderr, "Lock removed : %.*s\n", len, name->addr);
+			} else
 				if (!interactive)
 				{
 					reply.code = CMMS_V_LKESHOW;

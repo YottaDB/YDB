@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,7 +73,7 @@ void	lke_show(void)
 	int4			pid;
 	size_t			ls_len;
 	int			n;
-	char 			regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_KEY_SZ];
+	char 			regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_LKNAME_LEN + 1];
 	mlk_ctldata_ptr_t	ctl;
 	mstr			regname, node, one_lock;
 	gd_region		*reg;
@@ -99,7 +99,7 @@ void	lke_show(void)
 			&& reg->open)
 		{
 			match = TRUE;
-			util_out_print("!/!AD!/", NOFLUSH_OUT, REG_LEN_STR(reg));
+			util_out_print("!/!AD", NOFLUSH_OUT, REG_LEN_STR(reg));
 			/* If distributed database, the region is located on another node */
 			if (reg->dyn.addr->acc_meth == dba_cm)
 			{

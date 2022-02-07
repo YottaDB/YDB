@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,8 +33,6 @@
 #include "lke.h"
 #include "mlk_shrblk_delete_if_empty.h"
 
-#define KDIM	64		/* max number of subscripts */
-
 GBLREF VSIG_ATOMIC_T	util_interrupt;
 error_def(ERR_CTRLC);
 
@@ -45,14 +43,14 @@ void lke_show_memory(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t bhead, char *prefix
 	mlk_shrblk_ptr_t	b, bnext, parent, children;
 	mlk_shrsub_ptr_t	dsub;
 	mlk_prcblk_ptr_t	pending;
-	char			temp[MAX_ZWR_KEY_SZ + 1];
-	char			new_prefix[KDIM + 2];
+	char			temp[ZWR_EXP_RATIO(MAX_LK_SUB_LEN) + 1];
+	char			new_prefix[MAX_LKSUBSCRIPTS + 1];
 	mlk_subhash_state_t	hs;
 	uint4			total_len;
 	mlk_subhash_res_t	hashres;
 	mlk_subhash_val_t	hash;
 
-	SNPRINTF(new_prefix, KDIM + 2, "	%s", prefix);
+	SNPRINTF(new_prefix, SIZEOF(new_prefix), "\t%s", prefix);
 	for (b = bhead, bnext = 0; bnext != bhead; b = bnext)
 	{
 		dsub = (mlk_shrsub_ptr_t)R2A(b->value);
@@ -118,11 +116,11 @@ bool	lke_showtree(struct CLB 	*lnk,
 		     bool 		memory,
 	             int		*shr_sub_size)
 {
-	mlk_shrblk_ptr_t	node, start[KDIM];
+	mlk_shrblk_ptr_t	node, start[MAX_LKSUBSCRIPTS];
 	mlk_shrblk_ptr_t	tree;
 	mlk_ctldata_ptr_t	ctl;
-	unsigned char	subscript_offset[KDIM];
-	static char	name_buffer[MAX_ZWR_KEY_SZ + 1];
+	int			subscript_offset[MAX_LKSUBSCRIPTS];
+	static char		name_buffer[MAX_LKNAME_LEN + 1];	/* + 1 is to store trailing null byte */
 	static MSTR_DEF(name, 0, name_buffer);
 	int		depth = 0;
 	bool		locks = FALSE;
@@ -133,7 +131,7 @@ bool	lke_showtree(struct CLB 	*lnk,
 	tree = (mlk_shrblk_ptr_t)R2A(ctl->blkroot);
 	if (memory)
 	{
-		lke_show_memory(pctl, tree, "	");
+		lke_show_memory(pctl, tree, "\t");
 		if (shr_sub_size)
 			(*shr_sub_size) = ctl->subfree - ctl->subbase;
 		lke_show_hashtable(pctl);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -117,7 +117,7 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 		if (MV_IS_SQLNULL(mp_temp))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZYSQLNULLNOTVALID);
 		MV_FORCE_STR(mp_temp);
-		if (255 < (mp_temp)->str.len)
+		if (MAX_LK_SUB_LEN < (mp_temp)->str.len)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_LOCKSUB2LONG, 1, (mp_temp)->str.len,
 				      ERR_TEXT, 2, (mp_temp)->str.len, (mp_temp)->str.addr);
 		assert((mp_temp)->mvtype & MV_STR);

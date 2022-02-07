@@ -1932,10 +1932,24 @@ enum
  * contain a null in the last position so there will often be a +1 or +2 when these constants
  * are used.
  */
-#define MAX_GVSUBSCRIPTS 31
-#define MAX_LVSUBSCRIPTS 31
-#define MAX_INDSUBSCRIPTS 31
-#define MAX_FOR_STACK 32
+#define MAX_GVSUBSCRIPTS	31
+#define MAX_LVSUBSCRIPTS	31
+#define MAX_INDSUBSCRIPTS	31
+#define	MAX_LKSUBSCRIPTS	(MAX_GVSUBSCRIPTS + 1)	/* maximum number of subscripts in a LOCK reference,
+							 * + 1 for unsubscripted variable name.
+							 */
+#define MAX_FOR_STACK		32
+
+#define	MAX_LK_SUB_LEN		255	/* maximum length of each subscript in a subscripted LOCK reference */
+/* Below computes the maximum space needed to store the lock reference name displayed by a LKE SHOW.
+ * MAX_MIDENT_LEN is to store the lock variable name.
+ * + 2 is to store the "(" and ")" surrounding the subscripts.
+ * MAX_LK_SUB_LEN is space to store each subscript.
+ * + 3 is to store two double quotes surrounding the subscript and 1 comma following it.
+ * MAX_LKSUBSCRIPTS - 1 is to account for maximum number of subscripts (- 1 is to not double count variable name)
+ * ZWR_EXP_RATIO macro is to account for $ZWRITE representation overhead for non-displayable characters.
+ */
+#define	MAX_LKNAME_LEN		ZWR_EXP_RATIO(MAX_MIDENT_LEN + 2 + (MAX_LK_SUB_LEN + 3) * (MAX_LKSUBSCRIPTS - 1))
 
 #define PUSH_PARM_OVERHEAD	4	/* This extra space in the array is needed because push_parm() is capable of handling 32
 					 * arguments, but callg needs to accomidate space for 4 items, namely argument count

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,7 +47,7 @@ int4 lke_getcli(bool *all,
 	int4		status;
 	unsigned short	len;
 	int		keylen;
-	char		one_lockbuf[MAX_ZWR_KEY_SZ + 1];
+	char		one_lockbuf[MAX_LKNAME_LEN + 1];
 
 	status = TRUE;
 /*

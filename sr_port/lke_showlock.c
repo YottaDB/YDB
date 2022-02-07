@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,15 +63,19 @@ GBLREF	uint4		process_id;
 void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr* name);
 void lke_formatlocknodes(mlk_shrblk_ptr_t node, mstr* name);
 
+#define	OWNED_BY_PID	"Owned by PID= "
+#define	REQUEST_PID	"Request  PID= "
+#define	WHICH_IS	" which is "
+
 static	char	gnam[]    = GNAM_FMT_STR,
-		ownedby[] = "Owned by PID= " PID_FMT_STR " which is !AD!AD",
-		request[] = "Request  PID= " PID_FMT_STR " which is !AD!AD",
+		ownedby[] = OWNED_BY_PID PID_FMT_STR WHICH_IS "!AD!AD",
+		request[] = REQUEST_PID  PID_FMT_STR WHICH_IS "!AD!AD",
 		nonexpr[] = "a nonexistent process",
 		existpr[] = "an existing process",
 		nonexam[] = "an inexaminable process",
 		nopriv[]  = "no privilege";
 
-void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr* name)
+void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr *name)
 {
 	mlk_shrsub_ptr_t	value;
 	char			save_ch;
@@ -95,7 +99,8 @@ void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr* name)
 
 		subsc.str.len = value->length;
 		subsc.str.addr = (char*) value->data;
-		len2 = MAX_ZWR_KEY_SZ + 1;
+		assert(MAX_LKNAME_LEN > name->len);
+		len2 = MAX_LKNAME_LEN - name->len;
 		if (val_iscan(&subsc))
 		{
 			/* avoid printing enclosed quotes for canonical numbers */
@@ -106,9 +111,9 @@ void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr* name)
 			len2 -= 2; /* exclude the enclosing quotes */
 		} else
 			format2zwr((sm_uc_ptr_t) value->data, value->length, (unsigned char*) &name->addr[name->len], &len2);
-
 		name->len += len2;
 		name->addr[name->len++] = ')';
+		assert(MAX_LKNAME_LEN > name->len);
 	}
 }
 
@@ -147,7 +152,9 @@ bool	lke_showlock(
 	short		len1;
 	uint4		status;
 	UINTPTR_T	f[7];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	unsub = (0 == name->len);
 
 	lke_formatlocknode(node, name);
@@ -196,31 +203,49 @@ bool	lke_showlock(
 					f[5] = f[6] = 0;
 				if (interactive)
 				{
-					msg = gnam;
-					len1 = STR_LIT_LEN(gnam);
-					memcpy(format, msg, len1);
-
-					if (owned && !lock)
-					{
-						msg = ownedby;
-						len2 = STR_LIT_LEN(ownedby);
-					} else
-					{
-						msg = request;
-						len2 = STR_LIT_LEN(request);
-					}
-					memcpy(format + len1, msg, len2);
-					format[len1 + len2] = '\0';
-					assert((len1 + len2) < SIZEOF(format));
 					if (NULL == lnk)
 					{
-						if ((NULL == one_lock.addr) ||
-							(!memcmp(name->addr, one_lock.addr, one_lock.len)
-							&& (!exact || (one_lock.len == f[0]))))
-							util_out_print(format, FLUSH, f[0], f[1], f[2], f[3], f[4], f[5], f[6]);
+						if ((NULL == one_lock.addr)
+							|| (!memcmp(name->addr, one_lock.addr, one_lock.len)
+								&& (!exact || (one_lock.len == f[0]))))
+						{	/* Cannot use "util_out_print" here since it has a 2K limit whereas
+							 * f[1] (length of string) can be significantly greater (YDB#845).
+							 * Hence using "fprintf" to stderr directly.
+							 */
+							if (TREF(util_outptr) != TREF(util_outbuff_ptr))
+							{	/* This means this is the first lock name being printed in
+								 * this region after the "util_out_print()" call in "lke_show.c"
+								 * which set up the util_output buffers to hold the region name.
+								 * So print that out and then move on to FPRINTF calls.
+								 */
+								util_out_print("", FLUSH);
+							}
+							FPRINTF(stderr, "%.*s %s%d%s%.*s%.*s\n", (int)f[0], (char *)f[1],
+								(owned && !lock) ? OWNED_BY_PID : REQUEST_PID,
+								(int)f[2], WHICH_IS, (int)f[3], (char *)f[4],
+								(int)f[5], (char *)f[6]);
+						}
 					} else
+					{
+						msg = gnam;
+						len1 = STR_LIT_LEN(gnam);
+						memcpy(format, msg, len1);
+
+						if (owned && !lock)
+						{
+							msg = ownedby;
+							len2 = STR_LIT_LEN(ownedby);
+						} else
+						{
+							msg = request;
+							len2 = STR_LIT_LEN(request);
+						}
+						memcpy(format + len1, msg, len2);
+						format[len1 + len2] = '\0';
+						assert((len1 + len2) < SIZEOF(format));
 						util_cm_print(lnk, CMMS_V_LKESHOW, format, FLUSH,
 							      f[0], f[1], f[2], f[3], f[4], f[5], f[6]);
+					}
 				}
 				if ((NULL != one_lock.addr) &&
 					(memcmp(name->addr, one_lock.addr, one_lock.len) ||

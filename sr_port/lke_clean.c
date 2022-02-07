@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,7 +60,7 @@ void lke_clean(void)
 	int4			pid, repeat, bc_before, bc_after;
 	gtm_int8		sleep_time;
 	mstr			regname, node, one_lock;
-	char			regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_KEY_SZ];
+	char			regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_LKNAME_LEN + 1];
 	int			fi, mi;
 	uint4			ti, num_buckets, bucket_offset, loop_cnt, loop_cnt2, total_len;
 	mlk_shrhash_map_t	usedmap, usedmap2;
@@ -276,7 +276,9 @@ void lke_clean(void)
 								 * out of position; very bad
 								 * Emit a critical warning and carry on
 								 */
-								char name_buffer[MAX_ZWR_KEY_SZ + 1];
+								char name_buffer[MAX_LKNAME_LEN + 1];	/* + 1 to store trailing
+													 * null byte.
+													 */
 								MSTR_DEF(name, 0, name_buffer);
 
 								lke_formatlockname(shr, &name);
