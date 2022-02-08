@@ -31,6 +31,7 @@ patch:
 	patch --no-backup-if-mismatch ../sr_port/jobexam_process.c jobexam_process.c.patch
 	patch --no-backup-if-mismatch ../sr_port/op_fnzsigproc.c op_fnzsigproc.c.patch
 	patch --no-backup-if-mismatch ../sr_port/op_hang.c op_hang.c.patch
+	patch --no-backup-if-mismatch ../sr_port/op_zsystem.c op_zsystem.c.patch
 	patch --no-backup-if-mismatch ../sr_port/stp_gcol_src.h stp_gcol_src.h.patch
 	patch --no-backup-if-mismatch ../sr_unix/gtm_dump_core.c gtm_dump_core.c.patch
 	patch --no-backup-if-mismatch ../sr_unix/gtm_fork_n_core.c gtm_fork_n_core.c.patch
@@ -43,6 +44,7 @@ reset:
 	patch --reject-file=- --reverse ../sr_port/jobexam_process.c jobexam_process.c.patch
 	patch --reject-file=- --reverse ../sr_port/op_fnzsigproc.c op_fnzsigproc.c.patch
 	patch --reject-file=- --reverse ../sr_port/op_hang.c op_hang.c.patch
+	patch --reject-file=- --reverse ../sr_port/op_zsystem.c op_zsystem.c.patch
 	patch --reject-file=- --reverse ../sr_port/stp_gcol_src.h stp_gcol_src.h.patch
 	patch --reject-file=- --reverse ../sr_unix/gtm_dump_core.c gtm_dump_core.c.patch
 	patch --reject-file=- --reverse ../sr_unix/gtm_fork_n_core.c gtm_fork_n_core.c.patch

@@ -1,0 +1,29 @@
+#################################################################
+#								#
+# Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_port/op_zsystem.c b/sr_port/op_zsystem.c
+index 6f015b67..ad66f45a 100755
+--- a/sr_port/op_zsystem.c
++++ b/sr_port/op_zsystem.c
+@@ -77,6 +77,12 @@ void op_zsystem(mval *v)
+ 	DCL_THREADGBL_ACCESS;
+ 
+ 	SETUP_THREADGBL_ACCESS;
++	/* Skip executing command inside ZSYSTEM during fuzz testing as it can cause false afl crashes.
++	 * For example, the below M code would cause afl to treat the SIG-15 as a crash when it is not.
++	 *	ZSystem "$gtm_dist/mupip stop "_$Job
++	 */
++	dollar_zsystem = 0;
++	return;
+ 	if (RESTRICTED(zsystem_op))
+ 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, ZSYSTEMSTR);
+ 	TPNOTACID_CHECK(ZSYSTEMSTR);
