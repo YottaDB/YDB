@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -20,7 +23,6 @@
 #include "iottdef.h"
 #include "cvtparm.h"
 #include "mvalconv.h"
-#include "cvttime.h"
 #include "cvtprot.h"
 
 GBLREF spdesc stringpool;
@@ -101,13 +103,6 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 				return  (int4) ERR_DEVPARPROT;
 			msk = nl;
 			cp = &msk;
-			break;
-		case IOP_SRC_TIME:
-			status = cvttime(src, tim);
-			if ((status & 1) == 0)
-				return status;
-			siz = SIZEOF(tim) ;
-			cp = (unsigned char *) tim ;
 			break;
 		default:
 			assert(FALSE);

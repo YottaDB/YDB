@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001 Sanchez Computer Associates, Inc.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,7 +24,6 @@
 #define IOP_SRC_MSK 3	/* source is character mask */
 #define IOP_SRC_PRO 4	/* source is protection mask */
 #define IOP_SRC_LNGMSK 5 /* source is int4 character mask */
-#define IOP_SRC_TIME 6	/* source is the date-time string */
 
 typedef struct
 {

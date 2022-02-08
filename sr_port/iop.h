@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -104,7 +107,7 @@ IOP_DESC(85, iop_readsync, 0, IOP_USE_OK, 0),
 IOP_DESC(86, iop_noreadsync, 0, IOP_USE_OK, 0),
 IOP_DESC(87, iop_ttsync, 0, IOP_USE_OK, 0),
 IOP_DESC(88, iop_nottsync, 0, IOP_USE_OK, 0),
-IOP_DESC(89, iop_after, SIZEOF(int4) * 2, IOP_CLOSE_OK, IOP_SRC_TIME),
+IOP_DESC(89, iop_after, SIZEOF(int4) * 2, 0, 0),
 IOP_DESC(90, iop_burst, 0, IOP_CLOSE_OK, 0),
 IOP_DESC(91, iop_characteristic, SIZEOF(int4), IOP_CLOSE_OK, IOP_SRC_INT),
 IOP_DESC(92, iop_copies, SIZEOF(int4), IOP_CLOSE_OK, IOP_SRC_INT),
