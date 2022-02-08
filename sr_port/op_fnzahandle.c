@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -30,17 +33,24 @@ void op_fnzahandle(lv_val *srclv, mval *dst)
 {
 	unsigned char		*handle;
 
-	assert(srclv);
-	assert(dst);
-	if (srclv->v.mvtype & MV_ALIASCONT)
+	assert(NULL != srclv);
+	assert(NULL != dst);
+	if (srclv == (lv_val *)&literal_null)
+	{	/* This is an "lv_val *" returned by "op_getindx()" for the "undef_inhibit" case.
+		 * We need to treat this case as a subscripted lvn and return the empty string. So set handle to "NULL".
+		 */
+		handle = NULL;
+	} else if (srclv->v.mvtype & MV_ALIASCONT)
 	{	/* lv_val is an alias container, use its pointer addr as the handle */
 		assert(!LV_IS_BASE_VAR(srclv));
 		handle = (unsigned char *)srclv->v.str.addr;
 	} else if (LV_IS_BASE_VAR(srclv))
-		/* lv_val is a base variable, use its lv_val addr as the handle */
+	{	/* lv_val is a base variable, use its lv_val addr as the handle */
 		handle = (unsigned char *)srclv;
-	else
+	} else
+	{	/* This is a subscripted lvn. We need to return the empty string. So set handle to "NULL". */
 		handle = NULL;
+	}
 	/* Now convert handle to return value -- return ascii-ized addr if present */
 	if (NULL != handle)
 	{
@@ -51,5 +61,7 @@ void op_fnzahandle(lv_val *srclv, mval *dst)
 		stringpool.free += dst->str.len;
 		dst->mvtype = MV_STR;
 	} else
+	{	/* Return the empty string */
 		memcpy(dst, &literal_null, SIZEOF(mval));
+	}
 }
