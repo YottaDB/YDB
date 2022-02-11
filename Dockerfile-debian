@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -103,6 +103,10 @@ RUN apt-get update && \
                     pkg-config \
                     clang \
                     cargo \
+                    python3-dev \
+                    python3-setuptools \
+                    libffi-dev \
+                    python3-pip \
                     && \
     apt-get clean
 RUN locale-gen en_US.UTF-8
@@ -131,11 +135,21 @@ RUN . /opt/yottadb/current/ydb_env_set \
  && git checkout develop \
  && go test -v lang.yottadb.com/go/yottadb \
  && cd - \
+ && git clone https://gitlab.com/YottaDB/Lang/YDBPython.git \
+ && cd YDBPython \
+ && python3 setup.py install --user \
+ && pip3 install pytest psutil pytest-order \
+ && python3 -m pytest \
+ && for artifact in $(cat .gitignore); do rm -rf $artifact; done \
+ && cd - \
+ && rm -rf YDBPython \
  && git clone https://gitlab.com/oesiman/yottadb-perl.git \
  && cd yottadb-perl \
  && perl Makefile.PL \
  && make test TEST_DB=1 \
  && make install \
+ && cd - \
+ && rm -rf yottadb-perl \
  && echo "zsystem \"mupip rundown -relinkctl\"" | /opt/yottadb/current/ydb -dir
 ENTRYPOINT ["/opt/yottadb/current/ydb"]
 CMD ["-run", "%XCMD", "zsystem \"bash\""]
