@@ -72,7 +72,6 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_ENV_TRANSLATE,              "$ydb_env_transla
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_ERROR_ON_JNL_FILE_LOST,     "$ydb_error_on_jnl_file_lost",     "$gtm_error_on_jnl_file_lost")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_ETRAP,                      "$ydb_etrap",                      "$gtm_etrap")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_EXTRACT_NOCOL,              "$ydb_extract_nocol",              "$gtm_extract_nocol")
-YDBENVINDX_TABLE_ENTRY (YDBENVINDX_FULLBLOCKWRITES,            "$ydb_fullblockwrites",            "$gtm_fullblockwrites")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_GBLDIR,                     "$ydb_gbldir",                     "$gtmgbldir")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_GBLDIR_TRANSLATE,           "$ydb_gbldir_translate",           "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_GDSCERT,                    "$ydb_gdscert",                    "$gtm_gdscert")
