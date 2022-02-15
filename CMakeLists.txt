@@ -33,23 +33,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-<<<<<<< HEAD
 set(version r135)
-=======
-<<<<<<< HEAD
-set(version r134)
-=======
-<<<<<<< HEAD
-set(version r133)
-=======
-set(version ${V6.3-012})
-if("${version}" STREQUAL "")
-        set(version V9.9-0)
-endif()
->>>>>>> f33a273c... GT.M V6.3-012
->>>>>>> [#603] [V63012] Merge GT.M V6.3-012 into YottaDB mainline (with conflicts)
->>>>>>> [#603] [V63012] Merge GT.M V6.3-012 into YottaDB mainline (with conflicts)
-
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)

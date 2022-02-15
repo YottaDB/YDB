@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -176,13 +176,8 @@ int gvn(void)
 	SUBS_ARRAY_2_TRIPLES(ref, sb1, sb2, subscripts, 0);
 	if (shifting)
 	{
-<<<<<<< HEAD
 		if (TREF(saw_side_effect) && ((YDB_BOOL != TREF(ydb_fullbool)) || (OLD_SE != TREF(side_effect_handling))))
-		{	/* saw a side effect in a subscript - time to stop shifting */
-=======
-		if (TREF(saw_side_effect) && ((GTM_BOOL != TREF(gtm_fullbool)) || (OLD_SE != TREF(side_effect_handling))))
 		{	/* saw a side effect in a subscript - our reference has been superceded so no targ game on the name */
->>>>>>> f33a273c... GT.M V6.3-012
 			setcurtchain(oldchain);
 			triptr = (TREF(curtchain))->exorder.bl;
 			dqadd(triptr, &tmpchain, exorder);

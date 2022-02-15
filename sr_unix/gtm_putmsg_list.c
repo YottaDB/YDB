@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,13 +50,9 @@
 /* #GTM_THREAD_SAFE : The below function (gtm_putmsg_list) is thread-safe because caller ensures serialization with locks */
 void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 {
-<<<<<<< HEAD
-	int		i, msg_id, fao_actual, fao_count, freeze_msg_id;
-=======
-	GBLREF      boolean_t               gtm_dist_ok_to_use;
+	GBLREF      boolean_t               ydb_dist_ok_to_use;
 
-	int		i, msg_id, fao_actual, fao_count, dummy, freeze_msg_id;
->>>>>>> f33a273c... GT.M V6.3-012
+	int		i, msg_id, fao_actual, fao_count, freeze_msg_id;
 	char		msg_buffer[1024];
 	mstr		msg_string;
 	const err_msg	*msg;
@@ -92,7 +88,7 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 	for (; ; )
 	{
 		msg_id = va_arg(var, int);
-	 	mustlog = ( gtm_dist_ok_to_use && (!(RESTRICTED(logdenials))) &&
+	 	mustlog = ( ydb_dist_ok_to_use && (!(RESTRICTED(logdenials))) &&
 			(MSGFLAG(msg_id) & MSGMUSTLOG) ); /* GTM-7759 logging unless restricted */
 		CHECK_IF_FREEZE_ON_ERROR_NEEDED(csa, msg_id, freeze_needed, freeze_msg_id, local_jnlpool);
 		--arg_count;

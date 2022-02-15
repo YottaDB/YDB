@@ -151,13 +151,8 @@ typedef struct cache_rec_struct
 					 * in progress. This is used by wcs_recover to decide whether to place a cr into
 					 * the active or wip queue.
 					 */
-<<<<<<< HEAD
-	bool		needs_first_write; 	/* If this block needs to be written to disk for the first time,
-						 *  note it (only applicable for ydb_fullblockwrites) */
-=======
 	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
-						 *  note it (only applicable for fullblockwrites) */
->>>>>>> f33a273c... GT.M V6.3-012
+						 *  note it (only applicable for ydb_fullblockwrites) */
 	/* bool		filler4bytealign[1];	 Note: Make sure any changes here are reflected in "cache_state_rec" too */
 } cache_rec;
 
@@ -245,13 +240,8 @@ typedef struct
 					 * in progress. This is used by wcs_recover to decide whether to place a cr into
 					 * the active or wip queue.
 					 */
-<<<<<<< HEAD
-	bool		needs_first_write; 	/* If this block needs to be written to disk for the first time,
-						 *  note it (only applicable for ydb_fullblockwrites) */
-=======
 	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
-						 *  note it (only applicable for fullblockwrites) */
->>>>>>> f33a273c... GT.M V6.3-012
+						 *  note it (only applicable for ydb_fullblockwrites) */
 	/*bool		filler4bytealign[1];	 Note: Make sure any changes here are reflected in "cache_state_rec" too */
 } cache_state_rec;
 
@@ -2004,13 +1994,9 @@ typedef struct sgmnt_data_struct
 	/************* FIELDS RELATED TO DB TRANSACTION HISTORY *****************************/
 	th_index	trans_hist;		/* transaction history - if moved from 1st filehdr block, change TH_BLOCK */
 	/************* FIELDS RELATED TO WRITE CACHE FLUSHING *******************************/
-<<<<<<< HEAD
-	uint8		flush_time;
-=======
 	int4		write_fullblk;
 	char		filler[4];
-	int4		flush_time[2];
->>>>>>> f33a273c... GT.M V6.3-012
+	uint8		flush_time;
 	int4		flush_trigger;
 	int4		n_wrt_per_flu;		/* Number of writes per flush call. Overloaded for BG and MM */
 	int4		wait_disk_space;        /* seconds to wait for diskspace before giving up on a db block write */
@@ -2584,11 +2570,7 @@ typedef struct	gd_region_struct
 							 *	corresponding base region.
 							 */
 	bool			epoch_taper;
-<<<<<<< HEAD
-	unsigned char		reservedDBFlags; 	/* Flags for reservedDB types and/or features */
-=======
-	bool			reservedDBFlags;	/* Flags for reservedDB types and/or features */
->>>>>>> f33a273c... GT.M V6.3-012
+	unsigned char		reservedDBFlags;	/* Flags for reservedDB types and/or features */
 	bool			lock_crit_with_db;	/* controls whether LOCK crit is separate (0) or shared with DB (1) */
 	/* All fields before this point are relied upon by GDE. All fields after this point are relied upon only by
 	 * the runtime logic (i.e. it is one big filler/padding area as far as GDE is concerned).

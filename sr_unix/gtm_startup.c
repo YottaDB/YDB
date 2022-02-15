@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,7 +87,7 @@
 #include "jobsp.h" /* For gcall.h */
 #include "gcall.h" /* For ojchildparms() */
 #include "common_startup_init.h"
-#include "trans_numeric.h"
+#include "ydb_trans_numeric.h"
 #ifdef UTF8_SUPPORTED
 #include "utfcgr.h"
 #endif
@@ -154,22 +154,14 @@ void gtm_startup(struct startup_vector *svec)
 	 * while in UNIX, it's all done with environment variables
 	 * hence, various references to data copied from *svec could profitably be referenced directly
 	 */
-<<<<<<< HEAD
+	boolean_t		is_defined;
 	char			*temp;
-	mstr			log_name;
+	int4			temp_ydb_strpllim;
 	stack_frame 		*frame_pointer_lcl;
 	static char 		other_mode_buf[] = "OTHER";
 	char			*ptr;
 	int			i, status;
 	mval			noiso_lit, gbllist;
-=======
-	boolean_t	is_defined;
-	char		*temp;
-	int4		temp_gtm_strpllim;
-	mstr		log_name;
-	stack_frame 	*frame_pointer_lcl;
-	static char 	other_mode_buf[] = "OTHER";
->>>>>>> f33a273c... GT.M V6.3-012
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -235,12 +227,10 @@ void gtm_startup(struct startup_vector *svec)
 	/* Initialize alignment requirement for the runtime stringpool */
 	/* mstr_native_align = ydb_logical_truth_value(YDBENVINDX_DISABLE_ALIGNSTR, FALSE, NULL) ? FALSE : TRUE; */
 	mstr_native_align = FALSE; /* TODO: remove this line and uncomment the above line */
-	/* See if $gtm_string_pool_limit is set */
-	log_name.addr = GTM_STRPLLIM;
-	log_name.len = SIZEOF(GTM_STRPLLIM) - 1;
-	temp_gtm_strpllim = trans_numeric(&log_name, &is_defined, TRUE);
-	if (0 < temp_gtm_strpllim)
-		stringpool.strpllim = (temp_gtm_strpllim < STP_GCOL_TRIGGER_FLOOR ? STP_GCOL_TRIGGER_FLOOR : 0) + temp_gtm_strpllim;
+	/* See if $ydb_string_pool_limit is set */
+	temp_ydb_strpllim = ydb_trans_numeric(YDBENVINDX_STRING_POOL_LIMIT,  &is_defined, IGNORE_ERRORS_FALSE, NULL);
+	if (0 < temp_ydb_strpllim)
+		stringpool.strpllim = (temp_ydb_strpllim < STP_GCOL_TRIGGER_FLOOR ? STP_GCOL_TRIGGER_FLOOR : 0) + temp_ydb_strpllim;
 	getjobname();
 	getzprocess();
 	getzmode();

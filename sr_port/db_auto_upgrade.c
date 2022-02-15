@@ -196,13 +196,15 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMV63003:
 				/*  GT.M v63007 added stable user control of flush_trigger using flush_trigger_top */
 				csd->flush_trigger_top = FLUSH_FACTOR(csd->n_bts);	/* more predictable than flush_trigger */
-<<<<<<< HEAD
 				/* Note: This also needs to handle the GDSMR122 case (see comment in gdsdbver_sp.h) hence
 				 * the r122 related code block below.
 				 */
 				/* YottaDB r122 introduced "reorg_sleep_nsec" to slow down reorg update rate by user */
 				csd->reorg_sleep_nsec = 0;
 			case GDSMV63007:	/* Note: This is also the case for GDSMR122 */
+				/* GT.M V63012 added fullblkwrt option */
+				csd->write_fullblk = 0;
+				break;
 			case GDSMR126:
 				/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support nanosecond timers */
 				csd->flush_time = csd->flush_time * NANOSECS_IN_MSEC;
@@ -222,6 +224,11 @@ void db_auto_upgrade(gd_region *reg)
 				csd->max_procs.time = 0;
 				break;
 			case GDSMR134:
+				/* GT.M V63012 added fullblkwrt option */
+				csd->write_fullblk = 0;
+				break;
+			case GDSMV63012:
+			case GDSMR136:
 		/* When adding a new minor version, the following template should be maintained
 		 * a) If there are any file header fields added in the new minor version, initialize the fields to default values
 		 *    in the last case (i.e. above this comment block). Do not add a "break" for the above "case" block.
@@ -231,20 +238,12 @@ void db_auto_upgrade(gd_region *reg)
 		 *    than the older YottaDB GDSMVCURR value (e.g. in case of YottaDB r1.32) and so those GT.M switch/case
 		 *    code paths above will not be reached for upgrades from an older YottaDB release to a newer YottaDB release.
 		 */
-=======
-			case GDSMV63007:
-				/* GT.M V63012 added fullblkwrt option */
-				csd->write_fullblk = 0;
-				break;
-			case GDSMV63012:
->>>>>>> f33a273c... GT.M V6.3-012
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
 			/* Move the below cases above the "case GDSMR126:" above as later GT.M versions use these minor
 			 * db version enum values.
 			 */
-			case GDSMVFILLER1:
 			case GDSMVFILLER2:
 			case GDSMVFILLER3:
 			case GDSMVFILLER4:

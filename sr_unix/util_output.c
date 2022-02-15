@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -346,16 +346,12 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 						break;
 					case 'Z': /* null teminated string */
 						GETFAOVALDEF(faocnt, fao, caddr_t, c, NULL);
-<<<<<<< HEAD
-						length = c ? STRLEN(c) : 0;
+						stringlength = c ? strlen(c) : 0;
+						length = (MAX_STRLEN > stringlength) ? (int)stringlength : MAX_STRLEN;
 						break;
 					default:
 						assert(FALSE);
 						length = MAXINT4;	/* For static scan */
-=======
-						stringlength = c ? strlen(c) : 0;
-						length = (MAX_STRLEN > stringlength) ? (int)stringlength : MAX_STRLEN;
->>>>>>> f33a273c... GT.M V6.3-012
 				}
 				/* Since gtmsecshr does not load ICU libraries (since dlopen() with LD_LIBRARY_PATH
 				 * does not work for root setuid executables), avoid calling gtm_wcswidth() and

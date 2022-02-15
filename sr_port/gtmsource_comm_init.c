@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,11 +46,8 @@
 #include "repl_sp.h"
 #include "repl_comm.h"
 #include "repl_log.h"
-<<<<<<< HEAD
 #include "dogetaddrinfo.h"
-=======
 #include "util.h"	/* util_out_print in GTM_PUTMSG_CSA_ADDRINFO */
->>>>>>> f33a273c... GT.M V6.3-012
 
 #define RESOLUTION_FAILURE_PREFIX	"Failure in resolving "
 GBLDEF	int			gtmsource_sock_fd = FD_INVALID;
@@ -66,23 +63,16 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 	/* Initialize communication stuff */
 	struct addrinfo 	*ai_ptr = NULL, *ai_head = NULL, hints;
 	gtmsource_local_ptr_t   gtmsource_local;
-<<<<<<< HEAD
 	intrpt_state_t  	prev_intrpt_state;
 	struct linger		disable_linger = {0, 0};
 	char			error_string[1024];
 	int			err_status;
 	char			*host;
 	char			port_buffer[NI_MAXSERV];
+	char			hostinfo[SIZEOF(RESOLUTION_FAILURE_PREFIX) + MAX_HOST_NAME_LEN + NI_MAXSERV];
 	int			port_len;
 	int			errcode;
 	int			tries;
-=======
-	char	*host;
-	char	port_buffer[NI_MAXSERV], hostinfo[SIZEOF(RESOLUTION_FAILURE_PREFIX) + MAX_HOST_NAME_LEN + NI_MAXSERV];
-	int	port_len;
-	int	errcode;
-	int	tries;
->>>>>>> f33a273c... GT.M V6.3-012
 
 	if (FD_INVALID != gtmsource_sock_fd) /* Initialization done already */
 		return(0);
@@ -93,32 +83,12 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 	host = gtmsource_local->secondary_host;
 	CLIENT_HINTS(hints);
 	for (tries = 0;
-<<<<<<< HEAD
 	     (tries < MAX_GETHOST_TRIES) && (EAI_AGAIN == (errcode = dogetaddrinfo(host, port_buffer, &hints, &ai_head)));
 	     tries++);
-	if (0 != errcode)
-		RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
-	/* Find one address valid for creating socket */
-	assert(ai_head);
-	for(ai_ptr = ai_head; NULL != ai_ptr; ai_ptr = ai_ptr->ai_next)
-	{
-		if (FD_INVALID == (gtmsource_sock_fd = socket(ai_ptr->ai_family, ai_ptr->ai_socktype, ai_ptr->ai_protocol)))
-			err_status = errno;
-		else
-		{
-			err_status = 0;
-			break;
-		}
-=======
-	     tries < MAX_GETHOST_TRIES &&
-	     EAI_AGAIN == (errcode = getaddrinfo(host, port_buffer, &hints, &ai_head));
-	      tries++)
-		;
 	if ((0 != errcode) && print_addresolve_error)
 	{
 		SNPRINTF(hostinfo, SIZEOF(hostinfo), "%s%s:%s", RESOLUTION_FAILURE_PREFIX, host, port_buffer);
 		GTM_PUTMSG_CSA_ADDRINFO(NULL, ERR_GETADDRINFO, errcode, hostinfo);
->>>>>>> f33a273c... GT.M V6.3-012
 	}
 	if (ai_head)
 	{
@@ -147,26 +117,6 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 		gtmsource_local->secondary_addrlen = ai_ptr->ai_addrlen;
 		memcpy((struct sockaddr*)(&gtmsource_local->secondary_inet_addr), ai_ptr->ai_addr, ai_ptr->ai_addrlen);
 		freeaddrinfo(ai_head); /* prevent mem-leak */
-<<<<<<< HEAD
-		SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket create : %s",
-			 STRERROR(err_status));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
-	}
-	assert(NULL != ai_ptr);
-	assert(SIZEOF(gtmsource_local->secondary_inet_addr) >= ai_ptr->ai_addrlen);
-	/* only save the addrinfo and address after the socket is successfuly created */
-	gtmsource_local->secondary_af = ai_ptr->ai_family;
-	gtmsource_local->secondary_addrlen = ai_ptr->ai_addrlen;
-	memcpy((struct sockaddr*)(&gtmsource_local->secondary_inet_addr), ai_ptr->ai_addr, ai_ptr->ai_addrlen);
-	freeaddrinfo(ai_head); /* prevent mem-leak */
-	/* A connection breakage should get rid of the socket */
-	if (-1 == setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, SIZEOF(disable_linger)))
-	{
-		err_status = ERRNO;
-		SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket disable linger : %s",
-			 STRERROR(err_status));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
-=======
 		/* A connection breakage should get rid of the socket */
 		if (-1 == setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_LINGER,
 				(const void *)&disable_linger, SIZEOF(disable_linger)))
@@ -176,7 +126,6 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 					STRERROR(err_status));
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
 		}
->>>>>>> f33a273c... GT.M V6.3-012
 	}
 	return(errcode);
 }

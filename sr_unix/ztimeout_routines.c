@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -118,8 +118,6 @@ void check_and_set_ztimeout(mval * inp_val)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-<<<<<<< HEAD
-	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 	if (NULL != ztimeout_local_str_val)
 	{	/* This is left over from a previous call to "check_and_set_ztimeout()" that encountered an error
 		 * midway (e.g. inside "op_commarg()" call below) and so could not get a chance to free memory then
@@ -135,13 +133,6 @@ void check_and_set_ztimeout(mval * inp_val)
 	local_str_end = ztimeout_local_str_val + inp_val->str.len;
 	ztimeout_local_str_val[inp_val->str.len] = '\0';
 	colon_ptr = strchr(ztimeout_local_str_val, ':');
-=======
-	local_str_val = (char *)malloc(inp_val->str.len + 1);
-	memcpy(local_str_val, inp_val->str.addr, inp_val->str.len);
-	local_str_end = local_str_val + inp_val->str.len;
-	local_str_val[inp_val->str.len] = '\0';
-	colon_ptr = strchr(local_str_val, ':');
->>>>>>> f33a273c... GT.M V6.3-012
 	ztimeout_vector = (TREF(dollar_ztimeout)).ztimeout_vector;
 	ztimeout_seconds = (TREF(dollar_ztimeout)).ztimeout_seconds;
 	max_read_len = ((NULL == colon_ptr)

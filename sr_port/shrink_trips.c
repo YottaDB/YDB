@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2003, 2011 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2003-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> f33a273c... GT.M V6.3-012
+ *								*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,7 +62,7 @@ void shrink_trips(void)
 	if (ydbDebugLevel & GDL_DebugCompiler)
 	{
 		PRINTF(" \n\n\n\n************************** Before shrink_trips scan ****************************\n");
-		cdbg_dump_triple_all();
+		cdbg_dump_t_orig();
 	}
 #	endif
 	first_pass = TRUE;
@@ -132,7 +128,7 @@ void shrink_trips(void)
 	if (ydbDebugLevel & GDL_DebugCompiler)
 	{
 		PRINTF(" \n\n\n\n************************** After shrink_trips scan *****************************\n");
-		cdbg_dump_triple_all();
+		cdbg_dump_t_orig();
 	}
 #	endif
 }

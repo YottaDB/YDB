@@ -373,10 +373,6 @@ MBSTART {											\
 	cs_data = save_csdata;										\
 }
 
-<<<<<<< HEAD
-GBLREF	int4			ydb_fullblockwrites;	/* Do full (not partial) database block writes */
-=======
->>>>>>> f33a273c... GT.M V6.3-012
 GBLREF	boolean_t		is_src_server;
 GBLREF  boolean_t               mupip_jnl_recover;
 GBLREF	gd_region		*gv_cur_region, *db_init_region;
@@ -1215,12 +1211,8 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	 * unconditionally
 	 */
 	reg->dyn.addr->acc_meth = tsd->acc_meth;
-<<<<<<< HEAD
-	reg->dyn.addr->read_only = tsd_read_only;
-=======
 	reg->dyn.addr->read_only = tsd->read_only;
 	reg->dyn.addr->full_blkwrt = tsd->write_fullblk;
->>>>>>> f33a273c... GT.M V6.3-012
 	COPY_AIO_SETTINGS(reg->dyn.addr, tsd);	/* copy "asyncio" from tsd to reg->dyn.addr */
 	new_shm_ipc = udi->shm_created;
 	if (tsd_read_only)
@@ -1780,11 +1772,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		udi->counter_ftok_incremented = FALSE;
 		assert(-1 != status);	/* since we hold the access control lock, we do not expect any errors */
 	}
-<<<<<<< HEAD
-	if (ydb_fullblockwrites)
-=======
 	if (csd->write_fullblk)
->>>>>>> f33a273c... GT.M V6.3-012
 	{	/* We have been asked to do FULL BLOCK WRITES for this database. On *NIX, attempt to get the filesystem
 		 * blocksize from statvfs. This allows a full write of a blockwithout the OS having to fetch the old
 		 * block for a read/update operation. We will round the IOs to the next filesystem blocksize if the
@@ -1801,10 +1789,6 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		 */
 		fbwsize = get_fs_block_size(udi->fd);
 		dblksize = csd->blk_size;
-<<<<<<< HEAD
-		if (0 != fbwsize && (0 == dblksize % fbwsize) && (0 == (BLK_ZERO_OFF(csd->start_vbn)) % fbwsize))
-			csa->do_fullblockwrites = ydb_fullblockwrites;		/* This region is fullblockwrite enabled */
-=======
 		if (0 == fbwsize || (0 != dblksize % fbwsize) || (0 != (BLK_ZERO_OFF(csd->start_vbn)) % fbwsize))
 		{
 			if (!IS_STATSDB_REGNAME(reg))
@@ -1820,7 +1804,6 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			}
 			csd->write_fullblk = 0;		/* This region is not fullblockwrite enabled */
 		}
->>>>>>> f33a273c... GT.M V6.3-012
 		/* Report this length in DSE even if not enabled */
 		csa->fullblockwrite_len = fbwsize;		/* Length for rounding fullblockwrite */
 	}

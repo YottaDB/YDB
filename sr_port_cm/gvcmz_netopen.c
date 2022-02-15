@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,16 +85,8 @@ void gvcmz_netopen_attempt(struct CLB *c)
 	jnl_process_vector	temp_vect;
 #endif
 
-<<<<<<< HEAD
 	ASSERT_IS_LIBGNPCLIENT;
-	VMS_ONLY(
-		ESTABLISH(gvcmz_netopen_ch); /* our old servers run only on VMS; no need for retry on other OSs */
-		clb = c; /* need this assignment since we can't pass c to gvcmz_netopen_ch */
-	)
-	c->mbf = stringpool.free;
-=======
 
->>>>>>> f33a273c... GT.M V6.3-012
 	c->mbl = CM_MINBUFSIZE;
 	ENSURE_STP_FREE_SPACE(c->mbl);
 	c->mbf = stringpool.free;

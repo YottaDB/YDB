@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,20 +29,12 @@
  *	(indr_stringpool).  comp_fini changes it back from indr_stringpool to
  *	rts_stringpool when the compilation is finished.
  */
-<<<<<<< HEAD
-GBLREF char	cg_phase;
-GBLREF int4	curr_fetch_count;
-GBLREF spdesc	stringpool,rts_stringpool;
-GBLREF spdesc	indr_stringpool;
-GBLREF triple	*curr_fetch_trip;
-=======
 GBLREF char		cg_phase;
-GBLREF int4		aligned_source_buffer, curr_fetch_count;
+GBLREF int4		curr_fetch_count;
 GBLREF short int	source_line;
 GBLREF spdesc		stringpool,rts_stringpool;
 GBLREF spdesc		indr_stringpool;
 GBLREF triple		*curr_fetch_trip;
->>>>>>> f33a273c... GT.M V6.3-012
 
 error_def(ERR_INDRMAXLEN);
 

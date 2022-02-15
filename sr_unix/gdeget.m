@@ -396,16 +396,11 @@ segment:
 	s segs(s,"BLOCK_SIZE")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	s segs(s,"FULLBLKWRT")=0
 	if (gldfmt>12) do
-<<<<<<< HEAD
-	. if $$bin2num($zextract(rec,rel,rel+1))'=0 d message^GDE(gdeerr("INPINTEG"),"""""")
-	. set rel=rel+2 set segs(s,"EXTENSION_COUNT")=$$bin2num($zextract(rec,rel,rel+3)),rel=rel+4
-=======
 	. if gldfmt=13 do
-	. . if $$bin2num($zextract(rec,rel,rel+1))'=0 zm gdeerr("INPINTEG")
+	. . if $$bin2num($zextract(rec,rel,rel+1))'=0 d message^GDE(gdeerr("INPINTEG"),"""""")
 	. . else  set rel=rel+2
 	. else  set segs(s,"FULLBLKWRT")=$$bin2num($zextract(rec,rel,rel+1)),rel=rel+2
 	. set segs(s,"EXTENSION_COUNT")=$$bin2num($zextract(rec,rel,rel+3)),rel=rel+4
->>>>>>> f33a273c... GT.M V6.3-012
 	if (gldfmt<=12) set segs(s,"EXTENSION_COUNT")=$$bin2num($zextract(rec,rel,rel+1)),rel=rel+2
 	s segs(s,"ALLOCATION")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
 	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) d message^GDE(gdeerr("INPINTEG"),"""""")	; reserved for clb
@@ -863,4 +858,3 @@ v6310init:
 	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32   ; maximum name length allowed is 31 characters
         s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
         q
-

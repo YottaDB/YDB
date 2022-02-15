@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -637,8 +637,6 @@ void mupip_backup(void)
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ERR_FILENAMETOOLONG);
 			}
-<<<<<<< HEAD
-=======
 			/* GTM-9182 : If there's just enough space for the temp filepath, BUT NOT for the backup filepath, backup
 			 *  succeeds even though the full pathname of backup file exceeds MAX_FN_LEN. This should NOT be allowed.
 			 * This check is not required for backup files having full pathnames
@@ -659,8 +657,6 @@ void mupip_backup(void)
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ERR_FILENAMETOOLONG);
 			}
-			SNPRINTF(tempfilename + tempdir_full.len, MAX_FN_LEN - tempdir_full.len, "/%s_XXXXXX", tempnam_prefix);
->>>>>>> f33a273c... GT.M V6.3-012
 			MKSTEMP(tempfilename, rptr->backup_fd);
 			if (FD_INVALID == rptr->backup_fd)
 			{

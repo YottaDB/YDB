@@ -98,18 +98,12 @@ int f_incr(oprtype *a, opctype op)
 		assert(&tmpexpr != tmpexpr.exorder.bl);
 		dqadd(TREF(expr_start), &tmpexpr, exorder);	/* this is a violation of info hiding */
 		TREF(expr_start) = tmpexpr.exorder.bl;
-<<<<<<< HEAD
-		assert(OC_GVSAVTARG == (TREF(expr_start))->opcode);
-		triptr2 = newtriple(OC_GVRECTARG);	/* restore the result of the last gvn to preserve $referece (the naked) */
-		triptr2->operand[0] = put_tref(TREF(expr_start));
-=======
 		if (OC_GVSAVTARG == (TREF(expr_start))->opcode)
 		{
-			triptr = newtriple(OC_GVRECTARG);	/* restore result of last gvn to preserve $reference (the naked) */
-			triptr->operand[0] = put_tref(TREF(expr_start));
+			triptr2 = newtriple(OC_GVRECTARG);	/* restore the result of the last gvn to preserve $referece (the naked) */
+			triptr2->operand[0] = put_tref(TREF(expr_start));
 		} else
 			assert(OC_NOOP == (TREF(expr_start))->opcode);
->>>>>>> [#603] [V63012] Merge GT.M V6.3-012 into YottaDB mainline (with conflicts)
 	}
 	if (!TREF(shift_side_effects) || (YDB_BOOL != TREF(ydb_fullbool)) || (OC_INDINCR != r->opcode)
 		|| (NULL == TREF(expr_start)) || (NULL == triptr))
@@ -130,11 +124,7 @@ int f_incr(oprtype *a, opctype op)
 	{	/* add the chain after "expr_start" which may be much before "curtchain" */
 		newtriple(OC_GVSAVTARG);
 		setcurtchain(oldchain);
-<<<<<<< HEAD
-=======
-		assert(NULL != TREF(expr_start));
 		assert(&targchain != targchain.exorder.bl);
->>>>>>> f33a273c... GT.M V6.3-012
 		dqadd(TREF(expr_start), &targchain, exorder);	/* this is a violation of info hiding */
 		TREF(expr_start) = targchain.exorder.bl;
 		assert(OC_GVSAVTARG == (TREF(expr_start))->opcode);

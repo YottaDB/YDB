@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -122,7 +122,7 @@ void alloc_reg(void)
 				remove_backptr(x, &x->operand[0], tempcont);
 				x->opcode = OC_NOOP;
 				x->operand[0].oprclass = NO_REF;
-				assert(NO_REF == x->operand[1].oprclass);
+				assert((NO_REF == x->operand[1].oprclass) || (TRIP_REF == x->operand[1].oprclass));
 				assert(NO_REF == x->destination.oprclass);
 				continue;
 			case OC_STO:
@@ -143,18 +143,6 @@ void alloc_reg(void)
 			default:
 				break;
 		}
-<<<<<<< HEAD
-		if (OC_PASSTHRU == opc)
-		{
-			COMPDBG(PRINTF(" *** OC_PASSTHRU opcode being NOOP'd\n"););
-			remove_backptr(x, &x->operand[0], tempcont);
-			x->opcode = OC_NOOP;
-			x->operand[0].oprclass = NO_REF;
-			assert((NO_REF == x->operand[1].oprclass) || (TRIP_REF == x->operand[1].oprclass));
-			continue;
-		}
-=======
->>>>>>> f33a273c... GT.M V6.3-012
 		if (NO_REF == (dest_type = x->destination.oprclass))	/* Note assignment */
 		{
 			oct = oc_tab[opc].octype;

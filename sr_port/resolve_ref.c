@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,12 +55,12 @@ int resolve_ref(int errknt)
 
 	SETUP_THREADGBL_ACCESS;
 #	ifdef DEBUG
-	if (!run_time && (gtmDebugLevel & GDL_DebugCompiler))
+	if (!run_time && (ydbDebugLevel & GDL_DebugCompiler))
 	{	/* ensure that "borrowing" of backpointers has not left any trace */
 		dqloop(&t_orig, exorder, curtrip)
 		{
 			tripbp = &curtrip->backptr;
-			assert((tripbp == tripbp->que.fl) && (tripbp == tripbp->que.bl) && (NULL == tripbp->bpt));
+			assert((tripbp == tripbp->que.fl) && (tripbp == tripbp->que.bl) && (NULL == tripbp->bkptr));
 		}
 	}
 #	endif

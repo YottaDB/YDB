@@ -71,12 +71,7 @@
 GBLREF	boolean_t	dollar_zquit_anyway;	/* if TRUE compile QUITs to not care whether or not they're from an extrinsic */
 GBLREF	uint4		ydbDebugLevel; 		/* Debug level (0 = using default sm module so with
 						   a DEBUG build, even level 0 implies basic debugging) */
-<<<<<<< HEAD
 GBLREF	boolean_t	ydbSystemMalloc;	/* Use the system's malloc() instead of our own */
-GBLREF	int4		ydb_fullblockwrites;	/* Do full (not partial) database block writes */
-=======
-GBLREF	boolean_t	gtmSystemMalloc;	/* Use the system's malloc() instead of our own */
->>>>>>> f33a273c... GT.M V6.3-012
 GBLREF	boolean_t	certify_all_blocks;
 GBLREF	uint4		ydb_blkupgrade_flag;	/* controls whether dynamic block upgrade is attempted or not */
 GBLREF	boolean_t	ydb_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
@@ -102,10 +97,6 @@ void	gtm_env_init(void)
 	mstr			trans;
 	uint4			tdbglvl, tmsock, reservesize, memsize, cachent, trctblsize, trctblbytes;
 	uint4			max_threads, max_procs;
-<<<<<<< HEAD
-	int4			temp_strpllim;
-=======
->>>>>>> f33a273c... GT.M V6.3-012
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -233,36 +224,6 @@ void	gtm_env_init(void)
 		if (is_defined)
 			TREF(ydb_dirtree_collhdr_always) = ret; /* if logical is not defined, the TREF takes the default value */
 #		endif
-<<<<<<< HEAD
-		/* Full Database-block Write mode */
-		ydb_fullblockwrites = (int)ydb_logical_truth_value(YDBENVINDX_FULLBLOCKWRITES, FALSE, &is_defined);
-		if (!is_defined) /* Variable not defined */
-			ydb_fullblockwrites = DEFAULT_FBW_FLAG;
-		else if (!ydb_fullblockwrites) /* Set to false */
-			ydb_fullblockwrites = FALSE;
-		else /* Set to true, exam for FULL_DATABASE_WRITE */
-		{
-			ydb_fullblockwrites = ydb_trans_numeric(YDBENVINDX_FULLBLOCKWRITES, &is_defined, IGNORE_ERRORS_TRUE, NULL);
-			switch(ydb_fullblockwrites)
-			{
-			case FULL_FILESYSTEM_WRITE:
-			case FULL_DATABASE_WRITE:
-				/* Both these values are valid */
-				break;
-			default:
-				/* Else, assume FULL_FILESYSTEM_WRITE */
-				ydb_fullblockwrites = FULL_FILESYSTEM_WRITE;
-				break;
-			}
-		}
-=======
-		/* Initialize variable that controls TP allocation clue (for created blocks) */
-		val.addr = GTM_TP_ALLOCATION_CLUE;
-		val.len = SIZEOF(GTM_TP_ALLOCATION_CLUE) - 1;
-		gtm_tp_allocation_clue = (block_id)trans_numeric(&val, &is_defined, TRUE);
-		if (!is_defined)
-			gtm_tp_allocation_clue = (block_id)MAXTOTALBLKS_MAX;
->>>>>>> f33a273c... GT.M V6.3-012
 		/* GDS Block certification */
 		ret = ydb_logical_truth_value(YDBENVINDX_GDSCERT, FALSE, &is_defined);
 		if (is_defined)
@@ -404,12 +365,7 @@ void	gtm_env_init(void)
 		/* See if $ydb_mupjnl_parallel is set */
 		ydb_mupjnl_parallel = ydb_trans_numeric(YDBENVINDX_MUPJNL_PARALLEL, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		if (!is_defined)
-<<<<<<< HEAD
 			ydb_mupjnl_parallel = 1;
-		/* See if $ydb_string_pool_limit is set */
-		temp_strpllim = ydb_trans_numeric(YDBENVINDX_STRING_POOL_LIMIT, &is_defined, IGNORE_ERRORS_TRUE, NULL);
-		if (0 < temp_strpllim)
-			TREF(gtm_strpllim) = temp_strpllim;
 		/* See if ydb_repl_filter_timeout is specified */
 		ydb_repl_filter_timeout = ydb_trans_numeric(YDBENVINDX_REPL_FILTER_TIMEOUT, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		if (!is_defined)
@@ -422,9 +378,6 @@ void	gtm_env_init(void)
 				&& (REPL_FILTER_TIMEOUT_MAX >= ydb_repl_filter_timeout));
 		ret = ydb_logical_truth_value(YDBENVINDX_DOLLAR_TEST, FALSE, &is_defined);
 		dollar_test_default = (is_defined ? ret : TRUE);
-=======
-			gtm_mupjnl_parallel = 1;
->>>>>>> f33a273c... GT.M V6.3-012
 		/* gtm_nofflf for GTM-9136.  Default is FALSE */
 		gtm_nofflf = ydb_logical_truth_value(YDBENVINDX_NOFFLF, FALSE, &is_defined);
 

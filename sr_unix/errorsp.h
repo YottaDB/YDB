@@ -113,17 +113,12 @@ GBLREF uint4			process_id;
 #define SEVERE		4
 #define SEV_MSK		7
 
-<<<<<<< HEAD
 /* A YDB error code is one that is either in merrors.msg or in ydberrors.msg */
 #define IS_YDB_ERROR(err) (((err & FACMASK(merrors_ctl.facnum))							\
 					&& (MSGMASK(err, merrors_ctl.facnum) <= merrors_ctl.msg_cnt))		\
 				|| ((err & FACMASK(ydberrors_ctl.facnum))					\
 					&& (MSGMASK(err, ydberrors_ctl.facnum) <= ydberrors_ctl.msg_cnt)))
 
-=======
-#define IS_GTM_ERROR(err) \
-	(((err & 0x0FFFFFFF) & FACMASK(merrors_ctl.facnum))  &&  (MSGMASK(err, merrors_ctl.facnum) <= merrors_ctl.msg_cnt))
->>>>>>> f33a273c... GT.M V6.3-012
 #define CHECKHIGHBOUND(hptr)  assert(hptr < (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))
 #define CHECKLOWBOUND(hptr)   assert(hptr >= (&chnd[0] - 1)) /* Low check for chnd - 1 in case last handler setup new handler */
 

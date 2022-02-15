@@ -64,26 +64,20 @@ int m_xecute(void)
 		}
 		/* caution: fall through ??? maybe ??? */
 	case EXPR_GOOD:
-<<<<<<< HEAD
 		/* Try to see if the string passed to XECUTE can be precompiled at compile time. This is an optimization to
 		 * see if the XECUTE can be avoided without any impact to the M program. Disallow this if we have other
 		 * M commands following the XECUTE in the same M line. This is because if the XECUTE string has a FOR loop
 		 * or IF check in it, those would affect the M commands following the XECUTE if the XECUTE command is removed
 		 * and the string pased to XECUTE is instead compiled. Hence the TK_EOL check of the window_token below.
 		 */
+		for (ref0 = tmpchain.exorder.bl, ref1 = ref0->exorder.bl; OC_NOOP == ref1->opcode; ref1 = ref1->exorder.bl)
+ 			;	/*  WARNING very evil violations of information hiding above and below */
 		if (!run_time
 			&& (TK_EOL == TREF(window_token))
-			&& (OC_LIT == (ref0 = (TREF(curtchain))->exorder.bl)->opcode)
-			&& (ref0->exorder.bl == TREF(curtchain)))
-		{	/* just found a literal, and only one, and we are not already at run time; WARNING assignment above */
-			/* Can't drive the parsing with the source because there may be emedded quotes, rather must use the literal
-=======
-		for (ref0 = tmpchain.exorder.bl, ref1 = ref0->exorder.bl; OC_NOOP == ref1->opcode; ref1 = ref1->exorder.bl)
-			;	/*  WARNING very evil violations of information hiding above and below */
-		if (!run_time && (OC_LIT == ref0->opcode) && (&tmpchain == ref1))
+			&& (OC_LIT == ref0->opcode)
+			&& (&tmpchain == ref1))
 		{	/* Just found a literal, and only one, and we are not already at run time.
 			 * Can't drive the parsing with the source because there may be emedded quotes, rather must use the literal
->>>>>>> f33a273c... GT.M V6.3-012
 			 * The code in this block sorta/kinda does things like comp_init and op_commarg between a save and restore
 			 * of parser state. If the parse fails or runs into a GOTO, NEW, QUIT or (nested) XECUTE it reverts to
 			 * producing the code for a run time evaluation of the literal. GOTO and QUIT must deal with the XECUTE

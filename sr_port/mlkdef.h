@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -173,34 +173,29 @@ typedef struct				/* the subscript value of a single node in a tree.  Stored sep
 
 typedef struct	mlk_ctldata_struct	/* this describes the entire shared lock section */
 {
-	ptroff_t	prcfree;		/* relative pointer to the first empty mlk_prcblk */
-	ptroff_t	blkbase;		/* relative pointer to the first mlk_shrblk array entry */
-	ptroff_t	blkfree;		/* relative pointer to the first free mlk_shrblk.
-						 * if zero, the blkcnt must also equal zero */
-	ptroff_t	blkhash;		/* relative pointer to the first mlk_shrhash, or MLK_CTL_BLKHASH_EXT if external */
-	ptroff_t	blkroot;		/* relative pointer to the first name level mlk_shrblk.
-						 * if zero, then there are no locks in this section */
-	ptroff_t	subbase;		/* relative pointer to the base of the mlk_shrsub area */
-	ptroff_t	subfree;		/* relative pointer to the first free cell in the shrsub area */
-	ptroff_t	subtop;			/* relative pointer to the top of the shrsub area */
-	uint4		max_prccnt;		/* maximum number of entries in the prcfree chain */
-	uint4		max_blkcnt;		/* maximum number of entries in the blkfree chain */
-	uint4		num_blkhash;		/* number of hash buckets */
-	int4		prccnt;			/* number of entries in the prcfree chain */
-	int4		blkcnt;			/* number of entries in the blkfree chain */
-	unsigned int	wakeups;		/* lock wakeup counter */
-	boolean_t	lockspacefull_logged;	/* whether LOCKSPACEFULL has been issued since last being below threshold */
-	boolean_t	gc_needed;		/* whether we've determined that a garbage collection is needed */
-	boolean_t	resize_needed;		/* whether we've determined that a hash table resize is needed */
-	boolean_t	rehash_needed;		/* whether we've determined that a hash table rehash is needed */
-	global_latch_t	lock_gc_in_progress;	/* pid of the process doing the GC, or 0 if none */
-<<<<<<< HEAD
-	mlk_subhash_seed_t hash_seed;		/* seed value to use to initialize hash */
-	int		hash_shmid;		/* shared memory id of hash table, or undefined if internal (see blkhash) */
-=======
+	ptroff_t		prcfree;		/* relative pointer to the first empty mlk_prcblk */
+	ptroff_t		blkbase;		/* relative pointer to the first mlk_shrblk array entry */
+	ptroff_t		blkfree;		/* relative pointer to the first free mlk_shrblk.
+						 	* if zero, the blkcnt must also equal zero */
+	ptroff_t		blkhash;		/* relative pointer to the first mlk_shrhash, or MLK_CTL_BLKHASH_EXT if external */
+	ptroff_t		blkroot;		/* relative pointer to the first name level mlk_shrblk.
+						 	* if zero, then there are no locks in this section */
+	ptroff_t		subbase;		/* relative pointer to the base of the mlk_shrsub area */
+	ptroff_t		subfree;		/* relative pointer to the first free cell in the shrsub area */
+	ptroff_t		subtop;			/* relative pointer to the top of the shrsub area */
+	uint4			max_prccnt;		/* maximum number of entries in the prcfree chain */
+	uint4			max_blkcnt;		/* maximum number of entries in the blkfree chain */
+	uint4			num_blkhash;		/* number of hash buckets */
+	int4			prccnt;			/* number of entries in the prcfree chain */
+	int4			blkcnt;			/* number of entries in the blkfree chain */
+	unsigned int		wakeups;		/* lock wakeup counter */
+	boolean_t		lockspacefull_logged;	/* whether LOCKSPACEFULL has been issued since last being below threshold */
+	boolean_t		gc_needed;		/* whether we've determined that a garbage collection is needed */
+	boolean_t		resize_needed;		/* whether we've determined that a hash table resize is needed */
+	boolean_t		rehash_needed;		/* whether we've determined that a hash table rehash is needed */
+	global_latch_t		lock_gc_in_progress;	/* pid of the process doing the GC, or 0 if none */
 	mlk_subhash_seed_t	hash_seed;		/* seed value to use to initialize hash */
-	int		hash_shmid;		/* shared memory id of hash table, or INVALID_SHMID if internal. */
->>>>>>> f33a273c... GT.M V6.3-012
+	int			hash_shmid;		/* shared memory id of hash table, or INVALID_SHMID if internal. */
 } mlk_ctldata;
 
 /* Define types for shared memory resident structures */

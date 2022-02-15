@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,7 +29,7 @@
 
 GBLREF boolean_t	run_time;
 GBLREF triple		t_orig;
-GBLREF uint4		gtmDebugLevel;
+GBLREF uint4		ydbDebugLevel;
 
 error_def(ERR_EXPR);
 error_def(ERR_MAXARGCNT);
@@ -62,13 +62,7 @@ int eval_expr(oprtype *a)
 	triple		*argtrip, *parm, *ref, *ref1, *t1, *t2;
 	mliteral	*m1, *m2;
 	mval		tmp_mval;
-<<<<<<< HEAD
 	enum octype_t	type;
-
-=======
-	int i = 0;
-	unsigned short	type;
->>>>>>> f33a273c... GT.M V6.3-012
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -100,7 +94,7 @@ int eval_expr(oprtype *a)
 				assert(&t_orig != ref->exorder.fl);
 				TREF(expr_start) = TREF(expr_start_orig) = ref;
 #				ifdef DEBUG
-				if (GDL_DebugCompiler & gtmDebugLevel)
+				if (GDL_DebugCompiler & ydbDebugLevel)
 					CHKTCHAIN(TREF(expr_start), exorder, FALSE);
 #				endif
 			}
@@ -254,7 +248,7 @@ int eval_expr(oprtype *a)
 			{
 				advancewindow();
 #				ifdef DEBUG
-				if ((GDL_DebugCompiler & gtmDebugLevel) && (NULL != TREF(expr_start)))
+				if ((GDL_DebugCompiler & ydbDebugLevel) && (NULL != TREF(expr_start)))
 					CHKTCHAIN(TREF(expr_start), exorder, FALSE);
 #				endif
 				if (!expratom(&optyp_2))
@@ -264,7 +258,7 @@ int eval_expr(oprtype *a)
 				}
 			}
 #			ifdef DEBUG
-			if ((GDL_DebugCompiler & gtmDebugLevel) && (NULL != TREF(expr_start)))
+			if ((GDL_DebugCompiler & ydbDebugLevel) && (NULL != TREF(expr_start)))
 				CHKTCHAIN(TREF(expr_start), exorder, FALSE);
 #			endif
 			coerce(&optyp_2, type);

@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -265,15 +265,8 @@ THREADGBLFPTR(gtm_env_xlate_entry,		int,		())		/* gtm_env_xlate() or ydb_env_xla
 THREADGBLDEF(ydb_environment_init,		boolean_t)			/* indicates a development environment rather
 										 * than a production environment */
 THREADGBLFPTR(gtm_sigusr1_handler,		void, 		(void))		/* SIGUSR1 signal handler function ptr */
-<<<<<<< HEAD
 THREADGBLDEF(ydb_linktmpdir,			mstr)				/* Directory to use for relinkctl files */
-THREADGBLDEF(gtm_strpllim,			int4)				/* if non-zero, sets limit on stringpool */
-THREADGBLDEF(gtm_strpllimwarned,		boolean_t)			/* already hit limit on stringpool  */
 THREADGBLDEF(ydb_trigger_etrap,			mval)				/* $etrap - for use in triggers */
-=======
-THREADGBLDEF(gtm_linktmpdir,			mstr)				/* Directory to use for relinkctl files */
-THREADGBLDEF(gtm_trigger_etrap,			mval)				/* $etrap - for use in triggers */
->>>>>>> f33a273c... GT.M V6.3-012
 THREADGBLDEF(gtm_trctbl_cur,			trctbl_entry *)			/* Current gtm trace table entry */
 THREADGBLDEF(gtm_trctbl_end,			trctbl_entry *)			/* End of gtm trace table (last entry + 1) */
 THREADGBLDEF(gtm_trctbl_groups,			unsigned int)			/* Trace group mask (max 31 groups) */

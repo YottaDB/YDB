@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -293,11 +293,8 @@ boolean_t mu_int_blk(
 	uint4		cnt, span_curr_blk, rval_len, gblsize;
 	unsigned short	numsubs;
 	unsigned int	null_subscript_cnt;
-<<<<<<< HEAD
 	boolean_t	coll_ret;
-=======
 	DCL_THREADGBL_ACCESS;
->>>>>>> f33a273c... GT.M V6.3-012
 
 	SETUP_THREADGBL_ACCESS;
 	instance_frozen = TREF(instance_frozen_crit_skipped);
@@ -417,17 +414,12 @@ boolean_t mu_int_blk(
 	{
 		rec_num++;
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
-<<<<<<< HEAD
 		{
 			free(free_blk_base);	/* Added in case called from non-terminating process (perhaps in future) */
 			return FALSE;		/* Only happens on termination, so don't worry about mu_int_plen. */
 		}
-		mu_int_cum[RECS][level]++;
-=======
-			return FALSE;	/* Only happens on termination, so don't worry about mu_int_plen. */
 		if (!block_being_retried)
 			mu_int_cum[RECS][level]++;
->>>>>>> f33a273c... GT.M V6.3-012
 		GET_USHORT(temp_ushort, &(((rec_hdr_ptr_t)rec_base)->rsiz));
 		rec_size = temp_ushort;
 		mu_int_offset[mu_int_plen - 1] = (uint4)(rec_base - blk_base);

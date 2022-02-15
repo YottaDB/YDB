@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -962,13 +962,8 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	/* Take backup of block in phase2 (outside of crit). */
 	cs->cr = cr;		/* note down "cr" so phase2 can find it easily (given "cs") */
 	/* If this is the first time the the database block has been written, we must write
-<<<<<<< HEAD
-	 * the entire database block if ydb_fullblockwrites = 2 */
-	/* Note that the check for ydb_fullblockwrites happens when we decide to write the block,
-=======
 	 * the entire database block if csd->write_fullblk = 2 */
 	/* Note that the check for csd->write_fullblk happens when we decide to write the block,
->>>>>>> f33a273c... GT.M V6.3-012
 	 * not here; so if the block is new, mark as needing first write */
 	if (WAS_FREE(cs->blk_prior_state))
 		cs->cr->needs_first_write = TRUE;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,11 +94,7 @@ MBSTART {										\
 											\
 	SETUP_THREADGBL_ACCESS;								\
 					/* memcmp() is fast and 3 chars sufficient */	\
-<<<<<<< HEAD
- 	if ((ydbDebugLevel & GDL_DebugCompiler) && (0 == memcmp(#N, "exorder", 3)))	\
-=======
-	if ((GDL_DebugCompiler & gtmDebugLevel) && (0 == memcmp(#N, "exorder", 3)))	\
->>>>>>> f33a273c... GT.M V6.3-012
+	if ((GDL_DebugCompiler & ydbDebugLevel) && (0 == memcmp(#N, "exorder", 3)))	\
 	{										\
 		if ((triple *)-1 != (triple *)(Q)) /* to avoid post-checking deletes */	\
 			chktchain((triple *)(Q));					\

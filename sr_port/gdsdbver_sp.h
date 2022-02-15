@@ -36,7 +36,6 @@ ENUM_ENTRY(GDSMV62002),		/* New field defer_allocate needed for database file pr
 ENUM_ENTRY(GDSMV63000),		/* New field non_null_iv to indicate IV mode for encrypted blocks */
 ENUM_ENTRY(GDSMV63000A),	/* Move fields ftok_counter_halted and access_counter_halted from fileheader to nodelocal */
 ENUM_ENTRY(GDSMV63001),		/* New "asyncio" option; New reservedDBFlags field */
-<<<<<<< HEAD
 ENUM_ENTRY(GDSMV63003),		/* New field "read_only" to indicate a read-only database */
 ENUM_ENTRY(GDSMV63007),		/* Reuse abandoned field for use controlled stable flush_trigger_top.
 				 * Can also correspond to ENUM_ENTRY(GDSMR122) since this enum value was used by both
@@ -46,7 +45,7 @@ ENUM_ENTRY(GDSMV63007),		/* Reuse abandoned field for use controlled stable flus
 				 * In GDSMR122, this is what happened.
 				 *	New field "reorg_sleep_nsec" to slow down reorg update rate (e.g. reduce restarts) by user
 				 */
-ENUM_ENTRY(GDSMVFILLER1),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMV63012),		/* New fullblklwrt option */
 ENUM_ENTRY(GDSMVFILLER2),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER3),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER4),	/* Space reserved for GT.M changes to minor db format */
@@ -65,9 +64,5 @@ ENUM_ENTRY(GDSMVFILLER16),	/* Space reserved for GT.M changes to minor db format
 ENUM_ENTRY(GDSMR126),		/* Includes GT.M V6.3-007 */
 ENUM_ENTRY(GDSMR130),
 ENUM_ENTRY(GDSMR134),		/* New field "max_procs" records max concurrent processes accessing database */
-=======
-ENUM_ENTRY(GDSMV63003),		/* New field read_only to indicate a read-only database */
-ENUM_ENTRY(GDSMV63007),		/* Reuse abandoned field for use controlled stable flush_trigger_top */
-ENUM_ENTRY(GDSMV63012),		/* New fullblklwrt option */
->>>>>>> f33a273c... GT.M V6.3-012
+ENUM_ENTRY(GDSMR136),		/* Includes GT.M V6.3-012 */
 ENUM_ENTRY(GDSMVLAST)

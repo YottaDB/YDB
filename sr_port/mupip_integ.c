@@ -537,12 +537,8 @@ void mupip_integ(void)
 			gv_altkey->base[gv_altkey->end] = '\0';
 			if (gv_target->act)
 				act_in_gvt(gv_target);
-<<<<<<< HEAD
 			dummy = '\0';
-			if (mu_int_blk(trees->root, MAX_BT_DEPTH, TRUE, gv_altkey->base, gv_altkey->end, &dummy, 0, 0))
-=======
 			if (mu_int_blk(trees->root, MAX_BT_DEPTH, TRUE, gv_altkey->base, gv_altkey->end, &dummy, 0, 0, 0, FALSE))
->>>>>>> f33a273c... GT.M V6.3-012
 			{
 				/* We are done with the INTEG CHECK for the current GVT, but if the spanning node INTEG
 				 * check is not finished, either of the following two are occurred.

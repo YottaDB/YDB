@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -804,17 +804,12 @@ void *gtm_malloc_main(size_t size)	/* Note renamed to gtm_malloc_dbg when includ
 			 * we should be be doing debug builds, drive the debug flavor of gtm_malloc instead which
 			 * will do its own initialization if it still needs to (see top of gtmSmInit() above).
 			 */
-<<<<<<< HEAD
-			PRO_ONLY(if (0 != ydbDebugLevel) return (void *)gtm_malloc_dbg(size));
-			return (void *)gtm_malloc(size);
-=======
 			smCallerIdExtraLevels++;
 #			ifndef DEBUG
-			if (gtmDebugLevel & GDL_SmAllMallocDebug)
+			if (ydbDebugLevel & GDL_SmAllMallocDebug)
 				return (void *)gtm_malloc_dbg(size);
 #			endif
 			return (void *)gtm_malloc_main(size);
->>>>>>> f33a273c... GT.M V6.3-012
 		}
 #	ifndef DEBUG
 	} else

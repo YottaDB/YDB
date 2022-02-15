@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -213,11 +213,8 @@ typedef enum {
 	WBTEST_SOCKET_KEEPALIVE,		/* 163 : shorten keepalive parameters so test fails fast */
 	WBTEST_FETCHCOMM_ERR,			/* 164 : Communication error during fetchresync rollback */
 	WBTEST_FETCHCOMM_HISTINFO,		/* 165 : Communication error during fetchresync rollback HISTINFO */
-<<<<<<< HEAD
-=======
 	WBTEST_MUINTEG_TQREAD,			/* 166 : Force t_qread to return NULL. To test integ with frozen instance */
-	WBTEST_FULLBLKWRT_DB			/* 167 : Full disk blk writes for new blocks */
->>>>>>> f33a273c... GT.M V6.3-012
+	WBTEST_FULLBLKWRT_DB,			/* 167 : Full disk blk writes for new blocks */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.

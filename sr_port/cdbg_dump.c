@@ -129,22 +129,12 @@ void cdbg_dump_boolchain(void)
 /* Routine to dump a single triple and its followers */
 void cdbg_dump_triple(triple *dtrip, int indent)
 {
-<<<<<<< HEAD
-	PRINTF("%s Triple %s [opc %d at 0x"lvaddr"]   fwdptr: 0x"lvaddr"   bkwdptr: 0x"lvaddr
-	       "  srcline: %d  colmn: %d  rtaddr: %d\n",
-	       cdbg_indent(indent), oc_tab_graphic[dtrip->opcode], dtrip->opcode, (long unsigned int)dtrip,
-	       (long unsigned int)dtrip->exorder.fl, (long unsigned int)dtrip->exorder.bl, dtrip->src.line,
-	       dtrip->src.column, dtrip->rtaddr);
-=======
-	int		len;
-
 	PRINTF("%s Triple %s [opc %d at 0x%08lx] ex.fl: 0x%08lx ex.bl: 0x%08lx bp.fl:0x%08lx bp.bl:0x%08lx bpt:0x%08lx"
 		" sline: %d colmn: %d rtaddr: %d\n",
 		cdbg_indent(indent), oc_tab_graphic[dtrip->opcode], dtrip->opcode, (unsigned long)dtrip,
 		(unsigned long)dtrip->exorder.fl, (unsigned long)dtrip->exorder.bl,
-	       (unsigned long)dtrip->backptr.que.fl, (unsigned long)dtrip->backptr.que.bl, (unsigned long)dtrip->backptr.bpt,
+	       (unsigned long)dtrip->backptr.que.fl, (unsigned long)dtrip->backptr.que.bl, (unsigned long)dtrip->backptr.bkptr,
 	       dtrip->src.line, dtrip->src.column, dtrip->rtaddr);
->>>>>>> f33a273c... GT.M V6.3-012
 	cdbg_dump_operand(indent + 1, &dtrip->operand[0], OP_0);
 	cdbg_dump_operand(indent + 1, &dtrip->operand[1], OP_1);
 	if (dtrip->destination.oprclass)
@@ -235,14 +225,9 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 			break;
 		case TJMP_REF:
 			if (opr->oprval.tref)
-<<<<<<< HEAD
-				PRINTF("%s   tjmp-ref: 0x"lvaddr"  jump list ptr: 0x"lvaddr"\n", cdbg_indent(indent),
+				PRINTF("%s   tjmp-ref: 0x%08lx  jump list ptr: 0x%08lx\n", cdbg_indent(indent),
 						(long unsigned int)opr->oprval.tref,
 						(long unsigned int)&opr->oprval.tref->jmplist);
-=======
-				PRINTF("%s tjmp-ref jump list ptr: 0x%08lx\n", cdbg_indent(indent),
-					(unsigned long)&opr->oprval.tref->jmplist);
->>>>>>> f33a273c... GT.M V6.3-012
 			else
 				PRINTF("%s ** Warning ** oprval.tref is NULL\n", cdbg_indent(indent));
 			break;

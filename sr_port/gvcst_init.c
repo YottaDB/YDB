@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -934,12 +934,8 @@ void gvcst_init(gd_region *reg)
 		csa->mlkctl = NULL;
 		csa->mlkctl_len = 0;
 		csa->mlkhash = NULL;
-<<<<<<< HEAD
-		csa->gd_ptr = owning_gd;
-=======
 		csa->mlkhash_shmid = INVALID_SHMID;
-		csa->gd_ptr = addr ? addr : gd_header;
->>>>>>> f33a273c... GT.M V6.3-012
+		csa->gd_ptr = owning_gd;
 		if (csa->gd_ptr)
 			csa->gd_instinfo = csa->gd_ptr->instinfo;
 		/* Note: REPL_ALLOWED(csa) is usable below since "dbfilopn" has special code set csa->repl_state

@@ -4,7 +4,7 @@
 # Copyright (c) 2001-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -75,7 +75,7 @@ source $gtm_tools/set_library_path.csh
 source $gtm_tools/check_utf8_support.csh
 if ("TRUE" == "$is_utf8_support") then
 	set icuver =  `setenv gtm_dist $PWD ; $gtm_tools/is_icu_symbol_rename.csh`
-	if ("" != "$icuver") setenv gtm_icu_version "$icuver"
+	if ("" != "$icuver") setenv ydb_icu_version "$icuver"
 	if (! -e utf8) mkdir utf8
 	if ( "OS/390" == $HOSTOS ) then
 		setenv gtm_chset_locale $utflocale	# LC_CTYPE not picked up right

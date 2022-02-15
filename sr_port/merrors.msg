@@ -180,12 +180,7 @@
 !  Note new YottaDB error messages should be added to ydberrors.msg instead of to this file to avoid collisions with errors
 !  added here for GT.M by FIS.
 !
-<<<<<<< HEAD
 !  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M/YottaDB since V4.2.
-=======
-!
-!  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M since V4.2.
->>>>>>> f33a273c... GT.M V6.3-012
 !
 ACK		<>/success/fao=0!/ansi=0
 BREAKZST	<Break instruction encountered during ZSTEP action>/info/fao=0!/ansi=0
@@ -852,19 +847,11 @@ BADGBLSECVER	<Global Section !AD does not match the current database version>/er
 RECSIZENOTEVEN	<RECORDSIZE [!UL] needs to be a multiple of 2 if ICHSET or OCHSET is UTF-16, UTF-16LE or UTF-16BE>/error/fao=1!/ansi=0
 BUFFLUFAILED	<Error flushing buffers from !AD for database file !AD>/error/fao=4!/ansi=0/T
 MUQUALINCOMP	<Incompatible qualifiers - FILE and REGION>/error/fao=0!/ansi=0
-<<<<<<< HEAD
 DISTPATHMAX	<Executable path length is greater than maximum (!UL)>/error/fao=1!/ansi=0
-FILEOPENFAIL	<Failed to open file !AD>/error/fao=2!/ansi=0
+FILEOPENFAIL	<Failed to open file !AD>/error/fao=2!/ansi=0//1
 UNUSEDMSG851	<IMAGENAME nixed in r1.20>/error/fao=0!/ansi=0
 GTMSECSHRPERM	<The gtmsecshr module in $ydb_dist (!AD) does not have the correct permission: !AD, and UID: !UL>/error/fao=5!/ansi=0
 YDBDISTUNDEF	<Environment variable $ydb_dist is not defined>/error/fao=0!/ansi=0
-=======
-DISTPATHMAX	<$gtm_dist path is greater than maximum (!UL)>/error/fao=1!/ansi=0
-FILEOPENFAIL	<Failed to open file !AD>/error/fao=2!/ansi=0//1
-IMAGENAME	<The executing module name should be !AD instead of !AD>/error/fao=4!/ansi=0
-GTMSECSHRPERM	<The gtmsecshr module in $gtm_dist (!AD) does not have the correct permission: !AD, and UID: !UL>/error/fao=5!/ansi=0
-GTMDISTUNDEF	<Environment variable $gtm_dist is not defined>/error/fao=0!/ansi=0
->>>>>>> f33a273c... GT.M V6.3-012
 SYSCALL		<Error received from system call !AD -- called from module !AD at line !UL>/error/fao=5!/ansi=0
 MAXGTMPATH	<The executing module path is greater than the maximum !UL>/error/fao=1!/ansi=0
 TROLLBK2DEEP	<Intended rollback(!SL) deeper than the current $tlevel(!UL)>/error/fao=2!/ansi=0
@@ -1253,19 +1240,11 @@ CHNGTPRSLVTM	<Mupip will change tp_resolve_time from !UL to !UL because expected
 JNLUNXPCTERR	<Unexpected error encountered for Journal !AD at disk address 0x!XL>/error/fao=3!/ansi=0
 OMISERVHANG	<GTCM OMI server is hung>/info/fao=0!/ansi=0
 RSVDBYTE2HIGH	<Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and Reserved bytes (!UL)>/error/fao=5!/ansi=0
-<<<<<<< HEAD
-BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0
-BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0
+BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0//1
+BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0//1
 UNUSEDMSG1244	<VMSMEMORY2 nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 UNUSEDMSG1245	<LOADBGSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
 UNUSEDMSG1246	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
-=======
-BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0//1
-BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0//1
-VMSMEMORY2	<Central storage exhausted during allocation of dynamic file descriptor with !UL bytes - check page file quota and page file size>/error/fao=1!/ansi=0
-UNUSEDMSG1243	<LOADBGSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
-UNUSEDMSG1244	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
->>>>>>> f33a273c... GT.M V6.3-012
 REPLINSTMISMTCH	<Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)>/error/fao=8!/ansi=0
 REPLINSTREAD	<Error reading [0x!XL] bytes at offset [0x!16@XQ] from replication instance file !AD>/error/fao=4!/ansi=0//1
 REPLINSTDBMATCH	<Replication instance file !AD has seqno [0x!16@XQ] while database has a different seqno [0x!16@XQ]>/error/fao=4!/ansi=0
@@ -1533,11 +1512,7 @@ SETEXTRENV	<Database files are missing or Instance is frozen; supply the databas
 NOTALLDBRNDWN	<Not all regions were successfully rundown>/error/fao=0!/ansi=0
 TPRESTNESTERR	<TP restart signaled while handing error - treated as nested error - Use TROLLBACK in error handler to avoid this>/error/fao=0!/ansi=0
 JNLFILRDOPN	<Error opening journal file !AD for read for database file !AD>/error/fao=4!/ansi=0
-<<<<<<< HEAD
 UNUSEDMSG1514	<SEQNUMSEARCHTIMEOUT nixed in r1.24 because it was unused starting GT.M V6.3-000>/error/fao=0!/ansi=0
-=======
-SEQNUMSEARCHTIMEOUT	<Timed out trying to find sequence number !@ZQ [0x!16@XQ] in Journal File(s). See above messages for details. Source server exiting>/error/fao=2!/ansi=0//1
->>>>>>> f33a273c... GT.M V6.3-012
 FTOKKEY		<FTOK key 0x!XL>/info/fao=1!/ansi=0
 SEMID		<Semaphore id !UL>/info/fao=1!/ansi=0
 JNLQIOSALVAGE	<Journal IO lock for database file !AD salvaged from dead process !UL>/info/fao=3!/ansi=0
