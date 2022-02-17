@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -215,14 +215,14 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 				zshow_zwrite(&output);
 				break;
 		}
+		/* If ZSHOW was done onto a subscripted lvn but no zshow records got dumped in that lvn, it might have $data = 0.
+		 * Kill it in that case as otherwise it will create an out-of-design situation for $query(lvn).
+		 */
+		if ((type == ZSHOW_LOCAL) && (NULL != active_lv) && lcl_arg1_is_desc_of_arg2(active_lv, lvn))
+			UNDO_ACTIVE_LV(actlv_op_zshow);
 	}
 	output.code = 0;
 	output.flush = TRUE;
 	zshow_output(&output,0);
 	MAXSTR_BUFF_FINI;
-	/* If ZSHOW was done onto a subscripted lvn but no zshow records got dumped in that lvn, it might have $data = 0.
-	 * Kill it in that case as otherwise it will create an out-of-design situation for $query(lvn).
-	 */
-	if ((type == ZSHOW_LOCAL) && (NULL != active_lv) && lcl_arg1_is_desc_of_arg2(active_lv, lvn))
-		UNDO_ACTIVE_LV(actlv_op_zshow);
 }
