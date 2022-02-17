@@ -65,13 +65,6 @@ MBSTART {						\
 MBSTART {							\
 	triple *REF;						\
 								\
-	if ((OCQ_INVALID == ((triple *)(Q))->opcode) 		\
-		&& (((triple *)(Q))->exorder.bl == (Q)))	\
-	{							\
-		REF =  maketriple(OCQ_NOOP);			\
-		DQINIT(REF, exorder);				\
-		DQINS((Q), exorder, REF);			\
-	}							\
 	CHKTCHAIN(Q, N, TRUE);					\
 } MBEND
 

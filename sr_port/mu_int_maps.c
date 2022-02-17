@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -193,7 +196,7 @@ void mu_int_maps(void)
 						util_out_print(
 							"!/MUPIP INFO: mu_int_maps: 1st precheck failed. retrying block in buffer",
 								TRUE);
-					if (free_blk_base);
+					if (free_blk_base)
 						free(free_blk_base);
 					free_blk_base = NULL;
 					buff_blk_base = mu_int_read_buffer(blkno, &ondsk_blkver, &free_blk_base);
