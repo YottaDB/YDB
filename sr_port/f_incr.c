@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,6 +86,19 @@ int f_incr(oprtype *a, opctype op)
 		}
 		setcurtchain(&targchain);
 		dqadd(&targchain, &incrchain, exorder);	/* dir before targ - this is a violation of info hiding */
+		if (NULL == triptr)
+		{	/* If "triptr" is NULL, it means "TREF(expr_start)" was NULL before the "expr()" call above.
+			 * If "expr()" involved a boolean expression evaluation, then "TREF(expr_start)" could have gotten
+			 * set to a non-NULL value. In that case, we need to reset "TREF(expr_start()" back to the original
+			 * value (i.e. NULL) as it would otherwise point to a triple in the "incrchain" (which has already
+			 * been merged into "targchain") and pose problems in the "dqadd(TREF(expr_start), &targchain, ...)"
+			 * call at the end of this function because "dqadd()" assumes that "TREF(expr_start)" and "targchain"
+			 * are non-intersecting chains. Since we are restoring "TREF(expr_start)", need to restore
+			 * "TREF(expr_start_orig)" as well at the same time as the two globals need to be in sync.
+			 */
+			TREF(expr_start) = triptr;	/* restore original shift chain */
+			TREF(expr_start_orig) = savptr;
+		}
 	}
 	coerce(increment, OCT_MVAL);
 	ins_triple(r);

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #define OP_DEST 2	/* destination is passed */
 
 void cdbg_dump_t_orig(void);
+void cdbg_dump_chain(triple *chain);
 void cdbg_dump_curtchain(void);
 void cdbg_dump_boolchain(void);
 void cdbg_dump_triple(triple *dtrip, int indent);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,46 +88,40 @@ LITREF int4	sa_class_sizes[];
 STATICDEF char	*indent_str;
 STATICDEF int	last_indent = 0;
 
-/* Routine to dump all triples on "t_orig" chain - also callable from debugger */
-void cdbg_dump_t_orig(void)
+/* Routine to dump all triples on a generic chain starting at "chain" - also callable from debugger */
+void cdbg_dump_chain(triple *chain)
 {
 	triple	*ct;
 
-	dqloop(&t_orig, exorder, ct)
+	dqloop(chain, exorder, ct)
 	{
 		PRINTF("\n ************************ Triple Start **********************\n");
 		cdbg_dump_triple(ct, 0);
 	}
+}
+
+/* Routine to dump all triples on "t_orig" chain - also callable from debugger */
+void cdbg_dump_t_orig(void)
+{
+	cdbg_dump_chain(&t_orig);
 }
 
 /* Routine to dump all triples on "TREF(curtchain)" chain - also callable from debugger */
 void cdbg_dump_curtchain(void)
 {
-	triple	*ct, *chain;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	chain = TREF(curtchain);
-	dqloop(chain, exorder, ct)
-	{
-		PRINTF("\n ************************ Triple Start **********************\n");
-		cdbg_dump_triple(ct, 0);
-	}
+	cdbg_dump_chain(TREF(curtchain));
 }
 
 /* Routine to dump all triples on "TREF(boolchain_ptr)" chain - also callable from debugger */
 void cdbg_dump_boolchain(void)
 {
-	triple	*ct, *chain;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	chain = TREF(boolchain_ptr);
-	dqloop(chain, exorder, ct)
-	{
-		PRINTF("\n ************************ Triple Start **********************\n");
-		cdbg_dump_triple(ct, 0);
-	}
+	cdbg_dump_chain(TREF(boolchain_ptr));
 }
 
 /* Routine to dump a single triple and its followers */
