@@ -205,6 +205,7 @@ void db_auto_upgrade(gd_region *reg)
 				/* GT.M V63012 added fullblkwrt option */
 				csd->write_fullblk = 0;
 				break;
+			case GDSMV63012:
 			case GDSMR126:
 				/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support nanosecond timers */
 				csd->flush_time = csd->flush_time * NANOSECS_IN_MSEC;
@@ -227,7 +228,6 @@ void db_auto_upgrade(gd_region *reg)
 				/* GT.M V63012 added fullblkwrt option */
 				csd->write_fullblk = 0;
 				break;
-			case GDSMV63012:
 			case GDSMR136:
 		/* When adding a new minor version, the following template should be maintained
 		 * a) If there are any file header fields added in the new minor version, initialize the fields to default values
