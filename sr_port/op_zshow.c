@@ -31,8 +31,10 @@
 #include "gtm_maxstr.h"
 #include "svnames.h"
 
-GBLREF lv_val	*active_lv;
-GBLREF gv_key	*gv_currkey;
+GBLREF	lv_val	*active_lv;
+GBLREF	gv_key	*gv_currkey;
+
+LITREF	mval	literal_null;
 
 error_def(ERR_ZSHOWBADFUNC);
 
@@ -102,9 +104,12 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 		i = func->str.len;
 	}
 	memset(&output, 0, SIZEOF(output));
-	if (type == ZSHOW_LOCAL)
+	assert((ZSHOW_LOCAL == type) || (NULL == lvn));
+	if (ZSHOW_LOCAL == type)
+	{
+		assert(NULL != lvn);
 		output.out_var.lv.lvar = lvn;
-	else if (type == ZSHOW_GLOBAL)
+	} else if (type == ZSHOW_GLOBAL)
 	{
 		output.out_var.gv.end = gv_currkey->end;
 		output.out_var.gv.prev = gv_currkey->prev;
@@ -215,14 +220,46 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 				zshow_zwrite(&output);
 				break;
 		}
-		/* If ZSHOW was done onto a subscripted lvn but no zshow records got dumped in that lvn, it might have $data = 0.
-		 * Kill it in that case as otherwise it will create an out-of-design situation for $query(lvn).
+		/* If ZSHOW output was redirected to "lvn" but no zshow records got dumped in the subtree under "lvn" as part
+		 * of the current zshow action code, it is possible an "op_putindx()" call was done to create a subscripted node
+		 * under "lvn" in anticipation of actual nodes getting set under the subtree but none happened. In that case,
+		 * the currently active lvn ("active_lv" global variable maintained by "op_putindx()") would have $data = 0.
+		 * This will create an out-of-design situation for a later $query(lvn) and hence needs to be killed. Hence the
+		 * use of the UNDO_ACTIVE_LV macro below. Note though that the "op_kill" call inside UNDO_ACTIVE_LV could
+		 * potentially kill not just "active_lv" but also parent lv tree nodes until it finds a node with a non-zero $data.
+		 * But we do not want the kill to reach "lvn" as that lv node is relied upon by later iterations in this for loop
+		 * to unconditionally exist (the "op_putindx()" for that lvn would have been done by generated code). Therefore,
+		 * check if "lvn" does not have any data and if so temporarily set it to point to one ("literal_null") before
+		 * the UNDO_ACTIVE_LV and then reset it immediately afterwards.
 		 */
-		if ((type == ZSHOW_LOCAL) && (NULL != active_lv) && lcl_arg1_is_desc_of_arg2(active_lv, lvn))
+		if ((ZSHOW_LOCAL == type) && (NULL != active_lv) && lcl_arg1_is_desc_of_arg2(active_lv, lvn))
+		{
+			boolean_t	is_defined;
+
+			is_defined = LV_IS_VAL_DEFINED(lvn);
+			if (!is_defined)
+			{
+				assert(0 == lvn->v.mvtype);
+				lvn->v = literal_null;
+			}
 			UNDO_ACTIVE_LV(actlv_op_zshow);
+			if (!is_defined)
+				LV_VAL_CLEAR_MVTYPE(lvn);
+		}
 	}
 	output.code = 0;
 	output.flush = TRUE;
 	zshow_output(&output,0);
 	MAXSTR_BUFF_FINI;
+	/* If ZSHOW output was redirected to "lvn", check if it is not a base var and if it is undefined. In that case,
+	 * it is possible this is a node with $data = 0 (see comment block above explaining $query issues otherwise).
+	 * If so, we need to kill it and any potential parent nodes until a non-zero $data node is found. Therefore use
+	 * the UNDO_ACTIVE_LV macro below. Note though that "active_lv" should never point to an unsubscripted lvn hence
+	 * the check for !LV_IS_BASE_VAR below.
+	 */
+	if ((ZSHOW_LOCAL == type) && !LV_IS_BASE_VAR(lvn) && !LV_IS_VAL_DEFINED(lvn))
+	{
+		active_lv = lvn;	/* needed by the UNDO_ACTIVE_LV macro call */
+		UNDO_ACTIVE_LV(actlv_op_zshow);
+	}
 }
