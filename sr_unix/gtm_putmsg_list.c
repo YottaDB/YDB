@@ -110,7 +110,7 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 				if (MAX_FAO_PARMS < f_count)
 					f_count = MAX_FAO_PARMS;
 			} else
-				f_actual = f_count = 0;
+				f_count = 0;
 			fmt_ptr = util_format(msg_string.addr, var_sav, fmt_ptr, SIZEOF(fmt_buf) - 1, f_count);
 			*fmt_ptr = '\0';
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(fmt_buf));

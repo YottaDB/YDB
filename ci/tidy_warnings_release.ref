@@ -125,9 +125,9 @@ gtm_putmsg.c:warning: Branch condition evaluates to a garbage value [clang-analy
 gtm_putmsg.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 gtm_putmsg_list.c:warning: Uninitialized va_list is copied [clang-analyzer-valist.Uninitialized]
 gtm_putmsg_list.c:warning: Value stored to 'i' is never read [clang-analyzer-deadcode.DeadStores]
-gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (166 padding bytes, where 6 is optimal).
+gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (170 padding bytes, where 2 is optimal).
 gtm_threadgbl_init.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]
-gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (166 padding bytes, where 6 is optimal).
+gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (170 padding bytes, where 2 is optimal).
 gtm_trigger.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]
 gtm_trigger.c:warning: Value stored to 'added' is never read [clang-analyzer-deadcode.DeadStores]
 gtm_trigger.c:warning: Value stored to 'rc' is never read [clang-analyzer-deadcode.DeadStores]
@@ -155,7 +155,6 @@ gtmsecshr.c:warning: Null pointer passed to 1st parameter expecting 'nonnull' [c
 gtmsecshr.c:warning: Value stored to 'secshr_sem' is never read [clang-analyzer-deadcode.DeadStores]
 gtmsource.c:warning: Value stored to 'log_init_status' is never read [clang-analyzer-deadcode.DeadStores]
 gtmsource_comm_init.c:warning: Access to field 'ai_family' results in a dereference of a null pointer (loaded from variable 'ai_ptr') [clang-analyzer-core.NullDereference]
-gtmsource_comm_init.c:warning: The right operand of '!=' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 gtmsource_ctl_init.c:warning: Access to field 'next' results in a dereference of a null pointer (loaded from variable 'last_rctl') [clang-analyzer-core.NullDereference]
 gtmsource_ctl_init.c:warning: Value stored to 'jnl_status' is never read [clang-analyzer-deadcode.DeadStores]
 gtmsource_ctl_init.c:warning: Value stored to 'status' is never read [clang-analyzer-deadcode.DeadStores]
@@ -174,7 +173,6 @@ gtmsource_shutdown.c:warning: Value stored to 'status' is never read [clang-anal
 gtmsource_shutdown.c:warning: Value stored to 'status' is never read [clang-analyzer-deadcode.DeadStores]
 gtmsource_shutdown.c:warning: Value stored to 'status' is never read [clang-analyzer-deadcode.DeadStores]
 gtmsource_srv_latch.c:warning: Value stored to 'repl_csa' is never read [clang-analyzer-deadcode.DeadStores]
-gv_rundown.c:warning: Value stored to 'udi' is never read [clang-analyzer-deadcode.DeadStores]
 gv_trigger.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
 gv_trigger.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
 gv_trigger.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
@@ -383,6 +381,7 @@ mu_replpool_release_sem.c:warning: Value stored to 'status' is never read [clang
 mu_replpool_release_sem.c:warning: Value stored to 'status' is never read [clang-analyzer-deadcode.DeadStores]
 mu_replpool_release_sem.c:warning: Value stored to 'status' is never read [clang-analyzer-deadcode.DeadStores]
 mu_rndwn_file.c:warning: Access to field 'open' results in a dereference of a null pointer (loaded from variable 'rundown_reg') [clang-analyzer-core.NullDereference]
+mu_rndwn_file.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 mu_rndwn_file.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 mu_rndwn_file.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]
 mu_rndwn_file.c:warning: Value stored to 'rc' is never read [clang-analyzer-deadcode.DeadStores]
