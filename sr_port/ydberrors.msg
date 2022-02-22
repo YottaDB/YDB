@@ -19,10 +19,6 @@
 	.FACILITY	YDB,256/PREFIX=ERR_
 	.TITLE		YDBERRORS Error Messages for YottaDB
 !
-!  List of messages that are (currently) only used in Golang Wrapper code
-!    STRUCTNOTALLOCD
-!    INVLNPAIRLIST
-!
 !  List of known undocumented messages follows (along with a comment) (do not change "known undocumented" phrase)
 ! ----- Buffer to introduce new undocumented error messages without affecting UNUSEDMSGnnn match with corresponding line numbers.
 !
@@ -53,9 +49,9 @@ STDERRALREADYOPEN	<STDERR deviceparameter specifies an already open device !AD>/
 SETENVFAIL	<VIEW "SETENV":"!AD" failed in setenv() system call>/error/fao=2
 UNSETENVFAIL	<VIEW "UNSETENV":"!AD" failed in unsetenv() system call>/error/fao=2
 UNKNOWNSYSERR	<[!UL] does not correspond to a known YottaDB error code>/error/fao=1
-STRUCTNOTALLOCD	<Structure not previously called with Alloc() method>/error/fao=0
+UNUSED56R132	<Unused error - last used r1.32>/error/fao=0
 NODEEND		<End of list of nodes/subscripts>/error/fao=0
-INVLNPAIRLIST	<Invalid lockname/subscript pair list (uneven number of lockname/subscript parameters)>/error/fao=0
+UNUSED58R132	<Unused error - last used r1.32>/error/fao=0
 INVTPTRANS	<Invalid TP transaction - either invalid TP token or transaction not in progress>/error/fao=0
 THREADEDAPINOTALLOWED	<Process cannot switch to using threaded Simple API while already using Simple API>/error/fao=0
 SIMPLEAPINOTALLOWED	<Process cannot switch to using Simple API while already using threaded Simple API>/error/fao=0
