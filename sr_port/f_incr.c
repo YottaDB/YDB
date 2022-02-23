@@ -29,7 +29,7 @@ int f_incr(oprtype *a, opctype op)
 {
 	boolean_t	ok;
 	oprtype		*increment;
-	triple		incrchain, *oldchain, *r, *savptr, targchain, tmpexpr, *triptr;
+	triple		incrchain, *oldchain, *r, *savptr, targchain, tmpexpr, *triptr, *triptr2;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -86,19 +86,6 @@ int f_incr(oprtype *a, opctype op)
 		}
 		setcurtchain(&targchain);
 		dqadd(&targchain, &incrchain, exorder);	/* dir before targ - this is a violation of info hiding */
-		if (NULL == triptr)
-		{	/* If "triptr" is NULL, it means "TREF(expr_start)" was NULL before the "expr()" call above.
-			 * If "expr()" involved a boolean expression evaluation, then "TREF(expr_start)" could have gotten
-			 * set to a non-NULL value. In that case, we need to reset "TREF(expr_start()" back to the original
-			 * value (i.e. NULL) as it would otherwise point to a triple in the "incrchain" (which has already
-			 * been merged into "targchain") and pose problems in the "dqadd(TREF(expr_start), &targchain, ...)"
-			 * call at the end of this function because "dqadd()" assumes that "TREF(expr_start)" and "targchain"
-			 * are non-intersecting chains. Since we are restoring "TREF(expr_start)", need to restore
-			 * "TREF(expr_start_orig)" as well at the same time as the two globals need to be in sync.
-			 */
-			TREF(expr_start) = triptr;	/* restore original shift chain */
-			TREF(expr_start_orig) = savptr;
-		}
 	}
 	coerce(increment, OCT_MVAL);
 	ins_triple(r);
@@ -108,12 +95,21 @@ int f_incr(oprtype *a, opctype op)
 		dqadd(TREF(expr_start), &tmpexpr, exorder);	/* this is a violation of info hiding */
 		TREF(expr_start) = tmpexpr.exorder.bl;
 		assert(OC_GVSAVTARG == (TREF(expr_start))->opcode);
-		triptr = newtriple(OC_GVRECTARG);	/* restore the result of the last gvn to preserve $referece (the naked) */
-		triptr->operand[0] = put_tref(TREF(expr_start));
+		triptr2 = newtriple(OC_GVRECTARG);	/* restore the result of the last gvn to preserve $referece (the naked) */
+		triptr2->operand[0] = put_tref(TREF(expr_start));
 	}
 	if (!TREF(shift_side_effects) || (YDB_BOOL != TREF(ydb_fullbool)) || (OC_INDINCR != r->opcode)
-		|| (NULL == TREF(expr_start)))
-	{	/* put it on the end of the main chain as there's no reason to play more with the ordering */
+		|| (NULL == TREF(expr_start)) || (NULL == triptr))
+	{	/* Put it on the end of the main chain as there's no reason to play more with the ordering */
+		/* Note: The reason for the "(NULL == triptr)" check in the above "if" is the following.
+		 * If "triptr" is NULL, it means "TREF(expr_start)" was NULL before the "expr()" call above.
+		 * If "expr()" involved a boolean expression evaluation, then "TREF(expr_start)" could have gotten
+		 * set to a non-NULL value. In that case, "TREF(expr_start()" would point to a triple in the "incrchain"
+		 * (which has already been merged into "targchain") and so the "dqadd(TREF(expr_start), &targchain, ...)"
+		 * call in the "else" block below cannot be done as "dqadd()" assumes that "TREF(expr_start)" and "targchain"
+		 * are non-intersecting chains. Hence we treat a NULL value of "triptr" as if "TREF(expr_start)" is NULL
+		 * and fall through into the "if" block in that case.
+		 */
 		setcurtchain(oldchain);
 		triptr = (TREF(curtchain))->exorder.bl;
 		dqadd(triptr, &targchain, exorder);	/* this is a violation of info hiding */
