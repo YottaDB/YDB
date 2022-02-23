@@ -1,6 +1,7 @@
+# syntax=docker/dockerfile:1.2
 #################################################################
 #								#
-# Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -87,30 +88,28 @@ RUN mkdir -p /tmp/yottadb-build \
 FROM ubuntu:${OS_VSN} as ydb-release
 
 ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && \
+RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,target=/tmp/staging \
+    # This is a strange step: The mount volume is readonly; and we actually write to it in ydbinstall
+    # So we need to copy the mount contents to a seperate folder
+    cp -R /tmp/staging /tmp/ydb-release && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
                     file \
                     binutils \
                     libelf-dev \
-                    libicu-dev \
-                    locales \
-                    pkg-config \
-                    wget \
-                    vim \
-                    && \
-    apt-get clean
-RUN locale-gen en_US.UTF-8
+                    libicu66 \
+		    nano \
+		    wget \
+		    && \
+    /tmp/ydb-release/ydbinstall --utf8 default --installdir /opt/yottadb/current && \
+    apt-get remove -y wget && \
+    apt-get autoclean -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /tmp/ydb-release
+
 WORKDIR /data
-COPY --from=ydb-release-builder /tmp/yottadb-release /tmp/yottadb-release
-RUN cd /tmp/yottadb-release  \
- && pkg-config --modversion icu-io \
-      > /tmp/yottadb-release/.icu.vsn \
- && ./ydbinstall \
-      --utf8 `cat /tmp/yottadb-release/.icu.vsn` \
-      --installdir /opt/yottadb/current \
- && rm -rf /tmp/yottadb-release
 ENV gtmdir=/data \
-    LANG=en_US.UTF-8 \
-    LANGUAGE=en_US:en \
-    LC_ALL=en_US.UTF-8
+    LC_ALL=C.UTF-8 \
+    EDITOR=/usr/bin/nano
 ENTRYPOINT ["/opt/yottadb/current/ydb"]

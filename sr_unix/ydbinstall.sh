@@ -43,7 +43,7 @@ utillist="date id grep uname mktemp cut tr dirname chmod rm mkdir cat wget sed s
 # If not error out at beginning instead of erroring out midway during the install.
 utillist="$utillist ps file wc touch chown chgrp groups getconf awk expr locale install ld strip"
 # Check utilities used by YottaDB for normal operation
-utillist="$utillist nm realpath"
+utillist="$utillist nm realpath ldconfig"
 arch=`uname -m`
 if [ "armv6l" = "$arch" ] || [ "armv7l" = "$arch" ] ; then
 	# ARM platform requires cc (in configure.gtc) to use as the system linker (ld does not work yet)
@@ -213,6 +213,14 @@ isvaluevalid()
 	echo $retval
 }
 
+# This function finds the current ICU version using ldconfig
+# There is a M version of this function in sr_unix/ydbenv.mpt
+# It needs to be maintained in parallel to this function
+icu_version()
+{
+	ldconfig -p | grep -m1 -F libicuio.so. | cut -d" " -f1 | cut -d. -f3-4
+}
+
 # This function installs the selected plugins. Before calling it, $ydb_installdir and $tmpdir need to be set so that it can
 # find the right place to install the plugins and the right place to build the plugins respectively. This function will
 # set remove_tmpdir to 0 if one or more plugin builds fail.
@@ -266,7 +274,7 @@ install_plugins()
 	if [ "Y" = $ydb_encplugin ] ; then
 		echo "Now installing YDBEncrypt"
 		cd $tmpdir	# Get back to top level temporary directory as the current directory
-		export ydb_icu_version=$ydb_icu_version
+		export ydb_icu_version=$ydb_found_or_requested_icu_version
 		mkdir enc_tmp && cd enc_tmp
 		url="https://gitlab.com/YottaDB/Util/YDBEncrypt.git"
 		if git clone -q ${url} .; then
@@ -301,10 +309,8 @@ install_plugins()
 				cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
 				cp _ZLIB.m ${ydb_installdir}/plugin/r
 				if [ "Y" = $ydb_utf8 ] ; then
-					if [ "default" = "$ydb_icu_version" ] ; then
-						ydb_icu_version=`pkg-config --modversion icu-io`
-						export ydb_icu_version
-					fi
+					ydb_icu_version=$ydb_found_or_requested_icu_version
+					export ydb_icu_version
 					mkdir utf8
 					(
 						cd utf8
@@ -650,6 +656,16 @@ osfile="/etc/os-release"
 buildosfile="../build_os_release"
 osid=`grep -w ID $osfile | cut -d= -f2 | cut -d'"' -f2`
 
+# Get actual ICU version if UTF-8 install was requested with "default" ICU version
+if [ "Y" = "$ydb_utf8" ] ; then
+	if [ "default" = $ydb_icu_version ] ; then
+		ydb_found_or_requested_icu_version=`icu_version`
+	else
+		ydb_found_or_requested_icu_version=$ydb_icu_version
+fi
+
+fi
+
 if [ "Y" = "$ydb_plugins_only" ]; then
 	if [ ! -n "$ydb_installdir" ] ; then
 		# If --installdir was not specified, we first look to $ydb_dist for
@@ -670,7 +686,7 @@ if [ "Y" = "$ydb_plugins_only" ]; then
 	# Check if UTF8 is installed.
 	if [ -d "$ydb_installdir/utf8" ] ; then
 		ydb_utf8="Y"
-		if [ -z "$ydb_icu_version" ] ; then ydb_icu_version="default" ; fi
+		ydb_found_or_requested_icu_version=`icu_version`
 	else
 		ydb_utf8="N"
 	fi
@@ -1143,10 +1159,8 @@ fi
                             #	"Directory $ydb_dist does not exist. Do you wish to create it as part of this installation? (y or n)"
     if [ -z "$ydb_icu_version" ] ; then echo n 	# Response to : "Should UTF-8 support be installed?"
     else echo y 		# Response to : "Should UTF-8 support be installed?"
-        if [ "default" = $ydb_icu_version ] ; then echo n 	# Response to : "Should an ICU version other than the default be used?"
-        else echo y		# Response to : "Should an ICU version other than the default be used?"
-            echo $ydb_icu_version	# Response to : "Enter ICU version"
-        fi
+        echo y 			# Response to : "Should an ICU version other than the default be used?"
+        echo $ydb_found_or_requested_icu_version	# Response to : "Enter ICU version"
     fi
     if [ "Y" = $ydb_deprecated ] ; then echo y # Response to : "Should deprecated components be installed?"
     else echo n			# Response to : "Should deprecated components be installed?"
