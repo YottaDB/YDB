@@ -165,11 +165,11 @@ help_exit()
     echo "Version is defaulted from yottadb file if one exists in the same directory as the installer."
     echo "This version must run as root."
     echo ""
-    echo "Example usages are (assumes latest YottaDB release is r1.32 and latest GT.M version is V6.3-010)"
-    echo "  ydbinstall.sh                          # installs latest YottaDB release (r1.32) at /usr/local/lib/yottadb/r132"
-    echo "  ydbinstall.sh --utf8 default           # installs YottaDB release r1.32 with added support for UTF-8"
-    echo "  ydbinstall.sh --installdir /r132 r1.32 # installs YottaDB r1.32 at /r132"
-    echo "  ydbinstall.sh --gtm                    # installs latest GT.M version (V6.3-010) at /usr/local/lib/fis-gtm/V6.3-010_x86_64"
+    echo "Example usages are (assumes latest YottaDB release is r1.34 and latest GT.M version is V7.0-001)"
+    echo "  ydbinstall.sh                          # installs latest YottaDB release (r1.34) at /usr/local/lib/yottadb/r134"
+    echo "  ydbinstall.sh --utf8 default           # installs YottaDB release r1.34 with added support for UTF-8"
+    echo "  ydbinstall.sh --installdir /r134 r1.34 # installs YottaDB r1.34 at /r134"
+    echo "  ydbinstall.sh --gtm                    # installs latest GT.M version (V7.0-001) at /usr/local/lib/fis-gtm/V7.0-001_x86_64"
     echo ""
     exit 1
 }
