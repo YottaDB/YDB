@@ -93,23 +93,28 @@ RUN apt-get update && \
                     ca-certificates \
                     libelf-dev \
                     libicu-dev \
-                    locales \
                     wget \
-                    vim \
+                    gcc \
+                    nano \
                     procps \
                     make \
                     golang \
                     git \
                     pkg-config \
-                    clang \
-                    cargo \
                     python3-dev \
                     python3-setuptools \
                     libffi-dev \
                     python3-pip \
                     && \
     apt-get clean
-RUN locale-gen en_US.UTF-8
+
+# For our Rust Plugin, it doesn't work with Rust 1.48 installed by default on Debian
+# Install the latest stable version, per our pipeline in https://gitlab.com/YottaDB/Lang/YDBRust
+RUN wget -O rustup-init.sh https://sh.rustup.rs && \
+    chmod +x rustup-init.sh && \
+    ./rustup-init.sh -y --default-toolchain stable && \
+    rm ./rustup-init.sh
+
 WORKDIR /data
 COPY --from=ydb-release-builder /tmp/yottadb-release /tmp/yottadb-release
 RUN cd /tmp/yottadb-release  \
@@ -120,11 +125,10 @@ RUN cd /tmp/yottadb-release  \
       --installdir /opt/yottadb/current \
  && rm -rf /tmp/yottadb-release
 ENV ydb_dir=/data \
-    LANG=en_US.UTF-8 \
-    LANGUAGE=en_US:en \
     LC_ALL=C.UTF-8 \
     ydb_chset=UTF-8 \
-    GOPATH=$HOME/go
+    GOPATH=$HOME/go \
+    EDITOR=/bin/nano
 # MUPIP RUNDOWN need in the following chain because otherwise ENTRYPOINT complains
 # about inability to run %XCMD and rundown needed. Cause not known, but this workaround works
 # and is otherwise benign.
