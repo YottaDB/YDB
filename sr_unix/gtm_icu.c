@@ -498,6 +498,7 @@ void gtm_icu_init(void)
 			}
 			if (NULL == fptr)
 			{
+				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				COPY_DLLERR_MSG(err_str, err_msg);
 				envname = (char *)(!is_ydb_env_match_usable
 							? "ydb_icu_version/gtm_icu_version"
@@ -529,6 +530,7 @@ void gtm_icu_init(void)
 			fptr(icu_version);
 			if (!(IS_ICU_VER_GREATER_THAN_MIN_VER(icu_version[0], icu_version[1])))
 			{
+				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				/* Construct the first part of the ICUVERLT36 error message. */
 				SNPRINTF(tmp_errstr, SIZEOF(ICU_LIBNAME) + STR_LIT_LEN(ICU_LIBNAME_SUFFIX), "%s%s", ICU_LIBNAME,
 					ICU_LIBNAME_SUFFIX);
