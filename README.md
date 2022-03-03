@@ -55,13 +55,13 @@ listed below. For example for Ubuntu Linux:
 
   ```sh
   Ubuntu Linux OR Raspbian Linux OR Beagleboard Debian
-  sudo apt-get install --no-install-recommends file make gcc git curl tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev binutils
+  sudo apt-get install --no-install-recommends file make gcc git curl tcsh {libconfig,libelf,libicu,libncurses}-dev binutils
 
   Arch Linux
-  sudo pacman -S file make gcc git curl tcsh {libconfig,libelf,libgcrypt,libgpg-error,gpgme,icu,ncurses,openssl,zlib} binutils
+  sudo pacman -S file make gcc git curl tcsh {libconfig,libelf,icu,ncurses} binutils
 
   CentOS Linux OR RedHat Linux
-  sudo yum install file make gcc git curl tcsh {libconfig,gpgme,libicu,libgpg-error,libgcrypt,ncurses,openssl,zlib,elfutils-libelf}-devel binutils
+  sudo yum install file make gcc git curl tcsh {libconfig,libicu,ncurses,elfutils-libelf}-devel binutils
   ```
 
   There may be other library dependencies or the packages may have different names.
@@ -226,4 +226,3 @@ docker run --rm -it yottadb/yottadb # you can add a specific version after a ":"
   ```tcsh
   limit openfiles 4096
   ```
-

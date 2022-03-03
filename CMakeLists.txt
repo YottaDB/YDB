@@ -481,24 +481,6 @@ set_target_properties(libyottadb PROPERTIES
 add_dependencies(libyottadb gen_export)
 add_dependencies(yottadb libyottadb)
 
-# Iterate over the list of GPG related libraries
-foreach(gpglib gpg-error gpgme gcrypt config)
-  # For each library, we need a new CMake variable, hence GPGLIB_${gpglib}
-  find_library(GPGLIB_${gpglib} NAME ${gpglib} PATHS ${CMAKE_LIBRARY_PATH})
-  # Append the found library to the list
-  set(GPG_LIBRARIES ${GPG_LIBRARIES} ${GPGLIB_${gpglib}})
-  message(STATUS "GPGLIB_${gpglib}=${GPGLIB_${gpglib}}")
-endforeach()
-
-# Iterate over the list of SSL related libraries
-foreach(tlslib ssl crypto config)
-  # For each library, we need a new CMake variable, hence TLSLIB_${tlslib}
-  find_library(TLSLIB_${tlslib} NAME ${tlslib} PATHS ${CMAKE_LIBRARY_PATH})
-  # Append the found library to the list
-  set(TLS_LIBRARIES ${TLS_LIBRARIES} ${TLSLIB_${tlslib}})
-  message(STATUS "TLSLIB_${tlslib}=${TLSLIB_${tlslib}}")
-endforeach()
-
 install(TARGETS
   yottadb
   dse

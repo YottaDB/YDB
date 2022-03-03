@@ -31,13 +31,8 @@ RUN yum update -y || true && \
                     cmake \
                     tcsh \
                     libconfig \
-                    gpgme \
                     libicu-devel \
-                    libgpg-error-devel \
-                    libgcrypt-devel \
                     ncurses-devel \
-                    openssl-devel \
-                    zlib-devel \
                     elfutils-libelf-devel \
                     binutils-devel
 

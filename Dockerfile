@@ -36,13 +36,8 @@ RUN apt-get update && \
                     tcsh \
                     libconfig-dev \
                     libelf-dev \
-                    libgcrypt-dev \
-                    libgpg-error-dev \
-                    libgpgme11-dev \
                     libicu-dev \
                     libncurses-dev \
-                    libssl-dev \
-                    zlib1g-dev \
                     && \
     apt-get clean
 
