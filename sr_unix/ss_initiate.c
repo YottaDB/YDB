@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -531,9 +531,12 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 			/* Release crit before going into the wait loop */
 			if (csa->now_crit)	/* In MUPIP INTEG and instance freeze, it is possible we don't have crit */
 				rel_crit(reg);
-			GET_CUR_TIME(time_str);
-			util_out_print("!/MUPIP INFO: !AD : Start kill-in-prog wait for database !AD", TRUE,
-				CTIME_BEFORE_NL, time_str, DB_LEN_STR(reg));
+			if (debug_mupip)
+			{
+				GET_CUR_TIME(time_str);
+				util_out_print("!/MUPIP INFO: !AD : Start kill-in-prog wait for database !AD", TRUE,
+					CTIME_BEFORE_NL, time_str, DB_LEN_STR(reg));
+			}
 			while (csd->kill_in_prog && (MAX_CRIT_TRY > crit_counter++))
 			{
 				GET_C_STACK_FOR_KIP(kip_pids_arr_ptr, crit_counter, MAX_CRIT_TRY, 1, MAX_KIP_PID_SLOTS);
