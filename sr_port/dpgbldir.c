@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -99,8 +99,13 @@ gd_addr *zgbldir_opt(mval *v, boolean_t env_translated)
 
 	SETUP_THREADGBL_ACCESS;
 	for (name = gdr_name_head;  name;  name = (gdr_name *)name->link)
-		if (v->str.len == name->name.len && !memcmp(v->str.addr, name->name.addr, v->str.len))
-			return name->gd_ptr;
+	{
+		if (v->str.len == name->name.len)
+		{
+			if (!v->str.len || !memcmp(v->str.addr, name->name.addr, v->str.len))
+				return name->gd_ptr;
+		}
+	}
 
 	/* Skip gbldir translation if env and gbldir translation is handled in the same way */
 	skip_gbldir_translate = env_translated
