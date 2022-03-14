@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1175,7 +1175,6 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	uint4			len, value_len[NUM_SUBS], save_value_len[NUM_SUBS];
 	stringkey		kill_trigger_hash, set_trigger_hash;
 	char			tmp_str[MAX_HASH_LEN + 1];
-	char			xecute_buffer[MAX_BUFF_SIZE + MAX_XECUTE_LEN];
 	unsigned char		*dispbuff;
 	mval			multi_jrec, *trigjrec;
 	char			*trigjrecptr;
@@ -1196,6 +1195,7 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	uint4			set_hash_totlen, kill_hash_totlen;
 	static char 		*trigptr_buff = NULL;
 	static unsigned int	trigptr_alloclen = 0;
+	static char		*xecute_buffer;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1410,7 +1410,17 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	{
 		if (NULL != trigfile_device)
 		{
-			assert(SIZEOF(xecute_buffer) == MAX_BUFF_SIZE + MAX_XECUTE_LEN);
+			/* Note: Although "xecute_buffer" variable is used only within this enclosing "if" code block,
+			 * "trigjrec->str.addr" points to it even after this "if" block is done and so the scope of
+			 * "xecute_buffer" is the entire function instead of just this "if" block.
+			 */
+			if (NULL == xecute_buffer)
+				xecute_buffer = malloc(MAX_BUFF_SIZE + MAX_XECUTE_LEN);
+			else
+			{	/* This "static" variable is non-NULL implies that the below malloc has already happened
+				 * as part of a prior invocation of this function (e.g. rts_error) so avoid double allocating.
+				 */
+			}
 			/* Leave MAX_BUFF_SIZE to store other (excluding XECUTE) parts of the trigger definition.
 			 * This way we can copy over these once the multi-line XECUTE string is constructed and
 			 * use this to write the TLGTRIG/ULGTRIG journal record in case we do "jnl_format" later.
@@ -1466,7 +1476,7 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 									"M source line length of !UL", FLUSH, MAX_SRCLINE);
 						value_len[XECUTE_SUB] = 1;
 						values[XECUTE_SUB][0] = ' ';
-						max_xecute_size = SIZEOF(xecute_buffer);
+						max_xecute_size = MAX_BUFF_SIZE + MAX_XECUTE_LEN;
 					}
 					multiline_parse_fail = TRUE;
 				}
@@ -1488,7 +1498,7 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 				{
 					value_len[XECUTE_SUB] = 1;
 					values[XECUTE_SUB][0] = ' ';
-					max_xecute_size = SIZEOF(xecute_buffer);
+					max_xecute_size = MAX_BUFF_SIZE + MAX_XECUTE_LEN;
 				}
 			}
 			trigjrec->str.len = trigjreclen + value_len[XECUTE_SUB];
@@ -1648,6 +1658,11 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 			break;
 		} while (TRUE);
 	} while (TRUE);
+	if (NULL != xecute_buffer)
+	{
+		free(xecute_buffer);
+		xecute_buffer = NULL;
+	}
 	if ((STATS_UNCHANGED_TRIGFILE == overall_trig_status) || (STATS_NOERROR_TRIGFILE == overall_trig_status))
 	{
 		trig_stats[overall_trig_status]++;
