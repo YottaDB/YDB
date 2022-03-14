@@ -204,7 +204,6 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMV63007:	/* Note: This is also the case for GDSMR122 */
 				/* GT.M V63012 added fullblkwrt option */
 				csd->write_fullblk = 0;
-				break;
 			case GDSMV63012:
 			case GDSMR126:
 				/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support nanosecond timers */
@@ -223,7 +222,6 @@ void db_auto_upgrade(gd_region *reg)
 				 */
 				csd->max_procs.cnt = 0;
 				csd->max_procs.time = 0;
-				break;
 			case GDSMR134:
 				/* GT.M V63012 added fullblkwrt option */
 				csd->write_fullblk = 0;
