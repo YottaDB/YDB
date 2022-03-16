@@ -122,7 +122,6 @@ int m_xecute(void)
 				ins_triple(ref0);
 				pending_errtriplecode = 0;	/* forget the error - leave it to runtime */
 				TREF(source_error_found) = 0;
-
 			}
 		} else
 			rval = EXPR_FAIL;

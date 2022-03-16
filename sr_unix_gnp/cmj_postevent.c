@@ -34,7 +34,7 @@ cmi_status_t cmj_postevent(struct CLB *lnk)
 	case CMI_REASON_IODONE:
 		if (lnk->ast)
 		{
-			CMI_DPRINT(("CALLING AST FROM CMJ_POSTEVENT after IODONE, called from 0x%x\n", caller_id(0)));
+			CMI_DPRINT(("CALLING AST FROM CMJ_POSTEVENT after IODONE, called from 0x%x\n", caller_id(1)));
 			(*lnk->ast)(lnk);
 		}
 		break;
@@ -66,7 +66,7 @@ cmi_status_t cmj_postevent(struct CLB *lnk)
 		}
 		if (lnk->ast)
 		{
-			CMI_DPRINT(("CALLING AST FROM CMJ_POSTEVENT after ERROR, called from 0x%x\n", caller_id(0)));
+			CMI_DPRINT(("CALLING AST FROM CMJ_POSTEVENT after ERROR, called from 0x%x\n", caller_id(1)));
 			(*lnk->ast)(lnk);
 		}
 		if (tsk->err)
