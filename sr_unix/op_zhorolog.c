@@ -43,9 +43,6 @@ void op_zhorolog(mval *s, boolean_t z)
 		rts_error_csa(NULL, VARLSTCNT(1) ERR_WEIRDSYSTIME);
 #endif
 	seconds = ts.tv_sec;
-	/* Round up the number of seconds if $HOROLOG and microseconds >= 0.5 seconds */
-	if ((!z) && (ts.tv_nsec >= (NANOSECS_IN_SEC / 2)))
-		seconds++;
 	gmtoffset = dollarh(seconds, &days, &seconds);
 	s->str.addr = (char *)strpool_free;
 	strpool_free = i2asc(strpool_free, days);

@@ -223,7 +223,7 @@ void db_auto_upgrade(gd_region *reg)
 				csd->max_procs.cnt = 0;
 				csd->max_procs.time = 0;
 			case GDSMR134:
-				/* GT.M V63012 added fullblkwrt option */
+				/* GT.M V63012 (merged after YottaDB r1.34) added fullblkwrt option */
 				csd->write_fullblk = 0;
 				break;
 			case GDSMR136:

@@ -114,7 +114,7 @@ GBLREF uint4			process_id;
 #define SEV_MSK		7
 
 /* A YDB error code is one that is either in merrors.msg or in ydberrors.msg */
-#define IS_YDB_ERROR(err) (((err & FACMASK(merrors_ctl.facnum))							\
+#define IS_YDB_ERROR(err) ((((err & 0x0FFFFFFF) & FACMASK(merrors_ctl.facnum))					\
 					&& (MSGMASK(err, merrors_ctl.facnum) <= merrors_ctl.msg_cnt))		\
 				|| ((err & FACMASK(ydberrors_ctl.facnum))					\
 					&& (MSGMASK(err, ydberrors_ctl.facnum) <= ydberrors_ctl.msg_cnt)))
