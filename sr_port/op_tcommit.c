@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -218,7 +218,7 @@ enum cdb_sc	op_tcommit(void)
 
 	SETUP_THREADGBL_ACCESS;
 #	ifdef GTM_TRIGGER
-	DBGTRIGR((stderr, "op_tcommit: Entry from 0x"lvaddr"\n", caller_id(0)));
+	DBGTRIGR((stderr, "op_tcommit: Entry from 0x"lvaddr"\n", caller_id(1)));
 	skip_invoke_restart = skip_INVOKE_RESTART;	/* note down global value in local variable */
 	skip_INVOKE_RESTART = FALSE;	/* reset global variable to default state as soon as possible */
 #	else

@@ -313,6 +313,7 @@ void resolve_tref(triple *curtrip, oprtype *opnd)
 		COMPDBG(PRINTF(" ** Passthru replacement: Operand at 0x%08lx replaced by operand at 0x%08lx\n",
 			       (unsigned long)opnd, (unsigned long)&tripref->operand[0]););
 		assert(TRIP_REF == tripref->operand[0].oprclass);
+		/* The TRIP_REF check below is needed due to $ZYSQLNULL */
 		assert(((NO_REF == tripref->operand[1].oprclass) || (TRIP_REF == tripref->operand[1].oprclass)) &&
 			(NO_REF == tripref->destination.oprclass));
 		*opnd = tripref->operand[0];

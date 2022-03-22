@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -208,7 +208,7 @@ void gtm_exit_handler(void)
 			return;
 		}
 		DBGSIGHND_ONLY(fprintf(stderr, "gtm_exit_handler: Entered in simpleThreadAPI mode.. (thread %p) from %p\n",
-				       (void *)pthread_self(), (void *)caller_id()); fflush(stderr));
+				       (void *)pthread_self(), (void *)caller_id(1)); fflush(stderr));
 	}
 	DEBUG_ONLY(ydb_dmp_tracetbl());
 	attempting = rundown_state_mprof;
