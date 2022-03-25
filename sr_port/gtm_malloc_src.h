@@ -795,8 +795,11 @@ void *gtm_malloc_main(size_t size)	/* Note renamed to gtm_malloc_dbg when includ
 			return retVal;
 		} else  /* Storage mgmt has not been initialized */
 		{
+			uint4 save_smCallerIdExtraLevels;
 			PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */
+			save_smCallerIdExtraLevels = smCallerIdExtraLevels;
 			gtmSmInit();
+			smCallerIdExtraLevels = save_smCallerIdExtraLevels;
 			PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release exclusive thread lock if needed */
 			/* Reinvoke gtm_malloc now that we are initialized.
 			 *
