@@ -78,7 +78,7 @@ lv_val *lv_getslot(symval *sym)
 	}
 	assert(lv);
 	DBGRFCT((stderr, "\n>> lv_getslot(): Allocating new lv_val at 0x"lvaddr" by routine 0x"lvaddr" at mpc 0x"lvaddr
-		 " for symval 0x"lvaddr" (curr_symval: 0x"lvaddr")\n", lv, caller_id(1), frame_pointer->mpc, sym, curr_symval));
+		 " for symval 0x"lvaddr" (curr_symval: 0x"lvaddr")\n", lv, caller_id(0), frame_pointer->mpc, sym, curr_symval));
 	return lv;
 }
 
@@ -119,7 +119,7 @@ lvTree *lvtree_getslot(symval *sym)
 		}
 	}
 	assert(lvt);
-	DBGRFCT((stderr, ">> lvtree_getslot(): Allocating new lvTree at 0x"lvaddr" by routine 0x"lvaddr"\n", lvt, caller_id(1)));
+	DBGRFCT((stderr, ">> lvtree_getslot(): Allocating new lvTree at 0x"lvaddr" by routine 0x"lvaddr"\n", lvt, caller_id(0)));
 	return lvt;
 }
 
@@ -161,6 +161,6 @@ lvTreeNode *lvtreenode_getslot(symval *sym)
 	}
 	assert(lv);
 	DBGRFCT((stderr, ">> lvtreenode_getslot(): Allocating new lvTreeNode at 0x"lvaddr" by routine 0x"lvaddr"\n",
-			lv, caller_id(1)));
+			lv, caller_id(0)));
 	return lv;
 }

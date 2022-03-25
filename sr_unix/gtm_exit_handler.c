@@ -208,7 +208,7 @@ void gtm_exit_handler(void)
 			return;
 		}
 		DBGSIGHND_ONLY(fprintf(stderr, "gtm_exit_handler: Entered in simpleThreadAPI mode.. (thread %p) from %p\n",
-				       (void *)pthread_self(), (void *)caller_id(1)); fflush(stderr));
+				       (void *)pthread_self(), (void *)caller_id(0)); fflush(stderr));
 	}
 	DEBUG_ONLY(ydb_dmp_tracetbl());
 	attempting = rundown_state_mprof;

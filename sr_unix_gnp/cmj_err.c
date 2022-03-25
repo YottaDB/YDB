@@ -22,7 +22,7 @@ void cmj_err(struct CLB *lnk, cmi_reason_t reason, cmi_status_t status)
 	struct NTD *tsk = lnk->ntd;
 
 	ASSERT_IS_LIBCMISOCKETTCP;
-	CMI_DPRINT(("CMJ_ERR called from 0x%x, reason %d, status %d\n", caller_id(1), reason, status));
+	CMI_DPRINT(("CMJ_ERR called from 0x%x, reason %d, status %d\n", caller_id(0), reason, status));
 
 	lnk->deferred_event = TRUE;
 	lnk->deferred_reason = reason;

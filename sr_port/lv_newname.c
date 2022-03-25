@@ -48,7 +48,7 @@ void lv_newname(ht_ent_mname *hte, symval *sym)
 	LVVAL_INIT(lv, sym);
 	DBGRFCT((stderr, "\nlv_newname: Varname '%.*s' in sym 0x"lvaddr" resetting hte 0x"lvaddr" from 0x"lvaddr" to 0x"lvaddr
 		 " -- called from 0x"lvaddr"\n\n", hte->key.var_name.len, hte->key.var_name.addr, sym, hte, hte->value, lv,
-		 caller_id(1)));
+		 caller_id(0)));
 	hte->value = lv;
 	assert(1 == lv->stats.trefcnt);
 	assert(0 == lv->stats.crefcnt);
