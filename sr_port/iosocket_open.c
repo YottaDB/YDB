@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -206,7 +206,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 			switch(ch)
 			{
 				case iop_delimiter:
-					delimiter_len = (int4)(unsigned char)*(pp->str.addr + p_offset);
+					delimiter_len = (int4)(unsigned char)(*(pp->str.addr + p_offset));
 					if (((MAX_DELIM_LEN + 1) * MAX_N_DELIMITER) >= delimiter_len)
 						memcpy(delimiter_buffer, (pp->str.addr + p_offset + 1), delimiter_len);
 					else
@@ -302,7 +302,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					break;
 				case iop_zlisten:
 					listen_specified = TRUE;
-					len = (int)(*(pp->str.addr + p_offset));
+					len = (int)(unsigned char)(*(pp->str.addr + p_offset));
 					if (len < SA_MAXLITLEN)
 					{
 						memset(sockaddr, 0, SIZEOF(sockaddr));
@@ -313,7 +313,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					break;
 				case iop_connect:
 					connect_specified = TRUE;
-					len = (int)(*(pp->str.addr + p_offset));
+					len = (int)(unsigned char)(*(pp->str.addr + p_offset));
 					if (len < SA_MAXLITLEN)
 					{
 						memset(sockaddr, 0, SIZEOF(sockaddr));
@@ -331,7 +331,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					break;
 				case iop_attach:
 					attach_specified = TRUE;
-					handle_len = (int)(*(pp->str.addr + p_offset));
+					handle_len = (int)(unsigned char)(*(pp->str.addr + p_offset));
 					if (handle_len > MAX_HANDLE_LEN)
 						handle_len = MAX_HANDLE_LEN;
 					memcpy(sock_handle, pp->str.addr + p_offset + 1, handle_len);
@@ -340,7 +340,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARINAP);
 					break;
 				case iop_zff:
-					if (MAX_ZFF_LEN >= (zff_len = (int4)(unsigned char)*(pp->str.addr + p_offset)))
+					if (MAX_ZFF_LEN >= (zff_len = (int4)(unsigned char)(*(pp->str.addr + p_offset))))
 						memcpy(zff_buffer, (char *)(pp->str.addr + p_offset + 1), zff_len);
 					else
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFF2MANY, 2, zff_len, MAX_ZFF_LEN);
