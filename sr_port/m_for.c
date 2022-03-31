@@ -168,6 +168,7 @@ int m_for(void)
 		if (OC_VAR != control_ref->exorder.fl->opcode)
 		{
 			FOR_POP(BLOWN_FOR);
+			REVERT;
 			return FALSE;
 		}
 		assert(MVAR_REF == control_ref->exorder.fl->operand[0].oprclass);
