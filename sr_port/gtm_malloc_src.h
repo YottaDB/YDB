@@ -795,6 +795,9 @@ void *gtm_malloc_main(size_t size)	/* Note renamed to gtm_malloc_dbg when includ
 			return retVal;
 		} else  /* Storage mgmt has not been initialized */
 		{
+			/* See discussion at https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1132#note_884556763
+			 * for more details on why the save/restore is needed
+			 */
 			uint4 save_smCallerIdExtraLevels;
 			PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */
 			save_smCallerIdExtraLevels = smCallerIdExtraLevels;

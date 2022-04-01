@@ -16,6 +16,8 @@
 #ifndef MDQ_H_DEFINED
 #define MDQ_H_DEFINED
 
+#include "opcode.h"
+
 /* Define basic working macros for queue management of doubly linked list is defined using elements "N.fl" and "N.bl".
  * The DSRINS insert at tail rather than head and so work FIFO rather than LIFO with DQLOOP and associated macros
  */
@@ -46,8 +48,6 @@
  * the test to see if should do debugging is not elegant but it does allow decent debugging. Note those macros without
  * debugging are statically defined.
  */
-#  define OCQ_NOOP 0L		/* This needs to align with OC_NOOP, which is 0, but 'twould make a mess to do the includes */
-#  define OCQ_INVALID -1L
 #define dqloop(Q, N, I) DQLOOP(Q, N, I)
 #ifdef GTM_MALLOC_BUILD		/* gtm_malloc doesn't deal with triples and the include they require make for trouble */
 #define dqinit(Q, N) DQINIT(Q, N)
@@ -65,10 +65,10 @@ MBSTART {						\
 MBSTART {							\
 	triple *REF;						\
 								\
-	if (((uint4)(OCQ_INVALID) == ((triple *)(Q))->opcode)	\
+	if ((OCQ_INVALID == ((triple *)(Q))->opcode)            \
 		&& (((triple *)(Q))->exorder.bl == (Q)))	\
 	{							\
-		REF =  maketriple(OCQ_NOOP);			\
+		REF =  maketriple(OC_NOOP);                     \
 		DQINIT(REF, exorder);				\
 		DQINS((Q), exorder, REF);			\
 	}							\
