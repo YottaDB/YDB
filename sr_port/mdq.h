@@ -61,19 +61,6 @@ MBSTART {						\
 } MBEND
 #define DQTRIPCHK(Q, N) assert((0 != memcmp(#N, "exorder", 3)) || (OCQ_INVALID != ((triple *)(Q))->opcode))
 #endif
-#  define dqnoop(Q)						\
-MBSTART {							\
-	triple *REF;						\
-								\
-	if ((OCQ_INVALID == ((triple *)(Q))->opcode)            \
-		&& (((triple *)(Q))->exorder.bl == (Q)))	\
-	{							\
-		REF =  maketriple(OC_NOOP);                     \
-		DQINIT(REF, exorder);				\
-		DQINS((Q), exorder, REF);			\
-	}							\
-	CHKTCHAIN(Q, N, TRUE);					\
-} MBEND
 
 /* #define DEBUG_TRIPLES / * Uncomment this to do triple debugging, which is also tied to ydb_dbglvl, as of this writing: 0x4000 */
 #ifndef DEBUG_TRIPLES
@@ -83,6 +70,7 @@ MBSTART {							\
 #  define dqrins(Q, N, X)	DQRINS(Q, N, X)
 #  define dqadd(Q, X, N)	DQADD(Q, X, N)
 #  define CHKTCHAIN(Q, N, B)
+#  define dqnoop(Q)
 #else
 #  include "gtmdbglvl.h"
 GBLREF	uint4		ydbDebugLevel;
@@ -141,6 +129,19 @@ MBSTART {						\
 	CHKTCHAIN(X, N, FALSE);				\
 	DQADD(Q, X, N);					\
 	CHKTCHAIN(Q, N, ((Q) != TREF(expr_start)));	\
+} MBEND
+#  define dqnoop(Q)						\
+MBSTART {							\
+	triple *REF;						\
+								\
+	if ((OCQ_INVALID == ((triple *)(Q))->opcode)            \
+		&& (((triple *)(Q))->exorder.bl == (Q)))	\
+	{							\
+		REF =  maketriple(OC_NOOP);                     \
+		DQINIT(REF, exorder);				\
+		DQINS((Q), exorder, REF);			\
+	}							\
+	CHKTCHAIN(Q, N, TRUE);					\
 } MBEND
 #endif
 
