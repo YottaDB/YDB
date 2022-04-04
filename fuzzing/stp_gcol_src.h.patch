@@ -11,15 +11,15 @@
 #################################################################
 
 diff --git a/sr_port/stp_gcol_src.h b/sr_port/stp_gcol_src.h
-index 63f18667..caff9dfc 100644
+index 818ac645..d251cff8 100644
 --- a/sr_port/stp_gcol_src.h
 +++ b/sr_port/stp_gcol_src.h
-@@ -1016,7 +1016,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
- 			if ((TREF(gtm_strpllimwarned)) /* previously warned */
- 				&& (0 < TREF(gtm_strpllim)) /* watching a stp limit */
- 				&& ((stp_incr + stringpool.top - stringpool.base) > TREF(gtm_strpllim))) /* expanding larger */
--					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STPOFLOW);
-+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) MAKE_MSG_ERROR(ERR_STPOFLOW));
+@@ -1017,7 +1017,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
+ 				&& ((stp_incr + stringpool.top - stringpool.base) > stringpool.strpllim)) /* expanding larger */
+ 			{
+ 				assert(0 < stringpool.strpllim);	/* must have been watching stp limit */
+-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STPOFLOW);
++				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) MAKE_MSG_ERROR(ERR_STPOFLOW));
+ 			}
  			expand_stp((ssize_t)(stp_incr + stringpool.top - stringpool.base));
  #			ifdef DEBUG
- 			/* If expansion failed and stp_gcol_ch did an UNWIND and we were already in exit handling code,
