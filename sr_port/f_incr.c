@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -105,6 +105,7 @@ int f_incr(oprtype *a, opctype op)
 		} else
 			assert(OC_NOOP == (TREF(expr_start))->opcode);
 	}
+<<<<<<< HEAD
 	if (!TREF(shift_side_effects) || (YDB_BOOL != TREF(ydb_fullbool)) || (OC_INDINCR != r->opcode)
 		|| (NULL == TREF(expr_start)) || (NULL == triptr))
 	{	/* Put it on the end of the main chain as there's no reason to play more with the ordering */
@@ -117,6 +118,11 @@ int f_incr(oprtype *a, opctype op)
 		 * are non-intersecting chains. Hence we treat a NULL value of "triptr" as if "TREF(expr_start)" is NULL
 		 * and fall through into the "if" block in that case.
 		 */
+=======
+	if (!TREF(shift_side_effects) || (GTM_BOOL != TREF(gtm_fullbool)) || (OC_INDINCR != r->opcode)
+		|| (NULL == TREF(expr_start)))
+	{	/* put it on the end of the main chain as there's no reason to play more with the ordering */
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 		setcurtchain(oldchain);
 		triptr = (TREF(curtchain))->exorder.bl;
 		dqadd(triptr, &targchain, exorder);	/* this is a violation of info hiding */

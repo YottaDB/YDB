@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -650,8 +650,12 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 		*ptr = TOUPPER(*ptr);
 	assert(0 < STRLEN(local_options));	/* This is guaranteed because of the previous "assert(0 < option_len)" */
 	ptr = STRTOK_R(local_options, ",", &strtokptr);
+<<<<<<< HEAD
 	assert(NULL != ptr);	/* This is guaranteed because of the previous "assert(0 < STRLEN(local_options))" */
 	do
+=======
+	while (NULL != ptr)
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	{
 		switch (*ptr)
 		{
@@ -690,7 +694,12 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 				assert(FALSE);	/* Parsing should have found invalid command */
 				break;
 		}
+<<<<<<< HEAD
 	} while (NULL != (ptr = STRTOK_R(NULL, ",", &strtokptr)));
+=======
+		ptr = STRTOK_R(NULL, ",", &strtokptr);
+	}
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	return !((*isolation && *noisolation) || (*consistency && *noconsistency));
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -43,6 +43,7 @@
 
 GBLREF boolean_t	gtm_utf8_mode, hup_on, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF int		exi_condition, process_exiting;
+GBLREF int4		error_condition;
 GBLREF io_pair		io_curr_device, io_std_device;
 GBLREF mval		dollar_zstatus;
 GBLREF volatile int4	outofband;
@@ -91,7 +92,7 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 	{
 		DOWRITERC(tt_ptr->fildes, text, textlen, status);
 		tt_ptr->write_active = FALSE;
-		if (0 == status)
+		if ((0 == status) && (ERR_TERMHANGUP != error_condition))
 		{
 			if ((io_ptr == io_std_device.out) && (prin_out_dev_failure))
 			{	/* if it was TRUE, try flush we may have skipped above & clear flag because write worked */

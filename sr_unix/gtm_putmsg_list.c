@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -52,8 +52,13 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 {
 	GBLREF      boolean_t               ydb_dist_ok_to_use;
 
+<<<<<<< HEAD
 	int		i, msg_id, fao_actual, fao_count, freeze_msg_id;
 	char		msg_buffer[1024];
+=======
+	int		i, msg_id, fao_actual, fao_count, dummy, freeze_msg_id;
+	char		msg_buffer[PUT_BUFF_SIZE];
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	mstr		msg_string;
 	const err_msg	*msg;
 	const err_ctl	*ctl;
@@ -97,7 +102,7 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 		else
 			GET_MSG_INFO(msg_id, ctl, msg);
 		msg_string.addr = msg_buffer;
-		msg_string.len = sizeof msg_buffer;
+		msg_string.len = SIZEOF(msg_buffer);
 		gtm_getmsg(msg_id, &msg_string);
 		if (mustlog)
 		{				/* If this message must be sysloged for GTM-7759, do it here */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -376,7 +376,7 @@ static void expand_stp(size_t new_size)	/* BYPASSOK */
 		ESTABLISH(stp_gcol_ch);
 	assert(IS_GTM_IMAGE || IS_MUPIP_IMAGE);
 	assert(!stringpool_unexpandable);
-	DBGSTPGCOL((stderr, "expand_stp(new_size=%u)\n", new_size));
+	DBGSTPGCOL((stderr, "expand_stp(new_size=%llu)\n", new_size));
 	stp_init(new_size);
 	if (retry_if_expansion_fails)
 		REVERT;
@@ -966,7 +966,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 #	endif
 	space_reclaim = space_after_compact - space_before_compact; /* this can be -ve, if alignment causes expansion */
 	space_needed -= (ssize_t)space_after_compact;
-	DBGSTPGCOL((stderr, "space_needed=%i\n", space_needed));
+	DBGSTPGCOL((stderr, "space_needed=%li\n", space_needed));
 	/* After compaction if less than 31.25% of space is avail, consider it a low reclaim pass */
 	if (STP_LOWRECLAIM_LEVEL(stringpool.top - stringpool.base) > space_after_compact) /* BYPASSOK */
 		(*low_reclaim_passes)++;
@@ -1014,13 +1014,17 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 				break;			/* stp_incr can't get smaller - give up and use what we have */
 			expansion_failed = FALSE;	/* will be set to TRUE by condition handler if can't get memory */
 			assert((stp_incr + stringpool.top - stringpool.base) >= (space_needed + blklen));
-			DBGSTPGCOL((stderr, "incr_factor=%i stp_incr=%i space_needed=%i\n", *incr_factor, stp_incr, space_needed));
+			DBGSTPGCOL((stderr, "incr_factor=%i stp_incr=%i space_needed=%li\n", *incr_factor, stp_incr, space_needed));
 			if ((stringpool.strpllimwarned) /* previously warned */
 				&& ((stp_incr + stringpool.top - stringpool.base) > stringpool.strpllim)) /* expanding larger */
 			{
 				assert(0 < stringpool.strpllim);	/* must have been watching stp limit */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STPOFLOW);
 			}
+			DBGSTPGCOL((stderr, "base=%p top=%p (size=%llu)\n", stringpool.base, stringpool.top,
+						(size_t)(stringpool.top - stringpool.base)));
+			assert((ssize_t)(stringpool.top - stringpool.base)
+					< ((ssize_t)(stp_incr + stringpool.top - stringpool.base)));
 			expand_stp((ssize_t)(stp_incr + stringpool.top - stringpool.base));
 #			ifdef DEBUG
 			/* If expansion failed and stp_gcol_ch did an UNWIND and we were already in exit handling code,
@@ -1079,6 +1083,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		/* Adjust incr_factor */
 		if (*incr_factor > 1)
 			*incr_factor = *incr_factor - 1;
+		DBGSTPGCOL((stderr, "incr_factor=%i space_needed=%li\n", *incr_factor, space_needed));
 		if (topstr != array)
 		{
 #			ifdef STP_MOVE

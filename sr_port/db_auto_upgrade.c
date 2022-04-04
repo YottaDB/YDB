@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -93,7 +93,7 @@ void db_auto_upgrade(gd_region *reg)
 	 * valid so it is important that the minor db version is incremented each time the fileheader is updated and that
 	 * this routine is correspondingly updated to initialize the new fields in prior versions of the header. SE 5/2006.
 	 */
-	if (csd->minor_dbver < GDSMVCURR)
+	if (GDSMVCURR > csd->minor_dbver)
 	{	/* In general, the method for adding new versions is:
 		 * 1) If there are no automatic updates for this version, it is optional to add the version to the switch
 		 *    statement below. Those there are more for example at this time (through V53000).
@@ -156,6 +156,7 @@ void db_auto_upgrade(gd_region *reg)
 				csd->max_update_array_size
 					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 			case GDSMV70001:
+<<<<<<< HEAD
 				if (GDSMR200_V70000 != csd->minor_dbver)
 				{
 					/* Do YottaDB r2.00 related auto upgrade operations.
@@ -219,6 +220,15 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMVFILLER35:
 			case GDSMVFILLER36:
 			case GDSMVFILLER37:
+=======
+				/* GT.M V70002 added proactive block split option */
+				csd->problksplit = DEFAULT_PROBLKSPLIT;
+				break;		/* so a new "case" needs to be added BEFORE the assert. */
+			case GDSMV70002:
+				/* Nothing to do for this version since it is GDSMVCURR for now. */
+				assert(FALSE);
+				break;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 			default:
 				/* Unrecognized version in the header */
 				assertpro(FALSE && csd->minor_dbver);
@@ -261,7 +271,11 @@ void v6_db_auto_upgrade(gd_region *reg)
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	assert(NULL != csd);
-	if (NULL == csd)
+	/* Auto upgrade previously done by current ver, skip it. WARNING: Fields auto-upgraded to non-zero
+	 * values, like problksplit, need special handling to enabled switch V7 versions working with a V6
+	 * database. There is no such special casing at the moment. Future versions will need to address it
+	 */
+	if ((NULL == csd) || (GDSMVCURR == csd->last_mdb_ver))
 		return;
 	assert(0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1)); /* This function is only for V6 DBs */
 	if (0 > csd->mutex_spin_parms.mutex_hard_spin_count)
@@ -485,7 +499,13 @@ void v6_db_auto_upgrade(gd_region *reg)
 				csd->max_update_array_size = csd->max_non_bm_update_array_size
 					= (int4)(ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 				csd->max_update_array_size
+<<<<<<< HEAD
 					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
+=======
+				+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
+				/* GT.M V70002 added proactive block split option */
+				csd->problksplit = DEFAULT_PROBLKSPLIT;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 				break;
 			case GDSMV63015:
 				assert(FALSE);	/* if this should come to pass, add appropriate code above the assert */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -30,6 +30,7 @@
 #include "have_crit.h"
 #include "deferred_events_queue.h"
 #include "deferred_events.h"
+#include "try_event_pop.h"
 
 GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF mval			dollar_zstatus;
@@ -93,9 +94,16 @@ void jobinterrupt_process_cleanup(void)
 	*mbptr++ = 0;
 	util_out_print((caddr_t)msgbuf, OPER);
 	if (NULL == dollar_ecode.error_last_b_line)
+<<<<<<< HEAD
 	{	/* Was a direct mode frame this message needs to go out to the console */
 		dec_err(VARLSTCNT(1) ERR_ERRWZINTR);
 	}
 	if ((0 == dollar_ecode.index) || !(ETRAP_IN_EFFECT))
 		TRY_EVENT_POP;			/* leaving interrupt and not in error handling, so check for pending timed events */
+=======
+		dec_err(VARLSTCNT(1) ERR_ERRWZINTR);	/* Was a direct mode frame - this message needs to go out to the console */
+	TAREF1(save_xfer_root, jobinterrupt).event_state = not_in_play;
+	event_type = no_event;
+	TRY_EVENT_POP;			/* leaving interrupt and not in error handling, so check for pending timed events */
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 }

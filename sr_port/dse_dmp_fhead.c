@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -257,9 +257,12 @@ void dse_dmp_fhead (void)
 		util_out_print("  Full Block Write                         !UL", TRUE, csd->write_fullblk);
 		if (db_shares_gvstats)
 			util_out_print("  StatsDB Allocation            !19UL", TRUE, csd->statsdb_allocation);
+<<<<<<< HEAD
 		util_out_print("  Max conc proc time         !22UL", FALSE, csd->max_procs.time);
 		util_out_print("  Max Concurrent processes         !9UL", TRUE, csd->max_procs.cnt);
 		util_out_print("  Reorg Sleep Nanoseconds         !17UL", TRUE, csd->reorg_sleep_nsec);
+=======
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump these if -/ALL as if part of above display */
@@ -318,8 +321,9 @@ void dse_dmp_fhead (void)
 		util_out_print("  FTOK counter halted                  !AD", TRUE, 5, cnl->ftok_counter_halted ? " TRUE" : "FALSE");
 		util_out_print("  Access control rundown bypasses         !9UL", FALSE, cnl->dbrndwn_access_skip);
 		util_out_print("  FTOK rundown bypasses           !10UL", TRUE, cnl->dbrndwn_ftok_skip);
-		util_out_print("  Epoch taper                                 !AD", TRUE, 5,
+		util_out_print("  Epoch taper                                 !AD", FALSE, 5,
 				(csd->epoch_taper ? " TRUE" : "FALSE"));
+		util_out_print("  Proactive Block Splitting     !12UL", TRUE, csd->problksplit);
 		new_line = FALSE;
 		for (index = 0; MAX_WTSTART_PID_SLOTS > index; index++)
 		{

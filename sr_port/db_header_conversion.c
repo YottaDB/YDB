@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020-2021 Fidelity National Information	*
+ * Copyright (c) 2020-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
@@ -51,6 +51,7 @@ void db_header_upconv(sgmnt_data_ptr_t v7)
 	v7->trans_hist.total_blks = v6->trans_hist.total_blks;
 	v7->trans_hist.free_blocks = v6->trans_hist.free_blocks;
 	v7->last_start_backup = v6->last_start_backup;
+	v7->problksplit = v6->problksplit;
 }
 
 /* Convert the header from v7 to v6 format */
@@ -120,5 +121,6 @@ void db_header_dwnconv(sgmnt_data_ptr_t v7)
 	v6->max_rec = v7->max_rec;
 	v6->i_reserved_bytes = v7->i_reserved_bytes;
 	v6->last_start_backup = v7->last_start_backup;
+	v6->problksplit = v7->problksplit;
 	v6->db_got_to_V7_once = FALSE;
 }

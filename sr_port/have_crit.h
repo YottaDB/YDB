@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
@@ -95,11 +95,15 @@ typedef enum
 	INTRPT_IN_JNL_FSYNC,		/* Deferring interrupts in jnl_fsync() while holding the latch */
 	INTRPT_IN_EVENT_HANDLING,	/* Deferring interrupts while managing a deferred or outofband event */
 	INTRPT_IN_KILL_CLEANUP,		/* Deferring interrupts while performing KILL cleanup - used by REORG */
+<<<<<<< HEAD
 
 	/****************** Below interrupt states are YottaDB-ONLY **************/
 	INTRPT_IN_SS_DESTROY_CONTEXT,	/* Deferring interrupts in ss_destroy_context() */
 
 	/****************** Below interrupt states are common to both GT.M and YottaDB **************/
+=======
+	INTRPT_IN_RTN_CLEANUP,          /* Deferring interrupts while cleaning up routines */
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 

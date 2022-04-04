@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -28,6 +29,9 @@
 GBLREF spdesc stringpool;
 LITREF unsigned char io_params_size[];
 
+error_def(ERR_DEVPARTOOBIG);
+error_def(ERR_DEVPARPROT);
+
 #define IOP_DESC(a,b,c,d,e) {d, e}
 LITDEF dev_ctl_struct dev_param_control[] =
 {
@@ -37,9 +41,6 @@ LITDEF dev_ctl_struct dev_param_control[] =
 
 int4 cvtparm(int iocode, mval *src, mval *dst)
 {
-	error_def(ERR_DEVPARTOOBIG);
-	error_def(ERR_DEVPARPROT);
-
 	int4 		status, nl,  tim[2];
 	int		siz, extra_siz, cnt, strlen;
 	short		ns;
@@ -100,8 +101,11 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 			assert(siz == SIZEOF(int4));
 			nl = 0;
 			for (cp = (unsigned char *) src->str.addr, cnt = src->str.len ; cnt > 0 ; cnt--)
-				nl |= (1 << *cp++);
-			cp = (unsigned char *) &nl;
+			{
+				if (*cp < 32)
+					nl |= (1 << *cp++);
+			}
+			cp = (unsigned char *)&nl;
 			break;
 		case IOP_SRC_LNGMSK:
 			MV_FORCE_STR(src);

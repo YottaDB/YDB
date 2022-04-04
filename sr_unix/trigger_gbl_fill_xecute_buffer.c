@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -174,7 +174,7 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 		}
 		val_ptr = &key_val;
 		xecute_buff_len = mval2i(val_ptr);
-		assert(MAX_XECUTE_LEN >= xecute_buff_len);
+		assert((0 < xecute_buff_len) && (MAX_XECUTE_LEN >= xecute_buff_len));
 		xecute_buff_ptr = xecute_buff = malloc(xecute_buff_len);
 		len = 0;
 		while (len < xecute_buff_len)

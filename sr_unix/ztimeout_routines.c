@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2021 Fidelity National Information	*
+ * Copyright (c) 2018-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
@@ -60,17 +60,29 @@
 #include "compiler.h"
 #include "gtm_common_defs.h"
 #include "gtm_time.h"
+<<<<<<< HEAD
 #include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
+=======
+#ifdef DEBUG_DEFERRED_EVENT
+#include "funsvn.h"
+#include "nametabtyp.h"
+#include "namelook.h"
+#endif
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
 GBLREF	boolean_t		ydb_white_box_test_case_enabled, ztrap_explicit_null;
 GBLREF	dollar_ecode_type	dollar_ecode;
 GBLREF	int			dollar_truth, ydb_white_box_test_case_number;
 GBLREF	stack_frame		*frame_pointer;
-GBLREF	void			(*ztimeout_clear_ptr)(void);
 GBLREF	volatile boolean_t	dollar_zininterrupt;
 GBLREF	volatile int4		outofband;
 
 LITREF	mval			literal_minusone, literal_null;
+#ifdef DEBUG_DEFERRED_EVENT
+LITREF unsigned char    svn_index[];
+LITREF nametabent       svn_names[];
+LITREF svn_data_type    svn_data[];
+#endif
 
 STATICDEF mstr			vector;
 
@@ -191,10 +203,17 @@ void ztimeout_expired(void)
 	SETUP_THREADGBL_ACCESS;
 	DBGDFRDEVNT((stderr, "%d %s: ztimeout expired - setting xfer handlers\n", __LINE__, __FILE__));
 #	ifdef DEBUG
+<<<<<<< HEAD
 	if (ydb_white_box_test_case_enabled && ((WBTEST_ZTIMEOUT_TRACE == ydb_white_box_test_case_number)
 			|| (WBTEST_ZTIME_DEFER_CRIT == ydb_white_box_test_case_number)
 			|| (WBTEST_ZTIM_EDGE == ydb_white_box_test_case_number)))
 		DBGFPF((stderr, "# ztimeout expired, white box case setting xfer handlers\n", __LINE__, __FILE__));
+=======
+	if (gtm_white_box_test_case_enabled && ((WBTEST_ZTIMEOUT_TRACE == gtm_white_box_test_case_number)
+			|| (WBTEST_ZTIME_DEFER_CRIT == gtm_white_box_test_case_number)
+			|| (WBTEST_ZTIM_EDGE == gtm_white_box_test_case_number)))
+		DBGFPF((stderr, "# ztimeout expired, white box case %d setting xfer handlers\n", gtm_white_box_test_case_number));
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 #	endif
 	xfer_set_handlers(ztimeout, 0, FALSE);
 }
@@ -202,23 +221,46 @@ void ztimeout_expired(void)
 void ztimeout_set(int4 dummy_param)
 {	/* attempts to redirect the transfer table to the timeout event at the next opportunity, when we have a current mpc */
 	intrpt_state_t	prev_intrpt_state;
+#	ifdef DEBUG_DEFERRED_EVENT
+	int		index;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(INTRPT_IN_EVENT_HANDLING == intrpt_ok_state);
 	assert(ztimeout == outofband);
+<<<<<<< HEAD
 	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT))
+=======
+	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && ETRAP_IN_EFFECT) || have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 		|| (jobinterrupt == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
 	{	/* not a good time, so save it */
 		outofband = no_event;
 		TAREF1(save_xfer_root, ztimeout).event_state = queued;
 		SAVE_XFER_QUEUE_ENTRY(ztimeout, 0);
+<<<<<<< HEAD
 		DBGDFRDEVNT((stderr, "%d %s: ztimeout_set - ZTIMEOUT queued: trap: %d, intrpt: %d\n",
 			     __LINE__, __FILE__, ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)), dollar_zininterrupt));
 #		ifdef DEBUG
 		if (ydb_white_box_test_case_enabled && ((WBTEST_ZTIMEOUT_TRACE == ydb_white_box_test_case_number)
 				|| (WBTEST_ZTIME_DEFER_CRIT == ydb_white_box_test_case_number)))
 			DBGFPF((stderr, "# ztimeout_set : white box case ZTIMEOUT Deferred\n"));
+=======
+		DBGDFRDEVNT((stderr, "%d %s: ztimeout_set - ZTIMEOUT queued; dec_indx %d, et: %d intrpt: %d, crit: %d\n",
+			__LINE__, __FILE__, ETRAP_IN_EFFECT, dollar_zininterrupt, have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)));
+#		ifdef DEBUG
+#		ifdef DEBUG_DEFERRED_EVENT
+		if (ETRAP_IN_EFFECT)
+		{
+			index = namelook(svn_index, svn_names, "ZSTATUS", SIZEOF("ZSTATUS"));
+			op_zwritesvn(svn_data[index].opcode);
+		}
+#		endif
+		if (gtm_white_box_test_case_enabled && ((WBTEST_ZTIMEOUT_TRACE == gtm_white_box_test_case_number)
+				|| (WBTEST_ZTIME_DEFER_CRIT == gtm_white_box_test_case_number)))
+			DBGFPF((stderr, "# ztimeout_set : white box case %d ZTIMEOUT Deferred\n", gtm_white_box_test_case_number));
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 #		endif
 		return;
 	}
@@ -228,8 +270,14 @@ void ztimeout_set(int4 dummy_param)
 	DEFER_INTO_XFER_TAB;
 	DBGDFRDEVNT((stderr, "%d %s: ztimeout_set - pending xfer entries for ztimeout\n", __LINE__, __FILE__));
 #	ifdef DEBUG
+<<<<<<< HEAD
 	if (ydb_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == ydb_white_box_test_case_number))
 		DBGFPF((stderr, "# ztimeout_set: set the xfer entries for ztimeout\n"));
+=======
+	if (gtm_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == gtm_white_box_test_case_number))
+		DBGFPF((stderr, "# ztimeout_set: white box case %d set the xfer entries for ztimeout\n",
+			gtm_white_box_test_case_number));
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 #	endif
 }
 
@@ -245,8 +293,8 @@ void ztimeout_action(void)
 	assert(pending == TAREF1(save_xfer_root, ztimeout).event_state);
 	DBGDFRDEVNT((stderr, "%d %s: ztimeout_action - driving the ztimeout vector\n", __LINE__, __FILE__));
 	DBGEHND((stderr, "ztimeout_action: Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt 0x"lvaddr "/0x"lvaddr
-		" - frame has type 0x%04lx\n",
-	frame_pointer, frame_pointer->restart_pc, frame_pointer->restart_ctxt, frame_pointer->type));
+		" - frame has type 0x%04lx\n", frame_pointer, frame_pointer->restart_pc,
+		frame_pointer->restart_ctxt, frame_pointer->type));
 	ztimeout_clear_timer();
 	DBGDFRDEVNT((stderr, "%d %s: ztimeout_action - changing pending to event_state: %d\n", __LINE__, __FILE__,
 		TAREF1(save_xfer_root, ztimeout).event_state));
@@ -263,8 +311,8 @@ void ztimeout_clear_timer(void)
 
 	SETUP_THREADGBL_ACCESS;
 	SHOWTIME(asccurtime);
-	DBGDFRDEVNT((stderr, "%d %s: ztimeout_clear_timer - clearing ztimeout while %s in use\n", __LINE__, __FILE__,
-		asccurtime, TREF(ztimeout_timer_on) ? "": "not "));
+	DBGDFRDEVNT((stderr, "%d %s: ztimeout_clear_timer - clearing ztimeout @ %s while %sin use\n", __LINE__, __FILE__,
+		asccurtime, TREF(ztimeout_timer_on) ? "": "*NOT* "));
 	assert(INTRPT_IN_EVENT_HANDLING == intrpt_ok_state);
 	entry = &TAREF1(save_xfer_root, ztimeout);
 	if (queued == entry->event_state)
@@ -275,8 +323,14 @@ void ztimeout_clear_timer(void)
 	if (pending == entry->event_state)
 	{
 #		ifdef DEBUG
+<<<<<<< HEAD
 		if (ydb_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == ydb_white_box_test_case_number))
 			DBGFPF((stderr, "# ztimeout_clear_timer - resetting the xfer entries for ztimeout\n"));
+=======
+		if (gtm_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == gtm_white_box_test_case_number))
+			DBGFPF((stderr, "# ztimeout_clear_timer - white box case %d resetting the xfer entries for ztimeout\n",
+				gtm_white_box_test_case_number));
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 		assert(ztimeout == outofband);
 #		endif
 	}

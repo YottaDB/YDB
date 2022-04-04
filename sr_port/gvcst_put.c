@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -148,6 +148,8 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		span_nodes_disallowed;
+GBLREF  boolean_t               is_updproc;
+GBLREF	uint4			dollar_trestart;
 
 error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVIS);
@@ -267,6 +269,34 @@ CONDITION_HANDLER(gvcst_put_ch)
 		UNWIND(NULL, NULL);
 	}
 	NEXTCH;
+}
+
+/* Used to determine how many records in a block to count to estimate number of records in the block */
+#define NUMRECSTOCOUNTTOESTIMATE 3
+
+static inline int4 num_recs_in_blk(sm_uc_ptr_t pBlkBase);
+
+static inline int4 num_recs_in_blk(sm_uc_ptr_t pBlkBase)
+{
+	sm_uc_ptr_t pBlkTop, pRec;
+	uint4 blkLen, recLen, heuristicRecsSize;
+	uint4 recCnt;
+
+	heuristicRecsSize = 0;
+	blkLen = ((blk_hdr_ptr_t) pBlkBase)->bsiz;
+	if (blkLen > MAX_DB_BLK_SIZE)
+		return -1;
+	pBlkTop = pBlkBase + blkLen;
+	pRec = pBlkBase + SIZEOF(blk_hdr);
+	for (recCnt = NUMRECSTOCOUNTTOESTIMATE; (0 < recCnt) && (pRec < pBlkTop); recCnt--)
+	{
+		GET_USHORT(recLen, &((rec_hdr_ptr_t)pRec)->rsiz);
+		pRec += recLen;
+		heuristicRecsSize += recLen;
+	}
+	if ((pRec > pBlkTop) || (0 == heuristicRecsSize))
+		return -1;
+	return recCnt ? (NUMRECSTOCOUNTTOESTIMATE - recCnt) : ((blkLen * NUMRECSTOCOUNTTOESTIMATE) / heuristicRecsSize);
 }
 
 void	gvcst_put(mval *val)
@@ -565,6 +595,8 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	} dbg_trace;
 	dbg_trace		dbg_trace_array[16];
 #	endif
+	boolean_t dont_copy_extra_record = FALSE;
+	boolean_t preemptive_split;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1306,7 +1338,22 @@ tn_restart:
 		 */
 		assert((new_blk_size >= new_blk_size_single) || (CDB_STAGNATE > t_tries));
 		prev_split_to_right = split_to_right;	/* note down "split_to_right" corresponding to one lower level */
-		if ((new_blk_size <= blk_fill_size) || (new_blk_size <= new_blk_size_single))
+		dont_copy_extra_record = FALSE; /* will adjust later if needed */
+		/* Let's use restarts to determine if it might be a good idea to split blocks */
+		preemptive_split = FALSE;
+		/* Preemptive split interferes with existing gvcst_put() optimizations on the final retry. */
+		/* This may be an area for further investigation in the future. */
+                if ((2 == t_tries) && (2 >= dollar_trestart) && (0 != csd->problksplit) && (0 == bh_level)
+                        && (gv_target != csa->dir_tree) && !is_updproc && !IS_STATSDB_CSA(csa))
+
+		{
+			if (num_recs_in_blk(buffaddr) > csd->problksplit)
+			{
+				preemptive_split = TRUE;
+				dont_copy_extra_record = TRUE; /* this interferes so disable */
+			}
+		}
+		if (((new_blk_size <= blk_fill_size) || (new_blk_size <= new_blk_size_single)) && !preemptive_split)
 		{	/* Update can be done without overflowing the block's fillfactor OR the record to be updated
 			 * is the only record in the new block. Do not split block in either case. This means we might
 			 * not honour the desired FillFactor if the only record in a block exceeds the blk_fill_size,
@@ -1857,7 +1904,8 @@ tn_restart:
 					copy_extra_record = ((bstar_rec_size(long_blk_id) != rec_size)
 							&& ((new_blk_size_l + bstar_rec_size(long_blk_id)) <= blk_fill_size));
 				} else
-					copy_extra_record = ((0 == prev_rec_offset) && (NEWREC_DIR_LEFT == last_split_dir)
+					copy_extra_record = (!dont_copy_extra_record && (0 == prev_rec_offset)
+								&& (NEWREC_DIR_LEFT == last_split_dir)
 								&& new_rec && (SIZEOF(blk_hdr) < cur_blk_size));
 				BLK_INIT(bs_ptr, bs1);
 				if (no_pointers)

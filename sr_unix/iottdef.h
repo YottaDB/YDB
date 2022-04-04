@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -43,7 +43,7 @@
 
 #define TERMHUP_NOPRINCIO_CHECK(WRITE)								\
 MBSTART {											\
-	assert(hup_on);										\
+	assert(hup_on || prin_in_dev_failure);										\
 	exi_condition = -ERR_TERMHANGUP;							\
 	ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, WRITE, FALSE);					\
 	async_action(FALSE);									\

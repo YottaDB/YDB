@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -23,7 +23,11 @@ D_EVENT(sighup, ctrap_set),			/* 6 */
 D_EVENT(neterr_action, gvcmz_neterr),		/* 7 - from here rest of the list are deferred but not outofband */
 D_EVENT(zstep_pending, op_zstep),		/* 8 */
 D_EVENT(zbreak_pending, op_setzbrk),		/* 9 */
+<<<<<<< HEAD
 D_EVENT(ttwriterr, tt_write_error_set),		/* 10 */
 D_EVENT(deferred_signal, deferred_signal_set),	/* 11 */
+=======
+D_EVENT(defer_error, defer_error_set),		/* 10 */
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 D_EVENT(DEFERRED_EVENTS, ctrlc_set)		/* count; ctrlc_set is just a place holder here */
 

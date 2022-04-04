@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -40,6 +40,7 @@ error_def(ERR_FCNSVNEXPECTED);
 error_def(ERR_FNOTONSYS);
 error_def(ERR_INVFCN);
 error_def(ERR_INVSVN);
+error_def(ERR_NUMOFLOW);
 error_def(ERR_RPARENMISSING);
 error_def(ERR_SIDEEFFECTEVAL);
 error_def(ERR_VAREXPECTED);
@@ -99,6 +100,7 @@ LITDEF nametabent svn_names[] =
 	,{ 4, "ZJOB" }
 	,{ 4, "ZKEY" }
 	,{ 6, "ZLEVEL" }
+	,{10, "ZMALLOCLIM" }
 	,{13, "ZMAXTPTIMEOUT" }
 	,{ 8, "ZMLKHASH" }
 	,{ 5, "ZMODE" }
@@ -147,7 +149,11 @@ LITDEF nametabent svn_names[] =
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
+<<<<<<< HEAD
 	22, 28, 34 ,34, 34, 34, 35, 36, 107	/* s t u v w x y z ~ */
+=======
+	22, 28, 34 ,34, 34, 34, 35, 36, 101	/* s t u v w x y z ~ */
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -198,6 +204,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZJOB, FALSE, ALL_SYS }
 	,{ SV_ZKEY, FALSE , ALL_SYS }
 	,{ SV_ZLEVEL, FALSE, ALL_SYS }
+	,{ SV_ZMALLOCLIM, TRUE, ALL_SYS}
 	,{ SV_ZMAXTPTIME, TRUE, ALL_SYS }
 	,{ SV_ZMLKHASH, FALSE, ALL_SYS }
 	,{ SV_ZMODE, FALSE, ALL_SYS }
@@ -633,6 +640,13 @@ int expritem(oprtype *a)
 					}
 				}
 				advancewindow();
+				if (((OC_FNZCHAR == fun_data[index].opcode) || (OC_FNCHAR == fun_data[index].opcode))
+					&& (MV_NUM_APPROX == ((MV_NM | MV_NUM_APPROX) & (TREF(director_mval)).mvtype)))
+				{	/* [z]f_char need an error based s2n failing to create a valid numeric argument */
+					assert((0 == (TREF(director_mval)).e) && !val_iscan(&(TREF(director_mval))));
+					TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;  /* improve hints */
+					stx_error(ERR_NUMOFLOW);
+				}
 				advancewindow();
 				if (!parse_warn)
 				{

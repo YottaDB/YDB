@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2021 Fidelity National Information	*
+ * Copyright (c) 2008-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -115,19 +115,22 @@ TAB_GVSTATS_REC(n_bt_scarce          , "BTS", "# times db_csh_get too many retri
  * to avoid storing the stats below (though the header space is still allocated).
  */
 /* This first group of stats are collections of other stats (aggregates) */
-TAB_GVSTATS_REC(n_dbext_wait         , "DEXA", "wait flag for ext in prog             ")
-TAB_GVSTATS_REC(n_bg_wait            , "GLB",  "wait flag for bg acc in prog          ")
-TAB_GVSTATS_REC(n_jnl_wait           , "JNL",  "wait flag for jnl acc in prog         ")
-TAB_GVSTATS_REC(n_mlk_wait           , "MLK",  "wait flag for mlk acc in prog         ")
-TAB_GVSTATS_REC(n_proc_wait          , "PRC",  "wait flag for proc cleanup in prog    ")
-TAB_GVSTATS_REC(n_trans_wait         , "TRX",  "wait flag for trans in prog           ")
-TAB_GVSTATS_REC(n_util_wait          , "ZAD",  "wait flag for utility cmd in prog     ")
-
-TAB_GVSTATS_REC(n_ws2                , "JOPA", "wait flag for journal open in prog    ")
-TAB_GVSTATS_REC(n_ws12               , "AFRA", "wait flag for auto freeze release     ")
-TAB_GVSTATS_REC(n_ws15               , "BREA", "wait flag for blk rd encryp cycle sync")
-TAB_GVSTATS_REC(n_ws39               , "MLBA", "wait flag for mlk acquire blocked     ")
-TAB_GVSTATS_REC(n_ws47               , "TRGA", "wait flag for grab region for trans   ")
+TAB_GVSTATS_REC(n_dbext_wait         , "DEXA", "counter for ext in prog               ")
+TAB_GVSTATS_REC(n_bg_wait            , "GLB",  "counter for bg acc in prog            ")
+TAB_GVSTATS_REC(n_jnl_wait           , "JNL",  "counter for jnl acc in prog           ")
+TAB_GVSTATS_REC(n_mlk_wait           , "MLK",  "counter for mlk acc in prog           ")
+TAB_GVSTATS_REC(n_proc_wait          , "PRC",  "counter for proc cleanup in prog      ")
+TAB_GVSTATS_REC(n_trans_wait         , "TRX",  "counter for trans in prog             ")
+TAB_GVSTATS_REC(n_util_wait          , "ZAD",  "counter for utility cmd in prog       ")
+TAB_GVSTATS_REC(n_ws2                , "JOPA", "counter for journal open in prog      ")
+TAB_GVSTATS_REC(n_ws12               , "AFRA", "counter for auto freeze release       ")
+TAB_GVSTATS_REC(n_ws15               , "BREA", "counter for blk rd encryp cycle sync  ")
+TAB_GVSTATS_REC(n_ws39               , "MLBA", "counter for mlk acquire blocked       ")
+TAB_GVSTATS_REC(n_ws47               , "TRGA", "counter for grab region for trans     ")
+TAB_GVSTATS_REC(n_wait_read_long     , "WRL",  "# times sleep read exceeds counter X  ")
+TAB_GVSTATS_REC(n_pre_read_globals   , "PRG",  "# of pre-read globals                 ")
+TAB_GVSTATS_REC(n_writer_flush       , "WFL",  "# of DB FLushes by the writer helpers ")
+TAB_GVSTATS_REC(n_writer_helper_epoch, "WHE",  "# of waits for jnl write lock or fsync")
 /* End stats for GTM-8863 (please do not delete this) */
 /* If new stats are added beyond this point, edit gvstats_rec_cnl2csd in gvstats_rec.c */
 

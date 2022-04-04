@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -24,6 +24,7 @@
 #include "alloc_reg.h"
 #include "advancewindow.h"
 #include "hashtab_str.h"
+#include "start_fetches.h"
 
 /*	WARNING: comp_fini restores the currently-active stringpool from the
  *	indirection stringpool (indr_stringpool) to the runtime stringpool
@@ -66,7 +67,7 @@ int comp_fini(int status, mstr *obj, opctype retcode, oprtype *retopr, oprtype *
 				ref->operand[0] = *retopr;
 			if (OC_IRETMVAL == retcode)
 				ref->operand[1] = *dst;
-			start_fetches(OC_NOOP);
+			START_FETCHES(OC_NOOP);
 			resolve_ref(0);	/* cannot fail because there are no MLAB_REF's in indirect code */
 			alloc_reg();
 			INVOKE_STP_GCOL(0);

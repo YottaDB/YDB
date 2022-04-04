@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -52,7 +52,7 @@
 
 static readonly char	space_text[] = {' '};
 
-GBLREF boolean_t	ctrlc_on, gtm_utf8_mode;
+GBLREF boolean_t	ctrlc_on, gtm_utf8_mode, hup_on;
 GBLREF io_log_name	*io_root_log_name;
 GBLREF io_pair		io_std_device;
 GBLREF int		process_exiting;
@@ -109,6 +109,7 @@ void zshow_devices(zshow_out *output)
 	static readonly char output_iv[] = "OIV=";
 	static readonly char key[] = "KEY=";
 	static readonly char iv[] = "IV=";
+	static readonly char hup_text[] = "HUPENABLE";
 
 	/* gtmsocket specific */
 	static readonly char at_text[] = {'@'};
@@ -374,6 +375,8 @@ void zshow_devices(zshow_out *output)
 					}
 					if (tt_ptr->mupintr)
 						ZS_STR_OUT(&v, interrupt_text);
+					if (hup_on)
+						ZS_STR_OUT(&v, hup_text);
 					break;
 				case rm:
 					/* we go to rm_ptr above for the rm type */

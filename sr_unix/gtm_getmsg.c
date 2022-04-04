@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
@@ -32,16 +32,21 @@ GBLREF bool	dec_nofac;
  */
 int gtm_getmsg(int4 msgnum, mstr *msgbuf)
 {
+<<<<<<< HEAD
 	short int	m_len, faclen, taglen, j, sever;
 	int		retval;
+=======
+	short int	severity;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	char		*cp;
-	const char 	*top, *msgp, *fac;
+	const char 	*top, *msgp, *fac, *base;
 	char		outbuf[32];
 	char_ptr_t	tag;
 	const err_msg	*msg;
 	const err_ctl	*ctl;
-	size_t		cp_len;
+	size_t		cp_len, faclen, m_len, taglen;
 
+	assert(0 < msgbuf->len);	/* All callers pass in a large buffer */
 	ctl = err_check(msgnum);
 	retval = 0;
 	if (NULL != ctl)
@@ -49,18 +54,18 @@ int gtm_getmsg(int4 msgnum, mstr *msgbuf)
 		GET_MSG_INFO(msgnum, ctl, msg);
 		msgp = msg->msg;
 		tag = (char_ptr_t)msg->tag;
-		fac = ctl->facname;
-		sever = SEVMASK(msgnum);
+		fac = (const char *)ctl->facname;
+		severity = (short int)SEVMASK(msgnum);
 	} else
 	{
-		sever = ERROR;
+		severity = ERROR;
 		tag = (char_ptr_t)outbuf;
 		if ((MAX_SYSERR > msgnum) && (msgnum > 0))
 		{
 			assert(NULL != STRERROR(1));	/* OSF/1 check; can happen with 64-bit pointers and bad declaration */
 			cp = (char *)tag;
 			MEMCPY_LIT(cp, ERR_TAG);
-			cp += strlen(ERR_TAG);
+			cp += STR_LIT_LEN(ERR_TAG);
 			cp = (char *)i2asc((uchar_ptr_t)cp, msgnum);
 			*cp = '\0';
 			msgp = STRERROR(msgnum);
@@ -80,60 +85,85 @@ int gtm_getmsg(int4 msgnum, mstr *msgbuf)
 		m_len += (taglen = strlen((const char *)tag));
 		m_len += 2;	/* ,  */
 	}
-	m_len = m_len > msgbuf->len - 1 ? msgbuf->len - 1 : m_len;
-	cp = msgbuf->addr;
-	top = cp + m_len;
+	/* Subtract the max length by 1 to leave space for terminating null */
+	m_len = (m_len > (msgbuf->len - 1)) ? (msgbuf->len - 1) : m_len;
+	base = (const char *)msgbuf->addr;
+	cp = (char *)base;
+	top = (const char *)(cp + m_len);
 	if (!dec_nofac)
 	{
-		if (cp < top)
+		/* Use a loop construct to fill the message buffer with as much
+		 * information as possible. At any point in the loop, if the
+		 * buffer becomes full, a break statement will exit the loop,
+		 * terminating the the buffer filling.
+		 */
+		do {
+			if (cp >= top)
+				break;
 			*cp++ = '%';
-
-		j = faclen > top-cp ? top-cp : faclen;
-		if (j)
-		{
-			assert(0 < j);
-			cp_len = (size_t) j;
-			assert(cp_len <= (m_len - (cp - msgbuf->addr)));
-			memcpy(cp, fac, cp_len);
-			cp += j;
-		}
-		if (cp < top)
-			*cp++ = '-';
-		if (cp < top)
-		{
-			switch(sever)
+			cp_len = (size_t)((faclen > (top - cp)) ? (top - cp) : faclen);
+			if (cp_len)
 			{
-			case SUCCESS:	*cp++ = 'S'; break;
-			case INFO:	*cp++ = 'I'; break;
-			case WARNING:	*cp++ = 'W'; break;
-			case ERROR:	*cp++ = 'E'; break;
-			case SEVERE:	*cp++ = 'F'; break;
-			default:	*cp++ = 'U'; break;
+				memcpy(cp, fac, cp_len);
+				cp += cp_len;
 			}
-		}
-		if (cp < top)
+			if (cp >= top)
+				break;
 			*cp++ = '-';
-		j = taglen > top-cp ? top-cp : taglen;
-		if (j)
-		{
-			assert(0 < j);
-			cp_len = j;
-			assert(cp_len <= (m_len - (cp - msgbuf->addr)));
-			memcpy(cp, tag, cp_len);
-			cp += j;
-		}
-		if (cp < top)
+			if (cp >= top)
+				break;
+			switch(severity)
+			{
+				case SUCCESS:
+					*cp++ = 'S';
+					break;
+				case INFO:
+					*cp++ = 'I';
+					break;
+				case WARNING:
+					*cp++ = 'W';
+					break;
+				case ERROR:
+					*cp++ = 'E';
+					break;
+				case SEVERE:
+					*cp++ = 'F';
+					break;
+				default:
+					*cp++ = 'U';
+					break;
+			}
+			if (cp >= top)
+				break;
+			*cp++ = '-';
+			cp_len = (size_t)((taglen > (top - cp)) ? (top - cp) : taglen);
+			if (cp_len)
+			{
+				memcpy(cp, tag, cp_len);
+				cp += cp_len;
+			}
+			if (cp >= top)
+				break;
 			*cp++ = ',';
-		if (cp < top)
+			if (cp >= top)
+				break;
 			*cp++ = ' ';
+			break;
+		} while (0);
 	}
-
-	assert( (top - cp)  <= (m_len - (cp - msgbuf->addr)));
+	assert((top - cp) <= (m_len - (cp - base)));
 	assert(0 <= (top - cp));
-	cp_len = top - cp;
+	cp_len = (size_t)(top - cp);
 	memcpy(cp, msgp, cp_len);
 	cp += cp_len;
+<<<<<<< HEAD
 	msgbuf->len = m_len;
 	*cp++ = 0;
 	return retval;
+=======
+	/* The buffer size calculation always leaves space for a null character */
+	assert((int)(cp - base) < msgbuf->len);
+	*cp = 0;
+	msgbuf->len = (int)m_len;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 }

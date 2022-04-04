@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2021 Fidelity National Information	*
+ * Copyright (c) 2005-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -225,6 +225,10 @@ typedef enum {
 	WBTEST_SOCKET_NONBLOCK,			/* 173 : Set SO_SNDBUF for non blocking socket */
 	WBTEST_JOBFAIL_FILE_LIM,		/* 174 : starve the process of file descriptors to produce a JOBFAIL */
 	WBTEST_BACKUP_FORCE_MV_RV,		/* 175 : Force error during MUPIP BACKUP mv phase */
+<<<<<<< HEAD
+=======
+	WBTEST_RTNOBJ_INTEG			/* 176 : Inject a loop into the relinkctl linked list to trigger rtnobj_integ() */
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable

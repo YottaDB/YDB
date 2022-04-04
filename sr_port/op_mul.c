@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -19,6 +19,7 @@
 #include "eb_muldiv.h"
 #include "promodemo.h"
 #include "op.h"
+#include "toktyp.h"
 
 LITREF int4	ten_pwr[];
 LITREF mval	literal_zero;
@@ -29,6 +30,7 @@ void	op_mul(mval *u, mval *v, mval *p)
 	boolean_t	promo;
 	int4		c, exp;
 	mval		w, z;
+<<<<<<< HEAD
 	int		u_mvtype, v_mvtype;
 
 	/* If u or v is $ZYSQLNULL, the result is $ZYSQLNULL */
@@ -39,6 +41,11 @@ void	op_mul(mval *u, mval *v, mval *p)
 		*p = literal_sqlnull;
 		return;
 	}
+=======
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
 	u_mvtype = u->mvtype;
@@ -70,8 +77,10 @@ void	op_mul(mval *u, mval *v, mval *p)
 	c = eb_mul(u->m, v->m, p->m);
 	exp = u->e + v->e + c - MV_XBIAS;
 	if (EXPHI <= exp)
+	{
+		TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* improve hints */
 		rts_error_csa(NULL, VARLSTCNT(1) ERR_NUMOFLOW); /* BYPASSRTSABT */
-	else if (EXPLO > exp)
+	} else if (EXPLO > exp)
 		*p = literal_zero;
 	else if (exp < EXP_INT_OVERF  &&  exp > EXP_INT_UNDERF  &&  p->m[0] == 0  &&  (p->m[1]%ten_pwr[EXP_INT_OVERF-1-exp]==0))
 		demote(p, exp, u->sgn ^ v->sgn);

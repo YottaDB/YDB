@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -17,6 +17,10 @@
 
 #include "arit.h"
 #include "stringpool.h"
+#include "toktyp.h"
+#include "cgp.h"
+
+GBLREF char		cg_phase;	/* code generation phase */
 
 #define DIGIT(x)	((x >='0') && (x <= '9'))
 #define NUM_MASK	(MV_NM | MV_INT | MV_NUM_APPROX)
@@ -158,7 +162,7 @@ char *s2n(mval *u)
 		i += j;
 		if ((0 == u->m[0]) && (6 >= x) && (0 <= i))
 		{
-			u->mvtype |= (tail || (1 < sign) || ((0 != zero) && (1 != u->str.len)))
+			u->mvtype |= (tail || (1 < sign) || ((0 != zero) && (1 != u->str.len)))			/* approx or not? */
 				? (MV_NM | MV_INT | MV_NUM_APPROX) : (MV_NM | MV_INT);
 			if (0 > j)
 				u->m[1] /= ((sign & 1) ? -ten_pwr[-j] : ten_pwr[-j]);
@@ -177,14 +181,18 @@ char *s2n(mval *u)
 				u->mvtype &= ~NUM_MASK;
 				if (!TREF(compile_time))
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NUMOFLOW);
+<<<<<<< HEAD
 				else
 					TREF(s2n_intlit) = 0;	/* "advancewindow" relies on this */
+=======
+				u->mvtype |= MV_NUM_APPROX; /* breadcrumb for experitem to help f_[z]char() with NUMOFLOW error */
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 			} else
 			{
 				u->e = x;
 				u->sgn = sign & 1;
-				u->mvtype |= (tail || (1 < sign) || ((0 != zero) && (1 != u->str.len)))
-					? (MV_NM | MV_NUM_APPROX) : MV_NM;
+				u->mvtype |= (tail || (1 < sign) || ((0 != zero) && (1 != u->str.len)))		/* approx or not? */
+					  ? (MV_NM | MV_NUM_APPROX) : MV_NM;		/* similar to above but not MV_INT */
 			}
 		}
 		assert(MANT_HI > u->m[1]);

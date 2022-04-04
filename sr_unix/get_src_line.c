@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -431,7 +431,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 		if (size)
 		{
 			assert((prev_srcptr + size) <= srcptr_max);
-			assert(MAXPOSINT4 >= size);
+			assert((0 <= size) && (MAXPOSINT4 >= size));
 			current->len = (mstr_len_t)size;
 			current->addr = (char *)prev_srcptr;
 		} else

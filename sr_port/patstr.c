@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -139,6 +139,7 @@ typedef struct
 
 int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 {
+<<<<<<< HEAD
 	pat_strlit		strlit;
 	boolean_t		dfa, done, infinite;
 	boolean_t		dfa_fixed_len, fixed_len, prev_fixed_len, split_atom, start_dfa;
@@ -180,12 +181,44 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						 * byte in inchar (to be stored in curchar). Therefore from this point onwards,
 						 * "curchar" should never be used in this function. This is also asserted below.
 						 */
+=======
+	alternation	*cur_alt, init_alt;
+	boolean_t	dfa, dfa_fixed_len, done, done_free, fixed_len, infinite, last_infinite,
+			prev_fixed_len, split_atom, start_dfa;
+	boolean_t	topseen = FALSE;/* If TRUE it means we found inchar to be == in_top and so did NOT scan the NEXT
+					 * byte in inchar (to be stored in curchar). Therefore from this point onwards,
+					 * "curchar" should never be used in this function. This is also asserted below.
+					 */
+	char		*saveinstr;
+	gtm_int64_t	bound;
+	int		atom_map, altmax, any_alt, altcount, altmin, altsimplify, bit,
+			charpos, chidx, count, curr_leaf_num, curr_min_dfa, cursize,
+			exp_temp[CHAR_CLASSES], high_in, jump, leafcnt, leaf_num, low_in,
+			max[MAX_PATTERN_ATOMS], min[MAX_PATTERN_ATOMS], min_dfa,
+			saw_delimiter, seq, seqcnt, size[MAX_PATTERN_ATOMS], size_in, sym_num, total_max, total_min;
+	int4		allmask, alloclen, altactive, altend, altlen, bitpos, bytelen, lower_bound, status, upper_bound;
+	mstr		alttail;
+	pat_strlit	strlit;
+	static int4	recurse_cnt;
+	struct e_table	expand, *exp_ptr;
+	struct leaf	leaves, *lv_ptr;
+	uint4		*fstchar, last_leaf_mask, *lastpatptr, mbit, *outchar, *patmaskptr, pattern_mask, *topchar, y_max;
+	unsigned char	*buffptr, curchar, *inchar, *in_top, *let_go, symbol;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
 	if (0 == instr->len)		/* empty pattern string. Cant do much */
 	{
-		instr->addr++;	/* Return 1 byte more for compile_pattern to properly compute erroring M source column */
+		instr->addr++;		/* Return 1 byte more for compile_pattern to properly compute erroring M source column */
 		return ERR_PATCODE;
 	}
+	if (NULL == relay)	/* while there might be one or more heurstics producing a correct result from weird patterns */
+		recurse_cnt = MAX_PATTERN_ATOMS;	/* stop excessive recursion; works for any reasonable case; see GTM-9476*/
+	else			/* this game limits excess (see GTM-9469) recursing in a relatively cheap and effective way */
+	{
+		if (!recurse_cnt--)
+			return ERR_PATMAXLEN;	/* source column must be beyond report bounds, so no worries about its accuracy */
+	}
+	any_alt = altactive = saw_delimiter = 0;
 	memset(&leaves, 0, SIZEOF(leaves));
 	memset(&expand, 0, SIZEOF(expand));
 	init_alt.next = NULL;

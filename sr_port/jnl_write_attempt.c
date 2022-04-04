@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -219,6 +219,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 {
 	jnl_buffer_ptr_t	jb;
 	uint4			prev_freeaddr;
+	uint4			index1, index2;
 	unsigned int		lcnt, prev_lcnt, cnt;
 	sgmnt_addrs		*csa;
 	jnlpool_addrs_ptr_t	save_jnlpool;
@@ -262,6 +263,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 				 * below (due to the "continue" below under the "SS_NORMAL == status" if check).
 				 */
 				BG_TRACE_PRO_ANY(csa, jnl_phase2_cleanup_if_possible);
+<<<<<<< HEAD
 				SLEEP_USEC(1, TRUE);
 				if (!was_crit && (0 == (lcnt % ITERATIONS_100K)))
 				{	/* We do not have crit and have slept a while (100K iterations of 1-micro-second each
@@ -271,14 +273,38 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 					 * and does not hold crit but has written journal records after those written by another
 					 * process which was kill -9ed in phase2 of its jnl commit. Not doing this check would
 					 * cause the process in gds_rundown to be indefinitely stuck in "jnl_wait".
+=======
+				SLEEP_USEC(1, FALSE);
+				/* There are two conditions here:
+				 * 1. The process already holds crit. In this case, immediately perform the cleanup action
+				 * 2. The process has already slept 100k times for 1ms (~ 100ms) without crit. Given the wait
+				 * without crit, see if crit can be obtained that way the JNL_PHASE2_CLEANUP_IF_POSSIBLE macro
+				 * will attempt "jnl_phase2_salvage" if needed.
+				 *
+				 * An example scenario where this is needed is if a process is in "gds_rundown"->"jnl_wait"
+				 * and does not hold crit but has written journal records after those written by another
+				 * process which was kill -9ed in phase2 of its jnl commit. Not doing this check would
+				 * cause the process in gds_rundown to be indefinitely stuck in "jnl_wait".
+				 */
+				if (was_crit || (!was_crit && (0 == (lcnt % ITERATIONS_100K))
+						&& (grab_crit_immediate(jpc->region, OK_FOR_WCS_RECOVER_TRUE, NOT_APPLICABLE))))
+				{
+					SHM_READ_MEMORY_BARRIER;	/* Ensure the indices read from memory are correct */
+					index1 = jb->phase2_commit_index1;
+					index2 = jb->phase2_commit_index2;
+					/* This condition implies that a update/MUMPS process was killed in CMT06, right before
+					 * updating jb->phase2_commit_index2. If crit is held, increment index2 & call
+					 * jnl_phase2_cleanup() to process it as a dead commit.
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 					 */
-					if (grab_crit_immediate(jpc->region, OK_FOR_WCS_RECOVER_TRUE, NOT_APPLICABLE))
-					{
-						JNL_PHASE2_CLEANUP_IF_POSSIBLE(csa, jb); /* phase2 commits in progress.
-											  * Clean them up if possible.
-											  */
+					if ((csa->now_crit) && (index1 == index2) && (jb->freeaddr < jb->rsrv_freeaddr)
+						&& ((jb->phase2_commit_array[index1].start_freeaddr +
+							jb->phase2_commit_array[index1].tot_jrec_len) == jb->rsrv_freeaddr))
+						INCR_PHASE2_COMMIT_INDEX(jb->phase2_commit_index2, JNL_PHASE2_COMMIT_ARRAY_SIZE);
+					/* phase2 commits in progress. Clean them up if possible. */
+					JNL_PHASE2_CLEANUP_IF_POSSIBLE(csa, jb);
+					if (!was_crit)
 						rel_crit(jpc->region);
-					}
 				}
 			}
 		}

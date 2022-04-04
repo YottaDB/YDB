@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -217,8 +217,13 @@ typedef struct gtmsrc_lcl_struct
 		boolean_t path_found;											\
 															\
 		temp_inst_fn[trans_name.len] = '\0';									\
+<<<<<<< HEAD
 		path_found = get_full_path(trans_name.addr, trans_name.len, fn, fn_len, bufsize, &ustatus);		\
 		if (!path_found && (return_on_error != err_act))								\
+=======
+		if (!get_full_path(trans_name.addr, (unsigned int)trans_name.len, fn, fn_len, bufsize, &ustatus)	\
+				&& err_act)										\
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 		{													\
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLINSTACC, 2, trans_name.len, trans_name.addr,	\
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("full path could not be found"), ustatus);		\

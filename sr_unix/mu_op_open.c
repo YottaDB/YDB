@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -143,7 +143,14 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 				ch = *(pp->str.addr + p_offset++);
 				if (iop_sequential == ch)
 					iod->type = rm;
+<<<<<<< HEAD
 				UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
+=======
+				if (IOP_VAR_SIZE == io_params_size[ch])
+					p_offset += (int)(unsigned char)*(pp->str.addr + p_offset) + 1;
+				else
+					p_offset += io_params_size[ch];
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 			}
 			tl->iod = iod;
 		} else
@@ -228,6 +235,7 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 		{
 			ch = *(pp->str.addr + p_offset++);
 			assert((params)ch < (params)n_iops);
+			assert(pp->str.len > p_offset);
 			switch (ch)
 			{
 				case iop_append:
@@ -249,6 +257,7 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 					oflag  |= O_WRONLY | O_CREAT;
 					break;
 				case iop_ipchset:
+					assert(pp->str.len > (p_offset + 1));
 #					ifdef KEEP_zOS_EBCDIC
 					if ( (iconv_t)0 != iod->input_conv_cd )
 					{
@@ -264,12 +273,13 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 					if (gtm_utf8_mode)
 					{
 						chset_mstr.addr = (char *)(pp->str.addr + p_offset + 1);
-						chset_mstr.len = *(pp->str.addr + p_offset);
+						chset_mstr.len = (int)(unsigned char)*(pp->str.addr + p_offset);
 						SET_ENCODING(iod->ichset, &chset_mstr);
 						ichset_specified = TRUE;
 					}
 					break;
 				case iop_opchset:
+					assert(pp->str.len > (p_offset + 1));
 #					ifdef KEEP_zOS_EBCDIC
 					if ( (iconv_t)0 != iod->output_conv_cd)
 					{
@@ -285,7 +295,7 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 					if (gtm_utf8_mode)
 					{
 						chset_mstr.addr = (char *)(pp->str.addr + p_offset + 1);
-						chset_mstr.len = *(pp->str.addr + p_offset);
+						chset_mstr.len = (int)(unsigned char)*(pp->str.addr + p_offset);
 						SET_ENCODING(iod->ochset, &chset_mstr);
 						ochset_specified = TRUE;
 					}

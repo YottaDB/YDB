@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2021 Fidelity National Information	*
+ * Copyright (c) 2015-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -52,6 +52,7 @@ ENUM_ENTRY(GDSMV63014),		/* 23 - GTM-8863 stats added to file header: GVSTATS mo
 ENUM_ENTRY(GDSMV63015),		/* 24 - safety entry in case GT.M needs to release another V6.3 version */
 ENUM_ENTRY(GDSMV70000),		/* 25 - Changed GT.M to use 64-bit block numbers, required significant changes to the header */
 ENUM_ENTRY(GDSMV70001),		/* 26 - GTM-9131 new statsdb_allocation option & GTM-8681 Backup Timestamp in file header */
+<<<<<<< HEAD
 ENUM_ENTRY(GDSMVFILLER27),	/* 27 - Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER28),	/* 28 - Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER29),	/* 29 - Space reserved for GT.M changes to minor db format */
@@ -74,4 +75,7 @@ ENUM_ENTRY(GDSMR136),		/* 41 - Includes GDSMV63012 and GDSMV63014.
 				 */
 ENUM_ENTRY(GDSMR200_V70000),	/* 42 - YottaDB r2.00 which includes GDSMV70000 */
 ENUM_ENTRY(GDSMR200_V70001),	/* 43 - YottaDB r2.00 which includes GDSMV70001 */
+=======
+ENUM_ENTRY(GDSMV70002),		/* 27 - GTM-9426 - Automatically split database blocks based upon restarts... */
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 ENUM_ENTRY(GDSMVLAST)

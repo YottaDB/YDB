@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2017 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2022 Fidelity National Information	*
+>>>>>>> eb3ea98c (GT.M V7.0-002)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -23,6 +27,7 @@
 #include "stringpool.h"
 #include "op.h"
 #include "mvalconv.h"
+#include "toktyp.h"
 
 #define ACCUR_PERCENT	0.00000000000000055
 #define MAX_M_INT 999999999
@@ -208,6 +213,7 @@ void op_exp(mval *u, mval* v, mval *p)
 #	ifdef UNIX
 	if (HUGE_VAL == z)		/* Infinity return value check */
 	{
+		TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* improve hints */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
 		return;
 	}
@@ -296,6 +302,7 @@ void op_exp(mval *u, mval* v, mval *p)
 	exponent = MV_XBIAS + n + 9;
 	if (exponent >= EXPHI)
 	{
+		TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* improve hints */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
 		return;
 	}

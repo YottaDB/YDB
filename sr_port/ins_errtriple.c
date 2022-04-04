@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -75,9 +75,20 @@ void ins_errtriple(int4 in_error)
 		{	/* We have not yet started processing the current line and so add OC_RTERROR triple */
 			add_rterror_triple = TRUE;
 		}
+<<<<<<< HEAD
 		if ((ERR_DIVZERO == in_error) || (ERR_NEGFRACPWR == in_error) || (ERR_NUMOFLOW == in_error)
 					|| (ERR_PATNOTFOUND == in_error) || (ERR_BOOLEXPRTOODEEP == in_error))
 			TREF(rts_error_in_parse) = TRUE;	/* WARNING: fallthrough */
+=======
+		/* delete all trailing triples and if the first, replace them below with an OC_RTERROR triple */
+		dqdelchain(x, TREF(curtchain), exorder);
+		CHKTCHAIN(TREF(curtchain), exorder, FALSE);
+		assert(!add_rterror_triple || ((TREF(pos_in_chain)).exorder.bl->exorder.fl == TREF(curtchain)));
+		assert(!add_rterror_triple || ((TREF(curtchain))->exorder.bl == (TREF(pos_in_chain)).exorder.bl));
+		if ((ERR_DIVZERO == in_error) || (ERR_NEGFRACPWR == in_error)
+				|| (ERR_NUMOFLOW == in_error) || (ERR_PATNOTFOUND == in_error))
+			TREF(rts_error_in_parse) = TRUE;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	} else
 	{	/* For IS_STX_WARN errors (if not compiling a trigger), parsing continues, so dont strip the chain */
 		add_rterror_triple = TRUE;

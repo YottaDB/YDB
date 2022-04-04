@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -1013,6 +1013,7 @@ MBSTART {								\
 #define NODE_LOCAL_SIZE				(ROUND_UP(SIZEOF(node_local), OS_PAGE_SIZE))
 #define NODE_LOCAL_SPACE(CSD)			(ROUND_UP(CRIT_SPACE(NUM_CRIT_ENTRY(CSD)) + NODE_LOCAL_SIZE, OS_PAGE_SIZE))
 #define MIN_NODE_LOCAL_SPACE			(ROUND_UP(CRIT_SPACE(MIN_CRIT_ENTRY) + NODE_LOCAL_SIZE, OS_PAGE_SIZE))
+#define DEFAULT_PROBLKSPLIT     		5 /* proactively split blocks if contains more records that this in the block */
 /* In order for gtmsecshr not to pull in OTS library, NODE_LOCAL_SIZE_DBS is used in secshr_db_clnup instead of NODE_LOCAL_SIZE */
 #define NODE_LOCAL_SIZE_DBS			(ROUND_UP(SIZEOF(node_local), DISK_BLOCK_SIZE))
 

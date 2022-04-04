@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -639,9 +639,9 @@ void	op_view(int numarg, mval *keyword, ...)
 					}
 				}
 			}
-			if (-1 != ncol)
+			if (0 <= ncol)
 				TREF(local_collseq_stdnull) = (ncol ? TRUE: FALSE);
-			if (-1 != nct)
+			if (0 <= nct)
 				TREF(local_coll_nums_as_strings) = (nct ? TRUE: FALSE);
 			break;
 		case VTK_PATLOAD:
@@ -1027,6 +1027,7 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 				if (!reg->read_only)
 				{
 					JNLPOOL_INIT_IF_NEEDED(cs_addrs, cs_data, cs_addrs->nl, SCNDDBNOUPD_CHECK_FALSE);
+					/* Negatives treated as zero */
 					nbuffs = (NULL != thirdarg) ? MV_FORCE_INT(thirdarg) : cs_addrs->nl->wcs_active_lvl;
 					JNL_ENSURE_OPEN_WCS_WTSTART(cs_addrs, reg, nbuffs, NULL, FALSE, dummy_errno);
 				}

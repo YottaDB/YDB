@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2019 Fidelity National Information	*
+ * Copyright (c) 2009-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -202,8 +202,8 @@ MBSTART {															\
 #define INIT_DB_OR_JNL_ENCRYPTION(CSA, CSD, FILENAME_LEN, FILENAME, RC)								\
 {																\
 	RC = 0;															\
-	(CSA)->encr_key_handle = GTMCRYPT_INVALID_KEY_HANDLE;									\
-	(CSA)->encr_key_handle2 = GTMCRYPT_INVALID_KEY_HANDLE;									\
+	(CSA)->encr_key_handle = (void *)GTMCRYPT_INVALID_KEY_HANDLE;								\
+	(CSA)->encr_key_handle2 = (void *)GTMCRYPT_INVALID_KEY_HANDLE;								\
 	if (IS_ENCRYPTED((CSD)->is_encrypted))											\
 	{															\
 		GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(CSA, (CSD)->encryption_hash,							\
@@ -253,6 +253,7 @@ MBSTART {															\
 		hash_string.address = (gtm_char_t *)(HASH);									\
 		db_path_string.length = (gtm_long_t)DB_PATH_LENGTH;								\
 		db_path_string.address = (gtm_char_t *)(DB_PATH);								\
+		assert(0 <= db_path_string.length);										\
 		DEFER_INTERRUPTS(INTRPT_IN_CRYPT_SECTION, prev_intrpt_state);							\
 		if (0 != gtmcrypt_init_db_cipher_context_by_hash(&(ENCRYPT_KEY_HANDLE), hash_string, db_path_string, null_iv))	\
 			RC = SET_CRYPTERR_MASK(ERR_CRYPTKEYFETCHFAILED);							\
@@ -339,8 +340,10 @@ MBSTART {															\
 		assert(NULL != HASH);												\
 		filename_string.length = (gtm_long_t)FILENAME_LENGTH;								\
 		filename_string.address = (gtm_char_t *)(FILENAME);								\
+		assert(0 <= filename_string.length);										\
 		key_path_string.length = (gtm_long_t)KEY_PATH_LENGTH;								\
 		key_path_string.address = (gtm_char_t *)(KEY_PATH);								\
+		assert(0 <= key_path_string.length);										\
 		DEFER_INTERRUPTS(INTRPT_IN_CRYPT_SECTION, prev_intrpt_state);							\
 		if (0 != gtmcrypt_obtain_db_key_hash_by_keyname(filename_string, key_path_string, &hash_string))		\
 			RC = SET_CRYPTERR_MASK(ERR_CRYPTKEYFETCHFAILED);							\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -98,6 +98,7 @@ THREADGBLDEF(window_ident,			mstr)				/* current scanner mident from advancewind
 THREADGBLDEF(window_mval,			mval)				/* current scanner mval from advancewindow */
 THREADGBLDEF(window_token,			char)				/* current scanner token from advancewindow */
 THREADGBLDEF(xecute_literal_parse,		boolean_t)			/* flag TRUE when trying what its name says */
+THREADGBLDEF(fetch_control,			fetch_ctrl)			/* structure for managing lvn fetches */
 
 /* Database */
 THREADGBLDEF(dbinit_max_delta_secs,		uint4)				/* max time before we bail out in db_init */

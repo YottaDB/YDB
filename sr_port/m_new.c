@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -25,9 +25,7 @@
 #include "advancewindow.h"
 #include "cmd.h"
 #include "namelook.h"
-
-GBLREF int4 		curr_fetch_count;
-GBLREF triple		*curr_fetch_opr, *curr_fetch_trip;
+#include "start_fetches.h"
 
 LITREF nametabent 	svn_names[];
 LITREF svn_data_type 	svn_data[];
@@ -55,14 +53,14 @@ int m_new(void)
 	{
 	case TK_IDENT:
 		var = get_mvaddr(&(TREF(window_ident)));
-		if (var->last_fetch != curr_fetch_trip)
+		if (var->last_fetch != (TREF(fetch_control)).curr_fetch_trip)	/* this block is identical a block in put_mvar */
 		{
 			fetch = newtriple(OC_PARAMETER);
-			curr_fetch_opr->operand[1] = put_tref(fetch);
+			(TREF(fetch_control)).curr_fetch_opr->operand[1] = put_tref(fetch);
 			fetch->operand[0] = put_ilit(var->mvidx);
-			curr_fetch_count++;
-			curr_fetch_opr = fetch;
-			var->last_fetch = curr_fetch_trip;
+			((TREF(fetch_control)).curr_fetch_count)++;
+			(TREF(fetch_control)).curr_fetch_opr = fetch;
+			var->last_fetch = (TREF(fetch_control)).curr_fetch_trip;
 		}
 		tmp = maketriple(OC_NEWVAR);
 		tmp->operand[0] = put_ilit(var->mvidx);

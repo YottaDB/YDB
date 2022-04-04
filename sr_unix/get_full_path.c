@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -74,6 +74,7 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 			assert(c1 >= cwdbuf);
 			dir_len = (unsigned int)(c1 - cwdbuf);
 			assert(cptr >= orig_fn);
+			assert((0 <= (unsigned int)(cptr - orig_fn)) && (max_len > (unsigned int)(cptr - orig_fn)));
 			trim_len = (unsigned int)(cptr - orig_fn);
 			assert(orig_len >= trim_len);
 			newfn_len = orig_len - trim_len;
@@ -90,6 +91,7 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 			if ('.' == *cptr && '/' == (*(cptr + 1)))
 				cptr += 2;
 			assert(cptr >= orig_fn);
+			assert((0 <= (unsigned int)(cptr - orig_fn)) && (max_len > (unsigned int)(cptr - orig_fn)));
 			trim_len = (unsigned int)(cptr - orig_fn);
 			assert(orig_len >= trim_len);
 			newfn_len = orig_len - trim_len;

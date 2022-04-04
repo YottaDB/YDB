@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,23 +21,32 @@
 GBLREF spdesc stringpool;
 
 error_def(ERR_INDRMAXLEN);
-error_def(ERR_STRINGOFLOW);
 error_def(ERR_VAREXPECTED);
 
 void op_indname(mval *dst, mval *target, mval *subs)
 {
+	boolean_t	quoted;
 	int		i;
-	unsigned char	*out, *end, *start;
+	unsigned char	*cp, *end, *out, *start;
 
 	MV_FORCE_STR(target);
+	if (0 == target->str.len)
+		stx_error(ERR_VAREXPECTED);
 	MV_FORCE_STR(subs);
+	if ((target->str.len + subs->str.len) > MAX_SRCLINE)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
 	ENSURE_STP_FREE_SPACE(MAX_SRCLINE);
 	start = out = stringpool.free;
-	if ((target->str.len + subs->str.len) > MAX_SRCLINE)
-		RTS_ERROR_ABT(VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
-	memcpy(out, target->str.addr, target->str.len);
-	out += target->str.len;
-	if (*start == '@')
+	for (cp = (unsigned char *)target->str.addr, i = target->str.len, quoted = 0; i; i--)
+	{	/* simple parsing transfer rather than memcpy so an embedded "comment" doesn't cause premature truncation */
+		if ('"' == *cp)
+			quoted	= !quoted;
+		if ((';' == *cp) && !quoted)
+			break;		/* comment delimiter means the value is complete */
+		*out++ = *cp++;
+	}
+	assert(!quoted);
+	if ((*start == '@') && (0 != subs->str.len))
 	{
 		*out++ = '@';
 		*out++ = '#';

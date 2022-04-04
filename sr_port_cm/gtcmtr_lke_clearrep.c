@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -67,7 +67,7 @@ cm_op_t gtcmtr_lke_clearrep(struct CLB *lnk, clear_request *creq)
 	{
 		csa = &FILE_INFO(cur_region)->s_addrs;
 		lke_ctl = (mlk_ctldata_ptr_t)csa->mlkctl;
-		util_cm_print(lnk, 0, NULL, RESET);
+		util_cm_print(lnk, 0, NULL, 0, RESET);
 		dnode.len = creq->nodelength;
 		dnode.addr = creq->node;
 		MLK_PVTCTL_INIT(pctl, cur_region);

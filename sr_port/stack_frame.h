@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -75,7 +75,11 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 	 */
 	unsigned short	type;
 	unsigned char	flags;
+<<<<<<< HEAD
 	char		dollar_test;	/* Ideally "bool" but can hold values of 0, 1 as well as -1 hence defined as "char" */
+=======
+	signed char	dollar_test;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	/*uint4		glvn_indx;*/	/* state of glvn pool at frame creation time. For use when gtmpcat is changed. */
 	unsigned char	*for_ctrl_stack;/* NOTE: temporarily using this field for glvn_indx so that gtmpcat works */
 	unsigned char	*restart_pc;	/* interrupt restart program counter */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -65,12 +65,26 @@ error_def(ERR_ZINTRECURSEIO);
 
 int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 {
-	boolean_t	ret = FALSE, timed, utf8_active, zint_restart, first_time;
-	unsigned char	inbyte;
+	ABS_TIME	cur_time, end_time;
+	boolean_t	ch_set, first_time, ret = FALSE, timed, utf8_active, zint_restart;
+	char		dc1, dc3;
+	d_tt_struct	*tt_ptr;
+	fd_set		input_fd;
+	int		inchar_width, msk_in, msk_num, rdlen, selstat, status, utf8_more;
+	io_desc		*io_ptr;
+	mv_stent	*mv_zintdev;
+	short int	i;
+	struct timeval	input_timeval;
+	TID		timer_id;
+	tt_interrupt	*tt_state;
+	uint4		mask;
+	unsigned char	inbyte, *zb_ptr, *zb_top;
+	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
 	wint_t		inchar;
 #ifdef __MVS__
 	wint_t		asc_inchar;
 #endif
+<<<<<<< HEAD
 	char		dc1, dc3;
 	short int	i;
 	io_desc		*io_ptr;
@@ -87,16 +101,18 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 	mv_stent	*mv_zintdev;
 	boolean_t	ch_set;
 	DCL_THREADGBL_ACCESS;
+=======
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
 	SETUP_THREADGBL_ACCESS;
 	io_ptr = io_curr_device.in;
-	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
-	if (sighup == outofband)
+	if (ERR_TERMHANGUP == error_condition)
 	{
 		TERMHUP_NOPRINCIO_CHECK(FALSE);				/* FALSE for READ */
 		io_ptr->dollar.za = ZA_IO_ERR;
 		return FALSE;
 	}
+	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	assert(io_ptr->state == dev_open);
 	iott_flush(io_curr_device.out);
 	tt_ptr = (d_tt_struct*) io_ptr->dev_sp;

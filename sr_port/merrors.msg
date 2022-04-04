@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-! Copyright (c) 2001-2021 Fidelity National Information		!
+! Copyright (c) 2001-2022 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 ! Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	!
@@ -352,7 +352,7 @@ SELECTFALSE	<No argument to $SELECT was true>/error/fao=0!/ansi=4
 SPOREOL		<Either a space or an end-of-line was expected but not found>/error/fao=0!/ansi=0
 SRCLIN		<!_!AD!/!_!AD>/info/fao=4!/ansi=0
 SRCLOC		<!_!_At column !UL, line !UL, source module !AD>/info/fao=4!/ansi=0
-UNUSEDMSG353	<SRCLOCUNKNOWN unused in V7.0-000 and for an indetermite time prior>/info/fao=0!/ansi=0
+RLNKRECNFL	<Conflict on relinkctl file !AZ for $ZROUTINES directory !AD, running an integrity check>/warning/fao=3!/ansi=0
 STACKCRIT	<Stack space critical>/error/fao=0!/ansi=0
 STACKOFLOW	<Stack overflow>/fatal/fao=0!/ansi=0
 STACKUNDERFLO	<Stack underflow>/error/fao=0!/ansi=0
@@ -570,7 +570,7 @@ CCEBGONLY	<Only BG databases can be clustered>/error/fao=0!/ansi=0
 CCENOCCP	<The cluster control program is not running on this node>/info/fao=0!/ansi=0
 CCECCPPID	<The cluster control program has PID 0x!XL>/info/fao=1!/ansi=0
 CCECLSTPRCS	<!UL processes are accessing clustered database files>/info/fao=1!/ansi=0
-ZSHOWBADFUNC	<An illegal function was specified for ZSHOW>/error/fao=0!/ansi=0
+ZSHOWBADFUNC	<An invalid information code was specified with ZSHOW or $ZJOBEXAM()>/error/fao=0!/ansi=0
 NOTALLJNLEN	<Journaling disabled/off for !AD regions>/warning/fao=2!/ansi=0
 BADLOCKNEST	<Unsupported nesting of LOCK commands>/error/fao=0!/ansi=0
 NOLBRSRC	<Object libraries cannot have SRC paths associated>/error/fao=0!/ansi=0
@@ -634,7 +634,11 @@ UNUSEDMSG634	<DBFILERDONLY error nixed in YottaDB r1.36 (still in use in GT.M)>/
 RMWIDTHPOS	<File record size or width must be greater than zero>/error/fao=0!/ansi=72
 OFFSETINV	<Entry point !AD+!SL not valid>/error/fao=3!/ansi=13
 JOBPARTOOLONG	<Total parameter length is too long for job command>/error/fao=0!/ansi=0
+<<<<<<< HEAD
 UNUSEDMSG637	<JOBARGMISSING nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
+=======
+RLNKINTEGINFO	<Integrity check completed successfully: !AD -- called from module !AD at line !UL>/info/fao=5!/ansi=0
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 RUNPARAMERR	<Error accessing parameter for run command>/error/fao=0!/ansi=0
 FNNAMENEG	<Depth argument to $NAME cannot be negative>/error/fao=0!/ansi=0
 ORDER2		<Invalid second argument to $ORDER.  Must be -1 or 1.>/error/fao=0!/ansi=0
@@ -1117,8 +1121,13 @@ GVFAILCORE	<A core file is being created for later analysis if necessary>/error/
 UNUSEDMSG1115	<DBCDBNOCERTIFY removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 DBFRZRESETSUC	<Freeze released successfully on database file !AD>/info/fao=2!/ansi=0
 JNLFILEXTERR	<Error during extension of journal file !AD>/error/fao=2!/ansi=0
+<<<<<<< HEAD
 JOBEXAMDONE	<YottaDB process !UL completed job examine to !AD>/info/fao=3!/ansi=0
 JOBEXAMFAIL	<YottaDB process !UL executing $ZJOBEXAM function failed with the preceding error message>/error/fao=1!/ansi=0
+=======
+JOBEXAMDONE	<GT.M process !UL successfully executed $ZJOBEXAM() into !AD>/info/fao=3!/ansi=0
+JOBEXAMFAIL	<GT.M process !UL failed while executing $ZJOBEXAM(). Check the preceding error message for more information.>/error/fao=1!/ansi=0
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 JOBINTRRQST	<Job interrupt requested>/error/fao=0!/ansi=0
 ERRWZINTR	<Error while processing $ZINTERRUPT>/error/fao=0!/ansi=0
 CLIERR		<!AD>/error/fao=2!/ansi=0
@@ -1140,7 +1149,7 @@ JNLSWITCHTOOSM	<Journal AUTOSWITCHLIMIT [!UL blocks] is less than Journal ALLOCA
 JNLSWITCHSZCHG	<Journal AUTOSWITCHLIMIT [!UL blocks] is rounded down to [!UL blocks] to equal the sum of Journal ALLOCATION [!UL blocks] and a multiple of Journal EXTENSION [!UL blocks] for database file !AD>/info/fao=6!/ansi=0
 NOTRNDMACC	<Only random access files are supported as backup files for non-incremental backup>/error/fao=0!/ansi=0
 TMPFILENOCRE	<Error in MUPIP BACKUP while trying to create temporary file !AD>/error/fao=2!/ansi=0
-SHRMEMEXHAUSTED	<Attempt by process to use more shared memory than currently permitted by VMS>/error/fao=0!/ansi=0
+UNUSEDMSG1141	<SHRMEMEXHAUSTED last used in OpenVMS>/error/fao=0!/ansi=0
 JNLSENDOPER	<pid = 0x!XL : status = 0x!XL : jpc_status = 0x!XL : jpc_status2 = 0x!XL : iosb.cond = 0x!XW>/info/fao=5!/ansi=0
 DDPSUBSNUL	<NUL characters in subscripts are not supported by DDP>/error/fao=0!/ansi=0
 DDPNOCONNECT	<Named volume set, !AD, is not connected>/error/fao=2!/ansi=0
@@ -1241,9 +1250,15 @@ OMISERVHANG	<GTCM OMI server is hung>/info/fao=0!/ansi=0
 RSVDBYTE2HIGH	<Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and Reserved bytes (!UL)>/error/fao=5!/ansi=0
 BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0//1
 BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0//1
+<<<<<<< HEAD
 UNUSEDMSG1244	<VMSMEMORY2 nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 UNUSEDMSG1245	<LOADBGSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
 UNUSEDMSG1246	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
+=======
+UNUSEDMSG1242	<VMSMEMORY2 last used in OpenVMS>/error/fao=0!/ansi=0
+UNUSEDMSG1243	<LOADBGSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
+UNUSEDMSG1244	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 REPLINSTMISMTCH	<Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)>/error/fao=8!/ansi=0
 REPLINSTREAD	<Error reading [0x!XL] bytes at offset [0x!16@XQ] from replication instance file !AD>/error/fao=4!/ansi=0//1
 REPLINSTDBMATCH	<Replication instance file !AD has seqno [0x!16@XQ] while database has a different seqno [0x!16@XQ]>/error/fao=4!/ansi=0
@@ -1524,14 +1539,23 @@ DBMBMINCFREFIXED	<Master bitmap incorrectly marks local bitmap 0x!XL as free. Au
 NULLENTRYREF	<JOB command did not specify entryref>/error/fao=0!/ansi=0
 ZPEEKNORPLINFO	<$ZPEEK() unable to access requested replication structure>/error/fao=0!/ansi=0
 MMREGNOACCESS	<Region !AD (!AD) is no longer accessible. See prior error messages in the operator and application error logs>/error/fao=4!/ansi=0
+<<<<<<< HEAD
 MALLOCMAXUNIX	<Exceeded maximum allocation defined by $ydb_max_storalloc/gtm_max_storalloc>/error/fao=0!/ansi=0
 UNUSEDMSG1528	<MALLOCMAXVMS nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
+=======
+UNUSEDMSG1525	<MALLOCMAXUNIX last used in OpenVMS>/error/fao=0!/ansi=0
+MALLOCCRIT	<Memory allocation critical due to request for !UJ bytes from 0x!XJ>/warning/fao=2!/ansi=0
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 HOSTCONFLICT	<Host !AD could not open database file !AD because it is marked as already open on node !AD>/error/fao=6!/ansi=0
 GETADDRINFO	<Error in getting address info>/error/fao=0!/ansi=0
 GETNAMEINFO	<Error in getting name info>/error/fao=0!/ansi=0
 SOCKBIND	<Error in binding socket>/error/fao=0!/ansi=0
 INSTFRZDEFER	<Instance Freeze initiated by !AD error on region !AD deferred due to critical resource conflict>/info/fao=4!/ansi=0
+<<<<<<< HEAD
 UNUSEDMSG1534	<REGOPENRETRY last used in V6.3-000A>/error/fao=0!/ansi=0
+=======
+VIEWARGTOOLONG	<The argument length (!UL) to VIEW command !AD exceeds the maximum !UL>/error/fao=4!/ansi=0
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 REGOPENFAIL	<Failed to open region !AD (!AD) due to conflicting database shutdown activity>/error/fao=4!/ansi=0
 REPLINSTNOSHM	<Database !AD has no active connection to a replication journal pool>/error/fao=2!/ansi=0
 DEVPARMTOOSMALL	<Deviceparameter must be greater than zero (0)>/error/fao=0!/ansi=0

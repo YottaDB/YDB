@@ -120,7 +120,7 @@
 2 Copyright
    Copyright
 
-   Copyright 2021
+   Copyright 2022
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -2950,6 +2950,7 @@
 
    YottaDB process execution is interruptible with the following events:
 
+<<<<<<< HEAD
    When YottaDB detects any of these events, it transfers control to a vector
    that depends on the event. For CTRAP characters and ZMAXTPTIME, YottaDB uses
    the $ETRAP or $ZTRAP vectors described in more detail in the Error
@@ -2960,6 +2961,23 @@
    file and reports each such occasion to the operator log. For <CTRL-C> with
    CENABLE, YottaDB enters Direct Mode to give the programmer control. Without
    CENABLE or CTRAP, YottaDB ignores <CTRL-C> on a $PRINCIPAL terminal.
+=======
+   When GT.M detects any of these events, it transfers control to a vector
+   that depends on the event. For most events, GT.M uses the $ETRAP or $ZTRAP
+   vectors described in more detail in the Error Processing chapter. For
+   INTRPT and $ZTEXit, it XECUTEs the interrupt handler code placed in
+   $ZINTERRUPT. If $ZINTERRUPT is an empty string, the process ignores any
+   MUPIP INTRPT directed at it. The default value of $ZINTERRUPT is "IF
+   $ZJOBEXAM()" which redirects a dump of ZSHOW "*" to a file and reports
+   each such occasion to the operator log. For $ZTIMEOUT, the value may
+   specify a vector that takes precedence over the current error handling
+   vector. For <CTRL-C> without CENABLE, it transfers control as if there was
+   an error; with CENABLE, GT.M enters Direct Mode to give the programmer
+   control. Without CENABLE or CTRAP, GT.M ignores <CTRL-C> on a $PRINCIPAL
+   terminal. The GT.M terminal handler only recognizes other <CTRL>
+   characters if CTRAP enabled when the the OS terminal handling delivers and
+   they appear in the terminal input stream.
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
    YottaDB recognizes most of these events when they occur but transfers control
    to the interrupt vector at the start of each M line, at each iteration of
@@ -6731,9 +6749,10 @@
 3 ZSHOW_Information_Codes
    ZSHOW Information Codes
 
-   A ZSHOW argument is an expression containing codes selecting one or more
-   types of information.
+   A ZSHOW argument is an expression containing a list of codes that select
+   one or more types of information. The ZSHOW information codes are:
 
+<<<<<<< HEAD
    A: A stands for Autorelink and provides output in the same format as MUPIP
    RCTLDUMP, but restricted to the routines contained in the relinkctl areas
    in use by the process issuing the command. ZSHOW "*" does not include
@@ -6772,6 +6791,58 @@
    V: displays local and alias variables
 
    * displays all possible types of ZSHOW information
+=======
+   +------------------------------------------------------------------------+
+   | Code |                           Description                           |
+   |------+-----------------------------------------------------------------|
+   | *    | is the wildcard code which is same as ZSHOW "IVBDLGRC"; all     |
+   |      | excluding codes "A", "S", and "T".                              |
+   |------+-----------------------------------------------------------------|
+   |      | the code "A" stands for Autorelink and provides output in the   |
+   |      | same format as MUPIP RCTLDUMP, but restricted to the routines   |
+   |      | contained in the relinkctl areas in use by the process issuing  |
+   |      | the command. ZSHOW "*" does not include ZSHOW "A" because of an |
+   | A    | expectation that the typical volume of the information does not |
+   |      | provide a good return for its value. If you wish your error     |
+   |      | handling or INTRPT routines to dump this information, ask for   |
+   |      | it explicitly, possibly by doing a ZSHOW "A" into a local       |
+   |      | variable before doing a ZSHOW "*".                              |
+   |------+-----------------------------------------------------------------|
+   | B    | displays active ZBREAK breakpoints and their associated actions |
+   |------+-----------------------------------------------------------------|
+   |      | provides the list of loaded external call packages and their    |
+   | C    | routines. ZSHOW "C" does not report packages that are           |
+   |      | accessible but have not been accessed by the process.           |
+   |------+-----------------------------------------------------------------|
+   |      | displays information on currently OPEN devices; it tends to     |
+   | D    | display information on device states that differ from the       |
+   |      | default                                                         |
+   |------+-----------------------------------------------------------------|
+   |      | displays the access statistics for global variables and access  |
+   | G    | to database file since process startup. When the process does   |
+   |      | not have access to the current shared statistics, ZSHOW "G"     |
+   |      | returns a question-mark (?) at the end of the output strings.   |
+   |------+-----------------------------------------------------------------|
+   | I    | displays the current values of all intrinsic special variables  |
+   |------+-----------------------------------------------------------------|
+   | L    | displays GT.M LOCKs and ZALLOCATEs held by the process          |
+   |------+-----------------------------------------------------------------|
+   |      | displays the GT.M invocation stack and a hash based on the      |
+   | R    | MurmurHash3 algorithm of M source code for each routine on the  |
+   |      | stack.                                                          |
+   |------+-----------------------------------------------------------------|
+   | S    | displays the GT.M invocation stack - like R, but without the    |
+   |      | hash                                                            |
+   |------+-----------------------------------------------------------------|
+   |      | displays the cross-region summary (total) lines associated with |
+   | T    | G and L codes. Lines associated with G end with a question-mark |
+   |      | (?) when the process does not have access to the current shared |
+   |      | statistics.                                                     |
+   |------+-----------------------------------------------------------------|
+   | V    | displays local and alias variables that are active in the       |
+   |      | current context                                                 |
+   +------------------------------------------------------------------------+
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
    Codes may be upper- or lower-case. Invalid codes produce a run-time error.
    Multiple occurrences of the same code in one ZSHOW argument only produce
@@ -6783,19 +6854,29 @@
    of "V", the effect is to have the results of the earlier code also appear
    in the results of the "V" code.
 
-   If the wildcard (*) occurs in the list, ZSHOW uses the default order
-   (ZSHOW "IVBDLGR" ):
+   When the wildcard (*) occurs in the list, it overrides all other codes and
+   displays codes in the order of "IVBDLGRC" which produces the following
+   information:
 
    If G occurs in the list, the following statistics are displayed. The table
    is in alphabetical order, but ZSHOW will display the statistics according
    to historical practice with the most recently added statistics displayed
    last. The statistics are displayed in a comma-separated list where each
+<<<<<<< HEAD
    item has its mnemonic followed by a colon and a counter. YottaDB maintains
    the counter in DECIMAL. Each counter has 8-byte (can get as high as
    2**64). If these counters exceed 18 decimal digits (somewhere between
    2**59 and 2**60), which is the current YottaDB numeric representation
    precision threshold, their use in arithmetic expressions in YottaDB results
    in loss of precision. The mnemonics are:
+=======
+   item has its mnemonic followed by a colon and a counter. GT.M reports
+   counters in DECIMAL. Each counter has 8-byte (can get as high as 2**64).
+   If these counters exceed 18 decimal digits (somewhere between 2**59 and
+   2**60), which is the current GT.M numeric representation precision
+   threshold, their use in arithmetic expressions in GT.M results in loss of
+   precision. The mnemonics are:
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
    AFRA: # of waits for instance freeze to release critical sections
    BREA: # of waits for block read & decryption
@@ -6848,6 +6929,7 @@
    NTW : # of Non-tp committed Transactions that were read-Write on this database
    ORD : # of $ORDer(,1) (forward) operations (TP and non-TP); the count of $Order(,-1) operations are reported under ZPR.
    PRC : # of waits on exit
+   PRG : # of pre-read globals that were performed by the reader helper
    QRY : # of $QueRY() operations (TP and non-TP)
    SET : # of SET operations (TP and non-TP)
    TBR : # of Tp transaction induced Block Reads on this database
@@ -6867,7 +6949,10 @@
    TRX : # of waits for transaction in progress
    TTR : # of Tp committed Transactions that were Read-only on this database
    TTW : # of Tp committed Transactions that were read-Write on this database
+   WFL : # of database flushes that were performed by the writer helpers
    WFR : # of times a process slept while waiting for another process to read in a database block
+   WHE : # of writer helper epochs
+   WRL : # of times a process consistently slept(longer than WFR) while waiting for another process to read in a database block
    ZAD : # of waits for region freeze off
    ZPR : # of $order(,-1) or $ZPRevious() (reverse order) operations (TP and non-TP). The count of $Order(,1) operations are reported under ORD.
    ZTR : # of ZTRigger command operations
@@ -9832,7 +9917,7 @@
 
    YY: Outputs the rightmost two digits of the year.
 
-   YEAR: Outputs the year as a four-digit number.
+   YEAR or YYYY: Outputs the year as a four-digit number.
 
    YYYYYY: Outputs the year as a six-digit number.
 
@@ -10040,6 +10125,9 @@
 
    $ZGETJPI(expr1,expr2)
 
+3 Examples
+   Examples
+
    Example:
 
    YDB>write $zgetjpi(1975,"isprocalive")
@@ -10056,25 +10144,54 @@
    YDB>
 
    This uses $ZGETJPI() to measure the actual CPU time, measured in
-   hundredths of a second, consumed by performing the BENCH routine.
+   hundredths of a second, consumed by running the ^bench routine.
 
 2 $ZJOBEXAM()
    $ZJOBEXAM()
 
+<<<<<<< HEAD
    Returns the full specification of the file into which the function places
    a ZSHOW "*". The return value serves as a way to save, to notify others of
    the exact location of the output, or to open the file for further
    processing. YottaDB reports each $ZJOBEXAM() to the operator log facility
    with its file specification.
+=======
+   Places ZSHOW <code> output into a file and returns the absolute file name.
+   The format for the $ZJOBEXAM function is:
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
-   The optional expression argument is a template output device
-   specification. It can be a device, a file directory, or a file name. The
-   template is an expression that is pre-processed to create a file
-   specification as the target for the ZSHOW. The preprocessing is equivalent
-   to $ZPARSE(), as illustrated by the following M code:
+   $ZJOBEXAM([expr1][,expr2])
 
+<<<<<<< HEAD
    set deffn="YDB_JOBEXAMINE.ZSHOW_DMP_"_$JOB_"_"_<cntr>
    set filespec=$zparse(expr1,"",deffn)
+=======
+     o The optional first expression is the output specification. It can be a
+       file directory or a file name. $ZJOBEXAM() pre-processes the first
+       expression to create a file specification as the target for the ZSHOW
+       command output. The preprocessing is equivalent to $ZPARSE(), as
+       illustrated by the following M code:
+
+       GTM>set cntr=1,deffn="GTM_JOBEXAM.ZSHOW_DMP_"_$JOB_"_"_cntr
+
+       GTM>w $zparse(deffn)
+       /path/to/GTM_JOBEXAM.ZSHOW_DMP_49878_1
+       GTM>w $zjobexam()
+       /path/to/GTM_JOBEXAM.ZSHOW_DMP_49878_1
+       GTM>
+
+     o The optional second expression evaluates to a string containing a list
+       of one or more ZSHOW information codes that determine the type of
+       information. If the second expression is missing or empty, GT.M
+       operates as it was a "*" and produces all context. Note that using an
+       explicit list may be useful in limiting the exposure of sensitive
+       information.
+
+   The return value serves as a way to save, to notify others of the exact
+   location of the output or to open the file for further processing. GT.M
+   logs the JOBEXAMDONE message to the operator log for each $ZJOBEXAM()
+   which includes the full file specification.
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
    The $ZJOBEXAM()does not trigger error processing except when there is a
    problem storing its return value, so no error is reported to the process
@@ -10093,6 +10210,7 @@
 
    Example:
 
+<<<<<<< HEAD
    YDB>set x=$zjobexam()
    YDB>write x
    /home/gtmuser1/.yottadb/r200_x86_64/r/YDB_JOBEXAM.ZSHOW_DMP_28760_1
@@ -10100,9 +10218,22 @@
    YDB>write x
    /home/gtmuser1/.yottadb/r200_x86_64/r/test.file
    YDB>
+=======
+   GTM>set x=$zjobexam()
+   GTM>write x
+   /tmp/GTM_JOBEXAM.ZSHOW_DMP_383974_1
+   GTM>set x=$zjobexam("jobexam.out")
+   GTM>write x
+   /tmp/jobexam.out
+   GTM>set x=$zjobexam("jobexam_ISV.out","I")
+   GTM>write x
+   /tmp/jobexam_ISV.out
+   GTM>
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
-   Shows default file name and type of the files created containing the zshow
-   dump information and the difference when the name and type are specified.
+   In the first two examples, the output file contains zshow "*" information.
+   The 3rd example saves zshow "I" (ISVs only) information in the output
+   file.
 
 2 $ZJustify()
    $ZJustify()
@@ -12094,12 +12225,13 @@
 2 $ZINTerrupt
    $ZINTerrupt
 
-   $ZINT[ERRUPT] specifies the code to be XECUTE'd when an interrupt (for
-   example, through a MUPIP INTRPT) is processed. While a $ZINTERRUPT action
-   is in process, any additional interrupt signals are discarded. When an
-   interrupt handler is invoked, the current value of $REFERENCE is saved and
-   restored when the interrupt handler returns. The current device ($IO) is
-   neither saved nor restored.
+   $ZINT[ERRUPT] specifies the code that GT.M XECUTEs at the time of
+   processing an interrupt (for example, through a MUPIP INTRPT). While a
+   $ZINTERRUPT action is in process, GT.M defers any additional interrupt
+   signals. At the time of invoking an interrupt handler, GT.M saves the
+   current values of $ECODE and $REFERENCE and restores them when the
+   interrupt handler returns. GT.M neither saves nor restores the current
+   device ($IO).
 
    YottaDB permits the SET command to modify the value of $ZINTERRUPT.
 
@@ -12121,10 +12253,10 @@
 
    **Note**
 
-   If the default value for $ZINTERRUPT is modified, no $ZJOBEXAM() will
-   occur unless the replacement value directly or indirectly invokes that
-   function. In other words, while $ZJOBEXAM() is part of the interrupt
-   handling by default, it is not an implicit part of the interrupt handling.
+   If the default value for $ZINTERRUPT is modified, no $ZJOBEXAM() occurs
+   unless the replacement value directly or indirectly invokes that function.
+   In other words, while $ZJOBEXAM() is part of the interrupt handling by
+   default, it is not an implicit part of the interrupt handling.
 
    The interrupt handler is executed by YottaDB when on a statement boundary or
    on an appropriate boundary in a potentially long running COMMAND (in the
@@ -12346,6 +12478,38 @@
    This program, executed from Direct Mode, produces a value of 4 for
    $ZLEVEL. If you run this program from the shell, the value of $ZLEVEL is
    three (3).
+
+2 $ZMALLoclim
+   $ZMALLoclim
+
+   $ZMALL[OCLIM] contains an integer value specifying a number of bytes of
+   process memory, which, if exceeded, cause GT.M to issue a MALLOCCRIT
+   error. When the value is zero (0), GT.M imposes no limit, although the OS
+   still does. A positive value specifies a byte limit with a minimum of
+   2.5MB. A value of minus one (-1) provides a value of half the system
+   imposed limit if any.
+
+   When a request for additional memory exceeds the limit, GT.M does the
+   expansion and then produces trappable MALLOCCRIT warning. By default, some
+   later request for memory is likely to produce a fatal MEMORY error, unless
+   subsequent to MALLOCCRIT, a limit has been reestablished by SET ZMALLOCLIM
+   to the same or higher limit, but one not exceeding any system limit.
+
+   Note that GT.M allocates memory from the OS in large blocks so the
+   interaction of $ZMALLOCLIM with memory growth is not exact. MEMORY errors
+   are fatal and terminate the process. In the case of a MEMORY error, GT.M
+   makes an attempt to marshal available memory to enable as graceful a
+   termination as possible. Note that independent of this mechanism, the OS
+   may kill the process without recourse if it determines the greed of the
+   process for memory jeopardizes the viability of the system.
+
+   When the integer byte value specified in a SET $ZMALLOCLIN=intexpr or, at
+   process startup, by the $gtm_malloc_limit environment variable specifies a
+   positive value, GT.M uses the smaller of that value and any OS defined
+   amount for the value of $ZMALLOCLIM. GT.M does not give errors or messages
+   about its choice for $ZMALLOCLIM between a specified value and some other
+   more appropriate value, so if the application needs to verify the result,
+   it should examine the resulting ISV value.
 
 2 $ZMAXTPTIme
    $ZMAXTPTIme
@@ -13893,6 +14057,7 @@
    +------------------------------------------------------------------------+
    |                Interaction Management Deviceparameters                 |
    |------------------------------------------------------------------------|
+<<<<<<< HEAD
    |    DEVICEPARAMETER    | COMMAND |               COMMENT                |
    |-----------------------+---------+--------------------------------------|
    |                       |         | Controls whether <CTRL-C> on         |
@@ -13919,6 +14084,38 @@
    |                       |         | characters (for example <CTRL-B>).   |
    |-----------------------+---------+--------------------------------------|
    | [NO]TERMINATOR[=expr] | U       | Controls characters that end a READ  |
+=======
+   |      DEVICEPARAMETER       | COMMAND |             COMMENT             |
+   |----------------------------+---------+---------------------------------|
+   |                            |         | Controls whether <CTRL-C> on    |
+   | [NO]CENABLE                | U       | $PRINCIPAL causes GT.M to go to |
+   |                            |         | direct mode.                    |
+   |----------------------------+---------+---------------------------------|
+   | CTRAP=$CHAR(intexpr[,...]) | U       | Controls vectoring on trapped   |
+   |                            |         | <CTRL> characters.              |
+   |----------------------------+---------+---------------------------------|
+   | [NO]EDITING                | U       | Controls the editing mode for   |
+   |                            |         | $PRINCIPAL.                     |
+   |----------------------------+---------+---------------------------------|
+   |                            |         | Control whether an "Erase"      |
+   | [NO]EMPTERM                | U       | character on an empty input     |
+   |                            |         | line should terminate a READ or |
+   |                            |         | READ # command.                 |
+   |----------------------------+---------+---------------------------------|
+   | [NO]ESCAPE                 | U       | Controls escape sequence        |
+   |                            |         | processing.                     |
+   |----------------------------+---------+---------------------------------|
+   | [NO]INSERT                 | U       | Controls insert or overstrike   |
+   |                            |         | on input.                       |
+   |----------------------------+---------+---------------------------------|
+   |                            |         | Controls interpretation by the  |
+   | [NO]PASTHRU                | U       | operating system of special     |
+   |                            |         | control characters (for example |
+   |                            |         | <CTRL-B>).                      |
+   |----------------------------+---------+---------------------------------|
+   | [NO]TERMINATOR[=expr]      | U       | Controls characters that end a  |
+   |                            |         | READ                            |
+>>>>>>> eb3ea98c (GT.M V7.0-002)
    +------------------------------------------------------------------------+
 
    +------------------------------------------------------------------+
@@ -15269,12 +15466,12 @@
    The WRITE command sends data to a socket.
 
    WRITE ! inserts the character(s) of the first I/O delimiter (if any) to
-   the sending buffer. If "ZFF=expr" has been specified, WRITE # inserts the
-   characters of expr. Otherwise WRITE # has no effect. WRITE ! and WRITE #
-   always maintain $X and $Y in a fashion that emulates a terminal cursor
-   position except when the device is OPENed with a UTF CHSET because the
-   units for $X and $Y for terminals are in display columns while for sockets
-   they are in codepoints.
+   the sending buffer. When the "ZFF=expr" characteristic is specified, WRITE
+   # inserts the characters of expr. Otherwise WRITE # has no effect. WRITE !
+   and WRITE # always maintain $X and $Y in a fashion that emulates a
+   terminal cursor position except when the device is OPENed with a UTF CHSET
+   because the units for $X and $Y for terminals are in display columns while
+   for sockets they are in codepoints/characters.
 
    The WRITE command for SOCKET devices accepts the following
    controlmnemonics:
@@ -15283,16 +15480,16 @@
 
    where numexpr specifies the listen queue depth for a listening socket. The
    value of numexpr must be between 1 and the system-enforced maximum. By
-   default, an OPEN or USE with LISTEN immediately sets the listen queue size
-   to 1. For vendor-specific information on how to change your system's
-   maximum queue length, refer to the listen manpage.
+   default, an OPEN or USE with LISTEN sets the listen queue size to 1. For
+   vendor-specific information on how to change your system's maximum queue
+   length, refer to the listen manpage.
 
    WRITE /WAIT[(timeout[,[what][,handle]])]
 
-   where timeout is a numeric expression that specifies how long in seconds a
-   server waits for a connection or data to become available on one of the
-   sockets in the current Socket Device, what may contain a string containing
-   "READ" and/or "WRITE", and handle specifies the socket handle.
+   where the required timeout is a numeric expression specifing how long in
+   seconds a server waits for a connection or data to become available on one
+   of the sockets in the current Socket Device, what may contain a string
+   containing "READ" and/or "WRITE", and handle specifies the socket handle.
 
    If the optional second argument only specifies "WRITE", WRITE /WAIT does
    not check incoming connections for listening sockets.
@@ -15303,18 +15500,24 @@
 
    **Note**
 
-   In most circumstances, WRITE /WAIT or WRITE /WAIT(timeout,"WRITE") for
-   SOCKET devices which contain a non blocking socket returns immediately
-   because non blocking sockets are usually ready for writing.
+   In most circumstances, WRITE /WAIT(timeout[,"WRITE"]) for SOCKET devices
+   which contain a non blocking socket returns immediately because non
+   blocking sockets are usually ready for writing.
 
    If the current Socket Device is $PRINCIPAL and input and output are
    different SOCKETs, WRITE /WAIT applies to the input side of the device.
 
    WRITE /PASS([targetpid],[timeout],handle[,handle]...)
 
+<<<<<<< HEAD
    WRITE /PASS allows a YottaDB process to send DETACHed TCP or LOCAL sockets
    (that is, sockets in the socket pool) to another YottaDB process. The
    receiving process should execute WRITE /ACCEPT to receive the socket.
+=======
+   WRITE /PASS allows a GT.M process to send DETACHed TCP or LOCAL sockets
+   (that is, sockets in the socket pool) to another GT.M process. The
+   receiving process must execute WRITE /ACCEPT to receive the socket.
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
      o If a numeric targetpid is specified, YottaDB matches the value against
        the process id ($JOB) of the process receiving the sockets. YottaDB uses
@@ -15325,6 +15528,7 @@
        transfer completes within the specified time, and otherwise sets $TEST
        to 0 and does not transfer any of the sockets.
      o Each handle specifies a socket in the socket pool.
+<<<<<<< HEAD
      o On a successful transfer, YottaDB eliminates access by the sending
        process to the specified and sent sockets. In any case where the
        transfer does not complete, YottaDB retains all the sockets in the socket
@@ -15335,6 +15539,18 @@
    WRITE /ACCEPT allows a YottaDB process to receive a DETACHed TCP or LOCAL
    sockets (that is, sockets in the socket pool) from another YottaDB process .
    The sending process should execute WRITE /PASS to send the socket.
+=======
+     o On a successful transfer, GT.M eliminates further access to the
+       specified and sent sockets by the sending process. In any case where
+       the transfer does not complete, GT.M retains all the sockets in the
+       socket pool of the sender.
+
+   WRITE /ACCEPT(.lvar,[sourcepid],[timeout][,[handle]]...)
+
+   WRITE /ACCEPT allows a GT.M process to receive a DETACHed TCP or LOCAL
+   sockets (that is, sockets in the socket pool) from another GT.M process .
+   The sending process must execute WRITE /PASS to send the socket.
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
      o lvar is an unsubscripted local variable name (lvn) which must be
        passed by reference indicated with a period (".") prefix. On
@@ -15374,9 +15590,9 @@
    that provides the characteristic for all its sockets, or by a subsequent
    USE that specifies the appropriate deviceparameter(s). YottaDB transfers only
    the socket connection itself, the socket handle, and buffered socket data
-   (if any).
+   (if any), but no characteristics established by the sender.
 
-   WRITE /TLS(option[,[timeout][,tlsid[,cfg-file-options]])
+   WRITE /TLS(option[,[timeout][,tlsid[,[obfuscatedpassword][,cfg-file-options]]]])
 
    SOCKET devices support encrypted connections with TLS using an encryption
    plugin. YottaDB ships with a reference implementation of the plugin which
@@ -15388,11 +15604,19 @@
        indicates which TLS role to assume. The server role requires a
        certificate specified in the configuration file section with the label
        matching tlsid. The client role may require a certificate depending on
+<<<<<<< HEAD
        the OpenSSL options. If a timeout is specified for options "client" or
        "server", YottaDB sets $TEST to 1 if the command successfully completed
        or to 0 if it timed out. $DEVICE provides status information in case
        of an error. ZSHOW "D" includes "TLS" in the second line of the output
        for an encrypted socket.
+=======
+       the OpenSSL options. If the argument specifies a timeout with options
+       "client" or "server", GT.M sets $TEST to 1 if the command successfully
+       completes or to 0 if it times out. $DEVICE provides status information
+       in case of an error. ZSHOW "D" includes "TLS" in the second line of
+       the output for an encrypted socket.
+>>>>>>> eb3ea98c (GT.M V7.0-002)
      o "renegotiate" applies only to a server socket. It allows applications
        to request a TLS renegotiation. Renegotiation requires the suspension
        of application communication and the application must read all pending
@@ -15409,17 +15633,32 @@
        option, if no section named tlsid is present in the configuration
        file, YottaDB creates a virtual section with that name for the life of
        the process.
-     o cfg-file-options specifies configuration file options. Note
-       cfg-file-options override those options if they are already specified
-       in the configuration file except ssl-options and verify-level which
-       are merged.
+     o obfuscatedpassword can represent a private key in the tlsid section of
+       the configuration file which overrides any existing password such as
+       the environment variable gtmtls_passwd_<tlsid>. If a password is
+       supplied on the command, it must supply the tlsid as well unless the
+       option is "renegotiate".
+     o cfg-file-options specifies configuration file options for the section
+       labeled tlsid. If there is no section with the label tlsid, GT.M
+       creates a new virtual section, which persists for the life of the
+       process. The specified options override those in the configuration
+       file except for ssl-options and verify-level GT.M combines/merges with
+       those specified in the configuration file. The options, which are
+       case-sensitive, must be specified in the same format as the
+       configuration file including the terminating semi-colon (";").
      o Supported cfg-file-options for the "renegotiate" command are
        (case-sensitive): verify-depth, verify-level, verify-mode,
        session-id-hex, and CAfile. WRITE /TLS ignores all other configuration
-       file options whether given on the command or in the configuration
+       file options whether given with the command or in the configuration
        file. For more information on the supported configuration options,
        refer to the Creating a Configuration File section of the
        Administration and Operations Guide.
+
+   Example:
+
+   set obspass="CD86FF2BFD1F06EE"\\t; maskpass output of password for private key
+   set cfgoptions="cert:""/path/to/certificate"";key:""/path/to/key.pem"";"
+   write /tls("server",,"tlsone",obspass,cfgoptions)
 
    **Note**
 
@@ -15436,7 +15675,7 @@
    the current SOCKET device. Sockets default to blocking WRITEs.
 
    A socket must be enabled for non-blocking WRITEs before enabling it for
-   TLS if both features are desired.
+   TLS when using both features on the same socket.
 
    For non-blocking sockets, YottaDB retries a WRITE that blocks up to the
    number of times specified by the $gtm_non_blocked_write_retries
@@ -15448,11 +15687,11 @@
    $DEVICE to "1,Resource temporarily unavailable" and issues an error if
    IOERROR is "TRAP".
 
-   If IOERROR is not "TRAP", $DEVICE must be checked after each WRITE. An
-   attempt to WRITE to a socket after it has been blocked is an error which
-   sets $DEVICE to "1,Non blocking WRITE blocked - no further WRITEs
-   allowed". Thus the only operation permitted on a blocked socket is to
-   CLOSE it.
+   If IOERROR is not "TRAP", the application must check $DEVICE after each
+   WRITE. An attempt to WRITE to a socket after it has been blocked is an
+   error which sets $DEVICE to "1,Non blocking WRITE blocked - no further
+   WRITEs allowed". Thus the only operation permitted on a blocked socket is
+   a CLOSE.
 
    **Note**
 
@@ -15489,9 +15728,9 @@
    readiness for WRITE on non-blocking sockets, but never checks readiness to
    WRITE on blocking sockets, even if explicitly requested.
 
-   If the socket selected by a WRITE /WAIT which implicitly or explicitly
-   requests the write state would block on a READ but not block on WRITE,
-   $KEY contains:
+   If the socket selected by a WRITE /WAIT implicitly or explicitly requests
+   the state for writing would block on a READ but not block on WRITE, $KEY
+   contains:
 
    WRITE|<socket handle>|<address>
 
@@ -15499,18 +15738,19 @@
    more bytes than the system is ready to accept.
 
    If the socket selected by WRITE /WAIT which implicitly or explicitly
-   requests the read state would not block on a READ but would block on a
-   WRITE, $KEY contains:
+   requests the state for reading would not block on a READ but would block
+   on a WRITE, $KEY contains:
 
    READ|<socket handle>|<address>
 
    $ZKEY after a prior WRITE /WAIT will contain a piece of the format
    "WRITE|sockethandle|ipaddress" if a non-blocking socket was considered
-   writable which will be the case most of the time. If a socket was also
-   readable, there will be two pieces in $ZKEY for the socket, one for WRITE
-   and the other for READ.
+   writable, which we expect to be typical. If a socket was also readable,
+   there will be two pieces in $ZKEY for the socket, one for WRITE and the
+   other for READ.
 
-   Whether a socket is enabled for non-blocking WRITEs may be determined by:
+   An application can determine whether a socket is enabled for non-blocking
+   WRITEs with:
 
    $ZSOCKET(device,"BLOCKING",index)
 
@@ -17403,10 +17643,11 @@
 5 CTRAP
    CTRAP
 
-   CTRAP=expr Applies to: TRM
+   CTRAP=$CHAR(intexpr[,...]) Applies to: TRM
 
    CTRAP=expr Applies to: Terminals and Printers
 
+<<<<<<< HEAD
    Establishes the <CTRL> characters in the expression as trap characters for
    the current device. When YottaDB receives a trap character in the input from
    a device, YottaDB issues a run-time exception. The device does not have to be
@@ -17415,14 +17656,28 @@
    The <CTRL> characters are ASCII 0 though 31. However terminal
    configuration may prevent of most <CTRL> characters from ever reaching
    YottaDB's CTRAP facility.
+=======
+   Establishes a trap facility for <CTRL> characters for the current device.
+   The expression is a comma seperated list of ASCII characters where
+   0<=intexpr<=31. Other than <CTRL_C>, GT.M recognizes <CTRL> characters
+   only when reading them from $IO. The behavior for <CTRL-C> is different in
+   the sense that the OS recognizes it as an out-of-band interrupt including
+   when it occurs on $PRINCIPAL when $IO'=$PRINCIPAL and delivers it
+   immediately; When the device receives a <CTRL-n>, GT.M interrupts process
+   execution.
 
-   For example, the command U $P:CTRAP=$C(26,30,7,19) sets a trap for the
-   ASCII characters <SUB>, <RS>, <BEL> and <DC3>.
+   Other than the <CTRL> characters (ASCII 0 through 31), terminal
+   configuration may cause some <CTRL> characters to be seen as causing an OS
+   action and also prevent them from ever reaching GT.M's CTRAP facility.
+>>>>>>> eb3ea98c (GT.M V7.0-002)
+
+   For example, the command USE $PRINCIPAL:CTRAP=$C(26,30,7,19) sets a trap
+   for the ASCII characters <SUB>, <RS>, <BEL> and <DC3>.
 
    Specifying CTRAP completely replaces the previous CTRAP list. Setting
-   CTRAP to the null string ("") disables character trapping.
+   CTRAP to the empty string ("") disables character trapping.
 
-   A trap character enabled by CTRAP produces one of the following actions:
+   A <CTRL-n> enabled by CTRAP produces one of the following actions:
 
    For more information on error handling, refer to Chapter 13: "Err
    Processing".
@@ -17469,10 +17724,13 @@
    "YGTMSOCKETPOOL") and may be attached to another socket device. If the
    socket being removed is the current socket, then YottaDB does the following:
 
+<<<<<<< HEAD
    1. The socket ATTACHed prior to the removed socket, is made current, if one such exists.
    2. The socket ATTACHed after the removed socket, is made current, if the removed one was the first socket.
    3. $PRINCIPAL is made the current device ($IO), if the removed socket was the only one in the current socket device.
 
+=======
+>>>>>>> eb3ea98c (GT.M V7.0-002)
    **Note**
 
    A socket can move from one device to another using DETACH/ATTACH. A socket
@@ -17481,6 +17739,9 @@
    buffered, this may cause unintentional consequences in the application if
    [I|O]CHSET changes. YottaDB does not detect (or report) a change in
    [I|O]CHSET due to DETACH/ATTACH.
+
+   DETACH is not compatible with any other device parameters in the USE
+   command.
 
    Example:
 
@@ -17605,8 +17866,8 @@
    Enabling PASTHRU mode supersedes EDITING mode.
 
    If any of the EDITING <CTRL> characters are in the CTRAP list, their
-   editing functions are not available since CTRAP takes precedence. However
-   the EDITING <CTRL> characters takes precedence over the TERMINATOR list.
+   editing functions are not available since CTRAP takes precedence. However,
+   EDITING <CTRL> characters take precedence over the TERMINATOR list.
 
    **Note**
 
@@ -17782,8 +18043,9 @@
    [NO]HUPENABLE Applies to: Terminal PRINCIPAL devices
 
    Enables or disables the recognition by the process of the loss ("hang up")
-   of PRINCIPAL device terminal. When enabled the proces receives an
+   of the PRINCIPAL device terminal. When enabled the proces receives a
    TERMHANGUP error if the O/S signals that the terminal assigned to the
+<<<<<<< HEAD
    process as the PRINCIPAL device has disconnected. If YottaDB is configured to
    ignore such a signal, a process may subsequently receive an IOEOF or a
    TERMWRITE error from an attempt to respectively READ from, or WRITE to the
@@ -17793,6 +18055,20 @@
 
    If defined, the gtm_hupeable environment variable determines the initial
    process behavior, and if that is undefined YottaDB does not immeidately
+=======
+   process as the PRINCIPAL device has disconnected. In addition, a
+   TERMHANGUP error implicitly sets the device to NOHUPENABLE so if a process
+   anticipates multiple disconnects/hangups, it should explicitly issue a USE
+   $PRINCIPAL:HUPENABLE. If GT.M is configured to ignore such a signal, a
+   process may subsequently receive an IOEOF or a TERMWRITE error from an
+   attempt to respectively READ from, or WRITE to the missing device. GT.M
+   terminates a process that ignores more than one of these messages and, if
+   the process is not in Direct Mode, sends a NOPRINCIO message to the
+   operator log.
+
+   If defined, the gtm_hupeable environment variable determines the initial
+   process behavior, and if that is undefined GT.M does not immediately
+>>>>>>> eb3ea98c (GT.M V7.0-002)
    report a terminal disconnect.
 
 5 IKEY
@@ -18162,32 +18438,40 @@
 
    [Z]WIDTH=intexpr Applies to: TRM SOC NULL SD FIFO PIPE
 
-   [Z]WIDTH=intexpr Applies to: Terminals and Printers, Socket Device, NULL
-   Device, PIPE, and Sequential Files
+   [Z]WIDTH=intexpr Applies to: Terminals and Printers, SOCKET devices, NULL
+   devices, PIPE devices, and Sequential Files
 
    Sets the device's logical record size and enables WRAP. The default WIDTH
    for SD, FIFO, and PIPE is taken from the RECORDSIZE.
 
    NOWRAP and WIDTH supersede each other. When WIDTH and NOWRAP appear
    together on the same USE command, the final one controls the device
-   behavior. For a terminal, WIDTH=0 is equivalent to WIDTH=n:NOWRAP, where n
-   is the default length of a logical record on that terminal.
+   behavior.
 
+   In M mode if WIDTH is set to 0, GT.M uses the default WIDTH of the TRM and
+   SOC devices, in other words: USE x:WIDTH=0 is equivalent to USE
+   x:(WIDTH=<device-default>:NOWRAP.
+
+<<<<<<< HEAD
    Terminals inherit their default WIDTH in YottaDB from the invoking shell
    environment. The default WIDTH for null and socket device is 255.
+=======
+   Terminals inherit their default WIDTH in GT.M from the invoking shell
+   environment. The default WIDTH for null and SOCKET devices is 255.
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
-   For SD and SOC which support 1MB strings, you can specify WIDTH up to
+   For SD and SOC which support 1MiB strings, you can specify WIDTH up to
    1,048,576.
 
    In UTF-8 mode and TRM, SD, FIFO, and PIPE output, the WIDTH
    deviceparameter is in units of display-columns and is used with $X to
-   control truncation and WRAPing for output and maintenance of $X and $Y for
-   input.
+   control truncation and WRAPing of output and maintenance of $X and $Y.
 
    In UTF-8 mode and SOC, the WIDTH deviceparameter is in units of UTF-8 code
-   points and is used with $X to control truncation and wrapping for output
-   and maintenance of $X and $Y for input.
+   points (characters), and is used with $X to control truncation and
+   wrapping for output and maintenance of $X and $Y.
 
+<<<<<<< HEAD
    In M mode if WIDTH is set to 0, YottaDB uses the default WIDTH of the TRM and
    SOC devices. USE x:WIDTH=0 is equivalent to USE
    x:(WIDTH=<device-default>:NOWRAP. For SD, FIFO, and PIPE devices in M
@@ -18198,6 +18482,10 @@
 
    In UTF-8 mode and SOC output, the WIDTH deviceparameter specifies the
    number of UTF-8 characters.
+=======
+   Along with device WIDTH and WRAP, GT.M format control characters, and the
+   FILTER device characteristic, also have an effect on $X.
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
 5 WRAP
    WRAP
@@ -21752,10 +22040,20 @@ characters
    An EXCEPTION based on an error for the device applies only to that device,
    and provides a specific error handler for a specific I/O device.
 
+<<<<<<< HEAD
    The CTRAP deviceparameter for USE establishes a set of trap characters for
    terminal input. When YottaDB encounters an input character in that set, YottaDB
    executes the EXCEPTION deviceparamenter, or, $ETRAP or $ZTRAP if the
    device has no current EXCEPTION.
+=======
+   The CTRAP deviceparameter for USE establishes <CTRL-n> where 0<=n<=31 as
+   an interrupting signal. When GT.M encounters <CTRL-n> with CTRAP enabled,
+   GT.M executes the EXCEPTION deviceparamenter, or, $ETRAP or $ZTRAP if the
+   device has no current EXCEPTION. <CTRL-C> is unique among <CTRL>
+   characters, in that the OS recognizes it as an out-of-band signal and
+   delivers it immediately; GT.M recognizes other <CTRL> character when they
+   appear duing a READ.
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
    Example:
 

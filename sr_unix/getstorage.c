@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,18 +25,16 @@ error_def(ERR_SYSCALL);
 
 int4	getstorage(void)
 {
-        struct rlimit	rl;
-        int 		save_errno;
-	UINTPTR_T       cur_sbrk;
-        rlim_t		size;
+	struct rlimit	rl;
+	int 		save_errno;
+	UINTPTR_T	cur_sbrk;
+	rlim_t		size;
 
-        if (0 != getrlimit(RLIMIT_DATA,&rl))
-        {
-                save_errno = errno;
-		RTS_ERROR_ABT(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL(ERRSTR),
-			CALLFROM,
-			save_errno);
-        }
+	if (0 != getrlimit(RLIMIT_DATA,&rl))
+	{
+		save_errno = errno;
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL(ERRSTR), CALLFROM, save_errno);
+	}
 #if !defined(__MVS__)
 	cur_sbrk = (UINTPTR_T)sbrk(0); /* Two step conversion to eliminate warnings */
 #else
@@ -44,8 +42,10 @@ int4	getstorage(void)
 #endif
 	size = rl.rlim_cur - cur_sbrk;
 /* #if !defined(GTM64) && defined(INT8_SUPPORTED) */
-        if (MAXPOSINT4 < size)
-                size = MAXPOSINT4;
+	if (MAXPOSINT4 < size)
+		size = MAXPOSINT4;
+	else if (0 > size)
+		size = 0;
 /* Temporarily, all platform return a diminished potential storage value until stack alignment issues on x86_64
  * are fixed allowing floats again or a better fix is made.
  *
@@ -54,5 +54,5 @@ int4	getstorage(void)
  * 		size = MAX_LONG_IN_DOUBLE;
  * #endif
  */
-        return size;
+	return size;
 }

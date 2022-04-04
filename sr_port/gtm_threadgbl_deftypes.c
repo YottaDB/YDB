@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Copyright (c) 2010-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -133,6 +133,7 @@
 # include "relinkctl.h"
 #endif
 #include "ztimeout_routines.h"
+#include "deferred_events.h"
 #include "deferred_events_queue.h"
 
 /* This module's purpose is to generate gtm_threadgbl_deftypes.h for a given platform. This header file

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -47,7 +47,11 @@
 #include "deferred_events_queue.h"
 #include "ztimeout_routines.h"
 #include "jobinterrupt_process.h"
+<<<<<<< HEAD
 #include "bool_zysqlnull.h"
+=======
+#include "try_event_pop.h"
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
 GBLREF	boolean_t	dollar_truth, is_tracing_on, skip_error_ret;
 GBLREF	mval		*alias_retarg;
@@ -154,7 +158,6 @@ void op_unwind(void)
 	 * our error state. If we have a deferred timeout and none of the deferral conditions are anymore in effect, release
 	 * the hounds.
 	 */
-	if ((no_event == outofband) && (no_event != (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
-		TRY_EVENT_POP;
+	TRY_EVENT_POP;
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -92,7 +92,8 @@ GBLREF	uint4			update_trans;
  * We don't need any pass more than this because if we hold crit then no one else can start a dsk_read for this block.
  * This # of passes is hardcoded in the macro BAD_LUCK_ABOUNDS
  */
-#define BAD_LUCK_ABOUNDS 2
+#define BAD_LUCK_ABOUNDS	2
+#define READ_EXCEED_COUNTER	2
 
 #define	RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, newcr, newcycle)				\
 MBSTART {												\
@@ -134,7 +135,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	cache_rec_ptr_t		cr;
 	bt_rec_ptr_t		bt;
 	boolean_t		clustered, hold_onto_crit, was_crit, issued_db_init_crypt_warning, sync_needed;
-	int			dummy, lcnt, ocnt;
+	int			dummy, exceed_sleep_count, lcnt, ocnt;
 	cw_set_element		*cse;
 	off_chain		chain1;
 	register sgmnt_addrs	*csa;
@@ -497,8 +498,12 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
 #				ifdef DEBUG
 				/* stop self to test sechshr_db_clnup clears the read state */
+<<<<<<< HEAD
 				if (ydb_white_box_test_case_enabled
 					&& (WBTEST_SIGTSTP_IN_T_QREAD == ydb_white_box_test_case_number))
+=======
+				if (WBTEST_ENABLED(WBTEST_SIGTSTP_IN_T_QREAD))
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 				{	/* this should never fail, but because of the way we developed the test we got paranoid */
 					dummy = kill(process_id, SIGTERM);
 					assert(0 == dummy);
@@ -588,6 +593,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		*cycle = cr->cycle;
 		SHM_READ_MEMORY_BARRIER;
 		sleep_invoked = FALSE;
+		exceed_sleep_count = 1;
 		for (lcnt = 1;  ; lcnt++)
 		{
 			if (0 > cr->read_in_progress)
@@ -807,8 +813,16 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				INCR_GVSTATS_COUNTER(csa, cnl, n_wait_for_read, 1);
 				if (!sleep_invoked)	/* Count # of blks for which we ended up sleeping on the read */
 					BG_TRACE_PRO_ANY(csa, t_qread_ripsleep_nblks);
+				if (0 == (exceed_sleep_count % READ_EXCEED_COUNTER))
+				{	/* Count the number of blocks for which we ended up sleeping on the read, when counter
+					 * exceeds READ_EXCEED_COUNTER. It is an indication that the wait was longer than
+					 * 					 * n_wait_for_read.
+					 * 					 					 */
+					INCR_GVSTATS_COUNTER(csa, cnl, n_wait_read_long, 1);
+				}
 				wcs_sleep(lcnt);
 				sleep_invoked = TRUE;
+				exceed_sleep_count++;
 			}
 		}
 		if (set_wc_blocked)	/* cannot use cnl->wc_blocked here as we might not necessarily have crit */

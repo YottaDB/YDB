@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2021 Fidelity National Information	*
+ * Copyright (c) 2007-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -45,11 +45,18 @@
 #include "gtmdbglvl.h"
 #include "gtmio.h"
 #include "have_crit.h"
+#include "deferred_events_queue.h"
+#include "deferred_events.h"
 
 GBLREF  int		process_exiting;		/* Process is on it's way out */
+<<<<<<< HEAD
 GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
 GBLREF	uint4		ydbDebugLevel;
 GBLREF	size_t		ydb_max_storalloc;		/* Max value for $ZREALSTOR or else memory error is raised */
+=======
+GBLREF	uint4		gtmDebugLevel;
+GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
 OS_PAGE_SIZE_DECLARE
 
@@ -68,10 +75,16 @@ OS_PAGE_SIZE_DECLARE
 #define MAXINDEX 5
 
 /* Fields to help instrument our algorithm */
+GBLREF	boolean_t	gtmSystemMalloc;		/* Use the system's malloc() instead of our own */
+GBLREF	boolean_t	malloccrit_issued;		/* set at time of MALLOCCRIT */
+GBLREF	int		gtmMallocErrorErrno;		/* Errno at point of last failure */
+GBLREF	size_t		gtmMallocErrorSize;		/* Size of last failed malloc */
+GBLREF	size_t		zmalloclim;			/* ISV memory warning of MALLOCCRIT in bytes */
 GBLREF	size_t		totalRmalloc;			/* Total storage allocated through malloc() */
 GBLREF  size_t    	totalRallocGta;                 /* Total storage currently (real) mmap alloc'd */
 GBLREF  size_t     	totalAllocGta;                  /* Total mmap allocated (includes allocation overhead but not free space */
 GBLREF  size_t     	totalUsedGta;                   /* Sum of "in-use" portions (totalAllocGta - overhead) */
+GBLREF	unsigned char	*gtmMallocErrorCallerid;	/* Callerid of last failed malloc */
 static	int		totalAllocs;                    /* Total alloc requests */
 static	int		totalFrees;                     /* Total free requests */
 static	size_t		rAllocMax;                      /* Maximum value of totalRallocGta */
@@ -83,6 +96,7 @@ static	int		freeElemCnt[MAXINDEX + 2];      /* Current count of elements on the 
 static	int		freeElemMax[MAXINDEX + 2];      /* Maximum number of blocks on the free queue */
 
 error_def(ERR_INVDBGLVL);
+error_def(ERR_MALLOCCRIT);
 error_def(ERR_MEMORY);
 error_def(ERR_MEMORYRECURSIVE);
 error_def(ERR_SYSCALL);
@@ -195,6 +209,7 @@ void gtm_text_free(void *addr)
 /* ******* Normal mmap() expansion ******* */
 
 /* These routines for Unix are NOT thread or interrupt safe */
+<<<<<<< HEAD
 #  define TEXT_ALLOC(rsize, addr)										\
 {														\
 	int	save_errno;											\
@@ -206,35 +221,57 @@ void gtm_text_free(void *addr)
 	}													\
  	addr = mmap(NULL, rsize, (PROT_READ + PROT_WRITE + PROT_EXEC), (MAP_PRIVATE + MAP_ANONYMOUS), -1, 0);	\
 	if (MAP_FAILED == addr)											\
+=======
+#  define TEXT_ALLOC(SIZE, ADDR)										\
+MBSTART {													\
+	int	SAVE_ERRNO;											\
+														\
+	ADDR = mmap(NULL, SIZE, (PROT_READ + PROT_WRITE + PROT_EXEC), (MAP_PRIVATE + MAP_ANONYMOUS), -1, 0);	\
+	if (MAP_FAILED == ADDR)											\
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	{													\
 		--gtaSmDepth;											\
                 --fast_lock_count;										\
-		save_errno = errno;										\
-	        if (ENOMEM == save_errno)									\
+		SAVE_ERRNO = errno;										\
+	        if (ENOMEM == SAVE_ERRNO)									\
 		{												\
 			assert(WBTEST_ENABLED(WBTEST_SKIP_CORE_FOR_MEMORY_ERROR));				\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MEMORY, 2, rsize, CALLERID, save_errno);  	\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MEMORY, 2, SIZE, CALLERID, SAVE_ERRNO);	\
 		}												\
-		/* On non-allocate related error, give more general error and assertpro(FALSE) */			\
+		/* On non-allocate related error, give more general error and assertpro(FALSE) */		\
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(14) ERR_SYSCALL, 5, LEN_AND_LIT("mmap()"), CALLFROM,	\
-			       save_errno, 0, ERR_CALLERID, 3, LEN_AND_LIT("TEXT_ALLOC"), CALLERID);		\
-		assertpro(FALSE);											\
+			       SAVE_ERRNO, 0, ERR_CALLERID, 3, LEN_AND_LIT("TEXT_ALLOC"), CALLERID);		\
+		assertpro(FALSE);										\
 	}													\
-}
-#define TEXT_FREE(addr, rsize) 											\
-{														\
-	int	rc, save_errno;											\
-	rc = munmap(addr, rsize);										\
-	if (-1 == rc)												\
+	if (!gtmSystemMalloc && !malloccrit_issued /* totalRmalloc* not available for system malloc */		\
+		&& (0 < zmalloclim) && ((SIZE + totalRmalloc + totalRallocGta) > zmalloclim))			\
+	{	/* Boundary check on zmalloclim */								\
+		gtmMallocErrorSize = SIZE;									\
+		gtmMallocErrorCallerid = CALLERID;								\
+		gtmMallocErrorErrno = ERR_MALLOCCRIT;								\
+		/* doubling here and halving in gtm_env_init accomodate the fact that 				\
+		 * stringpool expansions are large, and if occurring, not easy to gracefully			\
+		 * continue from, which is also related to deferring the MALLOCCRIT error			\
+		 */												\
+		assertpro(!IS_GTMSECSHR_IMAGE);									\
+		malloccrit_issued = TRUE;									\
+		(*xfer_set_handlers_fnptr)(defer_error, ERR_MALLOCCRIT, FALSE);					\
+	}													\
+} MBEND
+#define TEXT_FREE(ADDR, RSIZE) 											\
+MBSTART {													\
+	int	RC, SAVE_ERRNO;											\
+	RC = munmap(ADDR, RSIZE);										\
+	if (-1 == RC)												\
 	{													\
 		--gtaSmDepth;											\
                 --fast_lock_count;										\
-		save_errno = errno;										\
+		SAVE_ERRNO = errno;										\
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(14) ERR_SYSCALL, 5, LEN_AND_LIT("munmap"), CALLFROM,	\
-			       save_errno, 0, ERR_CALLERID, 3, LEN_AND_LIT("TEXT_FREE"), CALLERID);		\
-		assertpro(FALSE);											\
+			       SAVE_ERRNO, 0, ERR_CALLERID, 3, LEN_AND_LIT("TEXT_FREE"), CALLERID);		\
+		assertpro(FALSE);										\
 	}													\
-}
+} MBEND
 #define STE_FP(p) p->userStorage.links.fPtr
 #define STE_BP(p) p->userStorage.links.bPtr
 
@@ -569,6 +606,7 @@ void gtm_text_free(void *addr)
  */
 void printAllocInfo(void)
 {
+#ifndef STATIC_ANALYSIS
         textElem        *eHdr, *uStor;
         int             i;
 
@@ -596,5 +634,6 @@ void printAllocInfo(void)
 				elemSplits[i], elemCombines[i], freeElemCnt[i], freeElemMax[i]);
 		}
 	}
+#endif
 }
 #endif /* COMP_GTA */

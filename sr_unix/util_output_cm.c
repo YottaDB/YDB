@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
@@ -37,7 +37,7 @@
 static unsigned char outbuff[OUT_BUFF_SIZE];
 static unsigned char *outptr;
 
-void util_cm_print(clb_struct *lnk, int code, char *message, int flush, ...)
+void util_cm_print(clb_struct *lnk, int code, char *message, int faocnt, int flush, ...)
 {
 	va_list		var;
 	int4		status, i;
@@ -53,7 +53,7 @@ void util_cm_print(clb_struct *lnk, int code, char *message, int flush, ...)
 	{
 		ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 		util_out_print(NULL, RESET);	/* Clear any pending messages */
-		util_out_print_vaparm(message, NOFLUSH_OUT, var, MAXPOSINT4);
+		util_out_print_vaparm(message, NOFLUSH_OUT, var, faocnt);
 		msglen = (size_t)(TREF(util_outptr) - TREF(util_outbuff_ptr));
 		memcpy(outptr, TREF(util_outbuff_ptr), msglen);
 		outptr += msglen;

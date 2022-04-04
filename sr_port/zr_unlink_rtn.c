@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Copyright (c) 2013-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -39,7 +39,9 @@
  * Parameters:
  *
  *   old_rhead - Old routine header to be processed
- *   free_all  - Currently only true by gtm_unlink_all. If TRUE, releases routine in its entirety - nothing stays behind.
+ *   free_all  - If TRUE, releases routine in its entirety - nothing stays behind. When using TRUE,
+ *               consider using DEFER_INTERRUPTS(INTRPT_IN_RTN_CLEANUP, prev_intrpt_state) if you
+ *               have not previously removed the routine name from the rtn_table name.
  *               If FALSE, only the "releasable" sections as noted in comments of obj_code.c are released.
  *
  * Note when a "normal" routine is re-linked, not all of it is removed. Both the original routine header and the label

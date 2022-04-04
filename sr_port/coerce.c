@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2019 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2022 Fidelity National Information	*
+>>>>>>> eb3ea98c (GT.M V7.0-002)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -81,7 +85,7 @@ void coerce(oprtype *a, enum octype_t new_type)
 			}
 			ref->opcode = OC_ILIT;
 			ref->operand[0].oprclass = ILIT_REF;
-			ref->operand[0].oprval.ilit = MV_FORCE_INTD(&(lit->v));
+			ref->operand[0].oprval.ilit = MV_FORCE_INTD(&(lit->v)); /* All literals, neg/pos, are allowed */
 			return;
 		default:
 			break;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -85,7 +85,7 @@ cm_op_t gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 		pctl2 = pctl;
 		REL_LOCK_CRIT(pctl, was_crit);
 		pctl2.ctl = lke_ctl;
-		util_cm_print(lnk, 0, NULL, RESET);
+		util_cm_print(lnk, 0, NULL, 0, RESET);
 		dnode.len = sreq->nodelength;
 		dnode.addr = sreq->node;
 		if (lke_ctl->blkroot != 0)

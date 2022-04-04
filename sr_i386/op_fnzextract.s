@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2006, 2008 Fidelity Information Services, Inc	#
+# Copyright (c) 2006-2022 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -67,6 +68,9 @@ l10:	movl	last(%ebp),%edx		# edx - last
 	movw	$mval_m_str,mval_w_mvtype(%edi)	# always a string
 	movl	mval_l_strlen(%esi),%ecx	# ecx - src. str. len.
 	cmpl	%eax,%ecx		# if left index > str. len,
+						# then null result
+	jl	l25
+	cmpl	$0,%edx			# if left index < 0,
 						# then null result
 	jl	l25
 	cmpl	%edx,%ecx		# right index may be at most the len.

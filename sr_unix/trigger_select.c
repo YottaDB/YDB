@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -252,6 +252,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 	{
 		mv_trig_cnt_ptr = &trigger_count;
 		count = MV_FORCE_INT(mv_trig_cnt_ptr);
+		assert(0 < count);
 		BUILD_HASHT_SUB_SUB_CURRKEY(gbl_name, gbl_name_len, LITERAL_HASHLABEL, STRLEN(LITERAL_HASHLABEL));
 		if (!gvcst_get(&trigger_value))
 		{	/* There has to be a #LABEL */
@@ -785,7 +786,7 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 	}
 	if (dump_all)
 		dump_all_triggers();
-	else
+	else if (0 < select_list_len)
 	{
 		sel_ptr = STRTOK_R(save_select_list, ",", &strtok_ptr);
 		assert(0 != select_list_len);	/* or else "dump_all" would have been TRUE and we would have gone to "if" above */
@@ -796,6 +797,8 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 		}
 		do
 		{
+			if (NULL == sel_ptr)	/* Unlikely event that the first return is NULL */
+				break;
 			trig_name = ('^' != *sel_ptr);
 			ptr1 = sel_ptr;
 			len1 = STRLEN(ptr1);

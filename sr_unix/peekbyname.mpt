@@ -97,12 +97,17 @@
 	.	set:""=format format=$select(type["uint":"U",type["unsigned":"U",1:"")
 	.	set:""=format format=$select(type["int":"I",1:"")
 	.	; miscellaneous whitelist of non-standard types
+<<<<<<< HEAD
 	.	set:""=format format=$select("boolean_t"=type:"I","_Bool"=type:"I","time_t"=type:"I","gtm_timet"=type:"I",1:"")
 	.	set:""=format format=$select("size_t"=type:"U",1:"")
 	.	; POSIX defines dev_t to be an integer type and ino_t to be an unsigned integer type
 	.	set:""=format format=$select("ino_t"=type:"U","dev_t"=type:"I",1:"")
 	.	; An "unsigned short" would have already been handled in the `type["unsigned"` check above. Handle "short" here.
 	.	set:""=format format=$select("short"=type:"I",1:"")
+=======
+	.	set:""=format format=$select("boolean_t"=type:"I","time_t"=type:"I","gtm_timet"=type:"I","size_t"=type:"U",1:"")
+	.	set:""=format format=$select("_Bool"=type:"I",1:"")
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	.	do:""=format error("UNSUPTYPE",type)
 	set $etrap=etrap
 	; determine if this is an array

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -52,11 +52,10 @@
 #include "dollar_quit.h"
 #include "ztimeout_routines.h"
 #include "mlkdef.h"
-#ifdef UNIX
-#  include "iormdef.h"
-#  ifdef DEBUG
-#    include "wbox_test_init.h"
-#  endif
+#include "iormdef.h"
+#include "toktyp.h"
+#ifdef DEBUG
+#  include "wbox_test_init.h"
 #endif
 
 #define ESC_OFFSET		4
@@ -72,8 +71,12 @@ GBLREF mlk_subhash_val_t	mlk_last_hash;
 GBLREF mstr			dollar_zchset, dollar_zpatnumeric, dollar_zpin, dollar_zpout;
 GBLREF mval			dollar_estack_delta, dollar_job, dollar_system, dollar_zdir, dollar_zerror, dollar_zgbldir;
 GBLREF mval			dollar_zinterrupt, dollar_zproc, dollar_zsource, dollar_zstatus, dollar_ztexit, dollar_zyerror;
+<<<<<<< HEAD
 GBLREF mval			dollar_zcmdline;
 GBLREF size_t			totalAlloc, totalAllocGta, totalRmalloc, totalRallocGta, totalUsed, totalUsedGta;
+=======
+GBLREF size_t			totalAlloc, totalAllocGta, totalRmalloc, totalRallocGta, totalUsed, totalUsedGta, zmalloclim;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 GBLREF spdesc			stringpool;
 GBLREF stack_frame		*frame_pointer;
 GBLREF uint4			dollar_tlevel, dollar_trestart, dollar_zjob;
@@ -109,14 +112,22 @@ LITREF int4		ydb_release_name_len;
 
 void op_svget(int varnum, mval *v)
 {
+<<<<<<< HEAD
 	io_log_name	*tl;
 	int 		count;
 	gtm_uint64_t	ucount;
 	char		*c1, *c2;
 	mval		*mvp;
 #	ifdef UNIX
+=======
+	boolean_t	lcl_compile_time;
+	char		*c1, *c2, director_token;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	d_rm_struct	*d_rm;
-#	endif
+	gtm_uint64_t	ucount;
+	int 		count;
+	io_log_name	*tl;
+	mval		*mvp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -627,6 +638,9 @@ void op_svget(int varnum, mval *v)
 			count = stringpool.strpllim;
 			MV_FORCE_MVAL(v, count);
 			break;
+		case SV_ZMALLOCLIM:
+			MV_FORCE_UMVAL(v, zmalloclim);
+			break;
 		case SV_ZTIMEOUT:
 			count = get_ztimeout(v);
 			if (-1 == count)
@@ -638,6 +652,7 @@ void op_svget(int varnum, mval *v)
 		default:
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVSVN);
 	}
+<<<<<<< HEAD
 	if (!(MVTYPE_IS_SQLNULL(v->mvtype)))
 	{
 		if (!(MVTYPE_IS_STRING(v->mvtype)))
@@ -654,5 +669,21 @@ void op_svget(int varnum, mval *v)
 			s2n(v);
 			TREF(compile_time) = lcl_compile_time;
 		}
+=======
+	if (!(MVTYPE_IS_STRING(v->mvtype)))
+	{	/* in case op_svget is called at compile time; shouldn't hurt much any time */
+		assert(MVTYPE_IS_NUMERIC(v->mvtype));
+		n2s(v);
+	} else if (!(MVTYPE_IS_NUMERIC(v->mvtype)))
+	{	/* need to stop NUMOFLOW errors from preventing access to ISV values that s2n would flag as out of range */
+		assert(MVTYPE_IS_STRING(v->mvtype));
+		lcl_compile_time = TREF(compile_time);
+		director_token = TREF(director_token);
+		TREF(director_token) = TK_STRLIT;
+		TREF(compile_time) = TRUE;
+		s2n(v);
+		TREF(director_token) = director_token;
+		TREF(compile_time) = lcl_compile_time;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	}
 }

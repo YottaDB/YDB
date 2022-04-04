@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2014 Fidelity Information Services, Inc		*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2014-2022 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> eb3ea98c (GT.M V7.0-002)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +36,8 @@ rtnobj_hdr_t	*remqh_rtnobj(que_ent_ptr_t base, sm_uc_ptr_t shm_base);
 void		remq_rtnobj_specific(que_ent_ptr_t que_base, sm_uc_ptr_t shm_base, rtnobj_hdr_t *rtnobj);
 sm_uc_ptr_t	rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t obj_size, gtm_uint64_t objhash);
 void		rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed);
+rtnobj_hdr_t	*rtnobj_retpos(open_relinkctl_sgm *linkctl, rtnobj_sm_off_t shm_index_off);
+void		rtnobj_integ(relinkrec_t *relinkrec, open_relinkctl_sgm *linkctl);
 
 #endif
 

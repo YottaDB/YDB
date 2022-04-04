@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> eb3ea98c (GT.M V7.0-002)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +32,11 @@
 GBLREF connection_struct *curr_entry;
 GBLREF mlk_pvtblk *mlk_cm_root;
 
+<<<<<<< HEAD
 cm_op_t gtcmtr_lkreqimmed(void)
+=======
+char gtcmtr_lkreqimmed(void)
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 {
 	unsigned char *ptr, return_val;
 	cm_region_list *reg_walk;

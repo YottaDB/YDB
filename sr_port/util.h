@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -71,6 +71,7 @@ void		util_out_syslog_dump(void);
 }
 
 #define OUT_BUFF_SIZE	2048
+#define PUT_BUFF_SIZE	1024
 #define NOFLUSH_OUT	0
 #define FLUSH		1
 #define RESET		2
@@ -97,8 +98,9 @@ void util_exit_handler(void);
 void util_out_close(void);
 void util_out_send_oper(char *addr, unsigned int len);
 void util_out_print(caddr_t message, int flush, ...);
+void util_out_print_args(caddr_t message, int faocnt, int flush, ...);
 
 #include "cmidef.h"	/* for clb_struct */
-void util_cm_print(clb_struct *lnk, int code, char *message, int flush, ...);
+void util_cm_print(clb_struct *lnk, int code, char *message, int faocnt, int flush, ...);
 
 #endif /* UTIL_included */

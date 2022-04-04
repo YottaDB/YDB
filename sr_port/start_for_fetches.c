@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +13,9 @@
 #include "mdef.h"
 #include "compiler.h"
 #include "opcode.h"
+#include "start_fetches.h"
 
-GBLREF int4	curr_fetch_count;
 GBLREF mvax	*mvaxtab;
-GBLREF triple	*curr_fetch_opr, *curr_fetch_trip;
 
 /* When in the body of a FOR loop, we need to maintain the binding for the control variable.
  * If the action of a command (or function) can alter the symbol table, e.g. BREAK or NEW,
@@ -28,12 +28,14 @@ void start_for_fetches(void)
 	triple	*fetch_trip, *ref1, *ref2;
 	int	fetch_count, idiff, index;
 	mvax	*idx;
+	DCL_THREADGBL_ACCESS;
 
-	fetch_trip = curr_fetch_trip;
-	fetch_count = curr_fetch_count;
-	start_fetches(OC_FETCH);
+	SETUP_THREADGBL_ACCESS;
+	fetch_trip = (TREF(fetch_control)).curr_fetch_trip;
+	fetch_count = (TREF(fetch_control)).curr_fetch_count;
+	START_FETCHES(OC_FETCH);
 	ref1 = fetch_trip;
-	ref2 = curr_fetch_trip;
+	ref2 = (TREF(fetch_control)).curr_fetch_trip;
 	idx = mvaxtab;
 	while (ref1->operand[1].oprclass)
 	{
@@ -62,8 +64,8 @@ void start_for_fetches(void)
 			}
 		}
 		assert(idx->mvidx == index);
-		idx->var->last_fetch = curr_fetch_trip;
+		idx->var->last_fetch = (TREF(fetch_control)).curr_fetch_trip;
 	}
-	curr_fetch_count = fetch_count;
-	curr_fetch_opr = ref2;
+	(TREF(fetch_control)).curr_fetch_count = fetch_count;
+	(TREF(fetch_control)).curr_fetch_opr = ref2;
 }

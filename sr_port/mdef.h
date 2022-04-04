@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -110,7 +110,11 @@
 
 #include <inttypes.h>
 #include <stdarg.h>
+<<<<<<< HEAD
 
+=======
+#include <stdbool.h>
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 #include "mdefsa.h"
 #include "gtm_common_defs.h"
 #include "mdefsp.h"
@@ -350,8 +354,13 @@ typedef UINTPTR_T uintszofptr_t;
 #define BITS_PER_UCHAR	8 /* note, C does not require this to be 8, see <limits.h> for definitions of CHAR_BIT and UCHAR_MAX */
 
 #define MAXPOSINT4		((int4)0x7fffffff)
+<<<<<<< HEAD
 #define MAX_DIGITS_IN_INT4	10	/* maximum number of decimal digits in a  4-byte integer */
 #define MAX_DIGITS_IN_INT	MAX_DIGITS_IN_INT4
+=======
+#define MINNEGINT4		((int4)0x80000000)
+#define MAX_DIGITS_IN_INT	10	/* maximum number of decimal digits in a  4-byte integer */
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 #define MAX_DIGITS_IN_INT8	20	/* maximum number of decimal digits in an 8-byte integer */
 #define MAX_HEX_DIGITS_IN_SHORT	 4	/* maximum number if hexadecimal digits in a  2-byte integer */
 #define MAX_HEX_DIGITS_IN_INT	 8	/* maximum number of hexadecimal digits in a  4-byte integer */
@@ -368,6 +377,7 @@ typedef UINTPTR_T uintszofptr_t;
 #define MAX_LONG_IN_DOUBLE	0xFFFFFFFFFFFFF /*Max Fraction part in IEEE double format*/
 #define MAX_INT_IN_BYTE		255
 
+<<<<<<< HEAD
 /* We used to previously define a "bool" type here as "char". But this conflicted with the "bool" type (defined as "_Bool")
  * in "stdbool.h" and included by various system header files (e.g. unicode/uchar.h -> unicode/utypes.h -> unicode/umachine.h)
  * which in turn showed up as [-Wlto-type-mismatch] warnings when YDB was built using gcc 11.2 or higher in a Ubuntu 22.04 system
@@ -377,6 +387,13 @@ typedef UINTPTR_T uintszofptr_t;
  */
 #include <stdbool.h>	/* this defines "bool" type (as _Bool) */
 
+=======
+#ifndef _AIX
+#	ifndef __sparc
+	typedef int		boolean_t;
+#	endif
+#endif
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 typedef unsigned char	mreg;
 typedef int4		mint;
 

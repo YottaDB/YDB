@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -50,6 +50,7 @@ GBLREF	volatile boolean_t	timer_in_handler;
 error_def(ERR_NOREGION);
 error_def(ERR_NOTGBL);
 error_def(ERR_VIEWARGCNT);
+error_def(ERR_VIEWARGTOOLONG);
 error_def(ERR_VIEWGVN);
 error_def(ERR_VIEWLVN);
 error_def(ERR_VIEWREGLIST);
@@ -63,7 +64,12 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 	gvnh_spanreg_t		*gvspan;
 	gv_namehead		*tmp_gvt;
 	ht_ent_mname		*tabent;
+<<<<<<< HEAD
 	int			cmp, i, n, reg_index, targ;
+=======
+	int			cmp, len, n, reg_index, targ;
+	mident_fixed		lcl_buff;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	mname_entry		gvent, lvent;
 	mident_fixed		lcl_buff;
 	mstr			namestr, tmpstr;
@@ -272,6 +278,12 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				gvt_pending_buddy_list = (buddy_list *)malloc(SIZEOF(buddy_list));
 				initialize_list(gvt_pending_buddy_list, SIZEOF(gvt_container), NOISOLATION_INIT_ALLOC);
 			}
+<<<<<<< HEAD
+=======
+			if ((0 > parm->str.len) || (MAX_PARMS < (size_t)parm->str.len))
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_VIEWARGTOOLONG, 4, parm->str.len,
+					strlen((const char *)vtp->keyword), vtp->keyword, MAX_PARMS);
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 			tmpstr.len = parm->str.len;	/* we need to change len and should not change parm->str, so take a copy */
 			tmpstr.addr = parm->str.addr;
 			if (0 != tmpstr.len)
@@ -292,6 +304,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 						parmblk->ni_list.type = NOISOLATION_NULL;
 						break;
 				}
+<<<<<<< HEAD
 			}
 			if (0 == tmpstr.len)
 			{
@@ -307,6 +320,25 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				src = nextsrc;
 				assert(src < src_top);
 				for ( ; ; )
+=======
+				if (!tmpstr.len) /* Nothing beyond the "+/-" */
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, tmpstr.len, NULL);
+				memcpy(global_names, tmpstr.addr, tmpstr.len);
+				global_names[tmpstr.len] = '\0';
+				src = (unsigned char *)STRTOK_R((char *)global_names, ",", &strtokptr);
+				if (NULL == src)
+				{
+					if (MAX_MIDENT_LEN < parm->str.len)
+						parm->str.len = MAX_MIDENT_LEN;
+					memcpy(&lcl_buff.c[0], parm->str.addr, parm->str.len);
+					n = MAX_PARMS;
+					format2zwr((sm_uc_ptr_t)&lcl_buff.c, parm->str.len, global_names, &n);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
+				}
+				REINITIALIZE_LIST(noisolation_buddy_list);	/* reinitialize the noisolation buddy_list */
+				parmblk->ni_list.gvnh_list = NULL;
+				for ( ; src < &global_names[tmpstr.len + 1]; src = nextsrc)
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 				{
 					if (',' == *nextsrc)
 						break;
@@ -361,6 +393,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					 */
 					if (NULL == (gvspan = gvnh_reg->gvspan))
 					{
+<<<<<<< HEAD
 						ADD_TO_GVT_PENDING_LIST_IF_REG_NOT_OPEN(r_ptr, &gvnh_reg->gvt, NULL);
 					} else
 					{
@@ -372,6 +405,90 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 						reg_index -= gvspan->min_reg_index;
 						ADD_TO_GVT_PENDING_LIST_IF_REG_NOT_OPEN(r_ptr,
 							&gvspan->gvt_array[reg_index], &gvnh_reg->gvt);
+=======
+						namestr.addr = (char *)src + 1;		/* skip initial '^' */
+						namestr.len = INTCAST(nextsrc - src - 2); /* don't count initial ^ and trailing 0 */
+						if (namestr.len > MAX_MIDENT_LEN)
+							namestr.len = MAX_MIDENT_LEN;
+						if (valid_mname(&namestr))
+						{
+							memcpy(&lcl_buff.c[0], namestr.addr, namestr.len);
+							gvent.var_name.len = namestr.len;
+						} else
+						{
+							len = INTCAST(nextsrc - src - 1);
+							if (MAX_MIDENT_LEN < len)
+								len = MAX_MIDENT_LEN;
+							memcpy(&lcl_buff.c[0], src, len);
+							n = MAX_PARMS;
+							format2zwr((sm_uc_ptr_t)&lcl_buff.c, len, global_names, &n);
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
+						}
+					} else
+					{
+						len = INTCAST(nextsrc - src - 1);
+						if (MAX_MIDENT_LEN < len)
+							len = MAX_MIDENT_LEN;
+						memcpy(&lcl_buff.c[0], src, len);
+						PUSH_MV_STENT(MVST_MVAL);
+						tmpmv = &mv_chain->mv_st_cont.mvs_mval;
+						tmpmv->mvtype = MV_STR;
+						n = ZWR_EXP_RATIO(len);
+						ENSURE_STP_FREE_SPACE(n);
+						tmpmv->str.addr = (char *)stringpool.free;
+						format2zwr((sm_uc_ptr_t)&lcl_buff.c, len, (uchar_ptr_t)stringpool.free, &n);
+						stringpool.free += n;
+						tmpmv->str.len = n;
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, n, tmpmv->str.addr);
+					}
+					tmp_gvt = NULL;
+					gvent.var_name.addr = &lcl_buff.c[0];
+					COMPUTE_HASH_MNAME(&gvent);
+					if (NULL != (tabent = lookup_hashtab_mname(gd_header->tab_ptr, &gvent)))
+					{
+						gvnh_reg = (gvnh_reg_t *)tabent->value;
+						assert(NULL != gvnh_reg);
+						tmp_gvt = gvnh_reg->gvt;
+					} else
+					{
+						gd_map = gv_srch_map(gd_header, gvent.var_name.addr, gvent.var_name.len,
+													SKIP_BASEDB_OPEN_FALSE);
+						r_ptr = gd_map->reg.addr;
+						tmp_gvt = (gv_namehead *)targ_alloc(r_ptr->max_key_size, &gvent, r_ptr);
+						GVNH_REG_INIT(gd_header, gd_header->tab_ptr, gd_map, tmp_gvt,
+											r_ptr, gvnh_reg, tabent);
+						/* In case of a global spanning multiple regions, the gvt pointer corresponding to
+						 * the region where the unsubscripted global reference maps to is stored in TWO
+						 * locations (one in gvnh_reg->gvspan->gvt_array[index] and one in gvnh_reg->gvt.
+						 * So pass in both these pointer addresses to be stored in the pending list in
+						 * case this gvt gets reallocated (due to different keysizes between gld and db).
+						 */
+						if (NULL == (gvspan = gvnh_reg->gvspan))
+						{
+							ADD_TO_GVT_PENDING_LIST_IF_REG_NOT_OPEN(r_ptr, &gvnh_reg->gvt, NULL);
+						} else
+						{
+							gd_reg_start = &gd_header->regions[0];
+							GET_REG_INDEX(gd_header, gd_reg_start, r_ptr, reg_index);
+								/* the above sets "reg_index" */
+							assert(reg_index >= gvspan->min_reg_index);
+							assert(reg_index <= gvspan->max_reg_index);
+							reg_index -= gvspan->min_reg_index;
+							ADD_TO_GVT_PENDING_LIST_IF_REG_NOT_OPEN(r_ptr,
+								&gvspan->gvt_array[reg_index], &gvnh_reg->gvt);
+						}
+					}
+					ADD_GVT_TO_VIEW_NOISOLATION_LIST(tmp_gvt, parmblk);
+					if (!is_dollar_view && (NULL != gvnh_reg->gvspan))
+					{	/* Global spans multiple regions. Make sure gv_targets corresponding to ALL
+						 * spanned regions are allocated so NOISOLATION status can be set in all of
+						 * them even if the corresponding regions are not open yet. Do this only for
+						 * VIEW "NOISOLATION" commands which change the noisolation characteristic.
+						 * $VIEW("NOISOLATION") only examines the characteristics and so no need to
+						 * allocate all the gv-targets in that case. Just one is enough.
+						 */
+						gvnh_spanreg_subs_gvt_init(gvnh_reg, gd_header, parmblk);
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 					}
 				}
 				ADD_GVT_TO_VIEW_NOISOLATION_LIST(tmp_gvt, parmblk);

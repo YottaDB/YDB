@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -193,6 +193,13 @@ typedef struct
 	char			uo_type;
 	enum octype_t		opr_type;
 } toktabtype;
+
+typedef struct
+{
+	triple	*curr_fetch_trip;
+	triple	*curr_fetch_opr;
+	int4	curr_fetch_count;
+} fetch_ctrl;
 
 /* These two structures really belong in glvn_pool.h, but gtmpcat doesn't know to include that file. So put them here for now. */
 #include "callg.h"
@@ -527,16 +534,6 @@ typedef struct
 	} else if (TREF(for_stack_ptr) > (oprtype **)TADR(for_stack))						\
 		--(TREF(for_stack_ptr));									\
 }
-
-/* The following macro should be used when doing an OC_FETCH other than at the start of a line because
- * it deals with the possibility that there is a preceding FOR, in which case, we use start_for_fetches to
- * be sure the new fetch includes any FOR loop control variable
- */
-#define MID_LINE_REFETCH											\
-	if (TREF(for_stack_ptr) == TADR(for_stack))								\
-		start_fetches(OC_FETCH);									\
-	else	/* if in the body of a FOR loop we need to ensure the control variable is refetched */		\
-		start_for_fetches();
 
 /* $TEXT(+n^rtn) fetches from the most recently ZLINK'd version of rtn. $TEXT(+n) fetches from the currently executing version.
  * The compiler converts $TEXT(+n) to $TEXT(+n^!), indicating at runtime $TEXT should fetch from the current executing routine.
@@ -987,7 +984,6 @@ boolean_t	litref_triple_oprcheck(oprtype *operand);
 #		else
 void		shrink_jmps(void);
 #		endif
-void		start_fetches(opctype op);
 void		start_for_fetches(void);
 void		tnxtarg(oprtype *a);
 void		tripinit(void);

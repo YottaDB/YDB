@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
@@ -15,6 +15,9 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
+#include "io.h"
+#include <rtnhdr.h>
 #include "xfer_enum.h"
 #include "tp_timeout.h"
 #include "deferred_events.h"
@@ -27,6 +30,7 @@
 #include "deferred_events_queue.h"
 #include "stack_frame.h"
 #include "error.h"
+#include "ztimeout_routines.h"
 
 /* =============================================================================
  * EXTERNAL VARIABLES
@@ -36,10 +40,22 @@
 GBLREF boolean_t		is_tracing_on;				/* M profiling */
 GBLREF boolean_t		tp_timeout_set_xfer;
 GBLREF intrpt_state_t		intrpt_ok_state;
+GBLREF io_pair			io_std_device;
+GBLREF size_t			gtmMallocErrorSize;			/* Size of malloc limit violation */
 GBLREF stack_frame		*frame_pointer;
+GBLREF unsigned char		*gtmMallocErrorCallerid;		/* Callerid of malloc limit violation */
+GBLREF unsigned char		*restart_ctxt, *restart_pc;
+GBLREF void			(*tp_timeout_action_ptr)(void);
 GBLREF volatile boolean_t	dollar_zininterrupt;
 GBLREF volatile int4		fast_lock_count, outofband;		/* fast_lock_count protects some non-reentrant code */
 GBLREF xfer_entry_t		xfer_table[];				/* transfer table */
+
+error_def(ERR_CTRAP);
+error_def(ERR_CTRLC);
+error_def(ERR_MALLOCCRIT);
+error_def(ERR_TERMHANGUP);
+error_def(ERR_TERMWRITE);
+error_def(ERR_JOBINTRRQST);
 
 /* ----------------------------------------------------------------------------
  * Establish only first received; queue others; discard multiples of the same
@@ -73,44 +89,53 @@ boolean_t xfer_set_handlers(int4  event_type, int4 param_val, boolean_t popped_e
 	SETUP_THREADGBL_ACCESS;
 	assertpro(DEFERRED_EVENTS > event_type);
 	entry = &TAREF1(save_xfer_root, event_type);
+	entry->param_val = param_val;
 	if ((INTRPT_IN_EVENT_HANDLING == intrpt_ok_state) && !popped_entry && (no_event != event_type))
-	{	/* events already in flux - stash this as in the record for this event */
+	{	/* events already in flux - stash this "as is" in the record for this event */
 		if (not_in_play == entry->event_state)
 			entry->event_state = signaled;
-		return TRUE;						/* currently only used by tp_timeout.c */
+		DBGDFRDEVNT((stderr, "%d %s: xfer_set_handlers - stashed: %d with state: %d\n", __LINE__, __FILE__, e_type,
+			TAREF1(save_xfer_root, e_type).event_state));
+		return TRUE;						/* return value currently only used by tp_timeout.c */
 	}
 	/* WARNING! AIO sets multi_thread_in_use which disables DEFER_INTERRUPTS, treat it like an active event */
 	if (!(already_ev_handling = ((INTRPT_IN_EVENT_HANDLING == intrpt_ok_state) || multi_thread_in_use)))
 		DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);	/* ensure ownership of the event mechanism */
 	if (dollar_zininterrupt && (jobinterrupt == event_type))
-	{	/* ignore jobinterrupt flooding */
-		real_xfer_reset(jobinterrupt);
-		TAREF1(save_xfer_root, jobinterrupt).event_state = not_in_play;
+	{	/* ignore jobinterrupt flooding; expect too many to report with DBGDFRDEVNT; might also gather a count */
 		if (!already_ev_handling)
 			ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
 		return TRUE;
 	}
-	if (queued == entry->event_state)
-	{	/* Fast path, if not already handling an event, from queue to pending for event already popped from the queue,
-		 * but still in the queued state
-		 */
-		if (!popped_entry && (no_event == outofband) && (!already_ev_handling))
+	if (!already_ev_handling && (queued == entry->event_state))
+	{	/* Fast path, if not already handling as queued */
+		if (!popped_entry && (no_event == outofband))
 		{	/* this event is at the head of the queue so pop it here */
 			POP_XFER_QUEUE_ENTRY(&e_type, &pv);
 			DBGDFRDEVNT((stderr, "%d %s: xfer_set_handlers - popped: %d with state: %d\n", __LINE__, __FILE__,
 				     e_type, TAREF1(save_xfer_root, e_type).event_state));
-			if (e_type != event_type)
+			DEBUG_ONLY(popped_entry = TRUE);
+			if ((no_event != e_type) && (e_type != event_type))
 			{
 				if (not_in_play != TAREF1(save_xfer_root, e_type).event_state)
-				{
+				{	/* give previously enqueued event priority */
 					assert(queued == TAREF1(save_xfer_root, event_type).event_state);
 					event_type = e_type;
 				} else
-					assert(FALSE);
+					assert(FALSE);	/* the dequeued item should be active, but is not!!! */
+				DBGDFRDEVNT((stderr, "%d %s: xfer_set_handlers - popped event_type = %d\n", __LINE__, __FILE__,
+					event_type));
 			}
 		}
+<<<<<<< HEAD
 		DBGDFRDEVNT((stderr, "%d %s: xfer_set_handlers - %sevent_type = %d\n", __LINE__, __FILE__,
 			     popped_entry ? "popped " : "", event_type));
+=======
+	}
+	if (!already_ev_handling)
+	{
+		assert(no_event == outofband || (event_type == outofband));
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 		assert(!dollar_zininterrupt || (jobinterrupt != event_type));
 		if (entry != (TREF(save_xfer_root_ptr))->ev_que.fl)
 		{	/* no event in play so pend this one by jiggeriing the xfer_table */
@@ -127,15 +152,14 @@ boolean_t xfer_set_handlers(int4  event_type, int4 param_val, boolean_t popped_e
 		return TRUE;
 	}
 	if (not_in_play != entry->event_state)
-	{	/* each event only gets one chance at a time */
+	{	/* each event only gets one chance at a time and this one is active, so discard duplicate */
 		DBGDFRDEVNT((stderr, "%d %s: xfer_set_handlers - already in process event: %d with state: %d\n",
 			     __LINE__, __FILE__,event_type, entry->event_state));
 		if (!already_ev_handling)
 			ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
 		return TRUE;
 	}
-	if ((no_event == outofband) && (!dollar_zininterrupt || ((tptimeout != event_type) && (ztimeout != event_type)))
-			&& (!already_ev_handling))
+	if (!already_ev_handling && (no_event == outofband) && (!have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)))
 	{	/* no competion or blocking interrupt: collect $200 and go straight to pending */
 		/* -------------------------------------------------------
 		 * If table changed, it was not synchronized.
@@ -192,8 +216,9 @@ boolean_t xfer_set_handlers(int4  event_type, int4 param_val, boolean_t popped_e
 }
 
 boolean_t xfer_reset_if_setter(int4 event_type)
-{	/* reset the state and potentially the transfer table for a particular event that needs canceling */
+{	/* if the transfer table has been changed to activate event_type, return it to "normal," otherwise leve it alone */
 	boolean_t	already_ev_handling, res;
+	int4		dummy;
 	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
@@ -201,89 +226,44 @@ boolean_t xfer_reset_if_setter(int4 event_type)
 	/* WARNING! AIO sets multi_thread_in_use which disables DEFER_INTERRUPTS, treat it like an active event */
 	if (!(already_ev_handling = ((INTRPT_IN_EVENT_HANDLING == intrpt_ok_state) || multi_thread_in_use)))
 		DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
-	if ((event_type == outofband) || ((no_event == outofband) && (tptimeout == event_type ? tp_timeout_set_xfer
-		: (jobinterrupt == event_type) ? dollar_zininterrupt : (ztimeout == event_type ? TRUE
-		: (ctrlc == event_type) ? TRUE : FALSE))))
+	switch (outofband)
 	{
-		DBGDFRDEVNT((stderr, "%d %s: xfer_reset_if_setter: event_type %d is first\n", __LINE__, __FILE__, event_type));
-		if (res = (active == TAREF1(save_xfer_root, event_type).event_state))			/* WARNING: assignment */
+	case no_event:					/* no outofband to match up with */
+		switch (event_type)
 		{
-			assert(res);
-			res = (real_xfer_reset(event_type));
-		}
-		DBGDFRDEVNT((stderr, "%d %s: xfer_reset_if_setter: xfer_reset_handlers returned %d\n", __LINE__, __FILE__, res));
-		return res;
-	}
-	DBGDFRDEVNT((stderr, "%d %s: xfer_reset_if_setter: event_type %d is but pending event is %d\n", __LINE__, __FILE__,
-		event_type, outofband));
-	if (!already_ev_handling)
-		ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
-	return FALSE;
-}
-
-boolean_t xfer_reset_handlers(int4 event_type)
-{	/* but individual cases and states may get special treatment */
-	boolean_t	to_queue;
-	int 		e_type;
-	int4		state;
-	intrpt_state_t	prev_intrpt_state;
-	save_xfer_entry	*entry;
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-	DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
-	assert(INTRPT_IN_EVENT_HANDLING != prev_intrpt_state);
-#	ifdef DEBUG_DEFERRED_EVENT
-	DBGDFRDEVNT((stderr, "%d %s: xfer_reset_handlers - event: %d\n", __LINE__, __FILE__, event_type));
-	scan_xfer_queue_entries(FALSE);
-#	endif
-	assert(outofband == event_type);
-	if ((event_type != outofband) && (not_in_play == TAREF1(save_xfer_root, event_type).event_state)) /* term 1 protects pro */
-	{	/* no need if state shows the invoking event has no current interest in the xfer table */
-		ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
-		return FALSE;
-	}
-	for (e_type = no_event + 1; DEFERRED_EVENTS > e_type; e_type++)
-	{
-		entry = &TAREF1(save_xfer_root, e_type);
-		to_queue = ((jobinterrupt == event_type) && ((tptimeout == e_type) || (ztimeout == e_type)));
-		state = entry->event_state;
-		switch (state)
-		{
-		case pending:
-			if (zstep_pending == e_type)
-				continue;	/* zsteps tend to repeat unless specifically turned off */
-		case active:
-			if (!to_queue)
-				real_xfer_reset(e_type);	/* WARNING: fallthrough */
-		case signaled:
-			if (!to_queue)
-				entry->event_state = not_in_play;
-			else
-			{	/* if clearing jobinterrupt we leave (z & tp) timeouts queued until that event is over */
-				SAVE_XFER_QUEUE_ENTRY(e_type, TAREF1(save_xfer_root, e_type).param_val);
-				entry->event_state = queued;
-			}					/* WARNING fallthrough */
-		case queued:
+		case jobinterrupt:
+			res = dollar_zininterrupt;	/* might sh/could be an assert & fall through */
+			break;
+		case ctrlc:
+		case sighup:
+		case tptimeout:				/* the caller sets event_state to active */
+		case ztimeout:
+			res = TRUE;
 			break;
 		default:
-			assertpro(num_event_states > state);
+			res = FALSE;
 		}
-		assert((not_in_play == entry->event_state) || (queued == entry->event_state));
-		if (!to_queue)
-		{	/* when resetting doesn't leave queued == event state alone */
-			REMOVE_XFER_QUEUE_ENTRY(e_type);
-			entry->event_state = not_in_play;
-		}
+	default:
+		res = (event_type == outofband);
 	}
-	assert(not_in_play == TAREF1(save_xfer_root, event_type).event_state);
-	TAREF1(save_xfer_root, ctrap).param_val = 0;
-#	ifdef DEBUG_DEFERRED_EVENT
-	DBGDFRDEVNT((stderr, "%d %s: xfer_reset_handlers - event: %d\n", __LINE__, __FILE__, event_type));
-	scan_xfer_queue_entries(FALSE);
-#	endif
-	ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
-	return TRUE;
+	if (res)
+	{	/* it's worth a try */
+		DBGDFRDEVNT((stderr, "%d %s: xfer_reset_if_setter: event_type %d is first\n", __LINE__, __FILE__, event_type));
+		if (res = (active == TAREF1(save_xfer_root, event_type).event_state))	/* WARNING: assignment */
+			res = (real_xfer_reset(event_type));
+		DBGDFRDEVNT((stderr, "%d %s: xfer_reset_if_setter: xfer_reset_handlers returned %d\n", __LINE__, __FILE__, res));
+		if (res && (not_in_play != TAREF1(save_xfer_root, tptimeout).event_state))
+		{	/* give tptimeout some priority */
+			REMOVE_XFER_QUEUE_ENTRY(tptimeout);				/* don't leave it in the queue */
+			if (pending != TAREF1(save_xfer_root, tptimeout).event_state)
+				xfer_set_handlers(tptimeout, dummy, TRUE);		/* param_val not used, hence dummy */
+		}
+	} else
+		DBGDFRDEVNT((stderr, "%d %s: xfer_reset_if_setter: event_type %d is but waiting event is %d\n", __LINE__, __FILE__,
+			event_type, outofband));
+	if (!already_ev_handling)
+		ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
+	return res;
 }
 
 /* ------------------------------------------------------------------
@@ -339,12 +319,10 @@ boolean_t real_xfer_reset(int4 event_type)
 		FIX_XFER_ENTRY(xf_retarg, op_retarg);
 	}
 	FIX_XFER_ENTRY(xf_forloop, op_forloop);
-	TAREF1(save_xfer_root, event_type).event_state = not_in_play;
-	DBGDFRDEVNT((stderr, "%d %s: real_xfer_reset cleared event_type: %d from event_state active to %d\n", __LINE__, __FILE__,
+	DBGDFRDEVNT((stderr, "%d %s: real_xfer_reset cleared event_type: %d from event_state pending to %d\n", __LINE__, __FILE__,
 		     event_type, TAREF1(save_xfer_root, event_type).event_state));
 	REMOVE_XFER_QUEUE_ENTRY(event_type);
 	outofband = no_event;
-	TAREF1(save_xfer_root, event_type).event_state = not_in_play;
 	if (!already_ev_handling)
 		ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
 	/* -------------------------------------------------------------------------
@@ -364,13 +342,14 @@ boolean_t real_xfer_reset(int4 event_type)
 /* This function can be invoked by op_*intrrpt* transfer table functions or by long-running functions that check for pending events.
  * The transfer table adjustments should be active only for a short duration between the occurrence of an outofband event
  * and the handling of it at a logical boundary where we have a captured mpc to allow and appropriate return to normal execution.
- * We don't expect to be running with those transfer table adjustmentss for more than one M-line. If "outofband" is set to 0, the
- * call to"outofband_action" below will do nothing and we will end up running with the op_*intrrpt* transfer table functions
+ * We don't expect to be running with those transfer table adjustmentss for more than one M-line. If "outofband" is set to 0, a
+ * call to async_action below will do nothing and we will end up running with the op_*intrrpt* transfer table functions
  * indefinitely. In this case M-FOR loops are known to return incorrect results which might lead to application integrity issues.
  * It is therefore safer to assertpro, as we will at least have the core for analysis.
  */
 void async_action(bool lnfetch_or_start)
 {
+	boolean_t	ours;
 	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
@@ -394,10 +373,18 @@ void async_action(bool lnfetch_or_start)
 	}
 	DBGDFRDEVNT((stderr, "%d %s: async_action - pending event: %d active\n", __LINE__, __FILE__, outofband));
 	assertpro(DEFERRED_EVENTS > outofband);
+	if (lnfetch_or_start)
+	{
+		frame_pointer->restart_pc = frame_pointer->mpc;
+		frame_pointer->restart_ctxt = frame_pointer->ctxt;
+	}
 	ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);				/* opening a window of race */
+	if ((io_std_device.in->type == tt) && (no_event == TAREF1(save_xfer_root, defer_error).event_state))
+		iott_flush(io_std_device.in);
 	switch (outofband)
 	{
 		case jobinterrupt:
+<<<<<<< HEAD
 			dollar_zininterrupt = TRUE;	/* do this at every point to minimize nesting; WARNING: fallthrough*/
 		case ctrlc:							/* these go from pending to active here */
 		case ctrap:
@@ -408,9 +395,39 @@ void async_action(bool lnfetch_or_start)
 		case ztimeout:
 		case deferred_signal:
 			outofband_action(lnfetch_or_start);	/* which effectively does assertpro(no_event == outofband) */
+=======
+			dollar_zininterrupt = TRUE;	/* do this at every point to minimize nesting */
+			TAREF1(save_xfer_root, outofband).event_state = active;
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBINTRRQST);
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 			break;
-		case (neterr_action):
-			/* network error not implemented here yet - might should move from mdb_condition_handler */
+		case ctrlc:							/* these go from pending to active here */
+			TAREF1(save_xfer_root, outofband).event_state = active;
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CTRLC);
+			break;
+		case ctrap:
+			TAREF1(save_xfer_root, outofband).event_state = active;
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_CTRAP, 1, TAREF1(save_xfer_root, ctrap).param_val);
+			break;
+		case sighup:
+			TAREF1(save_xfer_root, sighup).event_state = pending;
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TERMHANGUP);
+			break;
+		case (defer_error):
+			TAREF1(save_xfer_root, outofband).event_state = active;
+			ours = xfer_reset_if_setter(defer_error);
+			assert(ours);
+			if ((ERR_MALLOCCRIT == TAREF1(save_xfer_root, defer_error).param_val))
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_MALLOCCRIT, 2, gtmMallocErrorSize, gtmMallocErrorCallerid);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_TERMWRITE, 0, TAREF1(save_xfer_root, defer_error).param_val);
+			break;
+		case tptimeout:					/* these have their own action routines that do pending -> active */
+			(*tp_timeout_action_ptr)();
+			break;
+		case ztimeout:
+			ztimeout_action();
+			break;
+		case (neterr_action):	/* netrror_action currently set in assembly routines placed by mdb_condition_handler */
 		case (zstep_pending):
 		case (zbreak_pending):
 			assert(FALSE);	/* ZStep/Zbreak events not not really asynchronous, so they don't come here */

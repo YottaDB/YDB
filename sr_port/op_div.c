@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -20,6 +20,7 @@
 #include "eb_muldiv.h"
 #include "promodemo.h"
 #include "op.h"
+#include "toktyp.h"
 
 LITREF int4	ten_pwr[];
 LITREF mval	literal_zero;
@@ -33,6 +34,7 @@ void	op_div (mval *u, mval *v, mval *q)
 	boolean_t	promo;
 	int4		c, exp;
 	mval		w, z;
+<<<<<<< HEAD
 	int		u_mvtype, v_mvtype;
 
 	/* If u or v is $ZYSQLNULL, the result is $ZYSQLNULL */
@@ -51,6 +53,17 @@ void	op_div (mval *u, mval *v, mval *q)
 	if ((v_mvtype & MV_INT) && (0 == v->m[1]))
 		RTS_ERROR_ABT(VARLSTCNT(1) ERR_DIVZERO);
 	if (u_mvtype & MV_INT & v_mvtype)
+=======
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	MV_FORCE_NUM(u);
+	MV_FORCE_NUM(v);
+	assert((MV_NM | MV_NUM_APPROX) & v->mvtype);
+	if ((0 == v->m[1]) && ((0 == v->m[0]) || (MV_INT & v->mvtype)))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DIVZERO);
+	if (u->mvtype & MV_INT & v->mvtype)
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	{
 		promo = eb_mvint_div(u->m[1], v->m[1], q->m);
 		if (!promo)
@@ -77,8 +90,10 @@ void	op_div (mval *u, mval *v, mval *q)
 	EB_DIV(v, u, q, c);	/* sets "c" based on input parameters "v", "u" and "q" */
 	exp = u->e - v->e + c + MV_XBIAS;
 	if (EXPHI <= exp)
+	{
+		TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* improve hints */
 		rts_error_csa(NULL, VARLSTCNT(1) ERR_NUMOFLOW);	/* BYPASSRTSABT */
-	else if (exp < EXPLO)
+	} else if (exp < EXPLO)
 		*q = literal_zero;
 	else if (exp < EXP_INT_OVERF  &&  exp > EXP_INT_UNDERF  &&  q->m[0] == 0  &&  (q->m[1]%ten_pwr[EXP_INT_OVERF-1-exp] == 0))
 		demote(q, exp, u->sgn ^ v->sgn);

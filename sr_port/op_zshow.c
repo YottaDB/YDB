@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -36,73 +36,66 @@ GBLREF	gv_key	*gv_currkey;
 
 LITREF	mval	literal_null;
 
+LITREF unsigned char lower_to_upper_table[];
+
 error_def(ERR_ZSHOWBADFUNC);
 
 void op_zshow(mval *func, int type, lv_val *lvn)
 {
-	const char	*ptr;
-	boolean_t	do_all = FALSE,
-			done_a = FALSE,
-			done_b = FALSE,
-			done_c = FALSE,
-			done_d = FALSE,
-			done_g = FALSE,
-			done_i = FALSE,
-			done_l = FALSE,
-			done_r = FALSE,
-			done_s = FALSE,
-			done_t = FALSE,
-			done_v = FALSE;
-	int		i;
+	const char	*ptr, *ptr_top;
   	zshow_out	output;
+<<<<<<< HEAD
+=======
+	char		zshow_code;
+	char		reqorder[sizeof(ZSHOW_ALL_ITEMS)];	/* codes in requested order, just once */
+	int		reqcnt;
+	int		done_chars = 0;	/* Bit field of upper case characters found */
+
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	MAXSTR_BUFF_DECL(buff);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(func);
-	for (i = 0, ptr = func->str.addr; i < func->str.len; i++, ptr++)
+	assert(0 <= func->str.len);
+	for (reqcnt = 0, ptr = func->str.addr, ptr_top = ptr + func->str.len; ptr < ptr_top; ptr++)
 	{
-		switch (*ptr)
+		zshow_code = lower_to_upper_table[(unsigned char)*ptr];
+		switch (zshow_code)
 		{
 			case 'A':
-			case 'a':
 			case 'B':
-			case 'b':
 			case 'C':
-			case 'c':
 			case 'D':
-			case 'd':
 			case 'G':
-			case 'g':
 			case 'I':
-			case 'i':
 			case 'L':
-			case 'l':
 			case 'R':
-			case 'r':
 			case 'S':
-			case 's':
 			case 'T':
-			case 't':
 			case 'V':
-			case 'v':
-				continue;
+				if (!(done_chars & (1 << (zshow_code - 'A'))))
+				{	/* New code, put it in the request list and mark it as done */
+					done_chars |= (1 << (zshow_code - 'A'));
+					reqorder[reqcnt++] = zshow_code;
+				}
+				break;
 			case '*':
-				do_all = TRUE;
+				/* '*' requested. Set all character codes as done, including impossible,
+				 * which doubles as the '*' requested flag, because there are only 26
+				 * characters in the alphabet */
+				done_chars = -1;
 				break;
 			default:
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZSHOWBADFUNC);
 		}
 	}
-	if (do_all)
-	{
+	if (-1 == done_chars)
+	{	/* '*' requested, use the default list */
 		ptr = ZSHOW_ALL;
-		i = STR_LIT_LEN(ZSHOW_ALL);
-	} else
-	{
-		ptr = func->str.addr;
-		i = func->str.len;
-	}
+		reqcnt = STR_LIT_LEN(ZSHOW_ALL);
+	} else	/* Use the generated list */
+		ptr = reqorder;
 	memset(&output, 0, SIZEOF(output));
 	assert((ZSHOW_LOCAL == type) || (NULL == lvn));
 	if (ZSHOW_LOCAL == type)
@@ -120,90 +113,52 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 	output.buff = &buff[0];
 	output.size = SIZEOF(buff);
 	output.ptr = output.buff;
-	for ( ; i ; i--, ptr++)
+	/* The order of output is in the requested order of zshow information codes
+	 * NOTE: "*", aka all, has an order of output: "IVBDLGRC" without "A" or "T"
+	 * NOTE: "R" is for stack output with checksums (default for '*')
+	 * 	 "S" is for stack output without checksums
+	 * NOTE: "T" is "G" and "L", reversed order from the above, and with totals only
+	 * NOTE: "A" added with GTM-8160 for AutoRelink to provide the same information
+	 * 	     as MUPIP RCTLDUMP. Due to the volume of information, this is not
+	 * 	     included in "*"
+	 */
+	assert((0 <= reqcnt) && (reqcnt < SIZEOF(reqorder)));
+	for (ptr_top = ptr + reqcnt; ptr < ptr_top; ptr++)
 	{
-		output.line_num = 1;
+		output.line_num = 1;	/* Reset to column 1 */
+		output.code = *ptr;
 		switch (*ptr)
 		{
 			case 'A':
-			case 'a':
-				if (done_a)
-					break;
-				done_a = TRUE;
-				output.code = 'A';
 				ARLINK_ONLY(zshow_rctldump(&output));
 				break;
 			case 'B':
-			case 'b':
-				if (done_b)
-					break;
-				done_b = TRUE;
-				output.code = 'B';
 				zshow_zbreaks(&output);
 				break;
 			case 'C':
-			case 'c':
-				if (done_c)
-					break;
-				done_c = TRUE;
-				output.code = 'C';
 				zshow_zcalls(&output);
 				break;
 			case 'D':
-			case 'd':
-				if (done_d)
-					break;
-				done_d = TRUE;
-				output.code = 'D';
 				zshow_devices(&output);
 				break;
 			case 'G':
-			case 'g':
-				if (done_g)
-					break;
-				done_g = TRUE;
-				output.code = 'G';
 				output.line_num = 0;	/* G statistics start at 0 for <*,*> output and not 1 like the others */
 				zshow_gvstats(&output, FALSE);
 				break;
 			case 'I':
-			case 'i':
-				if (done_i)
-					break;
-				done_i = TRUE;
-				output.code = 'I';
 				zshow_svn(&output, SV_ALL);
 				break;
 			case 'L':
-			case 'l':
-				if (done_l)
-					break;
-				done_l = TRUE;
-				output.code = 'L';
 				output.line_num = 0;	/* L statistics start at 0 for <LUS,LUF> output and not 1 like the others */
 				zshow_locks(&output, FALSE);
 				break;
 			case 'R':
-			case 'r':
-				if (done_r)
-					break;
-				done_r = TRUE;
-				output.code = 'R';
 				zshow_stack(&output, TRUE);	/* show_checksum = TRUE */
 				break;
 			case 'S':
-			case 's':
-				if (done_s)
-					break;
-				done_s = TRUE;
-				output.code = 'S';
 				zshow_stack(&output, FALSE);	/* show_checksum = FALSE */
 				break;
 			case 'T':
-			case 't':
-				if (done_t)
-					break;
-				done_t = TRUE;
 				output.code = 'G';
 				output.line_num = 0;	/* G statistics start at 0 for <*,*> output and not 1 like the others */
 				zshow_gvstats(&output, TRUE);
@@ -212,12 +167,10 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 				zshow_locks(&output, TRUE);
 				break;
 			case 'V':
-			case 'v':
-				if (done_v)
-					break;
-				done_v = TRUE;
-				output.code = 'V';
 				zshow_zwrite(&output);
+				break;
+			default:
+				assert(FALSE);
 				break;
 		}
 		/* If ZSHOW output was redirected to "lvn" but no zshow records got dumped in the subtree under "lvn" as part

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -67,7 +67,11 @@ error_def(ERR_OUTOFSPACE);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 
+<<<<<<< HEAD
 void jobexam_process(mval *dump_file_name, mval *zshowcodes, mval *dump_file_spec)
+=======
+void jobexam_process(mval *dump_file_name, mval *dump_file_spec, mval *fmt)
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 {
 	mval			*input_dump_file_name;
 	io_pair			dev_in_use;
@@ -143,12 +147,17 @@ void jobexam_process(mval *dump_file_name, mval *zshowcodes, mval *dump_file_spe
 		assert(saved_util_outbuff_len <= SIZEOF(saved_util_outbuff));
 		memcpy(saved_util_outbuff, TREF(util_outbuff_ptr), saved_util_outbuff_len);
 	}
+<<<<<<< HEAD
 	/* See comment inside "jobexam_dump()" for why "&dev_in_use" needs to be passed as a parameter */
 	jobexam_dump(input_dump_file_name, dump_file_spec, save_dump_file_name_buff, zshowcodes, &dev_in_use);
 	io_curr_device = dev_in_use;
 	/* If any errors occur in job_exam_dump, the condition handler will unwind the stack to this point
 	 * in the caller frame and continue execution from here.
 	 */
+=======
+	jobexam_dump(input_dump_file_name, dump_file_spec, save_dump_file_name_buff, fmt);
+	/* If any errors occur in job_exam_dump, the condition handler will unwind the stack to this point and return.  */
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	if (0 != saved_util_outbuff_len)
 	{	/* Restore util_outbuff values */
 		memcpy(TREF(util_outbuff_ptr), saved_util_outbuff, saved_util_outbuff_len);
@@ -179,7 +188,11 @@ void jobexam_process(mval *dump_file_name, mval *zshowcodes, mval *dump_file_spe
 /* This routine is broken out as another ep so we can do cleanup processing in jobexam_process if
  * we trigger the condition handler and unwind.
  */
+<<<<<<< HEAD
 void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_file_name_buff, mval *zshowcodes, io_pair *dev_in_use)
+=======
+void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_file_name_buff, mval *fmt)
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 {
 	unsigned char		dump_file_name[DEFAULT_DUMP_FILE_TOTSIZE], *dump_file_name_ptr;
 	mval			def_file_name, parms, zshowops;
@@ -224,6 +237,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
 	/* Open, use, and zshow into new file, then close and reset current io device */
 	op_open(dump_file_spec, &parms, (mval *)&literal_zero, 0);
 	op_use(dump_file_spec, &parms);
+<<<<<<< HEAD
 	zshowops.mvtype = MV_STR;
 	if (0 == zshowcodes->str.len)
 	{
@@ -235,6 +249,20 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
 		zshowops.str.len = zshowcodes->str.len;
 	}
 	op_zshow(&zshowops, ZSHOW_DEVICE, NULL);
+=======
+	zshowall.mvtype = MV_STR;
+	if ( (NULL == fmt) || (0 == fmt->str.len) )
+	{
+		zshowall.str.addr = "*";
+		zshowall.str.len = 1;
+	} else
+	{
+		zshowall.str.addr = fmt->str.addr;
+		zshowall.str.len = fmt->str.len;
+	}
+
+	op_zshow(&zshowall, ZSHOW_DEVICE, NULL);
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	parms.str.addr = (char *)dumpable_error_dump_file_noparms;
 	parms.str.len = SIZEOF(dumpable_error_dump_file_noparms);
 	SAVE_IN_OUT_IS_CURR_DEVICE(lcl_dev_in_use, in_is_curr_device, out_is_curr_device);

@@ -30,7 +30,11 @@
 #include "mvalconv.h"
 #include "numcmp.h"
 #include "promodemo.h"	/* for "demote" prototype used in LV_NODE_GET_KEY */
+<<<<<<< HEAD
 #include "libyottadb_int.h"
+=======
+#include "zshow.h"
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
 GBLREF bool		undef_inhibit;
 GBLREF mv_stent		*mv_chain;
@@ -40,10 +44,17 @@ GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 
 LITREF	mval		literal_null;
 
+<<<<<<< HEAD
 /* Similar to IS_IN_STRINGPOOL macro in stringpool.h but we only need to check the start address and can assume the
  * remainder of the string is in the stringpool (saves some arithmetic)
  */
 #define	IS_ADDR_IN_STRINGPOOL(PTR) ((((unsigned char *)PTR) < stringpool.top) && ((unsigned char *)PTR >= stringpool.base))
+=======
+error_def(ERR_LVNULLSUBS);
+error_def(ERR_MAXSTRLEN);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_STACKCRIT);
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
 error_def(ERR_LVNULLSUBS);
 error_def(ERR_MAXSTRLEN);
@@ -81,8 +92,13 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	boolean_t		found, is_num, is_simpleapi_mode, is_sqlnull, is_str, last_sub_null, nullsubs_implies_firstsub,
 				push_v1;
 	ht_ent_mname		*tabent;
+<<<<<<< HEAD
 	int			i, j, nexti, length, dstlen;
 	lv_val			*lvn, *v, *ve;
+=======
+	int			dst_len, i, j, length;
+	lv_val			*lvn, *lvns[MAX_LVSUBSCRIPTS], *v, *ve;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 	lvTree			*lvt;
 	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS + 1], *node, *nullsubsnode, *nullsubsparent, *parent;
 	mname_entry		lvent;
@@ -358,6 +374,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				(TREF(last_fnquery_return_varname)).str.addr = (char *)stringpool.free;
 				stringpool.free += varname->str.len;
 			} else
+<<<<<<< HEAD
 				(TREF(last_fnquery_return_varname)).str.addr = varname->str.addr;
 			(TREF(last_fnquery_return_varname)).str.len = varname->str.len;
 			(TREF(last_fnquery_return_varname)).mvtype = MV_STR;
@@ -394,6 +411,30 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				is_sqlnull = MV_IS_SQLNULL(mv);
 				/* Do not do collation transformations in case of $ZYSQLNULL */
 				if (TREF(local_collseq) && !is_sqlnull)
+=======
+				v2->str = mv->str;
+			/* Now that v2->str has been initialized, initialize mvtype as well (doing this in the other
+			 * order could cause "stp_gcol" (if invoked in between) to get confused since v2->str is
+			 * not yet initialized with current subscript (in the M-stack).
+			 */
+			v2->mvtype = MV_STR;
+			if (MAX_STRLEN < (dst_len = ZWR_EXP_RATIO(v2->str.len)))
+			{	/* Only do the expansion if there is a possibility of a length issue */
+				ENSURE_STP_FREE_SPACE(dst_len);
+				format2zwr((sm_uc_ptr_t)v2->str.addr, v2->str.len, (uchar_ptr_t)stringpool.free, &dst_len);
+				if (MAX_STRLEN < (v1->str.len + dst_len + 1))
+				{	/* key length + value lenght + ')' */
+					va_end(var);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
+				}
+			}
+			mval_lex(v2, &format_out);
+			if (format_out.addr != (char *)stringpool.free)	/* BYPASSOK */
+			{	/* We must put the string on the string pool ourself - mval_lex didn't do it
+				 * because v2 is a canonical numeric string. It is canonical but has too many
+				 * digits to be treated as a number. It must be output as a quoted string. */
+				if (!IS_STP_SPACE_AVAILABLE(v2->str.len + 2))
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 				{
 					ALLOC_XFORM_BUFF(mv->str.len);
 					assert(NULL != TREF(lcl_coll_xform_buff));

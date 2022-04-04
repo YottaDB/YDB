@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -112,6 +112,7 @@ void op_hang(mval* num)
 	{
 		tmp = mval2double(num) * (double)1000;
 		ms = ((double)MAXPOSINT4 >= tmp) ? (int)tmp : (int)MAXPOSINT4;
+		assert(0 <= ms);
 	}
 	DEBUG_ONLY(orig_ms = ms);
 	if (ms)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2021 Fidelity National Information	*
+ * Copyright (c) 2005-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,6 +78,7 @@ GBLREF	upd_helper_entry_ptr_t	helper_entry;
 GBLREF	uint4			process_id;
 GBLREF	uint4			is_updhelper;
 GBLREF	boolean_t		jnlpool_init_needed;
+GBLREF	gd_addr			*gd_header;
 
 error_def(ERR_NOTALLDBOPN);
 error_def(ERR_RECVPOOLSETUP);
@@ -88,6 +89,7 @@ void updhelper_init(recvpool_user who)
 {
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
 	upd_helper_entry_ptr_t	helper, helper_top;
+	gd_region		*reg, *reg_top;
 
 	is_updhelper = who;
 	getjobnum();
@@ -112,7 +114,13 @@ void updhelper_init(recvpool_user who)
 	helper_entry = helper;
 	gvinit();
 	jnlpool_init_needed = TRUE;
-	if (!region_init(FALSE))
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTALLDBOPN);
+	reg_top = gd_header->regions + gd_header->n_regions;
+	for (reg = gd_header->regions; reg < reg_top; reg++)
+	{	/* Use gvcst_init to set statsdb up, and enable statistics to reader and writer helpers */
+		if (!(reg->open))
+		{
+			gvcst_init(reg, NULL);
+		}
+	}
 	return;
 }

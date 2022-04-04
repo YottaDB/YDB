@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries. *
@@ -298,7 +298,11 @@ void double2mval(mval *dst, double src)
 	return;
 }
 
+<<<<<<< HEAD
 /* Converts an mval into a 32-bit signed integer, or MAXPOSINT4/-MAXPOSINT4 on overflow/underflow. */
+=======
+/* Converts an mval into a 32-bit signed integer, or MAXPOSINT4 on overflow, or MINNEGINT4 on underflow */
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 int4 mval2i(mval *v)
 {
 	int4	i;
@@ -314,7 +318,16 @@ int4 mval2i(mval *v)
 		if (exp > EXP_IDX_BIAL)
 		{
 			j = mval2double(v);
+<<<<<<< HEAD
 			i = (((double)MAXPOSINT4 < j) ? MAXPOSINT4 : ((-(double)MAXPOSINT4 > j) ? -MAXPOSINT4 : (int4)j));
+=======
+			if (MINNEGINT4 > j)
+				i = MINNEGINT4;
+			else if (MAXPOSINT4 < j)
+				i = MAXPOSINT4;
+			else	/* if ((MINNEGINT4 <= j) && (MAXPOSINT4 >= j)) */
+				i = (int4)j;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 		} else if (exp < MV_XBIAS)
 			i = 0;
 		else

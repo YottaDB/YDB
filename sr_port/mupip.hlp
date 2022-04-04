@@ -141,7 +141,7 @@
     -BY[TESTREAM] [-NET[TIMEOUT]]
     -DA[TABASE]
     -[NO]NEWJNLFILES[=[NO]PREVLINK],[NO]S[YNC_IO]]
-    -O[NLINE]
+    -[NO]O[NLINE]
     -REC[ORD]
     -REPLA[CE]
     -RET[RY]=count
@@ -177,11 +177,12 @@
        any element of the destination list is invalid, BACKUP rejects the
        command with an error.
      o region-list may specify more than one region of the current global
-       directory in a list. Regions are case insensitive, separated by a
-       comma, and wildcards can be used to specify them. Any region-name may
-       include the wildcard characters * and % (remember to escape them to
-       protect them from inappropriate expansion by the shell). Any region
-       name expansion occurs in M (ASCII) collation order.
+       directory in a list. Regions are case insensitive and separated by a
+       comma. Any region-name may include the wildcard characters * and ?
+       (remember to escape them to protect them from inappropriate expansion
+       by the shell). Any region name expansion due to wildcards results
+       ordering determined by M (ASCII) collation. MUPIP BACKUP selects
+       regions for backup based on the order specified in the region-list.
      o Depending on the type of backup, destination-list may be a single
        directory, or a comma separated list of destinations including files,
        piped commands, or a TCP socket address (a combination of IPv4 or IPV6
@@ -3599,6 +3600,26 @@
        cause YottaDB to report errors.
      o The default value is never.
 
+3 PROblksplit
+   PROblksplit
+
+   Specifies the approximate number of records a block in the region must
+   exceed before GT.M considers a proactive block split. If the specified
+   value is 0, GT.M does not engage in proactive block splitting. The format
+   of the -PROBLKSPLIT qualifier is:
+
+   -PRO[BLKSPLIT]=integer
+
+     o GT.M makes proactive block splits when a block has a history of
+       causing repeated restarts; GT.M never proactively splits blocks that
+       don't encounter restarts.
+     o Proactive block splits tend to make globals require more blocks and
+       potentially deeper trees.
+     o A value of one (1) indicates to always consider proactive splits,
+       which might be useful for regions used to hold globals with a first
+       subscript of, for example, $job.
+     o The default value is five (5).
+
 3 Qdbrundown
    Qdbrundown
 
@@ -5157,10 +5178,8 @@
    -REDIRECT=gtm.dat=test/gtm.dat -FORWARD is an invalid command because
    -REDIRECT is not compatible with -EXTRACT.
 
-   MUPIP JOURNAL manipulates an inactive journal file that is available for
-   exclusive (standalone) use. You can transcribe Journal files to tape.
-   However, you must always restore them to disk for processing by MUPIP
-   JOURNAL.
+   MUPIP JOURNAL requires an inactive journal file that is available for
+   exclusive (standalone) use.
 
    Press <CTRL-C> to stop JOURNAL processing. A JOURNAL command that
    terminates abnormally by operator action or error produces an incomplete
@@ -9238,7 +9257,7 @@ Example:
 1 Copyright
    Copyright
 
-   Copyright 2021
+   Copyright 2022
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

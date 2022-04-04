@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	*
  *								*
@@ -92,7 +93,7 @@ void op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
 			gvzwr_arg(flag, (mval *)arg1, (mval *)0);
 			break;
 		default:
-			GTMASSERT;
+			assertpro(flag && FALSE);
 			break;
 		}
 	}

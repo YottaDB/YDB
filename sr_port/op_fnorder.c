@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -22,6 +22,7 @@
 #include "numcmp.h"
 #include "mvalconv.h"
 #include "promodemo.h"	/* for "demote" prototype used in LV_NODE_GET_KEY */
+#include "toktyp.h"
 
 #define MINUS_ONE -MV_BIAS
 
@@ -60,7 +61,10 @@ void op_fnorder(lv_val *src, mval *key, mval *dst)
 					(void)s2n(key);
 					mvt = key->mvtype;
 					if (!(mvt & MV_NM))
-						RTS_ERROR_ABT(VARLSTCNT(1) ERR_NUMOFLOW);
+					{
+						TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* adjust */
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NUMOFLOW);
+					}
 				} else	/* No, not numeric.  Note the fact for future reference */
 					mvt = key->mvtype |= MV_NUM_APPROX;
 			}

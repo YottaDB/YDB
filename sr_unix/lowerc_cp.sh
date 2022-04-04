@@ -1,7 +1,8 @@
 #!/bin/sh
 #################################################################
 #								#
-#	Copyright 2001, 2013 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2022 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	#
 #								#
@@ -27,7 +28,7 @@ do
 			dir=`dirname $i`
 			if [ "utf8" = $utf8 ]; then
 				echo $dir/$i "---> "  $newf$ext "-> "../$newf$ext
-				ln -s ../$newf$ext $newf$ext
+				ln -fs ../$newf$ext $newf$ext
 			else
 				echo $dir/$i "---> " $dir/$newf$ext
 				cp -p $i $dir/$newf$ext

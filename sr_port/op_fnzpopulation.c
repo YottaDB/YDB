@@ -1,10 +1,15 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2006-2022 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> eb3ea98c (GT.M V7.0-002)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +39,7 @@ void	op_fnzpopulation(mval *src, mval *del, mval *dst)
 	int	charidx, piececnt;
 	mval	dummy;
 
+<<<<<<< HEAD
 	MV_FORCE_STR(src);
 	MV_FORCE_STR(del);
 	if (0 < src->str.len)
@@ -136,4 +142,13 @@ STATICFNDEF int ZGetPieceCountFromPieceCache(mval *src, mval *del)
 	}
 	DEBUG_ONLY((TREF(ZLengthReentCnt))--);
 	return piececnt;
+=======
+	y = 0;
+	MV_FORCE_STR(arg1);
+	MV_FORCE_STR(arg2);
+	if (0 < arg2->str.len)
+		for (x = 1; x ; y++) x = op_fnzfind(arg1, arg2, x, &dummy);
+
+	MV_FORCE_MVAL(dst,y) ;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 }

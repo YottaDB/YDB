@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -139,6 +139,7 @@
 #include "gtcm.h"
 #include "sig_init.h"
 #include "deferred_events_queue.h"
+#include "deferred_events.h"
 #include "dm_audit_log.h"
 #include "bool_zysqlnull.h"
 #include "get_comm_info.h"
@@ -327,7 +328,7 @@ GBLDEF	boolean_t		is_tracing_on;
 GBLDEF	void			(*tp_timeout_start_timer_ptr)(int4 tmout_sec) = tp_start_timer_dummy;
 GBLDEF	void			(*tp_timeout_clear_ptr)(void) = tp_clear_timeout_dummy;
 GBLDEF	void			(*tp_timeout_action_ptr)(void) = tp_timeout_action_dummy;
-GBLDEF	void			(*ctrlc_handler_ptr)() = ctrlc_handler_dummy;
+GBLDEF	void			(*ctrlc_handler_ptr)(void) = ctrlc_handler_dummy;
 GBLDEF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace) = op_open_dummy;
 GBLDEF	void			(*unw_prof_frame_ptr)(void) = unw_prof_frame_dummy;
 /* Initialized only in gtm_startup() */
@@ -1118,8 +1119,15 @@ GBLDEF	boolean_t	gtm_main_thread_id_set;		/* Indicates whether the thread ID is 
 							 */
 GBLDEF	boolean_t	gtm_jvm_process;		/* Indicates whether we are running with JVM or stand-alone. */
 #endif
+<<<<<<< HEAD
 GBLDEF	size_t		ydb_max_storalloc;		/* Maximum that YottaDB allows to be allocated - used for testing */
 GBLDEF	boolean_t	ipv4_only;			/* If TRUE, only use AF_INET. Reflects the value of the ydb_ipv4_only
+=======
+GBLDEF	size_t		zmalloclim;			/* ISV memory warning of MALLOCCRIT in bytes */
+GBLDEF	boolean_t	malloccrit_issued;		/* MEMORY error limit set at time of MALLOCCRIT */
+GBLDEF	xfer_set_handlers_fnptr_t	xfer_set_handlers_fnptr;	/* see comment in deferred_events.h about this typedef */
+GBLDEF	boolean_t	ipv4_only;			/* If TRUE, only use AF_INET. Reflects the value of the gtm_ipv4_only
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 							 * environment variable, so is process wide.
 							 */
 GBLDEF void (*stx_error_fptr)(int in_error, ...);	/* Function pointer for stx_error() so gtm_utf8.c can avoid pulling

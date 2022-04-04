@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -104,6 +104,7 @@ static readonly char zinterrupt_text[] = "$ZINTERRUPT";
 static readonly char zio_text[] = "$ZIO";
 static readonly char zjob_text[] = "$ZJOB";
 static readonly char zlevel_text[] = "$ZLEVEL";
+static readonly char zmalloclim_text[] = "$ZMALLOCLIM";
 static readonly char zmaxtptime_text[] = "$ZMAXTPTIME";
 static readonly char zmlkhash_text[] = "$ZMLKHASH";
 static readonly char zmode_text[] = "$ZMODE";
@@ -158,8 +159,12 @@ GBLREF mlk_subhash_val_t	mlk_last_hash;
 GBLREF mstr			dollar_zchset, dollar_zpatnumeric, dollar_zpin, dollar_zpout;
 GBLREF mval			dollar_estack_delta, dollar_job, dollar_system, dollar_zdir, dollar_zerror, dollar_zgbldir;
 GBLREF mval			dollar_zinterrupt, dollar_zproc, dollar_ztexit, dollar_zsource, dollar_zstatus, dollar_zyerror;
+<<<<<<< HEAD
 GBLREF mval			dollar_zcmdline;
 GBLREF size_t			totalAlloc, totalRmalloc, totalUsed;
+=======
+GBLREF size_t			totalAlloc, totalRmalloc, totalUsed, zmalloclim;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 GBLREF stack_frame		*frame_pointer;
 GBLREF spdesc			stringpool;
 GBLREF uint4			dollar_tlevel, dollar_trestart, dollar_zjob;
@@ -233,7 +238,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 	int 		count, save_dollar_zlevel;
 	char		*c1, *c2;
 	char		zdir_error[ZDIR_ERR_LEN];
-	size_t		zdir_error_rem_len;
+	size_t		tmp, zdir_error_rem_len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -584,6 +589,14 @@ void zshow_svn(zshow_out *output, int one_sv)
 			save_dollar_zlevel = dollar_zlevel();
 			MV_FORCE_MVAL(&var, save_dollar_zlevel);
 			ZS_VAR_EQU(&x, zlevel_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
+		case SV_ZMALLOCLIM:
+			tmp = zmalloclim;
+			MV_FORCE_UMVAL(&var, (unsigned int)tmp);
+			ZS_VAR_EQU(&x, zmalloclim_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;

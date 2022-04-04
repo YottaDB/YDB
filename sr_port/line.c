@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -22,6 +22,7 @@
 #include "mmemory.h"
 #include "advancewindow.h"
 #include "show_source_line.h"
+#include "start_fetches.h"
 
 GBLREF command_qualifier	cmd_qlf;
 GBLREF int			mlmax;
@@ -68,7 +69,7 @@ boolean_t line(uint4 *lnc)
 	if (TK_INTLIT == TREF(window_token))
 		int_label();
 	if ((TK_IDENT == TREF(window_token)) || (cmd_qlf.qlf & CQ_LINE_ENTRY))
-		start_fetches(OC_LINEFETCH);
+		START_FETCHES(OC_LINEFETCH);
 	else
 		newtriple(OC_LINESTART);
 	CHKTCHAIN(TREF(curtchain), exorder, FALSE);
@@ -204,7 +205,7 @@ boolean_t line(uint4 *lnc)
 				show_source_line(TRUE);
 				dec_err(VARLSTCNT(1) ERR_BLKTOODEEP);
 			}
-			TREF(source_error_found) = TRUE;
+			TREF(source_error_found) = ERR_BLKTOODEEP;
 			success = FALSE;
 		}
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -151,9 +151,10 @@ void op_zlink (mval *v, mval *quals)
 	if (!v->str.len)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Filename/path is missing"));
-	if (MAX_FN_LEN < v->str.len)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Filename/path exceeds max length"));
+	assert(0 <= v->str.len);
+	if ((0 > v->str.len) || (MAX_FN_LEN < v->str.len))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, (0 < v->str.len) ? MAX_FN_LEN : 0, v->str.addr,
+			ERR_TEXT, 2, RTS_ERROR_LITERAL("Filename/path exceeds max length"));
 	DBGARLNK((stderr, "op_zlink: Call to (re)link routine %.*s\n", v->str.len, v->str.addr));
 	assert((SIZEOF(DOTM) == SIZEOF(DOTOBJ)) && (SIZEOF(srcnamebuf) == SIZEOF(objnamebuf)));
 	object_file_des = FD_INVALID;

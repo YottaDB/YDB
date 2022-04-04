@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -966,6 +966,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(maxkeysz_assured);
 	SWAP_SD4(hasht_upgrade_needed);
 	SWAP_SD4(defer_allocate);
+	SWAP_SD4(problksplit);
 }
 
 void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_native)
@@ -1214,6 +1215,7 @@ void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_n
 	SWAP_SD4(maxkeysz_assured);
 	SWAP_SD4(hasht_upgrade_needed);
 	SWAP_SD4(defer_allocate);
+	SWAP_SD4(problksplit);
 
 
 	/* convert the header back up to V7 format  */

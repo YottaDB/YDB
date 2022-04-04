@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -45,7 +45,11 @@
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
 #include "ztimeout_routines.h"
+<<<<<<< HEAD
 #include "bool_zysqlnull.h"
+=======
+#include "try_event_pop.h"
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
 GBLREF	boolean_t		dollar_truth, dollar_zquit_anyway, is_tracing_on;
 GBLREF	mval			*alias_retarg;
@@ -198,7 +202,6 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	 * and none of the deferral conditions are curretly in effect, release the hounds.
 	 * Below code should be kept in sync with unw_mv_ent.
 	 */
-	if ((no_event == outofband) && (no_event != (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
-		TRY_EVENT_POP;
+	TRY_EVENT_POP;
 	return 0;
 }

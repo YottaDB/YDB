@@ -1,6 +1,6 @@
  /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -61,7 +61,8 @@ GBLDEF	char			facility[MAX_INSTNAME_LEN + 100];
 GBLDEF	boolean_t		util_out_print_vaparm_flush;
 #endif
 
-GBLREF	boolean_t		blocksig_initialized, err_same_as_out, hup_on, is_rcvr_server, is_src_server, is_updproc;
+GBLREF	boolean_t		blocksig_initialized, err_same_as_out, hup_on, is_rcvr_server, is_src_server, is_updproc,
+					prin_in_dev_failure;
 GBLREF	io_pair			io_std_device;
 GBLREF	gd_addr			*gd_header;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
@@ -262,7 +263,10 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 		if (*message == '#')
 		{
 			if (0 < faocnt)
+			{
 				field_width = repeat_count = va_arg(fao, int4);
+				faocnt--;
+			}
 			++message;
 		} else
 		{
@@ -270,10 +274,19 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 				;
 			if ((length = (int)(c - message)) > 0)
 			{
-				field_width = repeat_count
-					= asc2i((uchar_ptr_t)message, length);
+				/* Accept the width/repeat only if there are more directives for the length */
+				if (0 < faocnt)
+					field_width = repeat_count = asc2i((uchar_ptr_t)message, length);
+				else
+					field_width = repeat_count = 0;
 				message = c;
 			}
+		}
+		if ((outtop - outptr) < field_width)
+		{
+			/* Requested width exceeds buffer size. Should not happen. Fix it */
+			assert((outtop - outptr) > field_width);
+			field_width = (outtop - outptr);
 		}
 		if ('@' == *message)			/* Indirectly addressed operand */
 		{
@@ -323,7 +336,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 				{
 					case 'C': /* a string with length in the first byte */
 						GETFAOVALDEF(faocnt, fao, caddr_t, c, NULL);
-						length = c ? *c++ : 0;
+						length = (int)(c ? (unsigned int)*c++ : 0); /* Cast ensures proper sign convert */
 						break;
 					case 'D':
 					case 'F': /* string with length and addr parameters. restrict to 1 MiB length */
@@ -332,12 +345,14 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 						GETFAOVALDEF(faocnt, fao, caddr_t, c, NULL);
 						break;
 					case 'S':
-						if (faocnt)
+						if (0 < faocnt)
 						{
 							d = (desc_struct *)va_arg(fao, caddr_t);
 							faocnt--;
 							c = d->addr;
-							length = d->len;
+							/* Unsigned conversion simplifies the MAX_STRLEN check */
+							stringlength = (uint4)d->len;
+							length = (MAX_STRLEN > stringlength) ? (int)stringlength : MAX_STRLEN;
 						} else
 						{
 							c = NULL;
@@ -351,8 +366,15 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 						break;
 					default:
 						assert(FALSE);
+<<<<<<< HEAD
 						length = MAXINT4;	/* For static scan */
+=======
+						c = NULL;
+						length = 0;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 				}
+				/* Check the parameter and count. The pointer can't be NULL with a non-zero length */
+				assert((NULL != c) || (0 == length));
 				/* Since gtmsecshr does not load ICU libraries (since dlopen() with LD_LIBRARY_PATH
 				 * does not work for root setuid executables), avoid calling gtm_wcswidth() and
 				 * U_ISPRINT() from gtmsecshr and thus non-zero widths used in util_out_print()
@@ -484,6 +506,8 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 								break;
 							default:
 								assert(FALSE);
+								GTM64_ONLY(addr_val = (UINTPTR_T)NULL);
+								NON_GTM64_ONLY(int_val = 0);
 						}
 					else
 					{
@@ -509,6 +533,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 								NON_GTM64_ONLY(int_val = int_val & 0xFFFFFFFF;)
 								break;
 							default:
+								int_val = 0;
 								assert(FALSE);
 						}
 					}
@@ -563,6 +588,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 						                       	break;
 								default:
 									assert(FALSE);
+									length = 0;
 							}
 							NON_GTM64_ONLY(i2hex(int_val, numptr, length);)
 							GTM64_ONLY(i2hex(('J' == type2) ? addr_val : int_val, numptr, length);)
@@ -607,7 +633,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					}
 				}
 				length = (int)(numptr - numa);		/* Length of asciified number */
-				if (length < field_width)
+				if ((0 < length) && (length < field_width))
 				{
 					memset(outptr, (('Z' == type) ? '0' : ' '), field_width - length);
 					outptr += field_width - length;
@@ -624,7 +650,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					)
 					NON_GTM64_ONLY(memset(outptr, '*', field_width);)
 					outptr += field_width;
-				} else
+				} else if (0 < length)
 				{
 					memcpy(outptr, numa, length);
 					outptr += length;
@@ -900,6 +926,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 }
 
 /* #GTM_THREAD_SAFE : The below function (util_out_print) is thread-safe because caller ensures serialization with locks */
+/* Because this function passes MAXPOSINT4 as the faocnt, only internal callers are allowed. */
 void	util_out_print(caddr_t message, int flush, ...)
 {
 	va_list	var;
@@ -908,7 +935,21 @@ void	util_out_print(caddr_t message, int flush, ...)
 	SETUP_THREADGBL_ACCESS;
 	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	va_start(var, flush);
-	util_out_print_vaparm(message, flush, var, MAXPOSINT4);
+	util_out_print_vaparm(message, flush, var, MAXPOSINT4); /* WARNING: UNCHECKED faocnt - internal use only */
+	va_end(TREF(last_va_list_ptr));
+	va_end(var);
+}
+
+/* #GTM_THREAD_SAFE : The below function (util_out_print_args) is thread-safe because caller ensures serialization with locks */
+void	util_out_print_args(caddr_t message, int faocnt, int flush, ...)
+{
+	va_list	var;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
+	va_start(var, flush);
+	util_out_print_vaparm(message, flush, var, faocnt);
 	va_end(TREF(last_va_list_ptr));
 	va_end(var);
 }
@@ -947,7 +988,7 @@ void util_cond_flush(void)
 
 	SETUP_THREADGBL_ACCESS;
 	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
-	assert(((int)ERR_TERMHANGUP != SIGNAL) || ((tt == io_std_device.in->type) && hup_on));
+	assert(((int)ERR_TERMHANGUP != SIGNAL) || ((tt == io_std_device.in->type) && prin_in_dev_failure));
 	if ((TREF(util_outptr) != TREF(util_outbuff_ptr)) && ((int)ERR_TERMHANGUP != SIGNAL))	/* if a PRINCIPAL device terminal */
 		util_out_print(NULL, FLUSH);	/* disappeared, sending stuff to it with a PRN_ERROR just complicates things */
 }

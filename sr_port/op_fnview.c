@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -696,19 +696,21 @@ void	op_fnview(int numarg, mval *dst, ...)
 			break;
 		case VTK_YCOLLATE:
 			n = MV_FORCE_INT(parmblk.value);
-			csp = ready_collseq(n);
+			if (0 == n)
+				break;	/* collation sequence # is 0, any version is compatible with it */
+			csp = ready_collseq(n);	/* Negative value treated as zero */
+			if (NULL == csp)
+			{
+				n = -1;
+				break;
+			}
 			if (NULL == arg2)
 			{	/* $VIEW("YCOLLATE",coll) : Determine version corresponding to collation sequence "coll" */
-				if (0 == n)
-					break;	/* collation sequence # is 0, version is 0 in this case */
-				if (csp)
-				{
-					n = (*csp->version)();
-					n &= 0x000000FF;	/* make an unsigned char, essentially */
-				} else
-					n = -1;
+				n = (*csp->version)();
+				n &= 0x000000FF;	/* make an unsigned char, essentially */
 			} else
 			{	/* $VIEW("YCOLLATE",coll,ver) : Check if collsequence "coll" version is compatible with "ver" */
+<<<<<<< HEAD
 				if (0 == n)
 					break;	/* collation sequence # is 0, any version is compatible with it */
 				if (NULL != csp)
@@ -717,6 +719,11 @@ void	op_fnview(int numarg, mval *dst, ...)
 					n = do_verify(csp, n, collver);
 				} else
 					n = -1;
+=======
+				collver = mval2i(arg2);	/* Negative value downcasted to unsigned char */
+				assert(0 <= collver);
+				n = do_verify(csp, n, collver);
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 			}
 			break;
 		case VTK_YGLDCOLL:
@@ -784,12 +791,12 @@ void	op_fnview(int numarg, mval *dst, ...)
 			RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);
 			break;
 		case VTK_YGDS2GVN:
-			n = (NULL != arg2) ? mval2i(arg2) : 0;
+			n = (NULL != arg2) ? mval2i(arg2) : 0;	/* Negative treated as zero */
 			key = gds2gvn(arg1, &buff[0], n);
 			COPY_ARG_TO_STRINGPOOL(dst, key, &buff[0]);
 			break;
 		case VTK_YGVN2GDS:
-			n = (NULL != arg2) ? mval2i(arg2) : 0;
+			n = (NULL != arg2) ? mval2i(arg2) : 0;	/* Negative treated as zero */
 			gvkey = (gv_key *)&save_currkey.key;
 			key = gvn2gds(arg1, gvkey, n);
 			/* If input has error at some point, copy whatever subscripts (+ gblname) have been successfully parsed */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -44,6 +44,7 @@
 #include "alias.h"
 #include "gt_timers_add_safe_hndlrs.h"
 #include "zco_init.h"
+#include "min_max.h"
 
 GBLREF boolean_t		run_time;
 GBLREF command_qualifier	cmd_qlf;
@@ -64,6 +65,7 @@ int	gtm_compile(void)
 	mstr			orig_cmdstr;
 	unsigned char		*mstack_ptr;
 	unsigned short		len;
+	size_t			origlen;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -76,18 +78,18 @@ int	gtm_compile(void)
 	run_time = TRUE;		/* This and the next seem odd, but called routines expect it */
 	TREF(compile_time) = FALSE;
 	mstack_ptr = (unsigned char *)malloc(USER_STACK_SIZE);
-	msp = stackbase = mstack_ptr + (USER_STACK_SIZE - SIZEOF(char *));
+	msp = stackbase = mstack_ptr + (USER_STACK_SIZE - sizeof(char *));
 	mv_chain = (mv_stent *)msp;
 	stackwarn = stacktop + (USER_STACK_SIZE / 4);
-	msp -= SIZEOF(stack_frame);
+	msp -= sizeof(stack_frame);
 	frame_pointer = (stack_frame *)msp;
-	memset(frame_pointer, 0, SIZEOF(stack_frame));
+	memset(frame_pointer, 0, sizeof(stack_frame));
 	frame_pointer->temps_ptr = (unsigned char *)frame_pointer;
 	frame_pointer->mpc = CODE_ADDRESS(gtm_ret_code);
 	frame_pointer->ctxt = GTM_CONTEXT(gtm_ret_code);
 	frame_pointer->type = SFT_COUNT;
-	frame_pointer->rvector = (rhdtyp *)malloc(SIZEOF(rhdtyp));
-	memset(frame_pointer->rvector, 0, SIZEOF(rhdtyp));
+	frame_pointer->rvector = (rhdtyp *)malloc(sizeof(rhdtyp));
+	memset(frame_pointer->rvector, 0, sizeof(rhdtyp));
 	symbinit();
 	/* Variables for supporting $ZSEARCH sorting and wildcard expansion */
 	TREF(zsearch_var) = lv_getslot(curr_symval);
@@ -95,10 +97,15 @@ int	gtm_compile(void)
 	/* command qualifier processing stuff */
 	zco_init();
 	assert(cli_lex_in_ptr);
-	/* Save the original MUMPS command line qualifers. These are processed after, and take precedence over, $ZCOMPILE. */
-	orig_cmdstr.len = strlen(cli_lex_in_ptr->in_str) - strlen("MUMPS ");
-	orig_cmdstr.addr = (char *)malloc(orig_cmdstr.len);
-	memcpy(orig_cmdstr.addr, cli_lex_in_ptr->in_str + strlen("MUMPS "), orig_cmdstr.len);
+	/* Save the original MUMPS command line qualifers, which starts with "MUMPS ". These are processed after,
+	 * and take precedence over, $ZCOMPILE. */
+	origlen = strlen(cli_lex_in_ptr->in_str);
+	assert(STR_LIT_LEN("MUMPS ") < origlen);
+	origlen -= STR_LIT_LEN("MUMPS ");
+	assert(MAXPOSINT4 >= origlen);
+	orig_cmdstr.addr = (char *)malloc(origlen);
+	memcpy(orig_cmdstr.addr, (char *)(cli_lex_in_ptr->in_str + (STR_LIT_LEN("MUMPS "))), origlen);
+	orig_cmdstr.len = (int)origlen;
 	INIT_CMD_QLF_STRINGS(cmd_qlf, obj_file, list_file, ceprep_file, MAX_FN_LEN);
 	len = module_name.len = 0;
 	zl_cmd_qlf(&(TREF(dollar_zcompile)), &cmd_qlf, source_file_string, &len, FALSE);	/* Init with default quals */

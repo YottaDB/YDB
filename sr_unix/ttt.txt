@@ -410,7 +410,7 @@ OC_FNZJ2:	pushab	val.0
 OC_FNZJOBEXAM:	pushab	val.0
 		pushab	val.2
 		pushab	val.1
-		calls	#2,xfer.xf_fnzjobexam
+		calls	#3,xfer.xf_fnzjobexam
 OC_FNZLENGTH:	pushab	val.0
 		pushab	val.1
 		calls	#2,xfer.xf_fnzlength

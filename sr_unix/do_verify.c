@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -22,5 +23,9 @@
 int4 do_verify(collseq *csp, unsigned char type, unsigned char ver)
 {
 	assert(NULL != csp);
+<<<<<<< HEAD
 	return (0 == (*csp->verify)(type,ver));
+=======
+	return ((*csp->verify)(type,ver) == 0);
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -16,6 +16,7 @@
 #include "mdef.h"
 #include "arit.h"
 #include "op.h"
+#include "toktyp.h"
 
 LITREF int4	ten_pwr[] ;
 LITREF mval	literal_zero;
@@ -25,6 +26,7 @@ error_def(ERR_NUMOFLOW);
 
 void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 {
+<<<<<<< HEAD
         int	delta, uexp, vexp, exp;
         int4	m0, m1, n0, n1, x, factor;
 	char	usign, vsign, rsign;
@@ -32,14 +34,25 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
         m1 = u->m[1];
         if (0 == (u->mvtype & MV_INT))
         {
+=======
+	int delta, uexp, vexp, exp;
+	int4 m0, m1, n0, n1, x, factor;
+	char usign, vsign, rsign;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	m1 = u->m[1];
+	if ((u->mvtype & MV_INT) == 0)
+	{
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 		usign = u->sgn;
-                m0 = u->m[0];
-                uexp = u->e;
-        } else
-        {
+		m0 = u->m[0];
+		uexp = u->e;
+	} else
+	{
 		if (m1 == 0)
 			goto result_is_v;
-                m0 = 0;
+		m0 = 0;
 		if (m1 > 0)
 			usign = 0;
 		else
@@ -48,6 +61,7 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 			m1 = -m1;
 		}
 		for (uexp = EXP_INT_OVERF - 1 ; m1 < MANT_LO ; m1 *= 10 , uexp--)
+<<<<<<< HEAD
                         ;
         }
         n1 = v->m[1];
@@ -55,9 +69,18 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
         {
                 n0 = v->m[0];
                 vexp = v->e;
+=======
+			;
+	}
+	n1 = v->m[1];
+	if ((v->mvtype & MV_INT) == 0)
+	{
+		n0 = v->m[0];
+		vexp = v->e;
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 		vsign = v->sgn ^ subtraction;
-        } else
-        {
+	} else
+	{
 		if (n1 == 0)
 			goto result_is_u;
 		else if (n1 > 0)
@@ -67,44 +90,44 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 			vsign = !subtraction;
 			n1 = -n1;
 		}
-                n0 = 0;
+		n0 = 0;
 		for (vexp = EXP_INT_OVERF - 1 ; n1 < MANT_LO ; n1 *= 10 , vexp--)
-                        ;
-        }
-        delta = uexp - vexp;
+			;
+	}
+	delta = uexp - vexp;
 	if (delta >= 0)
 	{
 		exp = uexp;
 		if (delta >= NUM_DEC_DG_2L)
 			goto result_is_u;
-        	else if (delta >= NUM_DEC_DG_1L)
-        	{
-                	n0 = n1 / ten_pwr[delta - NUM_DEC_DG_1L];
-                	n1 = 0;
-        	} else if (delta > 0)
-        	{
-                	factor = ten_pwr[delta];
-                	x = n1;
-                	n1 /= factor;
-                	n0 = (x - (n1 * factor)) * ten_pwr[NUM_DEC_DG_1L - delta] + (n0 / factor);
-        	}
+		else if (delta >= NUM_DEC_DG_1L)
+		{
+			n0 = n1 / ten_pwr[delta - NUM_DEC_DG_1L];
+			n1 = 0;
+		} else if (delta > 0)
+		{
+			factor = ten_pwr[delta];
+			x = n1;
+			n1 /= factor;
+			n0 = (x - (n1 * factor)) * ten_pwr[NUM_DEC_DG_1L - delta] + (n0 / factor);
+		}
 	} else
-        {
+	{
 		exp = vexp;
 		if (delta <= - NUM_DEC_DG_2L)
 			goto result_is_v;
-        	else if (delta <= - NUM_DEC_DG_1L)
-        	{
-                	m0 = m1 / ten_pwr[-delta - NUM_DEC_DG_1L];
-                	m1 = 0;
-        	} else
-        	{
-                	factor = ten_pwr[-delta];
-                	x = m1;
-                	m1 /= factor;
-                	m0 = (x - (m1 * factor)) * ten_pwr[NUM_DEC_DG_1L + delta] + (m0 / factor);
-        	}
-        }
+		else if (delta <= - NUM_DEC_DG_1L)
+		{
+			m0 = m1 / ten_pwr[-delta - NUM_DEC_DG_1L];
+			m1 = 0;
+		} else
+		{
+			factor = ten_pwr[-delta];
+			x = m1;
+			m1 /= factor;
+			m0 = (x - (m1 * factor)) * ten_pwr[NUM_DEC_DG_1L + delta] + (m0 / factor);
+		}
+	}
 	if (usign == vsign)
 	{
 		/* Perform addition */
@@ -188,8 +211,10 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 		}
 	}
 	if (EXPHI <= exp)
+	{
+		TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* improve hints */
 		rts_error_csa(NULL, VARLSTCNT(1) ERR_NUMOFLOW); /* BYPASSRTSABT */
-	else if (EXPLO > exp)
+	} else if (EXPLO > exp)
 		*result = literal_zero;
 	else
 	{
@@ -199,7 +224,7 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 		result->m[0] = m0;
 		result->m[1] = m1;
 	}
-        return;
+	return;
 
 result_is_u:
 	*result = *u;
@@ -231,7 +256,7 @@ result_is_v:
 
 void op_add (mval *u, mval *v, mval *s)
 {
-        int4    m0, m1;
+	int4    m0, m1;
 	char	utype, vtype;
 
 	/* If u or v is $ZYSQLNULL, the result is $ZYSQLNULL */
@@ -250,33 +275,33 @@ void op_add (mval *u, mval *v, mval *s)
 	{
 		m1 = u->m[1] + v->m[1] ;
 		if (m1 < MANT_HI && m1 > -MANT_HI)
-                {
+		{
 			s->mvtype = MV_INT | MV_NM ;
-                        s->m[1] = m1;
-                        return;
-                }
+			s->m[1] = m1;
+			return;
+		}
 		if ( m1 > 0)
 		{
-                        s->sgn = 0;
-                } else
-                {
+			s->sgn = 0;
+		} else
+		{
 			s->sgn = 1;
-                        m1 = -m1;
-                }
-                s->mvtype = MV_NM;
-                s->e = EXP_INT_OVERF;
-                m0 = m1 / 10;
+			m1 = -m1;
+		}
+		s->mvtype = MV_NM;
+		s->e = EXP_INT_OVERF;
+		m0 = m1 / 10;
 		s->m[0] = (m1 - (m0 * 10)) * MANT_LO;
 		s->m[1] = m0;
-                return;
+		return;
 	}
 	add_mvals(u, v, 0, s);
-        return;
+	return;
 }
 
 void op_sub (mval *u, mval *v, mval *s)
 {
-        int4    m0, m1;
+	int4    m0, m1;
 	char	utype, vtype;
 
 	/* If u or v is $ZYSQLNULL, the result is $ZYSQLNULL */
@@ -295,25 +320,25 @@ void op_sub (mval *u, mval *v, mval *s)
 	{
 		m1 = u->m[1] - v->m[1] ;
 		if (m1 < MANT_HI && m1 > -MANT_HI)
-                {
+		{
 			s->mvtype = MV_INT | MV_NM ;
-                        s->m[1] = m1;
-                        return;
-                }
+			s->m[1] = m1;
+			return;
+		}
 		if ( m1 > 0)
 		{
-                        s->sgn = 0;
-                } else
-                {       s->sgn = 1;
-                        m1 = -m1;
-                }
-                s->mvtype = MV_NM;
-                s->e = EXP_INT_OVERF;
-                m0 = m1 / 10;
+			s->sgn = 0;
+		} else
+		{       s->sgn = 1;
+			m1 = -m1;
+		}
+		s->mvtype = MV_NM;
+		s->e = EXP_INT_OVERF;
+		m0 = m1 / 10;
 		s->m[0] = (m1 - (m0 * 10)) * MANT_LO;
 		s->m[1] = m0;
-                return;
+		return;
 	}
 	add_mvals(u, v, 1, s);
-        return;
+	return;
 }

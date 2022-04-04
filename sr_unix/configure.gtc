@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-# Copyright (c) 2009-2021 Fidelity National Information		#
+# Copyright (c) 2009-2022 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	#
@@ -83,11 +83,15 @@ fi
 
 # Help files
 hlpfiles="*help.dat *help.gld *.h"
+
 # Other files (left here for future use)
 ofiles="$hlpfiles"
 
 # Files that need to have $ydb_dist, $echo, etc. set in them.
 pathmods="ydb.gtc ydb_env_set.gtc ydb_env_unset.gtc gdedefaults.gtc"
+
+# Files deprecated in various releases. These should explicitly removed if installation is done on an existing directory.
+deprecatedfiles="geteuid semstat2 ftok"
 
 if [ $deliver_gtcm = "yes" ]; then
 	pathmods="$pathmods gtcm_run.gtc gtcm_slist.gtc"
@@ -250,12 +254,22 @@ fi
 read resp
 if [ ! -t 0 ] ; then echo "$resp"; fi
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+<<<<<<< HEAD
 	mkdir -p        $ydbdist
 	chmod ug-s,-t   $ydbdist
 	mkdir -p        $ydbdist/plugin/r $ydbdist/plugin/o
 	chmod 0755      $ydbdist/plugin/r $ydbdist/plugin/o $ydbdist
 	chown $owner    $ydbdist/plugin/r $ydbdist/plugin/o $ydbdist
 	chgrp $bingroup $ydbdist/plugin/r $ydbdist/plugin/o $ydbdist
+=======
+	mkdir -p        $gtmdist
+	chmod ug-s,-t   $gtmdist
+	mkdir -p        $gtmdist/plugin/r $gtmdist/plugin/o
+	chmod 0755      $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
+	chown $owner    $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
+	chgrp $bingroup $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
+	remove_deprecated=1
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 else
 	exit
 fi
@@ -372,6 +386,7 @@ if [ "$doutf8" -ne 0 ]; then
 	fi
 fi
 
+<<<<<<< HEAD
 # Install libgtmshr.so as a soft link to libyottadb.so for backward compatibility purposes just in case
 ln -fs ./libyottadb$ext $ydbdist/libgtmshr$ext || echo ln -fs ./libyottadb$ext $ydbdist/libgtmshr$ext
 ln -fs ./ydb_env_set $ydbdist/gtmprofile || echo ln -fs ./ydb_env_set $ydbdist/gtmprofile
@@ -380,6 +395,29 @@ if [ "$doutf8" -ne 0 ]; then
 	ln -fs ./libyottadb$ext $ydbdist/utf8/libgtmshr$ext || echo ln -fs ./libyottadb$ext $ydbdist/utf8/libgtmshr$ext
 	ln -fs ./ydb_env_set $ydbdist/utf8/gtmprofile || echo ln -fs ./ydb_env_set $ydbdist/utf8/gtmprofile
 	ln -fs ./ydb $ydbdist/utf8/gtm || echo ln -fs ./ydb $ydbdist/utf8/gtm
+=======
+# Remove deprecated files first if applicable
+if [ -n "$remove_deprecated" ]; then
+	$echo ""
+	$echo "Checking for deprecated files in $gtmdist"
+	$echo ""
+	for file in $deprecatedfiles
+	do
+		if [ -f "$gtmdist/$file" -o -f "$gtmdist/utf8/$file" ]; then
+			echo "	Removing $file"
+			rm -f $gtmdist/$file $gtmdist/utf8/$file
+		fi
+	done
+fi
+
+# Install COPYING if it is applicable
+file=COPYING
+if [ -f $file ]; then
+	cp -p $file $gtmdist
+	if [ "$doutf8" -ne 0 ]; then
+		ln -fs ../$file $gtmdist/utf8/$file
+	fi
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 fi
 
 # Install COPYING as well as README.md (YottaDB) or README.txt (GT.M) if it is applicable

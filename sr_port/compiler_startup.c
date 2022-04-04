@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -36,6 +36,7 @@
 #include "rtn_src_chksum.h"
 #include "gtmmsg.h"
 #include "iosp.h"	/* for SS_NORMAL */
+#include "start_fetches.h"
 
 #define HOPELESS_COMPILE 128
 
@@ -46,12 +47,11 @@ GBLREF char			cg_phase;	/* code generation phase */
 GBLREF command_qualifier	cmd_qlf;
 GBLREF hash_table_str		*complits_hashtab;
 GBLREF int			mlmax;
-GBLREF int4			curr_fetch_count;
 GBLREF mcalloc_hdr 		*mcavailptr, *mcavailbase;
 GBLREF mline			mline_root;
 GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
 GBLREF src_line_struct 	src_head;
-GBLREF triple			t_orig, *curr_fetch_trip, *curr_fetch_opr;
+GBLREF triple			t_orig;
 GBLREF unsigned char		source_file_name[];
 GBLREF unsigned short		source_name_len;
 
@@ -142,8 +142,8 @@ boolean_t compiler_startup(void)
 	null_lab = get_mladdr(&null_mident);
 	null_lab->ml = &mline_root;
 	mlmax++;
-	curr_fetch_trip = curr_fetch_opr = newtriple(OC_LINEFETCH);
-	curr_fetch_count = 0;
+	(TREF(fetch_control)).curr_fetch_trip = (TREF(fetch_control)).curr_fetch_opr = newtriple(OC_LINEFETCH);
+	(TREF(fetch_control)).curr_fetch_count = 0;
 	TREF(code_generated) = FALSE;
 	line_count = 1;
 	total_source_len = 0;

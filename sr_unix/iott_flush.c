@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -31,8 +31,10 @@
 
 GBLREF boolean_t	prin_out_dev_failure;
 GBLREF int		process_exiting;
+GBLREF int4		error_condition;
 GBLREF io_pair		io_curr_device, io_std_device;
 
+error_def(ERR_TERMHANGUP);
 error_def(ERR_TERMWRITE);
 
 void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
@@ -52,7 +54,7 @@ void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
 	if (0 < write_len)
 	{
 		DOWRITERC(tt_ptr->fildes, tt_ptr->ttybuff, write_len, status);
-		if (0 == status)
+		if ((0 == status) && (ERR_TERMHANGUP != error_condition))
 		{
 			tt_ptr->tbuffp = tt_ptr->ttybuff;
 			if (io_ptr == io_std_device.out)
@@ -72,7 +74,7 @@ void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TERMWRITE, 0, status);
 				prin_out_dev_failure = TRUE;			/* set flag for NOPRINCIO, to give app a chance */
 			}
-			xfer_set_handlers(ttwriterr, status, FALSE);
+			xfer_set_handlers(defer_error, status, FALSE);
 		}
 	}
 	tt_ptr->write_active = new_write_flag;

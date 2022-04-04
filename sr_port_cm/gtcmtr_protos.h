@@ -45,5 +45,32 @@ bool gtcmtr_lke_clearreq(struct CLB *lnk, char rnum, bool all, bool interactive,
 bool gtcmtr_lke_showreq(struct CLB *lnk, char rnum, bool all, bool wait, int4 pid, mstr *node);
 
 unsigned char *gtcmtr_get_key(void *gvkey, unsigned char *ptr, unsigned short len);
+<<<<<<< HEAD
+=======
+bool	gtcmtr_increment(void);
+char	gtcmtr_initproc(void);
+bool	gtcmtr_initreg(void);
+bool	gtcmtr_kill(void);
+char	gtcmtr_lkacquire(void);
+bool	gtcmtr_lkcanall(void);
+bool	gtcmtr_lkcancel(void);
+bool	gtcmtr_lkdelete(void);
+char	gtcmtr_lke_clearrep(struct CLB *lnk, clear_request *creq);
+bool	gtcmtr_lke_clearreq(struct CLB *lnk, char rnum, bool all, bool interactive, int4 pid, mstr *node);
+char	gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq);
+bool	gtcmtr_lke_showreq(struct CLB *lnk, char rnum, bool all, bool wait, int4 pid, mstr *node);
+char	gtcmtr_lkreqimmed(void);
+bool	gtcmtr_lkreqnode(void);
+char	gtcmtr_lkrequest(void);
+char	gtcmtr_lkresume(void);
+bool	gtcmtr_lksuspend(void);
+bool	gtcmtr_order(void);
+bool	gtcmtr_put(void);
+bool	gtcmtr_query(void);
+char	gtcmtr_terminate(bool cm_err);
+void	gtcmtr_terminate_free(connection_struct *ce);
+bool	gtcmtr_zprevious(void);
+bool	gtcmtr_zwithdraw(void);
+>>>>>>> eb3ea98c (GT.M V7.0-002)
 
 #endif

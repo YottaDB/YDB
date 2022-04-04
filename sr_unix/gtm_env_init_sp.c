@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2021 Fidelity National Information	*
+ * Copyright (c) 2004-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -284,7 +284,7 @@ void	gtm_env_init_sp(void)
 		(TREF(replgbl)).jnl_release_timeout = DEFAULT_JNL_RELEASE_TIMEOUT;
 	else if (0 > (TREF(replgbl)).jnl_release_timeout) /* consider negative timeout value as zero */
 		(TREF(replgbl)).jnl_release_timeout = 0;
-	else if (MAXPOSINT4 / MILLISECS_IN_SEC < (TREF(replgbl)).jnl_release_timeout) /* max value supported for timers */
+	else if ((MAXPOSINT4 / MILLISECS_IN_SEC) < (TREF(replgbl)).jnl_release_timeout) /* max value supported for timers */
 		(TREF(replgbl)).jnl_release_timeout = MAXPOSINT4 / MILLISECS_IN_SEC;
 	/* Initialize variable that controls the maximum time that a process should spend while waiting for semaphores in db_init */
 	hrtbt_cntr_delta = ydb_trans_numeric(YDBENVINDX_DB_STARTUP_MAX_WAIT, &is_defined, IGNORE_ERRORS_FALSE, NULL);
