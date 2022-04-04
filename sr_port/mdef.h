@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,6 +92,7 @@ typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
 
 #include <inttypes.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include "mdefsa.h"
 #include "gtm_common_defs.h"
 #include <mdefsp.h>
@@ -291,6 +292,7 @@ typedef UINTPTR_T uintszofptr_t;
 #define BITS_PER_UCHAR	8 /* note, C does not require this to be 8, see <limits.h> for definitions of CHAR_BIT and UCHAR_MAX */
 
 #define MAXPOSINT4		((int4)0x7fffffff)
+#define MINNEGINT4		((int4)0x80000000)
 #define MAX_DIGITS_IN_INT	10	/* maximum number of decimal digits in a  4-byte integer */
 #define MAX_DIGITS_IN_INT8	20	/* maximum number of decimal digits in an 8-byte integer */
 #define MAX_HEX_DIGITS_IN_SHORT	 4	/* maximum number if hexadecimal digits in a  2-byte integer */
@@ -313,7 +315,6 @@ typedef UINTPTR_T uintszofptr_t;
 	typedef int		boolean_t;
 #	endif
 #endif
-typedef char		bool;
 typedef unsigned char	mreg;
 typedef int4		mint;
 

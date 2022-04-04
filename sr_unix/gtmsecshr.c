@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -226,7 +226,7 @@ int main(int argc, char_ptr_t argv[])
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-	assert(MAXPOSINT4 >= GTMSECSHR_MESG_TIMEOUT);
+	assert((0 <= GTMSECSHR_MESG_TIMEOUT) && (MAXPOSINT4 >= GTMSECSHR_MESG_TIMEOUT));
 	common_startup_init(GTMSECSHR_IMAGE); 	/* Side-effect : Sets skip_dbtriggers = TRUE if platorm lacks trigger support */
 	err_init(gtmsecshr_cond_hndlr);
 	gtmsecshr_init(argv, &rundir, &rundir_len);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,8 +39,6 @@
 #else
 #	 error UNSUPPORTED PLATFORM
 #endif
-
-GBLREF triple	*curr_fetch_trip;
 
 error_def(ERR_CMD);
 error_def(ERR_CNOTONSYS);
@@ -130,9 +128,10 @@ LITDEF nametabent cmd_names[] =
  */
 LITDEF unsigned char cmd_index[27] =
 {
-	0, 0, 2, 4, 6, 8, 10, 12, 15, 17, 19, 21, 23
-	,25, 27, 29, 29, 31, 33, 35, 43, 45, 47, 49
-	,51, 51, 77 GTMTRIG_ONLY(+ 1) ARLINK_ONLY(+ 1) /* add ztrigger and zrupdate, respectively */
+	 0,  0,  2,  4,  6,  8, 10, 12, 15,	/* a b c d e f g h i */
+	17, 19, 21, 23 ,25, 27, 29, 29, 31,	/* j k l m n o p q r */
+	33, 35, 43, 45, 47, 49 ,51, 51, 77	/* s t u v w x y z ~ */
+	GTMTRIG_ONLY(+ 1) ARLINK_ONLY(+ 1)	/* add ztrigger and zrupdate, respectively */
 };
 LITDEF struct
 {
@@ -209,11 +208,12 @@ int cmd(void)
 	 * One for full command and one for short-hand notation.
 	 * For example, B and and BREAK.
 	 */
-	boolean_t	sense, shifting;
+	boolean_t	shifting;
 	char		*c;
 	int		rval, x;
+	int4		fetch_cnt;
 	oprtype		*cr;
-	triple		*fetch0, *oldchain, *ref0, *ref1, *temp_expr_start, tmpchain, *triptr;
+	triple		*fetch0, *fetch1, *oldchain, *ref0, *ref1, *temp_expr_start, tmpchain, *triptr;
 	mval		*v;
 	DCL_THREADGBL_ACCESS;
 
@@ -225,7 +225,7 @@ int cmd(void)
 	TREF(temp_subs) = FALSE;
 	CHKTCHAIN(TREF(curtchain), exorder, FALSE);
 	TREF(pos_in_chain) = *TREF(curtchain);
-	if (TREF(window_token) != TK_IDENT)
+	if (TK_IDENT != TREF(window_token))
 	{
 		stx_error(ERR_CMD);
 		return FALSE;
@@ -246,13 +246,15 @@ int cmd(void)
 		}
 		stx_error(ERR_INVCMD);					/* use warning form so stx_error treats it as provisional */
 	}
-	if (!VALID_CMD(x) )
+	if (!VALID_CMD(x))
 	{
 	    	stx_error(ERR_CNOTONSYS);
 		return FALSE;
 	}
 	oldchain = NULL;
 	advancewindow();
+	fetch0 = (TREF(fetch_control)).curr_fetch_trip;
+	fetch1 = (TREF(fetch_control)).curr_fetch_opr;
 	if ((TK_COLON != TREF(window_token)) || !cmd_data[x].pcnd_ok)
 	{
 		assert(m_zinvcmd != cmd_data[x].fcn);
@@ -260,6 +262,7 @@ int cmd(void)
 		shifting = FALSE;
 	} else
 	{
+		fetch_cnt = (TREF(fetch_control)).curr_fetch_count;
 		advancewindow();
 		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
 		if (!bool_expr(FALSE, cr))
@@ -298,7 +301,6 @@ int cmd(void)
 		stx_error(ERR_SPOREOL);
 		return FALSE;
 	}
-	fetch0 = curr_fetch_trip;
 	for (;;)
 	{
 		if ((EXPR_FAIL == (rval = (*cmd_data[x].fcn)())) || (TK_COMMA != TREF(window_token)))	/* NOTE assignment */
@@ -316,15 +318,18 @@ int cmd(void)
 	}
 	if (NULL != oldchain)
 	{	/* for a literal 0 postconditional, we just throw the command & args away and return happiness */
+		(TREF(fetch_control)).curr_fetch_trip = fetch0;
+		(TREF(fetch_control)).curr_fetch_opr = fetch1;
+		(TREF(fetch_control)).curr_fetch_count = fetch_cnt;
 		setcurtchain(oldchain);
 		return TRUE;
 	}
 	if ((EXPR_FAIL != rval) && cr)
 	{
-		if (fetch0 != curr_fetch_trip)
+		if (fetch0 != (TREF(fetch_control)).curr_fetch_trip)
 		{
-			assert(OC_FETCH == curr_fetch_trip->opcode);
-			*cr = put_tjmp(curr_fetch_trip);
+			assert(OC_FETCH == (TREF(fetch_control)).curr_fetch_trip->opcode);
+			*cr = put_tjmp((TREF(fetch_control)).curr_fetch_trip);
 		} else
 		{
 			if (shifting)

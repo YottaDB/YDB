@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -102,7 +102,8 @@ int f_incr(oprtype *a, opctype op)
 		} else
 			assert(OC_NOOP == (TREF(expr_start))->opcode);
 	}
-	if (!TREF(shift_side_effects) || (GTM_BOOL != TREF(gtm_fullbool)) || (OC_INDINCR != r->opcode))
+	if (!TREF(shift_side_effects) || (GTM_BOOL != TREF(gtm_fullbool)) || (OC_INDINCR != r->opcode)
+		|| (NULL == TREF(expr_start)))
 	{	/* put it on the end of the main chain as there's no reason to play more with the ordering */
 		setcurtchain(oldchain);
 		triptr = (TREF(curtchain))->exorder.bl;

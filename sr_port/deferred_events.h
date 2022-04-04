@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 
 #ifdef DEBUG
 /* Uncomment below to enable tracing of deferred events */
-/* #define DEBUG_DEFERRED_EVENT	*/
+/* #define DEBUG_DEFERRED_EVENT */
 #endif
 #ifdef DEBUG_DEFERRED_EVENT
 GBLREF	volatile int4		fast_lock_count;
@@ -56,13 +56,18 @@ MBSTART {										\
  *         a thorough redesign or rethinking).
  * ------------------------------------------------------------------
  */
-/*  Prototypes for transfer table callback functions, only called by routine that manages xfer_table. */
-boolean_t xfer_set_handlers(int4, int4 param, boolean_t popped_entry);
+/* To prevent GTMSECSHR from pulling in the function xfer_set_handlers currently used in gtm_malloc_src.h and gtm_test_alloc.c,
+ * and in turn the entire event codebase, we define a function-pointer variable and initialize it at startup to NULL only in
+ * GTMSECSHR and thereby not pull in other unneeded / unwanted executables.
+ */
+boolean_t	xfer_set_handlers(int4 event_type, int4 param, boolean_t popped_entry);
+typedef	boolean_t	(*xfer_set_handlers_fnptr_t)(int4 event_type, int4 param, boolean_t popped_entry);
+GBLREF	xfer_set_handlers_fnptr_t	xfer_set_handlers_fnptr;	/* see comment above about this typedef */
+/* other prototypes for transfer table callback functions, only called by routine that manages xfer_table. */
 /* Reset transfer table to normal settings.
  * Puts back most things back that could have been changed, excepting timeouts waiting for a jobinterrupt to complete
  * Return value indicates success/failure representing whether the type of reset is the same as event type of set.
  */
-boolean_t xfer_reset_handlers(int4 event_type);
 /* This version resets the handlers only if they were set by the same event type. */
 boolean_t xfer_reset_if_setter(int4 event_type);
 /* This version resets a handler */

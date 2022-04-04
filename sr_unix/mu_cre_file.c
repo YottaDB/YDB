@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -398,7 +398,7 @@ unsigned char mu_cre_file(void)
 	/* Check if this file is an encrypted database. If yes, do init */
 	if (IS_ENCRYPTED(gv_cur_region->dyn.addr->is_encrypted))
 	{
-		GTMCRYPT_HASH_GEN(cs_addrs, STRLEN(path), path, 0, NULL, hash, gtmcrypt_errno);
+		GTMCRYPT_HASH_GEN(cs_addrs, strnlen(path, sizeof(path)), path, 0, NULL, hash, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, file.len, file.addr);
@@ -408,7 +408,7 @@ unsigned char mu_cre_file(void)
 		}
 		memcpy(cs_data->encryption_hash, hash, GTMCRYPT_HASH_LEN);
 		SET_AS_ENCRYPTED(cs_data->is_encrypted); /* Mark this file as encrypted */
-		INIT_DB_OR_JNL_ENCRYPTION(cs_addrs, cs_data, STRLEN(path), path, gtmcrypt_errno);
+		INIT_DB_OR_JNL_ENCRYPTION(cs_addrs, cs_data, strnlen(path, sizeof(path)), path, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, file.len, file.addr);
@@ -423,6 +423,7 @@ unsigned char mu_cre_file(void)
 	cs_data->encryption_hash2_start_tn = 0;
 	cs_data->span_node_absent = TRUE;
 	cs_data->maxkeysz_assured = TRUE;
+	cs_data->problksplit = DEFAULT_PROBLKSPLIT;
 	mucregini(cs_data->trans_hist.total_blks);
 	cs_data->createinprogress = FALSE;
 	ASSERT_NO_DIO_ALIGN_NEEDED(udi);	/* because we are creating the database and so effectively have standalone access */

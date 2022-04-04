@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2020 Fidelity National Information	*
+ * Copyright (c) 2004-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,6 +47,7 @@
 #include "jnl.h"
 #include "tp.h"
 #include "cli.h"
+#include "getstorage.h"
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -83,6 +84,8 @@ GBLREF	boolean_t	gtm_stdxkill;		/* Use M Standard exclusive kill instead of hist
 GBLREF	boolean_t	ztrap_new;		/* Each time $ZTRAP is set it is automatically NEW'd */
 GBLREF	size_t		gtm_max_storalloc;	/* Used for testing: creates an allocation barrier */
 GBLREF	boolean_t	gtm_nofflf;		/* Used to control "write #" behavior ref GTM-9136 */
+GBLREF	size_t		zmalloclim;		/* ISV memory warning of MALLOCCRIT in bytes */
+GBLREF	boolean_t	malloccrit_issued;	/* MEMORY error limit set at time of MALLOCCRIT */
 
 void	gtm_env_init(void)
 {
@@ -92,6 +95,7 @@ void	gtm_env_init(void)
 	int			status2, i, j;
 	int4			status;
 	mstr			val, trans;
+	size_t			tmp_malloc_limit;
 	uint4			tdbglvl, tmsock, reservesize, memsize, cachent, trctblsize, trctblbytes;
 	uint4			max_threads, max_procs;
 	DCL_THREADGBL_ACCESS;
@@ -378,12 +382,24 @@ void	gtm_env_init(void)
 		val.addr = ZTRAP_NEW;
 		val.len = SIZEOF(ZTRAP_NEW) - 1;
 		ztrap_new = logical_truth_value(&val, FALSE, NULL);
-		/* See if $gtm_max_storalloc is set */
-		val.addr = GTM_MAX_STORALLOC;
-		val.len = SIZEOF(GTM_MAX_STORALLOC) - 1;
-		gtm_max_storalloc = trans_numeric(&val, &is_defined, TRUE);
-		/* See if $gtm_mupjnl_parallel is set */
-		val.addr = GTM_MUPJNL_PARALLEL;
+		/* Initialize dollar_zmalloclim and malloccrit_issued */
+		tmp_malloc_limit = (size_t)getstorage();
+		val.addr = GTM_MALLOC_LIMIT;
+		val.len = SIZEOF(GTM_MALLOC_LIMIT) - 1;
+		assert(0 == malloccrit_issued);
+		zmalloclim = (size_t)trans_numeric_64(&val, &is_defined, TRUE);
+		if (!is_defined || IS_GTMSECSHR_IMAGE)
+		{
+			zmalloclim = 0;					/* default is 0; exclude gtmsecshr */
+			malloccrit_issued = TRUE;
+		}
+		else if (0 > zmalloclim)				/* negative gives half the OS limit */
+			zmalloclim = tmp_malloc_limit / 2;		/* see gtm_malloc_src.h MALLOC macro comment on halving */
+		else if (zmalloclim > tmp_malloc_limit)
+			zmalloclim = tmp_malloc_limit;
+		else if (zmalloclim < MIN_MALLOC_LIM)
+			zmalloclim = MIN_MALLOC_LIM;
+		val.addr = GTM_MUPJNL_PARALLEL;				/* See if $gtm_mupjnl_parallel is set */
 		val.len = SIZEOF(GTM_MUPJNL_PARALLEL) - 1;
 		gtm_mupjnl_parallel = trans_numeric(&val, &is_defined, TRUE);
 		if (!is_defined)
@@ -394,7 +410,6 @@ void	gtm_env_init(void)
 		ret = logical_truth_value(&val, FALSE, &is_defined);
 		if (is_defined)
 		        gtm_nofflf = ret;
-
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 	}

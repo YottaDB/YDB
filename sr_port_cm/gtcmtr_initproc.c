@@ -44,7 +44,7 @@ GBLREF jnl_process_vector *originator_prc_vec;
 error_def(CMERR_INVPROT);
 error_def(ERR_TOOMANYCLIENTS);
 
-bool gtcmtr_initproc(void)
+char gtcmtr_initproc(void)
 {
 	unsigned char *reply;
         unsigned short beginprocnum;
@@ -56,7 +56,7 @@ bool gtcmtr_initproc(void)
 	reply++;
 	gtcm_protocol(&myproto);
 	if (!gtcm_protocol_match((protocol_msg *)reply, &myproto))
-		RTS_ERROR_ABT(VARLSTCNT(1) CMERR_INVPROT);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) CMERR_INVPROT);
 	curr_entry->query_is_queryget = gtcm_is_query_queryget((protocol_msg *)reply, &myproto);
 	curr_entry->err_compat = gtcm_err_compat((protocol_msg *)reply, &myproto);
 	curr_entry->cli_supp_allowexisting_stdnullcoll = (0 <= memcmp(reply + CM_LEVEL_OFFSET, CMM_STDNULLCOLL_MIN_LEVEL, 3));
@@ -95,7 +95,7 @@ bool gtcmtr_initproc(void)
         {
 		procnum++;	/* OK to wrap since proc_to_clb is proper size */
 		if (beginprocnum == procnum)
-			RTS_ERROR_ABT(VARLSTCNT(1) ERR_TOOMANYCLIENTS);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TOOMANYCLIENTS);
 	}
 	curr_entry->procnum = procnum;
         proc_to_clb[procnum] = curr_entry->clb_ptr;

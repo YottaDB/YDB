@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Copyright (c) 2003-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,6 +14,7 @@
 #define GTM_MALLOC_H__included
 
 #define GTM_MEMORY_RESERVE_DEFAULT 64	/* 64K reserve "backpocket-cache" released on out-of-memory error */
+#define MIN_MALLOC_LIM	2500000		/* SWAG of memory size for a modest routine */
 
 typedef size_t gtm_msize_t;
 

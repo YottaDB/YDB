@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,11 +19,10 @@
 #define ZSHOW_BUFF_ONLY 	4
 #define ZSHOW_NOPARM		-1
 
-#ifdef UNIX
-# define ZSHOW_ALL		"IVBDLGRC"
-#else
-# define ZSHOW_ALL		"IVBDLGSC"
-#endif
+/* Default set of zshow "*" codes */
+#define ZSHOW_ALL		"IVBDLGRC"
+/* All zshow codes */
+#define ZSHOW_ALL_ITEMS		"ABCDGILRSTV"
 
 #define CLEANUP_ZSHOW_BUFF				\
 {							\

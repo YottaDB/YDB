@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,15 +17,15 @@
 #include "mdq.h"
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
+#include "ztimeout_routines.h"
 
 GBLREF	int			(* volatile xfer_table[])();
 GBLREF	void			(*tp_timeout_clear_ptr)(void);
 GBLREF	volatile int4		outofband;
 GBLREF	volatile boolean_t	tp_timeout_set_xfer;
-GBLREF	void			(*ztimeout_clear_ptr)(void);
 
 void outofband_clear(void)
-{
+{	/* called by .c files: op_fetchintrrpt, op_forintrrpt, op_startintrrpt */
 	boolean_t status;
 	DCL_THREADGBL_ACCESS;
 
@@ -34,10 +34,12 @@ void outofband_clear(void)
 	{
 		assert(!tp_timeout_set_xfer);	/* TP timeout should not have been the primary event */
 		(*tp_timeout_clear_ptr)();
-		(*ztimeout_clear_ptr)();
+		ztimeout_clear_timer();
 		TAREF1(save_xfer_root, ctrap).param_val = 0;
 		EMPTY_XFER_QUEUE_ENTRIES;
+	} else
+	{
+		status = xfer_reset_if_setter(outofband);
+		assert(TRUE == status);
 	}
-	status = xfer_reset_handlers(outofband);
-	assert(TRUE == status);
 }

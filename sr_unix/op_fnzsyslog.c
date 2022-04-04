@@ -1,6 +1,6 @@
  /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information	*
+ * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,8 +42,8 @@ void op_fnzsyslog(mval* src, mval* dst)
 		}
 		memcpy(rebuff, src->str.addr, len);	/* Rebuffer to add null terminator */
 		rebuff[len] = '\0';			/* Add null terminator */
-		util_out_print(NULL, RESET);
-		util_out_print(rebuff, OPER);
+		util_out_print_args(NULL, 0, RESET);
+		util_out_print_args(rebuff, 0, OPER);
 		RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
 	}
 	memcpy(dst, &literal_one, SIZEOF(mval));

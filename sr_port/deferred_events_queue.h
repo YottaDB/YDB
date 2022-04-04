@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2021 Fidelity National Information	*
+ * Copyright (c) 2018-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,8 +31,6 @@ GBLREF  sigset_t			block_sigsent;
 
 #define OUTOFBAND_RESTARTABLE(event)	(jobinterrupt == (event))
 
-void outofband_action(boolean_t line_fetch_or_start);
-
 /* ------------------------------------------------------------------
  * Perform action corresponding to the first async event that
  * was logged.
@@ -43,7 +41,7 @@ void ctrlc_set(int4);
 void jobinterrupt_set(int4 dummy);
 void tptimeout_set(int4 dummy_param);		/* Used to setup tptimeout error via out-of-band */
 void ztimeout_set(int4 dummy_param);
-void tt_write_error_set(int4);
+void defer_error_set(int4);
 void async_action(bool);
 void outofband_clear(void);
 
@@ -118,22 +116,3 @@ MBSTART {									\
 		assert(INTRPT_IN_EVENT_HANDLING != intrpt_ok_state);		\
 } MBEND
 #endif /* DEFERRED_EVENTS_QUEUE_INCLUDED */
-
-#define TRY_EVENT_POP									\
-MBSTART {										\
-	int4		event_type, param_val;						\
-	intrpt_state_t	prev_intrpt_state;						\
-											\
-	assert(INTRPT_IN_EVENT_HANDLING != intrpt_ok_state);				\
-	DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);			\
-	if ((no_event == outofband)							\
-		&& (no_event != (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))	\
-	{	/* perhaps pop an_event */						\
-		POP_XFER_QUEUE_ENTRY(&event_type, &param_val);				\
-		if (no_event != event_type)						\
-			xfer_set_handlers(event_type, param_val, TRUE);			\
-		DBGDFRDEVNT((stderr, "%d %s: pop_reset_xfer returned event %d\n",	\
-			__LINE__, __FILE__, event_type));				\
-	}										\
-	ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);					\
-} MBEND

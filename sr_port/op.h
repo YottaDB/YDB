@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,7 +108,7 @@ void	op_fnzextract(int last, int first, mval *src, mval *dest);
 void	op_fnzfile(mval *name, mval *key, mval *ret);
 int4	op_fnzfind(mval *src, mval *del, mint first, mval *dst);
 void	op_fnzj2(mval *src, int len, mval *dst);
-void	op_fnzjobexam(mval *prelimSpec, mval *finalSpec);
+void	op_fnzjobexam(mval *prelimSpec,  mval *fmt, mval *finalSpec);
 void	op_fnzlength(mval *a1, mval *a0);
 void	op_fnzlkid(mint boolex, mval *retval);
 void	op_fnzm(mint x, mval *v);

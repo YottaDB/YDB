@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -677,6 +677,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		repl_instance.jnlpool_shmid = udi->shmid;
 		repl_instance.jnlpool_semid_ctime = udi->gt_sem_ctime;
 		repl_instance.jnlpool_shmid_ctime = udi->gt_shm_ctime;
+		assert((REPL_INST_HDR_SIZE == sizeof(repl_instance))
+				&& (REPL_INST_HDR_SIZE == sizeof(*jnlpool->repl_inst_filehdr)));
 		memcpy(jnlpool->repl_inst_filehdr, &repl_instance, REPL_INST_HDR_SIZE);	/* Initialize FILE HEADER */
 		jnlpool->repl_inst_filehdr->crash = TRUE;
 		/* Since we are creating the journal pool, initialize the mutex structures in the shared memory for later
@@ -1196,6 +1198,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		if (reset_gtmsrclcl_info)
 		{	/* Initialize all fields of "gtmsource_local" that are also present in the corresponding "gtmsrc_lcl" */
 			gtmsourcelocal_ptr->read_jnl_seqno = 1;	/* fully initialized when source server connects to receiver */
+			assert((MAX_INSTNAME_LEN == sizeof(gtmsource_options.secondary_instname))
+					&& (MAX_INSTNAME_LEN == sizeof(gtmsourcelocal_ptr->secondary_instname)));
 			memcpy(gtmsourcelocal_ptr->secondary_instname, gtmsource_options.secondary_instname, MAX_INSTNAME_LEN - 1);
 			gtmsourcelocal_ptr->connect_jnl_seqno = 0; /* fully initialized when source server connects to receiver */
 			gtmsourcelocal_ptr->send_losttn_complete = FALSE;

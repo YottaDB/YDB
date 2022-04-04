@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,7 +84,7 @@ void send_msg_csa(void *csa, int arg_count, ...)
 void send_msg_va(void *csa, int arg_count, va_list var)
 {
         int		dummy, fao_actual, fao_count, i, msg_id, freeze_msg_id;
-        char    	msg_buffer[1024];
+        char    	msg_buffer[PUT_BUFF_SIZE];
         mstr    	msg_string;
 	char		*save_util_outptr;
 	va_list		save_last_va_list_ptr;

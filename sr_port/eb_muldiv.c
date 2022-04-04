@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -243,40 +243,47 @@ int4	eb_div (int4 x[], int4 y[], int4 q[])	/* q = y/x */
 	xx[3] = (x[1]/(RADIX/1000))%RADIX;
 	xx[4] =  x[1]/((RADIX/1000)*RADIX);
 
-	assert (yx[9] <= xx[4]);
-	for (i = 4 ;  i >= 0 ;  i--)
-	{
-		qx[i] = (yx[i+5]*RADIX + yx[i+4]) / xx[4];
-		if (qx[i] != 0)
+	assert((yx[9] <= xx[4]) || (0 < xx[4]));
+	if (0 < xx[4])
+	{	/* The added IF should not be a performance hit since xx[4] was just set */
+		for (i = 4; (i >= 0) && (0 < xx[4]);  i--)
 		{
-			/* Multiply x by qx[i] and subtract from remainder. */
-			for (j = 0, borrow = 0 ;  j <= 4 ;  j++)
+			qx[i] = (yx[i+5]*RADIX + yx[i+4]) / xx[4];
+			if (qx[i] != 0)
 			{
-				prod = qx[i]*xx[j] + borrow;
-				borrow = prod/RADIX;
-				yx[i+j] -= (prod%RADIX);
-				if (yx[i+j] < 0)
+				/* Multiply x by qx[i] and subtract from remainder. */
+				for (j = 0, borrow = 0 ;  j <= 4 ;  j++)
 				{
-					yx[i+j] += RADIX;
-					borrow ++;
+					prod = qx[i]*xx[j] + borrow;
+					borrow = prod/RADIX;
+					yx[i+j] -= (prod%RADIX);
+					if (yx[i+j] < 0)
+					{
+						yx[i+j] += RADIX;
+						borrow ++;
+					}
 				}
-			}
-			yx[i+5] -= borrow;
+				yx[i+5] -= borrow;
 
-			while (yx[i+5] < 0)
-			{
-				qx[i] --;	/* estimate too high */
-				for (j = 0, carry = 0 ;  j <= 4 ;  j++)
+				while (yx[i+5] < 0)
 				{
-					yx[i+j] += (xx[j] + carry);
-					carry = yx[i+j]/RADIX;
-					yx[i+j] %= RADIX;
+					qx[i] --;	/* estimate too high */
+					for (j = 0, carry = 0 ;  j <= 4 ;  j++)
+					{
+						yx[i+j] += (xx[j] + carry);
+						carry = yx[i+j]/RADIX;
+						yx[i+j] %= RADIX;
+					}
+					yx[i+5] += carry;
 				}
-				yx[i+5] += carry;
 			}
+			assert (0 <= qx[i]  &&  qx[i] < RADIX);	/* make sure in range */
+			assert (yx[i+5] == 0);		/* check that remainder doesn't overflow */
 		}
-		assert (0 <= qx[i]  &&  qx[i] < RADIX);	/* make sure in range */
-		assert (yx[i+5] == 0);		/* check that remainder doesn't overflow */
+	} else
+	{	/* Unlikely case */
+		for (i = 0 ;  i < 5 ;  i++)
+			qx[i] = 0;
 	}
 
 	/* Assemble q 4-4-1/3-4-2 */

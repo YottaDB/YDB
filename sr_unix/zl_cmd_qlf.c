@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,8 +62,9 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (quals->len + SIZEOF(COMMAND) > MAX_LINE)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_COMPILEQUALS, 2, quals->len, quals->addr);
+	assert(0 <= quals->len);
+	if ((0 > quals->len) || ((MAX_LINE - SIZEOF(COMMAND)) < quals->len))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_COMPILEQUALS, 2, (0 < quals->len) ? MAX_LINE : 0, quals->addr);
 	MEMCPY_LIT(cbuf, COMMAND);
 	memcpy(cbuf + SIZEOF(COMMAND) - 1, quals->addr, quals->len);
 	cbuf[SIZEOF(COMMAND) - 1 + quals->len] = 0;
@@ -113,10 +114,13 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 		}
 		file.addr = pblk.l_name;
 		file.len = pblk.b_name;
-		if ((0 == pblk.b_ext) && ( MAX_FN_LEN >= (*srclen + SIZEOF(DOTM))))
+		if ((0 == pblk.b_ext) && (MAX_FN_LEN >= (*srclen + SIZEOF(DOTM))))
 		{
-			assert(0 != pblk.l_name);
-			assert(MAX_FN_LEN >= pblk.b_name);
+			assert(NULL != pblk.l_name);
+			assert((MAX_FN_LEN >= pblk.b_name) && (MAX_FN_LEN >= pblk.buff_size));
+			assert((pblk.buffer < pblk.l_name) && ((pblk.buffer + pblk.buff_size) > pblk.l_name));
+			/* pblk.buff_size is MAX_FN_LEN, but pblk.buffer is allocated with an extra byte for the trailing null */
+			assert((pblk.buffer + pblk.buff_size + 1) >= (pblk.l_name + pblk.b_name + SIZEOF(DOTM)));
 			memcpy(&pblk.l_name[pblk.b_name], DOTM, SIZEOF(DOTM));
 			pblk.b_ext = (SIZEOF(DOTM) - 1);
 		}

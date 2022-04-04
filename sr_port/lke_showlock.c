@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -225,9 +225,10 @@ bool	lke_showlock(
 						if ((NULL == one_lock.addr) ||
 							(!memcmp(name->addr, one_lock.addr, one_lock.len)
 							&& (!exact || (one_lock.len == f[0]))))
-							util_out_print(format, FLUSH, f[0], f[1], f[2], f[3], f[4], f[5], f[6]);
+							util_out_print_args(format, 7, FLUSH,
+									f[0], f[1], f[2], f[3], f[4], f[5], f[6]);
 					} else
-						util_cm_print(lnk, CMMS_V_LKESHOW, format, FLUSH,
+						util_cm_print(lnk, CMMS_V_LKESHOW, format, 7, FLUSH,
 							      f[0], f[1], f[2], f[3], f[4], f[5], f[6]);
 				}
 				if ((NULL != one_lock.addr) &&

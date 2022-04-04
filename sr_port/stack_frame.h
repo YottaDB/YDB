@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,7 +71,7 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 	 */
 	unsigned short	type;
 	unsigned char	flags;
-	bool		dollar_test;
+	signed char	dollar_test;
 	/*uint4		glvn_indx;*/	/* state of glvn pool at frame creation time. For use when gtmpcat is changed. */
 	unsigned char	*for_ctrl_stack;/* NOTE: temporarily using this field for glvn_indx so that gtmpcat works */
 	unsigned char	*restart_pc;	/* interrupt restart program counter */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -215,7 +215,7 @@ STATICFNDEF void scan_behavioral_words(char *c, struct extcall_entry_list *entry
 	}
 	c++;
 	token = STRTOK_R(c, " \t", &saveptr);
-	while (token != NULL)
+	while (NULL != token)
 	/* Make Keyword case insensitive */
 	{
 		temp_tok = token;

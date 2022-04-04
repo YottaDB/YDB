@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Copyright (c) 2007-2022 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -54,6 +54,8 @@ l10:
 	movw	$mval_m_str, mval_w_mvtype(REG64_ARG0)
 	movl	mval_l_strlen(REG64_ARG1), REG32_ARG3
 	cmpl	REG32_ACCUM, REG32_ARG3			# If left index > str. len, then null result
+	jl	l25
+	cmpl	$0, REG32_ARG2				# If right index < 0, then null result
 	jl	l25
 	cmpl	REG32_ARG2, REG32_ARG3			# Right index may be at most the len.
 	jge	l20					# .. of the source string

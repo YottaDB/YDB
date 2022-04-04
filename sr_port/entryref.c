@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -90,6 +90,7 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 	rtnname.len = labname.len = 0;
 	rtnname.addr = &rtn_text[0];
 	labname.addr = &lab_text[0];
+	label.oprclass = NO_REF;
 	/* Discover what sort of entryref we have */
 	switch (TREF(window_token))
 	{
@@ -107,21 +108,20 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 				rettrip->operand[0] =  put_mlab(&labname);
 				return rettrip;
 			}
-			label.oprclass = NO_REF;
+			assert(NO_REF == label.oprclass);
 			break;
 		case TK_ATSIGN:
 			if(!indirection(&label))
 				return NULL;
-			if ((TK_PLUS != TREF(window_token)) && (TK_CIRCUMFLEX != TREF(window_token))
-			    && (TK_COLON != TREF(window_token)) && can_commarg)
-			{	/* Have a single indirect arg like @ARG - not @LBL^[@]rtn or @LBL+1, etc. */
+			if (!(!can_commarg || (TK_PLUS == TREF(window_token)) || (TK_CIRCUMFLEX == TREF(window_token))))
+			{	/* a single indirect arg like @ARG - not @LBL^[@]rtn or @LBL+1, or +15 etc. */
 				rettrip = ref = maketriple(OC_COMMARG);
 				ref->operand[0] = label;
 				ref->operand[1] = put_ilit(commargcode);
 				ins_triple(ref);
 				return rettrip;
 			}
-			labname.len = 0;
+			assert(0 == labname.len);
 			break;
 		case TK_PLUS:
 			if (labref)
@@ -130,8 +130,8 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 				return NULL;
 			}	/* WARNING fallthrough possible */
 		default:
-			labname.len = 0;
-			label.oprclass = NO_REF;
+			assert(0 == labname.len);
+			assert(NO_REF == label.oprclass);
 			break;
 	}
 	if (!labref && (TK_PLUS == TREF(window_token)))

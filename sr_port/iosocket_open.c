@@ -297,7 +297,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					break;
 				case iop_zlisten:
 					listen_specified = TRUE;
-					len = (int)(*(pp->str.addr + p_offset));
+					len = (int)(unsigned char)*(pp->str.addr + p_offset);
 					if (len < SA_MAXLITLEN)
 					{
 						memset(sockaddr, 0, SIZEOF(sockaddr));
@@ -309,7 +309,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					break;
 				case iop_connect:
 					connect_specified = TRUE;
-					len = (int)(*(pp->str.addr + p_offset));
+					len = (int)(unsigned char)*(pp->str.addr + p_offset);
 					if (len < SA_MAXLITLEN)
 					{
 						memset(sockaddr, 0, SIZEOF(sockaddr));
@@ -328,7 +328,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					break;
 				case iop_attach:
 					attach_specified = TRUE;
-					handle_len = (int)(*(pp->str.addr + p_offset));
+					handle_len = (int)(unsigned char)*(pp->str.addr + p_offset);
 					if (handle_len > MAX_HANDLE_LEN)
 						handle_len = MAX_HANDLE_LEN;
 					assert((0 < handle_len) && (SIZEOF(sock_handle) >= handle_len));
@@ -388,16 +388,16 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					break;
 				case iop_w_protection:
 					filemode_mask |= S_IRWXO;
-					filemode |= *(pp->str.addr + p_offset);
+					filemode |= (uint)(unsigned char)*(pp->str.addr + p_offset);
 					break;
 				case iop_g_protection:
 					filemode_mask |= S_IRWXG;
-					filemode |= *(pp->str.addr + p_offset) << 3;
+					filemode |= (uint)(unsigned char)*(pp->str.addr + p_offset) << 3;
 					break;
 				case iop_s_protection:
 				case iop_o_protection:
 					filemode_mask |= S_IRWXU;
-					filemode |= *(pp->str.addr + p_offset) << 6;
+					filemode |= (uint)(unsigned char)*(pp->str.addr + p_offset) << 6;
 					break;
 				default:
 					break;

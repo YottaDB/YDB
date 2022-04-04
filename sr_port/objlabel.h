@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,7 @@
  * If the 32bit platform limit would be exceeded, start bumping the OBJ_PLATFORM_LABEL value - but only for 32 bit Linux.
  */
 
-#define OBJ_UNIX_LABEL	41
+#define OBJ_UNIX_LABEL	42
 #define	OBJ_PLATFORM_LABEL	0
 
 #ifdef USHBIN_SUPPORTED

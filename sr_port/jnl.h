@@ -1296,9 +1296,10 @@ MBSTART {														\
 	GBLREF	uint4		dollar_tlevel;										\
 															\
 	assert(CSA->now_crit);												\
-	/* The following condition implies that a previous update process was killed in CMT06, right before updating	\
+	/* The following condition implies that a update/MUMPS process was killed in CMT06, right before updating	\
 	 * JBP->phase2_commit_index2. Increment index2 & call jnl_phase2_cleanup() to process it as a dead commit.	\
 	 */														\
+	SHM_READ_MEMORY_BARRIER;	/* Ensure the indices read from memory are correct */				\
 	if ((JBP->phase2_commit_index2 == JBP->phase2_commit_index1) && (JBP->freeaddr < JBP->rsrv_freeaddr)		\
 		&& ((JBP->phase2_commit_array[JBP->phase2_commit_index1].start_freeaddr +				\
 			JBP->phase2_commit_array[JBP->phase2_commit_index1].tot_jrec_len) == JBP->rsrv_freeaddr))	\

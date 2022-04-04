@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information 	*
+ * Copyright (c) 2001-2022 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -184,7 +184,7 @@ LITDEF	err_msg merrors[] = {
 	{ "SPOREOL", "Either a space or an end-of-line was expected but not found", 0, 0 },
 	{ "SRCLIN", "!_!AD!/!_!AD", 4, 0 },
 	{ "SRCLOC", "!_!_At column !UL, line !UL, source module !AD", 4, 0 },
-	{ "UNUSEDMSG353", "SRCLOCUNKNOWN unused in V7.0-000 and for an indetermite time prior", 0, 0 },
+	{ "RLNKRECNFL", "Conflict on relinkctl file !AZ for $ZROUTINES directory !AD, running an integrity check", 3, 0 },
 	{ "STACKCRIT", "Stack space critical", 0, 0 },
 	{ "STACKOFLOW", "Stack overflow", 0, 0 },
 	{ "STACKUNDERFLO", "Stack underflow", 0, 0 },
@@ -402,7 +402,7 @@ LITDEF	err_msg merrors[] = {
 	{ "CCENOCCP", "The cluster control program is not running on this node", 0, 0 },
 	{ "CCECCPPID", "The cluster control program has PID 0x!XL", 1, 0 },
 	{ "CCECLSTPRCS", "!UL processes are accessing clustered database files", 1, 0 },
-	{ "ZSHOWBADFUNC", "An illegal function was specified for ZSHOW", 0, 0 },
+	{ "ZSHOWBADFUNC", "An invalid information code was specified with ZSHOW or $ZJOBEXAM()", 0, 0 },
 	{ "NOTALLJNLEN", "Journaling disabled/off for !AD regions", 2, 0 },
 	{ "BADLOCKNEST", "Unsupported nesting of LOCK commands", 0, 0 },
 	{ "NOLBRSRC", "Object libraries cannot have SRC paths associated", 0, 0 },
@@ -466,7 +466,7 @@ LITDEF	err_msg merrors[] = {
 	{ "RMWIDTHPOS", "File record size or width must be greater than zero", 0, 0 },
 	{ "OFFSETINV", "Entry point !AD+!SL not valid", 3, 0 },
 	{ "JOBPARTOOLONG", "Total parameter length is too long for job command", 0, 0 },
-	{ "JOBARGMISSING", "Missing job argument !UL - can't skip non-trailing arguments to a JOB command in OpenVMS editions", 1, 0 },
+	{ "RLNKINTEGINFO", "Integrity check completed successfully: !AD -- called from module !AD at line !UL", 5, 0 },
 	{ "RUNPARAMERR", "Error accessing parameter for run command", 0, 0 },
 	{ "FNNAMENEG", "Depth argument to $NAME cannot be negative", 0, 0 },
 	{ "ORDER2", "Invalid second argument to $ORDER.  Must be -1 or 1.", 0, 0 },
@@ -949,8 +949,8 @@ LITDEF	err_msg merrors[] = {
 	{ "UNUSEDMSG1115", "DBCDBNOCERTIFY removed from code in V7.0-000 Nov 2020", 0, 0 },
 	{ "DBFRZRESETSUC", "Freeze released successfully on database file !AD", 2, 0 },
 	{ "JNLFILEXTERR", "Error during extension of journal file !AD", 2, 0 },
-	{ "JOBEXAMDONE", "GT.M process !UL completed job examine to !AD", 3, 0 },
-	{ "JOBEXAMFAIL", "GT.M process !UL executing $ZJOBEXAM function failed with the preceding error message", 1, 0 },
+	{ "JOBEXAMDONE", "GT.M process !UL successfully executed $ZJOBEXAM() into !AD", 3, 0 },
+	{ "JOBEXAMFAIL", "GT.M process !UL failed while executing $ZJOBEXAM(). Check the preceding error message for more information.", 1, 0 },
 	{ "JOBINTRRQST", "Job interrupt requested", 0, 0 },
 	{ "ERRWZINTR", "Error while processing $ZINTERRUPT", 0, 0 },
 	{ "CLIERR", "!AD", 2, 0 },
@@ -972,7 +972,7 @@ LITDEF	err_msg merrors[] = {
 	{ "JNLSWITCHSZCHG", "Journal AUTOSWITCHLIMIT [!UL blocks] is rounded down to [!UL blocks] to equal the sum of Journal ALLOCATION [!UL blocks] and a multiple of Journal EXTENSION [!UL blocks] for database file !AD", 6, 0 },
 	{ "NOTRNDMACC", "Only random access files are supported as backup files for non-incremental backup", 0, 0 },
 	{ "TMPFILENOCRE", "Error in MUPIP BACKUP while trying to create temporary file !AD", 2, 0 },
-	{ "SHRMEMEXHAUSTED", "Attempt by process to use more shared memory than currently permitted by VMS", 0, 0 },
+	{ "UNUSEDMSG1141", "SHRMEMEXHAUSTED last used in OpenVMS", 0, 0 },
 	{ "JNLSENDOPER", "pid = 0x!XL : status = 0x!XL : jpc_status = 0x!XL : jpc_status2 = 0x!XL : iosb.cond = 0x!XW", 5, 0 },
 	{ "DDPSUBSNUL", "NUL characters in subscripts are not supported by DDP", 0, 0 },
 	{ "DDPNOCONNECT", "Named volume set, !AD, is not connected", 2, 0 },
@@ -1073,7 +1073,7 @@ LITDEF	err_msg merrors[] = {
 	{ "RSVDBYTE2HIGH", "Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and Reserved bytes (!UL)", 5, 0 },
 	{ "BKUPTMPFILOPEN", "Open of backup temporary file !AD failed", 2, 0 },
 	{ "BKUPTMPFILWRITE", "Write to backup temporary file !AD failed", 2, 0 },
-	{ "VMSMEMORY2", "Central storage exhausted during allocation of dynamic file descriptor with !UL bytes - check page file quota and page file size", 1, 0 },
+	{ "UNUSEDMSG1242", "VMSMEMORY2 last used in OpenVMS", 0, 0 },
 	{ "UNUSEDMSG1243", "LOADBGSZ2 last used in V6.3-009", 0, 0 },
 	{ "UNUSEDMSG1244", "LOADEDSZ2 last used in V6.3-009", 0, 0 },
 	{ "REPLINSTMISMTCH", "Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)", 8, 0 },
@@ -1354,14 +1354,14 @@ LITDEF	err_msg merrors[] = {
 	{ "NULLENTRYREF", "JOB command did not specify entryref", 0, 0 },
 	{ "ZPEEKNORPLINFO", "$ZPEEK() unable to access requested replication structure", 0, 0 },
 	{ "MMREGNOACCESS", "Region !AD (!AD) is no longer accessible. See prior error messages in the operator and application error logs", 4, 0 },
-	{ "MALLOCMAXUNIX", "Exceeded maximum allocation defined by $gtm_max_storalloc", 0, 0 },
-	{ "MALLOCMAXVMS", "Exceeded maximum allocation defined by GTM_MAX_STORALLOC", 0, 0 },
+	{ "UNUSEDMSG1525", "MALLOCMAXUNIX last used in OpenVMS", 0, 0 },
+	{ "MALLOCCRIT", "Memory allocation critical due to request for !UJ bytes from 0x!XJ", 2, 0 },
 	{ "HOSTCONFLICT", "Host !AD could not open database file !AD because it is marked as already open on node !AD", 6, 0 },
 	{ "GETADDRINFO", "Error in getting address info", 0, 0 },
 	{ "GETNAMEINFO", "Error in getting name info", 0, 0 },
 	{ "SOCKBIND", "Error in binding socket", 0, 0 },
 	{ "INSTFRZDEFER", "Instance Freeze initiated by !AD error on region !AD deferred due to critical resource conflict", 4, 0 },
-	{ "UNUSEDMSG1532", "REGOPENRETRY last used in V6.3-000A", 0, 0 },
+	{ "VIEWARGTOOLONG", "The argument length (!UL) to VIEW command !AD exceeds the maximum !UL", 4, 0 },
 	{ "REGOPENFAIL", "Failed to open region !AD (!AD) due to conflicting database shutdown activity", 4, 0 },
 	{ "REPLINSTNOSHM", "Database !AD has no active connection to a replication journal pool", 2, 0 },
 	{ "DEVPARMTOOSMALL", "Deviceparameter must be greater than zero (0)", 0, 0 },
@@ -1732,7 +1732,7 @@ LITDEF	int ERR_SELECTFALSE = 150373698;
 LITDEF	int ERR_SPOREOL = 150373706;
 LITDEF	int ERR_SRCLIN = 150373715;
 LITDEF	int ERR_SRCLOC = 150373723;
-LITDEF	int ERR_UNUSEDMSG353 = 150373731;
+LITDEF	int ERR_RLNKRECNFL = 150373728;
 LITDEF	int ERR_STACKCRIT = 150373738;
 LITDEF	int ERR_STACKOFLOW = 150373748;
 LITDEF	int ERR_STACKUNDERFLO = 150373754;
@@ -2014,7 +2014,7 @@ LITDEF	int ERR_DBFILERDONLY = 150375954;
 LITDEF	int ERR_RMWIDTHPOS = 150375962;
 LITDEF	int ERR_OFFSETINV = 150375970;
 LITDEF	int ERR_JOBPARTOOLONG = 150375978;
-LITDEF	int ERR_JOBARGMISSING = 150375986;
+LITDEF	int ERR_RLNKINTEGINFO = 150375987;
 LITDEF	int ERR_RUNPARAMERR = 150375994;
 LITDEF	int ERR_FNNAMENEG = 150376002;
 LITDEF	int ERR_ORDER2 = 150376010;
@@ -2520,7 +2520,7 @@ LITDEF	int ERR_JNLSWITCHTOOSM = 150380002;
 LITDEF	int ERR_JNLSWITCHSZCHG = 150380011;
 LITDEF	int ERR_NOTRNDMACC = 150380018;
 LITDEF	int ERR_TMPFILENOCRE = 150380026;
-LITDEF	int ERR_SHRMEMEXHAUSTED = 150380034;
+LITDEF	int ERR_UNUSEDMSG1141 = 150380034;
 LITDEF	int ERR_JNLSENDOPER = 150380043;
 LITDEF	int ERR_DDPSUBSNUL = 150380050;
 LITDEF	int ERR_DDPNOCONNECT = 150380058;
@@ -2621,7 +2621,7 @@ LITDEF	int ERR_OMISERVHANG = 150380811;
 LITDEF	int ERR_RSVDBYTE2HIGH = 150380818;
 LITDEF	int ERR_BKUPTMPFILOPEN = 418816282;
 LITDEF	int ERR_BKUPTMPFILWRITE = 418816290;
-LITDEF	int ERR_VMSMEMORY2 = 150380842;
+LITDEF	int ERR_UNUSEDMSG1242 = 150380842;
 LITDEF	int ERR_UNUSEDMSG1243 = 150380850;
 LITDEF	int ERR_UNUSEDMSG1244 = 150380858;
 LITDEF	int ERR_REPLINSTMISMTCH = 150380866;
@@ -2902,14 +2902,14 @@ LITDEF	int ERR_DBMBMINCFREFIXED = 150383056;
 LITDEF	int ERR_NULLENTRYREF = 150383066;
 LITDEF	int ERR_ZPEEKNORPLINFO = 150383074;
 LITDEF	int ERR_MMREGNOACCESS = 150383082;
-LITDEF	int ERR_MALLOCMAXUNIX = 150383090;
-LITDEF	int ERR_MALLOCMAXVMS = 150383098;
+LITDEF	int ERR_UNUSEDMSG1525 = 150383090;
+LITDEF	int ERR_MALLOCCRIT = 150383096;
 LITDEF	int ERR_HOSTCONFLICT = 150383106;
 LITDEF	int ERR_GETADDRINFO = 150383114;
 LITDEF	int ERR_GETNAMEINFO = 150383122;
 LITDEF	int ERR_SOCKBIND = 150383130;
 LITDEF	int ERR_INSTFRZDEFER = 150383139;
-LITDEF	int ERR_UNUSEDMSG1532 = 150383146;
+LITDEF	int ERR_VIEWARGTOOLONG = 150383146;
 LITDEF	int ERR_REGOPENFAIL = 150383154;
 LITDEF	int ERR_REPLINSTNOSHM = 150383162;
 LITDEF	int ERR_DEVPARMTOOSMALL = 150383170;

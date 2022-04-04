@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -181,6 +181,7 @@ void	dm_read (mval *v)
 	tt_interrupt	*tt_state;
 	uint4		mask;
 	unsigned int	exp_length, len, length;
+	unsigned char	*argv1;
 	unsigned char	*buffer_start;		/* beginning of non UTF8 buffer */
 	unsigned char	*current_ptr;		/* insert next character into buffer here */
 	unsigned char	escape_sequence[ESC_LEN];
@@ -538,8 +539,9 @@ void	dm_read (mval *v)
 					if (((strlen(REC) == match_length) || (strlen(RECALL) == match_length))
 						&& (0 == strncmp((const char *)buffer_start, RECALL, match_length)))
 					{
-						STRTOK_R((char *)buffer_start, delimiter_string, &strtokptr);
-						argv[1] = STRTOK_R(NULL, "", &strtokptr);
+						for (argv1 = buffer_start + match_length; !(IS_AT_END_OF_STRINGPOOL(argv1, 0))
+								&& (' ' != argv1[0]) && ('\t' != argv1[1]); argv1++);
+						argv[1] = (char *)((IS_AT_END_OF_STRINGPOOL(argv1, 0)) ? NULL : argv1);
 					} else
 						break;		/* not RECALL so end of line */
 #				ifdef UTF8_SUPPORTED

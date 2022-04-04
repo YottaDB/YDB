@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2020 Fidelity National Information	*
+ * Copyright (c) 2006-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -869,12 +869,12 @@ STATICFNDCL void utf8_badchar_real(utf8_err_type err_type, int len, unsigned cha
 unsigned char	*gtm_utf8_trim_invalid_tail(unsigned char *str, int len);
 boolean_t       valid_utf_string(const mstr *str);
 
-/* To prevent GTMSECSHR from pulling in the function "gtmwcswidth" (used in util_output.c) and in turn the entire utf
- * codebase, we define a function-pointer variable and initialize it at startup to NULL only in GTMSECSHR and not-null
- * in all the other executables.
+/* To prevent GTMSECSHR from pulling in the function "gtm_wcswidth" (used in util_output.c) and in turn the entire utf codebase,
+ * we define a function-pointer variable and initialize it at startup to NULL only in GTMSECSHR and thereby avoid pulling
+ * in all the unneeded / unwanted executables.
  */
 typedef	int	(*gtm_wcswidth_fnptr_t)(unsigned char* ptr, int len, boolean_t strict, int nonprintwidth);
 
-GBLREF	gtm_wcswidth_fnptr_t	gtm_wcswidth_fnptr;	/* see comment in gtm_utf8.h about this typedef */
+GBLREF	gtm_wcswidth_fnptr_t	gtm_wcswidth_fnptr;	/* see comment above about this typedef */
 
 #endif /* GTM_UTF8_H */

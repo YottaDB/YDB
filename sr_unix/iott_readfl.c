@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,9 @@
 #endif
 
 GBLREF	boolean_t		gtm_utf8_mode, hup_on, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF	char			*KEY_BACKSPACE, *KEY_DC, *KEY_DOWN, *KEY_INSERT, *KEY_LEFT, *KEYPAD_LOCAL, *KEYPAD_XMIT, *KEY_RIGHT,
+					*KEY_UP;
+GBLREF	int			AUTO_RIGHT_MARGIN, EAT_NEWLINE_GLITCH;
 GBLDEF	int			term_error_line;		/* record for cores */
 GBLREF	int4			exi_condition;
 GBLREF	io_pair			io_curr_device, io_std_device;
@@ -56,15 +59,11 @@ GBLREF	unsigned char		*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
 GBLREF	volatile int4		outofband;
 
+LITREF	unsigned char		lower_to_upper_table[];
+
 #ifdef UTF8_SUPPORTED
 LITREF	UChar32		u32_line_term[];
 #endif
-
-GBLREF	int		AUTO_RIGHT_MARGIN, EAT_NEWLINE_GLITCH;
-GBLREF	char		*KEY_BACKSPACE, *KEY_DC;
-GBLREF	char		*KEY_DOWN, *KEY_LEFT, *KEY_RIGHT, *KEY_UP;
-GBLREF	char		*KEY_INSERT;
-GBLREF	char		*KEYPAD_LOCAL, *KEYPAD_XMIT;
 
 #ifdef __MVS__
 #	define SEND_KEYPAD_LOCAL
@@ -73,8 +72,6 @@ GBLREF	char		*KEYPAD_LOCAL, *KEYPAD_XMIT;
 		if (edit_mode && NULL != KEYPAD_LOCAL && (keypad_len = STRLEN(KEYPAD_LOCAL)))	/* embedded assignment */	\
 			DOWRITE(tt_ptr->fildes, KEYPAD_LOCAL, keypad_len);
 #endif
-
-LITREF	unsigned char	lower_to_upper_table[];
 
 /* dc1 & dc3 have the same value in ASCII and EBCDIC */
 static readonly char		dc1 = 17;
@@ -137,45 +134,47 @@ void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
 
 int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseconds */
 {
-	boolean_t	ret, nonzerotimeout, timed, insert_mode, edit_mode, utf8_active, zint_restart, buffer_moved;
-	uint4		mask;
-	wint_t		inchar, *current_32_ptr, *buffer_32_start, switch_char;
-	unsigned char	inbyte, *outptr, *outtop;
-#ifdef __MVS__
-	wint_t		asc_inchar;
-#endif
-	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
-	unsigned char	*current_ptr;		/* insert next character into buffer here */
-	unsigned char	*buffer_start;		/* beginning of non UTF8 buffer */
-	int		msk_in, msk_num, rdlen, save_errno, selstat, status, ioptr_width, i, utf8_more;
-	int		exp_length;
-	int		inchar_width;		/* display width of inchar */
+	ABS_TIME	cur_time, end_time;
+	boolean_t	buffer_moved, ch_set, edit_mode, empterm, escape_edit, insert_mode, nonzerotimeout, ret, timed, utf8_active,
+				zint_restart;
+	d_tt_struct	*tt_ptr;
+	fd_set		input_fd;
+	int		backspace, delete, down, i, insert_key, ioptr_width, exp_length, keypad_len, left, msk_in, msk_num,
+				rdlen, right, save_errno, selstat, status, up, utf8_more;
 	int		delchar_width;		/* display width of deleted char */
 	int		delta_width;		/* display width change for replaced char */
 	int		dx, dx_start;		/* local dollar X, starting value */
 	int		dx_instr, dx_outlen;	/* wcwidth of string to insert point, whole string */
 	int		dx_prev, dx_cur, dx_next;/* wcwidth of string to char BEFORE, AT and AFTER the insert point */
+	int		inchar_width;		/* display width of inchar */
 	int		instr;			/* insert point in input string */
 	int		outlen;			/* total characters in line so far */
-	int		keypad_len, backspace, delete;
-	int		up, down, right, left, insert_key;
-	boolean_t	escape_edit, empterm;
 	io_desc		*io_ptr;
-	d_tt_struct	*tt_ptr;
 	io_terminator	outofbands;
 	io_termmask	mask_term;
-	tt_interrupt	*tt_state;
 	mv_stent	*mvc, *mv_zintdev;
-	unsigned char	*zb_ptr, *zb_top;
-	ABS_TIME	cur_time, end_time;
-	fd_set		input_fd;
+	tt_interrupt	*tt_state;
+	uint4		mask;
+	unsigned char	inbyte, *outptr, *outtop, *zb_ptr, *zb_top;
+	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
+	unsigned char	*current_ptr;		/* insert next character into buffer here */
+	unsigned char	*buffer_start;		/* beginning of non UTF8 buffer */
 	struct timeval	input_timeval;
 	struct timeval	save_input_timeval;
-	boolean_t	ch_set;
+	wint_t		inchar, *current_32_ptr, *buffer_32_start, switch_char;
+#ifdef __MVS__
+	wint_t		asc_inchar;
+#endif
 
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 	io_ptr = io_curr_device.in;
+	if (ERR_TERMHANGUP == error_condition)
+	{
+		TERMHUP_NOPRINCIO_CHECK(FALSE);				/* FALSE for READ */
+		io_ptr->dollar.za = ZA_IO_ERR;
+		return FALSE;
+	}
 	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	tt_ptr = (d_tt_struct *)(io_ptr->dev_sp);
 	assert(dev_open == io_ptr->state);
@@ -264,12 +263,6 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 		io_ptr->dollar.za = 0;
 		io_ptr->dollar.zeof = FALSE;
 		dx_start = (int)io_ptr->dollar.x;
-	}
-	if (sighup == outofband)
-	{
-		TERMHUP_NOPRINCIO_CHECK(FALSE);				/* FALSE for READ */
-		io_ptr->dollar.za = ZA_IO_ERR;
-		return FALSE;
 	}
 	v->str.len = 0;
 	ret = TRUE;

@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2021 Fidelity National Information		#
+# Copyright (c) 2001-2022 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -38,7 +38,7 @@ foreach file (gtmsecshr gtmsecshr_wrapper)
 	endif
 	set echo
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/${file} -L$gtm_obj $gtm_obj/${file}.o \
-			$gt_ld_sysrtns $gt_ld_extra_libs -lmumps $gt_ld_syslibs >& $gtm_map/${file}.map
+			$gt_ld_sysrtns $gt_ld_extra_libs -lmumps -lstub $gt_ld_syslibs >& $gtm_map/${file}.map
 	@ exit_status = $status
 	unset echo
 	if ( $exit_status != 0  ||  ! -x $3/${file} ) then

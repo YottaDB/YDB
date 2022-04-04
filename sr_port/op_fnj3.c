@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,14 +36,14 @@ void op_fnj3(mval *src,int width,int fract,mval *dst)
 	if (width < 0)
 		width = 0;
 	else	if (width > MAX_STRLEN)
-			RTS_ERROR_ABT(VARLSTCNT(1) ERR_MAXSTRLEN);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 	if (fract < 0)
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_JUSTFRACT);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JUSTFRACT);
 	w = width + MAX_NUM_SIZE + 2 + fract;
 	/* the literal two above accounts for the possibility
 	of inserting a zero and/or a minus with a width of zero */
-	if  (w > MAX_STRLEN)
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_MAXSTRLEN);
+	if  ((0 > w) || (MAX_STRLEN < w))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 	MV_FORCE_NUM(src);
 	/* need to guarantee that the n2s call will not cause string pool overflow */
 	ENSURE_STP_FREE_SPACE(w);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2021 Fidelity National Information	*
+ * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -171,7 +171,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 msec_timeout, int argcnt,
 	ENSURE_PASS_SOCKET(socketptr);
 	out_of_time = FALSE;
 #	if PID_CHECKING_SUPPORTED
-	if (-1 != pid)
+	if (-1 < pid)
 	{
 		peerpid = get_peer_pid(socketptr->sd);
 		if (-1 == peerpid)
@@ -375,7 +375,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 	ENSURE_PASS_SOCKET(socketptr);
 	out_of_time = FALSE;
 #	if PID_CHECKING_SUPPORTED
-	if (-1 != pid)
+	if (-1 < pid)
 	{
 		peerpid = get_peer_pid(socketptr->sd);
 		if (-1 == peerpid)

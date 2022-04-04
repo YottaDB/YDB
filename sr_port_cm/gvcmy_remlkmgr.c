@@ -155,7 +155,7 @@ bool gvcmy_remlkmgr(unsigned short count)
 				if (CMMS_E_ERROR != *(lktask_x->mbf))
 				{
 					SNPRINTF(errbuf, CM_ERRBUFF_SIZE, "gvcmy_remlkmgr 3: expected CMMS_E_ERROR, got %d",
-						(int)(*(lkerrlnk->mbf)));
+						(int)(*(lktask_x->mbf)));
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2,
 						LEN_AND_STR(errbuf));
 				}

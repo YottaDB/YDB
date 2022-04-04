@@ -387,8 +387,9 @@ OC_FNZGETSYI:	pushab	val.0
 		pushab	val.1
 		calls	#3,xfer.xf_fngetsyi
 OC_FNZJOBEXAM:	pushab	val.0
+		pushab	val.2
 		pushab	val.1
-		calls	#2,xfer.xf_fnzjobexam
+		calls	#3,xfer.xf_fnzjobexam
 OC_FNZLKID:	pushab	val.0
 		pushl	val.1
 		calls	#2,xfer.xf_fnzlkid

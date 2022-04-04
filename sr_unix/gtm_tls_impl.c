@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2021 Fidelity National Information	*
+ * Copyright (c) 2013-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -849,14 +849,12 @@ int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *
 	if (!(GTMTLS_OP_INTERACTIVE_MODE & tls_ctx->flags))
 		return 0;	/* Not running in an interactive mode. */
 	assert(NULL != tlsid);
-	env_name_len = strlen(tlsid);
-	assert(PASSPHRASE_ENVNAME_MAX > (sizeof(GTMTLS_PASSWD_ENV_PREFIX) + env_name_len)); /* Includes null */
+	env_name_len = strnlen(tlsid, (PASSPHRASE_ENVNAME_MAX - sizeof(GTMTLS_PASSWD_ENV_PREFIX))); /* Includes null */
 	env_name_idx = (sizeof(GTMTLS_PASSWD_ENV_PREFIX) - 1);
 	memcpy(env_name, GTMTLS_PASSWD_ENV_PREFIX, env_name_idx);
-	assert((sizeof(env_name) - env_name_idx) > (env_name_len + 1));
-	assert(PASSPHRASE_ENVNAME_MAX > env_name_len + env_name_idx);
 	memcpy(&env_name[env_name_idx], tlsid, env_name_len);
 	env_name_idx += env_name_len;
+	assert(PASSPHRASE_ENVNAME_MAX > env_name_idx);
 	env_name[env_name_idx] = '\0';
 	obs_len = strlen(obs_passwd);
 	pwent_node = gtm_tls_find_pwent(env_name);

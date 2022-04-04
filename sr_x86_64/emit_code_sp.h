@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2007-2021 Fidelity National Information	*
+ * Copyright (c) 2007-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -127,7 +127,7 @@ int x86_64_arg_reg(int indx);
  */
 #define CODE_BUF_GEN(op_code)								\
 MBSTART {										\
-	assert(MAXPOSINT4 > code_idx);							\
+	assert((0 <= code_idx) && (sizeof(code_buf) > code_idx));			\
 	(emit_base_info.flags.rex_set) ? (code_buf[code_idx++] = emit_base_info.rex):0;	\
 	code_buf[code_idx++] = (char)op_code;						\
 	if (emit_base_info.flags.modrm_byte_set)					\

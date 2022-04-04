@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -315,43 +315,13 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		CLEANUP_AND_RETURN_FALSE;
 	}
 	realpathlen = STRLEN(realpathname);
-	/* Calculate total line length for commands to execute (pushd + cp). *
-	 * If cannot fit in local variable array, malloc space *
-	 * commands to be executed :
-		pushd sourcedir && CP_CMD fname tempfilename
-	*/
+	/* Get the path to system utilities and prepend it to the command. */
 	for (i = 0; i < NUM_CMD; i++)
 	{
 		rv = CONFSTR(fulpathcmd[i], MAX_FN_LEN);
 		if (0 != rv)
 			CLEANUP_AND_RETURN_FALSE;
 	}
-	cmdlen = STR_LIT_LEN(UNALIAS) + STR_LIT_LEN(CD_CMD) + sourcedirlen + STR_LIT_LEN(CMD_SEPARATOR);
-	cmdlen += STR_LIT_LEN(fulpathcmd[0]) + STR_LIT_LEN(CP_OPT) + sourcefilelen + 1 /* space */
-								+ realpathlen + 1 /* terminating NULL byte */;
-	if (cmdlen > SIZEOF(cmdarray))
-		command = malloc(cmdlen);	/* allocate memory and use that instead of local array "cmdarray" */
-	/* cd */
-	MEMCPY_LIT(command, UNALIAS);
-	cmdlen = STR_LIT_LEN(UNALIAS);
-	MEMCPY_LIT(&command[cmdlen], CD_CMD);
-	cmdlen += STR_LIT_LEN(CD_CMD);
-	memcpy(&command[cmdlen], sourcedirname, sourcedirlen);
-	cmdlen += sourcedirlen;
-	MEMCPY_LIT(&command[cmdlen], CMD_SEPARATOR);
-	cmdlen += STR_LIT_LEN(CMD_SEPARATOR);
-	/* cp */
-	cmdpathlen = STRLEN(fulpathcmd[0]);
-	memcpy(&command[cmdlen], fulpathcmd[0], cmdpathlen);
-	cmdlen += cmdpathlen;
-	MEMCPY_LIT(&command[cmdlen], CP_OPT);
-	cmdlen += STR_LIT_LEN(CP_OPT);
-	memcpy(&command[cmdlen], sourcefilename, sourcefilelen);
-	cmdlen += sourcefilelen;
-	command[cmdlen++] = ' ';
-	memcpy(&command[cmdlen], realpathname, realpathlen);
-	cmdlen += realpathlen;
-	command[cmdlen] = 0;
 	/* Start prep for in-kernel copy */
 #	ifdef __x86_64
 	/* Do not use cp/pax on the first attempt */
@@ -490,6 +460,41 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 #	endif
 	if (TRUE == usesystem)
 	{
+		/* Calculate total line length for commands to execute (pushd + cp). *
+		 * If cannot fit in local variable array, malloc space *
+		 * commands to be executed :
+			pushd sourcedir && CP_CMD fname tempfilename
+		*/
+		cmdlen = STR_LIT_LEN(UNALIAS) + STR_LIT_LEN(CD_CMD) + sourcedirlen + STR_LIT_LEN(CMD_SEPARATOR);
+		cmdlen += STR_LIT_LEN(fulpathcmd[0]) + STR_LIT_LEN(CP_OPT) + sourcefilelen + 5 /* 4 quotes and 1 space */
+									+ realpathlen + 1 /* terminating NULL byte */;
+		if (cmdlen > SIZEOF(cmdarray))
+			command = malloc(cmdlen);	/* allocate memory and use that instead of local array "cmdarray" */
+		/* cd */
+		MEMCPY_LIT(command, UNALIAS);
+		cmdlen = STR_LIT_LEN(UNALIAS);
+		MEMCPY_LIT(&command[cmdlen], CD_CMD);
+		cmdlen += STR_LIT_LEN(CD_CMD);
+		memcpy(&command[cmdlen], sourcedirname, sourcedirlen);
+		cmdlen += sourcedirlen;
+		MEMCPY_LIT(&command[cmdlen], CMD_SEPARATOR);
+		cmdlen += STR_LIT_LEN(CMD_SEPARATOR);
+		/* cp */
+		cmdpathlen = STRLEN(fulpathcmd[0]);
+		memcpy(&command[cmdlen], fulpathcmd[0], cmdpathlen);
+		cmdlen += cmdpathlen;
+		MEMCPY_LIT(&command[cmdlen], CP_OPT);
+		cmdlen += STR_LIT_LEN(CP_OPT);
+		command[cmdlen++] = '\'';
+		memcpy(&command[cmdlen], sourcefilename, sourcefilelen);
+		cmdlen += sourcefilelen;
+		command[cmdlen++] = '\'';
+		command[cmdlen++] = ' ';
+		command[cmdlen++] = '\'';
+		memcpy(&command[cmdlen], realpathname, realpathlen);
+		cmdlen += realpathlen;
+		command[cmdlen++] = '\'';
+		command[cmdlen] = 0;
 		if (debug_mupip)
 			util_out_print("!/MUPIP INFO:   !AD", TRUE, cmdlen, command);
 		if (WBTEST_ENABLED(WBTEST_BACKUP_FORCE_SLEEP))
@@ -810,7 +815,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	tmplen = file->len;
 	/* Command to be executed : mv tempfilename backup_file */
 	cmdlen = STR_LIT_LEN(UNALIAS) + STR_LIT_LEN(fulpathcmd[1]);
-	cmdlen += tempfilelen + 1 /* space */ + tmplen + 1 /* terminating NULL byte */;
+	cmdlen += tempfilelen + 5 /* 4 quotes, 1 space */ + tmplen + 1 /* terminating NULL byte */;
 	if (cmdlen > SIZEOF(cmdarray))
 		command = malloc(cmdlen);	/* allocate memory and use that instead of local array "cmdarray" */
 	/* mv tmpfile destfile */
@@ -819,11 +824,15 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	cmdpathlen = STRLEN(fulpathcmd[1]);
 	memcpy(&command[cmdlen], fulpathcmd[1], cmdpathlen);
 	cmdlen += cmdpathlen;
+	command[cmdlen++] = '\'';
 	memcpy(&command[cmdlen], tempfilename, tempfilelen);
 	cmdlen += tempfilelen;
+	command[cmdlen++] = '\'';
 	command[cmdlen++] = ' ';
+	command[cmdlen++] = '\'';
 	memcpy(&command[cmdlen], file->addr, tmplen);
 	cmdlen += tmplen;
+	command[cmdlen++] = '\'';
 	command[cmdlen] = 0;
 	if (debug_mupip)
 		util_out_print("MUPIP INFO:   !AD", TRUE, cmdlen, command);

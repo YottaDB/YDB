@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -165,6 +165,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 					sptr = gvsub2str(key_ptr, &opstr, TRUE); /* gvsub2str assumes enough buffer available */
 					while (*key_ptr++)
 						;
+					assert(0 <= depth_count);
 					if (depth_count != MAXPOSINT4) /* although this may not make a difference in reality, */
 						depth_count--;	       /* do not disturb depth_count (used later) if default  */
 					*sptr++ = ',';

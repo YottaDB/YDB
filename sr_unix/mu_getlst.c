@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,13 +11,11 @@
  ****************************************************************/
 
 #include "mdef.h"
-
 #include "sys/types.h"
 #include "gtm_stat.h"
 #include "gtm_unistd.h"
 #include "gtm_string.h"
 #include "gtm_limits.h"
-
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -37,10 +35,11 @@
 #include "mu_getlst.h"
 #include "gtmmsg.h"
 #include "gtm_reservedDB.h"
-
+#include "gtm_malloc.h"
+#include "mdq.h"
+#include "compiler.h"
 GBLDEF	boolean_t		is_directory;
 GBLDEF	mstr			directory;
-
 GBLREF	backup_reg_list		*mu_repl_inst_reg_list;
 GBLREF 	bool			error_mupip;
 GBLREF 	bool			in_backup;
@@ -48,6 +47,8 @@ GBLREF	boolean_t		mu_star_specified;
 GBLREF	boolean_t		mu_region_found;
 GBLREF	gd_addr			*gd_header;
 GBLREF	tp_region		*grlist;
+GBLDEF	usr_reg_que		*usr_spec_regions = NULL; /* Queue of region(s) in user-specified order */
+
 
 error_def(ERR_MUBCKNODIR);
 error_def(ERR_MUNOACTION);
@@ -67,12 +68,13 @@ error_def(ERR_NOREGION);
 void mu_getlst(char *name, int4 size)
 {
 	boolean_t	matched, is_statsDB, is_autoDB;
-	char		*c1, *c2, *c3, *c4, fbuff[GTM_PATH_MAX], rbuff[GTM_PATH_MAX], fnbuff[GTM_PATH_MAX + 1];
+	char		*c1, *c2, *c3, *c4, rbuff[GTM_PATH_MAX], fbuff[GTM_PATH_MAX], fnbuff[GTM_PATH_MAX + 1];
 	gd_region	*reg;
 	tp_region	*list;
 	unsigned short	flen, i, rlen;
 	struct stat	stat_buf;
 	int		rc;
+	usr_reg_que	*region_que_entry = NULL;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -81,12 +83,16 @@ void mu_getlst(char *name, int4 size)
 	rlen = SIZEOF(rbuff);
 	flen = SIZEOF(fbuff);
 	is_directory = FALSE;
+	/* Initialize the usr_spec_regions queue */
+	usr_spec_regions = (usr_reg_que *)malloc(SIZEOF(usr_reg_que));
+	dqinit(usr_spec_regions, que);
 	if (!in_backup)
 	{
 		if (!cli_get_str(name, rbuff, &rlen))
 			mupip_exit(ERR_MUNODBNAME);
 		for (i = 0; i < rlen; i++)
-			rbuff[i] = TOUPPER(rbuff[i]); /* Region names are always upper-case ASCII and thoroughly NUL terminated */
+			/* Region names are always upper-case ASCII and thoroughly NUL terminated */
+			rbuff[i] = TOUPPER(rbuff[i]);
 		for ( ; i < ARRAYSIZE(rbuff); i++)
 			rbuff[i] = 0;
 	} else
@@ -112,7 +118,7 @@ void mu_getlst(char *name, int4 size)
 			}
 			assert(NULL == mu_repl_inst_reg_list);
 			if (NULL == mu_repl_inst_reg_list)
-				mu_repl_inst_reg_list = malloc(SIZEOF(backup_reg_list));
+				mu_repl_inst_reg_list = gtm_malloc(SIZEOF(backup_reg_list));
 			if ((!cli_get_str("REPLINSTANCE", fbuff, &flen)) || (0 == flen))
 			{
 				util_out_print("Error parsing REPLINSTANCE qualifier", TRUE);
@@ -131,7 +137,8 @@ void mu_getlst(char *name, int4 size)
 		if (!cli_get_str(name, rbuff, &rlen))
 			mupip_exit(ERR_MUNODBNAME);
 		for (i = 0; i < rlen; i++)
-			rbuff[i] = TOUPPER(rbuff[i]); /* Region names are always upper-case ASCII and thoroughly NUL terminated */
+			/* Region names are always upper-case ASCII and thoroughly NUL terminated */
+			rbuff[i] = TOUPPER(rbuff[i]);
 		for ( ; i < ARRAYSIZE(rbuff); i++)
 			rbuff[i] = 0;
 		flen = SIZEOF(fbuff);	/* reset max_buflen to original before call to "cli_get_str" */
@@ -180,6 +187,15 @@ void mu_getlst(char *name, int4 size)
 						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, REG_LEN_STR(reg));
 						continue;
 					}
+					if (FALSE == usr_reg_que_checkdup(&reg->rname[0], reg->rname_len))
+					{
+						/* Allocate memory for an entry in usr_spec_regions queue. No need to free. */
+						region_que_entry = (usr_reg_que *)malloc(SIZEOF(usr_reg_que));
+						region_que_entry->usr_reg = (char *)&reg->rname[0];
+						region_que_entry->usr_reg_len = reg->rname_len;
+						/* Insert on the right side of the queue */
+						dqrins(usr_spec_regions, que, region_que_entry);
+					}
 					if ((FALSE == in_backup) || (0 != ((backup_reg_list *)list)->backup_file.len))
 						continue;
 					if (TRUE == is_directory)
@@ -209,4 +225,14 @@ void mu_getlst(char *name, int4 size)
 			c1 = ++c2;
 	}
 	return;
+}
+static bool usr_reg_que_checkdup(unsigned char *regname, unsigned short regname_len)
+{
+	usr_reg_que	*iterator;
+	dqloop(usr_spec_regions, que, iterator)
+	{
+		if ((iterator->usr_reg_len == regname_len) && (FALSE == memcmp(iterator->usr_reg, (char *)regname, regname_len)))
+			return TRUE;
+	}
+	return FALSE;
 }

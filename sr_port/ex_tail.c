@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,6 +87,7 @@ void ex_tail(oprtype *opr)
 			MV_FORCE_NUMD(v1);
 			if (!(MV_NM & v1->mvtype) || !(MV_NM & v0->mvtype))
 			{	/* if we don't have a useful number we can't do useful math */
+				TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* improve hints */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
 				assert(TREF(rts_error_in_parse));
 				return;

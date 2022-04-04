@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2022 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +25,7 @@ void	op_fnzpopulation(mval *arg1, mval *arg2, mval *dst)
 	y = 0;
 	MV_FORCE_STR(arg1);
 	MV_FORCE_STR(arg2);
-	if (arg2->str.len)
+	if (0 < arg2->str.len)
 		for (x = 1; x ; y++) x = op_fnzfind(arg1, arg2, x, &dummy);
 
 	MV_FORCE_MVAL(dst,y) ;

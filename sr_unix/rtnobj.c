@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2021 Fidelity National Information	*
+ * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,9 +34,15 @@
 #include "gtm_permissions.h"
 #include "cachectl.h"
 #include "cacheflush.h"
+#include "send_msg.h"
+#include "wbox_test_init.h"
 
 /* Uncomment below line if you want RTNOBJ_DBG lines to be enabled */
 /* #define RTNOBJ_DEBUG */
+
+#ifdef DEBUG
+#define MAXVERS_TEST 2
+#endif
 
 #ifdef RTNOBJ_DEBUG
 #	define RTNOBJ_DBG(X)	X
@@ -120,7 +126,9 @@
 #ifdef AUTORELINK_SUPPORTED
 
 error_def(ERR_RELINKCTLERR);
+error_def(ERR_RLNKINTEGINFO);
 error_def(ERR_RLNKRECLATCH);
+error_def(ERR_RLNKRECNFL);
 error_def(ERR_RLNKSHMLATCH);
 error_def(ERR_SYSCALL);
 
@@ -265,6 +273,120 @@ rtnobj_hdr_t *remqh_rtnobj(que_ent_ptr_t que_base, sm_uc_ptr_t shm_base)
 	return rtnobj;
 }
 
+/* Routine to help traversing the open_relinkctl_sgm struct */
+rtnobj_hdr_t	*rtnobj_retpos(open_relinkctl_sgm *linkctl, rtnobj_sm_off_t shm_index_off)
+{
+	int			shm_index;
+	sm_off_t		shm_off;
+
+	shm_index = RTNOBJ_GET_SHM_INDEX(shm_index_off);
+	shm_off = RTNOBJ_GET_SHM_OFFSET(shm_index_off);
+	return ((rtnobj_hdr_t *)(linkctl->rtnobj_shm_base[shm_index] + shm_off));
+}
+
+/* Use the Floyd Cycle Detection
+ * This algorithm determines if there is a loop in the linked list by using two iterator:
+ * Slow iterator - moves one step at a time.
+ * Fast iterator - moves two steps at a time.
+ * If there is loop the two iterators have to collide, otherwise the fast iterator reaches
+ * the end of the list and returns the number of elements.
+ */
+void	rtnobj_integ(relinkrec_t *relinkrec, open_relinkctl_sgm *linkctl)
+{
+	rtnobj_hdr_t		*rtnobj;
+	rtnobj_sm_off_t		shm_index_off_slow, shm_index_off_fast, shm_index_off_prev, shm_index_off_loop_found;
+	boolean_t		complete_loop = TRUE;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	shm_index_off_slow = shm_index_off_fast = relinkrec->rtnobj_shm_offset;
+	relinkrec->numvers = 0;
+	while ((rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T != shm_index_off_fast)
+	{
+		shm_index_off_prev = shm_index_off_slow;
+		rtnobj = rtnobj_retpos(linkctl, shm_index_off_slow); /* Move the slow runner one step forward */
+		shm_index_off_slow = rtnobj->next_rtnobj_shm_offset;
+		relinkrec->numvers++;
+		if (TREF(gtm_autorelink_ctlmax) == relinkrec->numvers)
+		{	/* verify we don't traverse more than the maximum number of routines that the
+			 * shared memory segment is capable of holding.
+			 */
+			rtnobj = rtnobj_retpos(linkctl, shm_index_off_fast);
+			rtnobj->next_rtnobj_shm_offset = (rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T;
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RLNKINTEGINFO, 5,
+					LEN_AND_LIT("number of elements in shm segment exceeded gtm_autorelink_ctlmax - fixed"),
+					CALLFROM, 1, 1);
+			return;
+		}
+		rtnobj = rtnobj_retpos(linkctl, shm_index_off_fast); /* Move the fast runner one step forward */
+		shm_index_off_fast = rtnobj->next_rtnobj_shm_offset;
+		if((rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T == shm_index_off_fast)
+		{	/* the fast iterator moves two steps at a time, therefore a check is needed to
+			 * verify that the first step is not NULL. "NULL->next" would cause a seg fault.
+			 */
+			break;
+		}
+		relinkrec->numvers++;
+		if (TREF(gtm_autorelink_ctlmax) == relinkrec->numvers)
+		{	/* verify we don't traverse more than the maximum number of routines that the
+			 * shared memory segment is capable of holding.
+			 */
+			rtnobj = rtnobj_retpos(linkctl, shm_index_off_fast);
+			rtnobj->next_rtnobj_shm_offset = (rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T;
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RLNKINTEGINFO, 5,
+					LEN_AND_LIT("number of elements in shm segment exceeded gtm_autorelink_ctlmax - fixed"),
+					CALLFROM, 1, 1);
+			return;
+		}
+		rtnobj = rtnobj_retpos(linkctl, shm_index_off_fast); /* Move the fast runner one more step forward */
+		shm_index_off_fast = rtnobj->next_rtnobj_shm_offset;
+		if (shm_index_off_slow == shm_index_off_fast)
+		{	/* A loop found, and we need to check where it started.
+			 * We keep the slow iterator in the collision-point and move the fast iterator
+			 * to the head (relinkrec->rtnobj_shm_offset).
+			 */
+			relinkrec->numvers /= 2; /* Slow iterator steps */
+			shm_index_off_fast = relinkrec->rtnobj_shm_offset;
+			shm_index_off_loop_found = shm_index_off_slow;
+			while(shm_index_off_slow != shm_index_off_fast)
+			{	/* Move the two iterators one step at a time, which would cause them to
+				 * collide again at the loop-start.
+				 */
+				complete_loop = FALSE;
+				shm_index_off_prev = shm_index_off_slow;
+				rtnobj = rtnobj_retpos(linkctl, shm_index_off_slow); /* Move the slow runner one step forward */
+				shm_index_off_slow = rtnobj->next_rtnobj_shm_offset;
+				rtnobj = rtnobj_retpos(linkctl, shm_index_off_fast); /* Move the fast runner one step forward */
+				shm_index_off_fast = rtnobj->next_rtnobj_shm_offset;
+			}
+			/* The loop-start found, so we use the prev pointer(one step behind the slow iterator),
+ 			 * and change it to point to NULL which breaks the infinite loop. */
+			rtnobj = rtnobj_retpos(linkctl, shm_index_off_prev);
+			rtnobj->next_rtnobj_shm_offset = (rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T;
+			/* If complete_loop is TRUE, the last element in the list originaly pointed to the first one */
+			if (complete_loop)
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RLNKINTEGINFO, 5,
+						LEN_AND_LIT("a loop to the start of linkctl was detected and fixed"),
+						CALLFROM, 1, 1);
+				return;
+			} else
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RLNKINTEGINFO, 5,
+						LEN_AND_LIT("a loop to the middle of linkctl was detected and fixed"),
+						CALLFROM, 1, 1);
+			/* If complete_loop is FALSE we need to complete the counting of relinkrec->numvers */
+			for( ; (rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T != shm_index_off_loop_found; relinkrec->numvers++)
+			{
+				rtnobj = rtnobj_retpos(linkctl, shm_index_off_loop_found);
+				shm_index_off_loop_found = rtnobj->next_rtnobj_shm_offset;
+			}
+			return;
+		}
+	}
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RLNKINTEGINFO, 5, LEN_AND_LIT("relinkrec->numvers verified"), CALLFROM, 1, 1);
+	return;
+}
+
 /* Remove a specific element "rtnobj" from wherever it is in the doubly-linked relative-queue starting from "que_base".
  * Note "que_base" is a pointer to relinkctl shared memory whereas "rtnobj" is a pointer to rtnobj shared memory.
  * Hence the need for NULL_RTNOBJ_SM_OFF_T to indicate a link from rtnobj shm to relinkctl shm.
@@ -362,10 +484,13 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 	int			user_id;
 	int			group_id;
 	int			perm;
-	int			maxvers, curvers;
+	int			curvers, maxvers;
 	struct shmid_ds		shmstat;
 	struct perm_diag_data	pdd;
 #	ifdef DEBUG
+	boolean_t		rtnobj_integ_done = FALSE;
+	rtnobj_sm_off_t		shm_index_off_mid;
+	int			dbg_shm_cnt;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -390,7 +515,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 	do
 	{
 		if (CDB_STAGNATE <= loopcnt++)
-		{	/* We have tried THRICE to search without a lock but found something inconsistent (due to concurrent
+		{	 /* We have tried THRICE to search without a lock but found something inconsistent (due to concurrent
 			 * changes to shared memory structures). Get a lock on the entire relinkctl file before searching
 			 * for one last time.
 			 */
@@ -418,7 +543,6 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 		curvers = 0;
 		while ((rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T != shm_index_off)
 		{
-			assertpro(maxvers >= curvers++);	/* assertpro to avoid infinite loops in PRO (just in case) */
 			shm_index = RTNOBJ_GET_SHM_INDEX(shm_index_off);
 			shm_off = RTNOBJ_GET_SHM_OFFSET(shm_index_off);
 			assert(0 == (shm_off % 8));
@@ -433,6 +557,36 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 				break;
 			prev_rtnobj = rtnobj;
 			shm_index_off = rtnobj->next_rtnobj_shm_offset;
+#			ifdef DEBUG
+			if (WBTEST_ENABLED(WBTEST_RTNOBJ_INTEG) && !rtnobj_integ_done)
+			{
+				for (dbg_shm_cnt = 0; (rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T != shm_index_off; dbg_shm_cnt++)
+				{
+					if (dbg_shm_cnt == maxvers/2)
+						shm_index_off_mid = shm_index_off;
+					rtnobj = rtnobj_retpos(linkctl, shm_index_off);
+					shm_index_off = rtnobj->next_rtnobj_shm_offset;
+				}
+				if (MAXVERS_TEST < maxvers)
+					// non-head node as the loop point when there is more than 2 elements
+					rtnobj->next_rtnobj_shm_offset = shm_index_off_mid;
+				else
+					rtnobj->next_rtnobj_shm_offset = relinkrec->rtnobj_shm_offset;
+				maxvers = -1;
+				rtnobj_integ_done = TRUE;
+			}
+#			endif
+			if (maxvers < curvers++)	/* Avoid infinite loops (just in case) */
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_RLNKRECNFL, 3,
+						linkctl->relinkctl_path, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
+				rtnobj_integ(relinkrec, linkctl);
+				assertpro(maxvers != relinkrec->numvers);
+				/* Intinialize all values and iterate the fixed list from the start */
+				maxvers = relinkrec->numvers;
+				curvers = 0;
+				shm_index_off = relinkrec->rtnobj_shm_offset;
+			}
 		}
 		if ((rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T != shm_index_off)
 		{	/* If found return */
@@ -839,7 +993,7 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 	que_ent_ptr_t		freeList;
 	zro_validation_entry	*zhent;
 	sm_uc_ptr_t		objBuff;
-	int			maxvers, curvers;
+	int			curvers, maxvers;
 	DEBUG_ONLY(size_t	shm_size;)
 	DEBUG_ONLY(int		dbg_shm_index;)
 #	ifdef DEBUG
@@ -920,10 +1074,9 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 	shm_index_off = relinkrec->rtnobj_shm_offset;
 	prev_rtnobj = NULL;
 	maxvers = relinkrec->numvers;
-	curvers = 0;
-	while ((rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T != shm_index_off)
+	for (curvers = 0; (rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T != shm_index_off; curvers++)
 	{
-		assertpro(maxvers >= curvers++);	/* assertpro to avoid infinite loops in PRO (just in case) */
+		assertpro(maxvers >= curvers);	/* assertpro to avoid infinite loops in PRO (just in case) */
 		shm_index = RTNOBJ_GET_SHM_INDEX(shm_index_off);
 		shm_off = RTNOBJ_GET_SHM_OFFSET(shm_index_off);
 		assert(0 == (shm_off % 8));

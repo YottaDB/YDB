@@ -1,6 +1,7 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2009, 2014 Fidelity Information Services, Inc *
+ * Copyright (c) 2009-2022 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -74,6 +75,7 @@ void op_killaliasall(void)
 			 */
 			lvp = (lv_val *)tabent->value;
 			symv = LV_GET_SYMVAL(lvp);
+			assert(0 <= symv->symvlvl);
 			if (lowest_symvlvl > symv->symvlvl)
 				lowest_symvlvl = symv->symvlvl;
 		}

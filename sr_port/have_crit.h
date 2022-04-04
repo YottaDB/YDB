@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,6 +86,7 @@ typedef enum
 	INTRPT_IN_JNL_FSYNC,		/* Deferring interrupts in jnl_fsync() while holding the latch */
 	INTRPT_IN_EVENT_HANDLING,	/* Deferring interrupts while managing a deferred or outofband event */
 	INTRPT_IN_KILL_CLEANUP,		/* Deferring interrupts while performing KILL cleanup - used by REORG */
+	INTRPT_IN_RTN_CLEANUP,          /* Deferring interrupts while cleaning up routines */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 

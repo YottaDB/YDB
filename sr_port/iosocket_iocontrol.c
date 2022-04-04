@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,7 +108,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXPR);
 				return;
 			}
-			depth = MV_FORCE_INTD(arg);
+			depth = MV_FORCE_INTD(arg); /* Negative values are downcast to unsigned short */
 		}
 		iosocket_listen(io_curr_device.in, depth);
 	} else if (0 == memcmp(action, "WAIT", length))
@@ -142,7 +142,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 			arg = va_arg(args, mval *);
 			n--;
 			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
-				pid = MV_FORCE_INTD(arg);
+				pid = MV_FORCE_INTD(arg); /* Negative values are excluded */
 			else
 				pid = -1;
 		} else
@@ -172,7 +172,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 			arg = va_arg(args, mval *);
 			n--;
 			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
-				pid = MV_FORCE_INTD(arg);
+				pid = MV_FORCE_INTD(arg); /* Negative values are excluded */
 			else
 				pid = -1;
 		} else

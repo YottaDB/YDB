@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2021 Fidelity National Information	*
+ * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,6 +23,7 @@
 #include "gtm_utf8.h"
 #include "min_max.h"
 #include "common_startup_init.h"
+#include "deferred_events.h"
 
 GBLREF	boolean_t		skip_dbtriggers;
 GBLREF	boolean_t		is_replicator;
@@ -69,7 +70,9 @@ void	common_startup_init(enum gtmImageTypes img_type)
 	/* Set gtm_wcswidth_fnptr for util_output to work correctly in UTF-8 mode. This is needed only for utilities that can
 	 * operate on UTF-8 mode.
 	 */
+	/* these attempts to keep the gtmsecshr link from dragging lots of stuff in need investigation */
 	gtm_wcswidth_fnptr = (GTMSECSHR_IMAGE == img_type) ? NULL : gtm_wcswidth;
+	xfer_set_handlers_fnptr =  (GTMSECSHR_IMAGE == img_type) ? NULL : xfer_set_handlers;
 	NON_GTMTRIG_ONLY(skip_dbtriggers = TRUE;) /* Do not invoke triggers for trigger non-supporting platforms. */
 	span_nodes_disallowed = (GTCM_GNP_SERVER_IMAGE == img_type) || (GTCM_SERVER_IMAGE == img_type);
 	is_gtcm = ((GTCM_GNP_SERVER_IMAGE == img_type) || (GTCM_SERVER_IMAGE == img_type));

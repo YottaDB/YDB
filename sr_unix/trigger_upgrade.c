@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2021 Fidelity National Information	*
+ * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -146,6 +146,7 @@ STATICFNDEF void	gvtr_set_hashtrhash(char *trigvn, int trigvn_len, uint4 hash_co
 	op_zprevious(&mv_indx);
 	mv_indx_ptr = &mv_indx;
 	hash_indx = (0 == mv_indx.str.len) ? 1 : (mval2i(mv_indx_ptr) + 1);
+	assert(0 <= hash_indx);
 	i2mval(mv_indx_ptr, hash_indx);
 	MV_FORCE_STR(mv_indx_ptr);
 	/* Prepare the value of the SET */
@@ -356,6 +357,7 @@ void	trigger_upgrade(gd_region *reg)
 			is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashcycle, tmpmv);
 			assert(is_defined);
 			tmpint4 = mval2i(tmpmv);
+			assert(0 <= tmpint4);
 			tmpint4++;
 			i2mval(tmpmv, tmpint4);
 			gvtr_set_hasht_gblsubs((mval *)&literal_hashcycle, tmpmv);
@@ -364,11 +366,13 @@ void	trigger_upgrade(gd_region *reg)
 			if (is_defined)
 			{
 				tmpint4 = mval2i(tmpmv);
+				assert(0 <= tmpint4);
 				count = tmpint4;
 				/* Get ^#t(<gvn>,"#LABEL"), error out for invalid values. Upgrade disallowed for label 1 triggers */
 				is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashlabel, tmpmv);
 				assert(is_defined);
 				currlabel = mval2i(tmpmv);
+				assert(0 <= currlabel);
 				if ((V19_HASHT_GBL_LABEL_INT >= currlabel) || (HASHT_GBL_CURLABEL_INT <= currlabel))
 					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_TRIGUPBADLABEL, 6, currlabel,
 						HASHT_GBL_CURLABEL_INT, gvname->str.len, gvname->str.addr,
@@ -494,6 +498,7 @@ void	trigger_upgrade(gd_region *reg)
 					BUILD_HASHT_SUB_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
 						trigname, trigname_len, LITERAL_HASHSEQNUM, STR_LIT_LEN(LITERAL_HASHSEQNUM));
 					seq_num = gvcst_get(tmpmv) ? mval2i(tmpmv) : 0;
+					assert(0 <= seq_num);
 					if (trig_seq_num > seq_num)
 					{	/* Set ^#t("#TNAME",<trigger name>,"#SEQNUM") = trig_seq_num */
 						SET_TRIGGER_GLOBAL_SUB_SUB_SUB_STR(LITERAL_HASHTNAME,
@@ -506,6 +511,7 @@ void	trigger_upgrade(gd_region *reg)
 					BUILD_HASHT_SUB_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
 						trigname, trigname_len, LITERAL_HASHTNCOUNT, STR_LIT_LEN(LITERAL_HASHTNCOUNT));
 					tncount = gvcst_get(tmpmv) ? mval2i(tmpmv) + 1 : 1;
+					assert(0 < tncount);
 					i2mval(tmpmv, tncount);
 					SET_TRIGGER_GLOBAL_SUB_SUB_SUB_MVAL(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
 						trigname, trigname_len, LITERAL_HASHTNCOUNT, STR_LIT_LEN(LITERAL_HASHTNCOUNT),

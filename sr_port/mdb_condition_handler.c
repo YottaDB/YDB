@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,8 +85,8 @@
 #include "gtm_trigger.h"
 #endif
 
-GBLREF	boolean_t		created_core, dont_want_core, in_gvcst_incr, prin_dm_io, prin_in_dev_failure, prin_out_dev_failure,
-				run_time;
+GBLREF	boolean_t		created_core, dont_want_core, hup_on, in_gvcst_incr, prin_dm_io, prin_in_dev_failure,
+				prin_out_dev_failure, run_time;
 GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 GBLREF	dollar_stack_type	dollar_stack;
@@ -601,7 +601,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		flush_pio();
 	if ((int)ERR_CTRLC == SIGNAL)
 	{
-		xfer_reset_handlers(ctrlc);
+		xfer_reset_if_setter(ctrlc);
 		outofband = no_event;
 		if (!trans_action && !dm_action)
 		{	/* Verify not indirect or that context is unchanged before reset context */
@@ -649,14 +649,14 @@ CONDITION_HANDLER(mdb_condition_handler)
 			assert((((int)ERR_TERMHANGUP == SIGNAL) ? sighup : ctrap) == outofband);
 			if ((int)ERR_TERMHANGUP == SIGNAL)
 			{
+				assert(hup_on || prin_in_dev_failure);
 				SAVE_ZSTATUS_INTO_RTS_STRINGPOOL(dollar_ecode.error_last_b_line, NULL);
-				TAREF1(save_xfer_root, sighup).event_state = pending;
 				prin_in_dev_failure = prin_out_dev_failure = TRUE;
-			} else
-			{
-				TAREF1(save_xfer_root, ctrap).event_state = active;
-				real_xfer_reset(ctrap);
+				hup_on = FALSE;	/* normally there's only 1, but sigproc could cause multiple; app can reset it  */
 			}
+			TAREF1(save_xfer_root, outofband).event_state = active;
+			real_xfer_reset(outofband);
+			TAREF1(save_xfer_root, outofband).event_state = not_in_play;	/* sighup & ctrap both headed to trap */
 		}
 		outofband = no_event;
 		if (!trans_action && !(frame_pointer->type & SFT_DM))
@@ -781,7 +781,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		}
 		MUM_TSTART_FRAME_CHECK;
 		MUM_TSTART;
-	} else  if ((int)ERR_JOBINTRRQST == SIGNAL)
+	} else if ((int)ERR_JOBINTRRQST == SIGNAL)
 	{	/* Verify not indirect or that context is unchanged before reset context */
 		assert(NULL != frame_pointer->restart_pc);
 		assert((!(SFF_INDCE & frame_pointer->flags)) || (frame_pointer->restart_ctxt == frame_pointer->ctxt));
@@ -791,13 +791,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 		frame_pointer->mpc = frame_pointer->restart_pc;
 		frame_pointer->ctxt = frame_pointer->restart_ctxt;
 		assert(jobinterrupt == outofband);
-		dollar_zininterrupt = TRUE;     /* Note done before outofband is cleared to prevent nesting */
-		if (no_event != TAREF1(save_xfer_root, jobinterrupt).event_state)
-		{
-			TAREF1(save_xfer_root, jobinterrupt).event_state = active;
-			xfer_reset_handlers(jobinterrupt);
-		}
-		assert(not_in_play == TAREF1(save_xfer_root, jobinterrupt).event_state);
+		dollar_zininterrupt = TRUE;     /* Note down before outofband is cleared to prevent nesting */
+		TAREF1(save_xfer_root, jobinterrupt).event_state = active;
+		xfer_reset_if_setter(jobinterrupt);
+		assert(not_in_play != TAREF1(save_xfer_root, jobinterrupt).event_state);
+		TAREF1(save_xfer_root, jobinterrupt).event_state = active;
 		proc_act_type = SFT_ZINTR | SFT_COUNT;	/* trans_code will invoke jobinterrupt_process for us */
 		MUM_TSTART;
 	} else  if ((int)ERR_JOBINTRRETHROW == SIGNAL)

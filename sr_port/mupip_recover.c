@@ -165,7 +165,7 @@ seq_num	mur_get_max_strm_reg_seqno(int strm_num)
 
 void	mupip_recover(void)
 {
-	bool			mur_open_files_status;
+	int4			mur_open_files_status;
 	boolean_t		all_gen_properly_closed, apply_pblk, ztp_broken, intrrupted_recov_processing;
 	char			histdetail[HIST_LEN];
 	enum jnl_record_type	rectype;

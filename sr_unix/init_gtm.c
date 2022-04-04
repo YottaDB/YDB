@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,23 +46,20 @@
 #include "show_source_line.h"
 #include "patcode.h"
 #include "collseq.h"
-#include "ztimeout_routines.h"
 
 GBLREF boolean_t	utf8_patnumeric;
 GBLREF int4		exi_condition;
 GBLREF mstr		dollar_zchset;
+GBLREF int		(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF mstr		dollar_zpatnumeric;
 GBLREF mstr		default_sysid;
 GBLREF pattern		*pattern_list;
 GBLREF pattern		*curr_pattern;
 GBLREF pattern		mumps_pattern;
 GBLREF uint4		*pattern_typemask;
-GBLREF int		(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF void		(*ctrlc_handler_ptr)();
-GBLREF void		(*tp_timeout_action_ptr)(void);
-GBLREF void		(*tp_timeout_clear_ptr)(void);
-GBLREF void		(*tp_timeout_start_timer_ptr)(int4 tmout_sec);
-GBLREF void		(*unw_prof_frame_ptr)(void);
+GBLREF void		(*mupip_exit_fp)(int4 errnum);		/* Func ptr for mupip_exit() but in GTM, points to assert rtn */
+GBLREF void		(*show_source_line_fptr)(boolean_t warn); /* Func ptr for show_source_line() for same reason as below */
 GBLREF void		(*stx_error_fptr)(int in_error, ...);	/* Function pointer for stx_error() so gtm_utf8.c can avoid pulling
 								 * stx_error() into gtmsecshr, and thus just about everything else
 								 * as well.
@@ -71,16 +68,16 @@ GBLREF void		(*stx_error_va_fptr)(int in_error, va_list args);	/* Function point
 										 * can avoid pulling stx_error() into gtmsecshr,
 										 * and thus just about everything else as well.
 										 */
-GBLREF	void		(*mupip_exit_fp)(int4 errnum);		/* Func ptr for mupip_exit() but in GTM, points to assert rtn */
-GBLREF	void		(*show_source_line_fptr)(boolean_t warn); /* Func ptr for show_source_line() for same reason as above */
+GBLREF void		(*tp_timeout_action_ptr)(void);
+GBLREF void		(*tp_timeout_clear_ptr)(void);
+GBLREF void		(*tp_timeout_start_timer_ptr)(int4 tmout_sec);
+GBLREF void		(*unw_prof_frame_ptr)(void);
 #ifdef GTM_PTHREAD
 GBLREF pthread_t	gtm_main_thread_id;
 GBLREF boolean_t	gtm_main_thread_id_set;
 GBLREF boolean_t	gtm_jvm_process;
 #endif
 GBLDEF boolean_t	gtm_startup_active = FALSE;
-GBLDEF void             (*ztimeout_action_ptr)(void) = ztimeout_action;
-GBLDEF void             (*ztimeout_clear_ptr)(void) = ztimeout_clear_timer;
 
 STATICFNDCL void assert_on_entry(int4 arg);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Copyright (c) 2010-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,9 @@ void trigger_incr_cycle(char *trigvn, int trigvn_len)
 	{
 		mv_trig_cycle_ptr = &trigger_cycle;
 		cycle = MV_FORCE_INT(mv_trig_cycle_ptr);
+		assert((0 < cycle) && (MAXPOSINT4 > cycle));
+		if (MAXPOSINT4 == cycle)
+			cycle = 1;	/* Reset; gv_trigger uses cycle as a simple equality; higher/lower is not a concern */
 		cycle++;
 		INT2STR(cycle, cycle_str);
 		cycle_ptr = cycle_str;

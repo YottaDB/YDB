@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information 	*
+ * Copyright (c) 2001-2022 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -182,7 +182,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* SPOREOL */
 	   0,	/* SRCLIN */
 	   0,	/* SRCLOC */
-	   0,	/* UNUSEDMSG353 */
+	   0,	/* RLNKRECNFL */
 	   0,	/* STACKCRIT */
 	   0,	/* STACKOFLOW */
 	   0,	/* STACKUNDERFLO */
@@ -464,7 +464,7 @@ const static readonly int error_ansi[] = {
 	  72,	/* RMWIDTHPOS */
 	  13,	/* OFFSETINV */
 	   0,	/* JOBPARTOOLONG */
-	   0,	/* JOBARGMISSING */
+	   0,	/* RLNKINTEGINFO */
 	   0,	/* RUNPARAMERR */
 	   0,	/* FNNAMENEG */
 	   0,	/* ORDER2 */
@@ -970,7 +970,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLSWITCHSZCHG */
 	   0,	/* NOTRNDMACC */
 	   0,	/* TMPFILENOCRE */
-	   0,	/* SHRMEMEXHAUSTED */
+	   0,	/* UNUSEDMSG1141 */
 	   0,	/* JNLSENDOPER */
 	   0,	/* DDPSUBSNUL */
 	   0,	/* DDPNOCONNECT */
@@ -1071,7 +1071,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* RSVDBYTE2HIGH */
 	   0,	/* BKUPTMPFILOPEN */
 	   0,	/* BKUPTMPFILWRITE */
-	   0,	/* VMSMEMORY2 */
+	   0,	/* UNUSEDMSG1242 */
 	   0,	/* UNUSEDMSG1243 */
 	   0,	/* UNUSEDMSG1244 */
 	   0,	/* REPLINSTMISMTCH */
@@ -1352,14 +1352,14 @@ const static readonly int error_ansi[] = {
 	   0,	/* NULLENTRYREF */
 	   0,	/* ZPEEKNORPLINFO */
 	   0,	/* MMREGNOACCESS */
-	   0,	/* MALLOCMAXUNIX */
-	   0,	/* MALLOCMAXVMS */
+	   0,	/* UNUSEDMSG1525 */
+	   0,	/* MALLOCCRIT */
 	   0,	/* HOSTCONFLICT */
 	   0,	/* GETADDRINFO */
 	   0,	/* GETNAMEINFO */
 	   0,	/* SOCKBIND */
 	   0,	/* INSTFRZDEFER */
-	   0,	/* UNUSEDMSG1532 */
+	   0,	/* VIEWARGTOOLONG */
 	   0,	/* REGOPENFAIL */
 	   0,	/* REPLINSTNOSHM */
 	   0,	/* DEVPARMTOOSMALL */

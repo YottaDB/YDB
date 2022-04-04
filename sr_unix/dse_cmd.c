@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -168,6 +168,7 @@ static readonly CLI_ENTRY dse_cfhead_qual[] = {
 { "ONLINE_NBB",                0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
 { "OVERRIDE",                  0, 0, 0,                     0,                          0, 0, VAL_N_A,     0, 0,       0,        0       },
 { "PRE_READ_TRIGGER_FACTOR",   0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "PROBLKSPLIT",               0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "QDBRUNDOWN",                0, 0, 0,                     0,                          0, 0, VAL_N_A,     0, NEG,     0,        0       },
 { "RC_SRV_COUNT",              0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "RECORD_MAX_SIZE",           0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },

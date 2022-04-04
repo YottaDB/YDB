@@ -93,6 +93,7 @@
 	.	set:""=format format=$select(type["int":"I",1:"")
 	.	; miscellaneous whitelist of non-standard types
 	.	set:""=format format=$select("boolean_t"=type:"I","time_t"=type:"I","gtm_timet"=type:"I","size_t"=type:"U",1:"")
+	.	set:""=format format=$select("_Bool"=type:"I",1:"")
 	.	do:""=format error("UNSUPTYPE",type)
 	set $etrap=etrap
 	; determine if this is an array

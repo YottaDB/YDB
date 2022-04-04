@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +32,7 @@
 void op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
 {
 	va_list		var;
-	bool		flag;
+	int		flag;
 	int4		subsc, arg;
 	INTPTR_T	arg1, arg2;
 	VMS_ONLY(int4	count;)
@@ -89,7 +90,7 @@ void op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
 			gvzwr_arg(flag, (mval *)arg1, (mval *)0);
 			break;
 		default:
-			GTMASSERT;
+			assertpro(flag && FALSE);
 			break;
 		}
 	}

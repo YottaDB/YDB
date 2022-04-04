@@ -84,44 +84,50 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	old_ochset = ioptr->ochset;
 	while (*(pp->str.addr + p_offset) != iop_eol)
 	{
-		if ((ch = *(pp->str.addr + p_offset++)) == iop_exception)
+		switch (ch = *(pp->str.addr + p_offset++))
 		{
+		case iop_exception:
 			DEF_EXCEPTION(pp, p_offset, ioptr);
 			break;
-		} else  if (ch == iop_canonical)
+		case iop_canonical:
 			tt_ptr->canonical = TRUE;
-		else if (ch == iop_nocanonical)
+			break;
+		case iop_nocanonical:
 			tt_ptr->canonical = FALSE;
-		else if (ch == iop_empterm)
+			break;
+		case iop_empterm:
 			empt = TRUE;
-		else if (ch == iop_noempterm)
+			break;
+		case iop_noempterm:
 			empt = FALSE;
-		else if (iop_m == ch)
+			break;
+		case iop_m:
 			ioptr->ichset = ioptr->ochset = CHSET_M;
-		else if (gtm_utf8_mode && iop_utf8 == ch)
-			ioptr->ichset = ioptr->ochset = CHSET_UTF8;
-		else if (gtm_utf8_mode && (iop_ipchset == ch || iop_opchset == ch || iop_chset == ch))
-		{
-			GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
-			SET_ENCODING(temp_chset, &chset_mstr);
-			if (IS_UTF16_CHSET(temp_chset))		/* Not allowed for terminals */
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2, chset_mstr.len, chset_mstr.addr);
-			else
+			break;
+		case iop_utf8:
+			if (gtm_utf8_mode)
+				ioptr->ichset = ioptr->ochset = CHSET_UTF8;
+			break;
+		case iop_ipchset:
+		case iop_opchset:
+		case iop_chset:
+			if (gtm_utf8_mode)
 			{
-				switch(ch)
-				{
-					case iop_ipchset:
+				GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				SET_ENCODING(temp_chset, &chset_mstr);
+				if (IS_UTF16_CHSET(temp_chset)) /* Not allowed for terminals */
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2, chset_mstr.len, chset_mstr.addr);
+					else if (ch == iop_ipchset)
 						ioptr->ichset = temp_chset;
-						break;
-					case iop_opchset:
+					else if (ch == iop_opchset)
 						ioptr->ochset = temp_chset;
-						break;
-					case iop_chset:
+					else if (ch == iop_chset)
+					{
 						ioptr->ichset = temp_chset;
 						ioptr->ochset = temp_chset;
-						break;
-				}
+					}
 			}
+			break;
 		}
 		p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
 			(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);

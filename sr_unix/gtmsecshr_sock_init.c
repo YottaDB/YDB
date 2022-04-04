@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -248,7 +248,7 @@ int4 gtmsecshr_sock_init(int caller)
 						suffix = 'a';
 						gtmsecshr_cli_sockpath_end = strnlen(gtmsecshr_cli_sock_name.sun_path,
 								sizeof(gtmsecshr_cli_sock_name.sun_path));
-						assert(sizeof(gtmsecshr_cli_sock_name.sun_path) > gtmsecshr_cli_sockpath_end);
+						assert(sizeof(gtmsecshr_cli_sock_name.sun_path) > (1 + gtmsecshr_cli_sockpath_end));
 						gtmsecshr_cli_sock_name.sun_path[gtmsecshr_cli_sockpath_end + 1] = '\0';
 #						ifdef EXACT_SIZE_SOCKNAME
 						gtmsecshr_cli_sockpath_len++; /* Account for socket name growth (suffix) */

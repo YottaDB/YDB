@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2021 Fidelity National Information	*
+ * Copyright (c) 2005-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,7 +116,10 @@ int updhelper_reader(void)
 	gtm_uint64_t		pre_read_offset;
 	int			lcnt;
 	boolean_t		continue_reading;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	TREF(ok_to_see_statsdb_regs) = TRUE;
 	call_on_signal = updhelper_reader_sigstop;
 	updhelper_init(UPD_HELPER_READER);
 	repl_log(updhelper_log_fp, TRUE, TRUE, "Helper reader started. PID %d [0x%X]\n", process_id, process_id);
@@ -373,6 +376,7 @@ boolean_t updproc_preread(void)
 							reg = gv_cur_region;
 							csa = &FILE_INFO(reg)->s_addrs;
 							assert(!csa->now_crit);
+							INCR_GVSTATS_COUNTER(csa, csa->nl, n_pre_read_globals, 1);
 							status = gvcst_search(gv_currkey, NULL);
 							assert(!csa->now_crit);
 							TREF(tqread_nowait) = FALSE;	/* reset as soon as possible */

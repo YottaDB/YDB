@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -203,6 +203,7 @@ void advancewindow(void)
 		TREF(lexical_ptr) = (char *)s2n(&(TREF(director_mval)));
 		if (!((TREF(director_mval)).mvtype &= MV_NUM_MASK))
 		{
+			TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* improve hints */
 			stx_error(ERR_NUMOFLOW);
 			TREF(director_token) = TK_ERROR;
 			return;

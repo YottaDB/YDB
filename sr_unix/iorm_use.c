@@ -266,18 +266,18 @@ void	iorm_use(io_desc *iod, mval *pp)
 		case iop_w_protection:
 			FSTAT_CHECK(TRUE);
 			mode &= ~(0x07);
-			mode |= *(pp->str.addr + p_offset);
+			mode |= (short)(unsigned char)*(pp->str.addr + p_offset);
 			break;
 		case iop_g_protection:
 			FSTAT_CHECK(TRUE);
 			mode &= ~(0x07 << 3);
-			mode |= *(pp->str.addr + p_offset) << 3;
+			mode |= (short)(unsigned char)*(pp->str.addr + p_offset) << 3;
 			break;
 		case iop_s_protection:
 		case iop_o_protection:
 			FSTAT_CHECK(TRUE);
 			mode &= ~(0x07 << 6);
-			mode |= *(pp->str.addr + p_offset) << 6;
+			mode |= (short)(unsigned char)*(pp->str.addr + p_offset) << 6;
 			break;
 		case iop_pad:
 			if (iod->state != dev_open)
@@ -678,7 +678,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			 * side of $PRINCIPAL is equal to io_std_device.in we break if OUTSEEK is the device parameter.
 			 * A similar check is done on the output side if INSEEK or SEEK is the device parameter.
 			 */
-			if ((io_std_device.in == iod))
+			if ((io_std_device.in == iod))	/* CAUTION: potential fall-through */
 				break;
 			outdevparam = TRUE;
 		case iop_inseek:
@@ -706,7 +706,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 						} else
 							rm_ptr->file_pos = cur_position;
 					}
-					seek_len = MIN(*(pp->str.addr + p_offset), (LIMIT_SEEK_STR - 1));
+					seek_len = MIN((unsigned char)*(pp->str.addr + p_offset), (LIMIT_SEEK_STR - 1));
 					/* if seek_len not greater than zero then it's an error so quit now */
 					if (0 >= seek_len)
 						OUTPUT_SDSEEKERR("\"\"");

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -111,7 +111,8 @@ void op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_t
 				char_len++;
 			} else
 			{
-				offset = (uint4)((size_t)(tabent->value));
+				offset = (int4)((size_t)(tabent->value));
+				assert(0 <= offset);
 				if (MAXPOSINT4 != offset)
 				{	/* Valid translation found; copy new value to dst */
 					/* Because the hashtable can't do zeros, it has the offset incremented by one,

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -718,6 +718,17 @@ void dse_chng_fhead(void)
 		cs_data->epoch_taper = FALSE;
 		util_out_print("Database file !AD now has epoch taper flag set to FALSE", TRUE,
 					DB_LEN_STR(gv_cur_region));
+	}
+	if (CLI_PRESENT == cli_present("PROBLKSPLIT"))
+	{
+		cli_get_int("PROBLKSPLIT", &x);
+                if (0 <= x)
+		{
+                        cs_data->problksplit = x;
+			util_out_print("Database file !AD now has proactive block split flag set to !12UL", TRUE,
+					DB_LEN_STR(gv_cur_region), cs_data->problksplit);
+		} else
+                        util_out_print("Error: PROBLKSPLIT should be an integer of zero (0) or greater", TRUE);
 	}
 #	endif
 	if (CLI_PRESENT == cli_present(UNIX_ONLY("JNL_SYNCIO") VMS_ONLY("JNL_CACHE")))

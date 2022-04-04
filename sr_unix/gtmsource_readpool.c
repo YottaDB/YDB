@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2020 Fidelity National Information	*
+ * Copyright (c) 2006-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -102,7 +102,8 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 		{
 			assert(stop_read_at >= read_addr);
 			avail_data_qw = stop_read_at - read_addr;
-			assert(maxbufflen <= MAXPOSINT4); /* to catch the case of change in type of maxbufflen */
+			/* To catch the case of change in type of maxbufflen */
+			assert((0 <= maxbufflen) && (maxbufflen <= MAXPOSINT4));
 			avail_data = (uint4)MIN(avail_data_qw, (qw_num)maxbufflen);
 			assert(next_read_seqno < next_histinfo_seqno);
 			read_multiple = (first_tr_len < avail_data) && ((next_read_seqno + 1) < next_histinfo_seqno);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,7 +88,7 @@ void stx_error_va(int in_error, va_list args)
 	if (TREF(xecute_literal_parse))
 	{
 		ins_errtriple(in_error);
-		TREF(source_error_found) = TRUE;
+		TREF(source_error_found) = (int4)in_error;
 		return;
 	}
 	TREF(dollar_zcstatus) = !TREF(dollar_zcstatus) ? in_error : ERR_ERRORSUMMARY;

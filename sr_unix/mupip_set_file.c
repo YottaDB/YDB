@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -130,11 +130,11 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				lock_space_status, mutex_space_status, null_subs_status, qdbrundown_status, rec_size_status,
 				reg_exit_stat, rc, rsrvd_bytes_status, sleep_cnt_status, save_errno, stats_status, status,
 				status1, stdb_alloc_status, stdnullcoll_status, trigger_flush_limit_status, wrt_per_flu_status,
-				full_blkwrt_status;
+				full_blkwrt_status, problksplit_status;
 	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_flush_trigger, new_hard_spin,
 				new_key_size, new_lock_space, new_mutex_space, new_null_subs, new_rec_size, new_sleep_cnt,
 				new_spin_sleep, new_statsdb_alloc, new_stdnullcoll, new_wrt_per_flu, reserved_bytes,
-				spin_sleep_status, read_only_status, new_full_blkwrt;
+				spin_sleep_status, read_only_status, new_full_blkwrt, new_problksplit;
 	sgmnt_data_ptr_t	csd, pvt_csd;
 	tp_region		*rptr, single;
 	uint4			fsb_size, reservedDBFlags;
@@ -201,6 +201,12 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		need_standalone = TRUE;
 	encryption_complete_status = cli_present("ENCRYPTIONCOMPLETE");
 	epoch_taper_status = cli_present("EPOCHTAPER");
+	if (problksplit_status = cli_present("PROBLKSPLIT"))
+		if (!cli_get_int("PROBLKSPLIT", &new_problksplit))
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("PROBLKSPLIT"));
+			exit_stat |= EXIT_ERR;
+		}
 	/* EXTENSION_COUNT does not require standalone access and hence need_standalone will not be set to TRUE for this. */
 	if (extn_count_status = cli_present("EXTENSION_COUNT"))
 	{
@@ -923,6 +929,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				csd->epoch_taper = (CLI_PRESENT == epoch_taper_status);
 			if (asyncio_status)
 				csd->asyncio = (CLI_PRESENT == asyncio_status);
+			if (problksplit_status)
+				csd->problksplit = (uint4)new_problksplit;
 			if (extn_count_status)
 				csd->extension_size = (uint4)new_extn_count;
 			change_fhead_timer("FLUSH_TIME", csd->flush_time,
@@ -1008,6 +1016,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 						break;
 				}
 			}
+			if (problksplit_status)
+				util_out_print("Database file !AD now has proactive block split flag set to !UL", TRUE,
+					fn_len, fn, csd->problksplit);
 			if (got_standalone)
 			{
 				if (0 == memcmp(pvt_csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
@@ -1071,10 +1082,14 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 							(CLI_PRESENT == stdnullcoll_status) ?
 							"M standard null collation" : "GT.M null collation      ");
 			} else
+			{
+				if (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+					db_header_dwnconv(csd);
 				if (flush_buffers)
 					wcs_flu(WCSFLU_FLUSH_HDR);
 				else
 					fileheader_sync(gv_cur_region);
+			}
 		} else
 			exit_stat |= reg_exit_stat;
 		if (got_standalone)

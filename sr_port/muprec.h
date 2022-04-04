@@ -1321,7 +1321,7 @@ uint4			mur_jctl_from_next_gen(reg_ctl_list *rctl);
 void 			mur_multi_rehash(void);
 uint4			mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr);
 uint4			mur_next_rec(jnl_ctl_list **jjctl);
-uint4			mur_open_files(boolean_t retry);
+int4			mur_open_files(boolean_t retry);
 uint4			mur_output_pblk(reg_ctl_list *rctl);
 uint4			mur_output_record(reg_ctl_list *rctl);
 void			mur_output_show(void);

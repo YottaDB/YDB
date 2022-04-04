@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,6 +48,7 @@ GBLREF	volatile boolean_t	timer_in_handler;
 error_def(ERR_NOREGION);
 error_def(ERR_NOTGBL);
 error_def(ERR_VIEWARGCNT);
+error_def(ERR_VIEWARGTOOLONG);
 error_def(ERR_VIEWGVN);
 error_def(ERR_VIEWLVN);
 error_def(ERR_VIEWREGLIST);
@@ -61,7 +62,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 	gvnh_spanreg_t		*gvspan;
 	gv_namehead		*tmp_gvt;
 	ht_ent_mname		*tabent;
-	int			cmp, n, reg_index, targ;
+	int			cmp, len, n, reg_index, targ;
 	mident_fixed		lcl_buff;
 	mname_entry		gvent, lvent;
 	mstr			namestr, tmpstr;
@@ -274,7 +275,9 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				gvt_pending_buddy_list = (buddy_list *)malloc(SIZEOF(buddy_list));
 				initialize_list(gvt_pending_buddy_list, SIZEOF(gvt_container), NOISOLATION_INIT_ALLOC);
 			}
-			assertpro(SIZEOF(global_names) > parm->str.len);
+			if ((0 > parm->str.len) || (MAX_PARMS < (size_t)parm->str.len))
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_VIEWARGTOOLONG, 4, parm->str.len,
+					strlen((const char *)vtp->keyword), vtp->keyword, MAX_PARMS);
 			tmpstr.len = parm->str.len;	/* we need to change len and should not change parm->str, so take a copy */
 			tmpstr.addr = parm->str.addr;
 			if (0 != tmpstr.len)
@@ -295,11 +298,20 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 						parmblk->ni_list.type = NOISOLATION_NULL;
 						break;
 				}
-				if (!tmpstr.len)
+				if (!tmpstr.len) /* Nothing beyond the "+/-" */
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, tmpstr.len, NULL);
 				memcpy(global_names, tmpstr.addr, tmpstr.len);
 				global_names[tmpstr.len] = '\0';
 				src = (unsigned char *)STRTOK_R((char *)global_names, ",", &strtokptr);
+				if (NULL == src)
+				{
+					if (MAX_MIDENT_LEN < parm->str.len)
+						parm->str.len = MAX_MIDENT_LEN;
+					memcpy(&lcl_buff.c[0], parm->str.addr, parm->str.len);
+					n = MAX_PARMS;
+					format2zwr((sm_uc_ptr_t)&lcl_buff.c, parm->str.len, global_names, &n);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
+				}
 				REINITIALIZE_LIST(noisolation_buddy_list);	/* reinitialize the noisolation buddy_list */
 				parmblk->ni_list.gvnh_list = NULL;
 				for ( ; src < &global_names[tmpstr.len + 1]; src = nextsrc)
@@ -319,22 +331,27 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 							gvent.var_name.len = namestr.len;
 						} else
 						{
-							memcpy(&lcl_buff.c[0], src, nextsrc - src - 1);
+							len = INTCAST(nextsrc - src - 1);
+							if (MAX_MIDENT_LEN < len)
+								len = MAX_MIDENT_LEN;
+							memcpy(&lcl_buff.c[0], src, len);
 							n = MAX_PARMS;
-							format2zwr((sm_uc_ptr_t)&lcl_buff.c, nextsrc - src - 1, global_names, &n);
+							format2zwr((sm_uc_ptr_t)&lcl_buff.c, len, global_names, &n);
 							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
 						}
 					} else
 					{
-						memcpy(&lcl_buff.c[0], src, (n = nextsrc - src - 1));
+						len = INTCAST(nextsrc - src - 1);
+						if (MAX_MIDENT_LEN < len)
+							len = MAX_MIDENT_LEN;
+						memcpy(&lcl_buff.c[0], src, len);
 						PUSH_MV_STENT(MVST_MVAL);
 						tmpmv = &mv_chain->mv_st_cont.mvs_mval;
 						tmpmv->mvtype = MV_STR;
-						n = ZWR_EXP_RATIO(n);
+						n = ZWR_EXP_RATIO(len);
 						ENSURE_STP_FREE_SPACE(n);
 						tmpmv->str.addr = (char *)stringpool.free;
-						format2zwr((sm_uc_ptr_t)&lcl_buff.c, nextsrc - src - 1,
-								(uchar_ptr_t)stringpool.free, &n);
+						format2zwr((sm_uc_ptr_t)&lcl_buff.c, len, (uchar_ptr_t)stringpool.free, &n);
 						stringpool.free += n;
 						tmpmv->str.len = n;
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, n, tmpmv->str.addr);

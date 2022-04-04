@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2021 Fidelity National Information	*
+ * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -105,14 +105,17 @@ LITDEF mval literal_tcp6 = DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, (SI
 LITDEF char *zsocket_state_names[] = {"CONNECTED", "LISTENING", "BOUND", "CREATED", "CONNECTINPROGRESS"};
 LITDEF char *zsocket_howcreated_names[] = {"LISTEN", "ACCEPTED", "CONNECT", "PRINCIPAL", "PASSED"};
 
-#define GET_SOCKETPTR_INDEX(DSOCK, INDEX, SOCKETPTR)			\
-{									\
-	INDEX = (NULL != arg1) ? (!M_ARG_SKIPPED(arg1) ? mval2i(arg1) : DSOCK->current_socket) : (DSOCK->n_socket + 1);	\
-	if ((0 < DSOCK->n_socket) && (INDEX <= DSOCK->n_socket))	\
-		SOCKETPTR = DSOCK->socket[INDEX];			\
-	else								\
-		SOCKETPTR = NULL;					\
-}
+/* Macro to set the pointer to the target socket in the SOCKET device */
+#define GET_SOCKETPTR_INDEX(DSOCK, INDEX, SOCKETPTR)				\
+MBSTART {									\
+	INDEX = (NULL != arg1) ?						\
+		(!M_ARG_SKIPPED(arg1) ? mval2i(arg1) : DSOCK->current_socket)	\
+		: (DSOCK->n_socket + 1);					\
+	if ((0 <= INDEX) && (0 < DSOCK->n_socket) && (INDEX <= DSOCK->n_socket))\
+		SOCKETPTR = DSOCK->socket[INDEX];				\
+	else	/* Index not in bounds; treat like non-existent socket */	\
+		SOCKETPTR = NULL;						\
+} MBEND
 
 void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 {

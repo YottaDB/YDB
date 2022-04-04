@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2021 Fidelity National Information	*
+ * Copyright (c) 2017-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,13 +27,12 @@ int gtm_confstr(char *command, unsigned int maxsize)
 {
 	char 		pathbuf[MAX_FN_LEN];
 	char 		*cmd_path, *path_tok, *path_tokptr, *cmd_ptr;
-	size_t 		n;
+	size_t 		n, tok_len, cmdlen;
 	int 		status, i;
-	unsigned int	tok_len, cmdlen;
 	struct stat 	sb;
 
 	n = confstr(_CS_PATH, NULL, (size_t) 0);
-	assert(n <= MAX_FN_LEN);
+	assert((MAX_FN_LEN >= n) && (MAX_FN_LEN >= maxsize));
 	if ((n > maxsize) || (0 == n))
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SYSUTILCONF, 2,
@@ -42,18 +41,18 @@ int gtm_confstr(char *command, unsigned int maxsize)
 	}
 	confstr(_CS_PATH, pathbuf, n);
 	i = 0;
-	cmdlen = strlen(command);
+	cmdlen = strnlen(command, MAX_FN_LEN);
+	assert(0 < cmdlen); /* Internal commands should never be null */
 	path_tok = STRTOK_R(pathbuf, ":", &path_tokptr);
-	assert(cmdlen && (path_tok != NULL));
-	do
+	while (path_tok != NULL)
 	{
 		tok_len = strlen(path_tok);
-		assert((tok_len + cmdlen + 2) < maxsize);
-		if (maxsize <= (tok_len + cmdlen + 2))	/* Path + command will exceed command buffer size */
+		n = (tok_len + cmdlen + 2);
+		assert(n < maxsize);
+		if (maxsize <= n)	/* Path + command will exceed command buffer size */
 			break;
-		cmd_path = malloc(tok_len + cmdlen + 2);
+		cmd_ptr = cmd_path = (char *)malloc(n);
 		assert(NULL != cmd_path);
-		cmd_ptr = cmd_path;
 		memcpy(cmd_path, path_tok, tok_len); /* For SCI: Use cmd_path for memcpy, since it was the name malloced */
 		cmd_ptr += tok_len;
 		*cmd_ptr = '/';
@@ -65,7 +64,7 @@ int gtm_confstr(char *command, unsigned int maxsize)
 		if (!status && (S_IXUSR & sb.st_mode)) /* File is present and an executable */
 		{
 			cmdlen = strlen(cmd_path);
-			assert(maxsize > cmdlen + 1);
+			assert(maxsize > (cmdlen + 1));
 			if (maxsize <= (cmdlen + 1))	/* Path + command will exceed command buffer size */
 			{
 				free(cmd_path);
@@ -79,7 +78,8 @@ int gtm_confstr(char *command, unsigned int maxsize)
 			return 0;
 		}
 		free(cmd_path);
-	} while (NULL != (path_tok = STRTOK_R(NULL, ":", &path_tokptr) ));
+		path_tok = STRTOK_R(NULL, ":", &path_tokptr);
+	}
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SYSUTILCONF, 2,
 				LEN_AND_LIT("System utilities not found at the specified path"));
 	return -1;

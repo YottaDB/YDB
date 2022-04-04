@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -909,6 +909,7 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	rhdtyp		*rtnhdr;
 	int		size;
 	stack_frame	*fp;
+	intrpt_state_t  prev_intrpt_state;
 
 	/* TODO: We don't expect the trigger source to exist now gtm_trigger cleans it up ASAP. Remove it after a few releases */
 	assert (0 == trigdsc->xecute_str.str.len);
@@ -940,11 +941,13 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	/* Free all storage allocated on behalf of this trigger routine. Do this before removing from routine table since
 	 * some of the activities called during unlink look for the routine so it must be found.
 	 */
+	DEFER_INTERRUPTS(INTRPT_IN_RTN_CLEANUP, prev_intrpt_state);
 	zr_unlink_rtn(rtnhdr, TRUE);
 	/* Remove the routine from the rtn_table */
 	size = INTCAST((char *)rtn_names_end - (char *)mid);
 	if (0 < size)
 		memmove((char *)mid, (char *)(mid + 1), size);	/* Remove this routine name from sorted table */
 	rtn_names_end--;
+	ENABLE_INTERRUPTS(INTRPT_IN_RTN_CLEANUP, prev_intrpt_state);
 }
 #endif /* GTM_TRIGGER */

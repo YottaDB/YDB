@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -139,6 +139,7 @@ void unary_tail(oprtype *opr)
 						s2n(mv);
 						if (!(MV_NM & mv->mvtype))
 						{
+							TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
 							assert(TREF(rts_error_in_parse));
 							return;

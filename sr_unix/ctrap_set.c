@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,8 +39,8 @@ void ctrap_set(int4 ob_char)
 
 	SETUP_THREADGBL_ACCESS;
 	assert(INTRPT_IN_EVENT_HANDLING == intrpt_ok_state);
-	if ((ctrap != outofband) || have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT) || dollar_zininterrupt
-		|| (jobinterrupt == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
+	if ((((CTRLC == ob_char) ? ctrap : sighup) != outofband) || have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)
+		 || dollar_zininterrupt || (jobinterrupt == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
 	{	/* not a good time, so save it */
 		TAREF1(save_xfer_root, ctrap).event_state = queued;
 		SAVE_XFER_QUEUE_ENTRY(ctrap, 0);

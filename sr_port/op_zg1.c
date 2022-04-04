@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2021 Fidelity National Information	*
+ * Copyright (c) 2011-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,17 +56,16 @@ void op_zg1(int4 level)
 	curlvl = dollar_zlevel();
         if (0 > level)
 	{	/* Negative level specified, means to use relative level change */
-		if ((-level) > curlvl)
+		level += curlvl;	/* Compute relative desired level */
+		if (0 > level)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGOTOLTZERO);
-		unwlevels = -level;	/* Level to seek relative to current level */
-		level += curlvl;
 	} else
 	{	/* Else level is the level we wish to achieve - compute unrolls necessary */
-		unwlevels = curlvl - level;
-		if (0 > unwlevels)
+		if (0 > (curlvl - level))
 			/* Couldn't get to the level we were trying to unwind to */
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGOTOTOOBIG);
 	}
+	unwlevels = curlvl - level;
 	/* For ZGOTO 0, if this is MUPIP, exit after sending an oplog message recording the uncommon exit method.
 	 * Otherwise, if $ZTRAP is active or ""=$ECODE return a status of 0, else return the last error in $ECODE
 	 */

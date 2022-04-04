@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Copyright (c) 2012-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,10 +55,8 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (MAX_STRLEN < (messagelen = strlen(message)))
-		messagelen = MAX_STRLEN;
+	messagelen = strnlen(message, MAX_STRLEN);
 	assert(SIZEOF(count) <= SIZEOF(pid_t));
-	assert(MAXUINT4 >= GTM_MAX_DIR_LEN + messagelen + (3 * MAX_PIDSTR_LEN) + 5);
 	arr_len = GTM_MAX_DIR_LEN + messagelen + (3 * MAX_PIDSTR_LEN) + 5;	/* 4 spaces and a terminator */
 	if (!(TREF(gtm_waitstuck_script)).len)
 	{	/* uninitialized buffer - translate logical and move it to the buffer */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -135,6 +135,7 @@
 #define DEFAULT_ZERROR_LEN	(SIZEOF(DEFAULT_ZERROR_STR) - 1)
 #include "gtm_libaio.h"
 #include "deferred_events_queue.h"
+#include "deferred_events.h"
 #include "dm_audit_log.h"
 
 GBLDEF	gd_region		*db_init_region;
@@ -312,7 +313,7 @@ GBLDEF	boolean_t		is_tracing_on;
 GBLDEF	void			(*tp_timeout_start_timer_ptr)(int4 tmout_sec) = tp_start_timer_dummy;
 GBLDEF	void			(*tp_timeout_clear_ptr)(void) = tp_clear_timeout_dummy;
 GBLDEF	void			(*tp_timeout_action_ptr)(void) = tp_timeout_action_dummy;
-GBLDEF	void			(*ctrlc_handler_ptr)() = ctrlc_handler_dummy;
+GBLDEF	void			(*ctrlc_handler_ptr)(void) = ctrlc_handler_dummy;
 GBLDEF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace) = op_open_dummy;
 GBLDEF	void			(*unw_prof_frame_ptr)(void) = unw_prof_frame_dummy;
 /* Initialized only in gtm_startup() */
@@ -1090,7 +1091,9 @@ GBLDEF	boolean_t	gtm_main_thread_id_set;		/* Indicates whether the thread ID is 
 							 */
 GBLDEF	boolean_t	gtm_jvm_process;		/* Indicates whether we are running with JVM or stand-alone. */
 #endif
-GBLDEF	size_t		gtm_max_storalloc;		/* Maximum that GTM allows to be allocated - used for testing */
+GBLDEF	size_t		zmalloclim;			/* ISV memory warning of MALLOCCRIT in bytes */
+GBLDEF	boolean_t	malloccrit_issued;		/* MEMORY error limit set at time of MALLOCCRIT */
+GBLDEF	xfer_set_handlers_fnptr_t	xfer_set_handlers_fnptr;	/* see comment in deferred_events.h about this typedef */
 GBLDEF	boolean_t	ipv4_only;			/* If TRUE, only use AF_INET. Reflects the value of the gtm_ipv4_only
 							 * environment variable, so is process wide.
 							 */

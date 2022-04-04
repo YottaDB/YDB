@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2020 Fidelity National Information	*
+ * Copyright (c) 2003-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -262,7 +262,7 @@ void release_all_locks(unix_db_info *udi, gtmsource_local_ptr_t gtmsourcelocal_p
 		assert(FALSE);
 }
 
-uint4 mur_open_files(boolean_t retry)
+int4 mur_open_files(boolean_t retry)
 {
 	boolean_t			interrupted_rollback;
 	int                             jnl_total, jnlno, regno, max_reg_total, errcode;

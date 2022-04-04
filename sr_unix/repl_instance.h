@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -194,7 +194,8 @@ typedef struct gtmsrc_lcl_struct
 		&& (0 != trans_name.len))										\
 	{														\
 		temp_inst_fn[trans_name.len] = '\0';									\
-		if (!get_full_path(trans_name.addr, trans_name.len, fn, fn_len, bufsize, &ustatus) && err_act)		\
+		if (!get_full_path(trans_name.addr, (unsigned int)trans_name.len, fn, fn_len, bufsize, &ustatus)	\
+				&& err_act)										\
 		{													\
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLINSTACC, 2, trans_name.len, trans_name.addr,	\
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("full path could not be found"), ustatus);		\

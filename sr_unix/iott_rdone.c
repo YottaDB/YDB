@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,37 +62,34 @@ error_def(ERR_ZINTRECURSEIO);
 
 int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 {
-	boolean_t	ret = FALSE, timed, utf8_active, zint_restart, first_time;
-	unsigned char	inbyte;
+	ABS_TIME	cur_time, end_time;
+	boolean_t	ch_set, first_time, ret = FALSE, timed, utf8_active, zint_restart;
+	char		dc1, dc3;
+	d_tt_struct	*tt_ptr;
+	fd_set		input_fd;
+	int		inchar_width, msk_in, msk_num, rdlen, selstat, status, utf8_more;
+	io_desc		*io_ptr;
+	mv_stent	*mv_zintdev;
+	short int	i;
+	struct timeval	input_timeval;
+	TID		timer_id;
+	tt_interrupt	*tt_state;
+	uint4		mask;
+	unsigned char	inbyte, *zb_ptr, *zb_top;
+	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
 	wint_t		inchar;
 #ifdef __MVS__
 	wint_t		asc_inchar;
 #endif
-	char		dc1, dc3;
-	short int	i;
-	io_desc		*io_ptr;
-	d_tt_struct	*tt_ptr;
-	tt_interrupt	*tt_state;
-	TID		timer_id;
-	int		rdlen, selstat, status, utf8_more, inchar_width;
-	uint4		mask;
-	int		msk_in, msk_num;
-	unsigned char	*zb_ptr, *zb_top;
-	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
-	fd_set		input_fd;
-	struct timeval	input_timeval;
-	ABS_TIME	cur_time, end_time;
-	mv_stent	*mv_zintdev;
-	boolean_t	ch_set;
 
 	io_ptr = io_curr_device.in;
-	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
-	if (sighup == outofband)
+	if (ERR_TERMHANGUP == error_condition)
 	{
 		TERMHUP_NOPRINCIO_CHECK(FALSE);				/* FALSE for READ */
 		io_ptr->dollar.za = ZA_IO_ERR;
 		return FALSE;
 	}
+	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	assert(io_ptr->state == dev_open);
 	iott_flush(io_curr_device.out);
 	tt_ptr = (d_tt_struct*) io_ptr->dev_sp;

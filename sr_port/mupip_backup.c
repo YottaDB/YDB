@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,6 +81,7 @@
 #include "repl_sem.h"
 #include "gtm_sem.h"
 #include "anticipatory_freeze.h"
+#include "mdq.h"
 #define PATH_DELIM		'/'
 #define TMPDIR_ACCESS_MODE	(R_OK | W_OK | X_OK)
 
@@ -120,6 +121,7 @@ GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
+GBLREF	usr_reg_que		*usr_spec_regions;
 GBLREF	int			pool_init;
 LITREF char             gtm_release_name[];
 LITREF int4             gtm_release_name_len;
@@ -273,6 +275,7 @@ void mupip_backup(void)
 	char			time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */
 	struct perm_diag_data	pdd;
 	ZOS_ONLY(int		realfiletag;)
+	usr_reg_que		*region_que_entry;
 
 	/* ==================================== STEP 1. Initialization ======================================= */
 	backup_started = backup_interrupted = FALSE;
@@ -1475,22 +1478,28 @@ repl_inst_bkup_done2:
 			cli_get_int("RETRY", &maxretry);
 		else
 			maxretry = 1;
-		for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
+		dqloop(usr_spec_regions, que, region_que_entry)
 		{
-			if (rptr->not_this_time > keep_going)
-				continue;
-			gv_cur_region = rptr->reg;
-			TP_CHANGE_REG(gv_cur_region);	/* sets cs_addrs and cs_data which mubinccpy/mubfilcpy rely on */
-			if ((cs_addrs->onln_rlbk_cycle != cs_addrs->nl->onln_rlbk_cycle)
-				|| (0 != cs_addrs->nl->onln_rlbk_pid))
-			{	/* A concurrent online rollback happened since we did the gvcst_init or one is going on right now.
-				 * In either case, the BACKUP is unreliable. Cleanup and exit
-				 */
-				error_mupip = TRUE;
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DBROLLEDBACK);
-				break;
+			for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
+			{
+				if (rptr->not_this_time > keep_going)
+					continue;
+				TP_CHANGE_REG(rptr->reg); /* sets cs_addrs and cs_data which mubinccpy/mubfilcpy rely on */
+				if ((cs_addrs->onln_rlbk_cycle != cs_addrs->nl->onln_rlbk_cycle)
+					|| (0 != cs_addrs->nl->onln_rlbk_pid))
+				{	/* A concurrent online rollback happened since we did the gvcst_init or one
+					* is going on right now. In either case, the BACKUP is unreliable. Cleanup
+					* and exit.
+					*/
+					error_mupip = TRUE;
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DBROLLEDBACK);
+					break;
+				}
+				if ((char *)gv_cur_region->rname == (char *)region_que_entry->usr_reg)
+					break; /* Matching region found. Exit the loop*/
 			}
-
+			if (NULL == rptr)
+				continue; /* continue the dqloop */
 			/* If we are doing a timestamp, this is point we take as the date of the backup */
 			if (record)
 			{
@@ -1501,13 +1510,13 @@ repl_inst_bkup_done2:
 				if (1 < attemptcnt)
 				{
 					gtm_putmsg_csa(CSA_ARG(REG2CSA(rptr->reg)) VARLSTCNT(8) ERR_BKUPRETRY, 6,
-					REG_LEN_STR(gv_cur_region), DB_LEN_STR(gv_cur_region), attemptcnt, maxretry);
+							REG_LEN_STR(gv_cur_region), DB_LEN_STR(gv_cur_region),
+							attemptcnt, maxretry);
 				}
 				result = (incremental ? mubinccpy(rptr) : mubfilcpy(rptr, showprogress, attemptcnt));
 				if (result)
-					break;
-
-				if ((FALSE == result) && (attemptcnt == maxretry))
+					break; /* break to dqloop */
+				if (attemptcnt == maxretry)
 				{
 					if (file_backed_up)
 						util_out_print("Files backed up before above error are OK.", TRUE);
@@ -1517,8 +1526,8 @@ repl_inst_bkup_done2:
 				if (mu_ctrlc_occurred)
 					break;
 			}
-			if (TRUE == error_mupip)
-				break; /* break out of outer for loop */
+			if (error_mupip)
+				break; /* break out of dqloop */
 		}
 	} else
 	{

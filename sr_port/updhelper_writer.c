@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2021 Fidelity National Information	*
+ * Copyright (c) 2005-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -99,7 +99,10 @@ int updhelper_writer(void)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	boolean_t		flushed;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	TREF(ok_to_see_statsdb_regs) = TRUE;
 	call_on_signal = updhelper_writer_sigstop;
 	updhelper_init(UPD_HELPER_WRITER);
 	repl_log(updhelper_log_fp, TRUE, TRUE, "Helper writer started. PID %d [0x%X]\n", process_id, process_id);
@@ -134,6 +137,7 @@ int updhelper_writer(void)
 				{
 					JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 0, NULL, FALSE, dummy_errno);
 					flushed = TRUE;
+					INCR_GVSTATS_COUNTER(csa, cnl, n_writer_flush, 1);
 				}
 				assert(NULL == reorg_encrypt_restart_csa); /* ensure above wcs_wtstart call does not set it */
 				if (JNL_ENABLED(csd))
@@ -158,6 +162,7 @@ int updhelper_writer(void)
 												| WCSFLU_SPEEDUP_NOBEFORE);
 								assert(NULL == reorg_encrypt_restart_csa);
 								assert(jbp->next_epoch_time > jgbl.gbl_jrec_time);
+								INCR_GVSTATS_COUNTER(csa, cnl, n_writer_helper_epoch, 1);
 							}
 							rel_crit(reg);
 							/* Do equivalent of WCSFLU_SYNC_EPOCH now out of crit */

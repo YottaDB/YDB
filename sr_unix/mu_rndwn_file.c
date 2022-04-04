@@ -1307,15 +1307,20 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			{
 				jpc = csa->jnl;
 				/* Check for a special case when the update/MUMPS process is killed in CMT06
-				 * in UPDATE_JRS_RSRV_FREEADDR before updating pahse2_commit_index2.
+				 * in UPDATE_JRS_RSRV_FREEADDR before updating phase2_commit_index2.
 				 * This causes a hang in jnl_flush() from wcs_flu(WCSFLU_NONE) below.
-				 * Restore phase2_commit_index2 by INCRementing it.
+				 * Restore phase2_commit_index2 by incrementing it.
 				 */
 				if ((NULL != jpc) && (NULL != jpc->jnl_buff))
 				{
+					/* Standalone access, no need for a read barrier */
 					jbp = jpc->jnl_buff;
 					index1 = jbp->phase2_commit_index1;
 					index2 = jbp->phase2_commit_index2;
+					/* This condition implies that a update/MUMPS process was killed in CMT06, right before
+					 * updating jb->phase2_commit_index2. Since this is the only process running, increment
+					 * index2 and let wcs_flu() called via jnl_flush() below handle it.
+					 */
 					if ((index1 == index2) && (jbp->freeaddr < jbp->rsrv_freeaddr)
 						&& (csa->nl->update_underway_tn != csd->trans_hist.curr_tn)
 						&& ((jbp->phase2_commit_array[index1].start_freeaddr +

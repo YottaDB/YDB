@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-# Copyright (c) 2009-2021 Fidelity National Information		#
+# Copyright (c) 2009-2022 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -75,11 +75,15 @@ fi
 
 # Help files
 hlpfiles="*help.dat *help.gld *.h"
+
 # Other files (left here for future use)
 ofiles="$hlpfiles"
 
 # Files that need to have $gtm_dist, $echo, etc. set in them.
 pathmods="gtmbase.gtc gtmstart.gtc gtmstop.gtc gtmcshrc.gtc gtmprofile.gtc gtm.gtc gtmprofile_preV54000.gtc gdedefaults.gtc"
+
+# Files deprecated in various releases. These should explicitly removed if installation is done on an existing directory.
+deprecatedfiles="geteuid semstat2 ftok"
 
 if [ $deliver_gtcm = "yes" ]; then
 	pathmods="$pathmods gtcm_run.gtc gtcm_slist.gtc"
@@ -178,6 +182,7 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	chmod 0755      $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
 	chown $owner    $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
 	chgrp $bingroup $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
+	remove_deprecated=1
 else
 	exit
 fi
@@ -290,6 +295,20 @@ if [ "$doutf8" -ne 0 ]; then
 		chmod 0755 $gtmdist/utf8 $gtmdist/plugin/o/utf8
 		chown ${owner}:${bingroup} $gtmdist/utf8 $gtmdist/plugin/o/utf8
 	fi
+fi
+
+# Remove deprecated files first if applicable
+if [ -n "$remove_deprecated" ]; then
+	$echo ""
+	$echo "Checking for deprecated files in $gtmdist"
+	$echo ""
+	for file in $deprecatedfiles
+	do
+		if [ -f "$gtmdist/$file" -o -f "$gtmdist/utf8/$file" ]; then
+			echo "	Removing $file"
+			rm -f $gtmdist/$file $gtmdist/utf8/$file
+		fi
+	done
 fi
 
 # Install COPYING if it is applicable

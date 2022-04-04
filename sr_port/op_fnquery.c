@@ -28,6 +28,7 @@
 #include "mvalconv.h"
 #include "numcmp.h"
 #include "promodemo.h"	/* for "demote" prototype used in LV_NODE_GET_KEY */
+#include "zshow.h"
 
 GBLREF bool		undef_inhibit;
 GBLREF mv_stent		*mv_chain;
@@ -38,6 +39,7 @@ GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 LITREF	mval		literal_null;
 
 error_def(ERR_LVNULLSUBS);
+error_def(ERR_MAXSTRLEN);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
 
@@ -45,7 +47,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 {
 	boolean_t		found, is_num, is_str, last_sub_null, nullify_term;
 	ht_ent_mname		*tabent;
-	int			i, j, length;
+	int			dst_len, i, j, length;
 	lv_val			*lvn, *lvns[MAX_LVSUBSCRIPTS], *v, *ve;
 	lvTree			*lvt;
 	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS], *node, *nullsubsnode, *nullsubsparent, *parent;
@@ -341,7 +343,16 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 			 * not yet initialized with current subscript (in the M-stack).
 			 */
 			v2->mvtype = MV_STR;
-			assert(MAX_STRLEN >= v2->str.len); /* check in op_putindx should assure this */
+			if (MAX_STRLEN < (dst_len = ZWR_EXP_RATIO(v2->str.len)))
+			{	/* Only do the expansion if there is a possibility of a length issue */
+				ENSURE_STP_FREE_SPACE(dst_len);
+				format2zwr((sm_uc_ptr_t)v2->str.addr, v2->str.len, (uchar_ptr_t)stringpool.free, &dst_len);
+				if (MAX_STRLEN < (v1->str.len + dst_len + 1))
+				{	/* key length + value lenght + ')' */
+					va_end(var);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
+				}
+			}
 			mval_lex(v2, &format_out);
 			if (format_out.addr != (char *)stringpool.free)	/* BYPASSOK */
 			{	/* We must put the string on the string pool ourself - mval_lex didn't do it

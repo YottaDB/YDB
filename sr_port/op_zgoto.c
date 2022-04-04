@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2021 Fidelity National Information	*
+ * Copyright (c) 2011-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,9 +68,9 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 	curlvl = dollar_zlevel();
         if (0 > level)
 	{	/* Negative level specified, means to use relative level change */
-		if ((-level) > curlvl)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGOTOLTZERO);
 		level += curlvl;	/* Compute relative desired level */
+		if (0 > level)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGOTOLTZERO);
 	} else
 	{	/* Else level is the level we wish to achieve - compute unrolls necessary */
 		if (0 > (curlvl - level))

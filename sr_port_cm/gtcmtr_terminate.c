@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,7 @@ GBLREF short	gtcm_ast_avail;
 #endif
 GBLREF struct CLB	*proc_to_clb[];
 
-bool gtcmtr_terminate(bool cm_err)
+char gtcmtr_terminate(bool cm_err)
 {
 #ifdef VMS
 	unsigned char	*mbuffer;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -574,7 +574,7 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 	for ( ; 0 < option_len; ptr++, option_len--)
 		*ptr = TOUPPER(*ptr);
 	ptr = STRTOK_R(local_options, ",", &strtokptr);
-	do
+	while (NULL != ptr)
 	{
 		switch (*ptr)
 		{
@@ -613,7 +613,8 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 				assert(FALSE);	/* Parsing should have found invalid command */
 				break;
 		}
-	} while (ptr = STRTOK_R(NULL, ",", &strtokptr));
+		ptr = STRTOK_R(NULL, ",", &strtokptr);
+	}
 	return !((*isolation && *noisolation) || (*consistency && *noconsistency));
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -232,7 +232,8 @@ int gtmsource_get_opt(void)
 			     connect_parm_token_str = connect_parms_str;
 			     !connect_parms_badval &&
 			     connect_parms_index <= GTMSOURCE_CONN_PARMS_COUNT &&
-			     (connect_parm = STRTOK_R(connect_parm_token_str, GTMSOURCE_CONN_PARMS_DELIM, &strtokptr)) != NULL;
+			     /* inline assignment */
+			     (NULL != (connect_parm = STRTOK_R(connect_parm_token_str, GTMSOURCE_CONN_PARMS_DELIM, &strtokptr)));
 			     connect_parms_index++,
 			     connect_parm_token_str = NULL)
 			{

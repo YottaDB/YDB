@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2021 Fidelity National Information	*
+ * Copyright (c) 2013-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -182,19 +182,19 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			case iop_attach:
 				n_specified++;
 				attach_specified = TRUE;
-				handlea_len = (int)(*(pp->str.addr + p_offset));
+				handlea_len = (int)(unsigned char)*(pp->str.addr + p_offset);
 				memcpy(handlea, (char *)(pp->str.addr + p_offset + 1), handlea_len);
 				break;
 			case iop_detach:
 				n_specified++;
 				detach_specified = TRUE;
-				handled_len = (int)(*(pp->str.addr + p_offset));
+				handled_len = (int)(unsigned char)*(pp->str.addr + p_offset);
 				memcpy(handled, (char *)(pp->str.addr + p_offset + 1), handled_len);
 				break;
 			case iop_connect:
 				n_specified++;
 				connect_specified = TRUE;
-				int_len = (int)(*(pp->str.addr + p_offset));
+				int_len = (int)(unsigned char)*(pp->str.addr + p_offset);
 				if (int_len < USR_SA_MAXLITLEN)
 				{
 					memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), int_len);
@@ -245,7 +245,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			case iop_zlisten:
 				n_specified++;
 				listen_specified = TRUE;
-				int_len = (int)(*(pp->str.addr + p_offset));
+				int_len = (int)(unsigned char)*(pp->str.addr + p_offset);
 				if ((USR_SA_MAXLITLEN > int_len) && (0 < int_len))
 				{
 					memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), int_len);
@@ -257,7 +257,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			case iop_socket:
 				n_specified++;
 				socket_specified = TRUE;
-				handles_len = (int)(*(pp->str.addr + p_offset));
+				handles_len = (int)(unsigned char)*(pp->str.addr + p_offset);
 				memcpy(handles, (char *)(pp->str.addr + p_offset + 1), handles_len);
 				break;
 			case iop_ipchset:

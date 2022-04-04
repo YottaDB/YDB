@@ -83,7 +83,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 			DEF_EXCEPTION(pp, p_offset, iod);
 			break;
 		case iop_socket:
-			handle_len = (int)(*(pp->str.addr + p_offset));
+			handle_len = (int)(unsigned char)*(pp->str.addr + p_offset);
 			assert(handle_len > 0);
 			memcpy(sock_handle, (char *)(pp->str.addr + p_offset + 1), handle_len);
 			socket_specified = TRUE;

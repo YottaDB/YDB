@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -232,7 +232,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	SAVE_WTSTART_PID(cnl, process_id, index);
 	assert((cnl->in_wtstart > 0) && csa->in_wtstart);
 	max_ent = csd->n_bts;
-	if (0 == (max_writes = writes))			/* If specified writes to do, use that.. */
+	if (0 >= (max_writes = writes))			/* If specified writes to do, use that.. */
 		max_writes = csd->n_wrt_per_flu;	/* else, max writes is how many blocks there are */
 	jpc = csa->jnl;
 	assert(!JNL_ALLOWED(csd) ||( NULL != jpc));	/* if journaling is allowed, we better have non-null csa->jnl */

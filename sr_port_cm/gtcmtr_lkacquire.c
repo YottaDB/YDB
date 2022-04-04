@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +22,7 @@
 
 GBLREF connection_struct *curr_entry;
 
-bool gtcmtr_lkacquire(void)
+char gtcmtr_lkacquire(void)
 {
 	unsigned char *ptr, return_val, action, incr;
 	cm_region_list *reg_walk;

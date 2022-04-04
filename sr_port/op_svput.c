@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,8 +51,12 @@
 #include "have_crit.h"
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
+#include "gtm_malloc.h"
+#include "getstorage.h"
+#include "try_event_pop.h"
 
-GBLREF boolean_t		dollar_zquit_anyway, dollar_ztexit_bool, ztrap_new;
+
+GBLREF boolean_t		dollar_zquit_anyway, dollar_ztexit_bool, malloccrit_issued, ztrap_new;
 GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF gd_addr			*gd_header;
 GBLREF gv_key			*gv_currkey;
@@ -63,6 +67,7 @@ GBLREF mval			dollar_zsource, dollar_zstatus, dollar_ztexit, dollar_zyerror;
 GBLREF stack_frame		*error_frame;
 GBLREF volatile int4		outofband;
 GBLREF volatile boolean_t	dollar_zininterrupt;
+GBLREF	size_t			totalRmalloc, totalRallocGta, zmalloclim;
 #ifdef GTM_TRIGGER
 GBLREF mval		*dollar_ztvalue;
 GBLREF boolean_t	*ztvalue_changed_ptr;
@@ -93,8 +98,9 @@ error_def(ERR_ZTWORMHOLE2BIG);
 void op_svput(int varnum, mval *v)
 {
 	char	*vptr;
-	int	i, ok, state;
+	int	i, ok, state, tmp;
 	int4	previous_gtm_strpllim;
+	size_t	rtmp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -156,7 +162,7 @@ void op_svput(int varnum, mval *v)
 			}
 			break;
 		case SV_ZMAXTPTIME:
-			TREF(dollar_zmaxtptime) = mval2i(v);
+			TREF(dollar_zmaxtptime) = mval2i(v);	/* Negative values == no timeout */
 			break;
 		case SV_ZROUTINES:
 			MV_FORCE_STR(v);
@@ -197,13 +203,13 @@ void op_svput(int varnum, mval *v)
 					op_commarg(v, indir_linetail);
 					op_unwind();
 				}
+				(TREF(dollar_ztrap)).mvtype = MV_STR;
+				(TREF(dollar_ztrap)).str = v->str;
 				if ((TREF(dollar_etrap)).str.len > 0)
 				{
 					gtm_newintrinsic(&(TREF(dollar_etrap)));
 					NULLIFY_TRAP(TREF(dollar_etrap));
 				}
-				(TREF(dollar_ztrap)).mvtype = MV_STR;
-				(TREF(dollar_ztrap)).str = v->str;
 			}
 			if (ZTRAP_POP & TREF(ztrap_form))
 				ztrap_save_ctxt();
@@ -397,6 +403,19 @@ void op_svput(int varnum, mval *v)
 				stringpool.strpllimwarned =  FALSE;
 			else if (STP_GCOL_TRIGGER_FLOOR > stringpool.strpllim)
 				stringpool.strpllim += STP_GCOL_TRIGGER_FLOOR;
+			break;
+		case SV_ZMALLOCLIM:
+			MV_FORCE_INT(v);
+			tmp = mval2i(v);
+			rtmp = (size_t)getstorage();
+			if (0 > tmp)					/* negative gives half the OS limit */
+				tmp = rtmp / (size_t)2;			/* see gtm_malloc_src.h MALLOC macro comment on halving */
+			else if (rtmp < (size_t)tmp)
+				tmp = (int)rtmp;
+			else if ((0 != tmp) && (tmp < MIN_MALLOC_LIM))
+				tmp = MIN_MALLOC_LIM;
+			malloccrit_issued = ((0 == tmp) || ((size_t)tmp) >= zmalloclim) ? 0 : malloccrit_issued;
+			zmalloclim = (size_t)tmp;			/* reset malloccrit_issued above if SET raised/kept limit */
 			break;
 		case SV_ZTIMEOUT:
 			check_and_set_ztimeout(v);

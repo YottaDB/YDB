@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -462,7 +462,7 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize)
 	ESTABLISH(hashtab_rehash_ch);
 	DBGHASHTAB((stderr, "EXPAND_HASHTAB:ENTER: table: table(%lx) base (%lx), spare_base(%lx), spare_base_size(%d), \n",
 		table, table->base, table->spare_base, table->spare_base_size));
-	/* The next line keeps the HP-UX Itanium compiler in pro happy. This initialization is done is INIT_HASHTAB_INTL*
+	/* The next line keeps the HP-UX Itanium compiler in pro happy. This initialization is done in INIT_HASHTAB_INTL*
 	 * but this line is placed here to appease the compiler.
 	 */
 	newtable.dont_keep_spare_table = table->dont_keep_spare_table;

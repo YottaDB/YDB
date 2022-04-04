@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #include "opcode.h"
 #include "cgp.h"
 #include "lb_init.h"
+#include "start_fetches.h"
 
 /*	WARNING: comp_init changes the currently-active stringpool from the
  *	the runtime stringpool (rts_stringpool) to the indirection stringpool
@@ -28,10 +29,9 @@
  *	rts_stringpool when the compilation is finished.
  */
 GBLREF char		cg_phase;
-GBLREF int4		aligned_source_buffer, curr_fetch_count;
+GBLREF int4		aligned_source_buffer;
 GBLREF spdesc		stringpool,rts_stringpool;
 GBLREF spdesc		indr_stringpool;
-GBLREF triple		*curr_fetch_trip;
 
 error_def(ERR_INDRMAXLEN);
 
@@ -63,9 +63,9 @@ void comp_init(mstr *src, oprtype *dst)
 	lb_init();
 	assert(TREF(for_stack_ptr) == TADR(for_stack));
 	*TREF(for_stack_ptr) = NULL;
-	curr_fetch_trip = newtriple(OC_FETCH);
-	curr_fetch_count = 0;
-	start_fetches(OC_FETCH);
+	(TREF(fetch_control)).curr_fetch_trip = newtriple(OC_FETCH);
+	(TREF(fetch_control)).curr_fetch_count = 0;
+	START_FETCHES(OC_FETCH);
 	/* op_igetdst fetches the destination (ind_result) onto the M-stack at the start of execution so that if we end up doing
 	 * nested indirection, in which case ind_result could change, op_iretmval can put the result in the correct location.
 	 * op_igetsrc serves a very similar purpose, placing a copy of the source mval (ind_source) on the M-stack at the start

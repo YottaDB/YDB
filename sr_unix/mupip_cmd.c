@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -749,6 +749,7 @@ static	CLI_ENTRY	mup_set_qual[] = {		/* SET */
 { "NULL_SUBSCRIPTS",      mupip_set, 0, 0,                  mup_null_subs_qual,   0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0       },
 { "PARTIAL_RECOV_BYPASS", mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0       },
 { "PREVJNLFILE",          mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0       },
+{ "PROBLKSPLIT",          mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0       },
 { "QDBRUNDOWN",           mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0       },
 { "READ_ONLY",            mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0       },
 { "RECORD_SIZE",          mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0       },

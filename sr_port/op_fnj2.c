@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,8 +29,10 @@ void op_fnj2(mval *src, int len, mval *dst)
 	unsigned char 	*cp;
 	int 		n, size;
 
-	if (len > MAX_STRLEN)
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_MAXSTRLEN);
+	if (MAX_STRLEN < len)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
+	else if (0 > len)
+		len = 0;
 
 	MV_FORCE_STR(src);
 	MV_FORCE_LEN(src);
@@ -43,7 +45,7 @@ void op_fnj2(mval *src, int len, mval *dst)
 	{
 		size = src->str.len + n;
 		if (size > MAX_STRLEN)
-			RTS_ERROR_ABT(VARLSTCNT(1) ERR_MAXSTRLEN);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 		ENSURE_STP_FREE_SPACE(size);
 		cp = stringpool.free;
 		stringpool.free += size;
@@ -60,8 +62,10 @@ void op_fnzj2(mval *src, int len, mval *dst)
 	unsigned char	*cp;
 	int 		n;
 
-	if (len > MAX_STRLEN)
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_MAXSTRLEN);
+	if (MAX_STRLEN < len)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
+	else if (0 > len)
+		len = 0;
 
 	MV_FORCE_STR(src);
 	n = len - src->str.len;

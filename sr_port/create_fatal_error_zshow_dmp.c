@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Copyright (c) 2010-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,7 +12,7 @@
 
 #include "mdef.h"
 
-#include <signal.h>
+#include "gtm_signal.h"
 #include "gtm_string.h"
 
 #include "gtm_limits.h"
@@ -60,7 +60,7 @@ void create_fatal_error_zshow_dmp(int4 signal)
 		assert(GTM_PATH_MAX >= dump_fn_mval.str.len);
 		/* Create dump file */
 		save_SIGNAL = SIGNAL; 		/* Signal might be modified by jobexam_process() */
-		jobexam_process(&dump_fn_mval, &dummy_mval);
+		jobexam_process(&dump_fn_mval, &dummy_mval, NULL);
 		SIGNAL = save_SIGNAL;
 	}
 }

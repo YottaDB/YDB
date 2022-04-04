@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,6 +56,7 @@
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
 #include "ztimeout_routines.h"
+#include "try_event_pop.h"
 
 GBLREF symval			*curr_symval;
 GBLREF boolean_t		dollar_truth;
@@ -135,9 +136,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 					ztrap_explicit_null = TRUE;
 					if (!dollar_zininterrupt)
 					{	/* exiting error handling & not in interrupt code - check for queued timed events */
-						if ((no_event == outofband)
-								&& (no_event != (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
-							TRY_EVENT_POP;
+						TRY_EVENT_POP;
 					}
 				} else
 					ztrap_explicit_null = FALSE;
@@ -412,6 +411,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			 * and MVST_TRIGR are the same, so the processing of those elements is commonized.
 			 */
 			dollar_zininterrupt = FALSE;
+			TAREF1(save_xfer_root, jobinterrupt).event_state = not_in_play;
 			/* Get rid of old values that may exist */
 			if (dollar_ecode.begin)
 				free(dollar_ecode.begin);
@@ -427,8 +427,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			error_frame = mv_st_ent->mv_st_cont.mvs_zintr.error_frame_save;
 			memcpy(&dollar_ecode, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_ecode_save, SIZEOF(dollar_ecode));
 			memcpy(&dollar_stack, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_stack_save, SIZEOF(dollar_stack));
-			if (no_event != (TREF(save_xfer_root_ptr))->ev_que.fl->outofband)
-				TRY_EVENT_POP;						/* Fall into MVST_TRIGR */
+			TRY_EVENT_POP;							/* Fall into MVST_TRIGR */
 		case MVST_TRIGR:
 			dollar_truth = (boolean_t)mv_st_ent->mv_st_cont.mvs_trigr.saved_dollar_truth;
 			op_gvrectarg(&mv_st_ent->mv_st_cont.mvs_trigr.savtarg);

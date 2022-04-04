@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,12 +80,12 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 					TRUE, LEN_AND_LIT("PREVJNLFILE"));
 			return((uint4)ERR_JNLFILNOTCHG);
 		}
-		if (!get_full_path(STR_AND_LEN(buf), full_buf, &full_buf_len, SIZEOF(full_buf), &ustatus))
+		if (!get_full_path(STR_AND_LEN(buf), full_buf, &full_buf_len, sizeof(full_buf), &ustatus)) /* BYPASSOK: unsigned */
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, LEN_AND_STR(buf), ustatus);
 			return((uint4)ERR_JNLFILNOTCHG);
 		}
-		if (!get_full_path(STR_AND_LEN(jnl_fname), jnl_fn, &jnl_fn_len, SIZEOF(jnl_fn), &ustatus))
+		if (!get_full_path(STR_AND_LEN(jnl_fname), jnl_fn, &jnl_fn_len, sizeof(jnl_fn), &ustatus)) /* BYPASSOK: unsigned */
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, LEN_AND_STR(jnl_fname), ustatus);
 			return((uint4)ERR_JNLFILNOTCHG);

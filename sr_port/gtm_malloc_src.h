@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,6 +74,8 @@
 #include "gtm_env_init.h"
 #include "gtmio.h"
 #include "deferred_signal_handler.h"
+#include "deferred_events_queue.h"
+#include "deferred_events.h"
 
 /* This routine is compiled twice, once as debug and once as pro and put into the same pro build. The alternative
  * memory manager is selected with the debug flags (any non-zero gtmdbglvl setting invokes debug memory manager in
@@ -116,29 +118,37 @@
 #endif
 
 /* #GTM_THREAD_SAFE : The below macro (MALLOC) is thread-safe because caller ensures serialization with locks */
-#  define MALLOC(size, addr) 										\
-{													\
-	intrpt_state_t  prev_intrpt_state;								\
-	assert(IS_PTHREAD_LOCKED_AND_HOLDER);									\
-	if (!gtmSystemMalloc											\
-		&& (0 < gtm_max_storalloc) && ((size + totalRmalloc + totalRallocGta) > gtm_max_storalloc))	\
-	{	/* Boundary check for $gtm_max_storalloc (if set) */					\
-		gtmMallocErrorSize = size;								\
-		gtmMallocErrorCallerid = CALLERID;							\
-		gtmMallocErrorErrno = ERR_MALLOCMAXUNIX;						\
-		raise_gtmmemory_error();								\
-	}												\
-	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);				\
-	addr = (void *)malloc(size);									\
-	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);				\
-	if (NULL == (void *)addr)									\
+#  define MALLOC(SIZE, ADDR) 										\
+MBSTART{												\
+	intrpt_state_t  PREV_INTRPT_STATE;								\
+	size_t		TMP;										\
+													\
+	assert(IS_PTHREAD_LOCKED_AND_HOLDER);								\
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, PREV_INTRPT_STATE);				\
+	ADDR = (void *)malloc(SIZE);									\
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, PREV_INTRPT_STATE);				\
+	if (NULL == (void *)ADDR)									\
 	{												\
-		gtmMallocErrorSize = size;								\
+		gtmMallocErrorSize = SIZE;								\
 		gtmMallocErrorCallerid = CALLERID;							\
 		gtmMallocErrorErrno = errno;								\
 		raise_gtmmemory_error();								\
 	}												\
-}
+	if (!gtmSystemMalloc && !malloccrit_issued /* totalRmalloc* not available for system malloc */	\
+		&& (0 < zmalloclim) && ((SIZE + totalRmalloc + totalRallocGta) > zmalloclim))		\
+	{	/* Boundary check on zmalloclim */							\
+		gtmMallocErrorSize = SIZE;								\
+		gtmMallocErrorCallerid = CALLERID;							\
+		gtmMallocErrorErrno = ERR_MALLOCCRIT;							\
+		/* doubling here and halving in gtm_env_init accomodate the fact that 			\
+		 * stringpool expansions are large, and if occurring, not easy to gracefully		\
+		 * continue from, which is also related to deferring the MALLOCCRIT error		\
+		 */											\
+		assertpro(!IS_GTMSECSHR_IMAGE);								\
+		malloccrit_issued = TRUE;								\
+		(*xfer_set_handlers_fnptr)(defer_error, ERR_MALLOCCRIT, FALSE);				\
+	}												\
+} MBEND
 #  define FREE(size, addr) free(addr);
 #define MAXBACKFILL (16 * 1024)			/* Maximum backfill of large structures */
 #define MAXTWO 2048				/* Maximum size we allocate from queues */
@@ -309,6 +319,7 @@ GBLREF	uint4		gtmDebugLevel;			/* Debug level (0 = using default sm module so wi
 							 * a DEBUG build, even level 0 implies basic debugging)
 							 */
 GBLREF	boolean_t	gtmSystemMalloc;		/* Use the system's malloc() instead of our own */
+GBLREF	boolean_t	retry_if_expansion_fails;
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 GBLREF	volatile int4	gtmMallocDepth;			/* Recursion indicator. Volatile so it gets stored immediately */
 GBLREF	volatile void	*outOfMemoryMitigation;		/* Reserve that we will freed to help cleanup if run out of memory */
@@ -316,7 +327,6 @@ GBLREF	uint4		outOfMemoryMitigateSize;	/* Size of above reserve in Kbytes */
 GBLREF	int		mcavail;
 GBLREF	mcalloc_hdr	*mcavailptr, *mcavailbase;
 GBLREF	size_t		totalRallocGta;			/* Size allocated by gtm_text_alloc if at all */
-GBLREF	size_t		gtm_max_storalloc;		/* Max value for $ZREALSTOR or else memory error is raised */
 GBLREF	void		(*cache_table_relobjs)(void);	/* Function pointer to call cache_table_rebuild() */
 GBLREF	ch_ret_type	(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
 GBLREF	ch_ret_type	(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
@@ -331,6 +341,8 @@ GBLRDEF	boolean_t	gtmSmInitialized;		/* Initialized indicator */
 GBLRDEF	size_t		gtmMallocErrorSize;		/* Size of last failed malloc */
 GBLRDEF	unsigned char	*gtmMallocErrorCallerid;	/* Callerid of last failed malloc */
 GBLRDEF	int		gtmMallocErrorErrno;		/* Errno at point of last failure */
+GBLREF	size_t		zmalloclim;			/* ISV memory warning of MALLOCCRIT in bytes */
+GBLREF	boolean_t	malloccrit_issued;		/* set at time of MALLOCCRIT */
 
 GBLRDEF readonly struct
 {
@@ -405,6 +417,7 @@ STATICD	uint4	allocElemMax[MAXINDEX + 2];		/* Maximum number of blocks on the al
 #endif
 
 error_def(ERR_INVMEMRESRV);
+error_def(ERR_MALLOCCRIT);
 error_def(ERR_MEMORYRECURSIVE);
 error_def(ERR_MEMORY);
 error_def(ERR_SYSCALL);
@@ -1051,8 +1064,8 @@ void release_unused_storage(void)	/* Note renamed to release_unused_storage_dbg 
 /* #GTM_THREAD_SAFE : The below function (raise_gtmmemory_error) is thread-safe because caller ensures serialization with locks */
 void raise_gtmmemory_error(void)	/* Note renamed to raise_gtmmemory_error_dbg when included in gtm_malloc_dbg.c */
 {
-	void		*addr;
 	boolean_t	was_holder;
+	void		*addr;
 
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);
 #	ifndef DEBUG
@@ -1070,7 +1083,7 @@ void raise_gtmmemory_error(void)	/* Note renamed to raise_gtmmemory_error_dbg wh
         if (GDL_None == gtmDebugLevel)
         {
 #	endif
-		if (NULL != (addr = (void *)outOfMemoryMitigation)	/* Note assignment */
+		if (NULL != (addr = (void *)outOfMemoryMitigation)		/* WARNING assignment */
 		    && !(ht_rhash_ch == active_ch->ch || jbxm_dump_ch == active_ch->ch || stpgc_ch == active_ch->ch))
 		{       /* Free our reserve only if not in certain condition handlers (on UNIX) since it is
 			 * going to unwind this error and ignore it.
@@ -1090,7 +1103,7 @@ void raise_gtmmemory_error(void)	/* Note renamed to raise_gtmmemory_error_dbg wh
 		was_holder = TRUE; /* caller (gtm_malloc/gtm_free) got the thread lock so release it before the rts_error */
 		PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release exclusive thread lock if needed */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MEMORY, 2, gtmMallocErrorSize, gtmMallocErrorCallerid,
-					gtmMallocErrorErrno);
+			gtmMallocErrorErrno);
 #	ifndef DEBUG
 	} else
 		/* If not a debug module and debugging is enabled, reroute call to the debugging version. */
@@ -1158,6 +1171,7 @@ size_t gtm_bestfitsize(size_t size)
 /* #GTM_THREAD_SAFE : The below function (backfill) is thread-safe because caller ensures serialization with locks */
 void backfill(unsigned char *ptr, gtm_msize_t len)
 {
+#ifndef STATIC_ANALYSIS
 	unsigned char	*c;
 	ChunkType	*chunkPtr;
 	gtm_msize_t	unalgnLen, chunkCnt;
@@ -1202,6 +1216,7 @@ void backfill(unsigned char *ptr, gtm_msize_t len)
 			} while(len);
 		}
 	}
+#endif
 }
 
 /*  ** still under ifdef DEBUG ** */
@@ -1213,6 +1228,7 @@ void backfill(unsigned char *ptr, gtm_msize_t len)
 /* #GTM_THREAD_SAFE : The below function (backfillChk) is thread-safe because caller ensures serialization with locks */
 boolean_t backfillChk(unsigned char *ptr, gtm_msize_t len)
 {
+#ifndef STATIC_ANALYSIS
 	unsigned char	*c;
 	ChunkType	*chunkPtr;
 	gtm_msize_t	unalgnLen, chunkCnt;
@@ -1263,6 +1279,7 @@ boolean_t backfillChk(unsigned char *ptr, gtm_msize_t len)
 			} while(len);
 		}
 	}
+#endif
 	return TRUE;
 }
 

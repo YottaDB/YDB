@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,7 @@
 #include "patcode.h"
 #include "sorts_after.h"
 #include "stringpool.h"
+#include "toktyp.h"
 
 LITREF octabstruct	oc_tab[];
 
@@ -143,6 +144,7 @@ void bx_boollit(triple *t)
 			MV_FORCE_NUMD(v[j]);
 			if (!(MV_NM & v[j]->mvtype))
 			{	/* if we don't have a useful number the Boolean conversion won't be valid */
+				TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* improve hints */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
 				assert(TREF(rts_error_in_parse));
 				return;

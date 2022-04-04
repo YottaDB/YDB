@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -144,7 +144,7 @@ const static char readonly *secshrstart_error_code[] = {
 	client_timer_popped = FALSE;								\
 	recv_complete = FALSE;									\
 	save_errno = 0;										\
-	assert(MAXPOSINT4 >= CLIENT_ACK_TIMER);						\
+	assert((0 <= CLIENT_ACK_TIMER) && (MAXPOSINT4 >= CLIENT_ACK_TIMER));			\
 	start_timer(timer_id, CLIENT_ACK_TIMER, client_timer_handler, 0, NULL);			\
 }
 

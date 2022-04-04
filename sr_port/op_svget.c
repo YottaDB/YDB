@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,11 +51,10 @@
 #include "dollar_quit.h"
 #include "ztimeout_routines.h"
 #include "mlkdef.h"
-#ifdef UNIX
-#  include "iormdef.h"
-#  ifdef DEBUG
-#    include "wbox_test_init.h"
-#  endif
+#include "iormdef.h"
+#include "toktyp.h"
+#ifdef DEBUG
+#  include "wbox_test_init.h"
 #endif
 
 #define ESC_OFFSET		4
@@ -71,7 +70,7 @@ GBLREF mlk_subhash_val_t	mlk_last_hash;
 GBLREF mstr			dollar_zchset, dollar_zpatnumeric, dollar_zpin, dollar_zpout;
 GBLREF mval			dollar_estack_delta, dollar_job, dollar_system, dollar_zdir, dollar_zerror, dollar_zgbldir;
 GBLREF mval			dollar_zinterrupt, dollar_zproc, dollar_zsource, dollar_zstatus, dollar_ztexit, dollar_zyerror;
-GBLREF size_t			totalAlloc, totalAllocGta, totalRmalloc, totalRallocGta, totalUsed, totalUsedGta;
+GBLREF size_t			totalAlloc, totalAllocGta, totalRmalloc, totalRallocGta, totalUsed, totalUsedGta, zmalloclim;
 GBLREF spdesc			stringpool;
 GBLREF stack_frame		*frame_pointer;
 GBLREF uint4			dollar_tlevel, dollar_trestart, dollar_zjob;
@@ -98,14 +97,12 @@ LITREF int4		gtm_release_stamp_len;
 void op_svget(int varnum, mval *v)
 {
 	boolean_t	lcl_compile_time;
-	io_log_name	*tl;
-	int 		count;
-	gtm_uint64_t	ucount;
-	char		*c1, *c2;
-	mval		*mvp;
-#	ifdef UNIX
+	char		*c1, *c2, director_token;
 	d_rm_struct	*d_rm;
-#	endif
+	gtm_uint64_t	ucount;
+	int 		count;
+	io_log_name	*tl;
+	mval		*mvp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -595,6 +592,9 @@ void op_svget(int varnum, mval *v)
 			count = stringpool.strpllim;
 			MV_FORCE_MVAL(v, count);
 			break;
+		case SV_ZMALLOCLIM:
+			MV_FORCE_UMVAL(v, zmalloclim);
+			break;
 		case SV_ZTIMEOUT:
 			count = get_ztimeout(v);
 			if (-1 == count)
@@ -611,11 +611,14 @@ void op_svget(int varnum, mval *v)
 		assert(MVTYPE_IS_NUMERIC(v->mvtype));
 		n2s(v);
 	} else if (!(MVTYPE_IS_NUMERIC(v->mvtype)))
-	{
+	{	/* need to stop NUMOFLOW errors from preventing access to ISV values that s2n would flag as out of range */
 		assert(MVTYPE_IS_STRING(v->mvtype));
 		lcl_compile_time = TREF(compile_time);
+		director_token = TREF(director_token);
+		TREF(director_token) = TK_STRLIT;
 		TREF(compile_time) = TRUE;
 		s2n(v);
+		TREF(director_token) = director_token;
 		TREF(compile_time) = lcl_compile_time;
 	}
 }

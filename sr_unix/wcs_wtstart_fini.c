@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2020 Fidelity National Information	*
+ * Copyright (c) 2016-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,7 @@ int wcs_wtstart_fini(gd_region *reg, int nbuffs, cache_rec_ptr_t cr2flush)
 	crwipq = &csa->acc_meth.bg.cache_state->cacheq_wip;
 	crq = &csa->acc_meth.bg.cache_state->cacheq_active;
 	heaplistcrs = NULL;
-	if (0 == nbuffs) /* if number not specified, use default (same as "wcs_wtstart") */
+	if (0 >= nbuffs) /* if number not specified, use default (same as "wcs_wtstart") */
 		nbuffs = csd->n_wrt_per_flu;
 	basefreedlevel = cnl->wcs_buffs_freed;
         /* If we are asked to flush a specific cr AND it is the younger twin, check if the older twin needs

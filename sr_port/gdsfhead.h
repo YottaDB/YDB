@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -2041,7 +2041,9 @@ typedef struct sgmnt_data_struct
 	int4		shmid;			/* Since int may not be of fixed size, int4 is used */
 	gtm_time8	gt_sem_ctime;		/* time of creation of semaphore */
 	gtm_time8	gt_shm_ctime;		/* time of creation of shared memory */
-	char		filler_unixonly[40];	/* to ensure this section has 64-byte multiple size */
+	uint4 		problksplit; 		/* Split db blocks due to restarts - */
+						/* 0: don't; >0: don't if records in block are <= */
+	char		filler_unixonly[36];	/* to ensure this section has 64-byte multiple size */
 	/************* ACCOUNTING INFORMATION ********************************/
 	int4		filler_n_retries[CDB_MAX_TRIES];/* Now moved to TAB_GVSTATS_REC section */
 	int4		filler_n_puts;			/* Now moved to TAB_GVSTATS_REC section */
@@ -2613,7 +2615,7 @@ typedef struct	gd_region_struct
 							 *	corresponding base region.
 							 */
 	bool			epoch_taper;
-	bool			reservedDBFlags;	/* Flags for reservedDB types and/or features */
+	unsigned char		reservedDBFlags;	/* Flags for reservedDB types and/or features */
 	bool			lock_crit_with_db;	/* controls whether LOCK crit is separate (0) or shared with DB (1) */
 	/* All fields before this point are relied upon by GDE. All fields after this point are relied upon only by
 	 * the runtime logic (i.e. it is one big filler/padding area as far as GDE is concerned).
