@@ -28,7 +28,6 @@
 #include "gtm_inet.h"
 #include "gtm_iconv.h"
 #include "gtm_socket.h"
-#include "gtm_unistd.h"
 #include "gtm_limits.h"
 #include "gtm_un.h"
 #include "gtm_pwd.h"
