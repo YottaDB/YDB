@@ -149,18 +149,16 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 	gvkey->top = DBKEYSIZE(MAX_KEY_SZ);
 	gvkey->end = 0;
 	/* Avoid changing the characteristics of the caller's mval. Protect value of caller's value even after potential
-	 * stringpool garbage collections (which a local copy does not do. Note, we only need to pop the mv_stent we push
+	 * stringpool garbage collections (which a local copy does not do). Note, we only need to pop the mv_stent we push
 	 * onto the M stack on a normal return. Error returns always unwind the current M stack frame which will also
 	 * unwind this mv_stent.
 	 */
 	PUSH_MV_STENT(MVST_MVAL);		/* Create a temporary on M stack */
 	src = &mv_chain->mv_st_cont.mvs_mval;
 	*src = *msrc;
+	MV_FORCE_STR(src);			/* All cases in the switch below require src to have a string value */
 	if (forceStr)
-	{
-		MV_FORCE_STR(src);
 		src->mvtype |= MV_NUM_APPROX;	/* Force the mval to be treated as a string */
-	}
 	ESTABLISH(op_fnzatransform_ch);
 	transform_direction = (0 == reverse);
 	/* Previously the code relied on all non-zero values triggering reverse mapping.
@@ -231,7 +229,7 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 						*dst = literal_null;
 				}
 			} else
-				coll_failxutil = 1;	/*We do not support UTF-8 yet */
+				coll_failxutil = 1;	/* We do not support UTF-8 yet */
 			break;
 		/* Return the next char in the collation sequence (or null string if at top already) */
 		case 2:
