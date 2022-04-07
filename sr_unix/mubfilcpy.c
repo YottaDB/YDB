@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,6 +50,7 @@
 #include "wcs_phase2_commit_wait.h"
 #include "wbox_test_init.h"
 #include "db_write_eof_block.h"
+#include "mupip_exit.h"
 
 #define	TMPDIR_ACCESS_MODE	R_OK | W_OK | X_OK
 #define	TMPDIR_CREATE_MODE	S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH
@@ -243,9 +244,18 @@ bool	mubfilcpy (backup_reg_list *list)
 	tmpsrcdirname[gv_cur_region->dyn.addr->fname_len] = 0;
 	sourcedirname = dirname((char *)tmpsrcdirname);
 	sourcedirlen = STRLEN(sourcedirname);
-	/* Right now, "tempfilename" is the temporary directory under which the *.dat files will get created. *
-	 * Save this directory into tempdir, which will later be used to remove the temp dir. */
+	/* Right now, "tempfilename" is the full path to the temp file where the backup will get created.
+	 * Save this directory into tempdir, which will later be used to remove the temp file.
+	 * We also check to make sure that the temp file will not overflow the tempdir buffer
+	 * and throw a FILENAMETOOLONG if necessary.
+	 */
 	tempfilelen = STRLEN(tempfilename);
+	if (MAX_FN_LEN < (tempfilelen + 1)) /* +1 because a later line sets tempdir[tmpdirlen] to '\0' */
+	{
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2, tempfilelen, tempfilename);
+		mubclnup(list, need_to_del_tempfile);
+		mupip_exit(ERR_FILENAMETOOLONG);
+	}
 	memcpy(tempdir, tempfilename, tempfilelen);
 	tmpdirlen = tempfilelen;
 	/* mkdir tempdir*/

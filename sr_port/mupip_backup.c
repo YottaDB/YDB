@@ -237,7 +237,7 @@ void mupip_backup(void)
 	jnl_create_info		jnl_info;
 	file_control		*fc;
 	char			tempdir_trans_buffer[MAX_TRANS_NAME_LEN];
-	char			tempfilename[MAX_FN_LEN + 1], *tempfilename2;
+	char			tempfilename[MAX_FN_LEN + 1], *tempfilename2, *getcwd_res;
 	char			tempdir_full_buffer[MAX_FN_LEN + 1];
 	char			*jnl_str_ptr, jnl_str[256], entry[256], prev_jnl_fn[JNL_NAME_SIZE];
 	int			index, jnl_fstat;
@@ -308,10 +308,10 @@ void mupip_backup(void)
 			if (cli_get_str("SINCE", (char *)since_buff, &s_len))
 			{
 				lower_to_upper(since_buff, since_buff, s_len);
-				if ((0 == memcmp(since_buff, "INCREMENTAL", s_len))
-					|| (0 == memcmp(since_buff, "BYTESTREAM", s_len)))
+				if ((0 == STRNCMP_STR((char *)since_buff, "INCREMENTAL", s_len))
+					|| (0 == STRNCMP_STR((char *)since_buff, "BYTESTREAM", s_len)))
 					inc_since_inc = TRUE;
-				else if (0 == memcmp(since_buff, "RECORD", s_len))
+				else if (0 == STRNCMP_STR((char *)since_buff, "RECORD", s_len))
 					inc_since_rec = TRUE;
 			}
 		} else
@@ -611,10 +611,18 @@ void mupip_backup(void)
 			/* verify the accessibility of the tempdir */
 			if (FILE_STAT_ERROR == (fstat_res = gtm_file_stat(&tempdir_trans, NULL, &tempdir_full, FALSE, &ustatus)))
 			{
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_FILEPARSE, 2, tempdir_trans.len,
-						tempdir_trans.addr, ustatus);
+				GETCWD(tempdir_full.addr, MAX_FN_LEN + 1, getcwd_res);
+				tempdir_full.len = STRLEN(tempdir_full.addr);
+				nbytes2 = tempdir_full.len + tempdir_trans.len + 1;
+				tempfilename2 = malloc(nbytes2);
+				memcpy(tempfilename2, tempdir_full.addr, tempdir_full.len);
+				tempfilename2[tempdir_full.len] = '/';
+				memcpy(tempfilename2 + tempdir_full.len + 1, tempdir_trans.addr, tempdir_trans.len);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_FILEPARSE, 2, nbytes2,
+						tempfilename2, ustatus);
 				mubclnup(rptr, need_to_del_tempfile);
-				mupip_exit(ustatus);
+				free(tempfilename2);
+				mupip_exit(0);
 			}
 			/* Creating temp filename here. Check if we have the required space */
 			nbytes = SNPRINTF(tempfilename, SIZEOF(tempfilename), TEMP_FILE_FMT_STRING,
@@ -639,21 +647,18 @@ void mupip_backup(void)
 			}
 			/* GTM-9182 : If there's just enough space for the temp filepath, BUT NOT for the backup filepath, backup
 			 *  succeeds even though the full pathname of backup file exceeds MAX_FN_LEN. This should NOT be allowed.
-			 * This check is not required for backup files having full pathnames
+			 * YDB#864: A relative path should be fine if it never overflows a buffer even if the absolute path would
+			 * be over the 255 character limit. That means some relative file names that produce errors on upstream
+			 * will work fine with our change but our change also handles cases where MUPIP BACKUP is passed a path
+			 * of over 255 characters that ends with a directory name or where ydb_baktmpdir is set to something
+			 * that is less than the 255 character limit but the path for the actual backup exceeds 255 characters.
 			 */
-			for (index=0; index < file->len; index++)
+			if (MAX_FN_LEN < file->len)
 			{
-				if ('/' == file->addr[index])
-					break;
-			}
-			if ((index >= file->len) && (MAX_FN_LEN < (tempdir_full.len + file->len)))
-			{
-				tempdir_trans.addr[tempdir_trans.len] = '/';
-				tempdir_trans.len++;
-				memcpy(&tempdir_trans.addr[tempdir_trans.len], file->addr, file->len);
-				tempdir_trans.len += file->len;
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2, tempdir_trans.len,
-						tempdir_trans.addr);
+				/* Handle the case where $gtm_baktmpdir/$ydb_baktmpdir is set to a path <= 255 characters and
+				 * the specified backup path is > 255 characters.
+				 */
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2, file->len, file->addr);
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ERR_FILENAMETOOLONG);
 			}
@@ -743,6 +748,22 @@ void mupip_backup(void)
 			}
 		} else
 		{
+			/* Do the GTM-9182/YDB#864 check from above here to return a FILENAMETOOLONG error
+			 * if appropriate. We can't do the GTM-4212 check for a path to a temp file that is
+			 * too long to fit into a buffer here because tempdir_trans is empty and tempdir_full
+			 * contains garbage so we have to check that in sr_unix/mubfilcpy.c. We can however
+			 * check if the final destination of the backup file will be too long to fit into a
+			 * buffer.
+			*/
+			if (MAX_FN_LEN < file->len)
+			{
+				/* Handle the case where $gtm_baktmpdir/$ydb_baktmpdir is set to a path <= 255 characters and
+				 * the specified backup path is > 255 characters.
+				 */
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2, file->len, file->addr);
+				mubclnup(rptr, need_to_del_tempfile);
+				mupip_exit(ERR_FILENAMETOOLONG);
+			}
 			while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, FALSE, FALSE, FALSE, FALSE))
 			{
 				hiber_start(1000);
