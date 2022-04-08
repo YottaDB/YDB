@@ -40,11 +40,8 @@
 #include "gvsub2str.h"
 #include "io.h"
 #include "gtm_descript.h"
-<<<<<<< HEAD
 #include "mv_stent.h"
-=======
 #include "gvt_inline.h"
->>>>>>> 5e466fd7... GT.M V6.3-013
 
 #define MAX_KEY_SIZE	(MAX_KEY_SZ - 4)	/* internal and external maximums differ */
 

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -145,19 +145,12 @@ void op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_t
 
 void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 {
-<<<<<<< HEAD
-	static int xlate[NUM_CHARS];
-	static hash_table_int4 *xlate_hash = NULL;
-	static mstr prev_srch = {0, 0, NULL}, prev_rplc = {0, 0, NULL};
-	static unsigned int prev_gcols = 0;
-=======
 	int			dummy_len, maxLengthString, *xlate;
 	static hash_table_int4	*xlate_hash = NULL;
 	static int		xlate_array[NUM_CHARS];
 	static unsigned int 	prev_gcols = -1;
 	static mstr		prev_srch = {0, 0}, prev_rplc = {0, 0};
 	static mval		xlate_table;
->>>>>>> 5e466fd7... GT.M V6.3-013
 
 	assert(gtm_utf8_mode);							/* compiler only uses this for UTF-8) */
 	MV_FORCE_STR(src);							/* ensure all args have string representations */
@@ -174,18 +167,6 @@ void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 		MV_FORCE_LEN_SILENT(srch);
 		MV_FORCE_LEN_SILENT(rplc);
 	}
-<<<<<<< HEAD
-	if (!((prev_gcols == stringpool.gcols) && (srch->str.addr == prev_srch.addr) && (srch->str.len == prev_srch.len)
-			&& (rplc->str.addr == prev_rplc.addr) && (rplc->str.len == prev_rplc.len))
-			|| ((NULL == prev_srch.addr) && (NULL == prev_rplc.addr)))	/* We need the last line of this if statement to
-											 * avoid a sig-11 if srch and rplc are both undefined
-											 * on the first $translate call */
-	{
-		MV_FORCE_STR(srch);
-		MV_FORCE_STR(rplc);
-		if (NULL != xlate_hash)
-		{	/* about to allocate new one, so free any old, doing this after error checks so as to keep pointer valid */
-=======
 	assert((0 <= src->str.char_len) && (MAX_STRLEN >= src->str.char_len));
 	assert((0 <= srch->str.char_len) && (MAX_STRLEN >= srch->str.char_len));
 	assert((0 <= rplc->str.char_len) && (MAX_STRLEN >= rplc->str.char_len));
@@ -207,7 +188,6 @@ void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 	{	/* not a repeat, so can't reuse the last tables; above: !&& fails quicker than || */
 		if (NULL != xlate_hash)
 		{	/* about to allocate new one, so free any old; done after error checks to keep pointer valid */
->>>>>>> 5e466fd7... GT.M V6.3-013
 			free_hashtab_int4(xlate_hash);
 			free(xlate_hash);
 		}
@@ -244,7 +224,6 @@ void op_fntranslate_fast(mval *src, mval *rplc, mval *m_xlate, mval *m_xlate_has
 	/* ensure there's space for dst without another stp_gcol; src can only increase from current to maximum byte length */
 	ENSURE_STP_FREE_SPACE(src->str.char_len * SIZEOF(int4));		/* do now so stp_gcol doesn't shift xlate table */
 	xlate = (int4 *)m_xlate->str.addr;
-<<<<<<< HEAD
 	assert(m_xlate->str.len == NUM_CHARS * SIZEOF(int4));
 	if (0 != m_xlate_hash->str.len)
 	{
@@ -252,9 +231,6 @@ void op_fntranslate_fast(mval *src, mval *rplc, mval *m_xlate, mval *m_xlate_has
 		activate_hashtab_in_buffer_int4((sm_uc_ptr_t)m_xlate_hash->str.addr, xlate_hash);
 	} else
 		xlate_hash = NULL;
-=======
-	xlate_hash = m_xlate_hash->str.len ? activate_hashtab_in_buffer_int4((sm_uc_ptr_t)m_xlate_hash->str.addr, NULL) : NULL;
->>>>>>> 5e466fd7... GT.M V6.3-013
 	op_fntranslate_common(src, dst, rplc, xlate, xlate_hash);
 }
 #endif /* UTF8_SUPPORTED */
@@ -299,17 +275,6 @@ void op_fnztranslate_common(mval *src, mval *dst, int *xlate)
 void op_fnztranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 {
 	static int xlate[NUM_CHARS];
-<<<<<<< HEAD
-	static mstr prev_srch = {0, 0, NULL}, prev_rplc = {0, 0, NULL};
-	static unsigned int prev_gcols = 0;
-
-	MV_FORCE_STR(src);
-	if (!((prev_gcols == stringpool.gcols) && (srch->str.addr == prev_srch.addr) && (srch->str.len == prev_srch.len)
-			&& (rplc->str.addr == prev_rplc.addr) && (rplc->str.len == prev_rplc.len))
-			|| ((NULL == prev_srch.addr) && (NULL == prev_rplc.addr)))	/* We need the last line of this if statement to ensure
-											 * the error message is produced if srch and rplc are
-											 * are both undefined on the first $translate call */
-=======
 	static mstr prev_srch = {0, 0}, prev_rplc = {0, 0};
 	static unsigned int prev_gcols = -1;
 
@@ -320,7 +285,6 @@ void op_fnztranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 		MV_FORCE_LEN(src);
 	if (!(IS_STP_SPACE_AVAILABLE((src->str.len)) && (prev_gcols == stringpool.gcols) && (srch->str.addr == prev_srch.addr)
 		&& (srch->str.len == prev_srch.len) && (rplc->str.addr == prev_rplc.addr) && (rplc->str.len == prev_rplc.len)))
->>>>>>> 5e466fd7... GT.M V6.3-013
 	{
 		create_byte_xlate_table(srch, rplc, xlate);
 		prev_gcols = stringpool.gcols;

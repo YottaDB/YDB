@@ -28,10 +28,6 @@
 
 GBLREF boolean_t	run_time;
 GBLREF triple		t_orig;
-<<<<<<< HEAD
-GBLREF uint4		ydbDebugLevel;
-=======
->>>>>>> 5e466fd7... GT.M V6.3-013
 
 error_def(ERR_EXPR);
 error_def(ERR_MAXARGCNT);
@@ -96,14 +92,7 @@ int eval_expr(oprtype *a)
 				}
 				assert(&t_orig != ref->exorder.fl);
 				TREF(expr_start) = TREF(expr_start_orig) = ref;
-<<<<<<< HEAD
-#				ifdef DEBUG
-				if (GDL_DebugCompiler & ydbDebugLevel)
-					CHKTCHAIN(TREF(expr_start), exorder, FALSE);
-#				endif
-=======
 				CHKTCHAIN(TREF(curtchain), exorder, TRUE); /* defined away in mdq.h except with DEBUG_TRIPLES */
->>>>>>> 5e466fd7... GT.M V6.3-013
 			}
 			switch (bin_opcode)
 			{
@@ -255,28 +244,14 @@ int eval_expr(oprtype *a)
 			} else
 			{
 				advancewindow();
-<<<<<<< HEAD
-#				ifdef DEBUG
-				if ((GDL_DebugCompiler & ydbDebugLevel) && (NULL != TREF(expr_start)))
-					CHKTCHAIN(TREF(expr_start), exorder, FALSE);
-#				endif
-=======
 				CHKTCHAIN(TREF(curtchain), exorder, TRUE); /* defined away in mdq.h except with DEBUG_TRIPLES */
->>>>>>> 5e466fd7... GT.M V6.3-013
 				if (!expratom(&optyp_2))
 				{
 					stx_error(ERR_RHMISSING);
 					return EXPR_FAIL;
 				}
 			}
-<<<<<<< HEAD
-#			ifdef DEBUG
-			if ((GDL_DebugCompiler & ydbDebugLevel) && (NULL != TREF(expr_start)))
-				CHKTCHAIN(TREF(expr_start), exorder, FALSE);
-#			endif
-=======
 			CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq.h except with DEBUG_TRIPLES */
->>>>>>> 5e466fd7... GT.M V6.3-013
 			coerce(&optyp_2, type);
 			ref1 = optyp_1.oprval.tref;
 			if (((OC_VAR == ref1->opcode) || (OC_GETINDX == ref1->opcode))

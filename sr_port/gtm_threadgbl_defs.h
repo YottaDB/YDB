@@ -535,7 +535,6 @@ THREADGBLDEF(was_open_reg_seen,			boolean_t)	/* TRUE => there is at least one re
 THREADGBLDEF(nontp_jbuf_rsrv,			jbuf_rsrv_struct_t *)	/* Pointer to structure corresponding to reservations
 									 * on the journal buffer for current non-TP transaction.
 									 */
-<<<<<<< HEAD
 THREADGBLDEF(last_gvquery_key,			gv_key *)	/* Last key returned by $query(gvn). Note: Only one value
 								 * maintained for both forward and reverse $query(gvn)
 								 * This is the gv equivalent of last_fnquery_return_varname et al.
@@ -546,10 +545,7 @@ THREADGBLAR1DEF(ydbmsgprefixbuf,		char,	32)	/* The message prefix buffer size is
 THREADGBLDEF(ydbmsgprefix,			mstr)		/* mstr pointing to msgprefixbuf containing the YDB prompt */
 THREADGBLDEF(trig_forced_unwind,		boolean_t)	/* set/used by "gtm_trigger_fini", "op_unwind" and "unw_mv_ent" */
 THREADGBLDEF(ydb_recompile_newer_src,		boolean_t)	/* set based on env var "ydb_recompile_newer_src" */
-
-=======
 THREADGBLDEF(source_line,			int4)		/* keep track of line number in M file while compiling */
->>>>>>> 5e466fd7... GT.M V6.3-013
 /* Debug values */
 #ifdef DEBUG
 THREADGBLDEF(LengthReentCnt,			boolean_t)	/* Reentrancy count for GetPieceCountFromPieceCache() used by 2

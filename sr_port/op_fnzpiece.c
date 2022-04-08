@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,12 +54,6 @@ void op_fnzpiece(mval *src, mval *del, int first, int last, mval *dst)
 	int		match_res;
 	delimfmt	unichar;
 	DCL_THREADGBL_ACCESS;
-<<<<<<< HEAD
-=======
-	SETUP_THREADGBL_ACCESS;
-
-	assert(!is_gtm_chset_utf8 || !TREF(compile_time) || valid_utf_string(&src->str));
->>>>>>> 5e466fd7... GT.M V6.3-013
 
 	SETUP_THREADGBL_ACCESS;
 	assert(!TREF(compile_time) || !gtm_utf8_mode || valid_utf_string(&src->str));

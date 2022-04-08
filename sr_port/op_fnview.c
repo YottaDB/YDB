@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,12 +62,9 @@
 #include "interlock.h"
 #include "cache.h"
 #include "hashtab_objcode.h"
-<<<<<<< HEAD
 #include "gtm_env_xlate_init.h"
 #include "gtmdbglvl.h"
-=======
 #include "gvt_inline.h"
->>>>>>> 5e466fd7... GT.M V6.3-013
 
 GBLREF spdesc			stringpool;
 GBLREF int4			cache_hits, cache_fails;

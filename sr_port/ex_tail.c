@@ -82,7 +82,6 @@ void ex_tail(oprtype *opr, int depth)
 	t2 = t->exorder.fl;
 	assert((OC_COMVAL == t2->opcode) || (OC_COMINT == t2->opcode));	/* may need to change COMINT to COMVAL in bx_boolop */
 	assert(&t2->operand[0] == opr);				/* check next operation ensures an expression */
-<<<<<<< HEAD
 	/* Overwrite depth (set in coerce.c to INIT_GBL_BOOL_DEPTH) to current bool expr depth */
 	assert(TRIP_REF == t2->operand[1].oprclass);
 	depthtrip = t2->operand[1].oprval.tref;
@@ -90,8 +89,6 @@ void ex_tail(oprtype *opr, int depth)
 	assert(ILIT_REF == depthtrip->operand[0].oprclass);
 	assert(INIT_GBL_BOOL_DEPTH == depthtrip->operand[0].oprval.ilit);
 	depthtrip->operand[0].oprval.ilit = (mint)(depth + 1);
-=======
->>>>>>> 5e466fd7... GT.M V6.3-013
 	bftrip = maketriple(OC_BOOLFINI);
 	DEBUG_ONLY(bftrip->src = t->src);
 	bftrip->operand[0] = put_tref(bitrip);

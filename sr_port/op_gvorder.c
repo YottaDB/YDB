@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,13 +60,8 @@ void op_gvorder(mval *v)
 	enum db_acc_method	acc_meth;
 	gd_addr			*gd_targ;
 	gd_binding		*gd_map_start, *map, *map_top;
-<<<<<<< HEAD
 	gd_region		*save_gv_cur_region, *reg;
-	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
-=======
-	gd_region		*save_gv_cur_region;
 	gv_key_buf		save_currkey;
->>>>>>> 5e466fd7... GT.M V6.3-013
 	gv_namehead		*gvt, *save_gv_target;
 	gvnh_reg_t		*gvnh_reg;
 	gvnh_spanreg_t		*gvspan;

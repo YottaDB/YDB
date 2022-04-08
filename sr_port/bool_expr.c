@@ -94,17 +94,13 @@ int bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr)
 		DECREMENT_EXPR_DEPTH;
 		return TRUE;
 	}
-<<<<<<< HEAD
 	/* Pass CALLER_IS_BOOL_EXPR_FALSE if IF is caller of `bool_expr()`.
 	 * Pass CALLER_IS_BOOL_EXPR_TRUE in all other cases.
 	 * Since IF is the only one that comes in with the TRUE sense, we do a `!sense` to achieve this.
 	 */
 	andor_opcode = bx_get_andor_opcode(x.oprval.tref->opcode, OC_NOOP);
 	bx_tail(x.oprval.tref, sense, addr, 0, andor_opcode, !sense, 0, IS_LAST_BOOL_OPERAND_TRUE);
-=======
-	bx_tail(x.oprval.tref, sense, addr);
 	CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq.h except with DEBUG_TRIPLES */
->>>>>>> 5e466fd7... GT.M V6.3-013
 	DECREMENT_EXPR_DEPTH;
 	return TRUE;
 }

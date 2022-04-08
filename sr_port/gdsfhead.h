@@ -3410,35 +3410,7 @@ MBSTART {													\
 #define	PREV_KEY_NOT_COMPUTED	DBKEYSIZE(MAX_KEY_SZ)
 
 #define	COPY_PREV_KEY_TO_GVT_CLUE(GVT, EXPAND_PREV_KEY)							\
-<<<<<<< HEAD
-MBSTART {												\
-	GBLREF gv_key	*gv_altkey;									\
-													\
-	if (EXPAND_PREV_KEY)										\
-	{	/* gv_altkey has the previous key. Store it in clue for future clue-based searches */	\
-		if (NULL == GVT->prev_key)								\
-			GVKEY_INIT(GVT->prev_key, GVT->clue.top);					\
-		if (gv_altkey->end >= GVT->prev_key->top)						\
-		{	/* Note that this is possible in case of concurrency issues (i.e. we are in	\
-			 * a restartable situation (see comment at bottom of gvcst_expand_key.c which	\
-			 * talks about a well-formed key. Since we cannot easily signal a restart here,	\
-			 * we reallocate to ensure the COPY_KEY does not cause a buffer overflow and	\
-			 * the caller will eventually do the restart.					\
-			 */										\
-			DEBUG_ONLY(TREF(donot_commit) |= DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE;)	\
-			GVKEY_INIT(GVT->prev_key, DBKEYSIZE(gv_altkey->end));				\
-		}											\
-		DBG_CHECK_GVKEY_VALID(gv_altkey, DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE);		\
-		COPY_KEY(GVT->prev_key, gv_altkey);							\
-	} else if (NULL != GVT->prev_key)								\
-	{												\
-		assert(PREV_KEY_NOT_COMPUTED < (1 << (SIZEOF(gv_altkey->end) * 8)));			\
-		GVT->prev_key->end = PREV_KEY_NOT_COMPUTED;						\
-	}												\
-} MBEND
-=======
 		copy_prev_key_to_gvt_clue(GVT, EXPAND_PREV_KEY)
->>>>>>> 5e466fd7... GT.M V6.3-013
 
 /* Copy GVKEY to GVT->CLUE. Take care NOT to copy cluekey->top to GVKEY->top as they correspond
  * to the allocation sizes of two different memory locations and should stay untouched.
@@ -3596,88 +3568,8 @@ MBSTART {														\
 #define	DEBUG_GVT_CLUE_VALIDATE(GVT)
 #endif
 
-<<<<<<< HEAD
 #define	ZPREVIOUS_NULL_SUBS_LEVEL1	2	/* this value should be != FALSE and TRUE and is relied upon by "gvcst_search" */
 
-/* Macro to replace a NULL subscript at the end with the maximum possible subscript that could exist in the
- * database for this global name. Used by $ZPREVIOUS, $QUERY(gvn,-1) etc.
- */
-#define GV_APPEND_MAX_SUBS_KEY(GVKEY, GVT)							\
-MBSTART {											\
-	int		lastsubslen, keysize;							\
-	unsigned char	*ptr;									\
-												\
-	assert(GVT->clue.top || (NULL == GVT->gd_csa));						\
-	assert(!GVT->clue.top || (NULL != GVT->gd_csa) && (GVT->gd_csa == cs_addrs));		\
-	/* keysize can be obtained from GVT->clue.top in case of GT.M.				\
-	 * But for GT.CM client, clue will be uninitialized. So we would need to		\
-	 * compute keysize from gv_cur_region->max_key_size. Since this is true for		\
-	 * GT.M as well, we use the same approach for both to avoid an if check and a		\
-	 * break in the pipeline.								\
-	 */											\
-	keysize = DBKEYSIZE(gv_cur_region->max_key_size);					\
-	assert(!GVT->clue.top || (keysize == GVT->clue.top));					\
-	lastsubslen = keysize - GVKEY->prev - 2;						\
-	assertpro((0 < lastsubslen) && (GVKEY->top >= keysize) && (GVKEY->end > GVKEY->prev));	\
-	ptr = &GVKEY->base[GVKEY->prev];							\
-	memset(ptr, STR_SUB_MAXVAL, lastsubslen);						\
-	ptr += lastsubslen;									\
-	*ptr++ = KEY_DELIMITER;	 /* terminator for last subscript */				\
-	*ptr = KEY_DELIMITER;    /* terminator for entire key */				\
-	GVKEY->end = GVKEY->prev + lastsubslen + 1;						\
-	assert(GVKEY->end == (ptr - &GVKEY->base[0]));						\
-	if (NULL != gv_target->gd_csa)								\
-		DBG_CHECK_GVTARGET_INTEGRITY(GVT);						\
-} MBEND
-
-#define	GTCMTR_SUBS2STR_XFORM_IF_NEEDED(GVT, GVKEY, KEY_TOP)						\
-{													\
-	unsigned char	*kprev, *kcur, *ktop;								\
-	boolean_t	last_sub_is_null;								\
-													\
-	if (GVT->collseq || GVT->nct)									\
-	{	/* Need to convert subscript representation from client side to string representation	\
-		 * so any collation transformations can happen on server side.				\
-		 * First check if last subscript of incoming key is a NULL subscript.			\
-		 * If so, client would have represented it using a sequence of FF, FF, FF, ...		\
-		 * Remove the representation temporarily before doing the gv_xform_key.			\
-		 * Introduce the NULL subscript after the transformation.				\
-		 * This is because we do NOT allow a null subsc to be transformed to a non null subsc	\
-		 * 	so no need for that be part of the transformation.				\
-		 */											\
-		last_sub_is_null = TRUE;								\
-		kprev = &GVKEY->base[GVKEY->prev];							\
-		for (kcur = kprev, ktop = &GVKEY->base[KEY_TOP] - 1; kcur < ktop; kcur++)		\
-		{											\
-			if (STR_SUB_MAXVAL != *kcur)							\
-			{										\
-				last_sub_is_null = FALSE;						\
-				break;									\
-			}										\
-		}											\
-		if (last_sub_is_null)									\
-		{											\
-			*kprev = KEY_DELIMITER;	/* remove the null subscript temporarily */		\
-			GVKEY->end = GVKEY->prev;							\
-		}											\
-		gv_xform_key(GVKEY, FALSE);	/* do collation transform on server side */		\
-		if (last_sub_is_null)									\
-			GV_APPEND_MAX_SUBS_KEY(GVKEY, GVT); /* Insert the NULL subscript back */	\
-	}												\
-}
-
-#define	GV_UNDO_APPEND_MAX_SUBS_KEY(GVKEY, REG)						\
-MBSTART {										\
-	assert(REG->std_null_coll || (STR_SUB_PREFIX == GVKEY->base[GVKEY->prev]));	\
-	if (REG->std_null_coll)								\
-		GVKEY->base[GVKEY->prev] = SUBSCRIPT_STDCOL_NULL;			\
-	GVKEY->base[GVKEY->prev + 1] = KEY_DELIMITER;					\
-	GVKEY->end = GVKEY->prev + 2;							\
-	GVKEY->base[GVKEY->end] = KEY_DELIMITER;					\
-} MBEND
-
-=======
->>>>>>> 5e466fd7... GT.M V6.3-013
 /* Bit masks for the update_trans & si->update_trans variables */
 #define	UPDTRNS_DB_UPDATED_MASK		(1 << 0)	/* 1 if this region was updated by this non-TP/TP transaction */
 #define	UPDTRNS_JNL_LOGICAL_MASK	(1 << 1)	/* 1 if logical jnl record was written in this region's

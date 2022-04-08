@@ -45,11 +45,7 @@
 
 #define  LOGNAME_LEN 255
 
-<<<<<<< HEAD
-GBLREF	io_desc			*active_device;
-=======
 GBLREF io_desc			*active_device;
->>>>>>> 5e466fd7... GT.M V6.3-013
 GBLREF bool			licensed;
 GBLREF dev_dispatch_struct  	io_dev_dispatch_mupip[];
 GBLREF int4			lkid,lid;

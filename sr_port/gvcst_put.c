@@ -1480,38 +1480,22 @@ tn_restart:
 				/* -------------------------------------------------------------------------------------------------
 				 * We have to maintain information for future recomputation only if the following are satisfied
 				 *	1) The block is a leaf-level block
-				 *	2) The global has NOISOLATION turned ON
-				 *	3) The cw_set_element hasn't encountered a block-split or a kill
-				 *	4) We don't need an extra_block_split
+				 *	2) We are in TP (indicated by non-null cse)
+				 *	3) The global has NOISOLATION turned ON
+				 *	4) The cw_set_element hasn't encountered a block-split or a kill
+				 *	5) We don't need an extra_block_split
 				 *
 				 * We can also add an optimization that only cse's of mode gds_t_write need to have such an update,
 				 *	but because of the belief that for a nonisolated variable, we will very rarely encounter a
-				 *	situation where a created block will have some new keys added to it, and that adding
+				 *	situation where a created block (in TP) will have some new keys added to it, and that adding
 				 *	the check slows down the normal code, we don't do that check here.
 				 * -------------------------------------------------------------------------------------------------
 				 */
-				if (cse && gv_target->noisolation && !cse->write_type && !need_extra_block_split
-					&& (dollar_tlevel || !is_dollar_incr))
+				if (cse && gv_target->noisolation && !cse->write_type && !need_extra_block_split)
 				{
-<<<<<<< HEAD
 					assert(dollar_tlevel);
 					if ((NULL == cse->recompute_list_tail)
-						|| (0 != memcmp(gv_currkey->base, cse->recompute_list_tail->key.base, gv_currkey->top)))
-=======
-					if (is_dollar_incr)
-					{
-						assert(dollar_tlevel);
-						/* See comment in ENSURE_VALUE_WITHIN_MAX_REC_SIZE macro
-						 * definition for why the below macro call is necessary.
-						 */
-						ADD_TO_GVT_TP_LIST(gv_target, RESET_FIRST_TP_SRCH_STATUS_FALSE);
-						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_GVINCRISOLATION, 2,
-							gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr);
-					}
-					if (NULL == cse->recompute_list_tail ||
-						0 != memcmp(gv_currkey->base, cse->recompute_list_tail->keybuf.split.base,
-							gv_currkey->top))
->>>>>>> 5e466fd7... GT.M V6.3-013
+						|| (0 != memcmp(gv_currkey->base, cse->recompute_list_tail->keybuf.split.base, gv_currkey->top)))
 					{
 						tempkv = (dollar_tlevel ? (key_cum_value *)get_new_element(si->recompute_list, 1)
 									: &(TREF(non_tp_noiso_key_n_value)));
@@ -1527,18 +1511,10 @@ tn_restart:
 						cse->recompute_list_tail = tempkv;
 					} else
 						tempkv = cse->recompute_list_tail;
-<<<<<<< HEAD
 					assert((0 == value.len)
 						|| ((value.len == bs1[4].len) && 0 == memcmp(value.addr, bs1[4].addr, value.len)));
 					tempkv->value.len = value.len;	/* bs1[4].addr is undefined if value.len is 0 */
 					tempkv->value.addr = (char *)bs1[4].addr;/* 	but not used in that case, so ok */
-=======
-					assert(0 == val->str.len
-						|| ((val->str.len == bs1[4].len)
-							&& 0 == memcmp(val->str.addr, bs1[4].addr, val->str.len)));
-					tempkv->value.len = val->str.len;	/* x.addr not used if val->str.len is 0 */
-					tempkv->value.addr = dollar_tlevel ? (char *)bs1[4].addr : val->str.addr;
->>>>>>> 5e466fd7... GT.M V6.3-013
 				}
 
 			}

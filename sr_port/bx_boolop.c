@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -297,15 +297,10 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 	if (NULL != bfini)
 	{	/* if OC_BOOLINIT/OC_BOOLFINI pair, move them to the new chain */
 		assert((NULL != binit) && (OC_BOOLFINI == bfini->opcode) && (OC_BOOLINIT == binit->opcode));
-<<<<<<< HEAD
-		ref0 = bfini->exorder.fl;			/* get a pointer to the OC_COMVAL/OC_COMINT */
-		assert(((OC_COMVAL == ref0->opcode) || (OC_COMINT == ref0->opcode)) && (TRIP_REF == ref0->operand[0].oprclass));
-=======
 		if (OC_COMINT == bfini->exorder.fl->opcode)			/* substitution safe here rather than in ex_tail */
 			bfini->exorder.fl->opcode = OC_COMVAL;
-		assert((OC_COMVAL == bfini->exorder.fl->opcode) && (TRIP_REF == bfini->exorder.fl->operand[0].oprclass));
-		ref0 = bfini->exorder.fl;					/* get a pointer to the OC_COMVAL */
->>>>>>> 5e466fd7... GT.M V6.3-013
+		ref0 = bfini->exorder.fl;			/* get a pointer to the OC_COMVAL/OC_COMINT */
+		assert(((OC_COMVAL == ref0->opcode) || (OC_COMINT == ref0->opcode)) && (TRIP_REF == ref0->operand[0].oprclass));
 		bfini->opcode = OC_NOOP;
 		bfini->operand[0].oprclass = NO_REF;
 		assert(NO_REF == binit->operand[0].oprclass);

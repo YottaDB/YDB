@@ -24,16 +24,10 @@
 #else
 # define REFTYPE GBLREF
 #endif
-<<<<<<< HEAD
+#include <stdlib.h> /* For setenv used below */
 REFTYPE	boolean_t	ydb_white_box_test_case_enabled;
 REFTYPE	int		ydb_white_box_test_case_number;
 REFTYPE	int		ydb_white_box_test_case_count;
-=======
-#include <stdlib.h> /* For setenv used below */
-REFTYPE	boolean_t	gtm_white_box_test_case_enabled;
-REFTYPE	int		gtm_white_box_test_case_number;
-REFTYPE	int		gtm_white_box_test_case_count;
->>>>>>> 5e466fd7... GT.M V6.3-013
 REFTYPE	int 		gtm_wbox_input_test_case_count;
 
 void wbox_test_init(void);
@@ -222,11 +216,8 @@ typedef enum {
 	WBTEST_FETCHCOMM_HISTINFO,		/* 165 : Communication error during fetchresync rollback HISTINFO */
 	WBTEST_MUINTEG_TQREAD,			/* 166 : Force t_qread to return NULL. To test integ with frozen instance */
 	WBTEST_FULLBLKWRT_DB,			/* 167 : Full disk blk writes for new blocks */
-<<<<<<< HEAD
-=======
 	WBTEST_OPENFILE_DB,			/* 168 : Make OPENFILE_DB fail on a RW db */
-	WBTEST_REPL_TLS_RECONN			/* 169 : Try reconnect in case of transient TLS errors */
->>>>>>> 5e466fd7... GT.M V6.3-013
+	WBTEST_REPL_TLS_RECONN,			/* 169 : Try reconnect in case of transient TLS errors */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.
@@ -244,26 +235,19 @@ typedef enum {
 /* Make sure to setenv ydb_white_box_test_case_count if you are going to use GTM_WHITE_BOX_TEST */
 #define GTM_WHITE_BOX_TEST(input_test_case_num, lhs, rhs)						\
 {													\
-<<<<<<< HEAD
+	char			count_num[20];								\
 	if (ydb_white_box_test_case_enabled && (ydb_white_box_test_case_number == input_test_case_num))	\
 	{												\
 		gtm_wbox_input_test_case_count++;							\
-		if (ydb_white_box_test_case_count == gtm_wbox_input_test_case_count)			\
-=======
-	char			count_num[20];								\
-	if (gtm_white_box_test_case_enabled && (gtm_white_box_test_case_number == input_test_case_num))	\
-	{												\
-		gtm_wbox_input_test_case_count++;							\
-		/* To catch the gtm_wbox_input_test_case_count before it is
-		 * reset below and convey correctly to the TLS plugin
-		 */ \
+		/* To catch the gtm_wbox_input_test_case_count before it is				\
+		 * reset below and convey correctly to the TLS plugin					\
+		 */ 											\
 		if (WBTEST_REPL_TLS_RECONN == input_test_case_num)					\
 		{											\
-			snprintf(count_num, SIZEOF(count_num), "%d", gtm_wbox_input_test_case_count);			\
+			snprintf(count_num, SIZEOF(count_num), "%d", gtm_wbox_input_test_case_count);	\
 			setenv("wbox_count", count_num, 1);						\
 		}											\
-		if (gtm_white_box_test_case_count == gtm_wbox_input_test_case_count)			\
->>>>>>> 5e466fd7... GT.M V6.3-013
+		if (ydb_white_box_test_case_count == gtm_wbox_input_test_case_count)			\
 		{											\
 			lhs = rhs;									\
 			gtm_wbox_input_test_case_count = 0;						\

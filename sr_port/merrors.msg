@@ -1542,11 +1542,7 @@ ACTCOLLMISMTCH	<Global ^!AD inherits alternative collation sequence #!UL from gl
 GBLNOMAPTOREG	<Global !AD does not map to region !AD in current global directory>/error/fao=4!/ansi=0
 ISSPANGBL	<Operation cannot be performed on global ^!AD as it spans multiple regions in current global directory>/error/fao=2!/ansi=0
 TPNOSUPPORT	<Operation cannot be performed while inside of a TP transaction>/error/fao=0!/ansi=0
-<<<<<<< HEAD
-UNUSEDMSG1544	<GVSUBSERR last used in V6.3-000A>/error/fao=0!/ansi=0
-=======
 EXITSTATUS	<Unexpected process exit (!AD), exit status !UL -- called from module !AD at line !UL>/error/fao=6!/ansi=0
->>>>>>> 5e466fd7... GT.M V6.3-013
 ZATRANSERR	<The input string is too long to convert>/error/fao=0!/ansi=0
 FILTERTIMEDOUT	<Replication server timed out attempting to read seqno !16@XQ from external filter>/error/fao=1!/ansi=0
 TLSDLLNOOPEN	<Failed to load YottaDB TLS/SSL library for secure communication>/error/fao=0!/ansi=0

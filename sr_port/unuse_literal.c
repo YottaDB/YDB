@@ -1,12 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 5e466fd7... GT.M V6.3-013
+ *								*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,13 +12,7 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-<<<<<<< HEAD
-/* This module is derived from FIS code.
- ****************************************************************
- */
 
-=======
->>>>>>> 5e466fd7... GT.M V6.3-013
 #include "mdef.h"
 
 #include "mdq.h"

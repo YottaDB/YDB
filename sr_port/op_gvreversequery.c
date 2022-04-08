@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,7 @@
 #include "gvcmx.h"
 #include "gvusr.h"
 #include "libyottadb_int.h"
+#include "gvt_inline.h"
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey, *gv_altkey;
@@ -95,7 +96,7 @@ void op_gvreversequery(mval *v)
 			assert(gv_currkey->end == gv_currkey->prev + 2);
 			assert(gv_currkey->end < gv_currkey->top); /* need "<" (not "<=") to account for terminating 0x00 */
 			gv_currkey->base[gv_currkey->prev] = 01;
-			GV_APPEND_MAX_SUBS_KEY(gv_currkey, gv_target);
+			gv_append_max_subs_key(gv_currkey, gv_target);
 		} else
 			currkey_has_special_meaning = FALSE;	/* Input key is to be treated as is.
 								 * No special meaning like is the case for a null subscript.
@@ -129,7 +130,7 @@ void op_gvreversequery(mval *v)
 	}
 	if (ok_to_change_currkey && currkey_has_special_meaning)
 	{	/* Restore gv_currkey to what it was at function entry time */
-		GV_UNDO_APPEND_MAX_SUBS_KEY(gv_currkey, gv_cur_region);
+		gv_undo_append_max_subs_key(gv_currkey, gv_cur_region);
 	}
 	is_simpleapi_mode = IS_SIMPLEAPI_MODE;
 	assert((is_simpleapi_mode && (NULL == v)) || (!is_simpleapi_mode && (NULL != v)));

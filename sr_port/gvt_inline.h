@@ -3,6 +3,9 @@
  * Copyright (c) 2020 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -11,6 +14,8 @@
  ****************************************************************/
 #ifndef GVT_INLINE_INCLUDED
 #define GVT_INLINE_INCLUDED
+
+#include "gv_xform_key.h"
 
 static inline gv_key *gvkey_init(gv_key *gvkey, int4 keysize)
 {
@@ -96,6 +101,7 @@ static inline void copy_prev_key_to_gvt_clue(gv_namehead *gvt, boolean_t expand_
 			DEBUG_ONLY(TREF(donot_commit) |= DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE;)
 			GVKEY_INIT(gvt->prev_key, DBKEYSIZE(gv_altkey->end));
 		}
+		DBG_CHECK_GVKEY_VALID(gv_altkey, DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE);
 		COPY_KEY(gvt->prev_key, gv_altkey);
 	} else if (NULL != gvt->prev_key)
 	{
@@ -138,16 +144,17 @@ static inline void copy_curr_and_prev_key_to_gvtarget_clue(gv_namehead *gvt, gv_
 }
 
 /* Replace a NULL subscript at the end with the maximum possible subscript
- * that could exist in the database for this global name.
+ * that could exist in the database for this global name. Used by $ZPREVIOUS, $QUERY(gvn,-1) etc.
  */
-static inline void gvzprevious_append_max_subs_key(gv_key *gvkey, gv_namehead *gvt)
+
+static inline void gv_append_max_subs_key(gv_key *gvkey, gv_namehead *gvt)
 {
-	GBLREF	gd_region	*gv_cur_region;
+	GBLREF gd_region	*gv_cur_region;
 	int			lastsubslen, keysize;
 	unsigned char		*ptr;
 
 	assert(gvt->clue.top || (NULL == gvt->gd_csa));
-	assert(!gvt->clue.top || ((NULL != gvt->gd_csa) && (gvt->gd_csa == cs_addrs)));
+	assert(!gvt->clue.top || (NULL != gvt->gd_csa) && (gvt->gd_csa == cs_addrs));
 	/* keysize can be obtained from GVT->clue.top in case of GT.M.
 	 * But for GT.CM client, clue will be uninitialized. So we would need to
 	 * compute keysize from gv_cur_region->max_key_size. Since this is true for
@@ -166,7 +173,53 @@ static inline void gvzprevious_append_max_subs_key(gv_key *gvkey, gv_namehead *g
 	gvkey->end = gvkey->prev + lastsubslen + 1;
 	assert(gvkey->end == (ptr - &gvkey->base[0]));
 	if (NULL != gv_target->gd_csa)
-		dbg_check_gvtarget_integrity(gvt);
+		DBG_CHECK_GVTARGET_INTEGRITY(gvt);
+}
+
+static inline void gtcmtr_sub2str_xform_if_needed(gv_namehead *gvt, gv_key *gvkey, unsigned short key_top)
+{
+	unsigned char	*kprev, *kcur, *ktop;
+	boolean_t	last_sub_is_null;
+
+	if (gvt->collseq || gvt->nct)
+	{	/* Need to convert subscript representation from client side to string representation
+		 * so any collation transformations can happen on server side.
+		 * First check if last subscript of incoming key is a NULL subscript.
+		 * If so, client would have represented it using a sequence of FF, FF, FF, ...
+		 * Remove the representation temporarily before doing the gv_xform_key.
+		 * Introduce the NULL subscript after the transformation.
+		 * This is because we do NOT allow a null subsc to be transformed to a non null subsc
+		 * 	so no need for that be part of the transformation.
+		 */
+		last_sub_is_null = TRUE;
+		kprev = &gvkey->base[gvkey->prev];
+		for (kcur = kprev, ktop = &gvkey->base[key_top] - 1; kcur < ktop; kcur++)
+		{
+			if (STR_SUB_MAXVAL != *kcur)
+			{
+				last_sub_is_null = FALSE;
+				break;
+			}
+		}
+		if (last_sub_is_null)
+		{
+			*kprev = KEY_DELIMITER;	/* remove the null subscript temporarily */
+			gvkey->end = gvkey->prev;
+		}
+		gv_xform_key(gvkey, FALSE);	/* do collation transform on server side */
+		if (last_sub_is_null)
+			gv_append_max_subs_key(gvkey, gvt); /* Insert the NULL subscript back */
+	}
+}
+
+static inline void gv_undo_append_max_subs_key(gv_key *gvkey, gd_region *reg)
+{
+	assert(reg->std_null_coll || (STR_SUB_PREFIX == gvkey->base[gvkey->prev]));
+	if (reg->std_null_coll)
+		gvkey->base[gvkey->prev] = SUBSCRIPT_STDCOL_NULL;
+	gvkey->base[gvkey->prev + 1] = KEY_DELIMITER;
+	gvkey->end = gvkey->prev + 2;
+	gvkey->base[gvkey->end] = KEY_DELIMITER;
 }
 
 static inline void dbg_check_gvtarget_gvcurrkey_in_sync(boolean_t check_csaddrs)

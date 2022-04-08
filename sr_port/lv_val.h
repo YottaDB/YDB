@@ -538,14 +538,9 @@ void	op_clralsvars(lv_val *dst);
 void	op_fndata(lv_val *x, mval *y);
 void	op_fnzdata(lv_val *x, mval *y);
 void	op_fnincr(lv_val *local_var, mval *increment, mval *result);
-<<<<<<< HEAD
-void	op_fnnext(lv_val *src,mval *key,mval *dst);
-void	op_fno2(lv_val *src,mval *key,mval *dst,mval *direct);
-void	op_fnq2(int sbscnt, mval *dst, mval *direct, ...);
-=======
 void	op_fnnext(lv_val *src, mval *key, mval *dst);
 void	op_fno2(lv_val *src, mval *key, mval *dst, mval *direct);
->>>>>>> 5e466fd7... GT.M V6.3-013
+void	op_fnq2(int sbscnt, mval *dst, mval *direct, ...);
 void	op_fnorder(lv_val *src, mval *key, mval *dst);
 void	op_fnzahandle(lv_val *src, mval *dst);
 void	op_fnzprevious(lv_val *src, mval *key, mval *dst);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,7 +108,7 @@ uint4 dbfilop(file_control *fc)
 			if (WBTEST_ENABLED(WBTEST_OPENFILE_DB))
 			{
 				udi->fd = FD_INVALID;
-				errno = gtm_white_box_test_case_count ? gtm_white_box_test_case_count : EPERM;
+				errno = ydb_white_box_test_case_count ? ydb_white_box_test_case_count : EPERM;
 			} else
 #endif
 			OPENFILE_DB((char *)seg->fname, O_RDWR, udi, seg);

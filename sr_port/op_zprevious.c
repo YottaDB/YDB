@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,13 +63,8 @@ void op_zprevious(mval *v)
 	enum db_acc_method	acc_meth;
 	gd_addr			*gd_targ;
 	gd_binding		*gd_map_start, *map, *prev_map;
-<<<<<<< HEAD
 	gd_region		*save_gv_cur_region, *reg;
-	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
-=======
-	gd_region		*save_gv_cur_region;
 	gv_key_buf		save_currkey;
->>>>>>> 5e466fd7... GT.M V6.3-013
 	gv_namehead		*save_gv_target;
 	gvnh_reg_t		*gvnh_reg;
 	int			min_reg_index, reg_index, res;
@@ -107,11 +102,7 @@ void op_zprevious(mval *v)
 			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->prev + 1]);
 			assert(gv_currkey->end == gv_currkey->prev + 2);
 			assert(gv_currkey->end < gv_currkey->top); /* need "<" (not "<=") to account for terminating 0x00 */
-<<<<<<< HEAD
-			GV_APPEND_MAX_SUBS_KEY(gv_currkey, gv_target);
-=======
-			gvzprevious_append_max_subs_key(gv_currkey, gv_target);
->>>>>>> 5e466fd7... GT.M V6.3-013
+			gv_append_max_subs_key(gv_currkey, gv_target);
 		}
 		if (IS_ACC_METH_BG_OR_MM(acc_meth))
 		{
@@ -155,7 +146,7 @@ void op_zprevious(mval *v)
 		v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 		if (TREF(gv_last_subsc_null) && ok_to_change_currkey)
 		{	/* Restore gv_currkey to what it was at function entry time */
-			GV_UNDO_APPEND_MAX_SUBS_KEY(gv_currkey, gv_cur_region);
+			gv_undo_append_max_subs_key(gv_currkey, gv_cur_region);
 		}
 		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
 	} else

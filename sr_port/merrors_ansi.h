@@ -1373,11 +1373,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GBLNOMAPTOREG */
 	   0,	/* ISSPANGBL */
 	   0,	/* TPNOSUPPORT */
-<<<<<<< HEAD:sr_port/merrors_ansi.h
-	   0,	/* UNUSEDMSG1544 */
-=======
 	   0,	/* EXITSTATUS */
->>>>>>> 5e466fd7... GT.M V6.3-013:sr_i386/merrors_ansi.h
 	   0,	/* ZATRANSERR */
 	   0,	/* FILTERTIMEDOUT */
 	   0,	/* TLSDLLNOOPEN */

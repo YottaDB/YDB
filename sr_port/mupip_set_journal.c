@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -159,12 +159,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		grlist = (tp_region *)&dummy_rlist;
 	}
 	ESTABLISH_RET(mupip_set_jnl_ch, (uint4)ERR_MUNOFINISH);
-<<<<<<< HEAD
-	SET_GBL_JREC_TIME; /* set_jnl_file_close/cre_jnl_file/wcs_flu need gbl_jrec_time initialized */
 	for (rptr = (mu_set_rlist *)grlist; (EXIT_ERR != exit_status) && NULL != rptr; rptr = rptr->fPtr)
-=======
-	for (rptr = grlist; (EXIT_ERR != exit_status) && NULL != rptr; rptr = rptr->fPtr)
->>>>>>> 5e466fd7... GT.M V6.3-013
 	{
 		rptr->exclusive = FALSE;
 		rptr->state = NONALLOCATED;
@@ -195,14 +190,9 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			memcpy(seg->fname, db_fn, db_fn_len);
 		}
 		fc = seg->file_cntl;
-<<<<<<< HEAD
-		/* open shared to see what's possible */
-		gvcst_init(gv_cur_region);
-=======
 		/* open shared to see what's possible.  This can be slow, so do SET_GBL_JREC_TIME after, not before (GTM-8878)*/
-		gvcst_init(gv_cur_region, NULL);
+		gvcst_init(gv_cur_region);
 		SET_GBL_JREC_TIME; /* set_jnl_file_close/cre_jnl_file/wcs_flu need gbl_jrec_time initialized */
->>>>>>> 5e466fd7... GT.M V6.3-013
 		tp_change_reg();
 		assert(!gv_cur_region->was_open);
 		rptr->sd = csd = cs_data;
@@ -219,23 +209,6 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		{	/* While a FREEZE -ONLINE was in place, all processes exited, leaving the
 			 * shared memory up.
 			 */
-<<<<<<< HEAD
-			DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
-			if (FROZEN_CHILLED(cs_addrs))
-			{
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(gv_cur_region));
-				exit_status |= EXIT_WRN;
-				gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE);
-				exit_status |= gds_rundown_status;
-				/* Note: cs_addrs would have been freed inside "gds_rundown" so we cannot
-				 * set (or assert) "cs_addrs->hdr" to NULL.
-				 */
-				rptr->sd = NULL;
-				rptr->state = NONALLOCATED;	/* This means do not call "gds_rundown" again for this region
-								 * and do not process this region anymore. */
-				continue;
-			}
-=======
 			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(gv_cur_region));
 			exit_status |= EXIT_WRN;
 			gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE);
@@ -244,7 +217,6 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			rptr->state = NONALLOCATED;	/* This means do not call "gds_rundown" again for this region
 							 * and do not process this region anymore. */
 			continue;
->>>>>>> 5e466fd7... GT.M V6.3-013
 		}
 		/* Now determine new journal state, replication state and before_image for this region.
 		 * Information will be kept in "rptr", which is per region.

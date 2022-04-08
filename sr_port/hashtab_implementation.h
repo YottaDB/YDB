@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -766,39 +766,19 @@ sm_uc_ptr_t COPY_HASHTAB_TO_BUFFER(HASH_TABLE *table, sm_uc_ptr_t buffer, int (*
  * Constructs a usable hash table from the input "buffer" which points to a hash table structure created at compile time
  * and stored into M object code as a literal.
  *
-<<<<<<< HEAD
  * "buffer" is expected to stay alive for the duration of the life of the hastable; we don't perform an extra copy.
  * "table"  points to a HASH_TABLE structure. It is initialized to be a copy of the HASH_TABLE structure pointed to
  *	by the first section of "buffer". This separate memory is needed because we want to modify a few fields
  *	in the HASH_TABLE structure and we cannot do this in case the M object is in a shared library or in
  *	an autorelink file (i.e. no read/write permissions). Therefore we do this in all cases even when the .o
  *	file is in process private memory with read-write access. Keeps the code simple.
-=======
- * The buffer is expected to stay alive for the duration of
- *  the life of the hastable; we don't perform an extra copy
- * @param [in] buffer the written hashtable value; note that the caller is responsible for making the buffer
- * 	is large enough for the hash table, hash table entries, and the values the entries point to
- * @param [in] copy_entry_from_buffer function pointed to returns an int representing bits used in the buffer,
- * 	and takes the current hash table entry along with a pointer to the buffer. It should fill out the hash
- * 	table entry
->>>>>>> 5e466fd7... GT.M V6.3-013
  */
 void ACTIVATE_HASHTAB_IN_BUFFER(sm_uc_ptr_t buffer, HASH_TABLE *table)
 {
-<<<<<<< HEAD
 	int	i;
 	HT_ENT	*cur, *top;
 
 	memcpy(table, buffer, SIZEOF(HASH_TABLE));
-=======
-	int		i;
-	HT_ENT		*cur, *top;
-	HASH_TABLE	*table;
-
-	table = (HASH_TABLE *)buffer;
-	if (TRUE == table->active)
-		return table;
->>>>>>> 5e466fd7... GT.M V6.3-013
 	buffer += SIZEOF(HASH_TABLE);
 	table->entry_passed_thru = buffer;
 	buffer += ROUND_UP(table->size, BITS_PER_UCHAR);

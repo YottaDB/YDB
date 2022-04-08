@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +28,7 @@
 #include "gvcmx.h"
 #include "gvusr.h"
 #include "libyottadb_int.h"
+#include "gvt_inline.h"
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey, *gv_altkey;

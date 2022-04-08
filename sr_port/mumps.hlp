@@ -6742,26 +6742,16 @@
    If the wildcard (*) occurs in the list, ZSHOW uses the default order
    (ZSHOW "IVBDLGR" ):
 
-<<<<<<< HEAD
-   If G occurs in the list, the statistics are displayed in the following
-   order in a comma-separated list where each item has its mnemonic followed
-   by a colon and a counter. YottaDB maintains the counter in DECIMAL. Each
-   counter has 8-byte (can get as high as 2**64). If these counters exceed 18
-   decimal digits (somewhere between 2**59 and 2**60), which is the current
-   YottaDB numeric representation precision threshold, their use in arithmetic
-   expressions in YottaDB results in loss of precision. The mnemonics are:
-=======
    If G occurs in the list, the following statistics are displayed. The table
    is in alphabetical order, but ZSHOW will display the statistics according
    to historical practice with the most recently added statistics displayed
    last. The statistics are displayed in a comma-separated list where each
-   item has its mnemonic followed by a colon and a counter. GT.M maintains
+   item has its mnemonic followed by a colon and a counter. YottaDB maintains
    the counter in DECIMAL. Each counter has 8-byte (can get as high as
    2**64). If these counters exceed 18 decimal digits (somewhere between
-   2**59 and 2**60), which is the current GT.M numeric representation
-   precision threshold, their use in arithmetic expressions in GT.M results
+   2**59 and 2**60), which is the current YottaDB numeric representation
+   precision threshold, their use in arithmetic expressions in YottaDB results
    in loss of precision. The mnemonics are:
->>>>>>> 5e466fd7... GT.M V6.3-013
 
    BTD : # of database Block Transitions to Dirty
    BTS : # times dirty cache record flushed
@@ -6883,13 +6873,8 @@
    GLD:*,REG:*,SET:205,KIL:0,GET:1,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:0,DRD:9,DWT:15,
    NTW:203,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,TBW:2,TBR:6,
    TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,JFS:0,JBB:0,JFB:0,JFW:0,JRL:0,JRP:0,
-<<<<<<< HEAD
-   JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0
-   GLD:/home/gtmuser1/.yottadb/r134_x86_64/g/mumps.gld,REG:DEFAULT,SET:205,KIL:0,GET:1,
-=======
    JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,WFR:0,BUS:0,BTS:0
-   GLD:/home/gtmuser1/.fis-gtm/V5.4-002B_x86/g/mumps.gld,REG:DEFAULT,SET:205,KIL:0,GET:1,
->>>>>>> 5e466fd7... GT.M V6.3-013
+   GLD:/home/gtmuser1/.yottadb/r134_x86_64/g/mumps.gld,REG:DEFAULT,SET:205,KIL:0,GET:1,
    DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:411,DRD:9,DWT:15,NTW:2
    03,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,TBW:2,TBR:6,TR0:0,
    TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0
@@ -18513,11 +18498,7 @@
    YottaDB Utilities Summary Table
 
    +------------------------------------------------------------------------+
-<<<<<<< HEAD
-   | YottaDB Utilities Summary                                              |
-=======
-   |                         GT.M Utilities Summary                         |
->>>>>>> 5e466fd7... GT.M V6.3-013
+   |                      YottaDB Utilities Summary                         |
    |------------------------------------------------------------------------|
    | UTILITY NAME |                       DESCRIPTION                       |
    |--------------+---------------------------------------------------------|
@@ -19426,21 +19407,16 @@
    YottaDB represents values that fit in 18 digits as numeric values, and values
    that require more than 18 digits as strings.
 
-<<<<<<< HEAD
-   libyottadb.h also includes definitions for the following entry points
-   exported from libyottadb:
-=======
    **Note**
 
-   GT.M MUMPS language runtime supports a maximum of 1MiB strings. Please
+   YottaDB MUMPS language runtime supports a maximum of 1MiB strings. Please
    take care to use 1MiB buffers for Output-only and Input-Output variables.
    Failure to do so could cause a segmentation violation if the called M
    routine writes more data into the supplied buffer than the caller
    allocated.
 
-   gtmxc_types.h also includes definitions for the following entry points
-   exported from libgtmshr:
->>>>>>> 5e466fd7... GT.M V6.3-013
+   libyottadb.h also includes definitions for the following entry points
+   exported from libyottadb:
 
    void gtm_hiber_start(ydb_uint_t mssleep);
    void gtm_hiber_start_wait_any(ydb_uint_t mssleep)

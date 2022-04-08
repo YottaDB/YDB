@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -346,7 +346,6 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			 * The case (0 == n1) is not expected a lot (relatively) since the application may be able to optimize
 			 *	a number of reads of the same key into one read by using a local-variable to store the value.
 			 */
-<<<<<<< HEAD
 			/* Need to compare clue against incoming key. We already have the key length ("nKeyLen").
 			 * But need the length of "pTarg->clue", "pTarg->first_rec" and "pTarg->last_rec" keys.
 			 * While the first can be obtained from "pTarg->clue.end", the other two cannot be obtained in PRO
@@ -361,10 +360,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			assert(pTarg->last_rec->top == pTarg->clue.top);
 			keyCmpLen = pTarg->clue.top;
 			keyCmpLen = MIN(nKeyLen, keyCmpLen);
-			if (0 < (n1 = memcmp(pKey->base, pTarg->clue.base, keyCmpLen)))
-=======
-			if (0 < (n1 = memcmp(pKey->base, ((gv_key *)&(pTarg->clue))->base, nKeyLen)))
->>>>>>> 5e466fd7... GT.M V6.3-013
+			if (0 < (n1 = memcmp(pKey->base, ((gv_key *)&(pTarg->clue))->base, keyCmpLen)))
 			{
 				if (memcmp(pKey->base, pTarg->last_rec->base, keyCmpLen) <= 0)
 				{

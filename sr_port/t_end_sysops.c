@@ -156,9 +156,7 @@ GBLREF	int			gv_fillfactor, rc_set_fragment;	/* Contains offset within data at w
 GBLREF	jnl_format_buffer       *non_tp_jfb_ptr;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
-<<<<<<< HEAD
 GBLREF	boolean_t		exit_handler_active;
-=======
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -168,7 +166,6 @@ GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		cr_array_index, t_tries;
 GBLREF	volatile boolean_t	in_mutex_deadlock_check;
 GBLREF	volatile int4		crit_count, fast_lock_count, gtmMallocDepth;
->>>>>>> 5e466fd7... GT.M V6.3-013
 
 void fileheader_sync(gd_region *reg)
 {

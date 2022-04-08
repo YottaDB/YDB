@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,7 @@
 #include "gtcmtr_protos.h"
 #include "gv_xform_key.h"
 #include "gvcst_protos.h"	/* for gvcst_reversequery prototype */
+#include "gvt_inline.h"
 
 GBLREF connection_struct *curr_entry;
 GBLREF gv_namehead	*gv_target;
@@ -72,7 +73,7 @@ cm_op_t gtcmtr_reversequery(void)
 	/* See gtcmtr_zprevious.c for comments on "old_top" */
 	CM_GET_GVCURRKEY(ptr, tmp_len);
 	gtcm_bind_name(reg_ref->reghead, FALSE); /* gtcm_bind_name sets gv_target; do not use gv_target before gtcm_bind_name */
-	GTCMTR_SUBS2STR_XFORM_IF_NEEDED(gv_target, gv_currkey, old_top);
+	gtcmtr_sub2str_xform_if_needed(gv_target, gv_currkey, old_top);
 	found = (0 != gv_target->root) ? gvcst_reversequery() : FALSE;
 	if (found)
 	{

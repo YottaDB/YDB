@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -279,18 +279,11 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 		assert(udi->counter_ftok_incremented);
 		if (DECR_CNT_SAFE != decr_cnt)
 		{
-<<<<<<< HEAD
-			if (-1 == (ftok_semval = semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL)))
-			{
-				save_errno = errno;
-				GTM_SEM_CHECK_EINVAL(TREF(ydb_environment_init), save_errno, udi);
-=======
 			if ((-1 == (ftok_semval = semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL)))
 				&& !((EINVAL == (save_errno = errno) || (EIDRM == save_errno))		/* WARNING: assign */
 				&& (!udi->s_addrs.hdr || udi->s_addrs.hdr->read_only)))
 			{	/* an mm read_only database file maps process-private, so we don't care if the semaphore is gone */
-				GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
->>>>>>> 5e466fd7... GT.M V6.3-013
+				GTM_SEM_CHECK_EINVAL(TREF(ydb_environment_init), save_errno, udi);
 				ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
 			}
 			/* Below checks against 0, in case already we decremented semaphore number 1 */
@@ -319,16 +312,10 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 		}
 		udi->counter_ftok_incremented = FALSE;
 	}
-<<<<<<< HEAD
-	if (0 != (save_errno = do_semop(udi->ftok_semid, DB_CONTROL_SEM, -1, semflag)))
-	{
-		GTM_SEM_CHECK_EINVAL(TREF(ydb_environment_init), save_errno, udi);
-=======
 	if ((0 != (save_errno = do_semop(udi->ftok_semid, DB_CONTROL_SEM, -1, semflag)))    		/* WARNING: assign */
 		&& !(((EINVAL == save_errno)  || (EIDRM == save_errno)) && (!udi->s_addrs.hdr || udi->s_addrs.hdr->read_only)))
 	{	/* an mm read_only database file maps process-private, so we don't care if the semaphore is gone */
-		GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
->>>>>>> 5e466fd7... GT.M V6.3-013
+		GTM_SEM_CHECK_EINVAL(TREF(ydb_environment_init), save_errno, udi);
 		ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
 	}
 	udi->grabbed_ftok_sem = FALSE;

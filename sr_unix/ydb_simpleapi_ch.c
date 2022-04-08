@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,6 +56,7 @@
 #include "create_fatal_error_zshow_dmp.h"
 #include "gtm_multi_thread.h"
 #include "trace_table.h"
+#include "gvt_inline.h"
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	boolean_t		created_core;

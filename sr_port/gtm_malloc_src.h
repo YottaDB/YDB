@@ -804,11 +804,11 @@ void *gtm_malloc_main(size_t size, int stack_level)	/* Note renamed to gtm_mallo
 			/* See discussion at https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1132#note_884556763
 			 * for more details on why the save/restore is needed
 			 */
-			uint4 save_smCallerIdExtraLevels;
+			int save_stack_level;
 			PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */
-			save_smCallerIdExtraLevels = smCallerIdExtraLevels;
+			save_stack_level = stack_level;
 			gtmSmInit();
-			smCallerIdExtraLevels = save_smCallerIdExtraLevels;
+			stack_level = save_stack_level;
 			PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release exclusive thread lock if needed */
 			/* Reinvoke gtm_malloc now that we are initialized.
 			 *
@@ -817,13 +817,8 @@ void *gtm_malloc_main(size_t size, int stack_level)	/* Note renamed to gtm_mallo
 			 * will do its own initialization if it still needs to (see top of gtmSmInit() above).
 			 */
 #			ifndef DEBUG
-<<<<<<< HEAD
 			if (ydbDebugLevel & GDL_SmAllMallocDebug)
-				return (void *)gtm_malloc_dbg(size);
-=======
-			if (gtmDebugLevel & GDL_SmAllMallocDebug)
 				return (void *)gtm_malloc_dbg(size, stack_level + TAIL_CALL_LEVEL);
->>>>>>> 5e466fd7... GT.M V6.3-013
 #			endif
 			return (void *)gtm_malloc_main(size, stack_level + TAIL_CALL_LEVEL);
 		}

@@ -533,10 +533,12 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 			if (WBTEST_ENABLED(WBTEST_OPENFILE_DB))
 			{
 				udi->fd = FD_INVALID;
-				errno = gtm_white_box_test_case_count ? gtm_white_box_test_case_count : EPERM;
+				errno = ydb_white_box_test_case_count ? ydb_white_box_test_case_count : EPERM;
 			} else
 #endif
 			OPENFILE_DB(fnptr, O_RDWR, udi, seg);
+			int save_errno;
+
 			save_errno = errno;
 			/* When opening an auto-create type of reservedDB database file, it is possible
 			 * that it does not (yet) exist. In that case, make a call out to create it. Note that
@@ -593,8 +595,6 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 					/* Rename "tmp.dat_%YGTM" to "tmp.dat" */
 					if (-1 == RENAME(tmpbuff, (char *)seg->fname))
 					{
-						int save_errno;
-
 						save_errno = errno;
 						ftok_sem_release(tmp_reg, FALSE, FALSE);
 						MU_GV_CUR_REG_FREE(tmp_reg, save_gv_cur_region);
@@ -621,11 +621,11 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 		}
 		if (open_read_only || (FD_INVALID == udi->fd))
 		{
+			int save_errno;
+
 			OPENFILE_DB(fnptr, O_RDONLY, udi, seg);
 			if (FD_INVALID == udi->fd)
 			{
-				int save_errno;
-
 				save_errno = errno;
 				if (!IS_GTCM_GNP_SERVER_IMAGE)
 				{

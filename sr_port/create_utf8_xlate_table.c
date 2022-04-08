@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,24 +71,15 @@ hash_table_int4 *create_utf8_xlate_table(mval *srch, mval *rplc, int4 *xlate)
 		rcur = (char *)UTF8_MBTOWC(rcur, rtop, rcode);
 		if (1 == (scur - sprev))
 		{
-<<<<<<< HEAD
 			int	 index;
 
 			index = *(unsigned char *)sprev;
-			if (NO_VALUE == xlate[index])
+			if (NO_VALUE == xlate[index])		/* 1st replacement rules, so ignore any stragglers */
 				xlate[index] = (rprev - rbase);
 		} else
 		{
 			assert(NULL != xlate_hash);
-			if (!lookup_hashtab_int4(xlate_hash, (uint4*)&scode))
-=======
-			if (NO_VALUE == xlate[*sprev])		/* 1st replacement rules, so ignore any stragglers */
-				xlate[*sprev] = (rprev - rbase);
-		} else
-		{
-			assert(NULL != xlate_hash);
-			if(!lookup_hashtab_int4(xlate_hash, (uint4*)&scode))	/* first replacement rules again */
->>>>>>> 5e466fd7... GT.M V6.3-013
+			if (!lookup_hashtab_int4(xlate_hash, (uint4*)&scode))	/* first replacement rules again */
 			{	/* Store the offset of that character in replace string */
 				add_hashtab_int4(xlate_hash, (uint4*)&scode, (void*)(rprev - rbase + 1), &tabent);
 			}

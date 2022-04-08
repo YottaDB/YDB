@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,13 +75,8 @@ boolean_t wcs_flu(uint4 options);
 		 */											\
 		assert((ydb_white_box_test_case_enabled							\
 			&& (WB_PHASE2_COMMIT_ERR							\
-<<<<<<< HEAD
 				|| (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)))	\
 			|| (WBTEST_SLEEP_IN_WCS_WTSTART == ydb_white_box_test_case_number));		\
-=======
-				|| (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)	\
-				|| (WBTEST_SLEEP_IN_WCS_WTSTART  == gtm_white_box_test_case_number)));	\
->>>>>>> 5e466fd7... GT.M V6.3-013
 		status = (enum cdb_sc)cdb_sc_helpedout;							\
 	} else												\
 		status = (enum cdb_sc)cdb_sc_cacheprob;							\

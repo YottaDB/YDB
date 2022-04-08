@@ -130,6 +130,7 @@ GBLDEF int			rec_len;
  */
 GBLDEF enc_handles		mu_int_encr_handles;
 GBLDEF boolean_t		ointeg_this_reg;
+GBLDEF util_snapshot_ptr_t	util_ss_ptr;
 GBLDEF boolean_t		preserve_snapshot;
 GBLDEF boolean_t		online_specified;
 
@@ -148,7 +149,6 @@ GBLREF gv_namehead		*gv_target;
 GBLREF sgmnt_addrs		*cs_addrs;
 GBLREF short			crash_count;
 GBLREF tp_region		*grlist;
-GBLREF util_snapshot_ptr_t	util_ss_ptr;
 
 void mupip_integ(void)
 {

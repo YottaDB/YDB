@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,24 +72,7 @@ GBLREF	u_casemap_t 			gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitl
 GBLREF	char 				**gtmenvp;
 
 #define GTMCRYPT_ERRLIT			"during GT.M startup"
-<<<<<<< HEAD
 #define YDBXC_gblstat			"ydb_xc_gblstat=%s/gtmgblstat.xc"
-=======
-#define GTMXC_gblstat			"GTMXC_gblstat=%s/gtmgblstat.xc"
-
-#ifdef __osf__
- /* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
-  * specify compiler and link editor options in order to use (and allocate) 32-bit pointers.  However, since C is
-  * the only exception and, in particular because the operating system does not support such an exception, the argv
-  * array passed to the main program is an array of 64-bit pointers.  Thus the C program needs to declare argv[]
-  * as an array of 64-bit pointers and needs to do the same for any pointer it sets to an element of argv[].
-  */
-# pragma pointer_size (save)
-# pragma pointer_size (long)
-#endif
-
-GBLREF	char 				**gtmenvp;
->>>>>>> 5e466fd7... GT.M V6.3-013
 
 error_def(ERR_CRYPTDLNOOPEN);
 error_def(ERR_CRYPTDLNOOPEN2);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -443,13 +443,6 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSRVF, 4,
 				RTS_ERROR_TEXT("Client"), process_id, loop_count - 1,
 			   	ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to communicate with gtmsecshr"));
-<<<<<<< HEAD
-		/* If ydb_tmp is not defined, show default path */
-		if (ydb_tmp_ptr = ydb_getenv(YDBENVINDX_TMP, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2,
-				RTS_ERROR_TEXT(ydb_tmp_ptr), ERR_TEXT, 2, RTS_ERROR_TEXT("(from $ydb_tmp/$gtm_tmp)"));
-		else
-=======
 		if (FLUSH_DB_IPCS_INFO >= req_code)
 		{
 			if (ret_code)
@@ -460,22 +453,21 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 						RTS_ERROR_STRING(secshr_fail_mesg_code[req_code]));
 		}
 		ret_code = -1;
-		/* If gtm_tmp is not defined, show default path */
-		if (gtm_tmp_ptr = GETENV("gtm_tmp"))
+		/* If ydb_tmp is not defined, show default path */
+		if (ydb_tmp_ptr = ydb_getenv(YDBENVINDX_TMP, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))
 		{
 			if (!IS_GTM_IMAGE)
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2,
-					RTS_ERROR_TEXT(gtm_tmp_ptr),
-					ERR_TEXT, 2, RTS_ERROR_TEXT("(from $gtm_tmp)"));
+					RTS_ERROR_TEXT(ydb_tmp_ptr),
+					ERR_TEXT, 2, RTS_ERROR_TEXT("(from $ydb_tmp/$gtm_tmp)"));
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2,
-				RTS_ERROR_TEXT(gtm_tmp_ptr),
-				ERR_TEXT, 2, RTS_ERROR_TEXT("(from $gtm_tmp)"));
+				RTS_ERROR_TEXT(ydb_tmp_ptr), ERR_TEXT, 2, RTS_ERROR_TEXT("(from $ydb_tmp/$gtm_tmp)"));
 		} else
 		{
 			if (!IS_GTM_IMAGE)
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4)
 						ERR_GTMSECSHRTMPPATH, 2, RTS_ERROR_TEXT("/tmp"));
->>>>>>> 5e466fd7... GT.M V6.3-013
+
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4)
 					ERR_GTMSECSHRTMPPATH, 2, RTS_ERROR_TEXT("/tmp"));
 		}

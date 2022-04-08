@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,11 +60,7 @@ typedef	void * gtmcrypt_key_t;
  *
  * Returns:	0 if encryption was initialized successfully; -1 otherwise.
  */
-<<<<<<< HEAD:sr_unix/ydbcrypt_interface.h
 GBLREF gtm_status_t	gtmcrypt_init(gtm_int_t flags);
-=======
-extern gtm_status_t	gtmcrypt_init(gtm_int_t flags);
->>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtmcrypt_interface.h
 
 /*
  * Return the error string. Use this function to provide the current error status. The function is normally invoked following a
@@ -73,11 +69,7 @@ extern gtm_status_t	gtmcrypt_init(gtm_int_t flags);
  *
  * Returns:	The error string constructed so far.
  */
-<<<<<<< HEAD:sr_unix/ydbcrypt_interface.h
 GBLREF gtm_char_t	*gtmcrypt_strerror(void);
-=======
-extern gtm_char_t	*gtmcrypt_strerror(void);
->>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtmcrypt_interface.h
 
 /*
  * Find the key by hash and database path and set up database encryption and decryption state objects, if not created yet. Use this
@@ -99,13 +91,8 @@ extern gtm_char_t	*gtmcrypt_strerror(void);
  * Returns:	0 if the routine found the key, and either found existing database encryption and decryption state objects or
  * 		initialized them; -1 otherwise.
  */
-<<<<<<< HEAD:sr_unix/ydbcrypt_interface.h
 GBLREF gtm_status_t	gtmcrypt_init_db_cipher_context_by_hash(gtmcrypt_key_t *handle, gtm_string_t key_hash,
 					gtm_string_t db_path, gtm_string_t iv);
-=======
-extern gtm_status_t	gtmcrypt_init_db_cipher_context_by_hash(gtmcrypt_key_t *handle, gtm_string_t key_hash,
-								gtm_string_t db_path, gtm_string_t iv);
->>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtmcrypt_interface.h
 
 /*
  * Find the key by its name and set up device encryption or decryption state object. Use this function to locate a particular key by
@@ -124,13 +111,8 @@ extern gtm_status_t	gtmcrypt_init_db_cipher_context_by_hash(gtmcrypt_key_t *hand
  * Returns:	0 if the routine found the key, and either found existing database encryption and decryption state objects or
  *		initialized them; -1 otherwise.
  */
-<<<<<<< HEAD:sr_unix/ydbcrypt_interface.h
 GBLREF gtm_status_t	gtmcrypt_init_device_cipher_context_by_keyname(gtmcrypt_key_t *handle, gtm_string_t key_name,
 					gtm_string_t iv, gtm_int_t operation);
-=======
-extern gtm_status_t	gtmcrypt_init_device_cipher_context_by_keyname(gtmcrypt_key_t *handle, gtm_string_t key_name,
-									gtm_string_t iv, gtm_int_t operation);
->>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtmcrypt_interface.h
 
 /*
  * Find the key by the path of the database it corresponds to as well as its own path, and obtain its hash. Use this function to
@@ -145,13 +127,8 @@ extern gtm_status_t	gtmcrypt_init_device_cipher_context_by_keyname(gtmcrypt_key_
  *
  * Returns:	0 if the routine found the key and copied its hash to the specified location; -1 otherwise.
  */
-<<<<<<< HEAD:sr_unix/ydbcrypt_interface.h
 GBLREF gtm_status_t	gtmcrypt_obtain_db_key_hash_by_keyname(gtm_string_t db_path, gtm_string_t key_path,
 					gtm_string_t *hash_dest);
-=======
-extern gtm_status_t	gtmcrypt_obtain_db_key_hash_by_keyname(gtm_string_t db_path, gtm_string_t key_path,
-								gtm_string_t *hash_dest);
->>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtmcrypt_interface.h
 
 /*
  * Release the specified encryption or decryption state object, also releasing the decryption state if database encryption state is
@@ -161,11 +138,7 @@ extern gtm_status_t	gtmcrypt_obtain_db_key_hash_by_keyname(gtm_string_t db_path,
  *
  * Returns:	0 if the operation succeeded; -1 otherwise.
  */
-<<<<<<< HEAD:sr_unix/ydbcrypt_interface.h
 GBLREF gtm_status_t	gtmcrypt_release_cipher_context(gtmcrypt_key_t handle);
-=======
-extern gtm_status_t	gtmcrypt_release_cipher_context(gtmcrypt_key_t handle);
->>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtmcrypt_interface.h
 
 /*
  * Perform encryption or decryption of the provided data based on the specified encryption / decryption state. If the target buffer
@@ -186,13 +159,8 @@ extern gtm_status_t	gtmcrypt_release_cipher_context(gtmcrypt_key_t handle);
  *
  * Returns:	0 if the operation succeeded; -1 otherwise.
  */
-<<<<<<< HEAD:sr_unix/ydbcrypt_interface.h
 GBLREF gtm_status_t	gtmcrypt_encrypt_decrypt(gtmcrypt_key_t handle, gtm_char_t *src_block, gtm_int_t src_block_len,
 					  gtm_char_t *dest_block, gtm_int_t operation, gtm_int_t iv_mode, gtm_string_t iv);
-=======
-extern gtm_status_t	gtmcrypt_encrypt_decrypt(gtmcrypt_key_t handle, gtm_char_t *src_block, gtm_int_t src_block_len,
-						  gtm_char_t *dest_block, gtm_int_t operation, gtm_int_t iv_mode, gtm_string_t iv);
->>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtmcrypt_interface.h
 
 /*
  * Compare the keys associated with two encryption or decryption state objects.
@@ -202,21 +170,13 @@ extern gtm_status_t	gtmcrypt_encrypt_decrypt(gtmcrypt_key_t handle, gtm_char_t *
  *
  * Returns:	1 if both encryption or decryption state objects use the same key; 0 otherwise.
  */
-<<<<<<< HEAD:sr_unix/ydbcrypt_interface.h
 GBLREF gtm_int_t		gtmcrypt_same_key(gtmcrypt_key_t handle1, gtmcrypt_key_t handle2);
-=======
-extern gtm_int_t	gtmcrypt_same_key(gtmcrypt_key_t handle1, gtmcrypt_key_t handle2);
->>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtmcrypt_interface.h
 
 /*
  * Disable encryption and discard any sensitive data in memory.
  *
  * Returns:	0 if the operation succeeded; -1 otherwise.
  */
-<<<<<<< HEAD:sr_unix/ydbcrypt_interface.h
 GBLREF gtm_status_t	gtmcrypt_close(void);
-=======
-extern gtm_status_t	gtmcrypt_close(void);
->>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtmcrypt_interface.h
 
 #endif

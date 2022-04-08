@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -132,27 +132,18 @@ LITDEF nametabent svn_names[] =
 	,{10, "ZTWORMHOLE" }
 	,{ 9, "ZUSEDSTOR" }
 	,{ 3, "ZUT" }
-<<<<<<< HEAD
-	,{ 2, "ZV*" }
-	,{ 4, "ZYER*" }
-	,{ 9, "ZYINTRSIG" }
-	,{ 4, "ZYRE*" }
-	,{ 9, "ZYSQLNULL" }
-=======
 	,{ 8, "ZVERSION" }
 	,{ 7, "ZYERROR" }
->>>>>>> 5e466fd7... GT.M V6.3-013
+	,{ 9, "ZYINTRSIG" }
+	,{ 9, "ZYRELEASE" }
+	,{ 9, "ZYSQLNULL" }
 };
 
 /* Indexes into svn_names array for each letter of the alphabet */
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-<<<<<<< HEAD
-	22, 28, 34 ,34, 34, 34, 35, 36, 107	/* s t u v w x y z ~ */
-=======
-	22, 28, 34 ,34, 34, 34, 35, 36, 100	/* s t u v w x y z ~ */
->>>>>>> 5e466fd7... GT.M V6.3-013
+	22, 28, 34 ,34, 34, 34, 35, 36, 103	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -322,16 +313,11 @@ LITDEF nametabent fun_names[] =
 	,{10,"ZTRANSLATE"}
 	,{8, "ZTRIGGER"}
 	,{7, "ZTRNLNM"}
-<<<<<<< HEAD
-	,{2, "ZW"}, {6, "ZWIDTH"}
-	,{3, "ZWR"}, {6, "ZWRITE"}
+	,{6, "ZWIDTH"}
+	,{6, "ZWRITE"}
 	,{6, "ZYHASH"}
 	,{11, "ZYISSQLNULL"}
 	,{4, "ZYSU"}, {8, "ZYSUFFIX"}
-=======
-	,{6, "ZWIDTH"}
-	,{6, "ZWRITE"}
->>>>>>> 5e466fd7... GT.M V6.3-013
 };
 
 /* Index into fun_names array where entries that start with each letter of the alphabet begin. */
@@ -339,11 +325,7 @@ LITDEF unsigned char fun_index[27] =
 {
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
 	17, 19, 19, 21, 21, 25, 27, 29, 35,	/* j k l m n o p q r */
-<<<<<<< HEAD
-	39, 43, 47, 47, 48, 48, 48, 48, 126	/* s t u v w x y z ~ */
-=======
-	39, 43, 47, 47, 49, 49, 49, 49, 95	/* s t u v w x y z ~ */
->>>>>>> 5e466fd7... GT.M V6.3-013
+	39, 43, 47, 47, 49, 49, 49, 49, 99	/* s t u v w x y z ~ */
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -419,16 +401,11 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZTRANSLATE, ALL_SYS }
 	,{ OC_FNZTRIGGER, TRIGGER_OS }
 	,{ OC_FNZTRNLNM, ALL_SYS }
-<<<<<<< HEAD
-	,{ OC_FNZWIDTH, ALL_SYS }, { OC_FNZWIDTH, ALL_SYS }
-	,{ OC_FNZWRITE, ALL_SYS }, { OC_FNZWRITE, ALL_SYS }
+	,{ OC_FNZWIDTH, ALL_SYS }
+	,{ OC_FNZWRITE, ALL_SYS }
 	,{ OC_FNZYHASH, ALL_SYS }
 	,{ OC_FNZYISSQLNULL, ALL_SYS }
 	,{ OC_FNZYSUFFIX, ALL_SYS } ,{ OC_FNZYSUFFIX, ALL_SYS }
-=======
-	,{ OC_FNZWIDTH, ALL_SYS }
-	,{ OC_FNZWRITE, ALL_SYS }
->>>>>>> 5e466fd7... GT.M V6.3-013
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -504,16 +481,11 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 	f_translate,
 	f_ztrigger,
 	f_ztrnlnm,
-<<<<<<< HEAD
-	f_zwidth, f_zwidth,
-	f_zwrite, f_zwrite,
+	f_zwidth,
+	f_zwrite,
 	f_zyhash,
 	f_zyissqlnull,
 	f_zysuffix, f_zysuffix
-=======
-	f_zwidth,
-	f_zwrite,
->>>>>>> 5e466fd7... GT.M V6.3-013
 };
 
 int expritem(oprtype *a)

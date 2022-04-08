@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,7 +20,7 @@
 #include "generic_signal_handler.h"
 #include "sig_init.h"
 
-GBLREF struct NTD *ntd_root;
+GBLDEF struct NTD *ntd_root;
 
 /* CLEAN-UP: 1. replace CMI_CMICHECK with new message
 	2. find correct size and location of MBX_SIZE

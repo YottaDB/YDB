@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,20 +63,8 @@ void bx_tail(triple *t, boolean_t sense, oprtype *addr, int depth, opctype andor
 	case OC_COBOOL:
 		ex_tail(&t->operand[0], depth);
 		RETURN_IF_RTS_ERROR;
-<<<<<<< HEAD
 		jmp_opcode = sense ? OC_JMPNEQ : OC_JMPEQU;
 		ref = maketriple(jmp_opcode);
-=======
-		if (OC_GETTRUTH == t->operand[0].oprval.tref->opcode)
-		{
-			assert(NO_REF == t->operand[0].oprval.tref->operand[0].oprclass);
-			t->operand[0].oprval.tref->opcode = OC_NOOP;	/* must NOOP rather than delete as might be expr_start */
-			t->opcode = sense ? OC_JMPTSET : OC_JMPTCLR;
-			t->operand[0] = put_indr(addr);
-			return;
-		}
-		ref = maketriple(sense ? OC_JMPNEQ : OC_JMPEQU);
->>>>>>> 5e466fd7... GT.M V6.3-013
 		ref->operand[0] = put_indr(addr);
 		dqins(t, exorder, ref);
 		ADD_BOOL_ZYSQLNULL_PARMS(t, depth, jmp_opcode, andor_opcode, caller_is_bool_expr, is_last_bool_operand, jmp_depth);
