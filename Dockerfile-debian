@@ -102,6 +102,7 @@ RUN apt-get update && \
                     python3-setuptools \
                     libffi-dev \
                     python3-pip \
+		    npm \
                     && \
     apt-get clean
 RUN locale-gen en_US.UTF-8
