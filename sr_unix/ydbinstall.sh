@@ -67,9 +67,6 @@ cd `dirname $0`
 timestamp=`date +%Y%m%d%H%M%S`
 if [ -z "$USER" ] ; then USER=`id -un` ; fi
 
-# Initializing script name; if distributed with tarball then ./ydbinstall, otherwise ./ydbinstall.sh
-script_name="./`basename $0`"
-
 # Functions
 dump_info()
 {
@@ -169,10 +166,10 @@ help_exit()
     echo "This version must run as root."
     echo ""
     echo "Example usages are (assumes latest YottaDB release is r1.34 and latest GT.M version is V7.0-001)"
-    echo "  $script_name                          # installs latest YottaDB release (r1.34) at /usr/local/lib/yottadb/r134"
-    echo "  $script_name --utf8 default           # installs YottaDB release r1.34 with added support for UTF-8"
-    echo "  $script_name --installdir /r134 r1.34 # installs YottaDB r1.34 at /r134"
-    echo "  $script_name --gtm                    # installs latest GT.M version (V7.0-001) at /usr/local/lib/fis-gtm/V7.0-001_x86_64"
+    echo "  $0                          # installs latest YottaDB release (r1.34) at /usr/local/lib/yottadb/r134"
+    echo "  $0 --utf8 default           # installs YottaDB release r1.34 with added support for UTF-8"
+    echo "  $0 --installdir /r134 r1.34 # installs YottaDB r1.34 at /r134"
+    echo "  $0 --gtm                    # installs latest GT.M version (V7.0-001) at /usr/local/lib/fis-gtm/V7.0-001_x86_64"
     echo ""
     exit 1
 }
