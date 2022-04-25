@@ -373,7 +373,15 @@ typedef UINTPTR_T uintszofptr_t;
 #define MAX_LONG_IN_DOUBLE	0xFFFFFFFFFFFFF /*Max Fraction part in IEEE double format*/
 #define MAX_INT_IN_BYTE		255
 
-typedef char		bool;
+/* We used to previously define a "bool" type here as "char". But this conflicted with the "bool" type (defined as "_Bool")
+ * in "stdbool.h" and included by various system header files (e.g. unicode/uchar.h -> unicode/utypes.h -> unicode/umachine.h)
+ * which in turn showed up as [-Wlto-type-mismatch] warnings when YDB was built using gcc 11.2 or higher in a Ubuntu 22.04 system
+ * due to some .c files using the "char" definition and some .c files using the "_Bool" definition for the same "bool" field.
+ * To avoid this conflict, we remove our definition and instead use the "stdbool.h" definition in this central header file
+ * "mdef.h" thereby ensuring all structure members using the "bool" type get defined to the same type.
+ */
+#include <stdbool.h>	/* this defines "bool" type (as _Bool) */
+
 typedef unsigned char	mreg;
 typedef int4		mint;
 
