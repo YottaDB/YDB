@@ -1,0 +1,26 @@
+#################################################################
+#								#
+# Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_unix/gtm_putmsg_list.c b/sr_unix/gtm_putmsg_list.c
+index d889f70b..02b6c611 100644
+--- a/sr_unix/gtm_putmsg_list.c
++++ b/sr_unix/gtm_putmsg_list.c
+@@ -99,6 +99,9 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
+ 		msg_string.addr = msg_buffer;
+ 		msg_string.len = sizeof msg_buffer;
+ 		gtm_getmsg(msg_id, &msg_string);
++		mustlog = FALSE;	/* Do not send messages like ZGBLDIRACC (which would have "mustlog" set to 1) to syslog
++					 * during fuzz testing as it can cause syslog flooding (and disk full) situations.
++					 */
+ 		if (mustlog)
+ 		{				/* If this message must be sysloged for GTM-7759, do it here */
+ 			va_copy(var_sav, var);
