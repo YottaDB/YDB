@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -120,22 +123,6 @@ typedef struct mprof_wrapper_struct
 	gvargs_t		gvargs;
 	mval			gbl_to_fill;
 } mprof_wrapper;
-
-STATICFNDCL void get_entryref_information(boolean_t, trace_entry *);
-STATICFNDCL void parse_gvn(mval *);
-#ifdef UNIX
-STATICFNDCL void times_usec(ext_tms *curr);
-STATICFNDCL void child_times_usec(void);
-#else
-STATICFNDCL void get_cputime(ext_tms *curr);
-#endif
-STATICFNDCL void insert_total_times(boolean_t for_process);
-
-STATICFNDCL mprof_tree *rotate_2(mprof_tree **, int);
-STATICFNDCL mprof_tree *rotate_3(mprof_tree **, int, int);
-STATICFNDCL int mprof_tree_compare(mprof_tree *, trace_entry *);
-STATICFNDCL void mprof_tree_rebalance_path(mprof_tree *, trace_entry *);
-STATICFNDCL void mprof_tree_rebalance(mprof_tree **, trace_entry *);
 
 void	turn_tracing_on(mval *glvn, boolean_t from_env, boolean_t save_gbl);
 void	turn_tracing_off(mval *);

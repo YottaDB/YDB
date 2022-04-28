@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -16,9 +19,6 @@
 void cleanup_trigger_hash(char *trigvn, int trigvn_len, char **values, uint4 *value_len, stringkey *set_hash,
 		stringkey *kill_hash, boolean_t del_kill_hash, int match_index);
 void cleanup_trigger_name(char *trigvn, int trigvn_len, char *trigger_name, int trigger_name_len);
-STATICFNDCL int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **values, uint4 *value_len, stringkey *set_hash,
-					   stringkey *kill_hash, int old_trig_index, int new_trig_index);
-STATICFNDCL int4 update_trigger_name_value(char *trig_name, int trig_name_len, int new_trig_index);
 
 boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats);
 int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index);

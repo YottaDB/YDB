@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -11,8 +14,6 @@
 
 #ifndef TRIGGER_COMPARE_PROTOS_H_INCLUDED
 #define TRIGGER_COMPARE_PROTOS_H_INCLUDED
-
-STATICFNDCL boolean_t compare_vals(char *trigger_val, uint4 trigger_val_len, char *key_val, uint4 key_val_len);
 
 void build_kill_cmp_str(char *trigvn, int trigvn_len, char **values, uint4 *value_len, mstr *kill_key, boolean_t multi_line);
 void build_set_cmp_str(char *trigvn, int trigvn_len, char **values, uint4 *value_len, mstr *set_key, boolean_t multi_line);

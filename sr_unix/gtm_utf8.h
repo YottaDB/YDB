@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -858,14 +861,11 @@ int		utf8_len_dec(mstr* str);
 int		utf8_len_stx(mstr* str);
 int		utf8_len_silent(mstr* str);
 int		utf8_len_strict(unsigned char* ptr, int len);
-STATICFNDCL int utf8_len_real(utf8_err_type err_type, mstr* str);
 int		gtm_wcwidth(wint_t code);
 int		gtm_wcswidth(unsigned char* ptr, int len, boolean_t strict, int nonprintwidth);
 void		utf8_badchar(int len, unsigned char* str, unsigned char *strtop, int chset_len, unsigned char* chset);
 void		utf8_badchar_dec(int len, unsigned char* str, unsigned char *strtop, int chset_len, unsigned char* chset);
 void		utf8_badchar_stx(int len, unsigned char* str, unsigned char *strtop, int chset_len, unsigned char* chset);
-STATICFNDCL void utf8_badchar_real(utf8_err_type err_type, int len, unsigned char* str, unsigned char *strtop, int chset_len,
-				   unsigned char* chset);
 unsigned char	*gtm_utf8_trim_invalid_tail(unsigned char *str, int len);
 boolean_t       valid_utf_string(const mstr *str);
 

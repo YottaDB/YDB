@@ -52,9 +52,11 @@ LITREF	int4		ten_pwr[NUM_DEC_DG_1L+1];
 STATICFNDCL void lvAvlTreeNodeFltConv(lvTreeNodeNum *fltNode);
 STATICFNDCL lvTreeNode *lvAvlTreeSingleRotation(lvTreeNode *rebalanceNode, lvTreeNode *anchorNode, int4 balanceFactor);
 STATICFNDCL lvTreeNode *lvAvlTreeDoubleRotation(lvTreeNode *rebalanceNode, lvTreeNode *anchorNode, int4 balanceFactor);
+#ifdef DEBUG
 STATICFNDCL boolean_t lvAvlTreeLookupKeyCheck(treeKeySubscr *key);
 STATICFNDCL int lvAvlTreeNodeHeight(lvTreeNode *node);
 STATICFNDCL boolean_t lvAvlTreeNodeIsWellFormed(lvTree *lvt, lvTreeNode *node);
+#endif
 
 STATICFNDEF void lvAvlTreeNodeFltConv(lvTreeNodeNum *fltNode)
 {

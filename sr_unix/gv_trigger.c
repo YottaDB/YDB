@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -110,6 +110,13 @@ LITREF	mval	literal_hashcount;
 LITREF	mval	literal_hashcycle;
 LITREF	mval	literal_hashlabel;
 LITREF	mval	literal_null;
+
+STATICFNDCL	void		gvtr_db_tpwrap_helper(sgmnt_addrs *csa, int err_code, boolean_t root_srch_needed);
+STATICFNDCL	uint4		gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int type, char *start, char *end);
+STATICFNDCL	uint4		gvtr_process_pattern(char *ptr, uint4 len, gvtr_subs_t *subsdsc, gvt_trigger_t *gvt_trigger);
+STATICFNDCL	uint4		gvtr_process_gvsubs(char *start, char *end, gvtr_subs_t *subsdsc,
+						    boolean_t colon_imbalance, gv_namehead *gvt);
+STATICFNDCL	boolean_t	gvtr_is_key_a_match(char *keysub_start[], gv_trigger_t *trigdsc, mval *lvvalarray[]);
 
 #define TRIGGER_SUBSDEF(SUBSTYPE, SUBSNAME, LITMVALNAME, TRIGFILEQUAL, PARTOFHASH)	LITREF mval LITMVALNAME;
 #include "trigger_subs_def.h"

@@ -1695,10 +1695,10 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 		COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(gvt, pKey, EXPAND_PREV_KEY_FALSE);
 		if (new_rec)
 			t1->curr_rec.match = gvt->clue.end + 1;	/* Keep srch_hist and clue in sync for NEXT gvcst_search */
-			/* Now that the clue is known to be non-zero, we have the potential for the first_rec part of it to be
-			 * unreliable. Reset it to be safe. See comment in similar section in tp_hist for details on why.
-			 */
-			GVT_CLUE_INVALIDATE_FIRST_REC(gvt);
+		/* Now that the clue is known to be non-zero, we have the potential for the first_rec part of it to be
+		 * unreliable. Reset it to be safe. See comment in similar section in tp_hist for details on why.
+		 */
+		GVT_CLUE_INVALIDATE_FIRST_REC(gvt);
 	}
 	if (dollar_tlevel)
 	{

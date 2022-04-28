@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -155,7 +155,9 @@ STATICDEF int			gtmrecv_repl_uncmpmsglen;
 
 STATICFNDCL	void	gtmrecv_repl_send_loop_error(int status, char *msgtypestr);
 STATICFNDCL	int	repl_tr_endian_convert_rcvr(unsigned char remote_jnl_ver, uchar_ptr_t jnl_buff, uint4 jnl_len);
+#if defined(GTM_REPLIC_FLOW_CONTROL_ENABLED)
 STATICFNDCL	void	do_flow_control(uint4 write_pos);
+#endif
 STATICFNDCL	int	gtmrecv_est_conn(void);
 STATICFNDCL	int	gtmrecv_start_onln_rlbk(void);
 STATICFNDCL	void	prepare_recvpool_for_write(int datalen, int pre_filter_write_len);
@@ -532,6 +534,7 @@ STATICFNDEF int repl_tr_endian_convert_rcvr(unsigned char remote_jnl_ver, uchar_
 	return status;
 }
 
+#if defined(GTM_REPLIC_FLOW_CONTROL_ENABLED)
 STATICFNDEF void do_flow_control(uint4 write_pos)
 {
 	/* Check for overflow before writing */
@@ -613,6 +616,7 @@ STATICFNDEF void do_flow_control(uint4 write_pos)
 	}
 	return;
 }
+#endif
 
 STATICFNDEF int gtmrecv_est_conn(void)
 {

@@ -261,6 +261,16 @@ error_def(ERR_SETITIMERFAILED);
 error_def(ERR_TEXT);
 error_def(ERR_TIMERHANDLER);
 
+STATICFNDCL void	gt_timers_alloc(void);
+STATICFNDCL void	start_timer_int(TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len,
+					void *hdata, boolean_t safe_timer);
+STATICFNDCL void	sys_settimer (TID tid, ABS_TIME *time_to_expir);
+STATICFNDCL void	start_first_timer(ABS_TIME *curr_time, boolean_t is_os_signal_handler);
+STATICFNDCL GT_TIMER	*find_timer(TID tid, GT_TIMER **tprev);
+STATICFNDCL GT_TIMER	*add_timer(ABS_TIME *atp, TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len,
+				   void *hdata, boolean_t safe_timer);
+STATICFNDCL void	remove_timer(TID tid);
+
 /* Preallocate some memory for timers. */
 void gt_timers_alloc(void)
 {

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,6 +94,9 @@ error_def(ERR_IOEOF);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_MUPRESTERR);
 error_def(ERR_TEXT);
+
+STATICFNDCL	void	exec_read(BFILE *bf, char *buf, int nbytes);
+STATICFNDCL	void	tcp_read(BFILE *bf, char *buf, int nbytes);
 
 #define COMMON_READ(S, BUFF, LEN, INBUF)		\
 {							\

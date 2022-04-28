@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,6 +82,5 @@ typedef struct shm_parms_struct
 	free(parm);							\
 }
 
-STATICFNDCL boolean_t	mu_rndwn_file_statsdb(gd_region *statsDBreg, boolean_t *statsdb_exists, boolean_t standalone);
 boolean_t		mu_rndwn_file(gd_region *reg, boolean_t standalone);
 #endif

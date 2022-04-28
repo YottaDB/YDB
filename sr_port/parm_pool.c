@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,6 +41,9 @@ LITREF mval		skiparg;
 
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
+
+STATICFNDCL void parm_pool_init(unsigned int init_capacity);
+STATICFNDCL void parm_pool_expand(int slots_needed, int slots_copied);
 
 /*
  * The structure of the parameter pool looks like this:

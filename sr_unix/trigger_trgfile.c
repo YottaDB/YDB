@@ -67,6 +67,9 @@
 	return TRIG_FAILURE;								\
 }
 
+STATICFNDCL boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint4 trigger_filename_len, boolean_t noprompt,
+						    boolean_t lcl_implicit_tpwrap);
+
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	bool			mupip_error_occurred;
 GBLREF	gv_key			*gv_currkey;

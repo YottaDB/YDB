@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -33,6 +36,12 @@
 #define IS_INS_NODE	0
 
 STATICDEF mident *tmp_rout_name, *tmp_label_name;
+
+STATICFNDCL mprof_tree *rotate_2(mprof_tree **, int);
+STATICFNDCL mprof_tree *rotate_3(mprof_tree **, int, int);
+STATICFNDCL int mprof_tree_compare(mprof_tree *, trace_entry *);
+STATICFNDCL void mprof_tree_rebalance_path(mprof_tree *, trace_entry *);
+STATICFNDCL void mprof_tree_rebalance(mprof_tree **, trace_entry *);
 
 /* Creates a new generic node in the MPROF tree based on the information passed in arg. */
 mprof_tree *new_node(trace_entry *arg)

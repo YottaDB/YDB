@@ -324,6 +324,9 @@ error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
 error_def(ERR_FILTERTIMEDOUT);
 
+STATICFNDCL int repl_filter_recv(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize, boolean_t send_done);
+STATICFNDCL int repl_filter_recv_line(char *line, int *line_len, int max_line_len, boolean_t send_done);
+
 static	pid_t	repl_filter_pid = -1;
 static	int	repl_srv_filter_fd[2] = {FD_INVALID, FD_INVALID};
 static	int	repl_filter_srv_fd[2] = {FD_INVALID, FD_INVALID};

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,6 +55,12 @@ STATICDEF boolean_t 		use_realtime_flag = FALSE;	/* Indicates whether clock_gett
 								 * flag and so should use CLOCK_REALTIME instead. */
 
 LITDEF  MIDENT_CONST(above_routine, "*above*");
+
+STATICFNDCL void get_entryref_information(boolean_t, trace_entry *);
+STATICFNDCL void parse_gvn(mval *);
+STATICFNDCL void times_usec(ext_tms *curr);
+STATICFNDCL void child_times_usec(void);
+STATICFNDCL void insert_total_times(boolean_t for_process);
 
 #ifdef DEBUG
 #  define RUNTIME_LIMIT		604800000000.0	/* Not a long because on 32-bit platforms longs are only 4 bytes. */

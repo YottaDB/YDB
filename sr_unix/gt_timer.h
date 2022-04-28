@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -235,15 +235,5 @@ void		add_safe_timer_handler(int safetmr_cnt, ...);
 void		sys_canc_timer(void);
 void 		simple_timeout_timer(TID tid, int4 hd_len, boolean_t **timedout);
 void		timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_signal_handler);
-
-STATICFNDCL void	gt_timers_alloc(void);
-STATICFNDCL void	start_timer_int(TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len,
-					void *hdata, boolean_t safe_timer);
-STATICFNDCL void	sys_settimer (TID tid, ABS_TIME *time_to_expir);
-STATICFNDCL void	start_first_timer(ABS_TIME *curr_time, boolean_t is_os_signal_handler);
-STATICFNDCL GT_TIMER	*find_timer(TID tid, GT_TIMER **tprev);
-STATICFNDCL GT_TIMER	*add_timer(ABS_TIME *atp, TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len,
-				   void *hdata, boolean_t safe_timer);
-STATICFNDCL void	remove_timer(TID tid);
 
 #endif

@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -117,6 +117,8 @@ GBLREF	volatile int4		db_fsync_in_prog;	/* for DB_FSYNC macro usage */
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	int			num_additional_processors;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+
+STATICFNDCL int4 bml_find_busy_recycled(int4 hint, uchar_ptr_t base_addr, int4 blks_in_lmap, int *bml_status_ptr);
 
 boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 {

@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -33,6 +36,10 @@ GBLREF	void			(*show_source_line_fptr)(boolean_t warn); /* Func ptr for show_sou
 LITREF mval literal_null;
 
 error_def(ERR_BADCHAR);
+
+STATICFNDCL int utf8_len_real(utf8_err_type err_type, mstr* str);
+STATICFNDCL void utf8_badchar_real(utf8_err_type err_type, int len, unsigned char* str, unsigned char *strtop, int chset_len,
+				   unsigned char* chset);
 
 /* Return UTF8 length of mstr string in UTF8 characters */
 int utf8_len(mstr* str)

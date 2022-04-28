@@ -83,6 +83,14 @@ LITREF	mval			literal_zero;
 LITREF	mval			literal_ten;
 LITREF	char 			*trigger_subs[];
 
+STATICFNDCL void write_subscripts(char *out_rec, char **out_ptr, char **sub_ptr, int *sub_len);
+STATICFNDCL void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_indx);
+STATICFNDCL void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean_t trig_name);
+STATICFNDCL void dump_all_triggers(void);
+
+STATICFNDCL boolean_t trigger_select_tpwrap_helper(char *select_list, uint4 select_list_len);
+STATICFNDCL boolean_t trigger_select(char *select_list, uint4 select_list_len);
+
 #define TRIGGER_NAME_COMMENT	"trigger name: "
 #define TRIGGER_CYCLE_COMMENT	"  cycle: "
 

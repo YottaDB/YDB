@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,25 +74,6 @@ LITDEF int trig_subsc_partofhash[] =
 }
 
 error_def(ERR_TRIGDEFBAD);
-
-STATICFNDEF boolean_t compare_vals(char *trigger_val, uint4 trigger_val_len, char *key_val, uint4 key_val_len)
-{
-	char		*end_ptr;
-	char		*k_ptr;
-	char		*t_ptr;
-
-	if (key_val_len < trigger_val_len)
-		return FALSE;
-	end_ptr = trigger_val + trigger_val_len;
-	t_ptr = trigger_val;
-	k_ptr = key_val;
-	while ((end_ptr > t_ptr) && (*t_ptr == *k_ptr))
-	{
-		t_ptr++;
-		k_ptr++;
-	}
-	return ((end_ptr > t_ptr) && ('\0' == *k_ptr));
-}
 
 void build_kill_cmp_str(char *trigvn, int trigvn_len, char **values, uint4 *value_len, mstr *kill_key, boolean_t multi_line_xecute)
 {

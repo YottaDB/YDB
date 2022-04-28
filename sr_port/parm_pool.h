@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -98,8 +98,6 @@ typedef struct
 	parm_slot	parms[1];
 } parm_pool;
 
-STATICFNDCL void parm_pool_init(unsigned int init_capacity);
-STATICFNDCL void parm_pool_expand(int slots_needed, int slots_copied);
 void push_parm(unsigned int totalcnt, int truth_value, ...);
 void push_parm_ci(int truth_value, parmblk_struct *ci_parms);
 

@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -11,14 +14,6 @@
 
 #ifndef GV_TRIGGER_PROTOS_H_INCLUDED
 #define GV_TRIGGER_PROTOS_H_INCLUDED
-
-STATICFNDCL	void		gvtr_db_tpwrap_helper(sgmnt_addrs *csa, int err_code, boolean_t root_srch_needed);
-STATICFNDCL	uint4		gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int type, char *start, char *end);
-STATICFNDCL	uint4		gvtr_process_pattern(char *ptr, uint4 len, gvtr_subs_t *subsdsc, gvt_trigger_t *gvt_trigger);
-STATICFNDCL	uint4		gvtr_process_gvsubs(char *start, char *end, gvtr_subs_t *subsdsc,
-						    boolean_t colon_imbalance, gv_namehead *gvt);
-STATICFNDCL	boolean_t	gvtr_is_key_a_match(char *keysub_start[], gv_trigger_t *trigdsc, mval *lvvalarray[]);
-STATICFNDCL	boolean_t	gvtr_is_value_a_match(mval *val, gv_trigger_t *trigdsc);
 
 boolean_t	gvtr_get_hasht_gblsubs(mval *subs_mval, mval *ret_mval);
 void		gvtr_db_read_hasht(sgmnt_addrs *csa);

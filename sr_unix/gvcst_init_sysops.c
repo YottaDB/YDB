@@ -635,6 +635,8 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 				}
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
 			}
+			else
+				save_errno = 0;
 			reg->read_only = TRUE;		/* maintain csa->read_write simultaneously */
 			csa->read_write = FALSE;	/* maintain reg->read_only simultaneously */
 			csa->orig_read_write = FALSE;
