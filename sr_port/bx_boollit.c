@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@ void bx_boollit(triple *t, int depth)
  */
 {
 	boolean_t	tv[ARRAYSIZE(t->operand)];
-	int		dummy, j, neg, num, tvr;
+	int		dummy, j, tvr;
 	mval		*mv, *v[ARRAYSIZE(t->operand)];
 	opctype		c;
 	oprtype		*opr, *p;
@@ -73,15 +73,31 @@ void bx_boollit(triple *t, int depth)
 			bx_boollit(optrip[j], depth);
 		RETURN_IF_RTS_ERROR;
 		assert(OC_COMVAL != optrip[j]->opcode);
-		neg = num = 0;
 		UNARY_TAIL(opr, depth);
 		for (ref0 = t->operand[j].oprval.tref; OCT_UNARY & oc_tab[ref0->opcode].octype; ref0 = ref0->operand[0].oprval.tref)
 			;
 		optrip[j] = ref0;
 		if (OC_LIT == ref0->opcode)
 		{
+			int	com, neg, num, comval;
+
 			v[j] = &ref0->operand[0].oprval.mlit->v;
-			if (OC_COM == t->operand[j].oprval.tref->opcode)
+			com = (OC_COM == t->operand[j].oprval.tref->opcode);
+			neg = (OC_NEG == t->operand[j].oprval.tref->opcode);
+			num = (OC_FORCENUM == t->operand[j].oprval.tref->opcode);
+			comval = (OC_COMVAL == t->operand[j].oprval.tref->opcode);
+			if (com || neg || num || comval)
+			{	/* First check if literal corresponds to a number with a NUMOFLOW error.
+				 * In that case, return right away as literal optimization cannot be performed.
+				 */
+				MV_FORCE_NUMD(v[j]);
+				if (!(MV_NM & v[j]->mvtype))
+				{
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
+					return;
+				}
+			}
+			if (com)
 			{       /* any complement reduces the literal value to [unsigned] 1 or 0 */
 				unuse_literal(v[j]);
 				tv[j] = !MV_FORCE_BOOL(v[j]);
@@ -91,8 +107,6 @@ void bx_boollit(triple *t, int depth)
 				MV_FORCE_NUMD(v[j]);
 				num = 0;							/* any complement trumps num */
 			}
-			neg = OC_NEG == t->operand[j].oprval.tref->opcode;
-			num = OC_FORCENUM == t->operand[j].oprval.tref->opcode;
 			if (neg || num)
 			{	/* get literal into uniform state */
 				unuse_literal(v[j]);
@@ -111,12 +125,7 @@ void bx_boollit(triple *t, int depth)
 				} else
 				{
 					s2n(mv);
-					if (!(MV_NM & mv->mvtype))
-					{
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
-						assert(TREF(rts_error_in_parse));
-						return;
-					}
+					assert((MV_NM & mv->mvtype)); /* Else we would have issued NUMOFLOW a few lines above */
 				}
 				n2s(mv);
 				assert((MV_NM & mv->mvtype) && (MV_STR & mv->mvtype));
@@ -127,7 +136,7 @@ void bx_boollit(triple *t, int depth)
 			/* In the case of this one optimized but not other, remove all unary's except the first
 			 * If the first is a COMVAL, remove it.
 			 */
-			if (OC_COMVAL == t->operand[j].oprval.tref->opcode)
+			if (comval)
 			{
 				dqdel(t->operand[j].oprval.tref, exorder);
 				t->operand[j].oprval.tref = t->operand[j].oprval.tref->operand[0].oprval.tref;
