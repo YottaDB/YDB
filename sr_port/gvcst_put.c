@@ -1480,10 +1480,9 @@ tn_restart:
 				/* -------------------------------------------------------------------------------------------------
 				 * We have to maintain information for future recomputation only if the following are satisfied
 				 *	1) The block is a leaf-level block
-				 *	2) We are in TP (indicated by non-null cse)
-				 *	3) The global has NOISOLATION turned ON
-				 *	4) The cw_set_element hasn't encountered a block-split or a kill
-				 *	5) We don't need an extra_block_split
+				 *	2) The global has NOISOLATION turned ON
+				 *	3) The cw_set_element hasn't encountered a block-split or a kill
+ -				 *	4) We don't need an extra_block_split
 				 *
 				 * We can also add an optimization that only cse's of mode gds_t_write need to have such an update,
 				 *	but because of the belief that for a nonisolated variable, we will very rarely encounter a
@@ -1491,9 +1490,9 @@ tn_restart:
 				 *	the check slows down the normal code, we don't do that check here.
 				 * -------------------------------------------------------------------------------------------------
 				 */
-				if (cse && gv_target->noisolation && !cse->write_type && !need_extra_block_split)
+				if (cse && gv_target->noisolation && !cse->write_type && !need_extra_block_split
+					&& (dollar_tlevel || !is_dollar_incr))
 				{
-					assert(dollar_tlevel);
 					if ((NULL == cse->recompute_list_tail)
 						|| (0 != memcmp(gv_currkey->base, cse->recompute_list_tail->keybuf.split.base, gv_currkey->top)))
 					{
