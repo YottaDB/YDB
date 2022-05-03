@@ -63,8 +63,9 @@ fi
 # Ensure this is run from the directory in which it resides to avoid inadvertently deleting files
 cd `dirname $0`
 
-# Initialization
-timestamp=`date +%Y%m%d%H%M%S`
+# Initialization. Create a unique timestamp. We use 1-second granularity time and a parent process id just in case
+# two invocations of ydbinstall.sh happen at the exact same second (YDB#855).
+timestamp=`date +%Y%m%d%H%M%S`_$$
 if [ -z "$USER" ] ; then USER=`id -un` ; fi
 
 # Functions
