@@ -99,8 +99,6 @@ void ex_tail(oprtype *opr, int depth)
 	CHECK_AND_RETURN_IF_BOOLEXPRTOODEEP(depth + 1);
 	bx_tail(t, FALSE, i, depth + 1, andor_opcode, CALLER_IS_BOOL_EXPR_FALSE, depth + 1, IS_LAST_BOOL_OPERAND_TRUE);
 	RETURN_IF_RTS_ERROR;
-	if (OC_COMINT == (t2 = bftrip->exorder.fl)->opcode)	/* after bx_tail/bx_boolop it's safe to delete any OC_COMINT left */
-		dqdel(t2, exorder);
 	*i = put_tnxt(bftrip);
 	CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq except with DEBUG_TRIPLES */
 	return;
