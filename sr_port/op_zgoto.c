@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,8 +74,10 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 	MV_FORCE_STR(lbl_name);
 	rtnname = *rtn_name;
 	lblname = *lbl_name;
+	rtnname.str.len = MIN(MAX_MIDENT_LEN, rtnname.str.len);
 	memcpy(rtnname_buff, rtnname.str.addr, rtnname.str.len);
 	rtnname.str.addr = rtnname_buff;
+	lblname.str.len = MIN(MAX_MIDENT_LEN, lblname.str.len);
 	memcpy(lblname_buff, lblname.str.addr, lblname.str.len);
 	lblname.str.addr = lblname_buff;
 	DBGEHND((stderr, "op_zgoto: rtnname: %.*s  lblname: %.*s  offset: %d  level: %d\n",
