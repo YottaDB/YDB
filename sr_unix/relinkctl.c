@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,7 @@
 /* Constants defining how many times to retry the loop in relinkctl_open() based on the specific error conditions encountered. */
 #define MAX_RCTL_INIT_WAIT_RETRIES	1000	/* # of sleeps to allow while waiting for the shared memory to be initialized. */
 #define MAX_RCTL_DELETED_RETRIES	16	/* # of times to allow an existing relinkctl file to be deleted before open(). */
-#define MAX_RCTL_RUNDOWN_RETRIES	16	/* # of times to allow a mapped relinkctl file to get run down before shmat(). */
+#define MAX_RCTL_RUNDOWN_RETRIES	128	/* # of times to allow a mapped relinkctl file to get run down before shmat(). */
 
 DEBUG_ONLY(GBLDEF int	saved_errno;)
 GBLREF	uint4		process_id;
@@ -260,7 +260,8 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 	rtnobjshm_hdr_t		*rtnobj_shm_hdr;
 	relinkctl_data		*hdr;
 	char			errstr[256];
-	int			rctl_deleted_count, rctl_rundown_count, rctl_init_wait_count, rctl_do_shmat_count;
+	int			rctl_deleted_count, rctl_init_wait_count, rctl_do_shmat_count;
+	DEBUG_ONLY(int		rctl_rundown_count);
 	struct shmid_ds		shmstat;
 	DCL_THREADGBL_ACCESS;
 
@@ -270,7 +271,8 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 	DBGARLNK((stderr, "relinkctl_open: pid = %d : Opening relinkctl file %s for entry %.*s\n", getpid(),
 		linkctl->relinkctl_path, linkctl->zro_entry_name.len, linkctl->zro_entry_name.addr));
 	/* Anybody that has read permissions to the object container should have write permissions to the relinkctl file. */
-	rctl_deleted_count = rctl_rundown_count = rctl_init_wait_count = 0;
+	rctl_deleted_count = rctl_init_wait_count = 0;
+	DEBUG_ONLY(rctl_rundown_count = 0);
 	rctl_do_shmat_count = 0;
 	is_mu_rndwn_rlnkctl = TREF(is_mu_rndwn_rlnkctl);
 	do
@@ -381,7 +383,14 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			relinkctl_unlock_exclu(linkctl);
 			relinkctl_unmap(linkctl);
 			assert(NULL == linkctl->hdr);
-			assertpro(MAX_RCTL_RUNDOWN_RETRIES > rctl_rundown_count++); /* Too many loops should not be possible. */
+			/* We don't expect the below "continue" to execute too many times. But in practice we have seen
+			 * the continue execute as high as 40 on fast systems. This was before the YDB#872 fixes.
+			 * But because we know it is theoretically possible to execute the below as many times as possible
+			 * depending on system load, we don't "assertpro" below. Just an "assert" so Debug builds catch it
+			 * (and we fix the macro to be a high value if needed) but Release builds keep retrying indefinitely.
+			 * We don't expect this to be an infinite loop in practice.
+			 */
+			assert(MAX_RCTL_RUNDOWN_RETRIES > rctl_rundown_count++);
 			continue;
 		}
 		if (0 == hdr->relinkctl_max_rtn_entries)
