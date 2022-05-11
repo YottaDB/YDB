@@ -122,9 +122,9 @@ gtm_putmsg.c:warning: Branch condition evaluates to a garbage value [clang-analy
 gtm_putmsg.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 gtm_putmsg_list.c:warning: Uninitialized va_list is copied [clang-analyzer-valist.Uninitialized]
 gtm_putmsg_list.c:warning: Value stored to 'i' is never read [clang-analyzer-deadcode.DeadStores]
-gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (170 padding bytes, where 2 is optimal).
+gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (174 padding bytes, where 6 is optimal).
 gtm_threadgbl_init.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]
-gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (170 padding bytes, where 2 is optimal).
+gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (174 padding bytes, where 6 is optimal).
 gtm_trigger.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]
 gtm_trigger.c:warning: Value stored to 'added' is never read [clang-analyzer-deadcode.DeadStores]
 gtm_trigger.c:warning: Value stored to 'rc' is never read [clang-analyzer-deadcode.DeadStores]
@@ -231,6 +231,7 @@ gvincr_recompute_upd_array.c:warning: Value stored to 'jfb' is never read [clang
 gvn2gds.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 gvn2gds.c:warning: Value stored to 'key_top' is never read [clang-analyzer-deadcode.DeadStores]
 gvt_hashtab.c:warning: Value stored to 'added' is never read [clang-analyzer-deadcode.DeadStores]
+gvt_inline.h:warning: Access to field 'end' results in a dereference of a null pointer (loaded from variable 'gvkey') [clang-analyzer-core.NullDereference]
 incr_link.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 insert_region.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
 insert_region.c:warning: The left operand of '==' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
@@ -720,8 +721,6 @@ t_ch.c:warning: Value stored to 'retvalue' is never read [clang-analyzer-deadcod
 t_commit_cleanup.c:warning: Value stored to 'jnlpool_csa' is never read [clang-analyzer-deadcode.DeadStores]
 t_commit_cleanup.c:warning: Value stored to 'jnlpool_csa' is never read [clang-analyzer-deadcode.DeadStores]
 t_commit_cleanup.c:warning: Value stored to 'jnlpool_si' is never read [clang-analyzer-deadcode.DeadStores]
-t_end.c:warning: 2nd function call argument is an uninitialized value [clang-analyzer-core.CallAndMessage]
-t_end.c:warning: The right operand of '+' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 t_end.c:warning: Value stored to 'retvalue' is never read [clang-analyzer-deadcode.DeadStores]
 t_end.c:warning: Value stored to 'tmp_jnlpool' is never read [clang-analyzer-deadcode.DeadStores]
 t_end_sysops.c:warning: 2nd function call argument is an uninitialized value [clang-analyzer-core.CallAndMessage]
@@ -746,10 +745,8 @@ tp_incr_clean_up.c:warning: Value stored to 'freed' is never read [clang-analyze
 tp_restart.c:warning: Value stored to 'tp_tend_status' is never read [clang-analyzer-deadcode.DeadStores]
 tp_restart.c:warning: Value stored to 'tp_tend_status' is never read [clang-analyzer-deadcode.DeadStores]
 tp_tend.c:warning: 2nd function call argument is an uninitialized value [clang-analyzer-core.CallAndMessage]
-tp_tend.c:warning: Access to field 'end' results in a dereference of a null pointer (loaded from variable 'pKey') [clang-analyzer-core.NullDereference]
 tp_tend.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
 tp_tend.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
-tp_tend.c:warning: Value stored to 'chain1' is never read [clang-analyzer-deadcode.DeadStores]
 tp_tend.c:warning: Value stored to 'ctn' is never read [clang-analyzer-deadcode.DeadStores]
 tp_tend.c:warning: Value stored to 'is_mm' is never read [clang-analyzer-deadcode.DeadStores]
 tp_tend.c:warning: Value stored to 'tp_cr_array' is never read [clang-analyzer-deadcode.DeadStores]

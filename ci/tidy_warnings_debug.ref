@@ -85,9 +85,9 @@ gtm_putmsg.c:warning: Branch condition evaluates to a garbage value [clang-analy
 gtm_putmsg.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 gtm_putmsg_list.c:warning: Uninitialized va_list is copied [clang-analyzer-valist.Uninitialized]
 gtm_semutils.c:warning: The right operand of '!=' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
-gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (186 padding bytes, where 2 is optimal).
+gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (182 padding bytes, where 6 is optimal).
 gtm_threadgbl_init.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]
-gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (186 padding bytes, where 2 is optimal).
+gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (182 padding bytes, where 6 is optimal).
 gtmci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gtmci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gtmrecv.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
@@ -128,7 +128,6 @@ gvcst_kill.c:warning: Value stored to 'flush_cache' is never read [clang-analyze
 gvcst_kill_blk.c:warning: The right operand of '==' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 gvcst_lftsib.c:warning: Value stored to 'buffer_address' is never read [clang-analyzer-deadcode.DeadStores]
 gvcst_order.c:warning: Value stored to 'bp' is never read [clang-analyzer-deadcode.DeadStores]
-gvcst_put.c:warning: Access to field 'act' results in a dereference of a null pointer (loaded from variable 'save_targ') [clang-analyzer-core.NullDereference]
 gvcst_put.c:warning: Access to field 'next' results in a dereference of a null pointer (loaded from field 'recompute_list_tail') [clang-analyzer-core.NullDereference]
 gvcst_put.c:warning: Access to field 'update_trans' results in a dereference of a null pointer (loaded from variable 'si') [clang-analyzer-core.NullDereference]
 gvcst_put.c:warning: The left operand of '==' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
@@ -198,7 +197,6 @@ lke_showtree.c:warning: The right operand of '==' is a garbage value due to arra
 lv_kill.c:warning: Value stored to 'sym' is never read [clang-analyzer-deadcode.DeadStores]
 lv_newblock.c:warning: Value stored to 'lvt_base' is never read [clang-analyzer-deadcode.DeadStores]
 lv_tree.c:warning: Access to field 'balance' results in a dereference of a null pointer (loaded from variable 'anchorNode') [clang-analyzer-core.NullDereference]
-lv_tree.c:warning: Value stored to 'first_tree_create' is never read [clang-analyzer-deadcode.DeadStores]
 lvmon_compare_value_slots.c:warning: Value stored to 'error_seen' is never read [clang-analyzer-deadcode.DeadStores]
 lvmon_compare_value_slots.c:warning: Value stored to 'error_seen' is never read [clang-analyzer-deadcode.DeadStores]
 m_do.c:warning: Dereference of undefined pointer value [clang-analyzer-core.NullDereference]
@@ -456,6 +454,7 @@ process_deferred_stale.c:warning: Value stored to 'status' is never read [clang-
 region_freeze.c:warning: Value stored to 'jnl_switch_done' is never read [clang-analyzer-deadcode.DeadStores]
 region_freeze.c:warning: Value stored to 'jnl_switch_done' is never read [clang-analyzer-deadcode.DeadStores]
 repl_comm.c:warning: Although the value stored to 'status' is used in the enclosing expression, the value is never actually read from 'status' [clang-analyzer-deadcode.DeadStores]
+repl_comm.c:warning: The right operand of '==' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 repl_comm.c:warning: Value stored to 'save_errno' is never read [clang-analyzer-deadcode.DeadStores]
 repl_filter.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 repl_filter.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
@@ -498,7 +497,6 @@ stx_error.c:warning: Value stored to 'arg1' is never read [clang-analyzer-deadco
 stx_error.c:warning: va_end() is called on an uninitialized va_list [clang-analyzer-valist.Uninitialized]
 t_commit_cleanup.c:warning: Value stored to 'jnlpool_csa' is never read [clang-analyzer-deadcode.DeadStores]
 t_commit_cleanup.c:warning: Value stored to 'jnlpool_csa' is never read [clang-analyzer-deadcode.DeadStores]
-t_end.c:warning: The right operand of '==' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 t_end.c:warning: Value stored to 'tmp_jnlpool' is never read [clang-analyzer-deadcode.DeadStores]
 t_end_sysops.c:warning: Access to field 'jnl_buff' results in a dereference of a null pointer (loaded from field 'jnl') [clang-analyzer-core.NullDereference]
 t_end_sysops.c:warning: The right operand of '==' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
@@ -519,7 +517,6 @@ tp_incr_clean_up.c:warning: Although the value stored to 'blk' is used in the en
 tp_restart.c:warning: The right operand of '!=' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 tp_tend.c:warning: 2nd function call argument is an uninitialized value [clang-analyzer-core.CallAndMessage]
 tp_tend.c:warning: The right operand of '<' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
-tp_tend.c:warning: Value stored to 'is_mm' is never read [clang-analyzer-deadcode.DeadStores]
 tp_tend.c:warning: Value stored to 'tr' is never read [clang-analyzer-deadcode.DeadStores]
 tp_tend.c:warning: Value stored to 'tr' is never read [clang-analyzer-deadcode.DeadStores]
 trans_code_cleanup.c:warning: Access to field 'type' results in a dereference of a null pointer (loaded from variable 'fp') [clang-analyzer-core.NullDereference]

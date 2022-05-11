@@ -1478,7 +1478,7 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 	int			tmp_cmpc;
 	key_cum_value		*kv, *kvhead;			/* kvhead tp only */
 	mstr			value;
-	off_chain		chain1;				/* tp only */
+	DEBUG_ONLY(off_chain		chain1;)		/* tp only */
 	rec_hdr_ptr_t		curr_rec_hdr, next_rec_hdr, rp;
 	sgmnt_addrs		*csa;
 	sm_uc_ptr_t		cp1, buffaddr;
@@ -1609,7 +1609,7 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 		if (dollar_tlevel)
 		{
 			assertpro(0 == rc_set_fragment);
-			chain1 = *(off_chain *)&bh->blk_num;
+			DEBUG_ONLY(chain1 = *(off_chain *)&bh->blk_num;)
 			assert(0 == chain1.flag);
 			segment_update_array_size = UA_NON_BM_SIZE(cs_data);
 			ENSURE_UPDATE_ARRAY_SPACE(segment_update_array_size);

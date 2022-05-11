@@ -539,7 +539,6 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 			OPENFILE_DB(fnptr, O_RDWR, udi, seg);
 			int save_errno;
 
-			save_errno = errno;
 			/* When opening an auto-create type of reservedDB database file, it is possible
 			 * that it does not (yet) exist. In that case, make a call out to create it. Note that
 			 * a statsdb (which is also an autodb) gets created in "gvcst_init" so skip that here.
