@@ -84,7 +84,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	int			i, j, nexti, length, dstlen;
 	lv_val			*lvn, *v, *ve;
 	lvTree			*lvt;
-	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS], *node, *nullsubsnode, *nullsubsparent, *parent;
+	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS + 1], *node, *nullsubsnode, *nullsubsparent, *parent;
 	mname_entry		lvent;
 	mval			*arg1, **argpp, *argp2, **argpp2, *args[MAX_LVSUBSCRIPTS], *lfrsbs, *mv, tmpmv, tmp_sbs,
 				*last_fnquery_ret, *varname, *v1, *v2;
@@ -143,7 +143,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 			}
 			if (is_num = MV_IS_CANONICAL(arg1))
 				MV_FORCE_NUM(arg1);
-			else if ((0 == arg1->str.len) && !is_sqlnull && (nexti == sbscnt))
+			else if ((nexti == sbscnt) && !is_sqlnull && (0 == arg1->str.len))
 			{	/* The last search argument is a null string. For this situation, there is the possibility
 				 * of a syntax collision if (1) the user had (for example) specified $Q(a(1,3,"") to get
 				 * the first a(1,3,x) node or (2) this is the "next" element that was legitimately returned
