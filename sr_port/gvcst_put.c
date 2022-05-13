@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1707,7 +1707,16 @@ tn_restart:
 				}
 				if (buffaddr + cur_blk_size > (sm_uc_ptr_t)rp)
 				{
-					assert(!split_to_right);
+					/* Previously, there used to be an "assert(!split_to_right);" line here.
+					 * But that turned out to be an incorrect assert. This is because it is
+					 * possible for the assert to fail when the block got concurrently overwritten.
+					 * And in really rare cases, it is possible that "rp" is at the tail end of the
+					 * block with a record-header containing the right "rsiz" and "cmpc" fields such that
+					 * "new_blk_size_r" and "new_blk_size_single" are set to the exact same value.
+					 * That would get us into this "if" block even though it is a restartable situation.
+					 * The restart would be detected in the "if" check done a few lines down. Therefore
+					 * we do the assert after that check.
+					 */
 					BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 					GET_USHORT(tmp_rsiz, &rp->rsiz);
 					tmp_rsiz -= next_rec_shrink;
@@ -1722,6 +1731,7 @@ tn_restart:
 						status = cdb_sc_mkblk;
 						GOTO_RETRY;
 					}
+					assert(!split_to_right);
 					BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + next_rec_shrink, n);
 					if (prev_split_to_right)
 					{	/* Do block# adjustment like done above (search for "if (split_to_right)") */
