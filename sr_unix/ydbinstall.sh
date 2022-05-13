@@ -55,9 +55,9 @@ do
 done
 
 # Check whether libelf.so exists; issue an error and exit if it does not
-ldconfig -p | grep /libelf.so >/dev/null 2>&1 ; ydb_tmp_stat=$?
-if [ 0 -ne ${ydb_tmp_stat:-0} ] ; then
-	echo >&2 "library libelf.so is needed by YottaDB but not found. Exiting." ; exit $ydb_tmp_stat
+ldconfig -p | grep -qs /libelf.so ; ydb_tmp_stat=$?
+if [ 0 -ne $ydb_tmp_stat ] ; then
+	echo >&2 "Library libelf.so is needed by YottaDB but not found. Exiting." ; exit $ydb_tmp_stat
 fi
 
 # Ensure this is not being sourced so that environment variables in this file do not change the shell environment
