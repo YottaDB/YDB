@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,10 @@ void gtm_fetch(unsigned int indxarg, ...)
 									   * compile-time error.
 									   */
 	assert(!TREF(in_zwrite));	/* Verify in_zwrite was not left on */
-	DEBUG_ONLY(SET_ACTIVE_LV(NULL, TRUE, actlv_gtm_fetch);)
+	/* Note: It is okay to pass TRUE as the second argument to SET_ACTIVE_LV below in almost all cases but there are rare
+	 * exceptions (see https://gitlab.com/YottaDB/DB/YDB/-/issues/860#note_946513617 for an example). Hence FALSE passed below.
+	 */
+	DEBUG_ONLY(SET_ACTIVE_LV(NULL, FALSE, actlv_gtm_fetch);)
 #	ifdef DEBUG
 	if (0 == als_lvval_gc_frequency)
 	{
