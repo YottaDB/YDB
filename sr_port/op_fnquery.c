@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -254,46 +254,65 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 			h1--;
 		}
 	}
-	if (!found)
-	{
-		for ( ; ; --h1)
-		{
-			assert(h1 >= &history[0]);
-			if (h1 == &history[0])
-			{
-				if (!is_simpleapi_mode)
-				{	/* Array size of zero is the signal there is nothing else */
-					dst->mvtype = MV_STR;
-					dst->str.len = 0;
-				}
-				return;
-			}
-			node = *h1;
-			assert(NULL != node);
-			/* Find the right sibling (next) subscript */
-			node = lvAvlTreeNodeCollatedNext(node);
-			if (NULL != node)
-			{
-				*h1 = node;
-				break;
-			}
-		}
-	}
 	/* Saved last query result is irrelevant now */
 	TREF(last_fnquery_return_subcnt) = 0;
 	(TREF(last_fnquery_return_varname)).mvtype = MV_STR;
 	(TREF(last_fnquery_return_varname)).str.len = 0;
-	/* Go down leftmost subtree path (potentially > 1 avl trees) starting from "node" until you find the first DEFINED mval */
-	while (!LV_IS_VAL_DEFINED(node))
+	/* The for loop is needed to handle the case where there are undefined lv nodes dangling around with no children.
+	 * While such nodes should not be in the tree in the steady state, they can be present for a short duration like
+	 * in the command "for c(1)=$query(c)" when we set up the undefined lv node "c(1)" for the FOR loop control variable
+	 * and then use "$query(c)" to then initialize "c(1)" with a value. It is possible for an arbitrary number of such
+	 * dangling nodes to be present in the tree (e.g. nested "for" loops similar to the above with different subscripted
+	 * for loop control variables) but in practice we expect such nodes to be non-existent.
+	 */
+	for ( ; ; )
 	{
-		lvt = LV_GET_CHILD(node);
-		assert(NULL != lvt);	/* there cannot be an undefined lv node with no children dangling around */
-		nullsubsnode = TREF(local_collseq_stdnull)
-			? lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &nullsubsparent)
-			: NULL;
-		node = (NULL == nullsubsnode) ? lvAvlTreeFirst(lvt) : nullsubsnode;
-		assert(NULL != node);
-		*++h1 = node;
+		if (!found)
+		{
+			for ( ; ; --h1)
+			{
+				assert(h1 >= &history[0]);
+				if (h1 == &history[0])
+				{
+					if (!is_simpleapi_mode)
+					{	/* Array size of zero is the signal there is nothing else */
+						dst->mvtype = MV_STR;
+						dst->str.len = 0;
+					}
+					return;
+				}
+				node = *h1;
+				assert(NULL != node);
+				/* Find the right sibling (next) subscript */
+				node = lvAvlTreeNodeCollatedNext(node);
+				if (NULL != node)
+				{
+					*h1 = node;
+					found = TRUE;
+					break;
+				}
+			}
+		}
+		assert(found);
+		/* Go down leftmost subtree path (potentially > 1 avl trees) starting from "node" until you find the first DEFINED mval */
+		while (!LV_IS_VAL_DEFINED(node))
+		{
+			lvt = LV_GET_CHILD(node);
+			if (NULL == lvt)
+			{
+				/* Case of undefined lv node with no children dangling around. Redo outer "for" loop. */
+				found = FALSE;
+				break;
+			}
+			nullsubsnode = TREF(local_collseq_stdnull)
+				? lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &nullsubsparent)
+				: NULL;
+			node = (NULL == nullsubsnode) ? lvAvlTreeFirst(lvt) : nullsubsnode;
+			assert(NULL != node);
+			*++h1 = node;
+		}
+		if (found)
+			break;
 	}
 	/* Before we start formatting for output, decide whether we will be saving mvals of our subscripts
 	 * as we format. We only do this if the last subscript is a null. Bypassing it otherwise is a time saver.
