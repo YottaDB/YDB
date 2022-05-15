@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -264,61 +264,71 @@ void op_fnreversequery_va(int sbscnt, mval *dst, va_list var)
 	} else
 		descend = FALSE;
 	va_end(var);
-	if (!descend)
-	{	/* Ascend up the tree at "node" until you find a defined node or a left sibling */
-		do
-		{
-			if (h1 == &history[0])
+	/* Saved last query result is irrelevant now */
+	TREF(last_fnquery_return_subcnt) = 0;
+	(TREF(last_fnquery_return_varname)).mvtype = MV_STR;
+	(TREF(last_fnquery_return_varname)).str.len = 0;
+	/* The for loop is needed to handle the case where there are undefined lv nodes dangling around with no children.
+	 * See similar comment in "sr_port/op_fnquery.c" for more details on why this is necessary.
+	 */
+	for ( ; ; )
+	{
+		if (!descend)
+		{	/* Ascend up the tree at "node" until you find a defined node or a left sibling */
+			do
 			{
-				assert(*h1 == (lvTreeNode *)v);
-				if (!LV_IS_VAL_DEFINED(v))
-				{	/* Neither the base variable nor a tree underneath it exists. Return value is null string */
-					if (!is_simpleapi_mode)
-					{	/* Array size of zero is the signal there is nothing else */
-						dst->mvtype = MV_STR;
-						dst->str.len = 0;
-					}
-				} else
-				{	/* Base variable exists. Return value from reverse $query is base variable name.
-					 * Saved last query result (if any) is irrelevant now.
-					 */
-					TREF(last_fnquery_return_subcnt) = 0;
-					(TREF(last_fnquery_return_varname)).mvtype = MV_STR;
-					(TREF(last_fnquery_return_varname)).str.len = 0;
-					if (!is_simpleapi_mode)
-					{
-						ENSURE_STP_FREE_SPACE(varname->str.len);
-						memcpy(stringpool.free, varname->str.addr, varname->str.len);
-						dst->mvtype = MV_STR;
-						dst->str.addr = (char *)stringpool.free;
-						dst->str.len = varname->str.len;
-						stringpool.free += varname->str.len;
+				if (h1 == &history[0])
+				{
+					assert(*h1 == (lvTreeNode *)v);
+					if (!LV_IS_VAL_DEFINED(v))
+					{	/* Neither the base variable nor a tree underneath it exists. Return value is null string */
+						if (!is_simpleapi_mode)
+						{	/* Array size of zero is the signal there is nothing else */
+							dst->mvtype = MV_STR;
+							dst->str.len = 0;
+						}
 					} else
-					{	/* Returning just the name (no subscripts) so set the subscript count to -1 to
-						 * differentiate it from a NULL return signaling the end of the list. Similar
-						 * code exists in "sr_unix/sapi_save_targ_key_subscr_nodes.c" for global variables.
+					{	/* Base variable exists. Return value from reverse $query is base variable name.
+						 * Saved last query result (if any) is irrelevant now.
 						 */
-						TREF(sapi_query_node_subs_cnt) = -1;
+						if (!is_simpleapi_mode)
+						{
+							ENSURE_STP_FREE_SPACE(varname->str.len);
+							memcpy(stringpool.free, varname->str.addr, varname->str.len);
+							dst->mvtype = MV_STR;
+							dst->str.addr = (char *)stringpool.free;
+							dst->str.len = varname->str.len;
+							stringpool.free += varname->str.len;
+						} else
+						{	/* Returning just the name (no subscripts) so set the subscript count to -1 to
+							 * differentiate it from a NULL return signaling the end of the list. Similar
+							 * code exists in "sr_unix/sapi_save_targ_key_subscr_nodes.c" for global variables.
+							 */
+							TREF(sapi_query_node_subs_cnt) = -1;
+						}
 					}
+					return;
 				}
-				return;
-			}
-			node = *h1;
-			assert(NULL != node);
-			if (LV_IS_VAL_DEFINED(node))
-				break;		/* This node is the $query return value (no more descends needed) */
-			node = lvAvlTreeNodeCollatedPrev(node); /* Find the left sibling (previous) subscript */
-			if (NULL != node)
-			{
-				*h1 = node;
-				descend = TRUE;
-				break;
-			}
-			h1--;
-		} while (TRUE);
-	}
-	if (descend)
-	{	/* Go down rightmost subtree path (potentially > 1 avl trees) starting from "node"
+				node = *h1;
+				assert(NULL != node);
+				if (LV_IS_VAL_DEFINED(node))
+					break;		/* This node is the $query return value (no more descends needed) */
+				node = lvAvlTreeNodeCollatedPrev(node); /* Find the left sibling (previous) subscript */
+				if (NULL != node)
+				{
+					*h1 = node;
+					descend = TRUE;
+					break;
+				}
+				h1--;
+			} while (TRUE);
+		}
+		if (!descend)
+		{
+			assert(LV_IS_VAL_DEFINED(node));
+			break;
+		}
+		/* Go down rightmost subtree path (potentially > 1 avl trees) starting from "node"
 		 * until you find the first DEFINED mval.
 		 */
 		assert(*h1 == node);
@@ -326,16 +336,18 @@ void op_fnreversequery_va(int sbscnt, mval *dst, va_list var)
 		{
 			lvt = LV_GET_CHILD(node);
 			if (NULL == lvt)
+			{
+				/* Case of undefined lv node with no children dangling around. Redo outer "for" loop. */
+				descend = FALSE;
 				break;
+			}
 			node = lvAvlTreeCollatedLast(lvt);
 			assert(NULL != node);
 			*++h1 = node;
 		} while (TRUE);
+		if (descend)
+			break;
 	}
-	/* Saved last query result is irrelevant now */
-	TREF(last_fnquery_return_subcnt) = 0;
-	(TREF(last_fnquery_return_varname)).mvtype = MV_STR;
-	(TREF(last_fnquery_return_varname)).str.len = 0;
 	/* Before we start formatting for output, decide whether we will be saving mvals of our subscripts
 	 * as we format. We only do this if the last subscript is a null. Bypassing it otherwise is a time saver.
 	 */
