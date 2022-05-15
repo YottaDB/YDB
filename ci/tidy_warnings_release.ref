@@ -538,7 +538,6 @@ op_fnq2.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Un
 op_fnqsubscript.c:warning: Value stored to 'temp_cp' is never read [clang-analyzer-deadcode.DeadStores]
 op_fnquery.c:warning: 2nd function call argument is an uninitialized value [clang-analyzer-core.CallAndMessage]
 op_fnquery.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
-op_fnquery.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
 op_fnquery.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 op_fnreversequery.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
 op_fnreversequery.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
