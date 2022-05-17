@@ -89,6 +89,7 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
                     wget \
                     procps-ng \
 		    nano \
+		    gzip \
 		    && \
     /tmp/ydb-release/ydbinstall --utf8 default --installdir /opt/yottadb/current && \
     yum remove -y wget && \
