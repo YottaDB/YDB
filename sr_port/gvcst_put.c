@@ -1510,12 +1510,12 @@ tn_restart:
 						cse->recompute_list_tail = tempkv;
 					} else
 						tempkv = cse->recompute_list_tail;
-					assert((0 == value.len)
-						|| ((value.len == bs1[4].len) && 0 == memcmp(value.addr, bs1[4].addr, value.len)));
-					tempkv->value.len = value.len;	/* bs1[4].addr is undefined if value.len is 0 */
-					tempkv->value.addr = (char *)bs1[4].addr;/* 	but not used in that case, so ok */
+					assert(0 == val->str.len
+						|| ((val->str.len == bs1[4].len)
+							&& 0 == memcmp(val->str.addr, bs1[4].addr, val->str.len)));
+					tempkv->value.len = val->str.len;	/* val->str.addr not used if val->str.len is 0 */
+					tempkv->value.addr = dollar_tlevel ? (char *)bs1[4].addr : val->str.addr;
 				}
-
 			}
 		} else
 		{	/* Block split required */
