@@ -90,6 +90,7 @@
 #include "shmpool.h"		/* Needed for the shmpool structures */
 #include "db_snapshot.h"
 #include "wcs_wt.h"
+#include "stringpool.h"
 
 error_def(ERR_DBFILERR);
 error_def(ERR_FREEBLKSLOW);
@@ -1536,6 +1537,11 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 	{
 		pKey = (gv_key *)&kv->keybuf.key;
 		value = kv->value;
+		if (!dollar_tlevel)
+		{
+			assert(!IS_IN_STRINGPOOL(value.addr, value.len));
+			s2pool(&value);
+		}
 		target_key_size = pKey->end + 1;
 		if (kvhead != kv)
 		{
