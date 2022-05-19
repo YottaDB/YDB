@@ -151,8 +151,9 @@ typedef struct cache_rec_struct
 					 * in progress. This is used by wcs_recover to decide whether to place a cr into
 					 * the active or wip queue.
 					 */
-	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
-						 *  note it (only applicable for ydb_fullblockwrites) */
+	bool		needs_first_write;	/* If this block needs to be written to disk for the first time, then
+						 * flag it (note only applicable for FULLBLKWRT={1|2})
+						 */
 	/* bool		filler4bytealign[1];	 Note: Make sure any changes here are reflected in "cache_state_rec" too */
 } cache_rec;
 
@@ -240,8 +241,9 @@ typedef struct
 					 * in progress. This is used by wcs_recover to decide whether to place a cr into
 					 * the active or wip queue.
 					 */
-	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
-						 *  note it (only applicable for ydb_fullblockwrites) */
+	bool		needs_first_write;	/* If this block needs to be written to disk for the first time, then
+						 * flag it (note only applicable for FULLBLKWRT={1|2})
+						 */
 	/*bool		filler4bytealign[1];	 Note: Make sure any changes here are reflected in "cache_state_rec" too */
 } cache_state_rec;
 
