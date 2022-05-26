@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -126,16 +126,14 @@ int f_order(oprtype *a, opctype op)
 			return FALSE;
 		}
 		assert(TRIP_REF == dir_oprptr->oprclass);
-		triptr = dir_oprptr->oprval.tref;
+		sav_dirref = newtriple(OC_GVSAVTARG);	/* with a literal direction, $R reflects 1st argument */
+		triptr = newtriple(OC_GVRECTARG);
+		triptr->operand[0] = put_tref(sav_ref);
 		if (OC_LIT == triptr->opcode)
 		{	/* if direction is a literal - pick it up and stop flailing about */
 			if (MV_IS_TRUEINT(&triptr->operand[0].oprval.mlit->v, &intval) && (1 == intval || -1 == intval))
-			{
 				direction = (1 == intval) ? FORWARD : BACKWARD;
-				sav_dirref = newtriple(OC_GVSAVTARG);	/* with a literal direction, $R reflects 1st argument */
-				triptr = newtriple(OC_GVRECTARG);
-				triptr->operand[0] = put_tref(sav_ref);
-			} else
+			else
 			{	/* bad direction */
 				if (NULL != oldchain)
 					setcurtchain(oldchain);
@@ -145,9 +143,6 @@ int f_order(oprtype *a, opctype op)
 		} else
 		{
 			direction = TBD;
-			sav_dirref = newtriple(OC_GVSAVTARG);		/* $R reflects direction eval even if we revisit 1st arg */
-			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(sav_ref);
 			switch (object)
 			{
 			case GLOBAL:		/* The direction may have had a side effect, so take copies of subscripts */
