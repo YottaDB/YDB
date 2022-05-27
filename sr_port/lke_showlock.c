@@ -79,8 +79,7 @@ void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr *name)
 {
 	mlk_shrsub_ptr_t	value;
 	char			save_ch;
-	short			len1;
-	int			len2;
+	int			len1, len2;
 	static mval		subsc = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
 
 	value = (mlk_shrsub_ptr_t) R2A(node->value);

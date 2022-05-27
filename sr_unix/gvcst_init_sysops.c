@@ -642,9 +642,9 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 			if (!open_read_only && !((EPERM == save_errno) || (EACCES == save_errno)))
 			{
 				if (!IS_GTM_IMAGE)
-					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFILERDONLY, 3,
-							DB_LEN_STR(reg), (int)0, save_errno);
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFILERDONLY, 3, DB_LEN_STR(reg), (int)0, save_errno);
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERDONLY, 3,
+							DB_LEN_STR(reg), save_errno);
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERDONLY, 3, DB_LEN_STR(reg), save_errno);
 			}
 		}
 		if (!reg->owning_gd->is_dummy_gbldir && (!jnlpool_init_needed || !CUSTOM_ERRORS_AVAILABLE))
