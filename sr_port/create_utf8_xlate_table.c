@@ -39,16 +39,20 @@
  *
  * @return a hash table with each character mapped to the replace character offset
  */
-hash_table_int4 *create_utf8_xlate_table(mval *srch, mval *rplc, int4 *xlate)
+hash_table_int4 *create_utf8_xlate_table(mval *srch, mval *rplc, mstr *m_xlate)
 {
 	char		*rbase, *rcur, *rprev, *rtop, *scur, *sprev, *stop;
 	hash_table_int4	*xlate_hash = NULL;
 	ht_ent_int4	*tabent;
-	int		rcode, scode;
+	int		rcode, scode, xlate_len;
+	int4		*xlate;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	memset(xlate, NO_VALUE, SIZEOF(int4) * NUM_CHARS);
+	xlate = (int4 *)m_xlate->addr;
+	xlate_len = m_xlate->len;
+	assertpro((xlate_len >= srch->str.char_len) && ((NUM_CHARS * SIZEOF(int4)) <= xlate_len));
+	memset(xlate, NO_VALUE, xlate_len);
 	if (!((srch->mvtype & MV_UTF_LEN) && srch->str.len == srch->str.char_len))
 	{       /* need hash table if srch is a not a sting of single bytes */
 		if (TREF(compile_time))

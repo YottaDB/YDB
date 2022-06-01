@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -22,6 +22,7 @@
 #define GTM_STRINGH
 
 #include <string.h>
+#define MAX_CHAR_LEN		4	/* bytes - e.g. translate can turn a 1 byte character into an up to 4 byte character */
 
 #define	STRERROR	strerror
 #define	STRCPY(DEST, SOURCE)		strcpy((char *)(DEST), (char *)(SOURCE))

@@ -29,7 +29,7 @@ GBLREF spdesc stringpool;
 #include "hashtab.h"
 #include "gtm_utf8.h"
 
-GBLREF	boolean_t	badchar_inhibit;
+GBLREF	boolean_t	badchar_inhibit, gtm_utf8_mode;
 
 error_def(ERR_MAXSTRLEN);
 
@@ -58,8 +58,12 @@ void op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_t
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Callers are responsible for making sure there is space in the stringpool for the result */
-	assert(IS_STP_SPACE_AVAILABLE(MIN(((src->str.char_len * SIZEOF(int4))- src->str.len), MAX_STRLEN)));
+	/* callers using stringpool (compile_time) must already make sure there is space in the stringpool for the result */
+	if (!IS_IN_STRINGPOOL(xlate_hash, 1))					/* length not available but doesn't matter */
+	{
+		ENSURE_STP_FREE_SPACE(src->str.char_len * MAX_CHAR_LEN);
+	} else	/* nasty things can happen */
+		assertpro(IS_STP_SPACE_AVAILABLE_PRO(src->str.char_len * MAX_CHAR_LEN));
 	srcptr = src->str.addr;
 	srctop = srcptr + src->str.len;
 	dstptr = stringpool.free;
@@ -110,7 +114,8 @@ void op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_t
 				char_len++;
 			} else
 			{
-				offset = (uint4)((size_t)(tabent->value));
+				offset = (int4)((size_t)(tabent->value));
+				assert(0 <= offset);
 				if (MAXPOSINT4 != offset)
 				{	/* Valid translation found; copy new value to dst */
 					/* Because the hashtable can't do zeros, it has the offset incremented by one,
@@ -146,13 +151,16 @@ void op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_t
 void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 {
 	int			dummy_len, maxLengthString, *xlate;
+	mstr			m_xlate;
 	static hash_table_int4	*xlate_hash = NULL;
-	static int		xlate_array[NUM_CHARS];
+	static int4		xlate_array[NUM_CHARS];
 	static unsigned int 	prev_gcols = -1;
 	static mstr		prev_srch = {0, 0}, prev_rplc = {0, 0};
 	static mval		xlate_table;
+	DCL_THREADGBL_ACCESS;
 
-	assert(gtm_utf8_mode);							/* compiler only uses this for UTF-8) */
+	SETUP_THREADGBL_ACCESS;
+	assert(gtm_utf8_mode && !TREF(compile_time));				/* compiler only directs this for UTF-8) */
 	MV_FORCE_STR(src);							/* ensure all args have string representations */
 	MV_FORCE_STR(srch);
 	MV_FORCE_STR(rplc);
@@ -177,30 +185,34 @@ void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 			op_fnztranslate(src, srch, rplc, dst);
 		return;
 	}
-	if (NUM_CHARS < (maxLengthString = rplc->str.char_len + srch->str.char_len))		/* WARNING assignment */
-		xlate = (int *)malloc(SIZEOF(int) * maxLengthString);					/* need more space */
-	else
-		xlate = xlate_array;
-	maxLengthString = MIN((src->str.char_len * SIZEOF(int4)), MAX_STRLEN);
-	if (!(IS_STP_SPACE_AVAILABLE(maxLengthString)	/* the STP check ensures there's no stp_gcol after a choice to reuse */
-		&& (prev_gcols == stringpool.gcols) && (srch->str.addr == prev_srch.addr) && (srch->str.len == prev_srch.len)
-		&& (rplc->str.addr == prev_rplc.addr) && (rplc->str.len == prev_rplc.len) && (&xlate_array[0] == xlate)))
+	maxLengthString = srch->str.char_len;
+	if (!((srch->mvtype & MV_UTF_LEN) && (srch->str.len == srch->str.char_len)) && (NUM_CHARS < srch->str.char_len))
+	{	/* need more space */
+		m_xlate.len = srch->str.char_len;
+		m_xlate.addr = malloc(SIZEOF(int4) * maxLengthString);
+		maxLengthString += MIN((src->str.char_len * MAX_CHAR_LEN), MAX_STRLEN);
+	} else
+	{
+		m_xlate.len = SIZEOF(int4) * NUM_CHARS;
+		m_xlate.addr = (char *)xlate_array;
+	}
+	ENSURE_STP_FREE_SPACE(maxLengthString); /* do now because op_fntranslate_common must be paranoid about stp_gcol */
+	if (!((prev_gcols == stringpool.gcols) && (&xlate_array[0] == (int4 *)m_xlate.addr) && (srch->str.addr == prev_srch.addr)
+		&& (srch->str.len == prev_srch.len) && (rplc->str.addr == prev_rplc.addr) && (rplc->str.len == prev_rplc.len)))
 	{	/* not a repeat, so can't reuse the last tables; above: !&& fails quicker than || */
 		if (NULL != xlate_hash)
 		{	/* about to allocate new one, so free any old; done after error checks to keep pointer valid */
 			free_hashtab_int4(xlate_hash);
 			free(xlate_hash);
 		}
-		xlate_hash = create_utf8_xlate_table(srch, rplc, xlate);
+		xlate_hash = create_utf8_xlate_table(srch, rplc, &m_xlate);
 		prev_gcols = stringpool.gcols;
 		prev_srch = srch->str;
 		prev_rplc = rplc->str;
 	}
-	/* ensure there's space for dst without another stp_gcol; src can only increase from current to maximum byte length */
-	ENSURE_STP_FREE_SPACE(maxLengthString); /* do now so stp_gcol doesn't shift xlate table */
-	op_fntranslate_common(src, dst, rplc, xlate, xlate_hash);
-	if (&xlate_array[0] != xlate)
-		free(xlate);
+	op_fntranslate_common(src, dst, rplc, (int4 *)m_xlate.addr, xlate_hash);
+	if (&xlate_array[0] != (int4 *)m_xlate.addr)
+		free(m_xlate.addr);
 }
 
 void op_fntranslate_fast(mval *src, mval *rplc, mval *m_xlate, mval *m_xlate_hash, mval *dst)
@@ -221,8 +233,8 @@ void op_fntranslate_fast(mval *src, mval *rplc, mval *m_xlate, mval *m_xlate_has
 		MV_FORCE_LEN_SILENT(src);
 		MV_FORCE_LEN_SILENT(rplc);
 	}
-	/* ensure there's space for dst without another stp_gcol; src can only increase from current to maximum byte length */
-	ENSURE_STP_FREE_SPACE(src->str.char_len * SIZEOF(int4));		/* do now so stp_gcol doesn't shift xlate table */
+	/* ensure space for dst without stp_gcol moving xlate_table; src can only increase from current to maximum byte length */
+	ENSURE_STP_FREE_SPACE((gtm_utf8_mode ? (src->str.char_len * MAX_CHAR_LEN) : src->str.len) + m_xlate->str.len);
 	xlate = (int4 *)m_xlate->str.addr;
 	assert(m_xlate->str.len == NUM_CHARS * SIZEOF(int4));
 	if (0 != m_xlate_hash->str.len)
@@ -274,7 +286,7 @@ void op_fnztranslate_common(mval *src, mval *dst, int *xlate)
  */
 void op_fnztranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 {
-	static int xlate[NUM_CHARS];
+	static int xlate[NUM_CHARS];					/* not STATICDEF to prevent conflict with op_fn */
 	static mstr prev_srch = {0, 0}, prev_rplc = {0, 0};
 	static unsigned int prev_gcols = -1;
 
