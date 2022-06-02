@@ -14,7 +14,11 @@
  ****************************************************************/
 #ifndef GVT_INLINE_INCLUDED
 #define GVT_INLINE_INCLUDED
-
+/* This file is currently excluded from scantypedefs.m. If any
+ * future changes to this file add any typedefs such as GBLDEFs,
+ * then a change will need to be made to scantypedefs to remove
+ * the ExclInclude line
+ */
 #include "gv_xform_key.h"
 
 static inline gv_key *gvkey_init(gv_key *gvkey, int4 keysize)
