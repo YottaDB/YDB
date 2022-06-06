@@ -635,7 +635,6 @@ region_freeze.c:warning: Value stored to 'jnl_switch_done' is never read [clang-
 remove_rms.c:warning: Value stored to 'rc' is never read [clang-analyzer-deadcode.DeadStores]
 repl_comm.c:warning: Although the value stored to 'status' is used in the enclosing expression, the value is never actually read from 'status' [clang-analyzer-deadcode.DeadStores]
 repl_comm.c:warning: Value stored to 'save_errno' is never read [clang-analyzer-deadcode.DeadStores]
-repl_filter.c:warning: Assigned value is garbage or undefined [clang-analyzer-core.uninitialized.Assign]
 repl_filter.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 repl_filter.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 repl_filter.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]

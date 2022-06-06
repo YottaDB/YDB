@@ -462,7 +462,6 @@ repl_filter.c:warning: Branch condition evaluates to a garbage value [clang-anal
 repl_filter.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 repl_filter.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
 repl_filter.c:warning: Branch condition evaluates to a garbage value [clang-analyzer-core.uninitialized.Branch]
-repl_filter.c:warning: The left operand of '&' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 repl_filter.c:warning: Value stored to 'prefix' is never read [clang-analyzer-deadcode.DeadStores]
 repl_inst_edit.c:warning: 4th function call argument is an uninitialized value [clang-analyzer-core.CallAndMessage]
 repl_inst_edit.c:warning: Dereference of undefined pointer value [clang-analyzer-core.NullDereference]
