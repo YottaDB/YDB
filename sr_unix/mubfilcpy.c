@@ -196,8 +196,17 @@ bool	mubfilcpy (backup_reg_list *list)
 	}
 	memset(prefix, 0, MAX_FN_LEN);
 	memcpy(prefix, gv_cur_region->rname, gv_cur_region->rname_len);
-	SNPRINTF(&prefix[gv_cur_region->rname_len], MAX_FN_LEN - gv_cur_region->rname_len, "_%d_", process_id);
-
+	/* For testing purposes, we set the pid part of the temp file name to 99999 instead of the
+	 * pid. This may be necessary if the test is testing for FILENAMETOOLONG errors such as in
+	 * the r136/ydb864 test because a process_id with fewer or more digits than expected will
+	 * cause the temp file name to be shorter or longer than the test.
+	 */
+#	ifdef DEBUG
+	if (WBTEST_ENABLED(WBTEST_YDB_STATICPID))
+		SNPRINTF(&prefix[gv_cur_region->rname_len], MAX_FN_LEN - gv_cur_region->rname_len, "_%d_", 99999);
+	else
+#	endif
+		SNPRINTF(&prefix[gv_cur_region->rname_len], MAX_FN_LEN - gv_cur_region->rname_len, "_%d_", process_id);
 	/* verify that we have access to the temporary directory to avoid /tmp */
 	if (0 != ACCESS(tempdir, TMPDIR_ACCESS_MODE))
 	{
