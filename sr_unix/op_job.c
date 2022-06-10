@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,6 @@ void	job_timer_handler(void);
 GBLDEF	short			jobcnt		= 0;
 GBLDEF	int			job_errno;
 GBLDEF	volatile boolean_t	ojtimeout	= TRUE;
-GBLDEF	int			job_errno;
 
 GBLREF	uint4		dollar_trestart;
 GBLREF	int		dollar_truth;

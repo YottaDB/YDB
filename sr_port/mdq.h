@@ -75,7 +75,6 @@ MBSTART {						\
 #  define dqnoop(Q)
 #else
 #  include "gtmdbglvl.h"
-<<<<<<< HEAD
 GBLREF	uint4		ydbDebugLevel;
 /* Q: head of queue to check; N: the name of queue; B: whether to check main exorder (from curtchain) and any expr_start queue */
 #  define CHKTCHAIN(Q, N, B)									\

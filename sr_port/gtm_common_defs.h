@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -36,11 +36,7 @@
 #define LITREF		extern const
 #define error_def(x)	/* No longer used as errors are now #define values */
 
-/* Use GBLDEF to define STATICDEF for variables and STATICFNDEF, STATICFNDCL for functions. Define STATICDEF to "GBLDEF". This way
- * we know such usages are intended to be "static" but yet can effectively debug these variables since they are externally
- * visible. For functions, do not use the "static" keyword to make them externally visible. Note that a STATICREF for variables
- * does not make sense since statics are supposed to be used only within one module.
- */
+/* Note that a STATICREF for variables does not make sense since statics are supposed to be used only within one module. */
 #define	STATICDEF		static
 #define	STATICFNDCL		static
 #define	STATICFNDEF		static

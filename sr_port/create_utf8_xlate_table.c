@@ -54,7 +54,7 @@ hash_table_int4 *create_utf8_xlate_table(mval *srch, mval *rplc, mstr *m_xlate)
 	assertpro((xlate_len >= srch->str.char_len) && ((NUM_CHARS * SIZEOF(int4)) <= xlate_len));
 	memset(xlate, NO_VALUE, xlate_len);
 	if (!((srch->mvtype & MV_UTF_LEN) && srch->str.len == srch->str.char_len))
-	{       /* need hash table if srch is a not a sting of single bytes */
+	{       /* need hash table if srch is a not a string of single bytes */
 		if (TREF(compile_time))
 			xlate_hash = (hash_table_int4*)mcalloc(SIZEOF(hash_table_int4));
 		else
