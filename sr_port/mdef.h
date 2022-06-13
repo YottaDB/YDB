@@ -822,6 +822,7 @@ int4 timeout2msec(uint8 timeout);
  * Take this chance to define UNIX_ONLY and VMS_ONLY macros.
  */
 void m_usleep(int useconds);
+#define MAX_SHORT_SLEEP_MSEC	999
 #ifdef UNIX
 #	define SHORT_SLEEP(x) {assert(1000 > (x)); m_usleep((x) * 1000);}
 #else
@@ -902,6 +903,19 @@ void m_usleep(int useconds);
  */
 #define LONG_SLEEP(X)		hiber_start((X) * 1000)
 #define LONG_SLEEP_MSEC(X)	hiber_start(X)
+
+/* When a sleep can be under a second (SHORT_SLEEP()) or longer than a second (LONG_SLEEP), use this
+ * macro to do the right thing. While a short sleep can be done with LONG_SLEEP's hiber_start() call,
+ * it is far less efficient. Argument is milliseconds.
+ */
+#define SLEEP_FOR_MSEC(X)			\
+{ 						\
+	if (MAX_SHORT_SLEEP_MSEC >= (X))	\
+	{					\
+		SHORT_SLEEP(X);			\
+	} else					\
+		LONG_SLEEP_MSEC(X);		\
+}
 
 #define OS_PAGE_SIZE		gtm_os_page_size
 #define OS_PAGE_SIZE_DECLARE	GBLREF int4 gtm_os_page_size;

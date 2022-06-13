@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -172,16 +172,14 @@ int gtmsource_est_conn()
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "%d hard connection attempt failed : %s\n", connection_attempts + 1,
 				 STRERROR(errno));
 			repl_close(&gtmsource_sock_fd);
-			if (REPL_MAX_CONN_HARD_TRIES_PERIOD > hardtries_period)
-			{
-				SHORT_SLEEP(hardtries_period);
-			}
-			else
-				LONG_SLEEP_MSEC(hardtries_period);
-			gtmsource_poll_actions(FALSE);
-			if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
-				return (SS_NORMAL);
 		}
+		/* Pause (very briefly as this is a hard spin loop) before trying the connection again then check if any
+		 * interrupting conditions occurred before retrying the connection.
+		 */
+		SLEEP_FOR_MSEC(hardtries_period);
+		gtmsource_poll_actions(FALSE);
+		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
+			return (SS_NORMAL);
 		comminit_retval = gtmsource_comm_init(throw_errors);
 	} while (++connection_attempts < hardtries_count);
 	gtmsource_poll_actions(FALSE);
@@ -189,7 +187,7 @@ int gtmsource_est_conn()
 		return (SS_NORMAL);
 
 	if (hardtries_count <= connection_attempts)
-	{	/*Initialize logging period related variables*/
+	{	/* Initialize logging period related variables */
 		logging_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD];
 		logging_interval = 1;
 		logging_attempts = 0;
@@ -203,7 +201,9 @@ int gtmsource_est_conn()
 		do
 		{
 			if ((FD_INVALID == gtmsource_sock_fd) || (0 != comminit_retval))
-			{ /* gtmsource_comm_init failed to initialize the socket. Report error and retry gtmsource_comm_init. */
+			{	/* gtmsource_comm_init() failed to initialize the socket. Report error and retry
+				 * gtmsource_comm_init().
+				 */
 				if (0 == (connection_attempts + 1) % logging_interval)
 				{
 					repl_log(gtmsource_log_fp, TRUE, TRUE,
@@ -230,11 +230,14 @@ int gtmsource_est_conn()
 					throw_errors = TRUE;
 				} else /* Decrease the frequency of showing the connection failure error messages */
 					throw_errors = FALSE;
-				LONG_SLEEP(gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]);
-				gtmsource_poll_actions(FALSE);
-				if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
-					return (SS_NORMAL);
 			}
+			/* Pause before trying the connection again then check if any interrupting conditions occurred
+			 * before retrying the connection.
+			 */
+			LONG_SLEEP(gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]);
+			gtmsource_poll_actions(FALSE);
+			if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
+				return (SS_NORMAL);
 			comminit_retval = gtmsource_comm_init(throw_errors);
 			connection_attempts++;
 			if (0 == (connection_attempts % logging_interval) && 0 == (logging_attempts % alert_attempts))
@@ -247,7 +250,7 @@ int gtmsource_est_conn()
 				repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 			}
 			if (logging_period <= REPL_MAX_LOG_PERIOD)
-			{	 /*the maximum real_period can reach 2*REPL_MAX_LOG_PERIOD)*/
+			{	 /* the maximum real_period can reach 2*REPL_MAX_LOG_PERIOD) */
 				if (0 == connection_attempts % logging_interval)
 				{	/* Double the logging period after every logging attempt*/
 					logging_interval = logging_interval << 1;
