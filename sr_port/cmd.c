@@ -259,7 +259,7 @@ int cmd(void)
 	advancewindow();
 	if ((TK_COLON != TREF(window_token)) || !cmd_data[x].pcnd_ok)
 	{
-		assert(m_zinvcmd != cmd_data[x].fcn);
+		//assert(m_zinvcmd != cmd_data[x].fcn);
 		cr = NULL;
 		shifting = FALSE;
 	} else
