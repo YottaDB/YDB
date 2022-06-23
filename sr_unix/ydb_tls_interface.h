@@ -89,7 +89,7 @@
 #define GTMTLS_OP_CLIENT_CA	 	0x00010000
 /* CAfile or CApath processed */
 #define GTMTLS_OP_CA_LOADED	 	0x00020000
-#define GTMTMLS_OP_NOSHUTDOWN		0x00040000
+#define GTMTLS_OP_NOSHUTDOWN		0x00040000
 
 #define GTMTLS_IS_FIPS_MODE(CTX)	(TRUE == CTX->fips_mode)
 #define GTMTLS_RUNTIME_LIB_VERSION(CTX)	(CTX->runtime_version)
