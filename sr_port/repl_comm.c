@@ -340,6 +340,7 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 		{
 			if ((WBTEST_ENABLED(WBTEST_REPL_TLS_RECONN)) && is_rcvr_server)
 			{
+				bytes_recvd = 0;
 				GTM_WHITE_BOX_TEST(WBTEST_REPL_TLS_RECONN, bytes_recvd, -1);
 				if (-1 == bytes_recvd)
 					gtm_wbox_input_test_case_count = 11; /* Do not go to white box again*/

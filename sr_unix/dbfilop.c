@@ -63,7 +63,6 @@ uint4 dbfilop(file_control *fc)
 
 	udi = FC2UDI(fc);
 	csa = &udi->s_addrs;
-	save_errno = 0;
 	switch(fc->op)
 	{
 		case FC_READ:
@@ -113,6 +112,7 @@ uint4 dbfilop(file_control *fc)
 			} else
 #endif
 			OPENFILE_DB((char *)seg->fname, O_RDWR, udi, seg);
+			save_errno = 0;
 			if (FD_INVALID == udi->fd)
 			{
 				save_errno = errno;
