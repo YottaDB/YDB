@@ -74,6 +74,13 @@ test-clang-tidy:
         zlib1g-dev
     - ci/build.sh
 
+build-ubuntu-debug:
+  extends: .build
+  variables:
+    DOCKERFILE: Dockerfile
+    REPO: yottadb-debug
+    ARGS: --build-arg CMAKE_BUILD_TYPE=Debug
+
 commit-verify:
   image: ubuntu:18.04
   stage: build
@@ -116,6 +123,11 @@ push-ubuntu:
   variables:
     REPO: yottadb
 
+push-ubuntu-debug:
+  extends: .push
+  variables:
+    REPO: yottadb-debug
+
 push-rocky:
   extends: .push
   variables:
@@ -146,6 +158,11 @@ push-release-ubuntu:
   extends: .push-release
   variables:
     REPO: yottadb
+
+push-release-ubuntu-debug:
+  extends: .push-release
+  variables:
+    REPO: yottadb-debug
 
 push-release-rocky:
   extends: .push-release
