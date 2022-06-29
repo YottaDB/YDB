@@ -142,7 +142,7 @@ The commands below assume that you want to remove the docker container after run
 Volumes are also supported by mounting to the ```/data``` directory. If you want to mount the local directory ```ydb-data``` into the container to save your database and routines locally and use them in the container in the future, add the following command line parameter before the yottadb/yottadb argument:
 
 ```
--v `pwd`/ydb-data:/data
+-v $PWD/ydb-data:/data
 ```
 
 This creates a ydb-data directory in your current working directory. This can be deleted after the container is shutdown/removed if you want to remove all data created in the YottaDB container (such as your database and routines).
