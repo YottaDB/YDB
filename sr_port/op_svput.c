@@ -481,10 +481,10 @@ void op_svput(int varnum, mval *v)
 		case SV_ZSTRPLLIM:
 			previous_gtm_strpllim = stringpool.strpllim;
 			stringpool.strpllim = MV_FORCE_INT(v);
+			if (STP_GCOL_TRIGGER_FLOOR > stringpool.strpllim)
+				stringpool.strpllim = STP_GCOL_TRIGGER_FLOOR;
 			if ((stringpool.strpllim <= 0) || (stringpool.strpllim >= previous_gtm_strpllim))
 				stringpool.strpllimwarned =  FALSE;
-			else if (STP_GCOL_TRIGGER_FLOOR > stringpool.strpllim)
-				stringpool.strpllim += STP_GCOL_TRIGGER_FLOOR;
 			break;
 		case SV_ZTIMEOUT:
 			check_and_set_ztimeout(v);

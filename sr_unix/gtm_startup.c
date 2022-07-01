@@ -230,7 +230,7 @@ void gtm_startup(struct startup_vector *svec)
 	/* See if $ydb_string_pool_limit is set */
 	temp_ydb_strpllim = ydb_trans_numeric(YDBENVINDX_STRING_POOL_LIMIT,  &is_defined, IGNORE_ERRORS_FALSE, NULL);
 	if (0 < temp_ydb_strpllim)
-		stringpool.strpllim = (temp_ydb_strpllim < STP_GCOL_TRIGGER_FLOOR ? STP_GCOL_TRIGGER_FLOOR : 0) + temp_ydb_strpllim;
+		stringpool.strpllim = (temp_ydb_strpllim < STP_GCOL_TRIGGER_FLOOR) ? STP_GCOL_TRIGGER_FLOOR :  temp_ydb_strpllim;
 	getjobname();
 	getzprocess();
 	getzmode();
