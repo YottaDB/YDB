@@ -1205,3 +1205,4 @@ GBLDEF	boolean_t	dollar_zaudit;			/* Intrinsic that indicates whether direct mod
 							 */
 GBLDEF	dm_audit_info	*audit_conn;			/* Stores the APD logger's connection information */
 GBLDEF	boolean_t	gtm_nofflf;			/* GTM-9136 TRUE only to suppress LF after FF in "write #" */
+GBLDEF	void 		(*primary_exit_handler)(void);	/* If non-NULL, may be used to reestablish atexit() handler */

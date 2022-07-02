@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -577,10 +577,10 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 {
 	CLI_ENTRY 	*pparm_qual, *pparm1;
 	char		local_str[MAX_LINE], tmp_str[MAX_LINE + 1], *tmp_str_ptr;
-	char 		*ptr_next_val, *ptr_next_comma, *ptr_equal;
+	char 		*ptr_next_val, *ptr_prev_val, *ptr_next_comma, *ptr_equal;
 	int		neg_flg;
 	boolean_t	val_flg, has_a_qual;
-	size_t		len_str, ptr_equal_len;
+	size_t		len_str, ptr_equal_len, neg_adj_len_str;
 
 	has_a_qual = FALSE;
 	pparm_qual = pparm->qual_vals;
@@ -595,8 +595,8 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 		local_str[len_str] = '\0';
 		ptr_next_val = local_str;
 		while (NULL != ptr_next_val)
-		{	/* WARNING assignment below */
-			STRNCPY_STR(tmp_str, ptr_next_val, (len_str = MIN(strlen(ptr_next_val), sizeof(tmp_str))));
+		{
+			STRNCPY_STR(tmp_str, ptr_next_val, len_str);
 			tmp_str[len_str] = 0;
 			tmp_str_ptr = tmp_str;
 			ptr_next_comma = strchr(tmp_str_ptr, ',');
@@ -621,8 +621,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 			 */
 			if (-1 == (neg_flg = cli_check_negated( &tmp_str_ptr, pparm_qual, &pparm1)))
 				return FALSE;
-			if (1 == neg_flg)
-				len_str -=  strlen(NO_STRING);
+			neg_adj_len_str = len_str - ((1 == neg_flg) ? strlen(NO_STRING) : 0);
 
 			if ((ptr_equal) && (ptr_equal + 1 < ptr_next_comma))
 				val_flg = TRUE;
@@ -676,6 +675,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 				{
 					ptr_equal_len = strlen(ptr_equal + 1);
 					pparm1->pval_str = malloc(ptr_equal_len + 1);
+					assert(NULL != pparm1->pval_str);
 					STRNCPY_STR(pparm1->pval_str, ptr_next_val + (ptr_equal - tmp_str_ptr) + 1, ptr_equal_len);
 					pparm1->pval_str[ptr_equal_len] = 0;
 				}
@@ -686,8 +686,9 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 			pparm1->negated = neg_flg;
 			pparm1->present = CLI_PRESENT;
 			has_a_qual = TRUE;
-			if ((tmp_str_ptr + len_str) != ptr_next_comma)
+			if ((tmp_str_ptr + neg_adj_len_str) != ptr_next_comma)
 			{
+				ptr_prev_val = ptr_next_val;
 				ptr_next_val = strchr(ptr_next_val, ',') + 1;
 				if (!ptr_next_val || !*ptr_next_val)
 				{
@@ -696,6 +697,10 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 					return FALSE;
 
 				}
+				assert(ptr_next_val > ptr_prev_val);
+				len_str -= ptr_next_val - ptr_prev_val;
+				assert(0 <= len_str);
+				assert(MAX_LINE >= len_str);
 			} else
 				ptr_next_val = NULL;
 		}

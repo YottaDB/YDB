@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,15 +10,6 @@
  *								*
  ****************************************************************/
 
-/* iosocket_tcp_keepalive.c */
-/*
- * inputs: socket pointer; the keepalive_opt value used for idle; the name of the calling action; a Boolean giving need for cleanup
- * returns: TRUE for success, FALSE return is never really used because it's preceeded by the rts_error
- * the callers use a positive non-zero value of keepalive_opt to specify keepalive; used here to specify TCP_KEEPIDLE
- * this does not currently manipulate TCP_KEEPCNT  or TCP_KEEPINTVL except as part of a white box case that sets a short time
- * this function requires more sophistication if implementing control of the other two factors
- * control based on a deviceparameter rather than an environment variable for the process would require changes elsewhere
- */
 #include "mdef.h"
 #include <errno.h>
 #include "gtm_socket.h"
@@ -33,51 +24,119 @@
 
 error_def(ERR_SETSOCKOPTERR);
 
-boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, char *act)
+/* iosocket_tcp_keepalive.c */
+/*
+ * inputs: socket pointer; the keepalive_opt value used for idle; the name of the calling action; a Boolean giving need for cleanup
+ * returns: TRUE for success, FALSE for failure if ioerror=notrap otherwise rts_error on failures if freesocket
+ * the callers use a positive non-zero value of keepalive_opt to specify keepalive; used here to specify TCP_KEEPIDLE
+ * or to use values from the socket struct set via the OPTIONS device parameter if keepalive_opt is negative
+ * TCP_KEEPCNT and TCP_KEEPINTVL can only be set via OPTIONS except as part of a white box case that sets a short time
+ */
+boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, char *act, boolean_t freesocket)
 {
 	boolean_t		trap;
-	char			*errptr;
+	char			*errptr, *sockopt_errptr;
 	d_socket_struct		*dsocketptr;
-	int			keepalive_got;
+	int			keepidle_got, keepalive_value, keepidle_value;
+	int			keepintvl_got, keepintvl_value, keepcnt_got, keepcnt_value;
 	int4			errlen, real_errno;
 #	ifdef DEBUG
-	socklen_t		keepalive_got_len;
+	socklen_t		keepidle_got_len, keepintvl_got_len, keepcnt_got_len;
 #	endif
 	ssize_t			status;
 
-	assert(0 <keepalive_opt);
+	real_errno = 0;
+	DEBUG_ONLY(keepidle_got_len = SIZEOF(keepidle_got);)
+	if (0 > keepalive_opt)
+	{	/* SOCKOPTIONS_FROM_STRUCT so use values from socket struct */
+		if (SOCKOPTIONS_PENDING & socketptr->options_state.alive)
+		{
+			keepalive_value = socketptr->keepalive;
+			socketptr->options_state.alive &= ~SOCKOPTIONS_PENDING;
+		} else
+			keepalive_value = -1;	/* flag to skip setsockopt */
+		if (SOCKOPTIONS_PENDING & socketptr->options_state.idle)
+		{
+			keepidle_value = socketptr->keepidle;
+			socketptr->options_state.idle &= ~SOCKOPTIONS_PENDING;
+		} else
+			keepidle_value = -1;	/* flag to skip */
+		if (SOCKOPTIONS_PENDING & socketptr->options_state.cnt)
+		{
+			keepcnt_value = socketptr->keepcnt;
+			socketptr->options_state.cnt &= ~SOCKOPTIONS_PENDING;
+		} else
+			keepcnt_value = -1;	/* flag to skip */
+		if (SOCKOPTIONS_PENDING & socketptr->options_state.intvl)
+		{
+			keepintvl_value = socketptr->keepintvl;
+			socketptr->options_state.intvl &= ~SOCKOPTIONS_PENDING;
+		} else
+			keepintvl_value = -1;	/* flag to skip */
+	} else
+	{
+		keepalive_value = keepidle_value = keepalive_opt;	/* use environment variable for both */
+		keepcnt_value = keepintvl_value = -1;	/* flag to skip setsockopt */
+	}
 #	ifdef DEBUG
 #	ifndef DEBUG_SOCK
-	if (WBTEST_ENABLED(WBTEST_SOCKET_KEEPALIVE))
-	{
+	if ((0 <= keepalive_value) && WBTEST_ENABLED(WBTEST_SOCKET_KEEPALIVE))
+	{	/* skip if nothing to do with keepalive */
 #	endif
 		flush_pio();
-		printf("%s gtm_socket_keepalive_idle: %d\n", act, keepalive_opt);
+		if (0 < keepalive_opt)
+			printf("%s gtm_socket_keepalive_idle: %d\n", act, keepalive_opt);
+		else	/* if only KEEPALIVE in OPTIONS, idle may be -1 */
+			printf("%s USE :options=keepalive: %d, idle: %d\n", act, keepalive_value, keepidle_value);
 		FFLUSH(stdout);
-		printf("%s setting SO_KEEPALIVE\n", act);
+		printf("%s %ssetting SO_KEEPALIVE\n", act, (0 < keepalive_value ? "" : "un"));
 		FFLUSH(stdout);
 #	ifndef DEBUG_SOCK
 	}
 #	endif
 #	endif
-	real_errno = 0;
-	DEBUG_ONLY(keepalive_got_len = SIZEOF(keepalive_got);)
-	if (-1 == (status = setsockopt(socketptr->sd, SOL_SOCKET, SO_KEEPALIVE, &keepalive_opt, SIZEOF(keepalive_opt))))
+	if (0 <= keepalive_value)
 	{
-		real_errno = errno;
-		keepalive_opt = 0;			/* clear as a flag determining message for subsequent rts_error */
-	} else if (-1 == (status = setsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPIDLE, &keepalive_opt, SIZEOF(keepalive_opt))))
-		real_errno = errno;
-#	ifdef DEBUG
-	else if (-1 == (status = getsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPIDLE, &keepalive_got, &keepalive_got_len)))
-		real_errno = errno;
-	if (0 == status)
-	{
-		errptr = (char *)STRERROR(real_errno);
-		assert(keepalive_got == keepalive_opt);
-		real_errno = 0;
+		if (-1 == (status = setsockopt(socketptr->sd, SOL_SOCKET, SO_KEEPALIVE, &keepalive_value, SIZEOF(keepalive_value))))
+		{
+			real_errno = errno;
+			sockopt_errptr = "SO_KEEPALIVE";
+		}
 	}
-#	endif
+	if ((0 == real_errno) && (0 <= keepidle_value))
+	{
+		sockopt_errptr = "TCP_KEEPIDLE";	/* in case of error */
+		if (-1 == (status = setsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle_value,
+				SIZEOF(keepidle_value))))
+			real_errno = errno;
+#		ifdef DEBUG
+		else if (-1 == (status = getsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle_got,
+				&keepidle_got_len)))
+			real_errno = errno;
+		if (0 == status)
+		{
+			errptr = (char *)STRERROR(real_errno);
+			assert(keepidle_got == keepidle_value);
+			real_errno = 0;
+		}
+#		endif
+	}
+	if ((0 == real_errno) && (0 <= keepcnt_value))
+	{
+		if (-1 == setsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt_value, SIZEOF(keepcnt_value)))
+		{
+			sockopt_errptr = "TCP_KEEPCNT";
+			real_errno = errno;
+		}
+	}
+	if ((0 == real_errno) && (0 <= keepintvl_value))
+	{
+		if (-1 == setsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl_value, SIZEOF(keepintvl_value)))
+		{
+			sockopt_errptr = "TCP_KEEPINTVL";
+			real_errno = errno;
+		}
+	}
 	if (real_errno)
 	{
 		dsocketptr = socketptr->dev;
@@ -98,43 +157,59 @@ boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, ch
 #		endif
 #		endif
 		assert(FALSE);
-		if (FD_INVALID != socketptr->sd)
+		if (freesocket && trap)
 		{
-			close(socketptr->sd);	/* Don't leave a dangling socket around */
-			socketptr->sd = FD_INVALID;
-		}
-		SOCKET_FREE(socketptr);
-		if (trap)
+			if (FD_INVALID != socketptr->sd)
+			{
+				close(socketptr->sd);	/* Don't leave a dangling socket around */
+				socketptr->sd = FD_INVALID;
+			}
+			SOCKET_FREE(socketptr);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
-			      LEN_AND_STR(keepalive_opt ? "TCP_KEEPIDLE" : "SO_KEEPALIVE"), real_errno, errlen, errptr);
+			      LEN_AND_STR(sockopt_errptr), real_errno, errlen, errptr);
+		}
 		return FALSE;
 	}
 #	ifdef DEBUG
-	if (WBTEST_ENABLED(WBTEST_SOCKET_KEEPALIVE))
-	{	/* when implementing socket-level control, set keepalive interval of 2 to recognize missing peer in 6 seconds */
-		keepalive_opt = 2;		/* while in a whitebox case, a single value suffices*/
+	if ((0 <= keepalive_opt) && WBTEST_ENABLED(WBTEST_SOCKET_KEEPALIVE))
+	{	/* when implementing KEEPCNT and KEEPINTVL options, set to 2 to recognize missing peer in 6 seconds */
+		keepcnt_value = keepintvl_value = 2;	/* for now force it in white box test */
 		flush_pio();
 		printf("%s setting TCP_KEEP options\n wb enabled: %d, wb #: %d. opt: %d\n",
-		       act, gtm_white_box_test_case_enabled, gtm_white_box_test_case_number, keepalive_opt);
+		       act, gtm_white_box_test_case_enabled, gtm_white_box_test_case_number, keepcnt_value);
 		FFLUSH(stdout);
-		if (-1 == setsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPCNT, &keepalive_opt, SIZEOF(keepalive_opt)))
+		keepcnt_got_len = SIZEOF(keepcnt_got);
+		if (-1 == setsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt_value, SIZEOF(keepcnt_value)))
+		{
+			real_errno = errno;
 			assert(FALSE);		/* while a white box case, we can ignore errors */
-		if (-1 == getsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPCNT, &keepalive_got, &keepalive_got_len))
+		}
+		if (-1 == getsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt_got, &keepcnt_got_len))
+		{
+			real_errno = errno;
 			assert(FALSE);		/* while a white box case, we can ignore errors */
-		if (keepalive_got != keepalive_opt)
+		}
+		if (keepcnt_got != keepcnt_value)
 		{
 			flush_pio();
-			printf("cnt setopt: %d, getopt: %d\n", keepalive_opt, keepalive_got);
+			printf("cnt setopt: %d, getopt: %d\n", keepcnt_value, keepcnt_got);
 			FFLUSH(stdout);
 		}
-		if (-1 == setsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPINTVL, &keepalive_opt, SIZEOF(keepalive_opt)))
+		if (-1 == setsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl_value, SIZEOF(keepintvl_value)))
+		{
+			real_errno = errno;
 			assert(FALSE);		/* while a white box case, we can ignore errors */
-		if (-1 == getsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPINTVL, &keepalive_got, &keepalive_got_len))
+		}
+		keepintvl_got_len = SIZEOF(keepintvl_got);
+		if (-1 == getsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl_got, &keepintvl_got_len))
+		{
+			real_errno = errno;
 			assert(FALSE);		/* while a white box case, we can ignore errors */
-		if (keepalive_got != keepalive_opt)
+		}
+		if (keepintvl_got != keepintvl_value)
 		{
 			flush_pio();
-			printf("intvl setopt: %d, getopt: %d\n", keepalive_opt, keepalive_got);
+			printf("intvl setopt: %d, getopt: %d\n", keepintvl_value, keepintvl_got);
 			FFLUSH(stdout);
 		}
 	}

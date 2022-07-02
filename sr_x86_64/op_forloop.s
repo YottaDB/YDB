@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Copyright (c) 2007-2022 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -52,7 +52,7 @@ ENTRY	op_forloop
         movq	REG64_ARG1, step(%rbp)
         movq	REG64_ARG0, indx(%rbp)
 	movq	REG64_ARG0, REG64_ARG1
-	mv_force_defined_strict REG64_ARG1, l0		# Disregard NOUNDEF - errors if not defined
+	mv_force_defined_overwrite REG64_ARG1, l0	# copy literal_null into control variable if undefined
 	mv_force_num REG64_ARG1, l1
 	movq	indx(%rbp), REG64_ARG1
 	movq	step(%rbp), REG64_ARG0

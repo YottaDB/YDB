@@ -49,7 +49,7 @@ GBLREF	boolean_t					gtmcrypt_initialized;
 GBLREF	mstr						pvt_crypt_buf;
 GBLREF	char						dl_err[];
 GBLREF	char						*gtmcrypt_badhash_size_msg;
-
+GBLREF	void						(*primary_exit_handler)(void);
 LITREF	char						gtmcrypt_repeat_msg[];
 LITREF	gtm_string_t					null_iv;
 
@@ -229,6 +229,8 @@ MBSTART {															\
 			else													\
 				gtmcrypt_initialized = TRUE; /* Intialization is done for this process. */			\
 			ENABLE_INTERRUPTS(INTRPT_IN_CRYPT_SECTION, prev_intrpt_state);						\
+			if (gtmcrypt_initialized && primary_exit_handler)							\
+				atexit(primary_exit_handler);									\
 		} else														\
 			RC = SET_CRYPTERR_MASK(RC);										\
 	}															\
@@ -262,6 +264,8 @@ MBSTART {															\
 		RC = SET_REPEAT_MSG_MASK((SET_CRYPTERR_MASK(ERR_CRYPTOPFAILED)));						\
 		DEBUG_ONLY(CORE_ON_CRYPTOPFAILED);										\
 	}															\
+	if (gtmcrypt_initialized && primary_exit_handler)									\
+		atexit(primary_exit_handler);											\
 }
 
 /* Ensure that the symmetric key corresponding to the specified hash exists and that a handle is created. */

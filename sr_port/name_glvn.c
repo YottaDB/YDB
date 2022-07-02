@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,16 +52,28 @@ int name_glvn(boolean_t gblvn, oprtype *a)
 			if (vbar)
 				fnname_type |= FNVBAR;
 			advancewindow();
-			if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1++)))
+			if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1)))
 				return FALSE;
+			if (!vbar)
+			{	/* DE257948 - we need to force ex_tail() in a case we have an additional contain/square-bracket.
+				 * Correct the tree and sb1->opcode.tref and prevent an assert failure in emit_code.c
+				 */
+				coerce(sb1, OCT_MVAL);
+				ex_tail(sb1++);
+			}
 			if (TK_COMMA != TREF(window_token))
 				fnname_type |= FNEXTGBL1;
 			else
 			{
 				fnname_type |= FNEXTGBL2;
 				advancewindow();
-				if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1++)))
+				if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1)))
 					return FALSE;
+				if (!vbar)
+				{
+					coerce(sb1, OCT_MVAL);
+					ex_tail(sb1++);
+				}
 			}
 			if ((!vbar && (TK_RBRACKET != TREF(window_token))) || (vbar && (TK_VBAR != TREF(window_token))))
 			{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -2344,7 +2344,7 @@ int jnl_v22TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	cb = conv_buff;
 	status = SS_NORMAL;
 	jlen = *jnl_len;
-	this_upd_seqno = seq_num_zero;
+	this_upd_seqno = this_strm_seqno = seq_num_zero;
 	promote_uupd_to_tupd = FALSE;
 	assert(is_rcvr_server);
 	/* Since this filter function will be invoked only on the receiver side, the check for whether the receiver
@@ -2516,7 +2516,7 @@ int jnl_v24TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	cb = conv_buff;
 	status = SS_NORMAL;
 	jlen = *jnl_len;
-	this_upd_seqno = seq_num_zero;
+	this_upd_seqno = this_strm_seqno = seq_num_zero;
 	promote_uupd_to_tupd = FALSE;
 	assert(is_src_server);
 	/* Since this filter function will be invoked only on the source side, the check for whether the receiver
@@ -2692,7 +2692,7 @@ int jnl_v24TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	cb = conv_buff;
 	status = SS_NORMAL;
 	jlen = *jnl_len;
-	this_upd_seqno = seq_num_zero;
+	this_upd_seqno = this_strm_seqno = seq_num_zero;
 	promote_uupd_to_tupd = FALSE;
 	/* Since filter format V24 corresponds to journal formats V24, V25, or v26, in case of a V24 source and V2{5,6} receiver,
 	 * the source server will not do any filter transformations (because receiver jnl ver is higher). This means

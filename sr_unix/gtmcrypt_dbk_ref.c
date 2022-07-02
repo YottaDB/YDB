@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2021 Fidelity National Information	*
+ * Copyright (c) 2009-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -180,7 +180,7 @@ int gtmcrypt_getkey_by_hash(unsigned char *hash, char *db_path, gtm_keystore_t *
 {
 	int	err_caused_by_gpg, error, errorlen;
 	char	save_err[MAX_GTMCRYPT_ERR_STRLEN + 1], hex_buff[GTMCRYPT_HASH_HEX_LEN + 1];
-	char	*alert_msg;
+	char	*alert_msg, *errptr;
 
 	if (NULL != db_path)
 		*entry = keystore_lookup_by_keyname_plus(db_path, (char *)hash, SEARCH_BY_HASH);
@@ -196,15 +196,16 @@ int gtmcrypt_getkey_by_hash(unsigned char *hash, char *db_path, gtm_keystore_t *
 		{
 			if (!error)
 			{	/* Be specific in the error as to what hash we were trying to find. */
-				err_caused_by_gpg = ('\0' != gtmcrypt_err_string[0]);
+				errptr = gtmcrypt_strerror();
+				err_caused_by_gpg = ('\0' != errptr[0]);
 				alert_msg = err_caused_by_gpg ? GPG_MESSAGE : NON_GPG_MESSAGE;
 				GC_HEX(hash, hex_buff, GTMCRYPT_HASH_HEX_LEN);
 				if (err_caused_by_gpg)
 				{
-					errorlen = STRLEN(gtmcrypt_err_string);
+					errorlen = STRLEN(errptr);
 					if (MAX_GTMCRYPT_ERR_STRLEN < errorlen)
 						errorlen = MAX_GTMCRYPT_ERR_STRLEN;
-					memcpy(save_err, gtmcrypt_err_string, errorlen);
+					memcpy(save_err, errptr, errorlen);
 					save_err[errorlen] = '\0';
 					UPDATE_ERROR_STRING("Expected hash - " STR_ARG " - %s. %s",
 						ELLIPSIZE(hex_buff), save_err, alert_msg);

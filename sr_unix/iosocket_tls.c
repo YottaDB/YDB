@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2021 Fidelity National Information	*
+ * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,6 +43,7 @@
 GBLREF io_pair			io_curr_device;
 GBLREF char			dl_err[MAX_ERRSTR_LEN];
 GBLREF int			dollar_truth;
+GBLREF void 			(*primary_exit_handler)(void);
 
 GBLREF	gtm_tls_ctx_t		*tls_ctx;
 
@@ -194,7 +195,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			}
 			if (NULL == (tls_ctx = (gtm_tls_init(GTM_TLS_API_VERSION, GTMTLS_OP_INTERACTIVE_MODE))))
 			{
-				errp = gtm_tls_get_error();
+				errp = gtm_tls_get_error(NULL);
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 				if (socketptr->ioerror)
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, errlen, errp);
@@ -203,6 +204,8 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
 			}
+			if (primary_exit_handler)
+				atexit(primary_exit_handler);
 		}
 		socketptr->tlsenabled = TRUE;
 		flags = GTMTLS_OP_SOCKET_DEV | ((tlsopt_client == option) ? GTMTLS_OP_CLIENT_MODE : 0);
@@ -232,7 +235,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			{	/* error string available */
 				socketptr->tlsenabled = FALSE;
 				free(extrastr);
-				errp = gtm_tls_get_error();
+				errp = gtm_tls_get_error(NULL);
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
 				return;
@@ -250,7 +253,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			if (0 > gtm_tls_store_passwd(tls_ctx, idstr, passwordstr))
 			{	/* error string available */
 				socketptr->tlsenabled = FALSE;
-				errp = gtm_tls_get_error();
+				errp = gtm_tls_get_error(NULL);
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
 				return;
@@ -262,7 +265,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			{	/* Due to lack of gtm_tls_version(), old pre GTM_TLS_API_VERSION_NONBLOCK plugins will not even
 				 * load but include this test as an example of how to check if the plugin loaded is new enough */
 				socketptr->tlsenabled = FALSE;
-				errp = gtm_tls_get_error();
+				errp = gtm_tls_get_error(NULL);
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
 				return;
@@ -313,7 +316,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 		if (NULL == socketptr->tlssocket)
 		{
 			socketptr->tlsenabled = FALSE;
-			errp = gtm_tls_get_error();
+			errp = gtm_tls_get_error(NULL);
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 			if (socketptr->ioerror)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
@@ -376,7 +379,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				{
 					tls_errno = gtm_tls_errno();
 					if (0 > tls_errno)
-						errp = gtm_tls_get_error();
+						errp = gtm_tls_get_error((gtm_tls_socket_t *)socketptr->tlssocket);
 					else
 						errp = STRERROR(tls_errno);
 				} else
@@ -462,7 +465,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			{ /* get obuffer_error as additional ERR_TEXT */
 				errp = FLUSH_OUTPUT_ERROR;
 				if (-1 == socketptr->obuffer_errno)
-					errp2 = gtm_tls_get_error();
+					errp2 = gtm_tls_get_error((gtm_tls_socket_t *)socketptr->tlssocket);
 				else
 					errp2 = (char *)STRERROR(socketptr->obuffer_errno);
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR1_ERRSTR2(iod, errp, errlen, errp2, errlen2);
@@ -506,7 +509,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 		{
 			tls_errno = gtm_tls_errno();
 			if (0 > tls_errno)
-				errp = gtm_tls_get_error();
+				errp = gtm_tls_get_error((gtm_tls_socket_t *)socketptr->tlssocket);
 			else
 				errp = STRERROR(tls_errno);
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);

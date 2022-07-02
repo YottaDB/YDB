@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -123,6 +123,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 msec_timeout, boolean_t u
 						RTS_ERROR_LITERAL("SO_RCVBUF"), real_errno, errlen, errptr);
 					return FALSE;
 				}
+				socketptr->options_state.rcvbuf |= SOCKOPTIONS_USER;
 			} else
 			{
 				sockbuflen = SIZEOF(socketptr->bufsiz);
@@ -137,6 +138,15 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 msec_timeout, boolean_t u
 						RTS_ERROR_LITERAL("SO_RCVBUF"), real_errno, errlen, errptr);
 					return FALSE;
 				}
+				socketptr->options_state.rcvbuf |= SOCKOPTIONS_SYSTEM;
+			}
+			if (0 != (SOCKOPTIONS_PENDING & socketptr->options_state.sndbuf))
+			{
+				if (-1 == iosocket_setsockopt(socketptr, "SO_SNDBUF", SO_SNDBUF, SOL_SOCKET,
+						&socketptr->iobfsize, sizeof(socketptr->iobfsize), TRUE))
+					return FALSE;
+				socketptr->options_state.sndbuf |= SOCKOPTIONS_USER;
+				socketptr->options_state.sndbuf &= ~SOCKOPTIONS_PENDING;
 			}
 		}
 		if (socket_local == socketptr->protocol)
@@ -250,8 +260,13 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 msec_timeout, boolean_t u
 		if (0 == socketptr->local.port)
 			socketptr->local.port = actual_port;
 		assert(socketptr->local.port == actual_port);
-		keepalive_opt = TREF(gtm_socket_keepalive_idle);	/* deviceparameter would give more granular control */
-		if (keepalive_opt && !iosocket_tcp_keepalive(socketptr, keepalive_opt, action))
+		if ((SOCKOPTIONS_PENDING & socketptr->options_state.alive)
+			|| (SOCKOPTIONS_PENDING & socketptr->options_state.cnt)
+			|| (SOCKOPTIONS_PENDING & socketptr->options_state.intvl))
+			keepalive_opt = SOCKOPTIONS_FROM_STRUCT;
+		else
+			keepalive_opt = TREF(gtm_socket_keepalive_idle);	/* deviceparameter takes precedence */
+		if (keepalive_opt && !iosocket_tcp_keepalive(socketptr, keepalive_opt, action, TRUE))
 			return FALSE;				/* iosocket_tcp_keepalive issues rts_error rather than return */
 	} else
 	{

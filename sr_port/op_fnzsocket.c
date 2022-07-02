@@ -70,10 +70,18 @@ LITDEF char *zsocket_tls_options[] = {"CIPHER", "OPTIONS", "SESSION", "INTERNAL"
 #define	TLS_OPTIONS_INTERNAL	8
 #define TLS_OPTIONS_ALL_INDEX	4
 #define	TLS_OPTIONS_ALL_MASK	(TLS_OPTIONS_CIPHER | TLS_OPTIONS_OPTIONS | TLS_OPTIONS_SESSION)
-#define	OPTIONEND		','
-#define	OPTIONENDSTR		","
 #define OPTIONPREFIXLEN		3		/* vertbar CPOS colon */
 #endif
+
+#define	OPTIONEND		','
+#define	OPTIONENDSTR		","
+#define OPTIONDISABLE		'!'
+#define OPTIONVALUE		'='
+#define OPTIONVALUESEP		';'
+
+#define KEEPALIVE_STR	"KEEPALIVE"
+#define KEEPIDLE_STR	"KEEPIDLE"
+#define SNDBUF_STR	"SNDBUF"
 
 #define ZSOCKETITEM(A,B,C,D) {(SIZEOF(A) - 1), A}
 const nametabent zsocket_names[] =
@@ -83,9 +91,9 @@ const nametabent zsocket_names[] =
 #undef ZSOCKETITEM
 const unsigned char zsocket_indextab[] =
 { /*	A  B  C  D  E  F  G  H  I  J  K  L  M  N */
-	0, 0, 1, 2, 4, 4, 4, 4, 5, 7, 7, 7, 9, 10,
+	0, 0, 1, 2, 4, 4, 4, 4, 5, 7, 7, 11, 13, 14,
   /*	O   P   Q   R   S   T   U   V   W   X   Y   Z  end */
-	11, 11, 13, 13, 15, 17, 18, 18, 18, 18, 18, 18, 22
+	15, 16, 18, 18, 20, 23, 24, 24, 24, 24, 24, 24, 28
 };
 #define ZSOCKETITEM(A,B,C,D) C
 static const int zsocket_types[] =
@@ -99,19 +107,52 @@ static const int zsocket_level[] =
 #include "zsockettab.h"
 };
 #undef ZSOCKETITEM
+
+#define RETURN_SOCKOPT(OPTSTATE, OPTVALUE)				\
+MBSTART {								\
+	numret_set = 0;							\
+	if (0 == (SOCKOPTIONS_USER & socketptr->options_state.OPTSTATE))\
+	{	/* no user specified value */				\
+		numret = socketptr->OPTVALUE = sockopt_value;		\
+		numret_set = TRUE;					\
+		socketptr->options_state.OPTSTATE |= SOCKOPTIONS_SYSTEM;\
+	} else if (sockopt_value == socketptr->OPTVALUE)		\
+	{	/* user value same as getsockopt so just return it */	\
+		numret = sockopt_value;					\
+		numret_set = TRUE;					\
+	} else								\
+	{	/* return both values */				\
+		len = (2 * MAX_DIGITS_IN_INT) + 1;			\
+		ENSURE_STP_FREE_SPACE(len);				\
+		charptr = (char *)stringpool.free;			\
+		charptr = (char *)i2asc((uchar_ptr_t)charptr, socketptr->OPTVALUE);	\
+		*charptr++ = OPTIONVALUESEP;				\
+		charptr = (char *)i2asc((uchar_ptr_t)charptr, sockopt_value);	\
+		len = charptr - (char *)stringpool.free;		\
+		dst->str.addr = (char *)stringpool.free;		\
+		dst->str.len = len;					\
+		UTF8_ONLY(dst->str.char_len = 0);			\
+		stringpool.free += len;					\
+		zsocket_type = MV_STR;					\
+		numret_set = FALSE;					\
+	}								\
+} MBEND
+
 LITDEF mval literal_local = DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, (SIZEOF("LOCAL") - 1), "LOCAL", 0, 0);
 LITDEF mval literal_tcp = DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, (SIZEOF("TCP") - 1), "TCP", 0, 0);
 LITDEF mval literal_tcp6 = DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, (SIZEOF("TCP6") - 1), "TCP6", 0, 0);
 LITDEF char *zsocket_state_names[] = {"CONNECTED", "LISTENING", "BOUND", "CREATED", "CONNECTINPROGRESS"};
 LITDEF char *zsocket_howcreated_names[] = {"LISTEN", "ACCEPTED", "CONNECT", "PRINCIPAL", "PASSED"};
+/* Code scanners need this for a bounds check inspite of the above being hard coded names */
+#define MAX_ZSOCKET_NAMES (sizeof"CONNECTINPROGRESS" - 1)
 
 /* Macro to set the pointer to the target socket in the SOCKET device */
 #define GET_SOCKETPTR_INDEX(DSOCK, INDEX, SOCKETPTR)				\
-MBSTART {									\
+MBSTART {	/* if not even "," for third arg then force invalid index */	\
 	INDEX = (NULL != arg1) ?						\
 		(!M_ARG_SKIPPED(arg1) ? mval2i(arg1) : DSOCK->current_socket)	\
 		: (DSOCK->n_socket + 1);					\
-	if ((0 <= INDEX) && (0 < DSOCK->n_socket) && (INDEX <= DSOCK->n_socket))\
+	if ((0 <= INDEX) && (0 < DSOCK->n_socket) && (INDEX < DSOCK->n_socket))	\
 		SOCKETPTR = DSOCK->socket[INDEX];				\
 	else	/* Index not in bounds; treat like non-existent socket */	\
 		SOCKETPTR = NULL;						\
@@ -119,8 +160,8 @@ MBSTART {									\
 
 void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 {
-	VMS_ONLY(int	numarg;)
 	int		zsocket_item, zsocket_type, tmpnum, numret, index, index2;
+	int		numret_set;
 	int4		stat, len, len2;
 	mval		*arg1, *arg2, tmpmval;
 	mval		*keyword;
@@ -133,6 +174,8 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	int		nlen;		/* len of $P name */
 	io_log_name	*tlp;		/* logical record for translated name for $principal */
 	int		nldone;		/* 0 if not $ZPIN or $ZPOUT, 1 if $ZPIN and 2 if $ZPOUT */
+	int			sockopt_value;	/* for getsockopt calls */
+	GTM_SOCKLEN_TYPE	sockopt_len;	/* for getsockopt calls */
 	d_socket_struct		*dsocketptr;
 	socket_struct		*socketptr;
 #ifdef	GTM_TLS
@@ -147,7 +190,6 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	VMS_ONLY(va_count(numarg));
 	assertpro(2 <= numarg);
 	VAR_START(var, dst);
 	assertpro(NULL != dst);
@@ -184,8 +226,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			return;
 		}
 		iod = socket_pool->iod;
-	}
-	else if (0 == devicename->str.len)
+	} else if (0 == devicename->str.len)
 		iod = io_curr_device.in;
 	else
 	{
@@ -241,6 +282,9 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	if ((zsocket_item = namelook(zsocket_indextab, zsocket_names, keyword->str.addr, keyword->str.len)) < 0)
 	{
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZSOCKETATTR, 2, keyword->str.len, keyword->str.addr);
+		return;		/* The compiler doesn't like the zsocket_item == -1 case, and in pro it doesn't
+				 * see the assert(FALSE) from RTS_ERROR_CSA_ABT(), so let it know we are bailing out.
+				 */
 	}
 	zsocket_type = zsocket_types[zsocket_item];
 	if ((level_socket == zsocket_level[zsocket_item]) && (zsocket_index != zsocket_item))
@@ -278,6 +322,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 				} else
 				{	/* return UTF-8 or M */
 					dst->str = socketptr->delimiter[index2];
+					assert((0 <= dst->str.len) && (MAX_DELIM_LEN >= dst->str.len));
 					s2pool(&dst->str);
 					zsocket_type = MV_STR;
 				}
@@ -291,6 +336,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			dst->str.addr = (char *)zsocket_howcreated_names[socketptr->howcreated];
 			dst->str.len = STRLEN(dst->str.addr);
 			UTF8_ONLY(dst->str.char_len = 0);
+			assert((0 <= dst->str.len) && (MAX_ZSOCKET_NAMES >= dst->str.len));
 			s2pool(&dst->str);
 			break;
 		case zsocket_index:
@@ -323,6 +369,66 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			else
 				*dst = literal_zero;
 			break;
+		case zsocket_keepalive:
+			/* return [uservalue;]getsockoptvalue */
+			/* return null string if error */
+			sockopt_value = 0;
+			sockopt_len = sizeof(sockopt_value);
+			if (-1 != iosocket_getsockopt(socketptr, "SO_KEEPALIVE", SO_KEEPALIVE, SOL_SOCKET, &sockopt_value,
+						&sockopt_len, FALSE))
+			{
+				RETURN_SOCKOPT(alive, keepalive);
+			} else
+			{
+				*dst = literal_null;
+				zsocket_type = MV_STR;
+			}
+			break;
+		case zsocket_keepcnt:
+			/* return [uservalue;]getsockoptvalue */
+			/* return null string if error */
+			sockopt_value = 0;
+			sockopt_len = sizeof(sockopt_value);
+			if (-1 != iosocket_getsockopt(socketptr, "TCP_KEEPCNT", TCP_KEEPCNT, IPPROTO_TCP, &sockopt_value,
+						&sockopt_len, FALSE))
+			{
+				RETURN_SOCKOPT(cnt, keepcnt);
+			} else
+			{
+				*dst = literal_null;
+				zsocket_type = MV_STR;
+			}
+			break;
+		case zsocket_keepidle:
+			/* return [uservalue;]getsockoptvalue */
+			/* return null string if error */
+			sockopt_value = 0;
+			sockopt_len = sizeof(sockopt_value);
+			if (-1 != iosocket_getsockopt(socketptr, "TCP_KEEPIDLE", TCP_KEEPIDLE, IPPROTO_TCP, &sockopt_value,
+						&sockopt_len, FALSE))
+			{
+				RETURN_SOCKOPT(idle, keepidle);
+			} else
+			{
+				*dst = literal_null;
+				zsocket_type = MV_STR;
+			}
+			break;
+		case zsocket_keepintvl:
+			/* return [uservalue;]getsockoptvalue */
+			/* return null string if error */
+			sockopt_value = 0;
+			sockopt_len = sizeof(sockopt_value);
+			if (-1 != iosocket_getsockopt(socketptr, "TCP_KEEPINTVL", TCP_KEEPINTVL, IPPROTO_TCP, &sockopt_value,
+						&sockopt_len, FALSE))
+			{
+				RETURN_SOCKOPT(intvl, keepintvl);
+			} else
+			{
+				*dst = literal_null;
+				zsocket_type = MV_STR;
+			}
+			break;
 		case zsocket_localaddress:
 			if (NULL != socketptr->local.saddr_ip)
 			{
@@ -345,6 +451,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			} else
 				*dst = literal_null;
 			UTF8_ONLY(dst->str.char_len = 0);
+			assert((0 <= dst->str.len) && (SA_MAXLEN >= dst->str.len));
 			s2pool(&dst->str);
 			break;
 		case zsocket_localport:
@@ -368,12 +475,68 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case zsocket_number:
 			numret = (int)dsocketptr->n_socket;
 			break;
+		case zsocket_options:
+			/* build string from socket struct - note this may not be exactly what was specified */
+			len = 0;
+			if (SOCKOPTIONS_SYSTEM < socketptr->options_state.alive)
+			{	/* user specified */
+				len += STRLEN(KEEPALIVE_STR);
+				if (0 == socketptr->keepalive)
+					len++;		/* disabled */
+				else if (SOCKOPTIONS_SYSTEM < socketptr->options_state.idle)
+				{	/* if keepalive disabled skip keepidle */
+					len += STRLEN(KEEPIDLE_STR) + 1;	/* count = */
+					len += MAX_DIGITS_IN_INT;
+				}
+			}
+			if (SOCKOPTIONS_SYSTEM < socketptr->options_state.sndbuf)
+			{
+				if (len) len++;		/* comma unless only option */
+				len += STRLEN(SNDBUF_STR) + 1;	/* count = */
+				len += MAX_DIGITS_IN_INT;
+			}
+			ENSURE_STP_FREE_SPACE(len);
+			charptr = (char *)stringpool.free;
+			len2 = 0;
+			if (SOCKOPTIONS_SYSTEM < socketptr->options_state.alive)
+			{	/* user specified */
+				len2++;		/* count options */
+				if (0 >= socketptr->keepalive)
+				{
+					*charptr++ = OPTIONDISABLE;
+				}
+				MEMCPY_LIT(charptr, KEEPALIVE_STR);
+				charptr += STR_LIT_LEN(KEEPALIVE_STR);
+				if (0 < socketptr->keepidle)
+				{
+					*charptr++ = OPTIONVALUE;
+					charptr = (char *)i2asc((uchar_ptr_t)charptr, socketptr->keepidle);
+				}
+
+			}
+			if (SOCKOPTIONS_SYSTEM < socketptr->options_state.sndbuf)
+			{
+				if (0 < len2)
+					*charptr++ = OPTIONEND;		/* of previous option */
+				MEMCPY_LIT(charptr, SNDBUF_STR);
+				charptr += STR_LIT_LEN(SNDBUF_STR);
+				*charptr++ = OPTIONVALUE;
+				charptr = (char *)i2asc((uchar_ptr_t)charptr, socketptr->iobfsize);
+			}
+			len = charptr - (char *)stringpool.free;
+			dst->str.addr = (char *)stringpool.free;
+			dst->str.len = len;
+			UTF8_ONLY(dst->str.char_len = 0);
+			stringpool.free += len;
+			break;
 		case zsocket_parent:
 			if (NULL != socketptr->parenthandle)
 			{
 				dst->str.addr = socketptr->parenthandle;
 				dst->str.len = STRLEN(socketptr->parenthandle);
 				UTF8_ONLY(dst->str.char_len = 0);
+				/* The source buffer is socket_struct->handle[MAX_HANDLE_LEN] */
+				assert((0 <= dst->str.len) && (MAX_HANDLE_LEN >= dst->str.len));
 				s2pool(&dst->str);
 			} else
 				*dst = literal_null;
@@ -409,7 +572,6 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			{
 				dst->str.addr = socketptr->remote.saddr_ip;
 				dst->str.len = STRLEN(socketptr->remote.saddr_ip);
-#			ifndef VMS
 			} else if (socket_local == socketptr->protocol)
 			{
 				if (NULL != socketptr->remote.sa)
@@ -422,10 +584,10 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 					break;
 				}
 				dst->str.len = STRLEN(dst->str.addr);
-#			endif
 			} else
 				*dst = literal_null;
 			UTF8_ONLY(dst->str.char_len = 0);
+			assert((0 <= dst->str.len) && (SA_MAXLEN >= dst->str.len));
 			s2pool(&dst->str);
 			break;
 		case zsocket_remoteport:
@@ -437,10 +599,26 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 				zsocket_type = MV_STR;
 			}
 			break;
+		case zsocket_sndbuf:
+			/* return [uservalue;]getsockoptvalue */
+			/* return null string if error */
+			sockopt_value = 0;
+			sockopt_len = sizeof(sockopt_value);
+			if (-1 != iosocket_getsockopt(socketptr, "SO_SNDBUF", SO_SNDBUF, SOL_SOCKET, &sockopt_value,
+						&sockopt_len, FALSE))
+			{
+				RETURN_SOCKOPT(sndbuf, iobfsize);
+			} else
+			{
+				*dst = literal_null;
+				zsocket_type = MV_STR;
+			}
+			break;
 		case zsocket_sockethandle:
 			dst->str.addr = socketptr->handle;
 			dst->str.len = socketptr->handle_len;
 			UTF8_ONLY(dst->str.char_len = 0);
+			assert((0 <= dst->str.len) && (MAX_HANDLE_LEN >= dst->str.len));
 			s2pool(&dst->str);
 			break;
 		case zsocket_state:
@@ -448,6 +626,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			dst->str.addr = (char *)zsocket_state_names[socketptr->state];
 			dst->str.len = STRLEN(dst->str.addr);
 			UTF8_ONLY(dst->str.char_len = 0);
+			assert((0 <= dst->str.len) && (MAX_ZSOCKET_NAMES >= dst->str.len));
 			s2pool(&dst->str);
 			break;
 		case zsocket_tls:
@@ -636,12 +815,20 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			if (0 < socketptr->zff.len)
 			{
 				dst->str = socketptr->zff;
+				assert((0 <= dst->str.len) && (MAX_ZFF_LEN >= dst->str.len));
 				s2pool(&dst->str);
 			} else
 				*dst = literal_null;
 			break;
 		case zsocket_zibfsize:
-			numret = socketptr->bufsiz;
+			sockopt_value = 0;
+			sockopt_len = sizeof(sockopt_value);
+			if (-1 != iosocket_getsockopt(socketptr, "SO_RCVBUF", SO_RCVBUF, SOL_SOCKET, &sockopt_value,
+						&sockopt_len, FALSE))
+			{
+				RETURN_SOCKOPT(rcvbuf, bufsiz);
+			} else
+				numret = socketptr->bufsiz;
 			break;
 		default:
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZSOCKETATTR, 2, keyword->str.len, keyword->str.addr);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,6 @@ GBLREF	lv_val		*active_lv;
 
 error_def(ERR_LVNULLSUBS);
 error_def(ERR_MAXSTRLEN);
-error_def(ERR_UNDEF);
 
 #ifdef DEBUG
 void	set_active_lv(lv_val *newlv, boolean_t do_assert, int type)

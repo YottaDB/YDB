@@ -351,10 +351,10 @@ void async_action(bool lnfetch_or_start)
 	if (jobinterrupt == outofband)
 	{
 		if (dollar_zininterrupt)
-		{	/* This moderately deparate hack deals with interrupt flooding creeping through little state windows */
+		{	/* This moderately desparate hack deals with interrupt flooding creeping through little state windows */
 			assert(active == TAREF1(save_xfer_root, outofband).event_state);
 			real_xfer_reset(jobinterrupt);
-			assert(FALSE);
+			DEBUG_ONLY(gtm_fork_n_core());
 			MUM_TSTART;
 		}
 		TAREF1(save_xfer_root, jobinterrupt).event_state = pending;	/* jobinterrupt gets a pass from the assert below */

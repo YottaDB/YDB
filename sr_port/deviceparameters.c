@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -142,6 +142,7 @@ LITDEF nametabent dev_param_names[] =
 	,{1,"O"}				/* legacy abreviation for OWNER */
 	,{6,"OCHSET"}
 	,{4,"OKEY"}
+	,{7,"OPTIONS"}
 	,{9,"OUTREWIND"}
 	,{7,"OUTSEEK"}
 	,{2,"OV*"}	,{9,"OVERWRITE"}
@@ -242,7 +243,7 @@ LITDEF	uint4 dev_param_index[27] =
 	0,   5,   9,   27,  35,  50,  66,  68,  73,  82,  82,  83,  91,  94,
 
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	162, 170, 189, 190, 205, 225, 235, 241, 242, 257, 258, 259, 282
+	162, 171, 190, 191, 206, 226, 236, 242, 243, 258, 259, 260, 283
 };
 
 /* Offset of string within letter in dev_param_names */
@@ -390,6 +391,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_o_protection
 		,iop_opchset
 		,iop_output_key
+		,iop_options
 		,iop_outrewind
 		,iop_outseek
 		,iop_noinsert ,iop_noinsert

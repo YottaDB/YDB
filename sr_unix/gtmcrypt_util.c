@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2021 Fidelity National Information	*
+ * Copyright (c) 2013-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@
  * implementation.
  */
 GBLDEF	char	gtmcrypt_err_string[MAX_GTMCRYPT_ERR_STRLEN + 1];
+GBLDEF	char	*gtmtls_err_string = NULL;
 #ifndef USE_SYSLIB_FUNCS
 GBLDEF gtm_malloc_fnptr_t		gtm_malloc_fnptr;
 GBLDEF gtm_free_fnptr_t			gtm_free_fnptr;

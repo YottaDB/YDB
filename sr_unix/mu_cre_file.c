@@ -446,8 +446,8 @@ unsigned char mu_cre_file(void)
 	}
 	if (!cs_data->defer_allocate)
 	{
-		status = posix_fallocate(udi->fd, 0, BLK_ZERO_OFF(cs_data->start_vbn) +
-					 ((off_t)(cs_data->trans_hist.total_blks + 1) * cs_data->blk_size));
+		POSIX_FALLOCATE(udi->fd, 0, BLK_ZERO_OFF(cs_data->start_vbn) +
+					 ((off_t)(cs_data->trans_hist.total_blks + 1) * cs_data->blk_size), status);
 		if (0 != status)
 		{
 			assert(ENOSPC == status);

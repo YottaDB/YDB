@@ -248,7 +248,7 @@ int cmd(void)
 	}
 	if (!VALID_CMD(x))
 	{
-	    	stx_error(ERR_CNOTONSYS);
+		stx_error(ERR_CNOTONSYS);
 		return FALSE;
 	}
 	oldchain = NULL;
@@ -281,6 +281,7 @@ int cmd(void)
 			{	/* it's FALSE, so no need for this parse - get ready to discard it */
 				dqinit(&tmpchain, exorder);
 				oldchain = setcurtchain(&tmpchain);
+				TREF(discard) = (NULL != oldchain);
 			}
 			unuse_literal(v);
 			dqdel(triptr, exorder);				/* if it's TRUE, so just pretend it never appeared */
@@ -297,7 +298,10 @@ int cmd(void)
 	else if ((TK_EOL != TREF(window_token)) || !cmd_data[x].eol_ok)
 	{
 		if (NULL != oldchain)
+		{
 			setcurtchain(oldchain);
+			TREF(discard) = FALSE;
+		}
 		stx_error(ERR_SPOREOL);
 		return FALSE;
 	}
@@ -310,7 +314,10 @@ int cmd(void)
 			if ((TK_SPACE == TREF(window_token)) || (TK_EOL == TREF(window_token)))
 			{
 				if (NULL != oldchain)
+				{
 					setcurtchain(oldchain);
+					TREF(discard) = FALSE;
+				}
 				stx_error(ERR_EXPR);
 				return FALSE;
 			}
@@ -322,6 +329,7 @@ int cmd(void)
 		(TREF(fetch_control)).curr_fetch_opr = fetch1;
 		(TREF(fetch_control)).curr_fetch_count = fetch_cnt;
 		setcurtchain(oldchain);
+		TREF(discard) = FALSE;
 		return TRUE;
 	}
 	if ((EXPR_FAIL != rval) && cr)

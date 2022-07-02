@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,9 +36,11 @@
 #include "iosp.h"
 #include "repl_shutdcode.h"
 #include "repl_msg.h"
+#include "repl_comm.h"
 #include "gtmsource.h"
 #include "error.h"
 #include "dpgbldir.h"
+#include "wbox_test_init.h"
 
 #ifdef UNIX
 #include "ftok_sems.h"
@@ -47,6 +49,7 @@
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		is_src_server;
 GBLREF	gtmsource_options_t	gtmsource_options;
+GBLREF	int			gtmsource_sock_fd;
 
 error_def(ERR_ASSERT);
 error_def(ERR_CTRLC);
@@ -91,6 +94,11 @@ CONDITION_HANDLER(gtmsource_ch)
 		if (is_src_server)
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLSRCEXITERR, 2, gtmsource_options.secondary_instname,
 					gtmsource_options.log_file);
+		/* When WBTEST_INDUCE_TLSIOERR, intentionally skip the gracefull close of the socket descriptor to
+		 * induce a TLSIOERR in the Receiver Server */
+		DEBUG_ONLY(if (!WBTEST_ENABLED(WBTEST_INDUCE_TLSIOERR)))
+			if (FD_INVALID != gtmsource_sock_fd) /* Close the socket if open */
+				repl_close(&gtmsource_sock_fd);
        		NEXTCH;
 	}
 	VMS_ONLY (

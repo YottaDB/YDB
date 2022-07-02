@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2021 Fidelity National Information	*
+ * Copyright (c) 2003-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -204,7 +204,8 @@ void release_all_locks(unix_db_info *udi, gtmsource_local_ptr_t gtmsourcelocal_p
         onln_rlbk_reg_list      *rl;
 
         for (rl = rl_last; rl; rl = rl->fPtr)
-		RELEASE_ACCESS_CONTROL(rl); /* reset udi->grabbed_access_sem to FALSE */
+		if((FILE_INFO(rl->reg)->grabbed_access_sem) && (rl->rctl->standalone)) /* If we didn't already release it */
+			RELEASE_ACCESS_CONTROL(rl); /* reset udi->grabbed_access_sem to FALSE */
 	/* Release all the source server latches, from mur_close_files */
 	if (((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl)) && jgbl.onlnrlbk)
 	{
@@ -561,10 +562,14 @@ int4 mur_open_files(boolean_t retry)
 			if (x_lock)
 				break;
 			rl_last = rl;
-			for (rl = reglist; rl_last != rl; rl = rl->fPtr)
+			/* Iterate over all regions releasing them as long as we have it. Note that db_init()
+			 * pre-grabbed regions, so that the GRAB_ACCESS_CONTROL() in the first loop isn't the
+			 * only way a region could have been grabbed.*/
+			for (rl = reglist; NULL != rl; rl = rl->fPtr)
 			{
 				rel_crit(rl->reg);
-				RELEASE_ACCESS_CONTROL(rl);
+				if( (FILE_INFO(rl->reg)->grabbed_access_sem) && (rl->rctl->standalone))	/* We have this region..*/
+					RELEASE_ACCESS_CONTROL(rl);
 			}
 			assert((NULL != save_rl) && (tmpcsa->region == save_rl->reg));
 			GET_CUR_TIME(time_str);
@@ -839,7 +844,7 @@ int4 mur_open_files(boolean_t retry)
 					if (mur_options.forward && JNL_ENABLED(csd))
 						csd->jnl_state = jnl_closed;
 					csd->repl_state = repl_closed;
-					csd->file_corrupt = TRUE;
+					csd->file_corrupt = TRUE + 1;	/* very special kind of "true" indicates a temp condition */
 					/* flush the changed csd to disk */
 					fc = FILE_CNTL(rctl->gd);
 					fc->op = FC_WRITE;

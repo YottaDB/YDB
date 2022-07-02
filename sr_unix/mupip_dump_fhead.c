@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,12 +36,14 @@
 #include "mupip_dump_fhead.h"
 #include "gtm_stdlib.h"
 #include "wcs_flu.h"
+#include "mdq.h"
 
 GBLREF char			gtm_dist[GTM_PATH_MAX];
 GBLREF boolean_t		gtm_dist_ok_to_use;
 GBLREF tp_region		*grlist;
 GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_addrs		*cs_addrs;
+GBLREF usr_reg_que		*usr_spec_regions;
 
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_DBNOREGION);
@@ -60,6 +62,7 @@ void mupip_dump_fhead(void)
 	tp_region	*rptr;
 	unsigned char	file[GTM_PATH_MAX];
 	unsigned short	file_len = GTM_PATH_MAX - 1;
+	usr_reg_que	*region_que_entry;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -73,8 +76,16 @@ void mupip_dump_fhead(void)
 		mu_getlst("WHAT", SIZEOF(tp_region));
 		if (!grlist)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DBNOREGION);
-		for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)
+		dqloop(usr_spec_regions, que, region_que_entry)
 		{
+			for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)
+			{
+				gv_cur_region = rptr->reg;
+				if ((char *)gv_cur_region->rname == (char *)region_que_entry->usr_reg)
+					break; /* Matching region found. Exit the loop */
+			}
+			if (NULL == rptr)
+				continue; /* continue the dqloop */
 			if (CLI_PRESENT == cli_present("FLUSH"))
 			{
 				gv_init_reg(rptr->reg, NULL);

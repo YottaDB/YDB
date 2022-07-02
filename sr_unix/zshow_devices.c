@@ -30,6 +30,10 @@
 #include "zshow_params.h"
 #include "nametabtyp.h"
 #include "mvalconv.h"
+#include "iosp.h"
+#include "mmemory.h"
+#include "trans_log_name.h"
+#include "view.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #include <_Ccsid.h>
@@ -52,12 +56,25 @@ static readonly char	space_text[] = {' '};
 GBLREF boolean_t	ctrlc_on, gtm_utf8_mode, hup_on;
 GBLREF io_log_name	*io_root_log_name;
 GBLREF io_pair		*io_std_device;
+GBLREF io_log_name	*dollar_principal;
+GBLREF mstr		dollar_prin_log;
+GBLREF mstr		dollar_zpin;			/* contains "< /" */
+GBLREF mstr		dollar_zpout;			/* contains "> /" */
 GBLREF int		process_exiting;
 
 LITREF mstr		chset_names[];
 LITREF nametabent	dev_param_names[];
 LITREF uint4		dev_param_index[];
 LITREF zshow_index	zshow_param_index[];
+
+static readonly char terminal_text[] = "TERMINAL ";
+static readonly char rmsfile_text[] =  "RMS ";
+static readonly char fifo_text[] =  "FIFO ";
+static readonly char pipe_text[] =  "PIPE ";
+static readonly char socket_text[] = "SOCKET";		/* no trailing space */
+static readonly char null_text[] =  "NULL";
+static readonly char devop[] = "OPEN ";
+static readonly char devcl[] = "CLOSED ";
 
 void zshow_devices(zshow_out *output)
 {
@@ -82,11 +99,7 @@ void zshow_devices(zshow_out *output)
 	static readonly char space8_text[] = "        ";
 	static readonly char filchar_text[] = "CHARACTERS";
 	static readonly char filesc_text[] = "ESCAPES";
-	static readonly char terminal_text[] = "TERMINAL ";
 	static readonly char magtape_text[] =  "MAGTAPE ";
-	static readonly char rmsfile_text[] =  "RMS ";
-	static readonly char fifo_text[] =  "FIFO ";
-	static readonly char pipe_text[] =  "PIPE ";
 	static readonly char mailbox_text[] =  "MAILBOX ";
 	static readonly char dollarc_text[] = "$C(";
 	static readonly char equal_text[] = {'='};
@@ -96,8 +109,6 @@ void zshow_devices(zshow_out *output)
 	static readonly char rparen_text[] = {')'};
 	static readonly char lb_text[] = {'['};
 	static readonly char rb_text[] = {']'};
-	static readonly char devop[] = "OPEN ";
-	static readonly char devcl[] = "CLOSED ";
 	static readonly char interrupt_text[] = "ZINTERRUPT ";
 	static readonly char stdout_text[] =  "0-out";
 	static readonly char input_key[] = "IKEY=";
@@ -118,7 +129,6 @@ void zshow_devices(zshow_out *output)
 	static readonly char current_text[] = "CURRENT=";
 	static readonly char passive_text[] = "PASSIVE ";
 	static readonly char active_text[] = "ACTIVE ";
-	static readonly char socket_text[] = "SOCKET";
 	static readonly char descriptor_text[] = "DESC=";
 	static readonly char trap_text[] = "TRAP ";
 	static readonly char notrap_text[] = "NOTRAP ";
@@ -847,4 +857,108 @@ void zshow_devices(zshow_out *output)
 			}
 		}
 	}
+}
+
+/* Called from op_fnview for DEVICE keyword to get device type and status 	*
+ *
+ * device_name	pointer to mstr for device name, may be $ZPIN or $ZPOUT *
+ * device		output buffer : devicetype:open/closed			*
+ * device_len		length of buffer					*
+ * Returns		number of characters in output				*
+ */
+int view_device(mstr *device_name, unsigned char *device, int device_len)
+{
+	int4		len, len2, stat;
+	mstr		tn;				/* translated name */
+	mstr		devicename;
+	io_desc		*iod;
+	io_log_name	*nlog, *tl;
+	d_rm_struct	*rm_ptr;
+	char		buf1[MAX_TRANS_NAME_LEN];	/* buffer to hold translated name */
+	char		*c1;				/* used to compare $P name */
+	char		*devicetype;
+	int		nlen;				/* len of $P name */
+	io_log_name	*tlp;				/* logical record for translated name for $principal */
+	int		nldone;				/* 0 if not $ZPIN or $ZPOUT, 1 if $ZPIN and 2 if $ZPOUT */
+
+	nldone = len = 0;
+	if ((io_std_device->in != io_std_device->out))
+	{
+		tlp = dollar_principal ? dollar_principal : io_root_log_name->iod->trans_name;
+		nlen = tlp->len;
+		assert(dollar_zpout.len == dollar_zpin.len);
+		if ((nlen + dollar_zpout.len) == device_name->len)
+		{	/* passed the length test now compare the 2 pieces, the first one the length of
+			$P and the second $ZPIN or $ZPOUT	*/
+			c1 = (char *)tlp->dollar_io;
+			if (!memvcmp(c1, nlen, device_name->addr, nlen))
+			{
+				if (!memvcmp(dollar_zpin.addr, dollar_zpin.len,
+						&(device_name->addr[nlen]), dollar_zpin.len))
+					nldone = 1;
+				else if (!memvcmp(dollar_zpout.addr, dollar_zpout.len,
+						&(device_name->addr[nlen]), dollar_zpout.len))
+					nldone = 2;
+			}
+		}
+	}
+	if (0 == nldone)
+		nlog = get_log_name(device_name, NO_INSERT);
+	else
+		nlog = get_log_name(&dollar_prin_log, NO_INSERT);
+	if (NULL == nlog)
+	{
+		stat = TRANS_LOG_NAME(device_name, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
+		if (SS_NORMAL == stat)
+		{
+			if (0 != (tl = get_log_name(&tn, NO_INSERT)))
+				nlog = tl;
+		}
+	}
+	if (NULL != nlog)
+	{
+		iod = nlog->iod;
+		/* if iod is standard in device and it is a split device and it is $ZPOUT set iod to output device */
+		if ((2 == nldone) && (io_std_device->in == iod))
+			iod = io_std_device->out;
+		switch (iod->type)
+		{
+			case tt:
+				devicetype = terminal_text;
+				break;
+			case rm:
+				rm_ptr = (d_rm_struct *)iod->dev_sp;
+				if (rm_ptr->fifo)
+					devicetype = fifo_text;
+				else if (!rm_ptr->is_pipe)
+					devicetype = rmsfile_text;
+				else
+					devicetype = pipe_text;
+				break;
+			case gtmsocket:
+				devicetype = socket_text;
+				break;
+			case nl:
+				devicetype = null_text;
+				break;
+			default:
+				devicetype = NULL;
+		}
+		if (NULL != devicetype)
+		{
+			len = strlen(devicetype);
+			if (' ' == devicetype[len - 1])
+				len--;
+			assert((len + 1 + strlen(devcl)) <= device_len);	/* +1 = : */
+			memcpy(device, devicetype, len);
+			device[len] = ':';
+			len++;
+			c1 = (iod->state == dev_open) ? devop : devcl;
+			len2 = strlen(c1) - 1;		/* not the trailing space */
+			assert(' ' == c1[len2]);
+			memcpy(&device[len], c1, len2);
+			len += len2;
+		}
+	}
+	return len;
 }

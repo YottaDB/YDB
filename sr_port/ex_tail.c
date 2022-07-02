@@ -128,16 +128,15 @@ void ex_tail(oprtype *opr)
 				break;
 			}
 			RETURN_IF_RTS_ERROR;
-			if (NULL == v)				/* leaving divide by literal 0 to create a run time error */
-				break;				/* from while */
-			unuse_literal(v0);			/* drop original literals only after deciding whether to defer */
+			if ((NULL == v) || (!v->mvtype))
+				break;		/* leave divide by zero or missing mvtype from NUMOFLOW to cause run time errors */
+			unuse_literal(v0);	/* drop original literals only after deciding whether to defer */
 			unuse_literal(v1);
 			dqdel(t0, exorder);
 			dqdel(t1, exorder);
-			assert(v->mvtype);
 			n2s(v);
-			s2n(v);					/* compiler must leave literals with both numeric and string */
-			t->opcode = OC_LIT;			/* replace the original operator triple with new literal */
+			s2n(v);			/* compiler must leave literals with both numeric and string */
+			t->opcode = OC_LIT;	/* replace the original operator triple with new literal */
 			put_lit_s(v, t);
 			t->operand[1].oprclass = NO_REF;
 			assert(opr->oprval.tref == t);

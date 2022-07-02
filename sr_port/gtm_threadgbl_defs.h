@@ -68,6 +68,7 @@ THREADGBLDEF(linkage_last,			struct linkage_entry *)		/* Last added entry */
 #ifdef USHBIN_SUPPORTED
 THREADGBLDEF(objhash_state,			hash128_state_t)		/* Seed value - progressive hash of object file */
 #endif
+THREADGBLDEF(discard,				boolean_t)                      /* parsing after literal FALSE postconditional */
 THREADGBLDEF(pos_in_chain,			triple)				/* anchor used to restart after a parsing error */
 THREADGBLDEF(rts_error_in_parse,		boolean_t)			/* flag to stop parsing current line */
 THREADGBLDEF(s2n_intlit, 			boolean_t)			/* type info from s2n for advancewindow */

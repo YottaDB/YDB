@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2018-2021 Fidelity National Information	*
+ * Copyright (c) 2018-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved. *
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -54,6 +54,7 @@ GBLREF	io_pair			io_std_device;
 GBLREF	boolean_t		dollar_zaudit;
 GBLREF	char			dl_err[MAX_ERRSTR_LEN];	/* This is maintained by gtm_tls_loadlibrary() */
 GBLREF	dm_audit_info		*audit_conn;
+GBLREF	void 			(*primary_exit_handler)(void);
 
 error_def(ERR_TLSDLLNOOPEN);
 error_def(ERR_TEXT);
@@ -224,11 +225,13 @@ int	dm_audit_connect(void)
 				{
 					close(audit_conn->sock_fd);
 					audit_conn->sock_fd = FD_INVALID;
-					errptr = (char *)gtm_tls_get_error();
+					errptr = (char *)gtm_tls_get_error(NULL);
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_APDCONNFAIL, 0,
 							ERR_TLSINIT, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
 					return -1;
 				}
+				if (primary_exit_handler)
+					atexit(primary_exit_handler);
 			} else
 			{	/* TLS socket already exists, so just reuse it */
 				assert(NULL != audit_conn->tls_sock->gtm_ctx);
@@ -241,7 +244,7 @@ int	dm_audit_connect(void)
 									GTMTLS_OP_DM_AUDIT | GTMTLS_OP_CLIENT_MODE);
 			if (NULL == audit_conn->tls_sock)
 			{
-				errptr = (char *)gtm_tls_get_error();
+				errptr = (char *)gtm_tls_get_error(NULL);
 				close(audit_conn->sock_fd);
 				audit_conn->sock_fd = FD_INVALID;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_APDCONNFAIL, 0,
@@ -251,7 +254,7 @@ int	dm_audit_connect(void)
 			/* Attempt TLS handshake with logger */
 			if (0 > gtm_tls_connect(audit_conn->tls_sock))
 			{
-				errptr = (char *)gtm_tls_get_error();
+				errptr = (char *)gtm_tls_get_error(audit_conn->tls_sock);
 				gtm_tls_socket_close(audit_conn->tls_sock);
 				close(audit_conn->sock_fd);
 				audit_conn->sock_fd = FD_INVALID;
@@ -368,8 +371,9 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 		{
 			audit_conn->conn_type = AUDIT_CONN_TLS;
 			audit_conn->tls_id = (char *)malloc(MAX_TLSID_LEN + 1);
+			assert(NULL != audit_conn->tls_id);
 			audit_conn->tls_id[0] = '\0';
-			if ((3 == fields) && (NULL != tlsid) && ('\0' != tlsid[0]))
+			if ((3 == fields) && ('\0' != tlsid[0]))
 				memcpy(audit_conn->tls_id, tlsid, MAX_TLSID_LEN + 1);
 		}
 	} else
@@ -463,7 +467,7 @@ int	dm_audit_log(mval *v, int src)
 		{	/* Either invalid socket or sending failed */
 			if (need_free)
 				free(log_msg);
-			errptr = (char *)gtm_tls_get_error();
+			errptr = (char *)gtm_tls_get_error(audit_conn->tls_sock);
 			gtm_tls_socket_close(audit_conn->tls_sock);
 			close(audit_conn->sock_fd);
 			audit_conn->sock_fd = FD_INVALID;

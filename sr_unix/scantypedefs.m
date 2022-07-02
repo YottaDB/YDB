@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2010-2021 Fidelity National Information		;
+; Copyright (c) 2010-2022 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ; 								;
 ; 	This source code contains the intellectual property	;
@@ -467,6 +467,7 @@
 	;
 	Do ExclInclude("ccpact_tab.h")
 	Do ExclInclude("cdb_sc_table.h")
+	Do ExclInclude("devoptionstab.h")
 	Do ExclInclude("emit_code_sp.h")
 	Do ExclInclude("errorsp.h")
 	Do ExclInclude("gdsdbver_sp.h")

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,6 +76,7 @@ GBLREF	spdesc			rts_stringpool, stringpool;
 GBLREF	char			cli_err_str[];
 GBLREF	CLI_ENTRY		mupip_cmd_ary[];
 GBLREF	void			(*mupip_exit_fp)(int errcode);
+GBLREF void 			(*primary_exit_handler)(void);
 
 GBLDEF	CLI_ENTRY		*cmd_ary = &mupip_cmd_ary[0];	/* Define cmd_ary to be the MUPIP specific cmd table */
 
@@ -93,6 +94,7 @@ int main (int argc, char **argv)
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	sig_init(generic_signal_handler, NULL, suspsigs_handler, continue_handler);	/* Note: no ^C handler is defined (yet) */
 	atexit(mupip_exit_handler);
+	primary_exit_handler = mupip_exit_handler;
 	licensed = TRUE;
 	in_backup = FALSE;
 	op_open_ptr = mu_op_open;

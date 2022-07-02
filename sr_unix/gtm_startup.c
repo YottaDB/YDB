@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -129,6 +129,7 @@ GBLREF ch_ret_type		(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch *
 GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 GBLREF enum gtmImageTypes	image_type;
 GBLREF int			init_xfer_table(void);
+GBLREF void 			(*primary_exit_handler)(void);
 
 OS_PAGE_SIZE_DECLARE
 
@@ -237,6 +238,7 @@ void gtm_startup(struct startup_vector *svec)
 	{
 		sig_init(generic_signal_handler, ctrlc_handler_ptr, suspsigs_handler, continue_handler);
 		atexit(gtm_exit_handler);
+		primary_exit_handler = gtm_exit_handler;
 	}
 	io_init(IS_MUPIP_IMAGE);		/* starts with nocenable for GT.M runtime, enabled for MUPIP */
 	if (!IS_MUPIP_IMAGE)

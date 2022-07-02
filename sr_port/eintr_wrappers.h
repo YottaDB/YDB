@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -267,6 +267,16 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	{							\
 		RC = pipe(FDESC);				\
 	} while (-1 == RC && EINTR == errno);			\
+}
+
+/* posix_fallocate returns zero on success, or an error
+ * number on failure. Note that errno is not set. */
+#define POSIX_FALLOCATE(FD, BUF, SIZE, RC)			\
+{								\
+	do							\
+	{							\
+		RC = posix_fallocate(FD, BUF, SIZE);		\
+	} while (EINTR == RC);					\
 }
 
 #define READ_FILE(FD, BUF, SIZE, RC)				\

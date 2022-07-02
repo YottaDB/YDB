@@ -163,7 +163,7 @@
 			repl_close(&gtmsource_sock_fd);										\
 		} else														\
 		{														\
-			errp = (-1 == save_errno) ? (char *)gtm_tls_get_error() : STRERROR(save_errno);				\
+			errp = (-1 == save_errno) ? (char *)gtm_tls_get_error(NULL) : STRERROR(save_errno);			\
 			assert(FALSE);												\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0, ERR_TEXT, 2, LEN_AND_STR(errp));	\
 		}														\
@@ -241,6 +241,7 @@ error_def(ERR_REPLNOTLS);
 error_def(ERR_REPLXENDIANFAIL);
 error_def(ERR_REPLAHEAD);
 error_def(ERR_TRIG2NOTRIG);
+error_def(ERR_TLSIOERROR);
 error_def(ERR_TLSRENEGOTIATE);
 error_def(ERR_TEXT);
 
@@ -1603,6 +1604,10 @@ int gtmsource_process(void)
 					gtmsource_alloc_msgbuff(MAX_REPL_MSGLEN, TRUE); /* will also allocate filter buffer */
 				}
 			}
+#			if defined(DEBUG) && defined(GTM_TLS)
+			if (repl_tls.enabled && (WBTEST_ENABLED(WBTEST_INDUCE_TLSIOERR)))
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TLSIOERROR, 2, LEN_AND_LIT("WBTEST_INDUCE_TLSIOERR"));
+#			endif
 			/* GTMSOURCE_SAVE_STATE() and GTMSOURCE_NOW_TRANSITIONAL() check are not needed
 			 * here as the existing logic handles transitions.
 			 */

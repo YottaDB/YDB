@@ -223,7 +223,8 @@ typedef enum {
 	WBTEST_SOCKET_NONBLOCK,			/* 173 : Set SO_SNDBUF for non blocking socket */
 	WBTEST_JOBFAIL_FILE_LIM,		/* 174 : starve the process of file descriptors to produce a JOBFAIL */
 	WBTEST_BACKUP_FORCE_MV_RV,		/* 175 : Force error during MUPIP BACKUP mv phase */
-	WBTEST_RTNOBJ_INTEG			/* 176 : Inject a loop into the relinkctl linked list to trigger rtnobj_integ() */
+	WBTEST_RTNOBJ_INTEG,			/* 176 : Inject a loop into the relinkctl linked list to trigger rtnobj_integ() */
+	WBTEST_INDUCE_TLSIOERR			/* 177 : Source Server does not close the network socket in error shutdown */
 
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable

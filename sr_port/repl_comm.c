@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,6 +91,7 @@
 GBLDEF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
 GBLREF  boolean_t               is_rcvr_server;
 GBLREF  boolean_t               is_src_server;
+GBLREF  void 			(*primary_exit_handler)(void);
 #ifdef GTM_TLS
 GBLREF	gtm_tls_ctx_t		*tls_ctx;
 GBLREF	char			dl_err[MAX_ERRSTR_LEN];
@@ -279,9 +280,10 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 			if (-1 == save_errno)
 			{	/* This indicates an error from TLS/SSL layer and not from a system call. */
 				assert(repl_tls.enabled);
-				errptr = gtm_tls_get_error();
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"), ERR_TEXT, 2,
-					LEN_AND_STR(errptr));
+				errptr = gtm_tls_get_error(repl_tls.sock);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_WARNING(ERR_TLSIOERROR), 2, LEN_AND_LIT("send"),
+						ERR_TEXT, 2, LEN_AND_STR(errptr));
+				return save_errno;
 			}
 #			else
 			save_errno = ERRNO;
@@ -415,9 +417,10 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 			if (-1 == save_errno)
 			{
 				assert(repl_tls.enabled);
-				errptr = gtm_tls_get_error();
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("recv"), ERR_TEXT, 2,
-					LEN_AND_STR(errptr));
+				errptr = gtm_tls_get_error(repl_tls.sock);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_WARNING(ERR_TLSIOERROR), 2, LEN_AND_LIT("recv"),
+						ERR_TEXT, 2, LEN_AND_STR(errptr));
+				return save_errno;
 			}
 #			else
 			save_errno = ERRNO;
@@ -599,7 +602,8 @@ void repl_log_tls_info(FILE *logfp, gtm_tls_socket_t *socket)
 
 	if (0 != gtm_tls_get_conn_info(repl_tls.sock, &conn_info))
 	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONNINFO, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONNINFO, 0,
+				ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(repl_tls.sock)));
 		return;
 	}
 	repl_log(logfp, FALSE, TRUE, "TLS/SSL Session:\n");
@@ -646,11 +650,14 @@ void repl_do_tls_init(FILE *logfp)
 	} else if (NULL == (tls_ctx = gtm_tls_init(GTM_TLS_API_VERSION, 0)))
 	{
 		if (!PLAINTEXT_FALLBACK)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
 		else
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSINIT), 0, ERR_TEXT, 2,
-					LEN_AND_STR(gtm_tls_get_error()));
+					LEN_AND_STR(gtm_tls_get_error(NULL)));
 		issue_fallback_warning = TRUE;
+	} else if (primary_exit_handler)
+	{
+		atexit(primary_exit_handler);
 	}
 	if (issue_fallback_warning)
 	{

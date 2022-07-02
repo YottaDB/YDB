@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1423,9 +1423,9 @@ boolean_t gtmsource_exchange_tls_info(void)
 	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmsource_sock_fd, repl_tls.id, flags)))
 	{
 		if (!PLAINTEXT_FALLBACK)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSCONVSOCK), 0,
-				ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+				ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
 	} else
 	{
 		/* Do the actual handshake. */
@@ -1448,7 +1448,7 @@ boolean_t gtmsource_exchange_tls_info(void)
 			gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 			return FALSE;
 		}
-		errp = (-1 == status) ? (char *)gtm_tls_get_error() : STRERROR(status);
+		errp = (-1 == status) ? (char *)gtm_tls_get_error(NULL) : STRERROR(status);
 		if (!PLAINTEXT_FALLBACK)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSHANDSHAKE), 0, ERR_TEXT, 2, LEN_AND_STR(errp));

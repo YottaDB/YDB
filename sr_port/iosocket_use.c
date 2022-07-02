@@ -13,6 +13,7 @@
 /* iosocket_use.c */
 #include "mdef.h"
 
+#include "gtm_limits.h"
 #include "gtm_socket.h"
 #include "gtm_unistd.h"
 #include "gtm_iconv.h"
@@ -61,6 +62,7 @@ error_def(ERR_DEVPARMNEG);
 error_def(ERR_ILLESOCKBFSIZE);
 error_def(ERR_MRTMAXEXCEEDED);
 error_def(ERR_NOSOCKETINDEV);
+error_def(ERR_GETSOCKOPTERR);
 error_def(ERR_SETSOCKOPTERR);
 error_def(ERR_SOCKBFNOTEMPTY);
 error_def(ERR_SOCKNOTFND);
@@ -81,7 +83,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	char		addr[SA_MAXLITLEN], *errptr, sockaddr[SA_MAXLITLEN],
 			temp_addr[SA_MAXLITLEN], ioerror, *free_ozff = NULL;
 	unsigned char	delimiter_buffer[MAX_N_DELIMITER * (MAX_DELIM_LEN + 1)];
-	unsigned char	zff_buffer[MAX_ZFF_LEN];
+	unsigned char	zff_buffer[MAX_ZFF_LEN], options_buffer[UCHAR_MAX + 1];
 	boolean_t	attach_specified = FALSE,
 			detach_specified = FALSE,
 			connect_specified = FALSE,
@@ -97,14 +99,15 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			moreread_specified = FALSE,
 			flush_specified = FALSE,
 			create_new_socket;
-	int4 		index, n_specified, zff_len, delimiter_len, moreread_timeout;
+	int4 		index, n_specified, zff_len, delimiter_len, moreread_timeout, options_len;
 	int4		n_specified_dev, n_specified_socket;
 	int4		n_incomplete_dev;	/* device level not done in iop loop */
-	int		fil_type, nodelay, p_offset = 0;
+	int		fil_type, nodelay, p_offset = 0, newbufsiz;
+	GTM_SOCKLEN_TYPE	sockbuflen;
 	uint4		bfsize = DEFAULT_SOCKET_BUFFER_SIZE, ibfsize;
 	char		*tab;
 	int		save_errno;
-	mstr		chset_mstr;
+	mstr		chset_mstr, optionstr;
 	gtm_chset_t	temp_ochset, temp_ichset;
 	size_t		d_socket_struct_len;
 	boolean_t	ch_set;
@@ -118,6 +121,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	n_specified = n_specified_dev = n_specified_socket = n_incomplete_dev = 0;
 	zff_len = -1; /* indicates neither ZFF nor ZNOFF specified */
 	delimiter_len = -1; /* indicates neither DELIM nor NODELIM specified */
+	options_len = 0;	/* no OPTIONS yet */
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 
 	/* A read or wait was interrupted for this device. Allow only parmless use in $zinterrupt code for
@@ -234,7 +238,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				n_specified_socket++;
 				ibfsize_specified = TRUE;
 				GET_ULONG(ibfsize, pp->str.addr + p_offset);
-				if ((0 == ibfsize) || (MAX_INTERNAL_SOCBUF_SIZE < ibfsize))
+				if (0 == ibfsize)
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, ibfsize);
 				break;
 			case iop_ioerror:
@@ -361,6 +365,15 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			case iop_flush:
 				n_specified++;
 				flush_specified = TRUE;
+				break;
+			case iop_options:
+				n_specified++;
+				options_len = (int4)(unsigned char)*(pp->str.addr + p_offset);
+				if (UCHAR_MAX >= options_len)
+				{
+					memcpy(options_buffer, (unsigned char *)(pp->str.addr + p_offset + 1), options_len);
+					options_buffer[options_len] = '\0';
+				}
 				break;
 			default:
 				/* ignore deviceparm */
@@ -525,6 +538,12 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		iosocket_delimiter(delimiter_buffer, delimiter_len, &newsocket, (0 == delimiter_len));
 		socketptr->n_delimiter = 0;	/* prevent double frees if error */
 	}
+	if (0 < options_len)
+	{	/* call devoptions w/ options_buffer to update socket struct */
+		optionstr.addr = (char *)options_buffer;
+		optionstr.len = options_len;
+		devoptions(NULL, &newsocket, &optionstr, "USE", IOP_USE_OK);
+	}
 	if (iod->wrap && 0 != newsocket.n_delimiter && iod->width < newsocket.delimiter[0].len)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DELIMWIDTH, 2, iod->width, newsocket.delimiter[0].len);
 	/* Process the CHSET changes */
@@ -671,14 +690,32 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			}
 		}
 #		endif
-		if ((socketptr->bufsiz != newsocket.bufsiz)
-			&& (-1 == setsockopt(newsocket.sd, SOL_SOCKET, SO_RCVBUF, &newsocket.bufsiz, SIZEOF(newsocket.bufsiz))))
+		if (socketptr->bufsiz != newsocket.bufsiz)
 		{
-			save_errno = errno;
-			errptr = (char *)STRERROR(save_errno);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("SO_RCVBUF"), save_errno,
-				LEN_AND_STR(errptr));
-			return;
+			if (-1 == setsockopt(newsocket.sd, SOL_SOCKET, SO_RCVBUF, &newsocket.bufsiz, SIZEOF(newsocket.bufsiz)))
+			{
+				save_errno = errno;
+				errptr = (char *)STRERROR(save_errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("SO_RCVBUF"),
+						save_errno, LEN_AND_STR(errptr));
+				return;
+			}
+			newsocket.options_state.rcvbuf |= SOCKOPTIONS_USER;
+		}
+		if (0 != (SOCKOPTIONS_PENDING & newsocket.options_state.sndbuf))
+		{
+			if (-1 == iosocket_setsockopt(&newsocket, "SO_SNDBUF", SO_SNDBUF, SOL_SOCKET, &newsocket.iobfsize,
+					sizeof(newsocket.iobfsize), TRUE))
+				return;
+			newsocket.options_state.sndbuf |= SOCKOPTIONS_USER;
+			newsocket.options_state.sndbuf &= ~SOCKOPTIONS_PENDING;
+		}
+		if ((0 < options_len) && ((SOCKOPTIONS_PENDING & newsocket.options_state.alive)
+			|| (SOCKOPTIONS_PENDING & newsocket.options_state.cnt)
+			|| (SOCKOPTIONS_PENDING & newsocket.options_state.intvl)))
+		{	/* options specified and pending keepalive related value to apply */
+			if (!iosocket_tcp_keepalive(&newsocket, SOCKOPTIONS_FROM_STRUCT, "USE", FALSE))
+				return;
 		}
 		if (socketptr->buffer_size != newsocket.buffer_size)
 		{

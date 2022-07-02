@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2020 Fidelity National Information	*
+ * Copyright (c) 2016-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,9 +44,7 @@ void	jnl_phase2_salvage(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp, jbuf_phase2_in_p
 	boolean_t		write_null_record;
 	uint4			next_align_addr, start_freeaddr, end_freeaddr, save_phase2_freeaddr;
 	uint4			alignsize, pini_addr, rlen, tot_jrec_len;
-	struct_jrec_null	null_rec;
-	struct_jrec_inctn	inctn_rec;
-	jnl_record		*jrec;
+	jnl_record		jrec;
 	jnl_private_control	*jpc;
 
 	assert(!is_proc_alive(deadCmt->process_id, 0));
@@ -125,37 +123,35 @@ void	jnl_phase2_salvage(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp, jbuf_phase2_in_p
 	if (write_null_record)
 	{	/* Write JRT_NULL record */
 		assert(NULL_RECLEN == rlen);
-		null_rec.prefix.jrec_type = JRT_NULL;
-		null_rec.prefix.forwptr = NULL_RECLEN;
-		null_rec.prefix.pini_addr = pini_addr;
-		null_rec.prefix.time = deadCmt->jrec_time;
-		null_rec.prefix.checksum = INIT_CHECKSUM_SEED;
-		null_rec.prefix.tn = deadCmt->curr_tn;
+		jrec.jrec_null.prefix.jrec_type = JRT_NULL;
+		jrec.jrec_null.prefix.forwptr = NULL_RECLEN;
+		jrec.jrec_null.prefix.pini_addr = pini_addr;
+		jrec.jrec_null.prefix.time = deadCmt->jrec_time;
+		jrec.jrec_null.prefix.checksum = INIT_CHECKSUM_SEED;
+		jrec.jrec_null.prefix.tn = deadCmt->curr_tn;
 		assert(deadCmt->jnl_seqno);
-		null_rec.jnl_seqno = deadCmt->jnl_seqno;
-		null_rec.strm_seqno = deadCmt->strm_seqno;
-		null_rec.filler = 0;
-		null_rec.suffix.backptr = NULL_RECLEN;
-		null_rec.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-		jrec = (jnl_record *)&null_rec;
-		null_rec.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)jrec, NULL_RECLEN);
+		jrec.jrec_null.jnl_seqno = deadCmt->jnl_seqno;
+		jrec.jrec_null.strm_seqno = deadCmt->strm_seqno;
+		jrec.jrec_null.filler = 0;
+		jrec.jrec_null.suffix.backptr = NULL_RECLEN;
+		jrec.jrec_null.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+		jrec.jrec_null.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)&jrec, NULL_RECLEN);
 	} else
 	{	/* Write JRT_INCTN record */
-		inctn_rec.prefix.jrec_type = JRT_INCTN;
-		inctn_rec.prefix.forwptr = INCTN_RECLEN;
-		inctn_rec.prefix.pini_addr = pini_addr;
-		inctn_rec.prefix.time = deadCmt->jrec_time;
-		inctn_rec.prefix.checksum = INIT_CHECKSUM_SEED;
-		inctn_rec.prefix.tn = deadCmt->curr_tn;
-		inctn_rec.detail.blknum_struct.opcode = inctn_jnlphase2salvage;
-		inctn_rec.detail.blknum_struct.filler_short = 0;
-		inctn_rec.detail.blknum_struct.suffix.backptr = INCTN_RECLEN;
-		inctn_rec.detail.blknum_struct.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-		jrec = (jnl_record *)&inctn_rec;
-		inctn_rec.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)jrec, INCTN_RECLEN);
+		jrec.jrec_inctn.prefix.jrec_type = JRT_INCTN;
+		jrec.jrec_inctn.prefix.forwptr = INCTN_RECLEN;
+		jrec.jrec_inctn.prefix.pini_addr = pini_addr;
+		jrec.jrec_inctn.prefix.time = deadCmt->jrec_time;
+		jrec.jrec_inctn.prefix.checksum = INIT_CHECKSUM_SEED;
+		jrec.jrec_inctn.prefix.tn = deadCmt->curr_tn;
+		jrec.jrec_inctn.detail.blknum_struct.opcode = inctn_jnlphase2salvage;
+		jrec.jrec_inctn.detail.blknum_struct.filler_short = 0;
+		jrec.jrec_inctn.detail.blknum_struct.suffix.backptr = INCTN_RECLEN;
+		jrec.jrec_inctn.detail.blknum_struct.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+		jrec.jrec_inctn.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)&jrec, INCTN_RECLEN);
 		deadCmt->jnl_seqno = 0;	/* for the send_msg_csa call below */
 	}
-	jnl_write(jpc, jrec->prefix.jrec_type, jrec, NULL);
+	jnl_write(jpc, jrec.prefix.jrec_type, &jrec, NULL);
 	assert(start_freeaddr + rlen == jpc->phase2_freeaddr);
 	while (next_align_addr < end_freeaddr)
 	{	/* Write one or more JRT_ALIGN records to fill up one "alignsize" space. Note that one JRT_ALIGN record

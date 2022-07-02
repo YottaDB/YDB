@@ -24,8 +24,8 @@ oprtype put_mvar(mident *x)
 	ref = newtriple(OC_VAR);
 	ref->operand[0].oprclass = MVAR_REF;
 	ref->operand[0].oprval.vref = var = get_mvaddr(x);
-	if (var->last_fetch != (TREF(fetch_control)).curr_fetch_trip)		/* This block is the same as one iin m_new */
-	{
+	if ((var->last_fetch != (TREF(fetch_control)).curr_fetch_trip) && !TREF(discard))
+	{	/* This block is identical to one in m_new */
 		fetch = newtriple(OC_PARAMETER);
 		(TREF(fetch_control)).curr_fetch_opr->operand[1] = put_tref(fetch);
 		fetch->operand[0] = put_ilit(var->mvidx);

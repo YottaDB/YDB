@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,6 +69,7 @@ GBLDEF	CLI_ENTRY			*cmd_ary = &mumps_cmd_ary[0]; /* Define cmd_ary to be the MUM
 
 #define GTMCRYPT_ERRLIT			"during GT.M startup"
 #define GTMXC_gblstat			"GTMXC_gblstat=%s/gtmgblstat.xc"
+#define	MUMPS				"MUMPS "
 
 #ifdef __osf__
  /* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
@@ -91,7 +92,6 @@ error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TEXT);
 error_def(ERR_TLSDLLNOOPEN);
 error_def(ERR_TLSINIT);
-
 int gtm_main (int argc, char **argv, char **envp)
 #ifdef __osf__
 # pragma pointer_size (restore)
@@ -102,6 +102,7 @@ int gtm_main (int argc, char **argv, char **envp)
 	int             	eof, parse_ret;
 	int			gtmcrypt_errno;
 	int			status;
+	size_t			cplen;
 
 #	ifdef GTM_SOCKET_SSL_SUPPORT
 	char			tlsid_env_name[MAX_TLSID_LEN * 2];
@@ -134,8 +135,9 @@ int gtm_main (int argc, char **argv, char **envp)
 	 * we didnot change argv[0]
 	*/
 	ptr = cli_lex_in_ptr->in_str;
-	memmove(strlen("MUMPS ") + ptr, ptr, strlen(ptr) + 1);	/* BYPASSOK */
-	MEMCPY_LIT(ptr, "MUMPS ");
+	assert((NULL != ptr) && (cli_lex_in_ptr->buflen > (strlen(ptr) + sizeof(MUMPS))));
+	memmove(strlen(MUMPS) + ptr, ptr, strlen(ptr) + 1);	/* BYPASSOK */
+	MEMCPY_LIT(ptr, MUMPS);
 	/* reset the argument buffer pointer, it's changed in cli_gettoken() call above
 	 * do NOT reset to 0(NULL) to avoid fetching cmd line args into buffer again
 	 * cli_lex_in_ptr->tp is the pointer to indicate current position in the buffer
@@ -211,13 +213,15 @@ int gtm_main (int argc, char **argv, char **envp)
 											GTMTLS_OP_INTERACTIVE_MODE)))
 						{
 							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSINIT, 0,
-								ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+								ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
 						}
 					}
 					assert(NULL != tls_ctx);
-					assert((MAX_TLSID_LEN * 2) > (int)(eq - ptr));
-					memcpy(tlsid_env_name, ptr, (int)(eq - ptr));
-					tlsid_env_name[(int)(eq - ptr)] = '\0';
+					cplen = (eq - ptr);
+					if (sizeof(tlsid_env_name) > (cplen + 1))
+						cplen = sizeof(tlsid_env_name) - 1;
+					memcpy(tlsid_env_name, ptr, cplen);
+					tlsid_env_name[cplen] = '\0';
 					gtm_tls_prefetch_passwd(tls_ctx, tlsid_env_name);
 				}
 			}

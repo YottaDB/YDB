@@ -106,6 +106,7 @@ LITREF	mval		literal_one;
 #define		NO_REPLINST		"No replication instance defined"
 #define		STATS_MAX_DIGITS	MAX_DIGITS_IN_INT8
 #define		STATS_KEYWD_SIZE	(3 + 1 + 1)	/* 3 character mnemonic, colon and comma */
+#define		DEVICE_MAX_STATUS	(9 + 1 + 7)	/* TERMINAL<sp> : CLOSED<sp> */
 
 #define STATS_PUT_PARM(TXT, CNTR, BASE)					\
 {									\
@@ -140,6 +141,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 	trans_num	gd_targ_tn, *tn_array;
 	unsigned char	*c, *c_top, *key;
 	unsigned char	buff[MAX_ZWR_KEY_SZ];
+	unsigned char	device_status[DEVICE_MAX_STATUS];
 	va_list		var;
 	viewparm	parmblk, parmblk2;
 	viewtab_entry	*vtp;
@@ -818,6 +820,13 @@ void	op_fnview(int numarg, mval *dst, ...)
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			assert(NULL != csa->hdr);
 			n = !(RDBF_NOSTATS & csa->reservedDBFlags);
+			break;
+		case VTK_DEVICE:
+			n = view_device(&parmblk.value->str, device_status, sizeof(device_status));
+			dst->str.addr =(char *) device_status;
+			dst->str.len = n;
+			s2pool(&dst->str);
+
 			break;
 		default:
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWFN, 2, strlen((const char *)vtp->keyword), vtp->keyword);

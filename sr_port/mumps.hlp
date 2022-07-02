@@ -5440,11 +5440,10 @@
 
    **Note**
 
-   NOUNDEF does not apply to an undefined FOR control variable. This prevents
-   an increment (or decrement) of an undefined FOR control variable from
-   getting into an unintended infinite loop. For example, FOR A=1:1:10 KILL A
-   gives an UNDEF error on the increment from 1 to 2 even with VIEW
-   "NOUNDEF".
+   NOUNDEF applies even in the case of an undefined FOR control variable,
+   such as when a KILL or NEW command is used on the control variable, which
+   may cause an unintended indefinite loop. For example, FOR A=1:1:10 KILL A
+   results in an indefinite loop with VIEW "NOUNDEF".
 
 4 TRACE
    TRACE
@@ -10080,7 +10079,6 @@
        illustrated by the following M code:
 
        GTM>set cntr=1,deffn="GTM_JOBEXAM.ZSHOW_DMP_"_$JOB_"_"_cntr
-
        GTM>w $zparse(deffn)
        /path/to/GTM_JOBEXAM.ZSHOW_DMP_49878_1
        GTM>w $zjobexam()
@@ -15665,6 +15663,9 @@
    | MOREREADTIME=intexpr    | O/U     | milliseconds) that a SOCKET device |
    |                         |         | uses to check for arriving packet  |
    |-------------------------+---------+------------------------------------|
+   | OPTIONS=expr            | O/U     | Specifies a list of options for    |
+   |                         |         | the socket.                        |
+   |-------------------------+---------+------------------------------------|
    |                         |         | With USE, makes the socket         |
    |                         |         | specified by the handle named in   |
    |                         |         | expr the current socket for the    |
@@ -16646,6 +16647,35 @@
 
    For more information, refer to the description of KEY deviceparameter of
    OPEN or USE.
+
+5 OPTIONS
+   OPTIONS
+
+   OPTIONS=expr Applies to: SOC
+
+   Specifies setsockopt() options to be set for sockets. The value of the
+   expression is a comma separated list of option names. If the option takes
+   a value, it is given after an equal sign (=) following the name.
+
+   The supported options are:
+
+   KEEPALIVE   a positive value enables SO_KEEPALIVE.  A zero value disables SO_KEEPALIVE.
+   KEEPIDLE    sets the TCP_KEEPIDLE socket value.
+   KEEPCNT     sets the TCP_KEEPCNT socket value.
+   KEEPINTVL   sets the TCP_KEEPINTVL socket value.
+   SNDBUF      sets the size of the socket's network send buffer (SO_SNDBUF) in bytes.
+
+   Example:
+
+   OPEN dev:(LISTEN="1234:TCP":OPTIONS="KEEPALIVE=1,KEEPIDLE=50)::"SOCKET"
+
+   This enables SO_KEEPALIVE and sets TCP_KEEPIDLE to 50 seconds.
+
+   **Note**
+
+   Please review the man page for setsockopt for more information on the use
+   of these options. On Linux, "man 7 socket" and "man 7 tcp" provide
+   additional information.
 
 5 OWNER
    OWNER
@@ -18041,6 +18071,35 @@
 
    For more information, refer to the description of KEY deviceparameter of
    OPEN.
+
+5 OPTIONS
+   OPTIONS
+
+   OPTIONS=expr Applies to: SOC
+
+   Specifies setsockopt() options to be set for sockets. The value of the
+   expression is a comma separated list of option names. If the option takes
+   a value, it is given after an equal sign (=) following the name.
+
+   The supported options are:
+
+   KEEPALIVE   a positive value enables SO_KEEPALIVE.  A zero value disables SO_KEEPALIVE.
+   KEEPIDLE    sets the TCP_KEEPIDLE socket value.
+   KEEPCNT     sets the TCP_KEEPCNT socket value.
+   KEEPINTVL   sets the TCP_KEEPINTVL socket value.
+   SNDBUF      sets the size of the socket's network send buffer (SO_SNDBUF) in bytes.
+
+   Example:
+
+   USE dev:OPTIONS="KEEPALIVE=1,KEEPIDLE=50"
+
+   This enables SO_KEEPALIVE and sets TCP_KEEPIDLE to 50 seconds.
+
+   **Note**
+
+   Please review the man page for setsockopt for more information on the use
+   of these options. On Linux, "man 7 socket" and "man 7 tcp" provide
+   additional information.
 
 5 OUTREWIND
    OUTREWIND

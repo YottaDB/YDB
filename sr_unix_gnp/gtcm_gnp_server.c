@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -114,6 +114,7 @@ GBLREF enum gtmImageTypes	image_type;
 GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF char			cli_token_buf[];
 GBLREF CLI_ENTRY		gtcm_gnp_cmd_ary[];
+GBLREF void 			(*primary_exit_handler)(void);
 
 GBLDEF CLI_ENTRY		*cmd_ary = &gtcm_gnp_cmd_ary[0]; /* Define cmd_ary to be the GTCM_GNP server specific cmd table */
 GBLDEF bool			cm_timeout = FALSE;
@@ -468,6 +469,7 @@ int main(int argc, char **argv, char **envp)
 		EXIT(status);
 	}
 	atexit(gtcm_exi_handler);
+	primary_exit_handler = gtcm_exi_handler;
 	initialize_pattern_table();
 	/* Pre-allocate some timer blocks. */
 	prealloc_gt_timers();

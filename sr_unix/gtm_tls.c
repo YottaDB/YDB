@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2021 Fidelity National Information	*
+ * Copyright (c) 2013-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,13 +20,13 @@
  * signals (like SIGTERM) thereby avoiding any deadlocks. Note that this file has to be maintained in sync with gtm_tls_interface.h.
  */
 
-const char		*intrsafe_gtm_tls_get_error(void)
+const char		*intrsafe_gtm_tls_get_error(gtm_tls_socket_t *tlssocket)
 {
 	const char	*rv;
 	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
-	rv = (*gtm_tls_get_error_fptr)();
+	rv = (*gtm_tls_get_error_fptr)(tlssocket);
 	ENABLE_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	return rv;
 }

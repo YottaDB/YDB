@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,6 +76,7 @@ GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF char			cli_err_str[];
 GBLREF CLI_ENTRY		lke_cmd_ary[];
 GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
+GBLREF void 			(*primary_exit_handler)(void);
 
 GBLDEF CLI_ENTRY		*cmd_ary = &lke_cmd_ary[0];	/* Define cmd_ary to be the LKE specific cmd table */
 
@@ -95,6 +96,7 @@ int main (int argc, char *argv[])
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	sig_init(generic_signal_handler, lke_ctrlc_handler, suspsigs_handler, continue_handler);
 	atexit(util_exit_handler);
+	primary_exit_handler = util_exit_handler;
 	stp_init(STP_INITSIZE);
 	stpgc_ch = &stp_gcol_ch;
 	rts_stringpool = stringpool;
