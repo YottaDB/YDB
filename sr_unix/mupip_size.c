@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Copyright (c) 2012-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -269,7 +269,14 @@ void mupip_size(void)
 		if ((NULL != tcsa) && (NULL != tcsa->ti) && (0 != tcsa->ti->total_blks) && (NULL != tcsa->hdr)
 			&& (0 !=  MAXTOTALBLKS(tcsa->hdr)))
 		{
+<<<<<<< HEAD
 			db_file_name = (char *)grlist->reg->dyn.addr->fname;
+=======
+			if ((NULL != grlist->reg->dyn.addr) && (0 != grlist->reg->dyn.addr->fname_len))
+				db_file_name = (char *)grlist->reg->dyn.addr->fname;
+			else
+				db_file_name = "";
+>>>>>>> 35326517 (GT.M V7.0-003)
 			warn_db_sz(db_file_name, 0, tcsa->ti->total_blks, MAXTOTALBLKS(tcsa->hdr));
 		}
 	}

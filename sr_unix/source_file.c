@@ -138,8 +138,8 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 			break;
 		}
 		assert(ret.mvtype == MV_STR);
-		assert(ret.str.len <= MAX_FN_LEN);
 		source_name_len = ret.str.len;
+		assert(MAX_FN_LEN >= source_name_len);
 		memcpy(source_file_name, ret.str.addr, source_name_len);
 		source_file_name[source_name_len] = 0;
 		p = &source_file_name[plen.p.pblk.b_dir];

@@ -2349,16 +2349,53 @@ MBSTART {											\
 	}											\
 } MBEND
 
+/* one thing to watch out for is if online rollback is in progress, file_corrupt may be set
+ * between mur_open_files() & mur_close_files().  In this case, we overload the TRUE (1) value
+ * of "file_corrupt" to '2' (TRUE + 1) to indicate a temporary situation and spin for a bit,
+ * rereading the header, if we see that.  If this doesn't clear (perhaps there are lots of
+ * rollbacks being spawned), we do what we would have done under the original logic and
+ * declare ERR_DBFLCORRP */
 #define DO_DB_HDR_CHECK(REG, TSD)								\
 MBSTART {											\
 	GBLREF	boolean_t	mupip_jnl_recover;						\
 	uint4			gtm_errcode = 0;						\
+	int			slp_cnt = 0;							\
+	int			err = 0;							\
+	boolean_t		is_logged = FALSE;						\
 												\
 	if (TSD->createinprogress)								\
 		gtm_errcode = ERR_DBCREINCOMP;							\
 	if (TSD->file_corrupt && !mupip_jnl_recover && !TREF(in_mupip_integ) &&			\
 			!(IS_MUPIP_IMAGE && TREF(skip_file_corrupt_check)))			\
-		gtm_errcode = ERR_DBFLCORRP;							\
+	{											\
+		while (TSD->file_corrupt == (TRUE + 1)) /* temp condition during onl rlbck */	\
+		{										\
+			if (!is_logged)								\
+			{									\
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TEXT, 2,		\
+					LEN_AND_LIT("Spinning for 0-15 seconds until "		\
+					"clean DB header"));					\
+				is_logged = TRUE;						\
+			}									\
+			wcs_sleep(1);								\
+			if (15000 < slp_cnt++)							\
+			{									\
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TEXT, 2,		\
+					LEN_AND_LIT("Spin wait for clean DB header failed"));	\
+				break;								\
+			}									\
+			READ_DB_FILE_HEADER(REG, TSD, err);					\
+			if (err)								\
+			{									\
+				REVERT;								\
+				return -1;							\
+			}									\
+		}										\
+		if (TSD->file_corrupt) /* Didn't clear (or wasn't temporary) */			\
+		{										\
+			gtm_errcode = ERR_DBFLCORRP;						\
+		}										\
+	}											\
 	if ((dba_mm == TSD->acc_meth) && TSD->blks_to_upgrd)					\
 		gtm_errcode = ERR_MMNODYNUPGRD;							\
 	if (0 != gtm_errcode)									\

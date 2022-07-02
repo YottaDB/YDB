@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -226,10 +226,13 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 			if (socketptr->tlsenabled)
 			{
 				bytesread = gtm_tls_recv((gtm_tls_socket_t *)socketptr->tlssocket, buffer, maxlength);
+				DBGSOCK2((stdout, "socsnrio: gtm_tls_recv: %d :: errno: %d\n", bytesread, errno));
 				if (0 < bytesread)
 					return bytesread;
 				/* if want read or write, need to loop */
 				/* after setting tlspolldirection */
+				DBGSOCK2((stdout, "socsnrio: TLS errno %d - %s\n", gtm_tls_errno(),
+							gtm_tls_get_error((gtm_tls_socket_t *)socketptr->tlssocket)));
 				switch (bytesread)
 				{
 					case GTMTLS_WANT_READ:

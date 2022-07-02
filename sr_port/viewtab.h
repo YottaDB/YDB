@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -25,6 +25,7 @@ VIEWTAB("DEBUG1",		VTP_VALUE | VTP_NULL,		VTK_DEBUG1,		MV_STR),
 VIEWTAB("DEBUG2",		VTP_VALUE | VTP_NULL,		VTK_DEBUG2,		MV_STR),
 VIEWTAB("DEBUG3",		VTP_VALUE | VTP_NULL,		VTK_DEBUG3,		MV_STR),
 VIEWTAB("DEBUG4",		VTP_VALUE | VTP_NULL,		VTK_DEBUG4,		MV_STR),
+VIEWTAB("DEVICE",		VTP_VALUE,			VTK_DEVICE,		MV_STR),
 VIEWTAB("DMTERM",		VTP_NULL,			VTK_DMTERM,		MV_NM),
 #ifdef DEBUG
 VIEWTAB("DWB",			VTP_DBREGION | VTP_NULL,	VTK_DWB,		MV_NM), /* nodoc : drive white box test */

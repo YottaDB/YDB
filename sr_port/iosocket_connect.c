@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
@@ -255,6 +255,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 							RTS_ERROR_LITERAL("SO_RCVBUF"), save_errno, errlen, errptr);
 						return FALSE;
 					}
+					sockptr->options_state.rcvbuf |= SOCKOPTIONS_USER;
 				} else
 				{
 					sockbuflen = SIZEOF(sockptr->bufsiz);
@@ -280,6 +281,15 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 							RTS_ERROR_LITERAL("SO_RCVBUF"), save_errno, errlen, errptr);
 						return FALSE;
 					}
+					sockptr->options_state.rcvbuf |= SOCKOPTIONS_SYSTEM;
+				}
+				if (0 != (SOCKOPTIONS_PENDING & sockptr->options_state.sndbuf))
+				{
+					if (-1 == iosocket_setsockopt(sockptr, "SO_SNDBUF", SO_SNDBUF, SOL_SOCKET,
+						&sockptr->iobfsize, sizeof(sockptr->iobfsize), TRUE))
+						return FALSE;
+					sockptr->options_state.sndbuf |= SOCKOPTIONS_USER;
+					sockptr->options_state.sndbuf &= ~SOCKOPTIONS_PENDING;
 				}
 			}
 		}
@@ -643,9 +653,20 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 		}
 		STRNDUP(ipaddr, SA_MAXLEN, sockptr->remote.saddr_ip);
 		strncpy(&iod->dollar.key[len], sockptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
+<<<<<<< HEAD
 		keepalive_opt = TREF(ydb_socket_keepalive_idle);	/* deviceparameter would give more granular control */
 		if (keepalive_opt && !iosocket_tcp_keepalive(sockptr, keepalive_opt, action))
 			return FALSE;				/* iosocket_tcp_keepalive issues rts_error rather than return */
+=======
+	if ((SOCKOPTIONS_PENDING & sockptr->options_state.alive)
+		|| (SOCKOPTIONS_PENDING & sockptr->options_state.cnt)
+		|| (SOCKOPTIONS_PENDING & sockptr->options_state.intvl))
+		keepalive_opt = SOCKOPTIONS_FROM_STRUCT;
+	else
+		keepalive_opt = TREF(gtm_socket_keepalive_idle);	/* deviceparameter takes precedence */
+	if (keepalive_opt && !iosocket_tcp_keepalive(sockptr, keepalive_opt, action, TRUE))
+		return FALSE;		/* iosocket_tcp_keepalive issues rts_error rather than return */
+>>>>>>> 35326517 (GT.M V7.0-003)
 	} else
 	{	/* getsockname does not return info for AF_UNIX connected socket so copy from remote side */
 		local_ai_ptr->ai_socktype = sockptr->remote.ai.ai_socktype;

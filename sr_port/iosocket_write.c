@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -174,7 +174,7 @@ int iosocket_buffer_error(socket_struct *socketptr)
 	{
 		if (-1 == socketptr->obuffer_errno)
 		{
-			errptr = gtm_tls_get_error();
+			errptr = gtm_tls_get_error((gtm_tls_socket_t *)socketptr->tlssocket);
 		} else
 		{
 			errptr = (char *)STRERROR(socketptr->obuffer_errno);

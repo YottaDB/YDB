@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Copyright (c) 2007-2022 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
@@ -50,6 +50,7 @@ ENTRY	op_forloop
 	#
 	# Save the arguments on stack
 	#
+<<<<<<< HEAD
         movq	%rcx, loop(%rbp)
         movq	%rdx, term(%rbp)
         movq	%rsi, step(%rbp)
@@ -63,6 +64,21 @@ ENTRY	op_forloop
 	movw	mval_w_mvtype(%rdi), %dx
 	andw	%dx, %ax
 	testw	$mval_m_int_without_nm, %ax
+=======
+        movq	REG64_ARG3, loop(%rbp)
+        movq	REG64_ARG2, term(%rbp)
+        movq	REG64_ARG1, step(%rbp)
+        movq	REG64_ARG0, indx(%rbp)
+	movq	REG64_ARG0, REG64_ARG1
+	mv_force_defined_overwrite REG64_ARG1, l0	# copy literal_null into control variable if undefined
+	mv_force_num REG64_ARG1, l1
+	movq	indx(%rbp), REG64_ARG1
+	movq	step(%rbp), REG64_ARG0
+	movw	mval_w_mvtype(REG64_ARG1), REG16_ACCUM
+	movw	mval_w_mvtype(REG64_ARG0), REG16_ARG2
+	andw	REG16_ARG2, REG16_ACCUM
+	testw	$mval_m_int_without_nm, REG16_ACCUM
+>>>>>>> 35326517 (GT.M V7.0-003)
 	je	L66
 	movl	mval_l_m1(%rsi), %eax
 	addl	mval_l_m1(%rdi), %eax

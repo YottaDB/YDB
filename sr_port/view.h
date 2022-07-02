@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,6 +72,7 @@ viewtab_entry *viewkeys(mstr *v);
 void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *parmblk, boolean_t is_dollar_view);
 void view_routines(mval *dst, mident_fixed *name);
 void view_routines_checksum(mval *dst, mident_fixed *name);
+int view_device(mstr *device_name, unsigned char *device, int device_len);	/* in zshow_devices.c */
 
 #undef VIEWTAB
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2020 Fidelity National Information	*
+ * Copyright (c) 2016-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -46,10 +46,15 @@ void	jnl_phase2_salvage(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp, jbuf_phase2_in_p
 {
 	boolean_t		write_null_record;
 	uint4			next_align_addr, start_freeaddr, end_freeaddr, save_phase2_freeaddr;
+<<<<<<< HEAD
 	uint4			alignsize, pini_addr, rlen, tot_jrec_len, jrec_type;
 	struct_jrec_null	null_rec;
 	struct_jrec_inctn	inctn_rec;
 	jnl_record		*jrec;
+=======
+	uint4			alignsize, pini_addr, rlen, tot_jrec_len;
+	jnl_record		jrec;
+>>>>>>> 35326517 (GT.M V7.0-003)
 	jnl_private_control	*jpc;
 
 	assert(!is_proc_alive(deadCmt->process_id, 0));
@@ -129,6 +134,7 @@ void	jnl_phase2_salvage(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp, jbuf_phase2_in_p
 	if (write_null_record)
 	{	/* Write JRT_NULL record */
 		assert(NULL_RECLEN == rlen);
+<<<<<<< HEAD
 		null_rec.prefix.jrec_type = jrec_type = JRT_NULL;
 		null_rec.prefix.forwptr = NULL_RECLEN;
 		null_rec.prefix.pini_addr = pini_addr;
@@ -164,6 +170,37 @@ void	jnl_phase2_salvage(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp, jbuf_phase2_in_p
 		deadCmt->jnl_seqno = 0;	/* for the send_msg_csa call below */
 	}
 	jnl_write(jpc, jrec_type, jrec, NULL);
+=======
+		jrec.jrec_null.prefix.jrec_type = JRT_NULL;
+		jrec.jrec_null.prefix.forwptr = NULL_RECLEN;
+		jrec.jrec_null.prefix.pini_addr = pini_addr;
+		jrec.jrec_null.prefix.time = deadCmt->jrec_time;
+		jrec.jrec_null.prefix.checksum = INIT_CHECKSUM_SEED;
+		jrec.jrec_null.prefix.tn = deadCmt->curr_tn;
+		assert(deadCmt->jnl_seqno);
+		jrec.jrec_null.jnl_seqno = deadCmt->jnl_seqno;
+		jrec.jrec_null.strm_seqno = deadCmt->strm_seqno;
+		jrec.jrec_null.filler = 0;
+		jrec.jrec_null.suffix.backptr = NULL_RECLEN;
+		jrec.jrec_null.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+		jrec.jrec_null.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)&jrec, NULL_RECLEN);
+	} else
+	{	/* Write JRT_INCTN record */
+		jrec.jrec_inctn.prefix.jrec_type = JRT_INCTN;
+		jrec.jrec_inctn.prefix.forwptr = INCTN_RECLEN;
+		jrec.jrec_inctn.prefix.pini_addr = pini_addr;
+		jrec.jrec_inctn.prefix.time = deadCmt->jrec_time;
+		jrec.jrec_inctn.prefix.checksum = INIT_CHECKSUM_SEED;
+		jrec.jrec_inctn.prefix.tn = deadCmt->curr_tn;
+		jrec.jrec_inctn.detail.blknum_struct.opcode = inctn_jnlphase2salvage;
+		jrec.jrec_inctn.detail.blknum_struct.filler_short = 0;
+		jrec.jrec_inctn.detail.blknum_struct.suffix.backptr = INCTN_RECLEN;
+		jrec.jrec_inctn.detail.blknum_struct.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+		jrec.jrec_inctn.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)&jrec, INCTN_RECLEN);
+		deadCmt->jnl_seqno = 0;	/* for the send_msg_csa call below */
+	}
+	jnl_write(jpc, jrec.prefix.jrec_type, &jrec, NULL);
+>>>>>>> 35326517 (GT.M V7.0-003)
 	assert(start_freeaddr + rlen == jpc->phase2_freeaddr);
 	while (next_align_addr < end_freeaddr)
 	{	/* Write one or more JRT_ALIGN records to fill up one "alignsize" space. Note that one JRT_ALIGN record

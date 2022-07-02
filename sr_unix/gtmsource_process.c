@@ -166,7 +166,7 @@
 			repl_close(&gtmsource_sock_fd);										\
 		} else														\
 		{														\
-			errp = (-1 == save_errno) ? (char *)gtm_tls_get_error() : STRERROR(save_errno);				\
+			errp = (-1 == save_errno) ? (char *)gtm_tls_get_error(NULL) : STRERROR(save_errno);			\
 			assert(FALSE);												\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0, ERR_TEXT, 2, LEN_AND_STR(errp));	\
 		}														\
@@ -245,8 +245,23 @@ STATICDEF	boolean_t	renegotiation_pending = FALSE;
 
 #define	OUT_LINE			(256 + 1)
 #define PROC_SRCOPS_PRINT_MSG_LEN	2048
+<<<<<<< HEAD
 
 STATICFNDCL void repl_tr_endian_convert_src(repl_msg_ptr_t send_msgp, int send_tr_len, seq_num pre_read_seqno);
+=======
+error_def(ERR_JNLNEWREC);
+error_def(ERR_JNLSETDATA2LONG);
+error_def(ERR_REPLCOMM);
+error_def(ERR_REPLFTOKSEM);
+error_def(ERR_REPLINSTNOHIST);
+error_def(ERR_REPLNOTLS);
+error_def(ERR_REPLXENDIANFAIL);
+error_def(ERR_REPLAHEAD);
+error_def(ERR_TRIG2NOTRIG);
+error_def(ERR_TLSIOERROR);
+error_def(ERR_TLSRENEGOTIATE);
+error_def(ERR_TEXT);
+>>>>>>> 35326517 (GT.M V7.0-003)
 
 /* Endian converts the given set of journal records (possibly multiple sequence numbers) so that the secondary can consume them
  * as-is. This is done only in the case when the primary is running on a GT.M version less than the GT.M version on secondary
@@ -1628,6 +1643,10 @@ int gtmsource_process(void)
 					gtmsource_alloc_msgbuff(MAX_REPL_MSGLEN, TRUE); /* will also allocate filter buffer */
 				}
 			}
+#			if defined(DEBUG) && defined(GTM_TLS)
+			if (repl_tls.enabled && (WBTEST_ENABLED(WBTEST_INDUCE_TLSIOERR)))
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TLSIOERROR, 2, LEN_AND_LIT("WBTEST_INDUCE_TLSIOERR"));
+#			endif
 			/* GTMSOURCE_SAVE_STATE() and GTMSOURCE_NOW_TRANSITIONAL() check are not needed
 			 * here as the existing logic handles transitions.
 			 */

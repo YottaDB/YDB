@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2018 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2022 Fidelity National Information	*
+>>>>>>> 35326517 (GT.M V7.0-003)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -405,6 +409,16 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		eintr_handling_check();				\
 	} while (TRUE);						\
 	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
+}
+
+/* posix_fallocate returns zero on success, or an error
+ * number on failure. Note that errno is not set. */
+#define POSIX_FALLOCATE(FD, BUF, SIZE, RC)			\
+{								\
+	do							\
+	{							\
+		RC = posix_fallocate(FD, BUF, SIZE);		\
+	} while (EINTR == RC);					\
 }
 
 #define READ_FILE(FD, BUF, SIZE, RC)				\

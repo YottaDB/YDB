@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -299,6 +299,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlevar, pid_t pid, uint8 timeo
 int tcp_open(char *host, unsigned short port, uint8 timeout, boolean_t passive);
 
 bool same_device_check(mstr tname, char *buf);
+void	devoptions(io_desc *iod, void *socketptrarg, mstr *optionstr, char *where, int use);
 
 #define	iotype(O,X,Y,Z) 								\
 { 										\

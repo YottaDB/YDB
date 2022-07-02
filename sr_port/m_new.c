@@ -53,8 +53,8 @@ int m_new(void)
 	{
 	case TK_IDENT:
 		var = get_mvaddr(&(TREF(window_ident)));
-		if (var->last_fetch != (TREF(fetch_control)).curr_fetch_trip)	/* this block is identical a block in put_mvar */
-		{
+		if ((var->last_fetch != (TREF(fetch_control)).curr_fetch_trip) && !TREF(discard))
+		{	/* This block is identical to one in put_mvar */
 			fetch = newtriple(OC_PARAMETER);
 			(TREF(fetch_control)).curr_fetch_opr->operand[1] = put_tref(fetch);
 			fetch->operand[0] = put_ilit(var->mvidx);

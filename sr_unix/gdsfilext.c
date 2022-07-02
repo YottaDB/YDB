@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -409,7 +409,7 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 		 * the file is more than half the size of the partition, the next posix_fallocate will fail
 		 * for a 0 increase use the documented way
 		 */
-		save_errno = posix_fallocate(fd, old_size, new_size - old_size);
+		POSIX_FALLOCATE(fd, old_size, new_size - old_size, save_errno);
 		DEBUG_ONLY(first_save_errno = save_errno);
 		if ((ENOSPC == save_errno) && IS_GTM_IMAGE)
 		{
@@ -422,7 +422,7 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 					ISSUE_WAITDSKSPACE(to_wait, wait_period, send_msg_csa);
 				hiber_start(1000);
 				to_wait--;
-				save_errno = posix_fallocate(fd, old_size, new_size - old_size);
+				POSIX_FALLOCATE(fd, old_size, new_size - old_size, save_errno);
 			} while ((to_wait > 0) && (ENOSPC == save_errno));
 		}
 		if (0 != save_errno)
@@ -618,7 +618,14 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	{
 		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_DBFILEXT, 5, DB_LEN_STR(gv_cur_region), &blocks, &new_total,
 			&curr_tn);
+<<<<<<< HEAD
 		db_file_name = (char *)gv_cur_region->dyn.addr->fname;
+=======
+		if ((NULL != gv_cur_region) && (NULL != gv_cur_region->dyn.addr) && (0 != gv_cur_region->dyn.addr->fname_len))
+			db_file_name = (char *)gv_cur_region->dyn.addr->fname;
+		else
+			db_file_name = "";
+>>>>>>> 35326517 (GT.M V7.0-003)
 		warn_db_sz(db_file_name, blocks, new_total, MAXTOTALBLKS(cs_data));
 	}
 	return SS_NORMAL;

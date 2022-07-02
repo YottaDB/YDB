@@ -311,6 +311,7 @@ void iosocket_dlr_zkey(mstr *d)
 	int4		ii;
 	int		len, thislen, totlen, totplusthislen;
 	char		*zkeyptr, *charptr;
+	mval		*dzkey = NULL;
 	io_desc		*iod;
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;
@@ -346,22 +347,31 @@ void iosocket_dlr_zkey(mstr *d)
 				(socketptr->readyforwhat == (SOCKREADY_WRITE | SOCKREADY_READ)))
 				totplusthislen += MAXZKEYITEMLEN;	/* both READ and WRITE ready */
 			if (!IS_STP_SPACE_AVAILABLE(totplusthislen))
-			{	/* d must be mstr part of mval known to stp_gcol */
+			{
 				if (totlen)
 				{
-					d->len = totlen;
-					d->addr = (char *)stringpool.free;
+					assert(NULL == dzkey);
+					/* Temp MVAL to protect $zkey contents at the end of string pool from garbage collection */
+					PUSH_MV_STENT(MVST_MVAL);
+					dzkey = &mv_chain->mv_st_cont.mvs_mval;
+					dzkey->mvtype = MV_STR;
+					dzkey->str.len = totlen;
+					dzkey->str.addr = (char *)stringpool.free;
+					/* Advance stringpool free so that the contents are inside of it */
 					stringpool.free += totlen;
 				}
 				INVOKE_STP_GCOL(totplusthislen);
 				if (totlen)
 				{
-					if (!IS_AT_END_OF_STRINGPOOL(d->addr, totlen))
-					{	/* need to move to top */
-						memcpy(stringpool.free, d->addr, totlen);
+					assert(IS_IN_STRINGPOOL(dzkey->str.addr, totlen));
+					if (!IS_AT_END_OF_STRINGPOOL(dzkey->str.addr, totlen))
+					{	/* Move to top */
+						memcpy(stringpool.free, dzkey->str.addr, totlen);
 					} else
-						stringpool.free -= totlen;	/* backup over prior items */
-					d->len = 0;	/* so ignored by stp_gcol */
+						stringpool.free -= totlen;	/* Backup over prior items */
+					assert(dzkey);
+					POP_MV_STENT(); /* Release temporary MVAL */
+					dzkey = NULL;
 				}
 				zkeyptr = (char *)stringpool.free + totlen;
 			}

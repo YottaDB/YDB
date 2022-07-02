@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2021 Fidelity National Information	*
+ * Copyright (c) 2013-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -19,10 +19,11 @@
 #ifndef GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED
 #define GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED
 
-#define GTM_TLS_API_VERSION		0x00000005
+#define GTM_TLS_API_VERSION		0x00000006
 #define GTM_TLS_API_VERSION_SOCK	0x00000002	/* when TLS sockets added */
 #define GTM_TLS_API_VERSION_RENEGOPT	0x00000004	/* WRITE /TLS renegotiate with options */
 #define GTM_TLS_API_VERSION_NONBLOCK	0x00000005	/* WRITE /BLOCK("OFF") */
+#define GTM_TLS_API_VERSION_GET_ERROR	0x00000006	/* gtm_tls_get_error() socket ptr for errbuf */
 
 #define MAX_X509_LEN			256
 #define MAX_ALGORITHM_LEN		64
@@ -141,6 +142,7 @@ typedef struct gtm_tls_session_struct
 	void			*session;
 	char			tlsid[MAX_TLSID_LEN + 1];
 	gtm_tls_ctx_t		*gtm_ctx;
+	char			*errstr;
 } gtm_tls_socket_t;
 
 #endif	/* GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED */
@@ -155,7 +157,11 @@ typedef struct gtm_tls_session_struct
  */
 
 /* Returns the most recent error (null-terminated) related to the workings of the SSL/TLS reference implementation. */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	const char		*gtm_tls_get_error(void);
+=======
+extern const char		*gtm_tls_get_error(gtm_tls_socket_t *);
+>>>>>>> 35326517 (GT.M V7.0-003):sr_unix/gtm_tls_interface.h
 
 /* If the most recent invocation of the SSL/TLS reference implementation resulted in a system call error, `gtm_tls_errno' returns
  * the value of `errno'. Otherwise, -1 is returned in which case `gtm_tls_get_error' provides more information.

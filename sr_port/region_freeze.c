@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -364,6 +364,8 @@ freeze_status region_freeze_post(gd_region *region)
 	int			dummy_errno;
 	boolean_t		was_crit;
 	freeze_status		rval;
+	int			slp_cnt;
+	boolean_t		is_logged = FALSE;
 
 	csa = &FILE_INFO(region)->s_addrs;
 	csd = csa->hdr;
@@ -398,8 +400,30 @@ freeze_status region_freeze_post(gd_region *region)
 		}
 		csa->needs_post_freeze_online_clean = FALSE;
 	}
+	slp_cnt = 0;
 	if (csa->needs_post_freeze_flushsync)
 	{
+		/* we can't wcs_flu() until donotflush_dbjnl != TRUE because another process
+		 * like online rollback might be fooling with things, previously this
+		 * was not checked, and wcs_flu() would assert out on donotflush_dbjnl.
+		 * The assert below warns us in dbg something is iffy, if we are in pro
+		 * and we still don't see FALSE on donotflush_dbjnl,
+		 * we call wcs_flu() regardless, which the previous code did too.*/
+		while (TRUE == csa->nl->donotflush_dbjnl)
+		{
+			assert(1000 > slp_cnt);
+			if (1000 <= slp_cnt)
+				break;
+			if (!(slp_cnt % 100))
+				is_logged = FALSE;
+			if (!is_logged)
+			{
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TEXT, 2,
+					LEN_AND_LIT("Freeze spinning for clean DB header"));
+				is_logged = TRUE;
+			}
+			wcs_sleep(++slp_cnt); /* wcs_sleep maxes out at 10ms so this loop should run in ~ 10sec worst case */
+		}
 		if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH))
 			rval = REG_FLUSH_ERROR;
 		csa->needs_post_freeze_flushsync = FALSE;

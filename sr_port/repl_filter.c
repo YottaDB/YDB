@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -1169,6 +1169,11 @@ int jnl_v22TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	cb = conv_buff;
 	status = SS_NORMAL;
 	jlen = *jnl_len;
+<<<<<<< HEAD
+=======
+	this_upd_seqno = this_strm_seqno = seq_num_zero;
+	promote_uupd_to_tupd = FALSE;
+>>>>>>> 35326517 (GT.M V7.0-003)
 	assert(is_rcvr_server);
 	assert(LOCAL_TRIGGER_SUPPORT);	/* A lot of the below code has been simplified because of this assumption */
 	while (JREC_PREFIX_SIZE <= jlen)
@@ -1298,8 +1303,13 @@ int jnl_v44TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	cb = conv_buff;
 	status = SS_NORMAL;
 	jlen = *jnl_len;
+<<<<<<< HEAD
 	this_upd_seqno = 0;
 	this_strm_seqno = 0;	/* needed to avoid false [-Wuninitialized] warning from gcc 12.1 */
+=======
+	this_upd_seqno = this_strm_seqno = seq_num_zero;
+	promote_uupd_to_tupd = FALSE;
+>>>>>>> 35326517 (GT.M V7.0-003)
 	assert(is_src_server);
 	/* Since this filter function is invoked only on the source side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the REMOTE side supports triggers.
@@ -1485,8 +1495,27 @@ int jnl_v24TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	cb = conv_buff;
 	status = SS_NORMAL;
 	jlen = *jnl_len;
+<<<<<<< HEAD
 	assert(is_rcvr_server);
 	assert(LOCAL_TRIGGER_SUPPORT);	/* A lot of the below code has been simplified because of this assumption */
+=======
+	this_upd_seqno = this_strm_seqno = seq_num_zero;
+	promote_uupd_to_tupd = FALSE;
+	/* Since filter format V24 corresponds to journal formats V24, V25, or v26, in case of a V24 source and V2{5,6} receiver,
+	 * the source server will not do any filter transformations (because receiver jnl ver is higher). This means
+	 * jnl_v24TOv24 filter conversion function will be invoked on the receiver side to do V24 to V2{5,6} jnl format conversion.
+	 * Therefore we cannot do an assert(is_src_server) which we otherwise would have had in case the latest filter
+	 * version corresponds to only ONE journal version.
+	 *	assert(is_src_server);
+	 */
+	assert(is_src_server || is_rcvr_server);
+	receiver_supports_triggers = (is_src_server ? REMOTE_TRIGGER_SUPPORT : LOCAL_TRIGGER_SUPPORT);
+	GTMTRIG_ONLY(assert(receiver_supports_triggers);)	/* if receiver is V24 format, it should have been built
+								 * with trigger support enabled since we don't either build
+								 * anymore OR replicate anymore to trigger unsupported platforms
+								 * (HPPA/Tru64/VMS) from trigger-supporting Unix platforms.
+								 */
+>>>>>>> 35326517 (GT.M V7.0-003)
 	while (JREC_PREFIX_SIZE <= jlen)
 	{
 		assert(0 == ((UINTPTR_T)jb % SIZEOF(uint4)));

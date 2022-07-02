@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Copyright (c) 2012-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
@@ -22,6 +22,7 @@
 #include "gtm_stat.h"
 #include "gtm_socket.h"
 #include "gtm_inet.h"
+#include "gtm_limits.h"
 #include "gtm_time.h"
 #include "gtm_caseconv.h"
 #include "gtm_conv.h"
@@ -78,6 +79,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 	int			new_ozff_len, conv_len, handle_len, moreread_timeout, len;
 	unsigned short		port;
 	int4			errlen, msec_timeout, real_errno, p_offset = 0, zff_len, delimiter_len;
+	int4			options_len = 0;
 	int			d_socket_struct_len, soc_cnt;
 	ABS_TIME		cur_time, end_time;
 	io_desc			*ioptr;
@@ -88,7 +90,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 	mv_stent		*mv_zintdev;
 	boolean_t		zint_conn_restart = FALSE;
 	socket_interrupt	*sockintr;
-	mstr			chset_mstr;
+	mstr			chset_mstr, optionstr;
 	gtm_chset_t		default_chset, temp_ichset, temp_ochset;
 	boolean_t		attach_specified = FALSE,
 				listen_specified = FALSE,
@@ -103,6 +105,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 				ichset_specified,
 				ochset_specified;
 	unsigned char 		delimiter_buffer[MAX_N_DELIMITER * (MAX_DELIM_LEN + 1)], zff_buffer[MAX_ZFF_LEN];
+	unsigned char		options_buffer[UCHAR_MAX + 1];
 	char			ioerror,
 				sock_handle[MAX_HANDLE_LEN], delimiter[MAX_DELIM_LEN + 1];
 	int			socketptr_delim_len;
@@ -295,7 +298,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 				case iop_zibfsize:
 					ibfsize_specified = TRUE;
 					GET_ULONG(ibfsize, pp->str.addr + p_offset);
-					if ((0 == ibfsize) || (MAX_INTERNAL_SOCBUF_SIZE < ibfsize))
+					if (0 == ibfsize)
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, bfsize);
 					break;
 				case iop_zlisten:
@@ -402,6 +405,14 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					filemode_mask |= S_IRWXU;
 					filemode |= (uint)(unsigned char)*(pp->str.addr + p_offset) << 6;
 					break;
+				case iop_options:
+					options_len = (int4)(unsigned char)*(pp->str.addr + p_offset);
+					if (UCHAR_MAX >= options_len)
+					{
+						memcpy(options_buffer, (unsigned char *)(pp->str.addr + p_offset + 1), options_len);
+						options_buffer[options_len] = '\0';
+					}
+					break;
 				default:
 					break;
 			}
@@ -492,7 +503,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 		if (!socketptr)
 		{	/* If new socket not created, then use the existing (current) socket from the socket device */
 			if (dsocketptr->n_socket <= dsocketptr->current_socket)
-	 		{
+			{
 				assert(FALSE);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket,
 						dsocketptr->n_socket);
@@ -502,6 +513,12 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 				curr_socketptr = dsocketptr->socket[dsocketptr->current_socket];
 		} else	/* Set to the newly created socket */
 			curr_socketptr = socketptr;
+		if (curr_socketptr && (0 < options_len))
+		{	/* parse and store options in socket struct */
+			optionstr.addr = (char *)options_buffer;
+			optionstr.len = options_len;
+			devoptions(NULL, curr_socketptr, &optionstr, "OPEN", IOP_OPEN_OK);
+		}
 		/* parse the delimiter: delimiter_buffer ==> socketptr->delimiter[...] */
 		if ((0 <= delimiter_len) && (curr_socketptr))
 				iosocket_delimiter(delimiter_buffer, delimiter_len, curr_socketptr, (0 == delimiter_len));

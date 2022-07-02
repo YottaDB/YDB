@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -2634,9 +2634,9 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
 	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmrecv_sock_fd, repl_tls.id, GTMTLS_OP_VERIFY_PEER)))
 	{
 		if (!PLAINTEXT_FALLBACK)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSCONVSOCK), 0,
-				ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+				ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
 	} else
 	{
 		/* Do the actual handshake. */
@@ -2659,7 +2659,7 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
 			repl_connection_reset = TRUE;
 			return FALSE;
 		}
-		errp = (-1 == status) ? (char *)gtm_tls_get_error() : STRERROR(status);
+		errp = (-1 == status) ? (char *)gtm_tls_get_error(NULL) : STRERROR(status);
 		if (!PLAINTEXT_FALLBACK)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSHANDSHAKE), 0, ERR_TEXT, 2, LEN_AND_STR(errp));

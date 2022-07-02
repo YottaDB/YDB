@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2012 Fidelity Information Services, Inc		*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+=======
+ * Copyright (c) 2012-2022 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 35326517 (GT.M V7.0-003)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,10 +73,22 @@ lv_val *op_rfrshlvn(uint4 indx, opctype oc)
 	case OC_SRCHINDX:
 		lv = (lv_val *)callg((callgfnptr)op_srchindx, (gparam_list *)lvn_info);
 		if (NULL == lv)
+<<<<<<< HEAD
 		{	/* This path is currently only used by FOR. Issue LVUNDEF error even if NOUNDEF is enabled. */
 			end = format_key_mvals(buff, SIZEOF(buff), lvn_info);
 			rts_error(VARLSTCNT(4) ERR_LVUNDEF, 2, end - buff, buff);
 			assert(FALSE);
+=======
+		{
+			if (!undef_inhibit)
+			{
+				end = format_key_mvals(buff, SIZEOF(buff), lvn_info);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
+				assert(FALSE);
+			}
+			/* This path is currently only used by FOR. Recreate the control variable and continue. */
+			lv = (lv_val *)callg((callgfnptr)op_putindx, (gparam_list *)lvn_info);
+>>>>>>> 35326517 (GT.M V7.0-003)
 		}
 		break;
 	case OC_M_SRCHINDX:
@@ -79,7 +96,7 @@ lv_val *op_rfrshlvn(uint4 indx, opctype oc)
 		lv = (lv_val *)callg((callgfnptr)op_m_srchindx, (gparam_list *)lvn_info);
 		break;
 	default:
-		GTMASSERT;
+		assertpro(FALSE);
 	}
 	assert(lv);
 	return lv;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -932,10 +932,14 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 		iod->dollar.za = ZA_IO_ERR;
 #		ifdef GTM_TLS
 		if (socketptr->tlsenabled && (0 > real_errno))
-			errptr = (char *)gtm_tls_get_error();
-		else	/* TLS not enabled or system call error */
+		{
+			errptr = (char *)gtm_tls_get_error((gtm_tls_socket_t *)socketptr->tlssocket);
+			real_errno = gtm_tls_errno();
+		} else	/* TLS not enabled or system call error */
 #		endif
 			errptr = (char *)STRERROR(real_errno);
+		DBGSOCK((stdout, "socrfl: Error string: %.*s\n", errlen, errptr));
+		DBGSOCK((stdout, "socrfl: Error numbers: %d %d\n", status, real_errno));
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr, errlen);
 		ISSUE_NOPRINCIO_IF_NEEDED(iod, FALSE, !socketptr->ioerror);	/* FALSE indicates READ */
 		if (socketptr->ioerror && (prin_in_dev_failure || (0 < iod->error_handler.len) || iod->dollar.zeof))

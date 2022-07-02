@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
@@ -69,7 +69,22 @@ GBLREF unsigned char            *stackbase, *stacktop, *msp, *stackwarn;
 GBLREF volatile boolean_t	dollar_zininterrupt;
 GBLREF volatile int4		outofband;
 
+<<<<<<< HEAD
 boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *handle)
+=======
+error_def(ERR_GETNAMEINFO);
+error_def(ERR_GETSOCKNAMERR);
+error_def(ERR_GETSOCKOPTERR);
+error_def(ERR_SOCKACPT);
+error_def(ERR_SOCKNOTFND);
+error_def(ERR_SOCKWAIT);
+error_def(ERR_SOCKWAITARG);
+error_def(ERR_TEXT);
+error_def(ERR_SOCKMAX);
+error_def(ERR_ZINTRECURSEIO);
+
+boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *handle)
+>>>>>>> 35326517 (GT.M V7.0-003)
 {
 	ABS_TIME		utimeout, *utimeoutptr, cur_time, end_time;
 	nfds_t			poll_nfds;
@@ -589,8 +604,8 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boolean_t selectfirst)
 {
 	char            	*errptr;
-	GTM_SOCKLEN_TYPE	size, addrlen;
-	int			rv, len, errcode, keepalive_opt, save_errno;
+	GTM_SOCKLEN_TYPE	size, addrlen, sockoptlen;
+	int			rv, len, errcode, keepalive_opt, keepalive_value, save_errno;
 	int4            	errlen;
 	char			port_buffer[NI_MAXSERV], ipaddr[SA_MAXLEN + 1];
 	struct pollfd		poll_fds;
@@ -610,12 +625,29 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	peer_sa_ptr = ((struct sockaddr *)(&peer));
 	if (selectfirst || (dsocketptr->waitcycle > socketptr->readycycle))
 	{	/* if not selected this time do a select first to check if connection still there */
+<<<<<<< HEAD
 		poll_fds.fd = socketptr->sd;
 		poll_fds.events = POLLIN;
 		rv = poll(&poll_fds, 1, 0);
+=======
+		do
+		{
+#ifdef USE_POLL
+			poll_fds.fd = socketptr->sd;
+			poll_fds.events = POLLIN;
+			rv = poll(&poll_fds, 1, 0);
+#endif
+#ifdef USE_SELECT
+			FD_ZERO(&select_fdset);
+			FD_SET(socketptr->sd, &select_fdset);
+			utimeout.tv_sec = utimeout.tv_usec = 0;
+			rv = select(socketptr->sd + 1, (void *)&select_fdset, NULL, NULL, &utimeout);
+#endif
+		} while ((0 > rv) && (EINTR == (save_errno = errno))); /* inline assigment */
+>>>>>>> 35326517 (GT.M V7.0-003)
 		if (0 > rv)
 		{
-			errptr = (char *)STRERROR(errno);
+			errptr = (char *)STRERROR(save_errno);
 			errlen = STRLEN(errptr);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKWAIT, 0, ERR_TEXT, 2, errlen, errptr);
 			return -1;
@@ -698,9 +730,26 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 		if (NULL != newsocketptr->local.saddr_ip)
 			free(newsocketptr->local.saddr_ip);
 		STRNDUP(ipaddr, SA_MAXLEN, newsocketptr->local.saddr_ip);
+<<<<<<< HEAD
 		keepalive_opt = TREF(ydb_socket_keepalive_idle);	/* deviceparameter would give more granular control */
 		if (keepalive_opt && !iosocket_tcp_keepalive(newsocketptr, keepalive_opt, action))
 			return -1;				/* iosocket_tcp_keepalive issues rts_error rather than return */
+=======
+#		ifdef DEBUG
+		sockoptlen = sizeof(keepalive_value);
+		keepalive_value = 0;
+		if (-1 == getsockopt(newsocketptr->sd, SOL_SOCKET, SO_KEEPALIVE, &keepalive_value, &sockoptlen))
+		{
+			save_errno = errno;
+			errptr = (char *)STRERROR(save_errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5, LEN_AND_LIT("SO_KEEPALIVE"),
+				save_errno, LEN_AND_STR(errptr));
+			return -1;
+		} else if ((0 != newsocketptr->options_state.alive)
+				&& ((0 == keepalive_value) != (0 == newsocketptr->keepalive)))
+			assert(keepalive_value == socketptr->keepalive);	/* AIX returns cnt if on */
+#		endif
+>>>>>>> 35326517 (GT.M V7.0-003)
 	}
 	newsocketptr->state = socket_connected;
 	newsocketptr->passive = FALSE;

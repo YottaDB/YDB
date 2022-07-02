@@ -1140,7 +1140,7 @@ JNLSWITCHTOOSM	<Journal AUTOSWITCHLIMIT [!UL blocks] is less than Journal ALLOCA
 JNLSWITCHSZCHG	<Journal AUTOSWITCHLIMIT [!UL blocks] is rounded down to [!UL blocks] to equal the sum of Journal ALLOCATION [!UL blocks] and a multiple of Journal EXTENSION [!UL blocks] for database file !AD>/info/fao=6!/ansi=0
 NOTRNDMACC	<Only random access files are supported as backup files for non-incremental backup>/error/fao=0!/ansi=0
 TMPFILENOCRE	<Error in MUPIP BACKUP while trying to create temporary file !AD>/error/fao=2!/ansi=0
-UNUSEDMSG1141	<SHRMEMEXHAUSTED last used in OpenVMS>/error/fao=0!/ansi=0
+DEVICEOPTION	<Option !AD on !AZ command: !AZ>/error/fao=4!/ansi=0
 JNLSENDOPER	<pid = 0x!XL : status = 0x!XL : jpc_status = 0x!XL : jpc_status2 = 0x!XL : iosb.cond = 0x!XW>/info/fao=5!/ansi=0
 DDPSUBSNUL	<NUL characters in subscripts are not supported by DDP>/error/fao=0!/ansi=0
 DDPNOCONNECT	<Named volume set, !AD, is not connected>/error/fao=2!/ansi=0

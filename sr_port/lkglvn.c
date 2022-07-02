@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -60,22 +60,40 @@ int lkglvn(boolean_t gblvn)
 	{
 		vbar = (TK_VBAR == TREF(window_token));
 		advancewindow();
+<<<<<<< HEAD
 		if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom_coerce_mval(sb1++)))
+=======
+		if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1)))
+>>>>>>> 35326517 (GT.M V7.0-003)
 		{
 			stx_error(ERR_EXPR);
 			if (shifting)
 				setcurtchain(oldchain);
 			return FALSE;
 		}
+		if (!vbar)
+		{
+			coerce(sb1, OCT_MVAL);
+			ex_tail(sb1++);
+		}
 		if (TK_COMMA == TREF(window_token))
 		{
 			advancewindow();
+<<<<<<< HEAD
 			if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom_coerce_mval(sb1++)))
+=======
+			if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1)))
+>>>>>>> 35326517 (GT.M V7.0-003)
 			{
 				stx_error(ERR_EXPR);
 				if (shifting)
 					setcurtchain(oldchain);
 				return FALSE;
+			}
+			if (!vbar)
+			{
+				coerce(sb1, OCT_MVAL);
+				ex_tail(sb1++);
 			}
 		} else
 			*sb1++ = put_str(0, 0);

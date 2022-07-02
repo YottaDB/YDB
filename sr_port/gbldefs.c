@@ -1244,6 +1244,7 @@ GBLDEF	boolean_t	dollar_zaudit;			/* Intrinsic that indicates whether direct mod
 							 */
 GBLDEF	dm_audit_info	*audit_conn;			/* Stores the APD logger's connection information */
 GBLDEF	boolean_t	gtm_nofflf;			/* GTM-9136 TRUE only to suppress LF after FF in "write #" */
+<<<<<<< HEAD
 
 /* YottaDB global variables */
 GBLDEF	CLI_ENTRY	*cmd_ary;	/* Pointer to command table for MUMPS/DSE/LKE etc. */
@@ -1477,3 +1478,6 @@ GBLDEF	boolean_t		in_fake_enospc;	/* used by an assert in "send_msg.c" */
 GBLDEF gdr_name	*gdr_name_head;
 GBLDEF gd_addr	*gd_addr_head;
 
+=======
+GBLDEF	void 		(*primary_exit_handler)(void);	/* If non-NULL, may be used to reestablish atexit() handler */
+>>>>>>> 35326517 (GT.M V7.0-003)

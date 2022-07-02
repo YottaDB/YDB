@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -779,6 +779,8 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	gd_region		*baseDBreg;
 	sgmnt_addrs		*baseDBcsa;
 	node_local_ptr_t	baseDBnl;
+	int			slp_cnt = 0;
+	boolean_t		is_logged = FALSE;
 #	ifdef DEBUG
 	int			i;
 	char			*ptr;
@@ -1206,6 +1208,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		udi->shm_created = !tsd_read_only;
 	}
 	assert(udi->grabbed_access_sem || bypassed_access);
+	DO_DB_HDR_CHECK(reg, tsd); /* Basic sanity check on the file header fields */
 	if (udi->fd_opened_with_o_direct)
 	{	/* "tsd" points to dio_buff.aligned, a global variable buffer that will likely be reused by other functions
 		 * inside "db_init" (e.g. "recover_truncate" invoking "db_write_eof_block"). Point it back to tsdbuff
@@ -1215,7 +1218,6 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		memcpy(&tsdbuff, (sgmnt_data_ptr_t)(TREF(dio_buff)).aligned, SGMNT_HDR_LEN);
 		tsd = &tsdbuff;
 	}
-	DO_DB_HDR_CHECK(reg, tsd); /* Basic sanity check on the file header fields */
 	if (WBTEST_ENABLED(WBTEST_HOLD_ONTO_ACCSEM_IN_DBINIT))
 	{
 		DBGFPF((stderr, "Holding the access control semaphore.. Sleeping for 30 seconds\n"));
@@ -1575,11 +1577,29 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		 * state. Note that the reissue of a regular Rollback/Recover command will NOT hit this condition because it invokes
 		 * mu_rndwn_file (STANDALONE) that removes the shared memory. The only case in which mu_rndwn_file does NOT remove
 		 * shared memory is if it was invoked by an Online Rollback in which case the below check should be bypassed
+		 * However, if there is an online rollback active (that is not us) this should be a transient condition
+		 * and if we wait a little bit, it should go away.
 		 */
 		if (cnl->donotflush_dbjnl && !jgbl.onlnrlbk)
 		{
-			PRINT_CRASH_MESSAGE(0, cnl, ERR_TEXT, 2,
-				LEN_AND_LIT("mupip recover/rollback created shared memory. Needs MUPIP RUNDOWN"));
+			/* If we can see online rollback is out there, spin a bit */
+			while (cnl->donotflush_dbjnl && !jgbl.onlnrlbk && cnl->onln_rlbk_pid)
+			{
+				if (!(slp_cnt % 100))
+					is_logged = FALSE;
+				if (! is_logged)
+				{
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TEXT, 2,
+						LEN_AND_LIT("Spinning for clean DB header"));
+					is_logged = TRUE;
+				}
+				wcs_sleep(++slp_cnt);
+				if (1000 < slp_cnt)
+					break;
+			}
+			if (cnl->donotflush_dbjnl && !jgbl.onlnrlbk)
+				PRINT_CRASH_MESSAGE(0, cnl, ERR_TEXT, 2,
+					LEN_AND_LIT("mupip recover/rollback created shared memory. Needs MUPIP RUNDOWN"));
 		}
 		/* verify pointers from our calculation vs. the copy in shared memory */
 		if (cnl->critical != (sm_off_t)((sm_uc_ptr_t)csa->critical - (sm_uc_ptr_t)cnl))

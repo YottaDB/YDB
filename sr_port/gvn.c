@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -38,7 +38,7 @@ error_def(ERR_SIDEEFFECTEVAL);
 
 int gvn(void)
 {
-	boolean_t	parse_status, shifting, vbar;
+	boolean_t	shifting, vbar;
 	char		x;
 	int		hash_code;
 	opctype		ox;
@@ -65,29 +65,51 @@ int gvn(void)
 		sb1++;
 		vbar = (TK_VBAR == TREF(window_token));
 		advancewindow();
+<<<<<<< HEAD
 		if (vbar)
 			parse_status = expr(sb1++, MUMPS_EXPR);
 		else
 			parse_status = expratom_coerce_mval(sb1++);
 		if (!parse_status)
+=======
+		if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1)))
+>>>>>>> 35326517 (GT.M V7.0-003)
 		{
 			stx_error(ERR_EXPR);
 			if (shifting)
 				setcurtchain(oldchain);
 			return FALSE;
 		}
+		if (!vbar)
+		{	/* DE257948 - we need to force ex_tail() in a case we have an additional contain/square-bracket.
+			 * Correct the tree and sb1->opcode.tref and prevent an assert failure in emit_code.c
+			 */
+			coerce(sb1, OCT_MVAL);
+			ex_tail(sb1++);
+		}
 		if (TK_COMMA == TREF(window_token))
 		{
 			advancewindow();
+<<<<<<< HEAD
 			if (vbar)
 				parse_status = expr(sb1++, MUMPS_EXPR);
 			else
 				parse_status = expratom_coerce_mval(sb1++);
 			if (!parse_status)
 			{	stx_error(ERR_EXPR);
+=======
+			if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1)))
+			{
+				stx_error(ERR_EXPR);
+>>>>>>> 35326517 (GT.M V7.0-003)
 				if (shifting)
 					setcurtchain(oldchain);
 				return FALSE;
+			}
+			if (!vbar)
+			{
+				coerce(sb1, OCT_MVAL);
+				ex_tail(sb1++);
 			}
 		} else
 			*sb1++ = put_str(0,0);

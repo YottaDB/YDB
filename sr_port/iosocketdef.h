@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -47,6 +47,12 @@
 #define SOCKPEND_WRITE		2
 #define SOCKPEND_BUFFER		4	/* something in input buffer */
 
+/* bits for options_state in socket_struct */
+#define SOCKOPTIONS_SYSTEM	1	/* value from getsockopt */
+#define SOCKOPTIONS_USER	2	/* value specified by user */
+#define SOCKOPTIONS_PENDING	4	/* setsockopt needed */
+#define	SOCKOPTIONS_FROM_STRUCT	-1	/* flag for iosocket_tcp_keepalive.c */
+
 typedef struct
 {
 	uid_t   mem;
@@ -75,8 +81,15 @@ typedef struct
 #  define DBGSOCKWAIT(X)
 #  define DBGSOCKWAIT_ONLY(X)
 #endif
-#define DBGSOCK2(X)
-#define DBGSOCK_ONLY2(X)
+/* #define DEBUG_SOCK2 */
+#ifdef DEBUG_SOCK2
+#  include "gtmio.h"
+#  define DBGSOCK2(X) DBGFPF(X)
+#  define DBGSOCK_ONLY2(X) X
+#else
+#  define DBGSOCK2(X)
+#  define DBGSOCK_ONLY2(X)
+#endif
 
 /* About the length of the delimiter string. While we are allocating lots of space here for the maximum representation
  * of 64 delimiters each of 64 chars MB chars, the fact is that the iop option processing actually limits the string
@@ -94,7 +107,6 @@ typedef struct
 #define DEFAULT_LISTEN_DEPTH		1
 #define	DEFAULT_SOCKET_BUFFER_SIZE	0x400
 #define	MAX_SOCKET_BUFFER_SIZE		0x100000
-#define	MAX_INTERNAL_SOCBUF_SIZE	0x100000
 /* Next three fields relate to the time that a variable length unterminated read will wait to see
  * if there is more input coming in before it gives up and returns what it has to the user. This
  * time is specified in milliseconds. This value used to be 200ms but that was deemed too long on
@@ -406,6 +418,20 @@ typedef struct socket_struct_type
 	ssize_t				lastarg_sent;		/* number of bytes actually written */
 	int				readyforwhat;		/* bit mask SOCKREADY_READ and/or SOCKREADY_WRITE */
 	uint4				current_events;		/* bitmask SOCKPEND_ only within iosocket_wait, see pendingevent */
+	struct
+	{
+		unsigned int		alive	: 3;
+		unsigned int		idle	: 3;
+		unsigned int		cnt	: 3;
+		unsigned int		intvl	: 3;
+		unsigned int		sndbuf	: 3;
+		unsigned int		rcvbuf	: 3;
+	} options_state;
+	int				keepalive;		/* SO_KEEPALIVE */
+	int				keepidle;		/* TCP_KEEPIDLE */
+	int				keepcnt;		/* TCP_KEEPCNT */
+	int				keepintvl;		/* TCP_KEEPINTVL */
+	int				iobfsize;		/* SO_SNDBUF */
 } socket_struct;
 
 typedef struct socket_interrupt_type
@@ -456,7 +482,11 @@ void iosocket_close_one(d_socket_struct *dsocketptr, int index);
 int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boolean_t selectfirst);
 ssize_t iosocket_output_buffer(socket_struct *socketptr);
 int iosocket_buffer_error(socket_struct *socketptr);
-boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, char * act);
+boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, char * act, boolean_t freesocket);
+boolean_t iosocket_getsockopt(socket_struct *socketptr, char *optname, int option,
+	int level, void *optvalue,  GTM_SOCKLEN_TYPE *optvaluelen, boolean_t freesocket);
+int iosocket_setsockopt(socket_struct *socketptr, char *optname, int option,
+	int level, void *optvalue, GTM_SOCKLEN_TYPE optvaluelen, boolean_t freesocket);
 #ifdef GTM_TLS
 void    iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password, mval *extraarg);
 #endif

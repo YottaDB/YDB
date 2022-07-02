@@ -806,18 +806,18 @@
 3 REGION
    REGION
 
-   Specifies that the INTEG parameter identifies one or more regions rather
+   Specifies that the DUMPFHEAD command identifies one or more regions rather
    than a database file. The format of the REGION qualifier is:
 
    -R[EGION] region-list
 
-     o The region-list identifies the target of DUMPFHEAD. region-list may
+     o The region-list identifies the target of DUMPFHEAD; region-list may
        specify more than one region of the current global directory in a
-       list. Regions are case-insensitive, separated by a comma, and
-       wildcards can be used to specify them. Any region-name may include the
-       wildcard characters * and ? (remember to escape them to protect them
-       from inappropriate expansion by the shell). Any region name expansion
-       occurs in M (ASCII) collation order.
+       list. DUMPFHEAD treats regions names (separated by commas) as
+       case-insensitive with optional wildcard characters * and ? expanded in
+       M (ASCII) collation order. Remember to escape wildcard characters to
+       protect them from inappropriate expansion by the shell. DUMPFHEAD
+       processes regions based on the order specified in the region-list.
      o The region-list argument may specify more than one region of the
        current Global Directory in a list separated with commas. DUMPFHEAD
        -REGION requires the environment variable ydb_gbldir to specify a valid
@@ -1884,18 +1884,18 @@
 3 Region
    Region
 
-   Specifies that the INTEG parameter identifies one or more regions rather
+   Specifies that the INTEG command identifies one or more regions rather
    than a database file. The format of the REGION qualifier is:
 
    -R[EGION]=region-list
 
-     o The region-list identifies the target of INTEG. region-list may
+     o The region-list identifies the target of INTEG; region-list may
        specify more than one region of the current global directory in a
-       list. Regions are case-insensitive, separated by a comma, and
-       wildcards can be used to specify them. Any region-name may include the
-       wildcard characters * and ? (remember to escape them to protect them
-       from inappropriate expansion by the shell). Any region name expansion
-       occurs in M (ASCII) collation order.
+       list. INTEG treats regions names (separated by commas) as
+       case-insensitive with optional wildcard characters * and ? expanded in
+       M (ASCII) collation order. Remember to escape wildcard characters to
+       protect them from inappropriate expansion by the shell. INTEG
+       processes regions based on the order specified in the region-list.
      o The region-list argument may specify more than one region of the
        current Global Directory in a list separated with commas. INTEG
        -REGION requires the environment variable ydb_gbldir to specify a valid
@@ -4428,7 +4428,7 @@
    This example upgrades the file-header of mumps.dat to V5 format.
 
 1 Journaling
-   Journaling
+    Journaling
 
 2 SET
    SET
@@ -7159,7 +7159,43 @@
    ./configure --shared
    make CFLAGS="-m64"
 
+<<<<<<< HEAD
    By default, YottaDB searches for the libz.so shared library in the standard
+=======
+   z/OS:
+
+   Download the zlib 1.1.4 from the libpng project's download page on
+   SourceForge.com. Use a transfer mechanism that does not perform automatic
+   conversion to download a source tarball. If pax cannot read the archive,
+   it is a sign that the download mangled the archive. Use pax to unpack the
+   tarball, converting files from ASCII to EBCDIC.
+
+   pax -r -o setfiletag -ofrom=ISO8859-1,to=IBM-1047 -f zlib-1.1.4.tar.gz
+
+   Apply the following patch to the zlib 1.1.4 sources:
+
+   ---------------------------------- zlib_1.1.4_zos.patch --------------------------------------------------
+   diff -purN downloads/zlib/src.orig/configure downloads/zlib/src/configure
+   --- downloads/zlib/src.orig/configure Tue Dec 16 14:09:57 2008
+   +++ downloads/zlib/src/configure Mon Feb 9 14:30:49 2009
+   @@ -116,6 +116,11 @@ else SFLAGS=${CFLAGS-"-Kconform_pic -O"}
+   CFLAGS=${CFLAGS-"-O"} LDSHARED=${LDSHARED-"cc -G"};;
+   + OS/390*)+ CC=xlc+ SFLAGS=${CFLAGS-"-qascii -q64 -Wc,DLL,LP64,XPLINK,EXPORTALL -D_ALL_SOURCE_NOTHREADS"}
+   + CFLAGS=${CFLAGS-"-qascii -q64 -Wc,DLL,LP64,XPLINK,EXPORTALL -D_ALL_SOURCE_NOTHREADS"}
+   + LDSHARED=${LDSHARED-"xlc -qascii -q64 -Wl,dll,LP64,XPLINK "};;
+   # send working options for other systems to support@gzip.org *) SFLAGS=${CFLAGS-"-O"} CFLAGS=${CFLAGS-"-O"}
+
+   Build and install the zlib DLL, placing the xlc compilers in compatibility
+   to mode by setting the environment variable C89_CCMODE to 1. When not in
+   compatibility mode, xlc follows strict placement of command line options.
+   Configure and build the zlib software with ./configure --shared && make.
+   By default, the configure script places zlib in /usr/local/lib. Install
+   the software with make install. To ensure that GT.M finds zlib, include
+   /usr/local/lib in LIBPATH, the environment variable that provides a search
+   path for processes to use when they link DLLs.
+
+   By default, GT.M searches for the libz.so shared library in the standard
+>>>>>>> 35326517 (GT.M V7.0-003)
    system library directories (for example, /usr/lib, /usr/local/lib,
    /usr/local/lib64). If the shared library is installed in a non-standard
    location, before starting replication, you must ensure that the

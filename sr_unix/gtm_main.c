@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -72,7 +72,25 @@ GBLREF	u_casemap_t 			gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitl
 GBLREF	char 				**gtmenvp;
 
 #define GTMCRYPT_ERRLIT			"during GT.M startup"
+<<<<<<< HEAD
 #define YDBXC_gblstat			"ydb_xc_gblstat=%s/gtmgblstat.xc"
+=======
+#define GTMXC_gblstat			"GTMXC_gblstat=%s/gtmgblstat.xc"
+#define	MUMPS				"MUMPS "
+
+#ifdef __osf__
+ /* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
+  * specify compiler and link editor options in order to use (and allocate) 32-bit pointers.  However, since C is
+  * the only exception and, in particular because the operating system does not support such an exception, the argv
+  * array passed to the main program is an array of 64-bit pointers.  Thus the C program needs to declare argv[]
+  * as an array of 64-bit pointers and needs to do the same for any pointer it sets to an element of argv[].
+  */
+# pragma pointer_size (save)
+# pragma pointer_size (long)
+#endif
+
+GBLREF	char 				**gtmenvp;
+>>>>>>> 35326517 (GT.M V7.0-003)
 
 error_def(ERR_CRYPTDLNOOPEN);
 error_def(ERR_CRYPTDLNOOPEN2);
@@ -82,6 +100,7 @@ error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TEXT);
 error_def(ERR_TLSDLLNOOPEN);
 error_def(ERR_TLSINIT);
+<<<<<<< HEAD
 
 int gtm_main(int argc, char **argv, char **envp)
 {
@@ -92,6 +111,19 @@ int gtm_main(int argc, char **argv, char **envp)
 	int		status;
 	char		*pathptr;				/* this is similar to code in "dlopen_libyottadb.c" */
 	char		curr_exe_realpath[YDB_PATH_MAX];	/* this is similar to code in "dlopen_libyottadb.c" */
+=======
+int gtm_main (int argc, char **argv, char **envp)
+#ifdef __osf__
+# pragma pointer_size (restore)
+#endif
+{
+	char			*ptr, *eq, **p;
+	char			gtmlibxc[GTM_PATH_MAX];
+	int             	eof, parse_ret;
+	int			gtmcrypt_errno;
+	int			status;
+	size_t			cplen;
+>>>>>>> 35326517 (GT.M V7.0-003)
 
 #	ifdef GTM_SOCKET_SSL_SUPPORT
 	char			tlsid_env_name[MAX_TLSID_LEN * 2];
@@ -128,8 +160,9 @@ int gtm_main(int argc, char **argv, char **envp)
 	 * we did not change argv[0]
 	*/
 	ptr = cli_lex_in_ptr->in_str;
-	memmove(strlen("MUMPS ") + ptr, ptr, strlen(ptr) + 1);	/* BYPASSOK */
-	MEMCPY_LIT(ptr, "MUMPS ");
+	assert((NULL != ptr) && (cli_lex_in_ptr->buflen > (strlen(ptr) + sizeof(MUMPS))));
+	memmove(strlen(MUMPS) + ptr, ptr, strlen(ptr) + 1);	/* BYPASSOK */
+	MEMCPY_LIT(ptr, MUMPS);
 	/* reset the argument buffer pointer, it's changed in cli_gettoken() call above
 	 * do NOT reset to 0(NULL) to avoid fetching cmd line args into buffer again
 	 * cli_lex_in_ptr->tp is the pointer to indicate current position in the buffer
@@ -232,13 +265,15 @@ int gtm_main(int argc, char **argv, char **envp)
 											GTMTLS_OP_INTERACTIVE_MODE)))
 						{
 							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSINIT, 0,
-								ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+								ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
 						}
 					}
 					assert(NULL != tls_ctx);
-					assert((MAX_TLSID_LEN * 2) > (int)(eq - ptr));
-					memcpy(tlsid_env_name, ptr, (int)(eq - ptr));
-					tlsid_env_name[(int)(eq - ptr)] = '\0';
+					cplen = (eq - ptr);
+					if (sizeof(tlsid_env_name) > (cplen + 1))
+						cplen = sizeof(tlsid_env_name) - 1;
+					memcpy(tlsid_env_name, ptr, cplen);
+					tlsid_env_name[cplen] = '\0';
 					gtm_tls_prefetch_passwd(tls_ctx, tlsid_env_name);
 				}
 			}

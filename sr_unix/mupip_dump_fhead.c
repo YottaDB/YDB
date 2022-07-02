@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -39,12 +39,14 @@
 #include "mupip_dump_fhead.h"
 #include "gtm_stdlib.h"
 #include "wcs_flu.h"
+#include "mdq.h"
 
 GBLREF char			ydb_dist[YDB_PATH_MAX];
 GBLREF boolean_t		ydb_dist_ok_to_use;
 GBLREF tp_region		*grlist;
 GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_addrs		*cs_addrs;
+GBLREF usr_reg_que		*usr_spec_regions;
 
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_DBNOREGION);
@@ -61,8 +63,14 @@ void mupip_dump_fhead(void)
 {
 	int4		status;
 	tp_region	*rptr;
+<<<<<<< HEAD
 	unsigned char	file[YDB_PATH_MAX];
 	unsigned short	file_len = YDB_PATH_MAX - 1;
+=======
+	unsigned char	file[GTM_PATH_MAX];
+	unsigned short	file_len = GTM_PATH_MAX - 1;
+	usr_reg_que	*region_que_entry;
+>>>>>>> 35326517 (GT.M V7.0-003)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -76,8 +84,16 @@ void mupip_dump_fhead(void)
 		mu_getlst("REGION", SIZEOF(tp_region));
 		if (!grlist)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DBNOREGION);
-		for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)
+		dqloop(usr_spec_regions, que, region_que_entry)
 		{
+			for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)
+			{
+				gv_cur_region = rptr->reg;
+				if ((char *)gv_cur_region->rname == (char *)region_que_entry->usr_reg)
+					break; /* Matching region found. Exit the loop */
+			}
+			if (NULL == rptr)
+				continue; /* continue the dqloop */
 			if (CLI_PRESENT == cli_present("FLUSH"))
 			{
 				gv_init_reg(rptr->reg);

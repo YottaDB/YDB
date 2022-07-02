@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2021 Fidelity National Information	*
+ * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,14 +17,20 @@ ZSOCKETITEM("DESCRIPTOR", zsocket_descriptor, MV_NM, level_socket),
 ZSOCKETITEM("HOWCREATED", zsocket_howcreated, MV_STR, level_socket),
 ZSOCKETITEM("INDEX", zsocket_index, MV_NM, level_socket),
 ZSOCKETITEM("IOERROR", zsocket_ioerror, MV_STR, level_socket),
+ZSOCKETITEM("KEEPALIVE", zsocket_keepalive, MV_NM, level_socket),
+ZSOCKETITEM("KEEPCNT", zsocket_keepcnt, MV_NM, level_socket),
+ZSOCKETITEM("KEEPIDLE", zsocket_keepidle, MV_NM, level_socket),
+ZSOCKETITEM("KEEPINTVL", zsocket_keepintvl, MV_NM, level_socket),
 ZSOCKETITEM("LOCALADDRESS", zsocket_localaddress, MV_STR, level_socket),
 ZSOCKETITEM("LOCALPORT", zsocket_localport, MV_NM, level_socket),
 ZSOCKETITEM("MOREREADTIME", zsocket_morereadtime, MV_NM, level_socket),
 ZSOCKETITEM("NUMBER", zsocket_number, MV_NM, level_socdev),
+ZSOCKETITEM("OPTIONS",zsocket_options, MV_STR, level_socket),
 ZSOCKETITEM("PARENT", zsocket_parent, MV_STR, level_socket),
 ZSOCKETITEM("PROTOCOL", zsocket_protocol, MV_STR, level_socket),
 ZSOCKETITEM("REMOTEADDRESS", zsocket_remoteaddress, MV_STR, level_socket),
 ZSOCKETITEM("REMOTEPORT", zsocket_remoteport, MV_NM, level_socket),
+ZSOCKETITEM("SNDBUF", zsocket_sndbuf, MV_NM, level_socket),
 ZSOCKETITEM("SOCKETHANDLE", zsocket_sockethandle, MV_STR, level_socket),
 ZSOCKETITEM("STATE", zsocket_state, MV_STR, level_socket),
 ZSOCKETITEM("TLS", zsocket_tls, MV_STR, level_socket),

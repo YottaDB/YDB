@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -107,6 +107,7 @@ GBLDEF void			(*restart)() = &mum_tstart;
 GBLDEF ch_ret_type		(*mdb_condition_handler_ptr)(int arg) = &mdb_condition_handler;
 #endif
 
+<<<<<<< HEAD
 GBLREF	rtn_tabent		*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
 GBLREF	int4			break_message_mask;
 GBLREF	stack_frame 		*frame_pointer;
@@ -139,6 +140,35 @@ GBLREF	boolean_t		(*xfer_set_handlers_fnptr)(int4, int4 param, boolean_t popped_
 GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM];
 GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder[STMWORKQUEUEDIM];
 GBLREF	boolean_t		ydb_treat_sigusr2_like_sigusr1;
+=======
+GBLREF rtn_tabent		*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
+GBLREF int4			break_message_mask;
+GBLREF stack_frame 		*frame_pointer;
+GBLREF unsigned char 		*stackbase, *stacktop, *stackwarn, *msp;
+GBLREF unsigned char		*fgncal_stack;
+GBLREF mv_stent			*mv_chain;
+GBLREF xfer_entry_t		xfer_table[];
+GBLREF mval			dollar_system;
+GBLREF mval			dollar_zstatus;
+GBLREF bool			compile_time;
+GBLREF spdesc			stringpool;
+GBLREF spdesc			rts_stringpool;
+GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
+GBLREF lv_val			*zsrch_var, *zsrch_dir1, *zsrch_dir2;
+GBLREF symval			*curr_symval;
+GBLREF boolean_t		is_replicator;
+GBLREF void			(*ctrlc_handler_ptr)();
+GBLREF boolean_t		mstr_native_align;
+GBLREF boolean_t		gtm_utf8_mode;
+GBLREF casemap_t		casemaps[];
+GBLREF void             	(*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
+GBLREF ch_ret_type		(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
+GBLREF ch_ret_type		(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
+GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
+GBLREF enum gtmImageTypes	image_type;
+GBLREF int			init_xfer_table(void);
+GBLREF void 			(*primary_exit_handler)(void);
+>>>>>>> 35326517 (GT.M V7.0-003)
 
 OS_PAGE_SIZE_DECLARE
 
@@ -255,6 +285,7 @@ void gtm_startup(struct startup_vector *svec)
 	ctrlc_handler_ptr = &ctrlc_handler;
 	if (!IS_MUPIP_IMAGE)
 	{
+<<<<<<< HEAD
 		DEFINE_EXIT_HANDLER(gtm_exit_handler, TRUE);
 		if (!(MUMPS_CALLIN & invocation_mode))
 			sig_init(ydb_os_signal_handler, ctrlc_handler_ptr, suspsigs_handler, continue_handler);
@@ -272,6 +303,11 @@ void gtm_startup(struct startup_vector *svec)
 			} else
 				sig_init(ydb_os_signal_handler, ydb_os_signal_handler, suspsigs_handler, continue_handler);
 		}
+=======
+		sig_init(generic_signal_handler, ctrlc_handler_ptr, suspsigs_handler, continue_handler);
+		atexit(gtm_exit_handler);
+		primary_exit_handler = gtm_exit_handler;
+>>>>>>> 35326517 (GT.M V7.0-003)
 	}
 	io_init(IS_MUPIP_IMAGE);		/* starts with nocenable for GT.M runtime, enabled for MUPIP */
 	if (!IS_MUPIP_IMAGE)

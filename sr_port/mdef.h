@@ -565,7 +565,7 @@ GBLREF boolean_t               gtm_utf8_mode;
 unsigned char *n2s(mval *mv_ptr);
 char *s2n(mval *u);
 mval *underr (mval *start, ...);
-mval *underr_strict(mval *start, ...);
+mval *underr_overwrite(mval *start, ...);
 
 #ifdef DEBUG
 #	define	DBG_ASSERT(X)	assert(X),
