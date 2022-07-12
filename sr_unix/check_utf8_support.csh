@@ -32,45 +32,17 @@ if ("Linux" == "$HOSTOS") then
 else
 	set binaryopt = ""
 endif
-set found_icu = 0
+
+# The below logic finds the current ICU version. This is copied over from similar code in sr_unix/ydbinstall.sh
+set icu_ver = `ldconfig -p | grep -m1 -F libicuio.so. | cut -d" " -f1 | cut -d. -f3-4`
+if ($icu_ver >= "36") then
+	set found_icu = 1
+else
+	set found_icu = 0
+endif
+
 set utflocale = `locale -a | grep $binaryopt -iE '\.utf.?8$' | head -n1`
 
-# This _could_ not work on new platforms or newly installed supported platforms.
-# It should be manually tested using this command :
-#    ssh <some host> ls -l {/usr/local,/usr,}/lib{64,,32}/libicuio.{a,so,sl}
-
-foreach libdir ( {/usr/local,/usr,}/lib{64,/arm-linux-gnueabi{,hf},/aarch64-linux-gnu,/x86_64-linux-gnu,,32,/i386-linux-gnu}/libicuio.{a,so,sl} )
-	# 36 is the least version GT.M supports for ICU. We have to get the numeric value from the ICU library.
-	# ICU ships libicuio.so linked to the appropriate versioned library - so using filetype -L works well
-	# The below is the format of the libraries on various platforms:
-	# AIX       : libicu<alphanum><majorver><minorver>.<ext>   (e.g libicuio42.1.a)
-	# Others    : libicu<alphanum>.<ext>.<majorver>.<minorver> (e.g libicuio.so.42.1)
-
-	if ( ! -l $libdir ) continue
-
-	set icu_versioned_lib = `filetest -L $libdir`
-	set verinfo = ${icu_versioned_lib:s/libicuio//}
-	set parts = ( ${verinfo:as/./ /} )
-
-	if ($HOSTOS == "AIX") then
-		# for the above example parts = (42 1 a)
-		set icu_ver = $parts[1]
-	else
-		# for the above example parts = (so 42 1)
-		set icu_ver = $parts[2]
-		# On SUSE Linux, we have seen libicuio.so being a soft link to libicuio.so.suse65.1
-		# in which case "icu_ver" would be the string "suse65" instead of the number "65".
-		# This will cause issues with the '>= "36"' comparison done below so remove the non-numeric part.
-		if ( $icu_ver =~ ^[a-zA-Z_]+$ ) then
-			set icu_ver = `echo $icu_ver | sed 's/[a-zA-Z]//g'`
-		endif
-	endif
-
-	if ($icu_ver >= "36") then
-		set found_icu = 1
-		break
-	endif
-end
 # The calling gtm installation script should sould source this script in order to avoid duplication of 'setenv LD_LIBRARY_PATH'
 # The gtm-internal test system runs it within `...` in a few places and sets the return value to an env variable
 # To aid both the cases above, do a 'setenv is_utf8_support' as well as 'echo' of TRUE/FALSE
