@@ -4,7 +4,7 @@
 # Copyright (c) 2007-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -58,6 +58,12 @@ foreach libdir ( {/usr/local,/usr,}/lib{64,/arm-linux-gnueabi{,hf},/aarch64-linu
 	else
 		# for the above example parts = (so 42 1)
 		set icu_ver = $parts[2]
+		# On SUSE Linux, we have seen libicuio.so being a soft link to libicuio.so.suse65.1
+		# in which case "icu_ver" would be the string "suse65" instead of the number "65".
+		# This will cause issues with the '>= "36"' comparison done below so remove the non-numeric part.
+		if ( $icu_ver =~ ^[a-zA-Z_]+$ ) then
+			set icu_ver = `echo $icu_ver | sed 's/[a-zA-Z]//g'`
+		endif
 	endif
 
 	if ($icu_ver >= "36") then
