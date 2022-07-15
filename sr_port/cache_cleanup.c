@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2011 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,16 @@ void cache_cleanup(stack_frame *sf)
 	INTPTR_T	*vp;
 	boolean_t	deleted;
 
-	assert(sf->ctxt);
+	if (NULL == sf->ctxt)
+	{	/* Possible for example if there is a runtime error and as part of compiling the error handler ($ETRAP)
+		 * code, there is yet another error. In that case, "trans_code_cleanup()" would have called
+		 * IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK (which in turn invokes the "cache_cleanup()" function)
+		 * and would have reset "sf->ctxt" to NULL (actually to "GTM_CONTEXT(pseudo_ret)").
+		 * In that case, return right away as "cache_cleanup()" already happened for this stack frame.
+		 * See https://gitlab.com/YottaDB/DB/YDB/-/issues/860#note_933316079 for an example test program.
+		 */
+		return;
+	}
 	vp = (INTPTR_T *)sf->ctxt;
 	vp--;
 	if ((YDB_OMAGIC << 16) + OBJ_LABEL == *vp)	/* Validate backward linkage */
