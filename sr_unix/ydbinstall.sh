@@ -106,6 +106,7 @@ dump_info()
     if [ -n "$gtm_lcase_utils" ] ; then echo gtm_lcase_utils " : " $gtm_lcase_utils ; fi
     if [ -n "$gtm_linkenv" ] ; then echo gtm_linkenv " : " $gtm_linkenv ; fi
     if [ -n "$gtm_linkexec" ] ; then echo gtm_linkexec " : " $gtm_linkexec ; fi
+    if [ -n "$ydb_pkgconfig" ] ; then echo ydb_pkgconfig " : " $ydb_pkgconfig ; fi
     if [ -n "$ydb_octo" ] ; then echo ydb_octo " : " $ydb_octo ; fi
     if [ -n "$gtm_overwrite_existing" ] ; then echo gtm_overwrite_existing " : " $gtm_overwrite_existing ; fi
     if [ -n "$ydb_posix" ] ; then echo ydb_posix " : " $ydb_posix ; fi
@@ -156,6 +157,7 @@ help_exit()
     echo "--linkenv dirname        -> create link in dirname to gtmprofile and gtmcshrc files; incompatible with copyenv"
     echo "--linkexec dirname       -> create link in dirname to gtm script; incompatible with copyexec"
     echo "--nodeprecated           -> do not install deprecated components, specifically %DSEWRAP"
+    echo "--nopkg-config           -> do not create yottadb.pc for pkg-config, or update an existing file"
     echo "--octo parameters        -> download and install Octo; also installs required POSIX and AIM plugins. Specify optional cmake parameters for Octo as necessary"
     echo "--overwrite-existing     -> install into an existing directory, overwriting contents; defaults to requiring new directory"
     echo "--plugins-only           -> just install plugins for an existing YottaDB installation, not YottaDB"
@@ -496,6 +498,7 @@ while [ $# -gt 0 ] ; do
             unset gtm_copyexec
             shift ;;
 	--nodeprecated) ydb_deprecated="N" ; shift ;;
+	--nopkg-config) ydb_pkgconfig="N" ; shift ;;
 	--octo*) tmp=`echo $1 | cut -s -d = -f 2-`
 	    if [ -n "$tmp" ] ; then octo_cmake=$tmp ; fi
 	    ydb_octo="Y" ;
@@ -1236,8 +1239,9 @@ elif [ -d "$gtm_copyexec" ] ; then
 fi
 
 # Create the pkg-config file
-pcfilepath=/usr/share/pkgconfig
-cat > ${ydb_installdir}/yottadb.pc << EOF
+if [ "N" != "$ydb_pkgconfig" ] ; then
+    pcfilepath=/usr/share/pkgconfig
+    cat > ${ydb_installdir}/yottadb.pc << EOF
 prefix=${ydb_installdir}
 
 exec_prefix=\${prefix}
@@ -1251,21 +1255,22 @@ Cflags: -I\${includedir}
 Libs: -L\${libdir} -lyottadb -Wl,-rpath,\${libdir}
 EOF
 
-# Now place it where the system can find it
-# We strip the "r" and "." to perform a numeric comparision between the versions
-# YottaDB will only ever increment versions, so a larger number indicates a newer version
-if [ ! -f ${pcfilepath}/yottadb.pc ] || {
-	existing_version=$(grep "^Version: " ${pcfilepath}/yottadb.pc | cut -s -d " " -f 2)
-	! expr "$existing_version" \> "$ydb_version" >/dev/null
-   }; then
-    if [ ! -d $pcfilepath ]
-    then
-	mkdir $pcfilepath
+    # Now place it where the system can find it
+    # We strip the "r" and "." to perform a numeric comparision between the versions
+    # YottaDB will only ever increment versions, so a larger number indicates a newer version
+    if [ ! -f ${pcfilepath}/yottadb.pc ] || {
+	   existing_version=$(grep "^Version: " ${pcfilepath}/yottadb.pc | cut -s -d " " -f 2)
+	   ! expr "$existing_version" \> "$ydb_version" >/dev/null
+       }; then
+	if [ ! -d $pcfilepath ]
+	then
+	    mkdir $pcfilepath
+	fi
+	cp ${ydb_installdir}/yottadb.pc ${pcfilepath}/yottadb.pc
+	echo $product_name pkg-config file installed successfully at ${pcfilepath}/yottadb.pc
+    else
+	echo Skipping $product_name pkg-config file install for ${ydb_version} as newer version $existing_version exists at ${pcfilepath}/yottadb.pc
     fi
-    cp ${ydb_installdir}/yottadb.pc ${pcfilepath}/yottadb.pc
-    echo $product_name pkg-config file installed successfully at ${pcfilepath}/yottadb.pc
-else
-    echo Skipping $product_name pkg-config file install for ${ydb_version} as newer version $existing_version exists at ${pcfilepath}/yottadb.pc
 fi
 
 # install optional components if they were selected
