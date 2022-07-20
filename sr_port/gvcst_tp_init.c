@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -38,7 +41,7 @@ void gvcst_tp_init(gd_region *greg)
 	csa = (sgmnt_addrs *)&FILE_INFO(greg)->s_addrs;
 	if (NULL == csa->sgm_info_ptr)
 	{
-		si = csa->sgm_info_ptr = (sgm_info *)malloc(SIZEOF(sgm_info));
+		si = (sgm_info *)malloc(SIZEOF(sgm_info));
 		assert(32768 > SIZEOF(sgm_info));
 		memset(si, 0, SIZEOF(sgm_info));
 		si->tp_hist_size = TP_MAX_MM_TRANSIZE;
@@ -72,6 +75,11 @@ void gvcst_tp_init(gd_region *greg)
 			si->cr_array = NULL;
 		}
 		si->tp_set_sgm_done = FALSE;
+		csa->sgm_info_ptr = si;	/* Initialize csa->sgm_info_ptr only AFTER all "si->..." members are initialized
+					 * as otherwise we could try freeing up an incompletely set up structure later
+					 * in "gds_rundown()" if we got interrupted by a signal (e.g. SIG-15/SIGTERM)
+					 * before the initialization was complete.
+					 */
 	} else
 		si = csa->sgm_info_ptr;
 	si->gv_cur_region = greg;
