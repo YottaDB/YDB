@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1103,11 +1103,10 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				free(si->blks_in_use);
 				si->blks_in_use = NULL;
 			}
-			if (si->cr_array_size)
+			if (NULL != si->cr_array)
 			{
-				assert(NULL != si->cr_array);
-				if (NULL != si->cr_array)
-					free(si->cr_array);
+				free(si->cr_array);
+				si->cr_array = NULL;
 			}
 			if (NULL != si->first_tp_hist)
 				free(si->first_tp_hist);
