@@ -222,6 +222,18 @@ isvaluevalid()
 	echo $retval
 }
 
+# This function gets the OS id from the file passed in as $1 (either /etc/os-release or ../build_os_release)
+# It also does minor adjustments (e.g. SLES and SLED are both treated the same as "sle" osid).
+getosid()
+{
+	osid=`grep -w ID $1 | cut -d= -f2 | cut -d'"' -f2`
+	# Treat SLES (Server) and SLED (Desktop) distributions as the same.
+	if [ "sled" = "$osid" ] || [ "sles" = "$osid" ] ; then
+		osid="sle"
+	fi
+	echo $osid
+}
+
 # This function finds the current ICU version using ldconfig
 # There is a M version of this function in sr_unix/ydbenv.mpt
 # It needs to be maintained in parallel to this function
@@ -245,10 +257,7 @@ install_plugins()
 			tar xzf YDBPosix-master.tar.gz
 			cd YDBPosix-master
 			mkdir build && cd build
-			case "${osid}" in
-				rhel|centos|sles|rocky) cmake3 ..;;
-				*) cmake ..;;
-			esac
+			${cmakecmd} ../
 			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
 				# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
 				cd ../../..
@@ -350,10 +359,7 @@ install_plugins()
 			cd YDBOcto-master
 			mkdir build
 			cd build
-			case "${osid}" in
-				rhel|centos|sles|rocky) cmake3 ${octo_cmake} ..;;
-				*) cmake ${octo_cmake} ..;;
-			esac
+			${cmakecmd} ${octo_cmake} ../
 			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
 				# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
 				cd ../..
@@ -536,6 +542,21 @@ while [ $# -gt 0 ] ; do
 done
 if [ "Y" = "$gtm_verbose" ] ; then echo Processed command line ; dump_info ; fi
 
+osfile="/etc/os-release"
+if [ ! -f "$osfile" ] ; then
+	echo "/etc/os-release does not exist on host; Not installing YottaDB."
+	err_exit
+fi
+osid=`getosid $osfile`
+# Only CentOS 7 and RHEL 7 use "cmake3". All the others including RHEL 8, SLED, SLES, Rocky etc. are fine with cmake.
+osver=`grep -w VERSION_ID $osfile | tr -d \" | cut -d= -f2`
+osmajorver=`echo $osver | cut -d. -f1`
+if { [ "centos" = "$osid" ] || [ "rhel" = "$osid" ]; } && [ 7 = "$osmajorver" ] ; then
+	cmakecmd="cmake3"
+else
+	cmakecmd="cmake"
+fi
+
 if [ -n "$ydb_from_source" ] ; then
 	# If --from-source is selected, clone the git repo, build and invoke the build's ydbinstall
 	if [ -n "$ydb_branch" ] ; then
@@ -556,14 +577,9 @@ if [ -n "$ydb_from_source" ] ; then
 				err_exit
 			fi
 		fi
-		osid=`grep -w ID /etc/os-release | cut -d= -f2 | cut -d'"' -f2`
-		case "${osid}" in
-			rhel|centos|sles|rocky) cmake_command="cmake3";;
-			*) cmake_command="cmake";
-		esac
 		if [ "dbg" = `echo "$gtm_buildtype" | tr '[:upper:]' '[:lower:]'` ] ; then
 			# if --buildtype is dbg, tell CMake to make a dbg build
-			cmake_command="${cmake_command} -D CMAKE_BUILD_TYPE=Debug"
+			cmake_command="${cmakecmd} -D CMAKE_BUILD_TYPE=Debug"
 		fi
 		if ! ${cmake_command} -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../ ; then
 			echo "CMake failed. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
@@ -662,10 +678,6 @@ case ${gtm_hostos}_${gtm_arch} in
     *) echo Architecture `uname -o` on `uname -m` not supported by this script ; err_exit ;;
 esac
 
-osfile="/etc/os-release"
-buildosfile="../build_os_release"
-osid=`grep -w ID $osfile | cut -d= -f2 | cut -d'"' -f2`
-
 # Get actual ICU version if UTF-8 install was requested with "default" ICU version
 if [ "Y" = "$ydb_utf8" ] ; then
 	if [ "default" = $ydb_icu_version ] ; then
@@ -745,88 +757,87 @@ if [ "N" = "$ydb_force_install" ]; then
 	# but not yet sure if the OS and/or version is supported. Since
 	# --force-install is not specified, it is okay to do the os-version check now.
 	osver_supported=0 # Consider platform unsupported by default
-	if [ -f "$osfile" ] ; then
-		osver=`grep -w VERSION_ID $osfile | tr -d \" | cut -d= -f2`
-		# Set an impossible major/minor version by default in case we do not descend down known platforms in if/else below.
-		osallowmajorver="999"
-		osallowminorver="999"
-		if [ -f $buildosfile ] ; then
-			buildosid=`grep -w ID $buildosfile | cut -d= -f2 | cut -d'"' -f2`
-			buildosver=`grep -w VERSION_ID $osfile | tr -d \" | cut -d= -f2`
-			if [ "${buildosid}" "=" "${osid}" ] && [ "${buildosver}" "=" "${osver}" ] ; then
-				# If the YottaDB build was built on this OS version, it is supported
-				osallowmajorver="-1"
-				osallowminorver="-1"
-			fi
-		elif [ "x8664" = "${ydb_flavor}" ] ; then
-			if [ "ubuntu" = "${osid}" ] ; then
-				# Ubuntu 20.04 onwards is considered supported on x86_64
-				osallowmajorver="20"
-				osallowminorver="04"
-			elif [ "rhel" = "${osid}" ] ; then
-				# RHEL 7 onwards is considered supported on x86_64
-				osallowmajorver="7"
-				osallowminorver="0"
-			elif [ "centos" = "${osid}" ] ; then
-				# CentOS 8.x is considered supported on x86_64
-				osallowmajorver="8"
-				osallowminorver="0"
-			elif [ "rocky" = "${osid}" ] ; then
-				# Rocky Linux 8.x is considered supported on x86_64
-				osallowmajorver="8"
-				osallowminorver="0"
-			elif [ "debian" = "${osid}" ] ; then
-				# Debian 11 (buster) onwards is considered supported on x86_64.
-				osallowmajorver="11"
-				osallowminorver="0"
-			fi
-		elif [ "aarch64" = "${ydb_flavor}" ] ; then
-			if [ "ubuntu" = "${osid}" ] ; then
-				# Ubuntu 20.04 onwards is considered supported on AARCH64
-				osallowmajorver="20"
-				osallowminorver="04"
-			elif [ "debian" = ${osid} ] ; then
-				# Debian 11 (buster) onwards is considered supported on AARCH64
-				osallowmajorver="11"
-				osallowminorver="0"
-			fi
-		else
-			if [ "armv6l" = "${ydb_flavor}" ] ; then
-				if [ "debian" = ${osid} ] ; then
-					# Debian 11 onwards is considered supported on ARMV7L/ARMV6L
-					osallowmajorver="11"
-					osallowminorver="0"
-				fi
-			fi
+	# Set an impossible major/minor version by default in case we do not descend down known platforms in if/else below.
+	osallowmajorver="999"
+	osallowminorver="999"
+	buildosfile="../build_os_release"
+	if [ -f $buildosfile ] ; then
+		buildosid=`getosid $buildosfile`
+		buildosver=`grep -w VERSION_ID $buildosfile | tr -d \" | cut -d= -f2`
+		if [ "${buildosid}" "=" "${osid}" ] && [ "${buildosver}" "=" "${osver}" ] ; then
+			# If the YottaDB build was built on this OS version, it is supported
+			osallowmajorver="-1"
+			osallowminorver="-1"
 		fi
-		osmajorver=`echo $osver | cut -d. -f1`
-		# It is possible there is no minor version (e.g. Raspbian 9) in which case "cut" will not work
-		# as -f2 will give us 9 again. So use awk in that case which will give us "" as $2.
-		osminorver=`echo $osver | awk -F. '{print $2}'`
-		if [ "" = "$osminorver" ] ; then
-			# Needed by "expr" (since it does not compare "" vs numbers correctly)
-			# in case there is no minor version field (e.g. Raspbian 9 or even Debian 10 buster/sid).
-			osminorver="0"
+	elif [ "x8664" = "${ydb_flavor}" ] ; then
+		if [ "ubuntu" = "${osid}" ] ; then
+			# Ubuntu 20.04 onwards is considered supported on x86_64
+			osallowmajorver="20"
+			osallowminorver="04"
+		elif [ "rhel" = "${osid}" ] ; then
+			# RHEL 7 onwards is considered supported on x86_64
+			osallowmajorver="7"
+			osallowminorver="0"
+		elif [ "centos" = "${osid}" ] ; then
+			# CentOS 8.x is considered supported on x86_64
+			osallowmajorver="8"
+			osallowminorver="0"
+		elif [ "rocky" = "${osid}" ] ; then
+			# Rocky Linux 8.x is considered supported on x86_64
+			osallowmajorver="8"
+			osallowminorver="0"
+		elif [ "sle" = "${osid}" ] ; then
+			# SLED and SLES 15 onwards is considered supported on x86_64
+			osallowmajorver="15"
+			osallowminorver="0"
+		elif [ "debian" = "${osid}" ] ; then
+			# Debian 11 (buster) onwards is considered supported on x86_64.
+			osallowmajorver="11"
+			osallowminorver="0"
 		fi
-		# Some distros (particularly Arch) are missing VERSION_ID altogether.
-		# Use a default of 0, which will never be greater than the supported version.
-		if [ "${osmajorver:-0}" -gt "$osallowmajorver" ] ; then
-			osver_supported=1
-		elif [ "$osmajorver" "=" "$osallowmajorver" ] && [ "$osminorver" -ge "$osallowminorver" ] ; then
-			osver_supported=1
-		else
-			if [ "999" = "$osallowmajorver" ] ; then
-				# Not a supported OS. Print generic message without OS version #.
-				osname=`grep -w NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
-				echo "YottaDB not supported on $osname for ${ydb_flavor}. Not installing YottaDB."
-			else
-				# Supported OS but version is too old to support.
-				osname=`grep -w NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
-				echo "YottaDB supported from $osname $osallowmajorver.$osallowminorver. Current system is $osname $osver. Not installing YottaDB."
-			fi
+	elif [ "aarch64" = "${ydb_flavor}" ] ; then
+		if [ "ubuntu" = "${osid}" ] ; then
+			# Ubuntu 20.04 onwards is considered supported on AARCH64
+			osallowmajorver="20"
+			osallowminorver="04"
+		elif [ "debian" = ${osid} ] ; then
+			# Debian 11 (buster) onwards is considered supported on AARCH64
+			osallowmajorver="11"
+			osallowminorver="0"
 		fi
 	else
-		echo "/etc/os-release does not exist on host; Not installing YottaDB."
+		if [ "armv6l" = "${ydb_flavor}" ] ; then
+			if [ "debian" = ${osid} ] ; then
+				# Debian 11 onwards is considered supported on ARMV7L/ARMV6L
+				osallowmajorver="11"
+				osallowminorver="0"
+			fi
+		fi
+	fi
+	# It is possible there is no minor version (e.g. Raspbian 9) in which case "cut" will not work
+	# as -f2 will give us 9 again. So use awk in that case which will give us "" as $2.
+	osminorver=`echo $osver | awk -F. '{print $2}'`
+	if [ "" = "$osminorver" ] ; then
+		# Needed by "expr" (since it does not compare "" vs numbers correctly)
+		# in case there is no minor version field (e.g. Raspbian 9 or even Debian 10 buster/sid).
+		osminorver="0"
+	fi
+	# Some distros (particularly Arch) are missing VERSION_ID altogether.
+	# Use a default of 0, which will never be greater than the supported version.
+	if [ "${osmajorver:-0}" -gt "$osallowmajorver" ] ; then
+		osver_supported=1
+	elif [ "$osmajorver" "=" "$osallowmajorver" ] && [ "$osminorver" -ge "$osallowminorver" ] ; then
+		osver_supported=1
+	else
+		if [ "999" = "$osallowmajorver" ] ; then
+			# Not a supported OS. Print generic message without OS version #.
+			osname=`grep -w NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
+			echo "YottaDB not supported on $osname for ${ydb_flavor}. Not installing YottaDB."
+		else
+			# Supported OS but version is too old to support.
+			osname=`grep -w NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
+			echo "YottaDB supported from $osname $osallowmajorver.$osallowminorver. Current system is $osname $osver. Not installing YottaDB."
+		fi
 	fi
 	if [ 0 = "$osver_supported" ] ; then
 		echo "Specify ydbinstall.sh --force-install to force install"
@@ -965,6 +976,8 @@ else
 			#	yottadb_r132_x8664_rhel7_pro.tgz
 			#	yottadb_r132_x8664_rhel8_pro.tgz
 			#	yottadb_r132_x8664_ubuntu2004_pro.tgz
+			# From r1.36 onwards, the below tarball is also added for SUSE Linux
+			#	yottadb_r136_x8664_sle15_pro.tgz
 			# And below are the rules for picking a tarball name for a given target system (OS and architecture).
 			platform="${osid}"
 			case $arch in
@@ -973,12 +986,16 @@ else
 				rhel|centos|rocky)
 					# For x86_64 architecture and RHEL OS, we have separate tarballs for RHEL 7 and RHEL 8.
 					# Hence the use of "osmajorver" below in the "platform" variable.
-					osmajorver=`echo $osver | cut -d. -f1`
 					platform="rhel${osmajorver}"
 					# For centos, use the rhel tarball if one exists for the same version.
 					#	i.e. CentOS 7 should use the RHEL 7 tarball etc.
 					#	i.e. CentOS 8 should use the RHEL 8 tarball etc.
 					# Hence the "rhel|centos" usage in the above "case" block.
+					;;
+				sle)
+					# Just like RHEL OS, we have SLE tarballs for both SLES/SLED based on the major version.
+					# Hence the use of "osmajorver" below in the "platform" variable.
+					platform="sle${osmajorver}"
 					;;
 				esac
 				;;
@@ -1011,7 +1028,6 @@ else
 					# CentOS-specific releases of YottaDB for x86_64 happened only after r1.26
 					if expr r1.26 \< "${ydb_version}" >/dev/null; then
 						# If the OS major version is later than 7, treat it as centos. Otherwise, treat it as rhel.
-						osmajorver=`echo $osver | cut -d. -f1`
 						if [ 1 = `expr "$osmajorver" ">" "7"` ] ; then
 							platform="centos"
 						else
@@ -1035,7 +1051,6 @@ else
 					# Ubuntu version is 20.04 or later.
 					if expr r1.28 \< "${ydb_version}" >/dev/null; then
 						# If the OS major version is 20 or later, treat it as ubuntu. Otherwise, treat it as linux.
-						osmajorver=`echo $osver | cut -d. -f1`
 						if [ "${osmajorver:-0}" -gt 19 ] ; then
 							platform="ubuntu"
 						fi
