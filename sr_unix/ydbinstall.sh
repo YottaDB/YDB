@@ -139,8 +139,8 @@ help_exit()
     echo "--aim                    -> installs AIM plug-in"
     echo "--branch branchname      -> builds YottaDB from a specific git branch; use with --from-source"
     echo "--build-type buildtype   -> type of YottaDB build, default is pro"
-    echo "--copyenv dirname        -> copy gtmprofile and gtmcshrc files to dirname; incompatible with linkenv"
-    echo "--copyexec dirname       -> copy gtm script to dirname; incompatible with linkexec"
+    echo "--copyenv [dirname]      -> copy ydb_env_set, ydb_env_unset, and gtmprofile files to dirname, default /usr/local/etc; incompatible with linkenv"
+    echo "--copyexec [dirname]     -> copy ydb & gtm scripts to dirname, default /usr/local/bin; incompatible with linkexec"
     echo "--debug                  -> turn on debugging with set -x"
     echo "--distrib dirname or URL -> source directory for YottaDB/GT.M distribution tarball, local or remote"
     echo "--dry-run                -> do everything short of installing YottaDB, including downloading the distribution"
@@ -154,9 +154,13 @@ help_exit()
     echo "--help                   -> print this usage information"
     echo "--installdir dirname     -> directory where YottaDB is to be installed; defaults to /usr/local/lib/yottadb/version"
     echo "--keep-obj               -> keep .o files of M routines (normally deleted on platforms with YottaDB support for routines in shared libraries)"
-    echo "--linkenv dirname        -> create link in dirname to gtmprofile and gtmcshrc files; incompatible with copyenv"
-    echo "--linkexec dirname       -> create link in dirname to gtm script; incompatible with copyexec"
+    echo "--linkenv [dirname]      -> create link in dirname to ydb_env_set, ydb_env_unset & gtmprofile files, default /usr/local/etc; incompatible with copyenv"
+    echo "--linkexec [dirname]     -> create link in dirname to ydb & gtm scripts, default /usr/local/bin; incompatible with copyexec"
+    echo "--nocopyenv              -> do not copy ydb_env_set, ydb_env_unset, and gtmprofile to another directory"
+    echo "--nocopyexec             -> do not copy ydb & gtm scripts to another directory"
     echo "--nodeprecated           -> do not install deprecated components, specifically %DSEWRAP"
+    echo "--nolinkenv              -> do not create link to ydb_env_set, ydb_env_unset, and gtmprofile from another directory"
+    echo "--nolinkexec             -> do not create link to ydb & gtm scripts from another directory"
     echo "--nopkg-config           -> do not create yottadb.pc for pkg-config, or update an existing file"
     echo "--octo parameters        -> download and install Octo; also installs required POSIX and AIM plugins. Specify optional cmake parameters for Octo as necessary"
     echo "--overwrite-existing     -> install into an existing directory, overwriting contents; defaults to requiring new directory"
@@ -179,6 +183,8 @@ help_exit()
     echo "  $0 --utf8 default           # installs YottaDB release r1.34 with added support for UTF-8"
     echo "  $0 --installdir /r134 r1.34 # installs YottaDB r1.34 at /r134"
     echo "  $0 --gtm                    # installs latest GT.M version (V7.0-001) at /usr/local/lib/fis-gtm/V7.0-001_x86_64"
+    echo ""
+    echo "As options are processed left to right, later options can override earlier options."
     echo ""
     exit 1
 }
@@ -402,6 +408,8 @@ if [ -z "$gtm_dryrun" ] ; then gtm_dryrun="N" ; fi
 if [ -z "$gtm_group_restriction" ] ; then gtm_group_restriction="N" ; fi
 if [ -z "$gtm_gtm" ] ; then gtm_gtm="N" ; fi
 if [ -z "$gtm_lcase_utils" ] ; then gtm_lcase_utils="Y" ; fi
+if [ -z "$gtm_linkenv" ] ; then gtm_linkenv="/usr/local/etc" ; fi
+if [ -z "$gtm_linkexec" ] ; then gtm_linkexec="/usr/local/bin" ; fi
 if [ -z "$gtm_overwrite_existing" ] ; then gtm_overwrite_existing="N" ; fi
 if [ -z "$gtm_prompt_for_group" ] ; then gtm_prompt_for_group="N" ; fi
 if [ -z "$gtm_verbose" ] ; then gtm_verbose="N" ; fi
@@ -430,7 +438,7 @@ while [ $# -gt 0 ] ; do
         --copyenv*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then gtm_copyenv=$tmp
             else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then gtm_copyenv=$2 ; shift
-                else echo "--copyenv needs a value" ; err_exit
+                else gtm_copyenv="/usr/local/etc"
                 fi
             fi
             unset gtm_linkenv
@@ -438,7 +446,7 @@ while [ $# -gt 0 ] ; do
         --copyexec*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then gtm_copyexec=$tmp
             else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then gtm_copyexec=$2 ; shift
-                else echo "--copyexec needs a value" ; err_exit
+                else gtm_copyexec="/usr/local/bin"
                 fi
             fi
             unset gtm_linkexec
@@ -490,7 +498,7 @@ while [ $# -gt 0 ] ; do
         --linkenv*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then gtm_linkenv=$tmp
             else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then gtm_linkenv=$2 ; shift
-                else echo "--linkenv needs a value" ; err_exit
+                else gtm_linkenv="/usr/local/etc"
                 fi
             fi
             unset gtm_copyenv
@@ -498,12 +506,16 @@ while [ $# -gt 0 ] ; do
         --linkexec*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then gtm_linkexec=$tmp
             else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then gtm_linkexec=$2 ; shift
-                else echo "--linkexec needs a value" ; err_exit
+                else gtm_linkexec="/usr/local/bin"
                 fi
             fi
             unset gtm_copyexec
             shift ;;
+	--nocopyenv) unset gtm_copyenv ; shift ;;
+	--nocopyexec) unset gtm_copyexec ; shift ;;
 	--nodeprecated) ydb_deprecated="N" ; shift ;;
+	--nolinkenv) unset gtm_linkenv ; shift ;;
+	--nolinkexec) unset gtm_linkexec ; shift ;;
 	--nopkg-config) ydb_pkgconfig="N" ; shift ;;
 	--octo*) tmp=`echo $1 | cut -s -d = -f 2-`
 	    if [ -n "$tmp" ] ; then octo_cmake=$tmp ; fi
@@ -1237,16 +1249,16 @@ else
 fi
 echo $product_name version $ydb_version installed successfully at $ydb_installdir
 
-# Create copies of environment scripts and gtm executable
+# Create copies of, or links to, environment scripts and ydb & gtm executables
 if [ -d "$gtm_linkenv" ] ; then
-    ( cd $gtm_linkenv ; ln -s $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
+    ( cd $gtm_linkenv ; rm ydb_env_set ydb_env_unset gtmprofile ; ln -s $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked env ; ls -l $gtm_linkenv ; fi
 elif [ -d "$gtm_copyenv" ] ; then
     ( cd $gtm_copyenv ; cp -P $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Copied env ; ls -l $gtm_copyenv ; fi
 fi
 if [ -d "$gtm_linkexec" ] ; then
-    ( cd $gtm_linkexec ; ln -s $ydb_installdir/ydb $ydb_installdir/gtm ./ )
+    ( cd $gtm_linkexec ; rm -f ydb gtm ; ln -s $ydb_installdir/ydb $ydb_installdir/gtm ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked exec ; ls -l $gtm_linkexec ; fi
 elif [ -d "$gtm_copyexec" ] ; then
     ( cd $gtm_copyexec ; cp -P $ydb_installdir/ydb $ydb_installdir/gtm ./ )
