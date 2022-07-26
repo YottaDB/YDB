@@ -185,23 +185,20 @@ isvaluevalid()
 }
 
 # This function gets the OS id from the file passed in as $1 (either /etc/os-release or ../build_os_release)
-# It also does minor adjustments (e.g. SLES, SLED, and openSUSE Leap are all reported as "sle").
+# It also does minor adjustments (e.g. SLES and SLED are both treated the same as "sle" osid).
 getosid()
 {
 	osid=`grep -w ID $1 | cut -d= -f2 | cut -d'"' -f2`
-	# Treat SLES (Server), SLED (Desktop) and OpenSUSE Leap distributions as the same.
-	if [ "sled" = "$osid" ] || [ "sles" = "$osid" ] || [ "opensuse-leap" = "$osid" ] ; then
+	# Treat SLES (Server) and SLED (Desktop) distributions as the same.
+	if [ "sled" = "$osid" ] || [ "sles" = "$osid" ] ; then
 		osid="sle"
 	fi
 	echo $osid
 }
 
-# This function finds the current ICU version using ldconfig.
-# See comment in sr_unix/configure.gtc for why we use ldconfig and not pkg-config.
-# If file name is "libicuio.so.70", the below will return "70".
-# If file name is "libicuio.so.suse65.1", the below will return "65.1.suse" (needed for YottaDB to work on SLED 15).
-# There is a M version of this function in sr_unix/ydbenv.mpt as well as a .sh version in sr_unix/configure.gtc
-# They need to be maintained in parallel to this function.
+# This function finds the current ICU version using ldconfig
+# There is a M version of this function in sr_unix/ydbenv.mpt
+# It needs to be maintained in parallel to this function
 icu_version()
 {
 	$ldconfig -p | grep -m1 -F libicuio.so. | cut -d" " -f1 | sed 's/.*libicuio.so.\([a-z]*\)\([0-9\.]*\)/\2.\1/;s/\.$//;'
@@ -473,6 +470,115 @@ while [ $# -gt 0 ] ; do
 done
 if [ "Y" = "$gtm_verbose" ] ; then echo Processed command line ; dump_info ; fi
 
+osfile="/etc/os-release"
+if [ ! -f "$osfile" ] ; then
+	echo "/etc/os-release does not exist on host; Not installing YottaDB."
+	err_exit
+fi
+osid=`getosid $osfile`
+# Only CentOS 7 and RHEL 7 use "cmake3". All the others including RHEL 8, SLED, SLES, Rocky etc. are fine with cmake.
+osver=`grep -w VERSION_ID $osfile | tr -d \" | cut -d= -f2`
+osmajorver=`echo $osver | cut -d. -f1`
+if { [ "centos" = "$osid" ] || [ "rhel" = "$osid" ]; } && [ 7 = "$osmajorver" ] ; then
+	cmakecmd="cmake3"
+else
+	cmakecmd="cmake"
+fi
+
+if [ -n "$ydb_from_source" ] ; then
+	# If --from-source is selected, clone the git repo, build and invoke the build's ydbinstall
+	if [ -n "$ydb_branch" ] ; then
+		echo "Building branch $ydb_branch from repo $ydb_from_source"
+	else
+		echo "Building branch master from repo $ydb_from_source"
+	fi
+	ydbinstall_tmp=`mktemp -d`
+	cd $ydbinstall_tmp
+	#mkdir from_source && cd from_source
+	if git clone $ydb_from_source ; then
+		cd YDB
+		mkdir build && cd build
+		# Check if --branch was selected. If so, checkout that branch.
+		if [ -n "$ydb_branch" ] ; then
+			if ! git checkout $ydb_branch ; then
+				echo "branch $ydb_branch does not exist. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
+				err_exit
+			fi
+		fi
+		if [ "dbg" = `echo "$gtm_buildtype" | tr '[:upper:]' '[:lower:]'` ] ; then
+			# if --buildtype is dbg, tell CMake to make a dbg build
+			cmake_command="${cmakecmd} -D CMAKE_BUILD_TYPE=Debug"
+		fi
+		if ! ${cmake_command} -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../ ; then
+			echo "CMake failed. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
+			err_exit
+		fi
+		if ! make -j `grep -c ^processor /proc/cpuinfo` ; then
+			echo "Build failed. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
+			err_exit
+		fi
+		if ! make install ; then
+			echo "Make install failed. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
+			err_exit
+		fi
+	else
+		echo "Cloning git repo $ydb_from_source failed. Check that the URL is correct and accessible then try again."
+		err_exit
+	fi
+	# At this point, YottaDB has been built. Next, we invoke the build's ydbinstall with the same options except --from-source and
+	# --branch. To do this, we first have to determine the version number to cd into yottadb_r*
+	builddir=`ls -d yottadb_r*`
+	cd $builddir
+	# Now we have to determine the ydbinstall options to pass to ydbinstall. We ignore the following options for the following reasons:
+	# --branch and --from-source : already executed by this block of code
+	# --build-type : If a dbg build was requested, we've already built a dbg build with cmake
+	# --distrib and --filename : conflicts with --branch and --from-source
+	# --help : If this option was selected, ydbinstall would have exited already
+	# --plugins-only: There is no need to build YottaDB from source just to add plugins to an already installed YottaDB instance.
+	install_options=""
+	if [ "Y" = "$ydb_aim" ] ; then install_options="${install_options} --aim" ; fi
+	if [ -n "$gtm_copyenv" ] ; then install_options="${install_options} --copyenv ${gtm_copyenv}" ; fi
+	if [ -n "$gtm_copyexec" ] ; then install_options="${install_options} --copyexec ${gtm_copyexec}" ; fi
+	if [ "Y" = "$ydb_debug" ] ; then install_options="${install_options} --debug" ; fi
+	if [ "Y" = "$gtm_dryrun" ] ; then install_options="${install_options} --dry-run" ; fi
+	if [ "Y" = "$ydb_encplugin" ] ; then install_options="${install_options} --encplugin" ; fi
+	if [ "Y" = "$ydb_force_install" ] ; then install_options="${install_options} --force-install" ; fi
+	if [ "Y" = "$gtm_group_restriction" ] ; then install_options="${install_options} --group-restriction" ; fi
+	if [ "no" = "$ydb_change_removeipc" ] ; then install_options="${install_options} --preserveRemoveIPC" ; fi
+	if [ -n "$gtm_group" ] ; then install_options="${install_options} --group ${gtm_group}" ; fi
+	if [ "Y" = "$gtm_gtm" ] ; then install_options="${install_options} --gtm" ; fi
+	if [ -n "$ydb_installdir" ] ; then install_options="${install_options} --installdir ${ydb_installdir}" ; fi
+	if [ "Y" = "$gtm_keep_obj" ] ; then install_options="${install_options} --keep-obj" ; fi
+	if [ -n "$gtm_linkenv" ] ; then install_options="${install_options} --linkenv ${gtm_linkenv}" ; fi
+	if [ -n "$gtm_linkexec" ] ; then install_options="${install_options} --linkexec ${gtm_linkexec}" ; fi
+	if [ "N" = "$ydb_deprecated" ] ; then install_options="${install_options} --nodeprecated" ; fi
+	if [ "Y" = "$ydb_octo" ] ; then
+		if [ -n "$octo_cmake" ] ; then
+			install_options="${install_options} --octo ${octo_cmake}"
+		else
+			install_options="${install_options} --octo"
+		fi
+	fi
+	if [ "Y" = "$gtm_overwrite_existing" ] ; then install_options="${install_options} --overwrite-existing" ; fi
+	if [ "Y" = "$ydb_posix" ] ; then install_options="${install_options} --posix" ; fi
+	if [ "Y" = "$gtm_prompt_for_group" ] ; then install_options="${install_options} --prompt-for-group" ; fi
+	if [ "N" = "$gtm_lcase_utils" ] ; then install_options="${install_options} --ucaseonly-utils" ; fi
+	if [ -n "$gtm_user" ] ; then install_options="${install_options} --user ${gtm_user}" ; fi
+	if [ "Y" = "$ydb_utf8" ] ; then install_options="${install_options} --utf8 ${ydb_icu_version}" ; fi
+	if [ "Y" = "$gtm_verbose" ] ; then install_options="${install_options} --verbose" ; fi
+	if [ "Y" = "$ydb_zlib" ] ; then install_options="${install_options} --zlib" ; fi
+
+	# Now that we have the full set of options, run ydbinstall
+	if ./ydbinstall ${install_options} ; then
+		# Install succeeded. Exit with code 0 (success)
+		rm -r $ydbinstall_tmp
+		exit 0
+	else
+		echo "Install failed. Temporary directory $ydbinstall_tmp will not be deleted."
+		err_exit
+	fi
+fi
+
 # Set environment variables according to machine architecture
 gtm_arch=`uname -m | tr -d _`
 case $gtm_arch in
@@ -500,71 +606,167 @@ case ${gtm_hostos}_${gtm_arch} in
     *) echo Architecture `uname -o` on `uname -m` not supported by this script ; err_exit ;;
 esac
 
+# Get actual ICU version if UTF-8 install was requested with "default" ICU version
+if [ "Y" = "$ydb_utf8" ] ; then
+	if [ "default" = $ydb_icu_version ] ; then
+		ydb_found_or_requested_icu_version=`icu_version`
+	else
+		ydb_found_or_requested_icu_version=$ydb_icu_version
+fi
+
+fi
+
+if [ "Y" = "$ydb_plugins_only" ]; then
+	if [ ! -n "$ydb_installdir" ] ; then
+		# If --installdir was not specified, we first look to $ydb_dist for
+		# the YottaDB version. Otherwise, we check pkg-config.
+		if [ -d "$ydb_dist" ] ; then
+			ydb_installdir=$ydb_dist
+		else
+			ydb_installdir=$(pkg-config --variable=prefix yottadb)
+			ydb_dist=$ydb_installdir
+		fi
+	else
+		ydb_dist=$ydb_installdir
+	fi
+	# Check that YottaDB is actually installed by looking for the presence of a yottadb executable
+	if [ ! -e $ydb_installdir/yottadb ] ; then
+		echo "YottaDB not found at $ydb_installdir. Exiting" ; err_exit
+	fi
+	# Check if UTF8 is installed.
+	if [ -d "$ydb_installdir/utf8" ] ; then
+		ydb_utf8="Y"
+		ydb_found_or_requested_icu_version=`icu_version`
+	else
+		ydb_utf8="N"
+	fi
+	# Check that the plugins aren't already installed or that --overwrite-existing is selected
+	# Since selected --octo automatically selects --posix and --aim, we continue the install
+	# without overwriting if --aim and/or --posix is already installed and --octo is selected.
+	if [ "Y" != "$gtm_overwrite_existing" ] ; then
+		if [ "Y" = $ydb_encplugin ] && [ -e $ydb_installdir/plugin/libgtmcrypt.so ] ; then
+			echo "YDBEncrypt already installed and --overwrite-existing not specified. Exiting." ; err_exit
+		fi
+		if [ "Y" = $ydb_posix ] && [ -e $ydb_installdir/plugin/libydbposix.so ] ; then
+			if [ "Y" = $ydb_octo ] ; then
+				echo "YDBPosix already installed. Continuing YDBOcto install. Specify --overwrite-existing to overwrite YDBPosix."
+				ydb_posix="N"
+			else
+				echo "YDBPosix already installed and --overwrite-existing not specified. Exiting." ; err_exit
+			fi
+		fi
+		if [ "Y" = $ydb_aim ] && [ -e $ydb_installdir/plugin/o/_ydbaim.so ] ; then
+			if [ "Y" = $ydb_octo ] ; then
+				echo "YDBAIM already installed. Continuing YDBOcto install. Specify --overwrite-existing to overwrite YDBAIM."
+				ydb_aim="N"
+			else
+				echo "YDBAIM already installed and --overwrite-existing not specified. Exiting." ; err_exit
+			fi
+		fi
+		if [ "Y" = $ydb_zlib ] && [ -e $ydb_installdir/plugin/libgtmzlib.so ] ; then
+			echo "YDBZlib already installed and --overwrite-existing not specified. Exiting." ; err_exit
+		fi
+
+		if [ "Y" = $ydb_octo ] && [ -d $ydb_installdir/plugin/octo ] ; then
+			echo "YDBOcto already installed and --overwrite-existing not specified. Exiting." ; err_exit
+		fi
+	fi
+	tmpdir=`mktmpdir`
+	ydb_routines="$tmp($ydb_installdir)" ; export ydb_routines
+	remove_tmpdir=1 # remove the tmpdir if the plugin installs are successful
+	install_plugins
+	if [ 0 = "$remove_tmpdir" ] ; then exit 1; fi	# error seen while installing one or more plugins
+	rm -rf $tmpdir	# Now that we know it is safe to remove $tmpdir, do that before returning normal status
+	exit 0
+fi
+
 if [ "N" = "$ydb_force_install" ]; then
 	# At this point, we know the current machine architecture is supported by YottaDB
 	# but not yet sure if the OS and/or version is supported. Since
 	# --force-install is not specified, it is okay to do the os-version check now.
 	osfile="/etc/os-release"
 	osver_supported=0 # Consider platform unsupported by default
-	if [ -f "$osfile" ] ; then
-		osid=`grep -w ID $osfile | cut -d= -f2 | cut -d'"' -f2`
-		osver=`grep -w VERSION_ID $osfile | cut -d= -f2 | cut -d'"' -f2`
-		# Set an impossible major/minor version by default in case we do not descend down known platforms in if/else below.
-		osallowmajorver="999"
-		osallowminorver="999"
-		if [ "x8664" = "${ydb_flavor}" ] ; then
-			if [ "ubuntu" = "${osid}" ] ; then
-				# Ubuntu 18.04 and onwards is considered supported on 64-bit x86 architecture
-				osallowmajorver="18"
-				osallowminorver="04"
-			else
-				if [ "rhel" = "${osid}" ] ; then
-					# RHEL 7.x is considered supported on 64-bit x86 architecture
-					osallowmajorver="7"
-					osallowminorver="0"
-				fi
-			fi
-		elif [ "aarch64" = "${ydb_flavor}" ] ; then
-			if [ "ubuntu" = "${osid}" ] ; then
-				# Ubuntu 18.04 and onwards is considered supported on 64-bit ARM architecture
-				osallowmajorver="18"
-				osallowminorver="04"
-			fi
-		else
-			if [ "armv6l" = "${ydb_flavor}" -o "armv7l" = "${ydb_flavor}" ] ; then
-				if [ "raspbian" = "${osid}" -o "debian" = ${osid} ] ; then
-					# Raspbian or Debian 9 or 9.x is considered supported on 32-bit ARM architecture
-					osallowmajorver="9"
-					osallowminorver="0"
-				fi
-			fi
+	# Set an impossible major/minor version by default in case we do not descend down known platforms in if/else below.
+	osallowmajorver="999"
+	osallowminorver="999"
+	buildosfile="../build_os_release"
+	if [ -f $buildosfile ] ; then
+		buildosid=`getosid $buildosfile`
+		buildosver=`grep -w VERSION_ID $buildosfile | tr -d \" | cut -d= -f2`
+		if [ "${buildosid}" "=" "${osid}" ] && [ "${buildosver}" "=" "${osver}" ] ; then
+			# If the YottaDB build was built on this OS version, it is supported
+			osallowmajorver="-1"
+			osallowminorver="-1"
 		fi
-		osmajorver=`echo $osver | cut -d. -f1`
-		# It is possible there is no minor version (e.g. Raspbian 9) in which case "cut" will not work
-		# as -f2 will give us 9 again. So use awk in that case which will give us "" as $2.
-		osminorver=`echo $osver | awk -F. '{print $2}'`
-		if [ "" = "$osminorver" ] ; then
-			# Needed by "expr" (since it does not compare "" vs numbers correctly)
-			# in case there is no minor version field (e.g. Raspbian 9).
-			osminorver="0"
+	elif [ "x8664" = "${ydb_flavor}" ] ; then
+		if [ "ubuntu" = "${osid}" ] ; then
+			# Ubuntu 20.04 onwards is considered supported on x86_64
+			osallowmajorver="20"
+			osallowminorver="04"
+		elif [ "rhel" = "${osid}" ] ; then
+			# RHEL 7 onwards is considered supported on x86_64
+			osallowmajorver="7"
+			osallowminorver="0"
+		elif [ "centos" = "${osid}" ] ; then
+			# CentOS 8.x is considered supported on x86_64
+			osallowmajorver="8"
+			osallowminorver="0"
+		elif [ "rocky" = "${osid}" ] ; then
+			# Rocky Linux 8.x is considered supported on x86_64
+			osallowmajorver="8"
+			osallowminorver="0"
+		elif [ "sle" = "${osid}" ] ; then
+			# SLED and SLES 15 onwards is considered supported on x86_64
+			osallowmajorver="15"
+			osallowminorver="0"
+		elif [ "debian" = "${osid}" ] ; then
+			# Debian 11 (buster) onwards is considered supported on x86_64.
+			osallowmajorver="11"
+			osallowminorver="0"
 		fi
-		if [ 1 = `expr "$osmajorver" ">" "$osallowmajorver"` ] ; then
-			osver_supported=1
-		elif [ 1 = `expr "$osmajorver" "=" "$osallowmajorver"` -a 1 = `expr "$osminorver" ">=" "$osallowminorver"` ] ; then
-			osver_supported=1
-		else
-			if [ "999" = "$osallowmajorver" ] ; then
-				# Not a supported OS. Print generic message without OS version #.
-				osname=`grep -w NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
-				echo "YottaDB not supported on $osname for ${ydb_flavor}. Not installing YottaDB."
-			else
-				# Supported OS but version is too old to support.
-				osname=`grep -w NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
-				echo "YottaDB supported from $osname $osallowmajorver.$osallowminorver. Current system is $osname $osver. Not installing YottaDB."
-			fi
+	elif [ "aarch64" = "${ydb_flavor}" ] ; then
+		if [ "ubuntu" = "${osid}" ] ; then
+			# Ubuntu 20.04 onwards is considered supported on AARCH64
+			osallowmajorver="20"
+			osallowminorver="04"
+		elif [ "debian" = ${osid} ] ; then
+			# Debian 11 (buster) onwards is considered supported on AARCH64
+			osallowmajorver="11"
+			osallowminorver="0"
 		fi
 	else
-		echo "/etc/os-release does not exist on host; Not installing YottaDB."
+		if [ "armv6l" = "${ydb_flavor}" ] ; then
+			if [ "debian" = ${osid} ] ; then
+				# Debian 11 onwards is considered supported on ARMV7L/ARMV6L
+				osallowmajorver="11"
+				osallowminorver="0"
+			fi
+		fi
+	fi
+	# It is possible there is no minor version (e.g. Raspbian 9) in which case "cut" will not work
+	# as -f2 will give us 9 again. So use awk in that case which will give us "" as $2.
+	osminorver=`echo $osver | awk -F. '{print $2}'`
+	if [ "" = "$osminorver" ] ; then
+		# Needed by "expr" (since it does not compare "" vs numbers correctly)
+		# in case there is no minor version field (e.g. Raspbian 9 or even Debian 10 buster/sid).
+		osminorver="0"
+	fi
+	# Some distros (particularly Arch) are missing VERSION_ID altogether.
+	# Use a default of 0, which will never be greater than the supported version.
+	if [ "${osmajorver:-0}" -gt "$osallowmajorver" ] ; then
+		osver_supported=1
+	elif [ "$osmajorver" "=" "$osallowmajorver" ] && [ "$osminorver" -ge "$osallowminorver" ] ; then
+		osver_supported=1
+	else
+		if [ "999" = "$osallowmajorver" ] ; then
+			# Not a supported OS. Print generic message without OS version #.
+			osname=`grep -w NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
+			echo "YottaDB not supported on $osname for ${ydb_flavor}. Not installing YottaDB."
+		else
+			# Supported OS but version is too old to support.
+			osname=`grep -w NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
+			echo "YottaDB supported from $osname $osallowmajorver.$osallowminorver. Current system is $osname $osver. Not installing YottaDB."
+		fi
 	fi
 	if [ 0 = "$osver_supported" ] ; then
 		echo "Specify ydbinstall.sh --force-install to force install"
@@ -685,8 +887,104 @@ else
 		yottadb_download_urls=`sed 's,/uploads/,\n&,g' ${gtm_tmpdir}/${ydb_version} | grep "^/uploads/" | cut -d')' -f1`
 		# Determine current host's architecture
 		arch=`uname -m | tr -d '_'`
-		# Determine current host's OS. We expect the OS name in the tarball.
-		platform=`uname -s | tr '[A-Z]' '[a-z]'`
+		if expr r1.30 \< "${ydb_version}" >/dev/null; then
+			# From r1.32 onwards, the tarball naming conventions changed.
+			# Below are the tarball names for the r1.32 tarballs.
+			#	yottadb_r132_aarch64_debian11_pro.tgz
+			#	yottadb_r132_aarch64_ubuntu2004_pro.tgz
+			#	yottadb_r132_armv6l_debian11_pro.tgz
+			#	yottadb_r132_x8664_debian11.tgz
+			#	yottadb_r132_x8664_rhel7_pro.tgz
+			#	yottadb_r132_x8664_rhel8_pro.tgz
+			#	yottadb_r132_x8664_ubuntu2004_pro.tgz
+			# From r1.36 onwards, the below tarball is also added for SUSE Linux
+			#	yottadb_r136_x8664_sle15_pro.tgz
+			# And below are the rules for picking a tarball name for a given target system (OS and architecture).
+			platform="${osid}"
+			case $arch in
+			x8664)
+				case "${osid}" in
+				rhel|centos|rocky)
+					# For x86_64 architecture and RHEL OS, we have separate tarballs for RHEL 7 and RHEL 8.
+					# Hence the use of "osmajorver" below in the "platform" variable.
+					platform="rhel${osmajorver}"
+					# For centos, use the rhel tarball if one exists for the same version.
+					#	i.e. CentOS 7 should use the RHEL 7 tarball etc.
+					#	i.e. CentOS 8 should use the RHEL 8 tarball etc.
+					# Hence the "rhel|centos" usage in the above "case" block.
+					;;
+				sle)
+					# Just like RHEL OS, we have SLE tarballs for both SLES/SLED based on the major version.
+					# Hence the use of "osmajorver" below in the "platform" variable.
+					platform="sle${osmajorver}"
+					;;
+				esac
+				;;
+			armv7l)
+				# armv7l architecture should use the armv6l tarball if available.
+				arch="armv6l"
+				;;
+			esac
+		else
+			# For r1.30 and older YottaDB releases, use the below logic
+			# Below are the tarball names for the r1.30 tarballs.
+			#	yottadb_r130_linux_aarch64_pro.tgz
+			#	yottadb_r130_linux_armv6l_pro.tgz
+			#	yottadb_r130_linux_armv7l_pro.tgz
+			#	yottadb_r130_centos8_x8664_pro.tgz
+			#	yottadb_r130_debian10_x8664_pro.tgz
+			#	yottadb_r130_linux_x8664_pro.tgz
+			#	yottadb_r130_rhel7_x8664_pro.tgz
+			#	yottadb_r130_ubuntu2004_x8664_pro.tgz
+			platform=`uname -s | tr '[:upper:]' '[:lower:]'`
+			if [ $arch = "x8664" ] ; then
+				# If the current architecture is x86_64 and the distribution is RHEL (including CentOS and SLES)
+				# or Debian then set the platform to rhel or debian (not linux) as there are specific tarballs
+				# for these distributions. If the distribution is Ubuntu, then set the platform to ubuntu (not linux)
+				# if the version is 20.04 or later as there is a specific tarball for newer versions of Ubuntu.
+				#
+				# To get the correct binary for CentOS, RHEL and SLES, we treat OS major version 7 as rhel and later versions as centos
+				case "${osid}" in
+				rhel|centos|sles|rocky)
+					# CentOS-specific releases of YottaDB for x86_64 happened only after r1.26
+					if expr r1.26 \< "${ydb_version}" >/dev/null; then
+						# If the OS major version is later than 7, treat it as centos. Otherwise, treat it as rhel.
+						if [ 1 = `expr "$osmajorver" ">" "7"` ] ; then
+							platform="centos"
+						else
+							platform="rhel"
+						fi
+					# RHEL-specific releases of YottaDB for x86_64 happened only starting r1.10 so do this
+					# only if the requested version is not r1.00 (the only YottaDB release prior to r1.10)
+					elif [ "r1.00" != ${ydb_version} ]; then
+						platform="rhel"
+					fi
+					;;
+				debian)
+					# Debian-specific releases of YottaDB for x86_64 happened only after r1.24
+					if expr r1.24 \< "${ydb_version}" >/dev/null; then
+						platform="debian"
+					fi
+					;;
+				ubuntu)
+					# Starting with r1.30, there is an Ubuntu 20.04 build where the platform is ubuntu (not linux)
+					# so set the platform to ubuntu only if the requested version is r1.30 or later and the
+					# Ubuntu version is 20.04 or later.
+					if expr r1.28 \< "${ydb_version}" >/dev/null; then
+						# If the OS major version is 20 or later, treat it as ubuntu. Otherwise, treat it as linux.
+						if [ "${osmajorver:-0}" -gt 19 ] ; then
+							platform="ubuntu"
+						fi
+					fi
+					;;
+				esac
+			fi
+		fi
+		# Note that as long as we find a tarball with "$arch" and "$platform" in the name, we pick that tarball even if it has
+		# a specific version in it and the target system has a lesser version of the OS installed. This is because that case is
+		# possible only if --force-install is specified (or else a previous block of code would have done "osallowmajorver" and
+		# "osallowminorver" checks and issued appropriate errors). And in that case, we assume the user knows what they are doing
+		# and proceed with the install.
 		yottadb_download_url=""
 		for fullfilename in $yottadb_download_urls
 		do
