@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,7 @@ GBLREF mlabel			*mlabtab;
 GBLREF mline			mline_root;
 GBLREF mline			*mline_tail;
 GBLREF triple			t_orig;		/* head of triples */
+GBLREF boolean_t		cur_line_entry;	/* TRUE if control can reach this line in a -NOLINE_ENTRY compilation */
 
 error_def(ERR_BLKTOODEEP);
 error_def(ERR_COMMAORRPAREXP);
@@ -75,6 +76,7 @@ boolean_t line(uint4 *lnc)
 	TREF(pos_in_chain) = *(TREF(curtchain));
 	if (TK_IDENT == TREF(window_token))
 	{
+		cur_line_entry = TRUE;	/* We are in a line that begins with a LABEL */
 		x = get_mladdr(&(TREF(window_ident)));
 		if (x->ml)
 		{
@@ -167,7 +169,8 @@ boolean_t line(uint4 *lnc)
 					mlabtab->formalcnt = parmcount;
 			}
 		}
-	}
+	} else if (1 == curlin->line_number)
+		cur_line_entry = TRUE;	/* First line in M file. Line entry possible even with -NOLINE_ENTRY. */
 	if (success && (TK_EOL != TREF(window_token)))
 	{
 		if (TK_SPACE != TREF(window_token))

@@ -750,6 +750,10 @@ GBLDEF	mvax		*mvaxtab,*mvaxtab_end;
 GBLDEF	mlabel		*mlabtab;
 GBLDEF	mline		mline_root;
 GBLDEF	mline		*mline_tail;
+GBLDEF	boolean_t	cur_line_entry;	/* TRUE if control can reach this line in a -NOLINE_ENTRY compilation
+					 * Possible only for lines that start with a label AND the first line of an M file.
+					 */
+
 GBLDEF	triple		t_orig;
 GBLDEF	int		mvmax, mlmax, mlitmax;
 static	char		routine_name_buff[SIZEOF(mident_fixed)], module_name_buff[SIZEOF(mident_fixed)];
