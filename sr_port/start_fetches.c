@@ -25,8 +25,17 @@ GBLREF boolean_t		cur_line_entry;	/* TRUE if control can reach this line in a -N
 
 void start_fetches(opctype op)
 {
-	if (!curr_fetch_count &&
-		((OC_LINEFETCH != curr_fetch_trip->opcode) || (cmd_qlf.qlf & CQ_LINE_ENTRY) || !cur_line_entry))
+	boolean_t	noline_entry_point;
+
+	/* If the compilation happens with -NOLINE_ENTRY and control can reach the current M line from an external entry point,
+	 * then make sure the current OC_LINEFETCH accounts for ALL local variable references in this frame (not just the
+	 * ones seen till now in the parse, but also the ones that are going to follow under this entryref). A simple way
+	 * of ensuring this is by setting "curr_fetch_count" to 0 in this case. Not doing so can cause SIG-11 (YDB#901).
+	 */
+	noline_entry_point = ((OC_LINEFETCH == curr_fetch_trip->opcode) && !(cmd_qlf.qlf & CQ_LINE_ENTRY) && cur_line_entry);
+	if (noline_entry_point)
+		curr_fetch_count = 0;
+	if (!curr_fetch_count && !noline_entry_point)
 	{
 		if (OC_LINEFETCH == curr_fetch_trip->opcode)
 			curr_fetch_trip->opcode = OC_LINESTART;
