@@ -229,12 +229,12 @@ isvaluevalid()
 }
 
 # This function gets the OS id from the file passed in as $1 (either /etc/os-release or ../build_os_release)
-# It also does minor adjustments (e.g. SLES and SLED are both treated the same as "sle" osid).
+# It also does minor adjustments (e.g. SLES, SLED, and openSUSE Leap are all reported as "sle").
 getosid()
 {
 	osid=`grep -w ID $1 | cut -d= -f2 | cut -d'"' -f2`
-	# Treat SLES (Server) and SLED (Desktop) distributions as the same.
-	if [ "sled" = "$osid" ] || [ "sles" = "$osid" ] ; then
+	# Treat SLES (Server), SLED (Desktop), and openSUSE LEAP distributions as the same.
+	if [ "sled" = "$osid" ] || [ "sles" = "$osid" ] || [ "opensuse-leap" = "$osid" ] ; then
 		osid="sle"
 	fi
 	echo $osid
