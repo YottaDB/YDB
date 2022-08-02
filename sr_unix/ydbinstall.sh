@@ -233,7 +233,7 @@ isvaluevalid()
 getosid()
 {
 	osid=`grep -w ID $1 | cut -d= -f2 | cut -d'"' -f2`
-	# Treat SLES (Server), SLED (Desktop), and openSUSE LEAP distributions as the same.
+	# Treat SLES (Server), SLED (Desktop) and OpenSUSE Leap distributions as the same.
 	if [ "sled" = "$osid" ] || [ "sles" = "$osid" ] || [ "opensuse-leap" = "$osid" ] ; then
 		osid="sle"
 	fi
@@ -1005,9 +1005,9 @@ else
 					# Hence the "rhel|centos" usage in the above "case" block.
 					;;
 				sle)
-					# Just like RHEL OS, we have SLE tarballs for both SLES/SLED based on the major version.
-					# Hence the use of "osmajorver" below in the "platform" variable.
-					platform="sle${osmajorver}"
+					# Just like RHEL OS, we have SLE tarballs for both SLES/SLED/OpenSUSE Leap based on the
+					# major version. Hence the use of "osmajorver" below in the "platform" variable.
+					platform="${osid}${osmajorver}"
 					;;
 				esac
 				;;
@@ -1036,7 +1036,7 @@ else
 				#
 				# To get the correct binary for CentOS, RHEL and SLES, we treat OS major version 7 as rhel and later versions as centos
 				case "${osid}" in
-				rhel|centos|sles|rocky)
+				rhel|centos|sle|rocky)
 					# CentOS-specific releases of YottaDB for x86_64 happened only after r1.26
 					if expr r1.26 \< "${ydb_version}" >/dev/null; then
 						# If the OS major version is later than 7, treat it as centos. Otherwise, treat it as rhel.
