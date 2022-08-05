@@ -1251,7 +1251,7 @@ echo $product_name version $ydb_version installed successfully at $ydb_installdi
 
 # Create copies of, or links to, environment scripts and ydb & gtm executables
 if [ -d "$gtm_linkenv" ] ; then
-    ( cd $gtm_linkenv ; rm ydb_env_set ydb_env_unset gtmprofile ; ln -s $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
+    ( cd $gtm_linkenv ; rm -f ydb_env_set ydb_env_unset gtmprofile ; ln -s $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked env ; ls -l $gtm_linkenv ; fi
 elif [ -d "$gtm_copyenv" ] ; then
     ( cd $gtm_copyenv ; cp -P $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
