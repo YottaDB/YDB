@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -69,5 +72,6 @@ void tripinit(void)
 	mline_tail = &mline_root;
 	TREF(block_level) = 0;
 	setcurtchain(&t_orig);
+	TREF(pos_in_chain) = *TREF(curtchain);
 	return;
 }

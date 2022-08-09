@@ -126,19 +126,24 @@ void show_source_line(boolean_t warn)
 #			endif
 			}
 		}
-		dec_nofac = TRUE;
-		if (MAXLINESIZEFORDISPLAY > line_chwidth)
-			if (unable_to_complete_arrow)
-				dec_err(VARLSTCNT(6) ERR_SRCLIN, 4, (TREF(source_buffer)).len - 1, (TREF(source_buffer)).addr,
-					msgstr.len, msgstr.addr);
+		if (0 < line_chwidth)
+		{
+			dec_nofac = TRUE;
+			if (MAXLINESIZEFORDISPLAY > line_chwidth)
+				if (unable_to_complete_arrow)
+					dec_err(VARLSTCNT(6) ERR_SRCLIN, 4,
+						(TREF(source_buffer)).len - 1, (TREF(source_buffer)).addr,
+						msgstr.len, msgstr.addr);
+				else
+					dec_err(VARLSTCNT(6) ERR_SRCLIN, 4,
+						(TREF(source_buffer)).len - 1, (TREF(source_buffer)).addr,
+						b - buf, buf);
 			else
-				dec_err(VARLSTCNT(6) ERR_SRCLIN, 4, (TREF(source_buffer)).len - 1, (TREF(source_buffer)).addr,
-					b - buf, buf);
-		else
-			dec_err(VARLSTCNT(2) ERR_SRCLNNTDSP, 1, MAXLINESIZEFORDISPLAY);
-		if (!run_time)
-			dec_err(VARLSTCNT(6) ERR_SRCLOC, 4, TREF(last_source_column), TREF(source_line),
-				source_name_len, source_file_name);
-		dec_nofac = FALSE;
+				dec_err(VARLSTCNT(2) ERR_SRCLNNTDSP, 1, MAXLINESIZEFORDISPLAY);
+			if (!run_time)
+				dec_err(VARLSTCNT(6) ERR_SRCLOC, 4, TREF(last_source_column), TREF(source_line),
+					source_name_len, source_file_name);
+			dec_nofac = FALSE;
+		}
 	}
 }
