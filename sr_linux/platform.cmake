@@ -131,14 +131,9 @@ if (CMAKE_COMPILER_IS_GNUCC)
   if(${CMAKE_C_COMPILER_VERSION} VERSION_GREATER "6.3.0")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wmisleading-indentation")
   endif()
-  # TODO: Per https://gcc.gnu.org/pipermail/gcc-patches/2021-February/565514.html, gcc 12 should most likely have
-  # the "-ftrivial-auto-var-init=pattern" flag (see else section below for details).
-  # Need to enable the below code when that becomes available.
-  # -------------------------------------------------------------------------------------------
-  # if(ENABLE_AUTO_VAR_INIT_PATTERN AND ${CMAKE_C_COMPILER_VERSION} VERSION_GREATER_EQUAL "12.0.0")
-  #   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ftrivial-auto-var-init=pattern")
-  # endif()
-  # -------------------------------------------------------------------------------------------
+  if(ENABLE_AUTO_VAR_INIT_PATTERN AND ${CMAKE_C_COMPILER_VERSION} VERSION_GREATER_EQUAL "12.0.0")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ftrivial-auto-var-init=pattern")
+  endif()
 else()
   if(${CMAKE_C_COMPILER_VERSION} VERSION_GREATER_EQUAL "13.0.0")
     # clang 13 and higher issue a lot of [Wunused-but-set-variable] warnings. They are benign and clutter the output.
