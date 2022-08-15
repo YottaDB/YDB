@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -654,6 +654,7 @@ void mu_extract(void)
 			extr_collhdr.act = gv_target->act;
 			extr_collhdr.nct = gv_target->nct;
 			extr_collhdr.ver = gv_target->ver;
+			extr_collhdr.pad = 0;	/* Initialize unused padding field to avoid random/garbage values */
 			op_val.str.addr = (char *)(&extr_collhdr);
 			op_val.str.len = SIZEOF(extr_collhdr);
 			op_write(&op_val);
