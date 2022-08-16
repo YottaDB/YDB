@@ -592,6 +592,8 @@ if [ -n "$ydb_from_source" ] ; then
 		if [ "dbg" = `echo "$gtm_buildtype" | tr '[:upper:]' '[:lower:]'` ] ; then
 			# if --buildtype is dbg, tell CMake to make a dbg build
 			cmake_command="${cmakecmd} -D CMAKE_BUILD_TYPE=Debug"
+		else
+			cmake_command="${cmakecmd} -D CMAKE_BUILD_TYPE=RelWithDebInfo"
 		fi
 		if ! ${cmake_command} -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../ ; then
 			echo "CMake failed. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
