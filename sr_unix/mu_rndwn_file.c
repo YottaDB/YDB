@@ -1142,7 +1142,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_MURNDWNOVRD, 2, DB_LEN_STR(reg),
 						ERR_TEXT, 2,
 						LEN_AND_LIT("Overriding OPEN journal file state in shared memory"));
-				} else
+				} else if (!FROZEN_CHILLED(csa))
 				{	/* Journal file state being still open in shared memory implies a crashed state,
 					 * so error out.
 					 */
