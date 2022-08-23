@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -917,6 +917,14 @@ void	op_view(int numarg, mval *keyword, ...)
 		case VTK_ZTRIGGER_OUTPUT:
 			ydb_ztrigger_output = (0 != MV_FORCE_INT(parmblk.value));
 			break;
+#		ifdef DEBUG
+		case VTK_DWB:		/* Drive white box test - cases can be stacked in here */
+			if (WBTEST_ENABLED(WBTEST_YDB_SETSTATSOFF))
+			{
+				view_dbop(vtp->keycode, &parmblk, (numarg > 1) ? va_arg(var, mval *) : (mval *)NULL);
+			}
+			break;
+#		endif	/* DEBUG */
 		default:
 			va_end(var);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWCMD, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
@@ -1101,13 +1109,13 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 				csa = cs_addrs;
 				csd = csa->hdr;
 				set_gbuff_limit(&csa, &csd, thirdarg);
-#ifdef DEBUG
+#				ifdef DEBUG
 				if (WBTEST_ENABLED(WBTEST_CUSTERR_FREEZE))
 				{	/* Force an undocumented error and see if it freezes an instance */
 					util_out_print("In Whitebox Test : WBTEST_CUSTERR_FREEZE", TRUE);
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_ACK);
 				}
-#endif	/* DEBUG */
+#				endif	/* DEBUG */
 				break;
 			case VTK_STATSHARE:
 				assert(!IS_STATSDB_REG(reg));
@@ -1131,6 +1139,24 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 					gvcst_remove_statsDB_linkage(reg);
 				}
 				break;
+#			ifdef DEBUG
+			case VTK_DWB:		/* Additional wbox cases can be added here and triggered when enabled */
+				if (WBTEST_ENABLED(WBTEST_YDB_SETSTATSOFF))
+				{
+					gtm_uint64_t		*cntr_p, offset;
+					int			i;
+					node_local_ptr_t	cnl;
+
+					csa = cs_addrs;
+					cnl = csa->nl;
+					for (offset = 0, cntr_p = (gtm_uint64_t *)&cnl->gvstats_rec;
+					     offset < sizeof(gvstats_rec_t);
+					     offset += sizeof(gtm_uint64_t), cntr_p++)
+					{
+						*cntr_p = offset;
+					}
+				}
+#			endif /* DEBUG */
 		}
 	}
 	gv_cur_region = save_reg;

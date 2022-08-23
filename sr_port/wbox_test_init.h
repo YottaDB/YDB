@@ -229,6 +229,7 @@ typedef enum {
 	WBTEST_YDB_FILEDELFAIL,			/* 201 : Exercise FILEDELFAIL error codepath in "cre_jnl_file_intrpt_rename" */
 	WBTEST_YDB_RENAMEFAIL,			/* 202 : Exercise RENAMEFAIL error codepath in "cre_jnl_file_intrpt_rename" */
 	WBTEST_YDB_STATICPID,			/* 203 : Set pid to a static number for predictable test output */
+	WBTEST_YDB_SETSTATSOFF,			/* 204 : Reset all the gvstats to be the same as their offset in gvstats_rec_t */
 } wbtest_code_t;
 
 #if defined (DEBUG) && !defined (STATIC_ANALYSIS)

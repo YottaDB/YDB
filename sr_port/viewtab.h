@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,9 @@ VIEWTAB("DEBUG2",		VTP_VALUE | VTP_NULL,		VTK_DEBUG2,		MV_STR),
 VIEWTAB("DEBUG3",		VTP_VALUE | VTP_NULL,		VTK_DEBUG3,		MV_STR),
 VIEWTAB("DEBUG4",		VTP_VALUE | VTP_NULL,		VTK_DEBUG4,		MV_STR),
 VIEWTAB("DMTERM",		VTP_NULL,			VTK_DMTERM,		MV_NM),
+#ifdef DEBUG
+VIEWTAB("DWB",			VTP_DBREGION | VTP_NULL,	VTK_DWB,		MV_NM), /* nodoc : drive white box test */
+#endif
 VIEWTAB("ENVIRONMENT",		VTP_NULL,			VTK_ENVIRONMENT,	MV_STR),
 VIEWTAB("EPOCH",		VTP_DBREGION | VTP_NULL,	VTK_EPOCH,		MV_STR),
 VIEWTAB("FILL_FACTOR",		VTP_VALUE | VTP_NULL,		VTK_FILLFACTOR,		MV_NM),
