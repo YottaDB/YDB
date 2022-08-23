@@ -294,7 +294,9 @@ install_plugins()
 		export ydb_dist=${ydb_installdir}
 		url="https://gitlab.com/YottaDB/Util/YDBAIM.git"
 		if git clone -q ${url} .; then
-			if ! ./install.sh; then
+			mkdir build && cd build
+			${cmakecmd} ../
+			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
 				echo "YDBAIM build failed. The build directory ($PWD/aim_tmp) has been saved."
 				remove_tmpdir=0
 			fi
