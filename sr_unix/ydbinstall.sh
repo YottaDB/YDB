@@ -278,7 +278,7 @@ install_plugins()
 				cd ../../..
 				rm -R posix_tmp
 			else
-				echo "YDBPosix build failed. The build directory ($PWD/posix_tmp) has been saved."
+				echo "YDBPosix build failed. The build directory ($PWD) has been saved."
 				remove_tmpdir=0
 			fi
 		else
@@ -290,14 +290,20 @@ install_plugins()
 	if [ "Y" = $ydb_aim ] ; then
 		echo "Now installing YDBAIM"
 		cd $tmpdir
-		mkdir aim_tmp && cd aim_tmp
+		mkdir aim_tmp
+		cd aim_tmp
 		export ydb_dist=${ydb_installdir}
-		url="https://gitlab.com/YottaDB/Util/YDBAIM.git"
-		if git clone -q ${url} .; then
+		if curl -fSsLO https://gitlab.com/YottaDB/Util/YDBAIM/-/archive/master/YDBAIM-master.tar.gz; then
+			tar xzf YDBAIM-master.tar.gz
+			cd YDBAIM-master
 			mkdir build && cd build
 			${cmakecmd} ../
 			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
-				echo "YDBAIM build failed. The build directory ($PWD/aim_tmp) has been saved."
+				# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
+				cd ../../..
+				rm -R aim_tmp
+			else
+				echo "YDBAIM build failed. The build directory ($PWD) has been saved."
 				remove_tmpdir=0
 			fi
 		else
