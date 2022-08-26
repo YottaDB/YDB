@@ -548,11 +548,14 @@ int expritem(oprtype *a)
 		return TRUE;
 	case TK_LPAREN:
 		advancewindow();
+		INCREMENT_EXPR_DEPTH;
 		if (eval_expr(a) && TK_RPAREN == TREF(window_token))
 		{
+			DECREMENT_EXPR_DEPTH;
 			advancewindow();
 			return TRUE;
 		}
+		DECREMENT_EXPR_DEPTH;
 		stx_error(ERR_RPARENMISSING);
 		return FALSE;
 	case TK_DOLLAR:

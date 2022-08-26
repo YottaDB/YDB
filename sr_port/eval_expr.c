@@ -91,6 +91,7 @@ int eval_expr(oprtype *a)
 					dqins(ref, exorder, ref1);
 				}
 				assert(&t_orig != ref->exorder.fl);
+				assert(0 < TREF(expr_depth));
 				TREF(expr_start) = TREF(expr_start_orig) = ref;
 				CHKTCHAIN(TREF(curtchain), exorder, TRUE); /* defined away in mdq.h except with DEBUG_TRIPLES */
 			}
