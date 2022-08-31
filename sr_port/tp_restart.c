@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -305,7 +305,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				(TREF(tp_restart_entryref)).str.len = 0;
 			}
 			caller_id_flag = TRUE;
-			for (c = local_t_tries = 0; local_t_tries <= t_tries; local_t_tries++)
+			for (c = local_t_tries = 0; local_t_tries <= t_tries; )	/* Note: local_t_tries++ happens inside loop body */
 			{	/* in case of non-printable code provide hex representation */
 				if (ISALPHA_ASCII(t_fail_hist[local_t_tries]) || ISDIGIT_ASCII(t_fail_hist[local_t_tries])
 					|| ISPUNCT_ASCII(t_fail_hist[local_t_tries]))	/* currently, only is alpha needed */
@@ -331,6 +331,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 					(TREF(tp_restart_entryref)).str.len, (TREF(tp_restart_entryref)).str.addr);
 			} else
 			{
+				assert((tp_blkmod_nomod < TREF(blkmod_fail_type)) && (n_tp_blkmod_types > TREF(blkmod_fail_type)));
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(18) ERR_TPRESTART, 16, reg_mstr.len, reg_mstr.addr,
 					c, &fail_hist, TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len,
 					gvname_mstr.addr, n_pvtmods, n_blkmods, TREF(blkmod_fail_level), TREF(blkmod_fail_type),
