@@ -34,7 +34,7 @@ if [ "Y" = "$ydb_debug" ] ; then set -x ; fi
 
 check_if_util_exists()
 {
-	command -v $1 >/dev/null 2>&1 || { echo >&2 "Utility [$1] is needed by ydbinstall.sh but not found. Exiting."; exit 1; }
+	command -v $1 >/dev/null 2>&1 || command -v /sbin/$1 >/dev/null 2>&1 || { echo >&2 "Utility [$1] is needed by ydbinstall.sh but not found. Exiting."; exit 1; }
 }
 
 # Check all utilities that ydbinstall.sh will use and ensure they are present. If not error out at beginning.
@@ -55,7 +55,8 @@ do
 done
 
 # Check whether libelf.so exists; issue an error and exit if it does not
-ldconfig -p | grep -qs /libelf.so ; ydb_tmp_stat=$?
+ldconfig=$(command -v ldconfig || command -v /sbin/ldconfig)
+$ldconfig -p | grep -qs /libelf.so ; ydb_tmp_stat=$?
 if [ 0 -ne $ydb_tmp_stat ] ; then
 	echo >&2 "Library libelf.so is needed by YottaDB but not found. Exiting." ; exit $ydb_tmp_stat
 fi
@@ -254,7 +255,7 @@ getosid()
 # It needs to be maintained in parallel to this function
 icu_version()
 {
-	ldconfig -p | grep -m1 -F libicuio.so. | cut -d" " -f1 | cut -d. -f3-4
+	$ldconfig -p | grep -m1 -F libicuio.so. | cut -d" " -f1 | cut -d. -f3-4
 }
 
 # This function installs the selected plugins. Before calling it, $ydb_installdir and $tmpdir need to be set so that it can

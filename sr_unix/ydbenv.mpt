@@ -140,10 +140,12 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. . . . else  set $ecode=",U244,"
 	. . ; Ensure that an ICU version is set
 	. . if '($data(currenv("ydb_icu_version"))!$data(currenv("gtm_icu_version"))) do
-	. . . new line,icuv
+	. . . new ldconfig,line,icuv
 	. . . set icuv=""
-	. . . ; NB: There is a shell version of this check in sr_unix/ydbinstall.sh. It needs to be maintained in parallel to this version.
-	. . . open "ldconfig -p":(shell="/bin/sh":command="ldconfig -p":readonly)::"pipe" use "ldconfig -p"
+	. . . ; NB: There is a shell version of this check in sr_unix/ydbinstall.sh. It needs to be verified when this is modified.
+	. . . open "ldconfig":(shell="/bin/sh":command="command -v ldconfig || command -v /sbin/ldconfig":readonly)::"pipe" use "ldconfig"
+	. . . read ldconfig use io close "ldconfig"
+	. . . open "ldconfig -p":(shell="/bin/sh":command=ldconfig_" -p":readonly)::"pipe" use "ldconfig -p"
 	. . . for  read line quit:$zeof  if $zfind(line,$char(9)_"libicuio.so.") set icuv=$zpiece($zpiece(line,"libicuio.so.",2)," ") quit
 	. . . use io close "ldconfig -p"
 	. . . set:icuv'?1N.E $ecode=",U243,"
