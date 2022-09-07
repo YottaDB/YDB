@@ -245,6 +245,10 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 			assert(FALSE);	/* rts_error_csa should not return */
 		}
 	}
+	WBTEST_ONLY(WBTEST_YDB_MAXSECSHRRETRY,
+		    loop_count = MAX_COMM_ATTEMPTS + 1;		/* Cause us to enter error block below */
+		    req_code = code;				/* We won't enter the loop below to set this field */
+		    );
 	DEBUG_ONLY(mesg.usesecshr = TREF(ydb_usesecshr));	/* Flag ignored in PRO build */
 	while (MAX_COMM_ATTEMPTS >= loop_count)
 	{	/* first, try the sendto */

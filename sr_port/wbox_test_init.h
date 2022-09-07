@@ -230,6 +230,7 @@ typedef enum {
 	WBTEST_YDB_RENAMEFAIL,			/* 202 : Exercise RENAMEFAIL error codepath in "cre_jnl_file_intrpt_rename" */
 	WBTEST_YDB_STATICPID,			/* 203 : Set pid to a static number for predictable test output */
 	WBTEST_YDB_SETSTATSOFF,			/* 204 : Reset all the gvstats to be the same as their offset in gvstats_rec_t */
+	WBTEST_YDB_MAXSECSHRRETRY,		/* 205 : Cause loop gated by MAX_COMM_ATTEMPTs in secshr_client.c to fail */
 } wbtest_code_t;
 
 #if defined (DEBUG) && !defined (STATIC_ANALYSIS)
