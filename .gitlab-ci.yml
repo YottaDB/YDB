@@ -15,33 +15,26 @@ image: docker:latest
 services:
   - docker:dind
 
-stages:
- - build
- - push
-
 variables:
   DOCKER_BUILDKIT: 1
 
-.build:
-  artifacts:
-    paths:
-      - docker-images
-  stage: build
-  script:
-    - mkdir docker-images
-    - docker build ${ARGS} --pull -t yottadb/${REPO}:latest -f ${DOCKERFILE} .
-    - docker save yottadb/${REPO}:latest > docker-images/${REPO}.tar
+stages:
+ - build
+ - docker-create
+ - docker-push
 
-build-ubuntu:
-  extends: .build
-  variables:
-    DOCKERFILE: Dockerfile
-    REPO: yottadb
+commit-verify:
+  image: ubuntu:18.04
+  stage: build
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git wget gnupg
+  script:
+    - ci/commit_verify.sh ci/needs_copyright.sh https://gitlab.com/YottaDB/DB/YDB
 
 test-clang-tidy:
   image: ubuntu:18.04
-  # NOTE: conceptually this is a test and not a build, because it has no
-  # artifacts.  However, if we make it part of the `test` stage, it will only
+  # NOTE: conceptually this is a test and not a build.
+  # However, if we make it part of the `test` stage, it will only
   # run after all other builds succeed.  Since it already takes a half-hour to
   # execute, run it in parallel with all other build jobs instead.
   stage: build
@@ -74,35 +67,48 @@ test-clang-tidy:
         zlib1g-dev
     - ci/build.sh
 
-build-ubuntu-debug:
-  extends: .build
+.docker-create:
+  artifacts:
+    paths:
+      - docker-images
+    expire_in: 1 day
+  stage: docker-create
+  script:
+    - mkdir docker-images
+    - docker build ${ARGS} --pull -t yottadb/${REPO}:latest -f ${DOCKERFILE} .
+    - docker save yottadb/${REPO}:latest > docker-images/${REPO}.tar
+  only:
+    - master@YottaDB/DB/YDB
+
+
+docker-create-ubuntu:
+  extends: .docker-create
+  variables:
+    DOCKERFILE: Dockerfile
+    REPO: yottadb
+
+docker-create-ubuntu-debug:
+  extends: .docker-create
   variables:
     DOCKERFILE: Dockerfile
     REPO: yottadb-debug
     ARGS: --build-arg CMAKE_BUILD_TYPE=Debug
 
-commit-verify:
-  image: ubuntu:18.04
-  stage: build
-  before_script:
-    - apt-get update -qq && apt-get install -y -qq git wget gnupg
-  script:
-    - ci/commit_verify.sh ci/needs_copyright.sh https://gitlab.com/YottaDB/DB/YDB
-
-build-rocky:
-  extends: .build
+docker-create-rocky:
+  extends: .docker-create
   variables:
     DOCKERFILE: Dockerfile-rocky
     REPO: yottadb-rocky
 
-build-debian:
-  extends: .build
+docker-create-debian:
+  extends: .docker-create
   variables:
     DOCKERFILE: Dockerfile-debian
     REPO: yottadb-debian
 
-.push:
-  stage: push
+# Push Testing Docker Images, execute only on master
+.docker-push:
+  stage: docker-push
   script:
     - docker login -u $HUB_USERNAME -p $HUB_PASSWORD
     - docker load -i docker-images/${REPO}.tar
@@ -118,28 +124,29 @@ build-debian:
   only:
     - master@YottaDB/DB/YDB
 
-push-ubuntu:
-  extends: .push
+docker-push-ubuntu:
+  extends: .docker-push
   variables:
     REPO: yottadb
 
-push-ubuntu-debug:
-  extends: .push
+docker-push-ubuntu-debug:
+  extends: .docker-push
   variables:
     REPO: yottadb-debug
 
-push-rocky:
-  extends: .push
+docker-push-rocky:
+  extends: .docker-push
   variables:
     REPO: yottadb-rocky
 
-push-debian:
-  extends: .push
+docker-push-debian:
+  extends: .docker-push
   variables:
     REPO: yottadb-debian
 
-.push-release:
-  stage: push
+# Release Docker Images, only execute for tags
+.docker-push-release:
+  stage: docker-push
   script:
     - docker login -u $HUB_USERNAME -p $HUB_PASSWORD
     - docker load -i docker-images/${REPO}.tar
@@ -154,22 +161,22 @@ push-debian:
   only:
     - tags
 
-push-release-ubuntu:
-  extends: .push-release
+docker-push-release-ubuntu:
+  extends: .docker-push-release
   variables:
     REPO: yottadb
 
-push-release-ubuntu-debug:
-  extends: .push-release
+docker-push-release-ubuntu-debug:
+  extends: .docker-push-release
   variables:
     REPO: yottadb-debug
 
-push-release-rocky:
-  extends: .push-release
+docker-push-release-rocky:
+  extends: .docker-push-release
   variables:
     REPO: yottadb-rocky
 
-push-release-debian:
-  extends: .push-release
+docker-push-release-debian:
+  extends: .docker-push-release
   variables:
     REPO: yottadb-debian
