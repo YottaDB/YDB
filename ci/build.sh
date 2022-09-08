@@ -29,7 +29,7 @@ echo " -> build_type = $build_type"
 
 echo "# Run shellcheck on all scripts"
 if [ -x "$(command -v shellcheck)" ]; then
-	find .. -name build -prune -o -name '*.sh' -print0 | xargs -0 shellcheck -e SC1091,SC2154,SC1090,SC2086,SC2053,SC2046,SC2006,SC2164
+	find . -name '*.sh' -print0 | xargs -0 shellcheck -e SC1091,SC2154,SC1090,SC2086,SC2053,SC2046,SC2006,SC2164
 else
 	echo " -> Shellcheck not found!"
 	exit 1
@@ -59,9 +59,10 @@ exit $exit_status
 )
 
 echo "# Run the build using clang"
+rm -rf build # if it already exists
 mkdir build
 cd build || exit
-cmake -D CMAKE_C_COMPILER=clang-10 -D CMAKE_BUILD_TYPE=$build_type -D CMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+cmake -D CMAKE_C_COMPILER=clang-14 -D CMAKE_BUILD_TYPE=$build_type -D CMAKE_EXPORT_COMPILE_COMMANDS=ON ..
 mkdir warnings
 # Record the warnings, but if `make` fails, say why instead of silently exiting.
 set +e

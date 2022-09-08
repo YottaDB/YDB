@@ -2,7 +2,7 @@
 
 #################################################################
 #								#
-# Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -58,7 +58,7 @@ cd "$root"
 mkdir -p "$output_dir"
 find . -name '*.c' \
 	| grep -E 'sr_(linux|unix|port|x86_64)/.*\.c$' \
-	| xargs parallel clang-tidy-10 --quiet -p="$build_dir" '--checks=-clang-analyzer-security.insecureAPI.*' -- \
+	| xargs -n 1 -P $(getconf _NPROCESSORS_ONLN) clang-tidy-14 --quiet -p="$build_dir" '--checks=-clang-analyzer-security.insecureAPI.*' \
 	>"$output_dir/tidy_warnings.txt" 2>/dev/null
 
 cd "$output_dir"

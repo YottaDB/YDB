@@ -721,7 +721,7 @@ fi
 fi
 
 if [ "Y" = "$ydb_plugins_only" ]; then
-	if [ ! -n "$ydb_installdir" ] ; then
+	if [ -z "$ydb_installdir" ] ; then
 		# If --installdir was not specified, we first look to $ydb_dist for
 		# the YottaDB version. Otherwise, we check pkg-config.
 		if [ -d "$ydb_dist" ] ; then
@@ -1270,20 +1270,20 @@ fi
 echo $product_name version $ydb_version installed successfully at $ydb_installdir
 
 # Create copies of, or links to, environment scripts and ydb & gtm executables
-if [ ! -z "$gtm_linkenv" ] ; then
+if [ -n "$gtm_linkenv" ] ; then
     dirensure $gtm_linkenv
     ( cd $gtm_linkenv ; rm -f ydb_env_set ydb_env_unset gtmprofile ; ln -s $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked env ; ls -l $gtm_linkenv ; fi
-elif [ ! -z "$gtm_copyenv" ] ; then
+elif [ -n "$gtm_copyenv" ] ; then
     dirensure $gtm_copyenv
     ( cd $gtm_copyenv ; rm -f ydb_env_set ydb_env_unset gtmprofile ; cp -P $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Copied env ; ls -l $gtm_copyenv ; fi
 fi
-if [ ! -z "$gtm_linkexec" ] ; then
+if [ -n "$gtm_linkexec" ] ; then
     dirensure $gtm_linkexec
     ( cd $gtm_linkexec ; rm -f ydb gtm ; ln -s $ydb_installdir/ydb $ydb_installdir/gtm ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked exec ; ls -l $gtm_linkexec ; fi
-elif [ ! -z "$gtm_copyexec" ] ; then
+elif [ -n "$gtm_copyexec" ] ; then
     dirensure $gtm_copyexec
     ( cd $gtm_copyexec ; rm -f ydb gtm ; cp -P $ydb_installdir/ydb $ydb_installdir/gtm ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Copied exec ; ls -l $gtm_copyexec ; fi

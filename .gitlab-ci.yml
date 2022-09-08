@@ -24,7 +24,7 @@ stages:
  - docker-push
 
 commit-verify:
-  image: ubuntu:18.04
+  image: ubuntu:22.04
   stage: build
   before_script:
     - apt-get update -qq && apt-get install -y -qq git wget gnupg
@@ -32,7 +32,7 @@ commit-verify:
     - ci/commit_verify.sh ci/needs_copyright.sh https://gitlab.com/YottaDB/DB/YDB
 
 test-clang-tidy:
-  image: ubuntu:18.04
+  image: ubuntu:22.04
   # NOTE: conceptually this is a test and not a build.
   # However, if we make it part of the `test` stage, it will only
   # run after all other builds succeed.  Since it already takes a half-hour to
@@ -48,10 +48,11 @@ test-clang-tidy:
     - apt-get update -q
     - apt-get -q install -y --no-install-recommends >/dev/null
         ca-certificates
-        clang-10
-        clang-tidy-10
+        clang-14
+        clang-tidy-14
         file
         cmake
+        make
         git
         tcsh
         libconfig-dev
