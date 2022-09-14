@@ -217,7 +217,7 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. set $zgbldir=ydbgbldir
 	. set region=$view("gvfirst")
 	. for  do  set region=$view("gvnext",region) quit:'$zlength(region)
-	. . set dbfname=$zparse($zpiece($$^%PEEKBYNAME("gd_segment.fname",region),$zchar(0),1))
+	. . set dbfname=$zpiece($$^%PEEKBYNAME("gd_segment.fname",region),$zchar(0),1)
 	. . if $zlength($zsearch(dbfname,-1)) do DBEnsure(dbfname)
 	. . else  do:'($$^%PEEKBYNAME("gd_region.reservedDBFlags",region)#2)
 	. . . set cmd=dist_"/mupip create -region="_region
@@ -389,9 +389,12 @@ CreateRegion(region)
 	set io=$io
 	set ydbtmpdir=$ztrnlnm("ydb_tmp_env")_"/"
 	set:1=$zlength(ydbtmpdir) ydbtmpdir="/tmp/"
-	set tmp=$zpiece($$^%PEEKBYNAME("gd_segment.fname","DEFAULT"),$zchar(0),1)
-	set dbdir=$zparse(tmp,"directory")
-	set defaultfile=$view("wordexp",tmp)
+	set defaultfile=$zpiece($$^%PEEKBYNAME("gd_segment.fname","DEFAULT"),$zchar(0),1)
+	; Finding the directory of the database file for the DEFAULT region has to
+	; deal with the cases where the database file is in the current directory,
+	; as well as in /.
+	set tmp=$zlength(defaultfile,"/")
+	set dbdir=$select(tmp-1:$zpiece(defaultfile,"/",1,tmp-1)_"/",1:"")
 	do DBEnsure(defaultfile)
 	do getfields^%DUMPFHEAD(.defaultfhead,defaultfile)
 	set gdedefault=dist_"/gdedefaults"
@@ -653,14 +656,11 @@ Robustify	; rollback / recover an existing database if needed
 	;   the database and encounter a REQRUNDOWN/REQRECOV/REQROLLBACK type of
 	;   error. Hence the use of PEEKBYNAME("gd_segment.fname") below,  as it
 	;   only reads the segment file name from the gld file).
-	; - As the database file name could have env vars in it (e.g.
-	;   $ydb_dir/$ydb_rel/g/%ydbaim.dat) $view("WORDEXP") below generates
-	;   the complete name.
 	set (aimflag,octoflag)=1,semidnotnull=0
 	set region="" for  set region=$view("GVNEXT",region)  quit:region=""  do
 	. set:"YDBAIM"=region aimflag=0
 	. set:"YDBOCTO"=region octoflag=0
-	. set dbfname=$zparse($zpiece($$^%PEEKBYNAME("gd_segment.fname",region),$zchar(0),1))
+	. set dbfname=$zpiece($$^%PEEKBYNAME("gd_segment.fname",region),$zchar(0),1)
 	. if $zlength($zsearch(dbfname,-1)) do
 	. . set fhead(region,"fname")=dbfname
 	. . do DBEnsure(dbfname)
@@ -708,12 +708,13 @@ Robustify	; rollback / recover an existing database if needed
 	for  set region=$order(fhead(region)) quit:'$zlength(region)  do
 	. ; Verify that each region is clean: either not open, or if open has a semaphore
 	. set tmpok=(-1=fhead(region,"sgmnt_data.semid"))!$data(sem(fhead(region,"sgmnt_data.semid")))
-	. ; If the region for ^%ydbAIM* globals is not clean, is not journaled,
-	. ; and has AUTODB set, delete the file and consider the region clean
-	. do:'tmpok&(region="YDBAIM")&'fhead("YDBAIM","sgmnt_data.jnl_state")&(fhead("YDBAIM","sgmnt_data.reservedDBFlags")#2)
-	. . open fhead("YDBAIM","fname") close fhead("YDBAIM","fname"):delete
-	. . kill fhead("YDBAIM")
-	. . set tmpok=1
+	. ; If the regions for AIM or JNLF globals are not clean, are not journaled,
+	. ; and have AUTODB set, delete the database files and consider the region clean
+	. do:'tmpok&((region="YDBAIM")!(region="YDBJNLF"))
+	. . do:'fhead(region,"sgmnt_data.jnl_state")&(fhead(region,"sgmnt_data.reservedDBFlags")#2)
+	. . . open fhead(region,"fname") close fhead(region,"fname"):delete
+	. . . kill fhead(region)
+	. . . set tmpok=1
 	. set allok=allok*tmpok
 	; Rollback / recover database if not allok. This code has limitations in what it handles
 	; as it is intended to be for simple out-of-box use of YottaDB. The regions recovered

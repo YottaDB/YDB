@@ -1,0 +1,476 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+; Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; YDB Journal File Utility (YDBJNLF)
+%YDBJNLF
+	; Top level entry not supported
+	new $etrap do etrap
+	set $ecode=",U255,"	; top level entry not supported
+	quit			; should get here only in direct mode
+
+; Set error trap. The first action the error trap does is set a failsafe error
+; trap (e.g., if $zroutines is not correct). Thereafter, it jumps to the actual
+; error trap to print an error message and terminate, with a return code.
+;
+; Note that all external entry points:
+; - NEW $ETRAP and DO etrap if $ETRAP is the default error handler. This allows
+;   them to report the error messages for %YDBJNLF errors, instead of just
+;   reporting that $ECODE was assigned a non-empty value, which the default
+;   error trap will report. If an application sets an error trap ($ETRAP or
+;   $ETRAP) that will be used.
+etrap
+	set $etrap="set $etrap=""open """"/proc/self/fd/2"""" use """"/proc/self/fd/2"""" write $zstatus,! zshow """"*"""" zhalt $piece($zstatus,"""","""",1)""  goto err^"_$text(+0)
+	quit
+
+err	; Primary Error Handler
+	; ------------------------------------------------------------------------
+	; This is where control reaches when any error is encountered inside JNLF.
+	; The code does JNLF-specific cleanup here and then switches $etrap to a
+	; non-JNLF default handler that rethrows the error one caller frame at a
+	; time until it unwinds to a non-JNLF caller frame that has $etrap set at
+	; which point it can handle the error accordingly.
+	; ------------------------------------------------------------------------
+	new errcode,errtxt
+	; Restore IO device
+	use io close "mupip"
+	set errcode=$zpiece($ecode,",",2),errtxt=$text(@errcode)
+	; Check for JNLF-specific errors (in that case "errtxt" will be non-empty).
+	if $zlength(errtxt) do
+	. new xstr
+	. ; This is an JNLF specific error. Extract error text with unfilled
+	. ; parameter values. "xecute" that string to fill it with actual values.
+	. set xstr="set errtxt="_$zpiece(errtxt,";",2,$zlength(errtxt,";")) xecute xstr
+	. set $zstatus=$zpiece($zstatus,",",1,2)_","_$text(+0)_errtxt
+	; Now that primary error handling is done, switch to different handler
+	; to rethrow the error in caller frames. The rethrow will cause a
+	; different $etrap to be invoked in the first non-JNLF caller frame
+	; (because JNLF did a "new $etrap" at entry).
+	set $etrap="quit:$quit """" quit"
+	quit:$quit "" quit
+
+; Read journal file jnlfile
+; - Using MUPIP JOURNAL EXTRACT FORWARD SHOW=ALL FENCES=NONE DETAIL FULL
+; - If label is specified, it is used to identify the extract; otherwise the
+;   journal file name is the label. Any prior ingested journal data with the
+;   same label is replaced with the new data.
+; If called as a function, returns 1; raises errors by setting $ECODE.
+; Note that the MUPIP EXTRACT command uses the NOVERIFY option. Since this
+; utility program is intended for use in debugging and forensics, even
+; journal files with errors have value. If verification is needed, we
+; recommend it as a separate step before running this utility program.
+INGEST(jnlf,label)
+	new $etrap do etrap
+	set $ecode=""
+	new commapos,daytime,doneflag,etrapsav,gvref,i,io,j,jnlfgbl,jnlfile
+	new jnlsubrec,jpvtime,line,linenum,mupipcmd,node,nodesarg,offset,prefix
+	new prevline,recsize,rectype,rectypecomma,retcode,term,tmp,user
+	set io=$io
+	set jnlfile=$zsearch($get(jnlf,""),-1)
+	set:'$zlength(jnlfile) $ecode=",U249,"
+	set:'$zlength($get(label,"")) label=jnlfile
+	set prefix=$ztrnlnm("ydb_msgprefix")
+	set:'$zlength(prefix) prefix="YDB"
+	do getrectypes
+	set mupipcmd="$ydb_dist/mupip journal -extract=-stdout -forward -show=all -fences=none -noverify -detail -full "_jnlfile
+	set retcode='$$ensureydbjnlf
+	open "mupip":(shell="/bin/sh":command=mupipcmd:stderr="mupip_err":readonly)::"pipe"
+	; Read the first three lines of stderr to confirm journal file format
+	use "mupip_err"
+	set prevline=""
+	for linenum=1:1:3 do
+	. read line
+	. set:$zeof $ecode=",U253,"
+	. set prevline=line
+	. set:line'?@("1""%""1"""_prefix_"""1""-I-MUJNLSTAT,"".E") $ecode=",U250,"
+	; Purge old records with this label once journal file format is confirmed
+	do PURGE(label)
+	use "mupip"
+	read ^%ydbJNLF(label,"extrfmt")
+	; Performance is important for this loop. Since a journal file can be
+	; Gigabytes, with an extract to match, any performance improvement
+	; is worth making. The calls to $qlength() and $qsubscript() are
+	; perhaps the slowest parts of the loop, but it is not clear that
+	; there are faster alternatives which are functionally correct.
+	for  read line quit:$zeof  do
+	. set offset=$$FUNC^%HD($zpiece(line," ",1))
+	. set recsize=$$FUNC^%HD($zpiece($zpiece(line,"]",1),"[",2))
+	. set rectype=$zpiece($zpiece(line," :: ",2)," ",1),rectypecomma=rectype_","
+	. ; Check that record type is known
+	. set:'$data(jnlfgbl(rectype)) $ecode=",U254,"
+	. ; Get the extracted journal record extract & format for storage.
+	. ; This includes replacing the date and time parts of the $HOROLOG
+	. ; timestamp with "\" to make them distinct, sortable, pieces.
+	. set line=$$L^%TRIM($zpiece(line,rectype,2,$zlength(line,rectype)))
+	. set commapos=$zfind(line,",")
+	. set $zextract(line,commapos-1)="\"
+	. if $zfind("FKILL,FZKILL,GKILL,GZKILL,KILL,TKILL,TZKILL,TZTRIG,UKILL,ZKILL,ZTRIG,",rectypecomma) do
+	. . set node=$zpiece(line,"\",13,$zlength(line,"\"))
+	. . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\"_$qsubscript(node,0)_"\"_node
+	. ; In the following, since "=" separates the global variable node from its value
+	. ; in a journal extract line, but since a subscript can include a "=" character,
+	. ; calling $qlength() on leading pieces of the field in the line until it
+	. ; succeeds identifies the specific "=" for separating node from value.
+	. else  if $zfind("FSET,GSET,SET,TSET,USET,",rectypecomma) do
+	. . set nodesarg=$zpiece(line,"\",13,$zlength(line,"\"))
+	. . set etrapsav=$etrap,i=1
+	. . set $etrap="if "",M90,Z150379530,""=$ecode set $ecode="""" goto:$increment(i) @$stack($stack(-1),""place"")"
+	. . set gvref=$zpiece(nodesarg,"=",1,i) if $qlength(gvref)
+	. . set $etrap=etrapsav
+	. . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\"_$qsubscript(gvref,0)_"\"_gvref_"\"_$zextract(line,$zfind(line,gvref_"="),$zlength(line))
+	. else  if $zfind("EPOCH,",rectypecomma) do
+	. . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,11)_"\"_$ztranslate($zpiece(line,"\",12,$zlength(line,"\")),"\",":")
+	. else  set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,$zlength(line,"\"))
+	; Except for lists of ACTIVE and COMPLETE processes, performance is not
+	; important for the remainder of the function, as other metadata for
+	; even the largest journal file is only tens of lines.
+	set linenum=0,line=""
+	use "mupip_err"
+	; Get subfield labels & types.
+	do getsubfields
+	do skiptill("1""SHOW output for journal file"".E")
+	read line,line
+	; Read metadata subrecords. The match is in reverse order to prevent
+	; "Journal file hash2 start TN" and "Journal file hash2" lines matching
+	; the pattern for "Journal file hash" lines. This assumes that strings
+	; in the metadata do not contain ";" and binary data. This is true of
+	; YottaDB metadata. While strings such as database and journal file
+	; names can in theory contain such characters, it would be unusual for
+	; that to be the case.
+	for  set prevline=line read line set:$zeof $ecode=",U253," quit:line?1"Process That Created the Journal File:".E  do:$zlength(line)
+	. for i=jnlsubrec:-1:1 set doneflag=0 do  quit:doneflag
+	. . do:line?@(1_$zwrite($zpiece(jnlsubrec(i),";",1))_".E")
+	. . . set doneflag=1,tmp=jnlsubrec(i)
+	. . . if "int"=$zpiece(tmp,";",3) do
+	. . . . set $zpiece(^%ydbJNLF(label),";",i)=+$$L^%TRIM($zpiece(line,$zpiece(tmp,";",1),2))
+	. . . else  if "bool"=$zpiece(tmp,";",3) do
+	. . . . set $zpiece(^%ydbJNLF(label),";",i)=$select("TRUE"=$$L^%TRIM($zpiece(line,$zpiece(tmp,";",1),2)):1,1:0)
+	. . . else  if "timestamp"=$zpiece(tmp,";",3) do
+	. . . . set $zpiece(^%ydbJNLF(label),";",i)=$$daytimetodlrh($$L^%TRIM($zpiece(line,$zpiece(tmp,";",1),2)))
+	. . . else  set $zpiece(^%ydbJNLF(label),";",i)=$$L^%TRIM($zpiece(line,$zpiece(tmp,";",1),2))
+	. set:'doneflag $ecode=",U252,"
+	; At this point, the line "Process That Created the Journal File:" would have been read.
+	; Read empty line followed by line of the form:
+	; PID        NODE             USER         TERM JPV_TIME
+	; to get character positions of fields.
+	read line,line
+	set jpvtime=$zfind(line,"JPV_TIME")-$zlength("JPV_TIME")
+	set node=$zfind(line,"NODE")-$zlength("NODE")
+	set term=$zfind(line,"TERM")-$zlength("TERM")
+	set user=$zfind(line,"USER")-$zlength("USER")
+	; Read a line of hyphens and then the line with the process information
+	read line,line
+	set ^%ydbJNLF(label)=^(label)_";"_$$getprocinfo()
+	do skiptill("1.""-""")
+	read line	; Line with pid of process that first opened the journal file
+	set ^%ydbJNLF(label)=^(label)_";"_$$getprocinfo()
+	do skiptill("1""Process"".E")
+	; line is either "Process(es) that are still ACTIVE in this journal:" or
+	; "Process(es) that are COMPLETE in this journal:"
+	do:$zfind(line,"ACTIVE")
+	. read line,line,line	; skip till next line is first ACTIVE process
+	. set i=$order(^%ydbJNLFACTIVE(label,""),-1)
+	. for  read line quit:'$zlength(line)  set ^($increment(i))=$$getprocinfo()
+	. do skiptill("1""Process"".E")
+	do:$zfind(line,"COMPLETE")
+	. read line,line,line	; skip till next line is first COMPLETE process
+	. set i=$order(^%ydbJNLFCOMPLETE(label,""),-1)
+	. for  read line quit:'$zlength(line)  set ^($increment(i))=$$getprocinfo()
+	do skiptill("1.""-""")
+	for  read line quit:'$zlength(line)!$zeof  do
+	. set line=$$^%MPIECE(line)
+	. set ^%ydbJNLFOPCOUNT(label,$zpiece(line," ",1))=$zpiece(line," ",2)
+	; Make sure there is a line reporting successful end of MUPIP JOURNAL EXTRACT
+	do skiptill("1""%""1"""_prefix_"""1""-I-MUJNLSTAT, End processing at"".E")
+	use io close "mupip"
+	; Create global variable identifying table for each record type
+	set rectype=""
+	for  set rectype=$order(jnlfgbl(rectype)) quit:'$zlength(rectype)  do
+	. set ^%ydbJNLFRECTBL(label,rectype)=$zconvert($zpiece($zpiece(jnlfgbl(rectype),"^%ydbJNLF",2),"(",1),"U")
+	quit:$quit retcode quit
+
+; Output Octo CREATE TABLE statements for the globals with ingested journal records
+; rectype is a list of comma separated record types, e.g., SET,KILL. If omitted
+; or "*", CREATE TABLE statements for all record types are output.
+OCTODDL(rectype)
+	new $etrap do etrap
+	set $ecode=""
+	new currtbl,field,i,j,jnlfgbl,jnlsubrec,line,rectempl,tbltype,tblsel,tmp
+	; Get record and subfield labels & types.
+	do getrectypes
+	do getsubfields
+	set rectype=$get(rectype,"*")
+	do:"*"=rectype
+	. write "DROP TABLE IF EXISTS YDBJNLF KEEPDATA;",!
+	. write "CREATE TABLE YDBJNLF -- Metadata for ingested journal files",!
+	. write "(label VARCHAR"
+	. for i=1:1:jnlsubrec do
+	. . set rectempl=jnlsubrec(i),tmp=$zpiece(rectempl,";",3)
+	. . write ","
+	. . write:i-1 " -- ",$zpiece(jnlsubrec(i-1),";",1)
+	. . write !," ",$zpiece(rectempl,";",2),$select("int"=tmp:" INTEGER","bool"=tmp:" BOOLEAN",1:" VARCHAR")
+	. ; Metadata for process that created journal file and first process that opened it
+	. write ","," -- ",$zpiece(rectempl,";",1),!
+	. ; Note juggling of output formatting below to position commas and linefeeds correctly
+	. write " -- Columns for the processes that (a) created the journal file and (b) first opened it",!
+	. for i="crproc","openproc" do
+	. . write " ",i_"pid INTEGER"
+	. . write ",",!," ",i_"node VARCHAR"
+	. . write ",",!," ",i_"user VARCHAR"
+	. . write ",",!," ",i_"term INTEGER"
+	. . write ",",!," ",i_"jpvdate INTEGER"
+	. . write ",",!," ",i_"jpvtime INTEGER,",!
+	. write " PRIMARY KEY (label)"
+	. write ")",!,"Delim "";""",!
+	. write "Global ""^%ydbJNLF"";",!
+	. ; Metadata for processes still active / complete in the journal file
+	. for currtbl="ACTIVE","COMPLETE" do
+	. . write "DROP TABLE IF EXISTS YDBJNLF",currtbl," KEEPDATA;",!
+	. . write "CREATE TABLE YDBJNLF",currtbl,!
+	. . write "(label VARCHAR,",!
+	. . write " seqno INTEGER,",!
+	. . write " pid INTEGER,",!
+	. . write " nnam VARCHAR,",!	; node name
+	. . write " unam VARCHAR,",!	; user name
+	. . write " term INTEGER,",!	; terminal
+	. . write " horologdate INTEGER,",!
+	. . write " horologtime INTEGER,",!
+	. . write " PRIMARY KEY (label, seqno))",!
+	. . write "Delim "";""",!
+	. . write "Global ""^%ydbJNLF",currtbl,""";",!
+	. write "DROP TABLE IF EXISTS YDBJNLFOPCOUNT KEEPDATA;",!
+	. write "CREATE TABLE YDBJNLFOPCOUNT -- Opcode count",!
+	. write "(label VARCHAR,",!," opcode VARCHAR,",!," occurs INTEGER,",!," PRIMARY KEY (label, opcode))",!
+	. write "GLOBAL ""^%ydbJNLFOPCOUNT"";",!
+	. write "DROP TABLE IF EXISTS YDBJNLFRECTYPE KEEPDATA;",!
+	. write "CREATE TABLE YDBJNLFRECTYPE -- Table for record types",!
+	. write "(label VARCHAR,",!
+	. write " rectype VARCHAR,",!," tbl VARCHAR,",!
+	. write " PRIMARY KEY (label, rectype))",!
+	. write "GLOBAL ""^%ydbJNLFRECTBL"";",!
+	if '$zlength(rectype) quit:$quit 1 quit
+	for i=1:1 set line=$zpiece($text(@("TYPE"_i)),";",2) quit:'$zlength(line)  do
+	. for j=1:1:$zlength(line,",")-1 do
+	. . set tbltype($zpiece(line,",",j))="TYPE"_i
+	if "*"=rectype do
+	. set (rectype,tmp)=$order(tbltype(""))
+	. for  set tmp=$order(tbltype(tmp)) quit:'$zlength(tmp)  set rectype=rectype_","_tmp
+	else  for i=1:1:$zlength(rectype,",") set:'$data(tbltype($zpiece(rectype,",",i))) $ecode=",U251,"
+	for i=1:1:$zlength(rectype,",") set tblsel(tbltype($zpiece(rectype,",",i)))=""
+	set currtbl="" for  set currtbl=$order(tblsel(currtbl)) quit:'$zlength(currtbl)  do
+	. write "DROP TABLE IF EXISTS YDBJNLF",currtbl," KEEPDATA;",!
+	. write "CREATE TABLE YDBJNLF",currtbl," -- "
+	. set tmp=$zpiece($text(@(currtbl)),";",2)
+	. write $zextract(tmp,1,$zlength(tmp)-1),!
+	. write "(label VARCHAR"
+	. write ",",!," offset INTEGER"
+	. write ",",!," recsize INTEGER"
+	. set rectempl=$zpiece($text(@$zconvert(currtbl,"l")),";",2)
+	. for j=1:1:$zlength(rectempl,"\") do
+	. . set field=$zpiece(rectempl,"\",j)
+	. . write ",",!," ",field,$select($zfind($text(varchar),field_","):" VARCHAR",1:" INTEGER")
+	. write ",",!," PRIMARY KEY (label, offset, recsize))",!,"Delim ""\""",!
+	. write "Global ""^%ydbJNLF"_currtbl_""";",!
+	quit:$quit 1 quit
+
+; Remove ingested journal file information
+PURGE(label)
+	new etrap do etrap
+	new tmp
+	set label=$get(label,"")
+	set tmp="^%ydbJNLF"
+	for  do  set tmp=$order(@tmp) quit:'$zlength(tmp)!(tmp'?1"^%ydbJNLF".E)
+	. if $zlength(label) kill @tmp@(label)
+	. else  kill @tmp
+	quit:$quit 1 quit
+
+; Except for error message texts, labels below are accessed only from within this routine.
+
+; Convert a timestamp of the form YYYY/MM/DD HH:MM:SS to $horolog format
+daytimetodlrh(str)
+	new date,time,tmp
+	set tmp=$zpiece(str," ",1),date=$$FUNC^%DATE($zpiece(tmp,"/",2,3)_"/"_$zpiece(tmp,"/",1))
+	set tmp=$zpiece(str," ",2),time=$$FUNC^%TI($ztranslate($zpiece(tmp,":",1,2),":"))+$zpiece(tmp,":",3)
+	quit date_","_time
+
+; Ensure that a YDBJNL region exists in the global directory
+; Returns 1 if it already exists, 0 if it had to be created
+ensureydbjnlf()
+	new defdir,deffile,err,errflag,flag,i,io,j,jnlffile,k,l,out,region
+	set flag=0,io=$io,region=$view("gvfirst")
+	for  set:"YDBJNLF"=region flag=1 quit:flag!'$zlength(region)  set region=$view("gvnext",region)
+	do:'flag	; create YDBJNLF region if it does not exist
+	. set errflag=0
+	. ; $$^%PEEKBYNAME() in a PIPE is used to get the database file name with environment
+	. ; variables, as the YDBJNLF region should use the same environment variables.
+	. open "peekbyname":(shell="/bin/sh":command="$ydb_dist/yottadb -run %XCMD 'write $zpiece($$^%PEEKBYNAME(""gd_segment.fname"",""DEFAULT""),$zchar(0),1),!'":readonly)::"pipe"
+	. use "peekbyname" read deffile
+	. use io close "peekbyname"
+	. set defdir=$zpiece(deffile,"/",1,$zlength(deffile,"/")-1)
+	. ; Since defdir will be the empty string if the DEFAULT database file is
+	. ; in current directory or if it is in /, $zlength(defdir) cannot be
+	. ; used to determine whether jnlffile needs a prefix.
+	. set jnlffile=$select($zlength(deffile,"/")-1:defdir_"/",1:"")_"%ydbjnlf.dat"
+	. open "gde":(shell="/bin/sh":command="$ydb_dist/yottadb -run GDE":stderr="gdeerr")::"pipe" use "gde"
+	. write "add -region ydbjnlf -autodb -dynamic_segment=ydbjnlf -nojournal -key_size=1019 -record_size=1048576",!
+	. write "add -segment ydbjnlf -access_method=mm -block_size=4096 -allocation=5000 -extension=10000 -file_name="""_jnlffile_"""",!
+	. for i="j","J" for j="n","N" for k="l","L" for l="f","F" write "add -name %ydb"_i_j_k_l_"* -region=ydbjnlf",!
+	. write "exit",!
+	. for i=1:1 read out(i) quit:$zeof  set:out(i)?1"%GDE-E-".E errflag=1
+	. do:errflag
+	. . use "gdeerr"
+	. . for i=1:1 read err(i) quit:$zeof
+	. . set $ecode=",U248,"
+	. use io close "gde"
+	. view "gbldirload":$zgbldir
+	quit flag
+
+; Given a value such as:
+; 0000017195 mylaptop         ydbuser      3    2022/09/22 10:56:53
+; in the caller's local variable line, the function returns a semicolon
+; separated result of six pieces: the pid, node name, user, terminal or
+; pseudo terminal (potentially empty), and the date and time (essentially the
+; pieces of $HOROLOG, but separated by a semicolon. The fields are obtained
+; from character positions set by the caller.
+; Uses variables from the caller: jpvtime, line, node, term, user
+getprocinfo()
+	new maxpos,procinfo
+	set maxpos=$zlength(line)+1
+	set procinfo=+line							; PID
+	set procinfo=procinfo_";"_$zpiece($zextract(line,node,maxpos)," ",1)	; NODE
+	set procinfo=procinfo_";"_$zpiece($zextract(line,user,maxpos)," ",1)	; USER
+	set procinfo=procinfo_";"_$zpiece($zextract(line,term,maxpos)," ",1)	; TERM
+	set daytime=$$daytimetodlrh($zextract(line,jpvtime,maxpos))
+	set procinfo=procinfo_";"_$zpiece(daytime,",",1)			; DATE
+	set procinfo=procinfo_";"_$zpiece(daytime,",",2)			; TIME
+	quit procinfo
+
+; Get record types. Updates variable jnlfgbl from caller
+getrectypes
+	new i,j,line,rectype
+	for i=1:1 set line=$zpiece($text(@("TYPE"_i)),";",2) quit:'$zlength(line)  do
+	. for j=1:1:$zlength(line,",")-1 do
+	. . set rectype=$zpiece(line,",",j)
+	. . set jnlfgbl(rectype)="^%ydbJNLFTYPE"_i_"(label,offset,recsize)"
+	quit
+
+; Get subfield labels and types. For want of a better term, "subfields" refers
+; to MUPIP EXTRACT lines such as " Prev journal file name" listed under label
+; jnlsub1.  Note $text() reports blank lines as " ".
+; Modifies variable jnlsubrec from caller.
+getsubfields
+	new i,tmp
+	for i=1:1 set tmp=$text(@("jnlsub1+"_i)) quit:1=$zlength(tmp)  do
+	. set jnlsubrec(i)=$zextract(tmp,2,$zlength(tmp))
+	set jnlsubrec=i-1
+	quit
+
+; Read lines & skip till a line matching pattern patt is reached
+; Modifies local variable line set in caller
+skiptill(patt)
+	for  set prevline=line read:$increment(linenum) line set:$zeof $ecode=",U253," quit:line?@patt
+	quit
+
+; Subordinate fields following names of previous and next journal files. Each of
+; these is stored as "\" separated piece in nodes of ^%ydbJNLFmeta(label), with
+; the offset from jnlsub1 being the piece number (e.g., Journal file label is
+; the second piece).
+jnlsub1
+;Journal file name;jnlfilename
+;Journal file label;jnlfilelabel
+;Database file name;dbfilename
+; Prev journal file name;prevjnlfilename
+; Next journal file name;nextjnlfilename
+; Before-image journal;beforeimagejnl
+; Journal file header size;jnlfilehdrsize;int
+; Virtual file size;virtfilesize;int
+; Journal file checksum seed;jnlfilecksumseed;int
+; Crash;crash;bool
+; Recover interrupted;recovintrptd;bool
+; Journal file encrypted;jnlfileenc;bool
+; Journal file (re)encryption in progress;jnlfilereencon;bool
+; Journal file hash;jnlfilehash
+; Journal file hash2;jnlfilehash2
+; Journal file uses null IV;jnlfilenulliv;bool
+; Journal file encryption hash cutoff;jnlfilehashcutoff;int
+; Journal file hash2 start TN;jnlfilehash2starttn;int
+; Blocks to Upgrade Adjustment;blkstoupgradeadj;int
+; End of Data;endofdata;int
+; Prev Recovery End of Data;prevrecovendofdata;int
+; Endian Format;endianfmt
+; Journal Creation Time;creattime;timestamp
+; Time of last update;lastupdtime;timestamp
+; Begin Transaction;begintrans;int
+; End Transaction;endtrans;int
+; Align size;alignsize;int
+; Epoch Interval;epochint;int
+; Replication State;replstate
+; Jnlfile SwitchLimit;jnlfileswitchlimit;int
+; Jnlfile Allocation;jnlfilealloc;int
+; Jnlfile Extension;jnlfileext;int
+; Maximum Journal Record Length;maxjnlreclen;int
+; Turn Around Point Offset;turnaroundoffset;int
+; Last EOF Written;lasteofwrt;bool
+; Was a Previous Generation Journal File;wasprevjnlfile;bool
+; Turn Around Point Time;turnaroundpointtime;int
+; Start Region Sequence Number;startregseqnum;int
+; End Region Sequence Number;endregseqnum;int
+
+; The following labels define the structure of the global nodes for each journal record type.
+; Note that KILL class records do not have nodeval fields. However, since SET class records do
+; and since they are likely to be searched together, KILL class records are grouped with SET
+; class records, as the additional field (which will be NULL for KILL class records) takes up
+; no additional space. Similarly, AIMG and PBLK records are grouped as being similar. The
+; dsecmdline field of AIMG records adds no additional space for PBLK records.
+
+TYPE1	;FKILL,FSET,FZKILL,GKILL,GSET,GZKILL,KILL,SET,TKILL,TSET,TZKILL,TZTRIG,UKILL,USET,UZKILL,UZTRIG,ZKILL,ZTRIG,
+TYPE2	;TZTWORM,UZTWORM,ZTWORM,
+TYPE3	;TLGTRIG,ULGTRIG,
+TYPE4	;ALIGN,PFIN,
+TYPE5	;AIMG,PBLK,
+TYPE6	;EOF,
+TYPE7	;EPOCH,
+TYPE8	;INCTN,
+TYPE9	;NULL,
+TYPE10	;PINI,
+TYPE11	;TCOM,
+TYPE12	;TSTART,
+TYPE13	;ZTCOM,
+TYPE14	;ZTSTART,
+
+type1	;op\horologdate\horologtime\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\gvname\gvref\nodeval
+type2	;op\horologdate\horologtime\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\ztwormhole
+type3	;op\horologdate\horologtime\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\trigdefinition
+type4	;op\horologdate\horologtime\tnum\chksum\pid\clntpid
+type5	;op\horologdate\horologtime\tnum\chksum\pid\clntpid\blknum\bsiz\blkhdrtn\ondskbver\dsecmdline
+type6	;op\horologdate\horologtime\tnum\chksum\pid\clntpid\jsnum
+type7	;op\horologdate\horologtime\tnum\chksum\pid\clntpid\jsnum\blks_to_upgrd\free_blocks\total_blks\fully_upgraded\strmseq
+type8	;op\horologdate\horologtime\tnum\chksum\pid\clntpid\opcode\incdetail
+type9	;op\horologdate\horologtime\tnum\chksum\pid\clntpid\jsnum\strm_num\strm_seq\salvaged
+type10	;op\horologdate\horologtime\tnum\chksum\pid\nnam\unam\term\clntpid\clntnnam\clntunam\clntterm
+type11	;op\horologdate\horologtime\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\partners\tid
+type12	;op\horologdate\horologtime\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq
+type13	;horologdate\horologtime\tnum\chksum\pid\clntpid\token\partners
+type14	;horologdate\horologtime\tnum\chksum\pid\clntpid\token
+
+; The following are columns in the CREATE TABLE statements which are VARCHAR;
+; all others are INTEGER.
+varchar	;clntunam,dsecmdline,gvname,gvref,nnam,nodeval,op,strmseq,tid,trigdefinition,unam,ztwormhole,
+
+;	Error message texts
+U248	;"-F-GDEERR GDE error when creating YDBJNLF region"
+U249	;"-F-FILENOTEXIST Journal file "_$get(jnlf,"""""")_" not found"
+U250	;"-F-FILEFMTERR MUPIP JOURNAL EXTRACT stderr line #"_linenum_" is: "_line
+U251	;"-F-UNKNOWNRECTYP Unknown record type "_$zpiece(rectype,",",i)
+U252	;"-F-UNKNOWNSUBTYP Unknown subtype (field) in line "_line
+U253	;"-F-PREMATUREEOF MUPIP JOURNAL EXTRACT stderr prematurely encountered reading line #"_linenum_", previous line was "_prevline
+U254	;"-F-BADRECTYPE Record type "_rectype_" unknown. Line-"_i_": "_line
+U255	;"-F-BADINVOCATION Top level invocation of "_$text(+0)_" not supported; must invoke a label"
