@@ -26,6 +26,7 @@ stages:
 commit-verify:
   image: ubuntu:22.04
   stage: build
+  interruptible: true
   before_script:
     - apt-get update -qq && apt-get install -y -qq git wget gnupg
   script:
@@ -38,6 +39,7 @@ test-clang-tidy:
   # run after all other builds succeed.  Since it already takes a half-hour to
   # execute, run it in parallel with all other build jobs instead.
   stage: build
+  interruptible: true
   artifacts:
     paths:
       - build/warnings/
