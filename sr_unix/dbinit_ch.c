@@ -40,7 +40,7 @@
 #include "gtmio.h"
 #include "have_crit.h"
 
-GBLREF gd_region		*db_init_region;
+GBLREF gd_region		*db_init_region, *ftok_sem_reg;
 
 error_def(ERR_VERMISMATCH);
 
@@ -59,8 +59,8 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 	int			rc, lcl_new_dbinit_ipc;
 	boolean_t		ftok_counter_halted, access_counter_halted, decrement_ftok_counter;
 
-	/* Here, we can not rely on the validity of csa->hdr because this function can be triggered anywhere in db_init().Because
-	 * we don't have access to file header, we can not know if counters are disabled so we go by our best guess, not disabled,
+	/* Here, we cannot rely on the validity of csa->hdr because this function can be triggered anywhere in db_init(). Because
+	 * we don't have access to file header, we cannot know if counters are disabled so we go by our best guess, not disabled,
 	 * during cleanup.
 	 */
 	assert(NULL != db_init_region);
@@ -137,28 +137,40 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 						? (ftok_counter_halted ? DECR_CNT_SAFE : DECR_CNT_TRUE)
 						: DECR_CNT_FALSE;
 		if (udi->grabbed_ftok_sem)
-		{
-			ftok_sem_release(db_init_region, decrement_ftok_counter, TRUE);
-			assert(FALSE == udi->counter_ftok_incremented);
+		{	/* We hold the ftok semaphore. If we created the ftok semaphore, remove it now while we still
+			 * hold the lock. Any processes waiting on it already know how to handle if this semaphore
+			 * disappears. This allows us to always remove a semaphore we create so it is not left behind.
+			 */
+			if (udi->ftok_sem_created)
+			{	/* We created this semaphore - remove it now */
+				if (-1 == semctl(udi->ftok_semid, 0, IPC_RMID))
+				{	/* If we get an error, someone else may have deleted it (via rundown or other method)
+					 * and it is now recreated. We need do nothing in this case but in a surplus of
+					 * caution, report the error to the syslog.
+					 */
+					int	save_errno;
+					char	buff[128];
+
+					save_errno = errno;
+					SNPRINTF(buff, sizeof(buff), "semctl(IPC_RMID, %d)", udi->ftok_semid);
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(buff), CALLFROM,
+						     save_errno);
+				}
+			} else
+			{	/* We did not create this semaphore so just release it */
+				ftok_sem_release(db_init_region, decrement_ftok_counter, TRUE);
+				assert(FALSE == udi->counter_ftok_incremented);
+			}
 		} else if (udi->counter_ftok_incremented)
 			do_semop(udi->ftok_semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, SEM_UNDO | IPC_NOWAIT);
 		/* Below reset needed for "else if" case above but do it for "if" case too (in pro) just in case */
 		udi->counter_ftok_incremented = FALSE;
 		udi->grabbed_ftok_sem = FALSE;
-		if ((udi->ftok_sem_created) && (INVALID_SEMID != udi->ftok_semid))
-		{	/* If we created the ftok semaphore, remove it now if it exists */
-			if (-1 == semctl(udi->ftok_semid, 0, IPC_RMID))
-			{	/* If we get an error, someone else may have deleted it and it is now recreated. We need
-				 * do nothing in this case but in a surplus of caution, report the error to the syslog.
-				 */
-				int	save_errno;
-				char	buff[128];
-
-				save_errno = errno;
-				SNPRINTF(buff, sizeof(buff), "semctl(IPC_RMID, %d)", udi->ftok_semid);
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(buff), CALLFROM, save_errno);
-			}
-		}
+		/* Only clear ftok_sem_reg if it is the same as the current region. This is a relationship that may not
+		 * be true in situations where process_exiting is TRUE.
+		 */
+		if (ftok_sem_reg == db_init_region)
+			ftok_sem_reg = NULL;
 		if (!IS_GTCM_GNP_SERVER_IMAGE && !retry_dbinit) /* gtcm_gnp_server reuses file_cntl */
 		{
 			free(seg->file_cntl->file_info);
