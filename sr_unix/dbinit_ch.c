@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -142,6 +145,20 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 		/* Below reset needed for "else if" case above but do it for "if" case too (in pro) just in case */
 		udi->counter_ftok_incremented = FALSE;
 		udi->grabbed_ftok_sem = FALSE;
+		if ((udi->ftok_sem_created) && (INVALID_SEMID != udi->ftok_semid))
+		{	/* If we created the ftok semaphore, remove it now if it exists */
+			if (-1 == semctl(udi->ftok_semid, 0, IPC_RMID))
+			{	/* If we get an error, someone else may have deleted it and it is now recreated. We need
+				 * do nothing in this case but in a surplus of caution, report the error to the syslog.
+				 */
+				int	save_errno;
+				char	buff[128];
+
+				save_errno = errno;
+				SNPRINTF(buff, sizeof(buff), "semctl(IPC_RMID, %d)", udi->ftok_semid);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(buff), CALLFROM, save_errno);
+			}
+		}
 		if (!IS_GTCM_GNP_SERVER_IMAGE && !retry_dbinit) /* gtcm_gnp_server reuses file_cntl */
 		{
 			free(seg->file_cntl->file_info);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -131,12 +131,22 @@ boolean_t ftok_sem_get_common(gd_region *reg, boolean_t incr_cnt, int project_id
 		/* If we found there is no sem, create and initialize one. */
 		if (sem_known_removed)
 		{
-			if (INVALID_SEMID == (ftokid = udi->ftok_semid = semget(udi->key, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT)))
+			/* Note assignment in next line */
+			ftokid = udi->ftok_semid = semget(udi->key, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT | IPC_EXCL);
+			if (INVALID_SEMID == ftokid)
 			{
+				if (EEXIST == errno)
+				{	/* If it now exists (was created by another process since our previous semget() call)
+					 * then cycle back around so we pick it up without trying to recreate it.
+					 */
+					sem_known_removed = FALSE;
+					continue;
+				}
 				save_errno = errno;
 				RETURN_SEMWAIT_FAILURE(retstat, save_errno, op_semget, 0, ERR_CRITSEMFAIL, 0);
 			}
 			sem_known_removed = FALSE;
+			udi->ftok_sem_created = TRUE;
 			SET_GTM_ID_SEM(ftokid, status); /* Set 3rd semaphore's value to GTM_ID = 43 */
 			if (-1 == status)
 			{

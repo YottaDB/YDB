@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -114,6 +117,7 @@ typedef struct unix_db_info_struct
 	unsigned int	sem_deleted : 1;
 	unsigned int	grabbed_ftok_sem : 1;
 	unsigned int	grabbed_access_sem : 1;
+	unsigned int	ftok_sem_created : 1;		/* This process created the ftok semaphore */
 	unsigned int	counter_acc_incremented : 1;
 	unsigned int	counter_ftok_incremented : 1;
 	unsigned int	fd_opened_with_o_direct : 1;	/* If dbfilop(FC_OPEN) happened with O_DIRECT */
