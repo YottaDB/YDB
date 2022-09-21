@@ -53,9 +53,9 @@ setenv LC_ALL C
 # Instrument build for fuzzing
 make instrument
 
-# -----------------------------------------------------------
-# Ready test corpus
-make corpus
+# Now that the build is ready, set "ydb_dist" env var
+setenv ydb_dist $PWD/build-instrumented
+echo "setenv ydb_dist $ydb_dist" >> settings.csh
 
 # -----------------------------------------------------------
 # Ready random set of env vars before fuzz testing
@@ -70,7 +70,7 @@ if ($rand) then
 CAT_EOF
 
 	rm -f yottadb.gld yottadb.dat
-	setenv ydb_gbldir `pwd`/yottadb.gld	# Need this before the GDE command
+	setenv ydb_gbldir ${PWD}/yottadb.gld	# Need this before the GDE command
 	$ydb_dist/yottadb -run GDE @tmp.com
 	$ydb_dist/mupip create
 	echo "setenv ydb_gbldir $ydb_gbldir" >> settings.csh
@@ -169,8 +169,12 @@ endif
 cp settings.csh ~/fuzzing/settings.csh_$timestamp
 
 # -----------------------------------------------------------
-# Now that all pertinent env vars are randomly set, source them more before starting fuzz testing
+# Now that all pertinent env vars are randomly set, source them before starting fuzz testing (just for completeness sake)
 source settings.csh
+
+# -----------------------------------------------------------
+# Ready test corpus
+make corpus
 
 # -----------------------------------------------------------
 # Start fuzzing
