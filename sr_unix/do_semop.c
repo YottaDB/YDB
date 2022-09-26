@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2012 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> e9a1c121 (GT.M V6.3-014)
+ *								*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,20 +44,12 @@ int do_semop(int sems, int num, int op, int flg)
 	{
 		rv = try_semop_get_c_stack(sems, sop, 1);	/* try with patience and possible stack trace of blocker */
 		return rv;
-<<<<<<< HEAD
-	} else
-	{
-		while (-1 == (rv = semop(sems, sop, 1)) && EINTR == errno)
-			eintr_handling_check();
-		/* Note: Both "eintr_handling_check()" and "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" ensure "errno"
-		 * is untouched so it is safe to use "errno" after the call to examine the pre-call value.
-		 */
-		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-		return (-1 == rv) ? errno : 0;
-=======
->>>>>>> e9a1c121 (GT.M V6.3-014)
 	}
-	while (-1 == (rv = semop(sems, sop, 1)) && ((EINTR == errno)))
-		;
+	while (-1 == (rv = semop(sems, sop, 1)) && EINTR == errno)
+		eintr_handling_check();
+	/* Note: Both "eintr_handling_check()" and "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" ensure "errno"
+	 * is untouched so it is safe to use "errno" after the call to examine the pre-call value.
+	 */
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	return (-1 == rv) ? errno : 0;				/* return errno if not success */
 }

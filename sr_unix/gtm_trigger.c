@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -369,15 +369,9 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	}
 	/* Write trigger execute string out to temporary file and compile it */
 	assert(MAX_XECUTE_LEN >= trigdsc->xecute_str.str.len);
-<<<<<<< HEAD
-	rc = SNPRINTF(rtnname_template, YDB_PATH_MAX, "%s/trgtmpXXXXXX", DEFAULT_GTM_TMP);
-	assert(0 < rc);					/* Note rc is return code aka length - we expect a non-zero length */
-	assert(YDB_PATH_MAX >= rc);
-=======
-	assert(GTM_PATH_MAX >= (TREF(gtm_tmpdir)).len + SIZEOF("/trgtmpXXXXXX" + 1));
+	assert(GTM_PATH_MAX >= ((TREF(gtm_tmpdir)).len + SIZEOF("/trgtmpXXXXXX") + 1));
 	rc = SNPRINTF(rtnname_template, GTM_PATH_MAX, "%.*s/trgtmpXXXXXX", (TREF(gtm_tmpdir)).len, (TREF(gtm_tmpdir)).addr);
 	assert(0 < rc);					/* Note rc is return code aka length - we expect a non-zero length */
->>>>>>> e9a1c121 (GT.M V6.3-014)
 	/* The mkstemp() routine is known to bogus-fail for no apparent reason at all especially on AIX 6.1. In the event
 	 * this shortcoming plagues other platforms as well, we add a low-cost retry wrapper.
 	 */

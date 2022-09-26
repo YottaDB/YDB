@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -110,7 +110,6 @@ typedef struct
 	unsigned short fid[3];
 } gds_file_id;		/* VMS artifact baked into things that would need care to change */
 
-<<<<<<< HEAD
 /* Note the below is not the same size on all platforms but must be less than or equal to gds_file_id */
 typedef struct gd_id_struct
 {
@@ -118,12 +117,6 @@ typedef struct gd_id_struct
 	dev_t	device;
 } unix_file_id;
 
-=======
-typedef struct gd_id_struct  /* note this is not the same size on all platforms but must be less than or equal to gds_file_id */
-{	ino_t	inode;
-		dev_t	device;
-} unix_file_id;
->>>>>>> e9a1c121 (GT.M V6.3-014)
 typedef unix_file_id	gd_id;
 
 /* 2 replaces st_gen, an unused OSF1 artifact anticipating file gens; GTM64_ONLY 2 replaces previously implicit filler */
@@ -177,10 +170,7 @@ typedef struct
 		: ((A)->device != (B)->device) 				\
 			? ((A)->device > (B)->device ? 1 : -1)		\
 			: 0)
-<<<<<<< HEAD
 
-=======
->>>>>>> e9a1c121 (GT.M V6.3-014)
 #define is_gdid_gdid_identical(A, B) (0 == gdid_cmp(A, B) ? TRUE: FALSE)
 
 #define	VALFIRSTCHAR(X)			(ISALPHA_ASCII(X) || ('%' == X))

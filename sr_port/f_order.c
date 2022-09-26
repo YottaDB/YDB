@@ -126,12 +126,7 @@ int f_order(oprtype *a, opctype op)
 			return FALSE;
 		}
 		assert(TRIP_REF == dir_oprptr->oprclass);
-<<<<<<< HEAD
-		sav_dirref = newtriple(OC_GVSAVTARG);	/* with a literal direction, $R reflects 1st argument */
-=======
-		triptr = dir_oprptr->oprval.tref;
 		sav_dirref = newtriple(OC_GVSAVTARG); /* for explicit direction, $R at this point set by lit: 1st or var: 2nd arg */
->>>>>>> e9a1c121 (GT.M V6.3-014)
 		triptr = newtriple(OC_GVRECTARG);
 		triptr->operand[0] = put_tref(sav_ref);
 		if (OC_LIT == triptr->opcode)

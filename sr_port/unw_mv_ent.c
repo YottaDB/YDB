@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -152,9 +152,6 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				(TREF(dollar_etrap)).str.len = 0;
 				if ((TREF(save_xfer_root)))
 				{
-<<<<<<< HEAD
-				/* If TP timeout or ztimeout, check conditions before popping out */
-=======
 					/* A tp timeout or ztimeout was deferred. Now that
 					 * $ETRAP is no longer in effect and we are not in a
 					 * job interrupt, the timeout can no longer be deferred
@@ -163,7 +160,6 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				 	 * Below part of code should be kept in sync
 					 * with unw_retarg()
 					 */
->>>>>>> e9a1c121 (GT.M V6.3-014)
 					if (((TREF(save_xfer_root))->set_fn == tptimeout_set)
 						|| ((TREF(save_xfer_root))->set_fn == ztimeout_set))
 					{

@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2009, 2014 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> e9a1c121 (GT.M V6.3-014)
+ *								*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -178,7 +174,6 @@ boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 	 */
 	assert(!in_os_signal_handler || (WBTEST_SLEEP_IN_WCS_WTSTART == ydb_white_box_test_case_number));
 	assert(NULL != lcl_ss_ctx);
-<<<<<<< HEAD
 	/* Note: CLOSEFILE_RESET can invoke "eintr_handling_check()" after the "close()" call succeeds. And that
 	 * can in turn recurse into "ss_destroy_context()" which would call CLOSEFILE_RESET again on the same fd
 	 * and fail because the fd has already been closed. An example call stack of the recursion is
@@ -196,6 +191,14 @@ boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 	ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE, prev_intrpt_state);
 	if (FD_INVALID != save_shdw_fd)
 		CLOSEFILE_RESET(save_shdw_fd, status);
+#	ifdef DEBUG
+	if (ydb_white_box_test_case_enabled && (WBTEST_FAKE_SS_SHMDT_WINDOW == ydb_white_box_test_case_number))
+	{
+		FPRINTF(stdout, "About to delete shm at %x\n", lcl_ss_ctx->start_shmaddr);
+		if (INVALID_SHMID == lcl_ss_ctx->attach_shmid)
+			lcl_ss_ctx->attach_shmid = 0 ;	/* ensure / fake that it's not invalid */
+	}
+#	endif
 	/* Just like we needed to save the "shdw_fd" in a local variable above, we also need to save "attach_shmid" in a local
 	 * variable below and clear the shared/global copy before attempting the SHMDT. Otherwise, it is possible a timer
 	 * interrupt happens just before the SHMDT and as part of that "jnl_file_close_timer" gets invoked and does the actual
@@ -220,22 +223,7 @@ boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_SYSCALL, 5, LEN_AND_LIT("shmdt()"), CALLFROM,
 				      ERR_TEXT, 2, STRLEN(buf), buf, status);
 		}
-=======
-	if (FD_INVALID != lcl_ss_ctx->shdw_fd)
-	{
-		CLOSEFILE_RESET(lcl_ss_ctx->shdw_fd, status);
 	}
-#	ifdef DEBUG
-	if (gtm_white_box_test_case_enabled && (WBTEST_FAKE_SS_SHMDT_WINDOW == gtm_white_box_test_case_number))
-	{
-		FPRINTF(stdout, "About to delete shm at %x\n", lcl_ss_ctx->start_shmaddr);
-		if (INVALID_SHMID == lcl_ss_ctx->attach_shmid)
-			lcl_ss_ctx->attach_shmid = 0 ;	/* ensure / fake that it's not invalid */
->>>>>>> e9a1c121 (GT.M V6.3-014)
-	}
-#	endif
-	if (INVALID_SHMID != lcl_ss_ctx->attach_shmid)
-		SHMDT((void *)(lcl_ss_ctx->start_shmaddr));	/* no check for errors that 'cause gone is the goal */
 	/* Invalidate the context */
 	DEFAULT_INIT_SS_CTX(lcl_ss_ctx);
 	return TRUE;

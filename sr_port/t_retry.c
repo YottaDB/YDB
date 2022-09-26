@@ -423,13 +423,9 @@ void t_retry(enum cdb_sc failure)
 				{	/* Final retry on an update transaction and region is frozen.
 					 * Wait for it to be unfrozen and only then grab crit.
 					 */
-<<<<<<< HEAD
 					DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE;)
-					GRAB_UNFROZEN_CRIT(gv_cur_region, csa);
-					DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE;)
-=======
 					GRAB_UNFROZEN_CRIT(gv_cur_region, csa, WS_50);
->>>>>>> e9a1c121 (GT.M V6.3-014)
+					DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE;)
 				}
 			} else
 			{

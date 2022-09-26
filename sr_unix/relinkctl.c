@@ -28,6 +28,9 @@
 
 #include "add_inter.h"
 #include "interlock.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
 #include "gtmio.h"
 #include "relinkctl.h"
 #include "mmrhash.h"
@@ -682,7 +685,7 @@ void relinkctl_incr_nattached(boolean_t rtnobj_refcnt_incr_cnt)
 				/* Before incrementing refcnt, get a lock on the corresponding relinkctl file
 				 * (see "rtnobj_shm_malloc").
 				 */
-				if (!grab_latch(&relinkrec->rtnobj_latch, RLNKREC_LATCH_TIMEOUT_SEC))
+				if (!grab_latch(&relinkrec->rtnobj_latch, RLNKREC_LATCH_TIMEOUT_SEC, NOT_APPLICABLE, NULL))
 				{
 					linkctl = zhent->relinkctl_bkptr;
 					assert(FALSE);

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -50,7 +53,7 @@ void mlk_wake_pending(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 	if (!d->pending)
 		return;
 #	ifdef DEBUG
-	if (gtm_white_box_test_case_enabled && (WBTEST_LCKWAKEOVRFLO == gtm_white_box_test_case_number))
+	if (ydb_white_box_test_case_enabled && (WBTEST_LCKWAKEOVRFLO == ydb_white_box_test_case_number))
 		pctl->ctl->wakeups = (0xFFFFFFFFF > pctl->ctl->wakeups) ? 0xFFFFFFFFF :  0xFFFFFFFFFFFFFFFFLL;
 #	endif
 	pctl->ctl->wakeups++;

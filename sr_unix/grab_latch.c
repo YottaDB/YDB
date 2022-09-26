@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,10 +20,10 @@
 #endif
 
 #include "gtm_facility.h"
-#include "gdsroot.h"
-#include "fileinfo.h"
-#include "gdsbt.h"
 #include "interlock.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
 #include "performcaslatchcheck.h"
 #include "gtm_rel_quant.h"
 #include "sleep_cnt.h"

@@ -172,7 +172,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	hdrsize = (int4)ROUND_UP(SIZEOF_FILE_HDR(header_cpy), DISK_BLOCK_SIZE);
 #	ifdef DEBUG /* This code is shared by two WB tests */
 	if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) ||
-		(WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == gtm_white_box_test_case_count)))
+		(WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == ydb_white_box_test_case_count)))
 		if (!MEMCMP_LIT(gv_cur_region->rname, "DEFAULT") && !cs_addrs->nl->wbox_test_seq_num)
 		{
 			cs_addrs->nl->wbox_test_seq_num = 1;

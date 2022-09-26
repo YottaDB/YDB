@@ -287,7 +287,7 @@ enum cdb_sc	op_tcommit(void)
 				si->cr_array_index = 0;
 #				ifdef DEBUG /* This code is shared by two WB tests */
 				if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) ||
-					(WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == gtm_white_box_test_case_count)))
+					(WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == ydb_white_box_test_case_count)))
 					if (!MEMCMP_LIT(gv_cur_region->rname, "DEFAULT") && !csa->nl->wbox_test_seq_num)
 					{
 						while (0 == csa->nl->wbox_test_seq_num)

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,10 +58,10 @@ error_def(ERR_TEXT);
  */
 void mupip_ftok(void)
 {
-	boolean_t	fd, jnlpool, only, recvpool, showheader;
+	boolean_t	fd, jnlpool, ispool, only, recvpool, showheader;
 	char		fn[MAX_FN_LEN + 1], instfilename[MAX_FN_LEN + 1], replf[MAX_FN_LEN + 1];
 	gd_id		fid;
-	int		index, ispool, semid, shmid;
+	int		index, semid, shmid;
 	int4            id, status;
 	key_t           semkey;
 	mstr		file;
@@ -71,14 +71,8 @@ void mupip_ftok(void)
 	sm_uc_ptr_t	fid_ptr, fid_top;
 	unsigned int	full_len;
 	unsigned short	fn_len; /* cli library expects unsigned short */
-<<<<<<< HEAD
-	char		fn[MAX_FN_LEN + 1];
-	repl_inst_hdr	repl_instance;
-	gd_id		fid;
-	sm_uc_ptr_t	fid_ptr, fid_top;
-=======
+	boolean_t	use_instfilename;
 	DCL_THREADGBL_ACCESS;
->>>>>>> e9a1c121 (GT.M V6.3-014)
 
 	SETUP_THREADGBL_ACCESS;
 	if (FALSE == cli_get_int("ID", &id))
@@ -86,62 +80,48 @@ void mupip_ftok(void)
 	only = (CLI_PRESENT == cli_present("ONLY"));
 	jnlpool = (CLI_PRESENT == cli_present("JNLPOOL"));
 	recvpool = (CLI_PRESENT == cli_present("RECVPOOL"));
-<<<<<<< HEAD
-	if (jnlpool || recvpool)
-	{
-		in_mupip_ftok = TRUE;
-		repl_inst_read(fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
-		in_mupip_ftok = FALSE;
-		if (jnlpool)
-		{
-			semid = repl_instance.jnlpool_semid;
-			shmid = repl_instance.jnlpool_shmid;
-=======
-	ispool = jnlpool + recvpool;
-	if (ispool)						/* forget any parameters and use parms_cnt as loop control*/
-		TREF(parms_cnt) = ispool + 1;
+	ispool = (jnlpool || recvpool);
+	if (ispool && (0 == TREF(parms_cnt)))
+	{	/* If no parameters are specified, use the instance file pointed to by the current .gld file as the parameter */
+		use_instfilename = TRUE;
+		TREF(parms_cnt) = 1;
+		if (!repl_inst_get_name(instfilename, &full_len, SIZEOF(instfilename), issue_rts_error, NULL))
+			assertpro(NULL == instfilename);	/* otherwise, repl_inst_get_name issues rts_error */
+	} else {
+		use_instfilename = FALSE;
+	}
 	showheader = (!cli_negated("HEADER"));
-	index = (only && ispool);				/* if only, skip the instance file  */
-	for (; index < TREF(parms_cnt); index++)
-	{	/*  in order to handle multiple files, this loop directly uses the array built by cli */
+	for (index = 0; index < TREF(parms_cnt); index++)
+	{	/* In order to handle multiple files, this loop directly uses the array built by cli. */
 		if (ispool)
-		{	/* ispool idicates we're precessing based on the replication instance file */
-			if (only == index)
-			{	/* first pass - process the instance file */
-				if (!repl_inst_get_name(instfilename, &full_len, SIZEOF(instfilename), issue_rts_error, NULL))
-					assertpro(NULL == instfilename);	/* otherwise, repl_inst_get_name issues rts_error */
-				in_mupip_ftok = TRUE;	/* this flag implicitly relies on mupip ftok being once and done */
-				repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
-				in_mupip_ftok = FALSE;	/* no condition hander to reset this in case of error - see comment above */
-				memset(&pblk, 0, SIZEOF(pblk));
-				pblk.buff_size = MAX_FN_LEN;
-				pblk.buffer = replf;
-				pblk.fop = F_SYNTAXO;
-				file.addr = instfilename;
-				file.len = full_len;
-				status = parse_file(&file, &pblk);	/* this gets us to just the name and extension */
-				fn_len = pblk.b_name + pblk.b_ext;
-				memcpy(fn, pblk.l_name, fn_len);
-				fn[fn_len] = 0;
-				semkey = FTOK(fn, REPLPOOL_ID);
-				semid = shmid = -1;			/* not relevant for the file */
+		{	/* This is an instance file */
+			char	*fn_ptr;
+			if (!use_instfilename) {
+				strncpy(fn, TAREF1(parm_ary, index), MAX_FN_LEN);
+				fn_ptr = fn;
+				full_len = strlen(fn);
+			} else {
+				fn_ptr = instfilename;
+				/* full_len was already initialized as part of "repl_inst_get_name()" call above */
 			}
-			if (jnlpool && (1 == index))
-			{	/* goes first if also -recvpool */
-				semid = repl_instance.jnlpool_semid;
-				shmid = repl_instance.jnlpool_shmid;
-				fn_len = SIZEOF("jnlpool");
-				strncpy(fn, "jnlpool", fn_len);
-			} else if (recvpool && ((jnlpool ? 2 : 1) == index))
-			{	/* last or sole */
-				semid = repl_instance.recvpool_semid;
-				shmid = repl_instance.recvpool_shmid;
-				fn_len = SIZEOF("recvpool");
-				strncpy(fn, "recvpool", fn_len);
-			}
->>>>>>> e9a1c121 (GT.M V6.3-014)
+			/* Process the instance file */
+			in_mupip_ftok = TRUE;	/* this flag implicitly relies on mupip ftok being once and done */
+			repl_inst_read(fn_ptr, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
+			in_mupip_ftok = FALSE;	/* no condition hander to reset this in case of error - see comment above */
+			memset(&pblk, 0, SIZEOF(pblk));
+			pblk.buff_size = MAX_FN_LEN;
+			pblk.buffer = replf;
+			pblk.fop = F_SYNTAXO;
+			file.addr = fn_ptr;
+			file.len = full_len;
+			status = parse_file(&file, &pblk);	/* this gets us to just the name and extension */
+			fn_len = pblk.b_name + pblk.b_ext;
+			memcpy(fn, pblk.l_name, fn_len);
+			fn[fn_len] = 0;
+			semkey = FTOK(fn, REPLPOOL_ID);
+			semid = shmid = -1;			/* not relevant for the instance file file */
 		} else
-		{	/* not instance file based */
+		{	/* Not instance file based. This is a database file. */
 			strncpy(fn, TAREF1(parm_ary, index), MAX_FN_LEN);
 			semkey = FTOK(fn, id);
 			assert(semkey);
@@ -170,17 +150,42 @@ void mupip_ftok(void)
 				FPRINTF(stderr, "--------------------------------------------------------------\n");
 				showheader = FALSE;
 			}
-			if (!ispool || !index)
-			{	/* it's a file */
-				FPRINTF(stderr, "%20s :: %10d [0x%.8x] :: %10d [0x%.8x] :: %10d [0x%.8x] :: 0x", fn, semid, semid,
-					shmid, shmid, semkey, semkey);
-				fid_ptr = (sm_uc_ptr_t)&fid;
-				filename_to_id((gd_id_ptr_t)fid_ptr, fn);
-				for (fid_top = fid_ptr + SIZEOF(fid) ; fid_ptr < fid_top; fid_ptr++)
-					FPRINTF(stderr, "%.2x", *(sm_uc_ptr_t)fid_ptr);
-			} else
-				FPRINTF(stderr, "%20s :: %10d [0x%.8x] :: %10d [0x%.8x]", fn, semid, semid, shmid, shmid);
+			FPRINTF(stderr, "%20s :: %10d [0x%.8x] :: %10d [0x%.8x] :: %10d [0x%.8x] :: 0x", fn, semid, semid,
+				shmid, shmid, semkey, semkey);
+			fid_ptr = (sm_uc_ptr_t)&fid;
+			filename_to_id((gd_id_ptr_t)fid_ptr, fn);
+			for (fid_top = fid_ptr + SIZEOF(fid) ; fid_ptr < fid_top; fid_ptr++)
+				FPRINTF(stderr, "%.2x", *(sm_uc_ptr_t)fid_ptr);
 			FPRINTF(stderr, "\n");
+			if (ispool)
+			{
+				int	i;
+
+				for (i = 0; i < 2; i++)
+				{
+					boolean_t	display;
+
+					display = FALSE;
+					if (jnlpool && (0 == i))
+					{	/* goes first if also -recvpool */
+						semid = repl_instance.jnlpool_semid;
+						shmid = repl_instance.jnlpool_shmid;
+						fn_len = SIZEOF("jnlpool");
+						strncpy(fn, "jnlpool", fn_len);
+						display = TRUE;
+					} else if (recvpool && (0 != i))
+					{	/* last or sole */
+						semid = repl_instance.recvpool_semid;
+						shmid = repl_instance.recvpool_shmid;
+						fn_len = SIZEOF("recvpool");
+						strncpy(fn, "recvpool", fn_len);
+						display = TRUE;
+					}
+					if (display)
+						FPRINTF(stderr, "%20s :: %10d [0x%.8x] :: %10d [0x%.8x]\n",
+										fn, semid, semid, shmid, shmid);
+				}
+			}
 		} else		/* simple legacy format */
 			FPRINTF(stderr, "%20s  ::  %10d  [ 0x%8x ]\n", fn, semkey, semkey);
 	}

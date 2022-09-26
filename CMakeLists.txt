@@ -33,15 +33,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-<<<<<<< HEAD
 set(version r135)
-=======
-set(version ${V6.3-014})
-if("${version}" STREQUAL "")
-        set(version V9.9-0)
-endif()
-
->>>>>>> e9a1c121 (GT.M V6.3-014)
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)

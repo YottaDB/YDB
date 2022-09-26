@@ -3,6 +3,9 @@
  * Copyright (c) 2014-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -17,6 +20,9 @@
 #endif
 
 #include "interlock.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
 
 GBLREF	volatile int4	fast_lock_count;		/* Stop interrupts while we have our parts exposed */
 GBLREF	uint4		process_id;

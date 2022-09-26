@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,14 +77,11 @@ error_def(ERR_GCAFTER);
  */
 gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 {
-<<<<<<< HEAD
 	mlk_pvtctl_ptr_t	pctl;
-=======
 	boolean_t		blocked, was_crit, added;
 	connection_struct	*curr_entry;	/* for GT.CM GNP server */
 	gtm_uint64_t		retval;
-	int			siz, status;
->>>>>>> e9a1c121 (GT.M V6.3-014)
+	int			siz;
 	mlk_ctldata_ptr_t	ctl;
 	mlk_shrblk_ptr_t	d;
 	sgmnt_addrs		*csa;

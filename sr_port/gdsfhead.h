@@ -1856,6 +1856,13 @@ MBSTART {														\
 	}														\
 } MBEND
 
+/* Note: A couple of fields had to be relocated in the file header ("sgmnt_data" structure) as part of merging
+ * GT.M V6.3-014 since they used up a filler section where YottaDB had previously defined these fields.
+ * The below macros note down the offset of these fields before the relocation. This is used in "db_auto_upgrade.c".
+ */
+#define	SGMNT_DATA_OFFSET_R134_reorg_sleep_nsec	7168	/* offset of "reorg_sleep_nsec" prior to YottaDB r1.36 */
+#define	SGMNT_DATA_OFFSET_R134_max_procs	7176	/* offset of "max_procs" prior to YottaDB r1.36 */
+
 /* This is the structure describing a segment. It is used as a database file header (for MM or BG access methods).
  * The overloaded fields for MM and BG are n_bts, bt_buckets. */
 
@@ -2131,7 +2138,20 @@ typedef struct sgmnt_data_struct
 	int4		filler_5k;
 	/************* SECSHR_DB_CLNUP RELATED FIELDS (now moved to node_local) ***********/
 	int4		secshr_ops_index_filler;
-	int4		secshr_ops_array_filler[255];	/* taking up 1k */
+	int4		secshr_ops_array_filler[249];
+	/************** YottaDB specific fields *********************
+	 * We keep these fields at the end of what used to be a filler section (SECSHR_DB_CLNUP fields).
+	 * The hope is that even if GT.M starts using this filler section, they will use the first half so
+	 * YottaDB new fields will be added from the end of this section.
+	 */
+	max_procs_t	max_procs;		/* count of the largest number of processes accessing the database
+						 * along with a timestamp. Needs 8-byte alignment.
+						 * This used to be at offset "SGMNT_DATA_OFFSET_R134_max_procs" in YottaDB r1.34.
+						 */
+	uint4		reorg_sleep_nsec;	/* Time a MUPIP REORG sleeps before starting to process a GDS block.
+						 * This used to be at offset "SGMNT_DATA_OFFSET_R134_reorg_sleep_nsec" in r1.34.
+						 */
+	char		filler_6k[4];		/* Ensure 8 byte alignment for max_procs */
 	/********************************************************/
 	compswap_time_field next_upgrd_warn;	/* Time when we can send the next upgrade warning to the operator log */
 	uint4		is_encrypted;		/* Encryption state of the database as a superimposition of IS_ENCRYPTED and
@@ -2157,16 +2177,6 @@ typedef struct sgmnt_data_struct
 	uint4		basedb_fname_len;		/* byte length of filename stored in "basedb_fname[]" */
 	unsigned char	basedb_fname[256];	/* full path filaneme of corresponding baseDB if this is a statsDB */
 	boolean_t	read_only;		/* If TRUE, GT.M uses a process-private mmap instead of IPC */
-<<<<<<< HEAD
-	char		filler_7k[440];
-	/************** YottaDB specific fields *********************/
-	uint4		reorg_sleep_nsec;	/* Time a MUPIP REORG sleeps before starting to process a GDS block */
-	char		filler_7k_4byte1[4];	/* Ensure 8 byte alignment for max_procs */
-	max_procs_t	max_procs;		/* count of the largest number of processes accessing the database
-						 * along with a timestamp.
-						 */
-	char		filler_8k[1000];
-=======
 	/************* GVSTATS_REC RELATED FIELDS ***********/
 	/* gvstats_rec has outgrown its previous space.  There is enough space here at the end of the record
 	 * for all the new GTM-8863 stats if we don't save the 'A' versions (which arguably doesn't make
@@ -2177,7 +2187,6 @@ typedef struct sgmnt_data_struct
 	 */
 	gvstats_rec_csd_t	gvstats_rec;	/* As of GTM-8863 1304 bytes == 163 counters */
 	char			filler_8k[1464 - SIZEOF(gvstats_rec_csd_t)];
->>>>>>> e9a1c121 (GT.M V6.3-014)
 	/********************************************************/
 	/* Master bitmap immediately follows. Tells whether the local bitmaps have any free blocks or not. */
 } sgmnt_data;
@@ -5233,6 +5242,7 @@ void		db_common_init(gd_region *reg, sgmnt_addrs *csa, sgmnt_data_ptr_t csd);
 void		grab_crit(gd_region *reg, wait_state state);
 boolean_t	grab_crit_encr_cycle_sync(gd_region *reg, wait_state state);
 boolean_t	grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover, wait_state state);
+boolean_t	grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs, wait_state state, sgmnt_addrs *csa);
 boolean_t	grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_action);
 void		gv_init_reg(gd_region *reg);
 enum cdb_sc	gvincr_compute_post_incr(srch_blk_status *bh);
@@ -5246,6 +5256,7 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 					uint4 online, boolean_t flush_sync, freeze_reg_mp_state *pfrms);
 freeze_status	region_freeze_post(gd_region *region);
 void		rel_crit(gd_region *reg);
+void		rel_latch(sm_global_latch_ptr_t latch);
 void		rel_lock(gd_region *reg);
 boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs_recover);
 void		wcs_stale(TID tid, int4 hd_len, gd_region **region);

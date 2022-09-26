@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -248,7 +248,6 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 			if (lvl)
 			{
 				CHECK_ADJACENCY(nBlkId, lvl -1, mu_int_adj[lvl - 1]);
-<<<<<<< HEAD
 				if (BSTAR_REC_SIZE == (((rec_hdr *)pRec)->rsiz))
 				{	/* Found a star record. In this case we cannot invoke the GET_KEY_CPY_BUFF macro
 					 * as that expects a valid key (which a star record does not contain). Treat the
@@ -260,13 +259,6 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 			}
 			GET_KEY_CPY_BUFF(pRec, nRecLen, buff, status);
 			RETURN_IF_ABNORMAL_STATUS(status);
-=======
-			rec_cmpc = EVAL_CMPC((rec_hdr_ptr_t)pRec);
-			key_base = pRec + SIZEOF(rec_hdr);
-			GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key, name_len, key_size, buff, buff_length, rec_len);
-			if (0 == key_size)
-				continue;	/* indication of trouble parsing the block - don't use it */
->>>>>>> e9a1c121 (GT.M V6.3-014)
 			if (mu_subsc) /* Subscript option chosen */
 			{
 				CHECK_KEY_RANGE(mu_start_key, mu_end_key, buff, rCnt, musz_range_done);
@@ -302,15 +294,8 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 					continue;	/* skip these guys, we've already counted over there */
 			} else
 			{
-<<<<<<< HEAD
 				GET_KEY_CPY_BUFF(pRec, nRecLen, buff, status);
 				RETURN_IF_ABNORMAL_STATUS(status);
-=======
-				GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key, name_len, key_size, buff, buff_length,
-					rec_len);
-				if (0 == key_size)
-					continue;	/* indication of trouble parsing the block - don't use it */
->>>>>>> e9a1c121 (GT.M V6.3-014)
 				if (mu_subsc) /* Subscript option chosen */
 					CHECK_KEY_RANGE(mu_start_key, mu_end_key, buff, rCnt, musz_range_done);
 				if (skiprecs && (curroff < saveoff[lvl]))

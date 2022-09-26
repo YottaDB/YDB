@@ -6775,13 +6775,10 @@
    Specifies the instance name that uniquely identifies the instance and is
    immutable. The instance name can be from 1 to 16 characters. YottaDB takes
    the instance name (not the same as instance file name) from the
-<<<<<<< HEAD
-   environment variable ydb_repl_instname. If ydb_repl_instname is not set
-   and -name is not specified, YottaDB produces an error.
-=======
+   environment variable ydb_repl_instname. If either ydb_repl_instname is not set
+   or -name is not specified, YottaDB produces an error.
    environment variable gtm_repl_instname. If either gtm_repl_instname is not
    set or -name is not specified, GT.M produces an error.
->>>>>>> e9a1c121 (GT.M V6.3-014)
 
    -noreplace
 
@@ -7144,26 +7141,14 @@
 
    Specifies the size of the Journal Pool. The server rounds the size up or
    down to suit to align with other specified or implicit requirements. Any
-<<<<<<< HEAD
    size less than 1 MiB is rounded up to 1 MiB. If you do not specify a
    qualifier, the size defaults to the YottaDB default value of 64 MiB. Remember
    that you cannot exceed the system-provided maximum shared memory. For
    systems with high update rates, specify a larger buffer size to avoid the
    overflows and file I/O that occur when the Source Server reads journal
-   records from journal files. The maximum value is 4294967288(4GiB-8). MUPIP
-   REPLICATE -SOURCE ignores -BUFFSIZE if the Journal Pool is already set up.
-   The first Source Server process started on an instance sets up the Journal
-   Pool.
-=======
-   size less than 1 MiB is rounded up to 1 MiB. If -BUFFSIZE is not
-   specified, MUPIP sets the Journal Pool size to 64 MiB. Remember that you
-   cannot exceed the system-provided maximum shared memory. For systems with
-   high update rates, specify a larger buffer size to avoid the overflows and
-   file I/O that occur when the Source Server reads journal records from
-   journal files. The maximum value is 68719476736 (64GiB). MUPIP REPLICATE
-   -SOURCE ignores -BUFFSIZE if the Journal Pool is already set up. The first
-   Source Server process started on an instance sets up the Journal Pool.
->>>>>>> e9a1c121 (GT.M V6.3-014)
+   records from journal files. The maximum value is 68719476736 (64GiB).
+   MUPIP REPLICATE -SOURCE ignores -BUFFSIZE if the Journal Pool is already set up.
+   The first Source Server process started on an instance sets up the Journal Pool.
 
    -[no]jnlfileonly
 

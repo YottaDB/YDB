@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -34,6 +34,8 @@
 #include "ipcrmid.h"
 #include "interlock.h"
 #include "gdsroot.h"	/* for CDB_STAGNATE */
+#include "gdsbt.h"
+#include "gdsfhead.h"
 #include "incr_link.h"	/* for NATIVE_HDR_LEN */
 #include "hugetlbfs_overrides.h"	/* for the ADJUST_SHM_SIZE_FOR_HUGEPAGES macro */
 #include "gtm_permissions.h"

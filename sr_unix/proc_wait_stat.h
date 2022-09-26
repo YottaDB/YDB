@@ -3,6 +3,9 @@
  * Copyright (c) 2019-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -483,8 +486,9 @@ MBSTART {                                                                       
 			(CSADDRS)->nl->gvstats_rec.f_util_wait = (CSADDRS)->gvstats_rec_p->f_util_wait;		\
 		}                                                                                               \
 		                                                                                                \
-		/* We use gtm_white_box_test_case_count here as a WS value.                                     \
-		The flag file lets us coordinate without timing issues. */                                      \
+		/* We use ydb_white_box_test_case_count here as a WS value.                                     \
+		 * The flag file lets us coordinate without timing issues.					\
+		 */                                      							\
 		WBTEST_ONLY(WBTEST_WSSTATS_PAUSE,                                                               \
 		{                                                                                               \
 			wb_gtm8863_lock_pause(CSADDRS,WAITSTATE,INCVAL);                                        \

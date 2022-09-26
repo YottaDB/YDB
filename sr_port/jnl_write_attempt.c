@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,9 +140,8 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			 * However, a grab_crit() here may result in a deadlock, so just do a grab_crit_immediate() and proceed.
 			 */
 			if (!was_crit)
-<<<<<<< HEAD
 			{
-				grab_crit_immediate(jpc->region, TRUE);
+				grab_crit_immediate(jpc->region, TRUE, NOT_APPLICABLE);
 						/* jnl_write_attempt has an assert about have_crit that this relies on */
 				if (csa->now_crit)
 				{	/* Check jb io_writer again now that we have crit */
@@ -154,10 +153,6 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 				}
 			}
 			/* If no one home, try to clear the semaphore */
-=======
-				grab_crit_immediate(jpc->region, TRUE, NOT_APPLICABLE);
-			/* If no one home, try to clear the latch. */
->>>>>>> e9a1c121 (GT.M V6.3-014)
 			if (((FALSE == is_proc_alive(writer, jb->image_count))
 					DEBUG_ONLY(&& !(WBTEST_ENABLED(WBTEST_JNLPROCSTUCK_FORCE))))
 					&& COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, LOCK_AVAILABLE))

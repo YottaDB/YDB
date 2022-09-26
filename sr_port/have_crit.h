@@ -26,7 +26,6 @@
 #include "gtm_multi_thread.h"
 #include "gtm_multi_proc.h"
 #include "gtmsiginfo.h"
-#include "interlock.h"
 #include "xfer_enum.h"
 #include "deferred_signal_set.h"
 #include "deferred_events.h"

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -220,18 +220,14 @@ uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	}
 #	ifdef DEBUG
 	if ( (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) && dollar_tlevel && !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT")) ||
-	     (WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == gtm_white_box_test_case_count) &&
+	     (WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == ydb_white_box_test_case_count) &&
 	     !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT")) )
 	{
-<<<<<<< HEAD
-		SYSTEM("$ydb_dist/mumps -run $gtm_wbox_mrtn");
-=======
 		/* Not clear to me why the WBTEST_MM_CONCURRENT_FILE_EXTEND doesn't need something similar, but we don't want our
 		 * child to come here.  Unsetting the env shouldn't affect the parent, it reads env just once at process startup*/
 		if(WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE))
 			unsetenv("gtm_white_box_test_case_enable");
 		SYSTEM("$gtm_dist/mumps -run $gtm_wbox_mrtn");
->>>>>>> e9a1c121 (GT.M V6.3-014)
 		assert(1 == cs_addrs->nl->wbox_test_seq_num);	/* should have been set by mubfilcpy */
 		cs_addrs->nl->wbox_test_seq_num = 2;	/* signal mupip backup to stop sleeping in mubfilcpy */
 	}

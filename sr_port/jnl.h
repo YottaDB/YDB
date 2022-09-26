@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1913,22 +1913,12 @@ MBSTART {											\
 	FLUSH_DONE = FALSE;									\
 	if (jbp->dskaddr != jbp->rsrv_freeaddr)							\
 	{											\
-<<<<<<< HEAD
 		local_jnlpool = JNLPOOL_FROM(CSA);	/* uses "jnlpool" */			\
 		if (!IS_REPL_INST_FROZEN_JPL(local_jnlpool))					\
-=======
-		was_crit = CSA->now_crit;							\
-		if (!was_crit)									\
-			grab_crit(REG, WS_3);						\
-		DSKADDR = jbp->dskaddr;								\
-		FREEADDR = jbp->freeaddr;							\
-		RSRV_FREEADDR = jbp->rsrv_freeaddr;						\
-		if (JNL_ENABLED(CSA->hdr) && (DSKADDR != RSRV_FREEADDR))			\
->>>>>>> e9a1c121 (GT.M V6.3-014)
 		{										\
 			was_crit = CSA->now_crit;						\
 			if (!was_crit)								\
-				grab_crit(REG);							\
+				grab_crit(REG, WS_3);						\
 			DSKADDR = jbp->dskaddr;							\
 			FREEADDR = jbp->freeaddr;						\
 			RSRV_FREEADDR = jbp->rsrv_freeaddr;					\

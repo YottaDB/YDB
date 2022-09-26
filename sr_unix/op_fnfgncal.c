@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,13 +37,9 @@
 #include "callintogtmxfer.h"
 #include "min_max.h"
 #include "have_crit.h"
-<<<<<<< HEAD
-#include "gtm_malloc.h"		/* for verifyAllocatedStorage */
-#include "ydb_getenv.h"
-=======
 #include "gtmdbglvl.h"		/* for gtm_malloc.h */
 #include "gtm_malloc.h"		/* for VERIFY_STORAGE_CHAINS */
->>>>>>> e9a1c121 (GT.M V6.3-014)
+#include "ydb_getenv.h"
 #include "send_msg.h"
 
 /******************************************************************************
@@ -875,13 +871,9 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);	/* Expected for DEFERRED_SIGNAL_HANDLING_CHECK below */
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
-<<<<<<< HEAD
 	TREF(in_ext_call) = save_in_ext_call;
 	if (!save_in_ext_call)
 		check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
-=======
-	TREF(in_ext_call) = FALSE;
->>>>>>> e9a1c121 (GT.M V6.3-014)
 	verify_buffer((char *)param_list, n, entry_ptr->entry_name.addr);
 	check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
 	mumps_status = save_mumps_status;
@@ -1279,20 +1271,12 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
-<<<<<<< HEAD
 	TREF(in_ext_call) = save_in_ext_call;
 	is_tpretry = (ERR_TPRETRY == mumps_status);	/* note down whether the callg invocation had a TPRETRY error code */
 	mumps_status = save_mumps_status;
-	check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
 	verify_buffer((char *)param_list, (2*n), entry_ptr->entry_name.addr);
+	check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
 	/* Exit from the residual call-in environment(SFT_CI base frame) which might
-=======
-	TREF(in_ext_call) = FALSE;
-	verify_buffer((char *)param_list, (2*n), entry_ptr->entry_name.addr);
-	check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
-	mumps_status = save_mumps_status;
-	/* Exit from the residual call-in environment(SFF_CI and base frames) which might
->>>>>>> e9a1c121 (GT.M V6.3-014)
 	 * still exist on M stack when the externally called function in turn called
 	 * into an M routine.
 	 */

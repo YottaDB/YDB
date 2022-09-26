@@ -33,6 +33,23 @@
 #include "gvcst_protos.h"	/* for gvcst_init_sysops prototype */
 #include "db_write_eof_block.h"
 
+#define	MOVE_GVSTATS_REC_FROM_OLD_HDR_TO_NODE_LOCAL(CSA, CSD)						\
+{													\
+	/* Copy the 62 pre GTM-8863 stats from the old header location to node_local.			\
+	 * They will be copied back to the new header location at database rundown time.		\
+	 */												\
+	node_local_ptr_t	cnl;									\
+	gtm_uint64_t		*old_stats, *new_stats;							\
+													\
+	cnl = CSA->nl;											\
+	old_stats = (gtm_uint64_t *) &CSD->gvstats_rec_old_now_filler[0];				\
+	new_stats = (gtm_uint64_t *) &cnl->gvstats_rec;							\
+	for (i = 0; i < SIZEOF(CSD->gvstats_rec_old_now_filler)/SIZEOF(gtm_uint64_t); i++)		\
+	{												\
+		new_stats[i] = old_stats[i];								\
+	}												\
+}
+
 GBLREF  boolean_t       dse_running;
 
 error_def(ERR_DBBADUPGRDSTATE);
@@ -50,8 +67,6 @@ void db_auto_upgrade(gd_region *reg)
 	gtm_uint64_t		file_size;
 #	endif
 	int 			i;
-	gtm_uint64_t		*old_stats, *new_stats;
-	node_local_ptr_t	cnl;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -208,7 +223,9 @@ void db_auto_upgrade(gd_region *reg)
 				/* GT.M V63012 added fullblkwrt option */
 				csd->write_fullblk = 0;
 			case GDSMV63012:
-<<<<<<< HEAD
+				/* GT.M V63014 moved the gvstats section from one location in the file header to another */
+				MOVE_GVSTATS_REC_FROM_OLD_HDR_TO_NODE_LOCAL(csa, csd);
+			case GDSMV63014:
 			case GDSMR126:
 				/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support nanosecond timers */
 				csd->flush_time = csd->flush_time * NANOSECS_IN_MSEC;
@@ -227,8 +244,23 @@ void db_auto_upgrade(gd_region *reg)
 				csd->max_procs.cnt = 0;
 				csd->max_procs.time = 0;
 			case GDSMR134:
-				/* GT.M V63012 (merged after YottaDB r1.34) added fullblkwrt option */
-				csd->write_fullblk = 0;
+				if (GDSMR126 <= csd->minor_dbver)
+				{	/* Upgrading from a prior YottaDB release */
+					/* GT.M V63012 (merged after YottaDB r1.34) added fullblkwrt option */
+					csd->write_fullblk = 0;
+					/* GT.M V63014 (merged after YottaDB r1.34) moved gvstats around */
+					MOVE_GVSTATS_REC_FROM_OLD_HDR_TO_NODE_LOCAL(csa, csd);
+					/* GT.M V63014 code changes caused a couple of YottaDB fields to move around after r1.34.
+					 * Move them from their old location to their new location.
+					 */
+					csd->max_procs =
+						*(max_procs_t *)((sm_uc_ptr_t)csd + SGMNT_DATA_OFFSET_R134_max_procs);
+					csd->reorg_sleep_nsec =
+						*(uint4 *)((sm_uc_ptr_t)csd + SGMNT_DATA_OFFSET_R134_reorg_sleep_nsec);
+				}
+				/* else: Upgrading from a GT.M release. All auto upgrade activity would have already
+				 * happened as appropriate in the previous "case" blocks.
+				 */
 				break;
 			case GDSMR136:
 		/* When adding a new minor version, the following template should be maintained
@@ -240,25 +272,10 @@ void db_auto_upgrade(gd_region *reg)
 		 *    than the older YottaDB GDSMVCURR value (e.g. in case of YottaDB r1.32) and so those GT.M switch/case
 		 *    code paths above will not be reached for upgrades from an older YottaDB release to a newer YottaDB release.
 		 */
-=======
-				/* Copy the 62 pre GTM-8863 stats from the old header location to the new one */
-				cnl = csa->nl;
-				old_stats = (gtm_uint64_t *) &csd->gvstats_rec_old_now_filler[0];
-				new_stats = (gtm_uint64_t *) &cnl->gvstats_rec;
-				for (i = 0; i < SIZEOF(csd->gvstats_rec_old_now_filler)/SIZEOF(gtm_uint64_t); i++)
-				{
-					new_stats[i] = old_stats[i];
-				}
-				break;
-			case GDSMV63014:
->>>>>>> e9a1c121 (GT.M V6.3-014)
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
-			/* Move the below cases above the "case GDSMR126:" above as later GT.M versions use these minor
-			 * db version enum values.
-			 */
-			case GDSMVFILLER2:
+			/* Remove the below cases one by one as later GT.M versions use up these minor db version enum values. */
 			case GDSMVFILLER3:
 			case GDSMVFILLER4:
 			case GDSMVFILLER5:

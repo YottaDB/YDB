@@ -218,12 +218,9 @@ typedef enum {
 	WBTEST_FULLBLKWRT_DB,			/* 167 : Full disk blk writes for new blocks */
 	WBTEST_OPENFILE_DB,			/* 168 : Make OPENFILE_DB fail on a RW db */
 	WBTEST_REPL_TLS_RECONN,			/* 169 : Try reconnect in case of transient TLS errors */
-<<<<<<< HEAD
-=======
 	WBTEST_ZTIM_EDGE,			/* 170 : Timeout when trying to reset the timer */
 	WBTEST_LCKWAKEOVRFLO,			/* 171 : Force LOCK wakeups to almost overflow */
-	WBTEST_FAKE_SS_SHMDT_WINDOW		/* 172 : skip lcl_ss_ctx->shdw_fd = FD_INVALID to create "double" SHMDT */
->>>>>>> e9a1c121 (GT.M V6.3-014)
+	WBTEST_FAKE_SS_SHMDT_WINDOW,		/* 172 : skip lcl_ss_ctx->shdw_fd = FD_INVALID to create "double" SHMDT */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.

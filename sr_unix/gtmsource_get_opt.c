@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,28 +59,17 @@ GBLREF	repl_tls_info_t		repl_tls;
 GBLREF	volatile boolean_t	timer_in_handler;
 GBLREF  gd_addr                 *gd_header;
 
-<<<<<<< HEAD
 LITREF	char	*ydbenvname[YDBENVINDX_MAX_INDEX];
 LITREF	char	*gtmenvname[YDBENVINDX_MAX_INDEX];
 
-error_def(ERR_GETADDRINFO);
-=======
-error_def(ERR_BADCONNECTPARAM);
-error_def(ERR_BADPARAMCOUNT);
->>>>>>> e9a1c121 (GT.M V6.3-014)
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_REPLINSTSECLEN);
 error_def(ERR_REPLINSTSECUNDF);
 
 int gtmsource_get_opt(void)
 {
-<<<<<<< HEAD
-	boolean_t	connect_parms_badval, log, log_interval_specified, plaintext_fallback, secondary;
+	boolean_t	connect_parms_badval, connect_parm_digit, log, log_interval_specified, plaintext_fallback, secondary;
 	boolean_t	is_ydb_env_match;
-=======
-	boolean_t	connect_parms_badval, connect_parm_digit, dotted_notation, log, log_interval_specified;
-	boolean_t	plaintext_fallback, secondary;
->>>>>>> e9a1c121 (GT.M V6.3-014)
 	char		*c, *connect_parm, *connect_parms_str, *connect_parm_token_str;
 	char		tmp_connect_parms_str[GTMSOURCE_CONN_PARMS_LEN + 1];
 	char		freeze_comment[SIZEOF(gtmsource_options.freeze_comment)];
@@ -90,15 +79,10 @@ int gtmsource_get_opt(void)
 	char		statslog_val[SIZEOF("OFF")]; /* "ON" or "OFF" */
 	char		update_val[SIZEOF("DISABLE")]; /* "ENABLE" or "DISABLE" */
 	gtm_int64_t	buffsize;
-<<<<<<< HEAD
-	int		connect_parms_index, errcode, index = 0, renegotiate_interval, status, tries, timeout_status;
-	mstr		trans_name;
-=======
 	unsigned short	connect_parms_index, counter;
 	int 		index = 0, port_len, renegotiate_interval, status;
 	int		timeout_status;
-	mstr		log_nam, trans_name;
->>>>>>> e9a1c121 (GT.M V6.3-014)
+	mstr		trans_name;
 	struct hostent	*sec_hostentry;
 	unsigned short	connect_parms_str_len, filter_cmd_len, freeze_comment_len, freeze_val_len, inst_name_len, log_file_len;
 	unsigned short	secondary_len, statslog_val_len, tlsid_len, update_val_len;
@@ -246,25 +230,14 @@ int gtmsource_get_opt(void)
 				return -1;
 			}
 			connect_parms_str = &tmp_connect_parms_str[0];
-<<<<<<< HEAD
 			for (connect_parms_index = GTMSOURCE_CONN_HARD_TRIES_COUNT,
 				connect_parms_badval = FALSE,
 				connect_parm_token_str = connect_parms_str;
 			     !connect_parms_badval
-				&& (GTMSOURCE_CONN_PARMS_COUNT > connect_parms_index)
+				&& (GTMSOURCE_CONN_PARMS_COUNT >= connect_parms_index)
 				&& (NULL != (connect_parm =	/* Warning: Assignment inside boolean expression */
 						STRTOK_R(connect_parm_token_str, GTMSOURCE_CONN_PARMS_DELIM, &strtokptr)));
 			     connect_parms_index++, connect_parm_token_str = NULL)
-=======
-			for (connect_parms_index = 0,
-			     connect_parms_badval = FALSE,
-			     connect_parm_token_str = connect_parms_str;
-			     !connect_parms_badval &&
-			     connect_parms_index <= GTMSOURCE_CONN_PARMS_COUNT &&
-			     (connect_parm = STRTOK_R(connect_parm_token_str, GTMSOURCE_CONN_PARMS_DELIM, &strtokptr)) != NULL;
-			     connect_parms_index++,
-			     connect_parm_token_str = NULL)
->>>>>>> e9a1c121 (GT.M V6.3-014)
 			{
 				if (GTMSOURCE_CONN_PARMS_COUNT > connect_parms_index)
 				{
@@ -285,7 +258,7 @@ int gtmsource_get_opt(void)
 				if (connect_parms_badval)
 				{
 					switch(connect_parms_index)
-					{/*Addition validation and error reporting for each param in -CONNECTPARAM */
+					{	/*Addition validation and error reporting for each param in -CONNECTPARAM */
 						 case GTMSOURCE_CONN_HARD_TRIES_COUNT:
 							if ((connect_parm_digit) && (0 == ATOI(connect_parm)))
 							{

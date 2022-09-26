@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,17 +50,6 @@
 #include "warn_db_sz.h"
 #include "mu_getkey.h"
 
-<<<<<<< HEAD
-=======
-error_def(ERR_INTEGERRS);
-error_def(ERR_MUNOACTION);
-error_def(ERR_MUNOFINISH);
-error_def(ERR_MUPCLIERR);
-error_def(ERR_MUSIZEINVARG);
-error_def(ERR_NOSELECT);
-
-GBLREF block_id			mu_int_adj_prev[MAX_BT_DEPTH + 1];
->>>>>>> e9a1c121 (GT.M V6.3-014)
 GBLREF bool			error_mupip;
 GBLREF bool			mu_ctrlc_occurred;
 GBLREF bool			mu_ctrly_occurred;
@@ -304,16 +293,9 @@ enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 	register srch_hist		*pTargHist;
 	sm_uc_ptr_t			pVal, pTop, pRec, pBlkBase;
 	trans_num			tn;
-<<<<<<< HEAD
 	unsigned char			nLevl;
 	unsigned short			nRecLen;
 	unsigned char			buff[MAX_KEY_SZ + 1];
-	boolean_t			musz_range_done;
-=======
-	uchar_ptr_t			key_base, ptr;
-	unsigned char			buff[MAX_KEY_SZ + 1], nLevl;
-	unsigned short			nRecLen, rec_cmpc;
->>>>>>> e9a1c121 (GT.M V6.3-014)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -359,16 +341,9 @@ enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 			{
 				if ((((rec_hdr *)pRec)->rsiz) != BSTAR_REC_SIZE) /* Did not find the star key */
 				{
-<<<<<<< HEAD
 					GET_KEY_CPY_BUFF(pRec, nRecLen, buff, status);
 					RETURN_IF_ABNORMAL_STATUS(status);
-=======
-					GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key,
-							name_len, key_size,buff, buff_length, rec_len);
-					if (0 == key_size)
-						continue;	/* indication of trouble parsing the block - don't use it */
 					cmp_key = memcmp(buff, mu_start_key->base, mu_start_key->end + 1);
->>>>>>> e9a1c121 (GT.M V6.3-014)
 					if (mu_end_key)
 					{
 						if (0 < memcmp(buff, mu_end_key->base, mu_end_key->end + 1))

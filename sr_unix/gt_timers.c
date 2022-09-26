@@ -1323,24 +1323,15 @@ void check_for_timer_pops(boolean_t sig_handler_changed)
 	int			rc, stolenwhen = 0;		/* 0 = no, 1 = not first, 2 = first time */
 	sigset_t 		savemask;
 	struct sigaction 	current_sa;
-<<<<<<< HEAD
-
-	if (!USING_ALTERNATE_SIGHANDLING)
-	{	/* If managing our own signals, verify handler for SIGALRM is as it should be */
-		if (sig_handler_changed)
-=======
-	struct itimerval	curtimer;
 	int			save_errno = 0;
 
 	DBGSIGSAFEFPF((stderr, "check_for_timer_pops: sig_handler_changed=%d, first_timeset=%d, timer_active=%d\n",
 				sig_handler_changed, first_timeset, timer_active));
-	if (sig_handler_changed)
-	{
-		sigaction(SIGALRM, NULL, &current_sa);	/* get current info */
-		DBGSIGSAFEFPF((stderr, "check_for_timer_pops: current_sa.sa_handler=%p\n", current_sa.sa_handler));
-		if (!first_timeset)
->>>>>>> e9a1c121 (GT.M V6.3-014)
+	if (!USING_ALTERNATE_SIGHANDLING)
+	{	/* If managing our own signals, verify handler for SIGALRM is as it should be */
+		if (sig_handler_changed)
 		{
+			DBGSIGSAFEFPF((stderr, "check_for_timer_pops: current_sa.sa_handler=%p\n", current_sa.sa_handler));
 			sigaction(SIGALRM, NULL, &current_sa);	/* get current info */
 			if (!first_timeset)
 			{
@@ -1367,28 +1358,17 @@ void check_for_timer_pops(boolean_t sig_handler_changed)
 			}
 		}
 		DBGSIGSAFEFPF((stderr, "check_for_timer_pops: stolenwhen=%d\n", stolenwhen));
-		/* Check for an established timer */
-		deferred_timers_check_needed = TRUE;	/* Invoke timer_handler because the ext call could swallow a signal */
+		SET_DEFERRED_TIMERS_CHECK_NEEDED; /* Need to invoke timer_handler because the ext call could swallow a signal */
 	}
 	if (timeroot && (1 > timer_stack_count))
-<<<<<<< HEAD
-		DEFERRED_SIGNAL_HANDLING_CHECK;
+		DEFERRED_SIGNAL_HANDLING_CHECK;	/* Check for deferred timers */
+	/* Now that timer handling is done, issue errors as needed */
 	if (stolenwhen)
 	{
 		assert(!USING_ALTERNATE_SIGHANDLING);
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, current_sa.sa_sigaction,
 			     LEN_AND_STR(whenstolen[stolenwhen - 1]));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, current_sa.sa_sigaction,
-			      LEN_AND_STR(whenstolen[stolenwhen - 1]));
-		assert(FALSE);					/* does not return here */
 	}
-=======
-		DEFERRED_EXIT_HANDLING_CHECK;	/* Check for deferred timers */
-	/* Now that timer handling is done, issue errors as needed */
-	if (stolenwhen)
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, current_sa.sa_handler,
-			LEN_AND_STR(whenstolen[stolenwhen - 1]), save_errno);
->>>>>>> e9a1c121 (GT.M V6.3-014)
 }
 
 /* Externally exposed routine that does a find_timer and is SIGALRM interrupt safe. */

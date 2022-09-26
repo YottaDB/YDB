@@ -312,12 +312,6 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 		}
 		udi->counter_ftok_incremented = FALSE;
 	}
-<<<<<<< HEAD
-	if ((0 != (save_errno = do_semop(udi->ftok_semid, DB_CONTROL_SEM, -1, semflag)))    		/* WARNING: assign */
-		&& !(((EINVAL == save_errno)  || (EIDRM == save_errno)) && (!udi->s_addrs.hdr || udi->s_addrs.hdr->read_only)))
-	{	/* an mm read_only database file maps process-private, so we don't care if the semaphore is gone */
-		GTM_SEM_CHECK_EINVAL(TREF(ydb_environment_init), save_errno, udi);
-=======
 	while (TRUE)
 	{
 		save_errno = do_semop(udi->ftok_semid, DB_CONTROL_SEM, -1, semflag);
@@ -330,8 +324,7 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 			if (0 == save_errno)
 				break;
 		}
-		GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
->>>>>>> e9a1c121 (GT.M V6.3-014)
+		GTM_SEM_CHECK_EINVAL(TREF(ydb_environment_init), save_errno, udi);
 		ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
 	}
 	udi->grabbed_ftok_sem = FALSE;

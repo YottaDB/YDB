@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -149,6 +149,9 @@ uint4 freeze_online_multi_proc(reg_ctl_list *rctl)
 				return SS_NORMAL;
 			case REG_HAS_KIP:
 				/* Return REG_HAS_KIP status only when the retries exceed MAX_CRIT_TRY */
+				release_latch = FALSE;	/* needed to avoid [-Wsometimes-uninitialized] warning from C compiler
+							 * and [clang-analyzer-core.uninitialized.Branch] warning from clang-tidy
+							 */
 				GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
 				assert(release_latch);
 				util_out_print("Kill in progress indicator is set for database file !AD", TRUE,
@@ -175,6 +178,9 @@ uint4 freeze_online_multi_proc(reg_ctl_list *rctl)
 				assert(FALSE);
 		}
 	}
+	release_latch = FALSE;	/* needed to avoid [-Wsometimes-uninitialized] warning from C compiler
+				 * and [clang-analyzer-core.uninitialized.Branch] warning from clang-tidy
+				 */
 	GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
 	assert(release_latch);
 	util_out_print("Region !AD is now FROZEN", TRUE, REG_LEN_STR(reg));
@@ -205,21 +211,14 @@ void	mupip_freeze(void)
 	boolean_t		freeze, override, parallel = FALSE;
 	uint4			online;
 	freeze_status		freeze_ret;
-<<<<<<< HEAD
-	int			dummy_errno;
+	int			dummy_errno, regno, reg_total = 0;
 	const char 		*msg1[] = { "unfreeze", "freeze" };
 	const char 		*msg2[] = { "UNFROZEN", "FROZEN" };
 	const char 		*msg3[] = { "unfrozen", "frozen" };
-	DCL_THREADGBL_ACCESS;
-=======
-	int			dummy_errno, regno, reg_total = 0;
-	const char 		*msg1[] = { "unfreeze", "freeze" } ;
-	const char 		*msg2[] = { "UNFROZEN", "FROZEN" } ;
-	const char 		*msg3[] = { "unfrozen", "frozen" } ;
 	reg_ctl_list		*parallel_ctl;
 	void			**ret_array;		/* "gtm_multi_thread" related field */
 	size_t			shm_size;
->>>>>>> e9a1c121 (GT.M V6.3-014)
+	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	status = SS_NORMAL;

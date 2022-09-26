@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,9 @@
 #include "op.h"
 #include "op_fnzsearch.h"
 #include "interlock.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
 #include "toktyp.h"
 #include "valid_mname.h"
 #ifdef DEBUG

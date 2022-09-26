@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,6 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 	 */
 	do
 	{
-<<<<<<< HEAD
 		if (new_timeout)
 		{
 			new_timeout = FALSE;
@@ -104,51 +103,21 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 				{	/* Do not take trace of the same process again, in a point of time */
 					last_sem_trace = sops[loopcount].sem_num;
 					semop_pid = semctl(semid, sops[loopcount].sem_num, GETPID);
-					if ((-1 != semop_pid) && (semop_pid != process_id))
-					{
+					if (-1 == semop_pid)
+					{	/* no owner to trace leave the for loop with the errno from semctl */
+						save_errno = errno;
+						rc = -1;
+						break;
+					}
+					if (semop_pid != process_id)
+					{	/* not good to try tracing own process */
 						GET_C_STACK_FROM_SCRIPT("SEMOP_INFO", process_id, semop_pid, stuckcnt);
 						/* Got stack trace signal the first process to continue */
-=======
-		if (TREF(semwait2long))
-		{	/* 1st time or semwait2long timer pop mean we need to (re)start timer */
-			TREF(semwait2long) = FALSE;
-			start_timer((TID)semwt2long_handler,(int4)MAX_SEM_WAIT_TIME, semwt2long_handler, 0, NULL);
-		}
-		rc = semop(semid, sops, nsops);
-		if (-1 == rc)
-		{	/* didn't work */
-			save_errno = errno;
-			if ((EINTR == save_errno) && TREF(semwait2long))
-			{	/* semwait2long timer popped, get C-stack trace */
-				stuckcnt++;
-				last_sem_trace = -1;
-				for (loopcount = 0; loopcount < nsops; loopcount++)
-				{	/* for does 1 pass of each semop in set */
-					if ((last_sem_trace != sops[loopcount].sem_num) && (0 == sops[loopcount].sem_op))
-					{	/* Do not take trace of the same process again, in a point of time */
-						last_sem_trace = sops[loopcount].sem_num;
-						semop_pid = semctl(semid, sops[loopcount].sem_num, GETPID);
-						if (-1 == semop_pid)
-						{	/* no owner to trace leave the for loop with the errno from semctl */
-							save_errno = errno;
-							rc = -1;
-							break;
-						}
-						if (semop_pid != process_id)
-						{	/* not good to try tracing own process */
-							GET_C_STACK_FROM_SCRIPT("SEMOP_INFO", process_id, semop_pid, stuckcnt);
-							/* Got stack trace signal the first process to continue */
->>>>>>> e9a1c121 (GT.M V6.3-014)
 #							ifdef DEBUG
 						if (cnl)
 							GTM_WHITE_BOX_TEST(WBTEST_SEMTOOLONG_STACK_TRACE,
 								cnl->wbox_test_seq_num, 3);
 #							endif
-<<<<<<< HEAD
-					} else if (-1 == semop_pid)
-					{
-						save_errno = errno;
-						break;
 					}
 				}
 			}
@@ -156,14 +125,5 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 		}
 	} while (TRUE);
 	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-=======
-						}
-					}
-				}	/* for */
-			}	/* our timer pop */
-		}	/* error return from semop */
-	} while ((-1 == rc) && (EINTR == save_errno));	/* keep trying as long as error is an EINTR */
-	cancel_timer((TID)semwt2long_handler);
->>>>>>> e9a1c121 (GT.M V6.3-014)
 	return (-1 == rc) ? save_errno : 0;
 }

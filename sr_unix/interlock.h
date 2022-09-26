@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,10 +19,7 @@
 #include "compswap.h"
 #include "aswp.h"
 #include "memcoherency.h"
-#include "gdsroot.h"
-#include "gdsbt.h"
-#include "gdsblk.h"
-#include "gdsfhead.h"
+
 /* Define memory barrier macro to use in LOCK_BUFF_FOR_READ/RELEASE_BUFF_READ_LOCK macros below. On AIX
  * the locking macros have no memory barrier connotation because they use load/store_locked instructions.
  * The macros defined below give us that connotation on the platforms that need it and avoid adding additional
@@ -108,6 +105,3 @@
 
 #define	GRAB_LATCH_INDEFINITE_WAIT	-1	/* special value indicating infinite timeout input to "grab_latch" */
 
-/* Function prototypes */
-boolean_t	grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs, wait_state state, sgmnt_addrs *csa);
-void		rel_latch(sm_global_latch_ptr_t latch);

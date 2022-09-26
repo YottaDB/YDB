@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -145,13 +145,8 @@ int updhelper_reader(void)
 boolean_t updproc_preread(void)
 {
 	boolean_t		good_record, was_wrapped;
-<<<<<<< HEAD
-	uint4			pre_read_offset;
-	int			rec_len, cnt, retries, spins, maxspins, maxtries, key_len;
-=======
 	gtm_uint64_t		pre_read_offset;
-	int			rec_len, cnt, retries, spins, maxspins, key_len;
->>>>>>> e9a1c121 (GT.M V6.3-014)
+	int			rec_len, cnt, retries, spins, maxspins, maxtries, key_len;
 	enum jnl_record_type	rectype;
 	mstr_len_t		val_len;
 	mname_entry		gvname;

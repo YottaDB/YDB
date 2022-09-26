@@ -46,8 +46,7 @@ ENUM_ENTRY(GDSMV63007),		/* Reuse abandoned field for use controlled stable flus
 				 *	New field "reorg_sleep_nsec" to slow down reorg update rate (e.g. reduce restarts) by user
 				 */
 ENUM_ENTRY(GDSMV63012),		/* New fullblklwrt option */
-<<<<<<< HEAD
-ENUM_ENTRY(GDSMVFILLER2),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMV63014),		/* GTM-8863 stats added to file header: GVSTATS moved, upsized */
 ENUM_ENTRY(GDSMVFILLER3),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER4),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER5),	/* Space reserved for GT.M changes to minor db format */
@@ -62,11 +61,13 @@ ENUM_ENTRY(GDSMVFILLER13),	/* Space reserved for GT.M changes to minor db format
 ENUM_ENTRY(GDSMVFILLER14),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER15),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER16),	/* Space reserved for GT.M changes to minor db format */
-ENUM_ENTRY(GDSMR126),		/* Includes GT.M V6.3-007 */
+ENUM_ENTRY(GDSMR126),		/* Includes GDSMV63007 */
 ENUM_ENTRY(GDSMR130),
 ENUM_ENTRY(GDSMR134),		/* New field "max_procs" records max concurrent processes accessing database */
-ENUM_ENTRY(GDSMR136),		/* Includes GT.M V6.3-012 */
-=======
-ENUM_ENTRY(GDSMV63014),		/* GTM-8863 stats added to file header: GVSTATS moved, upsized */
->>>>>>> e9a1c121 (GT.M V6.3-014)
+ENUM_ENTRY(GDSMR136),		/* Includes GDSMV63012 and GDSMV63014.
+				 * Note: As part of V6.3-014 merge, the following fields in the file header had to be moved
+				 * because GT.M changes encroached on a filler section where those YottaDB fields used to be.
+				 *  a) max_procs
+				 *  b) reorg_sleep_nsec
+				 */
 ENUM_ENTRY(GDSMVLAST)

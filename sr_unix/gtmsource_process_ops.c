@@ -121,23 +121,6 @@ GBLREF	unsigned char		*gtmsource_tcombuff_start;
 GBLREF	gtmsource_options_t	gtmsource_options;
 #endif
 
-<<<<<<< HEAD
-=======
-error_def(ERR_REPLALERT);
-error_def(ERR_REPL2OLD);
-error_def(ERR_REPLCOMM);
-error_def(ERR_REPLFTOKSEM);
-error_def(ERR_REPLINSTNOHIST);
-error_def(ERR_REPLINSTSECMTCH);
-error_def(ERR_REPLNOXENDIAN);
-error_def(ERR_SECNOTSUPPLEMENTARY);
-error_def(ERR_STRMNUMMISMTCH1);
-error_def(ERR_STRMNUMMISMTCH2);
-error_def(ERR_TEXT);
-error_def(ERR_TLSCONVSOCK);
-error_def(ERR_TLSHANDSHAKE);
-
->>>>>>> e9a1c121 (GT.M V6.3-014)
 int gtmsource_est_conn()
 {
 	char			print_msg[PROC_OPS_PRINT_MSG_LEN], msg_str[1024], *errmsg;
@@ -210,19 +193,10 @@ int gtmsource_est_conn()
 				 STRERROR(errno));
 			repl_close(&gtmsource_sock_fd);
 		}
-<<<<<<< HEAD
 		/* Pause (very briefly as this is a hard spin loop) before trying the connection again then check if any
 		 * interrupting conditions occurred before retrying the connection.
 		 */
 		SLEEP_FOR_MSEC(hardtries_period);
-=======
-		if (REPL_MAX_CONN_HARD_TRIES_PERIOD > hardtries_period)
-		{
-			SHORT_SLEEP(hardtries_period);
-		}
-		else
-			LONG_SLEEP_MSEC(hardtries_period);
->>>>>>> e9a1c121 (GT.M V6.3-014)
 		gtmsource_poll_actions(FALSE);
 		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 			return (SS_NORMAL);
@@ -235,13 +209,8 @@ int gtmsource_est_conn()
 		return (SS_NORMAL);
 
 	if (hardtries_count <= connection_attempts)
-<<<<<<< HEAD
-	{	/* Initialize logging period related variables */
-		logging_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD];
-=======
-	{	/*Initialize variables to gradually reduce soft_try_attempts period logging*/
+	{	/* Initialize variables to gradually reduce soft_try_attempts period logging */
 		logging_period = soft_tries_period;
->>>>>>> e9a1c121 (GT.M V6.3-014)
 		logging_interval = 1;
 
 		if (soft_tries_period > max_sleep)
@@ -258,17 +227,13 @@ int gtmsource_est_conn()
 		do
 		{
 			if ((FD_INVALID == gtmsource_sock_fd) || (0 != comminit_retval))
-<<<<<<< HEAD
 			{	/* gtmsource_comm_init() failed to initialize the socket. Report error and retry
 				 * gtmsource_comm_init().
 				 */
-=======
-			{ /* gtmsource_comm_init failed to initialize the socket. Report error and retry gtmsource_comm_init. */
 				if (0 == alert_time_start)
 					time(&alert_time_start);
 				if (0 == noconnection_time)
 					noconnection_time = alert_time_start;
->>>>>>> e9a1c121 (GT.M V6.3-014)
 				if (0 == (connection_attempts + 1) % logging_interval)
 				{
 					repl_log(gtmsource_log_fp, TRUE, TRUE,
@@ -300,15 +265,11 @@ int gtmsource_est_conn()
 					throw_errors = TRUE;
 				} else /* Decrease the frequency of showing the connection failure error messages */
 					throw_errors = FALSE;
-<<<<<<< HEAD
-=======
-				LONG_SLEEP(soft_tries_period);
->>>>>>> e9a1c121 (GT.M V6.3-014)
 			}
 			/* Pause before trying the connection again then check if any interrupting conditions occurred
 			 * before retrying the connection.
 			 */
-			LONG_SLEEP(gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]);
+			LONG_SLEEP(soft_tries_period);
 			gtmsource_poll_actions(FALSE);
 			if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 				return (SS_NORMAL);

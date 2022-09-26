@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,23 +48,8 @@ void gtcml_chkreg(void)
 		gv_cur_region = reg->region->reg;
 		if (0 == reg->region->refcnt)
 		{
-<<<<<<< HEAD
 			gtcml_chklck(reg,FALSE);
 			assert(0 == reg->lock);
-		} else if (reg->region->wakeup < ((mlk_ctldata *)FILE_INFO(gv_cur_region)->s_addrs.mlkctl)->wakeups)
-		{
-			gtcml_chklck(reg,FALSE);
-			reg->region->wakeup = ((mlk_ctldata *)FILE_INFO(gv_cur_region)->s_addrs.mlkctl)->wakeups;
-			reg->pass = CM_BLKPASS;
-		} else if (0 == --reg->pass)
-		{
-			gtcml_chklck(reg,TRUE);
-			reg->pass = CM_BLKPASS;
-		}
-
-=======
-			gtcml_chklck(reg, FALSE);
-			assert (0 == reg->lock);
 		} else
 		{
 			/* the following avoids repeated dereferencing on the asumption that a slightly stale value (picked up
@@ -84,7 +69,6 @@ void gtcml_chkreg(void)
 			}
 			reg->region->wakeup = wakeup;	/* done for both cases above due to possibility of wakeup rollover */
 		}
->>>>>>> e9a1c121 (GT.M V6.3-014)
 		if (0 == reg->lock)
 		{
 			if (reg == blkdlist)

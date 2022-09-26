@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,12 +93,8 @@ static inline void grab_lock_crit_intl(mlk_pvtctl_ptr_t pctl, boolean_t *ret_was
 	{	/* Return value of "grab_latch" does not need to be checked because we pass
 		 * in GRAB_LATCH_INDEFINITE_WAIT as the timeout.
 		 */
-<<<<<<< HEAD
-		grab_latch(&csa->nl->lock_crit, GRAB_LATCH_INDEFINITE_WAIT);
-		*ret_was_crit = FALSE;				/* Initialize to keep code analyzer happy */
-=======
 		grab_latch(&csa->nl->lock_crit, GRAB_LATCH_INDEFINITE_WAIT, WS_38, csa);
->>>>>>> e9a1c121 (GT.M V6.3-014)
+		*ret_was_crit = FALSE;				/* Initialize to keep code analyzer happy */
 	}
 }
 

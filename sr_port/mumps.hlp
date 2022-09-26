@@ -6773,11 +6773,7 @@
    DEXA : 1 waiting for db extension, 0 otherwise
    DFL : # of Database FLushes of the entire set of dirty global buffers in shared memory to disk
    DFS : # of times a process does an fsync of the database file. For example: a) after writing an epoch journal record, b) as part of database file extension c) during database rundown d) as part of mupip reorg -truncate etc.
-<<<<<<< HEAD
    DRD : # of Disk ReaDs from the database file (TP and non-TP, committed and rolled-back).This does not include reads that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. YottaDB always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
-=======
-   DRD : # of Disk ReaDs from the database file (TP and non-TP, committed and rolled-back).This does not include reads that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method.
->>>>>>> e9a1c121 (GT.M V6.3-014)
    DTA : # of DaTA operations (TP and non-TP)
    DWT : # of Disk WriTes to the database file (TP and non-TP, committed and rolled-back). This does not include writes that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. YottaDB always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
    GET : # of GET operations (TP and non-TP)
