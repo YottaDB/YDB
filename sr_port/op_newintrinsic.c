@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -97,11 +97,11 @@ void op_newintrinsic(int intrtype)
 	if (SV_ZTRAP == intrtype)
 	{
 		ztrap_explicit_null = TRUE;
-		if(etrap_was_active)
+		if (etrap_was_active)
 			NULLIFY_TRAP(TREF(dollar_etrap));
 	} else if (SV_ETRAP == intrtype) {
 		ztrap_explicit_null = FALSE;
-		if(!etrap_was_active)
+		if (!etrap_was_active)
 			NULLIFY_TRAP(TREF(dollar_ztrap));
 	} else if (SV_ESTACK == intrtype)
 	{	/* Some extra processing for new of $ETRAP:

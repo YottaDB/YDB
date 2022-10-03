@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,6 +43,7 @@
 #include "rel_quant.h"
 #include "do_shmat.h"
 #include "mlk_ops.h"
+#include "restrict.h"
 
 #define NOFLUSH_OUT	0
 #define FLUSH		1
@@ -56,6 +57,7 @@ error_def(ERR_UNIMPLOP);
 error_def(ERR_TEXT);
 error_def(ERR_BADREGION);
 error_def(ERR_NOLOCKMATCH);
+error_def(ERR_RESTRICTEDOP);
 
 void	lke_clear(void)
 {
@@ -75,6 +77,8 @@ void	lke_clear(void)
 	node.len = SIZEOF(nodebuf);
 	one_lock.addr = one_lockbuf;
 	one_lock.len = SIZEOF(one_lockbuf);
+	if (RESTRICTED(lkeclear))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "LKECLEAR");
 	if (lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact, 0, 0) == 0)
 		return;
 	/* Search all regions specified on the command line */

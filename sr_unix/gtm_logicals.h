@@ -100,6 +100,7 @@
 #ifdef USE_LIBAIO
 #define GTM_AIO_NR_EVENTS		"$gtm_aio_nr_events"
 #endif
+#define	GTM_DB_CREATE_VER		"$gtm_db_create_ver"
 
 /* Replication */
 #define	GTM_REPL_INSTANCE		"$gtm_repl_instance"

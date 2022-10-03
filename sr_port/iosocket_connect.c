@@ -62,7 +62,8 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 	int4		errlen, last_errno, save_errno;
 	int		d_socket_struct_len, res, nfds, sockerror;
 	fd_set		writefds;
-	boolean_t	no_time_left = FALSE;
+	boolean_t	no_time_left = FALSE, first_time = TRUE, timer_started = FALSE, oneshot;
+	boolean_t	timer_done;	/* for TIMEOUT_INIT */
 	boolean_t	need_connect, need_socket, need_select;
 	short		len;
 	io_desc		*iod;
@@ -129,6 +130,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 		add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
 	}
 	real_sockintr->end_time_valid = sockintr->end_time_valid = FALSE;
+	oneshot = (0 == msec_timeout);
 	last_errno = 0;
 
 	remote_ai_ptr = (struct addrinfo*)(&(sockptr->remote.ai));
@@ -170,6 +172,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 					freeaddrinfo(sockptr->remote.ai_head);
 					sockptr->remote.ai_head = NULL;
 				}
+				SOCKET_FREE(sockptr);
 				assertpro(-2 != real_errno);
 				errptr = (char *)STRERROR(real_errno);
 				errlen = STRLEN(errptr);
@@ -180,6 +183,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 			if (remote_ai_ptr != raw_ai_ptr)
 				memcpy(remote_ai_ptr, raw_ai_ptr, SIZEOF(struct addrinfo));
 			need_socket = FALSE;
+			first_time = TRUE;	/* for initial connect */
 			temp_1 = 1;
 			if (socket_local != sockptr->protocol)
 			{
@@ -200,6 +204,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 						freeaddrinfo(sockptr->remote.ai_head);
 						sockptr->remote.ai_head = NULL;
 					}
+					SOCKET_FREE(sockptr);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 						  RTS_ERROR_LITERAL("SO_REUSEADDR"), save_errno, errlen, errptr);
 					return FALSE;
@@ -219,6 +224,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 						freeaddrinfo(sockptr->remote.ai_head);
 						sockptr->remote.ai_head = NULL;
 					}
+					SOCKET_FREE(sockptr);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 						RTS_ERROR_LITERAL("TCP_NODELAY"), save_errno, errlen, errptr);
 					return FALSE;
@@ -239,6 +245,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 							freeaddrinfo(sockptr->remote.ai_head);
 							sockptr->remote.ai_head = NULL;
 						}
+						SOCKET_FREE(sockptr);
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 							RTS_ERROR_LITERAL("SO_RCVBUF"), save_errno, errlen, errptr);
 						return FALSE;
@@ -260,6 +267,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 							freeaddrinfo(sockptr->remote.ai_head);
 							sockptr->remote.ai_head = NULL;
 						}
+						SOCKET_FREE(sockptr);
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
 							RTS_ERROR_LITERAL("SO_RCVBUF"), save_errno, errlen, errptr);
 						return FALSE;
@@ -281,11 +289,29 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 		{
 			/* Use plain connect to allow jobinterrupt */
 			assert(FD_INVALID != sockptr->sd);
+			if (first_time && (NO_M_TIMEOUT != msec_timeout))
+			{	/* start timer if not end_time, if timeout is 0 just a short wait */
+				DBGSOCK((stdout, "socconn: if first_time: msec_timeout = %d\n", msec_timeout));
+				sys_get_curr_time(&cur_time);
+				cur_time = sub_abs_time(&end_time, &cur_time);	/* calculate remaining time */
+				if (0 != msec_timeout)
+					msec_timeout = (int4)((cur_time.at_sec * MILLISECS_IN_SEC) +
+					/* Round up in order to prevent premature timeouts */
+						DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+				if (0 >= msec_timeout)
+				{
+					no_time_left = TRUE;
+					msec_timeout = 100 /* enough time to connect if no problems */;
+					DBGSOCK((stdout, "socconn: first_time msec_timeout was 0, now = %d\n", msec_timeout));
+				}
+				first_time = FALSE;
+				timer_started = TRUE;
+				TIMEOUT_INIT(timer_done, msec_timeout);
+			 }
 			res = connect(sockptr->sd, SOCKET_REMOTE_ADDR(sockptr), remote_ai_ptr->ai_addrlen);	 /* BYPASSOK */
 			if (res < 0)
 			{
 				save_errno = errno;
-				no_time_left = FALSE;
 				need_connect = TRUE;
 				switch (save_errno)
 				{
@@ -295,7 +321,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 						need_connect = FALSE;
 						break;
 					case EINTR:
-						if (outofband && 0 != msec_timeout)
+						DBGSOCK((stdout, "socconn: EINTR: outofband = %d, oneshot = %d\n",
+							outofband, oneshot));
+						if (outofband && !oneshot)
 						{	/* handle outofband unless zero timeout */
 							save_errno = 0;
 							need_socket = need_connect = FALSE;
@@ -304,23 +332,28 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 					case EINPROGRESS:
 					case EALREADY:
 						need_socket = need_connect = FALSE;
-						if (0 != msec_timeout)
+						if (!oneshot)
+						{
+							DBGSOCK((stdout, "socconn: EINPROGESS: errno = %d\n", save_errno));
 							need_select = TRUE;
+						}
 					/* fall through */
 					case ETIMEDOUT:	/* the other side bound but not listening */
 					case ECONNREFUSED:
 					case ENOENT:    /* LOCAL socket not there */
-						if (!no_time_left && (0 != msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+						if (!no_time_left && (!oneshot) && (NO_M_TIMEOUT != msec_timeout))
 						{
 							sys_get_curr_time(&cur_time);
 							cur_time = sub_abs_time(&end_time, &cur_time);
+							DBGSOCK((stdout, "socconn: ENOENT: errno = %d, msec_timeout= %d\n",
+								save_errno, msec_timeout));
 							msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
 								/* Round up in order to prevent premature timeouts */
 								DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
 							if (0 >= msec_timeout)
 								msec_timeout = 0;
 						}
-						if (0 == msec_timeout)
+						if (oneshot || (0 == msec_timeout))
 							no_time_left = TRUE;
 						else if (!no_time_left)
 						{
@@ -342,6 +375,11 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 						break;
 				}
 			} /* if connect failed */
+		}
+		if (timer_started)
+		{
+			timer_started = FALSE;
+			TIMEOUT_DONE(timer_done);
 		}
 		if (need_select)
 		{
@@ -440,7 +478,10 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(dsocketptr->iod, errptr, errlen);
 			}
 			if (sockptr->ioerror)
+			{
+				SOCKET_FREE(sockptr);
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_OPENCONN, 0, ERR_TEXT, 2, errlen, errptr);
+			}
 			errno = save_errno;
 			return FALSE;
 		}
@@ -451,7 +492,13 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 				freeaddrinfo(sockptr->remote.ai_head);
 				sockptr->remote.ai_head = NULL;
 			}
-			return FALSE;	/* caller will close socket */
+			if (!need_socket)
+			{
+				close(sockptr->sd);
+				sockptr->sd = FD_INVALID;
+			}
+			SOCKET_FREE(sockptr);
+			return FALSE;
 		}
 		if (res < 0 && outofband)	/* if connected delay outofband */
 		{
@@ -464,6 +511,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 					close(sockptr->sd);
 					sockptr->sd = FD_INVALID;
 				}
+				if (NULL != sockptr->remote.ai_head)
+				{
+					freeaddrinfo(sockptr->remote.ai_head);
+					sockptr->remote.ai_head = NULL;
+				}
+				SOCKET_FREE(sockptr);
 				async_action(FALSE);
 				assertpro(FALSE);
 			}

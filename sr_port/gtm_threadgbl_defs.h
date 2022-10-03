@@ -35,7 +35,7 @@
 THREADGBLDEF(grabbing_crit, 			gd_region *)			/* Region currently grabbing crit in (if any) */
 
 /* Compiler */
-THREADGBLDEF(blkmod_fail_level,		int4)				/* TP trace reporting element */
+THREADGBLDEF(blkmod_fail_level,			int4)				/* TP trace reporting element */
 THREADGBLDEF(blkmod_fail_type,			int4)				/* TP trace reporting element */
 THREADGBLDEF(block_level,			int4)				/* used to check embedded subroutine levels */
 THREADGBLDEF(boolchain,				triple)				/* anchor for chain used by bx_boolop  */
@@ -75,7 +75,7 @@ THREADGBLDEF(s2n_intlit, 			boolean_t)			/* type info from s2n for advancewindow
 THREADGBLDEF(routine_source_offset,		uint4)				/* offset of M source within literal text pool */
 THREADGBLDEF(saw_side_effect,			boolean_t)			/* need side effect handling other than naked */
 THREADGBLDEF(shift_side_effects, 		int)				/* flag shifting of side-effects ahead of boolean
-										 * evalation */
+										 * evaluation */
 THREADGBLDEF(side_effect_base,			boolean_t *)			/* anchor side effect array: bin ops & func args */
 THREADGBLDEF(side_effect_depth,			uint4)				/* current high water of side effect expr array */
 THREADGBLDEF(side_effect_handling,		int)				/* side effect handling in actuallists, function

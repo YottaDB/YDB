@@ -300,6 +300,8 @@ void	trigger_upgrade(gd_region *reg)
 	tmpmv = &tmpmval;	/* At all points maintain this relationship. The two are used interchangeably below */
 	if (gv_target->root)
 		do_upgrade = TRUE;
+	else
+		do_upgrade = FALSE;
 	/* The below logic assumes ^#t global does not have any integrity errors */
 	assert(do_upgrade);	/* caller should have not invoked us otherwise */
 	if (do_upgrade)

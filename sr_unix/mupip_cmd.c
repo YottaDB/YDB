@@ -252,7 +252,8 @@ static	CLI_ENTRY	mup_convert_qual[] = {		/* CONVERT */
 };
 
 static	CLI_ENTRY	mup_create_qual[] = {		/* CREATE */
-{ "REGION", mupip_create, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0 },
+{ "REGION", mupip_create, 0, 0, 0, 0, 0, VAL_REQ,        2, NON_NEG, VAL_STR, 0 },
+{ "V6",     mupip_create, 0, 0, 0, 0, 0, VAL_DISALLOWED, 2, NEG,     VAL_N_A, 0 },
 { "" }
 };
 

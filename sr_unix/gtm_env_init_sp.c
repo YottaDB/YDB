@@ -89,6 +89,7 @@ GBLREF	char			*gtm_core_file;
 GBLREF	char			*gtm_core_putenv;
 GBLREF	int			gtm_non_blocked_write_retries;	/* number for retries for non_blocked write to pipe */
 GBLREF	uint4			gtm_principal_editing_defaults;	/* ext_cap flags if tt */
+GBLREF	enum db_ver		gtm_db_create_ver;		/* database creation version */
 ZOS_ONLY(GBLREF	char		*gtm_utf8_locale_object;)
 ZOS_ONLY(GBLREF	boolean_t	gtm_tag_utf8_as_ascii;)
 GBLREF	volatile boolean_t	timer_in_handler;
@@ -314,6 +315,13 @@ void	gtm_env_init_sp(void)
 		TREF(dbinit_max_delta_secs) = DEFAULT_DBINIT_MAX_DELTA_SECS;
 	else
 		TREF(dbinit_max_delta_secs) = hrtbt_cntr_delta;
+	/* Initialize database file creation version */
+	gtm_db_create_ver = GDSVCURR;	/* Default to the current version */
+	val.addr = GTM_DB_CREATE_VER;
+	val.len = SIZEOF(GTM_DB_CREATE_VER) - 1;
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
+		if (('6' == buf[0]) || (('V' == toupper(buf[0])) && ('6' == buf[1])))
+			gtm_db_create_ver = GDSV6;	/* Create prior version: GDSV6 */
 	/* Initialize variable that controls the location of GT.M custom errors file (used for anticipatory freeze) */
 	val.addr = GTM_CUSTOM_ERRORS;
 	val.len = SIZEOF(GTM_CUSTOM_ERRORS) - 1;

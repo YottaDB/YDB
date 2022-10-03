@@ -43,7 +43,9 @@ GBLDEF	int			tls_errno;
 GBLDEF	gtmtls_passwd_list_t	*gtmtls_passwd_listhead;
 
 STATICDEF	config_t	gtm_tls_cfg;
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
 STATICDEF DH			*dh512, *dh1024;	/* Diffie-Hellman structures for Ephemeral Diffie-Hellman key exchange. */
+#endif
 #ifdef DEBUG
 STATICDEF	char		*wbox_enable = NULL, *wbox_tls_check = NULL,
 				*wbox_count = NULL, *wbox_test_count = NULL;
@@ -116,123 +118,16 @@ STATICDEF struct gtm_ssl_options gtm_ssl_verify_level_list[]=
 };
 STATICDEF struct gtm_ssl_options gtm_ssl_verify_mode_list[] =
 {
-	DEFINE_SSL_OP(SSL_VERIFY_PEER),
-	DEFINE_SSL_OP(SSL_VERIFY_NONE),
-	DEFINE_SSL_OP(SSL_VERIFY_FAIL_IF_NO_PEER_CERT),
-	DEFINE_SSL_OP(SSL_VERIFY_CLIENT_ONCE),
+#include "gen_tls_verify_options.h"
 	{NULL, 0}
 };
 STATICDEF struct gtm_ssl_options gtm_ssl_options_list[] =
 {
-#ifdef	SSL_OP_MICROSOFT_SESS_ID_BUG
-	DEFINE_SSL_OP(SSL_OP_MICROSOFT_SESS_ID_BUG),
-#endif
-#ifdef	SSL_OP_NETSCAPE_CHALLENGE_BUG
-	DEFINE_SSL_OP(SSL_OP_NETSCAPE_CHALLENGE_BUG),
-#endif
-#ifdef	SSL_OP_LEGACY_SERVER_CONNECT
-	DEFINE_SSL_OP(SSL_OP_LEGACY_SERVER_CONNECT),
-#endif
-#ifdef	SSL_OP_NETSCAPE_REUSE_CIPHER_CHANGE_BUG
-	DEFINE_SSL_OP(SSL_OP_NETSCAPE_REUSE_CIPHER_CHANGE_BUG),
-#endif
-#ifdef	SSL_OP_SSLREF2_REUSE_CERT_TYPE_BUG
-	DEFINE_SSL_OP(SSL_OP_SSLREF2_REUSE_CERT_TYPE_BUG),
-#endif
-#ifdef	SSL_OP_MICROSOFT_BIG_SSLV3_BUFFER
-	DEFINE_SSL_OP(SSL_OP_MICROSOFT_BIG_SSLV3_BUFFER),
-#endif
-#ifdef	SSL_OP_SAFARI_ECDHE_ECDSA_BUG
-	DEFINE_SSL_OP(SSL_OP_SAFARI_ECDHE_ECDSA_BUG),
-#endif
-#ifdef	SSL_OP_SSLEAY_080_CLIENT_DH_BUG
-	DEFINE_SSL_OP(SSL_OP_SSLEAY_080_CLIENT_DH_BUG),
-#endif
-#ifdef	SSL_OP_TLS_D5_BUG
-	DEFINE_SSL_OP(SSL_OP_TLS_D5_BUG),
-#endif
-#ifdef	SSL_OP_TLS_BLOCK_PADDING_BUG
-	DEFINE_SSL_OP(SSL_OP_TLS_BLOCK_PADDING_BUG),
-#endif
-#ifdef	SSL_OP_MSIE_SSLV2_RSA_PADDING
-	DEFINE_SSL_OP(SSL_OP_MSIE_SSLV2_RSA_PADDING),
-#endif
-#ifdef	SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS
-	DEFINE_SSL_OP(SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS),
-#endif
-#ifdef	SSL_OP_ALL
-	DEFINE_SSL_OP(SSL_OP_ALL),
-#endif
-#ifdef	SSL_OP_NO_QUERY_MTU
-	DEFINE_SSL_OP(SSL_OP_NO_QUERY_MTU),
-#endif
-#ifdef	SSL_OP_COOKIE_EXCHANGE
-	DEFINE_SSL_OP(SSL_OP_COOKIE_EXCHANGE),
-#endif
-#ifdef	SSL_OP_NO_TICKET
-	DEFINE_SSL_OP(SSL_OP_NO_TICKET),
-#endif
-#ifdef	SSL_OP_CISCO_ANYCONNECT
-	DEFINE_SSL_OP(SSL_OP_CISCO_ANYCONNECT),
-#endif
-#ifdef	SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION
-	DEFINE_SSL_OP(SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION),
-#endif
-#ifdef	SSL_OP_NO_COMPRESSION
-	DEFINE_SSL_OP(SSL_OP_NO_COMPRESSION),
-#endif
-#ifdef	SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION
-	DEFINE_SSL_OP(SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION),
-#endif
-#ifdef	SSL_OP_SINGLE_ECDH_USE
-	DEFINE_SSL_OP(SSL_OP_SINGLE_ECDH_USE),
-#endif
-#ifdef	SSL_OP_SINGLE_DH_USE
-	DEFINE_SSL_OP(SSL_OP_SINGLE_DH_USE),
-#endif
-#ifdef	SSL_OP_EPHEMERAL_RSA
-	DEFINE_SSL_OP(SSL_OP_EPHEMERAL_RSA),
-#endif
-#ifdef	SSL_OP_CIPHER_SERVER_PREFERENCE
-	DEFINE_SSL_OP(SSL_OP_CIPHER_SERVER_PREFERENCE),
-#endif
-#ifdef	SSL_OP_TLS_ROLLBACK_BUG
-	DEFINE_SSL_OP(SSL_OP_TLS_ROLLBACK_BUG),
-#endif
-#ifdef	SSL_OP_NO_SSLv2
-	DEFINE_SSL_OP(SSL_OP_NO_SSLv2),
-#endif
-#ifdef	SSL_OP_NO_SSLv3
-	DEFINE_SSL_OP(SSL_OP_NO_SSLv3),
-#endif
-#ifdef	SSL_OP_NO_TLSv1
-	DEFINE_SSL_OP(SSL_OP_NO_TLSv1),
-#endif
-#ifdef	SSL_OP_NO_TLSv1_2
-	DEFINE_SSL_OP(SSL_OP_NO_TLSv1_2),
-#endif
-/*	Special case for NO_TLSv1_3 so defined for pre OpenSSL 1.1.1 */
+#include "gen_tls_options.h"
 #ifndef	SSL_OP_NO_TLSv1_3
+/*	Special case: define this option so that pre OpenSSL 1.1.1 recognize it */
 #	define SSL_OP_NO_TLSv1_3	0x0
-#endif
 	DEFINE_SSL_OP(SSL_OP_NO_TLSv1_3),
-#ifdef	SSL_OP_NO_TLSv1_1
-	DEFINE_SSL_OP(SSL_OP_NO_TLSv1_1),
-#endif
-#ifdef	SSL_OP_PKCS1_CHECK_1
-	DEFINE_SSL_OP(SSL_OP_PKCS1_CHECK_1),
-#endif
-#ifdef	SSL_OP_PKCS1_CHECK_2
-	DEFINE_SSL_OP(SSL_OP_PKCS1_CHECK_2),
-#endif
-#ifdef	SSL_OP_NETSCAPE_CA_DN_BUG
-	DEFINE_SSL_OP(SSL_OP_NETSCAPE_CA_DN_BUG),
-#endif
-#ifdef	SSL_OP_NETSCAPE_DEMO_CIPHER_CHANGE_BUG
-	DEFINE_SSL_OP(SSL_OP_NETSCAPE_DEMO_CIPHER_CHANGE_BUG),
-#endif
-#ifdef	SSL_OP_CRYPTOPRO_TLSEXT_BUG
-	DEFINE_SSL_OP(SSL_OP_CRYPTOPRO_TLSEXT_BUG),
 #endif
 	{NULL, 0}
 };
@@ -505,6 +400,7 @@ STATICFNDEF int new_session_callback(SSL *ssl, SSL_SESSION *session)
 	return 1;
 }
 
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
 STATICFNDEF DH *read_dhparams(const char *dh_fn)
 {
 	BIO		*bio;
@@ -556,6 +452,7 @@ STATICFNDEF DH *tmp_dh_callback(SSL *ssl, int is_export, int keylength)
 	assert(dh512 && dh1024 && ((512 == keylength) || (1024 == keylength)));
 	return (512 == keylength) ? dh512 : dh1024;
 }
+#endif
 
 int gtm_tls_errno(void)
 {
@@ -634,10 +531,37 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 					GTM_TLS_API_VERSION, version);
 		return NULL;
 	}
+	/* Setup function pointers to symbols exported by libgtmshr.so. */
+	if (0 != gc_load_gtmshr_symbols())
+		return NULL;
+	/* Initialize OpenSSL library */
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	/* The following options are initialzied by default:
+	 * 	OPENSSL_INIT_LOAD_CRYPTO_STRINGS
+	 * 	OPENSSL_INIT_ADD_ALL_CIPHERS
+	 * 	OPENSSL_INIT_ADD_ALL_DIGESTS
+	 *	OPENSSL_INIT_LOAD_CONFIG as of 1.1.1 - second parameter is path to file; NULL means OS default
+	 *	OPENSSL_INIT_ASYNC
+	 *
+	 * The following are manually added:
+	 * 	OPENSSL_INIT_NO_ATEXIT - suppress OpenSSL's "atexit" handler (new OpenSSL 3.0)
+	 */
+#	ifndef OPENSSL_INIT_NO_ATEXIT
+#	define OPENSSL_INIT_NO_ATEXIT 0
+#	endif
+#	define GTMTLS_STARTUP_OPTIONS	(OPENSSL_INIT_NO_ATEXIT)
+	if (!OPENSSL_init_ssl(GTMTLS_STARTUP_OPTIONS, NULL))
+	{	/* Can't use SET_AND_APPEND_OPENSSL_ERROR which needs the above to initialize error reporting functions */
+		gtm_tls_set_error(NULL, "OpenSSL library initialization failed");
+		return NULL;
+	}
+#else
 	/* Initialize the SSL/TLS library, the algorithms/cipher suite and error strings. */
 	SSL_library_init();
 	SSL_load_error_strings();
 	ERR_load_BIO_strings();
+	OpenSSL_add_all_algorithms();
+#endif
 	/* Turn on FIPS mode if requested. */
 	fips_enabled = FALSE;	/* most common case. */
 	IS_FIPS_MODE_REQUESTED(fips_requested);
@@ -647,14 +571,14 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		if (-1 == rv)
 			return NULL; /* Relevant error detail populated in the above macro. */
 	}
-	OpenSSL_add_all_algorithms();
-	/* Setup function pointers to symbols exported by libgtmshr.so. */
-	if (0 != gc_load_gtmshr_symbols())
-		return NULL;
 	/* Setup a SSL context that allows TLSv1.x but no SSLv[23] (which is deprecated due to a great number of security
 	 * vulnerabilities).
 	 */
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	if (NULL == (ctx = SSL_CTX_new(TLS_method())))
+#else
 	if (NULL == (ctx = SSL_CTX_new(SSLv23_method())))
+#endif
 	{
 		SET_AND_APPEND_OPENSSL_ERROR("Failed to create an SSL context.");
 		return NULL;
@@ -813,7 +737,11 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		SSL_CTX_set_timeout(ctx, DEFAULT_SESSION_TIMEOUT);
 	if (CONFIG_FALSE == config_lookup_string(cfg, "tls.cipher-list", &cipher_list))
 		cipher_list = NULL;
-	else if (('\0' != cipher_list[0]) && (0 >= SSL_CTX_set_cipher_list(ctx, cipher_list)))
+	else if (('\0' != cipher_list[0]) && (0 >= SSL_CTX_set_cipher_list(ctx, cipher_list))
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+			&& (0 >= SSL_CTX_set_ciphersuites(ctx, cipher_list))
+#endif
+		)
 	{
 		SET_AND_APPEND_OPENSSL_ERROR("Failed to add Cipher-List command string: %s.", cipher_list);
 		SSL_CTX_free(ctx);
@@ -1230,7 +1158,11 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			cipher_list = (GTMTLS_OP_SOCKET_DEV & flags) ? GTM_DEFAULT_CIPHER_LIST : REPL_CIPHER_LIST;
 		}
 	}
-	if ((NULL != cipher_list) && (0 >= SSL_set_cipher_list(ssl, cipher_list)))
+	if ((NULL != cipher_list) && (0 >= SSL_set_cipher_list(ssl, cipher_list))
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+			&& (0 >= SSL_set_ciphersuites(ssl, cipher_list))
+#endif
+	   )
 	{
 		SET_AND_APPEND_OPENSSL_ERROR("Failed to add Cipher-List command string: %s.", cipher_list);
 		SSL_free(ssl);
@@ -1366,6 +1298,19 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			}
 		}
 	}
+#	ifdef SSL_OP_ALLOW_CLIENT_RENEGOTIATION
+	/* The Receiver Server does this to let the Source Server initiate renegotiation. OpenSSL 3.0 requires the
+	 * server side to explicitly allow client side initiated renegotiations. This was done to mitigate the
+	 * possibility of a denial-of-service attack caused by a client repeatedly requesting renegotiation. This should
+	 * not be a problem for replication since the Source and Receiver Servers negotiate a number of parameters
+	 * before starting TLS (protection by protocol).
+	 */
+	if (flags & GTMTLS_OP_RENEGOTIATE_REQUESTED)
+	{
+		assert(!CLIENT_MODE(flags));
+		SSL_set_options(ssl, SSL_OP_ALLOW_CLIENT_RENEGOTIATION);
+	}
+#	endif
 	/* OpenSSL does not recommend enabling compression as the current state of the SSL/TLS protocol does not specify identifiers
 	 * for compression libraries thereby allowing for incompatibilities when different SSL/TLS implementations are used in the
 	 * client and the server. So, disable compression.
@@ -1466,6 +1411,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			SSL_free(ssl);
 			return NULL;
 		}
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
 		/* Set up Ephemeral Diffie-Hellman key exchange callback. This callback is invoked whenever, during the connection
 	 	* time, OpenSSL requires Diffie-Hellman key parameters. The SSL_OP_SINGLE_DH_USE is turned on so that the same
 	 	* private key is not used for each session. This means a little extra computation during the time of handshake, but
@@ -1481,6 +1427,9 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			SSL_set_options(ssl, SSL_OP_SINGLE_DH_USE);
 			SSL_set_tmp_dh_callback(ssl, tmp_dh_callback);
 		}
+#else
+		SSL_set_dh_auto(ssl, 1);
+#endif
 	}
 	tlscafile = config_lookup_string(cfg, "tls.CAfile", &CAfile);
 	SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.CAfile", id);
@@ -1854,9 +1803,11 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 				case TLS1_2_VERSION:
 					ssl_version_ptr = "TLSv1.2";
 					break;
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
 				case TLS1_3_VERSION:
 					ssl_version_ptr = "TLSv1.3";
 					break;
+#endif
 				default:
 					ssl_version_ptr = NULL;
 					SNPRINTF(conn_info->protocol, SIZEOF(conn_info->protocol), "unknown protocol 0x%X",

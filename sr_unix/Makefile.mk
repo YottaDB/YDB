@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2021 Fidelity National Information		#
+# Copyright (c) 2013-2022 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -172,10 +172,41 @@ crypt_util_hdrfiles = gtmcrypt_util.h gtmcrypt_interface.h
 crypt_srcfiles = gtmcrypt_ref.c gtmcrypt_pk_ref.c gtmcrypt_dbk_ref.c gtmcrypt_sym_ref.c
 crypt_hrdfiles = gtmcrypt_ref.h gtmcrypt_pk_ref.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_interface.h
 tls_srcfiles = gtm_tls_impl.c
-tls_hdrfiles = gtm_tls_impl.h gtm_tls_interface.h
+gen_tls_hdrfiles = gen_tls_options.h gen_tls_verify_options.h
+tls_hdrfiles = gtm_tls_impl.h gtm_tls_interface.h ${gen_tls_hdrfiles}
+# Intentionally clean up these files
+cleanupfiles =  gen_tls_options.tmp gen_tls_verify_options.tmp whichsslh.[chi] whichsslhver
 
 all: libgtmcryptutil.so maskpass gcrypt openssl libgtmtls.so
 
+# Use the compiler to find the ssl.h header being used. Copy it into PWD and extract the macro definitions
+# Explanation of the AWK
+# - /ssl\.h/ match the line with the "ssl.h" header; assumption openssl/ssl.h is the only ssl.h include
+# - /^[^"]*"/ match everything from the beginning of the line that isn't a quotation mark until it encounters
+#             a quotation mark and substitute that with the null str
+# - /".*$/ match everything from a quotation mark to the end of the line and substitute that with the null str
+# - (possibly problematic) With full path to "ssl.h", use AWK's system func to copy the file into PWD
+# - exit the script so that this action is done only once
+whichsslh: Makefile
+	printf '#include <openssl/ssl.h>\n#include <stdio.h>\nint main(int argc, char *argv[]){\nprintf("/* %%s */\\n",OPENSSL_VERSION_TEXT);return 0;}' > whichsslh.c
+	$(CC) $(IFLAGS) -E whichsslh.c > whichsslh.i
+	awk '/ssl\.h/{sub(/^[^"]*"/,"");sub(/".*/,"");print;system("cp -f "$$0" whichsslh.h");exit}' whichsslh.i
+	$(CC) $(IFLAGS) whichsslh.c -o whichsslhver
+
+# Generate the two header files using an intermediate file step. Commands are always executed ensuring that the plugins
+# are recompiled only when a material change occurs
+# NOTE: select between field 2 vs 3 because OpenSSL headers after 1.0.2 do "#<space>define" instead of "#define"
+gen_tls_options.h: whichsslh
+	awk '/define[ \t]+SSL_OP_[A-Z_v0-9]+[ \t]+/{fld=2;if($$2 ~ /define/)fld=3;print "DEFINE_SSL_OP(" $$(fld) "),"}'       whichsslh.h > gen_tls_options.tmp
+	./whichsslhver >> gen_tls_options.tmp
+	test -e $@ && (cmp -s gen_tls_options.tmp $@ || mv gen_tls_options.tmp $@) || mv gen_tls_options.tmp $@
+
+gen_tls_verify_options.h: whichsslh
+	awk '/define[ \t]+SSL_VERIFY_[A-Z_v0-9]+[ \t]+/{fld=2;if($$2 ~ /define/)fld=3;print "DEFINE_SSL_OP(" $$(fld) "),"}'   whichsslh.h > gen_tls_verify_options.tmp
+	./whichsslhver >> gen_tls_verify_options.tmp
+	test -e $@ && (cmp -s gen_tls_verify_options.tmp $@ || mv gen_tls_verify_options.tmp $@) || mv gen_tls_verify_options.tmp $@
+
+# Reference Encryption Plugin Libraries
 libgtmcryptutil.so: $(crypt_util_srcfiles) $(crypt_util_hdrfiles)
 	@echo ; echo "Compiling $@..."
 	$(CC) $(CFLAGS) $(default_thirdparty_CFLAGS) $(crypt_util_srcfiles) $(LDSHR) $(LDFLAGS) $@ $(default_thirdparty_LDFLAGS)
@@ -188,16 +219,12 @@ maskpass: maskpass.c $(crypt_util_srcfiles) $(crypt_util_hdrfiles)
 	$(CC) $(CFLAGS) -DUSE_SYSLIB_FUNCS $(default_thirdparty_CFLAGS) maskpass.c $(crypt_util_srcfiles)	\
 		$(LDFLAGS) $@ $(default_thirdparty_LDFLAGS)
 
-ifneq ($(HAVE_GPGCRYPT),)
 gcrypt: libgtmcrypt_gcrypt_AES256CFB.so
 
 libgtmcrypt_gcrypt_AES256CFB.so: $(crypt_srcfiles) $(crypt_hdrfiles) libgtmcryptutil.so
 	@echo ; echo "Compiling $@..."
 	$(CC) $(CFLAGS) -DUSE_GCRYPT -DUSE_AES256CFB $(gcrypt_nofips_flag) $(crypt_srcfiles) $(LDSHR)		\
 		$(RPATHFLAGS) $(LDFLAGS) $@ -lgcrypt -lgpgme -lgpg-error $(COMMON_LIBS)
-else
-gcrypt:
-endif
 
 openssl: libgtmcrypt_openssl_AES256CFB.so
 
@@ -227,6 +254,7 @@ ifeq ($(HAVE_UTF8),0)
 	@echo $(icuver_msg)
 	(cd $(PLUGINDIR)/o/utf8 && env gtm_chset=UTF-8 ${gtm_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
 endif
+	rm -f ${cleanupfiles}
 
 uninstall:
 	@echo ; echo "Uninstalling shared libraries from $(PLUGINDIR) and maskpass from $(PLUGINDIR)/gtmcrypt..."
@@ -236,7 +264,7 @@ uninstall:
 
 clean:
 	@echo ; echo "Removing generated files..."
-	rm -f *.so *.o
+	rm -f *.so *.o ${cleanupfiles} ${gen_tls_hdrfiles}
 ifeq ($(NOT_IN_GTMCRYPTDIR),1)
 	rm -f maskpass
 endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,8 +50,8 @@ GBLREF sgmnt_data_ptr_t        cs_data;
 error_def(ERR_AUTODBCREFAIL);
 error_def(ERR_FILECREERR);
 
-/* This function is only called during the creation of a new region so it only needs to create V7 blocks */
-void mucblkini(void)
+/* This function is only called during the creation of a new region */
+void mucblkini(enum db_ver desired_db_ver)
 {
 	uchar_ptr_t		c, bmp;
 	blk_hdr_ptr_t		bp1, bp2;
@@ -59,7 +59,9 @@ void mucblkini(void)
 	unix_db_info		*udi;
 	int4			bmpsize, status;
 	block_id		blk;
+	boolean_t		isv7blk;
 
+	isv7blk = (GDSVCURR == desired_db_ver);
 	udi = FILE_INFO(gv_cur_region);
 	bp1 = (blk_hdr_ptr_t)malloc(cs_addrs->hdr->blk_size);
 	bp2 = (blk_hdr_ptr_t)malloc(cs_addrs->hdr->blk_size);
@@ -86,15 +88,18 @@ void mucblkini(void)
 		return;
 	}
 	rp = (rec_hdr_ptr_t)((uchar_ptr_t)bp1 + SIZEOF(blk_hdr));
-	bstar_rec((sm_uc_ptr_t)rp, TRUE); /* This function is creating a new region so it will always be making V7 blocks */
+	bstar_rec((sm_uc_ptr_t)rp, isv7blk); /* This function is creating a new region so it will always be making V7 blocks */
 	c = CST_BOK(rp);
 	blk = DIR_DATA;
-	PUT_BLK_ID(c, blk);
-	bp1->bver = GDSVCURR;
+	if (isv7blk)
+		PUT_BLK_ID_64(c, blk);
+	else
+		PUT_BLK_ID_32(c, blk);
+	bp1->bver = desired_db_ver;
 	bp1->levl = 1;
-	bp1->bsiz = bstar_rec_size(TRUE) + SIZEOF(blk_hdr);
+	bp1->bsiz = bstar_rec_size(isv7blk) + SIZEOF(blk_hdr);
 	bp1->tn = 0;
-	bp2->bver = GDSVCURR;
+	bp2->bver = desired_db_ver;
 	bp2->levl =0;
 	bp2->bsiz = SIZEOF(blk_hdr);
 	bp2->tn = 0;

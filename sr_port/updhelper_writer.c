@@ -119,11 +119,13 @@ int updhelper_writer(void)
 		flushed = FALSE;
 		for (reg = gd_header->regions, r_top = reg + gd_header->n_regions; reg < r_top; reg++)
 		{
-			assert(reg->open); /* we called region_init() in the initialization code */
+			 /* we only call gvcst_init() in updhelper_init(), skip closed regions */
+			if (!reg->open)
+				continue;
 			csa = &FILE_INFO(reg)->s_addrs;
 			cnl = csa->nl;
 			csd = csa->hdr;
-			if (reg->open && !reg->read_only)
+			if (!reg->read_only)
 			{
 				TP_CHANGE_REG(reg); /* for jnl_ensure_open() */
 				if (dba_mm == REG_ACC_METH(reg))

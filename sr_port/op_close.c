@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,11 +11,6 @@
  ****************************************************************/
 
 #include "mdef.h"
-
-#ifdef VMS
-#include <devdef.h>
-#include <rms.h>
-#endif
 
 #include "io.h"
 #include "iosp.h"
@@ -52,7 +47,8 @@ void op_close(mval *v, mval *p)
 		ciod = tl->iod;
 		if ((NULL == ciod) || (TRUE == ciod->perm) || (dev_open != ciod->state))
 		{
-			if (dev_never_opened == ciod->state)
+			if (ciod && (dev_never_opened == ciod->state)
+				&& ((rm == ciod->type) || (pi == ciod->type) || (ff == ciod->type)))
 				remove_rms(ciod);
 			return;
 		}
@@ -71,22 +67,21 @@ void op_close(mval *v, mval *p)
 				l = prev;
 			}
 		}
-	} else if ((SS_NOLOGNAM == stat) VMS_ONLY(|| (0 == v->str.len)))
+	} else if (SS_NOLOGNAM == stat)
 	{
 	        if (0 == (l = get_log_name(&v->str, NO_INSERT)))
 			return;
 		ciod = l->iod;
 		if ((NULL == ciod) || (TRUE == ciod->perm) || (dev_open != ciod->state))
 		{
-			if (dev_never_opened == ciod->state)
+			if (ciod && (dev_never_opened == ciod->state)
+				&& ((rm == ciod->type) || (pi == ciod->type) || (ff == ciod->type)))
 				remove_rms(ciod);
 			return;
 		}
 	}
-#	ifdef UNIX
 	else if (SS_LOG2LONG == stat)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, SIZEOF(buf) - 1);
-#	endif
 	else
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) stat);
 

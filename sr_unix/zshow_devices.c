@@ -149,11 +149,13 @@ void zshow_devices(zshow_out *output)
 	static readonly char text_text[] = " TEXT";
 	char   csname[_CSNAME_LEN_MAX + 1], *csptr;
 #endif
-	static readonly char zsh_socket_state[][10] =
+	static readonly char zsh_socket_state[][11] =
 		{	"CONNECTED"
 			,"LISTENING"
 			,"BOUND"
 			,"CREATED"
+			,"INPROGRESS"
+			,""
 		};
 	static readonly char morereadtime_text[] = "MOREREADTIME=";
 	char	*charptr;
@@ -650,7 +652,7 @@ void zshow_devices(zshow_out *output)
 						mval_write(output, &m, FALSE);
 						ZS_ONE_OUT(&v, space_text);
 						/* socket state */
-						ZS_STR_OUT(&v, zsh_socket_state[socketptr->state]);
+						ZS_VAR_STR_OUT(&v, zsh_socket_state[socketptr->state]);
 						ZS_ONE_OUT(&v, space_text);
 						/* socket IO mode */		switch(tiod->ichset)
 						{

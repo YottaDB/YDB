@@ -10,10 +10,12 @@
 #								#
 #################################################################
 
-# CMake 2.8.4 introduced LINK_DEPENDS target property
-# CMake 2.8.4 introduced generator expressions in custom commands
-# CMake 2.8.5 introduced use of C compiler as the assembler
-cmake_minimum_required(VERSION 2.8.5)
+# Min version of cmake on RHEL 6
+cmake_minimum_required(VERSION 3.6.0)
+if(POLICY CMP0087)
+  # Policy needed since cmake 3.16
+  cmake_policy(SET CMP0087 NEW)
+endif()
 project(GTM C ASM)
 
 # Max optimization level is -O2
@@ -27,7 +29,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version ${V7.0-003})
+set(version ${V7.0-004})
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -147,7 +149,8 @@ endif()
 # directory ordered by 'gt_src_list'.
 set(includes ${GTM_BINARY_DIR}/gen)
 foreach(d ${gt_src_list})
-  list(APPEND includes ${source_dir_${d}})
+  file(RELATIVE_PATH d_REL ${CMAKE_CURRENT_SOURCE_DIR} ${source_dir_${d}}/.)
+  list(APPEND includes ${d_REL})
 endforeach()
 include_directories(${includes})
 # We generate some uniquely-named headers in the top of the build tree.
@@ -317,6 +320,10 @@ if(gen_xfer_desc)
   foreach(src ${sources_used})
     set(CMAKE_CONFIGURABLE_FILE_CONTENT "${CMAKE_CONFIGURABLE_FILE_CONTENT}${src}\n")
   endforeach()
+  foreach(inc ${includes})
+    get_filename_component(absinc ${inc} REALPATH)
+    list(APPEND abs_includes ${absinc})
+  endforeach()
   configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in ${GTM_BINARY_DIR}/sources.list)
   add_custom_command(
     OUTPUT xfer_desc.i
@@ -326,7 +333,8 @@ if(gen_xfer_desc)
     COMMAND ${CMAKE_COMMAND}
       -D CMAKE_C_COMPILER=${CMAKE_C_COMPILER}
       -D "arch=${arch}"
-      -D "includes=${includes}"
+      -D "includes=${abs_includes}"
+      -D CMAKE_VERBOSE_MAKEFILE=${CMAKE_VERBOSE_MAKEFILE}
       -P ${GTM_SOURCE_DIR}/sr_unix/gen_xfer_desc.cmake
     VERBATIM
     )
@@ -348,7 +356,8 @@ set(gtmthreadgblasmhdr   "gen/gtm_threadgbl_deftypes.h")
 add_custom_command(
   OUTPUT ${gtmthreadgblasmhdr}
   DEPENDS gtm_threadgbl_deftypes
-  COMMAND gtm_threadgbl_deftypes > ${gtmthreadgblasmhdr}
+  COMMAND gtm_threadgbl_deftypes > ${gtmthreadgblasmhdr}.new
+  COMMAND cmp -s ${gtmthreadgblasmhdr} ${gtmthreadgblasmhdr}.new && rm -f ${gtmthreadgblasmhdr}.new || mv ${gtmthreadgblasmhdr}.new ${gtmthreadgblasmhdr}
   )
 # gtm_threadgbl_deftypes_asm.si
 set(gtmthreadgblasmfile   "gen/gtm_threadgbl_deftypes_asm.si")
@@ -396,8 +405,6 @@ foreach(lib
   add_dependencies(lib${lib} gen_gtm_threadgbl_deftypes)
 endforeach()
 
-# TODO: find_package or find_library for system libs?
-include_directories (/usr/local/include)
 target_link_libraries(libmumps		${libmumpslibs})
 if(gen_xfer_desc)
   add_dependencies(libmumps gen_xfer_desc)
@@ -428,7 +435,6 @@ list(APPEND with_export mupip)
 add_executable(lke			${lke_SOURCES})
 target_link_libraries(lke		liblke libmumps libgnpclient libmumps libgnpclient libcmisockettcp)
 list(APPEND with_export lke)
-
 
 add_executable(gtcm_server		${gtcm_server_SOURCES})
 target_link_libraries(gtcm_server	libgtcm libmumps libstub)
@@ -474,11 +480,68 @@ foreach(tlslib ssl crypto config)
   set(TLS_LIBRARIES ${TLS_LIBRARIES} ${TLSLIB_${tlslib}})
 endforeach()
 
+#-----------------------------------------------------------------------------
+## Encryption Plugin Library compilation ##
+
+# Generate the list of OpenSSL options from the target version's ssl.h. This avoids hardcoding these options
+# 1. Find the header file
+find_file(SSLH openssl/ssl.h CMAKE_INCLUDE_PATH)
+if(SSLH MATCHES ".+-NOTFOUND")
+	message(FATAL_ERROR "FATAL: ssl.h not found (${SSLH})")
+else()
+	message("INFO: Using ssl.h ${SSLH}")
+endif()
+# 2. Find awk
+find_program(AWK gawk mawk awk)
+if(AWK MATCHES ".+-NOTFOUND")
+	message(FATAL_ERROR "FATAL: AWK not be found (${AWK}).")
+endif()
+# 3. Create the awk scripts to avoid spurious CMake parsing errors and warnings
+# NOTE: select between field 2 vs 3 because OpenSSL headers after 1.0.2 do "#<space>define" instead of "#define"
+set(CMAKE_CONFIGURABLE_FILE_CONTENT
+	"/define[ \\t]+SSL_OP_[A-Z_v0-9]+[ \\t]+/{fld=2;if($2 ~ /define/)fld=3;print \"DEFINE_SSL_OP(\" $(fld) \"),\"}")
+configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in ${GTM_BINARY_DIR}/gen_tls_options.awk)
+set(CMAKE_CONFIGURABLE_FILE_CONTENT
+	"/define[ \\t]+SSL_VERIFY_[A-Z_v0-9]+[ \\t]+/{fld=2;if($2 ~ /define/)fld=3;print \"DEFINE_SSL_OP(\" $(fld) \"),\"}")
+configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in ${GTM_BINARY_DIR}/gen_tls_verify_options.awk)
+# 4. Generate the files
+add_custom_command(
+  OUTPUT ${GTM_BINARY_DIR}/gen_tls_verify_options.h
+  DEPENDS gen_gtm_threadgbl_deftypes
+  COMMENT "Generating SSL/TLS verification options header file"
+  COMMAND ${AWK} -f ${GTM_BINARY_DIR}/gen_tls_verify_options.awk ${SSLH} > ${GTM_BINARY_DIR}/gen_tls_verify_options.h
+  VERBATIM
+  )
+add_custom_command(
+  OUTPUT ${GTM_BINARY_DIR}/gen_tls_options.h
+  DEPENDS gen_gtm_threadgbl_deftypes
+  COMMENT "Generating SSL/TLS options header file"
+  COMMAND ${AWK} -f ${GTM_BINARY_DIR}/gen_tls_options.awk ${SSLH} > ${GTM_BINARY_DIR}/gen_tls_options.h
+  VERBATIM
+  )
+# 5. Setup the dependency for downstream consumers
+add_custom_target(gen_tls_options
+  DEPENDS ${GTM_BINARY_DIR}/gen_tls_options.h ${GTM_BINARY_DIR}/gen_tls_verify_options.h)
+
+# Locate libgcrypt's header files (assumption: all others headers are found in the same location)
+find_program(LIBGCRYPT_CONFIG_SCRIPT NAMES libgcrypt-config)
+if (LIBGCRYPT_CONFIG_SCRIPT MATCHES ".+-NOTFOUND")
+	message(FATAL_ERROR "FATAL: libgcrypt-config not found (${LIBGCRYPT_CONFIG_SCRIPT})")
+else()
+	# libgcrypt-config --cflags returns "\n" when the includes are located in the default search path
+	exec_program(${LIBGCRYPT_CONFIG_SCRIPT} ARGS --cflags RETURN_VALUE _return_VALUE OUTPUT_VARIABLE LIBGCRYPT_CFLAGS)
+	# If a path is returned, it is preceded by '-I' for use as CFLAG directive
+	string(REGEX REPLACE "^-I" "" LIBGCRYPT_INCLUDES "${LIBGCRYPT_CFLAGS}")
+	if (NOT (${LIBGCRYPT_INCLUDES} MATCHES "\n"))
+		message("INFO: ${LIBGCRYPT_CONFIG_SCRIPT} ${_return_VALUE} '${LIBGCRYPT_INCLUDES}'")
+		include_directories(${LIBGCRYPT_INCLUDES})
+	endif()
+endif()
+
 # Building the three encryption libraries could by a loop of some sort, but
 # manually creating each target is way easier.
 
 # Library=GCRYPT Algorithm=AES256CFB
-include_directories (/usr/local/ssl/include)
 add_library(libgtmcrypt_gcrypt_AES256CFB.so MODULE ${libgtmcrypt_SOURCES})
 set_target_properties(libgtmcrypt_gcrypt_AES256CFB.so PROPERTIES
   OUTPUT_NAME gtmcrypt_gcrypt_AES256CFB
@@ -519,7 +582,7 @@ set_target_properties(libgtmtls PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
   )
 target_link_libraries(libgtmtls ${TLS_LIBRARIES})
-add_dependencies(libgtmtls gen_gtm_threadgbl_deftypes)
+add_dependencies(libgtmtls gen_gtm_threadgbl_deftypes gen_tls_options)
 install(TARGETS libgtmtls DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
 add_executable(maskpass ${maskpass_SOURCES})
@@ -574,6 +637,7 @@ foreach(f
   list(APPEND files_to_place "${f_out}")
 endforeach()
 
+#-----------------------------------------------------------------------------
 install(TARGETS
   mumps
   dse
@@ -651,6 +715,7 @@ foreach(d ${gt_src_list})
         )
       install(FILES "${m_out}" DESTINATION ${GTM_INSTALL_DIR})
       list(APPEND files_to_place "${m_out}")
+      list(APPEND gtm_chset_routines_${gtm_chset} "${m_out}")
     endif()
   endforeach()
   foreach(m ${mpt_files_${d}})
@@ -809,6 +874,7 @@ foreach(gtm_chset "" "UTF-8")
       VERBATIM
       )
     list(APPEND files_to_place ${out})
+    list(APPEND mo_files ${out})
     install(FILES "${out}" DESTINATION ${GTM_INSTALL_DIR}${gtm_chset_dir_${gtm_chset}})
   endforeach()
 endforeach()
@@ -838,17 +904,26 @@ Halt")
     -D gtmgbldir=${GTM_BINARY_DIR}/${help}help
     )
   add_custom_command(
-    OUTPUT ${help}help.dat ${help}help.gld
-    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
+    OUTPUT ${GTM_BINARY_DIR}/${help}help.gld
+    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake $<TARGET_FILE:mumps>
             ${GTM_BINARY_DIR}/${help}help.in1
-            ${GTM_BINARY_DIR}/${help}help.in2
-    COMMAND ${CMAKE_COMMAND} -E remove ${help}help.dat ${help}help.gld
+            ${mo_files}
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:mumps> -D "args=-run;GDE"
       -D input_file=${GTM_BINARY_DIR}/${help}help.in1
       -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
+    VERBATIM
+    )
+  add_custom_command(
+    OUTPUT ${GTM_BINARY_DIR}/${help}help.dat
+    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake $<TARGET_FILE:mumps> $<TARGET_FILE:mupip>
+            ${GTM_BINARY_DIR}/${help}help.in2
+            ${GTM_BINARY_DIR}/${help}help.gld
+    WORKING_DIRECTORY ${GTM_BINARY_DIR}
+    COMMAND ${CMAKE_COMMAND} -E remove -f ${help}help.dat
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:mupip> -D "args=create"
+      -D gtmgbldir=${help}help
       -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:mumps> -D "args=-direct"
@@ -862,8 +937,8 @@ Halt")
 endforeach()
 if (GTMDefinedTypesInit${CMAKE_BUILD_TYPE}_found)
 add_custom_command(
-  OUTPUT GTMDEFINEDTYPESTODB.o
-  DEPENDS gtmhelp.dat gtmhelp.gld GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m ${GTM_BINARY_DIR}/gtmhelp.dat_noro
+  OUTPUT ${GTM_BINARY_DIR}/.gtm_deftypes_load
+  DEPENDS GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m GTMDEFINEDTYPESTODB.o ${GTM_BINARY_DIR}/gtmhelp.dat
   COMMAND ${CMAKE_COMMAND} -E copy GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m ${GTM_BINARY_DIR}/GTMDefinedTypesInit.m
   COMMAND ${CMAKE_COMMAND}
     -D gtm_dist=${GTM_BINARY_DIR}
@@ -872,9 +947,15 @@ add_custom_command(
     -D mumps=$<TARGET_FILE:mumps>
     -D "args=-run;GTMDEFINEDTYPESTODB"
     -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
-    VERBATIM
+  COMMAND touch ${GTM_BINARY_DIR}/.gtm_deftypes_load
+  VERBATIM
   )
 list(APPEND files_to_place GTMDEFINEDTYPESTODB.o)
+else()
+add_custom_command(
+  OUTPUT ${GTM_BINARY_DIR}/.gtm_deftypes_load
+  COMMAND touch ${GTM_BINARY_DIR}/.gtm_deftypes_load
+  )
 endif(GTMDefinedTypesInit${CMAKE_BUILD_TYPE}_found)
 
 foreach(help gtm gde mupip dse lke)
@@ -889,17 +970,17 @@ exit")
     -D gtmgbldir=${GTM_BINARY_DIR}/${help}help
     )
   add_custom_command(
-    OUTPUT ${GTM_BINARY_DIR}/${help}help.dat_ro
-    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
-            ${GTM_BINARY_DIR}/${help}help.in3
-	    ${help}help.dat ${help}help.gld ${help}help.dat_noro
+    OUTPUT ${GTM_BINARY_DIR}/.${help}help.dat_setro
+    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake $<TARGET_FILE:mupip>
+            ${GTM_BINARY_DIR}/${help}help.in3 ${GTM_BINARY_DIR}/.gtm_deftypes_load
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:mupip>
       -D input_file=${GTM_BINARY_DIR}/${help}help.in3
       -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
+    COMMAND touch ${GTM_BINARY_DIR}/.${help}help.dat_setro
     VERBATIM
     )
-    list(APPEND targets_to_run ${GTM_BINARY_DIR}/${help}help.dat_ro)
+    list(APPEND targets_to_run ${GTM_BINARY_DIR}/.${help}help.dat_setro)
 endforeach()
 
 foreach(help gtm gde mupip dse lke)
@@ -913,18 +994,15 @@ exit")
     -D gtmroutines=.
     -D gtmgbldir=${GTM_BINARY_DIR}/${help}help
     )
-  add_custom_command(
-    OUTPUT ${GTM_BINARY_DIR}/${help}help.dat_noro
+  add_custom_target(${help}help.dat_setnoro
     DEPENDS ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
-            ${GTM_BINARY_DIR}/${help}help.in4
-	    ${help}help.dat ${help}help.gld
+            ${GTM_BINARY_DIR}/${help}help.in4 ${help}help.dat
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:mupip>
       -D input_file=${GTM_BINARY_DIR}/${help}help.in4
       -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
     VERBATIM
     )
-    list(APPEND targets_to_run ${GTM_BINARY_DIR}/${help}help.dat_noro)
 endforeach()
 #-----------------------------------------------------------------------------
 
@@ -952,5 +1030,5 @@ if (EXISTS ${GTM_SOURCE_DIR}/COPYING)
   install(FILES COPYING DESTINATION ${GTM_INSTALL_DIR})
 endif()
 
-add_custom_target(place_files ALL DEPENDS ${files_to_place})
+add_custom_target(place_files DEPENDS ${files_to_place})
 add_custom_target(make_read_only ALL DEPENDS ${targets_to_run} place_files)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -177,6 +177,8 @@ boolean_t	gvcst_order2(void)
 					}
 				}
 			}
+			if (bh->curr_rec.match >= gv_currkey->end)
+				found = FALSE;
 			if (found)
 			{
 				assert(gv_altkey->top == gv_currkey->top);

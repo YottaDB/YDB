@@ -80,7 +80,6 @@ GBLREF	uint4			is_updhelper;
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	gd_addr			*gd_header;
 
-error_def(ERR_NOTALLDBOPN);
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_REPLWARN);
 error_def(ERR_TEXT);

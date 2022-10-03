@@ -526,7 +526,7 @@ MBSTART {											\
 		STATSDBREG_TO_BASEDBREG(statsDBreg, baseDBreg);							\
 		if (!baseDBreg->open)										\
 			gv_init_reg(baseDBreg, NULL);								\
-		if (!statsDBreg->open)										\
+		if (!statsDBreg->open && IS_ACC_METH_BG_OR_MM(baseDBreg->dyn.addr->acc_meth))			\
 		{	/* statsDB did not get opened as part of baseDB open above. Possible if gtm_statshare	\
 			 * is not set to 1. But user could still do a ZWR ^%YGS which would try to open		\
 			 * statsDB in caller (who is not equipped to handle errors) so do the open of the	\
@@ -1472,6 +1472,7 @@ MBSTART {											\
 #define SIZEOF_FILE_HDR(SGD)		(SGMNT_HDR_LEN + MASTER_MAP_SIZE(SGD))
 #define SIZEOF_FILE_HDR_DFLT		(SGMNT_HDR_LEN + MASTER_MAP_SIZE_DFLT)
 #define SIZEOF_FILE_HDR_V7		(SGMNT_HDR_LEN + MASTER_MAP_SIZE_V7)
+#define SIZEOF_FILE_HDR_V6		(SGMNT_HDR_LEN + MASTER_MAP_SIZE_V6)
 #define SIZEOF_FILE_HDR_V5		(SGMNT_HDR_LEN + MASTER_MAP_SIZE_V5)
 #define SIZEOF_FILE_HDR_MIN		(SGMNT_HDR_LEN + MASTER_MAP_SIZE_V4)
 #define SIZEOF_FILE_HDR_MAX		(SGMNT_HDR_LEN + MASTER_MAP_SIZE_MAX)
@@ -3534,11 +3535,11 @@ MBSTART {											\
 } MBEND
 #define COPY_KEY(TARG_KEY, SRC_KEY)												\
 MBSTART {															\
-	assert(TARG_KEY->top >= SRC_KEY->end);											\
+	assert((TARG_KEY)->top >= (SRC_KEY)->end);										\
 	/* ensure proper alignment before dereferencing SRC_KEY->end */								\
-	assert(0 == (((UINTPTR_T)(SRC_KEY)) % SIZEOF(SRC_KEY->end)));								\
+	assert(0 == (((UINTPTR_T)(SRC_KEY)) % SIZEOF((SRC_KEY)->end)));								\
 	/* WARNING: depends on the first two bytes of gv_key structure being key top field */					\
-	assert((2 == SIZEOF(TARG_KEY->top)) && ((sm_uc_ptr_t)(TARG_KEY) == (sm_uc_ptr_t)(&TARG_KEY->top)));			\
+	assert((2 == SIZEOF((TARG_KEY)->top)) && ((sm_uc_ptr_t)(TARG_KEY) == (sm_uc_ptr_t)(&(TARG_KEY)->top)));			\
 	memcpy(((sm_uc_ptr_t)(TARG_KEY) + 2), ((sm_uc_ptr_t)(SRC_KEY) + 2), OFFSETOF(gv_key, base[0]) + (SRC_KEY)->end - 1);	\
 } MBEND
 

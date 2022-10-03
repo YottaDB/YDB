@@ -765,6 +765,7 @@ GBLDEF	int4		cws_reorg_remove_index;			/* see mu_swap_blk.c for comments on the 
 GBLDEF	block_id	cws_reorg_remove_array[CWS_REORG_REMOVE_ARRAYSIZE];
 GBLDEF	uint4		log_interval;
 GBLDEF	uint4		gtm_principal_editing_defaults;	/* ext_cap flags if tt */
+GBLDEF	enum db_ver	gtm_db_create_ver;		/* database creation version */
 GBLDEF	boolean_t	in_repl_inst_edit;		/* used by an assert in repl_inst_read/repl_inst_write */
 GBLDEF	boolean_t	in_repl_inst_create;		/* used by repl_inst_read/repl_inst_write */
 GBLDEF	boolean_t	holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];	/* whether a particular replication semaphore is being held

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,21 @@ void op_gvnext(mval *v)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (!gv_currkey->prev)
+	{	/* Use name-level ordering from $ORDER() instead of duplicating it here. */
+		op_gvorder(v);
+		if (0 == v->str.len)
+		{	/* $NEXT() expects -1 instead of an empty string */
+			ENSURE_STP_FREE_SPACE(2);
+			c = v->str.addr = (char *) stringpool.free;
+			*c++ = '-';
+			*c = '1';
+			v->str.len = 2;
+			stringpool.free += 2;
+			v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
+		}
+		return;
+	}
 	acc_meth = REG_ACC_METH(gv_cur_region);
 	/* if the lowest subscript is -1, then make it null */
 	if ((gv_currkey->end == gv_currkey->prev + 4)
@@ -92,7 +107,6 @@ void op_gvnext(mval *v)
 		*c = '1';
 	 	v->str.len = 2;
 		stringpool.free += 2;
-
 	} else
 	{
 		gv_altkey->prev = gv_currkey->prev;
@@ -116,7 +130,6 @@ void op_gvnext(mval *v)
 		assert (v->str.addr < (char *) stringpool.top && v->str.addr >= (char *) stringpool.base);
 		assert (v->str.addr + v->str.len <= (char *) stringpool.top
 			&& v->str.addr + v->str.len >= (char *) stringpool.base);
-
 	}
 	v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 	if ((2 == v->str.len) && ('-' == *v->str.addr) && ('1' == *(v->str.addr + 1)))	/* odd this is not !found with no comment */

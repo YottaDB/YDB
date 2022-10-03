@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,21 +46,23 @@ GBLREF uint4		dollar_tlevel;
 
 DEFINE_NSB_CONDITION_HANDLER(gvcst_spr_queryget_ch)
 
-boolean_t	gvcst_spr_queryget(mval *cumul_val)
+boolean_t	gvcst_spr_queryget(mval *result_val)
 {
 	boolean_t	spr_tpwrapped;
 	boolean_t	est_first_pass;
+	boolean_t	found, result_found;
+	boolean_t	currkey_saved = FALSE;
 	int		reg_index;
-	gd_binding	*start_map, *end_map, *map, *prev_end_map, *stop_map;
+	gd_binding	*start_map, *end_map, *map, *prev_end_map, *stop_map, *rmap;
 	gd_region	*reg, *gd_reg_start;
 	gd_addr		*addr;
 	gv_namehead	*start_map_gvt;
+	gv_key_buf	currkey_save_buf = { .key.top = DBKEYSIZE(MAX_KEY_SZ), .key.end = 0, .key.prev = 0 };
 	gvnh_reg_t	*gvnh_reg;
-	boolean_t	found, cumul_found;
+	mname_entry	gvname;
 	mval		*val;
+	srch_blk_status	*bh;
 	trans_num	gd_targ_tn, *tn_array;
-	char            cumul_key[MAX_KEY_SZ];
-	int		cumul_key_len, prev;
 #	ifdef DEBUG
 	int		save_dollar_tlevel;
 #	endif
@@ -107,9 +109,7 @@ boolean_t	gvcst_spr_queryget(mval *cumul_val)
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	/* Do any initialization that is dependent on retries AFTER the op_tstart */
 	map = start_map;
-	cumul_found = FALSE;
-	cumul_key_len = 0;
-	DEBUG_ONLY(cumul_key[cumul_key_len] = KEY_DELIMITER;)
+	result_found = FALSE;
 	INCREMENT_GD_TARG_TN(gd_targ_tn); /* takes a copy of incremented "TREF(gd_targ_tn)" into local variable "gd_targ_tn" */
 	end_map = stop_map;
 	/* Verify that initializations that happened before op_tstart are still unchanged */
@@ -126,9 +126,7 @@ boolean_t	gvcst_spr_queryget(mval *cumul_val)
 		GET_REG_INDEX(addr, gd_reg_start, reg, reg_index);	/* sets "reg_index" */
 		assert((map != start_map) || (tn_array[reg_index] != gd_targ_tn));
 		assert(TREF(gd_targ_reg_array_size) > reg_index);
-		if (tn_array[reg_index] == gd_targ_tn)
-			continue;
-		if (map != start_map)
+		if ((map != start_map) || (gv_target->gd_csa != cs_addrs) || (gv_cur_region != start_map->reg.addr))
 			GV_BIND_SUBSREG(addr, reg, gvnh_reg);	/* sets gv_target/gv_cur_region/cs_addrs */
 		assert(reg->open);
 		if (gv_target->root)
@@ -136,33 +134,44 @@ boolean_t	gvcst_spr_queryget(mval *cumul_val)
 			found = gvcst_queryget(val);
 			if (found)
 			{
-				cumul_found = TRUE;
-				assert(gv_altkey->end);
-				assert(KEY_DELIMITER == gv_altkey->base[gv_altkey->end]);
-				assert(!cumul_key_len || (KEY_DELIMITER == cumul_key[cumul_key_len - 1]));
-				if (!cumul_key_len || (0 < memcmp(&cumul_key[0], &gv_altkey->base[0], cumul_key_len)))
-				{	/* just found alt_key is less (collation-wise) than cumul_key so update cumul_key */
-					cumul_key_len = gv_altkey->end + 1;
-					assert(cumul_key_len);
-					assert(cumul_key_len < ARRAYSIZE(cumul_key));
-					memcpy(&cumul_key[0], &gv_altkey->base[0], cumul_key_len);
-					DEBUG_ONLY(prev_end_map = end_map;)
-					/* update end_map as well now that we got an earlier cumul_key */
-					end_map = gv_srch_map_linear(map, (char *)&gv_altkey->base[0], gv_altkey->end - 1);
-					BACK_OFF_ONE_MAP_ENTRY_IF_EDGECASE(gv_altkey->base, gv_altkey->end - 1, end_map);
-					assert(prev_end_map >= end_map);
-					*cumul_val = *val;
+				rmap = gv_srch_map_linear(map, (char *)&gv_altkey->base[0], gv_altkey->end - 1);
+				if (map == rmap)
+				{
+					assert(gv_altkey->end);
+					assert(KEY_DELIMITER == gv_altkey->base[gv_altkey->end]);
+					result_found = TRUE;
+					*result_val = *val;
+					break;
 				}
 			}
 		}
 		tn_array[reg_index] = gd_targ_tn;
+		/* Since we know that any subsequent match would lie beyond the current map, replace the last subscript
+		 * in the search with the corresponding one from the map endpoint.
+		 * This keeps us from getting false hits which would have been associated with earlier maps.
+		 */
+		if (map != end_map)
+		{
+			if (!currkey_saved)
+			{
+				COPY_KEY(&currkey_save_buf.key, gv_currkey);
+				currkey_saved = TRUE;
+			}
+			memcpy(gv_currkey->base, map->gvkey.addr, map->gvkey_len);
+			gv_currkey->end = map->gvkey_len;
+			gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
+			gv_currkey->base[gv_currkey->end + 1] = KEY_DELIMITER;
+		}
 	}
-	if (gv_target != start_map_gvt)
+	if (currkey_saved)
+		COPY_KEY(gv_currkey, &currkey_save_buf.key);
+	if (currkey_saved || (gv_target != start_map_gvt))
 	{	/* Restore gv_cur_region/gv_target etc. */
 		gv_target = start_map_gvt;
 		gv_cur_region = start_map->reg.addr;
 		change_reg();
 	}
+	assert(gv_cur_region == start_map->reg.addr);
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	if (spr_tpwrapped)
 	{
@@ -171,12 +180,5 @@ boolean_t	gvcst_spr_queryget(mval *cumul_val)
 	}
 	POP_MV_STENT();	/* "val" */
 	assert(save_dollar_tlevel == dollar_tlevel);
-	if (cumul_found)
-	{	/* Restore accumulated minimal key into gv_altkey */
-		assert(cumul_key_len);
-		memcpy(&gv_altkey->base[0], &cumul_key[0], cumul_key_len);
-		gv_altkey->end = cumul_key_len - 1;
-		assert(KEY_DELIMITER == gv_altkey->base[gv_altkey->end]);
-	}
-	return cumul_found;
+	return result_found;
 }

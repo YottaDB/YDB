@@ -1559,6 +1559,9 @@ LITDEF	err_msg merrors[] = {
 	{ "BKUPRETRY", "Retrying MUPIP BACKUP for region: !AD (database file: !AD). Attempt: #!UL of !UL", 6, 0 },
 	{ "BKUPPROGRESS", "Transfer : !AD ; Speed : !AD MiB/sec ; Transactions : !@UQ ; Estimated time left : !UL !AD", 8, 0 },
 	{ "BKUPFILEPERM", "Backup file !AD does not have write permission", 2, 0 },
+	{ "AUDINITFAIL", "Audit !AZ facility failed to initialize audit information", 1, 0 },
+	{ "AUDCONNFAIL", "Audit !AZ facility failed to connect to audit logger", 1, 0 },
+	{ "AUDLOGFAIL", "Audit !AZ facility failed to log command", 1, 0 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -3107,6 +3110,9 @@ LITDEF	int ERR_SRCBACKLOGSTATUS = 150384699;
 LITDEF	int ERR_BKUPRETRY = 150384707;
 LITDEF	int ERR_BKUPPROGRESS = 150384715;
 LITDEF	int ERR_BKUPFILEPERM = 150384722;
+LITDEF	int ERR_AUDINITFAIL = 150384730;
+LITDEF	int ERR_AUDCONNFAIL = 150384738;
+LITDEF	int ERR_AUDLOGFAIL = 150384746;
 
 
 LITDEF	int merrors_undocarr[] = {
@@ -3142,7 +3148,7 @@ GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1546,
+	1549,
 	&merrors_undocarr[0],
 	25
 };

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,6 +78,8 @@ int f_select(oprtype *a, opctype op)
 	save_state->expr_start = TREF(expr_start);
 	save_state->expr_start_orig = TREF(expr_start_orig);
 	save_state->shift_side_effects = TREF(shift_side_effects);
+	if ((save_state->shift_side_effects) && (GTM_BOOL != TREF(gtm_fullbool)))
+		TREF(saw_side_effect) = TRUE; /* this will stop shifting of side effects in FULL_BOOL mode */
 	save_state->saw_side_effect = TREF(saw_side_effect);
 	save_state->expr_depth = TREF(expr_depth);
 	save_state->side_effect_base = TREF(side_effect_base);
@@ -279,7 +281,7 @@ int f_select(oprtype *a, opctype op)
 		dqadd(TREF(expr_start), &tmpchain, exorder);
 		TREF(expr_start) = tmpchain.exorder.bl;
 		if (shifting)
-		{	/* only play this game it has not been abandoned */
+		{	/* only play this game if it has not been abandoned */
 			assert(OC_GVSAVTARG == (TREF(expr_start))->opcode);
 			triptr = newtriple(OC_GVRECTARG);
 			triptr->operand[0] = put_tref(TREF(expr_start));

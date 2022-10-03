@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,14 +37,22 @@ boolean_t iosocket_delimiter(unsigned char *delimiter_buffer, int4 delimiter_len
 	unsigned char	*c, *top, delimiter[MAX_DELIM_LEN + 1];
 
 	/* free the previous delimiters if any */
+	if (0 < socketptr->n_delimiter && socketptr->odelimiter0.addr != socketptr->delimiter[0].addr)
+	{
+		free(socketptr->odelimiter0.addr);
+		socketptr->odelimiter0.addr = NULL;
+	}
 	for (ii = 0; ii < socketptr->n_delimiter; ii++)
 	{
-		free(socketptr->delimiter[ii].addr);
+		if (socketptr->delimiter[ii].addr)
+			free(socketptr->delimiter[ii].addr);
 		if (socketptr->idelimiter[ii].addr != socketptr->delimiter[ii].addr)
+		{
 			free(socketptr->idelimiter[ii].addr);
+			socketptr->idelimiter[ii].addr = NULL;
+		}
+		socketptr->delimiter[ii].addr = NULL;
 	}
-	if (0 < socketptr->n_delimiter && socketptr->odelimiter0.addr != socketptr->delimiter[0].addr)
-		free(socketptr->odelimiter0.addr);
 	socketptr->n_delimiter = 0;
 	socketptr->delim0containsLF = FALSE;
 	if (rm)

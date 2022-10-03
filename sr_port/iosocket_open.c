@@ -487,11 +487,11 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			{
 				assert(ioptr->newly_created == FALSE);
 				if (FD_INVALID != socketptr->temp_sd)
-						close(socketptr->temp_sd);
-					SOCKET_FREE(socketptr);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
-					return FALSE;
-				}
+					close(socketptr->temp_sd);
+				SOCKET_FREE(socketptr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
+				return FALSE;
+			}
 			socketptr->dev = newdsocket;
 			newdsocket->socket[newdsocket->n_socket++] = socketptr;
 			newdsocket->current_socket = newdsocket->n_socket - 1;
@@ -561,9 +561,6 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			|| (!iosocket_listen_sock(socketptr, DEFAULT_LISTEN_DEPTH))))
 		|| (connect_specified && (!iosocket_connect(socketptr, timepar, ibfsize_specified))))
 	{
-		if (socketptr->sd > 0)
-			(void)close(socketptr->sd);
-		SOCKET_FREE(socketptr);
 		REVERT_GTMIO_CH(&ioptr->pair, ch_set);
 		return FALSE;
 	} else if (is_principal)

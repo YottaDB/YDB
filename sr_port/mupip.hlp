@@ -679,7 +679,7 @@
 
    The format of the CREATE command is:
 
-   CR[EATE] [-R[EGION]=region-name]
+   CR[EATE] [-[no]V6] [-R[EGION]=region-name]
 
    The single optional -REGION qualifier specifies a region for which to
    create a database file.
@@ -690,6 +690,20 @@
    Note that this is the size of one database file -- a logical database (an
    M global variable namespace) can consist of an arbitrary number of
    database files.
+
+3 V6
+   V6
+
+   Directs MUPIP to create a V6.3-014 compatible database file. This option
+   is negatable to ensure that MUPIP CREATE always creates current version
+   database files even when the environment variable gtm_db_create_ver is
+   defined as V6. By default, MUPIP CREATE creates database files for the
+   current version. The environment variable gtm_db_create_ver can override
+   the default behavior.
+
+   The format of the V6 qualifier is:
+
+   -[no]V6
 
 3 Region
    Region
@@ -2864,6 +2878,11 @@
    TRUNCATE does not complete if there is a concurrent online BACKUP or use
    of the snapshot mechanism, for example by INTEG.
 
+   **Warning**
+
+   Because any competing updates may interfere with MUPIP's ability to free
+   space, minimize or prevent competing updates.
+
 3 UPgrade
    UPgrade
 
@@ -4419,7 +4438,7 @@
    This example upgrades the file-header of mumps.dat to V5 format.
 
 1 Journaling
-    Journaling
+   Journaling
 
 2 SET
    SET
@@ -7050,60 +7069,10 @@
    If you plan to use the optional compression facility for replication, you
    must provide the compression library. The GT.M interface for compression
    libraries accepts the zlib compression libraries without any need for
-   adaptation. These libraries are included in many UNIX distributions and
-   are downloadable from the zlib home page. GT.M supports the use of the IBM
-   provided zlib library for AIX. If you prefer to use other compression
-   libraries, you need to configure or adapt them to provide the same API
-   provided by zlib. Simple instructions for compiling zlib on a number of
-   platforms follow. Although GT.M uses zlib, zlib is not FIS software and
-   FIS does not support zlib. These instructions are merely provided as a
-   convenience to you.
-
-   If a package for zlib is available with your operating system, FIS
-   suggests that you use it rather than building your own.
-
-   AIX/XL compiler:
-
-   ./configure --shared
-   Add -q64 to the LDFLAGS line of the Makefile
-   make CFLAGS="-q64"
-
-   Linux/gcc:
-
-   ./configure --shared
-   make CFLAGS="-m64"
-
-   z/OS:
-
-   Download the zlib 1.1.4 from the libpng project's download page on
-   SourceForge.com. Use a transfer mechanism that does not perform automatic
-   conversion to download a source tarball. If pax cannot read the archive,
-   it is a sign that the download mangled the archive. Use pax to unpack the
-   tarball, converting files from ASCII to EBCDIC.
-
-   pax -r -o setfiletag -ofrom=ISO8859-1,to=IBM-1047 -f zlib-1.1.4.tar.gz
-
-   Apply the following patch to the zlib 1.1.4 sources:
-
-   ---------------------------------- zlib_1.1.4_zos.patch --------------------------------------------------
-   diff -purN downloads/zlib/src.orig/configure downloads/zlib/src/configure
-   --- downloads/zlib/src.orig/configure Tue Dec 16 14:09:57 2008
-   +++ downloads/zlib/src/configure Mon Feb 9 14:30:49 2009
-   @@ -116,6 +116,11 @@ else SFLAGS=${CFLAGS-"-Kconform_pic -O"}
-   CFLAGS=${CFLAGS-"-O"} LDSHARED=${LDSHARED-"cc -G"};;
-   + OS/390*)+ CC=xlc+ SFLAGS=${CFLAGS-"-qascii -q64 -Wc,DLL,LP64,XPLINK,EXPORTALL -D_ALL_SOURCE_NOTHREADS"}
-   + CFLAGS=${CFLAGS-"-qascii -q64 -Wc,DLL,LP64,XPLINK,EXPORTALL -D_ALL_SOURCE_NOTHREADS"}
-   + LDSHARED=${LDSHARED-"xlc -qascii -q64 -Wl,dll,LP64,XPLINK "};;
-   # send working options for other systems to support@gzip.org *) SFLAGS=${CFLAGS-"-O"} CFLAGS=${CFLAGS-"-O"}
-
-   Build and install the zlib DLL, placing the xlc compilers in compatibility
-   to mode by setting the environment variable C89_CCMODE to 1. When not in
-   compatibility mode, xlc follows strict placement of command line options.
-   Configure and build the zlib software with ./configure --shared && make.
-   By default, the configure script places zlib in /usr/local/lib. Install
-   the software with make install. To ensure that GT.M finds zlib, include
-   /usr/local/lib in LIBPATH, the environment variable that provides a search
-   path for processes to use when they link DLLs.
+   adaptation. These libraries are included in many distributions and are
+   downloadable from the zlib home page. If you prefer to use other
+   compression libraries, you need to configure or adapt them to provide the
+   same API provided by zlib.
 
    By default, GT.M searches for the libz.so shared library in the standard
    system library directories (for example, /usr/lib, /usr/local/lib,
@@ -7497,6 +7466,29 @@
    renegotiation requires the replication pipeline to be temporarily flushed,
    followed by the actual renegotiation, TLS renegotiation can cause
    momentary spikes in replication backlog.
+
+  Important
+
+   TLSv1.3 introduces a number of protocol changes. The concept of
+   renegotiation was removed. As a result, when using TLSv1.3, this qualifier
+   takes on a different meaning. GT.M used TLSv1.2 renegotiation to ensure
+   appropriate refresh of session keys (for rationale, see Luykx, A. and K.
+   Paterson, "Limits on Authenticated Encryption Use in TLS", 2016;
+   http://www.isg.rhul.ac.uk/~kp/TLS-AEbounds.pdf). As a result, GT.M uses
+   the term "renegotiation" for SOCKET devices where the mode is "server" and
+   "renegotiation_interval" for the frequency of renegotiation during
+   database replication. For TLSv1.3 sessions, the GT.M Reference TLS plugin
+   treats the "renegotiation" as a request to update the session keys.
+
+  Important
+
+   OpenSSL 3.0 by default does not allow client-side initiated TLSv1.2
+   renegotiation requests due to potential DoS attacks. Because of this, the
+   GT.M Reference TLS plugin built with a pre-OpenSSL 3.0 version does not
+   support client initiated renegotiation when communicating with a plugin
+   build with OpenSSL 3.0. This limitation only affects database replication
+   and not SOCKET devices. There is currently no work-around for this
+   limitation.
 
 2 Shutdown_Source_Server
    Shutdown Source Server

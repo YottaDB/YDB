@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,6 +33,7 @@
 
 GBLREF gd_addr 		*gd_header;
 GBLREF gd_region 	*gv_cur_region;
+GBLREF enum db_ver	gtm_db_create_ver;              /* database creation version */
 
 error_def(ERR_DBNOCRE);
 error_def(ERR_MUPCLIERR);
@@ -51,6 +52,11 @@ void mupip_create(void)
 	exit_stat = EXIT_NRM;
 	TREF(ok_to_see_statsdb_regs) = TRUE;
 	gvinit();
+	/* WARNING: CLI overrides env var */
+	if (CLI_PRESENT == cli_present("V6"))
+		gtm_db_create_ver = GDSV6;
+	else if (CLI_NEGATED == cli_present("V6"))
+		gtm_db_create_ver = GDSVCURR;
 	if (CLI_PRESENT == cli_present("REGION"))
 	{
 		reglen = SIZEOF(buff);

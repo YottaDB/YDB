@@ -61,6 +61,7 @@
 #include "have_crit.h"
 #include "gt_timers_add_safe_hndlrs.h"
 #include "continue_handler.h"
+#include "restrict.h"
 
 #ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
@@ -77,13 +78,13 @@ GBLREF char			cli_err_str[];
 GBLREF CLI_ENTRY		lke_cmd_ary[];
 GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 GBLREF void 			(*primary_exit_handler)(void);
-
 GBLDEF CLI_ENTRY		*cmd_ary = &lke_cmd_ary[0];	/* Define cmd_ary to be the LKE specific cmd table */
 
 static bool lke_process(int argc);
 static void display_prompt(void);
 
 error_def(ERR_CTRLC);
+error_def(ERR_RESTRICTEDOP);
 
 int main (int argc, char *argv[])
 {
@@ -106,6 +107,8 @@ int main (int argc, char *argv[])
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();
 	initialize_pattern_table();
+	if (RESTRICTED(lke))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "LKE");
 	gvinit();
 	region_init(FALSE);	/* Was TRUE, but that doesn't actually work if there are GTCM regions in the GLD,
 				 * at least in DEBUG, so leave it off for now to allow LKE to work in this situation.

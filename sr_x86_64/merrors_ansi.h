@@ -1557,4 +1557,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* BKUPRETRY */
 	   0,	/* BKUPPROGRESS */
 	   0,	/* BKUPFILEPERM */
+	   0,	/* AUDINITFAIL */
+	   0,	/* AUDCONNFAIL */
+	   0,	/* AUDLOGFAIL */
 	};

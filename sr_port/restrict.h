@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2020 Fidelity National Information	*
+ * Copyright (c) 2017-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,9 +10,8 @@
  *								*
  ****************************************************************/
 
-#define RESTRICTED(FACILITY)											\
+#define RESTRICTED(FACILITY)								\
 		(!restrict_initialized ? (restrict_init(), restrictions.FACILITY) : restrictions.FACILITY)
-
 #define COMM_FILTER_FILENAME     	"filter_commands.tab"
 #define PIPE_C_CALL_NAME		"gtmpipeopen"
 #define ZSY_C_CALL_NAME			"gtmzsystem"
@@ -32,6 +31,8 @@ struct restrict_facilities
 	boolean_t	trigger_mod;
 	boolean_t	cenable;
 	boolean_t	dse;
+	boolean_t	lkeclear;
+	boolean_t	lke;
 	boolean_t	dmode;
 	boolean_t	zcmdline;
 	boolean_t	halt_op;		/* V6.3-003 */
@@ -39,11 +40,10 @@ struct restrict_facilities
 	boolean_t	zsy_filter;		/* V6.3-006 */
 	boolean_t	pipe_filter;
 	boolean_t	library_load_path;	/* V6.3-007 */
+	boolean_t	mupip_enable;		/* V7.0-004 */
 	uint4		dm_audit_enable;
 	boolean_t	logdenials;		/* V6.3-012 */
 };
-
 GBLREF	struct restrict_facilities	restrictions;
 GBLREF	boolean_t			restrict_initialized;
-
 void restrict_init(void);

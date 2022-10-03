@@ -104,6 +104,7 @@ GBLREF hash_table_str		*complits_hashtab;
 GBLREF mval			*alias_retarg;
 GBLREF io_pair			*io_std_device;
 GTMTRIG_ONLY(GBLREF mval 	dollar_ztwormhole;)
+GTMTRIG_ONLY(GBLREF mval 	dollar_ztslate;)
 DEBUG_ONLY(GBLREF   boolean_t	ok_to_UNWIND_in_exit_handling;)
 
 
@@ -715,6 +716,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		MVAL_STPG_ADD(&dollar_zyerror);
 #		ifdef GTM_TRIGGER
 		MVAL_STPG_ADD(&dollar_ztwormhole);
+		MVAL_STPG_ADD(&dollar_ztslate);
 #		endif
 		MVAL_STPG_ADD(&(TREF(last_fnquery_return_varname)));
 		for (index = 0; index < TREF(last_fnquery_return_subcnt); index++)
