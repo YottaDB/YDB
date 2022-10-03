@@ -121,6 +121,13 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 					}
 				}
 			}
+			if (loopcount < nsops)
+			{	/* This means we did a "break" out of the inner "for" loop above due to an error in "semctl()".
+				 * Since that would have set "rc" and "save_errno" to appropriate values, "break" out of the
+				 * outer "do/while" loop as well and return.
+				 */
+				break;
+			}
 			new_timeout = TRUE; /* Start a new "semtimedop()" call for another MAX_SEM_WAIT_TIME_IN_SECONDS seconds */
 		}
 	} while (TRUE);
