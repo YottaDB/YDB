@@ -115,6 +115,8 @@ void mupip_ftok(void)
 			file.addr = fn_ptr;
 			file.len = full_len;
 			status = parse_file(&file, &pblk);	/* this gets us to just the name and extension */
+			assert(status & 1);
+			PRO_ONLY(UNUSED(status));
 			fn_len = pblk.b_name + pblk.b_ext;
 			memcpy(fn, pblk.l_name, fn_len);
 			fn[fn_len] = 0;

@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -138,6 +138,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 			repl_inst_ftok_sem_release();
 			status = rel_sem(SOURCE, JNL_POOL_ACCESS_SEM);
 			assert(0 == status);
+			PRO_ONLY(UNUSED(status));
 			return ABNORMAL_SHUTDOWN;
 		}
 		if (0 != rel_sem(SOURCE, JNL_POOL_ACCESS_SEM))
@@ -148,6 +149,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 			repl_inst_ftok_sem_release(); /* see comment above for why this is okay */
 			status = decr_sem(SOURCE, SRC_SERV_COUNT_SEM);
 			assert(0 == status);
+			PRO_ONLY(UNUSED(status));
 			return ABNORMAL_SHUTDOWN;
 		}
 		repl_inst_ftok_sem_release();
@@ -202,6 +204,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 					"the shutdown command.\n");
 			status = decr_sem(SOURCE, SRC_SERV_COUNT_SEM);
 			assert(0 == status);
+			PRO_ONLY(UNUSED(status));
 			return ABNORMAL_SHUTDOWN;
 		}
 	} else
@@ -254,6 +257,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 			repl_inst_ftok_sem_release();
 			status = decr_sem(SOURCE, SRC_SERV_COUNT_SEM);
 			assert(0 == status);
+			PRO_ONLY(UNUSED(status));
 			return ABNORMAL_SHUTDOWN;
 		}
 		/* Now that the locks are re-acquired, decrease the counter sempahore */
@@ -265,6 +269,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 			repl_inst_ftok_sem_release();
 			status = rel_sem(SOURCE, JNL_POOL_ACCESS_SEM);
 			assert(0 == status);
+			PRO_ONLY(UNUSED(status));
 			return ABNORMAL_SHUTDOWN;
 		}
 	}

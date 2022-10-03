@@ -124,7 +124,7 @@ GBLREF	gtmsource_options_t	gtmsource_options;
 int gtmsource_est_conn()
 {
 	char			print_msg[PROC_OPS_PRINT_MSG_LEN], msg_str[1024], *errmsg;
-	int			connection_attempts, max_heartbeat_wait, save_errno, comminit_retval, status;
+	int			connection_attempts, save_errno, comminit_retval, status;
 	int			send_buffsize, recv_buffsize, tcp_s_bufsize;
 	int 			logging_period, logging_interval; /* logging period = soft_tries_period*logging_interval */
 	int			alert_period, hardtries_count, hardtries_period;
@@ -153,11 +153,10 @@ int gtmsource_est_conn()
 	connection_attempts = 0;
 	comminit_retval = gtmsource_comm_init(throw_errors); /* set up gtmsource_local.secondary_ai */
 	max_shutdown_wait = GTMSOURCE_MAX_SHUTDOWN_WAITLOOP(gd_header);
-	soft_tries_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD];
-	hardtries_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD];
 	hardtries_count = gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_COUNT];
+	hardtries_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD];
+	soft_tries_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD];
 	alert_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_ALERT_PERIOD];
-	max_heartbeat_wait = gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT];
 	max_sleep = DIVIDE_ROUND_UP(max_shutdown_wait, 2);
 	if (hardtries_period > (max_sleep * 1000))
 	{
@@ -1685,8 +1684,9 @@ boolean_t	gtmsource_check_remote_strm_histinfo(seq_num seqno, boolean_t *rollbac
 	if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 		return FALSE;	/* concurrent online rollback happened */
 	status = repl_inst_histinfo_find_seqno(seqno, INVALID_SUPPL_STRM, &local_histinfo);
-	rel_lock(jnlpool->jnlpool_dummy_reg);
 	assert(0 == status);	/* we are guaranteed to find this since we have already verified 0th stream matches */
+	PRO_ONLY(UNUSED(status));
+	rel_lock(jnlpool->jnlpool_dummy_reg);
 	/* Fix last_histinfo_num[] in local side to include "local_histinfo" too (which could have strm_index > 0) */
 	if (0 < local_histinfo.strm_index)
 	{
@@ -1741,6 +1741,7 @@ boolean_t	gtmsource_check_remote_strm_histinfo(seq_num seqno, boolean_t *rollbac
 			return FALSE;	/* concurrent online rollback happened */
 		status = repl_inst_histinfo_get(lcl_histinfo_num, &local_histinfo);
 		assert(0 == status); /* Since we pass histinfo_num of 0 which is >=0 and < num_histinfo */
+		PRO_ONLY(UNUSED(status));
 		rel_lock(jnlpool->jnlpool_dummy_reg);
 		/* Compare the two history records. If they are not identical for even one stream, signal rollback on receiver */
 		if (!gtmsource_is_histinfo_identical(&histinfo_msg.history, &local_histinfo, seqno, OK_TO_LOG_TRUE))
