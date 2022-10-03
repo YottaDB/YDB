@@ -1729,6 +1729,9 @@ SRCBACKLOGSTATUS	<Instance !AD !AD>/info/fao=4!/ansi=0
 BKUPRETRY	<Retrying MUPIP BACKUP for region: !AD (database file: !AD). Attempt: #!UL of !UL>/info/fao=6!/ansi=0
 BKUPPROGRESS	<Transfer : !AD ; Speed : !AD MiB/sec ; Transactions : !@UQ ; Estimated time left : !UL !AD>/info/fao=8!/ansi=0
 BKUPFILEPERM	<Backup file !AD does not have write permission>/error/fao=2!/ansi=0
+AUDINITFAIL	<Audit !AZ facility failed to initialize audit information>/error/fao=1!/ansi=0
+AUDCONNFAIL	<Audit !AZ facility failed to connect to audit logger>/error/fao=1!/ansi=0
+AUDLOGFAIL	<Audit !AZ facility failed to log command>/error/fao=1!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

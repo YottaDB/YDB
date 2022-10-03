@@ -2185,13 +2185,19 @@
    routines executed within a process from the time that variable is first
    SET until it is KILLed, or until the process stops executing M. However, M
    "protects" a local variable after that variable appears as an argument to
-   a NEW command, or after it appears as an element in a formalist used in
+   a NEW command, or after it appears as an element in a formallist used in
    parameter passing. When M protects a local variable, it saves a copy of
    the variable's value and makes that variable undefined. M restores the
    variable to its saved value during execution of the QUIT that terminates
+<<<<<<< HEAD
    the process stack level associated with the "protecting" NEW or formalist.
    For more information on NEW and QUIT, refer to the "Commands" chapter in
    the YottaDB Programmer's Guide.
+=======
+   the process stack level associated with the "protecting" NEW or
+   formallist. For more information on NEW and QUIT, refer to the "Commands"
+   chapter in the GT.M Programmer's Guide.
+>>>>>>> b400aa64 (GT.M V7.0-004)
 
    M restricts the following uses of variables to local variables:
 
@@ -8850,6 +8856,11 @@
    | "BREAKMSG"        | none         | Value of the break message mask;    |
    |                   |              | YottaDB defaults this to 31.        |
    |-------------------+--------------+-------------------------------------|
+   |                   |              | Device type (FIFO, NULL, PIPE, RMS, |
+   | "DEVICE"          | Device name  | SOCKET, or TERMINAL) and device     |
+   |                   |              | status (OPEN or CLOSED) separated   |
+   |                   |              | by a colon (":")                    |
+   |-------------------+--------------+-------------------------------------|
    | "FREEBLOCKS"      | region       | Number of free database blocks in a |
    |                   |              | given region.                       |
    |-------------------+--------------+-------------------------------------|
@@ -9195,6 +9206,21 @@
    A5
    YDB>w $view("REGION","^a")
    DEFAULT,A1,A2,A3,A5,A4
+
+   Some examples of $VIEW("DEVICE",name) usage:
+
+   GTM> WRITE $VIEW("DEVICE","0")
+   TERMINAL:OPEN
+
+   This indicates the $PRINCIPAL device is a terminal and it is open (which
+   is usually the case for $PRINCIPAL.) The $ZPIN and $ZPOUT intrinsic
+   special variables can be used as the device name to select to
+   corresponding side of a split $PRINCIPAL device.
+
+   GTM> OPEN "f.txt"
+   GTM> CLOSE "f.txt":NODESTROY
+   GTM> WRITE $VIEW("DEVICE","f.txt")
+   RMS:CLOSED
 
 2 $ZAHandle()
    $ZAHandle()
@@ -10596,6 +10622,15 @@
    | IOERROR       | index         | 1 (TRUE) if IOERROR=TRAP otherwise 0   |
    |               |               | (FALSE).                               |
    |---------------+---------------+----------------------------------------|
+   | KEEPALIVE     | index         | A non zero value if SO_KEEPALIVE is    |
+   |               |               | enabled.                               |
+   |---------------+---------------+----------------------------------------|
+   | KEEPCNT       | index         | The value of TCP_KEEPCNT.              |
+   |---------------+---------------+----------------------------------------|
+   | KEEPIDLE      | index         | The value of TCP_KEEPIDLE in seconds.  |
+   |---------------+---------------+----------------------------------------|
+   | KEEPINTVL     | index         | The value of TCP_KEEPINTVL in seconds. |
+   |---------------+---------------+----------------------------------------|
    |               |               | The address of the local side of the   |
    | LOCALADDRESS  | index         | socket. For TCP sockets: the IPv6 or   |
    |               |               | IPv4 numeric address. For LOCAL        |
@@ -10611,6 +10646,12 @@
    | NUMBER        |               | The number of sockets in the SOCKET    |
    |               |               | device.                                |
    |---------------+---------------+----------------------------------------|
+   |               |               | a string of the "OPTIONS"              |
+   |               |               | previously specified for the selected  |
+   | OPTIONS       | index         | socket. The string may not exactly     |
+   |               |               | match the string originally specified  |
+   |               |               | but has the same meaning.              |
+   |---------------+---------------+----------------------------------------|
    |               |               | If the socket was created from a       |
    | PARENT        | index         | LISTENing socket: the handle of the    |
    |               |               | LISTENing socket.                      |
@@ -10624,6 +10665,9 @@
    |---------------+---------------+----------------------------------------|
    | REMOTEPORT    | index         | The numeric port of the remote side of |
    |               |               | a TCP socket.                          |
+   |---------------+---------------+----------------------------------------|
+   | SNDBUF        | index         | Size of the OS send buffer in bytes    |
+   |               |               | (SO_SNDBUF).                           |
    |---------------+---------------+----------------------------------------|
    | SOCKETHANDLE  | index         | The handle for the selected socket.    |
    |---------------+---------------+----------------------------------------|
@@ -10650,6 +10694,14 @@
    | ZDELAY        | index         | 1 if Nagle algorithm enabled,          |
    |               |               | otherwise 0.                           |
    +------------------------------------------------------------------------+
+
+   **Note**
+
+   The getsockopt() keywords (KEEPALIVE, KEEPCNT, KEEPIDLE, KEEPINTVL,
+   SNDBUF, and ZIBFSIZE return two values if the value previously specified
+   with the "OPTIONS" or "ZIBFSIZE" device parameter does't match the
+   system's current value. The two values are separated by a semicolon (";"):
+   "uservalue;systemvalue".
 
    The following table describes the values for the fourth expression for the
    TLS keyword.
@@ -10679,7 +10731,7 @@
    |       |The values for the SSL_OP options and verify modes are defined in the                  |
    |       |include/openssl/ssl.h file provided by the OpenSSL development package.                |
    |       |                                                                                       |
-   |       |Note: the TLS reference implementation plug-in disables SSLv3 by default.              |
+   |       |Note: the TLS reference implementation plug-in disables protocols prior to TLSv1.2.    |
    |-------+---------------------------------------------------------------------------------------|
    |       |The SSL protocol version prefixed by "P:" and the algorithm negotiated between the     |
    |CIPHER |server and client prefixed by "C:". Here is an example:                                |
@@ -15473,6 +15525,7 @@
        completes or to 0 if it times out. $DEVICE provides status information
        in case of an error. ZSHOW "D" includes "TLS" in the second line of
        the output for an encrypted socket.
+<<<<<<< HEAD
      o "renegotiate" applies only to a server socket. It allows applications
        to request a TLS renegotiation. Renegotiation requires the suspension
        of application communication and the application must read all pending
@@ -15481,6 +15534,18 @@
        when renegotiating keys. For example, in YottaDB replication, one party
        sends a renegotiation request and waits for an acknowledgement before
        initiating the renegotiation.
+=======
+     o "renegotiate" applies only to a server socket. Prior to TLSv1.3, this
+       option allows applications to request a TLS renegotiation.
+       Renegotiation requires the suspension of application communication and
+       the application must read all pending data before initiating a
+       renegotiation. This means that in the communication protocol used,
+       both parties must be at a known state when renegotiating keys. For
+       example, in GT.M replication, one party sends a renegotiation request
+       and waits for an acknowledgement before initiating the renegotiation.
+       Due to a change in the TLSv1.3 protocol which removed the concept of
+       renegotiation, this option refreshes the TLS connection keys.
+>>>>>>> b400aa64 (GT.M V7.0-004)
      o tlsid refers to the name of a section in the configuration file
        specified by the ydb_crypt_config environment variable. If tlsid is not
        specified with the "renegotiate" option and cfg-file-options are
@@ -15512,7 +15577,7 @@
 
    Example:
 
-   set obspass="CD86FF2BFD1F06EE"\\t; maskpass output of password for private key
+   set obspass="CD86FF2BFD1F06EE" ; maskpass output of password for private key
    set cfgoptions="cert:""/path/to/certificate"";key:""/path/to/key.pem"";"
    write /tls("server",,"tlsone",obspass,cfgoptions)
 
@@ -16681,9 +16746,9 @@
 
    The supported options are:
 
-   KEEPALIVE   a positive value enables SO_KEEPALIVE.  A zero value disables SO_KEEPALIVE.
-   KEEPIDLE    sets the TCP_KEEPIDLE socket value.
+   KEEPALIVE   a non zero value enables SO_KEEPALIVE.  A zero value disables SO_KEEPALIVE.
    KEEPCNT     sets the TCP_KEEPCNT socket value.
+   KEEPIDLE    sets the TCP_KEEPIDLE socket value.
    KEEPINTVL   sets the TCP_KEEPINTVL socket value.
    SNDBUF      sets the size of the socket's network send buffer (SO_SNDBUF) in bytes.
 
@@ -18111,9 +18176,9 @@
 
    The supported options are:
 
-   KEEPALIVE   a positive value enables SO_KEEPALIVE.  A zero value disables SO_KEEPALIVE.
-   KEEPIDLE    sets the TCP_KEEPIDLE socket value.
+   KEEPALIVE   a non zero value enables SO_KEEPALIVE.  A zero value disables SO_KEEPALIVE.
    KEEPCNT     sets the TCP_KEEPCNT socket value.
+   KEEPIDLE    sets the TCP_KEEPIDLE socket value.
    KEEPINTVL   sets the TCP_KEEPINTVL socket value.
    SNDBUF      sets the size of the socket's network send buffer (SO_SNDBUF) in bytes.
 

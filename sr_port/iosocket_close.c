@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -165,16 +165,22 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 {
 	int4		ii,jj;
 	int		rc, save_fd, save_rc = 0, save_errno;
+	int		local_process_exiting;
 	ssize_t		status;
+	intrpt_state_t	prev_intrpt_state;
 	socket_struct	*socketptr;
 	struct stat	statbuf, fstatbuf;
 	char		*path;
 	int		res;
 	int		null_fd = 0;
 
+	local_process_exiting = process_exiting;	/* record in case changes while here */
 	for (ii = start; ii >= end; ii--)
 	{
+		/* defer interrupts each iteration */
+		DEFER_INTERRUPTS(INTRPT_IN_SOCKET_CLOSE, prev_intrpt_state);
 		socketptr = dsocketptr->socket[ii];
+<<<<<<< HEAD
 		if (!gtm_pipe_child)
 		{
 			/* Don't reap if in a child process creating a new job or pipe device */
@@ -219,32 +225,91 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 		}
 		CLOSE(socketptr->sd, rc);
 		if (-1 == rc)
+=======
+		if ((NULL != socketptr) && (FD_INVALID != socketptr->sd))
+>>>>>>> b400aa64 (GT.M V7.0-004)
 		{
-			save_rc = rc;
-			save_fd = socketptr->sd;
-			save_errno = errno;
-		}
-		else if (!process_exiting && (3 > socketptr->sd))
-		{
-			OPENFILE(DEVNULL, O_RDWR, null_fd);
-			if (-1 == null_fd)
-			{
-				save_errno = errno;
+			if (!gtm_pipe_child)
+			{	/* Don't reap if in a child process creating a new job or pipe device */
+				if ((socket_local == socketptr->protocol) && socketptr->passive)
+				{	/* only delete if passive/listening */
+					assertpro(socketptr->local.sa);
+					path = ((struct sockaddr_un *)(socketptr->local.sa))->sun_path;
+					FSTAT_FILE(socketptr->sd, &fstatbuf, res);
+					if (-1 == res)
+					{
+						ENABLE_INTERRUPTS(INTRPT_IN_SOCKET_CLOSE, prev_intrpt_state);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+							LEN_AND_LIT("fstat during socket delete"), CALLFROM, errno);
+					}
+					STAT_FILE(path, &statbuf, res);
+					if (-1 == res)
+					{
+						ENABLE_INTERRUPTS(INTRPT_IN_SOCKET_CLOSE, prev_intrpt_state);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+							LEN_AND_LIT("stat during socket delete"), CALLFROM, errno);
+					}
+					if (UNLINK(path) == -1)
+					{
+						ENABLE_INTERRUPTS(INTRPT_IN_SOCKET_CLOSE, prev_intrpt_state);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+							LEN_AND_LIT("unlink during socket delete"), CALLFROM, errno);
+					}
+				}
+				/* below is similar to iosocket_flush but socketptr may not be current socket */
+				if (socketptr->obuffer_timer_set)
+				{
+					cancel_timer((TID)socketptr);
+					socketptr->obuffer_timer_set = FALSE;
+				}
+				status = 1;		/* OK value */
+				if ((0 < socketptr->obuffer_length) && (0 == socketptr->obuffer_errno))
+				{
+					socketptr->obuffer_output_active = TRUE;
+					status = iosocket_output_buffer(socketptr);
+					socketptr->obuffer_output_active = FALSE;
+				}
+				if ((0 < socketptr->obuffer_size) && ((0 >= status) || (0 != socketptr->obuffer_errno)))
+					iosocket_buffer_error(socketptr);	/* pre-existing error or error flushing buffer */
+#				ifdef GTM_TLS
+				if (socketptr->tlsenabled)
+				{
+					gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
+					socketptr->tlsenabled = FALSE;
+				}
+#				endif
 			}
-			assert(socketptr->sd == null_fd);
+			CLOSE(socketptr->sd, rc);
+			if (-1 == rc)
+			{
+				save_rc = rc;
+				save_fd = socketptr->sd;
+				save_errno = errno;
+			} else if (!process_exiting && (3 > socketptr->sd))
+			{
+				OPENFILE(DEVNULL, O_RDWR, null_fd);
+				if (-1 == null_fd)
+				{
+					save_errno = errno;
+				}
+				assert(socketptr->sd == null_fd);
+			}
+			socketptr->sd = FD_INVALID;
+			assert(local_process_exiting == process_exiting);
+			if (!process_exiting)
+				SOCKET_FREE(socketptr);		/* skip if on the way out */
 		}
-		SOCKET_FREE(socketptr);
 		if (dsocketptr->current_socket >= ii)
 			dsocketptr->current_socket--;
-		for (jj = ii + 1; jj <= dsocketptr->n_socket - 1; jj++)
+		for (jj = ii + 1; jj <= (dsocketptr->n_socket - 1); jj++)
 			dsocketptr->socket[jj - 1] = dsocketptr->socket[jj];
 		dsocketptr->n_socket--;
+		ENABLE_INTERRUPTS(INTRPT_IN_SOCKET_CLOSE, prev_intrpt_state);
 	}
 	if (0 != save_rc)
 	{
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, save_errno);
-	}
-	else if (-1 == null_fd)
+	} else if (-1 == null_fd)
 	{
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_FILEOPENFAIL, 2, LEN_AND_LIT(DEVNULL), save_errno, 0);
 	}

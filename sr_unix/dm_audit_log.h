@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 Fidelity National Information	*
+ * Copyright (c) 2018-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +28,7 @@
 #define AUDIT_SRC_UNKNOWN		0		/* Caller is unknown */
 #define AUDIT_SRC_DMREAD		1		/* Caller is dm_read */
 #define AUDIT_SRC_OPREAD		2		/* Caller is op_read */
+#define AUDIT_SRC_MUPIP			3		/* Caller is mupip */
 /* Connection type when sending log info to logger */
 #define AUDIT_CONN_INVALID		0
 #define AUDIT_CONN_UN			1		/* UNIX domain (socket) */

@@ -81,7 +81,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	int		new_ozff_len, conv_len, handled_len, handlea_len, handles_len, int_len, soc_cnt;
 	int4		length, width, new_len;
 	d_socket_struct *dsocketptr;
-	socket_struct	*socketptr, newsocket, *localsocketptr;
+	socket_struct	*socketptr, *curr_socketptr = NULL, *localsocketptr;
+	mstr_len_t	delim_len;
 	char		handlea[MAX_HANDLE_LEN], handles[MAX_HANDLE_LEN], handled[MAX_HANDLE_LEN];
 	char		addr[SA_MAXLITLEN], *errptr, sockaddr[SA_MAXLITLEN],
 			temp_addr[SA_MAXLITLEN], ioerror, *free_ozff = NULL;
@@ -509,6 +510,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		socketptr->filemode_mask = 0;
 		socketptr->uic.mem = (uid_t)-1;
 		socketptr->uic.grp = (gid_t)-1;
+		curr_socketptr = socketptr;
 	} else
 	{
 		if (!socket_specified)
@@ -531,23 +533,41 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			}
 			socketptr = newdsocket->socket[newdsocket->current_socket];
 		}
+		/* Make a copy of the socket_struct so most errors leave the previous structure as is.
+		 * SOCKET_FREE should not be used on this copy since it frees other things such as buffers
+		 * DELIMITER is an exception due to how iosocket_delimiter manages storage.
+		 */
+		curr_socketptr = (socket_struct *)malloc(sizeof(socket_struct));
+		memcpy(curr_socketptr, socketptr, sizeof(socket_struct));
 		socketptr->temp_sd = FD_INVALID;
 	}
-	newsocket = *socketptr;
+	assert(NULL != curr_socketptr);
 	/* ---------------------- apply changes to the local copy of the socket --------------------- */
 	if (0 <= delimiter_len)
+	{	/* note that previous delimiters are freed by the following */
+		iosocket_delimiter(delimiter_buffer, delimiter_len, curr_socketptr, (0 == delimiter_len));
+		if (curr_socketptr != socketptr)
+			socketptr->n_delimiter = 0;	/* prevent double frees or use of now freed memory if error */
+	}
+	if (iod->wrap && (0 != curr_socketptr->n_delimiter) && (iod->width < curr_socketptr->delimiter[0].len))
 	{
-		iosocket_delimiter(delimiter_buffer, delimiter_len, &newsocket, (0 == delimiter_len));
-		socketptr->n_delimiter = 0;	/* prevent double frees if error */
+		delim_len = curr_socketptr->delimiter[0].len;
+		if (create_new_socket)
+			SOCKET_FREE(socketptr)
+		else
+		{
+			if (0 < delimiter_len)		/* free new delimiters */
+				iosocket_delimiter((unsigned char *)NULL, 0, curr_socketptr, TRUE);
+			free(curr_socketptr);	/* other pointers copied from socketptr so just free this */
+		}
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DELIMWIDTH, 2, iod->width, delim_len);
 	}
 	if (0 < options_len)
 	{	/* call devoptions w/ options_buffer to update socket struct */
 		optionstr.addr = (char *)options_buffer;
 		optionstr.len = options_len;
-		devoptions(NULL, &newsocket, &optionstr, "USE", IOP_USE_OK);
+		devoptions(NULL, curr_socketptr, &optionstr, "USE", IOP_USE_OK);
 	}
-	if (iod->wrap && 0 != newsocket.n_delimiter && iod->width < newsocket.delimiter[0].len)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DELIMWIDTH, 2, iod->width, newsocket.delimiter[0].len);
 	/* Process the CHSET changes */
 	if (ichset_specified)
 	{
@@ -568,7 +588,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	if ((CHSET_M != iod->ochset) && (CHSET_UTF16 != iod->ochset) && (CHSET_MAX_IDX > iod->ichset))
 		get_chset_desc(&chset_names[iod->ochset]);
 	if (0 <= zff_len && /* ZFF or ZNOFF specified */
-	    0 < (newsocket.zff.len = zff_len)) /* assign the new ZFF len, might be 0 from ZNOFF, or ZFF="" */
+	    0 < (curr_socketptr->zff.len = zff_len)) /* assign the new ZFF len, might be 0 from ZNOFF, or ZFF="" */
 	{	/* ZFF="non-zero-len-string" specified */
 		if (gtm_utf8_mode) /* Check if ZFF has any invalid UTF-8 character */
 		{	/* Note: the ZFF string originates from the source program, so is in UTF-8 mode or M mode regardless of
@@ -576,20 +596,20 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			*/
 			utf8_len_strict(zff_buffer, zff_len);
 		}
-		if ((NULL != newsocket.ozff.addr) && (socketptr->ozff.addr != socketptr->zff.addr))
-			free_ozff = newsocket.ozff.addr;	/* previously converted */
-		if (NULL == newsocket.zff.addr) /* we rely on newsocket.zff.addr being set to 0 in iosocket_create() */
+		if ((NULL != curr_socketptr->ozff.addr) && (socketptr->ozff.addr != socketptr->zff.addr))
+			free_ozff = curr_socketptr->ozff.addr;	/* previously converted */
+		if (NULL == curr_socketptr->zff.addr) /* we rely on curr_socketptr->zff.addr being set to 0 in iosocket_create() */
 		{
-			socketptr->zff.addr = newsocket.zff.addr = (char *)malloc(MAX_ZFF_LEN);
+			socketptr->zff.addr = curr_socketptr->zff.addr = (char *)malloc(MAX_ZFF_LEN);
 			socketptr->zff.len = zff_len;		/* in case error so SOCKET_FREE frees */
 		}
-		memcpy(newsocket.zff.addr, zff_buffer, zff_len);
-		newsocket.ozff = newsocket.zff;
+		memcpy(curr_socketptr->zff.addr, zff_buffer, zff_len);
+		curr_socketptr->ozff = curr_socketptr->zff;
 	} else if (0 == zff_len)
 	{
-		if ((NULL != newsocket.ozff.addr) && (socketptr->ozff.addr != socketptr->zff.addr))
-			free_ozff = newsocket.ozff.addr;	/* previously converted */
-		newsocket.ozff = newsocket.zff;
+		if ((NULL != curr_socketptr->ozff.addr) && (socketptr->ozff.addr != socketptr->zff.addr))
+			free_ozff = curr_socketptr->ozff.addr;	/* previously converted */
+		curr_socketptr->ozff = curr_socketptr->zff;
 	}
 	if (gtm_utf8_mode)
 	{	/* If CHSET is being changed to UTF-16, and delimitors are not converted, convert them
@@ -659,15 +679,15 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		}
 	}
 	if (ioerror_specified)
-		newsocket.ioerror = ('T' == ioerror || 't' == ioerror);
+		curr_socketptr->ioerror = ('T' == ioerror || 't' == ioerror);
 	if (nodelay_specified || delay_specified)
-		newsocket.nodelay = nodelay_specified;	/* defaults to DELAY */
+		curr_socketptr->nodelay = nodelay_specified;	/* defaults to DELAY */
 	if (ibfsize_specified)
-		newsocket.bufsiz = ibfsize;
+		curr_socketptr->bufsiz = ibfsize;
 	if (moreread_specified)
 	{
-		newsocket.moreread_timeout = moreread_timeout;
-		newsocket.def_moreread_timeout = TRUE;	/* need to know this was user-defined in iosocket_readfl.c */
+		curr_socketptr->moreread_timeout = moreread_timeout;
+		curr_socketptr->def_moreread_timeout = TRUE;	/* need to know this was user-defined in iosocket_readfl.c */
 	}
 	if (!create_new_socket)
 	{
@@ -675,77 +695,115 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		if (flush_specified)
 			iosocket_flush(iod);	/* buffered output if any */
 		if (bfsize_specified)
+<<<<<<< HEAD
 			newsocket.buffer_size = bfsize;
 		if (socket_local != newsocket.protocol)
+=======
+			curr_socketptr->buffer_size = bfsize;
+#		ifdef TCP_NODELAY
+		if (socket_local != curr_socketptr->protocol)
+>>>>>>> b400aa64 (GT.M V7.0-004)
 		{
-			nodelay = newsocket.nodelay ? 1 : 0;
-			if ((socketptr->nodelay != newsocket.nodelay) &&
-			    (-1 == setsockopt(newsocket.sd, IPPROTO_TCP,
+			nodelay = curr_socketptr->nodelay ? 1 : 0;
+			if ((socketptr->nodelay != curr_socketptr->nodelay) &&
+			    (-1 == setsockopt(curr_socketptr->sd, IPPROTO_TCP,
 						      TCP_NODELAY, &nodelay, SIZEOF(nodelay))))
 			{
 				save_errno = errno;
 				errptr = (char *)STRERROR(save_errno);
+				assert(curr_socketptr != socketptr);	/* since not create new socket */
+				if (0 < delimiter_len)		/* new delimiters */
+					iosocket_delimiter((unsigned char *)NULL, 0, curr_socketptr, TRUE);
+				free(curr_socketptr);		/* SOCKET_FREE would free storage used by existing socket */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("TCP_NODELAY"),
 					save_errno, LEN_AND_STR(errptr));
 				return;
 			}
 		}
+<<<<<<< HEAD
 		if (socketptr->bufsiz != newsocket.bufsiz)
+=======
+#		endif
+		if (socketptr->bufsiz != curr_socketptr->bufsiz)
+>>>>>>> b400aa64 (GT.M V7.0-004)
 		{
-			if (-1 == setsockopt(newsocket.sd, SOL_SOCKET, SO_RCVBUF, &newsocket.bufsiz, SIZEOF(newsocket.bufsiz)))
+			if (-1 == setsockopt(curr_socketptr->sd, SOL_SOCKET, SO_RCVBUF, &curr_socketptr->bufsiz,
+					SIZEOF(curr_socketptr->bufsiz)))
 			{
 				save_errno = errno;
 				errptr = (char *)STRERROR(save_errno);
+				assert(curr_socketptr != socketptr);	/* since not create new socket */
+				if (0 < delimiter_len)		/* new delimiters */
+					iosocket_delimiter((unsigned char *)NULL, 0, curr_socketptr, TRUE);
+				free(curr_socketptr);		/* SOCKET_FREE would free storage used by existing socket */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("SO_RCVBUF"),
 						save_errno, LEN_AND_STR(errptr));
 				return;
 			}
-			newsocket.options_state.rcvbuf |= SOCKOPTIONS_USER;
+			curr_socketptr->options_state.rcvbuf |= SOCKOPTIONS_USER;
 		}
-		if (0 != (SOCKOPTIONS_PENDING & newsocket.options_state.sndbuf))
+		if (0 != (SOCKOPTIONS_PENDING & curr_socketptr->options_state.sndbuf))
 		{
-			if (-1 == iosocket_setsockopt(&newsocket, "SO_SNDBUF", SO_SNDBUF, SOL_SOCKET, &newsocket.iobfsize,
-					sizeof(newsocket.iobfsize), TRUE))
+			if (-1 == iosocket_setsockopt(curr_socketptr, "SO_SNDBUF", SO_SNDBUF, SOL_SOCKET, &curr_socketptr->iobfsize,
+					sizeof(curr_socketptr->iobfsize), TRUE))
+			{
+				assert(curr_socketptr != socketptr);	/* since not create new socket */
+				if (0 < delimiter_len)		/* new delimiters */
+					iosocket_delimiter((unsigned char *)NULL, 0, curr_socketptr, TRUE);
+				free(curr_socketptr);		/* SOCKET_FREE would free storage used by existing socket */
 				return;
-			newsocket.options_state.sndbuf |= SOCKOPTIONS_USER;
-			newsocket.options_state.sndbuf &= ~SOCKOPTIONS_PENDING;
+			}
+			curr_socketptr->options_state.sndbuf |= SOCKOPTIONS_USER;
+			curr_socketptr->options_state.sndbuf &= ~SOCKOPTIONS_PENDING;
 		}
-		if ((0 < options_len) && ((SOCKOPTIONS_PENDING & newsocket.options_state.alive)
-			|| (SOCKOPTIONS_PENDING & newsocket.options_state.cnt)
-			|| (SOCKOPTIONS_PENDING & newsocket.options_state.intvl)))
+		if ((0 < options_len) && ((SOCKOPTIONS_PENDING & curr_socketptr->options_state.alive)
+			|| (SOCKOPTIONS_PENDING & curr_socketptr->options_state.cnt)
+			|| (SOCKOPTIONS_PENDING & curr_socketptr->options_state.intvl)))
 		{	/* options specified and pending keepalive related value to apply */
-			if (!iosocket_tcp_keepalive(&newsocket, SOCKOPTIONS_FROM_STRUCT, "USE", FALSE))
+			if (!iosocket_tcp_keepalive(curr_socketptr, SOCKOPTIONS_FROM_STRUCT, "USE", TRUE))
+			{
+				assert(curr_socketptr != socketptr);	/* since not create new socket */
+				if (0 < delimiter_len)		/* new delimiters */
+					iosocket_delimiter((unsigned char *)NULL, 0, curr_socketptr, TRUE);
+				free(curr_socketptr);		/* SOCKET_FREE would free storage used by existing socket */
 				return;
+			}
 		}
-		if (socketptr->buffer_size != newsocket.buffer_size)
+		if (socketptr->buffer_size != curr_socketptr->buffer_size)
 		{
 			if (socketptr->buffered_length > bfsize)
+			{
+				assert(curr_socketptr != socketptr);	/* since not create new socket */
+				if (0 < delimiter_len)		/* new delimiters */
+					iosocket_delimiter((unsigned char *)NULL, 0, curr_socketptr, TRUE);
+				free(curr_socketptr);		/* SOCKET_FREE would free storage used by existing socket */
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_SOCKBFNOTEMPTY, 2, bfsize, socketptr->buffered_length);
-			newsocket.buffer = (char *)malloc(bfsize);
+			}
+			curr_socketptr->buffer = (char *)malloc(bfsize);
 			if (0 < socketptr->buffered_length)
 			{
-				memcpy(newsocket.buffer, socketptr->buffer + socketptr->buffered_offset,
+				assert(curr_socketptr != socketptr);	/* since not create new socket */
+				memcpy(curr_socketptr->buffer, socketptr->buffer + socketptr->buffered_offset,
 				       socketptr->buffered_length);
-				newsocket.buffered_offset = 0;
+				curr_socketptr->buffered_offset = 0;
 			}
 		}
 	}
 	/* -------------------------------------- action -------------------------------------------- */
-	if ((listen_specified && ((!iosocket_bind(&newsocket, NO_M_TIMEOUT, ibfsize_specified, FALSE))
-			|| (!iosocket_listen_sock(&newsocket, DEFAULT_LISTEN_DEPTH))))
-		|| (connect_specified && (!iosocket_connect(&newsocket, 0, ibfsize_specified))))
-	{	/* error message should be printed from bind/connect */
-		if (socketptr->sd > 0)
-			(void)close(socketptr->sd);
-		SOCKET_FREE(socketptr);
+	if ((listen_specified && ((!iosocket_bind(curr_socketptr, NO_M_TIMEOUT, ibfsize_specified, FALSE))
+			|| (!iosocket_listen_sock(curr_socketptr, DEFAULT_LISTEN_DEPTH))))
+		|| (connect_specified && (!iosocket_connect(curr_socketptr, 0, ibfsize_specified))))
+	{	/* error message should be printed from bind/connect and SOCKET_FREE */
+		assert(curr_socketptr == socketptr);	/* since create new socket */
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
 	/* ------------------------------------ commit changes -------------------------------------- */
 	if (create_new_socket)
 	{
+		assert(curr_socketptr == socketptr);	/* since create new socket */
 		/* a new socket is created. so add to the list */
-		newsocket.dev = dsocketptr;
+		curr_socketptr->dev = dsocketptr;
 		newdsocket->socket[newdsocket->n_socket++] = socketptr;
 		newdsocket->current_socket = newdsocket->n_socket - 1;
 	}
@@ -753,10 +811,12 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	{
 		if (NULL != free_ozff)
 			free(free_ozff);
-		if (socketptr->buffer_size != newsocket.buffer_size)
+		if (socketptr->buffer_size != curr_socketptr->buffer_size)
 			free(socketptr->buffer);
+		/* no need to free socketptr delimiters since already done if new ones specified */
+		memcpy(socketptr, curr_socketptr, sizeof(socket_struct));
+		free(curr_socketptr);		/* SOCKET_FREE would free storage used by existing socket */
 	}
-	*socketptr = newsocket;
 	memcpy(dsocketptr, newdsocket, d_socket_struct_len);
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;

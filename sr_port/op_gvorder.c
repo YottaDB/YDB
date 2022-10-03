@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -41,6 +41,7 @@
 #include "tp.h"
 #include "repl_msg.h"			/* for gtmsource.h */
 #include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
+#include "gvt_inline.h"
 
 
 GBLREF gd_region		*gv_cur_region;
@@ -59,8 +60,13 @@ void op_gvorder(mval *v)
 	boolean_t		found, ok_to_change_currkey;
 	enum db_acc_method	acc_meth;
 	gd_addr			*gd_targ;
+<<<<<<< HEAD
 	gd_binding		*gd_map_start, *map, *map_top;
 	gd_region		*save_gv_cur_region, *reg;
+=======
+	gd_binding		*gd_map_start, *map, *map_top, *start_map, *rmap;
+	gd_region		*save_gv_cur_region, *subreg;
+>>>>>>> b400aa64 (GT.M V7.0-004)
 	gv_key_buf		save_currkey;
 	gv_namehead		*gvt, *save_gv_target;
 	gvnh_reg_t		*gvnh_reg;
@@ -164,7 +170,7 @@ void op_gvorder(mval *v)
 		gd_targ = TREF(gd_targ_addr);
 		gd_map_start = gd_targ->maps;
 		map_top = gd_map_start + gd_targ->n_maps;
-		map = gv_srch_map(gd_targ, (char *)&gv_currkey->base[0], gv_currkey->end - 1, SKIP_BASEDB_OPEN_FALSE);
+		map = start_map = gv_srch_map(gd_targ, (char *)&gv_currkey->base[0], gv_currkey->end - 1, SKIP_BASEDB_OPEN_FALSE);
 		for ( ; map < map_top; ++map)
 		{
 			reg = map->reg.addr;
@@ -174,14 +180,21 @@ void op_gvorder(mval *v)
 			 */
 			if (IS_BASEDB_REGNAME(reg))
 			{	/* Non-statsDB region */
+<<<<<<< HEAD
 				if (!reg->open)
 					gv_init_reg(reg);
 				gv_cur_region = reg;	/* Set "gv_cur_region" global only after successful "gv_init_reg" */
 				change_reg();
+=======
+				if (!gv_cur_region->open)
+					gv_init_reg(gv_cur_region, NULL);
+>>>>>>> b400aa64 (GT.M V7.0-004)
 				/* Entries in directory tree of region could have empty GVT in which case move on to next entry */
 				acc_meth = REG_ACC_METH(gv_cur_region);
 				for ( ; ; )
 				{
+					gv_cur_region = map->reg.addr;
+					change_reg();
 					if (IS_ACC_METH_BG_OR_MM(acc_meth))
 					{
 						gv_target = cs_addrs->dir_tree;
@@ -205,47 +218,41 @@ void op_gvorder(mval *v)
 						found = FALSE;
 						break;
 					}
-					gvname.var_name.addr = (char *)&gv_altkey->base[0];
+					gvname.var_name.addr = (char *)gv_altkey->base;
 					gvname.var_name.len = gv_altkey->end - 1;
 					if (dba_cm == acc_meth)
 						break;
 					COMPUTE_HASH_MNAME(&gvname);
-					GV_BIND_NAME_AND_ROOT_SEARCH(gd_targ, &gvname, gvnh_reg);	/* updates "gv_currkey" */
+					GV_BIND_NAME_AND_ROOT_SEARCH(gd_targ, &gvname, gvnh_reg); /* updates "gv_currkey" */
+					GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, gd_targ, gv_currkey, subreg);
 					gvspan = gvnh_reg->gvspan;
 					assert((NULL != gvspan) || (gv_cur_region == map->reg.addr));
-					if (NULL != gvspan)
-					{	/* gv_target would NOT have been initialized by GV_BIND_NAME in this case.
-						 * So finish that initialization.
+					if (TREF(want_empty_gvts) && (NULL != gvspan))
+					{	/* For effective reorg truncates, we need to move empty data blocks
+						 * in reorg, so it sets want_empty_gvts before calling gv_select
+						 * which then calls op_gvorder. Check if any of the spanned regions
+						 * have a non-zero gv_target->root. If so, treat it as if op_gvdata
+						 * is non-zero. That is the only way truncate can work on this
+						 * empty GVT.
 						 */
 						datamval = &tmpmval;
-						/* The below macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH
-						 * 	(e.g. setting gv_cur_region for spanning globals)
-						 */
-						GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, gd_targ, gv_currkey, gvnh_reg->gd_reg);
 						op_gvdata(datamval);
 						if (MV_FORCE_INT(datamval))
 							break;
-						if (TREF(want_empty_gvts))
-						{	/* For effective reorg truncates, we need to move empty data blocks in
-							 * reorg, so it sets want_empty_gvts before calling gv_select which then
-							 * calls op_gvorder. Check if any of the spanned regions have a non-zero
-							 * gv_target->root. If so, treat it as if op_gvdata is non-zero. That is
-							 * the only way truncate can work on this empty GVT.
-							 */
-							maxi = gvspan->max_reg_index;
-							mini = gvspan->min_reg_index;
-							for (i = mini; i <= maxi; i++)
-							{
-								assert(i >= 0);
-								assert(i < gd_targ->n_regions);
-								gvt = GET_REAL_GVT(gvspan->gvt_array[i - mini]);
-								if ((NULL != gvt) && (0 != gvt->root))
-									break;
-							}
-							if (i <= maxi)
-								break;	/* Found one spanned region with non-zero gvt->root */
+						gvspan = gvnh_reg->gvspan;
+						maxi = gvspan->max_reg_index;
+						mini = gvspan->min_reg_index;
+						for (i = mini; i <= maxi; i++)
+						{
+							assert(i >= 0);
+							assert(i < gd_targ->n_regions);
+							gvt = GET_REAL_GVT(gvspan->gvt_array[i - mini]);
+							if ((NULL != gvt) && (0 != gvt->root))
+								break;
 						}
-					} else
+						if (i <= maxi)
+							break;	/* Found spanned region with non-zero gvt->root */
+					} else if (NULL == gvspan)
 					{	/* else gv_target->root would have been initialized by
 						 * GV_BIND_NAME_AND_ROOT_SEARCH.
 						 */
@@ -254,6 +261,61 @@ void op_gvorder(mval *v)
 						 */
 						if ((0 != gv_target->root) && (TREF(want_empty_gvts) || (0 != gvcst_data())))
 							break;
+					} else
+					{	/* For accurate results, we need to see if the node found by gvcst_order()
+						 * has data or that its first data child lies in the same map. Otherwise,
+						 * the node should be excluded.
+						 * To do this, take the proposed key and do a gvcst_query2() on it.
+						 * If the resulting key matches the request and is in the current map,
+						 * use it to derive the result. Otherwise, put things back to where they
+						 * were after the search and continue.
+						 */
+						if ((map != start_map)
+							&& (map[-1].gvkey_len + 1 > gv_currkey->end)
+							&& (0 == memcmp(gv_currkey->base, map[-1].gvkey.addr,
+											gv_currkey->end)))
+						{	/* The key we are searching is a prefix of the previous map,
+							 * so search from the end of that map to make sure that we
+							 * don't match anything earlier.
+							 */
+							GV_BIND_NAME_AND_ROOT_SEARCH(gd_targ, &gvname, gvnh_reg);
+							memcpy(gv_currkey->base + gv_currkey->end,
+									map[-1].gvkey.addr + gv_currkey->end,
+									map[-1].gvkey_len - gv_currkey->end);
+							gv_currkey->end = map[-1].gvkey_len;
+							gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
+							/* The below macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH
+							 * 	(e.g. setting gv_cur_region for spanning globals)
+							 */
+							GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, gd_targ, gv_currkey, subreg);
+						}
+						found = gv_target->root && gvcst_query2();
+						if (found)
+						{
+							rmap = gv_srch_map_linear(start_map, (char *)gv_altkey->base,
+											gv_altkey->end - 1);
+							if (map == rmap)
+							{
+								for (gv_altkey->end = 0;
+										gv_altkey->base[gv_altkey->end];
+										gv_altkey->end++)
+									;
+								gv_altkey->base[++gv_altkey->end] = KEY_DELIMITER;
+								found = TRUE;
+								break;
+							} else
+								found = FALSE;
+						}
+						/* The query failed, but we may still find something in the next global, so
+						 * reset gv_currkey to the global name so the increment below can work
+						 * properly.
+						 */
+						for (gv_currkey->end = 0;
+								gv_currkey->base[gv_currkey->end] != KEY_DELIMITER;
+								gv_currkey->end++)
+							;
+						gv_currkey->base[gv_currkey->end++] = KEY_DELIMITER;
+						gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 					}
 					GVKEY_INCREMENT_ORDER(gv_currkey);
 				}
@@ -273,6 +335,7 @@ void op_gvorder(mval *v)
 				GVKEY_DECREMENT_ORDER(gv_currkey); /* back off 1 spot from map */
 			}
 		}
+		change_reg();
 		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by (BYPASSOK)
 				* this to-be-overwritten mval */
 		if (found)

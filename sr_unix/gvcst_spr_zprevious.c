@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,16 +51,23 @@ boolean_t	gvcst_spr_zprevious(void)
 {
 	boolean_t	spr_tpwrapped;
 	boolean_t	est_first_pass;
-	boolean_t	found, cumul_found;
+	boolean_t	found, result_found;
+	boolean_t	do_atorder_search;
+	boolean_t	currkey_orig_saved = FALSE;
+	char		savech;
 	int		reg_index;
-	gd_binding	*start_map, *first_map, *stop_map, *end_map, *map, *prev_end_map;
+	int		prev;
+	gd_binding	*start_map, *first_map, *stop_map, *end_map, *map, *prev_end_map, *rmap;
 	gd_region	*reg, *gd_reg_start;
 	gd_addr		*addr;
 	gv_namehead	*start_map_gvt;
+	gv_key		*matchkey = NULL;
+	gv_key_buf	currkey_save_buf = { .key.top = DBKEYSIZE(MAX_KEY_SZ), .key.end = 0, .key.prev = 0 };
+	gv_key_buf	currkey_orig_buf = { .key.top = DBKEYSIZE(MAX_KEY_SZ), .key.end = 0, .key.prev = 0 };
+	gv_key_buf	altkey_save_buf = { .key.top = DBKEYSIZE(MAX_KEY_SZ), .key.end = 0, .key.prev = 0 };
 	gvnh_reg_t	*gvnh_reg;
+	srch_blk_status	*bh;
 	trans_num	gd_targ_tn, *tn_array;
-	char            cumul_key[MAX_KEY_SZ], savech;
-	int		cumul_key_len, prev;
 #	ifdef DEBUG
 	int		save_dollar_tlevel;
 #	endif
@@ -88,7 +95,7 @@ boolean_t	gvcst_spr_zprevious(void)
 	{
 		first_map = start_map;
 		BACK_OFF_ONE_MAP_ENTRY_IF_EDGECASE(gv_currkey->base, gv_currkey->end - 1, first_map);
-		if (start_map != first_map)
+		if ((start_map != first_map) || (gv_target->gd_csa != cs_addrs) || (gv_cur_region != start_map->reg.addr))
 		{	/* set global variables to point to new first_map region */
 			reg = first_map->reg.addr;
 			GV_BIND_SUBSREG(addr, reg, gvnh_reg);	/* sets gv_target/gv_cur_region/cs_addrs to new first_map */
@@ -135,9 +142,8 @@ boolean_t	gvcst_spr_zprevious(void)
 	/* Do any initialization that is dependent on retries AFTER the op_tstart */
 	map = first_map;
 	end_map = stop_map;
-	cumul_found = FALSE;
-	cumul_key_len = 0;
-	DEBUG_ONLY(cumul_key[cumul_key_len] = KEY_DELIMITER;)
+	result_found = FALSE;
+	do_atorder_search = FALSE;
 	INCREMENT_GD_TARG_TN(gd_targ_tn); /* takes a copy of incremented "TREF(gd_targ_tn)" into local variable "gd_targ_tn" */
 	/* Verify that initializations that happened before op_tstart are still unchanged */
 	assert(addr == TREF(gd_targ_addr));
@@ -153,39 +159,128 @@ boolean_t	gvcst_spr_zprevious(void)
 							 */
 		reg = map->reg.addr;
 		GET_REG_INDEX(addr, gd_reg_start, reg, reg_index);	/* sets "reg_index" */
-		assert((map != first_map) || (tn_array[reg_index] != gd_targ_tn));
 		assert(TREF(gd_targ_reg_array_size) > reg_index);
-		if (tn_array[reg_index] == gd_targ_tn)
-			continue;
 		GV_BIND_SUBSREG(addr, reg, gvnh_reg);	/* sets gv_target/gv_cur_region/cs_addrs */
 		assert(reg->open);
 		if (gv_target->root)
 		{
+			matchkey = gv_altkey;
 			found = gvcst_zprevious();
-			if (found)
+			assert(!found || !memcmp(&gv_altkey->base[0], &gv_currkey->base[0], prev));
+			if (do_atorder_search)
 			{
-				assert(!memcmp(&gv_altkey->base[0], &gv_currkey->base[0], prev));
-				cumul_found = TRUE;
-				assert(gv_altkey->end);
-				assert(gv_altkey->end > prev);
-				assert(KEY_DELIMITER == gv_altkey->base[gv_altkey->end]);
-				assert(!cumul_key_len || (KEY_DELIMITER == cumul_key[cumul_key_len - 1]));
-				if (!cumul_key_len || (0 > memcmp(&cumul_key[0], &gv_altkey->base[prev], cumul_key_len)))
-				{	/* just found alt_key is greater (collation-wise) than cumul_key so update cumul_key */
-					cumul_key_len = gv_altkey->end - prev;
-					assert(cumul_key_len);
-					assert(cumul_key_len < ARRAYSIZE(cumul_key));
-					memcpy(&cumul_key[0], &gv_altkey->base[prev], cumul_key_len);
-					DEBUG_ONLY(prev_end_map = end_map;)
-					/* update end_map as well now that we got a bigger cumul_key */
-					end_map = gv_srch_map_linear_backward(map, (char *)&gv_altkey->base[0], gv_altkey->end - 1);
-					assert(prev_end_map <= end_map);
+				bh = gv_target->hist.h;
+				if (gv_currkey->end <= bh->curr_rec.match)
+				{	/* The history indicates that the gvcst_search() performed by gvcst_order() actually found
+					 * the key marking the end of a previous map, so use that.
+					 */
+					matchkey = gv_currkey;
+					found = TRUE;
+				}
+			}
+			if (found)
+			{	/* For accurate results, we need to see if the node found by gvcst_zprevious() has data or that its
+				 * first data child lies in the same map. Otherwise, the node should be excluded.
+				 * To do this, take the proposed key and do a gvcst_query() on it.
+				 * If the resulting key matches the request and is in the current map, use it to derive the result.
+				 * Otherwise, put things back to where they were after the search and continue.
+				 */
+				if (!currkey_orig_saved)
+				{
+					COPY_KEY(&currkey_orig_buf.key, gv_currkey);
+					currkey_orig_saved = TRUE;
+				}
+				COPY_KEY(&currkey_save_buf.key, gv_currkey);
+				if (matchkey == gv_altkey)
+				{
+					COPY_KEY(gv_currkey, gv_altkey);
+					gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
+				} else
+				{
+					assert(matchkey == gv_currkey);
+					COPY_KEY(&altkey_save_buf.key, gv_altkey);
+					altkey_save_buf.split.base[altkey_save_buf.key.end] = KEY_DELIMITER;
+					if ((map[-1].gvkey_len > gv_currkey->end)
+							&& (0 == memcmp(gv_currkey->base, map[-1].gvkey.addr, gv_currkey->end)))
+					{	/* The prior map endpoint has the same subscript as the one we are looking for,
+						 * so do query search from there in order to avoid incorrectly matching earlier
+						 * next level subscripts.
+						 */
+						memcpy(gv_currkey->base, map[-1].gvkey.addr, map[-1].gvkey_len);
+						gv_currkey->end = map[-1].gvkey_len;
+						gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
+					}
+				}
+				do
+				{
+					found = gvcst_query2();
+					/* The query result is only useful if it shares the same base as the currkey
+					 * and has subscripts beyond that.
+					 */
+					if (found)
+					{
+						assert(gv_altkey->end >= prev);
+						assert(0 == memcmp(gv_currkey->base, gv_altkey->base, prev));
+						rmap = gv_srch_map_linear_backward(map, (char *)gv_altkey->base,
+											gv_altkey->end - 1);
+						if (map == rmap)
+						{
+							result_found = TRUE;
+							/* Use altkey from query, but only up to the subscript we care about. */
+							for (gv_altkey->end = prev;
+									gv_altkey->base[gv_altkey->end];
+									gv_altkey->end++)
+								;
+							gv_altkey->base[++gv_altkey->end] = KEY_DELIMITER;
+							/* gv_currkey will be restored from currkey_orig on the way out,
+							 * so no need to restore it here.
+							 */
+							matchkey = gv_altkey;
+							break;
+						}
+					}
+					if (matchkey == gv_altkey)
+					{	/* The saved gv_altkey is a miss, so don't bother restoring it. */
+						COPY_KEY(gv_currkey, &currkey_save_buf.key);
+						matchkey = NULL;
+					} else
+					{	/* The currkey check failed, so try the altkey. */
+						COPY_KEY(gv_currkey, &altkey_save_buf.key);
+						assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
+						matchkey = gv_altkey;
+					}
+				} while (matchkey);
+				if (matchkey)
+				{	/* Only non-NULL if we did a break out of the above loop. */
+					break;
 				}
 			}
 		}
+		if (map != end_map)
+		{	/* Since we know that any subsequent match would lie before the current map,
+			 * replace the last subscript in the search with the corresponding one from
+			 * the previous map endpoint.
+			 * This keeps us from getting false hits which would have been associated with earlier maps.
+			 */
+			assert(!memcmp(map[-1].gvkey.addr, &gv_currkey->base[0], prev));
+			assert(0 >= memcmp(map[-1].gvkey.addr + prev, gv_currkey->base + prev, gv_currkey->end - prev));
+			if (!currkey_orig_saved)
+			{
+				COPY_KEY(&currkey_orig_buf.key, gv_currkey);
+				currkey_orig_saved = TRUE;
+			}
+			for (gv_currkey->end = prev; map[-1].gvkey.addr[gv_currkey->end]; gv_currkey->end++)
+			{
+				gv_currkey->base[gv_currkey->end] = map[-1].gvkey.addr[gv_currkey->end];
+			}
+			gv_currkey->base[gv_currkey->end++] = KEY_DELIMITER;
+			gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
+			do_atorder_search = TRUE;
+		} else
+			do_atorder_search = FALSE;
 		tn_array[reg_index] = gd_targ_tn;
 	}
-	if (gv_target != start_map_gvt)
+	if (currkey_orig_saved || (gv_target != start_map_gvt))
 	{	/* Restore gv_cur_region/gv_target etc. */
 		gv_target = start_map_gvt;
 		gv_cur_region = start_map->reg.addr;
@@ -198,13 +293,13 @@ boolean_t	gvcst_spr_zprevious(void)
 		REVERT; /* remove our condition handler */
 	}
 	assert(save_dollar_tlevel == dollar_tlevel);
-	if (cumul_found)
+	if (result_found)
 	{	/* Restore accumulated minimal key into gv_altkey */
-		assert(cumul_key_len);
-		memcpy(&gv_altkey->base[0], &gv_currkey->base[0], prev);
-		memcpy(&gv_altkey->base[prev], &cumul_key[0], cumul_key_len);
-		gv_altkey->end = prev + cumul_key_len;
-		gv_altkey->base[gv_altkey->end] = KEY_DELIMITER;
+		assert(matchkey);
+		if (gv_altkey != matchkey)
+			COPY_KEY(gv_altkey, matchkey);
 	}
-	return cumul_found;
+	if (currkey_orig_saved)
+		COPY_KEY(gv_currkey, &currkey_orig_buf.key);
+	return result_found;
 }

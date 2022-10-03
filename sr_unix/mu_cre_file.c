@@ -53,6 +53,7 @@
 #include "gtm_permissions.h"
 #include "getzposition.h"
 #include "error.h"
+#include "db_header_conversion.h"
 
 #define BLK_SIZE (((gd_segment*)gv_cur_region->dyn.addr)->blk_size)
 
@@ -125,7 +126,12 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
+<<<<<<< HEAD
 GBLREF	uint4			ydbDebugLevel;
+=======
+GBLREF	uint4			gtmDebugLevel;
+GBLREF	enum db_ver		gtm_db_create_ver;              /* database creation version */
+>>>>>>> b400aa64 (GT.M V7.0-004)
 #ifdef DEBUG
 GBLREF	boolean_t		in_mu_cre_file;
 GBLREF	block_id		ydb_skip_bml_num;
@@ -193,12 +199,23 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 	struct perm_diag_data	pdd;
 	uint4		fbwsize;
 	int4		dblksize;
+	uint4 		file_hdr_size;
+	block_id 	start_vbn_target;
 	ZOS_ONLY(int	realfiletag;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	DEBUG_ONLY(mu_cre_file_fd = FD_INVALID);
 	DEBUG_ONLY(mu_cre_file_path = NULL);
+	if (GDSVCURR == gtm_db_create_ver)
+	{	/* Current version defaults */
+		file_hdr_size		= SIZEOF_FILE_HDR_DFLT;
+		start_vbn_target	= START_VBN_CURRENT;
+	} else
+	{	/* Prior version settings */
+		file_hdr_size		= SIZEOF_FILE_HDR_V6;
+		start_vbn_target	= START_VBN_V6;
+	}
 	cleanup_needed = FALSE;
 	DEBUG_ONLY(in_mu_cre_file = TRUE;)
 	assert((-(SIZEOF(uint4) * 2) & SIZEOF_FILE_HDR_DFLT) == SIZEOF_FILE_HDR_DFLT);
@@ -299,7 +316,7 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 		}
 	}
 	/* Blocks_for_create is in the unit of DISK_BLOCK_SIZE */
-	blocks_for_create = (gtm_uint64_t)(DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE) + 1
+	blocks_for_create = (gtm_uint64_t)(DIVIDE_ROUND_UP(file_hdr_size, DISK_BLOCK_SIZE) + 1
 					   + (seg->blk_size / DISK_BLOCK_SIZE
 					      * (gtm_uint64_t)((DIVIDE_ROUND_UP(seg->allocation, BLKS_PER_LMAP - 1))
 							       + seg->allocation)));
@@ -342,18 +359,18 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 	memset(&fc, 0, SIZEOF(file_control));
 	fc.file_info = (void*)&udi_struct;
 	udi->fd = mu_cre_file_fd;
-	cs_data = (sgmnt_data_ptr_t)malloc(SIZEOF_FILE_HDR_DFLT);
-	memset(cs_data, 0, SIZEOF_FILE_HDR_DFLT);
+	cs_data = (sgmnt_data_ptr_t)malloc(file_hdr_size);
+	memset(cs_data, 0, file_hdr_size);
 	cs_data->createinprogress = TRUE;
 	cs_data->semid = INVALID_SEMID;
 	cs_data->shmid = INVALID_SHMID;
 	/* We want our datablocks to start on what would be a block boundary within the file which will aid I/O
 	 * so pad the fileheader if necessary to make this happen.
 	 */
-	norm_vbn = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE) + 1;
-	assert(START_VBN_CURRENT >= norm_vbn);
-	cs_data->start_vbn = START_VBN_CURRENT;
-	cs_data->free_space += (START_VBN_CURRENT - norm_vbn) * DISK_BLOCK_SIZE;
+	norm_vbn = DIVIDE_ROUND_UP(file_hdr_size, DISK_BLOCK_SIZE) + 1;
+	assert(start_vbn_target >= norm_vbn);
+	cs_data->start_vbn = start_vbn_target;
+	cs_data->free_space += (start_vbn_target - norm_vbn) * DISK_BLOCK_SIZE;
 	cs_data->acc_meth = gv_cur_region->dyn.addr->acc_meth;
 	if ((dba_mm == cs_data->acc_meth) && (gv_cur_region->jnl_before_image))
 	{
@@ -438,10 +455,12 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 	cs_data->span_node_absent = TRUE;
 	cs_data->maxkeysz_assured = TRUE;
 	cs_data->problksplit = DEFAULT_PROBLKSPLIT;
-	mucregini(cs_data->trans_hist.total_blks);
+	mucregini(cs_data->trans_hist.total_blks, gtm_db_create_ver);
 	cs_data->createinprogress = FALSE;
+	if (GDSVCURR != gtm_db_create_ver)
+		db_header_dwnconv(cs_data);
 	ASSERT_NO_DIO_ALIGN_NEEDED(udi);	/* because we are creating the database and so effectively have standalone access */
-	DB_LSEEKWRITE(cs_addrs, udi, udi->fn, udi->fd, 0, cs_data, SIZEOF_FILE_HDR_DFLT, status);
+	DB_LSEEKWRITE(cs_addrs, udi, udi->fn, udi->fd, 0, cs_data, file_hdr_size, status);
 	if (0 != status)
 	{
 		PUTMSG_ERROR_CSA(cs_addrs, 7, ERR_FILECREERR, 4, LEN_AND_LIT("writing out file header"), LEN_AND_LIT(path), status);

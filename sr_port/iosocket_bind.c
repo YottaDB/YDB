@@ -86,6 +86,8 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 				real_errno = errno;
 				errptr = (char *)STRERROR(real_errno);
 				errlen = STRLEN(errptr);
+				close(socketptr->sd);
+				socketptr->sd = FD_INVALID;
 				SOCKET_FREE(socketptr);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 					RTS_ERROR_LITERAL("SO_REUSEADDR"), real_errno, errlen, errptr);
@@ -98,6 +100,8 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 				real_errno = errno;
 				errptr = (char *)STRERROR(real_errno);
 				errlen = STRLEN(errptr);
+				close(socketptr->sd);
+				socketptr->sd = FD_INVALID;
 				SOCKET_FREE(socketptr);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 					RTS_ERROR_LITERAL("TCP_NODELAY"), real_errno, errlen, errptr);
@@ -111,6 +115,8 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 					real_errno = errno;
 					errptr = (char *)STRERROR(real_errno);
 					errlen = STRLEN(errptr);
+					close(socketptr->sd);
+					socketptr->sd = FD_INVALID;
 					SOCKET_FREE(socketptr);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 						RTS_ERROR_LITERAL("SO_RCVBUF"), real_errno, errlen, errptr);
@@ -126,6 +132,8 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 					real_errno = errno;
 					errptr = (char *)STRERROR(real_errno);
 					errlen = STRLEN(errptr);
+					close(socketptr->sd);
+					socketptr->sd = FD_INVALID;
 					SOCKET_FREE(socketptr);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
 						RTS_ERROR_LITERAL("SO_RCVBUF"), real_errno, errlen, errptr);
@@ -137,7 +145,9 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 			{
 				if (-1 == iosocket_setsockopt(socketptr, "SO_SNDBUF", SO_SNDBUF, SOL_SOCKET,
 						&socketptr->iobfsize, sizeof(socketptr->iobfsize), TRUE))
+				{
 					return FALSE;
+				}
 				socketptr->options_state.sndbuf |= SOCKOPTIONS_USER;
 				socketptr->options_state.sndbuf &= ~SOCKOPTIONS_PENDING;
 			}
@@ -161,7 +171,11 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 			{
 					real_errno = errno;
 					if (ioerror)
+					{
+						close(socketptr->sd);
+						socketptr->sd = FD_INVALID;
 						SOCKET_FREE(socketptr);
+					}
 					SET_DOLLARDEVICE_ONECOMMA_STRERROR(dsocketptr->iod, real_errno);
 					if (ioerror)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKBIND, 0, real_errno);
@@ -196,16 +210,24 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 					/* fall through for LOCAL sockets since it is unlikely the file will go away */
 				default:
 					if (ioerror)
+					{
+						close(socketptr->sd);
+						socketptr->sd = FD_INVALID;
 						SOCKET_FREE(socketptr);
+					}
 					SET_DOLLARDEVICE_ONECOMMA_STRERROR(dsocketptr->iod, real_errno);
 					if (ioerror)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKBIND, 0, real_errno);
 					return FALSE;
 			}
-			if (no_time_left)
-				return FALSE;
-			hiber_start(100);
 			close(socketptr->sd);
+			socketptr->sd = FD_INVALID;
+			if (no_time_left)
+			{
+				SOCKET_FREE(socketptr);
+				return FALSE;
+			}
+			hiber_start(100);
 			if (-1 == (socketptr->sd = socket(ai_ptr->ai_family,ai_ptr->ai_socktype,
 									  ai_ptr->ai_protocol)))
 			{
@@ -230,6 +252,8 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(dsocketptr->iod, errptr, errlen);
 		if (ioerror)
 		{
+			close(socketptr->sd);
+			socketptr->sd = FD_INVALID;
 			SOCKET_FREE(socketptr);
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, real_errno, errlen, errptr);
 		}
@@ -246,6 +270,8 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(dsocketptr->iod, errptr, errlen);
 			if (ioerror)
 			{
+				close(socketptr->sd);
+				socketptr->sd = FD_INVALID;
 				SOCKET_FREE(socketptr);
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GETNAMEINFO, 0, ERR_TEXT, 2, errlen, errptr);
 			}
@@ -262,7 +288,9 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 		else
 			keepalive_opt = TREF(ydb_socket_keepalive_idle);	/* deviceparameter takes precedence */
 		if (keepalive_opt && !iosocket_tcp_keepalive(socketptr, keepalive_opt, action, TRUE))
+		{
 			return FALSE;				/* iosocket_tcp_keepalive issues rts_error rather than return */
+		}
 	} else
 	{
 		if (socketptr->filemode_mask)
@@ -279,6 +307,8 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(dsocketptr->iod, errptr, errlen);
 				if (ioerror)
 				{
+					close(socketptr->sd);
+					socketptr->sd = FD_INVALID;
 					SOCKET_FREE(socketptr);
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_SOCKINIT, 3, real_errno, errlen,
 						errptr, ERR_TEXT, 2, RTS_ERROR_LITERAL("setting protection"));
@@ -296,6 +326,8 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(dsocketptr->iod, errptr, errlen);
 				if (ioerror)
 				{
+					close(socketptr->sd);
+					socketptr->sd = FD_INVALID;
 					SOCKET_FREE(socketptr);
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_SOCKINIT, 3, real_errno, errlen,
 						errptr, ERR_TEXT, 2, RTS_ERROR_LITERAL("setting ownership"));

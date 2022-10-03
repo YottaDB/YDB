@@ -2631,7 +2631,8 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
 	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 		return FALSE;
 	/* At this point, the both sides are ready for a TLS/SSL handshake. Create a TLS/SSL aware socket. */
-	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmrecv_sock_fd, repl_tls.id, GTMTLS_OP_VERIFY_PEER)))
+	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmrecv_sock_fd, repl_tls.id,
+					GTMTLS_OP_VERIFY_PEER | GTMTLS_OP_RENEGOTIATE_REQUESTED)))
 	{
 		if (!PLAINTEXT_FALLBACK)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -112,7 +112,14 @@ boolean_t backup_block(sgmnt_addrs *csa, block_id blk, cache_rec_ptr_t backup_cr
 boolean_t backup_buffer_flush(gd_region *reg);
 void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage);
 void mubexpfilnam(char *dirname, unsigned int dirlen, backup_reg_list *list);
+<<<<<<< HEAD
 boolean_t mubfilcpy(backup_reg_list *list, boolean_t showprogress, int attemptcnt);
+=======
+#else
+#error Unsupported Platform
+#endif
+boolean_t mubfilcpy(backup_reg_list *list, boolean_t showprogress, int attemptcnt, boolean_t *stopretries);
+>>>>>>> b400aa64 (GT.M V7.0-004)
 boolean_t mubgetfil(backup_reg_list *list, char *name, unsigned short len);
 bool mubinccpy(backup_reg_list *list);
 void mup_bak_mag(void);

@@ -59,6 +59,9 @@ GBLREF	boolean_t		dollar_zaudit;
 GBLREF	char			dl_err[MAX_ERRSTR_LEN];	/* This is maintained by gtm_tls_loadlibrary() */
 GBLREF	dm_audit_info		*audit_conn;
 GBLREF	void 			(*primary_exit_handler)(void);
+GBLREF	boolean_t 		restrict_initialized;
+GBLREF	enum gtmImageTypes	image_type;
+LITREF	gtmImageName		gtmImageNames[];
 
 error_def(ERR_TLSDLLNOOPEN);
 error_def(ERR_TEXT);
@@ -76,6 +79,9 @@ error_def(ERR_OPENCONN);
 error_def(ERR_APDINITFAIL);
 error_def(ERR_APDCONNFAIL);
 error_def(ERR_APDLOGFAIL);
+error_def(ERR_AUDINITFAIL);
+error_def(ERR_AUDCONNFAIL);
+error_def(ERR_AUDLOGFAIL);
 
 /* Frees all memory allocated by the audit_conn global struct */
 void	free_dm_audit_info(void)
@@ -155,8 +161,14 @@ int	dm_audit_connect(void)
 				{
 					save_errno = errno;
 					errptr = (char *)STRERROR(save_errno);
-					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_APDCONNFAIL, 0,
-							ERR_SOCKINIT, 3, save_errno, LEN_AND_STR(errptr));
+					if (IS_MUPIP_IMAGE)
+					{
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_AUDCONNFAIL, 1,
+								gtmImageNames[image_type].imageName,
+								ERR_SOCKINIT, 3, save_errno, LEN_AND_STR(errptr));
+					} else if (IS_MUMPS_IMAGE)
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_APDCONNFAIL, 0,
+								ERR_SOCKINIT, 3, save_errno, LEN_AND_STR(errptr));
 					return -1;
 				}
 				head_ai_ptr = remote_ai_ptr->ai_next;	/* Get ready to try next address if connect fails */
@@ -206,7 +218,12 @@ int	dm_audit_connect(void)
 				close(audit_conn->sock_fd);
 				audit_conn->sock_fd = FD_INVALID;
 			}
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_APDCONNFAIL, 0, ERR_OPENCONN, 0, save_errno);
+			if (IS_MUPIP_IMAGE)
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_AUDCONNFAIL, 1, gtmImageNames[image_type].imageName,
+						ERR_OPENCONN, 0, save_errno);
+			} else if (IS_MUMPS_IMAGE)
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_APDCONNFAIL, 0, ERR_OPENCONN, 0, save_errno);
 			return -1;
 		}
 		assert(FD_INVALID != audit_conn->sock_fd);
@@ -220,8 +237,14 @@ int	dm_audit_connect(void)
 					close(audit_conn->sock_fd);
 					audit_conn->sock_fd = FD_INVALID;
 					/* dl_err is initialized and set in gtm_tls_loadlibrary() when an error occurs */
-					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_APDCONNFAIL, 0,
-							ERR_TLSDLLNOOPEN, 0, ERR_TEXT, 2, LEN_AND_STR(dl_err));
+					if (IS_MUPIP_IMAGE)
+					{
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_AUDCONNFAIL, 1,
+								gtmImageNames[image_type].imageName,
+								ERR_TLSDLLNOOPEN, 0, ERR_TEXT, 2, LEN_AND_STR(dl_err));
+					} else if (IS_MUMPS_IMAGE)
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_APDCONNFAIL, 0,
+								ERR_TLSDLLNOOPEN, 0, ERR_TEXT, 2, LEN_AND_STR(dl_err));
 					return -1;
 				}
 				/* Create the SSL/TLS context */
@@ -230,8 +253,14 @@ int	dm_audit_connect(void)
 					close(audit_conn->sock_fd);
 					audit_conn->sock_fd = FD_INVALID;
 					errptr = (char *)gtm_tls_get_error(NULL);
-					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_APDCONNFAIL, 0,
-							ERR_TLSINIT, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
+					if (IS_MUPIP_IMAGE)
+					{
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_AUDCONNFAIL, 1,
+								gtmImageNames[image_type].imageName,
+								ERR_TLSINIT, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
+					} else if (IS_MUMPS_IMAGE)
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_APDCONNFAIL, 0,
+								ERR_TLSINIT, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
 					return -1;
 				}
 				if (primary_exit_handler)
@@ -251,8 +280,15 @@ int	dm_audit_connect(void)
 				errptr = (char *)gtm_tls_get_error(NULL);
 				close(audit_conn->sock_fd);
 				audit_conn->sock_fd = FD_INVALID;
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_APDCONNFAIL, 0,
-						ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
+				restrict_initialized = TRUE;
+				if (IS_MUPIP_IMAGE)
+				{
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_AUDCONNFAIL, 1,
+							gtmImageNames[image_type].imageName,
+							ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
+				} else if (IS_MUMPS_IMAGE)
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_APDCONNFAIL, 0,
+							ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
 				return -1;
 			}
 			/* Attempt TLS handshake with logger */
@@ -262,8 +298,15 @@ int	dm_audit_connect(void)
 				gtm_tls_socket_close(audit_conn->tls_sock);
 				close(audit_conn->sock_fd);
 				audit_conn->sock_fd = FD_INVALID;
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_APDCONNFAIL, 0,
-						ERR_TLSHANDSHAKE, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
+				restrict_initialized = TRUE;
+				if (IS_MUPIP_IMAGE)
+				{
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_AUDCONNFAIL, 1,
+							gtmImageNames[image_type].imageName,
+							ERR_TLSHANDSHAKE, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
+				} else if (IS_MUMPS_IMAGE)
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_APDCONNFAIL, 0,
+							ERR_TLSHANDSHAKE, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
 				return -1;
 			}
 		}
@@ -275,8 +318,15 @@ int	dm_audit_connect(void)
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_APDCONNFAIL, 0,
-					ERR_SOCKINIT, 3, save_errno, LEN_AND_STR(errptr));
+			restrict_initialized = TRUE;
+			if (IS_MUPIP_IMAGE)
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_AUDCONNFAIL, 1,
+						gtmImageNames[image_type].imageName,
+						ERR_SOCKINIT, 3, save_errno, LEN_AND_STR(errptr));
+			} else if (IS_MUMPS_IMAGE)
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_APDCONNFAIL, 0,
+						ERR_SOCKINIT, 3, save_errno, LEN_AND_STR(errptr));
 			return -1;
 		}
 		CONNECT_SOCKET(audit_conn->sock_fd, (struct sockaddr *)&(audit_conn->un_addr),
@@ -286,7 +336,14 @@ int	dm_audit_connect(void)
 			save_errno = errno;
 			close(audit_conn->sock_fd);
 			audit_conn->sock_fd = FD_INVALID;
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_APDCONNFAIL, 0, ERR_OPENCONN, 0, save_errno);
+			restrict_initialized = TRUE;
+			if (IS_MUPIP_IMAGE)
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_AUDCONNFAIL, 1,
+						gtmImageNames[image_type].imageName,
+						ERR_OPENCONN, 0, save_errno);
+			} else if (IS_MUMPS_IMAGE)
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_APDCONNFAIL, 0, ERR_OPENCONN, 0, save_errno);//
 			return -1;
 		}
 	}
@@ -321,9 +378,10 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 	char			port_buffer[NI_MAXSERV + 1];
 	int			host_len, port_len;
 	unsigned int		host_info_len;
-	int			errcode;
+	int			errcode, real_errno;
 	int			fields, port;
 	char			tlsid[MAX_TLSID_LEN + 1];
+	char 			*errptr;
 
 	if (NULL != audit_conn)
 	{	/* Initialization had failed initially and
@@ -334,7 +392,12 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 	}
 	if ((NULL == host_info) || ('\0' == host_info[0]))
 	{	/* No logger (server) information provided */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_APDINITFAIL, 0, ERR_INVADDRSPEC);
+		restrict_initialized = TRUE; // needed for gtm_putmsg_list.c
+		if (IS_MUPIP_IMAGE)
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_AUDINITFAIL, 1,
+					gtmImageNames[image_type].imageName, ERR_INVADDRSPEC);
+		else if (IS_MUMPS_IMAGE)
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_APDINITFAIL, 0, ERR_INVADDRSPEC);
 		return -1;
 	}
 	/* Allocate and initialize memory for audit information */
@@ -354,7 +417,12 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 	if ((0 == fields) || (0 == host_len))
 	{
 		free_dm_audit_info();
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_APDINITFAIL, 0, ERR_INVADDRSPEC);
+		restrict_initialized = TRUE;
+		if (IS_MUPIP_IMAGE)
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_AUDINITFAIL, 1,
+					gtmImageNames[image_type].imageName, ERR_INVADDRSPEC);
+		else if (IS_MUMPS_IMAGE)
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_APDINITFAIL, 0, ERR_INVADDRSPEC);
 		return -1;
 	}
 	if ((3 == fields) || (2 == fields))
@@ -364,8 +432,19 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 		CLIENT_HINTS(hints);
 		if (0  != (errcode = dogetaddrinfo(host, port_buffer, &hints, &remote_ai_head)))
 		{
+			real_errno = errno;
 			free_dm_audit_info();
-			RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
+			TEXT_ADDRINFO(errptr, errcode, real_errno);
+			restrict_initialized = TRUE;
+			if (IS_MUPIP_IMAGE)
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_AUDCONNFAIL, 1, gtmImageNames[image_type].imageName,
+						ERR_GETADDRINFO, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
+			} else if (IS_MUMPS_IMAGE)
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_APDCONNFAIL, 0,
+						ERR_GETADDRINFO, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
+			}
 			return -1;
 		}
 		audit_conn->tcp_addr = remote_ai_head;
@@ -388,7 +467,12 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 		if (is_tls || (MAX_SOCKADDR_UN_PATH <= host_info_len))
 		{	/* If the "TLS" option is specified but no IP/port info provided or path to socket file is too long */
 			free_dm_audit_info();
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_APDINITFAIL, 0, ERR_INVADDRSPEC);
+			restrict_initialized = TRUE;
+			if (IS_MUPIP_IMAGE)
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_AUDINITFAIL, 1,
+					gtmImageNames[image_type].imageName, ERR_INVADDRSPEC);
+			else if (IS_MUMPS_IMAGE)
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_APDINITFAIL, 0, ERR_INVADDRSPEC);
 			return -1;
 		}
 		audit_conn->conn_type = AUDIT_CONN_UN;
@@ -400,15 +484,15 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 	return 0;
 }
 
-/* Responsible for Direct Mode Auditing. It essentially sends the to-be-logged
+/* Responsible for Direct Mode and MUPIP Auditing. It essentially sends the to-be-logged
  * command or activity to the listener (logger) for logging.
  *
  * params:
  * 	@v contains command to be logged
  * 	@src integer that identifies the source caller
  * returns:
- * 	FALSE if Direct Mode Auditing enabled and logging failed
- * 	TRUE if Direct Mode Auditing disabled, or if enabled and logging successfull
+ * 	FALSE if Direct Mode / MUPIP Auditing enabled and logging failed
+ * 	TRUE if Direct Mode / MUPIP Auditing disabled, or if enabled and logging successfull
  */
 int	dm_audit_log(mval *v, int src)
 {
@@ -417,29 +501,42 @@ int	dm_audit_log(mval *v, int src)
 	int		status, save_errno, log_msg_len, max_log_msg_len;
 	boolean_t	need_free = FALSE;
 
-	if (AUDIT_DISABLE == RESTRICTED(dm_audit_enable))
-		return TRUE;
-	assert(dollar_zaudit);
+	if (AUDIT_SRC_MUPIP != src)
+	{
+		if (AUDIT_DISABLE == RESTRICTED(dm_audit_enable))
+			return TRUE;
+		assert(dollar_zaudit);
+	}
 	/* Never log empty commands (useless entries) */
 	if (v->str.len == 0)
 		return TRUE;
 	/* Always skip logging if $IO != $PRINCIPAL */
-	if (io_curr_device.in != io_std_device.in)
+	if ((AUDIT_SRC_MUPIP != src) && (io_curr_device.in != io_std_device.in))
 		return TRUE;
 	/* Make sure the caller is classified, otherwise set to unknown */
-	if ((AUDIT_SRC_DMREAD != src) && (AUDIT_SRC_OPREAD != src))
+	if ((AUDIT_SRC_DMREAD != src) && (AUDIT_SRC_OPREAD != src) && (AUDIT_SRC_MUPIP != src))
 		src = AUDIT_SRC_UNKNOWN;	/* Unknown source caller */
 	/* Check if audit information was initialized */
 	if ((NULL == audit_conn) || !audit_conn->initialized)
 	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_APDLOGFAIL, 0,
-				ERR_TEXT, 2, LEN_AND_LIT("Audit information is not initialized"));
+		restrict_initialized = TRUE;
+		if (IS_MUPIP_IMAGE)
+		{
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_AUDLOGFAIL, 1, gtmImageNames[image_type].imageName,
+					ERR_TEXT, 2, LEN_AND_LIT("Audit information is not initialized"));
+		} else if (IS_MUMPS_IMAGE)
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_APDLOGFAIL, 0,
+					ERR_TEXT, 2, LEN_AND_LIT("Audit information is not initialized"));
 		return FALSE;
 	}
 	/* Check if an initial connect is needed */
 	if ((FD_INVALID == audit_conn->sock_fd) && (0 > dm_audit_connect()))
 	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_APDLOGFAIL, 0, ERR_APDCONNFAIL);
+		restrict_initialized = TRUE;
+		if (IS_MUPIP_IMAGE)
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_AUDLOGFAIL, 1, gtmImageNames[image_type].imageName);
+		else if (IS_MUMPS_IMAGE)
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_APDLOGFAIL, 0, ERR_APDCONNFAIL);
 		return FALSE;
 	}
 	assert(FD_INVALID != audit_conn->sock_fd);
@@ -475,8 +572,14 @@ int	dm_audit_log(mval *v, int src)
 			gtm_tls_socket_close(audit_conn->tls_sock);
 			close(audit_conn->sock_fd);
 			audit_conn->sock_fd = FD_INVALID;
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_APDLOGFAIL, 0,
-					ERR_TLSIOERROR, 2, LEN_AND_LIT("send"), ERR_TEXT, 2, LEN_AND_STR(errptr));
+			restrict_initialized = TRUE;
+			if (IS_MUPIP_IMAGE)
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_AUDLOGFAIL, 1, gtmImageNames[image_type].imageName,
+						ERR_TLSIOERROR, 2, LEN_AND_LIT("send"), ERR_TEXT, 2, LEN_AND_STR(errptr));
+			} else if (IS_MUMPS_IMAGE)
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_APDLOGFAIL, 0,
+						ERR_TLSIOERROR, 2, LEN_AND_LIT("send"), ERR_TEXT, 2, LEN_AND_STR(errptr));
 			return FALSE;
 		}
 	} else
@@ -489,8 +592,14 @@ int	dm_audit_log(mval *v, int src)
 				free(log_msg);
 			close(audit_conn->sock_fd);
 			audit_conn->sock_fd = FD_INVALID;
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_APDLOGFAIL, 0,
-					ERR_SYSCALL, 5, LEN_AND_LIT("SEND"), CALLFROM, save_errno);
+			restrict_initialized = TRUE;
+			if (IS_MUPIP_IMAGE)
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_AUDLOGFAIL, 1, gtmImageNames[image_type].imageName,
+						ERR_SYSCALL, 5, LEN_AND_LIT("SEND"), CALLFROM, save_errno);
+			} else if (IS_MUMPS_IMAGE)
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_APDLOGFAIL, 0,
+						ERR_SYSCALL, 5, LEN_AND_LIT("SEND"), CALLFROM, save_errno);
 			return FALSE;
 		}
 	}

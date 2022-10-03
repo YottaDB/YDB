@@ -782,7 +782,12 @@ GBLDEF	boolean_t	ydb_dbfilext_syslog_disable;	/* by default, log every file exte
 GBLDEF	int4		cws_reorg_remove_index;			/* see mu_swap_blk.c for comments on the need for these two */
 GBLDEF	block_id	cws_reorg_remove_array[CWS_REORG_REMOVE_ARRAYSIZE];
 GBLDEF	uint4		log_interval;
+<<<<<<< HEAD
 GBLDEF	uint4		ydb_principal_editing_defaults;	/* ext_cap flags if tt */
+=======
+GBLDEF	uint4		gtm_principal_editing_defaults;	/* ext_cap flags if tt */
+GBLDEF	enum db_ver	gtm_db_create_ver;		/* database creation version */
+>>>>>>> b400aa64 (GT.M V7.0-004)
 GBLDEF	boolean_t	in_repl_inst_edit;		/* used by an assert in repl_inst_read/repl_inst_write */
 GBLDEF	boolean_t	in_repl_inst_create;		/* used by repl_inst_read/repl_inst_write */
 GBLDEF	boolean_t	holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];	/* whether a particular replication semaphore is being held

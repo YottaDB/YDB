@@ -75,7 +75,7 @@
 #define GTMTLS_OP_REPL_CIPHER		0x00000080
 /* No verify mode specifed at top tls level */
 #define GTMTLS_OP_ABSENT_VERIFYMODE	0x00000100
-/* Server requested renegotiation without waiting for handshake */
+/* This is SSL_OP_ALLOW_CLIENT_RENEGOTIATION; Previously set between V62001-V62002A, but not used */
 #define GTMTLS_OP_RENEGOTIATE_REQUESTED	0x00000200
 /* No ydb_crypt_config  or tls in config needed for client only use */
 #define GTMTLS_OP_ABSENT_CONFIG		0x00000400

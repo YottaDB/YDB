@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -46,7 +46,7 @@ void remove_rms (io_desc *ciod)
 	assert(ciod->state == dev_closed || ciod->state == dev_never_opened);
 	/* When we get here after an open error with n_io_dev_types == ciod->type, the ciod->dev_sp should be NULL. Assert it */
 	assert((n_io_dev_types != ciod->type) || (NULL == ciod->dev_sp));
-	rm_ptr = (d_rm_struct *) ciod->dev_sp;
+	rm_ptr = ((rm == ciod->type) || (pi == ciod->type) || (ff == ciod->type)) ? (d_rm_struct *) ciod->dev_sp : NULL;
 	/* This routine will now be called if there is an open error to remove the partially created device
 	 * from the list of devices in io_root_log_name.  This means rm_ptr may be zero so don't use it if it is.
 	 */
@@ -77,9 +77,11 @@ void remove_rms (io_desc *ciod)
 		free(rm_ptr->fsblock_buffer);
 	if ((n_io_dev_types != ciod->type) && ciod->newly_created)
 	{
-		assert((NULL == rm_ptr) || !rm_ptr->is_pipe);
-		rc = UNLINK(ciod->trans_name->dollar_io);
-		assert(!rc);
+		if (((rm == ciod->type) && ((NULL == rm_ptr) || !rm_ptr->is_pipe)) || (ff == ciod->type))
+		{
+			rc = UNLINK(ciod->trans_name->dollar_io);
+			assert(!rc);
+		}
 	}
 	for (lpp = &io_root_log_name, lp = *lpp; lp; lp = *lpp)
 	{
@@ -120,7 +122,7 @@ void remove_rms (io_desc *ciod)
 	}
 	if (rm_ptr)
 	{
-		if (rm_ptr->is_pipe)
+		if ((rm_ptr->is_pipe) || (pi == ciod->type))
 		{	/* free up dev_param_pairs if defined */
 			assert(MAX_DEV_PARAM_PAIRS >= rm_ptr->dev_param_pairs.num_pairs);
 			for ( i = 0; i < rm_ptr->dev_param_pairs.num_pairs; i++ )

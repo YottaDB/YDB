@@ -109,6 +109,7 @@ void op_svput(int varnum, mval *v)
 	mval	lcl_mval;
 	int4	previous_gtm_strpllim;
 	size_t	rtmp;
+	mstr	trap_v;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -206,6 +207,7 @@ void op_svput(int varnum, mval *v)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOZTRAPINTRIG);
 #			endif
 			MV_FORCE_STR(v);
+<<<<<<< HEAD
 			/* Save string corresponding to input mval "v" in case the string pointed to by "v->str.addr"
 			 * gets shifted around by the op_newintrinsic()/gtm_newintrinsic() calls below
 			 */
@@ -220,12 +222,17 @@ void op_svput(int varnum, mval *v)
 				memcpy(lcl_str, v->str.addr, lcl_mval.str.len);
 				lcl_mval.str.addr = lcl_str;
 			}
+=======
+			/* Save v->str before op_newintrinsic(), which might overflow it. (gtm-DE304273) */
+			trap_v = v->str;
+>>>>>>> b400aa64 (GT.M V7.0-004)
 			if (ztrap_new)
 				op_newintrinsic(SV_ZTRAP);
-			if (!v->str.len)
+			if (!trap_v.len)
 			{	/* Setting $ZTRAP to empty causes any current error trapping to be canceled */
 				(TREF(dollar_etrap)).mvtype = (TREF(dollar_ztrap)).mvtype = MV_STR;
-				(TREF(dollar_etrap)).str = (TREF(dollar_ztrap)).str = v->str;
+				(TREF(dollar_ztrap)).str = trap_v;
+				(TREF(dollar_etrap)).str.len = 0;
 				ztrap_explicit_null = TRUE;
 				if (!dollar_zininterrupt)
 					TRY_EVENT_POP;		/* not in interrupt code, so check for pending timed events */
@@ -237,6 +244,11 @@ void op_svput(int varnum, mval *v)
 					op_commarg(v, indir_linetail);
 					op_unwind();
 				}
+<<<<<<< HEAD
+=======
+				(TREF(dollar_ztrap)).mvtype = MV_STR;
+				(TREF(dollar_ztrap)).str = trap_v;
+>>>>>>> b400aa64 (GT.M V7.0-004)
 				if ((TREF(dollar_etrap)).str.len > 0)
 				{
 					gtm_newintrinsic(&(TREF(dollar_etrap)));

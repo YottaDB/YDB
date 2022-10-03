@@ -239,7 +239,7 @@ void mupip_backup(void)
 	backup_reg_list		*rptr, *rrptr, *nocritrptr;
 	boolean_t		inc_since_inc , inc_since_rec, result, newjnlfiles, tn_specified,
 				replication_on, newjnlfiles_specified, keep_prev_link, bkdbjnl_disable_specified,
-				bkdbjnl_off_specified;
+				bkdbjnl_off_specified, stopretries;
 	unsigned char		since_buff[50];
 	jnl_create_info		jnl_info;
 	file_control		*fc;
@@ -247,8 +247,13 @@ void mupip_backup(void)
 	char			tempfilename[MAX_FN_LEN + 1], *tempfilename2, *getcwd_res;
 	char			tempdir_full_buffer[MAX_FN_LEN + 1];
 	char			*jnl_str_ptr, jnl_str[256], entry[256], prev_jnl_fn[JNL_NAME_SIZE];
+<<<<<<< HEAD
 	int			index, jnl_fstat, attemptcnt, maxretry;
 	mstr			tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
+=======
+	int			index, jnl_fstat, attemptcnt, maxtries;
+	mstr			tempdir_log, tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
+>>>>>>> b400aa64 (GT.M V7.0-004)
 	uint4			jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status;
 	boolean_t		jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE}, save_no_prev_link;
 	jnl_private_control	*jpc;
@@ -1513,11 +1518,16 @@ repl_inst_bkup_done2:
 					LEN_AND_STR(jnl_state_lit[rptr->backup_hdr->jnl_state]));
 		}
 		ENABLE_AST
-		/* Set maxretry */
+		/* Set maxtries */
 		if (CLI_PRESENT == cli_present("RETRY"))
-			cli_get_int("RETRY", &maxretry);
+		{
+			cli_get_int("RETRY", &maxtries);
+			maxtries++;
+		}
 		else
-			maxretry = 1;
+			maxtries = 2;
+		if (incremental)
+			maxtries = 1;
 		dqloop(usr_spec_regions, que, region_que_entry)
 		{
 			for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
@@ -1545,18 +1555,19 @@ repl_inst_bkup_done2:
 			{
 				rptr->backup_hdr->last_start_backup = (gtm_timet) time(NULL);
 			}
-			for (attemptcnt = 1; (attemptcnt <= maxretry) ; attemptcnt++)
+			for (attemptcnt = 1, stopretries = FALSE; (attemptcnt <= maxtries) ; attemptcnt++)
 			{
 				if (1 < attemptcnt)
 				{
 					gtm_putmsg_csa(CSA_ARG(REG2CSA(rptr->reg)) VARLSTCNT(8) ERR_BKUPRETRY, 6,
 							REG_LEN_STR(gv_cur_region), DB_LEN_STR(gv_cur_region),
-							attemptcnt, maxretry);
+							attemptcnt, maxtries);
 				}
-				result = (incremental ? mubinccpy(rptr) : mubfilcpy(rptr, showprogress, attemptcnt));
+				result = (incremental ? mubinccpy(rptr) : mubfilcpy(rptr, showprogress, attemptcnt, &stopretries));
 				if (result)
 					break; /* break to dqloop */
-				if (attemptcnt == maxretry)
+
+				if ((attemptcnt == maxtries) || (TRUE == stopretries))
 				{
 					if (file_backed_up)
 						util_out_print("Files backed up before above error are OK.", TRUE);

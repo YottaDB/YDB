@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2021 Fidelity National Information	*
+ * Copyright (c) 2017-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
@@ -41,6 +41,7 @@
 #include "iotimer.h"
 #include "io.h"
 #include "dm_audit_log.h"
+#include "gtmimagename.h"
 
 #define RESTRICT_FILENAME		"restrict.txt"
 #define RESTRICT_BREAK			"BREAK"
@@ -51,6 +52,8 @@
 #define RESTRICT_TRIGMOD		"TRIGGER_MOD"
 #define RESTRICT_CENABLE		"CENABLE"
 #define RESTRICT_DSE			"DSE"
+#define RESTRICT_LKECLEAR		"LKECLEAR"
+#define RESTRICT_LKE			"LKE"
 #define RESTRICT_DIRECT_MODE		"DIRECT_MODE"
 #define RESTRICT_ZCMDLINE		"ZCMDLINE"
 #define RESTRICT_HALT			"HALT"
@@ -60,6 +63,7 @@
 #define	RESTRICT_LIBRARY		"LIBRARY"
 #define	RESTRICT_LOGDENIALS		"LOGDENIALS"
 #define APD_ENABLE			"APD_ENABLE"
+#define AM_ENABLE			"AM_ENABLE"
 #define MAX_READ_SZ			1024	/* Restrict Mnemonic shouldn't exceed this limit */
 #define MAX_FACILITY_LEN		64
 #define MAX_GROUP_LEN			64
@@ -90,6 +94,7 @@ error_def(ERR_RESTRICTSYNTAX);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_APDINITFAIL);
+error_def(ERR_AUDINITFAIL);
 
 static inline boolean_t OPEN_MAPPING_FILE(struct stat *stat, char *fpath, FILE **fp, int *save_errno)
 {
@@ -151,6 +156,7 @@ void restrict_init(void)
 	int		save_errno, fields, status, lineno, logger_info_len, opt_len;
 	FILE		*restrictfp, *filtcmdfp = NULL;
 	boolean_t	restrict_one, restrict_default = FALSE, restrict_all = FALSE;
+	boolean_t	valid_audit_entry, cont;
 	struct group	grp, *grpres;
 	char		*grpbuf = NULL;
 	size_t		grpbufsz, audit_prefix_len = 0;
@@ -161,10 +167,16 @@ void restrict_init(void)
 	int		rest_owner_perms, rest_group_perms, rest_other_perms;
 
 	assert(!restrict_initialized);
+<<<<<<< HEAD
 	assert(ydb_dist_ok_to_use);
 	SNPRINTF(restrictpath, YDB_PATH_MAX, "%s/%s", ydb_dist, RESTRICT_FILENAME);
 	SNPRINTF(filtcmdpath, YDB_PATH_MAX, "%s/%s", ydb_dist, COMM_FILTER_FILENAME);
 
+=======
+	assert(gtm_dist_ok_to_use);
+	SNPRINTF(restrictpath, GTM_PATH_MAX, "%s/%s", gtm_dist, RESTRICT_FILENAME);
+	SNPRINTF(filtcmdpath, GTM_PATH_MAX, "%s/%s", gtm_dist, COMM_FILTER_FILENAME);
+>>>>>>> b400aa64 (GT.M V7.0-004)
 	Fopen(restrictfp, restrictpath, "r");
 	if (NULL == restrictfp)
 	{	/* No read access or the file does not exist */
@@ -207,16 +219,27 @@ void restrict_init(void)
 			if (NULL != lbp)
 			{
 				lineno++;
+				valid_audit_entry = FALSE;
+				cont = FALSE;
 				fields = SSCANF(linebuf, FACILITY_FMTSTR " : " GROUP_FMTSTR,
 									facility, group_or_flname);
 				if (0 == fields)
 					continue;	/* Ignore blank lines */
-				else if (0 == STRNCASECMP(facility, APD_ENABLE, STRLEN(APD_ENABLE)))
-				{	/* Direct mode auditing entry found */
-					if (!IS_MUMPS_IMAGE)
-						continue;	/* Skip direct mode auditing entry
-								 * when mumps image isn't running
-								 */
+				if (0 == STRNCASECMP(facility, APD_ENABLE, STRLEN(APD_ENABLE)))
+				{
+					valid_audit_entry = IS_MUMPS_IMAGE;
+					cont = (FALSE == valid_audit_entry) ? TRUE : FALSE;
+				}
+				if (0 == STRNCASECMP(facility, AM_ENABLE, STRLEN(AM_ENABLE)))
+				{
+
+					valid_audit_entry = IS_MUPIP_IMAGE;
+					cont = (FALSE == valid_audit_entry) ? TRUE : FALSE;
+				}
+				if (TRUE == cont)
+					continue;
+				if (TRUE == valid_audit_entry)
+				{	/* An auditing facility found */
 					fields = SSCANF(linebuf, FACILITY_FMTSTR " : %s",
 										facility, logger_info);
 					logger_info_len = STRLEN(logger_info);
@@ -294,17 +317,23 @@ void restrict_init(void)
 						break;
 					/* Initialize Direct Mode Auditing with the provided info */
 					if (0 > dm_audit_init(host_info, tls))
-					{	/* Treat error in auditing initialization as parse error. */
+					{
+						/* Treat error in auditing initialization as parse error. */
 						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RESTRICTSYNTAX, 3,
-								LEN_AND_STR(restrictpath), lineno, ERR_APDINITFAIL);
+									LEN_AND_STR(restrictpath), lineno, ERR_APDINITFAIL);
 						restrict_all = TRUE;
 						break;
 					}
-					if (audit_opread)
-						restrictions.dm_audit_enable = AUDIT_ENABLE_DMRDMODE;
-					else
-						restrictions.dm_audit_enable = AUDIT_ENABLE_DMODE;
-					dollar_zaudit = TRUE;
+					if (IS_MUMPS_IMAGE)
+					{
+						if (audit_opread)
+							restrictions.dm_audit_enable = AUDIT_ENABLE_DMRDMODE;
+						else
+							restrictions.dm_audit_enable = AUDIT_ENABLE_DMODE;
+						dollar_zaudit = TRUE;
+					}
+					if (IS_MUPIP_IMAGE)
+						restrictions.mupip_enable = TRUE;
 					continue;
 				}
 				else if (1 == fields)
@@ -379,6 +408,10 @@ void restrict_init(void)
 					restrictions.cenable = restrict_one;
 				else if (0 == STRNCASECMP(facility, RESTRICT_DSE, SIZEOF(RESTRICT_DSE)))
 					restrictions.dse = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_LKECLEAR, SIZEOF(RESTRICT_LKECLEAR)))
+					restrictions.lkeclear = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_LKE, SIZEOF(RESTRICT_LKE)))
+					restrictions.lke = restrict_one;
 				else if (0 == STRNCASECMP(facility, RESTRICT_DIRECT_MODE,
 						SIZEOF(RESTRICT_DIRECT_MODE)))
 					restrictions.dmode = restrict_one;
@@ -421,12 +454,15 @@ void restrict_init(void)
 		restrictions.trigger_mod = TRUE;
 		restrictions.cenable = TRUE;
 		restrictions.dse = TRUE;
+		restrictions.lkeclear = TRUE;
+		restrictions.lke = TRUE;
 		restrictions.dmode = TRUE;
 		restrictions.zcmdline = TRUE;
 		restrictions.halt_op = TRUE;
 		restrictions.zhalt_op = TRUE;
 		restrictions.library_load_path = TRUE;
 		restrictions.logdenials = TRUE;
+		restrictions.mupip_enable = TRUE;
 	}
 	if (restrictfp)
 		FCLOSE(restrictfp, status);

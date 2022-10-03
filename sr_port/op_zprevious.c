@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -62,8 +62,13 @@ void op_zprevious(mval *v)
 	boolean_t		found, ok_to_change_currkey;
 	enum db_acc_method	acc_meth;
 	gd_addr			*gd_targ;
+<<<<<<< HEAD
 	gd_binding		*gd_map_start, *map, *prev_map;
 	gd_region		*save_gv_cur_region, *reg;
+=======
+	gd_binding		*gd_map_start, *map, *prev_map, *rmap;
+	gd_region		*save_gv_cur_region;
+>>>>>>> b400aa64 (GT.M V7.0-004)
 	gv_key_buf		save_currkey;
 	gv_namehead		*save_gv_target;
 	gvnh_reg_t		*gvnh_reg;
@@ -176,14 +181,21 @@ void op_zprevious(mval *v)
 			 */
 			if (IS_BASEDB_REGNAME(reg))
 			{	/* Non-statsDB region */
+<<<<<<< HEAD
 				if (!reg->open)
 					gv_init_reg(reg);
 				gv_cur_region = reg;	/* Set "gv_cur_region" global only after successful "gv_init_reg" */
 				change_reg();
+=======
+				if (!gv_cur_region->open)
+					gv_init_reg(gv_cur_region, NULL);
+>>>>>>> b400aa64 (GT.M V7.0-004)
 				/* Entries in directory tree could have empty GVT in which case move on to previous entry */
 				acc_meth = REG_ACC_METH(gv_cur_region);
 				for ( ; ; )
 				{
+					gv_cur_region = map->reg.addr;
+					change_reg();
 					assert(0 == gv_currkey->prev);	/* or else gvcst_zprevious could get confused */
 					if (IS_ACC_METH_BG_OR_MM(acc_meth))
 					{
@@ -216,17 +228,46 @@ void op_zprevious(mval *v)
 					GV_BIND_NAME_AND_ROOT_SEARCH(gd_targ, &gvname, gvnh_reg);	/* updates "gv_currkey" */
 					assert((NULL != gvnh_reg->gvspan) || (gv_cur_region == map->reg.addr));
 					if (NULL != gvnh_reg->gvspan)
-					{	/* gv_target would NOT have been initialized by GV_BIND_NAME in this case.
-						 * So finish that initialization.
+					{	/* For accurate results, we need to see if the node found by gvcst_zprevious()
+						 * has data or that its first data child lies in the same map. Otherwise,
+						 * the node should be excluded.
+						 * To do this, take the proposed key and do a gvcst_query2() on it.
+						 * If the resulting key matches the request and is in the current map,
+						 * use it to derive the result. Otherwise, put things back to where they
+						 * were after the search and continue.
 						 */
-						datamval = &tmpmval;
-						/* The below macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH
-						 * 	(e.g. setting gv_cur_region for spanning globals)
-						 */
+						if ((prev_map->gvkey_len > gv_currkey->end)
+							&& (0 == memcmp(gv_currkey->base, prev_map->gvkey.addr, gv_currkey->end)))
+						{
+							memcpy(gv_currkey->base + gv_currkey->end,
+									prev_map->gvkey.addr + gv_currkey->end,
+									prev_map->gvkey_len - gv_currkey->end);
+							gv_currkey->end = prev_map->gvkey_len;
+							gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
+						}
 						GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, gd_targ, gv_currkey, gvnh_reg->gd_reg);
-						op_gvdata(datamval);
-						if (MV_FORCE_INT(datamval))
-							break;
+						found = gv_target->root && gvcst_query2();
+						if (found && (gv_altkey->end >= gvname.var_name.len + 1)
+							&& (0 == memcmp(gv_currkey->base, gv_altkey->base,
+										gvname.var_name.len + 1)))
+						{
+							rmap = gv_srch_map_linear_backward(map, (char *)gv_altkey->base,
+												gv_altkey->end - 1);
+							if (map == rmap)
+							{
+								for (gv_altkey->end = 0;
+										gv_altkey->base[gv_altkey->end];
+										gv_altkey->end++)
+									;
+								gv_altkey->base[++gv_altkey->end] = KEY_DELIMITER;
+								found = TRUE;
+								break;
+							} else
+								found = FALSE;
+						} else
+							found = FALSE;
+						gv_currkey->end = gvname.var_name.len + 1;
+						gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 					} else
 					{	/* else gv_target->root would have been initialized by
 						 * GV_BIND_NAME_AND_ROOT_SEARCH
@@ -254,7 +295,9 @@ void op_zprevious(mval *v)
 				gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 				assert(gv_currkey->top > gv_currkey->end);	/* ensure we are within allocated bounds */
 			}
+			GVKEY_INCREMENT_ORDER(gv_currkey);
 		}
+		change_reg();
 		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied (BYPASSOK)
 				* by this to-be-overwritten mval */
 		if (found)

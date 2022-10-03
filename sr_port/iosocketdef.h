@@ -197,28 +197,54 @@ MBSTART {													\
 
 #define SOCKET_FREE(SOCKPTR)							\
 {										\
-	if (NULL != SOCKPTR->buffer) 						\
-		free(SOCKPTR->buffer);						\
-	if (NULL != SOCKPTR->obuffer) 						\
-		free(SOCKPTR->obuffer);						\
-	if (NULL != SOCKPTR->zff.addr)						\
+	if (NULL != SOCKPTR)							\
 	{									\
-		if ((NULL != SOCKPTR->ozff.addr) && (SOCKPTR->ozff.addr != SOCKPTR->zff.addr))				\
-			free(SOCKPTR->ozff.addr);				\
-		free(SOCKPTR->zff.addr);					\
+		if (NULL != SOCKPTR->buffer) 					\
+		{								\
+			free(SOCKPTR->buffer);					\
+			SOCKPTR->buffer = NULL;					\
+		}								\
+		if (NULL != SOCKPTR->obuffer) 					\
+		{								\
+			free(SOCKPTR->obuffer);					\
+			SOCKPTR->obuffer = NULL;				\
+		}								\
+		if (NULL != SOCKPTR->zff.addr)					\
+		{								\
+			if ((NULL != SOCKPTR->ozff.addr) && (SOCKPTR->ozff.addr != SOCKPTR->zff.addr))			\
+				free(SOCKPTR->ozff.addr);			\
+			free(SOCKPTR->zff.addr);				\
+			SOCKPTR->zff.addr = SOCKPTR->ozff.addr = NULL;		\
+		}								\
+		if (NULL != SOCKPTR->local.sa)					\
+		{								\
+			free(SOCKPTR->local.sa);				\
+			SOCKPTR->local.sa = NULL;				\
+		}								\
+		if (NULL != SOCKPTR->remote.sa)					\
+		{								\
+			free(SOCKPTR->remote.sa);				\
+			SOCKPTR->remote.sa = NULL;				\
+		}								\
+		if (NULL != SOCKPTR->local.saddr_ip)				\
+		{								\
+			free(SOCKPTR->local.saddr_ip);				\
+			SOCKPTR->local.saddr_ip = NULL;				\
+		}								\
+		if (NULL != SOCKPTR->remote.saddr_ip)				\
+		{								\
+			free(SOCKPTR->remote.saddr_ip);				\
+			SOCKPTR->remote.saddr_ip = NULL;			\
+		}								\
+		if (NULL != SOCKPTR->parenthandle)				\
+		{								\
+			free(SOCKPTR->parenthandle);				\
+			SOCKPTR->parenthandle = NULL;				\
+		}								\
+		iosocket_delimiter((unsigned char *)NULL, 0, SOCKPTR, TRUE);	\
+		free(SOCKPTR);							\
+		SOCKPTR = NULL;							\
 	}									\
-	if (NULL != SOCKPTR->local.sa)						\
-		free(SOCKPTR->local.sa);					\
-	if (NULL != SOCKPTR->remote.sa)						\
-		free(SOCKPTR->remote.sa);					\
-	if (NULL != SOCKPTR->local.saddr_ip)					\
-		free(SOCKPTR->local.saddr_ip);					\
-	if (NULL != SOCKPTR->remote.saddr_ip)					\
-		free(SOCKPTR->remote.saddr_ip);					\
-	if (NULL != SOCKPTR->parenthandle)					\
-		free(SOCKPTR->parenthandle);					\
-	iosocket_delimiter((unsigned char *)NULL, 0, SOCKPTR, TRUE);		\
-	free(SOCKPTR);								\
 }
 
 #define SOCKET_DUP(SOCKPTR, NEWSOCKPTR)										\

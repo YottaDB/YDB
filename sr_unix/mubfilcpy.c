@@ -151,7 +151,7 @@ GBLREF	boolean_t		debug_mupip;
 GBLREF bool                     mu_ctrlc_occurred;
 
 #ifdef __x86_64
-STATICDEF void		*p;
+STATICDEF void		*func_ptr;
 #endif
 error_def(ERR_BKUPFILEPERM);
 error_def(ERR_BKUPPROGRESS);
@@ -167,7 +167,7 @@ error_def(ERR_BACKUPDBFILE);
 error_def(ERR_BACKUPTN);
 error_def(ERR_FILENAMETOOLONG);
 
-boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptcnt)
+boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptcnt, boolean_t *stopretries)
 {
 	mstr			*file, tempfile;
 	unsigned char		cmdarray[COMMAND_ARRAY_SIZE], *command = &cmdarray[0];
@@ -485,12 +485,18 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			assert(data_off < stat.st_size);
 			assert(hole_off <= stat.st_size);
 			strtm = time(NULL);
+<<<<<<< HEAD
 			copy_file_range_p = p;
 
 			size_t	max_cp_len;
 			max_cp_len = hole_off - in_off;
 			assert(max_cp_len <= remaining);
 			ret = copy_file_range_p(infd, (loff_t *)&in_off, outfd, (loff_t *)&out_off, max_cp_len, 0);
+=======
+			tmpsize = remaining;
+			copy_file_range_p = func_ptr;
+			ret = copy_file_range_p(infd, inoffp, outfd, outoffp, remaining, 0);
+>>>>>>> b400aa64 (GT.M V7.0-004)
 			if (WBTEST_ENABLED(WBTEST_BACKUP_FORCE_SLEEP))
 			{
 				util_out_print("BACKUP_STARTED", TRUE);
@@ -499,7 +505,12 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			}
 			if (-1 == ret)
 			{
+<<<<<<< HEAD
 				if (1 == handle_err("Error occurred during the copy phase of MUPIP BACKUP", errno))
+=======
+				if (1 == (status = handle_err("Error occurred during the copy phase of MUPIP BACKUP",
+						errno))) /* WARNING assignment */
+>>>>>>> b400aa64 (GT.M V7.0-004)
 					ABORTBACKUP;
 			}
 			endtm = time(NULL);
@@ -635,6 +646,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2, nbytes2, tempfilename2);
 		free(tempfilename2);
 		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_FILENAMETOOLONG);
+		*stopretries = TRUE;
 		CLEANUP_AND_RETURN_FALSE;
 	}
 	tempfilename[tempfilelen++] = '/';
@@ -1008,6 +1020,12 @@ inline int handle_err(char errorstr[], int saved_errno)
 	customptr = "\0";
 	switch (saved_errno)
 	{
+		case EXDEV:
+		{
+			SNPRINTF(oserror, BUF_MAX, "%s, %s for backing up region %s", "EXDEV",
+					(char *)STRERROR(saved_errno), gv_cur_region->rname);
+			break;
+		}
 		case ENOSPC:
 		{
 			SNPRINTF(oserror, BUF_MAX, "%s, %s for backing up region %s", "ENOSPC",
@@ -1026,8 +1044,8 @@ inline int handle_err(char errorstr[], int saved_errno)
 		{
 			if (0 != saved_errno)
 			{
-				SNPRINTF(oserror, BUF_MAX, "Error code: %d, %s", saved_errno,
-						(char *)STRERROR(saved_errno));
+				SNPRINTF(oserror, BUF_MAX, "Error code: %d, %s for backing up region %s", saved_errno,
+						(char *)STRERROR(saved_errno), gv_cur_region->rname);
 			}
 			break;
 		}
@@ -1063,8 +1081,8 @@ inline boolean_t ink_backup(void)
 	long int kernel_major, kernel_minor;
 	float glibcversion;
 	/* Check for the copy_file_range symbol */
-	p = dlsym(RTLD_DEFAULT, "copy_file_range");
-	if (NULL == p)
+	func_ptr = dlsym(RTLD_DEFAULT, "copy_file_range");
+	if (NULL == func_ptr)
 		return FALSE;
 	/* Get kernel version */
 	if (uname(&relbuff) != 0)

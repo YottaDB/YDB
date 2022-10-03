@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -81,7 +81,7 @@ error_def(ERR_JNLALLOCGROW);
 error_def(ERR_MUNOACTION);
 error_def(ERR_TEXT);
 
-void mucregini(block_id blk_init_size)
+void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 {
 	int4			status;
 	block_id		i;
@@ -93,17 +93,37 @@ void mucregini(block_id blk_init_size)
 	gd_region		*baseDBreg;
 	gd_segment		*seg;
 	sgmnt_data_ptr_t	csd;
+	char			*label;
+	enum db_ver		majorver;
+	enum mdb_ver		minorver;
+	trans_num		max_tn_default;
+	gtm_int8		master_map_size;
 
 	csd = cs_data;
-	MEMCPY_LIT(csd->label, GDS_LABEL);
-	csd->desired_db_format = GDSVCURR;
+	if (GDSVCURR == desired_db_ver)
+	{	/* Current version defaults */
+		label		= GDS_LABEL;
+		majorver	= GDSVCURR;
+		minorver	= GDSMVCURR;
+		master_map_size	= MASTER_MAP_SIZE_DFLT;
+		max_tn_default	= MAX_TN_DFLT;
+	} else
+	{	/* Prior version settings. TODO allow for alternative settings */
+		label		= V6_GDS_LABEL;
+		majorver	= GDSV6;
+		minorver	= GDSMV63014;
+		master_map_size	= MASTER_MAP_SIZE_V6;
+		max_tn_default	= MAX_TN_V6;
+	}
+	memcpy(csd->label, label, strnlen(label, sizeof(csd->label)));
+	csd->desired_db_format = majorver;
 	csd->fully_upgraded = TRUE;
 	csd->db_got_to_v5_once = TRUE;	/* no V4 format blocks that are non-upgradeable */
-	csd->minor_dbver = GDSMVCURR;
-	csd->certified_for_upgrade_to = GDSVCURR;
-	csd->creation_db_ver = GDSVCURR;
-	csd->creation_mdb_ver = GDSMVCURR;
-	csd->master_map_len = MASTER_MAP_SIZE_DFLT;
+	csd->minor_dbver = minorver;
+	csd->certified_for_upgrade_to = majorver;
+	csd->creation_db_ver = majorver;
+	csd->creation_mdb_ver = minorver;
+	csd->master_map_len = master_map_size;
 	csd->bplmap = BLKS_PER_LMAP;
 	seg = gv_cur_region->dyn.addr;
 	assert(seg->blk_size <= MAX_DB_BLK_SIZE);
@@ -305,14 +325,14 @@ void mucregini(block_id blk_init_size)
 			(*mupip_exit_fp)(ERR_MUNOACTION);
 		}
 	}
-	mucblkini();
+	mucblkini(desired_db_ver);
 	th->mm_tn = 0;
 	th->early_tn = 1;
 	th->curr_tn = 1;	/* in order to use INCREMENT_CURR_TN macro here, the logic has to be made complicated.
 				 * this is because the macro relies on max_tn/max_tn_warn being set and that does not happen
 				 * until a few lines later. hence keeping it simple here by doing a plain assignment of curr_tn.
 				 */
-	csd->max_tn = MAX_TN_DFLT;
+	csd->max_tn = max_tn_default;
 	SET_TN_WARN(csd, csd->max_tn_warn);
 	SET_LATCH_GLOBAL(&csd->next_upgrd_warn.time_latch, LOCK_AVAILABLE);
 }
