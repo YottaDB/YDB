@@ -248,6 +248,7 @@ GBLREF	struct sigaction	orig_sig_action[];
 GBLREF	int			ydb_main_lang;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		simpleThreadAPI_active;
+GBLREF	boolean_t		noThreadAPI_active;
 #ifdef YDB_USE_POSIX_TIMERS
 GBLREF	pid_t			posix_timer_thread_id;
 GBLREF	boolean_t		posix_timer_created;
@@ -1176,10 +1177,32 @@ void sys_canc_timer()
 		assert(FALSE);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("timer_delete()"), CALLFROM, save_errno);
 	}
-	posix_timer_created = FALSE;	/* Note: we do not use CLEAR_POSIX_TIMER_FIELDS_IF_APPLICABLE here since we want
-					 * to keep the non-zero "posix_timer_thread_id" as is (points to the MAIN worker
-					 * thread id) and just clear the fact that a posix timer was created now that we deleted it.
-					 */
+	if (!simpleThreadAPI_active && IS_SIMPLEAPI_MODE)
+	{	/* This process uses YottaDB in Simple API mode. In this case, it is possible the Simple API application
+		 * spawns multiple threads (but ensures serial access to the YottaDB engine). This was seen when using
+		 * the YDBPython wrapper (YDB#935). In this case, we need to not just clear "posix_timer_created" but
+		 * also "posix_timer_thread_id" since it could otherwise point to a dead thread-id.
+		 * Hence we use the macro call below to clear both fields.
+		 */
+		assert(MUMPS_CALLIN == invocation_mode);
+		CLEAR_POSIX_TIMER_FIELDS_IF_APPLICABLE;
+	} else
+	{	/* This process uses YottaDB in one of the following modes.
+		 *   1) Simple Thread API	(i.e. invocation_mode = MUMPS_CALLIN)
+		 *      In this case, we want to keep the non-zero "posix_timer_thread_id" as is (points to the MAIN worker
+		 *      thread id).
+		 *   2) yottadb -direct	(i.e. invocation_mode = MUMPS_DIRECT)
+		 *   3) yottadb -run		(i.e. invocation_mode = MUMPS_RUN)
+		 *   4) mupip		(i.e. invocation_mode = MUMPS_UTILTRIGR)
+		 *      In cases (2), (3) and (4) above, we want to keep the non-zero "posix_timer_thread_id" as is
+		 *      (points to the yottadb/mupip process id)
+		 * In all of the above cases, we only need to clear the fact that a posix timer was created (now that we
+		 * deleted it). Hence we do not use CLEAR_POSIX_TIMER_FIELDS_IF_APPLICABLE like in the "if" block above.
+		 * But instead just clear the one variable of interest.
+		 */
+		assert(posix_timer_thread_id);
+		posix_timer_created = FALSE;
+	}
 #	else
 	if (-1 == setitimer(ITIMER_REAL, &zero, &old_sys_timer))
 		REPORT_SETITIMER_ERROR("ITIMER_REAL", zero, FALSE, errno);
