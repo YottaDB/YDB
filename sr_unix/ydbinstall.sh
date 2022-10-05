@@ -129,7 +129,7 @@ help_exit()
     echo "--prompt-for-group       -> YottaDB installation script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
     echo "--ucaseonly-utils        -> install only upper case utility program names; defaults to both if not specified"
     echo "--user username          -> user who should own YottaDB installation; default is root"
-    echo "--utf8 ICU_version       -> install UTF-8 support using specified  major.minor ICU version; specify default to use versionprovided by OS as default"
+    echo "--utf8 ICU_version       -> install UTF-8 support using specified  major.minor ICU version; specify default to use version provided by OS as default"
     echo "--verbose                -> output diagnostic information as the script executes; default is to run quietly"
     echo "options that take a value (e.g, --group) can be specified as either --option=value or --option value"
     echo "options marked with * are likely to be of interest primarily to YottaDB developers"
@@ -182,6 +182,169 @@ isvaluevalid()
 		retval=1
 	fi
 	echo $retval
+}
+
+# This function gets the OS id from the file passed in as $1 (either /etc/os-release or ../build_os_release)
+# It also does minor adjustments (e.g. SLES, SLED, and openSUSE Leap are all reported as "sle").
+getosid()
+{
+	osid=`grep -w ID $1 | cut -d= -f2 | cut -d'"' -f2`
+	# Treat SLES (Server), SLED (Desktop) and OpenSUSE Leap distributions as the same.
+	if [ "sled" = "$osid" ] || [ "sles" = "$osid" ] || [ "opensuse-leap" = "$osid" ] ; then
+		osid="sle"
+	fi
+	echo $osid
+}
+
+# This function finds the current ICU version using ldconfig.
+# If file name is "libicuio.so.70", the below will return "70".
+# If file name is "libicuio.so.suse65.1", the below will return "65.1.suse" (needed for YottaDB to work on SLED 15).
+# There is a M version of this function in sr_unix/ydbenv.mpt
+# It needs to be maintained in parallel to this function
+icu_version()
+{
+	$ldconfig -p | grep -m1 -F libicuio.so. | cut -d" " -f1 | sed 's/.*libicuio.so.\([a-z]*\)\([0-9\.]*\)/\2.\1/;s/\.$//;'
+}
+
+# This function installs the selected plugins. Before calling it, $ydb_installdir and $tmpdir need to be set so that it can
+# find the right place to install the plugins and the right place to build the plugins respectively. This function will
+# set remove_tmpdir to 0 if one or more plugin builds fail.
+install_plugins()
+{
+	if [ "Y" = $ydb_posix ] ; then
+		echo "Now installing YDBPosix"
+		cd $tmpdir	# Get back to top level temporary directory as the current directory
+		mkdir posix_tmp
+		cd posix_tmp
+		export ydb_dist=${ydb_installdir}
+		if curl -fSsLO https://gitlab.com/YottaDB/Util/YDBPosix/-/archive/master/YDBPosix-master.tar.gz; then
+			tar xzf YDBPosix-master.tar.gz
+			cd YDBPosix-master
+			mkdir build && cd build
+			${cmakecmd} ../
+			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
+				# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
+				cd ../../..
+				rm -R posix_tmp
+			else
+				echo "YDBPosix build failed. The build directory ($PWD) has been saved."
+				remove_tmpdir=0
+			fi
+		else
+			echo "Unable to download YDBPosix. Your internet connection and/or the gitlab servers may be down. Please try again later."
+			remove_tmpdir=0
+		fi
+	fi
+
+	if [ "Y" = $ydb_aim ] ; then
+		echo "Now installing YDBAIM"
+		cd $tmpdir
+		mkdir aim_tmp
+		cd aim_tmp
+		export ydb_dist=${ydb_installdir}
+		if curl -fSsLO https://gitlab.com/YottaDB/Util/YDBAIM/-/archive/master/YDBAIM-master.tar.gz; then
+			tar xzf YDBAIM-master.tar.gz
+			cd YDBAIM-master
+			mkdir build && cd build
+			${cmakecmd} ../
+			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
+				# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
+				cd ../../..
+				rm -R aim_tmp
+			else
+				echo "YDBAIM build failed. The build directory ($PWD) has been saved."
+				remove_tmpdir=0
+			fi
+		else
+			echo "Unable to download YDBAIM. Your internet connection and/or the gitlab servers may be down. Please try again later"
+			remove_tmpdir=0
+		fi
+	fi
+
+	if [ "Y" = $ydb_encplugin ] ; then
+		echo "Now installing YDBEncrypt"
+		cd $tmpdir	# Get back to top level temporary directory as the current directory
+		export ydb_icu_version=$ydb_found_or_requested_icu_version
+		mkdir enc_tmp && cd enc_tmp
+		url="https://gitlab.com/YottaDB/Util/YDBEncrypt.git"
+		if git clone -q ${url} .; then
+			ydb_dist=${ydb_installdir} make -j `grep -c ^processor /proc/cpuinfo`
+			if ydb_dist=${ydb_installdir} make install; then
+				# Save the build directory if the make install command returns a non-zero exit code. Otherwise, remove it.
+				cd ..
+				rm -R enc_tmp
+			else
+				echo "YDBEncrypt build failed. The build directory ($PWD/enc_tmp) has been saved."
+				remove_tmpdir=0
+			fi
+		else
+			echo "Unable to download YDBEncrypt. Your internet connection and/or the gitlab servers may be down. Please try again later."
+			remove_tmpdir=0
+		fi
+		# rename gtmcrypt to ydbcrypt and create a symbolic link for backward compatibility
+		mv ${ydb_installdir}/plugin/gtmcrypt ${ydb_installdir}/plugin/ydbcrypt
+		ln -s ${ydb_installdir}/plugin/ydbcrypt ${ydb_installdir}/plugin/gtmcrypt
+	fi
+
+	if [ "Y" = $ydb_zlib ] ; then
+		echo "Now installing YDBZlib"
+		cd $tmpdir	# Get back to top level temporary directory as the current directory
+		mkdir zlib_tmp
+		cd zlib_tmp
+		if curl -fSsLO https://gitlab.com/YottaDB/Util/YDBZlib/-/archive/master/YDBZlib-master.tar.gz; then
+			tar xzf YDBZlib-master.tar.gz
+			cd YDBZlib-master
+			if gcc -c -fPIC -I${ydb_installdir} gtmzlib.c && gcc -o libgtmzlib.so -shared gtmzlib.o; then
+				# Save the build directory if either of the gcc commands return a non-zero exit code. Otherwise, remove it.
+				cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
+				cp _ZLIB.m ${ydb_installdir}/plugin/r
+				if [ "Y" = $ydb_utf8 ] ; then
+					ydb_icu_version=$ydb_found_or_requested_icu_version
+					export ydb_icu_version
+					mkdir utf8
+					(
+						cd utf8
+						export ydb_chset="UTF-8"
+						${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
+						cp _ZLIB.o ${ydb_installdir}/plugin/o/utf8
+					)
+				fi
+				${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
+				cp _ZLIB.o ${ydb_installdir}/plugin/o
+				cd ../..
+				rm -R zlib_tmp
+			else
+				echo "YDBZlib build failed. The build directory ($PWD/zlib_tmp) has been saved."
+				remove_tmpdir=0
+			fi
+		else
+			echo "Unable to download YDBZlib. Your internet connection and/or the gitlab servers may be down. Please try again later."
+			remove_tmpdir=0
+		fi
+	fi
+
+	if [ "Y" = $ydb_octo ] ; then
+		echo "Now installing YDBOcto"
+		cd $tmpdir	# Get back to top level temporary directory as the current directory
+		export ydb_dist=${ydb_installdir}
+		if git clone https://gitlab.com/YottaDB/DBMS/YDBOcto.git YDBOcto-master; then
+			cd YDBOcto-master
+			mkdir build
+			cd build
+			${cmakecmd} ${octo_cmake} ../
+			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
+				# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
+				cd ../..
+				rm -R YDBOcto-master
+			else
+				echo "YDBOcto build failed. The build directory ($PWD/YDBOcto-master) and the tarball ($PWD/YDBOcto-master.tar.gz) have been saved."
+				remove_tmpdir=0
+			fi
+		else
+			echo "Unable to download YDBOcto. Your internet connection and/or the gitlab servers may be down. Please try again later."
+			remove_tmpdir=0
+		fi
+	fi
 }
 
 # Defaults that can be over-ridden by command line options to follow

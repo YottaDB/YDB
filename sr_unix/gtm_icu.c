@@ -74,6 +74,9 @@ typedef void (*icu_func_t)();	/* a generic pointer type to the ICU function */
  */
 #define MAX_ICU_VERSION_STRLEN	20
 
+/* Reserve space for optional string prefix like "suse" in "libicuio.so.suse65.1" */
+#define	MAX_PREFIX_STR_LEN	16
+
 /* Maintain max length of all the ICU function names that YottaDB uses. This is currently 20 so we keep max at 24 to be safe.
  * In case a new function that has a name longer than 24 chars gets added, an assert below will fail so we are protected.
  */
@@ -161,7 +164,7 @@ error_def(ERR_ICUVERLT36);
  */
 static boolean_t parse_ydb_icu_version(char *icu_ver_buf, int len, char *icusymver, char *iculibver, boolean_t is_ydb_env_match)
 {
-	char		*ptr;
+	char		*ptr, *ptr2, *ptr3;
 	char		tmp_errstr[128]; /* "$ydb_icu_version is" */
 	int4		major_ver, minor_ver;
 	int		i;
@@ -169,28 +172,78 @@ static boolean_t parse_ydb_icu_version(char *icu_ver_buf, int len, char *icusymv
 	if ((NULL == icu_ver_buf) || (0 == len))
 		return FALSE;	/* empty string */
 
-	/* Deconstruct the two known forms of ydb_icu_version "[0-9].[0-9]" and "[0-9][0-9]" ignoring trailing values */
+	/* Deconstruct the two known forms of ydb_icu_version "[0-9].[0-9]" and "[0-9][0-9]" */
 	ptr = icu_ver_buf;
 	if (-1 == (major_ver = asc2i((uchar_ptr_t)ptr++, 1)))
 		return FALSE;
 	if ('.' == *ptr)
 		ptr++;
-	if (-1 == (minor_ver = asc2i((uchar_ptr_t)ptr, 1)))
+	ptr2 = ptr;
+	if (-1 == (minor_ver = asc2i((uchar_ptr_t)ptr2++, 1)))
+	{
+		assert(FALSE);
 		return FALSE;
+	}
+	if ('.' == *ptr2)
+	{	/* A patch version has been specified. Use this for icusymver and iculibver */
+		ptr3 = ++ptr2;
+		if (-1 == asc2i((uchar_ptr_t)ptr2++, 1))
+		{
+			assert(FALSE);
+			return FALSE;
+		}
+		if ('.' == *ptr2)
+		{	/* A string has been specified. Use this for iculibver.
+			 * On SLED 15, we need this to load icu library which is named as "libicuio.so.suse65.1"
+			 */
+			ptr2++;
+		} else
+		{	/* Only a patch version has been specified. No string that follows.
+			 * In such cases, ignore the patch version. All linux distributions that we have
+			 * experience with so far install ICU with symbol names containing only the major and
+			 * minor version (not the patch version) so no need to use it anymore.
+			 */
+			ptr2 = NULL;
+		}
+	} else
+		ptr2 = NULL;
 
 	/* Generate the ICU symbol renaming string */
 	i = 0;
 	icusymver[i++] = '_';
 	icusymver[i++] = *icu_ver_buf;
-	if ( 44 > ((major_ver * 10) + minor_ver))
+	if (44 > ((major_ver * 10) + minor_ver))
 		icusymver[i++] = '_';
 	icusymver[i++] = *ptr;
+	if (NULL != ptr2)
+	{
+		icusymver[i++] = '_';
+		icusymver[i++] = *ptr3;
+	}
 	icusymver[i++] = '\0';
 
 	/* Generate the ICU library name string */
 	i = 0;
+	if (NULL != ptr2)
+	{	/* An optional string prefix has been specified. Apply that to the .so name. */
+		int	len;
+
+		len = STRLEN(ptr2);
+		if (MAX_PREFIX_STR_LEN <= len)
+		{
+			assert(FALSE);
+			return FALSE;
+		}
+		memcpy(iculibver, ptr2, len);
+		i += len;
+	}
 	iculibver[i++] = *icu_ver_buf;
 	iculibver[i++] = *ptr;
+	if (NULL != ptr2)
+	{
+		iculibver[i++] = '.';
+		iculibver[i++] = *ptr3;
+	}
 	iculibver[i++] = '\0';
 
 	/* Check if the formatted version is greater than or equal to 3.6 */
@@ -208,7 +261,8 @@ void gtm_icu_init(void)
 {
 	char		*locale, *chset, *libname, err_msg[MAX_ERRSTR_LEN];
 	char		icu_final_fname[MAX_ICU_FNAME_LEN + 1 + MAX_ICU_VERSION_STRLEN];	/* 1 for '_' in between */
-	char		icu_ver_buf[MAX_ICU_VERSION_STRLEN], icusymver[MAX_ICU_VERSION_STRLEN], iculibver[MAX_ICU_VERSION_STRLEN];
+	char		icu_ver_buf[MAX_ICU_VERSION_STRLEN], icusymver[MAX_ICU_VERSION_STRLEN];
+	char		iculibver[MAX_ICU_VERSION_STRLEN + MAX_PREFIX_STR_LEN];
 	char		tmp_errstr[SIZEOF(ICU_LIBNAME) + STR_LIT_LEN(ICU_LIBNAME_SUFFIX)]; /* "libicuio.so has version" */
 	char		icu_libname[SIZEOF(ICU_LIBNAME) + MAX_ICU_VERSION_STRLEN];
 	char		*strtokptr;
@@ -287,7 +341,57 @@ void gtm_icu_init(void)
 		assert(SIZEOF(icu_libname) > icu_libname_len);
 		libname = icu_libname;
 	} else
-		libname = ICU_LIBNAME;	/* go with default name */
+		libname = ICU_LIBNAME;  /* go with default name */
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	if (RESTRICTED(library_load_path))
+	{
+		/* Try the version named symlink */
+		if (ydb_icu_ver_defined)
+		{
+			SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_FULL, ydb_dist, libname);
+			if (0 != Stat(librarypath, &libpath_stat)) /* Try the default named symlink */
+				SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_SHORT ICU_LIBNAME, ydb_dist);
+		} else	/* Try the default named symlink */
+			SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_SHORT ICU_LIBNAME, ydb_dist);
+#		ifdef _AIX
+		STRNCAT(librarypath, AIX_SHR_64, SIZEOF(AIX_SHR_64)); /* Append "(shr_64.o)" to library path */
+#		endif
+		libname = librarypath;
+		if (NULL == (handle = dlopen(libname, iculdflags)))
+		{
+			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+			SNPRINTF(err_msg, MAX_ERRSTR_LEN, "dlopen(%s)", libname);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, err_msg);
+		}
+#		ifndef _AIX
+		if (NULL == realpath(librarypath, real_path))
+			assert(FALSE); /* Just opened that library */
+		pieceptr = STRTOK_R(real_path, DOT_CHAR, &strtokptr);
+		while (NULL != pieceptr)
+		{
+			if ((2 == STRLEN(pieceptr)) && (('0' <= pieceptr[0]) && ('9' >= pieceptr[0]))
+					&& (('0' <= pieceptr[1]) && ('9' >= pieceptr[1])))
+			{
+				int ver;
+
+				icusymver_len = 0;
+				cptr = pieceptr;
+				A2I(cptr, pieceptr+2, ver);
+				assert(0 <= ver);	/* Already validated above */
+				/* Generate the ICU symbol renaming string */
+				icusymver[icusymver_len++] = '_';
+				icusymver[icusymver_len++] = pieceptr[0];
+				if (44 > ver)
+					icusymver[icusymver_len++] = '_';
+				icusymver[icusymver_len++] = pieceptr[1];
+				icusymver[icusymver_len++] = '\0';
+				ydb_icu_ver_defined = TRUE;
+				break;
+			}
+			pieceptr = STRTOK_R(NULL, DOT_CHAR, &strtokptr);
+		}
+#		endif
+	} else	/* Note: the "else" clause spans an ifdef which calls dlopen() twice on AIX */
 #	ifdef _AIX
 	if (gtm_icu_ver_defined || /* Use the AIX system default when no ICU version specified */
 			NULL == (handle = dlopen(ICU_LIBNAME_DEF, ICU_LIBFLAGS | RTLD_MEMBER)))
