@@ -395,7 +395,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		if (0 != rc)
 		{
 			UNLINK(rtnname);
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 		}
 	}
 #	endif
@@ -403,7 +403,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	if (0 != rc)
 	{
 		UNLINK(rtnname);
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 	}
 	if (NULL == memchr(trigdsc->xecute_str.str.addr, '\n', trigdsc->xecute_str.str.len))
 	{
@@ -411,14 +411,14 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		if (0 != rc)
 		{
 			UNLINK(rtnname);
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 		}
 	}
 	CLOSEFILE(rtnfd, rc);
 	if (0 != rc)
 	{
 		UNLINK(rtnname);
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, rc);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, rc);
 	}
 	assert(MAX_MIDENT_LEN > trigdsc->rtn_desc.rt_name.len);
 	zcomp_parms_ptr = zcomp_parms;
@@ -457,11 +457,11 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("TRIGCOMPFAIL"), TREF(dollar_zcstatus)));
 		if (-1 == UNLINK(objname))	/* Delete the object file first since rtnname is the unique key */
-			DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(11) ERR_SYSCALL, 5,
+			DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
 						RTS_ERROR_LITERAL("unlink(objname)"), CALLFROM,
 						ERR_TEXT, 2, LEN_AND_STR(objname), errno));
 		if (-1 == UNLINK(rtnname))	/* Delete the source file */
-			DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(11) ERR_SYSCALL, 5,
+			DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
 						RTS_ERROR_LITERAL("unlink(rtnname)"), CALLFROM,
 						ERR_TEXT, 2, LEN_AND_STR(rtnname), errno));
 		return ERR_TRIGCOMPFAIL;
@@ -503,11 +503,11 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		assert(FALSE); 	/* This mv_stent should be the one we just pushed */
 	/* Remove temporary files created */
 	if (-1 == UNLINK(objname))	/* Delete the object file first since rtnname is the unique key */
-		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(11) ERR_SYSCALL, 5,
+		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
 					RTS_ERROR_LITERAL("unlink(objname)"), CALLFROM,
 					ERR_TEXT, 2, LEN_AND_STR(objname), errno));
 	if (-1 == UNLINK(rtnname))	/* Delete the source file */
-		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(11) ERR_SYSCALL, 5,
+		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
 					RTS_ERROR_LITERAL("unlink(rtnname)"), CALLFROM,
 					ERR_TEXT, 2, LEN_AND_STR(rtnname), errno));
 	run_time = gtm_trigger_comp_prev_run_time;
