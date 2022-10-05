@@ -1177,14 +1177,13 @@ void sys_canc_timer()
 		assert(FALSE);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("timer_delete()"), CALLFROM, save_errno);
 	}
-	if (!simpleThreadAPI_active && IS_SIMPLEAPI_MODE)
+	if ((MUMPS_CALLIN == invocation_mode) && !simpleThreadAPI_active && IS_SIMPLEAPI_MODE)
 	{	/* This process uses YottaDB in Simple API mode. In this case, it is possible the Simple API application
 		 * spawns multiple threads (but ensures serial access to the YottaDB engine). This was seen when using
 		 * the YDBPython wrapper (YDB#935). In this case, we need to not just clear "posix_timer_created" but
 		 * also "posix_timer_thread_id" since it could otherwise point to a dead thread-id.
 		 * Hence we use the macro call below to clear both fields.
 		 */
-		assert(MUMPS_CALLIN == invocation_mode);
 		CLEAR_POSIX_TIMER_FIELDS_IF_APPLICABLE;
 	} else
 	{	/* This process uses YottaDB in one of the following modes.
