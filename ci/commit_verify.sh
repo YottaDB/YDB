@@ -77,13 +77,11 @@ GPG_KEYS=(
 gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "${GPG_KEYS[@]}"
 
 echo "# Add $upstream_repo as remote"
+git remote -v
 if ! git remote | grep -q upstream_repo; then
 	git remote add upstream_repo "$upstream_repo"
-	git fetch upstream_repo
-else
-	echo "Unable to add $upstream_repo as remote, remote name upstream_repo already exists"
-	exit 1
 fi
+git fetch upstream_repo
 
 echo "target/upstream branch set to: $target_branch"
 
