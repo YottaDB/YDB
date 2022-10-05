@@ -146,7 +146,18 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. . . open "ldconfig":(shell="/bin/sh":command="command -v ldconfig || command -v /sbin/ldconfig":readonly)::"pipe" use "ldconfig"
 	. . . read ldconfig use io close "ldconfig"
 	. . . open "ldconfig -p":(shell="/bin/sh":command=ldconfig_" -p":readonly)::"pipe" use "ldconfig -p"
-	. . . for  read line quit:$zeof  if $zfind(line,$char(9)_"libicuio.so.") set icuv=$zpiece($zpiece(line,"libicuio.so.",2)," ") quit
+	. . . for  read line quit:$zeof  if $zfind(line,$char(9)_"libicuio.so.") do  quit
+	. . . . new tmp,len,i
+	. . . . set tmp=$zpiece($zpiece(line,"libicuio.so.",2)," ")
+	. . . . ; On SLED 15 (SUSE) and openSUSE Leap we have the file name to be of the form "libicuio.so.suse65.1"
+	. . . . ;   In this case, we need to set ydb_icu_version env var to "65.1.suse".
+	. . . . ; On non-SLED systems, we have seen the file name to be of the form "libicuio.so.65".
+	. . . . ;   In this case, we need to set ydb_icu_version env var to "65".
+	. . . . ; The below logic takes care of that.
+	. . . . set len=$zlength(tmp)
+	. . . . for i=1:1:len quit:$zextract(tmp,i)?1N
+	. . . . set icuv=$zextract(tmp,i,len)
+	. . . . set:(1'=i) icuv=icuv_"."_$zextract(tmp,1,i-1)
 	. . . use io close "ldconfig -p"
 	. . . set:icuv'?1N.E $ecode=",U243,"
 	. . . do ExportEnv("ydb_icu_version",icuv),ExportEnv("gtm_icu_version",icuv)

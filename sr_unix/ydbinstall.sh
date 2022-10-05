@@ -171,7 +171,7 @@ help_exit()
     echo "--prompt-for-group       -> YottaDB installation script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
     echo "--ucaseonly-utils        -> install only upper case utility program names; defaults to both if not specified"
     echo "--user username          -> user who should own YottaDB installation; default is root"
-    echo "--utf8 ICU_version       -> install UTF-8 support using specified  major.minor ICU version; specify default to use versionprovided by OS as default"
+    echo "--utf8 ICU_version       -> install UTF-8 support using specified  major.minor ICU version; specify default to use version provided by OS as default"
     echo "--verbose                -> output diagnostic information as the script executes; default is to run quietly"
     echo "--zlib                   -> download and install the zlib plugin"
     echo "Options that take a value (e.g, --group) can be specified as either --option=value or --option value."
@@ -250,12 +250,14 @@ getosid()
 	echo $osid
 }
 
-# This function finds the current ICU version using ldconfig
+# This function finds the current ICU version using ldconfig.
+# If file name is "libicuio.so.70", the below will return "70".
+# If file name is "libicuio.so.suse65.1", the below will return "65.1.suse" (needed for YottaDB to work on SLED 15).
 # There is a M version of this function in sr_unix/ydbenv.mpt
 # It needs to be maintained in parallel to this function
 icu_version()
 {
-	$ldconfig -p | grep -m1 -F libicuio.so. | cut -d" " -f1 | cut -d. -f3-4
+	$ldconfig -p | grep -m1 -F libicuio.so. | cut -d" " -f1 | sed 's/.*libicuio.so.\([a-z]*\)\([0-9\.]*\)/\2.\1/;s/\.$//;'
 }
 
 # This function installs the selected plugins. Before calling it, $ydb_installdir and $tmpdir need to be set so that it can

@@ -318,9 +318,14 @@ if [ -d "utf8" ]; then
 				# the version reported by "pkg-config --modversion icu-io"
 				# is <major><minor>.<milli> and not <major>.<minor>
 				majmin=$maj
+				# If "ydb_icu_version" is set to "65.1", then sonamesuffix would be set to "65.1".
+				# But if "ydb_icu_version" is set to "65.1.suse", then sonamesuffix would be set to "suse65.1".
+				# This is needed so we find the right "libicuio.so.*" file on the system.
+				sonamesuffix=`echo $ydb_icu_version | sed 's/\([0-9\.]*\)\([a-z]*\)/\2\1/;s/\.$//;s/^\.//;'`
 			else
 				# Assuming the input is of the form 4.2.1
 				majmin=`$echo $ydb_icu_version | cut -d "." -f 1,2 | sed 's/\.//'`
+				sonamesuffix=$majmin
 			fi
 			if [ "$majmin" -lt "36" ] ; then
 				$echo "WARNING: ICU version $ydb_icu_version is less than 3.6. \c"
@@ -373,7 +378,7 @@ if [ -d "utf8" ]; then
 				# library with that version number exists.
 				# AIX and z/OS reference ICU as libicuioVERSION.{so,a}
 				# The other platforms reference the libraries as libicuio.{sl,so}.VERSION
-				if [ -f "$libpath/libicuio$majmin$icu_ext" -o -f "$libpath/libicuio$icu_ext.$majmin" ] ; then
+				if [ -f "$libpath/libicuio$majmin$icu_ext" -o -f "$libpath/libicuio$icu_ext.$sonamesuffix" ] ; then
 					icu_lib_found=1
 				else
 					icu_lib_found=0
@@ -382,8 +387,7 @@ if [ -d "utf8" ]; then
 			if [ $icu_lib_found -eq 1 ] ; then
 				# Figure out the object mode(64 bit or 32 bit)  of ICU libraries on the target machine
 				if [ $arch = "linux" ] ; then
-					icu_full_ver_lib=`ls -l $libpath/libicuio$icu_ext.$majmin 2>/dev/null | awk '{print $NF}'`
-					is64bit_icu=`file $libpath/$icu_full_ver_lib 2>/dev/null | grep "64-bit" | wc -l`
+					is64bit_icu=`file -L $libpath/libicuio$icu_ext.$sonamesuffix 2>/dev/null | grep "64-bit" | wc -l`
 				elif [ $arch = "ibm" ] ; then
 					icu_full_ver_lib=`ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null | awk '{print $NF}'`
 					icu_full_ver_lib=`basename $icu_full_ver_lib`
@@ -400,12 +404,14 @@ if [ -d "utf8" ]; then
 				# The default ICU library on AIX is unversioned
 				if [ "$found_icu" -eq 1 -a "$majmin" = "" ] ; then majmin=0; fi
 				# If we have everything we want, then save the libpath that contains the proper ICU library and
-				# set the ydb_icu_version
+				# set the ydb_icu_version if not already set.
 				if [ "$found_icu" -eq 1 -a "$majmin" -ge 36 ] ; then
 					save_icu_libpath="$libpath"
-					minorver=`expr $majmin % 10`
-					majorver=`expr $majmin / 10`
-					ydb_icu_version="$majorver.$minorver"
+					if [ "$ydb_icu_version" = "" ] ; then
+						minorver=`expr $majmin % 10`
+						majorver=`expr $majmin / 10`
+						ydb_icu_version="$majorver.$minorver"
+					fi
 					export ydb_icu_version
 					break
 				fi

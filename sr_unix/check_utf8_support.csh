@@ -34,7 +34,8 @@ else
 endif
 
 # The below logic finds the current ICU version. This is copied over from similar code in sr_unix/ydbinstall.sh
-set icu_ver = `ldconfig -p | grep -m1 -F libicuio.so. | cut -d" " -f1 | cut -d. -f3-4`
+# The sed is needed at the end to remove any non-numeric characters in the version file (e.g. suse65 -> 65).
+set icu_ver = `ldconfig -p | grep -m1 -F libicuio.so. | cut -d" " -f1 | cut -d. -f3 | sed 's/[^0-9]//g'`
 if ($icu_ver >= "36") then
 	set found_icu = 1
 else

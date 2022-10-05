@@ -641,23 +641,27 @@ install(FILES ${scripts}
   PERMISSIONS ${install_permissions_script}
   )
 
-find_program(PKGCONFIG NAMES pkg-config)
-if(PKGCONFIG)
-  execute_process(
-    COMMAND ${PKGCONFIG} --modversion icu-io
-    OUTPUT_VARIABLE icu_version
-    RESULT_VARIABLE icu_failed
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-  if(icu_failed)
-    message(FATAL_ERROR "Command\n ${PKGCONFIG} --modversion icu-io\nfailed (${icu_failed}).")
-  elseif("x${icu_version}" MATCHES "^x([0-9]+\\.[0-9]+)")
-    set(ydb_icu_version "${CMAKE_MATCH_1}")
+if (NOT DEFINED ENV{ydb_icu_version})
+  find_program(PKGCONFIG NAMES pkg-config)
+  if(PKGCONFIG)
+    execute_process(
+      COMMAND ${PKGCONFIG} --modversion icu-io
+      OUTPUT_VARIABLE icu_version
+      RESULT_VARIABLE icu_failed
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+    if(icu_failed)
+      message(FATAL_ERROR "Command\n ${PKGCONFIG} --modversion icu-io\nfailed (${icu_failed}).")
+    elseif("x${icu_version}" MATCHES "^x([0-9]+\\.[0-9]+)")
+      set(ydb_icu_version "${CMAKE_MATCH_1}")
+    else()
+      message(FATAL_ERROR "Command\n ${PKGCONFIG} --modversion icu-io\nproduced unrecognized output:\n ${icu_version}")
+    endif()
   else()
-    message(FATAL_ERROR "Command\n ${PKGCONFIG} --modversion icu-io\nproduced unrecognized output:\n ${icu_version}")
+    message(FATAL_ERROR "Unable to find 'pkg-config'.  Set PKGCONFIG in CMake cache.")
   endif()
 else()
-  message(FATAL_ERROR "Unable to find 'pkg-config'.  Set PKGCONFIG in CMake cache.")
+  set(ydb_icu_version "$ENV{ydb_icu_version}")
 endif()
 
 find_program(LOCALECFG NAMES locale)
