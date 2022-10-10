@@ -100,7 +100,7 @@ dump_info()
     if [ -n "$gtm_group_already" ] ; then echo gtm_group_already " : " $gtm_group_already ; fi
     if [ -n "$gtm_group_restriction" ] ; then echo gtm_group_restriction " : " $gtm_group_restriction ; fi
     if [ -n "$gtm_hostos" ] ; then echo gtm_hostos " : " $gtm_hostos ; fi
-    if [ -n "$ydb_icu_version" ] ; then echo ydb_icu_version " : " $ydb_icu_version ; fi
+    if [ -n "$icu_version" ] ; then echo icu_version " : " $icu_version ; fi
     if [ -n "$gtm_install_flavor" ] ; then echo gtm_install_flavor " : " $gtm_install_flavor ; fi
     if [ -n "$ydb_installdir" ] ; then echo ydb_installdir " : " $ydb_installdir ; fi
     if [ -n "$gtm_keep_obj" ] ; then echo gtm_keep_obj " : " $gtm_keep_obj ; fi
@@ -318,7 +318,6 @@ install_plugins()
 	if [ "Y" = $ydb_encplugin ] ; then
 		echo "Now installing YDBEncrypt"
 		cd $tmpdir	# Get back to top level temporary directory as the current directory
-		export ydb_icu_version=$ydb_found_or_requested_icu_version
 		mkdir enc_tmp && cd enc_tmp
 		url="https://gitlab.com/YottaDB/Util/YDBEncrypt.git"
 		if git clone -q ${url} .; then
@@ -353,8 +352,6 @@ install_plugins()
 				cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
 				cp _ZLIB.m ${ydb_installdir}/plugin/r
 				if [ "Y" = $ydb_utf8 ] ; then
-					ydb_icu_version=$ydb_found_or_requested_icu_version
-					export ydb_icu_version
 					mkdir utf8
 					(
 						cd utf8
@@ -442,7 +439,7 @@ ydb_force_install="N"
 # Process command line
 while [ $# -gt 0 ] ; do
     case "$1" in
-	--branch) tmp=`echo $1 | cut -s -d = -f 2-`
+	--branch*) tmp=`echo $1 | cut -s -d = -f 2-`
 	    if [ -n "$tmp" ] ; then ydb_branch=$tmp
 	    else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then ydb_branch=$2 ; shift
 	    else echo "--branch needs a value" ; err_exit
@@ -488,7 +485,7 @@ while [ $# -gt 0 ] ; do
 	    fi
 	    shift ;;
 	--force-install) ydb_force_install="Y" ; shift ;;
-	--from-source) tmp=`echo $1 | cut -s -d = -f 2-`
+	--from-source*) tmp=`echo $1 | cut -s -d = -f 2-`
 	    if [ -n "$tmp" ] ; then ydb_from_source=$tmp
 	    else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then ydb_from_source=$2 ; shift
 		else ydb_from_source="https://gitlab.com/YottaDB/DB/YDB.git"
@@ -558,8 +555,8 @@ while [ $# -gt 0 ] ; do
             fi
             shift ;;
         --utf8*) tmp=`echo $1 | cut -s -d = -f 2- | tr DEFAULT default`
-            if [ -n "$tmp" ] ; then ydb_icu_version=$tmp
-            else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then ydb_icu_version=`echo $2 | tr DEFAULT default`; shift
+            if [ -n "$tmp" ] ; then icu_version=$tmp
+            else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then icu_version=`echo $2 | tr DEFAULT default`; shift
                 else echo "--utf8 needs a value" ; err_exit
                 fi
             fi
@@ -587,6 +584,20 @@ if { [ "centos" = "$osid" ] || [ "rhel" = "$osid" ]; } && [ 7 = "$osmajorver" ] 
 	cmakecmd="cmake3"
 else
 	cmakecmd="cmake"
+fi
+
+# Get actual ICU version if UTF-8 install was requested with "default" ICU version
+if [ "Y" = "$ydb_utf8" ] ; then
+	if [ "default" = $icu_version ] ; then
+		ydb_found_or_requested_icu_version=`icu_version`
+	else
+		ydb_found_or_requested_icu_version=$icu_version
+	fi
+	# At this point "ydb_found_or_requested_icu_version" holds the user specified or implicitly determined
+	# ICU version to use. Set and export the "ydb_icu_version" env var to reflect this value.
+	# This is used in various places (e.g. "install_plugins" call below, "cmake" call below).
+	ydb_icu_version=$ydb_found_or_requested_icu_version
+	export ydb_icu_version
 fi
 
 if [ -n "$ydb_from_source" ] ; then
@@ -670,7 +681,7 @@ if [ -n "$ydb_from_source" ] ; then
 	if [ "Y" = "$gtm_prompt_for_group" ] ; then install_options="${install_options} --prompt-for-group" ; fi
 	if [ "N" = "$gtm_lcase_utils" ] ; then install_options="${install_options} --ucaseonly-utils" ; fi
 	if [ -n "$gtm_user" ] ; then install_options="${install_options} --user ${gtm_user}" ; fi
-	if [ "Y" = "$ydb_utf8" ] ; then install_options="${install_options} --utf8 ${ydb_icu_version}" ; fi
+	if [ "Y" = "$ydb_utf8" ] ; then install_options="${install_options} --utf8 ${icu_version}" ; fi
 	if [ "Y" = "$gtm_verbose" ] ; then install_options="${install_options} --verbose" ; fi
 	if [ "Y" = "$ydb_zlib" ] ; then install_options="${install_options} --zlib" ; fi
 
@@ -712,16 +723,6 @@ case ${gtm_hostos}_${gtm_arch} in
     *) echo Architecture `uname -o` on `uname -m` not supported by this script ; err_exit ;;
 esac
 
-# Get actual ICU version if UTF-8 install was requested with "default" ICU version
-if [ "Y" = "$ydb_utf8" ] ; then
-	if [ "default" = $ydb_icu_version ] ; then
-		ydb_found_or_requested_icu_version=`icu_version`
-	else
-		ydb_found_or_requested_icu_version=$ydb_icu_version
-fi
-
-fi
-
 if [ "Y" = "$ydb_plugins_only" ]; then
 	if [ -z "$ydb_installdir" ] ; then
 		# If --installdir was not specified, we first look to $ydb_dist for
@@ -740,12 +741,19 @@ if [ "Y" = "$ydb_plugins_only" ]; then
 		echo "YottaDB not found at $ydb_installdir. Exiting" ; err_exit
 	fi
 	# Check if UTF8 is installed.
-	if [ -d "$ydb_installdir/utf8" ] ; then
-		ydb_utf8="Y"
-		ydb_found_or_requested_icu_version=`icu_version`
-	else
-		ydb_utf8="N"
+	if [ "Y" != "$ydb_utf8" ] ; then
+		# ydb_found_or_requested_icu_version has NOT already been determined.
+		if [ -d "$ydb_installdir/utf8" ] ; then
+			ydb_utf8="Y"
+			ydb_found_or_requested_icu_version=`icu_version`
+			# Now that we determined the icu version, set ydb_icu_version env var as well.
+			ydb_icu_version=$ydb_found_or_requested_icu_version
+			export ydb_icu_version
+		else
+			ydb_utf8="N"
+		fi
 	fi
+	# else use ydb_found_or_requested_icu_version determined from what the user had specified along with the --utf8 option
 	# Check that the plugins aren't already installed or that --overwrite-existing is selected
 	# Since selected --octo automatically selects --posix and --aim, we continue the install
 	# without overwriting if --aim and/or --posix is already installed and --octo is selected.
@@ -1216,7 +1224,7 @@ fi
     echo y			# Response to one of two possible questions
                             #	"Directory $ydb_dist exists. If you proceed with this installation then some files will be over-written. Is it ok to proceed?"
                             #	"Directory $ydb_dist does not exist. Do you wish to create it as part of this installation? (y or n)"
-    if [ -z "$ydb_icu_version" ] ; then echo n 	# Response to : "Should UTF-8 support be installed?"
+    if [ -z "$icu_version" ] ; then echo n 	# Response to : "Should UTF-8 support be installed?"
     else echo y 		# Response to : "Should UTF-8 support be installed?"
         echo y 			# Response to : "Should an ICU version other than the default be used?"
         echo $ydb_found_or_requested_icu_version	# Response to : "Enter ICU version"

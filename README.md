@@ -117,11 +117,15 @@ listed below. For example for Ubuntu Linux:
 - Installing YottaDB
 
   Now you are ready to install YottaDB. The default installation path for each release includes the release
-  (e.g. for YottaDB r1.32, the default installation path is /usr/local/lib/yottadb/r134),
+  (e.g. for YottaDB r1.34, the default installation path is /usr/local/lib/yottadb/r134),
   but can be controlled using the ```--installdir``` option. Run ```./ydbinstall --help``` for a list of options.
 
+  Note that if the ```ydb_icu_version``` env var is set to a value other than what `pkg-config --modversion icu-io`
+  would return (observed on a SLED 15 or openLeap SUSE system), then the env var value needs to be preserved across
+  the sudo call hence the use of ```preserve-env``` below. It is not needed on other systems but does not hurt either.
+
   ```sh
-  sudo ./ydbinstall
+  sudo --preserve-env=ydb_icu_version ./ydbinstall
   cd - ; make clean
   ```
 
