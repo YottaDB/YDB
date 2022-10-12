@@ -552,19 +552,26 @@ foreach(d ${gt_src_list})
       endforeach()
     else()
       if(";${m_name};" MATCHES ";GTMDefinedTypesInit[a-zA-Z]*;")
-        set(m_out "${YDB_BINARY_DIR}/${m_name}.m")
-        set(${m_name}_found 1)
+	# If Release build, copy/install GTMDefinedTypesInitRelease.m as GTMDefinedTypesInit.m and ignore GTMDefinedTypesDebug.m
+	# If Debug   build, copy/install GTMDefinedTypesInitDebug.m   as GTMDefinedTypesInit.m and ignore GTMDefinedTypesRelease.m
+        if(m_name STREQUAL GTMDefinedTypesInit${defined_types_tail})
+          set(m_out "${YDB_BINARY_DIR}/GTMDefinedTypesInit.m")
+	else()
+          set(m_out "")
+	endif()
       else()
         set(m_out "${YDB_BINARY_DIR}/${m_upper}.m")
       endif()
-      add_custom_command(
-        OUTPUT "${m_out}"
-        DEPENDS ${YDB_SOURCE_DIR}/${d}/${m}
-        COMMAND ${CMAKE_COMMAND} -E copy ${YDB_SOURCE_DIR}/${d}/${m} "${m_out}"
-        )
-      install(FILES "${m_out}" DESTINATION ${YDB_INSTALL_DIR})
-      list(APPEND files_to_place "${m_out}")
-      list(APPEND m_routines "${m_out}")
+      if (NOT m_out STREQUAL "")
+        add_custom_command(
+          OUTPUT "${m_out}"
+          DEPENDS ${YDB_SOURCE_DIR}/${d}/${m}
+          COMMAND ${CMAKE_COMMAND} -E copy ${YDB_SOURCE_DIR}/${d}/${m} "${m_out}"
+          )
+        install(FILES "${m_out}" DESTINATION ${YDB_INSTALL_DIR})
+        list(APPEND files_to_place "${m_out}")
+        list(APPEND m_routines "${m_out}")
+      endif()
     endif()
   endforeach()
   foreach(m ${mpt_files_${d}})
@@ -770,11 +777,9 @@ Halt")
   install(CODE "set(help \"${help}\")")
   install(SCRIPT ${YDB_SOURCE_DIR}/cmake/set-help-read-only.cmake)
 endforeach()
-if (GTMDefinedTypesInit${defined_types_tail}_found)
 add_custom_command(
   OUTPUT GTMDEFINEDTYPESTODB.o
-  DEPENDS gtmhelp.dat gtmhelp.gld GTMDefinedTypesInit${defined_types_tail}.m
-  COMMAND ${CMAKE_COMMAND} -E copy GTMDefinedTypesInit${defined_types_tail}.m ${YDB_BINARY_DIR}/GTMDefinedTypesInit.m
+  DEPENDS gtmhelp.dat gtmhelp.gld GTMDefinedTypesInit.m
   COMMAND ${CMAKE_COMMAND}
     -D ydb_dist=${YDB_BINARY_DIR}
     -D ydb_routines=.
@@ -785,7 +790,6 @@ add_custom_command(
     VERBATIM
   )
 list(APPEND files_to_place GTMDEFINEDTYPESTODB.o)
-endif(GTMDefinedTypesInit${defined_types_tail}_found)
 
 configure_file(sr_unix/gpgagent.tab.in plugin/gpgagent.tab @ONLY)
 set(YDB_TOP "$ENV{PWD}/${YDB_INSTALL_DIR}")
