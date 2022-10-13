@@ -54,13 +54,6 @@ do
 	check_if_util_exists $util
 done
 
-# Check whether libelf.so exists; issue an error and exit if it does not
-ldconfig=$(command -v ldconfig || command -v /sbin/ldconfig)
-$ldconfig -p | grep -qs /libelf.so ; ydb_tmp_stat=$?
-if [ 0 -ne $ydb_tmp_stat ] ; then
-	echo >&2 "Library libelf.so is needed by YottaDB but not found. Exiting." ; exit $ydb_tmp_stat
-fi
-
 # Ensure this is not being sourced so that environment variables in this file do not change the shell environment
 if [ "ydbinstall" != `basename -s .sh $0` ] ; then
     echo "Please execute ydbinstall/ydbinstall.sh instead of sourcing it"
@@ -573,6 +566,38 @@ while [ $# -gt 0 ] ; do
 done
 if [ "Y" = "$gtm_verbose" ] ; then echo Processed command line ; dump_info ; fi
 
+# Check / set userids and groups
+if [ -z "$gtm_user" ] ; then gtm_user=$USER
+elif [ "$gtm_user" != "`id -un $gtm_user`" ] ; then
+    echo $gtm_user is a non-existent user ; err_exit
+fi
+if [ "root" = $USER ] ; then
+    if [ -z "$gtm_group" ] ; then gtm_group=`id -gn`
+    elif [ "root" != "$gtm_user" ] && [ "$gtm_group" != "`id -Gn $gtm_user | xargs -n 1 | grep $gtm_group`" ] ; then
+        echo $gtm_user is not a member of $gtm_group ; err_exit
+    fi
+else
+    echo Non-root installations not currently supported
+    if [ "N" = "$gtm_dryrun" ] ; then err_exit
+    else echo "Continuing because --dry-run selected"
+    fi
+fi
+
+# Check whether libelf.so exists; issue an error and exit if it does not
+ldconfig=$(command -v ldconfig || command -v /sbin/ldconfig)
+$ldconfig -p | grep -qs /libelf.so ; ydb_tmp_stat=$?
+if [ 0 -ne $ydb_tmp_stat ] ; then
+	echo >&2 "Library libelf.so is needed by YottaDB but not found. Exiting." ; exit $ydb_tmp_stat
+fi
+
+# If UTF-8 support is requested, but libicuio is not found, issue an error and exit
+if [ -n "$ydb_utf8" ] ; then
+   $ldconfig -p | grep -qs /libicuio ; ydb_tmp_stat=$?
+   if [ 0 -ne $ydb_tmp_stat ] ; then
+       echo >&2 "UTF-8 support requested but libicuio.so not found. Exiting." ; exit $ydb_tmp_stat
+   fi
+fi
+
 osfile="/etc/os-release"
 if [ ! -f "$osfile" ] ; then
 	echo "/etc/os-release does not exist on host; Not installing YottaDB."
@@ -895,7 +920,14 @@ if [ -z "$ydb_version" ] ; then
     if { [ -e "$tmp/yottadb" ] || [ -e "$tmp/mumps" ]; } && [ -e "$tmp/_XCMD.m" ] ; then
         ydb_distrib=$tmp
         ydb_dist=$tmp ; export ydb_dist
-        chmod +x $ydb_dist/yottadb
+	if [ ! -x "$ydb_dist/yottadb" ] ; then
+	    if [ "root" = "$USER" ] ; then
+		chmod +x $ydb_dist/yottadb
+	    else
+		echo >&2 "$ydb_dist/yottadb is not executable and script is not run as root"
+		exit 1
+	    fi
+	fi
         tmp=`mktmpdir`
         ydb_routines="$tmp($ydb_dist)" ; export ydb_routines
         # shellcheck disable=SC2016
@@ -1154,22 +1186,6 @@ fi
 if [ "Y" = "$gtm_verbose" ] ; then echo Downloaded and unpacked YottaDB/GT.M distribution ; dump_info ; fi
 
 # Check installation settings & provide defaults as needed
-tmp=`id -un`
-if [ -z "$gtm_user" ] ; then gtm_user=$tmp
-elif [ "$gtm_user" != "`id -un $gtm_user`" ] ; then
-    echo $gtm_user is a non-existent user ; err_exit
-fi
-if [ "root" = $tmp ] ; then
-    if [ -z "$gtm_group" ] ; then gtm_group=`id -gn`
-    elif [ "root" != "$gtm_user" ] && [ "$gtm_group" != "`id -Gn $gtm_user | xargs -n 1 | grep $gtm_group`" ] ; then
-        echo $gtm_user is not a member of $gtm_group ; err_exit
-    fi
-else
-    echo Non-root installations not currently supported
-    if [ "N" = "$gtm_dryrun" ] ; then err_exit
-    else echo "Continuing because --dry-run selected"
-    fi
-fi
 if [ -z "$ydb_installdir" ] ; then
     if [ "N" = "$gtm_gtm" ] ; then
          ydbver=`echo $ydb_version | tr '[:upper:]' '[:lower:]' | tr -d '.-'`
@@ -1189,7 +1205,9 @@ fi
 if [ "Y" = "$gtm_verbose" ] ; then echo Finished checking options and assigning defaults ; dump_info ; fi
 
 # Prepare input to YottaDB configure script. The corresponding questions in configure.gtc are listed below in comments
-gtm_configure_in=${gtm_tmpdir}/configure_${timestamp}.in
+if [ "root" = $(id -un) ] ; then gtm_configure_in=${gtm_tmpdir}/configure_${timestamp}.in
+else gtm_configure_in=${tmpdir}/configure_${timestamp}.in
+fi
 export ydb_change_removeipc			# Signal configure.gtc to set RemoveIPC=no or not, if needed
 issystemd=`command -v systemctl`
 if [ "" != "$issystemd" ] ; then
@@ -1252,6 +1270,9 @@ if [ "$ydb_distrib" != "$gtm_tmpdir" ] ; then
     fi
 fi
 
+# Stop here if this is a dry run
+if [ "Y" = "$gtm_dryrun" ] ; then echo "Terminating without making any changes as --dry-run specified" ; exit ; fi
+
 if [ -e configure.sh ] ; then rm -f configure.sh ; fi
 
 tmp=`head -1 configure | cut -f 1`
@@ -1260,9 +1281,6 @@ if [ "#!/bin/sh" != "$tmp" ] ; then
 fi
 cat configure >>configure.sh
 chmod +x configure.sh
-
-# Stop here if this is a dry run
-if [ "Y" = "$gtm_dryrun" ] ; then echo Installation prepared in $gtm_tmpdir ; exit ; fi
 
 if ! sh -x ./configure.sh <$gtm_configure_in 1> $gtm_tmpdir/configure_${timestamp}.out 2>$gtm_tmpdir/configure_${timestamp}.err; then
     echo "configure.sh failed. Output follows"
