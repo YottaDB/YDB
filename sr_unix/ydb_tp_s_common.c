@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -133,6 +133,8 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 					LEN_AND_STR(LYDBRTNNAME(lydbrtn)), namecount, YDB_MAX_NAMES);
 			for (curvarname = varnames, mv = varnamearray, mv_top = mv + namecount; mv < mv_top; curvarname++, mv++)
 			{
+				boolean_t	isvalid;
+
 				if (IS_INVALID_YDB_BUFF_T(curvarname))
 				{
 					SNPRINTF(buff, SIZEOF(buff), "Invalid varname array (index %d)", curvarname - varnames);
@@ -141,7 +143,9 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 				}
 				if (YDB_MAX_IDENT < curvarname->len_used)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VARNAME2LONG, 1, YDB_MAX_IDENT);
-				VALIDATE_MNAME_C1(curvarname->buf_addr, curvarname->len_used);
+				VALIDATE_MNAME_C1(curvarname->buf_addr, curvarname->len_used, isvalid);
+				if (!isvalid)
+					ydb_issue_invvarname_error(curvarname);
 				/* Note the variable name is put in the stringpool. Needed if this variable does not yet exist in
 				 * the current symbol table, a pointer to this string is added in op_tstart as part of the
 				 * "add_hashtab_mname_symval" call and that would then point to memory in user-driven C program

@@ -22,7 +22,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "LIBYOTTAMISMTCH", "$ydb_dist/libyottadb.so (!AD) does not match the shared library path (!AD)", 4, 0 },
 	{ "READONLYNOSTATS", "Read-only and Statistics sharing cannot both be enabled on database", 0, 0 },
 	{ "READONLYLKFAIL", "Failed to get !AD lock on READ_ONLY database file !AD", 4, 0 },
-	{ "INVVARNAME", "Invalid local/global/ISV variable name supplied to API call", 0, 0 },
+	{ "INVVARNAME", "Invalid local/global/ISV variable name !AD supplied to API call", 2, 0 },
 	{ "PARAMINVALID", "!AD parameter specified in !AD call", 4, 0 },
 	{ "INSUFFSUBS", "Return subscript array for !AD call too small - needs at least !UL entries for this call", 3, 0 },
 	{ "MINNRSUBSCRIPTS", "Number of subscripts cannot be a negative number", 0, 0 },

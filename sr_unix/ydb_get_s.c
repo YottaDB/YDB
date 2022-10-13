@@ -87,7 +87,7 @@ int ydb_get_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 	if (outofband)
 		outofband_action(FALSE);
 	/* Do some validation */
-	VALIDATE_VARNAME(varname, get_type, get_svn_index, FALSE);
+	VALIDATE_VARNAME(varname, get_type, get_svn_index, FALSE, LYDB_RTN_GET);
 	if (0 > subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
 	if (YDB_MAX_SUBS < subs_used)
@@ -154,7 +154,7 @@ int ydb_get_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 						{
 							mval	dst;
 
-							op_fnzwrite(0, &plist_mvals[i], &dst);	/* dst points to stringpool */
+							op_fnzwrite(FALSE, &plist_mvals[i], &dst); /* dst points to stringpool */
 							/* Check if we have enough space in our local buffer to copy over "dst".
 							 * If so, copy. If not, copy as much space as we have and proceed to
 							 * issue LVUNDEF error. Hence the use of MIN below.

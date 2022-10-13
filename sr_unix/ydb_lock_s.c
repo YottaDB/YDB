@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,7 +93,7 @@ int ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var)
 	{	/* Simplified version of the processing loop below that validates things */
 		varname = va_arg(varcpy, ydb_buffer_t *);
 		/* Validate the varname */
-		VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE);
+		VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE, LYDB_RTN_LOCK);
 		/* Validate the subscripts */
 		subs_used = va_arg(varcpy, int);
 		if (0 > subs_used)

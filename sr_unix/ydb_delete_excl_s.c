@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -90,6 +90,8 @@ int ydb_delete_excl_s(int namecount, const ydb_buffer_t *varnames)
 	     parmp < parmp_top;
 	     parmp++, mvalp++, curvarname++)
 	{	/* Validate each name to make sure is well formed */
+		boolean_t	isvalid;
+
 		if (IS_INVALID_YDB_BUFF_T(curvarname))
 		{
 			SNPRINTF(buff, SIZEOF(buff), "Invalid varname array (index %d)", curvarname - varnames);
@@ -98,7 +100,9 @@ int ydb_delete_excl_s(int namecount, const ydb_buffer_t *varnames)
 		}
 		if (YDB_MAX_IDENT < curvarname->len_used)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VARNAME2LONG, 1, YDB_MAX_IDENT);
-  		VALIDATE_MNAME_C1(curvarname->buf_addr, curvarname->len_used);	/* Validates varname and that it is a local var */
+  		VALIDATE_MNAME_C1(curvarname->buf_addr, curvarname->len_used, isvalid); /* Validate that varname is a local var */
+		if (!isvalid)
+			ydb_issue_invvarname_error(curvarname);
 		SET_MVAL_FROM_YDB_BUFF_T(mvalp, curvarname);
 		*parmp = mvalp;
 	}

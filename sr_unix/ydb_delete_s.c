@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,7 +80,7 @@ int ydb_delete_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	if (outofband)
 		outofband_action(FALSE);
 	/* We should have a variable name - check it out and determine type */
-	VALIDATE_VARNAME(varname, delete_type, delete_svn_index, FALSE);
+	VALIDATE_VARNAME(varname, delete_type, delete_svn_index, FALSE, LYDB_RTN_DELETE);
 	if (0 > subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
 	if (YDB_MAX_SUBS < subs_used)

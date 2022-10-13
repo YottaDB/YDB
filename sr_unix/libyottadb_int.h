@@ -81,7 +81,8 @@ typedef enum
 /* Returned values for VARTYPE in VALIDATE-VARNAME() macro */
 typedef enum
 {
-	LYDB_VARREF_GLOBAL = 1,		/* Referencing a global variable */
+	LYDB_VARREF_INVALID = 0,
+	LYDB_VARREF_GLOBAL,		/* Referencing a global variable */
 	LYDB_VARREF_LOCAL,		/* Referencing a local variable */
 	LYDB_VARREF_ISV			/* Referencing an ISV (Intrinsic Special Variable) */
 } ydb_var_types;
@@ -260,13 +261,14 @@ MBSTART {											\
  * checked and no further checking needs to be done.
  */
 
-/* A macro to check the entire MNAME for validity. Returns YDB_ERR_INVVARNAME otherwise */
-#define VALIDATE_MNAME_C1(VARNAMESTR, VARNAMELEN)						\
+/* A macro to check the entire MNAME for validity. Sets ISVALID to TRUE if valid and FALSE otherwise */
+#define VALIDATE_MNAME_C1(VARNAMESTR, VARNAMELEN, ISVALID)					\
 MBSTART {											\
 	char ctype;										\
 	     											\
 	assert(0 < (VARNAMELEN));								\
 	ctype = ctypetab[(VARNAMESTR)[0]];							\
+	ISVALID = TRUE;										\
 	switch(ctype)										\
 	{											\
 		case TK_LOWER:									\
@@ -275,18 +277,23 @@ MBSTART {											\
 			/* Valid first character */						\
 			break;	       		 						\
 		default:									\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);		\
+			ISVALID = FALSE;							\
+			break;									\
 	}											\
-	VALIDATE_MNAME_C2((VARNAMESTR) + 1, (VARNAMELEN) - 1);					\
+	if (ISVALID)										\
+		VALIDATE_MNAME_C2((VARNAMESTR) + 1, (VARNAMELEN) - 1, ISVALID);			\
 } MBEND
 
-/* Validate the 2nd char through the end of a given MNAME for validity returning YDB_ERR_INVVARNAME otherwise */
-#define VALIDATE_MNAME_C2(VARNAMESTR, VARNAMELEN)						\
+/* Validate the 2nd char through the end of a given MNAME for validity. Assumes ISVALID is set to TRUE
+ * at macro entry and sets it to FALSE if it finds some invalidity. Otherwise it leaves ISVALID as is (i.e. TRUE).
+ */
+#define VALIDATE_MNAME_C2(VARNAMESTR, VARNAMELEN, ISVALID)					\
 MBSTART {											\
 	char 		ctype, *cptr, *ctop;							\
 	signed char	ch;	      								\
 	       											\
 	assert(0 <= (VARNAMELEN));								\
+	assert(ISVALID);									\
 	for (cptr = (VARNAMESTR), ctop = (VARNAMESTR) + (VARNAMELEN); cptr < ctop; cptr++)	\
 	{	    			     	    			  		      	\
 		ctype = ctypetab[*cptr];							\
@@ -297,8 +304,11 @@ MBSTART {											\
 			case TK_DIGIT:								\
 				continue;							\
 			default:								\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);	\
+				ISVALID = FALSE;						\
+				break;								\
 		}		       								\
+		assert(!ISVALID);								\
+		break;										\
 	}											\
 } MBEND
 
@@ -307,18 +317,20 @@ MBSTART {											\
  *   - Non-NULL address
  *   - Determines the type of var (global, local, ISV)
  *
- * Any error in validation results in a return with code YDB_ERR_INVVARNAME.
+ * Any error in validation results in a YDB_ERR_INVVARNAME error (by invoking "ydb_issue_invvarname_error()").
  */
-#define VALIDATE_VARNAME(VARNAMEP, VARTYPE, VARINDEX, UPDATE)								\
+#define VALIDATE_VARNAME(VARNAMEP, VARTYPE, VARINDEX, UPDATE, LYDB_RTN_NAME)						\
 MBSTART {														\
-	char	ctype;													\
-	int	index, lenUsed;												\
+	boolean_t	isvalid;											\
+	char		ctype;												\
+	int		index, lenUsed;											\
 															\
 	if (IS_INVALID_YDB_BUFF_T(VARNAMEP))										\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);						\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,						\
+			LEN_AND_LIT("Invalid varname"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_NAME)));			\
 	lenUsed = (VARNAMEP)->len_used;											\
 	if (0 == lenUsed)												\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);						\
+		ydb_issue_invvarname_error(VARNAMEP);									\
 	/* Characterize first char of name ($, ^, %, or letter) */							\
 	ctype = ctypetab[(VARNAMEP)->buf_addr[0]];									\
 	switch(ctype)													\
@@ -328,9 +340,11 @@ MBSTART {														\
 			if (YDB_MAX_IDENT < lenUsed)									\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VARNAME2LONG, 1, YDB_MAX_IDENT);		\
 			if (0 == lenUsed)										\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);				\
+				ydb_issue_invvarname_error(VARNAMEP);							\
 			VARTYPE = LYDB_VARREF_GLOBAL;									\
-			VALIDATE_MNAME_C1((VARNAMEP)->buf_addr + 1, lenUsed);						\
+			VALIDATE_MNAME_C1((VARNAMEP)->buf_addr + 1, lenUsed, isvalid);					\
+			if (!isvalid)											\
+				ydb_issue_invvarname_error(VARNAMEP);							\
 			break;				      	   		      					\
 		case TK_LOWER:												\
 		case TK_UPPER:												\
@@ -338,12 +352,15 @@ MBSTART {														\
 			if (YDB_MAX_IDENT < lenUsed)									\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VARNAME2LONG, 1, YDB_MAX_IDENT);		\
 			VARTYPE = LYDB_VARREF_LOCAL;									\
-			VALIDATE_MNAME_C2((VARNAMEP)->buf_addr + 1, lenUsed - 1);					\
+			isvalid = TRUE;											\
+			VALIDATE_MNAME_C2((VARNAMEP)->buf_addr + 1, lenUsed - 1, isvalid);				\
+			if (!isvalid)											\
+				ydb_issue_invvarname_error(VARNAMEP);							\
 			break;												\
 		case TK_DOLLAR:												\
 			lenUsed--;											\
 			if (0 == lenUsed)										\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);				\
+				ydb_issue_invvarname_error(VARNAMEP);							\
 			VARTYPE = LYDB_VARREF_ISV;									\
 			index = namelook(svn_index, svn_names, (VARNAMEP)->buf_addr + 1, lenUsed); 			\
 			if (-1 == index) 	     			     						\
@@ -353,7 +370,12 @@ MBSTART {														\
 			VARINDEX = svn_data[index].opcode;								\
 			break;	   											\
 		default:												\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);					\
+			ydb_issue_invvarname_error(VARNAMEP);								\
+			/* Below line only needed to avoid false [clang-analyzer-core.UndefinedBinaryOperatorResult]	\
+			 * warning from clang-tidy in some callers of this macro.					\
+			 */												\
+			VARTYPE = LYDB_VARREF_INVALID;									\
+			break;												\
 	}		       												\
 } MBEND
 
@@ -851,6 +873,8 @@ void	ydb_stm_thread_exit(void);
 void	ydb_stm_atfork_prepare(void);
 void	ydb_stm_atfork_parent(void);
 void	ydb_stm_atfork_child(void);
+
+void	ydb_issue_invvarname_error(const ydb_buffer_t *varname);
 
 /* Use NO_THREADGBL_DEFTYPES here to keep these inline routines from expanding in gtm_threadgbl_deftypes.c where they are
  * unnecessary and cause build issues of the gtm_threadgbl_deftypes executable that builds gtm_threadgbl_deftypes.h.

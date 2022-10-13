@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,7 +68,7 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, const ydb_buffer_t *varname
 		outofband_action(FALSE);
 	ISSUE_TIME2LONG_ERROR_IF_NEEDED(timeout_nsec);
 	/* Setup and validate the varname */
-	VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE);
+	VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE, LYDB_RTN_LOCK_INCR);
 	if (0 > subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
 	if (YDB_MAX_SUBS < subs_used)
