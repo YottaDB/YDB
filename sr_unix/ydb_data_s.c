@@ -84,11 +84,7 @@ int ydb_data_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 	if (outofband)
 		outofband_action(FALSE);
 	/* Do some validation */
-	VALIDATE_VARNAME(varname, data_type, data_svn_index, FALSE, LYDB_RTN_DATA);
-	if (0 > subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
-	if (YDB_MAX_SUBS < subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+	VALIDATE_VARNAME(varname, subs_used, FALSE, LYDB_RTN_DATA, -1, data_type, data_svn_index);
 	if (NULL == ret_value)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DATA)));
@@ -140,11 +136,10 @@ int ydb_data_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 			op_gvdata(&data_value);				/* Fetch status into data_value */
 			break;
 		case LYDB_VARREF_ISV:
-			/* ISV references are not supported for this call */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
-			break;
+			/* The VALIDATE_VARNAME macro call done above should have already issued an error in this case */
 		default:
 			assertpro(FALSE);
+			break;
 	}
 	*ret_value = mval2i(&data_value);
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */

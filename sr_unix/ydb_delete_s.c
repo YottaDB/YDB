@@ -80,11 +80,7 @@ int ydb_delete_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	if (outofband)
 		outofband_action(FALSE);
 	/* We should have a variable name - check it out and determine type */
-	VALIDATE_VARNAME(varname, delete_type, delete_svn_index, FALSE, LYDB_RTN_DELETE);
-	if (0 > subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
-	if (YDB_MAX_SUBS < subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+	VALIDATE_VARNAME(varname, subs_used, FALSE, LYDB_RTN_DELETE, -1, delete_type, delete_svn_index);
 	/* Separate actions depending on type of delete (KILL) being done */
 	switch(delete_type)
 	{
@@ -156,11 +152,10 @@ int ydb_delete_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 			}
 			break;
 		case LYDB_VARREF_ISV:
-			/* ISV references are not supported for this call */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
-			break;
+			/* The VALIDATE_VARNAME macro call done above should have already issued an error in this case */
 		default:
 			assertpro(FALSE);
+			break;
 	}
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;

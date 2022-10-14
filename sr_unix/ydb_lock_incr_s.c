@@ -68,14 +68,7 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, const ydb_buffer_t *varname
 		outofband_action(FALSE);
 	ISSUE_TIME2LONG_ERROR_IF_NEEDED(timeout_nsec);
 	/* Setup and validate the varname */
-	VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE, LYDB_RTN_LOCK_INCR);
-	if (0 > subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
-	if (YDB_MAX_SUBS < subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-	/* ISV references are not supported for this call */
-	if (LYDB_VARREF_ISV == var_type)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+	VALIDATE_VARNAME(varname, subs_used, FALSE, LYDB_RTN_LOCK_INCR, -1, var_type, var_svn_index);
 	/* Initialize the private lock list */
 	op_lkinit();
 	/* Setup parameter list for callg() invocation of op_lkname() */

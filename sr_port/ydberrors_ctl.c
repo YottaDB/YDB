@@ -60,6 +60,9 @@ LITDEF	err_msg ydberrors[] = {
 	{ "DEVPARPARSE", "Error parsing device parameter specification", 0, 0 },
 	{ "SETZDIRTOOLONG", "$ZDIR value specified is !UL bytes long which is greater than the allowed maximum of !UL bytes", 2, 0 },
 	{ "UTF8NOTINSTALLED", "$ydb_dist does not have utf8 folder installed. Please use M mode or re-install YottaDB with UTF-8 support", 0, 0 },
+	{ "ISVUNSUPPORTED", "ISV variable name !AD not supported in !AD call", 4, 0 },
+	{ "GVNUNSUPPORTED", "Global variable name !AD not supported in !AD call", 4, 0 },
+	{ "ISVSUBSCRIPTED", "ISV variable name !AD specified with a non-zero subscript count of !UL", 3, 0 },
 };
 
 
@@ -72,7 +75,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	43,
+	46,
 	&ydberrors_undocarr[0],
 	0
 };

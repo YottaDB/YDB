@@ -81,11 +81,7 @@ int ydb_subscript_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_b
 	if (outofband)
 		outofband_action(FALSE);
 	/* Do some validation */
-	VALIDATE_VARNAME(varname, get_type, get_svn_index, FALSE, LYDB_RTN_SUBSCRIPT_NEXT);
-	if (0 > subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
-	if (YDB_MAX_SUBS < subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+	VALIDATE_VARNAME(varname, subs_used, FALSE, LYDB_RTN_SUBSCRIPT_NEXT, -1, get_type, get_svn_index);
 	if (NULL == ret_value)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 				LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_SUBSCRIPT_NEXT)));
@@ -162,9 +158,7 @@ int ydb_subscript_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_b
 			op_gvorder(&nextsub);				/* Locate next subscript this level */
 			break;
 		case LYDB_VARREF_ISV:
-			/* ISV references are not supported for this call */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
-			break;
+			/* The VALIDATE_VARNAME macro call done above should have already issued an error in this case */
 		default:
 			assertpro(FALSE);
 			break;

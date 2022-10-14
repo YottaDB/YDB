@@ -68,14 +68,7 @@ int ydb_lock_decr_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 	/* First step, initialize the private lock list */
 	op_lkinit();
 	/* Setup and validate the varname */
-	VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE, LYDB_RTN_LOCK_DECR);
-	if (0 > subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
-	if (YDB_MAX_SUBS < subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-	/* ISV references are not supported for this call */
-	if (LYDB_VARREF_ISV == var_type)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+	VALIDATE_VARNAME(varname, subs_used, FALSE, LYDB_RTN_LOCK_DECR, -1, var_type, var_svn_index);
 	/* Setup parameter list for callg() invocation of op_lkname() */
 	plist.arg[0] = NULL;				/* First arg is extended reference that simpleAPI doesn't support */
 	varname_mval.mvtype = MV_STR;

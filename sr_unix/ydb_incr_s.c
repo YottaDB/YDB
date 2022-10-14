@@ -78,11 +78,7 @@ int ydb_incr_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 	if (outofband)
 		outofband_action(FALSE);
 	/* Do some validation */
-	VALIDATE_VARNAME(varname, incr_type, incr_svn_index, FALSE, LYDB_RTN_INCR);
-	if (0 > subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
-	if (YDB_MAX_SUBS < subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+	VALIDATE_VARNAME(varname, subs_used, FALSE, LYDB_RTN_INCR, -1, incr_type, incr_svn_index);
 	if ((NULL == increment) || !increment->len_used)
 		increment_mval = literal_one;
 	else
@@ -157,11 +153,10 @@ int ydb_incr_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 			op_gvincr(increment_mv, ret_mv);
 			break;
 		case LYDB_VARREF_ISV:
-			/* ISV references are not supported for this call */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
-			break;
+			/* The VALIDATE_VARNAME macro call done above should have already issued an error in this case */
 		default:
 			assertpro(FALSE);
+			break;
 	}
 	if (NULL != ret_value)
 	{	/* Copy value to return buffer */

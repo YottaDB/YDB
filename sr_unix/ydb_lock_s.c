@@ -92,34 +92,16 @@ int ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var)
 	for (parmidx = 0; parmidx < namecount; parmidx++)
 	{	/* Simplified version of the processing loop below that validates things */
 		varname = va_arg(varcpy, ydb_buffer_t *);
-		/* Validate the varname */
-		VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE, LYDB_RTN_LOCK);
-		/* Validate the subscripts */
 		subs_used = va_arg(varcpy, int);
-		if (0 > subs_used)
-		{
-			va_end(varcpy);
-			SNPRINTF(buff, SIZEOF(buff), "Invalid subsarray for %.*s", varname->len_used, varname->buf_addr);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MINNRSUBSCRIPTS, 0, ERR_TEXT, 2, LEN_AND_STR(buff));
-		}
-		if (YDB_MAX_SUBS < subs_used)
-		{
-			va_end(varcpy);
-			SNPRINTF(buff, SIZEOF(buff), "Invalid subsarray for %.*s", varname->len_used, varname->buf_addr);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MAXNRSUBSCRIPTS, 0, ERR_TEXT, 2, LEN_AND_STR(buff));
-		}
+		/* Validate the varname and a little bit of the subscripts */
+		VALIDATE_VARNAME(varname, subs_used, FALSE, LYDB_RTN_LOCK, -1, var_type, var_svn_index);
+		/* Do more validation of the subscripts */
 		subsarray = va_arg(varcpy, ydb_buffer_t *);
 		if ((0 < subs_used) && (NULL == subsarray))
 		{       /* Count of subscripts is non-zero but no subscript specified - error */
 			va_end(varcpy);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SUBSARRAYNULL, 3, subs_used,
 				      LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_LOCK)));
-		}
-		/* ISV references are not supported for this call */
-		if (LYDB_VARREF_ISV == var_type)
-		{
-			va_end(varcpy);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 		}
 		/* Now validate each subscript */
 		for (sub_idx = 1, subptr = subsarray; sub_idx <= subs_used; sub_idx++, subptr++)

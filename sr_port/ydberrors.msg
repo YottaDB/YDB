@@ -68,6 +68,9 @@ TRANSREPLJNL1GB	<Transaction can use at most 1GiB of replicated journal records 
 DEVPARPARSE	<Error parsing device parameter specification>/error/fao=0
 SETZDIRTOOLONG	<$ZDIR value specified is !UL bytes long which is greater than the allowed maximum of !UL bytes>/error/fao=2
 UTF8NOTINSTALLED <$ydb_dist does not have utf8 folder installed. Please use M mode or re-install YottaDB with UTF-8 support>/error/fao=0
+ISVUNSUPPORTED	<ISV variable name !AD not supported in !AD call>/error/fao=4
+GVNUNSUPPORTED	<Global variable name !AD not supported in !AD call>/error/fao=4
+ISVSUBSCRIPTED	<ISV variable name !AD specified with a non-zero subscript count of !UL>/error/fao=3
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

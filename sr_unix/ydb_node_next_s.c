@@ -81,11 +81,7 @@ int ydb_node_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 	if (outofband)
 		outofband_action(FALSE);
 	/* Do some validation */
-	VALIDATE_VARNAME(varname, nodenext_type, nodenext_svn_index, FALSE, LYDB_RTN_NODE_NEXT);
-	if (0 > subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
-	if (YDB_MAX_SUBS < subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+	VALIDATE_VARNAME(varname, subs_used, FALSE, LYDB_RTN_NODE_NEXT, -1, nodenext_type, nodenext_svn_index);
 	if (NULL == ret_subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			      LEN_AND_LIT("NULL ret_subs_used"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_NODE_NEXT)));
@@ -143,11 +139,10 @@ int ydb_node_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 			status = sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, (char *)LYDBRTNNAME(LYDB_RTN_NODE_NEXT));
 			break;
 		case LYDB_VARREF_ISV:
-			/* ISV references are not supported for this call */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
-			break;
+			/* The VALIDATE_VARNAME macro call done above should have already issued an error in this case */
 		default:
 			assertpro(FALSE);
+			break;
 	}
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	TREF(sapi_query_node_subs_cnt) = 0;

@@ -312,22 +312,39 @@ MBSTART {											\
 	}											\
 } MBEND
 
-/* A macro for verifying an input variable name. This macro checks for:
+/* A macro for verifying an input variable name. This macro checks for things like
  *   - Non-zero length
  *   - Non-NULL address
  *   - Determines the type of var (global, local, ISV)
  *
- * Any error in validation results in a YDB_ERR_INVVARNAME error (by invoking "ydb_issue_invvarname_error()").
+ * Any failure in verification results in an error (various error scenarios are tested below).
+ *
+ * VARNAMEP, SUBS_USED, UPDATE, LYDB_RTN_NAME and INDEX are input parameters.
+ * VARTYPE and VARINDEX are output parameters.
  */
-#define VALIDATE_VARNAME(VARNAMEP, VARTYPE, VARINDEX, UPDATE, LYDB_RTN_NAME)						\
+#define VALIDATE_VARNAME(VARNAMEP, SUBS_USED, UPDATE, LYDB_RTN_NAME, INDEX, VARTYPE, VARINDEX)				\
 MBSTART {														\
 	boolean_t	isvalid;											\
 	char		ctype;												\
-	int		index, lenUsed;											\
+	int		iNDX;	/* named "iNDX" to avoid potential name conflict with "index" variable in caller */	\
+	int		lenUsed;											\
 															\
 	if (IS_INVALID_YDB_BUFF_T(VARNAMEP))										\
+	{														\
+		char		buff[256];		/* snprintf() buffer */						\
+															\
+		/* If INDEX is -1, it means caller is "ydb_delete_excl_s" or "ydb_tp_s_common" where it processes	\
+		 * a list of local variable names. In that case, we need to specify a variable name index in the	\
+		 * error message so the user can easily spot which variable had the PARAMINVALID error. Hence the	\
+		 * slightly different error message logic below.							\
+		 */													\
+		if (-1 == INDEX)											\
+			SNPRINTF(buff, SIZEOF(buff), "Invalid varname");						\
+		else													\
+			SNPRINTF(buff, SIZEOF(buff), "Invalid varname array (index %d)", INDEX);			\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,						\
-			LEN_AND_LIT("Invalid varname"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_NAME)));			\
+			LEN_AND_STR(buff), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_NAME)));					\
+	}														\
 	lenUsed = (VARNAMEP)->len_used;											\
 	if (0 == lenUsed)												\
 		ydb_issue_invvarname_error(VARNAMEP);									\
@@ -345,6 +362,14 @@ MBSTART {														\
 			VALIDATE_MNAME_C1((VARNAMEP)->buf_addr + 1, lenUsed, isvalid);					\
 			if (!isvalid)											\
 				ydb_issue_invvarname_error(VARNAMEP);							\
+			/* If INDEX is -1, it means caller is "ydb_delete_excl_s" or "ydb_tp_s_common" where it		\
+			 * processes a list of local variable names. In that case, we do not expect a global variable	\
+			 * name. Issue an error.									\
+			 */												\
+			if (-1 != INDEX)										\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GVNUNSUPPORTED, 4,				\
+					(VARNAMEP)->len_used, (VARNAMEP)->buf_addr,					\
+					LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_NAME)));					\
 			break;				      	   		      					\
 		case TK_LOWER:												\
 		case TK_UPPER:												\
@@ -362,12 +387,21 @@ MBSTART {														\
 			if (0 == lenUsed)										\
 				ydb_issue_invvarname_error(VARNAMEP);							\
 			VARTYPE = LYDB_VARREF_ISV;									\
-			index = namelook(svn_index, svn_names, (VARNAMEP)->buf_addr + 1, lenUsed); 			\
-			if (-1 == index) 	     			     						\
+			iNDX = namelook(svn_index, svn_names, (VARNAMEP)->buf_addr + 1, lenUsed); 			\
+			if (-1 == iNDX) 	     			     						\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSVN);					\
-			if (UPDATE && !svn_data[index].can_set)								\
+			if (UPDATE && !svn_data[iNDX].can_set)								\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SVNOSET);					\
-			VARINDEX = svn_data[index].opcode;								\
+			/* ISV usages are valid only if caller is "ydb_get_s" or "ydb_set_s". Else issue error. */	\
+			if ((LYDB_RTN_GET != LYDB_RTN_NAME) && (LYDB_RTN_SET != LYDB_RTN_NAME))				\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ISVUNSUPPORTED, 4,				\
+					(VARNAMEP)->len_used, (VARNAMEP)->buf_addr,					\
+					LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_NAME)));					\
+			else if (0 != SUBS_USED)									\
+				/* Subscripted ISVs are not allowed/supported */					\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ISVSUBSCRIPTED, 3,				\
+								(VARNAMEP)->len_used, (VARNAMEP)->buf_addr, SUBS_USED);	\
+			VARINDEX = svn_data[iNDX].opcode;								\
 			break;	   											\
 		default:												\
 			ydb_issue_invvarname_error(VARNAMEP);								\
@@ -377,6 +411,36 @@ MBSTART {														\
 			VARTYPE = LYDB_VARREF_INVALID;									\
 			break;												\
 	}		       												\
+	/* If we reach here, it means VARNAMEP has been determined to be a valid variable name (if not we would have	\
+	 * invoked "ydb_issue_invvarname_error()" and transferred control out of this macro), do additional checks.	\
+	 */														\
+	if (LYDB_RTN_LOCK != LYDB_RTN_NAME)										\
+	{														\
+		if (0 > SUBS_USED)											\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);					\
+		if (YDB_MAX_SUBS < SUBS_USED)										\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);					\
+	} else														\
+	{														\
+		if (0 > SUBS_USED)											\
+		{													\
+			char		buff[256];		/* snprintf() buffer */					\
+															\
+			SNPRINTF(buff, SIZEOF(buff), "Invalid subsarray for %.*s",					\
+					(VARNAMEP)->len_used, (VARNAMEP)->buf_addr);					\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MINNRSUBSCRIPTS, 0,				\
+									ERR_TEXT, 2, LEN_AND_STR(buff));		\
+		}													\
+		if (YDB_MAX_SUBS < SUBS_USED)										\
+		{													\
+			char		buff[256];		/* snprintf() buffer */					\
+															\
+			SNPRINTF(buff, SIZEOF(buff), "Invalid subsarray for %.*s",					\
+					(VARNAMEP)->len_used, (VARNAMEP)->buf_addr);					\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MAXNRSUBSCRIPTS, 0,				\
+									ERR_TEXT, 2, LEN_AND_STR(buff));		\
+		}													\
+	}														\
 } MBEND
 
 /* Macro to locate or create an entry in the symbol table for the specified base variable name. There are

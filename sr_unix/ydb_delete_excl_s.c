@@ -20,6 +20,7 @@
 #include "error.h"
 #include "stringpool.h"
 #include "outofband.h"
+#include "namelook.h"
 
 GBLREF	volatile int4	outofband;
 
@@ -37,12 +38,11 @@ GBLREF	volatile int4	outofband;
  */
 int ydb_delete_excl_s(int namecount, const ydb_buffer_t *varnames)
 {
-	boolean_t	error_encountered;
-	gparam_list	plist;
+	boolean_t		error_encountered;
+	gparam_list		plist;
 	const ydb_buffer_t	*curvarname;
-	mval		plist_mvals[YDB_MAX_NAMES], *mvalp;
-	void		**parmp, **parmp_top;
-	char		buff[256];		/* snprintf() buffer */
+	mval			plist_mvals[YDB_MAX_NAMES], *mvalp;
+	void			**parmp, **parmp_top;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -90,19 +90,14 @@ int ydb_delete_excl_s(int namecount, const ydb_buffer_t *varnames)
 	     parmp < parmp_top;
 	     parmp++, mvalp++, curvarname++)
 	{	/* Validate each name to make sure is well formed */
-		boolean_t	isvalid;
+		ydb_var_types	get_type;
+		int		get_svn_index, index;
 
-		if (IS_INVALID_YDB_BUFF_T(curvarname))
-		{
-			SNPRINTF(buff, SIZEOF(buff), "Invalid varname array (index %d)", curvarname - varnames);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-					LEN_AND_STR(buff), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DELETE_EXCL)));
-		}
-		if (YDB_MAX_IDENT < curvarname->len_used)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VARNAME2LONG, 1, YDB_MAX_IDENT);
-  		VALIDATE_MNAME_C1(curvarname->buf_addr, curvarname->len_used, isvalid); /* Validate that varname is a local var */
-		if (!isvalid)
-			ydb_issue_invvarname_error(curvarname);
+		index = curvarname - varnames;
+		/* In this case, we are guaranteed to be looking at unsubscripted local variable names so
+		 * pass in "0" as the "subs_used" parameter (2nd parameter) to the macro call below.
+		 */
+		VALIDATE_VARNAME(curvarname, 0, FALSE, LYDB_RTN_DELETE_EXCL, index, get_type, get_svn_index);
 		SET_MVAL_FROM_YDB_BUFF_T(mvalp, curvarname);
 		*parmp = mvalp;
 	}

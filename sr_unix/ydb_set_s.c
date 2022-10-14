@@ -70,11 +70,7 @@ int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 	if (outofband)
 		outofband_action(FALSE);
 	/* Do some validation */
-	VALIDATE_VARNAME(varname, set_type, set_svn_index, TRUE, LYDB_RTN_SET);
-	if (0 > subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
-	if (YDB_MAX_SUBS < subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+	VALIDATE_VARNAME(varname, subs_used, TRUE, LYDB_RTN_SET, -1, set_type, set_svn_index);
 	if (NULL == value)
 	{	/* Treat it as the null string */
 		null_ydb_buff.len_used = 0;

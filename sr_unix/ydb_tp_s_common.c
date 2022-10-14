@@ -25,6 +25,7 @@
 #include "preemptive_db_clnup.h"
 #include "stringpool.h"
 #include "outofband.h"
+#include "namelook.h"
 
 GBLREF	volatile int4	outofband;
 GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
@@ -52,13 +53,12 @@ GBLREF	uint4		dollar_tlevel;
 int ydb_tp_s_common(libyottadb_routines lydbrtn,
 			ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, const ydb_buffer_t *varnames)
 {
-	boolean_t	error_encountered;
-	mval		tid;
-	int		rc, tpfn_status, tstart_flag;
-	mval		varnamearray[YDB_MAX_NAMES], *mv, *mv_top;
+	boolean_t		error_encountered;
+	mval			tid;
+	int			rc, tpfn_status, tstart_flag;
+	mval			varnamearray[YDB_MAX_NAMES], *mv, *mv_top;
 	const ydb_buffer_t	*curvarname;
-	char		buff[256];			/* snprintf() buffer */
-	int		nested_tp;
+	int			nested_tp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -133,19 +133,14 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 					LEN_AND_STR(LYDBRTNNAME(lydbrtn)), namecount, YDB_MAX_NAMES);
 			for (curvarname = varnames, mv = varnamearray, mv_top = mv + namecount; mv < mv_top; curvarname++, mv++)
 			{
-				boolean_t	isvalid;
+				ydb_var_types	get_type;
+				int		get_svn_index, index;
 
-				if (IS_INVALID_YDB_BUFF_T(curvarname))
-				{
-					SNPRINTF(buff, SIZEOF(buff), "Invalid varname array (index %d)", curvarname - varnames);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-						      LEN_AND_STR(buff), LEN_AND_LIT(buff));
-				}
-				if (YDB_MAX_IDENT < curvarname->len_used)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VARNAME2LONG, 1, YDB_MAX_IDENT);
-				VALIDATE_MNAME_C1(curvarname->buf_addr, curvarname->len_used, isvalid);
-				if (!isvalid)
-					ydb_issue_invvarname_error(curvarname);
+				index = curvarname - varnames;
+				/* In this case, we are guaranteed to be looking at unsubscripted local variable names so
+				 * pass in "0" as the "subs_used" parameter (2nd parameter) to the macro call below.
+				 */
+				VALIDATE_VARNAME(curvarname, 0, FALSE, lydbrtn, index, get_type, get_svn_index);
 				/* Note the variable name is put in the stringpool. Needed if this variable does not yet exist in
 				 * the current symbol table, a pointer to this string is added in op_tstart as part of the
 				 * "add_hashtab_mname_symval" call and that would then point to memory in user-driven C program
