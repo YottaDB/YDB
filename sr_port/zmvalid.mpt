@@ -1,0 +1,66 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+; Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; YottaDB %ZMVALID utility to check if an input M string would compile fine
+; After compiling the input M string, this utility returns the full output of the compile.
+; Return value is
+; * the empty string ("") for a valid compile.
+; * a non-empty string (containing "%YDB-E-...") in case of an error in the compile.
+;
+; Note that we prefix a space before the input string "str" as part of placing it in the temporary .m program
+; Therefore, any compilation errors in Line 1 would show a column number 1 more than where the real error is in "str".
+
+%ZMVALID(str)
+	; Create a temporary .m file to store the input string as M compilation currently requires a file input
+	; We assume that a file name with the prefix "/tmp/ydbZMVALID" is only created by a %ZMVALID invocation.
+	; We append $JOB to the file name to ensure the file name is unique across pids. It is possible the pid gets
+	; reused and we encounter an orphaned file from a prior %ZMVALID invocation of a different process that had
+	; the same process id as us. In that case, we will truncate the file and write to it afresh.
+	new compile,file,i,line,ret,success
+	new $etrap
+	set $etrap="do error"
+	set success=0
+	; The below "for" loop is to handle cases where a file name with the prefix "/tmp/ydbZMVALID" was created by
+	; a different user which means we won't have write permissions on that file. So we move on to a different
+	; file name by just changing a "count" at the end of the file name.
+	for i=1:1  do  quit:success
+	. set file="/tmp/ydbZMVALIDpid"_$JOB_"count"_i_".m"
+	. open file:(newversion)
+	. set success=1
+	; ---------------------------------------
+	; Ready .m program for compilation
+	; ---------------------------------------
+	use file
+	write " "
+	write str,!
+	; ---------------------------------------
+	; Do the compilation
+	; ---------------------------------------
+	set compile="compile"
+	open compile:(command="$ydb_dist/yottadb -noobject "_file:readonly:exception="goto done")::"PIPE"
+	use compile
+	; ---------------------------------------
+	; Check if there were any errors
+	; ---------------------------------------
+	set ret=""
+	for  read line set ret=ret_line_$char(10)
+done
+	if '$zeof set ret=$zstatus
+	close compile
+	close file:delete
+	quit ret
+
+error	;
+	zwrite $zstatus
+	set:($zstatus["%YDB-E-DEVOPENFAIL") $ecode=""
+	quit
+
