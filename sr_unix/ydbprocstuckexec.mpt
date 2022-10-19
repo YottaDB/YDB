@@ -34,6 +34,8 @@
 
 	new blockcmd,blockexe,blockpid,callpid,count,end,env,errfiledse,file,i
 	new io,line,msg,okflag,outdir,outfile,outfiledse,procfsdir,prog,retcode
+	view "unsetenv":"ydb_procstuckexec"	; Prevent JOB'd process from invoking %YDBPROCSTUCKEXEC
+	view "unsetenv":"gtm_procstuckexec"
 	set io=$io
 	set msg=$zpiece($zcmdline," ",1)
 	set callpid=$zpiece($zcmdline," ",2)
