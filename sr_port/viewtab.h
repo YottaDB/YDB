@@ -16,7 +16,7 @@
 /* a few of the following VIEWTAB entries (be it VIEW command related or $VIEW function related) are not documented
  * in the programmer's guide. the reason behind the non-documentation is indicated across each such entry with a "nodoc :" prefix.
  */
-/*      KEYWORD			PARAMETER-TYPE			KEYCODE		RESULT-TYPE */
+/*      KEYWORD			PARAMETER-TYPE			KEYCODE			RESULT-TYPE (used by $VIEW but not VIEW) */
 VIEWTAB("BADCHAR",		VTP_NULL,			VTK_BADCHAR,		MV_NM),
 VIEWTAB("BREAKMSG",		VTP_NULL | VTP_VALUE,		VTK_BREAKMSG,		MV_NM),
 VIEWTAB("DBFLUSH",		VTP_DBREGION | VTP_NULL,	VTK_DBFLUSH,		MV_STR),

@@ -41,6 +41,8 @@
 #include "gtm_malloc.h"		/* for VERIFY_STORAGE_CHAINS */
 #include "ydb_getenv.h"
 #include "send_msg.h"
+#include "io.h"
+#include "iottdef.h"
 
 /******************************************************************************
  *
@@ -112,6 +114,7 @@ GBLREF spdesc 		stringpool;
 GBLREF int    		(*callintogtm_vectortable[])();
 GBLREF int		mumps_status;
 GBLREF volatile int4	gtmMallocDepth;
+GBLREF io_pair		io_std_device;
 #ifdef GTM_PTHREAD
 GBLREF boolean_t	gtm_jvm_process;
 GBLREF pthread_t	gtm_main_thread_id;
@@ -1017,6 +1020,21 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	/* It is an error to have more actual parameters than formal parameters */
 	if (argcnt > entry_ptr->argcnt)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCARGMSMTCH, 2, argcnt, entry_ptr->argcnt);
+	/* If $PRINCIPAL is a terminal device, and it has unflushed data on the output device side, flush that
+	 * before making the foreign call as otherwise the foreign call could in turn write to the terminal resulting
+	 * in out-of-order terminal writes if the unflushed data gets flushed after the foreign call (YDB#940).
+	 */
+	if (tt == io_std_device.out->type)
+	{
+		d_tt_struct	*tt_ptr;
+
+		tt_ptr = io_std_device.out->dev_sp;
+		/* Since "iott_flush()" does ESTABLISH (i.e. setjmp() calls), it is best for performance to avoid calling it if
+		 * not necessary. Hence the use of the macro below to check if there is any unflushed data and only then call it.
+		 */
+		if (0 != TT_UNFLUSHED_DATA_LEN(tt_ptr))
+			iott_flush(io_std_device.out);
+	}
 	VAR_START(var, argcnt);
 	if (java)
 	{

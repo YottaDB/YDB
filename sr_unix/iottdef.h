@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,6 +78,8 @@ MBSTART {									\
 		resetterm(ioPtr);						\
 	assert(!IS_SETTERM_DONE(ioPtr));					\
 } MBEND
+
+#define	TT_UNFLUSHED_DATA_LEN(TT_PTR)	(TT_PTR->tbuffp - TT_PTR->ttybuff)
 
 enum	tt_which
 {

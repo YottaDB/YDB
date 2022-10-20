@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,7 +68,7 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 	if ((sighup == outofband) || ((int)ERR_TERMHANGUP == SIGNAL))
 		TERMHUP_NOPRINCIO_CHECK(TRUE);				/* TRUE for WRITE */
 	tt_ptr->write_active = TRUE;
- 	buff_left = IOTT_BUFF_LEN - (int)((tt_ptr->tbuffp - tt_ptr->ttybuff));
+ 	buff_left = IOTT_BUFF_LEN - (int)TT_UNFLUSHED_DATA_LEN(tt_ptr);
 	assert(buff_left > IOTT_BUFF_MIN || prin_out_dev_failure);
 	if (buff_left < textlen)
         {

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,7 @@ void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
 	if (!tt_ptr->write_active)
 		return;	/* Was assert but that ended up causing endless loops -- now we just survive */
 	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
-	write_len = (ssize_t)(tt_ptr->tbuffp - tt_ptr->ttybuff);
+	write_len = (ssize_t)TT_UNFLUSHED_DATA_LEN(tt_ptr);
 	if (0 < write_len)
 	{
 		DOWRITERC(tt_ptr->fildes, tt_ptr->ttybuff, write_len, status);
