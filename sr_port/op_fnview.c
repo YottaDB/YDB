@@ -97,6 +97,7 @@ GBLREF mstr			extnam_str;
 GBLREF mstr			env_ydb_gbldir_xlate;
 GBLREF mval			dollar_zgbldir;
 GBLREF boolean_t		ydb_ztrigger_output;
+GBLREF bool			jobpid;
 
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_GBLNOMAPTOREG);
@@ -421,6 +422,12 @@ void	op_fnview(int numarg, mval *dst, ...)
 			break;
 		case VTK_LABELS:
 			n = (cmd_qlf.qlf & CQ_LOWER_LABELS) ? 1 : 0;
+			break;
+		case VTK_JOBPID:
+			if (jobpid)
+				*dst = literal_one;
+			else
+				*dst = literal_zero;
 			break;
 		case VTK_LVNULLSUBS:
 			n = TREF(lv_null_subs);
