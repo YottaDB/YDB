@@ -213,7 +213,7 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 						ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
 			}
 			/* Find the last ")" in the buffer. We can use SSCANF after that point onwards without any issues. */
-			DEBUG_ONLY(last_right_paren = NULL);
+			last_right_paren = NULL;
 			for (ptr = file_contents, ptr_top = file_contents + ret_size; ptr < ptr_top; ptr++)
 				if (')' == *ptr)
 					last_right_paren = ptr;
@@ -224,6 +224,7 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 				ptr = last_right_paren + 2;	/* skip ')' and ' ' after the "comm" field */
 			sscanf_ret = SSCANF(ptr, "%*c %*d %*d %*d %*d %*d %*u %*lu %*lu %*lu %*lu %lu %lu %ld %ld",
 					&field14, &field15, &field16, &field17);
+			UNUSED(sscanf_ret);
 			assert(EOF != sscanf_ret);
 			FCLOSE(fp, status);
 			switch (keywd_indx)
