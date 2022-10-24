@@ -277,7 +277,9 @@ int deviceparameters(oprtype *c, char who_calls)
 	triple		*ref, *parm;
 	int		n;
 	int		status;
-	char		parstr[MAXDEVPARLEN];
+	char		parstr[MAX_COMPILETIME_DEVPARLEN * 4];	/* Allocated space must be more than MAX_COMPILETIME_DEVPARLEN
+								 * is the only need. We randomly choose 4x space.
+								 */
 	char		*parptr;
 	boolean_t	is_parm_list;
 	boolean_t	parse_warn;
@@ -529,10 +531,11 @@ int deviceparameters(oprtype *c, char who_calls)
 			assert(TRIP_REF == x.oprclass);
 			if (OC_LIT == x.oprval.tref->opcode)
 			{
-				/* check to see if this string could overflow (5 is a int4 word plus a parameter code for
-				   safety)  Must check before cvtparm, due to the fact that tmpmval could otherwise
-				   be garbage collected by a later putstr
-				*/
+				/* Check to see if this string could overflow (5 is a int4 word plus a parameter code for
+				 * safety)  Must check before cvtparm, due to the fact that tmpmval could otherwise
+				 * be garbage collected by a later putstr
+				 */
+				assert(SIZEOF(parstr) > MAX_COMPILETIME_DEVPARLEN);
 				if (parptr - parstr + x.oprval.tref->operand[0].oprval.mlit->v.str.len + 5 > SIZEOF(parstr))
 				{
 					cat_list[cat_cnt++] = put_str(parstr, INTCAST(parptr - parstr));
@@ -543,6 +546,16 @@ int deviceparameters(oprtype *c, char who_calls)
 				if (status)
 				{
 					stx_error(status);
+					return FALSE;
+				} else if ((MAX_COMPILETIME_DEVPARLEN + IOP_VAR_SIZE_4BYTE_LEN) < tmpmval.str.len)
+				{	/* We have one string literal that is longer than MAX_COMPILETIME_DEVPARLEN, the maximum
+					 * allowed length for string literals seen at compile time. Issue error.
+					 * Note: We support a much higher limit (MAX_RUNTIME_DEVPARLEN) for dynamic strings
+					 * (e.g. device parameters that point to say local variable names instead of literals).
+					 * See IOP_VAR_SIZE_4BYTE for such device parameters.
+					 */
+					assert(IOP_VAR_SIZE_4BYTE == io_params_size[n]);
+					stx_error(ERR_DEVPARTOOBIG);
 					return FALSE;
 				}
 				memcpy(parptr, tmpmval.str.addr, tmpmval.str.len);

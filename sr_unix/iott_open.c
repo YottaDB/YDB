@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -127,8 +127,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 				}
 			}
 		}
-		p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-			(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+		UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 	}
 	if (ioptr->state != dev_open)
 	{

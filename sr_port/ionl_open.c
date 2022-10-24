@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #include "io.h"
 #include "stringpool.h"
 #include "gtmio.h"
+#include "copy.h"
 
 #define DEF_NL_WIDTH 255
 #define DEF_NL_LENGTH 66
@@ -67,8 +68,7 @@ short ionl_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 			s2pool(&ioptr->error_handler);
 			break;
 		}
-		p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-			(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+		UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 	}
 	return TRUE;
 }

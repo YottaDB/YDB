@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -161,8 +164,7 @@ void ionl_use(io_desc *iod, mval *pp)
 				break;
 			}
 		}
-		p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-			(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+		UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 	}
 	return;
 }

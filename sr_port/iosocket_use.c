@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -348,8 +348,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				/* ignore deviceparm */
 				break;
 		}
-		p_offset += ((io_params_size[ch] == IOP_VAR_SIZE) ?
-			     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+		UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 	}
 	/* ------ return immediately if no flag, worth a check because it is mostly true ------------ */
 	if (1 == p_offset)

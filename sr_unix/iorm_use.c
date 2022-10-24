@@ -78,7 +78,7 @@
 #define INVALID_SEEK_TAIL " invalid."
 
 /* define max size of SDSEEKERR error string */
-#define MAX_ERROR_SIZE STR_LIT_LEN(INVALID_SEEK_HEAD) + MAXDEVPARLEN + STR_LIT_LEN(INVALID_SEEK_TAIL)
+#define MAX_ERROR_SIZE STR_LIT_LEN(INVALID_SEEK_HEAD) + MAX_DISPLAYED_DEVPARLEN + STR_LIT_LEN(INVALID_SEEK_TAIL)
 
 /* output SDSEEKERR error */
 #define OUTPUT_SDSEEKERR(SEEK_STR)									\
@@ -924,8 +924,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 		default:
 			break;
 		}
-		p_offset += ((IOP_VAR_SIZE == io_params_size[c])
-			? (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[c]);
+		UPDATE_P_OFFSET(p_offset, c, pp);	/* updates "p_offset" using "c" and "pp" */
 	}
 	if (dev_open != iod->state || ichset_specified || ochset_specified)
 	{

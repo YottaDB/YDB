@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -200,8 +200,7 @@ void iorm_close(io_desc *iod, mval *pp)
 			default:
 				break;
 		}
-		p_offset += ( io_params_size[c]==IOP_VAR_SIZE ?
-			(unsigned char)(*(pp->str.addr + p_offset) + 1) : io_params_size[c] );
+		UPDATE_P_OFFSET(p_offset, c, pp);	/* updates "p_offset" using "c" and "pp" */
 	}
 
 	if (iod->pair.in != iod)

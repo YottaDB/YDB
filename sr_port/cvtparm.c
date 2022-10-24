@@ -41,7 +41,7 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 	error_def(ERR_DEVPARPROT);
 
 	int4 		status, nl,  tim[2];
-	int		siz, cnt, strlen;
+	int		siz, extra_siz, cnt, strlen;
 	short		ns;
 	unsigned char 	*cp, msk;
 	io_termmask 	lngmsk;
@@ -49,7 +49,12 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 	assert(MV_DEFINED(src));
 	strlen = -1;
 	siz = io_params_size[iocode];
-	ENSURE_STP_FREE_SPACE(siz + 1);
+	extra_siz = ((IOP_VAR_SIZE_4BYTE == siz) ? IOP_VAR_SIZE_4BYTE_LEN : 1);
+	/* For all "source_type" cases except IOP_SRC_STR, the value of "siz" is a maximum of the needed length so
+	 * we can invoke "ENSURE_STP_FREE_SPACE" macro here. But for IOP_SRC_STR, we don't know the actual string
+	 * length (which can be as high as MAX_STRLEN i.e. 1Mb) and therefore we need to invoke the macro again later.
+	 */
+	ENSURE_STP_FREE_SPACE(siz + extra_siz);
 	switch(dev_param_control[iocode].source_type)
 	{
 		case IOP_SRC_INT:
@@ -67,12 +72,27 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 			}
 			break;
 		case IOP_SRC_STR:
-			assert(siz == IOP_VAR_SIZE);
+			assert((IOP_VAR_SIZE == siz) || (IOP_VAR_SIZE_4BYTE == siz));
 			MV_FORCE_STR(src);
-			if (src->str.len > 255)	/*one byte string lengths within a parameter string*/
+			if ((IOP_VAR_SIZE == siz) && (MAX_COMPILETIME_DEVPARLEN < src->str.len))
+			{	/* For IOP_VAR_SIZE, we allow a maximum length of MAX_COMPILETIME_DEVPARLEN (i.e. 255)
+				 * as we allocate only 1-byte to store the string length. Issue error.
+				 */
+				assert(255 == MAX_COMPILETIME_DEVPARLEN);
 				return (int4) ERR_DEVPARTOOBIG;
+			}
+			/* Note: For IOP_VAR_SIZE_4BYTE, we allow a maximum length of MAX_RUNTIME_DEVPARLEN (i.e. 1MiB)
+			 * the maximum allowed string length in YottaDB as we allocate 4-bytes to store the string length.
+			 * We don't do any checks of MAX_RUNTIME_DEVPARLEN here (like we do for MAX_COMPILETIME_DEVPARLEN above)
+			 * because "src->str.len" is guaranteed to be less than or equal to MAX_STRLEN.
+			 */
+			assert(MAX_RUNTIME_DEVPARLEN == MAX_STRLEN);
 			strlen = src->str.len;
-			siz = strlen + SIZEOF(unsigned char);
+			siz = strlen + extra_siz;
+			/* Now that we know the real string length, allocate enough space in the stringpool to hold it.
+			 * See comment before the "switch()" above for why this second invocation of the macro is needed.
+			 */
+			ENSURE_STP_FREE_SPACE(siz);
 			cp = (unsigned char *) src->str.addr;
 			break;
 		case IOP_SRC_MSK:
@@ -112,8 +132,17 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 	dst->str.len = siz;
 	if (strlen >= 0)
 	{
-		*stringpool.free++ = strlen;
-		siz -= SIZEOF(char);
+		if (1 == extra_siz)
+		{
+			assert(256 > strlen);
+			*stringpool.free = strlen;
+		} else
+		{
+			assert(IOP_VAR_SIZE_4BYTE_LEN == extra_siz);
+			PUT_LONG(stringpool.free, strlen);
+		}
+		stringpool.free += extra_siz;
+		siz -= extra_siz;
 	}
 	memcpy(stringpool.free, cp, siz);
 	stringpool.free += siz;

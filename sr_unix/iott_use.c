@@ -516,8 +516,7 @@ void iott_use(io_desc *iod, mval *pp)
 					break;
 				}
 			}
-			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-				     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+			UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 		}
 		temp_ptr = (d_tt_struct *)d_in->dev_sp;
 		Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno, CHANGE_TERM_TRUE);

@@ -140,15 +140,14 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 			temp_iod->trans_name = tl;
 			temp_iod->type = n_io_dev_types;
 			p_offset = 0;
-			while(iop_eol != *(pp->str.addr + p_offset))
+			while (iop_eol != *(pp->str.addr + p_offset))
 			{
 				ch = *(pp->str.addr + p_offset++);
 				if (iop_fifo == ch)
 					temp_iod->type = ff;
 				else  if (iop_sequential == ch)
 					temp_iod->type = rm;
-				p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-					     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+				UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 			}
 			if (ff == temp_iod->type)
 			{
@@ -396,8 +395,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 				default:
 					break;
 			}
-			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-				     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+			UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 		}
 		/* Check the saved error from mknod() for fifo, also saved error from fstat() or stat()
 		   so error handler (if set)  can handle it */
@@ -500,8 +498,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 	 */
 	if ((rm == iod->type) && (dev_closed == iod->state) && ((d_rm_struct *)iod->dev_sp)->no_destroy)
 	{
-		for (p_offset = 0; iop_eol != *(pp->str.addr + p_offset); p_offset += ((IOP_VAR_SIZE == io_params_size[ch])
-				? (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]))
+		for (p_offset = 0; iop_eol != *(pp->str.addr + p_offset); )
 		{
 			ch = *(pp->str.addr + p_offset++);
 			assert((params)ch < (params)n_iops);
@@ -510,6 +507,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 				((d_rm_struct *)iod->dev_sp)->no_destroy = FALSE;
 				break;
 			}
+			UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 		}
 	}
 	if (dev_never_opened == iod->state)

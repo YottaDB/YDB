@@ -12,8 +12,41 @@
  *								*
  ****************************************************************/
 
-#define MAXDEVPARLEN 1024
-#define IOP_VAR_SIZE 255
+#define MAX_COMPILETIME_DEVPARLEN	255	/* maximum length of device parameter literals allowed at compile time */
+#define MAX_RUNTIME_DEVPARLEN		MAX_STRLEN	/* maximum length of device parameter allowed at run time */
+
+#define	MAX_DISPLAYED_DEVPARLEN		1024	/* maximum length of device parameter displayed in errors messages */
+
+/* The below macro values are chosen to be different from all values in the "data_element_size" column of "sr_port/iop.h"
+ * (other than of course those rows where these macros show up in that column). All current values are SIZEOF() of a data type
+ * that translates to a size of at most 32 bytes currently so defining these to be 255 and 254 ensures the uniqueness for now.
+ */
+#define IOP_VAR_SIZE_4BYTE	254
+#define IOP_VAR_SIZE		255
+
+#define	IOP_VAR_SIZE_LEN	1	/* 1-byte length field that precedes the actual string data */
+#define	IOP_VAR_SIZE_4BYTE_LEN	4	/* 4-byte length field that precedes the actual string data */
+
+#define	UPDATE_P_OFFSET(P_OFFSET, CH, PP)				\
+{									\
+	int	length;							\
+									\
+	switch(io_params_size[CH])					\
+	{								\
+	case IOP_VAR_SIZE:						\
+		length = (unsigned char)*(PP->str.addr + P_OFFSET);	\
+		length += IOP_VAR_SIZE_LEN;				\
+		break;							\
+	case IOP_VAR_SIZE_4BYTE:					\
+		GET_LONG(length, PP->str.addr + P_OFFSET);		\
+		length += IOP_VAR_SIZE_4BYTE_LEN;			\
+		break;							\
+	default:							\
+		length = io_params_size[CH];				\
+		break;							\
+	}								\
+	P_OFFSET += length;						\
+}
 
 #define IOP_OPEN_OK 1
 #define IOP_USE_OK 2

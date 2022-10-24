@@ -51,6 +51,7 @@
 #include "gtm_filter_command.h"
 #include "ydb_getenv.h"
 #include "min_max.h"
+#include "copy.h"
 
 ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
 GBLREF	boolean_t		gtm_pipe_child;
@@ -322,7 +323,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	int		return_stdout = TRUE;
 	int		return_stderr = FALSE;
 	char		ret_token[GTM_MAX_DIR_LEN];
-	char		error_str[MAXDEVPARLEN + STR_LIT_LEN(INVALID_CMD2)];
+	char		error_str[MAX_DISPLAYED_DEVPARLEN + STR_LIT_LEN(INVALID_CMD2)];
 	int		save_errno;
 	int		flags;
 	int		fcntl_res, rc;
@@ -354,8 +355,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 				sparams[PSHELL] = (char *)(pp->str.addr + p_offset + 1);
 				break;
 			case iop_command:
-				slen[PCOMMAND] = (unsigned int)(unsigned char)*(pp->str.addr + p_offset);
-				sparams[PCOMMAND] = (char *)(pp->str.addr + p_offset + 1);
+				GET_LONG(slen[PCOMMAND], pp->str.addr + p_offset);
+				sparams[PCOMMAND] = (char *)(pp->str.addr + p_offset + IOP_VAR_SIZE_4BYTE_LEN);
 				break;
 			case iop_stderr:
 				slen[PSTDERR] = (unsigned int)(unsigned char)*(pp->str.addr + p_offset);
@@ -373,8 +374,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 			default:
 				break;
 		}
-		p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-			     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+		UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 	}
 	/* for z/OS, grab the chset from the device params to tag the pipe */
 	ZOS_ONLY(gtm_zos_iop_chset(dev_name, pp, &read_chset, &write_chset);)
@@ -400,11 +400,11 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 			{
 				PIPE_ERROR_INIT();
 				if (PARSE_FAIL == parse_result)
-					SNPRINTF(error_str, MAXDEVPARLEN + STR_LIT_LEN(INVALID_CMD2), "%s%s", INVALID_CMD,
-						ret_token);
+					SNPRINTF(error_str, MAX_DISPLAYED_DEVPARLEN + STR_LIT_LEN(INVALID_CMD2),
+						"%s%s", INVALID_CMD, ret_token);
 				else
-					SNPRINTF(error_str, MAXDEVPARLEN + STR_LIT_LEN(INVALID_CMD2), "%s%s", INVALID_CMD2,
-						ret_token);
+					SNPRINTF(error_str, MAX_DISPLAYED_DEVPARLEN + STR_LIT_LEN(INVALID_CMD2),
+						"%s%s", INVALID_CMD2, ret_token);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 					  ERR_TEXT, 2, LEN_AND_STR(error_str));
 			}
@@ -456,7 +456,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		if (-1 == ret_stat || !(S_ISREG(sb.st_mode)) || !(sb.st_mode & (S_IXOTH | S_IXGRP | S_IXUSR)))
 		{
 			assert(GTM_MAX_DIR_LEN - 1 >= STRLEN(pshell));
-			SNPRINTF(error_str, MAXDEVPARLEN + STR_LIT_LEN(INVALID_CMD2), "Invalid shell: %s", pshell);
+			SNPRINTF(error_str, MAX_DISPLAYED_DEVPARLEN + STR_LIT_LEN(INVALID_CMD2), "Invalid shell: %s", pshell);
 			PIPE_ERROR_INIT();
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 				  ERR_TEXT, 2, LEN_AND_STR(error_str));

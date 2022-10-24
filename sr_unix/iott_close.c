@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,8 +65,7 @@ void iott_close(io_desc *v, mval *pp)
 			v->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
 			s2pool(&v->error_handler);
 		}
-		p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-			(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+		UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 	}
 	if (v == io_std_device.in || (v == io_std_device.out))
 	{

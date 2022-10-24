@@ -143,10 +143,7 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 				ch = *(pp->str.addr + p_offset++);
 				if (iop_sequential == ch)
 					iod->type = rm;
-				if (IOP_VAR_SIZE == io_params_size[ch])
-					p_offset += *(pp->str.addr + p_offset) + 1;
-				else
-					p_offset += io_params_size[ch];
+				UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 			}
 			tl->iod = iod;
 		} else
@@ -310,8 +307,7 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 				default:
 					break;
 			}
-			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-				(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+			UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 		}
 		if (!ichset_specified)
 			iod->ichset = (gtm_utf8_mode) ? CHSET_UTF8 : CHSET_M;

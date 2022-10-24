@@ -404,8 +404,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 				default:
 					break;
 			}
-			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-				     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+			UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 		}
 		if (listen_specified && connect_specified)
 		{
