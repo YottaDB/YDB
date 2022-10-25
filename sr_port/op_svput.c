@@ -53,6 +53,8 @@
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
 #include "util.h"
+#include "ydb_logicals.h"
+#include "ydb_setenv.h"
 
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
@@ -147,6 +149,8 @@ void op_svput(int varnum, mval *v)
 			if ((dollar_zgbldir.str.len != v->str.len)
 				|| memcmp(dollar_zgbldir.str.addr, v->str.addr, dollar_zgbldir.str.len))
 			{
+				mval	ydb_cur_gbldir;
+
 				if (0 == v->str.len)
 				{
 					dpzgbini();	/* Open default gbldir (i.e. SET $ZGBLDIR="") */
@@ -157,6 +161,13 @@ void op_svput(int varnum, mval *v)
 					dollar_zgbldir.str.addr = v->str.addr;
 					s2pool(&dollar_zgbldir.str);
 				}
+				/* Set "ydb_cur_gbldir" env var to current $zgbldir. Utilities like %YDBPROCSTUCKEXEC look at this
+				 * env var to know the current $zgbldir instead of what $ydb_gbldir env var points to (YDB#941).
+				 */
+				ydb_cur_gbldir.mvtype = MV_STR;
+				ydb_cur_gbldir.str.addr = (char *)(ydbenvname[YDBENVINDX_CUR_GBLDIR] + 1);
+				ydb_cur_gbldir.str.len = STRLEN(ydbenvname[YDBENVINDX_CUR_GBLDIR]) - 1;
+				ydb_setenv(&ydb_cur_gbldir, &dollar_zgbldir);
 				if (NULL != gv_currkey)
 				{
 					gv_currkey->base[0] = '\0';

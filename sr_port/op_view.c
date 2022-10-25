@@ -85,6 +85,7 @@
 #include "break.h"
 #include "min_max.h"
 #include "gvt_inline.h"
+#include "ydb_setenv.h"
 
 STATICFNDCL void lvmon_release(void);
 STATICFNDCL void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg);
@@ -195,7 +196,6 @@ void	op_view(int numarg, mval *keyword, ...)
 	open_relinkctl_sgm	*linkctl;
 	relinkrec_t		*linkrec;
 #	endif
-	char			*envvarname, *envvarvalue;
 	int			save_errno;
 	static readonly char msg1[] = "Caution: Database Block Certification Has Been ";
 	static readonly char lv_msg1[] =
@@ -421,28 +421,9 @@ void	op_view(int numarg, mval *keyword, ...)
 					rts_error_csa(CSA_ARG(NULL)
 						VARLSTCNT(4) ERR_VIEWARGCNT, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
 				}
-				/* Set up the env var name first */
-				envvarname = malloc(arg->str.len + 1);	/* + 1 for null terminated string, needed by "setenv" */
-				memcpy(envvarname, arg->str.addr, arg->str.len);
-				envvarname[arg->str.len] = '\0';
-				/* Set up the env var value next */
 				arg2 = va_arg(var, mval *);
 				MV_FORCE_STR(arg2);
-				envvarvalue = malloc(arg2->str.len + 1); /* + 1 for null terminated string, needed by "setenv" */
-				if (arg2->str.len)
-					memcpy(envvarvalue, arg2->str.addr, arg2->str.len);
-				envvarvalue[arg2->str.len] = '\0';
-				status = setenv(envvarname, envvarvalue, TRUE);
-				if (-1 == status)
-				{
-					save_errno = errno;
-					free(envvarname);
-					free(envvarvalue);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_SETENVFAIL, 2, arg->str.len, arg->str.addr,
-							ERR_SYSCALL, 5, RTS_ERROR_LITERAL("setenv()"), CALLFROM, save_errno);
-				}
-				free(envvarname);
-				free(envvarvalue);
+				ydb_setenv(arg, arg2);
 			}
 			/* else: Do nothing if an empty (0-length) env var name has been specified */
 			break;
@@ -450,7 +431,12 @@ void	op_view(int numarg, mval *keyword, ...)
 			assert(NULL != arg);
 			if (arg->str.len)
 			{
-				/* Set up the env var name first */
+				char	*envvarname;
+
+				/* Set up the env var name first. "unsetenv" needs null-terminated strings whereas the strings
+				 * pointed to by the "mval" are not null-terminated. So take a copy in temporarily malloced
+				 * memory and free it up before returning.
+				 */
 				envvarname = malloc(arg->str.len + 1);	/* + 1 for null terminated string, needed by "unsetenv" */
 				memcpy(envvarname, arg->str.addr, arg->str.len);
 				envvarname[arg->str.len] = '\0';
