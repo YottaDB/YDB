@@ -337,6 +337,8 @@ install_plugins()
 		# rename gtmcrypt to ydbcrypt and create a symbolic link for backward compatibility
 		mv ${ydb_installdir}/plugin/gtmcrypt ${ydb_installdir}/plugin/ydbcrypt
 		ln -s ${ydb_installdir}/plugin/ydbcrypt ${ydb_installdir}/plugin/gtmcrypt
+		# Enable execute permissions on .sh scripts in the YDBEncrypt plugin
+		chmod +x ${ydb_installdir}/plugin/ydbcrypt/*.sh
 	fi
 
 	if [ "Y" = $ydb_zlib ] ; then
