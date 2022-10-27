@@ -714,6 +714,21 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 				case ydb_string_star:
 					va_arg(var, void *);
 					break;
+				case ydb_buffer_star:;
+					ydb_buffer_t	*buff_ptr;
+
+					buff_ptr = va_arg(var, ydb_buffer_t *);
+					if (IS_INVALID_YDB_BUFF_T(buff_ptr))
+					{
+						char	buff1[64], buff2[64];
+
+						SNPRINTF(buff1, SIZEOF(buff1), "Invalid ydb_buffer_t (parameter %d)", i);
+						SNPRINTF(buff2, SIZEOF(buff2), "ydb_ci()/ydb_cip()/ydb_ci_t()/ydb_cip_t()");
+						va_end(var);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+							      LEN_AND_STR(buff1), LEN_AND_STR(buff2));
+					}
+					break;
 				case ydb_float:
 				case ydb_double:
 					va_arg(var, ydb_double_t);
@@ -815,6 +830,30 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 					}
 					arg_mval.str.len = (mstr_len_t)mstr_parm->length;
 					arg_mval.str.addr = mstr_parm->address;
+					s2pool(&arg_mval.str);
+					break;
+				case ydb_buffer_star:;
+					ydb_buffer_t	*buff_ptr;
+
+					buff_ptr = va_arg(var, ydb_buffer_t *);
+					arg_mval.mvtype = MV_STR;
+					if (IS_INVALID_YDB_BUFF_T(buff_ptr))
+					{
+						char	buff1[64], buff2[64];
+
+						SNPRINTF(buff1, SIZEOF(buff1), "Invalid ydb_buffer_t (parameter %d)", i);
+						SNPRINTF(buff2, SIZEOF(buff2), "ydb_ci()/ydb_cip()/ydb_ci_t()/ydb_cip_t()");
+						va_end(var);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+							      LEN_AND_STR(buff1), LEN_AND_STR(buff2));
+					}
+					if (MAX_STRLEN < (uint4)buff_ptr->len_used)
+					{
+						va_end(var);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+					}
+					arg_mval.str.len = (mstr_len_t)buff_ptr->len_used;
+					arg_mval.str.addr = buff_ptr->buf_addr;
 					s2pool(&arg_mval.str);
 					break;
 				default:
@@ -926,7 +965,7 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 		 * parameters that are not modified by the M routine.
 		 */
 		if (MV_ON(mask, arg_ptr))
-		{	/* Process all output (O/IO) and return parameters modified by the M routine */
+		{	/* Process all output (O/IO) or return parameters modified by the M routine */
 			switch(arg_type)
 			{
                                 case ydb_int_star:
@@ -973,12 +1012,27 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 						mstr_parm->length = arg_ptr->str.len;
 					memcpy(mstr_parm->address, arg_ptr->str.addr, mstr_parm->length);
 					break;
+				case ydb_buffer_star:;
+					ydb_buffer_t	*buff_ptr;
+
+					buff_ptr = va_arg(temp_var, ydb_buffer_t *);
+					MV_FORCE_STR(arg_ptr);
+					if (arg_ptr->str.len > buff_ptr->len_alloc)
+					{
+						va_end(temp_var);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2,
+									arg_ptr->str.len, buff_ptr->len_alloc);
+					}
+					memcpy(buff_ptr->buf_addr, arg_ptr->str.addr, arg_ptr->str.len);
+					buff_ptr->len_used = arg_ptr->str.len;
+					assert(!IS_INVALID_YDB_BUFF_T(buff_ptr));
+					break;
 				default:
 					va_end(temp_var);
 					assertpro(FALSE);
 			}
 		} else
-		{
+		{	/* This is not an output parameter (i.e. it is a I type parameter) */
 			switch(arg_type)
 			{
                                 case ydb_int_star:		/* All of the address types are same size so can lump together */
@@ -993,6 +1047,7 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 				case ydb_double_star:
 				case ydb_char_star:
 				case ydb_string_star:
+				case ydb_buffer_star:
 					va_arg(temp_var, void *);
 					break;
                                 case ydb_int:			/* The int sizes are the same so group them */

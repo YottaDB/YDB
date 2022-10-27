@@ -272,6 +272,11 @@ STATICFNDCL void free_return_type(INTPTR_T ret_val, enum ydb_types typ)
 				free((((ydb_string_t *)ret_val)->address));
 			free(((ydb_string_t *)ret_val));
 			break;
+		case ydb_buffer_star:
+			if (NULL != (((ydb_buffer_t *)ret_val)->buf_addr))
+				free((((ydb_buffer_t *)ret_val)->buf_addr));
+			free(((ydb_buffer_t *)ret_val));
+			break;
 		case ydb_float_star:
 			free(((ydb_float_t *)ret_val));
 			break;
@@ -473,6 +478,32 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 					*dst = literal_null;
 			}
 			break;
+		case ydb_buffer_star:;
+			ydb_buffer_t	*buff_ptr;
+
+			buff_ptr = (ydb_buffer_t *)src;
+			if (NULL == buff_ptr) /* If the assigned pointer value is NULL, pass back a literal_null */
+				*dst = literal_null;
+			else
+			{
+				dst->mvtype = MV_STR;
+				if (buff_ptr->len_used > MAX_STRLEN)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+				assert((-1 == prealloc_size) || (prealloc_size == buff_ptr->len_alloc));
+				if ((0 <= prealloc_size) && (buff_ptr->len_used > prealloc_size)
+						&& (buff_ptr->buf_addr >= (char *)ext_buff_start)
+						&& (buff_ptr->buf_addr < ((char *)ext_buff_start + ext_buff_len)))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_EXCEEDSPREALLOC, 3,
+							prealloc_size, m_label, buff_ptr->len_used);
+				if ((0 < buff_ptr->len_used) && (NULL != buff_ptr->buf_addr))
+				{
+					dst->str.len = (mstr_len_t)buff_ptr->len_used;
+					dst->str.addr = buff_ptr->buf_addr;
+					s2pool(&dst->str);
+				} else
+					*dst = literal_null;
+			}
+			break;
 		case ydb_float_star:
 			if (NULL == src) /* If the assigned pointer value is NULL, pass back a literal_null */
 				*dst = literal_null;
@@ -599,7 +630,8 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct 
 				sp->len = 0;
 				ISSUE_ERR_ONCE(issued_ERR_XCRETNULLREF, CSA_ARG(NULL) VARLSTCNT(4)
 						ERR_XCRETNULLREF, 2, LEN_AND_STR(entry_ptr->call_name.addr))
-			} if (0 > sp->len)
+			}
+			if (0 > sp->len)
 			{	/* Negative string length. syslog and reset to zero */
 				sp->len = 0;
 				ISSUE_ERR_ONCE(issued_ERR_ZCCONVERT, CSA_ARG(NULL) VARLSTCNT(4)
@@ -608,6 +640,26 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct 
 				assert(!(((INTPTR_T)sp->addr < (INTPTR_T)stringpool.free)
 					&& ((INTPTR_T)sp->addr >= (INTPTR_T)stringpool.base)));
 			return (int)(sp->len);
+			break;
+		case ydb_buffer_star:;
+			ydb_buffer_t	*buff_ptr;
+
+			buff_ptr = (ydb_buffer_t *)src;
+			if (NULL == buff_ptr->buf_addr)
+			{
+				buff_ptr->len_used = 0;
+				ISSUE_ERR_ONCE(issued_ERR_XCRETNULLREF, CSA_ARG(NULL) VARLSTCNT(4)
+						ERR_XCRETNULLREF, 2, LEN_AND_STR(entry_ptr->call_name.addr))
+			}
+			if (0 > buff_ptr->len_used)
+			{	/* Negative string length. syslog and reset to zero */
+				buff_ptr->len_used = 0;
+				ISSUE_ERR_ONCE(issued_ERR_ZCCONVERT, CSA_ARG(NULL) VARLSTCNT(4)
+						ERR_ZCCONVERT, 2, LEN_AND_STR(entry_ptr->call_name.addr))
+			} else
+				assert(!(((INTPTR_T)buff_ptr->buf_addr < (INTPTR_T)stringpool.free)
+					&& ((INTPTR_T)buff_ptr->buf_addr >= (INTPTR_T)stringpool.base)));
+			return (int)(buff_ptr->len_used);
 			break;
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
@@ -1051,6 +1103,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 		switch (entry_ptr->parms[i])
 		{
 			case ydb_string_star:	/* CAUTION: Fall-through. */
+			case ydb_buffer_star:	/* CAUTION: Fall-through. */
 			case ydb_char_star:
 				n += (-1 != entry_ptr->param_pre_alloc_size[i]) ? entry_ptr->param_pre_alloc_size[i] : 0;
 				/* CAUTION: Fall-through. */
@@ -1060,7 +1113,9 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 					if (MV_DEFINED(v))
 					{
 						MV_FORCE_STR(v);
-						n += v->str.len + 1;	/* ydb_string_star does not really need the extra byte */
+						n += v->str.len + 1;	/* Note: ydb_string_star and ydb_buffer_star
+									 * do not really need the extra byte.
+									 */
 					} else
 					{
 						MV_FORCE_DEFINED_UNLESS_SKIPARG(v);
@@ -1228,6 +1283,49 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 					*(char **)free_space_pointer = (char *)free_string_pointer;
 					*free_string_pointer = '\0';
 					free_space_pointer++;
+					free_string_pointer += pre_alloc_size;
+				} else /* Output and no pre-allocation specified */
+				{
+					if (0 == package->str.len)
+						/* Default package - do not display package name */
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i + 1,
+							  RTS_ERROR_LITERAL("<DEFAULT>"),
+							  extref->str.len, extref->str.addr);
+					else
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i + 1,
+							  package->str.len, package->str.addr,
+							  extref->str.len, extref->str.addr);
+				}
+				break;
+			case ydb_buffer_star:
+				param_list->arg[i] = free_space_pointer;
+				if (MASK_BIT_ON(m1))
+				{	/* If this is defined and input-enabled, it should have already been forced to string. */
+					ydb_buffer_t	*buff_ptr;
+
+					buff_ptr = (ydb_buffer_t *)free_space_pointer;
+					assert(!MV_DEFINED(v) || MV_IS_STRING(v));
+					if (MV_DEFINED(v) && v->str.len)
+					{
+						buff_ptr->len_alloc = buff_ptr->len_used = v->str.len;
+						buff_ptr->buf_addr = (char *)free_string_pointer;
+						memcpy(buff_ptr->buf_addr, v->str.addr, v->str.len);
+						free_string_pointer += v->str.len;
+					} else
+					{
+						buff_ptr->len_alloc = buff_ptr->len_used = 0;
+						buff_ptr->buf_addr = NULL;
+					}
+					free_space_pointer = (ydb_long_t *)((char *)free_space_pointer + SIZEOF(ydb_buffer_t));
+				} else if (0 < pre_alloc_size)
+				{
+					ydb_buffer_t	*buff_ptr;
+
+					buff_ptr = (ydb_buffer_t *)free_space_pointer;
+					buff_ptr->len_alloc = pre_alloc_size;
+					buff_ptr->len_used = 0;
+					buff_ptr->buf_addr = (char *)free_string_pointer;
+					free_space_pointer = (ydb_long_t *)((char *)free_space_pointer + SIZEOF(ydb_buffer_t));
 					free_string_pointer += pre_alloc_size;
 				} else /* Output and no pre-allocation specified */
 				{

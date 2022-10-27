@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
  ****************************************************************/
 
 /* The current version of this header file is now called libyottadb.h. This header file contains those
- * definitions (based on the base types defined in libyottadb.h) that enable compatibility with exiting
+ * definitions (based on the base types defined in libyottadb.h) that enable compatibility with existing
  * GT.M shops supporting the gtm_* types and routines and even the deprecated xc_* types. This allows
  * shops used to GT.M to "just work" using previously supported type/routine names.
  */

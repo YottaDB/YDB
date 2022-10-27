@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,44 +70,46 @@ STATICFNDCL void put_mstr(mstr *src, mstr *dst);
 STATICFNDCL uint4 array_to_mask(boolean_t ar[MAX_ACTUALS], int n);
 STATICFNDCL void ext_stx_error(int in_error, char *ext_table_name);
 
+/* The below array needs to be maintained in sync with "enum ydb_types" in "sr_unix/fgncalsp.h" */
 const int parm_space_needed[] =
 {
-	0,
-	0,
-	SIZEOF(void *),
-	SIZEOF(ydb_int_t),
-	SIZEOF(ydb_uint_t),
-	SIZEOF(ydb_long_t),
-	SIZEOF(ydb_ulong_t),
+	0,											/* ydb_notfound */
+	0,											/* ydb_void */
+	SIZEOF(void *),										/* ydb_status */
+	SIZEOF(ydb_int_t),									/* ydb_int */
+	SIZEOF(ydb_uint_t),									/* ydb_uint */
+	SIZEOF(ydb_long_t),									/* ydb_long */
+	SIZEOF(ydb_ulong_t),									/* ydb_ulong */
 #	ifdef GTM64
-	SIZEOF(ydb_int64_t),
-	SIZEOF(ydb_uint64_t),
+	SIZEOF(ydb_int64_t),									/* ydb_int64 */
+	SIZEOF(ydb_uint64_t),									/* ydb_uint64 */
 #	endif
-	SIZEOF(ydb_float_t),
-	SIZEOF(ydb_double_t),
-	SIZEOF(ydb_int_t *) + SIZEOF(ydb_int_t),
-	SIZEOF(ydb_uint_t *) + SIZEOF(ydb_uint_t),
-	SIZEOF(ydb_long_t *) + SIZEOF(ydb_long_t),
-	SIZEOF(ydb_ulong_t *) + SIZEOF(ydb_ulong_t),
+	SIZEOF(ydb_float_t),									/* ydb_float */
+	SIZEOF(ydb_double_t),									/* ydb_double */
+	SIZEOF(ydb_int_t *) + SIZEOF(ydb_int_t),						/* ydb_int_star */
+	SIZEOF(ydb_uint_t *) + SIZEOF(ydb_uint_t),						/* ydb_uint_star */
+	SIZEOF(ydb_long_t *) + SIZEOF(ydb_long_t),						/* ydb_long_star */
+	SIZEOF(ydb_ulong_t *) + SIZEOF(ydb_ulong_t),						/* ydb_ulong_star */
 #	ifdef GTM64
-	SIZEOF(ydb_int64_t *) + SIZEOF(ydb_int64_t),
-	SIZEOF(ydb_uint64_t *) + SIZEOF(ydb_uint64_t),
+	SIZEOF(ydb_int64_t *) + SIZEOF(ydb_int64_t),						/* ydb_int64_star */
+	SIZEOF(ydb_uint64_t *) + SIZEOF(ydb_uint64_t),						/* ydb_uint64_star */
 #	endif
-	SIZEOF(ydb_string_t *) + SIZEOF(ydb_string_t),
-	SIZEOF(ydb_float_t *) + SIZEOF(ydb_float_t),
-	SIZEOF(ydb_char_t *),
-	SIZEOF(ydb_char_t **) + SIZEOF(ydb_char_t *),
-	SIZEOF(ydb_double_t *) + SIZEOF(ydb_double_t),
-	SIZEOF(ydb_pointertofunc_t),
-	SIZEOF(ydb_pointertofunc_t *) + SIZEOF(ydb_pointertofunc_t),
-	SIZEOF(ydb_int_t *) + SIZEOF(ydb_int_t),
-	SIZEOF(ydb_int_t *) + SIZEOF(ydb_int_t),
-	SIZEOF(ydb_long_t *) + SIZEOF(ydb_long_t),
-	SIZEOF(ydb_float_t *) + SIZEOF(ydb_float_t),
-	SIZEOF(ydb_double_t *) + SIZEOF(ydb_double_t),
-	SIZEOF(ydb_string_t),  /* ydb_string_t contains a (ydb_long_t) and (ydb_char_t *) */
-	SIZEOF(ydb_string_t),
-	SIZEOF(ydb_string_t)
+	SIZEOF(ydb_string_t *) + SIZEOF(ydb_string_t),						/* ydb_string_star */
+	SIZEOF(ydb_float_t *) + SIZEOF(ydb_float_t),						/* ydb_float_star */
+	SIZEOF(ydb_char_t *),									/* ydb_char_star */
+	SIZEOF(ydb_char_t **) + SIZEOF(ydb_char_t *),						/* ydb_char_starstar */
+	SIZEOF(ydb_double_t *) + SIZEOF(ydb_double_t),						/* ydb_double_star */
+	SIZEOF(ydb_pointertofunc_t),								/* ydb_pointertofunc */
+	SIZEOF(ydb_pointertofunc_t *) + SIZEOF(ydb_pointertofunc_t),				/* ydb_pointertofunc_star */
+	SIZEOF(ydb_int_t *) + SIZEOF(ydb_int_t),						/* ydb_jboolean */
+	SIZEOF(ydb_int_t *) + SIZEOF(ydb_int_t),						/* ydb_jint*/
+	SIZEOF(ydb_long_t *) + SIZEOF(ydb_long_t),						/* ydb_jlong */
+	SIZEOF(ydb_float_t *) + SIZEOF(ydb_float_t),						/* ydb_jfloat */
+	SIZEOF(ydb_double_t *) + SIZEOF(ydb_double_t),						/* ydb_jdouble */
+	SIZEOF(ydb_string_t),  /* ydb_string_t contains a (ydb_long_t) and (ydb_char_t *) */	/* ydb_jstring */
+	SIZEOF(ydb_string_t),									/* ydb_jbyte_array */
+	SIZEOF(ydb_string_t),									/* ydb_jbig_decimal */
+	SIZEOF(ydb_buffer_t *) + SIZEOF(ydb_buffer_t),						/* ydb_buffer_star */
 };
 
 /* This table is searched serially so the search priority is:
@@ -147,6 +149,7 @@ const static struct
 	{"ydb_uint64_t",	{ydb_uint64,		ydb_uint64_star,	ydb_notfound}		},
 #	endif
 	{"ydb_ulong_t",		{ydb_ulong,		ydb_ulong_star,		ydb_notfound}		},
+	{"ydb_buffer_t",	{ydb_notfound,		ydb_buffer_star,	ydb_notfound}		},
 	{"gtm_char_t",		{ydb_notfound,		ydb_char_star,		ydb_char_starstar}	},
 	{"gtm_double_t",	{ydb_double,		ydb_double_star,	ydb_notfound}		},
 	{"gtm_float_t",		{ydb_float,		ydb_float_star,		ydb_notfound}		},
@@ -709,6 +712,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 			case ydb_char_star:
 			case ydb_float_star:
 			case ydb_string_star:
+			case ydb_buffer_star:
 			case ydb_int_star:
 			case ydb_uint_star:
 			case ydb_long_star:
@@ -916,6 +920,7 @@ callin_entry_list *citab_parse(boolean_t internal_use, const char *fname)
 			case ydb_float_star:
 			case ydb_double_star:
 			case ydb_string_star:
+			case ydb_buffer_star:
 			case ydb_jboolean:
 			case ydb_jint:
 			case ydb_jlong:
@@ -978,6 +983,7 @@ callin_entry_list *citab_parse(boolean_t internal_use, const char *fname)
 				case ydb_float_star:
 				case ydb_double_star:
 				case ydb_string_star:
+				case ydb_buffer_star:
 				case ydb_jboolean:
 				case ydb_jint:
 				case ydb_jlong:
