@@ -1005,9 +1005,6 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 				case ydb_string_star:
 					mstr_parm = va_arg(temp_var, ydb_string_t *);
 					MV_FORCE_STR(arg_ptr);
-					if (arg_ptr->str.len > mstr_parm->length)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2,
-									arg_ptr->str.len, mstr_parm->length);
 					if (mstr_parm->length > arg_ptr->str.len)
 						mstr_parm->length = arg_ptr->str.len;
 					memcpy(mstr_parm->address, arg_ptr->str.addr, mstr_parm->length);
