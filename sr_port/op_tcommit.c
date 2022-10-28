@@ -439,6 +439,7 @@ enum cdb_sc	op_tcommit(void)
 								}
 							}
 							cse->blk = new_blk;
+							csa->tp_hint = new_blk;
 							cse->mode = gds_t_acquired;
 							assert(GDSVCURR == cse->ondsk_blkver);
 							/* Assert that in final retry total_blks (private and shared) are in sync */
