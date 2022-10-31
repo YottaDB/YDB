@@ -712,22 +712,15 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 				case ydb_double_star:
 				case ydb_char_star:
 				case ydb_string_star:
-					va_arg(var, void *);
-					break;
 				case ydb_buffer_star:;
-					ydb_buffer_t	*buff_ptr;
-
-					buff_ptr = va_arg(var, ydb_buffer_t *);
-					if (IS_INVALID_YDB_BUFF_T(buff_ptr))
-					{
-						char	buff1[64], buff2[64];
-
-						SNPRINTF(buff1, SIZEOF(buff1), "Invalid ydb_buffer_t (parameter %d)", i);
-						SNPRINTF(buff2, SIZEOF(buff2), "ydb_ci()/ydb_cip()/ydb_ci_t()/ydb_cip_t()");
-						va_end(var);
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-							      LEN_AND_STR(buff1), LEN_AND_STR(buff2));
-					}
+					/* Note: For Output-only (O) or RETURN parameters in "ydb_buffer_star" case,
+					 * we do not issue ERR_PARAMINVALID error if "len_used" is greater than "len_alloc"
+					 * like we do for I or IO parameters. This is because it is more user-friendly to
+					 * ignore "len_used" and instead set it later based on the output/return value.
+					 * At that time, we will check if "buf_addr" is NULL and the output/return "len_used"
+					 * is non-zero. If so we will issue an ERR_PARAMINVALID error then.
+					 */
+					va_arg(var, void *);
 					break;
 				case ydb_float:
 				case ydb_double:
@@ -1020,7 +1013,23 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2,
 									arg_ptr->str.len, buff_ptr->len_alloc);
 					}
-					memcpy(buff_ptr->buf_addr, arg_ptr->str.addr, arg_ptr->str.len);
+					/* Check for ERR_PARAMINVALID error only if output/return "len_used" is non-zero
+					 * and "buf_addr" is NULL. See comment block about this error in an earlier part
+					 * of this function for why we do this check now rather than before.
+					 */
+					buff_ptr->len_used = arg_ptr->str.len;
+					if (IS_INVALID_YDB_BUFF_T(buff_ptr))
+					{
+						char	buff1[64], buff2[64];
+
+						SNPRINTF(buff1, SIZEOF(buff1), "Invalid ydb_buffer_t (parameter %d)", i);
+						SNPRINTF(buff2, SIZEOF(buff2), "ydb_ci()/ydb_cip()/ydb_ci_t()/ydb_cip_t()");
+						va_end(temp_var);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+							      LEN_AND_STR(buff1), LEN_AND_STR(buff2));
+					}
+					if (arg_ptr->str.len)
+						memcpy(buff_ptr->buf_addr, arg_ptr->str.addr, arg_ptr->str.len);
 					buff_ptr->len_used = arg_ptr->str.len;
 					assert(!IS_INVALID_YDB_BUFF_T(buff_ptr));
 					break;
