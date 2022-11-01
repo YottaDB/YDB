@@ -764,7 +764,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 				}
 				GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 				gtmsource_poll_actions(TRUE);
-				if(GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
+				if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
 				{
 					repl_log(gtmsource_log_fp, TRUE, TRUE,
 							"State change detected in update_max_seqno_info (poll)\n");
@@ -1728,7 +1728,9 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 					{
 						csa = &FILE_INFO(ctl->reg)->s_addrs;
 						freeaddr = csa->jnl->jnl_buff->rsrv_freeaddr;
-						if ((ctl->repl_buff->fc->eof_addr == freeaddr) || (!JNL_ENABLED(csa->hdr)))
+						if (((ctl->repl_buff->fc->eof_addr == freeaddr)
+								&& (ctl->max_seqno_eof_addr == freeaddr))
+							|| (!JNL_ENABLED(csa->hdr)))
 						{	/* No more pending updates in the journal file. Next update to the
 							 * journal file will take the seqno jctl->jnl_seqno which will be
 							 * greater than read_jnl_seqno
