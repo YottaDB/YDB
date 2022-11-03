@@ -403,7 +403,6 @@ error_def(ERR_BADDBVER);
 error_def(ERR_CRITSEMFAIL);
 error_def(ERR_DBBLKSIZEALIGN);
 error_def(ERR_DBCREINCOMP);
-error_def(ERR_DBFILERDONLY);
 error_def(ERR_DBFILERR);
 error_def(ERR_DBFLCORRP);
 error_def(ERR_DBGLDMISMATCH);
@@ -609,7 +608,24 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 				MU_GV_CUR_REG_FREE(tmp_reg, save_gv_cur_region);
 				/* DB file exists now - retry the open */
 				OPENFILE_DB(fnptr, O_RDWR, udi, seg);
+				read_write_save_errno = errno;
 			}
+			/* Check if the OPEN as O_RDWR failed due to EPERM/EACCESS (ENOENT is already taken care of above).
+			 * If so, fall through to code below that will retry the OPEN with O_RDONLY to see if that succeeds.
+			 * If not, issue an error right here as the current error should not be any different whether it is
+			 * O_RDWR or O_RDONLY. Previously we used to fall through to the O_RDONLY case and issue an error
+			 * only if the O_RDONLY OPEN also failed. But that can lead to confusing error messages as illustrated
+			 * by the below use case.
+			 *
+			 * We have noticed that on some file systems (e.g. f2fs), with O_DIRECT flag usage, the O_RDONLY OPEN
+			 * succeeds even though the O_RDWR OPEN fails with an EISDIR. And in other file systems (e.g. ext4),
+			 * the O_RDONLY OPEN fails with an EINVAL while the O_RDWR OPEN fails with an EISDIR. In both cases,
+			 * the O_RDWR OPEN failed correctly with an EISDIR so it is better to use that error message
+			 * as an EINVAL (in the ext4 case) or a successful open of a directory (in the f2fs case) would be
+			 * confusing to the user.
+			 */
+			if ((FD_INVALID == udi->fd) && (EPERM != read_write_save_errno) && (EACCES != read_write_save_errno))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), read_write_save_errno);
 			if (!udi->grabbed_access_sem)
 			{	/* If the process already has standalone access, these fields are initialized in mu_rndwn_file */
 				udi->ftok_semid = INVALID_SEMID;
@@ -641,17 +657,6 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 			reg->read_only = TRUE;		/* maintain csa->read_write simultaneously */
 			csa->read_write = FALSE;	/* maintain reg->read_only simultaneously */
 			csa->orig_read_write = FALSE;
-			/* Note: "read_write_save_errno" stores the errno after the OPENFILE_DB call inside the
-			 * "if (!open_read_only)" code block above.
-			 */
-			if (!open_read_only && !((EPERM == read_write_save_errno) || (EACCES == read_write_save_errno)))
-			{
-				if (!IS_GTM_IMAGE)
-					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFILERDONLY, 3,
-							DB_LEN_STR(reg), (int)0, read_write_save_errno);
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFILERDONLY, 3, DB_LEN_STR(reg),
-							(int)0, read_write_save_errno);
-			}
 		}
 		if (!reg->owning_gd->is_dummy_gbldir && (!jnlpool_init_needed || !CUSTOM_ERRORS_AVAILABLE))
 			break;

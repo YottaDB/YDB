@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,9 +77,7 @@ boolean_t mu_int_init(void)
 	fc->op = FC_OPEN;
 	status = dbfilop(fc);
 	if (SS_NORMAL != status)
-	{
-		csa = &FILE_INFO(gv_cur_region)->s_addrs;
-		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) status);
+	{	/* A DBOPNERR error message would have already been issued inside "dbfilop()" */
 		mu_int_skipreg_cnt++;
 		return FALSE;
 	}

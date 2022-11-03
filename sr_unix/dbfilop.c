@@ -43,12 +43,10 @@
 
 GBLREF	gd_region	*gv_cur_region;
 
-error_def(ERR_DBFILERDONLY);
 error_def(ERR_DBFILOPERR);
 error_def(ERR_DBNOTGDS);
 error_def(ERR_DBOPNERR);
 error_def(ERR_DBPREMATEOF);
-error_def(ERR_TEXT);
 
 uint4 dbfilop(file_control *fc)
 {
@@ -112,27 +110,36 @@ uint4 dbfilop(file_control *fc)
 			} else
 #endif
 			OPENFILE_DB((char *)seg->fname, O_RDWR, udi, seg);
-			save_errno = 0;
 			if (FD_INVALID == udi->fd)
 			{
 				save_errno = errno;
+				assert(save_errno);
+				/* See EPERM/EACCESS comment in "sr_unix/gvcst_init_sysops.c" for why we need this check here */
+				if ((EPERM != save_errno) && (EACCES != save_errno))
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5)
+							ERR_DBOPNERR, 2, LEN_AND_STR(seg->fname), save_errno);
+					return save_errno;
+				}
 				OPENFILE_DB((char *)seg->fname, O_RDONLY, udi, seg);
 				if (FD_INVALID == udi->fd)
-					return ERR_DBOPNERR;
+				{
+					save_errno = errno;
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5)
+							ERR_DBOPNERR, 2, LEN_AND_STR(seg->fname), save_errno);
+					return save_errno;
+				}
 				gv_cur_region->read_only = TRUE;	/* maintain csa->read_write simultaneously */
 				csa->read_write = FALSE;	/* maintain reg->read_only simultaneously */
 				csa->orig_read_write = FALSE;	/* maintain orig_read_write at same time as read_write */
 			}
 			FSTAT_FILE(udi->fd, &stat_buf, fstat_res);
 			if (-1 == fstat_res)
-				return ERR_DBOPNERR;
-			if (gv_cur_region->read_only && !((EPERM == save_errno) || (EACCES == save_errno)))
 			{
-				if (!IS_GTM_IMAGE)
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBFILERDONLY, 3, LEN_AND_STR(seg->fname),
-							stat_buf.st_mode & 0x1FF, save_errno);
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBFILERDONLY, 3, LEN_AND_STR(seg->fname),
-						stat_buf.st_mode & 0x1FF, save_errno);
+				save_errno = errno;
+				assert(FALSE);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBOPNERR, 2, LEN_AND_STR(seg->fname), save_errno);
+				return save_errno;
 			}
 #			ifdef __MVS__
 			if (-1 == gtm_zos_tag_to_policy(udi->fd, TAG_BINARY, &realfiletag))

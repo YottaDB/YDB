@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -342,9 +342,8 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 		fc->op = FC_OPEN;
 		status = dbfilop(fc);
 		if (SS_NORMAL != status)
-		{
-			util_out_print("!AD -> Error with dbfilop for shmid = !UL", TRUE, fname_len, fname, shmid);
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) status, 2, DB_LEN_STR(gv_cur_region), errno);
+		{	/* A DBOPNERR error message would have already been issued inside "dbfilop()" */
+			util_out_print("Error with dbfilop for shmid = !UL", TRUE, shmid);
 			*exit_stat = ERR_MUNOTALLSEC;
 			shmdt((void *)start_addr);
 			return FALSE;

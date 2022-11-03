@@ -287,8 +287,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				fc->op = FC_OPEN;
 				status = dbfilop(fc);
 				if (SS_NORMAL != status)
-				{
-					DBFILOP_FAIL_MSG(status, ERR_DBOPNERR);
+				{	/* A DBOPNERR error message would have already been issued inside "dbfilop()" */
 					exit_status |= EXIT_ERR;
 					continue;
 				}

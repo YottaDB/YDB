@@ -466,7 +466,7 @@ LITDEF	err_msg merrors[] = {
 	{ "COLLTYPVERSION", "Collation type !UL, version !UL mismatch", 2, 0 },
 	{ "LVNULLSUBS", "Null subscripts not allowed in local variables", 0, 0 },
 	{ "GVREPLERR", "Error replicating global in region !AD", 2, 0 },
-	{ "DBFILERDONLY", "The database file !AD was opened as read-only (perms !UL)", 3, 0 },
+	{ "UNUSEDMSG634", "DBFILERDONLY error nixed in YottaDB r1.36 (still in use in GT.M)", 3, 0 },
 	{ "RMWIDTHPOS", "File record size or width must be greater than zero", 0, 0 },
 	{ "OFFSETINV", "Entry point !AD+!SL not valid", 3, 0 },
 	{ "JOBPARTOOLONG", "Total parameter length is too long for job command", 0, 0 },

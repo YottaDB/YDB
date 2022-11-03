@@ -398,9 +398,8 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		csa = &(udi->s_addrs);		/* Need valid cs_addrs in is_anticipatory_freeze_needed, which can be called */
 		cs_addrs = csa;			/* by gtm_putmsg(), so set it up here. */
 		if (SS_NORMAL != status)
-		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) status, 2, DB_LEN_STR(reg), errno);
-			if (ENOENT == errno)
+		{	/* A DBOPNERR error message would have already been issued inside "dbfilop()" */
+			if (ENOENT == status)
 				mu_region_found = FALSE;
 			if (0 == iter)
 			{
