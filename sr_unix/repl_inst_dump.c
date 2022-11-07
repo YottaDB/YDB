@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -602,8 +602,8 @@ void	repl_inst_dump_jnlpoolctl(jnlpool_ctl_ptr_t jnlpool_ctl)
 		jnlpool_ctl->jnldata_base_off, jnlpool_ctl->jnldata_base_off);
 
 	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, jnlpool_size), SIZEOF(jnlpool_ctl->jnlpool_size));
-	util_out_print( PREFIX_JNLPOOLCTL "Journal Pool Size (in bytes)                !10UL [0x!XL]", TRUE,
-		jnlpool_ctl->jnlpool_size, jnlpool_ctl->jnlpool_size);
+	util_out_print( PREFIX_JNLPOOLCTL "Journal Pool Size (in bytes)      !20@UQ [0x!16@XQ]", TRUE,
+		&jnlpool_ctl->jnlpool_size, &jnlpool_ctl->jnlpool_size);
 
 	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, rsrv_write_addr), SIZEOF(jnlpool_ctl->rsrv_write_addr));
 	util_out_print( PREFIX_JNLPOOLCTL "Reserved Write Offset             !20@UQ [0x!16@XQ]", TRUE,
