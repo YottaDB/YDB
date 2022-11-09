@@ -140,6 +140,11 @@ else()
     # So disable them.
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-but-set-variable")
   endif()
+  if(${CMAKE_C_COMPILER_VERSION} VERSION_GREATER_EQUAL "15.0.0")
+    # clang 15 and higher issue a lot of [-Wdeprecated-non-prototype] warnings. They are benign and clutter the output.
+    # So disable them.
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-deprecated-non-prototype")
+  endif()
   # clang 10 and higher have the below flag that detects bugs due to the code assuming stack variables (automatic)
   # are initialized to 0 by default (which they are not). See https://reviews.llvm.org/D54604 for details.
   if(ENABLE_AUTO_VAR_INIT_PATTERN AND ${CMAKE_C_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.0.0")
