@@ -1031,11 +1031,34 @@ STATICFNDEF void parse_gvn(mval *gvn)
 
 void stack_leak_check(void)
 {
-	int	var_on_cstack;
+	int		var_on_cstack;
+	boolean_t	skip_stack_leak_check;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (GTMTRIG_ONLY((0 < gtm_trigger_depth) ||) (0 < TREF(gtmci_nested_level)))
+
+	skip_stack_leak_check = FALSE;
+	/* With CLANG 15, ASAN_OPTIONS=detect_stack_use_after_return=1 is enabled by default. This means "&var_on_cstack"
+	 *   would be different each time "stack_leak_check()" is invoked as it would point to a location in a heap memory
+	 *   section managed by the Address Sanitizer. And so, the "var_on_cstack_ptr" scheme below (which expects
+	 *   "&var_on_cstack" to be exactly the same each time this function is invoked) will not work.
+	 *
+	 * With GCC, ASAN_OPTIONS=detect_stack_use_after_return=1 is not enabled by default. But one can enable it at runtime
+	 *   by setting the ASAN_OPTIONS env var.
+	 *
+	 * Therefore skip stack leak check in both cases as otherwise we are guaranteed to fail the "assertpro()" below.
+	 */
+#	ifdef __clang__
+#		if __has_feature(address_sanitizer)
+		skip_stack_leak_check = TRUE;
+#		endif
+#	endif
+#	ifdef __GNUC__
+#		ifdef __SANITIZE_ADDRESS__
+		skip_stack_leak_check = TRUE;
+#		endif
+#	endif
+	if (skip_stack_leak_check || GTMTRIG_ONLY((0 < gtm_trigger_depth) ||) (0 < TREF(gtmci_nested_level)))
 		return;
 	if (NULL == var_on_cstack_ptr)
 		var_on_cstack_ptr = &var_on_cstack;
