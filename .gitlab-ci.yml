@@ -21,7 +21,6 @@ variables:
 stages:
  - build
  - docker-create
- - docker-push
 
 commit-verify:
   image: ubuntu:22.04
@@ -70,116 +69,119 @@ test-clang-tidy:
         zlib1g-dev
     - ci/build.sh
 
+# Main and ONLY docker creation mechanism.
 .docker-create:
-  artifacts:
-    paths:
-      - docker-images
-    expire_in: 1 day
   stage: docker-create
   script:
-    - mkdir docker-images
-    - docker build ${ARGS} --pull -t yottadb/${REPO}:latest -f ${DOCKERFILE} .
-    - docker save yottadb/${REPO}:latest > docker-images/${REPO}.tar
+    - docker build --platform=${PLATFORM} ${ARGS} --pull -t yottadb/${REPO}:${DOCKERHUBTAG} -f ${DOCKERFILE} .
+    - docker login -u $HUB_USERNAME -p $HUB_PASSWORD
+    - docker push yottadb/${REPO}:${DOCKERHUBTAG}
+    - docker tag yottadb/${REPO}:${DOCKERHUBTAG} yottadb/${REPO}:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
+    - docker push yottadb/${REPO}:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
+    - 'echo -e "FROM yottadb/${REPO}:${DOCKERHUBTAG}\n ENTRYPOINT []" > BareDockerfile'
+    - docker build --platform=${PLATFORM} --pull -t yottadb/${REPO}-base:${DOCKERHUBTAG} -f BareDockerfile .
+    - docker push yottadb/${REPO}-base:${DOCKERHUBTAG}
+    - docker tag yottadb/${REPO}-base:${DOCKERHUBTAG} yottadb/${REPO}-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
+    - docker push yottadb/${REPO}-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
   only:
     - master@YottaDB/DB/YDB
 
-
-docker-create-ubuntu:
+# Section for creating single commit docker images (:latest-master tags)
+# amd64
+.docker-create-amd64:
   extends: .docker-create
+  variables:
+    PLATFORM: linux/amd64
+    DOCKERHUBTAG: latest-master
+  tags:
+    - amd64
+# aarch64
+.docker-create-aarch64:
+  extends: .docker-create
+  variables:
+    PLATFORM: linux/aarch64
+    DOCKERHUBTAG: latest-master
+  tags:
+    - aarch64
+# END
+
+# Section for creating tagged Dockerfiles (:latest tags)
+# amd64
+.docker-create-amd64-release:
+  extends: .docker-create
+  variables:
+    PLATFORM: linux/amd64
+    DOCKERHUBTAG: latest
+  tags:
+    - amd64
+  only:
+    - tags
+# aarch64
+.docker-create-aarch64-release:
+  extends: .docker-create
+  variables:
+    PLATFORM: linux/aarch64
+    DOCKERHUBTAG: latest
+  tags:
+    - aarch64
+  only:
+    - tags
+# END
+
+# Single commit docker images for amd64 (:latest-master)
+docker-create-ubuntu-amd64:
+  extends: .docker-create-amd64
   variables:
     DOCKERFILE: Dockerfile
     REPO: yottadb
 
-docker-create-ubuntu-debug:
-  extends: .docker-create
+docker-create-ubuntu-debug-amd64:
+  extends: .docker-create-amd64
   variables:
     DOCKERFILE: Dockerfile
     REPO: yottadb-debug
     ARGS: --build-arg CMAKE_BUILD_TYPE=Debug
 
-docker-create-rocky:
-  extends: .docker-create
+docker-create-rocky-amd64:
+  extends: .docker-create-amd64
   variables:
     DOCKERFILE: Dockerfile-rocky
     REPO: yottadb-rocky
 
-docker-create-debian:
-  extends: .docker-create
+docker-create-debian-amd64:
+  extends: .docker-create-amd64
   variables:
     DOCKERFILE: Dockerfile-debian
     REPO: yottadb-debian
+# END
 
-# Push Testing Docker Images, execute only on master
-.docker-push:
-  stage: docker-push
-  script:
-    - docker login -u $HUB_USERNAME -p $HUB_PASSWORD
-    - docker load -i docker-images/${REPO}.tar
-    - docker tag yottadb/${REPO}:latest yottadb/${REPO}:latest-master
-    - docker push yottadb/${REPO}:latest-master
-    - docker tag yottadb/${REPO}:latest-master yottadb/${REPO}:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
-    - docker push yottadb/${REPO}:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
-    - 'echo -e "FROM yottadb/${REPO}:latest-master\n ENTRYPOINT []" > BareDockerfile'
-    - docker build --pull -t yottadb/${REPO}-base:latest-master -f BareDockerfile .
-    - docker push yottadb/${REPO}-base:latest-master
-    - docker tag yottadb/${REPO}-base:latest-master yottadb/${REPO}-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
-    - docker push yottadb/${REPO}-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
-  only:
-    - master@YottaDB/DB/YDB
-
-docker-push-ubuntu:
-  extends: .docker-push
+# Tag commit docker images for amd64 (:latest)
+docker-create-release-ubuntu-amd64:
+  extends: .docker-create-amd64-release
   variables:
+    DOCKERFILE: Dockerfile
     REPO: yottadb
 
-docker-push-ubuntu-debug:
-  extends: .docker-push
+docker-create-release-ubuntu-debug-amd64:
+  extends: .docker-create-amd64-release
   variables:
+    DOCKERFILE: Dockerfile
     REPO: yottadb-debug
+    ARGS: --build-arg CMAKE_BUILD_TYPE=Debug
 
-docker-push-rocky:
-  extends: .docker-push
+docker-create-release-rocky-amd64:
+  extends: .docker-create-amd64-release
   variables:
+    DOCKERFILE: Dockerfile-rocky
     REPO: yottadb-rocky
 
-docker-push-debian:
-  extends: .docker-push
+docker-create-release-debian-amd64:
+  extends: .docker-create-amd64-release
   variables:
+    DOCKERFILE: Dockerfile-debian
     REPO: yottadb-debian
+# END
 
-# Release Docker Images, only execute for tags
-.docker-push-release:
-  stage: docker-push
-  script:
-    - docker login -u $HUB_USERNAME -p $HUB_PASSWORD
-    - docker load -i docker-images/${REPO}.tar
-    - docker push yottadb/${REPO}:latest
-    - docker tag yottadb/${REPO}:latest yottadb/${REPO}:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
-    - docker push yottadb/${REPO}:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
-    - 'echo -e "FROM yottadb/${REPO}:latest\n ENTRYPOINT []" > BareDockerfile'
-    - docker build --pull -t yottadb/${REPO}-base:latest -f BareDockerfile .
-    - docker push yottadb/${REPO}-base:latest
-    - docker tag yottadb/${REPO}-base:latest yottadb/${REPO}-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
-    - docker push yottadb/${REPO}-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
-  only:
-    - tags
-
-docker-push-release-ubuntu:
-  extends: .docker-push-release
-  variables:
-    REPO: yottadb
-
-docker-push-release-ubuntu-debug:
-  extends: .docker-push-release
-  variables:
-    REPO: yottadb-debug
-
-docker-push-release-rocky:
-  extends: .docker-push-release
-  variables:
-    REPO: yottadb-rocky
-
-docker-push-release-debian:
-  extends: .docker-push-release
-  variables:
-    REPO: yottadb-debian
+# TODO #931: Single commit docker images for aarch64
+# TODO #931: Tag commit docker images for aarch64
+# END
