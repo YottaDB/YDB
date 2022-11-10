@@ -14,7 +14,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
+
 #include "compiler.h"
 #include "mdq.h"
 #include "opcode.h"
@@ -28,6 +30,7 @@
 #include "fullbool.h"
 #include "show_source_line.h"
 #include "op.h"
+#include "mmemory.h"
 
 GBLREF	bool		devctlexp;
 GBLREF	boolean_t	run_time;
@@ -497,7 +500,7 @@ int expritem(oprtype *a)
 	int		i, index, sv_opcode;
 	mval		v;
 	oprtype		*j, *k, x1;
-	tbp		argbp, *funcbp, *tripbp;
+	tbp		*funcbp, *tripbp;
 	triple		*argtrip, *functrip, *ref, *t1, *t2, *t3;
 	unsigned char	type;
 	DCL_THREADGBL_ACCESS;
@@ -735,7 +738,7 @@ int expritem(oprtype *a)
 		  */
 		assert(OLD_SE != TREF(side_effect_handling));
 		funcbp = &functrip->backptr;		/* borrow backptr to track args */
-		tripbp = &argbp;
+		tripbp = (tbp *)mcalloc(SIZEOF(tbp));
 		dqinit(tripbp, que);
 		tripbp->bkptr = NULL;
 		assert(NULL == funcbp->bkptr);
