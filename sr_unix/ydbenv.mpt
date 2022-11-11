@@ -787,7 +787,7 @@ Defaults
 	; gtmver:::env(ydbvar)#/g#/o#/o/utf8#/r:"ln -s "_env(ydbvar)_" "_env(gtmvar):$zpiece($zversion," ",2)_"_"_$zpiece($zversion," ",4)
 
 ;	Error message texts
-U239	;"-F_NOTAPATH Path "_file_" does not exist"
+U239	;"-F-NOTAPATH Path "_file_" does not exist"
 U240	;"-F-NOTAGLDFILE "_file_ " is not a global directory file"
 U241	;"-F-NOTADBFILE "_file_" is not a database file"
 U242	;"-F-MUPIPCREATEERR MUPIP CREATE failed, stderr at ",err
