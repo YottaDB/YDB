@@ -31,7 +31,7 @@ LITREF unsigned char io_params_size[];
 short ionl_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 timeout)
 {
 	unsigned char	ch;
-	io_desc		*d_in, *d_out, *ioptr;
+	io_desc		*d_out, *ioptr;
 	int		p_offset, status;
 
 	p_offset = 0;
@@ -46,7 +46,6 @@ short ionl_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	);
 	ioptr = dev_name->iod;
 	ioptr->state = dev_open;
-	d_in = ioptr->pair.in;
 	d_out = ioptr->pair.out;
 	ioptr->length = DEF_NL_LENGTH;
 	ioptr->width = DEF_NL_WIDTH;
@@ -57,11 +56,12 @@ short ionl_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	ioptr->dollar.y = 0;
 	while (*(pp->str.addr + p_offset) != iop_eol)
 	{
-		if ((ch = *(pp->str.addr + p_offset++)) == iop_wrap)
+		ch = *(pp->str.addr + p_offset++);
+		if (ch == iop_wrap)
 			d_out->wrap = TRUE;
-		if ((ch = *(pp->str.addr + p_offset++)) == iop_nowrap)
+		if (ch == iop_nowrap)
 			d_out->wrap = FALSE;
-		if ((ch = *(pp->str.addr + p_offset++)) == iop_exception)
+		if (ch == iop_exception)
 		{
 			ioptr->error_handler.len = *(pp->str.addr + p_offset);
 			ioptr->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
