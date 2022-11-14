@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,34 +46,38 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 	boolean_t	needsep, paren;
 	int 		ct, x, xx, y, intlen;
 	unsigned char	*ch, *cp, *ff, *ff_top, fncode, sign, *t, sepchar, decptchar;
+	mval		*t_src_p;
 
 	MV_FORCE_DEFINED(src);
-	/* if the dst will be different than the src we'll build the new value in the string pool and repoint dst there,
-	 * otherwise, dst will anyway become the same as src, therefore we can safely use dst as a "temporary" copy of src
-	 */
-	*dst = *src;
+	PUSH_MV_STENT(MVST_MVAL);			/* Create a temporary on M stack so garbage collection can see it */
+	t_src_p = &mv_chain->mv_st_cont.mvs_mval;	/* Operate on copy of src so can modify without changing original */
+	*t_src_p = *src;
 	if (use_fract)
-		op_fnj3(dst, 0, fract, dst);
+		op_fnj3(t_src_p, 0, fract, t_src_p);
 	else
 	{
-		MV_FORCE_NUM(dst);
-		MV_FORCE_CANONICAL(dst);	/* if the source operand is not a canonical number, force conversion */
+		MV_FORCE_NUM(t_src_p);
+		MV_FORCE_CANONICAL(t_src_p);	/* if the source operand is not a canonical number, force conversion */
 	}
 	assert (stringpool.free >= stringpool.base);
 	assert (stringpool.free <= stringpool.top);
 	MV_FORCE_STR(fmt);
-	MV_FORCE_STR(dst);
+	MV_FORCE_STR(t_src_p);
 	if (0 == fmt->str.len)
+	{
+		*dst = *t_src_p;
+		POP_MV_STENT(); 	/* Done with temporary */
 		return;
+	}
 	/* Reserve space in string pool to hold the destination string plus the commas,periods etc. that could get added.
 	 * Since the number of commas,periods etc. that get added is proportional to the length of the string (1/3 of the length)
-	 * to be safe, just reserve twice the space in dst->str.len. But if dst->str.len is too small, minor overheads
+	 * to be safe, just reserve twice the space in t_src_p->str.len. But if t_src_p->str.len is too small, minor overheads
 	 * like adding "+" at beginning and parentheses around the value could become more than twice the length so take
 	 * MAX_NUM_SIZE in that case before doing the twice calculation. Hence the MAX usage below.
 	 */
-	ENSURE_STP_FREE_SPACE(MAX(MAX_NUM_SIZE, dst->str.len) * 2);
-	ch = (unsigned char *)dst->str.addr;
-	ct = dst->str.len;
+	ENSURE_STP_FREE_SPACE(MAX(MAX_NUM_SIZE, t_src_p->str.len) * 2);
+	ch = (unsigned char *)t_src_p->str.addr;
+	ct = t_src_p->str.len;
 	cp = stringpool.free;
 	fncode = 0;
 	for (ff = (unsigned char *)fmt->str.addr, ff_top = ff + fmt->str.len; ff < ff_top;)
@@ -133,8 +137,8 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 	/* Only add '+' if > 0 */
 	if ((0 != (fncode & PLUS)) && (0 == sign))
 	{	/* Need to make into num and check for int 0 in case was preprocessed by op_fnj3() */
-		MV_FORCE_NUM(dst);
-		if ((0 == (dst->mvtype & MV_INT)) || (0 != dst->m[1]))
+		MV_FORCE_NUM(t_src_p);
+		if ((0 == (t_src_p->mvtype & MV_INT)) || (0 != t_src_p->m[1]))
 			sign = '+';
 	}
 	if ((0 != (fncode & MINUS)) && ('-' == sign))
@@ -199,5 +203,6 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 	dst->str.addr = (char *)stringpool.free;
 	dst->str.len = intlen;
 	stringpool.free = cp;
+	POP_MV_STENT(); 	/* Done with temporary */
 	return;
 }
