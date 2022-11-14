@@ -114,14 +114,14 @@ unsigned char gvcst_cre_autoDB(gd_region *reg)
 	jnlpool_addrs_ptr_t	save_jnlpool;
 	unsigned char		cstatus;
 
-	assert(RDBF_AUTODB & reg->reservedDBFlags);
+	assert(IS_AUTODB_REG(reg));
 	save_cur_region = gv_cur_region;
 	save_jnlpool = jnlpool;
 	memcpy((char *)&cur_region, reg, SIZEOF(gd_region));
 	memcpy((char *)&cur_segment, reg->dyn.addr, SIZEOF(gd_segment));
 	gv_cur_region = &cur_region;
 	gv_cur_region->dyn.addr = &cur_segment;
-	cstatus = mu_cre_file();
+	cstatus = mu_cre_file(CALLER_IS_MUPIP_CREATE_FALSE);
 	TP_CHANGE_REG(save_cur_region);
 	jnlpool = save_jnlpool;
 	return cstatus;

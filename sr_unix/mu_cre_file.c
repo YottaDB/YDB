@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -162,7 +162,7 @@ CONDITION_HANDLER(mu_cre_file_ch)
 	NEXTCH;
 }
 
-unsigned char mu_cre_file(void)
+unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 {
 	char		path[MAX_FN_LEN + 1], errbuff[OUT_LINE];
 	unsigned char	buff[DISK_BLOCK_SIZE];
@@ -253,10 +253,12 @@ unsigned char mu_cre_file(void)
 		 */
 		save_errno = errno;
 		TREF(mu_cre_file_openrc) = errno;		/* Save for "gvcst_init" */
-		/* If this is an AUTODB (but not a STATSDB) and the file already exists, this is not an error (some other
-		 * process created the file. This is ok so return as if we created it.
+		/* If this is an AUTODB (but not a STATSDB) and the file already exists, this is not an error if the caller
+		 * is "gvcst_cre_autoDB()" since it is possible another concurrent call to this function could have created
+		 * this file at the same time. So return as if we created it. But if the caller is MUPIP CREATE then we do
+		 * want to issue an error that the file already exists. Hence the use of "caller_is_mupip_create" below.
 		 */
-		if (IS_AUTODB_REG(gv_cur_region) && !IS_STATSDB_REG(gv_cur_region) && (EEXIST == errno))
+		if (!caller_is_mupip_create && IS_AUTODB_REG(gv_cur_region) && !IS_STATSDB_REG(gv_cur_region) && (EEXIST == errno))
 			return EXIT_NRM;
 		/* Suppress EEXIST messages for statsDBs */
 		if (!IS_STATSDB_REG(gv_cur_region) || (EEXIST != errno))
@@ -498,7 +500,11 @@ unsigned char mu_cre_file(void)
 	}
 	if ((32 * 1024 - SIZEOF(shmpool_blk_hdr)) < cs_data->blk_size)
 		PUTMSG_WARN_CSA(cs_addrs, 5, ERR_MUNOSTRMBKUP, 3, RTS_ERROR_STRING(path), 32 * 1024 - DISK_BLOCK_SIZE);
-	if (!(RDBF_AUTODB & gv_cur_region->reservedDBFlags))
+	/* If MUPIP CREATE is caller, then print a message indicating the database file got created even if it is an AUTODB
+	 * region. Otherwise the caller is "gvcst_cre_autoDB()" where the AUTODB file creation is supposed to be invisible
+	 * to the user so skip the file-created message in that case.
+	 */
+	if (caller_is_mupip_create || !IS_AUTODB_REG(gv_cur_region))
 		PUTMSG_WARN_CSA(cs_addrs, 4, ERR_DBFILECREATED, 2, LEN_AND_STR(path));
 	REVERT;
 	CLEANUP(EXIT_NRM);
