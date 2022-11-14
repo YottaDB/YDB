@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -302,7 +302,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		 * "ftok_sem_get" done with either "jnlpool->jnlpool_dummy_reg" region or "recvpool.recvpool_dummy_reg" region
 		 * locks the same entity.
 		 */
-		assert(is_updproc || ((GTMRELAXED == pool_user) && is_updhelper));
+		assert(is_updproc || (GTMRELAXED == pool_user));
 		reg = recvpool.recvpool_dummy_reg;
 	} else if (!tmp_jnlpool->pool_init)
 	{	/* reuse uninitialized jnlpool */
