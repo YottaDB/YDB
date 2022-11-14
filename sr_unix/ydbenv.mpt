@@ -71,8 +71,8 @@
 	quit			; should never get here because previous line should terminate process
 
 set	; Intended to be the most common entry point to this routine (with unset likely not as common)
-	new $test,aimflag,chset,currenv,dist,env,err,errflag,errpat,file,gtmgbldir,i,io,line,localeflag,octoflag,out,path,ppid
-	new prefix,setcmd,setsep,tmp1,tmp2,tmp3,tmp4,unset,unsetcmd,ydbgbldir,ydbreplinst,ydbretention,ydbroutines
+	new $test,aimflag,chset,cmd,currenv,dbfname,dist,env,err,errflag,errpat,file,gtmgbldir,i,io,line,localeflag,octoflag,out,path,ppid
+	new prefix,region,setcmd,setsep,tmp1,tmp2,tmp3,tmp4,unset,unsetcmd,ydbgbldir,ydbreplinst,ydbretention,ydbroutines
 	new ydbtmpdir,zstmp
 	do Etrap
 	set io=$io
@@ -196,28 +196,40 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	else  set ydbgbldir=path_"/g/yottadb.gld"				; Default ydbgbldir if undefined
 	if $zlength($zsearch(ydbgbldir,-1)) do Robustify			; Existing global directory, robustify database
 	else  do								; No global directory, create database
-	. ; command is /bin/sh to feed lines to shell process because of YottaDB deviceparameter limit
-	. open "dbcreate":(shell="/bin/sh":command="/bin/sh":stderr="dbcreateerr")::"pipe"
-	. use "dbcreate"
-	. write "export ydb_gbldir=",ydbgbldir,!,"export gtmgbldir=$ydb_gbldir",!
-	. write "export ydb_dir=",env("ydb_dir"),!,"export gtmdir=",env("gtmdir"),!
-	. write "export ydb_rel="_env("ydb_rel"),!,"export gtmver=",env("gtmver"),!
-	. if $zlength($zsearch("./gdedefaults",-1)) write dist,"/yottadb -run GDE <gdedefaults",!
-	. else  write dist,"/yottadb -run GDE <"_dist,"/gdedefaults",!
-	. write dist,"/mupip create",!
-	. write dist,"/mupip set -journal=""enable,on,before"" -region ""*""",!
-	. write /eof
-	. set out=ydbtmpdir_"CreateEnv.out"
 	. set err=ydbtmpdir_"CreateEnv.err",errflag=0
+	. set out=ydbtmpdir_"CreateEnv.out"
 	. open out:newversion,err:newversion
-	. for  read line quit:$zeof  use out write line,! use "dbcreate"
-	. ; Raise error for any MUPIP error
-	. use "dbcreateerr"
-	. for  read line quit:$zeof  use err write line,! use "dbcreateerr" set:line?@errpat errflag=1
-	. use io close "dbcreate","dbcreateerr"
+	. set cmd="export ydb_gbldir="_ydbgbldir_";export gtmgbldir=$ydb_gbldir"
+	. set cmd=cmd_";export ydb_dir="_env("ydb_dir")_";export gtmdir="_env("gtmdir")
+	. set cmd=cmd_";export ydb_rel="_env("ydb_rel")_";export gtmver="_env("gtmver")
+	. set cmd=cmd_";"_dist_"/yottadb -run GDE <"
+	. set:'$zlength($zsearch("./gdedefaults",-1)) cmd=cmd_dist_"/"
+	. set cmd=cmd_"gdedefaults"
+	. open "gldcreate":(shell="/bin/sh":command=cmd:stderr="gldcreateerr":readonly)::"pipe"
+	. use "gldcreate"
+	. for  read line quit:$zeof  use out write line,! use "gldcreate"
+	. use "gldcreateerr"
+	. for  read line quit:$zeof  use err write line,! use "gldcreateerr" set:line?@errpat errflag=1
+	. use io close "gldcreate","gldcreateerr"
+	. set:errflag $ecode=",U238,"
+	. ; Create database files for regions that need them
+	. view "setenv":"ydb_gbldir":ydbgbldir,"setenv":"ydb_dir":env("ydb_dir"),"setenv":"ydb_rel":env("ydb_rel")
+	. set $zgbldir=ydbgbldir
+	. set region=$view("gvfirst")
+	. for  do  set region=$view("gvnext",region) quit:'$zlength(region)
+	. . set dbfname=$zparse($zpiece($$^%PEEKBYNAME("gd_segment.fname",region),$zchar(0),1))
+	. . if $zlength($zsearch(dbfname,-1)) do DBEnsure(dbfname)
+	. . else  do:'($$^%PEEKBYNAME("gd_region.reservedDBFlags",region)#2)
+	. . . set cmd=dist_"/mupip create -region="_region
+	. . . set cmd=cmd_";"_dist_"/mupip set -journal=""enable,on,before"" -region "_region
+	. . . open "dbcreate":(shell="/bin/sh":command=cmd:readonly:stderr="dbcreateerr")::"pipe"
+	. . . use "dbcreate"
+	. . . for  read line quit:$zeof  use out write line,! use "dbcreate"
+	. . . use "dbcreateerr"
+	. . . for  read line quit:$zeof  use err write line,! use "dbcreateerr" set:line?@errpat errflag=1
+	. . . use io close "dbcreate","dbcreateerr"
 	. set:errflag $ecode=",U242,"
 	do ExportEnv("ydb_gbldir",ydbgbldir),ExportEnv("gtmgbldir",ydbgbldir)
-	set $zgbldir=ydbgbldir
 	; ydb_routines is set here. The order is:
 	; - existing application routines (with a default structure under $ydb_dir, if not specified)
 	; - shared libraries of plugins
@@ -628,13 +640,6 @@ Robustify	; rollback / recover an existing database if needed
 	for  read line quit:$zeof  use out write line,! use "gde"
 	use "gdeerr" for  read line quit:$zeof  use err write line,! use "gdeerr"
 	use io close "gde","gdeerr",err,out
-	; create YDBAIM and YDBOCTO regions if they don't exist
-	set (aimflag,octoflag)=1
-	set tmp1="" for  set tmp1=$view("gvnext",tmp1) quit:'$zlength(tmp1)  do
-	. set:"YDBAIM"=tmp1 aimflag=0
-	. set:"YDBOCTO"=tmp1 octoflag=0
-	do:aimflag CreateAIM
-	do:octoflag CreateOCTO
 	; Go through the regions in the global directory and for every region:
 	; - If the database file does not exist, invoke MUPIP CREATE for that
 	;   region (if the region has AutoDB set, MUPIP CREATE won't create the
@@ -651,18 +656,19 @@ Robustify	; rollback / recover an existing database if needed
 	; - As the database file name could have env vars in it (e.g.
 	;   $ydb_dir/$ydb_rel/g/%ydbaim.dat) $view("WORDEXP") below generates
 	;   the complete name.
-	set semidnotnull=0
+	set (aimflag,octoflag)=1,semidnotnull=0
 	set region="" for  set region=$view("GVNEXT",region)  quit:region=""  do
-	. set dbfname=$view("WORDEXP",$zpiece($$^%PEEKBYNAME("gd_segment.fname",region),$zchar(0),1))
+	. set:"YDBAIM"=region aimflag=0
+	. set:"YDBOCTO"=region octoflag=0
+	. set dbfname=$zparse($zpiece($$^%PEEKBYNAME("gd_segment.fname",region),$zchar(0),1))
 	. if $zlength($zsearch(dbfname,-1)) do
 	. . set fhead(region,"fname")=dbfname
 	. . do DBEnsure(dbfname)
 	. . do getfields^%DUMPFHEAD(.dumpfhead,dbfname)
 	. . merge fhead(region)=dumpfhead
 	. . set:(-1'=fhead(region,"sgmnt_data.semid")) semidnotnull=1
-	. else  do
-	. . open "create":(shell="/bin/sh":command="$ydb_dist/mupip create -region="_region:readonly:stderr="mupiperr")::"pipe"
-	. . use "create" read line	; Read and discard line as sometimes MUPIP process otherwise won't run
+	. else  do:'($$^%PEEKBYNAME("gd_region.reservedDBFlags",region)#2)
+	. . open "create":(shell="/bin/sh":command="$ydb_dist/mupip create -region="_region_";$ydb_dist/mupip set -journal=""enable,on,before"" -region "_region:readonly:stderr="mupiperr")::"pipe"
 	. . use "mupiperr"
 	. . set errflag=0
 	. . kill line
@@ -751,6 +757,9 @@ Robustify	; rollback / recover an existing database if needed
 	. . . open jnlfile close jnlfile:delete
 	. . . use "/proc/self/fd/2" write jnlfile," deleted",! use io
 	. . . set jnlfile=$zsearch($$jnlfile(region)_"_*",zstmp)
+	; Create YDBAIM and YDBOCTO regions, if needed
+	do:aimflag CreateAIM
+	do:octoflag CreateOCTO
 	quit
 
 ; Internally called function to get journal file name of a journaled region.
@@ -787,6 +796,7 @@ Defaults
 	; gtmver:::env(ydbvar)#/g#/o#/o/utf8#/r:"ln -s "_env(ydbvar)_" "_env(gtmvar):$zpiece($zversion," ",2)_"_"_$zpiece($zversion," ",4)
 
 ;	Error message texts
+U238	;"-F-GLDCREATEERR Create global directory failed, stderr at ",err
 U239	;"-F-NOTAPATH Path "_file_" does not exist"
 U240	;"-F-NOTAGLDFILE "_file_ " is not a global directory file"
 U241	;"-F-NOTADBFILE "_file_" is not a database file"
