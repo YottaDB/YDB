@@ -3,6 +3,9 @@
  * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -118,6 +121,7 @@ inline static int wait_for_wip_queue_to_clear(node_local_ptr_t cnl, cache_que_he
 		{
 			send_msg_csa(CSA_ARG(REG2CSA(reg)) VARLSTCNT(7) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 					ERR_AIOQUEUESTUCK, 2, (lcnt / SLEEP_ONE_MIN), (cr ? cr->blk : 0));
+			lcnt = 1;	/* Cannot do a "wcs_sleep()" call in next line for 0 milli-seconds */
 		}
 		wcs_sleep(lcnt);
 		if ((wip_cnt != cnl->wcs_wip_lvl) && (NULL == cr)) /* only for non-specific crs */
