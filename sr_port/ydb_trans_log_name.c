@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,6 +49,7 @@ int4 ydb_trans_log_name(ydbenvindx_t envindx, mstr *trans, char *buffer, int4 bu
 	envnamestr[1] = (char *)gtmenvname[envindx];
 	/* Assert that there is always a non-null ydb* env var. Converse is not always true. */
 	assert('\0' != envnamestr[0][0]);
+	status = SS_NOLOGNAM;	/* needed mainly to avoid [clang-analyzer-core.uninitialized.UndefReturn] warning */
 	for (i = 0; i < 2; i++)
 	{
 		envname.addr = envnamestr[i];

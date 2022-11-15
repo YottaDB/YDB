@@ -1009,7 +1009,6 @@ ydb_tp_s_common.c:warning: Value stored to 'rc' is never read [clang-analyzer-de
 ydb_tp_st.c:warning: Value stored to 'rlbk_retval' is never read [clang-analyzer-deadcode.DeadStores]
 ydb_tp_st.c:warning: Value stored to 'rlbk_retval' is never read [clang-analyzer-deadcode.DeadStores]
 ydb_tp_st.c:warning: Value stored to 'rlbk_retval' is never read [clang-analyzer-deadcode.DeadStores]
-ydb_trans_log_name.c:warning: Undefined or garbage value returned to caller [clang-analyzer-core.uninitialized.UndefReturn]
 zdate_form_init.c:warning: Although the value stored to 'status' is used in the enclosing expression, the value is never actually read from 'status' [clang-analyzer-deadcode.DeadStores]
 zl_cmd_qlf.c:warning: The left operand of '&' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 zl_cmd_qlf.c:warning: Value stored to 'status' is never read [clang-analyzer-deadcode.DeadStores]

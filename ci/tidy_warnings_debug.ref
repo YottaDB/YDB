@@ -713,7 +713,6 @@ ydb_init.c:warning: Null pointer passed to 2nd parameter expecting 'nonnull' [cl
 ydb_lock_s.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 ydb_lock_st.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 ydb_simpleapi_ch.c:warning: Dereference of null pointer [clang-analyzer-core.NullDereference]
-ydb_trans_log_name.c:warning: The right operand of '==' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 zl_cmd_qlf.c:warning: The left operand of '&' is a garbage value [clang-analyzer-core.UndefinedBinaryOperatorResult]
 zlput_rname.c:warning: Value stored to 'is_on_stack' is never read [clang-analyzer-deadcode.DeadStores]
 zro_search.c:warning: Access to field 'count' results in a dereference of a null pointer [clang-analyzer-core.NullDereference]
