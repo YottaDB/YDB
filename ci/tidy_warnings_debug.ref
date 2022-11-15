@@ -626,7 +626,6 @@ stx_error.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.
 stx_error.c:warning: Value stored to 'arg1' is never read [clang-analyzer-deadcode.DeadStores]
 stx_error.c:warning: Value stored to 'arg1' is never read [clang-analyzer-deadcode.DeadStores]
 stx_error.c:warning: va_end() is called on an uninitialized va_list [clang-analyzer-valist.Uninitialized]
-symb_line.c:warning: side effects in the 2nd macro argument 'b' are repeated in macro expansion [bugprone-macro-repeated-side-effects]
 t_commit_cleanup.c:warning: Value stored to 'jnlpool_csa' is never read [clang-analyzer-deadcode.DeadStores]
 t_commit_cleanup.c:warning: Value stored to 'jnlpool_csa' is never read [clang-analyzer-deadcode.DeadStores]
 t_end.c:warning: Value stored to 'tmp_jnlpool' is never read [clang-analyzer-deadcode.DeadStores]

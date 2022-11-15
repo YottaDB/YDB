@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -124,7 +124,8 @@ unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, int max_len
 			return out;
 	}
 	*out++ = '^';
-	len = MIN(routine->routine_name.len, --max_len);
+	--max_len;
+	len = MIN(routine->routine_name.len, max_len);
 	memcpy(out, routine->routine_name.addr, len);
 	out += len;
 	max_len -= len;
