@@ -56,10 +56,27 @@ root="$(git rev-parse --show-toplevel)"
 # NOTE: discards 'x warnings generated' output since it clutters up the logs.
 cd "$root"
 mkdir -p "$output_dir"
+
+cat > $output_dir/clang_tidy_checks.txt << CAT_EOF
+Checks: >
+    -clang-analyzer-security.insecureAPI.*,
+    bugprone-*,
+    -bugprone-signed-char-misuse,
+    -bugprone-narrowing-conversions,
+    -bugprone-macro-parentheses,
+    -bugprone-easily-swappable-parameters,
+    -bugprone-assert-side-effect,
+    -bugprone-implicit-widening-of-multiplication-result,
+    -bugprone-sizeof-expression,
+    -bugprone-suspicious-string-compare,
+CAT_EOF
+
 find . -name '*.c' \
 	| grep -E 'sr_(linux|unix|port|x86_64)/.*\.c$' \
-	| xargs -n 1 -P $(getconf _NPROCESSORS_ONLN) clang-tidy-14 --quiet -p="$build_dir" '--checks=-clang-analyzer-security.insecureAPI.*' \
-	>"$output_dir/tidy_warnings.txt" 2>/dev/null
+	| xargs -n 1 -P $(getconf _NPROCESSORS_ONLN) clang-tidy-14 --quiet -p="$build_dir"	\
+	  --config-file=$output_dir/clang_tidy_checks.txt					\
+	  >"$output_dir/tidy_warnings.txt" 2>/dev/null
 
 cd "$output_dir"
 "$root"/ci/sort_warnings.sh tidy_warnings.txt sorted_warnings.txt
+
