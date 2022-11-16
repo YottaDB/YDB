@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,6 +48,7 @@ void op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 		if (MV_IS_SQLNULL(in))
 		{	/* If at least one operand in a string concatenation is $ZYSQLNULL, then the return value is $ZYSQLNULL */
 			*dst = literal_sqlnull;
+			va_end(var);
 			return;
 		}
 		maxlen += (MV_IS_STRING(in)) ? (in)->str.len : MAX_NUM_LEN;

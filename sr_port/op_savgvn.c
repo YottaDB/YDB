@@ -2,7 +2,7 @@
  *								*
  * Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,13 +47,13 @@ void op_savgvn(UNIX_ONLY_COMMA(int argcnt) int hash_code_dummy, mval *val_arg, .
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	VAR_START(var, val_arg);
 	VMS_ONLY(va_count(argcnt));
 	--argcnt;	/* remove hash_code_dummy from parameter list before storing */
 	ENSURE_GLVN_POOL_SPACE(argcnt);
 	GET_GLVN_POOL_STATE(slot, m);
 	gvn_info = (gparam_list *)&slot->glvn_info;
 	gvn_info->n = argcnt;
+	VAR_START(var, val_arg);
 	key = val_arg;
 	for (i = 0; ; )
 	{
@@ -68,4 +68,5 @@ void op_savgvn(UNIX_ONLY_COMMA(int argcnt) int hash_code_dummy, mval *val_arg, .
 		else
 			break;
 	}
+	va_end(var);
 }

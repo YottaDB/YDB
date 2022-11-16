@@ -2,7 +2,7 @@
  *								*
  * Copyright 2012, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,6 @@ void op_savlvn(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	VAR_START(var, start);
 	VMS_ONLY(va_count(argcnt));
 	ENSURE_GLVN_POOL_SPACE(argcnt);
 	/* Get variable name and store it in the stringpool. */
@@ -61,6 +60,7 @@ void op_savlvn(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	m->mvtype = MV_STR; /* needs to be protected if garbage collection happens during s2pool below */
 	lvent = &slot->lvname->str;
 	ptr = stringpool.free;
+	VAR_START(var, start);
 	c = format_lvname(start, ptr, SIZEOF(mident_fixed));
 	lvent->addr = (char *)ptr;
 	lvent->len = (char *)c - (char *)ptr;
@@ -79,4 +79,5 @@ void op_savlvn(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 		if (MV_IS_STRING(m) && !IS_IN_STRINGPOOL(m->str.addr, m->str.len))
 			s2pool(&m->str);
 	}
+	va_end(var);
 }

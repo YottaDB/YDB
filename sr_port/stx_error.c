@@ -92,6 +92,8 @@ void stx_error_va(int in_error, va_list args)
 	{
 		ins_errtriple(in_error);
 		TREF(source_error_found) = TRUE;
+		va_end(dup_args);
+		va_end(args);
 		return;
 	}
 	TREF(dollar_zcstatus) = !TREF(dollar_zcstatus) ? in_error : ERR_ERRORSUMMARY;
@@ -108,6 +110,8 @@ void stx_error_va(int in_error, va_list args)
 		{	/* merrors.msg defines INVCMD as a warning but compiler conditions can turn it into an error */
 			if (ERR_INVCMD != in_error)	/* if INVCMD has morphed into an error, it won't match here */
 				ins_errtriple(in_error);
+			va_end(dup_args);
+			va_end(args);
 			return;
 		}
 		if (TREF(for_stack_ptr) > (oprtype **)TADR(for_stack))
@@ -131,6 +135,7 @@ void stx_error_va(int in_error, va_list args)
 			arg2 = va_arg(args, VA_ARG_TYPE);
 			arg3 = va_arg(args, VA_ARG_TYPE);
 			arg4 = va_arg(args, VA_ARG_TYPE);
+			va_end(dup_args);
 			va_end(args);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) in_error, cnt, arg1, arg2, arg3, arg4);
 		} else if ((ERR_LABELMISSING == in_error)
@@ -143,6 +148,7 @@ void stx_error_va(int in_error, va_list args)
 			assert(cnt == 2);
 			arg1 = va_arg(args, VA_ARG_TYPE);
 			arg2 = va_arg(args, VA_ARG_TYPE);
+			va_end(dup_args);
 			va_end(args);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) in_error, cnt, arg1, arg2);
 		} else if ((ERR_CEUSRERROR == in_error)
@@ -153,10 +159,12 @@ void stx_error_va(int in_error, va_list args)
 			cnt = va_arg(args, VA_ARG_TYPE);
 			assert(cnt == 1);
 			arg1 = va_arg(args, VA_ARG_TYPE);
+			va_end(dup_args);
 			va_end(args);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) in_error, cnt, arg1);
 		} else
 		{
+			va_end(dup_args);
 			va_end(args);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) in_error);
 		}
@@ -166,6 +174,7 @@ void stx_error_va(int in_error, va_list args)
 	flush_pio();
 	if (TREF(source_error_found))
 	{
+		va_end(dup_args);
 		va_end(args);
 		return;
 	}
@@ -182,6 +191,7 @@ void stx_error_va(int in_error, va_list args)
 	warn = (cmd_qlf.qlf & CQ_WARNINGS) != 0;
 	if (!warn && !list) /*SHOULD BE MESSAGE TYPE IS WARNING OR LESS*/
 	{
+		va_end(dup_args);
 		va_end(args);
 		return;
 	}
@@ -255,5 +265,6 @@ void stx_error_va(int in_error, va_list args)
 		va_end(dup_args);
 		*c = 0;
 		list_line(buf);
-	}
+	} else
+		va_end(dup_args);
 }

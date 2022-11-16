@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,6 @@ int gtm_cip(ci_name_descriptor* ci_info, ...)
 	 * ESTABLISH_RET of ydb_simpleapi_ch here like is done for other SimpleAPI function calls.
 	 */
 	VAR_START(var, ci_info);
-	/* Note: "va_end(var)" done inside "ydb_ci_exec" */
-	retval = ydb_ci_exec(ci_info->rtn_name.address, ci_info, var, FALSE);
+	retval = ydb_ci_exec(ci_info->rtn_name.address, ci_info, var, FALSE); /* Note: "va_end(var)" done inside "ydb_ci_exec" */
 	return retval;
 }

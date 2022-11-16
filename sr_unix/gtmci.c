@@ -581,7 +581,10 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 	if (!ydb_init_complete)
 	{
 		if ((status = ydb_init()) != 0)		/* Note - sets fgncal_stack */
+		{
+			va_end(var);
 			return status;
+		}
 		/* Since we called "ydb_init" above, "gtm_threadgbl" would have been set to a non-null VALUE
 		 * and so any call to SETUP_THREADGBL_ACCESS done by the function that called this macro
 		 * needs to be redone to set "lcl_gtm_threadgbl" to point to this new "gtm_threadgbl".

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -49,7 +52,6 @@ void op_lvzwrite(UNIX_ONLY_COMMA(int4 count) long arg1, ...)
 	MAXSTR_BUFF_DECL(buff);
 
 	SETUP_THREADGBL_ACCESS;
-	VAR_START(var, arg1);
 	VMS_ONLY(va_count(count));
 	MAXSTR_BUFF_INIT;
 
@@ -62,6 +64,7 @@ void op_lvzwrite(UNIX_ONLY_COMMA(int4 count) long arg1, ...)
 	output.ptr = output.buff;
 	out = &output;
 	count--;
+	VAR_START(var, arg1);
 	lvzwr_init(zwr_patrn_mident, (mval *)arg1);
 	for (; count > 0; )
 	{
@@ -81,6 +84,7 @@ void op_lvzwrite(UNIX_ONLY_COMMA(int4 count) long arg1, ...)
 				}
 				if (zwrhtab && !zwrhtab->cleaned)
 					als_zwrhtab_init();
+				va_end(var);
 				MAXSTR_BUFF_FINI;
 				TREF(in_zwrite) = FALSE;
 				return;

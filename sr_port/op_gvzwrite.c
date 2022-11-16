@@ -2,7 +2,7 @@
  *								*
  *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,6 +65,7 @@ void op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
 			gvzwr_arg(flag, 0, 0);  /* caution fall through */
 		case ZWRITE_END:
 			gvzwr_fini(&output, pat);
+			va_end(var);
 			MAXSTR_BUFF_FINI;
 			TREF(in_zwrite) = FALSE;
 			return;

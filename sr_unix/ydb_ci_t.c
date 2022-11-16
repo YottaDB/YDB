@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,14 +45,14 @@ int ydb_ci_t(uint64_t tptoken, ydb_buffer_t *errstr, const char *c_rtn_name, ...
 	ci_desc.rtn_name.length = STRLEN(ci_desc.rtn_name.address);
 	ci_desc.handle = NULL;
 	threaded_api_ydb_engine_lock(tptoken, errstr, LYDB_RTN_YDB_CI, &save_active_stapi_rtn, &save_errstr, &get_lock, &retval);
-	/* Note: "va_end(var)" done inside "ydb_ci_exec" */
 	if (YDB_OK == retval)
 	{
-		retval = ydb_cip_helper(LYDB_RTN_YDB_CI, &ci_desc, &var);
+		retval = ydb_cip_helper(LYDB_RTN_YDB_CI, &ci_desc, &var); /* Note: "va_end(var)" done inside "ydb_cip_helper()" */
 		if (0 != retval)
 			/* Set errstr from $zstatus before releasing the YottaDB multi-threaded engine lock */
 			SET_ERRSTR_FROM_ZSTATUS_IF_NOT_NULL(errstr);
 		threaded_api_ydb_engine_unlock(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
-	}
+	} else
+		va_end(var);
 	return retval;
 }

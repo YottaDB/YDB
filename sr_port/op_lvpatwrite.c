@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -49,7 +52,6 @@ void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...)
 	MAXSTR_BUFF_DECL(buff);
 
 	SETUP_THREADGBL_ACCESS;
-	VAR_START(var, arg1);
 	VMS_ONLY(va_count(count));
 	assert(1 < count);
 	local_buff = FALSE;
@@ -68,6 +70,7 @@ void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...)
 	} else
 		out = (zshow_out *) arg1;
 	count--;
+	VAR_START(var, arg1);
 	arg1 = va_arg(var, UINTPTR_T);
 	lvzwr_init(zwr_patrn_mval, (mval *)arg1);
 	count--;
@@ -89,6 +92,7 @@ void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...)
 				}
 				if (zwrhtab && !zwrhtab->cleaned)
 					als_zwrhtab_init();
+				va_end(var);
 				if (local_buff)
 					MAXSTR_BUFF_FINI;
 				TREF(in_zwrite) = FALSE;
