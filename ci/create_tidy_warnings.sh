@@ -69,6 +69,7 @@ Checks: >
     -bugprone-implicit-widening-of-multiplication-result,
     -bugprone-sizeof-expression,
     -bugprone-suspicious-string-compare,
+    -clang-analyzer-core.NonNullParamChecker,
 CAT_EOF
 
 find . -name '*.c' \
