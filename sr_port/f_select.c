@@ -30,7 +30,7 @@ GBLREF uint4		ydbDebugLevel;
 
 LITREF octabstruct oc_tab[];
 
-typedef struct _save_for_select
+typedef struct save_for_select
 {
 	triple		*expr_start;
 	triple		*expr_start_orig;

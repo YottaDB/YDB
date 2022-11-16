@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,7 +13,6 @@
  *								*
  ****************************************************************/
 
-#define _POSIX_EXIT	/* Needed for VMS system() call */ /* BYPASSOK: system() used insode the comment, no SYSTEM() needed */
 #include "mdef.h"
 
 #ifdef VMS

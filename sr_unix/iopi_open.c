@@ -12,9 +12,6 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-#ifndef _REENTRANT
-#  define _REENTRANT
-#endif
 
 #include "mdef.h"
 
