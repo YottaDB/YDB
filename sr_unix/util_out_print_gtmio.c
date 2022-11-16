@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +58,7 @@ void	util_out_print_gtmio(caddr_t message, int flush, ...)
 	if (STRCMP(message, "!AD") || (FLUSH != flush))
 	{
 		util_out_print_vaparm(message, NOFLUSH_OUT, var, MAXPOSINT4);
+		va_end(TREF(last_va_list_ptr));
 		src = TREF(util_outbuff_ptr);
 		assert(NULL != TREF(util_outptr));
 		srclen = INTCAST(TREF(util_outptr) - src) + 1;	/* 1 is for '\n' */
@@ -100,7 +101,6 @@ void	util_out_print_gtmio(caddr_t message, int flush, ...)
 		TREF(ztrigbuffLen) += srclen;
 		TREF(util_outptr) = TREF(util_outbuff_ptr);	/* Signal text is flushed */
 	}
-	va_end(TREF(last_va_list_ptr));
 	va_end(var);
 	return;
 }

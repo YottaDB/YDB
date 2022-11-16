@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -55,6 +58,9 @@ void util_cm_print(clb_struct *lnk, int code, char *message, int flush, ...)
 		memcpy(outptr, TREF(util_outbuff_ptr), msglen);
 		outptr += msglen;
 	}
+	assert(NULL != message);	/* or else "TREF(last_va_list_ptr)" would be uninitialized which would mean the
+					 * "va_end(TREF(last_va_list_ptr))" call below would use uninitialized data.
+					 */
 	va_end(TREF(last_va_list_ptr));
 	va_end(var);
 	switch (flush)
