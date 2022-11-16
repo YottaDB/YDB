@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -246,9 +246,8 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 		{
 			ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, shm_id);
 			*ipcs_ptr = '\0';
-			if (rndwn_both_pools)
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJPOOLRNDWNFL, 4, LEN_AND_STR(ipcs_buff),
-					LEN_AND_STR(instfilename));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJPOOLRNDWNFL, 4, LEN_AND_STR(ipcs_buff),
+				LEN_AND_STR(instfilename));
 		}
 		*jnlpool_sem_created = sem_created;
 	}
@@ -336,9 +335,8 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 		{
 			ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, shm_id);
 			*ipcs_ptr = '\0';
-			if (rndwn_both_pools)
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MURPOOLRNDWNFL, 4, LEN_AND_STR(ipcs_buff),
-					LEN_AND_STR(instfilename));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MURPOOLRNDWNFL, 4, LEN_AND_STR(ipcs_buff),
+				LEN_AND_STR(instfilename));
 		}
 	}
 	assert(jgbl.onlnrlbk || INST_FREEZE_ON_ERROR_POLICY || ((NULL == jnlpool) || (NULL == jnlpool->repl_inst_filehdr)));

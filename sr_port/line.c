@@ -116,47 +116,44 @@ boolean_t line(uint4 *lnc)
 				dqins(r, exorder, e);
 				embed_error = TRUE;
 			}
-			if (success)
+			for (parmcount = 0; TK_RPAREN != TREF(window_token); parmcount++)
 			{
-				for (parmcount = 0; TK_RPAREN != TREF(window_token); parmcount++)
+				if (TK_IDENT != TREF(window_token))
 				{
-					if (TK_IDENT != TREF(window_token))
+					stx_error(ERR_NAMEEXPECTED);
+					success = FALSE;
+					break;
+				} else
+				{
+					varnum = get_mvaddr(&(TREF(window_ident)))->mvidx;
+					for (r = parmbase->operand[1].oprval.tref; r; r = r->operand[1].oprval.tref)
 					{
-						stx_error(ERR_NAMEEXPECTED);
-						success = FALSE;
-						break;
-					} else
-					{
-						varnum = get_mvaddr(&(TREF(window_ident)))->mvidx;
-						for (r = parmbase->operand[1].oprval.tref; r; r = r->operand[1].oprval.tref)
+						assert(TRIP_REF == r->operand[0].oprclass);
+						assert(ILIT_REF == r->operand[0].oprval.tref->operand[0].oprclass);
+						assert((TRIP_REF == r->operand[1].oprclass)
+							|| (NO_REF == r->operand[1].oprclass));
+						if (r->operand[0].oprval.tref->operand[0].oprval.ilit == varnum)
 						{
-							assert(TRIP_REF == r->operand[0].oprclass);
-							assert(ILIT_REF == r->operand[0].oprval.tref->operand[0].oprclass);
-							assert((TRIP_REF == r->operand[1].oprclass)
-								|| (NO_REF == r->operand[1].oprclass));
-							if (r->operand[0].oprval.tref->operand[0].oprval.ilit == varnum)
-							{
-								stx_error(ERR_MULTFORMPARM);
-								success = FALSE;
-								break;
-							}
-						}
-						if (!success)
+							stx_error(ERR_MULTFORMPARM);
+							success = FALSE;
 							break;
-						r = newtriple(OC_PARAMETER);
-						parmtail->operand[1] = put_tref(r);
-						r->operand[0] = put_ilit(varnum);
-						parmtail = r;
-						advancewindow();
+						}
 					}
-					if (TK_COMMA == TREF(window_token))
-						advancewindow();
-					else if (TK_RPAREN != TREF(window_token))
-					{
-						stx_error(ERR_COMMAORRPAREXP);
-						success = FALSE;
+					if (!success)
 						break;
-					}
+					r = newtriple(OC_PARAMETER);
+					parmtail->operand[1] = put_tref(r);
+					r->operand[0] = put_ilit(varnum);
+					parmtail = r;
+					advancewindow();
+				}
+				if (TK_COMMA == TREF(window_token))
+					advancewindow();
+				else if (TK_RPAREN != TREF(window_token))
+				{
+					stx_error(ERR_COMMAORRPAREXP);
+					success = FALSE;
+					break;
 				}
 			}
 			if (success)

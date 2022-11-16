@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -131,12 +134,9 @@ void dse_chng_rhead(void)
 		BLK_INIT(bs_ptr, bs1);
 		cp = bp;
 		cp += SIZEOF(blk_hdr);
-		if (chng_rec)
-		{
-			BLK_SEG(bs_ptr, cp, rp - cp);
-			BLK_SEG(bs_ptr, (uchar_ptr_t)&new_rec, SIZEOF(rec_hdr));
-			cp = rp + SIZEOF(rec_hdr);
-		}
+		BLK_SEG(bs_ptr, cp, rp - cp);
+		BLK_SEG(bs_ptr, (uchar_ptr_t)&new_rec, SIZEOF(rec_hdr));
+		cp = rp + SIZEOF(rec_hdr);
 		if (b_top - cp)
 			BLK_SEG(bs_ptr, cp, b_top - cp);
 		if (!BLK_FINI(bs_ptr, bs1))
