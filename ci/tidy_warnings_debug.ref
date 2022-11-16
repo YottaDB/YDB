@@ -62,7 +62,6 @@ expritem.c:warning: Although the value stored to 'i' is used in the enclosing ex
 expritem.c:warning: Value stored to 'saw_se' is never read [clang-analyzer-deadcode.DeadStores]
 expritem.c:warning: Value stored to 'saw_se' is never read [clang-analyzer-deadcode.DeadStores]
 extern_func.c:warning: Value stored to 'nxtopr' is never read [clang-analyzer-deadcode.DeadStores]
-exttab_parse.c:warning: Address of stack memory associated with local variable 'rcfpath' is still referred to by the global variable 'ext_table_file_name' upon returning to the caller.  This will be a dangling reference [clang-analyzer-core.StackAddressEscape]
 f_select.c:warning: potentially unintended semicolon [bugprone-suspicious-semicolon]
 f_zconvert.c:warning: Although the value stored to 'tmpstr' is used in the enclosing expression, the value is never actually read from 'tmpstr' [clang-analyzer-deadcode.DeadStores]
 f_zconvert.c:warning: Although the value stored to 'tmpstr' is used in the enclosing expression, the value is never actually read from 'tmpstr' [clang-analyzer-deadcode.DeadStores]

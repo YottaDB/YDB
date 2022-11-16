@@ -54,7 +54,6 @@ STATICDEF int	ext_source_line_num;
 STATICDEF int	ext_source_line_len;
 STATICDEF int	ext_source_column;
 STATICDEF char	ext_source_line[MAX_SRC_LINE];
-STATICDEF char	*ext_table_file_name;
 STATICDEF boolean_t star_found;
 
 STATICFNDCL void *get_memory(size_t n);
@@ -64,7 +63,7 @@ STATICFNDCL char *scan_ident(char *c);
 STATICFNDCL void scan_behavioral_words(char *c, struct extcall_entry_list *entry_ptr);
 STATICFNDCL char *scan_labelref(char *c);
 STATICFNDCL enum ydb_types scan_keyword(char **c);
-STATICFNDCL int scan_array_bound(char **b,int curr_type);
+STATICFNDCL int scan_array_bound(char **b, int curr_type, char *ext_table_file_name);
 STATICFNDCL char *read_table(char *b, int l, FILE *f);
 STATICFNDCL void put_mstr(mstr *src, mstr *dst);
 STATICFNDCL uint4 array_to_mask(boolean_t ar[MAX_ACTUALS], int n);
@@ -452,7 +451,7 @@ STATICFNDEF enum ydb_types scan_keyword(char **c)
 	return ydb_notfound;
 }
 
-STATICFNDEF int scan_array_bound(char **b,int curr_type)
+STATICFNDEF int scan_array_bound(char **b, int curr_type, char *ext_table_file_name)
 {
 	char 		number[MAX_DIGITS_IN_INT];
 	char		*c;
@@ -561,6 +560,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 	void_ptr_t			pakhandle;
 	int				nbytes;
 	boolean_t			is_ydb_env_match;
+	char				*ext_table_file_name;
 
 	/* First, construct package name environment variable */
 	if (package->str.len)
@@ -742,7 +742,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 		if ('[' == *tbp)
 		{
 			if (star_found)
-				ret_pre_alloc_val = scan_array_bound(&tbp,ret_tok);
+				ret_pre_alloc_val = scan_array_bound(&tbp,ret_tok, ext_table_file_name);
 			else
 				ext_stx_error(ERR_ZCPREALLVALPAR, ext_table_file_name);
 			/* We should allow the pre-allocated value upto to the maximum string size (MAX_STRLEN) plus 1 for the
@@ -803,7 +803,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 			if ('[' == *tbp)
 			{
 				if (star_found && !is_input[parameter_count])
-					parameter_alloc_values[parameter_count] = scan_array_bound(&tbp, pr);
+					parameter_alloc_values[parameter_count] = scan_array_bound(&tbp, pr, ext_table_file_name);
 				else
 					ext_stx_error(ERR_ZCPREALLVALPAR, ext_table_file_name);
 				/* We should allow the pre-allocated value upto to the maximum string size (MAX_STRLEN) plus 1 for
@@ -868,6 +868,7 @@ callin_entry_list *citab_parse(boolean_t internal_use, const char *fname)
 	boolean_t		is_ydb_env_match;
 	int			nbytes;
 	char			tmpbuff[256];
+	char			*ext_table_file_name;
 
 	if (!internal_use)
 	{
