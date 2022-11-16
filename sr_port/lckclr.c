@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001 Sanchez Computer Associates, Inc.		*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@ GBLREF	mlk_pvtblk	*mlk_pvt_root;
 
 void lckclr(void)
 {
-	short i;
+	unsigned short i;
 	mlk_pvtblk *p1;
 
 	p1 = mlk_pvt_root;

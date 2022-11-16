@@ -79,7 +79,7 @@ int gtmsource_get_opt(void)
 	char		statslog_val[SIZEOF("OFF")]; /* "ON" or "OFF" */
 	char		update_val[SIZEOF("DISABLE")]; /* "ENABLE" or "DISABLE" */
 	gtm_int64_t	buffsize;
-	unsigned short	connect_parms_index, counter;
+	unsigned short	connect_parms_index;
 	int 		index = 0, port_len, renegotiate_interval, status;
 	int		timeout_status;
 	mstr		trans_name;
@@ -239,6 +239,8 @@ int gtmsource_get_opt(void)
 						STRTOK_R(connect_parm_token_str, GTMSOURCE_CONN_PARMS_DELIM, &strtokptr)));
 			     connect_parms_index++, connect_parm_token_str = NULL)
 			{
+				size_t	counter;
+
 				if (GTMSOURCE_CONN_PARMS_COUNT > connect_parms_index)
 				{
 					errno = 0;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,10 +67,12 @@ error_def(ERR_NOREGION);
 	}													\
 }
 
+#define	RBUFF_ARRAY_SIZE	YDB_PATH_MAX
+
 void mu_getlst(char *name, int4 size)
 {
 	boolean_t	matched, is_statsDB, is_autoDB;
-	char		*c1, *c2, *c3, *c4, fbuff[YDB_PATH_MAX], rbuff[YDB_PATH_MAX], fnbuff[YDB_PATH_MAX + 1];
+	char		*c1, *c2, *c3, *c4, fbuff[YDB_PATH_MAX], rbuff[RBUFF_ARRAY_SIZE], fnbuff[YDB_PATH_MAX + 1];
 	gd_region	*reg;
 	tp_region	*list;
 	unsigned short	flen, i, rlen;
@@ -90,7 +92,7 @@ void mu_getlst(char *name, int4 size)
 			mupip_exit(ERR_MUNODBNAME);
 		for (i = 0; i < rlen; i++)
 			rbuff[i] = TOUPPER(rbuff[i]); /* Region names are always upper-case ASCII and thoroughly NUL terminated */
-		for ( ; i < ARRAYSIZE(rbuff); i++)
+		for ( ; i < RBUFF_ARRAY_SIZE; i++)
 			rbuff[i] = 0;
 	} else
 	{
@@ -135,7 +137,7 @@ void mu_getlst(char *name, int4 size)
 			mupip_exit(ERR_MUNODBNAME);
 		for (i = 0; i < rlen; i++)
 			rbuff[i] = TOUPPER(rbuff[i]); /* Region names are always upper-case ASCII and thoroughly NUL terminated */
-		for ( ; i < ARRAYSIZE(rbuff); i++)
+		for ( ; i < RBUFF_ARRAY_SIZE; i++)
 			rbuff[i] = 0;
 		flen = SIZEOF(fbuff);	/* reset max_buflen to original before call to "cli_get_str" */
 		if ((!cli_get_str("SAVE_DIR", fbuff, &flen)) || (0 == flen))
