@@ -137,9 +137,9 @@ LITDEF nametabent svn_names[] =
 	,{ 9, "ZUSEDSTOR" }
 	,{ 3, "ZUT" }
 	,{ 8, "ZVERSION" }
-	,{ 7, "ZYERROR" }
+	,{ 7, "ZYERROR" }, { 4, "ZYER" }, { 5, "ZYERR" }
 	,{ 9, "ZYINTRSIG" }
-	,{ 9, "ZYRELEASE" }
+	,{ 9, "ZYRELEASE" }, { 4, "ZYRE" }
 	,{ 9, "ZYSQLNULL" }
 };
 
@@ -147,7 +147,7 @@ LITDEF nametabent svn_names[] =
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 104	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 107	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -236,9 +236,9 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZUSEDSTOR, FALSE, ALL_SYS }
 	,{ SV_ZUT, FALSE, ALL_SYS }
 	,{ SV_ZVERSION, FALSE, ALL_SYS }
-	,{ SV_ZYERROR, TRUE, ALL_SYS }
+	,{ SV_ZYERROR, TRUE, ALL_SYS } ,{ SV_ZYERROR, TRUE, ALL_SYS }, { SV_ZYERROR, TRUE, ALL_SYS }
 	,{ SV_ZYINTRSIG, FALSE, ALL_SYS }
-	,{ SV_ZYRELEASE, FALSE, ALL_SYS }
+	,{ SV_ZYRELEASE, FALSE, ALL_SYS } ,{ SV_ZYRELEASE, FALSE, ALL_SYS }
 	,{ SV_ZYSQLNULL, FALSE, ALL_SYS }
 };
 

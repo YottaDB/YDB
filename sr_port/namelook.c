@@ -44,7 +44,8 @@ int namelook(const unsigned char offset_tab[], const nametabent *name_tab, char 
 	i = name_tab + offset_tab[x -= 'A'];
 	top = name_tab + offset_tab[++x];
 	assert((i == top) || (i->name[0] >= temp[0]));
-	if ('Z' == temp[0])
+	/* YDB#904 - second part of if statement: don't do relaxed matching for ZY* ISVs, commands, and functions for YottaDB */
+	if ('Z' == temp[0] && !((1 < strlength) && ('Y' == temp[1])))
 	{	/* relaxed conventions for Z* keyword abbreviations accept leading subsets */
 		for (; i < top; i++)
 		{
