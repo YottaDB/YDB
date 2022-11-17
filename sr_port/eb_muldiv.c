@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001 Sanchez Computer Associates, Inc.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -109,8 +112,7 @@ int4	eb_mul (int4 v[], int4 u[], int4 p[])	/* p = u*v */
 			if ( 9 > i+j)
 				prod[i+j] = carry;
 			else
-				if (0 != carry)
-					assert(FALSE);
+				assert(0 == carry);
 		}
 	}
 

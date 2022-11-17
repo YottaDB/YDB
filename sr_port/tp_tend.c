@@ -407,9 +407,15 @@ boolean_t	tp_tend()
 			 * We will repeat this check later in crit but it will hopefully have little or nothing to do.
 			 * bypass 1st check if already in crit -- check later
 			 */
-			if (!csa->now_crit && !is_mm && !WCS_GET_SPACE(gv_cur_region, si->cw_set_depth + 1, NULL, csa))
+			if (!csa->now_crit && !is_mm)
+			{
+				boolean_t	wcs_get_space_passed;
+
+				wcs_get_space_passed = WCS_GET_SPACE(gv_cur_region, si->cw_set_depth + 1, NULL, csa);
 				/* only reason we currently know why wcs_get_space could fail */
-				assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
+				assert(wcs_get_space_passed || csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
+				PRO_ONLY(UNUSED(wcs_get_space_passed));
+			}
 			if (JNL_ENABLED(csa))
 			{	/* compute the total journal record size requirements before grab_crit.
 				 * there is code later that will check for state changes from now to then
@@ -1683,8 +1689,10 @@ boolean_t	tp_tend()
 			 * the old contents for the new contents. The acts of pinning and unpinning use compswap which does the
 			 * needed memory barriers.
 			 */
+#			ifndef MM_WRITE_MEMORY_BARRIER_IS_NO_OP
 			if (is_mm)
 				MM_WRITE_MEMORY_BARRIER;
+#			endif
 			INCREMENT_CURR_TN(csd); /* Step CMT12 */
 			csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;	/* phase2 : update database buffers. Step CMT13.
 									 * Set this BEFORE releasing crit but AFTER

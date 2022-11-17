@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -221,9 +221,16 @@ void release_all_locks(unix_db_info *udi, gtmsource_local_ptr_t gtmsourcelocal_p
 	/* Now that the standalone access is released, we should decrement the counter in the ftok semaphore
 	 * obtained in mu_rndwn_repl_instance(). This is not reset in case of a rollback.
 	 */
-	if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, FALSE)
-			|| !ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE))
-		assert(FALSE);
+	got_ftok = ftok_sem_lock(jnlpool->jnlpool_dummy_reg, FALSE);
+	assert(got_ftok);
+	if (got_ftok)
+	{
+		boolean_t	ftok_released;
+
+		ftok_released = ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE);
+		assert(ftok_released);
+		PRO_ONLY(UNUSED(ftok_released));
+	}
 }
 
 int4 mur_open_files(boolean_t retry)

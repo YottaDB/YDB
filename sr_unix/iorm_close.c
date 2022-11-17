@@ -203,10 +203,7 @@ void iorm_close(io_desc *iod, mval *pp)
 		UPDATE_P_OFFSET(p_offset, c, pp);	/* updates "p_offset" using "c" and "pp" */
 	}
 
-	if (iod->pair.in != iod)
-		assert(iod->pair.out == iod);
-	if (iod->pair.out != iod)
-		assert(iod->pair.in == iod);
+	assert((iod->pair.in == iod) || (iod->pair.out == iod));
 
 	iod->state = dev_closed;
 	/* save no_destroy for disk device */

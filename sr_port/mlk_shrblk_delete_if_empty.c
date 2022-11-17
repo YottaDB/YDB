@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,8 +39,10 @@ boolean_t mlk_shrblk_delete_if_empty(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 	CHECK_SHRBLKPTR(offset, *pctl);
 #	endif
 	p = (d->parent == 0) ? NULL : (mlk_shrblk_ptr_t)R2A(d->parent);
+#	ifdef DEBUG
 	if (p)
 		CHECK_SHRBLKPTR(d->parent, *pctl);
+#	endif
 	assert((0 != d->lsib) && (0 != d->rsib));
 	l = (mlk_shrblk_ptr_t)R2A(d->lsib);
 	r = (mlk_shrblk_ptr_t)R2A(d->rsib);

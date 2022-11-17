@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -57,8 +60,7 @@ mprof_stack_frame *mprof_stack_pop(void)
 
 	SETUP_THREADGBL_ACCESS;
 	last_frame = (TREF(mprof_stack_curr_frame))->prev;
-	if (NULL == TREF(mprof_stack_curr_frame))
-		assert(FALSE);
+	assert(NULL != TREF(mprof_stack_curr_frame));
 	/* only let mprof_chunk_avail_size become 0 if there have been previously allocated chunks */
 	if (((MPROF_STACK_ALLOC_CNT - 1) == TREF(mprof_chunk_avail_size)) && (NULL != last_frame))
 	{

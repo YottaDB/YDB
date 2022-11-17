@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,8 +58,14 @@ void auto_zlink(int rtnhdridx)
 	rtn.str.addr = rname.addr;
 	op_zlink(&rtn, NULL);			/* op_zlink() takes care of '%' -> '_' translation of routine name */
 	if ('_' == rname_buff.c[0]) rname_buff.c[0] = '%';
-	if ((NULL == find_rtn_hdr(&rname)) && (op_rhdaddr(&rtn, -1)))
-		assert(FALSE && rname.addr); 	/* if the routine is not found, op_rhdaddr should give and error & return FALSE */
+	if (NULL == find_rtn_hdr(&rname))
+	{
+		int	ret;
+
+		ret = op_rhdaddr(&rtn, -1);
+		assert(0 == ret); 	/* if the routine is not found, op_rhdaddr should give and error & return FALSE */
+		PRO_ONLY(UNUSED(ret));
+	}
 	DBGARLNK((stderr, "auto_zlink: Linked in rtn %.*s to "lvaddr"\n", rname.len, rname.addr, find_rtn_hdr(&rname)));
 	return;
 }

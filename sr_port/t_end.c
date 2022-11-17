@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -662,9 +662,15 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		 * outside crit. The available space must be double-checked inside crit.
 		 */
 		DEBUG_ONLY(tmp_jnlpool = jnlpool;)
-		if (!is_mm && !WCS_GET_SPACE(reg, cw_set_depth + 1, NULL, csa))
+		if (!is_mm)
+		{
+			boolean_t	wcs_get_space_passed;
+
+			wcs_get_space_passed = WCS_GET_SPACE(reg, cw_set_depth + 1, NULL, csa);
 			/* only reason we currently know why wcs_get_space could fail */
-			assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
+			assert(wcs_get_space_passed || csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
+			PRO_ONLY(UNUSED(wcs_get_space_passed));
+		}
 		assert(tmp_jnlpool == jnlpool);
 		for (;;)
 		{
@@ -1705,8 +1711,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	/* To avoid confusing concurrent processes, MM requires a barrier before incrementing db TN. For BG, cr->in_tend
 	 * serves this purpose so no barrier is needed. See comment in tp_tend.
 	 */
+#	ifndef MM_WRITE_MEMORY_BARRIER_IS_NO_OP
 	if (is_mm)
 		MM_WRITE_MEMORY_BARRIER;
+#	endif
 	INCREMENT_CURR_TN(csd); /* Step CMT12 */
 	csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;	/* phase2 : update database buffers. Step CMT13.
 							 * Set this BEFORE releasing crit but AFTER incrementing curr_tn.

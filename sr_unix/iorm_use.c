@@ -971,14 +971,12 @@ void	iorm_use(io_desc *iod, mval *pp)
 		{
 			assert(gtm_utf8_mode);
 			/* We shouldn't have an existing buffer at this point if not closed nodestroy */
-			if (!rm_ptr->no_destroy)
-				assert(NULL == rm_ptr->inbuf);
+			assert(rm_ptr->no_destroy || (NULL == rm_ptr->inbuf));
 		}
 		if (IS_UTF16_CHSET(iod->ochset))
 		{
 			/* We shouldn't have an existing buffer at this point if not closed nodestroy*/
-			if (!rm_ptr->no_destroy)
-				assert(NULL == rm_ptr->outbuf);
+			assert(rm_ptr->no_destroy || (NULL == rm_ptr->outbuf));
 		}
 	}
 	/* Now adjust the buffer based on new CHSET & recordsize, If the file was already opened */

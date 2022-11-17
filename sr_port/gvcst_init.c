@@ -312,8 +312,14 @@ CONDITION_HANDLER(gvcst_init_autoDB_ch)
 	else
 		reg = db_init_region;
 	udi = FILE_INFO(reg);
-	if (udi->grabbed_ftok_sem && !ftok_sem_release(reg, FALSE, FALSE))	/* release ftok lock on the base region */
-		assert(FALSE);
+	if (udi->grabbed_ftok_sem)
+	{
+		boolean_t	sem_released;
+
+		sem_released = ftok_sem_release(reg, FALSE, FALSE);	/* release ftok lock on the base region */
+		assert(sem_released);
+		PRO_ONLY(UNUSED(sem_released));
+	}
 	if (ftok_sem_reg == reg)
 		ftok_sem_reg = NULL;
 	/* Enable interrupts in case we are here with intrpt_ok_state == INTRPT_IN_GVCST_INIT due to an rts error.

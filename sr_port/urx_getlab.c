@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,12 +50,9 @@ bool urx_getlab (char *lab, int lablen, urx_rtnref *rtn, urx_labref **lp0p, urx_
 			break;
 		}
 	}
-	if (lp0 == (urx_labref *)rtn)
-		assert(((urx_rtnref *)lp0)->lab == lp1);
-	else
-		assert(lp0->next == lp1);
-	if (found)
-		assert(lp1 != 0);
+	assert((lp0 != (urx_labref *)rtn) || (((urx_rtnref *)lp0)->lab == lp1));
+	assert((lp0 == (urx_labref *)rtn) || (lp0->next == lp1));
+	assert(!found || (lp1 != 0));
 	*lp0p = lp0;
 	*lp1p = lp1;
 	return found;

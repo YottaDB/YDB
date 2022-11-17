@@ -51,13 +51,13 @@ GBLREF	jnl_gbls_t		jgbl;
 
 void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 {
-	boolean_t	is_mm;
 	blk_segment	*seg, *stop_ptr, *array;
 	off_chain	chain;
 	sm_uc_ptr_t	ptr, ptrtop, c;
 	sm_ulong_t	n;
 	int4		offset;
 	trans_num	blktn;
+	boolean_t	is_mm;
 #	ifdef DEBUG
 	boolean_t	integ_error_found;
 	rec_hdr_ptr_t	rp;
@@ -159,8 +159,12 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	 * cache-record. The act of pinning uses compswap which does the needed memory barriers so no need of a memory barrier in
 	 * the BG case. Also see similar comment in tp_tend before MM_WRITE_MEMORY_BARRIER.
 	 */
+#	ifndef MM_WRITE_MEMORY_BARRIER_IS_NO_OP
 	if (is_mm)
 		MM_WRITE_MEMORY_BARRIER;
+#	else
+	UNUSED(is_mm);
+#	endif
 	if (cse->forward_process)
 	{
 		stop_ptr = (blk_segment *)array->addr;

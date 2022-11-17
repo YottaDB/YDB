@@ -1918,8 +1918,8 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 					if (!ctl->repl_rctl->read_complete)
 					{
 						GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
-						if ((read_len = read_transaction(ctl, buff, buff_avail, read_jnl_seqno)) < 0)
-							assert(repl_errno == EREPL_JNLEARLYEOF);
+						read_len = read_transaction(ctl, buff, buff_avail, read_jnl_seqno);
+						assert((0 < read_len) || (repl_errno == EREPL_JNLEARLYEOF));
 						if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
 							return 0;
 						cumul_read += read_len;

@@ -72,7 +72,7 @@ int f_select(oprtype *a, opctype op)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-#	ifdef DEBUG
+#	ifdef DEBUG_TRIPLES
 	if (GDL_DebugCompiler & ydbDebugLevel)
 		CHKTCHAIN(TREF(curtchain), exorder, (NULL != TREF(expr_start)));
 #	endif
@@ -301,7 +301,7 @@ int f_select(oprtype *a, opctype op)
 			triptr = newtriple(OC_GVRECTARG);
 			triptr->operand[0] = put_tref(TREF(expr_start));
 		}
-#		ifdef DEBUG
+#		ifdef DEBUG_TRIPLES
 		if (GDL_DebugCompiler & ydbDebugLevel)
 		{
 			CHKTCHAIN(TREF(curtchain), exorder, TRUE);

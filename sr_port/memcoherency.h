@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson.			*
@@ -46,6 +46,7 @@
 #  define SHM_WRITE_MEMORY_BARRIER	asm("mb")
 #  define SHM_READ_MEMORY_BARRIER	SHM_WRITE_MEMORY_BARRIER /* same MB instruction for both read and write barriers */
 #  define MM_WRITE_MEMORY_BARRIER
+#  define MM_WRITE_MEMORY_BARRIER_IS_NO_OP
 
 #elif defined(POWER) || defined(PWRPC) /* GT.M defines POWER and PWRPC if _AIX is defined, see sr_rs6000/mdefsp.h */
   /* ############################### POWER architecture ################################## */
@@ -227,6 +228,7 @@
 #  define SHM_WRITE_MEMORY_BARRIER
 #  define SHM_READ_MEMORY_BARRIER
 #  define MM_WRITE_MEMORY_BARRIER
+#  define MM_WRITE_MEMORY_BARRIER_IS_NO_OP
 
 #endif
 

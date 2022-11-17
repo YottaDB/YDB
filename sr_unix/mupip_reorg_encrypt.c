@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -710,8 +710,8 @@ void mupip_reorg_encrypt(void)
 						}
 #						endif
 						assert(csd == cs_data);
-						if (!lcl_update_trans)
-							assert(lcnt);
+						assert(lcl_update_trans || lcnt);
+						PRO_ONLY(UNUSED(lcl_update_trans));
 						break;
 					}
 					assert(csd == cs_data);

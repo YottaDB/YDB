@@ -383,8 +383,11 @@ void gtm_icu_init(void)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, err_msg);
 		}
 #		ifndef _AIX
-		if (NULL == realpath(librarypath, real_path))
-			assert(FALSE); /* Just opened that library */
+		char	*real_path_ret;
+
+		real_path_ret = realpath(librarypath, real_path);
+		assert(NULL != real_path_ret); /* Just opened that library */
+		PRO_ONLY(UNUSED(real_path_ret));
 		pieceptr = STRTOK_R(real_path, DOT_CHAR, &strtokptr);
 		while (NULL != pieceptr)
 		{

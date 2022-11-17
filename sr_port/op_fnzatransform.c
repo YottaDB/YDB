@@ -67,8 +67,10 @@ CONDITION_HANDLER(op_fnzatransform_ch)
 {
 	START_CH(TRUE);
 	RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);
+#	ifdef DEBUG
 	if (transform_direction)
-		DEBUG_ONLY(TREF(skip_mv_num_approx_assert) = FALSE);
+		TREF(skip_mv_num_approx_assert) = FALSE;
+#	endif
 	if (ERR_ZATRANSERR != SIGNAL)
 	{	/* Override downstream GVSUBOFLOW error. This should not happen because we already
 		 * limit the string lenth to less than the maximum key size.

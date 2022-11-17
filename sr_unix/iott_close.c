@@ -48,11 +48,8 @@ void iott_close(io_desc *v, mval *pp)
 		return;
 	ESTABLISH_GTMIO_CH(&v->pair, ch_set);
 	iott_flush(v);
-	if (v->pair.in != v)
-		assert(v->pair.out == v);
+	assert((v->pair.in == v) || (v->pair.out == v));
 	ttptr = (d_tt_struct *)v->dev_sp;
-	if (v->pair.out != v)
-		assert(v->pair.in == v);
 	v->state = dev_closed;
 	resetterm(v);
 

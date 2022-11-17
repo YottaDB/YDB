@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -261,8 +261,7 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 				 */
 				assert(1 == replhdr->replinst_minorver);
 				/* Check if on-the-fly minor-version upgrade is necessary */
-				if (GDS_REPL_INST_MINOR_LABEL != replhdr->replinst_minorver)
-					assert(FALSE);
+				assert(GDS_REPL_INST_MINOR_LABEL == replhdr->replinst_minorver);
 			}
 		}
 	}

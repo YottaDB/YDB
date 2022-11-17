@@ -316,6 +316,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	char		*error_desc, *mident_suffix_p1, *mident_suffix_p2, *mident_suffix_top, *namesub1, *namesub2;
 	char		*zcomp_parms_ptr, *zcomp_parms_top;
 	mval		zlfile, zcompprm;
+	int		unlink_ret;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -456,14 +457,22 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		REVERT;
 		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("TRIGCOMPFAIL"), TREF(dollar_zcstatus)));
-		if (-1 == UNLINK(objname))	/* Delete the object file first since rtnname is the unique key */
-			DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
+		unlink_ret = UNLINK(objname);	/* Delete the object file first since rtnname is the unique key */
+#		ifdef DEBUG
+		if (-1 == unlink_ret)
+			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
 						RTS_ERROR_LITERAL("unlink(objname)"), CALLFROM,
-						ERR_TEXT, 2, LEN_AND_STR(objname), errno));
-		if (-1 == UNLINK(rtnname))	/* Delete the source file */
-			DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
+						ERR_TEXT, 2, LEN_AND_STR(objname), errno);
+#		endif
+		PRO_ONLY(UNUSED(unlink_ret));
+		unlink_ret = UNLINK(rtnname);	/* Delete the source file */
+#		ifdef DEBUG
+		if (-1 == unlink_ret)
+			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
 						RTS_ERROR_LITERAL("unlink(rtnname)"), CALLFROM,
-						ERR_TEXT, 2, LEN_AND_STR(rtnname), errno));
+						ERR_TEXT, 2, LEN_AND_STR(rtnname), errno);
+#		endif
+		PRO_ONLY(UNUSED(unlink_ret));
 		return ERR_TRIGCOMPFAIL;
 	}
 	if (dolink)
@@ -502,14 +511,22 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	} else
 		assert(FALSE); 	/* This mv_stent should be the one we just pushed */
 	/* Remove temporary files created */
-	if (-1 == UNLINK(objname))	/* Delete the object file first since rtnname is the unique key */
-		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
+	unlink_ret = UNLINK(objname);	/* Delete the object file first since rtnname is the unique key */
+#	ifdef DEBUG
+	if (-1 == unlink_ret)
+		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
 					RTS_ERROR_LITERAL("unlink(objname)"), CALLFROM,
-					ERR_TEXT, 2, LEN_AND_STR(objname), errno));
-	if (-1 == UNLINK(rtnname))	/* Delete the source file */
-		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
+					ERR_TEXT, 2, LEN_AND_STR(objname), errno);
+#	endif
+	PRO_ONLY(UNUSED(unlink_ret));
+	unlink_ret = UNLINK(rtnname);	/* Delete the source file */
+#	ifdef DEBUG
+	if (-1 == unlink_ret)
+		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
 					RTS_ERROR_LITERAL("unlink(rtnname)"), CALLFROM,
-					ERR_TEXT, 2, LEN_AND_STR(rtnname), errno));
+					ERR_TEXT, 2, LEN_AND_STR(rtnname), errno);
+#	endif
+	PRO_ONLY(UNUSED(unlink_ret));
 	run_time = gtm_trigger_comp_prev_run_time;
 	REVERT;
 	return 0;

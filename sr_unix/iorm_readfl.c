@@ -1573,8 +1573,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 							}
 							if (ASCII_LF == *char_start)
 							{
-								if (rm_ptr->crlastbuff)
-									assert(rm_ptr->crlast);
+								assert(!rm_ptr->crlastbuff || rm_ptr->crlast);
 								if (rm_ptr->crlast && !rdone)
 								{	/* ignore LF following CR */
 									rm_ptr->crlast = FALSE;
@@ -1769,8 +1768,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						assert(nextmb == rm_ptr->inbuf_pos);
 						if (u32_line_term[U32_LT_LF] == utf_code)
 						{
-							if (rm_ptr->crlastbuff)
-								assert(rm_ptr->crlast);
+							assert(!rm_ptr->crlastbuff || rm_ptr->crlast);
 							if (rm_ptr->crlast && !rdone)
 							{	/* ignore LF following CR */
 								rm_ptr->crlast = FALSE;

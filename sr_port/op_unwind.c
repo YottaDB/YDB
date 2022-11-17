@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -135,9 +135,11 @@ void op_unwind(void)
 	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
 	if (msp > stackbase)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
+#	ifdef DEBUG_TRIGR
 	if (SFF_NORET_VIA_MUMTSTART & frame_pointer->type)
 		DBGTRIGR((stderr, "op_unwind: Unwinding frame 0x"lvaddr" with type %d which has SFF_NORET_VIA_MUMTSTART enabled\n",
 			  frame_pointer, frame_pointer->type));
+#	endif
 	DRAIN_GLVN_POOL_IF_NEEDED;
 	PARM_ACT_UNSTACK_IF_NEEDED;
 	USHBIN_ONLY(rtnhdr = frame_pointer->rvector);	/* Save rtnhdr for cleanup call below */
