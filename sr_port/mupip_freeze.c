@@ -149,9 +149,7 @@ uint4 freeze_online_multi_proc(reg_ctl_list *rctl)
 				return SS_NORMAL;
 			case REG_HAS_KIP:
 				/* Return REG_HAS_KIP status only when the retries exceed MAX_CRIT_TRY */
-				release_latch = FALSE;	/* needed to avoid [-Wsometimes-uninitialized] warning from C compiler
-							 * and [clang-analyzer-core.uninitialized.Branch] warning from clang-tidy
-							 */
+				release_latch = FALSE;	/* needed to avoid [-Wsometimes-uninitialized] warning from C compiler */
 				GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
 				assert(release_latch);
 				util_out_print("Kill in progress indicator is set for database file !AD", TRUE,
@@ -178,9 +176,7 @@ uint4 freeze_online_multi_proc(reg_ctl_list *rctl)
 				assert(FALSE);
 		}
 	}
-	release_latch = FALSE;	/* needed to avoid [-Wsometimes-uninitialized] warning from C compiler
-				 * and [clang-analyzer-core.uninitialized.Branch] warning from clang-tidy
-				 */
+	release_latch = FALSE;	/* needed to avoid [-Wsometimes-uninitialized] warning from C compiler */
 	GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
 	assert(release_latch);
 	util_out_print("Region !AD is now FROZEN", TRUE, REG_LEN_STR(reg));
