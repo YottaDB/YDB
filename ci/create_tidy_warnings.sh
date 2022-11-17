@@ -72,9 +72,10 @@ Checks: >
     -clang-analyzer-core.NonNullParamChecker,
 CAT_EOF
 
-find . -name '*.c' \
-	| grep -E 'sr_(linux|unix|port|x86_64)/.*\.c$' \
-	| xargs -n 1 -P $(getconf _NPROCESSORS_ONLN) clang-tidy-14 --quiet -p="$build_dir"	\
+# While we don't have file names with embedded spaces, we still use -print0/-0
+# as a good practice, and shellcheck nudges us there as well.
+find sr_linux/ sr_unix/ sr_port/ sr_$(uname -m) -name '*.c' -print0 \
+	| xargs -0 -n 1 -P $(getconf _NPROCESSORS_ONLN) clang-tidy-14 --quiet -p="$build_dir"	\
 	  --config-file=$output_dir/clang_tidy_checks.txt					\
 	  >"$output_dir/tidy_warnings.txt" 2>/dev/null
 
