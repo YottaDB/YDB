@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -132,13 +132,11 @@ RUN . /opt/yottadb/current/ydb_env_set \
  && go get -t -d lang.yottadb.com/go/yottadb \
  && cd $GOPATH/src/lang.yottadb.com/go/yottadb \
  && git checkout develop \
- && go test -v lang.yottadb.com/go/yottadb \
  && cd - \
  && git clone https://gitlab.com/YottaDB/Lang/YDBPython.git \
  && cd YDBPython \
  && python3 setup.py install --user \
  && pip3 install pytest psutil pytest-order \
- && python3 -m pytest \
  && for artifact in $(cat .gitignore); do rm -rf $artifact; done \
  && cd - \
  && rm -rf YDBPython \

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -21,6 +21,7 @@ variables:
 stages:
  - build
  - docker-create
+ - docker-manifest
 
 commit-verify:
   image: ubuntu:22.04
@@ -31,7 +32,7 @@ commit-verify:
   script:
     - ci/commit_verify.sh ci/needs_copyright.sh https://gitlab.com/YottaDB/DB/YDB
 
-test-clang-tidy:
+.clang-tidy:
   image: ubuntu:22.04
   # NOTE: conceptually this is a test and not a build.
   # However, if we make it part of the `test` stage, it will only
@@ -69,6 +70,19 @@ test-clang-tidy:
         zlib1g-dev
     - ci/build.sh
 
+clang-tidy-amd64:
+  extends: .clang-tidy
+  tags:
+    - amd64
+
+# We run this job only on master since it's slow (30 minutes)
+clang-tidy-aarch64:
+  extends: .clang-tidy
+  tags:
+    - aarch64
+  only:
+    - master@YottaDB/DB/YDB
+
 # Main and ONLY docker creation mechanism.
 .docker-create:
   stage: docker-create
@@ -86,13 +100,27 @@ test-clang-tidy:
   only:
     - master@YottaDB/DB/YDB
 
-# Section for creating single commit docker images (:latest-master tags)
+.docker-manifest:
+  stage: docker-manifest
+  script:
+    - docker login -u $HUB_USERNAME -p $HUB_PASSWORD
+    - docker pull yottadb/${REPO}:${DOCKERHUBTAG}-amd64
+    - docker pull yottadb/${REPO}:${DOCKERHUBTAG}-aarch64
+    - docker manifest create yottadb/${REPO}:${DOCKERHUBTAG} yottadb/${REPO}:${DOCKERHUBTAG}-amd64 yottadb/${REPO}:${DOCKERHUBTAG}-aarch64
+    - docker manifest inspect yottadb/${REPO}:${DOCKERHUBTAG}
+    - docker manifest push yottadb/${REPO}:${DOCKERHUBTAG}
+  tags:
+    - amd64
+  only:
+    - master@YottaDB/DB/YDB
+
+# Section for creating single commit docker images (:latest-master docker tag)
 # amd64
 .docker-create-amd64:
   extends: .docker-create
   variables:
     PLATFORM: linux/amd64
-    DOCKERHUBTAG: latest-master
+    DOCKERHUBTAG: latest-master-amd64
   tags:
     - amd64
 # aarch64
@@ -100,18 +128,18 @@ test-clang-tidy:
   extends: .docker-create
   variables:
     PLATFORM: linux/aarch64
-    DOCKERHUBTAG: latest-master
+    DOCKERHUBTAG: latest-master-aarch64
   tags:
     - aarch64
 # END
 
-# Section for creating tagged Dockerfiles (:latest tags)
+# Section for creating Git tag Dockerfiles (:latest docker tag)
 # amd64
 .docker-create-amd64-release:
   extends: .docker-create
   variables:
     PLATFORM: linux/amd64
-    DOCKERHUBTAG: latest
+    DOCKERHUBTAG: latest-amd64
   tags:
     - amd64
   only:
@@ -121,9 +149,25 @@ test-clang-tidy:
   extends: .docker-create
   variables:
     PLATFORM: linux/aarch64
-    DOCKERHUBTAG: latest
+    DOCKERHUBTAG: latest-aarch64
   tags:
     - aarch64
+  only:
+    - tags
+# END
+
+# Shared Section for manifests
+.docker-manifest-commit:
+  stage: docker-manifest
+  extends: .docker-manifest
+  variables:
+    DOCKERHUBTAG: latest-master
+
+.docker-manifest-release:
+  stage: docker-manifest
+  extends: .docker-manifest
+  variables:
+    DOCKERHUBTAG: latest
   only:
     - tags
 # END
@@ -155,7 +199,56 @@ docker-create-debian-amd64:
     REPO: yottadb-debian
 # END
 
-# Tag commit docker images for amd64 (:latest)
+# Single commit docker images for aarch64 (:latest-master)
+docker-create-ubuntu-aarch64:
+  extends: .docker-create-aarch64
+  variables:
+    DOCKERFILE: Dockerfile
+    REPO: yottadb
+
+docker-create-ubuntu-debug-aarch64:
+  extends: .docker-create-aarch64
+  variables:
+    DOCKERFILE: Dockerfile
+    REPO: yottadb-debug
+    ARGS: --build-arg CMAKE_BUILD_TYPE=Debug
+
+docker-create-rocky-aarch64:
+  extends: .docker-create-aarch64
+  variables:
+    DOCKERFILE: Dockerfile-rocky
+    REPO: yottadb-rocky
+
+docker-create-debian-aarch64:
+  extends: .docker-create-aarch64
+  variables:
+    DOCKERFILE: Dockerfile-debian
+    REPO: yottadb-debian
+# END
+
+# Single Commit Manifests (:latest-master)
+docker-manifest-ubuntu:
+  extends: .docker-manifest-commit
+  variables:
+    REPO: yottadb
+
+docker-manifest-ubuntu-debug:
+  extends: .docker-manifest-commit
+  variables:
+    REPO: yottadb-debug
+
+docker-manifest-rocky:
+  extends: .docker-manifest-commit
+  variables:
+    REPO: yottadb-rocky
+
+docker-manifest-debian:
+  extends: .docker-manifest-commit
+  variables:
+    REPO: yottadb-debian
+# END
+
+# Git Tag commit docker images for amd64 (:latest)
 docker-create-release-ubuntu-amd64:
   extends: .docker-create-amd64-release
   variables:
@@ -182,6 +275,51 @@ docker-create-release-debian-amd64:
     REPO: yottadb-debian
 # END
 
-# TODO #931: Single commit docker images for aarch64
-# TODO #931: Tag commit docker images for aarch64
+# Git Tag commit docker images for aarch64 (:latest)
+docker-create-release-ubuntu-aarch64:
+  extends: .docker-create-aarch64-release
+  variables:
+    DOCKERFILE: Dockerfile
+    REPO: yottadb
+
+docker-create-release-ubuntu-debug-aarch64:
+  extends: .docker-create-aarch64-release
+  variables:
+    DOCKERFILE: Dockerfile
+    REPO: yottadb-debug
+    ARGS: --build-arg CMAKE_BUILD_TYPE=Debug
+
+docker-create-release-rocky-aarch64:
+  extends: .docker-create-aarch64-release
+  variables:
+    DOCKERFILE: Dockerfile-rocky
+    REPO: yottadb-rocky
+
+docker-create-release-debian-aarch64:
+  extends: .docker-create-aarch64-release
+  variables:
+    DOCKERFILE: Dockerfile-debian
+    REPO: yottadb-debian
+#END
+
+# Git Tag commit manifests (:latest)
+docker-manifest-ubuntu-release:
+  extends: .docker-manifest-release
+  variables:
+    REPO: yottadb
+
+docker-manifest-ubuntu-debug-release:
+  extends: .docker-manifest-release
+  variables:
+    REPO: yottadb-debug
+
+docker-manifest-rocky-release:
+  extends: .docker-manifest-release
+  variables:
+    REPO: yottadb-rocky
+
+docker-manifest-debian-release:
+  extends: .docker-manifest-release
+  variables:
+    REPO: yottadb-debian
 # END

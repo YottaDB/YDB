@@ -2,7 +2,7 @@
 
 #################################################################
 #								#
-# Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -130,9 +130,9 @@ fi
 cd ..
 ../ci/create_tidy_warnings.sh warnings .
 
-# NOTE: If this command fails, you can download `sorted_warnings.txt` to `ci/tidy_warnings_debug.ref`
+# NOTE: If this command fails, you can download `sorted_warnings.txt` to `ci/tidy_warnings_debug_$(uname -m).ref`
 if [ $build_type = Debug ]; then
-	compare ../ci/tidy_warnings_debug.ref warnings/{sorted_warnings.txt,tidy_warnings.txt}
+	compare ../ci/tidy_warnings_debug_$(uname -m).ref warnings/{sorted_warnings.txt,tidy_warnings.txt}
 else
-	compare ../ci/tidy_warnings_release.ref warnings/{sorted_warnings.txt,tidy_warnings.txt}
+	compare ../ci/tidy_warnings_release_$(uname -m).ref warnings/{sorted_warnings.txt,tidy_warnings.txt}
 fi
