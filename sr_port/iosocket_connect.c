@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -125,9 +125,6 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 	}
 	real_sockintr->end_time_valid = sockintr->end_time_valid = FALSE;
 	remote_ai_ptr = (struct addrinfo*)(&(sockptr->remote.ai));
-	flags_orig = 0;	/* Not needed but helps avoid a false "clang-analyzer-core.uninitialized.Assign" warning
-			 * below in the line "flags = flags_orig".
-			 */
 	do
 	{
 		/* If the connect was failed, we may have already changed the remote.
