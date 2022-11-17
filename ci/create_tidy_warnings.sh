@@ -71,6 +71,7 @@ Checks: >
     -bugprone-suspicious-string-compare,
     -clang-analyzer-core.NonNullParamChecker,
     -clang-analyzer-core.uninitialized.Assign,
+    -clang-analyzer-core.CallAndMessage,
 CAT_EOF
 
 # While we don't have file names with embedded spaces, we still use -print0/-0
