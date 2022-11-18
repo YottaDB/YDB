@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,6 @@ GBLREF  char 		*aio_shim_errstr;
 GBLREF	char		io_setup_errstr[];
 GBLREF	int		num_additional_processors;
 GBLREF	uint4		process_id;
-GBLREF	boolean_t	multi_thread_in_use;
 #ifdef 	DEBUG
 GBLREF	boolean_t	gtm_jvm_process;
 GBLREF	int		process_exiting;
@@ -415,24 +414,28 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 	 * the multiplexing worker thread will not invoke signal handlers (e.g. timer_handler())
 	 * and manipulate global variables while the main process/thread is concurrently running
 	 * and using them.
-	 * Note that SIGPROCMASK relies on multi_thread_in_use and so we must set it.
 	 * TODO: this code should ideally be merged with gtm_multi_thread.c When gtm_multi_thread()
 	 * is enhanced to create a thread in the background. Right now it returns only when the
 	 * thread completes.
 	 */
-	multi_thread_in_use = TRUE;
-	assert(TRUE == blocksig_initialized);
-	/* We block all signals, except those which could be generated from within the worker thread.
-	 * Every other signal must be externally generated and should drive the signal handler from
-	 * the main process and not this worker thread.
+	assert(blocksig_initialized);
+	/* 1) We block all signals, except those which could be generated from within the worker thread.
+	 *    Every other signal must be externally generated and should drive the signal handler from
+	 *    the main process and not this worker thread.
+	 * 2) We do not use "SIGPROCMASK" because then we would need to set "multi_thread_in_use" global
+	 *    variable to TRUE to ensure that macro goes through "pthread_sigmask" and not "sigprocmask".
+	 *    But that has its own race conditions so we skip the macro and directly call "pthread_sigmask".
 	 */
-	SIGPROCMASK(SIG_BLOCK, &block_worker, &savemask, ret);
+	ret = pthread_sigmask(SIG_BLOCK, &block_worker, &savemask);
+	assert(0 == ret);
+	UNUSED(ret);
 	ret = pthread_create(&gdi->pt, NULL, io_getevents_multiplexer, gdi);
 	if (0 != ret)
 	{
 		/* We don't want to clobber ret so we use ret2. */
-		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, ret2);
-		multi_thread_in_use = FALSE;
+		ret2 = pthread_sigmask(SIG_SETMASK, &savemask, NULL);
+		assert(0 == ret2);
+		UNUSED(ret2);
 		assert(EAGAIN == ret);
 		CLEANUP_AIO_SHIM_THREAD_INIT(tmp_gdi);
 		gtm_free(gdi);
@@ -440,8 +443,9 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 		errno = ret;	/* pthread_create() returns errno in ret. */
 		return -1;
 	}
-	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, ret);
-	multi_thread_in_use = FALSE;
+	ret = pthread_sigmask(SIG_SETMASK, &savemask, NULL);
+	assert(0 == ret);
+	UNUSED(ret);
 	gd->gd_runtime->thread_gdi = gdi;
 	return 0;
 }
