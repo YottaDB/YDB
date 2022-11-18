@@ -73,6 +73,7 @@ Checks: >
     -clang-analyzer-core.uninitialized.Assign,
     -clang-analyzer-core.CallAndMessage,
     -clang-analyzer-core.uninitialized.Branch,
+    -clang-analyzer-core.UndefinedBinaryOperatorResult,
 CAT_EOF
 
 # While we don't have file names with embedded spaces, we still use -print0/-0

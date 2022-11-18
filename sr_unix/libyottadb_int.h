@@ -405,10 +405,6 @@ MBSTART {														\
 			break;	   											\
 		default:												\
 			ydb_issue_invvarname_error(VARNAMEP);								\
-			/* Below line only needed to avoid false [clang-analyzer-core.UndefinedBinaryOperatorResult]	\
-			 * warning from clang-tidy in some callers of this macro.					\
-			 */												\
-			VARTYPE = LYDB_VARREF_INVALID;									\
 			break;												\
 	}		       												\
 	/* If we reach here, it means VARNAMEP has been determined to be a valid variable name (if not we would have	\
