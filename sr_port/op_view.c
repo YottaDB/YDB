@@ -86,6 +86,7 @@
 #include "min_max.h"
 #include "gvt_inline.h"
 #include "ydb_setenv.h"
+#include "svnames.h"
 
 STATICFNDCL void lvmon_release(void);
 STATICFNDCL void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg);
@@ -911,6 +912,40 @@ void	op_view(int numarg, mval *keyword, ...)
 			}
 			break;
 #		endif	/* DEBUG */
+		case VTK_GBLDIRLOAD:;
+			gd_addr		*reloaded_gd;
+			mval		tmp_mv, *new_zgbldir;
+
+			/* Load a gld file. Force reload it even if it has already been loaded.
+			 * Hence "TRUE" as the last parameter below.
+			 */
+			reloaded_gd = zgbldir_opt(parmblk.value, FALSE, TRUE);
+			assert(NULL != reloaded_gd);
+			UNUSED(reloaded_gd);
+			if (0 != parmblk.value->str.len)
+				new_zgbldir = parmblk.value;
+			else
+			{	/* Use the default gld name if the empty string has been specified.
+				 * The same name that $ZGBLDIR would get assigned to in a SET $ZGBLDIR="".
+				 */
+				gdr_name	*name;
+
+				name = zgbldir_name_lookup_only(parmblk.value);
+				assert(NULL != name);
+				tmp_mv.mvtype = MV_STR;
+				assert(0 != name->exp_name.len);
+				tmp_mv.str = name->exp_name;
+				new_zgbldir = &tmp_mv;
+			}
+			/* Switch to the new gld and make it the current/active one */
+			assert(0 != new_zgbldir->str.len);
+			dollar_zgbldir.str.len = 0;	/* This forces the "op_svput" call below to do a "zgbldir()"
+							 * and switch "gd_header" to the reloaded gld structure because
+							 * "new_zgbldir->str.len" (asserted as non-zero above) is different
+							 * from "dollar_zgbldir.str.len" (which is set to 0 here).
+							 */
+			op_svput(SV_ZGBLDIR, new_zgbldir);
+			break;
 		default:
 			va_end(var);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWCMD, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);

@@ -64,7 +64,7 @@ Function:       ZGBLDIR
 		The global directory pointer is then returned to the caller.
 
 Syntax:         gd_addr *zgbldir(mval *v)
-                gd_addr *zgbldir_opt(mval *v, boolean_t env_translated)
+                gd_addr *zgbldir_opt(mval *v, boolean_t env_translated, boolean_t force_load)
 
 Prototype:      ?
 
@@ -83,10 +83,10 @@ Notes:          NONE
 -*/
 gd_addr *zgbldir(mval *v)
 {
-	return zgbldir_opt(v, FALSE);
+	return zgbldir_opt(v, FALSE, FALSE);
 }
 
-gd_addr *zgbldir_opt(mval *v, boolean_t env_translated)
+gd_addr *zgbldir_opt(mval *v, boolean_t env_translated, boolean_t force_load)
 {
 	gd_addr		*gd_ptr;
 	mval		trans_val, temp_val;
@@ -98,12 +98,27 @@ gd_addr *zgbldir_opt(mval *v, boolean_t env_translated)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	for (name = gdr_name_head;  name;  name = (gdr_name *)name->link)
+	/* If "force_load" is TRUE, we should not be looking at our cache of already loaded gld files.
+	 * Note that the reload is going to create a NEW entry in the "gdr_name_head" linked list.
+	 * If the gld is already loaded, the reload is going to create a duplicate entry but more importantly
+	 * ahead of the pre-existing entry in the linked list. This way a later call to "zgbldir()" will
+	 * ensure the newly added entry gets picked up since it is ahead in the linked list. We do not get rid
+	 * of the pre-existing entry because a lot of structures could have noted it down. For example,
+	 * "udi->owning_gd", "reg->owning_gd", "csa->gd_ptr". In addition, "aio_shim_thread_init()" creates
+	 * an AIO thread based on the "owning_gd". All of those would get confused if we free up the memory
+	 * corresponding to the pre-existing "gd_ptr" entry. This means the "force_load" call, if done repeatedly
+	 * would end up allocating duplicate memory structures indefinitely (i.e. there is no limit to memory usage).
+	 * So the application has to be careful when invoking VIEW "GBLDIRLOAD" which is what does the "force_load" call.
+	 */
+	if (!force_load)
 	{
-		if (v->str.len == name->name.len)
+		for (name = gdr_name_head;  name;  name = (gdr_name *)name->link)
 		{
-			if (!v->str.len || !memcmp(v->str.addr, name->name.addr, v->str.len))
-				return name->gd_ptr;
+			if (v->str.len == name->name.len)
+			{
+				if (!v->str.len || !memcmp(v->str.addr, name->name.addr, v->str.len))
+					return name->gd_ptr;
+			}
 		}
 	}
 
@@ -156,7 +171,7 @@ gd_addr *zgbldir_opt(mval *v, boolean_t env_translated)
 				? (&ydb_gbldir_translate(&temp_val, &trans_val)->str)
 				: &temp_mstr;
 	tran_name = get_name(tran_mstr);
-	gd_ptr = gd_load(tran_name);
+	gd_ptr = gd_load(tran_name, force_load);
 	name = (gdr_name *)malloc(SIZEOF(gdr_name));
 	if (name->name.len = v->str.len)	/* Note embedded assignment */
 	{
@@ -185,11 +200,11 @@ Function:       ZGBLDIR_NAME_LOOKUP_ONLY
 		This function searches the list of global directory names for
 		the specified names.  If not found, it retruns NULL.
 
-Syntax:         gd_addr *zgbldir_name_lookup_only(mval *v)
+Syntax:         gdr_name *zgbldir_name_lookup_only(mval *v)
 
 Prototype:      ?
 
-Return:         *gd_addr -- a pointer to the global directory structure
+Return:         *gdr_name -- a pointer to the global directory name structure
 
 Arguments:      mval *v	-- an mval that contains the name of the global
 		directory to be accessed.  The name may require translation.
@@ -198,7 +213,7 @@ Side Effects:   NONE
 
 Notes:          NONE
 -*/
-gd_addr *zgbldir_name_lookup_only(mval *v)
+gdr_name	*zgbldir_name_lookup_only(mval *v)
 {
 	gd_addr		*gd_ptr;
 	gdr_name	*name;
@@ -206,14 +221,14 @@ gd_addr *zgbldir_name_lookup_only(mval *v)
 
 	for (name = gdr_name_head;  name;  name = (gdr_name *)name->link)
 		if (v->str.len == name->name.len && !memcmp(v->str.addr, name->name.addr, v->str.len))
-			return name->gd_ptr;
+			return name;
 	return NULL;
 }
 
 /*+
 Function:       GD_LOAD
 
-Syntax:		gd_addr *gd_load(mstr *gd_name)
+Syntax:		gd_addr *gd_load(mstr *gd_name, boolean_t force_load)
 
 		Open a global directory file and verify that it is a valid GD.
 		Determine if it has already been opened.  If not, setup and
@@ -234,7 +249,7 @@ Notes:          A) While checking may be done earlier for duplicate names,
 		operations useable only after the file is open, so checks
 		must be done within this function for duplicate files.
 -*/
-gd_addr *gd_load(mstr *v)
+gd_addr *gd_load(mstr *v, boolean_t force_load)
 {
 	void			*file_ptr; /* is a temporary structure as the file open and manipulations are currently stubs */
 	header_struct		*header, temp_head, disp_head;
@@ -256,12 +271,16 @@ gd_addr *gd_load(mstr *v)
 
 	SETUP_THREADGBL_ACCESS;
 	file_ptr = open_gd_file(v);
-	for (gd_addr_ptr = gd_addr_head;  gd_addr_ptr;  gd_addr_ptr = gd_addr_ptr->link)
-	{	/* if already open then return old structure */
-		if (comp_gd_addr(gd_addr_ptr, file_ptr))
-		{
-			close_gd_file(file_ptr);
-			return gd_addr_ptr;
+	/* If "force_load" is TRUE, we should not be looking at our cache of already loaded gld files */
+	if (!force_load)
+	{
+		for (gd_addr_ptr = gd_addr_head;  gd_addr_ptr;  gd_addr_ptr = gd_addr_ptr->link)
+		{	/* if already open then return old structure */
+			if (comp_gd_addr(gd_addr_ptr, file_ptr))
+			{
+				close_gd_file(file_ptr);
+				return gd_addr_ptr;
+			}
 		}
 	}
 	file_read(file_ptr, SIZEOF(header_struct), (uchar_ptr_t)&temp_head, 1);		/* Read in header and verify is valid GD */

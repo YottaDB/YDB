@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -31,9 +34,9 @@ typedef struct gvt_container_struct
 
 boolean_t	get_first_gdr_name(gd_addr *current_gd_header, mstr *log_nam);
 gd_addr		*zgbldir(mval *v);
-gd_addr		*zgbldir_opt(mval *v, boolean_t env_translated);
-gd_addr		*zgbldir_name_lookup_only(mval *v);
-gd_addr		*gd_load(mstr *v);
+gd_addr		*zgbldir_opt(mval *v, boolean_t env_translated, boolean_t force_load);
+gdr_name	*zgbldir_name_lookup_only(mval *v);
+gd_addr		*gd_load(mstr *v, boolean_t force_load);
 gd_addr		*get_next_gdr(gd_addr *prev);
 mstr		*get_name(mstr *ms);
 void		cm_add_gdr_ptr(gd_region *greg);

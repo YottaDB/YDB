@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -102,7 +102,7 @@ STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_lis
 	if (val1->str.len)
 	{
 		tmp_mstr_ptr = &val1_orig->str;
-		tmpgd = zgbldir_opt(val1, TRUE);
+		tmpgd = zgbldir_opt(val1, TRUE, FALSE);
 	} else
 	{
 		/* Null external reference, ensure that gd_header is not NULL */

@@ -180,8 +180,11 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				}
 			} else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_zgbldir)
 			{
+				gdr_name	*name;
+
 				/* Restore GLD if a match is found, otherwise defer setting gd_header */
-				gd_header = zgbldir_name_lookup_only(&dollar_zgbldir);
+				name = zgbldir_name_lookup_only(&dollar_zgbldir);
+				gd_header = (NULL != name) ? name->gd_ptr : NULL;
 				if (gv_currkey)
 				{
 					gv_currkey->base[0] = 0;
