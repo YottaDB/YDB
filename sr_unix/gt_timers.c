@@ -795,7 +795,6 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 		 */
 		timer_active = FALSE;				/* timer has popped; system timer not active anymore */
 	}
-	assert(gtm_is_main_thread() || gtm_jvm_process || simpleThreadAPI_active);
 	DUMP_TIMER_INFO("At the start of timer_handler()");
 #	ifdef DEBUG
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into generic_signal_handler

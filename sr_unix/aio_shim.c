@@ -541,7 +541,6 @@ int aio_shim_write(gd_region *reg, struct aiocb *aiocbp)
 	int		save_errno;
 
 	udi = FILE_INFO(reg);
-	assert(gtm_is_main_thread() || (gtm_jvm_process && process_exiting) || simpleThreadAPI_active);
 	owning_gd = udi->owning_gd;
 	assert(NULL != owning_gd);
 	if (NULL == (gdi = owning_gd->gd_runtime->thread_gdi))
