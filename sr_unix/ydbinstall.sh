@@ -238,7 +238,10 @@ getosid()
 	osid=`grep -w ID $1 | cut -d= -f2 | cut -d'"' -f2`
 	# Treat SLES (Server), SLED (Desktop) and OpenSUSE Leap distributions as the same.
 	if [ "sled" = "$osid" ] || [ "sles" = "$osid" ] || [ "opensuse-leap" = "$osid" ] ; then
-		osid="sle"
+	    osid="sle"
+	# If the distribution is not Debian, RHEL, or Ubuntu (e.g., Linux Mint), see what it is like.
+	elif ! echo "debian,rhel,ubuntu" | grep -qw $osid ; then
+	    osid=`grep -w ID_LIKE $1 | cut -d= -f2 | cut -d'"' -f2 | cut -d' ' -f1`
 	fi
 	echo $osid
 }
