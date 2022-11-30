@@ -155,7 +155,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 		return FALSE;
 	ESTABLISH_RET(mu_rndwn_repl_instance_ch, FALSE);
 	repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
-	assert(rndwn_both_pools || JNLPOOL_SEGMENT == replpool_id->pool_type || RECVPOOL_SEGMENT == replpool_id->pool_type);
+	assert(rndwn_both_pools || (JNLPOOL_SEGMENT == replpool_id->pool_type) || (RECVPOOL_SEGMENT == replpool_id->pool_type));
 	/* At this point, we have not yet attached to the jnlpool so we do not know if the ftok counter got halted
 	 * previously or not. So be safe and assume it has halted in case the jnlpool_shmid indicates it is up and running.
 	 * We will set udi->counter_ftok_incremented back to an accurate value after we attach to the jnlpool.
@@ -189,10 +189,24 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 				jnlpool_stat = mu_rndwn_replpool(replpool_id, &repl_instance, shm_id, &ipc_rmvd);
 				ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, shm_id);
 				*ipcs_ptr = '\0';
-				if (rndwn_both_pools && ((SS_NORMAL != jnlpool_stat) || ipc_rmvd))
+				if (!rndwn_both_pools)
+				{	/* Caller is Argumentless MUPIP RUNDOWN. Print a message for the shared memory id
+					 * if it was successfully removed. In this case, we won't print a MUJPOOLRNDWNSUC
+					 * message as it will be done later by caller (don't want duplicate/confusing messages).
+					 */
+					if (ipc_rmvd)
+					{
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SHMREMOVED, 3, shm_id,
+								LEN_AND_STR(instfilename));
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SHMREMOVED, 3, shm_id,
+								LEN_AND_STR(instfilename));
+					}
+				} else if ((SS_NORMAL != jnlpool_stat) || ipc_rmvd)
+				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6)
 							(jnlpool_stat ? ERR_MUJPOOLRNDWNFL : ERR_MUJPOOLRNDWNSUC),
 							4, LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename));
+				}
 			}
 			assert(ipc_rmvd || (jnlpool && (NULL != jnlpool->jnlpool_ctl)) || !mur_options.rollback);
 			assert((!jnlpool || (NULL == jnlpool->jnlpool_ctl)) || (SS_NORMAL == jnlpool_stat) || jgbl.onlnrlbk);
@@ -220,9 +234,21 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 							 */
 							ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, sem_id);
 							*ipcs_ptr = '\0';
-							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_MUJPOOLRNDWNSUC, 4,
-									LEN_AND_STR(ipcs_buff),
-									LEN_AND_STR(instfilename), ERR_SEMREMOVED, 1, sem_id);
+							if (!rndwn_both_pools)
+							{	/* If Argumentless MUPIP RUNDOWN, just print a message that
+								 * the semid got removed. The final message about a success or
+								 * failure to rundown the journal pool will be printed by caller.
+								 */
+								send_msg_csa(CSA_ARG(NULL)
+									VARLSTCNT(3) ERR_SEMREMOVED, 1, sem_id);
+								gtm_putmsg_csa(CSA_ARG(NULL)
+									VARLSTCNT(3) ERR_SEMREMOVED, 1, sem_id);
+							} else
+							{
+								gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_MUJPOOLRNDWNSUC, 4,
+									LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename),
+									ERR_SEMREMOVED, 1, sem_id);
+							}
 						}
 						repl_inst_jnlpool_reset();
 					}
@@ -251,8 +277,8 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 		}
 		*jnlpool_sem_created = sem_created;
 	}
-	if (((SS_NORMAL == jnlpool_stat) || !jgbl.mur_rollback) &&
-		(rndwn_both_pools || (RECVPOOL_SEGMENT == replpool_id->pool_type)))
+	if (((SS_NORMAL == jnlpool_stat) || !jgbl.mur_rollback)
+		&& (rndwn_both_pools || (RECVPOOL_SEGMENT == replpool_id->pool_type)))
 	{	/* --------------------------
 		 * Now rundown Receivpool
 		 * --------------------------
@@ -278,10 +304,24 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 				recvpool_stat = mu_rndwn_replpool(replpool_id, &repl_instance, shm_id, &ipc_rmvd);
 				ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, shm_id);
 				*ipcs_ptr = '\0';
-				if (rndwn_both_pools && ((SS_NORMAL != recvpool_stat) || ipc_rmvd))
+				if (!rndwn_both_pools)
+				{	/* Caller is Argumentless MUPIP RUNDOWN. Print a message for the shared memory id
+					 * if it was successfully removed. In this case, we won't print a MURPOOLRNDWNSUC
+					 * message as it will be done later by caller (don't want duplicate/confusing messages).
+					 */
+					if (ipc_rmvd)
+					{
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SHMREMOVED, 3, shm_id,
+								LEN_AND_STR(instfilename));
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SHMREMOVED, 3, shm_id,
+								LEN_AND_STR(instfilename));
+					}
+				} else if ((SS_NORMAL != recvpool_stat) || ipc_rmvd)
+				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6)
 							(recvpool_stat ? ERR_MURPOOLRNDWNFL : ERR_MURPOOLRNDWNSUC),
 							4, LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename));
+				}
 			}
 			assert((TRUE == ipc_rmvd) || (SS_NORMAL != recvpool_stat) || jgbl.onlnrlbk);
 			assert((INVALID_SHMID != repl_instance.recvpool_shmid) || (0 == repl_instance.recvpool_shmid_ctime));
@@ -306,9 +346,21 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 						 */
 						ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, sem_id);
 						*ipcs_ptr = '\0';
-						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_MURPOOLRNDWNSUC, 4,
-								LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename),
-								ERR_SEMREMOVED, 1, sem_id);
+						if (!rndwn_both_pools)
+						{	/* If Argumentless MUPIP RUNDOWN, just print a message that
+							 * the semid got removed. The final message about a success
+							 * or failure to rundown the receive pool will be printed by caller.
+							 */
+							send_msg_csa(CSA_ARG(NULL)
+								VARLSTCNT(3) ERR_SEMREMOVED, 1, sem_id);
+							gtm_putmsg_csa(CSA_ARG(NULL)
+								VARLSTCNT(3) ERR_SEMREMOVED, 1, sem_id);
+						} else
+						{
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_MURPOOLRNDWNSUC, 4,
+									LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename),
+									ERR_SEMREMOVED, 1, sem_id);
+						}
 					}
 					if (jnlpool && (NULL != jnlpool->jnlpool_ctl))
 					{	/* Journal pool is not yet removed. So, grab lock before resetting semid/shmid
