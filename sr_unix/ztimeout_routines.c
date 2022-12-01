@@ -103,6 +103,15 @@ error_def(ERR_ZTIMEOUT);
 	ztimeout_vector.str.len = 0;		\
 }
 
+#define	OP_COMMARG_S2POOL(ZTIMEOUT_VECTOR)		\
+{							\
+	mval	mv_copy;				\
+							\
+	mv_copy = *ZTIMEOUT_VECTOR;			\
+	s2pool(&mv_copy.str);				\
+	op_commarg(&mv_copy, indir_linetail);		\
+}
+
 void check_and_set_ztimeout(mval * inp_val)
 {
 	int 		max_read_len;
@@ -125,7 +134,7 @@ void check_and_set_ztimeout(mval * inp_val)
 	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 	if (NULL != ztimeout_local_str_val)
 	{	/* This is left over from a previous call to "check_and_set_ztimeout()" that encountered an error
-		 * midway (e.g. inside "op_commarg()" call below) and so could not get a chance to free memory then
+		 * midway (e.g. inside the "OP_COMMARG_S2POOL" call below) and so could not get a chance to free memory then
 		 * before returning from the function. Free that up now to avoid an accumulating memory leak.
 		 * This is why we need "ztimeout_local_str_val" to be a "static" variable.
 		 */
@@ -238,10 +247,10 @@ void check_and_set_ztimeout(mval * inp_val)
 	{
 		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 		ztimeout_local_str_val = ztimeout_vector.str.addr;	/* Keep a pointer so we free it in the next call to
-									 * this function in case of errors in "op_commarg".
+									 * this function in case of errors in "OP_COMMARG_S2POOL".
 									 * This avoids an accumulating memory leak.
 									 */
-		op_commarg(&ztimeout_vector, indir_linetail);
+		OP_COMMARG_S2POOL(&ztimeout_vector);
 		op_unwind();
 		ztimeout_local_str_val = NULL;	/* If we came here it means the M code specified was valid.
 						 * This is going to be assigned to TREF(dollar_ztimeout)
@@ -360,7 +369,7 @@ void ztimeout_process()
 	SETUP_THREADGBL_ACCESS;
 	/* Compile and push new (counted) frame onto the stack to drive the ztimeout vector */
 	assert((SFT_ZTIMEOUT | SFT_COUNT) == proc_act_type);
-	op_commarg(&(TREF(dollar_ztimeout)).ztimeout_vector, indir_linetail);
+	OP_COMMARG_S2POOL(&(TREF(dollar_ztimeout)).ztimeout_vector);
 	/* Below in sync with jobinterrupt_process */
 	frame_pointer->type = proc_act_type;    /* The mark of zorro.. */
         proc_act_type = 0;
