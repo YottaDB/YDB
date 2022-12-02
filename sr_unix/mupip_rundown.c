@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,6 +59,7 @@
 #include "ftok_sems.h"
 #include "ipcrmid.h"
 #include "do_semop.h"
+#include "is_file_identical.h"
 
 GBLREF	bool			in_backup;
 GBLREF	bool			error_mupip;
@@ -150,7 +151,13 @@ void mupip_rundown(void)
 			/* sets replpool_id/full_len; note: assignment */
 			if (DEBUG_ONLY(repl_inst_available = )REPL_INST_AVAILABLE(gd_header))
 			{
+				gd_id		instfilename_gdid;
+
 				instfilename = &replpool_id.instfilename[0];
+				status = filename_to_id(&instfilename_gdid, instfilename);
+				if (SS_NORMAL != status)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTACC, 2, full_len, instfilename,
+						status);
 				if (!mu_rndwn_repl_instance(&replpool_id, !anticipatory_freeze_available, TRUE,
 												&jnlpool_sem_created))
 				{	/* It is possible, we attached to the journal pool (and did not run it down because there
