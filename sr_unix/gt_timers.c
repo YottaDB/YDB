@@ -1355,9 +1355,9 @@ void check_for_timer_pops(boolean_t sig_handler_changed)
 					}
 				}
 			}
+			DBGSIGSAFEFPF((stderr, "check_for_timer_pops: stolenwhen=%d\n", stolenwhen));
+			SET_DEFERRED_TIMERS_CHECK_NEEDED; /* Need to invoke timer_handler because the ext call could swallow a signal */
 		}
-		DBGSIGSAFEFPF((stderr, "check_for_timer_pops: stolenwhen=%d\n", stolenwhen));
-		SET_DEFERRED_TIMERS_CHECK_NEEDED; /* Need to invoke timer_handler because the ext call could swallow a signal */
 	}
 	if (timeroot && (1 > timer_stack_count))
 		DEFERRED_SIGNAL_HANDLING_CHECK;	/* Check for deferred timers */
