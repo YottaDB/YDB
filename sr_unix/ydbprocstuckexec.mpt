@@ -78,7 +78,12 @@ cmd1	if okflag do
 	. write "Command line of process ",blockpid,!
 	. write $zpiece(line,$zchar(0),1)
 	. for i=2:1:$zlength(line,$zchar(0)) write " ",$zpiece(line,$zchar(0),i)
-	else  write "Command line of process ",blockpid," inaccessible at ",file
+	; While a normal filesystem file that is opened by a process remains
+	; available to a process until it closes the file, /proc is a pseudo
+	; filesystem,and a file can disappear while it is open. Since this means
+	; an error can occur in the READ command above, a USE is required below.
+	; Motivated by https://gitlab.com/YottaDB/DB/YDB/-/issues/937#note_1196807692
+	else  use outfile write "Command line of process ",blockpid," inaccessible at ",file
 	; report environment of blocking pid
 	write !,"--------------------",!
 	set file=procfsdir_"environ",okflag=1
