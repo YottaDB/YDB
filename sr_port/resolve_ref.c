@@ -212,12 +212,15 @@ int resolve_ref(int errknt)
 						opnd->oprclass = TJMP_REF;
 					}
 					break;
-				case MFUN_REF:
+				case MFUN_REF:;
+					triple	*chktrip_error;
+
 					assert(!run_time);
 					assert(OC_JMP == looptrip->opcode);
 					chktrip = looptrip->exorder.bl;
 					assert((OC_EXCAL == chktrip->opcode) || (OC_EXFUN == chktrip->opcode));
 					assert(TRIP_REF == chktrip->operand[1].oprclass);
+					chktrip_error = chktrip;	/* needed later for ERR_FMLLSTMISSING error context */
 					chktrip = chktrip->operand[1].oprval.tref;
 					assert(OC_PARAMETER == chktrip->opcode);
 					assert(TRIP_REF == chktrip->operand[0].oprclass);
@@ -246,23 +249,35 @@ int resolve_ref(int errknt)
 					tripref = mlbx->ml ? mlbx->ml->externalentry : 0;
 					if (tripref)
 					{
-						if (NO_FORMALLIST == mlbx->formalcnt)
+						if ((NO_FORMALLIST == mlbx->formalcnt) || (actcnt > mlbx->formalcnt))
 						{
+							int	in_error;
+
+							in_error = (NO_FORMALLIST == mlbx->formalcnt)
+										? ERR_FMLLSTMISSING
+										: ERR_ACTLSTTOOLONG;
+							if (ERR_ACTLSTTOOLONG == in_error)
+							{
+								int	i;
+
+								if (0 < mlbx->formalcnt)
+								{
+									for (i = 0; i < mlbx->formalcnt; i++)
+									{
+										chktrip = chktrip->operand[1].oprval.tref;
+										assert(OC_PARAMETER == chktrip->opcode);
+									}
+									chktrip_error = chktrip;
+								}
+								/* else "chktrip_error" is already initialized */
+							}
+							/* else "chktrip_error" is already initialized */
 							errknt++;
-							stx_error(ERR_FMLLSTMISSING, 2, mlbx->mvname.len, mlbx->mvname.addr);
+							stx_error(in_error, 4, mlbx->mvname.len, mlbx->mvname.addr,
+								chktrip_error->src.column, chktrip_error->src.line);
 							TREF(source_error_found) = 0;
 							tripref = newtriple(OC_RTERROR);
-							tripref->operand[0] = put_ilit(ERR_FMLLSTMISSING);
-							tripref->operand[1] = put_ilit(TRUE);	/* subroutine/func reference */
-							opnd->oprval.tref = tripref;
-							opnd->oprclass = TJMP_REF;
-						} else if (mlbx->formalcnt < actcnt)
-						{
-							errknt++;
-							stx_error(ERR_ACTLSTTOOLONG, 2, mlbx->mvname.len, mlbx->mvname.addr);
-							TREF(source_error_found) = 0;
-							tripref = newtriple(OC_RTERROR);
-							tripref->operand[0] = put_ilit(ERR_ACTLSTTOOLONG);
+							tripref->operand[0] = put_ilit(in_error);
 							tripref->operand[1] = put_ilit(TRUE);	/* subroutine/func reference */
 							opnd->oprval.tref = tripref;
 							opnd->oprclass = TJMP_REF;

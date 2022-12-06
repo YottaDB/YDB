@@ -201,7 +201,8 @@ void stx_error_va(int in_error, va_list args)
 	{
 		show_source_line(warn);
 		cnt = va_arg(args, VA_ARG_TYPE);
-		assert(cnt == 4);
+		assert(4 == cnt);
+		PRO_ONLY(UNUSED(cnt));
 		arg1 = va_arg(args, VA_ARG_TYPE);
 		arg2 = va_arg(args, VA_ARG_TYPE);
 		arg3 = va_arg(args, VA_ARG_TYPE);
@@ -211,15 +212,27 @@ void stx_error_va(int in_error, va_list args)
 			dec_err(VARLSTCNT(6) in_error, 4, arg1, arg2, arg3, arg4);
 			dec_err(VARLSTCNT(4) ERR_SRCNAM, 2, source_name_len, source_file_name);
 		}
-		arg1 = arg2 = arg3 = arg4 = 0;
+	} else if ((ERR_ACTLSTTOOLONG == in_error) || (ERR_FMLLSTMISSING == in_error))
+	{
+		cnt = va_arg(args, VA_ARG_TYPE);
+		assert(4 == cnt);
+		PRO_ONLY(UNUSED(cnt));
+		arg1 = va_arg(args, VA_ARG_TYPE);
+		arg2 = va_arg(args, VA_ARG_TYPE);
+		arg3 = va_arg(args, VA_ARG_TYPE);
+		arg4 = va_arg(args, VA_ARG_TYPE);
+		if (warn)
+		{
+			dec_err(VARLSTCNT(4) in_error, 2, arg1, arg2);
+			dec_err(VARLSTCNT(6) ERR_SRCLOC, 4, arg3, arg4, source_name_len, source_file_name);
+		}
 	} else if ((ERR_LABELMISSING == in_error)
-		|| (ERR_FMLLSTMISSING == in_error)
-		|| (ERR_ACTLSTTOOLONG == in_error)
 		|| (ERR_BADCHSET == in_error)
 		|| (ERR_BADCASECODE == in_error))
 	{
 		cnt = va_arg(args, VA_ARG_TYPE);
-		assert(cnt == 2);
+		assert(2 == cnt);
+		PRO_ONLY(UNUSED(cnt));
 		arg1 = va_arg(args, VA_ARG_TYPE);
 		arg2 = va_arg(args, VA_ARG_TYPE);
 		if (warn)
@@ -235,7 +248,8 @@ void stx_error_va(int in_error, va_list args)
 			if (ERR_PATNOTFOUND == in_error)
 			{
 				cnt = va_arg(args, VA_ARG_TYPE);
-				assert(cnt == 2);
+				assert(2 == cnt);
+				PRO_ONLY(UNUSED(cnt));
 				arg1 = va_arg(args, VA_ARG_TYPE);
 				arg2 = va_arg(args, VA_ARG_TYPE);
 				dec_err(VARLSTCNT(4) in_error, 2, arg1, arg2);
@@ -245,12 +259,12 @@ void stx_error_va(int in_error, va_list args)
 			else
 			{
 				cnt = va_arg(args, VA_ARG_TYPE);
-				assert(cnt == 1);
+				assert(1 == cnt);
+				PRO_ONLY(UNUSED(cnt));
 				arg1 = va_arg(args, VA_ARG_TYPE);
 				dec_err(VARLSTCNT(3) in_error, 1, arg1);
 			}
 		}
-		arg1 = arg2 = 0;
 	}
 	va_end(args);
 	if (list)
