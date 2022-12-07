@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,8 +89,6 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	assert(NULL == alias_retarg);
 	alias_retarg = NULL;
 	DBGEHND_ONLY(prevfp = frame_pointer);
-	if (tp_pointer && tp_pointer->fp <= frame_pointer)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPQUIT);
 	assert(msp <= stackbase && msp > stacktop);
 	assert(mv_chain <= (mv_stent *)stackbase && mv_chain > (mv_stent *)stacktop);
 	assert(frame_pointer <= (stack_frame *)stackbase && frame_pointer > (stack_frame *)stacktop);
@@ -154,6 +152,8 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	 */
 	unwind_nocounts();
 	assert(frame_pointer && (frame_pointer->type & SFT_COUNT));
+	if ((NULL != tp_pointer) && (tp_pointer->fp <= frame_pointer))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPQUIT);
 	while (mv_chain < (mv_stent *)frame_pointer)
 	{
 		msp = (unsigned char *)mv_chain;
