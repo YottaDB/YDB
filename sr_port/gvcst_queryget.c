@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -203,12 +203,14 @@ boolean_t gvcst_queryget2(mval *val, unsigned char *sn_ptr)
 					continue;
 				}
 				ENSURE_STP_FREE_SPACE(data_len);
-#				ifdef DEBUG
-				if (!save_strp)
-					save_strp = stringpool.free;
-#				endif
+				/* Assumption: In copying directly to "stringpool.free" below, we assume that
+				 * "t_end"/"tp_hist" (the only functions invoked before we do "val->str.addr = stringpool.free"
+				 * and return from this function) will never cause stp_gcol() call. We assert this by
+				 * noting down "stringpool.free" in a local variable "save_strp" and later checking that
+				 * "stringpool.free" stays the same before we return from this function.
+				 */
 				memcpy(stringpool.free, (sm_uc_ptr_t)rp + rsiz - data_len, data_len);
-				/* Assumption: t_end/tp_hist will never cause stp_gcol() call BYPASSOK */
+				DEBUG_ONLY(save_strp = stringpool.free);
 			}
 			if (!dollar_tlevel)
 			{
@@ -225,7 +227,9 @@ boolean_t gvcst_queryget2(mval *val, unsigned char *sn_ptr)
 			}
 			if (found)
 			{
-				DEBUG_ONLY(assert(save_strp == stringpool.free));
+				DEBUG_ONLY(assert(save_strp == stringpool.free));	/* Assert that "t_end"/"tp_hist" did
+											 * not cause "stp_gcol" call.
+											 */
 				/* Process val first. Already copied to string pool. */
 				val->mvtype = MV_STR;
 				val->str.addr = (char *)stringpool.free;
