@@ -297,8 +297,10 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 		case CM_LOCKS:
 			action = LOCKED;
 			break;
-		case INCREMENTAL:
 		case CM_ZALLOCATES:
+			action = ZALLOCATED;
+			break;
+		case INCREMENTAL:
 			action = cm_action;
 			break;
 		default:
