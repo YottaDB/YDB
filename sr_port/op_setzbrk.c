@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -62,9 +62,10 @@ error_def(ERR_ZBREAKFAIL);
 error_def(ERR_ZLINKFILE);
 error_def(ERR_ZLMODULE);
 
-void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
+void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt, boolean_t count_specified)
 	/* act == action associated with ZBREAK */
 	/* cnt == perform break after this many passes */
+	/* count_specified == TRUE if an integer count was specified by the user */
 {
 	char		*cp, zbloc_buff[MAX_ENTRYREF_LEN], *zbloc_end;
 	mident		*lab_name, *dummy;
@@ -82,6 +83,16 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 	boolean_t	deleted;
 	GTMTRIG_ONLY(boolean_t	is_trigger);
 
+	if (!count_specified)
+	{	/* User did not specify a count explicitly. But m_zbreak.c added a "cnt" implicitly. */
+		assert((0 == cnt) || (CANCEL_ONE == cnt) || (CANCEL_ALL == cnt));	/* only valid values */
+	} else
+	{	/* User specified a count. This cannot be negative. Issue error in that case.
+		 * A value of 0 is treated as if it was 1 (i.e. activate breakpoint the first time it is reached).
+		 */
+		if (0 > cnt)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZBRKCNTNEGATIVE, 1, cnt);
+	}
 	if (RESTRICTED(zbreak_op))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZBREAK");
 

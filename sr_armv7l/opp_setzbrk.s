@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -15,12 +15,13 @@
 /* opp_setzbrk.s */
 
 /*
- * void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
+ * void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt, int count_specified)
  *	r0	- *rtn
  *	r1	- *lab
  *	r2	- offset
  *	r3	- act == action associated with ZBREAK
  *	stack	- cnt == perform break after this many passes
+ *	stack	- count_specified == TRUE if user specified a count of times after which breakpoint has to be activated
  */
 
 	.title	opp_setzbrk.s

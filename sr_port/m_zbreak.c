@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -16,9 +19,7 @@
 #include "toktyp.h"
 #include "advancewindow.h"
 #include "cmd.h"
-
-#define CANCEL_ONE -1
-#define CANCEL_ALL -2
+#include "zbreak.h"
 
 GBLREF boolean_t	run_time;
 GBLREF mident		routine_name;
@@ -29,7 +30,7 @@ error_def(ERR_RTNNAME);
 
 int m_zbreak(void)
 {
-	boolean_t	cancel, cancel_all, dummybool, is_count;
+	boolean_t	cancel, cancel_all, dummybool, count_specified;
 	oprtype		action, count, label, offset, routine;
 	triple		*next, *ref;
 	DCL_THREADGBL_ACCESS;
@@ -48,6 +49,7 @@ int m_zbreak(void)
 		cancel = FALSE;
 		count = put_ilit((mint)0);
 	}
+	count_specified = FALSE;
 	if (TK_ASTERISK == TREF(window_token))
 	{
 		if (cancel)
@@ -103,15 +105,15 @@ int m_zbreak(void)
 			advancewindow();
 			if (TK_COLON == TREF(window_token))
 			{
-				is_count = TRUE;
+				count_specified = TRUE;
 				action = put_str("B",1);
 			} else
 			{
 				if (EXPR_FAIL == expr(&action, MUMPS_STR))
 					return FALSE;
-				is_count = (TK_COLON == TREF(window_token));
+				count_specified = (TK_COLON == TREF(window_token));
 			}
-			if (is_count)
+			if (count_specified)
 			{
 				advancewindow();
 				if (EXPR_FAIL == expr(&count, MUMPS_INT))
@@ -133,5 +135,8 @@ int m_zbreak(void)
 	ref = newtriple(OC_PARAMETER);
 	next->operand[1] = put_tref(ref);
 	ref->operand[0] = count;
+	next = newtriple(OC_PARAMETER);
+	ref->operand[1] = put_tref(next);
+	next->operand[0] = put_ilit((mint)count_specified);
 	return TRUE;
 }

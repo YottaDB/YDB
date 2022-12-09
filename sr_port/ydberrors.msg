@@ -71,6 +71,7 @@ UTF8NOTINSTALLED <$ydb_dist does not have utf8 folder installed. Please use M mo
 ISVUNSUPPORTED	<ISV variable name !AD not supported in !AD call>/error/fao=4
 GVNUNSUPPORTED	<Global variable name !AD not supported in !AD call>/error/fao=4
 ISVSUBSCRIPTED	<ISV variable name !AD specified with a non-zero subscript count of !UL>/error/fao=3
+ZBRKCNTNEGATIVE	<Count [!SL], of transits through a ZBREAK breakpoint before activating it, cannot be negative>/error/fao=1
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

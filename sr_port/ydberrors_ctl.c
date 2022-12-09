@@ -63,6 +63,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "ISVUNSUPPORTED", "ISV variable name !AD not supported in !AD call", 4, 0 },
 	{ "GVNUNSUPPORTED", "Global variable name !AD not supported in !AD call", 4, 0 },
 	{ "ISVSUBSCRIPTED", "ISV variable name !AD specified with a non-zero subscript count of !UL", 3, 0 },
+	{ "ZBRKCNTNEGATIVE", "Count [!SL], of transits through a ZBREAK breakpoint before activating it, cannot be negative", 1, 0 },
 };
 
 
@@ -75,7 +76,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	46,
+	47,
 	&ydberrors_undocarr[0],
 	0
 };

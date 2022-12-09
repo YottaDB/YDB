@@ -108,7 +108,6 @@ LITDEF nametabent cmd_names[] =
 	,{8, "ZTRIGGER"}
 	#		endif
 	,{7, "ZTSTART"}
-	,{6, "ZWATCH"}
 	,{9, "ZWITHDRAW"}
 	,{6, "ZWRITE"}
 };
@@ -135,7 +134,7 @@ LITDEF unsigned char cmd_index[27] =
 {
 	0, 0, 2, 4, 6, 8, 10, 12, 15, 17, 19, 21, 23
 	,25, 27, 29, 29, 31, 33, 35, 43, 45, 47, 49
-	,51, 51, 77 GTMTRIG_ONLY(+ 1) ARLINK_ONLY(+ 1) /* add ztrigger and zrupdate, respectively */
+	,51, 51, 76 GTMTRIG_ONLY(+ 1) ARLINK_ONLY(+ 1) /* add ztrigger and zrupdate, respectively */
 };
 LITDEF struct
 {
@@ -201,7 +200,6 @@ LITDEF struct
 	,{m_ztrigger, 0, 1, TRIGGER_OS}
 	#		endif
 	,{m_ztstart, 1, 1, ALL_SYS}
-	,{m_zwatch, 0, 1, 0}
 	,{m_zwithdraw, 0, 1, ALL_SYS}
 	,{m_zwrite, 1, 1, ALL_SYS}
 };

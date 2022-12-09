@@ -241,7 +241,7 @@ void	op_rterror(int4 sig, boolean_t subrtn);
 void	op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst);
 void	op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst);
 void	op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *dst);
-void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt);
+void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt, boolean_t count_specified);
 void	op_setzextract(mval *src, mval *expr, int schar, int echar, mval *dst);
 void	op_setzp1(mval *src, int delim, mval *expr, int ind, mval *dst);
 void	op_setzpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *dst);

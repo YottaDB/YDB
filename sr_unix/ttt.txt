@@ -2,7 +2,7 @@
 ;								;
 ; Copyright 2001, 2014 Fidelity Information Services, Inc	;
 ;								;
-; Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -840,7 +840,8 @@ OC_SETPIECE:	pushab	val.0
 		calls	#6,xfer.xf_setpiece
 OC_SETTEST:	bisb2	#1,r10
 		jsb	xfer.xf_dt_true
-OC_SETZBRK:	pushl	val.5
+OC_SETZBRK:	pushl	val.6
+		pushl	val.5
 		pushab	val.4
 		pushl	val.2
 		pushab	val.1

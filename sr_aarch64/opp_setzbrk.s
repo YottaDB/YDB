@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -21,6 +21,7 @@
  *	w2	- offset
  *	x3	- act == action associated with ZBREAK
  *	w4	- cnt == perform break after this many passes
+ *	w5	- count_specified == TRUE if user specified a count of times after which breakpoint has to be activated
  */
 
 	.include "linkage.si"
