@@ -1919,9 +1919,9 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 					{
 						GTMSOURCE_SAVE_STATE(gtmsource_state_sav);
 						read_len = read_transaction(ctl, buff, buff_avail, read_jnl_seqno);
-						assert((0 < read_len) || (repl_errno == EREPL_JNLEARLYEOF));
 						if (GTMSOURCE_NOW_TRANSITIONAL(gtmsource_state_sav))
 							return 0;
+						assert((0 < read_len) || (EREPL_JNLEARLYEOF == repl_errno));
 						cumul_read += read_len;
 						assert(cumul_read % JNL_WRT_END_MODULUS == 0);
 					}
