@@ -95,10 +95,11 @@
 {												\
 	int	rc;										\
 	int4	rv2, tmpcmdlen;									\
-	char	tmpcmd[(MAX_FN_LEN) * 2 + STR_LIT_LEN(UNALIAS) + 1];				\
-												\
+	int	maxtmpcmdlen = (MAX_FN_LEN) * 2 + STR_LIT_LEN(UNALIAS) + 1;			\
+	char	tmpcmd[maxtmpcmdlen];								\
 	if (FD_INVALID != backup_fd)								\
 		CLOSEFILE_RESET(backup_fd, rc);	/* resets "backup_fd" to FD_INVALID */		\
+	memset(tmpcmd, '\0', maxtmpcmdlen);							\
 	if (!debug_mupip)									\
 	{ /* An error happened. We are not sure if the temp dir is empty. Can't use rmdir() */	\
 		MEMCPY_LIT(tmpcmd, UNALIAS);							\

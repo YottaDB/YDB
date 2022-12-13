@@ -540,7 +540,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	}
 	if (new_ipc)
 	{	/* create new shared memory */
-		if (-1 == (udi->shmid = shmget(IPC_PRIVATE, gtmsource_options.buffsize, RWDALL | IPC_CREAT)))
+		if (-1 == (udi->shmid = gtm_shmget(IPC_PRIVATE, gtmsource_options.buffsize, RWDALL | IPC_CREAT, TRUE)))
 		{
 			udi->shmid = INVALID_SHMID;
 			save_errno = errno;

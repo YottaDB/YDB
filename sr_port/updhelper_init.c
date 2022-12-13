@@ -77,6 +77,7 @@ GBLREF	recvpool_addrs		recvpool;
 GBLREF	upd_helper_entry_ptr_t	helper_entry;
 GBLREF	uint4			process_id;
 GBLREF	uint4			is_updhelper;
+GBLREF	boolean_t		first_syslog;
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	gd_addr			*gd_header;
 
@@ -91,6 +92,9 @@ void updhelper_init(recvpool_user who)
 	gd_region		*reg, *reg_top;
 
 	is_updhelper = who;
+	/* The process might have sent a syslog message already, so set first_syslog here to force setting image type
+	 * with the new value of is_updhelper. */
+	first_syslog = TRUE;
 	getjobnum();
 	recvpool_init(UPD_HELPER_READER, FALSE);
 	upd_log_init(who);

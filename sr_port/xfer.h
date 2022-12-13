@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -281,9 +281,7 @@ XFER(xf_exfunretals, op_exfunretals),
 XFER(xf_setfnretin2als, op_setfnretin2als),
 XFER(xf_setfnretin2alsct, op_setfnretin2alsct),
 XFER(xf_zwritesvn, op_zwritesvn),
-#ifdef UNIX
-XFER(xf_ztrigger, op_ztrigger), /* Restrict to UNIX, not GTM_TRIGGER since is in ttt.txt which cannot be #ifdef'd out */
-#endif
+XFER(xf_ztrigger, op_ztrigger),
 XFER(xf_zhalt, op_zhalt),
 XFER(xf_fnzwrite, op_fnzwrite),
 XFER(xf_igetdst, op_igetdst),
@@ -301,20 +299,17 @@ XFER(xf_rfrshgvn, op_rfrshgvn),
 XFER(xf_indfnname2, op_indfnname2),
 XFER(xf_indget2, op_indget2),
 XFER(xf_indmerge2, op_indmerge2),
-#ifdef UNIX
 XFER(xf_fnzpeek, op_fnzpeek),
-#endif
 XFER(xf_litc, op_litc),
 XFER(xf_stolitc, op_stolitc),
 XFER(xf_fnzsocket, op_fnzsocket),
-#ifdef UNIX
 XFER(xf_fnzsyslog, op_fnzsyslog),
 XFER(xf_zrupdate, op_zrupdate),
-#endif
 #ifdef AUTORELINK_SUPPORTED
 XFER(xf_currhd, op_currhd),
 #endif
 XFER(xf_fnzcollate, op_fnzcollate),
 XFER(xf_fnzatransform, op_fnzatransform),
 XFER(xf_fnztranslate_fast, op_fnztranslate_fast),
-XFER(xf_fntranslate_fast, op_fntranslate_fast)
+XFER(xf_fntranslate_fast, op_fntranslate_fast),
+XFER(xf_fnzauditlog, op_fnzauditlog)

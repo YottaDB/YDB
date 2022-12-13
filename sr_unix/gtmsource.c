@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,6 +80,7 @@ GBLDEF	boolean_t		last_seen_freeze_flag = FALSE;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	gtmsource_state_t	gtmsource_state;
 GBLREF	boolean_t		is_src_server;
+GBLREF	boolean_t		first_syslog;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	uint4			process_id;
 GBLREF	int			gtmsource_sock_fd;
@@ -383,8 +384,9 @@ int gtmsource()
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	holds_sem[SOURCE][JNL_POOL_ACCESS_SEM] = FALSE;
 	assert(!holds_sem[SOURCE][SRC_SERV_COUNT_SEM]);
-	/* Start child source server initialization */
-	is_src_server = TRUE;
+	/* Start child source server initialization. The process might have sent a syslog message already, so set first_syslog
+	 * here to force setting image type with the new value of is_src_server. */
+	is_src_server = first_syslog = TRUE;
 	TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_ERRORS; /* source server should never switch journal files even on errors */
 	OPERATOR_LOG_MSG;
 	process_id = getpid();

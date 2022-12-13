@@ -37,6 +37,7 @@
 #include "relinkctl.h"
 #include "toktyp.h"		/* Needed for "valid_mname.h" */
 #include "valid_mname.h"
+#include "restrict.h"
 
 typedef enum
 {
@@ -126,6 +127,7 @@ GBLREF unsigned short		object_name_len;
 
 error_def(ERR_FILENOTFND);
 error_def(ERR_FILEPARSE);
+error_def(ERR_RESTRICTEDOP);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_VERSION);
@@ -170,6 +172,8 @@ void op_zlink (mval *v, mval *quals)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if ((NULL != quals) && RESTRICTED(zlink_op))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZLINK");
 	ARLINK_ONLY(recent_zhist = NULL);
 	MV_FORCE_STR(v);
 	if (!v->str.len)

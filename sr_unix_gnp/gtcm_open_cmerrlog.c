@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,6 +44,7 @@ void gtcm_open_cmerrlog(void)
 	int		len;
 	mstr		lfn1, lfn2;
 	char		lfn_path[MAX_TRANS_NAME_LEN + 1];
+	char		lfn_path_taint[MAX_TRANS_NAME_LEN + 1]; /* env vars interpolated, need to do some checks */
 	char		new_lfn_path[MAX_TRANS_NAME_LEN + 1];
 	int		new_len;
 	uint4 		ustatus;
@@ -61,34 +62,49 @@ void gtcm_open_cmerrlog(void)
 		lfn1.addr = GTCM_GNP_CMERR_FN;
 		lfn1.len = SIZEOF(GTCM_GNP_CMERR_FN) - 1;
 	}
-	rval = TRANS_LOG_NAME(&lfn1, &lfn2, lfn_path, SIZEOF(lfn_path), do_sendmsg_on_log2long);
+	rval = TRANS_LOG_NAME(&lfn1, &lfn2, lfn_path_taint, SIZEOF(lfn_path_taint), do_sendmsg_on_log2long);
 	if (rval == SS_NORMAL || rval == SS_NOLOGNAM)
 	{
-		lfn_path[lfn2.len] = 0;
-		new_len = ARRAYSIZE(new_lfn_path);
-		rename_file_if_exists(lfn_path, lfn2.len, new_lfn_path, &new_len, &ustatus);
-#ifdef __MVS__
-		if (-1 == gtm_zos_create_tagged_file(lfn_path, TAG_EBCDIC))
-			TAG_POLICY_GTM_PUTMSG(lfn_path, errno, -1, TAG_EBCDIC);
-#endif
-		Fopen(new_file, lfn_path, "a");
-		if (NULL != new_file)
+		lfn_path_taint[lfn2.len] = 0;
+		/* Static analysis complains that lfn_path_taint could be tainted with environment variables,
+		 * which is "true", but intentional, as that's what TRANS_LOG_NAME does.  Let's perform some very basic
+		 * sanity checks on it to show SA we have thought about it before copying it to lfn_path */
+		if ( (0 == STRNCMP_LIT(lfn_path_taint, "/dev/")) ||
+		     (0 == STRNCMP_LIT(lfn_path_taint, "/etc/")) ||
+		     (0 == STRNCMP_LIT(lfn_path_taint, "/boot/")) ||
+		     (0 == STRNCMP_LIT(lfn_path_taint, "/proc/"))
+		    )
 		{
-			gtcm_errfile = TRUE;
-			if (gtcm_errfs)
-				FCLOSE(gtcm_errfs, status);
-			gtcm_errfs = new_file;
-			DUP2(fileno(gtcm_errfs), 1, status);
-			if (status < 0)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
-						LEN_AND_LIT("Error on dup2 of stdout"), errno);
-			DUP2(fileno(gtcm_errfs), 2, status);
-			if (status < 0)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
-						LEN_AND_LIT("Error on dup2 of stderr"), errno);
+			fprintf(stderr, "Unable to log to lfn_path %s: forbidden path prefix or component\n", lfn_path_taint);
 		}
 		else
-			fprintf(stderr, "Unable to open %s : %s\n", lfn_path, STRERROR(errno));
+		{
+			memcpy(lfn_path, lfn_path_taint, sizeof(lfn_path_taint));
+			new_len = ARRAYSIZE(new_lfn_path);
+			rename_file_if_exists(lfn_path, lfn2.len, new_lfn_path, &new_len, &ustatus);
+#ifdef __MVS__
+			if (-1 == gtm_zos_create_tagged_file(lfn_path, TAG_EBCDIC))
+				TAG_POLICY_GTM_PUTMSG(lfn_path, errno, -1, TAG_EBCDIC);
+#endif
+			Fopen(new_file, lfn_path, "a");
+			if (NULL != new_file)
+			{
+				gtcm_errfile = TRUE;
+				if (gtcm_errfs)
+					FCLOSE(gtcm_errfs, status);
+				gtcm_errfs = new_file;
+				DUP2(fileno(gtcm_errfs), 1, status);
+				if (status < 0)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
+							LEN_AND_LIT("Error on dup2 of stdout"), errno);
+				DUP2(fileno(gtcm_errfs), 2, status);
+				if (status < 0)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
+							LEN_AND_LIT("Error on dup2 of stderr"), errno);
+			}
+			else
+				fprintf(stderr, "Unable to open %s : %s\n", lfn_path, STRERROR(errno));
+		}
 	} else
 		fprintf(stderr, "Unable to resolve %s : return value = %ld\n", GTCM_GNP_CMERR_FN, (long)rval);
 	gtcm_firsterr = FALSE;

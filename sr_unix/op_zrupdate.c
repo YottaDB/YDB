@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2021 Fidelity National Information	*
+ * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,7 @@
 #include "interlock.h"
 #include "toktyp.h"
 #include "valid_mname.h"
+#include "restrict.h"
 #ifdef DEBUG
 # include "toktyp.h"		/* Needed for "valid_mname.h" */
 #endif
@@ -47,6 +48,7 @@ LITREF	mval	literal_null;
 
 error_def(ERR_FILEPARSE);
 error_def(ERR_PARNORMAL);
+error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TEXT);
 
 #ifndef AUTORELINK_SUPPORTED
@@ -88,6 +90,8 @@ void op_zrupdate(int argcnt, ...)
 	uint4			hash, prev_hash_index;
 	va_list			var;
 
+	if (RESTRICTED(zrupdate_op))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZRUPDATE");
 	/* Currently only expecting one value per invocation right now. That will change in phase 2, hence the stdarg setup. */
 	va_start(var, argcnt);
 	assert(1 == argcnt);

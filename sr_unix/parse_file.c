@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,6 +22,7 @@
 #include "gtm_ipv6.h"
 
 #include "parse_file.h"
+#include "have_crit.h"
 #include "io.h"
 #include "iosp.h"
 #include "eintr_wrappers.h"
@@ -70,6 +71,8 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	struct sockaddr		localhost_sa, *localhost_sa_ptr;
 	mval			def_trans;
 	int			errcode;
+	intrpt_state_t		prev_intrpt_state;
+	size_t			move_len;		/* try to give static analysis more assurance on mmemove() params */
 
 	pblk->fnb = 0;
 	ai_ptr = localhost_ai_ptr = temp_ai_ptr = NULL;
@@ -83,6 +86,9 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	if (SS_LOG2LONG == status)
 		return ERR_FILEPATHTOOLONG;
 	assert(trans.addr == pblk->buffer);
+	assert(0 <= trans.len);
+	typedef char transbuf_t[trans.len];	/* let static analysis infer our buffer size */
+	transbuf_t *delptr, *trans_ptr;
 	memset(&def, 0, SIZEOF(def));	/* Initial the defaults to zero */
 	if (pblk->def1_size > 0)
 	{	/* Parse default filespec if supplied */
@@ -138,6 +144,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 				query_node_name[query_node_len] = 0;
 				localhost_sa_ptr = NULL;	/* Null value needed if not find query node (remote default) */
 				CLIENT_HINTS(hints);
+				DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				if (0 != (errcode = getaddrinfo(query_node_name, NULL, &hints, &ai_ptr)))	/* Assignment! */
 					ai_ptr = NULL;		/* Skip additional lookups */
 				else
@@ -150,6 +157,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 					localhost_sa_ptr = localhost_ai_ptr->ai_addr;
 				}
 				FREEADDRINFO(localhost_ai_ptr);
+				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				if (ai_ptr && !localhost_sa_ptr)
 				{	/* Have not yet established this is not a local node -- check further */
 					GETHOSTNAME(local_node_name, MAX_HOST_NAME_LEN, status);
@@ -157,6 +165,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 							LEN_AND_LIT("gethostname"), CALLFROM, errno);
 					CLIENT_HINTS(hints);
+					DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 					if (0 != (errcode = getaddrinfo(local_node_name, NULL, &hints, &localhost_ai_ptr)))
 						localhost_ai_ptr = NULL;	/* Empty address list */
 					for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
@@ -170,10 +179,12 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 						}
 					}
 					FREEADDRINFO(localhost_ai_ptr);
+					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				}
 				if (ai_ptr && !localhost_sa_ptr)
 				{
 					CLIENT_HINTS(hints);
+					DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 					if (0 != (errcode = getaddrinfo(LOCALHOSTNAME6, NULL, &hints, &localhost_ai_ptr)))
 						localhost_ai_ptr = NULL;	/* Empty address list */
 					for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
@@ -187,10 +198,13 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 						}
 					}
 					FREEADDRINFO(localhost_ai_ptr);
+					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				}
 				if (!localhost_sa_ptr)		/* Not local (or an unknown) host given */
 				{	/* Remote node specified -- don't apply any defaults */
+					DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 					FREEADDRINFO(ai_ptr);
+					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 					pblk->l_node = trans.addr;
 					pblk->b_node = node_name_len;
 					pblk->l_dir = base;
@@ -201,10 +215,16 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 					pblk->fnb |= (hasnode << V_HAS_NODE);
 					return ERR_PARNORMAL;
 				}
+				DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				FREEADDRINFO(ai_ptr);
+				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				/* Remove local node name from filename buffer */
 				assert(trans.len > node_name_len);	/* this is a function of how we determined node_name_len */
-				memmove(trans.addr, node, MIN(trans.len - node_name_len, MAX_FN_LEN));
+				trans_ptr = (transbuf_t *) trans.addr;
+				move_len =  MIN(trans.len - node_name_len, MAX_FN_LEN);
+				assert (sizeof(transbuf_t) >= move_len);
+				assert(NULL != trans_ptr);
+				memmove((void *)trans_ptr, node, move_len);
 				ptr = base = node -= node_name_len;
 				top -= node_name_len;
 				trans.len -= node_name_len;
@@ -272,8 +292,14 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 				while ((ptr < top) && ('/' == *ptr))
 					ptr++;
 			}
-			assert(top >= ptr);
-			memmove(del, ptr, top - ptr);
+			assert(top >= ptr);	/* Use asserts to tell static analyis that we have thought about this memmove() */
+			move_len = top - ptr;
+			assert((0 <= move_len) && (trans.len >= move_len)) ;
+			assert(NULL != ptr);
+			assert(NULL != del);
+			assert((del <= ptr) && (del >= trans.addr));
+			delptr = (transbuf_t *) del;
+			memmove((void *) delptr, ptr, move_len);
 			diff = (int)(ptr - del);
 			ptr -= diff;
 			top -= diff;

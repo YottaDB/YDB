@@ -67,7 +67,7 @@
 #include "gt_timers_add_safe_hndlrs.h"
 #include "continue_handler.h"
 #include "restrict.h"
-
+#include "dm_audit_log.h"
 #ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
@@ -93,6 +93,7 @@ GBLREF void 			(*primary_exit_handler)(void);
 
 GBLDEF block_id			patch_curr_blk;
 GBLDEF CLI_ENTRY		*cmd_ary = &dse_cmd_ary[0];	/* Define cmd_ary to be the DSE specific cmd table */
+GBLREF IN_PARMS 		*cli_lex_in_ptr;
 
 static bool		dse_process(int argc);
 static void 		display_prompt(void);
@@ -104,7 +105,6 @@ error_def(ERR_RESTRICTEDOP);
 int main(int argc, char *argv[])
 {
 	DCL_THREADGBL_ACCESS;
-
 	GTM_THREADGBL_INIT;
 	common_startup_init(DSE_IMAGE);
 	licensed = TRUE;
@@ -176,12 +176,18 @@ static void display_prompt(void)
 
 static bool	dse_process(int argc)
 {
-	int	res;
-
+	int	res, status;
 	ESTABLISH_RET(util_ch, TRUE);
 	func = 0;
 	util_interrupt = 0;
-	if (EOF == (res = parse_cmd()))
+	res = parse_cmd();
+	if (EOF != res)
+	{
+		status = log_cmd_if_needed(cli_lex_in_ptr->in_str);
+		if (status)
+			return FALSE;
+	}
+	if (EOF == res)
 	{
 		if (util_interrupt)
 		{

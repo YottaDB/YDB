@@ -60,7 +60,7 @@
 #define ESC_OFFSET		4
 #define MAX_COMMAND_LINE_LENGTH	255
 
-GBLREF boolean_t		dollar_zquit_anyway, dollar_zaudit;
+GBLREF boolean_t		dollar_zquit_anyway;
 GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF int			process_exiting;
 GBLREF int4			dollar_zeditor, dollar_zsystem, zdir_form;
@@ -248,7 +248,7 @@ void op_svget(int varnum, mval *v)
 			MV_FORCE_MVAL(v, count);
 			break;
 		case SV_ZAUDIT:
-			MV_FORCE_MVAL(v, dollar_zaudit);
+			MV_FORCE_MVAL(v, TREF(dollar_zaudit));
 			break;
 		case SV_ZB:
 			c1 = (char *)io_curr_device.in->dollar.zb;

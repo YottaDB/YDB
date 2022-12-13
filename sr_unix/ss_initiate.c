@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2020 Fidelity National Information	*
+ * Copyright (c) 2009-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,6 +62,7 @@
 #include "have_crit.h"
 #include "ss_lock_facility.h"
 #include "gtmimagename.h"
+#include "jnl_file_close_timer.h"
 
 GBLREF	boolean_t		muint_fast, ointeg_this_reg, online_specified;
 GBLREF	gd_region		*gv_cur_region;
@@ -149,7 +150,7 @@ ZOS_ONLY(error_def(ERR_TEXT);)
 					LEN_AND_LIT("Error with shmctl"), CALLFROM, RC);		\
 		}											\
 	}												\
-	SS_SHMID = shmget(IPC_PRIVATE, SS_SHMSIZE, RWDALL | IPC_CREAT);					\
+	SS_SHMID = gtm_shmget(IPC_PRIVATE, SS_SHMSIZE, RWDALL | IPC_CREAT, FALSE);			\
 	if (-1 == SS_SHMID)										\
 	{												\
 		RC = errno;										\

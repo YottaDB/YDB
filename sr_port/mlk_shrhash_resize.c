@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 Fidelity National Information	*
+ * Copyright (c) 2018-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@ boolean_t mlk_shrhash_resize(mlk_pvtctl_ptr_t pctl)
 
 	do
 	{
-		shmid_new = shmget(IPC_PRIVATE, shrhash_mem_new, RWDALL | IPC_CREAT);
+		shmid_new = gtm_shmget(IPC_PRIVATE, shrhash_mem_new, RWDALL | IPC_CREAT, TRUE);
 		assert(-1 != shmid_new);
 		if (-1 == shmid_new)
 		{

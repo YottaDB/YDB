@@ -18,7 +18,7 @@
  *
  *   1. Make organization defensible. Possible organizations:
  *      a. Group like-types alphabetically.
- *      b. Gorup related items (such as compiler, replication, etc.
+ *      b. Group related items (such as compiler, replication, etc.
  *   2. Because references will use an offset into this structure and since the "immediate offset" in
  *      compiler generated instructions is usually limited to "smaller" values like less than 16K or
  *      32K or whatever (platform dependent), items near the top of the table should be reserved used for
@@ -225,6 +225,11 @@ THREADGBLDEF(max_lcl_coll_xform_bufsiz,		int)				/* max size of local collation 
 THREADGBLDEF(replgbl,				replgbl_t)			/* set of global variables needed by the source
 										 * server */
 THREADGBLDEF(tqread_nowait,			boolean_t)			/* avoid sleeping in t_qread if TRUE */
+/* Auditing related global variables */
+THREADGBLDEF(dollar_zaudit, 			boolean_t)			/* Intrinsic that indicates whether direct mode
+										 * auditing (i.e. APD) is enabled.
+										 * TRUE => Auditing is enabled. */
+THREADGBLDEF(is_zauditlog, 			boolean_t)			/* Index for audit_conn*/
 /* Miscellaneous */
 THREADGBLDEF(arlink_enabled,			boolean_t)			/* TRUE if any zroutines segment is autorelink
 										 * enabled. */

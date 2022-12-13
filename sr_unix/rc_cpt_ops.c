@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -190,7 +190,7 @@ static int rc_init_ipc(void)
 		PERROR("Error with rc ftok");
 		return errno;
 	}
-	if ((rc_shmid = shmget(rc_key, SIZEOF(rc_cp_table) , RWDALL)) == -1)
+	if ((rc_shmid = gtm_shmget(rc_key, SIZEOF(rc_cp_table), RWDALL, FALSE)) == -1)
 	{
 		rc_shmid = INVALID_SHMID;
 		PERROR("Error with rc shmget");
@@ -311,7 +311,7 @@ int rc_cpt_inval(void)
 			PERROR("Error with rc ftok");
 			return errno;
 		}
-		if ((rc_shmid = shmget(rc_key, SIZEOF(rc_cp_table) , RWDALL)) == -1)
+		if ((rc_shmid = gtm_shmget(rc_key, SIZEOF(rc_cp_table), RWDALL, FALSE)) == -1)
 		{
 			rc_shmid = INVALID_SHMID;
 			PERROR("Error with rc shmget");
@@ -386,7 +386,7 @@ int mupip_rundown_cpt()
 	{	/* no GT.CM server installed on system - okay to reset RC values */
 		return 0;
 	}
-	if ((rc_shmid = shmget(rc_key, SIZEOF(rc_cp_table), RWDALL)) == -1)
+	if ((rc_shmid = gtm_shmget(rc_key, SIZEOF(rc_cp_table), RWDALL, FALSE)) == -1)
 	{	/* no RC CPT - okay to reset RC values */
 		rc_shmid = INVALID_SHMID;
 		return 0;
@@ -499,7 +499,7 @@ int rc_create_cpt(void)
 		PERROR("Error with rc ftok");
 		return errno;
 	}
-	if ((rc_shmid = shmget(rc_key, SIZEOF(rc_cp_table) ,IPC_CREAT |  RWDALL)) == -1)
+	if ((rc_shmid = gtm_shmget(rc_key, SIZEOF(rc_cp_table), IPC_CREAT | RWDALL, TRUE)) == -1)
 	{
 		rc_shmid = INVALID_SHMID;
 		PERROR("Error with rc shmget");

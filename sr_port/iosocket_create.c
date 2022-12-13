@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,15 +34,14 @@
 #include "gtm_ipv6.h"
 #include "gtm_stdlib.h"
 
+#include "have_crit.h"
 #include "io.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #include "min_max.h"
 #include "gtm_caseconv.h"
 #include "util.h"
-#ifndef VMS
 #include "trans_log_name.h"
-#endif
 
 error_def(ERR_ADDRTOOLONG);
 error_def(ERR_GETSOCKNAMERR);
@@ -70,12 +69,10 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 	const char		*errptr;
 	struct addrinfo		*ai_ptr;
 	struct addrinfo		hints, *addr_info_ptr = NULL;
-#ifndef VMS
 	struct sockaddr_un	*sa_un_ptr, sa_un_trans;
 	mval			localpath;
 	mstr			transpath;
 	int			trans_status;
-#endif
 	enum socket_protocol	protocol;
 	int			af;
 	int			sd;
@@ -85,6 +82,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 	int			port_buffer_len;
 	int			colon_cnt, protooffset;
 	char			*last_2colon = NULL;
+	intrpt_state_t		prev_intrpt_state;
 	int			addrlen;
 	GTM_SOCKLEN_TYPE	tmp_addrlen;
 
@@ -122,10 +120,8 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 		lower_to_upper((uchar_ptr_t)protocolstr, (uchar_ptr_t)&sockaddr[protooffset], tmplen);
 		if (((SIZEOF("TCP") - 1) == tmplen) && (0 == MEMCMP_LIT(protocolstr, "TCP")))
 			protocol = socket_tcpip;
-#		ifndef VMS
 		else if (((SIZEOF("LOCAL") - 1) == tmplen) && (0 == MEMCMP_LIT(protocolstr, "LOCAL")))
 			protocol = socket_local;
-#		endif
 		else
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PROTNOTSUP, 2, tmplen , &sockaddr[protooffset]);
@@ -161,12 +157,15 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				port_buffer_len = 0;
 				I2A(port_buffer, port_buffer_len, port);
 				port_buffer[port_buffer_len]='\0';
+				DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				if (0 != (errcode = getaddrinfo(NULL, port_buffer, &hints, &addr_info_ptr)))
 				{
 					close(sd);
+					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 					RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
 					return NULL;
 				}
+				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				SOCKET_ALLOC(socketptr);
 				socketptr->local.port = port;
 				socketptr->temp_sd = sd;
@@ -177,7 +176,9 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				ai_ptr->ai_addr = SOCKET_LOCAL_ADDR(socketptr);
 				ai_ptr->ai_addrlen = addr_info_ptr->ai_addrlen;
 				ai_ptr->ai_next = NULL;
+				DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				freeaddrinfo(addr_info_ptr);
+				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			} else
 			{	/* connection socket */
 				assert(2 == colon_cnt);
@@ -203,18 +204,20 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 					memcpy(temp_addr, sockaddr, addrlen);
 				temp_addr[addrlen] = 0;
 				CLIENT_HINTS(hints);
+				DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				if (0 != (errcode = getaddrinfo(temp_addr, port_buffer, &hints, &addr_info_ptr)))
 				{
+					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 					RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
 					return NULL;
 				}
+				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				/*  we will test all address families in iosocket_connect() */
 				SOCKET_ALLOC(socketptr);
 				socketptr->remote.ai_head = addr_info_ptr;
 				socketptr->remote.port = port;
 				socketptr->sd = socketptr->temp_sd = FD_INVALID; /* don't mess with 0 */
 			}
-#		ifndef VMS
 		} else if (socket_local == protocol)
 		{	/* should we get_full_path first */
 			/* check protooffset < sizeof sun_path */
@@ -262,7 +265,6 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				socketptr->remote.ai.ai_addrlen = (size_t)((struct sockaddr_un *)0)->sun_path + protooffset;
 				socketptr->sd = socketptr->temp_sd = FD_INVALID; /* don't mess with 0 */
 			}
-#		endif
 		} else
 			assertpro(socket_tcpip == protocol || socket_local == protocol);	/* protocol already checked */
 		socketptr->state = socket_created;
@@ -282,14 +284,12 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 		if (-1 == getsockname(socketptr->sd, SOCKET_LOCAL_ADDR(socketptr), &tmp_addrlen))
 		{
 			save_errno = errno;
-#			if !defined(VMS)
 			if (IS_SOCKNAME_UNIXERROR(save_errno))
 			{
 				SOCKET_LOCAL_ADDR(socketptr)->sa_family = AF_UNIX;
 				((struct sockaddr_un *)SOCKET_LOCAL_ADDR(socketptr))->sun_path[0] = '\0';
 				tmp_addrlen = SIZEOF(struct sockaddr_un);
 			} else
-#			endif
 			{
 				errptr = (char *)STRERROR(save_errno);
 				tmplen = STRLEN(errptr);
@@ -298,7 +298,6 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				return NULL;
 			}
 		}
-#		if !defined(VMS)
 		else if (((size_t) (((struct sockaddr *) 0)->sa_data) >= tmp_addrlen)
 			|| (0 == SOCKET_LOCAL_ADDR(socketptr)->sa_family))
 		{
@@ -309,7 +308,6 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 		if (AF_UNIX == SOCKET_LOCAL_ADDR(socketptr)->sa_family)
 			protocol = socket_local;
 		else
-#		endif
 			protocol = socket_tcpip;
 		ai_ptr->ai_addrlen = tmp_addrlen;
 		ai_ptr->ai_family = SOCKET_LOCAL_ADDR(socketptr)->sa_family;
@@ -337,14 +335,12 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				return NULL;
 			}
 		}
-#		if !defined(VMS)
 		else if (socket_local == protocol)
 		{
 			SOCKET_REMOTE_ADDR(socketptr)->sa_family = AF_UNIX;
 			((struct sockaddr_un *)SOCKET_REMOTE_ADDR(socketptr))->sun_path[0] = '\0';
 			tmp_addrlen = SIZEOF(struct sockaddr_un);
 		}
-#		endif
 		socketptr->remote.ai.ai_addrlen = tmp_addrlen;
 		assert(0 != SOCKET_REMOTE_ADDR(socketptr)->sa_family);
 		socketptr->remote.ai.ai_family = SOCKET_REMOTE_ADDR(socketptr)->sa_family;

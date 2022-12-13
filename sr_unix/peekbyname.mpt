@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2015-2021 Fidelity National Information		;
+; Copyright (c) 2015-2022 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -138,6 +138,26 @@ listiterate(out,gldpath)
 	. for j=1:1  set fieldname=$get(^gtmtypes(struct,j,"name")) quit:""=fieldname  do
 	. . if 'write set out(fieldname)=^gtmtypes(struct,j,"type")_","_^gtmtypes(struct,j,"len")
 	. . else  write fieldname,!
+	quit
+
+; Identify the $ZPEEK() arguments for a structure and name; output pass-by-reference csv is type,length,offset[,dimension]
+ARGS(struct,name,output,gldpath)
+	new $zgbldir,arg,dim,fieldname,idx,land,r,zwrite
+	new $etrap	; Do not modify caller's error trap
+	set $ecode="",$etrap="quit"	; Defer error handling to the caller without doing anything
+	set land=$zlevel-1
+	set $zgbldir=$select($length($get(gldpath)):gldpath,1:$ztrnlnm("gtm_dist"))_"/gtmhelp.gld"
+	if ""=$get(struct) do error("UNSUPSTRUCT","<empty>")
+	if '$data(^gtmtypfldindx(struct)) do error("UNSUPSTRUCT",struct)
+	if ""=$get(name) do error("INVALID","<empty>")
+	set idx=$get(^gtmtypfldindx(struct,name))
+	if 'idx do error("INVALID",name)
+	set zwrite=100>$zdata(output)
+	set fieldname=$get(^gtmtypes(struct,idx,"name")),output(fieldname)=""
+	zwrite:zwrite fieldname
+	for arg="type","len","off","dim" set r=$get(^gtmtypes(struct,idx,arg)) do
+	. if zwrite zwrite:""'=r ^gtmtypes(struct,idx,arg)
+	. else  set:""'=r output(fieldname)=output(fieldname)_","_r set:"dim"=arg $extract(output(fieldname),1)=""
 	quit
 
 data(field,gldpath)

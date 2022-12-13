@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,7 +13,27 @@
 #ifndef REPL_COMM_H
 #define REPL_COMM_H
 
-#define REPL_CONN_RESET(err)	(ECONNRESET == (err) || EPIPE == (err) || EINVAL == (err) || ETIMEDOUT == (err))
+/* Add OS specific network errors here */
+#ifndef _AIX
+# define OS_NETWORK_ERR(ERR)		(ECOMM == (ERR))
+#else
+# define OS_NETWORK_ERR(ERR)		FALSE
+#endif
+
+/* The following is a list of ERRNOs for which replication servers should attempt to retry the connection. This list
+ * is accurate as of 2022/11/21 RHEL 6 to Fedora 36 and AIX 7.1/7.2. */
+#define REPL_CONN_RESET(err)	(ECONNRESET == (err)										\
+					|| ECONNABORTED == (err)								\
+					|| ECONNREFUSED == (err)								\
+					|| EHOSTDOWN == (err)									\
+					|| EHOSTUNREACH == (err)								\
+					|| EINVAL == (err)									\
+					|| ENETDOWN == (err)									\
+					|| ENETRESET == (err)									\
+					|| ENETUNREACH == (err)									\
+					|| ETIMEDOUT == (err)									\
+					|| EPIPE == (err))									\
+					|| (OS_NETWORK_ERR(err)) 								\
 
 /* To use REPL_SEND_LOOP following variables need to exist:
  *	unsigned char	*msg_ptr;

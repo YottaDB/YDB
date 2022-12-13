@@ -479,7 +479,7 @@ LITDEF	err_msg merrors[] = {
 	{ "TRESTNOT", "Cannot TRESTART, transaction is not restartable", 0, 0 },
 	{ "TPLOCK", "Cannot release LOCK(s) held prior to current TSTART", 0, 0 },
 	{ "TPQUIT", "Cannot QUIT out of a routine with an active transaction", 0, 0 },
-	{ "TPFAIL", "Transaction COMMIT failed.  Failure code: !AD.", 2, 0 },
+	{ "TPFAIL", "Transaction COMMIT failed.", 0, 0 },
 	{ "TPRETRY", "Restart transaction from non-concurrency DB failure", 0, 0 },
 	{ "TPTOODEEP", "$TLEVEL cannot exceed 127", 0, 0 },
 	{ "ZDEFACTIVE", "ZDEFER already active", 0, 0 },
@@ -1073,8 +1073,8 @@ LITDEF	err_msg merrors[] = {
 	{ "RSVDBYTE2HIGH", "Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and Reserved bytes (!UL)", 5, 0 },
 	{ "BKUPTMPFILOPEN", "Open of backup temporary file !AD failed", 2, 0 },
 	{ "BKUPTMPFILWRITE", "Write to backup temporary file !AD failed", 2, 0 },
-	{ "UNUSEDMSG1242", "VMSMEMORY2 last used in OpenVMS", 0, 0 },
-	{ "UNUSEDMSG1243", "LOADBGSZ2 last used in V6.3-009", 0, 0 },
+	{ "SHMHUGETLB", "Could not back shared memory with huge pages, using base pages instead", 0, 0 },
+	{ "SHMLOCK", "Could not pin shared memory into physical memory", 0, 0 },
 	{ "UNUSEDMSG1244", "LOADEDSZ2 last used in V6.3-009", 0, 0 },
 	{ "REPLINSTMISMTCH", "Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)", 8, 0 },
 	{ "REPLINSTREAD", "Error reading [0x!XL] bytes at offset [0x!16@XQ] from replication instance file !AD", 4, 0 },
@@ -1562,6 +1562,7 @@ LITDEF	err_msg merrors[] = {
 	{ "AUDINITFAIL", "Audit !AZ facility failed to initialize audit information", 1, 0 },
 	{ "AUDCONNFAIL", "Audit !AZ facility failed to connect to audit logger", 1, 0 },
 	{ "AUDLOGFAIL", "Audit !AZ facility failed to log command", 1, 0 },
+	{ "SOCKCLOSE", "Error closing socket: (errno == !UL) !AD", 3, 0 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -2624,8 +2625,8 @@ LITDEF	int ERR_OMISERVHANG = 150380811;
 LITDEF	int ERR_RSVDBYTE2HIGH = 150380818;
 LITDEF	int ERR_BKUPTMPFILOPEN = 418816282;
 LITDEF	int ERR_BKUPTMPFILWRITE = 418816290;
-LITDEF	int ERR_UNUSEDMSG1242 = 150380842;
-LITDEF	int ERR_UNUSEDMSG1243 = 150380850;
+LITDEF	int ERR_SHMHUGETLB = 150380840;
+LITDEF	int ERR_SHMLOCK = 150380848;
 LITDEF	int ERR_UNUSEDMSG1244 = 150380858;
 LITDEF	int ERR_REPLINSTMISMTCH = 150380866;
 LITDEF	int ERR_REPLINSTREAD = 418816330;
@@ -3113,6 +3114,7 @@ LITDEF	int ERR_BKUPFILEPERM = 150384722;
 LITDEF	int ERR_AUDINITFAIL = 150384730;
 LITDEF	int ERR_AUDCONNFAIL = 150384738;
 LITDEF	int ERR_AUDLOGFAIL = 150384746;
+LITDEF	int ERR_SOCKCLOSE = 150384754;
 
 
 LITDEF	int merrors_undocarr[] = {
@@ -3148,7 +3150,7 @@ GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1549,
+	1550,
 	&merrors_undocarr[0],
 	25
 };

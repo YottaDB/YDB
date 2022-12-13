@@ -155,6 +155,8 @@ GBLDEF	boolean_t	prin_in_dev_failure;	/* used in I/O to perform NOPRINCIO detect
 GBLDEF	boolean_t	prin_out_dev_failure;	/* used in I/O to perform NOPRINCIO detection on output */
 GBLDEF	boolean_t	wcs_noasyncio;		/* used in wcs_wtstart to disable asyncio in the forward rollback/recover phase */
 GBLDEF	io_desc		*active_device;
+GBLDEF	bool		pin_shared_memory;
+GBLDEF	bool		hugetlb_shm_enabled;
 GBLDEF	bool		error_mupip,
 			file_backed_up,
 			gv_replopen_error,
@@ -396,6 +398,7 @@ GBLDEF	io_desc			*gtm_err_dev;
 GBLDEF	int			num_additional_processors;
 GBLDEF	int			gtm_errno = -1;		/* holds the errno (unix) in case of an rts_error */
 GBLDEF	int4			error_condition;
+GBLDEF	int4			pre_drvlongjmp_error_condition;
 GBLDEF	global_tlvl_info	*global_tlvl_info_head;
 GBLDEF	buddy_list		*global_tlvl_info_list;
 GBLDEF	boolean_t		job_try_again;
@@ -1198,12 +1201,6 @@ GBLDEF	char		io_setup_errstr[IO_SETUP_ERRSTR_ARRAYSIZE];
 GBLDEF	void		(*mupip_exit_fp)(int4 errnum);	/* Function pointer to mupip_exit() in MUPIP but points to a routine
 							 * that assert fails if run from non-MUPIP builds.
 							 */
-
-/* Direct mode auditing related global variables */
-GBLDEF	boolean_t	dollar_zaudit;			/* Intrinsic that indicates whether direct mode
-							 * auditing (i.e. APD) is enabled.
-							 * TRUE => Auditing is enabled.
-							 */
-GBLDEF	dm_audit_info	*audit_conn;			/* Stores the APD logger's connection information */
 GBLDEF	boolean_t	gtm_nofflf;			/* GTM-9136 TRUE only to suppress LF after FF in "write #" */
 GBLDEF	void 		(*primary_exit_handler)(void);	/* If non-NULL, may be used to reestablish atexit() handler */
+GBLDEF	dm_audit_info	audit_conn[MAX_AUD_CONN];	/* AUdit logging connection information */

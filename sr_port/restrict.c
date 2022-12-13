@@ -9,7 +9,6 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
 #include "mdef.h"
 #include <errno.h>
 #include <grp.h>
@@ -41,9 +40,12 @@
 #define RESTRICT_BREAK			"BREAK"
 #define RESTRICT_ZBREAK			"ZBREAK"
 #define RESTRICT_ZEDIT			"ZEDIT"
+#define RESTRICT_ZLINK			"ZLINK"
+#define RESTRICT_ZRUPDATE		"ZRUPDATE"
 #define RESTRICT_ZSYSTEM		"ZSYSTEM"
 #define RESTRICT_PIPEOPEN		"PIPE_OPEN"
 #define RESTRICT_TRIGMOD		"TRIGGER_MOD"
+#define RESTRICT_ZROUTINES		"ZROUTINES"
 #define RESTRICT_CENABLE		"CENABLE"
 #define RESTRICT_DSE			"DSE"
 #define RESTRICT_LKECLEAR		"LKECLEAR"
@@ -58,6 +60,9 @@
 #define	RESTRICT_LOGDENIALS		"LOGDENIALS"
 #define APD_ENABLE			"APD_ENABLE"
 #define AM_ENABLE			"AM_ENABLE"
+#define AZA_ENABLE			"AZA_ENABLE"
+#define AD_ENABLE			"AD_ENABLE"
+#define AL_ENABLE			"AL_ENABLE"
 #define MAX_READ_SZ			1024	/* Restrict Mnemonic shouldn't exceed this limit */
 #define MAX_FACILITY_LEN		64
 #define MAX_GROUP_LEN			64
@@ -74,6 +79,8 @@
 #define	AUDIT_OPT_TLS_LEN		STR_LIT_LEN(AUDIT_OPT_TLS)
 #define AUDIT_OPT_OPREAD		"RD"
 #define AUDIT_OPT_OPREAD_LEN		STR_LIT_LEN(AUDIT_OPT_OPREAD)
+#define AUDIT_OPT_LGDE			"LGDE"
+#define AUDIT_OPT_LGDE_LEN		STR_LIT_LEN(AUDIT_OPT_LGDE)
 
 GBLDEF	struct restrict_facilities	restrictions;
 GBLDEF	boolean_t			restrict_initialized;
@@ -81,7 +88,6 @@ GBLDEF	boolean_t			restrict_initialized;
 GBLREF	boolean_t			gtm_dist_ok_to_use;
 #endif
 GBLREF	char				gtm_dist[GTM_PATH_MAX];
-GBLREF	boolean_t			dollar_zaudit;
 
 error_def(ERR_RESTRICTSYNTAX);
 error_def(ERR_SYSCALL);
@@ -124,7 +130,6 @@ static inline boolean_t OPEN_MAPPING_FILE(struct stat *stat, char *fpath, FILE *
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, *save_errno);
 		}
 	}
-
 	return createnow;
 }
 
@@ -149,11 +154,15 @@ void restrict_init(void)
 	char		*grpbuf = NULL;
 	size_t		grpbufsz, audit_prefix_len = 0;
 	boolean_t	created_now = FALSE, tls = FALSE, audit_opread = FALSE;
+	boolean_t	is_ad, is_al, is_am, is_apd, is_aza, valid_option, is_zauditlog_tmp;
 	struct stat 	restrictStat;
 	uid_t		euid, fuid;
 	gid_t		egid, fgid;
 	int		rest_owner_perms, rest_group_perms, rest_other_perms;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	is_zauditlog_tmp = TREF(is_zauditlog);
 	assert(!restrict_initialized);
 	assert(gtm_dist_ok_to_use);
 	SNPRINTF(restrictpath, GTM_PATH_MAX, "%s/%s", gtm_dist, RESTRICT_FILENAME);
@@ -201,21 +210,47 @@ void restrict_init(void)
 			{
 				lineno++;
 				valid_audit_entry = FALSE;
-				cont = FALSE;
+				is_al = is_ad = is_aza = is_apd = is_am = tls = cont = FALSE;
+				TREF(is_zauditlog)= FALSE;
 				fields = SSCANF(linebuf, FACILITY_FMTSTR " : " GROUP_FMTSTR,
 									facility, group_or_flname);
 				if (0 == fields)
 					continue;	/* Ignore blank lines */
-				if (0 == STRNCASECMP(facility, APD_ENABLE, STRLEN(APD_ENABLE)))
+				if (0 == STRNCASECMP(facility, AZA_ENABLE, STRLEN(AZA_ENABLE)))
+					is_aza = TRUE;
+				else if (0 == STRNCASECMP(facility, APD_ENABLE, STRLEN(APD_ENABLE)))
+					is_apd = TRUE;
+				else if (0 ==STRNCASECMP(facility, AM_ENABLE, STRLEN(AM_ENABLE)))
+					is_am = TRUE;
+				else if (0 ==STRNCASECMP(facility, AD_ENABLE, STRLEN(AD_ENABLE)))
+					is_ad = TRUE;
+				else if (0 ==STRNCASECMP(facility, AL_ENABLE, STRLEN(AL_ENABLE)))
+					is_al = TRUE;
+				if (is_al)
+				{
+					valid_audit_entry = IS_LKE_IMAGE;
+					cont = (FALSE == valid_audit_entry) ? TRUE : FALSE;
+				}
+				if (is_ad)
+				{
+					valid_audit_entry = IS_DSE_IMAGE;
+					cont = (FALSE == valid_audit_entry) ? TRUE : FALSE;
+				}
+				if (is_apd)
 				{
 					valid_audit_entry = IS_MUMPS_IMAGE;
 					cont = (FALSE == valid_audit_entry) ? TRUE : FALSE;
 				}
-				if (0 == STRNCASECMP(facility, AM_ENABLE, STRLEN(AM_ENABLE)))
+				if (is_am)
 				{
-
 					valid_audit_entry = IS_MUPIP_IMAGE;
 					cont = (FALSE == valid_audit_entry) ? TRUE : FALSE;
+				}
+				if (is_aza)
+				{
+					valid_audit_entry = IS_MUMPS_IMAGE;
+					cont = (FALSE == valid_audit_entry) ? TRUE : FALSE;
+					TREF(is_zauditlog)= TRUE;
 				}
 				if (TRUE == cont)
 					continue;
@@ -256,7 +291,7 @@ void restrict_init(void)
 									|| (' ' == *apd_opts_strt)
 									|| ('\t' == *apd_opts_strt)))
 							apd_opts_strt++;	/* Ignore white space and commas */
-						/* Now have start of a direct mode auditing option token */
+						/* Now have start of an auditing option token */
 						opt_strt = apd_opts_strt;
 						/* Look for token terminator */
 						while ((apd_opts_strt < apd_opts_end) && (',' != *apd_opts_strt)
@@ -271,54 +306,75 @@ void restrict_init(void)
 								 */
 						if ((apd_opts_strt < apd_opts_end) && (',' == *apd_opts_strt))
 							apd_opts_strt++;           /* forward space past comma */
-						/* See if this is a valid dmode auditing option */
-						if ((AUDIT_OPT_OPREAD_LEN == opt_len)
+						/* See if this is a valid auditing option */
+						valid_option = FALSE;
+						if ((AUDIT_OPT_LGDE_LEN == opt_len)
 								&& (0 == STRNCASECMP(opt_strt,
-											AUDIT_OPT_OPREAD,
-											AUDIT_OPT_OPREAD_LEN)))
-							audit_opread = TRUE;
-#								ifdef GTM_TLS
+										AUDIT_OPT_LGDE,
+										AUDIT_OPT_LGDE_LEN)))
+						{
+							valid_option = TRUE;
+							if (is_aza) restrictions.gde_enable = TRUE;
+						} else if ((AUDIT_OPT_OPREAD_LEN == opt_len)
+								&& (0 == STRNCASECMP(opt_strt,
+										AUDIT_OPT_OPREAD,
+										AUDIT_OPT_OPREAD_LEN)))
+						{
+							valid_option = TRUE;
+							if (is_apd) audit_opread = TRUE;
+						}
+#						ifdef GTM_TLS
 						else if ((AUDIT_OPT_TLS_LEN == opt_len)
 								&& (0 == STRNCASECMP(opt_strt, AUDIT_OPT_TLS,
-											AUDIT_OPT_TLS_LEN)))
-							tls = TRUE;
-#								endif
+										AUDIT_OPT_TLS_LEN)))
+							tls = valid_option = TRUE;
+#						endif
 						else
-						{	/* Invalid option - parse error and restrict everything */
-							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9)
-									ERR_RESTRICTSYNTAX, 3,
-									LEN_AND_STR(restrictpath), lineno,
-									ERR_TEXT, 2,
-									LEN_AND_LIT("Invalid auditing option"));
-							restrict_all = TRUE;
-							break;
-						}
+                                                {       /* Invalid option - parse error and restrict everything */
+							if (!valid_option)
+							{
+								send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9)
+										ERR_RESTRICTSYNTAX, 3,
+										LEN_AND_STR(restrictpath), lineno,
+										ERR_TEXT, 2,
+										LEN_AND_LIT
+										("Invalid auditing option"));
+								restrict_all = TRUE;
+								break;
+							}
+                                                }
 					}
 					if (restrict_all)
 						break;
-					/* Initialize Direct Mode Auditing with the provided info */
+					/* Initialize Auditing with the provided info */
 					if (0 > dm_audit_init(host_info, tls))
 					{
 						/* Treat error in auditing initialization as parse error. */
 						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RESTRICTSYNTAX, 3,
-									LEN_AND_STR(restrictpath), lineno, ERR_APDINITFAIL);
+								LEN_AND_STR(restrictpath), lineno, ERR_AUDINITFAIL,
+								1, facility);
 						restrict_all = TRUE;
 						break;
 					}
-					if (IS_MUMPS_IMAGE)
+					if ((IS_MUMPS_IMAGE) && (is_apd))
 					{
 						if (audit_opread)
 							restrictions.dm_audit_enable = AUDIT_ENABLE_DMRDMODE;
 						else
 							restrictions.dm_audit_enable = AUDIT_ENABLE_DMODE;
-						dollar_zaudit = TRUE;
+						TREF(dollar_zaudit) = TRUE;
 					}
 					if (IS_MUPIP_IMAGE)
-						restrictions.mupip_enable = TRUE;
+						restrictions.mupip_audit_enable = TRUE;
+					if ((IS_MUMPS_IMAGE) && (is_aza))
+						restrictions.aza_enable = TRUE;
+					if (IS_DSE_IMAGE)
+						restrictions.dse_audit_enable = TRUE;
+					if (IS_LKE_IMAGE)
+						restrictions.lke_audit_enable = TRUE;
 					continue;
-				}
-				else if (1 == fields)
-					restrict_one = restrict_default;
+				} else if (1 == fields)
+						restrict_one = restrict_default;
 				else if (2 == fields)
 				{
 					if (NULL == grpbuf)
@@ -379,12 +435,18 @@ void restrict_init(void)
 					restrictions.zbreak_op = restrict_one;
 				else if (0 == STRNCASECMP(facility, RESTRICT_ZEDIT, SIZEOF(RESTRICT_ZEDIT)))
 					restrictions.zedit_op = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_ZLINK, SIZEOF(RESTRICT_ZLINK)))
+					restrictions.zlink_op = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_ZRUPDATE, SIZEOF(RESTRICT_ZRUPDATE)))
+					restrictions.zrupdate_op = restrict_one;
 				else if (0 == STRNCASECMP(facility, RESTRICT_ZSYSTEM, SIZEOF(RESTRICT_ZSYSTEM)))
 					restrictions.zsystem_op = restrict_one;
 				else if (0 == STRNCASECMP(facility, RESTRICT_PIPEOPEN, SIZEOF(RESTRICT_PIPEOPEN)))
 					restrictions.pipe_open = restrict_one;
 				else if (0 == STRNCASECMP(facility, RESTRICT_TRIGMOD, SIZEOF(RESTRICT_TRIGMOD)))
 					restrictions.trigger_mod = restrict_one;
+				else if (0 == STRNCASECMP(facility, RESTRICT_ZROUTINES, SIZEOF(RESTRICT_ZROUTINES)))
+					restrictions.zroutines_op = restrict_one;
 				else if (0 == STRNCASECMP(facility, RESTRICT_CENABLE, SIZEOF(RESTRICT_CENABLE)))
 					restrictions.cenable = restrict_one;
 				else if (0 == STRNCASECMP(facility, RESTRICT_DSE, SIZEOF(RESTRICT_DSE)))
@@ -430,9 +492,12 @@ void restrict_init(void)
 		restrictions.break_op = TRUE;
 		restrictions.zbreak_op = TRUE;
 		restrictions.zedit_op = TRUE;
+		restrictions.zlink_op = TRUE;
+		restrictions.zrupdate_op = TRUE;
 		restrictions.zsystem_op = TRUE;
 		restrictions.pipe_open = TRUE;
 		restrictions.trigger_mod = TRUE;
+		restrictions.zroutines_op = TRUE;
 		restrictions.cenable = TRUE;
 		restrictions.dse = TRUE;
 		restrictions.lkeclear = TRUE;
@@ -443,11 +508,14 @@ void restrict_init(void)
 		restrictions.zhalt_op = TRUE;
 		restrictions.library_load_path = TRUE;
 		restrictions.logdenials = TRUE;
-		restrictions.mupip_enable = TRUE;
+		restrictions.mupip_audit_enable = TRUE;
+		restrictions.lke_audit_enable = TRUE;
+		restrictions.dse_audit_enable = TRUE;
 	}
 	if (restrictfp)
 		FCLOSE(restrictfp, status);
 	if (filtcmdfp)
 		FCLOSE(filtcmdfp, status);
 	restrict_initialized = TRUE;
+	TREF(is_zauditlog)= is_zauditlog_tmp;
 }

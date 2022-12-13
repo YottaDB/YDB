@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2021 Fidelity National Information	*
+ * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -301,33 +301,36 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				continue;
 			SNPRINTF(errstr, SIZEOF(errstr), "open() of file %s failed", linkctl->relinkctl_path);
 			ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, errno);
-		} else if (!rctl_existed)
-		{	/* If we just created the relinkctl file, ensure correct permissions on it. */
-			FSTAT_FILE(fd, &stat_buf, status);
-			if (0 != status)
-			{
-				save_errno = errno;
-				CLOSEFILE_RESET(fd, rc);
-				SNPRINTF(errstr, SIZEOF(errstr), "fstat() of file %s failed", linkctl->relinkctl_path);
-				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
-			}
-			if ((((INVALID_UID != user_id) && (user_id != stat_buf.st_uid))
-					|| ((INVALID_GID != group_id) && (group_id != stat_buf.st_gid)))
-				&& (-1 == fchown(fd, user_id, group_id)))
-			{
-				save_errno = errno;
-				CLOSEFILE_RESET(fd, rc);
-				SNPRINTF(errstr, SIZEOF(errstr), "fchown() of file %s failed", linkctl->relinkctl_path);
-				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
-			}
 		}
-		linkctl->fd = fd;
-		FTRUNCATE(fd, RELINKCTL_MMAP_SZ, rc);
-		if (0 != rc)
+		FSTAT_FILE(fd, &stat_buf, status);
+		if (0 != status)
 		{
 			save_errno = errno;
-			SNPRINTF(errstr, SIZEOF(errstr), "ftruncate() of file %s failed", linkctl->relinkctl_path);
+			CLOSEFILE_RESET(fd, rc);
+			SNPRINTF(errstr, SIZEOF(errstr), "fstat() of file %s failed", linkctl->relinkctl_path);
 			ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
+		}
+		/* If we just created the relinkctl file, ensure correct permissions on it. */
+		if (!rctl_existed
+			&& (((INVALID_UID != user_id) && (user_id != stat_buf.st_uid))
+				|| ((INVALID_GID != group_id) && (group_id != stat_buf.st_gid)))
+			&& (-1 == fchown(fd, user_id, group_id)))
+		{
+			save_errno = errno;
+			CLOSEFILE_RESET(fd, rc);
+			SNPRINTF(errstr, SIZEOF(errstr), "fchown() of file %s failed", linkctl->relinkctl_path);
+			ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
+		}
+		linkctl->fd = fd;
+		if (stat_buf.st_size < RELINKCTL_MMAP_SZ)
+		{
+			FTRUNCATE(fd, RELINKCTL_MMAP_SZ, rc);
+			if (0 != rc)
+			{
+				save_errno = errno;
+				SNPRINTF(errstr, SIZEOF(errstr), "ftruncate() of file %s failed", linkctl->relinkctl_path);
+				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
+			}
 		}
 		relinkctl_map(linkctl);	/* linkctl->hdr is now accessible */
 		hdr = linkctl->hdr;
@@ -415,7 +418,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			DBGARLNK((stderr, "relinkctl_open: file first open\n"));
 			hdr->n_records = 0;
 			/* Create shared memory to store hash buckets of routine names for faster search in relinkctl file */
-			shmid = shmget(IPC_PRIVATE, shm_size, RWDALL | IPC_CREAT);
+			shmid = gtm_shmget(IPC_PRIVATE, shm_size, RWDALL | IPC_CREAT, TRUE);
 			if (-1 == shmid)
 			{
 				save_errno = errno;

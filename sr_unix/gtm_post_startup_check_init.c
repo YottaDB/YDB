@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 Fidelity National Information		*
+ * Copyright (c) 2018-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,7 @@
 #include "gtm_icu_api.h"
 #ifdef __linux__
 #include "hugetlbfs_overrides.h"
+#include "get_page_size.h"
 #endif
 
 /* This function exists to perform all initialization that can only be done
@@ -31,7 +32,8 @@
 void gtm_post_startup_check_init(void)
 {
 #	ifdef HUGETLB_SUPPORTED
-	libhugetlbfs_init();
+	get_page_size();
+	get_hugepage_size();
 #	endif
 	GTM_ICU_INIT_IF_NEEDED;
 }

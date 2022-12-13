@@ -58,6 +58,7 @@
 #include "cache.h"
 #include "hashtab_objcode.h"
 #include "gvt_inline.h"
+#include "restrict.h"
 
 GBLREF spdesc			stringpool;
 GBLREF int4			cache_hits, cache_fails, max_cache_entries;
@@ -73,7 +74,7 @@ GBLREF jnlpool_addrs_ptr_t	jnlpool;
 GBLREF bool			undef_inhibit;
 GBLREF int4			break_message_mask;
 GBLREF command_qualifier	 cmd_qlf;
-GBLREF tp_frame		*tp_pointer;
+GBLREF tp_frame			*tp_pointer;
 GBLREF uint4			dollar_tlevel;
 GBLREF int4			zdir_form;
 GBLREF boolean_t		badchar_inhibit;
@@ -130,7 +131,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 	gv_namehead	temp_gv_target;
 	gvnh_reg_t	*gvnh_reg;
 	gvnh_spanreg_t	*gvspan;
-	int		n, tl, newlevel, res, reg_index, collver, nct, act, ver;
+	int		apdtype, n, tl, newlevel, res, reg_index, collver, nct, act, ver;
 	block_id	n2 = 0;
 	lv_val		*lv;
 	mstr		tmpstr, commastr, *gblnamestr;
@@ -176,6 +177,9 @@ void	op_fnview(int numarg, mval *dst, ...)
 	{
 		case VTK_BADCHAR:
 			n = badchar_inhibit ? 0 : 1;
+			break;
+		case VTK_YLGDE:
+			n = (RESTRICTED(gde_enable) && RESTRICTED(aza_enable)) ? 1 : 0;
 			break;
 		case VTK_RCHITS:
 			n = 0;

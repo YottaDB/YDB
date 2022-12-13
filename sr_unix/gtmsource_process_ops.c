@@ -1102,20 +1102,10 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while sending %s. Status = %d ; %s\n",
 					msgtypestr, status, STRERROR(status));
-				close_retry = TRUE;
-			} else
-#			ifdef _AIX
-			if (ENETUNREACH == status)
-#			else
-			if (ECOMM == status) /*Communication error in send */
-#			endif
-			{
-				repl_log(gtmsource_log_fp, TRUE, TRUE,	"Error sending %s message. "
-				"Error in send : %s\n", msgtypestr, STRERROR(status));
-				close_retry = TRUE;
 				repl_log_conn_info(gtmsource_sock_fd, gtmsource_log_fp, TRUE);
 				if (WBTEST_ENABLED(WBTEST_REPLCOMM_SEND_SRC))
 					gtm_wbox_input_test_case_count = 6; /*Do not got into white box case again */
+				close_retry = TRUE;
 			}
 			if (close_retry)
 			{

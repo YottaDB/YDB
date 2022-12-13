@@ -99,6 +99,7 @@ LITDEF	err_msg gdeerrors[] = {
 	{ "GBLNAMCOLLVER", "Global directory indicates GBLNAME !AD has collation sequence #!UL with a version #!UL but shared library reports different version #!UL", 5, 0 },
 	{ "GDEASYNCIONOMM", "!AD segment has ASYNCIO turned on. Cannot support MM access method.", 2, 0 },
 	{ "NOPERCENTY", "^%Y* is a reserved global name in GT.M", 0, 0 },
+	{ "GDELOGFAIL", "GDE failed to log command. Check operator log for more information", 0, 0 },
 };
 
 LITDEF	int GDE_BLKSIZ512 = 150503435;
@@ -187,6 +188,7 @@ LITDEF	int GDE_STDNULLCOLLREQ = 150504091;
 LITDEF	int GDE_GBLNAMCOLLVER = 150504098;
 LITDEF	int GDE_GDEASYNCIONOMM = 150504106;
 LITDEF	int GDE_NOPERCENTY = 150504114;
+LITDEF	int GDE_GDELOGFAIL = 150504122;
 
 
 LITDEF	int gdeerrors_undocarr[] = {
@@ -197,7 +199,7 @@ GBLDEF	err_ctl gdeerrors_ctl = {
 	248,
 	"GDE",
 	&gdeerrors[0],
-	86,
+	87,
 	&gdeerrors_undocarr[0],
 	0
 };

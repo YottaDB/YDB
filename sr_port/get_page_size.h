@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,5 +14,6 @@
 #define GET_PAGE_SIZE_INCLUDED
 
 void get_page_size(void);
+void get_hugepage_size(void);
 
 #endif /* GET_PAGE_SIZE_INCLUDED */

@@ -1071,8 +1071,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* RSVDBYTE2HIGH */
 	   0,	/* BKUPTMPFILOPEN */
 	   0,	/* BKUPTMPFILWRITE */
-	   0,	/* UNUSEDMSG1242 */
-	   0,	/* UNUSEDMSG1243 */
+	   0,	/* SHMHUGETLB */
+	   0,	/* SHMLOCK */
 	   0,	/* UNUSEDMSG1244 */
 	   0,	/* REPLINSTMISMTCH */
 	   0,	/* REPLINSTREAD */
@@ -1560,4 +1560,5 @@ const static readonly int error_ansi[] = {
 	   0,	/* AUDINITFAIL */
 	   0,	/* AUDCONNFAIL */
 	   0,	/* AUDLOGFAIL */
+	  80,	/* SOCKCLOSE */
 	};

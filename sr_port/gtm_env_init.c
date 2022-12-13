@@ -86,6 +86,8 @@ GBLREF	size_t		gtm_max_storalloc;	/* Used for testing: creates an allocation bar
 GBLREF	boolean_t	gtm_nofflf;		/* Used to control "write #" behavior ref GTM-9136 */
 GBLREF	size_t		zmalloclim;		/* ISV memory warning of MALLOCCRIT in bytes */
 GBLREF	boolean_t	malloccrit_issued;	/* MEMORY error limit set at time of MALLOCCRIT */
+GBLREF	bool		pin_shared_memory;	/* pin shared memory into physical memory on creation */
+GBLREF	bool		hugetlb_shm_enabled;	/* allocate shared memory backed by huge pages */
 
 void	gtm_env_init(void)
 {
@@ -122,6 +124,14 @@ void	gtm_env_init(void)
 			if (gtmSystemMalloc)
 				gtmDebugLevel &= !GDL_SmAllMallocDebug;
 		}
+		/* gtm_pinshm environment/logical */
+		val.addr = GTM_PINSHM;
+		val.len = SIZEOF(GTM_PINSHM) - 1;
+		pin_shared_memory = logical_truth_value(&val, FALSE, &is_defined);
+		/* gtm_hugepages environment/logical */
+		val.addr = GTM_HUGETLB_SHM;
+		val.len = SIZEOF(GTM_HUGETLB_SHM) - 1;
+		hugetlb_shm_enabled = logical_truth_value(&val, FALSE, &is_defined);
 		/* gtm_boolean environment/logical */
 		val.addr = GTM_BOOLEAN;
 		val.len = SIZEOF(GTM_BOOLEAN) - 1;

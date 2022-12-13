@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2021 Fidelity National Information	*
+ * Copyright (c) 2005-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -142,7 +142,7 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 	   a failure. This is not a 100% valid check but it is good enough for the few times this will actually be run
 	   (upgrade and downgrade).
 	*/
-	shmid = shmget(sem_inf[0].ftok_key, 0, RWDALL);
+	shmid = gtm_shmget(sem_inf[0].ftok_key, 0, RWDALL, FALSE);
 	if (-1 == shmid)
 	{	/* That failed, second check is if shmid stored in file-header (if any) exists */
 		fd = OPEN(db_fn, O_RDONLY);	/* udi not available so OPENFILE_DB not used */
@@ -164,7 +164,7 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 		}
 		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		if (0 != v15_csd.shmid && INVALID_SHMID != v15_csd.shmid)
-			shmid = shmget(v15_csd.shmid, 0, RWDALL);
+			shmid = gtm_shmget(v15_csd.shmid, 0, RWDALL, FALSE);
 	}
 	if (-1 != shmid)
 	{

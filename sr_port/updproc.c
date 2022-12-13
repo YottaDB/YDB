@@ -1,7 +1,7 @@
 /****************************************************************
  *								*
 <<<<<<< HEAD
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -112,6 +112,7 @@ GBLREF 	sgmnt_data_ptr_t 	cs_data;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		is_updproc;
+GBLREF	boolean_t		first_syslog;
 GBLREF	seq_num			seq_num_zero, seq_num_one;
 GBLREF  gd_addr                 *gd_header;
 GBLREF	FILE	 		*updproc_log_fp;
@@ -390,7 +391,9 @@ int updproc(void)
 	 * a runtime error and does not turn journaling off.
 	 */
 	TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_ERRORS;
-	is_updproc = TRUE;
+	/* The process might have sent a syslog message already, so set first_syslog here to force setting image type
+	 * with the new value of is_updproc. */
+	is_updproc = first_syslog = TRUE;
 	trap_env_init();
 	is_replicator = TRUE;	/* as update process goes through t_end() and can write jnl recs to the jnlpool for replicated db */
 	TREF(ok_to_see_statsdb_regs) = TRUE;

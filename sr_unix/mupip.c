@@ -58,10 +58,6 @@
 #include "gtmio.h"
 #include "restrict.h"
 #include "dm_audit_log.h"
-#include "compiler.h"
-#include "send_msg.h"
-#include "gtm_unistd.h"
-#include "gtm_malloc.h"
 
 #ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
@@ -76,26 +72,18 @@ GBLREF	int			(*func)();
 GBLREF	char			cli_err_str[];
 GBLREF	CLI_ENTRY		mupip_cmd_ary[];
 GBLREF	void			(*mupip_exit_fp)(int errcode);
-GBLREF	boolean_t		gtm_dist_ok_to_use;
 GBLREF	void 			(*primary_exit_handler)(void);
 GBLDEF	CLI_ENTRY		*cmd_ary = &mupip_cmd_ary[0];	/* Define cmd_ary to be the MUPIP specific cmd table */
-GBLREF	char                    gtm_dist[GTM_PATH_MAX];
-GBLREF	enum gtmImageTypes	image_type;
-LITREF	gtmImageName		gtmImageNames[];
+GBLREF	IN_PARMS		*cli_lex_in_ptr;
 
 error_def(ERR_MUPCLIERR);
 error_def(ERR_MUNOACTION);
-error_def(ERR_RESTRICTEDOP);
-error_def(ERR_SYSCALL);
 void display_prompt(void);
 
 int main (int argc, char **argv)
 {
-	mval		input_line;
-	int		res, save_errno;
-	int 		i, gtm_dist_len, lenargv, len, cmdlinelen, max_argv;
-	boolean_t	is_restricted;
-	char 		*cmdletter, *cmdline;
+	int		i, lenargv, res, status;
+	char 		*cmdletter;
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
@@ -123,73 +111,20 @@ int main (int argc, char **argv)
 	INIT_FNPTR_GLOBAL_VARIABLES;
 	mu_get_term_characterstics();
 	gtm_chk_dist(argv[0]);
-	is_restricted = RESTRICTED(mupip_enable);
-	if (is_restricted)
-	{
-		errno = 0;
-		max_argv = sysconf(_SC_ARG_MAX);
-		save_errno = errno;
-		if (0 != save_errno)
-		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					RTS_ERROR_LITERAL("sysconf()"), CALLFROM, save_errno);
-			mupip_exit(ERR_MUNOACTION);
-		}
-		errno = 0;
-		cmdline = (char *)malloc(max_argv);
-		save_errno = errno;
-		if (0 != save_errno)
-		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					RTS_ERROR_LITERAL("malloc()"), CALLFROM, save_errno);
-			mupip_exit(ERR_MUNOACTION);
-		}
-		memset(cmdline, '\0', max_argv);
-		cmdlinelen = 0;
-		if (argc > 0)
-			len = SNPRINTF(cmdline, max_argv, "%s ", argv[1]);
-		for(i = 2 ; i < argc; i++)
-		{
-			cmdlinelen = cmdlinelen + len;
-			len = SNPRINTF(cmdline + cmdlinelen, max_argv - cmdlinelen, "%s ", argv[i]);
-		}
-		input_line.mvtype = MV_STR;
-		input_line.str.addr = cmdline;
-		input_line.str.len = STRLEN(input_line.str.addr);
-		if (argc > 1)
-		{
-			if (!dm_audit_log(&input_line, AUDIT_SRC_MUPIP))
-			{
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) MAKE_MSG_SEVERE(ERR_RESTRICTEDOP), 1,
-						gtmImageNames[image_type].imageName);
-				mupip_exit(ERR_MUNOACTION);
-			}
-		}
-	}
+	init_gtm();
 	cli_lex_setup(argc,argv);
 	if (argc < 2)
-	{
-		if (is_restricted)
-		{
-			SNPRINTF(cmdline, max_argv, "%s ", "MUPIP prompt(restricted)");
-			input_line.str.addr = cmdline;
-			input_line.str.len = STRLEN(input_line.str.addr);
-			dm_audit_log(&input_line, AUDIT_SRC_MUPIP); /* Not checking return value as we are exiting anyway */
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) MAKE_MSG_SEVERE(ERR_RESTRICTEDOP), 1, cmdline);
-			mupip_exit(ERR_MUNOACTION);
-		} else
-			display_prompt();	/* Interactive mode */
-	}
-	if (is_restricted)
-		free(cmdline);
-	/*      this call should be after cli_lex_setup() due to S390 A/E conversion    */
-	init_gtm();
+		display_prompt();	/* Interactive mode */
 	mupip_exit_fp = mupip_exit;	/* Initialize function pointer for use during MUPIP */
 	while (TRUE)
 	{	func = 0;
-		if ((res = parse_cmd()) == EOF)
+		res = parse_cmd();
+		if (EOF == res)
 			break;
-		else if (res)
+		status = log_cmd_if_needed(cli_lex_in_ptr->in_str);
+		if (status)
+			mupip_exit(ERR_MUNOACTION);
+		if (res)
 		{
 			if (1 < argc)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));

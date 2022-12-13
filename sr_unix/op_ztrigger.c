@@ -208,6 +208,7 @@ void op_ztrigger(void)
 				gvtr_parms.gvt_trigger = gvt_trigger;
 				/* Now that we have filled in minimal information, let "gvtr_match_n_invoke" do the rest */
 				gtm_trig_status = gvtr_match_n_invoke(&trigparms, &gvtr_parms);
+				INCR_GVSTATS_COUNTER(csa, csa->nl, n_ztrigger_fired, gvtr_parms.num_triggers_invoked);
 				assert((0 == gtm_trig_status) || (ERR_TPRETRY == gtm_trig_status));
 				if (ERR_TPRETRY == gtm_trig_status)
 				{	/* A restart has been signaled that we need to handle or complete the handling of.

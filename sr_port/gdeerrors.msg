@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-! Copyright (c) 2001-2018 Fidelity National Information		!
+! Copyright (c) 2001-2022 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 !	This source code contains the intellectual property	!
@@ -102,4 +102,5 @@ STDNULLCOLLREQ	<Region !AD needs Standard Null Collation enabled because global 
 GBLNAMCOLLVER	<Global directory indicates GBLNAME !AD has collation sequence #!UL with a version #!UL but shared library reports different version #!UL>/error/fao=5
 GDEASYNCIONOMM	<!AD segment has ASYNCIO turned on. Cannot support MM access method.>/error/fao=2
 NOPERCENTY	<^%Y* is a reserved global name in GT.M>/error/fao=0
+GDELOGFAIL	<GDE failed to log command. Check operator log for more information>/error/fao=0
 	.end
