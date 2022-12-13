@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -778,7 +778,7 @@ finish:
 			}
 			if ((SS_NORMAL == status) && shm_size)
 			{
-				shmid = shmget(IPC_PRIVATE, shm_size, 0600 | IPC_CREAT);
+				shmid = gtm_shmget(IPC_PRIVATE, shm_size, 0600 | IPC_CREAT, TRUE);
 				if (-1 == shmid)
 				{
 					save_errno = errno;

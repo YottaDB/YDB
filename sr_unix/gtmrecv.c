@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -77,6 +77,7 @@ GBLREF	gtmrecv_options_t	gtmrecv_options;
 GBLREF	int			gtmrecv_log_fd;
 GBLREF	FILE			*gtmrecv_log_fp;
 GBLREF	boolean_t		is_rcvr_server;
+GBLREF	boolean_t		first_syslog;
 GBLREF	int			gtmrecv_srv_count;
 GBLREF	uint4			log_interval;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
@@ -410,8 +411,15 @@ int gtmrecv(void)
 		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
 	assert(!holds_sem[RECV][RECV_POOL_ACCESS_SEM]);
 	assert(holds_sem[RECV][RECV_SERV_OPTIONS_SEM]);
+<<<<<<< HEAD
 	is_rcvr_server = TRUE;
 	SET_PROCESS_ID;
+=======
+	/* The process might have sent a syslog message already, so set first_syslog here to force setting image type
+	 * with the new value of is_rcvr_server. */
+	is_rcvr_server = first_syslog = TRUE;
+	process_id = getpid();
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 	OPERATOR_LOG_MSG;
 	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
 	 * Note that the initialization would already have been done by the parent receiver startup command but we need to

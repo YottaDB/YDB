@@ -114,6 +114,26 @@ STATICDEF unsigned char * repl_recv_trace_buff = 0;
 STATICDEF int repl_recv_size_trace_pos = 0;
 STATICDEF int repl_recv_size_trace[REPL_RECV_SIZE_TRACE_SIZE];
 
+<<<<<<< HEAD
+=======
+error_def(ERR_GETADDRINFO);
+error_def(ERR_GETNAMEINFO);
+error_def(ERR_GETSOCKNAMERR);
+error_def(ERR_TEXT);
+error_def(ERR_TLSCLOSE);
+error_def(ERR_TLSDLLNOOPEN);
+error_def(ERR_TLSINIT);
+error_def(ERR_TLSIOERROR);
+error_def(ERR_TLSCONNINFO);
+
+/* Use the OS appropriate errno when inducing WBTEST_REPLCOMM_SEND_SRC. Linux has ECOMM but AIX does not */
+#ifdef ECOMM
+#	define	WBTEST_REPLCOMM_SEND_SRC_ERRNO	ECOMM
+#else
+#	define	WBTEST_REPLCOMM_SEND_SRC_ERRNO	ENETUNREACH
+#endif
+
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 #define REPL_TRACE_BUFF(TRACE_BUFF, TRACE_BUFF_POS, IO_BUFF, IO_SIZE, MAX_TRACE_SIZE)			\
 {													\
 	if (IO_SIZE > MAX_TRACE_SIZE)									\
@@ -268,7 +288,7 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 			if (WBTEST_ENABLED(WBTEST_REPLCOMM_SEND_SRC) && is_src_server)
 			{
 				repl_log(stderr, TRUE, TRUE,"Changing save errno\n");
-				save_errno = 70;
+				save_errno = WBTEST_REPLCOMM_SEND_SRC_ERRNO; /* ECOMM on Linux and ENETUNREACH on AIX */
 			}
 			assert((EMSGSIZE != save_errno) && (EWOULDBLOCK != save_errno));
 			if (EINTR == save_errno)
@@ -439,7 +459,7 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
                  (WBTEST_ENABLED(WBTEST_REPLCOMM_ERR_SRC) && is_src_server))
 		{
 			repl_log(stderr, TRUE, TRUE, "Changing save_errno\n");
-			save_errno = 113;
+			save_errno = EHOSTUNREACH;
 		}
 		if (((WBTEST_ENABLED(WBTEST_FETCHCOMM_ERR)) || (WBTEST_ENABLED(WBTEST_FETCHCOMM_HISTINFO)))
 								&& !(is_rcvr_server || is_src_server))

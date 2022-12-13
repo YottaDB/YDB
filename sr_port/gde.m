@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2017 Fidelity National Information		;
+; Copyright (c) 2001-2022 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	;
@@ -50,7 +50,13 @@ INTERACT
 	quit:$g(gdequiet)
 	f  u io:ctrap=$c(25,26) w !,prompt," " r comline u @useio d comline:$l(comline)
 	q
+GDELOG
+	new $etrap
+	set $etrap="w !,$zmessage(gdeerr(""GDELOGFAIL"")),! d GETOUT^GDEEXIT h"
+	if $view("YLGDE"),$zauditlog(comline)
+	quit
 comline:
+	do GDELOG
 	f cp=1:1 s c=$e(comline,cp) q:(c'=" ")&(c'=TAB)	 ; remove extraneous whitespace at beginning of line
 	s ntoken="",ntoktype="TKEOL" s:runtime comline="/"_comline
 	d GETTOK^GDESCAN

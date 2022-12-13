@@ -37,6 +37,12 @@
 #endif
 #include "arlinkdbg.h"
 #include "relinkctl.h"
+<<<<<<< HEAD
+=======
+#include "toktyp.h"		/* Needed for "valid_mname.h" */
+#include "valid_mname.h"
+#include "restrict.h"
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 
 typedef enum
 {
@@ -110,6 +116,20 @@ GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF unsigned char		object_file_name[];
 GBLREF unsigned short		object_name_len;
 
+<<<<<<< HEAD
+=======
+error_def(ERR_FILENOTFND);
+error_def(ERR_FILEPARSE);
+error_def(ERR_RESTRICTEDOP);
+error_def(ERR_SYSCALL);
+error_def(ERR_TEXT);
+error_def(ERR_VERSION);
+error_def(ERR_WILDCARD);
+error_def(ERR_ZLINKFILE);
+error_def(ERR_ZLNOOBJECT);
+ZOS_ONLY(error_def(ERR_BADTAG);)
+
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 /* Routine to locate object files, or source and compile to an object file if necessary, and drive the linker to link the file
  * into this process appropriately. Three types of linking are currently supported on UNIX platforms (excepting Linux i386 which
  * has its own less fully-featured linker):
@@ -146,6 +166,8 @@ void op_zlink (mval *v, mval *quals)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if ((NULL != quals) && RESTRICTED(zlink_op))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZLINK");
 	ARLINK_ONLY(recent_zhist = NULL);
 	MV_FORCE_STR(v);
 	if (!v->str.len)

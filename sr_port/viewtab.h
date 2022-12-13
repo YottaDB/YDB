@@ -147,6 +147,8 @@ VIEWTAB("YGVN2GDS",		VTP_VALUE,			VTK_YGVN2GDS,		MV_STR), /* nodoc : GDE related
 												  * undocumented feature */
 VIEWTAB("YLCT",			VTP_NULL | VTP_VALUE,		VTK_YLCT,		MV_NM), /* nodoc : collation related
 												 * undocumented feature */
+VIEWTAB("YLGDE",		VTP_NULL,			VTK_YLGDE,		MV_NM),/* nodoc : gde logging related
+												 * undocumented feature */
 VIEWTAB("ZDEFBUFFER",		VTP_DBREGION,			VTK_ZDEFBUFF,		MV_NM), /* nodoc : seems to be an archaic
 												 * feature of GT.CM GNP */
 VIEWTAB("ZDEFCOUNT",		VTP_DBREGION,			VTK_ZDEFCNT,		MV_NM), /* nodoc : seems to be an archaic

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -69,49 +69,40 @@
 #include "repl_msg.h"			/* for gtmsource.h */
 #include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 #include "gvt_inline.h"
-
 #include "db_snapshot.h"
+#include "jnl_file_close_timer.h"
+#include "gtm_time.h"			/* for clock_gettime */
 
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #endif
 
-GBLREF	uint4			dollar_tlevel;
-GBLREF	uint4 			dollar_trestart;
-GBLREF	jnl_fence_control	jnl_fence_ctl;
-GBLREF	tp_frame		*tp_pointer;
+GBLREF	boolean_t		block_is_free, in_timed_tn, is_updproc, mupip_jnl_recover, tp_kill_bitmaps,
+				unhandled_stale_timer_pop;
+GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
+GBLREF	uint4			process_id, dollar_tlevel, dollar_trestart;
 GBLREF	gd_region		*gv_cur_region;
-GBLREF  gv_key			*gv_currkey;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	jnl_fence_control	jnl_fence_ctl;
+GBLREF	jnl_gbls_t		jgbl;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*first_sgm_info, *sgm_info_ptr;
-GBLREF	char			*update_array, *update_array_ptr;
-GBLREF	unsigned char		rdfail_detail;
-GBLREF	cw_set_element		cw_set[];
-GBLREF	boolean_t		tp_kill_bitmaps;
-GBLREF 	boolean_t		in_timed_tn;
-GBLREF	gv_namehead		*gv_target;
-GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
-GBLREF	unsigned int		t_tries;
-GBLREF	boolean_t		is_updproc;
-GBLREF	void			(*tp_timeout_clear_ptr)(boolean_t toss_queued);
-GBLREF	boolean_t		mupip_jnl_recover;
+GBLREF	tp_frame		*tp_pointer;
 GBLREF	tp_region		*tp_reg_list;	/* Chained list of regions used in this transaction not cleared on tp_restart */
-GBLREF	jnl_gbls_t		jgbl;
-GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
-GBLREF	boolean_t		block_is_free;
-GBLREF	boolean_t		unhandled_stale_timer_pop;
+GBLREF	unsigned char		rdfail_detail, t_fail_hist[CDB_MAX_TRIES];
+GBLREF	unsigned int		t_tries;
+GBLREF	void			(*tp_timeout_clear_ptr)(boolean_t toss_queued);
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		skip_INVOKE_RESTART;
-GBLREF	int4			gtm_trigger_depth;
-GBLREF	int4			tstart_trigger_depth;
+GBLREF	int4			gtm_trigger_depth, tstart_trigger_depth;
 #endif
 GBLREF	int4			tstart_gtmci_nested_level;
 #ifdef DEBUG
 GBLREF	boolean_t		forw_recov_lgtrig_only;
 #endif
-GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def(ERR_GBLOFLOW);
 error_def(ERR_TLVLZERO);
@@ -119,6 +110,9 @@ error_def(ERR_TLVLZERO);
 error_def(ERR_TRIGTCOMMIT);
 error_def(ERR_TCOMMITDISALLOW);
 #endif
+
+#define bml_wide	9	/* 2**9 = 0x200 */
+#define bml_adj_span	0xF	/* up to 16 bit maps away */
 
 STATICFNDCL void fix_updarray_and_oldblock_ptrs(sm_uc_ptr_t old_db_addrs[2], sgm_info *si);
 
@@ -184,33 +178,27 @@ STATICFNDEF void fix_updarray_and_oldblock_ptrs(sm_uc_ptr_t old_db_addrs[2], sgm
 
 enum cdb_sc	op_tcommit(void)
 {
-	boolean_t		blk_used, is_mm, was_crit;
-	sm_uc_ptr_t		bmp;
-	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;
-	unsigned int		ctn;
-	int			cw_depth, cycle, len, old_cw_depth;
-	sgmnt_addrs		*csa, *next_csa;
-	sgmnt_data_ptr_t	csd;
-	node_local_ptr_t	cnl;
-	sgm_info		*si, *temp_si;
-	enum cdb_sc		status;
-	cw_set_element		*cse, *last_cw_set_before_maps, *csetemp, *first_cse;
-	blk_ident		*blk, *blk_top, *next_blk;
-	block_id		bit_map, next_bm, new_blk;
-	cache_rec_ptr_t		cr;
-	kill_set		*ks;
-	off_chain		chain1;
-	tp_region		*tr;
-	sm_uc_ptr_t		old_db_addrs[2]; /* for MM extend */
-	jnl_buffer_ptr_t	jbp; /* jbp is non-NULL only if before-image journaling */
 	blk_hdr_ptr_t		old_block;
+	block_id		new_blk;
+	boolean_t		before_image_needed, blk_used, is_mm, skip_invoke_restart;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
-						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
-	unsigned int		bsiz;
+						    * This is used to read before-images of blocks whose cs->mode is gds_t_create
+						    */
+	cw_set_element		*cse, *last_cw_set_before_maps, *csetemp, *first_cse;
+	enum cdb_sc		status;
 	gd_region		*save_cur_region;	/* saved copy of gv_cur_region before TP_CHANGE_REG modifies it */
+	int			cw_depth, old_cw_depth;
 	jnlpool_addrs_ptr_t	save_jnlpool;
-	boolean_t		before_image_needed;
-	boolean_t		skip_invoke_restart;
+	jnl_buffer_ptr_t	jbp;			/* jbp is non-NULL only if before-image journaling */
+	kill_set		*ks;
+	node_local_ptr_t	cnl;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
+	sgm_info		*si, *temp_si;
+	sm_uc_ptr_t		old_db_addrs[2];	/* for MM extend */
+	struct timespec		ts;
+	tp_region		*tr;
+	unsigned int		bsiz;
 #	ifdef DEBUG
 	enum cdb_sc		prev_status;
 #	endif
@@ -282,7 +270,6 @@ enum cdb_sc	op_tcommit(void)
 				csd = cs_data;
 				cnl = csa->nl;
 				is_mm = (dba_mm == csa->hdr->acc_meth);
-				csa->tp_hint = 0;	/* will be set to non-zero later if we invoke "bm_getfree" */
 				si->cr_array_index = 0;
 #				ifdef DEBUG /* This code is shared by two WB tests */
 				if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) ||
@@ -309,7 +296,6 @@ enum cdb_sc	op_tcommit(void)
 				if (forw_recov_lgtrig_only)
 				{
 					jnl_format_buffer       *jfb;
-
 					assert(NULL == si->first_cw_set);
 					if (JNL_ENABLED(csa))
 					{
@@ -368,20 +354,23 @@ enum cdb_sc	op_tcommit(void)
 							TRAVERSE_TO_LATEST_CSE(first_cse);
 							old_db_addrs[0] = csa->db_addrs[0];
 							old_db_addrs[1] = csa->db_addrs[1];
-							if (0 == csa->tp_hint)
-							{	/* We are about to do a "bm_getfree" call for this database
-								 * for the first time in this TP transaction. Copy over the
-								 * allocation hint from shared memory.
-								 */
-								csa->tp_hint = cnl->tp_hint;
-							}
 							/* cse->blk could be a real block or a chain; we can't use a chain but
 							 * the following statement is unconditional because, in general, the region
-							 * hint works at least as well as the block, which is what we use in non-TP
-							 * we assign the hints in op_tcommit just before we grab crit to
-							 * maximize chances that the blocks we assign remain available in tp_tend
+							 * hint works at least as well as the last read block, which is what we use
+							 * in non-TP. We assign the hints in op_tcommit just before we grab crit to
+							 * maximize chances that the blocks we assign remain available in tp_tend.
 							 */
-							cse->blk = ++csa->tp_hint;
+							cse->blk = ++csa->tp_hint; /* bm_getfree increments, but +2 seems better */
+							if (t_tries && (cdb_sc_bmlmod == t_fail_hist[t_tries - 1]))
+							{	/* This seems like a place to try minimzing cdb_sc_blkmod; balance:
+								 * adjacency, computational cost & conflict frequency; this uses
+								 * time & pid for dispersion within a 16 bit map range
+								 */
+								clock_gettime(CLOCK_REALTIME, &ts);
+								cse->blk = (cse->blk & ~(-(block_id)BLKS_PER_LMAP))
+									+ (((uint4)(process_id * ts.tv_nsec) & bml_adj_span)
+									<< bml_wide);
+							}
 							while (FILE_EXTENDED == (new_blk = bm_getfree(cse->blk, &blk_used,
 								cw_depth, first_cse, &si->cw_set_depth)))
 							{
@@ -402,6 +391,7 @@ enum cdb_sc	op_tcommit(void)
 							} else
 								blk_used ? BIT_CLEAR_FREE(cse->blk_prior_state)
 									 : BIT_SET_FREE(cse->blk_prior_state);
+							csa->tp_hint = new_blk;		/* remember for next time in this region */
 							BEFORE_IMAGE_NEEDED(read_before_image, cse, csa, csd, new_blk,
 										before_image_needed);
 							if (!before_image_needed)

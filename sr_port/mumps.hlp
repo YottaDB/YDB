@@ -2960,10 +2960,17 @@
    each such occasion to the operator log. For $ZTIMEOUT, the value may
    specify a vector that takes precedence over the current error handling
    vector. For <CTRL-C> without CENABLE, it transfers control as if there was
+<<<<<<< HEAD
    an error; with CENABLE, YottaDB enters Direct Mode to give the programmer
    control. Without CENABLE or CTRAP, YottaDB ignores <CTRL-C> on a $PRINCIPAL
    terminal. The YottaDB terminal handler only recognizes other <CTRL>
    characters if CTRAP enabled when the the OS terminal handling delivers and
+=======
+   an error; with CENABLE, GT.M enters Direct Mode to give the programmer
+   control. Without CENABLE or CTRAP, GT.M ignores <CTRL-C> on a $PRINCIPAL
+   terminal. The GT.M terminal handler only recognizes other <CTRL>
+   characters if CTRAP enabled when the OS terminal handling delivers and
+>>>>>>> 732d6f04 (GT.M V7.0-005)
    they appear in the terminal input stream.
 
    YottaDB recognizes most of these events when they occur but transfers control
@@ -6851,6 +6858,7 @@
    JRO : # of Journal Records with a type Other than logical written to the journal file (e.g. AIMG, EPOCH, PBLK, PFIN, PINI, and so on)
    JRP : # of Journal Records with a Physical record type (i.e. PBLK, AIMG) written to the journal file (these records are seen only in a -detail journal extract)
    KIL : # of KILl operations (kill as well as zwithdraw, TP and non-TP)
+   KTG : # of of invoked KILL triggers
    LKF : # of LocK calls (mapped to this db) that Failed
    LKS : # of LocK calls (mapped to this db) that Succeeded
    MLBA: # of waits for blocked LOCK
@@ -6868,6 +6876,7 @@
    PRG : # of pre-read globals that were performed by the reader helper
    QRY : # of $QueRY() operations (TP and non-TP)
    SET : # of SET operations (TP and non-TP)
+   STG : # of invoked SET triggers
    TBR : # of Tp transaction induced Block Reads on this database
    TBW : # of Tp transaction induced Block Writes on this database
    TC0 : # of Tp transaction Conflicts at try 0 (counted only for that region which caused the TP transaction restart)
@@ -6891,6 +6900,7 @@
    WRL : # of times a process consistently slept(longer than WFR) while waiting for another process to read in a database block
    ZAD : # of waits for region freeze off
    ZPR : # of $order(,-1) or $ZPRevious() (reverse order) operations (TP and non-TP). The count of $Order(,1) operations are reported under ORD.
+   ZTG : # of of invoked ZTRIGGERs
    ZTR : # of ZTRigger command operations
 
    [NT]B[WR] mnemonics are satisfied by either disk access or, for databases that use the BG (buffered global) access method, global buffers in shared memory.
@@ -10640,11 +10650,11 @@
    | NUMBER        |               | The number of sockets in the SOCKET    |
    |               |               | device.                                |
    |---------------+---------------+----------------------------------------|
-   |               |               | a string of the "OPTIONS"              |
-   |               |               | previously specified for the selected  |
-   | OPTIONS       | index         | socket. The string may not exactly     |
-   |               |               | match the string originally specified  |
-   |               |               | but has the same meaning.              |
+   |               |               | a string of the OPTIONS previously     |
+   |               |               | specified for the selected socket. The |
+   | OPTIONS       | index         | string may not exactly match the       |
+   |               |               | string originally specified but has    |
+   |               |               | the same meaning.                      |
    |---------------+---------------+----------------------------------------|
    |               |               | If the socket was created from a       |
    | PARENT        | index         | LISTENing socket: the handle of the    |
@@ -10693,9 +10703,9 @@
 
    The getsockopt() keywords (KEEPALIVE, KEEPCNT, KEEPIDLE, KEEPINTVL,
    SNDBUF, and ZIBFSIZE return two values if the value previously specified
-   with the "OPTIONS" or "ZIBFSIZE" device parameter does't match the
-   system's current value. The two values are separated by a semicolon (";"):
-   "uservalue;systemvalue".
+   with the OPTIONS or "ZIBFSIZE" device parameter does't match the system's
+   current value. The two values are separated by a semicolon
+   (";"):"uservalue;systemvalue".
 
    The following table describes the values for the fourth expression for the
    TLS keyword.

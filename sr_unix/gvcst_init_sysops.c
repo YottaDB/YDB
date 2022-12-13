@@ -1280,7 +1280,11 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		dbsecspc(reg, tsd, &sec_size); 	/* Find db segment size */
 		/* Create new shared memory using IPC_PRIVATE. System guarantees a unique id */
 		GTM_WHITE_BOX_TEST(WBTEST_FAIL_ON_SHMGET, sec_size, GTM_UINT64_MAX);
+<<<<<<< HEAD
 		if (-1 == (udi->shmid = shmget(IPC_PRIVATE, sec_size, RWDALL | IPC_CREAT))) /* Warning: assignment */
+=======
+		if (-1 == (status_l = udi->shmid = gtm_shmget(IPC_PRIVATE, sec_size, RWDALL | IPC_CREAT, TRUE)))
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 		{
 			udi->shmid = (int)INVALID_SHMID;
 			status_l = INVALID_SHMID;

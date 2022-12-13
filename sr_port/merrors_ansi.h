@@ -1075,6 +1075,11 @@ const static readonly int error_ansi[] = {
 	   0,	/* RSVDBYTE2HIGH */
 	   0,	/* BKUPTMPFILOPEN */
 	   0,	/* BKUPTMPFILWRITE */
+<<<<<<< HEAD:sr_port/merrors_ansi.h
+=======
+	   0,	/* SHMHUGETLB */
+	   0,	/* SHMLOCK */
+>>>>>>> 732d6f04 (GT.M V7.0-005):sr_x86_64/merrors_ansi.h
 	   0,	/* UNUSEDMSG1244 */
 	   0,	/* UNUSEDMSG1245 */
 	   0,	/* UNUSEDMSG1246 */
@@ -1564,4 +1569,5 @@ const static readonly int error_ansi[] = {
 	   0,	/* AUDINITFAIL */
 	   0,	/* AUDCONNFAIL */
 	   0,	/* AUDLOGFAIL */
+	  80,	/* SOCKCLOSE */
 	};

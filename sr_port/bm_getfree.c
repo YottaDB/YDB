@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -85,13 +85,14 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 {
 	cw_set_element	*cs1;
 	sm_uc_ptr_t	bmp;
-	block_id	bml, extension_size, hint, hint_cycled, hint_limit, total_blks, lcnt, local_maps, offset;
+	block_id	bml, extension_size, hint, hint_cycled, hint_limit, lcnt, local_maps, offset;
 	block_id_ptr_t	b_ptr;
 	gd_region	*baseDBreg;
 	int		cw_set_top, depth;
 	unsigned int	n_decrements = 0;
 	trans_num	ctn;
 	int4		free_bit, map_size, new_allocation, status;
+	ublock_id	total_blks;
 	uint4		space_needed, was_crit;
 	sgmnt_addrs	*baseDBcsa;
 	srch_blk_status	blkhist;
@@ -99,11 +100,15 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 
 	SETUP_THREADGBL_ACCESS;
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
+<<<<<<< HEAD
 	hint = ((hint_arg >= total_blks) ? 1 : hint_arg);		/* for TP, hint can be > total_blks */
 #	ifdef DEBUG
 	if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= hint) && (hint < ydb_skip_bml_num))
 		hint = ydb_skip_bml_num;
 #	endif
+=======
+	hint = (((ublock_id)hint_arg >= total_blks) ? 1 : hint_arg);	/* avoid any chance of treating TP chain.flag as a sign */
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 	hint_cycled = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
 	hint_limit = DIVIDE_ROUND_DOWN(hint, BLKS_PER_LMAP);
 	local_maps = hint_cycled + 2;	/* for (up to) 2 wraps */

@@ -690,7 +690,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 		{	/* Need to allocate rtnobj buffer in a new shared memory segment */
 			assert(shm_index >= max_index);
 			shm_size = ((size_t)1 << (shm_index + MIN_RTNOBJ_SHM_INDEX));
-			ADJUST_SHM_SIZE_FOR_HUGEPAGES(shm_size, shm_size); /* second parameter "shm_size" is adjusted size */
+			ADJUST_SHM_SIZE_FOR_HUGEPAGES(shm_size, shm_size);
 			/* If minimum huge page size is much higher than requested shm size, adjust "shm_index"
 			 * accordingly so we use the allocated (bigger-than-requested) shm completely.
 			 */
@@ -698,7 +698,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 			assert(((size_t)1 << shmSizeIndex) == shm_size);
 			assert(shmSizeIndex >= (shm_index + MIN_RTNOBJ_SHM_INDEX));
 			shm_index = shmSizeIndex - MIN_RTNOBJ_SHM_INDEX;
-			shmid = shmget(IPC_PRIVATE, shm_size, RWDALL | IPC_CREAT);
+			shmid = gtm_shmget(IPC_PRIVATE, shm_size, RWDALL | IPC_CREAT, TRUE);
 			if (-1 == shmid)
 			{
 				save_errno = errno;

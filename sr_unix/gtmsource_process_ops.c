@@ -1101,15 +1101,19 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while sending %s. Status = %d ; %s\n",
 					msgtypestr, status, STRERROR(status));
+<<<<<<< HEAD
 				close_retry = TRUE;
 			} else if (ECOMM == status) /*Communication error in send */
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE,	"Error sending %s message. "
 				"Error in send : %s\n", msgtypestr, STRERROR(status));
 				close_retry = TRUE;
+=======
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 				repl_log_conn_info(gtmsource_sock_fd, gtmsource_log_fp, TRUE);
 				if (WBTEST_ENABLED(WBTEST_REPLCOMM_SEND_SRC))
 					gtm_wbox_input_test_case_count = 6; /*Do not got into white box case again */
+				close_retry = TRUE;
 			}
 			if (close_retry)
 			{

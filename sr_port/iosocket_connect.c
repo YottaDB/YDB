@@ -68,6 +68,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 	struct timeval	*sel_time, cur_timeval;
 	mv_stent	*mv_zintdev;
 	struct addrinfo *remote_ai_ptr, *raw_ai_ptr, *local_ai_ptr;
+	intrpt_state_t	prev_intrpt_state;
 	int		errcode, real_errno;
 	char		ipaddr[SA_MAXLEN + 1];
 	char		port_buffer[NI_MAXSERV];
@@ -169,7 +170,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 			{
 				if (NULL != sockptr->remote.ai_head)
 				{
+					DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 					freeaddrinfo(sockptr->remote.ai_head);
+					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 					sockptr->remote.ai_head = NULL;
 				}
 				SOCKET_FREE(sockptr);
@@ -205,7 +208,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					sockptr->sd = FD_INVALID;
 					if (NULL != sockptr->remote.ai_head)
 					{
+						DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 						freeaddrinfo(sockptr->remote.ai_head);
+						ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 						sockptr->remote.ai_head = NULL;
 					}
 					SOCKET_FREE(sockptr);
@@ -229,7 +234,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					sockptr->sd = FD_INVALID;
 					if (NULL != sockptr->remote.ai_head)
 					{
+						DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 						freeaddrinfo(sockptr->remote.ai_head);
+						ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 						sockptr->remote.ai_head = NULL;
 					}
 					SOCKET_FREE(sockptr);
@@ -254,7 +261,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 						sockptr->sd = FD_INVALID;
 						if (NULL != sockptr->remote.ai_head)
 						{
+							DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 							freeaddrinfo(sockptr->remote.ai_head);
+							ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 							sockptr->remote.ai_head = NULL;
 						}
 						SOCKET_FREE(sockptr);
@@ -281,7 +290,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 						sockptr->sd = FD_INVALID;
 						if (NULL != sockptr->remote.ai_head)
 						{
+							DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 							freeaddrinfo(sockptr->remote.ai_head);
+							ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 							sockptr->remote.ai_head = NULL;
 						}
 						SOCKET_FREE(sockptr);
@@ -519,7 +530,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 			}
 			if (NULL != sockptr->remote.ai_head)
 			{
+				DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				freeaddrinfo(sockptr->remote.ai_head);
+				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				sockptr->remote.ai_head = NULL;
 			}
 			SET_ERRPTR_AND_ERRLEN(save_errno, errptr, errlen);
@@ -540,7 +553,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 		{
 			if (NULL != sockptr->remote.ai_head)
 			{
+				DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				freeaddrinfo(sockptr->remote.ai_head);
+				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				sockptr->remote.ai_head = NULL;
 			}
 			if (!need_socket)
@@ -570,7 +585,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 				}
 				if (NULL != sockptr->remote.ai_head)
 				{
+					DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 					freeaddrinfo(sockptr->remote.ai_head);
+					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 					sockptr->remote.ai_head = NULL;
 				}
 				SOCKET_FREE(sockptr);
@@ -641,7 +658,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 	assert(FALSE == need_socket);
 	if (NULL != sockptr->remote.ai_head)
 	{
+		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		freeaddrinfo(sockptr->remote.ai_head);
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		sockptr->remote.ai_head = NULL;
 	}
 	local_ai_ptr = &(sockptr->local.ai);

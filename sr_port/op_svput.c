@@ -59,6 +59,7 @@
 #include "gtm_malloc.h"
 #include "getstorage.h"
 #include "try_event_pop.h"
+#include "restrict.h"
 
 
 GBLREF boolean_t		dollar_zquit_anyway, dollar_ztexit_bool, malloccrit_issued, ztrap_new;
@@ -95,6 +96,7 @@ LITREF mval		gvtr_cmd_mval[GVTR_CMDTYPES];
 
 error_def(ERR_INVECODEVAL);
 error_def(ERR_NOZTRAPINTRIG);
+error_def(ERR_RESTRICTEDOP);
 error_def(ERR_SETECODE);
 error_def(ERR_SETINSETTRIGONLY);
 error_def(ERR_SETINTRIGONLY);
@@ -190,6 +192,8 @@ void op_svput(int varnum, mval *v)
 			TREF(dollar_zmaxtptime) = num;
 			break;
 		case SV_ZROUTINES:
+			if (RESTRICTED(zroutines_op))
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZROUTINES");
 			MV_FORCE_STR(v);
 			/* The string(v) should be parsed and loaded before setting $zroutines
 			 * to retain the old value in case errors occur while loading */

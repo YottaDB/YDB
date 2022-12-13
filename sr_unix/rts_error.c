@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -55,6 +55,7 @@ GBLREF	void		(*stx_error_va_fptr)(int in_error, ...);	/* Function pointer for st
 GBLREF	uint4		process_id;
 
 error_def(ERR_ASSERT);
+error_def(ERR_DRVLONGJMP);
 error_def(ERR_GTMASSERT);
 error_def(ERR_GTMASSERT2);
 error_def(ERR_GTMCHECK);
@@ -163,7 +164,7 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 		PRN_ERROR;
 	/* This is simply a place holder msg to signal tp restart or otherwise rethrow an error */
 	if ((ERR_TPRETRY == msgid) || (ERR_REPEATERROR == msgid) || (ERR_REPLONLNRLBK == msgid) || (ERR_JOBINTRRQST == msgid)
-			|| (ERR_JOBINTRRETHROW == msgid))
+			|| (ERR_JOBINTRRETHROW == msgid) || (ERR_DRVLONGJMP == msgid))
 	{
 		SET_ERROR_CONDITION(msgid);	/* sets "error_condition" & "severity" */
 	} else

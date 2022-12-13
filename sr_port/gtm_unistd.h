@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
@@ -18,6 +18,8 @@
 #define GTM_UNISTDH
 
 #include <unistd.h>
+#include <errno.h>
+#include "gtm_string.h"
 
 #define CHDIR		chdir
 #define CHOWN		chown
@@ -94,6 +96,14 @@ GBLREF	boolean_t	gtm_utf8_mode;
 #define UNLINK		unlink
 
 #define TTYNAME		ttyname
+#define TTYNAME_R(fd,buf,buflen,rc)							\
+{											\
+	intrpt_state_t		prev_intrpt_state;					\
+											\
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);		\
+	rc = ttyname_r(fd, buf, buflen);						\
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);		\
+}
 
 #define ACCESS		access
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2019 Fidelity National Information	*
+ * Copyright (c) 2015-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -149,7 +149,7 @@ int	gtm_multi_proc(gtm_multi_proc_fnptr_t fnptr, int ntasks, int max_procs,
 	/* Allocate space for return array in shared memory. This will be later copied back to "ret_array" for caller */
 	shm_size += (SIZEOF(void *) * ntasks);
 	shm_size += extra_shm_size;
-	shmid = shmget(IPC_PRIVATE, shm_size, 0600 | IPC_CREAT);
+	shmid = gtm_shmget(IPC_PRIVATE, shm_size, 0600 | IPC_CREAT, TRUE);
 	if (-1 == shmid)
 	{
 		save_errno = errno;

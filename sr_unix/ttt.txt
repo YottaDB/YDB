@@ -1072,6 +1072,7 @@ OC_FNTRANSLATE_FAST: pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#5,xfer.xf_fntranslate_fast
+<<<<<<< HEAD
 OC_FNREVERSEQUERY:	irepab	val.3
 		pushab	val.2
 		pushab	val.0
@@ -1100,3 +1101,8 @@ OC_ANDOR:	pushl	val.1
 		calls	#1,xfer.xf_bool_andor
 OC_BOOLEXPRSTART:	calls	#0,xfer.xf_boolexprstart
 OC_BOOLEXPRFINISH:	calls	#0,xfer.xf_boolexprfinish
+=======
+OC_FNZAUDITLOG:	pushab	val.0			; /* destination mval */
+		pushab	val.1			; /* string */
+		calls	#2,xfer.xf_fnzauditlog
+>>>>>>> 732d6f04 (GT.M V7.0-005)

@@ -73,7 +73,7 @@ CDB_SC_UCHAR_ENTRY(cdb_sc_wcs_recover,      TRUE,  FALSE, 'A') /* 'A'  tp_hist/t
 CDB_SC_UCHAR_ENTRY(cdb_sc_keyoflow,         FALSE, FALSE, 'B') /* 'B'  gvcst_expand_key or gvcst_search (3) found key overflow */
 CDB_SC_UCHAR_ENTRY(cdb_sc_rmisalign,        FALSE, FALSE, 'C') /* 'C'  Record misaligned from nearly everyone */
 CDB_SC_UCHAR_ENTRY(cdb_sc_r2small,          FALSE, FALSE, 'D') /* 'D'  gvcst_expand_key found record too small */
-CDB_SC_UCHAR_ENTRY(cdb_sc_losthist,         FALSE, TRUE,  'E') /* 'E'  t_end/tp_tend (mm/bg) - tn could not be verified from history */
+CDB_SC_UCHAR_ENTRY(cdb_sc_losthist,         FALSE, TRUE,  'E') /* 'E'  t_end/tp_tend (bg only) - tn could not be verified from history */
 CDB_SC_UCHAR_ENTRY(cdb_sc_mapfail,          FALSE, FALSE, 'F') /* 'F'  Not currently used */
 CDB_SC_UCHAR_ENTRY(cdb_sc_lostcr,           FALSE, TRUE,  'G') /* 'G'  gvcst_...sib, t_end/tp_tend/tp_hist - found cache buffer modified */
 CDB_SC_UCHAR_ENTRY(cdb_sc_mkblk,            FALSE, FALSE, 'H') /* 'H'  Composing a local block failed, from gvcst_kill(3) gvcst_put(14) */

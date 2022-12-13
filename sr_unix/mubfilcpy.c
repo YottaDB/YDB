@@ -100,10 +100,11 @@
 {												\
 	int	rc;										\
 	int4	rv2, tmpcmdlen;									\
-	char	tmpcmd[(MAX_FN_LEN) * 2 + STR_LIT_LEN(UNALIAS) + 1];				\
-												\
+	int	maxtmpcmdlen = (MAX_FN_LEN) * 2 + STR_LIT_LEN(UNALIAS) + 1;			\
+	char	tmpcmd[maxtmpcmdlen];								\
 	if (FD_INVALID != backup_fd)								\
 		CLOSEFILE_RESET(backup_fd, rc);	/* resets "backup_fd" to FD_INVALID */		\
+<<<<<<< HEAD
 	/* An error happened. We are not sure if the temp dir is empty. Can't use rmdir() */	\
 	MEMCPY_LIT(tmpcmd, UNALIAS);								\
 	tmpcmdlen = STR_LIT_LEN(UNALIAS);							\
@@ -122,6 +123,22 @@
 	if (0 != rv2)										\
 	{											\
 		if (-1 == rv2)									\
+=======
+	memset(tmpcmd, '\0', maxtmpcmdlen);							\
+	if (!debug_mupip)									\
+	{ /* An error happened. We are not sure if the temp dir is empty. Can't use rmdir() */	\
+		MEMCPY_LIT(tmpcmd, UNALIAS);							\
+		tmpcmdlen = STR_LIT_LEN(UNALIAS);						\
+		cmdpathlen = STRLEN(fulpathcmd[2]);						\
+		memcpy(&tmpcmd[tmpcmdlen], fulpathcmd[2], cmdpathlen);				\
+		tmpcmdlen += cmdpathlen;							\
+		MEMCPY_LIT(&tmpcmd[tmpcmdlen], RMDIR_OPT);					\
+		tmpcmdlen += STR_LIT_LEN(RMDIR_OPT);						\
+		memcpy(&tmpcmd[tmpcmdlen], tempdir, tmpdirlen);					\
+		tmpcmdlen += tmpdirlen;								\
+		rv2 = SYSTEM((char *)tmpcmd);							\
+		if (0 != rv2)									\
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 		{										\
 			save_errno = errno;							\
 			errptr = (char *)STRERROR(save_errno);					\

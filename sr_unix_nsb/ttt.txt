@@ -1055,7 +1055,13 @@ OC_FNTRANSLATE_FAST: pushab   val.0
 		pushab val.2
 		pushab val.1
 		calls   #5,xfer.xf_fntranslate_fast
+<<<<<<< HEAD
 OC_FNZYHASH:	pushab	val.0
 		pushl	val.2
 		pushab	val.1
 		calls	#2,xfer.xf_fnzyhash
+=======
+OC_FNZAUDITLOG:	pushab	val.0			; /* destination mval */
+		pushab  val.1			; /* string */
+		calls	#2,xfer.xf_fnzauditlog
+>>>>>>> 732d6f04 (GT.M V7.0-005)

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2010-2020 Fidelity National Information		#
+# Copyright (c) 2010-2022 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
@@ -20,7 +20,9 @@
 #       The calling gtm installation script should sould source this script in order to
 #	avoid duplication of 'setenv LD_LIBRARY_PATH'.
 ###########################################################################################
-
+# GT.M generally shouldn't need the library path adjusted, but the below line can be commented
+# out to enable adjustments.
+exit
 if ($HOSTOS == "AIX") then
 	setenv LIBPATH
 else

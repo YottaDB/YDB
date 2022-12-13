@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
@@ -41,7 +41,7 @@ GBLREF	boolean_t	exit_handler_active;
 
 void jnl_file_close_timer(void)
 {
-	boolean_t		any_jnl_open = FALSE;
+	boolean_t		do_timer_restart = FALSE;
 	gd_addr			*addr_ptr;
 	gd_region		*r_local, *r_top;
 	int			rc;
@@ -75,7 +75,7 @@ void jnl_file_close_timer(void)
 				jpc = csa->jnl;
 				if (csa->now_crit)
 				{
-					any_jnl_open |= ((NULL != jpc) && (NOJNL != jpc->channel));
+					do_timer_restart |= csa->snapshot_in_prog || ((NULL != jpc) && (NOJNL != jpc->channel));
 					continue;
 				}
 				if ((NULL != jpc) && (NOJNL != jpc->channel) && JNL_FILE_SWITCHED(jpc))
@@ -85,18 +85,26 @@ void jnl_file_close_timer(void)
 					JNL_FD_CLOSE(jpc->channel, rc);	/* sets jpc->channel to NOJNL */
 					jpc->pini_addr = 0;
 				}
-				any_jnl_open |= ((NULL != jpc) && (NOJNL != jpc->channel));
+				do_timer_restart |= csa->snapshot_in_prog || ((NULL != jpc) && (NOJNL != jpc->channel));
 			}
 		}
 	}
 	/* Only restart the timer if there are still journal files open, or if we didn't check because it wasn't safe.
 	 * Otherwise, it will be restarted on the next successful jnl_file_open(), or never, if we are exiting.
 	 */
+<<<<<<< HEAD
 	if (!exit_handler_active && (any_jnl_open || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state)))
 		start_timer((TID)jnl_file_close_timer, OLDERJNL_CHECK_INTERVAL, jnl_file_close_timer, 0, NULL);
 	else
 	{
 		assert(!any_jnl_open || exit_handler_active);
+=======
+	if (do_timer_restart || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state))
+		start_timer((TID)jnl_file_close_timer, OLDERJNL_CHECK_INTERVAL, jnl_file_close_timer, 0, NULL);
+	else
+	{
+		assert(!do_timer_restart || process_exiting);
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 		oldjnlclose_started = FALSE;
 	}
 }

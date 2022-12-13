@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2021 Fidelity National Information	*
+ * Copyright (c) 2016-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -65,6 +65,7 @@ GBLREF boolean_t	created_core;
 GBLREF boolean_t	dont_want_core;
 GBLREF gd_addr		*gd_header;
 GBLREF mstr		extnam_str;
+GBLREF int4		pre_drvlongjmp_error_condition;
 DEBUG_ONLY(GBLREF boolean_t    ok_to_UNWIND_in_exit_handling;)
 
 STATICDEF intrpt_state_t	gvcst_statsDB_open_ch_intrpt_ok_state;
@@ -407,7 +408,6 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 	 */
 	if (longjmp_done2 || longjmp_done1)
 	{
-		assert(0 != error_condition);
 		/* Check if we got a TPRETRY (an internal error) in "gvcst_init" above. If so drive parent condition handler to
 		 * trigger restart. For any other error conditions, do not do anything more as we want statsdb open to silently
 		 * switch to nostats in that case.
@@ -430,6 +430,8 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			baseDBreg->reservedDBFlags |= RDBF_NOSTATS;
 			baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
 		}
+		if (ERR_DRVLONGJMP == error_condition)
+			SET_ERROR_CONDITION(pre_drvlongjmp_error_condition);
 	}
 	return;
 }

@@ -227,7 +227,10 @@ void op_zprevious(mval *v)
 						 */
 						if ((prev_map->gvkey_len > gv_currkey->end)
 							&& (0 == memcmp(gv_currkey->base, prev_map->gvkey.addr, gv_currkey->end)))
-						{
+						{	/* We found the same global name as the previous map's endpoint,
+							 * so search forward from there to make sure we found something
+							 * in this map by borrowing the endpoint's subscript(s).
+							 */
 							memcpy(gv_currkey->base + gv_currkey->end,
 									prev_map->gvkey.addr + gv_currkey->end,
 									prev_map->gvkey_len - gv_currkey->end);
@@ -251,8 +254,18 @@ void op_zprevious(mval *v)
 								gv_altkey->base[++gv_altkey->end] = KEY_DELIMITER;
 								found = TRUE;
 								break;
+<<<<<<< HEAD
 							}
 						}
+=======
+							} else
+								found = FALSE;
+						} else
+							found = FALSE;
+						/* We may have added subscripts from the previous map above, so restore
+						 * gv_currkey to the name alone by using the gvname we saved above.
+						 */
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 						gv_currkey->end = gvname.var_name.len + 1;
 						gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 					} else
@@ -267,13 +280,13 @@ void op_zprevious(mval *v)
 					break;
 			} else
 				found = FALSE;	/* Skip statsDB region completely. So set found to FALSE */
-			/* If previous map corresponds to a spanning global, then do not update gv_currkey as that would
-			 * effectively cause the spanning global to be skipped. If gvkey_len == gvname_len + 1 it is NOT
-			 * a spanning global map entry.
+			/* At this point, gv_currkey may be one of:
+			 * -- The initial gv_currkey, or one from a previous iteration. (map to statsdb region)
+			 * -- The result of gvcst_zprevious(), possibly mangled/restored (gvspan + prev_map name match case)
 			 */
 			assert(prev_map->gvkey_len >= (prev_map->gvname_len + 1));
-			if ((prev_map > (gd_map_start + 1)) && (prev_map->gvkey_len == (prev_map->gvname_len + 1)))
-			{
+			if (prev_map > (gd_map_start + 1))
+			{	/* Base the continued search on the previous map endpoint. */
 				assert(strlen(prev_map->gvkey.addr) == prev_map->gvname_len);
 				gv_currkey->end = prev_map->gvname_len + 1;
 				assert(gv_currkey->end <= (MAX_MIDENT_LEN + 1));
@@ -281,8 +294,13 @@ void op_zprevious(mval *v)
 				assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end - 1]);
 				gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 				assert(gv_currkey->top > gv_currkey->end);	/* ensure we are within allocated bounds */
+				if (prev_map->gvkey_len != (prev_map->gvname_len + 1))
+				{	/* The prior map endpoint has subscripts, and we may want to match its name, so start the
+					 * search after the name.
+					 */
+					GVKEY_INCREMENT_ORDER(gv_currkey);
+				}
 			}
-			GVKEY_INCREMENT_ORDER(gv_currkey);
 		}
 		change_reg();
 		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied (BYPASSOK)

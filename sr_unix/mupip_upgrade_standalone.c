@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +55,7 @@ boolean_t mupip_upgrade_standalone(char *fn, int *semid)
 		return FALSE;
 	}
 	/* If shared memory exists, the disk file is probably incomplete */
-	if ((shmget(key, 0, 0) != -1) || errno != ENOENT)
+	if ((gtm_shmget(key, 0, 0, FALSE) != -1) || errno != ENOENT)
 	{
 		util_out_print("File is locked by another user", TRUE);
 		return FALSE;
@@ -87,7 +88,7 @@ boolean_t mupip_upgrade_standalone(char *fn, int *semid)
 	}
 	/* See if someone built some shared memory in the time we were
 	 * building semaphores. If so, we have failed */
-	if((shmget(key, 0, 0) != -1) || errno != ENOENT)
+	if((gtm_shmget(key, 0, 0, FALSE) != -1) || errno != ENOENT)
 	{
 		if (0 != sem_rmid(sems))
 		{

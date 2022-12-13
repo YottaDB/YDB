@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -104,7 +104,7 @@ int shm_rmid(int ipcid)
 			if (EPERM != errno)
 			{
 				save_errno = errno;
-				SNPRINTF(buff, 128, "semctl(IPC_RMID, %d)", ipcid);
+				SNPRINTF(buff, 128, "shmctl(IPC_RMID, %d)", ipcid);
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(buff), CALLFROM, save_errno);
 				errno = save_errno;
 				return -1;

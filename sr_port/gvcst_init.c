@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -170,6 +170,13 @@ GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	uint4			process_id;
+<<<<<<< HEAD
+=======
+GBLREF	int4			pre_drvlongjmp_error_condition;
+
+LITREF char			gtm_release_name[];
+LITREF int4			gtm_release_name_len;
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 LITREF mval			literal_statsDB_gblname;
 
 #define MAX_DBINIT_RETRY	3
@@ -743,6 +750,7 @@ void gvcst_init(gd_region *reg)
 					{	/* Unwind back to ESTABLISH_NORET where did gvcst_init() call to open this
 						 * statsDB which now won't open.
 						 */
+						pre_drvlongjmp_error_condition = error_condition;
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DRVLONGJMP);
 					} else
 					{	/* We are not nested so can give the appropriate error ourselves */

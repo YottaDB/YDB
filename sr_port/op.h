@@ -93,6 +93,7 @@ void	op_fntext(mval *label, int int_exp, mval *rtn, mval *ret);
 void	op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst);
 void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...);
 void	op_fnzascii(int4 num, mval *in, mval *out);
+void	op_fnzauditlog(mval *src, mval *dst);
 void	op_fnzbitand(mval *dst, mval *bitstr1, mval *bitstr2);
 void	op_fnzbitcoun(mval *dst, mval *bitstr);
 void	op_fnzbitfind(mval *dst, mval *bitstr, int truthval, int pos);

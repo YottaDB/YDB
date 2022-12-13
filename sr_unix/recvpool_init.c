@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -310,7 +310,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	shm_created = FALSE;
 	if (new_ipc)
 	{	/* create new shared memory */
-		if (-1 == (udi->shmid = recvpool_shmid = shmget(IPC_PRIVATE, gtmrecv_options.buffsize, IPC_CREAT | RWDALL)))
+		if (-1 == (udi->shmid = recvpool_shmid =
+				gtm_shmget(IPC_PRIVATE, gtmrecv_options.buffsize, IPC_CREAT | RWDALL, TRUE)))
 		{
 			udi->shmid = recvpool_shmid = INVALID_SHMID;
 			save_errno = errno;

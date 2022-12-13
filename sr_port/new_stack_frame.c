@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -22,6 +22,7 @@
 #include "mprof.h"
 #include "error.h"
 #include "glvn_pool.h"
+#include "send_msg.h"
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF unsigned char	*stackbase, *stacktop, *msp, *stackwarn;
@@ -73,12 +74,18 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	sf->l_symtab = (ht_ent_mname **)msp;
 	if (msp <= stackwarn || msp > stackbase)
 	{
-		if (msp <= stacktop || msp > stackbase)
+		if ((msp > stacktop) && (msp <= stackbase))
 		{
-			msp = msp_save;
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
-		} else
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
+			if ((stackwarn-stacktop) < (x1+x2))
+			{	/* F135319 - if the process is blowing through both STACKCRIT and
+				 * STACKOFLOW in a single operation, syslog the STACKCRIT here.
+ 				 */
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
+			} else
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
+		}
+		msp = msp_save;
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
 	}
 	assert(msp < stackbase);
 	memset(msp, 0, x1 + x2);

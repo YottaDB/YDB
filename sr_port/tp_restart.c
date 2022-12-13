@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -67,15 +67,13 @@
 #include "gtmci.h"
 #include "gvt_inline.h"
 
+GBLREF	boolean_t		caller_id_flag, is_updproc, mupip_jnl_recover;
+GBLREF	int			dollar_truth, mumps_status;
 GBLDEF	int4			n_pvtmods, n_blkmods;
-
-GBLREF	uint4			dollar_tlevel;
-GBLREF	uint4			dollar_trestart;
-GBLREF	int			dollar_truth;
-GBLREF	mval			dollar_zgbldir;
 GBLREF	gd_addr			*gd_header;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
+<<<<<<< HEAD
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	sgm_info		*sgm_info_ptr;
@@ -85,31 +83,47 @@ GBLREF	unsigned char		*msp, *stackbase, *stacktop, t_fail_hist[CDB_MAX_TRIES];
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			process_id;
+=======
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 GBLREF	gd_region		*gv_cur_region;
-GBLREF	jnlpool_addrs_ptr_t	jnlpool;
-GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
-GBLREF	boolean_t		caller_id_flag;
-GBLREF	unsigned char		*tpstackbase, *tpstacktop;
-GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
-GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	sgmnt_data		*cs_data;
-GBLREF	symval			*curr_symval;
-GBLREF	trans_num		tstart_local_tn;	/* copy of global variable "local_tn" at op_tstart time */
-GBLREF	boolean_t		mupip_jnl_recover;
-GBLREF	mstr			extnam_str;
 GBLREF	jnl_gbls_t		jgbl;
+<<<<<<< HEAD
 GBLREF	sgmnt_addrs		*cs_addrs_list;
 GBLREF	boolean_t		is_updproc;
 GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
+=======
+GBLREF	jnlpool_addrs_ptr_t	jnlpool, jnlpool_head;
+GBLREF	mstr			extnam_str;
+GBLREF	mval			dollar_zgbldir;
+GBLREF	mv_stent		*mv_chain;
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	sgmnt_addrs		*cs_addrs, *cs_addrs_list, *reorg_encrypt_restart_csa;
+GBLREF	sgmnt_data		*cs_data;
+GBLREF	stack_frame		*frame_pointer;
+GBLREF	symval			*curr_symval;
+GBLREF	tp_frame		*tp_pointer;
+GBLREF	tp_region		*tp_reg_list;		/* chained list of regions in this transaction not cleared on tp_restart */
+GBLREF	trans_num		local_tn;		/* transaction number for THIS PROCESS */
+GBLREF	uint4			dollar_tlevel, dollar_trestart, t_err;
+GBLREF	unsigned char		*msp, *stackbase, *stacktop, t_fail_hist[CDB_MAX_TRIES], *tpstackbase, *tpstacktop;
+GBLREF	unsigned int		t_tries;
+#ifdef GTM_TRIGGER
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 GBLREF	int			tprestart_state;	/* When triggers restart, multiple states possible. See tp_restart.h */
-GBLREF	mval			dollar_ztwormhole;	/* Previous value (mval) restored on restart */
 GBLREF	mval			dollar_ztslate;
+<<<<<<< HEAD
 GBLREF	int4			tstart_gtmci_nested_level;
 GBLREF	int			mumps_status;
 
 LITREF	mval			literal_null;
+=======
+GBLREF	mval			dollar_ztwormhole;	/* Previous value (mval) restored on restart */
+LITREF	mval			literal_null;
+#endif
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 
 error_def(ERR_GVFAILCORE);
+error_def(ERR_GVIS);
 error_def(ERR_REPLONLNRLBK);
 error_def(ERR_TLVLZERO);
 error_def(ERR_TPFAIL);
@@ -137,23 +151,22 @@ CONDITION_HANDLER(tp_restart_ch)
 
 int tp_restart(int newlevel, boolean_t handle_errors_internally)
 {
-	unsigned char		*cp;
-	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, fail_hist[RESTART_CODE_EXPANSION_FACTOR];
-	unsigned int		c, hist_index, local_t_tries;
-	tp_frame		*tf;
+	boolean_t		reset_clues_done = FALSE;
+	boolean_t		tp_tend_status;
+	enum cdb_sc		status;
+	int			tprestart_rc, len;
+	int4			num_closed = 0;
+	gd_region		*restart_reg, *reg;
+	gv_namehead		*gvt;
+	jnlpool_addrs_ptr_t	save_jnlpool;
+	mstr			gvname_mstr, reg_mstr;
 	mv_stent		*mvc;
-	tp_region		*tr;
 	mval			beganHere;
 	sgmnt_addrs		*csa, *jpl_csa;
-	int4			num_closed = 0;
-	boolean_t		tp_tend_status;
-	boolean_t		reset_clues_done = FALSE;
-	mstr			gvname_mstr, reg_mstr;
-	gd_region		*restart_reg, *reg;
-	jnlpool_addrs_ptr_t	save_jnlpool, local_jnlpool;
-	int			tprestart_rc, len;
-	gv_namehead		*gvt;
-	enum cdb_sc		status;
+	tp_frame		*tf;
+	tp_region		*tr;
+	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, fail_hist[RESTART_CODE_EXPANSION_FACTOR];
+	unsigned int		c, hist_index, local_t_tries;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -228,11 +241,20 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		 * to white box test cases. Assert accordingly.
 		 */
 		assert(!mupip_jnl_recover || WB_COMMIT_ERR_ENABLED ||
+<<<<<<< HEAD
 				(WBTEST_TP_HIST_CDB_SC_BLKMOD == ydb_white_box_test_case_number));
 		if (TREF(tprestart_syslog_delta) && (((TREF(tp_restart_count))++ < TREF(tprestart_syslog_first))
 			|| (0 == ((TREF(tp_restart_count) - TREF(tprestart_syslog_first)) % TREF(tprestart_syslog_delta)))))
+=======
+				(WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
+		if ((CDB_STAGNATE <= t_tries)
+			|| (TREF(tprestart_syslog_delta) && (((TREF(tp_restart_count)) < TREF(tprestart_syslog_first))
+			|| (0 == ((TREF(tp_restart_count) - TREF(tprestart_syslog_first) + 1) % TREF(tprestart_syslog_delta))))))
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 		{
 			gvt = TAREF1(tp_fail_hist, t_tries);
+			if ((CDB_STAGNATE <= t_tries) && ((NULL == gvt) || (NULL == gvt->gd_csa)))
+				gvt = gv_target;
 			if ((NULL == gvt) || (NULL == gvt->gd_csa))
 			{
 				gvname_mstr.addr = (char *)gvname_unknown;
@@ -268,6 +290,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			{
 				if (0 == gvt->clue.end)
 				{	/* the clue has been invalidated - just use the unsubscripted name */
+					assert(NULL != &gvt->gvname);
 					gvname_mstr.addr = gvt->gvname.var_name.addr;
 					gvname_mstr.len = gvt->gvname.var_name.len;
 				} else
@@ -279,6 +302,10 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 					gvname_mstr.len = end - buff - 1;
 				}
 			}
+		}
+		if (TREF(tprestart_syslog_delta) && (((TREF(tp_restart_count))++ < TREF(tprestart_syslog_first))
+			|| (0 == ((TREF(tp_restart_count) - TREF(tprestart_syslog_first)) % TREF(tprestart_syslog_delta)))))
+		{
 			assert(0 == cdb_sc_normal);
 			if (cdb_sc_normal == status)
 				t_fail_hist[t_tries] = '0';	/* temporarily reset just for pretty printing */
@@ -305,8 +332,8 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			for (c = local_t_tries = 0; local_t_tries <= t_tries; )	/* Note: local_t_tries++ happens inside loop body */
 			{	/* in case of non-printable code provide hex representation */
 				if (ISALPHA_ASCII(t_fail_hist[local_t_tries]) || ISDIGIT_ASCII(t_fail_hist[local_t_tries])
-					|| ISPUNCT_ASCII(t_fail_hist[local_t_tries]))	/* currently, only is alpha needed */
-						fail_hist[c++] = t_fail_hist[local_t_tries++];
+						|| ISPUNCT_ASCII(t_fail_hist[local_t_tries])) /* currently, only is alpha needed */
+					fail_hist[c++] = t_fail_hist[local_t_tries++];
 				else
 				{
 					assert((c + 4) < RESTART_CODE_EXPANSION_FACTOR);
@@ -539,11 +566,21 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 					assert(!is_final_retry_code(status));
 					hist_index = t_tries;
 					t_tries = 0;
+					assert(NULL != sgm_info_ptr);
+					csa = sgm_info_ptr->tp_csa;
+					assert(NULL != csa);
 					assert(0 != have_crit(CRIT_HAVE_ANY_REG)); /* we should still be holding crit */
+<<<<<<< HEAD
 					assert(ydb_white_box_test_case_enabled
 					    && (WBTEST_TP_HIST_CDB_SC_BLKMOD == ydb_white_box_test_case_number));
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TPFAIL, 2, hist_index, t_fail_hist,
 							ERR_GVFAILCORE);
+=======
+					assert(gtm_white_box_test_case_enabled
+					    && (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(11) ERR_TPFAIL, 0, t_err, 2, hist_index, t_fail_hist,
+						ERR_GVIS, 2, gvname_mstr.len, gvname_mstr.addr, ERR_GVFAILCORE);
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 					/* Generate core only if not triggering this codepath using white-box tests */
 					DEBUG_ONLY(
 						if (!ydb_white_box_test_case_enabled
@@ -552,7 +589,8 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 							gtm_fork_n_core();
 					if (save_jnlpool != jnlpool)
 						jnlpool = save_jnlpool;
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist);
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_TPFAIL, 0, t_err, 2, hist_index, t_fail_hist,
+						      ERR_GVIS, 2, gvname_mstr.len, gvname_mstr.addr);
 					return 0; /* for the compiler only -- never executed */
 				} else
 				{

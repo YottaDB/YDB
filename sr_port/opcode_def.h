@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -346,6 +346,7 @@ OPCODE_DEF(OC_FNZCOLLATE, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZATRANSFORM, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZTRANSLATE_FAST, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNTRANSLATE_FAST, (OCT_MVAL | OCT_EXPRLEAF))
+<<<<<<< HEAD
 OPCODE_DEF(OC_FNREVERSEQUERY, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_GVREVERSEQUERY, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNQ2, (OCT_MVAL | OCT_EXPRLEAF))
@@ -358,5 +359,8 @@ OPCODE_DEF(OC_ANDOR, (OCT_BOOL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_BXRELOP, (OCT_BOOL | OCT_REL))
 OPCODE_DEF(OC_BOOLEXPRSTART, (OCT_BOOL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_BOOLEXPRFINISH, (OCT_BOOL | OCT_EXPRLEAF))
+=======
+OPCODE_DEF(OC_FNZAUDITLOG, (OCT_MVAL | OCT_EXPRLEAF))
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 OPCODE_DEF(OC_LASTOPCODE, (OCT_CGSKIP))
 /* insert new opcodes before OC_LASTOPCODE */

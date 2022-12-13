@@ -4334,7 +4334,7 @@ MBSTART {								\
 
 #define ONLY_SS_BEFORE_IMAGES(CSA) (CSA->snapshot_in_prog && !CSA->backup_in_prog && !(JNL_ENABLED(CSA) && CSA->jnl_before_image))
 
-#define SET_SNAPSHOTS_IN_PROG(X)	((X)->snapshot_in_prog = TRUE)
+#define SET_SNAPSHOTS_IN_PROG(X)	MBSTART { (X)->snapshot_in_prog = TRUE; START_JNL_FILE_CLOSE_TIMER_IF_NEEDED; } MBEND
 #define CLEAR_SNAPSHOTS_IN_PROG(X)	((X)->snapshot_in_prog = FALSE)
 # define SNAPSHOTS_IN_PROG(X)	((X)->snapshot_in_prog)
 /* Creates a new snapshot context. Called by GT.M (or utilities like update process, MUPIP LOAD which uses

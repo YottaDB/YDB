@@ -487,10 +487,19 @@
 3 RETry
    RETry
 
+<<<<<<< HEAD
    Makes the specified number of attempts to retry performing BACKUP if the
    backup fails. If -RETRY is not specified, YottaDB defaults -RETRY to zero
    (0). In case of an error, retry attempts are always based on cp or pax
    even when another copy mechanism is available.
+=======
+   Makes the specified number of retry attempts to perform BACKUP if the
+   backup fails. If -RETRY is not specified, MUPIP retries file copy
+   operation once if the first attempt fails for a retriable reason. In case
+   of an error, retry attempts are always based on cp or pax even when
+   another copy mechanism is available. If -RETRY=0 is specified, there is no
+   retry for any failure that BACKUP encounters.
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 
    The format of the RETRY qualifier is:
 
@@ -682,12 +691,17 @@
    The single optional -REGION qualifier specifies a region for which to
    create a database file.
 
+<<<<<<< HEAD
    Note that one YottaDB database file grows to a maximum size of
    1,040,187,392(992Mi) blocks. This means, for example, that with an 8KiB
    block size, the maximum single database file size is 7936GiB (8KiB*992Mi).
    Note that this is the size of one database file -- a logical database (an
    M global variable namespace) can consist of an arbitrary number of
    database files.
+=======
+   Note that a GT.M logical database (an M global variable namespace) can
+   consist of an arbitrary number of database files.
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 
 3 V6
    V6
@@ -713,6 +727,13 @@
    The format of the REGION qualifier is:
 
    -R[EGION]=region-name
+
+   **Note**
+
+   MUPIP CREATE silently ignores requests to create database files that have
+   AutoDB enabled in the Global Directory. MUPIP CREATE prints no message
+   even if the database region is specified by name. For more information on
+   AutoDB, refer to Region Qualifiers.
 
 3 Examples
    Examples

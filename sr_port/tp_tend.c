@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -1412,15 +1412,6 @@ boolean_t	tp_tend()
 		ctn = csd->trans_hist.curr_tn;
 		ASSERT_CURR_TN_EQUALS_EARLY_TN(csa, ctn);
 		csd->trans_hist.early_tn = ctn + 1;	/* Step CMT04 */
-		/* If this process had used "cnl->tp_hint" and done some block allocations in "bm_getfree", now that
-		 * all history validation is complete and this transaction is going to commit, take this opportunity
-		 * to update the shared memory hint to reflect this process' allocations in this TP transaction.
-		 */
-		if (csa->tp_hint)
-		{
-			cnl = csa->nl;
-			cnl->tp_hint = csa->tp_hint;	/* update the region hint to reflect any (successful) allocations */
-		}
 		is_mm = (dba_mm == csd->acc_meth);
 		csa->t_commit_crit = T_COMMIT_CRIT_PHASE0;	/* phase0 : write journal records. Step CMT05 */
 		if (JNL_ALLOWED(csa))

@@ -89,6 +89,8 @@ GBLREF  boolean_t 	dollar_test_default; 	/* Default value taken by dollar_truth 
 GBLREF	boolean_t	gtm_nofflf;		/* Used to control "write #" behavior ref GTM-9136 */
 GBLREF	size_t		zmalloclim;		/* ISV memory warning of MALLOCCRIT in bytes */
 GBLREF	boolean_t	malloccrit_issued;	/* MEMORY error limit set at time of MALLOCCRIT */
+GBLREF	bool		pin_shared_memory;	/* pin shared memory into physical memory on creation */
+GBLREF	bool		hugetlb_shm_enabled;	/* allocate shared memory backed by huge pages */
 
 #ifdef DEBUG
 GBLREF	block_id	ydb_skip_bml_num;
@@ -128,6 +130,7 @@ void	gtm_env_init(void)
 			if (ydbSystemMalloc)
 				ydbDebugLevel &= !GDL_SmAllMallocDebug;
 		}
+<<<<<<< HEAD
 		/* See if ydb_msgprefix is specified. If so store it in TREF(ydbmsgprefix).
 		 * Note: Default value is already stored in "gtm_threadgbl_init".
 		 * Do this initialization before most other variables so any error messages later issued in this module
@@ -135,6 +138,21 @@ void	gtm_env_init(void)
 		 */
 		if (SS_NORMAL ==
 			(status = ydb_trans_log_name(YDBENVINDX_MSGPREFIX, &trans, buf, SIZEOF(buf), IGNORE_ERRORS_TRUE, NULL)))
+=======
+		/* gtm_pinshm environment/logical */
+		val.addr = GTM_PINSHM;
+		val.len = SIZEOF(GTM_PINSHM) - 1;
+		pin_shared_memory = logical_truth_value(&val, FALSE, &is_defined);
+		/* gtm_hugepages environment/logical */
+		val.addr = GTM_HUGETLB_SHM;
+		val.len = SIZEOF(GTM_HUGETLB_SHM) - 1;
+		hugetlb_shm_enabled = logical_truth_value(&val, FALSE, &is_defined);
+		/* gtm_boolean environment/logical */
+		val.addr = GTM_BOOLEAN;
+		val.len = SIZEOF(GTM_BOOLEAN) - 1;
+		TREF(gtm_fullbool) = trans_numeric(&val, &is_defined, TRUE);
+		switch (TREF(gtm_fullbool))
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 		{
 			assert(SIZEOF(buf) > trans.len);
 			if (SIZEOF_ydbmsgprefixbuf > trans.len)

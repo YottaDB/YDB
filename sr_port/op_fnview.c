@@ -65,6 +65,7 @@
 #include "gtm_env_xlate_init.h"
 #include "gtmdbglvl.h"
 #include "gvt_inline.h"
+#include "restrict.h"
 
 GBLREF spdesc			stringpool;
 GBLREF int4			cache_hits, cache_fails;
@@ -150,7 +151,11 @@ void	op_fnview(int numarg, mval *dst, ...)
 	gv_namehead	temp_gv_target;
 	gvnh_reg_t	*gvnh_reg;
 	gvnh_spanreg_t	*gvspan;
+<<<<<<< HEAD
 	int		n, tl, newlevel, res, reg_index, collver, nct, act, ver, trigdepth, cidepth;
+=======
+	int		apdtype, n, tl, newlevel, res, reg_index, collver, nct, act, ver;
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 	block_id	n2 = 0;
 	lv_val		*lv;
 	mstr		tmpstr, commastr, *gblnamestr;
@@ -196,6 +201,9 @@ void	op_fnview(int numarg, mval *dst, ...)
 	{
 		case VTK_BADCHAR:
 			n = badchar_inhibit ? 0 : 1;
+			break;
+		case VTK_YLGDE:
+			n = (RESTRICTED(gde_enable) && RESTRICTED(aza_enable)) ? 1 : 0;
 			break;
 		case VTK_RCHITS:
 			n = 0;

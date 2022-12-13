@@ -2888,12 +2888,8 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				{
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset. Status = %d ; %s\n",
 							status, STRERROR(status));
-				} else
-				{
-					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Error in receiving from source."
-						 " Error in recv: %d ; %s\n", status, STRERROR(status));
-					SEND_SYSMSG_REPLCOMM(LEN_AND_LIT("Error in receiving from source. Error in recv"));
 					repl_log_conn_info(gtmrecv_sock_fd, gtmrecv_log_fp, TRUE);
+					SEND_SYSMSG_REPLCOMM(LEN_AND_LIT("Error in receiving from source. Error in recv"));
 				}
 			} else if (EREPL_SELECT == repl_errno)
 			{

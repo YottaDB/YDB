@@ -647,7 +647,7 @@ TLVLZERO	<Transaction is not in progress>/error/fao=0!/ansi=44
 TRESTNOT	<Cannot TRESTART, transaction is not restartable>/error/fao=0!/ansi=27
 TPLOCK		<Cannot release LOCK(s) held prior to current TSTART>/error/fao=0!/ansi=41
 TPQUIT		<Cannot QUIT out of a routine with an active transaction>/error/fao=0!/ansi=42
-TPFAIL		<Transaction COMMIT failed.  Failure code: !AD.>/error/fao=2!/ansi=0
+TPFAIL		<Transaction COMMIT failed.>/error/fao=0!/ansi=0
 TPRETRY		<Restart transaction from non-concurrency DB failure>/error/fao=0!/ansi=0
 TPTOODEEP	<$TLEVEL cannot exceed !UL>/error/fao=1!/ansi=0
 ZDEFACTIVE	<ZDEFER already active>/error/fao=0!/ansi=0
@@ -1241,9 +1241,15 @@ OMISERVHANG	<GTCM OMI server is hung>/info/fao=0!/ansi=0
 RSVDBYTE2HIGH	<Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and Reserved bytes (!UL)>/error/fao=5!/ansi=0
 BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0//1
 BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0//1
+<<<<<<< HEAD
 UNUSEDMSG1244	<VMSMEMORY2 nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 UNUSEDMSG1245	<LOADBGSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
 UNUSEDMSG1246	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
+=======
+SHMHUGETLB	<Could not back shared memory with huge pages, using base pages instead>/warning/fao=0!/ansi=0
+SHMLOCK		<Could not pin shared memory into physical memory>/warning/fao=0!/ansi=0
+UNUSEDMSG1244	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 REPLINSTMISMTCH	<Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)>/error/fao=8!/ansi=0
 REPLINSTREAD	<Error reading [0x!XL] bytes at offset [0x!16@XQ] from replication instance file !AD>/error/fao=4!/ansi=0//1
 REPLINSTDBMATCH	<Replication instance file !AD has seqno [0x!16@XQ] while database has a different seqno [0x!16@XQ]>/error/fao=4!/ansi=0
@@ -1732,6 +1738,7 @@ BKUPFILEPERM	<Backup file !AD does not have write permission>/error/fao=2!/ansi=
 AUDINITFAIL	<Audit !AZ facility failed to initialize audit information>/error/fao=1!/ansi=0
 AUDCONNFAIL	<Audit !AZ facility failed to connect to audit logger>/error/fao=1!/ansi=0
 AUDLOGFAIL	<Audit !AZ facility failed to log command>/error/fao=1!/ansi=0
+SOCKCLOSE	<Error closing socket: (errno == !UL) !AD>/error/fao=3!/ansi=80
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

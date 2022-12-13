@@ -667,19 +667,14 @@ void gtmsource_recv_ctl(void)
 				repl_log(gtmsource_log_fp, TRUE, TRUE,
 					"Connection reset while attempting to receive from secondary."
 					" Status = %d ; %s\n", status, STRERROR(status));
-			} else
-			{
-				repl_log(gtmsource_log_fp, TRUE, TRUE,
-					"Error receiving Control message from Receiver. Error in recv."
-					" Status = %d ; %s\n", status, STRERROR(status));
 				repl_log_conn_info(gtmsource_sock_fd, gtmsource_log_fp, TRUE);
 				SEND_SYSMSG_REPLCOMM(LEN_AND_LIT("Error receiving Control message from Receiver. Error in recv."));
 			}
-				repl_close(&gtmsource_sock_fd);
-				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-				gtmsource_state = gtmsource_local->gtmsource_state
-					= GTMSOURCE_WAITING_FOR_CONNECTION;
-				return;
+			repl_close(&gtmsource_sock_fd);
+			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
+			gtmsource_state = gtmsource_local->gtmsource_state
+				= GTMSOURCE_WAITING_FOR_CONNECTION;
+			return;
 		} else if (EREPL_SELECT == repl_errno)
 		{
 			SNPRINTF(err_string, SIZEOF(err_string),
@@ -917,22 +912,12 @@ int gtmsource_process(void)
 					repl_log(gtmsource_log_fp, TRUE, TRUE,
 					       "Connection reset while sending XOFF_ACK due to possible update process shutdown. "
 					       "Status = %d ; %s\n", status, STRERROR(status));
-						close_retry = TRUE;
-				} else
-#				ifdef _AIX
-				if (ENETUNREACH == status)
-#				else
-				if (ECOMM == status) /*Communication error in send */
-#				endif
-				{
-					repl_log(gtmsource_log_fp, TRUE, TRUE,"Error sending XOFF_ACK_ME message."
-						" Error in send : %d, %s\n", status, STRERROR(status));
 					repl_log_conn_info(gtmsource_sock_fd, gtmsource_log_fp, TRUE);
 					close_retry = TRUE;
 				}
 				if (close_retry)
 				{
-					repl_close(&gtmsource_sock_fd);
+		    			repl_close(&gtmsource_sock_fd);
 					SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 					gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 					close_retry = FALSE;
@@ -1882,6 +1867,7 @@ int gtmsource_process(void)
 									". Status = %d ; %s\n", pre_read_seqno,
 									pre_read_seqno, post_read_seqno, post_read_seqno,
 									 status, STRERROR(status));
+<<<<<<< HEAD
 								close_retry = TRUE;
 							} else if (ECOMM == status) /*Communication error in send */
 							{
@@ -1891,11 +1877,10 @@ int gtmsource_process(void)
 									INT8_FMTX" . Error in send: %s\n",
 									pre_read_seqno, pre_read_seqno, post_read_seqno,
 									post_read_seqno, STRERROR(status));
+=======
+>>>>>>> 732d6f04 (GT.M V7.0-005)
 								repl_log_conn_info(gtmsource_sock_fd, gtmsource_log_fp,
-											TRUE);
-								SNPRINTF(err_string, SIZEOF(err_string),
-                                                                	"Error sending DATA. Error in send : %s",
-										STRERROR(status));
+								TRUE);
 								close_retry = TRUE;
 							}
 							if (close_retry)

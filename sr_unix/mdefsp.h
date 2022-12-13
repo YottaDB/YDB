@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -263,13 +263,11 @@ typedef struct
 
 #define malloc gtm_malloc
 #define free gtm_free
-/* gtm_shmget calls either the native shmget or libhugetlbfs's shmget which uses Huge Pages
- * to back the shared segment if possible. This is a Linux only library.
+/* gtm_shmget either calls the native shmget or requests Huge Pages to back the
+ * shared memory segment if the environment variable gtm_hugetlb_shm is set.
+ * Huge Pages are only supported on Linux.
  */
-#if defined(__linux__) && (defined(__x86_64__) || defined(__i386__))
-#	define shmget	gtm_shmget
-	extern int gtm_shmget(key_t , size_t , int);
-#endif
+extern int gtm_shmget(key_t , size_t , int , bool);
 
 #ifndef __ia64
 #define CODE_ADDRESS(func)	(unsigned char *)func

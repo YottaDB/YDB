@@ -81,6 +81,9 @@ TAB_GVSTATS_REC(n_clean2dirty        , "BTD", "# of Block Transitions to Dirty  
 TAB_GVSTATS_REC(n_wait_for_read      , "WFR", "# of Blocks needing sleep on the read ") /* was t_qread_ripsleep_cnt in BG_TRC_REC */
 TAB_GVSTATS_REC(n_buffer_scarce      , "BUS", "# times db_csh_get too many retries   ") /*was db_csh_get_too_many_loops BG_TRC_REC*/
 TAB_GVSTATS_REC(n_bt_scarce          , "BTS", "# times db_csh_get too many retries   ") /* was bt_put_flush_dirty in BG_TRC_REC */
+TAB_GVSTATS_REC(n_set_trigger_fired  , "STG", "# of SET triggers fired               ")
+TAB_GVSTATS_REC(n_kill_trigger_fired , "KTG", "# of KILL triggers fired              ")
+TAB_GVSTATS_REC(n_ztrigger_fired     , "ZTG", "# of ZTRIGGERs fired                  ")
 
 /* Begin stats for GTM-8863 (please do not delete this) */
 /*
