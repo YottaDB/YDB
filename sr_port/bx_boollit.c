@@ -212,7 +212,19 @@ void bx_boollit(triple *t, int depth)
 			/* We don't need any COBOOLs, and all the negatives/coms should be out */
 			for (ref0 = t->operand[j].oprval.tref; ref0 != optrip[j]; ref0 = ref0->operand[0].oprval.tref)
 			{
-				assert((OC_NEG != ref0->opcode) && (OC_FORCENUM != ref0->opcode) && (OC_COM != ref0->opcode));
+				/* Note that all OC_NEG/OC_COM/OC_FORCENUM opcodes should have been eliminated by now.
+				 * But it is possible that a string with a NUMOFLOW is used as one of the operands in the
+				 * boolean expression. If so, the above opcodes would not have been eliminated.
+				 * An example is "write 0!((-(+(-("1E47")))))"
+				 *
+				 * It is still okay to remove the OC_NEG/OC_COM/OC_FORCENUM opcodes (if any are found) as part
+				 * of the literal optimization since a NUMOFLOW error is going to be issued anyways as we are
+				 * guaranteed to see an OC_RTERROR triple (added by the "UNARY_TAIL" macro call at the top
+				 * of this file) at the end of the "curtchain" triple execution chain in this case (asserted
+				 * by the ALREADY_RTERROR macro below).
+				 */
+				assert(((OC_NEG != ref0->opcode) && (OC_FORCENUM != ref0->opcode) && (OC_COM != ref0->opcode))
+					|| ALREADY_RTERROR);
 				dqdel(ref0, exorder);
 				t->operand[j].oprval.tref = ref0->operand[0].oprval.tref;
 			}
