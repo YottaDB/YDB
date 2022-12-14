@@ -18,7 +18,7 @@
 
 # ---------------------------------------------------------------------------------------------------------------------
 # For the latest version of this script, run the following command
-#	wget https://gitlab.com/YottaDB/DB/YDB/raw/master/sr_unix/ydbinstall.sh
+#	wget https://download.yottadb.com/ydbinstall.sh
 # ---------------------------------------------------------------------------------------------------------------------
 #
 # This script automates the installation of YottaDB as much as possible,
@@ -1160,7 +1160,7 @@ else
 				*"$platform"*) ;;		# If tarball has current platform in its name, consider it
 				*)             continue ;;	# else move on to next tarball
 			esac
-			yottadb_download_url="https://gitlab.com/YottaDB/DB/YDB${fullfilename}"
+			yottadb_download_url="https://download.yottadb.com/yottadb${fullfilename}"
 			break					# Now that we found one tarball, stop looking at other choices
 		done
 		if [ "$yottadb_download_url" = "" ]; then echo Unable to find YottaDB tarball for ${ydb_version} $platform $arch ; err_exit; fi

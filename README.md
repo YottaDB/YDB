@@ -158,7 +158,7 @@ Pre-built images are available on [docker hub](https://hub.docker.com/r/yottadb/
 ### Running a Pre-built image
 
 ```
-docker run --rm -it yottadb/yottadb # you can add a specific version after a ":" if desired
+docker run --rm -it download.yottadb.com/yottadb/yottadb # you can add a specific version after a ":" if desired
 ```
 
 ### Build Steps
