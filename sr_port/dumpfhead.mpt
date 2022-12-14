@@ -3,7 +3,7 @@
 ; Copyright (c) 2016-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -18,7 +18,7 @@
 dumpfhead(dbname)
 	new $etrap
 	new (dbname,debug)
-	set $etrap="quit"	; defer error handling to the caller
+	do Etrap
 	if '$data(debug) new debug set debug=0
 	do getfields(.record,dbname)
 	zwrite record
@@ -29,7 +29,7 @@ dumpfhead(dbname)
 ;
 getfields(fldarray,dbname)
 	new $etrap
-	set $etrap="quit:$quit """" quit"		; Defer error handling to the caller
+	do Etrap
 	new BigEndian,Endian,FALSE,Hex,HexDigits,LittleEndian,NullChar,TRUE
 	new endian,fhead,fldstring,flddim,fldidx,fldlen,fldname,fldnum,fldoff
 	new fldraw,fldtype,gtmhdwr,gtmos,gtmver,gtmzv,label,offset,platformendian,saveIO
@@ -85,6 +85,7 @@ getfields(fldarray,dbname)
 	; Read database fileheader
 	;
 	set saveIO=$IO
+	do DBEnsure^%YDBENV(dbname)	; Ensure that the file is a database file, set $ecode if not
 	open dbname:(readonly:fixed:recordsize=8192:chset="M":nowrap:exception="do badopen")
 	use dbname:exception="goto eof:$zeof,filerr"
 	read fhead#8192			; Read 8K of fileheader
@@ -193,3 +194,13 @@ BinToHex(bin,noendian)
 	. for i=1:1:binlen do
 	. . set num=$zascii(bin,i),hex=$zextract(HexDigits,(num#16)+1)_hex,num=num\16,hex=$zextract(HexDigits,num+1)_hex
 	quit "0x"_hex
+
+;
+; Error handler
+;
+Etrap	; Set error handler to print error message and return error code to shell
+	new $test
+	open "/proc/self/fd/2" ; open stderr for output if needed
+	set $etrap="set $etrap=""use """"/proc/self/fd/2"""" write $zstatus,! zshow """"*"""" zhalt 1"" set tmp1=$zpiece($ecode,"","",2),tmp2=$text(@tmp1) if $zlength(tmp2) use ""/proc/self/fd/2"" write ""%DUMPFHEAD"",@$zpiece(tmp2,"";"",2),! zhalt +$extract(tmp1,2,$zlength(tmp1))"
+	quit
+
