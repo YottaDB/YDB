@@ -200,7 +200,6 @@ BinToHex(bin,noendian)
 ;
 Etrap	; Set error handler to print error message and return error code to shell
 	new $test
-	open "/proc/self/fd/2" ; open stderr for output if needed
-	set $etrap="set $etrap=""use """"/proc/self/fd/2"""" write $zstatus,! zshow """"*"""" zhalt 1"" set tmp1=$zpiece($ecode,"","",2),tmp2=$text(@tmp1) if $zlength(tmp2) use ""/proc/self/fd/2"" write ""%DUMPFHEAD"",@$zpiece(tmp2,"";"",2),! zhalt +$extract(tmp1,2,$zlength(tmp1))"
+	set $etrap="set $etrap=""use $principal write $zstatus,! zshow """"*"""" zhalt 1"" set tmp1=$zpiece($ecode,"","",2),tmp2=$text(@tmp1) if $zlength(tmp2) use $principal write ""%DUMPFHEAD"",@$zpiece(tmp2,"";"",2),! zhalt +$extract(tmp1,2,$zlength(tmp1))"
 	quit
 
