@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,14 +78,14 @@ void mupip_dump_fhead(void)
 			util_out_print("Dumping fileheader of !AD", TRUE, DB_LEN_STR(rptr->reg));
 			status |= dumpfhead(DB_LEN_STR(rptr->reg));
 		}
-		mupip_exit(status == SS_NORMAL ? status : ERR_MUNOFINISH);
 	} else
 	{	/* we default to file if neither -file nor -region could be found */
 		if (!cli_get_str("WHAT", (char *) file, (unsigned short *) &file_len))
 			mupip_exit(ERR_MUPCLIERR);
 		file[file_len] = '\0';     /* Null terminate */
-		mupip_exit(dumpfhead(file_len, file));
+		status = dumpfhead(file_len, file);
 	}
+	mupip_exit((SS_NORMAL == status) ? status : ERR_MUNOFINISH);
 }
 
 int4 dumpfhead(int len, unsigned char *file)
