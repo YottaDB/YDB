@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -115,12 +115,27 @@ void trans_code_cleanup(void)
 				 * mdb_condition_handler won't drive an error handler in that case which would be caught in
 				 * one of the above conditions. Not breaking out of the loop here means the frame will just
 				 * unwind and we'll break on the direct mode frame which will be redriven. If the parent frame
-				 * is not a direct mode frame, we'll assert in debug or break in pro and just continue.
-				 * to direct mode.
+				 * is not a direct mode frame, we'll assert in debug or break in pro and just continue
+				 * to direct mode. When we say "parent frame", we allow for one or more indirect frames in
+				 * between (i.e. frames where "fp->flags & SFF_INDCE" is TRUE) as long as eventually they
+				 * lead to a direct mode frame.
 				 */
+				stack_frame	*tmp_fp;
+
 				assert(fp->flags & SFF_INDCE);
-				if (!fp->old_frame_pointer || !(fp->old_frame_pointer->type & SFT_DM))
+				tmp_fp = fp;
+				for ( ; ; )
 				{
+					tmp_fp = tmp_fp->old_frame_pointer;
+					if (NULL == tmp_fp)
+					{
+						assert(FALSE);
+						break;
+					}
+					if (tmp_fp->type & SFT_DM)
+						break;
+					if (tmp_fp->flags & SFF_INDCE)
+						continue;
 					assert(FALSE);
 					break;
 				}
