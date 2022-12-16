@@ -203,7 +203,8 @@ INGEST(jnlf,label)
 OCTODDL(rectype)
 	new $etrap do etrap
 	set $ecode=""
-	new currtbl,field,i,j,jnlfgbl,jnlsubrec,line,rectempl,tbltype,tblsel,tmp
+	new currtbl,field,i,io,j,jnlfgbl,jnlsubrec,line,rectempl,tbltype,tblsel,tmp
+	set io=$io
 	; Get record and subfield labels & types.
 	do getrectypes
 	do getsubfields
