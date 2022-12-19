@@ -34,7 +34,9 @@ GDEINIT
 	s endian("aarch64","Linux")=FALSE,glo("Linux")=1024
 	s HEX(0)=1
 	s gtm64=$p($zver," ",4)
-	i "/RS6000/x86_64/x86/S390/S390X/aarch64"[("/"_gtm64) s encsupportedplat=TRUE,gtm64=$s("x86"=gtm64:FALSE,1:TRUE)
+	i "/RS6000/x86_64/x86/S390/S390X/aarch64/armv7l/armv6l"[("/"_gtm64) d
+	. s encsupportedplat=TRUE
+	. s gtm64=$select("/x86/armv7l/armv6l"[("/"_gtm64):FALSE,1:TRUE)
 	e  s (encsupportedplat,gtm64)=FALSE
 	i (gtm64=TRUE) d
 	. f x=1:1:16 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
