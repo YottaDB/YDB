@@ -3,7 +3,7 @@
 # Copyright (c) 2014-2019 Fidelity National Information         #
 # Services, Inc. and/or its subsidiaries. All rights reserved.  #
 #								#
-# Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson.				#
@@ -843,9 +843,15 @@ if [ "N" = "$ydb_force_install" ]; then
 		fi
 	elif [ "x8664" = "${ydb_flavor}" ] ; then
 		if [ "ubuntu" = "${osid}" ] ; then
-			# Ubuntu 20.04 onwards is considered supported on x86_64
-			osallowmajorver="20"
-			osallowminorver="04"
+			if expr r1.36 \< "${ydb_version}" >/dev/null; then
+				# Ubuntu 22.04 onwards is considered supported on x86_64 from r1.38 onwards
+				osallowmajorver="22"
+				osallowminorver="04"
+			else
+				# Ubuntu 20.04 onwards is considered supported on x86_64 till r1.36
+				osallowmajorver="20"
+				osallowminorver="04"
+			fi
 		elif [ "rhel" = "${osid}" ] ; then
 			# RHEL 7 onwards is considered supported on x86_64
 			osallowmajorver="7"
@@ -868,11 +874,7 @@ if [ "N" = "$ydb_force_install" ]; then
 			osallowminorver="0"
 		fi
 	elif [ "aarch64" = "${ydb_flavor}" ] ; then
-		if [ "ubuntu" = "${osid}" ] ; then
-			# Ubuntu 20.04 onwards is considered supported on AARCH64
-			osallowmajorver="20"
-			osallowminorver="04"
-		elif [ "debian" = ${osid} ] ; then
+		if [ "debian" = ${osid} ] ; then
 			# Debian 11 (buster) onwards is considered supported on AARCH64
 			osallowmajorver="11"
 			osallowminorver="0"
@@ -1057,6 +1059,9 @@ else
 			#	yottadb_r132_x8664_ubuntu2004_pro.tgz
 			# From r1.36 onwards, the below tarball is also added for SUSE Linux
 			#	yottadb_r136_x8664_sle15_pro.tgz
+			# From r1.36 onwards, Ubuntu 22.04 is only supported (not Ubuntu 20.04).
+			# So the below tarball will be seen.
+			#	yottadb_r136_x8664_ubuntu2204_pro.tgz
 			# And below are the rules for picking a tarball name for a given target system (OS and architecture).
 			platform="${osid}"
 			case $arch in
