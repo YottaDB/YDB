@@ -594,7 +594,7 @@ if [ 0 -ne $ydb_tmp_stat ] ; then
 fi
 
 # If UTF-8 support is requested, but libicuio is not found, issue an error and exit
-if [ -n "$ydb_utf8" ] ; then
+if [ "Y" = "$ydb_utf8" ] ; then
    $ldconfig -p | grep -qs /libicuio ; ydb_tmp_stat=$?
    if [ 0 -ne $ydb_tmp_stat ] ; then
        echo >&2 "UTF-8 support requested but libicuio.so not found. Exiting." ; exit $ydb_tmp_stat
