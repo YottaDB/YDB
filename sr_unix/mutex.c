@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -828,13 +828,15 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 				assert((MUTEX_CONST_TIMEOUT_VAL * 2) == MUTEXLCKALERT_INTERVAL);
 				if ((0 == (++timeout_count % 2)) && (csa->critical->crit_cycle == local_crit_cycle))
 				{
+					uint4	onln_rlbk_pid;
+
 					if (IS_REPL_INST_FROZEN)
 						break;
-					if (0 != cnl->onln_rlbk_pid)
+					onln_rlbk_pid = cnl->onln_rlbk_pid;
+					if (0 != onln_rlbk_pid)
 					{
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_ORLBKINPROG, 3,
-								cnl->onln_rlbk_pid, DB_LEN_STR(reg));
-						assert(cnl->in_crit == cnl->onln_rlbk_pid);
+								onln_rlbk_pid, DB_LEN_STR(reg));
 						break;
 					}
 					if (INTERLOCK_ADD(&csa->critical->stuck_cycle, 1) == (local_stuck_cycle + 1))
@@ -949,10 +951,13 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 				{	/* and we're waiting on some living process */
 					if (local_crit_cycle == csa->critical->crit_cycle)
 					{	/* and things aren't moving */
+						uint4	onln_rlbk_pid;
+
 						assert(local_crit_cycle);
 						if (IS_REPL_INST_FROZEN)		/* recheck to minimize spurious reports */
 							continue;
-						if (0 == cnl->onln_rlbk_pid)
+						onln_rlbk_pid = cnl->onln_rlbk_pid;
+						if (0 == onln_rlbk_pid)
 						{	/* not rollback - send_msg after trace less likely to lose process */
 							GET_C_STACK_FROM_SCRIPT("MUTEXLCKALERT", process_id, in_crit_pid,
 								csa->critical->crit_cycle);
@@ -965,8 +970,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 						 * journal pool for its entire duration, use a different message
 						 */
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_ORLBKINPROG, 3,
-								cnl->onln_rlbk_pid, DB_LEN_STR(reg));
-						assert(cnl->in_crit == cnl->onln_rlbk_pid);
+								onln_rlbk_pid, DB_LEN_STR(reg));
 					}
 				} else
 				{	/* nobody home */
