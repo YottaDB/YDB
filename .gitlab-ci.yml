@@ -109,6 +109,11 @@ clang-tidy-aarch64:
     - docker manifest create yottadb/${REPO}:${DOCKERHUBTAG} yottadb/${REPO}:${DOCKERHUBTAG}-amd64 yottadb/${REPO}:${DOCKERHUBTAG}-aarch64
     - docker manifest inspect yottadb/${REPO}:${DOCKERHUBTAG}
     - docker manifest push yottadb/${REPO}:${DOCKERHUBTAG}
+    - docker pull yottadb/${REPO}-base:${DOCKERHUBTAG}-amd64
+    - docker pull yottadb/${REPO}-base:${DOCKERHUBTAG}-aarch64
+    - docker manifest create yottadb/${REPO}-base:${DOCKERHUBTAG} yottadb/${REPO}-base:${DOCKERHUBTAG}-amd64 yottadb/${REPO}-base:${DOCKERHUBTAG}-aarch64
+    - docker manifest inspect yottadb/${REPO}-base:${DOCKERHUBTAG}
+    - docker manifest push yottadb/${REPO}-base:${DOCKERHUBTAG}
   tags:
     - amd64
   only:
