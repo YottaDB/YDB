@@ -72,8 +72,6 @@ commit-verify:
 
 clang-tidy-amd64:
   extends: .clang-tidy
-  tags:
-    - amd64
 
 # We run this job only on master since it's slow (30 minutes)
 clang-tidy-aarch64:
