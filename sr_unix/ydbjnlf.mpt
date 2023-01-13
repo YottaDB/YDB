@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -82,7 +82,7 @@ INGEST(jnlf,label)
 	do getrectypes
 	set mupipcmd="$ydb_dist/mupip journal -extract=-stdout -forward -show=all -fences=none -noverify -detail -full "_jnlfile
 	set retcode='$$ensureydbjnlf
-	open "mupip":(shell="/bin/sh":command=mupipcmd:stderr="mupip_err":readonly)::"pipe"
+	open "mupip":(shell="/bin/sh":command=mupipcmd:stderr="mupip_err":readonly:recordsize=1048576)::"pipe"
 	; Read the first three lines of stderr to confirm journal file format
 	use "mupip_err"
 	set prevline=""
@@ -100,7 +100,7 @@ INGEST(jnlf,label)
 	; is worth making. The calls to $qlength() and $qsubscript() are
 	; perhaps the slowest parts of the loop, but it is not clear that
 	; there are faster alternatives which are functionally correct.
-	for  read line quit:$zeof  do
+	for  read line b:$zl(line)>32700  quit:$zeof  do
 	. set offset=$$FUNC^%HD($zpiece(line," ",1))
 	. set recsize=$$FUNC^%HD($zpiece($zpiece(line,"]",1),"[",2))
 	. set rectype=$zpiece($zpiece(line," :: ",2)," ",1),rectypecomma=rectype_","
@@ -112,14 +112,14 @@ INGEST(jnlf,label)
 	. set line=$$L^%TRIM($zpiece(line,rectype,2,$zlength(line,rectype)))
 	. set commapos=$zfind(line,",")
 	. set $zextract(line,commapos-1)="\"
-	. if $zfind("FKILL,FZKILL,GKILL,GZKILL,KILL,TKILL,TZKILL,TZTRIG,UKILL,ZKILL,ZTRIG,",rectypecomma) do
+	. if $zfind("FKILL,FZKILL,GKILL,GZKILL,KILL,UKILL,ZKILL,ZTRIG,",rectypecomma) do
 	. . set node=$zpiece(line,"\",13,$zlength(line,"\"))
 	. . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\"_$qsubscript(node,0)_"\"_node
 	. ; In the following, since "=" separates the global variable node from its value
 	. ; in a journal extract line, but since a subscript can include a "=" character,
 	. ; calling $qlength() on leading pieces of the field in the line until it
 	. ; succeeds identifies the specific "=" for separating node from value.
-	. else  if $zfind("FSET,GSET,SET,TSET,USET,",rectypecomma) do
+	. else  if $zfind("FSET,GSET,SET,USET,",rectypecomma) do
 	. . set nodesarg=$zpiece(line,"\",13,$zlength(line,"\"))
 	. . set etrapsav=$etrap,i=1
 	. . set $etrap="if "",M90,Z150379530,""=$ecode set $ecode="""" goto:$increment(i) @$stack($stack(-1),""place"")"
@@ -128,6 +128,31 @@ INGEST(jnlf,label)
 	. . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\"_$qsubscript(gvref,0)_"\"_gvref_"\"_$zextract(line,$zfind(line,gvref_"="),$zlength(line))
 	. else  if $zfind("EPOCH,",rectypecomma) do
 	. . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,11)_"\"_$ztranslate($zpiece(line,"\",12,$zlength(line,"\")),"\",":")
+	. ; If the reported record type in the extract is TSTART, it is only a visual
+	. ; cue to the start of a transaction in that region: there is no TSTART record
+	. ; in a journal file. While that visual cue is useful to a human being reading
+	. ; an extract, it adds no value to automated analysis of a journal file. The
+	. ; TSTART line in the output provides the offset and record size of the first
+	. ; record of that transaction in the journal file, and the next line reports
+	. ; the actual journal record. Hence %YDBJNLF reads that next line, and stores
+	. ; the extracted data with the offset and record size reported in the TSTART line.
+	. else  if $zfind("TSTART,",rectypecomma) do
+	. . read line set:$zeof $ecode=",U253,"
+	. . set rectype=$zpiece($$L^%TRIM(line)," ",1),rectypecomma=rectype_","
+	. . set line=$$L^%TRIM($zpiece(line,rectype,2,$zlength(line,rectype)))
+	. . set commapos=$zfind(line,",")
+	. . set $zextract(line,commapos-1)="\"
+	. . if $ZFIND("TKILL,TZKILL,TZTRIG,",rectypecomma) do
+	. . . set node=$zpiece(line,"\",13,$zlength(line,"\"))
+	. . . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\"_$qsubscript(node,0)_"\"_node
+	. . else  if $ZFIND("TSET,",rectypecomma) do
+	. . . set nodesarg=$zpiece(line,"\",13,$zlength(line,"\"))
+	. . . set etrapsav=$etrap,i=1
+	. . . set $etrap="if "",M90,Z150379530,""=$ecode set $ecode="""" goto:$increment(i) @$stack($stack(-1),""place"")"
+	. . . set gvref=$zpiece(nodesarg,"=",1,i) if $qlength(gvref)
+	. . . set $etrap=etrapsav
+	. . . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\"_$qsubscript(gvref,0)_"\"_gvref_"\"_$zextract(line,$zfind(line,gvref_"="),$zlength(line))
+	. . else  set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,$zlength(line,"\"))
 	. else  set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,$zlength(line,"\"))
 	; Except for lists of ACTIVE and COMPLETE processes, performance is not
 	; important for the remainder of the function, as other metadata for
