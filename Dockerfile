@@ -87,6 +87,9 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
     # This is a strange step: The mount volume is readonly; and we actually write to it in ydbinstall
     # So we need to copy the mount contents to a seperate folder
     cp -R /tmp/staging /tmp/ydb-release && \
+    # Add the CMake build_os_release file which is not part of the install directory
+    # Needed to allow us to build Ubuntu on AARCH64 for Docker Hub, but it's not officially supported
+    cp /etc/os-release /tmp/build_os_release && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
                     file \
