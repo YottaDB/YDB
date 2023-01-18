@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.2
 #################################################################
 #								#
-# Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -19,7 +19,7 @@
 # Use with data persistence:
 #   $ docker run --rm -e ydb_chset=utf-8 -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
 
-ARG OS_VSN=20.04
+ARG OS_VSN=22.04
 
 # Stage 1: YottaDB build image
 FROM ubuntu:${OS_VSN} as ydb-release-builder
@@ -92,7 +92,7 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
                     file \
                     binutils \
                     libelf-dev \
-                    libicu66 \
+                    libicu70 \
 		    nano \
 		    wget \
 		    && \
