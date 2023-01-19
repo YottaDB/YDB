@@ -70,9 +70,9 @@ err	; Primary Error Handler
 INGEST(jnlf,label)
 	new $etrap do etrap
 	set $ecode=""
-	new commapos,daytime,doneflag,etrapsav,gvref,i,io,j,jnlfgbl,jnlfile
+	new commapos,daytime,doneflag,etrapsav,gvname,gvref,i,io,j,jnlfgbl,jnlfile
 	new jnlsubrec,jpvtime,line,linenum,mupipcmd,node,nodesarg,offset,prefix
-	new prevline,recsize,rectype,rectypecomma,retcode,term,tmp,user
+	new prevline,recsize,rectype,rectypecomma,retcode,term,tmp,user,ydb982flag
 	set io=$io
 	set jnlfile=$zsearch($get(jnlf,""),-1)
 	set:'$zlength(jnlfile) $ecode=",U249,"
@@ -80,17 +80,17 @@ INGEST(jnlf,label)
 	set prefix=$ztrnlnm("ydb_msgprefix")
 	set:'$zlength(prefix) prefix="YDB"
 	do getrectypes
-	set mupipcmd="$ydb_dist/mupip journal -extract=-stdout -forward -show=all -fences=none -noverify -detail -full "_jnlfile
+	set mupipcmd="ydb_extract_nocol=1 $ydb_dist/mupip journal -extract=-stdout -forward -show=all -fences=none -noverify -detail -full "_jnlfile
 	set retcode='$$ensureydbjnlf
 	open "mupip":(shell="/bin/sh":command=mupipcmd:stderr="mupip_err":readonly:recordsize=1048576)::"pipe"
 	; Read the first three lines of stderr to confirm journal file format
 	use "mupip_err"
 	set prevline=""
-	for linenum=1:1:3 do
+	for linenum=1:1 do  quit:line?@("1""%""1"""_prefix_"""1""-I-MUJNLSTAT, Forward processing started"".E")
 	. read line
 	. set:$zeof $ecode=",U253,"
 	. set prevline=line
-	. set:line'?@("1""%""1"""_prefix_"""1""-I-MUJNLSTAT,"".E") $ecode=",U250,"
+	. set:line'?@("1""%""1"""_prefix_"""1""-""1(1""W"",1""I"")1""-"".E") $ecode=",U250,"
 	; Purge old records with this label once journal file format is confirmed
 	do PURGE(label)
 	use "mupip"
@@ -100,10 +100,14 @@ INGEST(jnlf,label)
 	; is worth making. The calls to $qlength() and $qsubscript() are
 	; perhaps the slowest parts of the loop, but it is not clear that
 	; there are faster alternatives which are functionally correct.
-	for  read line b:$zl(line)>32700  quit:$zeof  do
+	; The code includes a hack for ^#t global variables used in trigger definitions,
+	; which can be removed once https://gitlab.com/YottaDB/DB/YDB/-/issues/982 is
+	; addressed.
+	set ydb982flag=0
+	for  read line quit:$zeof  do
 	. set offset=$$FUNC^%HD($zpiece(line," ",1))
 	. set recsize=$$FUNC^%HD($zpiece($zpiece(line,"]",1),"[",2))
-	. set rectype=$zpiece($zpiece(line," :: ",2)," ",1),rectypecomma=rectype_","
+	. set rectype=$zpiece($zpiece($zpiece(line," :: ",2),"\",1)," ",1),rectypecomma=rectype_","
 	. ; Check that record type is known
 	. set:'$data(jnlfgbl(rectype)) $ecode=",U254,"
 	. ; Get the extracted journal record extract & format for storage.
@@ -114,18 +118,25 @@ INGEST(jnlf,label)
 	. set $zextract(line,commapos-1)="\"
 	. if $zfind("FKILL,FZKILL,GKILL,GZKILL,KILL,UKILL,ZKILL,ZTRIG,",rectypecomma) do
 	. . set node=$zpiece(line,"\",13,$zlength(line,"\"))
-	. . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\"_$qsubscript(node,0)_"\"_node
+	. . if "#"'=$zextract(node,2) set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\"_$qsubscript(node,0)_"\"_node
+	. . else  set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\^#"_$qsubscript($zextract(node,3,$zlength(node)),0)_"\"_node
 	. ; In the following, since "=" separates the global variable node from its value
 	. ; in a journal extract line, but since a subscript can include a "=" character,
 	. ; calling $qlength() on leading pieces of the field in the line until it
 	. ; succeeds identifies the specific "=" for separating node from value.
 	. else  if $zfind("FSET,GSET,SET,USET,",rectypecomma) do
 	. . set nodesarg=$zpiece(line,"\",13,$zlength(line,"\"))
+	. . set:"#"=$zextract(nodesarg,2) $zextract(nodesarg,2)="",ydb982flag=1
 	. . set etrapsav=$etrap,i=1
 	. . set $etrap="if "",M90,Z150379530,""=$ecode set $ecode="""" goto:$increment(i) @$stack($stack(-1),""place"")"
 	. . set gvref=$zpiece(nodesarg,"=",1,i) if $qlength(gvref)
 	. . set $etrap=etrapsav
-	. . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\"_$qsubscript(gvref,0)_"\"_gvref_"\"_$zextract(line,$zfind(line,gvref_"="),$zlength(line))
+	. . if ydb982flag do
+	. . . set tmp=$qsubscript(gvref,0),gvname="^#"_$zextract(tmp,2,$zlength(tmp))
+	. . . set tmp=gvref,gvref="^#"_$zextract(tmp,2,$zlength(tmp))
+	. . . set ydb982flag=0
+	. . else  set gvname=$qsubscript(gvref,0)
+	. . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\"_gvname_"\"_gvref_"\"_$zextract(line,$zfind(line,gvref_"="),$zlength(line))
 	. else  if $zfind("EPOCH,",rectypecomma) do
 	. . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,11)_"\"_$ztranslate($zpiece(line,"\",12,$zlength(line,"\")),"\",":")
 	. ; If the reported record type in the extract is TSTART, it is only a visual
@@ -138,20 +149,27 @@ INGEST(jnlf,label)
 	. ; the extracted data with the offset and record size reported in the TSTART line.
 	. else  if $zfind("TSTART,",rectypecomma) do
 	. . read line set:$zeof $ecode=",U253,"
-	. . set rectype=$zpiece($$L^%TRIM(line)," ",1),rectypecomma=rectype_","
+	. . set rectype=$zpiece($zpiece($$L^%TRIM(line),"\",1)," ",1),rectypecomma=rectype_","
 	. . set line=$$L^%TRIM($zpiece(line,rectype,2,$zlength(line,rectype)))
 	. . set commapos=$zfind(line,",")
 	. . set $zextract(line,commapos-1)="\"
 	. . if $ZFIND("TKILL,TZKILL,TZTRIG,",rectypecomma) do
 	. . . set node=$zpiece(line,"\",13,$zlength(line,"\"))
-	. . . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\"_$qsubscript(node,0)_"\"_node
+	. . . if "#"'=$zextract(node,2) set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\"_$qsubscript(node,0)_"\"_node
+	. . . else  set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\^#"_$qsubscript($zextract(node,3,$zlength(node)),0)_"\"_node
 	. . else  if $ZFIND("TSET,",rectypecomma) do
 	. . . set nodesarg=$zpiece(line,"\",13,$zlength(line,"\"))
+	. . . set:"#"=$zextract(nodesarg,2) $zextract(nodesarg,2)="",ydb982flag=1
 	. . . set etrapsav=$etrap,i=1
 	. . . set $etrap="if "",M90,Z150379530,""=$ecode set $ecode="""" goto:$increment(i) @$stack($stack(-1),""place"")"
 	. . . set gvref=$zpiece(nodesarg,"=",1,i) if $qlength(gvref)
 	. . . set $etrap=etrapsav
-	. . . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\"_$qsubscript(gvref,0)_"\"_gvref_"\"_$zextract(line,$zfind(line,gvref_"="),$zlength(line))
+	. . . if ydb982flag do
+	. . . . set tmp=$qsubscript(gvref,0),gvname="^#"_$zextract(tmp,2,$zlength(tmp))
+	. . . . set tmp=gvref,gvref="^#"_$zextract(tmp,2,$zlength(tmp))
+	. . . . set ydb982flag=0
+	. . . else  set gvname=$qsubscript(gvref,0)
+	. . . set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,12)_"\"_gvname_"\"_gvref_"\"_$zextract(line,$zfind(line,gvref_"="),$zlength(line))
 	. . else  set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,$zlength(line,"\"))
 	. else  set @jnlfgbl(rectype)=rectype_"\"_$zpiece(line,"\",2,$zlength(line,"\"))
 	; Except for lists of ACTIVE and COMPLETE processes, performance is not
