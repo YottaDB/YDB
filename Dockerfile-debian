@@ -90,6 +90,7 @@ RUN apt-get update && \
                     libicu-dev \
                     locales \
                     wget \
+                    netbase \
                     vim \
                     procps \
                     make \
@@ -102,10 +103,19 @@ RUN apt-get update && \
                     python3-setuptools \
                     libffi-dev \
                     python3-pip \
-		    npm \
-		    g++ \
-		    lua5.4 \
-		    liblua5.4-dev \
+                    npm \
+                    g++ \
+                    lua5.4 \
+                    liblua5.4-dev \
+                    build-essential \
+                    cmake \
+                    bison \
+                    flex \
+                    xxd \
+                    libreadline-dev \
+                    libssl-dev \
+                    curl \
+                    libconfig-dev \
                     && \
     apt-get clean
 RUN locale-gen en_US.UTF-8
@@ -117,6 +127,7 @@ RUN cd /tmp/yottadb-release  \
  && ./ydbinstall \
       --utf8 `cat /tmp/yottadb-release/.icu.vsn` \
       --installdir /opt/yottadb/current \
+      --octo \
  && rm -rf /tmp/yottadb-release
 ENV ydb_dir=/data \
     LANG=en_US.UTF-8 \
@@ -147,6 +158,11 @@ RUN . /opt/yottadb/current/ydb_env_set \
  && make install \
  && cd - \
  && rm -rf yottadb-perl \
- && echo "zsystem \"mupip rundown -relinkctl\"" | /opt/yottadb/current/ydb -dir
-ENTRYPOINT ["/opt/yottadb/current/ydb"]
-CMD ["-run", "%XCMD", "zsystem \"bash\""]
+ && printf "ydbrocks\nydbrocks" | "$ydb_dist/yottadb" -r %ydboctoAdmin add user ydb -w -a \
+ && $ydb_dist/mupip rundown -relinkctl
+RUN cp /opt/yottadb/current/plugin/octo/octo.conf /data/octo.conf && \
+    sed -i 's/address = "127.0.0.1"/address = "0.0.0.0"/' /data/octo.conf
+RUN mkdir logs # for Rocto to put its standard error stream
+COPY ci/docker-scripts/docker-debian-startup.sh /docker-debian-startup.sh
+EXPOSE 1337
+ENTRYPOINT ["/docker-debian-startup.sh"]

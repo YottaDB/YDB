@@ -96,9 +96,10 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
                     binutils \
                     libelf-dev \
                     libicu70 \
-		    nano \
-		    wget \
-		    && \
+                    nano \
+                    wget \
+                    netbase \
+                    && \
     /tmp/ydb-release/ydbinstall --utf8 default --installdir /opt/yottadb/current && \
     apt-get remove -y wget && \
     apt-get autoclean -y && \
