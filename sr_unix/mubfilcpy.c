@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -98,7 +98,11 @@
 		tmpcmdlen += cmdpathlen;							\
 		MEMCPY_LIT(&tmpcmd[tmpcmdlen], RMDIR_OPT);					\
 		tmpcmdlen += STR_LIT_LEN(RMDIR_OPT);						\
-		memcpy(&tmpcmd[tmpcmdlen], tempdir, tmpdirlen);					\
+		/* tempdir[] is not necessarily null-terminated so null terminate it and	\
+		 * copy the null byte too into "tmpcmd" before calling SYSTEM.			\
+		 */										\
+		tempdir[tmpdirlen] = 0;	/* see comment "rm tempdir" for similar code */		\
+		memcpy(&tmpcmd[tmpcmdlen], tempdir, tmpdirlen + 1);				\
 		tmpcmdlen += tmpdirlen;								\
 		rv2 = SYSTEM((char *)tmpcmd);							\
 		if (0 != rv2)									\
