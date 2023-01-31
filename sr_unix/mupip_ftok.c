@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,7 @@ void mupip_ftok(void)
 	char		fn[MAX_FN_LEN + 1], instfilename[MAX_FN_LEN + 1], replf[MAX_FN_LEN + 1];
 	gd_id		fid;
 	int		index, semid, shmid;
-	int4            id, status;
+	int4            id;
 	key_t           semkey;
 	mstr		file;
 	parse_blk	pblk;
@@ -87,52 +87,38 @@ void mupip_ftok(void)
 		TREF(parms_cnt) = 1;
 		if (!repl_inst_get_name(instfilename, &full_len, SIZEOF(instfilename), issue_rts_error, NULL))
 			assertpro(NULL == instfilename);	/* otherwise, repl_inst_get_name issues rts_error */
-	} else {
+	} else
 		use_instfilename = FALSE;
-	}
 	showheader = (!cli_negated("HEADER"));
 	for (index = 0; index < TREF(parms_cnt); index++)
 	{	/* In order to handle multiple files, this loop directly uses the array built by cli. */
+		char	*fn_ptr;
 		if (ispool)
 		{	/* This is an instance file */
-			char	*fn_ptr;
-			if (!use_instfilename) {
-				strncpy(fn, TAREF1(parm_ary, index), MAX_FN_LEN);
+			if (!use_instfilename)
+				fn_ptr = TAREF1(parm_ary, index);
+			else
+			{
+				strcpy(fn, instfilename);	/* Null terminated & range checked from repl_inst_get_name */
 				fn_ptr = fn;
-				full_len = strlen(fn);
-			} else {
-				fn_ptr = instfilename;
-				/* full_len was already initialized as part of "repl_inst_get_name()" call above */
 			}
 			/* Process the instance file */
 			in_mupip_ftok = TRUE;	/* this flag implicitly relies on mupip ftok being once and done */
 			repl_inst_read(fn_ptr, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 			in_mupip_ftok = FALSE;	/* no condition hander to reset this in case of error - see comment above */
-			memset(&pblk, 0, SIZEOF(pblk));
-			pblk.buff_size = MAX_FN_LEN;
-			pblk.buffer = replf;
-			pblk.fop = F_SYNTAXO;
-			file.addr = fn_ptr;
-			file.len = full_len;
-			status = parse_file(&file, &pblk);	/* this gets us to just the name and extension */
-			assert(status & 1);
-			PRO_ONLY(UNUSED(status));
-			fn_len = pblk.b_name + pblk.b_ext;
-			memcpy(fn, pblk.l_name, fn_len);
-			fn[fn_len] = 0;
-			semkey = FTOK(fn, REPLPOOL_ID);
+			semkey = FTOK(fn_ptr, REPLPOOL_ID);
 			semid = shmid = -1;			/* not relevant for the instance file file */
 		} else
 		{	/* Not instance file based. This is a database file. */
-			strncpy(fn, TAREF1(parm_ary, index), MAX_FN_LEN);
-			semkey = FTOK(fn, id);
+			fn_ptr = TAREF1(parm_ary, index);
+			semkey = FTOK(fn_ptr, id);
 			assert(semkey);
 			if (!only)
 			{	/* try as a database file */
-				OPENFILE(fn, O_RDONLY, fd); /* if OPEN works, file_head_read takes care of close if other issues */
-				if ((FD_INVALID == fd) || (!file_head_read(fn, &header, SIZEOF(header))))
+				OPENFILE(fn_ptr, O_RDONLY, fd); /* if OPEN works, file_head_read takes care of close if other issues */
+				if ((FD_INVALID == fd) || (!file_head_read(fn_ptr, &header, SIZEOF(header))))
 				{
-					FPRINTF(stderr, "%s is not a database file\n",fn);
+					FPRINTF(stderr, "%s is not a database file\n", fn_ptr);
 					FPRINTF(stderr, "This and any subsequent files are treated as -only\n");
 					only = TRUE;
 				} else
@@ -152,10 +138,10 @@ void mupip_ftok(void)
 				FPRINTF(stderr, "--------------------------------------------------------------\n");
 				showheader = FALSE;
 			}
-			FPRINTF(stderr, "%20s :: %10d [0x%.8x] :: %10d [0x%.8x] :: %10d [0x%.8x] :: 0x", fn, semid, semid,
+			FPRINTF(stderr, "%20s :: %10d [0x%.8x] :: %10d [0x%.8x] :: %10d [0x%.8x] :: 0x", fn_ptr, semid, semid,
 				shmid, shmid, semkey, semkey);
 			fid_ptr = (sm_uc_ptr_t)&fid;
-			filename_to_id((gd_id_ptr_t)fid_ptr, fn);
+			filename_to_id((gd_id_ptr_t)fid_ptr, fn_ptr);
 			for (fid_top = fid_ptr + SIZEOF(fid) ; fid_ptr < fid_top; fid_ptr++)
 				FPRINTF(stderr, "%.2x", *(sm_uc_ptr_t)fid_ptr);
 			FPRINTF(stderr, "\n");
@@ -172,24 +158,22 @@ void mupip_ftok(void)
 					{	/* goes first if also -recvpool */
 						semid = repl_instance.jnlpool_semid;
 						shmid = repl_instance.jnlpool_shmid;
-						fn_len = SIZEOF("jnlpool");
-						strncpy(fn, "jnlpool", fn_len);
+						fn_ptr = "jnlpool";
 						display = TRUE;
 					} else if (recvpool && (0 != i))
 					{	/* last or sole */
 						semid = repl_instance.recvpool_semid;
 						shmid = repl_instance.recvpool_shmid;
-						fn_len = SIZEOF("recvpool");
-						strncpy(fn, "recvpool", fn_len);
+						fn_ptr = "recvpool";
 						display = TRUE;
 					}
 					if (display)
 						FPRINTF(stderr, "%20s :: %10d [0x%.8x] :: %10d [0x%.8x]\n",
-										fn, semid, semid, shmid, shmid);
+										fn_ptr, semid, semid, shmid, shmid);
 				}
 			}
 		} else		/* simple legacy format */
-			FPRINTF(stderr, "%20s  ::  %10d  [ 0x%8x ]\n", fn, semkey, semkey);
+			FPRINTF(stderr, "%20s  ::  %10d  [ 0x%8x ]\n", fn_ptr, semkey, semkey);
 	}
 	mupip_exit(SS_NORMAL);
 }
