@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,7 +75,8 @@ typedef enum
 	PO_UHCREPL,	/* 13 Replication information from upd_helper_ctl */
 	PO_JNLREG,	/* 14 Journal information - jnl_private_control */
 	PO_JBFREG,	/* 15 Journal buffer information - jnl_buffer_ptr_t */
-	PO_GDSSEG,	/* 3 Segment information - gd_segment struct - process private structure */
+	PO_GDSSEG,	/* 16 Segment information - gd_segment struct - process private structure */
+	PO_UDIREG,	/* 17 Region information - unix_db_info_struct - process private structure */
 } zpeek_mnemonic;
 
 GBLREF boolean_t        	created_core;
@@ -121,16 +122,17 @@ LITDEF nametabent zpeek_names[] =
 	,{4, "PEEK"}			/* 23 */
 	,{3, "RIH"}, {7, "RIHREPL"}	/* 24, 25 */
 	,{3, "RPC"}, {7, "RPCREPL"}	/* 26, 27 */
-	,{3, "UHC"}, {7, "UHCREPL"}	/* 28, 29 */
-	,{3, "UPL"}, {7, "UPLREPL"}	/* 30, 31 */
-	                                /* Total length 32 */
+	,{3, "UDI"}, {6, "UDIREG"}	/* 28, 29 */
+	,{3, "UHC"}, {7, "UHCREPL"}	/* 30, 31 */
+	,{3, "UPL"}, {7, "UPLREPL"}	/* 32, 33 */
+	                                /* Total length 34 */
 };
 /* Index to first entry with given starting letter */
 LITDEF unsigned char zpeek_index[] =
 {
 	 0,  0,  0,  2,  2,  2,  4, 14, 14,	/* a b c d e f g h i */
 	14, 20, 20, 20, 20, 23, 23, 24, 24,	/* j k l m n o p q r */
-	28, 28, 28, 32, 32, 32, 32, 32, 32,	/* s t u v w x y z ~ */
+	28, 28, 28, 34, 34, 34, 34, 34, 34,	/* s t u v w x y z ~ */
 };
 /* Associated fetch code for each entry with flag for whether arguments accepted after code (e.g. CSAREG:MUMPS) */
 LITDEF zpeek_data_typ zpeek_data[] =
@@ -150,6 +152,7 @@ LITDEF zpeek_data_typ zpeek_data[] =
 	,{PO_PEEK, 1}
 	,{PO_RIHREPL, 0}, {PO_RIHREPL, 0}
 	,{PO_RPCREPL, 0}, {PO_RPCREPL, 0}
+	,{PO_UDIREG, 1}, {PO_UDIREG, 1}
 	,{PO_UHCREPL, 0}, {PO_UHCREPL, 0}
 	,{PO_UPLREPL, 0}, {PO_UPLREPL, 0}
 };
@@ -510,6 +513,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_NLREG:
 		case PO_JNLREG:
 		case PO_JBFREG:
+		case PO_UDIREG:
 			/* Uppercase the region name since that is what GDE does when creating them.
 			 * But we want the ability to do $zpeek on statsdb regions (lower-case regions)
 			 * so first check if region as is does exist. If so use that. If not, do uppercase.
@@ -635,6 +639,10 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 				zpeekadr = (PO_JNLREG == mnemonic_opcode) ? (void *)csa->jnl : (void *)csa->jnl->jnl_buff;
 			}
 			break;
+		case PO_UDIREG:		/* r_ptr set from option processing */
+			if (arg_supplied)
+				zpeekadr = FILE_INFO(r_ptr);
+			break;
 		case PO_GLFREPL:	/* This set of opcodes all require the journal pool to be initialized. Verify it */
 		case PO_GSLREPL:
 		case PO_JPCREPL:
@@ -744,6 +752,9 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			break;
 		case PO_JBFREG:
 			maxlen = SIZEOF(jnl_buffer);
+			break;
+		case PO_UDIREG:
+			maxlen = SIZEOF(unix_db_info);
 			break;
 		case PO_GLFREPL:
 			maxlen = SIZEOF(gtmsrc_lcl);
