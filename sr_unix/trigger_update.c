@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1552,28 +1552,35 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 			io_curr_device = io_save_device;
 		} else
 		{
-			char	*ptr;
-			uint4	len;
+			char		*ptr;
+			uint4		len;
+			boolean_t	newline_found;
 
 			assert(memchr(trigjrec->str.addr, '\n', trigjrec->str.len) == trigjrecptr);
-			ptr = trigjrecptr + 1;
-			len = trigjrec->str.addr + trigjrec->str.len - ptr;
-			/* Allow for an optional trailing ">>" or ">>\n" in the xecute string that the user specifies. But remove
-			 * it (if present) before passing to "process_xecute()" as it would try to compile it as valid M code
-			 * and encounter an error.
-			 */
-			if ((XTENDED_STOP_LEN <= len) && !memcmp(ptr + len - XTENDED_STOP_LEN, XTENDED_STOP, XTENDED_STOP_LEN))
+			if (NULL != trigjrecptr)
 			{
-				len -= XTENDED_STOP_LEN;
-			} else if ((XTENDED_STOP_LEN < len)
-				&& ('\n' == *(ptr + len - 1))
-				&& !memcmp(ptr + len - XTENDED_STOP_LEN - 1, XTENDED_STOP, XTENDED_STOP_LEN))
-			{
-				len -= XTENDED_STOP_LEN + 1;
-			}
-			values[XECUTE_SUB] = ptr;
-			value_len[XECUTE_SUB] = len;
-			if ('\n' != ptr[len - 1])
+				ptr = trigjrecptr + 1;
+				len = trigjrec->str.addr + trigjrec->str.len - ptr;
+				/* Allow for an optional trailing ">>" or ">>\n" in the xecute string that the user specifies.
+				 * But remove it (if present) before passing to "process_xecute()" as it would try to compile
+				 * it as valid M code and encounter an error.
+				 */
+				if ((XTENDED_STOP_LEN <= len)
+					&& !memcmp(ptr + len - XTENDED_STOP_LEN, XTENDED_STOP, XTENDED_STOP_LEN))
+				{
+					len -= XTENDED_STOP_LEN;
+				} else if ((XTENDED_STOP_LEN < len)
+					&& ('\n' == *(ptr + len - 1))
+					&& !memcmp(ptr + len - XTENDED_STOP_LEN - 1, XTENDED_STOP, XTENDED_STOP_LEN))
+				{
+					len -= XTENDED_STOP_LEN + 1;
+				}
+				values[XECUTE_SUB] = ptr;
+				value_len[XECUTE_SUB] = len;
+				newline_found = ('\n' == ptr[len - 1]);
+			} else
+				newline_found = FALSE;
+			if (FALSE == newline_found)
 			{
 				util_out_print_gtmio("Error : Multi-line xecute in $ztrigger ITEM must end in newline", FLUSH);
 				trig_stats[STATS_ERROR_TRIGFILE]++;
