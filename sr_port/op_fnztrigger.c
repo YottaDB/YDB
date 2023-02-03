@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -161,17 +164,14 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(FALSE == in_op_fnztrigger); /* $ZTRIGGER() should not nest */
-	DEBUG_ONLY(in_op_fnztrigger = TRUE);
 	/* $ZTRIGGER() is not allowed while already inside the trigger frame */
 	if (0 < gtm_trigger_depth)
-	{
-		DEBUG_ONLY(in_op_fnztrigger = FALSE);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DZTRIGINTRIG, 2, dollar_ztname->len, dollar_ztname->addr);
-	}
 	assert(rts_stringpool.base == stringpool.base); /* because stp management and trigger compilation have a history */
 	MV_FORCE_STR(func);
 	MV_FORCE_STR(arg1);
+	assert(FALSE == in_op_fnztrigger); /* $ZTRIGGER() should not nest */
+	DEBUG_ONLY(in_op_fnztrigger = TRUE);
 	/* MV_FORCE_STR(arg2); optional arg2 not currently used - added so parm easily implemented when added */
 	inparm_len = func->str.len;
 	if ((0 >= inparm_len) || (NAME_ENTRY_SZ < inparm_len) || !ISALPHA_ASCII(func->str.addr[0]))
