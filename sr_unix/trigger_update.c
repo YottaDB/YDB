@@ -1552,9 +1552,9 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 			io_curr_device = io_save_device;
 		} else
 		{
+			boolean_t	newline_found;
 			char		*ptr;
 			uint4		len;
-			boolean_t	newline_found;
 
 			assert(memchr(trigjrec->str.addr, '\n', trigjrec->str.len) == trigjrecptr);
 			if (NULL != trigjrecptr)
@@ -1577,7 +1577,8 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 				}
 				values[XECUTE_SUB] = ptr;
 				value_len[XECUTE_SUB] = len;
-				newline_found = ('\n' == ptr[len - 1]);
+				assert(0 <= len);
+				newline_found = ((0 == len) || ('\n' == ptr[len - 1]));
 			} else
 				newline_found = FALSE;
 			if (FALSE == newline_found)
