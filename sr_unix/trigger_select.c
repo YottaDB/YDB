@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -789,7 +789,11 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 	{
 		sel_ptr = STRTOK_R(save_select_list, ",", &strtok_ptr);
 		assert(0 != select_list_len);	/* or else "dump_all" would have been TRUE and we would have gone to "if" above */
-		assert(NULL != sel_ptr);	/* we are guaranteed this because of the previous assert */
+		if (NULL == sel_ptr)
+		{	/* Possible for example in : $ztrigger("select",",") */
+			INVALID_NAME_ERROR("Invalid global variable name in SELECT list: ", save_select_list, select_status);
+			return select_status;
+		}
 		do
 		{
 			trig_name = ('^' != *sel_ptr);
