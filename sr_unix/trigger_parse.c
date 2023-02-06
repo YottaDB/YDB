@@ -1046,7 +1046,7 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 			}
 		}
 	}
-	if ((0 == len) && (')' != *ptr))
+	if (0 == len)
 	{
 		util_out_print_gtmio("Missing \")\" after global subscript", FLUSH);
 		return FALSE;
