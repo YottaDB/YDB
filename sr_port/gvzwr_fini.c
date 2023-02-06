@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -88,7 +91,7 @@ void gvzwr_fini(zshow_out *out, int pat)
 			}
 		} else	/* Old (naked) reference. Keep previous gv_target reference */
 		{
-			if (gv_currkey->prev == 0)
+			if (IS_ILLEGAL_GVNAKED(gv_currkey))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GVNAKED);
 			gv_currkey->end = gv_currkey->prev;
 			gv_currkey->base[gv_currkey->end] = 0;

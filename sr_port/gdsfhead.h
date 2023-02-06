@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -5102,6 +5102,7 @@ MBSTART {										\
 		memcpy(&gv_currkey->base[PREV], SAVE_KEY_BUF.buf, OLDEND - PREV + 1);	\
 	assert('\0' == gv_currkey->base[OLDEND]);					\
 } MBEND
+#define	IS_ILLEGAL_GVNAKED(KEY)		((NULL == KEY) || (0 == KEY->prev) || (0 == KEY->end))
 
 #define CAN_APPEND_HIDDEN_SUBS(KEY)	(((KEY)->end + 5 <= MAX_KEY_SZ) && ((KEY)->end + 5 <= (KEY)->top))
 #define APPEND_HIDDEN_SUB(KEY)			\

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -135,7 +135,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 	dst->str.len = 0;
 	if (fnname_type == FNNAKGBL)
 	{
-		if (!gv_currkey || gv_currkey->prev == 0)
+		if (IS_ILLEGAL_GVNAKED(gv_currkey))
 		{
 			va_end(var);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GVNAKED);
