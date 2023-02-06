@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1316,7 +1316,7 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
 	int		parse_ret;
 	boolean_t	delim_present, name_present, pieces_present, xecute_present, zdelim_present;
 	char		*ptr;
-	char		*ptr1;
+	char		*ptr1, *ptr1_top;
 	char		*ptr2;
 	int4		rec_num;
 	CLI_ENTRY       *save_cmd_ary;
@@ -1364,21 +1364,23 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
 		return TRIG_SUCCESS;
 	}
 	ptr1 = input;
+	assert(0 <= input_len);
 	len = (uint4)input_len;
-	if ('^' != *ptr1++)
+	ptr1_top = ptr1 + len;
+	if ((ptr1 >= ptr1_top) || ('^' != *ptr1++))
 	{
 		ERROR_MSG_RETURN("Error : Missing global name:\n", input_len, input);
 	}
 	ptr = ptr1;
 	len--;
-	if (('%' != *ptr1) && !ISALPHA_ASCII(*ptr1))
+	if ((ptr1 >= ptr1_top) || (('%' != *ptr1) && !ISALPHA_ASCII(*ptr1)))
 	{
 		ERROR_MSG_RETURN("Error : Invalid global name:\n", input_len, input);
 	}
 	ptr1++;
-	while (ISALNUM_ASCII(*ptr1))
+	while ((ptr1 < ptr1_top) && ISALNUM_ASCII(*ptr1))
 		ptr1++;
-	if (('(' != *ptr1) && !ISSPACE_ASCII(*ptr1))
+	if ((ptr1 > ptr1_top) || (('(' != *ptr1) && !ISSPACE_ASCII(*ptr1)))
 	{
 		ERROR_MSG_RETURN("Error : Invalid global name:\n", input_len, input);
 	}
@@ -1400,7 +1402,7 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
 	/* lookup global to get collation info */
 	len -= (uint4)trigvn_len;
 	ptr2 = ptr1;
-	if ('(' == *ptr1)
+	if ((ptr1 < ptr1_top) && ('(' == *ptr1))
 	{
 		ptr1++;
 		len--;
