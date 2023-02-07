@@ -72,50 +72,51 @@ if [ -z "$USER" ] ; then USER=`id -un` ; fi
 dump_info()
 {
     set +x
-    if [ -n "$gtm_arch" ] ; then echo gtm_arch " : " $gtm_arch ; fi
+    if [ -n "$icu_version" ] ; then echo icu_version " : " $icu_version ; fi
+    if [ -n "$timestamp" ] ; then echo timestamp " : " $timestamp ; fi
+    if [ -n "$ydb_aim" ] ; then echo ydb_aim " : " $ydb_aim ; fi
     if [ -n "$ydb_branch" ] ; then echo ydb_branch " : " $ydb_branch ; fi
-    if [ -n "$gtm_buildtype" ] ; then echo gtm_buildtype " : " $gtm_buildtype ; fi
-    if [ -n "$gtm_configure_in" ] ; then echo gtm_configure_in " : " $gtm_configure_in ; fi
-    if [ -n "$gtm_copyenv" ] ; then echo gtm_copyenv " : " $gtm_copyenv ; fi
-    if [ -n "$gtm_copyexec" ] ; then echo gtm_copyexec " : " $gtm_copyexec ; fi
+    if [ -n "$ydb_change_removeipc" ] ; then echo ydb_change_removeipc " : " $ydb_change_removeipc ; fi
     if [ -n "$ydb_debug" ] ; then echo ydb_debug " : " $ydb_debug ; fi
     if [ -n "$ydb_deprecated" ] ; then echo ydb_deprecated " : " $ydb_deprecated ; fi
-    if [ -n "$ydb_dist" ] ; then echo ydb_dist " : " $ydb_dist ; fi
     if [ -n "$ydb_distrib" ] ; then echo ydb_distrib " : " $ydb_distrib ; fi
-    if [ -n "$gtm_dryrun" ] ; then echo gtm_dryrun " : " $gtm_dryrun ; fi
+    if [ -n "$ydb_dist" ] ; then echo ydb_dist " : " $ydb_dist ; fi
     if [ -n "$ydb_encplugin" ] ; then echo ydb_encplugin " : " $ydb_encplugin ; fi
     if [ -n "$ydb_filename" ] ; then echo ydb_filename " : " $ydb_filename ; fi
     if [ -n "$ydb_flavor" ] ; then echo ydb_flavor " : " $ydb_flavor ; fi
     if [ -n "$ydb_force_install" ] ; then echo ydb_force_install " : " $ydb_force_install ; fi
     if [ -n "$ydb_from_source" ] ; then echo ydb_from_source " : " $ydb_from_source ; fi
+    if [ -n "$ydb_gui" ] ; then echo ydb_gui " : " $ydb_gui ; fi
+    if [ -n "$ydb_installdir" ] ; then echo ydb_installdir " : " $ydb_installdir ; fi
+    if [ -n "$ydb_octo" ] ; then echo ydb_octo " : " $ydb_octo ; fi
+    if [ -n "$ydb_pkgconfig" ] ; then echo ydb_pkgconfig " : " $ydb_pkgconfig ; fi
+    if [ -n "$ydb_posix" ] ; then echo ydb_posix " : " $ydb_posix ; fi
+    if [ -n "$ydb_routines" ] ; then echo ydb_routines " : " $ydb_routines ; fi
+    if [ -n "$ydb_version" ] ; then echo ydb_version " : " $ydb_version ; fi
+    if [ -n "$ydb_zlib" ] ; then echo ydb_zlib " : " $ydb_zlib ; fi
+    if [ -n "$gtm_arch" ] ; then echo gtm_arch " : " $gtm_arch ; fi
+    if [ -n "$gtm_buildtype" ] ; then echo gtm_buildtype " : " $gtm_buildtype ; fi
+    if [ -n "$gtm_configure_in" ] ; then echo gtm_configure_in " : " $gtm_configure_in ; fi
+    if [ -n "$gtm_copyenv" ] ; then echo gtm_copyenv " : " $gtm_copyenv ; fi
+    if [ -n "$gtm_copyexec" ] ; then echo gtm_copyexec " : " $gtm_copyexec ; fi
+    if [ -n "$gtm_dryrun" ] ; then echo gtm_dryrun " : " $gtm_dryrun ; fi
     if [ -n "$gtm_ftp_dirname" ] ; then echo gtm_ftp_dirname " : " $gtm_ftp_dirname ; fi
-    if [ -n "$gtm_group" ] ; then echo gtm_group " : " $gtm_group ; fi
     if [ -n "$gtm_group_already" ] ; then echo gtm_group_already " : " $gtm_group_already ; fi
     if [ -n "$gtm_group_restriction" ] ; then echo gtm_group_restriction " : " $gtm_group_restriction ; fi
+    if [ -n "$gtm_group" ] ; then echo gtm_group " : " $gtm_group ; fi
+    if [ -n "$gtm_gtm" ] ; then echo gtm_gtm " : " $gtm_gtm ; fi
     if [ -n "$gtm_hostos" ] ; then echo gtm_hostos " : " $gtm_hostos ; fi
-    if [ -n "$icu_version" ] ; then echo icu_version " : " $icu_version ; fi
     if [ -n "$gtm_install_flavor" ] ; then echo gtm_install_flavor " : " $gtm_install_flavor ; fi
-    if [ -n "$ydb_installdir" ] ; then echo ydb_installdir " : " $ydb_installdir ; fi
     if [ -n "$gtm_keep_obj" ] ; then echo gtm_keep_obj " : " $gtm_keep_obj ; fi
     if [ -n "$gtm_lcase_utils" ] ; then echo gtm_lcase_utils " : " $gtm_lcase_utils ; fi
     if [ -n "$gtm_linkenv" ] ; then echo gtm_linkenv " : " $gtm_linkenv ; fi
     if [ -n "$gtm_linkexec" ] ; then echo gtm_linkexec " : " $gtm_linkexec ; fi
-    if [ -n "$ydb_pkgconfig" ] ; then echo ydb_pkgconfig " : " $ydb_pkgconfig ; fi
-    if [ -n "$ydb_octo" ] ; then echo ydb_octo " : " $ydb_octo ; fi
     if [ -n "$gtm_overwrite_existing" ] ; then echo gtm_overwrite_existing " : " $gtm_overwrite_existing ; fi
-    if [ -n "$ydb_posix" ] ; then echo ydb_posix " : " $ydb_posix ; fi
-    if [ -n "$ydb_aim" ] ; then echo ydb_aim " : " $ydb_aim ; fi
     if [ -n "$gtm_prompt_for_group" ] ; then echo gtm_prompt_for_group " : " $gtm_prompt_for_group ; fi
     if [ -n "$gtm_sf_dirname" ] ; then echo gtm_sf_dirname " : " $gtm_sf_dirname ; fi
     if [ -n "$gtm_tmpdir" ] ; then echo gtm_tmpdir " : " $gtm_tmpdir ; fi
     if [ -n "$gtm_user" ] ; then echo gtm_user " : " $gtm_user ; fi
     if [ -n "$gtm_verbose" ] ; then echo gtm_verbose " : " $gtm_verbose ; fi
-    if [ -n "$ydb_version" ] ; then echo ydb_version " : " $ydb_version ; fi
-    if [ -n "$ydb_zlib" ] ; then echo ydb_zlib " : " $ydb_zlib ; fi
-    if [ -n "$gtm_gtm" ] ; then echo gtm_gtm " : " $gtm_gtm ; fi
-    if [ -n "$ydb_routines" ] ; then echo ydb_routines " : " $ydb_routines ; fi
-    if [ -n "$timestamp" ] ; then echo timestamp " : " $timestamp ; fi
-    if [ -n "$ydb_change_removeipc" ] ; then echo ydb_change_removeipc " : " $ydb_change_removeipc ; fi
     if [ "Y" = "$ydb_debug" ] ; then set -x ; fi
 }
 
@@ -144,7 +145,8 @@ help_exit()
     echo "--from-source repo       -> builds and installs YottaDB from a git repo; defaults to building the latest master from gitlab if not specified; check README for list of prerequisites to build from source"
     echo "--group group            -> group that should own the YottaDB installation"
     echo "--group-restriction      -> limit execution to a group; defaults to unlimited if not specified"
-    echo "--gtm                    -> Install GT.M instead of YottaDB"
+    echo "--gtm                    -> install GT.M instead of YottaDB"
+    echo "--gui                    -> download and install the YottaDB GUI"
     echo "--help                   -> print this usage information"
     echo "--installdir dirname     -> directory where YottaDB is to be installed; defaults to /usr/local/lib/yottadb/version"
     echo "--keep-obj               -> keep .o files of M routines (normally deleted on platforms with YottaDB support for routines in shared libraries)"
@@ -372,6 +374,26 @@ install_plugins()
 		fi
 	fi
 
+	if [ "Y" = $ydb_gui ] ; then
+		echo "Now installing YDBGUI"
+		cd $tmpdir	# Get back to top level temporary directory as the current directory
+		export ydb_dist=${ydb_installdir}
+		if git clone https://gitlab.com/YottaDB/UI/YDBGUI.git YDBGUI-master; then
+			cd YDBGUI-master
+			mkdir build && cd build
+			if cmake .. && make && make install; then
+				cd ../..
+				rm -R YDBGUI-master
+			else
+				echo "YDBGUI build failed. The build directory ($PWD/YDBGUI-master) has been savd."
+				remove_tmpdir=0
+			fi
+		else
+		    echo "Unable to download YDBGUI. Your internet connection and/or the gitlab servers may be down. Please try again later."
+		    remove_tmpdir=0
+		fi
+	fi
+
 	if [ "Y" = $ydb_octo ] ; then
 		echo "Now installing YDBOcto"
 		cd $tmpdir	# Get back to top level temporary directory as the current directory
@@ -403,6 +425,7 @@ if [ -n "$ydb_keep_obj" ] ; then gtm_keep_obj="$ydb_keep_obj" ; fi
 if [ -n "$ydb_dryrun" ] ; then gtm_dryrun="$ydb_dryrun" ; fi
 if [ -n "$ydb_group_restriction" ] ; then gtm_group_restriction="$ydb_group_restriction" ; fi
 if [ -n "$ydb_gtm" ] ; then gtm_gtm="$ydb_gtm" ; fi
+if [ -z "$ydb_gui" ] ; then ydb_gui="N" ; fi
 if [ -n "$ydb_lcase_utils" ] ; then gtm_lcase_utils="$ydb_lcase_utils" ; fi
 if [ -n "$ydb_overwrite_existing" ] ; then gtm_overwrite_existing="$ydb_overwrite_existing" ; fi
 if [ -n "$ydb_prompt_for_group" ] ; then gtm_prompt_for_group="$ydb_prompt_for_group" ; fi
@@ -501,6 +524,7 @@ while [ $# -gt 0 ] ; do
                 fi
             fi
             shift ;;
+	--gui) ydb_gui="Y" ; shift ;;
         --help) help_exit ;;
         --installdir*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then ydb_installdir=$tmp
@@ -699,6 +723,7 @@ if [ -n "$ydb_from_source" ] ; then
 	if [ -n "$gtm_linkenv" ] ; then install_options="${install_options} --linkenv ${gtm_linkenv}" ; fi
 	if [ -n "$gtm_linkexec" ] ; then install_options="${install_options} --linkexec ${gtm_linkexec}" ; fi
 	if [ "N" = "$ydb_deprecated" ] ; then install_options="${install_options} --nodeprecated" ; fi
+	if [ "Y" = "$ydb_gui" ] ; then install_options="${install_options} --gui" ; fi
 	if [ "Y" = "$ydb_octo" ] ; then
 		if [ -n "$octo_cmake" ] ; then
 			install_options="${install_options} --octo ${octo_cmake}"
@@ -790,6 +815,9 @@ if [ "Y" = "$ydb_plugins_only" ]; then
 	if [ "Y" != "$gtm_overwrite_existing" ] ; then
 		if [ "Y" = $ydb_encplugin ] && [ -e $ydb_installdir/plugin/libgtmcrypt.so ] ; then
 			echo "YDBEncrypt already installed and --overwrite-existing not specified. Exiting." ; err_exit
+		fi
+		if [ "Y" = $ydb_gui ] && [ -e $ydb_installdir/plugin/o/_ydbgui.so ] ; then
+			echo "YDBGUI already installed and --overwrite-existing not specified. Exiting." ; err_exit
 		fi
 		if [ "Y" = $ydb_posix ] && [ -e $ydb_installdir/plugin/libydbposix.so ] ; then
 			if [ "Y" = $ydb_octo ] ; then
