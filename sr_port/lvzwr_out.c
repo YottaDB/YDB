@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,26 +75,17 @@ void lvzwr_out_targkey(mstr *one);
 void lvzwr_out_targkey(mstr *one)
 {
 	int	n, nsubs;
-#	ifdef DEBUG
-	int4	length;
-#	endif
 
 	zshow_output(zwr_output, lvzwrite_block->curr_name);
 	nsubs = lvzwrite_block->curr_subsc;
 	if (nsubs)
 	{
-		DEBUG_ONLY(length = 0;)
 		*one->addr = '(';
 		zshow_output(zwr_output, one);
 		for (n = 0 ; ; )
-		{	/* the following check protects against an apparent bug in the system service managing (at least) terminal
-			 * output where it gets overwhelmed and hangs in __write_nocancel (cat does too, so it's not GT.M); because
-			 * zwrite does a subscript at a time, this should not be necessary, however, the check is consistent with
-			 * appropriate restrictions in op_putindx, op_fnname and op_fnquery
-			 */
+		{
 			DEBUG_ONLY(MV_FORCE_STR(((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual);)
-			assert(MAX_STRLEN	/* WARNING assignment below; check in op_putindx should assure this */
-				>= (length += ((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual->str.len));
+			assert(MAX_STRLEN >= ((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual->str.len);
 			mval_write(zwr_output, ((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual, FALSE);
 			if (++n < nsubs)
 			{
