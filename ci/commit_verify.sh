@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #################################################################
 #								#
-# Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -132,23 +132,43 @@ do
 done
 
 # First check if there is a non-zero list of commits to verify. If the commit list is empty, skip this verification step.
+exit_status=0
 if [ -n "$commit_list" ]; then
 	# Get file list from all commits at once, rather than per-commit
 	filelist="$(git show --pretty="" --name-only $commit_list | sort -u)"
 	missing_files=""
+	copyright_only=""
 	for file in $filelist; do
+		if [[ ! -e $file ]]; then
+			continue
+		fi
+		changes=$(git diff upstream_repo/$target_branch..HEAD "$file")
+		if [[ "" != "$changes" ]]; then
+			changes=$(echo -n "$changes" | grep -v "+++" | grep "^+" || true)
+			num_changes=$(echo "$changes" | wc -l)
+			num_copyright_changes=$(echo "$changes" | grep -c 'Copyright (c)' || true)
+			if [[ $num_changes -eq $num_copyright_changes ]]; then
+				copyright_only="$copyright_only $file"
+			fi
+		fi
 		if $needs_copyright $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
 			# Print these out only at the end so they're all shown at once
 			missing_files="$missing_files $file"
 		fi
 	done
-	if [ -n "$missing_files" ]; then
-		echo "  --> Error: some files are missing a YottaDB Copyright notice and/or current year $curyear"
-		# Don't give duplicate errors for the same file
-		for file in $(echo $missing_files | tr ' ' '\n' | sort -u); do
+	if [ -n "$copyright_only" ]; then
+		echo "  --> Error: some files contain only copyright changes"
+		for file in $copyright_only; do
 			echo "	$file"
 		done
-		exit 1
+		exit_status=1
+	fi
+	if [ -n "$missing_files" ]; then
+		echo "  --> Error: some files are missing a YottaDB Copyright notice and/or current year $curyear"
+		for file in $missing_files; do
+			echo "	$file"
+		done
+		exit_status=1
 	fi
 fi
-
+exit $exit_status
