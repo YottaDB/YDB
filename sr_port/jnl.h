@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -812,9 +812,9 @@ typedef struct
 					  */
 #define	JS_MAX_MASK		(1 << 8) /* max of 8 bits we have for mask */
 
-/* Note that even though mumps_node, ztworm_str, lgtrig_str, align_str are members defined as type "jnl_string" below,
+/* Note that even though mumps_node, ztworm_str, lgtrig_str are members defined as type "jnl_string" below,
  * the "nodeflags" field is initialized to non-zero values ONLY in the case of the mumps_node member.
- * For ztworm_str, lgtrig_str and align_str, nodeflags is guaranteed to be zero so the 24-bit "length" member
+ * For ztworm_str and lgtrig_str, nodeflags is guaranteed to be zero so the 24-bit "length" member
  * can even be used as a 32-bit length (if necessary) without issues. This is why nodeflags is
  * defined in a different order (BEFORE or AFTER the "length" member) based on big-endian or little-endian.
  */

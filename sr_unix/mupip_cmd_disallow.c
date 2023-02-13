@@ -3,7 +3,7 @@
  * Copyright (c) 2002-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -469,6 +469,9 @@ boolean_t cli_disallow_mupip_replic_source(void)
 	/* TIMEOUT is supported only with SHUTDOWN qualifier */
 	disallow_return_value = (!d_c_cli_present("SHUTDOWN") && d_c_cli_present("TIMEOUT"));
 	CLI_DIS_CHECK_N_RESET;
+	/* ZEROBACKLOG is supported only with SHUTDOWN qualifier */
+	disallow_return_value = (!d_c_cli_present("SHUTDOWN") && d_c_cli_present("ZEROBACKLOG"));
+	CLI_DIS_CHECK_N_RESET;
 	/* One and only one of PASSIVE or SECONDARY must be specified with START */
 	disallow_return_value = (d_c_cli_present("START") && d_c_cli_present("PASSIVE") && d_c_cli_present("SECONDARY"));
 	CLI_DIS_CHECK_N_RESET;
@@ -479,6 +482,9 @@ boolean_t cli_disallow_mupip_replic_source(void)
 	CLI_DIS_CHECK_N_RESET;
 	/* SECONDARY is a mandatory qualifier with ACTIVATE */
 	disallow_return_value = (d_c_cli_present("ACTIVATE") && !d_c_cli_present("SECONDARY"));
+	CLI_DIS_CHECK_N_RESET;
+	/* SECONDARY is a mandatory qualifier with TRIGUPDATE */
+	disallow_return_value = (d_c_cli_present("TRIGUPDATE") && !d_c_cli_present("SECONDARY"));
 	CLI_DIS_CHECK_N_RESET;
 	/* One of LOG or LOG_INTERVAL needs to be specified with CHANGELOG */
 	disallow_return_value = (d_c_cli_present("CHANGELOG") && !d_c_cli_present("LOG") && !d_c_cli_present("LOG_INTERVAL"));

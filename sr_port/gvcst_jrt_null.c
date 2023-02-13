@@ -2,7 +2,7 @@
  *								*
  * Copyright 2012 Fidelity Information Services, Inc		*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,7 @@ GBLREF	uint4			dollar_tlevel;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	unsigned int		t_tries;
+GBLREF	gv_key			*gv_currkey;
 #endif
 
 error_def(ERR_JRTNULLFAIL);
@@ -64,6 +65,12 @@ void	gvcst_jrt_null(boolean_t salvaged)
 	rec->bitmask.salvaged = salvaged;
 	rec->bitmask.filler = 0;
 	jgbl.cumul_jnl_rec_len = NULL_RECLEN;
+	gv_target = NULL;	/* Since a NULL journal record corresponds to a seqno/transaction with no global references,
+				 * clear "gv_target" as otherwise it would be pointing to a leftover value from the previous
+				 * seqno/transaction and could cause "gvcst_redo_root_search()" to be incorrectly called from
+				 * "t_retry()" in case of "cdb_sc_gvtrootmod2" (due to an online rollback on receiver side).
+				 */
+	DEBUG_ONLY(gv_currkey->base[0] = '\0';)	/* to keep gv_target/gv_currkey in sync */
 	/* The rest of the initialization is taken care of by jnl_write_logical (invoked in t_end below) */
 	DEBUG_ONLY(jgbl.cumul_index = 1;)
 	for (;;)

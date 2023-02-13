@@ -236,7 +236,6 @@ region_freeze.c:warning: Value stored to 'jnl_switch_done' is never read [clang-
 region_freeze.c:warning: Value stored to 'jnl_switch_done' is never read [clang-analyzer-deadcode.DeadStores]
 repl_comm.c:warning: Although the value stored to 'status' is used in the enclosing expression, the value is never actually read from 'status' [clang-analyzer-deadcode.DeadStores]
 repl_comm.c:warning: Value stored to 'save_errno' is never read [clang-analyzer-deadcode.DeadStores]
-repl_filter.c:warning: Value stored to 'prefix' is never read [clang-analyzer-deadcode.DeadStores]
 repl_sort_tr_buff.c:warning: Although the value stored to 'cur_rec_idx' is used in the enclosing expression, the value is never actually read from 'cur_rec_idx' [clang-analyzer-deadcode.DeadStores]
 restrict.c:warning: Value stored to 'fields' is never read [clang-analyzer-deadcode.DeadStores]
 rtnobj.c:warning: Value stored to 'max_free_index' is never read [clang-analyzer-deadcode.DeadStores]

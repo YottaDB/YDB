@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,6 +64,8 @@
 #include "trigger.h"
 #endif
 #include "gvt_inline.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
 
 /* Do not apply null subscript transformations to LGTRIG and ZTWORM type records */
 #define NULLSUBSC_TRANSFORM_IF_NEEDED(RECTYPE, PTR)					\
@@ -197,9 +199,10 @@
 	assert(IS_VALID_STRM_SEQNO(STRM_SEQNO));				\
 	*(seq_num *)(CB) = STRM_SEQNO;						\
 	CB += SIZEOF(seq_num);							\
-	/* Set "salvaged" bit */						\
+	/* Set "salvaged" bitfield */						\
 	((struct_jrec_null *)PREFIX)->bitmask.salvaged = FALSE;			\
-	/* Skip the 31-bit filler */						\
+	/* Initialize "filler" bitfield */					\
+	((struct_jrec_null *)PREFIX)->bitmask.filler = 0;			\
 	CB += SIZEOF(uint4);							\
 	/* Initialize the suffix */						\
 	suffix = (jrec_suffix *)(CB);						\
@@ -218,6 +221,14 @@
 		trigupd_type = HASHT_JREC;				\
 	else if ((keystr->nodeflags & JS_NOT_REPLICATED_MASK))		\
 		trigupd_type = NON_REPLIC_JREC_TRIG;			\
+}
+
+#define	CLEAR_JS_NOT_REPLICATED_MASK_BIT_IN_NODEFLAGS(MUMPS_NODE_PTR)	\
+{									\
+	jnl_string	*keystr;					\
+									\
+	keystr = (jnl_string *)(mumps_node_ptr);			\
+	keystr->nodeflags &= ~JS_NOT_REPLICATED_MASK;			\
 }
 
 #define MORE_TO_TRANSFER -99
@@ -312,6 +323,7 @@ GBLREF	FILE			*gtmrecv_log_fp;
 GBLREF	int			gtmsource_filter;
 GBLREF	int			gtmrecv_filter;
 GBLREF	int			ydb_repl_filter_timeout;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 LITREF	char			*trigger_subs[];
 
@@ -1140,7 +1152,10 @@ void repl_check_jnlver_compat(boolean_t same_endianness)
  */
 int jnl_v22TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz)
 {
-	unsigned char		*jb, *cb, *cstart, *jstart, *ptr, *mumps_node_ptr;
+	unsigned char		*jb, *cb, *ptr, *mumps_node_ptr;
+#	ifdef DEBUG
+	unsigned char		*cstart, *jstart;
+#	endif
 	enum jnl_record_type	rectype;
 	int			status, reclen, conv_reclen;
 	uint4			jlen, tcom_num = 0, tupd_num = 0;
@@ -1159,8 +1174,8 @@ int jnl_v22TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 		assert(0 == ((UINTPTR_T)jb % SIZEOF(uint4)));
 		prefix = (jrec_prefix *)jb;
 		rectype = (enum	jnl_record_type)prefix->jrec_type;
-		cstart = cb;
-		jstart = jb;
+		DEBUG_ONLY(cstart = cb);
+		DEBUG_ONLY(jstart = jb);
 		reclen = prefix->forwptr;
 		BREAK_IF_BADREC(prefix, status); /* check if we encountered a bad record */
 		BREAK_IF_INCMPLREC(reclen, jlen, status); /* check if this record is incomplete */
@@ -1255,10 +1270,18 @@ int jnl_v22TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
  *	Note that V22 did not support LGTRIG records so issue an error.
  * (d) If remote side does support triggers, then skip LGTRIG journal records as they are not known to the older journal format.
  * (e) If the entire transaction consists of skipped records, send a NULL record instead.
+ *
+ * Note: jnl_v44TOv44 and jnl_v44TOv24 honor "-trigupdate" but jnl_v44TOv22 does not as the receiver is pre-V6.2-000
+ * and therefore does not support LGTRIG records anyways so one would see a %YDB-E-REPLNOHASHTREC error in the source
+ * server while trying to replicate trigger definitions and so no need to worry about replicating the updates that happen
+ * inside trigger logic as part of an originating update.
  */
 int jnl_v44TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz)
 {
-	unsigned char		*jb, *cb, *cstart, *jstart, *ptr, *mumps_node_ptr;
+	unsigned char		*jb, *cb, *ptr, *mumps_node_ptr;
+#	ifdef DEBUG
+	unsigned char		*cstart, *jstart;
+#	endif
 	enum jnl_record_type	rectype;
 	int			status, reclen, conv_reclen;
 	uint4			jlen, tcom_num = 0, tupd_num = 0;
@@ -1273,31 +1296,31 @@ int jnl_v44TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	cb = conv_buff;
 	status = SS_NORMAL;
 	jlen = *jnl_len;
-	this_upd_seqno = seq_num_zero;
+	this_upd_seqno = 0;
+	this_strm_seqno = 0;	/* needed to avoid false [-Wuninitialized] warning from gcc 12.1 */
 	assert(is_src_server);
 	/* Since this filter function is invoked only on the source side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the REMOTE side supports triggers.
 	 */
 	receiver_supports_triggers = REMOTE_TRIGGER_SUPPORT;
 	hasht_seen = FALSE;
-	this_strm_seqno = 0;	/* needed to avoid false [-Wuninitialized] warning from gcc 12.1 */
 	while (JREC_PREFIX_SIZE <= jlen)
 	{
 		assert(0 == ((UINTPTR_T)jb % SIZEOF(uint4)));
 		prefix = (jrec_prefix *)jb;
 		rectype = (enum	jnl_record_type)prefix->jrec_type;
-		cstart = cb;
-		jstart = jb;
+		DEBUG_ONLY(cstart = cb);
+		DEBUG_ONLY(jstart = jb);
 		reclen = prefix->forwptr;
 		BREAK_IF_BADREC(prefix, status); /* check if we encountered a bad record */
 		BREAK_IF_INCMPLREC(reclen, jlen, status); /* check if this record is incomplete */
-		if (this_upd_seqno == seq_num_zero)
+		assert(IS_REPLICATED(rectype));
+		assert(JRT_MAX_V44 >= rectype);
+		if (0 == this_upd_seqno)
 		{
 			this_upd_seqno = GET_JNL_SEQNO(jb);
 			this_strm_seqno = GET_STRM_SEQNO(jb);
 		}
-		assert(IS_REPLICATED(rectype));
-		assert(JRT_MAX_V44 >= rectype);
 		if (IS_TUPD(rectype))
 			promote_uupd_to_tupd = FALSE;
 		if (IS_LGTRIG(rectype) || (!receiver_supports_triggers && (IS_ZTRIG(rectype) || IS_ZTWORM(rectype))))
@@ -1445,7 +1468,10 @@ int jnl_v44TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
  */
 int jnl_v24TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz)
 {
-	unsigned char		*jb, *cb, *cstart, *jstart, *ptr, *mumps_node_ptr;
+	unsigned char		*jb, *cb, *ptr, *mumps_node_ptr;
+#	ifdef DEBUG
+	unsigned char		*cstart, *jstart;
+#	endif
 	enum jnl_record_type	rectype;
 	int			status, reclen, conv_reclen;
 	uint4			jlen, tcom_num = 0, tupd_num = 0;
@@ -1464,8 +1490,8 @@ int jnl_v24TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 		assert(0 == ((UINTPTR_T)jb % SIZEOF(uint4)));
 		prefix = (jrec_prefix *)jb;
 		rectype = (enum	jnl_record_type)prefix->jrec_type;
-		cstart = cb;
-		jstart = jb;
+		DEBUG_ONLY(cstart = cb);
+		DEBUG_ONLY(jstart = jb);
 		reclen = prefix->forwptr;
 		BREAK_IF_BADREC(prefix, status); /* check if we encountered a bad record */
 		BREAK_IF_INCMPLREC(reclen, jlen, status); /* check if this record is incomplete */
@@ -1552,94 +1578,128 @@ int jnl_v24TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 /* Convert a transaction from jnl format V44 (r1.24 onwards) to V24 (V6.2-000 to V6.3-005 AND r1.00 to r1.22)
  * (a) If null-subscript collation is different between the primary and the secondary
  * (b) Filter out jnl records that should not be replicated (i.e. updates done inside a trigger or ^#t records).
- * (c) If no conversion occurred (out-of-design), EREPL_INTLFILTER_NOCONVERT return error code.
+ *     unless this is the source server and -trigupdate was specified in which case replicate the original update
+ *     as well as the updates inside the trigger but skip replicating trigger definitions.
+ * (c) If the entire transaction consists of skipped records, send a NULL record instead.
  *
  * Note: V24 receiver server already knows to expect only LGTRIG record (and not ^#t records) so no special logic needed to
  *	filter/skip ^#t records like "jnl_v44TOv22" has.
  */
 int jnl_v44TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz)
 {
-	unsigned char		*jb, *cb, *cstart, *jstart, *ptr, *mumps_node_ptr;
+	unsigned char		*jb, *cb, *ptr, *mumps_node_ptr;
+#	ifdef DEBUG
+	unsigned char		*cstart, *jstart;
+#	endif
 	enum jnl_record_type	rectype;
 	int			status, reclen, conv_reclen;
 	uint4			jlen, tcom_num = 0, tupd_num = 0;
 	jrec_prefix 		*prefix;
 	uint4 			trigupd_type = NO_TRIG_JREC;
-	boolean_t		promote_uupd_to_tupd;
+	boolean_t		promote_uupd_to_tupd, is_trigupdate;
+	seq_num			this_upd_seqno, this_strm_seqno;
 
 	jb = jnl_buff;
 	cb = conv_buff;
 	status = SS_NORMAL;
 	jlen = *jnl_len;
+	this_upd_seqno = 0;
+	this_strm_seqno = 0;	/* needed to avoid false [-Wuninitialized] warning from gcc 12.1 */
 	assert(is_src_server);
+	is_trigupdate = jnlpool->gtmsource_local->trigupdate;
 	assert(REMOTE_TRIGGER_SUPPORT);	/* A lot of the below code has been simplified because of this assumption */
 	while (JREC_PREFIX_SIZE <= jlen)
 	{
 		assert(0 == ((UINTPTR_T)jb % SIZEOF(uint4)));
 		prefix = (jrec_prefix *)jb;
 		rectype = (enum	jnl_record_type)prefix->jrec_type;
-		cstart = cb;
-		jstart = jb;
+		DEBUG_ONLY(cstart = cb);
+		DEBUG_ONLY(jstart = jb);
 		reclen = prefix->forwptr;
 		BREAK_IF_BADREC(prefix, status); /* check if we encountered a bad record */
 		BREAK_IF_INCMPLREC(reclen, jlen, status); /* check if this record is incomplete */
 		assert(IS_REPLICATED(rectype));
 		assert(JRT_MAX_V44 >= rectype);
+		if (0 == this_upd_seqno)
+		{
+			this_upd_seqno = GET_JNL_SEQNO(jb);
+			this_strm_seqno = GET_STRM_SEQNO(jb);
+		}
 		if (IS_TUPD(rectype))
 			promote_uupd_to_tupd = FALSE;
 		conv_reclen = prefix->forwptr ;
 		BREAK_IF_NOSPC((cb - conv_buff + conv_reclen), conv_bufsiz, status);	/* check for available space */
-		if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
-		{
-			assert((jb == jstart) && (cb == cstart));
-			GET_JREC_UPD_TYPE((jb + FIXED_UPD_RECLEN), trigupd_type);
-			if ((HASHT_JREC == trigupd_type) || (NON_REPLIC_JREC_TRIG == trigupd_type))
-			{	/* Journal record has a #t global or is a non-#t global but that should not be replicated
-				 * (i.e. update done inside of a trigger). Filter both out of the transaction.
-				 * However, if this record is a TUPD record, note it down so we promote next UUPD record to a TUPD.
-				 */
-				if (IS_TUPD(rectype))
-					promote_uupd_to_tupd = TRUE;
-				assert((cb == cstart) && (jb == jstart));
-				jb = jb + reclen;
-				jlen -= reclen;
-				continue;
-			}
-			memcpy(cb, jb, conv_reclen);
-			mumps_node_ptr = cb + FIXED_UPD_RECLEN;
-			NULLSUBSC_TRANSFORM_IF_NEEDED(rectype, mumps_node_ptr);
+		if (is_trigupdate && (IS_LGTRIG(rectype) || IS_ZTRIG(rectype) || IS_ZTWORM(rectype)))
+		{	/* Source server was started with "-trigupdate". In that case, do not replicate any
+			 * LGTRIG (trigger definitions) or ZTRIG (ZTRIGGER command) or $ZTWORMHOLE jnl records
+			 * as trigger invocations are not desired on the receiver side (the user wants all journal records,
+			 * even those inside trigger invocations, replicated and played as is).
+			 */
 			if (IS_TUPD(rectype))
-				tupd_num++;
-			else if (IS_UUPD(rectype) && promote_uupd_to_tupd)
-			{
-				((jrec_prefix *)(cb))->jrec_type--;
-				assert(IS_TUPD(((jrec_prefix *)(cb))->jrec_type));
-				promote_uupd_to_tupd = FALSE;
-				tupd_num++;
-			}
-		} else if (JRT_TCOM == rectype)
-		{
-			assert((jb == jstart) && (cb == cstart));
-			tcom_num++;
-			if (tcom_num > tupd_num)
-			{	/* This is a case where all updates to one region in the TP transaction were
-				 * inside a trigger which means that region did not count towards tupd_num
-				 * in which case we should skip tcom_num too for that region.
-				 */
-				jb = jb + reclen;
-				jlen -= reclen;
-				continue;
-			}
-			memcpy(cb, jb, conv_reclen);
-			((struct_jrec_tcom *)(cb))->num_participants = tupd_num;
+				promote_uupd_to_tupd = TRUE;
 		} else
 		{
-			assert(JRT_NULL == rectype);
-			assert((cb == cstart) && (jb == jstart));
-			memcpy(cb, jb, conv_reclen);
-			/* "salvaged" bit in JRT_NULL record in V44 is part of "filler" in V24 format so send it as is */
+			if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
+			{
+				assert((jb == jstart) && (cb == cstart));
+				mumps_node_ptr = jb + FIXED_UPD_RECLEN;
+				/* If -trigupdate is specified, clear the JS_NOT_REPLICATED bit in the nodeflags if it is set.
+				 * Do this before the GET_JREC_UPD_TYPE macro call that way we ensure it will never set
+				 * "trigupd_type" to NON_REPLIC_JREC_TRIG in that case. That will ensure this journal record
+				 * gets replicated across no matter what.
+				 */
+				if (is_trigupdate)
+					CLEAR_JS_NOT_REPLICATED_MASK_BIT_IN_NODEFLAGS(mumps_node_ptr);
+				GET_JREC_UPD_TYPE((jb + FIXED_UPD_RECLEN), trigupd_type);
+				if ((HASHT_JREC == trigupd_type) || (NON_REPLIC_JREC_TRIG == trigupd_type))
+				{	/* Journal record has a #t global or is a non-#t global but that should not be replicated
+					 * (i.e. update done inside of a trigger). Filter both out of the transaction.
+					 * However, if this record is a TUPD record, note it down so we promote next UUPD record
+					 * to a TUPD.
+					 */
+					if (IS_TUPD(rectype))
+						promote_uupd_to_tupd = TRUE;
+					assert((cb == cstart) && (jb == jstart));
+					jb = jb + reclen;
+					jlen -= reclen;
+					continue;
+				}
+				memcpy(cb, jb, conv_reclen);
+				mumps_node_ptr = cb + FIXED_UPD_RECLEN;
+				NULLSUBSC_TRANSFORM_IF_NEEDED(rectype, mumps_node_ptr);
+				if (IS_TUPD(rectype))
+					tupd_num++;
+				else if (IS_UUPD(rectype) && promote_uupd_to_tupd)
+				{
+					((jrec_prefix *)(cb))->jrec_type--;
+					assert(IS_TUPD(((jrec_prefix *)(cb))->jrec_type));
+					promote_uupd_to_tupd = FALSE;
+					tupd_num++;
+				}
+			} else if (JRT_TCOM == rectype)
+			{
+				assert((jb == jstart) && (cb == cstart));
+				tcom_num++;
+				if (tcom_num > tupd_num)
+				{	/* This is a case where all updates to one region in the TP transaction were
+					 * inside a trigger which means that region did not count towards tupd_num
+					 * in which case we should skip tcom_num too for that region.
+					 */
+					jb = jb + reclen;
+					jlen -= reclen;
+					continue;
+				}
+				memcpy(cb, jb, conv_reclen);
+				((struct_jrec_tcom *)(cb))->num_participants = tupd_num;
+			} else
+			{
+				assert(JRT_NULL == rectype);
+				assert((cb == cstart) && (jb == jstart));
+				memcpy(cb, jb, conv_reclen);
+				/* "salvaged" bit in JRT_NULL record in V44 is part of "filler" in V24 format so send it as is */
+			}
+			cb = cb + conv_reclen;
 		}
-		cb = cb + conv_reclen;
 		jb = jb + reclen;
 		jlen -= reclen;
 	}
@@ -1648,10 +1708,17 @@ int jnl_v44TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	if (-1 != status)
 	{
 		if (cb == conv_buff)
-		{	/* No conversion happened. Currently this is NOT possible */
-			assert(FALSE);
-			repl_errno = EREPL_INTLFILTER_NOCONVERT;
-			status = -1;
+		{	/* No conversion happened. Currently this is possible ONLY if "-trigupdate" was specified and
+			 * this transaction only contains updates that corresponded to LGTRIG/ZTRIG/ZTWORMHOLE journal
+			 * records (which are not replicated in the "-trigupdate" case). In that case, send a NULL record.
+			 */
+			prefix = (jrec_prefix *)(cb);
+			if (NULL_RECLEN > conv_bufsiz)
+			{
+				repl_errno = EREPL_INTLFILTER_NOSPC;
+				status = -1;
+			} else
+				INITIALIZE_V44_NULL_RECORD(prefix, cb, this_upd_seqno, this_strm_seqno); /* Note : cb is updated */
 		}
 	}
 	*conv_len = (uint4)(cb - conv_buff);
@@ -1665,23 +1732,31 @@ int jnl_v44TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 
 /* Convert a transaction from filter format V44 (r1.24 onwards) to V44 (r1.24 onwards).
  * (a) If null-subscript collation is different between the primary and the secondary
- * (b) Filter out jnl records that should not be replicated (i.e. updates done inside a trigger or ^#t records).
- * (c) If no conversion occurred (out-of-design), EREPL_INTLFILTER_NOCONVERT return error code.
+ * (b) Filter out jnl records that should not be replicated (i.e. updates done inside a trigger or ^#t records)
+ *     unless this is the source server and -trigupdate was specified in which case replicate the original update
+ *     as well as the updates inside the trigger but skip replicating trigger definitions.
+ * (c) If the entire transaction consists of skipped records, send a NULL record instead.
  */
 int jnl_v44TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz)
 {
-	unsigned char		*jb, *cb, *cstart, *jstart, *ptr, *mumps_node_ptr;
+	unsigned char		*jb, *cb, *ptr, *mumps_node_ptr;
+#	ifdef DEBUG
+	unsigned char		*cstart, *jstart;
+#	endif
 	enum jnl_record_type	rectype;
 	int			status, reclen, conv_reclen;
 	uint4			jlen, tcom_num = 0, tupd_num = 0;
 	jrec_prefix 		*prefix;
 	uint4 			trigupd_type = NO_TRIG_JREC;
-	boolean_t		promote_uupd_to_tupd;
+	boolean_t		promote_uupd_to_tupd, is_trigupdate;
+	seq_num			this_upd_seqno, this_strm_seqno;
 
 	jb = jnl_buff;
 	cb = conv_buff;
 	status = SS_NORMAL;
 	jlen = *jnl_len;
+	this_upd_seqno = 0;
+	this_strm_seqno = 0;	/* needed to avoid false [-Wuninitialized] warning from gcc 12.1 */
 	/* The below comment was valid when V24 was the current filter format. But it is no longer valid now because V44
 	 * is the current filter format and there is only ONE journal version corresponding to it so the assert is re-enabled.
 	 * It might need to be disabled once we have a jnl format bump without a corresponding filter format bump.
@@ -1694,83 +1769,122 @@ int jnl_v44TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	 * ----------------------
 	 */
 	assert(is_src_server);
+	/* Even though "is_src_server" is TRUE at this point, it is possible it is not TRUE in the future (for example, if we
+	 * have a jnl format bump without a corresponding filter format bump). Therefore, the below check looks at "is_src_server"
+	 * too so this check works fine even if/when the above assert is removed in the future.
+	 */
+	is_trigupdate = (is_src_server && jnlpool->gtmsource_local->trigupdate);
 	while (JREC_PREFIX_SIZE <= jlen)
 	{
 		assert(0 == ((UINTPTR_T)jb % SIZEOF(uint4)));
 		prefix = (jrec_prefix *)jb;
 		rectype = (enum	jnl_record_type)prefix->jrec_type;
-		cstart = cb;
-		jstart = jb;
+		DEBUG_ONLY(cstart = cb);
+		DEBUG_ONLY(jstart = jb);
 		reclen = prefix->forwptr;
 		BREAK_IF_BADREC(prefix, status); /* check if we encountered a bad record */
 		BREAK_IF_INCMPLREC(reclen, jlen, status); /* check if this record is incomplete */
 		assert(IS_REPLICATED(rectype));
 		assert(JRT_MAX_V44 >= rectype);
+		if (0 == this_upd_seqno)
+		{
+			this_upd_seqno = GET_JNL_SEQNO(jb);
+			this_strm_seqno = GET_STRM_SEQNO(jb);
+		}
 		if (IS_TUPD(rectype))
 			promote_uupd_to_tupd = FALSE;
 		conv_reclen = prefix->forwptr ;
 		BREAK_IF_NOSPC((cb - conv_buff + conv_reclen), conv_bufsiz, status);	/* check for available space */
-		if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
-		{
-			assert((jb == jstart) && (cb == cstart));
-			GET_JREC_UPD_TYPE((jb + FIXED_UPD_RECLEN), trigupd_type);
-			if ((HASHT_JREC == trigupd_type) || (NON_REPLIC_JREC_TRIG == trigupd_type))
-			{	/* Journal record has a #t global or is a non-#t global but that should not be replicated
-				 * (i.e. update done inside of a trigger). Filter both out of the transaction.
-				 * However, if this record is a TUPD record, note it down so we promote next UUPD record to a TUPD.
-				 */
-				if (IS_TUPD(rectype))
-					promote_uupd_to_tupd = TRUE;
-				assert((cb == cstart) && (jb == jstart));
-				jb = jb + reclen;
-				jlen -= reclen;
-				continue;
-			}
-			memcpy(cb, jb, conv_reclen);
-			mumps_node_ptr = cb + FIXED_UPD_RECLEN;
-			NULLSUBSC_TRANSFORM_IF_NEEDED(rectype, mumps_node_ptr);
+		if (is_trigupdate && (IS_LGTRIG(rectype) || IS_ZTRIG(rectype) || IS_ZTWORM(rectype)))
+		{	/* Source server was started with "-trigupdate". In that case, do not replicate any
+			 * LGTRIG (trigger definitions) or ZTRIG (ZTRIGGER command) or $ZTWORMHOLE jnl records
+			 * as trigger invocations are not desired on the receiver side (the user wants all journal records,
+			 * even those inside trigger invocations, replicated and played as is).
+			 */
 			if (IS_TUPD(rectype))
-				tupd_num++;
-			else if (IS_UUPD(rectype) && promote_uupd_to_tupd)
-			{
-				((jrec_prefix *)(cb))->jrec_type--;
-				assert(IS_TUPD(((jrec_prefix *)(cb))->jrec_type));
-				promote_uupd_to_tupd = FALSE;
-				tupd_num++;
-			}
-		} else if (JRT_TCOM == rectype)
-		{
-			assert((jb == jstart) && (cb == cstart));
-			tcom_num++;
-			if (tcom_num > tupd_num)
-			{	/* This is a case where all updates to one region in the TP transaction were
-				 * inside a trigger which means that region did not count towards tupd_num
-				 * in which case we should skip tcom_num too for that region.
-				 */
-				jb = jb + reclen;
-				jlen -= reclen;
-				continue;
-			}
-			memcpy(cb, jb, conv_reclen);
-			((struct_jrec_tcom *)(cb))->num_participants = tupd_num;
+				promote_uupd_to_tupd = TRUE;
 		} else
 		{
-			assert(JRT_NULL == rectype);
-			assert((cb == cstart) && (jb == jstart));
-			memcpy(cb, jb, conv_reclen);
+			if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
+			{
+				assert((jb == jstart) && (cb == cstart));
+				mumps_node_ptr = jb + FIXED_UPD_RECLEN;
+				/* If -trigupdate is specified, clear the JS_NOT_REPLICATED bit in the nodeflags if it is set.
+				 * Do this before the GET_JREC_UPD_TYPE macro call that way we ensure it will never set
+				 * "trigupd_type" to NON_REPLIC_JREC_TRIG in that case. That will ensure this journal record
+				 * gets replicated across no matter what.
+				 */
+				if (is_trigupdate)
+					CLEAR_JS_NOT_REPLICATED_MASK_BIT_IN_NODEFLAGS(mumps_node_ptr);
+				GET_JREC_UPD_TYPE(mumps_node_ptr, trigupd_type);
+				if ((HASHT_JREC == trigupd_type) || (NON_REPLIC_JREC_TRIG == trigupd_type))
+				{	/* Journal record has a #t global or is a non-#t global but that should not be replicated
+					 * (i.e. update done inside of a trigger). Filter both out of the transaction.
+					 * However, if this record is a TUPD record, note it down so we promote next UUPD record
+					 * to a TUPD.
+					 */
+					if (IS_TUPD(rectype))
+						promote_uupd_to_tupd = TRUE;
+					assert((cb == cstart) && (jb == jstart));
+					jb = jb + reclen;
+					jlen -= reclen;
+					continue;
+				}
+				memcpy(cb, jb, conv_reclen);
+				mumps_node_ptr = cb + FIXED_UPD_RECLEN;
+				NULLSUBSC_TRANSFORM_IF_NEEDED(rectype, mumps_node_ptr);
+				if (IS_TUPD(rectype))
+					tupd_num++;
+				else if (IS_UUPD(rectype) && promote_uupd_to_tupd)
+				{
+					((jrec_prefix *)(cb))->jrec_type--;
+					assert(IS_TUPD(((jrec_prefix *)(cb))->jrec_type));
+					promote_uupd_to_tupd = FALSE;
+					tupd_num++;
+				}
+			} else if (JRT_TCOM == rectype)
+			{
+				assert((jb == jstart) && (cb == cstart));
+				tcom_num++;
+				if (tcom_num > tupd_num)
+				{	/* This is a case where all updates to one region in the TP transaction were
+					 * inside a trigger which means that region did not count towards tupd_num
+					 * in which case we should skip tcom_num too for that region.
+					 */
+					jb = jb + reclen;
+					jlen -= reclen;
+					continue;
+				}
+				memcpy(cb, jb, conv_reclen);
+				((struct_jrec_tcom *)(cb))->num_participants = tupd_num;
+			} else
+			{
+				assert(JRT_NULL == rectype);
+				assert((cb == cstart) && (jb == jstart));
+				memcpy(cb, jb, conv_reclen);
+			}
+			cb = cb + conv_reclen;
 		}
-		cb = cb + conv_reclen;
 		jb = jb + reclen;
 		jlen -= reclen;
 	}
 	assert((0 == jlen) || (-1 == status));
 	assert((jb == (jnl_buff + *jnl_len)) || (-1 == status));
-	if ((-1 != status) && (cb == conv_buff))
-	{	/* No conversion happened. Currently this is not possible */
-		assert(FALSE);
-		prefix = (jrec_prefix *)(cb);
-		repl_errno = EREPL_INTLFILTER_NOCONVERT;
-		status = -1;
+	if (-1 != status)
+	{
+		if (cb == conv_buff)
+		{	/* No conversion happened. Currently this is possible ONLY if "-trigupdate" was specified and
+			 * this transaction only contains updates that corresponded to LGTRIG/ZTRIG/ZTWORMHOLE journal
+			 * records (which are not replicated in the "-trigupdate" case). In that case, send a NULL record.
+			 */
+			prefix = (jrec_prefix *)(cb);
+			if (NULL_RECLEN > conv_bufsiz)
+			{
+				repl_errno = EREPL_INTLFILTER_NOSPC;
+				status = -1;
+			} else
+				INITIALIZE_V44_NULL_RECORD(prefix, cb, this_upd_seqno, this_strm_seqno); /* Note : cb is updated */
+		}
 	}
 	*conv_len = (uint4)(cb - conv_buff);
 	assert((0 < *conv_len) || (-1 == status));

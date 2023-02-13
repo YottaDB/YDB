@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -487,7 +487,9 @@ typedef struct
 	uint4			next_renegotiate_time;	/* Time (in future) at which the next SSL/TLS renegotiation happens. */
 	int4			num_renegotiations;	/* Number of SSL/TLS renegotiations that happened so far. */
 #	endif
-	GTM64_ONLY(int4		filler_8byte_align;)	/* Keep size % 8 == 0 */
+	boolean_t		trigupdate;		/* TRUE if -TRIGUPDATE was specified, FALSE otherwise */
+	boolean_t		filler_8byte_align1;
+	GTM64_ONLY(int4		filler_8byte_align2;)	/* Keep size % 8 == 0 */
 } gtmsource_local_struct;
 
 #if defined(__osf__) && defined(__alpha)
@@ -677,6 +679,7 @@ typedef struct
 	boolean_t	setcomment;	/* TRUE if -COMMENT was specified, FALSE otherwise */
 	boolean_t	jnlfileonly;	/* TRUE if -JNLFILEONLY was specified, FALSE otherwise */
 	boolean_t	zerobacklog;   	/* TRUE if -ZEROBACKLOG was specified, FALSE otherwise */
+	boolean_t	trigupdate;	/* TRUE if -TRIGUPDATE was specified, FALSE otherwise */
 	int4		cmplvl;
 	int4		shutdown_time;
 	gtm_uint64_t	buffsize;

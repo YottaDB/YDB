@@ -2,7 +2,7 @@
 
 #################################################################
 #								#
-# Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -80,10 +80,19 @@ CAT_EOF
 
 # While we don't have file names with embedded spaces, we still use -print0/-0
 # as a good practice, and shellcheck nudges us there as well.
+set +e	# Needed to record the failures with error detail, instead of silently exiting.
 find sr_linux/ sr_unix/ sr_port/ sr_$(uname -m) -name '*.c' -print0 \
 	| xargs -0 -n 1 -P $(getconf _NPROCESSORS_ONLN) clang-tidy-14 --quiet -p="$build_dir"	\
 	  --config-file=$output_dir/clang_tidy_checks.txt					\
-	  >"$output_dir/tidy_warnings.txt" 2>/dev/null
+	  >"$output_dir/tidy_warnings.txt" 2>"$output_dir/tidy_warnings.err"
+status=$?
+set -e
+if ! [ $status = 0 ]; then
+	echo "  --> clang-tidy exited with non-zero status. Most likely due to a C compilation error."
+	echo "  --> [grep -i error $output_dir/tidy_warnings.err] output follows"
+	grep -i error $output_dir/tidy_warnings.err
+	exit $status
+fi
 
 cd "$output_dir"
 "$root"/ci/sort_warnings.sh tidy_warnings.txt sorted_warnings.txt

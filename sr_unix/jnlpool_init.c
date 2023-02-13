@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1221,6 +1221,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 					gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD];
 				gtmsourcelocal_ptr->connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT] =
 					gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT];
+				gtmsourcelocal_ptr->trigupdate = gtmsource_options.trigupdate;
 			}
 			/* At this point online rollback cannot be concurrently running because we hold the journal pool access
 			 * control semaphore. So, go ahead and initialize the gtmsource_srv_latch for this source server.

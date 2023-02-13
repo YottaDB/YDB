@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1032,6 +1032,9 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 					SIZEOF(gtmsourcelocal_ptr->num_renegotiations));
 		util_out_print(PREFIX_SOURCELOCAL "Number of TLS/SSL renegotiations      !10UL [0x!XL]", TRUE, idx,
 					gtmsourcelocal_ptr->num_renegotiations, gtmsourcelocal_ptr->num_renegotiations);
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, trigupdate), SIZEOF(gtmsourcelocal_ptr->trigupdate));
+		PRINT_BOOLEAN( PREFIX_SOURCELOCAL "Trigger updates replicated (-trigupdate) !R7AZ",
+			gtmsourcelocal_ptr->trigupdate, idx);
 		PRINT_DASHES;
 	}
 }

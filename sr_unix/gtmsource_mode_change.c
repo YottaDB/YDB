@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -104,12 +107,15 @@ int gtmsource_mode_change(int to_mode)
 	 * This flag will be eventually detected by the concurrently running source server which will then change mode.
 	 */
 	if (GTMSOURCE_MODE_ACTIVE_REQUESTED == to_mode)
-	{
+	{	/* Copy options specified in "mupip replic -source -activate" command so the concurrently running source
+		 * server will use them when its activation is complete.
+		 */
 		jnlpool->gtmsource_local->secondary_port = gtmsource_options.secondary_port;
 		STRCPY(jnlpool->gtmsource_local->secondary_host, gtmsource_options.secondary_host);
 		jnlpool->gtmsource_local->secondary_port = gtmsource_options.secondary_port;
 		memcpy(&jnlpool->gtmsource_local->connect_parms[0], &gtmsource_options.connect_parms[0],
 				SIZEOF(gtmsource_options.connect_parms));
+		jnlpool->gtmsource_local->trigupdate = gtmsource_options.trigupdate;
 	}
 	if ('\0' != gtmsource_options.log_file[0] && 0 != STRCMP(jnlpool->gtmsource_local->log_file, gtmsource_options.log_file))
 	{
