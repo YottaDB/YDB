@@ -13,10 +13,10 @@
 # Simple build/running directions are below:
 #
 # Build:
-#   $ docker build -t yottadb/yottadb:latest .
+#   $ docker build -t yottadb/yottadb:latest -f Dockerfile-debian .
 #
 # Use with data persistence:
-#   $ docker run --rm -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
+#   $ docker run -p 1337:1337 -p 9080:9080 --rm -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
 
 ARG OS_VSN=bullseye
 
@@ -122,12 +122,11 @@ RUN locale-gen en_US.UTF-8
 WORKDIR /data
 COPY --from=ydb-release-builder /tmp/yottadb-release /tmp/yottadb-release
 RUN cd /tmp/yottadb-release  \
- && pkg-config --modversion icu-io \
-      > /tmp/yottadb-release/.icu.vsn \
  && ./ydbinstall \
-      --utf8 `cat /tmp/yottadb-release/.icu.vsn` \
+      --utf8 default \
       --installdir /opt/yottadb/current \
       --octo \
+      --gui \
  && rm -rf /tmp/yottadb-release
 ENV ydb_dir=/data \
     LANG=en_US.UTF-8 \
@@ -135,22 +134,17 @@ ENV ydb_dir=/data \
     LC_ALL=C.UTF-8 \
     ydb_chset=UTF-8 \
     GOPATH=$HOME/go
-# MUPIP RUNDOWN need in the following chain because otherwise ENTRYPOINT complains
-# about inability to run %XCMD and rundown needed. Cause not known, but this workaround works
-# and is otherwise benign.
 RUN . /opt/yottadb/current/ydb_env_set \
  && go version \
  && go get -t -d lang.yottadb.com/go/yottadb \
  && cd $GOPATH/src/lang.yottadb.com/go/yottadb \
  && git checkout develop \
  && cd - \
- && git clone https://gitlab.com/YottaDB/Lang/YDBPython.git \
- && cd YDBPython \
- && python3 setup.py install --user \
- && pip3 install pytest psutil pytest-order \
- && for artifact in $(cat .gitignore); do rm -rf $artifact; done \
+ && git clone https://github.com/anet-be/lua-yottadb.git \
+ && cd lua-yottadb \
+ && make install \
  && cd - \
- && rm -rf YDBPython \
+ && rm -rf lua-yottadb \
  && git clone https://gitlab.com/oesiman/yottadb-perl.git \
  && cd yottadb-perl \
  && perl Makefile.PL \
@@ -158,11 +152,13 @@ RUN . /opt/yottadb/current/ydb_env_set \
  && make install \
  && cd - \
  && rm -rf yottadb-perl \
- && printf "ydbrocks\nydbrocks" | "$ydb_dist/yottadb" -r %ydboctoAdmin add user ydb -w -a \
- && $ydb_dist/mupip rundown -relinkctl
-RUN cp /opt/yottadb/current/plugin/octo/octo.conf /data/octo.conf && \
-    sed -i 's/address = "127.0.0.1"/address = "0.0.0.0"/' /data/octo.conf
-RUN mkdir logs # for Rocto to put its standard error stream
+ && git clone https://gitlab.com/YottaDB/Lang/YDBPython.git \
+ && cd YDBPython \
+ && python3 setup.py install --user \
+ && pip3 install pytest psutil pytest-order \
+ && for artifact in $(cat .gitignore); do rm -rf $artifact; done \
+ && cd - \
+ && rm -rf YDBPython
 COPY ci/docker-scripts/docker-debian-startup.sh /docker-debian-startup.sh
-EXPOSE 1337
+EXPOSE 1337 9080
 ENTRYPOINT ["/docker-debian-startup.sh"]

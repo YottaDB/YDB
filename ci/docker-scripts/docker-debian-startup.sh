@@ -10,6 +10,19 @@
 #       the license, please stop and do not read further.       #
 #                                                               #
 #################################################################
+timestamp=$(date) # timestamp for logs in case needed for troubleshooting
 . /opt/yottadb/current/ydb_env_set
-rocto -aw 2>logs/rocto.log &
+mkdir -p logs
+if ! yottadb -run %ydboctoAdmin show users | grep -qw ydb  ; then
+    echo $timestamp >>logs/%ydboctoAdmin.log
+    printf "ydbrocks\nydbrocks" | "$ydb_dist/yottadb" -r %ydboctoAdmin add user ydb -w -a >>logs/%ydboctoAdmin.log
+fi
+if [ ! -e "node_modules" ] ; then
+    echo $timestamp >>logs/npm.log
+    npm install nodem 1>>logs/npm.log 2>&1
+fi
+echo $timestamp >>logs/rocto.log
+rocto -aw 2>>logs/rocto.log &
+echo $timestamp >>logs/%ydbgui.log
+yottadb -run %ydbgui --readwrite >>logs/%ydbgui.log &
 exec /bin/bash
