@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,7 +101,7 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 		}
 		GRAB_LOCK_CRIT_AND_SYNC(*pctl, was_crit);
 		retval = ctl->wakeups;
-		assert(retval);
+		assert(retval || WBTEST_ENABLED(WBTEST_LCKWAKEOVRFLO));
 		/* this calculation is size of basic mlk_shrsub blocks plus the padded value length
 		   that already contains the consideration for the length byte. This is so we get
 		   room to put a bunch of nicely aligned blocks so the compiler can give us its
