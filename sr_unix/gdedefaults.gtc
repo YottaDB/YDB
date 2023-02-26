@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-! Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	!
+! Copyright (c) 2021-2023 YottaDB LLC and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -18,8 +18,8 @@ change -segment default -block_size=4096 -allocation=5000 -extension=10000 -glob
 change -region default -record_size=4080 -key_size=255 -journal=(before,file="$ydb_dir/$ydb_rel/g/yottadb.mjl")
 ! DEFAULT end
 ! YDBAIM begin
-add -region ydbaim -autodb -dynamic_segment=ydbaim -nojournal -key_size=1019 -null_subscripts=always -record_size=2048
-add -segment ydbaim -access_method=mm -noasyncio -block_size=2048 -allocation=10000 -extension=20000 -file_name="$ydb_dir/$ydb_rel/g/%ydbaim.dat"
+add -region ydbaim -record_size=1048576 -key_size=1019 -dynamic_segment=ydbaim -null_subscripts=always -journal=(before,file_name="$ydb_dir/$ydb_rel/g/%ydbaim.mjl")
+add -segment ydbaim -noasyncio -block_size=2048 -allocation=10000 -extension=20000 -global_buffer_count=2000 -file_name="$ydb_dir/$ydb_rel/g/%ydbaim.dat"
 add -name %ydbAIM* -region=ydbaim
 add -name %ydbAIm* -region=ydbaim
 add -name %ydbAiM* -region=ydbaim
@@ -29,6 +29,26 @@ add -name %ydbaIm* -region=ydbaim
 add -name %ydbaiM* -region=ydbaim
 add -name %ydbaim* -region=ydbaim
 ! YDBAIM end
+! YDBJNLF begin
+add -region ydbjnlf  -record_size=1048576 -key_size=1019 -autodb -dynamic_segment=ydbjnlf -nojournal
+add -segment ydbjnlf -noasyncio -access_method=mm -file_name="$ydb_dir/$ydb_rel/g/%ydbjnlf.dat"
+add -name %ydbJNLF* -region=ydbjnlf
+add -name %ydbJNLf* -region=ydbjnlf
+add -name %ydbJNlF* -region=ydbjnlf
+add -name %ydbJNlf* -region=ydbjnlf
+add -name %ydbJnLF* -region=ydbjnlf
+add -name %ydbJnLf* -region=ydbjnlf
+add -name %ydbJnlF* -region=ydbjnlf
+add -name %ydbJnlf* -region=ydbjnlf
+add -name %ydbjNLF* -region=ydbjnlf
+add -name %ydbjNLf* -region=ydbjnlf
+add -name %ydbjNlF* -region=ydbjnlf
+add -name %ydbjNlf* -region=ydbjnlf
+add -name %ydbjnLF* -region=ydbjnlf
+add -name %ydbjnLf* -region=ydbjnlf
+add -name %ydbjnlF* -region=ydbjnlf
+add -name %ydbjnlf* -region=ydbjnlf
+! YDBJNLF end
 ! YDBOCTO begin
 add -region ydbocto -record_size=1048576 -key_size=1019 -dynamic_segment=ydbocto -null_subscripts=always -journal=(before,file_name="$ydb_dir/$ydb_rel/g/%ydbocto.mjl")
 add -segment ydbocto -noasyncio -block_size=2048 -allocation=10000 -extension=20000 -global_buffer_count=2000 -file_name="$ydb_dir/$ydb_rel/g/%ydbocto.dat"

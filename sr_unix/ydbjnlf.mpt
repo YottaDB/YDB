@@ -71,8 +71,8 @@ INGEST(jnlf,label)
 	new $etrap do etrap
 	set $ecode=""
 	new commapos,daytime,doneflag,etrapsav,gvname,gvref,i,io,j,jnlfgbl,jnlfile
-	new jnlsubrec,jpvtime,line,linenum,mupipcmd,node,nodesarg,offset,prefix
-	new prevline,recsize,rectype,rectypecomma,retcode,term,tmp,user,ydb982flag
+	new jnlformat,jnlsubrec,jpvtime,line,linenum,mupipcmd,node,nodesarg,offset
+	new prefix,prevline,recsize,rectype,rectypecomma,term,tmp,user,ydb982flag
 	set io=$io
 	set jnlfile=$zsearch($get(jnlf,""),-1)
 	set:'$zlength(jnlfile) $ecode=",U249,"
@@ -81,7 +81,6 @@ INGEST(jnlf,label)
 	set:'$zlength(prefix) prefix="YDB"
 	do getrectypes
 	set mupipcmd="ydb_extract_nocol=1 $ydb_dist/mupip journal -extract=-stdout -forward -show=all -fences=none -noverify -detail -full "_jnlfile
-	set retcode='$$ensureydbjnlf
 	open "mupip":(shell="/bin/sh":command=mupipcmd:stderr="mupip_err":readonly:recordsize=1048576)::"pipe"
 	; Read the first three lines of stderr to confirm journal file format
 	use "mupip_err"
@@ -91,7 +90,8 @@ INGEST(jnlf,label)
 	. set:$zeof $ecode=",U253,"
 	. set prevline=line
 	. set:line'?@("1""%""1"""_prefix_"""1""-""1(1""W"",1""I"")1""-"".E") $ecode=",U250,"
-	; Purge old records with this label once journal file format is confirmed
+	; Purge old records with this label once MUPIP reports it has started forward processing
+	; Starting forward processing also confirms that the journal file format is correct
 	do PURGE(label)
 	use "mupip"
 	read ^%ydbJNLF(label,"extrfmt")
@@ -192,13 +192,16 @@ INGEST(jnlf,label)
 	. for i=jnlsubrec:-1:1 set doneflag=0 do  quit:doneflag
 	. . do:line?@(1_$zwrite($zpiece(jnlsubrec(i),";",1))_".E")
 	. . . set doneflag=1,tmp=jnlsubrec(i)
-	. . . if "int"=$zpiece(tmp,";",3) do
-	. . . . set $zpiece(^%ydbJNLF(label),";",i)=+$$L^%TRIM($zpiece(line,$zpiece(tmp,";",1),2))
-	. . . else  if "bool"=$zpiece(tmp,";",3) do
+	. . . if "bool"=$zpiece(tmp,";",3) do
 	. . . . set $zpiece(^%ydbJNLF(label),";",i)=$select("TRUE"=$$L^%TRIM($zpiece(line,$zpiece(tmp,";",1),2)):1,1:0)
+	. . . else  if "format"=$zpiece(tmp,";",3) do
+	. . . . set (jnlformat,$zpiece(^%ydbJNLF(label),";",i))=+$ZPIECE($$L^%TRIM($zpiece(line,$zpiece(tmp,";",1),2)),"YDBJNL",2)
+	. . . else  if "int"=$zpiece(tmp,";",3) do
+	. . . . set $zpiece(^%ydbJNLF(label),";",i)=+$$L^%TRIM($zpiece(line,$zpiece(tmp,";",1),2))
 	. . . else  if "timestamp"=$zpiece(tmp,";",3) do
 	. . . . set $zpiece(^%ydbJNLF(label),";",i)=$$daytimetodlrh($$L^%TRIM($zpiece(line,$zpiece(tmp,";",1),2)))
-	. . . else  set $zpiece(^%ydbJNLF(label),";",i)=$$L^%TRIM($zpiece(line,$zpiece(tmp,";",1),2))
+	. . . else  do
+	. . . . set $zpiece(^%ydbJNLF(label),";",i)=$$L^%TRIM($zpiece(line,$zpiece(tmp,";",1),2))
 	. set:'doneflag $ecode=",U252,"
 	; At this point, the line "Process That Created the Journal File:" would have been read.
 	; Read empty line followed by line of the form:
@@ -237,8 +240,8 @@ INGEST(jnlf,label)
 	; Create global variable identifying table for each record type
 	set rectype=""
 	for  set rectype=$order(jnlfgbl(rectype)) quit:'$zlength(rectype)  do
-	. set ^%ydbJNLFRECTBL(label,rectype)=$zconvert($zpiece($zpiece(jnlfgbl(rectype),"^%ydbJNLF",2),"(",1),"U")
-	quit:$quit retcode quit
+	. set ^%ydbJNLFRECTBL(jnlformat,rectype)=$zconvert($zpiece($zpiece(jnlfgbl(rectype),"^%ydbJNLF",2),"(",1),"U")
+	quit
 
 ; Output Octo CREATE TABLE statements for the globals with ingested journal records
 ; rectype is a list of comma separated record types, e.g., SET,KILL. If omitted
@@ -296,9 +299,9 @@ OCTODDL(rectype)
 	. write "GLOBAL ""^%ydbJNLFOPCOUNT"";",!
 	. write "DROP TABLE IF EXISTS YDBJNLFRECTYPE KEEPDATA;",!
 	. write "CREATE TABLE YDBJNLFRECTYPE -- Table for record types",!
-	. write "(label VARCHAR,",!
-	. write " rectype VARCHAR,",!," tbl VARCHAR,",!
-	. write " PRIMARY KEY (label, rectype))",!
+	. write "(format INTEGER,",!
+	. write " rectype VARCHAR,",!," tbltype VARCHAR, -- table name is YDBJNLF followed by tbltype",!
+	. write " PRIMARY KEY (format, rectype))",!
 	. write "GLOBAL ""^%ydbJNLFRECTBL"";",!
 	if '$zlength(rectype) quit:$quit 1 quit
 	for i=1:1 set line=$zpiece($text(@("TYPE"_i)),";",2) quit:'$zlength(line)  do
@@ -344,38 +347,6 @@ daytimetodlrh(str)
 	set tmp=$zpiece(str," ",1),date=$$FUNC^%DATE($zpiece(tmp,"/",2,3)_"/"_$zpiece(tmp,"/",1))
 	set tmp=$zpiece(str," ",2),time=$$FUNC^%TI($ztranslate($zpiece(tmp,":",1,2),":"))+$zpiece(tmp,":",3)
 	quit date_","_time
-
-; Ensure that a YDBJNL region exists in the global directory
-; Returns 1 if it already exists, 0 if it had to be created
-ensureydbjnlf()
-	new defdir,deffile,err,errflag,flag,i,io,j,jnlffile,k,l,out,region
-	set flag=0,io=$io,region=$view("gvfirst")
-	for  set:"YDBJNLF"=region flag=1 quit:flag!'$zlength(region)  set region=$view("gvnext",region)
-	do:'flag	; create YDBJNLF region if it does not exist
-	. set errflag=0
-	. ; $$^%PEEKBYNAME() in a PIPE is used to get the database file name with environment
-	. ; variables, as the YDBJNLF region should use the same environment variables.
-	. open "peekbyname":(shell="/bin/sh":command="$ydb_dist/yottadb -run %XCMD 'write $zpiece($$^%PEEKBYNAME(""gd_segment.fname"",""DEFAULT""),$zchar(0),1),!'":readonly)::"pipe"
-	. use "peekbyname" read deffile
-	. use io close "peekbyname"
-	. set defdir=$zpiece(deffile,"/",1,$zlength(deffile,"/")-1)
-	. ; Since defdir will be the empty string if the DEFAULT database file is
-	. ; in current directory or if it is in /, $zlength(defdir) cannot be
-	. ; used to determine whether jnlffile needs a prefix.
-	. set jnlffile=$select($zlength(deffile,"/")-1:defdir_"/",1:"")_"%ydbjnlf.dat"
-	. open "gde":(shell="/bin/sh":command="$ydb_dist/yottadb -run GDE":stderr="gdeerr")::"pipe" use "gde"
-	. write "add -region ydbjnlf -autodb -dynamic_segment=ydbjnlf -nojournal -key_size=1019 -record_size=1048576",!
-	. write "add -segment ydbjnlf -access_method=mm -block_size=4096 -allocation=5000 -extension=10000 -file_name="""_jnlffile_"""",!
-	. for i="j","J" for j="n","N" for k="l","L" for l="f","F" write "add -name %ydb"_i_j_k_l_"* -region=ydbjnlf",!
-	. write "exit",!
-	. for i=1:1 read out(i) quit:$zeof  set:out(i)?1"%GDE-E-".E errflag=1
-	. do:errflag
-	. . use "gdeerr"
-	. . for i=1:1 read err(i) quit:$zeof
-	. . set $ecode=",U248,"
-	. use io close "gde"
-	. view "gbldirload":$zgbldir
-	quit flag
 
 ; Given a value such as:
 ; 0000017195 mylaptop         ydbuser      3    2022/09/22 10:56:53
@@ -429,7 +400,7 @@ skiptill(patt)
 ; the second piece).
 jnlsub1
 ;Journal file name;jnlfilename
-;Journal file label;jnlfilelabel
+;Journal file label;jnlfilelabel;format
 ;Database file name;dbfilename
 ; Prev journal file name;prevjnlfilename
 ; Next journal file name;nextjnlfilename
@@ -510,7 +481,6 @@ type14	;horologdate\horologtime\tnum\chksum\pid\clntpid\token
 varchar	;clntunam,dsecmdline,gvname,gvref,nnam,nodeval,op,strmseq,tid,trigdefinition,unam,ztwormhole,
 
 ;	Error message texts
-U248	;"-F-GDEERR GDE error when creating YDBJNLF region"
 U249	;"-F-FILENOTEXIST Journal file "_$get(jnlf,"""""")_" not found"
 U250	;"-F-FILEFMTERR MUPIP JOURNAL EXTRACT stderr line #"_linenum_" is: "_line
 U251	;"-F-UNKNOWNRECTYP Unknown record type "_$zpiece(rectype,",",i)

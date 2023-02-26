@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -71,7 +71,7 @@
 	quit			; should never get here because previous line should terminate process
 
 set	; Intended to be the most common entry point to this routine (with unset likely not as common)
-	new $test,aimflag,chset,cmd,currenv,dbfname,dist,env,err,errflag,errpat,file,gtmgbldir,i,io,line,localeflag,octoflag,out,path,ppid
+	new $test,aimflag,chset,cmd,currenv,dbfname,dist,env,err,errflag,errpat,file,gtmgbldir,i,io,jnlfflag,line,localeflag,octoflag,out,path,ppid
 	new prefix,region,setcmd,setsep,tmp1,tmp2,tmp3,tmp4,unset,unsetcmd,ydbgbldir,ydbreplinst,ydbretention,ydbroutines
 	new ydbtmpdir,zstmp
 	do Etrap
@@ -338,48 +338,8 @@ unset	; Unset the environment set by entryref set
 
 ; Utility labels, expected to be called only from within the routine
 
-CreateAIM
-	; Create YDBAIM region when it does not exist
-	new $test,defaultfhead,ydbtmpdir
-	do CreateRegion("YDBAIM")
-	quit
-
-CreateOCTO
-	; Create YDBOCTO region and journaled database, when they don't exist
-	; Local variable(s) used from caller: errpat
-	new $test,defaultfhead,defaultjnl,defaultjnlstate,err,errflag,io,jnlbefore,jnldir,jnlstate,line,out,replstate,ydbtmpdir
-	set io=$io
-	do CreateRegion("YDBOCTO")
-	open "mupip":(shell="/bin/sh":command="/bin/sh":stderr="err")::"pipe"
-	use "mupip"
-	write "$ydb_dist/mupip create -region=YDBOCTO",!
-	set defaultjnlstate=defaultfhead("sgmnt_data.jnl_state")
-	do:defaultjnlstate
-	. set defaultjnl=$zextract(defaultfhead("sgmnt_data.jnl_file_name"),1,defaultfhead("sgmnt_data.jnl_file_len"))
-	. set jnldir=$zpiece(defaultjnl,"/",1,$zlength(defaultjnl,"/")-1)
-	. set:$zlength(jnldir) jnldir=jnldir_"/"
-	. set jnlfile=jnldir_"%ydbocto.mjl"
-	. set jnlstate=$select(2=defaultjnlstate:"on",1:"off")
-	. set jnlbefore=$select(defaultfhead("sgmnt_data.jnl_before_image"):"before",1:"nobefore")
-	. set replstate=$select(defaultfhead("sgmnt_data.repl_state"):" -replication=on",1:"")
-	. write "$ydb_dist/mupip set",replstate," -journal=""enable,",jnlstate,","_jnlbefore_",file=",jnlfile,""" -region YDBOCTO",!
-	. ; Workaround for limitation in database engine limitation disussed in thread
-	. ; https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1125#note_843861584
-	. write "$ydb_dist/mupip set",replstate," -journal=""",jnlstate,","_jnlbefore_""" -region ""*""",!
-	write /eof
-	set out=ydbtmpdir_"MUPIP_YDBOCTO.out"
-	open out:newversion
-	for  read line quit:$zeof  use out write line,! use "mupip"
-	; Raise error for any MUPIP CREATE error
-	set err=ydbtmpdir_"MUPIP_YDBOCTO.err",errflag=0
-	open err:newversion use "err"
-	for  read line quit:$zeof  use err write line,! use "err" set:line?@errpat errflag=1
-	use io close "err",err,"mupip",out
-	set:errflag $ecode=",U242,"
-	quit
-
 CreateRegion(region)
-	; Create a region (YDBAIM/YDBOCTO) that does not exist in the global directory
+	; Create a region that does not exist in the global directory.
 	; Note that if environment variables are used in the global directory for
 	; the directory for the DEFAULT region, they should also be used for the
 	; directory for the region being created.
@@ -429,6 +389,36 @@ DBEnsure(file)
 	read head#9:0
 	use io close file
 	set:"GDSDYNUNX"'=head $ecode=",U241,"
+	quit
+
+DBJnlEnsure(region)
+	; Ensure that region has a database file, and journaling+replication matching DEFAULT
+	open "mupip":(shell="/bin/sh":command="/bin/sh":stderr="err")::"pipe"
+	use "mupip"
+	write "$ydb_dist/mupip create -region=",region,!
+	set defaultjnlstate=defaultfhead("sgmnt_data.jnl_state")
+	do:defaultjnlstate
+	. set defaultjnl=$zextract(defaultfhead("sgmnt_data.jnl_file_name"),1,defaultfhead("sgmnt_data.jnl_file_len"))
+	. set jnldir=$zpiece(defaultjnl,"/",1,$zlength(defaultjnl,"/")-1)
+	. set:$zlength(jnldir) jnldir=jnldir_"/"
+	. set jnlfile=jnldir_"%"_$zconvert(region,"l")_".mjl"
+	. set jnlstate=$select(2=defaultjnlstate:"on",1:"off")
+	. set jnlbefore=$select(defaultfhead("sgmnt_data.jnl_before_image"):"before",1:"nobefore")
+	. set replstate=$select(defaultfhead("sgmnt_data.repl_state"):" -replication=on",1:"")
+	. write "$ydb_dist/mupip set",replstate," -journal=""enable,",jnlstate,","_jnlbefore_",file=",jnlfile,""" -region ",region,!
+	. ; Workaround for limitation in database engine limitation disussed in thread
+	. ; https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1125#note_843861584
+	. write "$ydb_dist/mupip set",replstate," -journal=""",jnlstate,","_jnlbefore_""" -region ""*""",!
+	write /eof
+	set out=ydbtmpdir_"MUPIP_"_region_".out"
+	open out:newversion
+	for  read line quit:$zeof  use out write line,! use "mupip"
+	; Raise error for any MUPIP CREATE error
+	set err=ydbtmpdir_"MUPIP_"_region_".err",errflag=0
+	open err:newversion use "err"
+	for  read line quit:$zeof  use err write line,! use "err" set:line?@errpat errflag=1
+	use io close "err",err,"mupip",out
+	set:errflag $ecode=",U242,"
 	quit
 
 DirEnsure(ydbvar,gtmvar)
@@ -629,8 +619,10 @@ PathSame(path1,path2)
 ; Note: Robustify upgrades global directories automatically
 ; Use variable(s) from the caller: errpat
 Robustify	; rollback / recover an existing database if needed
-	new $test,allok,cmd,cutoff,dbfname,dumpfhead,err,errflag,fhead,field,fname,i,io,j,jnlfile,jnlfilelist,line
-	new out,region,replok,replon,sem,semid,semidnotnull,semkey,timestamp,tmpok,year
+	new $test,allok,cmd,cutoff,dbfname,defaultfhead,defaultjnl,defaultjnlstate,dumpfhead
+	new err,errflag,fhead,field,fname,i,io,j,jnlbefore,jnldir,jnlfile,jnlfilelist,jnlstate
+	new line,out,region,replok,replon,replstate,sem,semid,semidnotnull,semkey,timestamp
+	new tmpok,year
 	set io=$io
 	view "setenv":"ydb_dir":env("ydb_dir"),"setenv":"ydb_rel":env("ydb_rel"),"setenv":"ydb_gbldir":ydbgbldir,"setenv":"ydb_repl_instance":ydbreplinst
 	; Open the global direcory file, and exit, which will automatically upgrade the global directory
@@ -650,15 +642,16 @@ Robustify	; rollback / recover an existing database if needed
 	; - If the database file exists:
 	;   - If the file is open (there is an associated semaphore), move on.
 	;   - If the file was previously open, determine whether or not the file
-	;     needs rollback, recovery, or rundown, and
+	;     needs rollback, recovery, or rundown, and act appropriately.
 	; Note:
 	; - The code cannot use $VIEW("GVFILE",region) as that will try to open
 	;   the database and encounter a REQRUNDOWN/REQRECOV/REQROLLBACK type of
 	;   error. Hence the use of PEEKBYNAME("gd_segment.fname") below,  as it
 	;   only reads the segment file name from the gld file).
-	set (aimflag,octoflag)=1,semidnotnull=0
+	set (aimflag,jnlfflag,octoflag)=1,semidnotnull=0
 	set region="" for  set region=$view("GVNEXT",region)  quit:region=""  do
 	. set:"YDBAIM"=region aimflag=0
+	. set:"YDBJNLF"=region jnlfflag=0
 	. set:"YDBOCTO"=region octoflag=0
 	. set dbfname=$zpiece($$^%PEEKBYNAME("gd_segment.fname",region),$zchar(0),1)
 	. if $zlength($zsearch(dbfname,-1)) do
@@ -759,8 +752,9 @@ Robustify	; rollback / recover an existing database if needed
 	. . . use "/proc/self/fd/2" write jnlfile," deleted",! use io
 	. . . set jnlfile=$zsearch($$jnlfile(region)_"_*",zstmp)
 	; Create YDBAIM and YDBOCTO regions, if needed
-	do:aimflag CreateAIM
-	do:octoflag CreateOCTO
+	do:aimflag CreateRegion("YDBAIM"),DBJnlEnsure("YDBAIM")
+	do:jnlfflag CreateRegion("YDBJNLF")
+	do:octoflag CreateRegion("YDBOCTO"),DBJnlEnsure("YDBOCTO")
 	quit
 
 ; Internally called function to get journal file name of a journaled region.
