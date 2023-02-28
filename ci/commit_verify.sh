@@ -142,12 +142,14 @@ if [ -n "$commit_list" ]; then
 		if [[ ! -e $file ]]; then
 			continue
 		fi
-		changes=$(git diff upstream_repo/$target_branch..HEAD "$file")
-		if [[ "" != "$changes" ]]; then
-			changes=$(echo -n "$changes" | grep -v "+++" | grep "^+" || true)
-			num_changes=$(echo "$changes" | wc -l)
-			num_copyright_changes=$(echo "$changes" | grep -c 'Copyright (c)' || true)
-			if [[ $num_changes -eq $num_copyright_changes ]]; then
+		# Get number of changes (addition deletion file_name)
+		changes=$(git diff --numstat upstream_repo/$target_branch..HEAD "$file")
+		if [[ -n "$changes" ]]; then
+			additions=$(echo $changes | awk '{print $1}')
+			deletions=$(echo $changes | awk '{print $2}')
+			num_copyright_additions=$(git diff upstream_repo/$target_branch..HEAD "$file" | grep -e '^+' | grep -c 'Copyright (c)' || true)
+			num_copyright_deletions=$(git diff upstream_repo/$target_branch..HEAD "$file" | grep -e '^-' | grep -c 'Copyright (c)' || true)
+			if [[ ( $deletions == $num_copyright_deletions ) && ( $additions == $num_copyright_additions ) ]]; then
 				copyright_only="$copyright_only $file"
 			fi
 		fi
