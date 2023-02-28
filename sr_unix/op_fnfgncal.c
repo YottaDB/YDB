@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -927,10 +927,9 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
 	TREF(in_ext_call) = save_in_ext_call;
+	verify_buffer((char *)param_list, n, entry_ptr->entry_name.addr);
 	if (!save_in_ext_call)
 		check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
-	verify_buffer((char *)param_list, n, entry_ptr->entry_name.addr);
-	check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
 	mumps_status = save_mumps_status;
 	/* The first byte of the type description argument gets set to 0xFF in case error happened in JNI glue code,
 	 * so check for that and act accordingly.
