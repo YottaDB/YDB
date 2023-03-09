@@ -124,7 +124,7 @@ WORKDIR /data
 COPY --from=ydb-release-builder /tmp/yottadb-release /tmp/yottadb-release
 RUN cd /tmp/yottadb-release  \
  && ./ydbinstall \
-      --utf8 default \
+      --utf8 \
       --installdir /opt/yottadb/current \
       --octo \
       --gui \

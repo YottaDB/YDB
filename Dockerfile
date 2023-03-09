@@ -100,7 +100,7 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
                     wget \
                     netbase \
                     && \
-    /tmp/ydb-release/ydbinstall --utf8 default --installdir /opt/yottadb/current && \
+    /tmp/ydb-release/ydbinstall --utf8 --installdir /opt/yottadb/current && \
     apt-get remove -y wget && \
     apt-get autoclean -y && \
     apt-get clean && \

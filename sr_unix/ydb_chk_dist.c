@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,7 +74,6 @@ int ydb_chk_dist(char *image)
 	char		*exename;
 	int		exename_len;
 	int		path_len;
-	int		ydb_dist_len;
 	boolean_t	status;
 	boolean_t	is_gtcm_image;
 	char		image_real_path[YDB_PATH_MAX];
@@ -87,35 +86,37 @@ int ydb_chk_dist(char *image)
 	 */
 	if (STRNCMP_LIT(process_name, "MEMCHECK-"))
 	{
+		int	ydb_dist_len_lcl;
+
 		/* GT.CM servers defer issuing errors until startup */
 		is_gtcm_image = (IS_GTCM_GNP_SERVER_IMAGE || IS_GTCM_SERVER_IMAGE);
 		/* Use the real path while checking the path length. If not valid, let it fail when checking is_file_identical  */
 		real_dist = realpath(ydb_dist, real_ydb_dist_path);
 		if (real_dist)
-			STRNLEN(real_dist, YDB_PATH_MAX, ydb_dist_len);
+			STRNLEN(real_dist, YDB_PATH_MAX, ydb_dist_len_lcl);
 		else
-			STRNLEN(ydb_dist, YDB_PATH_MAX, ydb_dist_len);
-		if (ydb_dist_len)
+			STRNLEN(ydb_dist, YDB_PATH_MAX, ydb_dist_len_lcl);
+		if (ydb_dist_len_lcl)
 		{
 			assert(IS_VALID_IMAGE && (n_image_types > image_type));	/* assert image_type is initialized */
-			if (YDB_DIST_PATH_MAX <= ydb_dist_len)
+			if (YDB_DIST_PATH_MAX <= ydb_dist_len_lcl)
 			{
 				if (is_gtcm_image)
 					return 0;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX);
 			}
 		} else
 		{
 			if (is_gtcm_image)
 				return 0;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_YDBDISTUNDEF);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_YDBDISTUNDEF);
 		}
 		/* Get currently running executable */
 		nbytes = SNPRINTF(image_real_path, YDB_PATH_MAX, PROCSELF);
 		if ((0 > nbytes) || (nbytes >= YDB_PATH_MAX))
 		{
  			/* Error return from SNPRINTF */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX);
 		}
 		/* Create the comparison path (ydb_dist + '/' + exename + '\0') and compare it to image_real_path */
 		exename = strrchr(image, '/');
@@ -130,7 +131,7 @@ int ydb_chk_dist(char *image)
 		{
 			if (is_gtcm_image)
 				return 0;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, LEN_AND_STR(ydb_dist), LEN_AND_STR(image));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, LEN_AND_STR(ydb_dist), LEN_AND_STR(image));
 		}
 	}
 	ydb_dist_ok_to_use = TRUE;

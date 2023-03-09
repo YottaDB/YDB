@@ -1,7 +1,7 @@
 #!/bin/sh -
 #################################################################
-# Copyright (c) 2014-2019 Fidelity National Information		#
-# Services, Inc. and/or its subsidiaries. All rights reserved.	#
+# Copyright (c) 2014-2020 Fidelity National Information         #
+# Services, Inc. and/or its subsidiaries. All rights reserved.  #
 #								#
 # Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
@@ -74,7 +74,6 @@ if [ -z "$USER" ] ; then USER=`id -un` ; fi
 dump_info()
 {
 	set +x
-	if [ -n "$icu_version" ] ; then echo icu_version " : " $icu_version ; fi
 	if [ -n "$timestamp" ] ; then echo timestamp " : " $timestamp ; fi
 	if [ -n "$ydb_aim" ] ; then echo ydb_aim " : " $ydb_aim ; fi
 	if [ -n "$ydb_branch" ] ; then echo ydb_branch " : " $ydb_branch ; fi
@@ -94,6 +93,7 @@ dump_info()
 	if [ -n "$ydb_pkgconfig" ] ; then echo ydb_pkgconfig " : " $ydb_pkgconfig ; fi
 	if [ -n "$ydb_posix" ] ; then echo ydb_posix " : " $ydb_posix ; fi
 	if [ -n "$ydb_routines" ] ; then echo ydb_routines " : " $ydb_routines ; fi
+	if [ -n "$ydb_utf8" ] ; then echo ydb_utf8 " : " $ydb_utf8 ; fi
 	if [ -n "$ydb_version" ] ; then echo ydb_version " : " $ydb_version ; fi
 	if [ -n "$ydb_zlib" ] ; then echo ydb_zlib " : " $ydb_zlib ; fi
 	if [ -n "$gtm_arch" ] ; then echo gtm_arch " : " $gtm_arch ; fi
@@ -168,7 +168,7 @@ help_exit()
 	echo "--prompt-for-group	-> YottaDB installation script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
 	echo "--ucaseonly-utils		-> install only upper case utility program names; defaults to both if not specified"
 	echo "--user username		-> user who should own YottaDB installation; default is root"
-	echo "--utf8 ICU_version	-> install UTF-8 support using specified major.minor ICU version; specify default to use version provided by OS as default"
+	echo "--utf8                    -> install UTF-8 support"
 	echo "--verbose			-> output diagnostic information as the script executes; default is to run quietly"
 	echo "--zlib			-> download and install the zlib plugin"
 	echo "Options that take a value (e.g, --group) can be specified as either --option=value or --option value."
@@ -178,8 +178,8 @@ help_exit()
 	echo ""
 	echo "Example usages are (assumes latest YottaDB release is r1.38 and latest GT.M version is V7.0-005)"
 	echo "	$0				# installs latest YottaDB release (r1.38) at /usr/local/lib/yottadb/r138"
-	echo "	$0 --utf8 default		# installs YottaDB release r1.38 with added support for UTF-8"
-	echo "	$0 --installdir /r138 r1.38 # installs YottaDB r1.38 at /r138"
+	echo "	$0 --utf8			# installs YottaDB release r1.38 with added support for UTF-8"
+	echo "	$0 --installdir /r138 r1.38	# installs YottaDB r1.38 at /r138"
 	echo "	$0 --gtm			# installs latest GT.M version (V7.0-005) at /usr/local/lib/fis-gtm/V7.0-005_x86_64"
 	echo ""
 	echo "As options are processed left to right, later options can override earlier options."
@@ -580,10 +580,27 @@ while [ $# -gt 0 ] ; do
 				fi
 			fi
 			shift ;;
-		--utf8*) tmp=`echo $1 | cut -s -d = -f 2- | tr DEFAULT default`
-			if [ -n "$tmp" ] ; then icu_version=$tmp
-			else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then icu_version=`echo $2 | tr DEFAULT default`; shift
-				else echo "--utf8 needs a value" ; err_exit
+		--utf8*)
+			# We previously used to support "--utf8=default" or "--utf8 default" or "--utf8=7.1" or "--utf8 7.1" syntax
+			# where an ICU version of "default" or "7.1" (for example) needed to be specified. But in r1.40 (after merging
+			# GT.M V7.0-000 changes to sr_unix/gtminstall.sh), sr_unix/ydbinstall.sh started supporting "--utf8" with no value.
+			# To maintain backward compatibility, we allow for "--utf8=default" or "--utf8 default" syntax but issue an error
+			# if "--utf8=7.1" or "--utf8 7.1" syntax is specified.
+			tmp=`echo $1 | cut -s -d = -f 2- | tr DEFAULT default`
+			if [ -n "$tmp" ] ; then
+				if [ "default" != "$tmp" ] ; then
+				    echo "Only value permitted with --utf8= is [default]" ; err_exit
+				fi
+			fi
+			if [ 1 -lt $# ] ; then
+				tmp=`echo "$2" | grep -c '^--'`
+				if [ "$tmp" -eq 0 ] ; then
+					tmp=`echo $2 | tr DEFAULT default`; shift
+					if [ -n "$tmp" ] ; then
+						if [ "default" != "$tmp" ] ; then
+							echo "Only value permitted with --utf8 is [default]" ; err_exit
+						fi
+					fi
 				fi
 			fi
 			ydb_utf8="Y" ;
@@ -714,12 +731,8 @@ fi
 
 # Get actual ICU version if UTF-8 install was requested with "default" ICU version
 if [ "Y" = "$ydb_utf8" ] ; then
-	if [ "default" = $icu_version ] ; then
-		ydb_found_or_requested_icu_version=`icu_version`
-	else
-		ydb_found_or_requested_icu_version=$icu_version
-	fi
-	# At this point "ydb_found_or_requested_icu_version" holds the user specified or implicitly determined
+	ydb_found_or_requested_icu_version=`icu_version`
+	# At this point "ydb_found_or_requested_icu_version" holds the implicitly determined
 	# ICU version to use. Set and export the "ydb_icu_version" env var to reflect this value.
 	# This is used in various places (e.g. "install_plugins" call below, "cmake" call below).
 	ydb_icu_version=$ydb_found_or_requested_icu_version
@@ -808,7 +821,7 @@ if [ -n "$ydb_from_source" ] ; then
 	if [ "Y" = "$gtm_prompt_for_group" ] ; then install_options="${install_options} --prompt-for-group" ; fi
 	if [ "N" = "$gtm_lcase_utils" ] ; then install_options="${install_options} --ucaseonly-utils" ; fi
 	if [ -n "$gtm_user" ] ; then install_options="${install_options} --user ${gtm_user}" ; fi
-	if [ "Y" = "$ydb_utf8" ] ; then install_options="${install_options} --utf8 ${icu_version}" ; fi
+	if [ "Y" = "$ydb_utf8" ] ; then install_options="${install_options} --utf8" ; fi
 	if [ "Y" = "$gtm_verbose" ] ; then install_options="${install_options} --verbose" ; fi
 	if [ "Y" = "$ydb_zlib" ] ; then install_options="${install_options} --zlib" ; fi
 
@@ -880,7 +893,7 @@ if [ "Y" = "$ydb_plugins_only" ]; then
 			ydb_utf8="N"
 		fi
 	fi
-	# else use ydb_found_or_requested_icu_version determined from what the user had specified along with the --utf8 option
+	# else "$ydb_found_or_requested_icu_version" would already be set because the user had specified the --utf8 option
 	# Check that the plugins aren't already installed or that --overwrite-existing is selected
 	# Since selected --octo automatically selects --posix and --aim, we continue the install
 	# without overwriting if --aim and/or --posix is already installed and --octo is selected.
@@ -915,10 +928,9 @@ if [ "Y" = "$ydb_plugins_only" ]; then
 			echo "YDBOcto already installed and --overwrite-existing not specified. Exiting." ; err_exit
 		fi
 	fi
-	tmpdir=`mktmpdir`
-	ydb_routines="$tmp($ydb_installdir)" ; export ydb_routines
-	remove_tmpdir=1 # remove the tmpdir if the plugin installs are successful
-	install_plugins
+	tmpdir=`mktmpdir`	# used by the "install_plugins" function call below.
+	remove_tmpdir=1		# Assume the plugin installs will be successful by default.
+	install_plugins		# sets "remove_tmpdir" to 0 if there was an error installing one or more plugins
 	if [ 0 = "$remove_tmpdir" ] ; then exit 1; fi	# error seen while installing one or more plugins
 	rm -rf $tmpdir	# Now that we know it is safe to remove $tmpdir, do that before returning normal status
 	exit 0
@@ -1350,13 +1362,11 @@ fi
 	echo y			# Response to one of two possible questions
 				#	"Directory $ydb_dist exists. If you proceed with this installation then some files will be over-written. Is it ok to proceed?"
 				#	"Directory $ydb_dist does not exist. Do you wish to create it as part of this installation? (y or n)"
-	if [ -z "$icu_version" ] ; then echo n	# Response to : "Should UTF-8 support be installed?"
-	else echo y			# Response to : "Should UTF-8 support be installed?"
-		echo y			# Response to : "Should an ICU version other than the default be used?"
-		echo $ydb_found_or_requested_icu_version	# Response to : "Enter ICU version"
+	if [ "Y" != "$ydb_utf8" ] ; then echo n		# Response to : "Should UTF-8 support be installed?"
+	else echo y					# Response to : "Should UTF-8 support be installed?"
 	fi
-	if [ "Y" = $ydb_deprecated ] ; then echo y # Response to : "Should deprecated components be installed?"
-	else echo n			# Response to : "Should deprecated components be installed?"
+	if [ "Y" = $ydb_deprecated ] ; then echo y	# Response to : "Should deprecated components be installed?"
+	else echo n					# Response to : "Should deprecated components be installed?"
 	fi
 	echo $gtm_lcase_utils	# Response to : "Do you want uppercase and lowercase versions of the MUMPS routines?"
 	if [ "Y" = $gtm_shlib_support ] ; then echo $gtm_keep_obj ; fi	# Response to : "Object files of M routines placed in shared library $ydb_dist/libyottadbutil$ext. Keep original .o object files (y or n)?"
