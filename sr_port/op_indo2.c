@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2012 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 451ab477 (GT.M V7.0-000)
+ *								*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,14 +40,9 @@ void	op_indo2(mval *dst, uint4 indx, mval *direct)
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_NUM(direct);
-<<<<<<< HEAD
 	if (!MV_IS_TRUEINT(direct, &dummy_intval)
 			|| ((literal_one.m[1] != direct->m[1]) && (literal_minusone.m[1] != direct->m[1])))
-		rts_error(VARLSTCNT(1) ERR_ORDER2);
-=======
-	if (!MV_IS_TRUEINT(direct, &dummy_intval) || (direct->m[1] != (1 * MV_BIAS) && direct->m[1] != (-1 * MV_BIAS)))
 		RTS_ERROR_ABT(VARLSTCNT(1) ERR_ORDER2);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	slot = &((TREF(glvn_pool_ptr))->slot[indx]);
 	oc = slot->sav_opcode;
 	if (OC_SAVLVN == oc)

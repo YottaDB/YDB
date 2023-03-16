@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -103,14 +103,8 @@ boolean_t db_ipcs_reset(gd_region *reg)
 	status = dbfilop(fc);
 	gv_cur_region = temp_region;
 	if (SS_NORMAL != status)
-<<<<<<< HEAD
 	{	/* A DBOPNERR error message would have already been issued inside "dbfilop()" */
-                return FALSE;
-=======
-	{
-		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 		return FALSE;
->>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 	csd = !udi->fd_opened_with_o_direct ? &old_data : (sgmnt_data_ptr_t)(TREF(dio_buff)).aligned;
 	DB_LSEEKREAD(udi, udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);

@@ -1281,28 +1281,13 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 								 * later when source server connects to receiver */
 	}
 	if (!hold_onto_ftok_sem && !ftok_sem_release(jnlpool->jnlpool_dummy_reg, FALSE, FALSE))
-<<<<<<< HEAD
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	assert(NULL != jnlpool);
 	assert(NULL != jnlpool->jnlpool_ctl);
 	if (('\0' == repl_inst_name[0]) && ('\0' != repl_instfilename[0]))
 	{	/* fill in instance name if right instance file name and first */
 		if (0 == STRCMP(repl_instfilename, instfilename))
 			memcpy(repl_inst_name, repl_instance.inst_info.this_instname, MAX_INSTNAME_LEN);
-=======
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JNLPOOLSETUP);
-	/* Set up pool_init if jnlpool is still attached (e.g. we could have detached if GTMRELAXED and upd_disabled) */
-	if ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl))
-	{
-		if (('\0' == repl_inst_name[0]) && ('\0' != repl_instfilename[0]))
-		{	/* fill in instance name if right instance file name and first */
-			if (0 == STRCMP(repl_instfilename, instfilename))
-				memcpy(repl_inst_name, repl_instance.inst_info.this_instname, MAX_INSTNAME_LEN);
-		}
-		jnlpool->pool_init = TRUE;
-		pool_init++;
-		ENABLE_FREEZE_ON_ERROR;
->>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 	jnlpool->pool_init = TRUE;
 	pool_init++;

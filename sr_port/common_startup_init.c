@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,19 +44,13 @@ GBLREF	boolean_t		dse_running;
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	boolean_t 		span_nodes_disallowed;
-<<<<<<< HEAD
 GBLREF	char			ydb_dist[YDB_PATH_MAX];
 GBLREF	CLI_ENTRY		*cmd_ary;	/* Pointer to command table for MUMPS/DSE/LKE etc. */
-=======
-GBLREF	char			gtm_dist[GTM_PATH_MAX];
-GBLREF	unsigned int		gtm_dist_len;
->>>>>>> 451ab477 (GT.M V7.0-000)
 
 error_def(ERR_MIXIMAGE);
 
 void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 {
-<<<<<<< HEAD
 	boolean_t	is_gtcm, is_ydb_env_match;
 	boolean_t	status;
 	char		*dist;
@@ -66,10 +60,6 @@ void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 	int		save_errno;
 	Dl_info		shlib_info;
 	char		comparison[YDB_PATH_MAX], *envptr;
-=======
-	boolean_t		is_gtcm;
-	char			*dist;
->>>>>>> 451ab477 (GT.M V7.0-000)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -125,18 +115,6 @@ void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 	getjobnum();
 	/* Get the OS page size. */
 	get_page_size();
-<<<<<<< HEAD
-=======
-	/* Read gtm_dist. */
-	if (NULL != (dist = GETENV(GTM_DIST)))
-	{
-		gtm_dist_len = strnlen(dist, PATH_MAX);
-		assert(GTM_PATH_MAX > gtm_dist_len);
-		memcpy(gtm_dist, dist, gtm_dist_len);
-		gtm_dist[gtm_dist_len] = '\0';
-	} else
-		gtm_dist[0] = '\0';
->>>>>>> 451ab477 (GT.M V7.0-000)
 	/* Setup global variables corresponding to signal blocks. */
 	set_blocksig();
 	/* Do common environment initialization. */

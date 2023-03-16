@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,11 +57,7 @@ GBLREF boolean_t	is_tracing_on;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COMMFILTERERR, 4, LEN_AND_LIT(ROUTINE), 		\
 							LEN_AND_STR(err_str));					\
 		returned_command.length = 0;									\
-<<<<<<< HEAD
 		if (frame_pointer->type & SFT_CI)								\
-=======
-		if (frame_pointer->flags & SFF_CI)								\
->>>>>>> 451ab477 (GT.M V7.0-000)
 			ci_ret_code_quit();									\
 	}													\
 }

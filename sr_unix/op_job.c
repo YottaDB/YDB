@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -228,13 +228,8 @@ int	op_job(int4 argcnt, ...)
 		{
 			DOREADRC(pipe_fds[0], &job_errno, SIZEOF(job_errno), pipe_status);
 			if (0 < pipe_status)
-<<<<<<< HEAD
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, joberrs[exit_stat].len,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, joberrs[exit_stat].len,
 										joberrs[exit_stat].msg, errno);
-=======
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, joberrs[exit_stat].len,
-					joberrs[exit_stat].msg, 2, errno);
->>>>>>> 451ab477 (GT.M V7.0-000)
 			if (ERR_JOBLVN2LONG == job_errno)
 			{	/* This message takes buffer_size as argument so take it before closing the pipe */
 				DOREADRC(pipe_fds[0], &buffer_size, SIZEOF(buffer_size), pipe_status);

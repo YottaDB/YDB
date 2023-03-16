@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,16 +86,11 @@ void outofband_action(boolean_t lnfetch_or_start)
 					exit(ERR_CTRLC);
 				}
 				break;
-<<<<<<< HEAD
 			case (ctrap):		/* This signal is ignored in simpleAPI */
 				if (!(IS_SIMPLEAPI_MODE))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
 				else
 					outofband_clear();
-=======
-			case (ctrap):
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
->>>>>>> 451ab477 (GT.M V7.0-000)
 				break;
 			case (sighup):
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TERMHANGUP);
@@ -107,16 +102,11 @@ void outofband_action(boolean_t lnfetch_or_start)
 				 */
 				(*tp_timeout_action_ptr)();
 				break;
-<<<<<<< HEAD
 			case (jobinterrupt):	/* This signal is ignored in simpleAPI */
 				if (!(IS_SIMPLEAPI_MODE))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBINTRRQST);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBINTRRQST);
 				else
 					outofband_clear();
-=======
-			case (jobinterrupt):
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBINTRRQST);
->>>>>>> 451ab477 (GT.M V7.0-000)
 				break;
 			case (ztimeout): /* Following is basically rts_error (ignored for simpleAPI) */
 				if (!(IS_SIMPLEAPI_MODE))

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -121,20 +121,15 @@ void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, 
 			if (-1 == stat_res)
 			{
 				if (errno != ENOENT)
-<<<<<<< HEAD
 				{
 					char	statbuff[512];
 					int	save_errno;
 
 					save_errno = errno;
 					SNPRINTF(statbuff, SIZEOF(statbuff), "stat() on file %s", objfn);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(statbuff),
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(statbuff),
 							CALLFROM, save_errno);
 				}
-=======
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("stat"), CALLFROM,
-						errno);
->>>>>>> 451ab477 (GT.M V7.0-000)
 			} else
 				op_result = op;
 		}
@@ -167,20 +162,15 @@ void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, 
 				if (-1 == stat_res)
 				{
 					if (ENOENT != errno)
-<<<<<<< HEAD
 					{
 						char	statbuff[512];
 						int	save_errno;
 
 						save_errno = errno;
 						SNPRINTF(statbuff, SIZEOF(statbuff), "stat() on file %s", srcfn);
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(statbuff),
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(statbuff),
 								CALLFROM, save_errno);
 					}
-=======
-						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("stat"),
-							CALLFROM, errno);
->>>>>>> 451ab477 (GT.M V7.0-000)
 				} else
 				{
 					sp_result = sp;

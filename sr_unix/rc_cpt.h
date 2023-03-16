@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2009 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 451ab477 (GT.M V7.0-000)
+ *								*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,10 +35,4 @@ short		index;		/* next entry to fill */
 short		server_count;	/* number of servers using CPT */
 }rc_cp_table;
 
-<<<<<<< HEAD
-GBLREF int	rc_cpt_sem;	/* semaphore for CPTable */
-
 #define RC_CPT_PATH "$ydb_dist/gtcm_server"
-=======
-#define RC_CPT_PATH "$gtm_dist/gtcm_server"
->>>>>>> 451ab477 (GT.M V7.0-000)

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,6 @@ enum sig_handler_t
 	sig_hndlr_none,
 	sig_hndlr_continue_handler,
 	sig_hndlr_ctrlc_handler,
-	sig_hndlr_dbcertify_signal_handler,
 	sig_hndlr_generic_signal_handler,
 	sig_hndlr_jobexam_signal_handler,
 	sig_hndlr_jobinterrupt_event,

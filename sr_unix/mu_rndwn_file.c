@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -110,13 +110,8 @@ static boolean_t	sem_created;
 static boolean_t	no_shm_exists;
 static boolean_t	shm_status_confirmed;
 
-<<<<<<< HEAD
-LITREF char             ydb_release_name[];
-LITREF int4             ydb_release_name_len;
-=======
-LITREF char		gtm_release_name[];
-LITREF int4		gtm_release_name_len;
->>>>>>> 451ab477 (GT.M V7.0-000)
+LITREF char		ydb_release_name[];
+LITREF int4		ydb_release_name_len;
 
 error_def(ERR_BADDBVER);
 error_def(ERR_DBFILERR);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -248,14 +248,8 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 				 * Set error status to ERR_TLSIOERROR and let caller handle it appropriately.
 				 */
 				assert(repl_tls.enabled);
-<<<<<<< HEAD
 				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				save_errno = ERR_TLSIOERROR;
-=======
-				errptr = gtm_tls_get_error();
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"), ERR_TEXT, 2,
-					LEN_AND_STR(errptr));
->>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 #			else
 			save_errno = ERRNO;
@@ -397,15 +391,9 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 				 * Set error status to ERR_TLSIOERROR and let caller handle it appropriately.
 				 */
 				assert(repl_tls.enabled);
-<<<<<<< HEAD
 				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				save_errno = ERR_TLSIOERROR;
 				bytes_recvd = -1;	/* to ensure "save_errno" does not get overwritten a few lines later */
-=======
-				errptr = gtm_tls_get_error();
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("recv"), ERR_TEXT, 2,
-					LEN_AND_STR(errptr));
->>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 #			else
 			save_errno = ERRNO;

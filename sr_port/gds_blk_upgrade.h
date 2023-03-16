@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2005, 2012 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 451ab477 (GT.M V7.0-000)
+ *								*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,14 +72,10 @@ GBLREF	boolean_t	dse_running;
 	 *															\
 	 * Note the clearing of srcbuffptr is done as a flag that gds_blk_upgrd was run (used by dsk_read).			\
 	 */															\
-<<<<<<< HEAD
 	assert((UPGRADE_IF_NEEDED == ydb_blkupgrade_flag) || (UPGRADE_NEVER == ydb_blkupgrade_flag)				\
 								|| (UPGRADE_ALWAYS == ydb_blkupgrade_flag));			\
-	if (!dse_running || (UPGRADE_IF_NEEDED == ydb_blkupgrade_flag))								\
-=======
 	assert(GDSVCURR == GDSV7);	/* Assert should fail if GDSVCURR changes */						\
-	if (!dse_running || (UPGRADE_IF_NEEDED == gtm_blkupgrade_flag))								\
->>>>>>> 451ab477 (GT.M V7.0-000)
+	if (!dse_running || (UPGRADE_IF_NEEDED == ydb_blkupgrade_flag))								\
 	{															\
 		if ((fully_upgraded))												\
 		{														\
@@ -101,13 +93,8 @@ GBLREF	boolean_t	dse_running;
 	{															\
 		upgrdstatus = SS_NORMAL;											\
 		if (NULL != (void *)(ondskblkver))										\
-<<<<<<< HEAD
-			*(ondskblkver) = GDSV6;											\
-	} else															\
-=======
 			*(ondskblkver) = ((blk_hdr_ptr_t)(srcbuffptr))->bver;							\
-	} else if (UPGRADE_ALWAYS == gtm_blkupgrade_flag)									\
->>>>>>> 451ab477 (GT.M V7.0-000)
+	} else															\
 	{															\
 		/*This code path is not currently supported since it requires upgrading blocks*/				\
 		assert(FALSE);													\

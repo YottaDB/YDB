@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -245,13 +245,7 @@ typedef enum {
 	if (ydb_white_box_test_case_enabled && (ydb_white_box_test_case_number == input_test_case_num))	\
 	{												\
 		gtm_wbox_input_test_case_count++;							\
-<<<<<<< HEAD
-		/* To catch the gtm_wbox_input_test_case_count before it is				\
-		 * reset below and convey correctly to the TLS plugin					\
-		 */ 											\
-=======
 		/* Catch gtm_wbox_input_test_case_count before reset to convey it to the TLS plugin */	\
->>>>>>> 451ab477 (GT.M V7.0-000)
 		if (WBTEST_REPL_TLS_RECONN == input_test_case_num)					\
 		{											\
 			snprintf(count_num, SIZEOF(count_num), "%d", gtm_wbox_input_test_case_count);	\

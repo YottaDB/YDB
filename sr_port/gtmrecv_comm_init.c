@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,11 +94,10 @@ int gtmrecv_comm_init(in_port_t port)
 	 */
 	gtmrecv_listen_sock_fd = temp_sock_fd;
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, SIZEOF(disable_linger)))
-<<<<<<< HEAD
 	{
 		save_errno = ERRNO;
 		freeaddrinfo(ai_ptr);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with receiver server listen socket disable linger"), save_errno);
 	}
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&enable_reuseaddr,
@@ -106,17 +105,8 @@ int gtmrecv_comm_init(in_port_t port)
 	{
 		save_errno = ERRNO;
 		freeaddrinfo(ai_ptr);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with receiver server listen socket enable reuseaddr"), save_errno);
-=======
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error with receiver server listen socket disable linger"), ERRNO);
-	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&enable_reuseaddr,
-			SIZEOF(enable_reuseaddr)))
-	{
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error with receiver server listen socket enable reuseaddr"), ERRNO);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 	if ((0 > BIND(gtmrecv_listen_sock_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen)) || (WBTEST_ENABLED(WBTEST_REPL_INIT_ERR)) )
 	{

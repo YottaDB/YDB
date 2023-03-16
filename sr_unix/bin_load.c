@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,41 +77,6 @@ LITREF boolean_t mu_int_possub[16][16];
 LITREF boolean_t mu_int_negsub[16][16];
 LITREF boolean_t mu_int_exponent[256];
 
-<<<<<<< HEAD
-=======
-error_def(ERR_COLLATIONUNDEF);
-error_def(ERR_COLLTYPVERSION);
-error_def(ERR_CORRUPTNODE);
-error_def(ERR_DBBADNSUB);
-error_def(ERR_DBCMPNZRO);
-error_def(ERR_DBDUPNULCOL);
-error_def(ERR_DBFILERR);
-error_def(ERR_DBKEYMX);
-error_def(ERR_DBPRIVERR);
-error_def(ERR_DBRSIZMN);
-error_def(ERR_DBRSIZMX);
-error_def(ERR_FAILEDRECCOUNT);
-error_def(ERR_GBLOFLOW);
-error_def(ERR_GVFAILCORE);
-error_def(ERR_GVINVALID);
-error_def(ERR_GVIS);
-error_def(ERR_JNLFILOPN);
-error_def(ERR_KEY2BIG);
-error_def(ERR_LDBINFMT);
-error_def(ERR_LDSPANGLOINCMP);
-error_def(ERR_LOADCTRLY);
-error_def(ERR_LOADEOF);
-error_def(ERR_LOADINVCHSET);
-error_def(ERR_LOADRECCNT);
-error_def(ERR_MAXNRSUBSCRIPTS);
-error_def(ERR_MUNOFINISH);
-error_def(ERR_NULSUBSC);
-error_def(ERR_OLDBINEXTRACT);
-error_def(ERR_REC2BIG);
-error_def(ERR_RECLOAD);
-error_def(ERR_STATSDBNOTSUPP);
-error_def(ERR_TEXT);
-
 enum err_code
 {
 	CORRUPTNODE,
@@ -126,7 +91,6 @@ enum err_code
 	REC2BIG
 };
 
->>>>>>> 451ab477 (GT.M V7.0-000)
 #define	BIN_PUT		0
 #define	BIN_BIND	1
 #define	ERR_COR		2
@@ -352,12 +316,8 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base, DO_RTS_ERROR_FALSE);
 	if (0 >= len)
 	{
-<<<<<<< HEAD
 		FREE_MALLOCS;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
-=======
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LDBINFMT);
->>>>>>> 451ab477 (GT.M V7.0-000)
 		mupip_exit(ERR_LDBINFMT);
 	}
 	hdr_lvl = EXTR_HEADER_LEVEL(ptr);
@@ -365,12 +325,8 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 		((('6' <= hdr_lvl) && ('9' >= hdr_lvl)) && (BIN_HEADER_SZ == len)) ||
 		(('4' > hdr_lvl) && (V3_BIN_HEADER_SZ == len))))
 	{
-<<<<<<< HEAD
 		FREE_MALLOCS;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
-=======
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LDBINFMT);
->>>>>>> 451ab477 (GT.M V7.0-000)
 		mupip_exit(ERR_LDBINFMT);
 	}
 	/* expecting the level in a single character */
@@ -378,26 +334,10 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	if (0 != memcmp(ptr, BIN_HEADER_LABEL, SIZEOF(BIN_HEADER_LABEL) - 2) || ('2' > hdr_lvl) ||
 			*(BIN_HEADER_VERSION_ENCR_IV) < hdr_lvl)
 	{	/* ignore the level check */
-<<<<<<< HEAD
 		FREE_MALLOCS;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
-		mupip_exit(ERR_LDBINFMT);
-	}
-=======
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
-	/* check if extract was generated in UTF-8 mode */
-	utf8_extract = (0 == MEMCMP_LIT(&ptr[len - BIN_HEADER_LABELSZ], UTF8_NAME)) ? TRUE : FALSE;
-	if ((utf8_extract && !gtm_utf8_mode) || (!utf8_extract && gtm_utf8_mode))
-	{ /* extract CHSET doesn't match $ZCHSET */
-		if (utf8_extract)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("UTF-8"));
-		else
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
-		mupip_exit(ERR_LDBINFMT);
-	}
->>>>>>> 451ab477 (GT.M V7.0-000)
 	if ('4' >= hdr_lvl)
 	{	/* Binary extracts in V50000-to-V52000 (label=4) and pre-V50000 (label=3) could have a '\0' byte (NULL byte)
 		 * in the middle of the string. Replace it with ' ' (space) like it would be in V52000 binary extracts and above.

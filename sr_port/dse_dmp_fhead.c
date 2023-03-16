@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -161,19 +161,11 @@ void dse_dmp_fhead (void)
 		if (FROZEN_BY_ROOT == csd->freeze)
 			util_out_print("  Cache freeze id                    FROZEN BY ROOT", FALSE);
 		else
-<<<<<<< HEAD
-			util_out_print("  Cache freeze id                0x!XL", FALSE, (csd->freeze)? csd->freeze : 0);
-		dse_puttime(&csd->flush_time, "  Flush timer            !AD", TRUE);
-		util_out_print("  Freeze match                   0x!XL", FALSE, csd->image_count ? csd->image_count : 0);
-		util_out_print("  Flush trigger         !12UL", TRUE, csd->flush_trigger);
-		util_out_print("  Freeze online                 !AD", FALSE, 11,
-=======
 			util_out_print("  Cache freeze id                        0x!XL", FALSE, (csd->freeze)? csd->freeze : 0);
-		dse_puttime(csd->flush_time, "  Flush timer                    !AD", TRUE);
+		dse_puttime(&csd->flush_time, "  Flush timer                    !AD", TRUE);
 		util_out_print("  Freeze match                           0x!XL", FALSE, csd->image_count ? csd->image_count : 0);
 		util_out_print("  Flush trigger                 !12UL", TRUE, csd->flush_trigger);
 		util_out_print("  Freeze online                         !AD", FALSE, 11,
->>>>>>> 451ab477 (GT.M V7.0-000)
 					(cnl->freeze_online) ? "       TRUE" : "      FALSE");
 		util_out_print("  Freeze online autorelease            !AD", TRUE, 5,
 					(cnl->freeze_online & CHILLED_AUTORELEASE_MASK) ? " TRUE" : "FALSE");
@@ -253,22 +245,15 @@ void dse_dmp_fhead (void)
 				  (RDBF_AUTODB & csd->reservedDBFlags) ? " TRUE" : "FALSE");
 		util_out_print("  DB shares gvstats                    !AD", TRUE, 5,
 				  ! (RDBF_NOSTATS & csd->reservedDBFlags) ? " TRUE" : "FALSE");
-<<<<<<< HEAD
-		util_out_print("  LOCK shares DB critical section     !AD", FALSE, 5, csd->lock_crit_with_db ? " TRUE" : "FALSE");
-		util_out_print("  Read Only                      !AD", TRUE, 3, csd->read_only ? " ON" : "OFF");
-		util_out_print("  Recover interrupted                 !AD", FALSE, 5, (csd->recov_interrupted ? " TRUE" : "FALSE"));
-		util_out_print("  Full Block Write                 !UL", TRUE, csd->write_fullblk);
-		util_out_print("  Max conc proc time !22UL", FALSE, csd->max_procs.time);
-		util_out_print("  Max Concurrent processes !9UL", TRUE, csd->max_procs.cnt);
-		util_out_print("  Reorg Sleep Nanoseconds !17UL", TRUE, csd->reorg_sleep_nsec);
-=======
 		util_out_print("  LOCK shares DB critical section             !AD", FALSE, 5,
 				csd->lock_crit_with_db ? " TRUE" : "FALSE");
 		util_out_print("  Read Only                              !AD", TRUE, 3, csd->read_only ? " ON" : "OFF");
 		util_out_print("  Recover interrupted                         !AD", FALSE, 5,
 				(csd->recov_interrupted ? " TRUE" : "FALSE"));
 		util_out_print("  Full Block Write                         !UL", TRUE, csd->write_fullblk);
->>>>>>> 451ab477 (GT.M V7.0-000)
+		util_out_print("  Max conc proc time         !22UL", FALSE, csd->max_procs.time);
+		util_out_print("  Max Concurrent processes         !9UL", TRUE, csd->max_procs.cnt);
+		util_out_print("  Reorg Sleep Nanoseconds         !17UL", TRUE, csd->reorg_sleep_nsec);
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump if -/ALL as if part of above display */
@@ -299,19 +284,12 @@ void dse_dmp_fhead (void)
 			}
 		}
 		util_out_print(0, new_line);
-<<<<<<< HEAD
-		util_out_print("  Free Global Buffers            0x!XL", FALSE, freeque_cnt);
-		util_out_print("  wcs_wtstart pid count   0x!XL", TRUE, cnl->in_wtstart);
-		util_out_print("  Write Cache is Blocked              !AD", TRUE, 5, (cnl->wc_blocked ? " TRUE" : "FALSE"));
-		util_out_print("  Write Cache to be recovered         !AD", FALSE, 5,
-=======
 		util_out_print("  Free Global Buffers                    0x!XL", FALSE, freeque_cnt);
 		util_out_print("  wcs_wtstart pid count           0x!XL", TRUE, cnl->in_wtstart);
 		util_out_print("  Write Cache is Blocked                      !AD", FALSE, 5,
 				(cnl->wc_blocked ? " TRUE" : "FALSE"));
 		util_out_print("  wcs_wtstart intent cnt          0x!XL", TRUE, cnl->intent_wtstart);
 		util_out_print("  Write Cache to be recovered                 !AD", TRUE, 5,
->>>>>>> 451ab477 (GT.M V7.0-000)
 				((WC_BLOCK_RECOVER == cnl->wc_blocked) ? " TRUE" : "FALSE"));
 		util_out_print(0, TRUE);
 		util_out_print("  Quick database rundown is active            !AD", TRUE, 5,

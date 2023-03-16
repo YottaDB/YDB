@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,16 +134,10 @@ void op_unwind(void)
 	mv_chain = mvc;
 	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
 	if (msp > stackbase)
-<<<<<<< HEAD
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKUNDERFLO);
 #	ifdef DEBUG_TRIGR
 	if (SFF_NORET_VIA_MUMTSTART & frame_pointer->type)
 		DBGTRIGR((stderr, "op_unwind: Unwinding frame 0x"lvaddr" with type %d which has SFF_NORET_VIA_MUMTSTART enabled\n",
-=======
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKUNDERFLO);
-	if (SSF_NORET_VIA_MUMTSTART & frame_pointer->type)
-		DBGTRIGR((stderr, "op_unwind: Unwinding frame 0x"lvaddr" with type %d which has SSF_NORET_VIA_MUMTSTART enabled\n",
->>>>>>> 451ab477 (GT.M V7.0-000)
 			  frame_pointer, frame_pointer->type));
 #	endif
 	DRAIN_GLVN_POOL_IF_NEEDED;
@@ -159,7 +153,7 @@ void op_unwind(void)
 	{
 		if ((frame_pointer < (stack_frame *)msp)
 				|| (frame_pointer > (stack_frame *)stackbase) || (frame_pointer < (stack_frame *)stacktop))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKUNDERFLO);
 		assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	}
 	USHBIN_ONLY(CLEANUP_COPIED_RECURSIVE_RTN(rtnhdr));

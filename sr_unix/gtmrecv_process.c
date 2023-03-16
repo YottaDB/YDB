@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -369,7 +369,6 @@ STATICFNDEF void gtmrecv_repl_send_loop_error(int status, char *msgtypestr)
 	assert((EREPL_SEND == repl_errno) || (EREPL_SELECT == repl_errno));
 	if (EREPL_SEND == repl_errno)
 	{
-<<<<<<< HEAD
 #		ifdef GTM_TLS
 		if (ERR_TLSIOERROR == status)
 		{
@@ -390,22 +389,8 @@ STATICFNDEF void gtmrecv_repl_send_loop_error(int status, char *msgtypestr)
 		{
 			SNPRINTF(print_msg, SIZEOF(print_msg), "Error sending %s message. Error in send : %s",
 					msgtypestr, STRERROR(status));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 		}
-=======
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection got reset while sending %s message. Status = %d ; %s\n",
-				msgtypestr, status, STRERROR(status));
-		repl_connection_reset = TRUE;
-		repl_close(&gtmrecv_sock_fd);
-		SNPRINTF(print_msg, SIZEOF(print_msg), "Closing connection on receiver side\n");
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
-		return;
-	} else if (EREPL_SEND == repl_errno)
-	{
-		SNPRINTF(print_msg, SIZEOF(print_msg), "Error sending %s message. Error in send : %s",
-				msgtypestr, STRERROR(status));
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
->>>>>>> 451ab477 (GT.M V7.0-000)
 	} else if (EREPL_SELECT == repl_errno)
 	{
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Error sending %s message. Error in select : %s",
@@ -482,19 +467,11 @@ STATICFNDEF int repl_tr_endian_convert_rcvr(unsigned char remote_jnl_ver, uchar_
 			assert(&rec->jrec_null.strm_seqno == &rec->jrec_tcom.strm_seqno);
 			rec->jrec_null.strm_seqno = GTM_BYTESWAP_64(rec->jrec_null.strm_seqno);
 			if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
-<<<<<<< HEAD
-			{	/* This code will need changes in case the jnl-ver changes from V44 to V45 so add an assert to
+			{	/* This code will need changes in case the jnl-ver changes from V45 to V46 so add an assert to
 				 * alert to that possibility. Once the code is fixed for the new jnl format, change the assert
 				 * to reflect the new latest jnl-ver.
 				 */
-				assert(JNL_VER_THIS == V44_JNL_VER);
-=======
-			{	/* This code will need changes in case the jnl-ver changes from V28 to V29 so add an assert to
-				 * alert to that possibility. Once the code is fixed for the new jnl format, change the assert
-				 * to reflect the new latest jnl-ver.
-				 */
-				assert(JNL_VER_THIS == V28_JNL_VER);
->>>>>>> 451ab477 (GT.M V7.0-000)
+				assert(JNL_VER_THIS == V45_JNL_VER);
 				/* To better understand the logic below (particularly the use of hardcoded offsets), see comment
 				 * in repl_filter.c (search for "struct_jrec_upd layout" for the various jnl versions we support).
 				 */
@@ -1753,17 +1730,10 @@ STATICFNDEF void process_tr_buff(int msg_type)
 		assert(remote_side->jnl_ver);
 		if (ENDIAN_CONVERSION_NEEDED(is_new_histrec, this_side->jnl_ver, remote_side->jnl_ver, remote_side->cross_endian))
 		{
-<<<<<<< HEAD
 			if (SS_NORMAL != repl_tr_endian_convert_rcvr(remote_side->jnl_ver,
 							recvpool.recvdata_base + write_off, write_len))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLXENDIANFAIL, 3, LEN_AND_LIT("Replicating"),
-						&recvpool.upd_proc_local->read_jnl_seqno);
-=======
-			if (SS_NORMAL != (status = repl_tr_endian_convert(remote_side->jnl_ver,
-							recvpool.recvdata_base + write_off, write_len)))
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLXENDIANFAIL, 3, LEN_AND_LIT("Replicating"),
-					&recvpool.upd_proc_local->read_jnl_seqno);
->>>>>>> 451ab477 (GT.M V7.0-000)
+						&recvpool.upd_proc_local->read_jnl_seqno);
 		}
 		if (!is_new_histrec)
 		{

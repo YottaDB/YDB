@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001 Sanchez Computer Associates, Inc.		*
- *								*
- * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 451ab477 (GT.M V7.0-000)
+ *								*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,13 +27,7 @@ LITREF int4	ten_pwr[];
 LITREF mval	literal_zero;
 LITREF mval	literal_sqlnull;
 
-<<<<<<< HEAD
 void	flt_mod(mval *u, mval *v, mval *q)
-=======
-error_def(ERR_DIVZERO);
-
-void	flt_mod (mval *u, mval *v, mval *q)
->>>>>>> 451ab477 (GT.M V7.0-000)
 {
 	int	exp;
 	int4	z, x;
@@ -45,10 +35,7 @@ void	flt_mod (mval *u, mval *v, mval *q)
 	mval	y;			/* temporary mval for extended precision promotion
 					   to prevent modifying caller's data */
 	mval	*u_orig;		/* original (caller's) value of u */
-<<<<<<< HEAD
 	int	u_mvtype, v_mvtype;
-=======
->>>>>>> 451ab477 (GT.M V7.0-000)
 
 	/* If u or v is $ZYSQLNULL, the result is $ZYSQLNULL */
 	if (MV_IS_SQLNULL(u) || MV_IS_SQLNULL(v))
@@ -61,22 +48,12 @@ void	flt_mod (mval *u, mval *v, mval *q)
 	u_orig = u;
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
-<<<<<<< HEAD
 	u_mvtype = u->mvtype;
 	v_mvtype = v->mvtype;
 	if ((v_mvtype & MV_INT) && (0 == v->m[1]))
-		rts_error(VARLSTCNT(1) ERR_DIVZERO);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DIVZERO); /* BYPASSRTSABT */
 	if (u_mvtype & MV_INT & v_mvtype)
 	{	/* Both are INT's; use shortcut */
-=======
-
-	if ((v->mvtype & MV_INT) != 0  &&  v->m[1] == 0)
-		rts_error_csa(NULL, VARLSTCNT(1) ERR_DIVZERO); /* BYPASSRTSABT */
-
-	if ((u->mvtype & MV_INT & v->mvtype) != 0)
-	{
-		/* Both are INT's; use shortcut.  */
->>>>>>> 451ab477 (GT.M V7.0-000)
 		q->mvtype = MV_NM | MV_INT;
 		eb_int_mod(u->m[1], v->m[1], q->m);
 		return;

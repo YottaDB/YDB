@@ -1,8 +1,6 @@
 accumulate
-dbcertify_main
 dm_read
 dse_main
-ftok_main
 gtcm_gnp_server_main
 gtcm_play_main
 gtcm_server_main

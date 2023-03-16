@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,7 +106,6 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 		if (SS_NORMAL != status)
 		{
 			if (SS_LOG2LONG == status)
-<<<<<<< HEAD
 			{
 				char	*tmpptr;
 
@@ -114,17 +113,12 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 								: gtmenvname[YDBENVINDX_CM_PREFIX]);
 				nbytes = SNPRINTF((char *)buff, SIZEOF(buff), "%s%.*s", tmpptr, node.len, node.addr);
 				if ((0 < nbytes) && (SIZEOF(buff) > nbytes))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5)
 								ERR_LOGTOOLONG, 3, nbytes, buff, SIZEOF(buff) - 1);
 				else
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 							LEN_AND_LIT("SNPRINTF(gvcmy_open)"), CALLFROM, errno);
 			} else
-=======
-				RTS_ERROR_CSA_ABT(NULL,
-					VARLSTCNT(5) ERR_LOGTOOLONG, 3, task1.len, task1.addr, SIZEOF(buff) - 1);
-			else
->>>>>>> 451ab477 (GT.M V7.0-000)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
 		task.addr = (char *)task2.addr;

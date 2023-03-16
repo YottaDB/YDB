@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,9 +91,8 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 	while (key[keywd_indx][0] && (0 != STRNCMP_STR(upcase, key[keywd_indx], kwd->str.len)))
 		keywd_indx++;
 
-<<<<<<< HEAD
 	if (!key[keywd_indx][0])
-                 rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
+                 RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
 	if (0 == jpid)
 	{	/* Treat 0 as the current process id for backward compatibility reasons (YDB#908) */
 		jpid = process_id;
@@ -179,12 +178,6 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 		unsigned long	field15;	/* stime %lu */
 		long		field16;	/* cutime %ld */
 		long		field17;	/* cstime %ld */
-=======
-	if( !key[keywd_indx][0] )
-        {
-	 	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
-        }
->>>>>>> 451ab477 (GT.M V7.0-000)
 
 		sprintf(filename, "/proc/%d/stat", jpid);
 		Fopen(fp, filename, "r");

@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -192,19 +192,10 @@ int gtmsource_est_conn()
 				 STRERROR(errno));
 			repl_close(&gtmsource_sock_fd);
 		}
-<<<<<<< HEAD
 		/* Pause (very briefly as this is a hard spin loop) before trying the connection again then check if any
 		 * interrupting conditions occurred before retrying the connection.
 		 */
 		SLEEP_FOR_MSEC(hardtries_period);
-=======
-		if (MILLISECS_IN_SEC > hardtries_period)
-		{
-			SHORT_SLEEP(hardtries_period);
-		}
-		else
-			LONG_SLEEP_MSEC(hardtries_period);
->>>>>>> 451ab477 (GT.M V7.0-000)
 		gtmsource_poll_actions(FALSE);
 		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 			return (SS_NORMAL);
@@ -274,12 +265,9 @@ int gtmsource_est_conn()
 				} else /* Decrease the frequency of showing the connection failure error messages */
 					throw_errors = FALSE;
 			}
-<<<<<<< HEAD
 			/* Pause before trying the connection again then check if any interrupting conditions occurred
 			 * before retrying the connection.
 			 */
-=======
->>>>>>> 451ab477 (GT.M V7.0-000)
 			LONG_SLEEP(soft_tries_period);
 			gtmsource_poll_actions(FALSE);
 			if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -440,53 +440,16 @@ void	gvcst_put2(mval *val, span_parms *parms)
 {
 	blk_segment		*bs1, *bs_ptr, *new_blk_bs;
 	block_id		allocation_clue, tp_root, gvt_for_root, blk_num, last_split_blk_num[MAX_BT_DEPTH];
-	block_id		lcl_root, last_split_bnum;
-	block_index		left_hand_index, ins_chain_index, root_blk_cw_index, next_blk_index;
-<<<<<<< HEAD
-	block_offset		ins_off1, ins_off2, old_curr_chain_next_off;
-	cw_set_element		*cse, *cse_new, *old_cse;
-	gv_namehead		*save_targ, *split_targ, *dir_tree;
-	enum cdb_sc		status, status2;
-	gv_key			*temp_key, *src_key;
-	static gv_key		*gv_altkey2;
-	uchar_ptr_t		subrec_ptr;
-	mstr			value;
-	off_chain		chain1, curr_chain, prev_chain, chain2;
-	rec_hdr_ptr_t		curr_rec_hdr, extra_rec_hdr, next_rec_hdr, new_star_hdr, rp, tmp_rp;
-	srch_blk_status		*bh, *bq, *tp_srch_status;
-	srch_hist		*dir_hist;
-	int			cur_blk_size, blk_seg_cnt, delta, i, j, left_hand_offset, n, ins_chain_offset,
-				new_blk_size_l, new_blk_size_r, new_blk_size_single, new_blk_size, blk_reserved_size,
-				last_possible_left_offset, new_rec_size, next_rec_shrink, next_rec_shrink1, start_len,
-				offset_sum, rec_cmpc, tmp_cmpc, target_key_size, undo_index, cur_val_offset,
-				curr_offset, bh_level;
-	uint4			segment_update_array_size, bs1_2_len, bs1_3_len;
-	char			*va, last_split_direction[MAX_BT_DEPTH];
-	sm_uc_ptr_t		cp1, cp2, curr;
-	unsigned short		extra_record_blkid_off, rec_size, tmp_rsiz;
-	unsigned int		prev_rec_offset, prev_rec_match, curr_rec_offset, curr_rec_match;
-	boolean_t		copy_extra_record, level_0, new_rec, no_pointers, succeeded, key_exists;
-	boolean_t		make_it_null, gbl_target_was_set, duplicate_set, new_rec_goes_to_right, need_extra_block_split;
-	key_cum_value		*tempkv;
-	jnl_format_buffer	*jfb, *ztworm_jfb;
-	mval			*val_forjnl;
-	ht_ent_int4		*tabent;
-	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, old_ch, new_ch;
-	sm_uc_ptr_t		buffaddr;
 	block_id		lcl_root, last_split_bnum, *null_block_id;
-	sgm_info		*si;
-	uint4			nodeflags;
-	boolean_t		write_logical_jnlrecs, blk_match, is_split_dir_left;
-=======
-	block_offset		next_offset, first_offset, ins_off1, ins_off2, old_curr_chain_next_off;
-	boolean_t		jnl_format_done, is_dummy, needfmtjnl, fits, lcl_span_status, want_root_search = FALSE;
+	block_index		left_hand_index, ins_chain_index, root_blk_cw_index, next_blk_index;
+	block_offset		ins_off1, ins_off2, old_curr_chain_next_off;
 	boolean_t		copy_extra_record, level_0, new_rec, no_pointers, succeeded, key_exists;
 	boolean_t		make_it_null, gbl_target_was_set, duplicate_set, new_rec_goes_to_right, need_extra_block_split;
+	boolean_t		write_logical_jnlrecs, blk_match, is_split_dir_left;
+	boolean_t		jnl_format_done, is_dummy, needfmtjnl, fits, lcl_span_status, want_root_search = FALSE;
 	boolean_t		db_long_blk_id, long_blk_id;	/* db_long_blk_id is based on csd->desired_db_ver,
 								 * while long_blk_id is based on bp->bver
 								 */
-	boolean_t		write_logical_jnlrecs, can_write_logical_jnlrecs, blk_match, is_split_dir_left;
->>>>>>> 451ab477 (GT.M V7.0-000)
 	boolean_t		split_to_right;	/* FALSE if a block split creates a new block on the left of the split point.
 						 *	In this case, a "t_create" is needed for the new block on the left
 						 *	and a "t_write" is needed for the current block (right side of split).
@@ -515,7 +478,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	int			cur_blk_size, blk_seg_cnt, delta, i, j, left_hand_offset, n, ins_chain_offset,
 				new_blk_size_l, new_blk_size_r, new_blk_size_single, new_blk_size, blk_reserved_size,
 				last_possible_left_offset, new_rec_size, next_rec_shrink, next_rec_shrink1, start_len,
-				offset_sum, rec_cmpc, tmp_cmpc, target_key_size, tp_lev, undo_index, cur_val_offset,
+				offset_sum, rec_cmpc, tmp_cmpc, target_key_size, undo_index, cur_val_offset,
 				curr_offset, bh_level, blk_id_sz, off_chain_sz;
 	int			rc;
 	int			split_depth;
@@ -537,7 +500,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	sm_uc_ptr_t		buffaddr;
 	sgm_info		*si;
 	uchar_ptr_t		subrec_ptr;
-	uint4			segment_update_array_size, key_top, cp2_len, bs1_2_len, bs1_3_len;
+	uint4			segment_update_array_size, bs1_2_len, bs1_3_len;
 	uint4			nodeflags;
 	uint4			no_4byte_collhdr;
 	unsigned short		extra_record_blkid_off, rec_size, tmp_rsiz;
@@ -920,19 +883,17 @@ tn_restart:
 		SET_CMPC(curr_rec_hdr, 0);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, SIZEOF(rec_hdr));
-<<<<<<< HEAD
 		BLK_ADDR(null_block_id, SIZEOF(block_id), block_id);
 		*null_block_id = 0;
-		BLK_SEG(bs_ptr, (unsigned char *)null_block_id, SIZEOF(block_id));
-=======
+		assert(SIZEOF(*null_block_id) == SIZEOF(block_id_64));
+		assert(SIZEOF(*null_block_id) > SIZEOF(block_id_32));
 		if (db_long_blk_id)
 		{
-			BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid, SIZEOF(block_id_64));
+			BLK_SEG(bs_ptr, (unsigned char *)null_block_id, SIZEOF(block_id_64));
 		} else
 		{
-			BLK_SEG(bs_ptr, (unsigned char *)&v6_zeroes_blkid, SIZEOF(block_id_32));
+			BLK_SEG(bs_ptr, (unsigned char *)null_block_id, SIZEOF(block_id_32));
 		}
->>>>>>> 451ab477 (GT.M V7.0-000)
 		if (0 == BLK_FINI(bs_ptr, bs1))
 		{
 			assert(CDB_STAGNATE > t_tries);
@@ -1592,24 +1553,9 @@ tn_restart:
 				if (cse && gv_target->noisolation && !cse->write_type && !need_extra_block_split
 					&& (dollar_tlevel || !is_dollar_incr))
 				{
-<<<<<<< HEAD
-					if ((NULL == cse->recompute_list_tail)
-						|| (0 != memcmp(gv_currkey->base, cse->recompute_list_tail->keybuf.split.base, gv_currkey->top)))
-=======
-					if (is_dollar_incr)
-					{
-						assert(dollar_tlevel);
-						/* See comment in ENSURE_VALUE_WITHIN_MAX_REC_SIZE macro
-						 * definition for why the below macro call is necessary.
-						 */
-						ADD_TO_GVT_TP_LIST(gv_target, RESET_FIRST_TP_SRCH_STATUS_FALSE);
-						RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_GVINCRISOLATION, 2,
-							gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr);
-					}
-					if (NULL == cse->recompute_list_tail ||
-						0 != memcmp(gv_currkey->base, cse->recompute_list_tail->keybuf.split.base,
-							gv_currkey->top))
->>>>>>> 451ab477 (GT.M V7.0-000)
+					if (NULL == cse->recompute_list_tail
+						|| (0 != memcmp(gv_currkey->base, cse->recompute_list_tail->keybuf.split.base,
+							gv_currkey->top)))
 					{
 						tempkv = (dollar_tlevel ? (key_cum_value *)get_new_element(si->recompute_list, 1)
 									: &(TREF(non_tp_noiso_key_n_value)));
@@ -2032,15 +1978,12 @@ tn_restart:
 							memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
 							BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
 						} else
-<<<<<<< HEAD
 						{
 							BLK_ADDR(null_block_id, SIZEOF(block_id), block_id);
 							*null_block_id = 0;
-							BLK_SEG(bs_ptr, (unsigned char *)null_block_id, SIZEOF(block_id));
+							assert(SIZEOF(block_id) >= blk_id_sz);
+							BLK_SEG(bs_ptr, (unsigned char *)null_block_id, blk_id_sz);
 						}
-=======
-							BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid, blk_id_sz);
->>>>>>> 451ab477 (GT.M V7.0-000)
 					} else
 						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + rec_size - blk_id_sz, blk_id_sz);
 				}
@@ -2177,11 +2120,7 @@ tn_restart:
 								|| ((tmp_rsiz - extra_record_blkid_off)
 									== off_chain_sz + COLL_SPEC_LEN));
 						} else
-<<<<<<< HEAD
-							extra_record_blkid_off = tmp_rsiz - SIZEOF(off_chain);
-=======
-						extra_record_blkid_off = tmp_rsiz - off_chain_sz;
->>>>>>> 451ab477 (GT.M V7.0-000)
+							extra_record_blkid_off = tmp_rsiz - off_chain_sz;
 						assert(extra_record_blkid_off);
 						last_possible_left_offset = curr_rec_offset + extra_record_blkid_off;
 					} else
@@ -2358,7 +2297,6 @@ tn_restart:
 									prev_chain.next_off = (uint4)(
 										(prev_rec_offset + (unsigned int)(SIZEOF(rec_hdr))
 										 - (curr - buffaddr)));
-<<<<<<< HEAD
 									/* See first occurrence of tag
 									 * BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW in this
 									 * C file for why the below assert is disabled.
@@ -2366,14 +2304,8 @@ tn_restart:
 									 * assert((curr - buffaddr + prev_chain.next_off)
 									 *	<= ((new_blk_size_l < blk_reserved_size
 									 *	? new_blk_size_l : blk_reserved_size)
-									 *	- SIZEOF(off_chain)));
+									 *	- off_chain_sz));
 									 */
-=======
-									assert((curr - buffaddr + prev_chain.next_off)
-										<= ((new_blk_size_l < blk_reserved_size
-										? new_blk_size_l : blk_reserved_size)
-										- off_chain_sz));
->>>>>>> 451ab477 (GT.M V7.0-000)
 									if (dollar_tlevel != cse->t_level)
 									{
 										assert(dollar_tlevel > cse->t_level);
@@ -2430,19 +2362,13 @@ tn_restart:
 												- curr_offset);
 							} else
 								curr_chain.next_off = 0;
-<<<<<<< HEAD
 							/* See first occurrence of tag BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW
 							 * in this C file for why the below assert is disabled.
 							 *
 							 * assert((curr - buffaddr + curr_chain.next_off)
 							 *		<= ((new_blk_size_l < blk_reserved_size
-							 *		? new_blk_size_l : blk_reserved_size) - SIZEOF(off_chain)));
+							 *		? new_blk_size_l : blk_reserved_size) - off_chain_sz)));
 							 */
-=======
-							assert((curr - buffaddr + curr_chain.next_off)
-									<= ((new_blk_size_l < blk_reserved_size
-									? new_blk_size_l : blk_reserved_size) - off_chain_sz));
->>>>>>> 451ab477 (GT.M V7.0-000)
 							if (dollar_tlevel != cse->t_level)
 							{
 								assert(dollar_tlevel > cse->t_level);
@@ -2453,19 +2379,13 @@ tn_restart:
 							}
 							WRITE_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
 						}	/* end of *-key or not alternatives */
-<<<<<<< HEAD
 						/* See first occurrence of tag BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW
 						 * in this C file for why the below assert is disabled.
 						 *
 						 * assert((left_hand_offset + (int)cse_new->next_off) <=
 						 *	((new_blk_size_l < blk_reserved_size ? new_blk_size_l : blk_reserved_size)
-						 *		- SIZEOF(off_chain)));
+						 *		- off_chain_sz));
 						 */
-=======
-						assert((left_hand_offset + (int)cse_new->next_off) <=
-							((new_blk_size_l < blk_reserved_size ? new_blk_size_l : blk_reserved_size)
-								- off_chain_sz));
->>>>>>> 451ab477 (GT.M V7.0-000)
 					}	/* end of buffer and cse_new adjustments */
 					prev_first_off = cse_first_off;
 					if (ins_chain_offset)
@@ -2502,19 +2422,13 @@ tn_restart:
 								+ rec_cmpc + SIZEOF(blk_hdr));
 						assert(cse->first_off >= (SIZEOF(blk_hdr) + SIZEOF(rec_hdr)));
 					}
-<<<<<<< HEAD
 					/* See first occurrence of tag BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW
 					 * in this C file for why the below assert is disabled.
 					 *
 					 * assert((ins_chain_offset + (int)cse->next_off) <=
 					 * 	((new_blk_size_r < blk_reserved_size ? new_blk_size_r : blk_reserved_size)
-					 * 		- SIZEOF(off_chain)));
+					 * 		- off_chain_sz));
 					 */
-=======
-					assert((ins_chain_offset + (int)cse->next_off) <=
-						((new_blk_size_r < blk_reserved_size ? new_blk_size_r : blk_reserved_size)
-							- off_chain_sz));
->>>>>>> 451ab477 (GT.M V7.0-000)
 				}	/* end of of split processing */
 			}	/* end of tp only code */
 			if (!dollar_tlevel)

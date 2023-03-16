@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -582,14 +582,10 @@ int aio_shim_write(gd_region *reg, struct aiocb *aiocbp)
 	ATOMIC_ADD_FETCH(&gdi->num_ios, 1);
 	ret = io_submit(gdi->ctx, 1, cb);
 	/* the only acceptable error is EAGAIN in our case */
-<<<<<<< HEAD
-	DEBUG_ONLY(save_errno = errno);
-	assert((1 == ret) || (EAGAIN == save_errno));
-=======
 	if (0 > ret)
 		local_errno = errno;
-	assert((1 == ret) || (EAGAIN == errno));
->>>>>>> 451ab477 (GT.M V7.0-000)
+	DEBUG_ONLY(save_errno = errno);
+	assert((1 == ret) || (EAGAIN == save_errno));
 	if (1 == ret)
 		return 0;
 	/* we need to rescind the write */

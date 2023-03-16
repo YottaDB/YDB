@@ -153,15 +153,9 @@ typedef struct cache_rec_struct
 					 * in progress. This is used by wcs_recover to decide whether to place a cr into
 					 * the active or wip queue.
 					 */
-<<<<<<< HEAD
 	bool		needs_first_write;	/* If this block needs to be written to disk for the first time, then
 						 * flag it (note only applicable for FULLBLKWRT={1|2})
 						 */
-	/* bool		filler4bytealign[1];	 Note: Make sure any changes here are reflected in "cache_state_rec" too */
-=======
-	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
-						 *  note it (only applicable for fullblockwrites) */
->>>>>>> 451ab477 (GT.M V7.0-000)
 } cache_rec;
 
 /* A note about cache line separation of the latches contained in these blocks. Because this block is duplicated
@@ -248,15 +242,9 @@ typedef struct
 					 * in progress. This is used by wcs_recover to decide whether to place a cr into
 					 * the active or wip queue.
 					 */
-<<<<<<< HEAD
 	bool		needs_first_write;	/* If this block needs to be written to disk for the first time, then
 						 * flag it (note only applicable for FULLBLKWRT={1|2})
 						 */
-	/*bool		filler4bytealign[1];	 Note: Make sure any changes here are reflected in "cache_state_rec" too */
-=======
-	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
-						 *  note it (only applicable for fullblockwrites) */
->>>>>>> 451ab477 (GT.M V7.0-000)
 } cache_state_rec;
 
 #define		CR_BLKEMPTY		-1

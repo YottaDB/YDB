@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -342,27 +342,12 @@ enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 		pCurr->buffaddr = pBlkBase;
 		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen, musz_range_done)
 		{	/* enumerate records in block */
-<<<<<<< HEAD
-			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId);
-			RETURN_IF_ABNORMAL_STATUS(status);
-=======
 			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId, long_blk_id);
-			if (cdb_sc_normal != status)
-			{
-				assert(CDB_STAGNATE > t_tries);
-				return status;
-			}
->>>>>>> 451ab477 (GT.M V7.0-000)
+			RETURN_IF_ABNORMAL_STATUS(status);
 			CHECK_ADJACENCY(nBlkId, nLevl, a[nLevl]);
 			if (mu_subsc) /* Subscript option chosen */
 			{
-<<<<<<< HEAD
-				if ((((rec_hdr *)pRec)->rsiz) != BSTAR_REC_SIZE) /* Did not find the star key */
-=======
-				rec_cmpc = EVAL_CMPC((rec_hdr_ptr_t)pRec);
-				key_base = pRec + SIZEOF(rec_hdr);
 				if ((((rec_hdr *)pRec)->rsiz) != bstar_rec_sz) /* Did not find the star key */
->>>>>>> 451ab477 (GT.M V7.0-000)
 				{
 					GET_KEY_CPY_BUFF(pRec, nRecLen, buff, status);
 					RETURN_IF_ABNORMAL_STATUS(status);

@@ -91,13 +91,8 @@ void gvzwr_fini(zshow_out *out, int pat)
 			}
 		} else	/* Old (naked) reference. Keep previous gv_target reference */
 		{
-<<<<<<< HEAD
 			if (IS_ILLEGAL_GVNAKED(gv_currkey))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GVNAKED);
-=======
-			if (gv_currkey->prev == 0)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GVNAKED);
->>>>>>> 451ab477 (GT.M V7.0-000)
 			gv_currkey->end = gv_currkey->prev;
 			gv_currkey->base[gv_currkey->end] = 0;
 			gv_currkey->prev = 0;

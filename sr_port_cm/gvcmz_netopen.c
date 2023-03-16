@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,26 +53,6 @@ static struct CLB		*clb;
 int		v010_jnl_process_vector_size(void);
 void		v010_jnl_prc_vector(void *);
 
-<<<<<<< HEAD
-CONDITION_HANDLER(gvcmz_netopen_ch)
-{
-	/* This condition handler is established only for VMS. In VMS, we do not do CONTINUE for INFO/SUCCESS severity.
-	 * FALSE input to START_CH achieves the same thing. */
-	ASSERT_IS_LIBGNPCLIENT;
-	START_CH(FALSE);
-	if (SIGNAL != CMERR_INVPROT || second_attempt)
-	{
-		second_attempt = FALSE;
-		assert(clb);
-		gvcmy_close(clb);
-		NEXTCH;
-	}
-	second_attempt = TRUE;
-	UNWIND(NULL, NULL);
-}
-
-=======
->>>>>>> 451ab477 (GT.M V7.0-000)
 void gvcmz_netopen_attempt(struct CLB *c)
 {
 	unsigned char	*ptr, *proto_str;
@@ -143,13 +123,9 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 	protocol_msg		*server_proto;
 	size_t			sizt_len;
 
-<<<<<<< HEAD
 	ASSERT_IS_LIBGNPCLIENT;
-	c = UNIX_ONLY(cmi_alloc_clb())VMS_ONLY(cmu_makclb());
-=======
 	c = cmi_alloc_clb();
 	assert(NULL != c);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	c->usr = malloc(SIZEOF(link_info));
 	assert(NULL != c->usr);
 	li = c->usr;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,13 +92,8 @@ void dse_m_rest	(block_id		blk,		/* block number */
 	{
 		if (in_dir_tree || level > 1)	/* reread block because it may have been flushed from read	*/
 		{
-<<<<<<< HEAD
 			if (!(np = t_qread(blk, &dummy_int, &dummy_cr))) /* cache due to LRU buffer scheme and reads in recursive */
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);	/* calls to dse_m_rest.	*/
-=======
-			if (!(np = t_qread(blk,&dummy_int,&dummy_cr))) /* cache due to LRU buffer scheme and reads in recursive */
 				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);	/* calls to dse_m_rest. */
->>>>>>> 451ab477 (GT.M V7.0-000)
 			if (np != bp)
 			{
 				b_top = np + (b_top - bp);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -349,19 +349,8 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 	SET_CODE_SET(iod->out_code_set, OUTSIDE_CH_SET);
 	if (DEFAULT_CODE_SET != iod->out_code_set)
 		ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET, OUTSIDE_CH_SET);
-<<<<<<< HEAD
 #	endif
 	assert(-1 != file_des); /* as otherwise we would have returned after the OPEN3 above */
-=======
-#endif
-	/* smw 99/12/18 not possible to be -1 here */
-	if (-1 == file_des)
-	{
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
-			RTS_ERROR_LITERAL("open()"),
-			CALLFROM, save_errno);
-	}
->>>>>>> 451ab477 (GT.M V7.0-000)
 	if (n_io_dev_types == iod->type)
 	{
 		if (isatty(file_des))

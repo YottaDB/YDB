@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -280,19 +280,11 @@ void	op_view(int numarg, mval *keyword, ...)
 		case VTK_NOFULLBOOL:
 
 			if ((VTK_NOFULLBOOL == vtp->keycode) && (OLD_SE != TREF(side_effect_handling)))
-<<<<<<< HEAD
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SEFCTNEEDSFULLB);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_SEFCTNEEDSFULLB);
 			old_bool = TREF(ydb_fullbool);
 			TREF(ydb_fullbool) = (VTK_FULLBOOL == vtp->keycode) ? FULL_BOOL
 				: (VTK_FULLBOOLWARN == vtp->keycode) ? FULL_BOOL_WARN : YDB_BOOL;
 			if (old_bool != TREF(ydb_fullbool))
-=======
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_SEFCTNEEDSFULLB);
-			old_bool = TREF(gtm_fullbool);
-			TREF(gtm_fullbool) = (VTK_FULLBOOL == vtp->keycode) ? FULL_BOOL
-				: (VTK_FULLBOOLWARN == vtp->keycode) ? FULL_BOOL_WARN : GTM_BOOL;
-			if (old_bool != TREF(gtm_fullbool))
->>>>>>> 451ab477 (GT.M V7.0-000)
 				cache_table_rebuild();
 			break;
 		case VTK_GDSCERT:
@@ -550,12 +542,8 @@ void	op_view(int numarg, mval *keyword, ...)
 					lct = 0;
 			}
 			if (!found_reg)
-<<<<<<< HEAD
 			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GBLNOMAPTOREG, 4,
-=======
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GBLNOMAPTOREG, 4,
->>>>>>> 451ab477 (GT.M V7.0-000)
 					parmblk.value->str.len, parmblk.value->str.addr, REG_LEN_STR(reg));
 				lct = 0;	/* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
 			}
@@ -960,11 +948,7 @@ void	op_view(int numarg, mval *keyword, ...)
 			break;
 		default:
 			va_end(var);
-<<<<<<< HEAD
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWCMD, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
-=======
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWCMD, 2, strlen((const char *)vtp->keyword), vtp->keyword);
->>>>>>> 451ab477 (GT.M V7.0-000)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWCMD, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
 	}
 	va_end(var);
 	return;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Portions Copyright (c) 2001-2019 Fidelity National		*
@@ -79,6 +79,12 @@ void ex_arithlit_optimize(triple *t)
 	MV_FORCE_NUMD(v0);
 	v1 = &t1->operand[0].oprval.mlit->v;
 	MV_FORCE_NUMD(v1);
+	if (!(MV_NM & v1->mvtype) || !(MV_NM & v0->mvtype))
+	{	/* if we don't have a useful number we can't do useful math */
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
+		assert(TREF(rts_error_in_parse));
+		return;
+	}
 	/* Take a copy of "run_time" variable and set it to TRUE for the below computation.
 	 * This will ensure that any runtime errors encountered inside "ex_arithlit_compute" do not invoke
 	 * "stx_error_va_fptr" as part of a "rts_error_csa" call and return prematurely. We want such errors

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -351,24 +351,8 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 		if (rlen > hdr_len + blk_id_sz)
 		{
 			assert(NULL != global_collation_mstr.addr);
-<<<<<<< HEAD
 			GET_GVT_COLL_INFO(gv_target, (uchar_ptr_t)global_collation_mstr.addr,
-					  (int)(rlen - (hdr_len + SIZEOF(block_id))), dummy_ret);
-=======
-			subrec_ptr = get_spec((uchar_ptr_t)global_collation_mstr.addr,
-						(int)(rlen - (hdr_len + blk_id_sz)), COLL_SPEC);
-			if (subrec_ptr)
-			{
-				gv_target->nct = *(subrec_ptr + COLL_NCT_OFFSET);
-				gv_target->act = *(subrec_ptr + COLL_ACT_OFFSET);
-				gv_target->ver = *(subrec_ptr + COLL_VER_OFFSET);
-			} else
-			{
-				gv_target->nct = 0;
-				gv_target->act = 0;
-				gv_target->ver = 0;
-			}
->>>>>>> 451ab477 (GT.M V7.0-000)
+					  (int)(rlen - (hdr_len + blk_id_sz)), dummy_ret);
 		} else if (gv_target->act_specified_in_gld)
 		{	/* Global directory specified a collation. Directory tree did not specify any non-zero collation.
 			 * So global directory prevails.

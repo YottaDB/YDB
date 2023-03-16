@@ -38,13 +38,8 @@
 #include "gtm_limits.h"
 #include "restrict.h"
 
-<<<<<<< HEAD
 GBLREF	char 			ydb_dist[YDB_PATH_MAX];
-=======
-GBLREF  volatile boolean_t      timer_in_handler;
-GBLREF	char 			gtm_dist[GTM_PATH_MAX];
-GBLREF	boolean_t		gtm_dist_ok_to_use;
->>>>>>> 451ab477 (GT.M V7.0-000)
+GBLREF	boolean_t		ydb_dist_ok_to_use;
 
 #define	CR			0x0A		/* Carriage return */
 #define	NUM_TABS_FOR_GTMERRSTR	2
@@ -574,7 +569,6 @@ struct extcall_package_list *exttab_parse(mval *package)
 	else
 		ext_table_file_name = ydb_getenv(YDBENVINDX_XC, NULL_SUFFIX, &is_ydb_env_match);
 	if (NULL == ext_table_file_name)
-<<<<<<< HEAD
 	{	/* Environment variable for the package not found */
 		if (package->str.len)
 			nbytes = SNPRINTF(str_buffer, SIZEOF(str_buffer), "%s%.*s/%s%.*s",
@@ -585,36 +579,24 @@ struct extcall_package_list *exttab_parse(mval *package)
 					ydbenvname[YDBENVINDX_XC] + 1,
 					gtmenvname[YDBENVINDX_XC] + 1);
 		if ((0 < nbytes) && (SIZEOF(str_buffer) > nbytes))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
 		else
 		{
 			assert(FALSE);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("SNPRINTF(exttab_parse)"), CALLFROM, errno);
 		}
-=======
-	{
-		/* Environment variable for the package not found */
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
->>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 	/* Now we have the environment name, lookup file name */
 	Fopen(ext_table_file_handle, ext_table_file_name, "r");
 	if (NULL == ext_table_file_handle)
-<<<<<<< HEAD
 	{	/* Package's external call table could not be found */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTOPN, 2, LEN_AND_STR(ext_table_file_name));
-=======
-	{
-		/* Package's external call table could not be found */
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCCTOPN, 2, LEN_AND_STR(ext_table_file_name));
->>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 	ext_source_line_num = 0;
 	/* Pick-up name of shareable library */
 	do
 	{
-<<<<<<< HEAD
 		/* We check if val.len is 0 because if the first line is a comment, it will be equal to 0 and we will
 		* need to skip to the next line to find the shareable library's name.
 		*/
@@ -622,7 +604,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 		if (NULL == tbp)
 		{
 			/* External call table is a null file */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTNULLF, 2, package->str.len, package->str.addr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCCTNULLF, 2, package->str.len, package->str.addr);
 		}
 		SNPRINTF(str_temp_buffer, MAX_TABLINE_LEN, "%s", str_buffer);
 		tbp = exttab_scan_comment(str_temp_buffer);
@@ -641,22 +623,6 @@ struct extcall_package_list *exttab_parse(mval *package)
 	while (ISSPACE_ASCII(val.addr[val.len - 1]))
 		val.len = (val.len - 1);
 	if (SS_LOG2LONG == trans_log_name(&val, &trans, str_buffer, SIZEOF(str_buffer), dont_sendmsg_on_log2long))
-=======
-		/* External call table is a null file */
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCCTNULLF, 2, package->str.len, package->str.addr);
-	}
-	STRNCPY_STR(str_temp_buffer, str_buffer, MAX_TABLINE_LEN);
-	val.addr = str_temp_buffer;
-	val.len = STRLEN(str_temp_buffer);
-	/* Need to copy the str_buffer into another temp variable since
-	 * TRANS_LOG_NAME requires input and output buffers to be different.
-	 * If there is an env variable present in the pathname, TRANS_LOG_NAME
-	 * expands it and return SS_NORMAL. Else it returns SS_NOLOGNAM.
-	 * Instead of checking 2 return values, better to check against SS_LOG2LONG
-	 * which occurs if the pathname is too long after any kind of expansion.
- 	 */
-	if (SS_LOG2LONG == TRANS_LOG_NAME(&val, &trans, str_buffer, SIZEOF(str_buffer), dont_sendmsg_on_log2long))
->>>>>>> 451ab477 (GT.M V7.0-000)
 	{
 		/* Env variable expansion in the pathname caused buffer overflow */
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(str_buffer) - 1);
@@ -907,16 +873,15 @@ callin_entry_list *citab_parse(boolean_t internal_use, char **fname)
 
 	if (!internal_use)
 	{
-<<<<<<< HEAD
 		ext_table_file_name = (NULL == *fname) ? ydb_getenv(YDBENVINDX_CI, NULL_SUFFIX, &is_ydb_env_match) : (char *)*fname;
 		if (NULL == ext_table_file_name) /* environment variable not set */
 		{
 			nbytes = SNPRINTF(tmpbuff, SIZEOF(tmpbuff), "%s/%s",
 						ydbenvname[YDBENVINDX_CI] + 1, gtmenvname[YDBENVINDX_CI] + 1);
 			if ((0 < nbytes) && (SIZEOF(str_buffer) > nbytes))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(tmpbuff));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(tmpbuff));
 			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 						LEN_AND_LIT("SNPRINTF(citab_parse)"), CALLFROM, errno);
 		}
 		/* If "*fname" came in as NULL, update it to point to the value we derived from "ydb_getenv()" call above.
@@ -927,17 +892,8 @@ callin_entry_list *citab_parse(boolean_t internal_use, char **fname)
 			*fname = ext_table_file_name;
 	} else
 	{
+		assert(ydb_dist_ok_to_use);
 		SNPRINTF(rcfpath, YDB_PATH_MAX, "%s/%s", ydb_dist, COMM_FILTER_FILENAME);
-=======
-		ext_table_file_name = GETENV(CALLIN_ENV_NAME);
-		if (!ext_table_file_name) /* environment variable not set */
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(CALLIN_ENV_NAME));
-	}
-	else
-	{
-		assert(gtm_dist_ok_to_use);
-		SNPRINTF(rcfpath, GTM_PATH_MAX, "%s/%s", gtm_dist, COMM_FILTER_FILENAME);
->>>>>>> 451ab477 (GT.M V7.0-000)
 		ext_table_file_name = rcfpath;
 		/* Note that in this code path, we do not update "*fname" like we did in the "if" code path.
 		 * This is because in the "if" code path, all we had to do was return a "char *" pointer whereas here
@@ -949,13 +905,8 @@ callin_entry_list *citab_parse(boolean_t internal_use, char **fname)
 	}
 	Fopen(ext_table_file_handle, ext_table_file_name, "r");
 	if (!ext_table_file_handle) /* call-in table not found */
-<<<<<<< HEAD
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_CITABOPN, 2, LEN_AND_STR(ext_table_file_name),
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(12) ERR_CITABOPN, 2, LEN_AND_STR(ext_table_file_name),
 			  ERR_SYSCALL, 5, LEN_AND_LIT("fopen"), CALLFROM, errno);
-=======
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(11) ERR_CITABOPN, 2, LEN_AND_STR(ext_table_file_name),
-			ERR_SYSCALL, 5, LEN_AND_LIT("fopen"), CALLFROM, errno);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	ext_source_line_num = 0;
 	while (read_table(LIT_AND_LEN(str_buffer), ext_table_file_handle))
 	{

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -54,25 +54,10 @@
 # NON_GLIBC_ONLY(X)
 #endif
 
-<<<<<<< HEAD
-#  define MSTR_CONST(name, string)		mstr name = {0, LEN_AND_LIT(string)}
-#  define MSTR_DEF(name, length, string)	mstr name = {0, length, string}
-#  define MIDENT_CONST(name, string)	    mident name = {0, LEN_AND_LIT(string)}
-#  define MIDENT_DEF(name, length, string)      mident name = {0, length, string}
-=======
-/* mstr needs to be defined before including "mdefsp.h".  */
-typedef int mstr_len_t;
-typedef struct
-{
-	unsigned int	char_len;	/* Character length */
-	mstr_len_t	len;
-	char		*addr;
-} mstr;
 #define MSTR_CONST(name, string)		mstr name = {0, LEN_AND_LIT(string)}
 #define MSTR_DEF(name, length, string)		mstr name = {0, length, string}
 #define MIDENT_CONST(name, string)		mident name = {0, LEN_AND_LIT(string)}
 #define MIDENT_DEF(name, length, string)	mident name = {0, length, string}
->>>>>>> 451ab477 (GT.M V7.0-000)
 
 #define GET_MSTR_LEN(X, Y)	GET_ULONG(X, Y)
 #define PUT_MSTR_LEN(X, Y)	PUT_ULONG(X, Y)
@@ -1516,8 +1501,6 @@ int gtcm_play_main(int argc, char **argv, char **envp);
 int gtcm_server_main(int argc, char **argv, char **envp);
 int gtcm_gnp_server_main(int argc, char **argv, char **envp);
 int gtcm_shmclean_main(int argc, char **argv, char **envp);
-int dbcertify_main(int argc, char **argv, char **envp);
-int ftok_main(int argc, char **argv, char **envp);
 
 void eintr_handling_check(void);
 

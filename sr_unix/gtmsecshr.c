@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -107,16 +107,10 @@ GBLREF	key_t			gtmsecshr_key;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		need_core;
 GBLREF	boolean_t		first_syslog;		/* Defined in util_output.c */
-<<<<<<< HEAD
 GBLREF	char			ydb_dist[YDB_PATH_MAX];
 GBLREF	boolean_t		ydb_dist_ok_to_use;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		exit_handler_complete;
-=======
-GBLREF	char			gtm_dist[GTM_PATH_MAX];
-GBLREF	unsigned int		gtm_dist_len;
-GBLREF	boolean_t		gtm_dist_ok_to_use;
->>>>>>> 451ab477 (GT.M V7.0-000)
 
 LITREF	char			ydb_release_name[];
 LITREF	int4			ydb_release_name_len;
@@ -443,12 +437,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	/****** We are now in the (isolated) child process ******/
 	getjobnum();
 	pid = getsid(process_id);
-<<<<<<< HEAD
 	ydb_dist_ok_to_use = TRUE;
-=======
-	gtm_dist_ok_to_use = TRUE;
-	gtm_dist_len = strlen(gtm_dist);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	if ((pid != process_id) && ((pid_t)-1 == setsid()))
 	{
 		save_errno = errno;
@@ -516,11 +505,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 		gtmsecshr_exit(SEMAPHORETAKEN, FALSE);
 	}
 	if (0 != gtmsecshr_sock_init(SERVER))
-<<<<<<< HEAD
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3, RTS_ERROR_LITERAL("Server 9"),
-=======
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3, RTS_ERROR_LITERAL("Server"),
->>>>>>> 451ab477 (GT.M V7.0-000)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3, RTS_ERROR_LITERAL("Server 9"),
 			process_id);
 	if (-1 == Stat(gtmsecshr_sock_name.sun_path, &stat_buf))
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,

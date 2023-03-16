@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,20 +32,12 @@ error_def(ERR_FILENAMETOOLONG);
 boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, unsigned int *full_len,
 		unsigned int max_len, uint4 *status)
 {
-<<<<<<< HEAD
-	char	*cptr, *c1;
-	char	cwdbuf[YDB_PATH_MAX];
-	int	cwd_len;
-	int	i, length;
-	char	*getcwd_res;
-=======
 	char		*cptr, *c1;
-	char		cwdbuf[GTM_PATH_MAX];
+	char		cwdbuf[YDB_PATH_MAX];
 	unsigned int	cwd_len, dir_len, newfn_len, trim_len;
 	int		i;
 	char		*getcwd_res;
 	unsigned int	length;
->>>>>>> 451ab477 (GT.M V7.0-000)
 
 	if ('/' == *orig_fn)
 	{	/* The original path is already complete */

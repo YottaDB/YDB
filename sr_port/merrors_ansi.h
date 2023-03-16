@@ -1,13 +1,9 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD:sr_port/merrors_ansi.h
- * Copyright (c) 2001-2022 Fidelity National Information	*
-=======
- * Copyright (c) 2001-2021 Fidelity National Information 	*
->>>>>>> 451ab477 (GT.M V7.0-000):sr_i386/merrors_ansi.h
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -847,11 +843,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOTALLDBOPN */
 	   0,	/* MUSELFBKUP */
 	   0,	/* DBDANGER */
-<<<<<<< HEAD:sr_port/merrors_ansi.h
 	   0,	/* UNUSEDMSG1012 */
-=======
-	   0,	/* UNUSEDMSG1010 */
->>>>>>> 451ab477 (GT.M V7.0-000):sr_i386/merrors_ansi.h
 	   0,	/* TCGETATTR */
 	   0,	/* TCSETATTR */
 	   0,	/* IOWRITERR */

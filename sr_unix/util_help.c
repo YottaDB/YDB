@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,15 +57,9 @@ void util_help(void)
 	SETUP_THREADGBL_ACCESS;
 	assert(1 >= TREF(parms_cnt));
 	assert(GTM_IMAGE < image_type && UTIL_HELP_IMAGES > image_type);
-<<<<<<< HEAD
 	if (!ydb_dist_ok_to_use)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, LEN_AND_STR(ydb_dist),
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, LEN_AND_STR(ydb_dist),
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
-=======
-	if (!gtm_dist_ok_to_use)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, LEN_AND_STR(gtm_dist),
-			gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	if (0 == TREF(parms_cnt))
 		help_option = utilImageGLDs[INVALID_IMAGE];
 	else

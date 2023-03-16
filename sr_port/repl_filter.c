@@ -254,86 +254,58 @@ enum
 
 GBLDEF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
 {
-<<<<<<< HEAD
-	IF_44TO22,	/* Convert from jnl format V44 to V22) */
-	IF_44TO22,	/* Convert from jnl format V44 to V23) */
-	IF_44TO24,	/* Convert from jnl format V44 to V24) */
-	IF_44TO24,	/* Convert from jnl format V44 to V25) */
-	IF_44TO24,	/* Convert from jnl format V44 to V26) */
-	IF_44TO24,	/* Convert from jnl format V44 to V27) */
-	IF_INVALID,	/* Convert from jnl format V44 to V28). IF_INVALID will be filled in when GT.M bumps jnl format to V28. */
-	IF_INVALID,	/* Convert from jnl format V44 to V29). IF_INVALID will be filled in when GT.M bumps jnl format to V29. */
-	IF_INVALID,	/* Convert from jnl format V44 to V30). IF_INVALID will be filled in when GT.M bumps jnl format to V30. */
-	IF_INVALID,	/* Convert from jnl format V44 to V31). IF_INVALID will be filled in when GT.M bumps jnl format to V31. */
-	IF_INVALID,	/* Convert from jnl format V44 to V32). IF_INVALID will be filled in when GT.M bumps jnl format to V32. */
-	IF_INVALID,	/* Convert from jnl format V44 to V33). IF_INVALID will be filled in when GT.M bumps jnl format to V33. */
-	IF_INVALID,	/* Convert from jnl format V44 to V34). IF_INVALID will be filled in when GT.M bumps jnl format to V34. */
-	IF_INVALID,	/* Convert from jnl format V44 to V35). IF_INVALID will be filled in when GT.M bumps jnl format to V35. */
-	IF_INVALID,	/* Convert from jnl format V44 to V36). IF_INVALID will be filled in when GT.M bumps jnl format to V36. */
-	IF_INVALID,	/* Convert from jnl format V44 to V37). IF_INVALID will be filled in when GT.M bumps jnl format to V37. */
-	IF_INVALID,	/* Convert from jnl format V44 to V38). IF_INVALID will be filled in when GT.M bumps jnl format to V38. */
-	IF_INVALID,	/* Convert from jnl format V44 to V39). IF_INVALID will be filled in when GT.M bumps jnl format to V39. */
-	IF_INVALID,	/* Convert from jnl format V44 to V40). IF_INVALID will be filled in when GT.M bumps jnl format to V40. */
-	IF_INVALID,	/* Convert from jnl format V44 to V41). IF_INVALID will be filled in when GT.M bumps jnl format to V41. */
-	IF_INVALID,	/* Convert from jnl format V44 to V42). IF_INVALID will be filled in when GT.M bumps jnl format to V42. */
-	IF_INVALID,	/* Convert from jnl format V44 to V43). IF_INVALID will be filled in when GT.M bumps jnl format to V43. */
-	IF_44TO44,	/* Convert from jnl format V44 to V44) */
-=======
-	IF_24TO17,	/* Convert from filter format V24 to V17 (i.e., from jnl ver V27 to V17) */
-	IF_24TO17,	/* Convert from filter format V24 to V17 (i.e., from jnl ver V27 to V18) */
-	IF_24TO19,	/* Convert from filter format V24 to V19 (i.e., from jnl ver V27 to V19) */
-	IF_24TO19,	/* Convert from filter format V24 to V19 (i.e., from jnl ver V27 to V20) */
-	IF_24TO21,	/* Convert from filter format V24 to V21 (i.e., from jnl ver V27 to V21) */
-	IF_24TO22,	/* Convert from filter format V24 to V22 (i.e., from jnl ver V27 to V22) */
-	IF_24TO22,	/* Convert from filter format V24 to V22 (i.e., from jnl ver V27 to V23) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V24) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V25) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V26) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V28) */
-	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V28 to V28) */
->>>>>>> 451ab477 (GT.M V7.0-000)
+	IF_44TO22,	/* Convert from jnl format V45 (filter format V44) to V22 */
+	IF_44TO22,	/* Convert from jnl format V45 (filter format V44) to V23 */
+	IF_44TO24,	/* Convert from jnl format V45 (filter format V44) to V24 */
+	IF_44TO24,	/* Convert from jnl format V45 (filter format V44) to V25 */
+	IF_44TO24,	/* Convert from jnl format V45 (filter format V44) to V26 */
+	IF_44TO24,	/* Convert from jnl format V45 (filter format V44) to V27 */
+	IF_44TO24,	/* Convert from jnl format V45 (filter format V44) to V28 */
+	IF_INVALID,	/* Convert from jnl format ??? to V29. IF_INVALID will be filled in when GT.M bumps jnl format to V29. */
+	IF_INVALID,	/* Convert from jnl format ??? to V30. IF_INVALID will be filled in when GT.M bumps jnl format to V30. */
+	IF_INVALID,	/* Convert from jnl format ??? to V31. IF_INVALID will be filled in when GT.M bumps jnl format to V31. */
+	IF_INVALID,	/* Convert from jnl format ??? to V32. IF_INVALID will be filled in when GT.M bumps jnl format to V32. */
+	IF_INVALID,	/* Convert from jnl format ??? to V33. IF_INVALID will be filled in when GT.M bumps jnl format to V33. */
+	IF_INVALID,	/* Convert from jnl format ??? to V34. IF_INVALID will be filled in when GT.M bumps jnl format to V34. */
+	IF_INVALID,	/* Convert from jnl format ??? to V35. IF_INVALID will be filled in when GT.M bumps jnl format to V35. */
+	IF_INVALID,	/* Convert from jnl format ??? to V36. IF_INVALID will be filled in when GT.M bumps jnl format to V36. */
+	IF_INVALID,	/* Convert from jnl format ??? to V37. IF_INVALID will be filled in when GT.M bumps jnl format to V37. */
+	IF_INVALID,	/* Convert from jnl format ??? to V38. IF_INVALID will be filled in when GT.M bumps jnl format to V38. */
+	IF_INVALID,	/* Convert from jnl format ??? to V39. IF_INVALID will be filled in when GT.M bumps jnl format to V39. */
+	IF_INVALID,	/* Convert from jnl format ??? to V40. IF_INVALID will be filled in when GT.M bumps jnl format to V40. */
+	IF_INVALID,	/* Convert from jnl format ??? to V41. IF_INVALID will be filled in when GT.M bumps jnl format to V41. */
+	IF_INVALID,	/* Convert from jnl format ??? to V42. IF_INVALID will be filled in when GT.M bumps jnl format to V42. */
+	IF_INVALID,	/* Convert from jnl format ??? to V43. IF_INVALID will be filled in when GT.M bumps jnl format to V43. */
+	IF_44TO44,	/* Convert from jnl format V45 (filter format V44) to V44 */
+	IF_44TO44,	/* Convert from jnl format V45 (filter format V44) to V45 */
 };
 
 GBLDEF	intlfltr_t repl_filter_old2cur[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
 {
-<<<<<<< HEAD
-	IF_22TO44,	/* Convert from jnl format V22 to V44) */
-	IF_22TO44,	/* Convert from jnl format V23 to V44) */
-	IF_24TO44,	/* Convert from jnl format V24 to V44) */
-	IF_24TO44,	/* Convert from jnl format V25 to V44) */
-	IF_24TO44,	/* Convert from jnl format V26 to V44) */
-	IF_24TO44,	/* Convert from jnl format V27 to V44) */
-	IF_INVALID,	/* Convert from jnl format V28 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V28. */
-	IF_INVALID,	/* Convert from jnl format V29 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V29. */
-	IF_INVALID,	/* Convert from jnl format V30 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V30. */
-	IF_INVALID,	/* Convert from jnl format V31 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V31. */
-	IF_INVALID,	/* Convert from jnl format V32 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V32. */
-	IF_INVALID,	/* Convert from jnl format V33 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V33. */
-	IF_INVALID,	/* Convert from jnl format V34 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V34. */
-	IF_INVALID,	/* Convert from jnl format V35 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V35. */
-	IF_INVALID,	/* Convert from jnl format V36 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V36. */
-	IF_INVALID,	/* Convert from jnl format V37 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V37. */
-	IF_INVALID,	/* Convert from jnl format V38 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V38. */
-	IF_INVALID,	/* Convert from jnl format V39 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V39. */
-	IF_INVALID,	/* Convert from jnl format V40 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V40. */
-	IF_INVALID,	/* Convert from jnl format V41 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V41. */
-	IF_INVALID,	/* Convert from jnl format V42 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V42. */
-	IF_INVALID,	/* Convert from jnl format V43 to V44). IF_INVALID will be filled in when GT.M bumps jnl format to V43. */
-	IF_44TO44,	/* Convert from jnl format V44 to V44) */
-=======
-	IF_17TO24,	/* Convert from filter format V17 to V24 (i.e., from jnl ver V17 to V27) */
-	IF_17TO24,	/* Convert from filter format V17 to V24 (i.e., from jnl ver V18 to V27) */
-	IF_19TO24,	/* Convert from filter format V19 to V24 (i.e., from jnl ver V19 to V27) */
-	IF_19TO24,	/* Convert from filter format V19 to V24 (i.e., from jnl ver V20 to V27) */
-	IF_21TO24,	/* Convert from filter format V21 to V24 (i.e., from jnl ver V21 to V27) */
-	IF_22TO24,	/* Convert from filter format V22 to V24 (i.e., from jnl ver V22 to V27) */
-	IF_22TO24,	/* Convert from filter format V22 to V24 (i.e., from jnl ver V23 to V27) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V24 to V27) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V25 to V27) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V26 to V27) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V28) */
-	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V28 to V28) */
->>>>>>> 451ab477 (GT.M V7.0-000)
+	IF_22TO44,	/* Convert from jnl format V22 to V45 (filter format V44) */
+	IF_22TO44,	/* Convert from jnl format V23 to V45 (filter format V44) */
+	IF_24TO44,	/* Convert from jnl format V24 to V45 (filter format V44) */
+	IF_24TO44,	/* Convert from jnl format V25 to V45 (filter format V44) */
+	IF_24TO44,	/* Convert from jnl format V26 to V45 (filter format V44) */
+	IF_24TO44,	/* Convert from jnl format V27 to V45 (filter format V44) */
+	IF_24TO44,	/* Convert from jnl format V28 to V45 (filter format V44) */
+	IF_INVALID,	/* Convert from jnl format V29 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V29. */
+	IF_INVALID,	/* Convert from jnl format V30 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V30. */
+	IF_INVALID,	/* Convert from jnl format V31 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V31. */
+	IF_INVALID,	/* Convert from jnl format V32 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V32. */
+	IF_INVALID,	/* Convert from jnl format V33 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V33. */
+	IF_INVALID,	/* Convert from jnl format V34 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V34. */
+	IF_INVALID,	/* Convert from jnl format V35 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V35. */
+	IF_INVALID,	/* Convert from jnl format V36 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V36. */
+	IF_INVALID,	/* Convert from jnl format V37 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V37. */
+	IF_INVALID,	/* Convert from jnl format V38 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V38. */
+	IF_INVALID,	/* Convert from jnl format V39 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V39. */
+	IF_INVALID,	/* Convert from jnl format V40 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V40. */
+	IF_INVALID,	/* Convert from jnl format V41 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V41. */
+	IF_INVALID,	/* Convert from jnl format V42 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V42. */
+	IF_INVALID,	/* Convert from jnl format V43 to ???. IF_INVALID will be filled in when GT.M bumps jnl format to V43. */
+	IF_44TO44,	/* Convert from jnl format V44 to V45 (filter format V44) */
+	IF_44TO44,	/* Convert from jnl format V45 to V45 (filter format V44) */
 };
 
 GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
@@ -1128,24 +1100,8 @@ void repl_check_jnlver_compat(boolean_t same_endianness)
 
 	assert(is_src_server || is_rcvr_server);
 	if (JNL_VER_EARLIEST_REPL > REMOTE_JNL_VER)
-<<<<<<< HEAD
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
-			LEN_AND_LIT("Replication not supported between these two GT.M versions"));
-=======
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
-			LEN_AND_LIT("Dual/Multi site replication not supported between these two GT.M versions"));
-	else if ((V18_JNL_VER > REMOTE_JNL_VER) && !same_endianness)
-	{	/* cross-endian replication is supported only from V5.3-003 onwards. Issue error and shutdown. */
-		if (is_src_server)
-			other_side = "Replicating";
-		else if (is_rcvr_server)
-			other_side = "Originating";
-		else
-			/* repl_check_jnlver_compat is called only from source server and receiver server */
-			assertpro(is_src_server || is_rcvr_server);
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLNOXENDIAN, 4, LEN_AND_STR(other_side), LEN_AND_STR(other_side));
-	}
->>>>>>> 451ab477 (GT.M V7.0-000)
+			LEN_AND_LIT("Replication not supported between these two GT.M versions"));
 }
 
 /* The following code defines the functions that convert one jnl format to another.

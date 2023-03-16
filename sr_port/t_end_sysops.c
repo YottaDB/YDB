@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -191,20 +191,6 @@ void fileheader_sync(gd_region *reg)
 	cnl = csa->nl;
 	gvstats_rec_cnl2csd(csa);	/* Periodically transfer statistics from database shared-memory to file-header */
 	high_blk = cnl->highest_lbm_blk_changed;
-<<<<<<< HEAD
-=======
-	if (0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))
-		cnl->highest_lbm_blk_changed = GDS_CREATE_BLK_MAX;	/* Reset to initial value */
-	else DEBUG_ONLY(if (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1)))
-		cnl->highest_lbm_blk_changed = V6_GDS_CREATE_BLK_MAX;
-#ifdef DEBUG
-	else
-	{
-		assert((0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))
-			|| (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1)));
-	}
-#endif
->>>>>>> 451ab477 (GT.M V7.0-000)
 	flush_len = SGMNT_HDR_LEN;
 	if (0 <= high_blk)					/* If not negative, flush at least one master map block */
 		flush_len += ((high_blk / csd->bplmap / DISK_BLOCK_SIZE / BITS_PER_UCHAR) + 1) * DISK_BLOCK_SIZE;
@@ -231,7 +217,15 @@ void fileheader_sync(gd_region *reg)
 	 * if the instance is frozen and we had gotten a SIGTERM/SIGINT. We would then have not flushed the master map
 	 * and have lost all indication of how much to flush resulting in a DBMBPINCFL/DBMBMINCFRE integ error.
 	 */
-	cnl->highest_lbm_blk_changed = GDS_CREATE_BLK_MAX;
+	if (0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))
+		cnl->highest_lbm_blk_changed = GDS_CREATE_BLK_MAX;	/* Reset to initial value */
+	else DEBUG_ONLY(if (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1)))
+		cnl->highest_lbm_blk_changed = V6_GDS_CREATE_BLK_MAX;
+#ifdef DEBUG
+	else
+		assert((0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))
+			|| (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1)));
+#endif
 	return;
 }
 

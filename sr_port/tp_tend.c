@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -430,11 +430,7 @@ boolean_t	tp_tend()
 				/* check if current TP transaction's jnl size needs are greater than max jnl file size */
 				if (tot_jrec_size > (gtm_uint64_t)csd->autoswitchlimit)
 					/* can't fit in current transaction's journal records into one journal file */
-<<<<<<< HEAD
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLTRANS2BIG, 4, &tot_jrec_size,
-=======
-					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_JNLTRANS2BIG, 4, si->tot_jrec_size,
->>>>>>> 451ab477 (GT.M V7.0-000)
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_JNLTRANS2BIG, 4, &tot_jrec_size,
 						JNL_LEN_STR(csd), csd->autoswitchlimit);
 			}
 			if (REPL_ALLOWED(csa))

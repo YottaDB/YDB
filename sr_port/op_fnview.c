@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -149,12 +149,8 @@ void	op_fnview(int numarg, mval *dst, ...)
 	gv_namehead	temp_gv_target;
 	gvnh_reg_t	*gvnh_reg;
 	gvnh_spanreg_t	*gvspan;
-<<<<<<< HEAD
 	int		n, tl, newlevel, res, reg_index, collver, nct, act, ver, trigdepth, cidepth;
-=======
-	int		n, tl, newlevel, res, reg_index, collver, nct, act, ver;
 	block_id	n2 = 0;
->>>>>>> 451ab477 (GT.M V7.0-000)
 	lv_val		*lv;
 	mstr		tmpstr, commastr, *gblnamestr;
 	mval		*arg1, *arg2, tmpmval;

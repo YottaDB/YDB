@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,14 +56,10 @@ void rc_gbl_ord(rc_rsp_page *rsp)
 	srch_blk_status	*bh;
 	gvnh_reg_t	*gvnh_reg;
 
-<<<<<<< HEAD
-	ASSERT_IS_LIBGTCM;
-=======
 	/*This code is probably not being maintained as part of the v7 change so put this assert here to see
 	 * if we are even hitting this code during testing*/
 	assert(FALSE);
-
->>>>>>> 451ab477 (GT.M V7.0-000)
+	ASSERT_IS_LIBGTCM;
 	for (;;)
 	{
 		gv_target = cs_addrs->dir_tree;

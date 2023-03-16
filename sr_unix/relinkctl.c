@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,7 +106,7 @@ error_def(ERR_TEXT);
 	}													\
 	if (!gtm_permissions(&dir_stat_buf, &USER_ID, &GROUP_ID, &PERM, PERM_IPC, &pdd))			\
 	{													\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10 + PERMGENDIAG_ARG_COUNT) ERR_RELINKCTLERR, 2,		\
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10 + PERMGENDIAG_ARG_COUNT) ERR_RELINKCTLERR, 2,		\
 			RTS_ERROR_MSTR(&LINKCTL->zro_entry_name), ERR_PERMGENFAIL, 4,				\
 			RTS_ERROR_STRING("relinkctl"), RTS_ERROR_MSTR(&LINKCTL->zro_entry_name),		\
 			PERMGENDIAG_ARGS(pdd));									\
@@ -300,24 +300,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				/* We have to create a relinkctl file. We derive the permissions to use based on those of the object
 				 * directory.
 				 */
-<<<<<<< HEAD
 				GET_USER_ID_GROUP_ID_AND_PERM(linkctl, user_id, group_id, perm);
-=======
-				assert('\0' == linkctl->zro_entry_name.addr[linkctl->zro_entry_name.len]); /* For STAT_FILE. */
-				STAT_FILE(linkctl->zro_entry_name.addr, &dir_stat_buf, stat_res);
-				if (-1 == stat_res)
-				{
-					SNPRINTF(errstr, SIZEOF(errstr), "stat() of file %s failed", linkctl->zro_entry_name.addr);
-					ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, errno);
-				}
-				if (!gtm_permissions(&dir_stat_buf, &user_id, &group_id, &perm, PERM_IPC, &pdd))
-				{
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10 + PERMGENDIAG_ARG_COUNT) ERR_RELINKCTLERR, 2,
-						RTS_ERROR_MSTR(&linkctl->zro_entry_name), ERR_PERMGENFAIL, 4,
-						RTS_ERROR_STRING("relinkctl"), RTS_ERROR_MSTR(&linkctl->zro_entry_name),
-						PERMGENDIAG_ARGS(pdd));
-				}
->>>>>>> 451ab477 (GT.M V7.0-000)
 				/* Attempt to create the relinkctl file with desired permissions. */
 				OPEN3_CLOEXEC(linkctl->relinkctl_path, O_CREAT | O_RDWR | O_EXCL, perm, fd);
 				rctl_create_attempted = TRUE;
@@ -502,115 +485,6 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				}
 			} else if (!is_mu_rndwn_rlnkctl && hold_lock_during_shmat)
 				relinkctl_unlock_exclu(linkctl);
-<<<<<<< HEAD
-=======
-				relinkctl_unmap(linkctl);
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REQRLNKCTLRNDWN, 3,
-					linkctl->relinkctl_path, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
-			}
-			DBGARLNK((stderr, "relinkctl_open: file first open\n"));
-			hdr->n_records = 0;
-			/* Create shared memory to store hash buckets of routine names for faster search in relinkctl file */
-			shmid = shmget(IPC_PRIVATE, shm_size, RWDALL | IPC_CREAT);
-			if (-1 == shmid)
-			{
-				save_errno = errno;
-				relinkctl_delete(linkctl);
-				relinkctl_unlock_exclu(linkctl);
-				relinkctl_unmap(linkctl);
-				SNPRINTF(errstr, SIZEOF(errstr), "shmget() failed for shmsize=%llu [0x%llx]", shm_size, shm_size);
-				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
-			}
-			if (-1 == shmctl(shmid, IPC_STAT, &shmstat))
-			{
-				save_errno = errno;
-				relinkctl_delete(linkctl);
-				relinkctl_unlock_exclu(linkctl);
-				relinkctl_unmap(linkctl);
-				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
-				SNPRINTF(errstr, SIZEOF(errstr), "shmctl(IPC_STAT) failed for shmid=%d shmsize=%llu [0x%llx]",
-					shmid, shm_size, shm_size);
-				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
-			}
-			/* Change uid, group-id and permissions if needed */
-			need_shmctl = FALSE;
-			if ((INVALID_UID != user_id) && (user_id != shmstat.shm_perm.uid))
-			{
-				shmstat.shm_perm.uid = user_id;
-				need_shmctl = TRUE;
-			}
-			if ((INVALID_GID != group_id) && (group_id != shmstat.shm_perm.gid))
-			{
-				shmstat.shm_perm.gid = group_id;
-				need_shmctl = TRUE;
-			}
-			if (shmstat.shm_perm.mode != perm)
-			{
-				shmstat.shm_perm.mode = perm;
-				need_shmctl = TRUE;
-			}
-			if (need_shmctl && (-1 == shmctl(shmid, IPC_SET, &shmstat)))
-			{
-				save_errno = errno;
-				relinkctl_delete(linkctl);
-				relinkctl_unlock_exclu(linkctl);
-				relinkctl_unmap(linkctl);
-				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
-				SNPRINTF(errstr, SIZEOF(errstr), "shmctl(IPC_SET) failed for shmid=%d shmsize=%llu [0x%llx]",
-					shmid, shm_size, shm_size);
-				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
-			}
-			/* Initialize shared memory header */
-			if (-1 == (sm_long_t)(shm_base = (relinkshm_hdr_t *)do_shmat(shmid, 0, 0)))
-			{
-				save_errno = errno;
-				relinkctl_delete(linkctl);
-				relinkctl_unlock_exclu(linkctl);
-				relinkctl_unmap(linkctl);
-				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
-				SNPRINTF(errstr, SIZEOF(errstr), "shmat() failed for shmid=%d shmsize=%llu [0x%llx]",
-					shmid, shm_size, shm_size);
-				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
-			}
-			hdr->relinkctl_shmid = shmid;
-			hdr->relinkctl_shmlen = shm_size;
-			assert(ARRAYSIZE(shm_base->relinkctl_fname) > strlen(linkctl->relinkctl_path));
-			assert(0 == ((UINTPTR_T)shm_base % 8));
-			assert(0 == (SIZEOF(relinkshm_hdr_t) % SIZEOF(uint4)));	/* assert SIZEOF(*sm_uint_ptr_t) alignment */
-			memset(shm_base, 0, shm_size);
-			strcpy(shm_base->relinkctl_fname, linkctl->relinkctl_path);
-			shm_base->min_shm_index = TREF(relinkctl_shm_min_index);
-			/* Since search for a routine proceeds to check all rtnobj shmids from rtnobj_min_shm_index to
-			 * rtnobj_max_shm_index, set the two to impossible values so creation of the first rtnobj shmid
-			 * (whatever its shm_index turns out to be) causes these two to be overwritten to that shm_index.
-			 * Since rtnobj_min_shm_index is overwritten only if it is greater than shm_index, we set it to
-			 * one more than the highest value possible for shm_index i.e. NUM_RTNOBJ_SHM_INDEX. Likewise for
-			 * rtnobj_max_shm_index.
-			 */
-			shm_base->rtnobj_min_shm_index = NUM_RTNOBJ_SHM_INDEX;
-			shm_base->rtnobj_max_shm_index = 0;
-			shm_base->rndwn_adjusted_nattch = FALSE;
-			DEBUG_ONLY(shm_base->skip_rundown_check = FALSE;)
-			for (i = 0; i < NUM_RTNOBJ_SHM_INDEX; i++)
-			{
-				rtnobj_shm_hdr = &shm_base->rtnobj_shmhdr[i];
-				rtnobj_shm_hdr->rtnobj_shmid = INVALID_SHMID;
-				rtnobj_shm_hdr->rtnobj_min_free_index = NUM_RTNOBJ_SIZE_BITS;
-				for (j = 0; j < NUM_RTNOBJ_SIZE_BITS; j++)
-				{
-					rtnobj_shm_hdr->freeList[j].fl = NULL_RTNOBJ_SM_OFF_T;
-					rtnobj_shm_hdr->freeList[j].bl = NULL_RTNOBJ_SM_OFF_T;
-				}
-			}
-			SET_LATCH_GLOBAL(&shm_base->relinkctl_latch, LOCK_AVAILABLE);
-			hdr->nattached = 1;
-			hdr->zro_entry_name_len = MIN(linkctl->zro_entry_name.len, ARRAYSIZE(hdr->zro_entry_name) - 1);
-			memcpy(hdr->zro_entry_name, linkctl->zro_entry_name.addr, hdr->zro_entry_name_len);
-			hdr->zro_entry_name[hdr->zro_entry_name_len] = '\0';
-			/* Shared memory initialization complete. */
-			hdr->initialized = TRUE;
-			relinkctl_unlock_exclu(linkctl);
->>>>>>> 451ab477 (GT.M V7.0-000)
 		} else
 			initialize_hdr = TRUE;
 		if (initialize_hdr)
@@ -624,7 +498,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 					assert(FALSE);
 					relinkctl_unlock_exclu(linkctl);
 					relinkctl_unmap(linkctl);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REQRLNKCTLRNDWN, 3,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REQRLNKCTLRNDWN, 3,
 							linkctl->relinkctl_path, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
 				}
 				DBGARLNK((stderr, "relinkctl_open: file first open\n"));
@@ -855,17 +729,10 @@ int relinkctl_get_key(char key[YDB_PATH_MAX], mstr *zro_entry_name)
 	ydb_mmrhash_128_result(&hash_state, zro_entry_name->len + SIZEOF(obj_label), &hash);
 	ydb_mmrhash_128_hex(&hash, hexstr);
 	hexstr[32] = '\0';
-<<<<<<< HEAD
 	/* If the cumulative path to the relinkctl file exceeds YDB_PATH_MAX, it will be inaccessible, so no point continuing. */
 	if (YDB_PATH_MAX < (TREF(ydb_linktmpdir)).len + SLASH_GTM_RELINKCTL_LEN + SIZEOF(hexstr))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RELINKCTLERR, 2, RTS_ERROR_MSTR(zro_entry_name),
-				ERR_TEXT, 2, RTS_ERROR_LITERAL("Path to the relinkctl file is too long"));
-=======
-	/* If the cumulative path to the relinkctl file exceeds GTM_PATH_MAX, it will be inaccessible, so no point continuing. */
-	if (GTM_PATH_MAX < (TREF(gtm_linktmpdir)).len + SLASH_GTM_RELINKCTL_LEN + SIZEOF(hexstr))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_RELINKCTLERR, 2, RTS_ERROR_MSTR(zro_entry_name),
-			ERR_TEXT, 2, RTS_ERROR_LITERAL("Path to the relinkctl file is too long"));
->>>>>>> 451ab477 (GT.M V7.0-000)
+				ERR_TEXT, 2, RTS_ERROR_LITERAL("Path to the relinkctl file is too long"));
 	key_ptr = key;
 	memcpy(key_ptr, (TREF(ydb_linktmpdir)).addr, (TREF(ydb_linktmpdir)).len);
 	key_ptr += (TREF(ydb_linktmpdir)).len;

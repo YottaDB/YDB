@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -210,13 +210,8 @@ void zshow_output(zshow_out *out, const mstr *str)
 				/* make sure another subscript will fit */
 				is_base_var = LV_IS_BASE_VAR(lv);
 				LV_SBS_DEPTH(lv, is_base_var, sbs_depth);
-<<<<<<< HEAD
 				if (MAX_LVSUBSCRIPTS <= sbs_depth)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-=======
-				if (MAX_LVSUBSCRIPTS <= (sbs_depth + 1))
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
->>>>>>> 451ab477 (GT.M V7.0-000)
 				/* add the subscript for the "code" */
 				lv_child = op_putindx(VARLSTCNT(2) lv, mv_child);
 				lv_child->v.mvtype = 0; /* don't want a node so make it undef'd */
@@ -235,13 +230,8 @@ void zshow_output(zshow_out *out, const mstr *str)
 					/* make sure the subscript will fit */
 					is_base_var = LV_IS_BASE_VAR(lv_child);
 					LV_SBS_DEPTH(lv_child, is_base_var, sbs_depth);
-<<<<<<< HEAD
 					if (MAX_LVSUBSCRIPTS <= sbs_depth)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-=======
-					if (MAX_LVSUBSCRIPTS <= (sbs_depth + 1))
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
->>>>>>> 451ab477 (GT.M V7.0-000)
 					/* add the subscript */
 					lv_child = op_putindx(VARLSTCNT(2) lv_child, mv_child);
 					lv_child->v.mvtype = 0; /* if it is not the last one, no node */
@@ -276,13 +266,8 @@ void zshow_output(zshow_out *out, const mstr *str)
 				/* Check if we can add two more subscripts 1) out->code & 2) out->line_num */
 				is_base_var = LV_IS_BASE_VAR(lv);
 				LV_SBS_DEPTH(lv, is_base_var, sbs_depth);
-<<<<<<< HEAD
 				if (MAX_LVSUBSCRIPTS <= (sbs_depth + 1))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-=======
-				if (MAX_LVSUBSCRIPTS <= (sbs_depth + 2))
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
->>>>>>> 451ab477 (GT.M V7.0-000)
 				out->out_var.lv.child = op_putindx(VARLSTCNT(2) lv, mv);
 				DEBUG_ONLY(LV_SBS_DEPTH(out->out_var.lv.child, FALSE, dbg_sbs_depth);)
 				assert(MAX_LVSUBSCRIPTS > dbg_sbs_depth);

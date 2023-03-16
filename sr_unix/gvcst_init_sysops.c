@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -479,7 +479,7 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 	if (!(status & 1))
 	{
 		if (!update_seg_fname_and_return)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 		else
 		{	/* There was an error trying to expand the file name in the gld. Do not update seg->fname.
 			 * Just return so caller can then use seg->fname as was stored in the gld.
@@ -488,10 +488,6 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 			reg->seg_fname_initialized = TRUE;
 			return reg;
 		}
-<<<<<<< HEAD
-=======
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 	assert(((int)pblk.b_esl + 1) <= SIZEOF(seg->fname));
 	/* If a remote nodename has been specified with the @ syntax, pblk.l_node points to the character past the '@'
@@ -592,12 +588,7 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 					{
 						ftok_sem_release(tmp_reg, FALSE, FALSE);
 						MU_GV_CUR_REG_FREE(tmp_reg, save_gv_cur_region);
-<<<<<<< HEAD
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
-=======
-						save_errno = TREF(mu_cre_file_openrc);
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
->>>>>>> 451ab477 (GT.M V7.0-000)
 					}
 					memcpy(tmpbuff, seg->fname, seg->fname_len + 1); /* + 1 to include terminating '\0' */
 					seg->fname_len -= STR_LIT_LEN(EXT_NEW);
@@ -749,11 +740,7 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd, gtm_uint64_t *sec_size)
 
 int db_init(gd_region *reg, boolean_t ok_to_bypass)
 {
-<<<<<<< HEAD
-	boolean_t       	is_bg, read_only, tsd_read_only, need_stacktrace, have_standalone_access;
-=======
-	boolean_t		is_bg, read_only, need_stacktrace, have_standalone_access;
->>>>>>> 451ab477 (GT.M V7.0-000)
+	boolean_t		is_bg, read_only, tsd_read_only, need_stacktrace, have_standalone_access;
 	boolean_t		shm_setup_ok = FALSE, vermismatch = FALSE, vermismatch_already_printed = FALSE;
 	boolean_t		new_shm_ipc, replinst_mismatch, need_shmctl, need_semctl;
 	boolean_t		gld_do_crypt_init, db_do_crypt_init, semop_success, statsdb_off;
@@ -764,16 +751,8 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	sgmnt_addrs		*csa;
 	node_local_ptr_t	cnl;
 	sgmnt_data		tsdbuff;
-<<<<<<< HEAD
-	sgmnt_data_ptr_t        csd, tsd;
-	jnlpool_addrs_ptr_t	save_jnlpool;
-=======
 	sgmnt_data_ptr_t	csd, tsd;
-	jnlpool_addrs_ptr_t	save_jnlpool, local_jnlpool;
-	replpool_identifier	replpool_id;
-	unsigned int		full_len;	/* for REPL_INST_AVAILABLE */
-	gd_id			replfile_gdid, *tmp_gdid;
->>>>>>> 451ab477 (GT.M V7.0-000)
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	boolean_t		need_jnlpool_setup;
 	struct sembuf		sop[3];
 	struct stat		stat_buf;
@@ -1749,6 +1728,8 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 				assert(csd->semid == tsd->semid);
 				assert(!memcmp(&csd->gt_sem_ctime, &tsd->gt_sem_ctime, SIZEOF(tsd->gt_sem_ctime)));
 				assert(!memcmp(&csd->gt_shm_ctime, &tsd->gt_shm_ctime, SIZEOF(tsd->gt_shm_ctime)));
+				if (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+					db_header_dwnconv(csd);
 				DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, (off_t)0, (sm_uc_ptr_t)csd, SGMNT_HDR_LEN, save_errno);
 				if (0 != save_errno)
 				{
@@ -1762,7 +1743,6 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		{	/* For read-only process if shared memory and semaphore created for first time,
 			 * semaphore and shared memory id, and semaphore creation time are written to disk.
 			 */
-<<<<<<< HEAD
 			db_ipcs.open_fd_with_o_direct = udi->fd_opened_with_o_direct;
 			db_ipcs.semid = tsd->semid;	/* use tsd instead of csd in order for MM to work too */
 			db_ipcs.shmid = tsd->shmid;
@@ -1775,18 +1755,6 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
 			csa->read_only_fs = (EROFS == secshrstat);
 			if ((0 != secshrstat) && !csa->read_only_fs)
-=======
-			cnl->first_nonbypas_writer_seen = TRUE;
-			STRNCPY_STR(csd->machine_name, machine_name, MAX_MCNAMELEN);
-			assert(csd->shmid == tsd->shmid); /* csd already has uptodate sem/shm info from the UDI2CSD call above */
-			assert(csd->semid == tsd->semid);
-			assert(!memcmp(&csd->gt_sem_ctime, &tsd->gt_sem_ctime, SIZEOF(tsd->gt_sem_ctime)));
-			assert(!memcmp(&csd->gt_shm_ctime, &tsd->gt_shm_ctime, SIZEOF(tsd->gt_shm_ctime)));
-			if (0 == memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
-				db_header_dwnconv(csd);
-			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, (off_t)0, (sm_uc_ptr_t)csd, SGMNT_HDR_LEN, save_errno);
-			if (0 != save_errno)
->>>>>>> 451ab477 (GT.M V7.0-000)
 			{
 				if (save_jnlpool != jnlpool)
 					jnlpool = save_jnlpool;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -139,14 +139,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				new_spin_sleep, new_stdnullcoll, new_wrt_per_flu, reserved_bytes, new_full_blkwrt;
 	sgmnt_data_ptr_t	csd, pvt_csd;
 	tp_region		*rptr, single;
-<<<<<<< HEAD
-	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
-	uint4			fsb_size, reservedDBFlags;
 	uint4			reorg_sleep_nsec;
-=======
 	uint4			fsb_size, reservedDBFlags;
 	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
->>>>>>> 451ab477 (GT.M V7.0-000)
 	ZOS_ONLY(int 		realfiletag;)
 	DCL_THREADGBL_ACCESS;
 

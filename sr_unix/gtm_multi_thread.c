@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -102,19 +102,7 @@ int	gtm_multi_thread(gtm_pthread_fnptr_t fnptr, int ntasks, int max_threads,
 		return final_ret;
 	}
 #	ifdef GTM_PTHREAD
-<<<<<<< HEAD
 	INITIALIZE_THREAD_MUTEX_IF_NEEDED; /* Initialize thread-mutex variables if not already done */
-=======
-	/* Initialize thread-mutex variables if not already done */
-	if (!thread_mutex_initialized)
-	{
-		rc = pthread_mutex_init(&thread_mutex, NULL);
-		if (rc)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8)
-				ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_mutex_init()"), CALLFROM, rc);
-		thread_mutex_initialized = TRUE;
-	}
->>>>>>> 451ab477 (GT.M V7.0-000)
 	/* Initialize and set thread-is-joinable attribute */
 	rc = pthread_attr_init(&attr);
 	if (rc)

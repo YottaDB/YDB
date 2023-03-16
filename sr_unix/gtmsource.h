@@ -427,7 +427,7 @@ typedef struct
 						 * sync with the source server specific private global variable "gtmsource_state" */
 	int4			gtmsrc_lcl_array_index;	/* Index of THIS struct in the array of gtmsource_local_struct in jnlpool */
 	int4			repl_zlib_cmp_level;	/* zlib compression level currently used across the replication pipe */
-	unsigned char		filler1_align_8[3];
+	unsigned char		filler1_align_8[4];
 	int4			read_state;  	/* From where to read - pool or the file(s)? */
 	qw_off_t		read; 		/* Offset relative to jnldata_base_off of the next journal record from the pool */
 	repl_conn_info_t	remote_side;	/* Details of the remote side connection */
@@ -487,13 +487,9 @@ typedef struct
 	uint4			next_renegotiate_time;	/* Time (in future) at which the next SSL/TLS renegotiation happens. */
 	int4			num_renegotiations;	/* Number of SSL/TLS renegotiations that happened so far. */
 #	endif
-<<<<<<< HEAD
 	boolean_t		trigupdate;		/* TRUE if -TRIGUPDATE was specified, FALSE otherwise */
 	boolean_t		filler_8byte_align1;
 	GTM64_ONLY(int4		filler_8byte_align2;)	/* Keep size % 8 == 0 */
-=======
-	int4			filler_8byte_align;	/* Keep size % 8 == 0 */
->>>>>>> 451ab477 (GT.M V7.0-000)
 } gtmsource_local_struct;
 
 #if defined(__osf__) && defined(__alpha)

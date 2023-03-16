@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -83,11 +83,8 @@ uint4 dbfilop(file_control *fc)
 				if ((0 == memcmp(fc->op_buff, GDS_LABEL, GDS_LABEL_SZ - 1))	/* current GDS */
 					|| (0 == memcmp(fc->op_buff, V6_GDS_LABEL, GDS_LABEL_SZ - 1)))	/* V6 GDS*/
 				{
-<<<<<<< HEAD
-=======
-					if(0 == memcmp(fc->op_buff, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+					if (0 == memcmp(fc->op_buff, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
 						db_header_upconv((sgmnt_data_ptr_t)fc->op_buff);
->>>>>>> 451ab477 (GT.M V7.0-000)
 					if (offsetof(sgmnt_data, minor_dbver) < fc->op_len)
 						CHECK_DB_ENDIAN((sgmnt_data_ptr_t)fc->op_buff,
 								strlen(udi->fn), udi->fn); /* BYPASSOK */

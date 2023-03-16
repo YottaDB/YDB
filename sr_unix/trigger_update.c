@@ -546,13 +546,8 @@ boolean_t trigger_name_search(char *trigger_name, uint4 trigger_name_len, mval *
 		{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-<<<<<<< HEAD
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
-=======
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
->>>>>>> 451ab477 (GT.M V7.0-000)
 				trigger_name_len, trigger_name);
 		}
 		len = ptr2 - ptr;

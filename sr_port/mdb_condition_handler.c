@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -218,14 +218,9 @@ boolean_t clean_mum_tstart(void);
  */
 boolean_t clean_mum_tstart(void)
 {
-<<<<<<< HEAD
-=======
-	stack_frame	*save_zyerr_frame, *fp, *fpprev;
-	boolean_t	save_check_flag;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
->>>>>>> 451ab477 (GT.M V7.0-000)
 	if (NULL != zyerr_frame)
 	{
 		while ((NULL != frame_pointer) && (NULL != zyerr_frame))
@@ -260,11 +255,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 	jnlpool_addrs_ptr_t	local_jnlpool;
 	sgmnt_addrs		*csa;
 	stack_frame		*fp;
-<<<<<<< HEAD
-=======
 	boolean_t		error_in_zyerror;
 	boolean_t		compile_time;
->>>>>>> 451ab477 (GT.M V7.0-000)
 	boolean_t		repeat_error, etrap_handling, reset_mpc;
 	int			level, rc;
 	boolean_t		reserve_sock_dev = FALSE;
@@ -625,7 +617,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 #	endif
  	err_dev = active_device;
 	active_device = (io_desc *)NULL;
-<<<<<<< HEAD
+	compile_time = TREF(compile_time);
 	/* Determine if the error occurred on a action from direct mode. */
 	if (prin_dm_io)
 	{	/* "prin_dm_io" is TRUE implies we got an error while writing in direct mode. No more checks needed. */
@@ -635,7 +627,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 * Go back until we find a counted frame. If we see a SFF_INDCE frame and a SFT_DM frame
 		 * before then, we are in direct mode. Else we are not in direct mode.
 		 * Note that it is also possible for a compilation error before the SFF_INDCE frame is created in op_commarg.
-		 * That is also a direct mode error so take that into account separately (TREF(compile_time) usage below).
+		 * That is also a direct mode error so take that into account separately ("compile_time" usage below).
 		 *
 		 * Note that if we find a ZTIMEOUT or a ZINTERRUPT frame, these are code fragment frames being executed on
 		 * behalf of a $ZTIMEOUT or $ZINTERRUPT interrupt event. These frames are "counted frames" but because they
@@ -643,7 +635,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 * mode frame checks if a ZTIMEOUT or ZINTERRUPT frame is detected.
 		 */
 		dm_action = FALSE;
-		prev_frame_is_indce = TREF(compile_time);
+		prev_frame_is_indce = compile_time;
 		for (fp = frame_pointer; ; fp = fp->old_frame_pointer)
 		{
 			assert(!(fp->type & SFT_COUNT) || !(fp->type & SFT_DM));
@@ -662,11 +654,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 			assert(NULL != fp->old_frame_pointer);
 		}
 	}
-=======
-	compile_time = TREF(compile_time);
-	dm_action = (prin_dm_io || (frame_pointer->old_frame_pointer->type & SFT_DM)
-		|| (compile_time && (frame_pointer->type & SFT_DM)));
->>>>>>> 451ab477 (GT.M V7.0-000)
 	/* The errors are said to be transcendental when they occur during compilation/execution
 	 * of the error trap ({z,e}trap, device exception) or $zinterrupt. The errors in other
 	 * indirect code frames (zbreak, zstep, xecute etc.) aren't defined to be trancendental

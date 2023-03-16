@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -216,15 +216,9 @@ void zro_load(mstr *str)
 			if (ZRO_LBR == toktyp)
 			{
 				if (ZRO_TYPE_OBJLIB == array[oi].type)
-<<<<<<< HEAD
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr,
 						      ERR_NOLBRSRC);
 				toktyp = zro_gettok(&lp, top, &tok);
-=======
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr,
-						ERR_NOLBRSRC);
-				toktyp = GETTOK;
->>>>>>> 451ab477 (GT.M V7.0-000)
 				if (ZRO_DEL == toktyp)
 					toktyp = zro_gettok(&lp, top, &tok);
 				if ((ZRO_IDN != toktyp) && (ZRO_RBR != toktyp))
@@ -333,20 +327,15 @@ void zro_load(mstr *str)
 			pblk.fnb = 0;
 			status = parse_file(&op->str, &pblk);
 			if (!(status & 1))
-<<<<<<< HEAD
 			{
 				free(exp_buff);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
 					      ERR_FILEPARSE, 2, op->str.len, op->str.addr, status);
 			}
 			/* Copy object directory into what will become final $ZROUTINES */
 			COPY_ZROENT_AS_APPROPRIATE(op, pblk, exp_buff, exp_len_used, exp_alloc_len);
 			if (NULL != op->relinkctl_sgmaddr)
 				COPY_TO_EXP_BUFF("*", 1, exp_buff, exp_len_used, exp_alloc_len);	/* Add "*" to objdir */
-=======
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
-					ERR_FILEPARSE, 2, op->str.len, op->str.addr, status);
->>>>>>> 451ab477 (GT.M V7.0-000)
 			op->str.addr = (char *)malloc(pblk.b_esl + 1);
 			op->str.len = pblk.b_esl;
 			memcpy(op->str.addr, pblk.buffer, pblk.b_esl);
@@ -360,7 +349,6 @@ void zro_load(mstr *str)
 			COPY_TO_EXP_BUFF("(", 1, exp_buff, exp_len_used, exp_alloc_len);
 			for (; 0 < si--; op++)
 			{
-<<<<<<< HEAD
 				assert(ZRO_TYPE_SOURCE == op->type);
 				if (op->str.len)
 				{
@@ -370,7 +358,7 @@ void zro_load(mstr *str)
 					if (!(status & 1))
 					{
 						free(exp_buff);
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZROSYNTAX, 2,
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZROSYNTAX, 2,
 								str->len, str->addr,
 								ERR_FILEPARSE, 2, op->str.len, op->str.addr, status);
 					}
@@ -389,18 +377,6 @@ void zro_load(mstr *str)
 				{	/* Add space before next srcdir */
 					COPY_TO_EXP_BUFF(" ", 1, exp_buff, exp_len_used, exp_alloc_len);
 				}
-=======
-				pblk.buff_size = MAX_FN_LEN;
-				pblk.fnb = 0;
-				status = parse_file(&op->str, &pblk);
-				if (!(status & 1))
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
-						ERR_FILEPARSE, 2, op->str.len, op->str.addr, status);
-				op->str.addr = (char *)malloc(pblk.b_esl + 1);
-				op->str.len = pblk.b_esl;
-				memcpy(op->str.addr, pblk.buffer, pblk.b_esl);
-				op->str.addr[pblk.b_esl] = 0;
->>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 			COPY_TO_EXP_BUFF(")", 1, exp_buff, exp_len_used, exp_alloc_len);
 		}

@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -129,17 +129,10 @@ int gtmrecv(void)
 	ESTABLISH_RET(gtmrecv_ch, SS_NORMAL);
 	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool));
 	if (-1 == gtmrecv_get_opt())
-<<<<<<< HEAD
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
-	if (!ydb_dist_ok_to_use)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
-				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
-=======
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
-	if (!gtm_dist_ok_to_use)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
-			gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
->>>>>>> 451ab477 (GT.M V7.0-000)
+	if (!ydb_dist_ok_to_use)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
+				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	if (gtmrecv_options.start || gtmrecv_options.shut_down)
 	{	/* Use "gd_header" for consistency across all "jnlpool_init" usages in the codebase
 		 * even though it is NULL in the case of the receiver server.
@@ -481,32 +474,9 @@ int gtmrecv(void)
 	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmrecv_log_fd, gtmrecv_options.log_file);
 	assert(SS_NORMAL == log_init_status);
 	repl_log_fd2fp(&gtmrecv_log_fp, gtmrecv_log_fd);
-<<<<<<< HEAD
 	if (-1 == setsid())
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-			  RTS_ERROR_LITERAL("Receiver server error in setsid"), errno);
-=======
-	if (-1 == (procgp = setsid()))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Receiver server error in setsid"), errno);
-	/* Point stdin to /dev/null */
-	OPENFILE("/dev/null", O_RDONLY, null_fd);
-	if (0 > null_fd)
-		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
-	assert(null_fd > 2);
-	/* Detached from the initiating process, now detach from the starting IO */
-	io_rundown(NORMAL_RUNDOWN);
-	FSTAT_FILE(gtmrecv_log_fd, &stat_buf, log_init_status);
-	assertpro(!log_init_status);	/* io_rundown should not affect the log file */
-	DUP2(null_fd, 0, rc);
-	if (0 > rc)
-		RTS_ERROR_CSA_ABT(NULL, ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
-	/* Re-init IO now that we have opened the log file and set stdin to /dev/null */
-	io_init(IS_MUPIP_IMAGE);
-	CLOSEFILE(null_fd, rc);
-	if (0 > rc)
-		RTS_ERROR_CSA_ABT(NULL, ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	gtmrecv_local->recv_serv_pid = process_id;
 	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl));
 	jnlpool->jnlpool_ctl->gtmrecv_pid = process_id;

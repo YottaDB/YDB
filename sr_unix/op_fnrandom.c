@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2007 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 451ab477 (GT.M V7.0-000)
+ *								*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +24,6 @@
 #include "xoshiro.h"
 #include <errno.h>
 
-<<<<<<< HEAD
 GBLREF uint4	process_id;
 GBLREF uint64_t sm64_x;
 GBLREF uint64_t x256_s[4];
@@ -37,34 +32,16 @@ error_def(ERR_RANDARGNEG);
 
 void op_fnrandom (int4 interval, mval *ret)
 {
-=======
-GBLREF int4 process_id;
-
-error_def(ERR_RANDARGNEG);
-
-double          drand48(void);
-void            srand48(long int);
-
-void op_fnrandom (int4 interval, mval *ret)
-{
-	static int4	seed = 0;
->>>>>>> 451ab477 (GT.M V7.0-000)
 	int4		random;
 	FILE		*file;
 
 	if (1 >= interval)
 	{
-<<<<<<< HEAD
 		if (1 > interval)
-			rts_error(VARLSTCNT(1) ERR_RANDARGNEG);
+			RTS_ERROR_ABT(VARLSTCNT(1) ERR_RANDARGNEG);
 		/* Else: it is $random(1). The result/random-value is always 0. */
 		random = 0;
 	} else
-=======
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_RANDARGNEG);
-	}
-	if (seed == 0)
->>>>>>> 451ab477 (GT.M V7.0-000)
 	{
 		if (0 == sm64_x)
 		{	// initialize the random number generator if uninitialized

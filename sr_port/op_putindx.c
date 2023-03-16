@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2014 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 451ab477 (GT.M V7.0-000)
+ *								*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -147,11 +143,10 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			{
 				if (!key->str.len)
 				{
-<<<<<<< HEAD
 					if (LVNULLSUBS_OK != TREF(lv_null_subs))	/* Error for both LVNULLSUBS_{NO,NEVER} */
 					{
 						va_end(var);
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVNULLSUBS);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LVNULLSUBS);
 					}
 				}
 				if (TREF(local_collseq))
@@ -165,10 +160,6 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 					tmp_sbs.str.len = length;
 					s2pool(&(tmp_sbs.str));
 					key = &tmp_sbs;
-=======
-					va_end(var);
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LVNULLSUBS);
->>>>>>> 451ab477 (GT.M V7.0-000)
 				}
 			}
 			if (lvt = LV_GET_CHILD(lv))	/* caution: assignment */
@@ -211,32 +202,6 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			 */
 			SET_ACTIVE_LV(lv, (orig_subs_level == (subs_level + 1)) ? TRUE : FALSE, actlv_op_putindx1);
 		}
-<<<<<<< HEAD
-=======
-		/* the following check could be based on allowing the name and each subscript to be of maximum length; however,
-		 * then $QUERY() could produce a result greatly exceeding MAX_STRLEN, which, while it seems to work, should not
-		 * (although our testing coverage of all cases currently unknown) be consumable by other commands, functions or
-		 * operators; in addition, there seem to be issues with Linux system level I/O of gimundous strings causing hangs
-		 */
-		if (!(MV_CANONICAL & key->mvtype))
-			t_length += 2;					/* + 2 for the quotes if it's not canonical lvn */
-		else if (!(MV_STR & key->mvtype))
-			MV_FORCE_STR(key);				/* to ensure a length for the number */
-		if (MAX_STRLEN < (t_length += (key->str.len + 1)))	/* WARNING assignment */
-		{	/* + 1 above for the comma or close parenthesis */
-			if ((0 == n_length) && !((MAX_STRLEN + SIZEOF(name)) < t_length))
-			{	/* near max, so name length matters - adjust for it by replacing overestimate with actual length */
-				n_length = (char *)format_lvname((lv_val *)start, (uchar_ptr_t)name.c, SIZEOF(name)) - name.c;
-				t_length -= (SIZEOF(name) - n_length);
-			}
-			if (MAX_STRLEN < t_length)
-			{
-				va_end(var);
-				SET_ACTIVE_LV(lv, (orig_subs_level == (subs_level + 1)) ? TRUE : FALSE, actlv_op_putindx1);
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
-			}
-		}
->>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 	va_end(var);
 	if (base_lv != lv)

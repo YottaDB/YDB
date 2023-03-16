@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,7 +55,6 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
  * the format of any REPLICATED jnl record changes as opposed to the jnl format which can change if the jnl file hdr format
  * changes or if the format of a non-replicated journal record (e.g. EPOCH record) changes.
  *
-<<<<<<< HEAD
  * We support replication with versions as old as 5 years. To help with that determination every time the journal/filter
  * format changes, the release date of each version is included in the MM/YY column.
  *
@@ -82,7 +81,9 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
  * 03/2017 V24     V27    V6.3-001  <--- JRT_ALIGN record size reduced from min of 32 bytes to min of 16 bytes.
  *                                       The extract format though did not change as we extract a 0 tn now in -detail extract.
  *                                       The filter format did not change because ALIGN record is not replicated.
- * ??/???? V??     V28    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * 02/2021 V24     V28    V7.0-000  <--- block_id is extended from 4-bytes to 8-bytes.
+ *                                       That means changes to the EPOCH, TRUNC, INCTN, PBLK and AIMG journal records.
+ *                                       The filter format did not change because none of the above records are replicated.
  * ??/???? V??     V29    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
  * ??/???? V??     V30    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
  * ??/???? V??     V31    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
@@ -99,33 +100,7 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
  * ??/???? V??     V42    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
  * ??/???? V??     V43    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
  * 11/2018 V44     V44    r1.24     <--- NULL record has "salvaged" bit indicating auto-generated record (not user-generated)
-=======
- *	------	-------	--------
- *	Filter	Journal	GT.M
- *	format	format	version
- *	------	-------	--------
- *	V11	V11	GT.M V4.2-000
- *	V12	V12	GT.M V4.3-000
- *	V12	V13	GT.M V4.3-001
- *	V12	V14	GT.M V4.3-001A
- *	V15	V15	GT.M V4.4-002
- *	V16	V16	GT.M V5.0-FT01
- *	V17	V17	GT.M V5.0-000	<--- filter support starts here
- *	V17	V18	GT.M V5.3-003	(EPOCH record format changed so no filter format change)
- *	V19	V19	GT.M V5.4-000	(SET/KILL records have nodeflags, New ZTWORMHOLE record, file header max_jrec_len changes)
- *	V19	V20	GT.M V5.4-001	64K journal file header change in Unix but V20 change for VMS too; No jnlrec format change
- *	V21	V21	GT.M V5.4-002	Added replicated ZTRIGGER jnl record type
- *	V22	V22	GT.M V5.5-000	strm_seqno added to all logical records (supplementary instances)
- *	V22	V23	GT.M V6.0-000	Various journaling-related limits have changed, allowing for much larger journal records
- *	V24	V24	GT.M V6.2-000	New logical trigger journal record (TLGTRIG and ULGTRIG jnl records)
- *	V24	V25	GT.M V6.2-001	No new jnl record but bump needed to replicate logical trigger jnl records (GTM-7509)
- *	V24	V26	GT.M V6.2-002	No new jnl record but bump needed because of different encryption method
- *	V24	V27	GT.M V6.3-001	JRT_ALIGN record size reduced from min of 32 bytes to min of 16 bytes.
- *					The extract format though did not change as we extract a 0 tn now in -detial extract.
- *					The filter format did not change because ALIGN record is not replicated.
- *	V24	V28	GT.M V7.0-000	Block IDs were extended from 32-bit to 64-bit
- *					The filter format did not change since none of the modified records are replicated.
->>>>>>> 451ab477 (GT.M V7.0-000)
+ * 09/2023 V44     V45    r2.00     <--- Journal record format changes due to merging GT.M V7.0-000 (see "V28" above for details).
  */
 
 typedef enum
@@ -135,7 +110,6 @@ typedef enum
 	REPL_JNL_V26,		/* enum corresponding to journal format V26 */
 	REPL_JNL_V27,		/* enum corresponding to journal format V27 */
 	REPL_JNL_V28,		/* enum corresponding to journal format V28 */
-<<<<<<< HEAD
 	REPL_JNL_V29,		/* enum corresponding to journal format V29 */
 	REPL_JNL_V30,		/* enum corresponding to journal format V30 */
 	REPL_JNL_V31,		/* enum corresponding to journal format V31 */
@@ -152,8 +126,7 @@ typedef enum
 	REPL_JNL_V42,		/* enum corresponding to journal format V42 */
 	REPL_JNL_V43,		/* enum corresponding to journal format V43 */
 	REPL_JNL_V44,		/* enum corresponding to journal format V44 */
-=======
->>>>>>> 451ab477 (GT.M V7.0-000)
+	REPL_JNL_V45,		/* enum corresponding to journal format V45 */
 	REPL_JNL_MAX
 } repl_jnl_t;
 
@@ -209,15 +182,13 @@ GBLREF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
 #define V25_JNL_VER		25
 #define V26_JNL_VER		26
 #define V27_JNL_VER		27
-<<<<<<< HEAD
-#define V44_JNL_VER		44
-=======
 #define V28_JNL_VER		28
->>>>>>> 451ab477 (GT.M V7.0-000)
+#define V44_JNL_VER		44
+#define V45_JNL_VER		45
 
-#define	V44_NULL_RECLEN		48	/* size of a JRT_NULL record in V22/V23/V24/V44 jnl format */
+#define	V44_NULL_RECLEN		48	/* size of a JRT_NULL record in V22/V23/V24/V44/V45 jnl format */
 
-#define	V44_MUMPS_NODE_OFFSET		48	/* offset of "mumps_node" member in struct_jrec_upd struct in V44 jnl format */
+#define	V44_MUMPS_NODE_OFFSET		48	/* offset of "mumps_node" member in struct_jrec_upd struct in V44/V45 jnl format */
 
 int repl_filter_init(char *filter_cmd);
 int repl_filter(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize);

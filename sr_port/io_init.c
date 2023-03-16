@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,15 +120,6 @@ void io_init(boolean_t term_ctrl)
 	status = ydb_trans_log_name(YDBENVINDX_PRINCIPAL, &tn, buf1, SIZEOF(buf1), IGNORE_ERRORS_FALSE, NULL);
 	if (SS_NOLOGNAM == status)
 		dollar_principal = 0;
-<<<<<<< HEAD
-=======
-	else if (SS_NORMAL == status)
-		dollar_principal = get_log_name(&tn, INSERT);
-#	ifdef UNIX
-	else if (SS_LOG2LONG == status)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, SIZEOF(buf1) - 1);
-#	endif
->>>>>>> 451ab477 (GT.M V7.0-000)
 	else
 	{
 		assert(SS_NORMAL == status);
@@ -161,12 +152,7 @@ void io_init(boolean_t term_ctrl)
 		}
 	}
 	else if (SS_LOG2LONG == status)
-<<<<<<< HEAD
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, SIZEOF(buf1) - 1);
-=======
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, SIZEOF(buf1) - 1);
-#	endif
->>>>>>> 451ab477 (GT.M V7.0-000)
 	else
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	ESTABLISH(io_init_ch);

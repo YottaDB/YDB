@@ -166,14 +166,7 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	SETUP_THREADGBL_ACCESS;
 	/* $ZTRIGGER() is not allowed while already inside the trigger frame */
 	if (0 < gtm_trigger_depth)
-<<<<<<< HEAD
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DZTRIGINTRIG, 2, dollar_ztname->len, dollar_ztname->addr);
-=======
-	{
-		DEBUG_ONLY(in_op_fnztrigger = FALSE);
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DZTRIGINTRIG, 2, dollar_ztname->len, dollar_ztname->addr);
-	}
->>>>>>> 451ab477 (GT.M V7.0-000)
 	assert(rts_stringpool.base == stringpool.base); /* because stp management and trigger compilation have a history */
 	MV_FORCE_STR(func);
 	MV_FORCE_STR(arg1);

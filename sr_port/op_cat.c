@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2011 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 451ab477 (GT.M V7.0-000)
+ *								*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,23 +27,12 @@ GBLREF spdesc	stringpool;
 
 LITREF mval	literal_sqlnull;
 
-error_def(ERR_MAXSTRLEN);
-
 void op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 {
-<<<<<<< HEAD
 	va_list		var;
 	mval		*in;
 	int		maxlen, i;
 	unsigned char	*cp, *base;
-	error_def(ERR_MAXSTRLEN);
-=======
-	va_list var;
-	mval *in, *src;
-	int maxlen, i;
-	VMS_ONLY(int srcargs;)
-	unsigned char *cp, *base;
->>>>>>> 451ab477 (GT.M V7.0-000)
 
 	VAR_START(var, dst);
 	VMS_ONLY(va_count(srcargs);)

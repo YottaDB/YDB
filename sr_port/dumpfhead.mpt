@@ -3,7 +3,7 @@
 ; Copyright (c) 2016-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -110,14 +110,9 @@ getfields(fldarray,dbname)
 	;
 	; Now parse out the fields
 	;
-<<<<<<< HEAD
 	set $zgbldir="$ydb_dist/gtmhelp.gld"
-	set skey="sgmnt_data"
-=======
-	set $zgbldir="$gtm_dist/gtmhelp.gld"
 	if (label["GDSDYNUNX04") set skey="sgmnt_data"
 	else  if (label["GDSDYNUNX03") set skey="v6_sgmnt_data"
->>>>>>> 451ab477 (GT.M V7.0-000)
 	for fldnum=1:1:^gtmtypes(skey,0) do
 	. set fldtype=^gtmtypes(skey,fldnum,"type")
 	. quit:(0=$data(typeconvert(fldtype)))		; Ignore unknown types (likely a sub-struct header)

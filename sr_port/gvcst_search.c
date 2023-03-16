@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,13 +89,8 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	cw_set_element		*cse;
 	off_chain		chain1, chain2;
 	srch_blk_status		*tp_srch_status, *srch_status, *leaf_blk_hist;
-<<<<<<< HEAD
-	boolean_t		already_built, expand_prev_key, is_mm, skip_search_blk;
-	ht_ent_int4		*tabent;
-=======
-	boolean_t		already_built, is_mm, long_blk_id;
+	boolean_t		already_built, expand_prev_key, is_mm, skip_search_blk, long_blk_id;
 	ht_ent_int8		*tabent;
->>>>>>> 451ab477 (GT.M V7.0-000)
 	sm_uc_ptr_t		buffaddr;
 	trans_num		blkhdrtn, oldest_hist_tn;
 	int			hist_size;

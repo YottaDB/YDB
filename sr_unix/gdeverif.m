@@ -3,7 +3,7 @@
 ; Copyright (c) 2006-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -201,12 +201,7 @@ RQUALS(rquals)
 	for  set s=$order(rquals(s)) quit:'$length(s)  do regelm
 	quit:'verified verified
 	if $data(rquals("FILE_NAME")),$zlength(rquals("FILE_NAME"))>(SIZEOF("file_spec")-1) set verified=0
-<<<<<<< HEAD
 	if  do message^GDE($$info(gdeerr("VALTOOLONG")),$zwrite(rquals("FILE_NAME"))_":"_$zwrite(SIZEOF("file_spec")-1)_":""Journal filename""") do message^GDE(gdeerr("REGIS"),$zwrite(REGION))
-=======
-	if  do
-	. zmessage $$info(gdeerr("VALTOOLONG")):rquals("FILE_NAME"):SIZEOF("file_spec")-1:"Journal filename",gdeerr("REGIS"):REGION
->>>>>>> 451ab477 (GT.M V7.0-000)
 	set ks="KEY_SIZE",ks=$select($data(rquals(ks)):rquals(ks),$data(regs(REGION,ks)):regs(REGION,ks),1:tmpreg(ks))
 	set x="RECORD_SIZE",x=$select($data(rquals(x)):rquals(x),$data(regs(REGION,x)):regs(REGION,x),1:tmpreg(x))
 	do allocchk(.rquals)

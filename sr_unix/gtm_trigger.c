@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -361,17 +361,10 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 			}
 			if (mident_suffix_p1 == mident_suffix_top)
 			{	/* Phase 3: Punt */
-<<<<<<< HEAD
 				assert(WBTEST_HELPOUT_TRIGNAMEUNIQ == ydb_white_box_test_case_number);
-				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_TRIGNAMEUNIQ, 3,
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(5) ERR_TRIGNAMEUNIQ, 3,
 						trigdsc->rtn_desc.rt_name.len - 2, trigdsc->rtn_desc.rt_name.addr,
 						((alphanumeric_table_len + 1) * alphanumeric_table_len) + 1);
-=======
-				assert(WBTEST_HELPOUT_TRIGNAMEUNIQ == gtm_white_box_test_case_number);
-				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(5) ERR_TRIGNAMEUNIQ, 3,
-					trigdsc->rtn_desc.rt_name.len - 2, trigdsc->rtn_desc.rt_name.addr,
-					((alphanumeric_table_len + 1) * alphanumeric_table_len) + 1);
->>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 		}
 	}
@@ -402,55 +395,35 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		DOWRITERC(rtnfd, ERROR_CAUSING_JUNK, strlen(ERROR_CAUSING_JUNK), rc); /* BYPASSOK */
 		if (0 != rc)
 		{
-<<<<<<< HEAD
-			UNLINK(rtnname);
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
-=======
 			urc = UNLINK(rtnname);
 			assert(0 == urc);
-			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
->>>>>>> 451ab477 (GT.M V7.0-000)
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 		}
 	}
 #	endif
 	DOWRITERC(rtnfd, trigdsc->xecute_str.str.addr, trigdsc->xecute_str.str.len, rc);
 	if (0 != rc)
 	{
-<<<<<<< HEAD
-		UNLINK(rtnname);
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
-=======
 		urc = UNLINK(rtnname);
 		assert(0 == urc);
-		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
->>>>>>> 451ab477 (GT.M V7.0-000)
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 	}
 	if (NULL == memchr(trigdsc->xecute_str.str.addr, '\n', trigdsc->xecute_str.str.len))
 	{
 		DOWRITERC(rtnfd, NEWLINE, strlen(NEWLINE), rc);			/* BYPASSOK */
 		if (0 != rc)
 		{
-<<<<<<< HEAD
-			UNLINK(rtnname);
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
-=======
 			urc = UNLINK(rtnname);
 			assert(0 == urc);
-			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
->>>>>>> 451ab477 (GT.M V7.0-000)
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 		}
 	}
 	CLOSEFILE(rtnfd, rc);
 	if (0 != rc)
 	{
-<<<<<<< HEAD
-		UNLINK(rtnname);
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, rc);
-=======
 		urc = UNLINK(rtnname);
 		assert(0 == urc);
-		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, rc);
->>>>>>> 451ab477 (GT.M V7.0-000)
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, rc);
 	}
 	assert(MAX_MIDENT_LEN > trigdsc->rtn_desc.rt_name.len);
 	zcomp_parms_ptr = zcomp_parms;
@@ -610,13 +583,8 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	if (!(frame_pointer->type & SFT_TRIGR))
 	{	/* Create new trigger base frame first that back-stops stack unrolling and return to us */
 		if (GTM_TRIGGER_DEPTH_MAX < (gtm_trigger_depth + 1))	/* Verify we won't nest too deep */
-<<<<<<< HEAD
-			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_MAXTRIGNEST, 1, GTM_TRIGGER_DEPTH_MAX);
-		DBGTRIGR((stderr, "gtm_trigger: Invoking new trigger at frame_pointer 0x"lvaddr"  ctxt value: 0x"lvaddr"\n",
-=======
 			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(3) ERR_MAXTRIGNEST, 1, GTM_TRIGGER_DEPTH_MAX);
-		DBGTRIGR((stderr, "gtm_trigger: Invoking new trigger at frame_pointer 0x%016lx  ctxt value: 0x%016lx\n",
->>>>>>> 451ab477 (GT.M V7.0-000)
+		DBGTRIGR((stderr, "gtm_trigger: Invoking new trigger at frame_pointer 0x"lvaddr"  ctxt value: 0x"lvaddr"\n",
 			  frame_pointer, ctxt));
 		/* Protect against interrupts while we have only a trigger base frame on the stack */
 		DEFER_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND, prev_intrpt_state);

@@ -2,7 +2,7 @@
  *								*
  *	Copyright 2001 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,7 @@
 {									\
 	int	length;							\
 									\
+	assert(0 < P_OFFSET);						\
 	switch(io_params_size[CH])					\
 	{								\
 	case IOP_VAR_SIZE:						\
@@ -45,6 +46,7 @@
 		length = io_params_size[CH];				\
 		break;							\
 	}								\
+	assert(P_OFFSET < (MAXPOSINT4 - length));			\
 	P_OFFSET += length;						\
 }
 

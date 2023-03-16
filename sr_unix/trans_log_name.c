@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2010 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 451ab477 (GT.M V7.0-000)
+ *								*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,13 +69,8 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 			/* Get the env var name. Take care not to exceed input string length */
 			for ( ; (s_ptr < s_top) && (ch = *s_ptr, ('_' == ch) || ISALNUM_ASCII(ch)); s_ptr++)
 				;
-<<<<<<< HEAD
-			s_len = (int)(s_ptr - s_start) - 1;
-			/* Copy it into "temporary-buffer" so we can null-terminate it and pass to getenv */
-=======
 			s_len = (unsigned int)(s_ptr - s_start) - 1;
-			/* Copy it into "temporary-buffer" so we can null-terminate it and pass to GETENV */
->>>>>>> 451ab477 (GT.M V7.0-000)
+			/* Copy it into "temporary-buffer" so we can null-terminate it and pass to getenv */
 			if (trans_log_name_buflen <= s_len)
 			{	/* Currently allocated buffer is not enough. Expand it. */
 				assert(NULL != trans_log_name_buff);

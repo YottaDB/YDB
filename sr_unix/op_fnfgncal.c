@@ -774,15 +774,9 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 			space_n += SIZEOF(gtm_int64_t);
 		}
 #		endif
-<<<<<<< HEAD
 		jtype_char = entry_ptr->parms[j] - ydb_jtype_start_idx;
 		if ((0 > jtype_char) || (ydb_jtype_count <= jtype_char))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
-=======
-		jtype_char = entry_ptr->parms[j] - gtm_jtype_start_idx;
-		if ((0 > jtype_char) || (gtm_jtype_count <= jtype_char))
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
->>>>>>> 451ab477 (GT.M V7.0-000)
 		else
 			*types_descr_dptr = ydb_jtype_chars[MASK_BIT_ON(m2) ? (ydb_jtype_count + jtype_char) : jtype_char];
 		types_descr_dptr++;
@@ -997,31 +991,12 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 			else
 			{
 				if (package->str.len)
-<<<<<<< HEAD
 					xtrnl_table_name = ydb_getenv(YDBENVINDX_XC_PREFIX, &package->str, NULL_IS_YDB_ENV_MATCH);
 				else
 					xtrnl_table_name = ydb_getenv(YDBENVINDX_XC, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
 				assert(NULL != xtrnl_table_name);	/* or else a ZCCTENV error would have been issued earlier */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_XCVOIDRET, 4,
-					  LEN_AND_STR(entry_ptr->call_name.addr), LEN_AND_STR(xtrnl_table_name));
-=======
-				{
-					assert(package->str.len < MAX_NAME_LENGTH - SIZEOF(PACKAGE_ENV_PREFIX) - 1);
-					*tmp_buff_ptr++ = '_';
-					memcpy(tmp_buff_ptr, package->str.addr, package->str.len);
-					tmp_buff_ptr += package->str.len;
-				}
-				*tmp_buff_ptr = '\0';
-				xtrnl_table_name = GETENV(str_buffer);
-				if (NULL == xtrnl_table_name)
-				{ 	/* Environment variable for the package not found. This part of code is for more safety.
-					 * We should not come into this path at all.
-					 */
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
-				}
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_XCVOIDRET, 4,
-					LEN_AND_STR(entry_ptr->call_name.addr), LEN_AND_STR(xtrnl_table_name));
->>>>>>> 451ab477 (GT.M V7.0-000)
+					  LEN_AND_STR(entry_ptr->call_name.addr), LEN_AND_STR(xtrnl_table_name));
 			}
 		}
 	} else if (dst && (ydb_void != entry_ptr->return_type))
@@ -1086,13 +1061,8 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	}
 	/* Entry not found */
 	if ((NULL == entry_ptr) || (NULL == entry_ptr->fcn) || (NULL == entry_ptr->call_name.addr))
-<<<<<<< HEAD
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCRTENOTF, 2, extref->str.len, extref->str.addr);
-	/* Detect a call-out to Java. The java plugin still has references to "gtm_xcj" (not "ydb_xcj") hence the below check. */
-=======
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCRTENOTF, 2, extref->str.len, extref->str.addr);
-	/* Detect a call-out to Java. */
->>>>>>> 451ab477 (GT.M V7.0-000)
+	/* Detect a call-out to Java. The java plugin still has references to "gtm_xcj" (not "ydb_xcj") hence the below check. */
 	if (!strncmp(entry_ptr->call_name.addr, "gtm_xcj", 7))
 	{
 		java = TRUE;
@@ -1100,8 +1070,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	}
 	/* It is an error to have more actual parameters than formal parameters */
 	if (argcnt > entry_ptr->argcnt)
-<<<<<<< HEAD
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCARGMSMTCH, 2, argcnt, entry_ptr->argcnt);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCARGMSMTCH, 2, argcnt, entry_ptr->argcnt);
 	/* If $PRINCIPAL is a terminal device, and it has unflushed data on the output device side, flush that
 	 * before making the foreign call as otherwise the foreign call could in turn write to the terminal resulting
 	 * in out-of-order terminal writes if the unflushed data gets flushed after the foreign call (YDB#940).
@@ -1117,9 +1086,6 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 		if (0 != TT_UNFLUSHED_DATA_LEN(tt_ptr))
 			iott_flush(io_std_device.out);
 	}
-=======
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCARGMSMTCH, 2, argcnt, entry_ptr->argcnt);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	VAR_START(var, argcnt);
 	if (java)
 	{
@@ -1463,31 +1429,12 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 		else
 		{
 			if (package->str.len)
-<<<<<<< HEAD
 				xtrnl_table_name = ydb_getenv(YDBENVINDX_XC_PREFIX, &package->str, NULL_IS_YDB_ENV_MATCH);
 			else
 				xtrnl_table_name = ydb_getenv(YDBENVINDX_XC, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
 			assert(NULL != xtrnl_table_name);	/* or else a ZCCTENV error would have been issued earlier */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_XCVOIDRET, 4,
-				  LEN_AND_STR(entry_ptr->call_name.addr), LEN_AND_STR(xtrnl_table_name));
-=======
-			{
-				assert(package->str.len < MAX_NAME_LENGTH - SIZEOF(PACKAGE_ENV_PREFIX) - 1);
-				*tmp_buff_ptr++ = '_';
-				memcpy(tmp_buff_ptr, package->str.addr, package->str.len);
-				tmp_buff_ptr += package->str.len;
-			}
-			*tmp_buff_ptr = '\0';
-			xtrnl_table_name = GETENV(str_buffer);
-			if (NULL == xtrnl_table_name)
-			{	/* Environment variable for the package not found. This part of code is for more safety.
-				 * We should not come into this path at all.
-				 */
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
-			}
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_XCVOIDRET, 4,
-				LEN_AND_STR(entry_ptr->call_name.addr), LEN_AND_STR(xtrnl_table_name));
->>>>>>> 451ab477 (GT.M V7.0-000)
+				  LEN_AND_STR(entry_ptr->call_name.addr), LEN_AND_STR(xtrnl_table_name));
 		}
 	}
 	free_return_type(status, entry_ptr->return_type);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,17 +38,8 @@ void zco_init(void)
 	status = ydb_trans_log_name(YDBENVINDX_COMPILE, &tn, buf1, SIZEOF(buf1), IGNORE_ERRORS_FALSE, NULL);
 	if (SS_NORMAL != status)
 	{
-<<<<<<< HEAD
 		assert(SS_NOLOGNAM == status);
 		return;
-=======
-		if (SS_NOLOGNAM == status)
-			return;
-		else if (SS_LOG2LONG == status)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf1) - 1);
-		else
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) status);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 	if (0 == tn.len)
 		return;

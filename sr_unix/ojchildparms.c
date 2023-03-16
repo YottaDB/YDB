@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -237,13 +237,8 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		receive_child_locals_finalize(&local_buff);
 	/* Keep the pipe alive until local transfer is done which is done at the second call to this function */
 	if (local_trans_done == setup_op)
-<<<<<<< HEAD
 		if (close(setup_fd) < 0)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, setup_fd, errno, 0);
-=======
-		if ((rc = close(setup_fd)) < 0)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_CLOSEFAIL, 1, setup_fd, errno, 0);
->>>>>>> 451ab477 (GT.M V7.0-000)
 }
 
 STATICFNDEF void receive_child_locals_init(char **local_buff, mval **command_str)

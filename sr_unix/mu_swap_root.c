@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -273,19 +273,8 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr)
 block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, srch_hist *dir_hist_ptr, block_id child_blk_id,
 		sm_uc_ptr_t child_blk_ptr, kill_set *kill_set_list, trans_num curr_tn)
 {
-<<<<<<< HEAD
-	sgmnt_data_ptr_t	csd;
-	sgmnt_addrs		*csa;
-	srch_blk_status		bmlhist, freeblkhist;
-	block_id		hint_blk_num, free_blk_id, total_blks, num_local_maps, master_bit, temp_blk;
-	boolean_t		free_blk_recycled;
-	int4			free_bit, hint_bit, maxbitsthismap;
-	int			blk_seg_cnt, blk_size;
-	sm_uc_ptr_t		parent_blk_ptr, bn_ptr, saved_blk;
-=======
->>>>>>> 451ab477 (GT.M V7.0-000)
 	blk_segment		*bs1, *bs_ptr;
-	block_id		hint_blk_num, free_blk_id, parent_blk_id, total_blks, num_local_maps, master_bit,
+	block_id		hint_blk_num, free_blk_id, total_blks, num_local_maps, master_bit,
 				free_bit, temp_blk;
 	boolean_t		free_blk_recycled, child_long_blk_id, parent_long_blk_id;
 	cw_set_element		*tmpcse;
@@ -295,7 +284,6 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	int			tmp_cmpc, child_blk_id_sz, parent_blk_id_sz;
 	int4			hint_bit, maxbitsthismap;
 	jnl_buffer_ptr_t	jbbp; /* jbbp is non-NULL only if before-image journaling */
-	node_local_ptr_t	cnl;
 	sgmnt_data_ptr_t	csd;
 	sgmnt_addrs		*csa;
 	sm_uc_ptr_t		parent_blk_ptr, bn_ptr, saved_blk;
@@ -354,12 +342,8 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	 * 	4. Child block gets marked recycled in bitmap. (GVCST_BMP_MARK_FREE)
 	 */
 	parent_blk_ptr = dir_hist_ptr->h[parent_blk_lvl].buffaddr; /* parent_blk_lvl is 0 iff we're moving a gvt root block */
-<<<<<<< HEAD
-=======
-	parent_blk_id = dir_hist_ptr->h[parent_blk_lvl].blk_num;
 	parent_long_blk_id = IS_64_BLK_ID(parent_blk_ptr);
 	parent_blk_id_sz = SIZEOF_BLK_ID(parent_long_blk_id);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	CHECK_AND_RESET_UPDATE_ARRAY;
 	if (free_blk_recycled)
 	{	/* Otherwise, it's a completely free block, in which case no need to read. */

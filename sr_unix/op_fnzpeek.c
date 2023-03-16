@@ -586,17 +586,10 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2,
 					RTS_ERROR_LITERAL("mnemonic argument (array index)"));
 			break;
-<<<<<<< HEAD
 		case PO_PEEK:			/* Argument is address of form 0Xhhhhhhhh[hhhhhhhh] so has to be at least 2 bytes */
 			if ((2 >= arglen) || (('0' != *cptr++) || ('x' != *cptr) && ('X' != *cptr)))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
-					      RTS_ERROR_LITERAL("mnemonic argument (peek base address)"));
-=======
-		case PO_PEEK:			/* Argument is address of form 0Xhhhhhhhh[hhhhhhhh] */
-			if (('0' != *cptr++) || ('x' != *cptr) && ('X' != *cptr))
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2,
-					RTS_ERROR_LITERAL("mnemonic argument (peek base address)"));
->>>>>>> 451ab477 (GT.M V7.0-000)
+					      RTS_ERROR_LITERAL("mnemonic argument (peek base address)"));
 			cptr++;			/* Bump past 'x' or 'X' - rest of arg should be hex value */
 			prmpeekadr = (UINTPTR_T)GTM64_ONLY(asc_hex2l)NON_GTM64_ONLY(asc_hex2i)(cptr, arglen - 2);
 			if (-1 == (INTPTR_T)prmpeekadr)
@@ -638,24 +631,17 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			break;
 		case PO_JNLREG:		/* r_ptr set from option processing */
 		case PO_JBFREG:
-<<<<<<< HEAD
 			if (arg_supplied)
 			{
 				csa = &FILE_INFO(r_ptr)->s_addrs;
 				if (NULL == csa->jnl)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZPEEKNOJNLINFO, 2, REG_LEN_STR(r_ptr));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZPEEKNOJNLINFO, 2, REG_LEN_STR(r_ptr));
 				zpeekadr = (PO_JNLREG == mnemonic_opcode) ? (void *)csa->jnl : (void *)csa->jnl->jnl_buff;
 			}
 			break;
 		case PO_UDIREG:		/* r_ptr set from option processing */
 			if (arg_supplied)
 				zpeekadr = FILE_INFO(r_ptr);
-=======
-			csa = &FILE_INFO(r_ptr)->s_addrs;
-			if (NULL == csa->jnl)
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZPEEKNOJNLINFO, 2, REG_LEN_STR(r_ptr));
-			zpeekadr = (PO_JNLREG == mnemonic_opcode) ? (void *)csa->jnl : (void *)csa->jnl->jnl_buff;
->>>>>>> 451ab477 (GT.M V7.0-000)
 			break;
 		case PO_GLFREPL:	/* This set of opcodes all require the journal pool to be initialized. Verify it */
 		case PO_GSLREPL:
@@ -663,13 +649,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_NLREPL:
 		case PO_RIHREPL:
 			/* Make sure jnlpool_addrs are availble */
-<<<<<<< HEAD
 			if (!REPL_INST_AVAILABLE(gd_header))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
-=======
-			if (!REPL_INST_AVAILABLE(NULL))
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
->>>>>>> 451ab477 (GT.M V7.0-000)
 			if (!pool_init)
 			{
 				attach_success = op_fnzpeek_attach_jnlpool();
@@ -705,13 +686,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_UPLREPL:
 		case PO_UHCREPL:
 			/* Make sure recvpool_addrs are available */
-<<<<<<< HEAD
 			if (!REPL_INST_AVAILABLE(gd_header))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
-=======
-			if (!REPL_INST_AVAILABLE(NULL))
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
->>>>>>> 451ab477 (GT.M V7.0-000)
 			if (NULL == recvpool.recvpool_ctl)
 			{
 				attach_success = op_fnzpeek_attach_recvpool();
@@ -746,15 +722,14 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			zpeekadr = NULL; /* needed to silence [-Wsometimes-uninitialized] warning from LLVM compiler */
 	}
 	if (NULL == zpeekadr)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("zpeekadr"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("zpeekadr"));
 	/* Check "offset" parameter */
 	if (0 > offset)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("offset"));
 	zpeekadr = (void *)((char *)zpeekadr + offset);
 	/* Check "len" parameter */
 	if ((0 > len) || (MAX_STRLEN < len))
-<<<<<<< HEAD
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("length"));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("length"));
 	switch(mnemonic_opcode)
 	{
 		case PO_CSAREG:
@@ -819,9 +794,6 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	if (maxlen < len)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("length"));
 	/* Check "format" parameter */
-=======
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("length"));
->>>>>>> 451ab477 (GT.M V7.0-000)
 	if (1 < format->str.len)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("format"));
 	else if (1 == format->str.len)

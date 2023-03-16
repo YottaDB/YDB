@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -104,16 +104,8 @@ void repl_inst_create(void)
 		if (SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_REPL_INSTNAME, &trans_name, inst_name, SIZEOF(inst_name),
 								IGNORE_ERRORS_FALSE, NULL)))
 		{
-<<<<<<< HEAD
 			assert(SS_NOLOGNAM == status);	/* or else we would have issued an error inside "ydb_trans_log_name" */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLINSTNMUNDEF);
-=======
-			if (SS_LOG2LONG == status)
-				RTS_ERROR_CSA_ABT(NULL,
-					VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, SIZEOF(inst_name) - 1);
-			else
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_REPLINSTNMUNDEF);
->>>>>>> 451ab477 (GT.M V7.0-000)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_REPLINSTNMUNDEF);
 		}
 		inst_name_len = trans_name.len;
 	}

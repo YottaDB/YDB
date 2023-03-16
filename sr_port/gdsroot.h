@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -143,12 +143,8 @@ typedef struct
 	unsigned short fid[3];
 } gds_file_id;		/* VMS artifact baked into things that would need care to change */
 
-<<<<<<< HEAD
 /* Note the below is not the same size on all platforms but must be less than or equal to gds_file_id */
 typedef struct gd_id_struct
-=======
-typedef struct gd_id_struct  /* note this is not the same size on all platforms but must be less than or equal to gds_file_id */
->>>>>>> 451ab477 (GT.M V7.0-000)
 {
 	ino_t	inode;
 	dev_t	device;

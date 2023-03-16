@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,21 +51,8 @@ void zro_init(void)
 	SETUP_THREADGBL_ACCESS;
 	if ((TREF(dollar_zroutines)).addr)
 		free((TREF(dollar_zroutines)).addr);
-<<<<<<< HEAD
 	status = ydb_trans_log_name(YDBENVINDX_ROUTINES, &tn, buf1, SIZEOF(buf1), IGNORE_ERRORS_FALSE, NULL);
 	assert((SS_NORMAL == status) || (SS_NOLOGNAM == status));
-=======
-	val.addr = GTM_ZROUTINES;
-	val.len = SIZEOF(GTM_ZROUTINES) - 1;
-	status = TRANS_LOG_NAME(&val, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
-	if ((SS_NORMAL != status) && (SS_NOLOGNAM != status))
-	{
-		if (SS_LOG2LONG == status)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf1) - 1);
-		else
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) status);
-	}
->>>>>>> 451ab477 (GT.M V7.0-000)
 	if ((0 == tn.len) || (SS_NOLOGNAM == status))
 	{	/* "ydb_routines" env var is defined and set to "" OR undefined */
 		tn.len = 1;

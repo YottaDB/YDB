@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -123,13 +123,8 @@ void iott_use(io_desc *iod, mval *pp)
 		if (0 != status)
 		{
 			save_errno = errno;
-<<<<<<< HEAD
 			ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(iod);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
-=======
-			ISSUE_NOPRINCIO_IF_NEEDED(io_curr_device.out, FALSE, FALSE);	/* FALSE, FALSE: READ (sorta), not socket */
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
->>>>>>> 451ab477 (GT.M V7.0-000)
 		}
 		flush_input = FALSE;
 		d_in = iod->pair.in;
@@ -467,30 +462,9 @@ void iott_use(io_desc *iod, mval *pp)
 				case iop_ipchset:
 				{
 #						ifdef KEEP_zOS_EBCDIC
-<<<<<<< HEAD
 					if ((iconv_t)0 != iod->input_conv_cd)
 					{
 						ICONV_CLOSE_CD(iod->input_conv_cd);
-=======
-						if ((iconv_t)0 != iod->input_conv_cd)
-						{
-							ICONV_CLOSE_CD(iod->input_conv_cd);
-						}
-						SET_CODE_SET(iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
-						if (DEFAULT_CODE_SET != iod->in_code_set)
-							ICONV_OPEN_CD(iod->input_conv_cd,
-								(char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
-#						endif
-						GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
-						SET_ENCODING(temp_chset, &chset_mstr);
-						if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
-							break;	/* ignore UTF chsets if not utf8_mode. */
-						if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
-							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2,
-								chset_mstr.len, chset_mstr.addr);
-						iod->ichset = temp_chset;
-						break;
->>>>>>> 451ab477 (GT.M V7.0-000)
 					}
 					SET_CODE_SET(iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
 					if (DEFAULT_CODE_SET != iod->in_code_set)
@@ -502,7 +476,7 @@ void iott_use(io_desc *iod, mval *pp)
 					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
 						break;	/* ignore UTF chsets if not utf8_mode. */
 					if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2,
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2,
 							      chset_mstr.len, chset_mstr.addr);
 					iod->ichset = temp_chset;
 					break;
@@ -510,42 +484,9 @@ void iott_use(io_desc *iod, mval *pp)
 				case iop_opchset:
 				{
 #						ifdef KEEP_zOS_EBCDIC
-<<<<<<< HEAD
 					if ((iconv_t)0 != iod->output_conv_cd)
 					{
 						ICONV_CLOSE_CD(iod->output_conv_cd);
-=======
-						if ((iconv_t)0 != iod->output_conv_cd)
-						{
-							ICONV_CLOSE_CD(iod->output_conv_cd);
-						}
-						SET_CODE_SET(iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
-						if (DEFAULT_CODE_SET != iod->out_code_set)
-							ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET,
-								(char *)(pp->str.addr + p_offset + 1));
-#						endif
-						GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
-						SET_ENCODING(temp_chset, &chset_mstr);
-						if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
-							break;	/* ignore UTF chsets if not utf8_mode. */
-						if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
-							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2,
-								chset_mstr.len, chset_mstr.addr);
-						iod->ochset = temp_chset;
-						break;
-					}
-				case iop_chset:
-					{
-						GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
-						SET_ENCODING(temp_chset, &chset_mstr);
-						if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
-							break;	/* ignore UTF chsets if not utf8_mode. */
-						if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
-							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2,
-								chset_mstr.len, chset_mstr.addr);
-						iod->ichset = iod->ochset = temp_chset;
-						break;
->>>>>>> 451ab477 (GT.M V7.0-000)
 					}
 					SET_CODE_SET(iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
 					if (DEFAULT_CODE_SET != iod->out_code_set)
@@ -557,7 +498,7 @@ void iott_use(io_desc *iod, mval *pp)
 					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
 						break;	/* ignore UTF chsets if not utf8_mode. */
 					if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2,
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2,
 							      chset_mstr.len, chset_mstr.addr);
 					iod->ochset = temp_chset;
 					break;
@@ -569,7 +510,7 @@ void iott_use(io_desc *iod, mval *pp)
 					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
 						break;	/* ignore UTF chsets if not utf8_mode. */
 					if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2,
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2,
 							      chset_mstr.len, chset_mstr.addr);
 					iod->ichset = iod->ochset = temp_chset;
 					break;
@@ -580,15 +521,11 @@ void iott_use(io_desc *iod, mval *pp)
 		temp_ptr = (d_tt_struct *)d_in->dev_sp;
 		Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno, CHANGE_TERM_TRUE);
 		if (0 != status)
-<<<<<<< HEAD
 		{
 			assert(WBTEST_YDB_KILL_TERMINAL == ydb_white_box_test_case_number);
 			ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(iod);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
-		}
-=======
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
->>>>>>> 451ab477 (GT.M V7.0-000)
+		}
 		if (tt == d_in->type)
 		{
 			temp_ptr->term_ctrl = mask_in;
@@ -611,16 +548,11 @@ void iott_use(io_desc *iod, mval *pp)
 		{
 			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
 			if (0 != status)
-<<<<<<< HEAD
 			{
 				ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(iod);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("tcflush input"),
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("tcflush input"),
 					      CALLFROM, errno);
 			}
-=======
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LIT_AND_LEN("tcflush input"),
-					CALLFROM, errno);
->>>>>>> 451ab477 (GT.M V7.0-000)
 		}
 	} else if (tt_ptr->mupintr && !dollar_zininterrupt)
 	{	/* The interrupted read was not properly resumed so clear it now */

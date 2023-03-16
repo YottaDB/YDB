@@ -33,15 +33,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-<<<<<<< HEAD
 set(version r139)
-=======
-set(version ${V7.0-000})
-if("${version}" STREQUAL "")
-        set(version V9.9-0)
-endif()
-
->>>>>>> 451ab477 (GT.M V7.0-000)
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
@@ -236,12 +228,9 @@ endmacro()
 
 #-----------------------------------------------------------------------------
 
-<<<<<<< HEAD
 # Assign sources to executables.
 set_source_list(gtm_threadgbl_deftypes gtm_threadgbl_deftypes)
-set_source_list(dbcertify        dbcertify dlopen_libyottadb)
 set_source_list(dse              dse dlopen_libyottadb)
-set_source_list(ftok             ftok dlopen_libyottadb)
 set_source_list(gtcm_gnp_server  gtcm_gnp_server dlopen_libyottadb)
 set_source_list(gtcm_pkdisp      gtcm_pkdisp omi_extstr)
 set_source_list(gtcm_play        gtcm_play dlopen_libyottadb)
@@ -252,40 +241,9 @@ set_source_list(gtmsecshr_real   gtmsecshr)
 set_source_list(libyottadb       gtm_main mupip_main mupip_cmd dse_main dse_cmd lke_main lke_cmd)
 set_source_list(libyottadb       gtcm_play_main omi_srvc_xct omi_extstr)
 set_source_list(libyottadb       gtcm_server_main gtcm_gnp_server_main gtcm_gnp_clitab gtcm_shmclean_main)
-set_source_list(libyottadb       dbcertify_main dbcertify_cmd ftok_main)
 set_source_list(lke              lke dlopen_libyottadb)
 set_source_list(yottadb          gtm dlopen_libyottadb)
 set_source_list(mupip            mupip dlopen_libyottadb)
-set_source_list(semstat2         semstat2)
-=======
-# Assign sources to libraries.
-load_source_list(libcmisockettcp sr_unix_gnp/libcmisockettcp.list)
-load_source_list(libdse          sr_unix/libdse.list)
-load_source_list(libgnpclient    sr_unix_gnp/libgnpclient.list)
-load_source_list(libgnpserver    sr_unix_gnp/libgnpserver.list)
-load_source_list(libgtcm         sr_unix_cm/libgtcm.list)
-load_source_list(liblke          sr_unix/liblke.list)
-load_source_list(libmupip        sr_unix/libmupip.list)
-load_source_list(libstub         sr_unix/libstub.list)
-
-# Assign sources to executables.
-set_source_list(gtm_threadgbl_deftypes gtm_threadgbl_deftypes)
-set_source_list(dse              dse dse_cmd)
-set_source_list(gtcm_gnp_server  gtcm_gnp_server)
-set_source_list(gtcm_pkdisp      gtcm_pkdisp)
-set_source_list(gtcm_play        gtcm_play omi_srvc_xct)
-set_source_list(gtcm_server      gtcm_main omi_srvc_xct)
-set_source_list(gtcm_shmclean    gtcm_shmclean)
-set_source_list(gtmsecshr        gtmsecshr_wrapper)
-set_source_list(gtmsecshr_real   gtmsecshr)
-set_source_list(libgtmcrypt      gtmcrypt_ref gtmcrypt_pk_ref gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_util)
-set_source_list(libgtmtls        gtm_tls_impl gtmcrypt_util)
-set_source_list(libgtmshr        gtm_main)
-set_source_list(lke              lke lke_cmd)
-set_source_list(maskpass         maskpass gtmcrypt_util)
-set_source_list(mumps            gtm)
-set_source_list(mupip            mupip mupip_cmd)
->>>>>>> 451ab477 (GT.M V7.0-000)
 
 #-----------------------------------------------------------------------------
 # libmumps gets leftover sources, so compute the remaining list.
@@ -438,17 +396,6 @@ endforeach()
 add_custom_target(gen_export DEPENDS ydbexe_symbols.export yottadb_symbols.export)
 
 foreach(lib
-<<<<<<< HEAD
-=======
-  gtcm
-  cmisockettcp
-  gnpclient
-  gnpserver
-  dse
-  lke
-  mupip
-  stub
->>>>>>> 451ab477 (GT.M V7.0-000)
   mumps
   ${extralibs}
   )
@@ -483,16 +430,9 @@ add_executable(yottadb ${yottadb_SOURCES})
 add_executable(dse ${dse_SOURCES})
 list(APPEND with_export dse)
 
-<<<<<<< HEAD
-add_executable(dbcertify ${dbcertify_SOURCES})
-
 add_executable(gtmsecshr ${gtmsecshr_SOURCES})
 target_link_libraries(gtmsecshr libmumps) # needed for static linking since this is a setuid executable
                                           # and does not do a dlopen of libyottadb.so
-=======
-add_executable(gtmsecshr		${gtmsecshr_SOURCES})
-add_dependencies(gtmsecshr		gen_gtm_threadgbl_deftypes)
->>>>>>> 451ab477 (GT.M V7.0-000)
 
 add_executable(gtmsecshr_real ${gtmsecshr_real_SOURCES})
 set_target_properties(gtmsecshr_real PROPERTIES
@@ -522,25 +462,12 @@ add_executable(gtcm_pkdisp ${gtcm_pkdisp_SOURCES})
 
 add_executable(gtcm_shmclean ${gtcm_shmclean_SOURCES})
 
-<<<<<<< HEAD
-add_executable(semstat2 ${semstat2_SOURCES})
-
-add_executable(ftok ${ftok_SOURCES})
-
 add_library(libyottadb MODULE ${libyottadb_SOURCES})
 set_property(TARGET libyottadb PROPERTY OUTPUT_NAME yottadb)
 target_link_libraries(libyottadb libmumps)
 set_target_properties(libyottadb PROPERTIES
   LINK_FLAGS "${libyottadb_link} -Wl,-Map=libyottadb.map"
   LINK_DEPENDS "${libyottadb_dep}"
-=======
-add_library(libgtmshr MODULE ${libgtmshr_SOURCES})
-set_property(TARGET libgtmshr PROPERTY OUTPUT_NAME gtmshr)
-target_link_libraries(libgtmshr libmumps libgnpclient libcmisockettcp)
-set_target_properties(libgtmshr PROPERTIES
-  LINK_FLAGS "${libgtmshr_link}"
-  LINK_DEPENDS "${libgtmshr_dep}"
->>>>>>> 451ab477 (GT.M V7.0-000)
   )
 add_dependencies(libyottadb gen_export)
 add_dependencies(yottadb libyottadb)
@@ -884,9 +811,7 @@ endforeach()
 # Strip debug symbols from files
 if("${CMAKE_BUILD_TYPE}" MATCHES "RelWithDebInfo")
   list(APPEND executable_target_list
-    dbcertify
     dse
-    ftok
     gtcm_gnp_server
     gtcm_pkdisp
     gtcm_play
@@ -898,7 +823,6 @@ if("${CMAKE_BUILD_TYPE}" MATCHES "RelWithDebInfo")
     lke
     yottadb
     mupip
-    semstat2
     )
 
   foreach(e ${executable_target_list})

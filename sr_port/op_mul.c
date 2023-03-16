@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2011 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 451ab477 (GT.M V7.0-000)
+ *								*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,21 +24,12 @@ LITREF int4	ten_pwr[];
 LITREF mval	literal_zero;
 LITREF mval	literal_sqlnull;
 
-<<<<<<< HEAD
 void	op_mul(mval *u, mval *v, mval *p)
-=======
-error_def(ERR_NUMOFLOW);
-
-void	op_mul (mval *u, mval *v, mval *p)
->>>>>>> 451ab477 (GT.M V7.0-000)
 {
 	boolean_t	promo;
 	int4		c, exp;
 	mval		w, z;
-<<<<<<< HEAD
 	int		u_mvtype, v_mvtype;
-=======
->>>>>>> 451ab477 (GT.M V7.0-000)
 
 	/* If u or v is $ZYSQLNULL, the result is $ZYSQLNULL */
 	if (MV_IS_SQLNULL(u) || MV_IS_SQLNULL(v))

@@ -1009,13 +1009,8 @@ DBRNDWN		<Error during global database rundown for region !AD.!/Notify those res
 MUDESTROYFAIL	<Global section (!AD) corresponding to file !AD failed to be destroyed>/info/fao=4!/ansi=0
 NOTALLDBOPN	<Not all required database files were opened>/fatal/fao=0!/ansi=0
 MUSELFBKUP	<Database file !AD can not be backed upon itself>/error/fao=2!/ansi=0
-<<<<<<< HEAD
-DBDANGER	<Process !UL [0x!XL] killed while committing update for database file !AD.  Possibility of damage to block 0x!XL.>/warning/fao=5!/ansi=0
-UNUSEDMSG1012	<TRUNCATEFAIL nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
-=======
 DBDANGER	<Process !UL [0x!XL] killed while committing update for database file !AD.  Possibility of damage to block 0x!16@XQ.>/warning/fao=5!/ansi=0
-UNUSEDMSG1010	<TRUNCATEFAIL last used in V6.3-001A May 2017>/error/fao=0!/ansi=0
->>>>>>> 451ab477 (GT.M V7.0-000)
+UNUSEDMSG1012	<TRUNCATEFAIL nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 TCGETATTR	<Error while getting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 TCSETATTR	<Error while setting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 IOWRITERR	<IO Write by pid 0x!XL to blk 0x!XL of database file !AD failed.  Pid 0x!XL retrying the IO.>/error/fao=5!/ansi=0
@@ -1279,13 +1274,8 @@ BADCHAR		<$ZCHAR(!AD) is not a valid character in the !AD encoding form>/error/f
 DLRCILLEGAL	<!_!AD!/!_!_!_Illegal $CHAR() value !UL>/error/fao=3!/ansi=0
 NONUTF8LOCALE	<Locale has character encoding (!AD) which is not compatible with UTF-8 character set>/error/fao=2!/ansi=0
 INVDLRCVAL	<Invalid $CHAR() value !UL>/error/fao=1!/ansi=0
-<<<<<<< HEAD
-DBMISALIGN	<File header indicates total blocks is 0x!XL but file size indicates total blocks would be between 0x!XL and 0x!XL. Reconstruct the database from a backup or extend it by at least !UL blocks.>/error/fao=4!/ansi=0
-LOADINVCHSET	<Extract file CHSET (!AD) is incompatible with ydb_chset/gtm_chset>/error/fao=2!/ansi=0
-=======
 DBMISALIGN	<File header indicates total blocks is 0x!16@XQ but file size indicates total blocks would be between 0x!16@XQ and 0x!16@XQ. Reconstruct the database from a backup or extend it by at least !@UQ blocks.>/error/fao=4!/ansi=0
-LOADINVCHSET	<Extract file CHSET (!AD) is incompatible with gtm_chset>/error/fao=2!/ansi=0
->>>>>>> 451ab477 (GT.M V7.0-000)
+LOADINVCHSET	<Extract file CHSET (!AD) is incompatible with ydb_chset/gtm_chset>/error/fao=2!/ansi=0
 DLLCHSETM	<Routine !AD in library !AD was compiled with CHSET=M which is different from $ZCHSET. Recompile with CHSET=UTF-8 and re-link.>/error/fao=4!/ansi=0
 DLLCHSETUTF8	<Routine !AD in library !AD was compiled with CHSET=UTF-8 which is different from $ZCHSET. Recompile with CHSET=M and re-link.>/error/fao=4!/ansi=0
 BOMMISMATCH	<!AD Byte Order Marker found when !AD character set specified>/error/fao=4!/ansi=0
@@ -1307,13 +1297,8 @@ GTMSECSHRTMPPATH	<gtmsecshr path is !AD>/info/fao=2!/ansi=0
 UNUSEDMSG1296	<GTMERREXIT nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 INVMEMRESRV	<Could not allocate YottaDB memory reserve (!AD)>/warning/fao=2!/ansi=0
 OPCOMMISSED	<!UL errors and !UL MBFULLs sending prior operator messages>/info/fao=2!/ansi=0
-<<<<<<< HEAD
 COMMITWAITSTUCK	<Pid !UL waited !UL minute(s) for !UL concurrent YottaDB process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0
-COMMITWAITPID	<Pid !UL waited !UL minute(s) for pid !UL to finish commits to block 0x!XL in database file !AD>/error/fao=6!/ansi=0
-=======
-COMMITWAITSTUCK	<Pid !UL waited !UL minute(s) for !UL concurrent GT.M process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0
 COMMITWAITPID	<Pid !UL waited !UL minute(s) for pid !UL to finish commits to block 0x!16@XQ in database file !AD>/error/fao=6!/ansi=0
->>>>>>> 451ab477 (GT.M V7.0-000)
 UPDREPLSTATEOFF	<Error replicating global ^!AD as it maps to database !AD which has replication turned OFF>/error/fao=4!/ansi=0
 LITNONGRAPH	<M standard requires graphics in string literals; found non-printable: $ZCHAR(!AD)>/warning/fao=2!/ansi=0
 DBFHEADERR8	<Database file !AD: control problem: !AD was 0x!16@XQ expecting 0x!16@XQ> /info /fao=6!/ansi=0
@@ -1583,13 +1568,8 @@ CHSETALREADY	<Socket device already contains sockets with iCHSET=!AD, oCHSET=!AD
 DSEMAXBLKSAV	<DSE cannot SAVE another block as it already has the maximum of !UL>/error/fao=1!/ansi=0
 BLKINVALID	<0x!16@XQ is not a valid block as database file !AD has 0x!16@XQ total blocks>/error/fao=4!/ansi=0
 CANTBITMAP	<Can't perform this operation on a bit map (block at a 200 hexadecimal boundary)>/error/fao=0!/ansi=0
-<<<<<<< HEAD
-AIMGBLKFAIL	<After image build for block !XL in region !AD failed in DSE or MUPIP>/error/fao=3!/ansi=0
-YDBDISTUNVERIF	<Environment variable $ydb_dist (!AD) could not be verified against the executables path (!AD)>/error/fao=4!/ansi=0
-=======
 AIMGBLKFAIL	<After image build for block 0x!16@XQ in region !AD failed in DSE or MUPIP>/error/fao=3!/ansi=0
-GTMDISTUNVERIF	<Environment variable $gtm_dist (!AD) could not be verified against the executables path (!AD)>/error/fao=4!/ansi=0
->>>>>>> 451ab477 (GT.M V7.0-000)
+YDBDISTUNVERIF	<Environment variable $ydb_dist (!AD) could not be verified against the executables path (!AD)>/error/fao=4!/ansi=0
 CRYPTNOAPPEND	<APPEND disallowed on the encrypted file !AD>/error/fao=2!/ansi=0
 CRYPTNOSEEK	<SEEK disallowed on the encrypted file !AD>/error/fao=2!/ansi=0
 CRYPTNOTRUNC	<Not positioned at file start or EOF. TRUNCATE disallowed on the encrypted file !AD>/error/fao=2!/ansi=0

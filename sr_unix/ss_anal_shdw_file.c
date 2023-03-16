@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -115,22 +115,11 @@ void	ss_anal_shdw_file(char	*filename, int flen)
 				free(bp);
 				if (-1 != status)
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("read"),
-<<<<<<< HEAD
 						       flen, filename, status);
 				else
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSPREMATEOF, 5, blkno,
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSPREMATEOF, 5, &blkno,
 						       db_blk_size, blk_offset, flen, filename);
 				return;
-=======
-													flen, filename, status);
-					return;
-				} else
-				{
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSPREMATEOF, 5, &blkno,
-											db_blk_size, blk_offset, flen, filename);
-					return;
-				}
->>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 			ss_print_blk_details(blkno, bp);
 		}

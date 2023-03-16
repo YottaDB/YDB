@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,7 +54,6 @@ void  resetterm(io_desc *iod)
 		Tcsetattr(ttptr->fildes, TCSANOW, &t, status, save_errno, CHANGE_TERM_FALSE);
 		if (0 != status)
 		{
-<<<<<<< HEAD
 			assert(-1 == status);
 			assert(ENOTTY != save_errno);
 			/* Skip TCSETATTR error for ENOTTY (in case fildes is no longer a terminal) */
@@ -67,12 +66,8 @@ void  resetterm(io_desc *iod)
 				 * to terminate the process without resetting a non-existent terminal than creating a core file.
 				 */
 				if (!exit_handler_active)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, ttptr->fildes, save_errno);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TCSETATTR, 1, ttptr->fildes, save_errno);
 			}
-=======
-			if (gtm_isanlp(ttptr->fildes) == 0)
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TCSETATTR, 1, ttptr->fildes, save_errno);
->>>>>>> 451ab477 (GT.M V7.0-000)
 		}
 		ttptr->setterm_done_by = 0;
 	}

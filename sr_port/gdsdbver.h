@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -52,7 +55,7 @@ enum db_ver
 };
 
 #define GDSMVCURR ((enum mdb_ver)(GDSMVLAST - 1))
-#define BLK_ID_32_MVER ((enum mdb_ver)(GDSMV70000 - 1))
+#define BLK_ID_32_MVER ((enum mdb_ver)(GDSMR200 - 1))
 
 /* Database minor version as an enum quantity. This is an ever increasing number that may skip actual
  * releases as it is only added to when a file-header field is added or changed or if there is a

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -111,17 +111,11 @@ void mucblkini(void)
 	if (0 != status)
 	{
 		if (IS_MUMPS_IMAGE)
-<<<<<<< HEAD
 		{
 			free(bp2);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_AUTODBCREFAIL, 4, DB_LEN_STR(gv_cur_region),
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_AUTODBCREFAIL, 4, DB_LEN_STR(gv_cur_region),
 				      REG_LEN_STR(gv_cur_region), status);
 		} else
-=======
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_AUTODBCREFAIL, 4, DB_LEN_STR(gv_cur_region),
-				REG_LEN_STR(gv_cur_region), status);
-		else
->>>>>>> 451ab477 (GT.M V7.0-000)
 		{
 			PERROR("Error writing to disk");
 			free(bp2);

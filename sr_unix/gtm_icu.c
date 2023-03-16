@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -255,15 +255,9 @@ static boolean_t parse_ydb_icu_version(char *icu_ver_buf, int len, char *icusymv
 	if (!(IS_ICU_VER_GREATER_THAN_MIN_VER(major_ver, minor_ver)))
 	{
 		/* Construct the first part of the ICUVERLT36 error message. */
-<<<<<<< HEAD
 		SNPRINTF(tmp_errstr, SIZEOF(tmp_errstr), "%s is",
 			(is_ydb_env_match ?  ydbenvname[YDBENVINDX_ICU_VERSION] : gtmenvname[YDBENVINDX_ICU_VERSION]));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ICUVERLT36, 4, LEN_AND_STR(tmp_errstr), major_ver, minor_ver);
-=======
-		SNPRINTF(tmp_errstr, SIZEOF(GTM_ICU_VERSION) + STR_LIT_LEN(GTM_ICU_VERSION_SUFFIX), "%s%s", GTM_ICU_VERSION,
-			GTM_ICU_VERSION_SUFFIX);
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_ICUVERLT36, 4, LEN_AND_STR(tmp_errstr), major_ver, minor_ver);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 	return TRUE;
 }
@@ -317,15 +311,9 @@ void gtm_icu_init(void)
 	if (NULL == chset)	/* 4SCA : null return nl_langinfo not possible */
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_LIT("<undefined>"));
 	if ((NULL == locale) || (0 != strcasecmp(chset, "utf-8")) && (0 != strcasecmp(chset, "utf8")))
-<<<<<<< HEAD
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_STR(chset));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_STR(chset));
 	/* By default, YottaDB will henceforth expect that ICU has been built with symbol renaming disabled. If that is not the case,
 	 * YottaDB can be notified of this through an environment variable ($ydb_icu_version).  The variable should contain the
-=======
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_STR(chset));
-	/* By default, GT.M will henceforth expect that ICU has been built with symbol renaming disabled. If that is not the case,
-	 * GT.M can be notified of this through an environment variable (macro GTM_ICU_VERSION).  The variable should contain the
->>>>>>> 451ab477 (GT.M V7.0-000)
 	 * icu version number formatted as "<major-ver>.<minor-ver>". Example would be "3.6" to indicate ICU 3.6.
 	 * Given the above environment variable, YottaDB will try to dlopen the version specific icu library directly
 	 * (i.e. libicuio.so.36 instead of libicuio.so). In that case, it will try both renamed and non-renamed symbols and
@@ -569,17 +557,13 @@ void gtm_icu_init(void)
 			{
 				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				COPY_DLLERR_MSG(err_str, err_msg);
-<<<<<<< HEAD
 				envname = (char *)(!is_ydb_env_match_usable
 							? "ydb_icu_version/gtm_icu_version"
 							: (is_ydb_env_match
 								? ydbenvname[YDBENVINDX_ICU_VERSION]
 								: gtmenvname[YDBENVINDX_ICU_VERSION]) + 1); /* +1 skips past '$' */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10)
 					ERR_ICUSYMNOTFOUND, 4, LEN_AND_STR(cur_icu_fname), LEN_AND_STR(envname),
-=======
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ICUSYMNOTFOUND, 2, LEN_AND_STR(cur_icu_fname),
->>>>>>> 451ab477 (GT.M V7.0-000)
 					ERR_TEXT, 2, LEN_AND_STR(err_msg));
 			}
 			if (0 == findx)	/* record the fact that the symbols ARE renamed */

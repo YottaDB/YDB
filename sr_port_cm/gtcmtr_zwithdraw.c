@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2009 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 451ab477 (GT.M V7.0-000)
+ *								*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,24 +34,15 @@ GBLREF gv_key			*gv_currkey;
 GBLREF gv_namehead		*gv_target;
 GBLREF gd_region		*gv_cur_region;
 
-<<<<<<< HEAD
-cm_op_t gtcmtr_zwithdraw(void)
-=======
 error_def(ERR_DBPRIVERR);
 
-bool gtcmtr_zwithdraw(void)
->>>>>>> 451ab477 (GT.M V7.0-000)
+cm_op_t gtcmtr_zwithdraw(void)
 {
 	cm_region_list	*reg_ref;
 	unsigned char	*ptr, regnum;
 	unsigned short	top, len;
 
-<<<<<<< HEAD
-	error_def(ERR_DBPRIVERR);
-
 	ASSERT_IS_LIBGNPSERVER;
-=======
->>>>>>> 451ab477 (GT.M V7.0-000)
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(*ptr == CMMS_Q_ZWITHDRAW);
 	ptr++;

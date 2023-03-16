@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,14 +56,9 @@
 #define GTM_VER_LIT		"GT.M "
 #define MAX_VERSION_LEN		16	/* 16 bytes enough to hold V63000A, longest -VERSION= value possible */
 
-<<<<<<< HEAD
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		exit_handler_complete;
 GBLREF	sem_info		*sem_inf;
-=======
-LITREF char		gtm_release_name[];
-LITREF int4		gtm_release_name_len;
->>>>>>> 451ab477 (GT.M V7.0-000)
 
 STATICFNDCL void mupip_downgrade_cleanup(void);
 
@@ -111,12 +106,9 @@ void mupip_downgrade(void)
 	int		ftrunc_status;
 	block_id	temp_cnt;
 
-<<<<<<< HEAD
+	mupip_exit(ERR_GTMCURUNSUPP);
 	/* Initialization */
 	DEFINE_EXIT_HANDLER(mupip_downgrade_cleanup, TRUE);
-=======
-	mupip_exit(ERR_GTMCURUNSUPP);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	/* Structure checks .. */
 	assert((24 * 1024) == SIZEOF(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
 	sem_inf = (sem_info *)malloc(SIZEOF(sem_info) * FTOK_ID_CNT);

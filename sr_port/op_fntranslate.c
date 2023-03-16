@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -156,10 +156,6 @@ void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 	static int4		xlate_array[NUM_CHARS];
 	static unsigned int 	prev_gcols = -1;
 	static mstr		prev_srch = {0, 0}, prev_rplc = {0, 0};
-<<<<<<< HEAD
-	static mval		xlate_table;
-=======
->>>>>>> 451ab477 (GT.M V7.0-000)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

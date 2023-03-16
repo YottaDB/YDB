@@ -1,13 +1,9 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright (c) 2011-2017 Fidelity National Information	*
-=======
  * Copyright (c) 2011-2021 Fidelity National Information	*
->>>>>>> 451ab477 (GT.M V7.0-000)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*

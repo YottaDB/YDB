@@ -423,12 +423,8 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 						      process_id, heartbeat_counter);
 				} else
 				{
-<<<<<<< HEAD
 					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
-=======
 					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
->>>>>>> 451ab477 (GT.M V7.0-000)
 						RTS_ERROR_TEXT("Error with mutex wake msem"), save_errno);
 				}
 			}

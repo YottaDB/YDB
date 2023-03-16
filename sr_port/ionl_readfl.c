@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2006 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 451ab477 (GT.M V7.0-000)
+ *								*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,13 +18,7 @@
 
 GBLREF io_pair io_curr_device;
 
-<<<<<<< HEAD
 int ionl_readfl(mval *val, int4 width, uint8 timeout)
-=======
-error_def(ERR_IOEOF);
-
-int ionl_readfl(mval *val, int4 width, int4 timeout)
->>>>>>> 451ab477 (GT.M V7.0-000)
 {
 	io_desc *dv;
 

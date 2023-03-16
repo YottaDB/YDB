@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -161,20 +161,14 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 			ci += (0 < ci) ? 1 : 0;
 			assert(object_name_len >= ci);
 			clen = object_name_len - ci;
-<<<<<<< HEAD
 			if (2 <= clen)
 			{
-
 				if (('o' == object_file_name[ci + (clen - 1)]) && ('.' == object_file_name[ci + (clen - 2)]))
-					clen = clen - 2;
-				if ((2 <= clen) && ('m' == object_file_name[ci + (clen - 1)]) && ('.' == object_file_name[ci + (clen - 2)]))
-					clen = clen - 2;
+					clen -= 2;	/* Strip trailing ".o" (if any) */
+				if ((2 <= clen) && ('m' == object_file_name[ci + (clen - 1)])
+						&& ('.' == object_file_name[ci + (clen - 2)]))
+					clen -= 2;	/* Strip trailing ".m" (if any) */
 			}
-=======
-			if ((2 <= clen) && ('o' == object_file_name[ci + clen - 1])
-					&& ('.' == object_file_name[ci + clen - 2]))
-				clen -= 2;	/* Strip trailing ".o" */
->>>>>>> 451ab477 (GT.M V7.0-000)
 			SET_OBJ(object_file_name, object_name_len);
 			clen = object_name_len = MIN(clen, MAX_MIDENT_LEN);
 			memcpy(routine_name.addr, &object_file_name[ci], clen);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -90,16 +90,9 @@ void gtm_newintrinsic(mval *intrinsic)
 			if (msp <= stacktop)
 			{
 				msp = old_sp;
-<<<<<<< HEAD
-	   			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
-			} else
-	   			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
-=======
 			   	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
-			}
-	   		else
+			} else
 			   	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	   	}
 		/* Ready, set, shift the younger indirect frames to make room for mv_stent */
 		memmove(msp, old_sp, top - (unsigned char *)old_sp);

@@ -62,9 +62,8 @@ error_def(ERR_JNLENDIANLITTLE);
  * 		which needs to change to say IF_24TO44 if the earliest supported version changes to say V24).
  *      11) Add JRT_MAX_Vxx macro to jnl.h where xx is cur format (44 currently). And delete any unsupported JRT_MAX_Vxx macros.
  */
-<<<<<<< HEAD
-#define JNL_LABEL_TEXT		"YDBJNL44"	/* see above comment paragraph for todos whenever this is changed */
-#define JNL_VER_THIS		44
+#define JNL_LABEL_TEXT		"YDBJNL45"	/* see above comment paragraph for todos whenever this is changed */
+#define JNL_VER_THIS		45
 
 /* Since V24 filter format was first released in 09/2014 (see comment block in "repl_filter.h"), which is only 4 years
  * apart (our minimum is 5 years apart, see comment in sr_port/repl_filter.h) from when JNL_VER_THIS (i.e. V36 filter format)
@@ -74,22 +73,6 @@ error_def(ERR_JNLENDIANLITTLE);
 #define JNL_VER_EARLIEST_REPL	22
 
 #define JRT_MAX_V22		JRT_UZTRIG	/* Max jnlrec type in V22/V23 that can be input to replication filter.
-=======
-#define JNL_LABEL_TEXT		"GDSJNL28"	/* see above comment paragraph for todos whenever this is changed */
-#define JNL_VER_THIS		28
-#define JNL_VER_EARLIEST_REPL	17		/* Replication filter support starts here GDSJNL17 = GT.M V5.1-000.
-						 * (even though it should be V5.0-000, since that is pre-multisite,
-						 * the replication connection with V55000 will error out at handshake
-						 * time so V5.1-000 is the minimum that will even reach internal filter code)
-						 */
-#define JRT_MAX_V17		JRT_AIMG	/* Maximum jnl record type in GDSJNL17 or GDSJNL18 that can be input to replication
-						 * filter. Actually JRT_TRIPLE is a higher record type than JRT_AIMG but it is only
-						 * sent through the replication pipe and never seen by filter routines.
-						 */
-#define JRT_MAX_V19		JRT_UZTWORM	/* Max jnlrec type in GDSJNL19/GDSJNL20 that can be input to replication filter */
-#define JRT_MAX_V21		JRT_UZTRIG	/* Max jnlrec type in GDSJNL21 that can be input to replication filter */
-#define JRT_MAX_V22		JRT_UZTRIG	/* Max jnlrec type in GDSJNL22/GDSJNL23 that can be input to replication filter.
->>>>>>> 451ab477 (GT.M V7.0-000)
 						 * Actually JRT_HISTREC is a higher record type than JRT_UZTRIG but it is only
 						 * sent through the replication pipe and never seen by filter routines.
 						 */
@@ -537,11 +520,7 @@ typedef struct
 	global_latch_t		io_in_prog_latch;	/* UNIX only: write in progress indicator */
 	CACHELINE_PAD(SIZEOF(global_latch_t), 1);	/* start next latch at a different cacheline than previous fields */
 	global_latch_t		fsync_in_prog_latch;	/* fsync in progress indicator */
-<<<<<<< HEAD
-        CACHELINE_PAD(SIZEOF(global_latch_t), 2);	/* start next latch at a different cacheline than previous fields */
-=======
-	CACHELINE_PAD(SIZEOF(global_latch_t), 2)	/* start next latch at a different cacheline than previous fields */
->>>>>>> 451ab477 (GT.M V7.0-000)
+	CACHELINE_PAD(SIZEOF(global_latch_t), 2);	/* start next latch at a different cacheline than previous fields */
 	global_latch_t		phase2_commit_latch;	/* Used by "jnl_phase2_cleanup" to update "phase2_commit_index1" */
 	CACHELINE_PAD(SIZEOF(global_latch_t), 3);	/* pad enough space so next non-filler byte falls in different cacheline */
 	/**********************************************************************************************/
@@ -944,7 +923,6 @@ typedef struct	/* variable length */
 	block_id		blknum;
 	uint4			bsiz;
 	enum db_ver		ondsk_blkver;		/* Previous version of block from cache_rec */
-<<<<<<< HEAD
 	uint4			cmdstrlen;		/* Uninitialized in case of JRT_PBLK type;
 							 * Initialized (and non-zero) in case of JRT_AIMG reflecting the Byte
 							 *	length of the DSE command line that resulted in this AIMG record.
@@ -953,9 +931,6 @@ typedef struct	/* variable length */
 	char			blk_contents[1];	/* Actually blk_contents[bsiz]             in case of JRT_PBLK
 							 *      and blk_contents[bsiz + cmdstrlen] in case of JRT_AIMG
 							 */
-=======
-	char			blk_contents[1];	/* Actually blk_contents[bsiz] */
->>>>>>> 451ab477 (GT.M V7.0-000)
 } struct_jrec_blk;
 
 /* Note: A JRT_ALIGN is the ONLY journal record which does not have the full "jrec_prefix" prefix. This is because
@@ -1987,13 +1962,8 @@ uint4	jnl_write_attempt(jnl_private_control *jpc, uint4 threshold);
 void	jnl_prc_vector(jnl_process_vector *pv);
 void	jnl_send_oper(jnl_private_control *jpc, uint4 status);
 uint4	cre_jnl_file(jnl_create_info *info);
-<<<<<<< HEAD
-uint4 	cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_len);
-uint4	cre_jnl_file_intrpt_rename(sgmnt_addrs *csa);
-=======
 uint4	cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_len);
-void	cre_jnl_file_intrpt_rename(sgmnt_addrs *csa);
->>>>>>> 451ab477 (GT.M V7.0-000)
+uint4	cre_jnl_file_intrpt_rename(sgmnt_addrs *csa);
 void	jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header);
 uint4	jnl_ensure_open(gd_region *reg, sgmnt_addrs *csa);
 void	set_jnl_info(gd_region *reg, jnl_create_info *set_jnl_info);

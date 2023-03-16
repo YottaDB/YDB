@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -287,7 +287,6 @@ void	mur_extract_blk(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *r
 	memcpy((char *)&pblk_head, (char *)&rec->jrec_pblk.blk_contents[0], SIZEOF(blk_hdr));
 	EXTQW(pblk_head.tn);
 	EXTINT(rec->jrec_pblk.ondsk_blkver);
-<<<<<<< HEAD
 	assert((JRT_PBLK == rec->prefix.jrec_type) || (JRT_AIMG == rec->prefix.jrec_type));
 	if (JRT_AIMG == rec->prefix.jrec_type)
 	{	/* Also extract the DSE COMMAND that caused the AIMG record */
@@ -296,7 +295,6 @@ void	mur_extract_blk(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *r
 		extract_len += rec->jrec_aimg.cmdstrlen;
 		murgbl.extr_buff[extract_len++] = '\\';
 	}
-=======
 #ifdef DEBUG
 	for (lll_ptr = mur_options.blocklist; NULL != lll_ptr;  lll_ptr = lll_ptr->next)
 	{
@@ -328,7 +326,6 @@ void	mur_extract_blk(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *r
 		murgbl.extr_buff[extract_len++] = '\\';	/* Trailing slash is removed */
 	}
 #endif
->>>>>>> 451ab477 (GT.M V7.0-000)
 	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 

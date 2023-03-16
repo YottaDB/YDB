@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -216,7 +216,6 @@ int gtmsource_send_heartbeat(time_t *now)
 		return (SS_NORMAL);
 	}
 	if (EREPL_SEND == repl_errno)
-<<<<<<< HEAD
 	{
 #		ifdef GTM_TLS
 		if (ERR_TLSIOERROR == status)
@@ -235,14 +234,9 @@ int gtmsource_send_heartbeat(time_t *now)
 			gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 			return (SS_NORMAL);
 		} else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				LEN_AND_LIT("Error sending HEARTBEAT message. Error in send"), status);
 	} else if (EREPL_SELECT == repl_errno)
-=======
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			LEN_AND_LIT("Error sending HEARTBEAT message. Error in send"), status);
-	if (EREPL_SELECT == repl_errno)
->>>>>>> 451ab477 (GT.M V7.0-000)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Error sending HEARTBEAT message. Error in select"), status);
 	assertpro((SS_NORMAL == status));

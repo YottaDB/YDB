@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,19 +42,12 @@ typedef struct snapshot_info_struct
 {
 	uint4		ss_pid;				/* PID of the process doing the snapshot */
 	uint4		db_blk_size; 			/* Database block size */
-<<<<<<< HEAD
-	uint4		free_blks;			/* Free blocks at the time of snapshot */
-	uint4		total_blks;			/* Total blocks at the time of snapshot */
-	char		shadow_file[YDB_PATH_MAX];	/* Temporary file that will contain the before images */
-	int4		shadow_vbn;			/* Starting VBN of the shadow file */
-=======
 	trans_num	snapshot_tn;			/* Transaction number at which the snapshot started */
 	block_id	free_blks;			/* Free blocks at the time of snapshot */
 	block_id	total_blks;			/* Total blocks at the time of snapshot */
-	char		shadow_file[GTM_PATH_MAX];	/* Temporary file that will contain the before images */
+	char		shadow_file[YDB_PATH_MAX];	/* Temporary file that will contain the before images */
 	char		filler[7];			/* so as to make 8-byte allignment explicit */
 	block_id	shadow_vbn;			/* Starting VBN of the shadow file */
->>>>>>> 451ab477 (GT.M V7.0-000)
 	long		ss_shmid;			/* Shared memory identifier created by snapshot initiating process */
 	block_id	ss_shmsize;			/* Size of the shared memory newly created by snapshot initiating process */
 } snapshot_info_t;
@@ -91,13 +84,8 @@ typedef	struct snapshot_context_struct
 	shm_snapshot_ptr_t	ss_shm_ptr;
 	sm_uc_ptr_t		start_shmaddr;
 	void			*bitmap_addr;
-<<<<<<< HEAD
-	int4			shadow_vbn;
-	char			shadow_file[YDB_PATH_MAX];
-=======
 	block_id		shadow_vbn;
-	char			shadow_file[GTM_PATH_MAX];
->>>>>>> 451ab477 (GT.M V7.0-000)
+	char			shadow_file[YDB_PATH_MAX];
 	ss_proc_status		cur_state;
 	/* the property of process triggering snapshot. At present only last bit is used to indicate property of integ process:
 	 * 0x0000: Normal Integ, 0x0001:Fast Integ

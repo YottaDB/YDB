@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -312,19 +312,9 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 	RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);
 	/* Now that we have restored our state, if we failed due to no xutil helper, or xutil err: invoke an error */
 	if (coll_failxutil)
-<<<<<<< HEAD
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZATRANSCOL);
-	if (coll_noxutil)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, col);
-=======
-	{
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZATRANSCOL);
-	}
 	if (coll_noxutil)
-	{
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, col);
-	}
->>>>>>> 451ab477 (GT.M V7.0-000)
 }
 
 /* The following routines implement numeric aware

@@ -4,7 +4,7 @@
 # Copyright (c) 2009-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -74,11 +74,7 @@ else echo "Shared libary ldflags not set for this platform"; exit 1
 fi
 
 # Binaries
-<<<<<<< HEAD
-binaries="mupip yottadb libyottadb$ext lke dse ftok semstat2"
-=======
-binaries="mupip mumps libgtmshr$ext lke dse"
->>>>>>> 451ab477 (GT.M V7.0-000)
+binaries="mupip yottadb libyottadb$ext lke dse"
 
 # Normal scripts - executed by anyone
 nscripts="lowerc_cp"
@@ -113,17 +109,11 @@ if [ "$euid" != "root" ] ; then
 	exit 1
 fi
 
-<<<<<<< HEAD
 $echo "                     YottaDB Configuration Script"
-$echo "Copyright 2009, 2014 Fidelity Information Services, Inc. Use of this"
-$echo "software is restricted by the provisions of your license agreement."
-$echo "Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries."
-$echo "All rights reserved."
-=======
-$echo "                     GT.M Configuration Script"
 $echo "Copyright 2009-YYYY Fidelity Information Services, Inc. and/or its subsidiaries."
 $echo "Use of this software is restricted by the provisions of your license agreement."
->>>>>>> 451ab477 (GT.M V7.0-000)
+$echo "Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries."
+$echo "All rights reserved."
 $echo ""
 
 # Helper function
@@ -269,19 +259,12 @@ fi
 read resp
 if [ ! -t 0 ] ; then echo "$resp"; fi
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-<<<<<<< HEAD
+	mkdir -p        $ydbdist
+	chmod ug-s,-t   $ydbdist
 	mkdir -p        $ydbdist/plugin/r $ydbdist/plugin/o
 	chmod 0755      $ydbdist/plugin/r $ydbdist/plugin/o $ydbdist
 	chown $owner    $ydbdist/plugin/r $ydbdist/plugin/o $ydbdist
 	chgrp $bingroup $ydbdist/plugin/r $ydbdist/plugin/o $ydbdist
-=======
-	mkdir -p        $gtmdist
-	chmod ug-s,-t   $gtmdist
-	mkdir -p        $gtmdist/plugin/r $gtmdist/plugin/o
-	chmod 0755      $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
-	chown $owner    $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
-	chgrp $bingroup $gtmdist/plugin/r $gtmdist/plugin/o $gtmdist
->>>>>>> 451ab477 (GT.M V7.0-000)
 else
 	exit
 fi
@@ -297,52 +280,14 @@ $echo ""
 $echo "Installing YottaDB...."
 $echo ""
 
-<<<<<<< HEAD
-# Create $ydbdist/utf8 if this platform can support "UTF-8" mode.
-
-# keep the utf8 libicu search code in gtm_test_install.csh in sync with the following!
-if [ -d "utf8" ]; then
-	unset ydb_icu_version
-	# If package has utf8 directory, see if system has libicu and locale
-	# Setup library path (in prep for looking for libicu and crypto libs)
-	# Please keep in sync with sr_unix/set_library_path.csh and sr_unix/gtm_test_install.csh
-	if [ $is64bit_ydb -eq 1 ] ; then
-		if [ "$isarm_ydb" -eq 1 ] ; then
-			library_path="/usr/lib/aarch64-linux-gnu"
-		else
-			library_path="/usr/lib/x86_64-linux-gnu"
-		fi
-		library_path="$library_path /usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib"
-	elif [ "$isarm_ydb" -eq 1 ] ; then
-		library_path="/usr/lib/arm-linux-gnueabihf" # this is where Raspbian has ICU installed
-		library_path="$library_path /usr/lib/arm-linux-gnueabi" # this is where Debian has ICU installed
-		library_path="$library_path /usr/local/lib32 /usr/local/lib /usr/lib32 /usr/lib /libh32 /lib"
-	else
-		library_path="/usr/local/lib /usr/lib32 /usr/lib /usr/lib/i386-linux-gnu"
-	fi
-=======
-is64bit_gtm=`file mumps | grep -c 64.bit`
-
 if [ -d "utf8" ]; then
 	unset icu_version
 	doutf8=1
 	# If package has utf8 directory, see if system has libicu and locale
->>>>>>> 451ab477 (GT.M V7.0-000)
 	$echo "Should UTF-8 support be installed? (y or n) \c"
 	read resp
 	if [ ! -t 0 ] ; then echo "$resp"; fi
 	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-<<<<<<< HEAD
-		would_like_utf8=1
-		$echo "Should an ICU version other than the default be used? (y or n) \c"
-		read resp
-		if [ ! -t 0 ] ; then echo "$resp"; fi
-		if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-			$echo "Enter ICU version (at least ICU version 3.6 is required. Enter as <major-ver>.<minor-ver>): \c"
-			read ydb_icu_version
-			if [ ! -t 0 ] ; then echo "$ydb_icu_version"; fi
-			maj=`$echo $ydb_icu_version | cut -f 1 -d "."`
-=======
 		if [ -x "$(command -v pkg-config)" -a $(pkg-config --exists icu-io; echo $?) -eq 0 ]; then
 			versioncmd="pkg-config --modversion icu-io"
 			libcmd="pkg-config --variable=libdir icu-io"
@@ -359,7 +304,6 @@ if [ -d "utf8" ]; then
 		fi
 		if [ "$icu_version" != "" ] ; then
 			maj=`$echo $icu_version | cut -f 1 -d "."`
->>>>>>> 451ab477 (GT.M V7.0-000)
 			if [ "$maj" -ge "49" ] ; then
 				# Assuming the input is of the form 52.1. As of ICU 49 (aka 4.9),
 				# the version reported by "pkg-config --modversion icu-io"
@@ -371,107 +315,6 @@ if [ -d "utf8" ]; then
 				sonamesuffix=`echo $ydb_icu_version | sed 's/\([0-9\.]*\)\([a-z]*\)/\2\1/;s/\.$//;s/^\.//;'`
 			else
 				# Assuming the input is of the form 4.2.1
-<<<<<<< HEAD
-				majmin=`$echo $ydb_icu_version | cut -d "." -f 1,2 | sed 's/\.//'`
-				sonamesuffix=$majmin
-			fi
-			if [ "$majmin" -lt "36" ] ; then
-				$echo "WARNING: ICU version $ydb_icu_version is less than 3.6. \c"
-				$echo "UTF-8 support will not be installed"
-				would_like_utf8=0
-				doutf8=0
-			fi
-		fi
-	else
-		would_like_utf8=0
-		doutf8=0
-	fi
-	$echo "Should deprecated components be installed? (y or n) \c"
-	read resp
-	if [ ! -t 0 ] ; then echo "$resp"; fi
-	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-		ydb_deprecated="Y"
-	else
-		ydb_deprecated="N"
-	fi
-	# Look for libicu libraries
-	found_icu=0
-	icu_ext=".so"
-	if [ $arch = "ibm" ] ; then
-		icu_ext=".a"
-	fi
-	if [ "$would_like_utf8" -eq 1 ] ; then
-		for libpath in $library_path
-		do
-			icu_lib_found=0
-			if [ "$ydb_icu_version" = "" -a -f "$libpath/libicuio$icu_ext" ] ; then
-				icu_lib_found=1
-				# Find the actual version'ed library to which libicuio.{so,sl,a} points to
-				icu_versioned_lib=`ls -l $libpath/libicuio$icu_ext | awk '{print $NF}'`
-				# Find out vital parameters
-				if [ "$libpath/libicuio$icu_ext" = "$icu_versioned_lib" ]; then
-					majmin=""
-				elif [ $arch = "ibm" ]; then
-					# From the version'ed library(eg. libicuio36.0.a) extract out
-					# 36.0.a
-					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio//g'`
-					# Extract 36 from 36.0.a
-					majmin=`$echo $full_icu_ver_string | cut -f 1 -d '.'`
-				else
-					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio\.//g'`
-					majmin=`$echo $full_icu_ver_string | cut -f 2 -d '.'`
-				fi
-			elif [ "$ydb_icu_version" != "" ] ; then
-				# If the user specified a desired version number, then check if the ICU
-				# library with that version number exists.
-				# AIX and z/OS reference ICU as libicuioVERSION.{so,a}
-				# The other platforms reference the libraries as libicuio.{sl,so}.VERSION
-				if [ -f "$libpath/libicuio$majmin$icu_ext" -o -f "$libpath/libicuio$icu_ext.$sonamesuffix" ] ; then
-					icu_lib_found=1
-				else
-					icu_lib_found=0
-				fi
-			fi
-			if [ $icu_lib_found -eq 1 ] ; then
-				# Figure out the object mode(64 bit or 32 bit)  of ICU libraries on the target machine
-				if [ $arch = "linux" ] ; then
-					is64bit_icu=`file -L $libpath/libicuio$icu_ext.$sonamesuffix 2>/dev/null | grep "64-bit" | wc -l`
-				elif [ $arch = "ibm" ] ; then
-					icu_full_ver_lib=`ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null | awk '{print $NF}'`
-					icu_full_ver_lib=`basename $icu_full_ver_lib`
-					is64bit_icu=`nm -X64 $libpath/$icu_full_ver_lib 2>/dev/null | head -n 1 | wc -l`
-				fi
-				# Make sure both YottaDB and ICU are in sync with object mode compatibility (eg both are 32 bit/64 bit )
-				if [ "$is64bit_ydb" -eq 1 -a "$is64bit_icu" -ne 0 ] ; then
-					found_icu=1
-				elif [ "$is64bit_ydb" -ne 1 -a "$is64bit_icu" -eq 0 ] ; then
-					found_icu=1
-				else
-					found_icu=0
-				fi
-				# The default ICU library on AIX is unversioned
-				if [ "$found_icu" -eq 1 -a "$majmin" = "" ] ; then majmin=0; fi
-				# If we have everything we want, then save the libpath that contains the proper ICU library and
-				# set the ydb_icu_version if not already set.
-				if [ "$found_icu" -eq 1 -a "$majmin" -ge 36 ] ; then
-					save_icu_libpath="$libpath"
-					if [ "$ydb_icu_version" = "" ] ; then
-						minorver=`expr $majmin % 10`
-						majorver=`expr $majmin / 10`
-						ydb_icu_version="$majorver.$minorver"
-					fi
-					export ydb_icu_version
-					break
-				fi
-			fi
-		done
-		if [ "$found_icu" -eq 0 ] ; then
-			if [ "$majmin" != "" ] ; then
-				$echo "WARNING: ICU version $ydb_icu_version not found. Not installing UTF-8 support."
-			else
-				$echo "WARNING: Default ICU version not found. Not installing UTF-8 support."
-			fi
-=======
 				majmin=`$echo $icu_version | cut -d "." -f 1,2 | sed 's/\.//'`
 			fi
 			if [ "$majmin" -lt "36" ] ; then
@@ -482,7 +325,6 @@ if [ -d "utf8" ]; then
 		else
 			$echo "Could not find ICU version in the default location."
 			doutf8=0
->>>>>>> 451ab477 (GT.M V7.0-000)
 		fi
 		# Look for locale
 		utflocale=`locale -a | grep $binaryopt -iE '\.utf.?8$' | head -n1`
@@ -496,12 +338,22 @@ if [ -d "utf8" ]; then
 			exit 1
 		fi
 		if [ "$doutf8" -eq 1 -a "linux" = $arch ]; then
-			# We do not recommend setting gtm_icu_version on AIX
-			gtm_icu_version=$icu_version
-			export gtm_icu_version
+			ydb_icu_version=$icu_version
+			export ydb_icu_version
 		fi
 	else
 		doutf8=0
+	fi
+	# The answer to the below question is currently not used anywhere but the question is kept as is
+	# as otherwise removing it would be an interface change (ydbinstall.sh of different YottaDB releases
+	# communicates through these questions with configure.gtc and we don't want a backward incompatible change).
+	$echo "Should deprecated components be installed? (y or n) \c"
+	read resp
+	if [ ! -t 0 ] ; then echo "$resp"; fi
+	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+		ydb_deprecated="Y"
+	else
+		ydb_deprecated="N"
 	fi
 else
 	# If utf8 dir does not exist in package, can't install UTF-8 support
@@ -542,15 +394,14 @@ if [ "$doutf8" -ne 0 ]; then
 	fi
 fi
 
-<<<<<<< HEAD
 # Install libgtmshr.so as a soft link to libyottadb.so for backward compatibility purposes just in case
-ln -s ./libyottadb$ext $ydbdist/libgtmshr$ext || echo ln -s ./libyottadb$ext $ydbdist/libgtmshr$ext
-ln -s ./ydb_env_set $ydbdist/gtmprofile || echo ln -s ./ydb_env_set $ydbdist/gtmprofile
-ln -s ./ydb $ydbdist/gtm || echo ln -s ./ydb $ydbdist/gtm
+ln -fs ./libyottadb$ext $ydbdist/libgtmshr$ext || echo ln -fs ./libyottadb$ext $ydbdist/libgtmshr$ext
+ln -fs ./ydb_env_set $ydbdist/gtmprofile || echo ln -fs ./ydb_env_set $ydbdist/gtmprofile
+ln -fs ./ydb $ydbdist/gtm || echo ln -fs ./ydb $ydbdist/gtm
 if [ "$doutf8" -ne 0 ]; then
-	ln -s ./libyottadb$ext $ydbdist/utf8/libgtmshr$ext || echo ln -s ./libyottadb$ext $ydbdist/utf8/libgtmshr$ext
-	ln -s ./ydb_env_set $ydbdist/utf8/gtmprofile || echo ln -s ./ydb_env_set $ydbdist/utf8/gtmprofile
-	ln -s ./ydb $ydbdist/utf8/gtm || echo ln -s ./ydb $ydbdist/utf8/gtm
+	ln -fs ./libyottadb$ext $ydbdist/utf8/libgtmshr$ext || echo ln -fs ./libyottadb$ext $ydbdist/utf8/libgtmshr$ext
+	ln -fs ./ydb_env_set $ydbdist/utf8/gtmprofile || echo ln -fs ./ydb_env_set $ydbdist/utf8/gtmprofile
+	ln -fs ./ydb $ydbdist/utf8/gtm || echo ln -fs ./ydb $ydbdist/utf8/gtm
 fi
 
 # Install COPYING as well as README.md (YottaDB) or README.txt (GT.M) if it is applicable
@@ -559,25 +410,8 @@ do
 	if [ -f $file ]; then
 		cp -p $file $ydbdist
 		if [ "$doutf8" -ne 0 ]; then
-			ln -s ../$file $ydbdist/utf8/$file
+			ln -fs ../$file $ydbdist/utf8/$file
 		fi
-=======
-# Install COPYING if it is applicable
-file=COPYING
-if [ -f $file ]; then
-	cp -p $file $gtmdist
-	if [ "$doutf8" -ne 0 ]; then
-		ln -fs ../$file $gtmdist/utf8/$file
-	fi
-fi
-
-# Install README.txt if it is applicable
-file=README.txt
-if [ -f $file ]; then
-	cp -p $file $gtmdist
-	if [ "$doutf8" -ne 0 ]; then
-		ln -fs ../$file $gtmdist/utf8/$file
->>>>>>> 451ab477 (GT.M V7.0-000)
 	fi
 done
 
@@ -586,11 +420,7 @@ file=custom_errors_sample.txt
 if [ -f $file ]; then
 	cp -p $file $ydbdist
 	if [ "$doutf8" -ne 0 ]; then
-<<<<<<< HEAD
-		ln -s ../$file $ydbdist/utf8/$file
-=======
-		ln -fs ../$file $gtmdist/utf8/$file
->>>>>>> 451ab477 (GT.M V7.0-000)
+		ln -fs ../$file $ydbdist/utf8/$file
 	fi
 fi
 # Install the .cshrc and .profile files
@@ -661,9 +491,11 @@ chgrp $bingroup $ydbdist/plugin
 
 # Install GDE, GTMHELP, and all the percent routines
 cp -p *.o *.m $ydbdist
-if [ "N" = $ydb_deprecated ] ; then
-	rm $ydbdist/_DSEWRAP.m
-fi
+# The below commented section used to previously remove _DSEWRAP.m. But GT.M V7.0-000 removed _DSEWRAP.m so there is no need
+# for this code. We keep the below check commented so a reader knows there was a purpose for the "ydb_deprecated" variable.
+# if [ "N" = $ydb_deprecated ] ; then
+# 	rm $ydbdist/_DSEWRAP.m
+# fi
 
 # Install a mirror image (using soft links) of $ydbdist under $ydbdist/utf8 if this platform can support "UTF-8" mode.
 if [ "$doutf8" -ne 0 ]; then
@@ -687,23 +519,12 @@ if [ "$doutf8" -ne 0 ]; then
 			if [ -f $ydbdist/utf8/"$file" ]; then
 				rm -f $ydbdist/utf8/"$file"
 			fi
-<<<<<<< HEAD
 			if [ -f $ydbdist/"$file" ]; then
-				ln -s ../"$file" $ydbdist/utf8/"$file"
+				ln -fs ../"$file" $ydbdist/utf8/"$file"
 			fi
 		fi
 	done
-	ln -s ../plugin $ydbdist/utf8/plugin
-=======
-			if [ -f $gtmdist/"$file" ]; then
-				ln -fs ../"$file" $gtmdist/utf8/"$file"
-			fi
-		fi
-	done
-	if [ "$dogtmcrypt" -ne 0 ]; then
-		ln -fs ../plugin $gtmdist/utf8/plugin
-	fi
->>>>>>> 451ab477 (GT.M V7.0-000)
+	ln -fs ../plugin $ydbdist/utf8/plugin
 	cd ..
 fi
 
@@ -878,15 +699,9 @@ else
 	chgrp -R $bingroup $ydbdist
 fi
 
-<<<<<<< HEAD
 # Install real gtmsecshr with special permissions in $ydbdist/gtmsecshrdir
 tgtmsecshrdir=$ydbdist/gtmsecshrdir
-mkdir $tgtmsecshrdir
-=======
-# Install real gtmsecshr with special permissions in $gtmdist/gtmsecshrdir
-tgtmsecshrdir=$gtmdist/gtmsecshrdir
 mkdir -p $tgtmsecshrdir
->>>>>>> 451ab477 (GT.M V7.0-000)
 chmod 700 $tgtmsecshrdir
 chgrp $bingroup $tgtmsecshrdir
 
@@ -914,29 +729,17 @@ if [ -d $ydbdist/utf8 ]; then
 	if [ -f $ydbdist/utf8/gtmsecshr -o -h $ydbdist/utf8/gtmsecshr ]; then
 		rm -f $ydbdist/utf8/gtmsecshr
 	fi
-<<<<<<< HEAD
-	ln $ydbdist/gtmsecshr $ydbdist/utf8/gtmsecshr || \
-		echo ln $ydbdist/gtmsecshr $ydbdist/utf8/gtmsecshr
-=======
-	ln -f $gtmdist/gtmsecshr $gtmdist/utf8/gtmsecshr || \
-		echo ln -f $gtmdist/gtmsecshr $gtmdist/utf8/gtmsecshr
->>>>>>> 451ab477 (GT.M V7.0-000)
+	ln -f $ydbdist/gtmsecshr $ydbdist/utf8/gtmsecshr || \
+		echo ln -f $ydbdist/gtmsecshr $ydbdist/utf8/gtmsecshr
 
 	# Delete the gtmsecshrdir symlink
 	if [ -f $ydbdist/utf8/gtmsecshrdir -o -h $ydbdist/utf8/gtmsecshrdir ]; then
 		rm -f $ydbdist/utf8/gtmsecshrdir
 	fi
-<<<<<<< HEAD
 	mkdir -p $ydbdist/utf8/gtmsecshrdir
 	chmod 0500 $ydbdist/utf8/gtmsecshrdir
-	ln $ydbdist/gtmsecshrdir/gtmsecshr $ydbdist/utf8/gtmsecshrdir/gtmsecshr || \
-		echo ln $ydbdist/gtmsecshrdir/gtmsecshr $ydbdist/utf8/gtmsecshrdir/gtmsecshr
-=======
-	mkdir -p $gtmdist/utf8/gtmsecshrdir
-	chmod 0500 $gtmdist/utf8/gtmsecshrdir
-	ln -f $gtmdist/gtmsecshrdir/gtmsecshr $gtmdist/utf8/gtmsecshrdir/gtmsecshr || \
-		echo ln -f $gtmdist/gtmsecshrdir/gtmsecshr $gtmdist/utf8/gtmsecshrdir/gtmsecshr
->>>>>>> 451ab477 (GT.M V7.0-000)
+	ln -f $ydbdist/gtmsecshrdir/gtmsecshr $ydbdist/utf8/gtmsecshrdir/gtmsecshr || \
+		echo ln -f $ydbdist/gtmsecshrdir/gtmsecshr $ydbdist/utf8/gtmsecshrdir/gtmsecshr
 
 fi
 
@@ -958,11 +761,7 @@ if [ 0 != `grep -c '[1-9]' $ydb_dist/compstat` ]; then
 	$echo ""
 	$echo "YottaDB installation FAILED -- please review error messages"
 	$echo ""
-<<<<<<< HEAD
-	chmod -R a-x $ydbdist
-=======
-	( cd $gtm_dist && find . -type f -exec chmod a-x {} + )
->>>>>>> 451ab477 (GT.M V7.0-000)
+	( cd $ydb_dist && find . -type f -exec chmod a-x {} + )
 	exit 1
 fi
 

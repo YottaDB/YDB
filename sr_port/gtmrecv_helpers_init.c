@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,17 +87,10 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 
 	save_shutdown = helper->helper_shutdown;
 	helper->helper_shutdown = NO_SHUTDOWN;
-<<<<<<< HEAD
 	if (!ydb_dist_ok_to_use)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	if (WBTEST_ENABLED(WBTEST_MAXYDBDIST_HELPER_PROCESS))
-=======
-	if (!gtm_dist_ok_to_use)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
-			gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
-	if (WBTEST_ENABLED(WBTEST_MAXGTMDIST_HELPER_PROCESS))
->>>>>>> 451ab477 (GT.M V7.0-000)
 	{
 		memset(ydb_dist, 'a', YDB_PATH_MAX-2);
 		ydb_dist[YDB_PATH_MAX-1] = '\0';

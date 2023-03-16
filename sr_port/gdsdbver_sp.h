@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,8 +47,7 @@ ENUM_ENTRY(GDSMV63007),		/* Reuse abandoned field for use controlled stable flus
 				 */
 ENUM_ENTRY(GDSMV63012),		/* New fullblklwrt option */
 ENUM_ENTRY(GDSMV63014),		/* GTM-8863 stats added to file header: GVSTATS moved, upsized */
-<<<<<<< HEAD
-ENUM_ENTRY(GDSMVFILLER3),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMV70000),		/* Changed GT.M to use 64-bit block numbers, required significant changes to the header*/
 ENUM_ENTRY(GDSMVFILLER4),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER5),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER6),	/* Space reserved for GT.M changes to minor db format */
@@ -71,7 +70,5 @@ ENUM_ENTRY(GDSMR136),		/* Includes GDSMV63012 and GDSMV63014.
 				 *  a) max_procs
 				 *  b) reorg_sleep_nsec
 				 */
-=======
-ENUM_ENTRY(GDSMV70000),		/* Changed GTM.M to use 64-bit block numbers, required significant changes to the header*/
->>>>>>> 451ab477 (GT.M V7.0-000)
+ENUM_ENTRY(GDSMR200),		/* Includes GDSMV70000 */
 ENUM_ENTRY(GDSMVLAST)

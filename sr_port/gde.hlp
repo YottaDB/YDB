@@ -1368,16 +1368,11 @@
    LOCKs and database actions, we have no recommendations other than to
    choose what seems to work better for your application.
 
-<<<<<<< HEAD
    A specification of LOCK_CRIT_SEPARATE shows up as "Sep" in the "Lock Crit"
    column in a GDE SHOW -REGION output. A specification of NOLOCK_CRIT_SEPARATE
    shows up as "DB" in the "Lock Crit" column in a GDE SHOW -REGION output.
 
    By default, GDE uses LOCK_CRIT_SEPARATE.
-=======
-   By default, GDE uses LOCK_CRIT - separate resource management for LOCKs
-   and database actions.
->>>>>>> 451ab477 (GT.M V7.0-000)
 
    -[NO]N[ULL_SUBSCRIPTS]=[ALWAYS|NEVER|EXISTING]
 

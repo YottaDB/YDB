@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -183,18 +183,11 @@ void gtmrecv_fetchresync_connect(int port)
 		t1 = time(NULL);
 		repl_poll_wait.tv_sec = MAX_WAIT_FOR_FETCHRESYNC_CONN;
 		repl_poll_wait.tv_usec = 0;
-<<<<<<< HEAD
 		while ((status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &repl_poll_wait)) < 0)
 		{
 			if ((EINTR == errno)  || (EAGAIN == errno))
 			{
 				eintr_handling_check();
-=======
-		while (0 > (status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &repl_poll_wait)))
-		{
-			if ((EINTR == errno)  || (EAGAIN == errno))
-			{
->>>>>>> 451ab477 (GT.M V7.0-000)
 				t2 = time(NULL);
 				if (0 >= (int)(repl_poll_wait.tv_sec = (MAX_WAIT_FOR_FETCHRESYNC_CONN - (int)difftime(t2, t1))))
 				{
@@ -205,10 +198,9 @@ void gtmrecv_fetchresync_connect(int port)
 				FD_SET(gtmrecv_listen_sock_fd, &input_fds);
 				continue;
 			} else
-<<<<<<< HEAD
 			{
 				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("Error in select on listen socket"), errno);
 			}
 		}
@@ -217,7 +209,7 @@ void gtmrecv_fetchresync_connect(int port)
 		{
 			repl_log(stdout, TRUE, TRUE, "Waited about %d seconds for connection from primary source server\n",
 					MAX_WAIT_FOR_FETCHRESYNC_CONN);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Waited too long to get a connection request. Check if primary is alive."));
 		}
 		ACCEPT_SOCKET(gtmrecv_listen_sock_fd, primary_ai.ai_addr,
@@ -225,29 +217,10 @@ void gtmrecv_fetchresync_connect(int port)
 		if (FD_INVALID == gtmrecv_sock_fd)
 		{
 			save_errno = errno;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0,
 					ERR_TEXT, 2, LEN_AND_LIT("Error accepting connection from Source Server"), save_errno);
 		}
 		break;
-=======
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					LEN_AND_LIT("Error in select on listen socket"), errno);
-		}
-		if (status == 0)
-		{
-			repl_log(stdout, TRUE, TRUE, "Waited about %d seconds for connection from primary source server\n",
-				MAX_WAIT_FOR_FETCHRESYNC_CONN);
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				LEN_AND_LIT("Waited too long to get a connection request. Check if primary is alive."));
-		}
-		ACCEPT_SOCKET(gtmrecv_listen_sock_fd, primary_ai.ai_addr,
-			(GTM_SOCKLEN_TYPE *)&primary_ai.ai_addrlen, gtmrecv_sock_fd);
-		if (FD_INVALID != gtmrecv_sock_fd)
-			break;
-		save_errno = errno;
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0,
-			ERR_TEXT, 2, LEN_AND_LIT("Error accepting connection from Source Server"), save_errno);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	}
 	/* Connection established */
 	repl_close(&gtmrecv_listen_sock_fd); /* Close the listener socket */

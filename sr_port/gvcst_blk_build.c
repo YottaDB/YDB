@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -147,14 +147,9 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	 *    onln_rlbk_pid (non-zero implies online rollback is still running) and
 	 *    MISMATCH_ONLN_RLBK_CYCLES (TRUE return implies online rollback is finished) checks.
 	 */
-<<<<<<< HEAD
 	assert((ctn < cs_addrs->ti->early_tn) || write_after_image || is_mm
 		|| (cs_addrs->nl->onln_rlbk_pid || MISMATCH_ONLN_RLBK_CYCLES(cs_addrs, cs_addrs->nl)));
-	((blk_hdr_ptr_t)base_addr)->bver = GDSVCURR;
-=======
-	assert((ctn < cs_addrs->ti->early_tn) || write_after_image AIX_ONLY(|| (cs_data->acc_meth == dba_mm)));
 	((blk_hdr_ptr_t)base_addr)->bver = cse->ondsk_blkver;
->>>>>>> 451ab477 (GT.M V7.0-000)
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	((blk_hdr_ptr_t)base_addr)->bsiz = UINTCAST(array->len);
 	((blk_hdr_ptr_t)base_addr)->levl = cse->level;

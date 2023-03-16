@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -174,11 +174,7 @@ typedef struct
 {
 	FILL8DCL(uint4, crit_cycle, 1);
 	global_latch_t	semaphore;
-<<<<<<< HEAD
-	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 2);		/* 8 for the FILL8DCL */
-=======
-	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 2)	/* 8 for the FILL8DCL */
->>>>>>> 451ab477 (GT.M V7.0-000)
+	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 2);	/* 8 for the FILL8DCL */
 	FILL8DCL(latch_t, crashcnt, 3);
 	global_latch_t	crashcnt_latch;
 	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 4);	/* 8 for the FILL8DCL */
@@ -596,20 +592,12 @@ typedef struct node_local_struct
 								 * process grabbing crit will do cache recovery.  In MM mode,
 								 * it is used to call wcs_recover during a file extension.
 								 * Setting to WC_BLOCK_ONLY or WC_BLOCK_RECOVER stops all
-<<<<<<< HEAD
-								 * concurrent writers from working on the cache. */
-	global_latch_t	wc_var_lock;                            /* latch used for access to various wc_* ref counters */
-	CACHELINE_PAD(SIZEOF(global_latch_t), 1);		/* Keep these two latches in separate cache lines */
-	global_latch_t	db_latch;                               /* latch for interlocking on hppa and tandem */
-	CACHELINE_PAD(SIZEOF(global_latch_t), 2);
-=======
 								 * concurrent writers from working on the cache.
 								 */
 	global_latch_t	wc_var_lock;				/* latch used for access to various wc_* ref counters */
-	CACHELINE_PAD(SIZEOF(global_latch_t), 1)		/* Keep these two latches in separate cache lines */
+	CACHELINE_PAD(SIZEOF(global_latch_t), 1);		/* Keep these two latches in separate cache lines */
 	global_latch_t	db_latch;				/* latch for interlocking on hppa and tandem */
-	CACHELINE_PAD(SIZEOF(global_latch_t), 2)
->>>>>>> 451ab477 (GT.M V7.0-000)
+	CACHELINE_PAD(SIZEOF(global_latch_t), 2);
 	int4		cache_hits;
 	int4		wc_in_free;				/* number of write cache records in free queue */
 	/* All counters below (declared using CNTR4DCL) are 2 or 4-bytes, depending on platform, but always stored in 4 bytes.

@@ -3,7 +3,7 @@
 # Copyright (c) 2001-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -779,17 +779,10 @@ $gtm_com/IGS $ydb_dist/gtmsecshr UNHIDE
 set distfiles_log = "dist_files.`basename $gtm_exe`.log"
 find $ydb_dist -type f >&! $gtm_log/$distfiles_log
 if ($?scan_image) then
-<<<<<<< HEAD
-	tar cvf $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar dse ftok gtmsec* gtcm* libgtmshr.so lke mumps mupip
+	tar cvf $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar dse gtmsec* gtcm* libgtmshr.so lke mumps mupip
 	tar rvf $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar plugin/libgtm* plugin/gtmcrypt/maskpass
 	tar rvf $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar /usr/lib64/lib{config,gpgme,gpg-error,crypt,ssl,icu*,z,elf}.so*
 	gzip    $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar
-=======
-	tar cvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar dse gtmsec* gtcm* libgtmshr.so lke mumps mupip
-	tar rvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar plugin/libgtm* plugin/gtmcrypt/maskpass
-	tar rvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar /usr/lib64/lib{config,gpgme,gpg-error,crypt,ssl,icu*,z,elf}.so*
-	gzip    $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar
->>>>>>> 451ab477 (GT.M V7.0-000)
 endif
 $gtm_com/IGS $ydb_dist/gtmsecshr CHOWN
 awk 'BEGIN {dlen=length(ENVIRON["ydb_dist"]);stat=0} {if ((length($0)-dlen)>50) {stat=1}} END {exit stat}' $gtm_log/$distfiles_log

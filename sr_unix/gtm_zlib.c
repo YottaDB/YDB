@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,12 +35,8 @@ error_def(ERR_DLLNORTN);
 error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TEXT);
 
-<<<<<<< HEAD
 GBLREF char		ydb_dist[GTM_PATH_MAX];
-=======
-GBLREF char		gtm_dist[GTM_PATH_MAX];
-GBLREF boolean_t	gtm_dist_ok_to_use;
->>>>>>> 451ab477 (GT.M V7.0-000)
+GBLREF boolean_t	ydb_dist_ok_to_use;
 
 void gtm_zlib_init(void)
 {
@@ -68,12 +64,8 @@ void gtm_zlib_init(void)
 	if (RESTRICTED(library_load_path))
 	{
 		lpath = librarypath;
-<<<<<<< HEAD
+		assert(ydb_dist_ok_to_use);
 		SNPRINTF(librarypath, SIZEOF(librarypath), GTM_PLUGIN_FMT_SHORT ZLIB_AIXLIBNAME, ydb_dist);
-=======
-		assert(gtm_dist_ok_to_use);
-		SNPRINTF(librarypath, GTM_PATH_MAX, GTM_PLUGIN_FMT_SHORT ZLIB_AIXLIBNAME, gtm_dist);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	} else
 		lpath = ZLIB_AIXLIBNAME;
 	/* Attempt to load the AIX packaged zlib first */

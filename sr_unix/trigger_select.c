@@ -257,15 +257,9 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 		{	/* There has to be a #LABEL */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-<<<<<<< HEAD
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
-					gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#LABEL\""));
-=======
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
-				gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#LABEL\""));
->>>>>>> 451ab477 (GT.M V7.0-000)
+					gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#LABEL\""));
 		}
 		skip_chars = 1;
 		if ((trigger_value.str.len != STRLEN(HASHT_GBL_CURLABEL))
@@ -280,15 +274,9 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 		{	/* There has to be a #CYCLE */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-<<<<<<< HEAD
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
-					gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#CYCLE\""));
-=======
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
-				gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#CYCLE\""));
->>>>>>> 451ab477 (GT.M V7.0-000)
+					gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#CYCLE\""));
 		}
 		cycle_len = MIN(trigger_value.str.len, MAX_DIGITS_IN_INT);
 		memcpy(cycle, trigger_value.str.addr, cycle_len);
@@ -308,15 +296,9 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 			{	/* There has to be a #NAME */
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
-<<<<<<< HEAD
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
-				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
-						gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#NAME\""));
-=======
-				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
-					gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#NAME\""));
->>>>>>> 451ab477 (GT.M V7.0-000)
+						gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#NAME\""));
 
 			}
 			*out_rec_ptr++ = COMMENT_LITERAL;
@@ -516,17 +498,10 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 			{	/* We expect $c(0) in the middle of addr. If we dont find it, this is a restartable situation */
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
-<<<<<<< HEAD
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
-				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
+				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
 						LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
 						mv_trigger_val.str.len, mv_trigger_val.str.addr);
-=======
-				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
-					LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
-					mv_trigger_val.str.len, mv_trigger_val.str.addr);
->>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 			ptr++;
 			A2I(ptr, mv_trigger_val.str.addr + mv_trigger_val.str.len, indx);
@@ -534,17 +509,10 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 			{	/* We expect a valid index */
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
-<<<<<<< HEAD
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
-				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
+				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
 						LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
 						mv_trigger_val.str.len, mv_trigger_val.str.addr);
-=======
-				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
-					LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
-					mv_trigger_val.str.len, mv_trigger_val.str.addr);
->>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 			/* Use a local buffer to avoid possible garbage collection issues from write_out_trigger below */
 			memcpy(curr_gbl, mv_trigger_val.str.addr, trigvn_len);

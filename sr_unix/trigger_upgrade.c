@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -369,7 +369,7 @@ void	trigger_upgrade(gd_region *reg)
 			assert(is_defined);
 			currlabel = mval2i(tmpmv);
 			if ((V19_HASHT_GBL_LABEL_INT >= currlabel) || (HASHT_GBL_CURLABEL_INT <= currlabel))
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_TRIGUPBADLABEL, 6, currlabel,
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_TRIGUPBADLABEL, 6, currlabel,
 						HASHT_GBL_CURLABEL_INT, gvname->str.len, gvname->str.addr,
 						REG_LEN_STR(reg));
 			/* Set ^#t(<gvn>,"#LABEL")=HASHT_GBL_CURLABEL */
@@ -400,43 +400,7 @@ void	trigger_upgrade(gd_region *reg)
 			is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_gvsubs, tmpmv);
 			if (is_defined)
 			{
-<<<<<<< HEAD
 				STR_PHASH_PROCESS(hash_state, hash_totlen, tmpmval.str.addr, tmpmval.str.len);
-=======
-				tmpint4 = mval2i(tmpmv);
-				count = tmpint4;
-				/* Get ^#t(<gvn>,"#LABEL"), error out for invalid values. Upgrade disallowed for label 1 triggers */
-				is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashlabel, tmpmv);
-				assert(is_defined);
-				currlabel = mval2i(tmpmv);
-				if ((V19_HASHT_GBL_LABEL_INT >= currlabel) || (HASHT_GBL_CURLABEL_INT <= currlabel))
-					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_TRIGUPBADLABEL, 6, currlabel,
-						HASHT_GBL_CURLABEL_INT, gvname->str.len, gvname->str.addr,
-						REG_LEN_STR(reg));
-				/* Set ^#t(<gvn>,"#LABEL")=HASHT_GBL_CURLABEL */
-				gvtr_set_hasht_gblsubs((mval *)&literal_hashlabel, (mval *)&literal_curlabel);
-			} else
-				count = 0;
-			/* Kill ^#t(<gvn>,"#TRHASH") unconditionally and regenerate */
-			gvtr_kill_hasht_gblsubs((mval *)&literal_hashtrhash, TRUE);
-			/* At this point, gv_currkey is ^#t(<gvn>) */
-			for (i = 1; i <= count; i++)
-			{
-				/* At this point, gv_currkey is ^#t(<gvn>) */
-				curend = gv_currkey->end; /* note gv_currkey->end before changing it so we can restore it later */
-				assert(KEY_DELIMITER == gv_currkey->base[curend]);
-				assert(gv_target->gd_csa == cs_addrs);
-				i2mval(tmpmv, i);
-				COPY_SUBS_TO_GVCURRKEY(tmpmv, gv_cur_region, gv_currkey, was_null, is_null);
-				/* At this point, gv_currkey is ^#t(<gvn>,i) */
-				/* Compute new LHASH and BHASH hash values.
-				 *	LHASH uses : GVSUBS,                        XECUTE
-				 *	BHASH uses : GVSUBS, DELIM, ZDELIM, PIECES, XECUTE
-				 * So reach each of these pieces and compute hash along the way.
-				 */
-				STR_PHASH_INIT(hash_state, hash_totlen);
-				STR_PHASH_PROCESS(hash_state, hash_totlen, gvname->str.addr, gvname->str.len);
->>>>>>> 451ab477 (GT.M V7.0-000)
 				STR_PHASH_PROCESS(hash_state, hash_totlen, nullbyte, 1);
 			}
 			/* Copy over SET hash state (2-tuple <state,totlen>) to KILL hash state before adding

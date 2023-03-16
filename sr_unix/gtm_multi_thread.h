@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,7 +86,7 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
 	{														\
 		rc = pthread_mutex_init(&thread_mutex, NULL);								\
 		if (rc)													\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)							\
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8)								\
 					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_mutex_init()"), CALLFROM, rc);	\
 		thread_mutex_initialized = TRUE;									\
 	}														\

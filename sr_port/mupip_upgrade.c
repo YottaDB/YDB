@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,13 +59,8 @@
 #include "mu_all_version_standalone.h"
 #include "db_write_eof_block.h"
 
-<<<<<<< HEAD
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		exit_handler_complete;
-=======
-LITREF char	gtm_release_name[];
-LITREF int4	gtm_release_name_len;
->>>>>>> 451ab477 (GT.M V7.0-000)
 
 LITREF  char            	ydb_release_name[];
 LITREF  int4           		ydb_release_name_len;

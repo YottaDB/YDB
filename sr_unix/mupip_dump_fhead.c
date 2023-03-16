@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,15 +62,9 @@ void mupip_dump_fhead(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-<<<<<<< HEAD
 	/* Verify ydb_dist, and make sure there is a parameter. */
 	if (!ydb_dist_ok_to_use)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_YDBDISTUNVERIF, 4, LEN_AND_STR(ydb_dist));
-=======
-	/* Verify gtm_dist, and make sure there is a parameter. */
-	if (!gtm_dist_ok_to_use)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_GTMDISTUNVERIF, 4, LEN_AND_STR(gtm_dist));
->>>>>>> 451ab477 (GT.M V7.0-000)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_YDBDISTUNVERIF, 4, LEN_AND_STR(ydb_dist));
 	if (CLI_PRESENT == cli_present("REGION"))
 	{	/* region */
 		status = SS_NORMAL;

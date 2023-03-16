@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2011 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 451ab477 (GT.M V7.0-000)
+ *								*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,11 +60,10 @@ lv_val	*op_srchindx(UNIX_ONLY_COMMA(int argcnt) lv_val *lv, ...)
 			/* If input "key" is $ZYSQLNULL, then do not do NULLSUBS checks or collation transformations */
 			if (!MV_IS_SQLNULL(key))
 			{
-<<<<<<< HEAD
 				if ((0 == key->str.len) && (LVNULLSUBS_NEVER == TREF(lv_null_subs)))
 				{
 					va_end(var);
-					rts_error(VARLSTCNT(1) ERR_LVNULLSUBS);
+					RTS_ERROR_ABT(VARLSTCNT(1) ERR_LVNULLSUBS);
 				}
 				if (TREF(local_collseq))
 				{
@@ -82,22 +77,6 @@ lv_val	*op_srchindx(UNIX_ONLY_COMMA(int argcnt) lv_val *lv, ...)
 					s2pool(&(tmp_sbs.str));
 					key = &tmp_sbs;
 				}
-=======
-				va_end(var);
-				RTS_ERROR_ABT(VARLSTCNT(1) ERR_LVNULLSUBS);
-			}
-			if (TREF(local_collseq))
-			{
-				ALLOC_XFORM_BUFF(key->str.len);
-				tmp_sbs.mvtype = MV_STR;
-				tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
-				assert(NULL != TREF(lcl_coll_xform_buff));
-				tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
-				do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
-				tmp_sbs.str.len = length;
-				s2pool(&(tmp_sbs.str));
-				key = &tmp_sbs;
->>>>>>> 451ab477 (GT.M V7.0-000)
 			}
 			lv = (lv_val *)lvAvlTreeLookupStr(lvt, key, &parent);
 		} else

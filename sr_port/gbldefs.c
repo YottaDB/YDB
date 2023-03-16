@@ -473,12 +473,7 @@ GBLDEF	int4		write_filter;
 GBLDEF	boolean_t	need_no_standalone;
 GBLDEF	int4		zdir_form = ZDIR_FORM_FULLPATH; /* $ZDIR shows full path including DEVICE and DIRECTORY */
 GBLDEF	mval		dollar_zdir = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
-<<<<<<< HEAD
-GBLDEF	hash_table_int4	cw_stagnate;
-=======
-GBLDEF	int * volatile	var_on_cstack_ptr; /* volatile pointer to int; volatile so that nothing gets optimized out */
 GBLDEF	hash_table_int8	cw_stagnate;
->>>>>>> 451ab477 (GT.M V7.0-000)
 GBLDEF	boolean_t	cw_stagnate_reinitialized;
 
 GBLDEF	uint4		pat_everything[] = { 0, 2, PATM_E, 1, 0, PAT_MAX_REPEAT, 0, PAT_MAX_REPEAT, 1 }; /* pattern = ".e" */
@@ -1110,14 +1105,8 @@ GBLDEF	boolean_t	argumentless_rundown;
 GBLDEF	is_anticipatory_freeze_needed_t		is_anticipatory_freeze_needed_fnptr;
 GBLDEF	set_anticipatory_freeze_t		set_anticipatory_freeze_fnptr;
 GBLDEF	boolean_t	is_jnlpool_creator;
-<<<<<<< HEAD
 GBLDEF	char		ydb_dist[YDB_PATH_MAX];		/* Value of $ydb_dist env variable */
 GBLDEF	boolean_t	ydb_dist_ok_to_use = FALSE;	/* Whether or not we can use $ydb_dist */
-=======
-GBLDEF	char		gtm_dist[GTM_PATH_MAX];		/* Value of $gtm_dist env variable */
-GBLDEF	unsigned int	gtm_dist_len = 0;		/* Length of validated $gtm_dist */
-GBLDEF	boolean_t	gtm_dist_ok_to_use = FALSE;	/* Whether or not we can use $gtm_dist */
->>>>>>> 451ab477 (GT.M V7.0-000)
 GBLDEF	semid_queue_elem	*keep_semids;		/* Access semaphores that should be kept because shared memory is up */
 GBLDEF	boolean_t		dmterm_default;		/* Retain default line terminators in the direct mode */
 GBLDEF	boolean_t	in_jnl_file_autoswitch;		/* Set to TRUE for a short window inside jnl_file_extend when we are about

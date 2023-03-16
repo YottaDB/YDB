@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -509,11 +509,7 @@ boolean_t cli_numeric_check(CLI_ENTRY *pparm, char *val_str)
 		} else if (!cli_is_dcm(val_str) && !cli_is_hex_explicit(val_str))
 		{
 			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR,
-<<<<<<< HEAD
-			  "Unrecognized value: %s, Decimal integer expected",
-=======
 			  "Unrecognized value: %s, A non-negative decimal or hexadecimal integer required",
->>>>>>> 451ab477 (GT.M V7.0-000)
 			  val_str);
 			retval = FALSE;
 		}
@@ -602,14 +598,9 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 		local_str[len_str] = '\0';
 		ptr_next_val = local_str;
 		while (NULL != ptr_next_val)
-<<<<<<< HEAD
 		{
-			len_str= STRLEN(ptr_next_val);
+			len_str = STRLEN(ptr_next_val);
 			memcpy(tmp_str, ptr_next_val, len_str);
-=======
-		{	/* WARNING assignment below */
-			STRNCPY_STR(tmp_str, ptr_next_val, (len_str = MIN(strlen(ptr_next_val), sizeof(tmp_str))));
->>>>>>> 451ab477 (GT.M V7.0-000)
 			tmp_str[len_str] = 0;
 			tmp_str_ptr = tmp_str;
 			ptr_next_comma = strchr(tmp_str_ptr, ',');

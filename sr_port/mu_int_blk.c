@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1031,15 +1031,9 @@ boolean_t mu_int_blk(
 				*/
 				if (rec_size > (hdr_len + blk_id_sz))
 				{
-<<<<<<< HEAD
-					GET_GVT_COLL_INFO(trees_tail, (sm_uc_ptr_t)rec_base + hdr_len + SIZEOF(block_id),
-									(int)(rec_size - (hdr_len + SIZEOF(block_id))), coll_ret);
+					GET_GVT_COLL_INFO(trees_tail, (sm_uc_ptr_t)rec_base + hdr_len + blk_id_sz,
+									(int)(rec_size - (hdr_len + blk_id_sz)), coll_ret);
 					if (!coll_ret)
-=======
-					subrec_ptr = get_spec((sm_uc_ptr_t)rec_base + hdr_len + blk_id_sz,
-									(int)(rec_size - (hdr_len + blk_id_sz)), COLL_SPEC);
-					if (subrec_ptr)
->>>>>>> 451ab477 (GT.M V7.0-000)
 					{
 						mu_int_err(ERR_INVSPECREC, TRUE, TRUE, buff, comp_length, top_key, top_len,
 								(unsigned int)blk_levl);

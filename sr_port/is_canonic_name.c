@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -397,13 +397,8 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 		{	/* multi-byte increment */
 			assert(4 > utf8_len);
 			if (0 > utf8_len)
-<<<<<<< HEAD
-				rts_error_csa(CSA_ARG(NULL)
-					VARLSTCNT(6) ERR_BADCHAR, 4, cpt - 1, LEN_AND_LIT(UTF8_NAME));
-=======
 				RTS_ERROR_CSA_ABT(NULL,
-					VARLSTCNT(6) ERR_BADCHAR, 4, cpt-1, LEN_AND_LIT(UTF8_NAME));
->>>>>>> 451ab477 (GT.M V7.0-000)
+					VARLSTCNT(6) ERR_BADCHAR, 4, cpt - 1, LEN_AND_LIT(UTF8_NAME));
 			isrc += utf8_len;
 			cpt += utf8_len;
 		}

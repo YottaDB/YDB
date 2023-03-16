@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -152,15 +152,9 @@ boolean_t search_trigger_hash(char *trigvn, int trigvn_len, stringkey *trigger_h
 		{	/* There has to be a #TRHASH entry or else it is a retry situation (due to concurrent updates) */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-<<<<<<< HEAD
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
-=======
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-				LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
->>>>>>> 451ab477 (GT.M V7.0-000)
+					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
 		ptr = key_val.str.addr;
 		ptr2 = memchr(ptr, '\0', key_val.str.len);
@@ -168,15 +162,9 @@ boolean_t search_trigger_hash(char *trigvn, int trigvn_len, stringkey *trigger_h
 		{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-<<<<<<< HEAD
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
-=======
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-				LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
->>>>>>> 451ab477 (GT.M V7.0-000)
+					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
 		len = ptr2 - ptr;
 		if ((len != trigvn_len) || (0 != memcmp(trigvn, ptr, len)))
@@ -281,43 +269,10 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 		{
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-<<<<<<< HEAD
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
+			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
-=======
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-				LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
-		}
-		ptr = key_val.str.addr;
-		ptr2 = memchr(ptr, '\0', key_val.str.len);
-		if (NULL == ptr2)
-		{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
-			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
-				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-				LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
-		}
-		len = ptr2 - ptr;
-		if ((len != trigvn_len) || (0 != memcmp(trigvn, ptr, len)))
-		{	/* We expect all hashes under ^#t(<gbl>,"#TRHASH",...) to correspond to <gbl> in their value.
-			 * If not this is a TRIGDEFBAD situation.
-			 */
-			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
-				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-				LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
-		}
-		ptr += len;
-		assert(('\0' == *ptr) && (key_val.str.len > len));
-		ptr++;
-		A2I(ptr, key_val.str.addr + key_val.str.len, trig_index);
-		assert(0 < trig_index);
->>>>>>> 451ab477 (GT.M V7.0-000)
 		MV_FORCE_UMVAL(&mv_trig_indx, trig_index);
 		for (sub_indx = 0; sub_indx < NUM_SUBS; sub_indx++)
 		{

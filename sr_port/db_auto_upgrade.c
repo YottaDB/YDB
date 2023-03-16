@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,6 @@
 #include "gvcst_protos.h"	/* for gvcst_init_sysops prototype */
 #include "db_write_eof_block.h"
 
-<<<<<<< HEAD
 #define	MOVE_GVSTATS_REC_FROM_OLD_HDR_TO_NODE_LOCAL(CSA, CSD)						\
 {													\
 	/* Copy the 62 pre GTM-8863 stats from the old header location to node_local.			\
@@ -52,9 +51,6 @@
 }
 
 GBLREF  boolean_t       dse_running;
-=======
-GBLREF	boolean_t	dse_running;
->>>>>>> 451ab477 (GT.M V7.0-000)
 
 error_def(ERR_DBBADUPGRDSTATE);
 
@@ -70,13 +66,7 @@ void db_auto_upgrade(gd_region *reg)
 #	ifdef DEBUG
 	gtm_uint64_t		file_size;
 #	endif
-<<<<<<< HEAD
 	int 			i;
-=======
-	int			i;
-	gtm_uint64_t		*old_stats, *new_stats;
-	node_local_ptr_t	cnl;
->>>>>>> 451ab477 (GT.M V7.0-000)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -136,14 +126,72 @@ void db_auto_upgrade(gd_region *reg)
 			} else
 				csd->db_got_to_v5_once = TRUE;	/* db was created by V5 so safe to set this */
 		}
+		/* When adding a new minor version, the following template should be maintained
+		 * a) Remove the penultimate 'break'
+		 * b) Remove the assert(FALSE) in the last case (most recent minor version)
+		 * c) If there are any file header fields added in the new minor version, initialize the fields to default values
+		 *    in the last case
+		 * d) Add a new case with the new minor version
+		 * e) Add assert(FALSE) and break (like it was before)
+		 */
 		switch (csd->minor_dbver)
 		{	/* Note that handling for any fields introduced in a version will not go in the "switch-case" block
 			 * of code introduced for the new version but will go in the PREVIOUS "switch-case" block.
 			 */
 			case GDSMV70000:
+				/* This is a GT.M V7.0-000 database. Apply all file header upgrade changes that happened
+				 * in YottaDB r1.2* and r1.3* releases (i.e. all releases less than YottaDB r2.0 release).
+				 */
+				/* Handle GDSMR122 (aka GDSMV63007) case */
+				/* ----------------------------------- */
+				/* YottaDB r122 introduced "reorg_sleep_nsec" to slow down reorg update rate by user */
+				csd->reorg_sleep_nsec = 0;
+				/* ----------------------------------- */
+				/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support nanosecond timers */
+				csd->flush_time = csd->flush_time * NANOSECS_IN_MSEC;
+				/* Note: This is a little-endian solution and will need to be modified if we
+				 * ever support big-endian.
+				 */
+				if (0 == csd->flush_trigger_top)
+					csd->flush_trigger_top = FLUSH_FACTOR(csd->n_bts);
+				/* Note: This ensures that the csd->flush_trigger_top field added in GT.M v63007 is set if
+				 * the old db_minorver is GDSMR122.
+				 */
+				/* ----------------------------------- */
+				/* YottaDB r134 introduced "max_procs" which records the maximum number of
+				 * processes accessing the database to measure system load.
+				 */
+				csd->max_procs.cnt = 0;
+				csd->max_procs.time = 0;
+				break;
+			case GDSMR200:
+		/* When adding a new minor version, the following template should be maintained
+		 * 1) Remove the penultimate 'break' (i.e. "break" in the PREVIOUS "case" block.
+		 * 2) If there are any file header fields added in the new minor version, initialize the fields to default values
+		 *    in THIS/CURRENT case (i.e. above this comment block). Do not add a "break" for THIS/CURRENT "case" block.
+		 * 3) Then, add a NEW "case" statement with the new minor version. The below 3 lines become part of that "case".
+		 * 4) For every GT.M minor ver added since the previous YottaDB release, duplicate the relevant auto upgrade
+		 *    code in this case block. This is needed as the GT.M GDSMV* (e.g. GDSMV63012) values will be way less
+		 *    than the older YottaDB GDSMVCURR value (e.g. in case of YottaDB r1.32) and so those GT.M switch/case
+		 *    code paths above will not be reached for upgrades from an older YottaDB release to a newer YottaDB release.
+		 */
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
-				assert(FALSE);	/* When this assert fails, it means a new GDSMV* was created, */
-				break;		/* so a new "case" needs to be added BEFORE the assert. */
+				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
+				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
+			/* Remove the below cases one by one as later GT.M versions use up these minor db version enum values. */
+			case GDSMVFILLER4:
+			case GDSMVFILLER5:
+			case GDSMVFILLER6:
+			case GDSMVFILLER7:
+			case GDSMVFILLER8:
+			case GDSMVFILLER9:
+			case GDSMVFILLER10:
+			case GDSMVFILLER11:
+			case GDSMVFILLER12:
+			case GDSMVFILLER13:
+			case GDSMVFILLER14:
+			case GDSMVFILLER15:
+			case GDSMVFILLER16:
 			default:
 				/* Unrecognized version in the header */
 				assertpro(FALSE && csd->minor_dbver);
@@ -382,22 +430,7 @@ void v6_db_auto_upgrade(gd_region *reg)
 				 * happened as appropriate in the previous "case" blocks.
 				 */
 				break;
-			case GDSMR136:
-		/* When adding a new minor version, the following template should be maintained
-		 * a) If there are any file header fields added in the new minor version, initialize the fields to default values
-		 *    in the last case (i.e. above this comment block). Do not add a "break" for the above "case" block.
-		 * b) Then, add a new "case" statement with the new minor version. The below 3 lines become part of that "case".
-		 * c) For every GT.M minor ver added since the previous YottaDB release, duplicate the relevant auto upgrade
-		 *    code in this case block. This is needed as the GT.M GDSMV* (e.g. GDSMV63012) values will be way less
-		 *    than the older YottaDB GDSMVCURR value (e.g. in case of YottaDB r1.32) and so those GT.M switch/case
-		 *    code paths above will not be reached for upgrades from an older YottaDB release to a newer YottaDB release.
-		 */
-				/* Nothing to do for this version since it is GDSMVCURR for now. */
-<<<<<<< HEAD
-				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
-				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
-			/* Remove the below cases one by one as later GT.M versions use up these minor db version enum values. */
-			case GDSMVFILLER3:
+			case GDSMV70000:
 			case GDSMVFILLER4:
 			case GDSMVFILLER5:
 			case GDSMVFILLER6:
@@ -411,10 +444,9 @@ void v6_db_auto_upgrade(gd_region *reg)
 			case GDSMVFILLER14:
 			case GDSMVFILLER15:
 			case GDSMVFILLER16:
-=======
+			case GDSMR136:
 				assert(FALSE);	/* When this assert fails, it means a new GDSMV* was created, */
 				break;		/* so a new "case" needs to be added BEFORE the assert. */
->>>>>>> 451ab477 (GT.M V7.0-000)
 			default:
 				/* Unrecognized version in the header */
 				assertpro(FALSE && csd->minor_dbver);

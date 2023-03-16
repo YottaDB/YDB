@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -400,17 +400,10 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 					SNPRINTF(error_str, MAX_DISPLAYED_DEVPARLEN + STR_LIT_LEN(INVALID_CMD2),
 						"%s%s", INVALID_CMD, ret_token);
 				else
-<<<<<<< HEAD
 					SNPRINTF(error_str, MAX_DISPLAYED_DEVPARLEN + STR_LIT_LEN(INVALID_CMD2),
 						"%s%s", INVALID_CMD2, ret_token);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-					  ERR_TEXT, 2, LEN_AND_STR(error_str));
-=======
-					SNPRINTF(error_str, MAXDEVPARLEN + STR_LIT_LEN(INVALID_CMD2), "%s%s", INVALID_CMD2,
-						ret_token);
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-					ERR_TEXT, 2, LEN_AND_STR(error_str));
->>>>>>> 451ab477 (GT.M V7.0-000)
+					  ERR_TEXT, 2, LEN_AND_STR(error_str));
 			}
 		}
 	}

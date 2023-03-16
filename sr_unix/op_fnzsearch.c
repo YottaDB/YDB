@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,20 +91,15 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-<<<<<<< HEAD
 	if (mfunc)
 	{
 		if (STRM_ALWAYSNEW != indx)
 		{
 			if ((MAX_STRM_CT <= indx) || (0 > indx))	/* Allow an out-of-range stream only if used internally. */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSRCHSTRMCT);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZSRCHSTRMCT);
 		} else
 			zsrch_clr(STRM_ALWAYSNEW);	/* $ZSEARCH(expr,-1) : Special case to start a new stream */
 	}
-=======
-	if (mfunc && ((MAX_STRM_CT <= indx) || (0 > indx)))	/* Allow an out-of-range stream only if used internally. */
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZSRCHSTRMCT);
->>>>>>> 451ab477 (GT.M V7.0-000)
 	ESTABLISH_RET(fnzsrch_ch, -1);
 	TREF(fnzsearch_nullsubs_sav) = TREF(lv_null_subs);
 	TREF(lv_null_subs) = LVNULLSUBS_OK;			/* $ZSearch processing depends on this. */

@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2009 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 451ab477 (GT.M V7.0-000)
+ *								*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,27 +44,17 @@ GBLREF struct NTD *ntd_root;
 GBLREF struct CLB *proc_to_clb[];	/* USHRT_MAX + 1 so procnum can wrap */
 GBLREF jnl_process_vector *originator_prc_vec;
 
-<<<<<<< HEAD
-cm_op_t gtcmtr_initproc(void)
-=======
 error_def(CMERR_INVPROT);
 error_def(ERR_TOOMANYCLIENTS);
 
-bool gtcmtr_initproc(void)
->>>>>>> 451ab477 (GT.M V7.0-000)
+cm_op_t gtcmtr_initproc(void)
 {
 	unsigned char *reply;
         unsigned short beginprocnum;
         size_t jpv_size;
 	protocol_msg myproto;
 
-<<<<<<< HEAD
-	error_def(CMERR_INVPROT);
-        error_def(ERR_TOOMANYCLIENTS);
-
 	ASSERT_IS_LIBGNPSERVER;
-=======
->>>>>>> 451ab477 (GT.M V7.0-000)
 	reply = curr_entry->clb_ptr->mbf;
 	assert(*reply == CMMS_S_INITPROC);
 	reply++;

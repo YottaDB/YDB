@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2012 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 451ab477 (GT.M V7.0-000)
+ *								*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -191,14 +187,9 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		else
 		{
 			if (*ptr++ != gv_cur_region->cmx_regnum)
-<<<<<<< HEAD
-				rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+				RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			keylen = (len - 1 - (3 * SIZEOF(unsigned short)));	/* 3 for gv_key->top, prev, end */
 #			ifdef DEBUG
-=======
-				RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
-#ifdef DEBUG
->>>>>>> 451ab477 (GT.M V7.0-000)
 			CM_GET_USHORT(srv_buff_size, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 			assert(srv_buff_size == gv_altkey->top);
 			/* Check gv_altkey has enough size allocated for the data to be copied */

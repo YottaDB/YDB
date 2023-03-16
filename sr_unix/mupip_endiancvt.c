@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -105,7 +105,7 @@ error_def(ERR_TEXT);
 #define GTM_PUTMSG_CSA(...)	gtm_putmsg_csa(CSA_ARG(NULL) __VA_ARGS__)
 
 typedef struct
-{	/* adapted from dbcertify.h */
+{	/* adapted from the now nixed dbcertify.h */
 	unsigned int	top;		/* Offset to top of the key */
 	unsigned int	end;		/* End of the current key */
 	unsigned int	gvn_len;	/* Length of key */
@@ -169,11 +169,6 @@ block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key);
 void mupip_endiancvt(void)
 {
 	block_id		blk_num;
-<<<<<<< HEAD
-	int			i, db_fd, outdb_fd, mastermap_size;
-	unsigned short		n_len, outdb_len, t_len;
-=======
->>>>>>> 451ab477 (GT.M V7.0-000)
 	boolean_t		outdb_specified, endian_native, swap_boolean, got_standalone, override_specified;
 	char			db_name[MAX_FN_LEN + 1], *t_name;
 	char			outdb[MAX_FN_LEN + 1], conf_buff[MAX_CONF_RESPONSE + 1], *response;
@@ -1176,7 +1171,7 @@ void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_n
 
 int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_data, boolean_t override_specified)
 {	/* returns 0 for success
-	   This routine based on mubinccpy and dbcertify_scan_phase
+	   This routine based on mubinccpy (and the now nixed dbcertify_scan_phase)
 	*/
 	blk_hdr_ptr_t	bp_new, bp_native, bp_old;
 	block_id	blk_num, totblks, last_blk_written, mm_offset,
@@ -1751,7 +1746,7 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 
 	/* Determine type of block (DT lvl 0, DT lvl !0, GVT lvl 0, GVT lvl !0)
 
-	    Rules for checking (from dbcertify_scan_phase.c):
+	    Rules for checking (from the now nixed dbcertify_scan_phase.c):
 
 	    1) If compression count of 2nd record is zero, it *must* be a directory tree block. This is a fast path
 	       check to avoid doing the strlen in the second check.
@@ -1761,7 +1756,7 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 	       would have same GVN in the 2nd record as the first so the compression count would be a minimum of
 	       (length(GVN) + 1). The "+ 1" is for the terminating null of the GVN.
 
-	    dbcertify only cares about too full blocks so the above rules may not apply in all other cases.
+	    The now nixed dbcertify only cares about too full blocks so the above rules may not apply in all other cases.
 	    endian cvt only care about index (levl > 0), dtleaf, or gvtleaf.
 	*/
 	have_dt_blk = FALSE;
@@ -1793,13 +1788,8 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 			;
 		if (*++key_top)
 			have_gvtleaf = TRUE;		/* gdsblk_gvtleaf subscript so must be */
-<<<<<<< HEAD
-		else if (SIZEOF(block_id) <= ((rec1_ptr + rec1_len) - ++key_top) &&
-			 (SIZEOF(block_id) + COLL_SPEC_LEN) >= ((rec1_ptr + rec1_len) - key_top))
-=======
 		else if (blk_id_sz <= ((rec1_ptr + rec1_len) - ++key_top) &&
-			 (blk_id_sz + MAX_SPEC_TYPE_LEN) >= ((rec1_ptr + rec1_len) - key_top))
->>>>>>> 451ab477 (GT.M V7.0-000)
+			 (blk_id_sz + COLL_SPEC_LEN) >= ((rec1_ptr + rec1_len) - key_top))
 		{	/* record value long enough for block_id but not longer than block_id plus collation information */
 			READ_BLK_ID(long_blk_id, &ptr2blk, key_top);
 			if (new_is_native)

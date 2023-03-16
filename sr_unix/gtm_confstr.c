@@ -3,7 +3,7 @@
  * Copyright (c) 2017-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,12 +31,8 @@ int gtm_confstr(char *command, unsigned int maxsize)
 	char 		pathbuf[MAX_FN_LEN];
 	char 		*cmd_path, *path_tok, *path_tokptr, *cmd_ptr;
 	size_t 		n;
-<<<<<<< HEAD
-	int 		tok_len, status, cmdlen;
-=======
-	int 		status, i;
-	unsigned int	tok_len, cmdlen;
->>>>>>> 451ab477 (GT.M V7.0-000)
+	int 		status;
+	unsigned int 	tok_len, cmdlen;
 	struct stat 	sb;
 
 	n = confstr(_CS_PATH, NULL, (size_t) 0);

@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,17 +62,10 @@
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
 GBLREF	gv_namehead		*gv_target;
-<<<<<<< HEAD
 GBLREF	uint4			process_id;
-GBLREF	inctn_opcode_t          inctn_opcode;
-GBLREF	unsigned char           rdfail_detail;
-GBLREF	uint4			mu_int_adj[];
-=======
-GBLREF	int4			process_id;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	unsigned char		rdfail_detail;
-GBLREF	int4			mu_int_adj[];
->>>>>>> 451ab477 (GT.M V7.0-000)
+GBLREF	uint4			mu_int_adj[];
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	unsigned int		t_tries;
@@ -232,11 +225,7 @@ int4 mu_size_scan(glist *gl_ptr, int4 level)
 enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skiprecs)
 {
 	block_id			nBlkId;
-<<<<<<< HEAD
-	boolean_t			next_endtree, last_rec, next_skiprecs;
-=======
-	boolean_t			next_endtree, first_iter, last_rec, next_skiprecs, long_blk_id;
->>>>>>> 451ab477 (GT.M V7.0-000)
+	boolean_t			next_endtree, last_rec, next_skiprecs, long_blk_id;
 	cache_rec_ptr_t			cr;
 	enum cdb_sc			status;
 	int				curroff, incr_recs = 0, incr_scans = 0;
@@ -244,14 +233,8 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 	sm_uc_ptr_t			pTop, pRec, child_pBlkBase;
 	srch_hist			sibhist;
 	unsigned short			nRecLen;
-<<<<<<< HEAD
 	boolean_t			musz_range_done = FALSE;
-=======
-	unsigned short			rec_cmpc;
-	uchar_ptr_t			key_base, ptr;
-	boolean_t			first_key = TRUE, musz_range_done = FALSE;
-	int				name_len, key_size, buff_length, rec_len, bstar_rec_sz;
->>>>>>> 451ab477 (GT.M V7.0-000)
+	int				bstar_rec_sz;
 	unsigned char			buff[MAX_KEY_SZ + 1];
 
 	assert(mu_size_cumulative[lvl][BLK] < MAX_SCANS);
@@ -260,20 +243,11 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 	{	/* reached the bottom. count records in this block and validate */
 		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen, musz_range_done)
 		{
-<<<<<<< HEAD
-			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId);
+			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId, long_blk_id);
 			RETURN_IF_ABNORMAL_STATUS(status);
 			assert((MAX_BT_DEPTH + 1) > lvl);	/* this assert ensures that the CHECK_ADJACENCY macro
 			 					 * does not overrun the boundaries of the mu_int_adj array.
 								 */
-=======
-			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId, long_blk_id);
-			if (cdb_sc_normal != status)
-			{
-				assert(CDB_STAGNATE > t_tries);
-				return status;
-			}
->>>>>>> 451ab477 (GT.M V7.0-000)
 			if (lvl)
 			{
 				CHECK_ADJACENCY(nBlkId, lvl -1, mu_int_adj[lvl - 1]);
@@ -312,27 +286,13 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 		bstar_rec_sz = bstar_rec_size(long_blk_id);
 		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen, musz_range_done)
 		{
-<<<<<<< HEAD
 			boolean_t first_iter;
 
-			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId);
+			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId, long_blk_id);
 			RETURN_IF_ABNORMAL_STATUS(status);
 			curroff = (INTPTR_T)(pRec - pBlkBase);
 			gv_target->hist.h[lvl - targ_levl].curr_rec.offset = curroff;
-			if ((((rec_hdr *)pRec)->rsiz) == BSTAR_REC_SIZE) /* Found the star key */
-=======
-			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId, long_blk_id);
-			if (cdb_sc_normal != status)
-			{
-				assert(CDB_STAGNATE > t_tries);
-				return status;
-			}
-			curroff = (INTPTR_T)(pRec - pBlkBase);
-			gv_target->hist.h[lvl - targ_levl].curr_rec.offset = curroff;
-			rec_cmpc = EVAL_CMPC((rec_hdr_ptr_t)pRec);
-			key_base = pRec + SIZEOF(rec_hdr);
 			if ((((rec_hdr *)pRec)->rsiz) == bstar_rec_sz) /* Found the star key */
->>>>>>> 451ab477 (GT.M V7.0-000)
 			{
 				if (skiprecs && (curroff < saveoff[lvl]))
 					continue;	/* skip these guys, we've already counted over there */

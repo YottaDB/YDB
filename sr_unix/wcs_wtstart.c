@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -117,11 +117,7 @@ GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			update_trans;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;
 GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
-<<<<<<< HEAD
-=======
-GBLREF	bool			in_mupip_freeze;
 GBLREF	boolean_t		wcs_noasyncio;
->>>>>>> 451ab477 (GT.M V7.0-000)
 #ifdef DEBUG
 GBLREF	volatile int		reformat_buffer_in_use;
 GBLREF	volatile int4		gtmMallocDepth;

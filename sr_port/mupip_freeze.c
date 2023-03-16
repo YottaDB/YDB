@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -148,8 +148,9 @@ uint4 freeze_online_multi_proc(reg_ctl_list *rctl)
 	udi = FILE_INFO(reg);
 	csd = csa->hdr;
 	assert(multi_proc_in_use);
-	assert(udi->owning_gd);
-	udi->owning_gd->thread_gdi = NULL;
+	assert(NULL != udi->owning_gd);
+	assert(NULL != udi->owning_gd->gd_runtime);
+	udi->owning_gd->gd_runtime->thread_gdi = NULL;
 	fr_multiproc.region_index = rctl->region_index;
 	fr_multiproc.pfms = parallel_shm_hdr;
 	MUR_SET_MULTI_PROC_KEY(rctl, multi_proc_key);

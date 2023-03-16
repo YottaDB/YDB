@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,11 +91,7 @@ int rc_cpt_entry(block_id blk)
 	{
 		errno = 0;
 		i = semctl(rc_sem,0,GETVAL);
-<<<<<<< HEAD
 		if (-1 == i)   /* invalid semaphore */
-=======
-		if (errno)	/* invalid semaphore */
->>>>>>> 451ab477 (GT.M V7.0-000)
 		{
 			rc_sem = 0;
 			/* detach shared memory segment as well */

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -969,13 +969,8 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 				if (io_ptr->dollar.zeof)
 				{
 					io_ptr->dollar.za = 9;
-<<<<<<< HEAD
 					SEND_KEYPAD_LOCAL;
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
-=======
-					SEND_KEYPAD_LOCAL
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
->>>>>>> 451ab477 (GT.M V7.0-000)
 				} else
 				{
 					io_ptr->dollar.zeof = TRUE;
