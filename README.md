@@ -55,13 +55,16 @@ listed below. For example for Ubuntu Linux:
 
   ```sh
   Ubuntu Linux OR Raspbian Linux OR Beagleboard Debian
-  sudo apt-get install --no-install-recommends file make gcc git curl tcsh {libconfig,libelf,libicu,libncurses}-dev binutils ca-certificates
+  sudo apt-get install --no-install-recommends file cmake make gcc git curl tcsh {libconfig,libelf,libicu,libncurses}-dev binutils ca-certificates
 
   Arch Linux
-  sudo pacman -S file make gcc git curl tcsh {libconfig,libelf,icu,ncurses} binutils ca-certificates
+  sudo pacman -S file cmake make gcc git curl tcsh {libconfig,libelf,icu,ncurses} binutils ca-certificates
 
   CentOS Linux OR RedHat Linux
-  sudo yum install file make gcc git curl tcsh {libconfig,libicu,ncurses,elfutils-libelf}-devel binutils ca-certificates
+  sudo yum install file cmake make gcc git curl tcsh {libconfig,libicu,ncurses,elfutils-libelf}-devel binutils ca-certificates
+
+  SUSE (SLES or SLED) or OpenSUSE Leap or OpenSUSE Tumbleweed
+  sudo zypper install cmake make gcc git file curl tcsh binutils-gold icu {libconfig,libicu,ncurses,libelf}-devel binutils ca-certificates
   ```
 
   There may be other library dependencies or the packages may have different names.
@@ -96,6 +99,7 @@ listed below. For example for Ubuntu Linux:
   ### Build with gcc
   ```sh
   cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
+  export ydb_icu_version=65.1.suse # this is needed only on OpenSUSE Leap 15.4 or SLES 15.4 or SLED 15.4
   make -j `grep -c ^processor /proc/cpuinfo`
   make install	# For known errors in this step and how to work around them, consult the FAQ section below
   cd yottadb_r*  # The latest release number will be seen in the directory name
@@ -105,6 +109,7 @@ listed below. For example for Ubuntu Linux:
   ```sh
   export CC=/usr/bin/clang
   cmake -D CMAKE_LINKER:PATH=/usr/bin/ld.lld -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
+  export ydb_icu_version=65.1.suse # this is needed only on OpenSUSE Leap 15.4 or SLES 15.4 or SLED 15.4
   make -j `grep -c ^processor /proc/cpuinfo`
   make install	# For known errors in this step and how to work around them, consult the FAQ section below
   cd yottadb_r*  # The latest release number will be seen in the directory name
@@ -121,7 +126,7 @@ listed below. For example for Ubuntu Linux:
   but can be controlled using the ```--installdir``` option. Run ```./ydbinstall --help``` for a list of options.
 
   Note that if the ```ydb_icu_version``` env var is set to a value other than what `pkg-config --modversion icu-io`
-  would return (observed on a SLED 15 or openLeap SUSE system), then the env var value needs to be preserved across
+  would return (observed on a SLED 15 or openSUSE Leap system), then the env var value needs to be preserved across
   the sudo call hence the use of ```preserve-env``` below. It is not needed on other systems but does not hurt either.
 
   ```sh
