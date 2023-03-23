@@ -700,8 +700,11 @@ endif()
 
 foreach(ydb_chset "" "UTF-8")
   foreach(in ${ydb_chset_routines_${ydb_chset}})
-    string(REPLACE ".m" ".o" out "${in}")
-    get_filename_component(out_dir "${out}" PATH)
+    # ${in} is a ".m" file name. For example, "<path>/GDEGET.m". Derive the corresponding ".o" for it i.e. "<path>/GDEGET.o"
+    # in the example case.
+    get_filename_component(baseName "${in}" NAME_WE)
+    get_filename_component(out_dir "${in}" PATH)
+    set(out ${out_dir}/${baseName}.o)
     add_custom_command(
       OUTPUT ${out}
       DEPENDS ${in} ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake yottadb
