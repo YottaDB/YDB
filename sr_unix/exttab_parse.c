@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -856,7 +856,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 	return pak;
 }
 
-callin_entry_list *citab_parse(boolean_t internal_use, const char *fname)
+callin_entry_list *citab_parse(boolean_t internal_use, char **fname)
 {
 	int			parameter_count, i, fclose_res;
 	uint4			inp_mask, out_mask, mask;
@@ -872,7 +872,7 @@ callin_entry_list *citab_parse(boolean_t internal_use, const char *fname)
 
 	if (!internal_use)
 	{
-		ext_table_file_name = (NULL == fname) ? ydb_getenv(YDBENVINDX_CI, NULL_SUFFIX, &is_ydb_env_match) : (char *)fname;
+		ext_table_file_name = (NULL == *fname) ? ydb_getenv(YDBENVINDX_CI, NULL_SUFFIX, &is_ydb_env_match) : (char *)*fname;
 		if (NULL == ext_table_file_name) /* environment variable not set */
 		{
 			nbytes = SNPRINTF(tmpbuff, SIZEOF(tmpbuff), "%s/%s",
@@ -883,10 +883,23 @@ callin_entry_list *citab_parse(boolean_t internal_use, const char *fname)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 						LEN_AND_LIT("SNPRINTF(citab_parse)"), CALLFROM, errno);
 		}
+		/* If "*fname" came in as NULL, update it to point to the value we derived from "ydb_getenv()" call above.
+		 * This is used by caller to note down this file name (in "fname" field of the "ci_tab_entry_t" structure)
+		 * and use it in case a CINOENTRY error is issued at a later point in time.
+		 */
+		if (NULL == *fname)
+			*fname = ext_table_file_name;
 	} else
 	{
 		SNPRINTF(rcfpath, YDB_PATH_MAX, "%s/%s", ydb_dist, COMM_FILTER_FILENAME);
 		ext_table_file_name = rcfpath;
+		/* Note that in this code path, we do not update "*fname" like we did in the "if" code path.
+		 * This is because in the "if" code path, all we had to do was return a "char *" pointer whereas here
+		 * we would have to return the "char []" local array to the caller. Fortunately, we don't need this as
+		 * the only reason we would need it is for a later CINOENTRY error. But that is not possible since this
+		 * is an internally maintained call-in table file (in "$ydb_dist/filter_commands.tab") and so does not
+		 * have the same issues that a user-specified call-in table could have.
+		 */
 	}
 	Fopen(ext_table_file_handle, ext_table_file_name, "r");
 	if (!ext_table_file_handle) /* call-in table not found */
@@ -1057,19 +1070,21 @@ ci_tab_entry_t *ci_tab_entry_open(boolean_t internal_use, const char *fname)
 	hash_table_str		*ci_hashtab;
 	ht_ent_str		*syment;
 	stringkey       	symkey;
-	int			fname_len;
+	char			*fn;	/* local copy of "fname" that is not "const" (i.e. can be modified in this function) */
+	int			fn_len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (NULL != fname)
+	fn = (char *)fname;
+	if (NULL != fn)
 	{	/* Check if call-in table corresponding to "fname" has already been opened. If so skip open. */
 		assert(INTERNAL_USE_FALSE == internal_use);
-		fname_len = STRLEN(fname);
+		fn_len = STRLEN(fn);
 		for (ci_tab = TREF(ci_table_all); NULL != ci_tab; ci_tab = ci_tab->next)
 		{
-			if (ci_tab->fname_len != fname_len)
+			if (ci_tab->fname_len != fn_len)
 				continue;
-			if (strcmp(ci_tab->fname, fname))
+			if (strcmp(ci_tab->fname, fn))
 				continue;
 			break;
 		}
@@ -1081,7 +1096,16 @@ ci_tab_entry_t *ci_tab_entry_open(boolean_t internal_use, const char *fname)
 	}
 	if (NULL == ci_tab)
 	{
-		cname_list = citab_parse(internal_use, fname);
+		cname_list = citab_parse(internal_use, &fn);
+		/* Note: In case the above "citab_parse()" returns without errors and "internal_use" is FALSE, "fn" would be
+		 * set to a non-NULL value (the "ydb_ci" env var) inside the call, if it was NULL before the call. This is needed
+		 * because we note this file name down as part of the "ci_tab" structure below and is used in a CINOENTRY message.
+		 * If "internal_use" is TRUE, the call-in table used is "$ydb_dist/filter_commands.tab" which is not a user-defined
+		 * call-in table and hence is guaranteed to be in good shape so there is no way to get a CINOENTRY message from
+		 * there. That is why we do not take the trouble of returning the non-NULL value of "fn" in that case (as we then
+		 * need to pass in a character array through the call).
+		 */
+		assert((NULL != fn) || internal_use);
 		ci_hashtab = (hash_table_str *)malloc(SIZEOF(hash_table_str));
 		ci_hashtab->base = NULL;
 		init_hashtab_str(ci_hashtab, CALLIN_HASHTAB_SIZE, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
@@ -1095,14 +1119,14 @@ ci_tab_entry_t *ci_tab_entry_open(boolean_t internal_use, const char *fname)
 			assert(added);
 			assert(syment->value == entry);
 		}
-		fname_len = (NULL != fname) ? STRLEN(fname) : 0;
-		ci_tab = get_memory(SIZEOF(ci_tab_entry_t) + fname_len);
+		fn_len = (NULL != fn) ? STRLEN(fn) : 0;
+		ci_tab = get_memory(SIZEOF(ci_tab_entry_t) + fn_len);
 		ci_tab->cname_list = cname_list;
 		ci_tab->hashtab = ci_hashtab;
 		ci_tab->next = TREF(ci_table_all);
-		ci_tab->fname_len = fname_len;
-		if (fname_len)
-			memcpy(ci_tab->fname, fname, fname_len + 1);
+		ci_tab->fname_len = fn_len;
+		if (fn_len)
+			memcpy(ci_tab->fname, fn, fn_len + 1);
 		TREF(ci_table_all) = ci_tab;
 	}
 	return ci_tab;

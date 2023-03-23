@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -930,7 +930,7 @@ LITDEF	err_msg merrors[] = {
 	{ "CIDIRECTIVE", "Invalid directive parameter passing.  Expected I, O or IO.", 0, 0 },
 	{ "CIPARTYPE", "Invalid type specification for O/IO directive - expected pointer type", 0, 0 },
 	{ "CIUNTYPE", "Unknown parameter type encountered", 0, 0 },
-	{ "CINOENTRY", "No entry specified for !AD in the call-in table", 2, 0 },
+	{ "CINOENTRY", "No entry specified for !AD in the call-in table !AZ", 3, 0 },
 	{ "JNLINVSWITCHLMT", "Journal AUTOSWITCHLIMIT [!UL] falls outside of allowed limits [!UL] and [!UL]", 3, 0 },
 	{ "SETZDIR", "Cannot change working directory to !AD", 2, 0 },
 	{ "JOBACTREF", "Actual parameter in job command passed by reference", 0, 0 },

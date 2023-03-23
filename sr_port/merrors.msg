@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2020 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	!
+! Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -1095,7 +1095,7 @@ CIRPARMNAME	<Invalid parameter specification for call-in table>/error/fao=0!/ans
 CIDIRECTIVE	<Invalid directive parameter passing.  Expected I, O or IO.>/error/fao=0!/ansi=0
 CIPARTYPE	<Invalid type specification for O/IO directive - expected pointer type>/error/fao=0!/ansi=0
 CIUNTYPE	<Unknown parameter type encountered>/error/fao=0!/ansi=0
-CINOENTRY	<No entry specified for !AD in the call-in table>/error/fao=2!/ansi=0
+CINOENTRY	<No entry specified for !AD in the call-in table !AZ>/error/fao=3!/ansi=0
 JNLINVSWITCHLMT	<Journal AUTOSWITCHLIMIT [!UL] falls outside of allowed limits [!UL] and [!UL]>/error/fao=3!/ansi=0
 SETZDIR		<Cannot change working directory to !AD>/error/fao=2!/ansi=0//1
 JOBACTREF	<Actual parameter in job command passed by reference>/error/fao=0!/ansi=40

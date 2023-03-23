@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -641,7 +641,7 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 	if (NULL == entry)
 	{
 		if (!(entry = ci_find_rtn_entry(ci_tab, c_rtn_name)))	/* c_rtn_name not found in the table */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_CINOENTRY, 3, LEN_AND_STR(c_rtn_name), ci_tab->fname);
 		if (NULL != ci_info)
 			ci_info->handle = entry;
 	}
