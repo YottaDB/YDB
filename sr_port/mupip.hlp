@@ -253,7 +253,7 @@
        processing for all regions before starting archive. For example, a
        message like:
 
-       DB file /home/jdoe/.yottadb/r136_x86_64/g/gtm.dat backed up in file /backup/gtm.dat
+       DB file /home/jdoe/.yottadb/r138_x86_64/g/gtm.dat backed up in file /backup/gtm.dat
        Transactions up to 0x0000000000E92E04 are backed up.
 
        confirms that gtm.dat is backed up correctly and is ready for archive.
@@ -2371,7 +2371,7 @@
 
    $ mupip rctldump .
    Object Directory         : /tmp
-   Relinkctl filename       : /tmp/yottadb/r136_x86_64/ydb-relinkctl-61f9eb418212a24a75327f53106c1656
+   Relinkctl filename       : /tmp/yottadb/r138_x86_64/ydb-relinkctl-61f9eb418212a24a75327f53106c1656
    # of routines            : 1
    # of attached processes  : 2
    Relinkctl shared memory  : shmid: 11534344 shmlen: 0x57c6000
@@ -5479,12 +5479,12 @@
        following is an example of SHOW=HEADER output:
 
        -------------------------------------------------------------------------------
-       SHOW output for journal file /home/jdoe/.yottadb/r136_x86_64/g/gtm.mjl
+       SHOW output for journal file /home/jdoe/.yottadb/r138_x86_64/g/gtm.mjl
        -------------------------------------------------------------------------------
-       Journal file name       /home/jdoe/.yottadb/r136_x86_64/g/gtm.mjl
+       Journal file name       /home/jdoe/.yottadb/r138_x86_64/g/gtm.mjl
        Journal file label      GDSJNL27
-       Database file name      /home/jdoe/.yottadb/r136_x86_64/g/gtm.dat
-        Prev journal file name /home/jdoe/.yottadb/r136_x86_64/g/gtm.mjl_2012310190106
+       Database file name      /home/jdoe/.yottadb/r138_x86_64/g/gtm.dat
+        Prev journal file name /home/jdoe/.yottadb/r138_x86_64/g/gtm.mjl_2012310190106
         Next journal file name
         Before-image journal                      ENABLED
         Journal file header size                    65536 [0x00010000]
@@ -5534,7 +5534,7 @@
        qualifiers.The following is an example of SHOW=STATISTICS output:
 
        -------------------------------------------------------------------------------
-       SHOW output for journal file /home/jdoe/.yottadb/r136_x86_64/g/gtm.mjl
+       SHOW output for journal file /home/jdoe/.yottadb/r138_x86_64/g/gtm.mjl
        -------------------------------------------------------------------------------
        Record type    Count
        ----------------------
@@ -9180,6 +9180,6 @@ Example:
 
    **Note**
 
-   This help file is a concise representation of the revision r1.36 of the
+   This help file is a concise representation of the revision r1.38 of the
    Administration and Operations Guide. To obtain a copy of the current
    revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
