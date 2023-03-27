@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -208,10 +208,10 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 						}
 					}
 				}
-				if (was_crit && (crarray_index || !any_blocked) && (curcr == cr_top))
+				if (was_crit && (crarray_index || (!any_blocked && (0 != cnl->wcs_phase2_commit_pidcnt)))
+					&& (curcr == cr_top))
 				{	/* We hold crit, found no alive pids in phase2 commit, and found either at least one
-					 * dead pid or no blocking pids, the latter indicating that the wcs_phase2_commit_pidcnt
-					 * is wrong.
+					 * dead pid OR no blocking pids when the wcs_phase2_commit_pidcnt is still non-zero.
 					 * No need to wait any more. Return FALSE right away. Caller will invoke "wcs_recover"
 					 * to fix the situation.
 					 */
