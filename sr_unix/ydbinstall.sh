@@ -871,7 +871,7 @@ if [ "N" = "$ydb_force_install" ]; then
 		fi
 	elif [ "x8664" = "${ydb_flavor}" ] ; then
 		if [ "ubuntu" = "${osid}" ] ; then
-			if expr r1.36 \< "${ydb_version}" >/dev/null; then
+			if [ -z "$ydb_version" ] || [ 1 = `expr "r1.36" "<" "${ydb_version}"` ] ; then
 				# Ubuntu 22.04 onwards is considered supported on x86_64 from r1.38 onwards
 				osallowmajorver="22"
 				osallowminorver="04"
@@ -1087,7 +1087,7 @@ else
 			#	yottadb_r132_x8664_ubuntu2004_pro.tgz
 			# From r1.36 onwards, the below tarball is also added for SUSE Linux
 			#	yottadb_r136_x8664_sle15_pro.tgz
-			# From r1.36 onwards, Ubuntu 22.04 is only supported (not Ubuntu 20.04).
+			# From r1.38 onwards, Ubuntu 22.04 is only supported (not Ubuntu 20.04).
 			# So the below tarball will be seen.
 			#	yottadb_r136_x8664_ubuntu2204_pro.tgz
 			# And below are the rules for picking a tarball name for a given target system (OS and architecture).
