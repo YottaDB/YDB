@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -320,11 +320,19 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 			if (-1 == getpeername(socketptr->sd, SOCKET_REMOTE_ADDR(socketptr), &tmp_addrlen))
 			{
 				save_errno = errno;
-				errptr = (char *)STRERROR(save_errno);
-				tmplen = STRLEN(errptr);
-				SOCKET_FREE(socketptr);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
-				return NULL;
+				/* Note that it is possible that even though the socket is inherited from a JOB command
+				 * or xinetd or passed through LOCAL socket, it is possible the socket is a LISTENING socket.
+				 * Therefore, it is possible to see a ENOTCONN errno. Allow for that. Issue error otherwise.
+				 */
+				if (ENOTCONN != save_errno)
+				{
+					assert(FALSE);
+					errptr = (char *)STRERROR(save_errno);
+					tmplen = STRLEN(errptr);
+					SOCKET_FREE(socketptr);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
+					return NULL;
+				}
 			}
 		} else if (socket_local == protocol)
 		{
