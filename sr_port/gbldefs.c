@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -473,7 +473,6 @@ GBLDEF	int4		write_filter;
 GBLDEF	boolean_t	need_no_standalone;
 GBLDEF	int4		zdir_form = ZDIR_FORM_FULLPATH; /* $ZDIR shows full path including DEVICE and DIRECTORY */
 GBLDEF	mval		dollar_zdir = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
-GBLDEF	int * volatile	var_on_cstack_ptr; /* volatile pointer to int; volatile so that nothing gets optimized out */
 GBLDEF	hash_table_int4	cw_stagnate;
 GBLDEF	boolean_t	cw_stagnate_reinitialized;
 

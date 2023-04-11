@@ -2,7 +2,7 @@
  *								*
  *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -133,7 +133,6 @@ void	unw_prof_frame(void);
 char 	*pcalloc(unsigned int);
 void 	mprof_reclaim_slots(void);
 void	crt_gbl(mprof_tree *p, boolean_t is_for);
-void	stack_leak_check(void);
 
 mprof_tree	*new_node(trace_entry *);
 mprof_tree	*new_for_node(trace_entry *, char *);

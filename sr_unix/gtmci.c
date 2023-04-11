@@ -75,7 +75,6 @@ GBLREF  mv_stent         	*mv_chain;
 GBLREF	int			mumps_status;
 GBLREF 	void			(*restart)();
 GBLREF 	boolean_t		ydb_init_complete;
-GBLREF	volatile int 		*var_on_cstack_ptr;	/* volatile so that nothing gets optimized out */
 GBLREF	rhdtyp			*ci_base_addr;
 GBLREF  unsigned char		*fgncal_stack;
 GBLREF  uint4			dollar_tlevel;
@@ -214,7 +213,6 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	enum ydb_types		arg_type;
 	ydb_string_t		*mstr_parm;
 	parmblk_struct 		param_blk;
-	volatile int		*save_var_on_cstack_ptr;	/* Volatile to match global var type */
 	int			status;
 	intrpt_state_t		old_intrpt_state;
 	char			**arg_blob_ptr;
@@ -399,8 +397,6 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	push_parm_ci(dollar_truth, &param_blk);		/* Set up the parameter block for op_bindparm() in callee */
 	old_intrpt_state = intrpt_ok_state;
 	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT;	/* Reset interrupt state for the new M session. */
-	save_var_on_cstack_ptr = var_on_cstack_ptr;
-	var_on_cstack_ptr = NULL;			/* Reset var_on_cstack_ptr for the new M environment. */
 	assert(frame_pointer->old_frame_pointer->type & SFT_CI);
 	REVERT;						/* Revert gtmci_ch. */
 	/*				*/
@@ -417,7 +413,6 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	/*				*/
 	assert(!stringpool_unusable);
 	intrpt_ok_state = old_intrpt_state;		/* Restore the old interrupt state. */
-	var_on_cstack_ptr = save_var_on_cstack_ptr;	/* Restore the old environment's var_on_cstack_ptr. */
 	/* Check if ZHALT with non-zero argument happened inside the "dm_start()" invocation.
 	 * If so, forward that error to caller of "ydb_cij()".
 	 */
@@ -562,7 +557,6 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 	ydb_string_t		*mstr_parm;
 	char			*ydb_char_ptr;
 	parmblk_struct 		param_blk;
-	volatile int		*save_var_on_cstack_ptr;	/* Volatile to match global var type */
 	int			status;
 	intrpt_state_t		old_intrpt_state;
 	boolean_t		ci_ret_code_quit_needed = FALSE;
@@ -878,8 +872,6 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 	push_parm_ci(dollar_truth, &param_blk);		/* Set up the parameter block for op_bindparm() in callee */
 	old_intrpt_state = intrpt_ok_state;
 	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT; 	/* Reset interrupt state for the new M session */
-	save_var_on_cstack_ptr = var_on_cstack_ptr;
-	var_on_cstack_ptr = NULL; 			/* Reset var_on_cstack_ptr for the new M environment */
 	assert(frame_pointer->old_frame_pointer->type & SFT_CI);
 	REVERT; /* gtmci_ch */
 	/*				*/
@@ -896,7 +888,6 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 	/*				*/
 	assert(!stringpool_unusable);
 	intrpt_ok_state = old_intrpt_state; 		/* Restore the old interrupt state */
-	var_on_cstack_ptr = save_var_on_cstack_ptr;	/* Restore the old environment's var_on_cstack_ptr */
 	/* Check if ZHALT with non-zero argument happened inside the "dm_start()" invocation.
 	 * If so, forward that error to caller of "ydb_ci_exec()".
 	 */

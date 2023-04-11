@@ -236,7 +236,6 @@ mlk_shrblk_delete_if_empty.c:warning: Value stored to 'child' is never read [cla
 mlk_shrblk_find.c:warning: Value stored to 'ctl' is never read [clang-analyzer-deadcode.DeadStores]
 mlk_shrhash_resize.c:warning: Value stored to 'new_bucket' is never read [clang-analyzer-deadcode.DeadStores]
 mlk_unpend.c:warning: Value stored to 'csa' is never read [clang-analyzer-deadcode.DeadStores]
-mprof_funcs.c:warning: Address of stack memory associated with local variable 'var_on_cstack' is still referred to by the global variable 'var_on_cstack_ptr' upon returning to the caller.  This will be a dangling reference [clang-analyzer-core.StackAddressEscape]
 mu_clsce.c:warning: Although the value stored to 'status' is used in the enclosing expression, the value is never actually read from 'status' [clang-analyzer-deadcode.DeadStores]
 mu_clsce.c:warning: Although the value stored to 'status' is used in the enclosing expression, the value is never actually read from 'status' [clang-analyzer-deadcode.DeadStores]
 mu_clsce.c:warning: Although the value stored to 'status' is used in the enclosing expression, the value is never actually read from 'status' [clang-analyzer-deadcode.DeadStores]

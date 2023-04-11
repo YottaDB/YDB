@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -28,7 +28,6 @@
 
 	.text
 	.extern	gtm_fetch
-	.extern	stack_leak_check
 	.extern pcurrpos
 
 ENTRY op_mproflinefetch
@@ -39,12 +38,6 @@ ENTRY op_mproflinefetch
 	str	r6, [r12, #msf_ctxt_off]		/* save linkage pointer */
 	bl	gtm_fetch
 	bl	pcurrpos
-	cmp	r4, #3					/* Any args pushed on stack? */
-	movgt	sp, fp					/* If args on stack, we need to put sp where it was before
-							 * calling op_linefetch - otherwise stack_leak_check will complain.
-							 * But after returning to generated code, the stack pointer will be put
-							 * back where it belongs */
-	bl	stack_leak_check
 	ldr	r12, [r5]
 	ldr	lr, [r12, #msf_mpc_off]
 	bx	lr

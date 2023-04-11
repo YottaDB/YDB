@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,6 @@
 #include "is_proc_alive.h"
 
 GBLDEF	cache_rec_ptr_t		get_space_fail_cr;	/* gbldefed to be accessible in a pro core */
-GBLDEF	wcs_conflict_trace_t	*get_space_fail_array;	/* gbldefed to be accessilbe in a pro core */
 GBLDEF	int4			get_space_fail_arridx;	/* gbldefed to be accessilbe in a pro core */
 
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -63,7 +62,7 @@ error_def(ERR_BUFOWNERSTUCK);
 #define	WCS_CONFLICT_TRACE_ARRAYSIZE	64
 #define	LCNT_INTERVAL			DIVIDE_ROUND_UP(UNIX_GETSPACEWAIT, WCS_CONFLICT_TRACE_ARRAYSIZE)
 
-#define WCS_GET_SPACE_RETURN_FAIL(TRACEARRAY, CR)									\
+#define WCS_GET_SPACE_RETURN_FAIL(CR)											\
 {															\
 	/* A failure occurred. Ignored for WB test case */								\
 	assert(FALSE || (ydb_white_box_test_case_enabled								\
@@ -72,7 +71,6 @@ error_def(ERR_BUFOWNERSTUCK);
 					|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number)			\
 					|| (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == ydb_white_box_test_case_number))));	\
 	get_space_fail_cr = CR;												\
-	get_space_fail_array = TRACEARRAY;										\
 	if (TREF(ydb_environment_init) DEBUG_ONLY(&& !(ydb_white_box_test_case_enabled					\
 				&& ((WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)			\
 					|| (WBTEST_DB_WRITE_HANG == ydb_white_box_test_case_number)			\
@@ -325,5 +323,5 @@ boolean_t wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 			|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number)
 			|| (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == ydb_white_box_test_case_number));
 	INVOKE_C_STACK_APPROPRIATE(cr, csa, 2);
-	WCS_GET_SPACE_RETURN_FAIL(wcs_conflict_trace, cr);
+	WCS_GET_SPACE_RETURN_FAIL(cr);
 }

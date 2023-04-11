@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -23,7 +23,6 @@
 	.text
 	.extern	gtm_fetch
 	.extern pcurrpos
-	.extern	stack_leak_check
 
 	#
 	# This routine does local variable fetch for all variables on a given line of code, or alternatively, all
@@ -41,7 +40,6 @@ ENTRY	op_mproflinefetch
 	movb    $0, %al					# No variable length arguments
 	call	gtm_fetch
 	call	pcurrpos
-	call	stack_leak_check
 	movq	frame_pointer(%rip), %rax
 	pushq	msf_mpc_off(%rax)			# Push return address back on stack for return
 	ret

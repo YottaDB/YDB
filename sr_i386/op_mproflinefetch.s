@@ -2,6 +2,9 @@
 #								#
 #	Copyright 2001, 2011 Fidelity Information Services, Inc	#
 #								#
+# Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -34,9 +37,6 @@ ENTRY op_mproflinefetch
 	popl	msf_mpc_off(%eax)
 	call	gtm_fetch
 	call	pcurrpos
-	popl	%eax		# popping generated code args off stack before leak check
-	leal	(%esp,%eax,4),%esp
-	call	stack_leak_check
 	movl	frame_pointer,%eax
 	pushl	msf_mpc_off(%eax)
 	ret

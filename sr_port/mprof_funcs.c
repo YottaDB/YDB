@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,6 @@ GBLREF 	boolean_t		is_tracing_on;
 GBLREF 	stack_frame		*frame_pointer;
 GBLREF 	mval			dollar_job;
 GBLREF	uint4			process_id;
-GBLREF	int * volatile		var_on_cstack_ptr;		/* Volatile so that nothing gets optimized out. */
 GBLREF	int4			gtm_trigger_depth;
 
 STATICDEF boolean_t 		save_to_gbl = TRUE;		/* Indicates whether profiling info is to be saved to db. */
@@ -1029,44 +1028,3 @@ STATICFNDEF void parse_gvn(mval *gvn)
 	return;
 }
 
-void stack_leak_check(void)
-{
-	int		var_on_cstack;
-	boolean_t	skip_stack_leak_check;
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-
-	skip_stack_leak_check = FALSE;
-	/* With CLANG 15, ASAN_OPTIONS=detect_stack_use_after_return=1 is enabled by default. This means "&var_on_cstack"
-	 *   would be different each time "stack_leak_check()" is invoked as it would point to a location in a heap memory
-	 *   section managed by the Address Sanitizer. And so, the "var_on_cstack_ptr" scheme below (which expects
-	 *   "&var_on_cstack" to be exactly the same each time this function is invoked) will not work.
-	 *
-	 * With GCC, ASAN_OPTIONS=detect_stack_use_after_return=1 is not enabled by default. But one can enable it at runtime
-	 *   by setting the ASAN_OPTIONS env var.
-	 *
-	 * Therefore skip stack leak check in both cases as otherwise we are guaranteed to fail the "assertpro()" below.
-	 */
-#	ifdef __clang__
-#		if __has_feature(address_sanitizer)
-		skip_stack_leak_check = TRUE;
-#		endif
-#	endif
-#	ifdef __GNUC__
-#		ifdef __SANITIZE_ADDRESS__
-		skip_stack_leak_check = TRUE;
-#		endif
-#	endif
-	if (skip_stack_leak_check || GTMTRIG_ONLY((0 < gtm_trigger_depth) ||) (0 < TREF(gtmci_nested_level)))
-		return;
-	if (NULL == var_on_cstack_ptr)
-		var_on_cstack_ptr = &var_on_cstack;
-	if ((&var_on_cstack != var_on_cstack_ptr)
-#	     ifdef __i386	/* For 32-bit Linux allow a two pointer variation to accommodate ZHELP. */
-	     && ((SIZEOF(var_on_cstack) * 2) < ABS(&var_on_cstack - var_on_cstack_ptr))
-#	     endif
-	     )
-		assertpro(FALSE);
-	return;
-}
