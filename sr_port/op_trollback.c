@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -181,7 +181,8 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 			assert(NULL != gv_currkey);
 			gv_orig_key_ptr = tp_pointer->orig_key;
 			assert(NULL != gv_orig_key_ptr);
-			COPY_KEY(gv_currkey, gv_orig_key_ptr);
+			if (NULL != gv_currkey)
+				COPY_KEY(gv_currkey, gv_orig_key_ptr);
 			gv_target = tp_pointer->orig_gv_target;
 			gd_header = tp_pointer->gd_header;
 			gv_cur_region = tp_pointer->gd_reg;

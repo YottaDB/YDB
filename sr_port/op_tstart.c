@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,6 @@ GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	boolean_t		dollar_truth;
 GBLREF	mval			dollar_zgbldir;
-GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	gd_addr			*gd_header;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
@@ -288,9 +287,6 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 	}
 	/* Either cw_stagnate has not been initialized at all or previous-non-TP or tp_hist should have done CWS_RESET */
 	assert((0 == cw_stagnate.size) || cw_stagnate_reinitialized);
-	if (NULL == gd_header)
-		gvinit();
-	assert(NULL != gd_header);
 	if (!tphold_noshift && (SFT_DM & frame_pointer->old_frame_pointer->type))
 	{	/* Put a TPHOLD underneath dmode frame */
 		assert(frame_pointer->old_frame_pointer->old_frame_pointer);
@@ -399,8 +395,8 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 			memset(TREF(gv_tporigkey_ptr), 0, SIZEOF(gv_key_buf));
 		}
 		tf->orig_key = (gv_key *)&((TREF(gv_tporigkey_ptr))->key);
-		assert(NULL != gv_currkey);
-		MEMCPY_KEY(tf->orig_key, gv_currkey);
+		if (NULL != gv_currkey)
+			MEMCPY_KEY(tf->orig_key, gv_currkey);
 		tf->gd_header = gd_header;
 		tf->gd_reg = gv_cur_region;
 		tf->orig_gv_target = gv_target;

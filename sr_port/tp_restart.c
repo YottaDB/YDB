@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -704,7 +704,8 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		gv_cur_region = tf->gd_reg;
 		TP_CHANGE_REG(gv_cur_region);
 		assert(NULL != tf->orig_key);
-		COPY_KEY(gv_currkey, tf->orig_key);
+		if (NULL != gv_currkey)
+			COPY_KEY(gv_currkey, tf->orig_key);
 		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 		assert(-1 != tf->extnam_str.len);
 		len = tf->extnam_str.len;
