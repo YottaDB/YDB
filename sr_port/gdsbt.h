@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -686,6 +686,7 @@ typedef struct node_local_struct
 	uint4		wt_pid_array[MAX_WT_PID_SLOTS];		/* Processes with active wcs_timers (0 denotes empty slots)
 								 * Note: Unreliable - For Diagnostic Purposes only
 								 */
+	uint4		reorg_upgrade_pid;	/* indicates whether a MUPIP REORG -UPGRADE is in progress */
 	uint4		reorg_encrypt_pid;	/* indicates whether a MUPIP REORG -ENCRYPT is in progress */
 	uint4		reorg_encrypt_cycle;	/* reflects the cycle of database encryption status in a series of
 						 * MUPIP REORG -ENCRYPTs

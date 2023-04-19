@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2017 Fidelity National Information	*
+ * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,7 +54,7 @@ int jnl_write_extend_if_needed(int4 jrec_len, jnl_buffer_ptr_t jb, uint4 lcl_fre
 		 */
 		if (!jb->last_eof_written)
 		{
-			assertpro((csa->ti->early_tn == csa->ti->curr_tn) || (JRT_INCTN == rectype));
+			assertpro((csa->ti->early_tn == csa->ti->curr_tn) || (JRT_INCTN == rectype) || (JRT_PINI == rectype));
 			assert(!IS_REPLICATED(rectype)); /* all replicated jnl records should have gone through t_end/tp_tend */
 			assert(jrt_fixed_size[rectype]); /* this is used later in re-computing checksums */
 		}

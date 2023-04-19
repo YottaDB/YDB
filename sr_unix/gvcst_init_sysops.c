@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -401,7 +401,6 @@ error_def(ERR_HOSTCONFLICT);
 error_def(ERR_INVOPNSTATSDB);
 error_def(ERR_INVSTATSDB);
 error_def(ERR_JNLBUFFREGUPD);
-error_def(ERR_MMNODYNUPGRD);
 error_def(ERR_NLMISMATCHCALC);
 error_def(ERR_NLRESTORE);
 error_def(ERR_REQRECOV);
@@ -674,7 +673,7 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd, gtm_uint64_t *sec_size)
 	assert(0 == SHMPOOL_SECTION_SIZE % OS_PAGE_SIZE);
 	assert(0 == CACHE_CONTROL_SIZE(csd) % OS_PAGE_SIZE);
 	/* First compute the size based on sections common to both MM and BG */
-	csd->free_space = (BLK_ZERO_OFF(csd->start_vbn) - SIZEOF_FILE_HDR(csd));
+	assert((BLK_ZERO_OFF(csd->start_vbn) - SIZEOF_FILE_HDR(csd)) == csd->free_space);
 	tmp_sec_size = NODE_LOCAL_SPACE(csd) + JNL_SHARE_SIZE(csd) + LOCK_SPACE_SIZE(csd) + SHMPOOL_SECTION_SIZE
 		+ SIZEOF_FILE_HDR(csd);
 	/* Now, add sections specific to MM and BG */
@@ -1185,7 +1184,8 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		dbsecspc(reg, tsd, &sec_size); 	/* Find db segment size */
 		/* Create new shared memory using IPC_PRIVATE. System guarantees a unique id */
 		GTM_WHITE_BOX_TEST(WBTEST_FAIL_ON_SHMGET, sec_size, GTM_UINT64_MAX);
-		if (-1 == (status_l = udi->shmid = gtm_shmget(IPC_PRIVATE, sec_size, RWDALL | IPC_CREAT, TRUE)))
+		if (-1 == (status_l = udi->shmid = gtm_shmget(IPC_PRIVATE, sec_size, RWDALL | IPC_CREAT, TRUE,
+									DATABASE_FILE, (char*)reg->dyn.addr->fname)))
 		{
 			udi->shmid = (int)INVALID_SHMID;
 			status_l = INVALID_SHMID;
@@ -1307,7 +1307,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		if (-1 == stat_res)
 			RTS_ERROR(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
 		csd = csa->hdr = (sgmnt_data_ptr_t)((sm_uc_ptr_t)csa->mlkctl + csa->mlkctl_len);
-		mmap_sz = stat_buf.st_size - BLK_ZERO_OFF(tsd->start_vbn) - csd->free_space;
+		mmap_sz = stat_buf.st_size - BLK_ZERO_OFF(tsd->start_vbn);
 		assert(0 < mmap_sz);
 		CHECK_LARGEFILE_MMAP(reg, mmap_sz); /* can issue rts_error MMFILETOOLARGE */
 #		ifdef _AIX

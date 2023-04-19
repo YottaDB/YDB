@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,7 +66,7 @@
 			     && (DIR_ROOT != gv_target->root)				\
 			     && !redo_root_search_done					\
 			     && !TREF(in_gvcst_redo_root_search)			\
-			     && !mu_reorg_upgrd_dwngrd_in_prog				\
+			     && !mu_upgrade_in_prog					\
 			     && !mu_reorg_encrypt_in_prog				\
 			     && (!TREF(in_gvcst_bmp_mark_free) || mu_reorg_process)	\
 			)
@@ -83,8 +83,8 @@ GBLREF	tp_frame		*tp_pointer;
 GBLREF	trans_num		start_tn;
 GBLREF	unsigned char		cw_set_depth, cw_map_depth, t_fail_hist[CDB_MAX_TRIES];
 GBLREF	boolean_t		mu_reorg_process;
-GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;
+GBLREF	uint4			mu_upgrade_in_prog;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			t_err;
 GBLREF	jnl_gbls_t		jgbl;
@@ -149,9 +149,10 @@ void t_retry(enum cdb_sc failure)
 	/* We expect t_retry to be invoked with an abnormal failure code. mupip reorg is the only exception and can pass
 	 * cdb_sc_normal failure code in case it finds a global variable existed at start of reorg, but not when it came
 	 * into mu_reorg and did a gvcst_search. It cannot confirm this unless it holds crit for which it has to wait
-	 * until the final retry which is why we accept this way of invoking t_retry. Assert accordingly.
+	 * until the final retry which is why we accept this way of invoking t_retry. MUPIP REORG -UPGRADE also can pass
+	 * cdb_sc_normal while repeating the entire directory tree hierarchy. Assert accordingly.
 	 */
-	assert((cdb_sc_normal != failure) || mu_reorg_process);
+	assert((cdb_sc_normal != failure) || mu_reorg_process || mu_upgrade_in_prog);
 	t_fail_hist[t_tries] = (unsigned char)failure;
 	if (mu_reorg_process)
 		CWS_RESET;

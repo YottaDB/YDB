@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,11 +24,13 @@
 #include "dse.h"
 #include "print_target.h"
 #include "gv_trigger_common.h" /* for IS_GVKEY_HASHT_GBLNAME macro */
+#include "filestruct.h"
 
 GBLREF short int	patch_path_count;
 GBLREF block_id		ksrch_root;
 GBLREF bool		patch_find_root_search;
 GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_addr		*original_header;
 
@@ -75,6 +77,7 @@ void dse_f_key(void)
 	int		size, size_root, root_path_count, count, util_len;
 	int4		offset[MAX_BT_DEPTH + 1], root_offset[MAX_BT_DEPTH + 1];
 
+	DSE_DB_IS_TOO_OLD(cs_addrs, cs_data, gv_cur_region);
 	if (!dse_getki(&targ_key[0], &size, LIT_AND_LEN("KEY")))
 		return;
 	patch_path_count = 1;

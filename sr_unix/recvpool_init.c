@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -309,7 +309,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	if (new_ipc)
 	{	/* create new shared memory */
 		if (-1 == (udi->shmid = recvpool_shmid =
-				gtm_shmget(IPC_PRIVATE, gtmrecv_options.buffsize, IPC_CREAT | RWDALL, TRUE)))
+				gtm_shmget(IPC_PRIVATE, gtmrecv_options.buffsize, IPC_CREAT | RWDALL, TRUE, JOURNAL_POOL, udi->fn)))
 		{
 			udi->shmid = recvpool_shmid = INVALID_SHMID;
 			save_errno = errno;

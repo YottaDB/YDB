@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2020 Fidelity National Information	*
+ * Copyright (c) 2017-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,16 +36,21 @@
 #include "db_snapshot.h"
 #include "shmpool.h"
 #include "mupipbckup.h"
+#include "mu_updwn_ver_inline.h"
+#include "util.h"
 
 GBLREF	boolean_t		certify_all_blocks;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	uint4			mu_upgrade_in_prog;		/* non-zero if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLREF	uint4			process_id;
-#ifdef DEBUG
+#if defined(DEBUG) || defined(DEBUG_BLKS_TO_UPGRD)
 GBLREF	boolean_t		dse_running;
 GBLREF	node_local_ptr_t	locknl;
 GBLREF	gd_region		*gv_cur_region;		/* for the LOCK_HIST macro in the RELEASE_BUFF_UPDATE_LOCK macro */
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data		*cs_data;
 #endif
 
 /* Returns 0 if success, -1 if failure */
@@ -83,12 +88,7 @@ int secshr_finish_CMT18(sgmnt_addrs *csa,
 		cr = cs->cr;
 		ASSERT_IS_WITHIN_SHM_BOUNDS((sm_uc_ptr_t)cr, csa);
 		assert(blk_ptr == (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr));
-		/* Before resetting cr->ondsk_blkver, ensure db_format in file header did not
-		 * change in between phase1 (inside of crit) and phase2 (outside of crit).
-		 * This is needed to ensure the correctness of the blks_to_upgrd counter.
-		 */
-		assert(currtn > csd->desired_db_format_tn);
-		cr->ondsk_blkver = csd->desired_db_format;
+		SET_ONDSK_BLKVER(cr, csd, currtn);
 	} else
 		assert(blk_ptr == (MM_BASE_ADDR(csa) + (off_t)blk_size * blkid));
 	cnl = csa->nl;
@@ -148,13 +148,19 @@ int secshr_finish_CMT18(sgmnt_addrs *csa,
 		assert(!dollar_tlevel);
 		assert((inctn_bmp_mark_free_gtm == inctn_opcode) || (inctn_bmp_mark_free_mu_reorg == inctn_opcode)
 				|| (inctn_blkmarkfree == inctn_opcode) || dse_running);
-		/* Check if we are freeing a V4 format block and if so decrement the
-		 * blks_to_upgrd counter. Do not do this in case MUPIP REORG UPGRADE/DOWNGRADE
-		 * is marking a recycled block as free (inctn_opcode is inctn_blkmarkfree).
+		/* Check if we are freeing a V6p format block and if so decrement the
+		 * blks_to_upgrd counter.
 		 */
 		if (((inctn_bmp_mark_free_gtm == inctn_opcode) || (inctn_bmp_mark_free_mu_reorg == inctn_opcode))
-				&& (0 != inctn_detail.blknum_struct.blknum))
-			DECR_BLKS_TO_UPGRD(csa, csd, 1);
+				&& !mu_upgrade_in_prog && (0 != inctn_detail.blknum_struct.blknum)
+					&& (GDSV7m != cs->ondsk_blkver))
+			{
+				DECR_BLKS_TO_UPGRD(csa, csd, 1);
+#ifdef				DEBUG_BLKS_TO_UPGRD
+				util_out_print("!UL - !AD:0x!@XQ:!UL:!UL:!UL 18", TRUE, cs_data->blks_to_upgrd,
+						REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver, cs->level);
+#endif
+			}
 	}
 	assert(!cs->reference_cnt || (T_COMMIT_CRIT_PHASE2 != csa->t_commit_crit));
 	if (csa->now_crit)

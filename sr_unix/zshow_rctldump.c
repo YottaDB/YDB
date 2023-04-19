@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,10 +87,10 @@ void	zshow_rctldump(zshow_out *output)
 		for (linkrec = linkctl->rec_base, recnum = 1; recnum <= n_records; linkrec++, recnum++)
 		{
 			nbytes = SNPRINTF(buff, SIZEOF(buff), "    rec#%d: rtnname: %.*s  cycle: %d  objhash: 0x%llx"
-				"  numvers: %d  objlen: 0x%llx  shmlen: 0x%llx",
+				"  numvers: %d  objlen: 0x%llx  shmlen: 0x%llx  superseded: %d",
 				recnum, mid_len(&linkrec->rtnname_fixed), &linkrec->rtnname_fixed.c,
 				linkrec->cycle, linkrec->objhash, linkrec->numvers, linkrec->objLen,
-				linkrec->usedLen);
+				linkrec->usedLen, linkrec->rtnobj_supersede);
 			DUMP_ONE_LINE(output, buff, nbytes);
 		}
 	}

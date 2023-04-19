@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2021 Fidelity National Information	*
+ * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,6 +48,7 @@
 #include "do_semop.h"
 #include "ftok_sems.h"
 #include "have_crit.h"
+#include "mu_updwn_ver_inline.h"
 #include "mupip_reorg_encrypt.h"
 #include "t_abort.h"
 #include "interlock.h"
@@ -98,7 +99,6 @@ error_def(ERR_MUREORGFAIL);
 error_def(ERR_ENCRYPTCONFLT);
 error_def(ERR_MUREENCRYPTEND);
 error_def(ERR_MUREENCRYPTSTART);
-error_def(ERR_MUREENCRYPTV4NOALLOW);
 error_def(ERR_REORGCTRLY);
 
 STATICFNDEF boolean_t	wait_for_concurrent_reads(sgmnt_addrs *csa);
@@ -298,12 +298,7 @@ void mupip_reorg_encrypt(void)
 		}
 		/* ++++++++++++++++++++++++++ IN CRIT ++++++++++++++++++++++++++ */
 		grab_crit(reg, WS_91);
-		if (!csd->fully_upgraded)
-		{
-			CONTINUE_TO_NEXT_REGION(csa, csd, cnl, reg, reg_status, status,
-				REORG_IN_PROG_NOT_SET, HOLDING_CRIT, IS_ERROR,
-				gtm_putmsg_csa, (CSA_ARG(csa) VARLSTCNT(4) ERR_MUREENCRYPTV4NOALLOW, 2, DB_LEN_STR(reg)));
-		}
+		assert(csd->fully_upgraded || (0 == csd->blks_to_upgrd) || (BLK_ID_32_VER < csd->desired_db_format));
 		if (cnl->mupip_extract_count)
 		{
 			CONTINUE_TO_NEXT_REGION(csa, csd, cnl, reg, reg_status, status,
@@ -558,6 +553,11 @@ void mupip_reorg_encrypt(void)
 					blk_tn = ((blk_hdr_ptr_t)buff)->tn;
 					if (blk_tn >= start_tn)
 						continue;
+					if ((((blk_hdr_ptr_t)buff)->bver < csd->desired_db_format)
+							&& (0 == ((blk_hdr_ptr_t)buff)->levl))
+					{	/* REORG -ENCRYPT must do IO so it upgrades data blocks */
+						((blk_hdr_ptr_t)buff)->bver = csd->desired_db_format;
+					}
 				}
 				/* Begin non-TP transaction to (re)encrypt the block.
 				 * The way we do that is by updating the block using a null update array.

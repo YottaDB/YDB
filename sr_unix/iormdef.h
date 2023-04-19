@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,6 +94,8 @@ error_def(ERR_CRYPTBADWRTPOS);
 			if (0 != fclose_res)								\
 			{										\
 				save_fd = D_RM->FILDES;							\
+				D_RM->FILDES = FD_INVALID;						\
+				D_RM->FILSTR = NULL;							\
 				rc = errno;								\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, rc);\
 			}										\

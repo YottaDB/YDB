@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,7 @@
 #include "interlock.h"
 #include "do_shmat.h"
 #include "mlk_ops.h"
+#include "mlk_wake_pending.h"
 
 GBLREF	short		crash_count;
 #ifdef DEBUG
@@ -68,7 +69,9 @@ boolean_t	mlk_check_own(mlk_pvtblk *x)
 			csa->hdr->trans_hist.lock_sequence++;
 			ret_val = TRUE;
 		}
-	} else
+	} else if (x->blocked->pending)
+		mlk_wake_pending(&x->pvtctl, x->blocked);
+	else
 		ret_val = TRUE;	/* There is no owner. Take credit for freeing it.. */
 	REL_LOCK_CRIT(x->pvtctl, was_crit);
 	return ret_val;

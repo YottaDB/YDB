@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information 	*
+ * Copyright (c) 2001-2023 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -609,7 +609,7 @@ LITDEF	err_msg merrors[] = {
 	{ "KRNLKILL", "Process was terminated by SIGDANGER signal from the system -- System swap space is too low -- Report to System Administrator", 0, 0 },
 	{ "MEMORYRECURSIVE", "Memory Subsystem called recursively", 0, 0 },
 	{ "FREEZEID", "Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ", 7, 0 },
-	{ "UNUSEDMSG778", "BLKWRITERR last used in V6.3-001A May 2017", 0, 0 },
+	{ "FORCEDHALT2", "Receipt of 3 MUPIP STOP signals within !UL seconds, process: !UL shutting down with no exit handling like a kill -9", 2, 0 },
 	{ "DSEINVALBLKID", "Trying to edit DB with 64-bit block IDs using pre-V7 DSE", 0, 0 },
 	{ "PINENTRYERR", "Custom pinentry program failure", 0, 0 },
 	{ "BCKUPBUFLUSH", "Unable to flush buffer for online backup", 0, 0 },
@@ -1056,12 +1056,12 @@ LITDEF	err_msg merrors[] = {
 	{ "UNUSEDMSG1222", "DBCKILLIP removed from code in V7.0-000 Nov 2020", 0, 0 },
 	{ "UNUSEDMSG1223", "DBCNOFINISH removed from code in V7.0-000 Nov 2020", 0, 0 },
 	{ "DYNUPGRDFAIL", "Unable to dynamically upgrade block 0x!16@XQ in database !AD due to lack of free space in block", 3, 0 },
-	{ "MMNODYNDWNGRD", "Unable to use dynamic downgrade with MM access method for region !AD. Use BG access method for downgrade", 2, 0 },
-	{ "MMNODYNUPGRD", "Unable to use MM access method for region !AD until all database blocks are upgraded", 2, 0 },
-	{ "MUDWNGRDNRDY", "Database !AD is not ready to downgrade - still !@UQ database blocks to downgrade", 3, 0 },
-	{ "MUDWNGRDTN", "Transaction number 0x!16@XQ in database !AD is too big for MUPIP [REORG] DOWNGRADE. Renew database with MUPIP INTEG TN_RESET", 3, 0 },
+	{ "UNUSEDMSG1225", "MMNODYNDWNGRD removed from code in V7.1-000 Feb 2023", 0, 0 },
+	{ "UNUSEDMSG1226", "MMNODYNUPGRD removed from code in V7.1-000 Feb 2023", 0, 0 },
+	{ "UNUSEDMSG1227", "MUDWNGRDNRDY removed from code in V7.1-000 Feb 2023", 0, 0 },
+	{ "REORGUPCNFLCT", "MUPIP !AD encountered a conflict due to !AD (PID:!UL)", 5, 0 },
 	{ "MUDWNGRDNOTPOS", "Start VBN value is [!UL] while downgraded GT.M version can support only [!UL]. Downgrade not possible", 2, 0 },
-	{ "MUUPGRDNRDY", "Database !AD has not been certified as being ready to upgrade to !AD format", 4, 0 },
+	{ "MUUPGRDNRDY", "Database !AD has not been completely upgraded to !AD format - still !@UQ database blocks to upgrade", 5, 0 },
 	{ "TNWARN", "Database file !AD has 0x!16@XQ more transactions to go before reaching the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET", 4, 0 },
 	{ "TNTOOLARGE", "Database file !AD has reached the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET", 3, 0 },
 	{ "SHMPLRECOV", "Shared memory pool block recovery invoked for region !AD", 2, 0 },
@@ -1073,7 +1073,7 @@ LITDEF	err_msg merrors[] = {
 	{ "RSVDBYTE2HIGH", "Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and Reserved bytes (!UL)", 5, 0 },
 	{ "BKUPTMPFILOPEN", "Open of backup temporary file !AD failed", 2, 0 },
 	{ "BKUPTMPFILWRITE", "Write to backup temporary file !AD failed", 2, 0 },
-	{ "SHMHUGETLB", "Could not back shared memory with huge pages, using base pages instead", 0, 0 },
+	{ "SHMHUGETLB", "Could not back shared memory with huge pages, using base pages instead !AD", 2, 0 },
 	{ "SHMLOCK", "Could not pin shared memory into physical memory", 0, 0 },
 	{ "UNUSEDMSG1244", "LOADEDSZ2 last used in V6.3-009", 0, 0 },
 	{ "REPLINSTMISMTCH", "Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)", 8, 0 },
@@ -1148,7 +1148,7 @@ LITDEF	err_msg merrors[] = {
 	{ "CRYPTINIT", "Could not initialize encryption library while opening encrypted file !AD. !AD", 4, 0 },
 	{ "CRYPTOPFAILED", "Encrypt/Decrypt operation failed for file !AD. !AD", 4, 0 },
 	{ "CRYPTDLNOOPEN", "Could not load encryption library while opening encrypted file !AD. !AD", 4, 0 },
-	{ "CRYPTNOV4", "!AD is an encrypted database. Cannot downgrade(to V4) with Encryption option enabled.", 2, 0 },
+	{ "UNUSEDMSG1317", "CRYPTNOV4 last used in V6.3-014 Oct 2022", 0, 0 },
 	{ "CRYPTNOMM", "!AD is an encrypted database. Cannot support MM access method.", 2, 0 },
 	{ "READONLYNOBG", "Read-only cannot be enabled on non-MM databases", 0, 0 },
 	{ "CRYPTKEYFETCHFAILED", "Could not retrieve encryption key corresponding to file !AD. !AD", 4, 0 },
@@ -1163,8 +1163,8 @@ LITDEF	err_msg merrors[] = {
 	{ "LOCKSPACEFULL", "No more room for LOCK slots on database file !AD", 2, 0 },
 	{ "IOERROR", "Error occured while doing !AD in !AD operation -- called from module !AD at line !UL", 7, 0 },
 	{ "MAXSSREACHED", "Maximum snapshots - !UL - for region !AD reached. Please wait for the existing snapshots to complete before starting a new one.", 3, 0 },
-	{ "SNAPSHOTNOV4", "Cannot downgrade (to V4) while snapshots are in progress. Currently !UL snapshots are in progress for region !AD.", 3, 0 },
-	{ "SSV4NOALLOW", "Database snapshots are supported only on fully upgraded V5 databases. !AD has V4 format blocks.", 2, 0 },
+	{ "UNUSEDMSG1332", "SNAPSHOTNOV4 last used in V6.3-014 Oct 2022", 0, 0 },
+	{ "DBUPGRDREQ", "Database file !AD is not fully upgraded (format !AZ) and cannot be used by this version of GT.M. Please upgrade the database.", 3, 0 },
 	{ "SSTMPDIRSTAT", "Cannot access temporary directory !AD", 2, 0 },
 	{ "SSTMPCREATE", "Cannot create the temporary file in directory !AD for the requested snapshot", 2, 0 },
 	{ "JNLFILEDUP", "Journal files !AD and !AD are the same", 4, 0 },
@@ -1269,7 +1269,7 @@ LITDEF	err_msg merrors[] = {
 	{ "ORLBKNOSTP", "ONLINE ROLLBACK proceeding with database updates. MUPIP STOP will no longer be allowed", 0, 0 },
 	{ "ORLBKFRZPROG", "!AD : waiting for FREEZE on region !AD (!AD) to clear", 6, 0 },
 	{ "ORLBKFRZOVER", "!AD : FREEZE on region !AD (!AD) cleared", 6, 0 },
-	{ "ORLBKNOV4BLK", "Region !AD (!AD) has V4 format blocks. Database upgrade required. ONLINE ROLLBACK cannot continue", 4, 0 },
+	{ "ORLBKDBUPGRDREQ", "Region !AD (!AD) is not fully upgraded. ONLINE ROLLBACK cannot continue", 4, 0 },
 	{ "DBROLLEDBACK", "Concurrent ONLINE ROLLBACK detected on one or more regions. The current operation is no longer valid", 0, 0 },
 	{ "DSEWCREINIT", "Database cache reinitialized by DSE for region !AD", 2, 0 },
 	{ "MURNDWNOVRD", "OVERRIDE qualifier used with MUPIP RUNDOWN on database file !AD", 2, 0 },
@@ -1284,7 +1284,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MUTRUNCFAIL", "Truncate failed after reorg", 0, 0 },
 	{ "MUTRUNCNOSPACE", "Region !AD has insufficient space to meet truncate target percentage of !UL", 3, 0 },
 	{ "MUTRUNCNOTBG", "Region !AD does not have access method BG ", 2, 0 },
-	{ "MUTRUNCNOV4", "Region !AD is not fully upgraded from V4 format.", 2, 0 },
+	{ "UNUSEDMSG1455", "MUTRUNCNOV4 Last used in V7.0-004 Fed 2023", 0, 0 },
 	{ "MUTRUNCPERCENT", "Truncate threshold percentage should be from 0 to 99", 0, 0 },
 	{ "MUTRUNCSSINPROG", "Truncate detected concurrent snapshot in progress for region !AD", 2, 0 },
 	{ "MUTRUNCSUCCESS", "Database file !AD truncated from 0x!16@XQ blocks to 0x!16@XQ at transaction 0x!16@XQ", 5, 0 },
@@ -1354,7 +1354,7 @@ LITDEF	err_msg merrors[] = {
 	{ "NULLENTRYREF", "JOB command did not specify entryref", 0, 0 },
 	{ "ZPEEKNORPLINFO", "$ZPEEK() unable to access requested replication structure", 0, 0 },
 	{ "MMREGNOACCESS", "Region !AD (!AD) is no longer accessible. See prior error messages in the operator and application error logs", 4, 0 },
-	{ "UNUSEDMSG1525", "MALLOCMAXUNIX last used in OpenVMS", 0, 0 },
+	{ "FDSIZELMT", "Too many (!UL) descriptors needed by GT.CM server", 1, 0 },
 	{ "MALLOCCRIT", "Memory allocation critical due to request for !UJ bytes from 0x!XJ", 2, 0 },
 	{ "HOSTCONFLICT", "Host !AD could not open database file !AD because it is marked as already open on node !AD", 6, 0 },
 	{ "GETADDRINFO", "Error in getting address info", 0, 0 },
@@ -1449,13 +1449,13 @@ LITDEF	err_msg merrors[] = {
 	{ "EXTRINTEGRITY", "Database !AD potentially contains spanning nodes or data encrypted with two different keys", 2, 0 },
 	{ "CRYPTKEYRELEASEFAILED", "Could not safely release encryption key corresponding to file !AD. !AD", 4, 0 },
 	{ "MUREENCRYPTSTART", "Database !AD : MUPIP REORG ENCRYPT started by pid !UL at transaction number [0x!16@XQ]", 4, 0 },
-	{ "MUREENCRYPTV4NOALLOW", "Database (re)encryption supported only on fully upgraded V5 databases. !AD has V4 format blocks", 2, 0 },
+	{ "UNUSEDMSG1620", "MUREENCRYPTV4NOALLOW Last used in V7.0-004 Fed 2023", 0, 0 },
 	{ "ENCRYPTCONFLT", "MUPIP REORG -ENCRYPT and MUPIP EXTRACT -FORMAT=BIN cannot run concurrently - skipping !AD on region: !AD, file: !AD", 6, 0 },
 	{ "JNLPOOLRECOVERY", "The size of the data written to the journal pool (!UL) does not match the size of the data in the journal files (!UL) at journal sequence number [0x!16@XQ] for the replication instance file !AZ. The journal pool has been recovered.", 4, 0 },
 	{ "LOCKTIMINGINTP", "A LOCK at !AD within a TP transaction is waiting in a final TP retry, which may lead to a general response gap", 2, 0 },
 	{ "PBNUNSUPTYPE", "$ZPEEK() does not support type !AD", 2, 0 },
 	{ "DBFHEADLRU", "Database file !AD LRU pointer: 0x!16@XQ is outside of range: 0x!16@XQ to 0x!16@XQ or misaligned", 5, 0 },
-	{ "ASYNCIONOV4", "!AD database has !AD; cannot !AD", 6, 0 },
+	{ "UNUSEDMSG1626", "ASYNCIONOV4 last used in V7.0-004 Fed 2023", 0, 0 },
 	{ "AIOCANCELTIMEOUT", "Pid [0x!XL] timed out waiting for pending async io to complete/cancel in database file !AD", 3, 0 },
 	{ "DBGLDMISMATCH", "Database file !AD has !AZ whereas !AZ !AD in global directory !AD has !AZ", 9, 0 },
 	{ "DBBLKSIZEALIGN", "Database file !AD has AIO=ON and block_size=!UL which is not a multiple of filesystem block size !UL", 4, 0 },
@@ -1563,6 +1563,8 @@ LITDEF	err_msg merrors[] = {
 	{ "AUDCONNFAIL", "Audit !AZ facility failed to connect to audit logger", 1, 0 },
 	{ "AUDLOGFAIL", "Audit !AZ facility failed to log command", 1, 0 },
 	{ "SOCKCLOSE", "Error closing socket: (errno == !UL) !AD", 3, 0 },
+	{ "LINETOOLONG", "!AD prompt input exceeds !UL bytes", 3, 0 },
+	{ "ARGTRUNC", "!AD argument number !UL truncated. Keep the size of total command line within !UL bytes", 4, 0 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -2161,7 +2163,7 @@ LITDEF	int ERR_CALLERID = 150377099;
 LITDEF	int ERR_KRNLKILL = 150377108;
 LITDEF	int ERR_MEMORYRECURSIVE = 150377116;
 LITDEF	int ERR_FREEZEID = 150377123;
-LITDEF	int ERR_UNUSEDMSG778 = 150377130;
+LITDEF	int ERR_FORCEDHALT2 = 150377132;
 LITDEF	int ERR_DSEINVALBLKID = 150377138;
 LITDEF	int ERR_PINENTRYERR = 150377146;
 LITDEF	int ERR_BCKUPBUFLUSH = 150377154;
@@ -2608,10 +2610,10 @@ LITDEF	int ERR_UNUSEDMSG1221 = 150380674;
 LITDEF	int ERR_UNUSEDMSG1222 = 150380682;
 LITDEF	int ERR_UNUSEDMSG1223 = 150380690;
 LITDEF	int ERR_DYNUPGRDFAIL = 150380698;
-LITDEF	int ERR_MMNODYNDWNGRD = 150380706;
-LITDEF	int ERR_MMNODYNUPGRD = 150380714;
-LITDEF	int ERR_MUDWNGRDNRDY = 150380722;
-LITDEF	int ERR_MUDWNGRDTN = 150380730;
+LITDEF	int ERR_UNUSEDMSG1225 = 150380706;
+LITDEF	int ERR_UNUSEDMSG1226 = 150380714;
+LITDEF	int ERR_UNUSEDMSG1227 = 150380722;
+LITDEF	int ERR_REORGUPCNFLCT = 150380730;
 LITDEF	int ERR_MUDWNGRDNOTPOS = 150380738;
 LITDEF	int ERR_MUUPGRDNRDY = 150380746;
 LITDEF	int ERR_TNWARN = 150380752;
@@ -2700,7 +2702,7 @@ LITDEF	int ERR_CLOSEFAIL = 150381410;
 LITDEF	int ERR_CRYPTINIT = 150381418;
 LITDEF	int ERR_CRYPTOPFAILED = 150381426;
 LITDEF	int ERR_CRYPTDLNOOPEN = 150381434;
-LITDEF	int ERR_CRYPTNOV4 = 150381442;
+LITDEF	int ERR_UNUSEDMSG1317 = 150381442;
 LITDEF	int ERR_CRYPTNOMM = 150381450;
 LITDEF	int ERR_READONLYNOBG = 150381458;
 LITDEF	int ERR_CRYPTKEYFETCHFAILED = 418816922;
@@ -2715,8 +2717,8 @@ LITDEF	int ERR_CALLINAFTERXIT = 150381530;
 LITDEF	int ERR_LOCKSPACEFULL = 150381538;
 LITDEF	int ERR_IOERROR = 150381546;
 LITDEF	int ERR_MAXSSREACHED = 150381554;
-LITDEF	int ERR_SNAPSHOTNOV4 = 150381562;
-LITDEF	int ERR_SSV4NOALLOW = 150381570;
+LITDEF	int ERR_UNUSEDMSG1332 = 150381562;
+LITDEF	int ERR_DBUPGRDREQ = 150381570;
 LITDEF	int ERR_SSTMPDIRSTAT = 418817034;
 LITDEF	int ERR_SSTMPCREATE = 418817042;
 LITDEF	int ERR_JNLFILEDUP = 150381594;
@@ -2821,7 +2823,7 @@ LITDEF	int ERR_ORLBKCMPLT = 150382379;
 LITDEF	int ERR_ORLBKNOSTP = 150382387;
 LITDEF	int ERR_ORLBKFRZPROG = 150382395;
 LITDEF	int ERR_ORLBKFRZOVER = 150382403;
-LITDEF	int ERR_ORLBKNOV4BLK = 150382410;
+LITDEF	int ERR_ORLBKDBUPGRDREQ = 150382410;
 LITDEF	int ERR_DBROLLEDBACK = 150382418;
 LITDEF	int ERR_DSEWCREINIT = 150382427;
 LITDEF	int ERR_MURNDWNOVRD = 150382435;
@@ -2836,7 +2838,7 @@ LITDEF	int ERR_MUTRUNCERROR = 150382498;
 LITDEF	int ERR_MUTRUNCFAIL = 150382506;
 LITDEF	int ERR_MUTRUNCNOSPACE = 150382515;
 LITDEF	int ERR_MUTRUNCNOTBG = 150382522;
-LITDEF	int ERR_MUTRUNCNOV4 = 150382532;
+LITDEF	int ERR_UNUSEDMSG1455 = 150382532;
 LITDEF	int ERR_MUTRUNCPERCENT = 150382538;
 LITDEF	int ERR_MUTRUNCSSINPROG = 150382547;
 LITDEF	int ERR_MUTRUNCSUCCESS = 150382555;
@@ -2906,7 +2908,7 @@ LITDEF	int ERR_DBMBMINCFREFIXED = 150383056;
 LITDEF	int ERR_NULLENTRYREF = 150383066;
 LITDEF	int ERR_ZPEEKNORPLINFO = 150383074;
 LITDEF	int ERR_MMREGNOACCESS = 150383082;
-LITDEF	int ERR_UNUSEDMSG1525 = 150383090;
+LITDEF	int ERR_FDSIZELMT = 150383090;
 LITDEF	int ERR_MALLOCCRIT = 150383096;
 LITDEF	int ERR_HOSTCONFLICT = 150383106;
 LITDEF	int ERR_GETADDRINFO = 150383114;
@@ -3001,13 +3003,13 @@ LITDEF	int ERR_SETQUALPROB = 150383818;
 LITDEF	int ERR_EXTRINTEGRITY = 150383826;
 LITDEF	int ERR_CRYPTKEYRELEASEFAILED = 418819290;
 LITDEF	int ERR_MUREENCRYPTSTART = 150383843;
-LITDEF	int ERR_MUREENCRYPTV4NOALLOW = 150383850;
+LITDEF	int ERR_UNUSEDMSG1620 = 150383852;
 LITDEF	int ERR_ENCRYPTCONFLT = 150383858;
 LITDEF	int ERR_JNLPOOLRECOVERY = 150383866;
 LITDEF	int ERR_LOCKTIMINGINTP = 150383872;
 LITDEF	int ERR_PBNUNSUPTYPE = 150383882;
 LITDEF	int ERR_DBFHEADLRU = 150383891;
-LITDEF	int ERR_ASYNCIONOV4 = 150383898;
+LITDEF	int ERR_UNUSEDMSG1626 = 150383898;
 LITDEF	int ERR_AIOCANCELTIMEOUT = 150383906;
 LITDEF	int ERR_DBGLDMISMATCH = 150383914;
 LITDEF	int ERR_DBBLKSIZEALIGN = 150383922;
@@ -3115,6 +3117,8 @@ LITDEF	int ERR_AUDINITFAIL = 150384730;
 LITDEF	int ERR_AUDCONNFAIL = 150384738;
 LITDEF	int ERR_AUDLOGFAIL = 150384746;
 LITDEF	int ERR_SOCKCLOSE = 150384754;
+LITDEF	int ERR_LINETOOLONG = 150384762;
+LITDEF	int ERR_ARGTRUNC = 150384768;
 
 
 LITDEF	int merrors_undocarr[] = {
@@ -3150,7 +3154,7 @@ GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1550,
+	1552,
 	&merrors_undocarr[0],
 	25
 };

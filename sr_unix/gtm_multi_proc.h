@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2020 Fidelity National Information	*
+ * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,7 +18,7 @@ typedef	void *(*gtm_multi_proc_fnptr_t)(void *parm);
 int	gtm_multi_proc(gtm_multi_proc_fnptr_t fnptr, int ntasks, int max_procs,
 					void **ret_array, void *parm_array, int parmElemSize,
 					size_t extra_shm_size, gtm_multi_proc_fnptr_t init_fnptr,
-					gtm_multi_proc_fnptr_t finish_fnptr);
+					gtm_multi_proc_fnptr_t finish_fnptr, enum shmget_caller caller);
 void	gtm_multi_proc_helper(void);
 int	gtm_multi_proc_finish(gtm_multi_proc_fnptr_t finish_fnptr);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,7 +44,6 @@ void t_write_map (
 						 *	    "buffaddr"		--> Address of before image of the block
 						 *	    "cr"		--> cache-record that holds the block (BG only)
 						 *	    "cycle"		--> cycle when block was read by t_qread (BG only)
-						 *	    "cr->ondsk_blkver"	--> Actual block version on disk
 						 */
 		unsigned char	*upd_addr,	/* Address of the update array containing list of blocks to be cleared in bitmap */
 		trans_num	tn,		/* Transaction Number when this block was read. Used for cdb_sc_blkmod validation */
@@ -96,13 +95,8 @@ void t_write_map (
 	cs->cycle = blkhist->cycle;
 	cr = blkhist->cr;
 	cs->cr = cr;
-	/* the buffer in shared memory holding the GDS block contents currently does not have in its block header the
-	 * on-disk format of that block. if it had, we could have easily copied that over to the cw-set-element.
-	 * until then, we have to use the cache-record's field "ondsk_blkver". but the cache-record is available only in BG.
-	 * thankfully, in MM, we do not allow GDSV4 type blocks, so we can safely assign GDSV6 (or GDSVCURR) to this field.
-	 */
 	assert((NULL != cr) || (dba_mm == csa->hdr->acc_meth));
-	cs->ondsk_blkver = ((NULL == cr) ? cs_data->desired_db_format : cr->ondsk_blkver);
+	cs->ondsk_blkver = cs_data->desired_db_format;	/* bitmaps are always the desired DB format V6/V6p/V7m/V7 */
 	cs->ins_off = 0;
 	cs->index = 0;
 	assert(reference_cnt < csa->hdr->bplmap);	/* Cannot allocate more blocks than a bitmap holds */

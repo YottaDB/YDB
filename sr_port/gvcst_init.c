@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -212,7 +212,6 @@ error_def(ERR_DBVERPERFWARN2);
 error_def(ERR_DRVLONGJMP);	/* Generic internal only error used to drive longjump() in a queued condition handler */
 error_def(ERR_ENCRYPTCONFLT2);
 error_def(ERR_INVSTATSDB);
-error_def(ERR_MMNODYNUPGRD);
 error_def(ERR_REGOPENFAIL);
 error_def(ERR_STATSDBFNERR);
 error_def(ERR_STATSDBINUSE);
@@ -1067,7 +1066,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	if (!csd->fully_upgraded && curr_time_uint4 > next_warn_uint4
 	    && COMPSWAP_LOCK(&csd->next_upgrd_warn.time_latch, next_warn_uint4, 0, (curr_time_uint4 + UPGRD_WARN_INTERVAL), 0))
 	{	/* The msg is due and we have successfully updated the next time interval */
-		if (GDSVCURR != csd->desired_db_format)	/* TODO: what should this check? */
+		if (GDSVCURR != csd->desired_db_format)
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBVERPERFWARN1, 2, DB_LEN_STR(reg));
 		else
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBVERPERFWARN2, 2, DB_LEN_STR(reg));

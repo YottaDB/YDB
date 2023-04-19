@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2022 Fidelity National Information	*
+ * Copyright (c) 2014-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -418,7 +418,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			DBGARLNK((stderr, "relinkctl_open: file first open\n"));
 			hdr->n_records = 0;
 			/* Create shared memory to store hash buckets of routine names for faster search in relinkctl file */
-			shmid = gtm_shmget(IPC_PRIVATE, shm_size, RWDALL | IPC_CREAT, TRUE);
+			shmid = gtm_shmget(IPC_PRIVATE, shm_size, RWDALL | IPC_CREAT, TRUE, RELINK, linkctl->relinkctl_path);
 			if (-1 == shmid)
 			{
 				save_errno = errno;
@@ -827,6 +827,7 @@ relinkrec_t *relinkctl_insert_record(open_relinkctl_sgm *linkctl, mstr *rtnname)
 			/* assert(valid_mname(rtnname)) is not needed here because it was already done in relinkctl_find_record */
 			memcpy(&rec->rtnname_fixed.c[0], rtnname->addr, rtnname->len);
 			rec->cycle = 0;	/* Note incr_link() will bump this to 1 when routine is linked */
+			rec->rtnobj_supersede = 0;
 			rec->hashindex_fl = 0;
 			rec->objhash = 0;
 			rec->rtnobj_shm_offset = (rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T;

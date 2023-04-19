@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,6 +51,8 @@
 #include "gtmsource.h"
 #include "repl_instance.h"
 #include "have_crit.h"
+#include "sleep_cnt.h"		/* For SLEEP_ONE_MIN */
+#include "wcs_sleep.h"
 #ifdef GTM_TRIGGER
 #include "error_trap.h"
 #endif
@@ -88,6 +90,7 @@ error_def(ERR_MUJNLNOTCOMPL);
 error_def(ERR_MUJNLSTAT);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUPJNLINTERRUPT);
+error_def(ERR_REORGUPCNFLCT);
 error_def(ERR_REPEATERROR);
 error_def(ERR_REPLINSTDBMATCH);
 error_def(ERR_REPLINSTNOHIST);
@@ -166,10 +169,10 @@ seq_num	mur_get_max_strm_reg_seqno(int strm_num)
 void	mupip_recover(void)
 {
 	int4			mur_open_files_status;
-	boolean_t		all_gen_properly_closed, apply_pblk, ztp_broken, intrrupted_recov_processing;
+	boolean_t		all_gen_properly_closed, apply_pblk, cannot_proceed, ztp_broken, intrrupted_recov_processing;
 	char			histdetail[HIST_LEN];
 	enum jnl_record_type	rectype;
-	int			cur_time_len, regno, reg_total, status;
+	int			last_regno, lcnt, regno, reg_total, sleep_count, status;
 	jnl_ctl_list		*jctl;
 	jnl_tm_t		min_broken_time;
 	reg_ctl_list		*rctl;
@@ -239,7 +242,7 @@ void	mupip_recover(void)
 	}
 	all_gen_properly_closed = TRUE;
 	intrrupted_recov_processing = murgbl.intrpt_recovery = FALSE;
-	for (regno = 0; regno < reg_total; regno++)
+	for (last_regno = -1, regno = 0; regno < reg_total;)
 	{
 		rctl = &mur_ctl[regno];
 		jctl = rctl->jctl;
@@ -264,6 +267,26 @@ void	mupip_recover(void)
 			murgbl.intrpt_recovery = TRUE; /* Recovery was interrupted at some point */
 			rctl->csa->hdr->turn_around_point = FALSE; /* Reset turn around point field */
 		}
+		if (jgbl.onlnrlbk && (0 != rctl->csa->nl->reorg_upgrade_pid))
+		{	/* At this point, the DB and instance file have corrupt set. Wait for the REORG -UPGRADE to exit */
+			if (last_regno != regno)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REORGUPCNFLCT, 5,
+						LEN_AND_LIT("ROLLBACK -ONLINE"),
+						LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
+						rctl->csa->nl->reorg_upgrade_pid);
+				lcnt = SLEEP_ONE_MIN;
+				last_regno = regno;	/* Signal to not repeat the message */
+			}
+			wcs_sleep(lcnt--);
+			if (!lcnt)
+			{	/* Print the message once more to indicate why this process is stalled */
+				assert(FALSE);	/* We really don't think we should get here since REORG -UPGRADE should exit */
+				last_regno = -1;
+			}
+			continue;
+		}
+		regno++;
 	}
 	if (TREF(skip_DB_exists_check))
 		db_absent = FALSE;

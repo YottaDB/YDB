@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,7 +17,6 @@
  */
 
 #include "mdef.h"
-
 #include "gtm_ctype.h"
 #include <errno.h>
 #include "gtm_stdio.h"
@@ -30,12 +29,19 @@
 #include "cli.h"
 #include "eintr_wrappers.h"
 #include "min_max.h"
+#include "gtmmsg.h"
+#include "gtmimagename.h"
 
 GBLDEF char	cli_token_buf[MAX_LINE + 1];	/* Token buffer */
 GBLREF int	cmd_cnt;
 GBLREF char	**cmd_arg;
 GBLDEF boolean_t gtm_cli_interpret_string = TRUE;
 GBLDEF IN_PARMS *cli_lex_in_ptr;
+GBLREF enum gtmImageTypes	image_type;
+LITREF gtmImageName		gtmImageNames[];
+
+error_def(ERR_LINETOOLONG);
+error_def(ERR_ARGTRUNC);
 
 #ifdef UTF8_SUPPORTED
 GBLREF	boolean_t	gtm_utf8_mode;
@@ -459,6 +465,7 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 				if (U_BUFFER_OVERFLOW_ERROR == errorcode)
 				{	/* truncate so null terminated */
 					destbuffer[buffersize - 1] = 0;
+
 					retptr = destbuffer;
 				} else
 					retptr = NULL;
@@ -466,6 +473,13 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 				retptr = destbuffer;	/* Repoint to new home */
 			if (in_tp)
 				cli_lex_in_ptr->tp = retptr;
+			if (buffersize == (MAX_LINE - 1))
+			{
+				gtm_putmsg_csa(NULL, VARLSTCNT(5) ERR_LINETOOLONG, 3,
+						gtmImageNames[image_type].imageNameLen,
+						gtmImageNames[image_type].imageName, (MAX_LINE -1));
+				cli_lex_in_ptr->tp = NULL;
+			}
 		}
 	} else
 	{
@@ -485,10 +499,26 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 			in_len = MIN(in_len, buffersize);
 			if ('\n' == cli_fgets_buffer[in_len - 1])
 				cli_fgets_buffer[in_len - 1] = '\0';	 /* replace NL */
+			else if (in_len < buffersize)
+			{
+				if (0 != cli_fgets_buffer[in_len - 1])
+				{
+					cli_fgets_buffer[in_len] = '\0';
+					in_len++; /* +1 to include the null byte*/
+				}
+			}
+			assert(in_len <= buffersize); /* We are not aware of any such situation */
 			memcpy(destbuffer, cli_fgets_buffer, in_len);
 			retptr = destbuffer;	/* return proper buffer */
 			if (in_tp)
 				cli_lex_in_ptr->tp = retptr;
+			if (in_len == buffersize)
+			{
+				gtm_putmsg_csa(NULL, VARLSTCNT(5) ERR_LINETOOLONG, 3,
+						gtmImageNames[image_type].imageNameLen,
+						gtmImageNames[image_type].imageName, (MAX_LINE - 1));
+				cli_lex_in_ptr->tp = NULL;
+			}
 		}
 #	ifdef UTF8_SUPPORTED
 	}
@@ -510,9 +540,9 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 
 int	cli_gettoken (int *eof)
 {
-	char	*ptr, *ptr_top;
-	int	arg_no, print_len, token_len, avail;
-
+	char		*ptr, *ptr_top;
+	int		arg_no, print_len, token_len, avail;
+	boolean_t	need_null = FALSE;
 	assert(cli_lex_in_ptr);
 	/* Reading from program argument list */
 	if ((1 < cli_lex_in_ptr->argc) && (NULL == cli_lex_in_ptr->tp))
@@ -524,8 +554,23 @@ int	cli_gettoken (int *eof)
 		{	/* Convert arguments into array */
 			print_len = SNPRINTF(ptr, (ptr_top - ptr), "%s%s", (1 < arg_no) ? " " : "", cli_lex_in_ptr->argv[arg_no]);
 			if ((ptr_top - ptr) <= print_len)
+			{
+				need_null = TRUE;
 				break;
+			}
 			ptr += print_len;
+		}
+		/* snprintf() appending mechanism did not insert a null terminator at the end. */
+		if (need_null)
+		{
+			/* Insert a null byte at the end */
+			cli_lex_in_ptr->in_str[avail - 1] = 0;
+			if (!IS_MUMPS_IMAGE)
+			{
+				gtm_putmsg_csa(NULL, VARLSTCNT(6) ERR_ARGTRUNC, 4,
+						gtmImageNames[image_type].imageNameLen,
+						gtmImageNames[image_type].imageName, arg_no, (MAX_LINE - 1));
+			}
 		}
 	}
 	if ((NULL == cli_lex_in_ptr->tp) || (1 > strlen(cli_lex_in_ptr->tp)))

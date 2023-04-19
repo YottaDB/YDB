@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2020 Fidelity National Information		;
+; Copyright (c) 2001-2023 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -12,7 +12,7 @@
 %gbldef	; ; ;Global Collation Control
 	;
 kill(gname)
-	new $ETRAP,blkidlen,label,reg
+	new $ETRAP,blkidlen
 	set $ETRAP="goto error"
 	if $TLEVEL zmessage 150383202	; TPNOSUPPORT error
 	if '$$edit(.gname) quit 0
@@ -21,14 +21,13 @@ kill(gname)
 	. zmessage 150376418:$view("REGION",gname) ; DBREMOTE
 	if $data(@gname) zmessage 150373626	; Error if there is data in the global
 	set @gname="" kill @gname		; make sure that the global has a root
-        set reg=$view("REGION",gname),label=$extract($$^%PEEKBYNAME("sgmnt_data.label",reg),1,11)
-        set blkidlen=$select(label="GDSDYNUNX03":4,1:8) ; if DB is V6 use 4 byte length else use 8
+	set blkidlen=$$getblkidlen(gname)
 	set gname=$zextract(gname,2,32)		; remove circumflex, take at most 31 chars
 	view "YDIRTVAL":$zextract($view("YDIRTREE",gname),1,blkidlen),"YDIRTREE":gname
 	quit 1
 	;
 set(gname,nct,act)
-	new $ETRAP,blkidlen,label,reg,ver
+	new $ETRAP,blkidlen,ver
 	set $ETRAP="goto error"
 	if $TLEVEL zmessage 150383202	; TPNOSUPPORT error
 	if '$$edit(.gname) q 0
@@ -41,8 +40,7 @@ set(gname,nct,act)
 	set ver=$view("YCOLLATE",act)
 	if ver<0 zmessage 150376282:act		; doesn't find coll type, or can't get version
 	set @gname="" kill @gname			; make sure that the global has a root
-	set reg=$view("REGION",gname),label=$extract($$^%PEEKBYNAME("sgmnt_data.label",reg),1,11)
-	set blkidlen=$select(label="GDSDYNUNX03":4,1:8) ; if DB is V6 use 4 byte length else use 8
+	set blkidlen=$$getblkidlen(gname)
 	set gname=$zextract(gname,2,32)			; remove circumflex, take at most 31 chars
 	view "YDIRTVAL":$zextract($view("YDIRTREE",gname),1,blkidlen)_$zchar(1,nct,act,ver),"YDIRTREE":gname
 	quit 1
@@ -73,6 +71,12 @@ get(gname,reg)
 	. do getzpeek("sgmnt_data.def_coll",reg,.act)
 	. do getzpeek("sgmnt_data.def_coll_ver",reg,.ver)
 	quit nct_","_act_","_ver
+	;
+getblkidlen(gname)
+	new blkver,reg
+	; V7m/V7 use 8, prior vers use 4 bytes. WARNING: This is true in the directory tree only
+	set reg=$view("REGION",gname),blkver=$$^%PEEKBYNAME("sgmnt_data.desired_db_format",reg)
+	quit $select(2>blkver:4,1:8)
 	;
 getzpeek(field,region,result)
 	new xstr

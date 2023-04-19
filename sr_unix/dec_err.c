@@ -12,51 +12,18 @@
 
 #include "mdef.h"
 #include <stdarg.h>
-#include "fao_parm.h"
-#include "error.h"
-#include "msg.h"
+#include "gtm_putmsg_list.h"
 #include "util.h"
 #include "util_out_print_vaparm.h"
 #include "gtmmsg.h"
 
-GBLREF bool dec_nofac;
-
 void dec_err(uint4 argcnt, ...)
 {
 	va_list		var;
-	uint4		i, j, count, err;
-	const err_ctl 	*ec;
-	const err_msg	*em;
-	char		msgbuff[OUT_BUFF_SIZE];
-	mstr		msgstr;
-	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
-	util_out_print(0, RESET, 0);	/* reset the buffer */
+	util_out_print(NULL, RESET, NULL);	    /* reset the buffer */
 	VAR_START(var, argcnt);
-	assert (argcnt >= 1);
-	err = va_arg(var, uint4);
-	ec = err_check(err);
-	em = NULL;
-	if (ec)
-		GET_MSG_INFO(err, ec, em);
-	msgstr.addr = msgbuff;
-	msgstr.len = SIZEOF(msgbuff);
-	gtm_getmsg(err, &msgstr);
+	gtm_putmsg_list(NULL, argcnt, var);
+	util_out_print(NULL, FLUSH);
 
-	if (!em)
-		util_out_print(msgstr.addr, FLUSH, 1, err);
-	else
-	{
-		argcnt--;
-		if (argcnt)
-		{
-			count = va_arg(var, int4);
-			assert (count <= argcnt);
-		} else
-			count = 0;
-		util_out_print_vaparm(msgstr.addr, FLUSH, var, count);
-		va_end(TREF(last_va_list_ptr));
-	}
-	va_end(var);
 }

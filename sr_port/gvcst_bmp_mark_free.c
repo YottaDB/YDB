@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,23 +73,21 @@ error_def(ERR_IGNBMPMRKFREE);
 
 trans_num gvcst_bmp_mark_free(kill_set *ks)
 {
-	block_id		bit_map, next_bm, *updptr;
 	blk_ident		*blk, *blk_top, *nextblk;
+	block_id		bit_map, next_bm, *updptr;
+	boolean_t		mark_level_as_special;
+	cache_rec_ptr_t		cr;
+	enum cdb_sc		status;
+	inctn_opcode_t		saved_inctn_opcode;
+	int4			blk_prev_version;
+	srch_blk_status		bmphist;
+	srch_hist		alt_hist;
+	trans_num		ret_tn = 0;
 	trans_num		ctn, start_db_fmt_tn;
 	unsigned int		len;
 #	if defined(UNIX) && defined(DEBUG)
 	unsigned int		lcl_t_tries;
 #	endif
-	int4			blk_prev_version;
-	srch_hist		alt_hist;
-	trans_num		ret_tn = 0;
-	boolean_t		visit_blks;
-	srch_blk_status		bmphist;
-	cache_rec_ptr_t		cr;
-	enum db_ver		ondsk_blkver;
-	enum cdb_sc		status;
-	boolean_t		mark_level_as_special;
-	inctn_opcode_t		saved_inctn_opcode;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -105,14 +103,11 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 	 *	MUPIP REORG DOWNGRADE concurrently changes a block that we are about to free.
 	 */
 	start_db_fmt_tn = cs_data->desired_db_format_tn;
-	visit_blks = (!cs_data->fully_upgraded);	/* Local evaluation */
-	assert(!visit_blks || (visit_blks && dba_bg == cs_addrs->hdr->acc_meth)); /* must have blks_to_upgrd == 0 for non-BG */
 	assert(!dollar_tlevel); 			/* Should NOT be in TP now */
 	blk = &ks->blk[0];
 	blk_top = &ks->blk[ks->used];
-	if (!visit_blks)
+	if (0 != cs_data->fully_upgraded)
 	{	/* Database has been completely upgraded. Free all blocks in one bitmap as part of one transaction. */
-		assert(cs_data->db_got_to_v5_once); /* assert all V4 fmt blocks (including RECYCLED) have space for V5 upgrade */
 		inctn_detail.blknum_struct.blknum = 0; /* to indicate no adjustment to "blks_to_upgrd" necessary */
 		/* If any of the mini transaction below restarts because of an online rollback, we don't want the application
 		 * refresh to happen (like $ZONLNRLBK++ or rts error(DBROLLEDBACK). This is because, although we are currently in
@@ -261,7 +256,6 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 		assert((block_id)blk->block < cs_addrs->ti->total_blks);
 		assert(!IS_BITMAP_BLK(blk->block));
 		bit_map = ROUND_DOWN2((block_id)blk->block, BLKS_PER_LMAP);
-		assert(dba_bg == cs_addrs->hdr->acc_meth);
 		/* We need to check each block we are deleting to see if it is in the format of a previous version.
 		 * If it is, then "csd->blks_to_upgrd" needs to be correspondingly adjusted.
 		 */
@@ -290,30 +284,13 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				t_retry((enum cdb_sc)rdfail_detail);
 				continue;
 			}
-			/* IF csd->db_got_to_v5_once is FALSE
-			 *	a) mark the block as FREE (not RECYCLED to avoid confusing MUPIP REORG UPGRADE with a
-			 *		block that was RECYCLED right at the time of MUPIP UPGRADE from a V4 to V5 version).
-			 *		MUPIP REORG UPGRADE will mark all existing RECYCLED blocks as FREE.
-			 *	b) need to write PBLK
-			 * ELSE
-			 *	a) mark this block as RECYCLED
-			 *	b) no need to write PBLK (it will be written when the block later gets reused).
-			 * ENDIF
-			 *
-			 * Create a cw-set-element with mode gds_t_busy2free that will cause a PBLK to be written in t_end
-			 * (the value csd->db_got_to_v5_once will be checked while holding crit) only in the IF case above.
+			/* Create a cw-set-element with mode gds_t_busy2free that will cause a PBLK to be written in t_end.
 			 * At the same time bg_update will NOT be invoked for this cw-set-element so this block will not be
 			 * touched. But the corresponding bitmap block will be updated as part of the same transaction (see
-			 * t_write_map below) to mark this block as FREE or RECYCLED depending on whether csd->db_got_to_v5_once
-			 * is FALSE or TRUE (actual check done in gvcst_map_build and sec_shr_map_build).
+			 * t_write_map below) to mark this block as RECYCLED
 			 */
 			t_busy2free(&alt_hist.h[0]);
-			cr = alt_hist.h[0].cr;
-			ondsk_blkver = cr->ondsk_blkver;	/* Get local copy in case cr->ondsk_blkver changes between
-								 * first and second part of the ||
-								 */
-			assert((GDSV7 == ondsk_blkver) || (GDSV7m == ondsk_blkver) || (GDSV6 == ondsk_blkver));
-			if (GDSVCURR != ondsk_blkver)
+			if (GDSVCURR != ((blk_hdr_ptr_t)(alt_hist.h[0].buffaddr))->bver)
 				inctn_detail.blknum_struct.blknum = blk->block;
 			else
 				inctn_detail.blknum_struct.blknum = 0; /* i.e. no adjustment to "blks_to_upgrd" necessary */
@@ -340,10 +317,6 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				assert((CDB_STAGNATE == t_tries) || (lcl_t_tries == t_tries - 1));
 				assert(0 < t_tries);
 				DEBUG_ONLY(status = LAST_RESTART_CODE); /* get the recent restart code */
-				/* We don't expect online rollback related retries because we are here with the database NOT fully
-				 * upgraded. This means, online rollback cannot even start (it issues ORLBKNOV4BLK). Assert that.
-				 */
-				assert((cdb_sc_onln_rlbk1 != status) && (cdb_sc_onln_rlbk2 != status));
 				continue;
 			}
 			break;

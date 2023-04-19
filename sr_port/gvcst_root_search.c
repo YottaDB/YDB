@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,32 +44,27 @@
 #include "io.h"
 #include "gvt_inline.h"
 
-GBLREF	gv_key		*gv_currkey, *gv_altkey;
-GBLREF	int4		gv_keysize;
-GBLREF	gv_namehead	*gv_target;
-GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	boolean_t	mu_reorg_in_swap_blk, mu_reorg_process, mupip_jnl_recover;
 GBLREF	gd_region	*gv_cur_region;
-GBLREF	uint4		dollar_tlevel;
-GBLREF	uint4		dollar_trestart;
+GBLREF	gv_key		*gv_currkey, *gv_altkey;
+GBLREF	gv_namehead	*gv_target, *reorg_gv_target, *reset_gv_target, *upgrade_gv_target;
+GBLREF	inctn_opcode_t	inctn_opcode;
+// GBLREF	int4		gv_keysize;
+GBLREF	jnl_gbls_t	jgbl;
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	trans_num	start_tn;
+GBLREF	uint4		dollar_tlevel, dollar_trestart, mu_upgrade_in_prog, t_err, update_trans;
 GBLREF	unsigned int	t_tries;
-GBLREF	gv_namehead	*reset_gv_target;
-GBLREF	boolean_t	mu_reorg_process;
-GBLREF	boolean_t	mupip_jnl_recover;
+GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
+#ifdef GTM_TRIGGER
+GBLREF	boolean_t	skip_INVOKE_RESTART;
+#endif
 # ifdef DEBUG
 GBLREF	boolean_t	is_rcvr_server;
 GBLREF	boolean_t	is_src_server;
 GBLREF	unsigned char	t_fail_hist_dbg[T_FAIL_HIST_DBG_SIZE];
 GBLREF	unsigned int	t_tries_dbg;
 # endif
-GBLREF	jnl_gbls_t	jgbl;
-GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
-GBLREF	trans_num	start_tn;
-GBLREF	uint4		update_trans;
-GBLREF	inctn_opcode_t	inctn_opcode;
-GBLREF	uint4		t_err;
-#ifdef GTM_TRIGGER
-GBLREF	boolean_t	skip_INVOKE_RESTART;
-#endif
 
 error_def(ERR_ACTCOLLMISMTCH);
 error_def(ERR_GVGETFAIL);
@@ -235,7 +230,7 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 	enum cdb_sc	status;
 	boolean_t	gbl_target_was_set, long_blk_id;
 	int4		blk_id_sz;
-	gv_namehead	*save_targ;
+	gv_namehead	*next, *prev, *save_targ;
 	mname_entry	*gvent;
 	int		altkeylen;
 	int		tmp_cmpc;
@@ -338,6 +333,16 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 			T_RETRY_AND_CLEANUP(status, donot_restart);
 			continue;
 		}
+	}
+	if (mu_upgrade_in_prog && mu_reorg_in_swap_blk)
+	{
+		next = upgrade_gv_target->next_gvnh;
+		prev = upgrade_gv_target->prev_gvnh;
+		*upgrade_gv_target = *gv_target;
+		upgrade_gv_target->next_gvnh = next;
+		upgrade_gv_target->prev_gvnh = prev;
+		RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, SKIP_GVT_GVKEY_CHECK);
+		return cdb_sc_normal;
 	}
 	RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
 	if (lcl_root)

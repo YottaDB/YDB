@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,8 +32,8 @@
 #include "gtm_netdb.h"
 #include "gtm_ipv6.h"
 #include "gtm_unistd.h"
-#include "gtm_select.h"
 #include "min_max.h"
+#include "gtm_poll.h"
 
 #define	ESTABLISHED	"ESTABLISHED"
 
@@ -64,13 +64,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 	fd_set		writefds;
 	boolean_t	no_time_left = FALSE, first_time = TRUE, timer_started = FALSE, oneshot;
 	boolean_t	timer_done;	/* for TIMEOUT_INIT */
-	boolean_t	need_connect, need_socket, need_select;
+	boolean_t	need_connect, need_socket, need_poll;
 	short		len;
 	io_desc		*iod;
 	d_socket_struct *dsocketptr, *real_dsocketptr;
 	socket_interrupt *sockintr, *real_sockintr;
 	ABS_TIME	cur_time, end_time;
-	struct timeval	*sel_time;
 	mv_stent	*mv_zintdev;
 	struct addrinfo *remote_ai_ptr, *raw_ai_ptr, *local_ai_ptr;
 	intrpt_state_t	prev_intrpt_state;
@@ -78,6 +77,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 	char		ipaddr[SA_MAXLEN + 1];
 	char		port_buffer[NI_MAXSERV];
 	static readonly char 	action[] = "CONNECT";
+	int		poll_timeout;
+	nfds_t		poll_nfds;
+	struct pollfd	poll_fdlist[1];
 	GTM_SOCKLEN_TYPE	sockbuflen, tmp_addrlen;
 	DCL_THREADGBL_ACCESS;
 
@@ -92,7 +94,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 	real_sockintr = &real_dsocketptr->sock_save_state;
 	iod->dollar.key[0] = '\0';
 	need_socket = need_connect = TRUE;
-	need_select = FALSE;
+	need_poll = FALSE;
 	/* Check for restart */
 	if (dsocketptr->mupintr)
 	{       /* We have a pending read restart of some sort - check we aren't recursing on this device */
@@ -109,7 +111,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 				end_time = sockintr->end_time;
 			if ((socket_connect_inprogress == sockptr->state) && (FD_INVALID != sockptr->sd))
 			{
-				need_select = TRUE;
+				need_poll = TRUE;
 				need_socket = need_connect = FALSE;	/* sd still good */
 			}
 			/* Done with this mv_stent. Pop it off if we can, else mark it inactive. */
@@ -346,7 +348,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 						if (!oneshot)
 						{
 							DBGSOCK((stdout, "socconn: EINPROGESS: errno = %d\n", save_errno));
-							need_select = TRUE;
+							need_poll = TRUE;
 						}
 					/* fall through */
 					case ETIMEDOUT:	/* the other side bound but not listening */
@@ -374,7 +376,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 							else if (socket_local == sockptr->protocol)
 							{	/* AF_UNIX sockets do not continue the connect in background */
 								need_connect = TRUE;
-								need_socket = need_select = FALSE;
+								need_socket = need_poll = FALSE;
 							}
 							save_errno = 0;
 							res = -1;	/* do the outer loop again */
@@ -392,13 +394,13 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 			timer_started = FALSE;
 			TIMEOUT_DONE(timer_done);
 		}
-		if (need_select)
+		if (need_poll)
 		{
 			sockerror = 0;
 			do
-			{ /* unless outofband loop on select if connection continuing */
+			{	/* unless outofband loop on poll if connection continuing */
 				if (NO_M_TIMEOUT == msec_timeout)
-					sel_time = NULL;
+					poll_timeout = -1;
 				else
 				{
 					sys_get_curr_time(&cur_time);
@@ -407,7 +409,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 						/* Round up in order to prevent premature timeouts */
 						DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
 					if (0 < msec_timeout)
-						sel_time = (struct timeval *)&cur_time;
+						poll_timeout = msec_timeout;
 					else
 					{	/* timed out so done */
 						save_errno = res = 0;
@@ -416,10 +418,10 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 					}
 				}
 				assert(FD_INVALID != sockptr->sd);
-				assertpro(FD_SETSIZE > sockptr->sd);
-				FD_ZERO(&writefds);
-				FD_SET(sockptr->sd, &writefds);
-				res = select(sockptr->sd + 1, NULL, &writefds, NULL, sel_time);
+				poll_fdlist[0].fd = sockptr->sd;
+				poll_fdlist[0].events = POLLOUT;
+				poll_nfds = 1;
+				res = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 				if (0 < res)
 				{	/* check for socket error */
 					sockbuflen = SIZEOF(sockerror);
@@ -432,7 +434,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 					} else if (0 == res && 0 != sockerror)
 					{
 						if (EINTR == sockerror)
-						{ /* loop on select */
+						{ /* loop on poll */
 							save_errno = 0;
 							continue;
 						} else
@@ -443,7 +445,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 								last_errno = sockerror;
 								save_errno = 0;
 								need_socket = need_connect = TRUE;
-								need_select = FALSE;
+								need_poll = FALSE;
 								res = -1;
 							} else
 								save_errno = sockerror;
@@ -455,7 +457,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 						break;
 					}
 				} else if (0 == res)
-				{ /* select timed out */
+				{ /* poll timed out */
 					save_errno = 0;
 					no_time_left = TRUE;
 					break;
@@ -468,7 +470,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 					save_errno = 0;
 					break;
 				}
-			} while (TRUE); /* do select */
+			} while (TRUE); /* do poll */
 		}
 		if (save_errno)
 		{

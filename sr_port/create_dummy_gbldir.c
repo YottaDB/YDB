@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,4 +120,49 @@ gd_addr *create_dummy_gbldir(void)
 	addr->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
 	init_hashtab_mname((hash_table_mname *)addr->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE );
 	return addr;
+}
+
+/* This function is a helper function to the database upgrade processing. It is possible that other MUPIP processing
+ * would need such functionality in the future and the original code started as an adapation of create_dummy_gbldir(),
+ * above.
+ *
+ * The V6 to V7 upgrade processing iterates over blocks and, to generate block history, performs a reverse lookup of the
+ * name found in a block. This reverse lookup MUST find the name in the current database/segment. Without this, globals
+ * not mapped to the database file under processing point to a different database file tripping asserts and thwarts the
+ * attempt at creating a history for the blocks in the current database.
+ *
+ * Input:
+ * 	Current global directory
+ * 	Target region to which all globals must map
+ *
+ * Output:
+ * 	Global maps reduced to 3 entries
+ * 	Global maps point everything into one region
+ */
+#define REMAP_GBLDIR_N_MAPS 3
+void remap_globals_to_one_region(gd_addr *addr, gd_region *reg)
+{
+	int	i;
+
+	/* Setup map for only 3 names (once) */
+	assert(addr->n_maps >= REMAP_GBLDIR_N_MAPS);
+	if (REMAP_GBLDIR_N_MAPS < addr->n_maps)
+	{	/* Slam the last name entry onto all maps beyond the first two names */
+		for (i = 2; i < addr->n_maps; i++)
+			addr->maps[i] = addr->maps[addr->n_maps - 1];
+		/* Reduce the name map to 3 (required) names */
+		addr->n_maps = REMAP_GBLDIR_N_MAPS;
+	} else
+	{	/* Clean up the exist M-name hash table which points to the previous region */
+		assert(NULL != addr->tab_ptr);
+		free_hashtab_mname(addr->tab_ptr);
+		free(addr->tab_ptr);
+		addr->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
+		init_hashtab_mname((hash_table_mname *)addr->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE );
+	}
+	/* Repoint all names to the target region */
+	for (i = 0; i < addr->n_maps; i++)
+		addr->maps[i].reg.addr = reg;
+
+	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,7 +17,7 @@
 #include <wchar.h>
 #include <gtm_signal.h>
 #include "gtm_string.h"
-#include "gtm_select.h"
+#include "gtm_poll.h"
 #include "gtm_stdlib.h"
 
 #include "io.h"
@@ -66,18 +66,19 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 	boolean_t	ch_set, first_time, ret = FALSE, timed, utf8_active, zint_restart;
 	char		dc1, dc3;
 	d_tt_struct	*tt_ptr;
-	fd_set		input_fd;
 	int		inchar_width, msk_in, msk_num, rdlen, selstat, status, utf8_more;
 	io_desc		*io_ptr;
 	mv_stent	*mv_zintdev;
 	short int	i;
-	struct timeval	input_timeval;
 	TID		timer_id;
 	tt_interrupt	*tt_state;
 	uint4		mask;
 	unsigned char	inbyte, *zb_ptr, *zb_top;
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
 	wint_t		inchar;
+	int		poll_timeout;
+	nfds_t		poll_nfds;
+	struct pollfd	poll_fdlist[1];
 #ifdef __MVS__
 	wint_t		asc_inchar;
 #endif
@@ -163,13 +164,11 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 	if (NO_M_TIMEOUT == msec_timeout)
 	{
 		timed = FALSE;
-		input_timeval.tv_sec  = 100;
-		input_timeval.tv_usec = 0;
+		poll_timeout = 100 * MILLISECS_IN_SEC;
 	} else
 	{
 		timed = TRUE;
-		input_timeval.tv_sec = msec_timeout / MILLISECS_IN_SEC;
-		input_timeval.tv_usec = (msec_timeout % MILLISECS_IN_SEC) * MICROSECS_IN_MSEC;
+		poll_timeout = msec_timeout;
 		if (0 == msec_timeout)
 		{
 			if (!zint_restart)
@@ -226,27 +225,22 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 						ret = FALSE;
 						break;
 					}
-					input_timeval.tv_sec = cur_time.at_sec;
-					input_timeval.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
+					poll_timeout = (long)((cur_time.at_sec * MILLISECS_IN_SEC) +
+						DIVIDE_ROUND_UP((gtm_tv_usec_t)cur_time.at_usec, MICROSECS_IN_MSEC));
 				}
 			} else
-			{	/* This is an untimed read. We had set the select timeout to be 100 seconds by default. But since
-				 * "select" changes the timeout (in Linux) to account for the elapsed wait time, we need to reset
-				 * the timeout to be 100 seconds (else multiple iterations of this for loop could cause it to be
-				 * reset to 0 causing a CPU spin loop).
-				 */
-				input_timeval.tv_sec  = 100;
+			{
+				poll_timeout = 100 * MILLISECS_IN_SEC;
 			}
 		} else
 			first_time = FALSE;
-		assertpro(FD_SETSIZE > tt_ptr->fildes);
-		FD_ZERO(&input_fd);
-		FD_SET(tt_ptr->fildes, &input_fd);
-		assert(FD_ISSET(tt_ptr->fildes, &input_fd) != 0);
 		/* the checks for EINTR below are valid and should not be converted to EINTR
 		 * wrapper macros, since the select/read is not retried on EINTR.
 		 */
-		selstat = select(tt_ptr->fildes + 1, (void *)&input_fd, (void *)NULL, (void *)NULL, &input_timeval);
+		poll_fdlist[0].fd = tt_ptr->fildes;
+		poll_fdlist[0].events = POLLIN;
+		poll_nfds = 1;
+		selstat = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 		if (0 > selstat)
 		{
 			if (EINTR != errno)
@@ -267,7 +261,6 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 			continue;	/* select() timeout; try again */
 		} else if ((rdlen = (int)(read(tt_ptr->fildes, &inbyte, 1))) == 1)	/* This read is protected */
 		{
-			assert(FD_ISSET(tt_ptr->fildes, &input_fd) != 0);
 			/* --------------------------------------------------
 			 * set prin_in_dev_failure to FALSE to indicate that
 			 * input device is working now.

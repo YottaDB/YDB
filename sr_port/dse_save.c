@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,7 @@
 #include "dse.h"
 #include "cli.h"
 #include "util.h"
+#include "filestruct.h"
 
 /* Include prototypes */
 #include "t_qread.h"
@@ -32,6 +33,7 @@ GBLDEF uint4		patch_save_count = 0;
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF sgmnt_data_ptr_t	cs_data;
 
 error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_DSEMAXBLKSAV);
@@ -51,6 +53,7 @@ void dse_save(void)
 	unsigned short	buff_len;
 
 	assert(PATCH_SAVE_SIZE < MAXUINT4);
+	DSE_DB_IS_TOO_OLD(cs_addrs, cs_data, gv_cur_region);
 	memset(util_buff, 0, MAX_UTIL_LEN);
 	if (CLI_PRESENT == cli_present("LIST"))
 	{

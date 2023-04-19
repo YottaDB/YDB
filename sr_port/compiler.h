@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -172,7 +172,9 @@ typedef struct
 #define OCT_ARITH	512
 #define OCT_UNARY	1024
 #define OCT_NEGATED	2048
-#define OCT_REL	4096
+#define OCT_REL 	4096
+/* For booleans which have a side-effect somewhere in their (or a direct ancestor's) second operand's triple chain */
+#define OCT_SE		8192
 
 typedef struct
 {
@@ -641,6 +643,8 @@ int		bool_expr(boolean_t sense, oprtype *addr);
 void		bx_boollit(triple *t);
 void		bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr);
 void		bx_relop(triple *t, opctype cmp, opctype tst, oprtype *addr);
+void		bx_sboolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr);
+triple		*bx_startbool(triple *t);
 void		bx_tail(triple *t, boolean_t sense, oprtype *addr);
 void		chktchain(triple *head);
 void		code_gen(void);
@@ -656,7 +660,8 @@ int		expratom(oprtype *a);
 int		exfunc(oprtype *a, boolean_t alias_target);
 int		expritem(oprtype *a);
 int		expr(oprtype *a, int m_type);
-void		ex_tail(oprtype *opr);
+void		ex_arithlit(triple *t);
+void		ex_tail(oprtype *opr, boolean_t is_boolchild, boolean_t parent_comval);
 int		extern_func(oprtype *a);
 int		f_ascii(oprtype *a, opctype op);
 int		f_char(oprtype *a, opctype op);

@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2007-2020 Fidelity National Information		#
+# Copyright (c) 2007-2023 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -32,14 +32,24 @@ set utflocale = `locale -a | grep $binaryopt -iE '\.utf.?8$' | head -n1`
 
 # icu-config is deprecated. So try "pkg-config icu-io" first, followed by "icu-config" and "pkg-config icu"
 set cmd = "echo 0"
-if ( (-X pkg-config) && ( { pkg-config --exists icu-io } ) ) then
+if ( -X lslpp ) then
+	@ hasadt = { lslpp -Lcq ICU4C.adt } >& /dev/null
+	if ($hasadt) then
+		set uvernum="/usr/icu4c/include/unicode/uvernum.h"
+		set cmd = 'awk '"'"'$2 == "U_ICU_VERSION_SHORT" { ver=$3 ; gsub(/"/,"",ver) ; print ver }'"' $uvernum"
+		unset uvernum
+	endif
+	unset hasadt
+else if ( (-X pkg-config) && ( { pkg-config --exists icu-io } ) ) then
 	set cmd = "pkg-config --modversion icu-io"
 else if (-X icu-config) then
 	set cmd = "icu-config --version"
 else if ( (-X pkg-config) && ( { pkg-config --exists icu } ) ) then
 	set cmd = "pkg-config --modversion icu"
 endif
-set found_icu = `$cmd |& awk '{ver=+$0;if(ver>=3.6) {print 1} else {print 0}}'`
+set icuver="`$cmd`"
+set found_icu = `awk -v ver="$icuver" 'BEGIN {if(ver>=3.6) {print 1} else {print 0}}'`
+unset icuver
 
 if (0 == $found_icu) then
 	# If ICU is not found using the method above, just try harder by looking for libicuio*.* files in known locations

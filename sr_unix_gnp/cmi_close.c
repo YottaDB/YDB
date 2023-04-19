@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +14,8 @@
 #include "relqop.h"
 #include "eintr_wrappers.h"
 #include "gtmio.h"
+
+error_def(ERR_FDSIZELMT);
 
 cmi_status_t cmi_close(struct CLB *lnk)
 {
@@ -27,7 +30,8 @@ cmi_status_t cmi_close(struct CLB *lnk)
 	previous = QUEENT2CLB(qp, cqe);
 	remqt(&previous->cqe);
 	CLOSEFILE(lnk->mun, status);
-	assertpro(FD_SETSIZE > lnk->mun);
+	if (FD_SETSIZE <= lnk->mun)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FDSIZELMT, 1, lnk->mun);
 	FD_CLR(lnk->mun, &tsk->rs);
 	FD_CLR(lnk->mun, &tsk->ws);
 	FD_CLR(lnk->mun, &tsk->es);

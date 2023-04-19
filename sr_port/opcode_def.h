@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -350,5 +350,10 @@ OPCODE_DEF(OC_FNZATRANSFORM, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZTRANSLATE_FAST, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNTRANSLATE_FAST, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZAUDITLOG, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_SAND, (OCT_BOOL | OCT_SE))
+OPCODE_DEF(OC_SNAND, (OCT_BOOL | OCT_NEGATED | OCT_SE))
+OPCODE_DEF(OC_SOR, (OCT_BOOL | OCT_SE))
+OPCODE_DEF(OC_SNOR, (OCT_BOOL | OCT_NEGATED | OCT_SE))
+OPCODE_DEF(OC_SCOBOOL, (OCT_BOOL | OCT_COERCE | OCT_UNARY | OCT_SE))
 OPCODE_DEF(OC_LASTOPCODE, (OCT_CGSKIP))
 /* insert new opcodes before OC_LASTOPCODE */

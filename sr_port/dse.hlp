@@ -872,7 +872,8 @@
    -FU[LLY_UPGRADED]=boolean
 
    Sets a flag that indicates whether or not the database was fully upgraded
-   from V4 to V5 database format.. The value is either T[RUE] or F[ALSE].
+   from a prior version to the current database format. The value is either
+   T[RUE] or F[ALSE].
 
    Use only with: -FILEHEADER
 
@@ -2947,7 +2948,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2022
+   Copyright 2023
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

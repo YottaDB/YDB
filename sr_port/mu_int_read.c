@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,7 @@
 #include "db_snapshot.h"
 #include "mupip_exit.h"
 #include "t_qread.h"
+#include "gds_blk_upgrade_inline.h"
 
 GBLREF sgmnt_data		mu_int_data;
 GBLREF int4			mu_int_ovrhd;
@@ -169,17 +170,24 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *fr
 			}
 		}
 	}
-	if (csd->fully_upgraded && (GDSV6p == ((blk_hdr_ptr_t)tmp_ptr)->bver))
-	{	/* adjust for shift of GDSV7 id from 2 to 4 */
-		assert(GDSMV70000 == csd->creation_mdb_ver);
-		((blk_hdr_ptr_t)tmp_ptr)->bver = GDSV7;
-	}
-	if (!csd->fully_upgraded && (GDSV6 == ((blk_hdr_ptr_t)tmp_ptr)->bver)
-		&& (level = ((blk_hdr_ptr_t)tmp_ptr)->levl) && (LCL_MAP_LEVL != level))			/*WARNING assignment  */
-	{	/* prior version block needs block_id adjusted */
-		assert(csd->offset);
-		blk_ptr_adjust(tmp_ptr, csd->offset);
-		((blk_hdr_ptr_t)tmp_ptr)->bver = GDSV6p;
+	*ondsk_blkver = ((blk_hdr_ptr_t)tmp_ptr)->bver;
+	if (csd->fully_upgraded)
+	{
+		if ((GDSV6p == ((blk_hdr_ptr_t)tmp_ptr)->bver) && (GDSMV70000 == csd->creation_mdb_ver))
+			*ondsk_blkver = ((blk_hdr_ptr_t)tmp_ptr)->bver = GDSV7;	 /* adjust for shift of GDSV7 id from 2 to 4 */
+		else if ((GDSV7m == csd->desired_db_format) && (0 == ((blk_hdr_ptr_t)tmp_ptr)->levl))
+			*ondsk_blkver = ((blk_hdr_ptr_t)tmp_ptr)->bver = GDSV7m; /* treat level 0 as already upgraded */
+	} else if ((BLK_ID_32_VER <= csd->desired_db_format) && (GDSV6 == ((blk_hdr_ptr_t)tmp_ptr)->bver))
+	{
+		if (LCL_MAP_LEVL == (level = ((blk_hdr_ptr_t)tmp_ptr)->levl))	/* WARNING assignment */
+			*ondsk_blkver = GDSV7m;	/* local maps are treated as already upgraded */
+		else if (level)
+		{	/* prior version block needs block_id adjusted */
+			assert(csd->offset);
+			if (TRUE == blk_ptr_adjust(tmp_ptr, csd->offset))
+				*ondsk_blkver = ((blk_hdr_ptr_t)tmp_ptr)->bver = GDSV6p;
+			DEBUG_ONLY(else assert(FALSE));	/* Not expected to fail out of blk_ptr_adjust() */
+		}
 	}
 	return tmp_ptr;
 }

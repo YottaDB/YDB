@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -150,9 +150,14 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 					assert(pr->process_id);
 					if ((pr->process_id != yield_pid) && (process_id != pr->process_id))
 					{
+						/* If we are waiting on two pending processes, disable fairness
+						 * so we don't get livelocked */
+						if (TREF(mlk_yield_pid) && p->blocked && (p->blocked != d))
+							TREF(mlk_yield_pid) = MLK_FAIRNESS_DISABLED;
+						else
+							TREF(mlk_yield_pid) = pr->process_id;
 						p->blocked = d;
 						p->blk_sequence = d->sequence;
-						TREF(mlk_yield_pid) = pr->process_id;
 						blocked = TRUE;
 						/* Give the first waiting process a nudge to wake up */
 						ctl = p->pvtctl.ctl;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,23 +101,12 @@ enum dse_fmt
 	}													\
 }
 
-#ifdef UNIX
 # define GET_CONFIRM(X, Y)								\
 {											\
 	PRINTF("CONFIRMATION: ");							\
 	FGETS((X), (Y), stdin, fgets_res);						\
 	Y = strlen(X);									\
 }
-#else
-# define GET_CONFIRM(X, Y)								\
-{											\
-	if (!cli_get_str("CONFIRMATION", (X), &(Y)))					\
-	{										\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEWCINITCON);		\
-		return;									\
-	}										\
-}
-#endif
 
 #define GET_CONFIRM_AND_HANDLE_NEG_RESPONSE						\
 {											\
@@ -234,6 +223,32 @@ MBSTART {								\
 	GBLREF unsigned short   patch_comp_count;			\
 									\
 	patch_comp_count = patch_comp_key[0] = patch_comp_key[1] = 0;	\
+} MBEND
+
+/* Not a V7 database label and either not fully upgraded or there are blocks to upgrade */
+#define	DSE_DB_IS_TOO_OLD(CSA, CSD, REG)						\
+MBSTART {										\
+	error_def(ERR_DBUPGRDREQ); 							\
+	error_def(ERR_DSENOFINISH); 							\
+	LITREF	char *gtm_dbversion_table[];						\
+	char	confirm[256], *fgets_res;						\
+	size_t	len;									\
+											\
+	if ((MEMCMP_LIT(CSD->label, GDS_LABEL))						\
+			&& (!CSD->fully_upgraded || (0 != CSD->blks_to_upgrd)))		\
+	{										\
+		gtm_putmsg_csa(CSA, VARLSTCNT(5) MAKE_MSG_INFO(ERR_DBUPGRDREQ),		\
+				3, DB_LEN_STR(REG),					\
+				gtm_dbversion_table[CSD->desired_db_format]);		\
+		util_out_print("Please confirm this action [yN]: ", TRUE);		\
+		FGETS(confirm, sizeof(confirm) - 1, stdin, fgets_res);			\
+		len = strlen(confirm);							\
+		if ((0 == len) || (confirm[0] != 'Y' && confirm[0] != 'y'))		\
+		{									\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSENOFINISH);	\
+			return;								\
+		}									\
+	}										\
 } MBEND
 
 void		dse_adrec(void);

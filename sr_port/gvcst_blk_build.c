@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,8 @@ GBLREF	uint4			dollar_tlevel;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog, write_after_image;
+GBLREF	boolean_t		write_after_image;
+GBLREF	uint4			mu_upgrade_in_prog;
 GBLREF	unsigned int		t_tries;
 GBLREF	jnl_gbls_t		jgbl;
 
@@ -69,7 +70,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	 * which holds crit for the entire duration
 	 */
 	assert((dba_bg != cs_data->acc_meth) || dollar_tlevel || !cs_addrs->now_crit || write_after_image || jgbl.onlnrlbk
-		|| mu_reorg_upgrd_dwngrd_in_prog || ((NULL != cse->recompute_list_head) && (gds_t_write == cse->mode)));
+		|| mu_upgrade_in_prog || ((NULL != cse->recompute_list_head) && (gds_t_write == cse->mode)));
 	assert((dba_mm != cs_data->acc_meth) || dollar_tlevel || cs_addrs->now_crit);
 	assert(cse->mode != gds_t_writemap);
 	assert(cse->ondsk_blkver);

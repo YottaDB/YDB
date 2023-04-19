@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsfhead.h"
+#include "gdsdbver.h"
 #include "gdscc.h"
 #include "filestruct.h"
 #include "copy.h"
@@ -67,17 +68,17 @@ cw_set_element *t_write (
 			boolean_t	forward,	/* Is forward processing required? */
 			uint4		write_type)	/* Whether "killtn" of the bt needs to be simultaneously updated or not */
 {
-	cw_set_element		*cse, *tp_cse, *old_cse;
-	off_chain		chain;
-	uint4			iter;
-	srch_blk_status		*tp_srch_status;
-	ht_ent_int8		*tabent;
-	block_id		blk;
-	cache_rec_ptr_t		cr;
-	boolean_t		new_cse;	/* TRUE if we had to create a new cse for the input block */
-	jnl_buffer_ptr_t	jbbp;		/* jbbp is non-NULL only if before-image journaling */
-	sgmnt_addrs		*csa;
 	blk_hdr_ptr_t		old_block;
+	block_id		blk;
+	boolean_t		new_cse;	/* TRUE if we had to create a new cse for the input block */
+	cache_rec_ptr_t		cr;
+	cw_set_element		*cse, *old_cse, *tp_cse;
+	ht_ent_int8		*tabent;
+	jnl_buffer_ptr_t	jbbp;		/* jbbp is non-NULL only if before-image journaling */
+	off_chain		chain;
+	srch_blk_status		*tp_srch_status;
+	sgmnt_addrs		*csa;
+	uint4			iter;
 	unsigned int		bsiz;
 	DCL_THREADGBL_ACCESS;
 
@@ -212,8 +213,14 @@ cw_set_element *t_write (
 		 * thankfully, in MM, we do not allow GDSV4 type blocks, so we can safely assign GDSV6 (or GDSVCURR) to this field.
 		 */
 		cr = blkhist->cr;
-		assert((NULL != cr) || (dba_mm == csa->hdr->acc_meth));
-		cse->ondsk_blkver = (NULL != cr) ? cr->ondsk_blkver : cs_data->desired_db_format;
+		if (NULL != cr)
+			cse->ondsk_blkver = cr->ondsk_blkver;
+		else
+		{
+			assert(dba_mm == csa->hdr->acc_meth);
+			cse->ondsk_blkver = old_block->bver;
+			assert(cse->ondsk_blkver);
+		}
 		assert(cse->ondsk_blkver);
 		/* For uninitialized gv_target, initialize the in_tree status as IN_DIR_TREE */
 		assert (NULL != gv_target || dse_running || jgbl.forw_phase_recovery);

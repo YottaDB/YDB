@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020-2022 Fidelity National Information	*
+ * Copyright (c) 2020-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -302,8 +302,7 @@ typedef struct v6_sgmnt_data_struct
 	block_id	offset;				/* offset produced by mmb extension; interim pointer adjustment */
 	int4		max_rec;			/* pessimistic estimate of what bkl_size could hold */
 	int4		i_reserved_bytes;		/* for mangement of index splits; could be retained as a characteristic */
-	boolean_t	db_got_to_V7_once;		/* set TRUE by MUPIP REORG UPGRADE once it completes all work on region */
-	char		filler[164];			/* Filler to make 8-byte alignment explicit and aligned with V7 */
+	char		filler[168];			/* Filler to make 8-byte alignment explicit and aligned with V7 */
 	/************* INTERRUPTED RECOVERY RELATED FIELDS continued ****************/
 	seq_num		intrpt_recov_resync_strm_seqno[MAX_SUPPL_STRMS];/* resync/fetchresync jnl_seqno of interrupted rollback
 									 * corresponding to each non-supplementary stream.

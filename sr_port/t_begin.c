@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,7 +31,7 @@
 #include "tp_frame.h"
 #endif
 
-GBLREF	boolean_t		mu_reorg_process, mu_reorg_upgrd_dwngrd_in_prog, need_kip_incr;
+GBLREF	boolean_t		mu_reorg_process, need_kip_incr;
 GBLREF	cw_set_element		cw_set[];
 GBLREF	gv_namehead		*gv_target;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
@@ -40,7 +40,7 @@ GBLREF	sgm_info		*first_sgm_info;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	short			crash_count;
 GBLREF	trans_num		start_tn;
-GBLREF	uint4			dollar_tlevel, t_err, update_trans;
+GBLREF	uint4			dollar_tlevel, mu_upgrade_in_prog, t_err, update_trans;
 GBLREF	unsigned char		cw_set_depth, cw_map_depth;
 GBLREF	unsigned int		t_tries;
 GBLREF	volatile int4		fast_lock_count;
@@ -106,7 +106,7 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 			 *	   so gv_target->clue and/or gv_target->hist.h[x].cse does not matter. The global variable
 			 *	   bml_save_dollar_tlevel exactly identifies this scenario.
 			 */
-			assert(mu_reorg_process || mu_reorg_upgrd_dwngrd_in_prog || (NULL == s->cse) || bml_save_dollar_tlevel);
+			assert(mu_reorg_process || mu_upgrade_in_prog || (NULL == s->cse) || bml_save_dollar_tlevel);
 			if (start_tn > histtn)
 				start_tn = histtn;
 		}

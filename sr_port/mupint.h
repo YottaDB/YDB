@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,8 +15,6 @@
 
 #define	RETURN_AFTER_DB_OPEN_FALSE	FALSE
 #define	RETURN_AFTER_DB_OPEN_TRUE	TRUE
-
-#define	NO_ONLINE_ERR_MSG	"ONLINE qualifier for this region will be ignored"
 
 #define DEFAULT_ADJACENCY 10
 #define CHECK_ADJACENCY(BLK, LVL, CNTR)								\

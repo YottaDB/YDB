@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,7 @@
 #include "t_create.h"
 
 GBLREF	cw_set_element		cw_set[];
+GBLREF	enum db_ver		upgrade_block_split_format; /* Set only in mu_split */
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	sgm_info		*sgm_info_ptr;
@@ -85,7 +86,13 @@ block_index t_create (
 	cse->t_level = dollar_tlevel;
 	cse->low_tlevel = NULL;
 	cse->high_tlevel = NULL;
-	cse->ondsk_blkver = cs_data->desired_db_format;
+	/* When dealing with an index or directory tree block, take upgrade_block_split_format into account. Others use desired DB fmt */
+	if ((level || (DIR_ROOT == gv_target->root)) && upgrade_block_split_format)
+	{
+		assert(FALSE == cs_data->fully_upgraded);
+		cse->ondsk_blkver = upgrade_block_split_format;
+	} else
+		cse->ondsk_blkver = cs_data->desired_db_format;
 	assert (NULL != gv_target);	/* t_create is called by gvcst kill/put,mu split/swap_blk, where gv_target can't be NULL */
 	/* For uninitialized gv_target, initialize the in_tree status as IN_DIR_TREE, which later may be modified by t_write */
 	if (0 == gv_target->root)

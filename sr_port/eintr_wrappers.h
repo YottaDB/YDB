@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -304,18 +304,6 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 			 FLAGS, ADDR, ADDR_LEN);		\
 	} while (-1 == RC && EINTR == errno);			\
 }
-
-#define SELECT(FDS, INLIST, OUTLIST, XLIST, TIMEOUT, RC)	\
-{								\
-	struct timeval eintr_select_timeval;			\
-	do							\
-	{							\
-		eintr_select_timeval = *(TIMEOUT);		\
-		RC = select(FDS, INLIST, OUTLIST,		\
-			XLIST, &eintr_select_timeval);		\
-	} while (-1 == RC && EINTR == errno);			\
-}
-
 
 #define SEND(SOCKET, BUF, LEN, FLAGS, RC)			\
 {								\

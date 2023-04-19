@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,9 +34,9 @@ void	flt_mod (mval *u, mval *v, mval *q)
 					   to prevent modifying caller's data */
 	mval	*u_orig;		/* original (caller's) value of u */
 
-	u_orig = u;
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
+	u_orig = u;
 
 	if ((v->mvtype & MV_INT) != 0  &&  v->m[1] == 0)
 		rts_error_csa(NULL, VARLSTCNT(1) ERR_DIVZERO); /* BYPASSRTSABT */
@@ -85,6 +85,7 @@ void	flt_mod (mval *u, mval *v, mval *q)
 		{
 			/* Signs same (=> floor(u/v) >= 0) or (w == 0) or (underflow) => floor(u/v) == 0 */
 			*q = *u_orig;	/* u - floor(u/v)*v == u - 0*v == u */
+			MV_FORCE_CANONICAL(q);
 			return;
 		}
 	}

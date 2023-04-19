@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2021 Fidelity National Information		#
+# Copyright (c) 2001-2023 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -866,7 +866,11 @@ if ("AIX" == "$HOSTOS") then
 	oslevel -s
 	$gt_cc_compiler -qversion
 else if ("Linux" == $HOSTOS) then
-	if (-X lsb_release) lsb_release -d
+	if (-X lsb_release) then
+		lsb_release -ds | awk '{gsub(/"/,"") ; print}'
+	else if (-e /etc/os-release) then
+		awk -F= '/^PRETTY_NAME=/ {gsub(/"/,"",$2) ; print $2}' /etc/os-release
+	endif
 	$gt_cc_compiler --version |& head -1
 endif
 # gpg and related versions"

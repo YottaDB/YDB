@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,7 @@ GBLREF uint4			process_id;
 GBLREF unsigned int		t_tries;
 GBLREF uint4			dollar_tlevel;
 GBLREF sgm_info			*sgm_info_ptr;
-GBLREF boolean_t		mu_reorg_process;
+GBLREF boolean_t		mu_reorg_more_tries;
 #ifdef UNIX
 GBLREF uint4 			update_trans;
 GBLREF jnlpool_addrs_ptr_t	jnlpool;
@@ -226,7 +226,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			cr->refer = TRUE;
 			continue;
 		}
-		if (CDB_STAGNATE <= t_tries || mu_reorg_process)
+		if ((CDB_STAGNATE <= t_tries) || mu_reorg_more_tries)
 		{
 			/* Prevent stepping on self when crit for entire transaction.
 			 * This is done by looking up in sgm_info_ptr->blk_in_use and cw_stagnate for presence of the block.
@@ -419,7 +419,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		}
 		assert(0 == rip);
 		/* no other process "owns" the block */
-		if (CDB_STAGNATE <= t_tries || mu_reorg_process)
+		if ((CDB_STAGNATE <= t_tries) || mu_reorg_more_tries)
 		{	/* this should probably use cr->in_cw_set with a condition handler to cleanup */
 			CWS_INSERT(block);
 		}

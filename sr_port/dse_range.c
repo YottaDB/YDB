@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,7 @@
 #include "min_max.h"
 #include "util.h"
 #include "dse.h"
+#include "filestruct.h"
 
 /* Include prototypes */
 #include "t_qread.h"
@@ -36,6 +37,7 @@ GBLREF boolean_t	patch_find_root_search;
 GBLREF gd_region	*gv_cur_region;
 GBLREF short int	patch_path_count;
 GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF VSIG_ATOMIC_T	util_interrupt;
 
 error_def(ERR_CTRLC);
@@ -54,6 +56,7 @@ void dse_range(void)
 	short int	rsize, size, size1;
 	sm_uc_ptr_t	bp, b_top, key_bot, key_top, key_top1, rp, r_top;
 
+	DSE_DB_IS_TOO_OLD(cs_addrs, cs_data, gv_cur_region);
 	if (CLI_PRESENT == cli_present("FROM"))
 	{
 		if (BADDSEBLK == (from = dse_getblk("FROM", DSEBMLOK, DSEBLKNOCUR)))	/* WARNING: assignment */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2022 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -278,7 +278,7 @@ void mupip_endiancvt(void)
 			}
 		}
 		swap_dbver = (enum db_ver)GTM_BYTESWAP_32(old_data->desired_db_format);
-		if (!swap_dbver || ((GDSVCURR != swap_dbver) && !(BLK_ID_32_VER > swap_dbver)))
+		if ((0 >= swap_dbver) || (GDSV7 < swap_dbver))
 		{
 			check_error = NOTCURRDBFORMAT;
 			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
@@ -394,8 +394,7 @@ void mupip_endiancvt(void)
 				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 			}
 		}
-		if (!old_data->desired_db_format || ((GDSVCURR != old_data->desired_db_format)
-			&& !(BLK_ID_32_VER > old_data->desired_db_format)))
+		if ((0 >= old_data->desired_db_format) || (GDSV7 < old_data->desired_db_format))
 		{
 			check_error = NOTCURRDBFORMAT;
 			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2021 Fidelity National Information	*
+ * Copyright (c) 2005-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,21 +29,24 @@
 #include "gdsblk.h"
 #include "iosp.h"
 #include "gtmio.h"
-#include "gds_blk_downgrade.h"
 #include "add_inter.h"
 #include "anticipatory_freeze.h"
 #include "gtmcrypt.h"
 #include "min_max.h"
 #include "jnl.h"
+#include "mu_updwn_ver_inline.h"
 
-GBLREF	sm_uc_ptr_t	reformat_buffer;
 GBLREF	int		reformat_buffer_len;
+GBLREF	uint4		mu_upgrade_in_prog;
+GBLREF	sm_uc_ptr_t	reformat_buffer;
 GBLREF	volatile int	reformat_buffer_in_use;	/* used only in DEBUG mode */
 GBLREF	volatile int4	fast_lock_count;
 
 /*
- * 1) We write direct from the given buffer to a block in the database file on disk rather than from a cache record's buffer.
- * 2) This routine takes care of the maint of blks_to_upgrd in the file-header for these non-cached writes.
+ * Write directly from the given buffer to a block in the database file on disk rather than from a cache record's
+ * buffer. This function is called from mucblkini() and bml_init() via DSK_WRITE_NOCACHE to initialize the starting
+ * directory tree and bitmap blocks. The callers are either standalone operations or are holding crit - for file
+ * extensions - and are writing blocks not yet available to concurrent processing.
  */
 int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ver ondsk_blkver)
 {
@@ -74,41 +77,14 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 	 */
 	assert(0 == reformat_buffer_in_use);
 	DEBUG_ONLY(reformat_buffer_in_use++;)
-	/*if (IS_GDS_BLK_DOWNGRADE_NEEDED(ondsk_blkver))
-	{	* Need to downgrade/reformat this block back to the previous format *
-		DEBUG_DYNGRD_ONLY(PRINTF("DSK_WRITE_NOCACHE: Block %d being dynamically downgraded on write\n", blk));
-		if (csd->blk_size > reformat_buffer_len)
-		{	* Buffer not big enough (or does not exist) .. get a new one releasing old if it exists *
-			if (reformat_buffer)
-				free(reformat_buffer);	* Different blksized databases in use .. keep only largest one *
-			reformat_buffer = malloc(csd->blk_size);
-			reformat_buffer_len = csd->blk_size;
-		}
-		gds_blk_downgrade((v15_blk_hdr_ptr_t)reformat_buffer, (blk_hdr_ptr_t)buff);
-		buff = reformat_buffer;
-		size = (((v15_blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
-		* Represents a block state change from V5 -> V4 *
-		INCR_BLKS_TO_UPGRD(csa, csd, 1);
-		assert(SIZEOF(v15_blk_hdr) <= size);
-	} else */ if (GDSV6 == ondsk_blkver)
-	{
-		size = (((blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
-		assert(SIZEOF(blk_hdr) <= size);
-		/*INCR_BLKS_TO_UPGRD(csa, csd, 1);*/
-	} else DEBUG_ONLY(if ((GDSV7 == ondsk_blkver) || (GDSV7m == ondsk_blkver)))
-	{
-		assert(GDSVCURR == ondsk_blkver);
-		size = (((blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
-		assert(SIZEOF(blk_hdr) <= size);
-		/* no adjustment to blks_to_upgrd counter is needed since the format we are going to write is GDSVCURR */
+	size = (((blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
+	assert(SIZEOF(blk_hdr) <= size);
+	if (mu_upgrade_in_prog && (GDSV7m == csd->desired_db_format))
+	{	/* REORG -UPGRADE always forces the bitmap block version */
+		assert(!csd->fully_upgraded);
+		((blk_hdr_ptr_t)buff)->bver = GDSV7m;
 	}
-#	ifdef DEBUG
-	else
-		assert(((GDSV7 == ondsk_blkver) && (!MEMCMP_LIT(csd->label, GDS_LABEL)))
-			|| ((GDSV7m == ondsk_blkver) && (!MEMCMP_LIT(csd->label, GDS_LABEL)))
-			|| ((GDSV6 == ondsk_blkver) && (!MEMCMP_LIT(csd->label, V6_GDS_LABEL))));
-#	endif
-
+	assert(((blk_hdr_ptr_t)buff)->bver == csd->desired_db_format);
 	if (csd->write_fullblk) /* See similiar logic in wcs_wtstart.c */
 		size = (int)ROUND_UP(size, (FULL_DATABASE_WRITE == csd->write_fullblk)
 				? csd->blk_size : csa->fullblockwrite_len);

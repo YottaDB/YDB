@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,6 +87,20 @@ typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
 #define INVALID_SEMID			-1
 #define INVALID_SHMID 			-1L
 
+/* For use in the SHMHUGETLB syslog warning message */
+enum shmget_caller
+{
+	LOCK_FILE,
+	SNAPSHOT_FILE,
+	RELINK,
+	JOURNAL_POOL,
+	DATABASE_FILE,
+	RC_CPT,
+	GTM_MULTI_PROC_FREEZE,
+	GTM_MULTI_PROC_RECOVER,
+	N_SHMGET_CALLERS
+};
+
 /* constant needed for FIFO - OS390 redefines in mdefsp.h */
 #define FIFO_PERMISSION		010666 /* fifo with RW permissions for owner, group, other */
 
@@ -158,16 +172,6 @@ static inline int gtm_abrt() { abort(); return 0;}
 /* Define what is an invalid file descriptor */
 #define	FD_INVALID		-1	/* fd of -1 is invalid in UNIX posix calls */
 #define	FD_INVALID_NONPOSIX	FD_INVALID
-
-#if defined(UNIX)
-#	define	USE_POLL
-#	define	POLL_ONLY(X)	X
-#	define	SELECT_ONLY(X)
-#else
-#	define	USE_SELECT
-#	define	POLL_ONLY(X)
-#	define	SELECT_ONLY(X)	X
-#endif
 
 /* INTPTR_T is an integer that has the same length as a pointer on each platform.  Its basic use is for arithmetic
  * or generic parameters.
@@ -1387,6 +1391,7 @@ void mval_lex(mval *v, mstr *output);
 #define ZTRAP_POP	0x00000004
 #define ZTRAP_ADAPTIVE	(ZTRAP_CODE | ZTRAP_ENTRYREF)
 
+#define BYTEMASK	0xFF
 #define GTM_BYTESWAP_16(S)		\
 	(  (((S) & 0xff00) >> 8)	\
 	 | (((S) & 0x00ff) << 8)	\

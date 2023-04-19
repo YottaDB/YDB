@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,12 +26,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gtm_unistd.h"
-#ifdef USE_POLL
-#include <sys/poll.h>
-#endif
-#ifdef USE_SELECT
-#include "gtm_select.h"
-#endif
+#include "gtm_poll.h"
 #ifdef DEBUG_SOCKWAIT
 #include "gtmio.h"
 #include "have_crit.h"		/* DBGSOCKWAIT needs for DBGFPF */
@@ -84,24 +79,17 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 {
 	struct 	timeval  	utimeout, *utimeoutptr;
 	ABS_TIME		cur_time, end_time;
-#ifdef USE_POLL
 	nfds_t			poll_nfds;
 	struct pollfd		*poll_fds;
 	socket_struct		**poll_socketptr;	/* matching poll_fds */
 	size_t			poll_fds_size;
 	int			poll_timeout, poll_fd;
-#endif
-#ifdef USE_SELECT
-	int			select_max_fd;
-	fd_set			select_fdset, selectw_fdset;
-	boolean_t		selectw_needed;
-#endif
 	d_socket_struct 	*dsocketptr;
 	socket_struct   	*socketptr, *which_socketptr = NULL, *prev_socketptr;;
 	socket_interrupt	*sockintr;
 	char            	*errptr, *charptr;
 	int4            	errlen, ii, jj, handle_index;
-	int4			nselect, nlisten, nconnected, nwrite, rlisten, rconnected, rwrite;
+	int4			npoll, nlisten, nconnected, nwrite, rlisten, rconnected, rwrite;
 	int4			oldestconnectedcycle, oldestconnectedindex;
 	int4			oldestwritecycle, oldestwriteindex;
 	int4			oldestlistencycle, oldestlistenindex;
@@ -193,7 +181,6 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 		sockintr->who_saved = sockwhich_invalid;
 	}
 	/* check for events */
-#ifdef USE_POLL
 	poll_fds_size = dsocketptr->n_socket * (SIZEOF(struct pollfd) + SIZEOF(socket_struct *));
 	if (NULL == TREF(poll_fds_buffer))
 	{
@@ -207,19 +194,12 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 	}
 	poll_fds = (struct pollfd *) TREF(poll_fds_buffer);
 	poll_socketptr = (socket_struct **)((char *)poll_fds + (dsocketptr->n_socket * SIZEOF(struct pollfd)));
-#endif
-#ifdef	USE_SELECT
-	FD_ZERO(&select_fdset);
-	FD_ZERO(&selectw_fdset);
-	selectw_needed = FALSE;
-#endif
 	DBGSOCKWAIT((stdout,"waitcycle= %d\n",dsocketptr->waitcycle));
 	while (TRUE)
 	{
 		DBGSOCKWAIT((stdout,"wait loop:\n"));
-		POLL_ONLY(poll_nfds = 0);
-		SELECT_ONLY(select_max_fd = 0);
-		nselect = nlisten = nconnected = nwrite = rlisten = rconnected = rwrite = 0;
+		poll_nfds = 0;
+		npoll = nlisten = nconnected = nwrite = rlisten = rconnected = rwrite = 0;
 		rv = 0;
 		for (ii = 0; ii < dsocketptr->n_socket; ii++)
 		{
@@ -257,7 +237,6 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 						continue;	/* ready for ACCEPT now */
 					}
 				}
-#ifdef USE_POLL
 				poll_fds[poll_nfds].fd = socketptr->sd;
 				poll_fds[poll_nfds].events = 0;
 				if (WAIT_FOR_READ & wait_for_what)
@@ -267,25 +246,12 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 					poll_fds[poll_nfds].events |= POLLOUT;
 				poll_socketptr[poll_nfds] = socketptr;
 				poll_nfds++;
-#endif
-#ifdef USE_SELECT
-				assertpro(FD_SETSIZE > socketptr->sd);
-				if (WAIT_FOR_READ & wait_for_what)
-					FD_SET(socketptr->sd, &select_fdset);
-				if ((socket_connected == socketptr->state) && socketptr->nonblocked_output
-					&& (WAIT_FOR_WRITE & wait_for_what))
-				{
-					FD_SET(socketptr->sd, &selectw_fdset);
-					selectw_needed = TRUE;
-				}
-				select_max_fd = MAX(select_max_fd, socketptr->sd);
-#endif
-				nselect++;
+				npoll++;
 			}
 			if (which_socketptr)
 				break;		/* only check the one socket */
 		}
-		if (nselect)
+		if (npoll)
 		{
 			if (NO_M_TIMEOUT != msec_timeout)
 			{
@@ -318,7 +284,6 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 			zint_restart = sockintr->end_time_valid = FALSE;
 			for ( ; ; )
 			{
-#ifdef USE_POLL
 				if ((0 < rconnected) || (0 < rlisten) || (0 < rwrite))
 					poll_timeout = 0;
 				else if (NO_M_TIMEOUT == msec_timeout)
@@ -328,16 +293,6 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 						DIVIDE_ROUND_UP(utimeout.tv_usec, MICROSECS_IN_MSEC);
 				poll_fd = -1;
 				rv = poll(poll_fds, poll_nfds, poll_timeout);
-#endif
-#ifdef USE_SELECT
-				utimeoutptr = &utimeout;
-				if ((0 < rconnected) || (0 < rlisten) || (0 < rwrite))
-					utimeout.tv_sec = utimeout.tv_usec = 0;
-				else if (NO_M_TIMEOUT == msec_timeout)
-					utimeoutptr = (struct timeval *)NULL;
-				rv = select(select_max_fd + 1, (void *)&select_fdset,
-						selectw_needed ? (void *)&selectw_fdset : NULL, NULL, utimeoutptr);
-#endif
 				if (0 > rv && EINTR == errno)
 				{
 					if (0 != outofband)
@@ -425,23 +380,15 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 			socketptr = dsocketptr->socket[ii];
 			if ((socket_listening != socketptr->state) && (socket_connected != socketptr->state))
 				continue;	/* not a candidate for /WAIT */
-#ifdef USE_POLL
 			for (jj = 0; jj < poll_nfds; jj++)
 			{
 				if (socketptr == poll_socketptr[jj])
 					break;
 			}
 			assertpro((0 == jj) || (jj <= poll_nfds));	/* equal poll_nfds if not polled */
-			if (nselect && (jj != poll_nfds) && (socketptr->sd == poll_fds[jj].fd) && poll_fds[jj].revents)
-#endif
-#ifdef USE_SELECT
-			assertpro(FD_SETSIZE > socketptr->sd);
-			if (nselect && ((0 != FD_ISSET(socketptr->sd, &select_fdset)
-				|| (selectw_needed && (0 != FD_ISSET(socketptr->sd, &selectw_fdset))))))
-#endif
+			if (npoll && (jj != poll_nfds) && (socketptr->sd == poll_fds[jj].fd) && poll_fds[jj].revents)
 			{	/* set flag in socketptr and keep going */
-				if (POLL_ONLY((POLLIN & poll_fds[jj].revents))
-					SELECT_ONLY((FD_ISSET(socketptr->sd), &select_fdset)))
+				if (POLLIN & poll_fds[jj].revents)
 				{
 					socketptr->current_events |= SOCKPEND_READ;
 					socketptr->readyforwhat |= SOCKREADY_READ;
@@ -456,9 +403,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 					socketptr->readycycle = dsocketptr->waitcycle;
 				} else
 				{
-					if (SELECT_ONLY(selectw_needed && (FD_ISSET(socketptr->sd, &selectw_fdset)))
-						POLL_ONLY(poll_fds[jj].revents & POLLOUT))
-
+					if (poll_fds[jj].revents & POLLOUT)
 					{
 						socketptr->current_events |= SOCKPEND_WRITE;
 						socketptr->readyforwhat |= SOCKREADY_WRITE;
@@ -644,13 +589,8 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	int			rv, len, errcode, keepalive_opt, keepalive_value, save_errno;
 	int4            	errlen;
 	char			port_buffer[NI_MAXSERV], ipaddr[SA_MAXLEN + 1];
-#ifdef USE_POLL
 	struct pollfd		poll_fds;
 	int			poll_fd;
-#endif
-#ifdef USE_SELECT
-	fd_set			select_fdset;
-#endif
 	socket_struct		*newsocketptr;
 	struct sockaddr		*peer_sa_ptr;
 	struct sockaddr_storage	peer;           /* socket address + port */
@@ -669,17 +609,9 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	{	/* if not selected this time do a select first to check if connection still there */
 		do
 		{
-#ifdef USE_POLL
 			poll_fds.fd = socketptr->sd;
 			poll_fds.events = POLLIN;
 			rv = poll(&poll_fds, 1, 0);
-#endif
-#ifdef USE_SELECT
-			FD_ZERO(&select_fdset);
-			FD_SET(socketptr->sd, &select_fdset);
-			utimeout.tv_sec = utimeout.tv_usec = 0;
-			rv = select(socketptr->sd + 1, (void *)&select_fdset, NULL, NULL, &utimeout);
-#endif
 		} while ((0 > rv) && (EINTR == (save_errno = errno))); /* inline assigment */
 		if (0 > rv)
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,6 @@
 #include "wcs_sleep.h"
 #include "gtm_file_stat.h"
 #include "gtm_tempnam.h"
-#include "gds_blk_downgrade.h"
 #include "shmpool.h"
 #include "wcs_phase2_commit_wait.h"
 #include "wbox_test_init.h"
@@ -51,15 +50,13 @@
 #include "jnl.h"
 #ifdef __x86_64
 #	include <math.h>
-#	include "gtm_utsname.h"
-#	include <gnu/libc-version.h>
 #	include <dlfcn.h>
 #	define BUF_MAX		100
 #	define MIN_ETA		10
 #	define SHOWPERCENT	24
 #	define ADJUSTED_ETA	1.25
 #	define MEGABYTE 	1024 * 1024
-#	define GIGABYTE 	1024 *MEGABYTE
+#	define GIGABYTE 	1024 * MEGABYTE
 #endif
 #define	TMPDIR_ACCESS_MODE	R_OK | W_OK | X_OK
 #define	TMPDIR_CREATE_MODE	S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH
@@ -69,7 +66,8 @@
 #define	RMDIR_OPT		"-r "
 #define	CD_CMD			"cd "
 #define	CMD_SEPARATOR		" && "
-
+#define CAN_RETRY 		1
+#define CANNOT_RETRY		0
 #ifdef __linux__
 #	define	CP_CMD		"cp "
 #	define	CP_OPT		"--sparse=always "
@@ -91,12 +89,19 @@
 	}					\
 }
 
-#define	CLEANUP_AND_RETURN_FALSE								\
+#define	CLEANUP_AND_RETURN_FALSE(RETRY)								\
 {												\
 	int	rc;										\
 	int4	rv2, tmpcmdlen;									\
 	int	maxtmpcmdlen = (MAX_FN_LEN) * 2 + STR_LIT_LEN(UNALIAS) + 1;			\
 	char	tmpcmd[maxtmpcmdlen];								\
+	if (CANNOT_RETRY == RETRY)								\
+	{											\
+		if (online)									\
+			cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;				\
+		*stopretries = TRUE;								\
+	}											\
+	FREE_COMMAND_STR_IF_NEEDED;								\
 	if (FD_INVALID != backup_fd)								\
 		CLOSEFILE_RESET(backup_fd, rc);	/* resets "backup_fd" to FD_INVALID */		\
 	memset(tmpcmd, '\0', maxtmpcmdlen);							\
@@ -125,13 +130,7 @@
 	}											\
 	return FALSE;										\
 }
-#define	ABORTBACKUP						\
-{								\
-	if (online)						\
-		cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;	\
-	FREE_COMMAND_STR_IF_NEEDED;				\
-	CLEANUP_AND_RETURN_FALSE;				\
-}
+
 
 GBLREF	bool			file_backed_up;
 GBLREF	gd_region		*gv_cur_region;
@@ -188,14 +187,13 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	struct perm_diag_data	pdd;
 	int			ftruncate_res;
 	trans_num		ONE = 0x1;
-	boolean_t		in_kernel, usesystem = TRUE;
+	boolean_t		in_kernel, use_cp_or_pax = TRUE;
 #	ifdef __x86_64
 	int 			digicnt = 0, eta = MIN_ETA, infd, outfd, speedcnt = 0, transpadcnt = 0;
 	int 			csdigicnt = 0, cspadcnt = 0, speedigits = 0;
 	double			progper = 0, progfact = SHOWPERCENT;
 	size_t	 		tmpsize, transfersize, remaining;
 	ssize_t 		ret;
-	loff_t			*inoffp, *outoffp;
 	size_t			bytesspliced = 0, currspeed = 0, trans_cnt = 0, start_cnt = 0;
 	time_t			begtm, endtm, strtm;
 	char 			sizep[BUF_MAX], progperstr[BUF_MAX], padding[MAX_DIGITS_IN_INT8], fil=' ';
@@ -305,7 +303,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		errptr = (char *)STRERROR(save_errno);
 		util_out_print("Temporary directory !AD could not be created.", TRUE, tempfilelen, tempfilename);
 		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(errptr));
-		CLEANUP_AND_RETURN_FALSE;
+		CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 	}
 	if (NULL == realpath(tempfilename, realpathname))
 	{
@@ -313,7 +311,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		errptr = (char *)STRERROR(save_errno);
 		util_out_print("Temporary directory !AD could not be found after creation.", TRUE, tempfilelen, tempfilename);
 		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(errptr));
-		CLEANUP_AND_RETURN_FALSE;
+		CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 	}
 	realpathlen = STRLEN(realpathname);
 	/* Get the path to system utilities and prepend it to the command. */
@@ -321,17 +319,16 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	{
 		rv = CONFSTR(fulpathcmd[i], MAX_FN_LEN);
 		if (0 != rv)
-			CLEANUP_AND_RETURN_FALSE;
+			CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 	}
-	/* Start prep for in-kernel copy */
+	/* Check for copy_file_range symbol. Use copy_file_range() in the first attempt   */
 #	ifdef __x86_64
-	/* Do not use cp/pax on the first attempt */
-	in_kernel = ink_backup();
-	if (FALSE == in_kernel)
-		usesystem = TRUE;
-	else
-		usesystem = (1 < attemptcnt); /* Do not use cp on the first attempt */
-	if (!usesystem)
+	if (1 == attemptcnt)
+	{
+		use_cp_or_pax = (NULL == (func_ptr = dlsym(RTLD_DEFAULT, "copy_file_range")))
+				? TRUE : FALSE; /* Inline assignment */
+	}
+	if (!use_cp_or_pax)
 	{
 		mu_outofband_setup();
 		if (NULL == realpath((char *)tmpsrcfname, sourcefilepathname))
@@ -357,19 +354,19 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		if (-1 == infd)
 		{
 			if (1 == (status = handle_err("Unable to open() the database file", errno))) /* WARNING assignment */
-				ABORTBACKUP;
+				CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 		}
 		if (-1 == fstat(infd, &stat))
 		{
 			if (1 == (status = handle_err("Error obtaining fstat() from the database file",
 					errno))) /* WARNING assignment */
-				ABORTBACKUP;
+				CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 		}
 		outfd = open(tempfilepathname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
 		if (-1 == outfd)
 		{
 			if (1 == (status = handle_err("Unable to open() the backup file/location", errno))) /* WARNING assignment */
-			ABORTBACKUP;
+			CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 		}
 		/* set transfer size as maximum. Full copy-acceleration */
 		remaining = stat.st_size;
@@ -388,19 +385,23 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		{
 			strtm = time(NULL);
 			tmpsize = remaining;
+			ret = 0;
 			copy_file_range_p = func_ptr;
-			ret = copy_file_range_p(infd, inoffp, outfd, outoffp, remaining, 0);
+			ret = copy_file_range_p(infd, NULL, outfd, NULL, remaining, 0);
+			save_errno = errno;
+			if (1 > ret)
+			{
+				if (EXDEV == save_errno)
+					CLEANUP_AND_RETURN_FALSE(CAN_RETRY); /* Silently ignore and switch to cp */
+				if (1 == (status = handle_err("Error occurred during the copy phase of MUPIP BACKUP",
+						save_errno))) /* WARNING assignment */
+					CLEANUP_AND_RETURN_FALSE(CAN_RETRY);
+			}
 			if (WBTEST_ENABLED(WBTEST_BACKUP_FORCE_SLEEP))
 			{
 				util_out_print("BACKUP_STARTED", TRUE);
 				LONG_SLEEP(20);
 				showprogress = TRUE;
-			}
-			if (-1 == ret)
-			{
-				if (1 == (status = handle_err("Error occurred during the copy phase of MUPIP BACKUP",
-						errno))) /* WARNING assignment */
-					ABORTBACKUP;
 			}
 			endtm = time(NULL);
 			bytesspliced = bytesspliced + (size_t)ret;
@@ -451,15 +452,15 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 				}
 			}
 			if (TRUE == mu_ctrlc_occurred)
-				ABORTBACKUP;
+				CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 		} while ((0 < remaining) && (-1 < ret));
 		close(infd);
 		close(outfd);
 		if ((0 != remaining) || (ret == -1))
-			ABORTBACKUP; /* Copy failed so no need to retry */
+			CLEANUP_AND_RETURN_FALSE(CAN_RETRY); /* Copy failed so no need to retry */
 	}
 #	endif
-	if (TRUE == usesystem)
+	if (TRUE == use_cp_or_pax)
 	{
 		/* Calculate total line length for commands to execute (pushd + cp). *
 		 * If cannot fit in local variable array, malloc space *
@@ -503,6 +504,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			util_out_print("BACKUP_STARTED", TRUE);
 			LONG_SLEEP(20);
 		}
+		/* Perform the copy (cp or pax) */
 		rv = SYSTEM((char *)command);
 		if (0 != rv)
 		{
@@ -513,10 +515,10 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 				util_out_print("system : !AZ", TRUE, errptr);
 			}
 			util_out_print("Error doing !AD", TRUE, cmdlen, command);
-			ABORTBACKUP;
+			CLEANUP_AND_RETURN_FALSE(CAN_RETRY);
 		}
 		if (TRUE == mu_ctrlc_occurred)
-			ABORTBACKUP;
+			CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 	}
 	FREE_COMMAND_STR_IF_NEEDED;
 	assert(command == &cmdarray[0]);
@@ -529,8 +531,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		save_errno = errno;
 		errptr = (char *)STRERROR(save_errno);
 		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_FILENAMETOOLONG);
-		*stopretries = TRUE;
-		CLEANUP_AND_RETURN_FALSE;
+		CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 	}
 	tempfilename[tempfilelen++] = '/';
 	memcpy(&tempfilename[tempfilelen], sourcefilename, sourcefilelen);
@@ -543,11 +544,9 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		save_errno = errno;
 		errptr = (char *)STRERROR(save_errno);
 		util_out_print("open : !AZ", TRUE, errptr);
-		if (online)
-			cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
 		util_out_print("Error opening backup file !AD.", TRUE, file->len, file->addr);
 		util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
-		CLEANUP_AND_RETURN_FALSE;
+		CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 	}
 	FSTAT_FILE(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
 	if (-1 != fstat_res)
@@ -561,9 +560,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
 				RTS_ERROR_STRING(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
 				PERMGENDIAG_ARGS(pdd));
-			if (online)
-				cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
-			CLEANUP_AND_RETURN_FALSE;
+			CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 		}
 	/* Setup new group and permissions if indicated by the security rules. */
 	if ((-1 == fstat_res) || (-1 == FCHMOD(backup_fd, perm))
@@ -572,9 +569,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		save_errno = errno;
 		errptr = (char *)STRERROR(save_errno);
 		util_out_print("system : !AZ", TRUE, errptr);
-		if (online)
-			cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
-		CLEANUP_AND_RETURN_FALSE;
+		CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 	}
 #	if defined(__MVS__)
 	if (-1 == gtm_zos_tag_to_policy(backup_fd, TAG_BINARY, &realfiletag))
@@ -589,7 +584,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			 * Cleanup and exit
 			 */
 			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DBROLLEDBACK);
-			CLEANUP_AND_RETURN_FALSE;
+			CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 		}
 		/* if there has been an extend, truncate it */
 		FSTAT_FILE(backup_fd, &stat_buf, fstat_res);
@@ -600,7 +595,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			util_out_print("fstat : !AZ", TRUE, errptr);
 			util_out_print("Error obtaining status of backup file !AD.", TRUE, file->len, file->addr);
 			util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
-			CLEANUP_AND_RETURN_FALSE;
+			CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 		}
 		filesize = (off_t)BLK_ZERO_OFF(header_cpy->start_vbn)
 				+ (off_t)(header_cpy->trans_hist.total_blks + 1) * header_cpy->blk_size;
@@ -614,7 +609,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 				util_out_print("ftruncate : !AZ", TRUE, errptr);
 				util_out_print("Error truncating backup file !AD.", TRUE, file->len, file->addr);
 				util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
-				CLEANUP_AND_RETURN_FALSE;
+				CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 			}
 			status = db_write_eof_block(NULL, backup_fd, cs_data->blk_size, filesize - header_cpy->blk_size,
 													&(TREF(dio_buff)));
@@ -622,7 +617,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			{
 				util_out_print("Error writing the last block in database !AD.", TRUE, file->len, file->addr);
 				util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
-				CLEANUP_AND_RETURN_FALSE;
+				CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 			}
 		}
 		/* By getting crit here, we ensure that there is no process still in transaction logic that sees
@@ -645,7 +640,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1,
 					cs_addrs->nl->wcs_phase2_commit_pidcnt, DB_LEN_STR(gv_cur_region));
 				rel_crit(gv_cur_region);
-				CLEANUP_AND_RETURN_FALSE;
+				CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 			}
 		}
 		if (debug_mupip)
@@ -661,7 +656,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			if (++counter > MAX_BACKUP_FLUSH_TRY)
 			{
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_BCKUPBUFLUSH);
-				CLEANUP_AND_RETURN_FALSE;
+				CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 			}
 			if (counter & 0xF)
 			{
@@ -677,7 +672,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 					assert(FALSE);
 					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(gv_cur_region),
 						   ERR_ERRCALL, 3, CALLFROM);
-					CLEANUP_AND_RETURN_FALSE;
+					CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 				}
 				shmpool_abandoned_blk_chk(gv_cur_region, TRUE);
 				shmpool_unlock_hdr(gv_cur_region);
@@ -690,7 +685,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			if (0 != cs_addrs->shmpool_buffer->backup_errno)
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) cs_addrs->shmpool_buffer->backup_errno);
 			util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
-			CLEANUP_AND_RETURN_FALSE;
+			CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 		}
 		FSTAT_FILE(list->backup_fd, &stat_buf, fstat_res);
 		if (-1 == fstat_res)
@@ -701,7 +696,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			util_out_print("Error obtaining status of temporary file !AD.",
 					TRUE, LEN_AND_STR(list->backup_tempfile));
 			util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
-			CLEANUP_AND_RETURN_FALSE;
+			CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 		}
 		if (0 < (filesize = stat_buf.st_size))
 		{
@@ -729,7 +724,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 							TRUE, LEN_AND_STR(list->backup_tempfile));
 				util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
 				free(sblkh_p);
-				CLEANUP_AND_RETURN_FALSE;
+				CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 			}
 			while (TRUE)
 			{
@@ -747,17 +742,8 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 				if (blk_num < header_cpy->trans_hist.total_blks)
 				{
 					inbuf = (char_ptr_t)(sblkh_p + 1);
-					/* If the incoming block has an ondisk version of V4, convert it back to that
-					 * version before writing it out so it is the same as the block in the original
-					 * database.
-					 */
-					if (GDSV4 == sblkh_p->use.bkup.ondsk_blkver)
-					{	/* Need to downgrade this block back to a previous format. Downgrade in place. */
-						assert(GDSV4 != sblkh_p->use.bkup.ondsk_blkver); 	/* not supported */
-						gds_blk_downgrade((v15_blk_hdr_ptr_t)inbuf, (blk_hdr_ptr_t)inbuf);
-						size = (((v15_blk_hdr_ptr_t)inbuf)->bsiz + 1) & ~1;
-					} else
-						size = (((blk_hdr_ptr_t)inbuf)->bsiz + 1) & ~1;
+					/* Previously, blocks could be downgraded here as needed */
+					size = (((blk_hdr_ptr_t)inbuf)->bsiz + 1) & ~1;
 
 					if (cs_data->write_fullblk)
 						size = ROUND_UP(size, cs_addrs->fullblockwrite_len);
@@ -775,7 +761,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 						errptr = (char *)STRERROR(save_errno);
 						util_out_print("write : !AZ", TRUE, errptr);
 						free(sblkh_p);
-						CLEANUP_AND_RETURN_FALSE;
+						CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 					}
 				} /* Else ignore block that is larger than file was at time backup initiated */
 				DOREADRC(list->backup_fd, (sm_uc_ptr_t)sblkh_p, rsize, save_errno);
@@ -788,7 +774,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 						errptr = (char *)STRERROR(save_errno);
 						util_out_print("read : !AZ", TRUE, errptr);
 						free(sblkh_p);
-						CLEANUP_AND_RETURN_FALSE;
+						CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 					} else
 						/* End of file .. Note this does not detect the difference between
 						 * clean end of file and partial record end of file.
@@ -808,7 +794,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		util_out_print("write : !AZ", TRUE, errptr);
 		util_out_print("Error writing data to backup file !AD.", TRUE, file->len, file->addr);
 		util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
-		CLEANUP_AND_RETURN_FALSE;
+		CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 	}
 	CLOSEFILE_RESET(backup_fd, status);	/* resets "backup_fd" to FD_INVALID */
 	/* mv it to destination */
@@ -853,8 +839,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			util_out_print("system : !AZ", TRUE, errptr);
 		}
 		util_out_print("Error executing command : !AD", TRUE, cmdlen, command);
-		FREE_COMMAND_STR_IF_NEEDED;
-		CLEANUP_AND_RETURN_FALSE;
+		CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 	}
 	/* rm tempdir */
 	tempdir[tmpdirlen] = 0;
@@ -864,8 +849,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		errptr = (char *)STRERROR(save_errno);
 		util_out_print("access : !AZ", TRUE, errptr);
 		util_out_print("Removing temp dir : !AD", TRUE, tmpdirlen, tempdir);
-		FREE_COMMAND_STR_IF_NEEDED;
-		CLEANUP_AND_RETURN_FALSE;
+		CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 	}
 	FREE_COMMAND_STR_IF_NEEDED;
 	assert(command == &cmdarray[0]);
@@ -903,12 +887,10 @@ inline int handle_err(char errorstr[], int saved_errno)
 	customptr = "\0";
 	switch (saved_errno)
 	{
-		case EXDEV:
-		{
-			SNPRINTF(oserror, BUF_MAX, "%s, %s for backing up region %s", "EXDEV",
-					(char *)STRERROR(saved_errno), gv_cur_region->rname);
-			break;
-		}
+		case ENOTSUP:
+		case ENOSYS:
+			return 1;
+		case EFAULT:
 		case ENOSPC:
 		{
 			SNPRINTF(oserror, BUF_MAX, "%s, %s for backing up region %s", "ENOSPC",
@@ -952,34 +934,5 @@ inline int countdigits(size_t n)
 		digitcnt++;
 	} while (n);
 	return digitcnt;
-}
-/* boolean_t ink_backup(void) performs a run-time check and returns TRUE when the copy_file_range symbol exists,
- * Linux kernel >= 5.3 and GLIBC > 2.27.
- * Ensure that ink_backup(void) matches com/backup_copy_type.c in the test system.
- */
-inline boolean_t ink_backup(void)
-{
-	struct utsname relbuff;
-	char *ptr;
-	long int kernel_major, kernel_minor;
-	float glibcversion;
-	/* Check for the copy_file_range symbol */
-	func_ptr = dlsym(RTLD_DEFAULT, "copy_file_range");
-	if (NULL == func_ptr)
-		return FALSE;
-	/* Get kernel version */
-	if (uname(&relbuff) != 0)
-		return FALSE;
-	ptr = relbuff.release;
-	kernel_major = STRTOL(ptr, &ptr, 10);
-	ptr++;
-	kernel_minor = STRTOL(ptr, &ptr, 10);
-	/* Get glibc version */
-	glibcversion = ATOF(gnu_get_libc_version());
-	/* Check if Linux Kernel >= 5.3 and GLIBC > 2.27  */
-	if ((5 < kernel_major) || ((5 == kernel_major) && (3 <= kernel_minor) && ((glibcversion > 2.27))))
-		return TRUE;
-	else
-		return FALSE;
 }
 #endif

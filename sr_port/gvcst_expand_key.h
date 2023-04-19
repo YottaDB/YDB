@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,9 +44,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 #	ifdef GVCST_EXPAND_CURR_KEY
 	boolean_t	fullmatch;
 #	endif
-#	ifdef DEBUG
 	boolean_t	match_adjusted = FALSE;
-#	endif
 
 	/* Since searching for "srch_key" landed us in between pStat->prev_rec and pStat->curr_rec, we are guaranteed that
 	 * pStat->curr_rec.match >= record-compression-count-at-pStat->curr_rec.offset (or else the search would not have
@@ -108,7 +106,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 		if ((match > tmpCmpc) && (KEY_DELIMITER == src[match - 1]))
 		{
 			match--;
-			DEBUG_ONLY(match_adjusted = TRUE;)
+			match_adjusted = TRUE;
 		}
 #	ifdef GVCST_EXPAND_CURR_KEY
 	}
@@ -147,9 +145,41 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 #	ifdef GVCST_EXPAND_CURR_KEY
 	}
 #	endif
+#	ifdef GVCST_EXPAND_PREV_KEY
+	/* The process-private reconstructed exp_key and srch_key share a common byte-prefix of length
+	 * pStat->prev_rec.match. To finish exp_key expansion, its suffix is read in from shared memory
+	 * above. If we detect that the first byte of that suffix is identical to its corresponding byte
+	 * in srch_key, then we can infer that block modification has occurred: if these bytes were
+	 * identical at search-time, then pStat->prev_rec.match would be larger by (at least) one.
+	 * Since we know these bytes were different at search time but are identical now, we know that
+	 * block modification has occurred and we need to restart. The match variable itself usually
+	 * contains the offset of the byte in question, but there is one exception - when it has been
+	 * decremented in cases like the following. Srch_key is shown without compression or header,
+	 * since that's how it is during this code.
+	 *
+	 * srch_key ^A(1):                          0x41 0x00 0xBF 0x11 0x00 0x00 original match = 5
+	 *                                                                   ^----first different byte
+	 *            header‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|
+	 * shared mem ^A(1,2):  0x08 0x00 0x05 0x00 0xBF 0x21 0x00 0x00
+	 *
+	 * exp_key (post-exp, no hdr) ^A(1,2):      0x41 0x00 0xBF 0x11 0x00 0xBF 0x21 0x00 0x00
+	 *
+	 * In cases like the above, match is decremented to prevent problems with the double-terminator
+	 * logic, and we must re-increment it in order not to check a byte that should be
+	 * identical. Since the variable is not used again, we can readjust it for clean code
+	 */
+	if (match_adjusted)
+		match++;
+	if (match <= srch_key->end && dstBase[match] == srch_key->base[match])
+	{
+		assert(CDB_STAGNATE > t_tries);
+		return cdb_sc_blkmod;
+	}
+#	endif
 	if (KEY_DELIMITER == *dstBase)
 	{	/* A valid key wouldn't start with a '\0' character. So the block must have been concurrently modified. */
-		return cdb_sc_mkblk;
+		assert(CDB_STAGNATE > t_tries);
+		return cdb_sc_blkmod;
 	}
 	exp_key->end = dstEnd - dstBase;
 	assert(2 <= exp_key->end);
@@ -162,7 +192,8 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 	{	/* A valid key should have a non-null byte before the terminating 2-null-bytes.
 		 * If not, the block must have been concurrently modified. So restart.
 		 */
-		return cdb_sc_mkblk;
+		assert(CDB_STAGNATE > t_tries);
+		return cdb_sc_blkmod;
 	}
 	/* exp_key->prev is not initialized. Caller should not rely on this. */
 	/* Due to concurrency issues, it is possible "exp_key" is not a well-formed key (e.g. it might have two successive

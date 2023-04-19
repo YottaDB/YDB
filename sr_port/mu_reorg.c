@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -341,10 +341,10 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 					}
 					level = pre_order_successor_level;
 				}
-				max_fill = (0 == level)? d_max_fill : i_max_fill;
-				toler = (0 == level)? d_toler:i_toler;
+				max_fill = (0 == level) ? d_max_fill : i_max_fill;
+				toler = (0 == level) ? d_toler : i_toler;
 				cur_blk_size =  ((blk_hdr_ptr_t)(gv_target->hist.h[level].buffaddr))->bsiz;
-				if (cur_blk_size > max_fill + toler && 0 == (reorg_op & NOSPLIT)) /* SPLIT BLOCK */
+				if ((cur_blk_size > (max_fill + toler)) && (0 == (reorg_op & NOSPLIT))) /* SPLIT BLOCK */
 				{
 					cnt1 = cnt2 = 0;
 					/* history of current working block is in gv_target */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include <wctype.h>
 #include <wchar.h>
 #include "gtm_string.h"
-#include "gtm_select.h"
+#include "gtm_poll.h"
 #include "gtm_stdlib.h"
 
 #include "io_params.h"
@@ -138,7 +138,6 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 	boolean_t	buffer_moved, ch_set, edit_mode, empterm, escape_edit, insert_mode, nonzerotimeout, ret, timed, utf8_active,
 				zint_restart;
 	d_tt_struct	*tt_ptr;
-	fd_set		input_fd;
 	int		backspace, delete, down, i, insert_key, ioptr_width, exp_length, keypad_len, left, msk_in, msk_num,
 				rdlen, right, save_errno, selstat, status, up, utf8_more;
 	int		delchar_width;		/* display width of deleted char */
@@ -159,9 +158,10 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
 	unsigned char	*current_ptr;		/* insert next character into buffer here */
 	unsigned char	*buffer_start;		/* beginning of non UTF8 buffer */
-	struct timeval	input_timeval;
-	struct timeval	save_input_timeval;
 	wint_t		inchar, *current_32_ptr, *buffer_32_start, switch_char;
+	int		poll_timeout, save_poll_timeout;
+	nfds_t		poll_nfds;
+	struct pollfd	poll_fdlist[1];
 #ifdef __MVS__
 	wint_t		asc_inchar;
 #endif
@@ -317,13 +317,11 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 	if (NO_M_TIMEOUT == msec_timeout)
 	{
 		timed = FALSE;
-		input_timeval.tv_sec = 100;
-		input_timeval.tv_usec = 0;
+		poll_timeout = 100 * MILLISECS_IN_SEC;
 	} else
 	{
 		timed = TRUE;
-		input_timeval.tv_sec = msec_timeout / MILLISECS_IN_SEC;
-		input_timeval.tv_usec = (msec_timeout % MILLISECS_IN_SEC) * MICROSECS_IN_MSEC;
+		poll_timeout = msec_timeout;
 		if (!msec_timeout)
 		{
 			if (!zint_restart)
@@ -384,15 +382,14 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 			break;
 		}
 		errno = 0;
-		assertpro(FD_SETSIZE > tt_ptr->fildes);
-		FD_ZERO(&input_fd);
-		FD_SET(tt_ptr->fildes, &input_fd);
-		assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));
 		/* the checks for EINTR below are valid and should not be converted to EINTR
-		 * wrapper macros, since the select/read is not retried on EINTR.
+		 * wrapper macros, since the poll/read is not retried on EINTR.
 		 */
-		save_input_timeval = input_timeval;	/* take a copy and pass it because select() below might change it */
-		selstat = select(tt_ptr->fildes + 1, (void *)&input_fd, (void *)NULL, (void *)NULL, &save_input_timeval);
+		poll_fdlist[0].fd = tt_ptr->fildes;
+		poll_fdlist[0].events = POLLIN;
+		poll_nfds = 1;
+		save_poll_timeout = poll_timeout;	/* take a copy and pass it because poll() below might change it */
+		selstat = poll(&poll_fdlist[0], poll_nfds, save_poll_timeout);
 		if (selstat < 0)
 		{
 			if (EINTR != errno)
@@ -407,10 +404,9 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				ret = FALSE;
 				break;
 			}
-			continue;	/* select() timeout; keep going */
+			continue;	/* poll() timeout; keep going */
 		} else if (0 < (rdlen = (int)(read(tt_ptr->fildes, &inbyte, 1))))	/* This read is protected */
 		{
-			assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));
 			/* set prin_in_dev_failure to FALSE to indicate input device is working now */
 			prin_in_dev_failure = FALSE;
 			if (tt_ptr->canonical)
@@ -1096,8 +1092,8 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				ret = FALSE;
 				break;
 			}
-			input_timeval.tv_sec = cur_time.at_sec;
-			input_timeval.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
+			poll_timeout = (long)((cur_time.at_sec * MILLISECS_IN_SEC) +
+					DIVIDE_ROUND_UP((gtm_tv_usec_t)cur_time.at_usec, MICROSECS_IN_MSEC));
 		}
 	} while (outlen < length);
 	*zb_ptr++ = 0;

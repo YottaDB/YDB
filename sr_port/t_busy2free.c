@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2016 Fidelity National Information	*
+ * Copyright (c) 2007-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,7 +51,6 @@ void	t_busy2free(srch_blk_status *blkhist)
 	BIT_CLEAR_RECYCLED(cse->blk_prior_state);
 	cse->blk_checksum = 0;
 	csa = cs_addrs;
-	assert(dba_bg == csa->hdr->acc_meth);
 	assert(NULL != old_block);
 	jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
 	if ((NULL != jbbp) && (old_block->tn < jbbp->epoch_tn))
@@ -64,6 +63,7 @@ void	t_busy2free(srch_blk_status *blkhist)
 	cse->upd_addr = NULL;
 	cse->jnl_freeaddr = 0;		/* reset jnl_freeaddr that previous transaction might have filled in */
 	cse->done = FALSE;
+	cse->ondsk_blkver = old_block->bver;
 	blkhist->cse = cse;	/* indicate to t_end/tp_tend that this block is part of the write-set */
 	cw_set_depth++;
 }

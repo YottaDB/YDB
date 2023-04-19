@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2022 Fidelity National Information	*
+ * Copyright (c) 2004-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -528,7 +528,7 @@ void	gtm_env_init_sp(void)
 	 */
 	val.addr = GTM_STATSDIR;
 	val.len = SIZEOF(GTM_STATSDIR) - 1;
-	/* Using MAX_FN_LEN below instead of GTM_PATH_MAX because csa->nl->statsdb_fname[] size is MAX_FN_LEN + 1 */
+	/* Using MAX_STATSDIR_LEN because MAX_FN_LEN is reduced by the least required space for a statsdb file name */
 	if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long)))
 			|| (0 == trans.len))
 	{	/* Either no translation for $gtm_statsdir or the current and/or expanded value of $gtm_statsdir exceeds the

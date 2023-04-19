@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,8 +14,8 @@
 #define MUPIP_UPGRADE_INCLUDED
 
 void mupip_upgrade(void);
-enum cdb_sc upgrade_gvt(block_id curr_blk, int4 blk_size, gd_region *reg, mstr *root);
-enum cdb_sc upgrade_idx_block(block_id curr_blk, int4 blk_size, gd_region *reg, mstr *name);
+enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *gvname, cache_rec_ptr_t *cr);
+enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *cr);
 enum cdb_sc find_big_sib(block_id blk, int level);
 
 #endif /* MUPIP_UPGRADE_INCLUDED */

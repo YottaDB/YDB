@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,12 +30,12 @@
 #include "dpgbldir.h"
 #include "io.h"
 
-GBLREF	gv_namehead		*gv_target_list;
-GBLREF	gv_namehead		*gv_target;
 GBLREF	boolean_t		mupip_jnl_recover;
-GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	int			process_exiting;
+GBLREF	gv_namehead		*gv_target, *gv_target_list;
 GBLREF	gvt_container		*gvt_pending_list;
+GBLREF	int			process_exiting;
+GBLREF	uint4			mu_upgrade_in_prog;
+GBLREF	sgmnt_addrs		*cs_addrs;
 
 gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 {
@@ -236,10 +236,9 @@ void	targ_free(gv_namehead *gvt)
 		 *      d) This is a statsDB which can be closed on an opt-out and reopened on a subsequent opt-in.
 		 * Assert accordingly.
 		 */
-		UNIX_ONLY(assert(IS_GTCM_GNP_SERVER_IMAGE
+		assert(IS_GTCM_GNP_SERVER_IMAGE || mu_upgrade_in_prog|| (IS_STATSDB_REG(gvt->gd_csa->region))
 				 || (process_exiting && ((gvt == cs_addrs->dir_tree)
-							 GTMTRIG_ONLY(|| (gvt == cs_addrs->hasht_tree))))
-				 || (IS_STATSDB_REG(gvt->gd_csa->region))));
+							 GTMTRIG_ONLY(|| (gvt == cs_addrs->hasht_tree)))));
 		gv_target = NULL;	/* In that case, set gv_target to NULL to ensure freed up memory is never used */
 	}
 	/* assert we never delete a gvt that is actively used in a TP transaction */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,9 +77,10 @@ error_def(ERR_LOCKINCR2HIGH);
 error_def(ERR_LOCKIS);
 error_def(ERR_LOCKTIMINGINTP);
 
+#define LCKLEVELLMT 511
 #define LOCKTIMESTR "LOCK"
-#define ZALLOCTIMESTR "ZALLOCATE"
 #define MAX_WARN_STR_ARG_LEN 256
+#define ZALLOCTIMESTR "ZALLOCATE"
 
 /* We made these messages seperate functions because we did not want to do the MAXSTR_BUFF_DECL(buff) declaration in op_lock2,
  * because  MAXSTR_BUFF_DECL macro would allocate a huge stack every time op_lock2 is called.
@@ -94,7 +95,7 @@ STATICFNDCL void level_err(mlk_pvtblk *pvt_ptr)
 	MAXSTR_BUFF_DECL(buff);
 	MAXSTR_BUFF_INIT;
 	lock_str_to_buff(pvt_ptr, buff, MAX_STRBUFF_INIT);
-	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_LOCKINCR2HIGH, 1, pvt_ptr->level, ERR_LOCKIS, 2, LEN_AND_STR(buff));
+	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_LOCKINCR2HIGH, 1, LCKLEVELLMT, ERR_LOCKIS, 2, LEN_AND_STR(buff));
 }
 STATICFNDCL void tp_warning(mlk_pvtblk *pvt_ptr)
 {
@@ -228,7 +229,8 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds 
 					pvt_ptr1->level = 1;
 					break;
 				case INCREMENTAL:
-					if (pvt_ptr1->level < 511) /* The same lock can not be incremented more than 511 times. */
+					if (LCKLEVELLMT >= (pvt_ptr1->level + pvt_ptr1->translev))
+						/* The same lock can not be incremented more than 511 times. */
 						pvt_ptr1->level += pvt_ptr1->translev;
 					else
 						level_err(pvt_ptr1);

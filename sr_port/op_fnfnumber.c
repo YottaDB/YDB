@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,7 +61,7 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 	MV_FORCE_STR(dst);
 	if (0 == fmt->str.len)
 		return;
-	ENSURE_STP_FREE_SPACE(MAX_NUM_SIZE * 2);
+	ENSURE_STP_FREE_SPACE((MAX_NUM_SIZE * 2) + fract);
 	ch = (unsigned char *)dst->str.addr;
 	ct = dst->str.len;
 	cp = stringpool.free;

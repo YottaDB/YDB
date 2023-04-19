@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,60 +81,51 @@
 #include "gtm_repl_multi_inst.h" /* for DISALLOW_MULTIINST_UPDATE_IN_TP */
 #include "gvt_inline.h"
 
+LITREF	mval	literal_batch;
+LITREF	mstr	nsb_dummy;
 #ifdef GTM_TRIGGER
 LITREF	mval	literal_null;
 LITREF	mval	literal_one;
 LITREF	mval	literal_zero;
 #endif
-LITREF	mval	literal_batch;
-LITREF	mstr	nsb_dummy;
 
 /* Globals that will not change in value across nested trigger calls of gvcst_put OR even if they might change in value,
  * the change is such that they dont need save/restore logic surrounding the "gtm_trigger" call. Any new GBLREFs that are
  * added in this module need to be examined for interference between gvcst_put and nested trigger call and any save/restore
  * logic (if needed) should be appropriately added surrounding the "gtm_trigger" invocation.
  */
+#ifdef DEBUG
+GBLREF	boolean_t		donot_INVOKE_MUMTSTART, mu_reorg_process, skip_block_chain_tail_check;
+GBLREF	uint4			mu_upgrade_in_prog;
+#endif
 GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
-GBLREF	boolean_t		horiz_growth;
-GBLREF	boolean_t		in_gvcst_incr;
-GBLREF	boolean_t		mu_reorg_process;
-GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;	/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
+GBLREF	boolean_t		horiz_growth, in_gvcst_incr, is_updproc;
+GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 GBLREF	char			*update_array, *update_array_ptr;
+GBLREF	cw_set_element		cw_set[CDB_CW_SET_SIZE];/* create write set. */
+GBLREF	enum db_ver		upgrade_block_split_format;		/* REORG -UPGRADE switching between active and future block format */
 GBLREF	gv_key			*gv_altkey;
 GBLREF	gv_namehead		*reset_gv_target;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	int			gv_fillfactor;
 GBLREF	int			rc_set_fragment;	/* Contains offset within data at which data fragment starts */
-GBLREF	int4			gv_keysize;
-GBLREF	int4			prev_first_off, prev_next_off;
+GBLREF	int4			gv_keysize, prev_first_off, prev_next_off;
 GBLREF	uint4			update_trans;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
-GBLREF	jnl_gbls_t		jgbl;
-GBLREF	jnlpool_addrs_ptr_t	jnlpool;
-GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
-GBLREF	uint4			dollar_tlevel;
-GBLREF	uint4			process_id;
-GBLREF	uint4			update_array_size, cumul_update_array_size;	/* the current total size of the update array */
+GBLREF	jnlpool_addrs_ptr_t	jnlpool, jnlpool_head;
+GBLREF	stack_frame		*frame_pointer;
+GBLREF	uint4			dollar_tlevel, update_array_size;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	unsigned int		t_tries;
-GBLREF	cw_set_element		cw_set[CDB_CW_SET_SIZE];/* create write set. */
-GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
-GBLREF	stack_frame		*frame_pointer;
-GBLREF	mv_stent		*mv_chain;
 #ifdef GTM_TRIGGER
+GBLREF	boolean_t		skip_INVOKE_RESTART;
+GBLREF	boolean_t		ztwormhole_used;	/* TRUE if $ztwormhole was used by trigger code */
 GBLREF	int			tprestart_state;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
-GBLREF	boolean_t		skip_INVOKE_RESTART;
-GBLREF	boolean_t		ztwormhole_used;	/* TRUE if $ztwormhole was used by trigger code */
 #endif
-#ifdef DEBUG
-GBLREF	boolean_t		skip_block_chain_tail_check;
-GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
-#endif
-
 /* Globals that could change in value across nested trigger calls of gvcst_put AND need to be saved/restored */
-GBLREF	boolean_t		is_dollar_incr;
+GBLREF	boolean_t		is_dollar_incr, span_nodes_disallowed;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
@@ -144,9 +135,6 @@ GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	enum gtmImageTypes	image_type;
-GBLREF	boolean_t		span_nodes_disallowed;
-GBLREF  boolean_t               is_updproc;
 GBLREF	uint4			dollar_trestart;
 
 error_def(ERR_DBROLLEDBACK);
@@ -156,9 +144,7 @@ error_def(ERR_GVPUTFAIL);
 error_def(ERR_MAXBTLEVEL);
 error_def(ERR_REC2BIG);
 error_def(ERR_RSVDBYTE2HIGH);
-error_def(ERR_TEXT);
 error_def(ERR_TPRETRY);
-error_def(ERR_UNIMPLOP);
 
 /* Before issuing an error, add GVT to the list of known gvts in this TP transaction in case it is not already done.
  * This GVT addition is usually done by "tp_hist" but that function has most likely not yet been invoked in gvcst_put.
@@ -279,14 +265,12 @@ static inline int4 num_recs_in_blk(sm_uc_ptr_t pBlkBase);
 
 static inline int4 num_recs_in_blk(sm_uc_ptr_t pBlkBase)
 {
-	sm_uc_ptr_t pBlkTop, pRec;
-	uint4 blkLen, recLen, heuristicRecsSize;
-	uint4 recCnt;
+	sm_uc_ptr_t	pBlkTop, pRec;
+	uint4		blkLen, recLen, heuristicRecsSize;
+	uint4		recCnt;
 
 	heuristicRecsSize = 0;
 	blkLen = ((blk_hdr_ptr_t) pBlkBase)->bsiz;
-	if (blkLen > MAX_DB_BLK_SIZE)
-		return -1;
 	pBlkTop = pBlkBase + blkLen;
 	pRec = pBlkBase + SIZEOF(blk_hdr);
 	for (recCnt = NUMRECSTOCOUNTTOESTIMATE; (0 < recCnt) && (pRec < pBlkTop); recCnt--)
@@ -302,17 +286,14 @@ static inline int4 num_recs_in_blk(sm_uc_ptr_t pBlkBase)
 
 void	gvcst_put(mval *val)
 {
-	boolean_t			sn_tpwrapped, fits;
-	boolean_t			est_first_pass, found;
-	mval				val_ctrl, val_piece, val_dummy;
-	mval				*pre_incr_mval, *save_val;
 	block_id			lcl_root;
-	int				gblsize, chunk_size, i, oldend;
-	unsigned short			numsubs;
-	unsigned char			mychars[MAX_NSBCTRL_SZ];
-	int				save_dollar_tlevel, rc;
+	boolean_t			est_first_pass, fits, found, sn_tpwrapped;
 	boolean_t			save_in_gvcst_incr; /* gvcst_put2 sets this FALSE, so save it in case we need to back out */
+	int				chunk_size, gblsize, i, oldend, rc, save_dollar_tlevel;
+	mval				*pre_incr_mval, *save_val, val_ctrl, val_dummy, val_piece;
 	span_parms			parms;
+	unsigned char			mychars[MAX_NSBCTRL_SZ];
+	unsigned short			numsubs;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -456,17 +437,19 @@ void	gvcst_put(mval *val)
 void	gvcst_put2(mval *val, span_parms *parms)
 {
 	blk_segment		*bs1, *bs_ptr, *new_blk_bs;
-	block_id		allocation_clue, tp_root, gvt_for_root, blk_num, last_split_blk_num[MAX_BT_DEPTH];
-	block_id		lcl_root, last_split_bnum;
-	block_index		left_hand_index, ins_chain_index, root_blk_cw_index, next_blk_index;
-	block_offset		next_offset, first_offset, ins_off1, ins_off2, old_curr_chain_next_off;
-	boolean_t		jnl_format_done, is_dummy, needfmtjnl, fits, lcl_span_status, want_root_search = FALSE;
-	boolean_t		copy_extra_record, level_0, new_rec, no_pointers, succeeded, key_exists;
-	boolean_t		make_it_null, gbl_target_was_set, duplicate_set, new_rec_goes_to_right, need_extra_block_split;
+	block_id		allocation_clue, blk_num, gvt_for_root, last_split_blk_num[MAX_BT_DEPTH], last_split_bnum;
+	block_id		lcl_root, tp_root;
+	block_index		ins_chain_index, left_hand_index, next_blk_index, root_blk_cw_index;
+	block_offset		first_offset, ins_off1, ins_off2, next_offset, old_curr_chain_next_off;
+	boolean_t		blk_match, can_write_logical_jnlrecs, collhdr = FALSE, copy_extra_record, dont_copy_extra_record = FALSE,
+				duplicate_set, fits, gbl_target_was_set, is_dummy, is_split_dir_left, jnl_format_done,
+				lcl_span_status, level_0, key_exists, make_it_null, need_extra_block_split, needfmtjnl,
+				new_rec, new_rec_goes_to_right, no_pointers, preemptive_split, succeeded, write_logical_jnlrecs,
+				want_root_search = FALSE;
 	boolean_t		db_long_blk_id, long_blk_id;	/* db_long_blk_id is based on csd->desired_db_format,
 								 * while long_blk_id is based on bp->bver
 								 */
-	boolean_t		write_logical_jnlrecs, can_write_logical_jnlrecs, blk_match, is_split_dir_left;
+	boolean_t		prev_split_to_right; /* copy of "split_to_right" after child level split (used in parent split) */
 	boolean_t		split_to_right;	/* FALSE if a block split creates a new block on the left of the split point.
 						 *	In this case, a "t_create" is needed for the new block on the left
 						 *	and a "t_write" is needed for the current block (right side of split).
@@ -475,60 +458,53 @@ void	gvcst_put2(mval *val, span_parms *parms)
 						 *	and serves as the left side of the split AND a new block is created on the
 						 *	right ("t_create" is needed for that).
 						 */
-	boolean_t		prev_split_to_right; /* copy of "split_to_right" after child level split (used in parent split) */
+	cache_rec		dummy_cr;
 	char			*va, last_split_direction[MAX_BT_DEPTH];
-	const char		zeroes_blkid[SIZEOF(block_id_64)] = {0};
-	const char		zeroes_blkid_collhdr[SIZEOF(block_id_64) + COLL_SPEC_LEN] = {0};
-	const char		v6_zeroes_blkid[SIZEOF(block_id_32)] = {0};
-	const char		v6_zeroes_blkid_collhdr[SIZEOF(block_id_32) + COLL_SPEC_LEN] = {0};
-	enum cdb_sc		status, status2;
-	enum split_dir		last_split_dir;
-	sgmnt_addrs		*csa;
-	sgmnt_data_ptr_t	csd;
-	node_local_ptr_t	cnl;
-	int4			blk_size, blk_fill_size, blk_reserved_bytes;
+	const char		zeroes_blkid_collhdr[SIZEOF(block_id_64) + COLL_SPEC_LEN] = {0}; /* used with various lengths */
 	cw_set_element		*cse, *cse_new, *old_cse;
-	gv_key			*temp_key, *src_key;
+	enum cdb_sc		status, status2;
+	enum db_ver		bh_ver, desired_db_format;
+	enum split_dir		last_split_dir;
+	gv_key			*src_key, *temp_key;
 	static gv_key		*gv_altkey2;
-	gv_namehead		*save_targ, *split_targ, *dir_tree;
+	gv_namehead		*dir_tree, *save_targ, *split_targ;
 	ht_ent_int8		*tabent;
-	int			cur_blk_size, blk_seg_cnt, delta, i, j, left_hand_offset, n, ins_chain_offset,
-				new_blk_size_l, new_blk_size_r, new_blk_size_single, new_blk_size, blk_reserved_size,
-				last_possible_left_offset, new_rec_size, next_rec_shrink, next_rec_shrink1, start_len,
-				offset_sum, rec_cmpc, tmp_cmpc, target_key_size, tp_lev, undo_index, cur_val_offset,
-				curr_offset, bh_level, blk_id_sz, off_chain_sz;
-	int			rc;
-	int			split_depth;
-	int4			cse_first_off;
-	int4			data_len;
+	int			bh_level, blk_id_sz, blk_reserved_size, blk_seg_cnt, cur_blk_size, curr_offset, delta,
+				cur_val_offset, i, ins_chain_offset, is_mm, j, last_possible_left_offset, left_hand_offset, n,
+				new_blk_size, new_blk_size_l, new_blk_size_r, new_blk_size_single, new_rec_size,
+				next_rec_shrink, next_rec_shrink1, off_chain_sz, offset_sum, rc, rec_cmpc, split_depth,
+				start_len, target_key_size, tmp_cmpc, tp_lev, undo_index;
+	int4			blk_size, blk_fill_size, blk_reserved_bytes, cse_first_off, data_len;
 	jnl_action		*ja;
 	jnl_format_buffer	*jfb, *ztworm_jfb;
 	key_cum_value		*tempkv;
 	mstr			value;
+	mval			*ja_val;
 	mval			*set_val;	/* actual right-hand-side value of the SET or $INCR command */
 	mval			*val_forjnl;
-	mval			*ja_val;
-	off_chain		chain1, curr_chain, prev_chain, chain2;
-	v6_off_chain		v6_chain;
-	rec_hdr_ptr_t		curr_rec_hdr, extra_rec_hdr, next_rec_hdr, new_star_hdr, rp, tmp_rp;
-	srch_blk_status		*bh, *bq, *tp_srch_status;
-	srch_hist		*dir_hist;
+	node_local_ptr_t	cnl;
+	off_chain		chain1, chain2, curr_chain, prev_chain;
+	rec_hdr_ptr_t		curr_rec_hdr, extra_rec_hdr, new_star_hdr, next_rec_hdr, rp, tmp_rp;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
+	sgm_info		*si;
 	sm_uc_ptr_t		cp1, cp2, curr;
 	sm_uc_ptr_t		buffaddr;
-	sgm_info		*si;
+	srch_blk_status		*bh, *bq, *tp_srch_status;
+	srch_hist		*dir_hist;
 	uchar_ptr_t		subrec_ptr;
-	uint4			segment_update_array_size, key_top, cp2_len, bs1_2_len, bs1_3_len;
-	uint4			nodeflags;
-	uint4			no_4byte_collhdr;
+	uint4			bs1_2_len, bs1_3_len, cp2_len, key_top, nodeflags, segment_update_array_size;
+	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, new_ch, old_ch;
+	unsigned int		curr_rec_match, curr_rec_offset, prev_rec_match, prev_rec_offset;
 	unsigned short		extra_record_blkid_off, rec_size, tmp_rsiz;
-	unsigned int		prev_rec_offset, prev_rec_match, curr_rec_offset, curr_rec_match;
-	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, old_ch, new_ch;
+	v6_off_chain		v6_chain;
 #	ifdef GTM_TRIGGER
 	boolean_t		is_tpwrap;
 	boolean_t		lcl_implicit_tstart;		/* local copy of the global variable "implicit_tstart" */
 	boolean_t		lcl_is_dollar_incr;		/* local copy of is_dollar_incr taken at start of module.
 								 * used to restore is_dollar_incr in case of TP restarts */
-	boolean_t		ztval_gvcst_put_redo, skip_hasht_read;
+	boolean_t		skip_hasht_read, ztval_gvcst_put_redo;
+	DEBUG_ONLY(enum cdb_sc	save_cdb_status;)
 	gtm_trigger_parms	trigparms;
 	gvt_trigger_t		*gvt_trigger;
 	gvtr_invoke_parms_t	gvtr_parms;
@@ -545,7 +521,6 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	mval			*ztold_mval = NULL;
 	mval			*ztval_mval;
 	unsigned char		*save_msp;
-	DEBUG_ONLY(enum cdb_sc	save_cdb_status;)
 #	endif
 #	ifdef DEBUG
 	/* We want to capture all pertinent information across each iteration of gvcst_put.
@@ -562,7 +537,6 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	 * 		possible in non-TP if a lot of extra block splits occur), we assert fail.
 	 */
 	boolean_t		is_fresh_tn_start;
-	boolean_t		is_mm;
 	char			dbg_valbuff[256];
 	int			dbg_num_iters = -1;	/* number of iterations through gvcst_put */
 	int			lcl_dollar_tlevel, lcl_t_tries;
@@ -582,8 +556,6 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	} dbg_trace;
 	dbg_trace		dbg_trace_array[16];
 #	endif
-	boolean_t dont_copy_extra_record = FALSE;
-	boolean_t preemptive_split;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -593,7 +565,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	csd = csa->hdr;
 	cnl = csa->nl;
 	assert(csd == cs_data);
-	DEBUG_ONLY(is_mm = (dba_mm == csd->acc_meth);)
+	is_mm = (dba_mm == csd->acc_meth);
 #	ifdef GTM_TRIGGER
 	TRIG_CHECK_REPLSTATE_MATCHES_EXPLICIT_UPDATE(gv_cur_region, csa);
 	if (IS_EXPLICIT_UPDATE)
@@ -606,7 +578,8 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	}
 #	endif
 	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl, SCNDDBNOUPD_CHECK_TRUE);
-	db_long_blk_id = BLK_ID_32_VER < csd->desired_db_format;
+	desired_db_format = csd->desired_db_format;
+	db_long_blk_id = BLK_ID_32_VER < desired_db_format;
 	blk_size = csd->blk_size;
 	blk_reserved_bytes = parms->blk_reserved_bytes;
 	blk_fill_size = (blk_size * gv_fillfactor) / 100 - blk_reserved_bytes;
@@ -902,13 +875,7 @@ tn_restart:
 		SET_CMPC(curr_rec_hdr, 0);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, SIZEOF(rec_hdr));
-		if (db_long_blk_id)
-		{
-			BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid, SIZEOF(block_id_64));
-		} else
-		{
-			BLK_SEG(bs_ptr, (unsigned char *)&v6_zeroes_blkid, SIZEOF(block_id_32));
-		}
+		BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid_collhdr, db_long_blk_id ? SIZEOF(block_id_64) : SIZEOF(block_id_32));
 		if (0 == BLK_FINI(bs_ptr, bs1))
 		{
 			assert(CDB_STAGNATE > t_tries);
@@ -932,6 +899,7 @@ tn_restart:
 		 * continue to use this stored collation even if the db file header collation sequence changes (using DSE) during
 		 * the lifetime of this GVT.
 		 */
+		collhdr = TRUE;
 		if (save_targ->act)
 		{
 			act_in_gvt(save_targ); /* verify that collation library version is still compatible */
@@ -940,15 +908,9 @@ tn_restart:
 			 * create the GVT, it is okay for save_targ->collseq to be set to a non-NULL value since it
 			 * will be reinitialized when save_targ->root gets set to a non-zero value in gvcst_root_search.
 			 */
-			no_4byte_collhdr = 0;
-		} else if (save_targ->act_specified_in_gld)
-		{	/* If collation has been specified in gld, even though it is zero, we need to store it in
-			 * the directory tree. Or else we could get an incorrect ACTCOLLMISMTCH error later in case
-			 * the db file header has an overriding non-zero default collation field set.
-			 */
-			no_4byte_collhdr = 0;
-		} else
+		}
 #		ifdef DEBUG
+		else if (!save_targ->act_specified_in_gld)
 		{	/* Starting V6.1, newly created nodes in the directory tree (DT) leaf block have a 4-byte collation header
 			 * unconditionally but in order to test the code below for correctness on pre-existing DT leaf block
 			 * records which might not contain a 4-byte collation header, we randomly enable the 4-byte collation
@@ -957,47 +919,27 @@ tn_restart:
 			 * header unconditionally, this randomization will need to be removed.
 			 * Note that if the env var "gtm_dirtree_collhdr_always" is true, then disable this behavior (this is
 			 * usually set by tests that rely on a fixed DT leaf block layout and will fail if the layout changes).
+			 * For pro, add the 4-byte collation header even for "act" = 0
 			 */
-			if (TREF(gtm_dirtree_collhdr_always))
-				no_4byte_collhdr = 0;
-			else
+			if (!TREF(gtm_dirtree_collhdr_always))
 			{
 				op_fnrandom(2, random_mval);
-				no_4byte_collhdr = MV_FORCE_INT(random_mval);
+				collhdr = MV_FORCE_INT(random_mval);
 			}
 		}
-#		else
-			no_4byte_collhdr = 0;	/* for pro, add the 4-byte collation header even for "act" = 0 */
 #		endif
-		if (no_4byte_collhdr)
-		{	/* No 4-byte collation header */
-			if (db_long_blk_id)
-			{
-				value.addr = (char *)&zeroes_blkid;
-				value.len = SIZEOF(block_id_64);
-				assert(SIZEOF(zeroes_blkid) == value.len);
-			} else
-			{
-				value.addr = (char *)&v6_zeroes_blkid;
-				value.len = SIZEOF(block_id_32);
-				assert(SIZEOF(v6_zeroes_blkid) == value.len);
-			}
-		} else
+		long_blk_id = IS_64_BLK_ID(dir_hist->h[0].buffaddr);		/* see assert below as DT might be ahead/updated */
+#ifdef		DEBUG
+		if (csd->fully_upgraded && (long_blk_id != db_long_blk_id))	/* NOCOMMIT: fmt changed between fn start and now */
+			TREF(donot_commit) |= DONOTCOMMIT_GVCST_PUT_CONCURR_FMT_CHG;
+#endif
+		value.addr = (char *)&zeroes_blkid_collhdr;
+		value.len = SIZEOF_BLK_ID(long_blk_id);
+		if (collhdr)
 		{
 			/* The "block_id" will be filled in later. Fill the 4-byte collation header now */
-			if (db_long_blk_id)
-			{
-				value.addr = (char *)&zeroes_blkid_collhdr;
-				value.len = SIZEOF(block_id_64) + COLL_SPEC_LEN;
-				assert(SIZEOF(zeroes_blkid_collhdr) == value.len);
-				subrec_ptr = (unsigned char *)value.addr + SIZEOF(block_id_64);
-			} else
-			{
-				value.addr = (char *)&v6_zeroes_blkid_collhdr;
-				value.len = SIZEOF(block_id_32) + COLL_SPEC_LEN;
-				assert(SIZEOF(v6_zeroes_blkid_collhdr) == value.len);
-				subrec_ptr = (unsigned char *)value.addr + SIZEOF(block_id_32);
-			}
+			value.len += COLL_SPEC_LEN;
+			subrec_ptr = (unsigned char *)value.addr + value.len - COLL_SPEC_LEN;
 			assert(COLL_NCT_OFFSET > 0);
 			assert(COLL_ACT_OFFSET > 0);
 			assert(COLL_VER_OFFSET > 0);
@@ -1131,19 +1073,14 @@ tn_restart:
 	duplicate_set = FALSE; /* Assume this is NOT a duplicate set (most common case) */
 	split_depth = 0;
 	split_targ = gv_target;
-	for (succeeded = FALSE; !succeeded; no_pointers = level_0 = FALSE)
+	for (bh_level = 0, succeeded = FALSE; !succeeded; level_0 = no_pointers = FALSE, bh_level++)
 	{
 		buffaddr = bh->buffaddr;
+		bh_ver = ((blk_hdr_ptr_t)buffaddr)->bver;	/* Use actual information as if it were from history */
 		long_blk_id = IS_64_BLK_ID(buffaddr);
 		blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
-		if (long_blk_id)
-			off_chain_sz = SIZEOF(off_chain);
-		else
-			off_chain_sz = SIZEOF(v6_off_chain);
-		/* The off_chain struct used should be the same as the block_id type being used,
-		 * but we will use off_chain_sz as a separate value for code readability.
-		 */
-		assert(off_chain_sz == blk_id_sz);
+		off_chain_sz = long_blk_id ? SIZEOF(off_chain) : SIZEOF(v6_off_chain);
+		assert(off_chain_sz == blk_id_sz);	/* the off_chain struct replaces a block_id, so must have the same size */
 		cur_blk_size = ((blk_hdr_ptr_t)buffaddr)->bsiz;
 		target_key_size = temp_key->end + 1;
 		/* Potential size of a block containing just the new/updated record */
@@ -1264,7 +1201,7 @@ tn_restart:
 			next_rec_shrink = 0;
 		}
 		blk_num = bh->blk_num;
-		bh_level = bh->level;
+		assert(bh_level == bh->level);
 		if (dollar_tlevel)
 		{
 			if ((SIZEOF(rec_hdr) + target_key_size - prev_rec_match + value.len) != new_rec_size)
@@ -1323,19 +1260,7 @@ tn_restart:
 				 * added to the leaf level directory tree record for this global name (after the 8-byte block_id).
 				 * Irrespective of the collation header, make sure ins_chain_offset points to the block_id part.
 				 */
-				if (db_long_blk_id)
-				{
-					assert(((char *)&zeroes_blkid == value.addr)
-						|| ((char *)&zeroes_blkid_collhdr == value.addr));
-					assert((SIZEOF(zeroes_blkid) == value.len)
-						|| (SIZEOF(zeroes_blkid_collhdr) == value.len));
-				} else
-				{
-					assert(((char *)&v6_zeroes_blkid == value.addr)
-						|| ((char *)&v6_zeroes_blkid_collhdr == value.addr));
-					assert((SIZEOF(v6_zeroes_blkid) == value.len)
-						|| (SIZEOF(v6_zeroes_blkid_collhdr) == value.len));
-				}
+				assert((blk_id_sz  == value.len) || (blk_id_sz + COLL_SPEC_LEN == value.len) || !cs_data->fully_upgraded);
 				ins_chain_offset = (int)(curr_rec_offset + new_rec_size - value.len);
 			}
 			BLK_INIT(bs_ptr, bs1);
@@ -1393,7 +1318,7 @@ tn_restart:
 									 */
 						assert(((sm_uc_ptr_t)rp + rec_size) <= (buffaddr + cur_blk_size));
 							/* or else we would have restarted above with "cdb_sc_mkblk" */
-						assert(blk_id_sz == value.len);
+						assert(value.len == blk_id_sz);
 						memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
 					}
 				}
@@ -1516,11 +1441,8 @@ tn_restart:
 					}
 					assert((ins_chain_offset + (int)cse->next_off)
 						 <= (delta + (sm_long_t)cur_blk_size - off_chain_sz));
-				} else if (mu_reorg_process || mu_reorg_upgrd_dwngrd_in_prog)
-				{	/* turn off t_end (non-TP) optimization while outside of crit */
-					cse->recompute_list_head = cse->recompute_list_tail = NULL;
-					cse = NULL;
 				}
+				assert(!mu_reorg_process || !mu_upgrade_in_prog);
 			}
 			succeeded = TRUE;
 			if (level_0)
@@ -1976,7 +1898,7 @@ tn_restart:
 							memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
 							BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
 						} else
-							BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid, blk_id_sz);
+							BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid_collhdr, blk_id_sz);
 					} else
 						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + rec_size - blk_id_sz, blk_id_sz);
 				}
@@ -2061,7 +1983,17 @@ tn_restart:
 				 * assert(bs1[0].len <= blk_reserved_size);
 				 */
 			}
+			if ((bh_ver != desired_db_format) && (bh_level || (DIR_ROOT == gv_target->root)))
+			{	/* Index/directory tree block splits must preserve old sib's block ver */
+#ifdef DEBUG
+				if (!((GDSV6 < desired_db_format) && (GDSV6p <= bh_ver))) /* Should be transitional ver */
+					TREF(donot_commit) |= DONOTCOMMIT_GVCST_PUT_CONCURR_FMT_CHG;
+#endif
+				upgrade_block_split_format = bh_ver;
+			}
 			next_blk_index = t_create(blk_num, (uchar_ptr_t)new_blk_bs, left_hand_offset, left_hand_index, bh_level);
+			if ((bh_ver != desired_db_format) && (bh_level || (DIR_ROOT == gv_target->root)))
+				upgrade_block_split_format = 0;	/* Reset this to avoid unintended reuse later */
 			/* If "split_to_right" is TRUE, the existing block is untouched so no need to worry about any tp
 			 * chains that could be split due to the block-split. So we can safely skip the below chain stuff.
 			 * But currently if "dollar_tlevel" is TRUE, then we are guaranteed "split_to_right" is FALSE so
@@ -2486,6 +2418,7 @@ tn_restart:
 				{
 					cp2 = (unsigned char *)bs1[3].addr;
 					bs1_3_len = bs1[3].len;
+					assert(cp2 != NULL || bs1_3_len == 0);
 					for (j = 0; (j < bs1_3_len) && (*cp2 == *cp1); ++j)
 					{
 						++cp2;
@@ -2572,7 +2505,7 @@ tn_restart:
 				GOTO_RETRY;
 			}
 			bq = bh + 1;
-			if (HIST_TERMINATOR != bq->blk_num)
+			if ((HIST_TERMINATOR != bq->blk_num) && (MAX_BT_DEPTH > bh_level))
 			{	/* Not root;  write blocks and continue */
 				if (cdb_sc_normal != (status = gvcst_search_blk(temp_key, bq)))
 					GOTO_RETRY;
@@ -2583,6 +2516,8 @@ tn_restart:
 					 */
 					cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh_level,
 								TRUE, FALSE, level_0 ? GDS_WRITE_PLAIN : GDS_WRITE_KILLTN);
+					if ((bh_ver != desired_db_format) && (bh_level || (DIR_ROOT == gv_target->root)))
+						cse->ondsk_blkver = bh_ver;	/* Upgrade in progress, preserve block ver */
 					assert(!dollar_tlevel || !cse->high_tlevel);
 					if (dollar_tlevel)
 						cse->write_type |= GDS_WRITE_BLOCK_SPLIT;
@@ -2592,16 +2527,9 @@ tn_restart:
 				/* else left-side (i.e. current) block was untouched and new contents went into right block
 				 * so no need to invoke "t_write".
 				 */
-				if (long_blk_id)
-				{
-					value.len = SIZEOF(block_id_64);
-					value.addr = (char *)&zeroes_blkid;
-				} else
-				{
-					value.len = SIZEOF(block_id_32);
-					value.addr = (char *)&v6_zeroes_blkid;
-				}
 				++bh;
+				value.addr = (char *)&zeroes_blkid_collhdr;
+				value.len = SIZEOF_BLK_ID(IS_64_BLK_ID(bh->buffaddr));
 				ins_chain_index = next_blk_index;
 			} else
 			{	/* Create new root */
@@ -2614,6 +2542,14 @@ tn_restart:
 					}
 					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_MAXBTLEVEL, 4, gv_target->gvname.var_name.len,
 						gv_target->gvname.var_name.addr, REG_LEN_STR(gv_cur_region));
+				}
+				if ((bh_ver != desired_db_format) && (bh_level || (DIR_ROOT == gv_target->root)))
+				{	/* Index/directory tree block splits must preserve old sib's block ver */
+#ifdef DEBUG
+					if (!((GDSV6 < desired_db_format) && (GDSV6p <= bh_ver))) /* Should be transitional ver */
+						TREF(donot_commit) |= DONOTCOMMIT_GVCST_PUT_CONCURR_FMT_CHG;
+#endif
+					upgrade_block_split_format = bh_ver;
 				}
 				ins_chain_index = t_create(blk_num, (uchar_ptr_t)bs1, ins_chain_offset, ins_chain_index, bh_level);
 				make_it_null = FALSE;
@@ -2632,8 +2568,11 @@ tn_restart:
 					cse_new->new_buff = (unsigned char *)get_new_free_element(si->new_buff_list);
 					memcpy(cse_new->new_buff, cse->new_buff, ((blk_hdr_ptr_t)cse->new_buff)->bsiz);
 					cse_new->old_block = NULL;
+					cse_new->ondsk_blkver = cse->ondsk_blkver;
 					make_it_null = TRUE;
 				}
+				if ((bh_ver != desired_db_format) && (bh_level || (DIR_ROOT == gv_target->root)))
+					upgrade_block_split_format = 0;	/* Reset this to avoid unintended reuse later */
 				/* Build the right child of the new root right now since it is possible that before commit the
 				 * root block may have been recycled in the global buffer which wouldn't cause a restart since
 				 * it has been built already (see the gvcst_blk_build below). Otherwise, we may be relying
@@ -2660,24 +2599,12 @@ tn_restart:
 				BLK_ADDR(cp1, target_key_size, unsigned char);
 				memcpy(cp1, temp_key->base, target_key_size);
 				BLK_SEG(bs_ptr, cp1, target_key_size);
-				if (long_blk_id)
-				{
-					BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid, SIZEOF(block_id_64));
-				} else
-				{
-					BLK_SEG(bs_ptr, (unsigned char *)&v6_zeroes_blkid, SIZEOF(block_id_32));
-				}
+				BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid_collhdr, blk_id_sz);
 				BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 				next_rec_hdr->rsiz = bstar_rec_size(long_blk_id);
 				SET_CMPC(next_rec_hdr, 0);
 				BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
-				if (long_blk_id)
-				{
-					BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid, SIZEOF(block_id_64));
-				} else
-				{
-					BLK_SEG(bs_ptr, (unsigned char *)&v6_zeroes_blkid, SIZEOF(block_id_32));
-				}
+				BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid_collhdr, blk_id_sz);
 				if (0 == BLK_FINI(bs_ptr, bs1))
 				{
 					assert(CDB_STAGNATE > t_tries);
@@ -2686,14 +2613,15 @@ tn_restart:
 				}
 				assert(bs1[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
 				ins_off1 = (block_offset)(SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + target_key_size);
-				ins_off2 = (block_offset)(SIZEOF(blk_hdr) + (2 * SIZEOF(rec_hdr)) + blk_id_sz +
-							  target_key_size);
+				ins_off2 = (block_offset)(SIZEOF(blk_hdr) + (2 * SIZEOF(rec_hdr)) + blk_id_sz + target_key_size);
 				assert(ins_off1 < ins_off2);
 				/* Since a new root block is not created but two new children are created, this update to the
 				 * root block should disable the "indexmod" optimization (C9B11-001813).
 				 */
 				cse = t_write(bh, (unsigned char *)bs1, ins_off1, next_blk_index,
 							bh_level + 1, TRUE, FALSE, GDS_WRITE_KILLTN);
+				if ((bh_ver != desired_db_format) && (bh_level || (DIR_ROOT == gv_target->root)))
+					cse->ondsk_blkver = bh_ver;	/* Upgrade in progress, preserve block ver */
 				if (make_it_null)
 					cse->new_buff = NULL;
 				assert(!dollar_tlevel || !cse->high_tlevel);

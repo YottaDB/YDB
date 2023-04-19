@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,7 @@
 #include "gvcst_expand_key.h"
 #include "gvt_inline.h"
 
-GBLREF	boolean_t		mu_reorg_process, mu_reorg_upgrd_dwngrd_in_prog;
+GBLREF	boolean_t		mu_reorg_process;
 GBLREF	char			gvcst_search_clue;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_altkey;
@@ -48,7 +48,7 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	srch_blk_status		*first_tp_srch_status;	/* overriding value of srch_blk_status given by t_qread in case of TP */
 GBLREF	trans_num		local_tn;		/* transaction number for THIS PROCESS */
-GBLREF	uint4			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel, mu_upgrade_in_prog;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	unsigned int		t_tries;
 
@@ -303,7 +303,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			for (srch_status = &pTargHist->h[0]; HIST_TERMINATOR != srch_status->blk_num; srch_status++)
 			{	/* Do the actual verification of each history block */
 				assert((srch_status->level == srch_status - &pTargHist->h[0])
-					|| (mu_reorg_upgrd_dwngrd_in_prog && (DIR_ROOT == srch_status->blk_num)));
+					|| (mu_upgrade_in_prog && (DIR_ROOT == srch_status->blk_num)));
 				assert(is_mm || (NULL == srch_status->cr) || (NULL != srch_status->buffaddr));
 				cr = srch_status->cr;
 				assert(!is_mm || (NULL == cr));

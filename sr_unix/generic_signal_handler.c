@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,12 +71,13 @@ GBLREF	boolean_t		created_core;
 GBLREF	boolean_t		need_core;
 GBLREF	uint4			process_id;
 GBLREF	volatile int4		exit_state;
+GBLREF	ABS_TIME		mu_stop_tm_array[EXIT_IMMED - 1]; /* Save times of previous MUPIP STOPs */
 GBLREF	volatile unsigned int	core_in_progress;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	void			(*call_on_signal)();
 GBLREF	boolean_t		gtm_quiet_halt;
-GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
+GBLREF	volatile int4           gtmMallocDepth;         	  /* Recursion indicator */
 GBLREF	volatile boolean_t	timer_active;
 GBLREF	sigset_t		block_sigsent;
 GBLREF	gd_region		*gv_cur_region;
@@ -90,6 +91,7 @@ GBLREF	boolean_t		in_nondeferrable_signal_handler;
 LITREF	gtmImageName		gtmImageNames[];
 
 error_def(ERR_FORCEDHALT);
+error_def(ERR_FORCEDHALT2);
 error_def(ERR_GTMSECSHRSHUTDN);
 error_def(ERR_KILLBYSIG);
 error_def(ERR_KILLBYSIGSINFO1);
@@ -118,11 +120,14 @@ static inline void check_for_statsdb_memerr()
 	}
 }
 
+boolean_t is_timer_initialized(ABS_TIME timer) { return (((0 == timer.at_sec) && (0 == timer.at_usec)) ? FALSE : TRUE); }
+
 void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
 	gtm_sigcontext_t	*context_ptr;
 	void			(*signal_routine)();
 	intrpt_state_t		prev_intrpt_state;
+	ABS_TIME		mu_stop_timer;
 #	ifdef DEBUG
 	boolean_t		save_in_nondeferrable_signal_handler;
 #	endif
@@ -200,12 +205,35 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					DEFER_INTERRUPTS(INTRPT_IN_KILL_CLEANUP, prev_intrpt_state);	/* avoid ABANDONEDKILL */
 				if (DEFER_EXIT_PROCESSING)
 				{
+					if (!is_timer_initialized(mu_stop_tm_array[0]))
+						sys_get_curr_time(&mu_stop_tm_array[0]);
+					else if (!is_timer_initialized(mu_stop_tm_array[1]))
+						sys_get_curr_time(&mu_stop_tm_array[1]);
 					SET_FORCED_EXIT_STATE;
 					exit_state++;		/* Make exit pending, may still be tolerant though */
 					assert(!IS_GTMSECSHR_IMAGE);
 					if (exit_handler_active && !gtm_quiet_halt)
 						SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
 					return;
+				}
+				if (is_timer_initialized(mu_stop_tm_array[1]))
+				{
+					sys_get_curr_time(&mu_stop_timer);
+					mu_stop_tm_array[0] = sub_abs_time(&mu_stop_timer, &mu_stop_tm_array[0]);
+					/* MUPIP STOP three times within a minute logs the event and acts like a kill -9 */
+					if (MINUTE > mu_stop_tm_array[0].at_sec)
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FORCEDHALT2, 2,
+								mu_stop_tm_array[0].at_sec, process_id);
+					else
+					{
+						mu_stop_tm_array[0] = mu_stop_tm_array[1];
+						mu_stop_tm_array[1] = mu_stop_timer;
+						SET_FORCED_EXIT_STATE;
+						assert(!IS_GTMSECSHR_IMAGE);
+						if (exit_handler_active && !gtm_quiet_halt)
+							SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
+						return;
+					}
 				}
 				DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
 				exit_state = EXIT_IMMED;

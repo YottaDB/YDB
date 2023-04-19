@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information 	*
+ * Copyright (c) 2001-2023 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -607,7 +607,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* KRNLKILL */
 	   0,	/* MEMORYRECURSIVE */
 	   0,	/* FREEZEID */
-	   0,	/* UNUSEDMSG778 */
+	   0,	/* FORCEDHALT2 */
 	   0,	/* DSEINVALBLKID */
 	   0,	/* PINENTRYERR */
 	   0,	/* BCKUPBUFLUSH */
@@ -1054,10 +1054,10 @@ const static readonly int error_ansi[] = {
 	   0,	/* UNUSEDMSG1222 */
 	   0,	/* UNUSEDMSG1223 */
 	   0,	/* DYNUPGRDFAIL */
-	   0,	/* MMNODYNDWNGRD */
-	   0,	/* MMNODYNUPGRD */
-	   0,	/* MUDWNGRDNRDY */
-	   0,	/* MUDWNGRDTN */
+	   0,	/* UNUSEDMSG1225 */
+	   0,	/* UNUSEDMSG1226 */
+	   0,	/* UNUSEDMSG1227 */
+	   0,	/* REORGUPCNFLCT */
 	   0,	/* MUDWNGRDNOTPOS */
 	   0,	/* MUUPGRDNRDY */
 	   0,	/* TNWARN */
@@ -1146,7 +1146,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CRYPTINIT */
 	   0,	/* CRYPTOPFAILED */
 	   0,	/* CRYPTDLNOOPEN */
-	   0,	/* CRYPTNOV4 */
+	   0,	/* UNUSEDMSG1317 */
 	   0,	/* CRYPTNOMM */
 	   0,	/* READONLYNOBG */
 	   0,	/* CRYPTKEYFETCHFAILED */
@@ -1161,8 +1161,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* LOCKSPACEFULL */
 	   0,	/* IOERROR */
 	   0,	/* MAXSSREACHED */
-	   0,	/* SNAPSHOTNOV4 */
-	   0,	/* SSV4NOALLOW */
+	   0,	/* UNUSEDMSG1332 */
+	   0,	/* DBUPGRDREQ */
 	   0,	/* SSTMPDIRSTAT */
 	   0,	/* SSTMPCREATE */
 	   0,	/* JNLFILEDUP */
@@ -1267,7 +1267,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* ORLBKNOSTP */
 	   0,	/* ORLBKFRZPROG */
 	   0,	/* ORLBKFRZOVER */
-	   0,	/* ORLBKNOV4BLK */
+	   0,	/* ORLBKDBUPGRDREQ */
 	   0,	/* DBROLLEDBACK */
 	   0,	/* DSEWCREINIT */
 	   0,	/* MURNDWNOVRD */
@@ -1282,7 +1282,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUTRUNCFAIL */
 	   0,	/* MUTRUNCNOSPACE */
 	   0,	/* MUTRUNCNOTBG */
-	   0,	/* MUTRUNCNOV4 */
+	   0,	/* UNUSEDMSG1455 */
 	   0,	/* MUTRUNCPERCENT */
 	   0,	/* MUTRUNCSSINPROG */
 	   0,	/* MUTRUNCSUCCESS */
@@ -1352,7 +1352,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NULLENTRYREF */
 	   0,	/* ZPEEKNORPLINFO */
 	   0,	/* MMREGNOACCESS */
-	   0,	/* UNUSEDMSG1525 */
+	   0,	/* FDSIZELMT */
 	   0,	/* MALLOCCRIT */
 	   0,	/* HOSTCONFLICT */
 	   0,	/* GETADDRINFO */
@@ -1447,13 +1447,13 @@ const static readonly int error_ansi[] = {
 	   0,	/* EXTRINTEGRITY */
 	   0,	/* CRYPTKEYRELEASEFAILED */
 	   0,	/* MUREENCRYPTSTART */
-	   0,	/* MUREENCRYPTV4NOALLOW */
+	   0,	/* UNUSEDMSG1620 */
 	   0,	/* ENCRYPTCONFLT */
 	   0,	/* JNLPOOLRECOVERY */
 	   0,	/* LOCKTIMINGINTP */
 	   0,	/* PBNUNSUPTYPE */
 	   0,	/* DBFHEADLRU */
-	   0,	/* ASYNCIONOV4 */
+	   0,	/* UNUSEDMSG1626 */
 	   0,	/* AIOCANCELTIMEOUT */
 	   0,	/* DBGLDMISMATCH */
 	   0,	/* DBBLKSIZEALIGN */
@@ -1561,4 +1561,6 @@ const static readonly int error_ansi[] = {
 	   0,	/* AUDCONNFAIL */
 	   0,	/* AUDLOGFAIL */
 	  80,	/* SOCKCLOSE */
+	   0,	/* LINETOOLONG */
+	   0,	/* ARGTRUNC */
 	};

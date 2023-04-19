@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,6 +40,7 @@ uchar_ptr_t get_spec(uchar_ptr_t spec_rec_addr, int spec_rec_len, unsigned char 
 		assert(spec_len[*ptr]);					/* below gives an error in pro to stop indefinite loop */
 		if ((MAX_COLL_TYPE < *ptr) || (0 == spec_len[*ptr]))
 		{	/* no match or 0 length for increment */
+			assert((MAX_COLL_TYPE >= *ptr) && (0 != spec_len[*ptr]));
 			gv_target->root = 0;
 			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(6) ERR_INVSPECREC, 0, ERR_GVIS, 2,
 					  gv_altkey->end - 1, gv_altkey->base);

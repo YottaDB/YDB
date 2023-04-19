@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,22 +48,21 @@
 #include "cdb_sc.h"
 #include "mupip_reorg_encrypt.h"
 #include "mu_reorg.h"
+#include "gds_blk_upgrade_inline.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		dse_running, is_updhelper;
-GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			dollar_tlevel;
+GBLREF	uint4			mu_upgrade_in_prog;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	uint4			process_id;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;
-
-error_def(ERR_DSEBLKRDFAIL);	/* TODO: use more helpful error */
 
 int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolean_t blk_free)
 {
@@ -194,45 +193,62 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		}
 		ENABLE_INTERRUPTS(INTRPT_IN_CRYPT_RECONFIG, prev_intrpt_state);
 	}
-	if (0 == save_errno)	/* this bloc is a kissing cousin to code in mm_read and the 2should be maintained in parallel */
-	{	/* see if block needs to be converted to current version */
+	if (0 == save_errno)
+	{	/* see if block needs to be converted to current version. This code block should be maintained in parallel
+		 * with a similar section in mm_read */
 		if ((GDSV6p == (tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver)) && (GDSMV70000 == csd->creation_mdb_ver))
 		{       /* adjust for shift of GDSV7 id from 2 to 4 */
 			buff_is_modified_after_lseekread = TRUE;
 			tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver = GDSV7;
 		}
+		level = (int)((blk_hdr_ptr_t)buff)->levl;	/* Doing this here for the assert below */
 		if (blk_free || (GDSV4 == tmp_ondskblkver))
 		{	/* but might be uninitialed */
-			buff_is_modified_after_lseekread = TRUE;
 #			ifdef DEBUG
 			if (!blk_free && !is_updhelper && !dse_running && !mu_reorg_encrypt_in_prog
-					&& !mu_reorg_upgrd_dwngrd_in_prog)
+					&& !mu_upgrade_in_prog)
 				TREF(donot_commit) = DONOTCOMMIT_DSK_READ_EMPTY_BUT_NOT_FREE;	/* expected data, but got empty */
 #			endif
 			/* might not be correct, but any writer would correct it before it goes to a DB file */
-			tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver = csd->desired_db_format;
-		} else
-			assert((GDSV7 == tmp_ondskblkver) || (GDSV6 == tmp_ondskblkver)	/* vanilla cases */
-				|| ((GDSV7m == tmp_ondskblkver) && IS_64_BLK_ID(buff)) 	/* block upgrade complete from V6 */
-				|| (!fully_upgraded && (GDSV6p == tmp_ondskblkver))); /* shuffled & adjusted but still 4 byte ID */
-		if (!fully_upgraded && !blk_free && (GDSV7m != tmp_ondskblkver)) /* !fully_upgraded only during V6 -> V7 upgrade */
-		{	/* block in need of attention */
 			buff_is_modified_after_lseekread = TRUE;
-			/* data blocks & local bit maps just get a version update */
-			if ((0 == (level = (int)((blk_hdr_ptr_t)buff)->levl)) || (LCL_MAP_LEVL == level)) /* WARNING assignment */
-				tmp_ondskblkver = level ? GDSV7m : GDSV6;
-			else if ((csd->offset) && (GDSV6 == tmp_ondskblkver))
-			{	/* This is a pre-V7 index block needing its offset adjusted */
-				assert(MEMCMP_LIT(csd->label, GDS_LABEL));
-				blk_ptr_adjust(buff, csd->offset);
-				tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver = GDSV6p;	/* 4 byte block_id with offset applied */
-			} else
-				assert(GDSV6p == tmp_ondskblkver);
+			tmp_ondskblkver = csd->desired_db_format;
 		}
-		/* V7 block with V7 DB intent or V6 with V6 DB intent or V6 in transition to V7 */
-		assert(!fully_upgraded ? (GDSV7 != tmp_ondskblkver)	/* note: GDSV6p cannot exist when fully_upgraded is TRUE */
-			: (((GDSV7 == tmp_ondskblkver) || (GDSV7m == tmp_ondskblkver) && MEMCMP_LIT(csd->label, GDS_LABEL))
-			|| ((GDSV6 == tmp_ondskblkver) && (!MEMCMP_LIT(csd->label, V6_GDS_LABEL)))));
+#ifdef	DEBUG_UPGRADE
+		/* The following assert can trip in regular operation when dealing with recycled blocks after the DB becomes
+		 * fully upgraded after an MUPIP UPGRADE and MUPIP REORG -UPGRADE complete. Because this assert was instrumental
+		 * in debugging the various states of blocks during the upgrade process, we leave it in
+		 */
+		else
+			assert((GDSV7 == tmp_ondskblkver) || (GDSV6 == tmp_ondskblkver)	/* vanilla cases */
+				|| (LCL_MAP_LEVL == level)	/* This assert does not apply to local bit maps, ever */
+				|| (0 == level)	/* This assert cannot apply to level 0 blocks. Except for directory tree level 0
+						 * blocks, all level zero data blocks can be ANY version from V6 to V7m depending
+						 * on when they were created. */
+				|| ((GDSV7m == tmp_ondskblkver) && IS_64_BLK_ID(buff)) 	/* block upgrade complete from V6 */
+				|| (!fully_upgraded && (GDSV6p == tmp_ondskblkver)));	/* shuffled & adjusted but still 4byte ID */
+#endif
+		if (LCL_MAP_LEVL == level)
+		{	/* local bit maps just get a version update because they were never counted in blk_to_upgrd */
+			if ((GDSV7m > tmp_ondskblkver) && (GDSV7m == csd->desired_db_format))
+			{	/* this in not necessary, but a nice touch */
+				buff_is_modified_after_lseekread = TRUE;
+				tmp_ondskblkver = GDSV7m;
+			}
+		} else if ((csd->offset) && (GDSV6p > tmp_ondskblkver) && level
+				&& (MUPIP_REORG_IN_PROG_LOCAL_DSK_READ != mu_reorg_encrypt_in_prog))
+		{	/* pre-V7 index block needing its offset adjusted */
+			assert(MEMCMP_LIT(csd->label, GDS_LABEL) || (!fully_upgraded && (GDSV6p < csd->desired_db_format)));
+			if (TRUE == blk_ptr_adjust(buff, csd->offset))
+			{	/* Do not mark the buffer as changed if something went wrong. Let the caller deal with it */
+				buff_is_modified_after_lseekread = TRUE;
+				tmp_ondskblkver = GDSV6p;				/* 4 byte block_id with offset applied */
+			}
+		}
+#ifdef	DEBUG_UPGRADE
+		assert(!level || !fully_upgraded || (GDSV6p != tmp_ondskblkver) && (!MEMCMP_LIT(csd->label, GDS_LABEL)
+			? ((GDSV7 == tmp_ondskblkver) || (GDSV7m == tmp_ondskblkver))
+			: ((GDSV6 == tmp_ondskblkver) && !MEMCMP_LIT(csd->label, V6_GDS_LABEL))));
+#endif
 		assert((GDSV4 != tmp_ondskblkver) && (NULL != ondsk_blkver));	/* REORG encrypt does not pass ondsk_blkver */
 		*ondsk_blkver = tmp_ondskblkver;
 	}
@@ -248,6 +264,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		 * but it is not easily possible to identify that and we want to save if checks on the fast path and so do
 		 * the memory barrier in all cases.
 		 */
+		((blk_hdr_ptr_t)buff)->bver = tmp_ondskblkver;
 		SHM_WRITE_MEMORY_BARRIER;
 	}
 #	ifdef DEBUG
@@ -263,7 +280,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	effective_t_tries = UNIX_ONLY( (TREF(in_gvcst_redo_root_search)) ? (TREF(redo_rootsrch_ctxt)).t_tries : ) t_tries;
 	effective_t_tries = MAX(effective_t_tries, t_tries);
 	killinprog = (NULL != ((dollar_tlevel) ? sgm_info_ptr->kip_csa : kip_csa));
-	assert(dse_running || killinprog || jgbl.forw_phase_recovery || mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog
+	assert(dse_running || killinprog || jgbl.forw_phase_recovery || mu_upgrade_in_prog || mu_reorg_encrypt_in_prog
 			GTMTRIG_ONLY(|| TREF(in_trigger_upgrade)) || TREF(in_bm_getfree_gdsfilext)
 			|| (csa->now_crit != (CDB_STAGNATE > effective_t_tries)));
 #	endif

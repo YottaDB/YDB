@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,7 +54,7 @@ int indirection(oprtype *a)
 		return FALSE;
 	}
 	coerce(a, OCT_MVAL);
-	ex_tail(a);
+	ex_tail(a, FALSE, FALSE);
 	ENCOUNTERED_SIDE_EFFECT;
 	DECREMENT_EXPR_DEPTH;
 	if ((TK_ATSIGN == TREF(window_token)) || ((TK_ATHASH == TREF(window_token)) && concat_athashes))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,7 +87,7 @@ void	clean_mem(char *name)
 				}
 			} else
 				semid = INVALID_SEMID;
-			if ((m_id = gtm_shmget(msg_key, 10, RWDALL, FALSE)) != -1)
+			if ((m_id = gtm_shmget(msg_key, 10, RWDALL, FALSE, DATABASE_FILE, path2.addr)) != -1)
 			{
 				if (!quiet)
 					PRINTF("shmclean: removing shmid %d\n", m_id);
@@ -114,7 +114,7 @@ void	database_clean(char *path)
 		PRINTF("File: %s\n", path);
 		return;
 	}
-	if ((shmid = gtm_shmget(d_key, 10, RWALL, FALSE)) != -1)
+	if ((shmid = gtm_shmget(d_key, 10, RWALL, FALSE, DATABASE_FILE, path)) != -1)
 	{
 		if (!quiet)
 			PRINTF("shmclean: removing shmid %d\n", shmid);

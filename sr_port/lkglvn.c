@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,7 +67,7 @@ int lkglvn(boolean_t gblvn)
 		if (!vbar)
 		{
 			coerce(sb1, OCT_MVAL);
-			ex_tail(sb1++);
+			ex_tail(sb1++, FALSE, FALSE);
 		}
 		if (TK_COMMA == TREF(window_token))
 		{
@@ -82,7 +82,7 @@ int lkglvn(boolean_t gblvn)
 			if (!vbar)
 			{
 				coerce(sb1, OCT_MVAL);
-				ex_tail(sb1++);
+				ex_tail(sb1++, FALSE, FALSE);
 			}
 		} else
 			*sb1++ = put_str(0, 0);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,23 +27,32 @@ LITREF octabstruct	oc_tab[];
 
 error_def(ERR_NUMOFLOW);
 
-void ex_tail(oprtype *opr)
-/* work a non-leaf operand toward final form
- * contains code to do arthimetic on literals at compile time
- * and code to bracket Boolean expressions with BOOLINIT and BOOLFINI
+void ex_tail(oprtype *opr, boolean_t is_boolchild, boolean_t parent_comval)
+/* Traverse the triple tree in post-order, working non-leaf operands toward final form
+ * calls ex_arithlit to do arthimetic on literals at compile time, bx_boollit to optimize
+ * certain boolean literals, and bx_tail to replace boolean ops with jump chains.
+ * Its callees have certain expectations that they in the past enforced by calling each other and ex_tail recursively;
+ * they are now leaves that rely on this function to transport them down the tree in the correct order and maintain certain
+ * invariants documented here. Each of the functions expects all of the work of all the other functions to have
+ * happened already on all operands of the triple in question. This is guaranteed by the traversal order here. The exception
+ * is bx_tail, which is to be performed only on the topmost boolean in a directly-nested boolean expression. In the limiting case
+ * of a boolean expression with no nesting, it is processed then and there, and it follows that all boolean operations that
+ * descend from the current triple will already have been processed when the recursive ex_tail invocation returns, except for
+ * when the current triple is a boolean, and in that case only for those booleans that are part of an uninterrupted chain of
+ * boolean children. This is guaranteed by maintaining the is_boolchild flag parameter, true iff the parent triple is a boolean.
+ * bx_tail expects not to encounter unsimplified chains of unary operators except for OC_COMs, which is guaranteed by the
+ * placement of UNARY_TAIL. The parent_comval parameter allows us to avoid processing COBOOLS as jump chains when they will
+ * be simplified by the caller.
  */
 {
-	boolean_t	stop, tv;
-	mval		*v, *v0, *v1;
 	opctype		c;
 	oprtype		*i;
 	triple		*bftrip, *bitrip, *t, *t0, *t1, *t2;
-	uint		bexprs, j, oct;
+	uint		j, oct;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(TRIP_REF == opr->oprclass);
-	UNARY_TAIL(opr);	/* this is first because it can change opr and thus whether we should even process the tail */
 	RETURN_IF_RTS_ERROR;
 	CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq.h except with DEBUG_TRIPLES */
 	t = opr->oprval.tref; /* Refind t since UNARY_TAIL may have shifted it */
@@ -53,124 +62,64 @@ void ex_tail(oprtype *opr)
 		return;
 	assert(TRIP_REF == t->operand[0].oprclass);
 	assert((TRIP_REF == t->operand[1].oprclass) || (NO_REF == t->operand[1].oprclass));
-	if (!(OCT_BOOL & oct))
+	for (i = t->operand, j = 0; ARRAYTOP(t->operand) > i; i++, j++)
 	{
-		for (i = t->operand, j = 0; ARRAYTOP(t->operand) > i; i++, j++)
+		if (TRIP_REF == i->oprclass)
 		{
-			if (TRIP_REF == i->oprclass)
-			{
-				for (t0 = i->oprval.tref; OCT_UNARY & oc_tab[t0->opcode].octype; t0 = t0->operand[0].oprval.tref)
-					;
-				if (OCT_BOOL & oc_tab[t0->opcode].octype)
-					bx_boollit(t0);
-				ex_tail(i);			/* chained Boolean or arithmetic */
-				RETURN_IF_RTS_ERROR;
-			}
-		}
-		while (OCT_ARITH & oct)					/* really a sneaky if that allows us to use breaks */
-		{	/* Consider moving this to a separate module (say, ex_arithlit) for clarity and modularity */
-			/* binary arithmetic operations might be on literals, which can be performed at compile time */
-			for (i = t->operand, j = 0; ARRAYTOP(t->operand) > i; i++, j++)
-			{
-				if (OC_LIT != t->operand[j].oprval.tref->opcode)
-					break;				/* from for */
-			}
-			if (ARRAYTOP(t->operand) > i)
-				break;					/* from while */
-			for (t0 = t->operand[0].oprval.tref; TRIP_REF == t0->operand[0].oprclass; t0 = t0->operand[0].oprval.tref)
-				dqdel(t0, exorder);
-			for (t1 = t->operand[1].oprval.tref; TRIP_REF == t1->operand[0].oprclass; t1 = t1->operand[0].oprval.tref)
-				dqdel(t1, exorder);
-			v0 = &t0->operand[0].oprval.mlit->v;
-			MV_FORCE_NUMD(v0);
-			v1 = &t1->operand[0].oprval.mlit->v;
-			MV_FORCE_NUMD(v1);
-			if (!(MV_NM & v1->mvtype) || !(MV_NM & v0->mvtype))
-			{	/* if we don't have a useful number we can't do useful math */
-				TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* improve hints */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
-				assert(TREF(rts_error_in_parse));
-				return;
-			}
-			v = (mval *)mcalloc(SIZEOF(mval));
-			switch (c)
-			{
-			case OC_ADD:
-				op_add(v0, v1, v);
-				break;
-			case OC_DIV:
-			case OC_IDIV:
-			case OC_MOD:
-				if (!(MV_NM & v1->mvtype) || (0 != v1->m[1]))
-				{
-					if (OC_DIV == c)
-						op_div(v0, v1, v);
-					else if (OC_MOD == c)
-						flt_mod(v0, v1, v);
-					else
-						op_idiv(v0, v1, v);
-				} else				/* divide by literal 0 is a technique so let it go to run time*/
-					v = NULL;		/* flag value to get out of nested switch */
-				break;
-			case OC_EXP:
-				op_exp(v0, v1, v);
-				if ((1 == v->sgn) && (MV_INT & v->mvtype) && (0 == v->m[0]))
-					v = NULL;		/* flag value from op_exp indicates DIVZERO, so leave to run time */
-				break;
-			case OC_MUL:
-				op_mul(v0, v1, v);
-				break;
-			case OC_SUB:
-				op_sub(v0, v1, v);
-				break;
-			default:
-				assertpro(FALSE && t1->opcode);
-				break;
-			}
+			ex_tail(i, (OCT_BOOL & oct), (OC_COMVAL == c));			/* chained Boolean or arithmetic */
 			RETURN_IF_RTS_ERROR;
-			if ((NULL == v) || (!v->mvtype))
-				break;		/* leave divide by zero or missing mvtype from NUMOFLOW to cause run time errors */
-			unuse_literal(v0);	/* drop original literals only after deciding whether to defer */
-			unuse_literal(v1);
-			dqdel(t0, exorder);
-			dqdel(t1, exorder);
-			n2s(v);
-			s2n(v);			/* compiler must leave literals with both numeric and string */
-			t->opcode = OC_LIT;	/* replace the original operator triple with new literal */
-			put_lit_s(v, t);
-			t->operand[1].oprclass = NO_REF;
-			assert(opr->oprval.tref == t);
-			return;
 		}
-		if ((OC_COMINT == c) && (OC_BOOLINIT == (t0 = t->operand[0].oprval.tref)->opcode)) /* WARNING assignment */
-			opr->oprval.tref = t0;
-		return;
 	}
+	if (OCT_ARITH & oct)
+		ex_arithlit(t);
 	/* the following code deals with Booleans where the expression is not directly managing flow - those go through bool_expr */
-	for (t1 = t; ; t1 = t2)
-	{
-		assert(TRIP_REF == t1->operand[0].oprclass);
-		t2 = t1->operand[0].oprval.tref;
-		if (!(OCT_BOOL & oc_tab[t2->opcode].octype))
-			break;
-	}
-	bitrip = maketriple(OC_BOOLINIT);
-	DEBUG_ONLY(bitrip->src = t->src);
-	dqrins(t1, exorder, bitrip);
-	t2 = t->exorder.fl;
-	assert((OC_COMVAL == t2->opcode) || (OC_COMINT == t2->opcode));	/* may need to change COMINT to COMVAL in bx_boolop */
-	assert(&t2->operand[0] == opr);				/* check next operation ensures an expression */
-	bftrip = maketriple(OC_BOOLFINI);
-	DEBUG_ONLY(bftrip->src = t->src);
-	bftrip->operand[0] = put_tref(bitrip);
-	opr->oprval.tref = bitrip;
-	dqins(t, exorder, bftrip);
-	i = (oprtype *)mcalloc(SIZEOF(oprtype));
-	bx_tail(t, FALSE, i);
 	RETURN_IF_RTS_ERROR;
-	if (OC_COMINT == (t2 = bftrip->exorder.fl)->opcode)	/* after bx_tail/bx_boolop it's safe to delete any OC_COMINT left */
-		dqdel(t2, exorder);
-	*i = put_tnxt(bftrip);
-	CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq except with DEBUG_TRIPLES */
+	UNARY_TAIL(opr);
+	RETURN_IF_RTS_ERROR;
+	t = opr->oprval.tref;
+	c = t->opcode;
+	oct = oc_tab[c].octype;
+	if ((OCT_BOOL & oct))
+	{
+		if (!(OCT_UNARY & oct)) /* Boollit ought eventually to be made to operate on OC_COM */
+		{
+			bx_boollit(t);
+			RETURN_IF_RTS_ERROR;
+			c = t->opcode;
+			oct = oc_tab[c].octype;
+		}
+		/* While post-order traversal is the cleanest and most maintainable solution for almost everything this function
+		 * does, it doesn't neatly fit our boolean simplification, which turns directly nested booleans, e.g. x&(y&z) into
+		 * single jump chains. This saves some instructions, but it requires us not to start jump chains for booleans that
+		 * aren't going to have their own boolinit/fini anyway. (Which makes it impossible to handle the operands first in
+		 * every case. To deal with this, the wait_for_parent variable tracks whether or not we are called on an operand
+		 * of a boolean. If we are, and that operand is itself a genuine boolean operation (as opposed to a cobool or
+		 * something similar), then hold off on creating the chain as we will end up inside the one created by the caller
+		 * anyway. Finally, we also need to avoid creating boolchains for operands which will be immediately converted
+		 * to mvals.
+		 **/
+		if (!is_boolchild && (OCT_BOOL & oct) && !(OC_COBOOL == c && parent_comval))
+		{
+			bitrip = bx_startbool(t);
+			t0 = t->exorder.fl;
+			assert((OC_COMVAL == t0->opcode) || (OC_COMINT == t0->opcode));
+			assert(&t0->operand[0] == opr);				/* check next operation ensures an expression */
+			bftrip = maketriple(OC_BOOLFINI);
+			DEBUG_ONLY(bftrip->src = t->src);
+			bftrip->operand[0] = put_tref(bitrip);
+			opr->oprval.tref = bitrip;
+			dqins(t, exorder, bftrip);
+			i = (oprtype *)mcalloc(SIZEOF(oprtype));
+			bx_tail(t, FALSE, i);
+			RETURN_IF_RTS_ERROR;
+			/* after bx_tail/bx_boolop it's safe to delete any OC_COMINT left */
+			if (OC_COMINT == (t0 = bftrip->exorder.fl)->opcode)
+				dqdel(t0, exorder);
+			*i = put_tnxt(bftrip);
+			CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq except with DEBUG_TRIPLES */
+		}
+	}
+	else if ((OC_COMINT == c) && (OC_BOOLINIT == (t0 = t->operand[0].oprval.tref)->opcode))
+		opr->oprval.tref = t0;
 	return;
 }

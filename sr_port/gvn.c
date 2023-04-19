@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,7 +71,7 @@ int gvn(void)
 			 * Correct the tree and sb1->opcode.tref and prevent an assert failure in emit_code.c
 			 */
 			coerce(sb1, OCT_MVAL);
-			ex_tail(sb1++);
+			ex_tail(sb1++, FALSE, FALSE);
 		}
 		if (TK_COMMA == TREF(window_token))
 		{
@@ -86,7 +86,7 @@ int gvn(void)
 			if (!vbar)
 			{
 				coerce(sb1, OCT_MVAL);
-				ex_tail(sb1++);
+				ex_tail(sb1++, FALSE, FALSE);
 			}
 		} else
 			*sb1++ = put_str(0,0);
@@ -192,6 +192,13 @@ int gvn(void)
 			triptr = newtriple(OC_GVRECTARG);
 			triptr->operand[0] = put_tref(TREF(expr_start));
 		}
-	}
+	} else if (TREF(saw_side_effect) && TREF(shift_side_effects)
+			&& (GTM_BOOL != TREF(gtm_fullbool) || (OLD_SE != TREF(side_effect_handling))))
+		TREF(saw_side_effect) = TRUE;
+	/* The conditional above is a temporary solution to a quirk discovered in the process of reworking the handling of nested
+	 * boolean expressions: in some cases GT.M resets $REFERENCE in nested booleans without side effects. Communicating to
+	 * ex_tail that it's not worth short-circuiting this expression is helpful; otherwise the $REFERENCE issue spreads to
+	 * side-effect expressions. But this line of code should be removed when the handling is addressed.
+	 */
 	return TRUE;
 }

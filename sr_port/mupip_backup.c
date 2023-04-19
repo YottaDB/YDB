@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1401,14 +1401,6 @@ repl_inst_bkup_done2:
 				sbufh_p->dskaddr = 0;
 				sbufh_p->backup_errno = 0;
 				sbufh_p->failed = 0;
-#				ifdef DEBUG
-				/* Once the process register its pid as backup_pid, sleep for the 1 seconds, so that test
-				 * tests hits the scenario where BKUPRUNNING message is printed. Note that sleep of 1 sec
-				 * is fine because it is the box boxes which are failing to hit the concurrency scenario.
-				 */
-				if (gtm_white_box_test_case_enabled && (WBTEST_CONCBKUP_RUNNING == gtm_white_box_test_case_number))
-					LONG_SLEEP(1);
-#				endif
 				/* Make sure that the backup queue does not have any remnants on it. Note that we do not
 				   depend on the queue count here as it is imperative that, in the event that the count
 				   and queue get out of sync, that there ARE NO BLOCKS on this queue when we start or
@@ -1521,7 +1513,11 @@ repl_inst_bkup_done2:
 				result = (incremental ? mubinccpy(rptr) : mubfilcpy(rptr, showprogress, attemptcnt, &stopretries));
 				if (result)
 					break; /* break to dqloop */
-
+				/* In mubfilcpy() we change cs_addrs->nl->nbb to BACKUP_NOT_IN_PROGRESS
+				 * for concurrent online rollback and for certain error conditions. In such a case,
+				 * do not retry for online backup.  */
+				if ((online) && (BACKUP_NOT_IN_PROGRESS == cs_addrs->nl->nbb))
+					stopretries = TRUE;
 				if ((attemptcnt == maxtries) || (TRUE == stopretries))
 				{
 					if (file_backed_up)

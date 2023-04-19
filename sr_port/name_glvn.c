@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,7 +59,7 @@ int name_glvn(boolean_t gblvn, oprtype *a)
 				 * Correct the tree and sb1->opcode.tref and prevent an assert failure in emit_code.c
 				 */
 				coerce(sb1, OCT_MVAL);
-				ex_tail(sb1++);
+				ex_tail(sb1++, FALSE, FALSE);
 			}
 			if (TK_COMMA != TREF(window_token))
 				fnname_type |= FNEXTGBL1;
@@ -72,7 +72,7 @@ int name_glvn(boolean_t gblvn, oprtype *a)
 				if (!vbar)
 				{
 					coerce(sb1, OCT_MVAL);
-					ex_tail(sb1++);
+					ex_tail(sb1++, FALSE, FALSE);
 				}
 			}
 			if ((!vbar && (TK_RBRACKET != TREF(window_token))) || (vbar && (TK_VBAR != TREF(window_token))))

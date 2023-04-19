@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -146,7 +146,7 @@ GBLREF gtm_uint64_t		mu_int_cum[CUM_TYPE_MAX][MAX_BT_DEPTH + 1];
 GBLREF uint4			mu_int_offset[];
 GBLREF uint4			mu_int_errknt;
 GBLREF block_id			mu_int_path[];
-GBLREF int4			mu_int_blks_to_upgrd;
+GBLREF block_id			mu_int_blks_to_upgrd;
 GBLREF global_list		*trees;
 GBLREF global_list		*trees_tail;
 GBLREF gv_key			*mu_end_key;
@@ -324,9 +324,14 @@ boolean_t mu_int_blk(
 	blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 	blk_size = (int)((blk_hdr_ptr_t)blk_base)->bsiz;
 	blk_levl = ((blk_hdr_ptr_t)blk_base)->levl;
+#ifdef DEBUG_BLKS_TO_UPGRD
+	if (debug_mupip)
+		util_out_print("MUPIP INFO: 0x!@XQ:!UL:!UL", TRUE, &blk, ((blk_hdr_ptr_t)blk_base)->bver, blk_levl);
+#endif
 	if (!muint_fast)
 	{	/* conditions of the if below may need adjustment as versions go forward */
-		if ((GDSVCURR != mu_int_data.creation_db_ver) && (((blk_hdr_ptr_t)blk_base)->bver != mu_int_data.desired_db_format))
+		if ((GDSV7m == mu_int_data.certified_for_upgrade_to) && (BLK_ID_32_VER >= ondsk_blkver)
+				&& (LCL_MAP_LEVL != blk_levl))
 			mu_int_blks_to_upgrd++;
 		if (tn_reset_this_reg)
 		{

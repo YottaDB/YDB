@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,8 +52,10 @@ GBLREF util_snapshot_ptr_t	util_ss_ptr;
 GBLREF uint4			process_id;
 #endif
 
+LITREF	char			*gtm_dbversion_table[];
+
 error_def(ERR_BUFFLUFAILED);
-error_def(ERR_SSV4NOALLOW);
+error_def(ERR_DBUPGRDREQ);
 error_def(ERR_SSMMNOALLOW);
 
 void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_open)
@@ -109,20 +111,16 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_
 	assert(NULL != mu_int_master);
 	/* Ensure that we don't see an increase in the file header and master map size compared to it's maximum values */
 	assert(SGMNT_HDR_LEN >= SIZEOF(sgmnt_data) && (MASTER_MAP_SIZE_MAX >= MASTER_MAP_SIZE(csd)));
-	/* ONLINE INTEG if asked for explicitly by specifying -ONLINE is an error if the db has partial V4 blocks.
-	 * However, if -ONLINE is not explicitly specified but rather assumed implicitly (as default for -REG)
-	 * then turn off ONLINE INTEG for this region and continue as if -NOONLINE was specified
-	 */
-	if (!csd->fully_upgraded)
-	{
-		ointeg_this_reg = FALSE; /* Turn off ONLINE INTEG for this region */
-		if (online_specified)
+	if ((0 != csd->blks_to_upgrd) || !csd->fully_upgraded)
+	{	/* V7 dropped support for V4 along with the prior UPGRADE/DOWNGRADE capabilities. If the desired DB
+		 * format is prior to V6p (internal only format), reject any operation with the DB */
+		if (BLK_ID_32_VER > csd->desired_db_format)
 		{
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_SSV4NOALLOW, 2, DB_LEN_STR(gv_cur_region));
-			util_out_print(NO_ONLINE_ERR_MSG, TRUE);
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBUPGRDREQ, 3, DB_LEN_STR(gv_cur_region),
+					gtm_dbversion_table[csd->desired_db_format]);
 			mu_int_skipreg_cnt++;
 			return;
-		}
+		} /* else V6p+ is not be a problem */
 	}
 	if (!ointeg_this_reg || read_only)
 	{

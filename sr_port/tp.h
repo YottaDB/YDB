@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -360,6 +360,7 @@ static inline void READ_OFF_CHAIN(boolean_t long_blk_id, off_chain* chain, v6_of
  */
 #  define RESET_ALL_GVT_CLUES											\
 {														\
+	GBLREF	uint4		mu_upgrade_in_prog;		/* 1 indicates MUPIP UPGRADE in progress */	\
 	GBLREF	gv_namehead	*gv_target_list;								\
 	GBLREF	gv_namehead	*reorg_gv_target;								\
 														\
@@ -370,7 +371,7 @@ static inline void READ_OFF_CHAIN(boolean_t long_blk_id, off_chain* chain, v6_of
 		gvnh->clue.end = 0;										\
 		if (gvnh->gd_csa && (gvnh != gvnh->gd_csa->dir_tree))						\
 		{												\
-			assert ((DIR_ROOT != gvnh->root) || (gvnh == reorg_gv_target));				\
+			assert ((DIR_ROOT != gvnh->root) || (gvnh == reorg_gv_target) || mu_upgrade_in_prog);	\
 			gvnh->root = 0;										\
 		}												\
 		/* Cleanup any block-split info (of created block #) in gvtarget histories */			\
@@ -1017,8 +1018,6 @@ void tp_timeout_action_dummy(void);
 boolean_t	tp_tend(void);
 boolean_t	tp_crit_all_regions(void);
 
-#endif
-
 #define	GVNAME_UNKNOWN		"*BITMAP"
 #define GVNAME_DIRTREE		"*DIR"
 
@@ -1026,3 +1025,5 @@ static readonly char		gvname_unknown[] = GVNAME_UNKNOWN;
 static readonly int4		gvname_unknown_len = STR_LIT_LEN(GVNAME_UNKNOWN);
 static readonly char		gvname_dirtree[] = GVNAME_DIRTREE;
 static readonly int4		gvname_dirtree_len = STR_LIT_LEN(GVNAME_DIRTREE);
+
+#endif

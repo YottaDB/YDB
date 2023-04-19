@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2021 Fidelity National Information	*
+ * Copyright (c) 2005-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,8 +55,8 @@ enum db_ver
 	GDSVLAST	/* when changing this also update gtm_dbversion_table in mtables */
 };
 
-#define GDSMVCURR ((enum mdb_ver)(GDSMVLAST - 1))
-	#define BLK_ID_32_MVER ((enum mdb_ver)(GDSMV63014))	/* ideally this s.b. (GDSMVLAST - 2) but V6->V7 has some quirks */
+#define GDSMVCURR	((enum mdb_ver)(GDSMVLAST - 1))
+#define BLK_ID_32_MVER	((enum mdb_ver)(GDSMV63014))	/* ideally this s.b. (GDSMVLAST - 2) but V6->V7 has some quirks */
 
 /* Database minor version as an enum quantity. This is an ever increasing number that may skip actual
  * releases as it is only added to when a file-header field is added or changed or if there is a

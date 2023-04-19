@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,8 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "gvcst_protos.h"	/* needed by OPEN_BASEREG_IF_STATSREG */
+
+GBLREF	uint4	mu_upgrade_in_prog;
 
 /* Searches a global directory map array for which map entry an input "key" falls in.
  * "key" could be an unsubscripted or subscripted global reference.
@@ -34,9 +36,9 @@ gd_binding *gv_srch_map(gd_addr *addr, char *key, int key_len, boolean_t skip_ba
 #	endif
 
 	map_start = addr->maps;
-	assert(('%' == map_start[1].gvkey.addr[0]) && (1 == map_start[1].gvname_len));
+	assert((mu_upgrade_in_prog) || (('%' == map_start[1].gvkey.addr[0]) && (1 == map_start[1].gvname_len)));
 	/* We expect all callers to search for global names that start with "^%" or higher. */
-	assert(0 <= memcmp(key, &(map_start[1].gvkey.addr[0]), key_len));
+	assert((mu_upgrade_in_prog) || (0 <= memcmp(key, &(map_start[1].gvkey.addr[0]), key_len)));
 	low = 2;	/* get past local locks AND first map entry which is always "%" */
 	high = addr->n_maps - 1;
 	DEBUG_ONLY(dbg_match = -1;)

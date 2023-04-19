@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2022 Fidelity National Information	*
+ * Copyright (c) 2014-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,6 +25,6 @@
 #	define	ADJUST_SHM_SIZE_FOR_HUGEPAGES(SRCSIZE, DSTSIZE) DSTSIZE = ROUND_UP(SRCSIZE, OS_PAGE_SIZE)
 #endif
 
-extern int	gtm_shmget(key_t key, size_t size, int shmflg, bool lock);
+extern int	gtm_shmget(key_t key, size_t size, int shmflg, bool lock, enum shmget_caller caller, char *errinfostr);
 
 #endif /* HUGETLBFS_OVERRIDES_H_ */

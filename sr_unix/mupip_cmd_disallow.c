@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2021 Fidelity National Information	*
+ * Copyright (c) 2002-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -232,7 +232,8 @@ boolean_t cli_disallow_mupip_reorg(void)
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = d_c_cli_present("UPGRADE") && d_c_cli_present("DOWNGRADE");
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value = (d_c_cli_present("UPGRADE") || d_c_cli_present("DOWNGRADE")) && !d_c_cli_present("REGION");
+	disallow_return_value = (d_c_cli_present("UPGRADE") || d_c_cli_present("DOWNGRADE"))
+				&& !d_c_cli_present("REGION") && !d_c_cli_present("FILE");
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (d_c_cli_present("SAFEJNL")
 				|| d_c_cli_negated("SAFEJNL")

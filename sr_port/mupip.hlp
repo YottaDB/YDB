@@ -742,6 +742,11 @@
 
    **Note**
 
+   V7.0-000 and up do not support DOWNGRADE, even when running on a V6
+   database.
+
+   **Note**
+
    You must perform a GT.M database integrity check using the -noonline
    parameter prior to downgrading a database. The integrity check verifies
    and clears database header fields required for an orderly downgrade. If an
@@ -788,7 +793,7 @@
    The MUPIP DUMPFHEAD command displays information about one or more
    database files. The format of the MUPIP DUMPFHEAD command is:
 
-   DU[MPFHEAD]  {-FI[LE] file-name |-REG[ION] region-list}
+   DU[MPFHEAD]  {-FI[LE] file-name |-R[EGION] region-list}
 
    **Note**
 
@@ -2436,7 +2441,8 @@
        the one or more versions of object files currently loaded with this
        routine name (objlen:), the total length used up in shared memory for
        these object files where GT.M allocates each object file a rounded-up
-       perfect 2-power block of memory (shmlen:).
+       perfect 2-power block of memory (shmlen:), the number of times a
+       routine has been superseded/replaced (superseded:).
 
    Given a relinkctl file name, one can find the corresponding directory path
    using the Unix "strings" command on the Relinkctl file. For example,
@@ -2453,7 +2459,7 @@
    # of attached processes  : 2
    Relinkctl shared memory  : shmid: 11534344 shmlen: 0x57c6000
    Rtnobj shared memory # 1 : shmid: 11567113 shmlen: 0x100000 shmused: 0x200 shmfree: 0xffe00 objlen: 0x1c0
-    rec#1: rtnname: abcd cycle: 1 objhash: 0xedbfac8c7f7ca357 numvers: 1 objlen: 0x1c0 shmlen: 0x200
+    rec#1: rtnname: abcd cycle: 1 objhash: 0xedbfac8c7f7ca357 numvers: 1 objlen: 0x1c0 shmlen: 0x200 superseded: 1
 
 2 REORG
    REORG
@@ -2590,6 +2596,10 @@
    only when you have determined there is a clear reason to downgrade the DB
    format of a database to a prior format and there are no conditions that
    preclude that possibility.
+
+   **Note**:
+
+   V7.0-000 and up do not support REORG -DOWNGRADE.
 
 3 Encrypt
    Encrypt
@@ -2891,10 +2901,10 @@
 3 UPgrade
    UPgrade
 
-   Upgrade blocks to current DB version format. Use REORG -UPGRADE when it is
-   a part of a release notes procedure to upgrade the DB version format of a
-   database or when you encounter a database integrity error that requires
-   running REORG -UPGRADE.
+   Standalone operation to upgrade blocks to current DB version format. Use
+   REORG -UPGRADE when it is a part of a release notes procedure to upgrade
+   the DB version format of a database or when you encounter a database
+   integrity error that requires running REORG -UPGRADE.
 
 3 Examples
    Examples
@@ -3814,10 +3824,12 @@
 
    -STATSD[B_ALLOCATION]=integer
 
-     o GT.M doubles the block count with each statsdb size increase.
+     o GT.M implicitly doubles this block count each time it needs to extend
+       the associated statsdb.
      o The minimum STATSDB_ALLOCATION is 128 blocks.
      o The maximum STATSDB_ALLOCATION is 8,388,607 blocks.
-     o By default, GDE uses an STATSDB_ALLOCATION of 2050 blocks.
+     o By default, GDE provides an initial STATSDB_ALLOCATION of 2050 blocks
+       for use by MUPIP CREATE.
 
 3 STDnullcoll
    STDnullcoll
@@ -3843,6 +3855,10 @@
 
    Sets the block format version (Desired DB Format field in the file header)
    for all subsequent new blocks. The format of the VERSION qualifier is:
+
+   **Note**:
+
+   V7.0-000 and up do not support the -VERSION option.
 
    -V[ERSION]={V4|V6}
 
@@ -4013,14 +4029,12 @@
    global-name-list can be:
 
      o A comma separated list of global variables. For example,
-       -select='^a,^x)'
-     o Global variables may be subscripted. For example,
-       -select='^g1(""""a"""")'. Note that string subscripts require
-       sufficient quotes to make it though the shell parsing to reach MUPIP.
+       -select='^g1,^g4'. This would select only globals g1 and g4.
      o A range of global variables denoted by start:end syntax. For example,
-       -select='^g1:^g4(""""c"""")'.
-     o A global variable with wildcards, for example, -select='^g*'. Note the
-       name must be escaped to avoid shell filename expansion.
+       -select='^g1:^g4'. This selects all globals between g1 and g4,
+       inclusive.
+     o A global variable with wildcards. For example, -select='^g*'. This
+       selects all globals which begin with the letter g.
      o "*" to select all global variables.
 
    -Region
@@ -4063,6 +4077,9 @@
        -subscript="^g1:^g4".
      o A range of subscripted global variables denoted by start:end syntax.
        For example, -subscript="^g(1):^g(4)".
+     o String subscipts require sufficient quotes to make it though the shell
+       parsing to reach MUPIP. For example,
+       -select='^g1(""""a""""):^g1(""""b"""")'.
 
    **Note**
 
@@ -4092,11 +4109,11 @@
 
    On receipt of a MUPIP STOP signal, a GT.M process cleans up its
    participation in managing the database before shutting down. On receipt of
-   three MUPIP STOP signals in a row, a GT.M process shuts down forthwith
-   without cleaning up - the equivalent of a kill -9 signal. This can result
-   in structural database damage, because GT.M does not have sufficient
-   control of what happens in response to an immediate process termination to
-   protect against database damage under all circumstances.
+   three MUPIP STOP signals in a row within a minute, a GT.M process shuts
+   down forthwith without cleaning up - the equivalent of a kill -9 signal.
+   This can result in structural database damage, because GT.M does not have
+   sufficient control of what happens in response to an immediate process
+   termination to protect against database damage under all circumstances.
 
    In all cases, on receipt of a MUPIP STOP, a process will eventually
    terminate once it gets the resources needed to clean up. Use three MUPIP
@@ -4417,30 +4434,33 @@
 2 UPGRADE
    UPGRADE
 
-   Upgrades the file-header of a database. The format of the MUPIP UPGRADE
-   command is:
+   Upgrades a number of V6 database characteristics to a transitional V7
+   database format (V7m). This is the first stage in upgrading a V6 database
+   to the V7 format. This command must be run standalone and does not take a
+   long time. The remainder of the upgrade is done by MUPIP REORG -UPGRADE
+   which completes the remaining index block upgrades with standalone access.
 
-   UP[GRADE]
+   The format of the MUPIP UPGRADE command is:
 
-     o It increases the size from 4 bytes to 8 bytes of file-header fields
-       such as current transaction number (CTN), maximum TN and others that
-       contain transaction numbers.
-     o It resets the various trace counters and changes the database format
-       to V5. This change does not upgrade the individual database blocks but
-       sets the database format flag to V5.
-     o It also initializes a counter of the current blocks that are still in
-       V4 format. It decrements this counter each time an existing V4 format
-       block is converted to V5 format. When the counter is 0, the entire
-       database gets converted.
+   UP[GRADE] [-FILE file-name | [-REGION] region-list]
+
+     o Relocates blocks to make space for an expanded master bit map
+     o Removes global names without any data, so called "dead" globals
+     o Upgrades the database directory tree blocks to V7m
+     o Changes the starting VBN (virtual block number) to values greater than
+       or equal to 8193
+     o Expands the existing master bit map
+     o Sets the database format to V7m upon completion
 
 3 Example
    Example
 
    Example:
 
-   $ mupip upgrade mumps.dat
+   $ mupip upgrade -file mumps.dat
 
-   This example upgrades the file-header of mumps.dat to V5 format.
+   This example starts the first stage of the upgrade of mumps.dat to V7
+   format.
 
 1 Journaling
    Journaling
@@ -4719,13 +4739,18 @@
    Specifies the amount of memory used to buffer journal file output.
 
    MUPIP requires standalone access to the database to modify BUFFER_SIZE.
-   Therefore, GT.M restricts the use of the BUFFER_SIZE option to change the
+   Therefore, MUPIP restricts the use of the BUFFER_SIZE option to change the
    current journal-buffer-size as part of an online switch of the journal
    files.
 
    The default value is 2312 blocks. The minimum BUFFER_SIZE is 2307 blocks.
    The maximum BUFFER_SIZE is 1Mi blocks which means that the maximum buffer
    you can set for your journal file output is 512MiB.
+
+   If the amount requested is below the minimum or above the maximum SET
+   -JOURNAL adjusts the request accordingly. If the amount requested is
+   within the limits it may also be adjusted slightly upwards producing an
+   alignment that slightly improves journal I/O performance.
 
    DISABLE
 
@@ -8515,637 +8540,644 @@
 1 Summary
    Summary
 
-   +--------------------------------------------------------------------------------------------------------+
-   |  COMMAND  |    OBJECTS     |                    MAIN QUALIFIER                     |  GT.M  |Standalone|
-   |           |                |                                                       |version*| Access#  |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |B[ACKUP]   |region-name     |-BK[UPDBJNL]=DISABLE | OFF                             |        |          |
-   |           |file-name       |                                                       |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-BY[TESTREAM] -NET[TIMEOUT]=seconds                    |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-C[OMPREHENSIVE]                                       |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-DA[TABASE] -REPLA[CE]                                 |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-I[NCREMENTAL]                                         |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]J[OURNAL][=journal-options-list]                  |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-NETTIMEOUT                                            |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]NEWJNLFILES[=[NO]PREVLINK],[NO]S[YNC_IO]          |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-O[NLINE]                                              |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-RECORD                                                |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-REPLI[NSTANCE]=OFF | ON                               |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-S[INCE]={DATABASE|BYTESTREAM|RECORD}                  |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-T[RANSACTION=hexa;transaction_number]                 |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |CR[EATE]   |-               |-R[EGION]=region-name                                  |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |DO[WNGRADE]|file-name       |-V[ERION]={V4|V5}                                      |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |DU[MPFHEAD]|file-name or    |-                                                      |V6.3-001|          |
-   |           |region-list     |                                                       |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |EN[DIANCVT]|file-name       |-OUTDB=<outdb-file>                                    |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-OV[ERRIDE]                                            |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |EXI[T]     |-               |-                                                      |        |N/A       |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |EXTE[ND]   |region-name     |-B[LOCKS]=blocks                                       |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |EXTR[ACT]  |-               |-FO[RMAT]=GO|B[INARY]|Z[WR]                            |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-FR[EEZE]                                              |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-NU[LL_IV]                                             |V6.3-000|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-LA[BEL]=text                                          |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]L[OG]                                             |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-S[ELECT]=global-name-list                             |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-O[CHSET]=character-set                                |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-R[EGION=region-list                                   |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |F[REEZE]   |region-list     |-OF[F] [-OV[ERRIDE]]                                   |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-ON [-[NO]ONL[INE] [-[NO]A[UTORELEASE]] [-R[ECORD]]]   |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |FT[OK]     |File-name       |-D[B]                                                  |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-J[NLPOOL]                                             |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-R[ECVPOOL]                                            |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |H[ELP]     |command-option  |-                                                      |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |I[NTEG]    |File-name or    |-A[DJACENCY]=integer]                                  |        |          |
-   |           |region-list     |                                                       |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-BL[OCK]=hexa;block-number]                            |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-BR[IEF]                                               |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-FA[ST]                                                |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-FI[LE]                                                |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-FU[LL]                                                |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-NO]K[EYRANGES                                         |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO][MAP]=integer                                     |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]MAXK[EYSIZE]=integer                              |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-R[EGION]                                              |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]ST[ATS]                                           |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-SU[BSCRIPT]=subscript                                 |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-TN[_RESET]                                            |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]TR[ANSACTION][=integer]                           |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |IN[TRPT]   |process id      |                                                       |        |N/A       |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |J[OURNAL]  |file-name       |-EX[TRACT][=file-specification|                        |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-stdout]                                               |V5.5-000|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-REG[ION]                                              |V6.2-000|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-REC[OVER] | -RO[LLBACK]                               |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-SH[OW][=show-option-list]                             |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]V[ERIFY]                                          |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-BA[CKWARD] | -FO[RWARD]                               |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-CO[RRUPTDB]                                           |V6.3-010|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |L[OAD]     |file-name       |-BE[GIN]=integer                                       |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-BLOCK_DENSITY                                         |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-E[ND]=integer                                         |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-FI[LLFACTOR]=integer                                  |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-FO[RMAT]=GO|B[INARY]|Z[WR]                            |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-S[TDIN]                                               |V5.5-000|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-O[NERROR]                                             |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |REO[RG]    |                |-D[OWNGRADE]                                           |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-ENCR[YPT]=key                                         |V6.3-000|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-E[XCLUDE]=global-name-list                            |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-FI[LL_FACTOR]=integer                                 |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-I[NDEX_FILL_FACTOR]=integer                           |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-K[EEP]={pct%|blocks}                                  |V6.3-009|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-NOCO[ALESCE]                                          |V6.3-009|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-NOSP[LIT]                                             |V6.3-009|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-NOSW[AP]                                              |V6.3-009|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-R[ESUME]                                              |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-S[ELECT]=global-name-list                             |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-T[RUNCATE][=percentage]                               |V5.5-000|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-UP[GRADE]                                             |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-REG[ION] region-list                                  |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |REP[LICATE]|file-name       |-E[DITINSTANCE]                                        |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-N[AME]                                                |V5.5-000|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-I[NSTANCE_CREATE]                                     |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-R[ECEIVER                                             |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-S[OURCE]                                              |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-UPDA[TEPROC]                                          |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |RE[STORE]  |file-name or    |-[NO]E[XTEND]                                          |        |Y         |
-   |           |file-list       |                                                       |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |RU[NDOWN]  |file-name or    |-F[ILE]                                                |        |Y         |
-   |           |region-name     |                                                       |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-R[EGION]                                              |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-RELINKCTL [dir]                                       |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-OVERRIDE                                              |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |file-name or    |SE[T] {-FI[LE] file-name|-JN[LFILE]                    |        |          |
-   |SE[T]      |region-name     |journal-file-name|-REG[ION]                            |        |          |
-   |           |                |region-list|-REP[LICATION]={ON|OFF}}                   |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-AC[CESS_METHOD]={BG|MM}                               |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]AS[YNCIO]                                         |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]DE[FER_TIME][=seconds]                            |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]DEFER_ALLOCATE                                    |V6.2-002|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]EP[OCHTAPER]                                      |V6.2-001|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]ENCRYPTABLE                                       |V6.3-000|Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-E[XTENSION_COUNT]=integer(no of blocks)               |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-F[LUSH_TIME]=integer                                  |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-FU[LLBLKWRT]={0|1|2}                                  |V6.3-012|Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-G[LOBAL_BUFFERS]=integer                              |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-H[ARD_SPIN_COUNT]=integer                             |V6.3-003|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]INST[_FREEZE_ON_ERROR]                            |V6.0-000|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-JN[LFILE] journal-file-name                           |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-K[EY_SIZE]=bytes                                      |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]LCK_SHARES_DB_CRIT                                |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-L[OCK_SPACE]=integer                                  |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-M[UTEX_SLOTS]=integer                                 |V6.0-002|Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-N[ULL_SUBSCRIPTS]=value                               |V6.3-003|Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-PA[RTIAL_RECOV_BYPASS]                                |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]Q[DBRUNDOWN]                                      |V6.0-000|Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]REA[D_ONLY]                                       |V6.3-003|Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-REC[ORD_SIZE]=bytes                                   |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-REG[ION] region-list                                  |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-REP[LICATION]={ON|OFF}                                |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-RES[ERVED_BYTES]=integer                              |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-SLEE[P_SPIN_COUNT]=integer                            |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-SPIN[_SLEEP_MASK]=hexa_mask                           |V6.3-003|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-STAN[DALONENOT]                                       |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]STD[NULLCOLL]                                     |V6.3-003|Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-[NO]STAT[S]                                           |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-STATSD[B_ALLOCATION]=integer                          |V7.0-001|Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-V[ERSION]={V4|V6}                                     |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-W[AIT_DISK]=integer                                   |        |Y         |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |SI[ZE]     |global-name-list|-H[EURISTIC]=estimation_technique                      |V6.0-001|          |
-   |           |region-list     |                                                       |        |          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-S[ELECT]=global-name-list                             |V6.0-001|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-R[EGION]=region-list                                  |V6.0-001|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |ST[OP]     |process-id      |process-id                                             |        |N/A       |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |TRIGGER    |-               |-TRIG[GERFILE]=<trigger_definitions_file>              |V5.4-002|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-NOPR[OMPT]                                            |V5.4-002|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-SELE[CT][=name-list|*][<select-output-file>]          |V5.4-002|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |           |                |-UPGRADE                                               |V5.4-002|          |
-   |-----------+----------------+-------------------------------------------------------+--------+----------|
-   |UP[GRADE]  |file-name       |-                                                      |        |Y         |
-   +--------------------------------------------------------------------------------------------------------+
+   +---------------------------------------------------------------------------------------------------------+
+   |  COMMAND  |    OBJECTS     |                    MAIN QUALIFIER                     |  GT.M   |Standalone|
+   |           |                |                                                       |version* | Access#  |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |B[ACKUP]   |region-name     |-BK[UPDBJNL]=DISABLE | OFF                             |         |          |
+   |           |file-name       |                                                       |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-BY[TESTREAM] -NET[TIMEOUT]=seconds                    |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-C[OMPREHENSIVE]                                       |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-DA[TABASE] -REPLA[CE]                                 |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-I[NCREMENTAL]                                         |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]J[OURNAL][=journal-options-list]                  |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-NETTIMEOUT                                            |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]NEWJNLFILES[=[NO]PREVLINK],[NO]S[YNC_IO]          |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-O[NLINE]                                              |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-RECORD                                                |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-REPLI[NSTANCE]=OFF | ON                               |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-S[INCE]={DATABASE|BYTESTREAM|RECORD}                  |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-T[RANSACTION=hexa;transaction_number]                 |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |CR[EATE]   |-               |-R[EGION]=region-name                                  |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |DO[WNGRADE]|file-name       |-V[ERSION]={V4|V5}                                     |-V7.0-000|Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |DU[MPFHEAD]|File-name or    |-FI[LE]                                                |V6.3-001 |          |
+   |           |region-list     |                                                       |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-R[EGION]                                              |V7.0-003 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |EN[DIANCVT]|file-name       |-OUTDB=<outdb-file>                                    |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-OV[ERRIDE]                                            |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |EXI[T]     |-               |-                                                      |         |N/A       |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |EXTE[ND]   |region-name     |-B[LOCKS]=blocks                                       |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |EXTR[ACT]  |-               |-FO[RMAT]=GO|B[INARY]|Z[WR]                            |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-FR[EEZE]                                              |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-NU[LL_IV]                                             |V6.3-000 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-LA[BEL]=text                                          |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]L[OG]                                             |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-S[ELECT]=global-name-list                             |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-O[CHSET]=character-set                                |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-R[EGION=region-list                                   |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |F[REEZE]   |region-list     |-OF[F] [-OV[ERRIDE]]                                   |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-ON [-[NO]ONL[INE] [-[NO]A[UTORELEASE]] [-R[ECORD]]]   |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |FT[OK]     |File-name       |-D[B]                                                  |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-J[NLPOOL]                                             |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-R[ECVPOOL]                                            |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |H[ELP]     |command-option  |-                                                      |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |I[NTEG]    |File-name or    |-A[DJACENCY]=integer]                                  |         |          |
+   |           |region-list     |                                                       |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-BL[OCK]=hexa;block-number]                            |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-BR[IEF]                                               |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-FA[ST]                                                |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-FI[LE]                                                |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-FU[LL]                                                |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-NO]K[EYRANGES                                         |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO][MAP]=integer                                     |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]MAXK[EYSIZE]=integer                              |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-R[EGION]                                              |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]ST[ATS]                                           |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-SU[BSCRIPT]=subscript                                 |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-TN[_RESET]                                            |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]TR[ANSACTION][=integer]                           |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |IN[TRPT]   |process id      |                                                       |         |N/A       |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |J[OURNAL]  |file-name       |-EX[TRACT][=file-specification|                        |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-stdout]                                               |V5.5-000 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-REG[ION]                                              |V6.2-000 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-REC[OVER] | -RO[LLBACK]                               |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-SH[OW][=show-option-list]                             |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]V[ERIFY]                                          |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-BA[CKWARD] | -FO[RWARD]                               |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-CO[RRUPTDB]                                           |V6.3-010 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |L[OAD]     |file-name       |-BE[GIN]=integer                                       |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-BLOCK_DENSITY                                         |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-E[ND]=integer                                         |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-FI[LLFACTOR]=integer                                  |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-FO[RMAT]=GO|B[INARY]|Z[WR]                            |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-S[TDIN]                                               |V5.5-000 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-O[NERROR]                                             |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |REO[RG]    |                |-D[OWNGRADE]                                           |-V7.0-000|          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-ENCR[YPT]=key                                         |V6.3-000 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-E[XCLUDE]=global-name-list                            |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-FI[LL_FACTOR]=integer                                 |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-I[NDEX_FILL_FACTOR]=integer                           |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-K[EEP]={pct%|blocks}                                  |V6.3-009 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-NOCO[ALESCE]                                          |V6.3-009 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-NOSP[LIT]                                             |V6.3-009 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-NOSW[AP]                                              |V6.3-009 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-R[ESUME]                                              |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-S[ELECT]=global-name-list                             |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-T[RUNCATE][=percentage]                               |V5.5-000 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-UP[GRADE]                                             |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-REG[ION] region-list                                  |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |REP[LICATE]|file-name       |-E[DITINSTANCE]                                        |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-N[AME]                                                |V5.5-000 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-I[NSTANCE_CREATE]                                     |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-R[ECEIVER                                             |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-S[OURCE]                                              |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-UPDA[TEPROC]                                          |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |RE[STORE]  |file-name or    |-[NO]E[XTEND]                                          |         |Y         |
+   |           |file-list       |                                                       |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |RU[NDOWN]  |file-name or    |-F[ILE]                                                |         |Y         |
+   |           |region-name     |                                                       |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-R[EGION]                                              |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-RELINKCTL [dir]                                       |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-OVERRIDE                                              |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |file-name or    |SE[T] {-FI[LE] file-name|-JN[LFILE]                    |         |          |
+   |SE[T]      |region-name     |journal-file-name|-REG[ION]                            |         |          |
+   |           |                |region-list|-REP[LICATION]={ON|OFF}}                   |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-AC[CESS_METHOD]={BG|MM}                               |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]AS[YNCIO]                                         |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]DE[FER_TIME][=seconds]                            |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]DEFER_ALLOCATE                                    |V6.2-002 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]EP[OCHTAPER]                                      |V6.2-001 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]ENCRYPTABLE                                       |V6.3-000 |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-E[XTENSION_COUNT]=integer(no of blocks)               |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-F[LUSH_TIME]=integer                                  |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-FU[LLBLKWRT]={0|1|2}                                  |V6.3-012 |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-G[LOBAL_BUFFERS]=integer                              |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-H[ARD_SPIN_COUNT]=integer                             |V6.3-003 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]INST[_FREEZE_ON_ERROR]                            |V6.0-000 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-JN[LFILE] journal-file-name                           |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-K[EY_SIZE]=bytes                                      |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]LCK_SHARES_DB_CRIT                                |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-L[OCK_SPACE]=integer                                  |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-M[UTEX_SLOTS]=integer                                 |V6.0-002 |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-N[ULL_SUBSCRIPTS]=value                               |V6.3-003 |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-PA[RTIAL_RECOV_BYPASS]                                |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]Q[DBRUNDOWN]                                      |V6.0-000 |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]REA[D_ONLY]                                       |V6.3-003 |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-REC[ORD_SIZE]=bytes                                   |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-REG[ION] region-list                                  |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-REP[LICATION]={ON|OFF}                                |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-RES[ERVED_BYTES]=integer                              |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-SLEE[P_SPIN_COUNT]=integer                            |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-SPIN[_SLEEP_MASK]=hexa_mask                           |V6.3-003 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-STAN[DALONENOT]                                       |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]STD[NULLCOLL]                                     |V6.3-003 |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]STAT[S]                                           |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-STATSD[B_ALLOCATION]=integer                          |V7.0-001 |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-V[ERSION]={V4|V6}                                     |-V7.0-000|          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-W[AIT_DISK]=integer                                   |         |Y         |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |SI[ZE]     |global-name-list|-H[EURISTIC]=estimation_technique                      |V6.0-001 |          |
+   |           |region-list     |                                                       |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-S[ELECT]=global-name-list                             |V6.0-001 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-R[EGION]=region-list                                  |V6.0-001 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |ST[OP]     |process-id      |process-id                                             |         |N/A       |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |TRIGGER    |-               |-TRIG[GERFILE]=<trigger_definitions_file>              |V5.4-002 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-NOPR[OMPT]                                            |V5.4-002 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-SELE[CT][=name-list|*][<select-output-file>]          |V5.4-002 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-UPGRADE                                               |V5.4-002 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |UP[GRADE]  |File-name or    |-F[ILE]                                                |V7.1-000 |Y         |
+   |           |region-list     |                                                       |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-R[EGION]                                              |         |Y         |
+   +---------------------------------------------------------------------------------------------------------+
 
    The following table summarizes the qualifiers.
 
-   +------------------------------------------------------------------------------------------------------------------------------------+
-   |            Main Qualifier            |      MUPIP Command       |            Options/Qualifiers            |   GT.M   | Standalone |
-   |                                      |                          |                                          | Version* |  Access#   |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |-EDITINSTANCE                         |REPLICATE                 |-CHANGE                                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-DETAIL                                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-OFFSET=hexa                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-VALUE=hexa                               |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-SIZE=hexa                                |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-VALUE=hexa                               |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-[NO]QDBRUNDOWN                           |V6.3-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |-FENCES=<fence-options-list>          |JOURNAL-RECOVER-ROLLBACK  |ALWAYS                                    |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |NONE                                      |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |PROCESS                                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |-OFF                                  |FREEZE                    |-OVERRIDE                                 |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-RECORD                                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |-ON                                   |FREEZE                    |-[NO]ONLINE                               |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-[NO]AUTORELEASE                          |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |-INSTANCE_CREATE                      |REPLICATE                 |-NAME                                     |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-NOREPLACE                                |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-SUPPLEMENTARY                            |V5.5-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-[NO]QDBRUNDOWN                           |V6.3-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |BACKUP                    |                                          |          |            |
-   |-JOURNAL=<journal-options-list>       |                          |ALIGNSIZE=integer                         |          |            |
-   |                                      |SET                       |                                          |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |ALLOCATION=integer                        |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |AUTOSWITCHLIMIT=integer                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |BEFORE_IMAGES                             |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |BUFFER_SIZE=integer                       |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |DISABLE                                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |ENABLE                                    |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |EPOCH_INTERVAL=integer                    |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |EXTENSION=integer                         |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |FILENAME=file_name                        |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |OFF                                       |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |ON                                        |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |SYNC_IO                                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |YIELD_LIMIT=integer                       |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |-RECOVER                  |                                          |          |            |
-   |-LOOKBACK_LIMIT=lookback-option-list  |                          |TIME="time"                               |          |            |
-   |                                      |-ROLLBACK                 |                                          |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |OPERATIONS=integer                        |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |-RECEIVER                             |REPLICATE                 |-AUTOROLLBACK                             |V5.5-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-BUFFSIZE=integer                         |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-CHANGELOG                                |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-CHECKHEALTH                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-CMPLVL=integer                           |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-FILTER=filter_name                       |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-he[lpers]=[m[,n]]                        |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-INITIALIZE                               |V6.0-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-CMPLVL=n                                 |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-LISTENPORT=integer [                     |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-AUTOROLLBACK[=VERBOSE]]                  |V5.5-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-LOG=logfile                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-LOG_INTERVAL=integer                     |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-NORESYNC                                 |V5.5-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-RESUME=strm_num                          |V5.5-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-REUSE=instname                           |V5.5-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-RSYNC_STRM=strm_num                      |V5.5-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-SHOWBACKLOG                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-SHUTDOWN                                 |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-START                                    |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-STATSLOG=[ON|OFF]                        |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-STOPRECEIVERFILTER                       |V6.3-009  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-STOPSOURCEFILTER                         |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-TIMEOUT=seconds                          |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-TLSID=label                              |V6.1-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-UPDATEONLY                               |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-UPDOK                                    |V5.5-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-UPDNOTOK                                 |V5.5-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-UPDATERESYNC=/path/to/bkup-orig-inst     |V5.5-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |-RECOVER                              |JOURNAL                   |-AFTER=time                               |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-APPLY_AFTER_IMAGE                        |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-BACKWARD                                 |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-BEFORE=time                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-[NO]BROKENTRANS[=file]                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-CHAIN                                    |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-CHECKTN                                  |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-[NO]ER[ROR_LIMIT][=integer]              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-FENCES=fence-option-list                 |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-FORWARD                                  |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-FULL                                     |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-GLOBAL=<global_list>                     |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-ID=<pid_list>                            |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-INTERACTIVE                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-LOOKBACK_LIMIT=<lookback_limit_options>  |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-[NO]LOSTTRANS[=file]                     |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-PARA[LLEL][=n]                           |V6.3-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-RED[IRECT]=file-pair-list                |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-SINCE=time                               |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-VERBOSE                                  |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-VERIFY                                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |-EXTRACT                              |JOURNAL                   |-AFTER=time                               |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-BEFORE=time                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-[NO]BROKENTRANS[=file]                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-CHAIN                                    |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-CHECKTN                                  |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-[NO]ER[ROR_LIMIT]=integer]               |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-FENCES=fence-option-list                 |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-FULL                                     |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-GLOBAL=<global_list>                     |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-GV[PATFILE]=/path/to/pattern-file        |V6.3-009  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-ID=<pid_list>                            |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-INTERACTIVE                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-LOOKBACK_LIMIT=<lookback_limit_options>  |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-[NO]LOSTTRANS[=file]                     |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-REGION                                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-SINCE=time                               |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-VERBOSE                                  |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-VERIFY                                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |-ROLLBACK                             |JOURNAL                   |-APPLY_AFTER_IMAGE                        |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-BACKWARD                                 |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-BEFORE=time                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-[NO]BROKENTRANS[=file]                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-[NO]ER[ROR_LIMIT][=integer]              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-FENCES=fence-option-list                 |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-FETCHRESYNC                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-LOOKBACK_LIMIT=<lookback_limit_options>  |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-[NO]LOSTTRANS[=file]                     |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-ONLINE                                   |V5.5-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-PARA[LLEL][=n]                           |V6.3-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-RES[YNC]=hexa;journal_sequence_number    |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-VERBOSE                                  |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-VERIFY                                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |-SHOW=<show-option-list>              |JOURNAL                   |-ACTIVE_PROCESSES                         |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-ALL                                      |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-BROKEN_TRANSACTIONS                      |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-HEADER                                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-PROCESSES                                |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-STATISTICS                               |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-AFTER=time                               |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-USER=user-list                           |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-TRANSACTION=[KILL|SET]                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-INTERACTIVE                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-GLOBAL=<global_list>                     |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-ID=<pid_list>                            |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-INTERACTIVE                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-PARA[LLEL][=n]                           |V6.3-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |-SINCE                                |BACKUP                    |-BYTESTREAM                               |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-COMPREHENSIVE                            |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-DATABASE                                 |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-INCREMENTAL                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-RECORD                                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |-SO[URCE]                             |REPLICATE                 |-ACTIVATE                                 |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-BUFFSIZE=Buffer_size                     |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-CHANGELOG                                |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-CHECKHEALTH                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-CMPLVL=integer                           |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-CONNECTPARAMS=connection_options         |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-DEACTIVATE                               |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-DETAIL                                   |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-FILTER=filter_name                       |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-FREEZE=on|off                            |V6.0-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-[NO]COMMENT=string                       |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-INSTSECONDARY=secondary_instance name    |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-NOJNLFILEONLY                            |V6.2-001  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-JNLPOOL-LOG=log_file                     |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-LOG_INTERVAL=integer                     |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-LOSTTNCOMPLETE                           |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-NEEDRESTART                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-PASSIVE                                  |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-[NO]PLAINTEXTFALLBACK                    |V6.1-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-PROPAGATEPRIMARY                         |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-RENEGOTIATE_INTERVAL=minutes             |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-ROOTPRIMARY                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-SECONDARY=secondary_instance_name        |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-SHOWBACKLOG                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-SHUTDOWN                                 |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-START                                    |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-STATSLOG                                 |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-STOPSOURCEFILTER                         |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-TIMEOUT=seconds                          |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-TLSID=label                              |V6.1-000  |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-UPDOK                                    |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-UPDNOTOK                                 |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |                          |-ZEROBACKLOG                              |          |            |
-   |--------------------------------------+--------------------------+------------------------------------------+----------+------------|
-   |                                      |DOWNGRADE                 |                                          |          |            |
-   |-VERSION={V4|V5}                      |                          |file-name                                 |          |            |
-   |                                      |UPGRADE                   |                                          |          |            |
-   +------------------------------------------------------------------------------------------------------------------------------------+
+   +-------------------------------------------------------------------------------------------------------------------------------------+
+   |            Main Qualifier            |      MUPIP Command       |            Options/Qualifiers            |   GT.M    | Standalone |
+   |                                      |                          |                                          | Version*  |  Access#   |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |-EDITINSTANCE                         |REPLICATE                 |-CHANGE                                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-DETAIL                                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-OFFSET=hexa                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-VALUE=hexa                               |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-SIZE=hexa                                |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-VALUE=hexa                               |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]QDBRUNDOWN                           |V6.3-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |-FENCES=<fence-options-list>          |JOURNAL-RECOVER-ROLLBACK  |ALWAYS                                    |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |NONE                                      |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |PROCESS                                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |-OFF                                  |FREEZE                    |-OVERRIDE                                 |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-RECORD                                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |-ON                                   |FREEZE                    |-[NO]ONLINE                               |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]AUTORELEASE                          |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |-INSTANCE_CREATE                      |REPLICATE                 |-NAME                                     |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-NOREPLACE                                |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-SUPPLEMENTARY                            |V5.5-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]QDBRUNDOWN                           |V6.3-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |BACKUP                    |                                          |           |            |
+   |-JOURNAL=<journal-options-list>       |                          |ALIGNSIZE=integer                         |           |            |
+   |                                      |SET                       |                                          |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |ALLOCATION=integer                        |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |AUTOSWITCHLIMIT=integer                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |BEFORE_IMAGES                             |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |BUFFER_SIZE=integer                       |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |DISABLE                                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |ENABLE                                    |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |EPOCH_INTERVAL=integer                    |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |EXTENSION=integer                         |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |FILENAME=file_name                        |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |OFF                                       |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |ON                                        |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |SYNC_IO                                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |YIELD_LIMIT=integer                       |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |-RECOVER                  |                                          |           |            |
+   |-LOOKBACK_LIMIT=lookback-option-list  |                          |TIME="time"                               |           |            |
+   |                                      |-ROLLBACK                 |                                          |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |OPERATIONS=integer                        |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |-RECEIVER                             |REPLICATE                 |-AUTOROLLBACK                             |V5.5-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-BUFFSIZE=integer                         |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-CHANGELOG                                |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-CHECKHEALTH                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-CMPLVL=integer                           |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-FILTER=filter_name                       |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-he[lpers]=[m[,n]]                        |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-INITIALIZE                               |V6.0-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-CMPLVL=n                                 |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-LISTENPORT=integer [                     |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-AUTOROLLBACK[=VERBOSE]]                  |V5.5-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-LOG=logfile                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-LOG_INTERVAL=integer                     |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-NORESYNC                                 |V5.5-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-RESUME=strm_num                          |V5.5-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-REUSE=instname                           |V5.5-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-RSYNC_STRM=strm_num                      |V5.5-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-SHOWBACKLOG                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-SHUTDOWN                                 |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-START                                    |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-STATSLOG=[ON|OFF]                        |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-STOPRECEIVERFILTER                       |V6.3-009   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-STOPSOURCEFILTER                         |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-TIMEOUT=seconds                          |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-TLSID=label                              |V6.1-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-UPDATEONLY                               |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-UPDOK                                    |V5.5-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-UPDNOTOK                                 |V5.5-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-UPDATERESYNC=/path/to/bkup-orig-inst     |V5.5-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |-RECOVER                              |JOURNAL                   |-AFTER=time                               |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-APPLY_AFTER_IMAGE                        |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-BACKWARD                                 |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-BEFORE=time                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]BROKENTRANS[=file]                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-CHAIN                                    |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-CHECKTN                                  |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]ER[ROR_LIMIT][=integer]              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-FENCES=fence-option-list                 |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-FORWARD                                  |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-FULL                                     |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-GLOBAL=<global_list>                     |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-ID=<pid_list>                            |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-INTERACTIVE                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-LOOKBACK_LIMIT=<lookback_limit_options>  |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]LOSTTRANS[=file]                     |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-PARA[LLEL][=n]                           |V6.3-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-RED[IRECT]=file-pair-list                |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-SINCE=time                               |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-VERBOSE                                  |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-VERIFY                                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |-EXTRACT                              |JOURNAL                   |-AFTER=time                               |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-BEFORE=time                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]BROKENTRANS[=file]                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-CHAIN                                    |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-CHECKTN                                  |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]ER[ROR_LIMIT]=integer]               |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-FENCES=fence-option-list                 |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-FULL                                     |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-GLOBAL=<global_list>                     |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-GV[PATFILE]=/path/to/pattern-file        |V6.3-009   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-ID=<pid_list>                            |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-INTERACTIVE                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-LOOKBACK_LIMIT=<lookback_limit_options>  |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]LOSTTRANS[=file]                     |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-REGION                                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-SINCE=time                               |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-VERBOSE                                  |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-VERIFY                                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |-ROLLBACK                             |JOURNAL                   |-APPLY_AFTER_IMAGE                        |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-BACKWARD                                 |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-BEFORE=time                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]BROKENTRANS[=file]                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]ER[ROR_LIMIT][=integer]              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-FENCES=fence-option-list                 |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-FETCHRESYNC                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-LOOKBACK_LIMIT=<lookback_limit_options>  |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]LOSTTRANS[=file]                     |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-ONLINE                                   |V5.5-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-PARA[LLEL][=n]                           |V6.3-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-RES[YNC]=hexa;journal_sequence_number    |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-VERBOSE                                  |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-VERIFY                                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |-SHOW=<show-option-list>              |JOURNAL                   |-ACTIVE_PROCESSES                         |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-ALL                                      |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-BROKEN_TRANSACTIONS                      |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-HEADER                                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-PROCESSES                                |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-STATISTICS                               |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-AFTER=time                               |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-USER=user-list                           |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-TRANSACTION=[KILL|SET]                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-INTERACTIVE                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-GLOBAL=<global_list>                     |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-ID=<pid_list>                            |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-INTERACTIVE                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-PARA[LLEL][=n]                           |V6.3-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |-SINCE                                |BACKUP                    |-BYTESTREAM                               |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-COMPREHENSIVE                            |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-DATABASE                                 |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-INCREMENTAL                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-RECORD                                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |-SO[URCE]                             |REPLICATE                 |-ACTIVATE                                 |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-BUFFSIZE=Buffer_size                     |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-CHANGELOG                                |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-CHECKHEALTH                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-CMPLVL=integer                           |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-CONNECTPARAMS=connection_options         |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-DEACTIVATE                               |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-DETAIL                                   |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-FILTER=filter_name                       |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-FREEZE=on|off                            |V6.0-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]COMMENT=string                       |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-INSTSECONDARY=secondary_instance name    |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-NOJNLFILEONLY                            |V6.2-001   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-JNLPOOL-LOG=log_file                     |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-LOG_INTERVAL=integer                     |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-LOSTTNCOMPLETE                           |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-NEEDRESTART                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-PASSIVE                                  |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]PLAINTEXTFALLBACK                    |V6.1-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-PROPAGATEPRIMARY                         |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-RENEGOTIATE_INTERVAL=minutes             |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-ROOTPRIMARY                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-SECONDARY=secondary_instance_name        |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-SHOWBACKLOG                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-SHUTDOWN                                 |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-START                                    |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-STATSLOG                                 |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-STOPSOURCEFILTER                         |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-TIMEOUT=seconds                          |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-TLSID=label                              |V6.1-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-UPDOK                                    |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-UPDNOTOK                                 |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-ZEROBACKLOG                              |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |DOWNGRADE                 |                                          |           |            |
+   |-VERSION={V4|V5}                      |                          |file-name                                 |-V7.0-000  |            |
+   |                                      |UPGRADE                   |                                          |           |            |
+   +-------------------------------------------------------------------------------------------------------------------------------------+
 
    * denotes the GT.M version in which the qualifier or command was first
-   introduced. This column is maintained for qualifiers and command
-   introduced in GT.M versions starting with GT.M V5.4-002.
+   introduced. Versions that start with a minus sign, -, denote versions
+   where the qualifier or command was removed. This column is maintained for
+   qualifiers and command introduced in GT.M versions starting with GT.M
+   V5.4-002.
 
    # Additional information about Standalone Access:
 
@@ -9165,7 +9197,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2022
+   Copyright 2023
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

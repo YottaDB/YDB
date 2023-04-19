@@ -20,6 +20,8 @@
 #include "advancewindow.h"
 #include "show_source_line.h"
 #include "start_fetches.h"
+#include "error.h"
+#include "gtm_string.h"
 
 GBLREF command_qualifier	cmd_qlf;
 GBLREF int			mlmax;
@@ -36,6 +38,7 @@ error_def(ERR_MULTFORMPARM);
 error_def(ERR_MULTLAB);
 error_def(ERR_NAMEEXPECTED);
 error_def(ERR_NESTFORMP);
+error_def(ERR_TEXT);
 
 boolean_t line(uint4 *lnc)
 {
@@ -43,19 +46,17 @@ boolean_t line(uint4 *lnc)
 	int		parmcount, varnum;
 	short int	dot_count;
 	mlabel		*x;
-	mline		*curlin;
+	mline		*added_ret, *curlin;
 	triple		*first_triple, *parmbase, *parmtail, *r, *e;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(0 == TREF(expr_depth));
 	first_triple = (TREF(curtchain))->exorder.bl;
 	dot_count = 0;
 	parmbase = NULL;
 	success = TRUE;
 	curlin = (mline *)mcalloc(SIZEOF(*curlin));
-	curlin->line_number = 0;
-	curlin->table = FALSE;
-	assert(0 == TREF(expr_depth));
 	curlin->line_number = *lnc;
 	*lnc = *lnc + 1;
 	curlin->table = TRUE;
@@ -101,13 +102,33 @@ boolean_t line(uint4 *lnc)
 			 */
 			assert((OC_LINESTART == parmbase->exorder.bl->opcode) || (OC_LINEFETCH == parmbase->exorder.bl->opcode));
 			assert(0 != parmbase->exorder.bl->src.line);
-			/* No error should be inserted before the first label of the routine. */
 			if ((mlabtab->rson != x) || TREF(code_generated))
-			{
+			{	/* Don't insert an error before the first label of the routine. as no fallthrough possible */
+				if (TREF(block_level))
+				{	/* block_level means leaving embedded subroutine - assure OC_RET before inserted error */
+					if ((OC_RET != first_triple->opcode)
+						&& !(TREF(compile_time) && !(cmd_qlf.qlf & CQ_WARNINGS)))
+					{	/* warn of added QUIT */
+						show_source_line(TRUE);
+						dec_err(VARLSTCNT(6) MAKE_MSG_WARNING(ERR_FALLINTOFLST), 0,
+							ERR_TEXT, 2, RTS_ERROR_STRING("Adding implicit QUIT above"));
+					}
+					e = maketriple(OC_RET);	/* this needs an entry in line table to serve as jmp target */
+					r = first_triple->exorder.fl;
+					dqins(r, exorder, e);
+					first_triple = r->exorder.fl;
+					added_ret = (mline *)mcalloc(SIZEOF(*added_ret));
+					added_ret->externalentry = first_triple;
+					added_ret->table = FALSE;
+					added_ret->line_number = *lnc;
+					added_ret->block_ok = FALSE;
+					added_ret->parent = &mline_root;
+					added_ret->child = added_ret->sibling = NULL;
+					mline_tail = added_ret;
+				}
 				e = maketriple(OC_RTERROR);
 				e->operand[0] = put_ilit(ERR_FALLINTOFLST);
-				/* Not a subroutine/func reference. */
-				e->operand[1] = put_ilit(FALSE);
+				e->operand[1] = put_ilit(FALSE);	/* Not a subroutine/func reference. */
 				r = parmbase->exorder.bl->exorder.bl;
 				dqins(r, exorder, e);
 				embed_error = TRUE;

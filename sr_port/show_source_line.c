@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -132,7 +132,7 @@ void show_source_line(boolean_t warn)
 				dec_err(VARLSTCNT(6) ERR_SRCLIN, 4, (TREF(source_buffer)).len - 1, (TREF(source_buffer)).addr,
 					b - buf, buf);
 		else
-			dec_err(VARLSTCNT(2) ERR_SRCLNNTDSP, 1, MAXLINESIZEFORDISPLAY);
+			dec_err(VARLSTCNT(3) ERR_SRCLNNTDSP, 1, MAXLINESIZEFORDISPLAY);
 		if (!run_time)
 			dec_err(VARLSTCNT(6) ERR_SRCLOC, 4, TREF(last_source_column), TREF(source_line),
 				source_name_len, source_file_name);

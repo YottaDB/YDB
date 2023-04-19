@@ -1733,7 +1733,7 @@
    block sizes and using more appropriate block sizes for other global
    variables. 4KiB and 8KiB are popular database block sizes.
 
-   By default, GDE uses a BLOCK_SIZE of 1024 bytes.
+   By default, GDE uses a BLOCK_SIZE of 4096 bytes.
 
    --[NO]DEFER_ALLOCATE
 
@@ -2245,7 +2245,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2022
+   Copyright 2023
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

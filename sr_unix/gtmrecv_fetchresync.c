@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,7 +17,7 @@
 #include "gtm_string.h"
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
-#include "gtm_select.h"
+#include "gtm_poll.h"
 
 #include "gtm_un.h"
 #include "gtm_time.h" /* needed for difftime() definition; if this file is not included, difftime returns bad values on AIX */
@@ -77,7 +77,7 @@
 					LEN_AND_LIT("Error in send() for " MESSAGE), STATUS);	/* BYPASSOK(send) */		\
 		else if (EREPL_SELECT == repl_errno)										\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,					\
-					LEN_AND_LIT("Error in select() for " MESSAGE), STATUS);					\
+					LEN_AND_LIT("Error in poll() for " MESSAGE), STATUS);					\
 	}															\
 	if (0 >= WAIT_COUNT)													\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,						\
@@ -157,40 +157,39 @@ void gtmrecv_fetchresync_connect(int port)
 	int                             status;
 	struct addrinfo                 primary_ai;
 	struct sockaddr_storage         primary_sas;
-	struct timeval                  repl_poll_wait;
-	fd_set                          input_fds;
 	time_t                          t1, t2;
 	int				save_errno;
+	int				poll_timeout;
+	nfds_t				poll_nfds;
+	struct pollfd			poll_fdlist[1];
 
 	gtmrecv_comm_init(port);
 	primary_ai.ai_addr = (sockaddr_ptr)&primary_sas;
 	primary_ai.ai_addrlen = SIZEOF(primary_sas);
 	remote_side->proto_ver = REPL_PROTO_VER_UNINITIALIZED;
 	repl_log(stdout, TRUE, TRUE, "Waiting for a connection...\n");
-	assertpro(FD_SETSIZE > gtmrecv_listen_sock_fd);
-	FD_ZERO(&input_fds);
-	FD_SET(gtmrecv_listen_sock_fd, &input_fds);
 	while (TRUE)
 	{
 		t1 = time(NULL);
-		repl_poll_wait.tv_sec = MAX_WAIT_FOR_FETCHRESYNC_CONN;
-		repl_poll_wait.tv_usec = 0;
-		while (0 > (status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &repl_poll_wait)))
+		poll_fdlist[0].fd = gtmrecv_listen_sock_fd;
+		poll_fdlist[0].events = POLLIN;
+		poll_nfds = 1;
+		poll_timeout = MAX_WAIT_FOR_FETCHRESYNC_CONN * MILLISECS_IN_SEC;
+		while (0 > (status = poll(&poll_fdlist[0], poll_nfds, poll_timeout)))
 		{
 			if ((EINTR == errno)  || (EAGAIN == errno))
 			{
 				t2 = time(NULL);
-				if (0 >= (int)(repl_poll_wait.tv_sec = (MAX_WAIT_FOR_FETCHRESYNC_CONN - (int)difftime(t2, t1))))
+				if (0 >= (int)(poll_timeout =
+					(MILLISECS_IN_SEC * (MAX_WAIT_FOR_FETCHRESYNC_CONN - (int)difftime(t2, t1)))))
 				{
 					status = 0;
 					break;
 				}
-				repl_poll_wait.tv_usec = 0;
-				FD_SET(gtmrecv_listen_sock_fd, &input_fds);
 				continue;
 			} else
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					LEN_AND_LIT("Error in select on listen socket"), errno);
+					LEN_AND_LIT("Error in poll on listen socket"), errno);
 		}
 		if (status == 0)
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,7 @@
 #include "opcode.h"
 #include "mdq.h"
 #include "mmemory.h"
+#include "fullbool.h"
 
 LITREF octabstruct oc_tab[];
 
@@ -39,6 +40,8 @@ void bx_tail(triple *t, boolean_t sense, oprtype *addr)
  * triple		*t;     triple to be processed
  * boolean_t	sense;  code to be generated is jmpt or jmpf
  * oprtype		*addr;  address to jmp
+ * All called functions are leaf functions except for the (s)boolop ones, which call this recursively only
+ * to construct unified chains for directly nested pure bools.
  */
 {
 	opctype	c;
@@ -52,11 +55,24 @@ void bx_tail(triple *t, boolean_t sense, oprtype *addr)
 	assert((TRIP_REF == t->operand[1].oprclass) || (NO_REF == t->operand[1].oprclass));
 	if (OCT_NEGATED & oc_tab[c = t->opcode].octype)
 		sense = !sense;
+	if (EXT_BOOL == TREF(gtm_fullbool))
+	{
+		switch (c)
+		{
+		case OC_AND:
+		case OC_NAND:
+		case OC_OR:
+		case OC_NOR:
+			CONVERT_TO_SE(t);
+			c = t->opcode;
+			break;
+		default:
+			break;
+		}
+	}
 	switch (c)
 	{
 	case OC_COBOOL:
-		ex_tail(&t->operand[0]);
-		RETURN_IF_RTS_ERROR;
 		if (OC_GETTRUTH == t->operand[0].oprval.tref->opcode)
 		{
 			assert(NO_REF == t->operand[0].oprval.tref->operand[0].oprclass);
@@ -69,9 +85,19 @@ void bx_tail(triple *t, boolean_t sense, oprtype *addr)
 		ref->operand[0] = put_indr(addr);
 		dqins(t, exorder, ref);
 		return;
+	case OC_SCOBOOL:
+		/* Unlike S(N)AND and S(N)OR, COBOOLS are typically left in the execution chain by CG time.
+		 * Therefore this pseudo-op MUST be reverted before it arrives there. It is necessary to protect $TEST from
+		 * side effects - the original logic assumes the locality of GETTRUTH and its cobool. Conversion to scobool
+		 * must only ever take place when there is a guarantee that this function will be called on the converted triple.
+		 */
+		ref = maketriple(sense ? OC_JMPNEQ : OC_JMPEQU);
+		ref->operand[0] = put_indr(addr);
+		dqins(t, exorder, ref);
+		t->opcode = OC_COBOOL;
+		return;
 	case OC_COM:
 		bx_tail(t->operand[0].oprval.tref, !sense, addr);
-		RETURN_IF_RTS_ERROR;
 		t->opcode = OC_NOOP;				/* maybe operand or target, so noop, rather than dqdel the com */
 		t->operand[0].oprclass = NO_REF;
 		return;
@@ -108,9 +134,19 @@ void bx_tail(triple *t, boolean_t sense, oprtype *addr)
 		bx_boolop(t, FALSE, sense, sense, addr);
 		RETURN_IF_RTS_ERROR;
 		break;
+	case OC_SNAND:
+	case OC_SAND:
+		bx_sboolop(t, FALSE, sense, sense, addr);
+		RETURN_IF_RTS_ERROR;
+		break;
 	case OC_NOR:
 	case OC_OR:
 		bx_boolop(t, TRUE, !sense, sense, addr);
+		RETURN_IF_RTS_ERROR;
+		break;
+	case OC_SNOR:
+	case OC_SOR:
+		bx_sboolop(t, TRUE, !sense, sense, addr);
 		RETURN_IF_RTS_ERROR;
 		break;
 	default:

@@ -1,6 +1,5 @@
 bin_load
 db_ipcs_reset
-desired_db_format_set
 ext2jnl
 go_load
 gtm_tempnam
@@ -150,7 +149,6 @@ mupip_size
 mupip_stop
 mupip_trigger
 mupip_upgrade
-mupip_upgrade_standalone
 mur_apply_pblk
 mur_back_process
 mur_block_count_correct
@@ -221,3 +219,4 @@ updproc_end
 updproc_get_gblname
 updproc_init
 updproc_open_files
+verify_db_format_change_request

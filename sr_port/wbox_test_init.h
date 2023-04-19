@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- * Copyright (c) 2005-2022 Fidelity National Information	*
+ * Copyright (c) 2005-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -126,7 +126,7 @@ typedef enum {
 	WBTEST_ANTIFREEZE_OUTOFSPACE,		/* 81 :  */
 	/* End ANTIFREEZE related white box test cases */
 	WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP,	/* 82 : Send SIGTSTP to self if wcs_timers is 0 */
-	WBTEST_CONCBKUP_RUNNING,		/* 83 : Sleep in mupip_backup to test concurrent BACKUPs */
+	WBTEST_UNUSED_83,			/* 83 : Was WBTEST_CONCBKUP_RUNNING */
 	WBTEST_LONGSLEEP_IN_REPL_SHUTDOWN,	/* 84 : Sleep in Source/Receiver shutdown logic to ensure sem/shm is not removed */
 	WBTEST_FORCE_WCS_GET_SPACE,		/* 85 : Simulate state in which nearly all global buffers are dirty, forcing
 						 *      wcs_get_space to be called before committing an update */
@@ -224,7 +224,9 @@ typedef enum {
 	WBTEST_JOBFAIL_FILE_LIM,		/* 174 : starve the process of file descriptors to produce a JOBFAIL */
 	WBTEST_BACKUP_FORCE_MV_RV,		/* 175 : Force error during MUPIP BACKUP mv phase */
 	WBTEST_RTNOBJ_INTEG,			/* 176 : Inject a loop into the relinkctl linked list to trigger rtnobj_integ() */
-	WBTEST_INDUCE_TLSIOERR			/* 177 : Source Server does not close the network socket in error shutdown */
+	WBTEST_INDUCE_TLSIOERR,			/* 177 : Source Server does not close the network socket in error shutdown */
+	WBTEST_MU_STOP_THREAD			/* 178 : Will sleep in gtm_multi_thread to let us verify that first two MUPIP STOPs
+                                                 *       are indeed deferred in the interrupt-deferred zone, but the third isn't */
 
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable

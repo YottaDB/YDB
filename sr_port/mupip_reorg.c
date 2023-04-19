@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,6 +69,7 @@
 error_def(ERR_CONCURTRUNCINPROG);
 error_def(ERR_DBRDONLY);
 error_def(ERR_EXCLUDEREORG);
+error_def(ERR_GTMCURUNSUPP);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUPCLIERR);
@@ -86,7 +87,9 @@ error_def(ERR_MUKEEPNODEC);
 GBLREF	bool			error_mupip;
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
+GBLREF	boolean_t		debug_mupip;
 GBLREF	boolean_t		jnlpool_init_needed;
+GBLREF	boolean_t		mu_reorg_more_tries;
 GBLREF	boolean_t		mu_reorg_process;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey_next_reorg, *gv_currkey, *gv_altkey;
@@ -129,6 +132,8 @@ void mupip_reorg(void)
 	mu_outofband_setup();
 	truncate = FALSE;
 	reg_list = NULL;
+	/* DBG qualifier prints extra debug messages where applicable */
+	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
 	if (CLI_PRESENT == cli_present("TRUNCATE"))
 		truncate = TRUE;
 	if (CLI_PRESENT == cli_present("KEEP"))
@@ -170,8 +175,10 @@ void mupip_reorg(void)
 			mupip_exit(ERR_MUNOACTION);
 		}
 	}
-	if ((CLI_PRESENT == cli_present("UPGRADE")) || (CLI_PRESENT == cli_present("DOWNGRADE")))
-	{	/* Note that "mu_reorg_process" is not set to TRUE in case of MUPIP REORG -UPGRADE/DOWNGRADE.
+	if (CLI_PRESENT == cli_present("DOWNGRADE"))
+		mupip_exit(ERR_GTMCURUNSUPP);
+	if (CLI_PRESENT == cli_present("UPGRADE"))
+	{	/* Note that "mu_reorg_process" is not set to TRUE in case of MUPIP REORG -UPGRADE
 		 * This is intentional because we are not doing any REORG kind of processing.
 		 */
 		mu_reorg_upgrd_dwngrd();
@@ -291,7 +298,7 @@ void mupip_reorg(void)
 	}
 	TREF(want_empty_gvts) = FALSE;
 
-	mu_reorg_process = TRUE;
+	mu_reorg_more_tries = mu_reorg_process = TRUE;
 	assert(NULL == gv_currkey_next_reorg);
 	GVKEYSIZE_INIT_IF_NEEDED;	/* sets "gv_keysize", "gv_currkey" and "gv_altkey" (if not already done) */
 	GVKEY_INIT(gv_currkey_next_reorg, gv_keysize);
@@ -302,7 +309,7 @@ void mupip_reorg(void)
 	{
 		/* mu_reorg_process can't be set before gv_select above as the assert(!mu_reorg_process) fails in gvcst_search.
 		 * The option to set mu_reorg_process before calling gv_select and clearing it after being used in gvcst_init,
-		 *  can't be taken up as gvcst_init is called multiple times, once for each region.
+		 * can't be taken up as gvcst_init is called multiple times, once for each region.
 		 * This means gvcst_init() doesn't set csa->gbuff and we need to set csa->gbuff_limit explicitly now. */
 		if (0 == (TREF(gbuff_limit)).str.len)
 		{
@@ -413,7 +420,7 @@ void mupip_reorg(void)
 			mu_swap_root(&hasht_gl, &root_swap_statistic, 0);
 		}
 		util_out_print("Total root blocks moved: !UL", FLUSH, root_swap_statistic);
-		mu_reorg_process = FALSE;
+		mu_reorg_more_tries = mu_reorg_process = FALSE;
 		/* Default threshold is 0 i.e. we attempt to truncate no matter what free_blocks is. */
 		truncate_percent = 0;
 		cli_get_int("TRUNCATE", (int4 *)&truncate_percent);

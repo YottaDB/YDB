@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -47,12 +47,27 @@ int bool_expr(boolean_t sense, oprtype *addr)
 		return TRUE;
 	}
 	coerce(&x, OCT_BOOL);
-	UNARY_TAIL(&x);
+	/* In this function, x is a convenience opr expected by eval_expr and unary_tail, but unused elsewhere.
+	 * It points to the toplevel expression of this bool_expr, COBOOLed if not bool already by definition.
+	 * It refers to a triple, call it t0, which may itself refer to triples (call them t1/t2). We call ex_tail
+	 * on t1 and t2, but not t0, because this function takes care of the boolean handling for that top-level
+	 * triple, but we need to guarantee that everything lower is processed first. This function therefore must
+	 * mirror the structure of ex_tail, except insofar as it implements the boolinit/fini-free boolean handling.
+	 * As for the flags: the first tells ex_tail that any directly-nested booleans will be processed by a caller
+	 * function, so don't construct a boolchain for them yet. The final one says that this isn't a COMVAL-COBOOL
+	 * situation, where we'd need to defer making the COBOOL into a boolchain in view of pending simplification by
+	 * unary_tail or something similar.
+	 */
+	if (x.oprval.tref->operand[0].oprclass == TRIP_REF)
+		ex_tail(&x.oprval.tref->operand[0], TRUE, FALSE);
+	if (x.oprval.tref->operand[1].oprclass == TRIP_REF)
+		ex_tail(&x.oprval.tref->operand[1], TRUE, FALSE);
 	for(t2 = t1 = x.oprval.tref; OCT_UNARY & oc_tab[t1->opcode].octype; t2 = t1, t1 = t1->operand[0].oprval.tref)
 		;
 	if (OCT_ARITH & oc_tab[t1->opcode].octype)
-		ex_tail(&t2->operand[0]);
-	else if (OCT_BOOL & oc_tab[t1->opcode].octype)
+		ex_arithlit(t1);
+	UNARY_TAIL(&x);
+	if (OCT_BOOL & oc_tab[t1->opcode].octype)
 		bx_boollit(t1);
 	for (t1 = x.oprval.tref; OC_NOOP == t1->opcode; t1 = t1->exorder.bl)
 		;

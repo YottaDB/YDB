@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,8 +39,8 @@
 #include "gtm_string.h"
 #include "gtm_ctype.h"
 #include "gtm_stdio.h"
-#include "gtm_select.h"
 #include "eintr_wrappers.h"
+#include "gtm_poll.h"
 
 #include "copy.h"
 #include "gt_timer.h"
@@ -86,13 +87,15 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 	char                    msg_buffer[1024];
 	mstr                    msg_string;
 	ABS_TIME                cur_time, end_time;
-	fd_set                  tcp_fd;
 	struct sockaddr_storage peer;
 	short 			retry_num;
 	int 			save_errno, errlen;
 	const char		*terrptr;
 	int			errcode;
 	boolean_t		af;
+	int			poll_timeout;
+	nfds_t			poll_nfds;
+	struct pollfd		poll_fdlist[1];
 
 	msg_string.len = SIZEOF(msg_buffer);
 	msg_string.addr = msg_buffer;
@@ -209,8 +212,6 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			utimeout.tv_sec = timeout;
 			utimeout.tv_usec = 0;
 		}
-		assertpro(FD_SETSIZE > lsock);
-		FD_ZERO(&tcp_fd);
 		while (TRUE)
 		{
 			while (TRUE)
@@ -218,10 +219,16 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 				/* The check for EINTR below is valid and should not be converted to an EINTR wrapper macro
 				 * since it might be a timeout.
 				 */
-				FD_SET(lsock, &tcp_fd);
                                 save_utimeout = utimeout;
-				rv = select(lsock + 1, (void *)&tcp_fd, (void *)0, (void *)0,
-					(NO_M_TIMEOUT == timeout) ? (struct timeval *)0 : &utimeout);
+				poll_fdlist[0].fd = lsock;
+				poll_fdlist[0].events = POLLIN;
+				poll_nfds = 1;
+				if (NO_M_TIMEOUT == timeout)
+					poll_timeout = -1;
+				else
+					poll_timeout = (long)((utimeout.tv_sec * MILLISECS_IN_SEC) +
+						DIVIDE_ROUND_UP(utimeout.tv_usec, MICROSECS_IN_MSEC));
+				rv = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 				save_errno = errno;
                                 utimeout = save_utimeout;
 				if ((0 <= rv) || (EINTR != save_errno))
@@ -247,7 +254,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			{
 				(void)close(lsock);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					   LEN_AND_LIT("select()"), CALLFROM, save_errno);
+					   LEN_AND_LIT("poll()"), CALLFROM, save_errno);
 				assert(FALSE);
 				return -1;
 			}

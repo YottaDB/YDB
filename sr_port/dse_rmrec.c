@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,12 +26,12 @@
 #include "gdscc.h"
 #include "cli.h"
 #include "copy.h"
-#include "filestruct.h"
 #include "jnl.h"
 #include "util.h"
 #include "skan_offset.h"
 #include "skan_rnum.h"
 #include "dse.h"
+#include "filestruct.h"
 
 /* Include prototypes */
 #include "t_qread.h"
@@ -70,6 +70,7 @@ void dse_rmrec(void)
 	uchar_ptr_t	lbp, b_top, rp, r_top, key_top, rp_base;
 	unsigned short	cc, cc_base;
 
+	DSE_DB_IS_TOO_OLD(cs_addrs, cs_data, gv_cur_region);
 	if (gv_cur_region->read_only)
 		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */

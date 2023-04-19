@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "gtm_signal.h"
 #include "gtm_unistd.h"
 #include "gtm_stdlib.h"
-#include "gtm_select.h"
+#include "gtm_poll.h"
 #include "gtm_string.h"
 
 #include <errno.h>
@@ -162,7 +162,6 @@ void	dm_read (mval *v)
 	const char	delimiter_string[] = " \t";
 	d_tt_struct 	*tt_ptr;
 	enum RECALL_ERR_CODE	err_recall = NO_ERROR;
-	fd_set		input_fd;
 	int		backspace, cl, cur_cl, cur_value, delete, down, hist, histidx, index, insert_key, keypad_len, left;
 	int		delchar_width;		/* display width of deleted char */
 	int		delta_width;		/* display width change for replaced char */
@@ -177,7 +176,6 @@ void	dm_read (mval *v)
 	io_desc 	*io_ptr;
 	io_termmask	mask_term;
 	mv_stent	*mvc, *mv_zintdev;
-	struct timeval	input_timeval;
 	tt_interrupt	*tt_state;
 	uint4		mask;
 	unsigned int	exp_length, len, length;
@@ -189,6 +187,9 @@ void	dm_read (mval *v)
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
 	unsigned short	escape_length = 0;
 	wint_t		*buffer_32_start, codepoint, *current_32_ptr, inchar, *ptr32;
+	int		poll_timeout;
+	nfds_t		poll_nfds;
+	struct pollfd	poll_fdlist[1];
 #	ifdef __MVS__
 	wint_t		asc_inchar;
 #	endif
@@ -354,19 +355,12 @@ void	dm_read (mval *v)
 			async_action(FALSE);
 			break;
 		}
-		assertpro(FD_SETSIZE > tt_ptr->fildes);
-		FD_ZERO(&input_fd);
-		FD_SET(tt_ptr->fildes, &input_fd);
-		assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));
+		poll_fdlist[0].fd = tt_ptr->fildes;
+		poll_fdlist[0].events = POLLIN;
+		poll_nfds = 1;
 		/* Arbitrarily-chosen timeout value to prevent consumption of resources in tight loop when no input is available. */
-		input_timeval.tv_sec = 100;
-		input_timeval.tv_usec = 0;
-		/* N.B. On some Unix systems, the documentation for select() is ambiguous with respect to the first argument.
-		 * It specifies the number of contiguously-numbered file descriptors to be tested, starting with descriptor zero.
-		 * Thus, it should be equal to the highest-numbered file descriptor to test plus one.
-		 * (See _UNIX_Network_Programming_ by W. Richard Stevens, Section 6.13, pp. 328-331)
-		 */
-		selstat = select(tt_ptr->fildes + 1, (void *)&input_fd, (void *)NULL, (void *)NULL, &input_timeval);
+		poll_timeout = 100 * MILLISECS_IN_SEC;
+		selstat = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 		if (0 > selstat)
 			if (EINTR != errno)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
@@ -385,14 +379,13 @@ void	dm_read (mval *v)
 			} else
 				continue;
 		} else if (0 == status)
-		{	/* select() says there's something to read, but read() found zero characters; assume connection dropped. */
+		{	/* poll() says there's something to read, but read() found zero characters; assume connection dropped. */
 			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ tt not socket */
 			tt_ptr->discard_lf = FALSE;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 		}
 		else if (0 < status)
-		{	/* select() says it's ready to read and read() found some data */
-			assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));
+		{
 			/* set prin_in_dev_failure to FALSE in case it was set to TRUE in the previous read which may have failed */
 			prin_in_dev_failure = FALSE;
 #			ifdef UTF8_SUPPORTED

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -422,7 +422,7 @@ void	mupip_freeze(void)
 		status = gtm_multi_proc((gtm_multi_proc_fnptr_t)&freeze_online_multi_proc, reg_total,
 				MULTI_PROC_ONE_PER_REG, ret_array, (void *)parallel_ctl, SIZEOF(reg_ctl_list),
 				shm_size, (gtm_multi_proc_fnptr_t)&freeze_online_multi_proc_init,
-				(gtm_multi_proc_fnptr_t)&freeze_online_multi_proc_finish);
+				(gtm_multi_proc_fnptr_t)&freeze_online_multi_proc_finish, GTM_MULTI_PROC_FREEZE);
 	}
 	for (rptr = grlist;  NULL != rptr;  rptr = rptr->fPtr)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@
 GBLREF	uint4		dollar_tlevel;
 GBLREF	boolean_t	created_core;
 GBLREF	boolean_t	dse_running;
-GBLREF	boolean_t	mu_reorg_upgrd_dwngrd_in_prog;
+GBLREF	uint4		mu_upgrade_in_prog;
 GBLREF	uint4		mu_reorg_encrypt_in_prog;
 
 error_def(ERR_DBBLEVMX);
@@ -92,6 +92,16 @@ error_def(ERR_DBNONUMSUBS);
 #define TEXT3 " :              LVL=0x"
 #define TEXT4 ","
 
+#ifdef DEBUG_BLKS_TO_UPGRD
+#define DEBUG_BLKS_TO_UPGRD_FORK_N_CORE											\
+MBSTART	{														\
+		if (mu_upgrade_in_prog)											\
+			gtm_fork_n_core();										\
+} MBEND
+#else
+#define DEBUG_BLKS_TO_UPGRD_FORK_N_CORE
+#endif
+
 #define MAX_UTIL_LEN (STRLEN(TEXT0) + BLOCK_WINDOW + STRLEN(TEXT3) + LEVEL_WINDOW + STRLEN(TEXT4) + 1)
 #define	RTS_ERROR_FUNC(CSA, ERR, BUFF, ERROR_ACTION, REG)	/* for reg in a message, replace NULL in invocation */	\
 {															\
@@ -111,6 +121,7 @@ error_def(ERR_DBNONUMSUBS);
 				DB_LEN_STR((gd_region *)REG));								\
 		else													\
 			send_msg_csa(CSA_ARG(CSA) VARLSTCNT(4) MAKE_MSG_INFO(ERR), 2, LEN_AND_STR((char_ptr_t)BUFF));	\
+		DEBUG_BLKS_TO_UPGRD_FORK_N_CORE;									\
 		if ((ASSERTPRO_ON_CERT_FAIL != ERROR_ACTION) || (INFO == SEVMASK(ERR)))					\
 			break;												\
 		assertpro(0 == ERR);											\
@@ -285,8 +296,8 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 		is_directory = TRUE;
 	if ((0 != root) && (DIR_ROOT != root))
 		is_gvt = TRUE;
-	/* MUPIP REORG -TRUNCATE has some special cases */
-	if (MUSWP_INCR_ROOT_CYCLE == TREF(in_mu_swap_root_state))
+	/* MUPIP REORG -TRUNCATE/-UPGRADE have some special cases */
+	if ((MUSWP_INCR_ROOT_CYCLE == TREF(in_mu_swap_root_state)) || mu_upgrade_in_prog)
 	{	/* We could be updating either a gvt root block or a directory leaf block. Don't know yet. */
 		is_directory = FALSE;
 		is_gvt = FALSE;
@@ -519,19 +530,19 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 					RTS_ERROR_FUNC(csa, ERR_DBPTRNOTPOS, util_buff, error_action, NULL);
 					return FALSE;
 				}
-				if ((child > csa->ti->total_blks) && !mu_reorg_upgrd_dwngrd_in_prog && !mu_reorg_encrypt_in_prog)
+				if ((child > csa->ti->total_blks) && !mu_upgrade_in_prog && !mu_reorg_encrypt_in_prog)
 				{	/* REORG -UPGRADE/DOWNGRADE/ENCRYPT can update recycled blocks, which may contain children
 					 * beyond total_blks if a truncate happened sometime after the block was killed.
 					 */
 					RTS_ERROR_FUNC(csa, ERR_DBPTRMX, util_buff, error_action, NULL);
 					return FALSE;
 				}
-				if (!(child % bplmap))
-				{
+				if (!(child % bplmap) && !mu_upgrade_in_prog)
+				{	/* mu_upgrade_bmm creates 0 pointers in order to deal with KILL's globals */
 					RTS_ERROR_FUNC(csa, ERR_DBPTRMAP, util_buff, error_action, NULL);
 					return FALSE;
 				}
-				if (child == prev_child)
+				if ((child == prev_child) && !mu_upgrade_in_prog)
 				{
 					RTS_ERROR_FUNC(csa, ERR_DBBDBALLOC, util_buff, error_action, NULL);
 					return FALSE;

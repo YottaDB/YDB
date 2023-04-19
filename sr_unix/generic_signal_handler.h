@@ -12,6 +12,7 @@
 #ifndef GENERIC_SIGNAL_HANDLER_INCLUDED
 #define GENERIC_SIGNAL_HANDLER_INCLUDED
 
+boolean_t is_timer_initialized(ABS_TIME);
 void generic_signal_handler(int sig, siginfo_t *info, void *context);
 
 #endif /* GENERIC_SIGNAL_HANDLER_INCLUDED */

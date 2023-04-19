@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,7 @@
 #include "bit_clear.h"
 
 GBLREF	boolean_t		dse_running;
+GBLREF	uint4			mu_upgrade_in_prog;		/* 1 indicates MUPIP UPGRADE in progress */
 
 uint4 bml_free(block_id setfree, sm_uc_ptr_t map)
 {
@@ -38,6 +39,6 @@ uint4 bml_free(block_id setfree, sm_uc_ptr_t map)
 	ret = bit_set(setfree, map);
 	ret1 = bit_clear(setfree + 1, map);
 	/* Assert that only a BUSY or RECYCLED block gets marked as FREE (dse is an exception) */
-	assert((!ret && !ret1) || (ret && ret1) || dse_running);
+	assert((!ret && !ret1) || (ret && ret1) || dse_running || mu_upgrade_in_prog);
 	return ret;
 }

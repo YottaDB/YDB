@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +27,7 @@ GBLREF struct NTD *ntd_root;
 error_def(CMI_BADPORT);
 error_def(CMI_NOTND);
 error_def(CMI_NETFAIL);
+error_def(ERR_FDSIZELMT);
 
 cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
                 void (*err)(struct NTD *, struct CLB *, cmi_reason_t reason),
@@ -124,7 +126,8 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 		SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 		return status;
 	}
-	assertpro(FD_SETSIZE > ntd_root->listen_fd);
+	if (FD_SETSIZE <= ntd_root->listen_fd)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FDSIZELMT, 1, ntd_root->listen_fd);
 	FD_SET(ntd_root->listen_fd, &ntd_root->rs);
 	FD_SET(ntd_root->listen_fd, &ntd_root->es);
 	ntd_root->err = err;

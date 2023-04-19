@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2022 Fidelity National Information	*
+ * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,6 +62,9 @@ GBLREF	uint4		process_id;
 GBLREF	boolean_t	skip_exit_handler;
 GBLREF	uint4		mutex_per_process_init_pid;
 
+static	const	char	shmget_caller_freeze[] = "called by MUPIP freeze";
+static	const	char	shmget_caller_recover[] = "called by MUPIP recover -forward";
+
 error_def(ERR_FORCEDHALT);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
@@ -92,7 +95,7 @@ error_def(ERR_TEXT);
 int	gtm_multi_proc(gtm_multi_proc_fnptr_t fnptr, int ntasks, int max_procs,
 					void **ret_array, void *parm_array, int parmElemSize,
 					size_t extra_shm_size, gtm_multi_proc_fnptr_t init_fnptr,
-					gtm_multi_proc_fnptr_t finish_fnptr)
+					gtm_multi_proc_fnptr_t finish_fnptr, enum shmget_caller caller)
 {
 	int			final_ret, rc, rc2, tasknum, shmid, save_errno;
 	char			errstr[256];
@@ -146,7 +149,8 @@ int	gtm_multi_proc(gtm_multi_proc_fnptr_t fnptr, int ntasks, int max_procs,
 	/* Allocate space for return array in shared memory. This will be later copied back to "ret_array" for caller */
 	shm_size += (SIZEOF(void *) * ntasks);
 	shm_size += extra_shm_size;
-	shmid = gtm_shmget(IPC_PRIVATE, shm_size, 0600 | IPC_CREAT, TRUE);
+	shmid = gtm_shmget(IPC_PRIVATE, shm_size, 0600 | IPC_CREAT, TRUE, caller,
+				GTM_MULTI_PROC_FREEZE == caller ? (char*)shmget_caller_freeze : (char*)shmget_caller_recover);
 	if (-1 == shmid)
 	{
 		save_errno = errno;

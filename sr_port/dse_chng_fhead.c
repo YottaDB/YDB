@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -538,7 +538,7 @@ void dse_chng_fhead(void)
 		if (x < DIVIDE_ROUND_UP(BLK_ZERO_OFF(cs_data->start_vbn) - SGMNT_HDR_LEN, DISK_BLOCK_SIZE))
 		{	/* if the start_vbn needs fixing, do that first */
 			cs_data->master_map_len = x * DISK_BLOCK_SIZE;
-			cs_data->free_space = BLK_ZERO_OFF(cs_data->start_vbn) - (SGMNT_HDR_LEN + x);
+			cs_data->free_space = BLK_ZERO_OFF(cs_data->start_vbn) - SIZEOF_FILE_HDR(cs_data);
 		} else
 		{
 			x = DIVIDE_ROUND_UP(BLK_ZERO_OFF(cs_data->start_vbn) - SGMNT_HDR_LEN, DISK_BLOCK_SIZE);

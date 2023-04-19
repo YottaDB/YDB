@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,22 +14,6 @@
 #define WCS_FLU_H_INCLUDED
 
 boolean_t wcs_flu(uint4 options);
-
-/* Uncomment the below #define if you want to write EPOCH records for EVERY update.
- * This feature (when coupled with replication can turn out to be very useful to debug integ errors.
- * Given that an integ error occurred, through a sequence of binary search like rollbacks, we can find out
- * exactly what transaction number the error occurred so we can have a copy of the db for the prior transaction
- * and compare it with the db after the bad transaction and see exactly what changed. This was very useful
- * in figuring out the cause of the DBKEYORD error as part of enabling clues for TP (C9905-001119).
- *
- * #define	UNCONDITIONAL_EPOCH
- */
-
-#ifdef UNCONDITIONAL_EPOCH
-#	define	UNCONDITIONAL_EPOCH_ONLY(X)	X
-#else
-#	define	UNCONDITIONAL_EPOCH_ONLY(X)
-#endif
 
 #define	SET_WCS_FLU_FAIL_STATUS(status, csd)								\
 {	/* Reasons we currently know why wcs_flu can fail (when called from t_end or tp_tend) is if	\

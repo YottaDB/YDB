@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1639,40 +1639,7 @@ MBSTART {											\
  * Although we can derive "csd" from "csa", we pass them as two separate arguments for performance reasons.
  * Use local variables to record shared memory information for debugging purposes in case of an assert failure.
  */
-#define INCR_BLKS_TO_UPGRD(csa, csd, delta)						\
-MBSTART {										\
-	block_id	new_blks_to_upgrd;						\
-	block_id	cur_blks_to_upgrd;						\
-	block_id	cur_delta;							\
-											\
-	assert((csd)->createinprogress || (csa)->now_crit);				\
-	cur_delta = (delta);								\
-	assert((csa)->hdr == (csd));							\
-	assert(0 != cur_delta);								\
-	cur_blks_to_upgrd = (csd)->blks_to_upgrd;					\
-	assert(0 <= (csd)->blks_to_upgrd);						\
-	new_blks_to_upgrd = cur_delta + cur_blks_to_upgrd;				\
-	assert(0 <= new_blks_to_upgrd);							\
-	(csd)->blks_to_upgrd = new_blks_to_upgrd;					\
-	if (0 >= new_blks_to_upgrd)							\
-	{										\
-		if (0 == new_blks_to_upgrd)						\
-			(csd)->tn_upgrd_blks_0 = (csd)->trans_hist.curr_tn;		\
-		else									\
-		{	/* blks_to_upgrd counter in the fileheader should never hold a	\
-			 * negative value. Note down the negative value in a separate	\
-			 * field for debugging and set the counter to 0.		\
-			 */								\
-			(csd)->blks_to_upgrd = 0;					\
-			(csd)->blks_to_upgrd_subzero_error -= (new_blks_to_upgrd);	\
-		}									\
-	} else										\
-		(csd)->fully_upgraded = FALSE;						\
-} MBEND
-#define DECR_BLKS_TO_UPGRD(csa, csd, delta)	INCR_BLKS_TO_UPGRD((csa), (csd), -(delta))
-
 /* Interlocked queue instruction constants ... */
-
 #define	QI_STARVATION		3
 #define EMPTY_QUEUE		0L
 #define QUEUE_WAS_EMPTY		1
@@ -1816,6 +1783,9 @@ enum tp_ntp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] *
 #define DONOTCOMMIT_JNL_FORMAT				(1 << 12) /* Restartable situation seen in jnl_format */
 #define DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE		(1 << 13) /* Restartable situation seen in COPY_PREV_KEY_TO_GVT_CLUE */
 #define DONOTCOMMIT_DSK_READ_EMPTY_BUT_NOT_FREE		(1 << 14) /* Restartable situation seen in dsk_read */
+#define DONOTCOMMIT_GVCST_PUT_CONCURR_FMT_CHG		(1 << 15) /* Restartable situation seen in gvcst_put concurrent fmt delta */
+#define DONOTCOMMIT_T_END_CONCURR_FMT_CHG		(1 << 16) /* Restartable situation seen in t_end */
+#define DONOTCOMMIT_BLK_PTR_UPGRADE_INCORRECT		(1 << 17) /* Restartable situation where blk_ptr_adjust found wrong state */
 
 #define TAB_BG_TRC_REC(A,B)	B,
 enum bg_trc_rec_type
@@ -1994,14 +1964,13 @@ typedef struct sgmnt_data_struct
 						 *	updated with V4 format blocks (by MUPIP JOURNAL).
 						 */
 	boolean_t	db_got_to_v5_once;	/* Set to TRUE by the FIRST MUPIP REORG UPGRADE (since MUPIP UPGRADE was run
-						 * to upgrade the file header to V5 format) when it completes successfully.
+						 * to upgrade the file header format) when it completes successfully.
 						 * The FIRST reorg upgrade marks all RECYCLED blocks as FREE. Successive reorg
 						 * upgrades keep RECYCLED blocks as they are while still trying to upgrade them.
-						 * This is because ONLY the FIRST reorg upgrade could see RECYCLED blocks in V4
-						 * format that are too full (lack the additional space needed by the V5 block
-						 * header) to be upgraded to V5 format. Once these are marked FREE, all future
-						 * block updates happen in V5 format in the database buffers so even if they
-						 * are written in V4 format to disk, they are guaranteed to be upgradeable.
+						 * ONLY the FIRST reorg upgrade could see RECYCLED blocks in the prior format
+						 * to be upgraded to the current format. Once these are marked FREE, all future
+						 * block updates happen in the new format in the database buffers so even if they
+						 * are written in the old format to disk, they are guaranteed to be upgradeable.
 						 * This field marks that transition in the db and is never updated thereafter.
 						 */
 	boolean_t	opened_by_gtmv53;	/* Set to TRUE the first time this database is opened by GT.M V5.3-000 and higher */
@@ -2171,8 +2140,7 @@ typedef struct sgmnt_data_struct
 	block_id	offset;				/* offset produced by mmb extension; interim pointer adjustment */
 	int4		max_rec;			/* pessimistic extimate of what bkl_size could hold */
 	int4		i_reserved_bytes;		/* for mangement of index splits; could be retained as a characteristic */
-	boolean_t	db_got_to_V7_once;		/* set TRUE by MUPIP REORG UPGRADE once it completes all work on region */
-	char		filler[4];			/* Filler to make 8-byte alignment explicit */
+	char		filler[8];			/* Filler to make 8-byte alignment explicit */
 	/************* FIELDS EXTENDED IN V7 HEADER ********************************/
 	/* The sub-headers indicate where these fields were originally located */
 	/*MOSTLY STATIC DATABASE STATE FIELDS*/
@@ -2316,17 +2284,27 @@ typedef struct
 #define FC_OPEN 2
 #define FC_CLOSE 3
 
-#define DO_BADDBVER_CHK(REG, TSD)								\
-MBSTART {											\
-	if (MEMCMP_LIT(TSD->label, GDS_LABEL) && MEMCMP_LIT(TSD->label, V6_GDS_LABEL))		\
-	{											\
-		if (memcmp(TSD->label, GDS_LABEL, GDS_LABEL_SZ - 3))				\
-			rts_error_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(4) ERR_DBNOTGDS, 2,	\
-					DB_LEN_STR(REG));					\
-		else										\
-			rts_error_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(4) ERR_BADDBVER, 2,	\
-					DB_LEN_STR(REG));					\
-	}											\
+#define DO_BADDBVER_CHK(REG, TSD)									\
+MBSTART {												\
+	LITREF char		*gtm_dbversion_table[];							\
+	error_def(ERR_DBUPGRDREQ);									\
+	uint4			gtm_errcode = 0;							\
+													\
+	if (MEMCMP_LIT(TSD->label, GDS_LABEL) && MEMCMP_LIT(TSD->label, V6_GDS_LABEL))			\
+	{												\
+		if (memcmp(TSD->label, GDS_LABEL, GDS_LABEL_SZ - 3))					\
+			rts_error_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(4) ERR_DBNOTGDS, 2,		\
+					DB_LEN_STR(REG));						\
+		else											\
+			rts_error_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(4) ERR_BADDBVER, 2,		\
+					DB_LEN_STR(REG));						\
+	} else if ((!TSD->fully_upgraded || (0 != TSD->blks_to_upgrd)) 					\
+				&& (BLK_ID_32_VER > TSD->desired_db_format))				\
+	{	/* Either GDS_LABEL or V6_GDS_LABEL */							\
+		if (!IS_DSE_IMAGE)	/* DSE operations are individually restricted */		\
+			rts_error_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(5) ERR_DBUPGRDREQ, 3,		\
+					DB_LEN_STR(REG), gtm_dbversion_table[TSD->desired_db_format]);	\
+	}												\
 } MBEND
 
 /* one thing to watch out for is if online rollback is in progress, file_corrupt may be set
@@ -2376,8 +2354,6 @@ MBSTART {											\
 			gtm_errcode = ERR_DBFLCORRP;						\
 		}										\
 	}											\
-	if ((dba_mm == TSD->acc_meth) && TSD->blks_to_upgrd)					\
-		gtm_errcode = ERR_MMNODYNUPGRD;							\
 	if (0 != gtm_errcode)									\
 	{											\
 		if (IS_DSE_IMAGE)								\
@@ -3129,6 +3105,7 @@ MBSTART {															\
 																\
 	GBLREF	jnl_gbls_t	jgbl;												\
 	GBLREF	gv_key		*gv_currkey;											\
+	GBLREF	uint4		mu_upgrade_in_prog;										\
 																\
 	GVNH_REG = (gvnh_reg_t *)malloc(SIZEOF(gvnh_reg_t));									\
 	GVNH_REG->gvt = GVT;													\
@@ -3149,7 +3126,7 @@ MBSTART {															\
 		gvnh_spanreg_init(GVNH_REG, ADDR, GD_MAP);									\
 		gbl_spans_regions = (NULL != GVNH_REG->gvspan);									\
 	} else															\
-	{	/* GT.CM GNP or MUPIP JOURNAL -RECOVER/ROLLBACK */								\
+	{	/* GT.CM GNP or MUPIP JOURNAL -RECOVER/ROLLBACK or UPGRADE */							\
 		GVNH_REG->gvspan = NULL;											\
 		/* If GT.CM GNP, value of ADDR will be NULL so no need to search the global directory.				\
 		 * Otherwise (i.e. if MUPIP JOURNAL RECOVER/ROLLBACK), find from the gld whether the global			\
@@ -3164,7 +3141,7 @@ MBSTART {															\
 			gbl_spans_regions = FALSE;										\
 		else														\
 		{														\
-			assert(jgbl.forw_phase_recovery);									\
+			assert(jgbl.forw_phase_recovery || mu_upgrade_in_prog);					\
 			gvent_name = GVT->gvname.var_name.addr;									\
 			gvent_len = GVT->gvname.var_name.len;									\
 			spanmap = gv_srch_map(ADDR, gvent_name, gvent_len, SKIP_BASEDB_OPEN_FALSE);				\
@@ -3713,10 +3690,13 @@ MBSTART {									\
 MBSTART {												\
 	trans_num	headroom;									\
 													\
-	if (GDSV7 == (CSD)->desired_db_format)								\
+	if (BLK_ID_32_VER < (CSD)->desired_db_format)							\
 		headroom = TN_HEADROOM_V7;								\
-	else if((GDSV5 == (CSD)->desired_db_format) || (GDSV6 == (CSD)->desired_db_format))		\
+	else												\
+	{	/* V5/V6/V6p - V4 conversions are not allowed */							\
+		assert((CSD)->desired_db_format);							\
 		headroom = TN_HEADROOM_V6;								\
+	}												\
 	headroom *= HEADROOM_FACTOR;									\
 	(ret_warn_tn) = (CSD)->trans_hist.curr_tn;							\
 	if ((headroom < (CSD)->max_tn) && ((ret_warn_tn) < ((CSD)->max_tn - headroom)))			\
@@ -3724,6 +3704,18 @@ MBSTART {												\
 	assert((CSD)->trans_hist.curr_tn <= (ret_warn_tn));						\
 	assert((ret_warn_tn) <= (CSD)->max_tn);								\
 } MBEND
+
+/* Set the cr->ondsk_blkver to the csd->desired_db_format */
+#define SET_ONDSK_BLKVER(cr, csd, ctn)											\
+{															\
+	/* Note that the corresponding blks_to_uprd adjustment for this cache-record happened in phase1 while holding 	\
+	 * crit. MUPIP UPGRADE changes csd->desired_db_format while having standalone access. Previously, operations 	\
+	 * changing it waited for all phase2 commits to complete.							\
+	 */														\
+	/* Fully upgraded DBs use the desired DB format. In transition, block writer should have done the right thing */\
+	cr->ondsk_blkver = (csd->fully_upgraded) ? csd->desired_db_format : cs->ondsk_blkver;				\
+	assert(GDSV4 < cs->ondsk_blkver);										\
+}
 
 #define HIST_TERMINATOR		0
 #define HIST_SIZE(h)		( (SIZEOF(int4) * 2) + (SIZEOF(srch_blk_status) * ((h).depth + 1)) )
@@ -4275,9 +4267,7 @@ MBSTART {											\
 	}											\
 } MBEND
 
-/* No need to write before-image in case the block is FREE. In case the database had never been fully upgraded from V4 to V5 format
- * (after the MUPIP UPGRADE), all RECYCLED blocks can basically be considered FREE (i.e. no need to write before-images since
- * backward journal recovery will never be expected to take the database to a point BEFORE the mupip upgrade).
+/* No need to write before-image in case the block is FREE.
  * Logic to check if before image of a given block has to be read or not are slightly complicated if snapshots are present
  * For snapshots, we might want to read the before images of FREE blocks. Also, if the block that we are reading
  * is already before imaged by some other GT.M process then we do not needed to read the before image of such a block. But, such
@@ -4289,9 +4279,8 @@ MBSTART {											\
  */
 # define BEFORE_IMAGE_NEEDED(read_before_image, CS, csa, csd, blk_no, retval)						\
 MBSTART {														\
-	retval = (read_before_image && csd->db_got_to_v5_once);								\
-	retval = retval && (!WAS_FREE(CS->blk_prior_state) || SNAPSHOTS_IN_PROG(csa));				\
-	retval = retval && (!ONLY_SS_BEFORE_IMAGES(csa) || !ss_chk_shdw_bitmap(csa, SS_CTX_CAST(csa->ss_ctx), blk_no));\
+	retval = read_before_image && (!WAS_FREE(CS->blk_prior_state) || SNAPSHOTS_IN_PROG(csa));			\
+	retval = retval && (!ONLY_SS_BEFORE_IMAGES(csa) || !ss_chk_shdw_bitmap(csa, SS_CTX_CAST(csa->ss_ctx), blk_no));	\
 } MBEND
 
 # define CHK_AND_UPDATE_SNAPSHOT_STATE_IF_NEEDED(CSA, CNL, SS_NEED_TO_RESTART)							\
@@ -5278,6 +5267,7 @@ void	jnl_write_inctn_rec(sgmnt_addrs *csa);
 void	fileheader_sync(gd_region *reg);
 
 gd_addr	*create_dummy_gbldir(void);
+void remap_globals_to_one_region(gd_addr *addr, gd_region *reg);
 
 /* These prototypes should ideally be included in gvstats_rec.h but they require "sgmnt_addrs" type
  * to be defined which is done in this header file, hence the prototyping is done here instead.

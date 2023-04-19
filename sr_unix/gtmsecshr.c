@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,7 @@
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
 #include "gtm_permissions.h"
-#include "gtm_select.h"
+#include "gtm_poll.h"
 
 #if defined(__MVS__)
 # include "gtm_zos_io.h"
@@ -219,10 +219,11 @@ int main(int argc, char_ptr_t argv[])
 	TID			timer_id;
 	GTM_SOCKLEN_TYPE	client_addr_len;
 	char			*recv_ptr, *send_ptr, *rundir;
-	fd_set			wait_on_fd;
 	struct sockaddr_un	client_addr;
-	struct timeval		input_timeval;
 	gtmsecshr_mesg		mesg;
+	int			poll_timeout;
+	nfds_t			poll_nfds;
+	struct pollfd		poll_fdlist[1];
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
@@ -233,15 +234,14 @@ int main(int argc, char_ptr_t argv[])
 	timer_id = (TID)main;
 	while (TRUE)
 	{
-		input_timeval.tv_sec = MAX_TIMEOUT_VALUE;	/* Restart timeout each interation for platforms that save
-								 * unexpired time when select exits.
-								 */
-		input_timeval.tv_usec = 0;
-		assertpro(FD_SETSIZE > gtmsecshr_sockfd);
-		FD_ZERO(&wait_on_fd);
-		FD_SET(gtmsecshr_sockfd, &wait_on_fd);
 		gtmsecshr_timer_popped = FALSE;
-		SELECT(gtmsecshr_sockfd + 1, (void *)&wait_on_fd, NULL, NULL, &input_timeval, selstat);
+		poll_fdlist[0].fd = gtmsecshr_sockfd;
+		poll_fdlist[0].events = POLLIN;
+		poll_nfds = 1;
+		poll_timeout = MAX_TIMEOUT_VALUE * MILLISECS_IN_SEC; 	/* Restart timeout each interation for platforms that save
+									 * unexpired time when select exits.
+									 */
+		selstat = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 		if (0 > selstat)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GTMSECSHR, 1, process_id, ERR_GTMSECSHRSCKSEL, 0, errno);
 		else if (0 == selstat)

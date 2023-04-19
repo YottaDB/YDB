@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2022 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -170,7 +170,7 @@ error_def(ERR_NOTALLJNLEN);
 error_def(ERR_NOTALLREPLON);
 error_def(ERR_ORLBKFRZOVER);
 error_def(ERR_ORLBKFRZPROG);
-error_def(ERR_ORLBKNOV4BLK);
+error_def(ERR_ORLBKDBUPGRDREQ);
 error_def(ERR_ORLBKSTART);
 error_def(ERR_REPLSTATEOFF);
 error_def(ERR_RLBKNOBIMG);
@@ -454,12 +454,13 @@ int4 mur_open_files(boolean_t retry)
 				TP_CHANGE_REG(rctl->gd);
 				if (jgbl.onlnrlbk)
 				{
-					if (!cs_data->fully_upgraded)
+					if (!cs_data->fully_upgraded && (BLK_ID_32_VER > cs_data->desired_db_format))
 					{
-						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_ORLBKNOV4BLK, 4,
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_ORLBKDBUPGRDREQ, 4,
 							       REG_LEN_STR(gv_cur_region), DB_LEN_STR(gv_cur_region));
 						return FALSE;
 					}
+					/* else TODO: online_specified && V7m version - this should not be a problem */
 					/* Only select epoch_interval values (for timed epochs) which are sane. */
 					if (MAX_EPOCH_INTERVAL >= cs_data->epoch_interval)
 						max_epoch_interval = MAX(cs_data->epoch_interval, max_epoch_interval);
