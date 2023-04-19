@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +29,9 @@
 #include "gtmio.h"
 #include "relqop.h"
 #include "gtm_string.h" /* for memcpy */
+#include "eintr_wrappers.h"
+
+error_def(ERR_FDSIZELMT);
 
 void cmj_incoming_call(struct NTD *tsk)
 {
@@ -33,10 +41,14 @@ void cmj_incoming_call(struct NTD *tsk)
 	GTM_SOCKLEN_TYPE sz = SIZEOF(struct sockaddr);
 	cmi_status_t status;
 
+<<<<<<< HEAD
 	ASSERT_IS_LIBCMISOCKETTCP;
 	while ((-1 == (rval = ACCEPT(tsk->listen_fd, (struct sockaddr *)&sas, (GTM_SOCKLEN_TYPE *)&sz))) && EINTR == errno)
 		eintr_handling_check();
 	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
+=======
+	ACCEPT_SOCKET(tsk->listen_fd, (struct sockaddr *)&sas, (GTM_SOCKLEN_TYPE *)&sz, rval);
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	while (rval >= 0)
 	{
 		status = cmj_setupfd(rval);
@@ -70,14 +82,19 @@ void cmj_incoming_call(struct NTD *tsk)
 		lnk->peer_ai.ai_addrlen = sz;
 		insqh(&lnk->cqe, &tsk->cqh);
 		lnk->ntd = tsk;
-		assertpro(FD_SETSIZE > rval);
+		if (FD_SETSIZE <= rval)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FDSIZELMT, 1, rval);
 		FD_SET(rval, &tsk->es);
 		/* setup for callback processing */
 		lnk->deferred_event = TRUE;
 		lnk->deferred_reason = CMI_REASON_CONNECT;
+<<<<<<< HEAD
 		while ((-1 == (rval = ACCEPT(tsk->listen_fd, (struct sockaddr *)&sas, (GTM_SOCKLEN_TYPE *)&sz)))
 				&& (EINTR == errno))
 			eintr_handling_check();
 		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
+=======
+		ACCEPT_SOCKET(tsk->listen_fd, (struct sockaddr *)&sas, (GTM_SOCKLEN_TYPE *)&sz, rval);
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	}
 }

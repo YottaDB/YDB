@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -53,11 +53,16 @@ int indirection(oprtype *a)
 		stx_error(ERR_EXPR);
 		return FALSE;
 	}
+<<<<<<< HEAD
 	/* Note: A RETURN_IF_RTS_ERROR check is usually present after all "ex_tail" calls. But that is not needed here.
 	 * This is because we do not do any triple chain manipulations like is done in the other callers. And we want
 	 * to proceed with executing the generated code even if it is going to issue an error (OC_RTERROR triple
 	 * inserted by "ins_errtriple").
 	 */
+=======
+	coerce(a, OCT_MVAL);
+	ex_tail(a, FALSE, FALSE);
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	ENCOUNTERED_SIDE_EFFECT;
 	DECREMENT_EXPR_DEPTH;
 	if ((TK_ATSIGN == TREF(window_token)) || ((TK_ATHASH == TREF(window_token)) && concat_athashes))

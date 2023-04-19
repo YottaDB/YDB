@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -59,7 +59,6 @@
 #include "wcs_flu.h"
 #include "gds_rundown.h"
 #include "change_reg.h"
-#include "desired_db_format_set.h"
 #include "gtmmsg.h"		/* for gtm_putmsg prototype */
 #include "gtmcrypt.h"
 #include "anticipatory_freeze.h"
@@ -77,7 +76,6 @@ LITREF char			*gtm_dbversion_table[];
 
 #define GTMCRYPT_ERRLIT		"during GT.M startup"
 
-error_def(ERR_ASYNCIONOV4);
 error_def(ERR_ASYNCIONOMM);
 error_def(ERR_CRYPTDLNOOPEN);
 error_def(ERR_CRYPTDLNOOPEN2);
@@ -91,10 +89,8 @@ error_def(ERR_DBRDERR);
 error_def(ERR_DBRDONLY);
 error_def(ERR_GTMCURUNSUPP);
 error_def(ERR_INVACCMETHOD);
-error_def(ERR_MMNODYNDWNGRD);
 error_def(ERR_MUPIPSET2BIG);
 error_def(ERR_MUPIPSET2SML);
-error_def(ERR_MUREENCRYPTV4NOALLOW);
 error_def(ERR_NODFRALLOCSUPP);
 error_def(ERR_NOUSERDB);
 error_def(ERR_OFRZACTIVE);
@@ -122,7 +118,6 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	char			acc_spec[MAX_ACC_METH_LEN + 1], *command = "MUPIP SET VERSION", *errptr, exit_stat, *fn,
 				ver_spec[MAX_DB_VER_LEN + 1];
 	enum db_acc_method	access, access_new;
-	enum db_ver		desired_dbver;
 	uint4			fbwsize;
 	int4			dblksize;
 	gd_region		*temp_cur_region;
@@ -466,24 +461,10 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		need_standalone = TRUE;
 	if (cli_present("VERSION"))
 	{
-		cli_get_str("VERSION", ver_spec, &ver_spec_len);
-		ver_spec[ver_spec_len] = '\0';
-		cli_strupper(ver_spec);
-		if (0 == memcmp(ver_spec, "V7", ver_spec_len + 1))
-			desired_dbver = GDSV7;
-		else if (0 == memcmp(ver_spec, "V6", ver_spec_len + 1))
-			desired_dbver = GDSV6;
-		else if (0 == memcmp(ver_spec, "V4", ver_spec_len + 1))
-		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMCURUNSUPP);
-			exit_stat |= EXIT_ERR;
-			desired_dbver = GDSV4;
-		}
-		else
-			assertpro(FALSE);		/* CLI should prevent us ever getting here */
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMCURUNSUPP);
+		exit_stat |= EXIT_ERR;
 		flush_buffers = TRUE;
-	} else
-		desired_dbver = GDSVLAST;	/* really want to keep version, which has not yet been read */
+	}
 	if (disk_wait_status = cli_present("WAIT_DISK"))
 	{
 		if (cli_get_int("WAIT_DISK", &new_disk_wait))
@@ -636,13 +617,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 						reg_exit_stat |= EXIT_WRN;
 					}
 				}
-				if (pvt_csd->blks_to_upgrd)
-				{
-					util_out_print("MM access method cannot be set if there are blocks to upgrade",	TRUE);
-					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
-					reg_exit_stat |= EXIT_WRN;
-				}
-				if (pvt_csd->offset && ((GDSVCURR - 1) == pvt_csd->desired_db_format))
+				if (pvt_csd->offset && (GDSV6p == pvt_csd->desired_db_format))
 				{	/* if we support downgrade, enhance the above conditions */
 					util_out_print("MM access method cannot be set during DB upgrade",
 						TRUE);
@@ -688,11 +663,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 			if (encryptable_status)
 			{
-				if (!pvt_csd->fully_upgraded)
-				{
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUREENCRYPTV4NOALLOW, 2, fn_len, fn);
-					reg_exit_stat |= EXIT_WRN;
-				} else if (dba_mm == access_new)
+				assert(pvt_csd->fully_upgraded || (0 == pvt_csd->blks_to_upgrd) || (BLK_ID_32_VER < pvt_csd->desired_db_format));
+				if (dba_mm == access_new)
 				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOMM, 2, fn_len, fn);
 					reg_exit_stat |= EXIT_WRN;
@@ -858,25 +830,10 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		}
 		access_new = (n_dba == access ? csd->acc_meth : access);
-		if (GDSVLAST != desired_dbver)
-		{	/* TODO: reject GDSV4 requests and figure out what to do with MM; revise desired_db_format_set */
-			if ((dba_mm != access_new) || (GDSV4 != desired_dbver))
-				(void)desired_db_format_set(gv_cur_region, desired_dbver, command);
-			else	/* for other errors desired_db_format_set prints appropriate error messages */
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MMNODYNDWNGRD, 2, REG_LEN_STR(gv_cur_region));
-			if (csd->desired_db_format != desired_dbver)
-				reg_exit_stat |= EXIT_WRN;
-			else
-				util_out_print("Database file !AD now has desired DB format !AD", TRUE,
-					fn_len, fn, LEN_AND_STR(gtm_dbversion_table[csd->desired_db_format]));
-		}
 		if (encryption_complete_status)
 		{
-			if (!csd->fully_upgraded)
-			{
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUREENCRYPTV4NOALLOW, 2, fn_len, fn);
-				reg_exit_stat |= EXIT_WRN;
-			} else if (dba_mm == access_new)
+			assert(csd->fully_upgraded || (0 == csd->blks_to_upgrd) || (BLK_ID_32_VER < csd->desired_db_format));
+			if (dba_mm == access_new)
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOMM, 2, fn_len, fn);
 				reg_exit_stat |= EXIT_WRN;
@@ -891,12 +848,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		}
 		if (asyncio_status && (CLI_PRESENT == asyncio_status))
 		{
-			if (!csd->fully_upgraded)
-			{
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ASYNCIONOV4, 6, DB_LEN_STR(gv_cur_region),
-					LEN_AND_LIT("V4 format"), LEN_AND_LIT("enable ASYNCIO"));
-				reg_exit_stat |= EXIT_WRN;
-			}
+			assert(csd->fully_upgraded || (0 == csd->blks_to_upgrd) || (BLK_ID_32_VER < csd->desired_db_format));
 			if (!acc_meth_changing && (dba_bg != access_new))
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ASYNCIONOMM, 6, DB_LEN_STR(gv_cur_region),

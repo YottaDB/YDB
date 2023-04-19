@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -22,6 +22,9 @@
 #define BLK_MAPINVALID		0x02
 #define BLK_RECYCLED		0x03
 #define BML_BITS_PER_BLK	2
+#define BML_BLKS_PER_UCHAR	(BITS_PER_UCHAR / BML_BITS_PER_BLK)
+#define BLK_ONE_FREE		BLK_FREE << BML_BITS_PER_BLK
+#define BLK_TWO_FREE		BLK_ONE_FREE << BML_BITS_PER_BLK
 #define	THREE_BLKS_BITMASK	0x3F
 #define	TWO_BLKS_BITMASK	0x0F
 #define	ONE_BLK_BITMASK		0x03
@@ -98,7 +101,7 @@ MBSTART {													\
 
 # define DETERMINE_BML_FUNC(FUNC, CS, CSA)											\
 MBSTART {															\
-	GBLREF	boolean_t	mu_reorg_upgrd_dwngrd_in_prog;									\
+	GBLREF	uint4	mu_upgrade_in_prog;											\
 																\
 	if (CSA->nl->trunc_pid)													\
 	{	/* A truncate is in progress. If we are acquiring a block, we need to update cnl->highest_lbm_with_busy_blk to	\
@@ -119,10 +122,10 @@ MBSTART {															\
 				 */												\
 				FUNC = bml_free;										\
 				CS->level = LCL_MAP_LEVL;									\
- 			}													\
+			}													\
 		} else	/* cs->reference_cnt == 0 */										\
 		{														\
-			if (CSA->hdr->db_got_to_v5_once && mu_reorg_upgrd_dwngrd_in_prog)					\
+			if (CSA->hdr->db_got_to_v5_once && mu_upgrade_in_prog)							\
 				FUNC = bml_recycled;										\
 			else													\
 				FUNC = bml_free;										\

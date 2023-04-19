@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,6 +30,7 @@
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
+#include "spec_type.h"
 
 /* Include prototypes */
 #include "t_write.h"
@@ -60,8 +61,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	blk_hdr_ptr_t			old_blk_hdr;
 	blk_segment			*bs1, *bs_ptr;
 	block_id			blk, temp_blk;
-	static readonly block_id_64	zeroes_64 = 0;
-	static readonly block_id_32	zeroes_32 = 0;
+	const char			zeroes_blkid_collhdr[sizeof(block_id_64) + COLL_SPEC_LEN] = {0}; /* used with various len */
 	block_index			new_block_index;
 	bool				kill_root, first_copy;
 	cw_set_element			*cse, *old_cse;
@@ -216,7 +216,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		SET_CMPC(new_rec_hdr, 0);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, (sm_uc_ptr_t)new_rec_hdr, SIZEOF(rec_hdr));
-		BLK_SEG(bs_ptr, long_blk_id ? ((sm_uc_ptr_t)&zeroes_64) : ((sm_uc_ptr_t)&zeroes_32), blk_id_sz);
+		BLK_SEG(bs_ptr, (sm_uc_ptr_t)&zeroes_blkid_collhdr, blk_id_sz);
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
 			assert(CDB_STAGNATE > t_tries);

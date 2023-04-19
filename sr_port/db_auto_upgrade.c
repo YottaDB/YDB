@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -148,7 +148,6 @@ void db_auto_upgrade(gd_region *reg)
 				csd->offset = 0;
 				csd->max_rec = 0;
 				csd->i_reserved_bytes = 0;
-				csd->db_got_to_V7_once = TRUE;
 				csd->last_start_backup = (gtm_timet) 0; /* GTM-8681, but this is default value anyway */
 				/*the next four lines are because gvcst_init_sysops might have used an outdated assumption */
 				csd->max_update_array_size = csd->max_non_bm_update_array_size
@@ -401,6 +400,7 @@ void v6_db_auto_upgrade(gd_region *reg)
 				udi = FILE_INFO(reg);
 				new_eof = (off_t)BLK_ZERO_OFF(csd->start_vbn) + (off_t)csd->trans_hist.total_blks * csd->blk_size;
 				DEBUG_ONLY(file_size = gds_file_size(reg->dyn.addr->file_cntl);)
+<<<<<<< HEAD
 				/* Note that the last process to access this database in V63000A could have been in the middle of
 				 * a database file extension after having extended the database file size but before updating
 				 * the total_blks field in the file header etc. In that case, the "new_eof" value would be less
@@ -413,6 +413,12 @@ void v6_db_auto_upgrade(gd_region *reg)
 				 * GT.M V6.3-001. Tests that randomize the block size below 4096 will fail the assert. Therefore
 				 * modify the assert to account for that.
 				 */
+=======
+				 /* About the assert below for the new_eof. It does not work with block sizes under 4096 which
+				  * became the default in V63001. Tests that randomize the block size below 4096 will fail the
+				  * assert.
+				  */
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 				assert(((file_size * DISK_BLOCK_SIZE) == (new_eof + DISK_BLOCK_SIZE))
 						|| ((DISK_BLOCK_SIZE << 3) > csd->blk_size));
 				db_write_eof_block(udi, udi->fd, csd->blk_size, new_eof, &TREF(dio_buff));
@@ -486,7 +492,6 @@ void v6_db_auto_upgrade(gd_region *reg)
 				/* we do not initialize new post GDSMV63014 field csd->last_start_backup here because if
 				   it has never been set the default (all zeroes) is OK, and if it has, we do not want to
 				   overwrite it on our way up */
-				csd->db_got_to_V7_once = FALSE;
 				csd->offset = 0;
 				csd->max_rec = 0;
 				csd->i_reserved_bytes = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2019 Fidelity National Information	*
+ * Copyright (c) 2017-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -53,14 +53,18 @@
 #include "sec_shr_blk_build.h"
 #include "cert_blk.h"		/* for CERT_BLK_IF_NEEDED macro */
 #include "gdsbgtr.h"
+#include "mu_updwn_ver_inline.h"
 
 GBLREF	boolean_t		certify_all_blocks;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	cw_set_element		cw_set[];
+GBLREF	gd_region		*gv_cur_region;
 GBLREF	int4			strm_index;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_addrs 		*kip_csa;
+GBLREF	sgmnt_data		*cs_data;
+GBLREF	uint4			mu_upgrade_in_prog;		/* non-zero if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLREF	uint4			process_id;
 GBLREF	uint4			update_trans;
 GBLREF	unsigned char		cw_set_depth;
@@ -412,49 +416,49 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 									}
 								}
 							}
-							/* the following code is very similar to that in bg_update_phase1 */
-							if (gds_t_acquired == cs->mode)
-							{
-								if (GDSV4 == csd->desired_db_format)
-									INCR_BLKS_TO_UPGRD(csa, csd, 1);
-							} else
-							{
-#								ifdef DEBUG
-								/* We rely on the fact that cs->ondsk_blkver accurately reflects
-								 * the on-disk block version of the block and therefore can be
-								 * used to set cr->ondsk_blkver. Confirm this by checking that
-								 * if a cr exists for this block, then that cr's ondsk_blkver
-								 * matches with the cs. db_csh_get uses the global variable
-								 * cs_addrs to determine the region. So make it uptodate temporarily
-								 * holding its value in the local variable tmp_csa.
-								 */
-								tmp_csa = cs_addrs;	/* save cs_addrs in local */
-								cs_addrs = csa;		/* set cs_addrs for db_csh_get */
-								actual_cr = db_csh_get(cs->blk);
-								cs_addrs = tmp_csa;	/* restore cs_addrs */
-								/* actual_cr can be NULL if the block is NOT in the cache.
-								 * It can be CR_NOTVALID if the cache record originally
-								 * containing this block got reused for a different block
-								 * (i.e. cr->stopped = non-zero) as part of secshr_db_clnup.
-								 */
-								assert((NULL == actual_cr)
-									|| ((cache_rec_ptr_t)CR_NOTVALID == actual_cr)
-									|| (cs->ondsk_blkver == actual_cr->ondsk_blkver));
-#								endif
-								cr->ondsk_blkver = cs->ondsk_blkver;
-								if (cr->ondsk_blkver != csd->desired_db_format)
+							if (!cs_data->fully_upgraded)
+							{	/* Transitional DB format */
+								assert(GDSV6 < cs_data->desired_db_format);
+								if (GDSV7m != cs->ondsk_blkver)
 								{
-									if (GDSV4 == csd->desired_db_format)
-									{
-										if (gds_t_write_recycled != cs->mode)
-											INCR_BLKS_TO_UPGRD(csa, csd, 1);
-									} else
-									{
-										if (gds_t_write_recycled != cs->mode)
-											DECR_BLKS_TO_UPGRD(csa, csd, 1);
+									if (gds_t_acquired == cs->mode)
+									{	/* Increment blks_to_upgrd for new V6p idx blocks */
+										INCR_BLKS_TO_UPGRD(csa, csd, 1);
+#ifdef										DEBUG_BLKS_TO_UPGRD
+										util_out_print("!UL + !AD:0x!@XQ:!UL:!UL:!UL 08",
+												TRUE, cs_data->blks_to_upgrd,
+												REG_LEN_STR(gv_cur_region),
+												&cs->blk,
+												cs->ondsk_blkver, cs->level,
+												cs_data->blks_to_upgrd);
+#endif
+									} else if (0 == cs->level)
+									{	/* Level zero block, update the header and
+										 * decrement blks_to_upgrd */
+										DECR_BLKS_TO_UPGRD(cs_addrs, cs_data, 1);
+#ifdef										DEBUG_BLKS_TO_UPGRD
+										util_out_print("!UL - 0x!@XQ !AD:0x!@XQ:!UL:!UL 08",
+												TRUE, cs_data->blks_to_upgrd, &ctn,
+												REG_LEN_STR(gv_cur_region),
+												&cs->blk, cs->ondsk_blkver,
+												cs->level);
+#endif
+										cs->ondsk_blkver = cs_data->desired_db_format;
 									}
+								} else if ((GDSV7m == cs->ondsk_blkver) && mu_upgrade_in_prog)
+								{	/* Decrement in transition block */
+									DECR_BLKS_TO_UPGRD(csa, csd, 1);
+#ifdef									DEBUG_BLKS_TO_UPGRD
+									util_out_print("!UL - !AD:0x!@XQ:!UL:!UL:!UL (CMT08)",
+											TRUE, cs_data->blks_to_upgrd,
+											REG_LEN_STR(gv_cur_region), &cs->blk,
+											cs->ondsk_blkver, cs->level,
+											cs_data->blks_to_upgrd);
+#endif
 								}
 							}
+							/* The cse owns ondsk_blkver's setting, force it in the cacherec */
+							cr->ondsk_blkver = cs->ondsk_blkver;
 							cs->old_mode = -old_mode;	/* signal phase1 is complete */
 							assert(0 > cs->old_mode);
 							blk_ptr = (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr);
@@ -552,7 +556,7 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
 						LEN_AND_STR(wcblocked_ptr), process_id, &ctn, DB_LEN_STR(csa->region));
 		}
-	}	/* if (updTrans) */
+	}	/* if (updtrans) */
 	assert(csa->region->open);
 	secshr_rel_crit(csa->region, IS_EXITING_FALSE, IS_REPL_REG_FALSE);	/* Step CMT14 */
 	return;

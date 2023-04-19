@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2022 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -147,6 +147,48 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			process_id;
 
+<<<<<<< HEAD
+=======
+error_def(ERR_CRITSEMFAIL);
+error_def(ERR_DBFILOPERR);
+error_def(ERR_DBFRZRESETFL);
+error_def(ERR_DBFRZRESETSUC);
+error_def(ERR_DBJNLNOTMATCH);
+error_def(ERR_DBRDONLY);
+error_def(ERR_FILENOTFND);
+error_def(ERR_FILEPARSE);
+error_def(ERR_JNLBADRECFMT);
+error_def(ERR_JNLDBTNNOMATCH);
+error_def(ERR_JNLDBSEQNOMATCH);
+error_def(ERR_JNLFILEDUP);
+error_def(ERR_JNLFILEOPNERR);
+error_def(ERR_JNLNMBKNOTPRCD);
+error_def(ERR_JNLSTATEOFF);
+error_def(ERR_JNLTNOUTOFSEQ);
+error_def(ERR_MUKILLIP);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_MUPJNLINTERRUPT);
+error_def(ERR_MUSTANDALONE);
+error_def(ERR_NOPREVLINK);
+error_def(ERR_NOSTARFILE);
+error_def(ERR_NOTALLJNLEN);
+error_def(ERR_NOTALLREPLON);
+error_def(ERR_ORLBKFRZOVER);
+error_def(ERR_ORLBKFRZPROG);
+error_def(ERR_ORLBKDBUPGRDREQ);
+error_def(ERR_ORLBKSTART);
+error_def(ERR_REPLSTATEOFF);
+error_def(ERR_RLBKNOBIMG);
+error_def(ERR_ROLLBKINTERRUPT);
+error_def(ERR_STARFILE);
+error_def(ERR_SYSCALL);
+error_def(ERR_TEXT);
+error_def(ERR_WCBLOCKED);
+error_def(ERR_ORLBKRESTART);
+error_def(ERR_ORLBKREL);
+error_def(ERR_REPLPOOLINST);
+
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #define		STAR_QUOTE "\"*\""
 
 /* Release all locks, in general follow the direction of mur_close_files. We do not reset fields
@@ -429,12 +471,13 @@ int4 mur_open_files(boolean_t retry)
 				TP_CHANGE_REG(rctl->gd);
 				if (jgbl.onlnrlbk)
 				{
-					if (!cs_data->fully_upgraded)
+					if (!cs_data->fully_upgraded && (BLK_ID_32_VER > cs_data->desired_db_format))
 					{
-						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_ORLBKNOV4BLK, 4,
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_ORLBKDBUPGRDREQ, 4,
 							       REG_LEN_STR(gv_cur_region), DB_LEN_STR(gv_cur_region));
 						return FALSE;
 					}
+					/* else TODO: online_specified && V7m version - this should not be a problem */
 					/* Only select epoch_interval values (for timed epochs) which are sane. */
 					if (MAX_EPOCH_INTERVAL >= cs_data->epoch_interval)
 						max_epoch_interval = MAX(cs_data->epoch_interval, max_epoch_interval);

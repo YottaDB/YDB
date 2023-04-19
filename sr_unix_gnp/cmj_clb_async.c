@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +23,8 @@
 #include "gtm_stdio.h"
 #endif
 
+error_def(ERR_FDSIZELMT);
+
 cmi_status_t cmj_clb_set_async(struct CLB *lnk)
 {
 	struct NTD *tsk = lnk->ntd;
@@ -25,7 +32,8 @@ cmi_status_t cmj_clb_set_async(struct CLB *lnk)
 
 	ASSERT_IS_LIBCMISOCKETTCP;
 	CMI_DPRINT(("in cmj_clb_set_async sta = %d\n", lnk->sta));
-	assertpro(FD_SETSIZE > lnk->mun);
+	if (FD_SETSIZE <= lnk->mun)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FDSIZELMT, 1, lnk->mun);
 	switch (lnk->sta)
 	{
 	case CM_CLB_READ:

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2021 Fidelity National Information	*
+ * Copyright (c) 2007-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -66,6 +66,7 @@
 #include "add_inter.h"
 #include "wcs_write_in_progress_wait.h"
 #include "gvt_inline.h"
+#include "mu_updwn_ver_inline.h"
 
 /* Include prototypes */
 #include "send_msg.h"
@@ -98,20 +99,6 @@ error_def(ERR_FREEBLKSLOW);
 error_def(ERR_GBLOFLOW);
 error_def(ERR_TEXT);
 error_def(ERR_WCBLOCKED);
-
-/* Set the cr->ondsk_blkver to the csd->desired_db_format */
-#define SET_ONDSK_BLKVER(cr, csd, ctn)											\
-{															\
-	/* Note that even though the corresponding blks_to_uprd adjustment for this cache-record happened in phase1 	\
-	 * while holding crit, we are guaranteed that csd->desired_db_format did not change since then because the 	\
-	 * function that changes this ("desired_db_format_set") waits for all phase2 commits to	complete before 	\
-	 * changing the format. Before resetting cr->ondsk_blkver, ensure db_format in file header did not change in 	\
-	 * between phase1 (inside of crit) and phase2 (outside of crit). This is needed to ensure the correctness of 	\
-	 * the blks_to_upgrd counter.											\
-	 */														\
-	assert((ctn > csd->desired_db_format_tn) || ((ctn == csd->desired_db_format_tn) && (1 == ctn)));		\
-	cr->ondsk_blkver = csd->desired_db_format;									\
-}
 
 #define MAX_CYCLES	2
 
@@ -146,7 +133,6 @@ error_def(ERR_WCBLOCKED);
 GBLREF	boolean_t		block_saved, certify_all_blocks, dse_running, is_src_server, is_updproc, unhandled_stale_timer_pop,
 				write_after_image;
 GBLREF	boolean_t		mu_reorg_nosafejnl;		/* TRUE if NOSAFEJNL explicitly specified */
-GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;	/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLREF	cache_rec_ptr_t		cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	cw_set_element		cw_set[];
@@ -164,6 +150,7 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;	/* non-zero if MUPIP REORG is in progress */
 GBLREF	uint4			dollar_tlevel, process_id, update_array_size;
+GBLREF	uint4			mu_upgrade_in_prog;		/* non-zero if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		cr_array_index, t_tries;
 GBLREF	volatile boolean_t	in_mutex_deadlock_check;
@@ -257,10 +244,10 @@ void bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 	cti->free_blocks -= reference_cnt;
 	change_bmm = FALSE;
 	/* assert that cs->reference_cnt is 0 if we are in MUPIP REORG UPGRADE/DOWNGRADE */
-	assert(!mu_reorg_upgrd_dwngrd_in_prog || !mu_reorg_encrypt_in_prog || (0 == reference_cnt));
+	assert(!mu_upgrade_in_prog || !mu_reorg_encrypt_in_prog || (0 == reference_cnt));
 	/* assert that if cs->reference_cnt is 0, then we are in MUPIP REORG UPGRADE/DOWNGRADE or DSE MAPS or DSE CHANGE -BHEAD
 	 * or MUPIP REORG -TRUNCATE */
-	assert(mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog || dse_running || (0 != reference_cnt)
+	assert(mu_upgrade_in_prog || mu_reorg_encrypt_in_prog || dse_running || (0 != reference_cnt)
 		|| (NULL != csa->nl && process_id == csa->nl->trunc_pid));
 	if (0 < reference_cnt)
 	{	/* Blocks were allocated in this bitmap. Check if local bitmap became full as a result. If so update mastermap. */
@@ -287,8 +274,19 @@ void bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 			 * previous cw-set-element is of type gds_t_busy2free (which does not go through bg_update) */
 			assert((1 == cw_set_depth)
 				|| (2 == cw_set_depth) && (gds_t_busy2free == (cs-1)->old_mode));
-			if (0 != inctn_detail.blknum_struct.blknum)
+			/* When deleting pre-V7m index blocks, decrement blks_to_upgrd */
+			if (!mu_upgrade_in_prog && (0 != inctn_detail.blknum_struct.blknum)
+					&& (!cs_data->fully_upgraded && (GDSV6 < cs_data->desired_db_format))
+					&& (GDSV7m > (cs-1)->ondsk_blkver) && !(cs-1)->done)
+			{
 				DECR_BLKS_TO_UPGRD(csa, csd, 1);
+#ifdef				DEBUG_BLKS_TO_UPGRD
+				util_out_print("!UL - 0x0 !AD:0x!@XQ:!UL:!UL 0x!@XQ:!UL:!UL", TRUE, cs_data->blks_to_upgrd,
+						REG_LEN_STR(gv_cur_region),
+						&(cs-1)->blk, (cs-1)->ondsk_blkver, (cs-1)->level,
+						&(cs)->blk, (cs)->ondsk_blkver, (cs)->level);
+#endif
+			}
 		}
 	}
 	/* else cs->reference_cnt is 0, this means no free/busy state change in non-bitmap blocks, hence no mastermap change */
@@ -374,6 +372,39 @@ enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	} else
 	{	/* either it is a non-local bit-map or we are in dse_maps or MUPIP RECOVER writing an AIMG record */
 		assert((0 != (blkid & (BLKS_PER_LMAP - 1))) || write_after_image);
+		if (!cs_data->fully_upgraded)
+		{	/* Transitional DB format */
+			assert(GDSV6 < cs_data->desired_db_format);
+			if (GDSV7m != cs->ondsk_blkver)
+			{
+				if (gds_t_acquired == cs->mode)
+				{	/* Increment blks_to_upgrd for new V6p idx blocks */
+					INCR_BLKS_TO_UPGRD(cs_addrs, cs_data, 1);
+#ifdef					DEBUG_BLKS_TO_UPGRD
+					util_out_print("!UL + 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, cs_data->blks_to_upgrd, &ctn,
+							REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver,
+							cs->level, cs->mode);
+#endif
+				} else if (!mu_upgrade_in_prog && (0 == cs->level) && (GDSV6 == cs->ondsk_blkver)
+						&& (gds_t_write_recycled != cs->mode) && !cs->done)
+				{	/* Level zero block, update the header and decrement blks_to_upgrd */
+					DECR_BLKS_TO_UPGRD(cs_addrs, cs_data, 1);
+#ifdef					DEBUG_BLKS_TO_UPGRD
+					util_out_print("!UL - 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, cs_data->blks_to_upgrd, &ctn,
+							REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver,
+							cs->level, cs->mode);
+#endif
+					cs->ondsk_blkver = cs_data->desired_db_format;
+				}
+			} else if ((GDSV7m == cs->ondsk_blkver) && mu_upgrade_in_prog)
+			{					/* Decrement blks_to_upgrd for new V7m blocks */
+				DECR_BLKS_TO_UPGRD(cs_addrs, cs_data, 1);
+#ifdef				DEBUG_BLKS_TO_UPGRD
+				util_out_print("!UL - 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, cs_data->blks_to_upgrd, &ctn,
+						REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver, cs->level, cs->mode);
+#endif
+			}
+		}
 		if (FALSE == cs->done)
 		{	/* if the current block has not been built (from being referenced in TP) */
 			if (NULL != cs->new_buff)
@@ -388,11 +419,16 @@ enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 				((blk_hdr_ptr_t)db_addr[0])->tn = ((blk_hdr_ptr_t)cs->new_buff)->tn = ctn;
 			memcpy(db_addr[0], cs->new_buff, ((blk_hdr_ptr_t)cs->new_buff)->bsiz);
 		}
+<<<<<<< HEAD
 		long_blk_id = IS_64_BLK_ID(db_addr[0]);
 		DEBUG_ONLY(blk_id_sz = SIZEOF_BLK_ID(long_blk_id));
+=======
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		assert(SIZEOF(blk_hdr) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
 		assert((int)(((blk_hdr_ptr_t)db_addr[0])->bsiz) > 0);
 		assert((int)(((blk_hdr_ptr_t)db_addr[0])->bsiz) <= cs_data->blk_size);
+		long_blk_id = IS_64_BLK_ID(db_addr[0]);
+		blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 		if (!dollar_tlevel)
 		{
 			if (0 != cs->ins_off)
@@ -477,9 +513,12 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;		/* Local access copies */
 	csd = csa->hdr;
+<<<<<<< HEAD
 	v7_db_mode = (0 == MEMCMP_LIT(csd->label, GDS_LABEL));
 	DEBUG_ONLY(v6_db_mode = (0 == MEMCMP_LIT(csd->label, V6_GDS_LABEL)));
 	assert((v7_db_mode || v6_db_mode) && (v7_db_mode != v6_db_mode));
+=======
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	cnl = csa->nl;
 	assert(csd == cs_data);
 	mode = cs->mode;
@@ -626,10 +665,11 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		{	/* Wait for another process in bg_update_phase2 to stop overlaying the buffer (possible in case of)
 			 *	a) reuse of a killed block that's still in the cache
 			 *	b) the buffer has already been constructed in private memory (cse->new_buff is non-NULL)
+			 *	c) MUPIP REORG -UPGRADE in process - no TP and does not have a new_buff
 			 */
 			assert(process_id != cr->in_tend);
 			assert(((gds_t_acquired == mode) && (!read_before_image || (NULL == cs->old_block)))
-					|| (gds_t_acquired != mode) && (NULL != cs->new_buff));
+					|| (gds_t_acquired != mode) && ((NULL != cs->new_buff) || mu_upgrade_in_prog));
 			intend_finished = wcs_phase2_commit_wait(csa, cr);
 			GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_INTENDSTUCK, intend_finished, 0);
 			if (!intend_finished)
@@ -879,7 +919,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		 * or writing an AIMG record (possible by either DSE or MUPIP JOURNAL RECOVER),
 		 * or this is a newly created block, or we have an in-memory copy.
 		 */
-		 assert(dse_running || write_after_image || mu_reorg_upgrd_dwngrd_in_prog
+		 assert(dse_running || write_after_image || mu_upgrade_in_prog
 			 || ((gds_t_acquired != mode) ? (0 != cs->new_buff): (!read_before_image || (NULL == cs->old_block))));
 		if (!dollar_tlevel)		/* stuff it in the array before setting in_cw_set */
 		{
@@ -891,6 +931,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	assert(0 == cr->data_invalid);
 	if (0 != cr->r_epid)
 	{	/* must have got it with a db_csh_getn */
+<<<<<<< HEAD
 #		ifdef DEBUG
 		/* In rare cases (when free buffers are not easy to find), it is possible that "db_csh_getn" returned us a cr
 		 * whose buffer was used as part of a "gvcst_blk_build" of a prior block in the currently committing transaction.
@@ -902,6 +943,9 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		((blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr))->tn = (ctn - 1);
 #		endif
 		if (gds_t_acquired != mode)
+=======
+		if ((gds_t_acquired != mode) || mu_upgrade_in_prog)
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		{	/* Not a newly created block, yet we have got it with a db_csh_getn. This means we have an in-memory
 			 * copy of the block already built. In that case, cr->ondsk_blkver is uninitialized. Copy it over
 			 * from cs->ondsk_blkver which should hold the correct value.
@@ -915,62 +959,46 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		TREF(block_now_locked) = NULL;
 	}
 	/* Update csd->blks_to_upgrd while we have crit */
-	/* cs->ondsk_blkver is what gets filled in the PBLK record header as the pre-update on-disk block format.
-	 * cr->ondsk_blkver is what is used to update the blks_to_upgrd counter in the file-header whenever a block is updated.
-	 * They both better be the same. Note that PBLK is written if "read_before_image" is TRUE and cs->old_block is non-NULL.
-	 * For created blocks that have NULL cs->old_blocks, t_create should have set format to GDSVCURR. Assert that too.
-	 */
-	assert(!read_before_image || (NULL == cs->old_block) || (cs->ondsk_blkver == cr->ondsk_blkver));
-	assert((gds_t_acquired != mode) || (NULL != cs->old_block)
-		|| (v7_db_mode && ((GDSV7 == cs->ondsk_blkver) || (GDSV7m == cs->ondsk_blkver)))
-		|| (v6_db_mode && ((GDSV6 == cs->ondsk_blkver) || (GDSV6p == cs->ondsk_blkver))));
 	desired_db_format = csd->desired_db_format;
 	/* assert that appropriate inctn journal records were written at the beginning of the commit in t_end */
-	assert((inctn_blkupgrd_fmtchng != inctn_opcode) || ((GDSV6 == cr->ondsk_blkver) && (GDSV7m == desired_db_format)));
-	assert((inctn_blkdwngrd_fmtchng != inctn_opcode) || ((GDSV7m == cr->ondsk_blkver) && (GDSV6 == desired_db_format)));
+	assert((inctn_blkupgrd_fmtchng != inctn_opcode) || ((GDSV6p == cr->ondsk_blkver) && (GDSV7m == desired_db_format)));
 	assert(!(JNL_ENABLED(csa) && csa->jnl_before_image) || !mu_reorg_nosafejnl
 		|| (inctn_blkupgrd != inctn_opcode) || (cr->ondsk_blkver == desired_db_format));
-	assert(!mu_reorg_upgrd_dwngrd_in_prog || !mu_reorg_encrypt_in_prog || (gds_t_acquired != mode));
-	/* RECYCLED blocks could be converted by MUPIP REORG UPGRADE/DOWNGRADE. In this case do NOT update blks_to_upgrd */
-	assert((gds_t_write_recycled != mode) || mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog);
-	if (gds_t_acquired == mode)
-	{	/* It is a created block. It should inherit the desired db format. This is done as a part of call to
-		 * SET_ONDSK_BLKVER in bg_update_phase1 and bg_update_phase2.
-		 * Also, if this is a V7 DB and that format is V6, increase blks_to_upgrd.
-		 */
-		if ((GDSV6 == desired_db_format) && v7_db_mode)
+	assert(!mu_upgrade_in_prog || !mu_reorg_encrypt_in_prog || (gds_t_acquired != mode));
+	assert((gds_t_write_recycled != mode) || mu_upgrade_in_prog || mu_reorg_encrypt_in_prog);
+	if (!cs_data->fully_upgraded)
+	{
+		assert(GDSV6 < cs_data->desired_db_format);
+		if (GDSV7m != cs->ondsk_blkver)
 		{
-			INCR_BLKS_TO_UPGRD(csa, csd, 1);
-		}
-	} else if (cr->ondsk_blkver != desired_db_format)
-	{	/* Some sort of state change in the block format is occurring */
-		switch(desired_db_format)
+			if  (gds_t_acquired == mode)
+			{	/* Increment blks_to_upgrd for new V6p idx blocks */
+				INCR_BLKS_TO_UPGRD(csa, csd, 1);	/* Increment blks_to_upgrd for new V6p index blocks */
+#ifdef				DEBUG_BLKS_TO_UPGRD
+				util_out_print("!UL + 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, cs_data->blks_to_upgrd, &ctn,
+						REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver, cs->level, cs->mode);
+#endif
+			} else if (!mu_upgrade_in_prog && (0 == cs->level) && (GDSV6 == cs->ondsk_blkver)
+					&& (gds_t_write_recycled != cs->mode) && !cs->done)
+			{	/* Level zero block, update the header and decrement blks_to_upgrd */
+				DECR_BLKS_TO_UPGRD(cs_addrs, cs_data, 1);
+#ifdef				DEBUG_BLKS_TO_UPGRD
+				util_out_print("!UL - 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, cs_data->blks_to_upgrd, &ctn,
+						REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver, cs->level, cs->mode);
+#endif
+				cr->ondsk_blkver = cs->ondsk_blkver = cs_data->desired_db_format;
+			}
+		} else if ((GDSV7m == cs->ondsk_blkver) && mu_upgrade_in_prog)
 		{
-			case GDSV7m:
-				/* V6 -> V7 transition */
-				if (gds_t_write_recycled != mode)
-					if (v7_db_mode)
-						DECR_BLKS_TO_UPGRD(csa, csd, 1);
-					else
-						assert(FALSE);
-				break;
-			case GDSV6:
-				/* V4 -> V5 transition */
-				if (gds_t_write_recycled != mode)
-					if (v7_db_mode)
-						INCR_BLKS_TO_UPGRD(csa, csd, 1);
-					/*else
-						DECR_BLKS_TO_UPGRD(csa, csd, 1);*/
-				break;
-			case GDSV6p:		/* this is only the case for upgrade_dir_tree */
-				DECR_BLKS_TO_UPGRD(csa, csd, 1);
-				break;
-			default:
-				assertpro(FALSE);
+			DECR_BLKS_TO_UPGRD(csa, csd, 1);	/* Decrement in transition block */
+#ifdef			DEBUG_BLKS_TO_UPGRD
+			util_out_print("!UL - 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, cs_data->blks_to_upgrd, &ctn,
+					REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver, cs->level, cs->mode);
+#endif
 		}
 	}
 	/* generic dse_running variable below is used for caller == dse_maps */
-	assert((gds_t_writemap != mode) || dse_running || mu_reorg_upgrd_dwngrd_in_prog
+	assert((gds_t_writemap != mode) || dse_running || mu_upgrade_in_prog
 		|| cr->twin || (CR_BLKEMPTY == cs->cr->blk) || (cs->cr == cr) && (cs->cycle == cr->cycle));
 	/* Before marking this cache-record dirty, record the value of cr->dirty into cr->tn.
 	 * This is used in phase2 to determine "recycled".
@@ -1151,7 +1179,7 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		 * only exception to this is ONLINE ROLLBACK or MUPIP TRIGGER -UPGRADE which holds crit for the entire duration
 		 */
 		assert(!csa->now_crit || cs->recompute_list_head || dse_running || jgbl.onlnrlbk || TREF(in_trigger_upgrade)
-			|| mu_reorg_upgrd_dwngrd_in_prog);
+			|| mu_upgrade_in_prog);
 		if (FALSE == cs->done)
 		{	/* if the current block has not been built (from being referenced in TP) */
 			if (NULL != cs->new_buff)
@@ -1192,7 +1220,7 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 				}
 			}
 		} else
-		{
+		{	/* TP */
 			if (0 != cs->first_off)
 			{	/* TP - resolve pointer references to new blocks */
 				for (chain_ptr = blk_ptr + cs->first_off; ; chain_ptr += chain.next_off)
@@ -1537,7 +1565,6 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 	assert(dollar_tlevel ? (NULL != sgm_info_ptr) : (NULL == cse->new_buff));
 	if (dba_bg == csa->hdr->acc_meth)
 	{	/* For BG method, modify history with uptodate cache-record, buffer and cycle information.
-		* Also modify cse->old_block and cse->ondsk_blkver to reflect the updated buffer.
 		* This is necessary in case history contains an older twin cr or a cr which has since been recycled
 		*/
 		if (dollar_tlevel)
@@ -1564,13 +1591,18 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 		bh->cr = cr;
 		bh->cycle = cr->cycle;
 		cse->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
-		cse->ondsk_blkver = cr->ondsk_blkver;
 		/* old_block needs to be repointed to the NEW buffer but the fact that this block was free does not change in this
 		 * entire function. So cse->blk_prior_state's free_status can stay as it is.
 		 */
 		bh->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
 	}
 	buffaddr = bh->buffaddr;
+	if ((NULL != cse->old_block) && (cse->ondsk_blkver < ((blk_hdr_ptr_t)cse->old_block)->bver))
+	{	/* Adjust the ondsk_blkver as needed */
+		assert(!cs_data->fully_upgraded);
+		assert(GDSV7m == ((blk_hdr_ptr_t)cse->old_block)->bver);
+		cse->ondsk_blkver = ((blk_hdr_ptr_t)cse->old_block)->bver;
+	}
 	assert(NULL != cse->recompute_list_head);
 	for (kvhead = kv = cse->recompute_list_head; (NULL != kv); kv = kv->next)
 	{

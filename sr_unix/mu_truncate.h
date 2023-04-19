@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
@@ -15,8 +15,6 @@
 
 #ifndef MU_TRUNCATE_DEFINED
 #define MU_TRUNCATE_DEFINED
-
-#define BML_BLKS_PER_UCHAR		(BITS_PER_UCHAR / BML_BITS_PER_BLK)
 
 #define GET_STATUS(bp, blknum, bml_status)	\
 	bml_status = (bp >> (blknum * BML_BITS_PER_BLK)) & ((1 << BML_BITS_PER_BLK) - 1);

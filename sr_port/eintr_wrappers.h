@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -460,6 +460,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
+<<<<<<< HEAD
 #define SELECT(FDS, INLIST, OUTLIST, XLIST, TIMEOUT, RC)	\
 {								\
 	struct timeval eintr_select_timeval;			\
@@ -476,6 +477,8 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 }
 
 
+=======
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #define SEND(SOCKET, BUF, LEN, FLAGS, RC)			\
 {								\
 	do							\

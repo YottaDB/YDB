@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2019 Fidelity National Information	*
+ * Copyright (c) 2007-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,7 +22,8 @@
 /* Include prototypes */
 #include "bit_set.h"
 
-GBLREF	boolean_t		dse_running;
+GBLREF	boolean_t	dse_running;
+GBLREF  uint4		mu_upgrade_in_prog;
 
 uint4 bml_recycled(block_id setfree, sm_uc_ptr_t map)
 {
@@ -36,6 +37,6 @@ uint4 bml_recycled(block_id setfree, sm_uc_ptr_t map)
 	setfree *= BML_BITS_PER_BLK;
 	ret = bit_set(setfree, map);
 	ret1 = bit_set(setfree + 1, map);
-	assert((!ret && !ret1) || dse_running);
+	assert((!ret && !ret1) || dse_running || mu_upgrade_in_prog);
 	return ret;
 }

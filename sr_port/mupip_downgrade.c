@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2021 Fidelity National Information	*
+ * Copyright (c) 2005-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -13,46 +13,13 @@
  *								*
  ****************************************************************/
 
-/* mupip_downgrade.c: Driver program to downgrade V6.x database files to V4.x */
+/* mupip_downgrade.c: Driver program to downgrade database files - Unsupported since V7 */
 
 #include "mdef.h"
-
-#include "gtm_stat.h"
-#include "gtm_fcntl.h"
-#include "gtm_unistd.h"
-#include "eintr_wrappers.h"
-#include "gtm_stdlib.h"
-#include "gtm_string.h"
-
-#ifdef __MVS__
-#include "gtm_zos_io.h"
-#endif
-#include "gtmio.h"
-#include "iosp.h"
-#include "gdsroot.h"
-#include "v15_gdsroot.h"
-#include "gtm_facility.h"
-#include "fileinfo.h"
-#include "gdsbt.h"
-#include "v15_gdsbt.h"
-#include "gdsfhead.h"
-#include "v15_gdsfhead.h"
-#include "filestruct.h"
-#include "v15_filestruct.h"
-#include "jnl.h"	/* For fd_type */
-#include "error.h"
-#include "util.h"
-#include "gtmmsg.h"
-#include "cli.h"
-#include "repl_sp.h"
 #include "mupip_exit.h"
 #include "mupip_downgrade.h"
-#include "mu_upgrd_dngrd_hdr.h"
-#include "mu_upgrd_dngrd_confirmed.h"
-#include "mu_outofband_setup.h"
-#include "anticipatory_freeze.h"
-#include "mu_all_version_standalone.h"
 
+<<<<<<< HEAD
 #define GTM_VER_LIT		"GT.M "
 #define MAX_VERSION_LEN		16	/* 16 bytes enough to hold V63000A, longest -VERSION= value possible */
 
@@ -69,45 +36,14 @@ error_def(ERR_DBNOTGDS);
 error_def(ERR_DBOPNERR);
 error_def(ERR_DBPREMATEOF);
 error_def(ERR_DBRDONLY);
+=======
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 error_def(ERR_GTMCURUNSUPP);
-error_def(ERR_MUINFOUINT4);
-error_def(ERR_MUINFOUINT8);
-error_def(ERR_MUPGRDSUCC);
-error_def(ERR_MUNODBNAME);
-error_def(ERR_MUNODWNGRD);
-error_def(ERR_MUDWNGRDTN);
-error_def(ERR_MUDWNGRDNOTPOS);
-error_def(ERR_MUDWNGRDNRDY);
-error_def(ERR_MUSTANDALONE);
-error_def(ERR_PREMATEOF);
-error_def(ERR_STATSDBNOTSUPP);
-error_def(ERR_SYSCALL);
-error_def(ERR_TEXT);
 
 void mupip_downgrade(void)
 {
-	char		db_fn[MAX_FN_LEN + 1], ver_spec[MAX_VERSION_LEN + 1],
-			dwngrd_ver[MAX_VERSION_LEN + STR_LIT_LEN(GTM_VER_LIT)];
-	unsigned short	db_fn_len;	/* cli_get_str expects short */
-	unsigned short	ver_spec_len;
-	char		*hdr_ptr;
-	fd_type		channel;
-	int		save_errno, csd_size, rec_size;
-	int		fstat_res, idx, dwngrd_ver_len;
-	int4		status, rc;
-	uint4		status2;
-	off_t		file_size;
-	v15_sgmnt_data	v15_csd;
-	sgmnt_data	csd;
-	boolean_t	recovery_interrupted;
-	struct stat	stat_buf;
-	ZOS_ONLY(int	realfiletag;)
-	unsigned char	new_master_map[MASTER_MAP_SIZE_V4];
-	enum db_ver	desired_dbver;
-	int		ftrunc_status;
-	block_id	temp_cnt;
-
 	mupip_exit(ERR_GTMCURUNSUPP);
+<<<<<<< HEAD
 	/* Initialization */
 	DEFINE_EXIT_HANDLER(mupip_downgrade_cleanup, TRUE);
 	/* Structure checks .. */
@@ -410,4 +346,6 @@ STATICFNDEF void mupip_downgrade_cleanup(void)
 	if (sem_inf)
 		mu_all_version_release_standalone(sem_inf);
 	exit_handler_complete = TRUE;
+=======
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -71,7 +71,12 @@ GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			dollar_tlevel;
+<<<<<<< HEAD
 GBLREF	uint4			ydbDebugLevel;
+=======
+GBLREF	uint4			gtmDebugLevel;
+GBLREF	uint4			mu_upgrade_in_prog;
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 GBLREF	uint4			process_id;
 GBLREF	unsigned int		cr_array_index;
 GBLREF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
@@ -152,7 +157,7 @@ void wcs_recover(gd_region *reg)
 	TP_CHANGE_REG(reg);		/* which are needed by called routines such as wcs_wtstart and wcs_mm_recover */
 	if (dba_mm == reg->dyn.addr->acc_meth)	 /* MM uses wcs_recover to remap the database in case of a file extension */
 	{
-		wcs_mm_recover(reg);
+		wcs_mm_recover(reg, 0);
 		TP_CHANGE_REG(save_reg);
 		jnlpool = save_jnlpool;
 		TREF(wcs_recover_done) = TRUE;
@@ -722,7 +727,7 @@ void wcs_recover(gd_region *reg)
 }
 
 #ifdef MM_FILE_EXT_OK
-void	wcs_mm_recover(gd_region *reg)
+void	wcs_mm_recover(gd_region *reg, unsigned int orig_vbn_offset)
 {
 	int			save_errno;
 	gtm_uint64_t		mmap_sz;
@@ -754,7 +759,8 @@ void	wcs_mm_recover(gd_region *reg)
 	cs_addrs->db_addrs[0] = NULL;
 	syscall = MEM_UNMAP_SYSCALL;
 #	ifdef _AIX
-	status = shmdt(old_db_addrs[0] - BLK_ZERO_OFF(cs_data->start_vbn));
+	assert(!mu_upgrade_in_prog || (0 == orig_vbn_offset) || (mu_upgrade_in_prog && (cs_data->start_vbn > orig_vbn_offset)));
+	status = shmdt(old_db_addrs[0] - BLK_ZERO_OFF(cs_data->start_vbn - orig_vbn_offset));
 #	else
 	status = (INTPTR_T)munmap((caddr_t)old_db_addrs[0], (size_t)(old_db_addrs[1] - old_db_addrs[0]));
 #	endif

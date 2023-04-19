@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2021 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -20,7 +24,6 @@
 #include "gtm_unistd.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
-#include "gtm_select.h"
 #include "gtm_ipc.h"
 #ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 #include "gtm_poll.h"
@@ -60,6 +63,10 @@
 #include "gtm_c_stack_trace.h"
 #include "fork_init.h"
 #include "wbox_test_init.h"
+<<<<<<< HEAD
+=======
+#include "gtm_poll.h"
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #ifdef GTM_TRIGGER
 #include "trigger.h"
 #endif
@@ -357,7 +364,7 @@ static struct_jrec_null	null_jnlrec;
 
 static seq_num		save_jnl_seqno;
 static seq_num		save_strm_seqno;
-static boolean_t	is_nontp, is_null, select_valid;
+static boolean_t	is_nontp, is_null, poll_valid;
 
 void jnl_extr_init(void)
 {
@@ -602,12 +609,9 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 	ssize_t		l_len, r_len, buff_remaining ;
 	muextract_type	exttype;
 	fd_set		input_fds;
-#ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-	long		poll_timeout;
-	unsigned long	poll_nfds;
+	int		poll_timeout;
+	nfds_t		poll_nfds;
 	struct pollfd	poll_fdlist[1];
-#endif
-	struct timeval	repl_filter_poll_interval;
 	boolean_t	half_timeout_done, timedout;
 	DCL_THREADGBL_ACCESS;
 
@@ -645,30 +649,17 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 		if (0 < (buff_remaining = srv_buff_end - srv_read_end))
 		{
 			/* since it is possible that this read could happen twice in this loop (no newline found) then
-			 * do a select/poll unless this is the first time and we know the previous select/poll is still valid.
+			 * do a poll unless this is the first time and we know the previous poll is still valid.
 			 */
-			if (FALSE == select_valid)
+			if (FALSE == poll_valid)
 			{
-				while(1) /* select/poll until ok to read or timeout */
+				while(1) /* poll until ok to read or timeout */
 				{
-					repl_filter_poll_interval.tv_sec = 0;
-					repl_filter_poll_interval.tv_usec = 1000;
-#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-					assertpro(FD_SETSIZE > repl_filter_srv_fd[READ_END]);
-					FD_ZERO(&input_fds);
-					FD_SET(repl_filter_srv_fd[READ_END], &input_fds);
-#else
 					poll_fdlist[0].fd = repl_filter_srv_fd[READ_END];
 					poll_fdlist[0].events = POLLIN;
 					poll_nfds = 1;
-					poll_timeout = repl_filter_poll_interval.tv_usec / 1000;   /* convert to millisecs */
-#endif
-#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-					status = select(repl_filter_srv_fd[READ_END] + 1, &input_fds, NULL,
-							NULL, &repl_filter_poll_interval);
-#else
+					poll_timeout = 1;
 					status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
-#endif
 					if (-1 == status)
 					{
 						if (EINTR == errno) /* ignore interrupt and try again */
@@ -748,9 +739,9 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 				TIMEOUT_DONE(timedout);
 			if (0 < r_len) /* successful read */
 			{
-				/* if send is not done then need to do select/poll if we try read again */
+				/* if send is not done then need to do poll if we try read again */
 				if (FALSE == send_done)
-					select_valid = FALSE;
+					poll_valid = FALSE;
 				srv_read_end += r_len;
 				REPL_EXTRA_DPRINT5("repl_filter: b %d srv_line_start: 0x%x srv_line_end: 0x%x srv_read_end: 0x%x\n",
 							r_len, srv_line_start, srv_line_end, srv_read_end);
@@ -781,16 +772,16 @@ STATICFNDEF int repl_filter_recv(seq_num tr_num, unsigned char **tr, int *tr_len
 
 	assert(NULL != extr_rec);
 
-	/* the select/poll need not be done for the first read in processing loop in repl_filter_recv_line() */
-	select_valid = TRUE;
+	/* the poll need not be done for the first read in processing loop in repl_filter_recv_line() */
+	poll_valid = TRUE;
 	if (FIRST_RECV_COMPLETE > recv_state)
 	{
 		unwrap_nontp = FALSE; /* If this is TRUE then the filter program made a non-tp a transaction */
 		if (SS_NORMAL != (status = repl_filter_recv_line(extr_rec, &firstrec_len, extr_bufsiz, send_done)))
 			return status;
-		/* if send not done make sure we do a select before reading any more */
+		/* if send not done make sure we do a poll before reading any more */
 		if (FALSE == send_done)
-			select_valid = FALSE;
+			poll_valid = FALSE;
 		assert(recv_extract_bufsiz > firstrec_len);	/* assert initial allocation will always fit ONE extract line */
 		memcpy(recv_extract_buff, extr_rec, firstrec_len); /* note: includes terminating null */
 		extr_reclen = extr_len = firstrec_len;
@@ -910,12 +901,9 @@ int repl_filter(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize
 	boolean_t	first_send = TRUE;
 	fd_set		output_fds;
 	fd_set		input_fds;
-#ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-	long		poll_timeout;
-	unsigned long	poll_nfds;
+	int		poll_timeout;
+	nfds_t		poll_nfds;
 	struct pollfd	poll_fdlist[1];
-#endif
-	struct timeval	repl_filter_poll_interval;
 
 	assert(*tr_len <= *tr_bufsize);
 	recv_state = FIRST_RECV;
@@ -923,27 +911,14 @@ int repl_filter(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize
 	{
 		if ((FALSE == send_done) && (TRUE == try_send))
 		{
-			/* don't have to do the select for the first send */
+			/* don't have to do the poll for the first send */
 			if (FALSE == first_send)
 			{
-				repl_filter_poll_interval.tv_sec = 0;
-				repl_filter_poll_interval.tv_usec = 1000;
-#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-				assertpro(FD_SETSIZE > repl_srv_filter_fd[WRITE_END]);
-				FD_ZERO(&output_fds);
-				FD_SET(repl_srv_filter_fd[WRITE_END], &output_fds);
-#else
 				poll_fdlist[0].fd = repl_srv_filter_fd[WRITE_END];
 				poll_fdlist[0].events = POLLOUT;
 				poll_nfds = 1;
-				poll_timeout = repl_filter_poll_interval.tv_usec / 1000;   /* convert to millisecs */
-#endif
-#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-				status = select(repl_srv_filter_fd[WRITE_END] + 1, NULL, &output_fds, NULL,
-						&repl_filter_poll_interval);
-#else
+				poll_timeout = 1;
 				status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
-#endif
 				if (-1 == status)
 				{
 					if (EINTR == errno) /* ignore interrupt and try again */
@@ -962,7 +937,7 @@ int repl_filter(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize
 				{
 					try_recv = TRUE;
 					try_send = FALSE;
-					continue; /* when select is on receive then try it */
+					continue; /* when poll is on receive then try it */
 				}
 			}
 			status = repl_filter_send(tr_num, *tr, *tr_len, first_send);
@@ -982,27 +957,14 @@ int repl_filter(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize
 			}
 		}
 		if ((FALSE == recv_done) && (TRUE == try_recv))
-		{	/* if send is not done then do a select first */
+		{	/* if send is not done then do a poll first */
 			if (FALSE == send_done)
 			{
-				repl_filter_poll_interval.tv_sec = 0;
-				repl_filter_poll_interval.tv_usec = 1000;
-#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-				assertpro(FD_SETSIZE > repl_filter_srv_fd[READ_END]);
-				FD_ZERO(&input_fds);
-				FD_SET(repl_filter_srv_fd[READ_END], &input_fds);
-#else
 				poll_fdlist[0].fd = repl_filter_srv_fd[READ_END];
 				poll_fdlist[0].events = POLLIN;
 				poll_nfds = 1;
-				poll_timeout = repl_filter_poll_interval.tv_usec / 1000;   /* convert to millisecs */
-#endif
-#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-				status = select(repl_filter_srv_fd[READ_END] + 1, &input_fds, NULL, NULL,
-					&repl_filter_poll_interval);
-#else
+				poll_timeout = 1;
 				status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
-#endif
 				if (-1 == status)
 				{
 					if (EINTR == errno) /* ignore interrupt and try again */
@@ -1021,7 +983,7 @@ int repl_filter(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize
 				{
 					try_send = TRUE;
 					try_recv = FALSE;
-					continue; /* try select again */
+					continue; /* try poll again */
 				}
 			}
 

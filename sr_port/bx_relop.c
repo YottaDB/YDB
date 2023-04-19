@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -22,6 +22,7 @@
 
 LITREF octabstruct	oc_tab[];
 
+<<<<<<< HEAD
 void bx_relop(triple *t, opctype cmp, boolean_t sense, oprtype *addr, int depth, opctype andor_opcode,
 			boolean_t caller_is_bool_expr, int jmp_depth, boolean_t is_last_bool_operand)
 /* work Boolean relational arguments
@@ -146,5 +147,19 @@ void bx_relop(triple *t, opctype cmp, boolean_t sense, oprtype *addr, int depth,
 		}
 		p++;
 	}
+=======
+void bx_relop(triple *t, opctype cmp, opctype tst, oprtype *addr)
+/* Convert boolean relational operation into final cmp-jmp form.
+ * *t points to the Boolean operation, cmp and tst give (respectively) the opcode and the associated jump
+ * *addr points the operand for the jump and is eventually used by logic back in the invocation stack to fill in a target location
+ */
+{
+	triple	*ref;
+
+	ref = maketriple(tst);
+	ref->operand[0] = put_indr(addr);
+	dqins(t, exorder, ref);
+	t->opcode = cmp;
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	return;
 }

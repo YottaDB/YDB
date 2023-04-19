@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2021 Fidelity National Information	*
+ * Copyright (c) 2005-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -17,11 +17,6 @@
 #ifndef GDS_BLK_UPGRADE_INCLUDED
 #define GDS_BLK_UPGRADE_INCLUDED
 
-#ifdef DEBUG_DB_UPGRADE	/* define to get output for debugging */
-#define DBGUPGRADE(X)
-#else
-#define DBGUPGRADE(X)
-#endif
 #define UPGRADE_IF_NEEDED	0	/* default */
 #define UPGRADE_NEVER		1
 #define UPGRADE_ALWAYS		2
@@ -31,31 +26,7 @@ int4 gds_blk_upgrade(sm_uc_ptr_t gds_blk_src, sm_uc_ptr_t gds_blk_trg, int4 bsiz
 GBLREF	uint4		ydb_blkupgrade_flag;	/* control whether dynamic upgrade is attempted or not */
 GBLREF	boolean_t	dse_running;
 
-static inline void blk_ptr_adjust(sm_uc_ptr_t buff, block_id offset)
-{	/* buff contains a prior index block needing its offset adjusted */
-	block_id	blk_num, *blk_ptr;
-	sm_uc_ptr_t	blkEnd, recBase;
-	unsigned short	temp_ushort;
-
-	blkEnd = buff + ((blk_hdr_ptr_t)buff)->bsiz;
-	assert(IS_64_BLK_ID(buff) == FALSE);
-	DBG_VERIFY_ACCESS(blkEnd - 1);
-	for (recBase = buff + SIZEOF(blk_hdr) ; recBase < blkEnd; recBase += ((rec_hdr_ptr_t)recBase)->rsiz)
-	{	/* iterate through block updating pointers with the offset */
-		if (blkEnd <= (recBase + SIZEOF(rec_hdr)))
-		{
-			assert(FALSE);
-			buff = NULL;
-		}
-		GET_USHORT(temp_ushort, &(((rec_hdr_ptr_t)recBase)->rsiz));
-		/* collation info in directory tree which was already converted, so following is safe */
-		blk_ptr = (block_id *)(recBase + (int4)temp_ushort - SIZEOF_BLK_ID(FALSE));
-		GET_BLK_ID_32(blk_num, blk_ptr);
-		PUT_BLK_ID_32(blk_ptr, blk_num - offset);
-	}
-}
-
-/* The following macro was gutted in V7+ as dsk_read uses the inline fuction above to adjst block_ids, but does not actually
+/* The following macro was gutted in V7+ as dsk_read uses the inline fuction above to adjust block_ids, but does not actually
  * upgrade block_id fileds from 4 to 8 bytes, as managing that as part of the read was deemed to complex and not necessary
  * The macro remains in mur_blocks_free.c as a marker for possible future conversions and the text below retained for guidance
  *

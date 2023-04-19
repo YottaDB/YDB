@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -35,10 +35,18 @@ LITREF octabstruct	oc_tab[];
 error_def(ERR_NUMOFLOW);
 error_def(ERR_PATNOTFOUND);
 
+<<<<<<< HEAD
 void bx_boollit(triple *t, int depth)
 /* search the Boolean in t (recursively) for literal leaves; the logic is similar to bx_tail
  * the rest of the arguments parallel those in bx_boolop and used primarily handling basic Boolean operations (ON, NOR, AND, NAND)
  * to get the jump target and sense right for the left-hand operand of the operation
+=======
+void bx_boollit(triple *t)
+/* Type: tail-processing leaf function
+ * Callers: ex_tail and bool_expr
+ * Processes basic Boolean operations (OR, NOR, AND, NAND) at compile time.
+ * Make sure to fully tail-process all operands before calling this function.
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
  * jmp_type_one gives the sense of the jump associated with the first operand
  * jmp_to_next gives whether we need a second jump to complete the operation
  * sense gives the sense of the requested operation
@@ -48,12 +56,13 @@ void bx_boollit(triple *t, int depth)
 	boolean_t	tv[ARRAYSIZE(t->operand)];
 	int		dummy, j, tvr;
 	mval		*mv, *v[ARRAYSIZE(t->operand)];
-	opctype		c;
-	oprtype		*opr, *p;
+	opctype		opercode;
+	oprtype		*opr;
 	triple		*ref0, *optrip[ARRAYSIZE(t->operand)];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+<<<<<<< HEAD
 	assert(OCT_BOOL & oc_tab[t->opcode].octype);
 	assert((OC_BOOLINIT != t->opcode) || (NO_REF == t->operand[0].oprclass));
 	if (OC_BOOLINIT == t->opcode)
@@ -75,6 +84,15 @@ void bx_boollit(triple *t, int depth)
 		RETURN_IF_RTS_ERROR;
 		assert(OC_COMVAL != optrip[j]->opcode);
 		UNARY_TAIL(opr, depth);
+=======
+	opercode = t->opcode;
+	assert(OCT_BOOL & oc_tab[opercode].octype);
+	assert(TRIP_REF == t->operand[0].oprclass);
+	assert((OC_COBOOL != opercode) && (OC_COM != opercode) || (TRIP_REF == t->operand[1].oprclass));
+	for (opr = t->operand, j = 0; opr < ARRAYTOP(t->operand); opr++, j++)
+	{	/* checkout an operand to see if we can simplify it */
+		neg = num = 0;
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		for (ref0 = t->operand[j].oprval.tref; OCT_UNARY & oc_tab[ref0->opcode].octype; ref0 = ref0->operand[0].oprval.tref)
 			;
 		optrip[j] = ref0;
@@ -154,22 +172,70 @@ void bx_boollit(triple *t, int depth)
 	} else if (OC_LIT == optrip[1]->opcode)
 		j = 1;
 	if (2 == j)
-	{
+	{	/* both arguments are literals, so try the operation at compile time */
 		for (j = 0;  j < ARRAYSIZE(v); j++)
+<<<<<<< HEAD
 		{	/* both arguments are literals, so try the operation at compile time */
 			v[j] = &optrip[j]->operand[0].oprval.mlit->v;
 			tv[j] = MV_FORCE_BOOL(v[j]);
 		}
 		switch (t->opcode)
+=======
+			v[j] = &optrip[j]->operand[0].oprval.mlit->v;			/* prep the argument values */
+		switch (opercode)
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		{	/* optimize the Boolean operations here */
 		case OC_NAND:
+		case OC_SNAND:
 		case OC_AND:
-			tvr = (tv[0] && tv[1]);
-			break;
+		case OC_SAND:
 		case OC_NOR:
+		case OC_SNOR:
 		case OC_OR:
-			tvr = (tv[0] || tv[1]);
-			break;
+		case OC_SOR:
+		case OC_NGT:
+		case OC_GT:
+		case OC_NLT:
+		case OC_LT:
+			for (j = 0;  j < ARRAYSIZE(v); j++)
+			{	/* operators that come here need numeric coercion */
+				assert((OCT_ARITH | OCT_BOOL) & oc_tab[opercode].octype);
+				MV_FORCE_NUMD(v[j]);
+				if (!(MV_NM & v[j]->mvtype))
+				{       /* if we don't have a useful number, the operation won't be valid */
+					TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;  /* improve hints */
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
+					assert(TREF(rts_error_in_parse));
+					return;
+				}
+				tv[j] = MV_FORCE_BOOL(v[j]);	/* type operands as Boolean; needed or harmless and cheap */
+			}
+			switch (opercode)
+			{	/* time to evaluate the Boolean and arithmetic operations */
+			case OC_NAND:
+			case OC_SNAND:
+			case OC_AND:
+			case OC_SAND:
+				tvr = (tv[0] && tv[1]);
+				break;
+			case OC_NOR:
+			case OC_SNOR:
+			case OC_OR:
+			case OC_SOR:
+				tvr = (tv[0] || tv[1]);
+				break;
+			case OC_NGT:
+			case OC_GT:
+				tvr = 0 < numcmp(v[0], v[1]);
+				break;
+			case OC_NLT:
+			case OC_LT:
+				tvr = 0 > numcmp(v[0], v[1]);
+				break;
+			default:
+				assertpro(FALSE & opercode);
+			}
+			break;		/* after numeric coercion and inner switch; subsequent operations avoid the coercion */
 		case OC_NCONTAIN:
 		case OC_CONTAIN:
 			tvr = 1;
@@ -185,6 +251,7 @@ void bx_boollit(triple *t, int depth)
 		case OC_FOLLOW:
 			tvr = 0 < memvcmp(v[0]->str.addr, v[0]->str.len, v[1]->str.addr, v[1]->str.len);
 			break;
+<<<<<<< HEAD
 		case OC_NGT:
 		case OC_GT:
 			tvr = (0 < numcmp(v[0], v[1]));
@@ -193,6 +260,8 @@ void bx_boollit(triple *t, int depth)
 		case OC_LT:
 			tvr = (0 > numcmp(v[0], v[1]));
 			break;
+=======
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		case OC_NPATTERN:
 		case OC_PATTERN:
 			if (TREF(xecute_literal_parse))
@@ -206,8 +275,8 @@ void bx_boollit(triple *t, int depth)
 			tvr = (0 < sorts_after(v[0], v[1]));
 			break;
 		default:
-			assertpro(FALSE);
-		}
+			assertpro(FALSE & opercode);
+		}	/* through with switch */
 		for (j = 0;  j < ARRAYSIZE(v); j++)
 		{	/* finish cleaning up the original triples */
 			/* We don't need any COBOOLs, and all the negatives/coms should be out */
@@ -230,11 +299,11 @@ void bx_boollit(triple *t, int depth)
 				t->operand[j].oprval.tref = ref0->operand[0].oprval.tref;
 			}
 			unuse_literal(v[j]);
-			optrip[j]->opcode = OC_NOOP;	/* shouldn't dqdel be safe? */
+			optrip[j]->opcode = OC_NOOP;
 			optrip[j]->operand[0].oprclass = NO_REF;
 		}
 		t->operand[1].oprclass = NO_REF;
-		if (OCT_NEGATED & oc_tab[t->opcode].octype)
+		if (OCT_NEGATED & oc_tab[opercode].octype)
 			tvr = !tvr;
 		ref0 = maketriple(OC_LIT);
 		t->opcode = OC_COBOOL;

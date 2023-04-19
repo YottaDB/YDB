@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2022 Fidelity National Information	*
+ * Copyright (c) 2018-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -49,7 +49,8 @@ boolean_t mlk_shrhash_resize(mlk_pvtctl_ptr_t pctl)
 
 	do
 	{
-		shmid_new = gtm_shmget(IPC_PRIVATE, shrhash_mem_new, RWDALL | IPC_CREAT, TRUE);
+		shmid_new = gtm_shmget(IPC_PRIVATE, shrhash_mem_new, RWDALL | IPC_CREAT,
+				TRUE, LOCK_FILE, (char*) pctl->region->dyn.addr->fname);
 		assert(-1 != shmid_new);
 		if (-1 == shmid_new)
 		{

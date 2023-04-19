@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -32,6 +32,7 @@
 #include "copy.h"
 #include "util.h"
 #include "dse.h"
+#include "filestruct.h"
 
 /* Include prototypes*/
 #include "t_qread.h"
@@ -43,6 +44,7 @@ GBLREF gd_region	*gv_cur_region;
 GBLDEF global_root_list	*global_roots_head, *global_roots_tail;
 GBLDEF int4		patch_offset[MAX_BT_DEPTH + 1], patch_offset1[MAX_BT_DEPTH + 1];
 GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF sgmnt_data_ptr_t	cs_data;
 GBLDEF short int	patch_dir_path_count, patch_path_count;
 
 static boolean_t	was_crit, was_hold_onto_crit, nocrit_present;
@@ -62,7 +64,11 @@ void dse_f_blk(void)
 	sm_uc_ptr_t		blk_id, bp, b_top, key_top, rp, r_top, sp, srp, s_top;
 	DCL_THREADGBL_ACCESS;
 
+<<<<<<< HEAD
 	SETUP_THREADGBL_ACCESS;
+=======
+	DSE_DB_IS_TOO_OLD(cs_addrs, cs_data, gv_cur_region);
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	if (BADDSEBLK == (patch_find_blk = dse_getblk("BLOCK", DSENOBML, DSEBLKCUR)))		/* WARNING: assignment */
 		return;
 	patch_find_sibs = (CLI_PRESENT == cli_present("SIBLINGS"));

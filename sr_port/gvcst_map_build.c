@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -31,6 +31,7 @@
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	uint4		mu_upgrade_in_prog;
 
 void gvcst_map_build(block_id *array, sm_uc_ptr_t base_addr, cw_set_element *cs, trans_num ctn)
 {
@@ -68,5 +69,5 @@ void gvcst_map_build(block_id *array, sm_uc_ptr_t base_addr, cw_set_element *cs,
 		array++;
 		DEBUG_ONLY(prev_bitnum = bitnum;)
 	}
-	assert(actual_cnt == cs->reference_cnt);
+	assert(actual_cnt == cs->reference_cnt || mu_upgrade_in_prog);
 }

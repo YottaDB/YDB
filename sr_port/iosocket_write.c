@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -226,7 +226,7 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 	output_retries = status = 0;
 	lbuffer = buffer;
 	while ((0 == status) && (0 < llen))
-	{	/* poll/select tlspolldirection - needed if noblocking */
+	{	/* poll tlspolldirection - needed if noblocking */
 #		ifdef GTM_TLS
 		if (socketptr->tlsenabled)
 			pollwrite = (tlspolldirection == GTMTLS_WANT_READ) ? FALSE : TRUE;
@@ -268,11 +268,15 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 				socketptr->obuffer_errno = save_errno;
 				status = -1;
 				break;
+<<<<<<< HEAD
 			} else
 				eintr_handling_check();
+=======
+			}
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			continue;
 		} else if (0 == istatus)
-		{	/* poll/select timedout */
+		{	/* poll timedout */
 			if (socketptr->nonblocking && (++output_retries > socketptr->max_output_retries))
 			{
 				socketptr->obuffer_errno = EAGAIN;

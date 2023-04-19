@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
@@ -22,7 +22,7 @@
 #include "gdsfhead.h"
 #include "dbfilop.h"
 #include "gdsblk.h"
-#include "gds_blk_downgrade.h"
+#include "gdsbml.h"
 #include "gtmcrypt.h"
 #include "min_max.h"
 #include "mupint.h"
@@ -57,18 +57,10 @@ void mu_int_write(block_id blk, uchar_ptr_t ptr)
 	 */
 	assert(0 == reformat_buffer_in_use);
 	DEBUG_ONLY(reformat_buffer_in_use++;)
-	if (IS_GDS_BLK_DOWNGRADE_NEEDED(mu_int_data.desired_db_format))
-	{
-		if (reformat_buffer_len < mu_int_data.blk_size)
-		{
-			if (reformat_buffer)
-				free(reformat_buffer);
-			reformat_buffer = malloc(mu_int_data.blk_size);
-			reformat_buffer_len = mu_int_data.blk_size;
-		}
-		gds_blk_downgrade((v15_blk_hdr_ptr_t)reformat_buffer, (blk_hdr_ptr_t)ptr);
-		ptr = reformat_buffer;
-	}
+	/* Upgrade the block version of all level zero blocks */
+	if ((mu_int_data.desired_db_format > ((blk_hdr_ptr_t)ptr)->bver)
+			&& ((0 == ((blk_hdr_ptr_t)ptr)->levl) || (LCL_MAP_LEVL == ((blk_hdr_ptr_t)ptr)->levl)))
+		 ((blk_hdr_ptr_t)ptr)->bver = mu_int_data.desired_db_format;
 	fc = gv_cur_region->dyn.addr->file_cntl;
 	fc->op = FC_WRITE;
 	/* In case the block whose header we touched is encrypted, we need to reencrypt its entire content (unless using null IV),

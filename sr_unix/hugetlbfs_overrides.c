@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2022 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,8 +38,24 @@ GBLREF	bool	hugetlb_shm_enabled;
 
 error_def(ERR_SHMHUGETLB);
 error_def(ERR_SHMLOCK);
+error_def(ERR_TEXT);
 
-int gtm_shmget (key_t key, size_t size, int shmflg, bool lock)
+/* The below array should have an entry corresponding to each type in enum shmget_caller in mdef.h */
+static readonly char *errstr[] =
+{
+	"for lock file",		/* LOCK_FILE */
+	"for snapshot file",		/* SNAPSHOT_FILE */
+	"for relink file",		/* RELINK */
+	"for journal pool file",	/* JOURNAL_POOL */
+	"for database file",		/* DATABASE_FILE */
+	"for rc cpt path",		/* RC_CPT */
+	"for gtm_multi_proc",		/* GTM_MULTI_PROC_FREEZE */
+	"for gtm_multi_proc"		/* GTM_MULTI_PROC_RECOVER */
+};
+
+static char err_string[1024];
+
+int gtm_shmget (key_t key, size_t size, int shmflg, bool lock, enum shmget_caller caller, char *errinfostr)
 {
 #	ifdef HUGETLB_SUPPORTED
 	int			shmid;
@@ -51,7 +67,9 @@ int gtm_shmget (key_t key, size_t size, int shmflg, bool lock)
 		shmid = shmget(key, size, shmflg | SHM_HUGETLB);
 		if ((-1 == shmid) && ((EPERM == errno) || (ENOMEM == errno)))
 		{	/* retry without huge pages */
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SHMHUGETLB, 0, errno);
+			assert(N_SHMGET_CALLERS > caller && NULL != errinfostr);
+			SNPRINTF(err_string, SIZEOF(err_string), "%s %s", errstr[caller], errinfostr);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SHMHUGETLB, 2, RTS_ERROR_TEXT(err_string), errno);
 			shmid = shmget(key, size, shmflg);
 			native_shmget = TRUE;
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -99,6 +99,7 @@ enum cdb_sc	gvcst_lftsib(srch_hist *full_hist)
 	while (--new >= new_base)
 	{
 		--old;
+		long_blk_id = IS_64_BLK_ID(bp);
 		READ_BLK_ID(long_blk_id, &blk, bp + rtop - SIZEOF_BLK_ID(long_blk_id));
 		new->tn = cs_addrs->ti->curr_tn;
 		new->cse = NULL;

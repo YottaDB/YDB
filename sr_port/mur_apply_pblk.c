@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2020 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,6 @@
 #include "gtmmsg.h"
 #include "send_msg.h"
 #include "dbfilop.h"
-#include "gds_blk_downgrade.h"
 #include "gdsbml.h"
 #include "bit_clear.h"
 #include "bit_set.h"
@@ -49,6 +48,8 @@
 #include "gtm_pthread_init_key.h"
 #include "interlock.h"
 #include "gtm_multi_proc.h"
+#include "io.h"
+#include "gtmio.h"
 
 GBLREF	volatile int4		db_fsync_in_prog;	/* for DB_FSYNC macro usage */
 GBLREF	boolean_t		blocksig_initialized;
@@ -84,6 +85,12 @@ uint4 mur_apply_pblk(reg_ctl_list *rctl)
 
 	reg = rctl->gd;
 	status = gtm_pthread_init_key(reg);
+        if (WBTEST_ENABLED(WBTEST_MU_STOP_THREAD))
+        {
+		DBGFPF((stderr, "region %s thread will sleep indefinitely now\n",reg->rname));
+                while (TRUE)
+                        LONG_SLEEP(60);
+        }
 	if (0 != status)
 		return status;
 	udi = FILE_INFO(rctl->gd);
@@ -376,17 +383,7 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 		if (pblkrec.blknum > csa->nl->highest_lbm_blk_changed)
 			csa->nl->highest_lbm_blk_changed = pblkrec.blknum;
 	}
-	if (IS_GDS_BLK_DOWNGRADE_NEEDED(pblkrec.ondsk_blkver))
-	{	/* This block was not in GDSVCURR format before the GT.M update wrote this PBLK record. But since all buffers in
-		 * the cache are stored in GDSVCURR format, the before-image in the PBLK record is in GDSVCURR
-		 * format. In order to really undo the update, downgrade the before-image before playing it back.
-		 * This can thankfully be done inline (i.e. using the same buffer) due to the following reasons.
-		 *	a) The reformat routine allows for the source and target buffers to be the same AND
-		 *	b) The block downgrade routine always needs less space for the target buffer than the source buffer AND
-		 *	c) Recovery does not rely on the blk_contents of a PBLK journal record other than in this routine.
-		 */
-		 gds_blk_downgrade((v15_blk_hdr_ptr_t)pblkcontents, (blk_hdr_ptr_t)pblkcontents);
-	}
+	/* Previously, blocks could be downgraded here as needed */
 	db_ctl = rctl->db_ctl;
 	/* apply PBLKs to database of "rctl".
 	 * This only takes place during rollback/recover, and is thus the first restoration being done to the database;

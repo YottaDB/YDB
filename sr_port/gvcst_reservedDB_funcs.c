@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2022 Fidelity National Information	*
+ * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -90,6 +90,7 @@ MBSTART {							\
 
 error_def(ERR_DBPRIVERR);
 error_def(ERR_DRVLONGJMP);	/* Generic internal only error used to drive longjump() in a queued condition handler */
+error_def(ERR_FILEPATHTOOLONG);
 error_def(ERR_RNDWNSTATSDBFAIL);
 error_def(ERR_STATSDBERR);
 
@@ -866,7 +867,7 @@ void	gvcst_set_statsdb_fname(sgmnt_data_ptr_t csd, gd_region *baseDBreg, char *s
 		int_status = parse_file(&dbfile, &pblk);
 		if (!(int_status & 1))
 		{	/* Some error in "parse_file". Likely not enough space to store full-path file name of statsdb. */
-			assert(FALSE);
+			assert(ERR_FILEPATHTOOLONG == int_status);
 			TREF(statsdb_fnerr_reason) = FNERR_FNAMEBUF_OVERFLOW;
 			statsdb_off = TRUE;
 			break;

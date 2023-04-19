@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -48,6 +48,7 @@ GBLREF	cw_set_element		cw_set[];
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	uint4			dollar_trestart;
 GBLREF	uint4			dollar_tlevel;
+GBLREF	uint4			mu_upgrade_in_prog;	/* non-zero if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
 GBLREF	tp_region		*tp_reg_list;	      /* List of tp_regions for this transaction */
@@ -99,8 +100,7 @@ MBSTART {															\
 	csa = CS_ADDRS;														\
 	assert(!csa->t_commit_crit);												\
 	assert(!csa->now_crit || (csa->ti->curr_tn == csa->ti->early_tn));							\
-	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa, JNLPOOL); /* debug-only sanity check between				\
-								  * seqno of filehdr and jnlpool */				\
+	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa, JNLPOOL); /* debug-only sanity check between seqno of filehdr and jnlpool */	\
 	csd = csa->hdr;														\
 	/* Note: Below code is slightly similar to that in "mutex_salvage" */							\
 	if (csa->now_crit && JNL_ENABLED(csd) && (csd->trans_hist.early_tn != csd->trans_hist.curr_tn))				\
@@ -129,7 +129,8 @@ MBSTART {															\
 	}															\
 	if (UPDATE_TRANS)													\
 		RESET_EARLY_TN_IF_NEEDED(csa);		/* Undo Step (CMT04) */							\
-	assert(!csa->hold_onto_crit || JGBL.onlnrlbk || TREF(in_gvcst_redo_root_search) || dse_running);			\
+	assert(!csa->hold_onto_crit || dse_running || mu_upgrade_in_prog || JGBL.onlnrlbk 					\
+			|| TREF(in_gvcst_redo_root_search) || TREF(in_trigger_upgrade));					\
 	if (!csa->hold_onto_crit && RELEASE_CRIT)										\
 		rel_crit(GV_CUR_REGION); 		/* Undo Step (CMT01) */							\
 } MBEND

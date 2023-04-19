@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -158,7 +158,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	sts = gtm_multi_proc((gtm_multi_proc_fnptr_t)&mur_forward_multi_proc, max_procs, max_procs,
 				murgbl.ret_array, (void *)mur_ctl, SIZEOF(reg_ctl_list),
 				shm_size, (gtm_multi_proc_fnptr_t)&mur_forward_multi_proc_init,
-				(gtm_multi_proc_fnptr_t)&mur_forward_multi_proc_finish);
+				(gtm_multi_proc_fnptr_t)&mur_forward_multi_proc_finish, GTM_MULTI_PROC_RECOVER);
 	return (uint4)sts;
 }
 
@@ -778,7 +778,8 @@ finish:
 			}
 			if ((SS_NORMAL == status) && shm_size)
 			{
-				shmid = gtm_shmget(IPC_PRIVATE, shm_size, 0600 | IPC_CREAT, TRUE);
+				shmid = gtm_shmget(IPC_PRIVATE, shm_size, 0600 | IPC_CREAT, TRUE,
+									DATABASE_FILE, (char*)rctl->gd->dyn.addr->fname);
 				if (-1 == shmid)
 				{
 					save_errno = errno;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -303,7 +303,7 @@ int4	read_source_file (void)
 	if (MAX_SRCLINE < val.str.len)
 	{	/* Emit a warning */
 		extra_ch = *(--cp);					/* save the overflow character */
-		dec_err(VARLSTCNT(4) ERR_LSINSERTED, 3, TREF(source_line), source_name_len, source_file_name);
+		dec_err(VARLSTCNT(5) ERR_LSINSERTED, 3, TREF(source_line), source_name_len, source_file_name);
 		if (1 < TREF(source_line))
 			(TREF(source_line))--;
 	} else

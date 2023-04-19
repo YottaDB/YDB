@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,8 +31,12 @@
 #include "dse.h"
 #include "error.h"
 #include "util.h"
+#include "filestruct.h"
 
 GBLDEF enum dse_fmt	dse_dmp_format = CLOSED_FMT;
+GBLREF gd_region	*gv_cur_region;
+GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF sgmnt_data_ptr_t	cs_data;
 
 GBLREF boolean_t	patch_is_fdmp;
 GBLREF int		patch_fdmp_recs;
@@ -51,6 +60,7 @@ void	dse_dmp(void)
 
 	SETUP_THREADGBL_ACCESS;
 	patch_fdmp_recs = 0;
+	DSE_DB_IS_TOO_OLD(cs_addrs, cs_data, gv_cur_region);
 	glo_present = (CLI_PRESENT == cli_present("GLO"));
 	zwr_present = (CLI_PRESENT == cli_present("ZWR"));
 	if (glo_present || zwr_present)

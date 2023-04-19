@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,6 +30,7 @@
 #include "wbox_test_init.h"
 
 GBLREF 	jnl_gbls_t		jgbl;
+GBLREF	uint4			mu_upgrade_in_prog;
 
 error_def(ERR_JNLFILOPN);
 error_def(ERR_JNLSWITCHFAIL);
@@ -52,7 +53,7 @@ uint4 jnl_file_open_switch(gd_region *reg, uint4 sts, char *err_str, size_t err_
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	jpc = csa->jnl;
-	assert(sts GTMTRIG_ONLY(|| TREF(in_trigger_upgrade)));
+	assert(sts GTMTRIG_ONLY(|| TREF(in_trigger_upgrade)) || mu_upgrade_in_prog);
 	assert(!sts || ((ERR_JNLFILOPN != sts) && (NOJNL != jpc->channel)) || ((ERR_JNLFILOPN == sts) && (NOJNL == jpc->channel))
 			|| (ERR_JNLSWITCHRETRY == sts));
 	if (NOJNL != jpc->channel)

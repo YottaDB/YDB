@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -96,6 +96,20 @@
 /* Because shmget and semget returns -1 to indicate error, -1 can never be a valid shmid or semid */
 #define INVALID_SEMID			-1
 #define INVALID_SHMID 			-1L
+
+/* For use in the SHMHUGETLB syslog warning message */
+enum shmget_caller
+{
+	LOCK_FILE,
+	SNAPSHOT_FILE,
+	RELINK,
+	JOURNAL_POOL,
+	DATABASE_FILE,
+	RC_CPT,
+	GTM_MULTI_PROC_FREEZE,
+	GTM_MULTI_PROC_RECOVER,
+	N_SHMGET_CALLERS
+};
 
 /* constant needed for FIFO - OS390 redefines in mdefsp.h */
 #define FIFO_PERMISSION		010666 /* fifo with RW permissions for owner, group, other */
@@ -1504,6 +1518,7 @@ void eintr_handling_check(void);
 #define ZTRAP_POP	0x00000004
 #define ZTRAP_ADAPTIVE	(ZTRAP_CODE | ZTRAP_ENTRYREF)
 
+#define BYTEMASK	0xFF
 #define GTM_BYTESWAP_16(S)		\
 	(  (((S) & 0xff00) >> 8)	\
 	 | (((S) & 0x00ff) << 8)	\

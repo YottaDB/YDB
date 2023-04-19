@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2016 Fidelity National Information	*
+ * Copyright (c) 2004-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -179,13 +179,15 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	}
 	cse->upd_addr = (unsigned char *)bs1;
 	/* assert that cse->old_block is indeed pointing to the buffer that the cache-record is pointing to.
-	 * this is necessary to ensure that we are copying "ondsk_blkver" from the correct cache-record.
-	 * there is a possibility that this assert might not hold true which is if we are in a restartable situation.
-	 * but in that case do the same check that t_end will perform to determine this.
-	 */
+	 * While this code no longer copies the cache record's "ondsk_blkver" onto the cse, we leave this assert in place*/
 	assert((cse->old_block == (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr)) || (bh->cycle != cr->cycle) || (bh->cr != cr));
-	cse->ondsk_blkver = cr->ondsk_blkver;
 	cse->done = FALSE;
+	if (cse->ondsk_blkver < ((blk_hdr_ptr_t)cse->old_block)->bver)
+	{	/* Adjust the ondsk_blkver as needed */
+		assert(!cs_data->fully_upgraded);
+		assert(GDSV7m == ((blk_hdr_ptr_t)cse->old_block)->bver);
+		cse->ondsk_blkver = ((blk_hdr_ptr_t)cse->old_block)->bver;
+	}
 	/* Reformat the logical SET jnl-record if we need to write logical records. But recompute checksums for PBLK record
 	 * ONLY IF journaling is enabled. Do not need to do this in the case REPL_WAS_ENABLED(csa) is TRUE as replication
 	 * only cares about logical records. Hence the separation of the code below into two "if" blocks.

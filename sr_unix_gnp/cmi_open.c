@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -33,6 +33,8 @@
 GBLREF struct NTD *ntd_root;
 
 GBLREF	volatile int4	outofband;
+
+error_def(ERR_FDSIZELMT);
 
 cmi_status_t cmi_open(struct CLB *lnk)
 {
@@ -89,7 +91,8 @@ cmi_status_t cmi_open(struct CLB *lnk)
 #	endif
 			     ))
 	{	/* connection attempt will continue so wait for completion */
-		assertpro(FD_SETSIZE > new_fd);
+		if (FD_SETSIZE <= new_fd)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FDSIZELMT, 1, new_fd);
 		do
 		{
 			if (EINTR == errno)

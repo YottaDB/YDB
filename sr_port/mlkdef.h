@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -282,10 +282,14 @@ typedef struct	mlk_pvtblk_struct	/* one of these entries exists for each nref wh
 								no type for bit-fields, unsigned should be the only
 								type specified and alignment works according to the
 								total number of bits */
+	unsigned short		translev;		/* level for transaction (accounting for redundancy) */
 	unsigned char		trans;			/* boolean indicating whether already in list */
-	unsigned char		translev;		/* level for transaction (accounting for redundancy) */
 	unsigned char		old;			/* oldness boolean used for backing out zallocates */
+<<<<<<< HEAD
 	unsigned char		filler[5];		/* Fill out to align data on address boundary */
+=======
+	unsigned char		filler[4];		/* Fill out to align data on word boundary */
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #	ifdef DEBUG
 	size_t			alloc_size;
 	uint4			alloc_nref_len;

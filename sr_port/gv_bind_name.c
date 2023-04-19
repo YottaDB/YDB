@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -125,7 +125,7 @@ gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
 			REG_LEN_STR(reg), ERR_GVIS, 2, 1 + gvname->var_name.len, format_key);
 	}
 	gv_target = tmp_gvt;	/* now that any rts_error possibilities are all past us, it is safe to set gv_target.
-				 * Setting it before could casue gv_target and gv_currkey to get out of sync in case of
+				 * Setting it before could cause gv_target and gv_currkey to get out of sync in case of
 				 * an error condition and fail asserts in mdb_condition_handler (for example).
 				 */
 	memcpy(gv_currkey->base, gvname->var_name.addr, keylen);

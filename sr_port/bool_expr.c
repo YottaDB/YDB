@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -63,6 +63,7 @@ int bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr)
 	boolexprstart = maketriple(OC_BOOLEXPRSTART);
 	dqins(t1->exorder.bl, exorder, boolexprstart);
 	coerce(&x, OCT_BOOL);
+<<<<<<< HEAD
 	boolexprfinish = newtriple(OC_BOOLEXPRFINISH);
 	boolexprfinish->operand[0] = put_tref(boolexprstart);	/* This helps locate the corresponding OC_BOOLEXPRSTART
 								 * given a OC_BOOLEXPRFINISH.
@@ -81,6 +82,30 @@ int bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr)
 	 * Hence the RETURN_EXPR_IF_RTS_ERROR check below.
 	 */
 	RETURN_EXPR_IF_RTS_ERROR;
+=======
+	/* In this function, x is a convenience opr expected by eval_expr and unary_tail, but unused elsewhere.
+	 * It points to the toplevel expression of this bool_expr, COBOOLed if not bool already by definition.
+	 * It refers to a triple, call it t0, which may itself refer to triples (call them t1/t2). We call ex_tail
+	 * on t1 and t2, but not t0, because this function takes care of the boolean handling for that top-level
+	 * triple, but we need to guarantee that everything lower is processed first. This function therefore must
+	 * mirror the structure of ex_tail, except insofar as it implements the boolinit/fini-free boolean handling.
+	 * As for the flags: the first tells ex_tail that any directly-nested booleans will be processed by a caller
+	 * function, so don't construct a boolchain for them yet. The final one says that this isn't a COMVAL-COBOOL
+	 * situation, where we'd need to defer making the COBOOL into a boolchain in view of pending simplification by
+	 * unary_tail or something similar.
+	 */
+	if (x.oprval.tref->operand[0].oprclass == TRIP_REF)
+		ex_tail(&x.oprval.tref->operand[0], TRUE, FALSE);
+	if (x.oprval.tref->operand[1].oprclass == TRIP_REF)
+		ex_tail(&x.oprval.tref->operand[1], TRUE, FALSE);
+	for(t2 = t1 = x.oprval.tref; OCT_UNARY & oc_tab[t1->opcode].octype; t2 = t1, t1 = t1->operand[0].oprval.tref)
+		;
+	if (OCT_ARITH & oc_tab[t1->opcode].octype)
+		ex_arithlit(t1);
+	UNARY_TAIL(&x);
+	if (OCT_BOOL & oc_tab[t1->opcode].octype)
+		bx_boollit(t1);
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	for (t1 = x.oprval.tref; OC_NOOP == t1->opcode; t1 = t1->exorder.bl)
 		;
 	if ((OC_COBOOL == t1->opcode) && (OC_LIT == (t2 = t1->operand[0].oprval.tref)->opcode)

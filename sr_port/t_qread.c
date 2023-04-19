@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -168,18 +168,18 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	INCR_DB_CSH_COUNTER(csa, n_t_qreads, 1);
 	is_mm = (dba_mm == csd->acc_meth);
 	/* We better hold crit in the final retry (TP & non-TP). Only exception is journal recovery */
-	assert((t_tries < CDB_STAGNATE) || csa->now_crit || mupip_jnl_recover);
+#	ifdef DEBUG
+	assert((t_tries < CDB_STAGNATE) || csa->now_crit || mupip_jnl_recover || mu_reorg_encrypt_in_prog);
 	if (TREF(in_mupip_integ) && TREF(instance_frozen_crit_skipped))
 	{
 		assert(!dollar_tlevel);
-#		ifdef DEBUG
 		if (WBTEST_ENABLED(WBTEST_MUINTEG_TQREAD))
 		{
 			util_out_print("Whitebox test : t_qread returns NULL", TRUE);
 			return (sm_uc_ptr_t)NULL;
 		}
-#		endif
 	}
+#	endif
 	if (dollar_tlevel)
 	{
 		assert(sgm_info_ptr);
@@ -549,7 +549,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				assert(0 <= cr->read_in_progress);
 				assert(0 == cr->dirty);
 				/* Only set in cache if read was success */
-				cr->ondsk_blkver = (lcl_blk_free ? csd->desired_db_format : ondsk_blkver);
+				cr->ondsk_blkver = ondsk_blkver;
 				cr->r_epid = 0;
 				RELEASE_BUFF_READ_LOCK(cr);
 				TREF(block_now_locked) = NULL;

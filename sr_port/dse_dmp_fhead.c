@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -176,13 +176,13 @@ void dse_dmp_fhead (void)
 		util_out_print("  No. of writes/flush           !12UL", TRUE, csd->n_wrt_per_flu);
 		util_out_print("  Maximum TN                     0x!16@XQ", FALSE, &csd->max_tn);
 		if (GDSVLAST > csd->certified_for_upgrade_to)
-			util_out_print("  Certified for Upgrade to                !AD", TRUE,
+			util_out_print("  Certified for Upgrade to               !R3AD", TRUE,
 				LEN_AND_STR(gtm_dbversion_table[csd->certified_for_upgrade_to]));
 		else	/* out of range so print hex */
 			util_out_print("  Certified for Upgrade to         0x!XL", TRUE, csd->certified_for_upgrade_to);
 		util_out_print("  Maximum TN Warn                0x!16@XQ", FALSE, &csd->max_tn_warn);
 		if (GDSVLAST > csd->desired_db_format)
-			util_out_print("  Desired DB Format                       !AD", TRUE,
+			util_out_print("  Desired DB Format                      !R3AD", TRUE,
 				       LEN_AND_STR(gtm_dbversion_table[csd->desired_db_format]));
 		else	/* out of range so print hex */
 			util_out_print("  Desired DB Format               0x!XL", TRUE, csd->desired_db_format);
@@ -281,7 +281,7 @@ void dse_dmp_fhead (void)
 		util_out_print("  Blks Last Record Backup        0x!16@XQ", FALSE, &(csd->last_rec_bkup_last_blk));
 		util_out_print("  Last GT.M Minor Version               !4UL", TRUE, csd->last_mdb_ver);
 		util_out_print("  Blks Last Stream Backup        0x!16@XQ", FALSE, &(csd->last_inc_bkup_last_blk));
-		util_out_print("  DB Creation Version                     !AD", TRUE,
+		util_out_print("  DB Creation Version                    !R3AD", TRUE,
 				LEN_AND_STR(gtm_dbversion_table[csd->creation_db_ver]));
 		util_out_print("  Blks Last Comprehensive Backup 0x!16@XQ", FALSE, &(csd->last_com_bkup_last_blk));
 		util_out_print("  DB Creation Minor Version             !4UL", TRUE, csd->creation_mdb_ver);
@@ -534,7 +534,7 @@ void dse_dmp_fhead (void)
 		util_out_print(0, TRUE);
 		util_out_print("  Database is Fully Upgraded                : !AD",
 			TRUE, 5, (csd->fully_upgraded ? " TRUE" : "FALSE"));
-		util_out_print("  Database WAS ONCE Fully Upgraded from V4  : !AD",
+		util_out_print("  Database WAS ONCE Fully Upgraded          : !AD",
 			TRUE, 5, (csd->db_got_to_v5_once ? " TRUE" : "FALSE"));
 		util_out_print("  Blocks to Upgrade subzero(negative) error : 0x!16@XQ", TRUE, &(csd->blks_to_upgrd_subzero_error));
 		util_out_print("  TN when Blocks to Upgrade last became 0   : 0x!16@XQ", TRUE, &csd->tn_upgrd_blks_0);

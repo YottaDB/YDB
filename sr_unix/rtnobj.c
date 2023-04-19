@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2022 Fidelity National Information	*
+ * Copyright (c) 2014-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -698,7 +698,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 			assert(((size_t)1 << shmSizeIndex) == shm_size);
 			assert(shmSizeIndex >= (shm_index + MIN_RTNOBJ_SHM_INDEX));
 			shm_index = shmSizeIndex - MIN_RTNOBJ_SHM_INDEX;
-			shmid = gtm_shmget(IPC_PRIVATE, shm_size, RWDALL | IPC_CREAT, TRUE);
+			shmid = gtm_shmget(IPC_PRIVATE, shm_size, RWDALL | IPC_CREAT, TRUE, RELINK, linkctl->relinkctl_path);
 			if (-1 == shmid)
 			{
 				save_errno = errno;
@@ -969,7 +969,11 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 			relinkrec->rtnname_fixed.c, (UINTPTR_T)objhash,				\
 			(UINTPTR_T)linkctl, rtnobj->refcnt,					\
 			(UINTPTR_T)objBuff, relinkrec->numvers);)
-		relinkrec->objhash = objhash;
+		if (relinkrec->objhash != objhash)
+		{
+			++relinkrec->rtnobj_supersede;
+			relinkrec->objhash = objhash;
+		}
 		++relinkrec->cycle;	/* cycle bump is because of the implicit ZRUPDATE that linking a routine does */
 		if (0 == relinkrec->cycle)
 			relinkrec->cycle = 1;	/* cycle value of 0 has special meaning, so bump to 1 in case we roll over */

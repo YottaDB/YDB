@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2022 Fidelity National Information	*
+ * Copyright (c) 2014-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -329,7 +329,11 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			{
 				fds.fd = socketptr->sd;
 				fds.events = (GTMTLS_WANT_READ == status) ? POLLIN : POLLOUT;
+<<<<<<< HEAD
 				if (-1 == (status2 = poll(&fds, 1, (NO_M_TIMEOUT == (msec_timeout * (uint8)NANOSECS_IN_MSEC)) ? -1 : msec_timeout)))
+=======
+				if (-1 == (status2 = poll(&fds, 1, (NO_M_TIMEOUT == msec_timeout) ? -1 : msec_timeout)))
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 				{
 					save_errno = errno;
 					if (EAGAIN == save_errno)
@@ -387,9 +391,15 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 						REVERT_GTMIO_CH(&iod->pair, ch_set);
 						return;
 					} else
+<<<<<<< HEAD
 					{	/* adjust msec_timeout for poll/select */
 						msec_timeout = (cur_time.tv_sec * MILLISECS_IN_SEC) +
 								DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC);
+=======
+					{	/* adjust msec_timeout for poll */
+						msec_timeout = (cur_time.at_sec * MILLISECS_IN_SEC) +
+							DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC);
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 					}
 				} else if (0 == msec_timeout)
 				{	/* only one chance */

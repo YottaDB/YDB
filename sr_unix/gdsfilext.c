@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -43,8 +43,6 @@
 #include "send_msg.h"
 #include "gt_timer.h"
 #include "mmseg.h"
-#include "gdsblk.h"		/* needed for gds_blk_downgrade.h */
-#include "gds_blk_downgrade.h"	/* for IS_GDS_BLK_DOWNGRADE_NEEDED macro */
 #include "wbox_test_init.h"
 #include "anticipatory_freeze.h"
 /* Include prototypes */
@@ -471,9 +469,9 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 		assert(FALSE); /* Should be killed before that */
 	}
 	DEBUG_ONLY(prev_extend_blks_to_upgrd = cs_data->blks_to_upgrd;)
-	/* inctn_detail.blks_to_upgrd_delta holds the increase in "csd->blks_to_upgrd" due to the file extension */
-	inctn_detail.blks2upgrd_struct.blks_to_upgrd_delta =
-		(IS_GDS_BLK_DOWNGRADE_NEEDED(cs_data->desired_db_format) ? new_bit_maps : 0);
+	/* Previously, inctn_detail.blks_to_upgrd_delta hekd the increase in "csd->blks_to_upgrd" due to the file
+	 * extension. Because a downgrade is not possible, extensions do not increase blks_to_upgrd */
+	inctn_detail.blks2upgrd_struct.blks_to_upgrd_delta = 0;
 	if (JNL_ENABLED(cs_data))
 	{
 		save_inctn_opcode = inctn_opcode;

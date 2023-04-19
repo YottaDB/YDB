@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -117,7 +117,7 @@ static inline void READ_BLK_ID(boolean_t long_blk_id, block_id* blkid, sm_uc_ptr
 #define BLK_ID_BYTESWAP(X)	BLK_ID_64_BYTESWAP(X)
 
 #define GDS_MAX_BLK_BITS	62	/* see blk_ident structure in gdskill.h for why this cannot be any greater */
-#define GDS_MAX_VALID_BLK	(1<<GDS_MAX_BLK_BITS - 1)	/* the maximum valid block # that a GT.M database can have */
+#define GDS_MAX_VALID_BLK	(0x3FFFFFFFFFFFFFFF)	/* max valid block # in a GT.M database, ((1 << GDS_MAX_BLK_BITS) - 1) */
 #define GDS_CREATE_BLK_MAX	(block_id)(-1)	/* i.e. 0xFFFFFFFFFFFFFFFF which also has 63rd bit set to 1 indicating
 						 * it is a created block
 						 */

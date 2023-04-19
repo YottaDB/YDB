@@ -120,7 +120,7 @@
 2 Copyright
    Copyright
 
-   Copyright 2022
+   Copyright 2023
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -8874,13 +8874,23 @@
    |                   |              | default is "YottaDB Boolean         |
    |                   |              | short-circuit".                     |
    |                   |              | $VIEW("FULL_BOOLEAN") reports       |
-   | "FULL_BOOLEAN"    | none         | "Standard Boolean evaluation side   |
+   |                   |              | "Standard Boolean evaluation side   |
    |                   |              | effects" when it is not explicitly  |
    |                   |              | set, but that mode of operation is  |
+<<<<<<< HEAD
    |                   |              | required by the setting of          |
    |                   |              | ydb_side_effects, and "Standard     |
+=======
+   | "FULL_BOOLEAN"    | none         | required by the setting of          |
+   |                   |              | gtm_side_effects, and "Standard     |
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
    |                   |              | Boolean side-effect warning" when   |
-   |                   |              | warnings have been specified.       |
+   |                   |              | warnings have been specified. The   |
+   |                   |              | function reports "Extended Boolean  |
+   |                   |              | evaluation without                  |
+   |                   |              | short-circuiting" when              |
+   |                   |              | "EXTENDED_BOOLEAN" behavior is      |
+   |                   |              | enabled.                            |
    |-------------------+--------------+-------------------------------------|
    |                   |              | Truth Value indicating whether      |
    |                   |              | Database block certification is     |
@@ -8939,6 +8949,14 @@
    |-------------------+--------------+-------------------------------------|
    | "JNLFILE"         | region       | Journal file name associated with   |
    |                   |              | the region.                         |
+   |-------------------+--------------+-------------------------------------|
+   |                   |              | Returns the replication instance    |
+   |                   |              | file name for the current Journal   |
+   |                   |              | Pool and an empty string when there |
+   | ""JNLPOOL"        | none         | is no Journal Pool. Note that the   |
+   |                   |              | current Journal Pool may not be     |
+   |                   |              | associated with the last global     |
+   |                   |              | accessed by an extended reference.  |
    |-------------------+--------------+-------------------------------------|
    |                   |              | Index showing how many ZTSTART      |
    | "JNLTRANSACTION"  | none         | transaction fences have been opened |
@@ -9359,6 +9377,27 @@
    definitions to compare the ordering of two (literal) expressions as YottaDB
    would collate them if there was a way to collate them together. The result
    indicates that the first would collate before the second.
+
+2 $ZAUditlog
+   $ZAUditlog
+
+   Sends its argument to an audit logger/listener process. This function
+   requires setting the AZA_ENABLE audit logging facility in the
+   $gtm_dist/restrict.txt file. The format for the $ZAUDITLOG() function is:
+
+   ZAUDITLOG(expr)
+
+3 Examples
+   Examples
+
+   Example:
+
+   GTM>write $zauditlog("Name Change for "_ip)
+   1
+   GTM>
+
+   This example uses $ZAUDITLOG() to log a literal label concatenated with a
+   variable (identifier). The return indicates the logging was successful.
 
 2 $ZBIT_Functions
    $ZBIT Functions
@@ -10696,7 +10735,7 @@
 
    The getsockopt() keywords (KEEPALIVE, KEEPCNT, KEEPIDLE, KEEPINTVL,
    SNDBUF, and ZIBFSIZE return two values if the value previously specified
-   with the OPTIONS or "ZIBFSIZE" device parameter does't match the system's
+   with the OPTIONS or "ZIBFSIZE" device parameter doesn't match the system's
    current value. The two values are separated by a semicolon
    (";"):"uservalue;systemvalue".
 

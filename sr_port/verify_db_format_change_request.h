@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2021 Fidelity National Information	*
+ * Copyright (c) 2005-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,11 +10,13 @@
  *								*
  ****************************************************************/
 
-#ifndef GDS_BLK_UPGRADE_INCLUDED
-#define GDS_BLK_UPGRADE_INCLUDED
+#ifndef VERIFY_DB_FORMAT_CHANGE_REQUEST
 
-void gds_blk_downgrade(v15_blk_hdr_ptr_t gds_blk_trg, blk_hdr_ptr_t gds_blk_src);
+/* prototypes */
 
-#define	IS_GDS_BLK_DOWNGRADE_NEEDED(ondskblkver)	FALSE /* (GDSV7 <= (ondskblkver)) if v7 -> V6 downgrade were to exist */
+int4	verify_db_format_change_request(gd_region *reg, enum db_ver new_db_format, char *command_name);
 
+#define	WCS_PHASE2_COMMIT_WAIT_LIT	"wcb_phase2_commit_wait"
+
+#define VERIFY_DB_FORMAT_CHANGE_REQUEST
 #endif

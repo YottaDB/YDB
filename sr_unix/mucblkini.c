@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -48,7 +48,8 @@ MBSTART {						\
 
 GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_addrs		*cs_addrs;
-GBLREF sgmnt_data_ptr_t        cs_data;
+GBLREF sgmnt_data_ptr_t		cs_data;
+GBLREF uint4			mu_upgrade_in_prog;
 
 error_def(ERR_AUTODBCREFAIL);
 error_def(ERR_FILECREERR);
@@ -56,7 +57,7 @@ error_def(ERR_FILECREERR);
 /* This function is only called during the creation of a new region */
 void mucblkini(enum db_ver desired_db_ver)
 {
-	uchar_ptr_t		c, bmp;
+	uchar_ptr_t		c, bmp, bmp_base;
 	blk_hdr_ptr_t		bp1, bp2;
 	rec_hdr_ptr_t		rp;
 	unix_db_info		*udi;
@@ -64,14 +65,15 @@ void mucblkini(enum db_ver desired_db_ver)
 	block_id		blk;
 	boolean_t		isv7blk;
 
-	isv7blk = (GDSVCURR == desired_db_ver);
+	isv7blk = (GDSV7m <= desired_db_ver);
 	udi = FILE_INFO(gv_cur_region);
 	bp1 = (blk_hdr_ptr_t)malloc(cs_addrs->hdr->blk_size);
 	bp2 = (blk_hdr_ptr_t)malloc(cs_addrs->hdr->blk_size);
 	bmpsize = BM_SIZE(cs_addrs->hdr->bplmap);
 	if (cs_data->write_fullblk)
 		bmpsize = (int4)ROUND_UP(bmpsize, cs_addrs->fullblockwrite_len);
-	bmp = (uchar_ptr_t)malloc(bmpsize);
+	bmp_base = (uchar_ptr_t)malloc(bmpsize + OS_PAGE_SIZE);	/* UPGRADE opens an AIO DB, need to align buffer */
+	bmp = (sm_uc_ptr_t)ROUND_UP2((sm_long_t)bmp_base, OS_PAGE_SIZE);
 	DB_LSEEKREAD(udi, udi->fd, (off_t)BLK_ZERO_OFF(cs_addrs->hdr->start_vbn), bmp, bmpsize, status);
 	if (0 != status)
 	{
@@ -84,9 +86,9 @@ void mucblkini(enum db_ver desired_db_ver)
 	}
 	bml_busy(DIR_ROOT, bmp + SIZEOF(blk_hdr));
 	bml_busy(DIR_DATA, bmp + SIZEOF(blk_hdr));
-	ASSERT_NO_DIO_ALIGN_NEEDED(udi);	/* because we are creating the database and so effectively have standalone access */
+	ASSERT_NO_DIO_ALIGN_NEEDED(udi);	/* creating the database, so effectively have standalone access */
 	DB_LSEEKWRITE(cs_addrs, udi, udi->fn, udi->fd, (off_t)BLK_ZERO_OFF(cs_addrs->hdr->start_vbn), bmp, bmpsize, status);
-	free(bmp);
+	free(bmp_base);
 	if (0 != status)
 	{
 		free(bp1);

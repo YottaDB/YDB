@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -126,7 +126,12 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
+<<<<<<< HEAD
 GBLREF	uint4			ydbDebugLevel;
+=======
+GBLREF	uint4			gtmDebugLevel;
+GBLREF uint4			mu_upgrade_in_prog;
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 GBLREF	enum db_ver		gtm_db_create_ver;              /* database creation version */
 #ifdef DEBUG
 GBLREF	boolean_t		in_mu_cre_file;
@@ -195,7 +200,7 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 	struct perm_diag_data	pdd;
 	uint4		fbwsize;
 	int4		dblksize;
-	uint4 		file_hdr_size;
+	uint4 		sgmnt_hdr_plus_bmm_sz;
 	block_id 	start_vbn_target;
 	ZOS_ONLY(int	realfiletag;)
 	DCL_THREADGBL_ACCESS;
@@ -205,11 +210,11 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 	DEBUG_ONLY(mu_cre_file_path = NULL);
 	if (GDSVCURR == gtm_db_create_ver)
 	{	/* Current version defaults */
-		file_hdr_size		= SIZEOF_FILE_HDR_DFLT;
+		sgmnt_hdr_plus_bmm_sz	= SIZEOF_FILE_HDR_DFLT;
 		start_vbn_target	= START_VBN_CURRENT;
 	} else
 	{	/* Prior version settings */
-		file_hdr_size		= SIZEOF_FILE_HDR_V6;
+		sgmnt_hdr_plus_bmm_sz	= SIZEOF_FILE_HDR_V6;
 		start_vbn_target	= START_VBN_V6;
 	}
 	cleanup_needed = FALSE;
@@ -312,7 +317,7 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 		}
 	}
 	/* Blocks_for_create is in the unit of DISK_BLOCK_SIZE */
-	blocks_for_create = (gtm_uint64_t)(DIVIDE_ROUND_UP(file_hdr_size, DISK_BLOCK_SIZE) + 1
+	blocks_for_create = (gtm_uint64_t)(DIVIDE_ROUND_UP(sgmnt_hdr_plus_bmm_sz, DISK_BLOCK_SIZE) + 1
 					   + (seg->blk_size / DISK_BLOCK_SIZE
 					      * (gtm_uint64_t)((DIVIDE_ROUND_UP(seg->allocation, BLKS_PER_LMAP - 1))
 							       + seg->allocation)));
@@ -355,18 +360,19 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 	memset(&fc, 0, SIZEOF(file_control));
 	fc.file_info = (void*)&udi_struct;
 	udi->fd = mu_cre_file_fd;
-	cs_data = (sgmnt_data_ptr_t)malloc(file_hdr_size);
-	memset(cs_data, 0, file_hdr_size);
+	cs_data = (sgmnt_data_ptr_t)malloc(sgmnt_hdr_plus_bmm_sz);
+	memset(cs_data, 0, sgmnt_hdr_plus_bmm_sz);
 	cs_data->createinprogress = TRUE;
 	cs_data->semid = INVALID_SEMID;
 	cs_data->shmid = INVALID_SHMID;
 	/* We want our datablocks to start on what would be a block boundary within the file which will aid I/O
 	 * so pad the fileheader if necessary to make this happen.
 	 */
-	norm_vbn = DIVIDE_ROUND_UP(file_hdr_size, DISK_BLOCK_SIZE) + 1;
+	norm_vbn = DIVIDE_ROUND_UP(sgmnt_hdr_plus_bmm_sz, DISK_BLOCK_SIZE) + 1; /* Convert bytes to blocks */
 	assert(start_vbn_target >= norm_vbn);
 	cs_data->start_vbn = start_vbn_target;
 	cs_data->free_space += (start_vbn_target - norm_vbn) * DISK_BLOCK_SIZE;
+	assert(0 == cs_data->free_space);	/* As long as everything is in DISK_BLOCK_SIZE, this is TRUE */
 	cs_data->acc_meth = gv_cur_region->dyn.addr->acc_meth;
 	if ((dba_mm == cs_data->acc_meth) && (gv_cur_region->jnl_before_image))
 	{
@@ -456,7 +462,7 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 	if (GDSVCURR != gtm_db_create_ver)
 		db_header_dwnconv(cs_data);
 	ASSERT_NO_DIO_ALIGN_NEEDED(udi);	/* because we are creating the database and so effectively have standalone access */
-	DB_LSEEKWRITE(cs_addrs, udi, udi->fn, udi->fd, 0, cs_data, file_hdr_size, status);
+	DB_LSEEKWRITE(cs_addrs, udi, udi->fn, udi->fd, 0, cs_data, sgmnt_hdr_plus_bmm_sz, status);
 	if (0 != status)
 	{
 		PUTMSG_ERROR_CSA(cs_addrs, 7, ERR_FILECREERR, 4, LEN_AND_LIT("writing out file header"), LEN_AND_LIT(path), status);

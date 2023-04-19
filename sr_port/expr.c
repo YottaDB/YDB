@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -34,7 +34,11 @@ int expr(oprtype *a, int m_type)
 		return FALSE;
 	}
 	coerce(a, (MUMPS_INT == m_type) ? OCT_MINT : OCT_MVAL);
+<<<<<<< HEAD
 	ex_tail(a, 0);	/* There is a chance this will return a OCT_MVAL when we want OCT_MINT; force it again */
+=======
+	ex_tail(a, FALSE, FALSE);	/* There is a chance this will return a OCT_MVAL when we want OCT_MINT; force it again */
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	RETURN_EXPR_IF_RTS_ERROR;
 	coerce(a, (MUMPS_INT == m_type) ? OCT_MINT : OCT_MVAL);	/* Investigate whether ex_tail can do a better job */
 	if (TREF(expr_start) != TREF(expr_start_orig) && (OC_NOOP != (TREF(expr_start))->opcode))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,7 +94,8 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 				s2n(&temp_mval);
 				time = MV_FORCE_INTD(&temp_mval);
 				if ((0 > time) || (MAX_TIME < time))
-					RTS_ERROR_ABT(VARLSTCNT(4) ERR_ZDATEBADTIME, 2, temp_mval.str.len, temp_mval.str.addr);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZDATEBADTIME, 2, temp_mval.str.len,
+						temp_mval.str.addr);
 				break;
 			}
 		}
@@ -103,7 +104,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 	if ((MAX_DATE < day) || (MIN_DATE > day))
 	{
 		MV_FORCE_STR(src);
-		RTS_ERROR_ABT(VARLSTCNT(4) ERR_ZDATEBADDATE, 2, outlen, src->str.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZDATEBADDATE, 2, outlen, src->str.addr);
 	}
 	day += DAYS_MOST_YEARS;
 	dow = ((day + ADJUST_TO_1900) % DAYS_IN_WEEK) + 1;
@@ -151,7 +152,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 	}
 	outlen = (int)(fmttop - fmtptr);
 	if (outlen >= ZDATE_MAX_LEN)
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_ZDATEFMT);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZDATEFMT);
 	outptr = stringpool.free;
 	outtop = outptr + ZDATE_MAX_LEN;
 	temp_mval.mvtype = MV_STR;
@@ -170,6 +171,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 		case '*':
 		case '+':
 		case ';':
+		case '|':
 			*outptr++ = ch;
 			continue;
 		case 'M':
@@ -181,7 +183,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 				break;
 			}
 			if (('O' != ch) || ('N' != *fmtptr++))
-				RTS_ERROR_ABT(VARLSTCNT(1) ERR_ZDATEFMT);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZDATEFMT);
 			if (0 == mo_str->str.len)
 			{
 				temp_mval.str.addr = (char *)&defmonlst[(month - 1) * LEN_OF_3_CHAR_ABBREV];
@@ -195,7 +197,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 				nlen = -temp_mval.str.len;
 				outlen += - LEN_OF_3_CHAR_ABBREV - nlen;
 				if (outlen >= ZDATE_MAX_LEN)
-					RTS_ERROR_ABT(VARLSTCNT(1) ERR_ZDATEFMT);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZDATEFMT);
 			}
 			break;
 		case 'D':
@@ -207,7 +209,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 				break;
 			}
 			if (('A' != ch) || ('Y' != *fmtptr++))
-				RTS_ERROR_ABT(VARLSTCNT(1) ERR_ZDATEFMT);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZDATEFMT);
 			if (0 == day_str->str.len)
 			{
 				temp_mval.str.addr = (char *)&defdaylst[(dow - 1) * LEN_OF_3_CHAR_ABBREV];
@@ -221,7 +223,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 				nlen = -temp_mval.str.len;
 				outlen += - LEN_OF_3_CHAR_ABBREV - nlen;
 				if (outlen >= ZDATE_MAX_LEN)
-					RTS_ERROR_ABT(VARLSTCNT(1) ERR_ZDATEFMT);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZDATEFMT);
 			}
 			break;
 		case 'Y':
@@ -235,26 +237,26 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 			} else
 			{
 				if (('E' != ch) || ('A' != *fmtptr++) || ('R' != *fmtptr++))
-					RTS_ERROR_ABT(VARLSTCNT(1) ERR_ZDATEFMT);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZDATEFMT);
 				nlen = 4;
 			}
 			break;
 		case '1':
 			if ('2' != *fmtptr++)
-				RTS_ERROR_ABT(VARLSTCNT(1) ERR_ZDATEFMT);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZDATEFMT);
 			nlen = 2;
 			n = time / SECONDS_PER_HOUR;
 			n = ((n + HOURS_PER_AM_OR_PM - 1) % HOURS_PER_AM_OR_PM) + 1;
 			break;
 		case '2':
 			if ('4' != *fmtptr++)
-				RTS_ERROR_ABT(VARLSTCNT(1) ERR_ZDATEFMT);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZDATEFMT);
 			nlen = 2;
 			n = time / SECONDS_PER_HOUR;
 			break;
 		case '6':
 			if ('0' != *fmtptr++)
-				RTS_ERROR_ABT(VARLSTCNT(1) ERR_ZDATEFMT);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZDATEFMT);
 			nlen = 2;
 			n = time;
 			n /= MINUTES_PER_HOUR;
@@ -262,18 +264,18 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 			break;
 		case 'S':
 			if ('S' != *fmtptr++)
-				RTS_ERROR_ABT(VARLSTCNT(1) ERR_ZDATEFMT);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZDATEFMT);
 			nlen = 2;
 			n = time % SECONDS_PER_MINUTE;
 			break;
 		case 'A':
 			if ('M' != *fmtptr++)
-				RTS_ERROR_ABT(VARLSTCNT(1) ERR_ZDATEFMT);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZDATEFMT);
 			*outptr++ = (time < (HOURS_PER_AM_OR_PM * SECONDS_PER_HOUR)) ? 'A' : 'P';
 			*outptr++ = 'M';
 			continue;
 		default:
-			RTS_ERROR_ABT(VARLSTCNT(1) ERR_ZDATEFMT);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZDATEFMT);
 		}
 		if (nlen > 0)
 		{
@@ -292,7 +294,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 		}
 	}
 	if (fmtptr > fmttop)
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_ZDATEFMT);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZDATEFMT);
 	dst->mvtype = MV_STR;
 	dst->str.addr = (char *)stringpool.free;
 	dst->str.len = INTCAST((char *)outptr - dst->str.addr);

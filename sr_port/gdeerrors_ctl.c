@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD:sr_port/gdeerrors_ctl.c
  * Copyright (c) 2001-2024 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information 	*
+>>>>>>> f9ca5ad6 (GT.M V7.1-000):sr_x86_64/gdeerrors_ctl.c
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.*

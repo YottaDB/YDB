@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -121,15 +121,22 @@ GBLREF	boolean_t		created_core;
 GBLREF	boolean_t		need_core;
 GBLREF	uint4			process_id;
 GBLREF	volatile int4		exit_state;
+GBLREF	ABS_TIME		mu_stop_tm_array[EXIT_IMMED - 1]; /* Save times of previous MUPIP STOPs */
 GBLREF	volatile unsigned int	core_in_progress;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	boolean_t		exit_handler_active;
+<<<<<<< HEAD
 GBLREF	boolean_t		exit_handler_complete;
 GBLREF	void			(*exit_handler_fptr)();
 GBLREF	intrpt_state_t		intrpt_ok_state;
 GBLREF	int			last_sig;
 GBLREF	boolean_t		ydb_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
+=======
+GBLREF	void			(*call_on_signal)();
+GBLREF	boolean_t		gtm_quiet_halt;
+GBLREF	volatile int4           gtmMallocDepth;         	  /* Recursion indicator */
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 GBLREF	volatile boolean_t	timer_active;
 GBLREF	sigset_t		block_sigsent;
 GBLREF	gd_region		*gv_cur_region;
@@ -158,6 +165,7 @@ LITREF	gtmImageName		gtmImageNames[];
 STATICDEF	boolean_t	non_forwarded_sig_seen[EXIT_IMMED + 1];
 
 error_def(ERR_FORCEDHALT);
+error_def(ERR_FORCEDHALT2);
 error_def(ERR_GTMSECSHRSHUTDN);
 error_def(ERR_KILLBYSIG);
 error_def(ERR_KILLBYSIGSINFO1);
@@ -186,13 +194,20 @@ static inline void check_for_statsdb_memerr()
 	}
 }
 
+<<<<<<< HEAD
 void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t is_os_signal_handler)
+=======
+boolean_t is_timer_initialized(ABS_TIME timer) { return (((0 == timer.at_sec) && (0 == timer.at_usec)) ? FALSE : TRUE); }
+
+void generic_signal_handler(int sig, siginfo_t *info, void *context)
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 {
 	boolean_t		signal_forwarded, is_sigterm;
 	int			rc;
 	sigset_t		savemask;
 	boolean_t		using_alternate_sighandling;
 	intrpt_state_t		prev_intrpt_state;
+	ABS_TIME		mu_stop_timer;
 #	ifdef DEBUG
 	boolean_t		save_in_nondeferrable_signal_handler;
 #	endif
@@ -325,6 +340,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 					DEFER_INTERRUPTS(INTRPT_IN_KILL_CLEANUP, prev_intrpt_state);	/* avoid ABANDONEDKILL */
 				if (DEFER_EXIT_PROCESSING)
 				{
+<<<<<<< HEAD
 					if (OK_TO_INTERRUPT)
 						drive_non_ydb_signal_handler_if_any("generic_signal_handler2",
 											sig, info, context, FALSE);
@@ -343,6 +359,39 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 					CLEANUP_AND_RETURN(got_tlevel_lock);
 				}
 				DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
+=======
+					if (!is_timer_initialized(mu_stop_tm_array[0]))
+						sys_get_curr_time(&mu_stop_tm_array[0]);
+					else if (!is_timer_initialized(mu_stop_tm_array[1]))
+						sys_get_curr_time(&mu_stop_tm_array[1]);
+					SET_FORCED_EXIT_STATE;
+					exit_state++;		/* Make exit pending, may still be tolerant though */
+					assert(!IS_GTMSECSHR_IMAGE);
+					if (exit_handler_active && !gtm_quiet_halt)
+						SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
+					return;
+				}
+				if (is_timer_initialized(mu_stop_tm_array[1]))
+				{
+					sys_get_curr_time(&mu_stop_timer);
+					mu_stop_tm_array[0] = sub_abs_time(&mu_stop_timer, &mu_stop_tm_array[0]);
+					/* MUPIP STOP three times within a minute logs the event and acts like a kill -9 */
+					if (MINUTE > mu_stop_tm_array[0].at_sec)
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FORCEDHALT2, 2,
+								mu_stop_tm_array[0].at_sec, process_id);
+					else
+					{
+						mu_stop_tm_array[0] = mu_stop_tm_array[1];
+						mu_stop_tm_array[1] = mu_stop_timer;
+						SET_FORCED_EXIT_STATE;
+						assert(!IS_GTMSECSHR_IMAGE);
+						if (exit_handler_active && !gtm_quiet_halt)
+							SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
+						return;
+					}
+				}
+				DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 				exit_state = EXIT_IMMED;
 				SET_PROCESS_EXITING_TRUE; 	/* Set this BEFORE cancelling timers as wcs_phase2_commit_wait
 								 * relies on this.

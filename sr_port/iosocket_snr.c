@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -21,7 +21,7 @@
  * 		-- buffer		pointer to the buffer where to return stuff
  * 		-- maxlength		maximum number of bytes to get
  * 		-- flags		flags to be passed to recv()
- * 		-- time_for_read	pointer to the timeout structure used by select()
+ * 		-- time_for_read	pointer to the timeout structure used by poll()
  * 		-- extra_status		reports either a timeout or a lost-of-connection
  * 	return:
  * 		-- got some stuff to return 		return number of bytes received
@@ -53,12 +53,17 @@ static int fcntl_res;
 #ifdef DEBUG
 #include <sys/time.h>		/* for gettimeofday */
 #endif
+<<<<<<< HEAD
 #ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 #include "gtm_poll.h"
 #endif
 #endif
 #include "gtm_select.h"
 
+=======
+#endif
+#include "gtm_poll.h"
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #include "eintr_wrappers.h"
 #include "gt_timer.h"
 #include "io.h"
@@ -126,7 +131,6 @@ ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, i
 		recvbuff = buffer;
 		recvsize = maxlength;
 	}
-	VMS_ONLY(recvsize = MIN(recvsize, VMS_MAX_TCP_IO_SIZE));
 	DBGSOCK2((stdout, "socsnr: recvsize set to %d\n", recvsize));
 
 	/* Select and recv */
@@ -161,14 +165,9 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 	int		status, real_errno;
 	ssize_t		bytesread;
 	boolean_t	pollread;
-#	ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-	long		poll_timeout;
-	unsigned long	poll_nfds;
+	int		poll_timeout;
+	nfds_t		poll_nfds;
 	struct pollfd	poll_fdlist[1];
-#	else
-	fd_set		tcp_fd, *readfds, *writefds;
-	struct timeval	lcl_time_for_read;
-#	endif
 #	ifdef GTM_TLS
 	int		tlspolldirection = 0;
 #	endif
@@ -177,10 +176,6 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 		  socketptr, buffer, maxlength, flags));
 	DBGSOCK2((stdout, "time_for_read->tv_sec: %d  usec: %d\n", time_for_read->tv_sec, time_for_read->tv_nsec / NANOSECS_IN_USEC));
 	DEBUG_ONLY(clock_gettime(CLOCK_REALTIME, &tsbefore);)
-#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-	assertpro(FD_SETSIZE > socketptr->sd);
-	FD_ZERO(&tcp_fd);
-#endif
 	while (TRUE)
 	{
 		status = 0;
@@ -194,6 +189,7 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 			pollread = TRUE;
 		if (0 == status)
 		{	/* if TLS cachedbytes available no need to poll */
+<<<<<<< HEAD
 #			ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 			FD_SET(socketptr->sd, &tcp_fd);
 			assert(0 != FD_ISSET(socketptr->sd, &tcp_fd));
@@ -214,8 +210,14 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 			poll_fdlist[0].events = pollread ? POLLIN : POLLOUT;
 			poll_nfds = 1;
 			poll_timeout = DIVIDE_ROUND_UP(time_for_read->tv_nsec, NANOSECS_IN_MSEC);	/* convert to millisecs */
+=======
+			poll_fdlist[0].fd = socketptr->sd;
+			poll_fdlist[0].events = pollread ? POLLIN : POLLOUT;
+			poll_nfds = 1;
+			assert(time_for_read->at_sec == 0);
+			poll_timeout = DIVIDE_ROUND_UP(time_for_read->at_usec, MICROSECS_IN_MSEC);	/* convert to millisecs */
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
-#			endif
 			real_errno = errno;
 			DEBUG_ONLY(clock_gettime(CLOCK_REALTIME, &tsafter);)
 			DBGSOCK2((stdout, "socsnrio: Select return code: %d :: errno: %d\n", status, real_errno));

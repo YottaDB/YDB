@@ -95,6 +95,7 @@ GBLREF	boolean_t		is_src_server, is_updproc;
 GBLREF	gd_region		*ftok_sem_reg, *gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	uint4			mu_upgrade_in_prog;
 GBLREF	uint4			process_id;
 GBLREF	ipcs_mesg		db_ipcs;
 GBLREF	jnl_process_vector	*prc_vec;
@@ -230,6 +231,26 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			tp_change_reg();
 		}
 	}
+<<<<<<< HEAD
+=======
+	/* If this is a read-only database, simply return */
+	if (csd->read_only)
+	{
+		if (INVALID_SEMID != udi->semid)
+			semctl(udi->semid, 0, IPC_RMID);
+		udi->sem_deleted = TRUE;		/* Note that we deleted the semaphore */
+		udi->grabbed_access_sem = FALSE;
+		udi->counter_acc_incremented = FALSE;
+		assert(FALSE == udi->grabbed_ftok_sem);
+		if (INVALID_SEMID != udi->ftok_semid)
+			semctl(udi->ftok_semid, 0, IPC_RMID);
+		udi->counter_ftok_incremented = FALSE;
+		udi->semid = udi->ftok_semid = INVALID_SEMID;
+		return EXIT_NRM;
+	}
+	if (mu_upgrade_in_prog)
+		csa->nl->reorg_upgrade_pid = 0;
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	csa->regcnt--;
 	if (csa->regcnt)
 	{	/* There is at least one more region pointing to the same db file as this region.

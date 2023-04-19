@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -499,9 +499,11 @@ static readonly CLI_PARM mup_reorg_ff_parm[] = {
 
 /* USER_DEFINED_REORG is currently undocumented */
 static  CLI_ENTRY       mup_reorg_qual[] = {		/* REORG */
+{ "DBG",                mupip_reorg, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0       },
 { "DOWNGRADE",          mupip_reorg, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 { "ENCRYPT",            mupip_reorg, 0, 0,                 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
 { "EXCLUDE",            mupip_reorg, 0, 0,                 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
+{ "FILE",               mupip_reorg, 0, 0,                 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_N_A, 0       },
 { "FILL_FACTOR",        mupip_reorg, 0, mup_reorg_ff_parm, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0       },
 { "INDEX_FILL_FACTOR",  mupip_reorg, 0, mup_reorg_ff_parm, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0       },
 { "KEEP",               mupip_reorg, 0, 0,                 0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0       },
@@ -816,14 +818,20 @@ static	CLI_PARM	mup_stop_parm[] = {
 };
 
 static	CLI_ENTRY	mup_upgrade_qual[] = {		/* UPGRADE */
+<<<<<<< HEAD
 { "MASTERMAP", mupip_upgrade, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0},
 { "REGION",    mupip_upgrade, 0, 0, 0, 0, 0, VAL_OR_PARAM,   1, NON_NEG, VAL_N_A, 0},
+=======
+{ "DBG",    mupip_upgrade, 0, 0, 0, 0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0 },
+{ "FILE",   mupip_upgrade, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
+{ "REGION", mupip_upgrade, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 { "" }
-};	/* TODO: revisit file vs region vs choice? 1 function or two? names? */
+};
 
 static	CLI_PARM	mup_upgrade_parm[] = {
-{ "REGION", "Region: ", PARM_REQ},
-{ "", "",           PARM_REQ}
+{"WHAT", "File or Region: ", PARM_REQ},
+{ "",	"",		     PARM_REQ}
 };
 
 static	CLI_PARM	mup_downgrade_parm[] = {

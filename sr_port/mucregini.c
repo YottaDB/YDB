@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -108,7 +108,7 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 		master_map_size	= MASTER_MAP_SIZE_DFLT;
 		max_tn_default	= MAX_TN_DFLT;
 	} else
-	{	/* Prior version settings. TODO allow for alternative settings */
+	{	/* V6 version settings */
 		label		= V6_GDS_LABEL;
 		majorver	= GDSV6;
 		minorver	= GDSMV63014;
@@ -118,7 +118,7 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 	memcpy(csd->label, label, strnlen(label, sizeof(csd->label)));
 	csd->desired_db_format = majorver;
 	csd->fully_upgraded = TRUE;
-	csd->db_got_to_v5_once = TRUE;	/* no V4 format blocks that are non-upgradeable */
+	csd->db_got_to_v5_once = TRUE;	/* no prior version format blocks that are non-upgradeable */
 	csd->minor_dbver = minorver;
 	csd->certified_for_upgrade_to = majorver;
 	csd->creation_db_ver = majorver;

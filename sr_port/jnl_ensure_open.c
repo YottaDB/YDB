@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -24,8 +24,15 @@
 #include "gtmimagename.h"
 #include "wbox_test_init.h"
 #include "gtcm_jnl_switched.h"
+#include "jnl_file_close_timer.h"
+#include "gtmrecv.h"
 
 GBLREF	boolean_t		is_src_server;
+#if defined(CHECKFORMULTIGENMJLS)
+GBLREF	intrpt_state_t	intrpt_ok_state;
+GBLREF  uint4           is_updhelper;
+GBLREF  boolean_t       is_updproc;
+#endif
 
 error_def(ERR_JNLFILOPN);
 
@@ -75,5 +82,9 @@ uint4   jnl_ensure_open(gd_region *reg, sgmnt_addrs *csa)
 		GTM_WHITE_BOX_TEST(WBTEST_JNL_FILE_OPEN_FAIL, jnl_status, ERR_JNLFILOPN);
 #	endif
 	assert((0 != jnl_status) || !JNL_FILE_SWITCHED(jpc) || (is_src_server && !JNL_ENABLED(csa) && REPL_WAS_ENABLED(csa)));
+#if defined(CHECKFORMULTIGENMJLS)
+	if ((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && ((is_updproc || (UPD_HELPER_WRITER == is_updhelper))))
+		checkformultigenmjls(0); /* when it is safe focus on update process and update helper writers */
+#endif
 	return jnl_status;
 }

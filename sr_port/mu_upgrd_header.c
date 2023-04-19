@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -13,12 +13,11 @@
  *								*
  ****************************************************************/
 
-/* This program will upgrade v4.x header to v5.0-000 database. */
+/* This program is obsolete */
 
 
 #include "mdef.h"
 
-#include <math.h> /* needed for handling of epoch_interval */
 #include "gtm_stat.h"
 #include "gtm_unistd.h"
 #include "gtm_time.h"
@@ -34,13 +33,9 @@
 #include "v15_gdsfhead.h"
 #include "filestruct.h"
 #include "v15_filestruct.h"
-#include "gdsblk.h"           /* needed for gdsblkops.h */
-#include "jnl.h"
 #include "mu_upgrd_dngrd_hdr.h"
-#include "gtmmsg.h"
-#include "lockconst.h"
-#include "wcs_phase2_commit_wait.h"
 
+<<<<<<< HEAD
 LITREF  char			ydb_release_name[];
 LITREF  int4			ydb_release_name_len;
 
@@ -227,4 +222,9 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	csd->pre_read_trigger_factor = PRE_READ_TRIGGER_FACTOR;
 	csd->writer_trigger_factor = UPD_WRITER_TRIGGER_FACTOR;
 	SET_LATCH_GLOBAL(&csd->next_upgrd_warn.time_latch, LOCK_AVAILABLE);
+=======
+void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
+{
+	return;
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 }

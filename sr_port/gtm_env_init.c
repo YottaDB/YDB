@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2022 Fidelity National Information	*
+ * Copyright (c) 2004-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -163,6 +163,7 @@ void	gtm_env_init(void)
 			case YDB_BOOL:			/* original GT.M short-circuit Boolean evaluation with naked maintenance */
 			case FULL_BOOL:			/* standard behavior - evaluate everything with a side effect */
 			case FULL_BOOL_WARN:		/* like FULL_BOOL but give compiler warnings when it makes a difference */
+			case EXT_BOOL:
 				break;
 			default:
 				TREF(ydb_fullbool) = YDB_BOOL;

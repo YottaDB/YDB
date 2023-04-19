@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -85,9 +85,11 @@
 #include "deferred_events.h"
 #include "error_trap.h"
 #include "ztimeout_routines.h"
+#include "gtmdbglvl.h"		/* for GDL_UnconditionalEpoch */
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			dollar_trestart;
+GBLREF	uint4			gtmDebugLevel; 		/* Debug level */
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -581,7 +583,6 @@ boolean_t	tp_tend()
 			 * restart with a helped out code because the cache recovery will most likely result in a restart of
 			 * the current transaction which we want to avoid if we are in the final retry.
 			 */
-			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 			if (!csa->now_crit)
 			{
 				grab_crit(gv_cur_region, WS_54); /*Step CMT01 (see secshr_db_clnup.c for CMTxx step descriptions) */
@@ -590,7 +591,12 @@ boolean_t	tp_tend()
 				status = cdb_sc_helpedout;
 				goto failed;
 			}
+<<<<<<< HEAD
 			if (is_mm && ((csa->hdr != csd) || (pvt_total_blks != csd->trans_hist.total_blks)))
+=======
+			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
+			if (is_mm && ((csa->hdr != csd) || (csa->total_blks != csd->trans_hist.total_blks)))
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			{       /* If MM, check if wcs_mm_recover was invoked as part of the grab_crit done above OR if
 				 * the file has been extended. If so, restart.
 				 */
@@ -811,8 +817,15 @@ boolean_t	tp_tend()
 						}
 						assert(csd == csa->hdr);	/* If MM, csd shouldn't have been reset */
 					}
+<<<<<<< HEAD
 					if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time) UNCONDITIONAL_EPOCH_ONLY(|| TRUE))
 						&& !FROZEN_CHILLED(csa))
+=======
+					if (MAXUINT4 == jbp->next_epoch_time)
+						jbp->next_epoch_time = (uint4)(jgbl.gbl_jrec_time + jbp->epoch_interval);
+					if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time) ||
+							(gtmDebugLevel & GDL_UnconditionalEpoch)) && !FROZEN_CHILLED(csa))
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 					{	/* Flush the cache. Since we are in crit, defer syncing the epoch */
 						/* Note that at this point, jgbl.gbl_jrec_time has been computed taking into
 						 * account the current system time & the last journal record timestamp of ALL
@@ -1170,7 +1183,6 @@ boolean_t	tp_tend()
 							goto failed;
 						}
 						TP_PIN_CACHE_RECORD(cr, si);
-						cse->ondsk_blkver = cr->ondsk_blkver;
 						old_block = (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr);
 						assert((cse->cr != cr) || (cse->old_block == (sm_uc_ptr_t)old_block));
 						old_block_tn = old_block->tn;
@@ -1977,8 +1989,7 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 		if ((gds_t_acquired != cse->mode) || (ROUND_DOWN2(cse->blk, BLKS_PER_LMAP) != bml))
 			continue;
 		assert(gds_t_acquired == cse->mode);
-		assert((GDSVCURR == cse->ondsk_blkver) || (BLK_ID_32_VER > cse->ondsk_blkver));
-		assert((GDSVCURR == cse->ondsk_blkver) || (GDSV7m == cse->ondsk_blkver)
+		assert((BLK_ID_32_VER < cse->ondsk_blkver) /* Block is either V7m+ or has 32bit limits, Why? */
 			|| ((bml == (block_id_32)bml) && (total_blks == (block_id_32)total_blks)));
 		assert(*b_ptr == (cse->blk - bml));
 		do

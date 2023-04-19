@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -1561,7 +1561,11 @@ repl_inst_bkup_done2:
 				result = (incremental ? mubinccpy(rptr) : mubfilcpy(rptr, showprogress, attemptcnt, &stopretries));
 				if (result)
 					break; /* break to dqloop */
-
+				/* In mubfilcpy() we change cs_addrs->nl->nbb to BACKUP_NOT_IN_PROGRESS
+				 * for concurrent online rollback and for certain error conditions. In such a case,
+				 * do not retry for online backup.  */
+				if ((online) && (BACKUP_NOT_IN_PROGRESS == cs_addrs->nl->nbb))
+					stopretries = TRUE;
 				if ((attemptcnt == maxtries) || (TRUE == stopretries))
 				{
 					if (file_backed_up)

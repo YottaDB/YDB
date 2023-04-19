@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -66,7 +66,6 @@ GBLREF	gv_key			*gv_currkey, *gv_altkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	gv_namehead		*reorg_gv_target;
 GBLREF	inctn_opcode_t		inctn_opcode;
-GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	kill_set		*kill_set_tail;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_addrs		*kip_csa;
@@ -105,10 +104,10 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(mu_reorg_process);	/* TODO: use upg_mv_block? */
+	assert(mu_reorg_process || upg_mv_block);
 	gv_target = gl_ptr->gvt;
 	gv_target->clue.end = 0;		/* reset clue since reorg action on later globals might have invalidated it */
-	reorg_gv_target->gvname.var_name = gv_target->gvname.var_name;	/* needed by SAVE_ROOTSRCH_ENTRY_STATE */
+	reorg_gv_target->gvname.var_name = gv_target->gvname.var_name;  /* needed by SAVE_ROOTSRCH_ENTRY_STATE */
 	dir_hist_ptr = gv_target->alt_hist;
 	gvt_hist_ptr = &(gv_target->hist);
 	inctn_opcode = inctn_invalid_op;
@@ -116,11 +115,11 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 	{	/* set gv_target/gv_currkey/gv_cur_region/cs_addrs/cs_data to correspond to <globalname,reg> in gl_ptr */
 		gv_target->root = 0;		/* reset root so we recompute it in DO_OP_GVNAME below */
 		DO_OP_GVNAME(gl_ptr);
-	}
+	} /* else V6 to V7 upgrade where gen_hist_for_blk() has already done the name lookup */
 	csa = cs_addrs;
 	cnl = csa->nl;
 	csd = cs_data;	/* keep csd up to date; with MM, cs_data can change, and, dereferencing an older copy, cause SIG-11 */
-	if (gv_cur_region->read_only)			/* TODO: ensure such a check exists early on in upgrade logic */
+	if (gv_cur_region->read_only)
 		return;					/* Cannot proceed for read-only data files */
 	killed_global = FALSE;
 	while (0 == gv_target->root)
@@ -153,7 +152,7 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 			gv_target->clue.end = 0;
 			if (cdb_sc_normal != (status = gvcst_search(gv_altkey, dir_hist_ptr)))
 			{	/* Assign directory tree path to dir_hist_ptr */
-				assert(t_tries < CDB_STAGNATE);
+				assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
 				gv_target->root = save_root;
 				t_retry(status);
 				continue;
@@ -162,7 +161,7 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 			gv_target->clue.end = 0;
 			if (cdb_sc_normal != (gvcst_search(gv_currkey, NULL)))
 			{	/* Assign global variable tree path to gvt_hist_ptr */
-				assert(t_tries < CDB_STAGNATE);
+				assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
 				t_retry(status);
 				continue;
 			}
@@ -180,10 +179,10 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 		*root_swap_statistic_ptr += 1;
 		break;
 	}
-	if (DIR_ROOT == upg_mv_block)
-		return;
+	if (0 != upg_mv_block)	/* MUPIP UPGRADE Moving a GVT root from the top down, all done */
+		return;		/* UPGRADE is standalone and does not do REORG's deferred exit check */
 	/* ------------ Swap blocks in branch of directory tree --------- */
-	for (level = 0; (0 == upg_mv_block) && (level <= MAX_BT_DEPTH); level++)
+	for (level = 0; level <= MAX_BT_DEPTH; level++)
 	{
 		t_begin(ERR_MUREORGFAIL, UPDTRNS_DB_UPDATED_MASK);
 		for (;;)
@@ -195,7 +194,7 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 			gv_target->clue.end = 0;
 			if (cdb_sc_normal != (status = gvcst_search(gv_altkey, dir_hist_ptr)))
 			{	/* assign branch path of directory tree into dir_hist_ptr */
-				assert(t_tries < CDB_STAGNATE);
+				assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
 				gv_target->root = save_root;
 				t_retry(status);
 				continue;
@@ -275,6 +274,7 @@ block_id mu_swap_root_blk(glist *gl_ptr, srch_hist *gvt_hist_ptr, srch_hist *dir
 	assert(ABORT_SWAP < free_blk_id);
 	update_trans = UPDTRNS_DB_UPDATED_MASK;
 	inctn_opcode = inctn_mu_reorg;
+	/* There is either a kill/set list OR the code is moving the root block */
 	assert((1 == kill_set_list->used) || ((DIR_ROOT == gv_target->root) && (1 == gv_target->hist.h[1].blk_num)));
 	need_kip_incr = TRUE;
 	if (!cs_addrs->now_crit)
@@ -297,7 +297,7 @@ block_id mu_swap_root_blk(glist *gl_ptr, srch_hist *gvt_hist_ptr, srch_hist *dir
 	}
 	TREF(in_mu_swap_root_state) = MUSWP_NONE;
 	/* Note that this particular process's csa->root_search_cycle is now behind cnl->root_search_cycle.
-	 * This forces a cdb_sc_gvtrootmod2 restart in gvcst_bmp_mark_free below. TODO: how to handle after refactor???
+	 * This forces a cdb_sc_gvtrootmod2 restart in gvcst_bmp_mark_free below.
 	 */
 	assert(cs_addrs->nl->root_search_cycle > cs_addrs->root_search_cycle);
 	if (0 != upg_mv_block)
@@ -349,7 +349,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	if (NULL == (bmlhist.buffaddr = t_qread(bmlhist.blk_num, (sm_int_ptr_t)&bmlhist.cycle, &bmlhist.cr)))
 	{	/* WARNING: assignment above */
 		assert(0 == upg_mv_block);
-		assert(t_tries < CDB_STAGNATE);
+		assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
 		t_retry((enum cdb_sc)rdfail_detail);
 		return RETRY_SWAP;
 	}
@@ -371,11 +371,11 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		return RETRY_SWAP;
 	}
 	free_blk_id = bmlhist.blk_num + free_bit;
-	assert((0 == upg_mv_block) || (upg_mv_block + 1 == free_blk_id));
+	assert((0 == upg_mv_block) || (upg_mv_block <= free_blk_id));
 	if (DIR_ROOT >= free_blk_id)
 	{	/* Bitmap block 0 and directory tree root block 1 should always be marked busy. */
 		assert(0 == upg_mv_block);
-		assert(t_tries < CDB_STAGNATE);
+		assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
 		t_retry(cdb_sc_badbitmap);
 		return RETRY_SWAP;
 	}
@@ -399,7 +399,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		freeblkhist.blk_num = free_blk_id;
 		if (NULL == (freeblkhist.buffaddr = t_qread(free_blk_id, (sm_int_ptr_t)&freeblkhist.cycle, &freeblkhist.cr)))
 		{
-			assert(t_tries < CDB_STAGNATE);
+			assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
 			t_retry((enum cdb_sc)rdfail_detail);
 			return RETRY_SWAP;
 		}
@@ -412,7 +412,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	assert(blk_seg_cnt == child_blk_size);
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
-		assert(t_tries < CDB_STAGNATE);
+		assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
 		t_retry(cdb_sc_blkmod);
 		return RETRY_SWAP;
 	}
@@ -421,7 +421,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 			    : BIT_CLEAR_RECYCLED_AND_SET_FREE(tmpcse->blk_prior_state);
 	t_create(free_blk_id, (unsigned char *)bs1, 0, 0, child_blk_lvl);
 	tmpcse->mode = gds_t_acquired;
-	if (!free_blk_recycled || !cs_data->db_got_to_v5_once)
+	if (!free_blk_recycled)
 		tmpcse->old_block = NULL;
 	else
 	{
@@ -452,7 +452,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		GET_RSIZ(rec_size1, (parent_blk_ptr + curr_offset));
 		if ((parent_blk_size < rec_size1 + curr_offset) || (bstar_rec_size(parent_long_blk_id) > rec_size1))
 		{
-			assert(t_tries < CDB_STAGNATE);
+			assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
 			t_retry(cdb_sc_blkmod);
 			return RETRY_SWAP;
 		}
@@ -471,7 +471,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		assert(blk_seg_cnt == parent_blk_size);
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
-			assert(t_tries < CDB_STAGNATE);
+			assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
 			t_retry(cdb_sc_blkmod);
 			return RETRY_SWAP;
 		}

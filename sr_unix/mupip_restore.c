@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -22,7 +22,7 @@
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
-#include "gtm_select.h"
+#include "gtm_poll.h"
 
 #include <sys/wait.h>
 #include <stddef.h>
@@ -67,7 +67,6 @@
 #include "gtmmsg.h"
 #include "wcs_sleep.h"
 #include "db_ipcs_reset.h"
-#include "gds_blk_downgrade.h"
 #include "shmpool.h"
 #include "min_max.h"
 #include "gtmxc_types.h"
@@ -572,19 +571,9 @@ void mupip_restore(void)
 			*/
 			blk_ptr = inbuf + SIZEOF(muinc_blk_hdr);
 			size = old_blk_size;
-			if (GDSNOVER != sblkh_p->use.bkup.ondsk_blkver)
-			{	/* Specifically versioned blocks - Put them back in the version they were originally */
-				if (GDSV4 == sblkh_p->use.bkup.ondsk_blkver)
-				{
-					gds_blk_downgrade((v15_blk_hdr_ptr_t)blk_ptr, (blk_hdr_ptr_t)blk_ptr);
-					size = (((v15_blk_hdr_ptr_t)blk_ptr)->bsiz + 1) & ~1;
-					assert((size <= old_blk_size) && (size >= SIZEOF(v15_blk_hdr)));
-				} else
-				{
-					size = (((blk_hdr_ptr_t)blk_ptr)->bsiz + 1) & ~1;
-					assert((size <= old_blk_size) && (size >= SIZEOF(blk_hdr)));
-				}
-			}
+			/* Previously, blocks could be downgraded here as needed */
+			size = (((blk_hdr_ptr_t)blk_ptr)->bsiz + 1) & ~1;
+			assert((size <= old_blk_size) && (size >= SIZEOF(blk_hdr)));
 			in_len = MIN(old_blk_size, size) - SIZEOF(blk_hdr);
 			if (!same_encr_settings && IS_BLK_ENCRYPTED(((blk_hdr_ptr_t)blk_ptr)->levl, in_len))
 			{
@@ -798,16 +787,17 @@ STATICFNDEF void tcp_read(BFILE *bf, char *buf, int nbytes)
 {
 	int     	needed, status;
 	char		*curr;
-	fd_set          fs;
-	struct timeval	save_nap, nap;
 	int		rc;
+	int		poll_timeout, save_poll_timeout;
+	nfds_t		poll_nfds;
+	struct pollfd	poll_fdlist[1];
 
 	needed = nbytes;
 	curr = buf;
-	nap.tv_sec = 1;
-	nap.tv_usec = 0;
+	poll_timeout = MILLISECS_IN_SEC;
 	while (1)
 	{
+<<<<<<< HEAD
 		assertpro(FD_SETSIZE > bf->fd);
 		FD_ZERO(&fs);
 		FD_SET(bf->fd, &fs);
@@ -819,6 +809,14 @@ STATICFNDEF void tcp_read(BFILE *bf, char *buf, int nbytes)
 		status = select(bf->fd + 1, (void *)(&fs), (void *)0, (void *)0, &nap);
 		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		nap = save_nap;
+=======
+		poll_fdlist[0].fd = bf->fd;
+		poll_fdlist[0].events = POLLIN;
+		poll_nfds = 1;
+		save_poll_timeout = poll_timeout;
+		status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
+		poll_timeout = save_poll_timeout;
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		if (status > 0)
 		{
 			RECV(bf->fd, curr, needed, 0, status);

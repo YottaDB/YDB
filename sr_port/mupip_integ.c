@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -704,10 +704,10 @@ void mupip_integ(void)
 			if (!muint_fast && (mu_int_blks_to_upgrd != csd->blks_to_upgrd))
 			{
 				gtm_putmsg_csa(CSA_ARG(csa)
-					VARLSTCNT(4) ERR_DBBTUWRNG, 2, &(csd->blks_to_upgrd), &mu_int_blks_to_upgrd);
+					VARLSTCNT(4) ERR_DBBTUWRNG, 2, &mu_int_blks_to_upgrd, &(csd->blks_to_upgrd));
 				if (gv_cur_region->read_only || mu_int_errknt)
 					mu_int_errknt++;
-				else
+				else if (!ointeg_this_reg)
 				{
 					csd->blks_to_upgrd = mu_int_blks_to_upgrd;
 					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBBTUFIXED);
@@ -816,10 +816,11 @@ void mupip_integ(void)
 			{
 				if (MAXUINT8 != blocks_free)
 					csd->trans_hist.free_blocks = blocks_free;
-				if (!mu_int_errknt && muint_all_index_blocks && !muint_fast)
+				if ((!mu_int_errknt && muint_all_index_blocks && !muint_fast)
+						&& (mu_int_blks_to_upgrd != csd->blks_to_upgrd))
 				{
-					if (mu_int_blks_to_upgrd != csd->blks_to_upgrd)
-						csd->blks_to_upgrd = mu_int_blks_to_upgrd;
+					csd->blks_to_upgrd = mu_int_blks_to_upgrd;
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBBTUFIXED);
 				}
 				csd->span_node_absent = (sndata->sn_cnt) ? FALSE : TRUE;
 				csd->maxkeysz_assured = (maxkey_errors) ? FALSE : TRUE;

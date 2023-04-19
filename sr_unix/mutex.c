@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -23,7 +23,7 @@
 #include "gtm_stdlib.h"
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
-#include "gtm_select.h"
+#include "gtm_poll.h"
 #include "gtm_un.h"
 
 #include <errno.h>
@@ -144,12 +144,14 @@ MBSTART {															\
 	}															\
 } MBEND
 
+#define IS_ONLNRLBK_ACTIVE(CSA)	(0 != CSA->nl->onln_rlbk_pid)
 
 GBLREF int			num_additional_processors;
 GBLREF jnl_gbls_t		jgbl;
 GBLREF jnlpool_addrs_ptr_t	jnlpool;
 GBLREF uint4			process_id;
 GBLREF uint4			mutex_per_process_init_pid;
+GBLREF uint4			mu_upgrade_in_prog;
 #ifdef MUTEX_MSEM_WAKE
 #  ifdef POSIX_MSEM
 static sem_t			*mutex_wake_msem_ptr = NULL;
@@ -158,7 +160,6 @@ static msemaphore		*mutex_wake_msem_ptr = NULL;
 #  endif
 static mutex_que_entry_ptr_t	msem_slot;
 #else
-GBLREF fd_set			mutex_wait_on_descs;
 GBLREF int			mutex_sock_fd;
 #endif
 #ifdef DEBUG
@@ -184,6 +185,7 @@ error_def(ERR_MUTEXERR);
 error_def(ERR_MUTEXFRCDTERM);
 error_def(ERR_MUTEXLCKALERT);
 error_def(ERR_ORLBKINPROG);
+error_def(ERR_REORGUPCNFLCT);
 error_def(ERR_TEXT);
 error_def(ERR_WCBLOCKED);
 
@@ -368,6 +370,9 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 	ssize_t			nbrecvd;
 	int			timeout_intr_slpcnt;
 	long			timeout_val;
+	int			poll_timeout;
+	nfds_t			poll_nfds;
+	struct pollfd		poll_fdlist[1];
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -446,15 +451,17 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 			 */
 			timeout_intr_slpcnt = MUTEX_INTR_SLPCNT;
 			MUTEX_DPRINT4("%d: Sleeping for %d s %d us\n", process_id, timeout.tv_sec, timeout.tv_usec);
-			assertpro(FD_SETSIZE > mutex_sock_fd);
-			FD_SET(mutex_sock_fd, &mutex_wait_on_descs);
 			MUTEX_TRACE_CNTR(mutex_trc_slp);
 			/*
 			 * the check for EINTR below is valid and should not be converted to an EINTR
 			 * wrapper macro, since it might be a timeout.
 			 */
-			while (-1 == (sel_stat =
-				select(mutex_sock_fd + 1, &mutex_wait_on_descs, (fd_set *)NULL, (fd_set *)NULL, &timeout)))
+			poll_fdlist[0].fd = mutex_sock_fd;
+			poll_fdlist[0].events = POLLIN;
+			poll_nfds = 1;
+			poll_timeout = (long)((timeout.tv_sec * MILLISECS_IN_SEC) +
+					DIVIDE_ROUND_UP(timeout.tv_usec, MICROSECS_IN_MSEC));
+			while (-1 == (sel_stat = poll(&poll_fdlist[0], poll_nfds, poll_timeout)))
 			{
 				if (EINTR == errno)
 				{	/* somebody interrupted me, reduce the timeout by half and continue */
@@ -477,9 +484,6 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 				timeout.tv_usec = (gtm_tv_usec_t)(timeout_val % E_6);
 				MUTEX_DPRINT4("%d: Interrupted select, new timeout %d s %d us\n", process_id, timeout.tv_sec,
 					timeout.tv_usec);
-				/* the next line deals with the case that an interrupted select has changed mutex_wait_on_descs */
-				assertpro(FD_SETSIZE > mutex_sock_fd);
-				FD_SET(mutex_sock_fd, &mutex_wait_on_descs);
 				MUTEX_TRACE_CNTR(mutex_trc_slp);
 			}
 			if (1 == sel_stat) /* Somebody woke me up */
@@ -769,6 +773,11 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 				INCR_GVSTATS_COUNTER(csa, cnl, n_crits_in_epch, 1);
 			local_crit_cycle = csa->critical->crit_cycle;
 			local_stuck_cycle = csa->critical->stuck_cycle;
+			if (mu_upgrade_in_prog && IS_ONLNRLBK_ACTIVE(csa))
+				RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(7) ERR_REORGUPCNFLCT, 5,
+						LEN_AND_LIT("REORG -UPGRADE"),
+						LEN_AND_LIT("MUPIP ROLLBACK -ONLINE in progress"),
+						csa->nl->onln_rlbk_pid);
 			status = clock_gettime(CLOCK_REALTIME, &timeout);
 			if (0 != status)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
@@ -1003,6 +1012,11 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 		}
 		for (redo_cntr = MUTEX_MAX_WAIT_FOR_PROGRESS_CNTR; redo_cntr;)
 		{	/* loop on getting a slot on the queue - every time through, if crit is available, grab it and go */
+			if (mu_upgrade_in_prog && IS_ONLNRLBK_ACTIVE(csa))
+				RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(7) ERR_REORGUPCNFLCT, 5,
+						LEN_AND_LIT("REORG -UPGRADE"),
+						LEN_AND_LIT("MUPIP ROLLBACK -ONLINE in progress"),
+						csa->nl->onln_rlbk_pid);
 			ONE_MUTEX_TRY(csa, addr, crash_count, process_id, mutex_lock_type,	/* lock type is MUTEX_LOCK_WRITE */
 				spins, (gtm_int64_t)-1, yields, (gtm_int64_t)-1, queue_sleeps, epoch_count, atstart, state);
 			free_slot = (mutex_que_entry_ptr_t)REMQHI((que_head_ptr_t)&addr->freehead);

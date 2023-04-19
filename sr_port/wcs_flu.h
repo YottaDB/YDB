@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -18,6 +18,7 @@
 
 boolean_t wcs_flu(uint4 options);
 
+<<<<<<< HEAD
 /* Uncomment the below #define if you want to write EPOCH records for EVERY update.
  * This feature (when coupled with replication can turn out to be very useful to debug integ errors.
  * Given that an integ error occurred, through a sequence of binary search like rollbacks, we can find out
@@ -52,6 +53,21 @@ boolean_t wcs_flu(uint4 options);
 	assert(ydb_white_box_test_case_enabled || (WBTEST_SLEEP_IN_WCS_WTSTART == ydb_white_box_test_case_number));	\
 	assert(CDB_STAGNATE >= t_tries);										\
 	SET_CACHE_FAIL_STATUS(status, csd);										\
+=======
+#define	SET_WCS_FLU_FAIL_STATUS(status, csd)								\
+{	/* Reasons we currently know why wcs_flu can fail (when called from t_end or tp_tend) is if	\
+	 * 	a) wcs_flu avoided invoking wcs_recover because cnl->wc_blocked is already set 		\
+	 * 		to TRUE (this is possible only if cache-recoveries are induced by white-box 	\
+	 * 		testing).									\
+	 * OR	b) if wcs_flu encountered errors in the "jnl_flush" call. The only way we know this	\
+	 * 		out-of-design situation can happen is if journal buffer fields are tampered	\
+	 * 		with by white-box testing. In this case cnl->wc_blocked need not be TRUE.	\
+	 * In either case, white-box testing should be true. Assert accordingly.			\
+	 */												\
+	assert(gtm_white_box_test_case_enabled);							\
+	assert(CDB_STAGNATE >= t_tries);								\
+	SET_CACHE_FAIL_STATUS(status, csd);								\
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 }
 
 #define SET_CACHE_FAIL_STATUS(status, csd)								\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -170,8 +170,11 @@ void unary_tail(oprtype *opr, int depth)
 			default:	/* something other than a unary operator or a literal - stop and do what can be done */
 				if (OCT_ARITH & oc_tab[c2].octype)
 				{	/* some arithmetic */
+<<<<<<< HEAD
 					ex_tail(&t1->operand[0], depth);
 					RETURN_IF_RTS_ERROR;
+=======
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 					if (OC_LIT == t2->opcode)
 					{
 						c2 = t2->opcode;
@@ -182,6 +185,7 @@ void unary_tail(oprtype *opr, int depth)
 					} else
 						assert(c2 == t2->opcode);
 				}
+<<<<<<< HEAD
 				if (TRUE || !drop || (NO_REF != t2->operand[1].oprclass))
 					break;		/* don't try anything fancy if the leaf is complex */
 				assert(OCT_UNARY & oc_tab[c1].octype);
@@ -390,6 +394,9 @@ void unary_tail(oprtype *opr, int depth)
 				assert(c2 == t1->opcode);	/* check that 2nd pass appears to wind up same place as 1st */
 				ta->operand[0].oprval.tref = t1;
 				break;
+=======
+				break;		/* don't try anything fancy if the leaf is complex */
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		}
 		return;
 	} while (TRUE);		/* the loop is managed by breaks and a continue statement above */

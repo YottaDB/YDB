@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2020 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -67,6 +71,14 @@ int lkglvn(boolean_t gblvn)
 				setcurtchain(oldchain);
 			return FALSE;
 		}
+<<<<<<< HEAD
+=======
+		if (!vbar)
+		{
+			coerce(sb1, OCT_MVAL);
+			ex_tail(sb1++, FALSE, FALSE);
+		}
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		if (TK_COMMA == TREF(window_token))
 		{
 			advancewindow();
@@ -77,6 +89,14 @@ int lkglvn(boolean_t gblvn)
 					setcurtchain(oldchain);
 				return FALSE;
 			}
+<<<<<<< HEAD
+=======
+			if (!vbar)
+			{
+				coerce(sb1, OCT_MVAL);
+				ex_tail(sb1++, FALSE, FALSE);
+			}
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		} else
 			*sb1++ = put_str(0, 0);
 		if ((!vbar && (TK_RBRACKET != TREF(window_token))) || (vbar && (TK_VBAR != TREF(window_token))))

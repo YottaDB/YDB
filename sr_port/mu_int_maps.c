@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -155,8 +155,7 @@ void mu_int_maps(void)
 			mu_int_err(ERR_DBMBSIZMX, 0, 0, 0, 0, 0, 0, level);
 			continue;
 		}
-		if ((GDSVCURR != mu_int_data.creation_db_ver) && (((blk_hdr_ptr_t)blk_base)->bver != mu_int_data.desired_db_format))
-			mu_int_blks_to_upgrd++;	/* conditions of the prior if may need adjustment going forward */
+		/* here we might maintain mu_int_blks_to_upgrd for local bit maps, but none is needed for V6->V7 */
 		if (tn_reset_this_reg)
 		{
 			((blk_hdr_ptr_t)blk_base)->tn = 0;

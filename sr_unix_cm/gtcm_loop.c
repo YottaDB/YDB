@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -68,6 +68,7 @@ GBLREF int		per_conn_servtime;
 void	hang_handler(void);
 void	gcore_server(void);
 
+error_def(ERR_FDSIZELMT);
 error_def(ERR_OMISERVHANG);
 
 void gtcm_loop(omi_conn_ll *cll)
@@ -100,7 +101,8 @@ void gtcm_loop(omi_conn_ll *cll)
 /*	Pay attention to the network visible end point */
 	if (INV_FD_P((nfds = cll->nve)))
 	    break;
-	assertpro(FD_SETSIZE > cll->nve);
+	if (FD_SETSIZE <= cll->nve)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FDSIZELMT, 1, cll->nve);
 	FD_SET(cll->nve, &r_fds);
 	FD_SET(cll->nve, &e_fds);
 	if (psock >= 0)
@@ -108,7 +110,8 @@ void gtcm_loop(omi_conn_ll *cll)
 
 /*	We will service transactions from any existing connection */
 	for (cptr = cll->head; cptr; cptr = cptr->next) {
-	    assertpro(FD_SETSIZE > cptr->fd);
+	    if (FD_SETSIZE <= cptr->fd)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FDSIZELMT, 1, cptr->fd);
 	    FD_SET(cptr->fd, &r_fds);
 	    FD_SET(cptr->fd, &e_fds);
 	    if (cptr->fd > nfds)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -87,7 +87,6 @@ error_def(ERR_JNLFLUSH);
 error_def(ERR_MUTRUNCFAIL);
 error_def(ERR_MUTRUNCNOSPACE);
 error_def(ERR_MUTRUNCERROR);
-error_def(ERR_MUTRUNCNOV4);
 error_def(ERR_MUTRUNCNOTBG);
 error_def(ERR_MUTRUNCSSINPROG);
 error_def(ERR_MUTRUNCSUCCESS);
@@ -161,11 +160,7 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCNOTBG, 2, REG_LEN_STR(gv_cur_region));
 		return TRUE;
 	}
-	if (((GDSVCURR != csd->desired_db_format) && !(BLK_ID_32_VER > csd->desired_db_format)) || (csd->blks_to_upgrd != 0))
-	{
-		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCNOV4, 2, REG_LEN_STR(gv_cur_region));
-		return TRUE;
-	}
+	assert(csd->fully_upgraded || (0 == csd->blks_to_upgrd) || (BLK_ID_32_VER < csd->desired_db_format));
 	trunc_blocks = (truncate_percent * csa->ti->total_blks / 100);
 	if (csa->ti->free_blocks < trunc_blocks)
 	{
@@ -369,6 +364,7 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 	csa->nl->highest_lbm_with_busy_blk = MAX(found_busy_blk, csa->nl->highest_lbm_with_busy_blk);
 	assert(IS_BITMAP_BLK(csa->nl->highest_lbm_with_busy_blk));
 	new_total = MAX(MIN(old_total, csa->nl->highest_lbm_with_busy_blk + BLKS_PER_LMAP), keep_blocks);
+	assert(csd->fully_upgraded || (0 == csd->blks_to_upgrd) || (BLK_ID_32_VER < csd->desired_db_format));
 	if (mu_ctrly_occurred || mu_ctrlc_occurred)
 	{
 		rel_crit(gv_cur_region);
@@ -379,6 +375,7 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_MUTRUNCNOSPACE, 3, REG_LEN_STR(gv_cur_region), truncate_percent);
 		rel_crit(gv_cur_region);
 		return TRUE;
+<<<<<<< HEAD
 	} else if (new_total == old_total) /* If trying to truncate when database is already truncated */
 	{
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCALREADY, 2, REG_LEN_STR(gv_cur_region));
@@ -391,6 +388,8 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCNOV4, 2, REG_LEN_STR(gv_cur_region));
 		rel_crit(gv_cur_region);
 		return TRUE;
+=======
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	} else if (SNAPSHOTS_IN_PROG(csa->nl))
 	{
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCSSINPROG, 2, REG_LEN_STR(gv_cur_region));

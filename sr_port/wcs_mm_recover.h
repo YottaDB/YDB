@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #define MM_DBFILEXT_REMAP_IF_NEEDED(csa, reg)							\
 {												\
 	if (csa->total_blks != csa->ti->total_blks)						\
-		wcs_mm_recover(reg);								\
+		wcs_mm_recover(reg, 0);								\
 	assert(!csa->now_crit || (csa->total_blks == csa->ti->total_blks));			\
 }
 
@@ -28,6 +28,6 @@
 	}											\
 }
 
-void wcs_mm_recover(gd_region *reg);
+void wcs_mm_recover(gd_region *reg, unsigned int orig_vbn_offset);
 
 #endif

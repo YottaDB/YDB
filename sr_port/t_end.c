@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -90,12 +90,14 @@
 #include "error_trap.h"
 #include "ztimeout_routines.h"
 #include "jnl_file_close_timer.h"
+#include "gtmdbglvl.h"		/* for GDL_UnconditionalEpoch */
 
 GBLREF	bool			rc_locked;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	cache_rec_ptr_t		cr_array[]; /* Maximum number of blocks that can be in transaction */
 GBLREF	unsigned int		cr_array_index;
 GBLREF	boolean_t		block_saved;
+GBLREF	uint4			gtmDebugLevel; 		/* Debug level */
 GBLREF	uint4			update_trans;
 GBLREF	cw_set_element		cw_set[];		/* create write set. */
 GBLREF	gd_region		*gv_cur_region;
@@ -124,7 +126,6 @@ GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 GBLREF	boolean_t		is_dollar_incr;	/* valid only if gvcst_put is in the call-stack.
 						 * is a copy of "in_gvcst_incr" just before it got reset to FALSE */
-GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;	/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLREF	boolean_t		mu_reorg_nosafejnl;		/* TRUE if NOSAFEJNL explicitly specified */
 GBLREF	trans_num		mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block processed by
 								 * REORG UPGRADE/DOWNGRADE */
@@ -137,6 +138,7 @@ GBLREF	gv_key			*gv_currkey;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	int4			strm_index;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;	/* non-zero if MUPIP REORG ENCRYPT is in progress */
+GBLREF	uint4			mu_upgrade_in_prog;		/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
 #ifdef GTM_TRIGGER
@@ -180,9 +182,8 @@ error_def(ERR_TNTOOLARGE);
 #define	RECYCLED2FREE	0x00000002
 #define	FREE_DIR_DATA	0x00000004	/* denotes the block to be freed is a data block in directory tree */
 
-#define SAVE_2FREE_IMAGE(MODE, FREE_SEEN, CSD)								\
-	 (((gds_t_busy2free == MODE) && (!CSD->db_got_to_v5_once || (FREE_SEEN & FREE_DIR_DATA)))	\
-	|| (gds_t_recycled2free == MODE))
+#define SAVE_2FREE_IMAGE(MODE, FREE_SEEN, CSD)									\
+	 (((gds_t_busy2free == MODE) && (FREE_SEEN & FREE_DIR_DATA)) || (gds_t_recycled2free == MODE))		\
 
 /**
  * Validation function for a non-tp transaction; everything is done in crit
@@ -249,7 +250,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	gv_namehead		*gvnh;
 	gd_region		*reg;
 #	ifdef GTM_TRIGGER
-	uint4			cycle;
+	uint4			cycle, i;
 #	endif
 	snapshot_context_ptr_t	lcl_ss_ctx;
 	th_index_ptr_t		cti;
@@ -296,7 +297,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	 * Since we don't expect hold_onto_crit to be set by any other utility/function, the below assert is valid and is intended
 	 * to catch cases where the field is inadvertently set to TRUE.
 	 */
-	assert(!csa->hold_onto_crit || IS_DSE_IMAGE || mu_reorg_upgrd_dwngrd_in_prog
+	assert(!csa->hold_onto_crit || IS_DSE_IMAGE || mu_upgrade_in_prog
 		|| jgbl.onlnrlbk || TREF(in_gvcst_redo_root_search) || TREF(in_trigger_upgrade));
 	assert(cs_data == csd);
 	assert((t_tries < CDB_STAGNATE) || csa->now_crit);
@@ -315,7 +316,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	 * in MUPIP REORG UPGRADE/DOWNGRADE/ENCRYPT (mu_reorg_upgrd_dwngrd.c or mupip_reorg_encrypt.c), where update_trans is
 	 * explicitly set to 0 in some cases.
 	 */
-	assert((inctn_invalid_op == inctn_opcode) || mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog || update_trans);
+	assert((inctn_invalid_op == inctn_opcode) || mu_upgrade_in_prog || mu_reorg_encrypt_in_prog || update_trans);
 	assert(!need_kip_incr || update_trans || TREF(in_gvcst_redo_root_search));
 	cti = csa->ti;
 	pvt_total_blks = csa->total_blks;	/* Note down csa->total_blks BEFORE we grab crit for MM. This is because as part
@@ -342,7 +343,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			 * There would be just ONE cse entry and "hist2" is guaranteed to be NULL. Assert that.
 			 * Morph the one cse into a history that hist2 points to so we can use the below EACH_HIST for loop.
 			 */
-			assert(mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog);
+			assert(mu_upgrade_in_prog || mu_reorg_encrypt_in_prog);
 			assert(1 == cw_map_depth);
 			assert(0 == cw_set_depth);
 			assert(NULL == hist2);
@@ -588,9 +589,17 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				 */
 				assert((CDB_STAGNATE > t_tries) || (cs->blk < cti->total_blks));
 				cs->mode = gds_t_acquired;
-				assert((GDSVCURR == cs->ondsk_blkver) || (GDSV7m == cs->ondsk_blkver)
-					|| (BLK_ID_32_VER > cs->ondsk_blkver)
-					|| (mu_reorg_upgrd_dwngrd_in_prog && (GDSV6p == cs->ondsk_blkver)));
+#ifdef DEBUG
+				/* This condition is a little tricky at first blush. It is meant to cover index blocks only
+				 * because data blocks are upgraded later in mm_update() and bg_update_phase1()
+				 * If the DB is fully upgraded, on-disk block ver should == desired format
+				 * If the DB is NOT fully upgraded, aka in transition, index blocks should be V6p+
+				 * If any of the above conditions are violated, set donot_commit
+				 */
+				if ((0 < cs->level) && (csd->fully_upgraded ?   (csd->desired_db_format != cs->ondsk_blkver)
+							: (GDSV6p > cs->ondsk_blkver)))
+					TREF(donot_commit) |= DONOTCOMMIT_T_END_CONCURR_FMT_CHG;
+#endif
 			} else if (reorg_ss_in_prog && WAS_FREE(cs->blk_prior_state))
 			{
 				assert((gds_t_acquired == cs->mode) && (NULL == cs->old_block));
@@ -655,7 +664,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	block_saved = FALSE;
 	ESTABLISH_NOUNWIND(t_ch);	/* avoid hefty setjmp call, which is ok since we never unwind t_ch */
 	assert(!csa->hold_onto_crit || csa->now_crit);
-	CHECK_TN(csa, csd, cti->curr_tn);	/* macro might issue rts_error TNTOOLARGE */
 	if (!csa->now_crit)
 	{
 		/* Get more space if needed. This is done outside crit so that any necessary IO has a chance of occurring
@@ -709,10 +717,16 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			goto failed;
 		}
 	}
+<<<<<<< HEAD
 	/* We should never proceed to update a frozen database. Only exception is DSE.
 	 * See comment in FROZEN_HARD macro definition for why it needs to be invoked twice in the assert.
 	 */
 	assert(!FROZEN_HARD(csa) || !FROZEN_HARD(csa) || IS_DSE_IMAGE);
+=======
+	CHECK_TN(csa, csd, cti->curr_tn);	/* macro might issue rts_error TNTOOLARGE */
+	/* We should never proceed to update a frozen database. Only exception is DSE */
+	assert(!FROZEN_HARD(csa) || IS_DSE_IMAGE);
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	/* We never expect to come here with file_corrupt set to TRUE (in case of an online rollback) because
 	 * grab_crit done above will make sure of that. The only exception is RECOVER/ROLLBACK itself coming
 	 * here in the forward phase
@@ -996,6 +1010,18 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 					status = cdb_sc_lostcr;
 					goto failed;
 				}
+#ifdef REORG_UPGRADE_IS_ONLINE
+				/* MUPIP REORG -UPGRADE enters t_end without any of the usual concurrency checks. It is possible
+				 * for a process to be in bg_update_phase2 modifying the same CR. Since UPGRADE can be deferred
+				 * stop the update and let it t_retry() the GVT */
+				if (mu_upgrade_in_prog
+						&& ((0 <= cr->read_in_progress) || (0 != cr->in_cw_set) || (0 != cr->in_tend)))
+				{
+					assert(CDB_STAGNATE > t_tries);
+					status = cdb_sc_lostbefor;
+					goto failed;
+				}
+#endif
 				assert(0 == cr->in_tend);
 				/* Pin those buffers that we are planning on updating. Those are easily identified as the ones
 				 * where the history has a non-zero cw-set-element.
@@ -1036,7 +1062,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	 * resetting the clue just before doing the next gvcst_search. The mu_reorg* routines already take care of this reset
 	 * (in fact, this is asserted in gvcst_search too). So we can allow invalid clues here in that special case.
 	 */
-	if (!mu_reorg_process && (NULL != gv_target) && gv_target->clue.end)
+	if (!mu_reorg_process && !mu_upgrade_in_prog && (NULL != gv_target) && gv_target->clue.end)
 		/* gv_target can be NULL in case of DSE MAPS etc. */
 		DEBUG_GVT_CLUE_VALIDATE(gv_target);	/* Validate that gvt has valid first_rec, clue & last_rec fields */
 #	endif
@@ -1187,7 +1213,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 					goto failed;
 				}
 				PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
-				cs->ondsk_blkver = cr->ondsk_blkver;
 				old_block = (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr);
 				assert((cs->cr != cr) || (cs->old_block == (sm_uc_ptr_t)old_block));
 				old_block_tn = old_block->tn;
@@ -1304,7 +1329,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		 * The only exception is that in case of mu_reorg_{upgrd_dwngrd,encrypt}_in_prog cw_set_depth will be
 		 * LESS than tmp_cw_set_depth (this is still fine as there is more size allocated than used).
 		 */
-		assert((cw_set_depth == tmp_cw_set_depth) || ((mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog)
+		assert((cw_set_depth == tmp_cw_set_depth) || ((mu_upgrade_in_prog || mu_reorg_encrypt_in_prog)
 				&& cw_map_depth && (cw_set_depth < tmp_cw_set_depth)));
 		assert(jbp->before_images == csa->jnl_before_image);
 		assert((csa->jnl_state == csd->jnl_state) && (csa->jnl_before_image == csd->jnl_before_image));
@@ -1330,7 +1355,13 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		}
 		assert(!jbp->last_eof_written);
 		assert(jgbl.gbl_jrec_time >= jbp->prev_jrec_time);
+<<<<<<< HEAD
 		if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time) UNCONDITIONAL_EPOCH_ONLY(|| TRUE))
+=======
+		if (MAXUINT4 == jbp->next_epoch_time)
+			jbp->next_epoch_time = (uint4)(jgbl.gbl_jrec_time + jbp->epoch_interval);
+		if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time) || (gtmDebugLevel & GDL_UnconditionalEpoch))
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 						&& !FROZEN_CHILLED(csa))
 		{	/* Flush the cache. Since we are in crit, defer syncing epoch */
 			if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_IN_COMMIT | WCSFLU_SPEEDUP_NOBEFORE))
@@ -1423,9 +1454,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 					 * a) gds_t_write_root : In this case no need to write PBLK.
 					 * b) gds_t_busy2free : This is set by gvcst_bmp_mark_free to indicate
 					 *	that a block has to be freed right away instead of taking it
-					 *	through the RECYCLED state. This should be done only if
-					 *	csd->db_got_to_v5_once has not yet become TRUE. Once it is
-					 *	TRUE, block frees will write PBLK only when the block is reused.
+					 *	through the RECYCLED state.
+					 *	Block frees will write PBLK only when the block is reused.
 					 *      An exception is when the block is a level-0 block in directory
 					 * 	tree, we always write PBLK immediately.
 					 * c) gds_t_recycled2free: Need to write PBLK
@@ -1485,21 +1515,18 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			if ((inctn_blkupgrd == inctn_opcode) || (inctn_blkdwngrd == inctn_opcode)
 					|| (inctn_blkreencrypt == inctn_opcode))
 			{
-				assert(1 == cw_set_depth); /* upgrade/downgrade/(re)encrypt one block at a time */
+				assert((inctn_blkreencrypt != inctn_opcode) || (1 == cw_set_depth)); /* (re)encrypt one block at a time */
 				cs = cw_set;
-				assert(inctn_detail.blknum_struct.blknum == cs->blk);
 				assert((inctn_blkreencrypt != inctn_opcode) || (mu_reorg_upgrd_dwngrd_blktn < dbtn));
 				if (mu_reorg_nosafejnl)
 				{
 					assert(inctn_blkreencrypt != inctn_opcode);
-					blktn = mu_reorg_upgrd_dwngrd_blktn;
 					/* if NOSAFEJNL and there is going to be a block format change
 					 * as a result of this update, note it down in the inctn opcode
 					 * (for recovery) as there is no PBLK record for it to rely on.
 					 */
 					if (cs->ondsk_blkver != csd->desired_db_format)
-						inctn_opcode = (inctn_opcode == inctn_blkupgrd)
-								? inctn_blkupgrd_fmtchng : inctn_blkdwngrd_fmtchng;
+						inctn_opcode = inctn_blkupgrd_fmtchng;
 				}
 			}
 			jnl_write_reserve(csa, jrs, JRT_INCTN, INCTN_RECLEN, NULL);
@@ -1551,9 +1578,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	}
 	if (free_seen)
 	{	/* Write to snapshot and backup file for busy2free and recycled2free mode. These modes only appear in
-		 * mupip reorg -truncate or v4-v5 upgrade, neither of which can occur with MM.
+		 * mupip reorg -truncate, which cannot occur with MM.
 		 */
-		assert(!is_mm);
 		cs = &cw_set[0];
 		if (SAVE_2FREE_IMAGE(cs->mode, free_seen, csd))
 		{
@@ -1737,7 +1763,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		}
 	}
 	start_tn = dbtn; /* start_tn temporarily used to store currtn (for "bg_update_phase2") before releasing crit */
-	if (free_seen)
+	if (free_seen && !is_mm)
 	{	/* need to do below BEFORE releasing crit as we have no other lock on this buffer */
 		assert((2 <= cr_array_index) && (cr_array_index <= 3));	/* 3 is possible if we pinned a twin for bitmap update */
 		assert((2 == cw_set_depth) && (process_id == cr_array[0]->in_cw_set));
@@ -1877,14 +1903,12 @@ failed_skip_revert:
 	 */
 	if (!bml_save_dollar_tlevel)
 	{
-		for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
-		{
+		for (gvnh = gv_target_list, i = 0; (NULL != gvnh) && (0xFFFFFF > i); gvnh = gvnh->next_gvnh, i++)
 			if (gvnh->clue.end)
-			{
 				for (t1 = &gvnh->hist.h[0]; t1->blk_num; t1++)
 					assert(NULL == t1->cse);
-			}
-		}
+		if (i >= 0xFFFFFF) /* Must be in an infinite loop. Drop a core since the FOR loop broke */
+			gtm_fork_n_core();
 	}
 #	endif
 	/* t_commit_cleanup releases crit as long as the transition is from 2nd to 3rd retry or 3rd to 3rd retry. The only exception

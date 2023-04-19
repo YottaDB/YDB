@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2018 Fidelity National Information	*
+ * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -39,6 +39,15 @@ MBSTART {														\
 	}														\
 } MBEND
 
+/* To run in production remove the "defined(DEBUG)" clause. See jnl_file_close_timer.c for more details. */
+#if (defined(DEBUG) && defined(__linux__))
+#define CHECKFORMULTIGENMJLS
+#endif
+
 void jnl_file_close_timer(void);
+#if defined(CHECKFORMULTIGENMJLS)
+boolean_t checkformultigenmjls(int pid);
+void displayopenjnlfiles(int pid);
+#endif
 
 #endif

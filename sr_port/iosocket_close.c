@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -90,7 +90,6 @@ void iosocket_close(io_desc *iod, mval *pp)
 			break;
 		case iop_socket:
 			handle_len = (int)(unsigned char)*(pp->str.addr + p_offset);
-			assert(handle_len > 0);
 			memcpy(sock_handle, (char *)(pp->str.addr + p_offset + 1), handle_len);
 			socket_specified = TRUE;
 			break;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -50,8 +50,12 @@
 #include "wcs_recover.h"
 #include "gtm_string.h"
 #include "have_crit.h"
+<<<<<<< HEAD
 #include "gds_blk_downgrade.h"
 #include "deferred_exit_handler.h"
+=======
+#include "deferred_signal_handler.h"
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #include "memcoherency.h"
 #include "wbox_test_init.h"
 #include "wcs_clean_dbsync.h"
@@ -537,47 +541,11 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			CR_BUFFER_CHECK1(region, csa, csd, cr, cr_lo, cr_hi);
 			bp = (blk_hdr_ptr_t)(GDS_ANY_REL2ABS(csa, csr->buffaddr));
 			VALIDATE_BM_BLK(csr->blk, bp, csa, region, bmp_status);	/* bmp_status holds bmp buffer's validity */
-			/* GDSV4 (0) version uses this field as a block length so should always be > 0. Assert that.
-			 * There is one exception in that we might have a crash test where a process was killed just before
-			 * populating a block in bg_update_phase2 when cr->data_invalid is still 0 but cr->in_tend is non-zero
-			 * (so the block-header is still null) in which case "wcs_recover" would have kept cr->dirty non-zero
-			 * even though the block-header is empty. So assert that. Note that gds_blk_downgrade has a safety
-			 * check for bver == 0 and returns immediately in that case so it is okay to call it with a 0 bver in pro.
-			 */
 			assert((((blk_hdr_ptr_t)bp)->bver)
 			       || WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
 			       || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
-			if (IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver))
-			{	/* Need to downgrade/reformat this block back to a previous format. */
-				assert(!csd->asyncio);	/* asyncio & V4 format are not supported together */
-				assert((0 == reformat_buffer_in_use) || process_exiting);
-				DEBUG_ONLY(reformat_buffer_in_use++;)
-				DEBUG_DYNGRD_ONLY(PRINTF("WCS_WTSTART: Block %d being dynamically downgraded on write\n", \
-							 csr->blk));
-				if (csd->blk_size > reformat_buffer_len)
-				{	/* Buffer not big enough (or does not exist)
-					 * .. get a new one releasing old if it exists
-					 */
-					assert(0 == gtmMallocDepth);	/* should not be in a nested free/malloc */
-					if (reformat_buffer)
-						free(reformat_buffer);	/* Different blksized databases in use
-									 * .. keep only largest one
-									 */
-					reformat_buffer = malloc(csd->blk_size);
-					reformat_buffer_len = csd->blk_size;
-				}
-				gds_blk_downgrade((v15_blk_hdr_ptr_t)reformat_buffer, (blk_hdr_ptr_t)bp);
-				bp = (blk_hdr_ptr_t)reformat_buffer;
-				size = (((v15_blk_hdr_ptr_t)bp)->bsiz + 1) & ~1;
-			}
-			else DEBUG_ONLY(if ((GDSV7 >= csr->ondsk_blkver) && (GDSV6 <= csr->ondsk_blkver)))
-				size = (bp->bsiz + 1) & ~1;
-#			ifdef DEBUG
-			else
-			{
-				assert((GDSV7 >= csr->ondsk_blkver) && (GDSV6 <= csr->ondsk_blkver));
-			}
-#			endif
+			/* Previously, blocks could be downgraded as needed */
+			size = (bp->bsiz + 1) & ~1;
 			if (csd->write_fullblk)
 			{	/* See similiar logic in wcs_wtstart.c */
 #			ifdef DEBUG

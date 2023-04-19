@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -47,9 +47,21 @@
 #define GDL_IgnoreAvailSpace	0x00100000	/* (1048576) Allow gdsfilext/mu_cre_file (UNIX) to ignore available space */
 #define GDL_PrintPMAPStats	0x00200000	/* (2097152) Print process memory map on exit (using pmap or procmap utility) */
 #define GDL_AllowLargeMemcpy	0x00400000	/* (4194304) Bypass the 1GB sanity check in gtm_memcpy_validate_and_execute() */
+						/* ... */
+#define GDL_UnconditionalEpoch	0x40000000	/* (1073741824) Write an EPOCH for each update. replaces UNCONDITIONAL_EPOCH */
 #define GDL_UseSystemMalloc	0x80000000	/* (2147483648) Use the system's malloc(), disabling all the above GDL_Sm options */
 
 #define GDL_SmAllMallocDebug	(GDL_Simple | GDL_SmStats | GDL_SmTrace | GDL_SmDumpTrace | GDL_SmAllocVerf			\
 					| GDL_SmFreeVerf | GDL_SmBackfill | GDL_SmChkAllocBackfill | GDL_SmChkFreeBackfill	\
 					| GDL_SmStorHog | GDL_SmDump | GDL_SmInitAlloc)
+
+
+/* From sr_port/wcs_flu.h: Use GDL_UnconditionalEpoch to write EPOCH records for EVERY update.
+ * This feature (when coupled with replication can turn out to be very useful to debug integ errors. Given that
+ * an integ error occurred, through a sequence of binary search like rollbacks, we can find out exactly what
+ * transaction number the error occurred so we can have a copy of the db for the prior transaction and compare
+ * it with the db after the bad transaction and see exactly what changed. This was very useful in figuring out
+ * the cause of the DBKEYORD error as part of enabling clues for TP (C9905-001119).
+ */
+
 #endif

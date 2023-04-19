@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -212,6 +212,7 @@ GBLDEF	int4		backup_close_errno,
 			forced_exit_sig,
 			exit_state,
 			restore_read_errno;
+GBLDEF	ABS_TIME	mu_stop_tm_array[EXIT_IMMED - 1] = {{0, 0}, {0, 0}};
 GBLDEF	volatile int4	outofband;
 GBLDEF	int		mumps_status = SS_NORMAL;
 GBLDEF	gtm_uint64_t	stp_array_size;
@@ -342,10 +343,12 @@ GBLDEF	void			(*simple_timeout_timer_ptr)(TID tid, int4 hd_len, boolean_t **time
 GBLDEF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
 GBLDEF	boolean_t		mu_reorg_process;		/* set to TRUE by MUPIP REORG */
+GBLDEF	boolean_t		mu_reorg_more_tries;		/* set to TRUE by MUPIP REORG / REORG -UPGRADE */
 GBLDEF	boolean_t		mu_reorg_in_swap_blk;		/* set to TRUE for the duration of the call to "mu_swap_blk" */
 GBLDEF	boolean_t		mu_rndwn_process;
 GBLDEF	gv_key			*gv_currkey_next_reorg;
 GBLDEF	gv_namehead		*reorg_gv_target;
+GBLDEF	gv_namehead		*upgrade_gv_target;		/* DT target's hist from gen_hist_for_blk */
 GBLDEF	struct sockaddr_un	gtmsecshr_sock_name;
 GBLDEF	struct sockaddr_un	gtmsecshr_cli_sock_name;
 GBLDEF	key_t			gtmsecshr_key;
@@ -773,13 +776,18 @@ GBLDEF	mident_fixed	zlink_mname;
 GBLDEF	sm_uc_ptr_t	reformat_buffer;
 GBLDEF	int		reformat_buffer_len;
 GBLDEF	volatile int	reformat_buffer_in_use;	/* used only in DEBUG mode */
-GBLDEF	boolean_t	mu_reorg_upgrd_dwngrd_in_prog;	/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLDEF	boolean_t	mu_reorg_nosafejnl;		/* TRUE if NOSAFEJNL explicitly specified */
 GBLDEF	trans_num	mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block processed by MUPIP REORG {UP,DOWN}GRADE */
+GBLDEF	uint4		mu_upgrade_in_prog;		/* non-zero when DB upgrade is in progress: 1=UPGRADE, 2=REORG -UPGRADE */
+GBLDEF	enum db_ver	upgrade_block_split_format;	/* MUPIP REORG -UPGRADE started;retain block format in mu_split/gvcst_put */
 GBLDEF	inctn_opcode_t	inctn_opcode = inctn_invalid_op;
 GBLDEF	inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLDEF	uint4		region_open_count;		/* Number of region "opens" we have executed */
+<<<<<<< HEAD
 GBLDEF	uint4		ydb_blkupgrade_flag = UPGRADE_IF_NEEDED;	/* by default upgrade only if necessary */
+=======
+GBLDEF	uint4		gtm_blkupgrade_flag = UPGRADE_IF_NEEDED;	/* US1479867: DSE can manually upgrade a block */
+>>>>>>> f9ca5ad6 (GT.M V7.1-000)
 GBLDEF	boolean_t	disk_blk_read;
 GBLDEF	boolean_t	ydb_dbfilext_syslog_disable;	/* by default, log every file extension message */
 GBLDEF	int4		cws_reorg_remove_index;			/* see mu_swap_blk.c for comments on the need for these two */

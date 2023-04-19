@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2022 Fidelity National Information	*
+ * Copyright (c) 2009-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -79,7 +79,6 @@ error_def(ERR_MAXSSREACHED);
 error_def(ERR_SSFILOPERR);
 error_def(ERR_SSTMPCREATE);
 error_def(ERR_SSTMPDIRSTAT);
-error_def(ERR_SSV4NOALLOW);
 error_def(ERR_SYSCALL);
 ZOS_ONLY(error_def(ERR_BADTAG);)
 ZOS_ONLY(error_def(ERR_TEXT);)
@@ -151,7 +150,8 @@ ZOS_ONLY(error_def(ERR_TEXT);)
 					LEN_AND_LIT("Error with shmctl"), CALLFROM, RC);		\
 		}											\
 	}												\
-	SS_SHMID = gtm_shmget(IPC_PRIVATE, SS_SHMSIZE, RWDALL | IPC_CREAT, FALSE);			\
+	SS_SHMID = gtm_shmget(IPC_PRIVATE, SS_SHMSIZE, RWDALL | IPC_CREAT, FALSE, SNAPSHOT_FILE,	\
+									(char*)reg->dyn.addr->fname);	\
 	if (-1 == SS_SHMID)										\
 	{												\
 		RC = errno;										\
@@ -577,31 +577,6 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 		util_out_print("!/MUPIP INFO: Successfully created shared memory. SHMID = !UL",
 			TRUE,
 			ss_shmid);
-	}
-	/* It is possible that we did saw csd->full_upgraded TRUE before invoking ss_initiate but MUPIP SET -VER=V4 was done after
-	 * ss_initiate was called. Handle appropriately.
-	 */
-	if (!csd->fully_upgraded)
-	{
-		/* If -ONLINE was specified explicitly, then it is an ERROR. Issue the error and return FALSE. */
-		if (online_specified)
-		{
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_SSV4NOALLOW, 2, DB_LEN_STR(reg));
-			util_out_print(NO_ONLINE_ERR_MSG, TRUE);
-			GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, cnl);
-			UNFREEZE_REGION_IF_NEEDED(csd, reg);
-			return FALSE;
-		} else
-		{	/* If -ONLINE was assumed implicitly (default of INTEG -REG), then set ointeg_this_reg to FALSE,
-			 * relinquish the resources and continue as if it is -NOONLINE
-			 */
-			ointeg_this_reg = FALSE;
-			assert(NULL != *ss_ctx);
-			ss_release(ss_ctx);
-			GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, cnl);
-			UNFREEZE_REGION_IF_NEEDED(csd, reg);
-			return TRUE;
-		}
 	}
 	/* ===================== STEP 5: Flush the pending updates in the global cache =================== */
 	/* For a readonly database for the current process, we cannot do wcs_flu. We would have waited for the active queues

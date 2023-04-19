@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -17,6 +17,8 @@
 #include "cmidef.h"
 #include "caller_id.h"
 
+error_def(ERR_FDSIZELMT);
+
 void cmj_err(struct CLB *lnk, cmi_reason_t reason, cmi_status_t status)
 {
 	struct NTD *tsk = lnk->ntd;
@@ -27,7 +29,8 @@ void cmj_err(struct CLB *lnk, cmi_reason_t reason, cmi_status_t status)
 	lnk->deferred_event = TRUE;
 	lnk->deferred_reason = reason;
 	lnk->deferred_status = status;
-	assertpro(FD_SETSIZE > lnk->mun);
+	if (FD_SETSIZE <= lnk->mun)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FDSIZELMT, 1, lnk->mun);
 	FD_CLR(lnk->mun, &tsk->rs);
 	FD_CLR(lnk->mun, &tsk->ws);
 	FD_CLR(lnk->mun, &tsk->es);

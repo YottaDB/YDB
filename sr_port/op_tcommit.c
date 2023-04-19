@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -430,8 +430,6 @@ enum cdb_sc	op_tcommit(void)
 							cse->blk = new_blk;
 							csa->tp_hint = new_blk;
 							cse->mode = gds_t_acquired;
-							assert((GDSVCURR == cse->ondsk_blkver) || (GDSV7m == cse->ondsk_blkver)
-								|| (GDSV6 == cse->ondsk_blkver));
 							/* Assert that in final retry total_blks (private and shared) are in sync */
 							assert((CDB_STAGNATE > t_tries) || !is_mm
 									|| (csa->total_blks == csa->ti->total_blks));
