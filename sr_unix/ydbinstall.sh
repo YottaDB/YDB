@@ -25,52 +25,91 @@
 # to the extent of attempting to download the distribution file.
 #
 # Note: This needs to be run as root.
-#
-# NOTE: This script requires the GNU wget program to download
-# distribution files that are not on the local file system.
 
-# Turn on debugging if set
-if [ "Y" = "$ydb_debug" ] ; then set -x ; fi
+# Function Definitions
 
-# Function required for utility check
-check_if_deps_exist()
+#Append arguments in $2 to string named by $1 if not already in it
+append_to_str()
 {
-	depflag=1
-	unset depnotfound
-	for dep in $deplist ; do
-		command -v $dep >/dev/null 2>&1 || command -v /sbin/$dep >/dev/null 2>&1 || { depnotfound="$depnotfound $dep" ; unset depflag ; }
+	for substr in $2 ; do
+		eval "echo \$$1" | grep -qsw $substr || eval "$1=\"\$$1 $substr\""
 	done
-	if [ -z "$depflag" ] ; then
+}
+
+# Function for required header file check
+# As gcc terminates after the first header file not found error, the headers
+# must be checked for individually.
+check_if_hdrs_exist()
+{
+	hdrflag=1
+	unset hdrnotfound
+	tmpprog=$(mktemp -t ydbinstallXXXXXX --suffix=.c)
+	for hdr in $hdrlist ; do
+		printf "%s\n" '#include <stddef.h>' '#include <stdarg.h>' '#include <stdio.h>' \
+			'#include <setjmp.h>' '#include "'$hdr'"' "int main() {}" >$tmpprog
+		if ! gcc -H --syntax-only $tmpprog 1>/dev/null 2>&1 ; then
+			hdrnotfound="$hdrnotfound $hdr" ; unset hdrflag
+		fi
+	done
+	\rm -f $tmpprog
+	if [ -z "$hdrflag" ] ; then
 		printf "%s" "$1" >&2
-		for dep in $depnotfound ; do
-			printf "%s" " $dep" >&2
+		for shlib in $hdrnotfound ; do
+			printf "%s" " $shlib" >&2
 		done
 		echo >&2
 		unset alldepflag
 	fi
 }
 
-alldepflag=1
-# List of dependencies that ydbinstall.sh needs and ensure they are present.
-deplist="awk basename cat cut expr gzip ldconfig chmod cp date dirname grep id head mkdir mktemp rm sed sort tar tr uname xargs"
-check_if_deps_exist "Program(s) required to run the ydbinstall/ydbinstall.sh script not found:"
-if [ -z "$alldepflag" ] ; then exit 1 ; fi
+# Function for required shared library check
+check_if_shlibs_exist()
+{
+	shlibflag=1
+	tmpliblist=$(mktemp -t ydbinstallXXXXXX --suffix=.txt)
+	$ldconfig -p >$tmpliblist
+	unset shlibnotfound
+	for shlib in $shliblist ; do
+		grep -Eqsw "$shlib"'[.[:digit:]]*' $tmpliblist || { shlibnotfound="$shlibnotfound $shlib" ; unset shlibflag ; }
+	done
+	\rm $tmpliblist
+	if [ -z "$shlibflag" ] ; then
+		printf "%s" "$1" >&2
+		for shlib in $shlibnotfound ; do
+			printf "%s" " $shlib" >&2
+		done
+		echo >&2
+		unset alldepflag
+	fi
+}
 
-# Ensure this is run from the directory in which it resides to avoid inadvertently deleting files
-cd `dirname $0`
+# Function for required utility check
+check_if_utils_exist()
+{
+	utilflag=1
+	unset utilnotfound
+	for util in $utillist ; do
+		command -v $util >/dev/null 2>&1 || command -v /sbin/$util >/dev/null 2>&1 || { utilnotfound="$utilnotfound $util" ; unset utilflag ; }
+	done
+	if [ -z "$utilflag" ] ; then
+		printf "%s" "$1" >&2
+		for util in $utilnotfound ; do
+			printf "%s" " $util" >&2
+		done
+		echo >&2
+		unset alldepflag
+	fi
+}
 
-# Ensure this is not being sourced so that environment variables in this file do not change the shell environment
-if [ "ydbinstall" != `basename -s .sh $0` ] ; then
-	echo "Please execute ydbinstall/ydbinstall.sh instead of sourcing it"
-	return
-fi
+# This function ensures that a target directory exists
+dirensure()
+{
+	if [ ! -d "$1" ] ; then
+		mkdir -p "$1"
+		if [ "Y" = "$gtm_verbose" ] ; then echo Directory "$1" created ; fi
+	fi
+}
 
-# Initialization. Create a unique timestamp. We use 1-second granularity time and a parent process id just in case
-# two invocations of ydbinstall.sh happen at the exact same second (YDB#855).
-timestamp=`date +%Y%m%d%H%M%S`_$$
-if [ -z "$USER" ] ; then USER=`id -un` ; fi
-
-# Other Functions
 dump_info()
 {
 	set +x
@@ -128,49 +167,52 @@ err_exit()
 	exit 1
 }
 
+# Output helpful information and exit. Note that tabulation in the file appears inconsistent, but
+# is required for consistent tabulation on output. Reasons are unclear, but what is below works.
 help_exit()
 {
 	set +x
 	echo "ydbinstall [option] ... [version]"
 	echo "Options are:"
-	echo "--aim			-> installs AIM plugin"
-	echo "--branch branchname	-> builds YottaDB from a specific git branch; use with --from-source"
-	echo "--build-type buildtype	-> type of YottaDB build, default is pro"
-	echo "--copyenv [dirname]	-> copy ydb_env_set, ydb_env_unset, and gtmprofile files to dirname, default /usr/local/etc; incompatible with linkenv"
-	echo "--copyexec [dirname]	-> copy ydb & gtm scripts to dirname, default /usr/local/bin; incompatible with linkexec"
-	echo "--debug			-> turn on debugging with set -x"
+	echo "--aim				-> installs AIM plugin"
+	echo "--branch branchname		-> builds YottaDB from a specific git branch; use with --from-source"
+	echo "--build-type buildtype		-> type of YottaDB build, default is pro"
+	echo "--copyenv [dirname]		-> copy ydb_env_set, ydb_env_unset, and gtmprofile files to dirname, default /usr/local/etc; incompatible with linkenv"
+	echo "--copyexec [dirname]		-> copy ydb & gtm scripts to dirname, default /usr/local/bin; incompatible with linkexec"
+	echo "--debug				-> turn on debugging with set -x"
 	echo "--distrib dirname or URL	-> source directory for YottaDB/GT.M distribution tarball, local or remote"
 	echo "--dry-run			-> do everything short of installing YottaDB, including downloading the distribution"
-	echo "--encplugin		-> compile and install the encryption plugin"
-	echo "--filename filename	-> name of YottaDB distribution tarball"
-	echo "--force-install		-> install even if the current platform is not Supported"
-	echo "--from-source repo	-> builds and installs YottaDB from a git repo; defaults to building the latest master from gitlab if not specified; check README for list of prerequisites to build from source"
-	echo "--group group		-> group that should own the YottaDB installation"
-	echo "--group-restriction	-> limit execution to a group; defaults to unlimited if not specified"
-	echo "--gtm			-> install GT.M instead of YottaDB"
-	echo "--gui			-> download and install the YottaDB GUI"
-	echo "--help			-> print this usage information"
-	echo "--installdir dirname	-> directory where YottaDB is to be installed; defaults to /usr/local/lib/yottadb/version"
-	echo "--keep-obj		-> keep .o files of M routines (normally deleted on platforms with YottaDB support for routines in shared libraries)"
-	echo "--linkenv [dirname]	-> create link in dirname to ydb_env_set, ydb_env_unset & gtmprofile files, default /usr/local/etc; incompatible with copyenv"
-	echo "--linkexec [dirname]	-> create link in dirname to ydb & gtm scripts, default /usr/local/bin; incompatible with copyexec"
-	echo "--nocopyenv		-> do not copy ydb_env_set, ydb_env_unset, and gtmprofile to another directory"
-	echo "--nocopyexec		-> do not copy ydb & gtm scripts to another directory"
-	echo "--nodeprecated		-> do not install deprecated components, specifically %DSEWRAP"
-	echo "--nolinkenv		-> do not create link to ydb_env_set, ydb_env_unset, and gtmprofile from another directory"
-	echo "--nolinkexec		-> do not create link to ydb & gtm scripts from another directory"
-	echo "--nopkg-config		-> do not create yottadb.pc for pkg-config, or update an existing file"
+	echo "--encplugin			-> compile and install the encryption plugin"
+	echo "--filename filename		-> name of YottaDB distribution tarball"
+	echo "--force-install			-> install even if the current platform is not Supported"
+	echo "--from-source repo		-> builds and installs YottaDB from a git repo; defaults to building the latest master from gitlab if not specified; check README for list of prerequisites to build from source"
+	echo "--group group			-> group that should own the YottaDB installation"
+	echo "--group-restriction		-> limit execution to a group; defaults to unlimited if not specified"
+	echo "--gtm				-> install GT.M instead of YottaDB"
+	echo "--gui				-> download and install the YottaDB GUI"
+	echo "--help				-> print this usage information"
+	echo "--installdir dirname		-> directory where YottaDB is to be installed; defaults to /usr/local/lib/yottadb/version"
+	echo "--keep-obj			-> keep .o files of M routines (normally deleted on platforms with YottaDB support for routines in shared libraries)"
+	echo "--linkenv [dirname]		-> create link in dirname to ydb_env_set, ydb_env_unset & gtmprofile files, default /usr/local/etc; incompatible with copyenv"
+	echo "--linkexec [dirname]		-> create link in dirname to ydb & gtm scripts, default /usr/local/bin; incompatible with copyexec"
+	echo "--nocopyenv			-> do not copy ydb_env_set, ydb_env_unset, and gtmprofile to another directory"
+	echo "--nocopyexec			-> do not copy ydb & gtm scripts to another directory"
+	echo "--nodeprecated			-> do not install deprecated components, specifically %DSEWRAP"
+	echo "--nolinkenv			-> do not create link to ydb_env_set, ydb_env_unset, and gtmprofile from another directory"
+	echo "--nolinkexec			-> do not create link to ydb & gtm scripts from another directory"
+	echo "--nopkg-config			-> do not create yottadb.pc for pkg-config, or update an existing file"
 	echo "--octo parameters		-> download and install Octo; also installs required POSIX and AIM plugins. Specify optional cmake parameters for Octo as necessary"
-	echo "--overwrite-existing	-> install into an existing directory, overwriting contents; defaults to requiring new directory"
-	echo "--plugins-only		-> just install plugins for an existing YottaDB installation, not YottaDB"
-	echo "--posix			-> download and install the POSIX plugin"
-	echo "--preserveRemoveIPC	-> do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
-	echo "--prompt-for-group	-> YottaDB installation script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
+	echo "--overwrite-existing		-> install into an existing directory, overwriting contents; defaults to requiring new directory"
+	echo "--plugins-only			-> just install plugins for an existing YottaDB installation, not YottaDB"
+	echo "--posix				-> download and install the POSIX plugin"
+	echo "--preserveRemoveIPC		-> do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
+	echo "--prompt-for-group		-> YottaDB installation script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
+	echo "--sodium			-> download and install the libsodium plugin"
 	echo "--ucaseonly-utils		-> install only upper case utility program names; defaults to both if not specified"
-	echo "--user username		-> user who should own YottaDB installation; default is root"
-	echo "--utf8                    -> install UTF-8 support"
+	echo "--user username			-> user who should own YottaDB installation; default is root"
+	echo "--utf8				-> install UTF-8 support"
 	echo "--verbose			-> output diagnostic information as the script executes; default is to run quietly"
-	echo "--zlib			-> download and install the zlib plugin"
+	echo "--zlib				-> download and install the zlib plugin"
 	echo "Options that take a value (e.g, --group) can be specified as either --option=value or --option value."
 	echo "Options marked with \"*\" are likely to be of interest primarily to YottaDB developers."
 	echo "Version is defaulted from yottadb file if one exists in the same directory as the installer."
@@ -184,55 +226,7 @@ help_exit()
 	echo ""
 	echo "As options are processed left to right, later options can override earlier options."
 	echo ""
-	exit 1
-}
-
-# This function ensures that a target directory exists
-dirensure()
-{
-	if [ ! -d "$1" ] ; then
-		mkdir -p "$1"
-		if [ "Y" = "$gtm_verbose" ] ; then echo Directory "$1" created ; fi
-	fi
-}
-
-mktmpdir()
-{
-	case `uname -s` in
-		AIX | SunOS) tmpdirname="/tmp/${USER}_$$_${timestamp}"
-			( umask 077 ; mkdir $tmpdirname ) ;;
-		HP-UX) tmpdirname=`mktemp`
-			( umask 077 ; mkdir $tmpdirname ) ;;
-		*) tmpdirname=`mktemp -d` ;;
-	esac
-	echo $tmpdirname
-}
-
-# This function is invoked whenever we detect an option that requires a value (e.g. --utf8) that is not
-# immediately followed by a =. In that case, the next parameter in the command line ($2) is the value.
-# We check if this parameter starts with a "--" as well and if so it denotes a different option and not a value.
-#
-# Input
-# -----
-# $1 for this function is the # of parameters remaining to be processed in command line
-# $2 for this function is the next parameter in the command line immediately after the current option (which has a -- prefix).
-#
-# Output
-# ------
-# returns 0 in case $2 is non-null and does not start with a "--"
-# returns 1 otherwise.
-#
-isvaluevalid()
-{
-	if [ 1 -lt "$1" ] ; then
-		# bash might have a better way for checking whether $2 starts with "--" than the grep done below
-		# but we want this script to run with sh so go with the approach that will work on all shells.
-		retval=`echo "$2" | grep -c '^--'`
-	else
-		# option (e.g. --utf8) is followed by no other parameters in the command line
-		retval=1
-	fi
-	echo $retval
+	exit
 }
 
 # This function gets the OS id from the file passed in as $1 (either /etc/os-release or ../build_os_release)
@@ -263,58 +257,39 @@ icu_version()
 
 # This function installs the selected plugins. Before calling it, $ydb_installdir and $tmpdir need to be set so that it can
 # find the right place to install the plugins and the right place to build the plugins respectively. This function will
-# set remove_tmpdir to 0 if one or more plugin builds fail.
+# set remove_tmpdir to 0 if one or more plugin builds fail. The order of the plugins is alphabetical in two groups: those
+# without dependencies, and a second group that has dependencies on plugins in the first group.
+
+# This function is invoked whenever we detect an option that requires a value (e.g. --utf8) that is not
+# immediately followed by a =. In that case, the next parameter in the command line ($2) is the value.
+# We check if this parameter starts with a "--" as well and if so it denotes a different option and not a value.
+#
+# Input
+# -----
+# $1 for this function is the # of parameters remaining to be processed in command line
+# $2 for this function is the next parameter in the command line immediately after the current option (which has a -- prefix).
+#
+# Output
+# ------
+# returns 0 in case $2 is non-null and does not start with a "--"
+# returns 1 otherwise.
+#
+isvaluevalid()
+{
+	if [ 1 -lt "$1" ] ; then
+		# bash might have a better way for checking whether $2 starts with "--" than the grep done below
+		# but we want this script to run with sh so go with the approach that will work on all shells.
+		retval=`echo "$2" | grep -c '^--'`
+	else
+		# option (e.g. --utf8) is followed by no other parameters in the command line
+		retval=1
+	fi
+	echo $retval
+}
+
 install_plugins()
 {
-	if [ "Y" = $ydb_posix ] ; then
-		echo "Now installing YDBPosix"
-		cd $tmpdir	# Get back to top level temporary directory as the current directory
-		mkdir posix_tmp
-		cd posix_tmp
-		export ydb_dist=${ydb_installdir}
-		if wget ${wget_flags} ${PWD} https://gitlab.com/YottaDB/Util/YDBPosix/-/archive/master/YDBPosix-master.tar.gz; then
-			tar xzf YDBPosix-master.tar.gz
-			cd YDBPosix-master
-			mkdir build && cd build
-			${cmakecmd} ../
-			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
-				# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
-				cd ../../..
-				rm -R posix_tmp
-			else
-				echo "YDBPosix build failed. The build directory ($PWD) has been saved."
-				remove_tmpdir=0
-			fi
-		else
-			echo "Unable to download YDBPosix. Your internet connection and/or the gitlab servers may be down. Please try again later."
-			remove_tmpdir=0
-		fi
-	fi
-
-	if [ "Y" = $ydb_aim ] ; then
-		echo "Now installing YDBAIM"
-		cd $tmpdir
-		mkdir aim_tmp
-		cd aim_tmp
-		export ydb_dist=${ydb_installdir}
-		if wget ${wget_flags} ${PWD} https://gitlab.com/YottaDB/Util/YDBAIM/-/archive/master/YDBAIM-master.tar.gz; then
-			tar xzf YDBAIM-master.tar.gz
-			cd YDBAIM-master
-			mkdir build && cd build
-			${cmakecmd} ../
-			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
-				# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
-				cd ../../..
-				rm -R aim_tmp
-			else
-				echo "YDBAIM build failed. The build directory ($PWD) has been saved."
-				remove_tmpdir=0
-			fi
-		else
-			echo "Unable to download YDBAIM. Your internet connection and/or the gitlab servers may be down. Please try again later"
-			remove_tmpdir=0
-		fi
-	fi
+	if [ "Y" = $ydb_aim ] ; then install_std_plugin Util YDBAIM ; fi
 
 	if [ "Y" = $ydb_encplugin ] ; then
 		echo "Now installing YDBEncrypt"
@@ -322,14 +297,14 @@ install_plugins()
 		mkdir enc_tmp
 		cd enc_tmp
 		export ydb_dist=${ydb_installdir}
-		if wget ${wget_flags} ${PWD} https://gitlab.com/YottaDB/Util/YDBEncrypt/-/archive/master/YDBEncrypt-master.tar.gz; then
+		if wget ${wget_flags} ${PWD} https://gitlab.com/YottaDB/Util/YDBEncrypt/-/archive/master/YDBEncrypt-master.tar.gz 2>enc.err 1>enc.out; then
 			tar xzf YDBEncrypt-master.tar.gz
 			cd YDBEncrypt-master
-			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
+			if make -j `grep -c ^processor /proc/cpuinfo` 2>>../enc.err 1>>../enc.out && make install 2>>../enc.err 1>>../enc.out; then
 				# Save the build directory if the make install command returns a non-zero exit code. Otherwise, remove it.
+				if [ "Y" = "$gtm_verbose" ] ; then cat ../enc.err ../enc.out ; fi
 				cd ../..
-				rm -R enc_tmp
-
+				\rm -R enc_tmp
 				# rename gtmcrypt to ydbcrypt and create a symbolic link for backward compatibility
 				mv ${ydb_installdir}/plugin/gtmcrypt ${ydb_installdir}/plugin/ydbcrypt
 				ln -s ${ydb_installdir}/plugin/ydbcrypt ${ydb_installdir}/plugin/gtmcrypt
@@ -345,16 +320,25 @@ install_plugins()
 		fi
 	fi
 
+	if [ "Y" = "$ydb_posix" ] ; then install_std_plugin Util YDBPosix ; fi
+
+	if [ "Y" = "$ydb_sodium" ] ; then install_std_plugin Util YDBSodium ; fi
+
+	if [ "Y" = "$ydb_gui" ] ; then install_std_plugin UI YDBGUI ; fi
+
+	if [ "Y" = $ydb_octo ] ; then install_std_plugin DBMS YDBOcto ; fi
+
 	if [ "Y" = $ydb_zlib ] ; then
 		echo "Now installing YDBZlib"
 		cd $tmpdir	# Get back to top level temporary directory as the current directory
 		mkdir zlib_tmp
 		cd zlib_tmp
-		if wget ${wget_flags} ${PWD} https://gitlab.com/YottaDB/Util/YDBZlib/-/archive/master/YDBZlib-master.tar.gz; then
+		if wget ${wget_flags} ${PWD} https://gitlab.com/YottaDB/Util/YDBZlib/-/archive/master/YDBZlib-master.tar.gz 1>zlib.log 2>&1; then
 			tar xzf YDBZlib-master.tar.gz
 			cd YDBZlib-master
-			if gcc -c -fPIC -I${ydb_installdir} gtmzlib.c && gcc -o libgtmzlib.so -shared gtmzlib.o; then
+			if gcc -c -fPIC -I${ydb_installdir} gtmzlib.c && gcc -o libgtmzlib.so -shared gtmzlib.o 1>>../zlib.log 2>&1; then
 				# Save the build directory if either of the gcc commands return a non-zero exit code. Otherwise, remove it.
+				if [ "Y" = "$gtm_verbose" ] ; then cat ../zlib.log ; fi
 				cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
 				cp _ZLIB.m ${ydb_installdir}/plugin/r
 				if [ "Y" = $ydb_utf8 ] ; then
@@ -369,7 +353,7 @@ install_plugins()
 				${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
 				cp _ZLIB.o ${ydb_installdir}/plugin/o
 				cd ../..
-				rm -R zlib_tmp
+				\rm -R zlib_tmp
 			else
 				echo "YDBZlib build failed. The build directory ($PWD/zlib_tmp) has been saved."
 				remove_tmpdir=0
@@ -379,78 +363,99 @@ install_plugins()
 			remove_tmpdir=0
 		fi
 	fi
+}
 
-	if [ "Y" = $ydb_gui ] ; then
-		echo "Now installing YDBGUI"
-		cd $tmpdir	# Get back to top level temporary directory as the current directory
-		export ydb_dist=${ydb_installdir}
-		if git clone https://gitlab.com/YottaDB/UI/YDBGUI.git YDBGUI-master; then
-			cd YDBGUI-master
-			mkdir build && cd build
-			if cmake .. && make && make install; then
-				cd ../..
-				rm -R YDBGUI-master
-			else
-				echo "YDBGUI build failed. The build directory ($PWD/YDBGUI-master) has been savd."
-				remove_tmpdir=0
-			fi
+# Install a standard plugin.
+# - $1 is the subdirectory of https://gitlab.com/YottaDB where the plugin is located
+# - $2 is the name of the plugin
+install_std_plugin()
+{
+	echo "Now installing $2"
+	cd $tmpdir
+	mkdir ${2}_tmp ; cd ${2}_tmp
+	export ydb_dist=${ydb_installdir}
+	if git clone --depth 1 https://gitlab.com/YottaDB/$1/$2.git $2-master 2>${2}.err 1>${2}.out ; then
+		mkdir ${2}-master/build && cd ${2}-master/build
+		# Build the plugin, saving the directory if the build fails
+		if ( ${cmakecmd} .. && ${cmakecmd} --build . -j $(getconf _NPROCESSORS_ONLN) && ${cmakecmd} --install . ) 2>>${2}.err 1>>${2}.out ; then
+			if [ "Y" = "$gtm_verbose" ] ; then cat ${2}.out ; fi
+			cd ../../../.. ; \rm -rf ${2}_tmp
 		else
-			echo "Unable to download YDBGUI. Your internet connection and/or the gitlab servers may be down. Please try again later."
+			echo "$2 build failed. The build directory ($PWD) has been saved."
 			remove_tmpdir=0
+			cd ../../..
 		fi
-	fi
-
-	if [ "Y" = $ydb_octo ] ; then
-		echo "Now installing YDBOcto"
-		cd $tmpdir	# Get back to top level temporary directory as the current directory
-		export ydb_dist=${ydb_installdir}
-		if git clone https://gitlab.com/YottaDB/DBMS/YDBOcto.git YDBOcto-master; then
-			cd YDBOcto-master
-			mkdir build
-			cd build
-			${cmakecmd} ${octo_cmake} ../
-			if make -j `grep -c ^processor /proc/cpuinfo` && make install; then
-				# Save the build directory if either of the make commands return a non-zero exit code. Otherwise, remove it.
-				cd ../..
-				rm -R YDBOcto-master
-			else
-				echo "YDBOcto build failed. The build directory ($PWD/YDBOcto-master) and the tarball ($PWD/YDBOcto-master.tar.gz) have been saved."
-				remove_tmpdir=0
-			fi
-		else
-			echo "Unable to download YDBOcto. Your internet connection and/or the gitlab servers may be down. Please try again later."
-			remove_tmpdir=0
-		fi
+	else
+		echo "Unable to download $2. Your Internet connection and/or the GitLab servers may have issues. Please try again later."
+		remove_tmpdir=0
+		cd ../../..
 	fi
 }
 
+mktmpdir()
+{
+	case `uname -s` in
+		AIX | SunOS) tmpdirname="/tmp/${USER}_$$_${timestamp}"
+			( umask 077 ; mkdir $tmpdirname ) ;;
+		HP-UX) tmpdirname=`mktemp`
+			( umask 077 ; mkdir $tmpdirname ) ;;
+		*) tmpdirname=`mktemp -d` ;;
+	esac
+	echo $tmpdirname
+}
+
+# Turn on debugging if set
+if [ "Y" = "$ydb_debug" ] ; then set -x ; fi
+
+alldepflag=1
+# List of dependencies that ydbinstall.sh needs and ensure they are present.
+utillist="awk basename cat cut expr gzip ldconfig chmod cp date dirname grep id head mkdir mktemp rm sha256sum sed sort tar tr uname"
+check_if_utils_exist "Program(s) required to run the ydbinstall/ydbinstall.sh script not found:"
+if [ -z "$alldepflag" ] ; then err_exit ; fi
+
+# Ensure this is run from the directory in which it resides to avoid inadvertently deleting files
+cd `dirname $0`
+
+# Ensure this is not being sourced so that environment variables in this file do not change the shell environment
+if [ "ydbinstall" != `basename -s .sh $0` ] ; then
+	echo "Please execute ydbinstall/ydbinstall.sh instead of sourcing it"
+	return
+fi
+
+# Initialization. Create a unique timestamp. We use 1-second granularity time and a parent process id just in case
+# two invocations of ydbinstall.sh happen at the exact same second (YDB#855).
+timestamp=`date +%Y%m%d%H%M%S`_$$
+if [ -z "$USER" ] ; then USER=`id -un` ; fi
+
+
 # Defaults that can be over-ridden by command line options to follow
 # YottaDB prefixed versions:
+if [ -z "$ydb_aim" ] ; then ydb_aim="N" ; fi
 if [ -n "$ydb_buildtype" ] ; then gtm_buildtype="$ydb_buildtype" ; fi
-if [ -n "$ydb_keep_obj" ] ; then gtm_keep_obj="$ydb_keep_obj" ; fi
+if [ -z "$ydb_change_removeipc" ] ; then ydb_change_removeipc="yes" ; fi
+if [ -z "$ydb_deprecated" ] ; then ydb_deprecated="Y" ; fi
 if [ -n "$ydb_dryrun" ] ; then gtm_dryrun="$ydb_dryrun" ; fi
+if [ -z "$ydb_encplugin" ] ; then ydb_encplugin="N" ; fi
 if [ -n "$ydb_group_restriction" ] ; then gtm_group_restriction="$ydb_group_restriction" ; fi
 if [ -n "$ydb_gtm" ] ; then gtm_gtm="$ydb_gtm" ; fi
 if [ -z "$ydb_gui" ] ; then ydb_gui="N" ; fi
+if [ -n "$ydb_keep_obj" ] ; then gtm_keep_obj="$ydb_keep_obj" ; fi
 if [ -n "$ydb_lcase_utils" ] ; then gtm_lcase_utils="$ydb_lcase_utils" ; fi
-if [ -n "$ydb_overwrite_existing" ] ; then gtm_overwrite_existing="$ydb_overwrite_existing" ; fi
-if [ -n "$ydb_prompt_for_group" ] ; then gtm_prompt_for_group="$ydb_prompt_for_group" ; fi
-if [ -n "$ydb_verbose" ] ; then gtm_verbose="$ydb_verbose" ; fi
-if [ -z "$ydb_change_removeipc" ] ; then ydb_change_removeipc="yes" ; fi
-if [ -z "$ydb_deprecated" ] ; then ydb_deprecated="Y" ; fi
-if [ -z "$ydb_encplugin" ] ; then ydb_encplugin="N" ; fi
-if [ -z "$ydb_posix" ] ; then ydb_posix="N" ; fi
-if [ -z "$ydb_aim" ] ; then ydb_aim="N" ; fi
 if [ -z "$ydb_octo" ] ; then ydb_octo="N" ; fi
-if [ -z "$ydb_zlib" ] ; then ydb_zlib="N" ; fi
-if [ -z "$ydb_utf8" ] ; then ydb_utf8="N" ; fi
+if [ -n "$ydb_overwrite_existing" ] ; then gtm_overwrite_existing="$ydb_overwrite_existing" ; fi
 if [ -z "$ydb_plugins_only" ] ; then ydb_plugins_only="N" ; fi
+if [ -z "$ydb_posix" ] ; then ydb_posix="N" ; fi
+if [ -n "$ydb_prompt_for_group" ] ; then gtm_prompt_for_group="$ydb_prompt_for_group" ; fi
+if [ -z "$ydb_sodium" ] ; then ydb_sodium="N" ; fi
+if [ -n "$ydb_verbose" ] ; then gtm_verbose="$ydb_verbose" ; fi
+if [ -z "$ydb_utf8" ] ; then ydb_utf8="N" ; fi
+if [ -z "$ydb_zlib" ] ; then ydb_zlib="N" ; fi
 # GTM prefixed versions (for backwards compatibility)
 if [ -z "$gtm_buildtype" ] ; then gtm_buildtype="pro" ; fi
-if [ -z "$gtm_keep_obj" ] ; then gtm_keep_obj="N" ; fi
 if [ -z "$gtm_dryrun" ] ; then gtm_dryrun="N" ; fi
 if [ -z "$gtm_group_restriction" ] ; then gtm_group_restriction="N" ; fi
 if [ -z "$gtm_gtm" ] ; then gtm_gtm="N" ; fi
+if [ -z "$gtm_keep_obj" ] ; then gtm_keep_obj="N" ; fi
 if [ -z "$gtm_lcase_utils" ] ; then gtm_lcase_utils="Y" ; fi
 if [ -z "$gtm_linkenv" ] ; then gtm_linkenv="/usr/local/etc" ; fi
 if [ -z "$gtm_linkexec" ] ; then gtm_linkexec="/usr/local/bin" ; fi
@@ -465,6 +470,14 @@ ydb_force_install="N"
 # Process command line
 while [ $# -gt 0 ] ; do
 	case "$1" in
+		--aim) ydb_aim="Y" ; shift ;;
+		--allplugins)  ydb_aim="Y"
+			ydb_encplugin="Y"
+			ydb_gui="Y"
+			ydb_octo="Y"
+			ydb_posix="Y"
+			ydb_sodium="Y"
+			ydb_zlib="Y" ; shift ;;
 		--branch*) tmp=`echo $1 | cut -s -d = -f 2-`
 			if [ -n "$tmp" ] ; then ydb_branch=$tmp
 			else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then ydb_branch=$2 ; shift
@@ -564,15 +577,19 @@ while [ $# -gt 0 ] ; do
 		--octo*) tmp=`echo $1 | cut -s -d = -f 2-`
 			if [ -n "$tmp" ] ; then octo_cmake=$tmp ; fi
 			ydb_octo="Y" ;
-			ydb_posix="Y" ;
+			# If Octo, force installation of AIM and POSIX plugins to ensure
+			# that the latest versions are being installed. This may require
+			# the --overwrite-existing flag to be specified in case one of those
+			# plugins exists, but Octo does not.
 			ydb_aim="Y";
+			ydb_posix="Y" ;
 			shift ;;
 		--overwrite-existing) gtm_overwrite_existing="Y" ; shift ;;
 		--plugins-only) ydb_plugins_only="Y" ; shift ;;
 		--posix) ydb_posix="Y" ; shift ;;
-		--aim) ydb_aim="Y" ; shift ;;
 		--preserveRemoveIPC) ydb_change_removeipc="no" ; shift ;; # must come before group*
 		--prompt-for-group) gtm_prompt_for_group="Y" ; shift ;;
+		--sodium) ydb_sodium="Y" ; shift ;;
 		--ucaseonly-utils) gtm_lcase_utils="N" ; shift ;;
 		--user*) tmp=`echo $1 | cut -s -d = -f 2-`
 			if [ -n "$tmp" ] ; then gtm_user=$tmp
@@ -621,82 +638,78 @@ else
 	wget_flags="-qP"
 fi
 
-alldepflag=1
 # Add dependencies that the rest of the script and configure.gtc (which ydbinstall.sh calls) needs and ensure they are present.
-deplist="$deplist groups getconf chown chgrp file install ld ln locale strip touch wc wget"
-# Check for required dependencies and exit if any are not found
-check_if_deps_exist "Program(s) required to install YottaDB not found:"
+utillist="$utillist groups getconf chown chgrp file install ld ln locale strip touch wc wget"
+check_if_utils_exist "Program(s) required to install YottaDB not found:"
 
 # Add dependencies for normal YottaDB operation.
-deplist="nm realpath"
+utillist="nm realpath"
 arch=`uname -m`
 if [ "armv6l" = "$arch" ] || [ "armv7l" = "$arch" ] ; then
 	# ARM platform additionally requires cc (in configure.gtc) to use as the system linker.
-	deplist="$deplist cc"
+	utillist="$utillist cc"
 fi
 
-# Check for required dependencies and exit if any are not found
-check_if_deps_exist "Program(s) required to run YottaDB not found:"
+# Check for other required dependencies. Note that dependencies YottaDB requires
+# separately checked for first, and even if only plugins are to be installed,
+# as YottaDB is required for any plugin to work.
+check_if_utils_exist "Program(s) required by YottaDB not found:"
 
-# Check for additional dependencies beyond those for YottaDB
+ldconfig=$(command -v ldconfig || command -v /sbin/ldconfig)
+# Check for libraries required by YottaDB
+shliblist="libelf.so"
+if [ "Y" = "$ydb_utf8" ] ; then append_to_str shliblist "libicuio.so" ; fi
+check_if_shlibs_exist "Shared library/libraries required by YottaDB not found:"
+
+# Check for additional dependencies beyond those for YottaDB.
+unset hdrlist shliblist utillist
+
 # YDBAIM
-unset deplist
 if [ "Y" = $ydb_aim ] ; then
-	deplist="gcc git cmake make pkg-config"
-	check_if_deps_exist "Program(s) required to install YDBAIM not found:"
+	append_to_str utillist "gcc git cmake make pkg-config"
 fi
+
 # Encryption plugin
-unset deplist
 if [ "Y" = "$ydb_encplugin" ] ; then
-	deplist="gcc make tcsh"
-	check_if_deps_exist "Program(s) required to install the encryption plugin not found:"
+	append_to_str utillist "gcc make tcsh"
+	append_to_str shliblist "libconfig.so libssl.so"
+	append_to_str hdrlist "gcrypt.h gpg-error.h gpgme.h libconfig.h \
+		openssl/bio.h openssl/err.h openssl/evp.h openssl/ssl.h"
 fi
 # GUI
-unset deplist
 if [ "Y" = $ydb_gui ] ; then
-	deplist="cmake cp df gcc git grep pkg-config ps rm stat"
-	check_if_deps_exist "Program(s) required to install the GUI not found:"
+	append_to_str utillist "cmake cp df gcc git grep pkg-config ps rm stat"
 fi
 # Octo
-unset deplist
 if [ "Y" = "$ydb_octo" ] ; then
-	deplist="bison cmake flex gcc git gzip make pkg-config"
-	check_if_deps_exist "Program(s) required to install Octo not found:"
+	append_to_str utillist "bison cmake flex gcc git gzip make pkg-config"
+	append_to_str shliblist "libconfig.so libreadline.so"
+	append_to_str hdrlist "endian.h getopt.h libconfig.h \
+		openssl/conf.h openssl/err.h openssl/evp.h openssl/md5.h openssl/ssl.h \
+		readline/history.h readline/readline.h sys/syscall.h"
 fi
-# POSIX plugin
-unset deplist
+# POSIX plugin; note that all required headers are part of the POSIX standard
 if [ "Y" = "$ydb_posix" ] ; then
-	deplist="cmake gcc git make pkg-config"
-	check_if_deps_exist "Program(s) required to install Posix plugin not found:"
+	append_to_str utillist "cmake gcc git make pkg-config"
 fi
 
-# zlib plugin
-unset deplist
+# Zlib plugin; note that all required headers are part of the POSIX standard
 if [ "Y" = "$ydb_zlib" ] ; then
-	deplist="gcc"
-	check_if_deps_exist "Program(s) required to install the Zlib plugin not found:"
+	append_to_str utillist "gcc"
+	append_to_str shliblist "libz.so"
 fi
-
-# Check for required libraries
-ldconfig=$(command -v ldconfig || command -v /sbin/ldconfig)
-ydb_tmp_stat1=0
-$ldconfig -p | grep -qs /libelf.so ; ydb_tmp_stat1=$?
-if [ 0 -ne $ydb_tmp_stat1 ] ; then
-	echo >&2 "Library libelf.so is needed by YottaDB but not found."
-	unset alldepflag
+# libsodium plugin
+if [ "Y" = "$ydb_sodium" ] ; then
+	append_to_str utillist "cmake gcc git make"
+	append_to_str hdrlist "sodium.h"
 fi
-ydb_tmp_stat2=0
-# If UTF-8 support is requested, but libicuio is not found, issue an error and exit
-if [ "Y" = "$ydb_utf8" ] ; then
-	$ldconfig -p | grep -qs /libicuio ; ydb_tmp_stat2=$?
-	if [ 0 -ne $ydb_tmp_stat2 ] ; then
-		echo >&2 "UTF-8 support requested but libicuio.so not found."
-		unset alldepflag
-	fi
-fi
+# Check for required header files, shared libraries and utility programs
+check_if_utils_exist "Program(s) required to install selected plugins not found:"
+check_if_shlibs_exist "Shared library/libraries required by selected plugins not found:"
+check_if_hdrs_exist "Header file(s) required by selected plugins not found:"
 
 # Exit with an error if any dependencies are not met
-if [ -z "$alldepflag" ] ; then exit 1 ; fi
+if [ -z "$alldepflag" ] ; then err_exit ; fi
 
 # Check / set userids and groups
 if [ -z "$gtm_user" ] ; then gtm_user=$USER
@@ -705,7 +718,7 @@ elif [ "$gtm_user" != "`id -un $gtm_user`" ] ; then
 fi
 if [ "root" = $USER ] ; then
 	if [ -z "$gtm_group" ] ; then gtm_group=`id -gn`
-	elif [ "root" != "$gtm_user" ] && [ "$gtm_group" != "`id -Gn $gtm_user | xargs -n 1 | grep $gtm_group`" ] ; then
+	elif [ "root" != "$gtm_user" ] && { id -Gn $gtm_user | grep -qsvw $gtm_group ; } ; then
 		echo $gtm_user is not a member of $gtm_group ; err_exit
 	fi
 else
@@ -831,7 +844,7 @@ if [ -n "$ydb_from_source" ] ; then
 	# Now that we have the full set of options, run ydbinstall
 	if ./ydbinstall ${install_options} ; then
 		# Install succeeded. Exit with code 0 (success)
-		rm -r $ydbinstall_tmp
+		\rm -r $ydbinstall_tmp
 		exit 0
 	else
 		echo "Install failed. Temporary directory $ydbinstall_tmp will not be deleted."
@@ -883,60 +896,57 @@ if [ "Y" = "$ydb_plugins_only" ]; then
 	if [ ! -e $ydb_installdir/yottadb ] ; then
 		echo "YottaDB not found at $ydb_installdir. Exiting" ; err_exit
 	fi
-	# Check if UTF8 is installed.
-	if [ "Y" != "$ydb_utf8" ] ; then
-		# ydb_found_or_requested_icu_version has NOT already been determined.
-		if [ -d "$ydb_installdir/utf8" ] ; then
-			ydb_utf8="Y"
-			ydb_found_or_requested_icu_version=`icu_version`
-			# Now that we determined the icu version, set ydb_icu_version env var as well.
-			ydb_icu_version=$ydb_found_or_requested_icu_version
-			export ydb_icu_version
-		else
-			ydb_utf8="N"
-		fi
+	# If YottaDB is installed with UTF-8, we need that to install plugins
+	if [ -d "$ydb_installdir/utf8" ] ; then
+		ydb_utf8="Y"
+		ydb_found_or_requested_icu_version=`icu_version`
+		# Now that we determined the icu version, set ydb_icu_version env var as well.
+		ydb_icu_version=$ydb_found_or_requested_icu_version
+		export ydb_icu_version
+	else
+		ydb_utf8="N"
 	fi
 	# else "$ydb_found_or_requested_icu_version" would already be set because the user had specified the --utf8 option
 	# Check that the plugins aren't already installed or that --overwrite-existing is selected
-	# Since selected --octo automatically selects --posix and --aim, we continue the install
+	# Since selecting --octo automatically selects --posix and --aim, we continue the install
 	# without overwriting if --aim and/or --posix is already installed and --octo is selected.
+	nooverwrite=1
 	if [ "Y" != "$gtm_overwrite_existing" ] ; then
+		msgsuffix="already installed and --overwrite-existing not specified."
+		if [ "Y" = $ydb_aim ] && [ -e $ydb_installdir/plugin/o/_ydbaim.so ] ; then
+			echo YDBAIM $msgsuffix ; unset nooverwrite
+		fi
 		if [ "Y" = $ydb_encplugin ] && [ -e $ydb_installdir/plugin/libgtmcrypt.so ] ; then
-			echo "YDBEncrypt already installed and --overwrite-existing not specified. Exiting." ; err_exit
+			echo YDBEncrypt $msgsuffix ; unset nooverwrite
 		fi
 		if [ "Y" = $ydb_gui ] && [ -e $ydb_installdir/plugin/o/_ydbgui.so ] ; then
-			echo "YDBGUI already installed and --overwrite-existing not specified. Exiting." ; err_exit
+			echo YDBGUI $msgsuffix ; unset nooverwrite
+		fi
+		if [ "Y" = $ydb_octo ] && [ -d $ydb_installdir/plugin/octo ] ; then
+			echo "YDBOcto $msgsuffix" ; unset nooverwrite
 		fi
 		if [ "Y" = $ydb_posix ] && [ -e $ydb_installdir/plugin/libydbposix.so ] ; then
-			if [ "Y" = $ydb_octo ] ; then
-				echo "YDBPosix already installed. Continuing YDBOcto install. Specify --overwrite-existing to overwrite YDBPosix."
-				ydb_posix="N"
-			else
-				echo "YDBPosix already installed and --overwrite-existing not specified. Exiting." ; err_exit
-			fi
+			echo YDBPOSIX $msgsuffix ; unset nooverwrite
 		fi
-		if [ "Y" = $ydb_aim ] && [ -e $ydb_installdir/plugin/o/_ydbaim.so ] ; then
-			if [ "Y" = $ydb_octo ] ; then
-				echo "YDBAIM already installed. Continuing YDBOcto install. Specify --overwrite-existing to overwrite YDBAIM."
-				ydb_aim="N"
-			else
-				echo "YDBAIM already installed and --overwrite-existing not specified. Exiting." ; err_exit
-			fi
+		if [ "Y" = $ydb_sodium ] && [ -e $ydb_installdir/plugin/libsodium.so ] ; then
+			echo YDBSodium $msgsuffix ; unset nooverwrite
 		fi
 		if [ "Y" = $ydb_zlib ] && [ -e $ydb_installdir/plugin/libgtmzlib.so ] ; then
-			echo "YDBZlib already installed and --overwrite-existing not specified. Exiting." ; err_exit
-		fi
-
-		if [ "Y" = $ydb_octo ] && [ -d $ydb_installdir/plugin/octo ] ; then
-			echo "YDBOcto already installed and --overwrite-existing not specified. Exiting." ; err_exit
+			echo "YDBZlib $msgsuffix" ; unset nooverwrite
 		fi
 	fi
-	tmpdir=`mktmpdir`	# used by the "install_plugins" function call below.
-	remove_tmpdir=1		# Assume the plugin installs will be successful by default.
-	install_plugins		# sets "remove_tmpdir" to 0 if there was an error installing one or more plugins
-	if [ 0 = "$remove_tmpdir" ] ; then exit 1; fi	# error seen while installing one or more plugins
-	rm -rf $tmpdir	# Now that we know it is safe to remove $tmpdir, do that before returning normal status
-	exit 0
+	if [ "Y" = "$gtm_dryrun" ] ; then exit 0 ; fi
+	if [ -z "$nooverwrite" ] ; then
+		err_exit
+	else
+		tmpdir=`mktmpdir`
+		ydb_routines="$tmp($ydb_installdir)" ; export ydb_routines
+		remove_tmpdir=1 # remove the tmpdir if the plugin installs are successful
+		install_plugins
+		if [ 0 = "$remove_tmpdir" ] ; then err_exit; fi	# error seen while installing one or more plugins
+		\rm -rf $tmpdir	# Now that we know it is safe to remove $tmpdir, do that before returning normal status
+		exit 0
+	fi
 fi
 
 if [ "N" = "$ydb_force_install" ]; then
@@ -1045,7 +1055,7 @@ if [ -z "$ydb_version" ] ; then
 				chmod +x $ydb_dist/yottadb
 			else
 				echo >&2 "$ydb_dist/yottadb is not executable and script is not run as root"
-				exit 1
+				err_exit
 			fi
 		fi
 		tmp=`mktmpdir`
@@ -1053,9 +1063,9 @@ if [ -z "$ydb_version" ] ; then
 		# shellcheck disable=SC2016
 		if ! ydb_version=`$ydb_dist/yottadb -run %XCMD 'write $piece($zyrelease," ",2)' 2>&1`; then
 			echo >&2 "$ydb_dist/yottadb -run %XCMD 'write $piece($zyrelease," ",2)' failed with output $ydb_version"
-			exit 1
+			err_exit
 		fi
-		rm -rf $tmp
+		\rm -rf $tmp
 	fi
 fi
 if [ "Y" = "$gtm_verbose" ] ; then
@@ -1331,7 +1341,7 @@ else gtm_configure_in=${tmpdir}/configure_${timestamp}.in
 fi
 export ydb_change_removeipc			# Signal configure.gtc to set RemoveIPC=no or not, if needed
 issystemd=`command -v systemctl`
-if [ "" != "$issystemd" ] ; then
+if [ "N" = "$gtm_dryrun" ] && [ "" != "$issystemd" ] ; then
 	# It is a systemd installation
 	# Check if RemoveIPC=no is set. If not, set it if user hasn't specified --preserveRemoveIPC
 	logindconf="/etc/systemd/logind.conf"
@@ -1391,7 +1401,7 @@ fi
 # Stop here if this is a dry run
 if [ "Y" = "$gtm_dryrun" ] ; then echo "Terminating without making any changes as --dry-run specified" ; exit ; fi
 
-if [ -e configure.sh ] ; then rm -f configure.sh ; fi
+if [ -e configure.sh ] ; then \rm -f configure.sh ; fi
 
 tmp=`head -1 configure | cut -f 1`
 if [ "#!/bin/sh" != "$tmp" ] ; then
@@ -1403,37 +1413,39 @@ chmod +x configure.sh
 if ! sh -x ./configure.sh <$gtm_configure_in 1> $gtm_tmpdir/configure_${timestamp}.out 2>$gtm_tmpdir/configure_${timestamp}.err; then
 	echo "configure.sh failed. Output follows"
 	cat $gtm_tmpdir/configure_${timestamp}.out $gtm_tmpdir/configure_${timestamp}.err
-	exit 1
+	err_exit
 fi
 
-rm -rf ${tmpdir:?}/*	# Now that install is successful, remove everything under temporary directory
-			# We might still need this temporary directory for installing optional plugins (encplugin, posix etc.)
-			# if they have been specified in the ydbinstall.sh command line. Not having a valid current directory
-			# will cause YDB-E-SYSCALL errors from "getcwd()" in ydb_env_set calls made later.
 if [ "Y" = "$gtm_gtm" ] ; then
 	product_name="GT.M"
 else
 	product_name="YottaDB"
+	# Add ydbinstall to the installation if the installation was a YottaDB installation
+	cp ydbinstall $ydb_installdir
 fi
+\rm -rf ${tmpdir:?}/*	# Now that install is successful, remove everything under temporary directory
+			# We might still need this temporary directory for installing optional plugins (encplugin, posix etc.)
+			# if they have been specified in the ydbinstall.sh command line. Not having a valid current directory
+			# will cause YDB-E-SYSCALL errors from "getcwd()" in ydb_env_set calls made later.
 echo $product_name version $ydb_version installed successfully at $ydb_installdir
 
 # Create copies of, or links to, environment scripts and ydb & gtm executables
 if [ -n "$gtm_linkenv" ] ; then
 	dirensure $gtm_linkenv
-	( cd $gtm_linkenv ; rm -f ydb_env_set ydb_env_unset gtmprofile ; ln -s $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
+	( cd $gtm_linkenv ; \rm -f ydb_env_set ydb_env_unset gtmprofile ; ln -s $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
 	if [ "Y" = "$gtm_verbose" ] ; then echo Linked env ; ls -l $gtm_linkenv ; fi
 elif [ -n "$gtm_copyenv" ] ; then
 	dirensure $gtm_copyenv
-	( cd $gtm_copyenv ; rm -f ydb_env_set ydb_env_unset gtmprofile ; cp -P $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
+	( cd $gtm_copyenv ; \rm -f ydb_env_set ydb_env_unset gtmprofile ; cp -P $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
 	if [ "Y" = "$gtm_verbose" ] ; then echo Copied env ; ls -l $gtm_copyenv ; fi
 fi
 if [ -n "$gtm_linkexec" ] ; then
 	dirensure $gtm_linkexec
-	( cd $gtm_linkexec ; rm -f ydb gtm ; ln -s $ydb_installdir/ydb $ydb_installdir/gtm ./ )
+	( cd $gtm_linkexec ; \rm -f ydb gtm ; ln -s $ydb_installdir/ydb $ydb_installdir/gtm ./ )
 	if [ "Y" = "$gtm_verbose" ] ; then echo Linked exec ; ls -l $gtm_linkexec ; fi
 elif [ -n "$gtm_copyexec" ] ; then
 	dirensure $gtm_copyexec
-	( cd $gtm_copyexec ; rm -f ydb gtm ; cp -P $ydb_installdir/ydb $ydb_installdir/gtm ./ )
+	( cd $gtm_copyexec ; \rm -f ydb gtm ; cp -P $ydb_installdir/ydb $ydb_installdir/gtm ./ )
 	if [ "Y" = "$gtm_verbose" ] ; then echo Copied exec ; ls -l $gtm_copyexec ; fi
 fi
 
@@ -1479,7 +1491,7 @@ remove_tmpdir=1	# It is okay to remove $tmpdir at the end assuming ydbinstall is
 
 install_plugins
 
-if [ 0 = "$remove_tmpdir" ] ; then exit 1; fi	# error seen while installing one or more plugins
+if [ 0 = "$remove_tmpdir" ] ; then err_exit; fi	# error seen while installing one or more plugins
 
-rm -rf $tmpdir	# Now that we know it is safe to remove $tmpdir, do that before returning normal status
+\rm -rf $tmpdir	# Now that we know it is safe to remove $tmpdir, do that before returning normal status
 exit 0

@@ -52,7 +52,7 @@ fi
 # which exist in both directories.
 
 if [ -d utf8 ]; then
-	(cd utf8; ln -s ../* . 2> /dev/null; rm utf8; exit 0)
+	(cd utf8; ln -s ../* . 2> /dev/null; \rm utf8; exit 0)
 fi
 
 # Native shared library extension.
@@ -196,7 +196,7 @@ fi
 chown $owner tmp_owngrp 2> /dev/null
 if [ 0 != "$?" ] ; then
 	$echo $owner is not a valid user name - exiting!
-	rm tmp_owngrp
+	\rm tmp_owngrp
 	exit
 fi
 
@@ -210,7 +210,7 @@ fi
 chgrp $bingroup tmp_owngrp 2> /dev/null
 if [ 0 != "$?" ] ; then
 	$echo $bingroup is not a valid group name - exiting!
-	rm tmp_owngrp
+	\rm tmp_owngrp
 	exit 1
 fi
 
@@ -231,7 +231,7 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	group=$bingroup
 fi
 
-rm tmp_owngrp
+\rm tmp_owngrp
 
 $echo "In what directory should YottaDB be installed? \c"
 read ydbdist
@@ -367,12 +367,12 @@ do
 	sed -f sedin$$ $i > $dest
 	if [ "$doutf8" -ne 0 ]; then
 		cd utf8
-		if ( test -f "$dest" ) then rm $dest; fi
+		if ( test -f "$dest" ) then \rm $dest; fi
 		ln -fs ../$dest $dest
 		cd ..
 	fi
 done
-rm sedin$$
+\rm sedin$$
 if [ "$doutf8" -ne 0 ]; then
 	if [ ! -d $ydbdist/utf8 ]; then
 		mkdir -p $ydbdist/utf8 $ydbdist/plugin/o/utf8
@@ -424,10 +424,10 @@ for i in ydb ydb_env_set ydb_env_unset gtmcshrc
 do
 	if [ -e $i ]; then
 		cp -p $i $ydbdist
-		chmod 0755 $ydbdist/$i
 		chown $owner $ydbdist/$i
 	fi
 done
+chmod 0755 $ydbdist/ydb
 
 # Install the normal scripts
 for i in $nscripts
@@ -467,11 +467,11 @@ done
 # command is required on many modern SELinux based systems but depends on the filesystem in use (requires context
 # support). For that reason, we attempt the command and if it works, great. If it doesn't, oh well we tried.
 if [ -f /usr/bin/chcon ]; then
-	(chcon -t texrel_shlib_t $ydbdist/libyottadb$ext; exit 0)
+	(chcon -t texrel_shlib_t $ydbdist/libyottadb$ext 2>/dev/null; exit 0)
 fi
 
 # Create $ydbdist/plugin directory
-mkdir $ydbdist/plugin
+mkdir -p $ydbdist/plugin
 chmod 0755 $ydbdist/plugin
 chown $owner $ydbdist/plugin
 chgrp $bingroup $ydbdist/plugin
@@ -504,7 +504,7 @@ if [ "$doutf8" -ne 0 ]; then
 		else
 			# Soft link everything else
 			if [ -f $ydbdist/utf8/"$file" ]; then
-				rm -f $ydbdist/utf8/"$file"
+				\rm -f $ydbdist/utf8/"$file"
 			fi
 			if [ -f $ydbdist/"$file" ]; then
 				ln -fs ../"$file" $ydbdist/utf8/"$file"
@@ -550,7 +550,7 @@ $echo ""
 # Ensure we are NOT in UTF-8 mode
 ydb_chset="M"
 export ydb_chset
-(cd $ydbdist; ./yottadb -noignore *.m; $echo $?>compstat ; $ldcmd $ldflags -o libyottadbutil$ext *.o )
+(cd $ydbdist; ./yottadb -noignore *.m; $echo $?>compstat ; $ldcmd $ldflags -o libyottadbutil$ext *.o)
 
 # Now work on UTF-8 mode
 if [ "$doutf8" -ne 0 ]; then
@@ -596,13 +596,15 @@ do
 	fi
 done
 
-# Change mode to executable for the normal binaries
+# Change mode to executable for the normal binaries, but not shared libraries
 for i in $binaries
 do
-	chmod 755 $ydbdist/$i
-	basebinaryname=`basename $i .so`	# needed to take .so out of libyottadb.so; is a no-op for other non .so binaries
-	if [ -e $ydbdist/$basebinaryname.dbg ]; then
-		chmod 755 $ydbdist/$basebinaryname.dbg
+	basebinaryname=${i%%.so}
+	if [ $i = $basebinaryname ] ; then
+		chmod 755 $ydbdist/$i
+		if [ -e $ydbdist/$basebinaryname.dbg ]; then
+			chmod 755 $ydbdist/$basebinaryname.dbg
+		fi
 	fi
 done
 
@@ -663,7 +665,7 @@ if [ -f $ydb_dist/libyottadbutil$ext ] ; then
 	$echo "Keep original .o object files (y or n)? \c"
 	read resp
 	if [ ! -t 0 ] ; then echo "$resp"; fi
-	if [ "n" = "$resp" -o "N" = "$resp" ] ; then rm -f $ydb_dist/*.o $ydb_dist/utf8/*.o ; fi
+	if [ "n" = "$resp" -o "N" = "$resp" ] ; then \rm -f $ydb_dist/*.o $ydb_dist/utf8/*.o ; fi
 	$echo ""
 	if [ -f $ydb_dist/utf8/libyottadbutil$ext ] ; then
 		chown ${owner}:${bingroup} $ydb_dist/utf8/libyottadbutil$ext
@@ -708,14 +710,14 @@ if [ -d $ydbdist/utf8 ]; then
 
 	# Delete the gtmsecshr symlink
 	if [ -f $ydbdist/utf8/gtmsecshr -o -h $ydbdist/utf8/gtmsecshr ]; then
-		rm -f $ydbdist/utf8/gtmsecshr
+		\rm -f $ydbdist/utf8/gtmsecshr
 	fi
 	ln -f $ydbdist/gtmsecshr $ydbdist/utf8/gtmsecshr || \
 		echo ln -f $ydbdist/gtmsecshr $ydbdist/utf8/gtmsecshr
 
 	# Delete the gtmsecshrdir symlink
 	if [ -f $ydbdist/utf8/gtmsecshrdir -o -h $ydbdist/utf8/gtmsecshrdir ]; then
-		rm -f $ydbdist/utf8/gtmsecshrdir
+		\rm -f $ydbdist/utf8/gtmsecshrdir
 	fi
 	mkdir -p $ydbdist/utf8/gtmsecshrdir
 	chmod 0500 $ydbdist/utf8/gtmsecshrdir
@@ -746,7 +748,7 @@ if [ 0 != `grep -c '[1-9]' $ydb_dist/compstat` ]; then
 	exit 1
 fi
 
-rm -f $ydbdist/compstat
+\rm -f $ydbdist/compstat
 
 if [ "$gtm_icu_version" != "" ] ; then
 	icumessage=" Used gtm_icu_version=$gtm_icu_version for UTF-8 installation."
@@ -768,13 +770,14 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 fi
 
 # Save long listing of files, including permissions and sha256 for future reference
-find $gtmdist -type f \! -name install_permissions.log  -exec ls -l {} \; > $gtmdist/install_permissions.log
-chmod 0444 $gtmdist/install_permissions.log
-chown ${owner}:${bingroup} $gtmdist/install_permissions.log
+ls -l $ydbdist | grep ^\\W | grep -v install_permissions.log$ >$ydbdist/install_permissions.log
+chmod 0444 $ydbdist/install_permissions.log
+chown ${owner}:${bingroup} $ydbdist/install_permissions.log
 OPENSSL=$(command -p command -v openssl)
 if [ -x "$OPENSSL" ]; then
-	find $gtmdist -type f \! -name install_sha256_checksum.log -exec $OPENSSL sha256 {} \; \
-									> $gtmdist/install_sha256_checksum.log
-	chmod 0444 $gtmdist/install_sha256_checksum.log
-	chown ${owner}:${bingroup} $gtmdist/install_sha256_checksum.log
+	openssl sha256 $(awk '{print $9}' $ydbdist/install_permissions.log) > $ydbdist/install_sha256_checksum.log
+else
+	sha256sum $(awk '{print $9}' $ydbdist/install_permissions.log) > $ydbdist/install_sha256_checksum.log
 fi
+chmod 0444 $ydbdist/install_sha256_checksum.log
+chown ${owner}:${bingroup} $ydbdist/install_sha256_checksum.log
