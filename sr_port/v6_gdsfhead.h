@@ -3,6 +3,9 @@
  * Copyright (c) 2020 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -144,7 +147,7 @@ typedef struct v6_sgmnt_data_struct
 	/************* FIELDS RELATED TO WRITE CACHE FLUSHING *******************************/
 	int4		write_fullblk;
 	char		filler[4];
-	int4		flush_time[2];
+	uint8		flush_time;
 	int4		flush_trigger;
 	int4		n_wrt_per_flu;		/* Number of writes per flush call. Overloaded for BG and MM */
 	int4		wait_disk_space;	/* seconds to wait for diskspace before giving up on a db block write */

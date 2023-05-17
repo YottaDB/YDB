@@ -784,8 +784,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD8(trans_hist.total_blks);
 	SWAP_SD8(trans_hist.free_blocks);
 	/************* FIELDS RELATED TO WRITE CACHE FLUSHING *******************************/
-	SWAP_SD4(flush_time[0]);
-	SWAP_SD4(flush_time[1]);
+	SWAP_SD8(flush_time);
 	SWAP_SD4(flush_trigger);
 	SWAP_SD4(n_wrt_per_flu);
 	SWAP_SD4(wait_disk_space);
