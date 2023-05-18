@@ -288,20 +288,11 @@ if [ -d "utf8" ]; then
 	read resp
 	if [ ! -t 0 ] ; then echo "$resp"; fi
 	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-		if [ -x "$(command -v pkg-config)" -a $(pkg-config --exists icu-io; echo $?) -eq 0 ]; then
-			versioncmd="pkg-config --modversion icu-io"
-			libcmd="pkg-config --variable=libdir icu-io"
-		elif [ -x "$(command -v icu-config)" ] ; then
-			versioncmd="icu-config --version"
-			libcmd="icu-config --libdir"
-		elif [ -x "$(command -v pkg-config)" -a $(pkg-config --exists icu; echo $?) -eq 0 ]; then
-			versioncmd="pkg-config --modversion icu"
-			libcmd="pkg-config --variable=libdir icu"
-		fi
-		if [ -n "$versioncmd" ]; then
-			icu_version=`$versioncmd | awk '{ver=+$0;if(ver>5){ver=ver/10}printf("%.1f\n",ver);exit}'`
-			extendlibpath=`$libcmd`
-		fi
+		# The below line is copied from the "icu_version()" function in sr_unix/ydbinstall.sh
+		# The GT.M logic uses pkg-config to determine the ICU version. But we are trying to stay away from
+		# pkg-config in YottaDB for ydbinstall.sh and configure.gtc as it takes up a lot of space in the
+		# docker image to include the pkg-config package. Hence the use of "ldconfig" instead.
+		icu_version=$(ldconfig -p | grep -m1 -F libicuio.so. | cut -d" " -f1 | sed 's/.*libicuio.so.\([a-z]*\)\([0-9\.]*\)/\2.\1/;s/\.$//;')
 		if [ "$icu_version" != "" ] ; then
 			maj=`$echo $icu_version | cut -f 1 -d "."`
 			if [ "$maj" -ge "49" ] ; then
@@ -309,10 +300,6 @@ if [ -d "utf8" ]; then
 				# the version reported by "pkg-config --modversion icu-io"
 				# is <major><minor>.<milli> and not <major>.<minor>
 				majmin=$maj
-				# If "ydb_icu_version" is set to "65.1", then sonamesuffix would be set to "65.1".
-				# But if "ydb_icu_version" is set to "65.1.suse", then sonamesuffix would be set to "suse65.1".
-				# This is needed so we find the right "libicuio.so.*" file on the system.
-				sonamesuffix=`echo $ydb_icu_version | sed 's/\([0-9\.]*\)\([a-z]*\)/\2\1/;s/\.$//;s/^\.//;'`
 			else
 				# Assuming the input is of the form 4.2.1
 				majmin=`$echo $icu_version | cut -d "." -f 1,2 | sed 's/\.//'`
@@ -580,12 +567,6 @@ if [ "$doutf8" -ne 0 ]; then
 		unset LC_ALL
 		ydb_chset="UTF-8"
 		export ydb_chset
-		if [ $arch = "ibm" ]; then
-			export LIBPATH=$extendlibpath
-		else
-			LD_LIBRARY_PATH=$extendlibpath
-			export LD_LIBRARY_PATH
-		fi
 		(ydb_dist=$ydbdist/utf8; export ydb_dist; cd $ydb_dist; ./yottadb -noignore *.m; $echo $?>>$ydbdist/compstat; \
 		$ldcmd $ldflags -o libyottadbutil$ext *.o)
 	)

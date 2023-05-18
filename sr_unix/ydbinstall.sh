@@ -251,10 +251,11 @@ getosid()
 }
 
 # This function finds the current ICU version using ldconfig.
+# See comment in sr_unix/configure.gtc for why we use ldconfig and not pkg-config.
 # If file name is "libicuio.so.70", the below will return "70".
 # If file name is "libicuio.so.suse65.1", the below will return "65.1.suse" (needed for YottaDB to work on SLED 15).
-# There is a M version of this function in sr_unix/ydbenv.mpt
-# It needs to be maintained in parallel to this function
+# There is a M version of this function in sr_unix/ydbenv.mpt as well as a .sh version in sr_unix/configure.gtc
+# They need to be maintained in parallel to this function.
 icu_version()
 {
 	$ldconfig -p | grep -m1 -F libicuio.so. | cut -d" " -f1 | sed 's/.*libicuio.so.\([a-z]*\)\([0-9\.]*\)/\2.\1/;s/\.$//;'
