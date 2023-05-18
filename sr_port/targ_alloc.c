@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -71,8 +74,10 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	 * gv_namehead structure are defined using MAX_BT_DEPTH macros and we want to guard against changes to this macro
 	 * that cause unintended changes to the layout/size of the gv_namehead structure.
 	 */
-	assert(OFFSETOF(gv_namehead, filler_8byte_align0[0]) + SIZEOF(gvt->filler_8byte_align0)
-			== OFFSETOF(gv_namehead, root));
+	GTM64_ONLY(
+		assert(OFFSETOF(gv_namehead, filler_8byte_align0[0]) + SIZEOF(gvt->filler_8byte_align0)
+				== OFFSETOF(gv_namehead, root));
+	)
 	assert(OFFSETOF(gv_namehead, filler_8byte_align1[0]) + SIZEOF(gvt->filler_8byte_align1)
 			== OFFSETOF(gv_namehead, last_split_blk_num[0]));
 #	ifdef GTM_TRIGGER

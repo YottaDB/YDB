@@ -3029,7 +3029,7 @@ typedef struct	gv_namehead_struct
 							 * Valid only if clue->end is non-zero.
 							 */
 	boolean_t	noisolation;			/* whether isolation is turned on or off for this global */
-	char		filler_8byte_align0[4];
+	GTM64_ONLY(char	filler_8byte_align0[4];)
 	block_id	root;				/* Root of global variable tree */
 	mname_entry	gvname;				/* the name of the global */
 	srch_hist	hist;				/* block history array */
