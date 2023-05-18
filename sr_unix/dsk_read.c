@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -236,7 +236,8 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		{/* V6 databases should never have to have blocks upgraded when opened in V7 */
 			save_errno = SS_NORMAL;
 			tmp_ondskblkver = GDSV6;
-		}
+		} else
+			tmp_ondskblkver = GDSV4;
 		DEBUG_DYNGRD_ONLY(
 			if (GDSVCURR != tmp_ondskblkver)
 				PRINTF("DSK_READ: Block %d being dynamically upgraded on read\n", blk);

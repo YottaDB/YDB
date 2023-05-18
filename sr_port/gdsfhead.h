@@ -3814,6 +3814,8 @@ MBSTART {												\
 		headroom = TN_HEADROOM_V7;								\
 	else if((GDSV5 == (CSD)->desired_db_format) || (GDSV6 == (CSD)->desired_db_format))		\
 		headroom = TN_HEADROOM_V6;								\
+	else												\
+		headroom = TN_HEADROOM_V4;								\
 	headroom *= HEADROOM_FACTOR;									\
 	(ret_warn_tn) = (CSD)->trans_hist.curr_tn;							\
 	if ((headroom < (CSD)->max_tn) && ((ret_warn_tn) < ((CSD)->max_tn - headroom)))			\
