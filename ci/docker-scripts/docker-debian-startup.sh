@@ -12,6 +12,7 @@
 #################################################################
 timestamp=$(date) # timestamp for logs in case needed for troubleshooting
 . /opt/yottadb/current/ydb_env_set
+source $HOME/.cargo/env
 mkdir -p logs
 if ! yottadb -run %ydboctoAdmin show users | grep -qw ydb  ; then
     echo $timestamp >>logs/%ydboctoAdmin.log
