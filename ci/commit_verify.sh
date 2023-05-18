@@ -152,10 +152,10 @@ if [ -n "$commit_list" ]; then
 			if [[ ( $deletions == $num_copyright_deletions ) && ( $additions == $num_copyright_additions ) ]]; then
 				copyright_only="$copyright_only $file"
 			fi
-		fi
-		if $needs_copyright $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
-			# Print these out only at the end so they're all shown at once
-			missing_files="$missing_files $file"
+			if $needs_copyright $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
+				# Print these out only at the end so they're all shown at once
+				missing_files="$missing_files $file"
+			fi
 		fi
 	done
 	if [ -n "$copyright_only" ]; then
