@@ -276,12 +276,12 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	blk_segment		*bs1, *bs_ptr;
 	block_id		hint_blk_num, free_blk_id, total_blks, num_local_maps, master_bit,
 				free_bit, temp_blk;
-	boolean_t		free_blk_recycled, child_long_blk_id, parent_long_blk_id;
+	boolean_t		free_blk_recycled, parent_long_blk_id;
 	cw_set_element		*tmpcse;
 	int			blk_seg_cnt, blk_size;
 	int			parent_blk_size, child_blk_size, bsiz;
 	int			rec_size1, curr_offset, bpntr_end, hdr_len;
-	int			tmp_cmpc, child_blk_id_sz, parent_blk_id_sz;
+	int			tmp_cmpc, parent_blk_id_sz;
 	int4			hint_bit, maxbitsthismap;
 	jnl_buffer_ptr_t	jbbp; /* jbbp is non-NULL only if before-image journaling */
 	sgmnt_data_ptr_t	csd;
@@ -296,8 +296,6 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	csd = cs_data;
 	csa = cs_addrs;
 	blk_size = csd->blk_size;
-	child_long_blk_id = IS_64_BLK_ID(child_blk_ptr);
-	child_blk_id_sz = SIZEOF_BLK_ID(child_long_blk_id);
 	/* Find a free/recycled block for new block location. */
 	hint_blk_num = 0;
 	total_blks = csa->ti->total_blks;

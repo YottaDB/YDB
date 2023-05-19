@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,6 +93,7 @@ void print_exit_stats(void)
 		assert(cmdptr <= ARRAYTOP(systembuff));
 		rc = SYSTEM(systembuff);
 		assert(0 == rc);
+		PRO_ONLY(UNUSED(rc));
 	}
 #	ifdef DEBUG_MCALC
 	/* Find out how many plus total size of mcalloc() blocks exist and print the stats */

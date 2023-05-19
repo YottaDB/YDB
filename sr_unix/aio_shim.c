@@ -197,6 +197,7 @@ STATICFNDCL void *io_getevents_multiplexer(void *arg)
 				RECORD_ERROR_IN_WORKER_THREAD_AND_EXIT(gdi, "worker_thread::io_getevents()", errno);
 			num_ios = ATOMIC_SUB_FETCH(&gdi->num_ios, ret);
 			assert(num_ios >= 0);
+			PRO_ONLY(UNUSED(num_ios));
 		}
 		/* Exit if we have been notified via the exit eventfd */
 		if (EVENTFD_NOTIFIED(fds, EXIT_EFD))
@@ -229,7 +230,10 @@ STATICFNDCL int io_getevents_internal(aio_context_t ctx)
 		while (-1 == (ret = io_getevents(ctx, 0, MAX_EVENTS, event, &timeout)) && (EINTR == errno))
 			;
 		if (0 > ret)
+		{
 			local_errno = errno;
+			UNUSED(local_errno);
+		}
 		assert(ret >= 0);
 		if (-1 == ret)
 			return -1;
@@ -391,6 +395,7 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 	else
 	{
 		local_errno = errno;
+		UNUSED(local_errno);
 		assert(FALSE);
 		aio_shim_errstr = "eventfd(EXIT_EFD)";
 		return -1;
@@ -401,6 +406,7 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 	else
 	{
 		local_errno = errno;
+		UNUSED(local_errno);
 		assert(FALSE);
 		CLEANUP_AIO_SHIM_THREAD_INIT(tmp_gdi);
 		aio_shim_errstr = "eventfd(LAIO_EFD)";
@@ -412,6 +418,7 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 		 * aio_shim_setup().
 		 */
 		local_errno = errno;
+		PRO_ONLY(UNUSED(local_errno));
 		assert(NULL != aio_shim_errstr);
 		assert(EAGAIN == local_errno || (WBTEST_ENABLED(WBTEST_LOW_MEMORY) && ENOMEM == local_errno));
 		CLEANUP_AIO_SHIM_THREAD_INIT(tmp_gdi);
@@ -559,6 +566,7 @@ int aio_shim_write(gd_region *reg, struct aiocb *aiocbp)
 		ret = aio_shim_thread_init(owning_gd);
 		if (0 != ret)
 			local_errno = errno;
+		PRO_ONLY(UNUSED(local_errno));
 		assert((0 == ret) || (EAGAIN == local_errno));
 		if (-1 == ret)
 		{	/* aio_shim_thread_init() should set aio_shim_errstr */
@@ -583,7 +591,10 @@ int aio_shim_write(gd_region *reg, struct aiocb *aiocbp)
 	ret = io_submit(gdi->ctx, 1, cb);
 	/* the only acceptable error is EAGAIN in our case */
 	if (0 > ret)
+	{
 		local_errno = errno;
+		UNUSED(local_errno);
+	}
 	DEBUG_ONLY(save_errno = errno);
 	assert((1 == ret) || (EAGAIN == save_errno));
 	if (1 == ret)

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -132,6 +135,7 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 						CLOSEFILE_RESET(ptr->backup_fd, rc);	/* resets "ptr" to FD_INVALID */
 						rc = UNLINK(ptr->backup_tempfile);
 						assert(0 == rc);
+						PRO_ONLY(UNUSED(rc));
 					}
 				} else	/* defreeze the databases */
 					region_freeze(ptr->reg, FALSE, FALSE, FALSE, FALSE, FALSE);

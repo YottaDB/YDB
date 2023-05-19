@@ -20,8 +20,6 @@ do_patsplit.c:warning: Value stored to 'deltalen' is never read [clang-analyzer-
 do_pattern.c:warning: Value stored to 'attempt' is never read [clang-analyzer-deadcode.DeadStores]
 dollarx.c:warning: redundant condition 'utf8_active' [bugprone-redundant-branch-condition]
 dpgbldir.c:warning: Value stored to 'currMapIsSpanning' is never read [clang-analyzer-deadcode.DeadStores]
-dse_range.c:warning: Value stored to 'got_lonely_star' is never read [clang-analyzer-deadcode.DeadStores]
-dse_range.c:warning: Value stored to 'key_top' is never read [clang-analyzer-deadcode.DeadStores]
 emit_code.c:warning: Value stored to 'offset' is never read [clang-analyzer-deadcode.DeadStores]
 emit_code.c:warning: Value stored to 'reg' is never read [clang-analyzer-deadcode.DeadStores]
 emit_code_sp.c:warning: Value stored to 'address_size_prefix_seen' is never read [clang-analyzer-deadcode.DeadStores]
@@ -51,8 +49,8 @@ gtm_env_init.c:warning: Although the value stored to 'status' is used in the enc
 gtm_env_init.c:warning: Value stored to 'ret' is never read [clang-analyzer-deadcode.DeadStores]
 gtm_newintrinsic.c:warning: Value stored to 'shift_size' is never read [clang-analyzer-deadcode.DeadStores]
 gtm_putmsg_list.c:warning: Uninitialized va_list is copied [clang-analyzer-valist.Uninitialized]
-gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (182 padding bytes, where 6 is optimal).
-gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (182 padding bytes, where 6 is optimal).
+gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (186 padding bytes, where 2 is optimal).
+gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (186 padding bytes, where 2 is optimal).
 gtmci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gtmci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gtmrecv_get_opt.c:warning: Although the value stored to 'cmplvl_status' is used in the enclosing expression, the value is never actually read from 'cmplvl_status' [clang-analyzer-deadcode.DeadStores]
@@ -80,7 +78,6 @@ gvcst_put.c:warning: Value stored to 'skip_hasht_read' is never read [clang-anal
 gvcst_query.c:warning: Value stored to 'bp' is never read [clang-analyzer-deadcode.DeadStores]
 gvcst_query.c:warning: Value stored to 'rp' is never read [clang-analyzer-deadcode.DeadStores]
 gvcst_reservedDB_funcs.c:warning: Although the value stored to 'sdiqeptr_next' is used in the enclosing expression, the value is never actually read from 'sdiqeptr_next' [clang-analyzer-deadcode.DeadStores]
-gvcst_search.c:warning: Value stored to 'nBlkId' is never read [clang-analyzer-deadcode.DeadStores]
 gvincr_recompute_upd_array.c:warning: Value stored to 'jfb' is never read [clang-analyzer-deadcode.DeadStores]
 incr_link.c:warning: comparing object representation of type 'rhdtyp' (aka 'struct rhead_struct') which does not have a unique object representation; consider comparing the members of the object manually [bugprone-suspicious-memory-comparison]
 ionl_use.c:warning: Value stored to 'd_in' is never read [clang-analyzer-deadcode.DeadStores]

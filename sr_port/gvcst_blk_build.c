@@ -53,7 +53,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 {
 	blk_segment	*seg, *stop_ptr, *array;
 	boolean_t	long_blk_id;
-	int4		offset, blk_id_sz, off_chain_sz;
+	int4		offset;
 	off_chain	chain;
 	v6_off_chain	v6_chain;
 	sm_uc_ptr_t	ptr, ptrtop, c;
@@ -62,6 +62,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	boolean_t	is_mm;
 #	ifdef DEBUG
 	boolean_t	integ_error_found;
+	int4		blk_id_sz, off_chain_sz;
 	rec_hdr_ptr_t	rp;
 	sm_uc_ptr_t	chainptr, input_base_addr;
 	unsigned short	nRecLen;
@@ -80,8 +81,10 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	assert(cse->mode != gds_t_writemap);
 	array = (blk_segment *)cse->upd_addr;
 	long_blk_id = BLK_ID_32_VER < cse->ondsk_blkver;
+#	ifdef DEBUG
 	blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 	off_chain_sz = blk_id_sz; /* the off_chain struct should be the same size as the block_id in the current block */
+#	endif
 	assert(array->len >= SIZEOF(blk_hdr));
 	assert(array->len <= cs_data->blk_size);
 	assert((cse->ins_off + blk_id_sz) <= array->len);

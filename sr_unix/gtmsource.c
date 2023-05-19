@@ -184,7 +184,6 @@ int gtmsource()
 					if (NULL != jnlpool->gtmsource_local)
 						break;
 				}
-				chkbklogresult = 1;
 				for (; shutdowntime; shutdowntime--)
 				{
 					LONG_SLEEP(1);
@@ -421,6 +420,7 @@ int gtmsource()
 	mutex_per_process_init();
 	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, gtmsource_options.log_file);
 	assert(SS_NORMAL == log_init_status);
+	PRO_ONLY(UNUSED(log_init_status));
 	repl_log_fd2fp(&gtmsource_log_fp, gtmsource_log_fd);
 	if (-1 == setsid())
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,

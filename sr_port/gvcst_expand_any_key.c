@@ -74,14 +74,12 @@ enum cdb_sc gvcst_expand_any_key (srch_blk_status *blk_stat, sm_uc_ptr_t rec_top
 	int			cur_level;
 	int			star_keycmpc, star_keylen, star_rec_size;
 	int			tblk_size;
-	int4			blk_id_sz;
 	sm_uc_ptr_t		blk_base, curptr, rPtr1, rPtr2;
 	unsigned char		expanded_star_key[MAX_KEY_SZ];
 	unsigned short		temp_ushort;
 
 	blk_base = blk_stat->buffaddr;
 	long_blk_id = IS_64_BLK_ID(blk_base);
-	blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 	cur_level = blk_stat->level;
 	curptr = blk_base + SIZEOF(blk_hdr);
 	*rec_size = *keycmpc = *keylen = 0;

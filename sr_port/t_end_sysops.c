@@ -309,9 +309,9 @@ enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	v6_off_chain		v6_chain;
 	sm_uc_ptr_t		chain_ptr, db_addr[2];
 	boolean_t		write_to_snapshot_file, long_blk_id;
-	int4			blk_id_sz;
 	snapshot_context_ptr_t	lcl_ss_ctx;
 #	ifdef DEBUG
+	int4			blk_id_sz;
 	jbuf_rsrv_struct_t	*jrs;
 #	endif
 	DCL_THREADGBL_ACCESS;
@@ -389,7 +389,7 @@ enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 			memcpy(db_addr[0], cs->new_buff, ((blk_hdr_ptr_t)cs->new_buff)->bsiz);
 		}
 		long_blk_id = IS_64_BLK_ID(db_addr[0]);
-		blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
+		DEBUG_ONLY(blk_id_sz = SIZEOF_BLK_ID(long_blk_id));
 		assert(SIZEOF(blk_hdr) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
 		assert((int)(((blk_hdr_ptr_t)db_addr[0])->bsiz) > 0);
 		assert((int)(((blk_hdr_ptr_t)db_addr[0])->bsiz) <= cs_data->blk_size);
@@ -458,7 +458,10 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	bt_rec_ptr_t		bt;
 	cache_rec_ptr_t		cr, cr_new, save_cr;
 	boolean_t		read_finished, wait_for_rip, write_finished, intend_finished;
-	boolean_t		read_before_image, v7_db_mode, v6_db_mode;
+	boolean_t		read_before_image, v7_db_mode;
+#	ifdef DEBUG
+	boolean_t		v6_db_mode;
+#	endif
 	block_id		blkid;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -475,7 +478,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	csa = cs_addrs;		/* Local access copies */
 	csd = csa->hdr;
 	v7_db_mode = (0 == MEMCMP_LIT(csd->label, GDS_LABEL));
-	v6_db_mode = (0 == MEMCMP_LIT(csd->label, V6_GDS_LABEL));
+	DEBUG_ONLY(v6_db_mode = (0 == MEMCMP_LIT(csd->label, V6_GDS_LABEL)));
 	assert((v7_db_mode || v6_db_mode) && (v7_db_mode != v6_db_mode));
 	cnl = csa->nl;
 	assert(csd == cs_data);
@@ -1017,7 +1020,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 
 enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effective_tn, sgm_info *si)
 {
-	int4			n, blk_id_sz;
+	int4			n;
 	off_chain		chain;
 	v6_off_chain		v6_chain;
 	sm_uc_ptr_t		blk_ptr, backup_blk_ptr, chain_ptr;
@@ -1034,6 +1037,7 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	boolean_t		write_to_snapshot_file;
 	snapshot_context_ptr_t	lcl_ss_ctx;
 #	ifdef DEBUG
+	int4			blk_id_sz;
 	jbuf_rsrv_struct_t	*jrs;
 #	endif
 	DCL_THREADGBL_ACCESS;
@@ -1164,7 +1168,7 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		assert((int)((blk_hdr_ptr_t)blk_ptr)->bsiz > 0);
 		assert((int)((blk_hdr_ptr_t)blk_ptr)->bsiz <= csd->blk_size);
 		long_blk_id = IS_64_BLK_ID(blk_ptr);
-		blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
+		DEBUG_ONLY(blk_id_sz = SIZEOF_BLK_ID(long_blk_id));
 		if (!dollar_tlevel)
 		{
 			if (0 != cs->ins_off)

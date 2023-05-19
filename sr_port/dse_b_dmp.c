@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -54,7 +57,7 @@ boolean_t dse_b_dmp(void)
 {
 	cache_rec_ptr_t	cr;
 	block_id	blk, count, lmap_num;
-	boolean_t	bm_free, invalid_bitmap = FALSE, is_mm, was_crit, was_hold_onto_crit;
+	boolean_t	bm_free, invalid_bitmap = FALSE, was_crit, was_hold_onto_crit;
 	enum db_ver	ondsk_blkver;
 #	ifndef BLK_NUM_64BIT
 	gtm_int8	count2;
@@ -119,7 +122,6 @@ boolean_t dse_b_dmp(void)
 #endif
 	util_out_print(0, TRUE);
 	bplmap = cs_addrs->hdr->bplmap;
-	is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
 	mapsize = BM_SIZE(bplmap);
 	patch_rec_counter = 1;
 	was_crit = cs_addrs->now_crit;

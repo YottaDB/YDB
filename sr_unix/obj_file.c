@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,10 +74,12 @@ void drop_object_file(void)
         {
 		rc = UNLINK((const char *)object_file_name);
 		assert(!rc);
+		PRO_ONLY(UNUSED(rc));
 		CLOSE_OBJECT_FILE(object_file_des, rc);		/* Resets "object_file_des" to FD_INVALID */
 		assert(!rc);
 		rc = UNLINK(TADR(tmp_object_file_name));	/* Just in case the temp file was in play */
 		assert(!rc);
+		PRO_ONLY(UNUSED(rc));
 	}
 }
 
@@ -233,6 +235,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 				COMPUTE_HASH_STR(&symkey);
 				added = add_hashtab_str(compsyms_hashtab, &symkey, sym, &syment);
 				assert(added);
+				PRO_ONLY(UNUSED(added));
 				assert(syment->value);
 				assert(syment->key.str.addr == (char *)&((struct sym_table *)syment->value)->name[0]);
 			}
@@ -453,6 +456,7 @@ void emit_literals(void)
 	{
 		emit_immed(PADCHARS, padsize);
 		offset += padsize;
+		PRO_ONLY(UNUSED(offset));
 	}
 	assert((MAXPOSINT4 - (3 * SIZEOF(mstr))) > offset); /* Should never happen */
 	assert(0 == (uint4)(PADLEN(offset, NATIVE_WSIZE)));

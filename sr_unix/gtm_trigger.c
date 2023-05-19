@@ -373,6 +373,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	assert(GTM_PATH_MAX >= ((TREF(gtm_tmpdir)).len + SIZEOF("/trgtmpXXXXXX") + 1));
 	rc = SNPRINTF(rtnname_template, GTM_PATH_MAX, "%.*s/trgtmpXXXXXX", (TREF(gtm_tmpdir)).len, (TREF(gtm_tmpdir)).addr);
 	assert(0 < rc);					/* Note rc is return code aka length - we expect a non-zero length */
+	PRO_ONLY(UNUSED(rc));
 	/* The mkstemp() routine is known to bogus-fail for no apparent reason at all especially on AIX 6.1. In the event
 	 * this shortcoming plagues other platforms as well, we add a low-cost retry wrapper.
 	 */
@@ -406,6 +407,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	{
 		urc = UNLINK(rtnname);
 		assert(0 == urc);
+		PRO_ONLY(UNUSED(urc));
 		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 	}
 	if (NULL == memchr(trigdsc->xecute_str.str.addr, '\n', trigdsc->xecute_str.str.len))
@@ -415,6 +417,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		{
 			urc = UNLINK(rtnname);
 			assert(0 == urc);
+			PRO_ONLY(UNUSED(urc));
 			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 		}
 	}
@@ -423,6 +426,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	{
 		urc = UNLINK(rtnname);
 		assert(0 == urc);
+		PRO_ONLY(UNUSED(urc));
 		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, rc);
 	}
 	assert(MAX_MIDENT_LEN > trigdsc->rtn_desc.rt_name.len);
@@ -443,6 +447,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	{
 		urc = UNLINK(rtnname);
 		assert(0 == urc);
+		PRO_ONLY(UNUSED(urc));
 		assert(FALSE);
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_LITERAL("Compilation string too long"));
 	}
@@ -741,6 +746,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		lvval->v = *lvvalue;				/* Copy mval into lvval */
 		added = add_hashtab_mname_symval(&curr_symval->h_symtab, mne_p, lvval, &tabent);
 		assert(added);
+		PRO_ONLY(UNUSED(added));
 		assert(NULL != tabent);
 	}
 	/* While the routine header is available in trigdsc, we also need the <null> label address associated with

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.                                     *
  *								*
  *	This source code contains the intellectual property	*
@@ -190,10 +190,9 @@ void dse_range(void)
 				continue;
 		} else
 		{
-			got_lonely_star = FALSE;
 			if (lost)
 			{
-				if (long_blk_id == TRUE)
+				if (long_blk_id)
 				{
 #					ifdef BLK_NUM_64BIT
 					GET_BLK_ID_64(blk_child, key_top);
@@ -208,18 +207,11 @@ void dse_range(void)
 					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 				if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER)
 				{
-#					ifdef BLK_NUM_64BIT
-					long_blk_id = TRUE;
-					blk_id_size = SIZEOF(block_id_64);
-#					else
+#					ifndef BLK_NUM_64BIT
 					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
 							nocrit_present, cs_addrs, gv_cur_region);
 					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEINVALBLKID);
 #					endif
-				} else
-				{
-					long_blk_id = FALSE;
-					blk_id_size = SIZEOF(block_id_32);
 				}
 				if (((blk_hdr_ptr_t)bp)->bsiz > cs_addrs->hdr->blk_size)
 					b_top = bp + cs_addrs->hdr->blk_size;
@@ -235,8 +227,6 @@ void dse_range(void)
 					r_top = rp + rsize;
 				if (r_top >= b_top)
 					r_top = b_top;
-				if (((blk_hdr_ptr_t)bp)->levl)
-					key_top = r_top - blk_id_size;
 				for (key_top1 = rp + SIZEOF(rec_hdr); key_top1 < r_top ; )
 					if (!*key_top1++)
 						break;
