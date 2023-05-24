@@ -1759,21 +1759,11 @@ int jnl_v44TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	jlen = *jnl_len;
 	this_upd_seqno = 0;
 	this_strm_seqno = 0;	/* needed to avoid false [-Wuninitialized] warning from gcc 12.1 */
-	/* The below comment was valid when V24 was the current filter format. But it is no longer valid now because V44
-	 * is the current filter format and there is only ONE journal version corresponding to it so the assert is re-enabled.
-	 * It might need to be disabled once we have a jnl format bump without a corresponding filter format bump.
-	 * ----------------------
-	 * Since filter format V24 corresponds to journal formats V24, V25, or v26, in case of a V24 source and V2{5,6} receiver,
+	/* Since filter format V44 corresponds to journal formats V44 or V45. In case of a V44 source and V45 receiver,
 	 * the source server will not do any filter transformations (because receiver jnl ver is higher). This means
-	 * jnl_v24TOv24 filter conversion function is invoked on the receiver side to do V24 to V2{5,6} jnl format conversion.
+	 * jnl_v44TOv44 filter conversion function is invoked on the receiver side to do V44 to V45 jnl format conversion.
 	 * Therefore we cannot do an assert(is_src_server) which we otherwise would have had in case the latest filter
 	 * version corresponds to only ONE journal version.
-	 * ----------------------
-	 */
-	assert(is_src_server);
-	/* Even though "is_src_server" is TRUE at this point, it is possible it is not TRUE in the future (for example, if we
-	 * have a jnl format bump without a corresponding filter format bump). Therefore, the below check looks at "is_src_server"
-	 * too so this check works fine even if/when the above assert is removed in the future.
 	 */
 	is_trigupdate = (is_src_server && jnlpool->gtmsource_local->trigupdate);
 	while (JREC_PREFIX_SIZE <= jlen)
