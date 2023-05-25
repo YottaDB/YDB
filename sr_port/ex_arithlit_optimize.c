@@ -80,9 +80,9 @@ void ex_arithlit_optimize(triple *t)
 	v1 = &t1->operand[0].oprval.mlit->v;
 	MV_FORCE_NUMD(v1);
 	if (!(MV_NM & v1->mvtype) || !(MV_NM & v0->mvtype))
-	{	/* if we don't have a useful number we can't do useful math */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
-		assert(TREF(rts_error_in_parse));
+	{	/* If we don't have a useful number we can't do useful math. In this case, we would
+		 * have already issued a ERR_NUMOFLOW error, so don't issue error again here.
+		 */
 		return;
 	}
 	/* Take a copy of "run_time" variable and set it to TRUE for the below computation.

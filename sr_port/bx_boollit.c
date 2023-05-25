@@ -159,9 +159,9 @@ void bx_boollit(triple *t, int depth)
 			v[j] = &optrip[j]->operand[0].oprval.mlit->v;
 			MV_FORCE_NUMD(v[j]);
 			if (!(MV_NM & v[j]->mvtype))
-			{	/* if we don't have a useful number the Boolean conversion won't be valid */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
-				assert(!TREF(rts_error_in_parse));
+			{	/* If we don't have a useful number the Boolean conversion won't be valid. In this case,
+				 * we would have already issued a ERR_NUMOFLOW error, so don't issue error again here.
+				 */
 				return;
 			}
 			tv[j] = MV_FORCE_BOOL(v[j]);
