@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,7 +84,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 		rm_ptr = (d_rm_struct *)iod->dev_sp;
 	}
 	if (rm_ptr->read_only)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVICEREADONLY);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVICEREADONLY);
 	if ((!rm_ptr->fifo) && (!rm_ptr->is_pipe) && rm_ptr->output_encrypted)
 	{
 		if (!iod->dollar.zeof)
