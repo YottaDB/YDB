@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -461,6 +461,7 @@ void mupip_integ(void)
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2,
 						LEN_AND_LIT("Database is being (re)encrypted"));
 				mu_int_errknt++;
+				assert(1 == mu_int_plen);
 				mu_int_err(ERR_DBTNRESET, 0, 0, 0, 0, 0, 0, 0);
 				mu_int_errknt -= 2;
 				/* is this error supposed to update error count, or leave it ( then mu_int_errknt-- instead)*/
@@ -508,20 +509,24 @@ void mupip_integ(void)
 			if (!trees)
 				break;
 			mu_int_path[0] = trees->root;
+			mu_int_plen = 1;
 			if (trees->root < 0)
 			{
 				mu_int_err(ERR_DBRBNNEG, 0, 0, 0, 0, 0, 0, mu_int_root_level);
+				assert(0 == mu_int_plen);
 				continue;
 			}
 			if (trees->root >= mu_int_data.trans_hist.total_blks)
 			{
 				mu_int_err(ERR_DBRBNTOOLRG, 0, 0, 0, 0, 0, 0,
 					mu_int_root_level);
+				assert(0 == mu_int_plen);
 				continue;
 			}
 			if (0 == (trees->root % mu_int_data.bplmap))
 			{
 				mu_int_err(ERR_DBRBNLBMN, 0, 0, 0, 0, 0, 0, mu_int_root_level);
+				assert(0 == mu_int_plen);
 				continue;
 			}
 			mu_int_plen = 0;
