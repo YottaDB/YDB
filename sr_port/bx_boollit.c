@@ -157,13 +157,6 @@ void bx_boollit(triple *t, int depth)
 		for (j = 0;  j < ARRAYSIZE(v); j++)
 		{	/* both arguments are literals, so try the operation at compile time */
 			v[j] = &optrip[j]->operand[0].oprval.mlit->v;
-			MV_FORCE_NUMD(v[j]);
-			if (!(MV_NM & v[j]->mvtype))
-			{	/* If we don't have a useful number the Boolean conversion won't be valid. In this case,
-				 * we would have already issued a ERR_NUMOFLOW error, so don't issue error again here.
-				 */
-				return;
-			}
 			tv[j] = MV_FORCE_BOOL(v[j]);
 		}
 		switch (t->opcode)
