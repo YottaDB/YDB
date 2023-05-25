@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -161,7 +161,7 @@ void bx_boollit(triple *t, int depth)
 			if (!(MV_NM & v[j]->mvtype))
 			{	/* if we don't have a useful number the Boolean conversion won't be valid */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
-				assert(TREF(rts_error_in_parse));
+				assert(!TREF(rts_error_in_parse));
 				return;
 			}
 			tv[j] = MV_FORCE_BOOL(v[j]);
