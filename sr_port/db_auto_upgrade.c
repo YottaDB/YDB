@@ -378,8 +378,13 @@ void v6_db_auto_upgrade(gd_region *reg)
 				 * if the process going through "db_auto_upgrade" is a forward or backward MUPIP JOURNAL RECOVER
 				 * command, it would eventually invoke "mur_block_count_correct" which would fix this discrepancy
 				 * and ensure a later mupip integ is clean (no DBTOTBLK error).
+				 *
+				 * Also, the below assert does not work with block sizes under 4096 which became the default in
+				 * GT.M V6.3-001. Tests that randomize the block size below 4096 will fail the assert. Therefore
+				 * modify the assert to account for that.
 				 */
-				assert((file_size * DISK_BLOCK_SIZE) >= (new_eof + DISK_BLOCK_SIZE));
+				assert(((file_size * DISK_BLOCK_SIZE) == (new_eof + DISK_BLOCK_SIZE))
+						|| ((DISK_BLOCK_SIZE << 3) > csd->blk_size));
 				db_write_eof_block(udi, udi->fd, csd->blk_size, new_eof, &TREF(dio_buff));
 				/* GT.M V63001 introduced reservedDBFlags */
 				csd->reservedDBFlags = 0; /* RDBF_AUTODB = FALSE, RDBF_NOSTATS = FALSE, RDBF_STATSDB = FALSE */
