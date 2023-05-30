@@ -822,7 +822,9 @@ if [ -n "$ydb_from_source" ] ; then
 	if [ "Y" = "$gtm_prompt_for_group" ] ; then install_options="${install_options} --prompt-for-group" ; fi
 	if [ "N" = "$gtm_lcase_utils" ] ; then install_options="${install_options} --ucaseonly-utils" ; fi
 	if [ -n "$gtm_user" ] ; then install_options="${install_options} --user ${gtm_user}" ; fi
-	if [ "Y" = "$ydb_utf8" ] ; then install_options="${install_options} --utf8" ; fi
+	# Use "--utf8 default" (instead of just "--utf8") so "--from-source" works with pre-V7.0-000 ydbinstall
+	# invocations too (where --utf8 does require a icu version parameter).
+	if [ "Y" = "$ydb_utf8" ] ; then install_options="${install_options} --utf8 default" ; fi
 	if [ "Y" = "$gtm_verbose" ] ; then install_options="${install_options} --verbose" ; fi
 	if [ "Y" = "$ydb_zlib" ] ; then install_options="${install_options} --zlib" ; fi
 
