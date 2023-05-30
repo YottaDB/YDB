@@ -147,8 +147,12 @@ void db_auto_upgrade(gd_region *reg)
 				/* YottaDB r122 introduced "reorg_sleep_nsec" to slow down reorg update rate by user */
 				csd->reorg_sleep_nsec = 0;
 				/* ----------------------------------- */
-				/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support nanosecond timers */
-				csd->flush_time = csd->flush_time * NANOSECS_IN_MSEC;
+				/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support nanosecond
+				 * timers. In GT.M, "flush_time" is an array of 2 4-byte quantities but only the first 4-byte
+				 * is used. Whereas in YottaDB, "flush_time" is an 8-byte quantity. Therefore, nullify the
+				 * second 4-byte before doing the below multiplication to arrive at the 8-byte value.
+				 */
+				csd->flush_time = (csd->flush_time & (((uint8)1 << 32) - 1)) * NANOSECS_IN_MSEC;
 				/* Note: This is a little-endian solution and will need to be modified if we
 				 * ever support big-endian.
 				 */
@@ -165,16 +169,19 @@ void db_auto_upgrade(gd_region *reg)
 				csd->max_procs.time = 0;
 				break;
 			case GDSMR200:
-		/* When adding a new minor version, the following template should be maintained
-		 * 1) Remove the penultimate 'break' (i.e. "break" in the PREVIOUS "case" block.
-		 * 2) If there are any file header fields added in the new minor version, initialize the fields to default values
-		 *    in THIS/CURRENT case (i.e. above this comment block). Do not add a "break" for THIS/CURRENT "case" block.
-		 * 3) Then, add a NEW "case" statement with the new minor version. The below 3 lines become part of that "case".
-		 * 4) For every GT.M minor ver added since the previous YottaDB release, duplicate the relevant auto upgrade
-		 *    code in this case block. This is needed as the GT.M GDSMV* (e.g. GDSMV63012) values will be way less
-		 *    than the older YottaDB GDSMVCURR value (e.g. in case of YottaDB r1.32) and so those GT.M switch/case
-		 *    code paths above will not be reached for upgrades from an older YottaDB release to a newer YottaDB release.
-		 */
+				/* When adding a new minor version, the following template should be maintained
+				 * 1) Remove the penultimate 'break' (i.e. "break" in the PREVIOUS "case" block.
+				 * 2) If there are any file header fields added in the new minor version, initialize the fields
+				 *    to default values in THIS/CURRENT case (i.e. above this comment block). Do not add a
+				 *    "break" for THIS/CURRENT "case" block.
+				 * 3) Then, add a NEW "case" statement with the new minor version. The below 3 lines become
+				 *    part of that "case".
+				 * 4) For every GT.M minor ver added since the previous YottaDB release, duplicate the relevant
+				 *    auto upgrade code in this case block. This is needed as the GT.M GDSMV* (e.g. GDSMV63012)
+				 *    values will be way less than the older YottaDB GDSMVCURR value (e.g. in case of YottaDB
+				 *    r1.32) and so those GT.M switch/case code paths above will not be reached for upgrades
+				 *    from an older YottaDB release to a newer YottaDB release.
+				 */
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
@@ -395,8 +402,12 @@ void v6_db_auto_upgrade(gd_region *reg)
 				MOVE_GVSTATS_REC_FROM_OLD_HDR_TO_NODE_LOCAL(csa, csd);
 			case GDSMV63014:
 			case GDSMR126:
-				/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support nanosecond timers */
-				csd->flush_time = csd->flush_time * NANOSECS_IN_MSEC;
+				/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support nanosecond
+				 * timers. In GT.M, "flush_time" is an array of 2 4-byte quantities but only the first 4-byte
+				 * is used. Whereas in YottaDB, "flush_time" is an 8-byte quantity. Therefore, nullify the
+				 * second 4-byte before doing the below multiplication to arrive at the 8-byte value.
+				 */
+				csd->flush_time = (csd->flush_time & (((uint8)1 << 32) - 1)) * NANOSECS_IN_MSEC;
 				/* Note: This is a little-endian solution and will need to be modified if we
 				 * ever support big-endian.
 				 */
