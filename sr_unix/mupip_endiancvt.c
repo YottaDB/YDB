@@ -701,8 +701,9 @@ void mupip_endiancvt(void)
 
 void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 {
-	int	idx;
-	time_t	ctime;
+	enum mdb_ver	native_minor_dbver;
+	int		idx;
+	time_t		ctime;
 
 	/************* MOSTLY STATIC DATABASE STATE FIELDS **************************/
 	SWAP_SD4(blk_size);
@@ -732,6 +733,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(max_non_bm_update_array_size);
 	/* SWAP_SD4(file_corrupt); is set in main routine	*/
 	SWAP_SD4_CAST(minor_dbver, enum mdb_ver);
+	native_minor_dbver = (new_is_native ? new->minor_dbver : old->minor_dbver);
 	SWAP_SD4(jnl_checksum);
 	SWAP_SD4(wcs_phase2_commit_wait_spincnt);
 	SWAP_SD4_CAST(last_mdb_ver, enum mdb_ver);
@@ -784,7 +786,32 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD8(trans_hist.total_blks);
 	SWAP_SD8(trans_hist.free_blocks);
 	/************* FIELDS RELATED TO WRITE CACHE FLUSHING *******************************/
-	SWAP_SD8(flush_time);
+	if (native_minor_dbver < GDSMR200)
+	{	/* Database is V7 format and the most recent version/release that has used this database is some GT.M V7 version.
+		 * In that case, the "flush_time" variable is an array of 2 4-byte quantities. So endian convert accordingly.
+		 */
+		int4	*new_ptr, *old_ptr;
+
+		/* Assert that minor_dbver cannot correspond to any YottaDB release. Only a GT.M release.
+		 * Hence the below asserts check for all YottaDB release GDSMR* values before GDSMR200.
+		 */
+		assert(GDSMR126 != native_minor_dbver);
+		assert(GDSMR130 != native_minor_dbver);
+		assert(GDSMR134 != native_minor_dbver);
+		assert(GDSMR136 != native_minor_dbver);
+		assert(8 == SIZEOF(new->flush_time));
+		new_ptr = (int4 *)&new->flush_time;
+		old_ptr = (int4 *)&old->flush_time;
+		*new_ptr = GTM_BYTESWAP_32(*old_ptr);
+		old_ptr++;
+		new_ptr++;
+		*new_ptr = GTM_BYTESWAP_32(*old_ptr);
+	} else
+	{	/* Database is V7 format and most recent version/release that has used this database is YottaDB release
+		 * r2.00. In that case, the "flush_time" variable is an 8-byte quantity. So endian convert accordingly.
+		 */
+		SWAP_SD8(flush_time);
+	}
 	SWAP_SD4(flush_trigger);
 	SWAP_SD4(n_wrt_per_flu);
 	SWAP_SD4(wait_disk_space);
@@ -938,8 +965,9 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 
 void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_native)
 {
-	int	idx;
-	time_t	ctime;
+	enum mdb_ver	native_minor_dbver;
+	int		idx;
+	time_t		ctime;
 
 	/* convert the header back down to V6 format  */
 	db_header_dwnconv((sgmnt_data_ptr_t)old);
@@ -973,6 +1001,7 @@ void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_n
 	SWAP_SD4(max_non_bm_update_array_size);
 	/* SWAP_SD4(file_corrupt); is set in main routine	*/
 	SWAP_SD4_CAST(minor_dbver, enum mdb_ver);
+	native_minor_dbver = (new_is_native ? new->minor_dbver : old->minor_dbver);
 	SWAP_SD4(jnl_checksum);
 	SWAP_SD4(wcs_phase2_commit_wait_spincnt);
 	SWAP_SD4_CAST(last_mdb_ver, enum mdb_ver);
@@ -1025,7 +1054,27 @@ void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_n
 	SWAP_SD4(trans_hist.total_blks);
 	SWAP_SD4(trans_hist.free_blocks);
 	/************* FIELDS RELATED TO WRITE CACHE FLUSHING *******************************/
-	SWAP_SD8(flush_time);
+	if (native_minor_dbver < GDSMR130)
+	{	/* Database is V6 format and the most recent version/release that has used this database is either
+		 * a GT.M V6 version or a YottaDB release that is less than r1.30. In that case, the "flush_time"
+		 * variable is an array of 2 4-byte quantities. So endian convert accordingly.
+		 */
+		int4	*new_ptr, *old_ptr;
+
+		assert(8 == SIZEOF(new->flush_time));
+		new_ptr = (int4 *)&new->flush_time;
+		old_ptr = (int4 *)&old->flush_time;
+		*new_ptr = GTM_BYTESWAP_32(*old_ptr);
+		old_ptr++;
+		new_ptr++;
+		*new_ptr = GTM_BYTESWAP_32(*old_ptr);
+	} else
+	{	/* Database is V6 format and most recent version/release that has used this database is a YottaDB release
+		 * that is greater than or equal to r1.30. In that case, the "flush_time" variable is an 8-byte quantity.
+		 * So endian convert accordingly.
+		 */
+		SWAP_SD8(flush_time);
+	}
 	SWAP_SD4(flush_trigger);
 	SWAP_SD4(n_wrt_per_flu);
 	SWAP_SD4(wait_disk_space);
