@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -150,9 +150,9 @@ void dse_rest(void)
 	if (0 == found_index)
 	{
 		if (version)
-			util_out_print("Error: Version !UL of block !XL not found in set of saved blocks", TRUE, version, from);
+			util_out_print("Error: Version !UL of block 0x!16@XQ not found in set of saved blocks", TRUE, version, &from);
 		else
-			util_out_print("Error: Block !XL not found in set of saved blocks", TRUE, from);
+			util_out_print("Error: Block 0x!16@XQ not found in set of saved blocks", TRUE, &from);
 		return;
 	}
 	if (!version)

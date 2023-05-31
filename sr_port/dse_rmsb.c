@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -87,9 +90,9 @@ void dse_rmsb(void)
 	if (0 == found_index)
 	{
 		if (version)
-			util_out_print("Error: Version !UL of block !XL not found in set of saved blocks", TRUE, version, blk);
+			util_out_print("Error: Version !UL of block 0x!16@XQ not found in set of saved blocks", TRUE, version, &blk);
 		else
-			util_out_print("Error: Block !XL not found in set of saved blocks", TRUE, blk);
+			util_out_print("Error: Block 0x!16@XQ not found in set of saved blocks", TRUE, &blk);
 		return;
 	}
 	if (!version)
