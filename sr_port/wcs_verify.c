@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -841,7 +841,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					assert(expect_damage);
 					ret = FALSE;
 					SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, &(cr->blk),
-						RTS_ERROR_TEXT("cr hash"), cr0 - cr_qbase, cr->blk % csd->bt_buckets, CALLFROM);
+						RTS_ERROR_TEXT("cr hash"),
+						(uint4)(cr0 - cr_qbase), (uint4)(cr->blk % csd->bt_buckets), CALLFROM);
 					if (caller_is_wcs_recover && !cr->stopped)
 					{	/* if cr->stopped is TRUE, then the buffer was created by "secshr_db_clnup",
 						 * and hence it is ok to have different hash value, but otherwise we believe
@@ -902,7 +903,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				assert(expect_damage);
 				ret = FALSE;
 				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, &(cr->blk),
-					RTS_ERROR_TEXT("cr blkque hash"), -1, cr->blk % csd->bt_buckets, CALLFROM);
+					RTS_ERROR_TEXT("cr blkque hash"), (uint4)-1, (uint4)(cr->blk % csd->bt_buckets),
+					CALLFROM);
 				if (caller_is_wcs_recover && !cr->stopped) /* see comment above ("cr hash") for similar handling */
 				{
 					assert(expect_damage);
