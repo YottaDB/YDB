@@ -20,7 +20,7 @@
 #   $ docker run --rm  -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
 
 # Stage 1: YottaDB build image
-FROM rockylinux:8.7 as ydb-release-builder
+FROM rockylinux:8.8 as ydb-release-builder
 
 ARG CMAKE_BUILD_TYPE=Release
 RUN yum update -y || true && \
@@ -73,15 +73,12 @@ RUN mkdir -p /tmp/yottadb-build \
  && make install
 
 # Stage 2: YottaDB release image
-FROM rockylinux:8.7 as ydb-release
+FROM rockylinux:8.8 as ydb-release
 
 RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,target=/tmp/staging \
     # This is a strange step: The mount volume is readonly; and we actually write to it in ydbinstall
     # So we need to copy the mount contents to a seaprate folder
     cp -R /tmp/staging /tmp/ydb-release && \
-    # Add the CMake build_os_release file which is not part of the install directory
-    # Needed to allow us to build Rocky Linux on AARCH64 for Docker Hub, but it's not officially supported
-    cp /etc/os-release /tmp/build_os_release && \
     yum update -y && \
     yum install -y \
                     file \
@@ -91,9 +88,15 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
                     libicu \
                     wget \
                     procps-ng \
-		    nano \
-		    gzip \
-		    && \
+                    nano \
+                    gzip \
+                    && \
+    # Add the CMake build_os_release file which is not part of the install
+    # directory Needed to allow us to build Rocky Linux on AARCH64 for Docker
+    # Hub, but it's not officially supported. We do this AFTER yum update, since
+    # it can change the minor version and cause /etc/os-release and
+    # /tmp/build_os_release to be different and result in ydbinstall failing.
+    cp /etc/os-release /tmp/build_os_release && \
     /tmp/ydb-release/ydbinstall --utf8 --installdir /opt/yottadb/current && \
     yum remove -y wget && \
     yum clean all && \
