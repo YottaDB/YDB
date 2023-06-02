@@ -337,7 +337,7 @@ boolean_t mu_int_blk(
 	}
 	/* pstar indicates that the current block is a (root block with only a star key) or not.
 		This is passed into mu_int_blk() as eb_ok */
-	pstar = (is_root && (SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + blk_id_sz == blk_size));
+	pstar = (is_root && (SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + (blk_id_sz == blk_size)));
 	if (blk_size < (SIZEOF(blk_hdr) + (eb_ok ? 0 : (SIZEOF(rec_hdr) + (level ? blk_id_sz : MIN_DATA)))))
 	{
 		MU_INT_RETRY_ERR_RETURN(ERR_DBBSIZMN, TRUE, TRUE, bot_key, bot_len, top_key, top_len,

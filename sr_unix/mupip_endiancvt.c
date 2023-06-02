@@ -231,6 +231,7 @@ void mupip_endiancvt(void)
 		} else
 			mupip_exit(ERR_IOEOF);
 	}
+	/* memcmp returns 0 on a match, so use && to see if both return a non-0 value meaning it isn't one of the expected labels */
 	if (MEMCMP_LIT(&old_data->label[0], GDS_LABEL) && MEMCMP_LIT(&old_data->label[0], V6_GDS_LABEL))
 	{
 		util_out_print("Database file !AD has an unrecognizable format", TRUE, n_len, db_name);
@@ -347,6 +348,9 @@ void mupip_endiancvt(void)
 			} else
 				mupip_exit(ERR_IOEOF);
 		}
+		/* memcmp returns 0 on a match, so use && to see if both return a non-0 value meaning
+		 * it isn't one of the expected labels.
+		 */
 		if (MEMCMP_LIT(&old_data->label[0], GDS_LABEL) && MEMCMP_LIT(&old_data->label[0], V6_GDS_LABEL))
 		{
 			assert(FALSE);

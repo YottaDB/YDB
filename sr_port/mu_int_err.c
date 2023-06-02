@@ -117,7 +117,7 @@ void	mu_int_err(
 	 * The offset is represented as a sequence of hexadecimal digits and hence the "4*" below.
 	 * If MAX_DB_BLK_SIZE is bumped up at a later point, this assert will alert us about the need to fix OFFSET_WINDOW.
 	 */
-	assert((1 << (4*OFFSET_WINDOW)) > MAX_DB_BLK_SIZE);
+	assert((1 << (4 * OFFSET_WINDOW)) > MAX_DB_BLK_SIZE);
 	MEMCPY_LIT(&util_buff[util_len], NEWLINE);
 	util_len += SIZEOF(NEWLINE) - 1;
 	i2hexl_blkfill(mu_int_path[mu_int_plen], &util_buff[util_len], BLOCK_WINDOW);

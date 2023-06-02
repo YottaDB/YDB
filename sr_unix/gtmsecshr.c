@@ -895,6 +895,9 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 				CLOSEFILE_RESET(fd, save_errno);	/* resets "fd" to FD_INVALID */
 				break;
 			}
+			/* memcmp returns 0 on a match, so use && to see if both return a non-0 value meaning
+			 * it isn't one of the expected labels.
+			 */
 			if (memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1) && memcmp(csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
 			{	/* Verify is GT.M database file */
 				buf->code = ERR_DBNOTGDS;
