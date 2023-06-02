@@ -134,7 +134,8 @@ ENV ydb_dir=/data \
     LANGUAGE=en_US:en \
     LC_ALL=C.UTF-8 \
     ydb_chset=UTF-8 \
-    GOPATH=$HOME/go
+    GOPATH=$HOME/go \
+    GOPROXY=https://proxy.golang.org/cached-only
 RUN . /opt/yottadb/current/ydb_env_set \
  && go version \
  && go get -t -d lang.yottadb.com/go/yottadb \
