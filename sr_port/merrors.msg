@@ -317,7 +317,7 @@ UNUSEDMSG313	<MTRECTOOBIG last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
 UNUSEDMSG314	<MTRECTOOSM last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
 JNLTMQUAL3	<Time qualifier BEFORE_TIME="!AZ" is less than the journal file(s) minimum timestamp="!AZ">/error/fao=2!/ansi=0
 MULTLAB		<This label has been previously defined>/error/fao=0!/ansi=57
-GTMCURUNSUPP	<The requested operation is unsupported in this version of GT.M>/error/fao=0!/ansi=0
+GTMCURUNSUPP	<The requested operation is unsupported in this version of YottaDB>/error/fao=0!/ansi=0
 CCEDUMPOFF	<>/fatal/fao=0!/ansi=0
 NOPLACE		<Line specified in a ZBREAK cannot be found>/error/fao=0!/ansi=0
 JNLCLOSE	<Error closing journal file !AD>/error/fao=2!/ansi=0
@@ -582,7 +582,7 @@ RECCNT		<Last LOAD record number: !UL>/info/fao=1!/ansi=0
 TEXT		<!AD>/info/fao=2!/ansi=0
 ZWRSPONE	<Subscript patterns in ZWRITE are atomic; Invalid delimiter>/error/fao=0!/ansi=0
 FILEDEL		<File !AD successfully deleted>/info/fao=2!/ansi=0
-JNLBADLABEL	<Journal file !AD has a bad GT.M Journal File Label. Expected !AD. Found !AD.>/error/fao=6!/ansi=0
+JNLBADLABEL	<Journal file !AD has a bad YottaDB Journal File Label. Expected !AD. Found !AD.>/error/fao=6!/ansi=0
 JNLREADEOF	<End of journal file encountered>/error/fao=0!/ansi=0
 JNLRECFMT	<Journal file record format error encountered>/error/fao=0!/ansi=0
 BLKTOODEEP	<Block level too deep>/warning/fao=0!/ansi=0
