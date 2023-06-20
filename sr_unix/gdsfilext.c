@@ -183,7 +183,7 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 			- DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, bplmap) + blocks, bplmap - 1)
 			- DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, bplmap);
 	new_blocks = blocks + new_bit_maps;
-	assert((0 < (gtm_int8)new_blocks) || (!cs_data->defer_allocate && (0 == new_blocks)));
+	assert((0 < new_blocks) || (!cs_data->defer_allocate && (0 == new_blocks)));
 	if (new_blocks + cs_data->trans_hist.total_blks > MAXTOTALBLKS(cs_data))
 	{
 		assert(WBTEST_ENABLED(WBTEST_FILE_EXTEND_ERROR));
