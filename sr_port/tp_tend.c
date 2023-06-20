@@ -283,7 +283,7 @@ boolean_t	tp_tend()
 #	endif
 	int4			tprestart_syslog_delta;
         int4			event_type, param_val;
-	gtm_int8		pvt_total_blks;
+	block_id		pvt_total_blks;
         void (*set_fn)(int4 param);
 	DCL_THREADGBL_ACCESS;
 

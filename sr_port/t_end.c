@@ -256,7 +256,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	jbuf_rsrv_struct_t	*jrs;
 	jrec_rsrv_elem_t	*first_jre, *jre, *jre_top;
         int4			event_type, param_val;
-	uint4			pvt_total_blks;
+	block_id		pvt_total_blks;
         void (*set_fn)(int4 param);
 	DCL_THREADGBL_ACCESS;
 
