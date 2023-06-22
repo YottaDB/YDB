@@ -46,7 +46,7 @@ check_if_hdrs_exist()
 	tmpprog=$(mktemp -t ydbinstallXXXXXX --suffix=.c)
 	for hdr in $hdrlist ; do
 		printf "%s\n" '#include <stddef.h>' '#include <stdarg.h>' '#include <stdio.h>' \
-			'#include <setjmp.h>' '#include "'$hdr'"' "int main() {}" >$tmpprog
+			'#include <setjmp.h>' '#ifndef _FILE_OFFSET_BITS' '#define _FILE_OFFSET_BITS 64' '#endif' '#include <'$hdr'>' "int main() {}" >$tmpprog
 		if ! gcc -H --syntax-only $tmpprog 1>/dev/null 2>&1 ; then
 			hdrnotfound="$hdrnotfound $hdr" ; unset hdrflag
 		fi
