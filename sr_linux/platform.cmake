@@ -3,7 +3,7 @@
 # Copyright (c) 2013-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -50,10 +50,6 @@ else()
     set(arch "aarch64")
     set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -march=armv8-a -mcpu=cortex-a53")
     set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-march=armv8-a")
-    # gcc on AARCH64 works with -ggdb3 but clang on AARCH64 does not so temporarily enable the below only for gcc
-    if (CMAKE_COMPILER_IS_GNUCC)
-      set(CMAKE_ASM_FLAGS_DEBUG "-Wa,-ggdb3 ${CMAKE_ASM_FLAGS_DEBUG}")
-    endif()
   else()
     set(arch "x86_64")
     set(bits 64)
