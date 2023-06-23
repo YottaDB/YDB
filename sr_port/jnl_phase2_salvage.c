@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,7 @@ void	jnl_phase2_salvage(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp, jbuf_phase2_in_p
 {
 	boolean_t		write_null_record;
 	uint4			next_align_addr, start_freeaddr, end_freeaddr, save_phase2_freeaddr;
-	uint4			alignsize, pini_addr, rlen, tot_jrec_len;
+	uint4			alignsize, pini_addr, rlen, tot_jrec_len, jrec_type;
 	struct_jrec_null	null_rec;
 	struct_jrec_inctn	inctn_rec;
 	jnl_record		*jrec;
@@ -125,10 +125,11 @@ void	jnl_phase2_salvage(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp, jbuf_phase2_in_p
 		assert(start_freeaddr <= end_freeaddr);
 	}
 	assert(start_freeaddr + rlen <= end_freeaddr);
+	/* Note: "jrec_type" used below (instead of jrec->prefix.type) to avoid [-Warray-bounds] warning from gcc 12.2 on AARCH64 */
 	if (write_null_record)
 	{	/* Write JRT_NULL record */
 		assert(NULL_RECLEN == rlen);
-		null_rec.prefix.jrec_type = JRT_NULL;
+		null_rec.prefix.jrec_type = jrec_type = JRT_NULL;
 		null_rec.prefix.forwptr = NULL_RECLEN;
 		null_rec.prefix.pini_addr = pini_addr;
 		null_rec.prefix.time = deadCmt->jrec_time;
@@ -148,7 +149,7 @@ void	jnl_phase2_salvage(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp, jbuf_phase2_in_p
 		null_rec.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)jrec, NULL_RECLEN);
 	} else
 	{	/* Write JRT_INCTN record */
-		inctn_rec.prefix.jrec_type = JRT_INCTN;
+		inctn_rec.prefix.jrec_type = jrec_type = JRT_INCTN;
 		inctn_rec.prefix.forwptr = INCTN_RECLEN;
 		inctn_rec.prefix.pini_addr = pini_addr;
 		inctn_rec.prefix.time = deadCmt->jrec_time;
@@ -162,7 +163,7 @@ void	jnl_phase2_salvage(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp, jbuf_phase2_in_p
 		inctn_rec.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)jrec, INCTN_RECLEN);
 		deadCmt->jnl_seqno = 0;	/* for the send_msg_csa call below */
 	}
-	jnl_write(jpc, jrec->prefix.jrec_type, jrec, NULL);
+	jnl_write(jpc, jrec_type, jrec, NULL);
 	assert(start_freeaddr + rlen == jpc->phase2_freeaddr);
 	while (next_align_addr < end_freeaddr)
 	{	/* Write one or more JRT_ALIGN records to fill up one "alignsize" space. Note that one JRT_ALIGN record
