@@ -147,9 +147,12 @@ if [ -n "$commit_list" ]; then
 		if [[ -n "$changes" ]]; then
 			additions=$(echo $changes | awk '{print $1}')
 			deletions=$(echo $changes | awk '{print $2}')
+			if [[ (( $additions == 0 )) && (( $deletions == 0 )) ]]; then
+				continue
+			fi
 			num_copyright_additions=$(git diff upstream_repo/$target_branch..HEAD "$file" | grep -e '^+' | grep -c 'Copyright (c)' || true)
 			num_copyright_deletions=$(git diff upstream_repo/$target_branch..HEAD "$file" | grep -e '^-' | grep -c 'Copyright (c)' || true)
-			if [[ ( $deletions == $num_copyright_deletions ) && ( $additions == $num_copyright_additions ) ]]; then
+			if [[ (( $deletions == $num_copyright_deletions )) && (( $additions == $num_copyright_additions )) ]]; then
 				copyright_only="$copyright_only $file"
 			fi
 			if $needs_copyright $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
