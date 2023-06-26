@@ -135,32 +135,12 @@ ENV ydb_dir=/data \
     LC_ALL=C.UTF-8 \
     ydb_chset=UTF-8 \
     GOPATH=$HOME/go \
-    GOPROXY=https://proxy.golang.org/cached-only
-RUN . /opt/yottadb/current/ydb_env_set \
- && go version \
- && go get -t -d lang.yottadb.com/go/yottadb \
- && cd $GOPATH/src/lang.yottadb.com/go/yottadb \
- && git checkout develop \
- && cd - \
- && git clone https://github.com/anet-be/lua-yottadb.git \
- && cd lua-yottadb \
- && make install \
- && cd - \
- && rm -rf lua-yottadb \
- && git clone https://gitlab.com/oesiman/yottadb-perl.git \
- && cd yottadb-perl \
- && perl Makefile.PL \
- && make test TEST_DB=1 \
- && make install \
- && cd - \
- && rm -rf yottadb-perl \
- && git clone https://gitlab.com/YottaDB/Lang/YDBPython.git \
- && cd YDBPython \
- && python3 setup.py install --user \
- && pip3 install pytest psutil pytest-order \
- && for artifact in $(cat .gitignore); do rm -rf $artifact; done \
- && cd - \
- && rm -rf YDBPython
+    GOPROXY=https://proxy.golang.org/cached-only \
+    ydb_dist=/opt/yottadb/current
+RUN go version && go get -t -d lang.yottadb.com/go/yottadb && cd $GOPATH/src/lang.yottadb.com/go/yottadb && git checkout develop
+RUN git clone https://github.com/anet-be/lua-yottadb.git && cd lua-yottadb && make install && cd - && rm -rf lua-yottadb
+RUN . /opt/yottadb/current/ydb_env_set && git clone https://gitlab.com/oesiman/yottadb-perl.git && cd yottadb-perl && perl Makefile.PL && make test TEST_DB=1 && make install && cd - && rm -rf yottadb-perl
+RUN git clone https://gitlab.com/YottaDB/Lang/YDBPython.git && cd YDBPython && python3 setup.py install --user && cd - && rm -rf YDBPython
 COPY ci/docker-scripts/docker-debian-startup.sh /docker-debian-startup.sh
 EXPOSE 1337 9080
 ENTRYPOINT ["/docker-debian-startup.sh"]
