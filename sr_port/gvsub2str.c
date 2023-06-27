@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -67,9 +70,19 @@ unsigned char *gvsub2str(unsigned char *sub, mstr *opstr, boolean_t xlat_flg)
 	targ = (unsigned char *)opstr->addr;
 	if (STR_SUB_PREFIX == ch || (SUBSCRIPT_STDCOL_NULL == ch && KEY_DELIMITER == *sub))
 	{	/* If this is a string */
+		unsigned char	*ptr_top;
+
 		in_length = 0;
-		ptr = (xlat_flg ? buf : targ);
-		while ((ch = *sub++))
+		if (xlat_flg)
+		{
+			ptr = buf;
+			ptr_top = ptr + SIZEOF(buf);
+		} else
+		{
+			ptr = targ;
+			ptr_top = ptr + opstr->len;
+		}
+		while ((ch = *sub++) && (ptr < ptr_top))
 		{	/* Copy string to ptr, xlating each char */
 			in_length++;
 			if (STR_SUB_ESCAPE == ch)	/* if this is an escape, demote next char */
@@ -111,6 +124,12 @@ unsigned char *gvsub2str(unsigned char *sub, mstr *opstr, boolean_t xlat_flg)
 		if (xlat_flg)
 		{
 			targ_len = opstr->len;
+			if (ZWR_EXP_RATIO(in_length) > targ_len)
+			{	/* Ensure zwrite expansion of "in_length" will not exceed "targ_len".
+				 * Or else "format2zwr()" will fail a similar assert.
+				 */
+				in_length = ZWR_EXP_RATIO_INVERT(targ_len);
+			}
 			format2zwr((sm_uc_ptr_t)ptr, in_length, targ, &targ_len);
 			assert(targ_len <= opstr->len);
 			targ = targ + targ_len;

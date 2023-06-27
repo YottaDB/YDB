@@ -544,9 +544,11 @@ MBSTART {													\
  */
 #ifdef UTF8_SUPPORTED
 #	define	ZWR_EXP_RATIO(X)		(((X) * 9 + 11))
+#	define	ZWR_EXP_RATIO_INVERT(X)		(((X) - 11) / 9)
 #	define	MAX_ZWR_DCHAR_DIGITS		5
 #else
 #	define	ZWR_EXP_RATIO(X)		((X) * 6 + 7)
+#	define	ZWR_EXP_RATIO_INVERT(X)		(((X) - 7) / 6)
 #	define	MAX_ZWR_DCHAR_DIGITS		3
 #endif
 #define		MAX_ZWR_KEY_SZ			ZWR_EXP_RATIO(MAX_KEY_SZ)
