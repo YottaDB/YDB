@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -301,6 +301,9 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 				 */
 				if (DEFER_EXIT_PROCESSING)
 				{
+					if (OK_TO_INTERRUPT)
+						DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler",
+											sig, info, context, FALSE);
 					ALTERNATE_SIGHANDLING_SAVE_SIGNUM(using_alternate_sighandling);
 					SET_FORCED_EXIT_STATE(sig);
 					/* Before bumping "exit_state" or sending a ERR_FORCEDHALT message to syslog/console,
@@ -360,6 +363,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
 			if (DEFER_EXIT_PROCESSING)
 			{
+				if (OK_TO_INTERRUPT)
+					DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler", sig, info, context, FALSE);
 				ALTERNATE_SIGHANDLING_SAVE_SIGNUM(using_alternate_sighandling);
 				SET_FORCED_EXIT_STATE(sig);
 				/* Avoid duplicate bump of "exit_state" */

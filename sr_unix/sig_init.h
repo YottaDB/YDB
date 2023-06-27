@@ -248,6 +248,8 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 	 */											\
 	if (!IS_DONT_WANT_CORE_TRUE(SIG))							\
 	{											\
+		int	i;									\
+												\
 		for (i = 0; i < SAFE_TO_FORK_N_CORE_TRIES; i++)					\
 		{										\
 			if (safe_to_fork_n_core)						\
@@ -320,10 +322,6 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 	GBLREF	enum sig_handler_t	ydb_stm_invoke_deferred_signal_handler_type;						\
 	DEBUG_ONLY(GBLREF uint4	dollar_tlevel;)											\
 																\
-	pthread_t		mutexHolderThreadId, thisThreadId;								\
-	int			i, tLevel;											\
-	boolean_t		isSigThreadDirected, signalForwarded, thisThreadIsMutexHolder;					\
-																\
 	assert(!USING_ALTERNATE_SIGHANDLING);											\
 	assert((DUMMY_SIG_NUM == SIG) || (NULL != INFO));									\
 	if (DUMMY_SIG_NUM != SIG)												\
@@ -332,8 +330,12 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 		 * "FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED" itself. The variable "signalForwarded" tracks this below.		\
 		 */														\
 		if (simpleThreadAPI_active)											\
-		{	/*													\
-			 * Note: The below comment talks about SIGALRM as an example but the same reasoning applies to		\
+		{														\
+			pthread_t	mutexHolderThreadId, thisThreadId;							\
+			int		tLevel;											\
+			boolean_t	isSigThreadDirected, signalForwarded, thisThreadIsMutexHolder;				\
+																\
+			/* Note: The below comment talks about SIGALRM as an example but the same reasoning applies to		\
 			 * other signals too which this macro can be called for.						\
 			 *													\
 			 * If SimpleThreadAPI is active, the STAPI signal thread is usually the one that will receive		\
@@ -425,24 +427,17 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 				}												\
 			}													\
 		} else														\
-		{														\
-			thisThreadId = pthread_self();										\
-			if (gtm_main_thread_id_set && !pthread_equal(gtm_main_thread_id, thisThreadId))				\
-			{	/* Only redirect the signal if the main thread ID has been defined, and we are not that. */	\
-				/* Caller wants INFO and CONTEXT to be recorded as forwarding the signal would lose		\
-				 * that information in the forwarded call to the signal handler. Do that first.			\
-				 * Then forward the signal.									\
-				 */												\
-				STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG, INFO, CONTEXT);				\
-				/* Now that we have saved OS signal handler information, forward the signal */			\
-				pthread_kill(gtm_main_thread_id, SIG);								\
-				if (IS_EXI_SIGNAL)										\
-					DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED(SIG);						\
-				return;												\
-			}													\
-			/* Reset "INFO" and "CONTEXT" to be usable by a later call to "extract_signal_info" */			\
-			SAVE_OS_SIGNAL_HANDLER_INFO(SIGHNDLRTYPE, INFO);							\
-			SAVE_OS_SIGNAL_HANDLER_CONTEXT(SIGHNDLRTYPE, CONTEXT);							\
+		{	/* This is a Simple API process with potentially multiple threads. Check if the thread that did		\
+			 * the "ydb_init()" call is still alive. If so, forward the signal to that thread as we don't want	\
+			 * multiple threads running YottaDB code at the same time. If that thread is not alive (for example,	\
+			 * in an application using the Flask Web framework and the YDBPython wrapper, every YottaDB action,	\
+			 * including "ydb_init()", happens in a short-lived thread) handle it in current thread (YDBPython#32).	\
+			 * Since it is not accurately possible to detect if a thread exists or not (using the "pthread" calls)	\
+			 * we decide to handle the signal in the current thread in both the cases.				\
+			 */													\
+			/* Reset "INFO" and "CONTEXT" to be usable by a later call to "extract_signal_info" */		\
+			SAVE_OS_SIGNAL_HANDLER_INFO(SIGHNDLRTYPE, INFO);						\
+			SAVE_OS_SIGNAL_HANDLER_CONTEXT(SIGHNDLRTYPE, CONTEXT);						\
 		}														\
 	} else															\
 	{	/* Signal handler is explicitly invoked by YottaDB (e.g. by "ydb_stm_invoke_deferred_signal_handler") after	\
