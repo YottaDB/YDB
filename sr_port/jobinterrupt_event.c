@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,7 @@ void jobinterrupt_event(int sig, siginfo_t *info, void *context)
 	 */
 	if (!USING_ALTERNATE_SIGHANDLING)
 	{
-		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("jobinterrupt_event", sig, info, context, FALSE);
+		drive_non_ydb_signal_handler_if_any("jobinterrupt_event", sig, info, context, FALSE);
 	}
 }
 

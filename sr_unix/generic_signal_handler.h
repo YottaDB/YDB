@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001 Sanchez Computer Associates, Inc.		*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,45 +25,9 @@
 #include "sleep_cnt.h"
 
 GBLREF void (*ydb_stm_thread_exit_fnptr)(void);
+void drive_non_ydb_signal_handler_if_any(char *caller, int sig, siginfo_t *info, void *context, boolean_t drive_exit);
 
 #define YDB_ALTSTACK_SIZE	(256 * 1024)	/* Required size for alt-stack */
-
-/* Define a type for a sighandler_t variation for when SA_SIGINFO is used. Also, when we share signal handling with a
- * main in simpleAPI mode and need to drive the non-YottaDB base routine's handler for a signal, we need to move it to
- * a matching type because Linux does not define the handler with information attributes (the siginfo_t and context
- * parameters sent when SA_SIGINFO is specified) without some exotic C99* flag. Use this type to drive the handler.
- */
-typedef void (*nonYDB_sighandler_t)(int, siginfo_t *, void *);
-
-#define IS_HANDLER_DEFINED(SIGNAL) 						\
-	((SIG_DFL != (sighandler_t)orig_sig_action[(SIGNAL)].sa_sigaction)	\
-	 && (SIG_IGN != (sighandler_t)orig_sig_action[(SIGNAL)].sa_sigaction))
-
-/* This macro was originally added when YDB added a Go wrapper but after some rework, the Go wrapper now handles the signals
- * and lets YottaDB know about with "alternate signal handling mode". But since signal control is not likely to go away and
- * because we are adding wrappers for other languages, we are keeping this macro around and driving signals that come in
- * with it so the original signal handlers (if any were instantiated before the YDB engine was initialized) get driven when
- * a signal comes in.
- */
-#define DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY(NAME, SIGNAL, INFO, CONTEXT, DRIVEEXIT)					\
-MBSTART {														\
-	nonYDB_sighandler_t	sighandler;										\
-															\
-	if ((MUMPS_CALLIN & invocation_mode) && IS_HANDLER_DEFINED(SIGNAL))						\
-	{														\
-		assert((0 < (SIGNAL)) && (NSIG >= (SIGNAL)));								\
-		if (DRIVEEXIT)												\
-		{													\
-			DBGSIGHND((stderr, "%s: Driving ydb_stm_thread_exit() prior to signal passthru\n", NAME));	\
-			if (NULL != ydb_stm_thread_exit_fnptr)								\
-				(*ydb_stm_thread_exit_fnptr)();								\
-		}													\
-		sighandler = (nonYDB_sighandler_t)(orig_sig_action[(SIGNAL)].sa_handler);				\
-		DBGSIGHND((stderr, "%s: Passing signal %d through to the caller\n", (NAME), (SIGNAL)));			\
-		(*sighandler)((SIGNAL), (INFO), (CONTEXT));	/* Note - likely to NOT return */			\
-		DBGSIGHND((stderr, "%s: Returned from signal passthru for signal %d\n", (NAME), (SIGNAL)));		\
-	}														\
-} MBEND
 
 /* Macro to check if a given signal sets the "dont_want_core" variable to TRUE in the function "generic_signal_handler" */
 #define	IS_DONT_WANT_CORE_TRUE(SIG)	((SIGQUIT == SIG) || (SIGTERM == SIG) || (SIGINT == SIG))

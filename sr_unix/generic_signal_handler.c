@@ -183,7 +183,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 	{
 		if (!using_alternate_sighandling)	/* Go does not send us signals so no need to forward */
 		{
-			DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler", sig, info, context, TRUE);
+			drive_non_ydb_signal_handler_if_any("generic_signal_handler1", sig, info, context, TRUE);
 			UNDERSCORE_EXIT(sig);
 		}
 		return;		/* Nothing we can do if exit handler has run */
@@ -302,7 +302,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 				if (DEFER_EXIT_PROCESSING)
 				{
 					if (OK_TO_INTERRUPT)
-						DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler",
+						drive_non_ydb_signal_handler_if_any("generic_signal_handler2",
 											sig, info, context, FALSE);
 					ALTERNATE_SIGHANDLING_SAVE_SIGNUM(using_alternate_sighandling);
 					SET_FORCED_EXIT_STATE(sig);
@@ -364,7 +364,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 			if (DEFER_EXIT_PROCESSING)
 			{
 				if (OK_TO_INTERRUPT)
-					DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler", sig, info, context, FALSE);
+					drive_non_ydb_signal_handler_if_any("generic_signal_handler3", sig, info, context, FALSE);
 				ALTERNATE_SIGHANDLING_SAVE_SIGNUM(using_alternate_sighandling);
 				SET_FORCED_EXIT_STATE(sig);
 				/* Avoid duplicate bump of "exit_state" */

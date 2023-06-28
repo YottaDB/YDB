@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson.			*
@@ -821,7 +821,7 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 #		ifdef SIGNAL_PASSTHRU
 		if (!USING_ALTERNATE_SIGHANDLING && ((SIGALRM == orig_why) || signal_forwarded))
 		{	/* Only drive this handler if we have an actual signal - not a dummy call */
-			DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("timer_handler", why, info, context, FALSE);
+			drive_non_ydb_signal_handler_if_any("timer_handler", why, info, context, FALSE);
 		}
 #		endif
 		DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
@@ -1009,7 +1009,7 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 	/* If this is a call-in/simpleAPI mode and a handler exists for this signal, call it */
 	if (!USING_ALTERNATE_SIGHANDLING && ((SIGALRM == orig_why) || signal_forwarded))
 	{
-		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("timer_handler2", why, info, context, orig_sig_action[why].sa_sigaction);
+		drive_non_ydb_signal_handler_if_any("timer_handler2", why, info, context, orig_sig_action[why].sa_sigaction);
 	}
 #	endif
 	DUMP_TIMER_INFO("At the end of timer_handler()");

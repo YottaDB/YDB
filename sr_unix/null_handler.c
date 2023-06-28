@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,5 +27,5 @@ GBLREF	struct sigaction	orig_sig_action[];
 void null_handler(int sig, siginfo_t *info, void *context)
 {	/* Just forward the signal if there's a handler for it and we are handling signals - otherwise ignore it */
 	if (!USING_ALTERNATE_SIGHANDLING)
-		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("null_handler", sig, info, context, FALSE);
+		drive_non_ydb_signal_handler_if_any("null_handler", sig, info, context, FALSE);
 }

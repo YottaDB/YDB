@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,7 +78,7 @@ void signal_exit_handler(char *exit_handler_name, int sig, siginfo_t *info, void
 	DRIVE_EXIT_HANDLER_IF_EXISTS;
 	if (!USING_ALTERNATE_SIGHANDLING)
 	{
-		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("deferred_exit_handler", sig, info, context, TRUE);
+		drive_non_ydb_signal_handler_if_any("deferred_exit_handler", sig, info, context, TRUE);
 	} else
 	{	/* The main() entry point of this process is not YottaDB but is something else that is using alternate signal
 		 * handling (currently only Go is supported). For Go, we cannot EXIT here. We need to drive a panic() to

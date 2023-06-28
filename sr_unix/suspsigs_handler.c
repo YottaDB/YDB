@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,7 +39,7 @@ void suspsigs_handler(int sig, siginfo_t* info, void *context)
 	if (!USING_ALTERNATE_SIGHANDLING)
 	{
 		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_suspsigs_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
-		/* Note: We do not have any DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY usages below. That is, we do not forward
+		/* Note: We do not have any "drive_non_ydb_signal_handler_if_any()" usages below. That is, we do not forward
 		 * these signals to any non-YottaDB signal handler routine (e.g Go program using the YottaDB GoWrapper)
 		 * in this case but instead depend purely on YottaDB's suspend/continue operations.
 		 */
