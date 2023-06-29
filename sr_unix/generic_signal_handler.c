@@ -184,7 +184,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 		if (!using_alternate_sighandling)	/* Go does not send us signals so no need to forward */
 		{
 			drive_non_ydb_signal_handler_if_any("generic_signal_handler1", sig, info, context, TRUE);
-			UNDERSCORE_EXIT(sig);
+			UNDERSCORE_EXIT(-sig);
 		}
 		return;		/* Nothing we can do if exit handler has run */
 	}

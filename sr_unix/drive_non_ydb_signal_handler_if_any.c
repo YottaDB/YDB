@@ -66,7 +66,7 @@ void drive_non_ydb_signal_handler_if_any(char *caller, int sig, siginfo_t *info,
 				assert(OK_TO_INTERRUPT);	/* ensure we are not in middle of database commit etc.
 								 * as otherwise we will end up in integrity errors.
 								 */
-				UNDERSCORE_EXIT(sig);
+				UNDERSCORE_EXIT(-sig);
 			}
 		}
 		return;
