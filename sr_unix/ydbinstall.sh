@@ -1378,6 +1378,21 @@ fi
 	if [ "Y" != "$ydb_utf8" ] ; then echo n		# Response to : "Should UTF-8 support be installed?"
 	else echo y					# Response to : "Should UTF-8 support be installed?"
 	fi
+	# YottaDB r1.38 and older releases had 2 additional questions in the "sr_unix/configure.gtc" script in case
+	# they were asked to install with "--utf8". Add answers to those questions. In such cases, prior releases
+	# allowed for an arbitrary ICU version to be installed. But the current ydbinstall.sh does not allow for such
+	# an option so the user cannot pass a specific ICU version to the older release configure script using the
+	# post-r1.38/latest ydbinstall script. Such an option was never used by anyone in our understanding. All users only
+	# cared for the latest ICU version to be installed so take care of that using "$ydb_found_or_requested_icu_version"
+	# variable.
+	if expr "r1.38" \>= "${ydb_version}" >/dev/null; then
+		# If --utf8 was not specified, there are no additional questions in the older release. So skip the below logic.
+		if [ "Y" = "$ydb_utf8" ] ; then
+			# Add answers to the additional 2 questions that older release configure.gtc script expects.
+			echo y			# Response to : "Should an ICU version other than the default be used?"
+			echo $ydb_found_or_requested_icu_version	# Response to : "Enter ICU version"
+		fi
+	fi
 	if [ "Y" = $ydb_deprecated ] ; then echo y	# Response to : "Should deprecated components be installed?"
 	else echo n					# Response to : "Should deprecated components be installed?"
 	fi
