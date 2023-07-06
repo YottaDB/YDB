@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -40,7 +40,7 @@ void op_zstep(uint4 code, mval *action)
 {
 	boolean_t	already_ev_handling;
 	int4		ev, status;
-	intrpt_state_t	prev_intrpt_state;
+	intrpt_state_t	prev_intrpt_state = INTRPT_NUM_STATES;
 	save_xfer_entry	*entry;
 	stack_frame	*fp;
 	DCL_THREADGBL_ACCESS;

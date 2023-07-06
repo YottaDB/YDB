@@ -36,19 +36,19 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
 
 block_index t_create (
-		      block_id		hint,		/*  A hint block number.  */
-		      unsigned char	*upd_addr,	/*  address of the block segment array which contains
-							 *  update info for the block
-							 */
-		      block_offset	ins_off,	/*  offset to the position in the buffer that is to receive a block number
-							 *  when one is created.
-							 */
-		      block_index	index,		/*  index into the create/write set.  The specified entry is always a
-							 *  created entry. When the create gets assigned a block number,
-							 *  the block number is inserted into this buffer at the location
-							 *  specified by ins_off.
-							 */
-		      char		level)
+		      block_id			hint,		/*  A hint block number.  */
+		      struct blk_segment_struct	*upd_addr,	/*  address of the block segment array which contains
+								 *  update info for the block
+								 */
+		      block_offset		ins_off,	/*  offset to the position in the buffer that is to receive a block
+								 *  number when one is created.
+								 */
+		      block_index		index,		/*  index into the create/write set.  The specified entry is always
+								 *  a created entry. When the create gets assigned a block number,
+								 *  the block number is inserted into this buffer at the location
+								 *  specified by ins_off.
+								 */
+		      char			level)
 {
 	cw_set_element	*cse;
 
@@ -73,7 +73,7 @@ block_index t_create (
 	 */
 	assert((hint < 0) || (BLK_ID_32_VER < cs_data->desired_db_format) || ((block_id_32)hint == hint));
 	cse->blk = hint;
-	cse->upd_addr = upd_addr;
+	cse->upd_addr.blk = upd_addr;
 	cse->ins_off = ins_off;
 	cse->index = index;
 	cse->reference_cnt = 0;
@@ -86,13 +86,13 @@ block_index t_create (
 	cse->t_level = dollar_tlevel;
 	cse->low_tlevel = NULL;
 	cse->high_tlevel = NULL;
-	/* When dealing with an index or directory tree block, take upgrade_block_split_format into account. Others use desired DB fmt */
+	/* When dealing with an index or directory tree block, take upgrade_block_split_format into account.
+	 * Others use desired DB fmt.
+	 */
 	if ((level || (DIR_ROOT == gv_target->root)) && upgrade_block_split_format)
-	{
-		assert(FALSE == cs_data->fully_upgraded);
-		cse->ondsk_blkver = upgrade_block_split_format;
-	} else
-		cse->ondsk_blkver = cs_data->desired_db_format;
+		cse->ondsk_blkver = upgrade_block_split_format;	/* use upgrade_block_split_format as directed by caller */
+	else
+		cse->ondsk_blkver = cs_data->desired_db_format;	/* Level zero blocks always use desired format */
 	assert (NULL != gv_target);	/* t_create is called by gvcst kill/put,mu split/swap_blk, where gv_target can't be NULL */
 	/* For uninitialized gv_target, initialize the in_tree status as IN_DIR_TREE, which later may be modified by t_write */
 	if (0 == gv_target->root)

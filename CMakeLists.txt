@@ -1,6 +1,10 @@
 #################################################################
 #								#
+<<<<<<< HEAD
 # Copyright (c) 2012-2020 Fidelity National Information		#
+=======
+# Copyright (c) 2012-2023 Fidelity National Information		#
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	#
@@ -23,18 +27,26 @@ if(POLICY CMP0087)
 endif()
 project(YDB C ASM)
 
-# Max optimization level is -O2
+# Max optimization level is -O3
 get_property(languages GLOBAL PROPERTY ENABLED_LANGUAGES)
 foreach(lang ${languages})
   get_property(flags CACHE CMAKE_${lang}_FLAGS_RELEASE PROPERTY VALUE)
-  if("${flags}" MATCHES "-O[3-9]")
-    string(REGEX REPLACE "-O[3-9]" "-O2" flags "${flags}")
+  if("${flags}" MATCHES "[ ]?-O[0-9]*[ ]?")
+    string(REGEX REPLACE "([ ]?)(-O[0-9]*)([ ]?)" "\\1-O3\\3" flags "${flags}")
     set_property(CACHE CMAKE_${lang}_FLAGS_RELEASE PROPERTY VALUE "${flags}")
   endif()
 endforeach()
 
 # Defaults
+<<<<<<< HEAD
 set(version r203)
+=======
+set(version ${V7.1-001})
+if("${version}" STREQUAL "")
+        set(version V9.9-0)
+endif()
+
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
@@ -61,9 +73,30 @@ else()
 endif()
 
 if ( CMAKE_COMPILER_IS_GNUCC )
-    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -Wno-unused-value -Wno-unused-variable")
-    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wno-maybe-uninitialized -Wno-char-subscripts -Wno-unused-but-set-variable")
-    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wno-unused-function")
+    string(APPEND CMAKE_C_FLAGS " -std=c99"
+				" -Wmissing-prototypes -Wreturn-type -Wpointer-sign"
+				" -Wimplicit -Wall -Wno-unused-value -Wno-unused-function"
+				" -Wno-unused-variable"
+				" -Wno-unused-but-set-variable"
+				" -Wchar-subscripts"
+				" -Wno-unused-function -Woverflow"
+				" -Wno-parentheses"
+				" -Werror")
+    #string(APPEND CMAKE_C_FLAGS " -Wpedantic")
+    #string(APPEND CMAKE_C_FLAGS " -Wstrict-overflow=5")
+    if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.8.5)
+      string(APPEND CMAKE_C_FLAGS " -Wno-unused-result")
+    else()
+      string(APPEND CMAKE_C_FLAGS " -Wno-strict-aliasing")
+      if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.4.7)
+        string(APPEND CMAKE_C_FLAGS " -Wno-maybe-uninitialized")
+      else()
+        string(APPEND CMAKE_C_FLAGS " -Wno-uninitialized")
+      endif()
+    endif()
+    if(CMAKE_VERSION VERSION_GREATER 3.12.99)
+      add_link_options("LINKER:-z,noexecstack")
+    endif()
 endif()
 
 # The below option enables the address sanitizer in the build.
@@ -185,8 +218,13 @@ foreach(d ${gt_src_list})
 endforeach()
 include_directories(${includes})
 # We generate some uniquely-named headers in the top of the build tree.
+<<<<<<< HEAD
 include_directories(${YDB_BINARY_DIR})
 include_directories(/usr/include/openssl-1.0)
+=======
+include_directories(${GTM_BINARY_DIR})
+include_directories("/usr/local/include")
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
 # Function to select the first instance of a given source file name
 # found in the ordered 'gt_src_list' search path.
@@ -528,7 +566,125 @@ add_custom_command(
   )
 # 5. Setup the dependency for downstream consumers
 add_custom_target(gen_tls_options
+<<<<<<< HEAD
   DEPENDS ${YDB_BINARY_DIR}/gen_tls_options.h ${YDB_BINARY_DIR}/gen_tls_verify_options.h)
+=======
+  DEPENDS ${GTM_BINARY_DIR}/gen_tls_options.h ${GTM_BINARY_DIR}/gen_tls_verify_options.h)
+
+# Locate libgcrypt's header files (assumption: all others headers are found in the same location)
+find_program(LIBGCRYPT_CONFIG_SCRIPT NAMES libgcrypt-config)
+if (LIBGCRYPT_CONFIG_SCRIPT MATCHES ".+-NOTFOUND")
+	message(FATAL_ERROR "FATAL: libgcrypt-config not found (${LIBGCRYPT_CONFIG_SCRIPT})")
+else()
+	# libgcrypt-config --cflags returns "\n" when the includes are located in the default search path
+	exec_program(${LIBGCRYPT_CONFIG_SCRIPT} ARGS --cflags RETURN_VALUE _return_VALUE OUTPUT_VARIABLE LIBGCRYPT_CFLAGS)
+	# If a path is returned, it is preceded by '-I' for use as CFLAG directive
+	string(REGEX REPLACE "^-I" "" LIBGCRYPT_INCLUDES "${LIBGCRYPT_CFLAGS}")
+	if (NOT (${LIBGCRYPT_INCLUDES} MATCHES "\n"))
+		message("INFO: ${LIBGCRYPT_CONFIG_SCRIPT} ${_return_VALUE} '${LIBGCRYPT_INCLUDES}'")
+		include_directories(${LIBGCRYPT_INCLUDES})
+	endif()
+endif()
+
+# Building the three encryption libraries could by a loop of some sort, but
+# manually creating each target is way easier.
+
+# Library=GCRYPT Algorithm=AES256CFB
+add_library(libgtmcrypt_gcrypt_AES256CFB.so MODULE ${libgtmcrypt_SOURCES})
+set_target_properties(libgtmcrypt_gcrypt_AES256CFB.so PROPERTIES
+  OUTPUT_NAME gtmcrypt_gcrypt_AES256CFB
+  COMPILE_DEFINITIONS "USE_GCRYPT;USE_AES256CFB"
+  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
+  )
+add_dependencies(libgtmcrypt_gcrypt_AES256CFB.so gen_gtm_threadgbl_deftypes)
+target_link_libraries(libgtmcrypt_gcrypt_AES256CFB.so ${GPG_LIBRARIES})
+install(TARGETS libgtmcrypt_gcrypt_AES256CFB.so DESTINATION ${GTM_INSTALL_DIR}/plugin)
+
+# Establish the default encryption link
+set(default_encr_link   ${GTM_BINARY_DIR}/plugin/libgtmcrypt.so)
+set(default_encr_target libgtmcrypt_gcrypt_AES256CFB.so)
+add_custom_command(
+	OUTPUT ${default_encr_link}
+	COMMAND ${CMAKE_COMMAND} -E create_symlink "${default_encr_target}" "${default_encr_link}"
+	DEPENDS ${GTM_BINARY_DIR}/plugin/${default_encr_target}
+	COMMENT "Generating default_encr symbolic link"
+	)
+add_custom_target(install_default_encr ALL DEPENDS ${default_encr_link})
+install(FILES ${default_encr_link} DESTINATION ${GTM_INSTALL_DIR}/plugin)
+
+# Library=OPENSSL Algorithm=AES256CFB
+add_library(libgtmcrypt_openssl_AES256CFB MODULE ${libgtmcrypt_SOURCES})
+set_target_properties(libgtmcrypt_openssl_AES256CFB PROPERTIES
+  OUTPUT_NAME gtmcrypt_openssl_AES256CFB
+  COMPILE_DEFINITIONS "USE_OPENSSL;OPENSSL_API_COMPAT=0x10000000L;USE_AES256CFB"
+  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
+  )
+target_link_libraries(libgtmcrypt_openssl_AES256CFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
+add_dependencies(libgtmcrypt_openssl_AES256CFB gen_gtm_threadgbl_deftypes)
+install(TARGETS libgtmcrypt_openssl_AES256CFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
+
+add_library(libgtmtls MODULE ${libgtmtls_SOURCES})
+set_target_properties(libgtmtls PROPERTIES
+  OUTPUT_NAME gtmtls
+  COMPILE_DEFINITIONS "USE_OPENSSL;OPENSSL_API_COMPAT=0x10000000L"
+  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
+  )
+target_link_libraries(libgtmtls ${TLS_LIBRARIES})
+add_dependencies(libgtmtls gen_gtm_threadgbl_deftypes gen_tls_options)
+install(TARGETS libgtmtls DESTINATION ${GTM_INSTALL_DIR}/plugin)
+
+add_executable(maskpass ${maskpass_SOURCES})
+target_link_libraries(maskpass ${GPG_LIBRARIES} ${TLS_LIBRARIES})
+set_target_properties(maskpass PROPERTIES
+  COMPILE_DEFINITIONS "USE_GCRYPT;USE_SYSLIB_FUNCS"
+  RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin/gtmcrypt
+  )
+install(TARGETS maskpass DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt)
+
+# Always copy files into the plugin directory
+foreach(f
+      Makefile.mk
+      encrypt_sign_db_key.sh
+      gen_keypair.sh
+      gen_sym_hash.sh
+      gen_sym_key.sh
+      gtm_tls_impl.c
+      gtm_tls_impl.h
+      gtm_tls_interface.h
+      gtmcrypt_dbk_ref.c
+      gtmcrypt_dbk_ref.h
+      gtmcrypt_interface.h
+      gtmcrypt_pk_ref.c
+      gtmcrypt_pk_ref.h
+      gtmcrypt_ref.c
+      gtmcrypt_ref.h
+      gtmcrypt_sym_ref.c
+      gtmcrypt_sym_ref.h
+      gtmcrypt_util.c
+      gtmcrypt_util.h
+      import_and_sign_key.sh
+      maskpass.c
+      pinentry-gtm.sh
+      pinentry.m
+      show_install_config.sh
+    )
+  set(f_in "${GTM_SOURCE_DIR}/sr_unix/${f}")
+  string(REGEX REPLACE ".mk$" "" f_mod "${f}")
+  set(f_out "${GTM_BINARY_DIR}/plugin/gtmcrypt/${f_mod}")
+  add_custom_command(
+    OUTPUT "${f_out}"
+    DEPENDS "${f_in}"
+    COMMAND ${CMAKE_COMMAND} -E copy "${f_in}" "${f_out}"
+    )
+  if("${f}" MATCHES "\\.sh$")
+    set(permissions PERMISSIONS ${install_permissions_script})
+  else()
+    set(permissions "")
+  endif()
+  install(FILES "${f_out}" DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt ${permissions})
+  list(APPEND files_to_place "${f_out}")
+endforeach()
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
 #-----------------------------------------------------------------------------
 install(TARGETS

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -27,6 +27,7 @@
 #include "iotimer.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
+#include "iott_setterm.h"
 #include "gtm_caseconv.h"
 #include "stringpool.h"
 #include "min_max.h"
@@ -45,7 +46,6 @@
 #include "send_msg.h"
 #include "gtmmsg.h"		/* for gtm_putmsg() prototype */
 #include "change_reg.h"
-#include "setterm.h"
 #include "getzposition.h"
 #include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
 #ifdef DEBUG
@@ -245,7 +245,12 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 				extraarg = NULL;
 		} else
 			extraarg = NULL;
+<<<<<<< HEAD
 		iosocket_tls(option, (int)(nsec_timeout / NANOSECS_IN_MSEC), tlsid, password, extraarg);
+=======
+		assert(option);
+		iosocket_tls(option, msec_timeout, tlsid, password, extraarg);
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 #	endif
 	} else if (0 == memcmp(action, "BLOCK", length))
 	{	/* OFF, CLEAR, COUNT .lvn, SENT .lvn */
@@ -415,6 +420,7 @@ void iosocket_dlr_zkey(mstr *d)
 					} else
 						len = 0;
 				}
+				charptr = NULL;
 #			ifndef VMS
 			} else
 			{
@@ -456,6 +462,7 @@ void iosocket_dlr_zkey(mstr *d)
 						len = 0;
 				} else
 				{
+					assert(charptr);
 					len = STRLEN(charptr);		/* same as for READ */
 					len = MIN(len, (MAXZKEYITEMLEN - thislen));
 					memcpy(zkeyptr, charptr, len);

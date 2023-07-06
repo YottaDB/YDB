@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,7 +64,7 @@ GBLREF	volatile boolean_t	timer_in_handler;
 void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 {
 	boolean_t		dbsync_defer_timer;
-	gd_region               *reg, *save_region;
+	gd_region		*reg, *save_region;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	node_local_ptr_t	cnl;
@@ -100,9 +100,10 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	csd = csa->hdr;
 	cnl = csa->nl;
 	jpc = csa->jnl;
-	DEBUG_ONLY(jbp = NULL;)
 	if (NULL != jpc)
 		jbp = jpc->jnl_buff;	/* Note: Use "jbp" below ONLY if "jpc" is non-NULL */
+	else
+		jbp = NULL;
 	BG_TRACE_PRO_ANY(csa, n_dbsync_timers);
 	assert(csa == cs_addrs);
 	assert(!JNL_ALLOWED(csd) || (NULL != jpc));

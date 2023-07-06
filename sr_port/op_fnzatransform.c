@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -147,7 +147,7 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 	gv_target = &temp_gv_target;
 	memset(gv_target, 0, SIZEOF(gv_namehead));
 	gv_target->collseq = csp;
-	gvkey = (gv_key *)&save_currkey.key;
+	gvkey = &save_currkey.key;
 	gvkey->prev = 0;
 	gvkey->top = DBKEYSIZE(MAX_KEY_SZ);
 	gvkey->end = 0;

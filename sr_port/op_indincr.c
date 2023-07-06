@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2020 Fidelity National Information	*
+ * Copyright (c) 2004-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -34,7 +34,7 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 	int		rval;
 	mstr		*obj, object;
 	oprtype		v, getdst;
-	triple		*s, *src, *oldchain, tmpchain, *triptr;
+	triple		*s = NULL, *src, *oldchain, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -70,7 +70,7 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 			TREF(saw_side_effect) = TREF(shift_side_effects);
 			if (TREF(shift_side_effects) && (YDB_BOOL == TREF(ydb_fullbool)))
 			{
-				dqinit(&tmpchain, exorder);
+				exorder_init(&tmpchain);
 				oldchain = setcurtchain(&tmpchain);
 				if (EXPR_FAIL != (rval = indirection(&v)))	/* NOTE assignment */
 				{
@@ -101,10 +101,15 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 			rval = EXPR_FAIL;
 			break;
 		}
+<<<<<<< HEAD
 		if (NULL != s)
 			v = put_tref(s);
 		else
 			assert(EXPR_FAIL == rval);
+=======
+		assert(s);
+		v = put_tref(s);
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &v, &getdst, target->str.len))
 			return;
 		indir_src.str.addr = target->str.addr;

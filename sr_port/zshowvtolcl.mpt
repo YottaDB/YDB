@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2015 Fidelity National Information		;
+; Copyright (c) 2015-2023 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -19,13 +19,13 @@
 	; validation, it does not currently handle any GT.M errors, most likely due to input that's badly formed and fails when used
 	; for indirection; rather it relies on the current error trap, and it sends its messages of validation issues to the
 	; principal device; see sendmsg below if you want to change that.
-	if ""'=$ecode do sendmsg("m0") quit:$quit 0 quit			; want to start "error free"
+	if ""'=$ecode do sendmsg("m0") quit:$quit 0 quit				; want to start "error free"
 	if "^"'=$extract($qsubscript(%ZSHOWvbase,0)) do sendmsg("m1",%ZSHOWvbase) quit:$quit 0 quit
-	set %ZSHOWvbase("x")=%ZSHOWvbase
+	set %ZSHOWvbase("x")=%ZSHOWvbase,%ZSHOWvbase("cnt")=0				; setup & find lvn output from ZSHOW
 	set %ZSHOWvbase("depth")=$qlength(%ZSHOWvbase("x"))+1
 	set %ZSHOWvbase("length")=$length(%ZSHOWvbase("x"))-1
 	for %ZSHOWvbase("i")=1:1:%ZSHOWvbase("depth") quit:"V"=$qsubscript(%ZSHOWvbase("x"),%ZSHOWvbase("i"))
-	if %ZSHOWvbase("i")=%ZSHOWvbase("depth") do			; add a trailing "V"
+	if %ZSHOWvbase("i")=%ZSHOWvbase("depth") do					; add a trailing "V"
 	. if %ZSHOWvbase("x")["(" set %ZSHOWvbase("x")=$extract(%ZSHOWvbase("x"),1,%ZSHOWvbase("length"))_",""V"")"
 	. else  set %ZSHOWvbase("x")=%ZSHOWvbase("x")_"(""V"")"
 	. set %ZSHOWvbase("depth")=%ZSHOWvbase("depth")+1
@@ -35,102 +35,54 @@
 	. set %ZSHOWvbase("depth")=%ZSHOWvbase("depth")-1
 	else  do sendmsg("m2",%ZSHOWvbase("x")) quit:$quit 0 quit
 	if 1'<$data(@%ZSHOWvbase("x")) do sendmsg("m3",%ZSHOWvbase("x")) quit:$quit 0 quit
-	set %ZSHOWvbase("cindex")=0								; this line & next do initialization
-	set (%ZSHOWvbase("ret"),%ZSHOWvbase("m4"))=1
-	for %ZSHOWvbase("index")=1:1 do  quit:'%ZSHOWvbase("data")!'%ZSHOWvbase("ret")	; main loop
-	. set %ZSHOWvbase("data")=$data(@%ZSHOWvbase("x")@(%ZSHOWvbase("index")))
-	. quit:'%ZSHOWvbase("data")
-	. if 10=%ZSHOWvbase("data") do  quit							; not a legitimate node from ZWRITE
-	. . set $extract(%ZSHOWvbase("x"),$length(%ZSHOWvbase("x")))=","_%ZSHOWvbase("index")_")"
-	. . do sendmsg("m3",%ZSHOWvbase("x"))
-	. set %ZSHOWvbase("piece")=@%ZSHOWvbase("x")@(%ZSHOWvbase("index"))
-	. if "%ZSHOWvbase"=$extract(%ZSHOWvbase("piece"),1,$length("%ZSHOWvbase")) do  quit	; can't mess with our namespace
-	. . do:%ZSHOWvbase("m4") sendmsg("m4")
-	. . set %ZSHOWvbase("m4")=0
-	. if "*"=$extract(%ZSHOWvbase("piece")) set @%ZSHOWvbase("piece") quit			; alias SET must use SET @
-	. set %ZSHOWvbase("raw")=%ZSHOWvbase("piece"),(%ZSHOWvbase("key"),%ZSHOWvbase("value"))=""
-	. if 11=%ZSHOWvbase("data") do  quit:'%ZSHOWvbase("ret")				; deal with continuation nodes
-	. . for %ZSHOWvbase("cindex")=1:1 do  quit:1'=%ZSHOWvbase("cdata")!'%ZSHOWvbase("ret")	; loop thru continuation nodes
-	. . . set %ZSHOWvbase("cdata")=$data(@%ZSHOWvbase("x")@(%ZSHOWvbase("index"),%ZSHOWvbase("cindex")))
-	. . . quit:1'=%ZSHOWvbase("cdata")							; stop if end or non-conforming
-	. . . set %ZSHOWvbase("piece")=@%ZSHOWvbase("x")@(%ZSHOWvbase("index"),%ZSHOWvbase("cindex"))
-	. . . if 2**20>($zlength(%ZSHOWvbase("raw"))+$zlength(%ZSHOWvbase("piece"))) do  quit	; under max string length ?
-	. . . . set %ZSHOWvbase("raw")=%ZSHOWvbase("raw")_%ZSHOWvbase("piece")			; if so, just concatenate
-	. . . do rawtoval									; try shrinking prior accumulation
-	. set %ZSHOWvbase("rlength")=$length(%ZSHOWvbase("raw"))
-	. do:"*"=$extract(%ZSHOWvbase("raw"),%ZSHOWvbase("rlength"))				; remove training alias indicator
-	. . set $extract(%ZSHOWvbase("raw"),%ZSHOWvbase("rlength")-2,%ZSHOWvbase("rlength"))=""; not relevant & causes trouble
-	. set %ZSHOWvbase("cindex")=0								; flag this as the end
-	. do rawtoval							; and prep
-	. set:%ZSHOWvbase("ret") @%ZSHOWvbase("key")=%ZSHOWvbase("value")			; do actual assignment
-	quit:$quit %ZSHOWvbase("ret") quit
-rawtoval	; strips the key out of the raw accumulation and performs $ZWRITE(,1) compaction if needed
-	do:""=%ZSHOWvbase("key")  quit:'%ZSHOWvbase("ret")					; find the key
-	. set (%ZSHOWvbase("i"),%ZSHOWvbase("q"))=1,%ZSHOWvbase("key")=""			; find 1st equal-sign not in quotes
-	. for  do  quit:%ZSHOWvbase("q")!'%ZSHOWvbase("i")
-	. . set %ZSHOWvbase("c")=%ZSHOWvbase("i")
-	. . set %ZSHOWvbase("i")=$find(%ZSHOWvbase("raw"),"=",%ZSHOWvbase("c"))
-	. . if '%ZSHOWvbase("i") do  quit							; didn't find it
-	. . . set $extract(%ZSHOWvbase("x"),$length(%ZSHOWvbase("x")))=","_%ZSHOWvbase("index")_")"
-	. . . do sendmsg("m5",%ZSHOWvbase("x"))
-	. . for %ZSHOWvbase("c")=%ZSHOWvbase("c"):1:%ZSHOWvbase("i")-2 do			; count quotes
-	. . . set:""""=$extract(%ZSHOWvbase("raw"),%ZSHOWvbase("c")) %ZSHOWvbase("q")='%ZSHOWvbase("q")
-	. set %ZSHOWvbase("key")=$extract(%ZSHOWvbase("raw"),1,%ZSHOWvbase("i")-2)
-	. if 8192<$zlength(%ZSHOWvbase("key")) do  quit:'%ZSHOWvbase("ret")			; can we indirect the key?
-	. . set %ZSHOWvbase("key")=$zwrite(%ZSHOWvbase("key"),1)				; if not attempt to shrink it
-	. . quit:$length(%ZSHOWvbase("key"))							; it worked!
-	. . set $extract(%ZSHOWvbase("x"),$length(%ZSHOWvbase("x")))=","_%ZSHOWvbase("index")_")"
-	. . do sendmsg("m6",%ZSHOWvbase("x"))
-	. set %ZSHOWvbase("rlength")=$length(%ZSHOWvbase("raw"))
-	. set %ZSHOWvbase("raw")=$extract(%ZSHOWvbase("raw"),%ZSHOWvbase("i"),%ZSHOWvbase("rlength"))	;strip off key
-	if '%ZSHOWvbase("cindex") set %ZSHOWvbase("rawval")=$zwrite(%ZSHOWvbase("raw"),1)	; no more to add on
-	else  do  quit:'%ZSHOWvbase("ret")							; need to fit more in
-	. ; lines below are an imperfect heuristic because of possible quoting but quicker than parsing the whole value
-	. set %ZSHOWvbase("f")=0
-	. set %ZSHOWvbase("rlength")=$length(%ZSHOWvbase("raw"))
-	. for %ZSHOWvbase("i")=%ZSHOWvbase("rlength")-1:-1:0 do  quit:%ZSHOWvbase("f")	; start 1 back for room to add quote
-	. . set %ZSHOWvbase("c")=$extract(%ZSHOWvbase("raw"),%ZSHOWvbase("i"))	; 		; do alphas 1st as more likely
-	. . if (%ZSHOWvbase("c")?1AP&("$C(,)_"""'[%ZSHOWvbase("c"))),$increment(%ZSHOWvbase("f")) do; ?AP not in $C(,)_" safe split
-	. . . set %ZSHOWvbase("rawval")=$zwrite($extract(%ZSHOWvbase("raw"),1,%ZSHOWvbase("i"))_"""",1)	; shrink
-	. . . set %ZSHOWvbase("raw")=$extract(%ZSHOWvbase("raw"),%ZSHOWvbase("i")+1,%ZSHOWvbase("rlength"))_%ZSHOWvbase("piece")
-	. . . if """_"=$extract(%ZSHOWvbase("raw"),1,2) set $extract(%ZSHOWvbase("raw"),1,2)=""	;  "_ needs removal
-	. . . else  set %ZSHOWvbase("raw")=""""_%ZSHOWvbase("raw")				; otherwise start remaining with "
-	. do:'%ZSHOWvbase("f")								; no easy split; try to break up a $C()
-	. . for %ZSHOWvbase("i")=%ZSHOWvbase("rlength"):-1:0 do  quit:%ZSHOWvbase("f")!'%ZSHOWvbase("ret")
-	. . . set %ZSHOWvbase("c")=$extract(%ZSHOWvbase("raw"),%ZSHOWvbase("i"))		; this loop is less than perfect
-	. . . do:","=%ZSHOWvbase("c")&($extract(%ZSHOWvbase("raw"),%ZSHOWvbase("i")-1)?1N)	; argument delimiter in $C()
-	. . . . if $increment(%ZSHOWvbase("f"))
-	. . . . set ($extract(%ZSHOWvbase("raw"),%ZSHOWvbase("i")),%ZSHOWvbase("c"))=")"	; replace comma by closing function
-	. . if ")"=%ZSHOWvbase("c"),$extract(%ZSHOWvbase("raw"),%ZSHOWvbase("i")-1)?1N,$increment(%ZSHOWvbase("f")) do  quit
-	. . . set %ZSHOWvbase("rawval")=$zwrite($extract(%ZSHOWvbase("raw"),1,%ZSHOWvbase("i")),1)
-	. . . set %ZSHOWvbase("raw")=$extract(%ZSHOWvbase("raw"),%ZSHOWvbase("i")+3-%ZSHOWvbase("f"),%ZSHOWvbase("rlength"))
-	. . . set %ZSHOWvbase("raw")=%ZSHOWvbase("raw")_%ZSHOWvbase("piece")
-	. . . set:1<%ZSHOWvbase("f") %ZSHOWvbase("raw")="$C("_%ZSHOWvbase("raw")		; bigger "f" so restart $C()
-	. . if '%ZSHOWvbase("f") do								; maybe it's all $C(,)_ "s
-	. . . for %ZSHOWvbase("i")=%ZSHOWvbase("rlength"):-1:0 do  quit:%ZSHOWvbase("f")
-	. . . . set %ZSHOWvbase("c")=$extract(%ZSHOWvbase("raw"),%ZSHOWvbase("i"))
-	. . . . if "$C(,)_"""[%ZSHOWvbase("c"),$increment(%ZSHOWvbase("f")) do
-	. . . . . set %ZSHOWvbase("rawval")=$zwrite($extract(%ZSHOWvbase("raw"),1,%ZSHOWvbase("i"))_"""",1)	; shrink
-	. . . . . set %ZSHOWvbase("raw")=$extract(%ZSHOWvbase("raw"),%ZSHOWvbase("i")+1,%ZSHOWvbase("rlength"))_%ZSHOWvbase("piece")
-	. . . . . if """"=$extract(%ZSHOWvbase("raw")) set $extract(%ZSHOWvbase("raw"),1,2)=""	; " means "_ needs removal
-	. . . . . else  set %ZSHOWvbase("raw")=""""_%ZSHOWvbase("raw")				; otherwise start remaining with "
-	. . if '%ZSHOWvbase("f") do								; no luck at all
-	. . . set $extract(%ZSHOWvbase("x"),$length(%ZSHOWvbase("x")))=","_%ZSHOWvbase("index")_")"
-	. . . do sendmsg("m6",%ZSHOWvbase("x"))
-	do:""""""'=%ZSHOWvbase("raw")						; empty in produces empty out so skip error check
-	. if ""=%ZSHOWvbase("rawval")!(2**20'>($zlength(%ZSHOWvbase("rawval"))+$zlength(%ZSHOWvbase("value")))) do
-	. . set $extract(%ZSHOWvbase("x"),$length(%ZSHOWvbase("x")))=","_%ZSHOWvbase("index")_")"
-	. . do sendmsg("m6",%ZSHOWvbase("x"))
-	set %ZSHOWvbase("value")=%ZSHOWvbase("value")_%ZSHOWvbase("rawval")
-	quit
-sendmsg(x,y)				; message thing - could be turned into $zstatus settor if there's a need for set $ecode
+	set (%ZSHOWvbase("m4"),%ZSHOWvbase("ret"))=1					; initialization
+	for %ZSHOWvbase("index")=1:1 set %ZSHOWvbase("ret")=$$item(.%ZSHOWvbase) quit:""=%ZSHOWvbase("ret")  do
+	. set:1'=%ZSHOWvbase("ret") @%ZSHOWvbase("ret")
+	do:%ZSHOWvbase("cnt") sendmsg("m7",%ZSHOWvbase("cnt"))
+	quit:$quit '%ZSHOWvbase("cnt") quit
+
+item(x)
+	new cindex,contdata,cptr,data,indx,key,qoff,raw,ret,value			; comprehensive list or (%ZSHOWvbase,x)
+	set data=$data(@x("x")@(x("index")))
+	quit:'data ""									; done
+	if 10=data do  quit 1								; not a legitimate node from ZWRITE
+	. set $extract(x("x"),$length(x("x")))=","_x("index")_")"
+	. do sendmsg("m3",x("x"))
+	set raw=@x("x")@(x("index")),ret=1
+	if "%ZSHOWvbase"=$extract(raw,1,$length("%ZSHOWvbase")) do  quit 1		; can't mess with our working namespace
+	. do:%ZSHOWvbase("m4") sendmsg("m4",raw)
+	. set %ZSHOWvbase("m4")=0
+	set (key,value)=""
+	set (cptr,indx,qoff)=1								; find 1st equal-sign not in quotes
+	for  do  quit:qoff!'indx
+	. set indx=$find(raw,"=",cptr),cptr=$find(raw,"""",cptr)
+	. if 'indx do  quit								; didn't find it
+	. . set $extract(x("x"),$length(x("x")))=","_x("index")_")",indx=0
+	. . do sendmsg("m5",x("x"))
+	. if cptr,cptr<indx do
+	. . set qoff=0
+	. . for cptr=cptr:1:indx set:""""=$extract(raw,cptr) qoff='qoff			; count quotes
+	quit:'indx 1
+	set key=$extract(raw,1,indx-2),cindex=1
+	set value=$extract(raw,indx,$length(raw))					; strip off key
+	if 11=data for cindex=1:1 do  quit:'contdata!'cindex				; loop thru continuation nodes
+	. set contdata=$data(@x("x")@(x("index"),cindex))
+	. quit:'contdata
+	. if 1'=contdata do sendmsg("m2",x("x")) set cindex=0 quit			; stop if non-conforming
+	. set raw=@x("x")@(x("index"),cindex)
+	. if ((2**20)-1)<($zlength(key)+$zlength(value)+$zlength(raw)) do sendmsg("m6",x("x")) set cindex=0 quit	; won't fit
+	. set value=value_raw
+	quit $select(ret&cindex:key_"="_value,1:1)					; setup assignment or signal skip
+
+sendmsg(msg,parm)	; message thing - could be turned into $zstatus settor if there's a need for set $ecode
 	new i,io,m
-	set m=$text(@x)
-	set %ZSHOWvbase("ret")=$piece(m,";",2)							; maintain "ret" to exit or not
+	if $increment(x("cnt"))								; count skipped items
+	set m=$text(@msg)
+	set ret=$piece(m,";",2)								; maintain "ret" to exit or not
 	set m=$piece(m,";",3,99)
-	set:""=m m=x_" is not a valid message for sendmsg^"_$text(+0)_" or the source module is unavailable"
+	set:""=m m=msg_" is not a valid message for sendmsg^"_$text(+0)_" or the source module is unavailable"
 	set i=$find(m,"~")
-	set:i $extract(m,i-1)=$get(y)
+	set:i $extract(m,i-1)=$get(parm)
 	set io=$io
 	use $principal
 	write !,m,!
@@ -139,7 +91,8 @@ sendmsg(x,y)				; message thing - could be turned into $zstatus settor if there'
 m0	;0;^%ZSHOWVTOLCL won't run if ""'=$ecode
 m1	;0;~ is not a global reference
 m2	;0;~ does not match base for ZSHOW "V" format
-m3	;0;~ does not contain ZSHOW "V" data
+m3	;1;~ does not contain ZSHOW "V" data
 m4	;1;Cannot restore %ZSHOWvbase
-m5	;0;Could not extract a valid key from ~
-m6	;0;Could not work ~ into a value within current processing limits
+m5	;1;Could not extract a valid key from ~
+m6	;1;Could not work ~ into a value within current processing limits
+m7	;1;~ items skipped due to errors

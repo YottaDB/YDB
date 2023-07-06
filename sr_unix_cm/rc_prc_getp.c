@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +45,12 @@ GBLREF sgmnt_addrs	*cs_addrs;
 
 error_def(ERR_DSEBLKRDFAIL);
 
+<<<<<<< HEAD
 int rc_prc_getp(rc_q_hdr *qhdr)
+=======
+int
+rc_prc_getp(rc_q_hdr *qhdr)
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 {
     rc_req_getp	*req;
     rc_rsp_page	*rsp;
@@ -50,7 +60,10 @@ int rc_prc_getp(rc_q_hdr *qhdr)
     srch_hist		 targ_hist;
     short		 bsiz;
     unsigned char	*buffaddr;
+<<<<<<< HEAD
     DCL_THREADGBL_ACCESS;
+=======
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
     SETUP_THREADGBL_ACCESS;
     ASSERT_IS_LIBGTCM;
@@ -155,7 +168,7 @@ int rc_prc_getp(rc_q_hdr *qhdr)
 		    /* copy header block */
 		    memcpy(rsp->page, buffaddr, SIZEOF(blk_hdr));
 		    /* increase size field to include RC_BLKHD_PAD */
-		    PUT_SHORT(&((blk_hdr*)rsp->page)->bsiz,bsiz);
+		    PUT_ULONG(&((blk_hdr*)rsp->page)->bsiz,bsiz);
 		    memcpy(rsp->page + SIZEOF(blk_hdr) + RC_BLKHD_PAD,
 			   buffaddr + SIZEOF(blk_hdr),
 			   size_return - (SIZEOF(blk_hdr) + RC_BLKHD_PAD));
@@ -187,5 +200,3 @@ int rc_prc_getp(rc_q_hdr *qhdr)
 	    return 0;
     }
 }
-
-

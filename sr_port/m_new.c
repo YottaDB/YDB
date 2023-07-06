@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -97,16 +97,20 @@ int m_new(void)
 					tmp->operand[0] = put_ilit(svn_data[n].opcode);
 					break;
 				default:
-						STX_ERROR_WARN(ERR_SVNONEW);	/* sets "parse_warn" to TRUE */
+					STX_ERROR_WARN(ERR_SVNONEW);	/* sets "parse_warn" to TRUE */
+					tmp = NULL;
 				}
 			} else
 			{
 				STX_ERROR_WARN(ERR_INVSVN);	/* sets "parse_warn" to TRUE */
+				tmp = NULL;
 			}
 			advancewindow();
 			if (!parse_warn)
+			{
+				assert(tmp);
 				ins_triple(tmp);
-			else
+			} else
 			{	/* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
 				 * (invoked by stx_error). No need to do anything else.
 				 */

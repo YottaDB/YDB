@@ -107,14 +107,34 @@ void bx_tail(triple *t, boolean_t sense, oprtype *addr, int depth, opctype andor
 		break;
 	case OC_NAND:
 	case OC_AND:
+<<<<<<< HEAD
 		bx_boolop(t, FALSE, sense, sense, addr, depth + 1, andor_opcode, caller_is_bool_expr,
 										jmp_depth, is_last_bool_operand);
+=======
+		assert(EXT_BOOL != TREF(gtm_fullbool));
+		bx_boolop(t, FALSE, sense, sense, addr);
+		RETURN_IF_RTS_ERROR;
+		break;
+	case OC_SNAND:
+	case OC_SAND:
+		bx_sboolop(t, FALSE, sense, sense, addr);
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		RETURN_IF_RTS_ERROR;
 		break;
 	case OC_NOR:
 	case OC_OR:
+<<<<<<< HEAD
 		bx_boolop(t, TRUE, !sense, sense, addr, depth + 1, andor_opcode, caller_is_bool_expr,
 										jmp_depth, is_last_bool_operand);
+=======
+		assert(EXT_BOOL != TREF(gtm_fullbool));
+		bx_boolop(t, TRUE, !sense, sense, addr);
+		RETURN_IF_RTS_ERROR;
+		break;
+	case OC_SNOR:
+	case OC_SOR:
+		bx_sboolop(t, TRUE, !sense, sense, addr);
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		RETURN_IF_RTS_ERROR;
 		break;
 	default:

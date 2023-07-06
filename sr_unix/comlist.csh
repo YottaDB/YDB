@@ -604,7 +604,7 @@ foreach i ( $comlist_liblist )
 		set exclude = "$exclude|^omi_srvc_xct\.o|^omi_sx_play\.o"
 		set exclude = "$exclude|^gtcm_gnp_server\.o"
 		set exclude = "$exclude|^dummy_gtmci\.o"
-		/bin/ls | egrep '\.o$' | egrep -v "$exclude" | \
+		/bin/ls | grep '\.o$' | grep -vE "$exclude" | \
 			xargs -n50 $shell -f $gtm_tools/gt_ar.csh $gt_ar_option_create lib$i.a >>& ar$i.log
 		if ( $status ) then
 			@ comlist_status++
@@ -644,7 +644,7 @@ if (0 != $comlist_status) then
 	error_and_exit "COMLIST-E-ARCHIVE : One of the archive creations above failed -- aborting build"
 endif
 
-/bin/ls | egrep '\.o$' | egrep -v "$exclude" | xargs -n25 rm -f
+/bin/ls | grep '\.o$' | grep -vE "$exclude" | xargs -n25 rm -f
 
 switch ( $3 )
 case "gtm_bta":

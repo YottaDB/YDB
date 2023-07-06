@@ -47,6 +47,7 @@ LITDEF	err_msg cmierrors[] = {
 
 
 LITDEF	int cmierrors_undocarr[] = {
+	0	/* Placeholder to prevent empty array */
 };
 
 

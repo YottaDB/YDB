@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -64,8 +64,13 @@ GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		exit_handler_complete;
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		skip_exit_handler;
+<<<<<<< HEAD
 GBLREF 	boolean_t		is_tracing_on;
 GBLREF	int			fork_after_ydb_init;
+=======
+GBLREF	boolean_t		is_tracing_on;
+GBLREF	uint4			process_id;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 #ifdef DEBUG
 GBLREF 	boolean_t		stringpool_unusable;
 GBLREF 	boolean_t		stringpool_unexpandable;
@@ -167,6 +172,7 @@ static	enum rundown_state	attempting;
 error_def(ERR_GVRUNDOWN);
 error_def(ERR_LKRUNDOWN);
 error_def(ERR_MPROFRUNDOWN);
+error_def(ERR_PIDMISMATCH);
 
 /* Function that is invoked at process exit time to do cleanup.
  * The general flow here is to do various types of rundowns (e.g. db rundown, lock rundown, io rundown etc.).
@@ -189,6 +195,7 @@ void gtm_exit_handler(void)
 		 * have been cleared) so skip any YottaDB cleanup as part of exit handling.
 		 */
 		return;
+<<<<<<< HEAD
 	}
 	/* Skip exit handling if specified or if exit handler already active */
 	if (exit_handler_active || skip_exit_handler)
@@ -212,6 +219,22 @@ void gtm_exit_handler(void)
 	}
 	DEBUG_ONLY(ydb_dmp_tracetbl());
 	attempting = rundown_state_mprof;
+=======
+	if (process_id != getpid())
+	{	/* DE476408 - Skip exit handling when there is a process_id mismatch(after FORK) to avoid a child
+		 * process from removing the statsdb entry(gvcst_remove_statsDB_linkage) of its parent, which might
+		 * cause database damage.
+		 */
+		SHORT_SLEEP(100);
+		if (process_id != getpid())
+		{	/* gtm8518 - a retry in order to make sure the mismatch is consistant before avoiding rundowns */
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PIDMISMATCH, 2, process_id, getpid());
+			return;
+		}
+	}
+	exit_handler_active = TRUE;
+	attempting = rundown_state_lock;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	actual_exi_condition = 0;
 	ESTABLISH_NORET(exi_ch, error_seen);	/* "error_seen" is initialized inside this macro */
 #	ifdef DEBUG

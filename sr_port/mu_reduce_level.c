@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,6 +65,9 @@ enum cdb_sc mu_reduce_level(kill_set *kill_set_ptr)
 	kill_set_ptr->used = 0;
 	memset(kill_set_ptr, 0, SIZEOF(kill_set));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
+	if (((blk_hdr_ptr_t)gv_target->hist.h[level - 1].buffaddr)->bver
+			!= ((blk_hdr_ptr_t)gv_target->hist.h[level].buffaddr)->bver)
+		return cdb_sc_oprnotneeded;	/* Cannot reduce levels when the block versions do not match */
 	old_blk_base = gv_target->hist.h[level].buffaddr;
 	old_blk_sz = ((blk_hdr_ptr_t)(old_blk_base))->bsiz;
 	if ((SIZEOF(blk_hdr) + bstar_rec_size(BLK_ID_32_VER < ((blk_hdr_ptr_t)old_blk_base)->bver)) != old_blk_sz)
@@ -81,7 +84,7 @@ enum cdb_sc mu_reduce_level(kill_set *kill_set_ptr)
 		NONTP_TRACE_HIST_MOD(&gv_target->hist.h[level-1], t_blkmod_mu_reduce_level);
 		return cdb_sc_blkmod;
 	}
-	t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0, level - 1, TRUE, TRUE, GDS_WRITE_KILLTN);
+	t_write(&gv_target->hist.h[level], bs_ptr1, 0, 0, level - 1, TRUE, TRUE, GDS_WRITE_KILLTN);
 	kill_set_ptr->blk[kill_set_ptr->used].flag = 0;
 	kill_set_ptr->blk[kill_set_ptr->used].level = 0;
 	kill_set_ptr->blk[kill_set_ptr->used++].block = gv_target->hist.h[level-1].blk_num;

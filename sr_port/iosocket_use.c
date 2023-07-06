@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2022 Fidelity National Information	*
+ * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
@@ -78,14 +78,14 @@ void	iosocket_use(io_desc *iod, mval *pp)
 {
 	unsigned char	ch, len;
 	static char	*conv_buff = NULL;
-	int		new_ozff_len, conv_len, handled_len, handlea_len, handles_len, int_len, soc_cnt;
+	int		new_ozff_len, conv_len, handled_len = -1, handlea_len = -1, handles_len, int_len, soc_cnt;
 	int4		length, width, new_len;
 	d_socket_struct *dsocketptr;
-	socket_struct	*socketptr, *curr_socketptr = NULL, *localsocketptr;
+	socket_struct	*socketptr = NULL, *curr_socketptr = NULL, *localsocketptr;
 	mstr_len_t	delim_len;
 	char		handlea[MAX_HANDLE_LEN], handles[MAX_HANDLE_LEN], handled[MAX_HANDLE_LEN];
 	char		addr[SA_MAXLITLEN], *errptr, sockaddr[SA_MAXLITLEN],
-			temp_addr[SA_MAXLITLEN], ioerror, *free_ozff = NULL;
+			temp_addr[SA_MAXLITLEN], ioerror = 0, *free_ozff = NULL;
 	unsigned char	delimiter_buffer[MAX_N_DELIMITER * (MAX_DELIM_LEN + 1)];
 	unsigned char	zff_buffer[MAX_ZFF_LEN], options_buffer[UCHAR_MAX + 1];
 	boolean_t	attach_specified = FALSE,
@@ -103,16 +103,16 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			moreread_specified = FALSE,
 			flush_specified = FALSE,
 			create_new_socket;
-	int4 		index, n_specified, zff_len, delimiter_len, moreread_timeout, options_len;
+	int4 		index, n_specified, zff_len, delimiter_len, moreread_timeout = -1, options_len;
 	int4		n_specified_dev, n_specified_socket;
 	int4		n_incomplete_dev;	/* device level not done in iop loop */
 	int		fil_type, nodelay, p_offset = 0, newbufsiz;
 	GTM_SOCKLEN_TYPE	sockbuflen;
-	uint4		bfsize = DEFAULT_SOCKET_BUFFER_SIZE, ibfsize;
+	uint4		bfsize = DEFAULT_SOCKET_BUFFER_SIZE, ibfsize = MAXUINT4;
 	char		*tab;
 	int		save_errno;
 	mstr		chset_mstr, optionstr;
-	gtm_chset_t	temp_ochset, temp_ichset;
+	gtm_chset_t	temp_ochset = CHSET_MAX_IDX_ALL, temp_ichset = CHSET_MAX_IDX_ALL;
 	size_t		d_socket_struct_len;
 	boolean_t	ch_set;
 	DCL_THREADGBL_ACCESS;
@@ -406,6 +406,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	}
 	if ((ichset_specified || ochset_specified) && (listen_specified || connect_specified))
 	{	/* CHSET cannot be specified when opening a new socket, if there already are open sockets. */
+		assert(CHSET_MAX_IDX_ALL != temp_ochset);
+		assert(CHSET_MAX_IDX_ALL != temp_ichset);
 		if (0 < dsocketptr->n_socket && ((temp_ochset != iod->ochset) || (temp_ichset != iod->ichset)))
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_CHSETALREADY, 8,
@@ -453,6 +455,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		}
 		if (NULL == socket_pool)
 			iosocket_poolinit();
+		assert(0 <= handled_len);
 		iosocket_switch(handled, handled_len, dsocketptr, socket_pool);
 		if (0 > dsocketptr->current_socket)
 		{
@@ -473,6 +476,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ANCOMPTINC, 4, LEN_AND_LIT("ATTACH"), LEN_AND_LIT("USE"));
 			return;
 		}
+		assert(0 <= handlea_len);
 		if (NULL == socket_pool)
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKNOTFND, 2, handlea_len, handlea);
@@ -537,6 +541,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		 * SOCKET_FREE should not be used on this copy since it frees other things such as buffers
 		 * DELIMITER is an exception due to how iosocket_delimiter manages storage.
 		 */
+		assert(socketptr);
 		curr_socketptr = (socket_struct *)malloc(sizeof(socket_struct));
 		memcpy(curr_socketptr, socketptr, sizeof(socket_struct));
 		socketptr->temp_sd = FD_INVALID;
@@ -571,6 +576,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	/* Process the CHSET changes */
 	if (ichset_specified)
 	{
+		assert(CHSET_MAX_IDX_ALL != temp_ichset);
 		CHECK_UTF16_VARIANT_AND_SET_CHSET_SOCKET(dsocketptr->ichset_utf16_variant, iod->ichset, temp_ichset,
 								assert(!socketptr));
 		newdsocket->ichset_utf16_variant = dsocketptr->ichset_utf16_variant;
@@ -578,6 +584,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	}
 	if (ochset_specified)
 	{
+		assert(CHSET_MAX_IDX_ALL != temp_ochset);
 		CHECK_UTF16_VARIANT_AND_SET_CHSET_SOCKET(dsocketptr->ochset_utf16_variant, iod->ochset, temp_ochset,
 								assert(!socketptr));
 		newdsocket->ochset_utf16_variant = dsocketptr->ochset_utf16_variant;
@@ -683,9 +690,13 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	if (nodelay_specified || delay_specified)
 		curr_socketptr->nodelay = nodelay_specified;	/* defaults to DELAY */
 	if (ibfsize_specified)
+	{
+		assert(MAXUINT4 != ibfsize);
 		curr_socketptr->bufsiz = ibfsize;
+	}
 	if (moreread_specified)
 	{
+		assert(0 <= moreread_timeout);
 		curr_socketptr->moreread_timeout = moreread_timeout;
 		curr_socketptr->def_moreread_timeout = TRUE;	/* need to know this was user-defined in iosocket_readfl.c */
 	}

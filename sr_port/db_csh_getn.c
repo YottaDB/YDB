@@ -84,13 +84,13 @@ error_def(ERR_INVALIDRIP);
 
 cache_rec_ptr_t	db_csh_getn(block_id block)
 {
-	cache_rec_ptr_t		cr, hdr, midnite, our_midnite, q0, start_cr, poollimit_cr;
+	cache_rec_ptr_t		cr, hdr, midnite, our_midnite = NULL, q0, start_cr, poollimit_cr = NULL;
 	bt_rec_ptr_t		bt;
 	gd_region		*reg;
 	unsigned int		lcnt, ocnt;
 	int			max_ent, pass0, pass0cnt, pass1, pass2, pass3, rip;
 	int4			flsh_trigger;
-	uint4			first_r_epid, latest_r_epid;
+	uint4			first_r_epid = 0, latest_r_epid;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	srch_blk_status		*tp_srch_status;
@@ -160,6 +160,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			cr = start_cr;
 			if (pass0cnt)
 			{	/* doing restricted looking */
+				assert(our_midnite);
 				if (midnite != our_midnite)
 				{	/* "ordinary" end of buffer - wrap and set up private stop */
 					assert((start_cr + max_ent) == midnite);
@@ -183,6 +184,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 						}
 					} else if (1 == pass0cnt)
 					{
+						assert(poollimit_cr);
 						cr = our_midnite - pass0;
 						our_midnite = poollimit_cr + 1;
 						if (cr < start_cr)

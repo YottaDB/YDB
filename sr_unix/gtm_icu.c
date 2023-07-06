@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -276,8 +276,13 @@ void gtm_icu_init(void)
 	void_ptr_t	handle;
 	char_ptr_t	err_str;
 	icu_func_t	fptr;
+<<<<<<< HEAD
 	int		findx;
 	boolean_t	icu_getversion_found = FALSE, ydb_icu_ver_defined, symbols_renamed;
+=======
+	int		findx, ver;
+	boolean_t	icu_getversion_found = FALSE, gtm_icu_ver_defined, symbols_renamed = -1;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	UVersionInfo	icu_version;
 	int		iculdflags = ICU_LIBFLAGS;
 	struct stat	libpath_stat;
@@ -285,7 +290,7 @@ void gtm_icu_init(void)
 	char		*pieceptr, *cptr;
 #	ifdef _AIX
 	int		buflen, prev_dyn_size;
-	char            buf[ICU_LIBNAME_LEN], temp_path[GTM_PATH_MAX], search_paths[MAX_SEARCH_PATH_LEN];
+	char		buf[ICU_LIBNAME_LEN], temp_path[GTM_PATH_MAX], search_paths[MAX_SEARCH_PATH_LEN];
 	char		*ptr, *each_libpath, *dyn_search_paths = NULL, *search_path_ptr;
 	struct stat	real_path_stat;		/* To see if the resolved real_path exists or not */
 #	endif
@@ -505,6 +510,7 @@ void gtm_icu_init(void)
 		}
 #		endif
 	}
+<<<<<<< HEAD
 	/* Note that a call to "dlopen_handle_array_add(handle)" should normally have been placed here but
 	 * if "dlopen_handle_array_close()" happens on this handle (corresponding to libicuio.so) later and
 	 * any type of error occurs (e.g. CALLINAFTERXIT etc.), it is very likely we would end up invoking
@@ -520,6 +526,8 @@ void gtm_icu_init(void)
 				  	  */
 	#endif
 	DEBUG_ONLY(symbols_renamed = -1;)
+=======
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	for (findx = 0; findx < icu_func_n; ++findx)
 	{
 		cur_icu_fname = icu_fname[findx];

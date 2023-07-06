@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,12 +14,22 @@
 
 LITREF char 		ctypetab[NUM_CHARS];
 
-#define VALID_MNAME_FCHAR(MCHAR) (((NUM_ASCII_CHARS > (unsigned char)MCHAR)) && ((TK_UPPER == ctypetab[MCHAR])		\
-		|| (TK_LOWER == ctypetab[MCHAR]) || (TK_PERCENT == ctypetab[MCHAR])))
-#define VALID_MNAME_NFCHAR(MCHAR) (((NUM_ASCII_CHARS > (unsigned char)MCHAR)) && ((TK_UPPER == ctypetab[MCHAR])	\
-		|| (TK_LOWER == ctypetab[MCHAR]) || (TK_DIGIT == ctypetab[MCHAR])))
-#define VALID_OBJNAME_FCHAR(MCHAR) (((NUM_ASCII_CHARS > (unsigned char)MCHAR)) && ((TK_UPPER == ctypetab[MCHAR])	\
-		|| (TK_LOWER == ctypetab[MCHAR]) || (TK_UNDERSCORE == ctypetab[MCHAR])))
+static inline bool VALID_MNAME_FCHAR(unsigned char mchar)
+{
+	return ((NUM_ASCII_CHARS > mchar) && (TK_UPPER == ctypetab[mchar]))
+			|| (TK_LOWER == ctypetab[mchar]) || (TK_PERCENT == ctypetab[mchar]);
+}
+
+static inline bool VALID_MNAME_NFCHAR(unsigned char mchar)
+{
+	return ((NUM_ASCII_CHARS > mchar) && (TK_UPPER == ctypetab[mchar]))
+			|| (TK_LOWER == ctypetab[mchar]) || (TK_DIGIT == ctypetab[mchar]);
+}
+static inline bool VALID_OBJNAME_FCHAR(unsigned char mchar)
+{
+	return ((NUM_ASCII_CHARS > mchar) && (TK_UPPER == ctypetab[mchar]))
+			|| (TK_LOWER == ctypetab[mchar]) || (TK_UNDERSCORE == ctypetab[mchar]);
+}
 
 boolean_t valid_mname(mstr *targ);
 boolean_t valid_labname(mstr *targ);

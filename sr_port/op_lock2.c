@@ -53,12 +53,12 @@
 #include "filestruct.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "io.h"
+#include "iott_setterm.h"
 #include "jnl.h"
 #include "tp.h"
 #include "send_msg.h"
 #include "gtmmsg.h"		/* for gtm_putmsg() prototype */
 #include "change_reg.h"
-#include "setterm.h"
 #include "getzposition.h"
 #include "lockdefs.h"
 #include "is_proc_alive.h"

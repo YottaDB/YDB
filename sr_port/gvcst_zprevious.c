@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -95,7 +95,7 @@ boolean_t	gvcst_zprevious2(void)
 	boolean_t	found, two_histories;
 	enum cdb_sc	status;
 	srch_blk_status	*bh;
-	srch_hist	*lft_history;
+	srch_hist	*lft_history = NULL;
 	unsigned int	currkey_prev, currkey_end, altkey_end, prev_rec_match;
 	unsigned char	*c, *ctop;
 	DCL_THREADGBL_ACCESS;
@@ -183,6 +183,7 @@ boolean_t	gvcst_zprevious2(void)
 				gv_altkey->end = c - gv_altkey->base;
 				assert(gv_altkey->end < gv_altkey->top);
 			}
+			assert(!two_histories || lft_history);
 			if (!dollar_tlevel)
 			{
 				if ((trans_num)0 == t_end(&gv_target->hist, two_histories ? lft_history : NULL, TN_NOT_SPECIFIED))

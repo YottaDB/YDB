@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
@@ -23,7 +23,7 @@
 
 /* HEADER-FILE-DEPENDENCIES : min_max.h */
 
-typedef struct
+typedef struct blk_segment_struct
 {
 	sm_uc_ptr_t	addr;
 	sm_ulong_t	len;
@@ -162,6 +162,7 @@ typedef struct
 {														\
 	sm_ulong_t		lcl_len1;									\
 	GBLREF uint4		dollar_tlevel;									\
+	GBLREF uint4		mu_upgrade_in_prog;								\
 														\
 	/* Note that name of len variable "lcl_len1" should be different					\
 	 * from the name used in the REORG_BLK_SEG macro as otherwise						\
@@ -178,9 +179,10 @@ typedef struct
 	 * lengths could find their way to gvcst_blk_build even after tp_hist. Since those lengths are passed	\
 	 * directly to memmove which treats it as an unsigned quantity, it means huge memmoves that are likely	\
 	 * to cause memory corruption and/or SIG-11. Therefore it is absolutely necessary that if we are in TP	\
-	 * the caller does not pass in a negative length. Assert that.						\
+	 * the caller does not pass in a negative length. Assert that. Extend the assert to not apply to	\
+	 * UPGRADE processes which did not trip this assert when it was needed.					\
 	 */													\
-	assert(!dollar_tlevel || (0 <= (sm_long_t)lcl_len1));							\
+	assert((!dollar_tlevel && !mu_upgrade_in_prog) || (0 <= (sm_long_t)lcl_len1));				\
 	(BNUM)->addr = (ADDR);											\
 	(BNUM)->len  = lcl_len1;										\
 	blk_seg_cnt += (int)lcl_len1;										\

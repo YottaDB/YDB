@@ -134,7 +134,7 @@ static	mstr	global_collation_mstr;
 	}											\
 	if (mu_reorg_process)									\
 	{	/* In case gv_currkey/gv_target are out of sync. */				\
-		rootsrch_ctxt_ptr->gv_currkey = (gv_key *)&rootsrch_ctxt_ptr->currkey.key;	\
+		rootsrch_ctxt_ptr->gv_currkey = &((gv_key_buf *)&rootsrch_ctxt_ptr->currkey)->key;	\
 		MEMCPY_KEY(rootsrch_ctxt_ptr->gv_currkey, gv_currkey);				\
 		SET_GV_CURRKEY_FROM_GVT(reorg_gv_target);					\
 	}											\

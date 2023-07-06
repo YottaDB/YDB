@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -365,12 +365,12 @@ enum socket_which		/* which module saved the interrupted info */
 
 typedef struct socket_address_type
 {
-	struct sockaddr		      	*sa;
+	struct sockaddr			*sa;
 	struct addrinfo			ai;
 	struct addrinfo			*ai_head; /* store the head of addrinfo linked list */
-	unsigned short                  port;
+	unsigned short			port;
 	pid_t				process;	/* for LOCAL passfd */
-	char            		*saddr_ip;
+	char				*saddr_ip;
 } socket_address;
 
 typedef struct socket_struct_type
@@ -381,20 +381,20 @@ typedef struct socket_struct_type
 	boolean_t			passive,
 					ioerror,
 					urgent,
-	                                delim0containsLF;
+					delim0containsLF;
 	enum socket_state		state;
 	enum socket_protocol		protocol;
 	socket_address			local,
 					remote;
 	uint4				lastop;
 	uint4				moreread_timeout;		/* timeout to see if more data available (ms) */
-        char                            handle[MAX_HANDLE_LEN];
-        int                             handle_len;
+	char				handle[MAX_HANDLE_LEN];
+	int				handle_len;
 	int				bufsiz;				/* OS internal buffer size */
-        int	  	                n_delimiter;
+	int				n_delimiter;
 	int				last_recv_errno;
-        mstr                            delimiter[MAX_N_DELIMITER];
-        mstr                            idelimiter[MAX_N_DELIMITER];
+	mstr				delimiter[MAX_N_DELIMITER];
+	mstr				idelimiter[MAX_N_DELIMITER];
 	mstr				odelimiter0;
 	size_t				buffer_size;			/* size of the buffer for this socket */
 	size_t				buffered_length;		/* length of stuff buffered for this socket */

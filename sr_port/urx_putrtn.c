@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -41,7 +41,7 @@ urx_rtnref *urx_putrtn (char *rtn, int rtnlen, urx_rtnref *anchor)
 		c = rtnlen - rp1->len;
 		assert(0 < rtnlen);
 		if (!c)
-			c = memcmp(rtn, &rp1->name[0], rtnlen);
+			c = memcmp(rtn, rp1->name, rp1->len);
 		if (c > 0)
 		{
 			rp0 = rp1;

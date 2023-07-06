@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -80,8 +80,11 @@ void op_bindparm(int frmc, int frmp_arg, ...)
 		if ((0 == (TREF(parm_pool_ptr))->start_idx) || (SAFE_TO_OVWRT <= prev_count)
 				|| (DBG_ASSERT(2 <= (TREF(parm_pool_ptr))->start_idx)
 					(PARM_ACT_FRAME(curr_slot, prev_count) != frame_pointer)))
+		{
+			mask = 0;
 			actc = 0;
-		else
+			actp = NULL;
+		} else
 		{	/* Acquire mask, actual count, and pointer to actual list from the parameter pool. */
 			assert(1 <= (TREF(parm_pool_ptr))->start_idx);
 			mask = (*(curr_slot - 1)).mask_and_cnt.mask;

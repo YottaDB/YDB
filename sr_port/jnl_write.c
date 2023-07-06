@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2020 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -211,8 +211,6 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	/* Ensure that the checksum computed earlier in jnl_format or jnl_write_pblk or jnl_write_aimg_rec
 	 * or fixed-sized records matches with the block's content.
 	 */
-	blk_ptr = NULL;
-	jfb = NULL;
 	if ((JRT_PBLK == rectype) || (JRT_AIMG == rectype))
 	{
 		blk_ptr = (blk_hdr_ptr_t)parm1;
@@ -258,6 +256,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	 */
 	assert((checksum == tmp_csum1) || ((!JNL_ENABLED(csd)) && (JNL_ENABLED(csa))));
 #	endif
+	blk_ptr = NULL;
+	jfb = NULL;
 	ADJUST_CHECKSUM(checksum, lcl_freeaddr, checksum);
 	ADJUST_CHECKSUM(checksum, csd->jnl_checksum, checksum);
 	SET_JREC_CHECKSUM(jnl_rec, rectype, checksum);

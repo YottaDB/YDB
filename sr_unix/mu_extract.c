@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -225,8 +225,8 @@ void mu_extract(void)
 	gvnh_spanreg_t			*gvspan, *last_gvspan;
 	boolean_t 			region;
 	unsigned short			hash_array_len, hash2_index_array_len, null_iv_array_len;
-	uint4				*curr_hash2_index_ptr, *hash2_index_array_ptr;
-	unsigned char			*curr_hash_ptr, *hash_array_ptr, *null_iv_array_ptr;
+	uint4				*curr_hash2_index_ptr, *hash2_index_array_ptr = NULL;
+	unsigned char			*curr_hash_ptr, *hash_array_ptr = NULL, *null_iv_array_ptr = NULL;
 	sgmnt_data_ptr_t		csd;
 	sgmnt_addrs			*csa;
 	node_local_ptr_t		cnl;
@@ -307,7 +307,7 @@ void mu_extract(void)
 	int_nlen = n_len;
 	lower_to_upper((uchar_ptr_t)format_buffer, (uchar_ptr_t)format_buffer, int_nlen);
 	if (0 == STRNCMP_LIT_LEN(format_buffer, ZWR_FORMAT_STRING, n_len))
-	        format = MU_FMT_ZWR;
+		format = MU_FMT_ZWR;
 	else if (0 == STRNCMP_LIT_LEN(format_buffer, GO_FORMAT_STRING, n_len))
 	{
 		if (gtm_utf8_mode)
@@ -333,12 +333,12 @@ void mu_extract(void)
 	}
 	/* gv_select will select globals */
 	jnlpool_init_needed = TRUE;
-        gv_select(cli_buff, n_len, freeze, (char *)select_text, &gl_head, &reg_max_rec, &reg_max_key, &reg_max_blk, region);
- 	if (!gl_head.next)
-        {
-                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSELECT);
-                mupip_exit(ERR_NOSELECT);
-        }
+	gv_select(cli_buff, n_len, freeze, (char *)select_text, &gl_head, &reg_max_rec, &reg_max_key, &reg_max_blk, region);
+	if (!gl_head.next)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSELECT);
+		mupip_exit(ERR_NOSELECT);
+	}
 	if (!region)
 	{
 		for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
@@ -423,7 +423,8 @@ void mu_extract(void)
 			}
 		}
 		assert(-1 != reg_std_null_coll);
-	}
+	} else
+		reg_std_null_coll = -1;
 	MU_EXTR_STATS_INIT(grand_total);
 	MU_EXTR_STATS_INIT(global_total);
 	n_len = SIZEOF(outfilename);
@@ -550,6 +551,7 @@ void mu_extract(void)
 		op_write(&op_val);
 		if (any_file_encrypted)
 		{
+			assert(hash_array_ptr);
 			op_val.str.addr = (char *)(&hash_array_len);
 			op_val.str.len = SIZEOF(hash_array_len);
 			op_write(&op_val);
@@ -558,6 +560,7 @@ void mu_extract(void)
 			op_write(&op_val);
 			if (any_file_uses_non_null_iv)
 			{
+				assert(null_iv_array_ptr);
 				op_val.str.addr = (char *)(&null_iv_array_len);
 				op_val.str.len = SIZEOF(null_iv_array_len);
 				op_write(&op_val);
@@ -667,6 +670,8 @@ void mu_extract(void)
 				if (&FILE_INFO(gv_cur_region)->fileid == &FILE_INFO(rptr->reg)->fileid)
 					break;
 			}
+			assert(hash2_index_array_ptr);
+			assert(null_iv_array_ptr);
 			index2 = *(hash2_index_array_ptr + index);
 			null_iv = *(null_iv_array_ptr + index) == '1';
 			if (!IS_ENCRYPTED(cs_data->is_encrypted))
@@ -729,9 +734,9 @@ void mu_extract(void)
 				&grand_total.recknt, grand_total.keylen, grand_total.datalen, grand_total.reclen);
 	} else
 	{
-                gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSELECT);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSELECT);
 		UNLINK(outfilename);
-                mupip_exit(ERR_NOSELECT);
+		mupip_exit(ERR_NOSELECT);
 	}
 	mupip_exit(success ? SS_NORMAL : ERR_MUNOFINISH);
 }

@@ -91,6 +91,7 @@ void clear_cache_array(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg, b
 				{
 					bt->cache_index = CR_NOTVALID;
 					bt->blk = BT_NOTVALID;
+					bt->tn = 0;
 				}
 			}
 			cr->blk = CR_BLKEMPTY;

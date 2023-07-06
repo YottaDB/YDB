@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -97,7 +97,11 @@ void iott_use(io_desc *iod, mval *pp)
 	struct sigaction	act;
 	struct termios		t;
 	mstr			chset_mstr;
+<<<<<<< HEAD
 	gtm_chset_t		temp_chset, old_ichset;
+=======
+	gtm_chset_t		temp_chset = -1, old_ochset, old_ichset;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	uint4			mask_in;
 	unsigned char		ch, len;
 	boolean_t		ch_set;

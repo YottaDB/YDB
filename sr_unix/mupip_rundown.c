@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -150,7 +150,8 @@ void mupip_rundown(void)
 		seg->fname[seg->fname_len] = '\0';
 		rptr = &single;		/* a dummy value that permits one trip through the loop */
 		rptr->fPtr = NULL;
-	}
+	} else
+		rptr = NULL;
 	in_backup = FALSE;		/* Only want yes/no from mupfndfil, not an address */
 	if (region || file)
 	{

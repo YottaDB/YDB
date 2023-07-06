@@ -169,7 +169,7 @@ typedef struct cache_rec_struct
 */
 
 /* cache_state record */
-typedef struct
+typedef struct cache_state_rec_struct
 {
 	struct
 	{
@@ -2319,9 +2319,10 @@ MBSTART {												\
 		else											\
 			rts_error_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(4) ERR_BADDBVER, 2,		\
 					DB_LEN_STR(REG));						\
-	} else if ((!TSD->fully_upgraded || (0 != TSD->blks_to_upgrd)) 					\
+	} else if ((!TSD->fully_upgraded || ((0 != TSD->blks_to_upgrd) && !TREF(in_mupip_integ))) 	\
 				&& (BLK_ID_32_VER > TSD->desired_db_format))				\
-	{	/* Either GDS_LABEL or V6_GDS_LABEL */							\
+	{	/* Either GDS_LABEL or V6_GDS_LABEL; fully_upgraded false; blocks to upgrade not zero */\
+		/* Since INTEG can change blocks to upgrade, allow it to to pass */			\
 		if (!IS_DSE_IMAGE)	/* DSE operations are individually restricted */		\
 			rts_error_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(5) ERR_DBUPGRDREQ, 3,		\
 					DB_LEN_STR(REG), gtm_dbversion_table[TSD->desired_db_format]);	\
@@ -3009,14 +3010,29 @@ typedef struct
 	unsigned short	prev;
 } gv_key_nobase;
 
-typedef union {
-	gv_key_nobase	key;
-	char		buf[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	struct {
-		char	gv_key_data[SIZEOF(gv_key_nobase)];
-		char	base[DBKEYSIZE(MAX_KEY_SZ)];
-	} split;
+typedef struct
+{
+	char	gv_key_data[SIZEOF(gv_key_nobase)];
+	char	base[DBKEYSIZE(MAX_KEY_SZ)];
+} gv_key_buf_split;
+
+typedef union
+{
+	gv_key_nobase		nobase;
+	char			buf[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
+	gv_key_buf_split	split;
+} gv_key_buf_fixed;
+
+typedef union gv_key_buf_union
+{
+	gv_key			key;
+	gv_key_nobase		nobase;
+	char			buf[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
+	gv_key_buf_split	split;
+	gv_key_buf_fixed	fixed;
 } gv_key_buf;
+
+typedef gv_key_buf	*gv_key_ptr;
 
 /* The direction that the newly added record went after a block split at a given level */
 enum split_dir
@@ -3690,11 +3706,11 @@ MBSTART {														\
 	gvt = GVT; /* copy into local variable to avoid evaluating input multiple times */				\
 	klen = MIN(gvt->clue.end, gvt->first_rec->end);									\
 	assert(klen);													\
-	assert((0 <= memcmp(((gv_key *)&(gvt->clue))->base, gvt->first_rec->base, klen))				\
+	assert((0 <= memcmp(((gv_key_buf *)&(gvt->clue))->key.base, gvt->first_rec->base, klen))			\
 		|| (GVT_CLUE_FIRST_REC_UNRELIABLE == *((short *)gvt->first_rec->base)));				\
 	klen = MIN(gvt->clue.end, gvt->last_rec->end);									\
 	assert(klen);													\
-	assert(0 <= memcmp(gvt->last_rec->base, ((gv_key *)&(gvt->clue))->base, klen));					\
+	assert(0 <= memcmp(gvt->last_rec->base, ((gv_key_buf *)&(gvt->clue))->key.base, klen));			\
 	if (DIR_ROOT != gvt->root)											\
 	{	/* Not a directory tree => a GVT tree, check that first_rec/last_rec have at least gvname in it */	\
 		gvent = &gvt->gvname;											\
@@ -4552,19 +4568,19 @@ typedef enum
 /* This structure holds state captured on entry into gvcst_redo_root_search which it restores on error or exit */
 typedef struct redo_root_search_context_struct
 {
-	unsigned char	t_fail_hist[CDB_MAX_TRIES];
-	unsigned int	t_tries;
-	unsigned int	prev_t_tries;
-	inctn_opcode_t	inctn_opcode;
-	trans_num	start_tn;
-	uint4		update_trans;
-	uint4		t_err;
-	boolean_t	hold_onto_crit;
-	gv_key_buf	currkey;
-	gv_key		*gv_currkey;
+	unsigned char		t_fail_hist[CDB_MAX_TRIES];
+	unsigned int		t_tries;
+	unsigned int		prev_t_tries;
+	inctn_opcode_t		inctn_opcode;
+	trans_num		start_tn;
+	uint4			update_trans;
+	uint4			t_err;
+	boolean_t		hold_onto_crit;
+	gv_key_buf_fixed	currkey;
+	gv_key			*gv_currkey;
 #	ifdef DEBUG
-	unsigned char	t_fail_hist_dbg[T_FAIL_HIST_DBG_SIZE];
-	unsigned int	t_tries_dbg;
+	unsigned char		t_fail_hist_dbg[T_FAIL_HIST_DBG_SIZE];
+	unsigned int		t_tries_dbg;
 #	endif
 } redo_root_search_context;
 

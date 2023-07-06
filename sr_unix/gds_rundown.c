@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
@@ -190,6 +190,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
 	csd = csa->hdr;
+	cnl = csa->nl;
 	assert((csa == cs_addrs) && (csd == cs_data));	/* relied upon by "jnl_ensure_open" calls below */
 	if ((reg->open) && (dba_usr == csd->acc_meth))
 	{

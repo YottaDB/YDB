@@ -59,8 +59,13 @@ int eval_expr(oprtype *a)
 	tbp		*catbp, *tripbp;
 	triple		*argtrip, *parm, *ref, *ref1, *t1, *t2;
 	mliteral	*m1, *m2;
+<<<<<<< HEAD
 	mval		tmp_mval;
 	enum octype_t	type;
+=======
+	mval		tmp_mval = { 0 };
+	unsigned short	type;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -80,7 +85,6 @@ int eval_expr(oprtype *a)
 		{
 			if (!TREF(shift_side_effects))
 			{
-				assert(FALSE == TREF(saw_side_effect));
 				for (ref = (TREF(curtchain))->exorder.bl; oc_tab[ref->opcode].octype & OCT_BOOL;
 					ref = ref->exorder.bl)
 						;
@@ -273,6 +277,18 @@ int eval_expr(oprtype *a)
 			ref = newtriple(bin_opcode);
 			ref->operand[0] = optyp_1;
 			ref->operand[1] = optyp_2;
+<<<<<<< HEAD
+=======
+			/* Note that at eval_expr time we allow rhs operands to remain non-se despite containing lhs
+			 * side effects that cause parents to become SE-Booleans. Under the current design of Boolean
+			 * tail processing which uses the operations as anchors before which to place associated jumps,
+			 * this conversion is and must be done in bx_sboolop. If any parent is an SE-Bool then all
+			 * direct children must be made SE-Bools. Indirect children do not need to follow this rule.
+			 */
+			if (rh_se && (GTM_BOOL != TREF(gtm_fullbool))
+					&& (oc_tab[ref->opcode].octype & OCT_BOOL) && (ref->opcode != OC_COBOOL))
+				CONVERT_TO_SE(ref);
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		}
 		optyp_1 = put_tref(ref);
 	}

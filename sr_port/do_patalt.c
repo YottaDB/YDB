@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -169,7 +169,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 	int		match, alt_size, charlen, bytelen, pat_found;
 	mval		alt_pat, alt_str;
 	pte_csh		*tmp_pte;
-	unsigned char	*strtmp, *strnext;
+	unsigned char	*strtmp = NULL, *strnext;
 
 	if (PTE_MAX_ENTRIES <= repcnt)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_PATALTER2LARGE, 1, PTE_MAX_ENTRIES);
@@ -320,6 +320,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 					UTF8_ONLY(
 					else
 					{
+						assert(strtmp);
 						assert((strtmp < strtop) || (charlen == alt_tot_max));
 						if (strtmp < strtop)
 						{

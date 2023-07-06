@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -289,7 +289,7 @@ uint4 mur_process_intrpt_recov()
 		jfh->turn_around_offset = jctl->turn_around_offset;	/* save progress in file header for 	*/
 		jfh->turn_around_time = jctl->turn_around_time;		/* possible re-issue of recover 	*/
 		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
-			jfh->strm_end_seqno[idx] = csd->strm_reg_seqno[idx];
+			jfh->strm_end_seqno[idx] = rctl->csd->strm_reg_seqno[idx];
 		jfh_changed = TRUE;
 		/* We are about to update the journal file header of the turnaround-point journal file to store the
 		 * non-zero jfh->turn_around_offset. Ensure corresponding database is considered updated.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2019 Fidelity National Information		*
+ * Copyright (c) 2019-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
@@ -69,7 +69,7 @@ STATICFNDEF int mlk_rehash_tree(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t head, ml
 
 void mlk_rehash(mlk_pvtctl_ptr_t pctl)
 {
-	int			count;
+	int			count = -1;
 	mlk_shrblk_ptr_t	root;
 	mlk_subhash_state_t	hs;
 

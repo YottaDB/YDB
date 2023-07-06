@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2020 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,7 @@ void op_fnzcollate(mval *src, int col, int reverse, mval *dst)
 	MV_FORCE_STR(src);
 	if (0 == reverse)
 	{	/* gvn2gds */
-		gvkey = (gv_key *)&save_currkey.key;
+		gvkey = &save_currkey.key;
 		key = gvn2gds(src, gvkey, col);
 		/* If input has error at some point, copy whatever subscripts
 		 * (+ gblname) have been successfully parsed */
@@ -64,4 +64,3 @@ void op_fnzcollate(mval *src, int col, int reverse, mval *dst)
 		COPY_ARG_TO_STRINGPOOL(dst, key, &buff[0]);
 	}
 }
-

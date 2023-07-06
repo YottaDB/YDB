@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -108,8 +108,8 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	int			subcode;
 	jnl_record		*rec;
 	jnl_format_buffer	*prev_jfb, *jfb, *prev_prev_jfb;
-	jnl_str_len_t		keystrlen;
-	mstr_len_t		valstrlen;
+	jnl_str_len_t		keystrlen = 0;
+	mstr_len_t		valstrlen = -1;
 	sgm_info		*si;
 	sgmnt_addrs		*csa;
 	uint4			align_fill_size, jrec_size, tmp_jrec_size;
@@ -145,12 +145,118 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	if (jgbl.forw_phase_recovery)	/* In case of recovery, copy "nodeflags" from journal record being played */
 		nodeflags = jgbl.mur_jrec_nodeflags;
 	csa = &FILE_INFO(gv_cur_region)->s_addrs;
+<<<<<<< HEAD
 	is_ztworm = (JNL_ZTWORM == opcode);
 	is_ztworm_post_trig = (JNL_ZTWORM_POST_TRIG == opcode);
 	if (is_ztworm_post_trig)
 	{	/* In the JNL_ZTWORM_POST_TRIG case, "key" parameter is overloaded to contain the "jfb" created during the
 		 * previous call to "jnl_format()" for the JNL_ZTWORM case. Use that instead of creating a new "jfb".
 		 * Skip most of the code that is done for the normal "jnl_format()" case. Do just reformatting related code.
+=======
+	csd = csa->hdr;
+#	ifdef GTM_TRIGGER
+	/* If opcode is JNL_ZTWORM then check if ztwormhole operation can be avoided altogether.
+	 * This is the case if the value of $ZTWORMHOLE passed in is identical to the value of
+	 * $ZTWORMHOLE written for the immediately previous update stored in (global variable) jgbl.prev_ztworm_ptr
+	 * across regions in the current TP transaction. In that case, return right away.
+	 * For journal recovery, we skip this part since we want the ztwormhole record to be unconditionally written
+	 * (because GT.M wrote it in the first place).
+	 */
+	is_ztworm_rec = (JNL_ZTWORM == opcode);
+	if (is_ztworm_rec && !jgbl.forw_phase_recovery)
+	{
+		assert(REPL_ALLOWED(csa) || jgbl.forw_phase_recovery);
+		assert(dollar_tlevel);
+		assert(tstart_trigger_depth == gtm_trigger_depth);
+		assert((NULL != val) && (NULL == key));
+		assert(MV_IS_STRING(val));
+		assert(FIXED_UPD_RECLEN == FIXED_ZTWORM_RECLEN);
+		if (NULL != jgbl.prev_ztworm_ptr)
+		{
+			cur_str = &val->str;
+			prev_str.len = (*(jnl_str_len_t *)jgbl.prev_ztworm_ptr);
+			prev_str.addr = (char *)(jgbl.prev_ztworm_ptr + SIZEOF(jnl_str_len_t));
+			if ((prev_str.len == cur_str->len) && !memcmp(prev_str.addr, cur_str->addr, prev_str.len))
+			{
+				DEBUG_ONLY(dbg_in_jnl_format = FALSE;)
+				return NULL;
+			}
+		}
+	}
+#	endif
+	/* Allocate a jfb structure */
+	if (!dollar_tlevel)
+	{
+		jfb = non_tp_jfb_ptr; /* already malloced in gvcst_init() */
+		jgbl.cumul_jnl_rec_len = 0;
+		si = NULL;
+		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
+	} else
+	{
+		si = sgm_info_ptr;	/* reset "si" since previous set was #ifdef GTM_TRIGGER only code while this is not */
+		assert(si->tp_csa == csa);
+		assert((NULL != si->jnl_head) || (NULL == csa->next_fenced));
+		assert((NULL == si->jnl_head) || (NULL != csa->next_fenced));
+		assert((NULL == csa->next_fenced) || (JNL_FENCE_LIST_END == csa->next_fenced)
+						|| (NULL != csa->next_fenced->sgm_info_ptr->jnl_head));
+		jfb = (jnl_format_buffer *)get_new_element(si->jnl_list, 1);
+		jfb->next = NULL;
+		assert(NULL != si->jnl_tail);
+		GTMTRIG_ONLY(SET_PREV_JFB(si, jfb->prev);)
+		assert(NULL == *si->jnl_tail);
+		*si->jnl_tail = jfb;
+		si->jnl_tail = &jfb->next;
+		si->update_trans |= UPDTRNS_JNL_LOGICAL_MASK;	/* record that we are writing a logical jnl record in this region */
+		if (!(nodeflags & JS_NOT_REPLICATED_MASK))
+			si->update_trans |= UPDTRNS_JNL_REPLICATED_MASK;
+	}
+	ja = &(jfb->ja);
+	ja->operation = opcode;
+	ja->nodeflags = nodeflags;
+	/* Proceed with formatting the journal record in the allocated jfb */
+	if (!jnl_fence_ctl.level && !dollar_tlevel)
+	{	/* Non-TP */
+		subcode = 0;
+		tmp_jrec_size = FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE;
+		assert(0 == jgbl.tp_ztp_jnl_upd_num);
+	} else
+	{
+		if (NULL == csa->next_fenced)
+		{	/* F (or T) */
+			assert((NULL != jnl_fence_ctl.fence_list) || (0 == jgbl.tp_ztp_jnl_upd_num));
+			subcode = 1;
+			csa->next_fenced = jnl_fence_ctl.fence_list;
+			jnl_fence_ctl.fence_list = csa;
+		} else	/* G (or U) */
+		{	/* If this is a U type of record (jnl_fence_ctl.level would be 0 in that case), at least one call
+			 * to "jnl_format" has occurred in this TP transaction already. We therefore expect
+			 * jgbl.tp_ztp_jnl_upd_num to be non-zero at this point. The only exception is if "jnl_format"
+			 * had been called just once before and that was for a ZTWORM type of record in which case it would be
+			 * zero (both ZTWORM and following SET/KILL record will have the same update_num value of 1).
+			 */
+			assert(jnl_fence_ctl.level || jgbl.tp_ztp_jnl_upd_num
+				GTMTRIG_ONLY(|| (si && (jfb->prev == si->jnl_head) && (JRT_TZTWORM == jfb->prev->rectype))));
+			subcode = 3;
+		}
+		if (dollar_tlevel)
+			++subcode; /* TP */
+		else if (!jgbl.forw_phase_recovery && t_tries)
+			jgbl.tp_ztp_jnl_upd_num--;	/* If ZTP, increment this only ONCE per update, not ONCE per retry.
+							 * We do this by decrementing it if t_tries > 0 to balance the
+							 * tp_ztp_jnl_upd_num++ done a few lines below.
+							 */
+		tmp_jrec_size = FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE;
+		assert(FIXED_UPD_RECLEN == FIXED_ZTWORM_RECLEN);
+		assert(FIXED_UPD_RECLEN == FIXED_LGTRIG_RECLEN);
+		if (!jgbl.forw_phase_recovery)
+			jgbl.tp_ztp_jnl_upd_num++;
+		/* In case of forward phase of journal recovery, this would have already been set to appropriate value.
+		 * It is necessary to honor the incoming jgbl value for ZTP (since recovery could be playing records
+		 * from the middle of a ZTP transaction because the rest are before the EPOCH), but for TP it is not
+		 * necessary since all records are guaranteed to be AFTER the EPOCH so we can generate the numbers in
+		 * this function too. But since we expect recovery to play the TP records in the exact order in which
+		 * GT.M wrote them no point regenerating the same set of numbers again here. So we use incoming jgbl always.
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		 */
 		assert(!jgbl.forw_phase_recovery);	/* Forward phase of mupip journal recover/rollback do not apply triggers */
 		jfb = (jnl_format_buffer *)key;
@@ -273,6 +379,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	{
 		assert((1 << JFB_ELE_SIZE_IN_BITS) == JNL_REC_START_BNDRY);
 		assert(JFB_ELE_SIZE == JNL_REC_START_BNDRY);
+		assert(si);
 		jfb->buff = (char *)get_new_element(si->format_buff_list, jrec_size >> JFB_ELE_SIZE_IN_BITS);
 		if (REPL_ALLOWED(csa))
 			jfb->alt_buff = (char *)get_new_element(si->format_buff_list, jrec_size >> JFB_ELE_SIZE_IN_BITS);
@@ -300,6 +407,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	mumps_node_ptr = local_buffer;
 	if (NULL != key)
 	{
+		assert(keystrlen);
 		((jnl_string *)local_buffer)->length = keystrlen;
 		((jnl_string *)local_buffer)->nodeflags = nodeflags;
 		local_buffer += SIZEOF(jnl_str_len_t);
@@ -308,6 +416,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	}
 	if (NULL != val)
 	{
+		assert(0 <= valstrlen);
 		PUT_MSTR_LEN(local_buffer, valstrlen); /* SET command's data may not be aligned */
 		/* The below assert ensures that it is okay for us to increment by jnl_str_len_t (uint4)
 		 * even though valstrlen (above) is of type mstr_len_t (int). This is because PUT_MSTR_LEN

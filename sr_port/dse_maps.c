@@ -147,7 +147,7 @@ void dse_maps(void)
 			BLK_INIT(bs_ptr, bs1);
 			BLK_SEG(bs_ptr, blk_ptr + SIZEOF(blk_hdr), bml_size - SIZEOF(blk_hdr));
 			BLK_FINI(bs_ptr, bs1);
-			t_write(&blkhist, (unsigned char *)bs1, 0, 0, LCL_MAP_LEVL, TRUE, FALSE, GDS_WRITE_KILLTN);
+			t_write(&blkhist, bs1, 0, 0, LCL_MAP_LEVL, TRUE, FALSE, GDS_WRITE_KILLTN);
 			BUILD_AIMG_IF_JNL_ENABLED(csd, csa->ti->curr_tn);
 			t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
 		}

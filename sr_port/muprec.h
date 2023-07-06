@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -1161,7 +1161,7 @@ typedef struct {
 	char			strbuff[256], *ptr;										\
 	char			time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */					\
 	time_t			seconds;											\
-	multi_proc_shm_hdr_t	*mp_hdr;	/* Pointer to "multi_proc_shm_hdr_t" structure in shared memory */		\
+	multi_proc_shm_hdr_t	*mp_hdr = NULL;	/* Pointer to "multi_proc_shm_hdr_t" structure in shared memory */		\
 																\
 	if (mur_options.verbose)												\
 	{															\
@@ -1209,7 +1209,10 @@ typedef struct {
 				murgbl.broken_cnt, murgbl.broken_cnt);								\
 		}														\
 		if (multi_proc_in_use)												\
+		{														\
+			assert(mp_hdr);												\
 			rel_latch(&mp_hdr->multi_proc_latch);									\
+		}														\
 	}															\
 }
 

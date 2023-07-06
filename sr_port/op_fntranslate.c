@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -292,8 +292,8 @@ void op_fnztranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 	MV_FORCE_STR(src);
 	MV_FORCE_STR(srch);
 	MV_FORCE_STR(rplc);
-	if (gtm_utf8_mode && !badchar_inhibit)
-		MV_FORCE_LEN(src);
+	if (gtm_utf8_mode)
+		MV_FORCE_LEN_SILENT(src);
 	if (!(IS_STP_SPACE_AVAILABLE((src->str.len)) && (prev_gcols == stringpool.gcols) && (srch->str.addr == prev_srch.addr)
 		&& (srch->str.len == prev_srch.len) && (rplc->str.addr == prev_rplc.addr) && (rplc->str.len == prev_rplc.len)))
 	{
@@ -312,8 +312,8 @@ void op_fnztranslate_fast(mval *src, mval *m_xlate, mval *dst)
 
 	assert(MV_STR & m_xlate->mvtype);
 	MV_FORCE_STR(src);
-	if (gtm_utf8_mode && !badchar_inhibit)
-		MV_FORCE_LEN(src);
+	if (gtm_utf8_mode)
+		MV_FORCE_LEN_SILENT(src);
 	ENSURE_STP_FREE_SPACE(src->str.len); /* Allocate string space now so the stringpool doesn't shift xlate table */
 	xlate = (int4 *)m_xlate->str.addr;
 	assert(m_xlate->str.len == NUM_CHARS * SIZEOF(int4));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -25,15 +25,15 @@
 #include "iosp.h"
 #include "iottdef.h"
 #include "gtmio.h"
+#include "iott_setterm.h"
 #include "eintr_wrappers.h"
-#include "setterm.h"
 #include "gtm_isanlp.h"
 
 GBLREF	uint4		process_id;
 
 error_def(ERR_TCSETATTR);
 
-void setterm(io_desc *ioptr)
+void iott_setterm(io_desc *ioptr)
 {
 	int		status;
 	int		save_errno;

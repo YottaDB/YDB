@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,11 +30,11 @@ boolean_t valid_labname(mstr *targ)
 					break;
 			}
 			return (src == src_top ? TRUE: FALSE); /* Was it a valid M identifier? */
-		} else if ((unsigned char)(*src) < NUM_ASCII_CHARS && ctypetab[*src] == TK_DIGIT)
+		} else if ((unsigned char)(*src) < NUM_ASCII_CHARS && ctypetab[(unsigned char)*src] == TK_DIGIT)
 		{
 			for ( ; ++src < src_top; )
 			{
-				if ((unsigned char)(*src) >= NUM_ASCII_CHARS || ctypetab[*src] != TK_DIGIT)
+				if ((unsigned char)(*src) >= NUM_ASCII_CHARS || ctypetab[(unsigned char)*src] != TK_DIGIT)
 					break;
 			}
 			return (src == src_top ? TRUE: FALSE); /* Was it a valid M identifier? */

@@ -100,7 +100,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	tp_region		*grlist;
 GBLREF	trans_num		start_tn;
 GBLREF	uint4			mu_upgrade_in_prog;		/* 1 indicates MUPIP UPGRADE in progress */
-GBLREF	uint4			update_array_size;						/* for the BLK_* macros */
+GBLREF	uint4			update_array_size;		/* for the BLK_* macros */
 GBLREF	uint4			update_trans;
 GBLREF	uint4			process_id;
 GBLREF	unsigned char		cw_map_depth, rdfail_detail, t_fail_hist[];
@@ -267,7 +267,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 			}
 			blks_to_mv_levl_ptr[level][LEVEL_CNT]++;
 			blks_to_mv_levl_ptr[level][old_blk_num] = index;
-		}
+		}	/* end of loop over a local bit map */
 	}	/* end identification of blocks to move */
 	/* crit management is not critical as this runs standalone */
 	gvname.var_name.addr = (char *)gname;
@@ -275,9 +275,9 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	num_blks_mv = index;
 	assert(((blks_in_way) + 1) >= old_blk_num);
 	assert(DBKEYSIZE(MAX_KEY_SZ) == gv_keysize);			/* gv_keysize was init'ed by gvinit() in the caller */
-	if (NULL == gv_currkey_next_reorg)				/* Multi-region upgrade in progress, don't reallocate */
+	if (NULL == gv_currkey_next_reorg)
 		GVKEY_INIT(gv_currkey_next_reorg, gv_keysize);
-	else
+	else	/* Multi-region upgrade in progress, don't reallocate */
 		gv_currkey_next_reorg->end = 0;
 	upgrade_gv_target = targ_alloc(MAX_KEY_SZ, NULL, NULL);		/* UPGRADE needs space for gen_hist_for_blk */
 	upgrade_gv_target->hist.depth = 0;
@@ -349,7 +349,8 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 				if ((cdb_sc_starrecord != status) || (1 != blkHdr.levl))
 				{	/* not a KILL'd global artifact */
 					mv_blk_err = TRUE;
-					util_out_print("Region !AD: directory lookup failed, preventing ", FALSE, REG_LEN_STR(reg));
+					util_out_print("Region !AD: directory lookup failed (!UL), preventing ",
+							FALSE, REG_LEN_STR(reg), status);
 					util_out_print(" move of @x!@XQ; going on to next block.", TRUE, &old_blk_num);
 				}
 				t_abort(gv_cur_region, cs_addrs);				/* do crit and other cleanup */
@@ -376,8 +377,8 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 					assert(cdb_sc_normal == status);
 					t_abort(gv_cur_region, cs_addrs);			/* do crit and other cleanup */
 					mv_blk_err = TRUE;
-					util_out_print("Region !AD: parse of directory for key !AD failed ", FALSE,
-						REG_LEN_STR(reg), gvname.var_name.len, gvname.var_name.addr);
+					util_out_print("Region !AD: parse of directory for key !AD failed (!UL) ", FALSE,
+						REG_LEN_STR(reg), gvname.var_name.len, gvname.var_name.addr, status);
 					util_out_print("preventing move of 0x!@XQ; going on to next block.", TRUE, &old_blk_num);
 					continue;
 				}
@@ -389,8 +390,8 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 					assert(cdb_sc_normal == status);
 					t_abort(gv_cur_region, cs_addrs); /* do crit and other cleanup */
 					mv_blk_err = TRUE;
-					util_out_print("Region !AD: search for for key !AD failed, so ", FALSE,
-						REG_LEN_STR(reg), gvname.var_name.len, gvname.var_name.addr);
+					util_out_print("Region !AD: search for for key !AD failed (!UL), so ", FALSE,
+						REG_LEN_STR(reg), gvname.var_name.len, gvname.var_name.addr, status);
 					util_out_print("can't move block 0x!@XQ; going on to next block.", TRUE, &old_blk_num);
 					continue;
 				}
@@ -399,10 +400,10 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 			reorg_gv_target->hist.depth = 0;
 			reorg_gv_target->alt_hist->depth = 0;
 			if (is_bg)
-			{
+			{	/* Standalone operation not following normal concurrency patterns */
 				if (NULL == (bt = (bt_get(old_blk_num))))
-				{
-					bt_put(reg, old_blk_num);	/* unless/until cc differs, prevent hist restart */
+				{	/* Do this to prevent history/buffer reuse induced restart */
+					bt_put(reg, old_blk_num);
 					bt = bt_get(old_blk_num);
 				}
 				bt->tn = bt->killtn = start_tn - 1;
@@ -421,33 +422,35 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 				if (cdb_sc_normal != status)
 				{	/* swap to get the block out of the blks_in_way zone failed */
 					assert(cdb_sc_normal == status);
-					t_abort(gv_cur_region, cs_addrs);			/* do crit and other cleanup */
+					t_abort(gv_cur_region, cs_addrs);		/* do crit and other cleanup */
 					mv_blk_err = TRUE;
-					util_out_print("Region !AD: failed swap of block 0x!@XQ to 0x!@XQ;", FALSE,
+					util_out_print("Region !AD: failed swap of block 0x!@XQ to 0x!@XQ ", FALSE,
 						REG_LEN_STR(reg), &old_blk_num, new_blk_num);
-					util_out_print(" going on to next block.", TRUE);
+					util_out_print("(!UL); moving on to next block.", TRUE, status);
 					continue;
 				}
 				assert((blks_in_way + 1 != new_blk_num) && (t_blk_num == new_blk_num));
 				assert(new_blk_num == cw_set[0].blk);
 				assert(ROUND_DOWN2(new_blk_num, BLKS_PER_LMAP) == cw_set[2].blk);
-				t_blk_num -= blks_in_way;				/* t_blk_num is new loc w. offset applied */
+				t_blk_num -= blks_in_way;	/* t_blk_num is new block number after offset applied */
 				if (dt)
 					mu_reorg_process = TRUE;
 				ret_tn = t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED);
 				if (0 == ret_tn)
 				{	/* commit failed */
 					assert(ret_tn);
-					t_abort(gv_cur_region, cs_addrs);			/* do crit and other cleanup */
+					status = (t_tries) ? t_fail_hist[t_tries - 1] : cdb_sc_committfail;
+					t_abort(gv_cur_region, cs_addrs);		/* do crit and other cleanup */
 					mu_reorg_process = FALSE;
 					mv_blk_err = TRUE;
-					util_out_print("Region !AD: failed commit of block 0x!@XQ; ", FALSE,
-						REG_LEN_STR(reg), &old_blk_num);
-					util_out_print("swap to 0x@XQ going on to next block.", TRUE, &t_blk_num);
+					util_out_print("Region !AD: failed commit of block 0x!@XQ (!UL); ", FALSE,
+						REG_LEN_STR(reg), &old_blk_num, status);
+					util_out_print("swap to 0x!@XQ (0x!@XQ) going on to next block.", TRUE,
+							&new_blk_num, &t_blk_num);
 					continue;
 				}
-				assert((1 == kill_set_list.used) && !kill_set_list.blk[0].level && !kill_set_list.blk[0].flag
-					&& (old_blk_num == kill_set_list.blk[0].block));
+				assert((1 == kill_set_list.used) && !kill_set_list.blk[0].level
+					&& !kill_set_list.blk[0].flag && (old_blk_num == kill_set_list.blk[0].block));
 				GVCST_BMP_MARK_FREE(&kill_set_list, ret_tn, inctn_opcode, inctn_bmp_mark_free_mu_reorg,
 					inctn_opcode, csa);
 				mu_reorg_process = FALSE;
@@ -455,24 +458,25 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 				if (0 == ret_tn)
 				{	/* bit map commit failed */
 					assert(ret_tn);
-					t_abort(gv_cur_region, cs_addrs);			/* do crit and other cleanup */
+					status = (t_tries) ? t_fail_hist[t_tries - 1] : cdb_sc_committfail;
+					t_abort(gv_cur_region, cs_addrs);		/* do crit and other cleanup */
 					mv_blk_err = TRUE;
-					util_out_print("Region !AD: failed to free block 0x!@XQ; ", FALSE, REG_LEN_STR(reg),
-						&old_blk_num);
+					util_out_print("Region !AD: failed to free block 0x!@XQ (!UL); ",
+							FALSE, REG_LEN_STR(reg), &old_blk_num, status);
 					util_out_print("going on to next block; this only matters ", FALSE);
 					util_out_print("if another type of problem stops region conversion", TRUE);
 				}
 				if (debug_mupip)
-					util_out_print("moved level !UL block 0x!@XQ to 0x!@XQ", TRUE,
-							blkHdr.levl, &old_blk_num, &t_blk_num);
+					util_out_print("moved level !UL block 0x!@XQ to 0x!@XQ (0x!@XQ)", TRUE,
+							blkHdr.levl, &old_blk_num, &new_blk_num, &t_blk_num);
 				blk_moved_cnt++;
 			} else
 			{	/* The block being moved is a root block */
 				t_blk_num -= blks_in_way;
 				move_root_block(new_blk_num++, old_blk_num, gvnh_reg, &kill_set_list);
 				if (debug_mupip)
-					util_out_print("moved level !UL root block 0x!@XQ to 0x!@XQ", TRUE,
-							blkHdr.levl, &old_blk_num, &t_blk_num);
+					util_out_print("moved level !UL root block 0x!@XQ to 0x!@XQ (0x!@XQ)", TRUE,
+							blkHdr.levl, &old_blk_num, &new_blk_num, &t_blk_num);
 				root_moved_cnt++;
 			}
 			index++;
@@ -513,8 +517,8 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 		assert(cdb_sc_normal == status);
 		t_abort(gv_cur_region, cs_addrs);						/* do crit and other cleanup */
 		mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;
-		util_out_print("Region !AD: directory processing KILL'd globals failed; ", FALSE, REG_LEN_STR(reg));
-		util_out_print("cannot complete mastermap enlargement.", TRUE);
+		util_out_print("Region !AD: directory processing KILL'd globals failed ", FALSE, REG_LEN_STR(reg));
+		util_out_print("(!UL). Cannot complete mastermap enlargement.", TRUE, status);
 		return ERR_MUNOFINISH;
 	}
 	tot_kill_block_cnt = 2 * killed_gbl_cnt;					/* 2 = gvt root + 1 empty data block */
@@ -523,11 +527,12 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	blkBase = blkhist->buffaddr = t_qread(old_blk_num, &blkhist->cycle, &blkhist->cr);
 	if (NULL == blkBase)
 	{	/* read failed */
-		assert(cdb_sc_normal == (enum cdb_sc)rdfail_detail);
+		status = rdfail_detail;
+		assert(cdb_sc_normal == status);
 		t_abort(gv_cur_region, cs_addrs);						/* do crit and other cleanup */
 		mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;
-		util_out_print("Region !AD: read of block @x!@XQ failed. ", FALSE, REG_LEN_STR(reg), &old_blk_num);
-		util_out_print(" Cannot complete mastermap enlargement.", TRUE);
+		util_out_print("Region !AD: read of block @x!@XQ failed ", FALSE, REG_LEN_STR(reg), &old_blk_num);
+		util_out_print("(!UL). Cannot complete mastermap enlargement.", TRUE, status);
 		return ERR_MUNOFINISH;
 	}
 	blkHdr = *((blk_hdr_ptr_t)blkBase);
@@ -537,7 +542,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	if (cdb_sc_normal != status)
 	{	/* failed to develop a history */
 		assert(cdb_sc_normal == status);
-		t_abort(gv_cur_region, csa);							/* do crit and other cleanup */
+		t_abort(gv_cur_region, csa);					/* do crit and other cleanup */
 		return status;
 	}
 	blkhist->tn = csd->trans_hist.curr_tn;
@@ -552,7 +557,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 		bt->tn = bt->killtn = start_tn - 1;
 	}
 	if (debug_mupip)
-		util_out_print("moving level: !UL root block 0x!@XQ to 0x!@XQ", TRUE, blkHdr.levl, &old_blk_num, &new_blk_num);
+		util_out_print("Move lvl:!UL root block 0x!@XQ to 0x!@XQ", TRUE, blkHdr.levl, &old_blk_num, &new_blk_num);
 	memcpy(gv_currkey->base, gvname.var_name.addr, gvname.var_name.len);
 	gv_currkey->end = gvname.var_name.len;
 	gv_currkey->base[gv_currkey->end++] = KEY_DELIMITER;
@@ -562,18 +567,20 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	update_trans = UPDTRNS_DB_UPDATED_MASK;
 	t_begin_crit(ERR_MUNOUPGRD);
 	kill_set_list.used = 0;
-	if (SS_NORMAL != move_root_block(--new_blk_num, old_blk_num, gvnh_reg, &kill_set_list))	/* again predecrement new_blk_num */
+	/* WARNING assignment below; pre-decrement new_blk_num */
+	if (SS_NORMAL != (status = move_root_block(--new_blk_num, old_blk_num, gvnh_reg, &kill_set_list)))
 	{	/* relocation of the DIR_ROOT (block 1) failed */
 		assert(SS_NORMAL == status);
-		t_abort(gv_cur_region, cs_addrs);						/* do crit and other cleanup */
+		t_abort(gv_cur_region, cs_addrs);				/* do crit and other cleanup */
 		mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;
-		util_out_print("Region !AD: move of directory tree root failed; ", FALSE, REG_LEN_STR(reg));
+		util_out_print("Region !AD: move of directory tree root failed (!UL); ", FALSE, REG_LEN_STR(reg), status);
 		util_out_print("cannot complete mastermap enlargement.", TRUE);
 		return ERR_MUNOFINISH;
 	}
 	root_moved_cnt++;							/* move complete */
-	reorg_gv_target->gvname.var_name.len = gv_target->gvname.var_name.len;		/* needed by SAVE_ROOTSRCH_ENTRY_STATE */
-	memcpy(reorg_gv_target->gvname.var_name.addr, gv_target->gvname.var_name.addr, reorg_gv_target->gvname.var_name.len);
+	reorg_gv_target->gvname.var_name.len = gv_target->gvname.var_name.len;	/* needed by SAVE_ROOTSRCH_ENTRY_STATE */
+	memcpy(reorg_gv_target->gvname.var_name.addr, gv_target->gvname.var_name.addr,
+				reorg_gv_target->gvname.var_name.len);
 	t_abort(gv_cur_region, cs_addrs); 					/* do crit and other cleanup */
 	assert(DIR_ROOT == gv_target->hist.h[blkHdr.levl].blk_num);
 	gv_target->hist.h[blkHdr.levl].blk_num += blks_in_way;
@@ -587,13 +594,13 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_DBDSRDFMTCHNG, 9, DB_LEN_STR(reg),
 		LEN_AND_STR(gtm_dbversion_table[GDSV6p]), LEN_AND_LIT("MUPIP UPGRADE"),
 		process_id, process_id, &csd->desired_db_format_tn);
-	offset = csd->offset = blks_in_way;					/* "offset" to pointers in pre-upgrade blks */
+	offset = csd->offset = blks_in_way;					/* offset to pointers in pre-upgrade blks */
 	csd->trans_hist.total_blks -= blks_in_way;
 	csd->trans_hist.free_blocks -= (blks_in_way - bmls_to_work);		/* lost space less bmls which remain busy */
 	reinitialize_hashtab_mname(gd_header->tab_ptr);
 	csd->blks_to_upgrd = csd->trans_hist.total_blks - csd->trans_hist.free_blocks
 		- DIVIDE_ROUND_UP(csd->trans_hist.total_blks, BLKS_PER_LMAP);	/* Total blocks to upgrade */
-	/* abusing following functions to clear the entire array; note: last argument is not currently used by the function */
+	/* Use the following functions to forcefully clear the entire array */
 	SYNC_ROOT_CYCLES(csa);
 	if (is_bg)
 		clear_cache_array(csa, csd, gv_cur_region, (block_id)0, csd->trans_hist.total_blks - blks_in_way);
@@ -673,7 +680,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 		csa->hold_onto_crit = FALSE;
 		t_abort(gv_cur_region, cs_addrs);						/* do crit and other cleanup */
 		mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;
-		util_out_print("Region !AD : directory tree upgrade failed; ", FALSE, REG_LEN_STR(reg));
+		util_out_print("Region !AD : directory tree upgrade failed (!UL); ", FALSE, REG_LEN_STR(reg), status);
 		util_out_print("cannot complete mastermap enlargement.", TRUE);
 		return ERR_MUNOFINISH;
 	}
@@ -789,7 +796,7 @@ int4 upgrade_extend(gtm_int8 extension, gd_region *reg)
  *	(enum cdb_sc) returns a code containing cdb_sc_normal or a "retry" code
  ******************************************************************************************/
 enum cdb_sc gen_hist_for_blk(srch_blk_status *blkhist, sm_uc_ptr_t blkBase2, sm_uc_ptr_t recBase, mname_entry *gvname,
-				 gvnh_reg_t *gvnh_reg)
+				gvnh_reg_t *gvnh_reg)
 {	/* given a block, find a useful key */
 	block_id	blk_temp, curr_blk;
 	boolean_t	long_blk_id;
@@ -809,37 +816,37 @@ enum cdb_sc gen_hist_for_blk(srch_blk_status *blkhist, sm_uc_ptr_t blkBase2, sm_
 	{
 		status = read_record(&rec_sz, &key_cmpc, &key_len, key_buff, blkhist->level, blkhist, recBase);
 		if (cdb_sc_starrecord == status)
-		{	/* 1st/only record in block is a *-key - drop a level & try again */
+		{	/* 1st/only record in block is a *-key - drop a level and repeat the loop */
 			assert(blkhist->level);
 			READ_BLK_ID(long_blk_id, &blk_temp, SIZEOF(rec_hdr) + recBase + key_len);
 			blkBase2 = t_qread(blk_temp, &blkhist->cycle, &blkhist->cr);
-			long_blk_id = IS_64_BLK_ID(blkBase2);
 			if (NULL == blkBase2)
 			{	/* Failed to read the indicated block */
 				status = (enum cdb_sc)rdfail_detail;
-				assert(cdb_sc_normal == (enum cdb_sc)status);
+				assert((cdb_sc_normal == status)
+						|| (MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog));
 				break;
 			}
-			if (SIZEOF(blk_hdr) != ((blk_hdr_ptr_t)blkBase2)->bsiz)
-			{	/* block is not empty */
-				key_len = get_key_len(blkBase2, blkBase2 + SIZEOF(blk_hdr) + SIZEOF(rec_hdr));
-				memcpy(key_buff, blkBase2 + SIZEOF(blk_hdr) + SIZEOF(rec_hdr), key_len);
-				status = cdb_sc_normal;
-			} else
-			{ 	/* killed global tree return cdb_sc_starrecord as an indication */
-				assert(0 == ((blk_hdr_ptr_t)blkBase2)->levl);
-				break;	/* move on */
-			}
+			long_blk_id = IS_64_BLK_ID(blkBase2);
+			if (sizeof(blk_hdr) == ((blk_hdr_ptr_t)blkBase2)->bsiz)
+				return status;	/* Empty block represents a killed global tree; return cdb_sc_starrecord */
+			blkhist->level = ((blk_hdr_ptr_t)blkBase2)->levl;
+			blkhist->buffaddr = blkBase2;
+			recBase = blkBase2 + SIZEOF(blk_hdr);
+			continue;
 		} else if (cdb_sc_normal != status)
 		{	/* failed to parse record */
-			assert(cdb_sc_normal == status);
+			assert((cdb_sc_normal == status)
+					|| (MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog));
 			break;
 		} else
 		{	/* block has a potentially useful key in the first record */
 			assert((MAX_KEY_SZ >= key_len) && (0 == key_cmpc));
-			assert(!memcmp(key_buff, blkBase2 + SIZEOF(blk_hdr) + SIZEOF(rec_hdr), key_len));
+			assert((MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog)
+					|| (!memcmp(key_buff, blkBase2 + SIZEOF(blk_hdr) + SIZEOF(rec_hdr), key_len)));
 		}
-		assert((0 != blkhist->level) || (bstar_rec_size(long_blk_id) != ((blk_hdr_ptr_t)blkBase2)->bsiz));
+		assert((0 != blkhist->level) || (bstar_rec_size(long_blk_id) != ((blk_hdr_ptr_t)blkBase2)->bsiz)
+				|| (MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog));
 		/* parse for valid unsubscripted name */
 		cp = key_buff;
 		c = (u_char *)gvname->var_name.addr;
@@ -871,14 +878,16 @@ enum cdb_sc gen_hist_for_blk(srch_blk_status *blkhist, sm_uc_ptr_t blkBase2, sm_
 			 */
 			if (0 == ((blk_hdr_ptr_t)blkBase2)->levl)
 				break;
+			if (0 == blkhist->level)	/* Cannot go any lower, implies the above break did not happen */
+				return cdb_sc_badlvl;
 		}
 		assert(blkhist->level);
 		READ_BLK_ID(long_blk_id, &blk_temp, (sm_uc_ptr_t)(blkBase2 + SIZEOF(blk_hdr) + SIZEOF(rec_hdr)) + key_len);
 		blkBase2 = t_qread(blk_temp, &blkhist->cycle, &blkhist->cr);
 		if (NULL == blkBase2)
-		{	/* Failed to read the indicated block */
-			assert(cdb_sc_normal == (enum cdb_sc)rdfail_detail);
-			status = rdfail_detail;
+		{	/* Failed to read the indicated block. Possible for REORG -UPGRADE while online */
+			status = (enum cdb_sc)rdfail_detail;
+			assert((cdb_sc_normal == status) || (MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog));
 			break;
 		}
 		long_blk_id = IS_64_BLK_ID(blkBase2);
@@ -928,6 +937,11 @@ enum cdb_sc gen_hist_for_blk(srch_blk_status *blkhist, sm_uc_ptr_t blkBase2, sm_
 			COMPUTE_HASH_MNAME(gvname);
 			GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, gvname, gvnh_reg);
 		}
+		if (0 == gv_target->root)
+		{	/* Something went wrong in the above root search */
+			assert(MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog);
+			return cdb_sc_gvtrootnonzero;
+		}
 		if (gv_currkey->end != (key_len - 1))
 		{	/* gv_bind_name/gvcst_root_search can overwrite gv_currkey */
 			memcpy(gv_currkey->base, key_buff, key_len + 1);	/* the + 1 picks up a key_delimiter */
@@ -939,7 +953,9 @@ enum cdb_sc gen_hist_for_blk(srch_blk_status *blkhist, sm_uc_ptr_t blkBase2, sm_
 		if (DIR_ROOT != curr_blk)
 		{
 			status = gvcst_search(gv_currkey, NULL);
-			assert(cdb_sc_normal == status);
+			assert((cdb_sc_normal == status) || (MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog));
+			if (cdb_sc_normal != status)
+				return status;
 		}
 		if ((curr_blk != gv_target->root)
 			&& (curr_blk != gv_target->hist.h[curr_level].blk_num))
@@ -952,6 +968,8 @@ enum cdb_sc gen_hist_for_blk(srch_blk_status *blkhist, sm_uc_ptr_t blkBase2, sm_
 			status = gvcst_root_search(FALSE);
 			mu_reorg_in_swap_blk = FALSE;
 			assert(cdb_sc_normal == status);
+			if (cdb_sc_normal != status)
+				return status;
 			assert((DIR_ROOT == upgrade_gv_target->root)
 				&& (DIR_ROOT == upgrade_gv_target->hist.h[upgrade_gv_target->hist.depth].blk_num));
 			gv_target = upgrade_gv_target;
@@ -1186,6 +1204,10 @@ enum cdb_sc ditch_dead_globals(block_id curr_blk, block_id offset, cache_rec_ptr
 			{	/* failed to develop a history */
 				assert(cdb_sc_normal == status);
 				t_abort(gv_cur_region, cs_addrs);			/* do crit and other cleanup */
+				mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;
+				util_out_print("Region !AD: Block history generation for 0x!@XQ failed (!UL); ",
+						FALSE, REG_LEN_STR(gv_cur_region), &curr_blk, status);
+				util_out_print("cannot continue with upgrade.", TRUE);
 				return status;
 			}
 			/* Global killed, whack its pointer and free its two blocks */
@@ -1207,7 +1229,7 @@ enum cdb_sc ditch_dead_globals(block_id curr_blk, block_id offset, cache_rec_ptr
 				t_abort(gv_cur_region, cs_addrs);			/* do crit and other cleanup */
 				return status;
 			}
-			t_write(&dirHist, (unsigned char *)bs1, 0, 0, dirHist.level, TRUE, TRUE, GDS_WRITE_KILLTN);
+			t_write(&dirHist, bs1, 0, 0, dirHist.level, TRUE, TRUE, GDS_WRITE_KILLTN);
 			inctn_opcode = inctn_mu_reorg;
 			if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED))) /* WARNING: assign */
 			{	/* failed to commit the update */
@@ -1304,7 +1326,12 @@ enum cdb_sc adjust_master_map(block_id blks_in_way, gd_region *reg)
 			offset = BLK_ZERO_OFF(csd->start_vbn) + (off_t)bml_index * csd->blk_size;
 			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, offset, bml_hist.buffaddr, csd->blk_size, save_errno);
 			if (0 != save_errno)	/* Unable to flush the BML, bail */
+			{
+				util_out_print("Region !AD: write of bitmap block @x!@XQ failed. ",
+						FALSE, REG_LEN_STR(gv_cur_region), &bml_index);
+				util_out_print("Cannot complete mastermap enlargement.", TRUE);
 				return cdb_sc_blockflush;
+			}
 		}
 		if (change)
 			max_bml_chng = bml_index;
@@ -1353,8 +1380,14 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 	cache_rec_ptr_t		child_cr = NULL;
 	enum db_ver		blk_ver;
 	gvnh_reg_t		*gvnh_reg = NULL;
+<<<<<<< HEAD
 	int			adjust, blk_seg_cnt, blk_sz, count, level, split_blks_added, split_levels_added, key_cmpc,
 				key_cmpc_sib, key_len, key_len_sib, rec_offset, rec_sz, rec_sz_sib, space_need, v7_rec_sz;
+=======
+	int			adjust, blk_seg_cnt, blk_sz, count, level, max_fill, new_blk_sz, split_blks_added,
+				split_levels_added, key_cmpc, key_cmpc_sib, key_len, key_len_sib, rec_offset, rec_sz, rec_sz_sib,
+				space_need, v7_rec_sz;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	int4			blk_size, status;
 	kill_set		kill_set_list;
 	mname_entry		gvname;
@@ -1730,24 +1763,17 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 	update_trans = UPDTRNS_DB_UPDATED_MASK;
 	t_begin_crit(ERR_MUNOUPGRD);
 	/* Increment existing block size by the record count by rec pointer size difference */
-	blk_sz += count * (SIZEOF_BLK_ID(BLKID_64) - SIZEOF_BLK_ID(BLKID_32));
-	/* The following code should be maintained in tandem with upgrade_idx_block()'s similar block */
-	while (0 < (space_need = blk_sz - blk_size))						/* WARNING assignment */
+	new_blk_sz = blk_sz + count * (SIZEOF_BLK_ID(BLKID_64) - SIZEOF_BLK_ID(BLKID_32));
+	while (0 < (space_need = new_blk_sz - blk_size))						/* WARNING assignment */
 	{	/* Insufficient room; WARNING: using a loop construct to enable an alternate pathway out of this level */
-		space_need += SIZEOF(blk_hdr) + ((rec_hdr_ptr_t)recBase)->rsiz + (blk_size >> 3);
-		assert(((blk_size >> 1) + cs_data->max_key_size) > space_need);			/* paranoid check */
+		max_fill = (new_blk_sz >> 1);
 		if (debug_mupip)
-			util_out_print("splitting level !UL directory block @x!@XQ", TRUE, level, &curr_blk);
+			util_out_print("splitting level !UL dir block @x!@XQ (!UL/!UL)", TRUE, level, &curr_blk, blk_sz, max_fill);
 		split_blks_added = split_levels_added = 0;
 		mu_reorg_process = TRUE;
-		status = mu_split(level, space_need, space_need, &split_blks_added, &split_levels_added);
+		status = mu_split(level, max_fill, max_fill, &split_blks_added, &split_levels_added);
 		if (cdb_sc_normal != status)
 		{	/* split failed; WARNING: assignment above */
-			if (cdb_sc_oprnotneeded == status)
-			{	/* mu_split decided the split was not needed */
-				assert((0 == split_blks_added) && (0 == split_levels_added));
-				break;
-			}
 			assert(cdb_sc_normal == status);
 			t_abort(gv_cur_region, csa);						/* do crit and other cleanup */
 			return status;
@@ -1773,7 +1799,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 		assert(FALSE);
 	}
 	assert((dirHist.buffaddr == blkBase) && (dirHist.level == level));
-	assert(blk_sz <= blk_size);
+	assert(new_blk_sz <= blk_size);
 	/* Finally upgrade the block */
 	assert(dirHist.blk_num == curr_blk);
 	assert(GDSV7m != blk_ver);
@@ -1781,10 +1807,10 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 	assert((dirHist.buffaddr == blkBase) && (dirHist.level == level) && (!is_bg || (dirHist.cr->blk == curr_blk)));
 	CHECK_AND_RESET_UPDATE_ARRAY;
 	BLK_INIT(bs_ptr, bs1);
-	BLK_ADDR(v7bp, blk_sz, unsigned char);
+	BLK_ADDR(v7bp, new_blk_sz, unsigned char);
 	v7recBase = v7bp + SIZEOF(blk_hdr);
 	recBase = blkBase + SIZEOF(blk_hdr);
-	v7end = v7bp + blk_sz;
+	v7end = v7bp + new_blk_sz;
 	for (rec_sz = v7_rec_sz = 0; recBase < blkEnd; recBase += rec_sz, v7recBase += v7_rec_sz)
 	{	/* Update the recBase and v7recBase pointers to point to the next record */
 		/* Parse the record to account for possible collation information after block pointer */
@@ -1830,8 +1856,8 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 				recBase + SIZEOF(rec_hdr) + key_len + SIZEOF_BLK_ID(BLKID_32), COLL_SPEC_LEN);
 		}
 	}
-	BLK_SEG(bs_ptr, v7bp + SIZEOF(blk_hdr), blk_sz - SIZEOF(blk_hdr));
-	assert(blk_seg_cnt == blk_sz);
+	BLK_SEG(bs_ptr, v7bp + SIZEOF(blk_hdr), new_blk_sz - SIZEOF(blk_hdr));
+	assert(blk_seg_cnt == new_blk_sz);
 	if (!BLK_FINI(bs_ptr, bs1))
 	{	/* failed to finalize the update */
 		status = cdb_sc_mkblk;
@@ -1839,7 +1865,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 		t_abort(gv_cur_region, csa);							/* do crit and other cleanup */
 		return status;
 	}
-	t_write(&dirHist, (unsigned char *)bs1, 0, 0, level, TRUE, TRUE, GDS_WRITE_KILLTN);
+	t_write(&dirHist, bs1, 0, 0, level, TRUE, TRUE, GDS_WRITE_KILLTN);
 	inctn_opcode = inctn_mu_reorg;
 	mu_reorg_process = TRUE;
 	ret_tn = t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED);

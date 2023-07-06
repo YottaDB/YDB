@@ -123,7 +123,7 @@ void wcs_recover(gd_region *reg)
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
 	int4			dummy_errno, blk_size;
-	uint4			jnl_status, epid, r_epid;
+	uint4			jnl_status, epid = 0, r_epid;
 	int4			bt_buckets;
 	inctn_opcode_t		save_inctn_opcode;
 	unsigned int		bplmap, lcnt, total_rip_wait;
@@ -217,6 +217,10 @@ void wcs_recover(gd_region *reg)
 		 * in case there are orphaned phase2 jnl writes still lying around. Take this opportunity to do that.
 		 */
 		jnl_phase2_cleanup(csa, jbp);
+	} else
+	{
+		jpc = NULL;
+		jbp = NULL;
 	}
 	asyncio = csd->asyncio;
 	twinning_on = TWINNING_ON(csd);
@@ -325,6 +329,7 @@ void wcs_recover(gd_region *reg)
 					 */
 					assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
 						|| WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
+					assert(epid);
 					if (!((0 == r_epid) || (epid == r_epid)))
 					{
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(reg));
@@ -676,6 +681,7 @@ void wcs_recover(gd_region *reg)
 	if (!TREF(donot_write_inctn_in_wcs_recover) && JNL_ENABLED(csd))
 	{
 		assert(&FILE_INFO(jpc->region)->s_addrs == csa);
+		assert(jpc);
 		if (!jgbl.dont_reset_gbl_jrec_time)
 		{
 			SET_GBL_JREC_TIME; /* needed for jnl_ensure_open, jnl_write_pini and jnl_write_inctn_rec */

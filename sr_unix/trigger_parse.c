@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2010-2021 Fidelity National Information	*
+=======
+ * Copyright (c) 2010-2023 Fidelity National Information	*
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -390,9 +394,9 @@ STATICFNDEF boolean_t process_dollar_char(char **src_ptr, int *src_len, boolean_
 			UPDATE_DST(ptr, len, have_star, dst_ptr, lcl_dst_len, MAX_GVSUBS_LEN);
 			if ((0 < len) && ('(' == *ptr))
 				break;
-			else if ((3 < len) && ('H' == lower_to_upper_table[*ptr])
-					&& ('A' == lower_to_upper_table[*(ptr + 1)])
-					&& ('R' == lower_to_upper_table[*(ptr + 2)]) && ('(' == *(ptr + 3)))
+			else if ((3 < len) && ('H' == TOUPPER(*ptr))
+					&& ('A' == TOUPPER(*(ptr + 1)))
+					&& ('R' == TOUPPER(*(ptr + 2))) && ('(' == *(ptr + 3)))
 			{
 				ptr += 3;
 				len -= 3;
@@ -404,16 +408,16 @@ STATICFNDEF boolean_t process_dollar_char(char **src_ptr, int *src_len, boolean_
 		case 'z':
 		case 'Z':
 			UPDATE_DST(ptr, len, have_star, dst_ptr, lcl_dst_len, MAX_GVSUBS_LEN);
-			if ((2 < len) && ('C' == lower_to_upper_table[*ptr])
-					&& ('H' == lower_to_upper_table[*(ptr + 1)]) && ('(' == *(ptr + 2)))
+			if ((2 < len) && ('C' == TOUPPER(*ptr))
+					&& ('H' == TOUPPER(*(ptr + 1))) && ('(' == *(ptr + 2)))
 			{
 				ptr += 2;
 				len -= 2;
 			}
-			else if ((4 < len) && ('C' == lower_to_upper_table[*ptr])
-					&& ('H' == lower_to_upper_table[*(ptr + 1)])
-					&& ('A' == lower_to_upper_table[*(ptr + 2)])
-					&& ('R' == lower_to_upper_table[*(ptr + 3)]) && ('(' == *(ptr + 4)))
+			else if ((4 < len) && ('C' == TOUPPER(*ptr))
+					&& ('H' == TOUPPER(*(ptr + 1)))
+					&& ('A' == TOUPPER(*(ptr + 2)))
+					&& ('R' == TOUPPER(*(ptr + 3))) && ('(' == *(ptr + 4)))
 			{
 				ptr += 4;
 				len -= 4;
@@ -542,10 +546,10 @@ STATICFNDEF boolean_t process_delim(char *delim_str, uint4 *delim_len)
 					util_out_print_gtmio("Invalid entry in delimiter", FLUSH);
 					return FALSE;
 				}
-				if ((3 < len) && ('C' == lower_to_upper_table[*ptr])
-						&& ('H' == lower_to_upper_table[*(ptr + 1)])
-						&& ('A' == lower_to_upper_table[*(ptr + 2)])
-						&& ('R' == lower_to_upper_table[*(ptr + 3)]))
+				if ((3 < len) && ('C' == TOUPPER(*ptr))
+						&& ('H' == TOUPPER(*(ptr + 1)))
+						&& ('A' == TOUPPER(*(ptr + 2)))
+						&& ('R' == TOUPPER(*(ptr + 3))))
 				{
 					if (MAX_DELIM_LEN < ++dst_len)
 					{
@@ -555,11 +559,11 @@ STATICFNDEF boolean_t process_delim(char *delim_str, uint4 *delim_len)
 					*src_ptr++ = 'C';
 					ptr += 4;
 					len -= 4;
-				} else if ((4 < len) && ('Z' == lower_to_upper_table[*ptr])
-						&& ('C' == lower_to_upper_table[*(ptr + 1)])
-						&& ('H' == lower_to_upper_table[*(ptr + 2)])
-						&& ('A' == lower_to_upper_table[*(ptr + 3)])
-						&& ('R' == lower_to_upper_table[*(ptr + 4)]))
+				} else if ((4 < len) && ('Z' == TOUPPER(*ptr))
+						&& ('C' == TOUPPER(*(ptr + 1)))
+						&& ('H' == TOUPPER(*(ptr + 2)))
+						&& ('A' == TOUPPER(*(ptr + 3)))
+						&& ('R' == TOUPPER(*(ptr + 4))))
 				{
 					if (MAX_DELIM_LEN < (dst_len + 3))
 					{
@@ -1082,8 +1086,8 @@ STATICFNDEF boolean_t process_pieces(char *piece_str, uint4 *piece_len)
 	boolean_t	have_num_in_str;
 	uint		i;
 	uint4		len;
-	int		low;
-	int		num;
+	int		low = -1;
+	int		num = -1;
 	char		*ptr;
 	char		*ptr1;
 	boolean_t	have_error = FALSE;
@@ -1147,6 +1151,7 @@ STATICFNDEF boolean_t process_pieces(char *piece_str, uint4 *piece_len)
 				}
 				ptr++;
 				len--;
+				assert(-1 != num);
 				low = num;
 				if (!ISDIGIT_ASCII(*ptr))
 				{
@@ -1239,6 +1244,7 @@ STATICFNDEF boolean_t process_pieces(char *piece_str, uint4 *piece_len)
 				break;
 			num = (0 == bit) ? i * BITS_PER_INT - 1 : i * BITS_PER_INT + bit - 1;
 			have_low_num = FALSE;
+			assert(-1 != low);
 			if (num == low)
 				continue;
 			*ptr++ = ':';
@@ -1323,7 +1329,7 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
 	char		*ptr2;
 	int4		rec_num;
 	CLI_ENTRY       *save_cmd_ary;
-	boolean_t	set_present;
+	boolean_t	set_present = FALSE;
 	int		trigvn_len;
 	boolean_t	in_multi_line_xecute, out_multi_line_xecute;
 

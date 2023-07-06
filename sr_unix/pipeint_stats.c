@@ -1,9 +1,14 @@
 /****************************************************************
  *                                                              *
+<<<<<<< HEAD
  * Copyright 2011 Fidelity Information Services, Inc		*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2011-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -96,9 +96,11 @@ int mu_op_open(mval *v, mval *p, mval *t, mval *mspace)
 			break;
 		case SS_LOG2LONG:
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, SIZEOF(buf1) - 1);
+			GTM_UNREACHABLE();
 			break;
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) stat);
+			GTM_UNREACHABLE();
 		}
 	}
 	stat = mu_open_try(naml, tl, p, mspace);
@@ -110,7 +112,11 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 	boolean_t	ichset_specified, ochset_specified, filecreated = FALSE;
 	char		*buf, namebuf[LOGNAME_LEN + 1];
 	d_rm_struct	*d_rm;
+<<<<<<< HEAD
 	int		file_des, fstat_res, oflag, p_offset, save_errno, umask_creat, umask_orig;
+=======
+	int		char_or_block_special, file_des, fstat_res, oflag, p_offset, save_errno = 0, umask_creat, umask_orig;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	int4		recordsize, status;
 	io_desc		*iod;
 	mstr		chset_mstr;
@@ -352,8 +358,13 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 	SET_CODE_SET(iod->out_code_set, OUTSIDE_CH_SET);
 	if (DEFAULT_CODE_SET != iod->out_code_set)
 		ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET, OUTSIDE_CH_SET);
+<<<<<<< HEAD
 #	endif
 	assert(-1 != file_des); /* as otherwise we would have returned after the OPEN3 above */
+=======
+#endif
+	assert(-1 != file_des);
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	if (n_io_dev_types == iod->type)
 	{
 		if (isatty(file_des))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -180,6 +180,7 @@ void op_setzp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 			do
 			{
 				end_pfx = start_sfx;
+				lc = 0;
 				while ((start_sfx < end_src) && ((lc = *start_sfx) != ldelimc)) start_sfx++; /* Note assignment */
 				start_sfx++;
 				delim_cnt--;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2018 Fidelity National Information	*
+ * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -55,13 +55,39 @@ MBSTART {									\
 	ENABLE_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
 } MBEND
 
-#define PTHREAD_COND_TIMEDWAIT(COND, MUTEX, TIMEOUT, RVAL)			\
+#define PTHREAD_COND_BROADCAST(COND, RVAL)						\
 MBSTART {									\
 	intrpt_state_t		prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
-	(RVAL) = pthread_cond_timedwait(COND, MUTEX, TIMEOUT);			\
+	(RVAL) = pthread_cond_broadcast(COND);					\
 	ENABLE_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
+} MBEND
+
+#define PTHREAD_COND_WAIT(COND, MUTEX, RVAL)					\
+MBSTART {									\
+	GBLREF VSIG_ATOMIC_T	forced_exit;					\
+	intrpt_state_t		prev_intrpt_state;				\
+										\
+	DEFER_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
+	(RVAL) = pthread_cond_wait(COND, MUTEX);				\
+	if (forced_exit)							\
+		pthread_mutex_unlock(MUTEX);					\
+	ENABLE_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
+	assert(!forced_exit);							\
+} MBEND
+
+#define PTHREAD_COND_TIMEDWAIT(COND, MUTEX, TIMEOUT, RVAL)			\
+MBSTART {									\
+	GBLREF VSIG_ATOMIC_T	forced_exit;					\
+	intrpt_state_t		prev_intrpt_state;				\
+										\
+	DEFER_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
+	(RVAL) = pthread_cond_timedwait(COND, MUTEX, TIMEOUT);			\
+	if (forced_exit)							\
+		pthread_mutex_unlock(MUTEX);					\
+	ENABLE_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
+	assert(!forced_exit);							\
 } MBEND
 
 #ifdef GTM_PTHREAD
@@ -78,6 +104,7 @@ typedef struct {
 
 int	gtm_multi_thread_helper(thread_parm_t *tparm);
 
+<<<<<<< HEAD
 #define	INITIALIZE_THREAD_MUTEX_IF_NEEDED										\
 {															\
 	int	rc;													\
@@ -90,6 +117,35 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
 					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_mutex_init()"), CALLFROM, rc);	\
 		thread_mutex_initialized = TRUE;									\
 	}														\
+=======
+#define	IS_LIBPTHREAD_MUTEX_LOCK_HOLDER 	(pthread_self() == thread_mutex_holder)
+
+#define	PTHREAD_MUTEX_LOCK_IF_NEEDED(WAS_HOLDER)								\
+{														\
+	int	rc;												\
+														\
+	if (multi_thread_in_use)										\
+	{	/* gtm_malloc/gtm_free is not thread safe. So use locks to serialize */				\
+		assert(thread_mutex_initialized);								\
+		/* We should never use pthread_* calls inside a signal/timer handler. Assert that */		\
+		assert(!in_nondeferrable_signal_handler);							\
+		/* Allow for self to already own the lock (due to nested codepaths that need the lock. */	\
+		if (!IS_LIBPTHREAD_MUTEX_LOCK_HOLDER)								\
+		{												\
+			rc = pthread_mutex_lock(&thread_mutex);							\
+			if (rc)											\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,			\
+						RTS_ERROR_LITERAL("pthread_mutex_lock()"), CALLFROM, rc);	\
+			thread_mutex_holder = pthread_self();							\
+			WAS_HOLDER = FALSE;									\
+		} else												\
+			WAS_HOLDER = TRUE;									\
+	} else													\
+	{													\
+		assert(!thread_mutex_holder);									\
+		WAS_HOLDER = FALSE;										\
+	}													\
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 }
 
 #define	IS_LIBPTHREAD_MUTEX_LOCK_HOLDER 	(pthread_equal(pthread_self(), thread_mutex_holder))

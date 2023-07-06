@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +33,7 @@ void view_jnlfile(mval *dst, gd_region *reg)
 	switch(csa->hdr->jnl_state)
 	{
 	case jnl_notallowed:
+		jnl_name_addr = NULL;
 		dst->str.len = 0;
 		break;
 	case jnl_open:
@@ -40,7 +42,7 @@ void view_jnlfile(mval *dst, gd_region *reg)
 		dst->str.len = csa->hdr->jnl_file_len;
 		break;
 	default:
-		GTMASSERT;
+		assertpro(csa->hdr->jnl_state != csa->hdr->jnl_state);
 		break;
 	}
 	if (0 != dst->str.len)

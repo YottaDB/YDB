@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@ void repl_sort_tr_buff(uchar_ptr_t tr_buff, uint4 tr_bufflen)
 	uint4			working_record, copy_len, idx, min_updnum_reg, min_val, next_min_val, this_reg_updnum;
 	uint4			participants;
 #	ifdef DEBUG
-	uint4			tmp_sum, tcom_num = 0, prev_updnum_this_reg;
+	uint4			tmp_sum, tcom_num = 0, prev_updnum_this_reg = 0;
 #	endif
 	jnl_record		*rec;
 	jrec_prefix		*prefix;

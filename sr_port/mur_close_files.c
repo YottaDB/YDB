@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2020 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -689,9 +689,14 @@ boolean_t mur_close_files(void)
 						assert(anticipatory_freeze_available);
 						assert(!csa->hold_onto_crit);
 						grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
-					}
+					} else
+						was_crit = FALSE;
 					last_histinfo_seqno = repl_inst_histinfo_truncate(murgbl.consist_jnl_seqno);
+<<<<<<< HEAD
 					if ((NULL != jpl) && !was_crit)
+=======
+					if ((NULL != jnlpool->jnlpool_ctl) && !was_crit && !csa->hold_onto_crit)
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 						rel_lock(jnlpool->jnlpool_dummy_reg);
 					/* The above also updates "repl_inst_filehdr->jnl_seqno". If regular rollback, it also
 					 * updates "repl_inst_filehdr->crash" to FALSE. For online rollback, we have to update

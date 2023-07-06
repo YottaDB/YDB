@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -282,7 +282,7 @@ uint4 mur_back_processing(jnl_tm_t alt_tp_resolve_time)
 	uint4			status;
 	jnl_tm_t		max_lvrec_time, min_bov_time;
 	reg_ctl_list		*rctl, *rctl_top;
-	seq_num			rec_token_seq, save_resync_seqno, strm_seqno;
+	seq_num			rec_token_seq, save_resync_seqno, strm_seqno = 0;
 	sgmnt_data_ptr_t	csd;
 	unix_db_info		*udi;
 
@@ -409,10 +409,18 @@ uint4 mur_back_processing(jnl_tm_t alt_tp_resolve_time)
 					assert(!csd->intrpt_recov_resync_seqno
 						|| (csd->intrpt_recov_resync_seqno >= murgbl.resync_seqno));
 					csd->intrpt_recov_resync_seqno = murgbl.resync_seqno;
+#					if __GNUC__ == 7
+#					pragma GCC diagnostic push
+#					pragma GCC diagnostic ignored "-Warray-bounds"
+#					endif
 					assert(!murgbl.resync_strm_seqno_nonzero || rctl->recov_interrupted
 						|| (INVALID_SUPPL_STRM == idx) || (-1 == iterationcnt)
 						|| ((0 == iterationcnt) && !strm_seqno)
-						|| (iterationcnt && (strm_seqno == murgbl.resync_strm_seqno[idx])));
+						|| (iterationcnt && (MAX_SUPPL_STRMS > idx)
+								&& (strm_seqno == murgbl.resync_strm_seqno[idx])));
+#					if __GNUC__ == 7
+#					pragma GCC diagnostic pop
+#					endif
 					MUR_SAVE_RESYNC_STRM_SEQNO(rctl, csd);
 					/* flush the changed csd to disk */
 					fc = FILE_CNTL(rctl->gd);
@@ -608,7 +616,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 	jnl_ctl_list		*jctl;
 	jnl_record		*jnlrec;
 	jnl_string		*keystr;
-	jnl_tm_t		rec_time;
+	jnl_tm_t		rec_time = 0;
 	multi_struct		*multi;
 	mur_read_desc_t		*mur_desc;
 	reg_ctl_list		*rctl;
@@ -1132,12 +1140,8 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 			{
 				assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype) || (JRT_NULL == (rectype)));
 				assert(&jnlrec->jrec_set_kill.strm_seqno == &jnlrec->jrec_null.strm_seqno);
-				/* strm_seqno & strm_idx have already been initialized before for this record.
-				 * Assert that (i.e. they have not been changed since then) before using them.
-				 */
-				DEBUG_ONLY(save_strm_seqno = GET_STRM_SEQNO(jnlrec);)
-				assert(strm_idx == GET_STRM_INDEX(save_strm_seqno));
-				assert(strm_seqno == GET_STRM_SEQ60(save_strm_seqno));
+				strm_idx = GET_STRM_INDEX(GET_STRM_SEQNO(jnlrec));
+				strm_seqno = GET_STRM_SEQ60(GET_STRM_SEQNO(jnlrec));
 				skip_rec = (murgbl.resync_strm_seqno[strm_idx]
 						&& (strm_seqno > murgbl.resync_strm_seqno[strm_idx]));
 			}
@@ -1217,6 +1221,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				 * try not to issue the NOPREVLINK error for this boundary condition.
 				 */
 				assert(JNL_HDR_LEN == jctl->rec_offset);
+				assert(rec_time);
 				if (rec_time <= jgbl.mur_tp_resolve_time)
 				{
 					jctl->rec_offset = JNL_HDR_LEN + PINI_RECLEN;
@@ -1299,6 +1304,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				rctl->jctl_error = jctl;
 				return status;
 			}
+			assert(rec_time);
 			jnlrec = mur_desc->jnlrec;
 			rectype = (enum jnl_record_type)jnlrec->prefix.jrec_type;
 			rec_time = jnlrec->prefix.time;

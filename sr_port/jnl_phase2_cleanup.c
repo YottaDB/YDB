@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2020 Fidelity National Information	*
+ * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -115,6 +115,7 @@ void	jnl_phase2_cleanup(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp)
 				assert(begCmt < maxCmt);
 				PHASE2_COMMIT_ARRAY_ITERATE_UNTIL_WRITE_COMPLETE_FALSE(csa, phs2cmt, maxCmt);
 				index1 = phs2cmt - begCmt;
+				topCmt = NULL;
 			} else
 			{
 				maxCmt = topCmt = &jbp->phase2_commit_array[JNL_PHASE2_COMMIT_ARRAY_SIZE];
@@ -142,6 +143,7 @@ void	jnl_phase2_cleanup(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp)
 					 * above, we are guaranteed, we did not go down that code-block. In the else block,
 					 * we did initialize topCmt so we can safely use that here.
 					 */
+					assert(topCmt);
 					phs2cmt = topCmt;
 				}
 				phs2cmt--;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
@@ -62,7 +62,7 @@ boolean_t dse_fdmp(sm_uc_ptr_t data, int len)
 	unsigned char	*ret_addr;
 	boolean_t	is_snblk = FALSE;
 	span_subs	*ss_ptr;		/*spanning node key pointer */
-	unsigned int	snbid, offset, trail_zero, rev_num, num;
+	unsigned int	snbid = 0, offset, trail_zero, rev_num, num;
 	unsigned short	blk_sz;
 	mstr		opstr;
 

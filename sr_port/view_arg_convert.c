@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -59,7 +59,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 {
 	char			*cptr;
 	gd_binding		*gd_map;
-	gd_region		*gd_reg_start, *r_ptr, *r_top;
+	gd_region		*gd_reg_start, *r_ptr = NULL, *r_top;
 	gvnh_reg_t		*gvnh_reg;
 	gvnh_spanreg_t		*gvspan;
 	gv_namehead		*tmp_gvt;
@@ -211,6 +211,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					targ = 0;
 				}
 				parmblk->gv_ptr = is_dollar_view ? r_ptr : (gd_region *)TREF(view_region_list);
+				assert(parmblk->gv_ptr);
 			}
 			break;
 		case VTP_DBKEY:

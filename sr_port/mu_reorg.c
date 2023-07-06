@@ -54,6 +54,7 @@
 #include "anticipatory_freeze.h"
 
 /* Include prototypes */
+#include "is_proc_alive.h"
 #include "t_end.h"
 #include "t_retry.h"
 #include "mupip_reorg.h"
@@ -285,6 +286,8 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		gv_currkey->end = gn->len + 1;
 		return TRUE;
 	}
+	if ((0 != cs_addrs->nl->reorg_upgrade_pid) && (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0)))
+		return FALSE;	/* REORG -UPGRADE cannot run concurrently with TRUNCATE which has higher priority. Stop */
 	memcpy(&gv_currkey_next_reorg->base[0], &gv_currkey->base[0], gv_currkey->end + 1);
 	gv_currkey_next_reorg->end =  gv_currkey->end;
 	if (2 > dest_blk_id)
@@ -312,8 +315,9 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		complete_merge = TRUE;
 		while(complete_merge)	/* === START WHILE COMPLETE_MERGE === */
 		{
-			if (mu_ctrlc_occurred || mu_ctrly_occurred)
-			{
+			if (mu_ctrlc_occurred || mu_ctrly_occurred || ((0 != cs_addrs->nl->reorg_upgrade_pid)
+						&& (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0))))
+			{	/* REORG -UPGRADE cannot run concurrently with REORG which has higher priority. Stop */
 				SAVE_REORG_RESTART;
 				return FALSE;
 			}
@@ -521,8 +525,9 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			}/* === SPLIT-COALESCE LOOP END === */
 			t_abort(gv_cur_region, cs_addrs);	/* do crit and other cleanup */
 		}/* === START WHILE COMPLETE_MERGE === */
-		if (mu_ctrlc_occurred || mu_ctrly_occurred)
-		{
+		if (mu_ctrlc_occurred || mu_ctrly_occurred || ((0 != cs_addrs->nl->reorg_upgrade_pid)
+					&& (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0))))
+		{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE which has higher priority. Stop */
 			SAVE_REORG_RESTART;
 			return FALSE;
 		}
@@ -618,8 +623,9 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			}	/* === END OF SWAP LOOP === */
 			t_abort(gv_cur_region, cs_addrs);	/* do crit and other cleanup */
 		}
-		if (mu_ctrlc_occurred || mu_ctrly_occurred)
-		{
+		if (mu_ctrlc_occurred || mu_ctrly_occurred || ((0 != cs_addrs->nl->reorg_upgrade_pid)
+					&& (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0))))
+		{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE which has higher priority. Stop */
 			SAVE_REORG_RESTART;
 			return FALSE;
 		}

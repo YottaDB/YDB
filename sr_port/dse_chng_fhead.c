@@ -83,7 +83,7 @@ void dse_chng_fhead(void)
 #	ifndef BLK_NUM_64BIT
 	block_id_64	blkcnt2;
 #	endif
-	boolean_t	was_crit, was_hold_onto_crit, corrupt_file_present;
+	boolean_t	was_crit, was_hold_onto_crit = FALSE, corrupt_file_present;
 	boolean_t	override = FALSE, max_tn_present, max_tn_warn_present, curr_tn_present, change_tn;
 	char		temp_str[OUT_LINE], temp_str1[OUT_LINE], buf[MAX_LINE], *fname_ptr, hash_buff[GTMCRYPT_HASH_LEN];
 	const char	*freeze_msg[] = { "UNFROZEN", "FROZEN" };
@@ -328,7 +328,8 @@ void dse_chng_fhead(void)
 		buf_len = SIZEOF(buf);
 		if (cli_get_str("CERT_DB_VER", buf, &buf_len))
 		{
-			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
+			if ('v' == buf[0])	/* Uppercase the 'v' but not the trailing 'p' or 'm' */
+				buf[0] = 'V';
 			for (index_x=0; index_x < GDSVLAST ; index_x++)
 				if (0 == STRCMP(buf, gtm_dbversion_table[index_x]))
 				{
@@ -533,9 +534,9 @@ void dse_chng_fhead(void)
 	)
 	if ((CLI_PRESENT == cli_present("B_RECORD")) && (cli_get_hex64("B_RECORD", &tn)))
 		cs_data->last_rec_backup = tn;
-	if ((CLI_PRESENT == cli_present("BLKS_TO_UPGRADE")) && (cli_get_hex("BLKS_TO_UPGRADE", (uint4 *)&x)))
+	if ((CLI_PRESENT == cli_present("BLKS_TO_UPGRADE")) && (cli_get_hex64("BLKS_TO_UPGRADE", (gtm_uint64_t *)&blkcnt)))
 	{
-		cs_data->blks_to_upgrd = x;
+		cs_data->blks_to_upgrd = blkcnt;
 		cs_data->fully_upgraded = FALSE;
 	}
 	if ((CLI_PRESENT == cli_present("MBM_SIZE")) && (cli_get_int("MBM_SIZE", &x)))

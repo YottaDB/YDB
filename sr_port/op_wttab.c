@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -58,11 +58,11 @@ GBLREF io_desc		*active_device;
 void op_wttab(mint col)
 {
 	mstr		spaces;
-	int		delta, args_written;
+	int		delta, args_written = 0;
 	boolean_t	need_to_write = FALSE, nonblocking_socket = FALSE;
 	io_desc		*iod;
 	d_socket_struct	*dsocketptr;
-	socket_struct	*socketptr;
+	socket_struct	*socketptr = NULL;
 
 	iod = io_curr_device.out;
 	iod->esc_state = START;

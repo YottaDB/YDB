@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2020 Fidelity National Information	*
+ * Copyright (c) 2017-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,6 @@ int secshr_blk_full_build(boolean_t is_tp, sgmnt_addrs *csa,
 	boolean_t	is_write_root, long_blk_id;
 	cw_set_element	*nxt, *cs_ptr;
 	off_chain	chain;
-	v6_off_chain	v6_chain;
 	sgm_info	*si, *save_si;
 	unsigned char	*chain_ptr;
 	int		numargs;
@@ -125,7 +124,7 @@ int secshr_blk_full_build(boolean_t is_tp, sgmnt_addrs *csa,
 				assert(cs->index < si->cw_set_depth);
 				chain.cw_index = cs->index;
 				chain.next_off = cs->next_off;
-				WRITE_OFF_CHAIN(long_blk_id, &chain, &v6_chain, chain_ptr);
+				WRITE_OFF_CHAIN(long_blk_id, &chain, chain_ptr);
 				cs->ins_off = cs->next_off = 0;
 			}
 		} else
@@ -139,7 +138,7 @@ int secshr_blk_full_build(boolean_t is_tp, sgmnt_addrs *csa,
 		{
 			for (chain_ptr = blk_ptr + cs->first_off; ; chain_ptr += chain.next_off)
 			{
-				READ_OFF_CHAIN(long_blk_id, &chain, &v6_chain, chain_ptr);
+				READ_OFF_CHAIN(long_blk_id, &chain, chain_ptr);
 				if ((1 == chain.flag)
 					&& ((chain_ptr - blk_ptr + blk_id_sz) <= ((blk_hdr *)blk_ptr)->bsiz)
 					&& (chain.cw_index < si->cw_set_depth))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2020 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -77,7 +77,7 @@ void op_indsavglvn(mval *target, uint4 slot, uint4 do_ref)
 			s1 = (TREF(curtchain))->exorder.bl;
 			if (EXPR_FAIL != (rval = gvn()))			/* NOTE assignment */
 			{
-				for (sub = (TREF(curtchain))->exorder.bl; sub != s1; sub = sub->exorder.bl)
+				for (sub = (TREF(curtchain))->exorder.bl, put_oc = OC_NOOP; sub != s1; sub = sub->exorder.bl)
 				{
 					put_oc = sub->opcode;
 					if ((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc) || (OC_GVEXTNAM == put_oc))

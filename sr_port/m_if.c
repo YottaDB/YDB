@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -125,7 +125,7 @@ int m_if(void)
 						break;						/* line empty: no discard needed */
 					if (NULL == oldchain)
 					{	/* not already discarding, so get ready to discard the rest of the line */
-						dqinit(&tmpchain, exorder);
+						exorder_init(&tmpchain);
 						oldchain = setcurtchain(&tmpchain);
 					}
 				} else

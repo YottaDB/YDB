@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2022 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -542,7 +546,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	int4			tcom_num; /* the number of tcom records encountered */
 	seq_num			jnl_seqno, tmpseqno; /* the current jnl_seq no of the Update process */
 	seq_num			last_errored_seqno = 0;
-	int			key_len, rec_len, backptr;
+	int			key_len, rec_len, backptr = 0;
 	char			fn[MAX_FN_LEN];
 	sm_uc_ptr_t		readaddrs;	/* start of current rec in pool */
 	boolean_t		incr_seqno;
@@ -576,7 +580,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	uint4			cntr, last_nullsubs, last_subs, keyend;
 	gtm_uint64_t		write_wrap;
 #	ifdef GTM_TRIGGER
-	uint4			nodeflags;
+	uint4			nodeflags = 0xffffffff;
 	boolean_t		primary_has_trigdef, secondary_has_trigdef;
 	const char		*trigdef_inst = NULL, *no_trigdef_inst = NULL;
 #	endif
@@ -1222,6 +1226,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					if (!gv_target->trig_mismatch_test_done)
 					{
 						gv_target->trig_mismatch_test_done = TRUE; /* reset only in targ_alloc */
+						assert(0xffffffff != nodeflags);
 						primary_has_trigdef = (0 != (nodeflags & JS_HAS_TRIGGER_MASK));
 						secondary_has_trigdef = (NULL != gv_target->gvt_trigger);
 						if (primary_has_trigdef != secondary_has_trigdef)

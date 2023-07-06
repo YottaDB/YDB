@@ -218,6 +218,12 @@ typedef struct
 #endif
 } off_chain;
 
+typedef union
+{
+	block_id	id;
+	off_chain	chain;
+} block_ref;
+
 typedef struct
 {
 #ifdef	BIGENDIAN
@@ -231,29 +237,45 @@ typedef struct
 #endif
 } v6_off_chain;
 
-static inline void WRITE_OFF_CHAIN(boolean_t long_blk_id, off_chain* chain, v6_off_chain* v6_chain, sm_uc_ptr_t ptr)
+typedef union
+{
+	block_id_32	id;
+	v6_off_chain	chain;
+} v6_block_ref;
+
+static inline void WRITE_OFF_CHAIN(boolean_t long_blk_id, off_chain* chain, sm_uc_ptr_t ptr)
 {
 	if (long_blk_id)
-		GET_BLK_ID_64P(ptr, chain);
-	else
+	{	block_ref	*ref = (block_ref *)chain;
+
+		PUT_BLK_ID_64(ptr, ref->id);
+	} else
 	{
-		v6_chain->flag = chain->flag;
-		v6_chain->cw_index = chain->cw_index;
-		v6_chain->next_off = chain->next_off;
-		GET_BLK_ID_32P(ptr, v6_chain);
+		v6_block_ref	v6_ref;
+
+		v6_ref.chain.flag = chain->flag;
+		v6_ref.chain.cw_index = chain->cw_index;
+		v6_ref.chain.next_off = chain->next_off;
+		PUT_BLK_ID_32(ptr, v6_ref.id);
 	}
 }
 
-static inline void READ_OFF_CHAIN(boolean_t long_blk_id, off_chain* chain, v6_off_chain* v6_chain, sm_uc_ptr_t ptr)
+static inline void READ_OFF_CHAIN(boolean_t long_blk_id, off_chain* chain, sm_uc_ptr_t ptr)
 {
 	if (long_blk_id)
-		GET_BLK_ID_64P(chain, ptr);
-	else
 	{
-		GET_BLK_ID_32P(v6_chain, ptr);
-		chain->flag = v6_chain->flag;
-		chain->cw_index = v6_chain->cw_index;
-		chain->next_off = v6_chain->next_off;
+		block_ref	ref;
+
+		GET_BLK_ID_64(ref.id, ptr);
+		*chain = ref.chain;
+	} else
+	{
+		v6_block_ref	v6_ref;
+
+		GET_BLK_ID_32(v6_ref.id, ptr);
+		chain->flag = v6_ref.chain.flag;
+		chain->cw_index = v6_ref.chain.cw_index;
+		chain->next_off = v6_ref.chain.next_off;
 	}
 }
 
@@ -339,7 +361,7 @@ static inline void READ_OFF_CHAIN(boolean_t long_blk_id, off_chain* chain, v6_of
 {														\
 	int		cw_set_depth;										\
 	int		level;											\
-	off_chain	chain1;											\
+	block_ref	chain1;											\
 														\
 	cw_set_depth = CW_DEPTH;										\
 	if (GVNH->split_cleanup_needed)										\
@@ -348,8 +370,8 @@ static inline void READ_OFF_CHAIN(boolean_t long_blk_id, off_chain* chain, v6_of
 		 */												\
 		for (level = 0; level < ARRAYSIZE(GVNH->last_split_blk_num); level++)				\
 		{												\
-			chain1 = *(off_chain *)&GVNH->last_split_blk_num[level];				\
-			if (chain1.flag && ((unsigned)cw_set_depth <= (unsigned)chain1.cw_index))		\
+			chain1.id = GVNH->last_split_blk_num[level];						\
+			if (chain1.chain.flag && ((unsigned)cw_set_depth <= (unsigned)chain1.chain.cw_index))	\
 				GVNH->last_split_blk_num[level] = 0;						\
 		}												\
 	}													\
@@ -582,12 +604,12 @@ typedef struct trans_restart_hist_struct
 
 #define INVALIDATE_CLUE(CSE) 					\
 {								\
-	off_chain	macro_chain;				\
+	block_ref	macro_chain;				\
 								\
 	assert(CSE->blk_target);				\
 	CSE->blk_target->clue.end = 0;				\
-	macro_chain = *(off_chain *)&CSE->blk_target->root;	\
-	if (macro_chain.flag)					\
+	macro_chain.id = CSE->blk_target->root;			\
+	if (macro_chain.chain.flag)				\
 		CSE->blk_target->root = 0;			\
 }
 

@@ -39,9 +39,9 @@ error_def(ERR_MULTIPROCLATCH);
 {																\
 	GBLREF	uint4	process_id;												\
 																\
+	RELEASE_LATCH = FALSE;													\
 	if (multi_proc_in_use)													\
 	{															\
-		RELEASE_LATCH = FALSE;												\
 		if (process_id != multi_proc_shm_hdr->multi_proc_latch.u.parts.latch_pid)					\
 		{														\
 			if (!grab_latch(&multi_proc_shm_hdr->multi_proc_latch, MULTI_PROC_LATCH_TIMEOUT_SEC, NOT_APPLICABLE,NULL)) \

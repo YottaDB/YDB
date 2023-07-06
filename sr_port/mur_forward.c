@@ -246,6 +246,10 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 				rctl->csa->now_crit = FALSE;		/* reset since we don't own this region */
 			}
 		}
+	} else
+	{
+		mp_hdr = NULL;
+		shm_rctl_start = NULL;
 	}
 	first_shm_rctl = NULL;
 	/* Phase1 of forward recovery starts */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2021 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -162,7 +162,8 @@ void dse_cache(void)
 				{
 					SNPRINTF(temp_str, OUT_LINE, "!UL [0x!XL]");
 					old_value = *(sm_uint_ptr_t)chng_ptr;
-				}
+				} else
+					GTM_UNREACHABLE();
 				if (value_present)
 				{
 					if (SIZEOF(char) == size)

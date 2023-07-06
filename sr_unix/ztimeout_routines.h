@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2021 Fidelity National Information	*
+ * Copyright (c) 2018-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
@@ -28,6 +28,7 @@ void ztimeout_action(void);
 void ztimeout_expired(void);
 void ztimeout_clear_timer(void);
 int get_ztimeout(mval *result);
+<<<<<<< HEAD
 
 /* TODO: should this go back in (say) op_tcommit? */
 #define CALL_ZTIMEOUT_IF_DEFERRED								\
@@ -62,3 +63,5 @@ MBSTART	{											\
 	op_commarg(&mv_copy, indir_linetail);				\
 }
 
+=======
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)

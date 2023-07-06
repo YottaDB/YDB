@@ -36,10 +36,10 @@ MBSTART {														\
 #define HIBYTE	3
 #define ADJUST_CHECKSUM(cursum, num4, newsum)										\
 MBSTART {														\
-	uint4 tmpsum = csum_table[HIBYTE - 0][(cursum ^ num4) & BYTEMASK] ^ 						\
-			csum_table[HIBYTE - 1][((cursum ^ num4) >> (1 * BITS_PER_UCHAR)) & BYTEMASK] ^			\
-			csum_table[HIBYTE - 2][((cursum ^ num4) >> (2 * BITS_PER_UCHAR)) & BYTEMASK] ^ 			\
-			csum_table[HIBYTE - 3][((cursum ^ num4) >> (3 * BITS_PER_UCHAR)) & BYTEMASK]; 			\
+	uint4 tmpsum = csum_table[HIBYTE - 0][(cursum ^ (num4)) & BYTEMASK] ^ 						\
+			csum_table[HIBYTE - 1][((cursum ^ (num4)) >> (1 * BITS_PER_UCHAR)) & BYTEMASK] ^		\
+			csum_table[HIBYTE - 2][((cursum ^ (num4)) >> (2 * BITS_PER_UCHAR)) & BYTEMASK] ^ 		\
+			csum_table[HIBYTE - 3][((cursum ^ (num4)) >> (3 * BITS_PER_UCHAR)) & BYTEMASK]; 		\
 	newsum = tmpsum ? tmpsum : INIT_CHECKSUM_SEED;									\
 } MBEND
 #endif
@@ -47,13 +47,16 @@ MBSTART {														\
 #define ADJUST_CHECKSUM_TN(cursum, tn, newsum)										\
 MBSTART {														\
 	uint4 tmpsum_tn;												\
-	ADJUST_CHECKSUM(cursum, *(uint4 *)tn, tmpsum_tn);								\
-	ADJUST_CHECKSUM(tmpsum_tn, *(uint4 *)((char *)tn + SIZEOF(uint4)), newsum);					\
+	ADJUST_CHECKSUM(cursum, *(uint4 *)(tn), tmpsum_tn);								\
+	ADJUST_CHECKSUM(tmpsum_tn, *(uint4 *)((char *)(tn) + SIZEOF(uint4)), newsum);					\
 } MBEND
 
 #define COMPUTE_COMMON_CHECKSUM(common_cksum, prefix)									\
 MBSTART {														\
-	ADJUST_CHECKSUM_TN(INIT_CHECKSUM_SEED, &(prefix.tn), common_cksum);						\
+	trans_num_cksum		tn;											\
+															\
+	tn.tn = (prefix).tn;												\
+	ADJUST_CHECKSUM_TN(INIT_CHECKSUM_SEED, tn.enc, common_cksum);							\
 	ADJUST_CHECKSUM(common_cksum, prefix.pini_addr, common_cksum);							\
 	ADJUST_CHECKSUM(common_cksum, prefix.time, common_cksum);							\
 } MBEND

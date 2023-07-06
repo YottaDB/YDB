@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -214,8 +214,12 @@ int cmd(void)
 	int		rval, x;
 	int4		fetch_cnt;
 	oprtype		*cr;
+<<<<<<< HEAD
 	triple		*fetch0, *fetch1, *oldchain, *ref0, *ref1, *temp_expr_start, tmpchain, *triptr;
 	triple		*boolexprfinish, *boolexprfinish2;
+=======
+	triple		*fetch0, *fetch1, *oldchain, *ref0, *ref1, *temp_expr_start = NULL, tmpchain, *triptr;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	mval		*v;
 	DCL_THREADGBL_ACCESS;
 
@@ -263,6 +267,7 @@ int cmd(void)
 		//assert(m_zinvcmd != cmd_data[x].fcn);
 		cr = NULL;
 		shifting = FALSE;
+		fetch_cnt = -1;
 	} else
 	{
 		fetch_cnt = (TREF(fetch_control)).curr_fetch_count;
@@ -284,7 +289,7 @@ int cmd(void)
 			v = &triptr->operand[0].oprval.mlit->v;
 			if (0 == MV_FORCE_BOOL(v))
 			{	/* it's FALSE, so no need for this parse - get ready to discard it */
-				dqinit(&tmpchain, exorder);
+				exorder_init(&tmpchain);
 				oldchain = setcurtchain(&tmpchain);
 				TREF(discard) = (NULL != oldchain);
 			}
@@ -332,6 +337,13 @@ int cmd(void)
 	}
 	if (NULL != oldchain)
 	{	/* for a literal 0 postconditional, we just throw the command & args away and return happiness */
+<<<<<<< HEAD
+=======
+		assert(0 <= fetch_cnt);
+		(TREF(fetch_control)).curr_fetch_trip = fetch0;
+		(TREF(fetch_control)).curr_fetch_opr = fetch1;
+		(TREF(fetch_control)).curr_fetch_count = fetch_cnt;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		setcurtchain(oldchain);
 		if (fetch0 != (TREF(fetch_control)).curr_fetch_trip)
 		{
@@ -366,6 +378,7 @@ int cmd(void)
 		{
 			if (shifting)
 			{	/* the following appears to be a hack ensuring emit_code doesn't find any unmatched OC_GVRECTARG */
+				assert(temp_expr_start);
 				ref0 = newtriple(OC_JMP);
 				ref1 = newtriple(OC_GVRECTARG);
 				ref1->operand[0] = put_tref(temp_expr_start);

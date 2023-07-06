@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -103,7 +103,7 @@ void rc_gbl_ord(rc_rsp_page *rsp)
 						size_return = bsiz;
 					}
 					memcpy(rsp->page, bh->buffaddr, SIZEOF(blk_hdr));
-					PUT_SHORT(&((blk_hdr *)rsp->page)->bsiz, bsiz);
+					PUT_ULONG(&((blk_hdr *)rsp->page)->bsiz, bsiz);
 					memcpy(rsp->page + SIZEOF(blk_hdr) + RC_BLKHD_PAD,
 					       bh->buffaddr + SIZEOF(blk_hdr),
 					       size_return - (SIZEOF(blk_hdr) + RC_BLKHD_PAD));

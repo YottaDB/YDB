@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -197,7 +197,7 @@ void dse_rest(void)
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
-	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
+	t_write(&blkhist, bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
 	BUILD_AIMG_IF_JNL_ENABLED_AND_T_END_WITH_EFFECTIVE_TN(cs_addrs, cs_data, ((blk_hdr_ptr_t)lbp)->tn, &dummy_hist);
 	return;
 }

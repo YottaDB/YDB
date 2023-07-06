@@ -1,6 +1,7 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2012 Fidelity Information Services, Inc *
+ * Copyright (c) 2012-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -68,7 +69,7 @@ boolean_t t_recycled2free(srch_blk_status *blkhist)
 		}
 		JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, cs_data, cs_addrs, cse->old_block, bsiz);
 	}
-	cse->upd_addr = NULL;
+	cse->upd_addr.ptr = NULL;
 	cse->jnl_freeaddr = 0;      /* reset jnl_freeaddr that previous transaction might have filled in */
 	cse->done = FALSE;
 	cse->new_buff = NULL;
@@ -76,4 +77,3 @@ boolean_t t_recycled2free(srch_blk_status *blkhist)
 	cw_set_depth++;
 	return TRUE;
 }
-

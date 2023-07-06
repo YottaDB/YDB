@@ -45,7 +45,7 @@ void t_write_map (
 						 *	    "cr"		--> cache-record that holds the block (BG only)
 						 *	    "cycle"		--> cycle when block was read by t_qread (BG only)
 						 */
-		unsigned char	*upd_addr,	/* Address of the update array containing list of blocks to be cleared in bitmap */
+		block_id	*upd_addr,	/* Address of the update array containing list of blocks to be cleared in bitmap */
 		trans_num	tn,		/* Transaction Number when this block was read. Used for cdb_sc_blkmod validation */
 		int4		reference_cnt)	/* Same meaning as cse->reference_cnt (see gdscc.h for comments) */
 {
@@ -103,7 +103,7 @@ void t_write_map (
 	assert(reference_cnt > -csa->hdr->bplmap);	/* Cannot free more blocks than a bitmap holds */
 	cs->reference_cnt = reference_cnt;
 	cs->jnl_freeaddr = 0;		/* reset jnl_freeaddr that previous transaction might have filled in */
-	cs->upd_addr = upd_addr;
+	cs->upd_addr.map = upd_addr;
 	DEBUG_ONLY(
 		if (reference_cnt < 0)
 			reference_cnt = -reference_cnt;

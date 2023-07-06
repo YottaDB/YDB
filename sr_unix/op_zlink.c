@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -146,7 +146,11 @@ void op_zlink (mval *v, mval *quals)
 				obj_file[MAX_FN_LEN + 1],
 				objnamebuf[MAX_FN_LEN + 1],
 				srcnamebuf[MAX_FN_LEN + 1];
+<<<<<<< HEAD
 	int			qlf, save_errno, status, tslash;
+=======
+	int			initial_object_file_des, qlf, save_errno, status, tslash = 0;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	linktyp			type;
 	mstr			srcstr, objstr, file;
 	parse_blk		pblk;
@@ -311,11 +315,16 @@ void op_zlink (mval *v, mval *quals)
 		memcpy(srcnamebuf, pblk.l_name, pblk.b_name);
 		memcpy(&srcnamebuf[pblk.b_name], DOTM, SIZEOF(DOTM));
 		srcnamelen = pblk.b_name + SIZEOF(DOTM) - 1;
-		if ('%' == srcnamebuf[0])
-			srcnamebuf[0] = '_';
+		if (!objnamelen)
+		{
+			objnamelen = pblk.b_name;
+			memcpy(srcnamebuf, pblk.l_name, objnamelen);
+		}
 		assert(MAX_FN_LEN > (objnamelen + SIZEOF(DOTOBJ)));
 		memcpy(&objnamebuf[objnamelen], DOTOBJ, SIZEOF(DOTOBJ));		/* Copies null terminator */
 		objnamelen += (SIZEOF(DOTOBJ) - 1);
+		if ('%' == srcnamebuf[0])
+			srcnamebuf[0] = '_';
 		srcstr.addr = srcnamebuf;
 		srcstr.len = srcnamelen;
 		objstr.addr = objnamebuf;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +15,6 @@
 
 #define	ALLOCATION_CLUE(totblks)	(((totblks) / 64) + 8)	/* roger 19990607 - arbitrary & should be improved */
 
-block_index t_create(block_id hint, unsigned char *upd_addr, block_offset ins_off, block_index index, char level);
+block_index t_create(block_id hint, struct blk_segment_struct *upd_addr, block_offset ins_off, block_index index, char level);
 
 #endif

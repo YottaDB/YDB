@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -107,7 +107,9 @@ enum cdb_sc gvcst_dataget(mint *dollar_data, mval *val)
 			sn_ptr = stringpool.free;
 			total_len = 0;
 			val->str.addr = (char *)sn_ptr;
-			for (i = 0; i < numsubs; i++)
+			assert(0 < numsubs);
+			i = 0;
+			do
 			{
 				NEXT_HIDDEN_SUB(gv_currkey, i);
 				/* We only need to do a rtsib on the last chunk. Only there can we check for descendants */
@@ -129,7 +131,7 @@ enum cdb_sc gvcst_dataget(mint *dollar_data, mval *val)
 				assert(total_len < (gblsize + cs_addrs->hdr->blk_size));
 				if (!gotpiece || (total_len > gblsize))
 					break;
-			}
+			} while (++i < numsubs);
 			if ((total_len != gblsize) || (i != numsubs))
 			{	/* Fetched value either too small or too big compared to what control subscript says */
 				RESTORE_CURRKEY(gv_currkey, oldend);

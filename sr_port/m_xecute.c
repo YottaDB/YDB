@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -49,7 +49,7 @@ int m_xecute(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	dqinit(&tmpchain, exorder);
+	exorder_init(&tmpchain);
 	oldchain = setcurtchain(&tmpchain);
 	switch (expr(&x, MUMPS_STR))
 	{
@@ -90,7 +90,7 @@ int m_xecute(void)
 			 * adjustments to some names.
 			 */
 			src = &x.oprval.tref->operand[0].oprval.mlit->v.str;
-			dqinit(&tmpchain, exorder);
+			exorder_init(&tmpchain);
 			if (MAX_SRCLINE < (unsigned)src->len)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
 			/* save the parse state, point the compiler at the literal and see what happens */
@@ -121,7 +121,7 @@ int m_xecute(void)
 			if (EXPR_FAIL == rval)
 			{	/* not so good - remove the failed chain and just leave the literal for the run time form */
 				TREF(last_source_column) = source_column - 1;
-				dqinit(&tmpchain, exorder);
+				exorder_init(&tmpchain);
 				ins_triple(ref0);
 				pending_errtriplecode = 0;	/* forget the error - leave it to runtime */
 				TREF(source_error_found) = 0;

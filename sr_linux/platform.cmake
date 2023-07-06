@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2020 Fidelity National Information		#
+# Copyright (c) 2013-2023 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	#
@@ -81,12 +81,13 @@ set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I") # gcc -I does not make it to "as"
 # Compiler
 if(${CYGWIN})
   # (VEN/SMH): Looks like we need to add the defsym to tell the assembler to define 'cygwin'
-  set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,--defsym,cygwin=1")
+  string(APPEND CMAKE_ASM_FLAGS " -Wa,--defsym,cygwin=1")
 else()
   # Cygwin must have -ansi undefined (it adds __STRICT_ANSI__ which undefines some important prototypes like fdopen())
   #   See http://stackoverflow.com/questions/21689124/mkstemp-and-fdopen-in-cygwin-1-7-28
   # Cygwin warns if you add -fPIC that the compiled code is already position
   # independent. So don't add -fPIC
+<<<<<<< HEAD
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -fPIC ")
 endif()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign")
@@ -109,6 +110,9 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wuninitialized")
 if (ENABLE_ASAN)
     # Address sanitizer enabled. Use proper compiler/linker flags
     set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -fsanitize=address")
+=======
+  string(APPEND CMAKE_C_FLAGS " -fPIC -fno-defer-pop -ffloat-store -fno-omit-frame-pointer")
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 endif()
 if (CMAKE_COMPILER_IS_GNUCC)
   # In gcc 10.1.0 we noticed the below two warnings show up at link time and not at compile time (see commit message for details).

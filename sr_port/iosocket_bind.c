@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -38,7 +38,7 @@
 boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t update_bufsiz, boolean_t newversion)
 {
 	int			temp_1 = 1;
-	char			*errptr, *charptr;
+	char			*errptr, *charptr = NULL;
 	int4			errlen, real_errno;
 	short			len;
 	in_port_t		actual_port;
@@ -313,6 +313,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 		}
 		if (((gid_t)-1 != socketptr->uic.grp) || ((uid_t)-1 != socketptr->uic.mem))
 		{
+			assert(charptr);
 			CHG_OWNER(charptr, socketptr->uic.mem, socketptr->uic.grp, temp_1);
 			if (temp_1)
 			{

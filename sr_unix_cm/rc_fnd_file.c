@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -66,10 +66,14 @@ static int		rc_overflow_size = 0;
 static CONDITION_HANDLER(rc_fnd_file_ch1);
 static CONDITION_HANDLER(rc_fnd_file_ch2);
 
+<<<<<<< HEAD
 LITREF	char	*ydbenvname[YDBENVINDX_MAX_INDEX];
 LITREF	char	*gtmenvname[YDBENVINDX_MAX_INDEX];
 
 short rc_fnd_file(rc_xdsid *xdsid)
+=======
+unsigned short rc_fnd_file(rc_xdsid *xdsid)
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 {
 	gv_namehead	*g;
 	short		dsid, node;
@@ -145,7 +149,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		GVKEYSIZE_INIT_IF_NEEDED;	/* sets up "gv_keysize", "gv_currkey" and "gv_altkey" in sync if not already done */
 		cs_addrs->dir_tree = (gv_namehead *)malloc(SIZEOF(gv_namehead) + 2 * SIZEOF(gv_key) + 3 * gv_keysize);
 		g = cs_addrs->dir_tree;
-		g->first_rec = (gv_key*)(((gv_key *)&(g->clue))->base + gv_keysize);
+		g->first_rec = (gv_key*)(((gv_key_ptr)&(g->clue))->key.base + gv_keysize);
 		g->last_rec = (gv_key*)(g->first_rec->base + gv_keysize);
 		g->clue.top = g->last_rec->top = g->first_rec->top = gv_keysize;
 		/* No need to initialize g->clue.prev as it is never used */
@@ -272,7 +276,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		keysize = DBKEYSIZE(gv_cur_region->max_key_size);
 		cs_addrs->dir_tree = (gv_namehead *)malloc(SIZEOF(gv_namehead) + 2 * SIZEOF(gv_key) + 3 * keysize);
 		g = cs_addrs->dir_tree;
-		g->first_rec = (gv_key*)(((gv_key *)&(g->clue))->base + keysize);
+		g->first_rec = (gv_key*)(((gv_key_ptr)&(g->clue))->key.base + keysize);
 		g->last_rec = (gv_key*)(g->first_rec->base + keysize);
 		g->clue.top = g->last_rec->top = g->first_rec->top = keysize;
 		/* No need to initialize g->clue.prev as it is not currently used */

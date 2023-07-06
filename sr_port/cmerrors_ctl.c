@@ -28,6 +28,7 @@ LITDEF	err_msg cmerrors[] = {
 
 
 LITDEF	int cmerrors_undocarr[] = {
+	0	/* Placeholder to prevent empty array */
 };
 
 

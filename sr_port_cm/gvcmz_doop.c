@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -89,7 +89,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		   with V5.0-FT01 */
 			lnk->cbl++;
 		}
-		assert((uint4)lnk->cbl + SIZEOF(unsigned short) + (uint4)MAX_DBSTRLEN <= (uint4)CM_MAX_BUF_LEN);
+		assert((uint4)lnk->cbl <= (uint4)CM_MAX_BUF_LEN - (uint4)MAX_DBSTRLEN - SIZEOF(unsigned short));
 		lnk->cbl += (SIZEOF(unsigned short) + v->str.len); /* VALUE + length */
 	}
 	if ((CMMS_Q_GET == query_code)

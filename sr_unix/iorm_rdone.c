@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -30,7 +30,7 @@ int	iorm_rdone(mint *v, uint8 nsec_timeout)
 {
 	mval		tmp;
 	int		ret;
-        uint4		codepoint;
+	uint4		codepoint;
 	gtm_chset_t	ichset;
 
 	*v = -1;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2021 Fidelity National Information	*
+ * Copyright (c) 2008-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -152,7 +152,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 	char *token3;
 	int notfound = FALSE;
 	int ret_stat;
-	int pathsize, path_len;
+	int pathsize, path_len = -1;
 	int cmd_string_size;
 
 	path = ydb_getenv(YDBENVINDX_GENERIC_PATH, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
@@ -241,6 +241,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 			}
 			if (NULL != path)
 			{	/* search all the directories in the $PATH if defined */
+				assert(0 <= path_len);
 				memcpy(dir_in_path, path, path_len + 1);
 				for (str3 = dir_in_path; TRUE == notfound; str3 = NULL)
 				{
@@ -298,7 +299,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	int		p_offset = 0;
 	int		file_des_write;
 	int		file_des_read = 0;
-	int		file_des_read_stderr;
+	int		file_des_read_stderr = FD_INVALID;
 	int		param_offset = 0;
 	struct stat 	sb;
 	int 		ret_stat;
@@ -311,7 +312,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	char 		*sparams[3] = {0, 0, 0};
 	char 		*pcommand = 0;
 	char 		*pshell = 0;
-	char 		*pshell_name;
+	char 		*pshell_name = NULL;
 	char 		*pstderr = 0;
 	char 		*sh;
 	int		independent = FALSE;
@@ -657,7 +658,10 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 				else
 					ret = -1;
 		} else
+		{
+			assert(pshell_name);
 			ret = EXECL(pshell, pshell_name, "-c", pcommand, (char *)NULL);
+		}
 		if (-1 == ret)
 		{
 			WBTEST_ONLY(WBTEST_BADEXEC_PIPE_PROCESS,
@@ -817,6 +821,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 			}
 			in_d_rm->is_pipe = TRUE;
 			io_ptr->type = rm;
+			assert(FD_INVALID != file_des_read_stderr);
 			status_read = iorm_open(stderr_naml, pp, file_des_read_stderr, mspace, timeout);
 			if (TRUE == status_read)
 				(stderr_iod->pair.in)->state = dev_open;

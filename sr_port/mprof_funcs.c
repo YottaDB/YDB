@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -1010,3 +1010,27 @@ STATICFNDEF void parse_gvn(mval *gvn)
 	return;
 }
 
+<<<<<<< HEAD
+=======
+void stack_leak_check(void)
+{
+	int	var_on_cstack;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+#	ifdef UNIX
+	if (GTMTRIG_ONLY((0 < gtm_trigger_depth) ||) (0 < TREF(gtmci_nested_level)))
+		return;
+#	endif
+	if (NULL == var_on_cstack_ptr)
+		var_on_cstack_ptr = &var_on_cstack;
+	if ((&var_on_cstack != var_on_cstack_ptr)
+#	     ifdef __i386	/* For 32-bit Linux allow a two pointer variation to accommodate ZHELP. */
+	     && ((SIZEOF(var_on_cstack) * 2) < ABS(&var_on_cstack - var_on_cstack_ptr))
+#	     endif
+	     )
+	     	assertpro(FALSE);
+	var_on_cstack_ptr = NULL;
+	return;
+}
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)

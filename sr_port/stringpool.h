@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -104,12 +104,17 @@ MBSTART {											\
 		}											\
 		PTRARRAYCUR = PTRARRAY = (TYPE **)stp_array;						\
 		PTRARRAYTOP = PTRARRAYCUR + stp_array_size;						\
-	} else if (PTRARRAYCUR >= PTRARRAYTOP)								\
+	} else												\
 	{												\
-		stp_expand_array();									\
-		PTRARRAYCUR = (TYPE **)stp_array + (PTRARRAYCUR - PTRARRAY);				\
-		PTRARRAY = (TYPE **)stp_array;								\
-		PTRARRAYTOP = PTRARRAY + stp_array_size;						\
+		assert(PTRARRAYCUR);									\
+		assert(PTRARRAYTOP);									\
+		if (PTRARRAYCUR >= PTRARRAYTOP)								\
+		{											\
+			stp_expand_array();								\
+			PTRARRAYCUR = (TYPE **)stp_array + (PTRARRAYCUR - PTRARRAY);			\
+			PTRARRAY = (TYPE **)stp_array;							\
+			PTRARRAYTOP = PTRARRAY + stp_array_size;					\
+		}											\
 	}												\
 	*PTRARRAYCUR++ = PTR;										\
 }

@@ -146,7 +146,7 @@ STATICFNDEF int extend_wait_for_write(unix_db_info *udi, int blk_size, off_t new
 
 int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 {
-	sm_uc_ptr_t		old_base[2], mmap_retaddr;
+	sm_uc_ptr_t		old_base[2] = { NULL, NULL }, mmap_retaddr;
 	boolean_t		was_crit, is_mm;
 	int			fd, result, save_errno, status, to_msg, to_wait, wait_period;
 	DEBUG_ONLY(int		first_save_errno);
@@ -158,7 +158,7 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	unix_db_info		*udi;
 	inctn_opcode_t		save_inctn_opcode;
 	block_id		prev_extend_blks_to_upgrd;
-	jnl_private_control	*jpc;
+	jnl_private_control	*jpc = NULL;
 	jnl_buffer_ptr_t	jbp;
 	cache_rec_ptr_t		cr;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_NOSPC_ENABLED */
@@ -169,7 +169,6 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	assert(!IS_DSE_IMAGE);
 	assert((cs_addrs->nl == NULL) || (process_id != cs_addrs->nl->trunc_pid)); /* mu_truncate shouldn't extend file... */
 	assert(!process_exiting);
-	DEBUG_ONLY(old_base[0] = old_base[1] = NULL);
 	assert(!gv_cur_region->read_only);
 	udi = FILE_INFO(gv_cur_region);
 	is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
@@ -479,6 +478,7 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 			inctn_opcode = inctn_gdsfilext_mu_reorg;
 		else
 			inctn_opcode = inctn_gdsfilext_gtm;
+		assert(jpc);
 		if (0 == jpc->pini_addr)
 			jnl_write_pini(cs_addrs);
 		jnl_write_inctn_rec(cs_addrs);

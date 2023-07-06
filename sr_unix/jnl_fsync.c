@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -61,7 +61,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 	sgmnt_data_ptr_t	csd;
 	int4			lck_state;
 	int			fsync_ret, save_errno;
-	intrpt_state_t		prev_intrpt_state;
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	DEBUG_ONLY(uint4	onln_rlbk_pid;)
 
 	csa = &FILE_INFO(reg)->s_addrs;

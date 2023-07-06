@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -54,11 +54,7 @@
 #define DQTRIPCHK(Q, N)
 #else
 #define dqinit(Q, N)					\
-MBSTART {						\
-	if (!memcmp(#N, "exorder", 3))			\
-		((triple *)(Q))->opcode = OCQ_INVALID;	\
-	DQINIT(Q, N); 					\
-} MBEND
+	DQINIT(Q, N);
 #define DQTRIPCHK(Q, N) assert((0 != memcmp(#N, "exorder", 3)) || (OCQ_INVALID != ((triple *)(Q))->opcode))
 #ifdef DEBUG		/*don't turn this on in pro builds, at least without intentionally allowing it by changing this */
 /* #define DEBUG_TRIPLES / * Uncomment this to do triple debugging, which is also tied to ydb_dbglvl - as of this writing: 0x4000 */

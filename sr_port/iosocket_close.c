@@ -163,7 +163,12 @@ void iosocket_close(io_desc *iod, mval *pp)
 void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boolean_t socket_delete)
 {
 	int4		ii,jj;
+<<<<<<< HEAD
 	int		rc, save_fd, save_rc = 0, save_errno;
+=======
+	int		rc, save_fd = FD_INVALID, save_rc = 0, save_errno = 0;
+	int		local_process_exiting;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	ssize_t		status;
 	intrpt_state_t	prev_intrpt_state;
 	socket_struct	*socketptr;

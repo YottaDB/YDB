@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -144,18 +144,21 @@ STATICFNDEF void mu_rndwn_all_helper(shm_parms *parm_buff, char *fname, int *exi
 {
 	replpool_identifier	replpool_id;
 	boolean_t 		ret_status, jnlpool_sem_created;
+	size_t			fname_len;
 	unsigned char		ipcs_buff[MAX_IPCS_ID_BUF], *ipcs_ptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(mu_rndwn_all_helper_ch);
+	fname_len = strlen(fname);
 	if (validate_db_shm_entry(parm_buff, fname, tmp_exit_status))
 	{
 		if (SS_NORMAL == *tmp_exit_status)
 		{	/* shm still exists */
 			mu_gv_cur_reg_init();
-			gv_cur_region->dyn.addr->fname_len = strlen(fname);
+			gv_cur_region->dyn.addr->fname_len = MIN(fname_len, MAX_FN_LEN);
 			STRNCPY_STR(gv_cur_region->dyn.addr->fname, fname, gv_cur_region->dyn.addr->fname_len);
+			gv_cur_region->dyn.addr->fname[gv_cur_region->dyn.addr->fname_len] = '\0';
 			if (mu_rndwn_file(gv_cur_region, FALSE))
 			{	/* If this is a statsdb, "mu_rundwn_file" would have invoked rundown on basedb which would
 				 * in turn invoke rundown on the statsdb. The basedb rundown would print the MUFILRNDWNSUC
@@ -254,8 +257,9 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 {
 	boolean_t		remove_shmid;
 	file_control		*fc;
-	int			fname_len, save_errno, status, shmid;
+	int			save_errno, status, shmid;
 	node_local_ptr_t	nl_addr;
+	size_t			fname_len;
 	sm_uc_ptr_t		start_addr;
 	struct stat		st_buff;
 	struct shmid_ds		shmstat;
@@ -339,8 +343,9 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 	} else
 	{
 		mu_gv_cur_reg_init();
-		gv_cur_region->dyn.addr->fname_len = strlen(fname);
+		gv_cur_region->dyn.addr->fname_len = MIN(fname_len, MAX_FN_LEN);
 		STRNCPY_STR(gv_cur_region->dyn.addr->fname, fname, gv_cur_region->dyn.addr->fname_len);
+		gv_cur_region->dyn.addr->fname[gv_cur_region->dyn.addr->fname_len] = '\0';
 		fc = gv_cur_region->dyn.addr->file_cntl;
 		fc->op = FC_OPEN;
 		status = dbfilop(fc);

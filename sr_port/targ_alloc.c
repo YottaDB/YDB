@@ -108,8 +108,8 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	csa = ((NULL != reg) && reg->open) ? &FILE_INFO(reg)->s_addrs : NULL;
 	gvt_hashtab_present = FALSE;
 	if ((NULL != gvent) && (NULL != csa))
-	{
-		assert(keysize == csa->hdr->max_key_size);
+	{	/* Key size should be no greater than the max_key_size unless the key size is not assured */
+		assert((keysize == csa->hdr->max_key_size) || !csa->hdr->maxkeysz_assured);
 		if (NULL != csa->gvt_hashtab)
 		{	/* Check if incoming gvname is already part of the database file specific hashtable. If so,
 			 * return gv_target that already exists here instead of mallocing something new.

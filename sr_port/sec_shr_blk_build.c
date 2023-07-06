@@ -35,7 +35,7 @@ void	sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, cw_set_element *c
 	blk_segment	*seg, *stop_ptr, *array;
 	unsigned char	*ptr;
 
-	array = (blk_segment *)cse->upd_addr;
+	array = cse->upd_addr.blk;
 	assert(csa->read_write);
 	/* block transaction number needs to be modified first. see comment in gvcst_blk_build as to why */
 	assert((0 == cse->level) || (GDSV6 == cs_data->desired_db_format) || (GDSV6 < cse->ondsk_blkver));

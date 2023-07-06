@@ -155,6 +155,7 @@ void db_auto_upgrade(gd_region *reg)
 				csd->max_update_array_size
 					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 			case GDSMV70001:
+<<<<<<< HEAD
 			case GDSMV70002:
 				if (GDSMR200_V70000 != csd->minor_dbver)
 				{
@@ -209,6 +210,15 @@ void db_auto_upgrade(gd_region *reg)
 				 *    r1.32) and so those GT.M switch/case code paths above will not be reached for upgrades
 				 *    from an older YottaDB release to a newer YottaDB release.
 				 */
+=======
+				/* GT.M V70002 added proactive block split option */
+				csd->problksplit = DEFAULT_PROBLKSPLIT;
+			case GDSMV70002:
+				/* GT.M V71001 changed proactive block split default */
+				csd->problksplit = DEFAULT_PROBLKSPLIT;
+				break;		/* so a new "case" needs to be added BEFORE the assert. */
+			case GDSMV71001:
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2021 Fidelity National Information	*
+ * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -139,7 +139,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 				 */
 				++fast_lock_count; /* Disable wcs_stale for duration */
 				if (grab_latch(&whead->latch, WT_LATCH_TIMEOUT_SEC, WS_25, csa))
-                       		{
+				{
 					cr = cr2flush;
 					csr = (cache_state_rec_ptr_t)((sm_uc_ptr_t)cr + SIZEOF(cr->blkque));
 					/* now that we have the wip queue header lock ensure cr2flush is still on the wip queue */
@@ -152,9 +152,9 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 						retcsrptr = remqh((que_ent_ptr_t)((sm_uc_ptr_t)&csr->state_que
 							+ csr->state_que.bl));
 						if ((cache_state_rec_ptr_t)retcsrptr != csr)
-                                                {       /* Did not get the csr we intended so something must be wrong with cache.
-                                                         * Kill -9 can cause this. Assert that we were doing a crash shutdown.
-                                                         */
+						{	/* Did not get the csr we intended so something must be wrong with cache.
+							 * Kill -9 can cause this. Assert that we were doing a crash shutdown.
+							 */
 							assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
 								|| WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
 							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
@@ -205,11 +205,9 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 			}
 			break;		/* looped the queue */
 		}
-#		ifdef DEBUG
 		cr = (cache_rec_ptr_t)((sm_uc_ptr_t)csr - SIZEOF(cr->blkque));
 		assert(cr >= cr_lo);
 		assert(cr < cr_hi);
-#		endif
 		assert(csr->dirty);
 		assert(CR_BLKEMPTY != csr->blk);
 		AIO_SHIM_ERROR(&(csr->aiocb), aio_errno);

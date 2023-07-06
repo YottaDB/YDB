@@ -178,7 +178,7 @@ void	mupip_recover(void)
 	int			last_regno, lcnt, regno, reg_total, sleep_count, status;
 	jnl_ctl_list		*jctl;
 	jnl_tm_t		min_broken_time;
-	reg_ctl_list		*rctl;
+	reg_ctl_list		*rctl = NULL;
 	seq_num 		losttn_seqno, min_broken_seqno;
 	repl_histinfo		local_histinfo;
 	seq_num			max_reg_seqno, replinst_seqno;
@@ -274,7 +274,7 @@ void	mupip_recover(void)
 		{	/* At this point, the DB and instance file have corrupt set. Wait for the REORG -UPGRADE to exit */
 			if (last_regno != regno)
 			{
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REORGUPCNFLCT, 5,
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
 						LEN_AND_LIT("ROLLBACK -ONLINE"),
 						LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
 						rctl->csa->nl->reorg_upgrade_pid);
@@ -369,6 +369,7 @@ void	mupip_recover(void)
 	}
 	if (murgbl.intrpt_recovery && mur_options.update && mur_options.forward)
 	{
+		assert(rctl);
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUPJNLINTERRUPT, 2, DB_LEN_STR(rctl->gd));
 		mupip_exit(ERR_MUNOACTION);
 	}
@@ -519,6 +520,7 @@ void	mupip_recover(void)
 		 * of a system crash. So assert accordingly.
 		 */
 		assert(0 != losttn_seqno);
+		min_broken_time = MAXUINT4;
 	}
        	/* Multi_region TP/ZTP resolution */
 	if (!mur_options.forward)

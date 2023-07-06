@@ -83,6 +83,7 @@ error_def(ERR_NOSELECT);
 error_def(ERR_NOEXCLUDE);
 error_def(ERR_REORGCTRLY);
 error_def(ERR_REORGINC);
+error_def(ERR_REORGUPCNFLCT);
 error_def(ERR_MUKEEPNOTRUNC);
 error_def(ERR_MUKEEPPERCENT);
 error_def(ERR_MUKEEPNODEC);
@@ -389,6 +390,18 @@ void mupip_reorg(void)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REORGCTRLY);
 			mupip_exit(ERR_MUNOFINISH);
 		}
+		if ((0 != cs_addrs->nl->reorg_upgrade_pid) && (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0)))
+		{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE and is higher priority. Stop */
+			send_msg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
+					LEN_AND_LIT("REORG"),
+					LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
+					cs_addrs->nl->reorg_upgrade_pid);
+			gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
+					LEN_AND_LIT("REORG"),
+					LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
+					cs_addrs->nl->reorg_upgrade_pid);
+			mupip_exit(ERR_MUNOFINISH);
+		}
 	}
 	status = SS_NORMAL;
 	if (!reorg_success)
@@ -398,6 +411,26 @@ void mupip_reorg(void)
 		status = ERR_REORGINC;
 	} else if (truncate)
 	{
+		for (reg_iter = reg_list; reg_iter; reg_iter = reg_iter->next)
+		{
+			gv_cur_region = reg_iter->reg;
+			tp_change_reg();
+			csd = cs_data;
+			csa = cs_addrs;
+			cnl = csa->nl;
+			if ((0 != cnl->reorg_upgrade_pid) && (is_proc_alive(cnl->reorg_upgrade_pid, 0)))
+			{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE and is higher priority. Stop */
+				send_msg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
+						LEN_AND_LIT("REORG -TRUNCATE"),
+						LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
+						cnl->reorg_upgrade_pid);
+				gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
+						LEN_AND_LIT("REORG -TRUNCATE"),
+						LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
+						cnl->reorg_upgrade_pid);
+				mupip_exit(ERR_MUNOFINISH);
+			}
+		}
 		/* Move GVT ROOT blocks of all global names AFTER doing regular reorg on ALL global names.
 		 * This way we ensure one pass of reorg -truncate is enough to produce an optimally truncated file.
 		 */
@@ -409,12 +442,15 @@ void mupip_reorg(void)
 		{
 			gv_cur_region = reg_iter->reg;
 			tp_change_reg();
+			csd = cs_data;
+			csa = cs_addrs;
+			cnl = csa->nl;
 			SET_GVTARGET_TO_HASHT_GBL(cs_addrs);	/* sets gv_target */
 			SET_GV_CURRKEY_FROM_GVT(gv_target);
 			gv_target->root = 0; /* Recompute gv_target->root in case mu_reorg changed things around */
 			inctn_opcode = inctn_invalid_op;	/* needed for GVCST_ROOT_SEARCH */
 			GVCST_ROOT_SEARCH;			/* set gv_target->root */
-			if (0 == gv_target->root)
+			if ((0 == gv_target->root) || (0 != cnl->reorg_upgrade_pid))
 				continue;
 			hasht_gl.reg = gv_cur_region;
 			hasht_gl.gvt = gv_target;
@@ -449,6 +485,19 @@ void mupip_reorg(void)
 				send_msg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(4) ERR_MUTRUNC1ATIME, 3, lcl_pid,
 						REG_LEN_STR(gv_cur_region));
 				continue;
+			}
+			if ((0 != cnl->reorg_upgrade_pid) && (is_proc_alive(cnl->reorg_upgrade_pid, 0)))
+			{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE and is higher priority. Stop */
+				rel_crit(gv_cur_region);
+				send_msg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
+						LEN_AND_LIT("REORG -TRUNCATE"),
+						LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
+						cnl->reorg_upgrade_pid);
+				gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
+						LEN_AND_LIT("REORG -TRUNCATE"),
+						LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
+						cnl->reorg_upgrade_pid);
+				mupip_exit(ERR_MUNOFINISH);
 			}
 			cnl->trunc_pid = process_id;
 			cnl->highest_lbm_with_busy_blk = 0;

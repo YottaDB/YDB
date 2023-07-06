@@ -42,9 +42,14 @@ int gvn(void)
 	char		x;
 	int		hash_code;
 	opctype		ox;
+<<<<<<< HEAD
 	/* The subscripts array needs to be 2 larger than max subscripts to actually hold the maximum number of subscripts */
 	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS + 2];
 	triple		*oldchain, *ref, *s, tmpchain, *triptr;
+=======
+	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS + 1];
+	triple		*oldchain = NULL, *ref, *s, tmpchain, *triptr;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -52,10 +57,16 @@ int gvn(void)
 	advancewindow();
 	sb1 = sb2 = subscripts;
 	ox = 0;
+<<<<<<< HEAD
 	if (shifting = (TREF(shift_side_effects) && (!TREF(saw_side_effect) || (YDB_BOOL == TREF(ydb_fullbool)
 		&& (OLD_SE == TREF(side_effect_handling))))))
+=======
+	if (shifting = ((EXT_BOOL != TREF(gtm_fullbool)) && TREF(shift_side_effects)
+		&& (!TREF(saw_side_effect)
+			|| (GTM_BOOL == TREF(gtm_fullbool) && (OLD_SE == TREF(side_effect_handling))))))
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	{	/* NOTE assignment above */
-		dqinit(&tmpchain, exorder);
+		exorder_init(&tmpchain);
 		oldchain = setcurtchain(&tmpchain);
 	}
 	if ((TK_LBRACKET == TREF(window_token)) || (TK_VBAR == TREF(window_token)))
@@ -73,7 +84,10 @@ int gvn(void)
 		{
 			stx_error(ERR_EXPR);
 			if (shifting)
+			{
+				assert(oldchain);
 				setcurtchain(oldchain);
+			}
 			return FALSE;
 		}
 		if (TK_COMMA == TREF(window_token))
@@ -86,7 +100,10 @@ int gvn(void)
 			if (!parse_status)
 			{	stx_error(ERR_EXPR);
 				if (shifting)
+				{
+					assert(oldchain);
 					setcurtchain(oldchain);
+				}
 				return FALSE;
 			}
 		} else
@@ -95,7 +112,10 @@ int gvn(void)
 		{
 			stx_error(ERR_EXTGBLDEL);
 			if (shifting)
+			{
+				assert(oldchain);
 				setcurtchain(oldchain);
+			}
 			return FALSE;
 		}
 		advancewindow();
@@ -117,14 +137,20 @@ int gvn(void)
 		{
 			stx_error(ERR_GVNAKEDEXTNM);
 			if (shifting)
+			{
+				assert(oldchain);
 				setcurtchain(oldchain);
+			}
 			return FALSE;
 		}
 		if (TK_LPAREN != TREF(window_token))
 		{
 			stx_error(ERR_GBLNAME);
 			if (shifting)
+			{
+				assert(oldchain);
 				setcurtchain(oldchain);
+			}
 			return FALSE;
 		}
 		ox = OC_GVNAKED;
@@ -142,14 +168,20 @@ int gvn(void)
 			{
 				stx_error(ERR_MAXNRSUBSCRIPTS);
 				if (shifting)
+				{
+					assert(oldchain);
 					setcurtchain(oldchain);
+				}
 				return FALSE;
 			}
 			advancewindow();
 			if (EXPR_FAIL == expr(sb1, MUMPS_EXPR))
 			{
 				if (shifting)
+				{
+					assert(oldchain);
 					setcurtchain(oldchain);
+				}
 				return FALSE;
 			}
 			assert(TRIP_REF == sb1->oprclass);
@@ -166,7 +198,10 @@ int gvn(void)
 			{
 				stx_error(ERR_RPARENMISSING);
 				if (shifting)
+				{
+					assert(oldchain);
 					setcurtchain(oldchain);
+				}
 				return FALSE;
 			}
 		}
@@ -176,7 +211,12 @@ int gvn(void)
 	SUBS_ARRAY_2_TRIPLES(ref, sb1, sb2, subscripts, 0);
 	if (shifting)
 	{
+<<<<<<< HEAD
 		if (TREF(saw_side_effect) && ((YDB_BOOL != TREF(ydb_fullbool)) || (OLD_SE != TREF(side_effect_handling))))
+=======
+		assert(oldchain);
+		if (TREF(saw_side_effect) && ((GTM_BOOL != TREF(gtm_fullbool)) || (OLD_SE != TREF(side_effect_handling))))
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		{	/* saw a side effect in a subscript - our reference has been superceded so no targ game on the name */
 			setcurtchain(oldchain);
 			triptr = (TREF(curtchain))->exorder.bl;

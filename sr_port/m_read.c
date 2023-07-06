@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@ int m_read(void)
 	SETUP_THREADGBL_ACCESS;
 	TREF(temp_subs) = FALSE;
 	local = TRUE;
-	dqinit(&tmpchain, exorder);
+	exorder_init(&tmpchain);
 	switch (TREF(window_token))
 	{
 	case TK_ASTERISK:
@@ -65,7 +65,7 @@ int m_read(void)
 			if (!gvn())
 				return FALSE;
 			assert(OC_GVRECTARG != (TREF(curtchain))->opcode);	/* we count on gvn not having been shifted */
-			for (sub = (TREF(curtchain))->exorder.bl;  sub != s1;  sub = sub->exorder.bl)
+			for (sub = (TREF(curtchain))->exorder.bl, put_oc = OC_NOOP;  sub != s1;  sub = sub->exorder.bl)
 			{
 				put_oc = sub->opcode;
 				if ((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc) || (OC_GVEXTNAM == put_oc))
@@ -125,7 +125,7 @@ int m_read(void)
 		if (!gvn())
 			return FALSE;
 		assert(OC_GVRECTARG != (TREF(curtchain))->opcode);	/* we count on gvn not having been shifted */
-		for (sub = (TREF(curtchain))->exorder.bl;  sub != s1;  sub = sub->exorder.bl)
+		for (sub = (TREF(curtchain))->exorder.bl, put_oc = OC_NOOP; sub != s1;  sub = sub->exorder.bl)
 		{
 			put_oc = sub->opcode;
 			if ((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc) || (OC_GVEXTNAM == put_oc))

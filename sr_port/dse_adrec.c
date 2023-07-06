@@ -275,7 +275,7 @@ void dse_adrec(void)
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_AIMGBLKFAIL, 3, &blk, DB_LEN_STR(gv_cur_region));
 		return;
 	}
-	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
+	t_write(&blkhist, bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
 	BUILD_AIMG_IF_JNL_ENABLED(cs_data, csa->ti->curr_tn);
 	t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
 	free(lbp);

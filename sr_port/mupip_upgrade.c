@@ -79,8 +79,6 @@
 #include "gds_rundown.h"
 #include "error.h"
 #include "gtmmsg.h"
-#include "mu_outofband_setup.h"
-#include "mu_all_version_standalone.h"
 
 /* Because the process has standalone access, it must be released before proceeding to exit */
 #define RELEASE_ACCESS_SEMAPHORE_AND_RUNDOWN(REG, ERR)								\
@@ -133,7 +131,7 @@ error_def(ERR_TEXT);
 
 void mupip_upgrade(void)
 {
-	boolean_t		error, file, region, was_asyncio_enabled, was_crit;
+	boolean_t		error = FALSE, file, region, was_asyncio_enabled, was_crit;
 	block_id		blks_in_way, old_vbn;
 	char			buff[OUT_BUFF_SIZE], *errptr, fn[MAX_FN_LEN + 1];
 	enum jnl_state_codes	jnl_state;
@@ -143,7 +141,7 @@ void mupip_upgrade(void)
 	gv_namehead		*gvt;
 	inctn_opcode_t		save_inctn_opcode;
 	int			exit_status, fd, close_res, rc, save_errno, split_blks_added, split_levels_added;
-	int4			blk_size, bmls_to_work, new_bmm_size, status;
+	int4			blk_size, bmls_to_work, lcl_max_key_size, new_bmm_size, status;
 	jnl_buffer_ptr_t	jbp;
 	jnl_private_control	*jpc;
 	size_t			blocks_needed, fn_len;
@@ -169,7 +167,7 @@ void mupip_upgrade(void)
 	file = (CLI_PRESENT == cli_present("FILE"));
 	region = (CLI_PRESENT == cli_present("REGION")) || (CLI_PRESENT == cli_present("R"));
 	TREF(statshare_opted_in) = NO_STATS_OPTIN;	/* Do not open statsdb automatically when basedb is opened */
-	gvinit();					/* initialize gd_header (needed by the later call to mu_getlst) and gv_keysize */
+	gvinit();				/* initialize gd_header (needed by the later call to mu_getlst) and gv_keysize */
 	if ((file == region) && (TRUE == file))
 	{
 		mupip_exit(ERR_MUQUALINCOMP);
@@ -221,8 +219,9 @@ void mupip_upgrade(void)
 			if (EXIT_NRM != gds_rundown(CLEANUP_UDI_TRUE))
 			{	/* Failed to rundown the DB */
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRNDWN, 2, DB_LEN_STR(gv_cur_region));
-				util_out_print("Region !AD : Failed to rundown the database (!AD) in order to get standalone access.",
-				       TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
+				util_out_print(
+					"Region !AD : Failed to rundown the database (!AD) in order to get standalone access.",
+					TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
 			}
 			continue;
 		}
@@ -231,7 +230,8 @@ void mupip_upgrade(void)
 			fn_len = (size_t)rptr->reg->dyn.addr->fname_len + 1; /* Includes null terminator */
 			assert(sizeof(fn) >= fn_len);
 			memcpy(fn, (char *)rptr->reg->dyn.addr->fname, fn_len);
-		}
+		} else
+			fn_len = 0;
 		/* Obtain standalone access */
 		if (EXIT_NRM != gds_rundown(CLEANUP_UDI_FALSE))
 		{	/* Failed to rundown the DB, so we can't get standalone access */
@@ -321,10 +321,13 @@ void mupip_upgrade(void)
 		csd = cs_data;
 		assert(!csd->asyncio);
 		blk_size = csd->blk_size;
-		util_out_print("Region !AD : MUPIP MASTERMAP UPGRADE started (!AD)",
-				TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
+		util_out_print("Region !AD : MUPIP MASTERMAP UPGRADE started (!AD)", TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
 		blocks_needed = csd->trans_hist.total_blks - csd->trans_hist.free_blocks;
 		blocks_needed -= (csd->trans_hist.total_blks / BLKS_PER_LMAP);	/* Subtract LMAPs from the count */
+		/* The largest possible key size is limited by block size. The block must be able to fit a pointer with the longest
+		 * possible key size plus a star-record. This limitation comes from the index blocks and not the data blocks.
+		 */
+		lcl_max_key_size = blk_size - sizeof(blk_hdr) - sizeof(rec_hdr) - SIZEOF_BLK_ID(TRUE) - bstar_rec_size(TRUE);
 		if (FALSE == (was_crit = csa->now_crit)) /* WARNING assigment */
 			grab_crit(reg, WS_1);
 		if (JNL_ENABLED(csd))
@@ -401,13 +404,14 @@ void mupip_upgrade(void)
 			 * - Set all to free; because the DB is empty, this code does not need to retain prior block allocation
 			 */
 			csd->master_map_len = MASTER_MAP_SIZE_DFLT;
-			udi = FILE_INFO(reg);	/* Allocate an aligned buffer for new bmm (in case AIO), see DIO_BUFF_EXPAND_IF_NEEDED */
+			udi = FILE_INFO(reg);
+			/* Allocate an aligned buffer for new bmm (in case AIO), see DIO_BUFF_EXPAND_IF_NEEDED */
 			new_bmm_size = ROUND_UP(MASTER_MAP_SIZE_DFLT, cs_data->blk_size) + OS_PAGE_SIZE;
 			bml_buff = malloc(new_bmm_size);
 			bmm_base = (sm_uc_ptr_t)ROUND_UP2((sm_long_t)bml_buff, OS_PAGE_SIZE);
 			assert(OS_PAGE_SIZE >= (bmm_base - bml_buff));
-			memset(bmm_base, BMP_EIGHT_BLKS_FREE, MASTER_MAP_SIZE_DFLT); 		/* Initialize entire bmm to FREE */
-			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, SGMNT_HDR_LEN, bmm_base,	/* Write new BMM after file header */
+			memset(bmm_base, BMP_EIGHT_BLKS_FREE, MASTER_MAP_SIZE_DFLT); 	      /* Initialize entire bmm to FREE */
+			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, SGMNT_HDR_LEN, bmm_base,    /* Write new BMM after file header */
 					MASTER_MAP_SIZE_DFLT, status);
 			assert(SS_NORMAL == status);
 			free(bml_buff);								/* A little early in case of err */
@@ -491,6 +495,19 @@ void mupip_upgrade(void)
 			}
 			if (FALSE == was_crit)
 				rel_crit(reg);
+		}
+		if (csd->max_key_size > lcl_max_key_size)
+		{
+			util_out_print("Region !AD : WARNING The maximum key size for !AD is !UL",
+					TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg), csd->max_key_size);
+			util_out_print("Region !AD : WARNING This exceeds the largest possible size for a V7 database",
+					FALSE, REG_LEN_STR(reg));
+			util_out_print("with the current block size !UL.",
+					TRUE, blk_size);
+			util_out_print("Region !AD : WARNING Please run MUPIP INTEG on !AD to ensure all keys are less than !UL",
+					TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg), lcl_max_key_size);
+			csd->max_key_size = lcl_max_key_size;
+			csd->maxkeysz_assured = FALSE;
 		}
 		if (was_asyncio_enabled)
 		{

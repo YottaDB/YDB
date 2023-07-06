@@ -254,7 +254,7 @@ int4 mur_open_files(boolean_t retry)
 	freeze_status			reg_frz_status;
 	intrpt_state_t			prev_intrpt_state;
 	onln_rlbk_reg_list		*reglist = NULL, *rl, *rl_last, *save_rl, *rl_new;
-	boolean_t			x_lock, wait_for_kip, replinst_file_corrupt = FALSE, inst_requires_rlbk;
+	boolean_t			x_lock, wait_for_kip, replinst_file_corrupt = FALSE, inst_requires_rlbk = FALSE;
 	boolean_t			jnlpool_sem_created;
 	sgmnt_addrs			*tmpcsa;
 	sgmnt_data			*tmpcsd;
@@ -266,7 +266,7 @@ int4 mur_open_files(boolean_t retry)
 	unix_db_info			*udi;
 	char				time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	const char			*verbose_ptr;
-	gtmsource_local_ptr_t		gtmsourcelocal_ptr;
+	gtmsource_local_ptr_t		gtmsourcelocal_ptr = NULL;
 	DEBUG_ONLY(int			semval;)
 	DEBUG_ONLY(jnl_buffer_ptr_t	jb;)
 	boolean_t			recov_interrupted;
@@ -498,7 +498,8 @@ int4 mur_open_files(boolean_t retry)
 					assertpro(FALSE); /* should not reach here due to rts_error in the above function */
 
 			}
-		}
+		} else
+			csa = NULL;
 		/* For online rollback we need to grab crit on all the regions. But, this has to be done in the ftok order. To
 		 * setup the regions in the ftok order invoke insert_region.  Note that all we need is a list of regions sorted by
 		 * the inode/device numbers. So, a bubble sort would have worked just fine. But, since most of the code uses
@@ -562,6 +563,7 @@ int4 mur_open_files(boolean_t retry)
 					{
 						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ORLBKREL);
 						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ORLBKREL);
+						assert(gtmsourcelocal_ptr);
 						release_all_locks(udi, gtmsourcelocal_ptr, gld_db_files, max_reg_total, rl_last);
 						locks_released = TRUE;
 					}
@@ -587,6 +589,7 @@ int4 mur_open_files(boolean_t retry)
 		 */
 		if ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl))
 		{	/* Validate the journal pool is accessible and the offsets of various structures within it are intact */
+			assert(csa);
 			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 			csa->hold_onto_crit = TRUE;	/* No more unconditional rel_lock() */
 			assert(jnlpool->repl_inst_filehdr->crash); /* since we haven't removed the journal pool */
@@ -879,13 +882,12 @@ int4 mur_open_files(boolean_t retry)
 					return FALSE;	/* mur_fopen() would have done the appropriate gtm_putmsg() */
 				if (SS_NORMAL != (jctl->status = mur_fread_eof(jctl, rctl)))
 				{
-					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len,
+					gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len,
 						       jctl->jnl_fn, jctl->rec_offset, ERR_TEXT, 2,
 						       LEN_AND_LIT("mur_fread_eof failed"));
 					return FALSE;
 				}
-				assert((csa == rctl->csa) || !mur_options.update);
-				assert(!jgbl.onlnrlbk || (csa == &udi->s_addrs));
+				udi = FILE_INFO(rctl->gd);
 				if (jgbl.onlnrlbk && jctl->jfh->crash
 						&& !udi->shm_created && !jctl->jfh->recover_interrupted && !inst_requires_rlbk)
 				{	/* If the journal file is crashed, mur_fread_eof invokes mur_fread_eof_crash to read the
@@ -920,7 +922,9 @@ int4 mur_open_files(boolean_t retry)
 				}
 				if (!is_file_identical((char *)jctl->jfh->data_file_name, (char *)rctl->gd->dyn.addr->fname))
 				{
-					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBJNLNOTMATCH, 6, DB_LEN_STR(rctl->gd),
+					csa = &udi->s_addrs;
+					assert((csa == rctl->csa) || !mur_options.update);
+					gtm_putmsg_csa(csa, VARLSTCNT(8) ERR_DBJNLNOTMATCH, 6, DB_LEN_STR(rctl->gd),
 						jctl->jnl_fn_len, jctl->jnl_fn,
 						jctl->jfh->data_file_name_length, jctl->jfh->data_file_name);
 					return FALSE;

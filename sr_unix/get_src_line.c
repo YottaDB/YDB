@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -286,12 +286,12 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 	FILE			*fp;
 	gtm_rtn_src_chksum_ctx	checksum_ctx;
 	int			fclose_res, fdd, fsd, line_indx, *lt_ptr, rc, srcfilnamlen, srcrecs;
-	unsigned int		size;
+	unsigned int		size = 0;
 	mstr			*base, *current, src, *top;
 	off_t			srcsize;
 	routine_source		*src_tbl;
 	struct stat		srcfile_stat;
-	unsigned char		*srcptr, *srcptr_max, *srcstart, *eol_srcstart, *prev_srcptr;
+	unsigned char		*srcptr, *srcptr_max, *srcstart, *eol_srcstart, *prev_srcptr = NULL;
 	zro_ent			*srcdir;
 
 	srcstat = 0;
@@ -430,6 +430,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 			size = 0;
 		if (size)
 		{
+			assert(prev_srcptr);
 			assert((prev_srcptr + size) <= srcptr_max);
 			assert((0 <= size) && (MAXPOSINT4 >= size));
 			current->len = (mstr_len_t)size;

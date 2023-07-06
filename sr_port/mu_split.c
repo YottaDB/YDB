@@ -45,6 +45,7 @@ mu_split.c:
 #include "t_write_root.h"
 #include "t_create.h"
 #include "mupip_reorg.h"
+#include "mu_upgrade_bmm.h"
 
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	cw_set_element		cw_set[];
@@ -95,24 +96,25 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	boolean_t	create_root = FALSE, first_copy, insert_in_left, long_blk_id, new_rtblk_star_only, split_required;
 	cw_set_element	*cse;
 	enum cdb_sc	status;
-	int		available_bytes, blk_id_sz, blk_seg_cnt, blk_size, bstar_rec_sz, delta, level, max_fill, max_fill_sav,
-			new_ances_currkeycmpc, new_ances_currkeylen, new_ances_currkeysz, new_blk1_last_keysz, newblk2_first_keylen,
-			newblk2_first_keysz, new_ins_keycmpc, new_ins_keylen, new_ins_keysz, new_leftblk_top_off,
-			next_gv_currkeysz, old_ances_currkeycmpc, old_ances_currkeylen, old_blk1_last_rec_size, old_blk1_sz,
-			old_right_piece_len, rec_size, reserve_bytes, save_blk_piece_len, tkeycmpc, tkeylen, tmp_cmpc;
-	rec_hdr_ptr_t	new_rec_hdr1a, new_rec_hdr1b, new_rec_hdr2, root_hdr, star_rec_hdr, star_rec_hdr32, star_rec_hdr64;
-	sm_uc_ptr_t	ances_currkey, bn_ptr1, bn_ptr2, key_base, rec_base, rPtr1, rPtr2, new_blk1_top, newblk2_first_key,
-			new_blk2_frec_base, new_blk2_rem, new_blk2_top, new_ins_key, next_gv_currkey, old_blk_after_currec,
-			old_blk1_base, save_blk_piece;
+	int		blk_id_sz, blk_seg_cnt, blk_size, bstar_rec_sz, delta, level, max_fill, max_fill_sav,
+			new_ances_currkeycmpc = 0, new_ances_currkeylen = 0, new_ances_currkeysz, new_blk1_last_keysz,
+			newblk2_first_keylen, newblk2_first_keysz, new_ins_keycmpc, new_ins_keylen, new_ins_keysz,
+			new_leftblk_top_off, next_gv_currkeysz, old_ances_currkeycmpc, old_ances_currkeylen, old_blk1_last_rec_size,
+			old_blk1_sz, old_right_piece_len, rec_size, reserve_bytes, save_blk_piece_len, tkeycmpc, tkeylen, tmp_cmpc;
+	rec_hdr_ptr_t	new_rec_hdr1a, new_rec_hdr1b, new_rec_hdr2 = NULL, root_hdr, star_rec_hdr, star_rec_hdr32, star_rec_hdr64;
+	sm_uc_ptr_t	ances_currkey = NULL, bn_ptr1, bn_ptr2, key_base, rec_base, rPtr1, rPtr2, new_blk1_top = NULL,
+			newblk2_first_key, new_blk2_frec_base, new_blk2_rem, new_blk2_top, new_ins_key, next_gv_currkey,
+			old_blk_after_currec, old_blk1_base, save_blk_piece;
 	srch_blk_status	*old_blk1_hist_ptr;
 	unsigned char	curr_prev_key[MAX_KEY_SZ + 3], new_blk1_last_key[MAX_KEY_SZ + 3], *zeroes;
 	unsigned short	temp_ushort;
 
 	blk_hdr_ptr = (blk_hdr_ptr_t)(gv_target->hist.h[cur_level].buffaddr);
 	reserve_bytes = cs_data->reserved_bytes;			/* for now, simple if not upgrade/downgrade */
-	if (mu_upgrade_in_prog)	/* Future enhancement should make full use of i_max_fill and d_max_fill */
-	{
+	if (mu_upgrade_in_prog)
+	{	/* Future enhancement should make full use of i_max_fill and d_max_fill */
 		assert(i_max_fill == d_max_fill);
+<<<<<<< HEAD
 		reserve_bytes = cs_data->i_reserved_bytes + i_max_fill;
 		available_bytes = cs_data->blk_size - blk_hdr_ptr->bsiz;
 		if (available_bytes >= reserve_bytes)
@@ -123,6 +125,9 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			reserve_bytes = i_max_fill;
 		}
 		assert((cs_data->blk_size << 1) > available_bytes);	/* Half block size should always be enough */
+=======
+		reserve_bytes = 0;					/* REORG -UPGRADE is top down, so zero the reserve bytes */
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	}
 	blk_size = cs_data->blk_size;
 	CHECK_AND_RESET_UPDATE_ARRAY;					/* reset update_array_ptr to update_array */
@@ -130,8 +135,8 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	bstar_rec_sz = bstar_rec_size(long_blk_id);
 	blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 	zeroes = (long_blk_id ? (unsigned char*)(&zeroes_64) : (unsigned char*)(&zeroes_32));
-	if (mu_upgrade_in_prog)
-		upgrade_block_split_format = blk_hdr_ptr->bver;
+	upgrade_block_split_format = blk_hdr_ptr->bver;			/* Retain block format */
+	assert((FALSE == cs_data->fully_upgraded) || (upgrade_block_split_format == cs_data->desired_db_format));
 	BLK_ADDR(star_rec_hdr32, SIZEOF(rec_hdr), rec_hdr);		/* Space for 32bit block number star-key */
 	star_rec_hdr32->rsiz = bstar_rec_size(FALSE);
 	SET_CMPC(star_rec_hdr32, 0);
@@ -170,9 +175,17 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
 		CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 	}
-	if ((new_leftblk_top_off + bstar_rec_sz >= old_blk1_sz) && !mu_upgrade_in_prog)
+	if (new_leftblk_top_off + bstar_rec_sz >= old_blk1_sz)
 	{	/* Avoid split to create a small right sibling. Note this should not happen often when tolerance is high */
-		CLEAR_BLKFMT_AND_RETURN(cdb_sc_oprnotneeded);
+		if (!mu_upgrade_in_prog)
+			CLEAR_BLKFMT_AND_RETURN(cdb_sc_oprnotneeded);
+		else
+		{	/* MUPIP UPGRADE requires a split; Assume concurrency issue */
+			assert(t_tries < CDB_STAGNATE);
+			assert(MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog);
+			NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+			CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+		}
 	}
 	new_blk2_frec_base = old_blk1_base + new_leftblk_top_off;
 	BLK_ADDR(newblk2_first_key, MAX_KEY_SZ + 1, unsigned char);	/* Space for the first key */
@@ -187,6 +200,12 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	memcpy(newblk2_first_key, &new_blk1_last_key[0], tkeycmpc); /* copy the compressed key piece */
 	new_blk2_rem = new_blk2_frec_base + SIZEOF(rec_hdr) + newblk2_first_keylen;
 	newblk2_first_keysz = newblk2_first_keylen + tkeycmpc;
+	if (new_blk2_top < new_blk2_rem)
+	{	/* The remainder cannot be greater than the actual block end */
+		assert(t_tries < CDB_STAGNATE);
+		NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+		CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+	}
 	/* gv_currkey_next_reorg will be saved for next iteration in mu_reorg */
 	next_gv_currkey = newblk2_first_key;
 	next_gv_currkeysz = newblk2_first_keysz;
@@ -209,7 +228,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 	}
 	allocation_clue = ALLOCATION_CLUE(cs_data->trans_hist.total_blks);
-	right_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, 0, 0, level);
+	right_index = t_create(allocation_clue++, bs_ptr1, 0, 0, level);
 	(*blks_created)++;
 	/* Modify working block removing split piece */
 	BLK_INIT(bs_ptr2, bs_ptr1);
@@ -233,9 +252,12 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 	}
 	if (create_root)
-		left_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, 0, 0, level);
+		left_index = t_create(allocation_clue++, bs_ptr1, 0, 0, level);
 	else
-		t_write(old_blk1_hist_ptr, (unsigned char *)bs_ptr1, 0, 0, level, FALSE, TRUE, GDS_WRITE_KILLTN);
+	{
+		t_write(old_blk1_hist_ptr, bs_ptr1, 0, 0, level, FALSE, TRUE, GDS_WRITE_KILLTN);
+		left_index = -1;
+	}
 	/*
 	----------------------------------------------------------------------------
 	Modify ancestor block for the split in current level.
@@ -251,8 +273,6 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	memcpy(new_ins_key, &new_blk1_last_key[0], new_blk1_last_keysz);
 	new_ins_keysz = new_blk1_last_keysz;
 	assert(!mu_upgrade_in_prog || max_fill);
-	if (mu_upgrade_in_prog)
-		reserve_bytes = 0;				/* REORG -UPGRADE is top down, so zero the reserve bytes */
 	while (!create_root) 	/* ========== loop through ancestors as necessary ======= */
 	{
 		if (create_root = (level == gv_target->hist.depth)) /* WARNING: assigment */
@@ -268,8 +288,8 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 		zeroes = (long_blk_id ? (unsigned char*)(&zeroes_64) : (unsigned char*)(&zeroes_32));
 		star_rec_hdr = long_blk_id ? star_rec_hdr64 : star_rec_hdr32;
-		if (mu_upgrade_in_prog)
-			upgrade_block_split_format = blk_hdr_ptr->bver;
+		upgrade_block_split_format = blk_hdr_ptr->bver;	/* Retain block format */
+		assert((FALSE == cs_data->fully_upgraded) || (upgrade_block_split_format == cs_data->desired_db_format));
 		old_blk1_hist_ptr = &gv_target->hist.h[level];
 		old_blk1_base = (sm_uc_ptr_t)blk_hdr_ptr;
 		old_blk1_sz = blk_hdr_ptr->bsiz;
@@ -311,10 +331,14 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 			}
 			if (old_ances_currkeycmpc)
+			{
+				assert(ances_currkey);
 				memcpy(ances_currkey, &curr_prev_key[0], old_ances_currkeycmpc);
+			}
 		}
 		if (old_ances_currkeylen)
 		{
+			assert(ances_currkey);
 			memcpy(ances_currkey + old_ances_currkeycmpc, key_base, old_ances_currkeylen);
 			GET_CMPC(new_ances_currkeycmpc, new_ins_key, ances_currkey);
 			new_ances_currkeylen = new_ances_currkeysz - new_ances_currkeycmpc;
@@ -433,7 +457,10 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			}
 		}	/* end if split required */
 		else
+		{
 			split_required = FALSE;
+			new_rtblk_star_only = FALSE;
+		}
 		BLK_ADDR(new_rec_hdr1a, SIZEOF(rec_hdr), rec_hdr);
 		new_rec_hdr1a->rsiz = bstar_rec_sz + new_ins_keylen;
 		SET_CMPC(new_rec_hdr1a, new_ins_keycmpc);
@@ -459,7 +486,10 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			BLK_SEG(bs_ptr2, bn_ptr1, blk_id_sz);
 			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1b, SIZEOF(rec_hdr));
 			if (0 < new_ances_currkeylen)
+			{
+				assert(ances_currkey);
 				BLK_SEG(bs_ptr2, ances_currkey + new_ances_currkeycmpc, new_ances_currkeylen);
+			}
 			ins_off = blk_seg_cnt;
 			BLK_SEG(bs_ptr2, zeroes, blk_id_sz);
 			if (0 < (old_blk1_base + old_blk1_sz - old_blk_after_currec))
@@ -470,13 +500,14 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
 				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 			}
-			t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, ins_off, right_index,
+			t_write(&gv_target->hist.h[level], bs_ptr1, ins_off, right_index,
 				level, first_copy, FALSE, GDS_WRITE_KILLTN);
 			break;
 		}
 		/* if SPLIT REQUIRED */
 		if (insert_in_left) /* new_ins_key will go to left block */
 		{	/* LEFT BLOCK */
+			assert(new_blk1_top);
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			if (SIZEOF(blk_hdr) < old_blk1_hist_ptr->curr_rec.offset)
 			{
@@ -490,6 +521,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			BLK_SEG(bs_ptr2, bn_ptr1, blk_id_sz);
 			if (old_blk_after_currec < new_blk1_top) /* curr_rec is not the last record of new left block */
 			{
+				assert(ances_currkey);
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1b, SIZEOF(rec_hdr));
 				BLK_SEG(bs_ptr2, ances_currkey + new_ances_currkeycmpc, new_ances_currkeylen);
 				ins_off = blk_seg_cnt;
@@ -525,9 +557,9 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 			}
 			if (create_root)
-				left_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, ins_off, right_index, level);
+				left_index = t_create(allocation_clue++, bs_ptr1, ins_off, right_index, level);
 			else
-				t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, ins_off, right_index,
+				t_write(&gv_target->hist.h[level], bs_ptr1, ins_off, right_index,
 					level, first_copy, FALSE, GDS_WRITE_KILLTN);
 			/* RIGHT BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
@@ -539,6 +571,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				BLK_SEG(bs_ptr2, bn_ptr2, blk_id_sz);
 			} else
 			{
+				assert(new_rec_hdr2);
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr2, SIZEOF(rec_hdr));
 				BLK_SEG(bs_ptr2, newblk2_first_key, newblk2_first_keysz);
 				save_blk_piece_len = (int)(new_blk2_top - new_blk2_rem);
@@ -558,7 +591,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
 				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 			}
-			right_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, 0, 0, level);
+			right_index = t_create(allocation_clue++, bs_ptr1, 0, 0, level);
 			(*blks_created)++;
 		} else	/* end if insert_in_left */
 		{	/* new_ins_key to be inserted in right block */
@@ -585,14 +618,15 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 			}
 			if (create_root)
-				left_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, 0, 0, level);
+				left_index = t_create(allocation_clue++, bs_ptr1, 0, 0, level);
 			else
-				t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0,
+				t_write(&gv_target->hist.h[level], bs_ptr1, 0, 0,
 					level, TRUE, TRUE, GDS_WRITE_KILLTN);
 			/* RIGHT BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			if (new_leftblk_top_off < old_blk1_hist_ptr->curr_rec.offset)
 			{	/* anything before curr_rec */
+				assert(new_rec_hdr2);
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr2, SIZEOF(rec_hdr));
 				BLK_SEG(bs_ptr2, newblk2_first_key, newblk2_first_keysz);
 				save_blk_piece_len = (int)(old_blk1_hist_ptr->curr_rec.offset -
@@ -614,6 +648,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
 				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 			}
+			assert(ances_currkey || (0 == new_ances_currkeylen));
 			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1a, SIZEOF(rec_hdr));
 			BLK_SEG(bs_ptr2, new_ins_key + new_ins_keycmpc, new_ins_keylen);
 			BLK_SEG(bs_ptr2, bn_ptr1, blk_id_sz);
@@ -634,7 +669,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
 				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 			}
-			right_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, ins_off, right_index, level);
+			right_index = t_create(allocation_clue++, bs_ptr1, ins_off, right_index, level);
 			(*blks_created)++;
 		}	/* endif new_ins_key inserted in right block */
 		BLK_ADDR(new_ins_key, new_blk1_last_keysz, unsigned char);
@@ -662,7 +697,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
 			CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 		}
-		cse = t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, ins_off, left_index,
+		cse = t_write(&gv_target->hist.h[level], bs_ptr1, ins_off, left_index,
 			level + 1, TRUE, FALSE, GDS_WRITE_KILLTN);
 		t_write_root(ins_off2, right_index);	/* create a sibling cw-set-element to store ins_off2/right_index */
 		(*lvls_increased)++;

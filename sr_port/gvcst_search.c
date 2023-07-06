@@ -87,12 +87,12 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	unsigned short		n0, nKeyLen;
 	trans_num		tn;
 	cw_set_element		*cse;
-	off_chain		chain1, chain2;
+	block_ref		chain1, chain2;
 	srch_blk_status		*tp_srch_status, *srch_status, *leaf_blk_hist;
 	boolean_t		already_built, expand_prev_key, is_mm, skip_search_blk, long_blk_id;
 	ht_ent_int8		*tabent;
 	sm_uc_ptr_t		buffaddr;
-	trans_num		blkhdrtn, oldest_hist_tn;
+	trans_num		blkhdrtn, oldest_hist_tn = MAXUINT8;
 	int			hist_size;
 	unsigned short		bsiz;
 #	ifdef DEBUG
@@ -153,12 +153,12 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			{
 				leaf_blk_hist = &pHist->h[0];
 				assert(0 == leaf_blk_hist->level);
-				chain1 = *(off_chain *)&leaf_blk_hist->blk_num;
-				if (chain1.flag == 1)
+				chain1.id = leaf_blk_hist->blk_num;
+				if (chain1.chain.flag == 1)
 				{
 					assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
-					assert((int)chain1.cw_index < sgm_info_ptr->cw_set_depth);
-					tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain1.cw_index, &cse);
+					assert((int)chain1.chain.cw_index < sgm_info_ptr->cw_set_depth);
+					tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain1.chain.cw_index, &cse);
 				} else
 				{
 					tp_srch_status = leaf_blk_hist->first_tp_srch_status;
@@ -183,17 +183,17 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			leaf_blk_hist = &pTarg->hist.h[0];
 			assert(leaf_blk_hist->blk_target == pTarg);
 			assert(0 == leaf_blk_hist->level);
-			chain1 = *(off_chain *)&leaf_blk_hist->blk_num;
-			if (chain1.flag == 1)
+			chain1.id = leaf_blk_hist->blk_num;
+			if (1 == chain1.chain.flag)
 			{
 				assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
-				if ((int)chain1.cw_index >= sgm_info_ptr->cw_set_depth)
+				if ((int)chain1.chain.cw_index >= sgm_info_ptr->cw_set_depth)
 				{
 					assert(sgm_info_ptr->tp_csa == cs_addrs);
 					assert(FALSE == cs_addrs->now_crit);
 					return cdb_sc_blknumerr;
 				}
-				tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain1.cw_index, &cse);
+				tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain1.chain.cw_index, &cse);
 			} else
 			{
 				nBlkId = leaf_blk_hist->blk_num;
@@ -232,7 +232,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 						 * unconditionally here (besides it is only a few if checks done per block build
 						 * so it is considered okay performance-wise).
 						 */
-						if (!already_built && !chain1.flag)
+						if (!already_built && !chain1.chain.flag)
 						{	/* is_mm is calculated twice, but this is done so as to speed up the
 							 * most-frequent path, i.e. when there is a clue and either no cse or
 							 * cse->done is TRUE
@@ -328,6 +328,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 					if ((CDB_STAGNATE <= t_tries) || mu_reorg_process)
 					{
 						CWS_INSERT(cr->blk);
+						assert(MAXUINT8 != oldest_hist_tn);
 						if ((CDB_STAGNATE <= t_tries) && (srch_status->tn <= oldest_hist_tn))
 						{	/* The tn at which the history was last validated is before the earliest
 							 * transaction in the BT. The clue can no longer be relied upon.
@@ -347,6 +348,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			 * The case (0 == n1) is not expected a lot (relatively) since the application may be able to optimize
 			 *	a number of reads of the same key into one read by using a local-variable to store the value.
 			 */
+<<<<<<< HEAD
 			/* Need to compare clue against incoming key. We already have the key length ("nKeyLen").
 			 * But need the length of "pTarg->clue", "pTarg->first_rec" and "pTarg->last_rec" keys.
 			 * While the first can be obtained from "pTarg->clue.end", the other two cannot be obtained in PRO
@@ -362,6 +364,9 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			keyCmpLen = pTarg->clue.top;
 			keyCmpLen = MIN(nKeyLen, keyCmpLen);
 			if (0 < (n1 = memcmp(pKey->base, ((gv_key *)&(pTarg->clue))->base, keyCmpLen)))
+=======
+			if (0 < (n1 = memcmp(pKey->base, ((gv_key_buf *)&pTarg->clue)->split.base, nKeyLen)))
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			{
 				if (memcmp(pKey->base, pTarg->last_rec->base, keyCmpLen) <= 0)
 				{
@@ -529,13 +534,16 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 		READ_BLK_ID(long_blk_id, &nBlkId, pRec + n0 - SIZEOF_BLK_ID(long_blk_id));
 		if (is_mm)
 		{
-			PUT_BLK_ID(&chain2, nBlkId);
-			if ((0 == chain2.flag) && (nBlkId > cs_addrs->total_blks))
+			PUT_BLK_ID(&chain2.id, nBlkId);
+			if ((0 == chain2.chain.flag) && (nBlkId > cs_addrs->total_blks))
 			{	/* private copy should be taken care of by .flag */
 				if (cs_addrs->total_blks < cs_addrs->ti->total_blks)
 					return cdb_sc_helpedout;
 				else
+				{
+					assert(CDB_STAGNATE > t_tries);
 					return cdb_sc_blknumerr;
+				}
 			}
 		}
 		if (bstar_rec_size(long_blk_id) != n0)

@@ -102,7 +102,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	blk_segment		*bs1, *bs_ptr;
 	block_id		child1, child2, dest_blk_id, work_blk_id;
 	boolean_t		blk_was_free, deleted, gbl_target_was_set, temp_long_blk_id;
-	boolean_t		dest_long_blk_id, dest_long_parent_id, work_long_blk_id, work_long_parent_id;
+	boolean_t		dest_long_blk_id = FALSE, dest_long_parent_id, work_long_blk_id, work_long_parent_id;
 	cache_rec_ptr_t		dest_child_cr;
 	cw_set_element		*tmpcse;
 	enum cdb_sc		status;
@@ -110,14 +110,14 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	gv_namehead		*save_targ;
 	int			blk_seg_cnt, blk_size, first_offset, key_len, key_len_dir, nslevel, piece_len1, piece_len2,
 				rec_size1, rec_size2, second_offset, wlevel;
-	int			dest_blk_id_sz, dest_blk_level, dest_blk_size, dest_child_cycle;
-	int			dest_parent_id_sz, dest_parent_size;
+	int			dest_blk_id_sz = 0, dest_blk_level = -1, dest_blk_size, dest_child_cycle;
+	int			dest_parent_id_sz, dest_parent_size = 0;
 	int			work_blk_id_sz, work_blk_size;
 	int			work_parent_id_sz, work_parent_size;
 	jnl_buffer_ptr_t	jbbp;					/* jbbp is non-NULL only if before-image journaling */
 	sgmnt_addrs		*csa;
-	sm_uc_ptr_t		bmp_buff, bn_ptr, dest_blk_ptr, dest_parent_ptr, key_base, rec_base, saved_blk, tblk_ptr,
-				work_blk_ptr, work_parent_ptr;
+	sm_uc_ptr_t		bmp_buff, bn_ptr, dest_blk_ptr = NULL, dest_parent_ptr = NULL, key_base, rec_base, saved_blk,
+				tblk_ptr, work_blk_ptr, work_parent_ptr;
 	srch_blk_status		bmlhist, destblkhist, *hist_ptr, *work_blk_stat;
 	srch_hist		*dest_hist_ptr, *dir_hist_ptr;
 	trans_num		ctn;
@@ -155,7 +155,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	cws_reorg_remove_index = 0;
 	csa = cs_addrs;
 	/*===== Infinite loop to find the destination block =====*/
-	for ( ; ; )
+	do
 	{
 		blk_was_free = FALSE;
 		INCR_BLK_NUM(dest_blk_id);
@@ -240,18 +240,22 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if (BLK_BUSY != x_blk_lmap)
 		{	/* x_blk_map is either BLK_FREE or BLK_RECYCLED both of which mean the block is not used in the bitmap */
 			blk_was_free = TRUE;
+			dest_parent_id_sz = 0;
+			dest_long_parent_id = FALSE;
 			break;
 		} else
 			assert(0 == upg_mv_block);
 		/* dest_blk_id might contain a *-record only.
 		 * So follow the pointer to go to the data/index block, which has a non-* key to search.
 		 */
+		assert(0 <= dest_blk_level);
 		nslevel = dest_blk_level;
 		if (MAX_BT_DEPTH <= nslevel)
 		{
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_maxlvl;
 		}
+		assert(dest_blk_ptr);
 		rec_base = dest_blk_ptr + SIZEOF(blk_hdr);
 		GET_RSIZ(rec_size1, rec_base);
 		tblk_ptr = dest_blk_ptr;
@@ -381,20 +385,26 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		dest_blk_ptr = dest_hist_ptr->h[dest_blk_level].buffaddr;
 		dest_blk_size = ((blk_hdr_ptr_t)dest_blk_ptr)->bsiz;
 		dest_blk_ver = ((blk_hdr_ptr_t)dest_blk_ptr)->bver;
-		dest_parent_ptr = dest_hist_ptr->h[dest_blk_level+1].buffaddr;
-		dest_parent_size = ((blk_hdr_ptr_t)dest_parent_ptr)->bsiz;
 		dest_long_blk_id = IS_64_BLK_ID(dest_blk_ptr);
 		dest_blk_id_sz = SIZEOF_BLK_ID(dest_long_blk_id);
+		dest_parent_ptr = dest_hist_ptr->h[dest_blk_level+1].buffaddr;
+		dest_parent_size = ((blk_hdr_ptr_t)dest_parent_ptr)->bsiz;
 		dest_long_parent_id = IS_64_BLK_ID(dest_parent_ptr);
 		dest_parent_id_sz = SIZEOF_BLK_ID(dest_long_parent_id);
+		if (0 >= dest_parent_size)
+		{
+			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
+			return cdb_sc_blkmod;
+		}
 		break;
-	}
+	} while(TRUE);
 	/*===== End of indefinite loop to find the destination block =====*/
 	/*-----------------------------------------------------
 	   Now modify blocks for swapping. Maximum of 4 blocks.
 	   -----------------------------------------------------*/
 	if (!blk_was_free)
 	{	/* 1: dest_blk_id into work_blk_id */
+		assert(dest_blk_ptr);
 		assert(0 == upg_mv_block);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, dest_blk_ptr + SIZEOF(blk_hdr), dest_blk_size - SIZEOF(blk_hdr));
@@ -406,9 +416,9 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		}
 		assert(gv_target->hist.h[level].blk_num == work_blk_id);
 		assert(gv_target->hist.h[level].buffaddr == work_blk_ptr);
-		tmpcse = t_write(&gv_target->hist.h[level], (unsigned char *)bs1, 0, 0,
+		tmpcse = t_write(&gv_target->hist.h[level], bs1, 0, 0,
 					dest_blk_level, TRUE, TRUE, GDS_WRITE_KILLTN);
-		assert(!cs_data->fully_upgraded || (tmpcse->ondsk_blkver == dest_blk_ver));
+		assert(!cs_data->fully_upgraded || (tmpcse->ondsk_blkver == dest_blk_ver) || (0 == level));
 		tmpcse->ondsk_blkver = dest_blk_ver;
 	}
 	/* 2: work_blk_id into dest_blk_id */
@@ -418,12 +428,14 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		 * Working block cannot goto its parent because of traversal
 		 */
 		assert((0 == upg_mv_block));
-		if (dest_blk_level + 1 != level || dest_parent_size != work_blk_size)
+		if ((dest_blk_level + 1 != level) || (dest_parent_size != work_blk_size))
 		{
 			assert(t_tries < CDB_STAGNATE);
 			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
+		assert(dest_parent_size);
+		assert(dest_parent_ptr);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_ADDR(saved_blk, dest_parent_size, unsigned char);
 		memcpy(saved_blk, dest_parent_ptr, dest_parent_size);
@@ -450,9 +462,9 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		}
 		assert(dest_blk_id == dest_hist_ptr->h[dest_blk_level].blk_num);
 		assert(dest_blk_ptr == dest_hist_ptr->h[dest_blk_level].buffaddr);
-		tmpcse = t_write(&dest_hist_ptr->h[dest_blk_level], (unsigned char *)bs1, 0, 0,
+		tmpcse = t_write(&dest_hist_ptr->h[dest_blk_level], bs1, 0, 0,
 				level, TRUE, TRUE, GDS_WRITE_KILLTN);
-		assert(!cs_data->fully_upgraded || (tmpcse->ondsk_blkver == work_blk_ver));
+		assert(!cs_data->fully_upgraded || (tmpcse->ondsk_blkver == work_blk_ver) || (0 == level));
 		tmpcse->ondsk_blkver = work_blk_ver;
 	} else /* free block or, when working block does not move vertically (swap with parent/child) */
 	{
@@ -469,7 +481,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if (blk_was_free)
 		{
 			tmpcse = &cw_set[cw_set_depth];
-			t_create(dest_blk_id, (unsigned char *)bs1, 0, 0, level);
+			t_create(dest_blk_id, bs1, 0, 0, level);
 			/* Although we invoked t_create, we do not want t_end to allocate the block (i.e. change mode
 			 * from gds_t_create to gds_t_acquired). Instead we do that and a little more (that t_end does) all here.
 			 */
@@ -517,10 +529,10 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			hist_ptr = &dest_hist_ptr->h[dest_blk_level];
 			assert(dest_blk_id == hist_ptr->blk_num);
 			assert(dest_blk_ptr == hist_ptr->buffaddr);
-			tmpcse = t_write(hist_ptr, (unsigned char *)bs1, 0, 0, level, TRUE, TRUE, GDS_WRITE_KILLTN);
+			tmpcse = t_write(hist_ptr, bs1, 0, 0, level, TRUE, TRUE, GDS_WRITE_KILLTN);
 		}
+		assert(!cs_data->fully_upgraded || (tmpcse->ondsk_blkver == work_blk_ver) || (0 == level));
 		tmpcse->ondsk_blkver = work_blk_ver;
-		assert(cs_data->fully_upgraded || (0 == level) || (GDSV6p <= work_blk_ver));
 	}
 	if (!blk_was_free)
 	{	/* 3: Parent of destination block (may be parent of working block too) */
@@ -545,6 +557,8 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 				first_offset = dest_hist_ptr->h[level+1].curr_rec.offset;
 				second_offset = gv_target->hist.h[level+1].curr_rec.offset;
 			}
+			assert(dest_parent_size);
+			assert(dest_parent_ptr);
 			GET_RSIZ(rec_size1, dest_parent_ptr + first_offset);
 			GET_RSIZ(rec_size2, dest_parent_ptr + second_offset);
 			if ((dest_parent_size < first_offset + rec_size1) ||
@@ -579,12 +593,14 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			}
 			assert(level == dest_blk_level);
 			assert(dest_parent_ptr == dest_hist_ptr->h[level+1].buffaddr);
-			t_write(&dest_hist_ptr->h[level+1], (unsigned char *)bs1, 0, 0, level+1, FALSE, TRUE, GDS_WRITE_KILLTN);
+			t_write(&dest_hist_ptr->h[level+1], bs1, 0, 0, level+1, FALSE, TRUE, GDS_WRITE_KILLTN);
 		} else if (work_blk_id != dest_hist_ptr->h[dest_blk_level+1].blk_num)
 		{	/* Destination block moved into the position of working block.
 			 * So destination block's parent's pointer should be changed to work_blk_id
 			 */
 			BLK_INIT(bs_ptr, bs1);
+			assert(dest_parent_size);
+			assert(dest_parent_ptr);
 			GET_RSIZ(rec_size1, dest_parent_ptr + dest_hist_ptr->h[dest_blk_level+1].curr_rec.offset);
 			if ((dest_parent_size < (rec_size1 + dest_hist_ptr->h[dest_blk_level+1].curr_rec.offset)) ||
 				(bstar_rec_size(dest_long_parent_id) > rec_size1))
@@ -607,7 +623,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 				return cdb_sc_blkmod;
 			}
 			assert(dest_parent_ptr == dest_hist_ptr->h[dest_blk_level+1].buffaddr);
-			t_write(&dest_hist_ptr->h[dest_blk_level+1], (unsigned char *)bs1, 0, 0, dest_blk_level+1,
+			t_write(&dest_hist_ptr->h[dest_blk_level+1], bs1, 0, 0, dest_blk_level+1,
 				FALSE, TRUE, GDS_WRITE_KILLTN);
 		}
 	}
@@ -637,7 +653,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			return cdb_sc_blkmod;
 		}
 		assert(gv_target->hist.h[level+1].buffaddr == work_parent_ptr);
-		t_write(&gv_target->hist.h[level+1], (unsigned char *)bs1, 0, 0, level+1, FALSE, TRUE, GDS_WRITE_KILLTN);
+		t_write(&gv_target->hist.h[level+1], bs1, 0, 0, level+1, FALSE, TRUE, GDS_WRITE_KILLTN);
 	}
 	/* else already taken care of, when dest_blk_id moved */
 	if (blk_was_free)
@@ -659,7 +675,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		 */
 		save_cw_set_depth = cw_set_depth;
 		assert(!cw_map_depth);
-		t_write_map(&bmlhist, (uchar_ptr_t)update_array_ptr, ctn, 1);	/* will increment cw_set_depth */
+		t_write_map(&bmlhist, (block_id *)update_array_ptr, ctn, 1);	/* will increment cw_set_depth */
 		cw_map_depth = cw_set_depth;		/* set cw_map_depth to the latest cw_set_depth */
 		cw_set_depth = save_cw_set_depth;	/* restore cw_set_depth */
 		/* t_write_map simulation end */

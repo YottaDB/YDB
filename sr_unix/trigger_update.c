@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2010-2021 Fidelity National Information	*
+=======
+ * Copyright (c) 2010-2023 Fidelity National Information	*
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -1191,7 +1195,7 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	mname_entry		gvname;
 	int4			max_len;
 	boolean_t 		multi_line, multi_line_xecute;
-	int4			rec_len;
+	int4			rec_len = -1;
 	int4			rec_num;
 	boolean_t		status;
 	char			tfile_rec_val[MAX_BUFF_SIZE];
@@ -1208,7 +1212,7 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	char			tmp_str[MAX_HASH_LEN + 1];
 	unsigned char		*dispbuff;
 	mval			multi_jrec, *trigjrec;
-	char			*trigjrecptr;
+	char			*trigjrecptr = NULL;
 	int			trigjreclen;
 	io_pair			io_save_device;
 	int4			max_xecute_size;
@@ -1643,6 +1647,9 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 		memcpy(disp_trigvn, trigvn, trigvn_len);
 		disp_trigvn_len = trigvn_len;
 		disp_trigvn[disp_trigvn_len] = '\0';	/* null terminate just in case */
+		reg_index = -1;
+		min_reg_index = -1;
+		max_reg_index = -1;
 	}
 	jnl_format_done = FALSE;
 	new_name_check_done = FALSE;
@@ -1672,6 +1679,9 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 		/* else if (STATS_ERROR_TRIGFILE == overall_trig_status)   : it is already what it should be */
 		if (NULL == gvspan)
 			break;
+		assert(-1 != reg_index);
+		assert(-1 != max_reg_index);
+		assert(-1 != min_reg_index);
 		if (reg_index >= max_reg_index)
 			break;
 		do

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  * 								*
  * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidaries.	*
@@ -135,8 +135,15 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 				utf8_len_strict((unsigned char *)src->str.addr, src->str.len);	/* to report BADCHAR error */
 			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ICUERROR,
+<<<<<<< HEAD
 						1, status); /* ICU said bad, we say good or don't recognize error */
 		} else
+=======
+				1, status); /* ICU said bad, we say good or don't recognize error*/
+			dstbase = NULL;
+		}
+		else
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		{	/* BADCHAR should not be possible after the above validations */
 			status = U_ZERO_ERROR;
 			dst_ustr_ptr = dst_ustr;

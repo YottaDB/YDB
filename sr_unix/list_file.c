@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -73,7 +73,8 @@ static readonly struct
 
 void open_list_file(void)
 {
-	char		charspace, cp, fname[MAX_FN_LEN + 1], list_name[MAX_MIDENT_LEN + STR_LIT_LEN(LISTEXT)], *p;
+	char		charspace, fname[MAX_FN_LEN + 1], list_name[MAX_MIDENT_LEN + STR_LIT_LEN(LISTEXT)], *p;
+	unsigned char	cp;
 	mstr		fstr;
 	mval		file, parms;
 	parse_blk	pblk;

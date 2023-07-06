@@ -440,7 +440,11 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 	int			status;
 	boolean_t		raw;
 	boolean_t		open_read_only;
+<<<<<<< HEAD
 	int			stat_res, rc, len;
+=======
+	int			stat_res, rc, save_errno = 0;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	sgmnt_addrs		*csa;
 	sgmnt_data		tsdbuff;
 	sgmnt_data_ptr_t        tsd;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2022 Fidelity National Information	*
+ * Copyright (c) 2008-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -160,7 +160,7 @@ TAB_GVSTATS_REC(n_writer_helper_epoch, "WHE",  "# of waits for jnl write lock or
  *
  * These are brief descriptions of why crit is grabbed for a particular WS
  * In general, this command should suss the WS instances out of the code:
- *	egrep 'WS_[0-9]+\)|WS_[0-9]+,' $work_dir/gtm/{sr_port,sr_unix}/ * | grep -v proc_wait_stat.h
+ *	grep -E 'WS_[0-9]+\)|WS_[0-9]+,' $work_dir/gtm/{sr_port,sr_unix}/ * | grep -v proc_wait_stat.h
  *                                                                     ^(note no space before star when typed)
  *
  * Begin Non-Exposed Wait State Definitions (please do not delete this)

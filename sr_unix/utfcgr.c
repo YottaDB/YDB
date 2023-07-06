@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2018 Fidelity National Information	*
+ * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -165,8 +165,13 @@ boolean_t utfcgr_scanforcharN(int char_num, utfscan_parseblk *utf_parse_blk)
 {
 	int		char_idx, tcharcnt, tbyteidx, gcharcnt, gbytecnt, bytecnt, skip, bidx;
 	int		lchar_byteidx, lchar_charcnt;
+<<<<<<< HEAD
 	unsigned int	utfcgrepcnt, utfcgridx, chartype, lchar_typflags;
 	boolean_t	noslots, cachemod, scaneol;
+=======
+	unsigned int	utfcgrepcnt, utfcgridx, chartype = UTFCGR_NONE, lchar_typflags;
+	boolean_t	noslots, lastcharbad, cachemod, scaneol;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	unsigned char	*scantop, *scanptr;
 	mval		*mv;
 	utfcgr		*utfcgrp;
@@ -506,6 +511,7 @@ boolean_t utfcgr_scanforcharN(int char_num, utfscan_parseblk *utf_parse_blk)
 									 * and put it in cache.
 									 */
 				lchar_charcnt = tcharcnt + gcharcnt;
+				assert(UTFCGR_NONE != chartype);
 				DEBUG_ONLY(lchar_typflags = chartype);
 				DBGUTFC((stderr, "  utfcgr_scanforcharN: End-scan (!noslots) scan vars - lchar_byteidx: %d  "
 					 "  lchar_charcnt: %d  lchar_typflags: %d\n", lchar_byteidx, lchar_charcnt,

@@ -60,7 +60,7 @@ void	t_busy2free(srch_blk_status *blkhist)
 		bsiz = MIN(old_block->bsiz, csa->hdr->blk_size);
 		cse->blk_checksum = jnl_get_checksum(old_block, csa, bsiz);
 	}
-	cse->upd_addr = NULL;
+	cse->upd_addr.ptr = NULL;
 	cse->jnl_freeaddr = 0;		/* reset jnl_freeaddr that previous transaction might have filled in */
 	cse->done = FALSE;
 	cse->ondsk_blkver = old_block->bver;

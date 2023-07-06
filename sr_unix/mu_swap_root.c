@@ -33,28 +33,30 @@
 #include "muextr.h"
 #include "mu_reorg.h"
 /* Include prototypes */
-#include "t_end.h"
-#include "t_retry.h"
-#include "mupip_reorg.h"
-#include "util.h"
-#include "t_begin.h"
-#include "op.h"
+#include "add_inter.h"
+#include "change_reg.h"
+#include "gdsbml.h"
 #include "gvcst_protos.h"	/* for gvcst_rtsib,gvcst_search prototype */
 #include "gvcst_bmp_mark_free.h"
 #include "gvcst_kill_sort.h"
 #include "gtmmsg.h"
-#include "add_inter.h"
-#include "t_abort.h"
-#include "sleep_cnt.h"
-#include "wcs_sleep.h"
-#include "memcoherency.h"
-#include "gdsbml.h"
+#include "is_proc_alive.h"
 #include "jnl_get_checksum.h"
-#include "t_qread.h"
+#include "op.h"
+#include "memcoherency.h"
+#include "mupip_exit.h"
+#include "mupip_reorg.h"
+#include "sleep_cnt.h"
+#include "t_abort.h"
+#include "t_begin.h"
 #include "t_create.h"
+#include "t_end.h"
+#include "t_qread.h"
+#include "t_retry.h"
 #include "t_write_map.h"
 #include "t_write.h"
-#include "change_reg.h"
+#include "util.h"
+#include "wcs_sleep.h"
 
 GBLREF	boolean_t		mu_reorg_process;
 GBLREF	boolean_t		need_kip_incr;
@@ -78,9 +80,19 @@ GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	unsigned int		t_tries;
 
+<<<<<<< HEAD
 #ifdef DEBUG
 GBLREF	block_id		ydb_skip_bml_num;
 #endif
+=======
+error_def(ERR_DBRDONLY);
+error_def(ERR_GBLNOEXIST);
+error_def(ERR_MAXBTLEVEL);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_MUREORGFAIL);
+error_def(ERR_MUTRUNCNOTBG);
+error_def(ERR_REORGUPCNFLCT);
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
 #define RETRY_SWAP		(0)
 #define ABORT_SWAP		(-1)
@@ -121,6 +133,18 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 	csd = cs_data;	/* keep csd up to date; with MM, cs_data can change, and, dereferencing an older copy, cause SIG-11 */
 	if (gv_cur_region->read_only)
 		return;					/* Cannot proceed for read-only data files */
+	if ((0 == upg_mv_block) && (0 != cs_addrs->nl->reorg_upgrade_pid) && (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0)))
+	{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE and is higher priority. Stop */
+		send_msg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
+				LEN_AND_LIT("REORG -TRUNCATE"),
+				LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
+				cs_addrs->nl->reorg_upgrade_pid);
+		gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
+				LEN_AND_LIT("REORG -TRUNCATE"),
+				LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
+				cs_addrs->nl->reorg_upgrade_pid);
+		mupip_exit(ERR_MUNOFINISH);
+	}
 	killed_global = FALSE;
 	while (0 == gv_target->root)
 	{	/* Global does not "exist" */
@@ -419,8 +443,9 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	tmpcse = &cw_set[cw_set_depth];
 	(free_blk_recycled) ? BIT_SET_RECYCLED_AND_CLEAR_FREE(tmpcse->blk_prior_state)
 			    : BIT_CLEAR_RECYCLED_AND_SET_FREE(tmpcse->blk_prior_state);
-	t_create(free_blk_id, (unsigned char *)bs1, 0, 0, child_blk_lvl);
+	t_create(free_blk_id, bs1, 0, 0, child_blk_lvl);
 	tmpcse->mode = gds_t_acquired;
+	tmpcse->ondsk_blkver = ((blk_hdr_ptr_t)child_blk_ptr)->bver; /* Retain block version */
 	if (!free_blk_recycled)
 		tmpcse->old_block = NULL;
 	else
@@ -475,8 +500,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 			t_retry(cdb_sc_blkmod);
 			return RETRY_SWAP;
 		}
-		t_write(&dir_hist_ptr->h[parent_blk_lvl], (unsigned char *)bs1, 0, 0, parent_blk_lvl, FALSE, TRUE,
-			GDS_WRITE_KILLTN);
+		t_write(&dir_hist_ptr->h[parent_blk_lvl], bs1, 0, 0, parent_blk_lvl, FALSE, TRUE, GDS_WRITE_KILLTN);
 		/* To indicate later snapshot file writing process during fast_integ must write the block to snapshot file */
 		BIT_SET_DIR_TREE(cw_set[cw_set_depth - 1].blk_prior_state);
 	}
@@ -484,7 +508,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	PUT_BLK_ID(update_array_ptr, free_bit);
 	save_cw_set_depth = cw_set_depth; /* Bit maps go on end of cw_set (more fake acquired) */
 	assert(!cw_map_depth);
-	t_write_map(&bmlhist, (uchar_ptr_t)update_array_ptr, curr_tn, 1);
+	t_write_map(&bmlhist, (block_id *)update_array_ptr, curr_tn, 1);
 	cw_map_depth = cw_set_depth;
 	cw_set_depth = save_cw_set_depth;
 	update_array_ptr += SIZEOF(block_id);

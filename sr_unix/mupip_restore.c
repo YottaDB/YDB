@@ -155,7 +155,7 @@ void mupip_restore(void)
 	int			in_len;
 	boolean_t		same_encr_settings;
 	boolean_t		check_mdb_ver, bad_mdb_ver;
-	boolean_t		in_is_encrypted, in_to_be_encrypted;
+	boolean_t		in_is_encrypted = FALSE, in_to_be_encrypted = FALSE;
 	boolean_t		old_is_encrypted, old_to_be_encrypted;
 	boolean_t		in_use_new_key;
 	enc_handles		in_encr_handles, old_encr_handles;
@@ -404,7 +404,10 @@ void mupip_restore(void)
 			old_is_encrypted = IS_ENCRYPTED(old_data.is_encrypted);
 			old_to_be_encrypted = USES_NEW_KEY(&old_data);
 		} else
+		{
 			same_encr_settings = TRUE;
+			old_is_encrypted = old_to_be_encrypted = FALSE;
+		}
 		if (curr_tn != inhead.start_tn)
 		{
 			util_out_print("Transaction in input file !AD does not align with database TN.!/DB: !16@XQ!_"

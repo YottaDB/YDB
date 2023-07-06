@@ -179,7 +179,7 @@ void mupip_integ(void)
 	char			ss_filename[YDB_PATH_MAX];
 	unsigned short		ss_file_len = YDB_PATH_MAX;
 	unix_db_info		*udi;
-	gd_region		*baseDBreg, *reg;
+	gd_region		*baseDBreg, *reg = NULL;
 	sgmnt_addrs		*baseDBcsa;
 	node_local_ptr_t	baseDBnl;
 	sgmnt_addrs		*tcsa;
@@ -395,6 +395,7 @@ void mupip_integ(void)
 		sndata->sn_type = SN_NOT;
 		if (region)
 		{
+			assert(reg);
 			if (stats_specified)
 			{	/* -STATS has been specified. So only work on the stats region, not the base region.
 				 * "mu_getlst" would have added only the base region in the list. Replace that with
@@ -522,6 +523,7 @@ void mupip_integ(void)
 			{
 				if (region_was_frozen)
 				{
+					assert(reg);
 					region_freeze(reg, FALSE, FALSE, FALSE, FALSE, FALSE);
 					if (!reg->read_only)
 					{
@@ -708,10 +710,7 @@ void mupip_integ(void)
 				if (gv_cur_region->read_only || mu_int_errknt)
 					mu_int_errknt++;
 				else if (!ointeg_this_reg)
-				{
-					csd->blks_to_upgrd = mu_int_blks_to_upgrd;
 					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBBTUFIXED);
-				}
 			}
 			if (((0 != mu_int_data.kill_in_prog) || (0 != mu_int_data.abandoned_kills)) && (!mu_map_errs) && !region
 				&& !gv_cur_region->read_only)

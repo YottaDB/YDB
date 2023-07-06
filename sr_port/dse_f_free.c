@@ -66,14 +66,14 @@ void dse_f_free(void)
 		util_len = SIZEOF("Error: bit map in block ") - 1;
 		util_len += i2hexl_nofill(blk, (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 		memcpy(&util_buff[util_len], " incorrectly marked free in master map.",
-		       SIZEOF(" incorrectly marked free in master map.")) - 1;
+		       SIZEOF(" incorrectly marked free in master map."));
 		util_len += 39;
 	} else
 	{
 		memcpy(util_buff, "!/Next free block is ", SIZEOF("!/Next free block is "));
 		util_len = SIZEOF("!/Next free block is ") - 1;
 		util_len += i2hexl_nofill(blk, (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
-		memcpy(&util_buff[util_len], ".!/", SIZEOF(".!/")) - 1;
+		memcpy(&util_buff[util_len], ".!/", SIZEOF(".!/"));
 		util_len += SIZEOF(".!/");
 	}
 	util_buff[util_len] = 0;

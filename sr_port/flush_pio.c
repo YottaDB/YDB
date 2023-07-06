@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -103,7 +103,7 @@ void write_text_newline_and_flush_pio(mstr *text)
 					msg_start = text->addr;
 					msg_length = text->len;
 					/* Find all newlines and form feeds and convert them into appropriate GT.M I/O functions. */
-					for (i = 0; i < msg_length; i++)
+					for (i = 0, c = 0; i < msg_length; i++)
 					{
 						c = *(msg_start + i);
 						if ('\n' == c)

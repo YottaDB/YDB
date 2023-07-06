@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020-2021 Fidelity National Information	*
+ * Copyright (c) 2020-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@ MBSTART {											\
 	(PFMS)->reg_frozen_counter++;								\
 	if ((PFMS)->reg_frozen_counter >= (PFMS)->ntasks)					\
 	{	/* Signal all other processes to stop waiting when this is the last process */	\
-		pthread_cond_broadcast(&(PFMS)->reg_frozen_cond);				\
+		PTHREAD_COND_BROADCAST(&(PFMS)->reg_frozen_cond, rval);				\
 	}											\
 	else if (WAIT_PROC)									\
 	{	/* Wait other processes before releasing crit */				\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2020 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
@@ -145,6 +145,7 @@ int4 mu_size_scan(glist *gl_ptr, int4 level)
 	t_begin(ERR_MUSIZEFAIL, 0);
 	for(;;)
 	{	/* retry loop */
+		nLevl = -1;
 		status = read_block(gv_target->root, &pBlkBase, &nLevl, ANY_ROOT_LEVL);
 		if (cdb_sc_normal != status)
 		{
@@ -180,6 +181,7 @@ int4 mu_size_scan(glist *gl_ptr, int4 level)
 	{	/* retry loop. note that multiple successful read transactions can occur within a single iteration */
 		nBlkId = gv_target->root;
 		nLevl = ANY_ROOT_LEVL;
+		pBlkBase = NULL;
 		status = read_block(nBlkId, &pBlkBase, &nLevl, ANY_ROOT_LEVL);
 		if (cdb_sc_normal == status)
 		{
@@ -305,6 +307,7 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 				if (skiprecs && (curroff < saveoff[lvl]))
 					continue;	/* skip these guys, we've already counted over there */
 			}
+			child_pBlkBase = NULL;
 			status = read_block(nBlkId, &child_pBlkBase, &child_nLevl, lvl - 1);
 			RETURN_IF_ABNORMAL_STATUS(status);
 			last_rec = ((pRec + nRecLen) == pTop);

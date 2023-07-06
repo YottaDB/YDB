@@ -1,4 +1,5 @@
 /****************************************************************
+<<<<<<< HEAD
  *								*
  * Copyright 2011, 2014 Fidelity Information Services, Inc	*
  *								*
@@ -10,26 +11,42 @@
  *	under a license.  If you do not know the terms of	*
  *	the license, please stop and do not read further.	*
  *								*
+=======
+ *                                                              *
+ * Copyright (c) 2011-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *                                                              *
+ *      This source code contains the intellectual property     *
+ *      of its copyright holder(s), and is made available       *
+ *      under a license.  If you do not know the terms of       *
+ *      the license, please stop and do not read further.       *
+ *                                                              *
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
  ****************************************************************/
 
 /*-----------------------------------------------------------------------------
  * MurmurHash3 was written by Austin Appleby, and is placed in the public
  * domain. The author hereby disclaims copyright to this source code.
  *
+<<<<<<< HEAD
  * Note - The x86 and x64 versions do _not_ produce the same results, as the
  * algorithms are optimized for their respective platforms. You can still
  * compile and run any of them on any platform, but your performance with the
  * non-native version will be less than optimal.
  *
  * This version converted to C for use in GT.M/YottaDB by FIS/YottaDB.
+=======
+ * This version converted to C for use in GT.M by FIS.
+ * The original implementation has been superseded by an incremental,
+ * endian stable one, with only a few core pieces remaining.
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
  *-----------------------------------------------------------------------------*/
 
 #include "mdef.h"
-
 #include "gtm_string.h"
-
 #include "mmrhash.h"
 
+<<<<<<< HEAD
 /*
  * Since this code is largely third-party, its form is somewhat different than
  * other code in YottaDB/GT.M. This is intentional, at least for the initial version,
@@ -42,13 +59,19 @@
  * are retained for completeness and possible future use.
  *
  */
+=======
+#define C1 BIG_CONSTANT(0x87c37b91114253d5)
+#define C2 BIG_CONSTANT(0x4cf5ad432745937f)
+#define M1 0x52dce729
+#define M2 0x38495ab5
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
-#if 0
-#define	FORCE_INLINE __attribute__((always_inline))
-#else
-#define	FORCE_INLINE
-#endif
+#define LSHIFT_BYTES_SAFE(LHS, RHS)	((LHS) << ((RHS) * 8))
+#define RSHIFT_BYTES_SAFE(LHS, RHS)	((LHS) >> ((RHS) * 8))
+#define LSHIFT_BYTES(LHS, RHS)		((RHS < SIZEOF(LHS)) ? LSHIFT_BYTES_SAFE(LHS, RHS) : 0)
+#define RSHIFT_BYTES(LHS, RHS)		((RHS < SIZEOF(LHS)) ? RSHIFT_BYTES_SAFE(LHS, RHS) : 0)
 
+<<<<<<< HEAD
 
 static uint4 fmix ( uint4 h );
 
@@ -62,6 +85,9 @@ static ydb_uint8 fmix64 ( ydb_uint8 k );
 #define GETBLOCK(p,i) (((const uint4 *)p)[(int)i])
 
 #define GETBLOCK64(p,i) (((const ydb_uint8 *)p)[(int)i])
+=======
+/* Implementation */
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
 #ifdef BIGENDIAN
 #	if defined(__GNUC__) && (__GNUC__>4 || (__GNUC__==4 && __GNUC_MINOR__>=3))
@@ -80,33 +106,37 @@ static ydb_uint8 fmix64 ( ydb_uint8 k );
 #define UI64_TO_LE(X)			/* nothing */
 #endif
 
-/*-----------------------------------------------------------------------------
- * Finalization mix - force all bits of a hash block to avalanche            */
+#define GETBLOCK(p,i) (((const uint4 *)p)[(int)i])
 
-static FORCE_INLINE uint4 fmix ( uint4 h )
+static inline uint4 fmix(uint4 h)
 {
-  h ^= h >> 16;
-  h *= 0x85ebca6b;
-  h ^= h >> 13;
-  h *= 0xc2b2ae35;
-  h ^= h >> 16;
+	h ^= h >> 16;
+	h *= 0x85ebca6b;
+	h ^= h >> 13;
+	h *= 0xc2b2ae35;
+	h ^= h >> 16;
 
-  return h;
+	return h;
 }
 
+<<<<<<< HEAD
 /*----------*/
 
 static FORCE_INLINE ydb_uint8 fmix64 ( ydb_uint8 k )
+=======
+static inline gtm_uint8 fmix64(gtm_uint8 k)
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 {
-  k ^= k >> 33;
-  k *= BIG_CONSTANT(0xff51afd7ed558ccd);
-  k ^= k >> 33;
-  k *= BIG_CONSTANT(0xc4ceb9fe1a85ec53);
-  k ^= k >> 33;
+	k ^= k >> 33;
+	k *= BIG_CONSTANT(0xff51afd7ed558ccd);
+	k ^= k >> 33;
+	k *= BIG_CONSTANT(0xc4ceb9fe1a85ec53);
+	k ^= k >> 33;
 
-  return k;
+	return k;
 }
 
+<<<<<<< HEAD
 /*-----------------------------------------------------------------------------*/
 
 void MurmurHash3_x86_32 ( const void * key, int len,
@@ -459,6 +489,8 @@ void MurmurHash3_x64_128 ( const void * key, const int len,
 #define LSHIFT_BYTES(LHS, RHS)		((RHS < SIZEOF(LHS)) ? LSHIFT_BYTES_SAFE(LHS, RHS) : 0)
 #define RSHIFT_BYTES(LHS, RHS)		((RHS < SIZEOF(LHS)) ? RSHIFT_BYTES_SAFE(LHS, RHS) : 0)
 
+=======
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 #if !defined(BIGENDIAN)
 
 /* Little Endian */
@@ -674,12 +706,40 @@ MBSTART {													\
 	ADD_BYTES((STATEPTR), (KEY) + pb_carry_fill, (LEN) - pb_carry_fill);					\
 } MBEND
 
+<<<<<<< HEAD
 
 /* This is an endian-independent 16-byte murmur hash function */
 void ydb_mmrhash_128(const void *key, int len, uint4 seed, ydb_uint16 *out)
-{
-	hash128_state_t state;
+=======
+#if (defined(__i386) || defined(__x86_64__) || defined(_AIX))
+#	define UNALIGNED_SAFE	(1)
+#else
+#	define UNALIGNED_SAFE	(0)
+#endif
 
+/* Declare these here to generate non-inline versions */
+void	gtmmrhash_32(const void *key, int len, uint4 seed, uint4 *out4);
+void	gtmmrhash_128(const void *key, int len, uint4 seed, gtm_uint16 *out);
+void	gtmmrhash_128_hex(const gtm_uint16 *hash, unsigned char *out);
+void	gtmmrhash_128_bytes(const gtm_uint16 *hash, unsigned char *out);
+
+void MurmurHash3_x86_32(const void *key, int len, uint4 seed, void *out)
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
+{
+	int			i;
+	const unsigned char 	*tail;
+	const uint4		*blocks;
+	int			nblocks = len / 4;
+	uint4			h1 = seed;
+	uint4			c1 = 0xcc9e2d51;
+	uint4			c2 = 0x1b873593;
+	uint4			k1;
+#	ifndef UNALIGNED_ACCESS_SUPPORTED
+	static char		*buff;
+	static int		bufflen;
+#	endif
+
+<<<<<<< HEAD
 	HASH128_STATE_INIT(state, seed);
 	assert((state.carry_bytes == 0) && (state.c.one == 0) && (state.c.two == 0));
 	ydb_mmrhash_128_ingest(&state, key, len);
@@ -703,13 +763,75 @@ void ydb_mmrhash_32(const void *key, int len, uint4 seed, uint4 *out4)
 }
 
 void ydb_mmrhash_128_ingest(hash128_state_t *state, const void *key, int len)
+=======
+	# ifndef UNALIGNED_ACCESS_SUPPORTED
+	/* Murmur3 hash works only on 4-byte aligned keys so align key to avoid unaligned access error
+	* messages from an architecture that does not support it.
+	*/
+	if (len && (0 != ((UINTPTR_T)key % 4)))
+	{	/* make buffer 4-byte aligned */
+		if (bufflen < len)
+		{
+			if (NULL != buff)
+			{
+				assert(bufflen);
+				free(buff);
+			}
+			bufflen = len * 2;
+			buff = malloc(bufflen);
+		}
+		assert(bufflen >= len);
+		memcpy(buff, key, len);
+		key = (const unsigned char*)buff;
+	}
+	# endif
+	blocks = (const uint4 *)((char *)key + nblocks * 4);
+	for(i = -nblocks; i; i++)
+	{
+		k1 = GETBLOCK(blocks,i);
+
+		k1 *= c1;
+		k1 = ROTL32(k1,15);
+		k1 *= c2;
+
+		h1 ^= k1;
+		h1 = ROTL32(h1,13);
+		h1 = h1 * 5 + 0xe6546b64;
+	}
+	tail = (const unsigned char*)blocks;
+	k1 = 0;
+
+	/* The shifts below assume little endian, so the handling of the tail block is inconsistent with normal blocks
+	* on big endian systems. However, we are already using this version and we don't want to change the resulting
+	* hashes, so leave it alone.
+	*/
+	switch(len & 3)
+	{
+	case 3: k1 ^= tail[2] << 16;
+	/* no break */
+	case 2: k1 ^= tail[1] << 8;
+	/* no break */
+	case 1: k1 ^= tail[0];
+		k1 *= c1;
+		k1 = ROTL32(k1,15);
+		k1 *= c2;
+		h1 ^= k1;
+	};
+
+	h1 ^= len;
+	h1 = fmix(h1);
+	*(uint4*)out = h1;
+}
+
+int gtmmrhash_128_ingest(hash128_state_t *state, const void *key, int len)
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 {
 	int			i;
 	ydb_uint8		k1, k2;
 	const unsigned char	*keyptr;
 
 	if (0 == len)
-		return;
+		return 0;
 
 	keyptr = key;
 #	if !(defined(__i386) || defined(__x86_64__) || defined(_AIX))
@@ -731,6 +853,8 @@ void ydb_mmrhash_128_ingest(hash128_state_t *state, const void *key, int len)
 	}
 	if (len > 0)
 		PROCESS_BYTES(state, keyptr, len);
+
+	return len;
 }
 
 void ydb_mmrhash_128_result(hash128_state_t *state, uint4 total_len, ydb_uint16 *out)
@@ -766,6 +890,7 @@ void ydb_mmrhash_128_result(hash128_state_t *state, uint4 total_len, ydb_uint16 
 	out->two = h2;
 }
 
+<<<<<<< HEAD
 void ydb_mmrhash_128_bytes(const ydb_uint16 *hash, unsigned char *out)
 {
 #	ifdef BIGENDIAN
@@ -810,4 +935,6 @@ void ydb_mmrhash_128_hex(const ydb_uint16 *hash, unsigned char *out)
 
 /*******************************************************************************/
 
+=======
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 /*-----------------------------------------------------------------------------*/

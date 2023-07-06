@@ -49,24 +49,28 @@ GBLREF	boolean_t		mu_reorg_process;
 GBLREF	boolean_t		dse_running;
 GBLREF 	jnl_gbls_t		jgbl;
 
-cw_set_element *t_write (
-			srch_blk_status	*blkhist,	/* Search History of the block to be written. Currently the
-							 *	following members in this structure are used by "t_write"
-							 *	    "blk_num"		--> Block number being modified
-							 *	    "buffaddr"		--> Address of before image of the block
-							 *	    "cr->ondsk_blkver"	--> Actual block version on disk
-							 */
-			unsigned char 	*upd_addr,	/* Address of the update array that contains the changes for this block */
-			block_offset 	ins_off,	/* Offset to the position in the buffer that is to receive
-							 * 	a block number when one is created. */
-			block_index 	index,		/* Index into the create/write set.  The specified entry is
-							 * 	always a create entry. When the create gets assigned a
-							 * 	block number, the block number is inserted into this
-							 * 	buffer at the location specified by ins_off. */
-			char		level,		/* Level of the block in the tree */
-			boolean_t	first_copy,	/* Is first copy needed if overlaying same buffer? */
-			boolean_t	forward,	/* Is forward processing required? */
-			uint4		write_type)	/* Whether "killtn" of the bt needs to be simultaneously updated or not */
+
+/**
+ * t_write
+ *
+ * @param blkhist	Search History of the block to be written. Currently the following members
+ * 			in this structure are used by "t_write":
+ *				"blk_num"		--> Block number being modified
+ *				"buffaddr"		--> Address of before image of the block
+ *				"cr->ondsk_blkver"	--> Actual block version on disk
+ * @param upd_addr	Address of the update array that contains the changes for this block
+ * @param ins_off	Offset to the position in the buffer that is to receive a block number when one is created.
+ * @param index		Index into the create/write set. The specified entry is always a create entry.
+ * 			When the create gets assigned a block number, the block number is inserted into this buffer
+ * 			at the location specified by ins_off.
+ * @param level		Level of the block in the tree
+ * @param first_copy	Is first copy needed if overlaying same buffer?
+ * @param forward	Is forward processing required?
+ * @param write_type	Whether "killtn" of the bt needs to be simultaneously updated or not
+ * @return		A cw_set element representing the proposed write
+ */
+cw_set_element *t_write(srch_blk_status *blkhist, struct blk_segment_struct *upd_addr, block_offset ins_off, block_index index,
+			unsigned char level, boolean_t first_copy, boolean_t forward, uint4 write_type)
 {
 	blk_hdr_ptr_t		old_block;
 	block_id		blk;
@@ -75,7 +79,7 @@ cw_set_element *t_write (
 	cw_set_element		*cse, *old_cse, *tp_cse;
 	ht_ent_int8		*tabent;
 	jnl_buffer_ptr_t	jbbp;		/* jbbp is non-NULL only if before-image journaling */
-	off_chain		chain;
+	block_ref		chain;
 	srch_blk_status		*tp_srch_status;
 	sgmnt_addrs		*csa;
 	uint4			iter;
@@ -106,11 +110,11 @@ cw_set_element *t_write (
 	} else
 	{
 		assert(!index || index < sgm_info_ptr->cw_set_depth);
-		chain = *(off_chain *)&blk;
-		if (chain.flag == 1)
+		chain.id = blk;
+		if (chain.chain.flag == 1)
 		{
 			assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
-			tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain.cw_index, &cse);
+			tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain.chain.cw_index, &cse);
 			blk = cse->blk;
 		} else
 		{
@@ -245,7 +249,7 @@ cw_set_element *t_write (
 		assert(cse->level == level || (CDB_STAGNATE > t_tries) || gds_t_create == cse->mode
 			|| cse->blk_target->root == cse->blk);
 	}
-	cse->upd_addr = upd_addr;
+	cse->upd_addr.blk = upd_addr;
 	cse->ins_off = ins_off;
 	cse->index = index;
 	cse->reference_cnt = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -29,6 +29,7 @@
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF uint4		process_id;
+<<<<<<< HEAD
 
 /* For 32 bit processes, addresses are a bit smaller so define a format that works for either */
 #ifdef GTM64
@@ -36,6 +37,8 @@ GBLREF uint4		process_id;
 #else
 # define myaddr "        0x"lvaddr
 #endif
+=======
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
 /* Routine to dump the lock history array on demand starting with most recent and working backwards */
 

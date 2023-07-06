@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -206,7 +206,8 @@ void ch_trace_point() {return;}
  * disable/enable of interrupts this routine can add an assert that interrupts are disabled.
  */
 #define GTM_ASM_ESTABLISH	{	/* So named because gtm_asm_establish does exactly this */		\
-					GBLREF uint4 dollar_tlevel;						\
+					GBLREF uint4	dollar_tlevel;						\
+					GBLREF int	process_exiting;					\
 														\
 					assert(IS_PTHREAD_LOCKED_AND_HOLDER);					\
 					CHTRACEPOINT;								\
@@ -279,32 +280,37 @@ void ch_trace_point() {return;}
 # define ESTABLISH(x, ret)	ESTABLISH_RET(x, ret)
 #else
 # define ESTABLISH(x)		{										\
-					intrpt_state_t		prev_intrpt_state;				\
+					volatile intrpt_state_t		prev_intrpt_state_est;			\
 														\
-					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);			\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state_est);		\
 					ESTABLISH_NOJMP(x);							\
 					/* See ESTABLISH_RET macro comment for below assert */			\
-					ctxt->intrpt_ok_state = prev_intrpt_state;				\
+					ctxt->intrpt_ok_state = prev_intrpt_state_est;				\
 					if (0 != setjmp(ctxt->jmp))						\
 					{									\
+<<<<<<< HEAD
 						/* Undo increment done in rts_error_csa() */			\
 						if (0 < TREF(rts_error_depth))					\
 							--(TREF(rts_error_depth));				\
 						prev_intrpt_state = ctxt->intrpt_ok_state;			\
+=======
+						prev_intrpt_state_est = ctxt->intrpt_ok_state;			\
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 						REVERT;								\
 						/* See ESTABLISH_RET macro comment for below assert */		\
 						if (!multi_thread_in_use)					\
 						{								\
-							assert(INTRPT_OK_TO_INTERRUPT <= prev_intrpt_state);	\
-							assert(INTRPT_NUM_STATES > prev_intrpt_state);		\
-							intrpt_ok_state = prev_intrpt_state;			\
+							assert(INTRPT_OK_TO_INTERRUPT <= prev_intrpt_state_est);\
+							assert(INTRPT_NUM_STATES > prev_intrpt_state_est);	\
+							intrpt_ok_state = prev_intrpt_state_est;		\
 						}								\
 						return;								\
 					} else									\
-						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);	\
+						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state_est);	\
 				}
 # define ESTABLISH_NORET(x, did_long_jump)									\
 				{										\
+<<<<<<< HEAD
 					intrpt_state_t		prev_intrpt_state;				\
 														\
 					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);			\
@@ -329,6 +335,29 @@ void ch_trace_point() {return;}
 						intrpt_ok_state = prev_intrpt_state;				\
 					} else									\
 						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);	\
+=======
+					intrpt_state_t		prev_intrpt_state_estnr;				\
+					\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state_estnr);			\
+					did_long_jump = FALSE;								\
+					ESTABLISH_NOJMP(x);								\
+					/* See ESTABLISH_RET macro comment for below assert */				\
+					ctxt->intrpt_ok_state = prev_intrpt_state_estnr;				\
+					if (0 != setjmp(ctxt->jmp))							\
+					{										\
+						prev_intrpt_state_estnr = ctxt->intrpt_ok_state;			\
+						did_long_jump = TRUE;							\
+						/* See ESTABLISH_RET macro comment for below assert */			\
+						assert(INTRPT_OK_TO_INTERRUPT <= prev_intrpt_state_estnr);		\
+						assert(INTRPT_NUM_STATES > prev_intrpt_state_estnr);			\
+						/* Assert "intrpt_ok_state" and "prev_intrpt_state_estnr" are same in	\
+						 * "dbg" but restore "intrpt_ok_state" in "pro" just in case		\
+						 */									\
+						assert(prev_intrpt_state_estnr == intrpt_ok_state);			\
+						intrpt_ok_state = prev_intrpt_state_estnr;				\
+					} else										\
+						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state_estnr);		\
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 				}
 
 # define WITH_CH(HANDLER, OP, ERR_OP)										\
@@ -349,6 +378,7 @@ MBSTART {													\
 #endif
 
 #define REVERT			{										\
+					GBLREF	int		process_exiting;				\
 					intrpt_state_t		prev_intrpt_state;				\
 														\
 					assert(IS_PTHREAD_LOCKED_AND_HOLDER);					\

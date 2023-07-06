@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -86,6 +86,9 @@ GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 #endif
 
 error_def(ERR_DBROLLEDBACK);
+error_def(ERR_GVFAILCORE);
+error_def(ERR_TPFAIL);
+error_def(ERR_TRIGLOADFAIL);
 error_def(ERR_ZFILNMBAD);
 
 STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint4 trigger_filename_len, boolean_t noprompt,
@@ -253,6 +256,10 @@ boolean_t trigger_trgfile_tpwrap(char *trigger_filename, uint4 trigger_filename_
 			TREF(ztrigbuffLen) = utilbuff_len;	/* reset ztrig buffer at start of each try/retry */
 			TREF(util_outptr) = TREF(util_outbuff_ptr); /* Signal any unflushed text from previous try as gone */
 			trigger_status = trigger_trgfile_tpwrap_helper(trigger_filename, trigger_filename_len, noprompt, TRUE);
+			/* We expect the above function to return with either op_tcommit or a tp_restart invoked.
+			 * In the case of op_tcommit, we expect dollar_tlevel to be 0 and if so we break out of the loop.
+			 * In the tp_restart case, we expect a maximum of 4 tries/retries and much lesser usually.
+			 */
 			if (0 == dollar_tlevel)
 				break;
 			assert(0 < t_tries);
@@ -268,13 +275,20 @@ boolean_t trigger_trgfile_tpwrap(char *trigger_filename, uint4 trigger_filename_
 			 * trigger load logic already takes care of doing INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED before doing the
 			 * actual trigger load
 			 */
-			/* We expect the above function to return with either op_tcommit or a tp_restart invoked.
-			 * In the case of op_tcommit, we expect dollar_tlevel to be 0 and if so we break out of the loop.
-			 * In the tp_restart case, we expect a maximum of 4 tries/retries and much lesser usually.
-			 * Additionally we also want to avoid an infinite loop so limit the loop to what is considered
-			 * a huge iteration count and assertpro if that is reached as it suggests an out-of-design situation.
+			/* Avoid an infinite loop so limit the loop to what is considered a huge iteration count. Issue a TPFAIL
+			 * when exceeding TPWRAP_HELPER_MAX_ATTEMPTS as it suggests an out-of-design situation.
 			 */
-			assertpro(TPWRAP_HELPER_MAX_ATTEMPTS >= loopcnt);
+			if (TPWRAP_HELPER_MAX_ATTEMPTS >= loopcnt)
+				continue;
+			if (is_final_retry_code(failure))
+				/* It is possible to retry while holding crit for a subset of failure codes. A concurrent REORG
+				 * managed to out-compete a trigger load operation involving many globals across multiple regions
+				 * prompting this change.
+				 */
+				continue;
+			assert(TPWRAP_HELPER_MAX_ATTEMPTS >= loopcnt);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_TPFAIL, 0, ERR_TRIGLOADFAIL, 2, t_tries, t_fail_hist, ERR_GVFAILCORE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TPFAIL, 0, ERR_TRIGLOADFAIL, 2, t_tries, t_fail_hist);
 		}
 	} else
 	{

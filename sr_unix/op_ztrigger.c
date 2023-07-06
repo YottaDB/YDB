@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -120,7 +120,7 @@ void op_ztrigger(void)
 	sgmnt_addrs			*csa;
 	sgmnt_data_ptr_t		csd;
 	enum cdb_sc			cdb_status;
-	jnl_format_buffer		*jfb, *ztworm_jfb;
+	jnl_format_buffer		*jfb = NULL, *ztworm_jfb;
 	uint4				nodeflags;
 	boolean_t			write_logical_jnlrecs, jnl_format_done;
 	boolean_t			is_tpwrap;
@@ -130,10 +130,10 @@ void op_ztrigger(void)
 	gtm_trigger_parms		trigparms;
 	gvt_trigger_t			*gvt_trigger;
 	gvtr_invoke_parms_t		gvtr_parms;
-	int				gtm_trig_status, rc;
+	int				gtm_trig_status = 0, rc;
 	unsigned int			idx;
 	unsigned char			*save_msp;
-	mv_stent			*save_mv_chain;
+	mv_stent			*save_mv_chain = NULL;
 #	ifdef DEBUG
 	boolean_t			is_mm;
 	GTMTRIG_ONLY(enum cdb_sc	save_cdb_status;)
@@ -295,7 +295,10 @@ void op_ztrigger(void)
 		if (cdb_sc_normal != cdb_status)
 		{	/* See comment above about POP_MVALS_FROM_M_STACK_IF_NEEDED */
 			if ((NULL != save_msp) && (save_msp > msp))
+			{
+				assert(save_mv_chain);
 				UNW_MV_STENT_TO(save_msp, save_mv_chain);
+			}
 			t_retry(cdb_status);
 			skip_INVOKE_RESTART = FALSE;
 		} else
@@ -306,7 +309,10 @@ void op_ztrigger(void)
 			TRIGGER_BASE_FRAME_UNWIND_IF_NOMANSLAND;
 			/* See comment above about POP_MVALS_FROM_M_STACK_IF_NEEDED */
 			if ((NULL != save_msp) && (save_msp > msp))
+			{
+				assert(save_mv_chain);
 				UNW_MV_STENT_TO(save_msp, save_mv_chain);
+			}
 			rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 			PRO_ONLY(UNUSED(rc));
 			assert(0 == rc && TPRESTART_STATE_NORMAL == tprestart_state);

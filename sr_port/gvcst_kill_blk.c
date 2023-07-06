@@ -66,15 +66,15 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	block_id			blk, temp_blk;
 	block_index			new_block_index;
 	bool				kill_root, first_copy;
-	cw_set_element			*cse, *old_cse;
-	int4				blk_size, blk_seg_cnt, lmatch, rmatch, targ_len, prev_len, targ_base, next_rec_shrink,
-					temp_int, blkseglen, tmp_cmpc;
-	off_chain			chain1, curr_chain, prev_chain;
-	v6_off_chain			v6_chain;
+	cw_set_element			*cse, *old_cse = NULL;
+	int4				blk_size, blk_seg_cnt, lmatch, rmatch, targ_len = -1, prev_len = -1, targ_base = -1,
+					next_rec_shrink, temp_int, blkseglen, tmp_cmpc;
+	block_ref			chain1;
+	off_chain			curr_chain, prev_chain;
 	rec_hdr_ptr_t			left_ptr;	/*pointer to record before first record to delete*/
 	rec_hdr_ptr_t			del_ptr;	/*pointer to first record to delete*/
 	rec_hdr_ptr_t			right_ptr;	/*pointer to record after last record to delete*/
-	rec_hdr_ptr_t			right_prev_ptr;
+	rec_hdr_ptr_t			right_prev_ptr = NULL;
 	rec_hdr_ptr_t			rp, rp1;	/*scratch record pointer*/
 	rec_hdr_ptr_t			first_in_blk, top_of_block, new_rec_hdr, star_rec_hdr;
 	sm_uc_ptr_t			buffer, curr, prev, right_bytptr;
@@ -90,9 +90,9 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	blk = blkhist->blk_num;
 	if (dollar_tlevel)
 	{
-		PUT_BLK_ID(&chain1, blk);
+		PUT_BLK_ID(&chain1.id, blk);
 		assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
-		if ((1 == chain1.flag) && ((int)chain1.cw_index >= sgm_info_ptr->cw_set_depth))
+		if ((1 == chain1.chain.flag) && ((int)chain1.chain.cw_index >= sgm_info_ptr->cw_set_depth))
 		{
 			assert(sgm_info_ptr->tp_csa == cs_addrs);
 			assert(FALSE == cs_addrs->now_crit);
@@ -191,9 +191,9 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			READ_BLK_ID(long_blk_id, &temp_blk, (sm_uc_ptr_t)rp1 - blk_id_sz);
 			if (dollar_tlevel)
 			{
-				chain1 = *(off_chain *)&temp_blk;
+				chain1.id = temp_blk;
 				assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
-				if ((1 == chain1.flag) && ((int)chain1.cw_index >= sgm_info_ptr->cw_set_depth))
+				if ((1 == chain1.chain.flag) && ((int)chain1.chain.cw_index >= sgm_info_ptr->cw_set_depth))
 				{
 					assert(sgm_info_ptr->tp_csa == cs_addrs);
 					assert(FALSE == cs_addrs->now_crit);
@@ -211,7 +211,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_mkblk;
 		}
-		new_block_index = t_create(blk, (uchar_ptr_t)bs1, 0, 0, 0);
+		new_block_index = t_create(blk, bs1, 0, 0, 0);
 		/* create index block */
 		BLK_ADDR(new_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 		new_rec_hdr->rsiz = bstar_rec_size(long_blk_id);
@@ -224,7 +224,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_mkblk;
 		}
-		cse = t_write(blkhist, (unsigned char *)bs1, SIZEOF(blk_hdr) + SIZEOF(rec_hdr), new_block_index, 1,
+		cse = t_write(blkhist, bs1, SIZEOF(blk_hdr) + SIZEOF(rec_hdr), new_block_index, 1,
 			TRUE, FALSE, GDS_WRITE_KILLTN);
 		assert(!dollar_tlevel || !cse->high_tlevel);
 		if (dollar_tlevel)
@@ -254,6 +254,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		prev_len = 0;
 		if (right_extra)
 		{
+			assert(right_prev_ptr);
 			EVAL_CMPC2(right_prev_ptr, tmp_cmpc);
 			targ_len = tmp_cmpc - targ_base;
 			if (targ_len < 0)
@@ -305,6 +306,8 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	assert(0 <= blkseglen);
 	if (0 != blkseglen)
 	{
+		assert(0 <= targ_len);
+		assert(0 <= prev_len);
 		next_rec_shrink = targ_len + prev_len;
 		if (0 >= next_rec_shrink)
 		{
@@ -319,11 +322,15 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			if (targ_len)
 			{
 				BLK_ADDR(skb, targ_len, unsigned char);
+				assert(0 <= targ_base);
 				memcpy(skb, &search_key->base[targ_base], targ_len);
 				BLK_SEG(bs_ptr, skb, targ_len);
 			}
 			if (prev_len)
+			{
+				assert(right_prev_ptr);
 				BLK_SEG(bs_ptr, (sm_uc_ptr_t)(right_prev_ptr + 1) , prev_len);
+			}
 			right_bytptr = (sm_uc_ptr_t)(right_ptr + 1);
 			blkseglen = (int)((sm_uc_ptr_t)top_of_block - right_bytptr);
 			if (0 < blkseglen)
@@ -341,7 +348,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		assert(CDB_STAGNATE > t_tries);
 		return cdb_sc_mkblk;
 	}
-	cse = t_write(blkhist, (unsigned char *)bs1, 0, 0, level, first_copy, TRUE, GDS_WRITE_KILLTN);
+	cse = t_write(blkhist, bs1, 0, 0, level, first_copy, TRUE, GDS_WRITE_KILLTN);
 	assert(!dollar_tlevel || !cse->high_tlevel);
 	if (dollar_tlevel)
 	{
@@ -361,7 +368,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	{	/* fix up chains in the block to account for deleted records */
 		prev = NULL;
 		curr = buffer + cse->first_off;
-		READ_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
+		READ_OFF_CHAIN(long_blk_id, &curr_chain, curr);
 		while (curr < (sm_uc_ptr_t)del_ptr)
 		{	/* follow chain to first deleted record */
 			if (0 == curr_chain.next_off)
@@ -370,7 +377,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 				break;	/* special case described below: stop just before the first deleted record */
 			prev = curr;
 			curr += curr_chain.next_off;
-			READ_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
+			READ_OFF_CHAIN(long_blk_id, &curr_chain, curr);
 		}
 		if ((right_ptr == top_of_block) && (((sm_uc_ptr_t)del_ptr - curr) == off_chain_sz))
 		{
@@ -382,15 +389,16 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			/* store next_off in old_cse before actually changing it in the buffer(for rolling back) */
 			if (horiz_growth)
 			{
+				assert(old_cse);
 				old_cse->undo_next_off[0] = curr_chain.next_off;
 				old_cse->undo_offset[0] = (block_offset)(curr - buffer);
 				assert(old_cse->undo_offset[0]);
 			}
 			curr_chain.next_off = 0;
-			WRITE_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
+			WRITE_OFF_CHAIN(long_blk_id, &curr_chain, curr);
 			if (NULL != prev)
 			{	/* adjust previous chain next_off to reflect that the record it refers to is now a *-key */
-				READ_OFF_CHAIN(long_blk_id, &prev_chain, &v6_chain, prev);
+				READ_OFF_CHAIN(long_blk_id, &prev_chain, prev);
 				/* store next_off in old_cse before actually changing it in the buffer(for rolling back) */
 				if (horiz_growth)
 				{
@@ -404,7 +412,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 				assert((1ULL << NEXT_OFF_MAX_BITS) >
 					((sm_uc_ptr_t)left_ptr - prev + (unsigned int)(SIZEOF(rec_hdr))));
 				prev_chain.next_off = (uint4)((sm_uc_ptr_t)left_ptr - prev + (unsigned int)(SIZEOF(rec_hdr)));
-				WRITE_OFF_CHAIN(long_blk_id, &prev_chain, &v6_chain, prev);
+				WRITE_OFF_CHAIN(long_blk_id, &prev_chain, prev);
 			} else	/* it's the first (and only) one */
 				cse->first_off = (block_offset)((sm_uc_ptr_t)left_ptr - buffer + SIZEOF(rec_hdr));
 		} else if (curr >= (sm_uc_ptr_t)del_ptr)
@@ -414,7 +422,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 				if (0 == curr_chain.next_off)
 					break;
 				curr += curr_chain.next_off;
-				READ_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
+				READ_OFF_CHAIN(long_blk_id, &curr_chain, curr);
 			}
 			/* prev :   ptr to chain record immediately preceding the deleted area,
 			 *	    or 0 if none.
@@ -426,16 +434,17 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			{	/* the former end of the chain is going, going, gone */
 				if (NULL != prev)
 				{	/* terminate the chain before the delete */
-					READ_OFF_CHAIN(long_blk_id, &prev_chain, &v6_chain, prev);
+					READ_OFF_CHAIN(long_blk_id, &prev_chain, prev);
 					/* store next_off in old_cse before actually changing it in the buffer(for rolling back) */
 					if (horiz_growth)
 					{
+						assert(old_cse);
 						old_cse->undo_next_off[0] = prev_chain.next_off;
 						old_cse->undo_offset[0] = (block_offset)(prev - buffer);
 						assert(old_cse->undo_offset[0]);
 					}
 					prev_chain.next_off = 0;
-					WRITE_OFF_CHAIN(long_blk_id, &prev_chain, &v6_chain, prev);
+					WRITE_OFF_CHAIN(long_blk_id, &prev_chain, prev);
 				} else
 					cse->first_off = 0;		/* the whole chain is gone */
 			} else
@@ -443,11 +452,12 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 				/* next_rec_shrink is the change in record size due to the new compression count */
 				if (NULL != prev)
 				{
-					READ_OFF_CHAIN(long_blk_id, &prev_chain, &v6_chain, prev);
+					READ_OFF_CHAIN(long_blk_id, &prev_chain, prev);
 					/* ??? new compression may be less (ie +) so why are negative shrinks ignored? */
 					/* store next_off in old_cse before actually changing it in the buffer(for rolling back) */
 					if (horiz_growth)
 					{
+						assert(old_cse);
 						old_cse->undo_next_off[0] = prev_chain.next_off;
 						old_cse->undo_offset[0] = (block_offset)(prev - buffer);
 						assert(old_cse->undo_offset[0]);
@@ -462,7 +472,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 					prev_chain.next_off = (block_offset)(curr - prev -
 							((sm_uc_ptr_t)right_ptr - (sm_uc_ptr_t)del_ptr)
 							+ (next_rec_shrink > 0 ? next_rec_shrink : 0));
-					WRITE_OFF_CHAIN(long_blk_id, &prev_chain, &v6_chain, prev);
+					WRITE_OFF_CHAIN(long_blk_id, &prev_chain, prev);
 				} else	/* curr remains first: adjust the head */
 					cse->first_off = (block_offset)(curr - buffer -
 							((sm_uc_ptr_t)right_ptr - (sm_uc_ptr_t)del_ptr)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2020 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,7 +31,7 @@ int m_zgoto(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	dqinit(&tmpchain, exorder);
+	exorder_init(&tmpchain);
 	oldchain = setcurtchain(&tmpchain);
 	if ((TK_EOL == TREF(window_token)) || (TK_SPACE == TREF(window_token)))
 	{	/* Default zgoto level is 1 */

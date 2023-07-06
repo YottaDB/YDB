@@ -1,6 +1,6 @@
 	/****************************************************************
  *								*
- * Copyright (c) 2009-2020 Fidelity National Information	*
+ * Copyright (c) 2009-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,8 +50,8 @@
  */
 int mu_decrypt(char *fname, int fname_len, uint4 off, uint4 len, char *type, int type_len)
 {
-	int		fd, save_errno, gtmcrypt_errno, i, status, iv_len;
-	char		hash[GTMCRYPT_HASH_LEN], iv[GTM_MAX_IV_LEN], *iv_ptr, *buff, *buff_ptr;
+	int		fd, save_errno, gtmcrypt_errno, i, status, iv_len = null_iv.length;
+	char		hash[GTMCRYPT_HASH_LEN], iv[GTM_MAX_IV_LEN], *iv_ptr = null_iv.address, *buff, *buff_ptr;
 	boolean_t	is_encrypted, is_journal;
 	gtmcrypt_key_t	key_handle;
 	jrec_prefix	*prefix;
@@ -164,6 +164,7 @@ int mu_decrypt(char *fname, int fname_len, uint4 off, uint4 len, char *type, int
 	}
 	if (is_encrypted)
 	{
+		assert(iv_ptr || !iv_len);
 		GTMCRYPT_DECRYPT_WITH_IV(NULL, key_handle, buff_ptr, len, NULL, iv_ptr, iv_len, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{

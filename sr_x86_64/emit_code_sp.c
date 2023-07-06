@@ -1,6 +1,11 @@
 /****************************************************************
+<<<<<<< HEAD
  *								*
  * Copyright (c) 2007-2016 Fidelity National Information	*
+=======
+ *                                                              *
+ * Copyright (c) 2007-2023 Fidelity National Information	*
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -132,7 +137,11 @@ GBLREF emit_base_info_struct	emit_base_info;
 GBLREF int 			call_4lcldo_variant;
 GBLREF int			jmp_offset;	/* Offset to jump target */
 GBLREF char			cg_phase;	/* Code generation phase */
+<<<<<<< HEAD
 GBLREF CODE_TYPE		code_buf[];
+=======
+GBLREF unsigned char		code_buf[];
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 GBLREF int			code_idx;
 GBLREF unsigned char		*obpt;	 	/* Output buffer index */
 GBLREF unsigned char		outbuf[];

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -82,7 +82,7 @@ boolean_t xfer_set_handlers(int4  event_type, int4 param_val, boolean_t popped_e
 {	/* Keep track of what event types have come in and deal with them appropriately */
 	boolean_t	already_ev_handling;
 	int4		e_type, pv;
-	intrpt_state_t	prev_intrpt_state;
+	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	save_xfer_entry	*entry;
 	DCL_THREADGBL_ACCESS;
 
@@ -141,8 +141,7 @@ boolean_t xfer_set_handlers(int4  event_type, int4 param_val, boolean_t popped_e
 		} else
 			DBGDFRDEVNT((stderr, "%d %s: xfer_set_handlers - skipping [re]queued event type %d\n", __LINE__, __FILE__,
 				event_type));
-		if (!already_ev_handling)
-			ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
+		ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
 		return TRUE;
 	}
 	if (not_in_play != entry->event_state)
@@ -153,7 +152,7 @@ boolean_t xfer_set_handlers(int4  event_type, int4 param_val, boolean_t popped_e
 			ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
 		return TRUE;
 	}
-	if (!already_ev_handling && (no_event == outofband) && (!have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)))
+	if (!already_ev_handling && (no_event == outofband) && !have_crit(CRIT_IN_COMMIT))
 	{	/* no competion or blocking interrupt: collect $200 and go straight to pending */
 		/* -------------------------------------------------------
 		 * If table changed, it was not synchronized.
@@ -212,8 +211,8 @@ boolean_t xfer_set_handlers(int4  event_type, int4 param_val, boolean_t popped_e
 boolean_t xfer_reset_if_setter(int4 event_type)
 {	/* if the transfer table has been changed to activate event_type, return it to "normal," otherwise leve it alone */
 	boolean_t	already_ev_handling, res;
-	int4		dummy;
-	intrpt_state_t	prev_intrpt_state;
+	int4		dummy = 0;
+	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -286,7 +285,7 @@ boolean_t real_xfer_reset(int4 event_type)
 	boolean_t	already_ev_handling, cur_outofband;
 	int 		e_type;
 	int4		param_val, status;
-	intrpt_state_t	prev_intrpt_state;
+	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	save_xfer_entry	*entry;
 	DCL_THREADGBL_ACCESS;
 

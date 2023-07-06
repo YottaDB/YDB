@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -136,7 +141,7 @@ cmi_status_t cmj_write_urg_start(struct CLB *lnk)
 void cmj_write_interrupt(struct CLB *lnk, int signo)
 {
 	int save_errno;
-        ssize_t rval;
+	ssize_t rval = 0;
 	cmi_status_t status = SS_NORMAL;
 
 	ASSERT_IS_LIBCMISOCKETTCP;

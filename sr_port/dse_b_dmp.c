@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
@@ -66,13 +66,17 @@ boolean_t dse_b_dmp(void)
 {
 	cache_rec_ptr_t	cr;
 	block_id	blk, count, lmap_num;
+<<<<<<< HEAD
 	boolean_t	bm_free, invalid_bitmap = FALSE, was_crit, was_hold_onto_crit;
+=======
+	boolean_t	bm_free, invalid_bitmap = FALSE, is_mm, was_crit, was_hold_onto_crit = FALSE;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	enum db_ver	ondsk_blkver;
 #	ifndef BLK_NUM_64BIT
 	gtm_int8	count2;
 #	endif
 	int4		bplmap, dummy_int, head, iter1, iter2, len, mapsize, nocrit_present, util_len, lmap_indx, mask2;
-	sm_uc_ptr_t	bp, b_top, mb, rp;
+	sm_uc_ptr_t	bp = NULL, b_top, mb, rp;
 	unsigned char	mask, util_buff[MAX_UTIL_LEN];
 	char		image_fn[MAX_FN_LEN + 1];
 	unsigned short	image_fn_len = SIZEOF(image_fn);
@@ -147,6 +151,7 @@ boolean_t dse_b_dmp(void)
 		else if (use_image)
 			util_out_print("Dumping contents of !AD", TRUE, image_fn_len, image_fn);
 #endif
+		assert(bp);
 		if (((blk / bplmap) * bplmap) != blk)
 		{
 			if (((blk_hdr_ptr_t) bp)->levl && patch_is_fdmp)
@@ -223,6 +228,7 @@ boolean_t dse_b_dmp(void)
 					util_out_print((caddr_t)util_buff, TRUE );
 				} else
 				{
+					assert(bp);
 					mb = cs_addrs->bmm + (blk / (8 * bplmap));
 					lmap_num = blk / bplmap;
 					mask = 1 << (lmap_num - ((lmap_num / 8) * 8));
@@ -268,6 +274,7 @@ boolean_t dse_b_dmp(void)
 					{
 						for (iter2 = 0; iter2 < 8; iter2++)
 						{
+							assert(bp);
 							mask2 = dse_lm_blk_free(lmap_indx, bp + SIZEOF(blk_hdr));
 							if (!mask2)
 								util_out_print("!AD", FALSE, 1, BUSY_CHAR);

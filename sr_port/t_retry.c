@@ -327,13 +327,15 @@ void t_retry(enum cdb_sc failure)
 				 */
 				assert((t_tries <= t_tries_dbg) || (csa->hold_onto_crit && WB_COMMIT_ERR_ENABLED));
 				/* Assert that the same kind of restart code can never occur more than once once we go to the
-				 * final retry. The only exception is cdb_sc_helpedout which can happen due to other processes
-				 * setting cnl->wc_blocked to TRUE without holding crit.
+				 * final retry. The exceptions are:
+				 * - cdb_sc_helpedout happens due to other procs setting cnl->wc_blocked to TRUE w/o holding crit
+				 * - cdb_sc_onln_rlbk2 occurs across many regs in a trigger transaction or second phase of a kill
 				 */
 				assert(failure == t_fail_hist_dbg[t_tries_dbg - 1]);
 				DEBUG_ONLY(
 					for (tries = CDB_STAGNATE; tries < t_tries_dbg - 1; tries++)
-						assert((t_fail_hist_dbg[tries] != failure) || (cdb_sc_helpedout == failure));
+						assert((t_fail_hist_dbg[tries] != failure)	|| (cdb_sc_helpedout == failure)
+												|| (cdb_sc_onln_rlbk2 == failure));
 				)
 				t_tries = CDB_STAGNATE - 1;
 			}

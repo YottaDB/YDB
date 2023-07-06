@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2020 Fidelity National Information	*
+ * Copyright (c) 2007-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -60,7 +60,11 @@ void	jnl_pool_write(sgmnt_addrs *csa, enum jnl_record_type rectype, jnl_record *
 	jnlpool_ctl_ptr_t	jctl;
 	jpl_rsrv_struct_t	*jrs;
 	gtm_uint64_t		write, write_total;
+<<<<<<< HEAD
 	qw_off_t		cur_write_addr;
+=======
+	qw_off_t		cur_write_addr, end_write_addr = 0;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	gtm_int64_t		wait_write_addr;	/* needed signed because of subtraction happening below */
 
 	assert(is_replicator);

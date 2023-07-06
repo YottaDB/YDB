@@ -109,6 +109,7 @@ LITDEF	err_msg gdeerrors[] = {
 
 
 LITDEF	int gdeerrors_undocarr[] = {
+	0	/* Placeholder to prevent empty array */
 };
 
 

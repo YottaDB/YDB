@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2022 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -176,7 +176,8 @@ typedef struct
 	printf("# define ggo_%s %d\n", #name, (int)OFFSETOF(gtm_threadgbl_def_t, name));	\
 	printf("# define ggt_%s %s\n", #name, #type);	/* In this case, return type */		\
 	printf("# define gga_%s %s\n", #name, #args);						\
-	printf("typedef %s (*ggf_%s)%s;\n", #type, #name, #args);
+	printf("typedef %s (*ggf_%s)%s;\n", #type, #name, #args);				\
+	printf("extern ggf_%s ggx_%s;\n", #name, #name);  /* Avoid unused local typedef warning */
 
 /* For single dimension arrays, include the length of the entire array as it is likely needed, especially
  * for character types.

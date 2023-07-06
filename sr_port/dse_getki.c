@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -62,7 +62,7 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 	if (!cli_get_str(qual, buf, &buf_len))
 		return FALSE;
 	bot = temp_dst = (char *)&key_buf[0];
-	top = &buf[buf_len];
+	top = &buf[0] + buf_len;
 	src = &buf[0];
 	if ('^' != *src++)
 	{

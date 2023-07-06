@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2021 Fidelity National Information		;
+; Copyright (c) 2001-2023 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	;
@@ -245,12 +245,21 @@
  . Quit
  Use out
  Write "};",!!
+<<<<<<< HEAD
  Do
  . Use out
  . Write !!,"LITDEF"_$Char(9)_"int "_undocarr_"[] = {",!
  . For i1=1:1:undocmsgcnt  Write $char(9)_undocmnemonic(i1,"code")_","_$char(9)_"/* "_undocmnemonic(i1)_" */",!
  . Write "};",!!
  . Quit
+=======
+ For i1=1:1:cnt Write "LITDEF",$Char(9),"int ",prefix,outmsg(i1)," = ",outmsg(i1,"code"),";",!
+ Use out
+ Write !!,"LITDEF"_$Char(9)_"int "_undocarr_"[] = {",!
+ For i1=1:1:undocmsgcnt  Write $char(9)_undocmnemonic(i1,"code")_","_$char(9)_"/* "_undocmnemonic(i1)_" */",!
+ Write:'undocmsgcnt $char(9)_"0"_$char(9)_"/* Placeholder to prevent empty array */",!
+ Write "};",!!
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
  Write !,"GBLDEF",$Char(9),"err_ctl "_fn_"_ctl = {",!
  Write $Char(9),facnum,",",!
  Write $Char(9),""""_facility_""",",!

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
@@ -56,7 +56,7 @@ void op_zshow(mval *func, int type, lv_val *lvn, mint level)
 	assert(0 <= func->str.len);
 	for (reqcnt = 0, ptr = func->str.addr, ptr_top = ptr + func->str.len; ptr < ptr_top; ptr++)
 	{
-		zshow_code = lower_to_upper_table[(unsigned char)*ptr];
+		zshow_code = TOUPPER(*ptr);
 		switch (zshow_code)
 		{
 			case 'A':

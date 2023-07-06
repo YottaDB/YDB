@@ -1,6 +1,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+<<<<<<< HEAD
 ;								;
 ; Copyright (c) 2017-2020 Fidelity National Information		;
+=======
+;                                                               ;
+; Copyright (c) 2017-2023 Fidelity National Information		;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 ; Services, Inc. and/or its subsidiaries. All rights reserved.  ;
 ;								;
 ; Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	;
@@ -62,13 +67,13 @@ version	;0;If the format of %YGS changes, increment the version between the semi
 	new cmdline,pid,reg
 	set cmdline=$zcmdline
 	set (pid,reg,stat)="*"                  ; Default is all processes, all regions, all statistics
-	set reg="*"
 	for  quit:'$$trimleadingstr^%XCMD(.cmdline,"--")  do ; process options
 	. if $$trimleadingstr^%XCMD(.cmdline,"help") do MSGANDHALT("help")
 	. else  if $$trimleadingstr^%XCMD(.cmdline,"pid") set pid=$$trimleadingdelimstr^%XCMD(.cmdline)
 	. else  if $$trimleadingstr^%XCMD(.cmdline,"reg") set reg=$$trimleadingdelimstr^%XCMD(.cmdline)
 	. else  if $$trimleadingstr^%XCMD(.cmdline,"stat") set stat=$$trimleadingdelimstr^%XCMD(.cmdline)
 	. else  set $ecode=",U249,"
+	if $zlength(cmdline)  write !,"YGBLSTAT-F-INVALID, Unrecognized option: ",$zwrite(cmdline),!,!  do MSGANDHALT("help")
 	write $$STAT(pid,stat,,reg),!
 	quit
 

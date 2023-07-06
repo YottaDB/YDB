@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -39,7 +39,7 @@ void		util_out_syslog_dump(void);
  * under-construction messages.
  */
 #define SAVE_UTIL_OUT_BUFFER(UTIL_OUT_SAVE_PTR, VA_LIST_SAVE_PTR, COPY_SAVED)		\
-{											\
+MBSTART {										\
 	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;						\
 	if (TREF(util_outbuff_ptr) < (TADR(util_outbuff) + 				\
 	    OUT_BUFF_SIZE * (UTIL_OUTBUFF_STACK_SIZE - 1)))				\
@@ -50,8 +50,11 @@ void		util_out_syslog_dump(void);
 		TREF(util_outptr) = TREF(util_outbuff_ptr);				\
 		COPY_SAVED = TRUE;							\
 	} else										\
+	{										\
 		assert(FALSE);								\
-}
+		GTM_UNREACHABLE();							\
+	}										\
+} MBEND
 
 /* Repoint util_outbuff_ptr to the previous chunk of util_outbuff, so that the construction
  * of the buffer that was saved there could be finished safely, and also restore the

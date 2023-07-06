@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2011, 2014 Fidelity Information Services, Inc	;
+; Copyright (c) 2011-2023 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -27,9 +28,11 @@
 	;
 	new i,n,z
 	if '$length($get(charset)) do
-	. new a,x,y		; if charset not provided, initialize it to alphabet from which to generate random string
-	. xecute "for i="_$select($length($get(charranges)):charranges,1:"1:1:127")_" set x=$get(x)_$char(i)"
-	. for i=$ascii("A"):1:$ascii("Z"),$ascii("a"):1:$ascii("z") set a=$get(a)_$char(i) ;	a has all legal pattern codes
+	. new a,lim,x,y		; if charset not provided, initialize it to alphabet from which to generate random string
+	. set lim=$select("M"=$zchset:256,1:65536)
+	. if $length($get(charranges)) xecute "for i="_charranges_" quit:lim<i  set x=$get(x)_$char(i)"
+	. else  for i=1:1:127 quit:lim<i  set x=$get(x)_$zchar(i)				; avoid xecute if possible
+	. set a="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"				; a has all legal pattern codes
 	. ; default patcodes to "AN" if not specified; restrict to legal patcodes otherwise
 	. set patcodes="1."_$select($length($get(patcodes)):$translate(patcodes,$translate(patcodes,a)),1:"AN")
 	. for i=1:1:$length(x) set y=$extract(x,i) set:y?@patcodes charset=$get(charset)_y
@@ -39,4 +42,3 @@
 	quit:$quit z	; extrinsic
 	write z
 	quit
-

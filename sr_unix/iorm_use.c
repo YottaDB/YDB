@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -187,14 +187,18 @@ void	iorm_use(io_desc *iod, mval *pp)
 	boolean_t	init_input_encryption, init_output_encryption, reset_input_encryption, reset_output_encryption;
 	boolean_t	seek_specified, ichset_specified, ochset_specified, chset_allowed;
 	unsigned char	c;
-	short		mode, mode1;
+	short		mode = 0, mode1 = 0;
 	int4		length, width, width_bytes, recordsize, recsize_before, padchar;
+<<<<<<< HEAD
 	int		fstat_res, rv;
+=======
+	int		fstat_res, save_errno = 0, rv;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	d_rm_struct	*rm_ptr;
 	struct stat	statbuf;
 	int		p_offset;
 	mstr		chset_mstr;
-	gtm_chset_t	width_chset, temp_chset;
+	gtm_chset_t	width_chset, temp_chset = CHSET_MAX_IDX_ALL;
 	int		seek_len;
 	char		seek_str[LIMIT_SEEK_STR];
 	char		*seek_ptr;
@@ -206,7 +210,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 	off_t		cur_position;
 	int		bom_size_toread;
 	io_log_name	*dev_name;
-	mstr		input_iv, output_iv, input_key, output_key;
+	mstr		input_iv = {0, 0, NULL}, output_iv = {0, 0, NULL}, input_key = {0, 0, NULL}, output_key = {0, 0, NULL};
 	char		error_str[MAX_ERROR_SIZE];
 	boolean_t	ch_set, def_recsize_before;
 	int		disk_block_multiple;
@@ -456,8 +460,11 @@ void	iorm_use(io_desc *iod, mval *pp)
 						} while (TRUE);
 						HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 						if (-1 == newfd)
+						{
+							save_errno = errno;
 							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 								RTS_ERROR_LITERAL("dup"), CALLFROM, save_errno);
+						}
 						if (TRUE == rm_ptr->read_only)
 						{
 							FDOPEN(newstr,newfd,"r");
@@ -1025,6 +1032,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 		{	/* Input KEY deviceparameter is present. */
 			if (input_key_not_empty)
 			{	/* Input KEY is meaningful. */
+				assert(input_key.addr);
+				assert(input_iv.addr);
 				if (KEY_CHANGED(input, input_key, rm_ptr) || IV_CHANGED(input, input_iv, rm_ptr))
 				{	/* Requested a new IV or KEY; only allow if no reads have happened. */
 					if (rm_ptr->read_occurred)
@@ -1073,6 +1082,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 		{	/* Input KEY deviceparameter is present. */
 			if (output_key_not_empty)
 			{	/* Output KEY is meaningful. */
+				assert(output_key.addr);
+				assert(output_iv.addr);
 				if (KEY_CHANGED(output, output_key, rm_ptr) || IV_CHANGED(output, output_iv, rm_ptr))
 				{	/* Requested a new IV or KEY; only allow if no writes have happened. */
 					if (rm_ptr->write_occurred)
@@ -1134,6 +1145,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 	}
 	if (init_input_encryption)
 	{	/* Get the key handle corresponding to the keyname provided. */
+		assert(input_key.addr);
+		assert(input_iv.addr);
 		INIT_CIPHER_CONTEXT(GTMCRYPT_OP_DECRYPT, input_key, input_iv, rm_ptr->input_cipher_handle, dev_name);
 		rm_ptr->input_encrypted = TRUE;
 		rm_ptr->input_key.addr = input_key.addr;
@@ -1155,6 +1168,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 	}
 	if (init_output_encryption)
 	{	/* Get the key handle corresponding to the keyname provided. */
+		assert(output_key.addr);
+		assert(output_iv.addr);
 		INIT_CIPHER_CONTEXT(GTMCRYPT_OP_ENCRYPT, output_key, output_iv, rm_ptr->output_cipher_handle, dev_name);
 		rm_ptr->output_encrypted = TRUE;
 		rm_ptr->output_key.addr = output_key.addr;

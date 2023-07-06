@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
@@ -47,6 +47,7 @@ error_def(ERR_CENOINDIR);
 error_def(ERR_CETOOLONG);
 error_def(ERR_CETOOMANY);
 error_def(ERR_CEUSRERROR);
+error_def(ERR_DIVZERO);
 error_def(ERR_ERRORSUMMARY);
 error_def(ERR_FMLLSTMISSING);
 error_def(ERR_FMLLSTPRESENT);
@@ -54,6 +55,8 @@ error_def(ERR_FOROFLOW);
 error_def(ERR_INVDLRCVAL);
 error_def(ERR_LABELMISSING);
 error_def(ERR_MAXARGCNT);
+error_def(ERR_NEGFRACPWR);
+error_def(ERR_NUMOFLOW);
 error_def(ERR_PATNOTFOUND);
 error_def(ERR_SRCLIN);
 error_def(ERR_SRCLOC);
@@ -90,6 +93,13 @@ void stx_error_va(int in_error, va_list args)
 	 */
 	if (TREF(xecute_literal_parse))
 	{
+		/* Only report rts_error_in_parse if we encounter one of the four runtime errors
+		 * which are reported at compile-time under certain literal-optimization paths.
+		 * Report it early to prevent it from getting reported out at the Xecute level.
+		 */
+		if ((ERR_DIVZERO == in_error) || (ERR_NEGFRACPWR == in_error)
+				|| (ERR_NUMOFLOW == in_error) || (ERR_PATNOTFOUND == in_error))
+			TREF(rts_error_in_parse) = TRUE;
 		ins_errtriple(in_error);
 		TREF(source_error_found) = (int4)in_error;
 		va_end(dup_args);

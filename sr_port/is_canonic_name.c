@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -131,6 +131,10 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 	gvn = ((0 < src->str.len) && ('^' == src->str.addr[0]));
 	MV_FORCE_STR(src);
 	state = BEFORE_NAME;
+	term = 0;
+	envpart = 0;
+	point = 0;
+	previous = 0;
 	subs_count = -1;
 	*contains_env = 0;
 	subs_max = gvn ? MAX_GVSUBSCRIPTS : MAX_LVSUBSCRIPTS;

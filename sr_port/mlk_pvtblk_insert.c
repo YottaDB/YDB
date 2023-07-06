@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -40,7 +40,8 @@ int mlk_pvtblk_insert(mlk_pvtblk *pblk)
 	{
 		save_store = mlk_pvt_root;
 		mlk_pvt_root = ((link_info *)pblk->pvtctl.region->dyn.addr->cm_blk->usr)->netlocks;
-	}
+	} else
+		save_store = NULL;
 
 	if (!mlk_pvt_root)
 	{

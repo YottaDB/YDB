@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -24,8 +24,8 @@
 #include "io.h"
 #include "iottdef.h"
 #include "gtmio.h"
+#include "iott_setterm.h"
 #include "eintr_wrappers.h"
-#include "setterm.h"
 #include "gtm_isanlp.h"
 #include "svnames.h"
 #include "util.h"
@@ -38,7 +38,7 @@ GBLREF	boolean_t	exit_handler_active;
 
 error_def(ERR_TCSETATTR);
 
-void  resetterm(io_desc *iod)
+void  iott_resetterm(io_desc *iod)
 {
 	int		status;
 	int		save_errno;

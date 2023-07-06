@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2022 Fidelity National Information	*
+ * Copyright (c) 2018-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -17,6 +17,7 @@
 #include "io.h"
 #include "iosp.h"
 #include "iotimer.h"
+#include "iott_setterm.h"
 #include "stringpool.h"
 #include "op.h"
 #include "gdsroot.h"
@@ -34,7 +35,6 @@
 #include "send_msg.h"
 #include "gtmmsg.h"		/* for gtm_putmsg() prototype */
 #include "change_reg.h"
-#include "setterm.h"
 #include "getzposition.h"
 #include "min_max.h"
 #include "mvalconv.h"
@@ -73,7 +73,8 @@ GBLREF	int			dollar_truth, ydb_white_box_test_case_number;
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
 GBLREF	volatile int4		outofband;
-
+GBLREF	uint4			dollar_tlevel;
+GBLREF	int4			gtm_trigger_depth;
 LITREF	mval			literal_minusone, literal_null;
 #ifdef DEBUG_DEFERRED_EVENT
 LITREF unsigned char    svn_index[];
@@ -219,8 +220,14 @@ void ztimeout_set(int4 dummy_param)
 	SETUP_THREADGBL_ACCESS;
 	assert(INTRPT_IN_EVENT_HANDLING == intrpt_ok_state);
 	assert(ztimeout == outofband);
+<<<<<<< HEAD
 	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && ETRAP_IN_EFFECT)
 		|| (jobinterrupt == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
+=======
+	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && ETRAP_IN_EFFECT) || have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)
+		|| (jobinterrupt == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband)
+		|| ((0 == gtm_trigger_depth) && dollar_tlevel))
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	{	/* not a good time, so save it */
 		outofband = no_event;
 		TAREF1(save_xfer_root, ztimeout).event_state = queued;

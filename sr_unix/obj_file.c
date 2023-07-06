@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
@@ -189,7 +189,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 {
 	boolean_t		usehtab, added;
 	int4			cmp;
-	struct sym_table	*sym, *sym1, *newsym;
+	struct sym_table	*sym, *sym1 = NULL, *newsym;
 	stringkey		symkey;
 	ht_ent_str		*syment;
 	DCL_THREADGBL_ACCESS;
@@ -201,7 +201,6 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 	{	/* "Brute force" version of lookup for now (until SYM_HASH_CUTOVER symbols defined) */
 		assert(NULL == compsyms_hashtab || NULL == compsyms_hashtab->base);
 		sym = TREF(defined_symbols);
-		sym1 = NULL;
 		while (sym)
 		{	/* Consider this a match only if type is N_EXT. If we are inserting an external reference symbol
 			 * for the current routine name, we may find a N_TEXT entry. But in this case, we want to add another

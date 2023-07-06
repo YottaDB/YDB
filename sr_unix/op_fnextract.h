@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2018 Fidelity National Information	*
+ * Copyright (c) 2008-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -143,8 +143,12 @@ void OP_FNEXTRACT(int last, int first, mval *src, mval *dest)
 					UTF8_BADCHAR(0, utf_parse_blk.badcharstr, utf_parse_blk.badchartop, 0, NULL);
 				else
 					assertpro(FALSE);		/* Unknown error - no return */
+<<<<<<< HEAD
 				assert(FALSE);
 				srcptr = NULL;	/* needed to silence [-Wsometimes-uninitialized] warning from LLVM compiler */
+=======
+				srcptr = NULL;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			}
 			first_charcnt = utf_parse_blk.scan_char_count;		/* Save char count for "first" */
 		} else

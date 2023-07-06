@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -377,13 +377,14 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 		}
 		sym_num = charcls;
 		state_num++;
+		assertpro(state_num <= MAX_DFA_STATES);
 		for (seq = 1; seq < state_num; seq++)
 		{
 			charcls = 0;
 			ASSERT_IF_1DIM_ARRAY_OVERFLOW(offset, seq + 1);
 			offset[seq + 1]++;
 			offset[seq + 1] += offset[seq];
-			for (maskcls = 0; maskcls < CHAR_CLASSES; maskcls++)
+			for (maskcls = 0; (maskcls < CHAR_CLASSES) && (charcls < MAX_DFA_STATES); maskcls++)
 			{
 				if (expand->num_e[maskcls] > 0)
 				{

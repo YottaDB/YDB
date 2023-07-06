@@ -1,6 +1,6 @@
 /****************************************************************
 *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -153,7 +153,7 @@ void	repl_inst_edit(void)
 	int 			status, save_errno;
 	int			qdbrundown_status, cleanslots_status;
 	off_t			off;
-	unix_db_info		*udi;
+	unix_db_info		*udi = NULL;
 	union semun		semarg;
 	struct semid_ds		semstat;
 
@@ -292,6 +292,7 @@ void	repl_inst_edit(void)
 		}
 		if (cleanslots_status && jnlpool_available)
 		{
+			assert(udi);
 			assert(udi->grabbed_access_sem);
 			/* If shared memory is available and clean up desired,
 			 * then clean up the inactive gtmsource_local structures (slots)
@@ -329,6 +330,7 @@ void	repl_inst_edit(void)
 			}
 		} else if (cleanslots_status)
 		{
+			assert(udi);
 			assert(udi->grabbed_ftok_sem);
 			/* If shared memory is not available and cleaning desired,
 			 * only clean the inactive gtmsrc_lcl structures because the
@@ -364,6 +366,7 @@ void	repl_inst_edit(void)
 	}
 	if (need_lock)
 	{
+		assert(udi);
 		if (jnlpool_available)
 		{
 			assert(udi->grabbed_access_sem);

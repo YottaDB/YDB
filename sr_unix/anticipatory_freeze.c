@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -392,7 +392,7 @@ boolean_t		init_anticipatory_freeze_errors()
 			return FALSE;
 		}
 		/* Need to ignore the rest of the current buffer and exhaust the current line */
-		if (NEWLINE != *(buff_top - 1))
+		if ((0 < buff_top - buff) && (NEWLINE != buff[buff_top - buff - 1]))
 			EXHAUST_CURRENT_LINE(buff, handle, fgets_rc);
 	}
 	if (err_hashtab)

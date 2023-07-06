@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2012-2021 Fidelity National Information	*
+=======
+ * Copyright (c) 2012-2023 Fidelity National Information	*
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -364,7 +368,11 @@ enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 				valBlk[musz_rec] = nBlkId;
 				musz_rec++;
 			} else
-				valBlk[rCnt] = nBlkId;
+			{
+				assert(MAX_RECS_PER_BLK > rCnt);
+				if (MAX_RECS_PER_BLK > rCnt)  /* Our loop macro guarantes rCnt is OK, but SCA doesn't know that */
+					valBlk[rCnt] = nBlkId;
+			}
 		}
 		(mu_subsc) ? (r[nLevl] = musz_rec) : (r[nLevl] = rCnt);
 		/* randomly select next block */

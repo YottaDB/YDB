@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2018 Fidelity National Information	*
+ * Copyright (c) 2017-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -12,6 +12,9 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#ifndef GTMSOURCE_INLINE_H_INCLUDED
+#define GTMSOURCE_INLINE_H_INCLUDED
 
 #include "jnl.h"
 #include "memcoherency.h"
@@ -100,3 +103,4 @@ static inline void jpl_phase2_write_complete(struct jnlpool_addrs_struct *jnlpoo
 	if (!index || ((JPL_PHASE2_COMMIT_ARRAY_SIZE / 2) == index))
 		repl_phase2_cleanup(jnlpool);
 }
+#endif

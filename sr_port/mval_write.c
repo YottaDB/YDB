@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -59,8 +59,12 @@ error_def(ERR_STACKCRIT);
  * destination buffer */
 void mval_write(zshow_out *output, mval *v, boolean_t flush)
 {
+<<<<<<< HEAD
+=======
+	sm_uc_ptr_t	cp;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	uint4		ch;
-	int		fastate = 0, ncommas, src_len, src_cnt, strstart, chlen;
+	int		fastate = 0, ncommas = 0, src_len, src_cnt, strstart, chlen;
 	boolean_t	isctl, isill;
 	char		*strnext;
 	mval		*graphic_str, lmv;

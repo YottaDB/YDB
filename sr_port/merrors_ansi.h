@@ -1286,7 +1286,11 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUTRUNCFAIL */
 	   0,	/* MUTRUNCNOSPACE */
 	   0,	/* MUTRUNCNOTBG */
+<<<<<<< HEAD:sr_port/merrors_ansi.h
 	   0,	/* UNUSEDMSG1457 */
+=======
+	   0,	/* PIDMISMATCH */
+>>>>>>> 3c1c09f2 (GT.M V7.1-001):sr_x86_64/merrors_ansi.h
 	   0,	/* MUTRUNCPERCENT */
 	   0,	/* MUTRUNCSSINPROG */
 	   0,	/* MUTRUNCSUCCESS */

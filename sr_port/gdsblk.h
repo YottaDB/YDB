@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -142,7 +142,7 @@
 #endif
 
 /* Version 4 block header */
-typedef struct
+typedef struct v15_blk_hdr_struct
 {
 	unsigned short	bsiz;		/* block size */
 	unsigned char	levl;		/* block level. level 0 is data level. level 1 is
@@ -152,7 +152,7 @@ typedef struct
 } v15_blk_hdr;
 
 /* Current block header */
-typedef struct
+typedef struct blk_hdr_struct
 {
 	unsigned short	bver;		/* block version - overlays V4 block size */
 	unsigned char	filler;
@@ -163,7 +163,7 @@ typedef struct
 	trans_num	tn;		/* transaction number when block was written */
 } blk_hdr;
 
-typedef struct
+typedef struct rec_hdr_struct
 {
 	unsigned short	rsiz;		/* size of the record in bytes */
 	unsigned char	cmpc;		/* compression count of the record that allows for values up to 252

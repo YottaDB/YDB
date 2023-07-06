@@ -63,11 +63,11 @@ void dse_shift(void)
 	int4		blk_seg_cnt, blk_size, size;
 	sm_uc_ptr_t	bp;
 	srch_blk_status	blkhist;
-	uchar_ptr_t	lbp;
+	uchar_ptr_t	lbp = NULL;
 	uint4		offset, shift;
 
 	DSE_DB_IS_TOO_OLD(cs_addrs, cs_data, gv_cur_region);
-        if (gv_cur_region->read_only)
+	if (gv_cur_region->read_only)
 		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	if (BADDSEBLK == (blk = dse_getblk("BLOCK", DSENOBML, DSEBLKCUR)))		/* WARNING: assignment */
@@ -91,11 +91,11 @@ void dse_shift(void)
 	{
 		if (!cli_get_hex("BACKWARD", &shift))
 			return;
-                if (shift > offset)
+		if (shift > offset)
 		{
 		  	util_out_print("Error: shift greater than offset not allowed.", TRUE);
 			return;
-                }
+		}
 		forward = FALSE;
 	}
 	if (!shift)
@@ -131,6 +131,12 @@ void dse_shift(void)
 	BLK_INIT(bs_ptr, bs1);
 	if (forward)
 	{
+		if (!lbp)
+		{
+			util_out_print("Error:  insufficient memory to perform shift.", TRUE);
+			t_abort(gv_cur_region, cs_addrs);
+			return;
+		}
 		if (shift + size >= cs_addrs->hdr->blk_size)
 		{
 			util_out_print("Error:  block not large enough to accommodate shift.", TRUE);
@@ -161,7 +167,7 @@ void dse_shift(void)
 			free(lbp);
 		return;
 	}
-	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)bp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
+	t_write(&blkhist, bs1, 0, 0, ((blk_hdr_ptr_t)bp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
 	BUILD_AIMG_IF_JNL_ENABLED(cs_data, cs_addrs->ti->curr_tn);
 	t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
 	return;

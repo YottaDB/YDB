@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
@@ -64,7 +64,11 @@ GBLREF	bool			mu_ctrly_occurred;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	int			muint_adj;
+<<<<<<< HEAD
 GBLREF	uint4			mu_int_adj[];
+=======
+GBLREF	int4			mu_int_adj[];
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 GBLREF	uint4			process_id;
 GBLREF	unsigned int		t_tries;
 GBLREF	boolean_t		null_coll_key;
@@ -217,7 +221,9 @@ STATICFNDEF void accum_stats_impsmpl(stat_t *stat, double *r, double *a)
 	for (l = MAX_BT_DEPTH; (0 <= l) && (r[l] < EPS); l--)
 		w[l] = 0;
 	root_level = l;
-	assert(0 <= root_level);
+	assertpro(0 <= root_level);
+	if (0 > root_level)				/* Placate compiler warning on old gcc*/
+		return;
 	w[root_level] = 1;
 	for (k = l - 1; 2 <= l; k--, l--)
 		w[k] = w[l] * r[l];			/* NOTE: consider using log to avoid overflow if it becomes an issue */

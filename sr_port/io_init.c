@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -98,15 +98,20 @@ void io_init(boolean_t term_ctrl)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_SYSCALL, 5,
 							LEN_AND_LIT("open /dev/null on std descriptor"), CALLFROM, errno, 0);
 				assert(newfd == fd);
-			}
-			else
+				status = fstat(fd, &statbuf);
+			} else
+			{
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_SYSCALL, 5,
 					LEN_AND_LIT("fstat of std descriptor"), CALLFROM, errno, 0);
-		} else if (0 < fd)
+				GTM_UNREACHABLE();
+			}
+		}
+		assert(-1 != status);
+		if (0 < fd)
 		{
 			if (1 == fd)
 				out_statbuf = statbuf;
-			else
+			else if (2 == fd)
 				err_same_as_out = (statbuf.st_dev == out_statbuf.st_dev) && (statbuf.st_ino == out_statbuf.st_ino);
 		}
 	}

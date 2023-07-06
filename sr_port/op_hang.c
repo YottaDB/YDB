@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -53,7 +53,7 @@
 #include "send_msg.h"
 #include "gtmmsg.h"		/* for gtm_putmsg() prototype */
 #include "change_reg.h"
-#include "setterm.h"
+#include "iott_setterm.h"
 #include "getzposition.h"
 #include "sleep.h"
 #include "time.h"

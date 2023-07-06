@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2021 Fidelity National Information	*
+ * Copyright (c) 2008-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -144,7 +144,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	gtmrecv_local_ptr_t	gtmrecv_local;
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
 	pid_t			waitpid_res;
-	int4			msg_type, msg_len;
+	int4			msg_type, msg_len = 0;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -370,20 +370,20 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		{	/* Receive the header of a message */
 			assert(REPL_MSG_HDRLEN > *buff_unprocessed);	/* so we dont pass negative length in REPL_RECV_LOOP */
 			REPL_RECV_LOOP(gtmrecv_sock_fd, ((unsigned char *)gtmrecv_msgp) + *buff_unprocessed,
-				       (REPL_MSG_HDRLEN - *buff_unprocessed), REPL_POLL_WAIT)
+					(REPL_MSG_HDRLEN - *buff_unprocessed), REPL_POLL_WAIT)
 				; /* Empty Body */
 			if (SS_NORMAL == status)
 			{
 				assert(remote_side->endianness_known);	/* only then is remote_side->cross_endian reliable */
-		        	if (!remote_side->cross_endian)
-	        		{
-			                msg_len = gtmrecv_msgp->len;
-			                msg_type = gtmrecv_msgp->type;
-			        } else
-			        {
-			                msg_len = GTM_BYTESWAP_32(gtmrecv_msgp->len);
-			                msg_type = GTM_BYTESWAP_32(gtmrecv_msgp->type);
-			        }
+				if (!remote_side->cross_endian)
+				{
+					msg_len = gtmrecv_msgp->len;
+					msg_type = gtmrecv_msgp->type;
+				} else
+				{
+					msg_len = GTM_BYTESWAP_32(gtmrecv_msgp->len);
+					msg_type = GTM_BYTESWAP_32(gtmrecv_msgp->type);
+				}
 				msg_type = (msg_type & REPL_TR_CMP_MSG_TYPE_MASK);
 				assert((REPL_TR_CMP_JNL_RECS == msg_type) || (0 == (msg_len % REPL_MSG_ALIGN)));
 				msg_len = ROUND_UP2(msg_len, REPL_MSG_ALIGN);

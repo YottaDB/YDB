@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -27,8 +27,8 @@
 #include "io_params.h"
 #include "trmdef.h"
 #include "gtmio.h"
+#include "iott_setterm.h"
 #include "stringpool.h"
-#include "setterm.h"
 #include "getcaps.h"
 #include "gtm_isanlp.h"
 #include "gtm_conv.h"
@@ -149,6 +149,12 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 			if (gtm_isanlp(tt_ptr->fildes) == 0)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
+<<<<<<< HEAD
+=======
+		if (IS_GTM_IMAGE)
+			/* Only the true runtime runs with the modified terminal settings */
+			iott_setterm(ioptr);
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		status = getcaps(tt_ptr->fildes);
 		if (1 != status)
 		{

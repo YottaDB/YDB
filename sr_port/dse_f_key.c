@@ -55,7 +55,7 @@ STATICFNDEF void print_reg_if_mismatch(char *key, int keylen)
 	 * i.e. the gld does not map globals beginning with #. There is no reg mismatch possible in that case.
 	 * So skip this processing entirely.
 	 */
-	if (!IS_GVKEY_HASHT_GBLNAME(keylen -2, key))
+	if (!IS_GVKEY_HASHT_GBLNAME(keylen - 2, key))
 	{
 		map = gv_srch_map(original_header, key, keylen - 2, SKIP_BASEDB_OPEN_FALSE); /* -2 to remove two trailing 0s */
 		reg = map->reg.addr;

@@ -168,8 +168,55 @@ void bx_boollit(triple *t, int depth)
 			break;
 		case OC_NOR:
 		case OC_OR:
+<<<<<<< HEAD
 			tvr = (tv[0] || tv[1]);
 			break;
+=======
+		case OC_SOR:
+		case OC_NGT:
+		case OC_GT:
+		case OC_NLT:
+		case OC_LT:
+			for (j = 0;  j < ARRAYSIZE(v); j++)
+			{	/* operands that come here need numeric coercion */
+				assert((OCT_ARITH | OCT_BOOL) & oc_tab[opercode].octype);
+				MV_FORCE_NUMD(v[j]);
+				if (!(MV_NM & v[j]->mvtype))
+				{       /* if we don't have a useful number, the operation won't be valid */
+					TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;  /* improve hints */
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
+					assert(TREF(rts_error_in_parse));
+					return;
+				}
+				tv[j] = MV_FORCE_BOOL(v[j]);	/* type operands as Boolean; needed or harmless and cheap */
+			}
+			switch (opercode)
+			{	/* time to evaluate the Boolean and arithmetic operations */
+			case OC_NAND:
+			case OC_SNAND:
+			case OC_AND:
+			case OC_SAND:
+				tvr = (tv[0] && tv[1]);
+				break;
+			case OC_NOR:
+			case OC_SNOR:
+			case OC_OR:
+			case OC_SOR:
+				tvr = (tv[0] || tv[1]);
+				break;
+			case OC_NGT:
+			case OC_GT:
+				tvr = 0 < numcmp(v[0], v[1]);
+				break;
+			case OC_NLT:
+			case OC_LT:
+				tvr = 0 > numcmp(v[0], v[1]);
+				break;
+			default:
+				assertpro(FALSE & opercode);
+			}
+			break;		/* after numeric coercion and inner switch; subsequent operations avoid the coercion */
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		case OC_NCONTAIN:
 		case OC_CONTAIN:
 			tvr = 1;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -127,7 +127,7 @@ enum gds_t_mode
 
 typedef struct key_value_struct
 {
-	gv_key_buf		keybuf;
+	gv_key_buf_fixed	keybuf;
 	mstr			value;
 	struct key_value_struct	*next;
 } key_cum_value;
@@ -153,8 +153,12 @@ typedef struct cw_set_element_struct
 	key_cum_value	*recompute_list_tail;		/* pointer to a list of keys (with values) that need to be recomputed */
 	enum gds_t_mode	mode;				/* Create, write, or write root	*/
 	block_id	blk;				/* Block number or a hint block number for creates */
-	unsigned char	*upd_addr;			/* Address of the block segment array containing update info
-							 * for this block */
+	union
+	{
+		block_id			*map;	/* Array of block ids to update in this bitmap block */
+		struct blk_segment_struct	*blk;	/* Array of updates for this data block */
+		void				*ptr;	/* Neutral pointer for initialization/range check */
+	} upd_addr;					/* Update info */
         unsigned char   *new_buff;     			/* Address of a buffer created for each global mentioned inside of a
                                        			 * transaction more then once (for tp) */
 	gv_namehead	*blk_target;			/* address of the "gv_target" associated with a new_buff

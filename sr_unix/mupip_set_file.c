@@ -131,7 +131,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				stdnullcoll_status, trigger_flush_limit_status, wrt_per_flu_status, full_blkwrt_status,
 				problksplit_status;
 	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_flush_trigger, new_hard_spin,
-				new_key_size, new_lock_space, new_mutex_space, new_null_subs, new_rec_size, new_sleep_cnt,
+				new_key_size, new_lock_space, new_mutex_space, new_null_subs = -1, new_rec_size, new_sleep_cnt,
 				new_spin_sleep, new_statsdb_alloc, new_stdnullcoll, new_wrt_per_flu, reserved_bytes,
 				new_full_blkwrt, new_problksplit;
 	sgmnt_data_ptr_t	csd, pvt_csd;
@@ -166,6 +166,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVACCMETHOD);
 			exit_stat |= EXIT_ERR;
+			access = dba_dummy;
 		}
 		need_standalone = TRUE;
 	} else
@@ -554,6 +555,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_ERR);
 				continue;
 			}
+			assert(dba_dummy != access);
 			if ((n_dba != access) && (pvt_csd->acc_meth != access))	/* n_dba is a proxy for no change */
 			{
 				acc_meth_changing = TRUE;
@@ -663,7 +665,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 			if (encryptable_status)
 			{
-				assert(pvt_csd->fully_upgraded || (0 == pvt_csd->blks_to_upgrd) || (BLK_ID_32_VER < pvt_csd->desired_db_format));
+				assert(pvt_csd->fully_upgraded || (0 == pvt_csd->blks_to_upgrd)
+						|| (BLK_ID_32_VER < pvt_csd->desired_db_format));
 				if (dba_mm == access_new)
 				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOMM, 2, fn_len, fn);
@@ -712,7 +715,10 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (mutex_space_status)
 				NUM_CRIT_ENTRY(pvt_csd) = new_mutex_space;
 			if (null_subs_status)
+			{
+				assert(-1 != new_null_subs);
 				gv_cur_region->null_subs = pvt_csd->null_subs = (unsigned char)new_null_subs;
+			}
 			if (qdbrundown_status)
 				pvt_csd->mumps_can_bypass = (CLI_PRESENT == qdbrundown_status);
 			if (rec_size_status)
@@ -828,7 +834,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				mu_gv_cur_reg_free();
 				continue;
 			}
+			fd = FD_INVALID;
 		}
+		assert(dba_dummy != access);
 		access_new = (n_dba == access ? csd->acc_meth : access);
 		if (encryption_complete_status)
 		{
@@ -856,6 +864,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				reg_exit_stat |= EXIT_WRN;
 			}
 			/* AIO = ON, implies we need to use O_DIRECT. Check for db vs fs blksize alignment issues. */
+			assert(!got_standalone || (FD_INVALID != fd));
 			fsb_size = get_fs_block_size(got_standalone ? fd : FILE_INFO(gv_cur_region)->fd);
 			if (0 != (csd->blk_size % fsb_size))
 			{
@@ -1029,6 +1038,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					fn_len, fn, csd->problksplit);
 			if (got_standalone)
 			{
+				assert(FD_INVALID != fd);
 				if (0 == memcmp(pvt_csd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
 					db_header_dwnconv(pvt_csd);
 				DB_LSEEKWRITE(NULL,((unix_db_info *)NULL),NULL,fd,0,pvt_csd,SIZEOF(sgmnt_data),status);
@@ -1102,6 +1112,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			exit_stat |= reg_exit_stat;
 		if (got_standalone)
 		{
+			assert(FD_INVALID != fd);
 			CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 			db_ipcs_reset(gv_cur_region);
 		} else

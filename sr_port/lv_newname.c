@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -60,7 +60,7 @@ void lv_newname(ht_ent_mname *hte, symval *sym)
 	 * in its tp_frame and save the entry there. This is so var set in later TP frame levels still get restored
 	 * even if the TSTART frame they were created in gets committed.
 	 */
-	DEBUG_ONLY(first_tf_saveall = NULL);
+	first_tf_saveall = NULL;
 	for (tf = tp_pointer; (NULL != tf) && (tf->sym == sym); tf = tf->old_tp_frame)
 	{
 		if (tf->tp_save_all_flg)

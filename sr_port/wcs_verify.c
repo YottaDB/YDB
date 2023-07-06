@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -68,8 +68,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 	 * returns a FALSE for systemic problems that require a wcs_recover or something more drastic.
 	 */
 
-	uint4			cnt, lcnt ;
-	ssize_t			offset ;
+	uint4			cnt, lcnt;
+	ssize_t			offset;
 	trans_num		max_tn, tmp_8byte;
 	INTPTR_T		bp_lo, bp_top, bp, cr_base, cr_top, bt_top_off, bt_base_off;
 	sm_uc_ptr_t		bptmp, bp_bmp;
@@ -166,7 +166,10 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			csa->bt_base = (bt_rec_ptr_t)((sm_uc_ptr_t)csd + cnl->bt_base_off);
 		}
 	} else
+	{
 		n_bts = csd->n_bts;
+		offset = 0;
+	}
 	if (csa->ti != &csd->trans_hist)
 	{
 		assert(expect_damage);
@@ -177,6 +180,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 	}
 	if (dba_mm != csd->acc_meth)
 	{
+		assert(offset);
 		n_bts = csd->n_bts;
 		offset += n_bts * SIZEOF(bt_rec);
 		if (0 != (cnl->cache_off + CACHE_CONTROL_SIZE(csd)))
@@ -203,7 +207,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				RTS_ERROR_TEXT("bt_buckets"), csd->bt_buckets, getprime(n_bts));
 			csd->bt_buckets = getprime(n_bts);
 		}
-	}
+	} else
+		n_bts = 0;
 	if (JNL_ALLOWED(csd))
 	{
 		jpc = csa->jnl;
@@ -227,9 +232,14 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				jpc->jnl_buff = jbp;
 			}
 		}
+	} else
+	{
+		jpc = NULL;
+		jbp = NULL;
 	}
 	if (dba_mm != csd->acc_meth)
 	{
+		assert(n_bts);
 		bt_lo = csa->bt_base;
 		bt_hi = bt_lo + n_bts;
 		cr_lo = (cache_rec_ptr_t)csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;

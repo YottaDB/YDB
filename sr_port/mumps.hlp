@@ -275,7 +275,7 @@
    | ZWRite      | Displays all or some local or global variables.          |
    |-------------+----------------------------------------------------------|
    | $ZCSTATUS   | Holds the value of the status code for the last compile  |
-   |             | performed by a ZCOMPILE command.                         |
+   |             | performed by a ZCOMPILE, ZLINK or auto-ZLINK.            |
    |-------------+----------------------------------------------------------|
    | $ZEDit      | Contains the status code for the last ZEDit.             |
    |-------------+----------------------------------------------------------|
@@ -332,7 +332,7 @@
    | ZMessage    | Signals the specified condition.                         |
    |-------------+----------------------------------------------------------|
    | $ZCSTATUS   | Holds the value of the status code for the last compile  |
-   |             | performed by a ZCOMPILE command.                         |
+   |             | performed by a ZCOMPILE, ZLINK or auto-ZLINK.            |
    |-------------+----------------------------------------------------------|
    | $ZEOF       | Contains indication of whether the last READ reached     |
    |             | end-of-file.                                             |
@@ -6158,8 +6158,12 @@
 
    ZCOM[PILE][:tvexpr] expr[,...]
 
-   The $ZCSTATUS intrinsic special variable holds the value of the status
-   code for the compilation performed by a ZCOMPILE command.
+   The $ZCSTATUS intrinsic special variable which holds the value of the
+   status code for the compilation performed by a run-time compilation
+   command.
+
+   If the argument does not include compilation qualifiers, the commmand uses
+   the $ZCOMPILE ISV for possible qualifiers.
 
 3 Examples
    Examples
@@ -8943,7 +8947,7 @@
    |                   |              | Returns the replication instance    |
    |                   |              | file name for the current Journal   |
    |                   |              | Pool and an empty string when there |
-   | ""JNLPOOL"        | none         | is no Journal Pool. Note that the   |
+   | "JNLPOOL"         | none         | is no Journal Pool. Note that the   |
    |                   |              | current Journal Pool may not be     |
    |                   |              | associated with the last global     |
    |                   |              | accessed by an extended reference.  |
@@ -11903,14 +11907,21 @@
    $ZCOmpile
 
    $ZCO[MPILE] contains a string value composed of one or more qualifiers
+<<<<<<< HEAD
    that control the YottaDB compiler. Explicit ZLINKs and auto-ZLINKs use these
    qualifiers as defaults for any compilations that they perform.
+=======
+   that control the GT.M run-time compiler. ZCOMPILE, explicit ZLINKs and
+   auto-ZLINKs use these qualifiers as defaults for any compilations they
+   perform.
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
    $ZCOMPILE is a read-write ISV, that is, it can appear on the left side of
    the equal sign (=) in the argument to the SET command. A $ZCOMPILE value
    has the form of a list of M command qualifiers each separated by a space (
    ).
 
+<<<<<<< HEAD
    When the environment variable ydb_compile is defined, YottaDB initializes
    $ZCOMPILE to the translation of ydb_compile. Otherwise YottaDB initializes
    $ZCOMPILE to null. Changes to the value of $ZCOMPILE during a YottaDB
@@ -11918,6 +11929,13 @@
    value of the environment variable ydb_compile.
 
    ZCOMPILE returns a status of 1 after any error in compilation.
+=======
+   When the gtmcompile environment variable is defined, GT.M initializes
+   $ZCOMPILE to the translation of $gtmcompile. Otherwise GT.M initializes
+   $ZCOMPILE to null. Changes to the value of $ZCOMPILE during a GT.M
+   invocation only last for the current invocation and do not change the
+   value of the $gtmcompile environment variable.
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
    When $ZCOMPILE is null, YottaDB uses the default M command qualifiers
    -IGNORE, -LABEL=LOWER, -NOLIST, and -OBJECT.
@@ -11948,12 +11966,21 @@
    $ZCstatus
 
    $ZC[STATUS] holds the value of the status code for the last compilation
+<<<<<<< HEAD
    performed by a ZCOMPILE command. One (1) indicates a clean compilation, a
    positive number greater than one is an error code you can turn into text
    with $ZMESSAGE(), and a negative number is a negated error code that
    indicates YottaDB was not able to produce an object file. The error details
    appear in the compilation output, so $ZCSTATUS typically contains the code
    for ERRORSUMMARY.
+=======
+   performed by a ZCOMPILE, ZLINK or auto-ZLINK . One (1) indicates a clean
+   compilation, a positive number greater than one is an error code you can
+   turn into text with $ZMESSAGE(), and a negative number is a negated error
+   code that indicates GT.M was not able to produce an object file. The error
+   details appear in the compilation output, so $ZCSTATUS typically contains
+   the code for ERRORSUMMARY.
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
    YottaDB does not permit the SET command to modify $ZCSTATUS.
 
@@ -13462,9 +13489,17 @@
    Note that YottaDB only recognizes interrupts such as from $ZTIMEOUT at points
    where it can properly resume operation, such as the beginning of a line,
    when waiting on a command with a timeout, or when starting a FOR
+<<<<<<< HEAD
    iteration. When a timeout occurs, if the last assignment specified no
    vector, YottaDB uses the current $ETRAP or $ZTRAP. When a $ZTIMEOUT expires,
    it invokes one of three possible vectors:
+=======
+   iteration. GT.M defers recognition of a $ZTIMEOUT arriving while executing
+   a TP transaction until after a TROLLBACK or the "master" TCOMMIT. When a
+   timeout occurs, if the last assignment specified no vector, GT.M uses the
+   current $ETRAP or $ZTRAP. When a $ZTIMEOUT expires, it invokes one of
+   three possible vectors:
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
      o Its own labelref, which creates a new stack frame, from which it
        returns to the point at which it was recognized - similar to what
@@ -13480,7 +13515,7 @@
        documentation
 
    In all cases the invoked code can alter the behavior using the tools at
-   its disposal - e.g. GOTO, ZGOTO, $ECODE, etc.
+   its disposal - for example, GOTO, ZGOTO, $ECODE, etc.
 
    **Warning**
 
@@ -21637,8 +21672,8 @@ characters
    |                          | subroutine.                                 |
    |--------------------------+---------------------------------------------|
    |                          | Holds the value of the status code for the  |
-   | $ZCSTATUS                | last compilation performed by a ZCOMPILE    |
-   |                          | command.                                    |
+   | $ZCSTATUS                | last compilation performed by a ZCOMPILE,   |
+   |                          | ZLINK or auto-ZLINK.                        |
    |--------------------------+---------------------------------------------|
    |                          | Holds the value of the status code for the  |
    | $ZEDIT                   | last edit session invoked by a ZEDIT        |

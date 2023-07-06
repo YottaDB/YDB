@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -104,8 +104,8 @@ char	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char **ext_buff, int *extract_bu
 
 char	*jnl2ext(char *jnl_buff, char *ext_buff, char *ext_bufftop)
 {
-  	char		*curr, *val_ptr, rectype;
-	unsigned char	*ptr;
+	char		*curr, *val_ptr;
+	unsigned char	*ptr, rectype;
 	jnl_record	*rec;
 	gv_key		*key;
 	jnl_string	*keystr, *ztwormstr;

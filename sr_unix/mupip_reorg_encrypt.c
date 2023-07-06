@@ -177,7 +177,12 @@ void mupip_reorg_encrypt(void)
 	uint4			lcl_update_trans, pid, bptr_size;
 	jnl_private_control	*jpc;
 #	ifdef DEBUG
+<<<<<<< HEAD
 	uint4			reencryption_count;
+=======
+	uint4			reencryption_count = 0;
+	block_id		initial_blk_cnt;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 #	endif
 	unix_db_info		*udi;
 	DCL_THREADGBL_ACCESS;
@@ -558,20 +563,29 @@ void mupip_reorg_encrypt(void)
 					mu_reorg_encrypt_in_prog = MUPIP_REORG_IN_PROG_TRUE;
 					if (SS_NORMAL != status1)
 					{
-						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status1);
-						util_out_print("Region !AD : Error occurred while reading block [0x!XL]",
-								TRUE, REG_LEN_STR(reg), curblk);
-						reg_status = ERR_MUNOFINISH;
+						if ((-1 == status1) && (curblk >= csd->trans_hist.total_blks))
+						{
+							total_blks = csd->trans_hist.total_blks;
+							last_bmp = ROUND_DOWN2(total_blks - 1, BLKS_PER_LMAP);
+							assert(NULL == reorg_encrypt_restart_csa);
+							assert(SS_NORMAL == reg_status);
+							curbmp = last_bmp; /* to "break" out of 1st level (outermost) for loop */
+							lcnt = mapsize;	/* to break out of 2nd level (outer) for-loop */
+							util_out_print("Region !AD : Concurrent TRUNCATE reduced blocks [0x!@XQ]",
+									TRUE, REG_LEN_STR(reg), &csd->trans_hist.total_blks);
+						} else
+						{
+							gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+									status1);
+							reg_status = ERR_MUNOFINISH;
+						}
+						util_out_print("Region !AD : Error occurred while reading block [0x!@XQ]",
+								TRUE, REG_LEN_STR(reg), &curblk);
 						break;
 					}
 					blk_tn = ((blk_hdr_ptr_t)buff)->tn;
 					if (blk_tn >= start_tn)
 						continue;
-					if ((((blk_hdr_ptr_t)buff)->bver < csd->desired_db_format)
-							&& (0 == ((blk_hdr_ptr_t)buff)->levl))
-					{	/* REORG -ENCRYPT must do IO so it upgrades data blocks */
-						((blk_hdr_ptr_t)buff)->bver = csd->desired_db_format;
-					}
 				}
 				/* Begin non-TP transaction to (re)encrypt the block.
 				 * The way we do that is by updating the block using a null update array.
@@ -616,7 +630,7 @@ void mupip_reorg_encrypt(void)
 					{	/* Means a bitmap block. */
 						BLK_ADDR(blkid_ptr, SIZEOF(block_id), block_id);
 						*blkid_ptr = 0;
-						t_write_map(blkhist, (unsigned char *)blkid_ptr, curr_tn, 0);
+						t_write_map(blkhist, blkid_ptr, curr_tn, 0);
 						assert(&alt_hist.h[0] == blkhist);
 						alt_hist.h[0].blk_num = 0; /* create empty history for bitmap block */
 						assert(update_trans);
@@ -659,7 +673,7 @@ void mupip_reorg_encrypt(void)
 							BLK_SEG(bs_ptr, blkBase + SIZEOF(new_hdr),
 								new_hdr.bsiz - SIZEOF(new_hdr));
 							BLK_FINI(bs_ptr, bs1);
-							t_write(blkhist, (unsigned char *)bs1, 0, 0,
+							t_write(blkhist, bs1, 0, 0,
 								((blk_hdr_ptr_t)blkBase)->levl, FALSE,
 								FALSE, GDS_WRITE_PLAIN);
 							/* The directory tree status for now is only used to determine whether

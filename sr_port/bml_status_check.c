@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2007, 2008 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2007-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +65,16 @@ void	bml_status_check(cw_set_element *cs)
 				: NULL;
 		} else
 		{
+<<<<<<< HEAD
 			bmlbuff = (blk_hdr_ptr_t)mm_read(bmlblk);
+=======
+			bmlbuff = (blk_hdr_ptr_t)mm_read(bmlblk, FALSE);
+			/* mm_read would have incremented the GVSTATS n_dsk_read counter. But we dont want that to happen
+			 * because this function is invoked only in debug builds and yet we want the same counter
+			 * value for both pro and dbg builds. So undo that action immediately.
+			 */
+			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_dsk_read, (gtm_uint64_t)-1);/* note the -1 causes the undo */
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			assert(NULL != bmlbuff);
 		}
 		if (NULL != bmlbuff)

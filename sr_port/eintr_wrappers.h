@@ -499,6 +499,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 }
 
 #if defined(DEBUG)
+<<<<<<< HEAD
 #define SYSCONF(PARM, RC)									\
 {												\
 	intrpt_state_t		prev_intrpt_state;						\
@@ -517,6 +518,22 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	 * macros because the "ENABLE_INTERRUPTS" call above does the same thing		\
 	 * (invoke "DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED" eventually).			\
 	 */											\
+=======
+#define SYSCONF(PARM, RC)							\
+{										\
+	intrpt_state_t		prev_intrpt_state;				\
+										\
+	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);			\
+	if (gtm_white_box_test_case_enabled					\
+		&& (WBTEST_SYSCONF_WRAPPER == gtm_white_box_test_case_number))	\
+		{									\
+			DBGFPF((stderr, "will sleep indefinitely now\n"));		\
+			while (gtm_white_box_test_case_enabled)				\
+				LONG_SLEEP(60);						\
+		}									\
+		RC = sysconf(PARM);							\
+		ENABLE_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);		\
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 }
 #else
 #define SYSCONF(PARM, RC)									\

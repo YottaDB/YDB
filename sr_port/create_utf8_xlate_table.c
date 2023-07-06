@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2020 Fidelity National Information	*
+ * Copyright (c) 2018-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -54,7 +54,11 @@ hash_table_int4 *create_utf8_xlate_table(mval *srch, mval *rplc, mstr *m_xlate)
 	assertpro((xlate_len >= srch->str.char_len) && ((NUM_CHARS * SIZEOF(int4)) <= xlate_len));
 	memset(xlate, NO_VALUE, xlate_len);
 	if (!((srch->mvtype & MV_UTF_LEN) && srch->str.len == srch->str.char_len))
+<<<<<<< HEAD
 	{       /* need hash table if srch contains multi-byte UTF-8 characters (i.e. is not an ASCII string) */
+=======
+	{	/* need hash table if srch is a not a sting of single bytes */
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		if (TREF(compile_time))
 			xlate_hash = (hash_table_int4*)mcalloc(SIZEOF(hash_table_int4));
 		else
@@ -75,11 +79,16 @@ hash_table_int4 *create_utf8_xlate_table(mval *srch, mval *rplc, mstr *m_xlate)
 		rcur = (char *)UTF8_MBTOWC(rcur, rtop, rcode);
 		if (1 == (scur - sprev))
 		{
+<<<<<<< HEAD
 			int	 index;
 
 			index = *(unsigned char *)sprev;
 			if (NO_VALUE == xlate[index])		/* 1st replacement rules, so ignore any stragglers */
 				xlate[index] = (rprev - rbase);
+=======
+			if (NO_VALUE == xlate[(unsigned char)*sprev])	/* 1st replacement rules, so ignore any stragglers */
+				xlate[(unsigned char)*sprev] = (rprev - rbase);
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		} else
 		{
 			assert(NULL != xlate_hash);
@@ -95,11 +104,16 @@ hash_table_int4 *create_utf8_xlate_table(mval *srch, mval *rplc, mstr *m_xlate)
 		scur = (char *)UTF8_MBTOWC(scur, stop, scode);
 		if (1 == (scur - sprev))
 		{
+<<<<<<< HEAD
 			int	 index;
 
 			index = *(unsigned char *)sprev;
 			if (NO_VALUE == xlate[index])
 				xlate[index] = DELETE_VALUE;
+=======
+			if (NO_VALUE == xlate[(unsigned char)*sprev])
+				xlate[(unsigned char)*sprev] = DELETE_VALUE;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		} else
 		{
 			assert(NULL != xlate_hash);

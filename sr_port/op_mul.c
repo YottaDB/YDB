@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -59,12 +59,20 @@ void	op_mul(mval *u, mval *v, mval *p)
 			promote(&w); promote(&z);
 			u = &w;	     v = &z;
 		}
+<<<<<<< HEAD
 	} else if (u_mvtype & MV_INT)
+=======
+	} else if (u->mvtype & MV_INT)
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	{
 		w = *u;
 		promote(&w);
 		u = &w;
+<<<<<<< HEAD
 	} else if (v_mvtype & MV_INT)
+=======
+	} else if (v->mvtype & MV_INT)
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	{
 		w = *v;
 		promote(&w);
@@ -84,8 +92,13 @@ void	op_mul(mval *u, mval *v, mval *p)
 		*p = literal_zero;
 	else
 	{
-		p->mvtype = MV_NM;
-		p->sgn = u->sgn ^ v->sgn; p->e = exp;
+		if (p->m[1] || p->m[0])
+		{
+			p->mvtype = MV_NM;
+			p->sgn = u->sgn ^ v->sgn;
+			p->e = exp;
+		} else
+			*p = literal_zero;
 	}
 	assert(p->m[1] < MANT_HI);
 }

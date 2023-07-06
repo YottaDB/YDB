@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2009-2022 Fidelity National Information	*
+ * Copyright (c) 2009-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -57,7 +57,7 @@ void op_killaliasall(void)
 	lv_val		*lvp, *lvp_top, *lvrefp;
 	symval		*symv;
 	int		lowest_symvlvl;
-	ht_ent_mname	**htearraycur = NULL, **htearray = NULL, **htearraytop;
+	ht_ent_mname	**htearraycur = NULL, **htearray = NULL, **htearraytop = NULL;
 
 	SET_ACTIVE_LV(NULL, TRUE, actlv_op_killaliasall);	/* If we get here, subscript set was successful.
 								 * Clear active_lv to avoid later cleanup issues */

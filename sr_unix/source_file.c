@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -63,6 +63,7 @@ GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
 LITREF	mval		literal_notimeout;
 LITREF	mval		literal_null;
 LITREF	mval		literal_zero;
+LITREF	mval		literal_statsDB_gblname;
 
 static bool	tt_so_do_once;
 static io_pair	compile_src_dev;
@@ -125,13 +126,21 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 	ESTABLISH(source_ch);
 	tt_so_do_once = FALSE;
 	zsrch_clr(STRM_COMP_SRC);	/* Clear any existing search cache */
-	for (i = 0; ; i++)
+	for (i = 0; ; )
 	{
 		plen.p.pint = op_fnzsearch(&fstr, STRM_COMP_SRC, 0, &ret);	/* 3rd argument of 0 means internal invocation */
 		if (!ret.str.len)
 		{
 			if (!i)
 			{
+				fstr.str.addr = faddr;
+				fstr.str.len = flen;
+				plen.p.pint = op_fnzsearch(&fstr, STRM_COMP_SRC, 0, &ret);
+				if (ret.str.len)
+				{	/* if original name exists, clear search stream with return value so continue finds file */
+					zsrch_clr(STRM_COMP_SRC);
+					continue;
+				}
 				dec_err(VARLSTCNT(4) ERR_FILENOTFND, 2, fstr.str.len, fstr.str.addr);
 				TREF(dollar_zcstatus) = -ERR_ERRORSUMMARY;
 			}
@@ -145,14 +154,7 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 		p = &source_file_name[plen.p.pblk.b_dir];
 		if ((plen.p.pblk.b_dir >= SIZEOF("/dev/") - 1) && !MEMCMP_LIT(source_file_name, "/dev/"))
 			tt_so_do_once = TRUE;
-		else if (MFtIsReqd && (plen.p.pblk.b_ext != 2 || ('M' != p[plen.p.pblk.b_name + 1]
-			&&  'm' != p[plen.p.pblk.b_name + 1])))
-		{	/* M filetype is required but not present */
-			dec_err(VARLSTCNT(4) ERR_FILEPARSE, 2, source_name_len, source_file_name);
-			TREF(dollar_zcstatus) = -ERR_ERRORSUMMARY;
-			continue;
-		}
-		if (i || !MV_DEFINED(&cmd_qlf.object_file))
+		if (i)
 		{
 			routine_name.len = MIN(MAX_MIDENT_LEN, plen.p.pblk.b_name);
 			memcpy(routine_name.addr, p, routine_name.len);
@@ -164,6 +166,7 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 				gtm_putmsg_csa(CSA_ARG(NUL) VARLSTCNT(5) ERR_NOTMNAME, 2, source_name_len, source_file_name,
 					ERR_ZLNOOBJECT);
 				TREF(dollar_zcstatus) = -ERR_ERRORSUMMARY;
+				i++;
 				continue;
 			}
 			module_name.len = int_module_name.len = routine_name.len;
@@ -181,6 +184,7 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 		}
 		if (tt_so_do_once)
 			break;
+		i++;
 	}
 	REVERT;
 }

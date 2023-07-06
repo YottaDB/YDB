@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2022 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -598,20 +598,19 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 		 */
 		assert((REPL_FETCH_RESYNC != msg.type) || !remote_side_endianness_known);
 		*msg_type = msg.type;
-		*start_flags = START_FLAG_NONE;
 		memcpy((uchar_ptr_t)recvd_jnl_seqno, (uchar_ptr_t)&msg.msg[0], SIZEOF(seq_num));
 		if (REPL_START_JNL_SEQNO == msg.type)
 		{
+			int lcl_start_flags;
+
 			if (msg_is_cross_endian)
 				*recvd_jnl_seqno = GTM_BYTESWAP_64(*recvd_jnl_seqno);
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "Received REPL_START_JNL_SEQNO message with SEQNO "
 				"%llu [0x%llx]\n", INT8_PRINT(*recvd_jnl_seqno), INT8_PRINT(*recvd_jnl_seqno));
-			if (msg_is_cross_endian)
-				((repl_start_msg_ptr_t)&msg)->start_flags =
-					GTM_BYTESWAP_32(((repl_start_msg_ptr_t)&msg)->start_flags);
-			*start_flags = ((repl_start_msg_ptr_t)&msg)->start_flags;
+			lcl_start_flags = msg_is_cross_endian ? GTM_BYTESWAP_32(((repl_start_msg_ptr_t)&msg)->start_flags)
+								: ((repl_start_msg_ptr_t)&msg)->start_flags;
 			assert(!msg_is_cross_endian || (NODE_ENDIANNESS != ((repl_start_msg_ptr_t)&msg)->node_endianness));
-			if (*start_flags & START_FLAG_STOPSRCFILTER)
+			if (lcl_start_flags & START_FLAG_STOPSRCFILTER)
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE,
 					 "Start JNL_SEQNO msg tagged with STOP SOURCE FILTER\n");
@@ -625,7 +624,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			 * to check if the START_FLAG_VERSION_INFO bit is set in start_flags. If not the protocol is V50.
 			 * V51 implies support for multi-site while V50 implies dual-site configuration only.
 			 */
-			if (*start_flags & START_FLAG_VERSION_INFO)
+			if (lcl_start_flags & START_FLAG_VERSION_INFO)
 			{
 				assert(REPL_PROTO_VER_DUALSITE != ((repl_start_msg_ptr_t)&msg)->proto_ver);
 				remote_side->is_supplementary = ((repl_start_msg_ptr_t)&msg)->is_supplementary;
@@ -635,13 +634,24 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPL2OLD, 4, LEN_AND_STR(UNKNOWN_INSTNAME),
 					LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname));
 			}
-			assert(*start_flags & START_FLAG_HASINFO); /* V4.2+ versions have jnl ver in the start msg */
+			assert(lcl_start_flags & START_FLAG_HASINFO); /* V4.2+ versions have jnl ver in the start msg */
 			remote_side->jnl_ver = ((repl_start_msg_ptr_t)&msg)->jnl_ver;
 			REPL_DPRINT3("Local jnl ver is octal %o, remote jnl ver is octal %o\n",
 				this_side->jnl_ver, remote_side->jnl_ver);
 			repl_check_jnlver_compat(!remote_side->cross_endian);
+<<<<<<< HEAD
 			remote_side->is_std_null_coll = (*start_flags & START_FLAG_COLL_M) ? TRUE : FALSE;
 			remote_side->trigger_supported = (*start_flags & START_FLAG_TRIGGER_SUPPORT) ? TRUE : FALSE;
+=======
+			assert(remote_side->jnl_ver > V15_JNL_VER || 0 == (lcl_start_flags & START_FLAG_COLL_M));
+			if (remote_side->jnl_ver <= V15_JNL_VER)
+				lcl_start_flags &= ~START_FLAG_COLL_M; /* zap it for pro, just in case */
+			remote_side->is_std_null_coll = (lcl_start_flags & START_FLAG_COLL_M) ? TRUE : FALSE;
+			assert((remote_side->jnl_ver >= V19_JNL_VER) || (0 == (lcl_start_flags & START_FLAG_TRIGGER_SUPPORT)));
+			if (remote_side->jnl_ver < V19_JNL_VER)
+				lcl_start_flags &= ~START_FLAG_TRIGGER_SUPPORT; /* zap it for pro, just in case */
+			remote_side->trigger_supported = (lcl_start_flags & START_FLAG_TRIGGER_SUPPORT) ? TRUE : FALSE;
+>>>>>>> 3c1c09f2 (GT.M V7.1-001)
 #			ifdef GTM_TRIGGER
 			if (!remote_side->trigger_supported)
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Warning : Secondary does not support GT.M "
@@ -649,7 +659,8 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 #			endif
 			/* remote_side->null_subs_xform is initialized later in function "gtmsource_process" */
 			(TREF(replgbl)).trig_replic_warning_issued = FALSE;
-			remote_side->tls_requested = (*start_flags & START_FLAG_ENABLE_TLS) ? TRUE : FALSE;
+			remote_side->tls_requested = (lcl_start_flags & START_FLAG_ENABLE_TLS) ? TRUE : FALSE;
+			*start_flags = lcl_start_flags;
 			if (REPL_PROTO_VER_REMOTE_LOGPATH > remote_side->proto_ver)
 				return SS_NORMAL; /* Remote side doesn't support REPL_LOGFILE_INFO message */
 			SEND_REPL_LOGFILE_INFO(jnlpool->gtmsource_local->log_file, logfile_msg);

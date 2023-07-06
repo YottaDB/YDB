@@ -138,7 +138,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	boolean_t		need_jnl_sync, queue_empty, got_lock, bmp_status, do_asyncio, wtfini_called_once;
 	cache_que_head_ptr_t	ahead, whead;
 	cache_state_rec_ptr_t	csr, csrfirst;
-	int4			err_status = 0, n, n1, n2, max_ent, max_writes, save_errno;
+	int4			err_status = 0, n = INTERLOCK_FAIL, n1, n2, max_ent, max_writes, save_errno;
 	size_t			size ;
 	jnl_buffer_ptr_t	jb;
 	jnl_private_control	*jpc;
@@ -155,16 +155,16 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	boolean_t		is_mm, was_crit;
 	uint4			curr_wbox_seq_num;
 	int			try_sleep, rc;
-	gd_region		*sav_cur_region;
-	sgmnt_addrs		*sav_cs_addrs;
-	sgmnt_data		*sav_cs_data;
-	jnlpool_addrs_ptr_t	sav_jnlpool;
+	gd_region		*sav_cur_region = NULL;
+	sgmnt_addrs		*sav_cs_addrs = NULL;
+	sgmnt_data		*sav_cs_data = NULL;
+	jnlpool_addrs_ptr_t	sav_jnlpool = NULL;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_ERROR_POLICY_CSA */
 	intrpt_state_t		prev_intrpt_state;
 	char			*in, *out;
 	int			in_len;
 	int4			gtmcrypt_errno = 0;
-	gd_segment		*seg;
+	gd_segment		*seg = FALSE;
 	boolean_t		use_new_key, skip_in_trans, skip_sync, sync_keys;
 	que_ent_ptr_t		next, prev;
 	void_ptr_t		retcsrptr;
@@ -321,7 +321,10 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 						csr = NULL; /* no longer on the active queue */
 					rel_latch(&ahead->latch);
 				} else
+				{
+					cr = NULL;
 					csr = NULL; /* did not get the lock */
+				}
 				--fast_lock_count;
 				assert(0 <= fast_lock_count);
 			}
@@ -587,6 +590,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 					 * "reorg_encrypt_restart_csa", no crit on any region etc.) all of which are not
 					 * guaranteed in some cases.
 					 */
+					assert(seg);
 					INIT_DB_OR_JNL_ENCRYPTION(csa, csd, seg->fname_len, seg->fname, gtmcrypt_errno);
 					save_errno = gtmcrypt_errno;
 					if (0 == save_errno)
@@ -800,6 +804,7 @@ writes_completed:
 	{	/* Now that we have done all cleanup (reinserted the cache-record that failed the write and cleared cnl->in_wtstart
 		 * and cnl->intent_wtstart, go ahead and issue the error.
 		 */
+		assert(seg);
 		GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
 	}
 	if (pushed_region)

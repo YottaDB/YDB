@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
@@ -766,7 +766,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				jnl_info.total_blks    = csd->trans_hist.total_blks;
 				jnl_info_ptr = &jnl_info;
 				GTMCRYPT_COPY_ENCRYPT_SETTINGS(csd, jnl_info_ptr);
-                                if (EXIT_NRM != (status = cre_jnl_file(&jnl_info)))
+				if (EXIT_NRM != (status = cre_jnl_file(&jnl_info)))
 				{	/* There was an error attempting to create the journal file */
 					exit_status |= status;
 					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLNOCREATE, 2,
@@ -786,7 +786,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4,
 						jnl_info.jnl_len, jnl_info.jnl, DB_LEN_STR(gv_cur_region));
 				}
-                        }
+			}
 			/* Following jnl_before_image, jnl_state, repl_state are unique characteristics per region */
 			csd->jnl_before_image = jnl_info.before_images;
 			csd->jnl_state = rptr->jnl_new_state;

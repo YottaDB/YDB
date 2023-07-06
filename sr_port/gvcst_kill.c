@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -202,7 +202,7 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 {
 	block_id		gvt_root;
 	boolean_t		clue, flush_cache;
-	boolean_t		next_fenced_was_null, write_logical_jnlrecs, jnl_format_done;
+	boolean_t		next_fenced_was_null = FALSE, write_logical_jnlrecs, jnl_format_done;
 	boolean_t		left_extra, right_extra;
 	boolean_t		want_root_search = FALSE, is_dummy, succeeded, key_exists;
 	rec_hdr_ptr_t		rp;
@@ -213,7 +213,7 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 	enum cdb_sc		cdb_status;
 	int			lev, end, target_key_size;
 	uint4			prev_update_trans, actual_update;
-	jnl_format_buffer	*jfb, *ztworm_jfb;
+	jnl_format_buffer	*jfb = NULL, *ztworm_jfb;
 	jnl_action_code		operation;
 	kill_set		kill_set_head, *ks, *temp_ks;
 	node_local_ptr_t	cnl;
@@ -233,15 +233,15 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 	boolean_t		is_tpwrap;
 	boolean_t		lcl_implicit_tstart;	/* local copy of the global variable "implicit_tstart" */
 	gtm_trigger_parms	trigparms;
-	gvt_trigger_t		*gvt_trigger;
+	gvt_trigger_t		*gvt_trigger = NULL;
 	gvtr_invoke_parms_t	gvtr_parms;
-	int			gtm_trig_status, idx;
-	unsigned char		*save_msp;
-	mv_stent		*save_mv_chain;
+	int			gtm_trig_status = -1, idx;
+	unsigned char		*save_msp = NULL;
+	mv_stent		*save_mv_chain = NULL;
 	mval			*ztold_mval = NULL, ztvalue_new, ztworm_val;
 #	endif
 #	ifdef DEBUG
-	boolean_t		is_mm, root_search_done = FALSE;
+	boolean_t		root_search_done = FALSE;
 	uint4			dbg_research_cnt;
 #	endif
 	DCL_THREADGBL_ACCESS;
@@ -250,7 +250,6 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 	csa = cs_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
-	DEBUG_ONLY(is_mm = (dba_mm == csd->acc_meth));
 	GTMTRIG_ONLY(
 		TRIG_CHECK_REPLSTATE_MATCHES_EXPLICIT_UPDATE(gv_cur_region, csa);
 		if (IS_EXPLICIT_UPDATE)
@@ -805,11 +804,11 @@ research:
 			}
 			assert(csd == cs_data); /* To ensure they are the same even if MM extensions happened in between */
 		} else
-                {
-                        cdb_status = tp_hist(alt_hist);
-                        if (cdb_sc_normal != cdb_status)
+		{
+			cdb_status = tp_hist(alt_hist);
+			if (cdb_sc_normal != cdb_status)
 				GOTO_RETRY(cdb_status, SKIP_ASSERT_FALSE);
-                }
+		}
 		/* Note down $tlevel (used later) before it is potentially changed by op_tcommit below */
 		lcl_dollar_tlevel = dollar_tlevel;
 #		ifdef GTM_TRIGGER
@@ -891,6 +890,7 @@ retry:
 #			ifdef GTM_TRIGGER
 			assert(ERR_TPRETRY == gtm_trig_status);
 			TRIGGER_BASE_FRAME_UNWIND_IF_NOMANSLAND;
+			assert(save_mv_chain);
 			POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);
 			if (!lcl_implicit_tstart)
 			{	/* We started an implicit transaction for spanning nodes in gvcst_kill. Invoke restart to return. */

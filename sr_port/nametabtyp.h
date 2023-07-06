@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +14,7 @@
 
 #define NAME_ENTRY_SZ	MAX_MIDENT_LEN	/* maximum length of ISV/device-param/TSTART-param/JOB-param names */
 typedef struct {
-	char len;
+	unsigned char len;
 	char name[NAME_ENTRY_SZ];
 } nametabent;
 
