@@ -35,6 +35,7 @@
 #include "change_reg.h"
 #include "cws_insert.h"		/* for cw_stagnate hashtab operations */
 #include "do_semop.h"
+#include "format_targ_key.h"	/* for ISSUE_GVSUBOFLOW_ERROR */
 #include "gds_blk_upgrade.h"
 #include "gds_rundown.h"
 #include "gtmmsg.h"		/* for gtm_putmsg prototype */
@@ -55,6 +56,7 @@
 #include "mupip_reorg.h"
 #include "mupip_upgrade.h"
 #include "send_msg.h"		/* for send_msg */
+#include "sleep_cnt.h"
 #include "t_abort.h"
 #include "t_begin.h"
 #include "t_end.h"
@@ -66,6 +68,7 @@
 #include "verify_db_format_change_request.h"
 #include "wcs_flu.h"
 #include "wcs_phase2_commit_wait.h"
+#include "wcs_sleep.h"
 
 #include "repl_msg.h"		/* for gtmsource.h */
 #include "gtmsource.h"		/* for jnlpool_addrs_ptr_t */
@@ -75,24 +78,6 @@
 
 #define IS_ONLNRLBK_ACTIVE(CSA)	(0 != CSA->nl->onln_rlbk_pid)
 
-#ifndef	REORG_UPGRADE_IS_ONLINE
-/* Because the process has standalone access, it must be released before proceeding to exit */
-#define RELEASE_ACCESS_SEMAPHORE_AND_RUNDOWN(REG, ERR)								\
-MBSTART {													\
-	int4			save_errno;									\
-	unix_db_info		*udi;										\
-	udi = FILE_INFO(REG);											\
-	assert(udi->grabbed_access_sem);									\
-	if (0 != (save_errno = do_semop(udi->semid, DB_CONTROL_SEM, -1, SEM_UNDO)))				\
-	{													\
-		assert(FALSE);	/* we hold it, so we should be able to release it*/				\
-		rts_error_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(REG),		\
-				ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);		\
-	}													\
-	udi->grabbed_access_sem = FALSE;									\
-	ERR |= gds_rundown(CLEANUP_UDI_TRUE); /* Rundown stops times for prior regions */			\
-} MBEND
-#endif
 
 LITREF	char			gtm_release_name[];
 LITREF	int4			gtm_release_name_len;
@@ -106,7 +91,7 @@ GBLREF	cw_set_element		cw_set[];
 GBLREF	gd_addr			*gd_header;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_altkey, *gv_currkey, *gv_currkey_next_reorg;
-GBLREF	gv_namehead		*gv_target, *gv_target_list, *reorg_gv_target;
+GBLREF	gv_namehead		*gv_target, *gv_target_list, *reorg_gv_target, *upgrade_gv_target;
 GBLREF	hash_table_int8		cw_stagnate;				/* Release blocks added via CWS_INSERT - see mu_swap_blk */
 GBLREF	inctn_detail_t		inctn_detail;				/* holds detail to fill in to inctn jnl record */
 GBLREF	inctn_opcode_t		inctn_opcode;
@@ -165,7 +150,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 	gd_region		*reg;
 	gd_segment		*seg;
 	inctn_opcode_t		save_inctn_opcode;
-	int4			status, lcnt, resetcnt;
+	int4			lcnt, resetcnt, sleepcnt, status;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	mname_entry		gvname;
@@ -221,12 +206,18 @@ void	mu_reorg_upgrd_dwngrd(void)
 		mupip_exit(ERR_MUNOACTION);
 	}
 	TREF(skip_file_corrupt_check) = TRUE;				/* Prevent concurrent ONLINE ROLLBACK causing DBFLCORRP */
+	upgrade_gv_target = targ_alloc(MAX_KEY_SZ, NULL, NULL);		/* UPGRADE needs space for gen_hist_for_blk */
+	upgrade_gv_target->hist.depth = 0;
+	upgrade_gv_target->alt_hist->depth = 0;
 	reorg_gv_target = targ_alloc(MAX_KEY_SZ, NULL, NULL);		/* because it may be needed for before image journaling */
+	reorg_gv_target->hist.depth = 0;
+	reorg_gv_target->alt_hist->depth = 0;
 	for (rptr = grlist; !mu_ctrlc_occurred && (NULL != rptr); rptr = rptr->fPtr)
 	{	/* Iterate over regions again to upgrade gvt indices */
 		reg = rptr->reg;
 		gv_cur_region = reg;
 		tot_data_blks = gv_trees = tot_dt = tot_levl_cnt = tot_splt_cnt = 0;
+		sleepcnt = SLEEP_ONE_MIN;
 		/* Override name map so that all names map to the current region */
 		remap_globals_to_one_region(gd_header, gv_cur_region);
 		if (NULL == gv_currkey_next_reorg)			/* Multi-region upgrade in progress, don't reallocate */
@@ -236,28 +227,6 @@ void	mu_reorg_upgrd_dwngrd(void)
 		assert(DBKEYSIZE(MAX_KEY_SZ) == gv_keysize);		/* gv_keysize was init'ed by gvinit() in the caller */
 		gvcst_init(reg, NULL);
 		change_reg();
-#ifndef	REORG_UPGRADE_IS_ONLINE
-		/* Obtain standalone access for MUPIP REORG -UPGRADE until ONLINE tests cleanly */
-		if (EXIT_NRM != gds_rundown(CLEANUP_UDI_FALSE))
-		{	/* Failed to rundown the DB, so we can't get standalone access */
-			error = TRUE;
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRNDWN, 2, DB_LEN_STR(gv_cur_region));
-			util_out_print("Region !AD : Failed to rundown the database (!AD) in order to get standalone access.",
-			       TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
-			continue;
-		}
-		if (!STANDALONE(reg) || !(FILE_INFO(reg)->grabbed_access_sem))
-		{
-			error = TRUE;
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(reg));
-			util_out_print("Region !AD : Failed to get standalone access (!AD).",
-					TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
-			continue;
-		}
-		/* Reopen the region now that we have standalone access */
-		gvcst_init(reg, NULL);
-		change_reg();
-#endif
 		csd = cs_data;
 		csa = cs_addrs;
 		is_bg = (dba_bg == csd->acc_meth);
@@ -277,12 +246,27 @@ void	mu_reorg_upgrd_dwngrd(void)
 					LEN_AND_LIT("MUPIP ROLLBACK -ONLINE in progress"),
 					csa->nl->onln_rlbk_pid);
 			mupip_exit(ERR_MUNOFINISH);
-			return;
+		}
+		while ((0 != csa->nl->trunc_pid) && (is_proc_alive(csa->nl->trunc_pid, 0)))
+		{	/* Wait for a concurrent REORG -TRUNCATE to exit */
+			if (SLEEP_ONE_MIN == sleepcnt)
+				util_out_print("!/Region !AD : MUPIP REORG -TRUNCATE of !AD in progress, waiting for completion",
+						TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
+			wcs_sleep(sleepcnt--);
+			if (0 == sleepcnt)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REORGUPCNFLCT, 5,
+						LEN_AND_LIT("REORG -UPGRADE"),
+						LEN_AND_LIT("MUPIP REORG -TRUNCATE in progress"),
+						csa->nl->trunc_pid);
+				assert(FALSE);	/* REORG -TRUNCATE should have exited */
+				mupip_exit(ERR_MUNOFINISH);
+			}
 		}
 		if ((0 != csa->nl->reorg_upgrade_pid) && (is_proc_alive(csa->nl->reorg_upgrade_pid, 0)))
 		{
-			util_out_print("!/Region !AD : MUPIP REORG -UPGRADE of !AD in progress, skipping", TRUE,
-						REG_LEN_STR(reg), DB_LEN_STR(reg));
+			util_out_print("!/Region !AD : MUPIP REORG -UPGRADE of !AD in progress, skipping",
+					TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
 			continue;
 		}
 		mu_upgrade_in_prog = MUPIP_REORG_UPGRADE_IN_PROGRESS;
@@ -420,7 +404,8 @@ void	mu_reorg_upgrd_dwngrd(void)
 				}
 			}
 			curr_tn = csd->trans_hist.curr_tn;
-			csd->fully_upgraded = (0 == csd->blks_to_upgrd);	/* Upgrade complete */
+			if (csd->fully_upgraded = (0 == csd->blks_to_upgrd))	/* Upgrade complete, WARNING assignment */
+				csd->offset = 0;		/* Reset offset disabling V6p upgrades on read */
 			csd->minor_dbver = GDSMVCURR;		/* Raise the DB minor version to current */
 			csd->max_tn = MAX_TN_V7;		/* Expand TN limit */
 			SET_TN_WARN(csd, csd->max_tn_warn);	/* if max_tn changed above, max_tn_warn also needs the same */
@@ -445,11 +430,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 					RTS_ERROR_LITERAL("V7"), &csd->blks_to_upgrd);
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(errtext));
 		}
-#ifndef	REORG_UPGRADE_IS_ONLINE
-		RELEASE_ACCESS_SEMAPHORE_AND_RUNDOWN(gv_cur_region, error);
-#else
 		error |= gds_rundown(CLEANUP_UDI_TRUE);		/* Rundown region and cleanup */
-#endif
 		mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;
 		mu_reorg_more_tries = FALSE;
 	}
@@ -488,7 +469,7 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 	mname_entry	gvname;
 	sgmnt_addrs	*csa;
 	sgmnt_data	*csd;
-	sm_uc_ptr_t	blkBase, blkEnd, recBase;
+	sm_uc_ptr_t	blkBase, blkEnd, lrecBase, recBase;
 	srch_blk_status	dirHist;
 	trans_num	lcl_tn;
 	unsigned char	key_buff[MAX_KEY_SZ + 3];
@@ -509,12 +490,13 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 		curr_blk_cr = **cr;	/* Stash CR for later comparison */
 	}
 	blkBase = dirHist.buffaddr;
-	assert(IS_64_BLK_ID(blkBase));
+	if (!IS_64_BLK_ID(blkBase))
+		return cdb_sc_blkmod;	/* Directory tree blocks should all be V7m */
 	lcl_bsiz = ((blk_hdr_ptr_t)blkBase)->bsiz;
 	blkEnd = blkBase + lcl_bsiz;
 	blk_ver = ((blk_hdr_ptr_t)blkBase)->bver;
 	assert(GDSV7m == blk_ver);
-	recBase = blkBase + SIZEOF(blk_hdr);
+	lrecBase = recBase = blkBase + SIZEOF(blk_hdr);
 	dirHist.level = level = ((blk_hdr_ptr_t)blkBase)->levl;
 	dirHist.tn = lcl_tn = ((blk_hdr_ptr_t)blkBase)->tn;
 	gvname.var_name.addr = (char *)key_buff;
@@ -629,11 +611,13 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 					REG_LEN_STR(reg), curr_blk, lcl_gv_trees);
 		gv_trees = lcl_gv_trees;
 		return cdb_sc_normal;					/* done with this level 0 dt block; return up a level */
-	}
+	} else
+		status = cdb_sc_normal;
 	assert(level);
 	if (debug_mupip)
 		util_out_print("Region !AD: DT level !UL block 0x!@XQ\tprocessing GVTs", TRUE, REG_LEN_STR(reg), level, curr_blk);
 	lcl_gv_trees = 0;
+	lcnt = MAX_BLK_TRIES;
 	while (!mu_ctrlc_occurred && (recBase < blkEnd))
 	{	/* process the records in a directory tree index block */
 		status = read_record(&rec_sz, &key_cmpc, &key_len, key_buff, level, &dirHist, recBase);
@@ -689,8 +673,14 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 			return cdb_sc_blkmod;				/* Block changed, reprocess recursively */
 		assert(dirHist.level == level);
 		level = ((blk_hdr_ptr_t)blkBase)->levl;				/* might have increased due to split propagation */
-		if (cdb_sc_normal != status)
-			continue;	/* Retry the block */
+		if ((cdb_sc_normal != status) && (cdb_sc_starrecord != status))
+		{
+			if ((lrecBase == recBase) && (0 >= lcnt--))	/* Too many repeats on the same record */
+				return status;				/* Block re-read is necessary */
+			continue;					/* Otherwise, retry the record */
+		}
+		lrecBase = recBase;
+		lcnt = MAX_BLK_TRIES;
 		recBase += ((rec_hdr_ptr_t)recBase)->rsiz;
 		lcl_gv_trees++;
 		assert(blkEnd >= recBase);
@@ -722,20 +712,21 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
  ******************************************************************************************/
 enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *gvname, cache_rec_ptr_t *cr)
 {
+	blk_hdr		blkHdr;
 	blk_segment	*bs1, *bs_ptr;
 	block_id	blk_pter;
-	boolean_t	is_bg, is_mm, was_crit;
+	boolean_t	is_bg, is_mm;
 	cache_rec	dummy_gvt_cr, curr_blk_cr;
 	cache_rec_ptr_t	child_cr;
 	enum db_ver	blk_ver;
-	gvnh_reg_t	*gvnh_reg;
-	int		blk_seg_cnt, i, key_cmpc, key_len, level, new_blk_sz, num_recs, rec_sz, space_need,
+	gvnh_reg_t	*gvnh_reg = NULL;
+	int		blk_seg_cnt, i, key_cmpc, key_len, level, max_fill, new_blk_sz, num_recs, rec_sz, space_need,
 			split_blks_added, split_levels_added, v7_rec_sz;
 	int4		blk_size, child_data_blks, status;
 	mname_entry	gvt_name;
 	sgmnt_addrs	*csa;
 	sm_uc_ptr_t	blkBase, blkEnd, recBase, v7bp, v7end, v7recBase;
-	srch_blk_status	blkHist;
+	srch_blk_status	blkHist, *curr_blk_hist_ptr;
 	srch_hist	alt_hist;
 	trans_num	lcl_tn;
 	unsigned char	gname[SIZEOF(mident_fixed) + 2], key_buff[MAX_KEY_SZ + 3];
@@ -765,17 +756,19 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 		curr_blk_cr = **cr;	/* Stash CR for later comparison because the read is done before t_begin() */
 	}
 	blkBase = blkHist.buffaddr;
-	new_blk_sz = lcl_bsiz = ((blk_hdr_ptr_t)blkBase)->bsiz;
+	blkHdr = *((blk_hdr_ptr_t)blkBase);
+	new_blk_sz = lcl_bsiz = blkHdr.bsiz;
 	blkEnd = blkBase + new_blk_sz;
-	blkHist.level = level = ((blk_hdr_ptr_t)blkBase)->levl;
-	blkHist.tn = lcl_tn = ((blk_hdr_ptr_t)blkBase)->tn;
+	blkHist.level = level = blkHdr.levl;
+	blkHist.tn = lcl_tn = blkHdr.tn;
+	blk_ver = blkHdr.bver;
 	if (0 == level)	/* Caller intended to change an index block. The parent needs to be reprocessed */
 		return cdb_sc_badlvl;
 	if (debug_mupip)
 		util_out_print("!UL:0x!@XQ keyed with !AD from !@XQ", TRUE,
 				level, curr_blk, gvname->var_name.len, gvname->var_name.addr, &lcl_tn);
 	status = cdb_sc_normal;
-	if (GDSV7m != (blk_ver = ((blk_hdr_ptr_t)blkBase)->bver))				/* WARNING: assignment */
+	if (GDSV7m > blk_ver)
 	{	/* block needs pointers upgraded */
 		/* check how much space is need to upgrade the block and whether the block needs splitting */
 		if (debug_mupip)
@@ -811,35 +804,52 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 			return cdb_sc_blkmod;	/* Record did not end at the block size, retry */
 		recBase = blkBase + SIZEOF(blk_hdr);
 		blk_size = cs_data->blk_size;
-		split_blks_added = split_levels_added = 0;
-		if (was_crit = csa->now_crit)	/* WARNING assignment */
+		if (csa->now_crit)
 		{	/* Have to let go of crit ahead of the t_begin() and gen_hist_for_blk() below */
 			rel_crit(gv_cur_region);
 			assert(CDB_STAGNATE <= t_tries);
 			t_tries = 0;
 		}
-		/* The following code should be maintained in tandem with upgrade_dir_tree()'s similar block */
+		status = gen_hist_for_blk(&blkHist, blkBase, recBase, gvname, gvnh_reg);
+		if (cdb_sc_normal != status)	/* Failed to generate a history for the block */
+		{
+			if (cdb_sc_starrecord != status)
+				return status;
+			/* Got a star record, use bespoke history for t_end */
+			curr_blk_hist_ptr = &alt_hist.h[0];
+		} else	/* Use the real history pointer for t_end */
+		{
+			alt_hist = gv_target->hist;
+			curr_blk_hist_ptr = &alt_hist.h[level];
+		}
+		assert(level);
+		assert(new_blk_sz == (lcl_bsiz + num_recs * (SIZEOF_BLK_ID(BLKID_64) - SIZEOF_BLK_ID(BLKID_32))));
+		t_begin(ERR_MUNOUPGRD, UPDTRNS_DB_UPDATED_MASK);
 		while (0 < (space_need = new_blk_sz - blk_size))				/* WARNING assignment */
 		{	/* Insufficient room; WARNING: using a loop construct to enable an alternate pathway out of this level */
-			space_need += SIZEOF(blk_hdr) + ((rec_hdr_ptr_t)recBase)->rsiz + (blk_size >> 3);
-			status = gen_hist_for_blk(&blkHist, blkBase, recBase, gvname, gvnh_reg);
-			if (cdb_sc_normal != status)	/* Failed to generate a history for the block */
-				return status;
-			t_begin(ERR_MUNOUPGRD, UPDTRNS_DB_UPDATED_MASK);
-			assert(((blk_size >> 1) + cs_data->max_key_size) > space_need);		/* paranoid check */
+			if (2 == num_recs)
+			{	/* This block contains only two records:
+				*  - one regular (but really large) record with a block pointer
+				*  - a star-record
+				* If we need space, that implies that there is insufficient space to upgrade both block
+				* pointers from 4 bytes to 8 bytes. If the user tried to set this global with the current
+				* version, it would thrown a GVSUBOFLOW error. So that is what happens here. This error stops
+				* the upgrade because it cannot handle this situation.
+				*/
+				t_abort(gv_cur_region, csa);					/* do crit and other cleanup */
+				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+			}
+			max_fill = (new_blk_sz >> 1);
 			if (debug_mupip)
-				util_out_print("!UL:0x!@XQ\tSPLIT have:!UL need:!UL", TRUE, level, curr_blk, space_need, blk_size);
+				util_out_print("!UL:0x!@XQ\tSPLIT have:!UL need:!UL", TRUE, level, curr_blk, new_blk_sz, max_fill);
+			gv_target->clue.end = 0;	/* Invalidate the clue */
+			split_blks_added = split_levels_added = 0;
 			mu_reorg_process = TRUE;
-			status = mu_split(level, space_need, space_need, &split_blks_added, &split_levels_added);
+			status = mu_split(level, max_fill, max_fill, &split_blks_added, &split_levels_added);
 			mu_reorg_process = FALSE;
 			if (cdb_sc_normal != status)
-			{	/* split failed; WARNING: assignment above */
+			{	/* split failed */
 				t_abort(gv_cur_region, csa);					/* do crit and other cleanup */
-				if (cdb_sc_oprnotneeded == status)
-				{	/* mu_split decided the split was not needed */
-					assert((0 == split_blks_added) && (0 == split_levels_added));
-					break;
-				}
 				return status;
 			}
 			mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;	/* Splits can affect blocks_to_upgrd, temporarily disable */
@@ -867,12 +877,6 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 			return cdb_sc_blksplit;
 		}
 		/* Finally actually upgrade the block */
-		t_begin(ERR_MUNOUPGRD, UPDTRNS_DB_UPDATED_MASK);
-		if (was_crit)
-		{	/* Re-acquire crit using the last retry status */
-			t_tries = 2;
-			t_retry((enum cdb_sc)t_fail_hist[t_tries]);
-		}
 		if (NULL == (blkHist.buffaddr = t_qread(blkHist.blk_num, (sm_int_ptr_t)&blkHist.cycle, &blkHist.cr)))
 		{	/* WARNING assign above */
 			t_abort(gv_cur_region, csa);		/* do crit and other cleanup */
@@ -904,7 +908,7 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 			return cdb_sc_lostcr;
 		}
 		assert(GDSV7m != blk_ver);
-		assert((blkHist.buffaddr == blkBase) && (blkHist.level == level));
+		assert(blkHist.buffaddr == blkBase);
 		CHECK_AND_RESET_UPDATE_ARRAY;
 		BLK_INIT(bs_ptr, bs1);
 		BLK_ADDR(v7bp, new_blk_sz, unsigned char);
@@ -988,15 +992,21 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 		}
 		if (debug_mupip)
 			util_out_print("!UL:0x!@XQ\tFinalizing block !@XQ", TRUE, level, curr_blk, &start_tn);
-		blkHist.cr = &dummy_gvt_cr;		/* MM has no CR; BG don't modify the in-memory CR */
-		blkHist.cr->ondsk_blkver = GDSV7m;	/* t_write uses this to apply the block version */
-		alt_hist.h[0]		 = blkHist;	/* Assign the current history to the alternative history */
-		alt_hist.h[0].tn	 = start_tn;
-		alt_hist.h[0].blk_target = NULL;	/* So that t_end doesn't expect to find a gvnh */
-		alt_hist.h[0].cse	 = t_write(&blkHist, (unsigned char *)bs1, 0, 0, level, TRUE, TRUE, GDS_WRITE_KILLTN);
-		if (is_bg)
-			alt_hist.h[0].cse->cr = *cr;	/* t_write doesn't set the CR which was read earlier */
-		alt_hist.h[1].blk_num	 = 0;		/* Signal history reading end in t_end */
+		if (&alt_hist.h[0] == curr_blk_hist_ptr)
+		{	/* Bespoke history for star record for t_end */
+			assert(*cr == blkHist.cr);
+			dummy_gvt_cr.ondsk_blkver = GDSV7m;	/* t_write uses this to apply the block version */
+			blkHist.cr = &dummy_gvt_cr;		/* MM: has no CR; BG: don't modify the in-memory CR */
+			alt_hist.depth = 1;
+			alt_hist.h[0] = blkHist;		/* Use the latest information from t_qread() */
+			alt_hist.h[0].tn = start_tn;
+			alt_hist.h[0].blk_target = NULL;	/* So that t_end doesn't expect to find a gvnh */
+			alt_hist.h[1].blk_num = 0;		/* Stop history reading */
+		}
+		curr_blk_hist_ptr->cse = t_write(curr_blk_hist_ptr, bs1, 0, 0, level, TRUE, TRUE, GDS_WRITE_KILLTN);
+		curr_blk_hist_ptr->cse->ondsk_blkver = GDSV7m;	/* Update the block version */
+		if (is_bg && (&alt_hist.h[0] == curr_blk_hist_ptr)) /* Restore the CR pointer */
+			alt_hist.h[0].cr = curr_blk_hist_ptr->cse->cr = *cr;
 		inctn_opcode = inctn_blkupgrd;
 		inctn_detail.blknum_struct.blknum = *curr_blk;
 		mu_reorg_upgrd_dwngrd_blktn = ((blk_hdr_ptr_t)blkBase)->tn;
@@ -1064,7 +1074,6 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 				return cdb_sc_helpedout;	/* Block changed, reprocess recursively */
 			if (blkEnd != (blkBase + ((blk_hdr_ptr_t)blkBase)->bsiz))
 				return cdb_sc_blkmod;
-			assert(blkHist.level == level);
 			status = read_record(&rec_sz, &key_cmpc, &key_len, key_buff, level, &blkHist, recBase);
 			if (cdb_sc_starrecord == status)
 			{	/* Initialize name for *-key */

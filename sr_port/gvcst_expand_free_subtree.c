@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -107,7 +107,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 					assert(ksb->block < (1LL << CW_INDEX_MAX_BITS));
 					chain.cw_index = ksb->block;
 					assert(SIZEOF(chain) == SIZEOF(blk));
-					blk = *(block_id *)&chain;
+					blk = ((block_ref *)&chain)->id;
 				} else
 					blk = ksb->block;
 				if (!(bp = (blk_hdr_ptr_t)t_qread(blk, (sm_int_ptr_t)&cycle, &cr)))
@@ -153,7 +153,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 					if (dollar_tlevel)
 					{
 						assert(sgm_info_ptr->tp_csa == cs_addrs);
-						chain = *(off_chain *)&temp_blk;
+						chain = ((block_ref *)&temp_blk)->chain;
 						assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 						assertpro(!((1 == chain.flag) &&
 							((int)chain.cw_index >= sgm_info_ptr->cw_set_depth)));

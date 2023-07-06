@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2020 Fidelity National Information	*
+ * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,7 +55,7 @@ void	repl_phase2_cleanup(jnlpool_addrs *jpa)
 	qw_off_t		currWriteaddr, newWriteaddr;
 	uint4			stuckPid;
 	int			index1, index2;
-	jpl_phase2_in_prog_t	*phs2cmt, *deadCmt, *begCmt, *maxCmt, *topCmt;
+	jpl_phase2_in_prog_t	*phs2cmt, *deadCmt, *begCmt, *maxCmt, *topCmt = NULL;
 	jnlpool_ctl_ptr_t	jpl;
 	boolean_t		was_latch_owner;
 
@@ -151,6 +151,7 @@ void	repl_phase2_cleanup(jnlpool_addrs *jpa)
 					 * above, we are guaranteed, we did not go down that code-block. In the else block,
 					 * we did initialize topCmt so we can safely use that here.
 					 */
+					assert(topCmt);
 					phs2cmt = topCmt;
 				}
 				phs2cmt--;

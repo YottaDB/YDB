@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 Fidelity National Information		*
+ * Copyright (c) 2020-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,10 +12,16 @@
 #ifndef GVT_INLINE_INCLUDED
 #define GVT_INLINE_INCLUDED
 
+GBLREF int4		gv_keysize;
+GBLREF gv_key		*gv_currkey;
+GBLREF gv_key		*gv_altkey;
+GBLREF gv_namehead	*reset_gv_target;
+GBLREF boolean_t	dse_running;
+GBLREF gd_region	*gv_cur_region;
+
+
 static inline gv_key *gvkey_init(gv_key *gvkey, int4 keysize)
 {
-	GBLREF gv_key	*gv_altkey;
-	GBLREF gv_key	*gv_currkey;
 	gv_key		*new_KEY, *old_KEY;
 	int4		keySZ;
 	DEBUG_ONLY(DCL_THREADGBL_ACCESS);
@@ -55,7 +61,6 @@ static inline gv_key *gvkey_init(gv_key *gvkey, int4 keysize)
 static inline void dbg_check_gvtarget_integrity(gv_namehead *gvt)
 {
 	int			keysize, partial_size;
-	GBLREF	boolean_t	dse_running;
 
 	if (NULL != gvt->gd_csa->nl)
 	{	/* csa->nl is cleared when a statsDB is closed due to opt-out so use as flag if DB is open or not */
@@ -77,7 +82,6 @@ static inline void dbg_check_gvtarget_integrity(gv_namehead *gvt)
 
 static inline void copy_prev_key_to_gvt_clue(gv_namehead *gvt, boolean_t expand_prev_key)
 {
-	GBLREF gv_key	*gv_altkey;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -106,12 +110,13 @@ static inline void copy_prev_key_to_gvt_clue(gv_namehead *gvt, boolean_t expand_
 
 static inline void copy_curr_and_prev_key_to_gvtarget_clue(gv_namehead *gvt, gv_key *gvkey, boolean_t expand_prev_key)
 {
-	GBLREF gv_key	*gv_altkey;
 	int		keyend;
+	gv_key_ptr	clueptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	keyend = gvkey->end;
+	clueptr = (gv_key_buf *)&gvt->clue;
 	if (gvt->clue.top <= keyend)
 	{	/* Possible only if GVT corresponds to a global that spans multiple
 		 * regions. For example, a gvcst_spr_* function could construct a
@@ -122,14 +127,14 @@ static inline void copy_curr_and_prev_key_to_gvtarget_clue(gv_namehead *gvt, gv_
 		 */
 		assert(TREF(spangbl_seen));
 		keyend = gvt->clue.top - 1;
-		memcpy(((gv_key *)&(gvt->clue))->base, gvkey->base, keyend - 1);
-		((gv_key *)&(gvt->clue))->base[keyend - 1] = KEY_DELIMITER;
-		((gv_key *)&(gvt->clue))->base[keyend] = KEY_DELIMITER;
+		memcpy(clueptr->key.base, gvkey->base, keyend - 1);
+		clueptr->key.base[keyend - 1] = KEY_DELIMITER;
+		clueptr->key.base[keyend] = KEY_DELIMITER;
 	} else
 	{
 		assert(KEY_DELIMITER == gvkey->base[keyend]);
 		assert(KEY_DELIMITER == gvkey->base[keyend - 1]);
-		memcpy(((gv_key *)&(gvt->clue))->base, gvkey->base, keyend + 1);
+		memcpy(clueptr->key.base, gvkey->base, keyend + 1);
 	}
 	gvt->clue.end = keyend;
 	/* No need to maintain unused GVT->clue.prev */
@@ -142,7 +147,6 @@ static inline void copy_curr_and_prev_key_to_gvtarget_clue(gv_namehead *gvt, gv_
  */
 static inline void gvzprevious_append_max_subs_key(gv_key *gvkey, gv_namehead *gvt)
 {
-	GBLREF	gd_region	*gv_cur_region;
 	int			lastsubslen, keysize;
 	unsigned char		*ptr;
 
@@ -176,11 +180,6 @@ static inline void dbg_check_gvtarget_gvcurrkey_in_sync(boolean_t check_csaddrs)
 	int			varlen;
 	unsigned short		keyend;
 	unsigned char		*keybase;
-
-	GBLREF int4		gv_keysize;
-
-	GBLREF gv_key		*gv_currkey;
-	GBLREF gv_namehead	*reset_gv_target;
 
 	assert((NULL != gv_currkey) || (NULL == gv_target));
 	/* Make sure gv_currkey->top always reflects the maximum keysize across all dbs that we opened until now */

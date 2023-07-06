@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,7 @@
 #include "rel_quant.h"
 #include "do_shmat.h"
 
-GBLREF	int4 		process_id;
+GBLREF	uint4 		process_id;
 GBLREF	short		crash_count;
 GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned int	t_tries;

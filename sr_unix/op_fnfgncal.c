@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -152,9 +152,9 @@ STATICFNDCL gparam_list	*set_up_buffer(char *p_list, int len);
 STATICFNDCL void	verify_buffer(char *p_list, int len, char *m_label);
 STATICFNDCL void	free_return_type(INTPTR_T ret_val, enum gtm_types typ);
 
-static const int buff_boarder_len = 7;
-static const char *buff_front_boarder = "SMARKER";
-static const char *buff_end_boarder = "EMARKER";
+static const int buff_border_len = 8;
+static const char *buff_front_border = "SMARKER";
+static const char *buff_end_border = "EMARKER";
 
 /* If the assigned pointer value is NULL, pass back a literal_null */
 #define	VALIDATE_AND_CONVERT_PTR_TO_TYPE(LMVTYPE, TYPE, CONTAINER, DST, SRC)	\
@@ -181,15 +181,15 @@ MBSTART {									\
 /* Routine to set up boarders around the external call buffer */
 STATICFNDCL gparam_list *set_up_buffer(char *p_list, int len)
 {
-	memcpy(p_list, buff_front_boarder, buff_boarder_len);
-	memcpy((p_list + len + buff_boarder_len), buff_end_boarder, buff_boarder_len);
-	return (gparam_list *)(p_list + buff_boarder_len);
+	memcpy(p_list, buff_front_border, buff_border_len);
+	memcpy((p_list + len + buff_border_len), buff_end_border, buff_border_len);
+	return (gparam_list *)(p_list + buff_border_len);
 }
 
 STATICFNDCL void verify_buffer(char *p_list, int len, char *m_label)
 {
-	if ((0 != memcmp((p_list + len), buff_end_boarder, buff_boarder_len))
-		|| (0 != memcmp((p_list - buff_boarder_len), buff_front_boarder, buff_boarder_len)))
+	if ((0 != memcmp((p_list + len), buff_end_border, buff_border_len))
+		|| (0 != memcmp((p_list - buff_border_len), buff_front_border, buff_border_len)))
 	{
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_EXTCALLBOUNDS, 1, m_label);
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_EXTCALLBOUNDS, 1, m_label);
@@ -621,6 +621,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 		{
 			MV_FORCE_STR(v);
 			n += SIZEOF(void *) + v->str.len + 1;
+			n += 7;		/* Max possible additional space needed for alignment */
 			continue;
 		}
 		if (MASK_BIT_ON(m1))
@@ -636,6 +637,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 				n += SIZEOF(gtm_long_t) + v->str.len + 1;  /* length + string + '\0' */
 			} else
 				n += SIZEOF(gtm_long_t) + 1;		    /* length + '\0' */
+			n += 7;		/* Max possible additional space needed for alignment */
 		}
 #		ifndef GTM64
 		else if ((gtm_jdouble == entry_ptr->parms[j]) || (gtm_jlong == entry_ptr->parms[j]))
@@ -665,10 +667,12 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	 * another pointer from within the space buffer is referencing an area inside the string buffer. Note, however, that certain
 	 * arguments, such as gtm_jfloat_t and gtm_jdouble_t, and gtm_jlong_t on 32-bit boxes, are always passed by reference.
 	 */
-	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the proctection tags*/
+	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the protection tags*/
 	call_buff_size = n;
-	char param_list_buff[(call_buff_size + 2*buff_boarder_len)];
-	param_list = set_up_buffer(param_list_buff, n);
+
+	char	buff[(call_buff_size + 2*buff_border_len)]	__attribute__((aligned));
+
+	param_list = set_up_buffer(buff, n);
 	param_list->arg[0] = (void *)types_descr_ptr;
 	/* Adding 3 to account for type descriptions, class name, and method name arguments. */
 	free_space_pointer = (gtm_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * (argcnt + 3)));
@@ -685,6 +689,8 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 		v = va_arg(var_copy, mval *);
 		if (j < 3)
 		{
+			free_string_pointer += ((UINTPTR_T)free_string_pointer & 0x7)
+							? (8 - ((UINTPTR_T)free_string_pointer & 0x7)) : 0;
 			param_list->arg[j] = free_string_pointer;
 			if (v->str.len)
 			{
@@ -763,6 +769,8 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 				if (MV_ON(m1, v) && v->str.len)
 				{
 					*free_space_pointer++ = (gtm_long_t)v->str.len;
+					free_string_pointer += ((UINTPTR_T)free_string_pointer & 0x7)
+									? (8 - ((UINTPTR_T)free_string_pointer & 0x7)) : 0;
 					memcpy(free_string_pointer, v->str.addr, v->str.len);
 					*(char **)free_space_pointer = (char *)free_string_pointer;
 					free_string_pointer += v->str.len;
@@ -771,6 +779,8 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 					 * a valid length and a pointer to an empty null-terminated character array.
 					 */
 					*free_space_pointer++ = 0;
+					free_string_pointer += ((UINTPTR_T)free_string_pointer & 0x7)
+									? (8 - ((UINTPTR_T)free_string_pointer & 0x7)) : 0;
 					*(char **)free_space_pointer = (char *)free_string_pointer;
 				}
 				free_space_pointer++;
@@ -983,6 +993,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 						MV_FORCE_DEFINED_UNLESS_SKIPARG(v);
 						n += 1;
 					}
+					n += 7;		/* Max possible additional space needed for alignment */
 				}
 				break;
 #			ifndef GTM64
@@ -1011,9 +1022,12 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	 */
 	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the proctection tags*/
 	call_buff_size = 2*n;
-	char param_list_buff[(call_buff_size + (2 * buff_boarder_len))];
-	memset(param_list_buff, 0, (call_buff_size + (2 * buff_boarder_len)));	/* zero the contents for unmodified output values */
-	param_list = set_up_buffer(param_list_buff, 2*n);
+
+	char	buff[(call_buff_size + 2*buff_border_len)]	__attribute__((aligned));
+
+	/* zero the contents for unmodified output values */
+	memset(buff, 0, (call_buff_size + (2 * buff_border_len)));
+	param_list = set_up_buffer(buff, 2*n);
 	free_space_pointer = (gtm_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
 	free_string_pointer_start = free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
 	/* Load-up the parameter list */
@@ -1042,6 +1056,8 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 					(MV_ON(m1, v) ? GTM64_ONLY(mval2i8(v)) NON_GTM64_ONLY(mval2i(v)) : 0);
 				break;
 			case gtm_char_star:
+				free_string_pointer += ((UINTPTR_T)free_string_pointer & 0x7)
+								? (8 - ((UINTPTR_T)free_string_pointer & 0x7)) : 0;
 				param_list->arg[i] = free_string_pointer;
 				if (MASK_BIT_ON(m1))
 				{	/* If this is defined and input-enabled, it should have already been forced to string. */
@@ -1071,6 +1087,8 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				param_list->arg[i] = free_space_pointer;
 				/* If this is defined and input-enabled, it should have been forced to string in an earlier loop. */
 				assert(!MV_ON(m1, v) || MV_IS_STRING(v));
+				free_string_pointer += ((UINTPTR_T)free_string_pointer & 0x7)
+								? (8 - ((UINTPTR_T)free_string_pointer & 0x7)) : 0;
 				*(char **)free_space_pointer = free_string_pointer;
 				if (MV_ON(m1, v) && v->str.len)
 				{
@@ -1110,6 +1128,9 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 					if (MV_DEFINED(v) && v->str.len)
 					{
 						*free_space_pointer++ = (gtm_long_t)v->str.len;
+						free_string_pointer += ((UINTPTR_T)free_string_pointer & 0x7)
+										? (8 - ((UINTPTR_T)free_string_pointer & 0x7)) : 0;
+						assert(0 == ((UINTPTR_T)free_string_pointer & 0x7));
 						*(char **)free_space_pointer = (char *)free_string_pointer;
 						memcpy(free_string_pointer, v->str.addr, v->str.len);
 						free_string_pointer += v->str.len;

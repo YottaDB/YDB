@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -241,7 +241,7 @@ MBSTART {														\
 #endif
 
 #define PROCESS_CACHE_ENTRY(cp)							\
-        if (cp->src.str.len)	/* entry is used */				\
+	if (cp->src.str.len)	/* entry is used */				\
 		MSTR_STPG_ADD(&cp->src.str);					\
 	/* Run list of mvals for each code stream that exists */		\
 	if (cp->obj.len)							\
@@ -464,7 +464,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 	lv_blk			*lv_blk_ptr;
 	lv_val			*lvp, *lvlimit;
 	lvTreeNode		*node, *node_limit;
-	mstr			**cstr, *x;
+	mstr			**cstr = NULL, *x;
 	mv_stent		*mvs;
 	mval			*m, **mm, **mmtop, *mtop;
 	intszofptr_t		lv_subs;
@@ -543,7 +543,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 	assert(stringpool.invokestpgcollevel <= stringpool.top);
-        assert(CHK_BOUNDARY_ALIGNMENT(stringpool.top) == 0);
+	assert(CHK_BOUNDARY_ALIGNMENT(stringpool.top) == 0);
 	/* stp_vfy_mval(); / * uncomment to debug lv corruption issues.. */
 #	ifdef STP_MOVE
 	assert(stp_move_from < stp_move_to); /* why did we call with zero length range, or a bad range? */
@@ -562,7 +562,9 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		low_reclaim_passes = &indr_stp_low_reclaim_passes;
 		incr_factor = &indr_stp_incr_factor;
 	} else
+	{
 		assertpro(FALSE && stringpool.base);	/* neither rts_stringpool, nor indr_stringpool */
+	}
 	if (NULL == stp_array)
 		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));
 	topstr = array = stp_array;
@@ -1037,6 +1039,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		} else
 		{	/* Could not expand during forced expansion */
 			assert(non_mandatory_expansion && stop_non_mandatory_expansion);
+			assert(cstr);
 			if (space_after_compact < space_needed)
 			{	/* Restore stringpool.free since no garbage collection happened. */
 				stringpool.free = old_free;

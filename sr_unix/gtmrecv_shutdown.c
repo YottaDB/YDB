@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -124,11 +124,10 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 			return ABNORMAL_SHUTDOWN;
 		}
 		repl_inst_ftok_sem_release();
-		while((SHUTDOWN == recvpool.gtmrecv_local->shutdown)
+		while((SHUTDOWN == (exit_status = recvpool.gtmrecv_local->shutdown))
 				&& (0 < (savepid = recvpool.gtmrecv_local->recv_serv_pid))
 				&& is_proc_alive(savepid, 0))
 			SHORT_SLEEP(GTMRECV_WAIT_FOR_SHUTDOWN);
-		exit_status = recvpool.gtmrecv_local->shutdown;
 		if (SHUTDOWN == exit_status)
 		{
 			if (0 == savepid) /* No Receiver Process */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2020 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,7 @@ error_def(ERR_MUSIZEINVARG);
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
 GBLREF	gv_namehead		*gv_target;
-GBLREF	int4			process_id;
+GBLREF	uint4			process_id;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	int4			mu_int_adj[];
@@ -146,6 +146,7 @@ int4 mu_size_scan(glist *gl_ptr, int4 level)
 	t_begin(ERR_MUSIZEFAIL, 0);
 	for(;;)
 	{	/* retry loop */
+		nLevl = -1;
 		status = read_block(gv_target->root, &pBlkBase, &nLevl, ANY_ROOT_LEVL);
 		if (cdb_sc_normal != status)
 		{
@@ -181,6 +182,7 @@ int4 mu_size_scan(glist *gl_ptr, int4 level)
 	{	/* retry loop. note that multiple successful read transactions can occur within a single iteration */
 		nBlkId = gv_target->root;
 		nLevl = ANY_ROOT_LEVL;
+		pBlkBase = NULL;
 		status = read_block(nBlkId, &pBlkBase, &nLevl, ANY_ROOT_LEVL);
 		if (cdb_sc_normal == status)
 		{
@@ -310,6 +312,7 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 				if (skiprecs && (curroff < saveoff[lvl]))
 					continue;	/* skip these guys, we've already counted over there */
 			}
+			child_pBlkBase = NULL;
 			status = read_block(nBlkId, &child_pBlkBase, &child_nLevl, lvl - 1);
 			if (status != cdb_sc_normal)
 				return status;

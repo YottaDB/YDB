@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,6 +95,8 @@ tp_region	*insert_region(	gd_region	*reg,
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(reg->dyn.addr->fname), save_errno);
 			return NULL;
 		}
+		csa = NULL;
+		local_fid_index = -1;
 	}
 	/* See if the region is already on the list or if we have to add it */
 	for (tr = *reg_list, tr_last = NULL; NULL != tr; tr = tr->fPtr)
@@ -102,6 +104,8 @@ tp_region	*insert_region(	gd_region	*reg,
 		if ((reg->open) && ((tr->reg->open)))
 		{
 			assert(tr->fid_index == FILE_INFO(tr->reg)->s_addrs.fid_index);
+			assert(csa);
+			assert(0 <= local_fid_index);
 			if (local_fid_index == tr->fid_index)
 			{	/* probable find - assert not in final retry or in TP and have crit on the region already */
 				assert((CDB_STAGNATE > t_tries) || (dollar_tlevel && csa->now_crit));
@@ -162,7 +166,10 @@ tp_region	*insert_region(	gd_region	*reg,
 		} else
 			tr_new->fid_index = 1;
 	} else
+	{
+		assert(csa);
 		tr_new->fid_index = local_fid_index;
+	}
 	if (NULL == tr_last)
 	{	/* First element on the list */
 		tr_new->fPtr = *reg_list;

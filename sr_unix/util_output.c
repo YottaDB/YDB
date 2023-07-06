@@ -1,6 +1,6 @@
  /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -182,10 +182,10 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 	unsigned char	uchar;
 	short		sshort, *s;
 	unsigned short	ushort;
-	int		i, nexti, length, field_width, repeat_count, int_val, chwidth, orig_chwidth, cwidth;
+	int		i, nexti, length, field_width, repeat_count, int_val = 0, chwidth = -1, orig_chwidth, cwidth;
 	unsigned int	ch;
-	UINTPTR_T	addr_val;
-	ssize_t		chlen;
+	UINTPTR_T	addr_val = 0;
+	ssize_t		chlen = -1;
 	uint4		stringlength;
 	boolean_t	indirect;
 	qw_num_ptr_t	val_ptr;
@@ -213,13 +213,18 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 		prefix_len = (NULL == prefix) ? 0 : STRLEN((char *)prefix);
 		line_begin = (TREF(util_outptr) == TREF(util_outbuff_ptr));
 	} else
+	{
 		prefix = NULL;
+		prefix_len = -1;
+		line_begin = FALSE;
+	}
 	outptr = buff;
 	outtop = outptr + size - 5;	/* 5 bytes to prevent writing across border */
 	while (outptr < outtop)
 	{
 		if ((NULL != prefix) && line_begin)
 		{
+			assert(-1 != prefix_len);
 			if ((outptr + prefix_len + 3) >= outtop)
 				break;
 			memcpy(outptr, prefix, prefix_len);
@@ -394,6 +399,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 				{
 					if (!gtm_utf8_mode)
 					{
+						assert(0 <= chlen);
 						ch = *c;
 						isprintable = ((' ' <= ch) || ('~' >= ch)); /* Ignored in M mode for FAO !AD */
 					} else

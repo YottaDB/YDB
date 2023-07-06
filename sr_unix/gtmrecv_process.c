@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2022 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1754,12 +1754,18 @@ STATICFNDEF void process_tr_buff(int msg_type)
 		assert(0 == destlen % REPL_MSG_ALIGN);
 		msgp = (repl_msg_ptr_t)gtmrecv_uncmpmsgp;
 		msgp_top = (repl_msg_ptr_t)(gtmrecv_uncmpmsgp + destlen);
+	} else
+	{
+		msgp = NULL;
+		msgp_top = NULL;
 	}
 	do
 	{
 		assert(remote_side->endianness_known);	/* only then is remote_side->cross_endian reliable */
 		if (is_repl_cmpc)
 		{
+			assert(msgp);
+			assert(msgp_top);
 			if (msgp >= msgp_top)
 			{
 				assert(msgp == msgp_top);
@@ -2730,15 +2736,15 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 {
 	/* The work-horse of the Receiver Server */
 	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc;
-	boolean_t			uncmpfail, send_cross_endian, recvpool_prepared, copied_to_recvpool;
+	boolean_t			uncmpfail, send_cross_endian, recvpool_prepared = FALSE, copied_to_recvpool = FALSE;
 	gtmrecv_local_ptr_t		gtmrecv_local;
 	gtm_time4_t			ack_time;
         char				print_msg[PROC_RECVOPS_PRINT_MSG_LEN];
         char				print_msg_t[PROC_RECVOPS_PRINT_MSG_LEN];
-	int4				msghdrlen, strm_num, processed_hdrlen;
+	int4				msghdrlen, strm_num, processed_hdrlen = 0;
 	int4				need_histinfo_num;
 	int				cmpret;
-	int				msg_type, msg_len, hdr_msg_type, hdr_msg_len;
+	int				msg_type = REPL_MSGTYPE_LAST, msg_len, hdr_msg_type, hdr_msg_len;
 	int				torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
 	int				tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int				status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
@@ -2758,7 +2764,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 	seq_num				ack_seqno, temp_ack_seqno;
 	seq_num				request_from, recvd_jnl_seqno;
 	sgmnt_addrs			*repl_csa;
-	uchar_ptr_t			old_buffp, buffp_start;
+	uchar_ptr_t			old_buffp, buffp_start = NULL;
 	uint4				recvd_start_flags, len;
 	uLong				cmplen;
 	uLongf				destlen;
@@ -2973,7 +2979,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				if (!remote_side->endianness_known)
 				{
 					remote_side->endianness_known = TRUE;
-			                msg_type = ((repl_msg_ptr_t)buffp)->type;
+					msg_type = ((repl_msg_ptr_t)buffp)->type;
 					if (!((REPL_MSGTYPE_LAST > msg_type) || (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(msg_type))))
 						WACKY_MESSAGE(msg_type, &gtmrecv_sock_fd, 1);	/* impossible message type */
 					if ((REPL_MSGTYPE_LAST < msg_type) && (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(msg_type)))
@@ -3725,6 +3731,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				 * (including the header) to the beginning of the allocated buffer space. Restore the remaining
 				 * length to buff_unprocessed and reset data_len so that the header is read again.
 				 */
+				assert(buffp_start);
 				data_len = 0;
 				buff_unprocessed += (buffered_data_len + processed_hdrlen);
 				assert((0 <= buff_unprocessed) && (buff_unprocessed <= recvpool_size));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,7 @@ int m_do(void)
 	oprtype		*cr;
 	triple		*calltrip, *labelref, *obp, *oldchain, *ref0, *ref1, *routineref, tmpchain, *triptr;
 #	ifndef __i386
-	triple		*tripsize;
+	triple		*tripsize = NULL;
 #	endif
 	mval		*v;
 	DCL_THREADGBL_ACCESS;
@@ -58,7 +58,7 @@ int m_do(void)
 		else
 			return TRUE;
 	}
-	dqinit(&tmpchain, exorder);
+	exorder_init(&tmpchain);
 	oldchain = setcurtchain(&tmpchain);
 	calltrip = entryref(OC_CALL, OC_EXTCALL, (mint)indir_do, TRUE, FALSE, FALSE);
 	setcurtchain(oldchain);
@@ -184,7 +184,10 @@ int m_do(void)
 				setcurtchain(oldchain);		/* it's a FALSE so just discard the whole thing */
 #				ifndef __i386
 				if (OC_EXCAL == calltrip->opcode)
+				{
+					assert(tripsize);
 					tripsize->opcode = OC_NOOP;		/* if we are abandoning this DO, clear this too */
+				}
 #				endif
 				return TRUE;
 			}					/* the code below is the same as for the no postconditional case */
@@ -196,6 +199,7 @@ int m_do(void)
 				triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname);
 				calltrip->operand[0].oprclass = ILIT_REF;	/* dummy placeholder */
 #				ifndef __i386
+				assert(tripsize);
 				tripsize->operand[0].oprval.tsize->ct = triptr;
 #				endif
 			}
@@ -214,6 +218,7 @@ int m_do(void)
 			triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname);
 			calltrip->operand[0].oprclass = ILIT_REF;	/* dummy placeholder */
 #			ifndef __i386
+			assert(tripsize);
 			tripsize->operand[0].oprval.tsize->ct = triptr;
 #			endif
 		}
@@ -236,6 +241,7 @@ int m_do(void)
 			triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname);
 			calltrip->operand[0].oprclass = ILIT_REF;	/* dummy placeholder */
 #			ifndef __i386
+			assert(tripsize);
 			tripsize->operand[0].oprval.tsize->ct = triptr;
 #			endif
 		}

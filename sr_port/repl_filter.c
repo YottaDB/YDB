@@ -636,7 +636,8 @@ static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len, boole
 	/* Send the transaction tr_num in buffer tr of len tr_len to the filter */
 	ssize_t		extr_len, sent_len;
 	static ssize_t	send_len, prev_sent_len;
-	char		first_rectype, *extr_end;
+	unsigned char	first_rectype;
+	char		*extr_end;
 	char		*send_ptr;
 
 	if (TRUE == first_send)
@@ -1142,8 +1143,9 @@ void repl_check_jnlver_compat(boolean_t same_endianness)
 		else if (is_rcvr_server)
 			other_side = "Originating";
 		else
-			/* repl_check_jnlver_compat is called only from source server and receiver server */
+		{	/* repl_check_jnlver_compat is called only from source server and receiver server */
 			assertpro(is_src_server || is_rcvr_server);
+		}
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLNOXENDIAN, 4, LEN_AND_STR(other_side), LEN_AND_STR(other_side));
 	}
 }

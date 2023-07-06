@@ -10,29 +10,10 @@
  *								*
  ****************************************************************/
 
-/* This program is obsolete */
+#ifndef SETTERM_INCLUDED
+#define SETTERM_INCLUDED
 
+void iott_setterm(io_desc *iod);
+void iott_resetterm(io_desc *iod);
 
-#include "mdef.h"
-
-#include "gtm_stat.h"
-#include "gtm_unistd.h"
-#include "gtm_time.h"
-#include "gtm_string.h"
-#include "iosp.h"
-#include "gdsroot.h"
-#include "v15_gdsroot.h"
-#include "gtm_facility.h"
-#include "fileinfo.h"
-#include "gdsbt.h"
-#include "v15_gdsbt.h"
-#include "gdsfhead.h"
-#include "v15_gdsfhead.h"
-#include "filestruct.h"
-#include "v15_filestruct.h"
-#include "mu_upgrd_dngrd_hdr.h"
-
-void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
-{
-	return;
-}
+#endif /* SETTERM_INCLUDED */

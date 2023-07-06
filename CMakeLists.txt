@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2012-2022 Fidelity National Information		#
+# Copyright (c) 2012-2023 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -18,18 +18,18 @@ if(POLICY CMP0087)
 endif()
 project(GTM C ASM)
 
-# Max optimization level is -O2
+# Max optimization level is -O3
 get_property(languages GLOBAL PROPERTY ENABLED_LANGUAGES)
 foreach(lang ${languages})
   get_property(flags CACHE CMAKE_${lang}_FLAGS_RELEASE PROPERTY VALUE)
-  if("${flags}" MATCHES "-O[3-9]")
-    string(REGEX REPLACE "-O[3-9]" "-O2" flags "${flags}")
+  if("${flags}" MATCHES "[ ]?-O[0-9]*[ ]?")
+    string(REGEX REPLACE "([ ]?)(-O[0-9]*)([ ]?)" "\\1-O3\\3" flags "${flags}")
     set_property(CACHE CMAKE_${lang}_FLAGS_RELEASE PROPERTY VALUE "${flags}")
   endif()
 endforeach()
 
 # Defaults
-set(version ${V7.1-000})
+set(version ${V7.1-001})
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -50,9 +50,30 @@ if(GTM_ENABLE_DEBUG)
 endif()
 
 if ( CMAKE_COMPILER_IS_GNUCC )
-    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -Wno-unused-value -Wno-unused-variable")
-    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wno-maybe-uninitialized -Wno-char-subscripts -Wno-unused-but-set-variable")
-    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wno-unused-function")
+    string(APPEND CMAKE_C_FLAGS " -std=c99"
+				" -Wmissing-prototypes -Wreturn-type -Wpointer-sign"
+				" -Wimplicit -Wall -Wno-unused-value -Wno-unused-function"
+				" -Wno-unused-variable"
+				" -Wno-unused-but-set-variable"
+				" -Wchar-subscripts"
+				" -Wno-unused-function -Woverflow"
+				" -Wno-parentheses"
+				" -Werror")
+    #string(APPEND CMAKE_C_FLAGS " -Wpedantic")
+    #string(APPEND CMAKE_C_FLAGS " -Wstrict-overflow=5")
+    if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.8.5)
+      string(APPEND CMAKE_C_FLAGS " -Wno-unused-result")
+    else()
+      string(APPEND CMAKE_C_FLAGS " -Wno-strict-aliasing")
+      if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.4.7)
+        string(APPEND CMAKE_C_FLAGS " -Wno-maybe-uninitialized")
+      else()
+        string(APPEND CMAKE_C_FLAGS " -Wno-uninitialized")
+      endif()
+    endif()
+    if(CMAKE_VERSION VERSION_GREATER 3.12.99)
+      add_link_options("LINKER:-z,noexecstack")
+    endif()
 endif()
 
 set(install_permissions_script
@@ -155,6 +176,7 @@ endforeach()
 include_directories(${includes})
 # We generate some uniquely-named headers in the top of the build tree.
 include_directories(${GTM_BINARY_DIR})
+include_directories("/usr/local/include")
 
 # Function to select the first instance of a given source file name
 # found in the ordered 'gt_src_list' search path.
@@ -545,7 +567,7 @@ endif()
 add_library(libgtmcrypt_gcrypt_AES256CFB.so MODULE ${libgtmcrypt_SOURCES})
 set_target_properties(libgtmcrypt_gcrypt_AES256CFB.so PROPERTIES
   OUTPUT_NAME gtmcrypt_gcrypt_AES256CFB
-  COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_AES256CFB"
+  COMPILE_DEFINITIONS "USE_GCRYPT;USE_AES256CFB"
   LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
   )
 add_dependencies(libgtmcrypt_gcrypt_AES256CFB.so gen_gtm_threadgbl_deftypes)
@@ -568,7 +590,7 @@ install(FILES ${default_encr_link} DESTINATION ${GTM_INSTALL_DIR}/plugin)
 add_library(libgtmcrypt_openssl_AES256CFB MODULE ${libgtmcrypt_SOURCES})
 set_target_properties(libgtmcrypt_openssl_AES256CFB PROPERTIES
   OUTPUT_NAME gtmcrypt_openssl_AES256CFB
-  COMPILE_DEFINITIONS "USE_OPENSSL -DUSE_AES256CFB"
+  COMPILE_DEFINITIONS "USE_OPENSSL;OPENSSL_API_COMPAT=0x10000000L;USE_AES256CFB"
   LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
   )
 target_link_libraries(libgtmcrypt_openssl_AES256CFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
@@ -578,7 +600,7 @@ install(TARGETS libgtmcrypt_openssl_AES256CFB DESTINATION ${GTM_INSTALL_DIR}/plu
 add_library(libgtmtls MODULE ${libgtmtls_SOURCES})
 set_target_properties(libgtmtls PROPERTIES
   OUTPUT_NAME gtmtls
-  COMPILE_DEFINITIONS "USE_OPENSSL"
+  COMPILE_DEFINITIONS "USE_OPENSSL;OPENSSL_API_COMPAT=0x10000000L"
   LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
   )
 target_link_libraries(libgtmtls ${TLS_LIBRARIES})
@@ -588,7 +610,7 @@ install(TARGETS libgtmtls DESTINATION ${GTM_INSTALL_DIR}/plugin)
 add_executable(maskpass ${maskpass_SOURCES})
 target_link_libraries(maskpass ${GPG_LIBRARIES} ${TLS_LIBRARIES})
 set_target_properties(maskpass PROPERTIES
-  COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_SYSLIB_FUNCS"
+  COMPILE_DEFINITIONS "USE_GCRYPT;USE_SYSLIB_FUNCS"
   RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin/gtmcrypt
   )
 install(TARGETS maskpass DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt)

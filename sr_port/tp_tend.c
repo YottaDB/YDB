@@ -238,7 +238,7 @@ boolean_t	tp_tend()
 	boolean_t		is_mm, release_crit, x_lock, do_validation;
 	boolean_t		replication = FALSE, region_is_frozen;
 	boolean_t		supplementary = FALSE;	/* this variable is initialized ONLY if "replication" is TRUE. */
-	seq_num			strm_seqno, next_strm_seqno;
+	seq_num			strm_seqno = 0, next_strm_seqno = 0;
 	bt_rec_ptr_t		bt;
 	cache_rec_ptr_t		cr;
 	cw_set_element		*cse, *first_cw_set, *bmp_begin_cse;
@@ -249,7 +249,7 @@ boolean_t	tp_tend()
 	tp_region		*tr, *prev_tr, *next_tr;
 	sgmnt_addrs		*csa, *repl_csa = NULL;
 	sgmnt_data_ptr_t	csd;
-	node_local_ptr_t	cnl;
+	node_local_ptr_t	cnl = NULL;
 	srch_blk_status		*t1;
 	trans_num		ctn, oldest_hist_tn, epoch_tn, old_block_tn;
 	trans_num		valid_thru;	/* buffers touched by this transaction will be valid thru this tn */
@@ -264,7 +264,7 @@ boolean_t	tp_tend()
 	uint4			lcl_update_trans;
 	jnlpool_addrs_ptr_t	save_jnlpool, update_jnlpool, local_jnlpool;
 	jnlpool_ctl_ptr_t	jpl;
-	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress */
+	boolean_t		read_before_image = FALSE; /* TRUE if before-image journaling or online backup in progress */
 	blk_hdr_ptr_t		old_block;
 	unsigned int		bsiz;
 	cache_rec_ptr_t		*tp_cr_array;
@@ -593,6 +593,8 @@ boolean_t	tp_tend()
 			}
 			if (!is_mm)
 				oldest_hist_tn = OLDEST_HIST_TN(csa);
+			else
+				oldest_hist_tn = MAXUINT8;
 			/* We never expect to come here with file_corrupt set to TRUE (in case of an online rollback) because
 			 * grab_crit done above will make sure of that. The only exception is RECOVER/ROLLBACK itself coming
 			 * here in the forward phase
@@ -1041,7 +1043,7 @@ boolean_t	tp_tend()
 				assert(0 == cse->jnl_freeaddr);	/* ensure haven't missed out resetting jnl_freeaddr for any cse in
 								 * t_write/t_create/{t,mu}_write_map/t_write_root [D9B11-001991] */
 				TRAVERSE_TO_LATEST_CSE(cse);
-				assert(0 == ((off_chain *)&cse->blk)->flag);
+				assert(0 == ((block_ref *)&cse->blk)->chain.flag);
 				assert(!cse->high_tlevel);
 				if (is_mm)
 				{
@@ -1284,6 +1286,10 @@ boolean_t	tp_tend()
 		 * memory access.
 		 */
 		SHM_WRITE_MEMORY_BARRIER;
+	} else
+	{
+		jpl = NULL;
+		temp_jnl_seqno = 0;
 	}
 	/* There are two possible approaches that can be taken from now onwards.
 	 * 	a) Write journal and database records together for a region and move onto the next region.
@@ -1453,7 +1459,8 @@ boolean_t	tp_tend()
 					}
 				}
 			}
-		}
+		} else
+			jrs = NULL;
 		/* Write logical journal records if applicable. */
 		if (JNL_WRITE_LOGICAL_RECS(csa))
 		{
@@ -1474,6 +1481,7 @@ boolean_t	tp_tend()
 			assert(&rec->jrec_set_kill.num_participants == &rec->jrec_lgtrig.num_participants);
 			rec->jrec_set_kill.num_participants = replay_jnl_participants;
 			DEBUG_ONLY(++tmp_jnl_participants;)
+			assert(jrs);
 			do
 			{
 				jnl_write_reserve(csa, jrs, jfb->rectype, jfb->record_size, jfb);
@@ -1896,6 +1904,7 @@ skip_failed:
 	}
 failed_skip_revert:
 	assert(cdb_sc_normal != status);
+	assert(cnl);
 	t_fail_hist[t_tries] = status;
 	SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, cnl, status);
 	TP_RETRY_ACCOUNTING(csa, cnl);
@@ -1952,7 +1961,7 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 	bmp_begin_cse = si->first_cw_bitmap;	/* stored in a local to avoid pointer de-referencing within the loop below */
 	jbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
 	read_before_image = ((NULL != jbp) || csa->backup_in_prog || SNAPSHOTS_IN_PROG(csa));
-	b_ptr = (block_id_ptr_t)bml_cse->upd_addr;
+	b_ptr = bml_cse->upd_addr.map;
 	for (cse = si->first_cw_set;  cse != bmp_begin_cse; cse = cse->next_cw_set)
 	{
 		TRAVERSE_TO_LATEST_CSE(cse);

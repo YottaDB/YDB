@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -103,8 +103,8 @@ void	op_dmode(void)
 	if ((prin_in_dev_failure && (TRUE == io_curr_device.in->dollar.zeof)) || prin_out_dev_failure)
 		ISSUE_NOPRINCIO_IF_NEEDED((prin_out_dev_failure ? io_curr_device.out : io_curr_device.in), prin_out_dev_failure,
 			FALSE);
-	*((INTPTR_T **)&frame_pointer->restart_pc) = (INTPTR_T *)CODE_ADDRESS(call_dm);
-	*((INTPTR_T **)&frame_pointer->restart_ctxt) = (INTPTR_T *)GTM_CONTEXT(call_dm);
+	frame_pointer->restart_pc = CODE_ADDRESS(call_dm);
+	frame_pointer->restart_ctxt = GTM_CONTEXT(call_dm);
 	if (tt == io_curr_device.in->type)
 		tt_ptr = (d_tt_struct *)io_curr_device.in->dev_sp;
 	else

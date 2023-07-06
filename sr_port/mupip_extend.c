@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -173,7 +173,7 @@ void mupip_extend(void)
 			break;
 		default:
 			assertpro(IS_REG_BG_OR_MM(gv_cur_region));
-	}
+}
 	temp1 = total - old_total - bit_maps;
 	temp2 = total - DIVIDE_ROUND_UP(total, bplmap);
 	util_out_print("Extension successful, file !AD extended by !@UQ blocks.  Total blocks = !@UQ.",TRUE,

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,7 +79,7 @@ int dse_order(block_id srch,
 	else
 		b_top = bp + ((blk_hdr_ptr_t)bp)->bsiz;
 	CLEAR_DSE_COMPRESS_KEY;
-	for (rp = bp + SIZEOF(blk_hdr); rp < b_top ;rp = r_top, last = *pp)
+	for (r_top = rp = bp + SIZEOF(blk_hdr); rp < b_top ;rp = r_top, last = *pp)
 	{
 		GET_SHORT(rsize, &((rec_hdr_ptr_t)rp)->rsiz);
 		if (SIZEOF(rec_hdr) > rsize)

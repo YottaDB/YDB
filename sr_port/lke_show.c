@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,7 +66,7 @@ error_def(ERR_LOCKCRITOWNER);
 void	lke_show(void)
 {
 	bool			locks, all = TRUE, wait = TRUE, interactive = FALSE, match = FALSE, memory = TRUE, nocrit = TRUE;
-	boolean_t		exact = FALSE, was_crit;
+	boolean_t		exact = FALSE, was_crit = FALSE;
 	int4			pid;
 	size_t			ls_len;
 	int			n;
@@ -132,7 +132,7 @@ void	lke_show(void)
 				if (!nocrit)
 					GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
 				memcpy((uchar_ptr_t)ctl, (uchar_ptr_t)csa->mlkctl, ls_len);
-				assert((ctl->max_blkcnt > 0) && (ctl->max_prccnt > 0) && ((ctl->subtop - ctl->subbase) > 0));
+				assert((ctl->max_blkcnt > 0) && (ctl->max_prccnt > 0) && (ctl->subtop > ctl->subbase));
 				pctl2 = pctl;
 				if (MLK_CTL_BLKHASH_EXT == pctl.ctl->blkhash)
 				{
@@ -170,14 +170,18 @@ void	lke_show(void)
 			{
 				gtm_putmsg_csa(NULL, VARLSTCNT(2) ERR_BADREGION, 0);
 				locks = TRUE;
+				csa = NULL;
 			}
 			if (!locks)
 				gtm_putmsg_csa(NULL, VARLSTCNT(4) ERR_NOLOCKMATCH, 2, REG_LEN_STR(reg));
-			assert((ls_free <= 100) && (ls_free >= 0));
-			gtm_putmsg_csa(NULL, VARLSTCNT(4) ERR_LOCKSPACEUSE, 2, ((int)ls_free),
-				       csa->hdr->lock_space_size/OS_PAGELET_SIZE);
-			if (nocrit)
-				gtm_putmsg_csa(NULL, VARLSTCNT(3) ERR_LOCKCRITOWNER, 1, LOCK_CRIT_OWNER(csa));
+			if (csa)
+			{
+				assert((ls_free <= 100) && (ls_free >= 0));
+				gtm_putmsg_csa(csa, VARLSTCNT(4) ERR_LOCKSPACEUSE, 2, ((int)ls_free),
+					       csa->hdr->lock_space_size/OS_PAGELET_SIZE);
+				if (nocrit)
+					gtm_putmsg_csa(csa, VARLSTCNT(3) ERR_LOCKCRITOWNER, 1, LOCK_CRIT_OWNER(csa));
+			}
 		}
 	}
 	if (!match && (0 != regname.len))

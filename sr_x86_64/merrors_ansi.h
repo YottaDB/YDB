@@ -1282,7 +1282,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUTRUNCFAIL */
 	   0,	/* MUTRUNCNOSPACE */
 	   0,	/* MUTRUNCNOTBG */
-	   0,	/* UNUSEDMSG1455 */
+	   0,	/* PIDMISMATCH */
 	   0,	/* MUTRUNCPERCENT */
 	   0,	/* MUTRUNCSSINPROG */
 	   0,	/* MUTRUNCSUCCESS */

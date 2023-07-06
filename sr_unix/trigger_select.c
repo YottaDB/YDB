@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2022 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -219,7 +219,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 	char			*ptr1, *ptr2, *ptrtop;
 	mval			mi, trigger_count, trigger_value, *protect_trig_mval;
 	mval			*mv_trig_cnt_ptr;
-	boolean_t		multi_line;
+	boolean_t		multi_line = FALSE;
 	boolean_t		have_value, multi_record;
 	int			count;
 	int			indx, sub_indx;
@@ -726,7 +726,7 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 {
 	boolean_t		dump_all;
 	char			save_select_list[MAX_BUFF_SIZE];
-	char			*sel_ptr, *strtok_ptr, *prev_ptr, *ptr1, *ptr2;
+	char			*sel_ptr, *strtok_ptr, *prev_ptr = NULL, *ptr1, *ptr2;
 	int			gbl_len, prev_len;
 	mname_entry		gvname;
 	int			len, len1, badpos;
@@ -796,6 +796,7 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 				gbl_len = NAM_LEN(sel_ptr + 1, (int)(ptr1 - sel_ptr) - 1);
 				ptr1 = sel_ptr + 1;
 				/* Skip only if the previous global is the same as the current */
+				assert((prev_len != gbl_len) || prev_ptr);
 				if ((prev_len == gbl_len) && (0 == memcmp(prev_ptr, ptr1, gbl_len)))
 					continue;
 				SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);

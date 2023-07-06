@@ -197,7 +197,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 					t_retry((enum cdb_sc)rdfail_detail);
 					continue;
 				}
-				t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn, -(int4)(nextblk - blk));
+				t_write_map(&bmphist, (block_id *)update_array, ctn, -(int4)(nextblk - blk));
 				if (mark_level_as_special)
 				{
 					/* The special level value will be used later in gvcst_map_build to set the block to be
@@ -301,7 +301,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				t_retry((enum cdb_sc)rdfail_detail);
 				continue;
 			}
-			t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn, -1);
+			t_write_map(&bmphist, (block_id *)update_array, ctn, -1);
 			if ((MUSWP_FREE_BLK == TREF(in_mu_swap_root_state)) && blk->level)
 			{
 				assert(1 == ks->used);
@@ -316,7 +316,18 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 			{
 				assert((CDB_STAGNATE == t_tries) || (lcl_t_tries == t_tries - 1));
 				assert(0 < t_tries);
-				DEBUG_ONLY(status = LAST_RESTART_CODE); /* get the recent restart code */
+				status = LAST_RESTART_CODE; /* get the recent restart code */
+				if ((cdb_sc_onln_rlbk1 == status) || (cdb_sc_onln_rlbk2 == status)
+					|| TREF(rlbk_during_redo_root))
+				{	/* t_end restarted due to online rollback. Discard bitmap free-up and return control
+					 * to the application. But, before that reset only_reset_clues_if_onln_rlbk to FALSE
+					 */
+					TREF(in_gvcst_bmp_mark_free) = FALSE;
+					send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_IGNBMPMRKFREE, 4,
+							REG_LEN_STR(gv_cur_region), DB_LEN_STR(gv_cur_region));
+					t_abort(gv_cur_region, cs_addrs);
+					return ret_tn; /* actually 0 */
+				}
 				continue;
 			}
 			break;

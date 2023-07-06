@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,8 +58,8 @@ void mupip_ftok(void)
 	char		fn[MAX_FN_LEN + 1], instfilename[MAX_FN_LEN + 1], replf[MAX_FN_LEN + 1];
 	gd_id		fid;
 	int		index, ispool, semid, shmid;
-	int4            id, status;
-	key_t           semkey;
+	int4		id, status;
+	key_t		semkey = (key_t)-1;
 	mstr		file;
 	parse_blk	pblk;
 	repl_inst_hdr	repl_instance;
@@ -82,6 +82,7 @@ void mupip_ftok(void)
 	index = (only && ispool);				/* if only, skip the instance file  */
 	for (; index < TREF(parms_cnt); index++)
 	{	/*  in order to handle multiple files, this loop directly uses the array built by cli */
+		semid = shmid = -1;
 		if (ispool)
 		{	/* ispool idicates we're precessing based on the replication instance file */
 			if (only == index)
@@ -102,7 +103,6 @@ void mupip_ftok(void)
 				memcpy(fn, pblk.l_dir, fn_len);
 				fn[fn_len] = 0;
 				semkey = FTOK(fn, REPLPOOL_ID);
-				semid = shmid = -1;			/* not relevant for the file */
 			}
 			if (jnlpool && (1 == index))
 			{	/* goes first if also -recvpool */

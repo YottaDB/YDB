@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2020 Fidelity National Information	*
+ * Copyright (c) 2008-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,6 +140,7 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	{	/* initialize the beginning and the end of cache-records to be used later (only in case of cr == NULL) */
 		cr_lo = ((cache_rec_ptr_t)csa->acc_meth.bg.cache_state->cache_array) + csd->bt_buckets;
 		cr_top = cr_lo + csd->n_bts;
+		start_in_tend = 0;
 	}
 	/* Check/Sleep alternately for the phase2 commit to complete */
 	lcnt_isprcalv_freq = PHASE2_COMMIT_WAIT / PROC_ALIVE_CHECK_FACTOR;

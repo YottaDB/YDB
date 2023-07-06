@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2019 Fidelity National Information	*
+ * Copyright (c) 2017-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,6 +85,7 @@ void secshr_finish_CMT18_to_CMT19(sgmnt_addrs *csa)
 		currtn = si->start_tn;	/* tn at which phase1 happened in crit */
 	} else
 	{
+		si = NULL;
 		first_cw_set = (0 != cw_set_depth) ? cw_set : NULL;
 		currtn = start_tn;	/* tn at which phase1 happened in crit */
 	}
@@ -138,6 +139,7 @@ void secshr_finish_CMT18_to_CMT19(sgmnt_addrs *csa)
 			 */
 			if (dollar_tlevel)
 			{
+				assert(si);
 				crArray = si->cr_array;
 				crArrayIndex = si->cr_array_index;
 			} else
@@ -149,8 +151,10 @@ void secshr_finish_CMT18_to_CMT19(sgmnt_addrs *csa)
 		}
 #		endif
 		if (dollar_tlevel)
+		{
+			assert(si);
 			si->cr_array_index = 0;
-		else
+		} else
 			cr_array_index = 0; /* Take this opportunity to reset cr_array_index */
 		/* Now that phase2 of commit (all block builds) is done, set wc_blocked to trigger cache recovery */
 		/* If csa->t_commit_crit is TRUE, even if csa->now_crit is FALSE, we might need cache

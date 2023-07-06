@@ -59,7 +59,7 @@ int secshr_finish_CMT18(sgmnt_addrs *csa,
 {
 	blk_hdr_ptr_t		old_block_ptr;
 	block_id		blkid;
-	cache_que_heads_ptr_t	cache_state;
+	cache_que_heads_ptr_t	cache_state = NULL;
 	cache_rec_ptr_t		cr, cr_alt, start_cr;
 	int4			n;
 	int4			bufindx;	/* should be the same type as "csd->bt_buckets" */
@@ -90,7 +90,12 @@ int secshr_finish_CMT18(sgmnt_addrs *csa,
 		assert(blk_ptr == (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr));
 		SET_ONDSK_BLKVER(cr, csd, currtn);
 	} else
+	{
 		assert(blk_ptr == (MM_BASE_ADDR(csa) + (off_t)blk_size * blkid));
+		start_cr = NULL;
+		bufstart = NULL;
+		cr = NULL;
+	}
 	cnl = csa->nl;
 	/* Check if online backup is in progress and if there is a before-image to write.
 	 * If so need to store link to it so wcs_recover can back it up later. Cannot
@@ -106,15 +111,19 @@ int secshr_finish_CMT18(sgmnt_addrs *csa,
 		if (is_bg)
 		{
 			ASSERT_IS_WITHIN_SHM_BOUNDS((sm_uc_ptr_t)old_block_ptr, csa);
+			assert(bufstart);
 			bufindx = ((sm_uc_ptr_t)old_block_ptr - bufstart) / blk_size;
 			assert(0 <= bufindx);
 			assert(bufindx < csd->n_bts);
+			assert(start_cr);
+			assert(cr);
 			cr_alt = &start_cr[bufindx];
 			assert(!cr->stopped || (cr != cr_alt));
 			assert(cr->stopped || (cr == cr_alt)
 					|| (csd->asyncio && cr->backup_cr_is_twin && !cr_alt->backup_cr_is_twin));
 			assert(cr_alt->blk == blkid);
-		}
+		} else
+			cr_alt = NULL;
 		/* The following check is similar to the one in BG_BACKUP_BLOCK */
 		if (!WAS_FREE(cs->blk_prior_state) && (blkid >= cnl->nbb)
 			&& (0 == csa->shmpool_buffer->failed)
@@ -122,8 +131,10 @@ int secshr_finish_CMT18(sgmnt_addrs *csa,
 			&& (old_block_ptr->tn >= csa->shmpool_buffer->inc_backup_tn))
 		{
 			if (is_bg)
+			{
+				assert(cr_alt);
 				backup_block(csa, blkid, cr_alt, NULL);
-			else
+			} else
 				backup_block(csa, blkid, NULL, blk_ptr);
 			/* No need for us to flush the backup buffer. MUPIP BACKUP will anyways flush it at the end. */
 		}
@@ -140,7 +151,7 @@ int secshr_finish_CMT18(sgmnt_addrs *csa,
 		}
 	}
 	if (gds_t_writemap == cs->mode)
-		sec_shr_map_build(csa, (block_id*)cs->upd_addr, blk_ptr, cs, currtn);
+		sec_shr_map_build(csa, cs->upd_addr.map, blk_ptr, cs, currtn);
 	else if (0 != secshr_blk_full_build(dollar_tlevel, csa, csd, is_bg, cs, blk_ptr, currtn))
 		return -1;	/* commit failed for this cse; move on to next cse */
 	if (0 > cs->reference_cnt)
@@ -185,6 +196,7 @@ int secshr_finish_CMT18(sgmnt_addrs *csa,
 	cr = cs->cr;
 	assert(!cr->stopped || (process_id == cr->stopped));
 	assert(process_id == cr->in_tend);
+	assert(cache_state);
 	if (!cr->stopped)
 	{	/* Reset cr->in_tend now that cr is uptodate. Take this opportunity to reset cr->in_cw_set and the
 		 * write interlock thereby simulating exactly what bg_update_phase2 would have done. Also check cr->data_invalid.

@@ -38,7 +38,7 @@ GBLREF	unsigned char		rdfail_detail;
 
 error_def(ERR_DBFILERDONLY);
 
-sm_uc_ptr_t mm_read(block_id blk)
+sm_uc_ptr_t mm_read(block_id blk, boolean_t blk_free)
 {	/* this is a kissing cousin to code in dsk_read and the two blocs should be maintained in parallel */
 	boolean_t		buff_is_modified_after_read = FALSE, fully_upgraded, read_only, was_crit;
 	enum db_ver		tmp_ondskblkver;
@@ -46,6 +46,9 @@ sm_uc_ptr_t mm_read(block_id blk)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		buff;
+#ifdef DEBUG
+	blk_hdr			blkHdr;
+#endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -54,6 +57,10 @@ sm_uc_ptr_t mm_read(block_id blk)
 	csa = cs_addrs;
 	assert((csa->total_blks <= csa->ti->total_blks) || !IS_MCODE_RUNNING);
 	assert(blk >= 0);
+	/* Note: Even in snapshots, only INTEG requires mm_read to read FREE blocks. The assert below should be modified
+	 * if we later introduce a scheme where we can figure out as to who started the snapshots and assert accordingly
+	 */
+	assert(!blk_free || SNAPSHOTS_IN_PROG(csa)); /* Only SNAPSHOTS require mm_read to read a FREE block from the disk */
 	tmp_ondskblkver = (enum db_ver)csd->desired_db_format;
 	fully_upgraded = csd->fully_upgraded;
 	buff = (MM_BASE_ADDR(csa) + ((off_t)csa->hdr->blk_size * blk));
@@ -94,7 +101,7 @@ sm_uc_ptr_t mm_read(block_id blk)
 				tmp_ondskblkver = GDSV7m;
 				buff_is_modified_after_read = TRUE;
 			}
-		} else if ((csd->offset) && (GDSV6p > tmp_ondskblkver) && level)
+		} else if ((csd->offset) && (GDSV6p > tmp_ondskblkver) && level && !blk_free)
 		{	/* pre-V7 index block needing its offset adjusted */
 			assert(MEMCMP_LIT(csd->label, GDS_LABEL) || (!fully_upgraded && (GDSV6p < csd->desired_db_format)));
 			if (read_only)
@@ -109,6 +116,8 @@ sm_uc_ptr_t mm_read(block_id blk)
 			 */
 			if (FALSE == (was_crit = csa->now_crit)) /* WARNING assigment */
 				grab_crit(gv_cur_region, WS_15);
+			SHM_READ_MEMORY_BARRIER;
+			DEBUG_ONLY(blkHdr = *((blk_hdr_ptr_t)buff));
 			if ((GDSV6p > ((blk_hdr_ptr_t)buff)->bver) && ((blk_hdr_ptr_t)buff)->levl &&
 					(TRUE == blk_ptr_adjust(buff, csd->offset)))
 			{	/* Do not mark the buffer as changed if a concurrency conflict occurred */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1485,7 +1485,8 @@ MBSTART {												\
 
 #define	FREE_JBUF_RSRV_STRUCT(JRS)		\
 MBSTART {					\
-	assert(NULL != JRS);			\
+	assert((NULL != JRS) 			\
+		|| (WBTEST_ENABLED(WBTEST_SKIP_CORE_FOR_MEMORY_ERROR)));	\
 	if (NULL != JRS)			\
 	{					\
 		if (NULL != JRS->jrs_array)	\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -138,7 +138,10 @@ STATICFNDEF void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg
 		assert(gv_target->collseq == gvt->collseq);
 		assert(gv_target->nct == gvt->nct);
 	} else
+	{
+		addr_ptr = NULL;
 		gvnh_reg = NULL;
+	}
 	gv_currkey->end = gv_currkey->prev;
 	val = val_arg;
 	is_null = FALSE;

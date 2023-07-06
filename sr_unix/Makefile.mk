@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2022 Fidelity National Information		#
+# Copyright (c) 2013-2023 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -142,7 +142,7 @@ ifneq (,$(findstring AIX,$(UNAMESTR)))
 	# -bnoentry to tell the linker that shared library has no entry point.
 	LDSHR = -Wl,-G -bexpall -bnoentry
 	# On AIX, build maskpass and libgtmcryptutil.so with OpenSSL's libcrypto instead of libgcrypt.
-	default_thirdparty_CFLAGS = -DUSE_OPENSSL
+	default_thirdparty_CFLAGS = -DUSE_OPENSSL -DOPENSSL_API_COMPAT=0x10000000L
 	default_thirdparty_LDFLAGS = -lcrypto
 	# Set the default library
 	thirdparty = openssl
@@ -189,7 +189,7 @@ all: libgtmcryptutil.so maskpass gcrypt openssl libgtmtls.so
 # - exit the script so that this action is done only once
 whichsslh: Makefile
 	printf '#include <openssl/ssl.h>\n#include <stdio.h>\nint main(int argc, char *argv[]){\nprintf("/* %%s */\\n",OPENSSL_VERSION_TEXT);return 0;}' > whichsslh.c
-	$(CC) $(IFLAGS) -E whichsslh.c > whichsslh.i
+	$(CC) $(IFLAGS) $(default_thirdparty_CFLAGS) -E whichsslh.c > whichsslh.i
 	awk '/ssl\.h/{sub(/^[^"]*"/,"");sub(/".*/,"");print;system("cp -f "$$0" whichsslh.h");exit}' whichsslh.i
 	$(CC) $(IFLAGS) whichsslh.c -o whichsslhver
 
@@ -197,12 +197,14 @@ whichsslh: Makefile
 # are recompiled only when a material change occurs
 # NOTE: select between field 2 vs 3 because OpenSSL headers after 1.0.2 do "#<space>define" instead of "#define"
 gen_tls_options.h: whichsslh
-	awk '/define[ \t]+SSL_OP_[A-Z_v0-9]+[ \t]+/{fld=2;if($$2 ~ /define/)fld=3;print "DEFINE_SSL_OP(" $$(fld) "),"}'       whichsslh.h > gen_tls_options.tmp
+	awk '/define[ \t]+SSL_OP_[A-Z_v0-9]+[ \t]+/{fld=2;if($$2 ~ /define/)fld=3;print "DEFINE_SSL_OP(" $$(fld) "),"}'       \
+		whichsslh.h > gen_tls_options.tmp
 	./whichsslhver >> gen_tls_options.tmp
 	test -e $@ && (cmp -s gen_tls_options.tmp $@ || mv gen_tls_options.tmp $@) || mv gen_tls_options.tmp $@
 
 gen_tls_verify_options.h: whichsslh
-	awk '/define[ \t]+SSL_VERIFY_[A-Z_v0-9]+[ \t]+/{fld=2;if($$2 ~ /define/)fld=3;print "DEFINE_SSL_OP(" $$(fld) "),"}'   whichsslh.h > gen_tls_verify_options.tmp
+	awk '/define[ \t]+SSL_VERIFY_[A-Z_v0-9]+[ \t]+/{fld=2;if($$2 ~ /define/)fld=3;print "DEFINE_SSL_OP(" $$(fld) "),"}'   \
+		whichsslh.h > gen_tls_verify_options.tmp
 	./whichsslhver >> gen_tls_verify_options.tmp
 	test -e $@ && (cmp -s gen_tls_verify_options.tmp $@ || mv gen_tls_verify_options.tmp $@) || mv gen_tls_verify_options.tmp $@
 
@@ -230,12 +232,13 @@ openssl: libgtmcrypt_openssl_AES256CFB.so
 
 libgtmcrypt_openssl_AES256CFB.so: $(crypt_srcfiles) $(crypt_hdrfiles) libgtmcryptutil.so
 	@echo ; echo "Compiling $@..."
-	$(CC) $(CFLAGS) -DUSE_OPENSSL -DUSE_AES256CFB $(crypt_srcfiles) $(LDSHR) $(RPATHFLAGS) $(LDFLAGS)	\
+	$(CC) $(CFLAGS) -DUSE_OPENSSL -DOPENSSL_API_COMPAT=0x10000000L -DUSE_AES256CFB	\
+		$(crypt_srcfiles) $(LDSHR) $(RPATHFLAGS) $(LDFLAGS)	\
 		$@ -lcrypto -lgpgme -lgpg-error $(COMMON_LIBS)
 
 libgtmtls.so: $(tls_srcfiles) $(tls_hdrfiles) libgtmcryptutil.so
 	@echo ; echo "Compiling $@..."
-	$(CC) $(CFLAGS) $(tls_srcfiles) $(LDSHR) $(RPATHFLAGS) $(LDFLAGS) $@ -lssl $(COMMON_LIBS)
+	$(CC) $(CFLAGS) -DOPENSSL_API_COMPAT=0x10000000L $(tls_srcfiles) $(LDSHR) $(RPATHFLAGS) $(LDFLAGS) $@ -lssl $(COMMON_LIBS)
 
 install: all
 	@echo ; echo "Installing shared libraries to $(PLUGINDIR) and maskpass to $(PLUGINDIR)/gtmcrypt..."

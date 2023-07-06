@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2022 Fidelity National Information	*
+ * Copyright (c) 2014-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,11 @@
 #include "error.h"
 
 #define MAX_PASS_FDS			256
-#define PID_CHECKING_SUPPORTED		defined(__linux__) || defined(__sun) || defined(_AIX)
+#if defined(__linux__) || defined(__sun) || defined(_AIX)
+#	define PID_CHECKING_SUPPORTED		(1)
+#else
+#	define PID_CHECKING_SUPPORTED		(0)
+#endif
 
 #define RECVALL(FD, BUF, BUFLEN, RVAL)		XFERALL(recv, FD, BUF, BUFLEN, RVAL)
 #define SENDALL(FD, BUF, BUFLEN, RVAL)		XFERALL(send, FD, BUF, BUFLEN, RVAL)
@@ -128,7 +132,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 msec_timeout, int argcnt,
 	struct msgdata		mdata;
 	int			*fds;
 	pid_t			peerpid;
-	TID			timer_id;
+	TID			timer_id = 0;
 	char			complete_buf[STR_LIT_LEN(ACCEPT_COMPLETE)];
 	char			*errptr;
 	int4			errlen;
@@ -278,7 +282,10 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 msec_timeout, int argcnt,
 	if (0 != STRNCMP_LIT(complete_buf, ACCEPT_COMPLETE))
 	{
 		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
+		{
+			assert(timer_id);
 			cancel_timer(timer_id);
+		}
 		iod->dollar.za = ZA_IO_ERR;
 		errptr = PROTOCOL_ERROR;
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr, errlen);
@@ -288,7 +295,10 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 msec_timeout, int argcnt,
 		return;
 	}
 	if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
+	{
+		assert(timer_id);
 		cancel_timer(timer_id);
+	}
 	for (argn = 0; argn < argcnt; argn++)
 	{
 		handlestr = handles[argn];
@@ -309,7 +319,10 @@ ioerr:
 		return;
 	}
 	if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
+	{
+		assert(timer_id);
 		cancel_timer(timer_id);
+	}
 	iod->dollar.za = ZA_IO_ERR;
 	SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 	if (socketptr->ioerror)
@@ -332,12 +345,12 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 	struct msghdr		msg;
 	struct cmsghdr		*cmsg = NULL;
 	struct msgdata		mdata;
-	int			*fds;
+	int			*fds = NULL;
 	char			*hptr;
 	int			handlelen;
 	size_t			tmpbuflen;
 	pid_t			peerpid;
-	TID			timer_id;
+	TID			timer_id = 0;
 	char			complete_buf[STR_LIT_LEN(PASS_COMPLETE)];
 	char			*errptr;
 	int4			errlen;
@@ -434,7 +447,10 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 	if (SIZEOF(mdata) != rval)
 	{
 		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
+		{
+			assert(timer_id);
 			cancel_timer(timer_id);
+		}
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SOCKNOTPASSED);
 		return;
 	}
@@ -453,7 +469,10 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 	if (NULL == cmsg)
 	{
 		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
+		{
+			assert(timer_id);
 			cancel_timer(timer_id);
+		}
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SOCKNOTPASSED, 0);
 		return;
 	}
@@ -463,14 +482,20 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 	if (0 == fdcount)
 	{
 		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
+		{
+			assert(timer_id);
 			cancel_timer(timer_id);
+		}
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SOCKNOTPASSED, 0);
 		return;
 	}
 	if (gtm_max_sockets <= (socket_pool->n_socket + fdcount))
 	{
 		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
+		{
+			assert(timer_id);
 			cancel_timer(timer_id);
+		}
 		for (fdn = 0; fdn < fdcount; fdn++)
 		{
 			CLOSE(fds[fdn], rval);
@@ -536,7 +561,10 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 	if (0 != STRNCMP_LIT(complete_buf, PASS_COMPLETE))
 	{
 		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
+		{
+			assert(timer_id);
 			cancel_timer(timer_id);
+		}
 		for (fdn = scnt - 1; fdn >= 0; fdn--)
 		{
 			if (-1 != (index = iosocket_handle(handles[fdn].addr, &handles[fdn].len, FALSE, socket_pool)))
@@ -559,7 +587,10 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 		goto ioerr;
 	assert(rval == STR_LIT_LEN(ACCEPT_COMPLETE));
 	if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
+	{
+		assert(timer_id);
 		cancel_timer(timer_id);
+	}
 	if (NULL != handlesvar)
 	{
 		handleslen += (fdcount > 1) ? (fdcount - 1) : 0;		/* space for delimiters */
@@ -595,6 +626,7 @@ ioerr:
 		if (-1 != (index = iosocket_handle(handles[fdn].addr, &handles[fdn].len, FALSE, socket_pool)))
 			iosocket_close_one(socket_pool, index);
 	}
+	assert(fds || (scnt >= fdcount));
 	for (fdn = scnt; fdn < fdcount; fdn++)
 	{
 		CLOSE(fds[fdn], rval);

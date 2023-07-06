@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2019 Fidelity National Information	*
+ * Copyright (c) 2009-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -998,7 +998,7 @@ int als_lvval_gc(void)
 	lv_blk		*lv_blk_ptr;
 	ht_ent_mname	*htep, *htep_top;
 	lv_val		*lvp, *lvlimit;
-	lv_val		**lvarraycur = NULL, **lvarray = NULL, **lvarraytop, **lvptr;
+	lv_val		**lvarraycur = NULL, **lvarray = NULL, **lvarraytop = NULL, **lvptr;
 	mv_stent 	*mv_st_ent;
 	tp_frame	*tf;
 	tp_var		*restore_ent;

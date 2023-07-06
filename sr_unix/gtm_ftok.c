@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2011-2020 Fidelity National Information	*
+ * Copyright (c) 2011-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -18,25 +18,33 @@
 #include <gtm_stat.h>
 #include <eintr_wrappers.h>
 
-key_t
-gtm_ftok(const char *path, int id)
+unsigned int gtm_stat_hash(struct stat *statbuf)
 {
-    int rc;
-    struct stat statbuf;
-    uint32_t key = 0;
+	hash128_state_t		state;
+	gtm_uint16		out16;
+	uint4			key = 0;
 
-    STAT_FILE(path, &statbuf, rc);
-    if (rc < 0)
-    {
-        return (key_t)-1;
-    }
+	/* This needs to be the classic MurmurHash3 for compatibility with prior versions */
+	MurmurHash3_x86_32(&statbuf->st_dev, sizeof statbuf->st_dev, key, &key);
+	MurmurHash3_x86_32(&statbuf->st_ino, sizeof statbuf->st_ino, key, &key);
+	return key;
+}
 
-    MurmurHash3_x86_32(&statbuf.st_dev, sizeof statbuf.st_dev, key, &key);
-    MurmurHash3_x86_32(&statbuf.st_ino, sizeof statbuf.st_ino, key, &key);
+key_t gtm_ftok(const char *path, int id)
+{
+	int		rc;
+	struct stat	statbuf;
+	uint4		key;
 
-    /* substitute the id for the top 8 bits of the hash */
-    key &= 0x00ffffff;
-    key |= (id & 0xff) << 24;
+	STAT_FILE(path, &statbuf, rc);
+	if (rc < 0)
+	{
+		return (key_t)-1;
+	}
+	key = gtm_stat_hash(&statbuf);
+	/* substitute the id for the top 8 bits of the hash */
+	key &= 0x00ffffff;
+	key |= (id & 0xff) << 24;
 
-    return (key_t)key;
+	return (key_t)key;
 }

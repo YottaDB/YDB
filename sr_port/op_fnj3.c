@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,9 +39,12 @@ void op_fnj3(mval *src,int width,int fract,mval *dst)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 	if (fract < 0)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JUSTFRACT);
+	/* The literal two below accounts for the possibility
+	 * of inserting a zero and/or a minus with a width of zero.
+	 */
+	if (MAXINT4 < (gtm_uint8)width + MAX_NUM_SIZE + 2 + (gtm_uint8)fract)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 	w = width + MAX_NUM_SIZE + 2 + fract;
-	/* the literal two above accounts for the possibility
-	of inserting a zero and/or a minus with a width of zero */
 	if  ((0 > w) || (MAX_STRLEN < w))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 	MV_FORCE_NUM(src);
@@ -52,8 +55,8 @@ void op_fnj3(mval *src,int width,int fract,mval *dst)
 	if (src->mvtype & MV_INT)
 	{
 		n = src->m[1];
-                if (n < 0)
-                {
+		if (n < 0)
+		{
 			sign = 1;
 			n = -n;
 		}

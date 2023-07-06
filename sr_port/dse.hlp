@@ -11,9 +11,10 @@
    you unless you have extensive experience, you should always get guidance
    from FIS or an equivalently knowledgeable support resource before running
    any DSE command that changes any attribute of any production database or
-   other database you value. However, you can use those DSE commands that let
-   you see the attributes of your database for collecting database metrics
-   and monitoring status.
+   other database you value. Use utilities and commands like %PEEKBYNAME,
+   MUPIP DUMPFHEAD, GVSTATS, %YGBLSTAT, etc. Only use DSE for collecting
+   database metrics and monitoring status in an unusual situation where safer
+   tools are unavailable.
 
    GT.M installation procedure places the DSE utility program in a directory
    specified by the environment variable gtm_dist.
@@ -66,11 +67,8 @@
    only used under the direction of FIS support to recover from the
    unanticipated consequences of failures not adequately planned for (for
    example, you should configure GT.M applications such that you never need a
-   Change command to recover from a system crash).
-
-   Inquiry commands let you see the attributes of your database. You may
-   frequently use the inquiry commands for collecting your database metrics
-   and status reporting.
+   Change command to recover from a system crash). Use Inquiry commands
+   sparingly and only when there is no alternate available.
 
    The list of Change commands is as follows:
 

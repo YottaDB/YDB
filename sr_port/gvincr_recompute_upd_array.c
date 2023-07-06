@@ -146,7 +146,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	/* since cw_set_depth is guaranteed to be 1 (by the above assert), we can be sure that the only update array space we would
 	 * have used is for the current (and only) cw_set_element "cse" and hence can reuse the space by resetting update_array_ptr
 	 */
-	assert(ROUND_UP2((INTPTR_T)update_array, UPDATE_ELEMENT_ALIGN_SIZE) == (INTPTR_T)cse->upd_addr);
+	assert(ROUND_UP2((INTPTR_T)update_array, UPDATE_ELEMENT_ALIGN_SIZE) == (INTPTR_T)cse->upd_addr.ptr);
 	RESET_UPDATE_ARRAY; /* do not use CHECK_AND_RESET_UPDATE_ARRAY since we are knowingly resetting an active update array */
 	BLK_INIT(bs_ptr, bs1);
 	BLK_SEG(bs_ptr, buffaddr + SIZEOF(blk_hdr), bh->curr_rec.offset - SIZEOF(blk_hdr));
@@ -173,7 +173,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 		assert(CDB_STAGNATE > t_tries);
 		return cdb_sc_mkblk;
 	}
-	cse->upd_addr = (unsigned char *)bs1;
+	cse->upd_addr.blk = bs1;
 	/* assert that cse->old_block is indeed pointing to the buffer that the cache-record is pointing to.
 	 * While this code no longer copies the cache record's "ondsk_blkver" onto the cse, we leave this assert in place*/
 	assert((cse->old_block == (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr)) || (bh->cycle != cr->cycle) || (bh->cr != cr));

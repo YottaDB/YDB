@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,14 +77,14 @@ error_def(ERR_DBMBMINCFREFIXED);
 block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work, cw_set_element *cs, int *cw_depth_ptr)
 {
 	cw_set_element	*cs1;
-	sm_uc_ptr_t	bmp;
+	sm_uc_ptr_t	bmp = NULL;
 	block_id	bml, extension_size, hint, hint_cycled, hint_limit, lcnt, local_maps, offset;
 	block_id_ptr_t	b_ptr;
 	gd_region	*baseDBreg;
-	int		cw_set_top, depth;
+	int		cw_set_top, depth = -1;
 	unsigned int	n_decrements = 0;
-	trans_num	ctn;
-	int4		free_bit, map_size, new_allocation, status;
+	trans_num	ctn = 0;
+	int4		free_bit, map_size = 0, new_allocation, status;
 	ublock_id	total_blks;
 	uint4		space_needed, was_crit;
 	sgmnt_addrs	*baseDBcsa;
@@ -153,13 +153,14 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 			if (total_blks != cs_addrs->ti->total_blks)
 			{	/* File extension or MM switch detected. Rather than try to reset the loop, just recurse. */
 				CHECK_MM_DBFILEXT_REMAP_IF_NEEDED(cs_addrs, gv_cur_region);
-				rel_crit(gv_cur_region);
+				if (!was_crit)
+					rel_crit(gv_cur_region);
 				return (dba_mm == cs_data->acc_meth)
 						? FILE_EXTENDED
 						: bm_getfree(hint_arg, blk_used, cw_work, cs, cw_depth_ptr);
 			}
 			if (IS_STATSDB_CSA(cs_addrs))
-			{       /* Double the allocation size for statsdb regions to reduce tp_restart calls */
+			{	/* Double the allocation size for statsdb regions to reduce tp_restart calls */
 				assert(cs_addrs->total_blks == cs_addrs->ti->total_blks);
 				extension_size = cs_addrs->total_blks;
 			} else
@@ -272,7 +273,7 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 		} else
 		{
 			bmp = cs1->old_block;
-			b_ptr = (block_id_ptr_t)(cs1->upd_addr);
+			b_ptr = cs1->upd_addr.map;
 			b_ptr += cs1->reference_cnt - 1;
 			offset = *b_ptr + 1;
 		}
@@ -305,14 +306,16 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 	 * gets recycled with a non-bitmap block in which case the bit that bm_find_blk returns could be greater than map_size.
 	 * But, this should never happen in final retry.
 	 */
+	assert(map_size);
 	if ((map_size <= free_bit) && (CDB_STAGNATE <= t_tries))
 	{	/* Bad free bit. */
 		assert((NO_FREE_SPACE == free_bit) && (!lcnt));	/* All maps full, should have extended */
 		assertpro(FALSE);
 	}
+	assert(0 <= depth);
 	if (0 != depth)
 	{
-		b_ptr = (block_id_ptr_t)(cs1->upd_addr);
+		b_ptr = cs1->upd_addr.map;
 		b_ptr += cs1->reference_cnt++;
 		*b_ptr = free_bit;
 	} else
@@ -325,9 +328,10 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 		BLK_ADDR(b_ptr, space_needed, block_id);
 		memset(b_ptr, 0, space_needed);
 		*b_ptr = (block_id)free_bit;
+		assert(bmp);
 		blkhist.blk_num = bml;
 		blkhist.buffaddr = bmp;	/* cycle and cr have already been assigned from t_qread */
-		t_write_map(&blkhist, (uchar_ptr_t)b_ptr, ctn, 1); /* last parameter 1 is what cs->reference_cnt gets set to */
+		t_write_map(&blkhist, b_ptr, ctn, 1); /* last parameter 1 is what cs->reference_cnt gets set to */
 	}
 	return (bml + free_bit);
 }

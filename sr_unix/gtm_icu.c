@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -219,7 +219,7 @@ void gtm_icu_init(void)
 	char_ptr_t	err_str;
 	icu_func_t	fptr;
 	int		findx, ver;
-	boolean_t	icu_getversion_found = FALSE, gtm_icu_ver_defined, symbols_renamed;
+	boolean_t	icu_getversion_found = FALSE, gtm_icu_ver_defined, symbols_renamed = -1;
 	UVersionInfo	icu_version;
 	mstr		icu_ver, trans;
 	int		iculdflags = ICU_LIBFLAGS;
@@ -228,7 +228,7 @@ void gtm_icu_init(void)
 	char		*pieceptr, *cptr;
 #	ifdef _AIX
 	int		buflen, prev_dyn_size;
-	char            buf[ICU_LIBNAME_LEN], temp_path[GTM_PATH_MAX], search_paths[MAX_SEARCH_PATH_LEN];
+	char		buf[ICU_LIBNAME_LEN], temp_path[GTM_PATH_MAX], search_paths[MAX_SEARCH_PATH_LEN];
 	char		*ptr, *each_libpath, *dyn_search_paths = NULL, *search_path_ptr;
 	struct stat	real_path_stat;		/* To see if the resolved real_path exists or not */
 #	endif
@@ -437,7 +437,6 @@ void gtm_icu_init(void)
 		}
 #		endif
 	}
-	DEBUG_ONLY(symbols_renamed = -1;)
 	for (findx = 0; findx < icu_func_n; ++findx)
 	{
 		cur_icu_fname = icu_fname[findx];

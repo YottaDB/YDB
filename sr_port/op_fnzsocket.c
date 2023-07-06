@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2022 Fidelity National Information	*
+ * Copyright (c) 2014-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -177,7 +177,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	int			sockopt_value;	/* for getsockopt calls */
 	GTM_SOCKLEN_TYPE	sockopt_len;	/* for getsockopt calls */
 	d_socket_struct		*dsocketptr;
-	socket_struct		*socketptr;
+	socket_struct		*socketptr = NULL;
 #ifdef	GTM_TLS
 	int			tls_options_mask, optionoffset, optionlen;
 	gtm_tls_socket_t	*tls_sock;
@@ -299,6 +299,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	switch (zsocket_item)
 	{
 		case zsocket_blocking:
+			assert(socketptr);
 			if ((socket_connected == socketptr->state) && socketptr->nonblocked_output)
 				*dst = literal_zero;
 			else
@@ -308,6 +309,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			numret = (int)dsocketptr->current_socket;
 			break;
 		case zsocket_delimiter:
+			assert(socketptr);
 			if (NULL == arg2)
 			{	/* want how many delimiters */
 				numret = socketptr->n_delimiter;
@@ -329,9 +331,11 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			}
 			break;
 		case zsocket_descriptor:
+			assert(socketptr);
 			numret = socketptr->sd;
 			break;
 		case zsocket_howcreated:
+			assert(socketptr);
 			assert(creator_passed >= socketptr->howcreated);
 			dst->str.addr = (char *)zsocket_howcreated_names[socketptr->howcreated];
 			dst->str.len = STRLEN(dst->str.addr);
@@ -364,6 +368,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			}
 			break;
 		case zsocket_ioerror:
+			assert(socketptr);
 			if (socketptr->ioerror)
 				*dst = literal_one;
 			else
@@ -372,6 +377,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case zsocket_keepalive:
 			/* return [uservalue;]getsockoptvalue */
 			/* return null string if error */
+			assert(socketptr);
 			sockopt_value = 0;
 			sockopt_len = sizeof(sockopt_value);
 			if (-1 != iosocket_getsockopt(socketptr, "SO_KEEPALIVE", SO_KEEPALIVE, SOL_SOCKET, &sockopt_value,
@@ -387,6 +393,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case zsocket_keepcnt:
 			/* return [uservalue;]getsockoptvalue */
 			/* return null string if error */
+			assert(socketptr);
 			sockopt_value = 0;
 			sockopt_len = sizeof(sockopt_value);
 			if (-1 != iosocket_getsockopt(socketptr, "TCP_KEEPCNT", TCP_KEEPCNT, IPPROTO_TCP, &sockopt_value,
@@ -402,6 +409,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case zsocket_keepidle:
 			/* return [uservalue;]getsockoptvalue */
 			/* return null string if error */
+			assert(socketptr);
 			sockopt_value = 0;
 			sockopt_len = sizeof(sockopt_value);
 			if (-1 != iosocket_getsockopt(socketptr, "TCP_KEEPIDLE", TCP_KEEPIDLE, IPPROTO_TCP, &sockopt_value,
@@ -417,6 +425,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case zsocket_keepintvl:
 			/* return [uservalue;]getsockoptvalue */
 			/* return null string if error */
+			assert(socketptr);
 			sockopt_value = 0;
 			sockopt_len = sizeof(sockopt_value);
 			if (-1 != iosocket_getsockopt(socketptr, "TCP_KEEPINTVL", TCP_KEEPINTVL, IPPROTO_TCP, &sockopt_value,
@@ -430,6 +439,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			}
 			break;
 		case zsocket_localaddress:
+			assert(socketptr);
 			if (NULL != socketptr->local.saddr_ip)
 			{
 				dst->str.addr = socketptr->local.saddr_ip;
@@ -455,6 +465,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			s2pool(&dst->str);
 			break;
 		case zsocket_localport:
+			assert(socketptr);
 			if ((NULL != socketptr->local.sa) || socketptr->passive)
 				numret = (int)socketptr->local.port;
 			else
@@ -464,6 +475,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			}
 			break;
 		case zsocket_morereadtime:
+			assert(socketptr);
 			if (socketptr->def_moreread_timeout)	/* user specified */
 				numret = (int)socketptr->moreread_timeout;
 			else
@@ -477,6 +489,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			break;
 		case zsocket_options:
 			/* build string from socket struct - note this may not be exactly what was specified */
+			assert(socketptr);
 			len = 0;
 			if (SOCKOPTIONS_SYSTEM < socketptr->options_state.alive)
 			{	/* user specified */
@@ -530,6 +543,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			stringpool.free += len;
 			break;
 		case zsocket_parent:
+			assert(socketptr);
 			if (NULL != socketptr->parenthandle)
 			{
 				dst->str.addr = socketptr->parenthandle;
@@ -542,6 +556,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 				*dst = literal_null;
 			break;
 		case zsocket_protocol:
+			assert(socketptr);
 #			ifndef VMS
 			if (socket_local == socketptr->protocol)
 				*dst = literal_local;
@@ -568,6 +583,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			}
 			break;
 		case zsocket_remoteaddress:
+			assert(socketptr);
 			if (NULL != socketptr->remote.saddr_ip)
 			{
 				dst->str.addr = socketptr->remote.saddr_ip;
@@ -591,6 +607,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			s2pool(&dst->str);
 			break;
 		case zsocket_remoteport:
+			assert(socketptr);
 			if (NULL != socketptr->remote.sa)
 				numret = (int)socketptr->remote.port;
 			else
@@ -602,6 +619,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case zsocket_sndbuf:
 			/* return [uservalue;]getsockoptvalue */
 			/* return null string if error */
+			assert(socketptr);
 			sockopt_value = 0;
 			sockopt_len = sizeof(sockopt_value);
 			if (-1 != iosocket_getsockopt(socketptr, "SO_SNDBUF", SO_SNDBUF, SOL_SOCKET, &sockopt_value,
@@ -615,6 +633,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			}
 			break;
 		case zsocket_sockethandle:
+			assert(socketptr);
 			dst->str.addr = socketptr->handle;
 			dst->str.len = socketptr->handle_len;
 			UTF8_ONLY(dst->str.char_len = 0);
@@ -622,6 +641,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			s2pool(&dst->str);
 			break;
 		case zsocket_state:
+			assert(socketptr);
 			assert(socket_connect_inprogress >= socketptr->state);
 			dst->str.addr = (char *)zsocket_state_names[socketptr->state];
 			dst->str.len = STRLEN(dst->str.addr);
@@ -631,6 +651,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			break;
 		case zsocket_tls:
 #			ifdef	GTM_TLS
+			assert(socketptr);
 			if (socketptr->tlsenabled)
 			{
 				tls_sock = (gtm_tls_socket_t *)socketptr->tlssocket;
@@ -641,12 +662,12 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 				}
 				len = SIZEOF(ONE_COMMA) - 1 + SIZEOF(TLSCLIENTSTR) - 1 + 1; /* remove nulls, add trailing comma */
 				len += STRLEN(tls_sock->tlsid);		/* trailing comma above not needed if no tlsid but OK */
+				tls_options_mask = 0;
 				if ((NULL != arg2) && (0 < arg2->str.len))
 				{
 					len2 = MIN((MAX_TRANS_NAME_LEN - 1), arg2->str.len);
 					lower_to_upper((uchar_ptr_t)buf1, (uchar_ptr_t)arg2->str.addr, len2);
 					buf1[len2] = '\0';
-					tls_options_mask = 0;
 					for (charptr = buf1; (&buf1[len2] > charptr); charptr = optionend)
 					{
 						if (buf1 < charptr)
@@ -707,7 +728,9 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 						len += (OPTIONPREFIXLEN + (2 * MAX_HEX_DIGITS_IN_INT) + 1);
 					}
 				} else
+				{
 					len2 = 0;	/* flag no extras */
+				}
 				ENSURE_STP_FREE_SPACE(len);
 				charptr = (char *)stringpool.free;
 				len = SIZEOF(ONE_COMMA) - 1;
@@ -803,15 +826,18 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 				*dst = literal_null;
 			break;
 		case zsocket_zbfsize:
+			assert(socketptr);
 			numret = socketptr->buffer_size;
 			break;
 		case zsocket_zdelay:
+			assert(socketptr);
 			if (socketptr->nodelay)
 				*dst = literal_zero;
 			else
 				*dst = literal_one;
 			break;
 		case zsocket_zff:
+			assert(socketptr);
 			if (0 < socketptr->zff.len)
 			{
 				dst->str = socketptr->zff;
@@ -821,6 +847,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 				*dst = literal_null;
 			break;
 		case zsocket_zibfsize:
+			assert(socketptr);
 			sockopt_value = 0;
 			sockopt_len = sizeof(sockopt_value);
 			if (-1 != iosocket_getsockopt(socketptr, "SO_RCVBUF", SO_RCVBUF, SOL_SOCKET, &sockopt_value,
@@ -832,6 +859,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			break;
 		default:
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZSOCKETATTR, 2, keyword->str.len, keyword->str.addr);
+			GTM_UNREACHABLE();
 	}
 	dst->mvtype = zsocket_type;
 	if (MV_NM == dst->mvtype)

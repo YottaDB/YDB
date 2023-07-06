@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -96,13 +96,13 @@ void bm_setmap(block_id bml, block_id blk, int4 busy)
 	/* Terminate update array unconditionally with zero bitnum. */
 	*((block_id_ptr_t)update_array_ptr) = 0;
 	update_array_ptr += SIZEOF(block_id);
-	t_write_map(&blkhist, (uchar_ptr_t)update_array, ctn, reference_cnt);
+	t_write_map(&blkhist, (block_id *)update_array, ctn, reference_cnt);
 	if (JNL_ENABLED(cs_data))
 	{
 		cse = (cw_set_element *)(&cw_set[0]);
 		cse->new_buff = (unsigned char *)non_tp_jfb_ptr->buff;
 		memcpy(cse->new_buff, bmp, ((blk_hdr_ptr_t)bmp)->bsiz);
-		gvcst_map_build((block_id *)cse->upd_addr, (uchar_ptr_t)cse->new_buff, cse, cs_addrs->ti->curr_tn);
+		gvcst_map_build(cse->upd_addr.map, (uchar_ptr_t)cse->new_buff, cse, cs_addrs->ti->curr_tn);
 		cse->done = TRUE;
 	}
 	/* Call t_end till it succeeds or aborts (error will be reported) */

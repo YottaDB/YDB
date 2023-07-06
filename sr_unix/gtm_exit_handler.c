@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,8 @@ GBLREF	boolean_t		dont_want_core;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		skip_exit_handler;
-GBLREF 	boolean_t		is_tracing_on;
+GBLREF	boolean_t		is_tracing_on;
+GBLREF	uint4			process_id;
 #ifdef DEBUG
 GBLREF 	boolean_t		stringpool_unusable;
 GBLREF 	boolean_t		stringpool_unexpandable;
@@ -154,6 +155,7 @@ LITREF	mval		literal_notimeout;
 error_def(ERR_GVRUNDOWN);
 error_def(ERR_LKRUNDOWN);
 error_def(ERR_MPROFRUNDOWN);
+error_def(ERR_PIDMISMATCH);
 
 /* Function that is invoked at process exit time to do cleanup.
  * The general flow here is to do various types of rundowns (e.g. db rundown, lock rundown, io rundown etc.).
@@ -172,6 +174,18 @@ void gtm_exit_handler(void)
 	SETUP_THREADGBL_ACCESS;
 	if (exit_handler_active || skip_exit_handler) /* Skip exit handling if specified or if exit handler already active */
 		return;
+	if (process_id != getpid())
+	{	/* DE476408 - Skip exit handling when there is a process_id mismatch(after FORK) to avoid a child
+		 * process from removing the statsdb entry(gvcst_remove_statsDB_linkage) of its parent, which might
+		 * cause database damage.
+		 */
+		SHORT_SLEEP(100);
+		if (process_id != getpid())
+		{	/* gtm8518 - a retry in order to make sure the mismatch is consistant before avoiding rundowns */
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PIDMISMATCH, 2, process_id, getpid());
+			return;
+		}
+	}
 	exit_handler_active = TRUE;
 	attempting = rundown_state_lock;
 	actual_exi_condition = 0;

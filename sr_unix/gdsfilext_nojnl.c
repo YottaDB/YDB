@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2020 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -103,7 +103,8 @@ int gdsfilext_nojnl(gd_region* reg, block_id new_total, block_id old_total)
 			diobuff = &rctl->dio_buff;
 		} else
 			diobuff = &(TREF(dio_buff));
-	}
+	} else
+		diobuff = NULL;
 	status = db_write_eof_block(udi, udi->fd, blk_size, offset, diobuff);
 	if (0 != status)
 	{

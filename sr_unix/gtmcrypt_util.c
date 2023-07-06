@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2022 Fidelity National Information	*
+ * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -360,7 +360,7 @@ int gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int inte
 		pwent->env_value = MALLOC(len ? len + 1 : GTM_PASSPHRASE_MAX * 2 + 1);
 		assert(NULL != pwent->env_value);
 		env_name = pwent->env_name;
-		strncpy(env_name, name, SIZEOF(pwent->env_name));
+		strncpy(env_name, name, SIZEOF(pwent->env_name) - 1);
 		env_name[SIZEOF(pwent->env_name) - 1] = '\0';
 	} else
 		env_name = pwent->env_name;
@@ -388,7 +388,7 @@ int gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int inte
 		{
 			if (env_value != lpasswd)
 			{	/* env_value was malloc()ed for len + 1 bytes */
-				strncpy(env_value, lpasswd, len);	/* Store the hexadecimal representation in environment */
+				strncpy(env_value, lpasswd, len + 1);	/* Store the hexadecimal representation in environment */
 				env_value[len] = '\0';
 			}
 			passwd[len / 2] = '\0';		/* null-terminate the password string */

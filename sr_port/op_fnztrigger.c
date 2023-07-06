@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -198,7 +198,7 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	save_jnlpool = jnlpool;
 	if (NULL != gv_currkey)
 	{
-		save_gv_currkey = (gv_key *)&save_currkey.key;
+		save_gv_currkey = &save_currkey.key;
 		MEMCPY_KEY(save_gv_currkey, gv_currkey);
 		save_gv_last_subsc_null = TREF(gv_last_subsc_null);
 		save_gv_some_subsc_null = TREF(gv_some_subsc_null);

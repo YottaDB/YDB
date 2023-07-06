@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -745,9 +745,9 @@ int parse_cmd(void)
 	char 	*cmd_str;
 	int 	opt_cnt;
 	int 	eof, cmd_err;
-        DCL_THREADGBL_ACCESS;
+	DCL_THREADGBL_ACCESS;
 
-        SETUP_THREADGBL_ACCESS;
+	SETUP_THREADGBL_ACCESS;
 	opt_cnt = 0;
 	gpqual_root = NULL;
 	func = 0;

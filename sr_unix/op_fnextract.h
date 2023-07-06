@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2018 Fidelity National Information	*
+ * Copyright (c) 2008-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -144,6 +144,7 @@ void OP_FNEXTRACT(int last, int first, mval *src, mval *dest)
 					UTF8_BADCHAR(0, utf_parse_blk.badcharstr, utf_parse_blk.badchartop, 0, NULL);
 				else
 					assertpro(FALSE);		/* Unknown error - no return */
+				srcptr = NULL;
 			}
 			first_charcnt = utf_parse_blk.scan_char_count;		/* Save char count for "first" */
 		} else

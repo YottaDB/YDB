@@ -134,7 +134,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	boolean_t		clustered, hold_onto_crit, was_crit, issued_db_init_crypt_warning, sync_needed;
 	int			dummy, exceed_sleep_count, lcnt, ocnt;
 	cw_set_element		*cse;
-	off_chain		chain1;
+	block_ref		chain1;
 	register sgmnt_addrs	*csa;
 	register sgmnt_data_ptr_t	csd;
 	enum db_ver		ondsk_blkver;
@@ -182,13 +182,13 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		assert(sgm_info_ptr);
 		if (0 != sgm_info_ptr->cw_set_depth)
 		{
-			PUT_BLK_ID(&chain1, blk);
-			if (1 == chain1.flag)
+			PUT_BLK_ID(&chain1.id, blk);
+			if (1 == chain1.chain.flag)
 			{
 				assert(sgm_info_ptr->cw_set_depth);
 				assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
-				if ((int)chain1.cw_index < sgm_info_ptr->cw_set_depth)
-					tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain1.cw_index, &cse);
+				if ((int)chain1.chain.cw_index < sgm_info_ptr->cw_set_depth)
+					tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain1.chain.cw_index, &cse);
 				else
 				{
 					assert(FALSE == csa->now_crit);
@@ -205,7 +205,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				cse = first_tp_srch_status ? first_tp_srch_status->cse : NULL;
 			}
 			assert(!cse || !cse->high_tlevel);
-			assert(!chain1.flag || cse);
+			assert(!chain1.chain.flag || cse);
 			if (cse)
 			{	/* transaction has modified the sought after block  */
 				if ((gds_t_committed != cse->mode) || (n_gds_t_op < cse->old_mode))
@@ -232,7 +232,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						 */
 						gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, 0);
 						assert(NULL != cse->blk_target);
-						if (!already_built && !chain1.flag)
+						if (!already_built && !chain1.chain.flag)
 						{
 							buffaddr = first_tp_srch_status->buffaddr;
 							cr = first_tp_srch_status->cr;
@@ -272,7 +272,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					 * have had an old_mode of kill_t_create in which case we would not have come into this
 					 * else block. Assert accordingly.
 					 */
-					assert(!chain1.flag);
+					assert(!chain1.chain.flag);
 					first_tp_srch_status = NULL;	/* do not use any previous srch_hist information */
 				}
 			}
@@ -330,7 +330,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		 * positive value you can represent in a signed value of the same length.
 		 */
 		assert((&FILE_INFO(gv_cur_region)->s_addrs == csa) && (csd == cs_data));
-		assert(!csa->now_crit);
+		DEBUG_ONLY(PUT_BLK_ID(&chain1, blk));
+		assert((!csa->now_crit) || (1 == chain1.chain.flag));
 		rdfail_detail = cdb_sc_blknumerr;
 		return (sm_uc_ptr_t)NULL;
 	}
@@ -338,7 +339,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	{
 		*cycle = CYCLE_SHRD_COPY;
 		*cr_out = 0;
-		return (sm_uc_ptr_t)(mm_read(blk));
+		return (sm_uc_ptr_t)(mm_read(blk, lcl_blk_free));
 	}
 	was_crit = csa->now_crit;
 	cnl = csa->nl;

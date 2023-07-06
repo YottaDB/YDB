@@ -529,12 +529,7 @@ void mupip_endiancvt(void)
 			TAG_POLICY_GTM_PUTMSG(outdb, realfiletag, TAG_BINARY, errno);
 #		endif
 		new_data->file_corrupt = endian_native ? GTM_BYTESWAP_32(TRUE) : TRUE;
-		if (0 == memcmp(new_data->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
-		{
-			db_header_dwnconv(new_data);
-			LSEEKWRITE(outdb_fd, 0, new_data, SIZEOF(sgmnt_data), save_errno);
-		}else
-			LSEEKWRITE(outdb_fd, 0, new_data, SIZEOF(sgmnt_data), save_errno);
+		LSEEKWRITE(outdb_fd, 0, new_data, SIZEOF(sgmnt_data), save_errno);
 		if (0 != save_errno)
 		{
 			free(new_data);
@@ -618,13 +613,9 @@ void mupip_endiancvt(void)
 	new_data->file_corrupt = endian_native ? GTM_BYTESWAP_32(FALSE) : FALSE;
 	if (outdb_specified)
 	{
-		if (0 == memcmp(new_data->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
-			db_header_dwnconv(new_data);
 		LSEEKWRITE(outdb_fd, 0, new_data, SIZEOF(sgmnt_data), save_errno);
 	} else
 	{
-		if (0 == memcmp(new_data->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
-			db_header_dwnconv(new_data);
 		DB_LSEEKWRITE((sgmnt_addrs *)NULL, ((unix_db_info *)NULL), (char *)NULL, db_fd, 0,
 				new_data, SIZEOF(sgmnt_data), save_errno);
 	}
@@ -995,6 +986,7 @@ void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_n
 	SWAP_SD4(last_com_bkup_last_blk);
 	SWAP_SD4(last_rec_bkup_last_blk);
 	SWAP_SD4(reorg_restart_block);
+	/* Filler to align text with the V7 version */
 	/************* FIELDS SET WHEN DB IS OPEN ********************************/
 	new->image_count = 0;		/* should be zero when db is not open so reset it unconditionally */
 	new->freeze = 0;		/* should be zero when db is not open so reset it unconditionally */
@@ -1133,6 +1125,20 @@ void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_n
 #	define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)	SWAP_SD8(gvstats_rec.COUNTER);
 #	include "tab_gvstats_rec.h"
 #	undef TAB_GVSTATS_REC
+	/* Filler
+	 * space
+	 * for
+	 * alignment
+	 * with
+	 * the
+	 * V7
+	 * version
+	 * of
+	 * this
+	 * function
+	 *
+	 *
+	 */
 	/************* INTERRUPTED RECOVERY RELATED FIELDS continued ****************/
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 		SWAP_SD8(intrpt_recov_resync_strm_seqno[idx]);

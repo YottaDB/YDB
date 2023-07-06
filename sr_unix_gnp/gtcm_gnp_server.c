@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -152,7 +152,7 @@ error_def(ERR_TEXT);
 
 static void gtcm_gnp_server_actions(void)
 {
-	int4			status;
+	int4			status = SS_NORMAL;
 	unsigned short		value;
 	char			reply;
 	connection_struct	*prev_curr_entry;
@@ -297,7 +297,7 @@ static void gtcm_gnp_server_actions(void)
 			}
 			if (curr_entry)		/* curr_entry can be NULL if went through gtcmtr_terminate */
 			{
-			  	time(&curr_entry->lastact);
+				time(&curr_entry->lastact);
 				/* curr_entry is used by gtcm_urgread_ast to determine if it needs to defer the interrupt message */
 				prev_curr_entry = curr_entry;
 				if (CM_WRITE == reply)

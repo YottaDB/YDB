@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,11 +21,11 @@
 #include <errno.h>
 
 #include "io.h"
+#include "iott_setterm.h"
 #include "parse_file.h"
 #include "zroutines.h"
 #include "eintr_wrappers.h"
 #include "stringpool.h"
-#include "setterm.h"
 #include "op.h"
 #include "fork_init.h"
 #include "geteditor.h"
@@ -177,7 +177,7 @@ void op_zedit(mval *v, mval *p)
 
 	flush_pio();
 	if (tt == io_std_device.in->type)
-		resetterm(io_std_device.in);
+		iott_resetterm(io_std_device.in);
 	/* ignore interrupts */
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = 0;
@@ -206,7 +206,7 @@ void op_zedit(mval *v, mval *p)
 		/* restore interrupt handler */
 		sigaction(SIGINT, &intr, 0);
 		if (tt == io_std_device.in->type)
-			setterm(io_std_device.in);
+			iott_setterm(io_std_device.in);
 	} else
 	{
 		if (WBTEST_ENABLED(WBTEST_BADEXEC_OP_ZEDIT))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -211,7 +211,7 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 	boolean_t		have_value;
 	mval			key_val;
 	int4			len;
-	boolean_t		multi_record, kill_cmp, first_match_kill_cmp;
+	boolean_t		multi_record, kill_cmp = FALSE, first_match_kill_cmp = FALSE;
 	mval			mv_hash;
 	mval			mv_trig_indx;
 	boolean_t		match, first_match;

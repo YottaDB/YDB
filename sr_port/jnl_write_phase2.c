@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2017 Fidelity National Information	*
+ * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,7 @@ void	jnl_write_phase2(sgmnt_addrs *csa, jbuf_rsrv_struct_t *jrs)
 	uint4			common_csum, pini_addr, reclen, freeaddr, prev_freeaddr, start_freeaddr;
 	void			*param1;
 	jbuf_phase2_in_prog_t	*phs2cmt;
-	int			commit_index;
+	int			commit_index = -1;
 	boolean_t		write_to_jnlbuff, write_to_jnlpool;
 
 	assert(JNL_ALLOWED(csa));
@@ -60,8 +60,11 @@ void	jnl_write_phase2(sgmnt_addrs *csa, jbuf_rsrv_struct_t *jrs)
 	 */
 	if (write_to_jnlbuff)
 	{
+		trans_num_cksum		curr_tn;
+
 		jbp = jpc->jnl_buff;
-		ADJUST_CHECKSUM_TN(INIT_CHECKSUM_SEED, &jpc->curr_tn, common_csum);
+		curr_tn.tn = jpc->curr_tn;
+		ADJUST_CHECKSUM_TN(INIT_CHECKSUM_SEED, curr_tn.enc, common_csum);
 		pini_addr = jpc->pini_addr;
 		need_pini_adjustment = FALSE;
 		commit_index = jrs->phase2_commit_index;
@@ -95,12 +98,12 @@ void	jnl_write_phase2(sgmnt_addrs *csa, jbuf_rsrv_struct_t *jrs)
 		ADJUST_CHECKSUM(common_csum, pini_addr, common_csum);
 		ADJUST_CHECKSUM(common_csum, jgbl.gbl_jrec_time, common_csum);
 		SET_JPC_PHASE2_FREEADDR(jpc, jbp, start_freeaddr);	/* needed by "jnl_write_*" calls below */
-	}
+	} else
+		jbp = NULL;
 	for (jre = first_jre; jre < jre_top; jre++)
 	{
 #		ifdef DEBUG
-		if (write_to_jnlbuff)
-			prev_freeaddr = jpc->phase2_freeaddr;
+		prev_freeaddr = write_to_jnlbuff ? jpc->phase2_freeaddr : 0;
 #		endif
 		rectype = jre->rectype;
 		reclen = jre->reclen;
@@ -170,9 +173,13 @@ void	jnl_write_phase2(sgmnt_addrs *csa, jbuf_rsrv_struct_t *jrs)
 	}
 	if (write_to_jnlbuff)
 	{
-		DEBUG_ONLY(freeaddr = jpc->phase2_freeaddr;)
+#		ifdef DEBUG
+		freeaddr = jpc->phase2_freeaddr;
+#		endif
+		assert(jbp);
 		assert((freeaddr > jbp->freeaddr) || (csa->now_crit && (freeaddr == jbp->freeaddr)));
 		assert(freeaddr <= jbp->rsrv_freeaddr);
+		assert(0 <= commit_index);
 		JNL_PHASE2_WRITE_COMPLETE(csa, jbp, commit_index, freeaddr);
 	}
 	jrs->tot_jrec_len = 0;	/* reset needed to prevent duplicate calls to "jnl_write_phase2" for same curr_tn */

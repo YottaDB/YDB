@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,8 +16,11 @@
 #include "stringpool.h"
 #include "toktyp.h"
 #include "cgp.h"
+#include "gdsroot.h"
 
 GBLREF char		cg_phase;	/* code generation phase */
+GBLREF boolean_t	is_dollar_incr;
+GBLREF unsigned int	t_tries;
 
 #define DIGIT(x)	((x >='0') && (x <= '9'))
 #define NUM_MASK	(MV_NM | MV_INT | MV_NUM_APPROX)
@@ -172,7 +175,14 @@ char *s2n (mval *u)
 			{
 				u->mvtype &= ~NUM_MASK;
 				if (!TREF(compile_time))
+				{
+					if (is_dollar_incr && (CDB_STAGNATE > t_tries))
+					{
+						TREF(gvcst_incr_numoflow) = TRUE;
+						return NULL;
+					}
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NUMOFLOW);
+				}
 				u->mvtype |= MV_NUM_APPROX; /* breadcrumb for experitem to help f_[z]char() with NUMOFLOW error */
 			} else
 			{

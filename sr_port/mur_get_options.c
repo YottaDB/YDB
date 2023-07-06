@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2021 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -104,13 +104,13 @@ void	mur_get_options(void)
 	int		extr_type, cnt, top, onln_rlbk_val, status2;
 	io_pair		io_save_device, io_gvpatfile_device;
 	boolean_t	global_exclude;
-	long_list	*ll_ptr, *ll_ptr1;
-	long_long_list	*seqno_list, *seqno_list1;
+	long_list	*ll_ptr = NULL, *ll_ptr1;
+	long_long_list	*seqno_list = NULL, *seqno_list1;
 #ifdef CAN_ZWRITE_EXTRACT_PBLK
-	long_long_list	*blocklist_list, *blocklist_list1;
+	long_long_list	*blocklist_list = NULL, *blocklist_list1;
 #endif
-	redirect_list	*rl_ptr, *rl_ptr1, *tmp_rl_ptr;
-	select_list	*sl_ptr, *sl_ptr1;
+	redirect_list	*rl_ptr = NULL, *rl_ptr1, *tmp_rl_ptr;
+	select_list	*sl_ptr = NULL, *sl_ptr1;
 	boolean_t	interactive, parse_error, uniqname_error = FALSE;
 	struct stat	stat_buf;
 	DCL_THREADGBL_ACCESS;
@@ -373,7 +373,10 @@ void	mur_get_options(void)
 			if (mur_options.redirect == NULL)
 				mur_options.redirect = rl_ptr1;
 			else
+			{
+				assert(rl_ptr);
 				rl_ptr->next = rl_ptr1;
+			}
 			rl_ptr = rl_ptr1;
 			file_name_specified_len = (unsigned int)(cptr - entry_ptr);
 			if (file_name_specified_len > (MAX_FN_LEN + 1))
@@ -579,7 +582,10 @@ void	mur_get_options(void)
 			if (NULL == mur_options.global)
 				mur_options.global = sl_ptr1;
 			else
+			{
+				assert(sl_ptr);
 				sl_ptr->next = sl_ptr1;
+			}
 			sl_ptr = sl_ptr1;
 			if ('"' == entry_ptr[length - 1])
 				--length;
@@ -652,7 +658,10 @@ void	mur_get_options(void)
 			if (NULL == mur_options.user)
 				mur_options.user = sl_ptr1;
 			else
+			{
+				assert(sl_ptr);
 				sl_ptr->next = sl_ptr1;
+			}
 			sl_ptr = sl_ptr1;
 			if ('"' == entry_ptr[length - 1])
 				--length;
@@ -752,7 +761,10 @@ void	mur_get_options(void)
 				if (NULL == mur_options.patterns)
 					mur_options.patterns = sl_ptr1;
 				else
+				{
+					assert(sl_ptr);
 					sl_ptr->next = sl_ptr1;
+				}
 				sl_ptr = sl_ptr1;
 				sl_ptr->exclude = global_exclude;
 				sl_ptr->len = pattern_len;
@@ -819,7 +831,10 @@ void	mur_get_options(void)
 			if (NULL == mur_options.blocklist)
 				mur_options.blocklist = blocklist_list1;
 			else
+			{
+				assert(blocklist_list);
 				blocklist_list->next = blocklist_list1;
+			}
 			blocklist_list = blocklist_list1;
 			if ('"' == entry_ptr[length - 1])
 				--length;
@@ -895,7 +910,10 @@ void	mur_get_options(void)
 			if (NULL == mur_options.seqno)
 				mur_options.seqno = seqno_list1;
 			else
+			{
+				assert(seqno_list);
 				seqno_list->next = seqno_list1;
+			}
 			seqno_list = seqno_list1;
 			if ('"' == entry_ptr[length - 1])
 				--length;
@@ -970,7 +988,10 @@ void	mur_get_options(void)
 			if (NULL == mur_options.id)
 				mur_options.id = ll_ptr1;
 			else
+			{
+				assert(ll_ptr);
 				ll_ptr->next = ll_ptr1;
+			}
 			ll_ptr = ll_ptr1;
 			if ('"' == entry_ptr[length - 1])
 				--length;

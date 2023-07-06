@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	uint4			local_node_len, query_node_len, node_name_len;
 	parse_blk		def;
 	char			local_node_name[MAX_HOST_NAME_LEN + 1], query_node_name[MAX_HOST_NAME_LEN + 1];
-	char			*base, *ptr, *top, *del, *node, *name, *ext, ch;
+	char			*base, *ptr, *top, *del, *node, *name, *ext = NULL, ch;
 	char			**hostaddrlist;
 	char			def_string[MAX_FN_LEN + 1];
 	boolean_t		hasnode, hasdir, hasname, hasext, wilddir, wildname;
@@ -376,6 +376,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 			ptr += def.b_ext;
 		}
 	}
+	assert(ext);
 	pblk->b_name = ext - name;
 	pblk->b_ext = ptr - ext;
 	if (!hasdir && (def.fnb & F_HAS_DIR))

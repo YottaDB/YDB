@@ -423,7 +423,7 @@ gd_region *dbfilopn(gd_region *reg)
 	int			status;
 	boolean_t		raw;
 	boolean_t		open_read_only;
-	int			stat_res, rc, save_errno;
+	int			stat_res, rc, save_errno = 0;
 	sgmnt_addrs		*csa;
 	sgmnt_data		tsdbuff;
 	sgmnt_data_ptr_t        tsd;

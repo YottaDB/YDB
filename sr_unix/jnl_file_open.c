@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,7 +74,7 @@ uint4 jnl_file_open(gd_region *reg, boolean_t init)
 	struct stat		stat_buf;
 	uint4			sts;
 	sm_uc_ptr_t		nameptr;
-	int			fstat_res;
+	int			fstat_res = -1;
 	int			close_res;
 	boolean_t		switch_and_retry;
 	char			buff[OUT_BUFF_SIZE];

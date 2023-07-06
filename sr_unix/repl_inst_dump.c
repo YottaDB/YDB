@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,7 +116,8 @@ GBLREF	uint4		section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst
 
 void	repl_inst_dump_filehdr(repl_inst_hdr_ptr_t repl_instance)
 {
-	char		dststr[MAX_DIGITS_IN_INT], dstlen;
+	char		dststr[MAX_DIGITS_IN_INT];
+	unsigned char	dstlen;
 	char		*string;
 	int4		minorver, nodename_len, last_histinfo_num;
 	int		idx, strm_idx, offset;

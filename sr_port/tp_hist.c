@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,7 +85,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 {
 	int			hist_index;
 	srch_hist		*hist;
-	off_chain		chain;
+	block_ref		chain;
 	srch_blk_status		*t1, *t2;
 	block_id		blk;
 	srch_blk_status		*local_hash_entry;
@@ -166,8 +166,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 			 * after the block contents get modified, then we may incorrectly decide (looking at the
 			 * tn) that the block hasn't changed when actually its contents have.
 			 */
-			chain = *(off_chain *)&blk;
-			if (!chain.flag)
+			chain.id = blk;
+			if (!chain.chain.flag)
 			{	/* We need to ensure the shared copy hasn't changed since the beginning of the
 				 * transaction since not checking that can cause at least false UNDEFs.
 				 * e.g. Say earlier in this TP transaction we had gone down
@@ -324,8 +324,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 			 * For an existing block, we copy its search history into si->last_tp_hist.
 			 * For a created block, we dont since it doesn't need to be validated at commit.
 			 */
-			assert(!chain.flag || !t1->first_tp_srch_status);
-			if (store_history && !chain.flag)
+			assert(!chain.chain.flag || !t1->first_tp_srch_status);
+			if (store_history && !chain.chain.flag)
 			{
 				assert(si->cw_set_depth || !t1->cse);
 				local_hash_entry = t1->first_tp_srch_status;

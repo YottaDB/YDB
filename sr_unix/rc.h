@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -246,7 +247,7 @@ int		 rc_prc_setf P((rc_q_hdr *));
 rof_struct	*rc_oflow_alc P((void));
 void		 rc_oflow_fin P((rof_struct *));
 void		 rc_send_cpt P((rc_xblk_hdr *, rc_rsp_page *));
-short		 rc_fnd_file P((rc_xdsid *));
+unsigned short	 rc_fnd_file P((rc_xdsid *));
 int		 rc_frmt_lck P((char *, int4 , unsigned char *, short , short *));
 void		 rc_gbl_ord P((rc_rsp_page *));
 void		 rc_rundown P((void));

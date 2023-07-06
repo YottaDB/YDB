@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -206,7 +206,10 @@ boolean_t convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsig
 				else if (!MEMCMP_LIT(fnname, "CHAR") || !MEMCMP_LIT(fnname, "C"))
 					is_zchar = FALSE;
 				else
+				{
 					assert(FALSE);
+					GTM_UNREACHABLE();
+				}
 				/* Parse the arguments */
 				isrc++; /* skip the '(' */
 				while (TRUE)
@@ -318,7 +321,7 @@ unsigned char *gds2gvn(mval *gds, unsigned char *buff, int col)
 	memset(gv_target, 0, SIZEOF(gv_namehead));
 	gv_target->collseq = csp;
 	assert(MV_IS_STRING(gds));
-	gvkey = (gv_key *)&save_currkey.key;
+	gvkey = &save_currkey.key;
 	gvkey->prev = 0;
 	gvkey->top = DBKEYSIZE(MAX_KEY_SZ);
 	if ((gvkey->top < gds->str.len) || (2 > gds->str.len)

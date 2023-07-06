@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,7 +61,8 @@
 	ENABLE_INTERRUPTS(INTRPT_IN_SHMDT, prev_intrpt_state);		\
 }
 
-key_t gtm_ftok(const char *path, int id);
+key_t		gtm_ftok(const char *path, int id);
+unsigned int	gtm_stat_hash(struct stat *statbuf);
 
 #define IPC_REMOVED(ERRNO)	((EINVAL == ERRNO) || (EIDRM == ERRNO))	/* EIDRM is only on Linux */
 #define	SEM_REMOVED(ERRNO)	IPC_REMOVED(ERRNO)

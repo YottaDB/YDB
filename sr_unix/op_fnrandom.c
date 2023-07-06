@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,7 +18,7 @@
 #include "op.h"
 #include "mvalconv.h"
 
-GBLREF int4 process_id;
+GBLREF uint4 process_id;
 
 error_def(ERR_RANDARGNEG);
 
@@ -32,7 +32,7 @@ void op_fnrandom (int4 interval, mval *ret)
 
 	if (interval < 1)
 	{
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_RANDARGNEG);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RANDARGNEG);
 	}
 	if (seed == 0)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2022 Fidelity National Information	*
+ * Copyright (c) 2009-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -633,7 +633,7 @@ STATICFNDEF int keystore_refresh(void)
 			}
 			if (GTM_PATH_MAX <= envvar_len)
 			{
-				UPDATE_ERROR_STRING(ENV_TOOLONG_ERROR, "gtmcrypt_config", status);
+				UPDATE_ERROR_STRING(ENV_TOOLONG_ERROR, "gtmcrypt_config", (int)envvar_len);
 				return -1;
 			}
 			if (0 != stat(config_env, &stat_info))
@@ -912,9 +912,11 @@ STATICFNDEF void insert_unresolved_key_link(char *keyname, char *keypath, int in
 
 	node = (gtm_keystore_unres_key_link_t *)MALLOC(SIZEOF(gtm_keystore_unres_key_link_t));
 	memset(node->key_name, 0, GTM_PATH_MAX);
-	strncpy(node->key_name, keyname, GTM_PATH_MAX - 1);	/* Callers verified that the name fits in GTM_PATH_MAX */
+	strncpy(node->key_name, keyname, GTM_PATH_MAX);	/* Callers verified that the name fits in GTM_PATH_MAX */
+	node->key_name[GTM_PATH_MAX - 1] = '\0';
 	memset(node->key_path, 0, GTM_PATH_MAX);
-	strncpy(node->key_path, keypath, GTM_PATH_MAX - 1);	/* Callers verified that the path fits in GTM_PATH_MAX */
+	strncpy(node->key_path, keypath, GTM_PATH_MAX);	/* Callers verified that the path fits in GTM_PATH_MAX */
+	node->key_path[GTM_PATH_MAX - 1] = '\0';
 	node->next = keystore_by_unres_key_head;
 	node->index = index;
 	node->status = status;

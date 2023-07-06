@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,8 +18,8 @@
 
 #include "gtmsiginfo.h"
 #include "io.h"
+#include "iott_setterm.h"
 #include "send_msg.h"
-#include "setterm.h"
 
 GBLREF volatile int 	suspend_status;
 GBLREF io_pair		io_std_device;
@@ -43,7 +43,7 @@ void suspend(int sig)
 	if (!(sig == SIGTTOU || ((sig == SIGTTIN) && (NULL != io_std_device.out) && (tt == io_std_device.out->type))))
 		flush_pio();
 	if (NULL != io_std_device.in && tt == io_std_device.in->type)
-		resetterm(io_std_device.in);
+		iott_resetterm(io_std_device.in);
 	sig_count = 0;
 	status = kill(process_id, SIGSTOP);
 	assert(0 == status);

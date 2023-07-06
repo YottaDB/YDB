@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,8 +23,8 @@
 #include "io_params.h"
 #include "trmdef.h"
 #include "gtmio.h"
+#include "iott_setterm.h"
 #include "stringpool.h"
-#include "setterm.h"
 #include "getcaps.h"
 #include "gtm_isanlp.h"
 #include "gtm_conv.h"
@@ -148,7 +148,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		}
 		if (IS_GTM_IMAGE)
 			/* Only the true runtime runs with the modified terminal settings */
-			setterm(ioptr);
+			iott_setterm(ioptr);
 		status = getcaps(tt_ptr->fildes);
 		if (1 != status)
 		{

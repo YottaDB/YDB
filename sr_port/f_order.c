@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,7 @@ int f_order(oprtype *a, opctype op)
 	opctype		gv_oc;
 	oprtype		control_slot, dir_opr, *dir_oprptr, *next_oprptr;
 	short int	column;
-	triple		*oldchain, *r, *sav_dirref, *sav_gv1, *sav_gvn, *sav_lvn, *sav_ref, *share, *triptr;
+	triple		*oldchain, *r, *sav_dirref, *sav_gv1 = NULL, *sav_gvn = NULL, *sav_lvn, *sav_ref, *share, *triptr;
 	triple		*chain2, *obp, tmpchain2;
 	save_se		save_state;
 	DCL_THREADGBL_ACCESS;
@@ -146,12 +146,15 @@ int f_order(oprtype *a, opctype op)
 			{
 			case GLOBAL:		/* The direction may have had a side effect, so take copies of subscripts */
 				*next_oprptr = *dir_oprptr;
-				for (; sav_gvn != sav_gv1; sav_gvn = sav_gvn->exorder.bl)
+				assert(sav_gvn);
+				assert(sav_gv1);
+				assert(sav_gvn != sav_gv1);
+				do
 				{	/* hunt down the gv opcode */
 					gv_oc = sav_gvn->opcode;
 					if ((OC_GVNAME == gv_oc) || (OC_GVNAKED == gv_oc) || (OC_GVEXTNAM == gv_oc))
 						break;
-				}
+				} while ((sav_gvn = sav_gvn->exorder.bl) != sav_gv1);	/* Note assignment */
 				assert((OC_GVNAME == gv_oc) || (OC_GVNAKED == gv_oc) || (OC_GVEXTNAM == gv_oc));
 				TREF(temp_subs) = TRUE;
 				create_temporaries(sav_gvn, gv_oc);
@@ -188,7 +191,7 @@ int f_order(oprtype *a, opctype op)
 			case INDIRECT:		/* Save and restore the variable lookup for true left-to-right evaluation */
 				*next_oprptr = *dir_oprptr;
 				used_glvn_slot = TRUE;
-				dqinit(&tmpchain2, exorder);
+				exorder_init(&tmpchain2);
 				chain2 = setcurtchain(&tmpchain2);
 				INSERT_INDSAVGLVN(control_slot, r->operand[0], ANY_SLOT, 1);
 				setcurtchain(chain2);

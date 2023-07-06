@@ -161,7 +161,7 @@ void	dm_read (mval *v)
 	char		*strtokptr;
 	const char	delimiter_string[] = " \t";
 	d_tt_struct 	*tt_ptr;
-	enum RECALL_ERR_CODE	err_recall = NO_ERROR;
+	enum RECALL_ERR_CODE	err_recall;
 	int		backspace, cl, cur_cl, cur_value, delete, down, hist, histidx, index, insert_key, keypad_len, left;
 	int		delchar_width;		/* display width of deleted char */
 	int		delta_width;		/* display width change for replaced char */
@@ -172,21 +172,20 @@ void	dm_read (mval *v)
 	int		instr;			/* insert point in input string */
 	int		ioptr_width;		/* display width of the IO device */
 	int		outlen;			/* total characters in line so far */
-	int		match_length, msk_in, msk_num, num_chars_left, num_lines_above, right, selstat, status, up, utf8_more;
+	int		match_length, msk_in, msk_num, num_chars_left, num_lines_above, right, selstat, status, up, utf8_more = 0;
 	io_desc 	*io_ptr;
 	io_termmask	mask_term;
 	mv_stent	*mvc, *mv_zintdev;
 	tt_interrupt	*tt_state;
 	uint4		mask;
 	unsigned int	exp_length, len, length;
-	unsigned char	*argv1;
 	unsigned char	*buffer_start;		/* beginning of non UTF8 buffer */
 	unsigned char	*current_ptr;		/* insert next character into buffer here */
 	unsigned char	escape_sequence[ESC_LEN];
 	unsigned char	inbyte, *outptr, *outtop, *ptr, *ptrnext, *ptrtop;
-	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
+	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr = NULL;	/* to build up multi byte for character */
 	unsigned short	escape_length = 0;
-	wint_t		*buffer_32_start, codepoint, *current_32_ptr, inchar, *ptr32;
+	wint_t		*buffer_32_start = NULL, codepoint, *current_32_ptr, inchar, *ptr32;
 	int		poll_timeout;
 	nfds_t		poll_nfds;
 	struct pollfd	poll_fdlist[1];
@@ -327,6 +326,7 @@ void	dm_read (mval *v)
 				mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
 				if (utf8_active)
 				{
+					assert(buffer_32_start);
 					tt_state->exp_length = exp_length;
 					tt_state->buffer_32_start = buffer_32_start;
 					tt_state->utf8_more = utf8_more;
@@ -399,6 +399,7 @@ void	dm_read (mval *v)
 				}
 				if (utf8_more)
 				{	/* needed extra bytes */
+					assert(more_ptr);
 					*more_ptr++ = inbyte;
 					if (--utf8_more)
 						continue;	/* get next byte */
@@ -480,7 +481,9 @@ void	dm_read (mval *v)
 			}
 			if (terminator_seen)
 			{	/* carriage return or other line terminator has been typed */
+				assert(!utf8_active || buffer_32_start);
 				STORE_OFF(0, outlen);
+				err_recall = NO_ERROR;
 				if (utf8_active && (ASCII_CR == INPUT_CHAR))
 					tt_ptr->discard_lf = TRUE;
 					/* exceeding the maximum length exits the while loop, so it must fit here . */
@@ -530,12 +533,10 @@ void	dm_read (mval *v)
 					match_length = (uint4)strcspn((const char *)buffer_start, delimiter_string);
 					/* only "rec" and "recall" should be accepted */
 					if (((strlen(REC) == match_length) || (strlen(RECALL) == match_length))
-						&& (0 == strncmp((const char *)buffer_start, RECALL, match_length)))
-					{
-						for (argv1 = buffer_start + match_length; !(IS_AT_END_OF_STRINGPOOL(argv1, 0))
-								&& (' ' != argv1[0]) && ('\t' != argv1[1]); argv1++);
-						argv[1] = (char *)((IS_AT_END_OF_STRINGPOOL(argv1, 0)) ? NULL : argv1);
-					} else
+					     && (0 == strncmp((const char *)buffer_start, RECALL, match_length))
+					     && ((' ' == (inbyte = GET_OFF(match_length)) || !inbyte)))		/* WARNING assign */
+						argv[1] = inbyte ? (char *)(buffer_start + match_length + 1) : NULL;
+					else
 						break;		/* not RECALL so end of line */
 #				ifdef UTF8_SUPPORTED
 				}
@@ -644,6 +645,7 @@ void	dm_read (mval *v)
 			{
 				if (0 < instr)
 				{
+					assert(!utf8_active || buffer_32_start);
 					MOVE_CURSOR_LEFT_ONE_CHAR(dx, instr, dx_instr, dx_start, ioptr_width);
 					DEL_ONE_CHAR_AT_CURSOR(outlen, dx_outlen, dx, dx_instr, dx_start, ioptr_width);
 				}
@@ -669,6 +671,7 @@ void	dm_read (mval *v)
 				iott_escape(&escape_sequence[escape_length - 1], &escape_sequence[escape_length], io_ptr);
 			} else
 			{
+				assert(!utf8_active || buffer_32_start);
 				switch (inchar)
 				{
 					case EDIT_SOL:

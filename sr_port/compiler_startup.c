@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,7 +77,7 @@ boolean_t compiler_startup(void)
 	mstr			str;
 	size_t			mcallocated, alloc;
 	size_t			stlen;
-	mcalloc_hdr		*lastmca, *nextmca;
+	mcalloc_hdr		*lastmca = NULL, *nextmca;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -250,10 +250,12 @@ boolean_t compiler_startup(void)
 	reinit_compilation_externs();
 	/* Determine if need to remove any added mc blocks. Min value of mcallocated ensures we leave at least one block alone. */
 	for (alloc = 0, nextmca = mcavailptr;
-	     nextmca && (alloc < mcallocated);
-	alloc += nextmca->size, lastmca = nextmca, nextmca = nextmca->link);
+			nextmca && (alloc < mcallocated);
+			alloc += nextmca->size, lastmca = nextmca, nextmca = nextmca->link)
+		;
 	if (nextmca)
 	{	/* Start freeing at the nextmca node since these are added blocks */
+		assert(lastmca);
 		lastmca->link = NULL;	/* Sever link to further blocks here */
 		/* Release any remaining blocks if any */
 		for (lastmca = nextmca; lastmca; lastmca = nextmca)

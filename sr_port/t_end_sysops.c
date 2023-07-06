@@ -297,7 +297,6 @@ enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	block_id		blkid;
 	cw_set_element		*cs_ptr, *nxt;
 	off_chain		chain;
-	v6_off_chain		v6_chain;
 	sm_uc_ptr_t		chain_ptr, db_addr[2];
 	boolean_t		write_to_snapshot_file, long_blk_id;
 	int4			blk_id_sz;
@@ -354,7 +353,7 @@ enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	{
 		assert(0 == (blkid & (BLKS_PER_LMAP - 1)));
 		if (FALSE == cs->done)
-			gvcst_map_build((block_id *)cs->upd_addr, db_addr[0], cs, effective_tn);
+			gvcst_map_build(cs->upd_addr.map, db_addr[0], cs, effective_tn);
 		else
 		{	/* It has been built; Update tn in the block and copy from private memory to shared space. */
 			assert(write_after_image);
@@ -443,7 +442,7 @@ enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 			{	/* TP resolve pointer references to new blocks */
 				for (chain_ptr = db_addr[0] + cs->first_off; ; chain_ptr += chain.next_off)
 				{
-					READ_OFF_CHAIN(long_blk_id, &chain, &v6_chain, chain_ptr);
+					READ_OFF_CHAIN(long_blk_id, &chain, chain_ptr);
 					assert(1 == chain.flag);
 					assert((int)(chain_ptr - db_addr[0] + chain.next_off + blk_id_sz)
 							<= (int)(((blk_hdr_ptr_t)db_addr[0])->bsiz));
@@ -1016,7 +1015,6 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 {
 	int4			n, blk_id_sz;
 	off_chain		chain;
-	v6_off_chain		v6_chain;
 	sm_uc_ptr_t		blk_ptr, backup_blk_ptr, chain_ptr;
 	cw_set_element		*cs_ptr, *nxt;
 	cache_rec_ptr_t		cr, backup_cr;
@@ -1121,7 +1119,7 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		assert(csa->now_crit);	/* at this point, bitmap blocks are built while holding crit */
 		assert(0 == (blkid & (BLKS_PER_LMAP - 1)));
 		if (FALSE == cs->done)
-			gvcst_map_build((block_id *)cs->upd_addr, blk_ptr, cs, effective_tn);
+			gvcst_map_build(cs->upd_addr.map, blk_ptr, cs, effective_tn);
 		else
 		{	/* It has been built; Update tn in the block and copy from private memory to shared space */
 			assert(write_after_image);
@@ -1189,7 +1187,7 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 			{	/* TP - resolve pointer references to new blocks */
 				for (chain_ptr = blk_ptr + cs->first_off; ; chain_ptr += chain.next_off)
 				{
-					READ_OFF_CHAIN(long_blk_id, &chain, &v6_chain, chain_ptr);
+					READ_OFF_CHAIN(long_blk_id, &chain, chain_ptr);
 					assert(1 == chain.flag);
 					assert((int)(chain_ptr - blk_ptr + chain.next_off + blk_id_sz)
 							<= (int)((blk_hdr_ptr_t)blk_ptr)->bsiz);
@@ -1497,7 +1495,7 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 {
 	blk_hdr_ptr_t		old_block;
 	blk_segment		*bs1, *bs_ptr;
-	boolean_t		new_rec;
+	boolean_t		new_rec = FALSE;
 	/*cache_rec_ptr_t		cr; calculate instead of pass in ?*/
 	char			*va;
 	enum cdb_sc		status;
@@ -1508,7 +1506,7 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 	int			tmp_cmpc;
 	key_cum_value		*kv, *kvhead;			/* kvhead tp only */
 	mstr			value;
-	off_chain		chain1;				/* tp only */
+	block_ref		chain1;				/* tp only */
 	rec_hdr_ptr_t		curr_rec_hdr, next_rec_hdr, rp;
 	sgmnt_addrs		*csa;
 	sm_uc_ptr_t		cp1, buffaddr;
@@ -1568,7 +1566,7 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 	assert(NULL != cse->recompute_list_head);
 	for (kvhead = kv = cse->recompute_list_head; (NULL != kv); kv = kv->next)
 	{
-		pKey = (gv_key *)&kv->keybuf.key;
+		pKey = (gv_key *)&kv->keybuf.nobase;
 		value = kv->value;
 		target_key_size = pKey->end + 1;
 		if (kvhead != kv)
@@ -1643,8 +1641,8 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 		if (dollar_tlevel)
 		{
 			assertpro(0 == rc_set_fragment);
-			chain1 = *(off_chain *)&bh->blk_num;
-			assert(0 == chain1.flag);
+			chain1.id = bh->blk_num;
+			assert(0 == chain1.chain.flag);
 			segment_update_array_size = UA_NON_BM_SIZE(cs_data);
 			ENSURE_UPDATE_ARRAY_SPACE(segment_update_array_size);
 		} else
@@ -1664,7 +1662,7 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 			 * array space we have used is for the current (and only) cw_set_element "cse" and hence can reuse space
 			 * by resetting update_array_ptr
 			 */
-			assert(ROUND_UP2((INTPTR_T)update_array, UPDATE_ELEMENT_ALIGN_SIZE) == (INTPTR_T)cse->upd_addr);
+			assert(ROUND_UP2((INTPTR_T)update_array, UPDATE_ELEMENT_ALIGN_SIZE) == (INTPTR_T)cse->upd_addr.ptr);
 			RESET_UPDATE_ARRAY; /* no CHECK_AND_RESET_UPDATE_ARRAY because we are resetting an active update array */
 		}
 		BLK_INIT(bs_ptr, bs1);
@@ -1703,7 +1701,7 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 			BG_TRACE_PRO_ANY(csa, recompute_upd_array_blk_fini);
 			return cdb_sc_mkblk;
 		}
-		cse->upd_addr = (unsigned char *)bs1;
+		cse->upd_addr.blk = bs1;
 		cse->done = FALSE;
 		assert(NULL != gv_target);
 	}

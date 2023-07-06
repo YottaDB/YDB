@@ -76,6 +76,9 @@
 #include "db_write_eof_block.h"
 #include "mvalconv.h"
 
+/* Prototypes */
+#include "is_proc_alive.h"
+
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_DBFILERR);
 error_def(ERR_DBFSYNCERR);
@@ -88,6 +91,7 @@ error_def(ERR_MUTRUNCNOTBG);
 error_def(ERR_MUTRUNCSSINPROG);
 error_def(ERR_MUTRUNCSUCCESS);
 error_def(ERR_MUTRUNCBACKINPROG);
+error_def(ERR_REORGUPCNFLCT);
 error_def(ERR_TEXT);
 error_def(ERR_TRUNCBACKUPPROG);
 error_def(ERR_TRUNCNOTRUN);
@@ -202,6 +206,18 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 					truncate_percent);
 			return TRUE;
 		}
+		if ((0 != csa->nl->reorg_upgrade_pid) && (is_proc_alive(csa->nl->reorg_upgrade_pid, 0)))
+		{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE and is higher priority. Stop */
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
+					LEN_AND_LIT("REORG -TRUNCATE"),
+					LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
+					csa->nl->onln_rlbk_pid);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
+					LEN_AND_LIT("REORG -TRUNCATE"),
+					LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
+					csa->nl->onln_rlbk_pid);
+			return TRUE;
+		}
 		lmap_blk_num = lmap_num * BLKS_PER_LMAP;
 		if (csa->nl->highest_lbm_with_busy_blk >= lmap_blk_num)
 		{
@@ -269,7 +285,7 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 						t_retry(cdb_sc_lostbmlcr);
 						continue;
 					}
-					t_write_map(&bmphist, (unsigned char *)update_array, curr_tn, 0);
+					t_write_map(&bmphist, (block_id *)update_array, curr_tn, 0);
 					/* Set the opcode for INCTN record written by t_end() */
 					inctn_opcode = inctn_blkmarkfree;
 					if ((trans_num)0 == t_end(&alt_hist, NULL, TN_NOT_SPECIFIED))
@@ -309,7 +325,7 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 				t_retry((enum cdb_sc)rdfail_detail);
 				continue;
 			}
-			t_write_map(blkhist, (unsigned char *)blkid_ptr, curr_tn, 0);
+			t_write_map(blkhist, blkid_ptr, curr_tn, 0);
 			blkhist->blk_num = 0; /* create empty history for bitmap block */
 			if ((trans_num)0 == t_end(&alt_hist, NULL, TN_NOT_SPECIFIED))
 				continue;
@@ -365,6 +381,18 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 	} else if (BACKUP_NOT_IN_PROGRESS != cs_addrs->nl->nbb)
 	{
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCBACKINPROG, 2, REG_LEN_STR(gv_cur_region));
+		rel_crit(gv_cur_region);
+		return TRUE;
+	} else if ((0 != csa->nl->reorg_upgrade_pid) && (is_proc_alive(csa->nl->reorg_upgrade_pid, 0)))
+	{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE and is higher priority. Stop */
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
+				LEN_AND_LIT("REORG -TRUNCATE"),
+				LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
+				csa->nl->onln_rlbk_pid);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
+				LEN_AND_LIT("REORG -TRUNCATE"),
+				LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
+				csa->nl->onln_rlbk_pid);
 		rel_crit(gv_cur_region);
 		return TRUE;
 	}

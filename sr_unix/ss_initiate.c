@@ -225,7 +225,7 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 	struct stat		stat_buf;
 	uint4			crit_counter, fstat_status, tempnamprefix_len;
 	block_id		tot_blks, ss_shmsize, prev_ss_shmsize, ss_shm_vbn;
-	void			*ss_shmaddr;
+	void			*ss_shmaddr = NULL;
 	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 

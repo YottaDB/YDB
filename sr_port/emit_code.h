@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +37,7 @@ int	gtm_reg(int vax_reg);
 
 #ifdef __x86_64__
 #  define NUM_BUFFERRED_INSTRUCTIONS 100
-#  define CODE_TYPE char
+#  define CODE_TYPE unsigned char
 #elif defined(__ia64)
 #  define CODE_TYPE ia64_bundle
 #  define NUM_BUFFERRED_INSTRUCTIONS 25

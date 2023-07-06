@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -126,7 +126,8 @@ uint4 dbfilop(file_control *fc)
 				gv_cur_region->read_only = TRUE;	/* maintain csa->read_write simultaneously */
 				csa->read_write = FALSE;	/* maintain reg->read_only simultaneously */
 				csa->orig_read_write = FALSE;	/* maintain orig_read_write at same time as read_write */
-			}
+			} else
+				save_errno = 0;
 			FSTAT_FILE(udi->fd, &stat_buf, fstat_res);
 			if (-1 == fstat_res)
 				return ERR_DBOPNERR;

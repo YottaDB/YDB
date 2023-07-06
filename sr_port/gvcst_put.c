@@ -103,7 +103,7 @@ GBLREF	boolean_t		horiz_growth, in_gvcst_incr, is_updproc;
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	cw_set_element		cw_set[CDB_CW_SET_SIZE];/* create write set. */
-GBLREF	enum db_ver		upgrade_block_split_format;		/* REORG -UPGRADE switching between active and future block format */
+GBLREF	enum db_ver		upgrade_block_split_format;  /* REORG -UPGRADE switching between active and future block format */
 GBLREF	gv_key			*gv_altkey;
 GBLREF	gv_namehead		*reset_gv_target;
 GBLREF	inctn_opcode_t		inctn_opcode;
@@ -368,16 +368,20 @@ void	gvcst_put(mval *val)
 	if (save_in_gvcst_incr)
 	{
 		in_gvcst_incr = FALSE;		/* allow gvcst_put2 to do a regular set */
-		PUSH_MV_STENT(MVST_MVAL);       /* protect pre_incr_mval from stp_gcol */
+		PUSH_MV_STENT(MVST_MVAL);	/* protect pre_incr_mval from stp_gcol */
 		pre_incr_mval = &mv_chain->mv_st_cont.mvs_mval;
 		found = gvcst_get(pre_incr_mval);	/* what if it doesn't exist? needs to be treated as 0 */
 		if (found)
+		{
+test_incr_numoflow:
 			pre_incr_mval->mvtype = MV_STR;
+		}
 		else
 			*pre_incr_mval = literal_null;
 		op_add(pre_incr_mval, &increment_delta_mval, post_incr_mval);
 		POP_MV_STENT();			/* pre_incr_mval */
-		assert(MV_IS_NUMERIC(post_incr_mval));
+		DEBUG_ONLY(if (!TREF(gvcst_incr_numoflow)))
+			assert(MV_IS_NUMERIC(post_incr_mval));
 		MV_FORCE_STR(post_incr_mval);
 		val = post_incr_mval;		/* its a number, should fit in single block.. unless ridick rsrvdbytes.. */
 		fits = RECORD_FITS_IN_A_BLOCK(val, gv_currkey, cs_data->blk_size, parms.blk_reserved_bytes);
@@ -432,20 +436,25 @@ void	gvcst_put(mval *val)
 		REVERT; /* remove our condition handler */
 	}
 	assert(save_dollar_tlevel == dollar_tlevel);
+	return;
+	assertpro(FALSE);		/* ensure we never reach the goto below */
+	goto test_incr_numoflow;	/* Dummy goto makes the compiler satisfied the label used as a breakpoint in a
+					 * test is legit. The test_incr_numoflow label is used by increment/numoflow test. */
 }
 
 void	gvcst_put2(mval *val, span_parms *parms)
 {
 	blk_segment		*bs1, *bs_ptr, *new_blk_bs;
 	block_id		allocation_clue, blk_num, gvt_for_root, last_split_blk_num[MAX_BT_DEPTH], last_split_bnum;
-	block_id		lcl_root, tp_root;
-	block_index		ins_chain_index, left_hand_index, next_blk_index, root_blk_cw_index;
+	block_id		lcl_root = -1, tp_root;
+	block_index		ins_chain_index, left_hand_index, next_blk_index, root_blk_cw_index = -1;
 	block_offset		first_offset, ins_off1, ins_off2, next_offset, old_curr_chain_next_off;
-	boolean_t		blk_match, can_write_logical_jnlrecs, collhdr = FALSE, copy_extra_record, dont_copy_extra_record = FALSE,
-				duplicate_set, fits, gbl_target_was_set, is_dummy, is_split_dir_left, jnl_format_done,
-				lcl_span_status, level_0, key_exists, make_it_null, need_extra_block_split, needfmtjnl,
-				new_rec, new_rec_goes_to_right, no_pointers, preemptive_split, succeeded, write_logical_jnlrecs,
-				want_root_search = FALSE;
+	block_ref		chain1, chain2, curr_chain;
+	boolean_t		blk_match, can_write_logical_jnlrecs, collhdr = FALSE, copy_extra_record = FALSE,
+				dont_copy_extra_record = FALSE, duplicate_set, fits, gbl_target_was_set, is_dummy,
+				is_split_dir_left, jnl_format_done, lcl_span_status, level_0, key_exists, make_it_null,
+				need_extra_block_split, needfmtjnl, new_rec, new_rec_goes_to_right, no_pointers, preemptive_split,
+				succeeded, write_logical_jnlrecs, want_root_search = FALSE;
 	boolean_t		db_long_blk_id, long_blk_id;	/* db_long_blk_id is based on csd->desired_db_format,
 								 * while long_blk_id is based on bp->bver
 								 */
@@ -467,60 +476,60 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	enum split_dir		last_split_dir;
 	gv_key			*src_key, *temp_key;
 	static gv_key		*gv_altkey2;
-	gv_namehead		*dir_tree, *save_targ, *split_targ;
+	gv_namehead		*dir_tree = NULL, *save_targ, *split_targ;
 	ht_ent_int8		*tabent;
 	int			bh_level, blk_id_sz, blk_reserved_size, blk_seg_cnt, cur_blk_size, curr_offset, delta,
-				cur_val_offset, i, ins_chain_offset, is_mm, j, last_possible_left_offset, left_hand_offset, n,
+				cur_val_offset, i, ins_chain_offset, j, last_possible_left_offset, left_hand_offset, n,
 				new_blk_size, new_blk_size_l, new_blk_size_r, new_blk_size_single, new_rec_size,
 				next_rec_shrink, next_rec_shrink1, off_chain_sz, offset_sum, rc, rec_cmpc, split_depth,
 				start_len, target_key_size, tmp_cmpc, tp_lev, undo_index;
 	int4			blk_size, blk_fill_size, blk_reserved_bytes, cse_first_off, data_len;
 	jnl_action		*ja;
-	jnl_format_buffer	*jfb, *ztworm_jfb;
+	jnl_format_buffer	*jfb = NULL, *ztworm_jfb;
 	key_cum_value		*tempkv;
 	mstr			value;
 	mval			*ja_val;
 	mval			*set_val;	/* actual right-hand-side value of the SET or $INCR command */
 	mval			*val_forjnl;
 	node_local_ptr_t	cnl;
-	off_chain		chain1, chain2, curr_chain, prev_chain;
-	rec_hdr_ptr_t		curr_rec_hdr, extra_rec_hdr, new_star_hdr, next_rec_hdr, rp, tmp_rp;
+	off_chain		prev_chain;
+	rec_hdr_ptr_t		curr_rec_hdr, extra_rec_hdr, new_star_hdr, next_rec_hdr, rp, tmp_rp = NULL;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	sgm_info		*si;
 	sm_uc_ptr_t		cp1, cp2, curr;
 	sm_uc_ptr_t		buffaddr;
 	srch_blk_status		*bh, *bq, *tp_srch_status;
-	srch_hist		*dir_hist;
+	srch_hist		*dir_hist = NULL;
 	uchar_ptr_t		subrec_ptr;
 	uint4			bs1_2_len, bs1_3_len, cp2_len, key_top, nodeflags, segment_update_array_size;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, new_ch, old_ch;
 	unsigned int		curr_rec_match, curr_rec_offset, prev_rec_match, prev_rec_offset;
-	unsigned short		extra_record_blkid_off, rec_size, tmp_rsiz;
+	unsigned short		extra_record_blkid_off, rec_size, tmp_rsiz = 0;
 	v6_off_chain		v6_chain;
 #	ifdef GTM_TRIGGER
 	boolean_t		is_tpwrap;
 	boolean_t		lcl_implicit_tstart;		/* local copy of the global variable "implicit_tstart" */
-	boolean_t		lcl_is_dollar_incr;		/* local copy of is_dollar_incr taken at start of module.
+	boolean_t		lcl_is_dollar_incr = FALSE;	/* local copy of is_dollar_incr taken at start of module.
 								 * used to restore is_dollar_incr in case of TP restarts */
 	boolean_t		skip_hasht_read, ztval_gvcst_put_redo;
 	DEBUG_ONLY(enum cdb_sc	save_cdb_status;)
 	gtm_trigger_parms	trigparms;
-	gvt_trigger_t		*gvt_trigger;
+	gvt_trigger_t		*gvt_trigger = NULL;
 	gvtr_invoke_parms_t	gvtr_parms;
-	int			gtm_trig_status;
+	int			gtm_trig_status = -1;
 	mint			dlr_data;
-	mv_stent		*save_mv_chain;
+	mv_stent		*save_mv_chain = NULL;
 	mval			lcl_increment_delta_mval;	/* local copy of "increment_delta_mval" */
-	mval			*lcl_post_incr_mval;		/* local copy of "post_incr_mval" at function entry.
+	mval			*lcl_post_incr_mval = NULL;	/* local copy of "post_incr_mval" at function entry.
 								 * used to restore "post_incr_mval" in case of TP restarts */
-	mval			*lcl_val;			/* local copy of "val" at function entry.
+	mval			*lcl_val = NULL;		/* local copy of "val" at function entry.
 								 * used to restore "val" in case of TP restarts */
-	mval			*lcl_val_forjnl;
+	mval			*lcl_val_forjnl = NULL;
 	mval			*pval;				/* copy of "value" (an mstr), protected from stp gcol */
 	mval			*ztold_mval = NULL;
 	mval			*ztval_mval;
-	unsigned char		*save_msp;
+	unsigned char		*save_msp = NULL;
 #	endif
 #	ifdef DEBUG
 	/* We want to capture all pertinent information across each iteration of gvcst_put.
@@ -565,7 +574,6 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	csd = csa->hdr;
 	cnl = csa->nl;
 	assert(csd == cs_data);
-	is_mm = (dba_mm == csd->acc_meth);
 #	ifdef GTM_TRIGGER
 	TRIG_CHECK_REPLSTATE_MATCHES_EXPLICIT_UPDATE(gv_cur_region, csa);
 	if (IS_EXPLICIT_UPDATE)
@@ -634,6 +642,13 @@ void	gvcst_put2(mval *val, span_parms *parms)
 		status = cdb_sc_normal;
 		lcl_dollar_tlevel = dollar_tlevel;
 	)
+	if (TREF(gvcst_incr_numoflow))
+	{
+		TREF(gvcst_incr_numoflow) = FALSE;
+		is_dollar_incr = TRUE;
+		status = cdb_sc_blkmod;
+		GOTO_RETRY;
+	}
 fresh_tn_start:
 	DEBUG_ONLY(lcl_t_tries = -1;)
 	DEBUG_ONLY(is_fresh_tn_start = TRUE;)
@@ -747,11 +762,11 @@ tn_restart:
 	{
 		segment_update_array_size = UA_NON_BM_SIZE(csd);
 		ENSURE_UPDATE_ARRAY_SPACE(segment_update_array_size);
-		curr_chain = *(off_chain *)&lcl_root;
-		if (curr_chain.flag)
+		curr_chain.id = lcl_root;
+		if (curr_chain.chain.flag)
 		{
 			assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
-			tp_get_cw(si->first_cw_set, (int)curr_chain.cw_index, &cse);
+			tp_get_cw(si->first_cw_set, (int)curr_chain.chain.cw_index, &cse);
 			tp_root = cse->blk;
 			assert(tp_root);
 		}
@@ -778,9 +793,9 @@ tn_restart:
 			if (dollar_tlevel)
 			{
 				gvt_for_root = dir_hist->h[0].blk_num;
-				curr_chain = *(off_chain *)&gvt_for_root;
-				if (curr_chain.flag)
-					tp_get_cw(si->first_cw_set, curr_chain.cw_index, &cse);
+				curr_chain.id = gvt_for_root;
+				if (curr_chain.chain.flag)
+					tp_get_cw(si->first_cw_set, curr_chain.chain.cw_index, &cse);
 				else
 				{
 					if (NULL != (tabent = lookup_hashtab_int8(si->blks_in_use, (ublock_id *)&gvt_for_root)))
@@ -834,6 +849,7 @@ tn_restart:
 			/* The MAX_REC_SIZE check could not be done in op_gvincr (like is done in op_gvput) because
 			 * the post-increment value is not known until here. so do the check here.
 			 */
+			assert(dir_tree);
 			ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value, dir_tree);
 		} else
 			value = val->str;
@@ -843,6 +859,7 @@ tn_restart:
 		{	/* The record that is newly inserted/updated does not fit by itself in a separate block
 			 * if the current reserved-bytes for this database is taken into account. Cannot go on.
 			 */
+			assert(dir_tree);
 			ISSUE_RSVDBYTE2HIGH_ERROR(dir_tree);
 		}
 		BLK_ADDR(curr_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
@@ -884,9 +901,9 @@ tn_restart:
 		}
 		assert(bs1[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
 		allocation_clue = ALLOCATION_CLUE(csd->trans_hist.total_blks);
-		next_blk_index = t_create(allocation_clue, (uchar_ptr_t)new_blk_bs, 0, 0, 0);	/* create GVT data block */
+		next_blk_index = t_create(allocation_clue, new_blk_bs, 0, 0, 0);	/* create GVT data block */
 		++allocation_clue;
-		ins_chain_index = t_create(allocation_clue, (uchar_ptr_t)bs1, SIZEOF(blk_hdr) + SIZEOF(rec_hdr), next_blk_index, 1);
+		ins_chain_index = t_create(allocation_clue, bs1, SIZEOF(blk_hdr) + SIZEOF(rec_hdr), next_blk_index, 1);
 		/* create GVT index block */
 		root_blk_cw_index = ins_chain_index;
 		temp_key = gv_altkey;
@@ -1210,9 +1227,9 @@ tn_restart:
 				status = cdb_sc_mkblk;
 				GOTO_RETRY;
 			}
-			chain1 = *(off_chain *)&blk_num;
+			chain1.id = blk_num;
 			assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
-			if ((1 == chain1.flag) && ((int)chain1.cw_index >= si->cw_set_depth))
+			if ((1 == chain1.chain.flag) && ((int)chain1.chain.cw_index >= si->cw_set_depth))
 			{
 				assert(si->tp_csa == csa);
 				assert(FALSE == csa->now_crit);
@@ -1234,11 +1251,11 @@ tn_restart:
 		preemptive_split = FALSE;
 		/* Preemptive split interferes with existing gvcst_put() optimizations on the final retry. */
 		/* This may be an area for further investigation in the future. */
-                if ((2 == t_tries) && (2 >= dollar_trestart) && (0 != csd->problksplit) && (0 == bh_level)
-                        && (gv_target != csa->dir_tree) && !is_updproc && !IS_STATSDB_CSA(csa))
+		if ((!dollar_tlevel) && (2 == t_tries) && (2 >= dollar_trestart) && (0 != csd->problksplit) && (0 == bh_level)
+				&& (gv_target != csa->dir_tree) && !is_updproc && !IS_STATSDB_CSA(csa))
 
 		{
-			if (num_recs_in_blk(buffaddr) > csd->problksplit)
+			if (num_recs_in_blk(buffaddr) > (signed int)csd->problksplit)
 			{
 				preemptive_split = TRUE;
 				dont_copy_extra_record = TRUE; /* this interferes so disable */
@@ -1260,7 +1277,8 @@ tn_restart:
 				 * added to the leaf level directory tree record for this global name (after the 8-byte block_id).
 				 * Irrespective of the collation header, make sure ins_chain_offset points to the block_id part.
 				 */
-				assert((blk_id_sz  == value.len) || (blk_id_sz + COLL_SPEC_LEN == value.len) || !cs_data->fully_upgraded);
+				assert((blk_id_sz == value.len) || (blk_id_sz + COLL_SPEC_LEN == value.len)
+								|| !cs_data->fully_upgraded);
 				ins_chain_offset = (int)(curr_rec_offset + new_rec_size - value.len);
 			}
 			BLK_INIT(bs_ptr, bs1);
@@ -1279,7 +1297,8 @@ tn_restart:
 					BLK_ADDR(va, value.len, char);
 					memcpy(va, value.addr, value.len);
 					BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
-				}
+				} else
+					va = NULL;
 				if (!new_rec)
 					rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + rec_size);
 				n = (int)(cur_blk_size - ((sm_uc_ptr_t)rp - buffaddr));
@@ -1319,6 +1338,7 @@ tn_restart:
 						assert(((sm_uc_ptr_t)rp + rec_size) <= (buffaddr + cur_blk_size));
 							/* or else we would have restarted above with "cdb_sc_mkblk" */
 						assert(value.len == blk_id_sz);
+						assert(va);
 						memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
 					}
 				}
@@ -1369,7 +1389,7 @@ tn_restart:
 			 * in Blk5 containins ^a(1),^a(3) and a right sibling block Blk7 containing ^a(2). Effectively a
 			 * DBKEYGTIND integrity error. Hence the GDS_WRITE_KILLTN usage below.
 			 */
-			cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh_level,
+			cse = t_write(bh, bs1, ins_chain_offset, ins_chain_index, bh_level,
 						FALSE, FALSE, (!prev_split_to_right ? GDS_WRITE_PLAIN : GDS_WRITE_KILLTN));
 			assert(cse);
 			assert(!dollar_tlevel || !cse->high_tlevel);
@@ -1400,15 +1420,16 @@ tn_restart:
 							assert(old_cse->first_off);
 							assert(old_cse && old_cse->done);
 							assert(!old_cse->undo_next_off[0] && !old_cse->undo_offset[0]);
-						}
+						} else
+							old_cse = NULL;
 						/* find chain records before and after the new one */
-						for ( ; ; curr += curr_chain.next_off)
+						for ( ; ; curr += curr_chain.chain.next_off)
 						{	/* try to make offset_sum identify the 1st chain entry after new record */
-							READ_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
-							assert(1 == curr_chain.flag);
-							if (0 == curr_chain.next_off)
+							READ_OFF_CHAIN(long_blk_id, &curr_chain.chain, curr);
+							assert(1 == curr_chain.chain.flag);
+							if (0 == curr_chain.chain.next_off)
 								break;
-							offset_sum += curr_chain.next_off;
+							offset_sum += curr_chain.chain.next_off;
 							assert(offset_sum != curr_rec_offset);
 							/* The typecast is needed below to enforce a "signed int" comparison */
 							if (offset_sum >= (signed int)curr_rec_offset)
@@ -1417,24 +1438,26 @@ tn_restart:
 						/* store next_off in old_cse before changing it in the buffer (for rolling back) */
 						if (horiz_growth)
 						{
-							old_cse->undo_next_off[0] = curr_chain.next_off;
+							assert(old_cse);
+							old_cse->undo_next_off[0] = curr_chain.chain.next_off;
 							old_cse->undo_offset[0] = (block_offset)(curr - buffaddr);
 							assert(old_cse->undo_offset[0]);
 						}
-						if (0 == curr_chain.next_off)
+						if (0 == curr_chain.chain.next_off)
 						{	/* the last chain record precedes the new record: just update it */
 							/* 			   ---|---------------v
 							 * [blk_hdr]...[existing rec ( )]...[new rec ( )]... */
-							curr_chain.next_off = ins_chain_offset - offset_sum;
-							WRITE_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
+							curr_chain.chain.next_off = ins_chain_offset - offset_sum;
+							WRITE_OFF_CHAIN(long_blk_id, &curr_chain.chain, curr);
 						} else
 						{	/* update the chain record before the new one */
 							/* 			   ---|---------------v--------------------v
 							 * [blk_hdr]...[existing rec ( )]...[new rec ( )]...[existing rec ( )] */
 							assert((1ULL << NEXT_OFF_MAX_BITS)
 								> (ins_chain_offset - (curr - buffaddr)));
-							curr_chain.next_off = (unsigned int)(ins_chain_offset - (curr - buffaddr));
-							WRITE_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
+							curr_chain.chain.next_off
+								= (unsigned int)(ins_chain_offset - (curr - buffaddr));
+							WRITE_OFF_CHAIN(long_blk_id, &curr_chain.chain, curr);
 							cse->next_off = value.len
 								+ (offset_sum - curr_rec_offset - next_rec_shrink1);
 						}
@@ -1492,7 +1515,7 @@ tn_restart:
 					{
 						tempkv = (dollar_tlevel ? (key_cum_value *)get_new_element(si->recompute_list, 1)
 									: &(TREF(non_tp_noiso_key_n_value)));
-						tempkv->keybuf.key = *(gv_key_nobase *)gv_currkey;
+						tempkv->keybuf.nobase = *(gv_key_nobase *)gv_currkey;
 						tempkv->next = NULL;
 						memcpy(tempkv->keybuf.split.base, gv_currkey->base, gv_currkey->end + 1);
 						if (NULL == cse->recompute_list_head)
@@ -1560,22 +1583,22 @@ tn_restart:
 					last_split_bnum = gv_target->last_split_blk_num[bh_level];
 					if (dollar_tlevel)
 					{
-						chain2 = *(off_chain *)&last_split_bnum;
-						if (chain1.flag == chain2.flag)
+						chain2.id = last_split_bnum;
+						if (chain1.chain.flag == chain2.chain.flag)
 						{
-							if (!chain1.flag)
+							if (!chain1.chain.flag)
 								blk_match = (blk_num == last_split_bnum);
 							else
 							{
-								assert(chain1.cw_index < si->cw_set_depth);
-								blk_match = (chain1.cw_index == chain2.cw_index);
+								assert(chain1.chain.cw_index < si->cw_set_depth);
+								blk_match = (chain1.chain.cw_index == chain2.chain.cw_index);
 							}
 						} else
 							blk_match = FALSE;
 					} else
 					{
-						DEBUG_ONLY(chain1 = *(off_chain *)&last_split_bnum;)
-						assert(!chain1.flag);
+						DEBUG_ONLY(chain1.id = last_split_bnum;)
+						assert(!chain1.chain.flag);
 						blk_match = (blk_num == last_split_bnum);
 					}
 					is_split_dir_left = (NEWREC_DIR_LEFT == last_split_dir);
@@ -1705,7 +1728,8 @@ tn_restart:
 					BLK_ADDR(va, value.len, char);
 					memcpy(va, value.addr, value.len);
 					BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
-				}
+				} else
+					va = NULL;
 				if (buffaddr + cur_blk_size > (sm_uc_ptr_t)rp)
 				{
 					assert(!split_to_right);
@@ -1734,6 +1758,7 @@ tn_restart:
 						assert(((sm_uc_ptr_t)rp + rec_size) <= (buffaddr + cur_blk_size));
 							/* or else we would have restarted above with "cdb_sc_mkblk" */
 						assert(blk_id_sz == value.len);
+						assert(va);
 						memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
 					}
 				}
@@ -1991,7 +2016,7 @@ tn_restart:
 #endif
 				upgrade_block_split_format = bh_ver;
 			}
-			next_blk_index = t_create(blk_num, (uchar_ptr_t)new_blk_bs, left_hand_offset, left_hand_index, bh_level);
+			next_blk_index = t_create(blk_num, new_blk_bs, left_hand_offset, left_hand_index, bh_level);
 			if ((bh_ver != desired_db_format) && (bh_level || (DIR_ROOT == gv_target->root)))
 				upgrade_block_split_format = 0;	/* Reset this to avoid unintended reuse later */
 			/* If "split_to_right" is TRUE, the existing block is untouched so no need to worry about any tp
@@ -2004,9 +2029,9 @@ tn_restart:
 			if (!no_pointers && dollar_tlevel)
 			{	/* there may be chains */
 				assert(new_rec);
-				curr_chain = *(off_chain *)&blk_num;
-				if (curr_chain.flag)
-					tp_get_cw(si->first_cw_set, curr_chain.cw_index, &cse);
+				curr_chain.id = blk_num;
+				if (curr_chain.chain.flag)
+					tp_get_cw(si->first_cw_set, curr_chain.chain.cw_index, &cse);
 				else
 				{
 					if (NULL != (tabent = lookup_hashtab_int8(si->blks_in_use, (ublock_id *)&blk_num)))
@@ -2031,13 +2056,14 @@ tn_restart:
 					cse_first_off = (int4)cse->first_off;
 					offset_sum = cse_first_off;
 					curr = buffaddr + offset_sum;
-					READ_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
-					assert(1 == curr_chain.flag);
+					READ_OFF_CHAIN(long_blk_id, &curr_chain.chain, curr);
+					assert(1 == curr_chain.chain.flag);
 					/* Determine "last_possible_left_offset" and "extra_record_blkid_off" */
 					copy_extra_record = (!new_rec_goes_to_right && copy_extra_record);
 					if (copy_extra_record)
 					{
 						assert(!new_rec_goes_to_right);
+						assert(tmp_rp);
 						GET_USHORT(tmp_rsiz, &tmp_rp->rsiz);
 						tmp_cmpc = EVAL_CMPC(tmp_rp);
 						if (level_0)
@@ -2112,16 +2138,16 @@ tn_restart:
 						{	/* it's not an immediate hit */
 							for (;;)
 							{	/* follow chain upto split point */
-								assert(1 == curr_chain.flag);
-								if (0 == curr_chain.next_off)
+								assert(1 == curr_chain.chain.flag);
+								if (0 == curr_chain.chain.next_off)
 									break;
-								offset_sum += curr_chain.next_off;
+								offset_sum += curr_chain.chain.next_off;
 								if (offset_sum >= last_possible_left_offset)
 									break;
 
 								/* Increment curr_chain to the next element */
-								curr += curr_chain.next_off;
-								READ_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
+								curr += curr_chain.chain.next_off;
+								READ_OFF_CHAIN(long_blk_id, &curr_chain.chain, curr);
 							}	/* end of search chain loop */
 						}
 						assert(curr >= (buffaddr + cse_first_off));
@@ -2149,8 +2175,8 @@ tn_restart:
 								assert(!ins_chain_offset);
 								if (!extra_record_blkid_off && (offset_sum != cse_first_off))
 								{	/* bring curr up to the match */
-									curr += curr_chain.next_off;
-									READ_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
+									curr += curr_chain.chain.next_off;
+									READ_OFF_CHAIN(long_blk_id, &curr_chain.chain, curr);
 								}
 								curr_offset = curr - buffaddr;
 								undo_index = 0;
@@ -2159,7 +2185,7 @@ tn_restart:
 									 * next_off field from the last element in the chain
 									 * before this offset.
 									 */
-									prev_chain = curr_chain;
+									prev_chain = curr_chain.chain;
 									assert(extra_record_blkid_off
 										|| (bstar_rec_size(long_blk_id)
 											== (left_hand_offset - curr_offset)));
@@ -2173,20 +2199,20 @@ tn_restart:
 												&& !cse->undo_offset[0]);
 										assert(!cse->undo_next_off[1]
 												&& !cse->undo_offset[1]);
-										cse->undo_next_off[0] = curr_chain.next_off;
+										cse->undo_next_off[0] = curr_chain.chain.next_off;
 										cse->undo_offset[0] = (block_offset)curr_offset;
 										undo_index = 1;
 									}
-									WRITE_OFF_CHAIN(long_blk_id, &prev_chain, &v6_chain, curr);
+									WRITE_OFF_CHAIN(long_blk_id, &prev_chain, curr);
 								}
 								if (extra_record_blkid_off)
 								{
 									if (offset_sum != cse_first_off)
 									{	/* bring curr up to the match */
-										curr += curr_chain.next_off;
-										curr_offset += curr_chain.next_off;
-										READ_OFF_CHAIN(long_blk_id, &curr_chain,
-												&v6_chain, curr);
+										curr += curr_chain.chain.next_off;
+										curr_offset += curr_chain.chain.next_off;
+										READ_OFF_CHAIN(long_blk_id, &curr_chain.chain,
+												curr);
 									}
 									if (dollar_tlevel != cse->t_level)
 									{
@@ -2194,16 +2220,16 @@ tn_restart:
 										assert(!cse->undo_next_off[undo_index] &&
 											!cse->undo_offset[undo_index]);
 										cse->undo_next_off[undo_index] =
-													curr_chain.next_off;
+													curr_chain.chain.next_off;
 										cse->undo_offset[undo_index] =
 													(block_offset)curr_offset;
 									}
-									prev_chain = curr_chain;
+									prev_chain = curr_chain.chain;
 									prev_chain.next_off = 0;
-									WRITE_OFF_CHAIN(long_blk_id, &prev_chain, &v6_chain, curr);
+									WRITE_OFF_CHAIN(long_blk_id, &prev_chain, curr);
 									cse_new->next_off = bstar_rec_size(long_blk_id);
 								}
-								offset_sum += curr_chain.next_off;
+								offset_sum += curr_chain.chain.next_off;
 							} else
 							{
 								undo_index = 0;
@@ -2220,7 +2246,7 @@ tn_restart:
 									/*		      ---|--------------------v
 									 * [blk_hdr]...[prev rec( )][curr rec (*-key)( )] */
 									assert((buffaddr + prev_rec_offset) > curr);
-									prev_chain = curr_chain;
+									prev_chain = curr_chain.chain;
 									assert((offset_sum - prev_chain.next_off) /* check old */
 										== (curr - buffaddr)); /* method equivalent */
 									assert(((prev_rec_offset + (unsigned int)(SIZEOF(rec_hdr))
@@ -2241,34 +2267,34 @@ tn_restart:
 											&& !cse->undo_offset[0]);
 										assert(!cse->undo_next_off[1]
 											&& !cse->undo_offset[1]);
-										cse->undo_next_off[0] = curr_chain.next_off;
+										cse->undo_next_off[0] = curr_chain.chain.next_off;
 										cse->undo_offset[0] = (block_offset)(curr -
 														     buffaddr);
 										undo_index = 1;
 									}
-									WRITE_OFF_CHAIN(long_blk_id, &prev_chain, &v6_chain, curr);
+									WRITE_OFF_CHAIN(long_blk_id, &prev_chain, curr);
 									/* bring curr up to the match */
-									curr += curr_chain.next_off;
-									READ_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
+									curr += curr_chain.chain.next_off;
+									READ_OFF_CHAIN(long_blk_id, &curr_chain.chain, curr);
 								}
-								offset_sum += curr_chain.next_off;
+								offset_sum += curr_chain.chain.next_off;
 								if (dollar_tlevel != cse->t_level)
 								{
 									assert(dollar_tlevel > cse->t_level);
 									assert(!cse->undo_next_off[undo_index] &&
 										!cse->undo_offset[undo_index]);
-									cse->undo_next_off[undo_index] = curr_chain.next_off;
+									cse->undo_next_off[undo_index] = curr_chain.chain.next_off;
 									cse->undo_offset[undo_index] = (block_offset)(curr -
 														      buffaddr);
 								}
-								curr_chain.next_off = 0;
-								WRITE_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
+								curr_chain.chain.next_off = 0;
+								WRITE_OFF_CHAIN(long_blk_id, &curr_chain.chain, curr);
 							}
 						} else
 						{	/* found the split and no *-key issue: just terminate before the split */
 							if (offset_sum == cse_first_off)
-								offset_sum += curr_chain.next_off;	/* put it in the lead */
-							old_curr_chain_next_off = curr_chain.next_off;
+								offset_sum += curr_chain.chain.next_off; /* put it in the lead */
+							old_curr_chain_next_off = curr_chain.chain.next_off;
 							if (left_hand_offset)
 							{	/* there's a new chain rec in left */
 								curr_offset = curr - buffaddr;
@@ -2284,13 +2310,13 @@ tn_restart:
 								/*		      ---|---------------v
 								 * [blk_hdr]...[curr rec( )]...[new rec ( )] */
 								/* the new rec may or may not be a *-key */
-								assert((offset_sum - curr_chain.next_off) == curr_offset);
+								assert((offset_sum - curr_chain.chain.next_off) == curr_offset);
 								assert(left_hand_offset > curr_offset);
-								curr_chain.next_off = (block_offset)(left_hand_offset
+								curr_chain.chain.next_off = (block_offset)(left_hand_offset
 												- curr_offset);
 							} else
-								curr_chain.next_off = 0;
-							assert((curr - buffaddr + curr_chain.next_off)
+								curr_chain.chain.next_off = 0;
+							assert((curr - buffaddr + curr_chain.chain.next_off)
 									<= ((new_blk_size_l < blk_reserved_size
 									? new_blk_size_l : blk_reserved_size) - off_chain_sz));
 							if (dollar_tlevel != cse->t_level)
@@ -2301,7 +2327,7 @@ tn_restart:
 								cse->undo_next_off[0] = old_curr_chain_next_off;
 								cse->undo_offset[0] = (block_offset)(curr - buffaddr);
 							}
-							WRITE_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
+							WRITE_OFF_CHAIN(long_blk_id, &curr_chain.chain, curr);
 						}	/* end of *-key or not alternatives */
 						assert((left_hand_offset + (int)cse_new->next_off) <=
 							((new_blk_size_l < blk_reserved_size ? new_blk_size_l : blk_reserved_size)
@@ -2359,11 +2385,11 @@ tn_restart:
 			/* Record block split heuristic info that will be used in next block split */
 			if (!new_rec_goes_to_right)
 			{
-				chain1.flag = 1;
-				chain1.cw_index = next_blk_index;
-				chain1.next_off = 0;
+				chain1.chain.flag = 1;
+				chain1.chain.cw_index = next_blk_index;
+				chain1.chain.next_off = 0;
 				assert(SIZEOF(gv_target->last_split_blk_num[bh_level]) == SIZEOF(off_chain));
-				last_split_blk_num[bh_level] = *(block_id *)&chain1;
+				last_split_blk_num[bh_level] = chain1.id;
 			} else
 				last_split_blk_num[bh_level] = blk_num;
 			assert(temp_key == gv_altkey);
@@ -2514,7 +2540,7 @@ tn_restart:
 					 * Hence the GDS_WRITE_KILLTN use below. Refer to GTM-7353, C9B11-001813 (GTM-3984),
 					 * and C9H12-002934 (GTM-6104) for more details.
 					 */
-					cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh_level,
+					cse = t_write(bh, bs1, ins_chain_offset, ins_chain_index, bh_level,
 								TRUE, FALSE, level_0 ? GDS_WRITE_PLAIN : GDS_WRITE_KILLTN);
 					if ((bh_ver != desired_db_format) && (bh_level || (DIR_ROOT == gv_target->root)))
 						cse->ondsk_blkver = bh_ver;	/* Upgrade in progress, preserve block ver */
@@ -2551,7 +2577,7 @@ tn_restart:
 #endif
 					upgrade_block_split_format = bh_ver;
 				}
-				ins_chain_index = t_create(blk_num, (uchar_ptr_t)bs1, ins_chain_offset, ins_chain_index, bh_level);
+				ins_chain_index = t_create(blk_num, bs1, ins_chain_offset, ins_chain_index, bh_level);
 				make_it_null = FALSE;
 				if (NULL != cse)
 				{	/* adjust block to use the buffer and offsets worked out for the old root */
@@ -2618,7 +2644,7 @@ tn_restart:
 				/* Since a new root block is not created but two new children are created, this update to the
 				 * root block should disable the "indexmod" optimization (C9B11-001813).
 				 */
-				cse = t_write(bh, (unsigned char *)bs1, ins_off1, next_blk_index,
+				cse = t_write(bh, bs1, ins_off1, next_blk_index,
 							bh_level + 1, TRUE, FALSE, GDS_WRITE_KILLTN);
 				if ((bh_ver != desired_db_format) && (bh_level || (DIR_ROOT == gv_target->root)))
 					cse->ondsk_blkver = bh_ver;	/* Upgrade in progress, preserve block ver */
@@ -2643,11 +2669,11 @@ tn_restart:
 					DEBUG_ONLY(skip_block_chain_tail_check = TRUE;)
 					gvcst_blk_build(cse, NULL, 0);
 					DEBUG_ONLY(skip_block_chain_tail_check = FALSE;)
-					curr_chain.flag = 1;
-					curr_chain.cw_index = ins_chain_index;
-					curr_chain.next_off = 0;
+					curr_chain.chain.flag = 1;
+					curr_chain.chain.cw_index = ins_chain_index;
+					curr_chain.chain.next_off = 0;
 					curr = cse->new_buff + ins_off2;
-					WRITE_OFF_CHAIN(long_blk_id, &curr_chain, &v6_chain, curr);
+					WRITE_OFF_CHAIN(long_blk_id, &curr_chain.chain, curr);
 					cse->done = TRUE;
 					gv_target->clue.end = 0;
 				}
@@ -2739,6 +2765,7 @@ tn_restart:
 			 */
 			GTMTRIG_ONLY(assert(!ztval_gvcst_put_redo);)
 			assert(0 == gv_target->root);
+			assert(0 <= root_blk_cw_index);
 			if (!dollar_tlevel)
 			{
 				tp_root = cw_set[root_blk_cw_index].blk;
@@ -2747,11 +2774,11 @@ tn_restart:
 				assert(!IS_BITMAP_BLK(tp_root));
 			} else
 			{
-				chain1.flag = 1;
-				chain1.cw_index = root_blk_cw_index;
-				chain1.next_off = 0;	/* does not matter what value we set this field to */
+				chain1.chain.flag = 1;
+				chain1.chain.cw_index = root_blk_cw_index;
+				chain1.chain.next_off = 0;	/* does not matter what value we set this field to */
 				assert(SIZEOF(tp_root) == SIZEOF(chain1));
-				tp_root = *(block_id *)&chain1;
+				tp_root = chain1.id;
 			}
 			gv_target->root = tp_root;
 		}
@@ -2774,13 +2801,13 @@ tn_restart:
 			/* Fix blk_num if it was created in this transaction. In case of non-TP, we have the real block number
 			 * corresponding to the created block. In case of TP, we can know that only at tp_clean_up time so defer.
 			 */
-			chain1 = *(off_chain *)&blk_num;
-			if (chain1.flag)
+			chain1.id = blk_num;
+			if (chain1.chain.flag)
 			{
 				if (!dollar_tlevel)
 				{
-					assert(chain1.cw_index < ARRAYSIZE(cw_set));
-					split_targ->last_split_blk_num[bh_level] = cw_set[chain1.cw_index].blk;
+					assert(chain1.chain.cw_index < ARRAYSIZE(cw_set));
+					split_targ->last_split_blk_num[bh_level] = cw_set[chain1.chain.cw_index].blk;
 				} else
 					split_targ->split_cleanup_needed = TRUE;/* phantom blk# will be fixed at tp_clean_up time */
 			}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2022 Fidelity National Information	*
+ * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,4 +41,5 @@ ENUM_ENTRY(GDSMV63015),		/* 24 - safety entry in case we are forced to release a
 ENUM_ENTRY(GDSMV70000),		/* 25 - Changed GT.M to use 64-bit block numbers, required significant changes to the header*/
 ENUM_ENTRY(GDSMV70001),		/* 26 - GTM-9131 new statsdb_allocation option & GTM-8681 Backup Timestamp in file header */
 ENUM_ENTRY(GDSMV70002),		/* 27 - GTM-9426 - Automatically split database blocks based upon restarts... */
+ENUM_ENTRY(GDSMV71001),		/* 28 - Change default proactive block split threshhold */
 ENUM_ENTRY(GDSMVLAST)

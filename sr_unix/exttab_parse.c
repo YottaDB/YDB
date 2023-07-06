@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -649,7 +649,10 @@ struct extcall_package_list *exttab_parse(mval *package)
 			if (star_found)
 				ret_pre_alloc_val = scan_array_bound(&tbp,ret_tok);
 			else
+			{
 				ext_stx_error(ERR_ZCPREALLVALPAR, ext_table_file_name);
+				GTM_UNREACHABLE();
+			}
 			/* We should allow the pre-allocated value upto to the maximum string size (MAX_STRLEN) plus 1 for the
 			 * extra terminating NULL. Negative values would have been caught by scan_array_bound() above.
 			 */

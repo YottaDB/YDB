@@ -29,8 +29,8 @@ static inline void putop_in_newopr(triple *oldop, triple *newop, int opridx, boo
  * opridx - the index of the operand to protect
  * finish - whether or not to zero-out the oldop after protecting the operand.
  * This function safely gives operands of an operation which obeys standard locality to one that will be placed sommewhere else
- * in the exorder chain, and whose operands may therefore need protecting from intervening side effects. The only genuine
- * case here is when the operand is an OC_VAR, in which case this function inserts an intervening stotemp to provide as the operand
+ * in the exorder chain, and whose operands may therefore need protecting from intervening side effects. The only known cases are
+ * when the operand is an OC_VAR or OC_GETINDX, in which case this function inserts an intervening stotemp to provide as the operand
  * of the new operation. The function adds an OC_LITC between newop and an OC_LIT in -DYNAMIC_LITERALS compilation mode to prevent
  * work elsewhere. Future maintainers should note that this function may be of general use when manipulating exorder, but has not
  * been validated on operations which are not themselves the operands of OC_S(N)AND/OC_S(N)OR/OC_COM - i.e. OCT_BOOLs, either one
@@ -43,6 +43,7 @@ static inline void putop_in_newopr(triple *oldop, triple *newop, int opridx, boo
 	switch(opr->oprval.tref->opcode)
 	{
 	case OC_VAR:
+	case OC_GETINDX:
 		newtrip = maketriple(OC_STOTEMP);
 		newtrip->operand[0] = *opr;
 		dqins(opr->oprval.tref, exorder, newtrip);
@@ -129,11 +130,7 @@ void bx_sboolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolea
 	 * sequence when calling bx_tail. Complement (OC_COM) is in many ways a special case, and maintainers should be mindful
 	 * that it is the only unary pure boolean. Like any pure boolean, it can serve as a link in a chain of directly nested
 	 * booleans. But since it does not relocate its operand or deliver protection for the operands of its operand, we need
-	 * to do that here. One additional special case involves a left-hand-operand (N)AND/(N)OR of a parent S(N)AND/S(N)OR
-	 * operation. While we could build a separate triple chain for the left-hand tree, it will be easiest to instead turn
-	 * any direct boolean operation descendants of a SE-type op into SE-type ops themselves. This will allow us to build
-	 * one big chain (as for any other directly-nested boolean expression) at the cost of some extra stotemps under fullbool,
-	 * for the benefit of code simplicity and at least as many fewer set/clears as extra stotemps.
+	 * to do that here.
 	 * Warning: make no assumptions about exorder during the ex_tail phase of things.
 	 * */
 	for (i = t->operand, j = 0U; i < ARRAYTOP(t->operand); i++, j++)

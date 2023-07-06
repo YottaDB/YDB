@@ -206,7 +206,7 @@ void dse_over(void)
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
-	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
+	t_write(&blkhist, bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
 	BUILD_AIMG_IF_JNL_ENABLED(cs_data, cs_addrs->ti->curr_tn);
 	t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
 	return;

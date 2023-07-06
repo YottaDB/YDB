@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2020 Fidelity National Information	*
+ * Copyright (c) 2009-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -97,7 +97,7 @@ void	ss_anal_shdw_file(char	*filename, int flen)
 	db_blk_size = ss_filhdr.ss_info.db_blk_size;
 	assert(bitmap_size >= (tot_blks + 8 - 1) / 8);
 	bp = malloc(db_blk_size);
-	for (blkno = 0; blkno <= tot_blks; blkno++)
+	for (blkno = 0, num = bitmap_buffer[0]; blkno <= tot_blks; blkno++)
 	{
 		if (0 == blkno % BLKS_PER_WORD)
 		{

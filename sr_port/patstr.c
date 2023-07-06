@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -136,27 +136,27 @@ typedef struct
 
 int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 {
-	alternation	*cur_alt, init_alt;
+	alternation	*cur_alt = NULL, init_alt;
 	boolean_t	dfa, dfa_fixed_len, done, done_free, fixed_len, infinite, last_infinite,
-			prev_fixed_len, split_atom, start_dfa;
+			prev_fixed_len, split_atom, start_dfa = FALSE;
 	boolean_t	topseen = FALSE;/* If TRUE it means we found inchar to be == in_top and so did NOT scan the NEXT
 					 * byte in inchar (to be stored in curchar). Therefore from this point onwards,
 					 * "curchar" should never be used in this function. This is also asserted below.
 					 */
 	char		*saveinstr;
 	gtm_int64_t	bound;
-	int		atom_map, altmax, any_alt, altcount, altmin, altsimplify, bit,
+	int		atom_map, altmax = 0, any_alt, altcount = 0, altmin = 0, altsimplify, bit,
 			charpos, chidx, count, curr_leaf_num, curr_min_dfa, cursize,
-			exp_temp[CHAR_CLASSES], high_in, jump, leafcnt, leaf_num, low_in,
-			max[MAX_PATTERN_ATOMS], min[MAX_PATTERN_ATOMS], min_dfa,
+			exp_temp[CHAR_CLASSES], high_in, jump, leafcnt, leaf_num = 0, low_in,
+			max[MAX_PATTERN_ATOMS], min[MAX_PATTERN_ATOMS], min_dfa = 0,
 			saw_delimiter, seq, seqcnt, size[MAX_PATTERN_ATOMS], size_in, sym_num, total_max, total_min;
-	int4		allmask, alloclen, altactive, altend, altlen, bitpos, bytelen, lower_bound, status, upper_bound;
+	int4		allmask, alloclen, altactive, altend, altlen, bitpos, bytelen, lower_bound = -1, status, upper_bound = 0;
 	mstr		alttail;
 	pat_strlit	strlit;
 	static int4	recurse_cnt;
 	struct e_table	expand, *exp_ptr;
 	struct leaf	leaves, *lv_ptr;
-	uint4		*fstchar, last_leaf_mask, *lastpatptr, mbit, *outchar, *patmaskptr, pattern_mask, *topchar, y_max;
+	uint4		*fstchar, last_leaf_mask, *lastpatptr, mbit, *outchar, *patmaskptr, pattern_mask = 0, *topchar, y_max;
 	unsigned char	*buffptr, curchar, *inchar, *in_top, *let_go, symbol;
 
 	if (0 == instr->len)		/* empty pattern string. Cant do much */
@@ -307,7 +307,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						split_atom = TRUE;
 						if ((count >= (MAX_PATTERN_ATOMS - 1)) ||
 								(atom_map >= (MAX_PATTERN_ATOMS -2)))
-			                         	return ERR_PATMAXLEN;
+							return ERR_PATMAXLEN;
 
 					} else
 					{
@@ -466,6 +466,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					instr->addr = (char *)inchar + 1;
 					return ERR_PATCODE;
 				}
+				assert(cur_alt);
 				cur_alt->next = (unsigned char *)malloc(SIZEOF(alternation));
 				cur_alt = (alternation *)cur_alt->next;
 				cur_alt->next = NULL;
@@ -546,6 +547,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				}
 			}
 		}
+		assert(0 <= lower_bound);
 		if (split_atom)
 		{
 			assert(FALSE == infinite);

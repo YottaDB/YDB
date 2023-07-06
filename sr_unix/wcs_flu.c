@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -211,10 +211,10 @@ boolean_t wcs_flu(uint4 options)
 	boolean_t		latch_salvaged;
 	unsigned int		lcnt, pass;
 	int			n_bts, save_errno, wtstart_or_wtfini_errno;
-	jnl_buffer_ptr_t	jb;
+	jnl_buffer_ptr_t	jb = NULL;
 	jnl_private_control	*jpc;
 	uint4			jnl_status, to_wait, to_msg;
-	unix_db_info    	*udi;
+	unix_db_info		*udi;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
@@ -347,6 +347,7 @@ boolean_t wcs_flu(uint4 options)
 	if (jnl_enabled)
 	{
 		assert(SS_NORMAL == jnl_status);
+		assert(jb);
 		cnl->doing_epoch = sync_epoch || write_epoch;
 		epoch_already_current = (!force_epoch && (jb->post_epoch_freeaddr == jb->rsrv_freeaddr));
 		if (return_early = (speedup_nobefore && !csd->jnl_before_image))
@@ -403,7 +404,8 @@ boolean_t wcs_flu(uint4 options)
 			REL_CRIT_BEFORE_RETURN(cnl, reg);
 			return TRUE;
 		}
-	}
+	} else
+		epoch_already_current = FALSE;
 	BG_TRACE_ANY(csa, total_buffer_flush);
 	INCR_GVSTATS_COUNTER(csa, cnl, n_db_flush, 1);
 	cnl->wcsflu_pid = process_id;
@@ -621,7 +623,7 @@ boolean_t wcs_flu(uint4 options)
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_WCSFLUFAIL, 3, CALLFROM);
 						return FALSE;
 					}
-					assert(!jnl_enabled || jb->fsync_dskaddr == jb->rsrv_freeaddr);
+					assert(!jnl_enabled || (jb && (jb->fsync_dskaddr == jb->rsrv_freeaddr)));
 					assert(0 == wtstart_or_wtfini_errno);
 					wcs_recover(reg);
 					if (jnl_enabled)
@@ -693,6 +695,7 @@ boolean_t wcs_flu(uint4 options)
 		 * The next call to jnl_qio_start will do the fsync of the db before doing any jnl qio.
 		 * The basic requirement is that we shouldn't write the epoch out until we have synced the database.
 		 */
+		assert(jb);
 #		ifdef DEBUG
 		if (!gtm_white_box_test_case_enabled || (WBTEST_JNL_FILE_LOST_DSKADDR != gtm_white_box_test_case_number))
 		{

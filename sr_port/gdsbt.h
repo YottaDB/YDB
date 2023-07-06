@@ -77,7 +77,7 @@
 #define WC_BLOCK_ONLY		1
 #define WC_BLOCK_RECOVER	2
 
-typedef struct
+typedef struct th_index_struct
 {
 	trans_num	curr_tn;
 	trans_num	early_tn;
@@ -89,7 +89,7 @@ typedef struct
 	volatile block_id	free_blocks;
 } th_index;
 
-typedef struct
+typedef struct bt_rec_struct
 {
 	struct
 	{
@@ -108,7 +108,7 @@ typedef struct
  * first two longwords of a bt_rec.  CAUTION:  there is no such thing as a queue of
  * th_recs, they are always bt_recs, and the extra two longwords are always there
  */
-typedef struct
+typedef struct th_rec_struct
 {
 	struct
 	{
@@ -976,7 +976,7 @@ MBSTART {								\
 #define NODE_LOCAL_SIZE				(ROUND_UP(SIZEOF(node_local), OS_PAGE_SIZE))
 #define NODE_LOCAL_SPACE(CSD)			(ROUND_UP(CRIT_SPACE(NUM_CRIT_ENTRY(CSD)) + NODE_LOCAL_SIZE, OS_PAGE_SIZE))
 #define MIN_NODE_LOCAL_SPACE			(ROUND_UP(CRIT_SPACE(MIN_CRIT_ENTRY) + NODE_LOCAL_SIZE, OS_PAGE_SIZE))
-#define DEFAULT_PROBLKSPLIT     		5 /* proactively split blocks if contains more records that this in the block */
+#define DEFAULT_PROBLKSPLIT     		0 /* Do not proactively split blocks */
 /* In order for gtmsecshr not to pull in OTS library, NODE_LOCAL_SIZE_DBS is used in secshr_db_clnup instead of NODE_LOCAL_SIZE */
 #define NODE_LOCAL_SIZE_DBS			(ROUND_UP(SIZEOF(node_local), DISK_BLOCK_SIZE))
 

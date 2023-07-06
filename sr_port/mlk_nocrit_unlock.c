@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 #include "mlkdef.h"
 #include "mlk_unlock.h"
 
-GBLREF	int4 		process_id;
+GBLREF	uint4 		process_id;
 
 /* This function is similar to "mlk_unlock" except that it does not get crit. So does what can be safely done
  * and leaves the rest to be done by the next guy who has crit and wants this lock. Note that this means processes

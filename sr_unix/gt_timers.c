@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -194,7 +194,7 @@ MBSTART {												\
 /* Sleep for MS milliseconds of "clockid" time unless interrupted by RESTART processing */
 #ifdef _AIX
 /* Because of unreliability, AIX uses plain old nanosleep() */
-#define HIBER_START_CORE(MS, CLOCKID, RESTART)	SLEEP_USEC((MS * 1000), RESTART)
+#define HIBER_START_CORE(MS, CLOCKID, RESTART)	SLEEP_USEC((MS * 1000UL), RESTART)
 #else
 #define HIBER_START_CORE(MS, CLOCKID, RESTART)				\
 MBSTART {								\
@@ -691,6 +691,8 @@ STATICFNDEF void timer_handler(int why)
 	assert(!multi_thread_in_use || !safe_for_timer_pop);
 	if (safe_for_timer_pop)
 		SAVE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
+	else
+		save_util_outptr = NULL;
 #	ifdef DEBUG
 	if (safe_for_timer_pop)
 		in_nondeferrable_signal_handler = IN_TIMER_HANDLER;

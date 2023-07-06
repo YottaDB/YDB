@@ -250,7 +250,7 @@ LITDEF boolean_t mu_int_exponent[256] = {
 
 boolean_t mu_int_blk(
 		block_id blk,
-		char level,
+		unsigned char level,
 		boolean_t is_root,
 		unsigned char *bot_key,
 		int bot_len,
@@ -282,7 +282,7 @@ boolean_t mu_int_blk(
 	boolean_t	first_key, is_top, pstar, valid_gbl, hasht_global, instance_frozen;
 	boolean_t	muint_range_done = FALSE, nct_checked = FALSE, long_blk_id;
 	int4		blk_id_sz;
-	int		blk_size, buff_length, b_index, cmcc, comp_length, key_size, len, name_len,
+	int		blk_size, buff_length, b_index, cmcc, comp_length, key_size, len, name_len = -1,
 			num_len, rec_size, s_index, start_index, sub_start_index, hdr_len, idx;
 	int		tmp_cmpc, tmp_numsubs, max_allowed_key_size;
 	block_id	child, root_pointer, blk_lmap;
@@ -454,6 +454,7 @@ boolean_t mu_int_blk(
 			ptr = rec_base + SIZEOF(rec_hdr);
 		} else
 		{
+			assert(first_key || (0 <= name_len));
 			if (first_key)
 			{
 				if (rec_cmpc)
@@ -771,8 +772,17 @@ boolean_t mu_int_blk(
 				}
 				span_key = buff + buff_length - SPAN_SUBS_LENGTH - 1;
 				if (is_trigger)
-					max_allowed_key_size = MAX_KEY_SZ - 4;
-				else
+				{
+					long_blk_id = (BLK_ID_32_VER < mu_int_data.desired_db_format);
+					if ((MAX_KEY_SZ + sizeof(blk_hdr) + 2 * sizeof(rec_hdr) + 2 * SIZEOF_BLK_ID(long_blk_id))
+								< mu_int_data.blk_size)
+						max_allowed_key_size = MAX_KEY_SZ - 4;
+					else
+					{	/* The maximum key size is a function of the block size */
+						max_allowed_key_size = mu_int_data.blk_size - sizeof(blk_hdr) - sizeof(rec_hdr)
+							- SIZEOF_BLK_ID(long_blk_id) - bstar_rec_size(long_blk_id);
+					}
+				} else
 					max_allowed_key_size = mu_int_data.max_key_size;
 				if ((SPAN_SUBS_LENGTH < key_size + rec_cmpc) && (KEY_DELIMITER == *span_key++)
 						&& (SPAN_START_BYTE == *span_key))

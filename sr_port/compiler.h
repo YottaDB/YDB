@@ -12,6 +12,8 @@
 #ifndef COMPILER_H_INCLUDED
 #define COMPILER_H_INCLUDED
 
+#include "mdq.h"
+
 /* Values for oprclass - Changes made here need to be reflected in cdbg_dump opr_type_names table */
 typedef enum
 {
@@ -88,7 +90,7 @@ typedef struct	mliteralstruct
 		struct	mliteralstruct	*fl,
 					*bl;
 	}			que;
-	INTPTR_T       		rt_addr;
+	INTPTR_T		rt_addr;
 	int			reference_count;	/* Used in the hash table to track references */
 	mval			v;
 } mliteral;
@@ -350,7 +352,7 @@ typedef struct
 	TREF(expr_start_orig) = NULL;						\
 	TREF(shift_side_effects) = FALSE;					\
 	TREF(saw_side_effect) = FALSE;						\
-	dqinit(&(SS)->tmpchain, exorder);					\
+	exorder_init(&(SS)->tmpchain);						\
 	OLDCHAIN = setcurtchain(&(SS)->tmpchain);				\
 }
 
@@ -451,6 +453,8 @@ typedef struct
 																\
 	if (PROTECT_LVN = (TREF(side_effect_base))[TREF(expr_depth)])	/* NOTE assignment */					\
 		SE_NOTIFY = SE_WARN_ON;												\
+	else															\
+		SE_NOTIFY = FALSE;												\
 	while (SB2 < SB1)													\
 	{															\
 		if (PROTECT_LVN && (SB2 > (SUBSCRIPTS + XTRA)) && ((SB1 - SB2) > 1)						\
@@ -529,7 +533,7 @@ typedef struct
  */
 #define CLEAR_MVAL_BITS(mvalptr) 			\
 {							\
-	((mval_b *)(mvalptr))->sgne = 0;		\
+	((mval_gen *)(mvalptr))->byte.sgne = 0;		\
 	(mvalptr)->fnpc_indx = 0xff;			\
 	UTF8_ONLY((mvalptr)->utfcgr_indx = 0xff);	\
 }
@@ -573,6 +577,7 @@ typedef struct
 	char		*lexical_ptr;
 	char		window_token;
 	triple		pos_in_chain;
+	boolean_t	rts_error_in_parse;
 } parse_save_block;
 
 #define SAVE_PARSE_STATE(SAVE_PARSE_PTR)									\
@@ -588,6 +593,7 @@ MBSTART {													\
 	SAVE_PARSE_PTR->source_len = (TREF(source_buffer)).len;							\
 	SAVE_PARSE_PTR->window_token = TREF(window_token);							\
 	SAVE_PARSE_PTR->pos_in_chain = TREF(pos_in_chain);							\
+	SAVE_PARSE_PTR->rts_error_in_parse = TREF(rts_error_in_parse);						\
 } MBEND
 
 #define RESTORE_PARSE_STATE(SAVE_PARSE_PTR)								\
@@ -604,6 +610,7 @@ MBSTART {													\
 	TREF(source_error_found) = SAVE_PARSE_PTR->source_error_found;						\
 	TREF(window_token) = SAVE_PARSE_PTR->window_token;							\
 	TREF(pos_in_chain) = SAVE_PARSE_PTR->pos_in_chain;							\
+	TREF(rts_error_in_parse) = SAVE_PARSE_PTR->rts_error_in_parse;						\
 } MBEND
 
 #define RETURN_IF_RTS_ERROR							\
@@ -782,5 +789,11 @@ boolean_t	unuse_literal(mval *x);
 void		walktree(mvar *n,void (*f)(),char *arg);
 void		wrtcatopt(triple *r, triple ***lpx, triple **lptop);
 int		zlcompile(unsigned char len, unsigned char *addr);		/***type int added***/
+
+static inline void exorder_init(triple *chain)
+{
+	chain->opcode = OCQ_INVALID;
+	dqinit(chain, exorder);
+}
 
 #endif /* COMPILER_H_INCLUDED */

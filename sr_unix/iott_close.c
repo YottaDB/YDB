@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,8 +19,8 @@
 #include "iottdef.h"
 #include "io_params.h"
 #include "gtmio.h"
+#include "iott_setterm.h"
 #include "stringpool.h"
-#include "setterm.h"
 #include "error.h"
 #include "op.h"
 #include "indir_enum.h"
@@ -51,7 +51,7 @@ void iott_close(io_desc *v, mval *pp)
 	if (v->pair.out != v)
 		assert(v->pair.in == v);
 	v->state = dev_closed;
-	resetterm(v);
+	iott_resetterm(v);
 
 	p_offset = 0;
 	while (*(pp->str.addr + p_offset) != iop_eol)

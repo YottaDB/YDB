@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2020 Fidelity National Information	*
+ * Copyright (c) 2011-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -171,7 +171,7 @@ typedef struct lvTreeStruct
 	else											\
 	{											\
 		assert(lcl_flt_node->key_flags.key_bits.key_e || !lcl_flt_node->key_m1);	\
-		((mval_b *)(KEY))->sgne = lcl_flt_node->key_flags.key_bytes.key_sgne;		\
+		((mval_gen *)(KEY))->byte.sgne = lcl_flt_node->key_flags.key_bytes.key_sgne;	\
 		(KEY)->m[0] = lcl_flt_node->key_m0;						\
 		(KEY)->m[1] = lcl_flt_node->key_m1;						\
 	}											\

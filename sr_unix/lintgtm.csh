@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2020 Fidelity National Information		#
+# Copyright (c) 2001-2023 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -143,7 +143,7 @@ set gs = ($gtm_src)
 
 
 cp $gtm_inc/*.h .
-ls $gs[1] | egrep '\.c$' | xargs -i cp "$gs[1]/{}" .
+ls $gs[1] | grep '\.c$' | xargs -i cp "$gs[1]/{}" .
 chmod +w *.c *.h
 
 

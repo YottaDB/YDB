@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -208,6 +208,15 @@ typedef struct mv_stent_struct
 	} mv_st_cont;
 } mv_stent;
 
+/* Declare those global variables and error messages that are used by the PUSH_MV_STENT and POP_MV_STENT macros */
+LITREF	unsigned char	mvs_size[];
+GBLREF	unsigned char	*stackbase, *stacktop, *stackwarn, *msp;
+GBLREF	mv_stent	*mv_chain;
+
+error_def(ERR_STACKOFLOW);
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKUNDERFLO);
+
 void unw_mv_ent(mv_stent *mv_st_ent);
 void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 
@@ -248,38 +257,96 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 #define MV_SIZE(X) \
         ROUND_UP2_NOCHECK(((SIZEOF(*mv_chain) - SIZEOF(mv_chain->mv_st_cont) + SIZEOF(mv_chain->mv_st_cont.X))), NATIVE_WSIZE)
 
-#define PUSH_MV_STENT(T) (((msp -= mvs_size[T]) <= stackwarn) ?									\
-	((msp <= stacktop) ? (msp += mvs_size[T]/* fix stack */, rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW)) :	\
-	 rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT)) :								\
-	(((mv_stent *)msp)->mv_st_type = T ,											\
-	((mv_stent *)msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)),						\
-	mv_chain = (mv_stent *)msp)
+#define PUSH_MV_STENT(T) push_mv_stent(T)
 
-#define PUSH_MV_STCK(size, st_type) (((msp -= ROUND_UP(mvs_size[st_type] + (size), SIZEOF(char *))) <= stackwarn) ?	\
-	((msp <= stacktop) ? (msp += ROUND_UP(mvs_size[st_type] + (size), SIZEOF(char *)) /* fix stack */,		\
-        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW)) :							\
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT)) :							\
-	(((mv_stent *)msp)->mv_st_type = st_type,									\
-	((mv_stent *)msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)),					\
-	mv_chain = (mv_stent *)msp)
+static inline void push_mv_stent(int T)
+{
+	GBLREF	unsigned char		*msp;
+	GBLREF	unsigned char		*stackwarn;
+	GBLREF	unsigned char		*stackbase;
+	GBLREF	unsigned char		*stacktop;
+	GBLREF	mv_stent		*mv_chain;
+	LITREF	unsigned char		mvs_size[];
 
-#ifdef DEBUG
-#define POP_MV_STENT() (assert(msp == (unsigned char *) mv_chain),		\
-	msp += mvs_size[mv_chain->mv_st_type],					\
-	mv_chain = (mv_stent *)((char *) mv_chain + mv_chain->mv_st_next))
-#else
-#define POP_MV_STENT() (msp += mvs_size[mv_chain->mv_st_type],			\
-	mv_chain = (mv_stent *)((char *) mv_chain + mv_chain->mv_st_next))
-#endif
+	if ((msp -= mvs_size[T]) <= stackwarn)
+	{
+		if (msp <= stacktop)
+		{
+			msp += mvs_size[T];	/* fix stack */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
+		} else
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
+	} else if (msp > stackbase)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
+	} else
+	{
+		((mv_stent *)msp)->mv_st_type = T;
+		((mv_stent *)msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp);
+		mv_chain = (mv_stent *)msp;
+	}
+}
+
+#define PUSH_MV_STCK(size, st_type) push_mv_stck(size, st_type)
+
+inline static void push_mv_stck(int size, int st_type)
+{
+	GBLREF	unsigned char		*msp;
+	GBLREF	unsigned char		*stackwarn;
+	GBLREF	unsigned char		*stackbase;
+	GBLREF	unsigned char		*stacktop;
+	GBLREF	mv_stent		*mv_chain;
+	LITREF	unsigned char		mvs_size[];
+
+	if ((msp -= ROUND_UP(mvs_size[st_type] + size, SIZEOF(char *))) <= stackwarn)
+	{
+		if (msp <= stacktop)
+		{
+			msp += ROUND_UP(mvs_size[st_type] + (size), SIZEOF(char *)); /* fix stack */
+
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
+		} else
+		{
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
+		}
+	} else if (msp > stackbase)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
+	} else
+	{
+		((mv_stent *)msp)->mv_st_type = st_type;
+		((mv_stent *)msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp);
+		mv_chain = (mv_stent *)msp;
+	}
+}
+
+#define POP_MV_STENT() pop_mv_stent()
+
+inline static void pop_mv_stent(void)
+{
+	GBLREF	unsigned char		*msp;
+	GBLREF	unsigned char		*stackwarn;
+	GBLREF	unsigned char		*stackbase;
+	GBLREF	unsigned char		*stacktop;
+	GBLREF	mv_stent		*mv_chain;
+	LITREF	unsigned char		mvs_size[];
+
+	assert(msp == (unsigned char *) mv_chain);
+	msp += mvs_size[mv_chain->mv_st_type];
+	mv_chain = (mv_stent *)((char *) mv_chain + mv_chain->mv_st_next);
+	if (msp <= stackwarn)
+	{
+		if (msp <= stacktop)
+		{
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
+		} else
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
+	} else if (msp > stackbase)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
+	}
+}
 
 #define	IS_PTR_INSIDE_M_STACK(PTR)	(((unsigned char *)PTR < (sm_uc_ptr_t)stackbase) && ((unsigned char *)PTR > stacktop))
-
-/* Declare those global variables and error messages that are used by the PUSH_MV_STENT and POP_MV_STENT macros */
-LITREF	unsigned char	mvs_size[];
-GBLREF	unsigned char	*stackbase, *stacktop, *stackwarn, *msp;
-GBLREF	mv_stent	*mv_chain;
-
-error_def(ERR_STACKCRIT);
-error_def(ERR_STACKOFLOW);
 
 #endif

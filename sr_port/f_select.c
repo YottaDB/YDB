@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,7 +64,7 @@ int f_select(oprtype *a, opctype op)
 	boolean_t	first_time, got_true, se_saw_side, shifting, throwing;
 	opctype		old_op;
 	oprtype		*cnd, endtrip, target, tmparg;
-	triple		dmpchain, *loop_expr_start, *oldchain, *r, *ref, *savechain, tmpchain, *triptr;
+	triple		dmpchain, *loop_expr_start, *oldchain = NULL, *r, *ref, *savechain, tmpchain, *triptr;
 	mval		*v;
 	save_for_select	*save_state, ss;
 	DCL_THREADGBL_ACCESS;
@@ -93,7 +93,7 @@ int f_select(oprtype *a, opctype op)
 		|| (GTM_BOOL == TREF(gtm_fullbool))))
 	{	/* shift in progress; WARNING assignment above */
 		TREF(expr_depth) = 1;		/* Don't want to hit bottom with each expression, so start at 1 rather than 0 */
-		dqinit(&tmpchain, exorder);
+		exorder_init(&tmpchain);
 		oldchain = setcurtchain(&tmpchain);
 	}
 	r = maketriple(op);
@@ -114,7 +114,10 @@ int f_select(oprtype *a, opctype op)
 		{	/* bad Boolean */
 			SELECT_CLEANUP;
 			if (shifting)
+			{
+				assert(oldchain);
 				setcurtchain(oldchain);
+			}
 			else if ((NULL != savechain) && (((TREF(curtchain)) != &t_orig) || (!ALREADY_RTERROR)))
 				setcurtchain(savechain);		/* error means return to original chain */
 			return FALSE;
@@ -123,7 +126,10 @@ int f_select(oprtype *a, opctype op)
 		{	/* syntax problem */
 			SELECT_CLEANUP;
 			if (shifting)
+			{
+				assert(oldchain);
 				setcurtchain(oldchain);
+			}
 			else if ((NULL != savechain) && (((TREF(curtchain)) != &t_orig) || (!ALREADY_RTERROR)))
 				setcurtchain(savechain);		/* error means return to original chain */
 			stx_error(ERR_COLON);
@@ -139,7 +145,7 @@ int f_select(oprtype *a, opctype op)
 				break;					/* Boolean was not a literal */
 			v = &triptr->operand[0].oprval.mlit->v;		/* Boolean was a literal, so optimize it */
 			dqdel(triptr, exorder);
-			dqinit(&dmpchain, exorder);			/* both got_true and throwing use dumping */
+			exorder_init(&dmpchain);			/* both got_true and throwing use dumping */
 			unuse_literal(v);
 			if (0 == MV_FORCE_BOOL(v))
 			{	/* Boolean FALSE: discard the corresponding value */
@@ -159,7 +165,10 @@ int f_select(oprtype *a, opctype op)
 		{	/* bad expression */
 			SELECT_CLEANUP;
 			if (shifting)
+			{
+				assert(oldchain);
 				setcurtchain(oldchain);
+			}
 			else if ((NULL != savechain) && (((TREF(curtchain)) != &t_orig) || (!ALREADY_RTERROR)))
 				setcurtchain(savechain);		/* error means return to original chain */
 			return FALSE;
@@ -274,6 +283,7 @@ int f_select(oprtype *a, opctype op)
 		SELECT_CLEANUP;
 		assert(&tmpchain == TREF(curtchain));
 		newtriple(shifting ? OC_GVSAVTARG : OC_NOOP);	/* must have one of these two at expr_start */
+		assert(oldchain);
 		setcurtchain(oldchain);
 		assert(NULL != save_state->expr_start);
 		TREF(expr_start) = save_state->expr_start;

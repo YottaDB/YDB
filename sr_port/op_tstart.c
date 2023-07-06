@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -147,7 +147,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	sgmnt_addrs		*csa;
 	int4			shift_size;
 	boolean_t		tphold_noshift = FALSE, implicit_tstart;
-	lv_val			**lvarraycur = NULL, **lvarray = NULL, **lvarraytop, **lvptr;
+	lv_val			**lvarraycur = NULL, **lvarray = NULL, **lvarraytop = NULL, **lvptr;
 	GTMTRIG_ONLY(boolean_t	implicit_trigger;)
 	DCL_THREADGBL_ACCESS;
 
@@ -406,7 +406,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			TREF(gv_tporigkey_ptr) = (gv_key_buf *)malloc(SIZEOF(gv_key_buf));
 			memset(TREF(gv_tporigkey_ptr), 0, SIZEOF(gv_key_buf));
 		}
-		tf->orig_key = (gv_key *)&((TREF(gv_tporigkey_ptr))->key);
+		tf->orig_key = &((TREF(gv_tporigkey_ptr))->key);
 		assert(NULL != gv_currkey);
 		MEMCPY_KEY(tf->orig_key, gv_currkey);
 		tf->gd_header = gd_header;

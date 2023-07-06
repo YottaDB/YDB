@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,14 +23,14 @@ int is_equ(mval *u,mval *v)
 	land = utyp & vtyp;
 	lor = utyp | vtyp;
 	if ((land & MV_NM) != 0 && (lor & MV_NUM_APPROX) == 0)
-	{
-		/* at this point, the mval's are both exact numbers, we can do a numeric comparison */
-		/* If they are both integers, compare only the relevant cells */
-		if (land & MV_INT)
+	{	/* at this point, the mval's are both exact numbers, we can do a numeric comparison */
+		if (land & MV_INT)	/* If they are both integers, compare only the relevant cells */
 			return (u->m[1] == v->m[1]);
-		/* If one is an integer and the other is not, the two values cannot be equal */
 		if (lor & MV_INT)
+		{	/* If one is an integer and the other is not, the two values cannot be equal */
+			assert((vtyp & MV_INT) ? (u->m[1] || u->m[0]) : (v->m[1] || v->m[0]));	/* zero value must be INT */
 			return 0;
+		}
 		/* They are both decimal floating numbers, do a full comparison */
 		return ((((mval_b *)u)->sgne == ((mval_b *)v)->sgne) && (u->m[1] == v->m[1]) && (u->m[0]==v->m[0]));
 	}

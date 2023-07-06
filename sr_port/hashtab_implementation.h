@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -487,6 +487,10 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize)
 	{
 		temptab.spare_base = table->base; /* let's keep a spare in case we just have to clear the DELETED entries */
 		temptab.spare_base_size = table->size;
+	} else
+	{
+		temptab.spare_base = NULL;
+		temptab.spare_base_size = 0;
 	}
 
 	*table = newtable;

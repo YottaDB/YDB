@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,7 +51,7 @@ LITDEF nametabent dev_param_names[] =
 	,{4,"CONV*"}	,{7,"CONVERT"}
 	,{2,"CT*"}	,{4,"CTRA"}	,{5,"CTRAP"}	/*,{5,"CTRAP"}*/
 
-	,{4,"DELE*"}    ,{6,"DELETE"}
+	,{4,"DELE*"}	,{6,"DELETE"}
 	,{4,"DELI*"}	,{9,"DELIMITER"}
 	,{4,"DEST*" }	,{7,"DESTROY"}
 	,{3,"DET*"}				/*,{6, "DETACH}*/
@@ -446,7 +446,7 @@ int deviceparameters(oprtype *c, char who_calls)
 
 		,iop_uic ,iop_uic
 		,iop_upscroll ,iop_upscroll
-	        ,iop_urgent
+		,iop_urgent
 		,iop_user
 
 		,iop_nofixed

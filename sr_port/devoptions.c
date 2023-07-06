@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2022 Fidelity National Information		*
+ * Copyright (c) 2022-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -117,7 +117,7 @@ void	devoptions(io_desc *iod, void *socketptrarg, mstr *optionstr, char *caller,
 	int4			stat, len, len2;
 	mstr			keyword, options;
 	boolean_t		valuepresent;
-	int			optionvalue, valuelen, valuestart, local_errno;
+	int			optionvalue, valuelen, valuestart = -1, local_errno;
 	char			*errortext;
 	io_desc			*socket_iod;
 	d_socket_struct		*dsocketptr;
@@ -153,6 +153,7 @@ void	devoptions(io_desc *iod, void *socketptrarg, mstr *optionstr, char *caller,
 			{
 				if (valuepresent)
 				{	/* only one value per option */
+					assert(0 <= valuestart);
 					keywordend = valuestart - 1;	/* remove = */
 					errortext = ONEVALUEALLOWED;
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_DEVICEOPTION, 4,
@@ -164,13 +165,16 @@ void	devoptions(io_desc *iod, void *socketptrarg, mstr *optionstr, char *caller,
 			}
 		}
 		if (valuepresent)
+		{
+			assert(0 <= valuestart);
 			valuelen = index - valuestart;
-		else
+		} else
 			keyword.len = index;
 		if ((devopt_item = namelook(devoption_indextab, devoption_names, keyword.addr, keyword.len)) < 0)
 		{
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_DEVICEOPTION, 4, keyword.len, keyword.addr, caller, UNKNOWNOPTION);
 		}
+		assert(!valuepresent || (0 <= valuestart));
 		switch (devopt_item)
 		{
 			case devopt_keepalive:

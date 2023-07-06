@@ -83,7 +83,7 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *fr
 	sgmnt_addrs		*csa;
 	unix_db_info		*udi;
 	boolean_t		read_failed;
-	shm_snapshot_t		*ss_shm_ptr;
+	shm_snapshot_t		*ss_shm_ptr = NULL;
 
 	have_blk = FALSE;
 	csa = cs_addrs;

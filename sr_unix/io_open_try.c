@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,7 +95,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 	int		fstat_res;
 	int		p_offset, len;
 	boolean_t	mknod_err , stat_err, dir_err;
-	int 		save_mknod_err, save_stat_err, save_gsn_err;
+	int 		save_mknod_err = 0, save_stat_err = 0, save_gsn_err;
 	int		gso_stat, gsn_stat, sockoptval;
 	in_port_t	sockport;
 	GTM_SOCKLEN_TYPE	socknamelen;
@@ -410,10 +410,16 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 		/* Check the saved error from mknod() for fifo, also saved error from fstat() or stat()
 		   so error handler (if set)  can handle it */
 		if (ff == tl->iod->type  && mknod_err)
+		{
+			assert(save_mknod_err);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_mknod_err);
+		}
 		/* Error from either stat() or fstat() function */
 		if (stat_err)
+		{
+			assert(save_stat_err);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_stat_err);
+		}
 		/* Error from trying to open a dir */
 		if (dir_err)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_GTMEISDIR, 2, LEN_AND_STR(buf));

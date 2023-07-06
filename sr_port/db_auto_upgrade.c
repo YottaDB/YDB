@@ -139,8 +139,11 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMV70001:
 				/* GT.M V70002 added proactive block split option */
 				csd->problksplit = DEFAULT_PROBLKSPLIT;
-				break;		/* so a new "case" needs to be added BEFORE the assert. */
 			case GDSMV70002:
+				/* GT.M V71001 changed proactive block split default */
+				csd->problksplit = DEFAULT_PROBLKSPLIT;
+				break;		/* so a new "case" needs to be added BEFORE the assert. */
+			case GDSMV71001:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);
 				break;

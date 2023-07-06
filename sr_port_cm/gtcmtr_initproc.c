@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,16 +62,16 @@ char gtcmtr_initproc(void)
 	curr_entry->cli_supp_allowexisting_stdnullcoll = (0 <= memcmp(reply + CM_LEVEL_OFFSET, CMM_STDNULLCOLL_MIN_LEVEL, 3));
 	curr_entry->client_supports_long_names = (0 <= memcmp(reply + CM_LEVEL_OFFSET, CMM_LONGNAMES_MIN_LEVEL, 3));
 	originator_prc_vec = curr_entry->pvec = (jnl_process_vector *)malloc(SIZEOF(jnl_process_vector));
-        jpv_size = SIZEOF(jnl_process_vector);
-	assert(jpv_size >= curr_entry->clb_ptr->cbl - S_HDRSIZE - S_PROTSIZE &&
-		S_HDRSIZE + S_PROTSIZE < curr_entry->clb_ptr->cbl);
-        if (jpv_size > (curr_entry->clb_ptr->cbl - S_HDRSIZE - S_PROTSIZE))
+	jpv_size = SIZEOF(jnl_process_vector);
+	assert((jpv_size >= curr_entry->clb_ptr->cbl - S_HDRSIZE - S_PROTSIZE)
+			&& (S_HDRSIZE + S_PROTSIZE < curr_entry->clb_ptr->cbl));
+	if (jpv_size > (curr_entry->clb_ptr->cbl - S_HDRSIZE - S_PROTSIZE))
 	{	/* our jpv is larger than client so limit copy and pad */
-                jpv_size = curr_entry->clb_ptr->cbl - S_HDRSIZE - S_PROTSIZE;
-                memset((char *)originator_prc_vec + jpv_size, 0, SIZEOF(jnl_process_vector) - jpv_size);
-        }
+		jpv_size = curr_entry->clb_ptr->cbl - S_HDRSIZE - S_PROTSIZE;
+		memset((char *)originator_prc_vec + jpv_size, 0, SIZEOF(jnl_process_vector) - jpv_size);
+	}
 	reply = curr_entry->clb_ptr->mbf;
-        memcpy((unsigned char *)originator_prc_vec, reply + S_HDRSIZE + S_PROTSIZE, jpv_size);
+	memcpy((unsigned char *)originator_prc_vec, reply + S_HDRSIZE + S_PROTSIZE, jpv_size);
 	*reply = CMMS_T_INITPROC;
 	reply += S_HDRSIZE;
 	if (UNIX_ONLY(TRUE) VMS_ONLY(0 < memcmp(&((protocol_msg *)reply)->msg[CM_LEVEL_OFFSET], CMM_MIN_PEER_LEVEL, 3)))
@@ -89,16 +89,16 @@ char gtcmtr_initproc(void)
 		VMS_ONLY(jpv_v10to12((char *)originator_prc_vec, originator_prc_vec);)
 	}
 	reply += S_PROTSIZE;
-        total_process_init++;		/* count attempts */
-        beginprocnum = procnum;         /* so stop on wrap around */
-        while (NULL != proc_to_clb[procnum])
-        {
+	total_process_init++;		/* count attempts */
+	beginprocnum = procnum;		/* so stop on wrap around */
+	while (NULL != proc_to_clb[procnum])
+	{
 		procnum++;	/* OK to wrap since proc_to_clb is proper size */
 		if (beginprocnum == procnum)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TOOMANYCLIENTS);
 	}
 	curr_entry->procnum = procnum;
-        proc_to_clb[procnum] = curr_entry->clb_ptr;
+	proc_to_clb[procnum] = curr_entry->clb_ptr;
 	PUT_SHORT(reply, procnum);
 	procnum++;
 	curr_entry->clb_ptr->cbl = S_HDRSIZE + S_PROTSIZE + 2;

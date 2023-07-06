@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,7 @@ char *gtm_getenv(char *varname);
 # endif
 #define MKSTEMP(template,mkstemp_res)					\
 {									\
-        intrpt_state_t          prev_intrpt_state;			\
+	intrpt_state_t		prev_intrpt_state;			\
 									\
 	DEFER_INTERRUPTS(INTRPT_IN_MKSTEMP, prev_intrpt_state);		\
 	mkstemp_res = mkstemp(template);				\
@@ -71,7 +71,7 @@ char *gtm_getenv(char *varname);
 # endif
 int gtm_system_internal(const char *sh, const char *opt, const char *rtn, const char *cmdline);
 
-void gtm_image_exit(int status);
+void gtm_image_exit(int status) __attribute__ ((noreturn));
 
 #define	EXIT(x)		gtm_image_exit(x)
 

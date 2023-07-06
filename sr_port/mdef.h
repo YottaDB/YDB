@@ -118,12 +118,10 @@ GBLREF void	*gtm_threadgbl;		/* Accessed through TREF macro in gtm_threadgbl.h *
 
 #if defined(DEBUG)
 # ifndef STATIC_ANALYSIS
-error_def(ERR_ASSERT);
-#  define assert(x) ((x) ? 1 : rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ASSERT, 5, LEN_AND_LIT(__FILE__), __LINE__,		\
-						(SIZEOF(#x) - 1), (#x)))
+#  define assert(x) ((x) ? 1 : (assertfail(SIZEOF(#x) - 1, (#x), LEN_AND_LIT(__FILE__), __LINE__), 0))
 # else
 #  include <stdlib.h>
-static inline int gtm_abrt() { abort(); return 0;}
+   static inline int gtm_abrt() { abort(); return 0;}
 #  define assert(x) ((x) ? 1 : gtm_abrt())
 # endif
 # ifdef UNIX
@@ -663,9 +661,9 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 
 #define CALLFROM	LEN_AND_LIT(__FILE__), __LINE__
 void gtm_assert(int file_name_len, char file_name[], int line_no)				CLANG_SCA_ANALYZER_NORETURN;
-int gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[], int line_no)	CLANG_SCA_ANALYZER_NORETURN;
+void gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[], int line_no)	__attribute__((noreturn));
 #define GTMASSERT	(gtm_assert(CALLFROM))
-#define assertpro(x) ((x) ? 1 : gtm_assert2((SIZEOF(#x) - 1), (#x), CALLFROM))
+#define assertpro(x) ((x) ? 1 : (gtm_assert2((SIZEOF(#x) - 1), (#x), CALLFROM), 0))
 #ifdef UNIX
 #ifdef DEBUG
 /* The below debug only macros are always used in pairs to indicate a window where the code doesn't expect rts_errors to happen.
@@ -703,12 +701,14 @@ int4 timeout2msec(int4 timeout);
 MBSTART {					\
 	rts_error_csa(CSA, __VA_ARGS__);	\
 	assert(FALSE);				\
+	GTM_UNREACHABLE();			\
 } MBEND
 
 #define RTS_ERROR_ABT(...)			\
 MBSTART {					\
 	rts_error(__VA_ARGS__);			\
 	assert(FALSE);				\
+	GTM_UNREACHABLE();			\
 } MBEND
 
 /* the RTS_ERROR_TEXT macro will stay till all existing references to it have been renamed to RTS_ERROR_{LITERAL,STRING} */
@@ -718,6 +718,22 @@ MBSTART {					\
 #define	RTS_ERROR_STRING(STRING)	LENGTH_AND_STRING(STRING)
 #define RTS_ERROR_MSTR(MSTR)		(MSTR)->len, (MSTR)->addr
 #define RTS_ERROR_MVAL(MVAL)		RTS_ERROR_MSTR(&(MVAL)->str)
+
+#ifdef __GNUC__
+#define GTM_UNREACHABLE()	__builtin_unreachable()
+#else
+#define GTM_UNREACHABLE()
+#endif
+
+inline void assertfail(size_t testlen, char *teststr, int flen, char *fstr, int line) __attribute__ ((noreturn));
+
+error_def(ERR_ASSERT);
+
+inline void assertfail(size_t testlen, char *teststr, int flen, char *fstr, int line)
+{
+	rts_error_csa(NULL, VARLSTCNT(7) ERR_ASSERT, 5, flen, fstr, line, testlen, teststr);
+	GTM_UNREACHABLE();
+}
 
 #define	SET_PROCESS_EXITING_TRUE						\
 {										\
@@ -1619,7 +1635,7 @@ typedef struct repl_histinfo_struct
 	int4		prev_histinfo_num;			/* = 'n' if the previous history record corresponding to this
 								 * stream is the n'th history record in the instance file.
 								 */
-	char		strm_index;				/* = 0 by default.
+	unsigned char	strm_index;				/* = 0 by default.
 								 * = anywhere from 1 to 15 if this history record corresponds to a
 								 *	non-supplementary stream of updates.
 								 */

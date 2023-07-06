@@ -223,7 +223,7 @@ void mupip_backup(void)
 	unsigned short		s_len, length;
 	int4			size, crit_counter, save_errno, rv, orig_buff_size;
 	uint4			ustatus, reg_count;
-	trans_num		tn;
+	trans_num		tn = 0;
 	shmpool_buff_hdr_ptr_t	sbufh_p;
 	shmpool_blk_hdr_ptr_t	sblkh_p, next_sblkh_p;
 	backup_reg_list		*rptr, *rrptr, *nocritrptr;
@@ -238,14 +238,14 @@ void mupip_backup(void)
 	char			*jnl_str_ptr, jnl_str[256], entry[256], prev_jnl_fn[JNL_NAME_SIZE];
 	int			index, jnl_fstat, attemptcnt, maxtries;
 	mstr			tempdir_log, tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
-	uint4			jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status;
+	uint4			jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status = SS_NORMAL;
 	boolean_t		jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE}, save_no_prev_link;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	jnl_tm_t		save_gbl_jrec_time;
 	gd_region		*r_save, *reg;
 	int			sync_io_status;
-	boolean_t		sync_io, sync_io_specified, showprogress;
+	boolean_t		sync_io = FALSE, sync_io_specified = FALSE, showprogress;
 	boolean_t		dummy_ftok_counter_halted;
 	void			*repl_inst_available;
 	struct stat		stat_buf;
@@ -263,7 +263,7 @@ void mupip_backup(void)
 	struct shmid_ds		shm_buf;
 	struct semid_ds		semstat;
 	union semun		semarg;
-	int4			shm_id, sem_id;
+	int4			shm_id = INVALID_SHMID, sem_id = INVALID_SEMID;
 	replpool_identifier	replpool_id;
 	DEBUG_ONLY(jnlpool_addrs_ptr_t	jnlpool_save);
 	sm_uc_ptr_t		start_addr;

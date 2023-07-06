@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,6 +46,8 @@ int m_zmessage (void)
 		ref1 = ref0->operand[1].oprval.tref;
 		ref1->operand[0] = arg;
 		break;
+	default:
+		GTM_UNREACHABLE();
 	}
 	for (count = 1; TK_COLON == TREF(window_token); count++)
 	{

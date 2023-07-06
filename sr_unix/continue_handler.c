@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,17 +12,15 @@
 
 #include <mdef.h>
 
-#include <signal.h>
-#ifdef GTM_PTHREAD
-#  include <pthread.h>
-#endif
+#include "gtm_signal.h"
+#include "gtm_pthread.h"
 #include "gtm_syslog.h"
 #include "gtm_limits.h"
 
 #include "gtmsiginfo.h"
 #include "io.h"
 #include "send_msg.h"
-#include "setterm.h"
+#include "iott_setterm.h"
 #include "continue_handler.h"
 #include "gtmsecshr.h"
 
@@ -54,9 +53,9 @@ void continue_handler(int sig, siginfo_t *info, void *context)
 			 * I thought it better to restrict this message to when the process was actually
 			 * suspended and being continued. SE 7/01
 			 */
-			send_msg(VARLSTCNT(4) ERR_REQ2RESUME, 2, sig_info.send_pid, sig_info.send_uid);
+			send_msg_csa(NULL, VARLSTCNT(4) ERR_REQ2RESUME, 2, sig_info.send_pid, sig_info.send_uid);
 			if (NULL != io_std_device.in && tt == io_std_device.in->type)
-				setterm(io_std_device.in);
+				iott_setterm(io_std_device.in);
 			/* Fall through */
 		case DEFER_SUSPEND:
 			/* If suspend was deferred, this continue/resume overrides/cancels it */

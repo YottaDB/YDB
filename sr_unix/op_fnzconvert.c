@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -112,6 +112,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ICUERROR,
 				1, status); /* ICU said bad, we say good or don't recognize error*/
+			dstbase = NULL;
 		}
 		else
 		{	/* BADCHAR should not be possible after the above validations */

@@ -52,7 +52,6 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	boolean_t	long_blk_id;
 	int4		offset, blk_id_sz, off_chain_sz;
 	off_chain	chain;
-	v6_off_chain	v6_chain;
 	sm_uc_ptr_t	ptr, ptrtop, c;
 	sm_ulong_t	n;
 	trans_num	blktn;
@@ -74,7 +73,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	assert((dba_mm != cs_data->acc_meth) || dollar_tlevel || cs_addrs->now_crit);
 	assert(cse->mode != gds_t_writemap);
 	assert(cse->ondsk_blkver);
-	array = (blk_segment *)cse->upd_addr;
+	array = cse->upd_addr.blk;
 	long_blk_id = BLK_ID_32_VER < cse->ondsk_blkver;
 	blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 	off_chain_sz = blk_id_sz; /* the off_chain struct should be the same size as the block_id in the current block */
@@ -189,7 +188,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 			chain.cw_index = cse->index;
 			assert((1LL << NEXT_OFF_MAX_BITS) > cse->next_off);
 			chain.next_off = cse->next_off;
-			WRITE_OFF_CHAIN(long_blk_id, &chain, &v6_chain, ptr);
+			WRITE_OFF_CHAIN(long_blk_id, &chain, ptr);
 			cse->index = 0;
 			cse->ins_off = 0;
 			cse->next_off = 0;
@@ -216,7 +215,6 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 					GET_USHORT(nRecLen, &((rec_hdr_ptr_t)ptr)->rsiz);
 					if (0 == nRecLen)
 					{
-						assert(NULL == input_base_addr);
 						integ_error_found = TRUE;
 						break;
 					}
@@ -229,7 +227,6 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 							;
 						if (c >= ptrtop)
 						{
-							assert(NULL == input_base_addr);
 							integ_error_found = TRUE;
 							break;
 						}
@@ -241,21 +238,18 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 						if (((ptr - off_chain_sz) != chainptr)
 							&& ((ptr - off_chain_sz - COLL_SPEC_LEN) != chainptr))
 						{
-							assert(NULL == input_base_addr);
 							integ_error_found = TRUE;
 						}
 						break;
 					}
 					if (c > chainptr)
 					{
-						assert(NULL == input_base_addr);
 						integ_error_found = TRUE;
 						break;
 					}
-					READ_OFF_CHAIN(long_blk_id, &chain, &v6_chain, c);
+					READ_OFF_CHAIN(long_blk_id, &chain, c);
 					if (chain.flag)
 					{
-						assert(NULL == input_base_addr);
 						integ_error_found = TRUE;
 						break;
 					}
@@ -264,7 +258,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 					break;
 				if (chainptr < ptrtop)
 				{
-					READ_OFF_CHAIN(long_blk_id, &chain, &v6_chain, chainptr);
+					READ_OFF_CHAIN(long_blk_id, &chain, chainptr);
 					assert(1 == chain.flag || (skip_block_chain_tail_check && (0 == chain.next_off)));
 					assert(chain.cw_index < sgm_info_ptr->cw_set_depth);
 					offset = chain.next_off;

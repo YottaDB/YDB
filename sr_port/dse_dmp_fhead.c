@@ -48,6 +48,7 @@
 #include "db_snapshot.h"
 
 #define NEXT_EPOCH_TIME_SPACES	"                   " /* 19 spaces, we have 19 character field width to output Next Epoch Time */
+#define NEVER_STR "                   Never"
 
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	gd_region	*gv_cur_region;
@@ -260,7 +261,7 @@ void dse_dmp_fhead (void)
 
 		if (!csd->last_start_backup)		/* Handle backup timestamp: 0 == Never backed up */
 		{
-			strncpy(backup_start_buf, "                   Never", sizeof(backup_start_buf));
+			memcpy(backup_start_buf, NEVER_STR, sizeof(NEVER_STR));
 		} else
 		{
 			backup_start_tmp = (time_t) (csd->last_start_backup);	/* this will 32 squash on AIX */

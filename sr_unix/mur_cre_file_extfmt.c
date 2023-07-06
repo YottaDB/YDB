@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2021 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,13 +69,13 @@ error_def(ERR_FILENOTCREATE);
 
 int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 {
-	fi_type			*file_info;
+	fi_type			*file_info = NULL;
 	char			*ptr, rename_fn[MAX_FN_LEN + 1];
 	int			rename_fn_len, base_len, fn_exten_size, tmplen, rctl_index;
 	uint4			status;
 	mval			op_val, op_pars;
 	boolean_t		is_stdout;	/* Output will go STDOUT?. Matters only for single-region in this function */
-	boolean_t		need_rel_latch, copy_from_shm, single_reg, release_latch, key_reset;
+	boolean_t		need_rel_latch, copy_from_shm, single_reg, release_latch = FALSE, key_reset = FALSE;
 	boolean_t		is_dummy_gbldir, fname_is_devnull, is_regfile=TRUE;
 	reg_ctl_list		*rctl;
 	gd_region		*reg;
@@ -257,7 +257,7 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 	{
 		/* For multi-region, this header writing will be done later as part of "mur_merge_sort_extfmt" */
 		mur_write_header_extfmt(jctl, NULL, NULL, recstat);
-		if (is_regfile) /* Only show the message for file creation, if it were a regular file. */
+		if (is_regfile && file_info) /* Only show the message for file creation, if it were a regular file. */
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FILECREATE, 4, LEN_AND_STR(ext_file_type[recstat]),
 					file_info->fn_len, file_info->fn);
 	} else if (multi_proc_in_use)

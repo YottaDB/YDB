@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #include "gtm_conv.h"
+#include "gtm_ctype.h"
 #include "wbox_test_init.h"
 
 GBLREF spdesc 		stringpool;
@@ -42,7 +43,7 @@ int verify_case(const mstr *parm)
 
 	if (1 == parm->len)
 	{
-		c = lower_to_upper_table[*(uchar_ptr_t)parm->addr];
+		c = TOUPPER(*parm->addr);
 		for (index = 0; index < MAX_CASE_IDX; ++index)
 		{
 			if (c == casemaps[index].code[0])

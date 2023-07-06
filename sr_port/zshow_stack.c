@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,7 +64,7 @@ void zshow_stack(zshow_out *output, boolean_t show_checksum)
 		{	/* SFT_ZINTR is normally indirect but if the frame has been replaced by non-indirect frame via ZGOTO or GOTO
 			 * then do not include it in the indirect list here.
 			 */
-			if (nfp < &nocount_frames[MAX_INDR_PER_COUNTED])
+			if (nfp <= &nocount_frames[MAX_INDR_PER_COUNTED - 1])	/* SCA no &nocount_frames[MAX_INDR_PER_COUNTED] */
 				/* If room in array, save indirect frame type */
 				*nfp++ = fp->type;
 			else

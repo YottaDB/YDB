@@ -701,7 +701,10 @@
 
    The format of the V6 qualifier is:
 
-   -[no]V6
+   -[NO]V6
+
+   -NOV6 creates a V7 database overriding the value of the environment
+   variable gtm_db_create_ver.
 
 3 Region
    Region
@@ -2872,8 +2875,8 @@
 
    Specifies that REORG, after it has rearranged some or all of a region's
    contents, should attempt to reduce the size of the database file and
-   return free space to the file system. The format of the TRUNCATE qualifier
-   is:
+   return free space to the file system. TRUNCATE only applies to BG
+   databases. The format of the TRUNCATE qualifier is:
 
    -T[RUNCATE][=percentage]
 
@@ -2901,10 +2904,11 @@
 3 UPgrade
    UPgrade
 
-   Standalone operation to upgrade blocks to current DB version format. Use
-   REORG -UPGRADE when it is a part of a release notes procedure to upgrade
-   the DB version format of a database or when you encounter a database
-   integrity error that requires running REORG -UPGRADE.
+   Upgrades blocks to current DB version format. A REORG with the -UPGRADE
+   option cannot run concurrently on a file or region with any other REORG on
+   the same file or region. Use REORG -UPGRADE when it is a part of a release
+   notes procedure to upgrade the DB version format of a database or when you
+   encounter a database integrity error that requires running REORG -UPGRADE.
 
 3 Examples
    Examples
@@ -3639,21 +3643,21 @@
    PROblksplit
 
    Specifies the approximate number of records a block in the region must
-   exceed before GT.M considers a proactive block split. If the specified
-   value is 0, GT.M does not engage in proactive block splitting. The format
-   of the -PROBLKSPLIT qualifier is:
+   exceed before GT.M considers a proactive block split. The format of the
+   -PROBLKSPLIT qualifier is:
 
    -PRO[BLKSPLIT]=integer
 
-     o GT.M makes proactive block splits when a block has a history of
-       causing repeated restarts; GT.M never proactively splits blocks that
-       don't encounter restarts.
+     o GT.M never performs proactive block splitting inside a TP transaction.
      o Proactive block splits tend to make globals require more blocks and
        potentially deeper trees.
      o A value of one (1) indicates to always consider proactive splits,
        which might be useful for regions used to hold globals with a first
        subscript of, for example, $job.
-     o The default value is five (5).
+     o A value of five (5) indicates that GT.M considers proactive block
+       split only when the number of records in a block exceed 5.
+     o The default is zero (0). It means that GT.M does not consider
+       proactive block splitting by default.
 
 3 Qdbrundown
    Qdbrundown

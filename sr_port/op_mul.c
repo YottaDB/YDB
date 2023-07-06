@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,14 +47,12 @@ void	op_mul (mval *u, mval *v, mval *p)
 			promote(&w); promote(&z);
 			u = &w;	     v = &z;
 		}
-	}
-	else if (u->mvtype & MV_INT)
+	} else if (u->mvtype & MV_INT)
 	{
 		w = *u;
 		promote(&w);
 		u = &w;
-	}
-	else if (v->mvtype & MV_INT)
+	} else if (v->mvtype & MV_INT)
 	{
 		w = *v;
 		promote(&w);
@@ -72,8 +70,13 @@ void	op_mul (mval *u, mval *v, mval *p)
 		demote(p, exp, u->sgn ^ v->sgn);
 	else
 	{
-		p->mvtype = MV_NM;
-		p->sgn = u->sgn ^ v->sgn; p->e = exp;
+		if (p->m[1] || p->m[0])
+		{
+			p->mvtype = MV_NM;
+			p->sgn = u->sgn ^ v->sgn;
+			p->e = exp;
+		} else
+			*p = literal_zero;
 	}
 	assert(p->m[1] < MANT_HI);
 }

@@ -192,6 +192,7 @@ LITDEF	int GDE_GDELOGFAIL = 150504122;
 
 
 LITDEF	int gdeerrors_undocarr[] = {
+	0	/* Placeholder to prevent empty array */
 };
 
 

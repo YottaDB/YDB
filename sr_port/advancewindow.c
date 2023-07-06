@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,7 @@ static readonly unsigned char apos_ok[] =
 
 void advancewindow(void)
 {
-	unsigned char	*cp1, *cp2, *cp3, *cptop, *cptr;
+	unsigned char	*cp1, *cp2, *cp3, *cptop, *cptr = NULL;
 	unsigned char	*error, errtxt[(3 + 1) UTF8_ONLY(* GTM_MB_LEN_MAX)], x;	/* up to 3 digits/byte & a comma */
 	char		*tmp;
 	int		y, charlen;
@@ -74,7 +74,7 @@ void advancewindow(void)
 	switch (y = ctypetab[x])
 	{
 	case TK_CR:
-		y = ctypetab[*(++(TREF(lexical_ptr)))];
+		y = ctypetab[(unsigned char)*(++(TREF(lexical_ptr)))];
 		if (TK_EOL != y)
 		{	/* Not looking like a <CR><LF>, so it's an error */
 			y = TK_ERROR;
@@ -93,6 +93,8 @@ void advancewindow(void)
 			if (gtm_utf8_mode)
 				cptr = (unsigned char *)UTF8_MBTOWC((sm_uc_ptr_t)cp1, (TREF(source_buffer)).addr
 					+ (TREF(source_buffer)).len, ch);
+			else
+				ch = 0;
 #			endif
 			x = *cp1++;
 			if ((SP > x) UTF8_ONLY(|| (gtm_utf8_mode && !(U_ISPRINT(ch)))))
@@ -110,16 +112,18 @@ void advancewindow(void)
 #					ifdef UTF8_SUPPORTED
 					else
 					{
+						assert(cptr);
 						charlen = cptr - cp1 + 1;	/* get the number of bytes in the utf8 character */
 						assert(GTM_MB_LEN_MAX >= charlen);
 					}
 #					endif
-					for (cptr = cp1 - 1; charlen--;)	/* stop when all bytes are done */
+					for (cptr = cp1 - 1, error = errtxt; charlen--;)	/* stop when all bytes are done */
 					{	/* cptr winds up back where it started due to the increments in the loop */
 						error = (unsigned char*)i2asc((uchar_ptr_t)errtxt, (unsigned int)*cptr++);
 						*error++ = ',';
 					}
-					error--;				/* do not include the last comma */
+					if (errtxt != error)
+						error--;				/* do not include the last comma */
 					if (!(TREF(compile_time) && !(cmd_qlf.qlf & CQ_WARNINGS)))
 					{
 						show_source_line(TRUE);
@@ -248,7 +252,7 @@ void advancewindow(void)
 		return;
 	case TK_GREATER:
 	case TK_LESS:
-		if (TK_EQUAL == ctypetab[*(TREF(lexical_ptr) + 1)])
+		if (TK_EQUAL == ctypetab[(unsigned char)*(TREF(lexical_ptr) + 1)])
 		{
 			++(TREF(lexical_ptr));
 			y = ((TK_LESS == y) ? TK_NGREATER : TK_NLESS);
@@ -257,7 +261,7 @@ void advancewindow(void)
 	case TK_SEMICOLON:
 		while (*++(TREF(lexical_ptr)))
 			;
-		assert(TK_EOL == ctypetab[*TREF(lexical_ptr)]);
+		assert(TK_EOL == ctypetab[(unsigned char)*TREF(lexical_ptr)]);
 		TREF(director_token) = TK_EOL;
 		return;		/* if next character is terminator, avoid incrementing past it */
 	case TK_ASTERISK:

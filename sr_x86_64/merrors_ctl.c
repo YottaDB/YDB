@@ -1060,7 +1060,7 @@ LITDEF	err_msg merrors[] = {
 	{ "UNUSEDMSG1226", "MMNODYNUPGRD removed from code in V7.1-000 Feb 2023", 0, 0 },
 	{ "UNUSEDMSG1227", "MUDWNGRDNRDY removed from code in V7.1-000 Feb 2023", 0, 0 },
 	{ "REORGUPCNFLCT", "MUPIP !AD encountered a conflict due to !AD (PID:!UL)", 5, 0 },
-	{ "MUDWNGRDNOTPOS", "Start VBN value is [!UL] while downgraded GT.M version can support only [!UL]. Downgrade not possible", 2, 0 },
+	{ "MUDWNGRDNOTPOS", "Downgrade not possible for a V7 database version", 0, 0 },
 	{ "MUUPGRDNRDY", "Database !AD has not been completely upgraded to !AD format - still !@UQ database blocks to upgrade", 5, 0 },
 	{ "TNWARN", "Database file !AD has 0x!16@XQ more transactions to go before reaching the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET", 4, 0 },
 	{ "TNTOOLARGE", "Database file !AD has reached the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET", 3, 0 },
@@ -1284,7 +1284,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MUTRUNCFAIL", "Truncate failed after reorg", 0, 0 },
 	{ "MUTRUNCNOSPACE", "Region !AD has insufficient space to meet truncate target percentage of !UL", 3, 0 },
 	{ "MUTRUNCNOTBG", "Region !AD does not have access method BG ", 2, 0 },
-	{ "UNUSEDMSG1455", "MUTRUNCNOV4 Last used in V7.0-004 Fed 2023", 0, 0 },
+	{ "PIDMISMATCH", "Global variable with PID=!UL does not match specified PID=!UL", 2, 0 },
 	{ "MUTRUNCPERCENT", "Truncate threshold percentage should be from 0 to 99", 0, 0 },
 	{ "MUTRUNCSSINPROG", "Truncate detected concurrent snapshot in progress for region !AD", 2, 0 },
 	{ "MUTRUNCSUCCESS", "Database file !AD truncated from 0x!16@XQ blocks to 0x!16@XQ at transaction 0x!16@XQ", 5, 0 },
@@ -2838,7 +2838,7 @@ LITDEF	int ERR_MUTRUNCERROR = 150382498;
 LITDEF	int ERR_MUTRUNCFAIL = 150382506;
 LITDEF	int ERR_MUTRUNCNOSPACE = 150382515;
 LITDEF	int ERR_MUTRUNCNOTBG = 150382522;
-LITDEF	int ERR_UNUSEDMSG1455 = 150382532;
+LITDEF	int ERR_PIDMISMATCH = 150382528;
 LITDEF	int ERR_MUTRUNCPERCENT = 150382538;
 LITDEF	int ERR_MUTRUNCSSINPROG = 150382547;
 LITDEF	int ERR_MUTRUNCSUCCESS = 150382555;

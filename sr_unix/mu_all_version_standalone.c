@@ -64,7 +64,7 @@ error_def(ERR_TEXT);
 */
 void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 {
-	int		i, rc, save_errno, fd;
+	int		i, rc, save_errno, shmget_errno, fd;
 	struct sembuf	sop[4];
 	int		shmid;
 	ZOS_ONLY(int	realfiletag;)
@@ -143,6 +143,7 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 	   (upgrade and downgrade).
 	*/
 	shmid = gtm_shmget(sem_inf[0].ftok_key, 0, RWDALL, FALSE, DATABASE_FILE, (char*)db_fn);
+	shmget_errno = errno;
 	if (-1 == shmid)
 	{	/* That failed, second check is if shmid stored in file-header (if any) exists */
 		fd = OPEN(db_fn, O_RDONLY);	/* udi not available so OPENFILE_DB not used */
@@ -164,13 +165,17 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 		}
 		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		if (0 != v15_csd.shmid && INVALID_SHMID != v15_csd.shmid)
+		{
 			shmid = gtm_shmget(v15_csd.shmid, 0, RWDALL, FALSE, DATABASE_FILE, (char*)db_fn);
+			if (-1 == shmid)
+				shmget_errno = errno;
+		}
 	}
 	if (-1 != shmid)
 	{
 		mu_all_version_release_standalone(sem_inf);
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, RTS_ERROR_TEXT(db_fn),
-			save_errno, 0, ERR_FTOKKEY, 1, sem_inf[i].ftok_key);
+					shmget_errno, 0, ERR_FTOKKEY, 1, sem_inf[i].ftok_key);
 	}
 }
 

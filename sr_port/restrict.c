@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2022 Fidelity National Information	*
+ * Copyright (c) 2017-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -152,7 +152,7 @@ void restrict_init(void)
 	boolean_t	valid_audit_entry, cont;
 	struct group	grp, *grpres;
 	char		*grpbuf = NULL;
-	size_t		grpbufsz, audit_prefix_len = 0;
+	size_t		grpbufsz = 0, audit_prefix_len = 0;
 	boolean_t	created_now = FALSE, tls = FALSE, audit_opread = FALSE;
 	boolean_t	is_ad, is_al, is_am, is_apd, is_aza, valid_option, is_zauditlog_tmp;
 	struct stat 	restrictStat;
@@ -330,7 +330,7 @@ void restrict_init(void)
 							tls = valid_option = TRUE;
 #						endif
 						else
-                                                {       /* Invalid option - parse error and restrict everything */
+						{	/* Invalid option - parse error and restrict everything */
 							if (!valid_option)
 							{
 								send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9)
@@ -342,7 +342,7 @@ void restrict_init(void)
 								restrict_all = TRUE;
 								break;
 							}
-                                                }
+						}
 					}
 					if (restrict_all)
 						break;

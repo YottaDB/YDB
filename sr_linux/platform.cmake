@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2020 Fidelity National Information		#
+# Copyright (c) 2013-2023 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -46,20 +46,13 @@ set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I") # gcc -I does not make it to "as"
 # Compiler
 if(${CYGWIN})
   # (VEN/SMH): Looks like we need to add the defsym to tell the assembler to define 'cygwin'
-  set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,--defsym,cygwin=1")
+  string(APPEND CMAKE_ASM_FLAGS " -Wa,--defsym,cygwin=1")
 else()
   # Cygwin must have -ansi undefined (it adds __STRICT_ANSI__ which undefines some important prototypes like fdopen())
   #   See http://stackoverflow.com/questions/21689124/mkstemp-and-fdopen-in-cygwin-1-7-28
   # Cygwin warns if you add -fPIC that the compiled code is already position
   # independent. So don't add -fPIC
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -fPIC ")
-endif()
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wimplicit -Wall -Wno-parentheses -Wno-unused-value -Wno-unused-function")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-variable -Wno-char-subscripts")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-but-set-variable -fno-builtin")
-if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.8)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-result -Wno-maybe-uninitialized")
+  string(APPEND CMAKE_C_FLAGS " -fPIC -fno-defer-pop -ffloat-store -fno-omit-frame-pointer")
 endif()
 
 add_definitions(

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016 Fidelity National Information		*
+ * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,7 @@ int	db_write_eof_block(unix_db_info *udi, int fd, int blk_size, off_t offset, di
 
 	if ((NULL != udi) && udi->fd_opened_with_o_direct)
 	{
+		assert(diobuff);
 		DIO_BUFF_EXPAND_IF_NEEDED(udi, blk_size, diobuff);
 		buff = diobuff->aligned;
 		free_needed = FALSE;

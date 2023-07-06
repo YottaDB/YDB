@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,9 +60,9 @@ boolean_t zwr2format(mstr *src, mstr *des)
 				ch = *cp++;
 				if ('$' == ch)
 				{
-					ch = chtmp = lower_to_upper_table[*cp++];
-					if (('C' != ch) && (('Z' != ch) || ('C' != (ch = lower_to_upper_table[*cp++])) ||
-						('H' != (ch = lower_to_upper_table[*cp++]))))
+					ch = chtmp = TOUPPER(*cp++);
+					if (('C' != ch) && (('Z' != ch) || ('C' != (ch = TOUPPER(*cp++))) ||
+						('H' != (ch = TOUPPER(*cp++)))))
 						return FALSE;
 					if ('(' != (ch = *cp++))
 						return FALSE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -187,6 +187,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
 	csd = csa->hdr;
+	cnl = csa->nl;
 	assert((csa == cs_addrs) && (csd == cs_data));	/* relied upon by "jnl_ensure_open" calls below */
 	if ((reg->open) && (dba_usr == csd->acc_meth))
 	{
@@ -313,7 +314,6 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	/* If we have standalone access, then ensure that a concurrent online rollback cannot be running at the same time as it
 	 * needs the access control lock as well. The only expection is we are online rollback and currently running down.
 	 */
-	cnl = csa->nl;
 	onln_rlbk_pid = cnl->onln_rlbk_pid;
 	assert(!have_standalone_access || mupip_jnl_recover || !onln_rlbk_pid || !is_proc_alive(onln_rlbk_pid, 0));
 	if (!have_standalone_access)

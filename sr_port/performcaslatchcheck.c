@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,7 @@
 #include "gtmsecshr.h"
 #endif
 
-GBLREF	pid_t	process_id;
+GBLREF	uint4	process_id;
 GBLREF 	int4 	exi_condition;
 
 /* Returns TRUE if latch was held by a dead pid and was made available inside this function.

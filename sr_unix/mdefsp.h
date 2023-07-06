@@ -164,7 +164,7 @@ typedef char  mach_inst;	/* machine instruction */
 */
 #define LINKAGE_PSECT_BOUNDARY  8
 #undef BIGENDIAN
-typedef char  mach_inst;	/* machine instruction */
+typedef unsigned char  mach_inst;	/* machine instruction */
 #endif
 
 #ifdef Linux390
@@ -224,6 +224,12 @@ typedef struct
 	int4	m[2];
 	mstr	str;
 } mval_b;
+
+typedef union mval_gen_union
+{
+	mval	bits;
+	mval_b	byte;
+} mval_gen;
 
 #define VAR_START(a, b)	va_start(a, b)
 #define VARLSTCNT(a)	a,		/* push count of arguments*/

@@ -55,7 +55,7 @@ void ex_tail(oprtype *opr, boolean_t is_boolchild, boolean_t parent_comval)
 	assert(TRIP_REF == opr->oprclass);
 	RETURN_IF_RTS_ERROR;
 	CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq.h except with DEBUG_TRIPLES */
-	t = opr->oprval.tref; /* Refind t since UNARY_TAIL may have shifted it */
+	t = opr->oprval.tref;
 	c = t->opcode;
 	oct = oc_tab[c].octype;
 	if ((OCT_EXPRLEAF & oct) || (OC_NOOP == c))
@@ -72,8 +72,8 @@ void ex_tail(oprtype *opr, boolean_t is_boolchild, boolean_t parent_comval)
 	}
 	if (OCT_ARITH & oct)
 		ex_arithlit(t);
-	/* the following code deals with Booleans where the expression is not directly managing flow - those go through bool_expr */
 	RETURN_IF_RTS_ERROR;
+	/* the following code deals with Booleans where the expression is not directly managing flow - those go through bool_expr */
 	UNARY_TAIL(opr);
 	RETURN_IF_RTS_ERROR;
 	t = opr->oprval.tref;
@@ -83,6 +83,8 @@ void ex_tail(oprtype *opr, boolean_t is_boolchild, boolean_t parent_comval)
 	{
 		if (!(OCT_UNARY & oct)) /* Boollit ought eventually to be made to operate on OC_COM */
 		{
+			if (EXT_BOOL == TREF(gtm_fullbool))
+				CONVERT_TO_SE(t);
 			bx_boollit(t);
 			RETURN_IF_RTS_ERROR;
 			c = t->opcode;
@@ -92,12 +94,13 @@ void ex_tail(oprtype *opr, boolean_t is_boolchild, boolean_t parent_comval)
 		 * does, it doesn't neatly fit our boolean simplification, which turns directly nested booleans, e.g. x&(y&z) into
 		 * single jump chains. This saves some instructions, but it requires us not to start jump chains for booleans that
 		 * aren't going to have their own boolinit/fini anyway. (Which makes it impossible to handle the operands first in
-		 * every case. To deal with this, the wait_for_parent variable tracks whether or not we are called on an operand
+		 * every case). To deal with this, the is_boolchild variable tracks whether or not we are called on an operand
 		 * of a boolean. If we are, and that operand is itself a genuine boolean operation (as opposed to a cobool or
 		 * something similar), then hold off on creating the chain as we will end up inside the one created by the caller
 		 * anyway. Finally, we also need to avoid creating boolchains for operands which will be immediately converted
 		 * to mvals.
 		 **/
+		assert(!(OC_COBOOL == c && parent_comval && OC_LIT != t->operand[0].oprval.tref->opcode));
 		if (!is_boolchild && (OCT_BOOL & oct) && !(OC_COBOOL == c && parent_comval))
 		{
 			bitrip = bx_startbool(t);

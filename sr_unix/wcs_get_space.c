@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2020 Fidelity National Information	*
+ * Copyright (c) 2007-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -104,13 +104,13 @@ error_def(ERR_BUFOWNERSTUCK);
 /* go after a specific number of buffers or a particular buffer */
 boolean_t wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 {
+	static wcs_conflict_trace_t	wcs_conflict_trace[WCS_CONFLICT_TRACE_ARRAYSIZE];
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	node_local_ptr_t        cnl;
+	node_local_ptr_t	cnl;
 	cache_que_head_ptr_t	q0, base, crwipq = NULL;
 	int4			count, dummy_errno, flsh_trigger, i, k, max_count, n, save_errno = 0;
 	uint4			lcnt, size, to_wait, to_msg, this_idx;
-	wcs_conflict_trace_t	wcs_conflict_trace[WCS_CONFLICT_TRACE_ARRAYSIZE];
 	cache_rec		cr_contents;
 	boolean_t		asyncio, ret;
 	int			curr_wc_in_free;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,8 +32,8 @@ int f_incr(oprtype *a, opctype op)
 	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
 	/* may need to evaluate the increment (2nd arg) early and use result later: prepare to juggle triple chains */
-	dqinit(&targchain, exorder);	/* a place for the operation and the target */
-	dqinit(&tmpexpr, exorder);	/* a place to juggle the shifted chain in case it's active */
+	exorder_init(&targchain);	/* a place for the operation and the target */
+	exorder_init(&tmpexpr);	/* a place to juggle the shifted chain in case it's active */
 	triptr = maketriple(OC_NOOP);
 	dqrins(&tmpexpr, exorder, triptr);
 	triptr = TREF(expr_start);
@@ -76,7 +76,7 @@ int f_incr(oprtype *a, opctype op)
 		*increment = put_ilit(1);	/* default optional increment to 1 */
 	else
 	{
-		dqinit(&incrchain, exorder);	/* a place for the increment */
+		exorder_init(&incrchain);	/* a place for the increment */
 		setcurtchain(&incrchain);	/* increment expr must evaluate before the glvn in $INCR(glvn,expr) */
 		advancewindow();
 		if (EXPR_FAIL == expr(increment, MUMPS_NUM))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,14 +27,14 @@ int exfunc(oprtype *a, boolean_t alias_target)
 	triple		*calltrip, *calltrip_opr1_tref, *counttrip, *funret, *labelref, *masktrip;
 	triple		*oldchain, *ref0, *routineref, tmpchain, *triptr;
 #	if defined(USHBIN_SUPPORTED) || defined(VMS)
-	triple		*tripsize;
+	triple		*tripsize = NULL;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(TK_DOLLAR == TREF(window_token));
 	advancewindow();
-	dqinit(&tmpchain, exorder);
+	exorder_init(&tmpchain);
 	oldchain = setcurtchain(&tmpchain);
 	calltrip = entryref(OC_EXFUN, OC_EXTEXFUN, INDIR_DUMMY, TRUE, TRUE, FALSE);
 	setcurtchain(oldchain);
@@ -122,6 +122,7 @@ int exfunc(oprtype *a, boolean_t alias_target)
 		triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname);
 		calltrip->operand[0].oprclass = ILIT_REF;	/* dummy placeholder */
 #		if defined(USHBIN_SUPPORTED) || defined(VMS)
+		assert(tripsize);
 		tripsize->operand[0].oprval.tsize->ct = triptr;
 #		endif
 	}

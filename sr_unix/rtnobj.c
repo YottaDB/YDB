@@ -489,7 +489,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 	struct perm_diag_data	pdd;
 #	ifdef DEBUG
 	boolean_t		rtnobj_integ_done = FALSE;
-	rtnobj_sm_off_t		shm_index_off_mid;
+	rtnobj_sm_off_t		shm_index_off_mid = NULL_RTNOBJ_SM_OFF_T;
 	int			dbg_shm_cnt;
 	DCL_THREADGBL_ACCESS;
 
@@ -568,9 +568,10 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 					shm_index_off = rtnobj->next_rtnobj_shm_offset;
 				}
 				if (MAXVERS_TEST < maxvers)
-					// non-head node as the loop point when there is more than 2 elements
+				{	/* non-head node as the loop point when there is more than 2 elements */
+					assert(NULL_RTNOBJ_SM_OFF_T != shm_index_off_mid);
 					rtnobj->next_rtnobj_shm_offset = shm_index_off_mid;
-				else
+				} else
 					rtnobj->next_rtnobj_shm_offset = relinkrec->rtnobj_shm_offset;
 				maxvers = -1;
 				rtnobj_integ_done = TRUE;
@@ -987,7 +988,7 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 	open_relinkctl_sgm	*linkctl;
 	relinkshm_hdr_t		*shm_hdr;
 	int			maxObjIndex, sizeIndex;
-	int			min_index, max_index, min_free_index, max_free_index, shm_index;
+	int			min_index, max_index, min_free_index, max_free_index, shm_index = -1;
 	gtm_uint64_t		elemSize, origElemSize, objLen;
 	rtnobj_hdr_t		*rtnobj, *prev_rtnobj, *rtnobj2;
 	rtnobj_sm_off_t		shm_index_off;

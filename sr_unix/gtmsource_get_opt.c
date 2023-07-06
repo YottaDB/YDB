@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2022 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -540,7 +540,7 @@ int gtmsource_get_opt(void)
 				}
 				gtmsource_options.setcomment = TRUE;
 				STRNCPY_STR(gtmsource_options.freeze_comment, freeze_comment,
-					SIZEOF(gtmsource_options.freeze_comment) - 1);
+						SIZEOF(gtmsource_options.freeze_comment));
 				gtmsource_options.freeze_comment[SIZEOF(gtmsource_options.freeze_comment) - 1] = '\0';
 			}
 			else if (cli_present("COMMENT") == CLI_NEGATED)

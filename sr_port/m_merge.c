@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,7 @@ int m_merge(void)
 	int		type;
 	boolean_t	used_glvn_slot;
 	mval		mv;
-	opctype 	put_oc;
+	opctype 	put_oc = OC_NOOP;
 	oprtype 	mopr, control_slot;
 	triple		*obp, *ref, *restart, *s1, *sub, tmpchain;
 	DCL_THREADGBL_ACCESS;
@@ -44,7 +44,7 @@ int m_merge(void)
 	used_glvn_slot = FALSE;
 	sub = NULL;
 	restart = newtriple(OC_RESTARTPC);	/* Here is where a restart should pick up */
-	dqinit(&tmpchain, exorder);
+	exorder_init(&tmpchain);
 	/* Left Hand Side of EQUAL sign */
 	switch (TREF(window_token))
 	{
@@ -165,7 +165,10 @@ int m_merge(void)
 	obp = (TREF(curtchain))->exorder.bl;
 	dqadd(obp, &tmpchain, exorder);
 	if (TREF(temp_subs) && TREF(side_effect_handling) && sub)
+	{
+		assert(OC_NOOP != put_oc);
 		create_temporaries(sub, put_oc);
+	}
 	TREF(temp_subs) = FALSE;
 	if (used_glvn_slot)
 	{

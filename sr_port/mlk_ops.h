@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,10 @@ static inline void mlk_pvtctl_set_ctl(mlk_pvtctl_ptr_t pctl, mlk_ctldata_ptr_t c
 				|| (pctl->csa->mlkhash == (mlk_shrhash_ptr_t)R2A(pctl->ctl->blkhash)));
 		pctl->shrblk = (mlk_shrblk_ptr_t)R2A(pctl->ctl->blkbase) - 1;
 	} else
+	{
+		pctl->shrblk = NULL;
 		assert(dba_cm == pctl->region->dyn.addr->acc_meth);
+	}
 }
 
 static inline void mlk_pvtctl_init(mlk_pvtctl_ptr_t pctl, struct gd_region_struct *reg)
@@ -90,6 +93,7 @@ static inline void grab_lock_crit_intl(mlk_pvtctl_ptr_t pctl, boolean_t *ret_was
 		 * in GRAB_LATCH_INDEFINITE_WAIT as the timeout.
 		 */
 		grab_latch(&csa->nl->lock_crit, GRAB_LATCH_INDEFINITE_WAIT, WS_38, csa);
+		*ret_was_crit = FALSE;
 	}
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -250,7 +250,7 @@ int load_pattern_table(int name_len,char *file_name)
 					util_out_print("Identifier expected, found !AD", TRUE, idlen, ident);
 					pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
 				}
-				code = lower_to_upper_table[ident[0]];
+				code = TOUPPER(ident[0]);
 				if (idlen > 1)
 				{
 					if (((code != 'Y') && (code != 'Z')) || (ident[0] != ident[idlen - 1]))
@@ -433,7 +433,7 @@ skip_whitespace:
 		do {
 			*id++ = *ch++;
 			idlen++;
-		} while (typemask[*ch] & (PATM_A | PATM_N));
+		} while (typemask[(unsigned char)*ch] & (PATM_A | PATM_N));
 		*id++ = '\0';
 		if (patcmp(ident, (uchar_ptr_t)"PATCODE") == 0)
 			return K_PATCODE;
@@ -447,7 +447,7 @@ skip_whitespace:
 	case '0': case '1': case '2': case '3': case '4':
 	case '5': case '6': case '7': case '8': case '9':
 		number = *ch++ - '0';
-		while (typemask[*ch] & PATM_N)
+		while (typemask[(unsigned char)*ch] & PATM_N)
 			number = 10 * number + *ch++ - '0';
 		return T_NUMBER;
 		break;
@@ -466,7 +466,7 @@ static int patcmp(unsigned char *str1,unsigned char *str2)
 
 	while ('\0' != *str2)
 	{
-		cmp = lower_to_upper_table[*str1++] - lower_to_upper_table[*str2++];
+		cmp = TOUPPER(*str1++) - TOUPPER(*str2++);
 		if (0 != cmp)
 			return cmp;
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2018 Fidelity National Information	*
+ * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,13 +48,39 @@ MBSTART {									\
 	ENABLE_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
 } MBEND
 
-#define PTHREAD_COND_TIMEDWAIT(COND, MUTEX, TIMEOUT, RVAL)			\
+#define PTHREAD_COND_BROADCAST(COND, RVAL)						\
 MBSTART {									\
 	intrpt_state_t		prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
-	(RVAL) = pthread_cond_timedwait(COND, MUTEX, TIMEOUT);			\
+	(RVAL) = pthread_cond_broadcast(COND);					\
 	ENABLE_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
+} MBEND
+
+#define PTHREAD_COND_WAIT(COND, MUTEX, RVAL)					\
+MBSTART {									\
+	GBLREF VSIG_ATOMIC_T	forced_exit;					\
+	intrpt_state_t		prev_intrpt_state;				\
+										\
+	DEFER_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
+	(RVAL) = pthread_cond_wait(COND, MUTEX);				\
+	if (forced_exit)							\
+		pthread_mutex_unlock(MUTEX);					\
+	ENABLE_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
+	assert(!forced_exit);							\
+} MBEND
+
+#define PTHREAD_COND_TIMEDWAIT(COND, MUTEX, TIMEOUT, RVAL)			\
+MBSTART {									\
+	GBLREF VSIG_ATOMIC_T	forced_exit;					\
+	intrpt_state_t		prev_intrpt_state;				\
+										\
+	DEFER_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
+	(RVAL) = pthread_cond_timedwait(COND, MUTEX, TIMEOUT);			\
+	if (forced_exit)							\
+		pthread_mutex_unlock(MUTEX);					\
+	ENABLE_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
+	assert(!forced_exit);							\
 } MBEND
 
 #ifdef GTM_PTHREAD
@@ -94,7 +120,10 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
 		} else												\
 			WAS_HOLDER = TRUE;									\
 	} else													\
+	{													\
 		assert(!thread_mutex_holder);									\
+		WAS_HOLDER = FALSE;										\
+	}													\
 }
 
 #define	PTHREAD_MUTEX_UNLOCK_IF_NEEDED(WAS_HOLDER)							\

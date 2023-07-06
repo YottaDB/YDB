@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,6 +60,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 	cw_set_element	*cse, *old_cse;
 	kill_set	*ks;
 	off_chain	chain;
+	block_ref	ref;
 	srch_blk_status	*tp_srch_status;
 	uint4		iter;
 	ht_ent_int8	*tabent;
@@ -71,10 +72,14 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 	SETUP_THREADGBL_ACCESS;
 	horiz_growth = FALSE;
 	if (!dollar_tlevel)
-		ks = kill_set_tail;
-	else
 	{
-		PUT_BLK_ID(&chain, blk);
+		ks = kill_set_tail;
+		chain.cw_index = 0;
+		chain.flag = 0;
+	} else
+	{
+		PUT_BLK_ID(&ref.id, blk);
+		chain = ref.chain;
 		tp_srch_status = NULL;
 		if (chain.flag == 1)
 		{

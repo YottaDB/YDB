@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -150,7 +150,7 @@ n_jpl_trc_rec_types
 };
 #undef TAB_JPL_TRC_REC
 
-typedef struct
+typedef struct jnlpool_ctl_struct_struct
 { 	/* IMPORTANT : all fields that are used by the source server reading from pool logic must be defined VOLATILE to avoid
 	 * compiler optimization, forcing fresh load on every access.
 	 */
@@ -397,7 +397,7 @@ MBSTART {												\
 }
 
 #define	SET_JNL_SEQNO(JPL, TEMP_JNL_SEQNO, SUPPLEMENTARY, STRM_SEQNO, STRM_INDEX, NEXT_STRM_SEQNO)	\
-{													\
+MBSTART {												\
 	GBLREF	jnl_gbls_t	jgbl;									\
 													\
 	assert(!jgbl.forw_phase_recovery);								\
@@ -408,7 +408,7 @@ MBSTART {												\
 		NEXT_STRM_SEQNO = STRM_SEQNO + 1;							\
 		JPL->strm_seqno[STRM_INDEX] = NEXT_STRM_SEQNO;						\
 	}												\
-}
+} MBEND
 
 /* The following structure contains data items local to one Source Server.
  * It is maintained in the journal pool to provide for persistence across

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -204,6 +204,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 	} else
 	{
 		sem_incremented = FALSE;
+		maxindex = -1;
 		if (gtmsource_srv_count)
 		{
 			repl_log(stdout, TRUE, TRUE, "Initiating shut down\n");
@@ -332,4 +333,3 @@ void gtmsource_sigstop(void)
 		gtmsource_stop(FALSE);
 	return;
 }
-

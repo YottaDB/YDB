@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -193,7 +193,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	jnlpool_ctl_ptr_t	jpl;
 	pid_t			pid;
 	sgm_info		*si;
-	sgmnt_addrs		*csa, *repl_csa;
+	sgmnt_addrs		*csa = NULL, *repl_csa;
 	sgmnt_data_ptr_t	csd;
 #	ifdef DEBUG
 	sgm_info		*jnlpool_si;

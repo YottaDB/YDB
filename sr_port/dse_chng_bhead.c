@@ -150,7 +150,7 @@ void dse_chng_bhead(void)
 			t_abort(gv_cur_region, csa);
 			return;
 		}
-		t_write(&blkhist, (unsigned char *)bs1, 0, 0, new_hdr.levl, TRUE, FALSE, GDS_WRITE_KILLTN);
+		t_write(&blkhist, bs1, 0, 0, new_hdr.levl, TRUE, FALSE, GDS_WRITE_KILLTN);
 		BUILD_AIMG_IF_JNL_ENABLED(csd, csa->ti->curr_tn);
 		t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
 	}
@@ -174,7 +174,7 @@ void dse_chng_bhead(void)
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, blkhist.buffaddr + SIZEOF(new_hdr), new_hdr.bsiz - SIZEOF(new_hdr));
 		BLK_FINI(bs_ptr, bs1);
-		t_write(&blkhist, (unsigned char *)bs1, 0, 0,
+		t_write(&blkhist, bs1, 0, 0,
 			((blk_hdr_ptr_t)blkhist.buffaddr)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
 		/* Pass the desired tn as argument to bg_update/mm_update below */
 		BUILD_AIMG_IF_JNL_ENABLED_AND_T_END_WITH_EFFECTIVE_TN(csa, csd, tn, &dummy_hist);

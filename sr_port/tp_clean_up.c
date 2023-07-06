@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,7 +74,7 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 	int		level;
 	int4		depth;
 	uint4		tmp_update_array_size;
-	off_chain	chain1;
+	block_ref	chain1;
 	ua_list		*next_ua, *tmp_ua;
 	srch_blk_status	*t1;
 	boolean_t       is_mm;
@@ -167,8 +167,8 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 			{
 				assert(gvnh->read_local_tn == local_tn);
 				gvnh->clue.end = 0;
-				chain1 = *(off_chain *)&gvnh->root;
-				if (chain1.flag)
+				chain1.id = gvnh->root;
+				if (chain1.chain.flag)
 				{
 					DEBUG_ONLY(csa = gvnh->gd_csa;)
 					assert(csa->dir_tree != gvnh);
@@ -189,8 +189,8 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 				for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
 				{
 					assert((gvnh->read_local_tn != local_tn) || (0 == gvnh->clue.end));
-					chain1 = *(off_chain *)&gvnh->root;
-					assert(!chain1.flag);	/* Also assert that all gvts in this process have valid root blk */
+					chain1.id = gvnh->root;
+					assert(!chain1.chain.flag);	/* All gvts in this process must have valid root blk */
 				}
 			}
 #			endif
@@ -241,14 +241,14 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 						{
 							for (level = 0; level < ARRAYSIZE(blk_target->last_split_blk_num); level++)
 							{
-								chain1 = *(off_chain *)&blk_target->last_split_blk_num[level];
-								if (chain1.flag)
+								chain1.id = blk_target->last_split_blk_num[level];
+								if (chain1.chain.flag)
 								{
-									if (chain1.cw_index < si->cw_set_depth)
+									if (chain1.chain.cw_index < si->cw_set_depth)
 									{
 										assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 										tp_get_cw(si->first_cw_set,
-												(int)chain1.cw_index, &cse1);
+												(int)chain1.chain.cw_index, &cse1);
 										assert(NULL != cse1);
 										histblk = cse1->blk;
 									} else
@@ -263,12 +263,12 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 						}
 						if (0 == blk_target->clue.end)
 						{
-							chain1 = *(off_chain *)&blk_target->root;
-							if (chain1.flag)
+							chain1.id = blk_target->root;
+							if (chain1.chain.flag)
 							{
 								assert(blk_target != cs_addrs->dir_tree);
 								assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
-								tp_get_cw(si->first_cw_set, (int)chain1.cw_index, &cse1);
+								tp_get_cw(si->first_cw_set, (int)chain1.chain.cw_index, &cse1);
 								assert(NULL != cse1);
 								blk_target->root = cse1->blk;
 							}
@@ -283,7 +283,7 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 						histblk = t1->blk_num;
 						if (cseblk == histblk)
 						{
-							assert(!((off_chain *)&histblk)->flag);
+							assert(!((block_ref *)&histblk)->chain.flag);
 							if (!is_mm)
 							{
 								cr = cse->cr;
@@ -309,11 +309,11 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 							t1->cse = NULL;
 						} else
 						{
-							chain1 = *(off_chain *)&histblk;
-							if (chain1.flag)
+							chain1.id = histblk;
+							if (chain1.chain.flag)
 							{
 								assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
-								tp_get_cw(si->first_cw_set, (int)chain1.cw_index, &cse1);
+								tp_get_cw(si->first_cw_set, (int)chain1.chain.cw_index, &cse1);
 								if (cse == cse1)
 								{
 									if (blk_target->root == histblk)
@@ -387,8 +387,8 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 			 */
 			for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
 			{
-				chain1 = *(off_chain *)&gvnh->root;
-				assert(!chain1.flag);
+				chain1.id = gvnh->root;
+				assert(!chain1.chain.flag);
 				/* If there was a gvnh->write_local_tn, we could assert that if ever that field was updated
 				 * in this transaction, then gvnh->root better be non-zero. Otherwise gvnh could have been
 				 * used only for reads in this TP and in that case it is ok for the root to be 0.

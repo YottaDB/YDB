@@ -77,16 +77,16 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 	char			temp_addr[SA_MAXLEN + 1], addr[SA_MAXLEN + 1];
 	char 			*from, *to, *errptr, *temp_ch;
 	char			ipname[SA_MAXLEN];
-	int			match, sock, sendbufsize, ii, on = 1, temp_1 = -2;
+	int			match, sock = FD_INVALID, sendbufsize, ii, on = 1, temp_1 = -2;
 	GTM_SOCKLEN_TYPE	size;
-	int4                    rv, msec_timeout;
+	int4			rv, msec_timeout;
 	struct addrinfo		*ai_ptr = NULL, *remote_ai_ptr = NULL, *remote_ai_head, hints;
 	char			port_buffer[NI_MAXSERV], *brack_pos;
 
 	int			host_len, addr_len, port_len;
-	char                    msg_buffer[1024];
-	mstr                    msg_string;
-	ABS_TIME                cur_time, end_time;
+	char			msg_buffer[1024];
+	mstr			msg_string;
+	ABS_TIME		cur_time, end_time;
 	struct sockaddr_storage peer;
 	short 			retry_num;
 	int 			save_errno, errlen;
@@ -155,7 +155,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			{
 				save_errno = errno;
 				errptr = (char *)STRERROR(save_errno);
-        	 		errlen = STRLEN(errptr);
+				errlen = STRLEN(errptr);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, save_errno, errlen, errptr);
 				assert(FALSE);
 				return -1;
@@ -178,8 +178,8 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			save_errno = errno;
 			(void)close(lsock);
 			errptr = (char *)STRERROR(save_errno);
-         		errlen = STRLEN(errptr);
-                	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+			errlen = STRLEN(errptr);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 					LEN_AND_LIT("SO_REUSEADDR"), save_errno, errlen, errptr);
 			assert(FALSE);
 			return -1;
@@ -211,6 +211,10 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
 			utimeout.tv_sec = timeout;
 			utimeout.tv_usec = 0;
+		} else
+		{
+			utimeout.tv_sec = 0;
+			utimeout.tv_usec = 0;
 		}
 		while (TRUE)
 		{
@@ -219,7 +223,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 				/* The check for EINTR below is valid and should not be converted to an EINTR wrapper macro
 				 * since it might be a timeout.
 				 */
-                                save_utimeout = utimeout;
+				save_utimeout = utimeout;
 				poll_fdlist[0].fd = lsock;
 				poll_fdlist[0].events = POLLIN;
 				poll_nfds = 1;
@@ -230,7 +234,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 						DIVIDE_ROUND_UP(utimeout.tv_usec, MICROSECS_IN_MSEC));
 				rv = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 				save_errno = errno;
-                                utimeout = save_utimeout;
+				utimeout = save_utimeout;
 				if ((0 <= rv) || (EINTR != save_errno))
 					break;
 				if (NO_M_TIMEOUT != timeout)
@@ -286,7 +290,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			break;
 			/* previously there is following check here
 			 * if ((0 == temp_sin_addr) || (0 == memcmp(&addr[0], &temp_addr[0], strlen(addr))))
-                         * However, temp_sin_addr is always 0 on server side, and addr(local address) shoud not equal to
+			 * However, temp_sin_addr is always 0 on server side, and addr(local address) shoud not equal to
 			 * temp_addr(remote address), so the entire check should be removed
 			 */
 		}

@@ -20,10 +20,12 @@
 int expr(oprtype *a, int m_type)
 {
 	int		rval;
+	boolean_t	start_shift;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	INCREMENT_EXPR_DEPTH;
+	start_shift = TREF(shift_side_effects);
 	CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq.h except with DEBUG_TRIPLES */
 	if (EXPR_FAIL == (rval = eval_expr(a)))		/* NOTE assignment */
 	{
@@ -44,6 +46,7 @@ int expr(oprtype *a, int m_type)
 					newtriple(OC_GVRECTARG)->operand[0] = put_tref(TREF(expr_start));
 		}
 	}
+	TREF(shift_side_effects) = start_shift;
 	DECREMENT_EXPR_DEPTH;
 	return rval;
 }

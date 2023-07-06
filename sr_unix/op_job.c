@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,6 +30,7 @@
 #include "deferred_events_queue.h"
 #include "op.h"
 #include "io.h"
+#include "iott_setterm.h"
 #include "mvalconv.h"
 
 #include "gdsroot.h"
@@ -46,7 +47,6 @@
 #include "send_msg.h"
 #include "gtmmsg.h"		/* for gtm_putmsg() prototype */
 #include "change_reg.h"
-#include "setterm.h"
 #include "getzposition.h"
 #include "iosocketdef.h"
 #include "min_max.h"
@@ -235,7 +235,8 @@ int	op_job(int4 argcnt, ...)
 						errno);
 			}
 		}
-	}
+	} else
+		exit_stat = 0;
 	assert(SIZEOF(pid_t) == SIZEOF(zjob_pid));
 	DOREADRC(pipe_fds[0], &zjob_pid, SIZEOF(zjob_pid), pipe_status);
 	/* empty pipe (pipe_status == -1) is ignored and not reported as error */

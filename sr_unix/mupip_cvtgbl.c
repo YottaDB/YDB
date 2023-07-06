@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -224,7 +224,7 @@ void mupip_cvtgbl(void)
 int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *line3_len, uint4 *max_rec_size, int *utf8_extract,
 		int *dos)
 {
-	char	*c, *c1, *ctop, *line1, *line2, *line3, *ptr;
+	char	*c, *c1, *ctop, *line1, *line2 = NULL, *line3, *ptr;
 	int	len, line2_len, ret;
 	mval	v;
 	uint4	max_io_size;
@@ -264,6 +264,7 @@ int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *lin
 			line2 = line1 + *line1_len;
 		} else if (line2_len)
 		{	/* If line1 length is actually < 12 chars, the buffer has characters from line2 as well */
+			assert(line2);
 			for (c = line2, ctop = c + line2_len; c < ctop; c++)
 			{	/* look for a line 2 terminator */
 				if ('\n' == *c)
@@ -284,6 +285,7 @@ int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *lin
 		util_out_print("!AD", TRUE, *line1_len, line1);
 		if ((0 == line2_len) || (c == ctop))
 		{	/* need to get at least some more of 2nd line */
+			assert(line2);
 			ptr = line2 + line2_len;
 			if (0 < (len = go_get(&ptr, 0, max_io_size)))		/* WARNING assignment */
 				line2_len += len;
@@ -297,6 +299,7 @@ int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *lin
 		}
 		if (0 < line2_len)
 		{	/* we have 2 label lines to work with */
+			assert(line2);
 			line2_len -= *dos;
 			c1 = line2 + line2_len;
 			*c1 = 0;	/* null terminate the line to keep regex in bounds */

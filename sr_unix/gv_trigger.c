@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,7 +79,7 @@ GBLREF	uint4			t_err;
 GBLREF	int			tprestart_state;
 GBLREF	unsigned int		t_tries;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
-GBLREF	pid_t			process_id;
+GBLREF	uint4			process_id;
 GBLREF	trans_num		local_tn;
 #ifdef DEBUG
 GBLREF	uint4			dollar_trestart;
@@ -421,7 +421,7 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 	char		keybuff[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
 	gv_key		*out_key;
 	uint4		len, len1, min, nelems;
-	gvt_trigger_t	*gvt_trigger;
+	gvt_trigger_t	*gvt_trigger = NULL;
 	char		*dststart, *dstptr, *srcptr, ch;
 	boolean_t	ret;
 	int		cmpres;
@@ -493,6 +493,7 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 	{
 		case GVTR_PARSE_POINT:
 			assert(&subsdsc->gvtr_subs_type == &subsdsc->gvtr_subs_point.gvtr_subs_type);
+			assert(gvt_trigger);
 			len = out_key->end;	/* keep trailing 0 */
 			subsdsc->gvtr_subs_point.len = len;
 			dststart = (char *)get_new_element(gvt_trigger->gv_trig_list, DIVIDE_ROUND_UP(len, GVTR_LIST_ELE_SIZE));
@@ -505,6 +506,7 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 			assert(&subsdsc->gvtr_subs_type == &subsdsc->gvtr_subs_range.gvtr_subs_type);
 			if (len)
 			{
+				assert(gvt_trigger);
 				len = out_key->end;	/* keep trailing 0 */
 				assert(len);
 				dststart = (char *)get_new_element(gvt_trigger->gv_trig_list,
@@ -523,6 +525,7 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 			{
 				len = out_key->end;	/* keep trailing 0 */
 				assert(len);
+				assert(gvt_trigger);
 				dststart = (char *)get_new_element(gvt_trigger->gv_trig_list,
 									DIVIDE_ROUND_UP(len, GVTR_LIST_ELE_SIZE));
 				memcpy(dststart, out_key->base, len);
@@ -633,13 +636,13 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	gvt_trigger_t		*gvt_trigger;
 	uint4			trigidx, num_gv_triggers, num_pieces, len, cmdtype, index, minpiece, maxpiece;
 	gv_trigger_t		*gv_trig_array, *trigdsc, *trigtop;
-	uint4			currkey_end, cycle, numsubs, cursub, numlvsubs, curlvsub;
+	uint4			currkey_end, cycle, numsubs, cursub, numlvsubs, curlvsub = -1;
 	char			ch, *ptr, *ptr_top, *ptr_start;
 	boolean_t		quote_imbalance, colon_imbalance, end_of_subscript;
 	uint4			paren_imbalance;
 	gvtr_subs_t		*subsdsc;
-	mname_entry		*lvnamedsc;
-	uint4			*lvindexdsc, status;
+	mname_entry		*lvnamedsc = NULL;
+	uint4			*lvindexdsc = NULL, status;
 	int			ctype;
 	char			save_rtn_name[MAX_TRIGNAME_LEN], save_var_name[MAX_MIDENT_LEN];
 	uint4			save_rtn_name_len, save_var_name_len;
@@ -656,11 +659,11 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	/* Save gv_currkey and gv_altkey */
 	assert(NULL != gv_currkey);
 	assert((SIZEOF(gv_key) + gv_currkey->end + 1) <= SIZEOF(save_currkey));
-	save_gv_currkey = (gv_key *)&save_currkey.key;
+	save_gv_currkey = &save_currkey.key;
 	MEMCPY_KEY(save_gv_currkey, gv_currkey);
 	assert(NULL != gv_altkey);
 	assert((SIZEOF(gv_key) + gv_altkey->end + 1) <= SIZEOF(save_altkey));
-	save_gv_altkey = (gv_key *)&save_altkey.key;
+	save_gv_altkey = &save_altkey.key;
 	MEMCPY_KEY(save_gv_altkey, gv_altkey);
 	save_gv_last_subsc_null = TREF(gv_last_subsc_null);
 	save_gv_some_subsc_null = TREF(gv_some_subsc_null);
@@ -959,17 +962,19 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 					end_of_subscript = TRUE;
 				else if ('=' == ch)
 				{	/* a local variable name has been specified for a subscript */
+					assert(0 <= curlvsub);
 					assert(curlvsub < numlvsubs);
+					assert(lvindexdsc);
 					*lvindexdsc++ = cursub;
 					len = UINTCAST(ptr - ptr_start);
 					assert(len);
 #					ifdef DEBUG
 					/* Check validity of lvname */
-					ctype = ctypetab[ptr_start[0]];
+					ctype = ctypetab[(unsigned char)ptr_start[0]];
 					assert((TK_PERCENT == ctype) || (TK_LOWER == ctype) || (TK_UPPER == ctype));
 					for (index = 1; index < len; index++)
 					{
-						ctype = ctypetab[ptr_start[index]];
+						ctype = ctypetab[(unsigned char)ptr_start[index]];
 						assert((TK_LOWER == ctype) || (TK_UPPER == ctype) || (TK_DIGIT == ctype));
 					}
 #					endif
@@ -1474,7 +1479,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	gv_key_buf		save_currkey;
 	gv_trigger_t		*trigdsc, *trigstop, *trigstart;
 	int			gtm_trig_status, tfxb_status, num_triggers_invoked, trigmax, trig_list_offset;
-	mstr			*ztupd_mstr;
+	mstr			*ztupd_mstr = NULL;
 	mval			*keysub_mval;
 	mval			*lvvalarray[MAX_GVSUBSCRIPTS + 1];
 	mval			*ztupd_mval, dummy_mval;
@@ -1531,7 +1536,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	 * gets opened) inside any of the "gtm_trigger" invocations. So we should maintain pointers only
 	 * to the local copy (not the global gv_currkey) for use inside all iterations of the for loop.
 	 */
-	save_gv_currkey = (gv_key *)&save_currkey.key;
+	save_gv_currkey = &save_currkey.key;
 	assert(((char *)save_gv_currkey + SIZEOF(gv_key) + gv_currkey->end + 1) < (char *)(&save_currkey + 1));
 	MEMCPY_KEY(save_gv_currkey, gv_currkey);
 	key_ptr = (char *)save_gv_currkey->base;
@@ -1630,6 +1635,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 			if (is_set_trigger)
 			{
 				assert(0 == ztupd_mval->mvtype);
+				assert(ztupd_mstr);
 				if (trigdsc->delimiter.str.len)
 				{
 					trigparms->ztdelim_new = (mval *)&trigdsc->delimiter;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2021 Fidelity National Information	*
+ * Copyright (c) 2002-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,7 +54,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
      make a copy of op_gvargs if necessary */
 
 	boolean_t	concat, dot_seen, dollarzch, isdolar, naked;
-	char		*c_ref, *c_top, ch, *dstptr, *p1, *p2, *strnext, *subsc_ptr;
+	char		*c_ref, *c_top, ch, *dstptr, *p1 = NULL, *p2, *strnext, *subsc_ptr;
 	int 		chcode, chtmp, count;
 	mstr_len_t	chlen;
 	mval		*spt;

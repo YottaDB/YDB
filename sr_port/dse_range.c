@@ -47,7 +47,8 @@ error_def(ERR_DSEINVALBLKID);
 void dse_range(void)
 {
 	block_id	from, to, blk, blk_child;
-	boolean_t	busy_matters, free, got_lonely_star, index, lost, low, star, up, was_crit, was_hold_onto_crit, long_blk_id;
+	boolean_t	busy_matters, free, got_lonely_star, index, lost, low, star, up, was_crit, was_hold_onto_crit = FALSE,
+			long_blk_id;
 	cache_rec_ptr_t	dummy_cr;
 	char		level, lower[MAX_KEY_SZ + 1], targ_key[MAX_KEY_SZ + 1], upper[MAX_KEY_SZ + 1];
 	int		cnt, dummy, lower_len, upper_len;

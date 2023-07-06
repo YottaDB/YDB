@@ -71,6 +71,7 @@ GBLREF gv_namehead		*gv_target;
 GBLREF gv_namehead		*reset_gv_target;
 GBLREF jnl_fence_control	 jnl_fence_ctl;
 GBLREF jnlpool_addrs_ptr_t	jnlpool;
+GBLREF jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF bool			undef_inhibit;
 GBLREF int4			break_message_mask;
 GBLREF command_qualifier	 cmd_qlf;
@@ -106,6 +107,7 @@ LITREF	mval		literal_one;
 #define		WRN_BOOL_RES		"Standard Boolean with side-effect warning"
 #define		EXT_BOOL_RES		"Extended Boolean evaluation without short-circuiting"
 #define		NO_REPLINST		"No replication instance defined"
+#define		NO_REPLMATCH		"*"
 #define		STATS_MAX_DIGITS	MAX_DIGITS_IN_INT8
 #define		STATS_KEYWD_SIZE	(3 + 1 + 1)	/* 3 character mnemonic, colon and comma */
 #define		DEVICE_MAX_STATUS	(9 + 1 + 7)	/* TERMINAL<sp> : CLOSED<sp> */
@@ -121,32 +123,33 @@ LITREF	mval		literal_one;
 }
 
 void	op_fnview(int numarg, mval *dst, ...)
-{	boolean_t	save_transform, n_int8 = FALSE;
-	char		instfilename[MAX_FN_LEN + 1 + 1];	/* 1 for possible flag character */
-	collseq		*csp;
-	gd_binding	*map, *start_map, *end_map;
-	gd_gblname	*gname;
-	gd_region	*reg, *reg_start, *reg_top, *statsDBreg;
-	gv_key		*gvkey;
-	gv_key_buf	save_currkey;
-	gv_namehead	temp_gv_target;
-	gvnh_reg_t	*gvnh_reg;
-	gvnh_spanreg_t	*gvspan;
-	int		apdtype, n, tl, newlevel, res, reg_index, collver, nct, act, ver;
-	block_id	n2 = 0;
-	lv_val		*lv;
-	mstr		tmpstr, commastr, *gblnamestr;
-	mval		*arg1, *arg2, tmpmval;
-	mval		*keyword;
-	sgmnt_addrs	*csa;
-	tp_frame	*tf;
-	trans_num	gd_targ_tn, *tn_array;
-	unsigned char	*c, *c_top, *key;
-	unsigned char	buff[MAX_ZWR_KEY_SZ];
-	unsigned char	device_status[DEVICE_MAX_STATUS];
-	va_list		var;
-	viewparm	parmblk, parmblk2;
-	viewtab_entry	*vtp;
+{	boolean_t		save_transform, n_int8 = FALSE, found = FALSE;
+	char			instfilename[MAX_FN_LEN + 1 + 1];	/* 1 for possible flag character */
+	collseq			*csp;
+	gd_binding		*map, *start_map, *end_map;
+	gd_gblname		*gname;
+	gd_region		*reg, *reg_start, *reg_top, *statsDBreg;
+	gv_key			*gvkey;
+	gv_key_buf		save_currkey;
+	gv_namehead		temp_gv_target;
+	gvnh_reg_t		*gvnh_reg;
+	gvnh_spanreg_t		*gvspan;
+	jnlpool_addrs_ptr_t	jnlpool_local;
+	int			apdtype, n = 0x1bad2bad, tl, newlevel, res, reg_index, collver, nct, act, ver;
+	block_id		n2 = 0;
+	lv_val			*lv;
+	mstr			tmpstr, commastr, *gblnamestr;
+	mval			*arg1, *arg2, tmpmval;
+	mval			*keyword;
+	sgmnt_addrs		*csa;
+	tp_frame		*tf;
+	trans_num		gd_targ_tn, *tn_array;
+	unsigned char		*c, *c_top, *key;
+	unsigned char		buff[MAX_ZWR_KEY_SZ];
+	unsigned char		device_status[DEVICE_MAX_STATUS];
+	va_list			var;
+	viewparm		parmblk, parmblk2;
+	viewtab_entry		*vtp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -353,7 +356,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_JNLPOOL:
 			tmpstr.addr = NO_REPLINST;
 			tmpstr.len = SIZEOF(NO_REPLINST)-1;
-			if (!jnlpool)
+			if (!jnlpool_head && (NULL == arg1))
 			{
 				if (!gd_header)		/* IF GD_HEADER == 0 THEN OPEN GBLDIR */
 					gvinit();
@@ -365,14 +368,51 @@ void	op_fnview(int numarg, mval *dst, ...)
 				}
 			} else
 			{
-				reg = jnlpool->jnlpool_dummy_reg;
+				if (NULL != arg1)
+				{
+					jnlpool_local = jnlpool_head;
+					if (arg1->str.len)
+					{	/* find jnlpool with fname == arg1->str */
+						for (; jnlpool_local; jnlpool_local = jnlpool_local->next)
+						{
+							if (NULL != jnlpool_local->jnlpool_dummy_reg)
+							{
+								reg = jnlpool_local->jnlpool_dummy_reg;
+								if (reg->dyn.addr && (reg->dyn.addr->fname_len == arg1->str.len) &&
+									!memcmp(reg->dyn.addr->fname, arg1->str.addr,
+											arg1->str.len))
+								{
+									found = TRUE;
+									jnlpool_local = jnlpool_local->next;
+									break;
+								}
+							}
+						}
+					} else
+						jnlpool_local = jnlpool_head;
+				} else
+					jnlpool_local = jnlpool;	/* do not change current jnlpool */
+				if (jnlpool_local)
+					reg = jnlpool_local->jnlpool_dummy_reg;
+				else
+				{	/* no more jnlpools */
+					reg = NULL;
+					if (found)		/* but last so no more */
+						tmpstr.len = 0;
+					else
+					{	/* second arg is unknown file name or no jnlpools at all */
+						tmpstr.addr = NO_REPLMATCH;
+						tmpstr.len = SIZEOF(NO_REPLMATCH)-1;
+					}
+				}
 				if (reg && reg->dyn.addr)
 				{
 					tmpstr.addr = (char *)reg->dyn.addr->fname;
 					tmpstr.len = reg->dyn.addr->fname_len;
 				}
 			}
-			s2pool(&tmpstr);
+			if (tmpstr.len)
+				s2pool(&tmpstr);
 			dst->str = tmpstr;
 			dst->mvtype = vtp->restype;
 			break;
@@ -405,7 +445,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			csa = &FILE_INFO(reg)->s_addrs;
 			n = csa->gbuff_limit;
 			break;
-#ifdef TESTPOLLCRIT
+#ifdef DEBUG
 		case VTK_GRABCRIT:
 		case VTK_RELCRIT:
 		case VTK_GRABLOCK:
@@ -504,7 +544,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 				n = (NULL != gname) ? gname->act : 0;
 			} else
 				n = 0;
-			gvkey = (gv_key *)&save_currkey.key;
+			gvkey = &save_currkey.key;
 			key = gvn2gds(arg1, gvkey, n);
 			assert(key > &gvkey->base[0]);
 			assert(gvkey->end == key - &gvkey->base[0] - 1);
@@ -726,8 +766,8 @@ void	op_fnview(int numarg, mval *dst, ...)
 			COPY_ARG_TO_STRINGPOOL(dst, key, &buff[0]);
 			break;
 		case VTK_YGVN2GDS:
-			n = (NULL != arg2) ? mval2i(arg2) : 0;	/* Negative treated as zero */
-			gvkey = (gv_key *)&save_currkey.key;
+			n = (NULL != arg2) ? mval2i(arg2) : 0;
+			gvkey = &save_currkey.key;
 			key = gvn2gds(arg1, gvkey, n);
 			if (!n)
 				key = &gvkey->base[0];
@@ -846,7 +886,10 @@ void	op_fnview(int numarg, mval *dst, ...)
 		if(n_int8 == TRUE)
 			MV_FORCE_LMVAL(dst, n2);
 		else
+		{
+			assert(0x1bad2bad != n);
 			MV_FORCE_MVAL(dst, n);
+		}
 	} else
 		dst->mvtype = vtp->restype;
 }

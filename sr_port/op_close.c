@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,7 @@ void op_close(mval *v, mval *p)
 	io_log_name	*l;
 	io_log_name	*prev;
 	io_log_name	*tl;		/* logical record for translated name */
-	int4		stat;	        /* status */
+	int4		stat;		/* status */
 	mstr		tn;		/* translated name */
 	d_rm_struct 	*rm_ptr;
 
@@ -42,7 +42,7 @@ void op_close(mval *v, mval *p)
 	stat = TRANS_LOG_NAME(&v->str, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long);
 	if (SS_NORMAL == stat)
 	{
-	        if (0 == (tl = get_log_name(&tn, NO_INSERT)))
+		if (0 == (tl = get_log_name(&tn, NO_INSERT)))
 			return;
 		ciod = tl->iod;
 		if ((NULL == ciod) || (TRUE == ciod->perm) || (dev_open != ciod->state))
@@ -60,16 +60,16 @@ void op_close(mval *v, mval *p)
 				assert(FALSE);
 				continue;       /* skip it on pro */
 			}
-		        if (l->iod == ciod && l != tl)
+			if (l->iod == ciod && l != tl)
 			{
-			        prev->next = l->next;
+				prev->next = l->next;
 				free(l);
 				l = prev;
 			}
 		}
 	} else if (SS_NOLOGNAM == stat)
 	{
-	        if (0 == (l = get_log_name(&v->str, NO_INSERT)))
+		if (0 == (l = get_log_name(&v->str, NO_INSERT)))
 			return;
 		ciod = l->iod;
 		if ((NULL == ciod) || (TRUE == ciod->perm) || (dev_open != ciod->state))
@@ -81,9 +81,14 @@ void op_close(mval *v, mval *p)
 		}
 	}
 	else if (SS_LOG2LONG == stat)
+	{
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, SIZEOF(buf) - 1);
-	else
+		GTM_UNREACHABLE();
+	} else
+	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) stat);
+		GTM_UNREACHABLE();
+	}
 
 	active_device = ciod;
 	if (io_curr_device.in == ciod)

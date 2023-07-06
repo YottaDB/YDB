@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,7 +26,7 @@
 
 error_def(ERR_WCFAIL);
 
-GBLREF int4		process_id;
+GBLREF uint4		process_id;
 #ifdef DEBUG
 GBLREF jnl_gbls_t	jgbl;
 #endif

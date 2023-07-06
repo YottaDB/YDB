@@ -83,7 +83,8 @@ enum dse_fmt
 			grab_crit_encr_cycle_sync(GV_CUR_REGION, WS_55);					\
 		WAS_HOLD_ONTO_CRIT = CS_ADDRS->hold_onto_crit;							\
 		CS_ADDRS->hold_onto_crit = TRUE;								\
-	}													\
+	} else													\
+		WAS_HOLD_ONTO_CRIT = TRUE;									\
 }
 
 /* Rel crit for dse* functions taking into account -nocrit if specified */

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
+ * Copyright (c) 2007-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +58,7 @@ void	bml_status_check(cw_set_element *cs)
 				: NULL;
 		} else
 		{
-			bmlbuff = (blk_hdr_ptr_t)mm_read(bmlblk);
+			bmlbuff = (blk_hdr_ptr_t)mm_read(bmlblk, FALSE);
 			/* mm_read would have incremented the GVSTATS n_dsk_read counter. But we dont want that to happen
 			 * because this function is invoked only in debug builds and yet we want the same counter
 			 * value for both pro and dbg builds. So undo that action immediately.

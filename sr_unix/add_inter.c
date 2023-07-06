@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,7 +22,7 @@
 #include "wcs_sleep.h"
 #include "rel_quant.h"
 
-GBLREF	int4		process_id;
+GBLREF	uint4		process_id;
 GBLREF	volatile int4	fast_lock_count;		/* Used in wcs_stale */
 GBLREF	int		num_additional_processors;
 
@@ -47,8 +47,8 @@ int4	add_inter(int val, sm_int_ptr_t addr, sm_global_latch_ptr_t latch)
 	++fast_lock_count;
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
 	cntrval_p = addr;	/* Need volatile context especially on Itanium */
-        for (retries = LOCK_TRIES - 1; 0 < retries; retries--)  /* - 1 so do rel_quant 3 times first */
-        {	/* seems like a legitinate spin which could take advantage of transactional memory */
+	for (retries = LOCK_TRIES - 1; 0 < retries; retries--)  /* - 1 so do rel_quant 3 times first */
+	{	/* seems like a legitinate spin which could take advantage of transactional memory */
 		for (spins = maxspins; 0 < spins; spins--)
 		{
 			cntrval = *cntrval_p;

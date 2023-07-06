@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -155,6 +155,7 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	rhdtyp			*old_rhead;
 	rtn_tabent		*tabent_ptr;
 	int			sect_ro_rel_size, sect_rw_rel_size, name_buf_len, alloc_len, order, zerofd;
+	bool			order_valid;
 	uint4			lcl_compiler_qlf;
 	boolean_t		dynlits;
 	ssize_t	 		status, sect_rw_nonrel_size, sect_ro_rel_offset;
@@ -784,14 +785,18 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		lbt_ent = lbt_bot;
 		olbt_bot = old_rhead->labtab_adr;
 		olbt_top = olbt_bot + old_rhead->labtab_len;
+		order = 0;
+		order_valid = FALSE;
 		for (olbt_ent = olbt_bot;  olbt_ent < olbt_top;  olbt_ent++)
 		{	/* Match new label entries with old label entries */
 			for (; lbt_ent < lbt_top; lbt_ent++)
 			{
 				MIDENT_CMP(&olbt_ent->lab_name, &lbt_ent->lab_name, order);
+				order_valid = TRUE;
 				if (0 >= order)
 					break;
 			}
+			assert((lbt_ent >= lbt_top) || order_valid);
 			if ((lbt_ent < lbt_top) && !order)
 			{	/* Have a label name match. Update line pointer for this entry */
 				olbt_ent->lnr_adr = lbt_ent->lnr_adr;

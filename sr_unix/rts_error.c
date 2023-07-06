@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -139,7 +139,7 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 		if (IS_GTMSECSHR_IMAGE)
 			util_out_print(NULL, RESET);
 		SET_ERROR_CONDITION(msgid);	/* sets "error_condition" & "severity" */
-		if (!run_time && (CGP_PARSE == cg_phase) && !DUMP)
+		if ((!run_time || TREF(xecute_literal_parse)) && (CGP_PARSE == cg_phase) && !DUMP)
 		{
 			(*stx_error_va_fptr)(msgid, var_dup);
 			TREF(director_token) = TK_ERROR;
@@ -160,3 +160,5 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 	 */
 	return FALSE;
 }
+
+void assertfail(size_t testlen, char *teststr, int flen, char *fstr, int line) __attribute__ ((noreturn));

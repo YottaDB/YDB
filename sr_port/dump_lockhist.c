@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,7 @@
 #include "have_crit.h"
 
 GBLREF gd_region	*gv_cur_region;
-GBLREF int		process_id;
+GBLREF uint4		process_id;
 
 /* Routine to dump the lock history array on demand starting with most recent and working backwards */
 

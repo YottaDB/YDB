@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,7 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	inctn_opcode_t	  	inctn_opcode;
 GBLREF	int			muint_adj;
 GBLREF	int4			mu_int_adj[];
-GBLREF	int4			process_id;
+GBLREF	uint4			process_id;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	unsigned int		t_tries;
@@ -230,7 +230,9 @@ STATICFNDCL void accum_stats_ar(stat_t *stat, double *r, double *a)
 	for (j = MAX_BT_DEPTH; (0 <= j) && (r[j] < EPS); j--)
 		accept[j] = 0;
 	depth = j;
-	assert(0 <= depth);				/* r[0] should remain zero since we don't maintain it */
+	assertpro(0 <= depth);				/* r[0] should remain zero since we don't maintain it */
+	if (0 > depth)					/* Placate compiler warning on old gcc */
+		return;
 	accept[depth] = 1;				/* always accept the root */
 	for (; 2 <= j; j--)
 		accept[j - 1] = accept[j] * ((j == depth) ? 1 : (r[j] / stat->f_max[j]));

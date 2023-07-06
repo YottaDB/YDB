@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,7 @@ void comp_init(mstr *src, oprtype *dst)
 
 	SETUP_THREADGBL_ACCESS;
 	if ((MAX_SRCLINE < (unsigned)src->len) && ((TREF(source_buffer)).addr == (char *)&aligned_source_buffer))
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);	/* no error if it's ojchildparms */
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);	/* no error for ojchildparms / other long */
 	memcpy((TREF(source_buffer)).addr,src->addr,src->len);
 	(TREF(source_buffer)).len = src->len + 1;
 	*((TREF(source_buffer)).addr + src->len) = *((TREF(source_buffer)).addr + src->len + 1) = '\0';

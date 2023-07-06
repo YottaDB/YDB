@@ -145,7 +145,7 @@ void bx_boollit(triple *t)
 		case OC_NLT:
 		case OC_LT:
 			for (j = 0;  j < ARRAYSIZE(v); j++)
-			{	/* operators that come here need numeric coercion */
+			{	/* operands that come here need numeric coercion */
 				assert((OCT_ARITH | OCT_BOOL) & oc_tab[opercode].octype);
 				MV_FORCE_NUMD(v[j]);
 				if (!(MV_NM & v[j]->mvtype))

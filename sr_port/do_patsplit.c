@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -338,6 +338,8 @@ int do_patsplit(mval *str, mval *pat)
 			assert((rightptr < strtop) || (fixedptr == maxfixedptr) && (fixednext > maxfixedptr));
 			if (rightptr < strtop)
 				rightnext = UTF8_MBNEXT(rightptr, strtop);
+			else
+				rightnext = rightptr;
 		}
 		)
 		if (!do_patfixed(&fixed_str, &fixed_pat))

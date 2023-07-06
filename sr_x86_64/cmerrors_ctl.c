@@ -30,6 +30,7 @@ LITDEF	int CMERR_CMSYSSRV = 150569010;
 
 
 LITDEF	int cmerrors_undocarr[] = {
+	0	/* Placeholder to prevent empty array */
 };
 
 

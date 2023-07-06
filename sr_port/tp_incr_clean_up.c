@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -223,8 +223,8 @@ void restore_next_off(cw_set_element *cse)
 {
 	sm_uc_ptr_t 	ptr;
 	int		cur_blk_size, iter;
-	off_chain	chain;
-	v6_off_chain	v6_chain;
+	block_ref	chain;
+	v6_block_ref	v6_chain;
 	boolean_t	long_blk_id;
 
 	assert(cse->done);
@@ -248,14 +248,14 @@ void restore_next_off(cw_set_element *cse)
 			ptr = cse->new_buff + cse->undo_offset[iter];
 			if (long_blk_id)
 			{
-				GET_BLK_ID_64P(&chain, ptr);
-				chain.next_off = cse->undo_next_off[iter];
-				GET_BLK_ID_64P(ptr, &chain);
+				GET_BLK_ID_64(chain.id, ptr);
+				chain.chain.next_off = cse->undo_next_off[iter];
+				PUT_BLK_ID_64(ptr, chain.id);
 			} else
 			{
-				GET_BLK_ID_32P(&v6_chain, ptr);
-				v6_chain.next_off = cse->undo_next_off[iter];
-				GET_BLK_ID_32P(ptr, &v6_chain);
+				GET_BLK_ID_32(v6_chain.id, ptr);
+				v6_chain.chain.next_off = cse->undo_next_off[iter];
+				PUT_BLK_ID_32(ptr, v6_chain.id);
 			}
 			cse->undo_offset[iter] = cse->undo_next_off[iter] = 0;
 		} else

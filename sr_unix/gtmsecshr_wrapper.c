@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2018 Fidelity National Information	*
+ * Copyright (c) 2008-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,6 +59,8 @@
 #define ASCIICTLMIN	0   /* NULL character */
 #define GTM_TMP		"gtm_tmp"
 #define GTM_DIST	"gtm_dist"
+#define GTM_WHITE_BOX_TEST_CASE_ENABLE	"gtm_white_box_test_case_enable"
+#define GTM_WHITE_BOX_TEST_CASE_NUMBER	"gtm_white_box_test_case_number"
 #define	SUB_PATH_TO_GTMSECSHRDIR "/gtmsecshrdir"
 #define	REL_PATH_TO_CURDIR "."
 #define	REL_PATH_TO_GTMSECSHR "./gtmsecshr"
@@ -73,8 +75,6 @@
 #define GTM_TZ				"TZ"
 #define TZLOCATOR			"TZ="
 #define NEWLINE				0x0a
-#define GTM_WHITE_BOX_TEST_CASE_ENABLE	"gtm_white_box_test_case_enable"
-#define GTM_WHITE_BOX_TEST_CASE_NUMBER	"gtm_white_box_test_case_number"
 #define GTMETCDIRPATH			"/etc"
 #define BADGTMETCDIRPATH		"/bogusdirnotetc"
 #define GTMENVIRONFILE			"environment"
@@ -178,6 +178,9 @@ int main()
 	char 		gtm_secshr_path_display[MAX_ENV_VAR_VAL_LEN];
 	char 		gtm_secshr_orig_path[MAX_ENV_VAR_VAL_LEN];
 	boolean_t	gtm_tmp_exists = FALSE;
+	boolean_t	gtm_white_box_test_case_pass_envvars = FALSE;
+	char 		gtm_white_box_test_case_enable_val[MAX_ENV_VAR_VAL_LEN];
+	char 		gtm_white_box_test_case_number_val[MAX_ENV_VAR_VAL_LEN];
 	int		rc;
 	sigset_t	mask;
 #	ifdef _AIX
@@ -342,6 +345,28 @@ int main()
 			strcpy(gtm_tmp_val, env_var_ptr);
 		}
 	}
+#	ifdef DEBUG
+	/* Normally, all non-essential environment variables are cleared before calling the real
+	 * GTMSECSHR executable. For a very specific white box case, WBTEST_FORCE_SEMGETERROR,
+	 * the two environment variables used for the white box case are passed. This is only done
+	 * in debug and they are length checked. If another white box case is ever needed by GTMSECSHR
+	 * it needs to be added here and in gtmsecshr.c.
+	 */
+	if (env_var_ptr = getenv(GTM_WHITE_BOX_TEST_CASE_NUMBER))	/* Warning - assignment */
+	{
+		if (MAX_ALLOWABLE_LEN >= strlen(env_var_ptr))
+		{
+			strcpy(gtm_white_box_test_case_number_val, env_var_ptr);
+			if (WBTEST_FORCE_SEMGETERROR == atoi(gtm_white_box_test_case_number_val))
+				if (env_var_ptr = getenv(GTM_WHITE_BOX_TEST_CASE_ENABLE))	/* Warning - assignment */
+					if (MAX_ALLOWABLE_LEN >= strlen(env_var_ptr))
+					{
+						gtm_white_box_test_case_pass_envvars = TRUE;
+						strcpy(gtm_white_box_test_case_enable_val, env_var_ptr);
+					}
+		}
+	}
+#	endif
 	if (!ret)
 	{	/* clear all */
 #		if defined(SUNOS) || defined(__CYGWIN__)
@@ -371,6 +396,14 @@ int main()
 				ret = -1;
 			}
 		}
+#		ifdef DEBUG
+		/* This is only for debugging with a white box case so no need to check the status */
+		if (gtm_white_box_test_case_pass_envvars)
+		{
+			setenv(GTM_WHITE_BOX_TEST_CASE_ENABLE, gtm_white_box_test_case_enable_val, TRUE);
+			setenv(GTM_WHITE_BOX_TEST_CASE_NUMBER, gtm_white_box_test_case_number_val, TRUE);
+		}
+#		endif
 #		ifdef _AIX
 		if (gtm_TZ_found DEBUG_ONLY(|| WBTEST_ENABLED(WBTEST_SECSHRWRAP_SETENVFAIL2)))
 		{

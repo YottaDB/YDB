@@ -62,7 +62,7 @@ typedef struct struct_spanode_integ{
 unsigned char	span_node_buf[MAX_KEY_SZ];	/* Spanning node key */
 }span_node_integ;
 
-boolean_t mu_int_blk(block_id blk, char level, boolean_t is_root, unsigned char *bot_key,
+boolean_t mu_int_blk(block_id blk, unsigned char level, boolean_t is_root, unsigned char *bot_key,
 	int bot_len, unsigned char *top_key, int top_len, boolean_t eb_ok, enum db_ver ondsk_blkver,
 	boolean_t retry_block_from_buffer);
 boolean_t mu_int_fhead(void);

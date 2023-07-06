@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2021 Fidelity National Information	*
+ * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -264,7 +264,7 @@ int mur_merge_sort_extfmt(void)
 {
 	FILE			*fp, *fp_out, **fp_array;
 	boolean_t		extr_file_created, single_reg, skip_sort;
-	boolean_t		is_dummy_gbldir, errored_out;
+	boolean_t		is_dummy_gbldir, errored_out = FALSE;
 	char			*buff, extr_fn[MAX_FN_LEN + 1], *fn, *fn_out;
 	char			rename_fn[MAX_FN_LEN + 1];
 	int			rename_fn_len, fn_len;

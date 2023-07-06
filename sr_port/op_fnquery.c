@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 	lvTree			*lvt;
 	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS], *node, *nullsubsnode, *nullsubsparent, *parent;
 	mname_entry		lvent;
-	mval			*arg1, **argpp, *argp2, **argpp2, *args[MAX_LVSUBSCRIPTS], *lfrsbs, *mv, tmpmv, tmp_sbs,
+	mval			*arg1 = NULL, **argpp, *argp2, **argpp2, *args[MAX_LVSUBSCRIPTS], *lfrsbs, *mv, tmpmv, tmp_sbs,
 				*varname, *v1, *v2;
 	mval			xform_args[MAX_LVSUBSCRIPTS];	/* for lclcol */
 	mstr			format_out;
@@ -228,6 +228,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 				--h1;
 		} else
 		{	/* Need to find right sibling. "lvt" is tree to search in and "arg1" is key to search for. */
+			assert(arg1);
 			node = lvAvlTreeKeyCollatedNext(lvt, arg1);
 			if (NULL != node)
 			{

@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2007-2016 Fidelity National Information	*
+ * Copyright (c) 2007-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -129,7 +129,7 @@ GBLREF emit_base_info_struct	emit_base_info;
 GBLREF int 			call_4lcldo_variant;
 GBLREF int			jmp_offset;	/* Offset to jump target */
 GBLREF char			cg_phase;	/* Code generation phase */
-GBLREF char 			code_buf[];
+GBLREF unsigned char		code_buf[];
 GBLREF int			code_idx;
 GBLREF unsigned char		*obpt;	 	/* Output buffer index */
 GBLREF unsigned char		outbuf[];

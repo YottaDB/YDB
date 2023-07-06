@@ -55,21 +55,6 @@ void bx_tail(triple *t, boolean_t sense, oprtype *addr)
 	assert((TRIP_REF == t->operand[1].oprclass) || (NO_REF == t->operand[1].oprclass));
 	if (OCT_NEGATED & oc_tab[c = t->opcode].octype)
 		sense = !sense;
-	if (EXT_BOOL == TREF(gtm_fullbool))
-	{
-		switch (c)
-		{
-		case OC_AND:
-		case OC_NAND:
-		case OC_OR:
-		case OC_NOR:
-			CONVERT_TO_SE(t);
-			c = t->opcode;
-			break;
-		default:
-			break;
-		}
-	}
 	switch (c)
 	{
 	case OC_COBOOL:
@@ -131,6 +116,7 @@ void bx_tail(triple *t, boolean_t sense, oprtype *addr)
 		break;
 	case OC_NAND:
 	case OC_AND:
+		assert(EXT_BOOL != TREF(gtm_fullbool));
 		bx_boolop(t, FALSE, sense, sense, addr);
 		RETURN_IF_RTS_ERROR;
 		break;
@@ -141,6 +127,7 @@ void bx_tail(triple *t, boolean_t sense, oprtype *addr)
 		break;
 	case OC_NOR:
 	case OC_OR:
+		assert(EXT_BOOL != TREF(gtm_fullbool));
 		bx_boolop(t, TRUE, !sense, sense, addr);
 		RETURN_IF_RTS_ERROR;
 		break;

@@ -258,6 +258,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			 	 */
 				SNPRINTF(errstr, SIZEOF(errstr), "stat() of file %s failed", linkctl->relinkctl_path);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, errno);
+				rctl_create_attempted = FALSE;
 			} else
 			{	/* If the relinkctl file is missing, then we are not going to create one if either the object
 				 * directory does not exist or we are a MUPIP RUNDOWN -RELINKCTL process.
@@ -864,7 +865,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 	rhdtyp			*rtnhdr;
 	relinkctl_data		*hdr;
 	int			shmid, i, nattached;
-	relinkshm_hdr_t		*shm_hdr;
+	relinkshm_hdr_t		*shm_hdr = NULL ;
 	rtnobjshm_hdr_t		*rtnobj_shm_hdr;
 	stack_frame		*fp;
 	boolean_t		is_mu_rndwn_rlnkctl, remove_shm, remove_rctl;
@@ -962,6 +963,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 						nattached = shm_buf.shm_nattch - 1; /* remove self since we will do a SHMDT soon */
 						if (hdr->nattached != nattached)
 						{
+							assert(shm_hdr);
 							hdr->nattached = nattached;	/* fix hdr->nattached while at this */
 							shm_hdr->rndwn_adjusted_nattch = TRUE;
 						}
@@ -986,6 +988,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 			}
 			if (remove_shm)
 			{
+				assert(shm_hdr);
 #				ifdef DEBUG
 				clean_shutdown = (!shm_hdr->rndwn_adjusted_nattch && !shm_hdr->skip_rundown_check);
 				if (clean_shutdown)

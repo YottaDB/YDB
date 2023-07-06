@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,7 +84,7 @@ GBLREF int		sa_temps[];
 LITREF int		sa_class_sizes[];
 
 GBLDEF CODE_TYPE	code_buf[NUM_BUFFERRED_INSTRUCTIONS];
-GBLDEF int		code_idx;
+GBLDEF unsigned int	code_idx;
 #ifdef DEBUG
 GBLDEF struct inst_count generated_details[MAX_CODE_COUNT], calculated_details[MAX_CODE_COUNT];
 GBLDEF int4 generated_count, calculated_count;
@@ -134,7 +134,7 @@ void trip_gen(triple *ct)
 	oprtype		*saved_opr[MAX_ARGS];
 	uint4		oct;
 	short		tp;		/* template pointer */
-	const short	*tsp;		/* template short pointer */
+	const short	*tsp = NULL;	/* template short pointer */
 	triple		*ttp;		/* temp triple pointer */
 	int		irep_index;
 	oprtype		*irep_opr;
@@ -1040,7 +1040,7 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 	unsigned char	reg, op_mod, op_reg;
 	int		offset, immediate;
 	int		upper_idx, lower_idx;
-	triple		*ct;
+	triple		*ct = NULL;
 	int		low, extra, high;
 	GTM64_ONLY(int	next_ptr_offset = 8;)
 	if (TRIP_REF == opr->oprclass)
@@ -1058,6 +1058,7 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 			switch (opr->oprclass)
 			{
 				case TRIP_REF:
+					assert(ct);
 					assert(0 == ct->destination.oprclass);
 					assert(val_output);
 					switch (ct->opcode)
@@ -1237,6 +1238,7 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 			switch (opr->oprclass)
 			{
 				case TRIP_REF:
+					assert(ct);
 					assert(0 == ct->destination.oprclass);
 					assert(val_output);
 					switch (ct->opcode)
@@ -1440,6 +1442,7 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 			switch (opr->oprclass)
 			{
 				case TRIP_REF:
+					assert(ct);
 					assert(0 == ct->destination.oprclass);
 					assert(val_output);
 					switch (ct->opcode)

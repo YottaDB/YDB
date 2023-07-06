@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,7 +65,7 @@ sm_uc_ptr_t dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr_
 	int4		util_len, head;
 	long		blk_id_size;
 	sm_uc_ptr_t	r_top, key_top, cptr0, cptr1, cptr_top, cptr_base = NULL, cptr_next = NULL;
-	ssize_t		chlen;
+	ssize_t		chlen = -1;
 	uint4		ch;
 	unsigned short	cc, size;
 
@@ -266,12 +266,14 @@ sm_uc_ptr_t dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr_
 						break;
 
 					case 1: /* illegal or non-printable characters */
+						assert(0 <= chlen);
 						util_out_print(dot_str, FALSE);
 						if (--chlen <= 0)
 							fastate = 0;
 						break;
 
 					case 2: /* printable multi-byte characters */
+						assert(0 <= chlen);
 						if (chlen-- > 1) /* fill leading bytes with spaces */
 							util_out_print(space_str, FALSE);
 						else

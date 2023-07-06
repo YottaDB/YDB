@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2017 Fidelity National Information	*
+ * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,9 +20,14 @@
 gtm_status_t accumulate(int argc, gtm_string_t *acc, gtm_string_t *incr)
 {
 	unsigned long long *acc1, *acc2, *incr1;
+
 	acc1 = (unsigned long long *)acc->address;
 	acc2 = (unsigned long long *)(acc->address + (acc->length > incr->length ? incr->length : acc->length));
 	incr1 = (unsigned long long *)incr->address;
+	/* Confirm 8-byte alignment of string buffers */
+	assert(0 == ((UINTPTR_T)acc1 & 0x7));
+	assert(0 == ((UINTPTR_T)acc2 & 0x7));
+	assert(0 == ((UINTPTR_T)incr1 & 0x7));
 	while ( acc1 < acc2 ) *acc1++ += *incr1++ ;
 	return 0;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2020 Fidelity National Information	*
+ * Copyright (c) 2004-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,7 +31,7 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 	int		rval;
 	mstr		*obj, object;
 	oprtype		v, getdst;
-	triple		*s, *src, *oldchain, tmpchain, *triptr;
+	triple		*s = NULL, *src, *oldchain, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -66,7 +66,7 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 			TREF(saw_side_effect) = TREF(shift_side_effects);
 			if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
 			{
-				dqinit(&tmpchain, exorder);
+				exorder_init(&tmpchain);
 				oldchain = setcurtchain(&tmpchain);
 				if (EXPR_FAIL != (rval = indirection(&v)))	/* NOTE assignment */
 				{
@@ -97,6 +97,7 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 			rval = EXPR_FAIL;
 			break;
 		}
+		assert(s);
 		v = put_tref(s);
 		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &v, &getdst, target->str.len))
 			return;

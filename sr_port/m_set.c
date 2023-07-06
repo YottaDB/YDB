@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -129,9 +129,10 @@ int m_set(void)
 	boolean_t	used_glvn_slot;
 	int		delimlen, first_val_lit, index, last_val_lit, nakedzalias, setop;
 	int		first_setleft_invalid;	/* set to TRUE if the first setleft target is invalid */
-	opctype		put_oc;
+	opctype		put_oc = OC_NOOP;
 	oprtype		delimval, firstval, lastval, resptr, *result, v, control_slot, first_control_slot;
-	triple		*curtargchain, *delimiter, discardcurtchain, *first, *get, *jmptrp1, *jmptrp2, *last, *obp, *put;
+	triple		*curtargchain, *delimiter, discardcurtchain, *first = NULL, *get, *jmptrp1, *jmptrp2, *last, *obp,
+			*put = NULL;
 	triple		*s, *s0, *s1, save_targchain, *save_curtchain, *save_curtchain1, *sub, targchain, *tmp;
 	triple		*ref;
 	mint		delimlit;
@@ -147,7 +148,7 @@ int m_set(void)
 	SETUP_THREADGBL_ACCESS;
 	TREF(temp_subs) = FALSE;
 	used_glvn_slot = FALSE;
-	dqinit(&targchain, exorder);
+	exorder_init(&targchain);
 	result = (oprtype *)mcalloc(SIZEOF(oprtype));
 	resptr = put_indr(result);
 	delimiter = sub = last = NULL;
@@ -401,6 +402,7 @@ int m_set(void)
 				/* Parse the remaining arguments until corresponding RIGHT-PAREN/SPACE/EOL is reached */
 				if (!parse_until_rparen_or_space())
 					SYNTAX_ERROR_NOREPORT_HERE;
+				s = NULL;
 			} else
 			{
 				switch (fun_data[index].opcode)
@@ -477,6 +479,7 @@ int m_set(void)
 					if (!gvn())
 						SYNTAX_ERROR_NOREPORT_HERE;
 					assert(OC_GVRECTARG != (TREF(curtchain))->opcode);	/* gvn not shifted */
+					put_oc = OC_NOOP;
 					for (sub = (TREF(curtchain))->exorder.bl; sub != s1 ; sub = sub->exorder.bl)
 					{
 						put_oc = sub->opcode;
@@ -532,7 +535,8 @@ int m_set(void)
 				{
 					assert(ILIT_REF ==firstval.oprval.tref->operand[0].oprclass);
 					first_val_lit = firstval.oprval.tref->operand[0].oprval.ilit;
-				}
+				} else
+					first_val_lit = 0;
 				if (TK_COMMA != TREF(window_token))
 				{	/* There is no "last" value. Only if 1 char literal delimiter and
 					 * no "last" value can we generate shortcut code to op_set[z]p1 entry
@@ -659,14 +663,17 @@ int m_set(void)
 			advancewindow();
 			if (!parse_warn)
 			{
+				assert(s);
 				dqrins(&targchain, exorder, s);
 				dqrins(&targchain, exorder, put);
 				/* Put result operand on the chain. End of chain depends on whether or not
 				 * we are calling the shortcut or the full set-piece code
 				 */
 				if (delim1char)
+				{
+					assert(first);
 					first->operand[1] = resptr;
-				else
+				} else
 					last->operand[1] = resptr;
 				/* Set jump targets if we did tests above. The function "tnxtarg" operates on "curtchain"
 				 * but we want to set targets based on "targchain", so temporarily switch them. Should not
@@ -699,13 +706,13 @@ int m_set(void)
 				 * switch to a temporary chain (both for curtchain and targchain) that will be discarded finally.
 				 */
 				/* save curtchain */
-				dqinit(&discardcurtchain, exorder);
+				exorder_init(&discardcurtchain);
 				save_curtchain = setcurtchain(&discardcurtchain);
 				assert(!curtchain_switched);
 				curtchain_switched = TRUE;
 				/* save targchain */
 				save_targchain = targchain;
-				dqinit(&targchain, exorder);
+				exorder_init(&targchain);
 			}
 		}
 		assert(FIRST_SETLEFT_NOTSEEN != first_setleft_invalid);
@@ -746,6 +753,7 @@ int m_set(void)
 				advancewindow();
 				if (!exfunc(result, TRUE))
 					SYNTAX_ERROR_NOREPORT_HERE;
+				assert(put);
 				if (OC_SETALSIN2ALSCT == put->opcode)
 					/* Change opcode to create an alias container from the returned alias */
 					put->opcode = OC_SETFNRETIN2ALSCT;
@@ -769,6 +777,7 @@ int m_set(void)
 				 * an alias container (and hence a different data type), we need to adjust the
 				 * opcode accordingly.
 				 */
+				assert(put);
 				if (OC_SETALS2ALS == put->opcode)
 					put->opcode = OC_SETALSCTIN2ALS;
 				else

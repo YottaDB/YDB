@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,7 +85,7 @@ void mur_put_aimg_rec(jnl_record *rec)
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
-	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)aimg_blk_ptr)->levl, TRUE, FALSE, GDS_WRITE_PLAIN);
+	t_write(&blkhist, bs1, 0, 0, ((blk_hdr_ptr_t)aimg_blk_ptr)->levl, TRUE, FALSE, GDS_WRITE_PLAIN);
 	if (JNL_ENABLED(cs_data))
 	{
 		cse = (cw_set_element *)(&cw_set[0]);

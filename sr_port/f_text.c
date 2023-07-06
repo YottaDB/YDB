@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@ int f_text(oprtype *a, opctype op)
 {
 	char	*c;
 	int	implicit_offset = 0, len;
-	triple	*label, *r;
+	triple	*label = NULL, *r;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -85,15 +85,17 @@ int f_text(oprtype *a, opctype op)
 	if (TK_PLUS != TREF(window_token))
 	{
 		if ((OC_INDTEXT != r->opcode) || (TK_CIRCUMFLEX == TREF(window_token)))
-			/* Set default offset (0 or 1 as computed above) when offset not specified */
+		{	/* Set default offset (0 or 1 as computed above) when offset not specified */
+			assert(label);
 			label->operand[0] = put_ilit(implicit_offset);
-		else
+		} else
 		{	/* Fill in indirect text for case where indirect specifies entire operand */
 			r->opcode = OC_INDFUN;
 			r->operand[1] = put_ilit((mint)indir_fntext);
 		}
 	} else
 	{	/* Process offset */
+		assert(label);
 		advancewindow();
 		if (EXPR_FAIL == expr(&(label->operand[0]), MUMPS_INT))
 			return FALSE;
@@ -101,7 +103,10 @@ int f_text(oprtype *a, opctype op)
 	if (TK_CIRCUMFLEX != TREF(window_token))
 	{	/* No routine specified - default to current routine */
 		if (OC_INDFUN != r->opcode)
+		{
+			assert(label);
 			label->operand[1] = PUT_CURRENT_RTN; /* tell op_fntext to pick up current routine version */
+		}
 	} else
 	{	/* Routine has been specified - pull it */
 		advancewindow();
@@ -126,6 +131,7 @@ int f_text(oprtype *a, opctype op)
 						if ((STRLEN(suppressed_values[implicit_offset]) == len)
 								&& (0 == memcmp(c, suppressed_values[implicit_offset], len)))
 						{
+							assert(label);
 							label->operand[1] = put_str(suppressed_values[implicit_offset], len);
 							break;
 						}
@@ -140,7 +146,10 @@ int f_text(oprtype *a, opctype op)
 					return FALSE;
 				}
 			} else
+			{
+				assert(label);
 				label->operand[1] = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
+			}
 			advancewindow();
 			break;
 		case TK_ATSIGN:

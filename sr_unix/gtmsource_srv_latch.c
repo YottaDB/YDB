@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,7 +34,7 @@
 #include "have_crit.h"
 #include "util.h"		/* For OUT_BUFF_SIZE */
 
-GBLREF	int4			process_id;
+GBLREF	uint4			process_id;
 GBLREF	int			num_additional_processors;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnl_gbls_t		jgbl;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2021 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,7 +100,7 @@ error_def(ERR_TEXT);
 uint4	cre_jnl_file(jnl_create_info *info)
 {
 	mstr 		filestr;
-	int 		org_fn_len, rename_fn_len, fstat;
+	int 		org_fn_len, rename_fn_len = 0, fstat;
 	char		*org_fn, rename_fn[MAX_FN_LEN + 1];
 	boolean_t	no_rename;
 
@@ -186,7 +186,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	csa = info->csa;
 	if (info->no_rename)
 	{	/* The only cases where no-renaming is possible are as follows
-    		 * (i) MUPIP SET JOURNAL where the new journal file name is different from the current journal file name
+		 * (i) MUPIP SET JOURNAL where the new journal file name is different from the current journal file name
 		 * (ii) For MUPIP BACKUP, MUPIP SET JOURNAL, GT.M Runtime and forw_phase_recovery,
 		 * 	in case the current journal file does not exist (due to some abnormal condition).
 		 *	But in this case we cut the link and hence info->no_prev_link should be TRUE.

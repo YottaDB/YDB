@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,7 +84,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	mval			mv;
 	seq_num 		rec_token_seq, rec_strm_seqno, resync_strm_seqno;
 	jnl_record		*rec;
-	jnl_string		*keystr;
+	jnl_string		*keystr = NULL;
 	multi_struct 		*multi;
 	jnl_ctl_list		*jctl;
 	ht_ent_mname		*tabent;
@@ -93,7 +93,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	pini_list_struct	*plst;
 	int4			gtmcrypt_errno;
 	boolean_t		use_new_key;
-	forw_multi_struct	*forw_multi;
+	forw_multi_struct	*forw_multi = NULL;
 #	if (defined(DEBUG) && defined(UNIX))
 	int4			strm_idx;
 #	endif

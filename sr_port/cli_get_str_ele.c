@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2018 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,7 @@
 
 #include "mdef.h"
 #include "cliif.h"
+#include "gtm_ctype.h"
 
 LITREF unsigned char  lower_to_upper_table[];
 
@@ -21,7 +22,7 @@ boolean_t cli_get_str_ele(char *inbuff, char *dst, unsigned short *dst_len, bool
 	while (*inbuff && ',' != *inbuff)
 	{
 		if (upper_case)
-			*dst++ = lower_to_upper_table[*inbuff++];
+			*dst++ = TOUPPER(*inbuff++);
 		else
 			*dst++ = *inbuff++;
 		(*dst_len)++;

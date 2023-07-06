@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,9 +54,11 @@ int is_srv_alive(int srv_type)
 	{
 		if (srv_alive = is_proc_alive(srv_pid, 0))
 			semval = get_sem_info(RECV, (GTMRECV == srv_type) ? RECV_SERV_COUNT_SEM : UPD_PROC_COUNT_SEM, SEM_INFO_VAL);
-		if (srv_alive && 1 == semval)
+		else
+			semval = 0;
+		if (srv_alive && (1 == semval))
 			status = SRV_ALIVE;
-		else if (!srv_alive || 0 == semval)
+		else if (0 == semval)
 			status = SRV_DEAD;
 		else
 			status = SRV_ERR;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +11,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_ctype.h"
 
 LITREF unsigned char lower_to_upper_table[];
 
@@ -26,7 +28,7 @@ unsigned int asc_hex2i(uchar_ptr_t p, int len)
 			ret = (ret << 4) + (*p - '0');
 		else
 		{
-			ch = lower_to_upper_table[*p];
+			ch = TOUPPER(*p);
 			if (('A' <= ch) && ('F' >= ch))
 				ret = (ret << 4) + ch - 'A' + 10;
 			else
@@ -51,7 +53,7 @@ gtm_uint64_t  asc_hex2l(uchar_ptr_t p, int len)
 			ret = (ret << 4) + (*p - '0');
 		else
 		{
-			ch = lower_to_upper_table[*p];
+			ch = TOUPPER(*p);
 			if (('A' <= ch) && ('F' >= ch))
 				ret = (ret << 4) + ch - 'A' + 10;
 			else

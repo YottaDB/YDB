@@ -38,7 +38,7 @@ int lkglvn(boolean_t gblvn)
 	char		*lknam, lkname_buf[MAX_MIDENT_LEN + 1], x;
 	opctype		ox;
 	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS + 1];
-	triple		*oldchain, *ref, tmpchain, *triptr;
+	triple		*oldchain = NULL, *ref, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -47,10 +47,11 @@ int lkglvn(boolean_t gblvn)
 	lknam = lkname_buf;
 	if (gblvn)
 		*lknam++ = '^';
-	if (shifting = (TREF(shift_side_effects) && (!TREF(saw_side_effect) || (GTM_BOOL == TREF(gtm_fullbool)
-		&& (OLD_SE == TREF(side_effect_handling))))))
+	if (shifting = ((EXT_BOOL != TREF(gtm_fullbool)) && TREF(shift_side_effects)
+		&& (!TREF(saw_side_effect)
+			|| (GTM_BOOL == TREF(gtm_fullbool) && (OLD_SE == TREF(side_effect_handling))))))
 	{	/* NOTE assignment above */
-		dqinit(&tmpchain, exorder);
+		exorder_init(&tmpchain);
 		oldchain = setcurtchain(&tmpchain);
 	}
 	if ((TK_LBRACKET == TREF(window_token)) || (TK_VBAR == TREF(window_token)))
@@ -61,7 +62,10 @@ int lkglvn(boolean_t gblvn)
 		{
 			stx_error(ERR_EXPR);
 			if (shifting)
+			{
+				assert(oldchain);
 				setcurtchain(oldchain);
+			}
 			return FALSE;
 		}
 		if (!vbar)
@@ -76,7 +80,10 @@ int lkglvn(boolean_t gblvn)
 			{
 				stx_error(ERR_EXPR);
 				if (shifting)
+				{
+					assert(oldchain);
 					setcurtchain(oldchain);
+				}
 				return FALSE;
 			}
 			if (!vbar)
@@ -90,7 +97,10 @@ int lkglvn(boolean_t gblvn)
 		{
 			stx_error(ERR_EXTGBLDEL);
 			if (shifting)
+			{
+				assert(oldchain);
 				setcurtchain(oldchain);
+			}
 			return FALSE;
 		}
 		advancewindow();
@@ -115,14 +125,20 @@ int lkglvn(boolean_t gblvn)
 			{
 				stx_error(ERR_MAXNRSUBSCRIPTS);
 				if (shifting)
+				{
+					assert(oldchain);
 					setcurtchain(oldchain);
+				}
 				return FALSE;
 			}
 			advancewindow();
 			if (EXPR_FAIL == expr(sb1, MUMPS_EXPR))
 			{
 				if (shifting)
+				{
+					assert(oldchain);
 					setcurtchain(oldchain);
+				}
 				return FALSE;
 			}
 			sb1++;
@@ -135,7 +151,10 @@ int lkglvn(boolean_t gblvn)
 			{
 				stx_error(ERR_RPARENMISSING);
 				if (shifting)
+				{
+					assert(oldchain);
 					setcurtchain(oldchain);
+				}
 				return FALSE;
 			}
 		}
@@ -147,12 +166,14 @@ int lkglvn(boolean_t gblvn)
 	{
 		if (TREF(saw_side_effect) && ((GTM_BOOL != TREF(gtm_fullbool)) || (OLD_SE != TREF(side_effect_handling))))
 		{	/* saw a side effect in a subscript - time to stop shifting */
+			assert(oldchain);
 			setcurtchain(oldchain);
 			triptr = (TREF(curtchain))->exorder.bl;
 			dqadd(triptr, &tmpchain, exorder);
 		} else
 		{
 			newtriple(OC_GVSAVTARG);
+			assert(oldchain);
 			setcurtchain(oldchain);
 			assert(&tmpchain != tmpchain.exorder.bl);
 			dqadd(TREF(expr_start), &tmpchain, exorder);

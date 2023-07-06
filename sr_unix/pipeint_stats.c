@@ -1,6 +1,7 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2011 Fidelity Information Services, Inc       *
+ * Copyright (c) 2011-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -16,7 +17,7 @@
 #include "gtmimagename.h"
 #include "pipeint_stats.h"
 
-GBLREF	int			process_id;
+GBLREF	uint4			process_id;
 
 /* Print stats on how many times pipe processing was interrupted by mupip interrupt. Note
    that this routine stands alone so that inclusion of it in mupip, lke, etc by print_exit_stats()

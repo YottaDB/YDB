@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2018 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -208,7 +208,7 @@ void	mur_output_show()
 	int			rectype, size;
 	pini_list_struct	*plst;
 	ht_ent_int4 		*tabent, *topent;
-	boolean_t		first_time, ok_to_show[NUM_SHW_TYPES], release_latch;
+	boolean_t		first_time = TRUE, ok_to_show[NUM_SHW_TYPES], release_latch = FALSE;
 	int			index;
 	jnl_proc_time		tmp_jpv_time;
 	multi_proc_shm_hdr_t	*mp_hdr;	/* Pointer to "multi_proc_shm_hdr_t" structure in shared memory */

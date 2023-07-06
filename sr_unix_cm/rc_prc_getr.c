@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,13 +61,12 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	srch_blk_status	*bh;
 	gvnh_reg_t	*gvnh_reg;
 
-	/*This code is probably not being maintained as part of the v7 change so put this assert here to see
-	 * if we are even hitting this code during testing*/
-	assert(FALSE);
-
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	/*This code is probably not being maintained as part of the v7 change so put this assert here to see
+	 * if we are even hitting this code during testing*/
+	assert(FALSE);
 	ESTABLISH_RET(rc_dbms_ch,0);
 	req = (rc_req_getr *)qhdr;
 	rsp = (rc_rsp_page *)qhdr;
@@ -235,7 +234,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 				}
 
 				memcpy(rsp->page, bh->buffaddr, SIZEOF(blk_hdr));
-				PUT_SHORT(&((blk_hdr*)rsp->page)->bsiz,bsiz);
+				PUT_ULONG(&((blk_hdr*)rsp->page)->bsiz,bsiz);
 				memcpy(rsp->page + SIZEOF(blk_hdr) + RC_BLKHD_PAD, bh->buffaddr + SIZEOF(blk_hdr),
 					  size_return - (SIZEOF(blk_hdr) + RC_BLKHD_PAD));
 				rsp->size_return.value = size_return;

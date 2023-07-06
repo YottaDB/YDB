@@ -134,7 +134,7 @@ STATICFNDEF void fix_updarray_and_oldblock_ptrs(sm_uc_ptr_t old_db_addrs[2], sgm
 		TRAVERSE_TO_LATEST_CSE(cse);
 		if (gds_t_writemap != cse->mode)
 		{
-			array = (blk_segment *)cse->upd_addr;
+			array = cse->upd_addr.blk;
 			stop_ptr = array; /* Note: No cse->first_copy optimization done here (like in gvcst_blk_build). GTM-8523 */
 			seg = (blk_segment *)array->addr;
 			while (seg != stop_ptr)
@@ -181,7 +181,7 @@ enum cdb_sc	op_tcommit(void)
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create
 						    */
-	cw_set_element		*cse, *last_cw_set_before_maps, *csetemp, *first_cse;
+	cw_set_element		*cse = NULL, *last_cw_set_before_maps, *csetemp, *first_cse;
 	enum cdb_sc		status;
 	gd_region		*save_cur_region;	/* saved copy of gv_cur_region before TP_CHANGE_REG modifies it */
 	int			cw_depth, old_cw_depth;
@@ -334,7 +334,8 @@ enum cdb_sc	op_tcommit(void)
 						 * in that case do not reset si->first_cw_bitmap.
 						 */
 						last_cw_set_before_maps = si->last_cw_set;
-					}
+					} else
+						last_cw_set_before_maps = NULL;
 					for (cse = si->first_cw_set;  NULL != cse;  cse = cse->next_cw_set)
 					{	/* assert to ensure we haven't missed out on resetting jnl_freeaddr for any cse
 						 * in t_write/t_create/t_write_map/t_write_root/mu_write_map [D9B11-001991] */
@@ -429,7 +430,10 @@ enum cdb_sc	op_tcommit(void)
 						}	/* if (gds_t_create == cse->mode) */
 					}	/* for (all cw_set_elements) */
 					if (NULL == si->first_cw_bitmap)
+					{
+						assert(last_cw_set_before_maps);
 						si->first_cw_bitmap = last_cw_set_before_maps->next_cw_set;
+					}
 					if ((cdb_sc_normal == status) && 0 != csd->dsid)
 					{
 						for (ks = si->kill_set_head; NULL != ks; ks = ks->next_kill_set)
@@ -475,6 +479,7 @@ enum cdb_sc	op_tcommit(void)
 				)
 				if (cdb_sc_gbloflow == status)
 				{
+					assert(cse);
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLOFLOW, 2,
 						DB_LEN_STR(cse->blk_target->gd_csa->region));
 					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_GBLOFLOW, 2,
@@ -510,8 +515,8 @@ enum cdb_sc	op_tcommit(void)
 			csa = jnl_fence_ctl.fence_list;
 			if ((JNL_FENCE_LIST_END != csa) && jgbl.wait_for_jnl_hard && !is_updproc && !mupip_jnl_recover)
 			{	/* For mupip journal recover all transactions applied during forward phase are treated as
-			   	 * BATCH transaction for performance gain, since the recover command can be reissued like
-			   	 * a batch restart. Similarly update process considers all transactions as BATCH */
+				 * BATCH transaction for performance gain, since the recover command can be reissued like
+				 * a batch restart. Similarly update process considers all transactions as BATCH */
 				do
 				{	/* only those regions that are actively journaling and had a TCOM record
 					 * written as part of this TP transaction will appear in the list.
@@ -530,7 +535,9 @@ enum cdb_sc	op_tcommit(void)
 				assert(FILE_INFO(tr->reg)->s_addrs.now_crit);
 				rel_crit(tr->reg);
 			}
-		}
+			temp_si = NULL;
+		} else
+			temp_si = NULL;
 		assert(UNIX_ONLY(jgbl.onlnrlbk || TREF(in_trigger_upgrade) || ) (0 == have_crit(CRIT_HAVE_ANY_REG)));
 		/* Commit was successful */
 		dollar_trestart = 0;

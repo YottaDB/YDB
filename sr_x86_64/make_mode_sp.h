@@ -1,6 +1,7 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2007, 2011 Fidelity Information Services, Inc *
+ * Copyright (c) 2007-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -9,7 +10,7 @@
  *                                                              *
  ****************************************************************/
 
-#define CODEBUF_TYPE	char
+#define CODEBUF_TYPE	unsigned char
 #define CALL_SIZE	12
 #define EXTRA_INST	0
 #define EXTRA_INST_SIZE	0

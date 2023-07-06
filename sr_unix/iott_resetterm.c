@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,13 +20,13 @@
 #include "io.h"
 #include "iottdef.h"
 #include "gtmio.h"
+#include "iott_setterm.h"
 #include "eintr_wrappers.h"
-#include "setterm.h"
 #include "gtm_isanlp.h"
 
 error_def(ERR_TCSETATTR);
 
-void  resetterm(io_desc *iod)
+void  iott_resetterm(io_desc *iod)
 {
 	int		status;
 	int		save_errno;

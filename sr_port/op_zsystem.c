@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,13 +27,13 @@
 #include "filestruct.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "io.h"
+#include "iott_setterm.h"
 #include "jnl.h"
 #include "tp.h"
 #include "send_msg.h"
 #include "gtmmsg.h"		/* for gtm_putmsg() prototype */
 #include "op.h"
 #include "change_reg.h"
-#include "setterm.h"
 #include "getzposition.h"
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
@@ -78,7 +78,7 @@ void op_zsystem(mval *v)
 	MV_FORCE_STR(v);
 	flush_pio();
 	if (io_std_device.in->type == tt)
-		resetterm(io_std_device.in);
+		iott_resetterm(io_std_device.in);
 	if (v->str.len)
 	{
 		/* Copy the command to a new buffer and append a '\0' */
@@ -139,6 +139,6 @@ void op_zsystem(mval *v)
 	if (WIFEXITED(wait_stat))
 		dollar_zsystem = WEXITSTATUS(wait_stat);
 	if (io_std_device.in->type == tt)
-		setterm(io_std_device.in);
+		iott_setterm(io_std_device.in);
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,6 +13,7 @@
 #include "mdef.h"
 #include "gtm_caseconv.h"
 #include "gtm_string.h"
+#include "gtm_ctype.h"
 
 LITREF unsigned char lower_to_upper_table[];
 
@@ -35,7 +36,7 @@ void str_to_title (unsigned char *d, unsigned char *s, int4 len)
 		}
 		if (up && (97 <= *c) && (122 >= *c))
 		{
-			*c = lower_to_upper_table[*c];
+			*c = TOUPPER(*c);
 			up = FALSE;
 		}
 	}

@@ -17,6 +17,7 @@
 #include "mmemory.h"
 #include "opcode.h"
 #include "stringpool.h"
+#include "fullbool.h"
 
 LITREF	octabstruct	oc_tab[];
 
@@ -62,11 +63,15 @@ int bool_expr(boolean_t sense, oprtype *addr)
 		ex_tail(&x.oprval.tref->operand[0], TRUE, FALSE);
 	if (x.oprval.tref->operand[1].oprclass == TRIP_REF)
 		ex_tail(&x.oprval.tref->operand[1], TRUE, FALSE);
-	for(t2 = t1 = x.oprval.tref; OCT_UNARY & oc_tab[t1->opcode].octype; t2 = t1, t1 = t1->operand[0].oprval.tref)
+	for (t1 = x.oprval.tref; OCT_UNARY & oc_tab[t1->opcode].octype; t1 = t1->operand[0].oprval.tref)
 		;
 	if (OCT_ARITH & oc_tab[t1->opcode].octype)
 		ex_arithlit(t1);
 	UNARY_TAIL(&x);
+	if (EXT_BOOL == TREF(gtm_fullbool) && !(OCT_UNARY & oc_tab[x.oprval.tref->opcode].octype))
+		CONVERT_TO_SE(x.oprval.tref);
+	for (t1 = x.oprval.tref; OCT_UNARY & oc_tab[t1->opcode].octype; t1 = t1->operand[0].oprval.tref)
+		;
 	if (OCT_BOOL & oc_tab[t1->opcode].octype)
 		bx_boollit(t1);
 	for (t1 = x.oprval.tref; OC_NOOP == t1->opcode; t1 = t1->exorder.bl)

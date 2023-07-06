@@ -51,6 +51,11 @@
 
 typedef gtm_uint64_t	trans_num;
 typedef uint4		trans_num_4byte;
+typedef union
+{
+	trans_num	tn;
+	uint4		enc[2];
+} trans_num_cksum;
 
 typedef int4		block_id_32;	/* block_id type used pre-V7 kept for compatibility with old DBs
 					 * allows for GDS block #s to have 32 bits but see GDS_MAX_BLK_BITS below

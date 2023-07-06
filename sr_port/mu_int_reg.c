@@ -111,7 +111,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_
 	assert(NULL != mu_int_master);
 	/* Ensure that we don't see an increase in the file header and master map size compared to it's maximum values */
 	assert(SGMNT_HDR_LEN >= SIZEOF(sgmnt_data) && (MASTER_MAP_SIZE_MAX >= MASTER_MAP_SIZE(csd)));
-	if ((0 != csd->blks_to_upgrd) || !csd->fully_upgraded)
+	if (!csd->fully_upgraded)
 	{	/* V7 dropped support for V4 along with the prior UPGRADE/DOWNGRADE capabilities. If the desired DB
 		 * format is prior to V6p (internal only format), reject any operation with the DB */
 		if (BLK_ID_32_VER > csd->desired_db_format)

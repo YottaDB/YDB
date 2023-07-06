@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -115,6 +115,7 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 			break;
 		default:
 			assert(FALSE);
+			GTM_UNREACHABLE();
 	}
 	dst->mvtype = MV_STR;
 	dst->str.addr = (char *) stringpool.free;

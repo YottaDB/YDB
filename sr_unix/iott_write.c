@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -148,7 +148,10 @@ void iott_write(mstr *v)
 				{
 					ptrtop = (unsigned char *)str + str_len;
 					avail_width = io_ptr->width - io_ptr->dollar.x;
-					for (this_width = 0, ptr = (unsigned char *)str; ptr < ptrtop; ptr = ptrnext)
+					this_width = 0;
+					ptr = (unsigned char *)str;
+					assert(ptr < ptrtop);
+					do
 					{
 						ptrnext = UTF8_MBTOWC(ptr, ptrtop, codepoint);
 						if (WEOF == codepoint)
@@ -157,7 +160,8 @@ void iott_write(mstr *v)
 						if ((this_width + char_width) > avail_width)
 							break;
 						this_width += char_width;
-					}
+						ptr = ptrnext;
+					} while(ptr < ptrtop);
 					len = (int)(ptr - (unsigned char *)str);
 					if (0 == len)
 					{

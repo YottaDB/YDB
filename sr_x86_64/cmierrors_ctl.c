@@ -68,6 +68,7 @@ LITDEF	int CMI_REASON_CONFIRM = 150634698;
 
 
 LITDEF	int cmierrors_undocarr[] = {
+	0	/* Placeholder to prevent empty array */
 };
 
 

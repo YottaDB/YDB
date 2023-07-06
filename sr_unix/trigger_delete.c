@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -562,7 +562,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 	char			tmp_trig_str[MAX_BUFF_SIZE];
 	int4			trig_len;
 	char			trig_name[MAX_TRIGNAME_LEN];
-	int			trig_name_len;
+	int			trig_name_len = 0;
 	int			tmp_len;
 	char			*tt_val[NUM_SUBS];
 	uint4			tt_val_len[NUM_SUBS];
@@ -611,6 +611,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 		{
 			trig_name_len = MIN(trig_len, MAX_TRIGNAME_LEN);
 			assert(MAX_TRIGNAME_LEN >= trig_len);
+			assert(trig_name_len);
 			memcpy(trig_name, trigger_value.str.addr, trig_name_len);
 			tt_val[sub_indx] = NULL;
 			tt_val_len[sub_indx] = 0;
@@ -656,6 +657,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 	BUILD_HASHT_SUB_MSUB_CURRKEY(trigvn, trigvn_len, trigger_index);
 	gvcst_kill(TRUE);
 	assert(0 == gvcst_data());
+	assert(trig_name_len);
 	if (1 == count)
 	{ /* This is the last trigger for "trigvn" - clean up trigger name, remove #LABEL and #COUNT */
 		assert(1 == index);

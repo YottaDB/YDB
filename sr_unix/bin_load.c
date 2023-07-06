@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -270,10 +270,11 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	unsigned char		hdr_lvl, src_buff[MAX_KEY_SZ + 1], dest_buff[MAX_ZWR_KEY_SZ],
 				cmpc_str[MAX_KEY_SZ + 1], dup_key_str[MAX_KEY_SZ + 1], sn_key_str[MAX_KEY_SZ + 1], *sn_key_str_end;
 	unsigned char		*end_buff, *gvn_char, *subs, mych;
-	unsigned short		rec_len, next_cmpc, numsubs, num_subscripts;
-	int			len, current, last, max_key, max_rec, fmtd_key_len;
-	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos, sn_hold_buff_size;
-	uint4			max_data_len, max_subsc_len, gblsize, data_len, num_of_reg = 0;
+	unsigned short		rec_len, next_cmpc, numsubs = 0, num_subscripts;
+	int			len, current, last, max_key = 0, max_rec = 0, fmtd_key_len;
+	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0;
+	int			sn_hold_buff_pos = 0, sn_hold_buff_size = 0;
+	uint4			max_data_len, max_subsc_len, gblsize = 0, data_len, num_of_reg = 0;
 	ssize_t			subsc_len, extr_std_null_coll;
 	gtm_uint64_t		iter, key_count, tmp_rec_count, global_key_count;
 	DEBUG_ONLY(gtm_uint64_t		saved_begin = 0);
@@ -286,7 +287,8 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	mname_entry		gvname;
 	mstr			mstr_src, mstr_dest, opstr;
 	collseq			*extr_collseq, *db_collseq, *save_gv_target_collseq;
-	coll_hdr		extr_collhdr, db_collhdr;
+	coll_hdr		extr_collhdr = { 0, 0, 0, 0,}, db_collhdr = { 0, 0, 0, 0 };
+	bool			extr_collhdr_set = FALSE, db_collhdr_set = FALSE;
 	gv_key			*tmp_gvkey = NULL;	/* null-initialize at start, will be malloced later */
 	gv_key			*sn_gvkey = NULL; /* null-initialize at start, will be malloced later */
 	gv_key			*sn_savekey = NULL; /* null-initialize at start, will be malloced later */
@@ -294,10 +296,10 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	gv_key			*orig_gv_currkey_ptr = NULL;
 	char			std_null_coll[BIN_HEADER_NUMSZ + 1], *sn_hold_buff = NULL, *sn_hold_buff_temp = NULL;
 	int			in_len, gtmcrypt_errno, n_index, encrypted_hash_array_len, null_iv_array_len;
-	char			*inbuf, *encrypted_hash_array_ptr, *curr_hash_ptr, *null_iv_array_ptr, null_iv_char;
+	char			*inbuf, *encrypted_hash_array_ptr, *curr_hash_ptr, *null_iv_array_ptr = NULL, null_iv_char;
 	int4			index;
 	gtmcrypt_key_t		*encr_key_handles = NULL;
-	boolean_t		encrypted_version, mixed_encryption, valid_gblname;
+	boolean_t		encrypted_version, mixed_encryption = FALSE, valid_gblname;
 	char			index_err_buf[1024];
 	gvnh_reg_t		*gvnh_reg;
 	gd_region		*dummy_reg, *reg_ptr = NULL;
@@ -427,6 +429,10 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 			null_iv_array_ptr = malloc(null_iv_array_len);
 			memcpy(null_iv_array_ptr, ptr, null_iv_array_len);
 		}
+	} else
+	{
+		encrypted_hash_array_ptr = NULL;
+		n_index = 0;
 	}
 	if ('2' < hdr_lvl)
 	{
@@ -438,6 +444,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 			mupip_exit(ERR_LDBINFMT);
 		}
 		extr_collhdr = *((coll_hdr *)(ptr));
+		extr_collhdr_set = TRUE;
 		new_gvn = TRUE;
 	} else
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_OLDBINEXTRACT, 1, hdr_lvl - '0');
@@ -460,6 +467,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 		} else if (len == SIZEOF(coll_hdr))
 		{
 			extr_collhdr = *((coll_hdr *)(ptr));
+			extr_collhdr_set = TRUE;
 			assert(hdr_lvl > '2');
 			iter--;
 		}
@@ -508,6 +516,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 		else if (len == SIZEOF(coll_hdr))
 		{
 			extr_collhdr = *((coll_hdr *)(ptr));
+			extr_collhdr_set = TRUE;
 			assert(hdr_lvl > '2');
 			new_gvn = TRUE;			/* next record will contain a new gvn */
 			iter--;	/* Decrement as this record does not count as a record for loading purposes */
@@ -523,6 +532,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 				{
 					case '9':
 						/* Record is encrypted; ensure legitimate encryption handle index. */
+						assert(n_index);
 						if ((n_index <= index) || (0 > index))
 						{
 							SNPRINTF(index_err_buf, SIZEOF(index_err_buf),
@@ -545,6 +555,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 #						endif
 						in_len = len - SIZEOF(int4) - SIZEOF(blk_hdr);
 						inbuf = (char *)(tmp_ptr + SIZEOF(blk_hdr));
+						assert(null_iv_array_ptr);
 						null_iv_char = null_iv_array_ptr[index];
 						assert(('1' == null_iv_char) || ('0' == null_iv_char));
 						GTMCRYPT_DECRYPT(NULL, ('0' == null_iv_char), encr_key_handles[index],
@@ -565,6 +576,9 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 						 * non-zero---which would only be the case if the region was encrypted---but only
 						 * when dealing with a mix of encrypted and unencrypted data.
 						 */
+						assert(n_index);
+						assert(encrypted_version);
+						assert(encrypted_hash_array_ptr);
 						if ((n_index <= index) || (0 > index)
 						    || (mixed_encryption
 							&& (0 == memcmp(encrypted_hash_array_ptr + index * GTMCRYPT_HASH_LEN,
@@ -577,6 +591,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 					case '5':	/* CAUTION: Fall-through. */
 					case '8':
 						/* Record is encrypted; ensure legitimate encryption handle index. */
+						assert(n_index);
 						assertpro((n_index > index) && (0 <= index));
 						in_len = len - SIZEOF(int4);
 						inbuf = (char *)tmp_ptr;
@@ -585,6 +600,8 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 						GC_BIN_LOAD_ERR(gtmcrypt_errno);
 						rp = (rec_hdr *)tmp_ptr;
 						break;
+					default:
+						assertpro(hdr_lvl != hdr_lvl);
 				}
 			} else
 				rp = (rec_hdr *)tmp_ptr;
@@ -638,6 +655,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 			db_collhdr.act = gv_target->act;
 			db_collhdr.ver = gv_target->ver;
 			db_collhdr.nct = gv_target->nct;
+			db_collhdr_set = TRUE;
 		}
 		GET_USHORT(rec_len, &rp->rsiz);
 		if (0 != EVAL_CMPC(rp))
@@ -658,7 +676,8 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 			DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 			continue;
 		}
-		if (new_gvn)
+		assert(!new_gvn || (extr_collhdr_set && db_collhdr_set));
+		if (new_gvn && extr_collhdr_set && db_collhdr_set)
 		{
 			global_key_count = 1;
 			if ((db_collhdr.act != extr_collhdr.act) || (db_collhdr.ver != extr_collhdr.ver)
@@ -805,6 +824,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 					gvkey_char_ptr++;
 				}
 			}
+			assert(max_key);
 			if (gv_currkey->end >= max_key)
 			{
 				bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
@@ -940,6 +960,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 				ok_to_put = TRUE;
 				putting_a_sn = FALSE;
 				numsubs = 0;
+				gblsize = 0;
 			}
 			if (is_hidden_subscript)
 			{	/* it's a chunk and we were expecting one */
@@ -978,6 +999,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 					sn_incmp_gbl_already_killed = FALSE;
 				} else
 				{	/* we only need to compare the key before the hidden subscripts */
+					assert(gblsize);
 					if ((expected_sn_chunk_number == sn_chunk_number)
 							&& (sn_gvkey->end == gv_currkey->end - (SPAN_SUBS_LEN + 1))
 							&& !memcmp(sn_gvkey->base,gv_currkey->base, sn_gvkey->end)
@@ -1135,6 +1157,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 					v.str.addr = sn_hold_buff;
 					v.str.len = sn_hold_buff_pos;
 				}
+				assert(max_rec);
 				if (v.str.len > max_rec)
 				{
 					bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);

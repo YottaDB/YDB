@@ -132,7 +132,7 @@ MBSTART	{														\
 
 int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int4 error_action, gv_namehead *gvt)
 {
-	block_id		child, prev_child;
+	block_ref		child, prev_child;
 	rec_hdr_ptr_t		rp, r_top;
 	int			num_subscripts, fmtd_key_len;
 	uint4			bplmap, mask1, offset, rec_offset, rec_size;
@@ -188,7 +188,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 	MEMCPY_LIT(&util_buff[util_len], TEXT4);
 	util_len += STRLEN(TEXT4);
 	util_buff[util_len] = 0;
-	chain = *(off_chain *)&blk;
+	chain = ((block_ref *)&blk)->chain;
 	/* Assert that if at all chain.flag is non-zero (i.e. a created block), we are in TP and not yet in the commit logic.
 	 * The only exception to this rule is if we are in TP and inside phase1 of the commit logic and trying to certify a
 	 * block that was killed inside of the transaction (possible if cert_blk is called directly from tp_tend). In this case,
@@ -315,7 +315,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 	comp_length = 2 * SIZEOF(char);		/* for double NUL to indicate no prior key */
 	prior_expkey[0] = prior_expkey[1] = 0;	/* double NUL also works for memvcmp test for key order */
 	next_tp_child_ptr = NULL;
-	prev_child = 0;
+	prev_child.id = 0;
 	rec_num = 0;
 	for (rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)bp + SIZEOF(blk_hdr)) ;  rp < (rec_hdr_ptr_t)blk_top ;  rp = r_top)
 	{
@@ -518,31 +518,31 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 		/* Check for proper child block numbers */
 		if ((0 != blk_levl) || (0 != is_directory))
 		{
-			READ_BLK_ID(long_blk_id, &child, blk_id_ptr);
-			chain = *(off_chain *)&child;
+			READ_BLK_ID(long_blk_id, &child.id, blk_id_ptr);
+			chain = child.chain;
 			/* In TP, child block number can be greater than the total_blks for blocks created within TP.
 			 * Dont do any checks on such blocks.
 			 */
 			if (!dollar_tlevel || !chain.flag)
 			{
-				if (child <= 0)
+				if (child.id <= 0)
 				{
 					RTS_ERROR_FUNC(csa, ERR_DBPTRNOTPOS, util_buff, error_action, NULL);
 					return FALSE;
 				}
-				if ((child > csa->ti->total_blks) && !mu_upgrade_in_prog && !mu_reorg_encrypt_in_prog)
+				if ((child.id > csa->ti->total_blks) && !mu_upgrade_in_prog && !mu_reorg_encrypt_in_prog)
 				{	/* REORG -UPGRADE/DOWNGRADE/ENCRYPT can update recycled blocks, which may contain children
 					 * beyond total_blks if a truncate happened sometime after the block was killed.
 					 */
 					RTS_ERROR_FUNC(csa, ERR_DBPTRMX, util_buff, error_action, NULL);
 					return FALSE;
 				}
-				if (!(child % bplmap) && !mu_upgrade_in_prog)
+				if (!(child.id % bplmap) && !mu_upgrade_in_prog)
 				{	/* mu_upgrade_bmm creates 0 pointers in order to deal with KILL's globals */
 					RTS_ERROR_FUNC(csa, ERR_DBPTRMAP, util_buff, error_action, NULL);
 					return FALSE;
 				}
-				if ((child == prev_child) && !mu_upgrade_in_prog)
+				if ((child.id == prev_child.id) && !mu_upgrade_in_prog)
 				{
 					RTS_ERROR_FUNC(csa, ERR_DBBDBALLOC, util_buff, error_action, NULL);
 					return FALSE;

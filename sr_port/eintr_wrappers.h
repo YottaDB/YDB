@@ -341,7 +341,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		&& (WBTEST_SYSCONF_WRAPPER == gtm_white_box_test_case_number))	\
 		{									\
 			DBGFPF((stderr, "will sleep indefinitely now\n"));		\
-			while (TRUE)							\
+			while (gtm_white_box_test_case_enabled)				\
 				LONG_SLEEP(60);						\
 		}									\
 		RC = sysconf(PARM);							\

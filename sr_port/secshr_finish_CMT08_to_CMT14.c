@@ -147,7 +147,7 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 		secshr_send_DBCLNUPINFO_msg(csa, numargs, argarray);
 	} else
 	{
-		DEBUG_ONLY(si = NULL;)
+		si = NULL;
 		first_cw_set = (0 != cw_set_depth) ? cw_set : NULL;
 		updTrans = update_trans;
 		numargs = 0;
@@ -228,6 +228,12 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 					cr_top = start_cr + max_bts;
 					if (!csa->wcs_pidcnt_incremented)
 						INCR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl);
+				} else
+				{
+					clru = NULL;
+					start_cr = NULL;
+					max_bts = -1;
+					cr_top = NULL;
 				}
 				blk_size = csd->blk_size;
 				cs = first_cw_set;
@@ -271,6 +277,7 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 							 * of KILL.
 							 */
 							assert(dollar_tlevel);
+							assert(si);
 							assert((kill_t_write == cs->mode) || (kill_t_create == cs->mode));
 							if (!cs->done)
 							{	/* Initialize cs->new_buff to non-NULL since "sec_shr_blk_build"
@@ -330,6 +337,10 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 					if (is_bg)
 					{
 						assert(T_COMMIT_CRIT_PHASE1 == csa->t_commit_crit);
+						assert(clru);
+						assert(start_cr);
+						assert(0 <= max_bts);
+						assert(cr_top);
 						/* A positive value of cse->old_mode implies phase1 is not complete on this cse
 						 * so we need to do phase1 tasks (e.g. blks_to_upgrd counter adjustment,
 						 * find a cr for cs->cr etc.
@@ -382,7 +393,10 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 								assert(ARRAYSIZE(cr_array) > cr_array_index);
 								PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
 							} else
+							{
+								assert(si);
 								TP_PIN_CACHE_RECORD(cr, si);
+							}
 							cr->backup_cr_is_twin = FALSE;
 							cr->in_tend = process_id;
 							cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
@@ -490,8 +504,10 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 						|| (dollar_tlevel && IS_BG_PHASE2_COMMIT_IN_CRIT(cs, cs->mode)))
 					{	/* Below is Step 10a (comprises Steps CMT16 and CMT18 */
 						if (dollar_tlevel)
+						{
+							assert(si);
 							jrs = si->jbuf_rsrv_ptr;
-						else
+						} else
 							jrs = TREF(nontp_jbuf_rsrv);
 						/* Below is Step CMT16 (done as part of CMT10a) */
 						if (NEED_TO_FINISH_JNL_PHASE2(jrs))
@@ -503,8 +519,10 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 				}
 			}
 			if (dollar_tlevel)
+			{
+				assert(si);
 				si->update_trans = updTrans | UPDTRNS_TCOMMIT_STARTED_MASK;	/* Step CMT11 for TP */
-			else
+			} else
 				update_trans = updTrans | UPDTRNS_TCOMMIT_STARTED_MASK;	/* Step CMT11 for Non-TP */
 			INCREMENT_CURR_TN(csd);	/* roll forward Step (CMT12) */
 		}
@@ -513,6 +531,7 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 		/* Check if kill_in_prog flag in file header has to be incremented. */
 		if (dollar_tlevel)
 		{
+			assert(si);
 			if ((NULL != si->kill_set_head) && (NULL == si->kip_csa))
 				INCR_KIP(csd, csa, si->kip_csa);
 			si->start_tn = ctn;	/* needed by "secshr_finish_CMT18_to_CMT19" */

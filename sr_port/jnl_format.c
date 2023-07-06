@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,8 +100,8 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	jnl_record		*rec;
 	jnl_action		*ja;
 	jnl_format_buffer	*prev_jfb, *jfb, *prev_prev_jfb;
-	jnl_str_len_t		keystrlen;
-	mstr_len_t		valstrlen;
+	jnl_str_len_t		keystrlen = 0;
+	mstr_len_t		valstrlen = -1;
 	sgm_info		*si;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -176,6 +176,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	{
 		jfb = non_tp_jfb_ptr; /* already malloced in gvcst_init() */
 		jgbl.cumul_jnl_rec_len = 0;
+		si = NULL;
 		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
 	} else
 	{
@@ -221,7 +222,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 			 * zero (both ZTWORM and following SET/KILL record will have the same update_num value of 1).
 			 */
 			assert(jnl_fence_ctl.level || jgbl.tp_ztp_jnl_upd_num
-				GTMTRIG_ONLY(|| ((jfb->prev == si->jnl_head) && (JRT_TZTWORM == jfb->prev->rectype))));
+				GTMTRIG_ONLY(|| (si && (jfb->prev == si->jnl_head) && (JRT_TZTWORM == jfb->prev->rectype))));
 			subcode = 3;
 		}
 		if (dollar_tlevel)
@@ -270,6 +271,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	{
 		assert((1 << JFB_ELE_SIZE_IN_BITS) == JNL_REC_START_BNDRY);
 		assert(JFB_ELE_SIZE == JNL_REC_START_BNDRY);
+		assert(si);
 		jfb->buff = (char *)get_new_element(si->format_buff_list, jrec_size >> JFB_ELE_SIZE_IN_BITS);
 		if (REPL_ALLOWED(csa))
 			jfb->alt_buff = (char *)get_new_element(si->format_buff_list, jrec_size >> JFB_ELE_SIZE_IN_BITS);
@@ -298,6 +300,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	mumps_node_ptr = local_buffer;
 	if (NULL != key)
 	{
+		assert(keystrlen);
 		((jnl_string *)local_buffer)->length = keystrlen;
 		((jnl_string *)local_buffer)->nodeflags = nodeflags;
 		local_buffer += SIZEOF(jnl_str_len_t);
@@ -306,6 +309,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	}
 	if (NULL != val)
 	{
+		assert(0 <= valstrlen);
 		PUT_MSTR_LEN(local_buffer, valstrlen); /* SET command's data may not be aligned */
 		/* The below assert ensures that it is okay for us to increment by jnl_str_len_t (uint4)
 		 * even though valstrlen (above) is of type mstr_len_t (int). This is because PUT_MSTR_LEN
