@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,6 +67,10 @@ GBLREF 	gd_region		*gv_cur_region;
 GBLREF 	sgmnt_data_ptr_t	cs_data;
 GBLREF 	sgmnt_addrs		*cs_addrs;
 GBLREF	void			(*mupip_exit_fp)(int4 errnum);
+
+#ifdef DEBUG
+GBLREF	block_id		ydb_skip_bml_num;
+#endif
 
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_COLLTYPVERSION);
@@ -266,6 +270,11 @@ void mucregini(block_id blk_init_size)
 	NUM_CRIT_ENTRY(csd) = seg->mutex_slots;
 	csd->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
 	csd->defer_allocate = seg->defer_allocate;
+#	ifdef DEBUG
+	/* Force-enable DEFER_ALLOCATE in case ydb_skip_bml_num is non-zero to avoid huge test runtimes */
+	if (0 != ydb_skip_bml_num)
+		csd->defer_allocate = TRUE;
+#	endif
 	csd->read_only = seg->read_only;
 	time(&ctime);
 	assert(SIZEOF(ctime) >= SIZEOF(int4));
@@ -283,6 +292,10 @@ void mucregini(block_id blk_init_size)
 	bmm_init();
 	for (i = 0; i < blk_init_size ; i += csd->bplmap)
 	{
+#		ifdef DEBUG
+		if ((0 != ydb_skip_bml_num) && (0 < i) && (i < ydb_skip_bml_num))
+			i = ydb_skip_bml_num;
+#		endif
 		status = bml_init(i);
 		if (status != SS_NORMAL)
 		{

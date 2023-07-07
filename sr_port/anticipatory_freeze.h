@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -335,6 +335,10 @@ MBSTART {															\
 #define DB_LSEEKWRITE_HANG(CSA)	FALSE
 #endif
 
+#ifdef DEBUG
+GBLREF	gtm_int8	ydb_skip_bml_num;	/* Use "gtm_int8" since it is possible "block_id" type is not yet defined */
+#endif
+
 /* #GTM_THREAD_SAFE : The below macro (DB_LSEEKWRITE) is thread-safe */
 #define	DB_LSEEKWRITE(CSA, UDI, DB_FN, FD, OFFSET, BUFF, SIZE, STATUS)							\
 MBSTART {														\
@@ -344,6 +348,11 @@ MBSTART {														\
 	assert(!CSA_LOCAL || !CSA_LOCAL->region || FILE_INFO(CSA_LOCAL->region)->grabbed_access_sem			\
 			|| !(CSA_LOCAL)->nl || !FROZEN_CHILLED(CSA_LOCAL) || FREEZE_LATCH_HELD(CSA_LOCAL));		\
 	DBG_CHECK_DIO_ALIGNMENT(UDI, OFFSET, BUFF, SIZE);								\
+	assert((0 == ydb_skip_bml_num) || (NULL == UDI) || (0 == OFFSET)						\
+		|| ((BLK_ZERO_OFF(((unix_db_info *)UDI)->s_addrs.hdr->start_vbn)					\
+			+ ((gtm_int8)BLKS_PER_LMAP * ((unix_db_info *)UDI)->s_addrs.hdr->blk_size)) > OFFSET)		\
+		|| ((BLK_ZERO_OFF(((unix_db_info *)UDI)->s_addrs.hdr->start_vbn)					\
+			+ (ydb_skip_bml_num * ((unix_db_info *)UDI)->s_addrs.hdr->blk_size)) <= OFFSET));		\
 	/* We should never write to a READ_ONLY db file header unless we hold standalone access on the db */		\
 	assert((0 != OFFSET) || !((sgmnt_data_ptr_t)BUFF)->read_only || (NULL == UDI) || UDI->grabbed_access_sem);	\
 	DO_LSEEKWRITE(CSA_LOCAL, DB_FN, FD, OFFSET, BUFF, SIZE, STATUS, fake_db_enospc, DB_LSEEKWRITE_HANG(CSA),	\

@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,6 +88,10 @@ GBLREF	cw_set_element		cw_set[];		/* create write set. */
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned char		cw_map_depth;
 GBLREF	uint4			update_trans;
+
+#ifdef DEBUG
+GBLREF	block_id		ydb_skip_bml_num;
+#endif
 
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_DBBTUWRNG);
@@ -328,6 +332,13 @@ void	mu_reorg_upgrd_dwngrd(void)
 		memset(&reorg_stats, 0, SIZEOF(reorg_stats));	/* initialize statistics for this region */
 		for (curbmp = start_bmp; curbmp <= last_bmp; curbmp += BLKS_PER_LMAP)
 		{
+#			ifdef DEBUG
+			if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= curbmp) && (curbmp < ydb_skip_bml_num))
+			{
+				curbmp = ydb_skip_bml_num - BLKS_PER_LMAP;
+				continue;
+			}
+#			endif
 			if (mu_ctrly_occurred || mu_ctrlc_occurred)
 			{
 				status1 = ERR_MUNOFINISH;

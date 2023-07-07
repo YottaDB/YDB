@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -79,6 +82,10 @@ GBLREF unsigned int	t_tries;
 GBLREF gv_key		*gv_currkey;
 GBLREF hash_table_int8	cw_stagnate;
 
+#ifdef DEBUG
+GBLREF	block_id	ydb_skip_bml_num;
+#endif
+
 /******************************************************************************************
 Input Parameters:
 	level: level of working block
@@ -147,6 +154,13 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	{
 		blk_was_free = FALSE;
 		INCR_BLK_NUM(dest_blk_id);
+#		ifdef DEBUG
+		if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP < dest_blk_id) && (dest_blk_id < ydb_skip_bml_num))
+		{
+			dest_blk_id = ydb_skip_bml_num;
+			continue;
+		}
+#		endif
 		/* A Pre-order traversal should not cause a child block to go to its parent.
 		 * However, in case it happens because already the organization was like that or for any other reason, skip swap.
 		 * If we decide to swap, code below should be changed to take care of the special case.

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -38,16 +41,20 @@
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 
+#ifdef DEBUG
+GBLREF	block_id	ydb_skip_bml_num;
+#endif
+
 #define BPL	SIZEOF(int4)*8/BML_BITS_PER_BLK					/* blocks masked by a int4 */
 
 error_def(ERR_DBRDERR);
 error_def(ERR_DYNUPGRDFAIL);
 
-int4 mur_blocks_free(reg_ctl_list *rctl)
+block_id mur_blocks_free(reg_ctl_list *rctl)
 {
 	int4		x;
-	block_id	bnum, maps;
-	int		mapsize, i, j, k, fcnt, status;
+	block_id	bnum, maps, i, fcnt;
+	int		mapsize, j, k, status;
 	unsigned char	*c, *disk, *m_ptr;
 	uint4		*dskmap, map_blk_size;
 	file_control	*db_ctl;
@@ -75,6 +82,14 @@ int4 mur_blocks_free(reg_ctl_list *rctl)
 	db_ctl->op_len = cs_data->blk_size;
 	for (i = 0; i != maps; i++)
 	{
+#		ifdef DEBUG
+		if ((0 != ydb_skip_bml_num) && (1 == i))
+		{
+			i = ydb_skip_bml_num / BLKS_PER_LMAP - 1;
+			fcnt += (ydb_skip_bml_num - BLKS_PER_LMAP) / BLKS_PER_LMAP * (BLKS_PER_LMAP - 1);
+			continue;
+		}
+#		endif
 		bnum = i * cs_data->bplmap;
 		db_ctl->op = FC_READ;
 		db_ctl->op_pos = cs_data->start_vbn + ((gtm_int64_t)cs_data->blk_size / DISK_BLOCK_SIZE * bnum);

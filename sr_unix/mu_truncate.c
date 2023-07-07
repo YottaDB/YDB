@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -213,6 +213,10 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 			return TRUE;
 		}
 		lmap_blk_num = lmap_num * BLKS_PER_LMAP;
+#		ifdef DEBUG
+		if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= lmap_blk_num) && (lmap_blk_num < ydb_skip_bml_num))
+			break;
+#		endif
 		if (csa->nl->highest_lbm_with_busy_blk >= lmap_blk_num)
 		{
 			found_busy_blk = lmap_blk_num;

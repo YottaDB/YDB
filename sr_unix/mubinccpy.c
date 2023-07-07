@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -333,6 +333,13 @@ bool	mubinccpy (backup_reg_list *list)
 	read_offset = (off_t)BLK_ZERO_OFF(header->start_vbn);
 	for (blk_num_base = 0;  blk_num_base < header->trans_hist.total_blks;  blk_num_base += blks_per_buff)
 	{
+#		ifdef DEBUG
+		if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= blk_num_base) && (blk_num_base < ydb_skip_bml_num))
+		{
+			read_offset += (bsize * (ydb_skip_bml_num - blk_num_base));
+			blk_num_base = ydb_skip_bml_num;
+		}
+#		endif
 		if (online && (0 != cs_addrs->shmpool_buffer->failed))
 			break;
 		if ((header->trans_hist.total_blks - blk_num_base) < blks_per_buff)
@@ -364,6 +371,10 @@ bool	mubinccpy (backup_reg_list *list)
 		for (i = 0; i < blks_per_buff; i++, bptr = (blk_hdr *)((char *)bptr + bsize))
 		{
 			blk_num = blk_num_base + i;
+#			ifdef DEBUG
+			if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= blk_num) && (blk_num < ydb_skip_bml_num))
+				continue;
+#			endif
 			if (mu_ctrly_occurred  ||  mu_ctrlc_occurred)
 			{
 				free(outptr);

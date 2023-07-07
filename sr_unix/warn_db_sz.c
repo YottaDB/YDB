@@ -3,6 +3,9 @@
  * Copyright (c) 2018-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -22,12 +25,20 @@
 
 error_def(ERR_LOWSPC);
 
+#ifdef DEBUG
+GBLREF	block_id		ydb_skip_bml_num;
+#endif
+
 void warn_db_sz(char *db_fname, block_id prev_blocks, block_id curr_blocks, block_id tot_blocks)
 {
 	double new_sz_frac;
 	double old_sz_frac;
 	int diff;
 
+#	ifdef DEBUG
+	if (0 != ydb_skip_bml_num)
+		return;	/* Do not issue LOWSPC warning if huge sparse dbs are possible */
+#	endif
 	new_sz_frac = (WBTEST_ENABLED(WBTEST_DB_BLOCKS_WARN)) ?
 			SPCWARNTHRESHOLD : (((double)curr_blocks) / ((double)tot_blocks)) * 100;
 	if (new_sz_frac < SPCWARNTHRESHOLD)

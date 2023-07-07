@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,6 +91,11 @@ boolean_t mu_int_init(void)
 	fc->op = FC_READ;
 	/* Do aligned reads if opened with O_DIRECT */
 	udi = FC2UDI(fc);
+#	ifdef DEBUG
+	udi->s_addrs.hdr = NULL;	/* Clear previous value of udi->s_addrs.hdr as it would have been freed up
+					 * inside STANDALONE macro invoked above.
+					 */
+#	endif
 	tsd = udi->fd_opened_with_o_direct ? (sgmnt_data_ptr_t)(TREF(dio_buff)).aligned : &mu_int_data;
 	fc->op_buff = (uchar_ptr_t)tsd;
 	fc->op_len = SGMNT_HDR_LEN;
@@ -99,6 +104,11 @@ boolean_t mu_int_init(void)
 	/* Ensure "mu_int_data" is populated even if we did not directly read into it for the O_DIRECT case */
 	if (udi->fd_opened_with_o_direct)
 		memcpy(&mu_int_data, (TREF(dio_buff)).aligned, SGMNT_HDR_LEN);
+#	ifdef DEBUG
+	udi->s_addrs.hdr = &mu_int_data;	/* Now that we have read in the file header, point udi to it for the next dbfilop.
+						 * This is used by the DB_LSEEKREAD macro if "ydb_skip_bml_num" is non-zero.
+						 */
+#	endif
 	if (MASTER_MAP_SIZE_MAX < MASTER_MAP_SIZE(&mu_int_data) ||
 	    native_size < DIVIDE_ROUND_UP(SGMNT_HDR_LEN + MASTER_MAP_SIZE(&mu_int_data), DISK_BLOCK_SIZE) + MIN_DB_BLOCKS)
 	{

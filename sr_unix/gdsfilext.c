@@ -81,7 +81,15 @@ MBSTART {															\
 			2, LEN_AND_LIT("Please make more disk space available or shutdown GT.M to avoid data loss"), ENOSPC);	\
 } MBEND
 
-#define SUSPICIOUS_EXTEND 	(2 * (dollar_tlevel ? sgm_info_ptr->cw_set_depth : cw_set_depth) < cs_addrs->ti->free_blocks)
+#ifdef DEBUG
+GBLREF	block_id	ydb_skip_bml_num;
+#endif
+
+#define SUSPICIOUS_EXTEND 	((2 * (dollar_tlevel ? sgm_info_ptr->cw_set_depth : cw_set_depth)				\
+					DEBUG_ONLY( + ((0 != ydb_skip_bml_num)							\
+						? ((ydb_skip_bml_num - BLKS_PER_LMAP) / BLKS_PER_LMAP * (BLKS_PER_LMAP - 1))	\
+						: 0)))										\
+					< cs_addrs->ti->free_blocks)								\
 
 GBLREF	sigset_t		blockalrm;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -99,6 +107,10 @@ GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl r
 GBLREF	boolean_t		ydb_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
 GBLREF	uint4			ydbDebugLevel;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+
+#ifdef DEBUG
+GBLREF	block_id		ydb_skip_bml_num;
+#endif
 
 error_def(ERR_DBFILERR);
 error_def(ERR_DBFILEXT);
@@ -183,6 +195,14 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 			- DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, bplmap) + blocks, bplmap - 1)
 			- DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, bplmap);
 	new_blocks = blocks + new_bit_maps;
+#	ifdef DEBUG
+	if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP >= cs_data->trans_hist.total_blks)
+			&& (BLKS_PER_LMAP < (cs_data->trans_hist.total_blks + new_blocks)))
+	{
+		new_blocks += (ydb_skip_bml_num - BLKS_PER_LMAP);
+		new_bit_maps += (ydb_skip_bml_num - BLKS_PER_LMAP) / BLKS_PER_LMAP;
+	}
+#	endif
 	assert((0 < new_blocks) || (!cs_data->defer_allocate && (0 == new_blocks)));
 	if (new_blocks + cs_data->trans_hist.total_blks > MAXTOTALBLKS(cs_data))
 	{
@@ -196,6 +216,10 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
 	} else
 	{
+#		ifdef DEBUG
+		if (0 == ydb_skip_bml_num)
+		{
+#		endif
 		if (!(ydbDebugLevel & GDL_IgnoreAvailSpace))
 		{	/* Bypass this space check if debug flag above is on. Allows us to create a large sparce DB
 			 * in space it could never fit it if wasn't sparse. Needed for some tests.
@@ -218,6 +242,9 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 				}
 			}
 		}
+#		ifdef DEBUG
+		}
+#		endif
 	}
 #	ifdef DEBUG
 	if ( (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) && dollar_tlevel && !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT")) ||
@@ -482,6 +509,11 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 		for (map = ROUND_UP(old_total, bplmap); map < new_total; map += bplmap)
 		{
 			DEBUG_ONLY(new_bit_maps--;)
+#			ifdef DEBUG
+			assert(0 < map);
+			if ((0 != ydb_skip_bml_num) && (map < ydb_skip_bml_num))
+				continue;
+#			endif
 			if (SS_NORMAL != (status = bml_init(map)))
 			{
 				GDSFILEXT_CLNUP;
@@ -519,6 +551,11 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	assert(cs_data->blks_to_upgrd == (inctn_detail.blks2upgrd_struct.blks_to_upgrd_delta + prev_extend_blks_to_upgrd));
 	assert((0 < blocks) || (!cs_data->defer_allocate && (0 == new_blocks)));
 	assert(0 < (cs_addrs->ti->free_blocks + blocks));
+#	ifdef DEBUG
+	if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP >= cs_data->trans_hist.total_blks)
+				&& (BLKS_PER_LMAP < (cs_data->trans_hist.total_blks + new_blocks)))
+		blocks += (ydb_skip_bml_num - BLKS_PER_LMAP) / BLKS_PER_LMAP * (BLKS_PER_LMAP - 1);
+#	endif
 	cs_addrs->ti->free_blocks += blocks;
 	cs_addrs->total_blks = cs_addrs->ti->total_blks = new_total;
 	blocks = old_total;

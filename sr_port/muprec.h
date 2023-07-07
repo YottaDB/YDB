@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1282,7 +1282,7 @@ uint4			mur_back_phase1(reg_ctl_list *rctl);
 uint4			mur_back_phase2(reg_ctl_list *rctl);
 uint4			mur_back_processing_one_region(mur_back_opt_t *mur_back_options);
 int4 			mur_block_count_correct(reg_ctl_list *rctl);
-int4			mur_blocks_free(reg_ctl_list *rctl);
+block_id		mur_blocks_free(reg_ctl_list *rctl);
 boolean_t		mur_close_files(void);
 int4			mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat);
 void			mur_close_file_extfmt(boolean_t in_mur_close_files);

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -55,6 +58,10 @@ GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF short		crash_count;
 GBLREF srch_hist	dummy_hist;
 GBLREF uint4		update_array_size;
+
+#ifdef DEBUG
+GBLREF	block_id		ydb_skip_bml_num;
+#endif
 
 error_def(ERR_DBRDONLY);
 error_def(ERR_DSEBLKRDFAIL);
@@ -120,6 +127,13 @@ void dse_maps(void)
 		dse_m_rest(blk, bml_list, bml_size, &csa->ti->free_blocks, TRUE);
 		for (blk_index = 0, bml_index = 0;  blk_index < total_blks; blk_index += bplmap, bml_index++)
 		{
+#			ifdef DEBUG
+			if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP == blk_index))
+			{
+				bml_index += (ydb_skip_bml_num - blk_index) / BLKS_PER_LMAP;
+				blk_index = ydb_skip_bml_num;
+			}
+#			endif
 			t_begin_crit(ERR_DSEFAIL);
 			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 			CWS_RESET;

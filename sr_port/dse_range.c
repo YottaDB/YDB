@@ -41,6 +41,10 @@ GBLREF short int	patch_path_count;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF VSIG_ATOMIC_T	util_interrupt;
 
+#ifdef DEBUG
+GBLREF	block_id	ydb_skip_bml_num;
+#endif
+
 error_def(ERR_CTRLC);
 error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_DSEINVALBLKID);
@@ -103,6 +107,13 @@ void dse_range(void)
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	for (blk = from; blk <= to ;blk++)
 	{
+#		ifdef DEBUG
+		if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= blk) && (blk < ydb_skip_bml_num))
+		{
+			blk = ydb_skip_bml_num - 1;
+			continue;
+		}
+#		endif
 		if (util_interrupt)
 		{
 			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);

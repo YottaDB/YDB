@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,6 +61,10 @@
 #include "muprec.h"
 
 GBLREF	jnl_gbls_t	jgbl;
+
+#ifdef DEBUG
+GBLREF	block_id	ydb_skip_bml_num;
+#endif
 
 error_def(ERR_DBFILERR);
 
@@ -126,6 +130,11 @@ int gdsfilext_nojnl(gd_region* reg, block_id new_total, block_id old_total)
 	/* initialize bitmaps, if any new ones are added */
 	for (ii = ROUND_UP(old_total, BLKS_PER_LMAP); ii < new_total; ii += BLKS_PER_LMAP)
 	{
+#		ifdef DEBUG
+		assert(0 < ii);
+		if ((0 != ydb_skip_bml_num) && (ii < ydb_skip_bml_num))
+			continue;
+#		endif
 		offset = (off_t)BLK_ZERO_OFF(csd->start_vbn) + (off_t)ii * blk_size;
 		DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, offset, aligned_buff, blk_size, status);
 		if (0 != status)

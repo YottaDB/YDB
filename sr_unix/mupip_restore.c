@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,6 +80,10 @@ GBLDEF	inc_list_struct		in_files;
 GBLREF	uint4			pipe_child;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	int4			restore_read_errno;
+
+#ifdef DEBUG
+GBLREF	block_id		ydb_skip_bml_num;
+#endif
 
 LITREF	char			*gtm_dbversion_table[];
 LITREF	char			*mdb_ver_names[];
@@ -213,6 +217,11 @@ void mupip_restore(void)
 	}
 	if (udi->fd_opened_with_o_direct)
 		memcpy(&old_data, csd, SGMNT_HDR_LEN);
+#	ifdef DEBUG
+	udi->s_addrs.hdr = &old_data;	/* Now that we have read in the file header, point udi to it for the next dbfilop.
+					 * This is used by the DB_LSEEKREAD macro if "ydb_skip_bml_num" is non-zero.
+					 */
+#	endif
 	if (memcmp(old_data.label, label, GDS_LABEL_SZ) && memcmp(old_data.label, v6_label, GDS_LABEL_SZ))
 	{
 		util_out_print("Output file !AD has an unrecognizable format", TRUE, n_len, db_name);
@@ -421,6 +430,11 @@ void mupip_restore(void)
 				 */
 				new_eof = (off_t)BLK_ZERO_OFF(old_start_vbn) + ((off_t)inhead.db_total_blks * old_blk_size);
 				new_size = new_eof + old_blk_size;
+#				ifdef DEBUG
+				udi->s_addrs.hdr = csd;	/* Point udi to an up to date file header as it is used by the below
+							 * "db_write_eof_block()" call if "ydb_skip_bml_num" is non-zero.
+							 */
+#				endif
 				status = db_write_eof_block(udi, db_fd, old_blk_size, new_eof, &(TREF(dio_buff)));
 				if (0 != status)
 				{
@@ -496,6 +510,10 @@ void mupip_restore(void)
 					bml_newmap((blk_hdr_ptr_t)newmap, BM_SIZE(bplmap), curr_tn, csd->desired_db_format);
 					for (ii = ROUND_UP(old_tot_blks, bplmap); ii < inhead.db_total_blks; ii += bplmap)
 					{
+#						ifdef DEBUG
+						if ((0 != ydb_skip_bml_num) && (0 < ii) && (ii < ydb_skip_bml_num))
+							ii = ydb_skip_bml_num;
+#						endif
 						offset = (off_t)BLK_ZERO_OFF(old_start_vbn) + (off_t)ii * old_blk_size;
 						DB_LSEEKWRITE(NULL, udi, NULL, db_fd, offset, newmap, old_blk_size, status);
 						if (0 != status)

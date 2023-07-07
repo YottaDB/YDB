@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -128,6 +128,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uint4			ydbDebugLevel;
 #ifdef DEBUG
 GBLREF	boolean_t		in_mu_cre_file;
+GBLREF	block_id		ydb_skip_bml_num;
 #endif
 
 STATICDEF	int	mu_cre_file_fd;		/* needed for "mu_cre_file_ch" */
@@ -403,6 +404,10 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 	 * manner as every non-bitmap block must have an associated bitmap)
 	 */
 	cs_data->trans_hist.total_blks += DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, BLKS_PER_LMAP - 1);
+#	ifdef DEBUG
+	if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP < cs_data->trans_hist.total_blks))
+		cs_data->trans_hist.total_blks += (ydb_skip_bml_num - BLKS_PER_LMAP);
+#	endif
 	cs_data->extension_size = gv_cur_region->dyn.addr->ext_blk_count;
 	/* Check if this file is an encrypted database. If yes, do init */
 	if (IS_ENCRYPTED(gv_cur_region->dyn.addr->is_encrypted))
@@ -454,6 +459,7 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 	}
 	if (!cs_data->defer_allocate)
 	{
+		assert(0 == ydb_skip_bml_num);
 		status = posix_fallocate(udi->fd, 0, BLK_ZERO_OFF(cs_data->start_vbn) +
 					 ((off_t)(cs_data->trans_hist.total_blks + 1) * cs_data->blk_size));
 		if (0 != status)

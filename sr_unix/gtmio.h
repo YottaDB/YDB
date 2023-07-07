@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -384,10 +384,19 @@ MBSTART {											\
 		RC = -1;		/* Something kept us from reading what we wanted */	\
 } MBEND
 
-#define	DB_LSEEKREAD(UDI, FD, OFFSET, BUFF, SIZE, STATUS)		\
-MBSTART {								\
-	DBG_CHECK_DIO_ALIGNMENT(UDI, OFFSET, BUFF, SIZE);		\
-	LSEEKREAD(FD, OFFSET, BUFF, SIZE, STATUS);			\
+#ifdef DEBUG
+GBLREF	gtm_int8	ydb_skip_bml_num;	/* Use "gtm_int8" since it is possible "block_id" type is not yet defined */
+#endif
+
+#define	DB_LSEEKREAD(UDI, FD, OFFSET, BUFF, SIZE, STATUS)							\
+MBSTART {													\
+	DBG_CHECK_DIO_ALIGNMENT(UDI, OFFSET, BUFF, SIZE);							\
+	assert((0 == ydb_skip_bml_num) || (0 == OFFSET) || (NULL == ((unix_db_info *)UDI)->s_addrs.hdr)		\
+		|| ((BLK_ZERO_OFF(((unix_db_info *)UDI)->s_addrs.hdr->start_vbn)				\
+			+ ((gtm_int8)BLKS_PER_LMAP * ((unix_db_info *)UDI)->s_addrs.hdr->blk_size)) > OFFSET)	\
+		|| ((BLK_ZERO_OFF(((unix_db_info *)UDI)->s_addrs.hdr->start_vbn)				\
+			+ (ydb_skip_bml_num * ((unix_db_info *)UDI)->s_addrs.hdr->blk_size)) <= OFFSET));	\
+	LSEEKREAD(FD, OFFSET, BUFF, SIZE, STATUS);					\
 } MBEND
 
 /* The below macro is almost the same as LSEEKREAD except it has an extra parameter where the number of

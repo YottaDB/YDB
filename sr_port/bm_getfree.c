@@ -70,6 +70,10 @@ GBLREF uint4		dollar_tlevel;
 GBLREF uint4		update_array_size, cumul_update_array_size;
 GBLREF unsigned int	t_tries;
 
+#ifdef DEBUG
+GBLREF	block_id	ydb_skip_bml_num;
+#endif
+
 error_def(ERR_DBBADFREEBLKCTR);
 error_def(ERR_DBMBMINCFREFIXED);
 
@@ -89,6 +93,10 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
 	if (hint >= total_blks)		/* for TP, hint can be > total_blks */
 		hint = 1;
+#	ifdef DEBUG
+	if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= hint) && (hint < ydb_skip_bml_num))
+		hint = ydb_skip_bml_num;
+#	endif
 	hint_cycled = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
 	hint_limit = DIVIDE_ROUND_DOWN(hint, BLKS_PER_LMAP);
 	local_maps = hint_cycled + 2;	/* for (up to) 2 wraps */
@@ -102,6 +110,10 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 			{
 				hint_cycled = hint_limit;
 				hint = 1;
+#				ifdef DEBUG
+				if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= hint) && (hint < ydb_skip_bml_num))
+					hint = ydb_skip_bml_num;
+#				endif
 				continue;
 			}
 			if (SS_NORMAL != (status = GDSFILEXT(cs_data->extension_size, total_blks, TRANS_IN_PROG_TRUE)))
@@ -125,6 +137,13 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 			continue;
 		}
 		bml *= BLKS_PER_LMAP;
+#		ifdef DEBUG
+		if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= bml) && (bml < ydb_skip_bml_num))
+		{
+			hint = ydb_skip_bml_num + 1;
+			continue;
+		}
+#		endif
 		if (ROUND_DOWN2(hint, BLKS_PER_LMAP) != bml)
 		{	/* not within requested map */
 			if ((bml < hint) && (hint_cycled))	/* wrap? - second one should force an extend for sure */
@@ -271,6 +290,17 @@ boolean_t	is_free_blks_ctr_ok(void)
 	local_maps = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
 	for (free_blocks = 0, free_bml = 0; free_bml < local_maps; free_bml++)
 	{
+#		ifdef DEBUG
+		if ((0 != ydb_skip_bml_num)
+			&& (BLKS_PER_LMAP <= (BLKS_PER_LMAP * free_bml))
+			&& ((BLKS_PER_LMAP * free_bml) < ydb_skip_bml_num))
+		{
+			free_bml = (ydb_skip_bml_num / BLKS_PER_LMAP) - 1;
+				/* - 1 to compensate the "free_bml++" done in "for" loop line */
+			free_blocks += (ydb_skip_bml_num - BLKS_PER_LMAP) / BLKS_PER_LMAP * (BLKS_PER_LMAP - 1);
+			continue;
+		}
+#		endif
 		bml = bmm_find_free((uint4)free_bml, (sm_uc_ptr_t)MM_ADDR(cs_data), local_maps);
 		if (bml < free_bml)
 			break;
@@ -299,6 +329,7 @@ boolean_t	is_free_blks_ctr_ok(void)
 	assert(cs_addrs->ti->free_blocks == free_blocks);
 	if (cs_addrs->ti->free_blocks != free_blocks)
 	{
+		assert(FALSE);
 		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_DBBADFREEBLKCTR, 4, DB_LEN_STR(gv_cur_region),
 				&(cs_addrs->ti->free_blocks), &free_blocks);
 		cs_addrs->ti->free_blocks = free_blocks;

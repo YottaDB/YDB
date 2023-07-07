@@ -65,6 +65,10 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	uint4			process_id;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;
 
+#ifdef DEBUG
+GBLREF	block_id		ydb_skip_bml_num;
+#endif
+
 error_def(ERR_DYNUPGRDFAIL);
 
 int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolean_t blk_free)
@@ -121,6 +125,18 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	assert(csd == cs_data);
 	size = csd->blk_size;
 	assert(csd->acc_meth == dba_bg);
+#	ifdef DEBUG
+	if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= blk) && (blk < ydb_skip_bml_num))
+	{	/* Huge db scheme is in effect and a block in the range of the HOLE in the huge db (any block
+		 * number from the bitmap block BLKS_PER_LMAP to block "ydb_skip_bml_num-1") was specified. This is possible
+		 * in case of a restartable transaction situation. In this case, just return a zeroed block and the
+		 * transaction will eventually restart.
+		 */
+		memset(buff, 0, size);
+		in_dsk_read--;
+		return 0;
+	}
+#	endif
 	/* Since csd->fully_upgraded is referenced more than once in this module (once explicitly and once in
 	 * GDS_BLK_UPGRADE_IF_NEEDED macro used below), take a copy of it and use that so all usages see the same value.
 	 * Not doing this, for example, can cause us to see the database as fully upgraded in the first check causing us

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,7 @@ GBLREF	sgmnt_data		mu_int_data;
 GBLREF	block_id		mu_int_path[];
 GBLREF	boolean_t		tn_reset_this_reg;
 GBLREF	int			mu_int_plen;
-GBLREF	int4			mu_int_blks_to_upgrd;
+GBLREF	block_id		mu_int_blks_to_upgrd;
 GBLREF	int			disp_map_errors;
 GBLREF	int			mu_map_errs;
 GBLREF	int			disp_trans_errors;
@@ -53,6 +53,10 @@ GBLREF	sgmnt_data		*cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
 
 GBLREF trans_num	largest_tn;
+
+#ifdef DEBUG
+GBLREF	block_id		ydb_skip_bml_num;
+#endif
 
 error_def(ERR_DBREADBM);
 error_def(ERR_DBLVLINC);
@@ -119,6 +123,10 @@ void mu_int_maps(void)
 	{
 		assert(mapsize == mu_int_data.bplmap);
 		blkno = mcnt * mu_int_data.bplmap;
+#		ifdef DEBUG
+		if ((0 != ydb_skip_bml_num) && (0 < blkno) && (blkno < ydb_skip_bml_num))
+			continue;
+#		endif
 		bml_busy(0, mu_int_locals + ((blkno * BML_BITS_PER_BLK) / BITS_PER_UCHAR));
 		blk_base = mu_int_read(blkno, &ondsk_blkver, &free_blk_base);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
 		if (!blk_base)

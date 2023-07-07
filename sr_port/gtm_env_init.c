@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,6 +86,10 @@ GBLREF	size_t		ydb_max_storalloc;	/* Used for testing: creates an allocation bar
 GBLREF	int		ydb_repl_filter_timeout;/* # of seconds that source server waits before issuing FILTERTIMEDOUT */
 GBLREF  boolean_t 	dollar_test_default; 	/* Default value taken by dollar_truth via dollar_test_default */
 GBLREF	boolean_t	gtm_nofflf;		/* Used to control "write #" behavior ref GTM-9136 */
+
+#ifdef DEBUG
+GBLREF	block_id	ydb_skip_bml_num;
+#endif
 
 void	gtm_env_init(void)
 {
@@ -223,6 +227,18 @@ void	gtm_env_init(void)
 		ret = ydb_logical_truth_value(YDBENVINDX_DIRTREE_COLLHDR_ALWAYS, FALSE, &is_defined);
 		if (is_defined)
 			TREF(ydb_dirtree_collhdr_always) = ret; /* if logical is not defined, the TREF takes the default value */
+		/* ydb_test_4g_db_blks env var. If set to a non-zero value of N, it implies blocks from the 1st local bitmap
+		 * to the N-1th local bitmap block are not allocated in the db file. After the 0th local bitmap block, the
+		 * Nth local bitmap block is where block allocation continues. This helps test records in the database blocks
+		 * that contain 8-byte block numbers where the higher order 4-byte is non-zero. This effectively tests all
+		 * code (mostly added in GT.M V7.0-000 and merged into YottaDB r2.00) that handles 8-byte block numbers.
+		 * A 0 value implies this scheme is disabled.
+		 */
+		ydb_skip_bml_num = (block_id)ydb_trans_numeric(YDBENVINDX_TEST_4G_DB_BLKS, &is_defined, IGNORE_ERRORS_TRUE, NULL);
+		if (!is_defined)
+			ydb_skip_bml_num = 0;
+		else
+			ydb_skip_bml_num *= BLKS_PER_LMAP;
 #		endif
 		/* GDS Block certification */
 		ret = ydb_logical_truth_value(YDBENVINDX_GDSCERT, FALSE, &is_defined);

@@ -117,7 +117,7 @@ GBLDEF global_list		*trees;
 GBLDEF sgmnt_data		mu_int_data;
 GBLDEF unsigned char		*mu_int_master;
 GBLDEF trans_num		largest_tn;
-GBLDEF int4			mu_int_blks_to_upgrd;
+GBLDEF block_id			mu_int_blks_to_upgrd;
 GBLDEF span_node_integ		*sndata;
 GBLDEF boolean_t		null_coll_type_err = FALSE;
 GBLDEF boolean_t		null_coll_type;
@@ -442,6 +442,13 @@ void mupip_integ(void)
 			 * verifications
 			 */
 			csd = &mu_int_data;
+#			ifdef DEBUG
+			fc = gv_cur_region->dyn.addr->file_cntl;
+			udi = FC2UDI(fc);
+			udi->s_addrs.hdr = csd;	/* Needed by asserts in "DB_LSEEKREAD" macro in "dbfilop()" calls when
+						 * "ydb_skip_bml_num" is non-zero.
+						 */
+#			endif
 		}
 		trees_tail = trees = (global_list *)malloc(SIZEOF(global_list));
 		memset(trees, 0, SIZEOF(global_list));

@@ -147,7 +147,7 @@ GBLREF gtm_uint64_t		mu_int_cum[CUM_TYPE_MAX][MAX_BT_DEPTH + 1];
 GBLREF uint4			mu_int_offset[];
 GBLREF uint4			mu_int_errknt;
 GBLREF block_id			mu_int_path[];
-GBLREF int4			mu_int_blks_to_upgrd;
+GBLREF block_id			mu_int_blks_to_upgrd;
 GBLREF global_list		*trees;
 GBLREF global_list		*trees_tail;
 GBLREF gv_key			*mu_end_key;

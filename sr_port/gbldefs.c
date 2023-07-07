@@ -1419,3 +1419,6 @@ GBLDEF	boolean_t	ydb_treat_sigusr2_like_sigusr1;	/* set based on env var "ydb_tr
 GBLDEF	int		jobinterrupt_sig_num;		/* Set to signal number that caused $ZINTERRUPT (SIGUSR1/SIGUSR2).
 							 * Used to derive the value of the ISV $ZYINTRSIG.
 							 */
+#ifdef DEBUG
+GBLDEF	block_id	ydb_skip_bml_num;	/* See comment in "sr_port/gtm_env_init.c" for purpose */
+#endif
