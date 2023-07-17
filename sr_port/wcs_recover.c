@@ -278,7 +278,7 @@ void wcs_recover(gd_region *reg)
 	for (cr = cr_lo, total_rip_wait = 0; cr < cr_hi; cr++, buffptr += blk_size)
 	{
 		cr->buffaddr = GDS_ANY_ABS2REL(csa, buffptr);	/* reset it to what it should be just to be safe */
-		if (((int)(cr->blk) != CR_BLKEMPTY) && (((int)(cr->blk) < 0) || ((int)(cr->blk) >= csd->trans_hist.total_blks)))
+		if ((cr->blk != CR_BLKEMPTY) && ((cr->blk < 0) || (cr->blk >= csd->trans_hist.total_blks)))
 		{	/* bad block number. discard buffer for now. actually can do better by looking at cr->bt_index... */
 			cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 			cr->blk = CR_BLKEMPTY;

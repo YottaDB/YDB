@@ -365,8 +365,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				 */
 				max_tn = th->tn;
 			}
-			if (((int)(th->blk) != BT_NOTVALID) &&
-				(((int)(th->blk) < 0) || ((int)(th->blk) > csd->trans_hist.total_blks)))
+			if ((th->blk != BT_NOTVALID) &&
+				((th->blk < 0) || (th->blk > csd->trans_hist.total_blks)))
 			{
 				assert(expect_damage);
 				ret = FALSE;
@@ -458,7 +458,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 						RTS_ERROR_TEXT("bt->blkque.bl"), (UINTPTR_T)bt->blkque.bl,
 						(sm_uc_ptr_t)bt_prev - (sm_uc_ptr_t)bt);
 				}
-				if ((int)(bt->blk) != BT_NOTVALID)
+				if (bt->blk != BT_NOTVALID)
 				{
 					if ((csa->bt_header + (bt->blk % csd->bt_buckets)) != bt0)
 					{
@@ -524,7 +524,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		/* scan all bts looking for valid bt->blks whose bts were not in any blkque */
 		for (bt = bt_lo; bt < bt_hi; bt++)
 		{
-			if ((FALSE == (*blkque_array)[bt - bt_lo]) && ((int)(bt->blk) != BT_NOTVALID))
+			if ((FALSE == (*blkque_array)[bt - bt_lo]) && (bt->blk != BT_NOTVALID))
 			{
 				assert(expect_damage);
 				ret = FALSE;
@@ -543,8 +543,8 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		asyncio = csd->asyncio;
 		for (bp = bp_lo, cr = cr_lo, cnt = n_bts; cnt > 0; cr++, bp += csd->blk_size, cnt--)
 		{
-			if (((int)(cr->blk) != CR_BLKEMPTY) &&
-				(((int)(cr->blk) < 0) || ((int)(cr->blk) >= csd->trans_hist.total_blks)))
+			if ((cr->blk != CR_BLKEMPTY) &&
+				((cr->blk < 0) || (cr->blk >= csd->trans_hist.total_blks)))
 			{
 				assert(expect_damage);
 				ret = FALSE;
@@ -836,7 +836,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 						RTS_ERROR_TEXT("cr->blkque.bl"), (UINTPTR_T)cr->blkque.bl,
 						(sm_uc_ptr_t)cr_prev - (sm_uc_ptr_t)cr);
 				}
-				if (((int)(cr->blk) != CR_BLKEMPTY) && ((cr_qbase + (cr->blk % csd->bt_buckets)) != cr0))
+				if ((cr->blk != CR_BLKEMPTY) && ((cr_qbase + (cr->blk % csd->bt_buckets)) != cr0))
 				{
 					assert(expect_damage);
 					ret = FALSE;
@@ -898,7 +898,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		/* scan all crs looking for non-empty cr->blks whose crs were not in any blkque */
 		for (cr = cr_lo; cr < cr_hi; cr++)
 		{
-			if ((FALSE == (*blkque_array)[cr - cr_lo]) && ((int)(cr->blk) != CR_BLKEMPTY))
+			if ((FALSE == (*blkque_array)[cr - cr_lo]) && (cr->blk != CR_BLKEMPTY))
 			{
 				assert(expect_damage);
 				ret = FALSE;
