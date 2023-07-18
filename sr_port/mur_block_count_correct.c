@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -40,6 +43,10 @@ GBLREF 	gd_region		*gv_cur_region;
 GBLREF	sgmnt_data_ptr_t 	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF 	jnl_gbls_t		jgbl;
+
+#ifdef DEBUG
+GBLREF	block_id		ydb_skip_bml_num;
+#endif
 
 error_def(ERR_DBFILERR);
 error_def(ERR_DBUNDACCMT);
@@ -88,6 +95,19 @@ int4 mur_block_count_correct(reg_ctl_list *rctl)
 		 */
 		bplmap = cs_data->bplmap;
 		new_blocks = (native_size - size)/(mu_data->blk_size / DISK_BLOCK_SIZE);
+#		ifdef DEBUG
+		if (0 != ydb_skip_bml_num)
+		{	/* Check if the current value of "total_blks" is BEFORE where the HOLE starts and if "new_blocks"
+			 * will take "total_blks" to AFTER where the HOLE ends. In that case, subtract the blocks in the
+			 * HOLE away from "new_blocks" before calling GDSFILEXT.
+			 */
+			if ((BLKS_PER_LMAP >= total_blks) && ((new_blocks + total_blks) > ydb_skip_bml_num))
+			{
+				assert(new_blocks > (ydb_skip_bml_num - BLKS_PER_LMAP));
+				new_blocks -= (ydb_skip_bml_num - BLKS_PER_LMAP);
+			}
+		}
+#		endif
 		new_bit_maps = DIVIDE_ROUND_UP(total_blks + new_blocks, bplmap) - DIVIDE_ROUND_UP(total_blks, bplmap);
 		tmpcnt = new_blocks - new_bit_maps;
 		/* Call GDSFILEXT only if the no of blocks by which DB needs to be extended is not '0' since GDSFILEXT() treats
