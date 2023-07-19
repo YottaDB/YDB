@@ -51,8 +51,7 @@ GBLREF	int			trans_errors;
 GBLREF	boolean_t		debug_mupip;
 GBLREF	sgmnt_data		*cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
-
-GBLREF trans_num	largest_tn;
+GBLREF	trans_num		largest_tn;
 
 #ifdef DEBUG
 GBLREF	block_id		ydb_skip_bml_num;
@@ -122,12 +121,12 @@ void mu_int_maps(void)
 	for (mcnt = 0;  mcnt < maps;  mcnt++, local += BM_MINUS_BLKHDR_SIZE(mapsize))
 	{
 		assert(mapsize == mu_int_data.bplmap);
-		blkno = mcnt * mu_int_data.bplmap;
 #		ifdef DEBUG
-		if ((0 != ydb_skip_bml_num) && (0 < blkno) && (blkno < ydb_skip_bml_num))
-			continue;
+		if ((0 != ydb_skip_bml_num) && (1 == mcnt))
+			mcnt = ydb_skip_bml_num / BLKS_PER_LMAP;
 #		endif
-		bml_busy(0, mu_int_locals + ((blkno * BML_BITS_PER_BLK) / BITS_PER_UCHAR));
+		blkno = mcnt * mu_int_data.bplmap;
+		bml_busy(0, local);
 		blk_base = mu_int_read(blkno, &ondsk_blkver, &free_blk_base);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
 		if (!blk_base)
 		{

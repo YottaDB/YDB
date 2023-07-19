@@ -126,6 +126,7 @@
 }
 
 GBLDEF unsigned char		muint_temp_buff[MAX_MIDENT_LEN + 1];
+
 GBLREF unsigned char		*mu_int_locals;
 GBLREF unsigned char		mu_int_root_level;
 GBLREF bool			mu_ctrly_occurred, mu_ctrlc_occurred;
@@ -163,6 +164,10 @@ GBLREF boolean_t		nct_err_type;
 GBLREF boolean_t		debug_mupip;
 GBLREF int			rec_len;
 GBLREF jnlpool_addrs_ptr_t	jnlpool;
+#ifdef DEBUG
+GBLREF	block_id		ydb_skip_bml_num;
+#endif
+
 error_def(ERR_DBBADKYNM);
 error_def(ERR_DBBADNSUB);
 error_def(ERR_DBBADPNTR);
@@ -296,6 +301,7 @@ boolean_t mu_int_blk(
 	unsigned short	numsubs;
 	unsigned int	null_subscript_cnt;
 	boolean_t	coll_ret;
+	gtm_uint64_t	mu_int_locals_offset;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -308,7 +314,15 @@ boolean_t mu_int_blk(
 		mu_int_path[mu_int_plen] = 0;
 	}
 	blk_lmap = (blk / mu_int_data.bplmap) * mu_int_data.bplmap;
-	if (!block_being_retried && !bml_busy(blk - blk_lmap, mu_int_locals + ((blk_lmap * BML_BITS_PER_BLK) / BITS_PER_UCHAR)))
+	mu_int_locals_offset = ((blk_lmap * BML_BITS_PER_BLK) / BITS_PER_UCHAR);
+#	ifdef DEBUG
+	if ((0 != ydb_skip_bml_num) && (0 < blk_lmap))
+	{
+		assert(blk_lmap >= ydb_skip_bml_num);
+		mu_int_locals_offset -= (((ydb_skip_bml_num - BLKS_PER_LMAP) * BML_BITS_PER_BLK) / BITS_PER_UCHAR);
+	}
+#	endif
+	if (!block_being_retried && !bml_busy(blk - blk_lmap, mu_int_locals + mu_int_locals_offset))
 	{	/* block already marked busy */
 		mu_int_err(ERR_DBBDBALLOC, TRUE, TRUE, bot_key, bot_len, top_key, top_len, (unsigned int)(level));
 		return FALSE;
@@ -942,8 +956,15 @@ boolean_t mu_int_blk(
 			} else
 			{
 				blk_lmap = (child / mu_int_data.bplmap) * mu_int_data.bplmap;
-				if (!bml_busy(child - blk_lmap,
-						mu_int_locals + ((blk_lmap * BML_BITS_PER_BLK) / BITS_PER_UCHAR)))
+				mu_int_locals_offset = ((blk_lmap * BML_BITS_PER_BLK) / BITS_PER_UCHAR);
+#				ifdef DEBUG
+				if ((0 != ydb_skip_bml_num) && (0 < blk_lmap))
+				{
+					assert(blk_lmap >= ydb_skip_bml_num);
+					mu_int_locals_offset -= (((ydb_skip_bml_num - BLKS_PER_LMAP) * BML_BITS_PER_BLK) / BITS_PER_UCHAR);
+				}
+#				endif
+				if (!bml_busy(child - blk_lmap, mu_int_locals + mu_int_locals_offset))
 				{
 					mu_int_offset[mu_int_plen]=0;
 					mu_int_path[mu_int_plen++]=child;	/* Increment mu_int_plen */

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -35,6 +38,10 @@ GBLREF	sgmnt_data		mu_int_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			mu_int_errknt;
 GBLREF	boolean_t		tn_reset_specified;
+
+#ifdef DEBUG
+GBLREF	block_id		ydb_skip_bml_num;
+#endif
 
 error_def(ERR_DBNOTDB);
 error_def(ERR_DBINCRVER);
@@ -237,7 +244,14 @@ boolean_t mu_int_fhead(void)
 		}
 	}
 	/* make working space for all local bitmaps */
-	maps = (actual_tot_blks + mu_data->bplmap - 1) / mu_data->bplmap;
+	maps = DIVIDE_ROUND_UP(actual_tot_blks, mu_data->bplmap);
+#	ifdef DEBUG
+	if ((0 != ydb_skip_bml_num) && (1 < maps))
+	{
+		assert(maps >= (ydb_skip_bml_num / BLKS_PER_LMAP));
+		maps -= ((ydb_skip_bml_num / BLKS_PER_LMAP) - 1);	/* do not malloc space for local bitmaps in the HOLE */
+	}
+#	endif
 	size = (gtm_uint64_t)(BM_SIZE(mu_data->bplmap) - SIZEOF(blk_hdr));
 	size *= maps;
 	mu_int_locals = (unsigned char *)malloc(size);
