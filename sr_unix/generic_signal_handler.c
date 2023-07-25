@@ -173,21 +173,13 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 
 	SETUP_THREADGBL_ACCESS;
 	using_alternate_sighandling = USING_ALTERNATE_SIGHANDLING;	/* Simpler local version */
-	/* Check for rethrown signal before we check forwarding. When deferred_exit_handler() processes a deferred
-	 * signal, some non-M languages (specifically Golang, perhaps others) rethrow the signal so it comes through
-	 * here twice. Since we run the exit handler logic just prior to invoking non-YDB signal handlers that were
-	 * in place before YDB was initialized, we can check exit_handler_complete to see if it has already run. If
-	 * has, we just drive the non-M main's handler and do an _exit() if it returns.
+	/* Check for rethrown signal before we check forwarding. When deferred_exit_handler() processes a deferred signal,
+	 * some non-M languages (specifically Golang, perhaps others) rethrow the signal so it comes through here twice.
+	 * Since we run the exit handler logic just prior to invoking non-YDB signal handlers that were in place before
+	 * YDB was initialized, we can check exit_handler_complete to see if it has already run. If it has, just return.
 	 */
 	if (exit_handler_complete)
-	{
-		if (!using_alternate_sighandling)	/* Go does not send us signals so no need to forward */
-		{
-			drive_non_ydb_signal_handler_if_any("generic_signal_handler1", sig, info, context, TRUE);
-			UNDERSCORE_EXIT(-sig);
-		}
 		return;		/* Nothing we can do if exit handler has run */
-	}
 	if (!using_alternate_sighandling)
 	{
 		signal_forwarded = IS_SIGNAL_FORWARDED(sig_hndlr_generic_signal_handler, sig, info);
