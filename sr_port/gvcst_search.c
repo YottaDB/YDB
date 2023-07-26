@@ -510,7 +510,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			assert(2 == SIZEOF(pCurr->prev_rec.match));
 			pCurr->prev_rec.offset = PREV_REC_UNINITIALIZED;
 			pCurr->prev_rec.match = PREV_REC_UNINITIALIZED;
-			pCurr->curr_rec.offset = bsiz - BSTAR_REC_SIZE;
+			pCurr->curr_rec.offset = bsiz - bstar_rec_size(long_blk_id);
 			pCurr->curr_rec.match = 0;
 		}
 		if ((n0 = pCurr->curr_rec.offset) >= bsiz)	/* Warning: Assignment */

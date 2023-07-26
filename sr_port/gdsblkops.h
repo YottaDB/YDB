@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -36,10 +39,10 @@ typedef struct
  * BLK_INIT, BLK_FINI space ---> CDB_CW_SET_SIZE * (BLK_SEG_ARRAY_SIZE * SIZEOF(blk_segment))
  * BLK_ADDR leaf-level space---> 2 * cs_data->blk_size         (for current and new sibling)
  * BLK_ADDR index-level space--> (MAX_BT_DEPTH - 1) * (2 * (MAX_KEY_SZ + SIZEOF(rec_hdr) + SIZEOF(block_id)) + SIZEOF(rec_hdr))
- * 2 extra space            ---> cs_data->blk_size + BSTAR_REC_SIZE		(needed in case of global-variable creation)
+ * 2 extra space            ---> cs_data->blk_size + bstar_rec_size		(needed in case of global-variable creation)
  * Bitmap BLK_ADDR space    ---> (MAX_BT_DEPTH + 1) * (SIZEOF(block_id) * (BLKS_PER_LMAP + 1))
  *
- * In the above calculations SIZEOF(block_id) and BSTAR_REC_SIZE are placeholders for the Macro/Function calls
+ * In the above calculations SIZEOF(block_id) and bstar_rec_size are placeholders for the Macro/Function calls
  * that will return different values depending on whether the DB is V6 or V7
  */
 

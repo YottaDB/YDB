@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -199,7 +199,13 @@ typedef rec_hdr *rec_hdr_ptr_t;
 /* Macros/Inline functions for bstar records */
 #define BSTAR_REC_SIZE_32	INTCAST((SIZEOF(rec_hdr) + SIZEOF(block_id_32)))
 #define BSTAR_REC_SIZE_64	INTCAST((SIZEOF(rec_hdr) + SIZEOF(block_id_64)))
-#define BSTAR_REC_SIZE		BSTAR_REC_SIZE_64
+/* Comment the below macro definition out as the availability of this macro can cause subtle bugs.
+ * See https://gitlab.com/YottaDB/DB/YDBTest/-/work_items/522#note_1489467002 for an example.
+ * Not having this macro will force the caller to use the "bstar_rec_size" static inline function
+ * which is the right usage because the star-record size varies depending on whether the block format is V6 or V7.
+ *
+ * #define BSTAR_REC_SIZE		BSTAR_REC_SIZE_64
+ */
 
 static inline int bstar_rec_size(boolean_t long_blk_id)
 {
