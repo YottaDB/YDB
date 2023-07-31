@@ -180,8 +180,8 @@ help_exit()
 	echo "--copyenv [dirname]		-> copy ydb_env_set, ydb_env_unset, and gtmprofile files to dirname, default /usr/local/etc; incompatible with linkenv"
 	echo "--copyexec [dirname]		-> copy ydb & gtm scripts to dirname, default /usr/local/bin; incompatible with linkexec"
 	echo "--debug				-> turn on debugging with set -x"
-	echo "--distrib dirname or URL	-> source directory for YottaDB/GT.M distribution tarball, local or remote"
-	echo "--dry-run			-> do everything short of installing YottaDB, including downloading the distribution"
+	echo "--distrib dirname or URL		-> source directory for YottaDB/GT.M distribution tarball, local or remote"
+	echo "--dry-run				-> do everything short of installing YottaDB, including downloading the distribution"
 	echo "--encplugin			-> compile and install the encryption plugin"
 	echo "--filename filename		-> name of YottaDB distribution tarball"
 	echo "--force-install			-> install even if the current platform is not Supported"
@@ -200,18 +200,18 @@ help_exit()
 	echo "--nodeprecated			-> do not install deprecated components, specifically %DSEWRAP"
 	echo "--nolinkenv			-> do not create link to ydb_env_set, ydb_env_unset, and gtmprofile from another directory"
 	echo "--nolinkexec			-> do not create link to ydb & gtm scripts from another directory"
-	echo "--nopkg-config			-> do not create yottadb.pc for pkg-config, or update an existing file"
-	echo "--octo parameters		-> download and install Octo; also installs required POSIX and AIM plugins. Specify optional cmake parameters for Octo as necessary"
+	echo "--nopkg-config			-> do not copy yottadb.pc from installdir to /usr/share/pkgconfig/yottadb.pc"
+	echo "--octo parameters			-> download and install Octo; also installs required POSIX and AIM plugins. Specify optional cmake parameters for Octo as necessary"
 	echo "--overwrite-existing		-> install into an existing directory, overwriting contents; defaults to requiring new directory"
 	echo "--plugins-only			-> just install plugins for an existing YottaDB installation, not YottaDB"
 	echo "--posix				-> download and install the POSIX plugin"
 	echo "--preserveRemoveIPC		-> do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
 	echo "--prompt-for-group		-> YottaDB installation script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
-	echo "--sodium			-> download and install the libsodium plugin"
-	echo "--ucaseonly-utils		-> install only upper case utility program names; defaults to both if not specified"
+	echo "--sodium				-> download and install the libsodium plugin"
+	echo "--ucaseonly-utils			-> install only upper case utility program names; defaults to both if not specified"
 	echo "--user username			-> user who should own YottaDB installation; default is root"
 	echo "--utf8				-> install UTF-8 support"
-	echo "--verbose			-> output diagnostic information as the script executes; default is to run quietly"
+	echo "--verbose				-> output diagnostic information as the script executes; default is to run quietly"
 	echo "--zlib				-> download and install the zlib plugin"
 	echo "Options that take a value (e.g, --group) can be specified as either --option=value or --option value."
 	echo "Options marked with \"*\" are likely to be of interest primarily to YottaDB developers."
@@ -1464,10 +1464,9 @@ elif [ -n "$gtm_copyexec" ] ; then
 	if [ "Y" = "$gtm_verbose" ] ; then echo Copied exec ; ls -l $gtm_copyexec ; fi
 fi
 
-# Create the pkg-config file
-if [ "N" != "$ydb_pkgconfig" ] ; then
-	pcfilepath=/usr/share/pkgconfig
-	cat > ${ydb_installdir}/yottadb.pc << EOF
+# Create the pkg-config file in installdir
+pcfilepath=/usr/share/pkgconfig
+cat > ${ydb_installdir}/yottadb.pc << EOF
 prefix=${ydb_installdir}
 
 exec_prefix=\${prefix}
@@ -1481,7 +1480,8 @@ Cflags: -I\${includedir}
 Libs: -L\${libdir} -lyottadb -Wl,-rpath,\${libdir}
 EOF
 
-	# Now place it where the system can find it
+if [ "N" != "$ydb_pkgconfig" ] ; then
+	# Now place pkg-config file where the system can find it
 	# We strip the "r" and "." to perform a numeric comparision between the versions
 	# YottaDB will only ever increment versions, so a larger number indicates a newer version
 	if [ ! -f ${pcfilepath}/yottadb.pc ] || {
