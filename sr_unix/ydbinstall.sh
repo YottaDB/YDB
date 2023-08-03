@@ -132,6 +132,8 @@ dump_info()
 	if [ -n "$ydb_pkgconfig" ] ; then echo ydb_pkgconfig " : " $ydb_pkgconfig ; fi
 	if [ -n "$ydb_posix" ] ; then echo ydb_posix " : " $ydb_posix ; fi
 	if [ -n "$ydb_routines" ] ; then echo ydb_routines " : " $ydb_routines ; fi
+	if [ -n "$ydb_sodium" ] ; then echo ydb_sodium " : " $ydb_sodium ; fi
+	if [ -n "$ydb_syslog" ] ; then echo ydb_syslog " : " $ydb_syslog ; fi
 	if [ -n "$ydb_utf8" ] ; then echo ydb_utf8 " : " $ydb_utf8 ; fi
 	if [ -n "$ydb_version" ] ; then echo ydb_version " : " $ydb_version ; fi
 	if [ -n "$ydb_zlib" ] ; then echo ydb_zlib " : " $ydb_zlib ; fi
@@ -208,6 +210,7 @@ help_exit()
 	echo "--preserveRemoveIPC		-> do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
 	echo "--prompt-for-group		-> YottaDB installation script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
 	echo "--sodium				-> download and install the libsodium plugin"
+	echo "--syslog				-> download and install the YDBSyslog plugin"
 	echo "--ucaseonly-utils			-> install only upper case utility program names; defaults to both if not specified"
 	echo "--user username			-> user who should own YottaDB installation; default is root"
 	echo "--utf8				-> install UTF-8 support"
@@ -320,13 +323,15 @@ install_plugins()
 		fi
 	fi
 
+	if [ "Y" = "$ydb_gui" ] ; then install_std_plugin UI YDBGUI ; fi
+
+	if [ "Y" = $ydb_octo ] ; then install_std_plugin DBMS YDBOcto ; fi
+
 	if [ "Y" = "$ydb_posix" ] ; then install_std_plugin Util YDBPosix ; fi
 
 	if [ "Y" = "$ydb_sodium" ] ; then install_std_plugin Util YDBSodium ; fi
 
-	if [ "Y" = "$ydb_gui" ] ; then install_std_plugin UI YDBGUI ; fi
-
-	if [ "Y" = $ydb_octo ] ; then install_std_plugin DBMS YDBOcto ; fi
+	if [ "Y" = "$ydb_syslog" ] ; then install_std_plugin Util YDBSyslog ; fi
 
 	if [ "Y" = $ydb_zlib ] ; then
 		echo "Now installing YDBZlib"
@@ -447,6 +452,7 @@ if [ -z "$ydb_plugins_only" ] ; then ydb_plugins_only="N" ; fi
 if [ -z "$ydb_posix" ] ; then ydb_posix="N" ; fi
 if [ -n "$ydb_prompt_for_group" ] ; then gtm_prompt_for_group="$ydb_prompt_for_group" ; fi
 if [ -z "$ydb_sodium" ] ; then ydb_sodium="N" ; fi
+if [ -z "$ydb_syslog" ] ; then ydb_syslog="N" ; fi
 if [ -n "$ydb_verbose" ] ; then gtm_verbose="$ydb_verbose" ; fi
 if [ -z "$ydb_utf8" ] ; then ydb_utf8="N" ; fi
 if [ -z "$ydb_zlib" ] ; then ydb_zlib="N" ; fi
@@ -477,6 +483,7 @@ while [ $# -gt 0 ] ; do
 			ydb_octo="Y"
 			ydb_posix="Y"
 			ydb_sodium="Y"
+			ydb_syslog="Y"
 			ydb_zlib="Y" ; shift ;;
 		--branch*) tmp=`echo $1 | cut -s -d = -f 2-`
 			if [ -n "$tmp" ] ; then ydb_branch=$tmp
@@ -590,6 +597,7 @@ while [ $# -gt 0 ] ; do
 		--preserveRemoveIPC) ydb_change_removeipc="no" ; shift ;; # must come before group*
 		--prompt-for-group) gtm_prompt_for_group="Y" ; shift ;;
 		--sodium) ydb_sodium="Y" ; shift ;;
+		--syslog) ydb_syslog="Y" ; shift ;;
 		--ucaseonly-utils) gtm_lcase_utils="N" ; shift ;;
 		--user*) tmp=`echo $1 | cut -s -d = -f 2-`
 			if [ -n "$tmp" ] ; then gtm_user=$tmp
@@ -676,10 +684,12 @@ if [ "Y" = "$ydb_encplugin" ] ; then
 	append_to_str hdrlist "gcrypt.h gpg-error.h gpgme.h libconfig.h \
 		openssl/bio.h openssl/err.h openssl/evp.h openssl/ssl.h"
 fi
+
 # GUI
 if [ "Y" = $ydb_gui ] ; then
 	append_to_str utillist "cmake cp df gcc git grep pkg-config ps rm stat"
 fi
+
 # Octo
 if [ "Y" = "$ydb_octo" ] ; then
 	append_to_str utillist "bison cmake flex gcc git gzip make pkg-config"
@@ -688,9 +698,21 @@ if [ "Y" = "$ydb_octo" ] ; then
 		openssl/conf.h openssl/err.h openssl/evp.h openssl/md5.h openssl/ssl.h \
 		readline/history.h readline/readline.h sys/syscall.h"
 fi
+
 # POSIX plugin; note that all required headers are part of the POSIX standard
 if [ "Y" = "$ydb_posix" ] ; then
 	append_to_str utillist "cmake gcc git make pkg-config"
+fi
+
+# libsodium plugin
+if [ "Y" = "$ydb_sodium" ] ; then
+	append_to_str utillist "cmake gcc git make"
+	append_to_str hdrlist "sodium.h"
+fi
+
+# YDBSyslog plugin
+if [ "Y" = $ydb_syslog ] ; then
+	append_to_str utillist "gcc git cmake make pkg-config"
 fi
 
 # Zlib plugin; note that all required headers are part of the POSIX standard
@@ -698,11 +720,7 @@ if [ "Y" = "$ydb_zlib" ] ; then
 	append_to_str utillist "gcc"
 	append_to_str shliblist "libz.so"
 fi
-# libsodium plugin
-if [ "Y" = "$ydb_sodium" ] ; then
-	append_to_str utillist "cmake gcc git make"
-	append_to_str hdrlist "sodium.h"
-fi
+
 # Check for required header files, shared libraries and utility programs
 check_if_utils_exist "Program(s) required to install selected plugins not found:"
 check_if_shlibs_exist "Shared library/libraries required by selected plugins not found:"
@@ -832,6 +850,8 @@ if [ -n "$ydb_from_source" ] ; then
 	fi
 	if [ "Y" = "$gtm_overwrite_existing" ] ; then install_options="${install_options} --overwrite-existing" ; fi
 	if [ "Y" = "$ydb_posix" ] ; then install_options="${install_options} --posix" ; fi
+	if [ "Y" = "$ydb_sodium" ] ; then install_options="${install_options} --sodium" ; fi
+	if [ "Y" = "$ydb_syslog" ] ; then install_options="${install_options} --syslog" ; fi
 	if [ "Y" = "$gtm_prompt_for_group" ] ; then install_options="${install_options} --prompt-for-group" ; fi
 	if [ "N" = "$gtm_lcase_utils" ] ; then install_options="${install_options} --ucaseonly-utils" ; fi
 	if [ -n "$gtm_user" ] ; then install_options="${install_options} --user ${gtm_user}" ; fi
@@ -930,6 +950,9 @@ if [ "Y" = "$ydb_plugins_only" ]; then
 		fi
 		if [ "Y" = $ydb_sodium ] && [ -e $ydb_installdir/plugin/libsodium.so ] ; then
 			echo YDBSodium $msgsuffix ; unset nooverwrite
+		if [ "Y" = $ydb_syslog ] && [ -e $ydb_installdir/plugin/o/_ydbsyslog.so ] ; then
+			echo YDBSyslog $msgsuffix ; unset nooverwrite
+		fi
 		fi
 		if [ "Y" = $ydb_zlib ] && [ -e $ydb_installdir/plugin/libgtmzlib.so ] ; then
 			echo "YDBZlib $msgsuffix" ; unset nooverwrite
