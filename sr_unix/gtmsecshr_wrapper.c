@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,15 +55,13 @@
 #include "gtm_limits.h"
 #include "get_syslog_flags.h"
 #include "ydb_getenv.h"
+#include "gtmsecshr.h"
 
-#define ROOTUID 0
-#define ROOTGID 0
 #define MAX_ENV_VAR_VAL_LEN 1024
 #define MAX_ALLOWABLE_LEN 256
 #define ASCIICTLMAX	32  /* space character */
 #define ASCIICTLMIN	0   /* NULL character */
 #define YDB_TMP		"ydb_tmp"
-#define	SUB_PATH_TO_GTMSECSHRDIR "/gtmsecshrdir"
 #define	REL_PATH_TO_CURDIR "."
 #define	REL_PATH_TO_GTMSECSHR "./gtmsecshr"
 #define	GTMSECSHR_BASENAME "/gtmsecshr"
@@ -310,7 +308,7 @@ int main()
 	if (env_var_ptr = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))	/* Warning - assignment */
 	{
 		if (MAX_ALLOWABLE_LEN <
-				(strlen(env_var_ptr) + STR_LIT_LEN(SUB_PATH_TO_GTMSECSHRDIR) + STR_LIT_LEN(GTMSECSHR_BASENAME)))
+				SECSHR_PARENT_DIR_LEN(strlen(env_var_ptr)) + STR_LIT_LEN(GTMSECSHR_DIR_SUFFIX) + STR_LIT_LEN(GTMSECSHR_BASENAME))
 		{
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRYDBDIST2LONG);
 			ret = -1;
@@ -319,13 +317,13 @@ int main()
 			snprintf(ydb_dist_val, SIZEOF(ydb_dist_val), "%s", env_var_ptr);
 			/* point the path to the real gtmsecshr - for display purposes only */
 			snprintf(gtm_secshr_path, MAX_ENV_VAR_VAL_LEN, "%s%s%s",
-					env_var_ptr, SUB_PATH_TO_GTMSECSHRDIR, GTMSECSHR_BASENAME);
+					SECSHR_PARENT_DIR(env_var_ptr), GTMSECSHR_DIR_SUFFIX, GTMSECSHR_BASENAME);
 			strsanitize(gtm_secshr_path, gtm_secshr_path_display);
 			/* point the path to the real gtmsecshrdir */
-			snprintf(gtm_secshrdir_path, MAX_ENV_VAR_VAL_LEN, "%s%s", env_var_ptr, SUB_PATH_TO_GTMSECSHRDIR);
+			snprintf(gtm_secshrdir_path, MAX_ENV_VAR_VAL_LEN, "%s%s", SECSHR_PARENT_DIR(env_var_ptr), GTMSECSHR_DIR_SUFFIX);
 			strsanitize(gtm_secshrdir_path, gtm_secshrdir_path_display);
 			/* the path to gtmsecshr wrapper that we want to display in a PS listing */
-			snprintf(gtm_secshr_orig_path, MAX_ENV_VAR_VAL_LEN, "%s%s", env_var_ptr, GTMSECSHR_BASENAME);
+			snprintf(gtm_secshr_orig_path, MAX_ENV_VAR_VAL_LEN, "%s%s", SECSHR_PARENT_DIR(env_var_ptr), GTMSECSHR_BASENAME);
 		}
 	} else
 	{

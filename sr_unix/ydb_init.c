@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -287,11 +287,12 @@ int ydb_init()
 		else if (YDB_DIST_PATH_MAX <= dist_len)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX);
 		/* Verify that $ydb_dist/gtmsecshr is available with setuid root */
-		memcpy(path, ydb_dist, dist_len);
-		path[dist_len] =  '/';
-		memcpy(path + dist_len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
-		path_len = dist_len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
-		assertpro(YDB_PATH_MAX > path_len);
+		path_len = SECSHR_PARENT_DIR_LEN(dist_len) + 1 + STRLEN(GTMSECSHR_EXECUTABLE);	/* includes null */
+		/* SECSHRPATHMAX error would've been issued prior to this assert if the condition below was to fail */
+		assert(YDB_PATH_MAX > path_len);
+		memcpy(path, SECSHR_PARENT_DIR(ydb_dist), SECSHR_PARENT_DIR_LEN(dist_len));
+		path[SECSHR_PARENT_DIR_LEN(dist_len)] =  '/';
+		memcpy(path + SECSHR_PARENT_DIR_LEN(dist_len) + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
 		path[path_len] = '\0';
 		if (-1 == Stat(path, &stat_buf))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,

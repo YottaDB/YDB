@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,7 +91,7 @@ gid_t	gtm_get_group_id(struct stat *stat_buff)
 	if (ydb_dist_ok_to_use)
 	{
 		/* build a path to libyottadb.so */
-		SNPRINTF(temp, SIZEOF(temp), LIBYOTTADBDOTSO, ydb_dist);
+		SNPRINTF(temp, SIZEOF(temp), LIBYOTTADBDOTSO_FMT_STR, ydb_dist);
 		STAT_FILE(temp, stat_buff, ret_stat);
 		if (0 == ret_stat)
 		{

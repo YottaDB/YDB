@@ -75,6 +75,8 @@ GPG_KEYS=(
     "7DFE4A199F6CEF4930E8116F9C97353925E898E9"
     # Berwyn Hoyt
     "0135A87314F8DE1D16C66011A02724281164EA4F"
+    # Tomas Morstein
+    "A8C4D3290201B5647F557BC8135280C2690FCF0F"
 )
 gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "${GPG_KEYS[@]}"
 

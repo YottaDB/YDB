@@ -95,7 +95,7 @@ void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 		{	/* Could not find "common_startup_init" symbol in a shared library. Issue error. */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("dladdr"), CALLFROM);
 		}
-		nbytes = SNPRINTF(comparison, YDB_PATH_MAX, LIBYOTTADBDOTSO, ydb_dist);
+		nbytes = SNPRINTF(comparison, YDB_PATH_MAX, LIBYOTTADBDOTSO_FMT_STR, ydb_dist);
 		if ((0 > nbytes) || (nbytes >= YDB_PATH_MAX))
 		{	/* Error return from SNPRINTF */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX);
@@ -104,6 +104,14 @@ void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 		if (!status)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_LIBYOTTAMISMTCH, 4,
 				LEN_AND_STR(comparison), LEN_AND_STR(shlib_info.dli_fname));
+#		ifdef YDB_EXTERNAL_SECSHR_PARENT_DIR
+		/* Check the real gtmsecshr path which is always longer than the gtmsecshr wrapper */
+		nbytes = SNPRINTF(comparison, YDB_PATH_MAX, GTMSECSHR_REAL_FMT_STR, YDB_EXTERNAL_SECSHR_PARENT_DIR);
+		if ((0 > nbytes) || (nbytes >= YDB_PATH_MAX))
+		{	/* Error return from SNPRINTF */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SECSHRPATHMAX, 1, YDB_DIST_PATH_MAX);
+		}
+#		endif
 	}
 	/* else : In gtmsecshr, there is no dlopen of "libyottadb.so" hence above check is skipped.
 	 *        Also, it has its own "ydb_dist" checks.

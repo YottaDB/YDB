@@ -34,6 +34,7 @@
  Set fn=$Piece(txt," ",1)
  Set nohdr=$Piece(txt," ",2)
  ;
+ If $ztrnlnm("gtm_tools")="" write "ERROR: $gtm_tools must be defined!",! zhalt 1
  Set in=$ZPARSE(fn,"","",".msg")
  Set out=$ZPARSE(fn,"NAME"),txt=$ZPARSE(out,"","[]",".c")
  Set l=$Length(txt),outansi=txt

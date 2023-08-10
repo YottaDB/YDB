@@ -197,12 +197,12 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	if (!gtmsecshr_file_check_done)
 	{
 		len = STRLEN(ydb_dist);
-		assert(YDB_PATH_MAX >= (len + 1 + sizeof(GTMSECSHR_EXECUTABLE))); /* Includes null */
-		memcpy(gtmsecshr_path, ydb_dist, len);
-		gtmsecshr_path[len] =  '/';
-		memcpy(gtmsecshr_path + len + 1, GTMSECSHR_EXECUTABLE, sizeof(GTMSECSHR_EXECUTABLE)); /* Includes null */
+		assert(YDB_PATH_MAX >= (SECSHR_PARENT_DIR_LEN(len) + 1 + sizeof(GTMSECSHR_EXECUTABLE))); /* Includes null */
+		memcpy(gtmsecshr_path, SECSHR_PARENT_DIR(ydb_dist), SECSHR_PARENT_DIR_LEN(len));
+		gtmsecshr_path[SECSHR_PARENT_DIR_LEN(len)] =  '/';
+		memcpy(gtmsecshr_path + SECSHR_PARENT_DIR_LEN(len) + 1, GTMSECSHR_EXECUTABLE, sizeof(GTMSECSHR_EXECUTABLE)); /* Includes null */
 		gtmsecshr_pathname.addr = gtmsecshr_path;
-		gtmsecshr_pathname.len = (mstr_len_t)(len + 1 + strlen(GTMSECSHR_EXECUTABLE)); /* Excludes null */
+		gtmsecshr_pathname.len = (mstr_len_t)(SECSHR_PARENT_DIR_LEN(len) + 1 + strlen(GTMSECSHR_EXECUTABLE)); /* Excludes null */
 		assert((0 < gtmsecshr_pathname.len) && (YDB_PATH_MAX > gtmsecshr_pathname.len));
 		if (-1 == Stat(gtmsecshr_pathname.addr, &stat_buf))
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,

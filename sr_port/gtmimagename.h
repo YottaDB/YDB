@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,6 +59,8 @@ GBLREF	boolean_t		run_time;	/* needed by IS_MCODE_RUNNING macro */
 #define	IS_LIBCMISOCKETTCP	(IS_MUMPS_IMAGE || IS_LKE_IMAGE || IS_GTCM_GNP_SERVER_IMAGE)
 #define	IS_LIBGTCM		(IS_GTCM_SERVER_IMAGE || IS_GTCM_SHMCLEAN_IMAGE)
 
-#define LIBYOTTADBDOTSO		"%s/libyottadb.so"
+/* String templates */
+#define LIBYOTTADBDOTSO_FMT_STR		"%s/libyottadb.so"
+#define GTMSECSHR_REAL_FMT_STR		"%s/gtmsecshrdir/gtmsecshr"
 
 #endif

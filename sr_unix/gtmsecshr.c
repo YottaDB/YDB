@@ -316,10 +316,10 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	int		file_des, save_errno, len = 0;
 	int		create_attempts = 0;
 	int		secshr_sem;
-	int		semop_res, rndirln, modlen, ydbdistlen;
-	char		*name_ptr, *rndir, *tmp_ptr, ydbdist[YDB_PATH_MAX];
+	int		semop_res, rndirln, modlen, parentdirlen;
+	char		*name_ptr, *rndir, *tmp_ptr, parentdir[YDB_PATH_MAX];
 	char		gtmsecshr_realpath[YDB_PATH_MAX];
-	char		*path, *chrrv;
+	char		*chrrv;
 	pid_t		pid;
 	struct sembuf	sop[4];
 	gtmsecshr_mesg	mesg;
@@ -357,27 +357,26 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 			RTS_ERROR_LITERAL("Server 1"), process_id, ERR_GTMSECSHRNOARG0);
 		gtmsecshr_exit(UNABLETODETERMINEPATH, FALSE);
 	}
-	path = ydb_dist;
-	chrrv = realpath(path, ydbdist);
+	chrrv = realpath(SECSHR_PARENT_DIR(ydb_dist), parentdir);
 	if (NULL != chrrv)
 	{
-		ydbdistlen = STRLEN(ydbdist);
+		parentdirlen = STRLEN(parentdir);
 		/* Now compute the length of the string "$ydb_dist/gtmsecshrdir/gtmsecshr" */
-		if (SIZEOF(ydbdist) >= (ydbdistlen + STR_LIT_LEN(GTMSECSHR_DIR_SUFFIX) + 1 + SIZEOF(GTMSECSHR_EXECUTABLE)))
+		if (SIZEOF(parentdir) >= (parentdirlen + STR_LIT_LEN(GTMSECSHR_DIR_SUFFIX) + 1 + SIZEOF(GTMSECSHR_EXECUTABLE)))
 		{
-			tmp_ptr = ydbdist + ydbdistlen;
+			tmp_ptr = parentdir + parentdirlen;
 			memcpy(tmp_ptr, GTMSECSHR_DIR_SUFFIX, STR_LIT_LEN(GTMSECSHR_DIR_SUFFIX));
 			tmp_ptr += STR_LIT_LEN(GTMSECSHR_DIR_SUFFIX);
 			*tmp_ptr++ = '/';
 			memcpy(tmp_ptr, GTMSECSHR_EXECUTABLE, STR_LIT_LEN(GTMSECSHR_EXECUTABLE));
 			tmp_ptr += STR_LIT_LEN(GTMSECSHR_EXECUTABLE);
 			*tmp_ptr = '\0';
-			ydbdistlen = tmp_ptr - ydbdist;
+			parentdirlen = tmp_ptr - parentdir;
 		} else
-			ydbdistlen = 0;
+			parentdirlen = 0;
 	} else
-		ydbdistlen = 0;
-	if ((rndirln != ydbdistlen) || (0 != memcmp(rndir, ydbdist, rndirln)))
+		parentdirlen = 0;
+	if ((rndirln != parentdirlen) || (0 != memcmp(rndir, parentdir, rndirln)))
 	{
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMSECSHRSTART, 3,
 			RTS_ERROR_LITERAL("Server 2"), process_id, ERR_GTMSECSHRBADDIR);
@@ -387,12 +386,12 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	/* Take off the "/gtmsecshr" suffix (leaves "$ydb_dist/gtmsecshrdir") and use this to compare current working directory */
 	rndirln -= SIZEOF(GTMSECSHR_EXECUTABLE); /* SIZEOF includes 1 for trailing null byte but we use that for leading '/') */
 	rndir[rndirln] = '\0';			/* Terminate directory string (executable/dir name already checked) */
-	chrrv = getcwd(ydbdist, YDB_PATH_MAX);	/* Use ydbdist 'cause it's convenient */
+	chrrv = getcwd(parentdir, YDB_PATH_MAX);	/* Use parentdir 'cause it's convenient */
 	if (NULL != chrrv)
-		ydbdistlen = STRLEN(ydbdist);
+		parentdirlen = STRLEN(parentdir);
 	else
-		ydbdistlen = 0;
-	if ((rndirln != ydbdistlen) || (0 != memcmp(rndir, ydbdist, rndirln)))
+		parentdirlen = 0;
+	if ((rndirln != parentdirlen) || (0 != memcmp(rndir, parentdir, rndirln)))
 	{
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMSECSHRSTART, 3,
 			RTS_ERROR_LITERAL("Server 3"), process_id, ERR_GTMSECSHRBADDIR);

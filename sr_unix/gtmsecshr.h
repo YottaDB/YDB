@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,24 @@
 #define GTMSECSHR_DIR_SUFFIX		"/gtmsecshrdir"
 #define GTMSECSHR_EXECUTABLE		"gtmsecshr"
 
+/* If defined, its value will replace `ydb_dist` in all references
+ * to `gtmsecshr` SUID binaries in order to separate those privileged
+ * binaries from the `ydb_dist` itself so that `ydb_dist` itself can
+ * be safely located on mounts with `nosuid` and `ro` flags set.
+ *
+ * Useful for operating YDB on platforms like Nix(OS) or Guix(SD);
+ * see GitLab MR !1374 for more details.
+ */
+#ifdef YDB_EXTERNAL_SECSHR_PARENT_DIR
+#define SECSHR_PARENT_DIR(x)      (YDB_EXTERNAL_SECSHR_PARENT_DIR)
+#define SECSHR_PARENT_DIR_LEN(x)  (STR_LIT_LEN(YDB_EXTERNAL_SECSHR_PARENT_DIR))
+#else
+#define SECSHR_PARENT_DIR(x)      (x)
+#define SECSHR_PARENT_DIR_LEN(x)  (x)
+#endif
+
 #define	ROOTUID				0
+#define	ROOTGID				0
 
 #ifdef SHORT_GTMSECSHR_TIMEOUT
 #    define MAX_TIMEOUT_VALUE		30
