@@ -84,6 +84,22 @@ void drive_non_ydb_signal_handler_if_any(char *caller, int sig, siginfo_t *info,
 		(*sighandler3)(sig, info, context);	/* Note - likely to NOT return */
 	else
 		(*sighandler1)(sig);			/* Note - likely to NOT return */
+	if ((SIGQUIT == sig) || (SIGTERM == sig) || (SIGINT == sig))
+	{	/* If we are here, it means the main application signal handler for these fatal signals
+		 * returned back which means we should not call that signal handler again for these signals
+		 * as it could cause SIGSEGV (seen when Flask SIGINT signal handler is invoked twice in interactive mode)
+		 * so note down that fact by resetting the signal handler to SIG_IGN (as that would cause this function
+		 * to return without any main application signal handler re-invocation).
+		 */
+		if (NULL != sighandler3)
+			orig_sig_action[sig].sa_sigaction = (sighandler_3parms_t)SIG_IGN;
+		else
+			orig_sig_action[sig].sa_handler = SIG_IGN;
+	}
+	/* else: it is possible similar issues exist for signals other than SIGQUIT/SIGTERM/SIGINT too and need
+	 * similar handling (to avoid duplicate user signal handler invocation and potential SIGSEGV).
+	 * Not sure if that is safe to do in all cases so deferring that change until the need arises.
+	 */
 	DBGSIGHND((stderr, "%s : Returned from signal passthru for signal %d\n", caller, sig));
 	return;
 }
