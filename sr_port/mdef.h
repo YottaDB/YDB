@@ -497,6 +497,7 @@ MBSTART {													\
 
 #define MAX_STRLEN_32K			32767
 /* MAX_STRLEN for local variable is changed from 32767 to 1048576 (1 MB) */
+/* Note: The below macro needs to be kept in sync with YDB_MAX_STR in sr_unix/libyottadb.h */
 #define MAX_STRLEN	 		(1 * 1024 * 1024)	/* Maximum YottaDB string size (1 MB) */
 #define MAX_DBSTRLEN			((32 * 1024) - 1) 	/* Maximum database string size */
 /* Initial buffer size allocated for a GT.M string which can geometrically be increased upto the size enough to fit in MAX_STRLEN */
@@ -1955,8 +1956,8 @@ enum
  * contain a null in the last position so there will often be a +1 or +2 when these constants
  * are used.
  */
-#define MAX_GVSUBSCRIPTS	31
-#define MAX_LVSUBSCRIPTS	31
+#define MAX_GVSUBSCRIPTS	31 /* Note: This macro needs to be kept in sync with YDB_MAX_SUBS in sr_unix/libyottadb.h */
+#define MAX_LVSUBSCRIPTS	31 /* Note: This macro needs to be kept in sync with YDB_MAX_SUBS in sr_unix/libyottadb.h */
 #define MAX_INDSUBSCRIPTS	31
 #define	MAX_LKSUBSCRIPTS	(MAX_GVSUBSCRIPTS + 1)	/* maximum number of subscripts in a LOCK reference,
 							 * + 1 for unsubscripted variable name.

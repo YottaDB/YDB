@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -249,6 +249,11 @@ typedef struct
 
 #define CHARMAXARGS	256
 #define MAX_FORARGS	127
+
+/* Note: The below macro needs to be kept in sync with the following
+ * 1) MAX_M_LINE_LEN in YDBOcto/src/octo_types.h
+ * 2) YDB_MAX_M_LINE_LEN in sr_unix/libyottadb.h
+ */
 #define MAX_SRCLINE	32766	/* Maximum length of a program source or indirection line (32KiB - 2).
 				 * Note: This is not set to be 32KiB since it has to be less than
 				 * DEF_RM_WIDTH and DEF_RM_RECORDSIZE (which are currently both set to 32KiB - 1).

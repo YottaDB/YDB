@@ -72,8 +72,19 @@ enum
 /* Maximum values */
 #define	YDB_MAX_IDENT		31		/* Maximum size of global/local name (not including '^') */
 #define	YDB_MAX_NAMES		35		/* Maximum number of variable names can be specified in a single ydb_*_s() call */
+
+/* Note: The below macro needs to be kept in sync with MAX_STRLEN in sr_port/mdef.h */
 #define	YDB_MAX_STR		(1 * 1024 * 1024)	/* Maximum YottaDB string length */
+
+/* Note: The below macro needs to be kept in sync with MAX_GVSUBSCRIPTS and MAX_LVSUBSCRIPTS in sr_port/mdef.h */
 #define	YDB_MAX_SUBS		31		/* Maximum subscripts currently supported */
+
+/* Note: The below macro needs to be kept in sync with
+ * 1) MAX_SRCLINE in sr_port/compiler.h AND
+ * 2) MAX_M_LINE_LEN in YDBOcto/src/octo_types.h
+ */
+#define	YDB_MAX_M_LINE_LEN	32766
+
 #define	YDB_MAX_PARMS		32		/* Maximum parameters to an M call (call-in) */
 #define	YDB_MAX_TIME_NSEC	(0x7fffffffllu * 1000llu * 1000llu)	/* Max specified time in (long long) nanoseconds */
 #define	YDB_MAX_YDBERR		(1 << 30)	/* Maximum (absolute) value for a YottaDB error */
