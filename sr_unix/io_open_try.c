@@ -247,6 +247,20 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 						tl->iod->type = rm;
 						break;
 					case S_IFSOCK:
+						if (-2 == file_des)
+						{	/* Even though the file is a socket type of file, we don't have a 0 or 1
+							 * file descriptor corresponding to it (see "file_des" setting code above).
+							 * Therefore, treat it as a simple file ("rm"). Note that this is
+							 * guaranteed to issue a ERR_DEVOPENFAIL error after the "OPEN3" call
+							 * below. But assigning it a device type of say "gtmsocket" would issue
+							 * an error later while trying to read/write to that device (e.g. a
+							 * NOSOCKETINDEV error while trying to write). It is better for the
+							 * user to see the issue right at OPEN time than a lot later. Hence the
+							 * choice of "rm" as the device type.
+							 */
+							tl->iod->type = rm;
+							break;
+						}
 						/* If SOCK_STREAM, AF_INET/AF_INET6, and not [kr]shell port assume we were
 						 * started by inetd.
 						 * We are not able to trigger exception until active_device set
@@ -265,6 +279,11 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 						sockoptlen = SIZEOF(sockoptval);
 						gso_stat = getsockopt(file_des, SOL_SOCKET, SO_TYPE, &sockoptval,
 								      (GTM_SOCKLEN_TYPE *)&sockoptlen);
+#						ifdef DEBUG
+						int	save_errno;
+						save_errno = errno;	/* used for debugging in case "getsockopt()" call fails */
+						UNUSED(save_errno);
+#						endif
 						if (!gso_stat && SOCK_STREAM == sockoptval)
 						{
 							socknamelen = SIZEOF(sockname);
