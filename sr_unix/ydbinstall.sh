@@ -1,6 +1,6 @@
 #!/bin/sh -
 #################################################################
-# Copyright (c) 2014-2020 Fidelity National Information         #
+# Copyright (c) 2014-2021 Fidelity National Information         #
 # Services, Inc. and/or its subsidiaries. All rights reserved.  #
 #								#
 # Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	#
@@ -1364,7 +1364,7 @@ else gtm_configure_in=${tmpdir}/configure_${timestamp}.in
 fi
 export ydb_change_removeipc			# Signal configure.gtc to set RemoveIPC=no or not, if needed
 issystemd=`command -v systemctl`
-if [ "N" = "$gtm_dryrun" ] && [ "" != "$issystemd" ] ; then
+if [ "N" = "$gtm_dryrun" ] && [ -n "$issystemd" ] ; then
 	# It is a systemd installation
 	# Check if RemoveIPC=no is set. If not, set it if user hasn't specified --preserveRemoveIPC
 	logindconf="/etc/systemd/logind.conf"
