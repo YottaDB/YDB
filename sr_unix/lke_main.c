@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,7 +76,6 @@ GBLREF VSIG_ATOMIC_T		util_interrupt;
 GBLREF bool			licensed;
 GBLREF void			(*func)(void);
 GBLREF spdesc			rts_stringpool, stringpool;
-GBLREF global_latch_t		defer_latch;
 GBLREF char			cli_err_str[];
 GBLREF CLI_ENTRY		lke_cmd_ary[];
 GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
@@ -97,7 +96,6 @@ int lke_main(int argc, char *argv[], char **envp)
 	DEFINE_EXIT_HANDLER(util_exit_handler, TRUE);	/* Must be defined only AFTER err_init() has setup condition handling */
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	sig_init(ydb_os_signal_handler, lke_ctrlc_handler, suspsigs_handler, continue_handler);
-	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	stp_init(STP_INITSIZE);
 	stpgc_ch = &stp_gcol_ch;
 	rts_stringpool = stringpool;

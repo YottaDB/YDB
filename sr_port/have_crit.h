@@ -40,6 +40,7 @@
 
 typedef enum
 {
+	/****************** Below interrupt states are common to both GT.M and YottaDB **************/
 	INTRPT_OK_TO_INTERRUPT = 0,
 	INTRPT_IN_GTCMTR_TERMINATE,
 	INTRPT_IN_TP_UNWIND,
@@ -92,12 +93,13 @@ typedef enum
 					 * so that "ydb_exit()" does not see a NULL frame_pointer as part of handling a SIG-15.
 					 */
 	INTRPT_IN_JNL_FSYNC,		/* Deferring interrupts in jnl_fsync() while holding the latch */
-<<<<<<< HEAD
-	INTRPT_IN_SS_DESTROY_CONTEXT,	/* Deferring interrupts in ss_destroy_context() */
-=======
 	INTRPT_IN_EVENT_HANDLING,	/* Deferring interrupts while managing a deferred or outofband event */
 	INTRPT_IN_KILL_CLEANUP,		/* Deferring interrupts while performing KILL cleanup - used by REORG */
->>>>>>> 52a92dfd (GT.M V7.0-001)
+
+	/****************** Below interrupt states are YottaDB-ONLY **************/
+	INTRPT_IN_SS_DESTROY_CONTEXT,	/* Deferring interrupts in ss_destroy_context() */
+
+	/****************** Below interrupt states are common to both GT.M and YottaDB **************/
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 
@@ -192,7 +194,7 @@ void	deferred_signal_handler(void);
 		 * that gets handled at the earliest safe point.								\
 		 */														\
 		if (NULL != xfer_set_handlers_fnptr)										\
-			(*xfer_set_handlers_fnptr)(outofband_event, deferred_signal_set_fnptr, 0, FALSE);			\
+			(*xfer_set_handlers_fnptr)(deferred_signal, deferred_signal_set_fnptr, 0, FALSE);			\
 		/* else: it is "gtmsecshr" in which case outofband does not apply */						\
 	}															\
 	/* Whenever "forced_exit" gets set to 1, set the corresponding deferred event too */					\
@@ -323,7 +325,6 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
 /* Can't include sig_init.h until the definitions above were done ([DEFER|ENABLE]_INTERRUPTS) */
 #include "sig_init.h"
 
-<<<<<<< HEAD
 /* This macro used to previously check if the global variable "intrpt_ok_state" holds any of the following values.
  *
  *	INTRPT_IN_X_TIME_FUNCTION
@@ -340,41 +341,5 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
  * Hence the use of "in_os_signal_handler" global variable below.
  */
 #define	OK_TO_SEND_MSG	(!in_os_signal_handler)
-=======
-/* Inline functions */
-
-static inline void deferred_exit_handling_check(void)
-{
-	char			*rname;
-
-	GBLREF	int		process_exiting;
-	GBLREF	VSIG_ATOMIC_T	forced_exit;
-	GBLREF	volatile int4	gtmMallocDepth;
-	GBLREF	volatile int	suspend_status;
-
-	/* The forced_exit state of 2 indicates that the exit is already in progress, so we do not
-	 * need to process any deferred events. Note if threads are running, check if forced_exit is
-	 * non-zero and if so exit the thread (using pthread_exit) otherwise skip deferred event
-	 * processing. A similar check will happen once threads stop running.
-	 */
-	if (INSIDE_THREADED_CODE(rname))
-	{
-		PTHREAD_EXIT_IF_FORCED_EXIT;
-	} else if ((2 > forced_exit) && !process_exiting && (INTRPT_IN_KILL_CLEANUP != intrpt_ok_state))
-	{	/* If forced_exit was set while in a deferred state, disregard any deferred timers and
-		 * invoke deferred_signal_handler directly.
-		 */
-		if (forced_exit && OK_TO_INTERRUPT)
-			deferred_signal_handler();
-		else
-		{
-			if ((DEFER_SUSPEND == suspend_status) && OK_TO_INTERRUPT)
-				suspend(SIGSTOP);
-			if (deferred_timers_check_needed && OK_TO_INTERRUPT)
-				check_for_deferred_timers();
-		}
-	}
-}
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 #endif /* HAVE_CRIT_H_INCLUDED */

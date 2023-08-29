@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -121,13 +121,8 @@ inline static int wait_for_wip_queue_to_clear(node_local_ptr_t cnl, cache_que_he
 		if (lcnt >= (MAX_WIP_QWAIT AIX_ONLY(* 4)))
 		{	/* The number of 10 ms sleeps to reach 1 min. Issue error and restart the count */
 			send_msg_csa(CSA_ARG(REG2CSA(reg)) VARLSTCNT(7) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-<<<<<<< HEAD
-					ERR_AIOQUEUESTUCK, 2, (lcnt / SLEEP_ONE_MIN), (cr ? cr->blk : 0));
-			lcnt = 1;	/* Cannot do a "wcs_sleep()" call in next line for 0 milli-seconds */
-=======
 					ERR_AIOQUEUESTUCK, 2, (MAX_WIP_QWAIT AIX_ONLY(* 4)), (cr ? cr->blk : 0));
 			lcnt = 1;	/* Can't sleep for zero seconds */
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		}
 		wcs_sleep(lcnt);	/* Iterations 10 and above sleep for 10 ms */
 		if ((wip_cnt != cnl->wcs_wip_lvl) && (NULL == cr)) /* only for non-specific crs */

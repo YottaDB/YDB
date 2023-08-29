@@ -310,15 +310,7 @@ chmod +w *		# this allows the rm to work without prompting for an override
 rm *
 
 cp $gtm_tools/lowerc_cp.sh lowerc_cp
-<<<<<<< HEAD
-if ( "$HOSTOS" == "SunOS" ) then
-	cp $gtm_tools/ydbinstall_Solaris.sh ydbinstall
-else
-	cp $gtm_tools/ydbinstall.sh ydbinstall
-endif
-=======
-cp $gtm_tools/gtminstall.sh gtminstall
->>>>>>> 52a92dfd (GT.M V7.0-001)
+cp $gtm_tools/ydbinstall.sh ydbinstall
 
 chmod +x {lowerc,ydbinstall}*
 
@@ -674,22 +666,14 @@ case "gtm_pro":
 	breaksw
 endsw
 
-<<<<<<< HEAD
-if ( ! -x $ydb_dist/mumps ) then
-	echo "comlist-E-nomumps, ${dollar_sign}ydb_dist/mumps is not executable" >> $errorlog
-	echo "comlist-W-nomsgverify, unable to verify error message definition files" >> $errorlog
-	echo "comlist-W-noonlinehelp, unable to generate on-line help files" >> $errorlog
-	goto comlist.END
-=======
 $shell -f $buildscript $buildargs
 if ($status) @ comlist_status++
 if (0 != $comlist_status) then
 	error_and_exit "COMLIST-E-BUILD : $buildscript invocation above failed -- aborting build"
 endif
 
-if ( ! -x $gtm_dist/mumps ) then
-	error_and_exit "COMLIST-E-NOMUMPS : ${dollar_sign}gtm_dist/mumps is not executable"
->>>>>>> 52a92dfd (GT.M V7.0-001)
+if ( ! -x $ydb_dist/mumps ) then
+	error_and_exit "COMLIST-E-NOMUMPS : ${dollar_sign}ydb_dist/mumps is not executable"
 endif
 
 set mupip_size = `ls -l $gtm_exe/mupip |awk '{print $5}'`
@@ -831,13 +815,8 @@ $gtm_com/IGS $ydb_dist/gtmsecshr CHOWN
 awk 'BEGIN {dlen=length(ENVIRON["ydb_dist"]);stat=0} {if ((length($0)-dlen)>50) {stat=1}} END {exit stat}' $gtm_log/$distfiles_log
 if ($status) then
 	@ comlist_status++
-<<<<<<< HEAD
-	echo "comlist-E-pathlength, the longest path beyond \$ydb_dist exceeds 50 bytes" >> $errorlog
+	echo "COMLIST-E-PATHLENGTH : The longest path beyond \$ydb_dist exceeds 50 bytes" >> $errorlog
 	awk 'BEGIN {dlen=length(ENVIRON["ydb_dist"]);stat=0} \
-=======
-	echo "COMLIST-E-PATHLENGTH : The longest path beyond \$gtm_dist exceeds 50 bytes" >> $errorlog
-	awk 'BEGIN {dlen=length(ENVIRON["gtm_dist"]);stat=0} \
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		{if ((length($0)-dlen)>50) {print $0,"- length :",length($0)-dlen ; stat=1}} \
 		END {exit stat}' $gtm_log/$distfiles_log >>&! $errorlog
 endif

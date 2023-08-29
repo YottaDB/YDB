@@ -1359,27 +1359,18 @@
 
    By default, GDE uses a KEY_SIZE of 64 bytes
 
-   -[NO]L[OCK_CRIT]
+   -[NO]L[OCK_CRIT_SEPARATE]
 
-<<<<<<< HEAD
-   Specifies whether YottaDB should share the resource management between a
-   database and its corresponding LOCKs or use separate and different
-   resource management for the two. Because, in the current implementation,
-   YottaDB has not identified any reason to share resource management between
-   LOCKs and database actions, we have no recommendations other than to
-   choose what seems to work better for your application.
-=======
-   GT.M uses critical sections for LOCK management and various database
-   activities. LOCK_CRIT in GDE specifies that GT.M should use separate
-   critical sections for LOCK management and database activity. NOLOCK_CRIT
+   YottaDB uses critical sections for LOCK management and various database
+   activities. LOCK_CRIT_SEPARATE in GDE specifies that YottaDB should use separate
+   critical sections for LOCK management and database activity. NOLOCK_CRIT_SEPARATE
    specifies the use of the database critical section for both LOCK and
    database activity.
 
-   Because, in the current implementation, FIS has not identified any reason
+   Because, in the current implementation, YottaDB has not identified any reason
    to share resource management between LOCKs and database actions, we have
    no recommendations other than to choose what seems to work better for your
    application.
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
    A specification of LOCK_CRIT_SEPARATE shows up as "Sep" in the "Lock Crit"
    column in a GDE SHOW -REGION output. A specification of NOLOCK_CRIT_SEPARATE

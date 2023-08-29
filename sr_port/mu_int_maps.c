@@ -126,13 +126,8 @@ void mu_int_maps(void)
 			mcnt = ydb_skip_bml_num / BLKS_PER_LMAP;
 #		endif
 		blkno = mcnt * mu_int_data.bplmap;
-<<<<<<< HEAD
 		bml_busy(0, local);
-		blk_base = mu_int_read(blkno, &ondsk_blkver, &free_blk_base);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
-=======
-		bml_busy(0, mu_int_locals + ((blkno * BML_BITS_PER_BLK) / BITS_PER_UCHAR));
 		blk_base = mu_int_read(blkno, &ondsk_blkver, &free_blk_base);
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		if (!blk_base)
 		{
 			mu_int_path[0] = blkno;

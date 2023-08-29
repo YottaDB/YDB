@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -219,17 +219,7 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 	{
 		assert(0 != socketptr->obuffer_wait_time);
 		timeout = socketptr->obuffer_wait_time;
-<<<<<<< HEAD
-=======
 	}
-#	ifndef USE_POLL
-	FD_ZERO(&fds);
-	FD_SET(socketptr->sd, &fds);
-	timeout = timeout * 1000;	/* convert milli to micro seconds */
-	timeout_spec.tv_sec = 0;
-	timeout_spec.tv_usec = timeout;
-#	endif
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	llen = length;
 	output_retries = status = 0;
 	lbuffer = buffer;
@@ -253,17 +243,7 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 				status = -1;
 				break;
 			}
-<<<<<<< HEAD
-			if (EAGAIN == save_errno)
-			{
-				/* No need of "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" call as "rel_quant()" checks for
-				 * deferred signals already (invokes "DEFERRED_SIGNAL_HANDLING_CHECK").
-				 */
-				rel_quant();	/* seems like a legitimate rel_quant */
-			} else if (EINTR != save_errno)
-=======
 			if ((EAGAIN == save_errno) || (EWOULDBLOCK == save_errno))
->>>>>>> 52a92dfd (GT.M V7.0-001)
 			{
 				if (socketptr->nonblocking && (++output_retries > socketptr->max_output_retries))
 				{
@@ -272,6 +252,9 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 					status = -1;
 					break;
 				}
+				/* No need of "HANDLE_EINTR_OUTSIDE_SYSTEM_CALL" call as "rel_quant()" checks for
+				 * deferred signals already (invokes "DEFERRED_SIGNAL_HANDLING_CHECK").
+				 */
 				rel_quant();	/* seems like a legitimate rel_quant */
 			} else if (EINTR != save_errno)
 			{

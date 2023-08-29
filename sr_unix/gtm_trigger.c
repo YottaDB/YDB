@@ -721,11 +721,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 			assert(extnam_str.addr);
 			assert(mv_st_ent->mv_st_cont.mvs_trigr.savextref.addr);
 			memcpy(extnam_str.addr, mv_st_ent->mv_st_cont.mvs_trigr.savextref.addr, extnam_str.len);
-<<<<<<< HEAD
-=======
 		}
-		mumps_status = 0;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		assert(run_time);
 		/* Note we do not reset the handlers for parallel triggers - set one time only when enter first level
 		 * trigger. After that, whatever happens in trigger world, stays in trigger world.

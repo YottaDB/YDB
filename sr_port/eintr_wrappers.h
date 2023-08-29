@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -258,7 +258,6 @@
  * If NREAD < NELEMS, if error then copies errno into RC, if eof then sets RC to 0. Note: RC is not initialized otherwise.
  * Macro is named GTM_FREAD instead of FREAD because AIX defines a macro by the same name in fcntl.h.
  */
-<<<<<<< HEAD
 #define GTM_FREAD(BUFF, ELEMSIZE, NELEMS, FP, NREAD, RC)					\
 MBSTART {											\
 	size_t		elems_to_read, elems_read;						\
@@ -301,37 +300,6 @@ MBSTART {											\
 	 * macros because the "ENABLE_INTERRUPTS" call above does the same thing		\
 	 * (invoke "DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED" eventually).			\
 	 */											\
-=======
-#define GTM_FREAD(BUFF, ELEMSIZE, NELEMS, FP, NREAD, RC)			\
-MBSTART {									\
-	size_t		elems_to_read, elems_read;				\
-	intrpt_state_t	prev_intrpt_state;					\
-	\
-	DEFER_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);		\
-	elems_to_read = NELEMS;							\
-	for (;;)								\
-	{									\
-		elems_read = fread(BUFF, ELEMSIZE, elems_to_read, FP);		\
-		assert(elems_read <= elems_to_read);				\
-		elems_to_read -= elems_read;					\
-		if (0 == elems_to_read)						\
-			break;							\
-		RC = feof(FP);							\
-		if (RC)								\
-		{	/* Reached EOF. No error. */				\
-			RC = 0;							\
-			break;							\
-		}								\
-		RC = ferror(FP);						\
-		assert(RC);							\
-		clearerr(FP);	/* reset error set by the "fread" */		\
-		/* In case of EINTR, retry "fread" */				\
-		if (EINTR != errno)						\
-			break;							\
-	}									\
-	NREAD = NELEMS - elems_to_read;						\
-	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);		\
->>>>>>> 52a92dfd (GT.M V7.0-001)
 } MBEND
 
 #define GTM_FSYNC(FD, RC)					\

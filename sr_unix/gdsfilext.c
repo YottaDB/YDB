@@ -247,17 +247,10 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 #		endif
 	}
 #	ifdef DEBUG
-<<<<<<< HEAD
-	if ( (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) && dollar_tlevel && !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT")) ||
-	     (WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == ydb_white_box_test_case_count) &&
-	     !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT")) )
-	{
-=======
 	if (((WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) && dollar_tlevel && !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT")) ||
-	     (WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == gtm_white_box_test_case_count) &&
+	     (WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == ydb_white_box_test_case_count) &&
 	     !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT"))) && !cs_addrs->now_crit)
 	{	/* Sync with copy in bm_getfree() */
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		/* Not clear to me why the WBTEST_MM_CONCURRENT_FILE_EXTEND doesn't need something similar, but we don't want our
 		 * child to come here.  Unsetting the env shouldn't affect the parent, it reads env just once at process startup*/
 		if(WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE))

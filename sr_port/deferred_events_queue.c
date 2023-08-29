@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,14 +13,8 @@
  *								*
  ****************************************************************/
 #include "mdef.h"
-<<<<<<< HEAD
 
-#include "gtm_sizeof.h"
-#include "xfer_enum.h"
-#include "fix_xfer_entry.h"
-=======
 #include "have_crit.h"
->>>>>>> 52a92dfd (GT.M V7.0-001)
 #include "deferred_events_queue.h"
 #include "deferred_events.h"
 #include "error_trap.h"

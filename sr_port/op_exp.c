@@ -47,11 +47,7 @@ void op_exp(mval *u, mval* v, mval *p)
 	mval		w, zmv;
 	int4		n, n1;
 	int4		z1_rnd, z2_rnd, pten;
-<<<<<<< HEAD
-=======
 	int		idx;
-	DCL_THREADGBL_ACCESS;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 	u1_p = &u1;
 	memcpy(u1_p, u, SIZEOF(mval));

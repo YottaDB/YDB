@@ -33,15 +33,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-<<<<<<< HEAD
 set(version r139)
-=======
-set(version ${V7.0-001})
-if("${version}" STREQUAL "")
-        set(version V9.9-0)
-endif()
-
->>>>>>> 52a92dfd (GT.M V7.0-001)
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
@@ -442,12 +434,7 @@ add_executable(gtmsecshr ${gtmsecshr_SOURCES})
 target_link_libraries(gtmsecshr libmumps) # needed for static linking since this is a setuid executable
                                           # and does not do a dlopen of libyottadb.so
 
-<<<<<<< HEAD
 add_executable(gtmsecshr_real ${gtmsecshr_real_SOURCES})
-=======
-add_executable(gtmsecshr_real		${gtmsecshr_real_SOURCES})
-target_link_libraries(gtmsecshr_real	libmumps)
->>>>>>> 52a92dfd (GT.M V7.0-001)
 set_target_properties(gtmsecshr_real PROPERTIES
   OUTPUT_NAME gtmsecshr
   RUNTIME_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/gtmsecshrdir

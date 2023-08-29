@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,9 +13,10 @@
 #include "mdef.h"
 
 #include "xfer_enum.h"
-#include "outofband.h"
 #include "fix_xfer_entry.h"
 #include "op.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "deferred_signal_set.h"
 
 GBLREF	volatile int	in_os_signal_handler;
@@ -29,6 +30,7 @@ void deferred_signal_set(int4 dummy_val)
 	assert(in_os_signal_handler);
 	if (deferred_signal != outofband)
 	{	/* We need deferred signal outofband processing at our earliest convenience */
-		SET_OUTOFBAND(deferred_signal);
+		outofband = deferred_signal;
+		DEFER_INTO_XFER_TAB;
 	}
 }

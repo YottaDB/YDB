@@ -79,21 +79,13 @@
 #include "tp_change_reg.h"
 #include "alias.h"
 #include "create_fatal_error_zshow_dmp.h"
-<<<<<<< HEAD
-#include "have_crit.h"
 #include "invocation_mode.h"
-=======
 #include "ztimeout_routines.h"
->>>>>>> 52a92dfd (GT.M V7.0-001)
 #include "iormdef.h"
 #include "ftok_sems.h"
 #include "gtm_putmsg_list.h"
 #include "gvt_inline.h"
-<<<<<<< HEAD
-#include "ztimeout_routines.h"
-=======
 #include "deferred_events.h"
->>>>>>> 52a92dfd (GT.M V7.0-001)
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
@@ -168,10 +160,7 @@ error_def(ERR_TPSTACKCRIT);
 error_def(ERR_TPSTACKOFLOW);
 error_def(ERR_TPTIMEOUT);
 error_def(ERR_UNSOLCNTERR);
-<<<<<<< HEAD
-=======
 error_def(ERR_ZINTRECURSEIO);
->>>>>>> 52a92dfd (GT.M V7.0-001)
 error_def(ERR_ZTIMEOUT);
 
 boolean_t clean_mum_tstart(void);
@@ -728,12 +717,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 				real_xfer_reset(ctrap);
 			}
 		}
-<<<<<<< HEAD
-		if (!trans_action && !dm_action && !(frame_pointer->type & SFT_DM))
-=======
 		outofband = no_event;
-		if (!trans_action && !(frame_pointer->type & SFT_DM))
->>>>>>> 52a92dfd (GT.M V7.0-001)
+		if (!trans_action && !dm_action && !(frame_pointer->type & SFT_DM))
 		{
 			if (!repeat_error)
 			{

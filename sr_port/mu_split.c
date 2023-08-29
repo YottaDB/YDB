@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,8 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 static	gtm_int8 const		zeroes_64 = 0;
 static	int4 const		zeroes_32 = 0;
 GBLREF	uint4			update_array_size;			/* for the BLK_* macros */
-GBLREF	unsigned char		cw_set_depth, t_tries;
+GBLREF	unsigned char		cw_set_depth;
+GBLREF	unsigned int		t_tries;
 
 enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, int level, int cur_blk_size, int max_fill, int *last_rec_size,
 					unsigned char *last_key, int *last_keysz, int *top_off);
@@ -129,13 +130,9 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	star_rec_hdr->rsiz = bstar_rec_sz;
 	SET_CMPC(star_rec_hdr, 0);
 	level = cur_level;
-<<<<<<< HEAD
-	max_fill = (0 == level) ? d_max_fill : i_max_fill;
+	max_fill_sav = max_fill = (0 == level) ? d_max_fill : i_max_fill;
 	assert(0 <= max_fill);
 
-=======
-	max_fill_sav = max_fill = (0 == level) ? d_max_fill : i_max_fill;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	/*  -------------------
 	 *  Split working block.
 	 *  -------------------
@@ -675,18 +672,15 @@ Return :
 enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, int level, int cur_blk_size, int max_fill, int *last_rec_size,
 					unsigned char *last_key, int *last_keysz, int *top_off)
 {
-	block_id	blkid;
-	int		index, rec_size, tkeycmpc;
+	int		rec_size, tkeycmpc;
 	enum cdb_sc	status;
-	sm_uc_ptr_t 	blk_base, iter, rec_base, rPtr1, rPtr2, rPtr_arry[cs_data->max_rec];
-	unsigned short	temp_ushort;
+	sm_uc_ptr_t 	blk_base, rec_base;
 
 	*last_keysz = 0;
 	*top_off = SIZEOF(blk_hdr);
 	*last_rec_size = 0;
 	blk_base = blk_stat->buffaddr;
 	rec_base = blk_base + SIZEOF(blk_hdr);
-<<<<<<< HEAD
 	/* max_fill is computed based on the fill factor after taking reserved_bytes into account. But since MAX_RESERVED_B
 	 * macro (which is used by MUPIP SET to limit the reserved_bytes value to not go very close to the block_size value)
 	 * ensures we leave space for at least SIZEOF(blk_hdr) so we are guaranteed *top_off (which is == SIZEOF(blk_hdr))
@@ -696,9 +690,6 @@ enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, int level, int c
 	 */
 	assert(*top_off < max_fill);
 	do
-=======
-	for (index = 0; *top_off < max_fill; )
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	{
 		READ_RECORD(status, &rec_size, &tkeycmpc, last_keysz, last_key,
 				level, blk_stat, rec_base);
@@ -714,14 +705,9 @@ enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, int level, int c
 			NONTP_TRACE_HIST_MOD(blk_stat, t_blkmod_mu_split);
 			return cdb_sc_blkmod; /* block became invalid */
 		}
-<<<<<<< HEAD
 	} while (*top_off < max_fill);
 	if (*top_off > cur_blk_size
 		|| (((blk_hdr_ptr_t)blk_base)->levl != level)
-=======
-	}	/* end of "while" loop */
-	if ((*top_off > cur_blk_size) || (((blk_hdr_ptr_t)blk_base)->levl != level)
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		|| (((blk_hdr_ptr_t)blk_base)->bsiz != cur_blk_size))
 	{
 		assert(t_tries < CDB_STAGNATE);

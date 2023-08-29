@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -551,13 +551,8 @@ int mur_merge_sort_extfmt(void)
 					rctl = &rctl_start[index];
 					fn = ((fi_type *)rctl->file_info[recstat])->fn;
 					SNPRINTF(errstr, SIZEOF(errstr), "fread() : %s : Expected = %lld : Actual = %lld",
-<<<<<<< HEAD
 										fn, (long long)jm_size, (long long)ret_size);
-					if (save_errno)
-=======
-													fn, jm_size, ret_size);
 					if (errored_out)
->>>>>>> 52a92dfd (GT.M V7.0-001)
 					{	/* ERROR encountered during GTM_FREAD */
 						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
 									ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, errno);

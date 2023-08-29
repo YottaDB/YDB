@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2014 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 52a92dfd (GT.M V7.0-001)
+ *								*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,15 +47,10 @@ void ctrlc_set(int4 dummy_param)
 	assert(INTRPT_IN_EVENT_HANDLING == intrpt_ok_state);
 	if (!(ctrlc_on && IS_MCODE_RUNNING))
 	{
-<<<<<<< HEAD
-		ctrap_action_is = 0;
-		SET_OUTOFBAND(ctrlc);
-=======
 		DBGDFRDEVNT((stderr, "%d %s: ctrlc_set - ctrlc outofband not enabled\n", __LINE__, __FILE__));
 		assert((pending == TAREF1(save_xfer_root, ctrlc).event_state)
 			|| ((active == TAREF1(save_xfer_root, ctrlc).event_state)));
 		return;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	}
 	if ((ctrlc != outofband) || have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT))
 	{	/* not a good time, so save it */
@@ -76,7 +67,7 @@ void ctrlc_set(int4 dummy_param)
 	DEFER_INTO_XFER_TAB;
 	DBGDFRDEVNT((stderr, "%d %s: ctrlc_set - pending xfer entries for ctrlc\n", __LINE__, __FILE__));
 #	ifdef DEBUG
-	if (gtm_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == gtm_white_box_test_case_number))
+	if (ydb_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == ydb_white_box_test_case_number))
 		DBGFPF((stderr, "# ctrlc_set: set the xfer entries for ctrlc\n"));
 #	endif
 }

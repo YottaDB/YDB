@@ -45,15 +45,6 @@ GBLREF	unsigned short		object_name_len, source_name_len;
 
 STATICDEF uint4		save_qlf;
 
-<<<<<<< HEAD
-=======
-error_def(ERR_COMPILEQUALS);
-error_def(ERR_FILEPARSE);
-error_def(ERR_NORTN);
-error_def(ERR_NOTMNAME);
-error_def(ERR_ZLNOOBJECT);
-
->>>>>>> 52a92dfd (GT.M V7.0-001)
 void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned short *srclen, boolean_t last)
 {
 	char		cbuf[MAX_LINE], inputf[MAX_FN_LEN + 1];
@@ -120,25 +111,17 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 				!(status & 1) ? status : ERR_NORTN);
 		}
 		file.addr = pblk.l_name;
-<<<<<<< HEAD
 		if ((pblk.b_ext != (SIZEOF(DOTM) - 1)) || memcmp(&pblk.l_name[pblk.b_name], DOTM, SIZEOF(DOTM) - 1))
 		{	/* Move any non-".m" extension over to be part of the file name */
 			pblk.b_name += pblk.b_ext;
 			pblk.b_ext = 0;
 			if ((pblk.buffer + MAX_FN_LEN) >= (pblk.l_name + pblk.b_name + SIZEOF(DOTM)))
 			{
+				assert(0 != pblk.l_name);
+				assert(MAX_FN_LEN >= pblk.b_name);
 				memcpy(&pblk.l_name[pblk.b_name], DOTM, SIZEOF(DOTM));
 				pblk.b_ext = (SIZEOF(DOTM) - 1);
 			}
-=======
-		file.len = pblk.b_name;
-		if ((0 == pblk.b_ext) && ( MAX_FN_LEN >= (*srclen + SIZEOF(DOTM))))
-		{
-			assert(0 != pblk.l_name);
-			assert(MAX_FN_LEN >= pblk.b_name);
-			memcpy(&pblk.l_name[pblk.b_name], DOTM, SIZEOF(DOTM));
-			pblk.b_ext = (SIZEOF(DOTM) - 1);
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		}
 		file.len = pblk.b_name;
 		source_name_len = pblk.b_dir + pblk.b_name + pblk.b_ext;
@@ -182,23 +165,16 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 				;       /* scan back from end for rtn name & triggerness */
 			ci += (0 < ci) ? 1 : 0;
 			assert(object_name_len >= ci);
-<<<<<<< HEAD
-			clen = object_name_len - ci;
-			if (2 <= clen)
-			{
-				if (('o' == object_file_name[ci + (clen - 1)]) && ('.' == object_file_name[ci + (clen - 2)]))
-					clen -= 2;	/* Strip trailing ".o" (if any) */
-				if ((2 <= clen) && ('m' == object_file_name[ci + (clen - 1)])
-						&& ('.' == object_file_name[ci + (clen - 2)]))
-					clen -= 2;	/* Strip trailing ".m" (if any) */
-			}
-=======
 			iclen = object_name_len - ci;
 			assert((iclen >= 0) && (iclen <= object_name_len));
-			if ((2 <= iclen) && ('o' == object_file_name[ci + iclen - 1])
-					&& ('.' == object_file_name[ci + iclen - 2]))
-				iclen -= 2;	/* Strip trailing ".o" */
->>>>>>> 52a92dfd (GT.M V7.0-001)
+			if (2 <= iclen)
+			{
+				if (('o' == object_file_name[ci + (iclen - 1)]) && ('.' == object_file_name[ci + (iclen - 2)]))
+					iclen -= 2;	/* Strip trailing ".o" (if any) */
+				if ((2 <= iclen) && ('m' == object_file_name[ci + (iclen - 1)])
+						&& ('.' == object_file_name[ci + (iclen - 2)]))
+					iclen -= 2;	/* Strip trailing ".m" (if any) */
+			}
 			SET_OBJ(object_file_name, object_name_len);
 			assert(0 <= iclen);
 			clen = object_name_len = (unsigned short) MIN(iclen, MAX_MIDENT_LEN);

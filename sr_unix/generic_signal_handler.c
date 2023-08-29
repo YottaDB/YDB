@@ -44,6 +44,7 @@
 #include "io.h"
 #include "gtmio.h"
 #include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "util.h"
 /* For gd_region */
 #include "gdsroot.h"
@@ -109,13 +110,9 @@ GBLREF	volatile boolean_t	timer_active;
 GBLREF	sigset_t		block_sigsent;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	boolean_t		blocksig_initialized;
-<<<<<<< HEAD
-GBLREF	struct sigaction	orig_sig_action[];
-GBLREF	sigset_t		blockalrm;
-=======
 GBLREF	boolean_t		mu_reorg_process;
 GBLREF	sgmnt_data_ptr_t	cs_data;
->>>>>>> 52a92dfd (GT.M V7.0-001)
+GBLREF	sigset_t		blockalrm;
 #ifdef DEBUG
 GBLREF	boolean_t		in_nondeferrable_signal_handler;
 #endif
@@ -167,16 +164,11 @@ static inline void check_for_statsdb_memerr()
 
 void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t is_os_signal_handler)
 {
-<<<<<<< HEAD
 	boolean_t		signal_forwarded, is_sigterm;
 	int			rc;
 	sigset_t		savemask;
 	boolean_t		using_alternate_sighandling;
-=======
-	gtm_sigcontext_t	*context_ptr;
-	void			(*signal_routine)();
 	intrpt_state_t		prev_intrpt_state;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 #	ifdef DEBUG
 	boolean_t		save_in_nondeferrable_signal_handler;
 #	endif

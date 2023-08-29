@@ -122,16 +122,9 @@ GBLREF	uint4			update_array_size;			/* for the BLK_* macros */
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		exit_handler_complete;
 
-<<<<<<< HEAD
 LITREF  char            	ydb_release_name[];
 LITREF  int4           		ydb_release_name_len;
 
-GBLDEF	sem_info		*sem_inf;
-
-STATICFNDCL void mupip_upgrade_cleanup(void);
-
-=======
->>>>>>> 52a92dfd (GT.M V7.0-001)
 error_def(ERR_BADDBVER);
 error_def(ERR_DBFILERR);
 error_def(ERR_DBFILOPERR);
@@ -160,7 +153,6 @@ error_def(ERR_TEXT);
 #define SML_GVNAME		"%"
 
 static sem_info	*sem_inf;
-static void mupip_upgrade_cleanup(void);
 static gtm_int8	tot_dt, tot_levl_cnt, tot_splt_cnt;
 
 void mupip_upgrade(void)
@@ -189,24 +181,7 @@ void mupip_upgrade(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-<<<<<<< HEAD
 	/* Initialization */
-	DEFINE_EXIT_HANDLER(mupip_upgrade_cleanup, TRUE);
-	/* Structure checks .. */
-	assert((24 * 1024) == SIZEOF(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
-	sem_inf = (sem_info *)malloc(SIZEOF(sem_info) * FTOK_ID_CNT);
-	memset(sem_inf, 0, SIZEOF(sem_info) * FTOK_ID_CNT);
-	db_fn_len = SIZEOF(db_fn);
-	if (!cli_get_str("FILE", db_fn, &db_fn_len))
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUNODBNAME);
-	db_fn_len = MIN(db_fn_len, MAX_FN_LEN);
-	db_fn[db_fn_len] = '\0';	/* Null terminate */
-	/* Need to find out if this is a statsDB file. This necessitates opening the file to read the sgmnt_data
-	 * file header before we have the proper locks obtained for it so after checking, the file is closed again
-	 * so it can be opened under lock to prevent race conditions.
-	 */
-	if (FD_INVALID != (channel = OPEN(db_fn, O_RDONLY)))
-=======
 	/* Structure checks */
 	mupip_exit(ERR_GTMCURUNSUPP);
 	assert((8192) == SIZEOF(sgmnt_data));		/* Verify V7 file header hasn't changed */
@@ -216,7 +191,6 @@ void mupip_upgrade(void)
 	/* TODO: support file or region */
 	mu_getlst("REGION", SIZEOF(tp_region)); /* get the parm for the REGION qualifier */
 	if (error_mupip)
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	{
 		util_out_print("!/MUPIP UPGRADE cannot proceed with above errors!/", TRUE);
 		mupip_exit(ERR_MUNOACTION);	/* TODO: here & elsewhere, why the change from ERR_MUNOUPGRD? */
@@ -226,57 +200,14 @@ void mupip_upgrade(void)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Upgrade canceled by user"));
 		mupip_exit(ERR_MUNOACTION);
 	}
-<<<<<<< HEAD
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Mupip upgrade started"));
-	UNIX_ONLY(mu_all_version_get_standalone(db_fn, sem_inf));
-	mu_outofband_setup();	/* Will ignore user interrupts. Note that now the
-				 * elapsed time for this is order of milliseconds */
-	/* ??? Should we set this just before DB_DO_FILE_WRITE to have smallest time window of ignoring signal? */
-	if (FD_INVALID == (channel = OPEN(db_fn, O_RDWR)))	/* Note assignment */
-	{
-		save_errno = errno;
-		if (FD_INVALID != (channel = OPEN(db_fn, O_RDONLY)))
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_DBRDONLY, 2, db_fn_len, db_fn, errno, 0,
-				   MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2, LEN_AND_LIT("Cannot upgrade read-only database"));
-		else
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBOPNERR, 2, db_fn_len, db_fn, save_errno);
-		mupip_exit(ERR_MUNOUPGRD);
-	}
-	/* get file status */
-	FSTAT_FILE(channel, &stat_buf, fstat_res);
-	if (-1 == fstat_res)
-	{
-		F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"), CALLFROM, errno);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBOPNERR, 2, db_fn_len, db_fn);
-		mupip_exit(ERR_MUNOUPGRD);
-	}
-#	if defined(__MVS__)
-	if (-1 == gtm_zos_tag_to_policy(channel, TAG_BINARY, &realfiletag))
-		TAG_POLICY_GTM_PUTMSG(db_fn, errno, realfiletag, TAG_BINARY);
-#	endif
-	v15_file_size = stat_buf.st_size;
-	v15_csd_size = SIZEOF(v15_sgmnt_data);
-	DO_FILE_READ(channel, 0, &v15_csd, v15_csd_size, status, status2);
-	if (SS_NORMAL != status)
-	{
-		F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, db_fn_len, db_fn, status);
-		mupip_exit(ERR_MUNOUPGRD);
-	}
-	if (!memcmp(v15_csd.label, GDS_LABEL, STR_LIT_LEN(GDS_LABEL)))
-	{	/* Check if the V5 database is old(supports only 128M blocks) if so update the V5 database to support
-		 * to 224M blocks.
-=======
 	/* Iterate over regions */
 	for (rptr = grlist;  NULL != rptr;  rptr = rptr->fPtr)
 	{	/* Initialize the region to check if eligible for upgrade */
 		/* TODO: implement interlock so BACKUP, INTEG (snapshot), REORG ROLLBACK don't run concurrently with UPGRADE
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		 */
 		reg = rptr->reg;
 		gv_cur_region = reg;
-		gvcst_init(reg, NULL);
+		gvcst_init(reg);
 		change_reg();
 		csa = cs_addrs;
 		csd = cs_data;
@@ -287,49 +218,13 @@ void mupip_upgrade(void)
 					LEN_AND_LIT("Non-V6.x database cannot be upgraded"));
 			continue; /* move onto next region */
 		}
-<<<<<<< HEAD
-		if (MASTER_MAP_SIZE_V5_OLD == csd.master_map_len)
-		{
-			/* We have detected the master map which supports only 128M blocks so we need to
-			 * bump it up to one that supports 224M blocks. */
-			csd.master_map_len = MASTER_MAP_SIZE_V5;
-			assert(START_VBN_V5 == csd.start_vbn);
-			DEBUG_ONLY (
-				norm_vbn = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_V5, DISK_BLOCK_SIZE) + 1;
-				assert(START_VBN_V5 == norm_vbn);
-			)
-			csd.free_space = 0;
-			DB_DO_FILE_WRITE(channel, 0, &csd, SIZEOF(csd), status, status2);
-			if (SS_NORMAL != status)
-			{
-				F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, db_fn_len, db_fn, status);
-				mupip_exit(ERR_MUNOUPGRD);
-			}
-			memset(new_v5_master_map, BMP_EIGHT_BLKS_FREE, (MASTER_MAP_SIZE_V5 - MASTER_MAP_SIZE_V5_OLD));
-			DB_DO_FILE_WRITE(channel, SIZEOF(csd) + MASTER_MAP_SIZE_V5_OLD, new_v5_master_map,
-							(MASTER_MAP_SIZE_V5 - MASTER_MAP_SIZE_V5_OLD), status, status2);
-			if (SS_NORMAL != status)
-			{
-				F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, db_fn_len, db_fn, status);
-				mupip_exit(ERR_MUNOUPGRD);
-			}
-			F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
-			UNIX_ONLY(mu_all_version_release_standalone(sem_inf));
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2,
-					LEN_AND_LIT("Maximum master map size is now increased from 32K to 56K"));
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUPGRDSUCC, 6, db_fn_len, db_fn,
-					RTS_ERROR_LITERAL("upgraded"), ydb_release_name_len, ydb_release_name);
-			mupip_exit(SS_NORMAL);
-=======
 		if (RDBF_STATSDB_MASK == csd->reservedDBFlags)
 		{	/* TODO: statsDB need upgrades */
 			error = TRUE;
 			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_STATSDBNOTSUPP, 2, DB_LEN_STR(reg));
 			continue; /* move onto next region */
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		}
+		mastermap = FALSE;	/* to silence [-Wuninitialized] warning */
 		if (mastermap)
 		{
 			/* Region can be upgraded - run it down and get standalone TODO: abuse rollback flags to avoid standalone */
@@ -351,7 +246,7 @@ void mupip_upgrade(void)
 				continue;
 			}
 			/* Reopen the region now that we have standalone access */
-			gvcst_init(reg, NULL);
+			gvcst_init(reg);
 			change_reg();
 			csa = cs_addrs;
 			csd = cs_data;
@@ -392,7 +287,7 @@ void mupip_upgrade(void)
 					       TRUE, REG_LEN_STR(reg));
 				continue;
 			}
-			gvcst_init(reg, NULL);
+			gvcst_init(reg);
 			change_reg();
 			csa = cs_addrs;
 			csd = cs_data;
@@ -403,7 +298,7 @@ void mupip_upgrade(void)
 			db_ipcs_reset(gv_cur_region);
 #endif
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUPGRDSUCC, 6, DB_LEN_STR(reg), RTS_ERROR_LITERAL("upgraded"),
-				       gtm_release_name_len, gtm_release_name);
+				       ydb_release_name_len, ydb_release_name);
 		} else
 		{
 			if (GDSV7m != csd->desired_db_format)
@@ -445,12 +340,14 @@ void mupip_upgrade(void)
 						continue;
 					}
 #endif
+					level = 0;	/* to silence [-Wuninitialized] warning */
 					if (cdb_sc_normal != (status = read_record(&rec_sz, &key_cmpc, &key_len, key_buff,
 							level, &dirHist, recBase)))
 					{	/* failed to parse record */
 						l_tries++;
 						continue;
 					}
+					long_blk_id = BLKID_64;	/* to silence [-Wuninitialized] warning */
 					READ_BLK_ID(long_blk_id, &blk_ptr, recBase + SIZEOF(rec_hdr) + key_len);
 					if ((0 == blk_ptr) || (csa->ti->total_blks < blk_ptr))
 					{	/* block_id out of range */
@@ -534,109 +431,6 @@ enum cdb_sc upgrade_gvt(block_id curr_blk, int4 blk_size, gd_region *reg, mstr *
 	blkEnd = blkBase + ((blk_hdr_ptr_t)blkBase)->bsiz;
 	for (blkEnd = blkBase + ((blk_hdr_ptr_t)blkBase)->bsiz; --level; )
 	{
-<<<<<<< HEAD
-		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2,
-							LEN_AND_LIT("Database creation in progress"));
-		mupip_exit(ERR_MUNOUPGRD);
-	}
-	if (v15_csd.freeze)
-	{
-		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2, LEN_AND_LIT("Database is frozen"));
-		mupip_exit(ERR_MUNOUPGRD);
-	}
-	if (v15_csd.wc_blocked)
-	{
-		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR),
-			   2, LEN_AND_LIT("Database modifications are disallowed because wc_blocked is set"));
-		mupip_exit(ERR_MUNOUPGRD);
-	}
-	if (v15_csd.file_corrupt)
-	{
-		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2, LEN_AND_LIT("Database corrupt"));
-		mupip_exit(ERR_MUNOUPGRD);
-	}
-	if (v15_csd.intrpt_recov_tp_resolve_time || v15_csd.intrpt_recov_resync_seqno || v15_csd.recov_interrupted
-	    || v15_csd.intrpt_recov_jnl_state || v15_csd.intrpt_recov_repl_state)
-	{
-		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2,
-								LEN_AND_LIT("Recovery was interrupted"));
-		mupip_exit(ERR_MUNOUPGRD);
-	}
-	if (GDSVCURR != v15_csd.certified_for_upgrade_to)
-	{
-		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUUPGRDNRDY, 4, db_fn_len, db_fn,
-								ydb_release_name_len, ydb_release_name);
-		mupip_exit(ERR_MUNOUPGRD);
-	}
-	max_max_rec_size = v15_csd.blk_size - SIZEOF(blk_hdr);
-	if (VMS_ONLY(9) UNIX_ONLY(8) > v15_csd.reserved_bytes)
-	{
-		F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBMINRESBYTES, 4, VMS_ONLY(9) UNIX_ONLY(8), v15_csd.reserved_bytes);
-		mupip_exit(ERR_MUNOUPGRD);
-	}
-	if (v15_csd.max_rec_size > max_max_rec_size)
-	{
-		F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBMAXREC2BIG, 3,
-			v15_csd.max_rec_size, v15_csd.blk_size, max_max_rec_size);
-		mupip_exit(ERR_MUNOUPGRD);
-	}
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Old file header size"),
-											v15_csd_size, v15_csd_size);
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("Old file length"),
-											&v15_file_size, &v15_file_size);
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Old file start_vbn"),
-											v15_csd.start_vbn, v15_csd.start_vbn);
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Old file gds blk_size"),
-											v15_csd.blk_size, v15_csd.blk_size);
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Old file total_blks"),
-		   v15_csd.trans_hist.total_blks, v15_csd.trans_hist.total_blks);
-	assert(ROUND_DOWN2(v15_csd.blk_size, DISK_BLOCK_SIZE) == v15_csd.blk_size);
-	assert(((off_t)v15_csd.start_vbn) * DISK_BLOCK_SIZE +
-			(off_t)v15_csd.trans_hist.total_blks * v15_csd.blk_size == v15_file_size);
-	/* Now call mu_upgrd_header() to do file header upgrade in memory */
-        mu_upgrd_header(&v15_csd, &csd);
-	csd.master_map_len = MASTER_MAP_SIZE_V4;	/* V5 master map is not part of file header */
-	memcpy(new_master_map, v15_csd.master_map, MASTER_MAP_SIZE_V4);
-	DB_DO_FILE_WRITE(channel, 0, &csd, SIZEOF(csd), status, status2);
-	if (SS_NORMAL != status)
-	{
-		F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, db_fn_len, db_fn, status);
-		mupip_exit(ERR_MUNOUPGRD);
-	}
-	DB_DO_FILE_WRITE(channel, SIZEOF(csd), new_master_map, MASTER_MAP_SIZE_V4, status, status2);
-	if (SS_NORMAL != status)
-	{
-		F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, db_fn_len, db_fn, status);
-		mupip_exit(ERR_MUNOUPGRD);
-	}
-	/* The V4 database file would have a 512-byte EOF block. Enlarge it to be a GDS-block instead (V6 format). */
-	db_write_eof_block(NULL, channel, v15_csd.blk_size, v15_file_size - DISK_BLOCK_SIZE, &(TREF(dio_buff)));
-	F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
-	mu_all_version_release_standalone(sem_inf);
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUPGRDSUCC, 6, db_fn_len, db_fn, RTS_ERROR_LITERAL("upgraded"),
-		   							ydb_release_name_len, ydb_release_name);
-	mupip_exit(SS_NORMAL);
-}
-
-STATICFNDEF void mupip_upgrade_cleanup(void)
-{
-	if (exit_handler_active)
-		return;
-	exit_handler_active = TRUE;
-	if (sem_inf)
-		mu_all_version_release_standalone(sem_inf);
-	exit_handler_complete = TRUE;
-=======
 		first_key.str.len = 0;
 		for (recBase = blkBase + SIZEOF(blk_hdr); recBase < blkEnd; )
 		{
@@ -661,7 +455,7 @@ STATICFNDEF void mupip_upgrade_cleanup(void)
 			}
 			assert(GDSV7m == ((blk_hdr_ptr_t)blkBase)->bver);
 			level = ((blk_hdr_ptr_t)blkBase)->levl;	/* might have increased due to split propagation */
-			if (BSTAR_REC_SIZE == (rec_sz = ((rec_hdr_ptr_t)recBase)->rsiz))		/* WARNING assignment*/
+			if (BSTAR_REC_SIZE_64 == (rec_sz = ((rec_hdr_ptr_t)recBase)->rsiz))		/* WARNING assignment*/
 			{	/* *-key record - name must carry over TODO does it need a "push?" */
 				assert(((recBase + rec_sz) == blkEnd) && (1 == level));
 				if (!first_key.str.len)
@@ -916,7 +710,6 @@ enum cdb_sc upgrade_idx_block(block_id curr_blk, int4 blk_size, gd_region *reg, 
 	cs_data->blks_to_upgrd--;
 	DBGUPGRADE(util_out_print("adjusted level !UL index block @x!@XQ", TRUE, level, &curr_blk));
 	return cdb_sc_normal; 									/* finished upgrading this block */
->>>>>>> 52a92dfd (GT.M V7.0-001)
 }
 
 #ifdef notnow
@@ -1028,7 +821,7 @@ enum cdb_sc find_big_sib(block_id blk, int level)
 			continue;
 		}
 		/* Reopen the region now that we have standalone access */
-		gvcst_init(reg, NULL);
+		gvcst_init(reg);
 #endif
 		csa = cs_addrs;
 		csd = cs_data;
@@ -1069,7 +862,7 @@ enum cdb_sc find_big_sib(block_id blk, int level)
 					TRUE, REG_LEN_STR(reg));
 			continue;
 		}
-		gvcst_init(reg, NULL);
+		gvcst_init(reg);
 		change_reg();
 		csa = cs_addrs;
 		csd = cs_data;
@@ -1080,7 +873,7 @@ enum cdb_sc find_big_sib(block_id blk, int level)
 		db_ipcs_reset(gv_cur_region);
 #endif
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUPGRDSUCC, 6, DB_LEN_STR(reg), RTS_ERROR_LITERAL("upgraded"),
-				gtm_release_name_len, gtm_release_name);
+				ydb_release_name_len, ydb_release_name);
 	}
 	if (error)
 		mupip_exit(ERR_MUNOFINISH);

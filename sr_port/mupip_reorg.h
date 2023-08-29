@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -12,8 +15,10 @@
 
 #ifndef MUPIP_REORG_DEFINED
 
+/* MUPIP REORG uses this macro to avoid KILLABANDONED errors in case of a MUPIP STOP (GTM-9400). */
 #define	DEFERRED_EXIT_REORG_CHECK									\
 	deferred_exit_reorg_check()
+
 /* prototypes */
 
 boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
@@ -37,36 +42,27 @@ void mupip_reorg(void);
 
 /* Inline functions */
 
+/* MUPIP REORG uses this inline function to avoid KILLABANDONED errors in case of a MUPIP STOP (GTM-9400).
+ * This macro checks if there was a MUPIP STOP that was deferred and if "cs_data->kill_in_prog" is 0.
+ * If so, it should be safe to handle the deferred signal without any KILLABANDONED error likelihood.
+ */
 static inline void deferred_exit_reorg_check(void)
 {
-	char			*rname;
-
-	GBLREF	int			process_exiting;
 	GBLREF	sgmnt_data_ptr_t	cs_data;
 	GBLREF	VSIG_ATOMIC_T		forced_exit;
-	GBLREF	volatile int4		gtmMallocDepth;
-	GBLREF	volatile int		suspend_status;
 
-	/* This is a variation on the deferred_exit handling_check in have_crit.h
-	 * The forced_exit state of 2 indicates that the exit is already in progress, so we need not process any deferred events.
+	/* Since the DEFERRED_EXIT_REORG_CHECK macro invokes this function and is called from mu_reorg.c and mu_swap_root.c
+	 * at various points in the process life time, we want to have the "forced_exit" check done first as it would be
+	 * a quick check for the fast path. In case "forced_exit" is non-zero, then we have the potential of a MUPIP STOP
+	 * so in that case, do the more heavyweight DEFERRED_SIGNAL_HANDLING_CHECK macro invocation.
 	 */
-	assert(!INSIDE_THREADED_CODE(rname));				/* need to change if mupip reorg goes multi-threaded */
-	if (forced_exit && (2 > forced_exit) && !process_exiting  && !cs_data->kill_in_prog)
-	{	/* If forced_exit was set while in a deferred state, disregard any deferred timers and
-		* invoke deferred_signal_handler directly.
-		*/
-		if (INTRPT_IN_KILL_CLEANUP == intrpt_ok_state)	/* no KIP & only set INTRPT_IN_KILL_CLEANUP if OK_TO_INTERRUPT */
+	if (forced_exit && !cs_data->kill_in_prog)
+	{
+		if (INTRPT_IN_KILL_CLEANUP == intrpt_ok_state)
+		{	/* no KIP & only set INTRPT_IN_KILL_CLEANUP if OK_TO_INTERRUPT */
 			ENABLE_INTERRUPTS(INTRPT_IN_KILL_CLEANUP, INTRPT_OK_TO_INTERRUPT);
-		if ((2 > forced_exit) && OK_TO_INTERRUPT)
-		{
-			deferred_signal_handler();
-		} else
-		{
-			if ((DEFER_SUSPEND == suspend_status) && OK_TO_INTERRUPT)
-				suspend(SIGSTOP);
-			if (deferred_timers_check_needed && OK_TO_INTERRUPT)
-				check_for_deferred_timers();
 		}
+		DEFERRED_SIGNAL_HANDLING_CHECK;
 	}
 }
 

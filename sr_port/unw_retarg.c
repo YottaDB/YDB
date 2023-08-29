@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,26 +68,14 @@ error_def(ERR_TPQUIT);
 /* This has to be maintained in parallel with op_unwind(), the unwind without a return argument (intrinsic quit) routine. */
 int unw_retarg(mval *src, boolean_t alias_return)
 {
-<<<<<<< HEAD
 	rhdtyp		*rtnhdr;
 	mval		ret_value, *trg;
-	boolean_t	got_ret_target;
+	boolean_t	defer_tptimeout, defer_ztimeout, got_ret_target;
 	lv_val		*srclv, *srclvc, *base_lv;
 	symval		*symlv, *symlvc;
-	int4		event_type, param_val;
-	void		(*set_fn)(int4 param);
 #	ifdef DEBUG_ERRHND
 	stack_frame	*prevfp;
 #	endif
-=======
-	boolean_t	defer_tptimeout, defer_ztimeout, got_ret_target;
-	int4		srcsymvlvl;
-	lv_val		*srclv, *srclvc, *base_lv;
-	mval		ret_value, *trg;
-	rhdtyp		*rtnhdr;
-	stack_frame	*prevfp;
-	symval		*symlv, *symlvc;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

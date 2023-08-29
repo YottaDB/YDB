@@ -58,11 +58,7 @@ void wb_gtm8863_lock_pause(void *csa_generic, wait_state ws)
 	if ( (WS_41 == ws) && (ws == ydb_white_box_test_case_count) )
 	{
 		fd = creat("prc.txt", 0666);
-<<<<<<< HEAD
-		snprintf(buf, SIZEOF(buf), "%llu", (long long unsigned int)csa->gvstats_rec_p->f_proc_wait);
-=======
-		snprintf(buf, SIZEOF(buf), "%lu", csa->gvstats_rec_p->n_proc_wait);
->>>>>>> 52a92dfd (GT.M V7.0-001)
+		snprintf(buf, SIZEOF(buf), "%llu", (long long unsigned int)csa->gvstats_rec_p->n_proc_wait);
 		write(fd, STR_AND_LEN(buf));
 		close(fd);
 	}
@@ -71,11 +67,7 @@ void wb_gtm8863_lock_pause(void *csa_generic, wait_state ws)
 	if ( (WS_82 == ws) && (ws == ydb_white_box_test_case_count) )
 	{
 		fd = creat("zad.txt", 0666);
-<<<<<<< HEAD
-		snprintf(buf, SIZEOF(buf), "%llu", (long long unsigned int)csa->gvstats_rec_p->f_util_wait);
-=======
-		snprintf(buf, SIZEOF(buf), "%lu", csa->gvstats_rec_p->n_util_wait);
->>>>>>> 52a92dfd (GT.M V7.0-001)
+		snprintf(buf, SIZEOF(buf), "%llu", (long long unsigned int)csa->gvstats_rec_p->n_util_wait);
 		write(fd, STR_AND_LEN(buf));
 		close(fd);
 	}

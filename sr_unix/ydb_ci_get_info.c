@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 
 #include "libyottadb_int.h"
 #include "fgncalsp.h"
-#include "outofband.h"
+#include "deferred_events_queue.h"
 
 GBLREF	volatile int4	outofband;
 

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -328,7 +328,7 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 				/* Source and Object file modification timestamp are identical. Sleep a bit and update object file
 				 * modification timestamp to see if that becomes newer.
 				 */
-				NANOSLEEP(1, RESTART_TRUE); /* Sleep for 1 nanosecond, the least possible sleep */
+				NANOSLEEP(1, RESTART_TRUE, MT_SAFE_TRUE); /* Sleep for 1 nanosecond, the least possible sleep */
 				futimens(object_file_des, times); /* Set "last modification time" of object file to current time */
 				/* In case the underlying file system does not track timestamps at nanosecond level, we will
 				 * need to do the do/while loop many times until the current time becomes greater even at the

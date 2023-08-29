@@ -42,10 +42,6 @@ void op_zut(mval *s)
 	 */
 	msectmp = microseconds = (1LL * MICROSECS_IN_SEC * ts.tv_sec) + (ts.tv_nsec / NANOSECS_IN_USEC);
 	assert(0 < microseconds);
-<<<<<<< HEAD
-
-=======
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	/* Count the number of digits */
 	for (numdigs = 0; msectmp; numdigs++, msectmp /= DECIMAL_BASE)
 		;

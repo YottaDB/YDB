@@ -229,11 +229,7 @@ int	op_job(int4 argcnt, ...)
 			DOREADRC(pipe_fds[0], &job_errno, SIZEOF(job_errno), pipe_status);
 			if (0 < pipe_status)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, joberrs[exit_stat].len,
-<<<<<<< HEAD
 										joberrs[exit_stat].msg, errno);
-=======
-					joberrs[exit_stat].msg, errno);
->>>>>>> 52a92dfd (GT.M V7.0-001)
 			if (ERR_JOBLVN2LONG == job_errno)
 			{	/* This message takes buffer_size as argument so take it before closing the pipe */
 				DOREADRC(pipe_fds[0], &buffer_size, SIZEOF(buffer_size), pipe_status);

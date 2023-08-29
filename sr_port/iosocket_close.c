@@ -246,11 +246,7 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 	}
 	else if (-1 == null_fd)
 	{
-<<<<<<< HEAD
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_FILEOPENFAIL, 2, LEN_AND_LIT("/dev/null"), save_errno, 0);
-=======
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_FILEOPENFAIL, 2, LIT_AND_LEN(DEVNULL), save_errno, 0);
->>>>>>> 52a92dfd (GT.M V7.0-001)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_FILEOPENFAIL, 2, LEN_AND_LIT(DEVNULL), save_errno, 0);
 	}
 }
 

@@ -45,9 +45,7 @@
 	old_stats = (gtm_uint64_t *) &CSD->gvstats_rec_old_now_filler[0];				\
 	new_stats = (gtm_uint64_t *) &cnl->gvstats_rec;							\
 	for (i = 0; i < SIZEOF(CSD->gvstats_rec_old_now_filler)/SIZEOF(gtm_uint64_t); i++)		\
-	{												\
 		new_stats[i] = old_stats[i];								\
-	}												\
 }
 
 GBLREF  boolean_t       dse_running;
@@ -138,53 +136,10 @@ void db_auto_upgrade(gd_region *reg)
 		{	/* Note that handling for any fields introduced in a version will not go in the "switch-case" block
 			 * of code introduced for the new version but will go in the PREVIOUS "switch-case" block.
 			 */
-			case GDSMV63015:	/* because we added this in case, after its number had alreay been used by V70000 */
+			case GDSMV63015: /* because we added this in case, after its number had already been used by V70000 */
 			case GDSMV70000:
-<<<<<<< HEAD
-				/* This is a GT.M V7.0-000 database. Apply all file header upgrade changes that happened
-				 * in YottaDB r1.2* and r1.3* releases (i.e. all releases less than YottaDB r2.0 release).
-				 */
-				/* Handle GDSMR122 (aka GDSMV63007) case */
-				/* ----------------------------------- */
-				/* YottaDB r122 introduced "reorg_sleep_nsec" to slow down reorg update rate by user */
-				csd->reorg_sleep_nsec = 0;
-				/* ----------------------------------- */
-				/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support nanosecond
-				 * timers. In GT.M, "flush_time" is an array of 2 4-byte quantities but only the first 4-byte
-				 * is used. Whereas in YottaDB, "flush_time" is an 8-byte quantity. Therefore, nullify the
-				 * second 4-byte before doing the below multiplication to arrive at the 8-byte value.
-				 */
-				csd->flush_time = (csd->flush_time & (((uint8)1 << 32) - 1)) * NANOSECS_IN_MSEC;
-				/* Note: This is a little-endian solution and will need to be modified if we
-				 * ever support big-endian.
-				 */
-				if (0 == csd->flush_trigger_top)
-					csd->flush_trigger_top = FLUSH_FACTOR(csd->n_bts);
-				/* Note: This ensures that the csd->flush_trigger_top field added in GT.M v63007 is set if
-				 * the old db_minorver is GDSMR122.
-				 */
-				/* ----------------------------------- */
-				/* YottaDB r134 introduced "max_procs" which records the maximum number of
-				 * processes accessing the database to measure system load.
-				 */
-				csd->max_procs.cnt = 0;
-				csd->max_procs.time = 0;
-				break;
-			case GDSMR200:
-				/* When adding a new minor version, the following template should be maintained
-				 * 1) Remove the penultimate 'break' (i.e. "break" in the PREVIOUS "case" block.
-				 * 2) If there are any file header fields added in the new minor version, initialize the fields
-				 *    to default values in THIS/CURRENT case (i.e. above this comment block). Do not add a
-				 *    "break" for THIS/CURRENT "case" block.
-				 * 3) Then, add a NEW "case" statement with the new minor version. The below 3 lines become
-				 *    part of that "case".
-				 * 4) For every GT.M minor ver added since the previous YottaDB release, duplicate the relevant
-				 *    auto upgrade code in this case block. This is needed as the GT.M GDSMV* (e.g. GDSMV63012)
-				 *    values will be way less than the older YottaDB GDSMVCURR value (e.g. in case of YottaDB
-				 *    r1.32) and so those GT.M switch/case code paths above will not be reached for upgrades
-				 *    from an older YottaDB release to a newer YottaDB release.
-				 */
-=======
+			case GDSMR200_V70000:
+				/* Do GT.M V7.0-001 related auto upgrade operations */
 				csd->creation_db_ver = GDSVCURR;     /* required due to renumbering of db_vers due to V6 upgrades */
 				csd->creation_mdb_ver = GDSMV70000;  /* required due to adding protection for possible V63015 */
 				csd->desired_db_format = GDSVCURR;   /* required due to renumbering of db_vers due to V6 upgrades */
@@ -200,26 +155,70 @@ void db_auto_upgrade(gd_region *reg)
 					= (int4)(ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 				csd->max_update_array_size
 					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
-				break;
 			case GDSMV70001:
->>>>>>> 52a92dfd (GT.M V7.0-001)
+				if (GDSMR200_V70000 != csd->minor_dbver)
+				{
+					/* Do YottaDB r2.00 related auto upgrade operations.
+					 * This is a GT.M V7.0-000 database. Apply all file header upgrade changes that happened
+					 * in YottaDB r1.2* and r1.3* releases (i.e. all releases less than YottaDB r2.0 release).
+					 */
+					/* Handle GDSMR122 (aka GDSMV63007) case */
+					/* ----------------------------------- */
+					/* YottaDB r122 introduced "reorg_sleep_nsec" to slow down reorg update rate by user */
+					csd->reorg_sleep_nsec = 0;
+					/* ----------------------------------- */
+					/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support
+					 * nanosecond timers. In GT.M, "flush_time" is an array of 2 4-byte quantities but only
+					 * the first 4-byte is used. Whereas in YottaDB, "flush_time" is an 8-byte quantity.
+					 * Therefore, nullify the second 4-byte before doing the below multiplication to
+					 * arrive at the 8-byte value.
+					 */
+					csd->flush_time = (csd->flush_time & (((uint8)1 << 32) - 1)) * NANOSECS_IN_MSEC;
+					/* Note: This is a little-endian solution and will need to be modified if we
+					 * ever support big-endian.
+					 */
+					if (0 == csd->flush_trigger_top)
+						csd->flush_trigger_top = FLUSH_FACTOR(csd->n_bts);
+					/* Note: This ensures that the csd->flush_trigger_top field added in GT.M v63007 is set if
+					 * the old db_minorver is GDSMR122.
+					 */
+					/* ----------------------------------- */
+					/* YottaDB r134 introduced "max_procs" which records the maximum number of
+					 * processes accessing the database to measure system load.
+					 */
+					csd->max_procs.cnt = 0;
+					csd->max_procs.time = 0;
+				}
+				break;
+			case GDSMR200_V70001:
+				/* When adding a new minor version, the following template should be maintained
+				 * 1) Remove the penultimate 'break' (i.e. "break" in the PREVIOUS "case" block.
+				 * 2) If there are any file header fields added in the new minor version, initialize the fields
+				 *    to default values in THIS/CURRENT case (i.e. above this comment block). Do not add a
+				 *    "break" for THIS/CURRENT "case" block.
+				 * 3) Then, add a NEW "case" statement with the new minor version. The below 3 lines become
+				 *    part of that "case".
+				 * 4) For every GT.M minor ver added since the previous YottaDB release, duplicate the relevant
+				 *    auto upgrade code in this case block. This is needed as the GT.M GDSMV* (e.g. GDSMV63012)
+				 *    values will be way less than the older YottaDB GDSMVCURR value (e.g. in case of YottaDB
+				 *    r1.32) and so those GT.M switch/case code paths above will not be reached for upgrades
+				 *    from an older YottaDB release to a newer YottaDB release.
+				 */
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
 			/* Remove the below cases one by one as later GT.M versions use up these minor db version enum values. */
-			case GDSMVFILLER4:
-			case GDSMVFILLER5:
-			case GDSMVFILLER6:
-			case GDSMVFILLER7:
-			case GDSMVFILLER8:
-			case GDSMVFILLER9:
-			case GDSMVFILLER10:
-			case GDSMVFILLER11:
-			case GDSMVFILLER12:
-			case GDSMVFILLER13:
-			case GDSMVFILLER14:
-			case GDSMVFILLER15:
-			case GDSMVFILLER16:
+			case GDSMVFILLER27:
+			case GDSMVFILLER28:
+			case GDSMVFILLER29:
+			case GDSMVFILLER30:
+			case GDSMVFILLER31:
+			case GDSMVFILLER32:
+			case GDSMVFILLER33:
+			case GDSMVFILLER34:
+			case GDSMVFILLER35:
+			case GDSMVFILLER36:
+			case GDSMVFILLER37:
 			default:
 				/* Unrecognized version in the header */
 				assertpro(FALSE && csd->minor_dbver);
@@ -425,10 +424,24 @@ void v6_db_auto_upgrade(gd_region *reg)
 				/* GT.M V63012 added fullblkwrt option */
 				csd->write_fullblk = 0;
 			case GDSMV63012:
-<<<<<<< HEAD
 				/* GT.M V63014 moved the gvstats section from one location in the file header to another */
 				MOVE_GVSTATS_REC_FROM_OLD_HDR_TO_NODE_LOCAL(csa, csd);
 			case GDSMV63014:
+				csd->desired_db_format = GDSV6;	/* because it takes an action to move toward V7 */
+				if (0 == csd->statsdb_allocation)
+					csd->statsdb_allocation = STATSDB_ALLOCATION;	/* Initialize with statsdb default value */
+				/* we do not initialize new post GDSMV63014 field csd->last_start_backup here because if
+				   it has never been set the default (all zeroes) is OK, and if it has, we do not want to
+				   overwrite it on our way up */
+				csd->db_got_to_V7_once = FALSE;
+				csd->offset = 0;
+				csd->max_rec = 0;
+				csd->i_reserved_bytes = 0;
+				/* the next four lines are because gvcst_init_sysops might have used an outdated assumption */
+				csd->max_update_array_size = csd->max_non_bm_update_array_size
+					= (int4)(ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
+				csd->max_update_array_size
+					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 			case GDSMR126:
 				/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support nanosecond
 				 * timers. In GT.M, "flush_time" is an array of 2 4-byte quantities but only the first 4-byte
@@ -469,54 +482,12 @@ void v6_db_auto_upgrade(gd_region *reg)
 				 * happened as appropriate in the previous "case" blocks.
 				 */
 				break;
-			case GDSMV70000:
-			case GDSMVFILLER4:
-			case GDSMVFILLER5:
-			case GDSMVFILLER6:
-			case GDSMVFILLER7:
-			case GDSMVFILLER8:
-			case GDSMVFILLER9:
-			case GDSMVFILLER10:
-			case GDSMVFILLER11:
-			case GDSMVFILLER12:
-			case GDSMVFILLER13:
-			case GDSMVFILLER14:
-			case GDSMVFILLER15:
-			case GDSMVFILLER16:
-			case GDSMR136:
-				assert(FALSE);	/* When this assert fails, it means a new GDSMV* was created, */
-				break;		/* so a new "case" needs to be added BEFORE the assert. */
-=======
-				/* Copy the 62 pre GTM-8863 stats from the old header location to the new one */
-				cnl = csa->nl;
-				old_stats = (gtm_uint64_t *) &csd->gvstats_rec_old_now_filler[0];
-				new_stats = (gtm_uint64_t *) &cnl->gvstats_rec;
-				for (i = 0; i < SIZEOF(csd->gvstats_rec_old_now_filler)/SIZEOF(gtm_uint64_t); i++)
-					new_stats[i] = old_stats[i];
-			case GDSMV63014:
-				csd->desired_db_format = GDSV6;	/* because it takes an action to move toward V7 */
-				if (0 == csd->statsdb_allocation)
-					csd->statsdb_allocation = STATSDB_ALLOCATION;	/* Initialize with statsdb default value */
-				/* we do not initialize new post GDSMV63014 field csd->last_start_backup here because if
-				   it has never been set the default (all zeroes) is OK, and if it has, we do not want to
-				   overwrite it on our way up */
-				csd->db_got_to_V7_once = FALSE;
-				csd->offset = 0;
-				csd->max_rec = 0;
-				csd->i_reserved_bytes = 0;
-				/*the next four lines are because gvcst_init_sysops might have used an outdated assumption */
-				csd->max_update_array_size = csd->max_non_bm_update_array_size
-				= (int4)(ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
-				csd->max_update_array_size
-				+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
-				break;
 			case GDSMV63015:
 				assert(FALSE);	/* if this should come to pass, add appropriate code above the assert */
-				break;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 			default:
 				/* Unrecognized version in the header */
 				assertpro(FALSE && csd->minor_dbver);
+				break;
 		}
 		csd->minor_dbver = BLK_ID_32_MVER;	/* applies to all pre-V7 versions and expected here by workcheck */
 	}

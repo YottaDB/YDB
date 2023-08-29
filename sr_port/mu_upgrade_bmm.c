@@ -3,6 +3,9 @@
  * Copyright (c) 2021 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -300,6 +303,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 						blkhist->buffaddr = blkBase2 = blkBase;
 						blkhist->level = blkHdr.levl;
 						recBase = blkBase + SIZEOF(blk_hdr);
+						gvnh_reg = NULL;	/* to silence [-Wuninitialized] warning */
 						status = find_dt_entry_for_blk(blkhist, blkBase2, recBase, &gvname, gvnh_reg);
 						if (cdb_sc_normal != status)
 						{	/* skip this block */
@@ -1136,6 +1140,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, int4 blk_size, 
 	assert(!update_trans && !need_kip_incr);
 	update_trans = UPDTRNS_DB_UPDATED_MASK;
 	t_begin_crit(ERR_MUNOUPGRD);
+	gvnh_reg = NULL;	/* to silence [-Wuninitialized] warning */
 	status = find_dt_entry_for_blk(&dirHist, blkBase, recBase, &gvname, gvnh_reg);
 	if (cdb_sc_normal != status)
 	{

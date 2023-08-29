@@ -4,7 +4,7 @@
 # Copyright (c) 2001-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -80,18 +80,9 @@ rm -f $ydb_dist/{PINENTRY,pinentry}.[om]
 cp -pf $gtm_tools/Makefile.mk $ydb_dist_plugin/gtmcrypt/Makefile
 chmod +x $ydb_dist_plugin/gtmcrypt/*.sh
 #
-<<<<<<< HEAD
 pushd $ydb_dist_plugin/gtmcrypt
-if ("HP-UX" == "$HOSTOS") then
-	set make = "gmake"
-else
-	set make = "make"
-endif
-=======
-pushd $gtm_dist_plugin/gtmcrypt
 set make = "make"
 
->>>>>>> 52a92dfd (GT.M V7.0-001)
 if ($gtm_verno =~ V[4-8]*) then
 	# For production builds don't do any randomizations.
 	set algorithm = "AES256CFB"

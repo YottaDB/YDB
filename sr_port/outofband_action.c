@@ -19,14 +19,10 @@
 
 #include "io.h"
 #include "stack_frame.h"
-<<<<<<< HEAD
-#include "outofband.h"
-#include "libyottadb_int.h"
-#include "have_crit.h"
-=======
 #include "have_crit.h"
 #include "deferred_events_queue.h"
->>>>>>> 52a92dfd (GT.M V7.0-001)
+#include "libyottadb_int.h"
+#include "have_crit.h"
 
 GBLREF volatile boolean_t	dollar_zininterrupt;
 GBLREF io_pair			io_std_device;
@@ -43,7 +39,7 @@ error_def(ERR_TERMWRITE);
 error_def(ERR_JOBINTRRQST);
 
 void outofband_action(boolean_t lnfetch_or_start)
-{	/* initates transfer of control using the condition handler mechanism expecting a catch by the mdeb_condition_handler */
+{	/* initates transfer of control using the condition handler mechanism expecting a catch by the mdb_condition_handler */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -73,19 +69,12 @@ void outofband_action(boolean_t lnfetch_or_start)
 		 */
 		switch(outofband)
 		{
-<<<<<<< HEAD
-			case (ctrly):		/* This signal is ignored in simpleAPI */
-				if (!(IS_SIMPLEAPI_MODE))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLY);
-				else
-					outofband_clear();
-				break;
-			case (ctrlc):
+			case ctrlc:
 				/* Note this outofband is currently allowed for simpleAPI functions.
 				 * It exits the process in simple*API mode.
 				 */
 				if (!(IS_SIMPLEAPI_MODE))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CTRLC);
 				else
 				{	/* If we are running with Go, just return as we'll panic instead of exit */
 					if (YDB_MAIN_LANG_GO == ydb_main_lang)
@@ -96,53 +85,33 @@ void outofband_action(boolean_t lnfetch_or_start)
 					exit(ERR_CTRLC);
 				}
 				break;
-			case (ctrap):		/* This signal is ignored in simpleAPI */
+			case ctrap:		/* This signal is ignored in simpleAPI */
 				if (!(IS_SIMPLEAPI_MODE))
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_CTRAP, 1, TAREF1(save_xfer_root, ctrap).param_val);
 				else
 					outofband_clear();
-				break;
-			case (sighup):
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TERMHANGUP);
-				break;
-			case (tptimeout):
-				/* Currently following is nothing but an rts_error.
-				 * Function pointer is used for flexibility.
-				 * Note this outofband is currently allowed for simpleAPI functions.
-				 */
-				(*tp_timeout_action_ptr)();
-				break;
-			case (jobinterrupt):	/* This signal is ignored in simpleAPI */
-				if (!(IS_SIMPLEAPI_MODE))
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBINTRRQST);
-				else
-					outofband_clear();
-				break;
-			case (ztimeout): /* Following is basically rts_error (ignored for simpleAPI) */
-				if (!(IS_SIMPLEAPI_MODE))
-					(*ztimeout_action_ptr)();
-				else
-					outofband_clear();
-=======
-			case ctrlc:
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CTRLC);
-				break;
-			case ctrap:
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_CTRAP, 1, TAREF1(save_xfer_root, ctrap).param_val);
 				break;
 			case sighup:
 				TAREF1(save_xfer_root, sighup).event_state = pending;
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TERMHANGUP);
 				break;
-			case tptimeout:	/* following is basically an rts_error; function pointer is used for flexibility */
+			case tptimeout:
+				/* Following is basically an rts_error; function pointer is used for flexibility.
+				 * Note this outofband is currently allowed for simpleAPI functions.
+				 */
 				(*tp_timeout_action_ptr)();
 				break;
-			case jobinterrupt:
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBINTRRQST);
+			case jobinterrupt:	/* This signal is ignored in simpleAPI */
+				if (!(IS_SIMPLEAPI_MODE))
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBINTRRQST);
+				else
+					outofband_clear();
 				break;
-			case ztimeout: /* following is basically rts_error */
-				(*ztimeout_action_ptr)();
->>>>>>> 52a92dfd (GT.M V7.0-001)
+			case ztimeout: /* Following is basically rts_error (ignored for simpleAPI) */
+				if (!(IS_SIMPLEAPI_MODE))
+					(*ztimeout_action_ptr)();
+				else
+					outofband_clear();
 				break;
 			case ttwriterr:
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_TERMWRITE, 0, TAREF1(save_xfer_root, ttwriterr).param_val);

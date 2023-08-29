@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,11 +92,8 @@
 /* CAfile or CApath processed */
 #define GTMTLS_OP_CA_LOADED	 	0x00020000
 #define GTMTLS_OP_NOSHUTDOWN		0x00040000
-<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
-=======
 /* NON BLOCKing WRITE so set SSL_MODE_ENABLE_PARTIAL_WRITE	*/
 #define GTMTLS_OP_NONBLOCK_WRITE	0x00080000
->>>>>>> 52a92dfd (GT.M V7.0-001):sr_unix/gtm_tls_interface.h
 
 #define GTMTLS_IS_FIPS_MODE(CTX)	(TRUE == CTX->fips_mode)
 #define GTMTLS_RUNTIME_LIB_VERSION(CTX)	(CTX->runtime_version)
@@ -169,13 +166,8 @@ GBLREF	int		gtm_tls_errno(void);
  * necessary to initialize the SSL/TLS context are obtained from the configuration file pointed to by `$ydb_crypt_config'.
  *
  * Arguments:
-<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
  *   `version' : The API version that the caller understands. Current version is GTM_TLS_API_VERSION.
- *   `flags'   : Initialization flags as a bitmask. Currently, the only one the API understands is GTMTLS_OP_INTERACTIVE_MODE.
-=======
- *   `version' : The API version that the caller understands. Current version is 0x5.
  *   `flags'   : Initialization flags as a bitmask. The first one the API understands is GTMTLS_OP_INTERACTIVE_MODE.
->>>>>>> 52a92dfd (GT.M V7.0-001):sr_unix/gtm_tls_interface.h
  *               Set this bitmask if the process doing the SSL/TLS initialization is run in an interactive mode. This lets
  *               the API decide if it can prompt for a password if a need arises while decrypting the private key.
  *

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,11 +82,8 @@ GBLREF volatile boolean_t	dollar_zininterrupt;
 GBLREF volatile int4		outofband;
 GBLREF zshow_out		*zwr_output;
 GBLREF zwr_hash_table		*zwrhtab;
-<<<<<<< HEAD
-GBLREF boolean_t		tp_timeout_deferred;
 GBLREF mval			dollar_testmv;
 GBLREF int 			dollar_truth;
-=======
 #ifdef GTM_TRIGGER
 GBLREF boolean_t		run_time, *ztvalue_changed_ptr;
 GBLREF int			mumps_status;
@@ -101,7 +98,6 @@ GBLREF gtm_trigger_parms	*gtm_trigprm_last;
 GBLREF gv_trigger_t		*gtm_trigdsc_last;		/* For debugging purposes - parms gtm_trigger called with */
 #  endif
 #endif
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 #define FREEIFALLOC(ADR) if (NULL != (ADR)) free(ADR)
 
@@ -481,7 +477,6 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				TREF(dollar_ztrap) = mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save;
 				ztrap_explicit_null = mv_st_ent->mv_st_cont.mvs_trigr.ztrap_explicit_null_save;
 			}
-<<<<<<< HEAD
 			if (TREF(trig_forced_unwind))
 			{	/* This is a forced unwind of the trigger context so reset the condition handler stack too */
 				DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
@@ -507,49 +502,6 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
 				TREF(trig_forced_unwind) = FALSE;
 			}
-			if ((TREF(save_xfer_root)))
-			{	/* A tp timeout was deferred. Now that $ETRAP is no longer in effect and/or we are no
-				 * longer in a job interrupt, the timeout can no longer be deferred and needs to be
-				 * recognized.
-				 */
-				if (((TREF(save_xfer_root))->set_fn == tptimeout_set)
-					|| ((TREF(save_xfer_root))->set_fn == ztimeout_set))
-				{
-					if ((tp_timeout_deferred || TREF(ztimeout_deferred))
-						UNIX_ONLY(&& !dollar_zininterrupt) && ((0 == dollar_ecode.index)
-									|| !(ETRAP_IN_EFFECT)))
-					{
-						DBGDFRDEVNT((stderr, "Calling pop_reset_xfer from unw_mv_ent\n"));
-						POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
-						xfer_set_handlers(event_type, set_fn, param_val, TRUE);
-					}
-				} else
-				{
-					DBGDFRDEVNT((stderr, "Calling pop_reset_xfer from unw_mv_ent\n"));
-					POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
-					xfer_set_handlers(event_type, set_fn, param_val, TRUE);
-				}
-			}
-=======
-			DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
-			CHECKHIGHBOUND(mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save);
-			CHECKLOWBOUND(mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save);
-			ctxt = mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save;
-			/* same assert as in gtm_trigger.c */
-			assert(((0 == gtm_trigger_depth)
-					&& (((ch_at_trigger_init == ctxt->ch)
-						|| ((ch_at_trigger_init == (ctxt - 1)->ch)
-							&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
-								|| (&gvcst_spr_kill_ch == ctxt->ch))))))
-				|| ((0 < gtm_trigger_depth)
-					&& (((&mdb_condition_handler == ctxt->ch)
-						|| ((&mdb_condition_handler == (ctxt - 1)->ch)
-							&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
-								|| (&gvcst_spr_kill_ch == ctxt->ch)))))));
-			active_ch = ctxt;
-			ctxt->ch_active = FALSE;
-			ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
->>>>>>> 52a92dfd (GT.M V7.0-001)
 #			endif	/* GTM_TRIGGER */
 			return;
 		case MVST_MRGZWRSV:

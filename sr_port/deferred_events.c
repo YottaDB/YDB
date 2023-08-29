@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -20,8 +23,8 @@
 #include "add_inter.h"
 #include "op.h"
 #include "fix_xfer_entry.h"
-#include "deferred_events_queue.h"
 #include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "stack_frame.h"
 #include "error.h"
 

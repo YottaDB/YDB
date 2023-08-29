@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,15 +29,10 @@
 #include "io.h"
 #include "iosp.h"
 #include "stringpool.h"
-<<<<<<< HEAD
-#include "jobinterrupt_init.h"
-#include "jobinterrupt_event.h"
+#include "jobinterrupt_process.h"
 #include "ydb_trans_log_name.h"
 #include "libyottadb.h"
 #include "sig_init.h"
-=======
-#include "jobinterrupt_process.h"
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 GBLREF	mval		dollar_zinterrupt;
 GBLREF	boolean_t	ydb_treat_sigusr2_like_sigusr1;

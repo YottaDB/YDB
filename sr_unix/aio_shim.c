@@ -459,16 +459,10 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 		errno = ret;	/* pthread_create() returns errno in ret. */
 		return -1;
 	}
-<<<<<<< HEAD
 	ret = pthread_sigmask(SIG_SETMASK, &savemask, NULL);
 	assert(0 == ret);
 	UNUSED(ret);
 	gd->gd_runtime->thread_gdi = gdi;
-=======
-	multi_thread_in_use = FALSE;
-	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, ret);
-	gd->thread_gdi = gdi;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	return 0;
 }
 

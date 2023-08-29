@@ -917,17 +917,11 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		assert(!csa->now_crit);
 		rel_crit(reg);
 	}
-<<<<<<< HEAD
-	status = (!csd_read_only) ? SHMDT((caddr_t)cnl) : 0;
-	csa->nl = NULL; /* dereferencing nl after detach is not right, so we set it to NULL so that we can test before dereference*/
-	csa->hdr = NULL;	/* dereferencing hdr after detach also is not right so set it to NULL */
-=======
 	/* Dereferencing nl or hdr+friends after detach is not right; Nullify ahead of the detach operation so that concurrent
 	 * code, e.g. signal handlers, can test before a dereference the occurs in the middle of a detach. */
 	csa->nl = NULL;
 	cs_data = csd = csa->hdr = NULL;
-	status = SHMDT((caddr_t)cnl);
->>>>>>> 52a92dfd (GT.M V7.0-001)
+	status = (!csd_read_only) ? SHMDT((caddr_t)cnl) : 0;
 	/* Note that although csa->nl is NULL, we use CSA_ARG(csa) below (not CSA_ARG(NULL)) to be consistent with similar
 	 * usages before csa->nl became NULL. The "is_anticipatory_freeze_needed" function (which is in turn called by the
 	 * CHECK_IF_FREEZE_ON_ERROR_NEEDED macro) does a check of csa->nl before dereferencing shared memory contents so

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,20 +50,7 @@ GBLREF	unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF	volatile int4		outofband;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
 
-<<<<<<< HEAD
 boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t update_bufsiz)
-=======
-error_def(ERR_GETNAMEINFO);
-error_def(ERR_GETSOCKNAMERR);
-error_def(ERR_GETSOCKOPTERR);
-error_def(ERR_OPENCONN);
-error_def(ERR_SETSOCKOPTERR);
-error_def(ERR_SOCKINIT);
-error_def(ERR_TEXT);
-error_def(ERR_ZINTRECURSEIO);
-
-boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t update_bufsiz)
->>>>>>> 52a92dfd (GT.M V7.0-001)
 {
 	int		temp_1, flags, flags_orig, keepalive_opt;
 	char		*errptr;
@@ -566,15 +553,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 			mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
 			socketus_interruptus++;
 			DBGSOCK((stdout, "socconn: mv_stent queued - endtime: %d/%d  interrupts: %d\n",
-<<<<<<< HEAD
 				 end_time.tv_sec, end_time.tv_nsec / NANOSECS_IN_USEC, socketus_interruptus));
-			outofband_action(FALSE);
-			assertpro(FALSE);      /* Should *never* return from outofband_action */
-=======
-				 end_time.at_sec, end_time.at_usec, socketus_interruptus));
 			async_action(FALSE);
 			assertpro(FALSE);      /* Should *never* return from async_action */
->>>>>>> 52a92dfd (GT.M V7.0-001)
 			return FALSE;   /* For the compiler.. */
 		}
 		hiber_start(100);

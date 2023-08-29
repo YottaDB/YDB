@@ -54,18 +54,6 @@
 # NON_GLIBC_ONLY(X)
 #endif
 
-<<<<<<< HEAD
-=======
-/* mstr needs to be defined before including "mdefsp.h".  */
-#define MSTR_LEN_MAX INT_MAX
-typedef int mstr_len_t;		/* Change MSTR_LEN_MAX if this changes */
-typedef struct
-{
-	unsigned int	char_len;	/* Character length */
-	mstr_len_t	len;
-	char		*addr;
-} mstr;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 #define MSTR_CONST(name, string)		mstr name = {0, LEN_AND_LIT(string)}
 #define MSTR_DEF(name, length, string)		mstr name = {0, length, string}
 #define MIDENT_CONST(name, string)		mident name = {0, LEN_AND_LIT(string)}
@@ -850,16 +838,9 @@ MBSTART {					\
 
 /* SLEEP_USEC wrapper, see sleep.c for more information */
 void m_usleep(int useconds);
-<<<<<<< HEAD
-#define MAX_SHORT_SLEEP_MSEC	999
-#ifdef UNIX
-#	define SHORT_SLEEP(x) {assert(1000 > (x)); m_usleep((x) * 1000);}
-#else
-#	define SHORT_SLEEP(x) hiber_start(x);
-#endif
-=======
-#define SHORT_SLEEP(x) {assert(1000 > (x)); m_usleep((x) * 1000);}
->>>>>>> 52a92dfd (GT.M V7.0-001)
+
+#define	MAX_SHORT_SLEEP_MSEC	999
+#define	SHORT_SLEEP(x)	{assert(1000 > (x)); m_usleep((x) * 1000);}
 
 #ifdef UNIX
 	/* It is possible UNIX_ONLY is defined in case of .c files used in test system (due to they including
@@ -2030,7 +2011,9 @@ enum
 /* Ensures that the argument is defined if it was not skipped. */
 #define MV_FORCE_DEFINED_UNLESS_SKIPARG(V)	((!M_ARG_SKIPPED(V)) ? (MV_FORCE_DEFINED(V)) : (V))
 
-<<<<<<< HEAD
+/* /dev/null */
+#define DEVNULL		"/dev/null"
+
 #ifdef DEBUG
   /* Define macros that are helpful in verifying that functions in libyottadb.so are only invoked
    * by the executables/utilities we expect and not by anything else. For example, libgnpclient.list
@@ -2044,13 +2027,6 @@ enum
 # define ASSERT_IS_LIBGNPSERVER		assert(IS_LIBGNPSERVER)
 # define ASSERT_IS_LIBCMISOCKETTCP	assert(IS_LIBCMISOCKETTCP)
 # define ASSERT_IS_LIBGTCM		assert(IS_LIBGTCM)
-=======
-/* /dev/null */
-#define DEVNULL		"/dev/null"
-
-#ifdef _AIX
-#define LIBPATH_ENV		"LIBPATH"
->>>>>>> 52a92dfd (GT.M V7.0-001)
 #else
 # define ASSERT_IS_LIBGNPCLIENT
 # define ASSERT_IS_LIBGNPSERVER
@@ -2058,20 +2034,6 @@ enum
 # define ASSERT_IS_LIBGTCM
 #endif
 
-<<<<<<< HEAD
-/* HDR_FILE_INCLUDE_SYNTAX :
- * There are a few header files that exist in multiple sr_* directories.
- * For example,
- *	./sr_unix/rtnhdr.h
- *	./sr_unix_nsb/rtnhdr.h
- * Whenever we have such a header file, it needs to be included using <> syntax and not "" syntax.
- * This is because, even though this is not a system-header file, but is a user-defined header file,
- * if the C file doing including rtnhdr.h is found in sr_unix, sr_unix/rtnhdr.h would be picked by the
- * compiler (because it is in the same directory as the including C file) if the "" syntax is used
- * even though the correct file to pick up is sr_unix_nsb/rtnhdr.h. Using the <> syntax avoids this issue.
- * This block of comment is here as a marker so all such non-intuitive include usages reference this.
- */
-=======
 #ifdef DEBUG
 # define DBG_VERIFY_ACCESS(PTR)			\
 {	/* Ensure accessible pointer (no SIG-11) */	\
@@ -2083,5 +2045,17 @@ enum
 # define DBG_VERIFY_ACCESS(PTR)
 #endif
 
->>>>>>> 52a92dfd (GT.M V7.0-001)
+/* HDR_FILE_INCLUDE_SYNTAX :
+ * There are a few header files that exist in multiple sr_* directories.
+ * For example,
+ *	./sr_unix/rtnhdr.h
+ *	./sr_unix_nsb/rtnhdr.h
+ * Whenever we have such a header file, it needs to be included using <> syntax and not "" syntax.
+ * This is because, even though this is not a system-header file, but is a user-defined header file,
+ * if the C file including rtnhdr.h is found in sr_unix, sr_unix/rtnhdr.h would be picked by the
+ * compiler (because it is in the same directory as the including C file) if the "" syntax is used
+ * even though the correct file to pick up is sr_unix_nsb/rtnhdr.h. Using the <> syntax avoids this issue.
+ * This block of comment is here as a marker so all such non-intuitive include usages reference this.
+ */
+
 #endif /* MDEF_included */

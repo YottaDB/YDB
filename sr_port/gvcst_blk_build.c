@@ -74,16 +74,10 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	 * which operates outside crit. The exceptions to this are DSE (write_after_image is TRUE) or ONLINE ROLLBACK
 	 * which holds crit for the entire duration
 	 */
-<<<<<<< HEAD
 	is_mm = (dba_mm == cs_data->acc_meth);
-	assert((dba_bg != cs_data->acc_meth) || dollar_tlevel || !cs_addrs->now_crit || write_after_image| jgbl.onlnrlbk
-		|| ((NULL != cse->recompute_list_head) && (gds_t_write == cse->mode)));
-	assert(!is_mm || dollar_tlevel || cs_addrs->now_crit);
-=======
 	assert((dba_bg != cs_data->acc_meth) || dollar_tlevel || !cs_addrs->now_crit || write_after_image || jgbl.onlnrlbk
 		|| mu_reorg_upgrd_dwngrd_in_prog || ((NULL != cse->recompute_list_head) && (gds_t_write == cse->mode)));
-	assert((dba_mm != cs_data->acc_meth) || dollar_tlevel || cs_addrs->now_crit);
->>>>>>> 52a92dfd (GT.M V7.0-001)
+	assert(!is_mm || dollar_tlevel || cs_addrs->now_crit);
 	assert(cse->mode != gds_t_writemap);
 	assert(cse->ondsk_blkver);
 	array = (blk_segment *)cse->upd_addr;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,7 +19,7 @@
 #include "op.h"
 #include "error.h"
 #include "stringpool.h"
-#include "outofband.h"
+#include "deferred_events_queue.h"
 #include "namelook.h"
 
 GBLREF	volatile int4	outofband;

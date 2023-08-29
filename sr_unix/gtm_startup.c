@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -109,7 +109,6 @@ GBLDEF void			(*restart)() = &mum_tstart;
 GBLDEF ch_ret_type		(*mdb_condition_handler_ptr)(int arg) = &mdb_condition_handler;
 #endif
 
-<<<<<<< HEAD
 GBLREF	rtn_tabent		*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
 GBLREF	int4			break_message_mask;
 GBLREF	stack_frame 		*frame_pointer;
@@ -124,7 +123,6 @@ GBLREF	spdesc			stringpool;
 GBLREF	spdesc			rts_stringpool;
 GBLREF	command_qualifier	glb_cmd_qlf, cmd_qlf;
 GBLREF	symval			*curr_symval;
-GBLREF	global_latch_t 		defer_latch;
 GBLREF	boolean_t		is_replicator;
 GBLREF	void			(*ctrlc_handler_ptr)();
 GBLREF	boolean_t		mstr_native_align;
@@ -138,39 +136,11 @@ GBLREF	enum gtmImageTypes	image_type;
 GBLREF	int			init_xfer_table(void);
 GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 GBLREF	void			(*ydb_stm_invoke_deferred_signal_handler_fnptr)(void);
-GBLREF	boolean_t		(*xfer_set_handlers_fnptr)(int4, void (*callback)(int4), int4 param, boolean_t popped_entry);
+GBLREF	boolean_t		(*xfer_set_handlers_fnptr)(int4, int4 param, boolean_t popped_entry);
 GBLREF	void			(*deferred_signal_set_fnptr)(int4 dummy_val);
 GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM];
 GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder[STMWORKQUEUEDIM];
 GBLREF	boolean_t		ydb_treat_sigusr2_like_sigusr1;
-=======
-GBLREF rtn_tabent		*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
-GBLREF int4			break_message_mask;
-GBLREF stack_frame 		*frame_pointer;
-GBLREF unsigned char 		*stackbase, *stacktop, *stackwarn, *msp;
-GBLREF unsigned char		*fgncal_stack;
-GBLREF mv_stent			*mv_chain;
-GBLREF xfer_entry_t		xfer_table[];
-GBLREF mval			dollar_system;
-GBLREF mval			dollar_zstatus;
-GBLREF bool			compile_time;
-GBLREF spdesc			stringpool;
-GBLREF spdesc			rts_stringpool;
-GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
-GBLREF lv_val			*zsrch_var, *zsrch_dir1, *zsrch_dir2;
-GBLREF symval			*curr_symval;
-GBLREF boolean_t		is_replicator;
-GBLREF void			(*ctrlc_handler_ptr)();
-GBLREF boolean_t		mstr_native_align;
-GBLREF boolean_t		gtm_utf8_mode;
-GBLREF casemap_t		casemaps[];
-GBLREF void             	(*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
-GBLREF ch_ret_type		(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
-GBLREF ch_ret_type		(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
-GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
-GBLREF enum gtmImageTypes	image_type;
-GBLREF int			init_xfer_table(void);
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 OS_PAGE_SIZE_DECLARE
 
@@ -334,12 +304,6 @@ void gtm_startup(struct startup_vector *svec)
 		trap_env_init();
 	zdate_form_init(svec);
 	dollar_system_init(svec);
-<<<<<<< HEAD
-	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
-=======
-	init_callin_functable();
-	gtm_env_xlate_init();
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	ce_init();	/* initialize compiler escape processing */
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();

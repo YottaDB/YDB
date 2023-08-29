@@ -59,11 +59,7 @@ enum db_ver
 };
 
 #define GDSMVCURR ((enum mdb_ver)(GDSMVLAST - 1))
-<<<<<<< HEAD
-#define BLK_ID_32_MVER ((enum mdb_ver)(GDSMR200 - 1))
-=======
-	#define BLK_ID_32_MVER ((enum mdb_ver)(GDSMV63014))	/* ideally this s.b. (GDSMVLAST - 2) but V6->V7 has some quirks */
->>>>>>> 52a92dfd (GT.M V7.0-001)
+#define BLK_ID_32_MVER ((enum mdb_ver)(GDSMR200_V70000 - 1))
 
 /* Database minor version as an enum quantity. This is an ever increasing number that may skip actual
  * releases as it is only added to when a file-header field is added or changed or if there is a

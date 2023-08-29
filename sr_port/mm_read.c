@@ -34,7 +34,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	unsigned char		rdfail_detail;
 
 sm_uc_ptr_t mm_read(block_id blk)
-{	/* this is a kissing cousin to code in dsk_read and the two blocs should be maintained in parallel */
+{	/* this is a kissing cousin to code in dsk_read and the two blocks should be maintained in parallel */
 	boolean_t		fully_upgraded;
 	enum db_ver		tmp_ondskblkver;
 	int			level;
@@ -44,19 +44,11 @@ sm_uc_ptr_t mm_read(block_id blk)
 	/* --- extended or dse (dse is able to edit any header fields freely) --- */
 	assert((cs_addrs->total_blks <= cs_addrs->ti->total_blks) || !IS_MCODE_RUNNING);
 	assert(blk >= 0);
-<<<<<<< HEAD
-
-	if (dba_mm != cs_addrs->hdr->acc_meth)
-		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_dsk_read, 1);
-	if (blk < cs_addrs->total_blks) 		/* use the private copy of total_blks */
-		return (MM_BASE_ADDR(cs_addrs) + ((off_t)cs_addrs->hdr->blk_size * blk));
-
-=======
+	assert(dba_mm == cs_addrs->hdr->acc_meth);
 	csd = cs_data;
 	tmp_ondskblkver = (enum db_ver)csd->desired_db_format;
 	fully_upgraded = csd->fully_upgraded;
 	buff = (MM_BASE_ADDR(cs_addrs) + ((off_t)cs_addrs->hdr->blk_size * blk));
-	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_dsk_read, 1);
 	if (blk < cs_addrs->total_blks)		/* test against process private copy of total_blks */
 	{	/* seems OK - see if block needs to be converted to current version */
 		if ((GDSV6p == (tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver)) && (GDSMV70000 == csd->creation_mdb_ver))
@@ -91,7 +83,6 @@ sm_uc_ptr_t mm_read(block_id blk)
 		SHM_WRITE_MEMORY_BARRIER;
 		return buff;
 	}
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	rdfail_detail = (blk < cs_addrs->ti->total_blks) ? cdb_sc_helpedout : cdb_sc_blknumerr;
 	return (sm_uc_ptr_t)NULL;
 }

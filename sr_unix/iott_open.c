@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,12 +34,9 @@
 #include "gtm_conv.h"
 #include "gtmimagename.h"
 #include "error.h"
-<<<<<<< HEAD
-#include "ydb_getenv.h"
-=======
 #include "op.h"
 #include "indir_enum.h"
->>>>>>> 52a92dfd (GT.M V7.0-001)
+#include "ydb_getenv.h"
 
 GBLREF int		COLUMNS, GTM_LINES, AUTO_RIGHT_MARGIN;
 GBLREF uint4		ydb_principal_editing_defaults;

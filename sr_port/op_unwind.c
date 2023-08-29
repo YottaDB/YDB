@@ -46,12 +46,8 @@
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
 #include "ztimeout_routines.h"
-<<<<<<< HEAD
-#include "jobinterrupt_event.h"
-#include "bool_zysqlnull.h"
-=======
 #include "jobinterrupt_process.h"
->>>>>>> 52a92dfd (GT.M V7.0-001)
+#include "bool_zysqlnull.h"
 
 GBLREF	boolean_t	dollar_truth, is_tracing_on, skip_error_ret;
 GBLREF	mval		*alias_retarg;
@@ -68,18 +64,10 @@ error_def(ERR_TPQUIT);
 /* This has to be maintained in parallel with unw_retarg(), the unwind with a return argument (extrinisic quit) routine. */
 void op_unwind(void)
 {
-<<<<<<< HEAD
-	rhdtyp			*rtnhdr;
-	boolean_t		trig_forced_unwind;
-	mv_stent		*mvc;
-	int4			event_type, param_val;
-	void (*set_fn)(int4 param);
-
-=======
 	boolean_t	defer_tptimeout, defer_ztimeout;
 	mv_stent	*mvc;
 	rhdtyp		*rtnhdr;
->>>>>>> 52a92dfd (GT.M V7.0-001)
+	boolean_t	trig_forced_unwind;
 	DBGEHND_ONLY(stack_frame *prevfp;)
 	DCL_THREADGBL_ACCESS;
 

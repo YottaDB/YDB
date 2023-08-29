@@ -122,11 +122,7 @@ void mur_write_header_extfmt(jnl_ctl_list *jctl, FILE *fp, char *fname, int recs
 				"fwrite() : %s : Expected = %lld : Actual = %lld",
 						(stdout == fp) ? "-STDOUT" : fname, (long long)extrlen, (long long)ret_size);
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8)
-<<<<<<< HEAD
-						ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
-=======
 				ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, errno);
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		}
 	}
 }

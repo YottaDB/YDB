@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,25 +21,20 @@
 #include "indir_enum.h"
 #include "op.h"
 #include "fix_xfer_entry.h"
-<<<<<<< HEAD
-=======
 #include "have_crit.h"
 #include "deferred_events_queue.h"
 #include "deferred_events.h"
->>>>>>> 52a92dfd (GT.M V7.0-001)
 #include "restrict.h"
+
+GBLDEF stack_frame	*zstep_level;
 
 GBLREF bool		neterr_pending;
 GBLREF int		iott_write_error;
-<<<<<<< HEAD
 GBLREF int4		gtm_trigger_depth;
-=======
 GBLREF intrpt_state_t	intrpt_ok_state;
 GBLREF stack_frame	*frame_pointer;
-GBLDEF stack_frame	*zstep_level;
 GBLREF volatile int4	outofband;
 GBLREF xfer_entry_t	xfer_table[];
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 void op_zstep(uint4 code, mval *action)
 {
@@ -51,16 +46,12 @@ void op_zstep(uint4 code, mval *action)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-<<<<<<< HEAD
 	if ((0 < gtm_trigger_depth) && RESTRICTED(trigger_mod))
 		return;
-	if (neterr_pending || outofband || iott_write_error)
-=======
 	assert(!(RESTRICTED(zbreak_op)));
 	TAREF1(save_xfer_root, zstep_pending).event_state = pending;
 	TAREF1(save_xfer_root, zstep_pending).param_val = (int)code;
 	if (neterr_pending)
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		return;
 	if (NULL == action)
 		TREF(zstep_action) = TREF(dollar_zstep);	/* no action specified on the command - use $ZSTEP */
@@ -110,13 +101,8 @@ void op_zstep(uint4 code, mval *action)
 		case ZSTEP_OUTOF:
 
 			for (fp = frame_pointer; fp && !(fp->type & SFT_COUNT); fp = fp->old_frame_pointer)
-<<<<<<< HEAD
 				; /* skip uncounted frames (if any) in storing "zstep_level" (when ZSTEP OVER/OUTOF action needs to kick in) */
-			zstep_level = (unsigned char *)fp;
-=======
-				; /* don't place in a non VM frame if we are in one */
 			zstep_level = fp;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 			if (ZSTEP_OVER == code)
 			{
 				DBGDFRDEVNT((stderr, "%d %s: OVER - zstep_level: %x\n", __LINE__, __FILE__, zstep_level));

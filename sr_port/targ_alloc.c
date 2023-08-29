@@ -74,14 +74,6 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	 * gv_namehead structure are defined using MAX_BT_DEPTH macros and we want to guard against changes to this macro
 	 * that cause unintended changes to the layout/size of the gv_namehead structure.
 	 */
-<<<<<<< HEAD
-	GTM64_ONLY(
-		assert(OFFSETOF(gv_namehead, filler_8byte_align0[0]) + SIZEOF(gvt->filler_8byte_align0)
-				== OFFSETOF(gv_namehead, root));
-	)
-	assert(OFFSETOF(gv_namehead, filler_8byte_align1[0]) + SIZEOF(gvt->filler_8byte_align1)
-			== OFFSETOF(gv_namehead, last_split_blk_num[0]));
-=======
 	assert(SIZEOF(gvt->clue) == SIZEOF(gv_key));			/* gv_key_nobase should be the same size as gv_key */
 #	ifdef look_at_gv_namehead_offsets
 	printf("offseta: %d, offsetb: %d\n", (int)(SIZEOF(gv_namehead) - SIZEOF(gvt->clue)), (int)OFFSETOF(gv_namehead, clue));
@@ -91,10 +83,12 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 		(int)OFFSETOF(gv_namehead, last_split_blk_num));
 #	endif
 	assert(OFFSETOF(gv_namehead, clue) == SIZEOF(gv_namehead) - SIZEOF(gvt->clue));		/* check no padding after clue */
-	assert(OFFSETOF(gv_namehead, filler_8byte_align0) + SIZEOF(gvt->filler_8byte_align0) == OFFSETOF(gv_namehead, root));
+	GTM64_ONLY(
+		assert(OFFSETOF(gv_namehead, filler_8byte_align0) + SIZEOF(gvt->filler_8byte_align0)
+			== OFFSETOF(gv_namehead, root));
+	)
 	assert(OFFSETOF(gv_namehead, filler_8byte_align1) + SIZEOF(gvt->filler_8byte_align1)
 		== OFFSETOF(gv_namehead, last_split_blk_num));
->>>>>>> 52a92dfd (GT.M V7.0-001)
 #	ifdef GTM_TRIGGER
 #	ifdef DEBUG
 	partial_size = SIZEOF(gvt->trig_mismatch_test_done) + SIZEOF(gvt->filler_clue_end_align);

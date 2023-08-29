@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -153,7 +153,8 @@ MBSTART {								\
 /* Define types that are needed by external plugins (e.g. encryption plugin) here (and not in mdef.h) */
 
 /* mstr needs to be defined before including "mdefsp.h".  */
-typedef int mstr_len_t;
+#define	MSTR_LEN_MAX	INT_MAX
+typedef	int	mstr_len_t;		/* Change MSTR_LEN_MAX if this changes */
 typedef struct
 {
 	unsigned int	char_len;	/* Character length */

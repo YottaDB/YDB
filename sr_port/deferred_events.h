@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,16 +13,9 @@
  *								*
  ****************************************************************/
 #ifndef DEFERRED_EVENTS_INCLUDED
-#define DEFERRED_EVENTS_NCLUDED
-
-<<<<<<< HEAD
-#ifndef DEFERRED_EVENTS_included
-#define DEFERRED_EVENTS_included
-
-=======
+#define DEFERRED_EVENTS_INCLUDED
 
 #ifdef DEBUG
->>>>>>> 52a92dfd (GT.M V7.0-001)
 /* Uncomment below to enable tracing of deferred events */
 /* #define DEBUG_DEFERRED_EVENT	*/
 #endif
@@ -74,35 +67,6 @@ boolean_t xfer_set_handlers(int4, int4 param, boolean_t popped_entry);
 boolean_t xfer_reset_handlers(int4 event_type);
 /* This version resets the handlers only if they were set by the same event type. */
 boolean_t xfer_reset_if_setter(int4 event_type);
-<<<<<<< HEAD
-
-/* -------------------------------------------------------
- * Prototypes for transfer table callback functions.
- * Only called by routine that manages xfer_table.
- *
- * Should use these (with enums?) to ensure type checking
- * is done.
- * -------------------------------------------------------
- */
-
-void ctrap_set(int4);
-void ctrlc_set(int4);
-void ctrly_set(int4);
-void tt_write_error_set(int4);
-
-/* ------------------------------------------------------------------
- * Perform action corresponding to the first async event that
- * was logged.
- * ------------------------------------------------------------------
- */
-void async_action(bool);
-boolean_t xfer_table_changed(void);
-
-#define IS_VALID_TRAP ((set_fn == (&ctrlc_set)) || (set_fn == (&ctrap_set)) || (set_fn == (&ctrly_set)))
-
-#endif /* DEFERRED_EVENTS_included */
-=======
 /* This version resets a handler */
 boolean_t real_xfer_reset(int4 event_type);
 #endif /* DEFERRED_EVENTS_INCLUDED */
->>>>>>> 52a92dfd (GT.M V7.0-001)

@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,7 +106,7 @@ int mk_tmp_object_file(const unsigned char *object_fname, int object_fname_len)
 	do
 	{
 		/*memcpy(TADR(tmp_object_file_name), object_fname, object_fname_len);*/
-		mcpy_tmp_object_file_name(object_fname, object_fname_len);
+		mcpy_tmp_object_file_name((char *)object_fname, object_fname_len);
 		/* Note memcpy() below purposely includes null terminator */
 		/*memcpy(TADR(tmp_object_file_name) + object_fname_len, MKSTEMP_MASK, SIZEOF(MKSTEMP_MASK));*/
 		MKSTEMP(TADR(tmp_object_file_name), fdesc);

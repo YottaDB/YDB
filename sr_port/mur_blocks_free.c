@@ -52,19 +52,10 @@ error_def(ERR_DYNUPGRDFAIL);
 
 block_id mur_blocks_free(reg_ctl_list *rctl)
 {
-<<<<<<< HEAD
-	int4		x;
 	block_id	bnum, maps, i, fcnt;
-	int		mapsize, j, k, status;
-	unsigned char	*c, *disk, *m_ptr;
-	uint4		*dskmap, map_blk_size;
-	file_control	*db_ctl;
-=======
-	block_id	bnum, maps;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	enum db_ver	dummy_ondskblkver;
 	file_control	*db_ctl;
-	int		mapsize, i, j, k, fcnt, status;
+	int		mapsize, j, k, status;
 	int4		x;
 	uint4		*dskmap, map_blk_size;
 	unix_db_info	*udi;
@@ -90,8 +81,7 @@ block_id mur_blocks_free(reg_ctl_list *rctl)
 	db_ctl->op_buff = (uchar_ptr_t)disk;
 	db_ctl->op_len = cs_data->blk_size;
 	for (i = 0; i != maps; i++)
-<<<<<<< HEAD
-	{
+	{	/* TODO: why mess with anything in bml other than version? */
 #		ifdef DEBUG
 		if ((0 != ydb_skip_bml_num) && (1 == i))
 		{
@@ -100,9 +90,6 @@ block_id mur_blocks_free(reg_ctl_list *rctl)
 			continue;
 		}
 #		endif
-=======
-	{	/* TODO: why mess with anything in bml other than version? */
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		bnum = i * cs_data->bplmap;
 		db_ctl->op = FC_READ;
 		db_ctl->op_pos = cs_data->start_vbn + ((gtm_int64_t)cs_data->blk_size / DISK_BLOCK_SIZE * bnum);

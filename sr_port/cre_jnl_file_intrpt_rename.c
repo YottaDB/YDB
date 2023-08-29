@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,7 +44,7 @@
 		SHORT_SLEEP(lcnt);                                                                      \
 		if (FILE_PRESENT != gtm_file_stat(FILESTR, NULL, NULL, FALSE, USTATUS))                 \
 		{	/* Leave cre_jnl_file_intrpt_rename() when the EXT_NEW file doesn't persist */  \
-			return;                                                                         \
+			return 0;                                                                       \
 		}                                                                                       \
 	}                                                                                               \
 }
@@ -142,15 +142,11 @@ uint4	cre_jnl_file_intrpt_rename(sgmnt_addrs *csa)
 	} else
 	{	/* mumps.mjl is present. This means STEP4 did not yet execute. */
 		if (FILE_PRESENT == status2)
-<<<<<<< HEAD
 		{	/* mumps.mjl_%YGTM is present. This means STEP2 is done. But since STEP4 is not yet done
 			 * we do not know if STEP3 (filling jnl file header with valid data) happened completely so
 			 * just discard this file. It will be re-created by the next process attempting the switch.
 			 */
-=======
-		{
 			WAIT_FOR_EXT_NEW(&filestr, &ustatus);
->>>>>>> 52a92dfd (GT.M V7.0-001)
 			status = gtm_file_remove(filestr.addr, (int)filestr.len, &ustatus);
 			if (SYSCALL_ERROR(status))
 			{

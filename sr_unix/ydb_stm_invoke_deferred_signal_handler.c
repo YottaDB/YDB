@@ -17,7 +17,7 @@
 #include "sig_init.h"
 #include "continue_handler.h"
 #include "ctrlc_handler.h"
-#include "jobinterrupt_event.h"
+#include "jobinterrupt_process.h"
 #include "suspsigs_handler.h"
 #include "jobexam_signal_handler.h"
 #include "jobsp.h"

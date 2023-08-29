@@ -216,7 +216,7 @@
 
   NOTE:
 
-   The OS services accessed by GT.M commonly treat a <NUL> character as a
+   The OS services accessed by YottaDB commonly treat a <NUL> character as a
    terminator therefore any in cases where application information passes to
    the OS as arguments an embedded <NUL> may cause non-obvious behavior.
 
@@ -2948,20 +2948,20 @@
 3 Interrupt_Handling
    Interrupt Handling
 
-   GT.M process execution is interruptible with the following events:
+   YottaDB process execution is interruptible with the following events:
 
-   When GT.M detects any of these events, it transfers control to a vector
-   that depends on the event. For CTRAP characters and ZMAXTPTIME, GT.M uses
+   When YottaDB detects any of these events, it transfers control to a vector
+   that depends on the event. For CTRAP characters and ZMAXTPTIME, YottaDB uses
    the $ETRAP or $ZTRAP vectors described in more detail in the Error
    Processing chapter. For INTRPT and $ZTEXit, it XECUTEs the interrupt
    handler code placed in $ZINTERRUPT. If $ZINTERRUPT is an empty string, the
    process ignores any MUPIP INTRPT directed at it. The default value of
    $ZINTERRUPT is "IF $ZJOBEXAM()" which redirects a dump of ZSHOW "*" to a
    file and reports each such occasion to the operator log. For <CTRL-C> with
-   CENABLE, GT.M enters Direct Mode to give the programmer control. Without
-   CENABLE or CTRAP, GT.M ignores <CTRL-C> on a $PRINCIPAL terminal.
+   CENABLE, YottaDB enters Direct Mode to give the programmer control. Without
+   CENABLE or CTRAP, YottaDB ignores <CTRL-C> on a $PRINCIPAL terminal.
 
-   GT.M recognizes most of these events when they occur but transfers control
+   YottaDB recognizes most of these events when they occur but transfers control
    to the interrupt vector at the start of each M line, at each iteration of
    a FOR loop, at certain points during the execution of commands which may
    take a "long" time. For example, ZWRITE, HANG, LOCK, MERGE, ZSHOW "V",
@@ -2976,8 +2976,8 @@
    countdown until the interrupt handling is complete.
 
    If +$ZTEXIT evaluates to a truth value at the outermost TCOMMIT or
-   TROLLBACK, GT.M XECUTEs $ZINTERRUPT after completing the commit or
-   rollback. Except for <CTRL-C> GT.M recognizes CTRAP characters when READ.
+   TROLLBACK, YottaDB XECUTEs $ZINTERRUPT after completing the commit or
+   rollback. Except for <CTRL-C> YottaDB recognizes CTRAP characters when READ.
    CTRAP characters other than <CTRL-C> tend to be limited by terminal
    configuration.
 
@@ -3184,13 +3184,8 @@
 
    Example:
 
-<<<<<<< HEAD
-   YDB>FOR p="1U.20A1"",""1U.20A",5N IF x?@p QUIT
+   YDB>FOR p="1U.20A1"",""1U.20A","5N" IF x?@p QUIT
    YDB>ELSE WRITE !,"Incorrect format" QUIT
-=======
-   GTM>FOR p="1U.20A1"",""1U.20A","5N" IF x?@p QUIT
-   GTM>ELSE WRITE !,"Incorrect format" QUIT
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
    This example uses pattern code indirection to test x for either a name (of
    the form Last,First) or a number.
@@ -6878,7 +6873,8 @@
    ZTR : # of ZTRigger command operations
 
    [NT]B[WR] mnemonics are satisfied by either disk access or, for databases that use the BG (buffered global) access method, global buffers in shared memory.
-   GT.M maintains the counters of the mnemonics marked with a * on AIX. On Linux, GT.M does not currently increment the counters of these mnemonics but retains them in the ZSHOW output for backward compatibility.
+   GT.M maintains the counters of the mnemonics marked with a * on AIX. Since YottaDB is supported only on Linux, YottaDB
+   does not currently increment the counters of these mnemonics but retains them in the ZSHOW output for backward compatibility.
 
    When $PRINCIPAL input and output are different devices, ZSHOW "D" shows
    them as separate items identified as 0 for input and 0-out for output.
@@ -11476,7 +11472,7 @@
    the environment variable ydb_sysid or gtm_sysid. If neither of the names have
    any evaluation (i.e. both are undefined), the value after the comma is gtm_sysid.
 
-   GT.M accepts SET $SYSTEM=expr, where expr appends to the initial value up
+   YottaDB accepts SET $SYSTEM=expr, where expr appends to the initial value up
    to the length permitted for an initial value; an empty string removes any
    current added value.
 
@@ -11838,11 +11834,7 @@
    appear in the compilation output, so $ZCSTATUS typically contains the code
    for ERRORSUMMARY.
 
-<<<<<<< HEAD
-   YottaDB does not permit the SET command to modify $ZSTATUS.
-=======
-   GT.M does not permit the SET command to modify $ZCSTATUS.
->>>>>>> 52a92dfd (GT.M V7.0-001)
+   YottaDB does not permit the SET command to modify $ZCSTATUS.
 
 2 $ZCLose
    $ZCLose
@@ -12134,39 +12126,7 @@
    function. In other words, while $ZJOBEXAM() is part of the interrupt
    handling by default, it is not an implicit part of the interrupt handling.
 
-<<<<<<< HEAD
-3 Interrupt_Handling
-   Interrupt Handling
-
-   YottaDB process execution is interruptible with the following events:
-
-   When YottaDB detects any of these events, it transfers control to a vector
-   that depends on the event. For CTRAP characters and ZMAXTPTIME, YottaDB uses
-   the $ETRAP or $ZTRAP vectors described in more detail in the Error
-   Processing chapter. For INTRPT and $ZTEXit, it XECUTEs the interrupt
-   handler code placed in $ZINTERRUPT. If $ZINTERRUPT is an empty string, the
-   process ignores any MUPIP INTRPT directed at it. The default value of
-   $ZINTERRUPT is "IF $ZJOBEXAM()" which redirects a dump of ZSHOW "*" to a
-   file and reports each such occasion to the operator log. For <CTRL-C> with
-   CENABLE, it enters Direct Mode to give the programmer control. Without
-   CENABLE or CTRAP, YottaDB ignores <CTRL-C> on a $PRINCIPAL terminal.
-
-   YottaDB recognizes most of these events when they occur but transfers control
-   to the interrupt vector at the start of each M line, at each iteration of
-   a FOR LOOP, at certain points during the execution of commands which may
-   take a "long" time. For example, ZWRITE, HANG, LOCK, MERGE, ZSHOW "V",
-   OPENs of disk files and FIFOs, OPENs of SOCKETs with the CONNECT parameter
-   (unless zero timeout,) WRITE /WAIT for SOCKETs, and READ for terminals,
-   SOCKETs, FIFOs, and PIPEs. If +$ZTEXIT evaluates to a truth value at the
-   outermost TCOMMIT or TROLLBACK, YottaDB XECUTEs $ZINTERRUPT after completing
-   the commit or rollback. Except for <CTRL-C> YottaDB recognizes CTRAP
-   characters when READ. CTRAP characters other than <CTRL-C> tend to be
-   limited by terminal configuration.
-
    The interrupt handler is executed by YottaDB when on a statement boundary or
-=======
-   The interrupt handler is executed by GT.M when on a statement boundary or
->>>>>>> 52a92dfd (GT.M V7.0-001)
    on an appropriate boundary in a potentially long running COMMAND (in the
    same place as YottaDB recognizes <CTRL-C>). If a YottaDB process is in a long
    running external call (for example; waiting in a message queue) YottaDB does
@@ -12191,25 +12151,14 @@
    connected to the local system. Design interrupt driven code to account for
    this issue.
 
-<<<<<<< HEAD
    When an interrupt handler is invoked, YottaDB saves and restores the current
-   values of $REFERENCE. However, the current device ($IO) is neither saved
+   value of $REFERENCE. However, the current device ($IO) is neither saved
    nor restored. If an interrupt handler changes $IO (via USE), ensure that
    the interrupt handler restores the current device before returning. To
    restore the device which was current when the interrupt handler began,
    specify USE without any deviceparameters. Any attempt to do IO on a device
    which was actively doing IO when the interrupt was recognized may result
    in a ZINTERCURSEIO error.
-=======
-   When GT.M uses an interrupt handler, it saves and restores the current
-   value of $REFERENCE. However, GT.M does not implicitly save or restore the
-   current device ($IO). If an interrupt handler changes $IO (via USE),
-   ensure that the interrupt handler restores the current device before
-   returning. To restore the device which was current when the interrupt
-   handler began, specify USE without any deviceparameters. Any attempt to do
-   IO on a device which was actively doing IO when the interrupt was
-   recognized may cause a ZINTERCURSEIO error.
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
    Code in $ZINTERRUPT must use routine names in any entryref argument to a
    DO, GOTO, JOB, ZGOTO or any extrinsic as the arrival of the interrupt can
@@ -12219,23 +12168,13 @@
    evaluates to 1 (TRUE).
 
    If an error occurs while compiling the $ZINTERRUPT code, the error handler
-<<<<<<< HEAD
    is not invoked, YottaDB sends the YDB-E-ERRWZINTR message and the compiler
    error message to the operator log facility. If the YottaDB process is at a
    direct mode prompt or is executing a direct mode command (for example, a FOR
-   loop), YottaDB sends also sends the YDB-E-ERRWZINTR error message to the user
+   loop), YottaDB also sends the YDB-E-ERRWZINTR error message to the user
    console along with the compilation error. In both cases, the interrupted
    process resumes execution without performing any action specified by the
    defective $ZINTERRUPT vector.
-=======
-   is not invoked, GT.M sends the ERRWZINTR message and the compiler error
-   message to the operator log facility. If the GT.M process is at a direct
-   mode prompt or is executing a direct mode command (for example, a FOR
-   loop), GT.M also sends the ERRWZINTR error message to the user console
-   along with the compilation error. In both cases, the interrupted process
-   resumes execution without performing any action specified by the defective
-   $ZINTERRUPT vector.
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
    The error handler is invoked if an error occurs while executing the
    $ZINTERRUPT code. If an error occurs during execution of the interrupt
@@ -13370,12 +13309,7 @@
    where it can properly resume operation, such as the beginning of a line,
    when waiting on a command with a timeout, or when starting a FOR
    iteration. When a timeout occurs, if the last assignment specified no
-<<<<<<< HEAD
-   vector, YottaDB uses the current $ETRAP or $ZTRAP. YottaDB rejects an attempted
-   KILL of $ZTIMeout with the VAREXPECTED error and an attempted NEW of
-   $ZTIMeout with the SVNONEW error.
-=======
-   vector, GT.M uses the current $ETRAP or $ZTRAP. When a $ZTIMEOUT expires,
+   vector, YottaDB uses the current $ETRAP or $ZTRAP. When a $ZTIMEOUT expires,
    it invokes one of three possible vectors:
 
      o Its own labelref, which creates a new stack frame, from which it
@@ -13402,9 +13336,8 @@
    Using a [Z}GOTO that stays within a $ZTIMEOUT labelref vector frame may
    cause undefined and undesirable behavior
 
-   GT.M rejects an attempted KILL of $ZTIMeout with the VAREXPECTED error and
+   YottaDB rejects an attempted KILL of $ZTIMeout with the VAREXPECTED error and
    an attempted NEW of $ZTIMeout with the SVNONEW error.
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
    Example:
 
@@ -15505,7 +15438,7 @@
    A socket must be enabled for non-blocking WRITEs before enabling it for
    TLS if both features are desired.
 
-   For non-blocking sockets, GT.M retries a WRITE that blocks up to the
+   For non-blocking sockets, YottaDB retries a WRITE that blocks up to the
    number of times specified by the $gtm_non_blocked_write_retries
    environment variable with a 100 millisecond delay between each retry. The
    default retries value is 10 times if $gtm_non_blocked_write_retries is not
@@ -15524,7 +15457,7 @@
    **Note**
 
    Note that multi-argument WRITEs are equivalent to a series of one argument
-   WRITEs, and that GT.M turns unparenthesized concatenation within a write
+   WRITEs, and that YottaDB turns unparenthesized concatenation within a write
    argument into multi-argument WRITEs. Format control characters such as "!"
    and "#" are each considered as an argument.
 
@@ -15540,7 +15473,7 @@
    <CTRL-C>, exceeding $ZMAXTPTIME, or $ZTIMEOUT expiring. These events
    result in a transfer to the interrupt vector or error handler at the next
    execution boundary as described in the "Interrupt Handling" section of the
-   GT.M Programmer's Guide.
+   YottaDB Programmer's Guide.
 
    When non-blocking WRITEs are enabled for a socket, WRITE /WAIT may check
    if that socket would not block on WRITE in addition to READ. The optional
@@ -16098,12 +16031,12 @@
    [NO]FFLF Applies to: SD
 
    The [NO]FFLF deviceparameter controls whether WRITE # produces only a
-   form-feed (<FF>) or a form-feed and line-feed (<FF><LF>). Previously, GT.M
+   form-feed (<FF>) or a form-feed and line-feed (<FF><LF>). Previously, YottaDB
    used <FF><LF> which deviated from the standard, but out of concern for
    existing practice the default remains <FF><LF>.
 
    Additionally, the "gtm_nofflf" environment variable controls the default
-   WRITE # behavior of GT.M. If it is unset or set to 0, N[O] or F[ALSE], the
+   WRITE # behavior of YottaDB. If it is unset or set to 0, N[O] or F[ALSE], the
    default behavior is unchanged. If it is set to 1, Y[ES] or T[RUE], the
    default behavior of WRITE # is changed to produce only a form-feed (<FF>),
    though M programs can still control behavior by specifying the FFLF
@@ -17532,17 +17465,13 @@
 
    Removes the socket identified by expr from the current socket device,
    without affecting any existing connection of that socket. The removed
-<<<<<<< HEAD
-   socket is placed in the socketpool and may be attached to another socket
-   device. If the socket being removed is the current socket, then YottaDB does
-   the following:
-=======
    socket is placed in the socketpool (which has the reserved name
-   "YGTMSOCKETSPOOL") and may be attached to another socket device. If the
-   socket being removed is the current socket, then GT.M does the following:
+   "YGTMSOCKETPOOL") and may be attached to another socket device. If the
+   socket being removed is the current socket, then YottaDB does the following:
 
-   (
->>>>>>> 52a92dfd (GT.M V7.0-001)
+   1. The socket ATTACHed prior to the removed socket, is made current, if one such exists.
+   2. The socket ATTACHed after the removed socket, is made current, if the removed one was the first socket.
+   3. $PRINCIPAL is made the current device ($IO), if the removed socket was the only one in the current socket device.
 
    **Note**
 
@@ -17776,12 +17705,12 @@
    [NO]FFLF Applies to: SD
 
    The [NO]FFLF deviceparameter controls whether WRITE # produces only a
-   form-feed (<FF>) or a form-feed and line-feed (<FF><LF>). Previously, GT.M
+   form-feed (<FF>) or a form-feed and line-feed (<FF><LF>). Previously, YottaDB
    used <FF><LF> which deviated from the standard, but out of concern for
    existing practice the default remains <FF><LF>.
 
    Additionally, the "gtm_nofflf" environment variable controls the default
-   WRITE # behavior of GT.M. If it is unset or set to 0, N[O] or F[ALSE], the
+   WRITE # behavior of YottaDB. If it is unset or set to 0, N[O] or F[ALSE], the
    default behavior is unchanged. If it is set to 1, Y[ES] or T[RUE], the
    default behavior of WRITE # is changed to produce only a form-feed (<FF>),
    though M programs can still control behavior by specifying the FFLF
@@ -17855,15 +17784,15 @@
    Enables or disables the recognition by the process of the loss ("hang up")
    of PRINCIPAL device terminal. When enabled the proces receives an
    TERMHANGUP error if the O/S signals that the terminal assigned to the
-   process as the PRINCIPAL device has disconnected. If GT.M is configured to
+   process as the PRINCIPAL device has disconnected. If YottaDB is configured to
    ignore such a signal, a process may subsequently receive an IOEOF or a
    TERMWRITE error from an attempt to respectively READ from, or WRITE to the
-   missing device. GT.M terminates a process that ignores more than one of
+   missing device. YottaDB terminates a process that ignores more than one of
    these messages and, if the process is not in Direct Mode, sends a
    NOPRINCIO message to the operator log.
 
    If defined, the gtm_hupeable environment variable determines the initial
-   process behavior, and if that is undefined GT.M does not immeidately
+   process behavior, and if that is undefined YottaDB does not immeidately
    report a terminal disconnect.
 
 5 IKEY
@@ -18844,7 +18773,7 @@
    |--------------+---------------------------------------------------------|
    | %HO          | Converts hexadecimal numbers to octal.                  |
    |--------------+---------------------------------------------------------|
-   | %JSWRITE     | Converts a GT.M glv structure to a string of JS         |
+   | %JSWRITE     | Converts a YottaDB glv structure to a string of JS      |
    |              | objects.                                                |
    |--------------+---------------------------------------------------------|
    | %LCASE       | Converts a string to all lower case.                    |
@@ -19732,7 +19661,7 @@
 
    YottaDB continues to support xc_* and gtm_* equivalent types and routines of
    ydb_* for upward compatibility. These types are defined in a second header
-   file with the name that is supported on GT.M (gtmxc_types.h). Note the xc_*
+   file with the name that is supported on YottaDB (gtmxc_types.h). Note the xc_*
    equivalent types are marked in this header file as deprecated. Note also that
    gtmxc_types.h also includes libyottadb.h for the definition of the ydb_* base
    types and routines.
@@ -20570,9 +20499,9 @@
        character of the input string.
      o level: Currently unused and should not be examined or changed.
      o honor_numeric: Boolean variable to specify whether to use standard
-       GT.M collation for digits.
+       YottaDB collation for digits.
 
-          o TRUE: use standard GT.M collation for digits before any other
+          o TRUE: use standard collation for digits before any other
             character
           o FALSE: treat digits the same as all other characters
 

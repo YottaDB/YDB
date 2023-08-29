@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -28,7 +28,7 @@
 #include "libydberrors.h"
 #include "gdsroot.h"
 #include "iosp.h"		/* for SS_NORMAL */
-#include "is_file_identical.h"
+#include "is_gdid.h"
 #include "libyottadb_int.h"
 
 /* YottaDB reimplementation of the gtm_filename_to_id() utility function that allows the return

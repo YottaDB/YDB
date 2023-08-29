@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -640,7 +640,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		sleep_nsec = cs_data->reorg_sleep_nsec;
 		assert((0 <= sleep_nsec) && (NANOSECS_IN_SEC > sleep_nsec));
 		if (sleep_nsec)
-			NANOSLEEP(sleep_nsec, RESTART_TRUE);
+			NANOSLEEP(sleep_nsec, RESTART_TRUE, MT_SAFE_TRUE);
 	}	/* ================ END MAIN LOOP ================ */
 
 	/* =========== START REDUCE LEVEL ============== */

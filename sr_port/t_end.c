@@ -254,12 +254,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	th_index_ptr_t		cti;
 	jbuf_rsrv_struct_t	*jrs;
 	jrec_rsrv_elem_t	*first_jre, *jre, *jre_top;
-<<<<<<< HEAD
-        int4			event_type, param_val;
 	block_id		pvt_total_blks;
-        void (*set_fn)(int4 param);
-=======
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1816,12 +1811,7 @@ skip_cr_array:
 	assert(!csa->now_crit || csa->hold_onto_crit);
 	assert(cdb_sc_normal == status);
 	REVERT;	/* no need for t_ch to be invoked if any errors occur after this point */
-<<<<<<< HEAD
-	CALL_ZTIMEOUT_IF_DEFERRED;
 	DEFERRED_SIGNAL_HANDLING_CHECK; /* now that crits are released, check if deferred signal/exit handling needs to be done */
-=======
-	DEFERRED_EXIT_HANDLING_CHECK; /* now that all crits are released, check if deferred signal/exit handling needs to be done */
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	assert(update_trans);
 	if (REPL_ALLOWED(csa) && IS_DSE_IMAGE)
 	{

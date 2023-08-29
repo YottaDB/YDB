@@ -134,12 +134,7 @@ STATICDEF int repl_recv_size_trace[REPL_RECV_SIZE_TRACE_SIZE];
 
 int fd_ioready(int sock_fd, int poll_direction, int timeout)
 {
-<<<<<<< HEAD
-	int		save_errno, status, EAGAIN_cnt = 0;
-=======
 	int		save_errno, status, EAGAIN_cnt = 0, ENOMEM_cnt = 0, REPL_MAXPOLLFAIL_cnt = 0;
-#	ifdef USE_POLL
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	struct pollfd	fds;
 
 	assert(timeout < MILLISECS_IN_SEC);
@@ -150,15 +145,10 @@ int fd_ioready(int sock_fd, int poll_direction, int timeout)
 	{
 		save_errno = ERRNO;
 		if (EINTR == save_errno)
-<<<<<<< HEAD
-		{	/* Give it another shot. But, halve the timeout so we don't keep doing this forever. */
+		{
 			eintr_handling_check();
-			timeout = timeout >> 1;
-		} else if (EAGAIN == save_errno)
-=======
 			timeout = timeout >> 1; /* Give it another shot but reduce the timeout by half */
-		else if (EAGAIN == save_errno)
->>>>>>> 52a92dfd (GT.M V7.0-001)
+		} else if (EAGAIN == save_errno)
 		{	/* Resource starved system; relinquish the processor in the hope that we may get the required resources
 			 * next time around.
 			 */
@@ -171,13 +161,6 @@ int fd_ioready(int sock_fd, int poll_direction, int timeout)
 			 * deferred signals already (invokes "DEFERRED_SIGNAL_HANDLING_CHECK").
 			 */
 			rel_quant();	/* this seems legit */
-<<<<<<< HEAD
-		} else
-		{
-			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-			return -1;
-		}
-=======
 		} else if (ENOMEM == save_errno)
 		{
 			if (0 == ++ENOMEM_cnt % REPL_COMM_LOG_ENOMEM_INTERVAL)
@@ -185,17 +168,14 @@ int fd_ioready(int sock_fd, int poll_direction, int timeout)
 				repl_log(stderr, TRUE, TRUE, "Communication subsytem warning: No memory available for "
 						"polling. ENOMEM returned from select()/poll() %d times\n", ENOMEM_cnt);
 			}
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			return -1;
 		}
-		/* Restore fd_set. Also, on Linux, select() modifies timeout, so restore timeout to the GT.M controlled timeout */
-		SELECT_ONLY(
-			assert(0 == timeout_spec.tv_sec);
-			timeout_spec.tv_usec = timeout;
-			FD_SET(sock_fd, &fds);
-		)
 		if (REPL_MAXPOLLFAIL < ++REPL_MAXPOLLFAIL_cnt)
+		{
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			return -1;
->>>>>>> 52a92dfd (GT.M V7.0-001)
+		}
 	}
 	if (-1 != status)
 		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;

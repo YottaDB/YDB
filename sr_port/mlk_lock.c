@@ -116,16 +116,10 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 		if (ctl->gc_needed || ctl->resize_needed || ctl->rehash_needed
 		    || (ctl->subtop - ctl->subfree < siz) || (ctl->blkcnt < p->subscript_cnt))
 		{
-<<<<<<< HEAD
 			REL_LOCK_CRIT(*pctl, was_crit);
+			TPNOTACID_CHECK(LOCKGCINTP);
 			prepare_for_gc(pctl);
 			GRAB_LOCK_CRIT_AND_SYNC(*pctl, was_crit);
-=======
-			REL_LOCK_CRIT(p->pvtctl, was_crit);
-			TPNOTACID_CHECK(LOCKGCINTP);
-			prepare_for_gc(&p->pvtctl);
-			GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
->>>>>>> 52a92dfd (GT.M V7.0-001)
 			assert(ctl->lock_gc_in_progress.u.parts.latch_pid == process_id);
 			if (ctl->rehash_needed)
 				mlk_rehash(pctl);

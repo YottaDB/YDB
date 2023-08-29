@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -99,14 +99,9 @@ error_def(ERR_ZTWORMHOLE2BIG);
 
 void op_svput(int varnum, mval *v)
 {
-<<<<<<< HEAD
-	int	i, ok, state;
 	char	*vptr, lcl_str[256], *tmp;
-	mval	lcl_mval;
-=======
-	char	*vptr;
 	int	i, ok, state;
->>>>>>> 52a92dfd (GT.M V7.0-001)
+	mval	lcl_mval;
 	int4	previous_gtm_strpllim;
 	DCL_THREADGBL_ACCESS;
 

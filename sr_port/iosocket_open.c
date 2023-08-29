@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,14 +43,9 @@
 #include "min_max.h"
 
 GBLREF	boolean_t		gtm_utf8_mode;
-<<<<<<< HEAD
-GBLREF	uint4			ydb_max_sockets;
-GBLREF	boolean_t		dollar_zininterrupt;
-=======
 GBLREF	d_socket_struct		*socket_pool, *newdsocket;
-GBLREF	int4			gtm_max_sockets;
+GBLREF	uint4			ydb_max_sockets;
 GBLREF	io_pair			io_std_device;	/* standard device */
->>>>>>> 52a92dfd (GT.M V7.0-001)
 GBLREF	UConverter		*chset_desc[];
 GBLREF	volatile boolean_t	dollar_zininterrupt;
 

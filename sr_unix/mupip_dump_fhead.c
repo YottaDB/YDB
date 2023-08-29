@@ -80,7 +80,7 @@ void mupip_dump_fhead(void)
 		{
 			if (CLI_PRESENT == cli_present("FLUSH"))
 			{
-				gv_init_reg(rptr->reg, NULL);
+				gv_init_reg(rptr->reg);
 				gv_cur_region = rptr->reg; /* required for wcs_flu */
 				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 				if (TRUE == grab_crit_immediate(gv_cur_region, TRUE, NOT_APPLICABLE))

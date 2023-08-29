@@ -50,14 +50,6 @@ STATICDEF boolean_t 		mdb_ch_set;			/* Indicates whether we can rely on mdb_cond
 STATICDEF gtm_uint64_t		child_system, child_user;	/* Store system and user CPU time for child processes. */
 STATICDEF gtm_uint64_t		process_system, process_user;	/* Store system and user CPU time for current process. */
 STATICDEF mstr			mprof_mstr;			/* Area to hold global and subscripts. */
-<<<<<<< HEAD
-STATICDEF boolean_t 		use_realtime_flag = FALSE;	/* Indicates whether clock_gettime is unable to use CLOCK_MONOTONIC
-								 * flag and so should use CLOCK_REALTIME instead. */
-=======
-#ifdef __osf__
-STATICDEF struct rusage		last_usage = {0, 0};		/* Contains the last value obtained via getrusage() on Tru64. */
-#endif
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 LITDEF  MIDENT_CONST(above_routine, "*above*");
 

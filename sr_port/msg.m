@@ -3,7 +3,7 @@
 ; Copyright (c) 2001-2021 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -13,12 +13,8 @@
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
-<<<<<<< HEAD
  set $etrap="use $principal write $zstats,!! kill outmsg zshow ""*"" zhalt 1"
- New ansiopen,err,fn,i1,in,lo,msg,out,outansi,severe,txt,up,vms
-=======
  New ansiopen,err,fn,i1,in,lo,msg,out,outansi,severe,txt,up
->>>>>>> 52a92dfd (GT.M V7.0-001)
  Set (severe("warning"),ival(0))=0
  Set (severe("success"),ival("A"))=1
  Set (severe("error"),ival("B"))=2
@@ -27,12 +23,8 @@
  Set ival("T")=5
  Set up="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
  Set lo="abcdefghijklmnopqrstuvwxyz"
-<<<<<<< HEAD
- set ydbplatform=$zpiece($zversion," ",3)
-=======
  ; On the slowest server, this routine took less than half a second. So, there is no need to wait for more than 30 seconds.
  Set $ztimeout="30:use $principal write ""# msg.m took longer than expected"",! zshow ""*"" zhalt 1"
->>>>>>> 52a92dfd (GT.M V7.0-001)
  ;
  ; Run this program as $gtm_exe/mumps -run msg filename
  ; If used in a non-build environment, pass "nohdr" as second argument to not depend on the presence of $gtm_tools/copyright.txt
@@ -55,7 +47,6 @@
  Set cnt=0,undocmsgcnt=0,lineno=0
  Open in:readonly,out:newversion
  Set ansiopen=0
-<<<<<<< HEAD
  Use out Do chdr		; Create <fn>_ctl.c file and its prologue
  set ydbfn=$select("ydberrors"=fn:"ydberrors.h",1:"ydb"_fn_".h") ; Avoid naming it ydbydberrors.h
  open ydbfn:newversion		; Create ydb<fn>.h file and its prologue
@@ -77,9 +68,6 @@
  . use libydberrorsfn
  . do chdr
  ;
-=======
- Use out Do:"nohdr"'=nohdr hdr
->>>>>>> 52a92dfd (GT.M V7.0-001)
  For  Use in Read msg Set lineno=lineno+1 Quit:$TRanslate(msg,lo,up)?.E1".FACILITY".E
  Set err=0 Do  Quit:err
  . New i1,i2,upmsg
@@ -248,31 +236,19 @@
  . Quit:ansi="none"
  . Do:'ansiopen
  . . Open outansi:newversion Use outansi
-<<<<<<< HEAD
  . . Do chdr Set ansiopen=1 Write !,"const static readonly int error_ansi[] = {",!
-=======
- . . Do:"nohdr"'=nohdr hdr Set ansiopen=1 Write !,"const static readonly int error_ansi[] = {",!
->>>>>>> 52a92dfd (GT.M V7.0-001)
  . . Quit
  . Set:""'=ival integ(outmsg(cnt))=ival
  . Use outansi Write $Char(9),$Justify(ansi,4),",",$Char(9),"/* ",outmsg(cnt)," */",!
  . Quit
  Use out
  Write "};",!!
-<<<<<<< HEAD
  Do
  . Use out
  . Write !!,"LITDEF"_$Char(9)_"int "_undocarr_"[] = {",!
  . For i1=1:1:undocmsgcnt  Write $char(9)_undocmnemonic(i1,"code")_","_$char(9)_"/* "_undocmnemonic(i1)_" */",!
  . Write "};",!!
  . Quit
-=======
- For i1=1:1:cnt Write "LITDEF",$Char(9),"int ",prefix,outmsg(i1)," = ",outmsg(i1,"code"),";",!
- Use out
- Write !!,"LITDEF"_$Char(9)_"int "_undocarr_"[] = {",!
- For i1=1:1:undocmsgcnt  Write $char(9)_undocmnemonic(i1,"code")_","_$char(9)_"/* "_undocmnemonic(i1)_" */",!
- Write "};",!!
->>>>>>> 52a92dfd (GT.M V7.0-001)
  Write !,"GBLDEF",$Char(9),"err_ctl "_fn_"_ctl = {",!
  Write $Char(9),facnum,",",!
  Write $Char(9),""""_facility_""",",!
@@ -304,20 +280,14 @@
  ;set x="",ival=0 for  set x=$o(integ(x)) quit:'$length(x)  if $increment(ival)
  ;zwrite ival
  Quit
-<<<<<<< HEAD
 
 ;
 ; Routine to write C header file for the generated_ctl.c file and the C header files
 ;
 chdr
+ Quit:"nohdr"=nohdr
  Set saveIO=$IO
- If vms Set cfile=$ztrnlnm("gtm$src")_"copyright.txt"
- If 'vms Set cfile=$ztrnlnm("gtm_tools")_"/copyright.txt"
-=======
-hdr
- Set prevout=$IO
  Set cfile=$ztrnlnm("gtm_tools")_"/copyright.txt"
->>>>>>> 52a92dfd (GT.M V7.0-001)
  Set xxxx="2001"
  Set yyyy=$zdate($H,"YYYY")
  Open cfile:read

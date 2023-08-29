@@ -972,13 +972,8 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 				ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);	/* FALSE, FALSE: READ, not socket*/
 				if (io_ptr->dollar.zeof)
 				{
-<<<<<<< HEAD
-					io_ptr->dollar.za = 9;
-					SEND_KEYPAD_LOCAL;
-=======
 					io_ptr->dollar.za = ZA_IO_ERR;
-					SEND_KEYPAD_LOCAL
->>>>>>> 52a92dfd (GT.M V7.0-001)
+					SEND_KEYPAD_LOCAL;
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 				} else
 				{

@@ -2020,13 +2020,8 @@ typedef struct sgmnt_data_struct
 						 */
 	/************* FIELDS RELATED TO WRITE CACHE FLUSHING *******************************/
 	int4		write_fullblk;
-<<<<<<< HEAD
-	char		filler[4];
-	uint8		flush_time;
-=======
 	int4		statsdb_allocation;
-	int4		flush_time[2];
->>>>>>> 52a92dfd (GT.M V7.0-001)
+	uint8		flush_time;
 	int4		flush_trigger;
 	int4		n_wrt_per_flu;		/* Number of writes per flush call. Overloaded for BG and MM */
 	int4		wait_disk_space;	/* seconds to wait for diskspace before giving up on a db block write */

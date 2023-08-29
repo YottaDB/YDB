@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -103,24 +103,6 @@ void tptimeout_set(int4 dummy_param)
 			asccurtime));
 		return;
 	}
-<<<<<<< HEAD
-	if (tptimeout != outofband)
-	{
-		SET_OUTOFBAND(tptimeout);
-		tp_timeout_set_xfer = TRUE;
-#		ifdef VMS
-		/* Set event flag now that intercept is in place */
-		status = sys$setef(efn_outofband);
-		assert(SS$_WASCLR == status);
-		assertpro((SS$_WASCLR == status) || (SS$_WASSET == status));
-		sys$wake(0,0);
-#		endif
-	} else
-	{
-		DBGWTIME((stderr, "%s tptimeout_set: tptimeout outofband already set\n" VMS_ONLY("\n"), asccurtime));
-	}
-	UNIX_ONLY(tp_timeout_deferred = FALSE);	/* Clear flag now that intercept setup or already installed */
-=======
 	DBGDFRDEVNT((stderr, "%d %s %s: tptimeout_set: TP timeout *NOT* deferred - zinint: %d, ecindex: %d,  et: %d\n",
 		__LINE__, __FILE__,asccurtime, dollar_zininterrupt, dollar_ecode.index, ETRAP_IN_EFFECT));
 	if (queued == (TAREF1(save_xfer_root, tptimeout)).event_state)
@@ -132,7 +114,6 @@ void tptimeout_set(int4 dummy_param)
 	DBGDFRDEVNT((stderr, "%d %s: tptimeout_set - tptimeout outofband already pending\n", __LINE__, __FILE__));
 	assert((pending == TAREF1(save_xfer_root, tptimeout).event_state)
 		|| ((active == TAREF1(save_xfer_root, tptimeout).event_state)));
->>>>>>> 52a92dfd (GT.M V7.0-001)
 }
 
 /* ------------------------------------------------------------------
@@ -192,7 +173,7 @@ void tp_clear_timeout(void)
 #		ifdef DEBUG
 		if (pending == entry->event_state)
 		{
-			if (gtm_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == gtm_white_box_test_case_number))
+			if (ydb_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == ydb_white_box_test_case_number))
 				DBGFPF((stderr, "%d %s: tp_clear_timeout - resetting the xfer entries for tptimeout\n",
 					__LINE__, __FILE__));
 		}

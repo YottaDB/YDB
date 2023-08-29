@@ -49,12 +49,7 @@
 #include "gtm_utf8.h"
 #endif
 
-<<<<<<< HEAD
-GBLREF boolean_t		dmterm_default, dollar_zininterrupt, gtm_utf8_mode, prin_in_dev_failure, prin_out_dev_failure;
-=======
-GBLREF boolean_t		dmterm_default, gtm_utf8_mode, prin_in_dev_failure,
-				prin_out_dev_failure;
->>>>>>> 52a92dfd (GT.M V7.0-001)
+GBLREF boolean_t		dmterm_default, gtm_utf8_mode, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF char			*CLR_EOL, *CURSOR_DOWN, *CURSOR_LEFT, *CURSOR_RIGHT, *CURSOR_UP;
 GBLREF char			*KEY_BACKSPACE, *KEY_DC, *KEY_DOWN, *KEY_INSERT, *KEY_LEFT, *KEY_RIGHT, *KEY_UP;
 GBLREF char			*KEY_HOME, *KEY_END;
@@ -70,11 +65,7 @@ GBLREF spdesc			stringpool;
 GBLREF stack_frame		*frame_pointer;
 GBLREF unsigned char		*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF volatile int4		outofband;
-<<<<<<< HEAD
-GBLREF	volatile boolean_t	timer_in_handler;
-=======
 GBLREF volatile boolean_t	dollar_zininterrupt, timer_in_handler;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 LITREF unsigned char	lower_to_upper_table[];
 #ifdef UTF8_SUPPORTED

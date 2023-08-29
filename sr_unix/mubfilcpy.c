@@ -49,10 +49,8 @@
 #include "wcs_phase2_commit_wait.h"
 #include "wbox_test_init.h"
 #include "db_write_eof_block.h"
-<<<<<<< HEAD
 #include "mupip_exit.h"
 
-=======
 #include "mu_outofband_setup.h"
 #include "wcs_flu.h"
 #include "jnl.h"
@@ -68,7 +66,7 @@
 #	define MEGABYTE 	1024 * 1024
 #	define GIGABYTE 	1024 *MEGABYTE
 #endif
->>>>>>> 52a92dfd (GT.M V7.0-001)
+
 #define	TMPDIR_ACCESS_MODE	R_OK | W_OK | X_OK
 #define	TMPDIR_CREATE_MODE	S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH
 #define	COMMAND_ARRAY_SIZE	1024
@@ -212,7 +210,6 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	double			progper = 0, progfact = SHOWPERCENT;
 	size_t	 		tmpsize, transfersize, remaining;
 	ssize_t 		ret;
-	loff_t			*inoffp, *outoffp;
 	size_t			bytesspliced = 0, currspeed = 0, trans_cnt = 0, start_cnt = 0;
 	time_t			begtm, endtm, strtm;
 	char 			sizep[BUF_MAX], progperstr[BUF_MAX], padding[MAX_DIGITS_IN_INT8], fil=' ';
@@ -255,7 +252,6 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	}
 	memset(prefix, 0, MAX_FN_LEN);
 	memcpy(prefix, gv_cur_region->rname, gv_cur_region->rname_len);
-<<<<<<< HEAD
 	/* For testing purposes, we set the pid part of the temp file name to 99999 instead of the
 	 * pid. This may be necessary if the test is testing for FILENAMETOOLONG errors such as in
 	 * the r136/ydb864 test because a process_id with fewer or more digits than expected will
@@ -267,9 +263,6 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	else
 #	endif
 		SNPRINTF(&prefix[gv_cur_region->rname_len], MAX_FN_LEN - gv_cur_region->rname_len, "_%d_", process_id);
-=======
-	SNPRINTF(&prefix[gv_cur_region->rname_len], MAX_FN_LEN - gv_cur_region->rname_len, "_%d_", process_id);
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	/* verify that we have access to the temporary directory to avoid /tmp */
 	if (0 != ACCESS(tempdir, TMPDIR_ACCESS_MODE))
 	{
@@ -458,7 +451,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			strtm = time(NULL);
 			tmpsize = remaining;
 			copy_file_range_p = p;
-			ret = copy_file_range_p(infd, inoffp, outfd, outoffp, remaining, 0);
+			ret = copy_file_range_p(infd, NULL, outfd, NULL, remaining, 0);
 			if (WBTEST_ENABLED(WBTEST_BACKUP_FORCE_SLEEP))
 			{
 				util_out_print("BACKUP_STARTED", TRUE);
@@ -736,12 +729,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
 			CLEANUP_AND_RETURN_FALSE;
 		}
-<<<<<<< HEAD
-
 		if (0 < stat_buf.st_size)
-=======
-		if (0 < (filesize = stat_buf.st_size))
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		{
 			rsize = (int4)(SIZEOF(muinc_blk_hdr) + header_cpy->blk_size);
 			sblkh_p = (muinc_blk_hdr_ptr_t)malloc(rsize);

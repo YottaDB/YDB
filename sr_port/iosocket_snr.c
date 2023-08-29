@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -175,13 +175,8 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 
 	DBGSOCK2((stdout, "socsnrio: Socket read request - socketptr: 0x"lvaddr"  buffer: 0x"lvaddr"  maxlength: %d  flags: %d  ",
 		  socketptr, buffer, maxlength, flags));
-<<<<<<< HEAD
 	DBGSOCK2((stdout, "time_for_read->tv_sec: %d  usec: %d\n", time_for_read->tv_sec, time_for_read->tv_nsec / NANOSECS_IN_USEC));
-	DEBUG_ONLY(gettimeofday(&tvbefore, NULL);)
-=======
-	DBGSOCK2((stdout, "time_for_read->at_sec: %d  usec: %d\n", time_for_read->at_sec, time_for_read->at_usec));
 	DEBUG_ONLY(clock_gettime(CLOCK_REALTIME, &tsbefore);)
->>>>>>> 52a92dfd (GT.M V7.0-001)
 #ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 	assertpro(FD_SETSIZE > socketptr->sd);
 	FD_ZERO(&tcp_fd);

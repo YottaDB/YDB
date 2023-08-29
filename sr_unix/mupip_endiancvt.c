@@ -793,14 +793,14 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD8(trans_hist.total_blks);
 	SWAP_SD8(trans_hist.free_blocks);
 	/************* FIELDS RELATED TO WRITE CACHE FLUSHING *******************************/
-	if (native_minor_dbver < GDSMR200)
+	if (native_minor_dbver < GDSMR200_V70000)
 	{	/* Database is V7 format and the most recent version/release that has used this database is some GT.M V7 version.
 		 * In that case, the "flush_time" variable is an array of 2 4-byte quantities. So endian convert accordingly.
 		 */
 		int4	*new_ptr, *old_ptr;
 
 		/* Assert that minor_dbver cannot correspond to any YottaDB release. Only a GT.M release.
-		 * Hence the below asserts check for all YottaDB release GDSMR* values before GDSMR200.
+		 * Hence the below asserts check for all YottaDB release GDSMR* values before GDSMR200_V70000.
 		 */
 		assert(GDSMR126 != native_minor_dbver);
 		assert(GDSMR130 != native_minor_dbver);

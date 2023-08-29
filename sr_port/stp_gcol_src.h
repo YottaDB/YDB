@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -91,12 +91,8 @@ GBLREF lvzwrite_datablk		*lvzwrite_block;
 GBLREF mliteral			literal_chain;
 GBLREF mstr			*comline_base, **stp_array;
 GBLREF mval			dollar_system, dollar_zerror, dollar_zgbldir, dollar_zstatus;
-<<<<<<< HEAD
-GBLREF mval			dollar_zyerror, zstep_action, dollar_zinterrupt, dollar_zsource, dollar_ztexit;
-GBLREF mval			dollar_testmv;
-=======
 GBLREF mval			dollar_zyerror, dollar_zinterrupt, dollar_zsource, dollar_ztexit;
->>>>>>> 52a92dfd (GT.M V7.0-001)
+GBLREF mval			dollar_testmv;
 GBLREF mv_stent			*mv_chain;
 GBLREF sgm_info			*first_sgm_info;
 GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;

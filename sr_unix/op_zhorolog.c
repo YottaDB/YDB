@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,21 +38,13 @@ void op_zhorolog(mval *s, boolean_t z)
 	assert(stringpool.free <= stringpool.top);
 	assert(stringpool.free >= stringpool.base);
 	ENSURE_STP_FREE_SPACE(MAXNUMLEN + 1);
-<<<<<<< HEAD
-	strpool_free = stringpool.free;	assertpro(-1 != clock_gettime(CLOCK_REALTIME, &ts));
-#ifdef DEBUG
-	/* The OS should never return an invalid time */
-	if ((ts.tv_sec < 0) || (ts.tv_nsec < 0) || (ts.tv_nsec > NANOSECS_IN_SEC))
-		rts_error_csa(NULL, VARLSTCNT(1) ERR_WEIRDSYSTIME);
-=======
 	strpool_free = stringpool.free;
 	assertpro(-1 != clock_gettime(CLOCK_REALTIME, &ts));
-#ifdef DEBUG
+#	ifdef DEBUG
 	/* The OS should never return an invalid time */
 	if ((ts.tv_sec < 0) || (ts.tv_nsec < 0) || (ts.tv_nsec > NANOSECS_IN_SEC))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_WEIRDSYSTIME);
->>>>>>> 52a92dfd (GT.M V7.0-001)
-#endif
+#	endif
 	seconds = ts.tv_sec;
 	gmtoffset = dollarh(seconds, &days, &seconds);
 	s->str.addr = (char *)strpool_free;

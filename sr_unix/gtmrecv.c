@@ -477,26 +477,6 @@ int gtmrecv(void)
 	if (-1 == setsid())
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Receiver server error in setsid"), errno);
-<<<<<<< HEAD
-=======
-	/* Point stdin to /dev/null */
-	OPENFILE(DEVNULL, O_RDONLY, null_fd);
-	if (0 > null_fd)
-		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
-	assert(null_fd > 2);
-	/* Detached from the initiating process, now detach from the starting IO */
-	io_rundown(NORMAL_RUNDOWN);
-	FSTAT_FILE(gtmrecv_log_fd, &stat_buf, log_init_status);
-	assertpro(!log_init_status);	/* io_rundown should not affect the log file */
-	DUP2(null_fd, 0, rc);
-	if (0 > rc)
-		RTS_ERROR_CSA_ABT(NULL, ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
-	/* Re-init IO now that we have opened the log file and set stdin to /dev/null */
-	io_init(IS_MUPIP_IMAGE);
-	CLOSEFILE(null_fd, rc);
-	if (0 > rc)
-		RTS_ERROR_CSA_ABT(NULL, ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	gtmrecv_local->recv_serv_pid = process_id;
 	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl));
 	jnlpool->jnlpool_ctl->gtmrecv_pid = process_id;

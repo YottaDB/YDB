@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,16 +51,9 @@ int get_ztimeout(mval *result)
 		cur_time = sub_abs_time(&(TREF(dollar_ztimeout)).end_time, &cur_time);
 		if (0 <= cur_time.tv_sec)
 		{
-<<<<<<< HEAD
-			DBGDFRDEVNT((stderr,"cur_time.tv_nsec is: %d\n", cur_time.tv_nsec));
 			ms = DIVIDE_ROUND_DOWN(cur_time.tv_nsec, NANOSECS_IN_MSEC);
-			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, ((NULL == ztimeout_vector_ptr)? "%ld.%ld" : "%ld.%ld:"),
-					cur_time.tv_sec, ms);
-=======
-			ms = DIVIDE_ROUND_DOWN(cur_time.at_usec, MICROSECS_IN_MSEC);
 			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, (!ztimeout_vector_len ? "%ld.%ld" : "%ld.%ld:"),
-					cur_time.at_sec, ms);
->>>>>>> 52a92dfd (GT.M V7.0-001)
+					cur_time.tv_sec, ms);
 		} else
 			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, (!ztimeout_vector_len ? "%ld" : "%ld:"), ms);
 	}

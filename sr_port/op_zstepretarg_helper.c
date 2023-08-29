@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "stack_frame.h"
 #include "op.h"
 
-GBLREF unsigned char	*zstep_level;
+GBLREF stack_frame	*zstep_level;
 GBLREF stack_frame	*frame_pointer;
 
 /* This function is written in C since it is easier than writing this in assembly for multiple platforms.
@@ -35,6 +35,6 @@ void	op_zstepretarg_helper(void)
 		if (fp->type & SFT_COUNT)
 			break;
 	}
-	if ((NULL != fp) && ((unsigned char *)fp == zstep_level))
-		zstep_level = (unsigned char *)frame_pointer;
+	if ((NULL != fp) && (fp == zstep_level))
+		zstep_level = frame_pointer;
 }

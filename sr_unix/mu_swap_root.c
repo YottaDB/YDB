@@ -176,38 +176,6 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 			continue;
 		else if (ABORT_SWAP == free_blk_id)
 			break;
-<<<<<<< HEAD
-		update_trans = UPDTRNS_DB_UPDATED_MASK;
-		inctn_opcode = inctn_mu_reorg;
-		assert(1 == kill_set_list.used);
-		need_kip_incr = TRUE;
-		if (!csa->now_crit)
-			WAIT_ON_INHIBIT_KILLS(cnl, MAXWAIT2KILL);
-		DEBUG_ONLY(lcl_t_tries = t_tries);
-		TREF(in_mu_swap_root_state) = MUSWP_INCR_ROOT_CYCLE;
-		assert(!TREF(in_gvcst_redo_root_search));
-		if ((trans_num)0 == t_end(gvt_hist_ptr, dir_hist_ptr, TN_NOT_SPECIFIED))
-		{
-			TREF(in_mu_swap_root_state) = MUSWP_NONE;
-			need_kip_incr = FALSE;
-			assert(NULL == kip_csa);
-			ABORT_TRANS_IF_GBL_EXIST_NOMORE(lcl_t_tries, tn_aborted);
-			if (tn_aborted)
-			{	/* It is not an error if the global (that once existed) doesn't exist anymore (due to ROLLBACK) */
-				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLNOEXIST, 2, GNAME(gl_ptr).len, GNAME(gl_ptr).addr);
-				return;
-			}
-			continue;
-		}
-		TREF(in_mu_swap_root_state) = MUSWP_NONE;
-		/* Note that this particular process's csa->root_search_cycle is now behind cnl->root_search_cycle.
-		 * This forces a cdb_sc_gvtrootmod2 restart in gvcst_bmp_mark_free below.
-		 */
-		assert(cnl->root_search_cycle > csa->root_search_cycle);
-		gvcst_kill_sort(&kill_set_list);
-		GVCST_BMP_MARK_FREE(&kill_set_list, ret_tn, inctn_mu_reorg, inctn_bmp_mark_free_mu_reorg, inctn_opcode, csa);
-=======
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		DECR_KIP(csd, csa, kip_csa);
 		*root_swap_statistic_ptr += 1;
 		break;
@@ -424,12 +392,6 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	 *	3. Free block's corresponding bitmap reflects above change.
 	 * 	4. Child block gets marked recycled in bitmap. (GVCST_BMP_MARK_FREE)
 	 */
-<<<<<<< HEAD
-	parent_blk_ptr = dir_hist_ptr->h[parent_blk_lvl].buffaddr; /* parent_blk_lvl is 0 iff we're moving a gvt root block */
-	parent_long_blk_id = IS_64_BLK_ID(parent_blk_ptr);
-	parent_blk_id_sz = SIZEOF_BLK_ID(parent_long_blk_id);
-=======
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	CHECK_AND_RESET_UPDATE_ARRAY;
 	if (free_blk_recycled)
 	{	/* Otherwise, it's a completely free block, in which case no need to read. */
@@ -482,7 +444,6 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	{
 		/* 2. Parent block in directory tree remains busy, but points to new child block location. */
 		parent_blk_ptr = dir_hist_ptr->h[parent_blk_lvl].buffaddr; /* 0 == parent_blk_lvl if moving a gvt root block */
-		parent_blk_id = dir_hist_ptr->h[parent_blk_lvl].blk_num;
 		parent_long_blk_id = IS_64_BLK_ID(parent_blk_ptr);
 		parent_blk_id_sz = SIZEOF_BLK_ID(parent_long_blk_id);
 		curr_offset = dir_hist_ptr->h[parent_blk_lvl].curr_rec.offset;

@@ -99,16 +99,11 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 
 	SETUP_THREADGBL_ACCESS;
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
-<<<<<<< HEAD
-	if (hint >= total_blks)		/* for TP, hint can be > total_blks */
-		hint = 1;
+	hint = ((hint_arg >= total_blks) ? 1 : hint_arg);		/* for TP, hint can be > total_blks */
 #	ifdef DEBUG
 	if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= hint) && (hint < ydb_skip_bml_num))
 		hint = ydb_skip_bml_num;
 #	endif
-=======
-	hint = ((hint_arg >= total_blks) ? 1 : hint_arg);		/* for TP, hint can be > total_blks */
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	hint_cycled = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
 	hint_limit = DIVIDE_ROUND_DOWN(hint, BLKS_PER_LMAP);
 	local_maps = hint_cycled + 2;	/* for (up to) 2 wraps */
@@ -139,7 +134,7 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 #				ifdef DEBUG
 				if ((WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) && dollar_tlevel
 						&& !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT"))
-					|| (WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == gtm_white_box_test_case_count)
+					|| (WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == ydb_white_box_test_case_count)
 						&& !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT")))
 				{	/* Sync with copy in gdsfilext()
 					 * Unset the env shouldn't affect the parent, it reads env just once at process startup.

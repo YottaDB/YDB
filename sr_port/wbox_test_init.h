@@ -222,13 +222,10 @@ typedef enum {
 	WBTEST_ZTIM_EDGE,			/* 170 : Timeout when trying to reset the timer */
 	WBTEST_LCKWAKEOVRFLO,			/* 171 : Force LOCK wakeups to almost overflow */
 	WBTEST_FAKE_SS_SHMDT_WINDOW,		/* 172 : skip lcl_ss_ctx->shdw_fd = FD_INVALID to create "double" SHMDT */
-<<<<<<< HEAD
-=======
 	WBTEST_SOCKET_NONBLOCK,			/* 173 : Set SO_SNDBUF for non blocking socket */
 	WBTEST_JOBFAIL_FILE_LIM,		/* 174 : starve the process of file descriptors to produce a JOBFAIL */
-	WBTEST_BACKUP_FORCE_MV_RV		/* 175 : Force error during MUPIP BACKUP mv phase */
+	WBTEST_BACKUP_FORCE_MV_RV,		/* 175 : Force error during MUPIP BACKUP mv phase */
 
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.

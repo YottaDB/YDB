@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -289,13 +289,8 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 		{
 			if (EINTR != errno)
 			{
-<<<<<<< HEAD
-				io_ptr->dollar.za = 9;
-				if (timed && (0 == nsec_timeout))
-=======
 				io_ptr->dollar.za = ZA_IO_ERR;
-				if (timed && (0 == msec_timeout))
->>>>>>> 52a92dfd (GT.M V7.0-001)
+				if (timed && (0 == nsec_timeout))
 					iott_rterm(io_ptr);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				break;
@@ -478,14 +473,9 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 		{
 			if (EINTR != errno)
 			{
-<<<<<<< HEAD
 				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-				io_ptr->dollar.za = 9;
-				if (timed && (0 == nsec_timeout))
-=======
 				io_ptr->dollar.za = ZA_IO_ERR;
-				if (timed && (0 == msec_timeout))
->>>>>>> 52a92dfd (GT.M V7.0-001)
+				if (timed && (0 == nsec_timeout))
 					iott_rterm(io_ptr);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				break;

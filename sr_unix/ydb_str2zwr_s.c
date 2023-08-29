@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,7 +17,7 @@
 #include "libyottadb_int.h"
 #include "stringpool.h"		/* for "s2pool" prototype */
 #include "op.h"			/* for "op_fnzwrite" prototype */
-#include "outofband.h"
+#include "deferred_events_queue.h"
 
 GBLREF	volatile int4	outofband;
 

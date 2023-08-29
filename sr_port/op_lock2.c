@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,13 +64,7 @@
 #include "is_proc_alive.h"
 #include "mvalconv.h"
 #include "min_max.h"
-<<<<<<< HEAD
 #include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
-=======
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 GBLREF	bool		out_of_time, remlkreq;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;
@@ -378,16 +372,11 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 			 * in mlk_shrblk_find. If mlk_lock is invoked for the second (or higher) time in op_lock2 for the
 			 * same lock resource, "mlk_shrblk_find" assumes a sleep has happened in between two locking attempts.
 			 */
-<<<<<<< HEAD
-			UPDATE_PROC_WAIT_STATE(pvt_ptr1->pvtctl.csa, WS_39, 1);
+			UPDATE_CRIT_COUNTER(pvt_ptr1->pvtctl.csa, WS_39);
 			hiber_start_wait_any(sleep_msec);
 			sleep_msec = sleep_msec * 2;
 			if (LOCK_SELF_WAKE_MAX <= sleep_msec)
 				sleep_msec = LOCK_SELF_WAKE_START;
-=======
-			UPDATE_CRIT_COUNTER(pvt_ptr1->pvtctl.csa, WS_39);
-			hiber_start_wait_any(LOCK_SELF_WAKE);
->>>>>>> 52a92dfd (GT.M V7.0-001)
 			/* Every reattempt at a blocking lock needs crit which could be a bottleneck. So minimize reattempts.
 			 * The "blk_sequence" check below serves that purpose. If the sequence number is different between
 			 * the shared and private copies, it means the lock state in shared memory has changed since last we

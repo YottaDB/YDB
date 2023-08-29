@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,7 +75,6 @@ GBLREF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	bool			in_backup;
 GBLREF	bool			licensed;
 GBLREF	int			(*func)();
-GBLREF	global_latch_t		defer_latch;
 GBLREF	spdesc			rts_stringpool, stringpool;
 GBLREF	char			cli_err_str[];
 GBLREF	void			(*mupip_exit_fp)(int errcode);

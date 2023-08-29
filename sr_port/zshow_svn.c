@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -150,56 +150,11 @@ static readonly char zclose_text[] = "$ZCLOSE";
 static readonly char zkey_text[] = "$ZKEY";
 static readonly char arrow_text[] = "->";
 
-<<<<<<< HEAD
-GBLREF mval		dollar_zdir;
-GBLREF mval		dollar_zproc;
-GBLREF stack_frame	*frame_pointer;
-GBLREF io_pair		io_curr_device;
-GBLREF io_pair		io_std_device;
-GBLREF io_log_name	*io_root_log_name;
-GBLREF io_log_name	*dollar_principal;
-GBLREF mval		dollar_zgbldir;
-GBLREF mval		dollar_job;
-GBLREF uint4		dollar_zjob;
-GBLREF mval		dollar_zstatus;
-GBLREF mval		dollar_zsource;
-GBLREF int4		dollar_zsystem;
-GBLREF boolean_t	dollar_zaudit;
-GBLREF int4		dollar_zeditor;
-GBLREF uint4		dollar_tlevel;
-GBLREF uint4		dollar_trestart;
-GBLREF mval		dollar_estack_delta, dollar_zerror, dollar_zyerror, dollar_system;
-GBLREF mval		dollar_zinterrupt, dollar_ztexit;
-GBLREF boolean_t	dollar_zininterrupt;
-GBLREF int4		zdir_form;
-GBLREF size_t		totalAlloc;
-GBLREF size_t		totalRmalloc;
-GBLREF size_t		totalUsed;
-GBLREF mstr		dollar_zchset;
-GBLREF mstr		dollar_zpatnumeric;
-GBLREF boolean_t	dollar_zquit_anyway;
-#ifdef GTM_TRIGGER
-GBLREF mstr		*dollar_ztname;
-GBLREF mval		*dollar_ztdata;
-GBLREF mval		*dollar_ztdelim;
-GBLREF mval		*dollar_ztoldval;
-GBLREF mval		*dollar_ztriggerop;
-GBLREF mval		dollar_ztslate;
-GBLREF mval		*dollar_ztupdate;
-GBLREF mval		*dollar_ztvalue;
-GBLREF mval		dollar_ztwormhole;
-GBLREF int4		gtm_trigger_depth;
-#endif
-GBLREF spdesc		stringpool;
-GBLREF mstr		dollar_zpin;
-GBLREF mstr		dollar_zpout;
-GBLREF mlk_subhash_val_t	mlk_last_hash;
-GBLREF	int			jobinterrupt_sig_num;
-=======
+GBLREF int			jobinterrupt_sig_num;
 GBLREF boolean_t		dollar_zaudit, dollar_zquit_anyway;
 GBLREF int4			dollar_zeditor, dollar_zsystem, zdir_form;
 GBLREF io_log_name		*dollar_principal, *io_root_log_name;
-GBLREF io_pair			io_curr_device, *io_std_device;;
+GBLREF io_pair			io_curr_device, io_std_device;
 GBLREF mlk_subhash_val_t	mlk_last_hash;
 GBLREF mstr			dollar_zchset, dollar_zpatnumeric, dollar_zpin, dollar_zpout;
 GBLREF mval			dollar_estack_delta, dollar_job, dollar_system, dollar_zdir, dollar_zerror, dollar_zgbldir;
@@ -215,7 +170,6 @@ GBLREF mstr			*dollar_ztname;
 GBLREF mval			*dollar_ztdata, *dollar_ztdelim, *dollar_ztoldval, *dollar_ztriggerop, dollar_ztslate;
 GBLREF mval			*dollar_ztupdate, *dollar_ztvalue, dollar_ztwormhole;
 #endif
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 LITREF mval		literal_zero, literal_one, literal_null, literal_sqlnull;
 LITREF char		gtm_release_name[];

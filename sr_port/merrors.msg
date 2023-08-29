@@ -179,13 +179,7 @@
 !  Note new YottaDB error messages should be added to ydberrors.msg instead of to this file to avoid collisions with errors
 !  added here for GT.M by FIS.
 !
-<<<<<<< HEAD
 !  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M/YottaDB since V4.2.
-=======
-!
-!
-!  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M since V4.2.
->>>>>>> 52a92dfd (GT.M V7.0-001)
 !
 ACK		<>/success/fao=0!/ansi=0
 BREAKZST	<Break instruction encountered during ZSTEP action>/info/fao=0!/ansi=0

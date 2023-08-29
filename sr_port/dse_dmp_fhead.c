@@ -255,15 +255,11 @@ void dse_dmp_fhead (void)
 		util_out_print("  Recover interrupted                         !AD", FALSE, 5,
 				(csd->recov_interrupted ? " TRUE" : "FALSE"));
 		util_out_print("  Full Block Write                         !UL", TRUE, csd->write_fullblk);
-<<<<<<< HEAD
+		if (db_shares_gvstats)
+			util_out_print("  StatsDB Allocation            !19UL", TRUE, csd->statsdb_allocation);
 		util_out_print("  Max conc proc time         !22UL", FALSE, csd->max_procs.time);
 		util_out_print("  Max Concurrent processes         !9UL", TRUE, csd->max_procs.cnt);
 		util_out_print("  Reorg Sleep Nanoseconds         !17UL", TRUE, csd->reorg_sleep_nsec);
-=======
-		if(db_shares_gvstats)
-			util_out_print("  StatsDB Allocation            !19UL", TRUE, csd->statsdb_allocation);
-
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump these if -/ALL as if part of above display */

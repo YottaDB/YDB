@@ -185,15 +185,9 @@ GBLDEF	boolean_t	is_updproc,
 			gtcm_connection,
 			is_replicator,		/* TRUE => this process can write jnl records to the jnlpool for replicated db */
 			dollar_truth = TRUE,
-<<<<<<< HEAD
 			dollar_test_default = TRUE,
 			ydb_stdxkill,		/* TRUE => Use M Standard X-KILL - FALSE use historical GTM X-KILL (default) */
-			in_timed_tn,		/* TRUE => Timed TP transaction in progress */
-			tp_timeout_deferred;	/* TRUE => A TP timeout has occurred but is deferred */
-=======
-			gtm_stdxkill,		/* TRUE => Use M Standard X-KILL - FALSE use historical GTM X-KILL (default) */
 			in_timed_tn;		/* TRUE => Timed TP transaction in progress */
->>>>>>> 52a92dfd (GT.M V7.0-001)
 GBLDEF	uint4		is_updhelper;		/* = UPD_HELPER_READER if reader helper, = UPD_HELPER_WRITER if writer helper,
 						 * = 0 otherwise.
 						 */
@@ -323,12 +317,7 @@ GBLDEF	boolean_t	oldjnlclose_started;
 /* DEFERRED EVENTS */
 GBLDEF	bool		licensed = TRUE;
 
-<<<<<<< HEAD
-GBLDEF	volatile uint4		num_deferred;
 GBLDEF	volatile int4		fast_lock_count;	/* Used in wcs_stale */
-=======
-GBLDEF	volatile	int4	fast_lock_count;	/* Used in wcs_stale */
->>>>>>> 52a92dfd (GT.M V7.0-001)
 /* REPLICATION RELATED GLOBALS */
 GBLDEF	gtmsource_options_t	gtmsource_options;
 GBLDEF	gtmrecv_options_t	gtmrecv_options;

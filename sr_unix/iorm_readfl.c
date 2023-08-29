@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1917,7 +1917,6 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 	assert(EOF == -1);
 	if (-1 == status)
 	{
-<<<<<<< HEAD
 		if (EINTR != real_errno)
 		{
 			v->str.len = 0;
@@ -1926,26 +1925,13 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 			{	/* Cancel the timer before taking the error return */
 				if (timed && !out_of_time)
 					cancel_timer(timer_id);
-				io_ptr->dollar.za = 9;
+				io_ptr->dollar.za = ZA_IO_ERR;
 				/* save error in $device */
 				SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, real_errno);
 				ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ, not socket*/
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
 			}
 			ret = FALSE;
-=======
-		v->str.len = 0;
-		v->str.addr = (char *)stringpool.free;					/* ensure valid address */
-		if (EAGAIN != real_errno)
-		{	/* Cancel the timer before taking the error return */
-			if (timed && !out_of_time)
-				cancel_timer(timer_id);
-			io_ptr->dollar.za = ZA_IO_ERR;
-			/* save error in $device */
-			SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, real_errno);
-			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ, not socket*/
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		}
 		/* else: No need to call "eintr_handling_check()" again as it was already
 		 * done above right after the "read()" system call happened.

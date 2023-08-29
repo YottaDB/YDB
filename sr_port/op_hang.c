@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,12 +35,8 @@
 # include "wcs_sleep.h"
 # include "wbox_test_init.h"
 # include "gtmio.h"
-<<<<<<< HEAD
 # include "deferred_exit_handler.h"
-=======
->>>>>>> 52a92dfd (GT.M V7.0-001)
 # include "util.h"
-# include "deferred_signal_handler.h"
 #endif
 
 #include "gdsroot.h"
@@ -183,8 +179,7 @@ void op_hang(mval* num)
 			if (0 == ms)
 				return;		/* done with HANG */
 		}
-<<<<<<< HEAD
-		hiber_start(ms);
+		hiber_start_wall_time(ms);
 		if (outofband)
 		{
 			PUSH_MV_STENT(MVST_ZINTCMD);
@@ -200,32 +195,13 @@ void op_hang(mval* num)
 			TAREF1(zintcmd_active, ZINTCMD_HANG).restart_ctxt_last = frame_pointer->restart_ctxt;
 			TAREF1(zintcmd_active, ZINTCMD_HANG).count++;
 			mvs_zintcmd->command = ZINTCMD_HANG;
-			outofband_action(FALSE);
+			async_action(FALSE);
 		}
 	} else
 	{	/* For timeouts less than 1 millisecond, do no sleeps but just yield the current time slice.
 		 * Note: No outofband processing done in this case as we are done with the desired HANG.
 		 */
 		rel_quant();
-=======
-		hiber_start_wall_time(ms);
-	} else	/* the rel_quant below seems legitimate */
-		rel_quant();
-	if (outofband)
-	{
-		PUSH_MV_STENT(MVST_ZINTCMD);
-		mv_chain->mv_st_cont.mvs_zintcmd.end_or_remain = end_time;
-		mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_check = frame_pointer->restart_ctxt;
-		mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_check = frame_pointer->restart_pc;
-		/* save current information from zintcmd_active */
-		mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_prior = TAREF1(zintcmd_active, ZINTCMD_HANG).restart_ctxt_last;
-		mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_prior = TAREF1(zintcmd_active, ZINTCMD_HANG).restart_pc_last;
-		TAREF1(zintcmd_active, ZINTCMD_HANG).restart_pc_last = frame_pointer->restart_pc;
-		TAREF1(zintcmd_active, ZINTCMD_HANG).restart_ctxt_last = frame_pointer->restart_ctxt;
-		TAREF1(zintcmd_active, ZINTCMD_HANG).count++;
-		mv_chain->mv_st_cont.mvs_zintcmd.command = ZINTCMD_HANG;
-		async_action(FALSE);
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	}
 	return;
 }

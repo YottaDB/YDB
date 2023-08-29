@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,12 +40,6 @@ void ctrap_set(int4 ob_char)
 {
 	DCL_THREADGBL_ACCESS;
 
-<<<<<<< HEAD
-	if (!outofband)
-	{
-		SET_OUTOFBAND((CTRLC == ob_char) ? ctrap : sighup);
-		ctrap_action_is = ob_char;
-=======
 	SETUP_THREADGBL_ACCESS;
 	assert(INTRPT_IN_EVENT_HANDLING == intrpt_ok_state);
 	if ((ctrap != outofband) || have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT) || dollar_zininterrupt
@@ -57,7 +51,6 @@ void ctrap_set(int4 ob_char)
 			     __LINE__, __FILE__, outofband, ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)), dollar_zininterrupt,
 			     have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)));
 		return;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	}
 	DBGDFRDEVNT((stderr, "%d %s: ctrap_set - NOT deferred\n", __LINE__, __FILE__));
 	TAREF1(save_xfer_root, ctrap).param_val = ob_char;
@@ -65,7 +58,7 @@ void ctrap_set(int4 ob_char)
 	DEFER_INTO_XFER_TAB;
 	DBGDFRDEVNT((stderr, "%d %s: ctrap_set - pending xfer entries for ctrap - outofband: %d\n", __LINE__, __FILE__, outofband));
 #	ifdef DEBUG
-	if (gtm_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == gtm_white_box_test_case_number))
+	if (ydb_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == ydb_white_box_test_case_number))
 		DBGFPF((stderr, "# ctrap_set: set the xfer entries for ctrap\n"));
 #	endif
 }

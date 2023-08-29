@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,17 +49,6 @@ error_def(ERR_TLSCLOSE);
 
 #define DEFAULT_RENEGOTIATE_TIMEOUT	(2 * 60) /* About 2 hours between renegotiation. */
 #define MIN_RENEGOTIATE_TIMEOUT		1
-
-<<<<<<< HEAD
-#define REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(NEXT_RENEG_HRTBT)								\
-MBSTART {														\
-	if (0 < gtmsource_options.renegotiate_interval)									\
-	{														\
-		repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_TIMEOUT;						\
-		TIMEOUT_DONE_NOCH(NEXT_RENEG_HRTBT);									\
-		TIMEOUT_INIT_NOCH(NEXT_RENEG_HRTBT, gtmsource_options.renegotiate_interval * (uint8)NANOSECS_IN_SEC);	\
-	}														\
-} MBEND
 
 #define ISSUE_REPLNOTLS(ERRID, STR1, STR2)										\
 MBSTART {														\
@@ -111,14 +100,6 @@ MBSTART {													\
 		CLEAR_REPL_TLS_REQUESTED; /* As if -tlsid qualifier was never specified. */			\
 	}													\
 } MBEND
-=======
-#define ISSUE_REPLNOTLS(ERRID, STR1, STR2)											\
-{																\
-	if (!PLAINTEXT_FALLBACK)												\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERRID, 4, LEN_AND_LIT(STR1), LEN_AND_LIT(STR2));			\
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERRID), 4, LEN_AND_LIT(STR1), LEN_AND_LIT(STR2));		\
-}
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 void	repl_log_tls_info(FILE *logfp, gtm_tls_socket_t *socket);
 int 	repl_do_tls_handshake(FILE *logfp, int sock_fd, boolean_t do_accept, int *poll_direction);

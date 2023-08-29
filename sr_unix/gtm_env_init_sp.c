@@ -82,7 +82,7 @@ GBLREF	boolean_t		dmterm_default, hup_on;
 GBLREF	boolean_t		ipv4_only;		/* If TRUE, only use AF_INET. */
 GBLREF	char			*gtm_core_file;
 GBLREF	char			*gtm_core_putenv;
-GBLREF	int			gtm_non_blocked_write_retries;	/* number for retries for non_blocked write to pipe */
+GBLREF	int			ydb_non_blocked_write_retries;	/* number for retries for non_blocked write to pipe */
 GBLREF	uint4			gtm_principal_editing_defaults;	/* ext_cap flags if tt */
 ZOS_ONLY(GBLREF	char		*gtm_utf8_locale_object;)
 ZOS_ONLY(GBLREF	boolean_t	gtm_tag_utf8_as_ascii;)

@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2007 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 52a92dfd (GT.M V7.0-001)
+ *								*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,12 +14,9 @@
  ****************************************************************/
 
 #include "mdef.h"
-<<<<<<< HEAD
 
-=======
 #include "gtm_string.h"
-#include <rtnhdr.h>
->>>>>>> 52a92dfd (GT.M V7.0-001)
+
 #include "zbreak.h"
 #include "zshow.h"
 #include "compiler.h"

@@ -78,13 +78,9 @@ typedef enum
 
 void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *password, mval *extraarg)
 {
-<<<<<<< HEAD
-	int4			devlen, extrastr_len, flags, len, length, save_errno, status, status2, timeout, tls_errno, errlen, errlen2;
-=======
 	int4			devlen, extrastr_len, flags, len, length, save_errno, status, status2, timeout, tls_errno;
 	int4			errlen, errlen2;
 	int			fcntl_flags, fcntl_res;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	io_desc			*iod;
 	d_socket_struct 	*dsocketptr;
 	socket_struct		*socketptr;
@@ -294,10 +290,10 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				}
 				socketptr->nonblocking = TRUE;
 #				ifdef	DEBUG
-				if (WBTEST_ENABLED(WBTEST_SOCKET_NONBLOCK) && (0 < gtm_white_box_test_case_count))
+				if (WBTEST_ENABLED(WBTEST_SOCKET_NONBLOCK) && (0 < ydb_white_box_test_case_count))
 				{
 					if (-1 == setsockopt(socketptr->sd, SOL_SOCKET, SO_SNDBUF,
-						&gtm_white_box_test_case_count, SIZEOF(gtm_white_box_test_case_count)))
+						&ydb_white_box_test_case_count, SIZEOF(ydb_white_box_test_case_count)))
 					{
 						save_errno = errno;
 						errptr = (char *)STRERROR(save_errno);

@@ -72,12 +72,8 @@ enum
 	PARSE_FAIL_NOPATH	/* the parse failed and $PATH is undefined in the environment */
 };
 
-<<<<<<< HEAD
-#define FREE_ALL {				\
-=======
 #define FREE_ALL				\
 MBSTART {					\
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	if (NULL != copy_cmd_string)		\
 		free(copy_cmd_string);		\
 	if (NULL != temp)			\
@@ -88,12 +84,7 @@ MBSTART {					\
 		free(dir_in_path);		\
 	if (NULL != command2)			\
 		free(command2);			\
-<<<<<<< HEAD
-}
-=======
 } MBEND
-
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 int parse_pipe(char *cmd_string, char *ret_token);
 

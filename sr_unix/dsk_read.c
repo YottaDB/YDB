@@ -66,15 +66,11 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	uint4			process_id;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;
 
-<<<<<<< HEAD
 #ifdef DEBUG
 GBLREF	block_id		ydb_skip_bml_num;
 #endif
 
-error_def(ERR_DYNUPGRDFAIL);
-=======
 error_def(ERR_DSEBLKRDFAIL);	/* TODO: use more helpful error */
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolean_t blk_free)
 {
@@ -112,7 +108,11 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	csa = cs_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
-<<<<<<< HEAD
+	assert(csd == cs_data);
+	assert(NULL != cnl);
+	assert(0 == in_dsk_read);	/* dsk_read should never be nested. the read_reformat_buffer logic below relies on this */
+	DEBUG_ONLY(in_dsk_read++;)
+	assert(GDSVCURR == GDSV7);	/* assert should fail if GDSVCURR changes */
 	/* Note: Only INTEG (i.e. SNAPSHOTS) requires dsk_read to read FREE blocks. So one could ideally assert the following.
 	 *	assert(!blk_free || SNAPSHOTS_IN_PROG(csa));
 	 * But it is possible that SNAPSHOTS_IN_PROG(csa) was TRUE in t_end/op_tcommit just BEFORE we read the before images
@@ -122,10 +122,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	 * Therefore, it is possible we come here to read a before image while the SNAPSHOTS_IN_PROG(csa) flag does not reflect
 	 * the original value we started out the before-image reading "for" loop in t_end/op_tcommit with. Hence we do not assert.
 	 */
-	assert(0 == in_dsk_read);	/* dsk_read should never be nested. the read_reformat_buffer logic below relies on this */
-	DEBUG_ONLY(in_dsk_read++;)
 	udi = FILE_INFO(gv_cur_region);
-	assert(csd == cs_data);
 	size = csd->blk_size;
 	assert(csd->acc_meth == dba_bg);
 #	ifdef DEBUG
@@ -140,27 +137,6 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		return 0;
 	}
 #	endif
-	/* Since csd->fully_upgraded is referenced more than once in this module (once explicitly and once in
-	 * GDS_BLK_UPGRADE_IF_NEEDED macro used below), take a copy of it and use that so all usages see the same value.
-	 * Not doing this, for example, can cause us to see the database as fully upgraded in the first check causing us
-	 * not to allocate save_buff (a temporary buffer to hold a V4 format block) at all but later in the macro
-	 * we might see the database as NOT fully upgraded so we might choose to call the function gds_blk_upgrade which
-	 * does expect a temporary buffer to have been pre-allocated. It is ok if the value of csd->fully_upgraded
-	 * changes after we took a copy of it since we have a buffer locked for this particular block (at least in BG)
-	 * so no concurrent process could be changing the format of this block. For MM there might be an issue.
-=======
-	assert(csd == cs_data);
-	assert(NULL != cnl);
-	assert(0 == in_dsk_read);	/* dsk_read should never be nested. the read_reformat_buffer logic below relies on this */
-	DEBUG_ONLY(in_dsk_read++;)
-	assert(GDSVCURR == GDSV7);	/* assert should fail if GDSVCURR changes */
-	/* Note: Even in snapshots, only INTEG requires dsk_read to read FREE blocks. The assert below should be modified
-	 * if we later introduce a scheme where we can figure out as to who started the snapshots and assert accordingly
-	 */
-	assert(!blk_free || SNAPSHOTS_IN_PROG(csa)); /* Only SNAPSHOTS require dsk_read to read a FREE block from the disk */
-	udi = FILE_INFO(gv_cur_region);
-	assert(csd == cs_data);
-	size = csd->blk_size;
 	tmp_ondskblkver = (enum db_ver)csd->desired_db_format;
 	/* Cache csd->fully_upgraded once so that all uses work the same way. Repeatedly referencing csd->fully_upgraded could
 	 * result in different values seen through-out the function resulting in incorrect operation. For example, the code does
@@ -172,11 +148,9 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	 *   extra work since the block on disk will already have been upgraded
 	 * - fully_upgraded is cached as TRUE but becomes FALSE before reading the block from disk/mmap. There is no problem since
 	 *   the process performs NO upgrade. Some later process will take the responsiblity for such an upgrade
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	 */
 	fully_upgraded = csd->fully_upgraded;
 	assert(0 == (long)buff % SIZEOF(block_id));
-	assert(NULL != cnl);
 	if (dba_mm != csd->acc_meth)
 		INCR_GVSTATS_COUNTER(csa, cnl, n_dsk_read, 1);
 	enc_save_buff = buff;
@@ -243,48 +217,6 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		}
 		ENABLE_INTERRUPTS(INTRPT_IN_CRYPT_RECONFIG, prev_intrpt_state);
 	}
-<<<<<<< HEAD
-	if (!blk_free && (0 == save_errno))
-	{	/* See if block needs to be converted to current version. Assuming buffer is at least short aligned */
-		assert(0 == (long)buff % 2);
-		/* GDSV4 (0) version uses "buff->bver" as a block length so should always be > 0 when M code is running.
-		 * The only exception is if the block has not been initialized (possible if it is BLK_FREE status in the
-		 * bitmap). This is possible due to concurrency issues while traversing down the tree. But if we have
-		 * crit on this region, we should not see these either.
-		 */
-		assert(!IS_MCODE_RUNNING || !csa->now_crit || ((blk_hdr_ptr_t)buff)->bver);
-		/* Block must be converted to current version (if necessary) for use by internals.
-		 * By definition, all blocks are converted from/to their on-disk version at the IO point.
-		 */
-		if (!MEMCMP_LIT(csd->label, GDS_LABEL))
-		{
-			GDS_BLK_UPGRADE_IF_NEEDED(blk, buff, save_buff, csd, &tmp_ondskblkver, save_errno, fully_upgraded);
-			save_errno = SS_NORMAL;
-			tmp_ondskblkver = GDSV7;
-		} else if (!MEMCMP_LIT(csd->label, V6_GDS_LABEL))
-		{/* V6 databases should never have to have blocks upgraded when opened in V7 */
-			save_errno = SS_NORMAL;
-			tmp_ondskblkver = GDSV6;
-		} else
-			tmp_ondskblkver = GDSV4;
-		DEBUG_DYNGRD_ONLY(
-			if (GDSVCURR != tmp_ondskblkver)
-				PRINTF("DSK_READ: Block %d being dynamically upgraded on read\n", blk);
-		)
-		assert(((GDSV7 == tmp_ondskblkver) && (!MEMCMP_LIT(csd->label, GDS_LABEL)))
-			|| ((GDSV6 == tmp_ondskblkver) && (!MEMCMP_LIT(csd->label, V6_GDS_LABEL)))
-			|| (NULL != save_buff));
-		if (NULL != ondsk_blkver)
-			*ondsk_blkver = tmp_ondskblkver;
-		/* a bitmap block should never be short of space for a dynamic upgrade. assert that. */
-		assert((NULL == ondsk_blkver) || !IS_BITMAP_BLK(blk) || (ERR_DYNUPGRDFAIL != save_errno));
-		/* If we didn't run gds_blk_upgrade which would move the block into the cache, we need to do
-		 * it ourselves. Note that buff will be cleared by the GDS_BLK_UPGRADE_IF_NEEDED macro if
-		 * buff and save_buff are different and gds_blk_upgrade was called.
-		 */
-		if ((NULL != save_buff) && (NULL != buff))	/* Buffer not moved by upgrade, we must move */
-			memcpy(save_buff, buff, size);
-=======
 	if (0 == save_errno)	/* this bloc is a kissing cousin to code in mm_read and the 2should be maintained in parallel */
 	{	/* see if block needs to be converted to current version */
 		if ((GDSV6p == (tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver)) && (GDSMV70000 == csd->creation_mdb_ver))
@@ -326,7 +258,6 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 			|| ((GDSV6 == tmp_ondskblkver) && (!MEMCMP_LIT(csd->label, V6_GDS_LABEL)))));
 		assert((GDSV4 != tmp_ondskblkver) && (NULL != ondsk_blkver));	/* REORG encrypt does not pass ondsk_blkver */
 		*ondsk_blkver = tmp_ondskblkver;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	}
 	if (buff_is_modified_after_lseekread)
 	{	/* Normally the disk read (done in LSEEKREAD macro) would do the necessary write memory barrier to make the

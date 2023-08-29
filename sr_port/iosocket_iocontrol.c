@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,7 +55,7 @@
 
 GBLREF spdesc		stringpool;
 GBLREF io_pair		io_curr_device;
-GBLREF int		gtm_non_blocked_write_retries;	/* number of retries for non_blocked write to socket */
+GBLREF int		ydb_non_blocked_write_retries;	/* number of retries for non_blocked write to socket */
 
 LITREF	mval		literal_notimeout;
 LITREF	mval		skiparg;
@@ -126,10 +126,6 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXPR);
 			return;
 		}
-<<<<<<< HEAD
-		iosocket_wait(io_curr_device.in, nsec_timeout);
-	} else if (0 == STRCMP(action, "PASS"))
-=======
 		if (2 <= argcnt)
 		{	/* what operation to check */
 			arg = va_arg(args, mval *);
@@ -142,9 +138,8 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
 				handle = arg;
 		}
-		iosocket_wait(io_curr_device.in, msec_timeout, whatop, handle);
-	} else if (0 == memcmp(action, "PASS", length))
->>>>>>> 52a92dfd (GT.M V7.0-001)
+		iosocket_wait(io_curr_device.in, nsec_timeout, whatop, handle);
+	} else if (0 == STRCMP(action, "PASS"))
 	{
 		n = argcnt;
 		if (1 <= argcnt)
@@ -480,7 +475,9 @@ void  iosocket_block_iocontrol(io_desc *iod, mval *option, mval *returnarg)
 	socket_struct	*socketptr;
 	boolean_t	ch_set;
 	char		option_buf[MAX_BLOCK_OPTION + 1], *errptr;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	if (0 >= dsocketptr->n_socket)
@@ -527,15 +524,15 @@ void  iosocket_block_iocontrol(io_desc *iod, mval *option, mval *returnarg)
 				return;
 			}
 			socketptr->nonblocked_output = TRUE;
-			socketptr->max_output_retries = gtm_non_blocked_write_retries;
+			socketptr->max_output_retries = ydb_non_blocked_write_retries;
 			socketptr->args_written = socketptr->lastarg_size = socketptr->lastarg_sent = 0;
 			SOCKET_OBUFFER_INIT(socketptr, socketptr->buffer_size, 0, 0);
 			socketptr->obuffer_in_use = FALSE;	/* only used if actually blocked or TLS */
 #ifdef	DEBUG
-			if (WBTEST_ENABLED(WBTEST_SOCKET_NONBLOCK) && (0 < gtm_white_box_test_case_count))
+			if (WBTEST_ENABLED(WBTEST_SOCKET_NONBLOCK) && (0 < ydb_white_box_test_case_count))
 			{
 				if (-1 == setsockopt(socketptr->sd, SOL_SOCKET, SO_SNDBUF,
-					&gtm_white_box_test_case_count, SIZEOF(gtm_white_box_test_case_count)))
+					&ydb_white_box_test_case_count, SIZEOF(ydb_white_box_test_case_count)))
 				{
 					save_errno = errno;
 					errptr = (char *)STRERROR(save_errno);

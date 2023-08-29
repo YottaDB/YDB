@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,33 +30,20 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gtm_unistd.h"
-<<<<<<< HEAD
 #include "gtm_poll.h"
 
-=======
-#ifdef USE_POLL
-#include <sys/poll.h>
-#endif
-#ifdef USE_SELECT
-#include "gtm_select.h"
-#endif
 #ifdef DEBUG_SOCKWAIT
 #include "gtmio.h"
 #include "have_crit.h"		/* DBGSOCKWAIT needs for DBGFPF */
 #endif
->>>>>>> 52a92dfd (GT.M V7.0-001)
+
 #include "io_params.h"
 #include "gt_timer.h"
 #include "io.h"
 #include "iotimer.h"
 #include "iosocketdef.h"
 #include "min_max.h"
-<<<<<<< HEAD
-#include "outofband.h"
-=======
 #include "deferred_events_queue.h"
-#include <rtnhdr.h>
->>>>>>> 52a92dfd (GT.M V7.0-001)
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "gtm_netdb.h"
@@ -69,41 +56,20 @@
 #define READ		"READ"
 #define WRITE		"WRITE"
 
-<<<<<<< HEAD
-GBLREF volatile int4		outofband;
-GBLREF uint4			ydb_max_sockets;
-GBLREF int			socketus_interruptus;
-GBLREF boolean_t		dollar_zininterrupt;
-=======
 #define	WAIT_FOR_READ		1       /* or incoming connection */
 #define	WAIT_FOR_WRITE  	2
 #define	WAIT_FOR_ISDEFAULT  	4
 #define WAIT_FOR_DEFAULT        (WAIT_FOR_READ | WAIT_FOR_WRITE | WAIT_FOR_ISDEFAULT)
 
 GBLREF int			dollar_truth, socketus_interruptus;
-GBLREF int4			gtm_max_sockets;
+GBLREF uint4			ydb_max_sockets;
 GBLREF mv_stent			*mv_chain;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 GBLREF stack_frame  	        *frame_pointer;
 GBLREF unsigned char            *stackbase, *stacktop, *msp, *stackwarn;
 GBLREF volatile boolean_t	dollar_zininterrupt;
 GBLREF volatile int4		outofband;
 
-<<<<<<< HEAD
-boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout)
-=======
-error_def(ERR_GETNAMEINFO);
-error_def(ERR_GETSOCKNAMERR);
-error_def(ERR_SOCKACPT);
-error_def(ERR_SOCKNOTFND);
-error_def(ERR_SOCKWAIT);
-error_def(ERR_SOCKWAITARG);
-error_def(ERR_TEXT);
-error_def(ERR_SOCKMAX);
-error_def(ERR_ZINTRECURSEIO);
-
-boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *handle)
->>>>>>> 52a92dfd (GT.M V7.0-001)
+boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *handle)
 {
 	ABS_TIME		utimeout, *utimeoutptr, cur_time, end_time;
 	nfds_t			poll_nfds;
@@ -111,26 +77,12 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 	socket_struct		**poll_socketptr;	/* matching poll_fds */
 	size_t			poll_fds_size;
 	int			poll_timeout, poll_fd;
-<<<<<<< HEAD
-=======
-#endif
-#ifdef USE_SELECT
-	int			select_max_fd;
-	fd_set			select_fdset, selectw_fdset;
-	boolean_t		selectw_needed;
-#endif
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	d_socket_struct 	*dsocketptr;
 	socket_struct   	*socketptr, *which_socketptr = NULL, *prev_socketptr;;
 	socket_interrupt	*sockintr;
 	char            	*errptr, *charptr;
-<<<<<<< HEAD
-	int4            	errlen, ii, jj;
-	int4			nselect, rlisten, rconnected;
-=======
 	int4            	errlen, ii, jj, handle_index;
-	int4			nselect, nlisten, nconnected, nwrite, rlisten, rconnected, rwrite;
->>>>>>> 52a92dfd (GT.M V7.0-001)
+	int4			nselect, nwrite, rlisten, rconnected, rwrite;
 	int4			oldestconnectedcycle, oldestconnectedindex;
 	int4			oldestwritecycle, oldestwriteindex;
 	int4			oldestlistencycle, oldestlistenindex;
@@ -236,26 +188,12 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 	}
 	poll_fds = (struct pollfd *) TREF(poll_fds_buffer);
 	poll_socketptr = (socket_struct **)((char *)poll_fds + (dsocketptr->n_socket * SIZEOF(struct pollfd)));
-<<<<<<< HEAD
-	while (TRUE)
-	{
-		poll_nfds = 0;
-		nselect = rlisten = rconnected = 0;
-=======
-#endif
-#ifdef	USE_SELECT
-	FD_ZERO(&select_fdset);
-	FD_ZERO(&selectw_fdset);
-	selectw_needed = FALSE;
-#endif
 	DBGSOCKWAIT((stdout,"waitcycle= %d\n",dsocketptr->waitcycle));
 	while (TRUE)
 	{
 		DBGSOCKWAIT((stdout,"wait loop:\n"));
-		POLL_ONLY(poll_nfds = 0);
-		SELECT_ONLY(select_max_fd = 0);
-		nselect = nlisten = nconnected = nwrite = rlisten = rconnected = rwrite = 0;
->>>>>>> 52a92dfd (GT.M V7.0-001)
+		poll_nfds = 0;
+		nselect = rlisten = nwrite = rconnected = rwrite = 0;
 		rv = 0;
 		for (ii = 0; ii < dsocketptr->n_socket; ii++)
 		{
@@ -267,15 +205,9 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 			if ((socket_listening == socketptr->state) || (socket_connected == socketptr->state))
 			{
 				if (socket_connected == socketptr->state)
-<<<<<<< HEAD
 				{	/* Connected socket */
 					/* if buffer not empty set flag but not FD_SET */
-					if (0 < socketptr->buffered_length)
-=======
-				{ /* if buffer not empty set flag but not FD_SET */
-					nconnected++;	/* increment even if not in whatop */
 					if ((0 < socketptr->buffered_length) && (WAIT_FOR_READ & wait_for_what))
->>>>>>> 52a92dfd (GT.M V7.0-001)
 					{	/* something in the buffer so ready now */
 						if (!(SOCKPEND_READ & socketptr->pendingevent))
 						{
@@ -290,16 +222,9 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 						if (!socketptr->nonblocked_output)
 							continue;	/* no need to check if writable */
 					}
-<<<<<<< HEAD
-				} else
-				{	/* Listening socket */
-					if (socketptr->pendingevent)
-=======
 				} else if (WAIT_FOR_READ & wait_for_what)
-				{	/* increment n... even if not in whatop */
-					nlisten++;
+				{
 					if (SOCKPEND_READ & socketptr->pendingevent)
->>>>>>> 52a92dfd (GT.M V7.0-001)
 					{
 						rlisten++;
 						continue;	/* ready for ACCEPT now */
@@ -314,22 +239,6 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 					poll_fds[poll_nfds].events |= POLLOUT;
 				poll_socketptr[poll_nfds] = socketptr;
 				poll_nfds++;
-<<<<<<< HEAD
-=======
-#endif
-#ifdef USE_SELECT
-				assertpro(FD_SETSIZE > socketptr->sd);
-				if (WAIT_FOR_READ & wait_for_what)
-					FD_SET(socketptr->sd, &select_fdset);
-				if ((socket_connected == socketptr->state) && socketptr->nonblocked_output
-					&& (WAIT_FOR_WRITE & wait_for_what))
-				{
-					FD_SET(socketptr->sd, &selectw_fdset);
-					selectw_needed = TRUE;
-				}
-				select_max_fd = MAX(select_max_fd, socketptr->sd);
-#endif
->>>>>>> 52a92dfd (GT.M V7.0-001)
 				nselect++;
 			}
 			if (which_socketptr)
@@ -370,12 +279,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 			zint_restart = sockintr->end_time_valid = FALSE;
 			for ( ; ; )
 			{
-<<<<<<< HEAD
-				if ((0 < rconnected) || (0 <rlisten))
-=======
-#ifdef USE_POLL
 				if ((0 < rconnected) || (0 < rlisten) || (0 < rwrite))
->>>>>>> 52a92dfd (GT.M V7.0-001)
 					poll_timeout = 0;
 				else if (NO_M_TIMEOUT == nsec_timeout)
 					poll_timeout = -1;
@@ -384,19 +288,6 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 						DIVIDE_ROUND_UP(utimeout.tv_nsec, NANOSECS_IN_MSEC);
 				poll_fd = -1;
 				rv = poll(poll_fds, poll_nfds, poll_timeout);
-<<<<<<< HEAD
-=======
-#endif
-#ifdef USE_SELECT
-				utimeoutptr = &utimeout;
-				if ((0 < rconnected) || (0 < rlisten) || (0 < rwrite))
-					utimeout.tv_sec = utimeout.tv_usec = 0;
-				else if (NO_M_TIMEOUT == msec_timeout)
-					utimeoutptr = (struct timeval *)NULL;
-				rv = select(select_max_fd + 1, (void *)&select_fdset,
-						selectw_needed ? (void *)&selectw_fdset : NULL, NULL, utimeoutptr);
-#endif
->>>>>>> 52a92dfd (GT.M V7.0-001)
 				if (0 > rv && EINTR == errno)
 				{
 					eintr_handling_check();
@@ -495,18 +386,8 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 			}
 			assertpro((0 == jj) || (jj <= poll_nfds));	/* equal poll_nfds if not polled */
 			if (nselect && (jj != poll_nfds) && (socketptr->sd == poll_fds[jj].fd) && poll_fds[jj].revents)
-<<<<<<< HEAD
-=======
-#endif
-#ifdef USE_SELECT
-			assertpro(FD_SETSIZE > socketptr->sd);
-			if (nselect && ((0 != FD_ISSET(socketptr->sd, &select_fdset)
-				|| (selectw_needed && (0 != FD_ISSET(socketptr->sd, &selectw_fdset))))))
-#endif
->>>>>>> 52a92dfd (GT.M V7.0-001)
 			{	/* set flag in socketptr and keep going */
-				if (POLL_ONLY((POLLIN & poll_fds[jj].revents))
-					SELECT_ONLY((FD_ISSET(socketptr->sd), &select_fdset)))
+				if (POLLIN & poll_fds[jj].revents)
 				{
 					socketptr->current_events |= SOCKPEND_READ;
 					socketptr->readyforwhat |= SOCKREADY_READ;
@@ -521,9 +402,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 					socketptr->readycycle = dsocketptr->waitcycle;
 				} else
 				{
-					if (SELECT_ONLY(selectw_needed && (FD_ISSET(socketptr->sd, &selectw_fdset)))
-						POLL_ONLY(poll_fds[jj].revents & POLLOUT))
-
+					if (poll_fds[jj].revents & POLLOUT)
 					{
 						socketptr->current_events |= SOCKPEND_WRITE;
 						socketptr->readyforwhat |= SOCKREADY_WRITE;
@@ -730,16 +609,6 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 		poll_fds.fd = socketptr->sd;
 		poll_fds.events = POLLIN;
 		rv = poll(&poll_fds, 1, 0);
-<<<<<<< HEAD
-=======
-#endif
-#ifdef USE_SELECT
-		FD_ZERO(&select_fdset);
-		FD_SET(socketptr->sd, &select_fdset);
-		utimeout.tv_sec = utimeout.tv_usec = 0;
-		rv = select(socketptr->sd + 1, (void *)&select_fdset, NULL, NULL, &utimeout);
-#endif
->>>>>>> 52a92dfd (GT.M V7.0-001)
 		if (0 > rv)
 		{
 			errptr = (char *)STRERROR(errno);

@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,18 +40,12 @@
 
 GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	d_socket_struct		*newdsocket, *socket_pool;
-GBLREF	int4			gtm_max_sockets;
+GBLREF	uint4			ydb_max_sockets;
 GBLREF	io_desc			*active_device;
 GBLREF	io_pair			io_curr_device, io_std_device;
 GBLREF	spdesc			stringpool;
 GBLREF	UConverter  		*chset_desc[];
-<<<<<<< HEAD
-GBLREF	uint4			ydb_max_sockets;
-GBLREF	d_socket_struct		*newdsocket;
-GBLREF	boolean_t		dollar_zininterrupt;
-=======
 GBLREF	volatile boolean_t	dollar_zininterrupt;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 LITREF	nametabent		filter_names[];
 LITREF	unsigned char		filter_index[27];
@@ -412,12 +406,6 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				 LEN_AND_LIT("OPEN"));
 		return;
 	}
-<<<<<<< HEAD
-	/* ------------------ make a local copy of device structure to play with -------------------- */
-	d_socket_struct_len = SIZEOF(d_socket_struct) + (SIZEOF(socket_struct) * (ydb_max_sockets - 1));
-	memcpy(newdsocket, dsocketptr, d_socket_struct_len);
-	/* --------------- handle the two special cases attach/detach first ------------------------- */
-=======
 	/* --------------- handle the three special cases socket/attach/detach first ----------------------- */
 	if (socket_specified)
 	{
@@ -442,7 +430,6 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			return;
 		}
 	}
->>>>>>> 52a92dfd (GT.M V7.0-001)
 	if (detach_specified)
 	{
 		if ((1 < n_specified) || (0 < n_specified_socket) || (0 < n_incomplete_dev))
@@ -482,7 +469,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		return; /* attach can only be specified by itself */
 	}
 	/* ------------------ make a local copy of device structure to play with -------------------- */
-	d_socket_struct_len = SIZEOF(d_socket_struct) + (SIZEOF(socket_struct) * (gtm_max_sockets - 1));
+	d_socket_struct_len = SIZEOF(d_socket_struct) + (SIZEOF(socket_struct) * (ydb_max_sockets - 1));
 	memcpy(newdsocket, dsocketptr, d_socket_struct_len);
 	/* ------------ create/identify the socket to work on and make a local copy ----------------- */
 	if (create_new_socket = (listen_specified || connect_specified))	/* real "=" */

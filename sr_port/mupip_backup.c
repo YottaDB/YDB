@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -83,17 +83,15 @@
 #include "repl_sem.h"
 #include "gtm_sem.h"
 #include "anticipatory_freeze.h"
+
 #define PATH_DELIM		'/'
-<<<<<<< HEAD
+#define TMPDIR_ACCESS_MODE	(R_OK | W_OK | X_OK)
+
 /* Note: Use %08x for process_id in the format string below to ensure we have 8 hex digits always irrespective of the
  * actual value of process_id. Makes the length deterministic instead of %x which would
  * make the length dependent on the process_id and makes it harder for testing as well as the user.
  */
 #define	TEMP_FILE_FMT_STRING	"%.*s/%.*s_%08x_XXXXXX"
-
-=======
->>>>>>> 52a92dfd (GT.M V7.0-001)
-#define TMPDIR_ACCESS_MODE	(R_OK | W_OK | X_OK)
 
 GBLDEF  boolean_t	backup_started;
 GBLDEF  boolean_t	backup_interrupted;
@@ -132,11 +130,9 @@ GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	int			pool_init;
-<<<<<<< HEAD
-=======
+
 LITREF char             gtm_release_name[];
 LITREF int4             gtm_release_name_len;
->>>>>>> 52a92dfd (GT.M V7.0-001)
 
 error_def(ERR_BACKUPCTRL);
 error_def(ERR_BACKUPKILLIP);
@@ -249,13 +245,8 @@ void mupip_backup(void)
 	char			tempfilename[MAX_FN_LEN + 1], *tempfilename2, *getcwd_res;
 	char			tempdir_full_buffer[MAX_FN_LEN + 1];
 	char			*jnl_str_ptr, jnl_str[256], entry[256], prev_jnl_fn[JNL_NAME_SIZE];
-<<<<<<< HEAD
-	int			index, jnl_fstat;
-	mstr			tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
-=======
 	int			index, jnl_fstat, attemptcnt, maxretry;
-	mstr			tempdir_log, tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
->>>>>>> 52a92dfd (GT.M V7.0-001)
+	mstr			tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
 	uint4			jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status;
 	boolean_t		jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE}, save_no_prev_link;
 	jnl_private_control	*jpc;

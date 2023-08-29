@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,12 +24,7 @@
 #include "mdq.h"
 #include "compiler.h"
 
-
 GBLREF	boolean_t	ctrlc_on, hup_on;	/* TRUE in cenable mode; FALSE in nocenable mode */
-<<<<<<< HEAD
-GBLREF	int4		outofband;		/* enumerated: ctrap, ctrlc or ctrly*/
-=======
->>>>>>> 52a92dfd (GT.M V7.0-001)
 GBLREF	io_pair		io_std_device;		/* standard device */
 GBLREF	void		(*ctrlc_handler_ptr)();
 GBLREF	volatile int4	outofband;		/* enumerated event ID*/
