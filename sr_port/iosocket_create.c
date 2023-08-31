@@ -273,6 +273,8 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 		return socketptr;
 	} else
 	{	/* socket already setup by inetd or passed via JOB or LOCAL socket */
+		DEBUG_ONLY(boolean_t	is_enotconn_error);
+
 		SOCKET_ALLOC(socketptr);
 		socketptr->sd = file_des;
 		socketptr->temp_sd = FD_INVALID;
@@ -305,6 +307,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 		ai_ptr->ai_addrlen = tmp_addrlen;
 		ai_ptr->ai_family = SOCKET_LOCAL_ADDR(socketptr)->sa_family;
 		ai_ptr->ai_socktype = SOCK_STREAM;
+		DEBUG_ONLY(is_enotconn_error = FALSE);
 		if (socket_tcpip == protocol)
 		{	/* extract port information */
 			GETNAMEINFO(SOCKET_LOCAL_ADDR(socketptr), tmp_addrlen, host_buffer, NI_MAXHOST, port_buffer,
@@ -321,19 +324,20 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 			if (-1 == getpeername(socketptr->sd, SOCKET_REMOTE_ADDR(socketptr), &tmp_addrlen))
 			{
 				save_errno = errno;
-				/* Note that it is possible that even though the socket is inherited from a JOB command
-				 * or xinetd or passed through LOCAL socket, it is possible the socket is a LISTENING socket.
-				 * Therefore, it is possible to see a ENOTCONN errno. Allow for that. Issue error otherwise.
-				 */
-				if (ENOTCONN != save_errno)
+				/* Note: We allow LISTENING sockets to be passed through a LOCAL socket (YDB#996). In that
+				 * case, allow for a ENOTCONN error. Issue error otherwise. This is easily identifier by checking
+				 * for "sockaddr" being NULL. "iosocket_pass_local()" uses this special first parameter value
+				 * whereas other callers of "iosocket_create()" use a non-NULL value.
+                                 */
+				if ((NULL != sockaddr) || (ENOTCONN != save_errno))
 				{
-					assert(FALSE);
 					errptr = (char *)STRERROR(save_errno);
 					tmplen = STRLEN(errptr);
 					SOCKET_FREE(socketptr);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
 					return NULL;
 				}
+				DEBUG_ONLY(is_enotconn_error = TRUE);
 			}
 		} else if (socket_local == protocol)
 		{
@@ -360,6 +364,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 			socketptr->passive = TRUE;
 		} else
 		{
+			assert(!is_enotconn_error);
 			socketptr->state = socket_connected;
 			socketptr->passive = FALSE;
 		}
