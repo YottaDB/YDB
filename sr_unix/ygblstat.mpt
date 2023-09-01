@@ -3,7 +3,7 @@
 ; Copyright (c) 2017-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.  ;
 ;								;
-; Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -50,7 +50,6 @@ help    ; Usage: mumps -run %YGBLSTAT [--help] [--pid pidlist] [--reg reglist] [
 	;                              to all statistics), for process pid (defaults to all
 	;                              processes), for region (defaults to all regions) in
 	;                              global directory gld (defaults to current global direcory).
-	; Note: this program uses external calls, which must be installed.
 version	;0;If the format of %YGS changes, increment the version between the semicolons to ensure %YGS gets reconstructed on a relink
 
 	; Main Program
