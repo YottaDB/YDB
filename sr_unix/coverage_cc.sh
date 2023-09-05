@@ -1,8 +1,11 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #################################################################
 #								#
 # Copyright (c) 2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
+#								#
+# Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -82,7 +85,7 @@ main () {
 		for stop_file in $stop_list
 		do
 			case $arg in
-				$stop_file)
+				"$stop_file")
 					is_stop_list=1
 					;;
 				*/${stop_file})
@@ -93,8 +96,8 @@ main () {
 	done
 
 	# If we are not linux, not doing a debug build, or if we are on the stop list punt to the original compiler/options
-	if [ \( $OSTYPE != "linux" \) -o \( $is_debug_build -eq 0 \) -o \( $is_stop_list -eq 1 \) ]; then
-		exec $real_compiler $*
+	if [ $OSTYPE != "linux" ] || [ $is_debug_build -eq 0 ] || [ $is_stop_list -eq 1 ]; then
+		exec $real_compiler "$@"
 	fi
 
 	# We are doing a debug build.  Can our default compiler profile at the pid-separated level?
@@ -121,7 +124,7 @@ main () {
 
 	# Overlay ourselves and punt to a standard compile.
 	if [ $can_profile -ne 1 ]; then
-		exec $real_compiler $*
+		exec $real_compiler "$@"
 	fi
 
 	# It is standard practice for automated (ie: not developer driven) test runs to be compiled as
@@ -145,7 +148,8 @@ main () {
 	# test system.  I think the gcc runtime would create it, but would not get the ACL
 	# created, which could leave us with unwritable .gcda files later.
 	# We use a timestamp on the output dir so if the build changes, it doesn't write to the wrong version
-	time_stamp=`ls -ld /usr/library/$gtm_verno | \
+	# shellcheck disable=SC2012
+	time_stamp=`ls -ld "/usr/library/$gtm_verno" | \
 		gawk '{time=sprintf("%s_%02d_%s",toupper($6),$7,$8); gsub(":","",time); print time}'`
 	profile_dir="/testarea1/${runtime_user}/coverage/${gtm_verno}_${time_stamp}/gcda"
 	if [ ! -d $profile_dir ]; then
@@ -160,7 +164,7 @@ main () {
 	if setfacl -d -m other::rw -m user::rw -m group::rw $profile_dir 2> /dev/null; then
 		:
 	else
-		exec $real_compiler $*
+		exec $real_compiler "$@"
 	fi
 
 	# Patch argv to include coverage options.  Originally the gcda files were generated
@@ -168,7 +172,7 @@ main () {
 	# are generated in /testarea1/$runtime_user/coverage/gcda.
 	# The profile-prefix-path keeps the files from being renamed with weird '#' escapes.
 	argv="$*"
-	if [ \( $is_compile -eq 1 \) -a \( $is_debug_build -eq 1 \) -a \( $is_stop_list -eq 0 \) ]; then
+	if [ $is_compile -eq 1 ] && [ $is_debug_build -eq 1 ] && [ $is_stop_list -eq 0 ]; then
 		argv="-fprofile-prefix-path=/usr/library/${gtm_verno}/dbg/obj $argv"
 		argv="-fprofile-dir=${profile_dir} $argv"
 		argv="--coverage $argv"
@@ -184,4 +188,4 @@ main () {
 	exec $real_compiler $argv
 }
 
-main $*
+main "$@"
