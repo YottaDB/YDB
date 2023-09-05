@@ -82,8 +82,10 @@ error_def(ERR_SETSOCKOPTERR);
 	do												\
 	{												\
 		RC = send((SOCKETPTR)->sd, BUF, LEN, FLAGS);	/* BYPASSOK handle EINTR here */	\
-	} while ((-1 == RC) && (EINTR == errno) && (!outofband ||					\
-			((SOCKETPTR)->nonblocked_output ? (jobinterrupt == outofband) : TRUE)));	\
+		if ((-1 != RC) || (EINTR != errno))							\
+			break;										\
+		eintr_handling_check();									\
+	} while (!outofband || ((SOCKETPTR)->nonblocked_output ? (jobinterrupt == outofband) : TRUE));	\
 }
 
 #define DOTCPSEND_REAL(SOCKETPTR, SBUFF, SBUFF_LEN, SFLAGS, WRITTEN, RC)						\
@@ -748,6 +750,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 						{
 							if (EINTR == status)
 							{
+								eintr_handling_check();
 								status = 0;
 								errortext = SOCKBLOCK_OUTOFBAND;
 							} else
