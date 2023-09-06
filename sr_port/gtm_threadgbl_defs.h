@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,13 @@
 
 /* Priority access fields - commonly used fields in performance situations */
 THREADGBLDEF(grabbing_crit, 			gd_region *)			/* Region currently grabbing crit in (if any) */
+
+/* Below line is kept at beginning of this file (instead of somewhere in the middle of the file) to avoid errors when
+ * compiling sr_armv7l/dm_start.s since "ldr" instruction in ESTABLISH macro in sr_armv7l/error.si uses "#ggo_rts_error_depth"
+ * and that has to be less than 4096 or else the assembler issues a "Error: bad immediate value for offset (4200)" error
+ * (where 4200 offset is > 4096).
+ */
+THREADGBLDEF(rts_error_depth,			unsigned int)			/* Recursion level of rts_error_csa() */
 
 /* Compiler */
 THREADGBLDEF(blkmod_fail_level,			int4)				/* TP trace reporting element */
@@ -329,7 +336,6 @@ THREADGBLDEF(ydb_autorelink_keeprtn,		boolean_t)			/* do not let go of objects i
 THREADGBLDEF(open_shlib_root,			open_shlib *)			/* Anchor for open shared library list */
 THREADGBLDEF(parm_pool_ptr,			parm_pool *)			/* Pointer to the parameter pool */
 THREADGBLDEF(parms_cnt,                         unsigned int)                   /* Parameters count */
-THREADGBLDEF(rts_error_depth,			unsigned int)			/* Recursion level of rts_error_csa() */
 THREADGBLDEF(sapi_query_node_subs,		mstr *)				/* -> Array of YDB_MAX_SUBS mstrs holding subs
 										 * .. to return to ydb_node_*_s(). */
 THREADGBLDEF(sapi_query_node_subs_cnt,		int)				/* Count of subs filled in */
