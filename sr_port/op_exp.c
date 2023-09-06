@@ -40,7 +40,6 @@ void op_exp(mval *u, mval* v, mval *p)
 	mval 		u1, *u1_p;
 	double 		accuracy, exponent;
 	double 		x, x1, y, z, z2, z3, z4, z5, id, il;
-	double		savz;
 	int		im0, im1, ie, i, j, j1;
 	boolean_t	fraction = FALSE, in = FALSE;
 	boolean_t	neg = FALSE, even = TRUE;
@@ -254,7 +253,6 @@ void op_exp(mval *u, mval* v, mval *p)
 	 * Could add checks for zero/infinity here to avoid lengthy (300ish iterations) while loops below.
 	 */
 	n = 0;
-	savz = z;
 	while (1e16 <= z)
 	{
 		n += 5;

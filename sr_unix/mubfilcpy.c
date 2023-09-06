@@ -62,7 +62,7 @@
 #	define BUF_MAX		100
 #	define MIN_ETA		10
 #	define SHOWPERCENT	24
-#	define ADJUSTED_ETA	1.25
+#	define ADJUSTED_ETA	5 /4	/* not using 1.25 to avoid [bugprone-integer-division] warning */
 #	define MEGABYTE 	1024 * 1024
 #	define GIGABYTE 	1024 *MEGABYTE
 #endif
@@ -211,7 +211,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	size_t	 		tmpsize, transfersize, remaining;
 	ssize_t 		ret;
 	size_t			bytesspliced = 0, currspeed = 0, trans_cnt = 0, start_cnt = 0;
-	time_t			begtm, endtm, strtm;
+	time_t			endtm, strtm;
 	char 			sizep[BUF_MAX], progperstr[BUF_MAX], padding[MAX_DIGITS_IN_INT8], fil=' ';
 	boolean_t		sizeGiB = TRUE;
 	char 			*etaptr;
@@ -418,20 +418,19 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		infd = open(sourcefilepathname, O_RDONLY);
 		if (-1 == infd)
 		{
-			if (1 == (status = handle_err("Unable to open() the database file", errno))) /* WARNING assignment */
+			if (1 == handle_err("Unable to open() the database file", errno))
 				ABORTBACKUP;
 		}
 		if (-1 == fstat(infd, &stat))
 		{
-			if (1 == (status = handle_err("Error obtaining fstat() from the database file",
-					errno))) /* WARNING assignment */
+			if (1 == handle_err("Error obtaining fstat() from the database file", errno))
 				ABORTBACKUP;
 		}
 		outfd = open(tempfilepathname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
 		if (-1 == outfd)
 		{
-			if (1 == (status = handle_err("Unable to open() the backup file/location", errno))) /* WARNING assignment */
-			ABORTBACKUP;
+			if (1 == handle_err("Unable to open() the backup file/location", errno))
+				ABORTBACKUP;
 		}
 		/* set transfer size as maximum. Full copy-acceleration */
 		remaining = stat.st_size;
@@ -442,14 +441,12 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		tmpsize = (sizeGiB) ? DIVIDE_ROUND_UP(tmpsize, GIGABYTE) : DIVIDE_ROUND_UP(tmpsize, MEGABYTE);
 		digicnt = SNPRINTF(transferbuf, MAX_DIGITS_IN_INT8 + 7, "/ %lld %siB", tmpsize, (sizeGiB ? "G" : "M")) - 6;
 		memcpy(sizep, transferbuf, STRLEN(transferbuf) + 1);
-		begtm = time(NULL);
 		start_cnt = header_cpy->trans_hist.curr_tn;
 		if (showprogress)
 			util_out_print("Starting BACKUP for region : !AD", TRUE, REG_LEN_STR(gv_cur_region));
 		do
 		{
 			strtm = time(NULL);
-			tmpsize = remaining;
 			copy_file_range_p = p;
 			ret = copy_file_range_p(infd, NULL, outfd, NULL, remaining, 0);
 			if (WBTEST_ENABLED(WBTEST_BACKUP_FORCE_SLEEP))
@@ -460,8 +457,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			}
 			if (-1 == ret)
 			{
-				if (1 == (status = handle_err("Error occurred during the copy phase of MUPIP BACKUP",
-						 errno))) /* WARNING assignment */
+				if (1 == handle_err("Error occurred during the copy phase of MUPIP BACKUP", errno))
 					ABORTBACKUP;
 			}
 			endtm = time(NULL);
@@ -477,7 +473,6 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 				if (progper > progfact)
 				{
 					progfact = progfact + SHOWPERCENT;
-					tmpsize = bytesspliced;
 					tmpsize = (sizeGiB) ? DIVIDE_ROUND_UP(bytesspliced, GIGABYTE) : DIVIDE_ROUND_UP
 							(bytesspliced, MEGABYTE);
 					memset(padding, '\0', 3);
@@ -553,8 +548,6 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	 */
 	if (tempfilelen + sourcefilelen + 1 > MAX_FN_LEN)	// +1 for the '/'
 	{
-		save_errno = errno;
-		errptr = (char *)STRERROR(save_errno);
 		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_FILENAMETOOLONG);
 		CLEANUP_AND_RETURN_FALSE;
 	}

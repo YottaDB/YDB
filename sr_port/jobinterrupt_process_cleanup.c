@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,6 @@ error_def(ERR_ERRWZINTR);
 void jobinterrupt_process_cleanup(void)
 {
 	int		zstlen;
-	int4		event_type;
 	mstr            msgbuff;
 	stack_frame	*fp;
 	unsigned char	msgbuf[OUT_BUFF_SIZE], *mbptr;
@@ -97,7 +96,6 @@ void jobinterrupt_process_cleanup(void)
 	{	/* Was a direct mode frame this message needs to go out to the console */
 		dec_err(VARLSTCNT(1) ERR_ERRWZINTR);
 	}
-	event_type = no_event;
 	if ((0 == dollar_ecode.index) || !(ETRAP_IN_EFFECT))
 		TRY_EVENT_POP;			/* leaving interrupt and not in error handling, so check for pending timed events */
 }

@@ -231,8 +231,10 @@ void empty_xfer_queue_entries(void)
 	dqloop((TREF(save_xfer_root_ptr)), ev_que, entry)
 	{
 		if (not_in_play == entry->event_state)
-		DBGDFRDEVNT((stderr, "%d %s: empty_xfer_queue_entries event_type: %d event_state: %d\n", __LINE__, __FILE__,
-			entry->outofband, entry->event_state));
+		{
+			DBGDFRDEVNT((stderr, "%d %s: empty_xfer_queue_entries event_type: %d event_state: %d\n",
+				__LINE__, __FILE__, entry->outofband, entry->event_state));
+		}
 		assert(queued == entry->event_state);
 		dqdel(entry, ev_que);
 		entry->event_state = not_in_play;

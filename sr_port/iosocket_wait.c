@@ -76,17 +76,17 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 	struct pollfd		*poll_fds;
 	socket_struct		**poll_socketptr;	/* matching poll_fds */
 	size_t			poll_fds_size;
-	int			poll_timeout, poll_fd;
+	int			poll_timeout;
 	d_socket_struct 	*dsocketptr;
 	socket_struct   	*socketptr, *which_socketptr = NULL, *prev_socketptr;;
 	socket_interrupt	*sockintr;
 	char            	*errptr, *charptr;
 	int4            	errlen, ii, jj, handle_index;
-	int4			nselect, nwrite, rlisten, rconnected, rwrite;
+	int4			nselect, rlisten, rconnected, rwrite;
 	int4			oldestconnectedcycle, oldestconnectedindex;
 	int4			oldestwritecycle, oldestwriteindex;
 	int4			oldestlistencycle, oldestlistenindex;
-	int4			oldesteventcycle, oldesteventindex;
+	int4			oldesteventindex;
 	int			rv, max_fd, len, len1;
 	boolean_t		zint_restart, retry_accept = FALSE;
 	mv_stent		*mv_zintdev;
@@ -193,8 +193,7 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 	{
 		DBGSOCKWAIT((stdout,"wait loop:\n"));
 		poll_nfds = 0;
-		nselect = rlisten = nwrite = rconnected = rwrite = 0;
-		rv = 0;
+		nselect = rlisten = rconnected = rwrite = 0;
 		for (ii = 0; ii < dsocketptr->n_socket; ii++)
 		{
 			if (which_socketptr)
@@ -286,7 +285,6 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 				else
 					poll_timeout = (utimeout.tv_sec * MILLISECS_IN_SEC) +
 						DIVIDE_ROUND_UP(utimeout.tv_nsec, NANOSECS_IN_MSEC);
-				poll_fd = -1;
 				rv = poll(poll_fds, poll_nfds, poll_timeout);
 				if (0 > rv && EINTR == errno)
 				{
@@ -370,8 +368,8 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 			return FALSE;
 		}
 		/* find out which sockets are ready */
-		oldestlistencycle = oldestconnectedcycle = oldestwritecycle = oldesteventcycle = 0;
-		oldestlistenindex = oldestconnectedindex = oldestwriteindex = oldesteventindex = -1;
+		oldestlistencycle = oldestconnectedcycle = oldestwritecycle = 0;
+		oldestlistenindex = oldestconnectedindex = oldestwriteindex = -1;
 		for (ii = 0; ii < dsocketptr->n_socket; ii++)
 		{
 			if (which_socketptr && (which_socketptr != dsocketptr->socket[ii]))
@@ -497,16 +495,13 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 		}
 		if (0 < oldestlistencycle)
 		{
-			oldesteventcycle = oldestlistencycle;
 			oldesteventindex = oldestlistenindex;
 		} else if (0 < oldestconnectedcycle)
 		{	/* something to READ has priority over a WRITE */
-			oldesteventcycle = oldestconnectedcycle;
 			oldesteventindex = oldestconnectedindex;
 			DBGSOCKWAIT((stdout,"selected read socket[%d], cycle = %d\n", oldestconnectedindex, oldestconnectedcycle));
 		} else if (0 < oldestwritecycle)
 		{
-			oldesteventcycle = oldestwritecycle;
 			oldesteventindex = oldestwriteindex;
 			DBGSOCKWAIT((stdout,"selected write socket[%d], cycle = %d\n", oldestwriteindex, oldestwritecycle));
 		} else
@@ -589,7 +584,6 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	int4            	errlen;
 	char			port_buffer[NI_MAXSERV], ipaddr[SA_MAXLEN + 1];
 	struct pollfd		poll_fds;
-	int			poll_fd;
 	socket_struct		*newsocketptr;
 	struct sockaddr		*peer_sa_ptr;
 	struct sockaddr_storage	peer;           /* socket address + port */

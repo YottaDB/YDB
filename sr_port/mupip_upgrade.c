@@ -177,7 +177,9 @@ void mupip_upgrade(void)
 	tp_region	*rptr;
 	unix_db_info	*udi;
 	unsigned char	first_buff[MAX_KEY_SZ + 1], key_buff[MAX_KEY_SZ + 1];
+#	ifdef notnow
 	mval		first_key = DEFINE_MVAL_STRING(MV_STR | MV_NUM_APPROX,  0, 0, 0, (char *)first_buff, 0, 0);
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -248,7 +250,6 @@ void mupip_upgrade(void)
 			/* Reopen the region now that we have standalone access */
 			gvcst_init(reg);
 			change_reg();
-			csa = cs_addrs;
 			csd = cs_data;
 			blk_size = csd->blk_size;
 			util_out_print("!/Region !AD : MUPIP MASTERMAP UPGRADE started", TRUE, REG_LEN_STR(reg));
@@ -341,8 +342,8 @@ void mupip_upgrade(void)
 					}
 #endif
 					level = 0;	/* to silence [-Wuninitialized] warning */
-					if (cdb_sc_normal != (status = read_record(&rec_sz, &key_cmpc, &key_len, key_buff,
-							level, &dirHist, recBase)))
+					if (cdb_sc_normal
+						!= read_record(&rec_sz, &key_cmpc, &key_len, key_buff, level, &dirHist, recBase))
 					{	/* failed to parse record */
 						l_tries++;
 						continue;
@@ -363,7 +364,7 @@ void mupip_upgrade(void)
 						memcpy(first_key.str.addr, root_name.addr, key_len);
 					}
 #endif
-					if (cdb_sc_normal != (status = upgrade_gvt(blk_ptr, blk_size, reg, &root_name)))
+					if (cdb_sc_normal != upgrade_gvt(blk_ptr, blk_size, reg, &root_name))
 					{	/* gvt_upgrade had a problem; WARNING assign above */
 						l_tries++;
 						continue;
@@ -387,7 +388,6 @@ enum cdb_sc upgrade_gvt(block_id curr_blk, int4 blk_size, gd_region *reg, mstr *
 	blk_segment	*bs1, *bs_ptr;
 	block_id	blk_pter;
 	boolean_t	long_blk_id, was_crit;
-	enum db_ver	blk_ver;
 	gvnh_reg_t	*gvnh_reg;
 	int		blk_sz, key_cmpc, key_len, level, rec_sz;
 	int4		status;
@@ -510,8 +510,7 @@ enum cdb_sc upgrade_gvt(block_id curr_blk, int4 blk_size, gd_region *reg, mstr *
 			continue;
 		}
 		dirHist.blk_num = lft_history.h[level -1].blk_num;		/* drop a level. setup and continue */
-			continue;
-	} while (level);
+	}
 	return status;
 }
 
@@ -575,6 +574,7 @@ enum cdb_sc upgrade_idx_block(block_id curr_blk, int4 blk_size, gd_region *reg, 
 	long_blk_id = IS_64_BLK_ID(blkBase);
 	assert(FALSE == long_blk_id);
 	blk_ver = ((blk_hdr_ptr_t)blkBase)->bver;
+	PRO_ONLY(UNUSED(blk_ver));
 	recBase = blkBase + SIZEOF(blk_hdr);
 	if (0 == name->len)
 	{	/* TODO: deal with *-key search */
@@ -659,7 +659,7 @@ enum cdb_sc upgrade_idx_block(block_id curr_blk, int4 blk_size, gd_region *reg, 
 	v7recBase = v7bp + SIZEOF(blk_hdr);
 	((blk_hdr_ptr_t)v7bp)->bsiz = new_blk_sz;
 	recBase = blkBase + SIZEOF(blk_hdr);
-	for (rec_sz = v7_rec_sz = 0; recBase < blkEnd; recBase += rec_sz, v7recBase += v7_rec_sz)
+	for (rec_sz = 0; recBase < blkEnd; recBase += rec_sz, v7recBase += v7_rec_sz)
 	{	/* Update the recBase and v7recBase pointers to point to the next record */
 		/* Because blocks have pointers rather than application data, no spanning & bsiz not a worry */
 		/* TODO: simplify as no collation info to deal with */
@@ -696,10 +696,11 @@ enum cdb_sc upgrade_idx_block(block_id curr_blk, int4 blk_size, gd_region *reg, 
 		assert(cdb_sc_normal == status);
 		return status;
 	}
-	if (cdb_sc_normal == (status = gvcst_lftsib(&left_hist)))	/* TODO How to deal with split; WARNING assignment */
-		left_blk_status = left_hist.h;
-	else if (cdb_sc_endtree == status)
-		status = cdb_sc_normal;
+	if (cdb_sc_normal != (status = gvcst_lftsib(&left_hist)))	/* TODO How to deal with split; WARNING assignment */
+	{
+		if (cdb_sc_endtree == status)
+			status = cdb_sc_normal;
+	}
 	if (cdb_sc_normal != status)
 	{
 		assert(cdb_sc_normal == status);

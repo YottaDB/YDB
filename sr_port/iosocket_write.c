@@ -275,7 +275,7 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 		{	/* poll/select timedout */
 			if (socketptr->nonblocking && (++output_retries > socketptr->max_output_retries))
 			{
-				save_errno = socketptr->obuffer_errno = EAGAIN;
+				socketptr->obuffer_errno = EAGAIN;
 				status = -1;
 				break;
 			}
@@ -289,10 +289,10 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 			if (0 < bytessent)
 			{	/* unless partial writes enabled either none or all should have been written */
 				save_errno2 = gtm_tls_errno();	/* get for debug */
+				UNUSED(save_errno2);	/* to avoid [clang-analyzer-deadcode.DeadStores] warning */
 				if (llen > bytessent)
 				{
-					if (!socketptr->nonblocked_output)
-						assert(FALSE && (llen == bytessent));
+					assert(socketptr->nonblocked_output);
 					++short_sends;
 				}
 				llen -= bytessent;
@@ -415,6 +415,7 @@ void iosocket_output_timed(socket_struct *socketptr)
 		socketptr->obuffer_output_active = TRUE;
 		length = socketptr->obuffer_length;
 		status = iosocket_output(socketptr, socketptr->obuffer, length, TRUE, TRUE, &written);
+		UNUSED(status);
 		socketptr->obuffer_output_active = FALSE;
 		assert((length == written) || (0 != socketptr->obuffer_errno));	/* short write */
 	}
@@ -574,7 +575,6 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 							format is unspecified */
 			dsocketptr->ochset_utf16_variant = iod->ochset;
 			get_chset_desc(&chset_names[iod->ochset]);
-			written = 0;
 			DOTCPSEND(socketptr, UTF16BE_BOM, UTF16BE_BOM_LEN, flags, written, status);
 			DBGSOCK2((stdout, "socwrite: TCP send of BOM-BE with rc %d\n", status));
 			if (0 != status)
@@ -676,7 +676,6 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 					 * there will be recursion iosocket_Write -> iosocket_Wteol ->iosocket_Write */
 					if (0 < socketptr->n_delimiter)
 					{	/* delimiters from wrapping are not counted for non blocking output */
-						written = 0;
 						DOTCPSEND(socketptr, socketptr->odelimiter0.addr, socketptr->odelimiter0.len,
 							(socketptr->urgent ? MSG_OOB : 0) | flags, written, status);
 						DBGSOCK2((stdout, "socwrite: TCP send of %d byte delimiter with rc %d\n",
@@ -730,7 +729,6 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 				}
 			}
 			assert(0 != b_len);
-			written = 0;
 			DOTCPSEND(socketptr, out, b_len, (socketptr->urgent ? MSG_OOB : 0) | flags, written, status);
 			DBGSOCK2((stdout, "socwrite: TCP data send of %d (of %d) bytes with rc %d\n", written, b_len, status));
 			total_written += written;

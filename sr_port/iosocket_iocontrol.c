@@ -323,7 +323,7 @@ void iosocket_dlr_zkey(mstr *d)
 	assertpro(gtmsocket == iod->type);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	zkeyptr = (char *)stringpool.free;
-	totlen = thislen = totplusthislen = len = 0;
+	totlen = 0;
 	for (ii = 0; ii < dsocketptr->n_socket; ii++)
 	{
 		socketptr = dsocketptr->socket[ii];

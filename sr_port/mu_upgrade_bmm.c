@@ -194,8 +194,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 		{	/* process the local bit map for BUSY blocks */
 			old_blk_num = curbml + bml_index;
 			GET_BM_STATUS(bml_buff, bml_index, bml_status);
-			if (blks_in_way == curbml)
-				assert(BLK_MAPINVALID != bml_status);
+			assert((blks_in_way != curbml) || (BLK_MAPINVALID != bml_status));
 			if (BLK_BUSY == bml_status)
 			{	/* this block is BUSY so add it to the array of blocks to move */
 				blkBase = t_qread(old_blk_num, &blkhist->cycle, &blkhist->cr);
@@ -356,6 +355,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 							if (cdb_sc_normal != (status = gvcst_search(gv_currkey, NULL)))
 							{	/* failed to get global tree history for key; WARNING: assgn above*/
 								assert(cdb_sc_normal == status);
+								PRO_ONLY(UNUSED(status));
 								t_abort(gv_cur_region, cs_addrs); /* do crit and other cleanup */
 								mv_blk_err = TRUE;
 								util_out_print("Region !AD: search for for key !AD failed, so ",
@@ -500,6 +500,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	if (cdb_sc_normal != (status = ditch_dead_globals(DIR_ROOT)))			/* WARNING assignment */
 	{
 		assert(cdb_sc_normal == status);
+		PRO_ONLY(UNUSED(status));
 		t_abort(gv_cur_region, cs_addrs);						/* do crit and other cleanup */
 		mu_reorg_upgrd_dwngrd_in_prog = FALSE;
 		util_out_print("Region !AD: directory processing KILL'd globals failed; ", FALSE, REG_LEN_STR(reg));
@@ -554,6 +555,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	if (cdb_sc_normal != (status = clean_master_map())) /* TODO: sb unnecessary find way to ditch *//* WARNING assignment */
 	{
 		assert(cdb_sc_normal == status);
+		PRO_ONLY(UNUSED(status));
 		t_abort(gv_cur_region, cs_addrs);						/* do crit and other cleanup */
 		mu_reorg_upgrd_dwngrd_in_prog = FALSE;
 		util_out_print("Region !AD: mastermap adjustment failed; ", FALSE, REG_LEN_STR(reg));
@@ -566,6 +568,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	if (cdb_sc_normal != (status = upgrade_dir_tree(DIR_ROOT, blks_in_way, csd->blk_size, reg)))	/* WARNING assignment */
 	{
 		assert(cdb_sc_normal == status);
+		PRO_ONLY(UNUSED(status));
 		t_abort(gv_cur_region, cs_addrs);						/* do crit and other cleanup */
 		mu_reorg_upgrd_dwngrd_in_prog = FALSE;
 		util_out_print("Region !AD: directory tree upgrade failed; ", FALSE, REG_LEN_STR(reg));
@@ -775,7 +778,6 @@ int4	move_root_block(block_id new_blk_num, block_id old_blk_num, gvnh_reg_t *gvn
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		bp;
-	trans_num		ret_tn;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -901,7 +903,6 @@ enum cdb_sc ditch_dead_globals(block_id curr_blk)
 	int4			status;
 	sm_uc_ptr_t		blkBase, blkEnd, recBase;
 	srch_blk_status		dirHist, leafHist, rootHist;
-	trans_num		ret_tn;
 	unsigned char		key_buff[MAX_KEY_SZ + 1];
 
 	dirHist.blk_num = curr_blk;
@@ -990,7 +991,7 @@ enum cdb_sc ditch_dead_globals(block_id curr_blk)
 			}
 			t_write(&dirHist, (unsigned char *)bs1, 0, 0, dirHist.level, TRUE, TRUE, GDS_WRITE_KILLTN);
 			inctn_opcode = inctn_mu_reorg;
-			if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED))) /* WARNING: assign */
+			if ((trans_num)0 == t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED)) /* WARNING: assign */
 			{	/* failed to commit update */
 				status = t_fail_hist[t_tries - 1];
 				assert(cdb_sc_normal == status);
@@ -1162,7 +1163,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, int4 blk_size, 
 			t_abort(gv_cur_region, cs_addrs);					/* do crit and other cleanup */
 			return status;
 		}
-		if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED))) /* t_end:508 bm_getfree ??? 6 */
+		if ((trans_num)0 == t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED)) /* t_end:508 bm_getfree ??? 6 */
 		{
 			status = t_fail_hist[t_tries - 1];
 			assert(cdb_sc_normal == status);
@@ -1259,7 +1260,6 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, int4 blk_size, 
 		t_abort(gv_cur_region, cs_addrs);						/* do crit and other cleanup */
 		return status;
 	}
-	blkBase = dirHist.buffaddr;
 #	endif
 	DBGUPGRADE(util_out_print("adjusted level !UL directory block @x!@XQ", TRUE, level, &curr_blk));
 	return cdb_sc_normal; /* finished upgrading this block and also any leaf nodes descended from this block */

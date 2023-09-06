@@ -137,7 +137,6 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		return 0;
 	}
 #	endif
-	tmp_ondskblkver = (enum db_ver)csd->desired_db_format;
 	/* Cache csd->fully_upgraded once so that all uses work the same way. Repeatedly referencing csd->fully_upgraded could
 	 * result in different values seen through-out the function resulting in incorrect operation. For example, the code does
 	 * not allocate scratch space for the temporary pre-V7 formatted block which is needed later in the function. It is ok if

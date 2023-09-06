@@ -46,7 +46,6 @@ sm_uc_ptr_t mm_read(block_id blk)
 	assert(blk >= 0);
 	assert(dba_mm == cs_addrs->hdr->acc_meth);
 	csd = cs_data;
-	tmp_ondskblkver = (enum db_ver)csd->desired_db_format;
 	fully_upgraded = csd->fully_upgraded;
 	buff = (MM_BASE_ADDR(cs_addrs) + ((off_t)cs_addrs->hdr->blk_size * blk));
 	if (blk < cs_addrs->total_blks)		/* test against process private copy of total_blks */
@@ -66,12 +65,15 @@ sm_uc_ptr_t mm_read(block_id blk)
 		if (!fully_upgraded && (GDSV7m != tmp_ondskblkver))		/* !fully_upgraded only during V6 -> V7 upgrade */
 		{	/* block in need of attention */
 			if ((0 == (level = (int)((blk_hdr_ptr_t)buff)->levl)) || (LCL_MAP_LEVL == level)) /* WARNING assignment */
-				tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver = GDSV7m;	/* bit map & data blocks just get version */
-			else if ((csd->offset) && (GDSV6 == tmp_ondskblkver))
+			{
+				((blk_hdr_ptr_t)buff)->bver = GDSV7m;	/* bit map & data blocks just get version */
+				DEBUG_ONLY(tmp_ondskblkver = GDSV7m);
+			} else if ((csd->offset) && (GDSV6 == tmp_ondskblkver))
 			{	/* This is a pre-V7 index block needing its offset adjusted */
 				assert(MEMCMP_LIT(csd->label, GDS_LABEL));
 				blk_ptr_adjust(buff, csd->offset);
-				tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver = GDSV6p;	/* 4 byte block_id with offset applied */
+				((blk_hdr_ptr_t)buff)->bver = GDSV6p;	/* 4 byte block_id with offset applied */
+				DEBUG_ONLY(tmp_ondskblkver = GDSV6p);
 			} else
 				assert(GDSV6p == tmp_ondskblkver);
 		}

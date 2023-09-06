@@ -282,7 +282,7 @@ block_id mu_swap_root_blk(glist *gl_ptr, srch_hist *gvt_hist_ptr, srch_hist *dir
 	DEBUG_ONLY(lcl_t_tries = t_tries);
 	TREF(in_mu_swap_root_state) = MUSWP_INCR_ROOT_CYCLE;
 	assert(!TREF(in_gvcst_redo_root_search));
-	if ((trans_num)0 == (ret_tn = t_end(gvt_hist_ptr, (DIR_ROOT != root_blk_id) ? dir_hist_ptr : NULL, TN_NOT_SPECIFIED)))
+	if ((trans_num)0 == t_end(gvt_hist_ptr, (DIR_ROOT != root_blk_id) ? dir_hist_ptr : NULL, TN_NOT_SPECIFIED))
 	{
 		TREF(in_mu_swap_root_state) = MUSWP_NONE;
 		need_kip_incr = FALSE;
