@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,21 +41,26 @@
  */
 #define	ASSERT_NO_DIO_ALIGN_NEEDED(UDI)	assert(in_mu_cre_file && !(UDI)->fd_opened_with_o_direct)
 
-#define	DBG_CHECK_DIO_ALIGNMENT(udi, offset, buff, size)							\
-MBSTART {													\
-	DEBUG_ONLY(DCL_THREADGBL_ACCESS);									\
-														\
-	DEBUG_ONLY(SETUP_THREADGBL_ACCESS);									\
-	assert((NULL == (udi)) || !(udi)->fd_opened_with_o_direct || (NULL != (TREF(dio_buff)).aligned));	\
-	assert((NULL == (udi)) || !(udi)->fd_opened_with_o_direct || OFFSET_IS_DIO_ALIGNED(udi, offset));	\
-	assert((NULL == (udi)) || !(udi)->fd_opened_with_o_direct || BUFF_IS_DIO_ALIGNED(udi, buff));		\
-	assert((NULL == (udi)) || !(udi)->fd_opened_with_o_direct || SIZE_IS_DIO_ALIGNED(udi, size));		\
-	/* If we are using the global variable "dio_buff.aligned", then we better not be executing in timer	\
-	 * code or in threaded code (as we have only ONE buffer to use). Assert that.				\
-	 */													\
-	assert(((TREF(dio_buff)).aligned != (char *)(buff)) || (!timer_in_handler && !multi_thread_in_use));	\
-	/* Assert that we are not exceeding allocated buffer bounds in case of "dio_buff.aligned" */		\
-	assert(((TREF(dio_buff)).aligned != (char *)(buff)) || DIO_BUFF_NO_OVERFLOW((TREF(dio_buff)), size));	\
+#define	DBG_CHECK_DIO_ALIGNMENT(udi, offset, buff, size)								\
+MBSTART {														\
+	GBLREF	VSIG_ATOMIC_T	forced_exit;										\
+															\
+	DEBUG_ONLY(DCL_THREADGBL_ACCESS);										\
+															\
+	DEBUG_ONLY(SETUP_THREADGBL_ACCESS);										\
+	assert((NULL == (udi)) || !(udi)->fd_opened_with_o_direct || (NULL != (TREF(dio_buff)).aligned));		\
+	assert((NULL == (udi)) || !(udi)->fd_opened_with_o_direct || OFFSET_IS_DIO_ALIGNED(udi, offset));		\
+	assert((NULL == (udi)) || !(udi)->fd_opened_with_o_direct || BUFF_IS_DIO_ALIGNED(udi, buff));			\
+	assert((NULL == (udi)) || !(udi)->fd_opened_with_o_direct || SIZE_IS_DIO_ALIGNED(udi, size));			\
+	/* If we are using the global variable "dio_buff.aligned", then we better not be executing in a signal		\
+	 * handler or in threaded code. This is because we have only ONE "dio_buff" global variable buffer to		\
+	 * use and it is possible this macro is being invoked in mainline code when a signal (e.g. SIGALRM)		\
+	 * occurs and the signal handler code invokes the same macro using the same global buffer thereby		\
+	 * potentially trashing the buffer being used by the mainline code.						\
+	 */														\
+	assert(((TREF(dio_buff)).aligned != (char *)(buff)) || (!in_os_signal_handler && !multi_thread_in_use));	\
+	/* Assert that we are not exceeding allocated buffer bounds in case of "dio_buff.aligned" */			\
+	assert(((TREF(dio_buff)).aligned != (char *)(buff)) || DIO_BUFF_NO_OVERFLOW((TREF(dio_buff)), size));		\
 } MBEND
 
 typedef struct
