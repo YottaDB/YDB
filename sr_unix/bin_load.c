@@ -623,11 +623,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 			db_collhdr.nct = gv_target->nct;
 		}
 		GET_USHORT(rec_len, &rp->rsiz);
-		if (max_rec < rec_len)
-		{
-			bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
-			bin_call_db(ERR_COR, REC2BIG, rec_len, max_rec, REG_LEN_STR(gvnh_reg->gd_reg));
-		} else if (0 != EVAL_CMPC(rp))
+		if (0 != EVAL_CMPC(rp))
 		{
 			bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
 			bin_call_db(ERR_COR, DBCMPNZRO, 0, 0, gvname.var_name.len, (unsigned char*)(gvname.var_name.addr));
@@ -1115,6 +1111,13 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 					gv_currkey->end -= (SPAN_SUBS_LEN + 1);
 					v.str.addr = sn_hold_buff;
 					v.str.len = sn_hold_buff_pos;
+				}
+				if (v.str.len > max_rec)
+				{
+					bin_call_db(ERR_COR, CORRUPTNODE, iter, global_key_count, 0, NULL);
+					bin_call_db(ERR_COR, REC2BIG, v.str.len, max_rec, REG_LEN_STR(gvnh_reg->gd_reg));
+					assert(mupip_error_occurred);
+					break;
 				}
 				if (gvnh_reg->gvspan)
 					bin_call_db(BIN_PUT_GVSPAN, 0, (INTPTR_T)&v, (INTPTR_T)gvnh_reg, 0, NULL);
