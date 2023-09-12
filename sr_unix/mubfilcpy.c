@@ -43,7 +43,6 @@
 #include "gtmmsg.h"
 #include "wcs_sleep.h"
 #include "gtm_file_stat.h"
-#include "gtm_tempnam.h"
 #include "gds_blk_downgrade.h"
 #include "shmpool.h"
 #include "wcs_phase2_commit_wait.h"
@@ -183,13 +182,8 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	struct stat		stat_buf, stat;
 	off_t			filesize, offset;
 	char 			*inbuf, *ptr, *errptr, *sourcefilename, *sourcedirname;
-	char			tempfilename[COMMAND_ARRAY_SIZE];	/* is sized the same as "cmdarray" because a file name
-									 * that is created using system("cp ...") on "cmdarray"
-									 * is later opened using open() on "tempfilename".
-									 * Therefore we do not want the cp to succeed due to
-									 * a bigger "cmdarray" buffer and "open()" to fail.
-									 */
-	char			tempdir[MAX_FN_LEN], prefix[MAX_FN_LEN];
+	char			tempfilename[MAX_FN_LEN + 1];
+	char			tempdir[MAX_FN_LEN + 1], prefix[MAX_FN_LEN];
 	char			tmpsrcfname[MAX_FN_LEN], tmpsrcdirname[MAX_FN_LEN], realpathname[PATH_MAX];
 	char			sourcefilepathname[GTM_PATH_MAX + MAX_FN_LEN], tempfilepathname[GTM_PATH_MAX + MAX_FN_LEN];
 	char 			tmprealpath[GTM_PATH_MAX + MAX_FN_LEN];
@@ -289,7 +283,19 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	/* do go into the loop for the first time, irrespective of fstat_res*/
 	while ((FILE_NOT_FOUND != fstat_res) || (!ntries))
 	{
-		gtm_tempnam(tempdir, prefix, tempfilename);
+		int	len;
+
+		len = SNPRINTF(tempfilename, SIZEOF(tempfilename), "%s%s%d.tmp", tempdir, prefix, ntries);
+		if (SIZEOF(tempfilename) <= len)
+		{
+			char	tmpbuff[MAX_FN_LEN * 2];
+
+			len = SNPRINTF(tmpbuff, SIZEOF(tmpbuff), "%s%s%d.tmp", tempdir, prefix, ntries);
+			assert(SIZEOF(tmpbuff) > len);
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2, len, tmpbuff);
+			mubclnup(list, need_to_del_tempfile);
+			mupip_exit(ERR_FILENAMETOOLONG);
+		}
 		tempfile.addr = tempfilename;
 		tempfile.len = STRLEN(tempfilename);
 		if ((FILE_STAT_ERROR == (fstat_res = gtm_file_stat(&tempfile, NULL, NULL, FALSE, &ustatus))) ||
@@ -322,12 +328,8 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	 * and throw a FILENAMETOOLONG if necessary.
 	 */
 	tempfilelen = STRLEN(tempfilename);
-	if (MAX_FN_LEN < (tempfilelen + 1)) /* +1 because a later line sets tempdir[tmpdirlen] to '\0' */
-	{
-		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2, tempfilelen, tempfilename);
-		mubclnup(list, need_to_del_tempfile);
-		mupip_exit(ERR_FILENAMETOOLONG);
-	}
+	assert(SIZEOF(tempfilename) == SIZEOF(tempdir));
+	assert(SIZEOF(tempdir) >= (tempfilelen + 1)); /* +1 because a later line sets tempdir[tmpdirlen] to '\0' */
 	memcpy(tempdir, tempfilename, tempfilelen);
 	tmpdirlen = tempfilelen;
 	/* mkdir tempdir*/
@@ -546,8 +548,17 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	 * add the DB filename (only the final filename, without the pathname) to point to tmpfilename.
 	 * Check that enough space is there in the buffer.
 	 */
-	if (tempfilelen + sourcefilelen + 1 > MAX_FN_LEN)	// +1 for the '/'
-	{
+	if (SIZEOF(tempfilename) < (tempfilelen + 1 + sourcefilelen + 1))	/* +1 for the '/', +1 for '\0' */
+	{	/* Buffer was not enough. Print the too-long file name but allocate memory first */
+		char	*tempfilename2;
+		int	nbytes, nbytes2;
+
+		nbytes = tempfilelen + sourcefilelen + 1;
+		tempfilename2 = malloc(nbytes + 1);	/* + 1 is for terminating null */
+		nbytes2 = SNPRINTF(tempfilename2, nbytes + 1, "%s/%s", tempfilename, sourcefilename);
+		assert((0 < nbytes2) && (nbytes2 < (nbytes + 1)));
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2, nbytes2, tempfilename2);
+		free(tempfilename2);
 		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_FILENAMETOOLONG);
 		CLEANUP_AND_RETURN_FALSE;
 	}

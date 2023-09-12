@@ -21,7 +21,6 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
-#include "gtm_tempnam.h"
 #include "gtm_time.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
@@ -86,6 +85,7 @@
 
 #define PATH_DELIM		'/'
 #define TMPDIR_ACCESS_MODE	(R_OK | W_OK | X_OK)
+#define	SCRATCH_DIR		"/tmp/"
 
 /* Note: Use %08x for process_id in the format string below to ensure we have 8 hex digits always irrespective of the
  * actual value of process_id. Makes the length deterministic instead of %x which would
@@ -594,7 +594,7 @@ void mupip_backup(void)
 				if (ptr > rptr->backup_file.addr)
 				{
 					tempdir_trans.len = INTCAST(ptr - rptr->backup_file.addr + 1);
-					if (SIZEOF(tempdir_trans_buffer) >= tempdir_trans.len)
+					if (SIZEOF(tempdir_trans_buffer) > tempdir_trans.len)
 					{
 						memcpy(tempdir_trans_buffer, rptr->backup_file.addr, tempdir_trans.len);
 						tempdir_trans_buffer[tempdir_trans.len] = '\0';

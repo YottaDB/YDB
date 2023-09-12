@@ -21,7 +21,6 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
-#include "gtm_tempnam.h"
 #include "gtm_time.h"
 
 #include "gdsroot.h"

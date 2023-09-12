@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,6 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
-#include "gtm_tempnam.h"
 #include "gtm_time.h"
 
 #include "gdsroot.h"

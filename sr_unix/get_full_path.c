@@ -41,7 +41,7 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 
 	if ('/' == *orig_fn)
 	{	/* The original path is already complete */
-		if (max_len < orig_len)
+		if (max_len < (orig_len + 1))
 		{
 			*status = ERR_FILENAMETOOLONG;
 			return FALSE;
