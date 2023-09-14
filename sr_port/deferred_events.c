@@ -407,6 +407,7 @@ void async_action(bool lnfetch_or_start)
 			TAREF1(save_xfer_root, outofband).event_state = active;			/*WARNING: fallthrough */
 		case tptimeout:					/* these have their own action routines that do pending -> active */
 		case ztimeout:
+		case deferred_signal:
 			outofband_action(lnfetch_or_start);	/* which effectively does assertpro(no_event == outofband) */
 			break;
 		case (neterr_action):

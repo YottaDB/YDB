@@ -28,9 +28,7 @@ GBLREF	volatile int4	outofband;
 void deferred_signal_set(int4 dummy_val)
 {
 	assert(in_os_signal_handler);
-	if (deferred_signal != outofband)
-	{	/* We need deferred signal outofband processing at our earliest convenience */
-		outofband = deferred_signal;
-		DEFER_INTO_XFER_TAB;
-	}
+	assert(deferred_signal == outofband);
+	/* We need deferred signal outofband processing at our earliest convenience */
+	DEFER_INTO_XFER_TAB;
 }
