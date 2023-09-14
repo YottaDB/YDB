@@ -3,6 +3,9 @@
 ; Copyright (c) 1987-2018 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -33,18 +36,18 @@
 	 . . w !,"If you wish to exit enter a carat (^)",!
 	 . . s %ZD=""
 	. i $zparse(%ZD)="" w "  no such device" s %ZD="" q
-	. o %ZD:(newversion:block=2048:record=2044:exception="g noopen"):0
+	. o %ZD:(newversion:stream:exception="g noopen"):0
 	. i '$t  w !,%ZD," is not available" s %ZD="" q
 	. q
 noopen	. w !,$p($ZS,",",2,999),! c %ZD s %ZD=""
 	q:%ZD="^"
 	w !!
 	i '$l(%ZH) s %ZH="%GO Global Output Utility"
-	u %ZD w %ZH w:"M"'=$ZCHSET " ",$ZCHSET w !,"GT.M ",$zd($h,"DD-MON-YEAR 24:60:SS")  w:fmt " ZWR" w !
+	u %ZD:(width=1E6:nowrap) w %ZH w:"M"'=$ZCHSET " ",$ZCHSET w !,"YottaDB ",$zd($h,"DD-MON-YEAR 24:60:SS")  w:fmt " ZWR" w !
 	s gn="",(m,n)=0
 	f  s gn=$o(%ZG(gn)) q:gn=""  s g=gn d
 	. s fmtdone=0
-	. u $p w:$x>70 ! w gn,?$x\10+1*10 u %ZD i $p=%ZD w !
+	. u $p w:$x>70 ! w gn,?$x\10+1*10 u %ZD:(width=1E6:nowrap) i $p=%ZD w !
 	. s m=m+1
 	. i $d(@g)'[0 d   s n=n+1
 	 . . i fmt  zwr @g s fmtdone=1
@@ -53,7 +56,7 @@ noopen	. w !,$p($ZS,",",2,999),! c %ZD s %ZD=""
  	 . . i fmt zwr:'fmtdone @g	; don't zwr if already done for unsubscripted global. It takes care for subscripts too
 	 . . e  w g,!,@g,!
 	 . . s n=n+1
-	u %ZD w !!
+	u %ZD:(width=1E6:nowrap) w:$x !
 	u $p
 	w !!,"Total of ",n," node",$s(n=1:"",1:"s")
 	w " in ",m," global",$s(m=1:".",1:"s."),!!
