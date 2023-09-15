@@ -427,21 +427,6 @@ void v6_db_auto_upgrade(gd_region *reg)
 				/* GT.M V63014 moved the gvstats section from one location in the file header to another */
 				MOVE_GVSTATS_REC_FROM_OLD_HDR_TO_NODE_LOCAL(csa, csd);
 			case GDSMV63014:
-				csd->desired_db_format = GDSV6;	/* because it takes an action to move toward V7 */
-				if (0 == csd->statsdb_allocation)
-					csd->statsdb_allocation = STATSDB_ALLOCATION;	/* Initialize with statsdb default value */
-				/* we do not initialize new post GDSMV63014 field csd->last_start_backup here because if
-				   it has never been set the default (all zeroes) is OK, and if it has, we do not want to
-				   overwrite it on our way up */
-				csd->db_got_to_V7_once = FALSE;
-				csd->offset = 0;
-				csd->max_rec = 0;
-				csd->i_reserved_bytes = 0;
-				/* the next four lines are because gvcst_init_sysops might have used an outdated assumption */
-				csd->max_update_array_size = csd->max_non_bm_update_array_size
-					= (int4)(ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
-				csd->max_update_array_size
-					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 			case GDSMR126:
 				/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support nanosecond
 				 * timers. In GT.M, "flush_time" is an array of 2 4-byte quantities but only the first 4-byte
@@ -481,6 +466,26 @@ void v6_db_auto_upgrade(gd_region *reg)
 				/* else: Upgrading from a GT.M release. All auto upgrade activity would have already
 				 * happened as appropriate in the previous "case" blocks.
 				 */
+			case GDSMR136:
+				/* Below are GT.M V7 related auto upgrade actions. We do this here so all GT.M prior releases
+				 * and YottaDB prior releases fall through to this section. Else we would have to duplicate
+				 * this code in various places.
+				 */
+				csd->desired_db_format = GDSV6;	/* because it takes an action to move toward V7 */
+				if (0 == csd->statsdb_allocation)
+					csd->statsdb_allocation = STATSDB_ALLOCATION;	/* Initialize with statsdb default value */
+				/* we do not initialize new post GDSMV63014 field csd->last_start_backup here because if
+				   it has never been set the default (all zeroes) is OK, and if it has, we do not want to
+				   overwrite it on our way up */
+				csd->db_got_to_V7_once = FALSE;
+				csd->offset = 0;
+				csd->max_rec = 0;
+				csd->i_reserved_bytes = 0;
+				/* the next four lines are because gvcst_init_sysops might have used an outdated assumption */
+				csd->max_update_array_size = csd->max_non_bm_update_array_size
+					= (int4)(ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
+				csd->max_update_array_size
+					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 				break;
 			case GDSMV63015:
 				assert(FALSE);	/* if this should come to pass, add appropriate code above the assert */
