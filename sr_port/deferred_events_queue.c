@@ -59,6 +59,22 @@ void save_xfer_queue_entry(int4 event_type, int4 param_val)
 	assert(queued == TAREF1(save_xfer_root, event_type).event_state);
 	entry = &(TAREF1(save_xfer_root, event_type));
 	entry->param_val = param_val;
+
+	/* Check if entry is already in the queue. See https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1383#note_1561685379
+	 * for test that shows it is possible. In this case, return right away as otherwise, it will later fail an assert
+	 * in "pop_real_xfer_queue_entry()".
+	 */
+	save_xfer_entry	*start_entry, *cur_entry;
+	cur_entry = start_entry = (TREF(save_xfer_root_ptr));
+	do
+	{
+		if (cur_entry == entry)
+			return;
+		cur_entry = cur_entry->ev_que.fl;
+		if (cur_entry == start_entry)
+			break;
+	} while (TRUE);
+
 	DBGDFRDEVNT((stderr, "%d %s: save_xfer_queue_entry adding new node for %d.\n", __LINE__, __FILE__, event_type));
 	if ((jobinterrupt == event_type) || ((tptimeout == event_type)
 		&& (ztimeout == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband)))
