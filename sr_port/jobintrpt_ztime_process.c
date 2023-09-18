@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,7 +67,11 @@ void jobintrpt_ztime_process(boolean_t ztime)
 	assert(ztime || dollar_zininterrupt);
 	/* Compile and push new (counted) frame onto the stack to drive the $zinterrupt handler */
 	assert(((ztime ? SFT_ZTIMEOUT : SFT_ZINTR) | SFT_COUNT) == proc_act_type);
-	op_commarg((ztime ? (mval *)&(TREF(dollar_ztimeout)) : (mval *)&dollar_zinterrupt), indir_linetail);
+	if (ztime)
+	{
+		OP_COMMARG_S2POOL(&((TREF(dollar_ztimeout)).ztimeout_vector));
+	} else
+		op_commarg(&dollar_zinterrupt, indir_linetail);
 	frame_pointer->type = proc_act_type;	/* The mark of zorro.. */
 	proc_act_type = 0;
 	/* Now we need to preserve our current environment. This MVST_ZINTR mv_stent type will hold

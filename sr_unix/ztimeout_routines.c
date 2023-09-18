@@ -127,7 +127,7 @@ void check_and_set_ztimeout(mval *inp_val)
 		}
 		if (ztimeout_vector.str.len)
 		{	/* make sure the vector is valid code */
-			op_commarg(&ztimeout_vector, indir_linetail);
+			OP_COMMARG_S2POOL(&ztimeout_vector);
 			op_unwind();
 		} else
 		{
