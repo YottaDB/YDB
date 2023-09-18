@@ -81,6 +81,7 @@ void jobinterrupt_set(int4 sig_num)
 	outofband = jobinterrupt;
 	DEFER_INTO_XFER_TAB;
 	TAREF1(save_xfer_root, jobinterrupt).event_state = active;
+	TAREF1(save_xfer_root, jobinterrupt).param_val = sig_num;
 	DBGDFRDEVNT((stderr, "%d %s: jobinterrupt_set - set the xfer entries for jobinterrupt_event\n", __LINE__, __FILE__));
 	assert((SIGUSR1 == sig_num) || (SIGUSR2 == sig_num));
 	/* Note down the signal number that triggered $ZINTERRUPT processing.

@@ -58,6 +58,7 @@ void save_xfer_queue_entry(int4 event_type, int4 param_val)
 	assert(NULL != TREF(save_xfer_root_ptr));
 	assert(queued == TAREF1(save_xfer_root, event_type).event_state);
 	entry = &(TAREF1(save_xfer_root, event_type));
+	assert((jobinterrupt != event_type) || (0 != param_val));
 	entry->param_val = param_val;
 
 	/* Check if entry is already in the queue. See https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1383#note_1561685379
@@ -102,6 +103,7 @@ void pop_real_xfer_queue_entry(int4* event_type, int4* param_val)
 		entry = (TREF(save_xfer_root_ptr))->ev_que.fl;
 		dqdel(entry, ev_que);
 		*param_val = entry->param_val;
+		assert((jobinterrupt != *event_type) || (0 != *param_val));
 		if (*event_type == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband)
 		{	/* This should not happen, but it did during testing. Fix it for PRO */
 			assert((TREF(save_xfer_root_ptr))->ev_que.fl == (TREF(save_xfer_root_ptr))->ev_que.bl);
