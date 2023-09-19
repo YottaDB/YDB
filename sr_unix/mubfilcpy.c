@@ -446,11 +446,83 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		start_cnt = header_cpy->trans_hist.curr_tn;
 		if (showprogress)
 			util_out_print("Starting BACKUP for region : !AD", TRUE, REG_LEN_STR(gv_cur_region));
+
+		size_t	in_off, out_off, data_off, hole_off;
+		in_off = out_off = data_off = hole_off = 0;
 		do
 		{
+			if ((in_off == data_off) || (in_off == hole_off))
+			{
+				for ( ; ; )
+				{
+					size_t		ret_off;
+					boolean_t	is_seek_data;
+
+					if (in_off == data_off)
+					{
+						ret_off = hole_off = lseek(infd, data_off, SEEK_HOLE);
+						is_seek_data = FALSE;
+					} else
+					{
+						ret_off = data_off = lseek(infd, hole_off, SEEK_DATA);
+						is_seek_data = TRUE;
+					}
+					if ((off_t)-1 == ret_off)
+					{
+						int	save_errno;
+						char	errstr[256];
+
+						save_errno = errno;
+						/* ENXIO implies last section of the file is a HOLE. It is not an error.
+						 * Just skip copying that tail end HOLE section.
+						 */
+						if (is_seek_data && (ENXIO == save_errno))
+						{
+							remaining = 0;
+							break;
+						}
+						SNPRINTF(errstr, SIZEOF(errstr), "lseek(0x%llx, %s)", (unsigned long long)ret_off,
+							(!is_seek_data ? "SEEK_HOLE" : "SEEK_DATA"));
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
+								ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
+						ABORTBACKUP;
+					}
+					/* Note that it is possible for concurrent updates during an online backup to write
+					 * holes/data past the size of the source file at the start of the backup. Therefore
+					 * limit the data/hole analysis to the original size of the source file.
+					 */
+					if (!is_seek_data)
+					{
+						if (hole_off > stat.st_size)
+							hole_off = stat.st_size;
+					} else
+					{
+						if (data_off > stat.st_size)
+							data_off = stat.st_size;
+					}
+					if (is_seek_data)
+					{	/* Skip copying any hole sections in the file */
+						in_off = out_off = data_off;
+						remaining -= (data_off - hole_off);
+						assert(0 <= remaining);
+						continue;
+					}
+					break;
+				}
+				if (0 == remaining)
+					break;
+			}
+			assert(in_off < stat.st_size);
+			assert(out_off < stat.st_size);
+			assert(data_off < stat.st_size);
+			assert(hole_off <= stat.st_size);
 			strtm = time(NULL);
 			copy_file_range_p = p;
-			ret = copy_file_range_p(infd, NULL, outfd, NULL, remaining, 0);
+
+			size_t	max_cp_len;
+			max_cp_len = hole_off - in_off;
+			assert(max_cp_len <= remaining);
+			ret = copy_file_range_p(infd, (loff_t *)&in_off, outfd, (loff_t *)&out_off, max_cp_len, 0);
 			if (WBTEST_ENABLED(WBTEST_BACKUP_FORCE_SLEEP))
 			{
 				util_out_print("BACKUP_STARTED", TRUE);
