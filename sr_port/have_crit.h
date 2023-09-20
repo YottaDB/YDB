@@ -185,6 +185,12 @@ void	deferred_signal_handler(void);
 	assert((0 == forced_exit) || (1 == forced_exit));									\
 	forced_exit = 1;													\
 	forced_exit_sig = SIG;		/* Record the signal forcing us to exit */						\
+	/* Whenever "forced_exit" gets set to 1, set the corresponding deferred event too. Do it before the			\
+	 * "xfer_set_handlers_fnptr()" call below as asserts in "deferred_signal_handler()" would fail otherwise.		\
+	 */															\
+	SET_DEFERRED_EXIT_CHECK_NEEDED;												\
+	SET_FORCED_THREAD_EXIT; 	/* Signal any running threads to stop */						\
+	SET_FORCED_MULTI_PROC_EXIT; 	/* Signal any parallel processes to stop */						\
 	if (in_os_signal_handler)												\
 	{	/* If we are inside an OS signal handler and therefore had to defer exit					\
 		 * handling, treat this as an outofband event as this is checked by lots of					\
@@ -197,10 +203,6 @@ void	deferred_signal_handler(void);
 			(*xfer_set_handlers_fnptr)(deferred_signal, deferred_signal_set_fnptr, 0, FALSE);			\
 		/* else: it is "gtmsecshr" in which case outofband does not apply */						\
 	}															\
-	/* Whenever "forced_exit" gets set to 1, set the corresponding deferred event too */					\
-	SET_DEFERRED_EXIT_CHECK_NEEDED;												\
-	SET_FORCED_THREAD_EXIT; 	/* Signal any running threads to stop */						\
-	SET_FORCED_MULTI_PROC_EXIT; 	/* Signal any parallel processes to stop */						\
 }
 
 /* Set the value of forced_exit to 2. This should indicate that we are already in the exit processing, and do not want to
