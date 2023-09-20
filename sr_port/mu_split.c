@@ -105,6 +105,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	unsigned short	temp_ushort;
 
 	blk_hdr_ptr = (blk_hdr_ptr_t)(gv_target->hist.h[cur_level].buffaddr);
+	reserve_bytes = cs_data->reserved_bytes;			/* for now, simple if not upgrade/downgrade */
 	if (mu_reorg_upgrd_dwngrd_in_prog)				/* TODO: some of this likely not upgrade-specific */
 	{
 		assert(i_max_fill == d_max_fill);			/* TODO: for DT, indicies, d_max_fill irrelevant */
@@ -112,11 +113,12 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		available_bytes = cs_data->blk_size - blk_hdr_ptr->bsiz;
 		if (available_bytes >= reserve_bytes)
 			return cdb_sc_normal;				/* upgrade does not require a split */
-#		ifdef DEBUG
 		if ((cs_data->blk_size << 1) < reserve_bytes)		/* TODO: sacrifice of reserved_bytes documented in RN */
-			available_bytes += cs_data->i_reserved_bytes;
+		{
+			DEBUG_ONLY(available_bytes += cs_data->i_reserved_bytes);
+			reserve_bytes = i_max_fill;
+		}
 		assert((cs_data->blk_size << 1) > available_bytes);	/* TODO: replace assert with appropriate action? */
-#		endif
 	}
 	blk_size = cs_data->blk_size;
 	CHECK_AND_RESET_UPDATE_ARRAY;					/* reset update_array_ptr to update_array */
@@ -230,7 +232,6 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	memcpy(new_ins_key, &new_blk1_last_key[0], new_blk1_last_keysz);
 	new_ins_keysz = new_blk1_last_keysz;
 	assert(!mu_reorg_upgrd_dwngrd_in_prog || max_fill);
-	reserve_bytes = i_max_fill;
 	for (;;) 	/* ========== loop through ancestors as necessary ======= */
 	{
 		level++;
