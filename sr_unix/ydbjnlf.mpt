@@ -26,10 +26,6 @@
 ;   them to report the error messages for %YDBJNLF errors, instead of just
 ;   reporting that $ECODE was assigned a non-empty value, which the default
 ;   error trap will report. If an application sets an error trap ($ETRAP or
-;   $ETRAP) that will be used.
-etrap
-	set $etrap="set $etrap=""open """"/proc/self/fd/2"""" use """"/proc/self/fd/2"""" write $zstatus,! zshow """"*"""" zhalt $piece($zstatus,"""","""",1)""  goto err^"_$text(+0)
-	quit
 
 err	; Primary Error Handler
 	; ------------------------------------------------------------------------
@@ -41,7 +37,7 @@ err	; Primary Error Handler
 	; ------------------------------------------------------------------------
 	new errcode,errtxt
 	; Restore IO device
-	use io close "mupip"
+	use $select($data(io):io,1:$principal) close "mupip"
 	set errcode=$zpiece($ecode,",",2),errtxt=$text(@errcode)
 	; Check for JNLF-specific errors (in that case "errtxt" will be non-empty).
 	if $zlength(errtxt) do
@@ -56,6 +52,16 @@ err	; Primary Error Handler
 	; (because JNLF did a "new $etrap" at entry).
 	set $etrap="quit:$quit """" quit"
 	quit:$quit "" quit
+
+etrap	; Set primary and fallback error handlers
+	new flag,stderr
+	set flag=1,stderr="/proc/"_$job_"/fd/2"
+	open stderr:(exception="goto etrap1")
+	close stderr
+	set $etrap="set $etrap=""open "_stderr_" use "_stderr_" write $zstatus,! zshow """"*"""" zhalt $piece($zstatus,"""","""",1)""  goto err^"_$text(+0)
+	quit
+etrap1	set $etrap="set $etrap=""use $principal zshow """"*"""" if $zsyslog($zstatus)""  goto err^"_$text(+0)
+	quit
 
 ; Read journal file jnlfile
 ; - Using MUPIP JOURNAL EXTRACT FORWARD SHOW=ALL FENCES=NONE DETAIL FULL
