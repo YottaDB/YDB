@@ -393,6 +393,17 @@ boolean_t	is_free_blks_ctr_ok(void)
 		if (bml < free_bml)
 			break;
 		free_bml = bml;
+#		ifdef DEBUG
+		if ((0 != ydb_skip_bml_num)
+			&& (BLKS_PER_LMAP <= (BLKS_PER_LMAP * free_bml))
+			&& ((BLKS_PER_LMAP * free_bml) < ydb_skip_bml_num))
+		{
+			free_bml = (ydb_skip_bml_num / BLKS_PER_LMAP) - 1;
+				/* - 1 to compensate the "free_bml++" done in "for" loop line */
+			free_blocks += (ydb_skip_bml_num - BLKS_PER_LMAP) / BLKS_PER_LMAP * (BLKS_PER_LMAP - 1);
+			continue;
+		}
+#		endif
 		bml *= BLKS_PER_LMAP;
 		if (!(bmp = t_qread(bml, (sm_int_ptr_t)&cycle, &cr))
 				|| (BM_SIZE(BLKS_PER_LMAP) != ((blk_hdr_ptr_t)bmp)->bsiz)
