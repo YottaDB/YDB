@@ -396,10 +396,6 @@ void gtmsource_recv_ctl(void)
 	 * nothing in the pipe. So, it shouldn't be an expensive operation even if done before every send. Also,
 	 * in doing so, we react to an XOFF sooner than later.
 	 */
-	/* Make sure we don't sleep for an extended period of time if there is something to be sent across */
-	assert((GTMSOURCE_SENDING_JNLRECS != gtmsource_state)
-			|| ((0 == poll_time) || (GTMSOURCE_IDLE_POLL_WAIT == poll_time))
-			GTMTLS_ONLY(DEBUG_ONLY(|| renegotiation_pending)));
 	if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 		return;
 	if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
@@ -429,6 +425,11 @@ void gtmsource_recv_ctl(void)
 		poll_time = REPL_POLL_WAIT; /* because we are waiting for a REPL_RENEG_ACK */
 	}
 #	endif
+	/* Make sure we don't sleep for an extended period of time if there is something to be sent across */
+	assert((GTMSOURCE_SENDING_JNLRECS != gtmsource_state)
+			|| ((0 == poll_time) || (GTMSOURCE_IDLE_POLL_WAIT == poll_time))
+			GTMTLS_ONLY(|| renegotiation_pending)
+			);
 	recv_msgp = &recv_msg;
 	REPL_RECV_LOOP(gtmsource_sock_fd, recv_msgp, MIN_REPL_MSGLEN, poll_time)
 	{
