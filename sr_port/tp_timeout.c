@@ -90,7 +90,7 @@ void tptimeout_set(int4 dummy_param)
 	SETUP_THREADGBL_ACCESS;
 	assert(INTRPT_IN_EVENT_HANDLING == intrpt_ok_state);
 	assert(tptimeout == outofband);
-	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)) || have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)
+	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT))
 		|| (jobinterrupt == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
 	{	/* Error handling or job interrupt is in effect - defer tp timeout until $ECODE is cleared and/or we have unrolled
 		* the job interrupt frame.

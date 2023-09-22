@@ -207,15 +207,14 @@ void ztimeout_set(int4 dummy_param)
 	SETUP_THREADGBL_ACCESS;
 	assert(INTRPT_IN_EVENT_HANDLING == intrpt_ok_state);
 	assert(ztimeout == outofband);
-	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)) || have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)
+	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT))
 		|| (jobinterrupt == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
 	{	/* not a good time, so save it */
 		outofband = no_event;
 		TAREF1(save_xfer_root, ztimeout).event_state = queued;
 		SAVE_XFER_QUEUE_ENTRY(ztimeout, 0);
-		DBGDFRDEVNT((stderr, "%d %s: ztimeout_set - ZTIMEOUT queued: trap: %d, intrpt: %d, crit: %d\n",
-			     __LINE__, __FILE__, ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)), dollar_zininterrupt,
-			     have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)));
+		DBGDFRDEVNT((stderr, "%d %s: ztimeout_set - ZTIMEOUT queued: trap: %d, intrpt: %d\n",
+			     __LINE__, __FILE__, ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)), dollar_zininterrupt));
 #		ifdef DEBUG
 		if (ydb_white_box_test_case_enabled && ((WBTEST_ZTIMEOUT_TRACE == ydb_white_box_test_case_number)
 				|| (WBTEST_ZTIME_DEFER_CRIT == ydb_white_box_test_case_number)))

@@ -52,13 +52,12 @@ void ctrlc_set(int4 dummy_param)
 			|| ((active == TAREF1(save_xfer_root, ctrlc).event_state)));
 		return;
 	}
-	if ((ctrlc != outofband) || have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT))
+	if (ctrlc != outofband)
 	{	/* not a good time, so save it */
 		TAREF1(save_xfer_root, ctrlc).event_state = queued;
 		SAVE_XFER_QUEUE_ENTRY(ctrlc, 0);
-		DBGDFRDEVNT((stderr, "%d %s: ctrlc_set - ctrlc queued - outofband: %d, trap: %d, intrpt: %d, crit: %d\n",
-			 __LINE__, __FILE__, outofband, ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)), dollar_zininterrupt,
-			 have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)));
+		DBGDFRDEVNT((stderr, "%d %s: ctrlc_set - ctrlc queued - outofband: %d, trap: %d, intrpt: %d\n",
+			 __LINE__, __FILE__, outofband, ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)), dollar_zininterrupt));
 		return;
 	}
 	DBGDFRDEVNT((stderr, "%d %s: ctrlc_set - NOT deferred\n", __LINE__, __FILE__));
