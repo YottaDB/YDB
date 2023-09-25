@@ -132,7 +132,7 @@ int gtm_getmsg(int4 msgnum, mstr *msgbuf)
 	assert(0 <= (top - cp));
 	cp_len = top - cp;
 	memcpy(cp, msgp, cp_len);
-	cp += top - cp;
+	cp += cp_len;
 	msgbuf->len = m_len;
 	*cp++ = 0;
 	return retval;
