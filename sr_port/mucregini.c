@@ -141,6 +141,7 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 	csd->epoch_taper_jnl_pct = EPOCH_TAPER_JNL_PCT_DEFAULT;
 	csd->asyncio = IS_AIO_ON_SEG(seg);
 	csd->reserved_bytes = seg->reserved_bytes;
+	csd->i_reserved_bytes = seg->reserved_bytes;
 	csd->clustered = FALSE;
 	csd->lock_crit_with_db = gv_cur_region->lock_crit_with_db;
 	csd->file_corrupt = 0;
@@ -201,6 +202,7 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 	if (!csd->jnl_buffer_size)
 		ROUND_UP_JNL_BUFF_SIZE(csd->jnl_buffer_size, JNL_BUFFER_DEF, csd);
 	if (JNL_ALLOWED(csd))
+	{
 		if (csd->jnl_buffer_size < JNL_BUFF_PORT_MIN(csd))
 		{
 			ROUND_UP_MIN_JNL_BUFF_SIZE(csd->jnl_buffer_size, csd);
@@ -208,10 +210,11 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 		{
 			ROUND_DOWN_MAX_JNL_BUFF_SIZE(csd->jnl_buffer_size, csd);
 		}
+	}
 	csd->def_coll = gv_cur_region->def_coll;
 	if (csd->def_coll)
 	{
-		if (csp = ready_collseq((int)(csd->def_coll)))
+		if ((csp = ready_collseq((int)(csd->def_coll))))
 		{
 			csd->def_coll_ver = (csp->version)(csd->def_coll);
 			if (!do_verify(csp, csd->def_coll, csd->def_coll_ver))

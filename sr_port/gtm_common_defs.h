@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2012-2022 Fidelity National Information	*
+=======
+ * Copyright (c) 2012-2023 Fidelity National Information	*
+>>>>>>> fdfdea1e (GT.M V7.1-002)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -90,7 +94,7 @@
 							 			 */
 
 #define	MEMCMP_LIT(SOURCE, LITERAL)		memcmp(SOURCE, LITERAL, SIZEOF(LITERAL) - 1)
-#define MEMCPY_LIT(TARGET, LITERAL)		memcpy(TARGET, LITERAL, SIZEOF(LITERAL) - 1)
+#define MEMCPY_LIT(TARGET, LITERAL)		memcpy((void *)TARGET, LITERAL, SIZEOF(LITERAL) - 1)
 
 #define DIVIDE_ROUND_UP(VALUE, MODULUS)		(((VALUE) + ((MODULUS) - 1)) / (MODULUS))
 #define DIVIDE_ROUND_DOWN(VALUE, MODULUS)	((VALUE) / (MODULUS))

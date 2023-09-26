@@ -219,7 +219,7 @@ int get_file_encr_hash(boolean_t is_journal, char *fname, int fname_len, int *fd
 	} else
 	{
 		dfh = (sgmnt_data *)header;
-		if (status = MEMCMP_LIT(dfh->label, GDS_LABEL_GENERIC))	/* Note: assignment! */
+		if ((status = MEMCMP_LIT(dfh->label, GDS_LABEL_GENERIC)))	/* Note: assignment! */
 		{
 			free(header);
 			GC_DISPLAY_ERROR_AND_RETURN("Invalid database file !AD", status, fname_len, fname);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,13 +60,16 @@ int init_rand_table (void)
   char c_seed[MAX_SEED_LEN + 1];
   int  i_seed, seed_len;
   int i, j, k;
+  time_t now;
 
-  i_seed = (int) time(NULL);
+  now = time(NULL);
+  i_seed = (int) now;
+  if ((9999999999 < now) || (999999999 >= now)) /* punt: system clock is broken, or this code still in use after 20 Nov 2286 */
+  {
+  	i_seed = (int) 1693256989;	/* Set arbitrary 10 digit number */
+  }
   SNPRINTF(c_seed, MAX_SEED_LEN + 1, "%d", i_seed);
-  seed_len = STRLEN(c_seed);
-
-  if (seed_len > MAX_SEED_LEN)
-  	return(0);
+  seed_len = 10; /* strlen(c_seed) always 10 */
 
   SNPRINTF(buf, MAX_RND_IDX + 2, "%s aEbFcGdHeI", c_seed);
 

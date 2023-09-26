@@ -111,7 +111,7 @@ void dse_rest(void)
 			rn[i] = 0;
 		found_index = 0;
 		for (i = 0, region = original_header->regions; i < original_header->n_regions ;i++, region++)
-			if (found_index = !memcmp(&region->rname[0], &rn[0], MAX_RN_LEN))	/* WARNING: assignment */
+			if ((found_index = !memcmp(&region->rname[0], &rn[0], MAX_RN_LEN)))	/* WARNING: assignment */
 				break;
 		if (!found_index)
 		{

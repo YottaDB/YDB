@@ -736,10 +736,11 @@
 2 DOWNGRADE
    DOWNGRADE
 
-   The MUPIP DOWNGRADE command changes the file header format to V4 or V5.
-   The format of the MUPIP DOWNGRADE command is:
+   The MUPIP DOWNGRADE command changes the file header format from V6 to V5
+   under appropriate conditions. The format of the MUPIP DOWNGRADE command
+   is:
 
-   D[OWNGRADE] -V[ERSION]={V4|V5|V63000A} file-name
+   D[OWNGRADE] -V[ERSION]={V5|V63000A}} file-name
 
    **Note**
 
@@ -758,6 +759,7 @@
 3 VERSION
    VERSION
 
+<<<<<<< HEAD
    V4 and V5 specifies file header format. For more information on the
    downgrade criteria for your database, refer to the release notes document
    of your current YottaDB version.
@@ -771,6 +773,11 @@
      o You cannot downgrade a V5 database which has standard null collation.
        In such a case, perform a MUPIP EXTRACT -FORMAT=ZWR operation on the
        V5 database and then perform a MUPIP LOAD operation on a V4 database.
+=======
+   V5 specifies file header format. For more information on the downgrade
+   criteria for your database, refer to the release notes document of your
+   current GT.M version.
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 
    V63000A:
 
@@ -784,9 +791,9 @@
 
    Example:
 
-   $ mupip downgrade mumps.dat
+   $ mupip downgrade mumps.dat -VERSION=V5
 
-   This command changes the file-header of mumps.dat to V4 format.
+   This command changes the file-header of mumps.dat to V5 format.
 
 2 DUMPFHEAD
    DUMPFHEAD
@@ -958,6 +965,13 @@
        expand.
      o EXTEND uses the Global Directory to map the region to the dynamic
        segment and the segment to the file.
+     o A V6 database file can have a maximum of 992Mi blocks and a V7
+       database file can have a maximum of 16Gi blocks. A request to EXTEND
+       blocks beyond this limit produces an error. In such a case, performing
+       a region split, REORG to reclaim free blocks, etc. may be some of the
+       available options. FIS recommends operating procedures to proactively
+       monitoring DB growth to ensure that corrective actions are performed
+       before reaching these limits.
 
 3 Blocks
    Blocks
@@ -1534,6 +1548,29 @@
    Specifies that the file-name is a database file. By default, MUPIP FTOK
    uses -DB.
 
+3 ID
+   ID
+
+   Specifies the signature use for the ftok; if unspecified, it defaults to
+   the signature for a GT.M database file. if a file is not valid and
+   accessible, FTOK reports -1 values. By default, the utility provides
+   additional information about the file, including its file ID which
+   provides the basis for the FTOK.
+
+3 [NO]HEADER
+   [NO]HEADER
+
+   Displays or omits the header of the table. -ONLY output has no header, but
+   by default other forms include a header that -NOHEADER suppresses.
+
+3 ONLY
+   ONLY
+
+   Restricts the output to only the FTOK Key; if a file is not valid and
+   accessible, FTOK reports -1 values. -ONLY does not report the table header
+   even when -HEADER is specified. If the database file is unavailable, the
+   utility defaults to the -ONLY behavior.
+
 3 JNLPOOL
    JNLPOOL
 
@@ -1546,6 +1583,7 @@
    Specifies that the reported key is for the Receive Pool of the instance
    created by the current Global Directory.
 
+<<<<<<< HEAD
 3 ID
    ID
 
@@ -1566,6 +1604,8 @@
    Displays or omits the header of the table. By default, MUPIP FTOK displays
    the header.
 
+=======
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 2 HASH
    HASH
 
@@ -1629,8 +1669,10 @@
     -A[DJACENCY]=integer
     -BL[OCK]=hexa;block-number
     -BR[IEF]
+    -DMAX[BLOCKSIZE][=integer]
     -FA[ST]
     -FU[LL]
+    -IMAX[BLOCKSIZE][=integer]
     -[NO]K[EYRANGES]
     -[NO]MAP[=integer]
     -[NO]MAXK[EYSIZE][=integer]
@@ -1728,6 +1770,16 @@
      o By default, MUPIP INTEG uses the BRIEF qualifier.
      o Incompatible with: -FULL
 
+3 DMAXblocksize
+   DMAXblocksize
+
+   Specifies the maximum actual size of a data-level block in the database;
+   any data block which contains data in excess of this size causes integ to
+   report the block number, its path, and an error. The format of the
+   DMAXBLOCKSIZE qualifier is:
+
+   -DMAX[BLOCKSIZE][=integer]
+
 3 FAst
    FAst
 
@@ -1777,6 +1829,16 @@
      o By default, INTEG reports are -BRIEF.
      o Use -FULL to have INTEG report all global names in a region or list of
        regions.
+
+3 IMAXblocksize
+   IMAXblocksize
+
+   Specifies the maximum actual size of an index-level block in the database;
+   any index block which contains data in excess of this size causes integ to
+   report the block number, its path, and an error. The format of the
+   IMAXBLOCKSIZE qualifier is:
+
+   -IMAX[BLOCKSIZE][=integer]
 
 3 Keyranges
    Keyranges
@@ -1851,11 +1913,7 @@
 
      o -NOONLINE specifies that the database should be frozen during MUPIP
        INTEG.
-     o By default, MUPIP INTEG is online except for databases containing V4
-       blocks for which the default is -NOONLINE. Note that databases
-       containing V4 blocks should exist only in databases that are in the
-       process of being migrated from V4 to V5; please complete your
-       migration to the V5 format before using MUPIP INTEG -ONLINE.
+     o By default, MUPIP INTEG is online.
      o Since MUPIP INTEG -ONLINE does not freeze database updates, it cannot
        safely correct errors in the "blocks to upgrade" and "free blocks"
        fields in the file header, while MUPIP INTEG -NOONLINE can correct
@@ -2482,9 +2540,11 @@
     -D[OWNGRADE]
     -ENCR[YPT]=key
     -E[XCLUDE]=global-name-list
-    -FI[LL_FACTOR]=integer
+    -FILE=file-name
+    -FILL[_FACTOR]=integer
     -I[NDEX_FILL_FACTOR]=integer
     -K[EEP]={pct% | blocks}
+    -MIN[_LEVEL]=integer
     -NOCO[ALESCE]
     -NOSP[LIT]
     -NOSW[AP]
@@ -2693,14 +2753,24 @@
      o In case any global appears in the argument lists of both -SELECT and
        -EXCLUDE, REORG terminates with an error.
 
-3 Fill_factor
-   Fill_factor
+3 FILE
+   FILE
+
+   Specifies which database to upgrade. The format of the FILE qualifier is:
+
+   FILE=file-name
+
+     o The arguments for the FILE must be a fully qualified path to a
+       database file.
+
+3 FILL_factor
+   FILL_factor
 
    Specifies how full you want each database block to be. This is a target
    number. Individual blocks may be more or less full than the fill factor.
    The format of the FILL_FACTOR qualifier is:
 
-   F[ILL_FACTOR]=integer
+   FILL[_FACTOR]=integer
 
      o The arguments for the FILL_FACTOR qualifier must be integers from 30
        to 100. These integers represent the percentage of the data block that
@@ -2736,6 +2806,20 @@
    factor for index blocks than for data blocks. By default, the
    INDEX_FILL_FACTOR is the value of FILL_FACTOR regardless of whether that
    value is explicitly specified or implicitly obtained by default.
+
+3 Min_level
+   Min_level
+
+   Directs REORG to only process blocks with a level greater than or equal to
+   what is specified. -Min_level=1, for example, instructs REORG to only
+   process index blocks. The format of the MIN_LEVEL qualifier is:
+
+   -M[IN_LEVEL]=integer
+
+   When the user intends to target only a subset of the blocks in a database
+   for splitting, coalescing, and swapping, this setting can significantly
+   reduce the overhead of doing so. -Min_level=1 can be understood as the
+   REORG equivalent of an INTEG -FAST.
 
 3 Keep
    Keep
@@ -3278,6 +3362,7 @@
    SE[T] {-FI[LE] file-name|-JN[LFILE] journal-file-name|-REG[ION] region-list}
     -AC[CESS_METHOD]={BG|MM}
     -[NO]AS[YNCIO]
+    -DATA[_RESERVED_BYTES]=integer
     -[NO]DE[FER_TIME][=seconds]
     -[NO]DEFER_ALLOCATE
     -[NO]ENCRYPTA[BLE]
@@ -3287,6 +3372,7 @@
     -FU[LLBLKWRT]={0|1|2}
     -G[LOBAL_BUFFERS]=integer
     -H[ARD_SPIN_COUNT]=integer
+    -INDEX[_RESERVED_BYTES]=integer
     -[NO]INST[_FREEZE_ON_ERROR]
     -JN[LFILE] journal-file-name journal-file-quals
     -K[EY_SIZE]=bytes
@@ -3299,14 +3385,13 @@
     -REC[ORD_SIZE]=bytes
     -REG[ION] region-list
     -REP[LICATION]={ON|OFF}
-    -RES[ERVED_BYTES]=integer]
+    -RES[ERVED_BYTES]=integer
     -SL[EEP_SPIN_COUNT]=integer
     -SPIN_SLEEP_M[ASK]=hex_mask
     -[NO]STAT[S]
     -STATSD[B_ALLOCATION]=integer(no of blocks)
     -[NO]STD[NULLCOLL]
     -T[RIGGER_FLUSH]=integer
-    -V[ERSION]={V4|V6}
     -W[AIT_DISK]=integer
     -WR[ITES_PER_FLUSH=integer
 
@@ -3383,6 +3468,20 @@
    the ASYNCIO qualifier is:
 
    -[NO]AS[YNCIO]
+
+3 DATA_reserved_bytes
+   DATA_reserved_bytes
+
+   Specifies the size for GT.M to reserve in data-level database blocks.
+   DATA_RESERVED_BYTES can be used as a user-managed fill factor when it is
+   appropriate to have a different level of sparseness for data and index
+   blocks. The format of the DATA_RESERVED_BYTES qualifier is:
+
+   -DATA[_RESERVED_BYTES]=size
+
+     o The minimum DATA_RESERVED_BYTES is 0 bytes. The maximum
+       DATA_RESERVED_BYTES = Block Size - Max Key Size - 40 (Block/Record
+       header overheads). The default DATA_RESERVED_BYTES is 0 bytes.
 
 3 Defer_time
    Defer_time
@@ -3544,6 +3643,20 @@
        and unless, you have data from testing and benchmarking that
        demonstrates a benefit from a change.
 
+3 INDEX_reserved_bytes
+   INDEX_reserved_bytes
+
+   Specifies the size for GT.M to reserve in index-level database blocks.
+   INDEX_RESERVED_BYTES can be used as a user-managed fill factor when it is
+   appropriate to have a different level of sparseness for data and index
+   blocks. The format of the INDEX_RESERVED_BYTES qualifier is:
+
+   -INDEX[_RESERVED_BYTES]=size
+
+     o The minimum INDEX_RESERVED_BYTES is 0 bytes. The maximum
+       INDEX_RESERVED_BYTES = Block Size - Max Key Size - 40 (Block/Record
+       header overheads). The default INDEX_RESERVED_BYTES is 0 bytes.
+
 3 INST_freeze_on_error
    INST_freeze_on_error
 
@@ -3647,7 +3760,13 @@
 
    -PRO[BLKSPLIT]=integer
 
+<<<<<<< HEAD
      o YottaDB never performs proactive block splitting inside a TP transaction.
+=======
+     o Proactive consideration occurs when a mini-transaction retries
+       updating an data block more than once due to contention.
+     o GT.M never performs proactive block splitting inside a TP transaction.
+>>>>>>> fdfdea1e (GT.M V7.1-002)
      o Proactive block splits tend to make globals require more blocks and
        potentially deeper trees.
      o A value of one (1) indicates to always consider proactive splits,
@@ -3749,21 +3868,20 @@
 3 REServed_bytes
    REServed_bytes
 
-   Specifies the size to be reserved in each database block. RESERVED_BYTES
-   is generally used to reserve room for compatibility with other
-   implementations of M or to observe communications protocol restrictions.
+   Specifies the size for GT.M to reserve in both data and index database
+   blocks. RESERVED_BYTES is generally used as a user-managed fill factor.
    The format of the RESERVED_BYTES qualifier is:
 
    -RES[ERVED_BYTES]=size
 
-     o RESERVED_BYTES may also be used as a user-managed fill factor.
      o The minimum RESERVED_BYTES is 0 bytes. The maximum RESERVED_BYTES =
-       Block Size - Key Size - 40 (Block/Record header overheads).
+       Block Size - Max Key Size - 40 (Block/Record header overheads). The
+       default RESERVED_BYTES is 0 bytes.
 
 3 SLeep_spin_count
    SLeep_spin_count
 
-   Specifies the number of times a processes suspends its activity while
+   Specifies the number of times a process suspends its activity while
    waiting to obtain critical sections for shared resources, principally
    those involving databases. The format of the -SLEEP_SPIN_COUNT qualifier
    is:
@@ -3863,13 +3981,8 @@
 
    V7.0-000 and up do not support the -VERSION option.
 
-   -V[ERSION]={V4|V6}
+   -V[ERSION]={V5|V6}
 
-     o MUPIP UPGRADE and MUPIP REORG -UPGRADE set the Desired DB Format field
-       in the database file header to V6 while MUPIP REORG -DOWNGRADE sets it
-       to V4.
-     o To set the version to V4, the current transaction number (CTN) of the
-       database must be within the range of a 32-bit maximum.
      o V6 block format is compatible with the V5 block format. The longer key
        and longer records (spanning nodes) features of V6 format are
        automatically disabled when used with YottaDB V5.* versions.
@@ -3903,19 +4016,10 @@
    This example enables NOBEFORE image journaling and turns on journaling for
    all regions.
 
-   $ mupip set -version=V4 -file mumps.dat
-   Database file mumps.dat now has desired DB format V4
-
-   This example sets the block format to V4 for all subsequent new blocks in
-   V6 database file mumps.dat.
-
-   Example:
-
-   $ mupip set -version=v6 -file mumps.dat
+   $ mupip set -version=V5 -file mumps.dat
    Database file mumps.dat now has desired DB format V5
 
-   This example sets the block format to V6 for all subsequent new blocks in
-   V4 database file mumps.dat.
+   This example disables the V6 extensions for database file mumps.dat.
 
    Example:
 
@@ -4544,8 +4648,9 @@
    Specifies that the argument to the SET is a file-specification for a
    single database file. A Journal file's name can include UTF-8 characters.
 
-   Old journal files stay open for about 10 seconds after a switch to a new
-   journal file.
+   If a process has a journal file open and another process explicitly
+   switches to a new journal file, it may keep the old journal open for up to
+   60 seconds.
 
    -R[EGION]
 
@@ -5555,6 +5660,9 @@
    Because MUPIP ROLLBACK -ONLINE can take a database backwards in state
    space, please make sure that you understand what it is that you intend it
    to do when you invoke it.
+
+   MUPIP ROLLBACK -ONLINE issues an ORLBKROLLED message to the system log
+   indicating the logical state of the database changed.
 
    By default, MUPIP JOURNAL -ROLLBACK -BACKWARD is -NOONLINE.
 
@@ -6756,15 +6864,15 @@
    |                | AIMG record.                                          |
    |----------------+-------------------------------------------------------|
    | ondskbver      | On disk block version of this block at the time of    |
-   |                | writing the PBLK or AIMG record. 0 => V4, 1 => V5.    |
+   |                | writing the PBLK or AIMG record.                      |
    |----------------+-------------------------------------------------------|
    | incdetail      | 0 if opcode=1,2,3; blks2upgrd if opcode=4,5,6; blknum |
    |                | if opcode=7,8,9,10,11,12,13                           |
    |----------------+-------------------------------------------------------|
    | ztwormhole     | string corresponding to $ZTWORMHOLE                   |
    |----------------+-------------------------------------------------------|
-   | blks2upgrd     | # of new V4 format bitmap blocks created if           |
-   |                | opcode=4,5; csd->blks_to_upgrd if opcode=6            |
+   | blks2upgrd     | # of V6 format index blocks csd->blks_to_upgrd if     |
+   |                | opcode=6                                              |
    |----------------+-------------------------------------------------------|
    | uname          | Name of the user that wrote this PINI record.         |
    |----------------+-------------------------------------------------------|
@@ -7115,33 +7223,34 @@
    The square brackets [] denote an optional qualifier group. The optional
    and mandatory qualifiers in each qualifier group are as follows:
 
-   +------------------------------------------------------------------------------------+
-   |             Category              |                   Qualifiers                   |
-   |-----------------------------------+------------------------------------------------|
-   |                                   |  o [-cmplvl=<compression_level>]               |
-   |                                   |  o [-connectparams=<hard_tries>,               |
-   |connection_qualifiers              |    <hard_tries_period>, <soft_tries_period>,   |
-   |                                   |    <alert_time>, <heartbeat_period>,           |
-   |                                   |    <max_heartbeat_wait>]                       |
-   |-----------------------------------+------------------------------------------------|
-   |jnlpool_setup_qualifiers           |  o [-buffsize=<Journal Pool size in bytes>]    |
-   |                                   |  o [-[no]jnlfileonly]                          |
-   |-----------------------------------+------------------------------------------------|
-   |logfile_management_qualifiers      |  o -log=<log file name>                        |
-   |                                   |  o [-log_interval=<integer>]                   |
-   |-----------------------------------+------------------------------------------------|
-   |primary_role_qualifiers            |  o {-rootprimary|-propagateprimary}            |
-   |                                   |  o [{-updok|-updnotok}]                        |
-   |-----------------------------------+------------------------------------------------|
-   |replication_filter_qualifier       |  o -filter=<filter command>                    |
-   |-----------------------------------+------------------------------------------------|
-   |secondary_identification_qualifiers|  o -instsecondary=<secondary_instance_name>    |
-   |                                   |  o -secondary=<hostname:port>                  |
-   |-----------------------------------+------------------------------------------------|
-   |                                   |  o [-[no]plaintextfallback]                    |
-   |tls_replication_qualifiers         |  o [-renegotiate_interval=<minutes>]           |
-   |                                   |  o -tlsid=<label>                              |
-   +------------------------------------------------------------------------------------+
+   +--------------------------------------------------------------------------------------+
+   |             Category              |                    Qualifiers                    |
+   |-----------------------------------+--------------------------------------------------|
+   |                                   |  o [-cmplvl=<compression_level>]                 |
+   |                                   |  o [-connectparams=<hard_tries>,                 |
+   |connection_qualifiers              |    <hard_tries_period>, <soft_tries_period>,     |
+   |                                   |    <alert_time>, <heartbeat_period>,             |
+   |                                   |    <max_heartbeat_wait>]                         |
+   |                                   |  o [-[NO]{SEND|RECV}BUFFSIZE[=<buffer_size>]]    |
+   |-----------------------------------+--------------------------------------------------|
+   |jnlpool_setup_qualifiers           |  o [-buffsize=<Journal Pool size in bytes>]      |
+   |                                   |  o [-[no]jnlfileonly]                            |
+   |-----------------------------------+--------------------------------------------------|
+   |logfile_management_qualifiers      |  o -log=<log file name>                          |
+   |                                   |  o [-log_interval=<integer>]                     |
+   |-----------------------------------+--------------------------------------------------|
+   |primary_role_qualifiers            |  o {-rootprimary|-propagateprimary}              |
+   |                                   |  o [{-updok|-updnotok}]                          |
+   |-----------------------------------+--------------------------------------------------|
+   |replication_filter_qualifier       |  o -filter=<filter command>                      |
+   |-----------------------------------+--------------------------------------------------|
+   |secondary_identification_qualifiers|  o -instsecondary=<secondary_instance_name>      |
+   |                                   |  o -secondary=<hostname:port>                    |
+   |-----------------------------------+--------------------------------------------------|
+   |                                   |  o [-[no]plaintextfallback]                      |
+   |tls_replication_qualifiers         |  o [-renegotiate_interval=<minutes>]             |
+   |                                   |  o -tlsid=<label>                                |
+   +--------------------------------------------------------------------------------------+
 
    You can start the Source Server in passive mode with mupip replicate
    -source -start -passive. The general syntax for starting a Source Server
@@ -7269,10 +7378,39 @@
    You can specify up to six parameters with -CONNECTPARAMS. MUPIP uses the
    defaults for the parameters not specified.
 
+   -[NO]{SEND|RECV}BUFFSIZE[=n]
+
+   Specifies the desired minimum TCP send and/or receive buffer sizes. This
+   affects the SO_SNDBUF and SO_RCVBUF socket options of the socket GT.M uses
+   for replication, not the journalpool or any other application-level
+   buffer. n is a positive integer value indicating the desired minimum
+   buffer size. If GT.M finds that the specified buffer already has a
+   sufficient size when it is created, GT.M will avoid setting the buffer
+   explicitly. The -NO{SEND|RECV}BUFFSIZE version of this qualifier instructs
+   GT.M to avoid setting the buffer sizes under any circumstance. In some
+   environments, when the size of these buffers are dynamically adjusted
+   except in cases where an application sets their size explicitly,
+   -NO{SEND|RECV}BUFFSIZE can lead to good performance in a wide variety of
+   network conditions. By default and without passing this qualifier, GT.M
+   enforces a minimum size of approximately 1MiB for each buffer. This
+   qualifier may only be passed to a -START command.
+
+   **Note**
+
+   The actual size of a tcp buffer depends on a variety of environmental
+   conditions, including system configuration, operating system, and
+   available memory. Users of GT.M on Linux may observe that GT.M will report
+   in the source and/or receiver logs buffers that are approximately twice
+   what is requested, if the request has been honored by the OS. This is due
+   to a quirk in the way that the Linux kernel reports TCP buffer sizes: the
+   user-available size is approximately equal to what is requested, and the
+   additional space is used internally by the kernel.
+
    Journal Pool Setup Qualifiers:
 
    -buffsize=<Journal Pool size in bytes>
 
+<<<<<<< HEAD
    Specifies the size of the Journal Pool. The server rounds the size up or
    down to suit to align with other specified or implicit requirements. Any
    size less than 1 MiB is rounded up to 1 MiB. If you do not specify a
@@ -7283,6 +7421,46 @@
    records from journal files. The maximum value is 68719476736 (64GiB).
    MUPIP REPLICATE -SOURCE ignores -BUFFSIZE if the Journal Pool is already set up.
    The first Source Server process started on an instance sets up the Journal Pool.
+=======
+   On the Source Server, -BUFFSIZE specifies the size of the Journal Pool.
+   The server rounds the size up or down to align with other specified or
+   implicit requirements. Any size less than 1 MiB is rounded up to 1 MiB. If
+   -BUFFSIZE is not specified, MUPIP defaults the Journal Pool size to 64
+   MiB. Remember that you cannot exceed the system-provided maximum shared
+   memory. For systems with high update rates, specify a larger buffer size
+   to avoid the overflows and file I/O that occur when the Source Server
+   reads journal records from journal files. The maximum value is 68719476736
+   (64GiB). The first Source Server process started on an instance sets up
+   the Journal Pool. MUPIP REPLICATE -SOURCE ignores -BUFFSIZE if the Journal
+   Pool is already set up.
+
+   On the Receiver Server, -BUFFSIZE specifies the size of the Receiver Pool.
+   For applications having periodic spikes in the replication volume, FIS
+   recommends having a larger Receiver Pool. The Receiver Pool is a memory
+   structure that temporarily holds updates coming from the Source Server.
+   The Update Process transfers these updates to permanent storage so that
+   they can become accessible by mumps processes. As long as the Update
+   Process is alive and running, it is safe to assume that updates in the
+   Receiver Pool will eventually get transferred to permanent storage even if
+   a network failure happens between the Source and Receiver Servers. The
+   Receiver Pool becomes full when the speed of applying updates by the
+   Update Process is slower than the speed of receiving updates from the
+   Source Server. When the Receiver Pool becomes full, the network refuses to
+   accept more updates from the Source Server which increases the backlog on
+   the Source Server. Therefore, a larger size Receiver Pool delays this
+   condition and helps cushion the impact of periodic spike in replication
+   volumes.
+
+   **Note**
+
+   On the Originating Instance, GT.M processes can access updates as soon as
+   any other GT.M process commits them. However, mumps processes on a
+   Replicating Instance cannot access updates from the Originating Instance
+   until the Source Server sends them, the Receiver Process moves them to the
+   Receive Pool and the Update Process picks and commits them. Please bear
+   this distinction in mind while configuring replicating/reporting instances
+   for your application.
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 
    -[no]jnlfileonly
 
@@ -8706,7 +8884,7 @@ Example:
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |CR[EATE]   |-               |-R[EGION]=region-name                                  |         |Y         |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
-   |DO[WNGRADE]|file-name       |-V[ERSION]={V4|V5}                                     |-V7.0-000|Y         |
+   |DO[WNGRADE]|file-name       |-V[ERSION]=V5                                          |-V7.0-000|Y         |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |DU[MPFHEAD]|File-name or    |-FI[LE]                                                |V6.3-001 |          |
    |           |region-list     |                                                       |         |          |
@@ -8756,11 +8934,15 @@ Example:
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-BR[IEF]                                               |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-DMAXBLOCKSIZE=integer                                 |V7.1-002 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-FA[ST]                                                |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-FI[LE]                                                |         |Y         |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-FU[LL]                                                |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-IMAXBLOCKSIZE=integer                                 |V7.1-002 |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-NO]K[EYRANGES                                         |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
@@ -8816,11 +8998,15 @@ Example:
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-E[XCLUDE]=global-name-list                            |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
-   |           |                |-FI[LL_FACTOR]=integer                                 |         |          |
+   |           |                |-FILL[_FACTOR]=integer                                 |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-FILE=file-name                                        |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-I[NDEX_FILL_FACTOR]=integer                           |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-K[EEP]={pct%|blocks}                                  |V6.3-009 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-MIN[_LEVEL]=integer                                   |V7.1-002 |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-NOCO[ALESCE]                                          |V6.3-009 |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
@@ -8870,7 +9056,9 @@ Example:
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-[NO]AS[YNCIO]                                         |         |Y         |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
-   |           |                |-[NO]DE[FER_TIME][=seconds]                            |         |Y         |
+   |           |                |-DATA_[RESERVED_BYTES]=integer                         |V7.1-002 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-[NO]DE[FER_TIME][=seconds]                            |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-[NO]DEFER_ALLOCATE                                    |V6.2-002 |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
@@ -8887,6 +9075,8 @@ Example:
    |           |                |-G[LOBAL_BUFFERS]=integer                              |         |Y         |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-H[ARD_SPIN_COUNT]=integer                             |V6.3-003 |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |                |-INDEX_[RESERVED_BYTES]=integer                        |V7.1-002 |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-[NO]INST[_FREEZE_ON_ERROR]                            |V6.0-000 |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
@@ -8914,7 +9104,7 @@ Example:
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-REP[LICATION]={ON|OFF}                                |         |Y         |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
-   |           |                |-RES[ERVED_BYTES]=integer                              |         |Y         |
+   |           |                |-RES[ERVED_BYTES]=integer                              |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-SLEE[P_SPIN_COUNT]=integer                            |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
@@ -8928,7 +9118,7 @@ Example:
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-STATSD[B_ALLOCATION]=integer                          |V7.0-001 |Y         |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
-   |           |                |-V[ERSION]={V4|V6}                                     |-V7.0-000|          |
+   |           |                |-V[ERSION]={V5|V6}                                     |-V7.0-000|          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-W[AIT_DISK]=integer                                   |         |Y         |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
@@ -9059,6 +9249,8 @@ Example:
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-LOG_INTERVAL=integer                     |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]RECVBUFFSIZE[=integer]               |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-NORESYNC                                 |V5.5-000   |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-RESUME=strm_num                          |V5.5-000   |            |
@@ -9066,6 +9258,8 @@ Example:
    |                                      |                          |-REUSE=instname                           |V5.5-000   |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-RSYNC_STRM=strm_num                      |V5.5-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]SENDBUFFSIZE[=integer]               |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-SHOWBACKLOG                              |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
@@ -9237,7 +9431,7 @@ Example:
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |-SO[URCE]                             |REPLICATE                 |-ACTIVATE                                 |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
-   |                                      |                          |-BUFFSIZE=Buffer_size                     |           |            |
+   |                                      |                          |-BUFFSIZE=integer                         |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-CHANGELOG                                |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
@@ -9275,11 +9469,15 @@ Example:
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-PROPAGATEPRIMARY                         |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]RECVBUFFSIZE[=integer]               |V7.1-002   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-RENEGOTIATE_INTERVAL=minutes             |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-ROOTPRIMARY                              |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-SECONDARY=secondary_instance_name        |           |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-[NO]SENDBUFFSIZE[=integer]               |V7.1-002   |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-SHOWBACKLOG                              |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
@@ -9302,7 +9500,7 @@ Example:
    |                                      |                          |-ZEROBACKLOG                              |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |DOWNGRADE                 |                                          |           |            |
-   |-VERSION={V4|V5}                      |                          |file-name                                 |-V7.0-000  |            |
+   |-VERSION={V5|V6}                      |                          |file-name                                 |-V7.0-000  |            |
    |                                      |UPGRADE                   |                                          |           |            |
    +-------------------------------------------------------------------------------------------------------------------------------------+
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -68,7 +68,7 @@ GBLREF int4			dollar_zeditor, dollar_zsystem, zdir_form;
 GBLREF io_log_name		*dollar_principal, *io_root_log_name;
 GBLREF io_pair			io_curr_device, io_std_device;
 GBLREF mlk_subhash_val_t	mlk_last_hash;
-GBLREF mstr			dollar_zchset, dollar_zpatnumeric, dollar_zpin, dollar_zpout;
+GBLREF mstr			dollar_zchset, dollar_zicuver, dollar_zpatnumeric, dollar_zpin, dollar_zpout;
 GBLREF mval			dollar_estack_delta, dollar_job, dollar_system, dollar_zdir, dollar_zerror, dollar_zgbldir;
 GBLREF mval			dollar_zinterrupt, dollar_zproc, dollar_zsource, dollar_zstatus, dollar_ztexit, dollar_zyerror;
 GBLREF mval			dollar_zcmdline;
@@ -410,6 +410,10 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZYSQLNULL:
 			*v = literal_sqlnull;
+			break;
+		case SV_ZICUVER:
+			v->mvtype = MV_STR;
+			v->str = dollar_zicuver;
 			break;
 		case SV_ZSYSTEM:
 			MV_FORCE_MVAL(v, dollar_zsystem);

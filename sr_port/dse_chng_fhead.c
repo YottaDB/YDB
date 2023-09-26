@@ -314,6 +314,13 @@ void dse_chng_fhead(void)
 		UPDATE_MAX_PROCS_STRING(cs_addrs->nl, cs_data->max_procs);
 	}
 	if ((CLI_PRESENT == cli_present("RESERVED_BYTES")) && (cli_get_int("RESERVED_BYTES", &x)))
+	{
+		cs_data->reserved_bytes = x;
+		cs_data->i_reserved_bytes = x;
+	}
+	if ((CLI_PRESENT == cli_present("INDEX_RESERVED_BYTES")) && (cli_get_int("INDEX_RESERVED_BYTES", &x)))
+		cs_data->i_reserved_bytes = x;
+	if ((CLI_PRESENT == cli_present("DATA_RESERVED_BYTES")) && (cli_get_int("DATA_RESERVED_BYTES", &x)))
 		cs_data->reserved_bytes = x;
 	if ((CLI_PRESENT == cli_present("DEF_COLLATION")) && (cli_get_int("DEF_COLLATION", &x)))
 		cs_data->def_coll = x;
@@ -458,8 +465,12 @@ void dse_chng_fhead(void)
 	)
 	if (CLI_PRESENT == cli_present("STDNULLCOLL"))
 	{
-		if ( -1 != (x = cli_t_f_n("STDNULLCOLL")))
-			gv_cur_region->std_null_coll = cs_data->std_null_coll = x;
+		x = cli_t_f_n("STDNULLCOLL");
+		if (-1 != x)
+		{
+			gv_cur_region->std_null_coll = x;
+			cs_data->std_null_coll = x;
+		}
 	}
 	corrupt_file_present = (CLI_PRESENT == cli_present("CORRUPT_FILE"));
 	if (corrupt_file_present)

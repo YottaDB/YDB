@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -65,7 +65,7 @@ void gtcml_chklck(cm_lckblkreg *reg, bool timed)
 	{
 		if (timed)
 		{
-			if (timeout = gtcml_lcktime(lck))
+			if ((timeout = gtcml_lcktime(lck)))
 			{
 				prc = prc1 = lck->prc;
 				if (prc)

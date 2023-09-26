@@ -179,9 +179,14 @@ error_def(ERR_TPRETRY);
 	 */															\
 	if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))						\
 		end = &buff[MAX_ZWR_KEY_SZ - 1];										\
-	rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(11) ERR_RSVDBYTE2HIGH, 5, new_blk_size_single,				\
-		REG_LEN_STR(gv_cur_region), blk_size, blk_reserved_bytes,							\
-		ERR_GVIS, 2, end - buff, buff);											\
+	if (level_0)														\
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_RSVDBYTE2HIGH, 6, new_blk_size_single,			\
+			REG_LEN_STR(gv_cur_region), blk_size, "data", blk_reserved_bytes,					\
+			ERR_GVIS, 2, end - buff, buff);										\
+	else															\
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_RSVDBYTE2HIGH, 6, new_blk_size_single,			\
+			REG_LEN_STR(gv_cur_region), blk_size, "index", blk_reserved_bytes,					\
+			ERR_GVIS, 2, end - buff, buff);										\
 }
 
 #define	RESTORE_ZERO_GVT_ROOT_ON_RETRY(LCL_ROOT, GV_TARGET, DIR_HIST, DIR_TREE)					\
@@ -298,7 +303,8 @@ void	gvcst_put(mval *val)
 
 	SETUP_THREADGBL_ACCESS;
 	parms.span_status = FALSE;
-	parms.blk_reserved_bytes = cs_data->reserved_bytes; /* Only want to read once for consistency */
+	parms.blk_reserved_bytes = cs_data->reserved_bytes;
+	parms.indx_blk_reserved_bytes = cs_data->i_reserved_bytes;
 	parms.enable_trigger_read_and_fire = TRUE;
 	parms.enable_jnl_format = TRUE;
 	lcl_root = gv_target->root;
@@ -594,8 +600,6 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	desired_db_format = csd->desired_db_format;
 	db_long_blk_id = BLK_ID_32_VER < desired_db_format;
 	blk_size = csd->blk_size;
-	blk_reserved_bytes = parms->blk_reserved_bytes;
-	blk_fill_size = (blk_size * gv_fillfactor) / 100 - blk_reserved_bytes;
 	lcl_span_status = parms->span_status;
 	if (lcl_span_status)
 	{
@@ -658,6 +662,8 @@ tn_restart:
 	 * typically do a normal increment and then, for certain conditions, do a complementary decrement, we assert that
 	 * the net effect is never a decrease.
 	 */
+	blk_reserved_bytes = parms->blk_reserved_bytes;
+	blk_fill_size = (blk_size * gv_fillfactor) / 100 - blk_reserved_bytes;
 	assert(csa == cs_addrs);	/* no amount of retries should change cs_addrs from what it was at entry into gvcst_put */
 	assert((((int)t_tries) > lcl_t_tries) || (CDB_STAGNATE == t_tries));
 	DEBUG_ONLY(lcl_t_tries = t_tries;) /* update lcl_t_tries */
@@ -897,7 +903,8 @@ tn_restart:
 			status = cdb_sc_mkblk;
 			GOTO_RETRY;
 		}
-		assert(bs1[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
+		/* Assert that new block has space for reserved bytes */
+		assert(bs1[0].len <= (blk_size - parms->indx_blk_reserved_bytes));
 		allocation_clue = ALLOCATION_CLUE(csd->trans_hist.total_blks);
 		next_blk_index = t_create(allocation_clue, new_blk_bs, 0, 0, 0);	/* create GVT data block */
 		++allocation_clue;
@@ -1114,6 +1121,9 @@ tn_restart:
 	split_targ = gv_target;
 	for (bh_level = 0, succeeded = FALSE; !succeeded; level_0 = no_pointers = FALSE, bh_level++)
 	{
+		blk_reserved_bytes = (level_0 ? parms->blk_reserved_bytes : parms->indx_blk_reserved_bytes);
+		blk_reserved_size = blk_size - blk_reserved_bytes;
+		blk_fill_size = (blk_size * gv_fillfactor) / 100 - blk_reserved_bytes;
 		buffaddr = bh->buffaddr;
 		bh_ver = ((blk_hdr_ptr_t)buffaddr)->bver;	/* Use actual information as if it were from history */
 		long_blk_id = IS_64_BLK_ID(buffaddr);
@@ -1424,8 +1434,9 @@ tn_restart:
 			{
 				if (dollar_tlevel)
 				{	/* formerly tp_offset_chain - inserts a new_entry in the chain */
-					assert((NULL != cse->new_buff) || horiz_growth && cse->low_tlevel->new_buff
-						&& (buffaddr == cse->low_tlevel->new_buff));
+					assert((NULL != cse->new_buff)
+						|| (horiz_growth && cse->low_tlevel->new_buff
+							&& (buffaddr == cse->low_tlevel->new_buff)));
 					assert(!prev_split_to_right && (0 == cse->next_off));
 					assert(ins_chain_offset > (signed)SIZEOF(blk_hdr));	/* we want signed comparison */
 					offset_sum = cse->first_off;
@@ -2398,8 +2409,8 @@ tn_restart:
 						assert(offset_sum >= (int)cse_first_off);
 						assert(offset_sum > curr_rec_offset);
 						assert((curr_rec_offset == ((sm_uc_ptr_t)rp - buffaddr))
-							|| copy_extra_record
-								&& (curr_rec_offset + tmp_rsiz == ((sm_uc_ptr_t)rp - buffaddr)));
+							|| (copy_extra_record
+								&& (curr_rec_offset + tmp_rsiz == ((sm_uc_ptr_t)rp - buffaddr))));
 						cse->first_off = (block_offset)(offset_sum - ((sm_uc_ptr_t)rp - buffaddr)
 								+ rec_cmpc + SIZEOF(blk_hdr));
 						assert(cse->first_off >= (SIZEOF(blk_hdr) + SIZEOF(rec_hdr)));
@@ -2761,7 +2772,7 @@ tn_restart:
 			nodeflags |= JS_SKIP_TRIGGERS_MASK;
 		if (duplicate_set)
 			nodeflags |= JS_IS_DUPLICATE;
-		assert(!jnl_format_done || !is_dollar_incr && (JNL_SET == non_tp_jfb_ptr->ja.operation));
+		assert(!jnl_format_done || (!is_dollar_incr && (JNL_SET == non_tp_jfb_ptr->ja.operation)));
 		if (need_extra_block_split)
 			inctn_opcode = inctn_gvcstput_extra_blk_split;
 		else if (JNL_WRITE_LOGICAL_RECS(csa) && !jnl_format_done)
@@ -2946,7 +2957,7 @@ tn_restart:
 						val = trigparms.ztvalue_new;
 						val_forjnl = trigparms.ztvalue_new;
 						MV_FORCE_STR(val); /* in case the updated value happens to be a numeric quantity */
-						fits = RECORD_FITS_IN_A_BLOCK(val, gv_currkey, blk_size, blk_reserved_bytes);
+						fits = RECORD_FITS_IN_A_BLOCK(val, gv_currkey, blk_size, parms->blk_reserved_bytes);
 						if (!fits)
 						{	/* If val is now too big to fit in a block, we need to back out into
 							 * gvcst_put and try again with spanning nodes. This means we should

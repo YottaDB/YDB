@@ -52,8 +52,15 @@ int gvn(void)
 	advancewindow();
 	sb1 = sb2 = subscripts;
 	ox = 0;
+<<<<<<< HEAD
 	if (shifting = (TREF(shift_side_effects) && (!TREF(saw_side_effect) || (YDB_BOOL == TREF(ydb_fullbool)
 		&& (OLD_SE == TREF(side_effect_handling))))))
+=======
+	if ((shifting = ((EXT_BOOL != TREF(gtm_fullbool)) && TREF(shift_side_effects)
+				&& (!TREF(saw_side_effect)
+					|| (GTM_BOOL == TREF(gtm_fullbool)
+						&& (OLD_SE == TREF(side_effect_handling)))))))
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 	{	/* NOTE assignment above */
 		exorder_init(&tmpchain);
 		oldchain = setcurtchain(&tmpchain);

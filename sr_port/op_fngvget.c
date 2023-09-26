@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,7 +54,7 @@ void op_fngvget(mval *dst)
 			break;
 		default :
 			;
-			if (gotit = gvusr_get(dst))	/* NOTE: assignment */
+			if ((gotit = gvusr_get(dst)))	/* NOTE: assignment */
 				s2pool(&dst->str);
 			break;
 	}

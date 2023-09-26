@@ -335,7 +335,7 @@ int do_patsplit(mval *str, mval *pat)
 		{
 			assert(fixedptr < strtop);
 			fixednext = UTF8_MBNEXT(fixedptr, strtop);
-			assert((rightptr < strtop) || (fixedptr == maxfixedptr) && (fixednext > maxfixedptr));
+			assert((rightptr < strtop) || ((fixedptr == maxfixedptr) && (fixednext > maxfixedptr)));
 			if (rightptr < strtop)
 				rightnext = UTF8_MBNEXT(rightptr, strtop);
 			else

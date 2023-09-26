@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -26,7 +26,7 @@
 #include "min_max.h"
 #include "gtm_trigger_trc.h"
 
-#define	INFO_MSK(error)	(error & ~SEV_MSK | INFO)
+#define	INFO_MSK(error)	((error & ~SEV_MSK) | INFO)
 
 GBLREF mident_fixed	zlink_mname;
 GBLREF volatile int4	outofband;

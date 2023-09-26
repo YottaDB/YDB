@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -828,7 +828,7 @@ void zshow_devices(zshow_out *output)
 							for (jj = 0; jj < socketptr->n_delimiter; jj++)
 							{
 								delim_len_sm = socketptr->delimiter[jj].len;
-								memcpy(delim_buff_sm,
+								memcpy((void *)delim_buff_sm,
 								       socketptr->delimiter[jj].addr, delim_len_sm);
 								assert(delim_mstr_buff == delim.addr);
 								delim_len = SIZEOF(delim_mstr_buff);

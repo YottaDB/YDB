@@ -119,15 +119,17 @@ GBLREF	uchar_ptr_t		repl_filter_buff;
 GBLREF	uint4			process_id;
 GBLREF	unsigned char		*gtmsource_tcombuffp;
 GBLREF	unsigned char		*gtmsource_tcombuff_start;
-#ifdef GTM_TLS
 GBLREF	gtmsource_options_t	gtmsource_options;
-#endif
 
 int gtmsource_est_conn()
 {
 	char			print_msg[PROC_OPS_PRINT_MSG_LEN], msg_str[1024], *errmsg;
+<<<<<<< HEAD
 	int			connection_attempts, save_errno, comminit_retval, status;
 	int			send_buffsize, recv_buffsize, tcp_s_bufsize;
+=======
+	int			connection_attempts, max_heartbeat_wait, save_errno, comminit_retval, status;
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 	int 			logging_period, logging_interval; /* logging period = soft_tries_period*logging_interval */
 	int			alert_period, hardtries_count, hardtries_period;
 	int 			max_shutdown_wait, max_sleep, soft_tries_period;
@@ -297,52 +299,12 @@ int gtmsource_est_conn()
 			}
 		} while (TRUE);
 	}
-	if (0 != (status = get_send_sock_buff_size(gtmsource_sock_fd, &send_buffsize)))
+	if (0 != (status = get_send_sock_buff_size(gtmsource_sock_fd, &repl_max_send_buffsize)))
 	{
 		SNPRINTF(msg_str, SIZEOF(msg_str), "Error getting socket send buffsize : %s", STRERROR(status));
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
 	}
-	if (send_buffsize < GTMSOURCE_TCP_SEND_BUFSIZE)
-	{
-		for (tcp_s_bufsize = GTMSOURCE_TCP_SEND_BUFSIZE;
-			  tcp_s_bufsize >= MAX(send_buffsize, GTMSOURCE_MIN_TCP_SEND_BUFSIZE)
-			  &&  0 != (status = set_send_sock_buff_size(gtmsource_sock_fd, tcp_s_bufsize));
-			  tcp_s_bufsize -= GTMSOURCE_TCP_SEND_BUFSIZE_INCR)
-			;
-		if (tcp_s_bufsize < GTMSOURCE_MIN_TCP_SEND_BUFSIZE)
-		{
-			SNPRINTF(msg_str, SIZEOF(msg_str), "Could not set TCP send buffer size in range [%d, %d], last "
-					"known error : %s", GTMSOURCE_MIN_TCP_SEND_BUFSIZE, GTMSOURCE_TCP_SEND_BUFSIZE,
-					STRERROR(status));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
-		}
-	}
-	if (0 != (status = get_send_sock_buff_size(gtmsource_sock_fd, &repl_max_send_buffsize))) /* may have changed */
-	{
-		SNPRINTF(msg_str, SIZEOF(msg_str), "Error getting socket send buffsize : %s", STRERROR(status));
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
-	}
-	if (0 != (status = get_recv_sock_buff_size(gtmsource_sock_fd, &recv_buffsize)))
-	{
-		errmsg = STRERROR(status);
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			LEN_AND_LIT("Error getting socket recv buffsize"),
-			ERR_TEXT, 2, LEN_AND_STR(errmsg));
-	}
-	if (recv_buffsize < GTMSOURCE_TCP_RECV_BUFSIZE)
-	{
-		if (0 != (status = set_recv_sock_buff_size(gtmsource_sock_fd, GTMSOURCE_TCP_RECV_BUFSIZE)))
-		{
-			if (recv_buffsize < GTMSOURCE_MIN_TCP_RECV_BUFSIZE)
-			{
-				SNPRINTF(msg_str, SIZEOF(msg_str), "Could not set TCP recv buffer size to %d : %s",
-						GTMSOURCE_MIN_TCP_RECV_BUFSIZE, STRERROR(status));
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2,
-						 LEN_AND_STR(msg_str));
-			}
-		}
-	}
-	if (0 != (status = get_recv_sock_buff_size(gtmsource_sock_fd, &repl_max_recv_buffsize))) /* may have changed */
+	if (0 != (status = get_recv_sock_buff_size(gtmsource_sock_fd, &repl_max_recv_buffsize)))
 	{
 		SNPRINTF(msg_str, SIZEOF(msg_str), "Error getting socket recv buffsize : %s", STRERROR(status));
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
@@ -1958,8 +1920,8 @@ void	gtmsource_send_new_histrec()
 	 * But with supplementary instances, it is possible for two consecutive history records to have the same start_seqno
 	 * (if those came from different root primary instances at the same time). Take care of that in the assert below.
 	 */
-	assert(!this_side->is_supplementary && (gtmsource_local->read_jnl_seqno < gtmsource_local->next_histinfo_seqno)
-		|| this_side->is_supplementary && (gtmsource_local->read_jnl_seqno <= gtmsource_local->next_histinfo_seqno));
+	assert((!this_side->is_supplementary && (gtmsource_local->read_jnl_seqno < gtmsource_local->next_histinfo_seqno))
+		|| (this_side->is_supplementary && (gtmsource_local->read_jnl_seqno <= gtmsource_local->next_histinfo_seqno)));
 	gtmsource_histinfo_get(gtmsource_local->next_histinfo_num - 1, &histinfo);
 	if ((GTMSOURCE_WAITING_FOR_CONNECTION != gtmsource_state) && this_side->is_supplementary && first_histrec_send
 			&& (0 < histinfo.strm_index))

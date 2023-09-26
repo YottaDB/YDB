@@ -34,9 +34,11 @@ GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	volatile boolean_t	in_wcs_recover;
 GBLREF	int			process_exiting;
+GBLREF	char			*repl_state_lit[];
 
 error_def(ERR_JNLCLOSED);
-error_def(ERR_REPLJNLCLOSED);
+error_def(ERR_REPLSTATE);
+error_def(ERR_TEXT);
 
 uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 {	/* Notify operator and terminate journaling */
@@ -107,8 +109,11 @@ uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 		csa->hdr->repl_state = repl_was_open;
 		reg_seqno = csa->hdr->reg_seqno;
 		jnlseqno = (jnlpool && jnlpool->jnlpool_ctl) ? jnlpool->jnlpool_ctl->jnl_seqno : MAX_SEQNO;
-		send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_REPLJNLCLOSED, 6, DB_LEN_STR(jpc->region), &reg_seqno, &reg_seqno,
-				&jnlseqno, &jnlseqno);
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(17) ERR_JNLCLOSED, 3, DB_LEN_STR(jpc->region), &csa->ti->curr_tn,
+			ERR_REPLSTATE, 6, LEN_AND_LIT(FILE_STR), DB_LEN_STR(jpc->region),
+			LEN_AND_STR(repl_state_lit[csa->hdr->repl_state]), ERR_TEXT, 2,
+			RTS_ERROR_TEXT("Replication will continue using records in the replication journal pool,"
+					" but will fail if operation requires access to journal files"));
 	} else
 		send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLCLOSED, 3, DB_LEN_STR(jpc->region), &csa->ti->curr_tn);
 	jnl_file_close(jpc->region, FALSE, TRUE);

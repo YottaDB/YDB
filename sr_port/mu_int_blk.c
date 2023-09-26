@@ -164,10 +164,15 @@ GBLREF boolean_t		nct_err_type;
 GBLREF boolean_t		debug_mupip;
 GBLREF int			rec_len;
 GBLREF jnlpool_addrs_ptr_t	jnlpool;
+<<<<<<< HEAD
 #ifdef DEBUG
 GBLREF	block_id		ydb_skip_bml_num;
 #endif
 
+=======
+GBLREF int4			max_data_blk_size;
+GBLREF int4			max_index_blk_size;
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 error_def(ERR_DBBADKYNM);
 error_def(ERR_DBBADNSUB);
 error_def(ERR_DBBADPNTR);
@@ -204,6 +209,7 @@ error_def(ERR_DBSPANCHUNKORD);
 error_def(ERR_DBNULCOL);
 error_def(ERR_NULSUBSC);
 error_def(ERR_DBNONUMSUBS);
+error_def(ERR_BSIZTOOLARGE);
 
 LITDEF boolean_t mu_int_possub[16][16] = {
 	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -428,9 +434,20 @@ boolean_t mu_int_blk(
 	buff_length = 0;
 	comp_length = bot_len;
 	is_top = FALSE;
-	memcpy(buff, bot_key, bot_len);
+	memcpy((void *)buff, bot_key, bot_len);
 	mu_sub_list[0].index = NO_SUBSCRIPTS;
 	rec_num = 0;
+	if (level)
+	{
+		if ((max_index_blk_size > 0) && (blk_size > max_index_blk_size))
+			MU_INT_RETRY_INCR_PLEN(ERR_BSIZTOOLARGE, TRUE, FALSE, bot_key, bot_len, top_key,
+					top_len, (unsigned int)blk_levl);
+	} else
+	{
+		if ((max_data_blk_size > 0) && (blk_size > max_data_blk_size))
+			MU_INT_RETRY_INCR_PLEN(ERR_BSIZTOOLARGE, TRUE, FALSE, bot_key, bot_len, top_key,
+					top_len, (unsigned int)blk_levl);
+	}
 	for (rec_base = blk_base + SIZEOF(blk_hdr);  (rec_base < blk_top) && (FALSE == muint_range_done);
 		rec_base = rec_top, comp_length = buff_length)
 	{
@@ -567,7 +584,7 @@ boolean_t mu_int_blk(
 						(unsigned int)blk_levl);
 				}
 			}
-			memcpy(old_buff, buff, comp_length);
+			memcpy((void *)old_buff, buff, comp_length);
 			memcpy(buff + rec_cmpc, key_base, key_size);
 			buff_length = rec_cmpc + key_size;
 			rec_len = buff_length;
@@ -800,12 +817,12 @@ boolean_t mu_int_blk(
 				if (is_trigger)
 				{
 					long_blk_id = (BLK_ID_32_VER < mu_int_data.desired_db_format);
-					if ((MAX_KEY_SZ + sizeof(blk_hdr) + 2 * sizeof(rec_hdr) + 2 * SIZEOF_BLK_ID(long_blk_id))
+					if ((MAX_KEY_SZ + SIZEOF(blk_hdr) + 2 * SIZEOF(rec_hdr) + 2 * SIZEOF_BLK_ID(long_blk_id))
 								< mu_int_data.blk_size)
 						max_allowed_key_size = MAX_KEY_SZ - 4;
 					else
 					{	/* The maximum key size is a function of the block size */
-						max_allowed_key_size = mu_int_data.blk_size - sizeof(blk_hdr) - sizeof(rec_hdr)
+						max_allowed_key_size = mu_int_data.blk_size - SIZEOF(blk_hdr) - SIZEOF(rec_hdr)
 							- SIZEOF_BLK_ID(long_blk_id) - bstar_rec_size(long_blk_id);
 					}
 				} else
@@ -1032,7 +1049,7 @@ boolean_t mu_int_blk(
 				}
 				*c1 = 0;
 				assert(SIZEOF(muint_temp_buff) == SIZEOF(temp_buff));
-				memcpy(muint_temp_buff, temp_buff, SIZEOF(temp_buff));
+				memcpy((void *)muint_temp_buff, temp_buff, SIZEOF(temp_buff));
 				if (mu_key)
 				{
 					if (mu_end_key)	/* range */
@@ -1084,6 +1101,7 @@ boolean_t mu_int_blk(
 				}
 			}
 		}
+
 	}
 	if (top_len)
 	{

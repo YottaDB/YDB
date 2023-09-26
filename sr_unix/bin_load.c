@@ -211,7 +211,7 @@ void zwr_out_print(char * buff, int bufflen)
 	int uopbuffpos, uopleft, uopstride;
 
 	buffpos = 0;
-	while (left = bufflen - buffpos)
+	while ((left = bufflen - buffpos))
 	{
 		if (buffpos)
 			FPRINTF(stderr,"_");
@@ -219,7 +219,7 @@ void zwr_out_print(char * buff, int bufflen)
 		zwrlen = SIZEOF(zwrbuff);
 		format2zwr((sm_uc_ptr_t)(buff + buffpos), stride, (unsigned char *)zwrbuff, &zwrlen);
 		uopbuffpos = 0;
-		while (uopleft = zwrlen - uopbuffpos)
+		while ((uopleft = zwrlen - uopbuffpos))
 		{
 			uopstride = (uopleft > UOP_BASE_STRIDE) ? UOP_BASE_STRIDE : uopleft;
 			savechar = *(zwrbuff + uopstride);
@@ -668,7 +668,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 			{
 				if (extr_collhdr.act)
 				{
-					if (extr_collseq = ready_collseq((int)extr_collhdr.act))
+					if ((extr_collseq = ready_collseq((int)extr_collhdr.act)))
 					{
 						if (!do_verify(extr_collseq, extr_collhdr.act, extr_collhdr.ver))
 						{
@@ -688,7 +688,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 				}
 				if (db_collhdr.act)
 				{
-					if (db_collseq = ready_collseq((int)db_collhdr.act))
+					if ((db_collseq = ready_collseq((int)db_collhdr.act)))
 					{
 						if (!do_verify(db_collseq, db_collhdr.act, db_collhdr.ver))
 						{
@@ -839,7 +839,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 			/* Validate the subscripts */
 			subs = gvn_char + 1;
 			num_subscripts = 0;
-			while (mych = *subs++) /* WARNING: assignment */
+			while ((mych = *subs++)) /* WARNING: assignment */
 			{
 				num_subscripts++;
 				if (MAX_GVSUBSCRIPTS < num_subscripts)
@@ -855,7 +855,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 				{
 					if (mych > LAST_NEGATIVE_SUBSCRIPT) /* Is it a positive numeric subscript */
 					{
-						while (mych = *subs++) /* WARNING: assignment */
+						while ((mych = *subs++)) /* WARNING: assignment */
 						{
 							memcpy(&subtocheck, &mych, 1);
 							if (!mu_int_possub[subtocheck.one][subtocheck.two])
@@ -898,7 +898,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 				else /* It is a string subscript */
 				{
 					/* string can have arbitrary content so move to the next subscript */
-					while (mych = *subs++) /* WARNING: assignment */
+					while ((mych = *subs++)) /* WARNING: assignment */
 						;
 				}
 				if (mupip_error_occurred)

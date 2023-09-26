@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -35,7 +35,7 @@ void cmi_idle(uint4 hiber)
 	 */
 	SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &oset, rc);
 	cmj_housekeeping();
-	while (lnk = cmj_getdeferred(ntd_root))
+	while ((lnk = cmj_getdeferred(ntd_root)))
 	{
 		lnk->deferred_event = FALSE;
 		posted = TRUE;

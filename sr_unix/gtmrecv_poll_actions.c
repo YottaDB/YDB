@@ -274,7 +274,11 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				; /* Empty Body */
 			if (SS_NORMAL != status)
 			{
+<<<<<<< HEAD
 				if (EREPL_SEND == repl_errno)
+=======
+				if (REPL_CONN_RESET(status) && (EREPL_SEND == repl_errno))
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 				{
 #					ifdef GTM_TLS
 					if (ERR_TLSIOERROR == status)
@@ -494,7 +498,11 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 												curr_conn_state.send_seqno);
 		} else
 		{
+<<<<<<< HEAD
 			if (EREPL_SEND == repl_errno)
+=======
+			if (REPL_CONN_RESET(status) && (EREPL_SEND == repl_errno))
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 			{
 #				ifdef GTM_TLS
 				if (ERR_TLSIOERROR == status)
@@ -543,7 +551,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		}
 	}
 	if ((upd_proc_local->bad_trans && bad_trans_detected) || onln_rlbk_flg_set
-		|| (UPDPROC_START == upd_proc_local->start_upd) && (1 != report_cnt))
+		|| ((UPDPROC_START == upd_proc_local->start_upd) && (1 != report_cnt)))
 	{
 		if (UPDPROC_START == upd_proc_local->start_upd)
 		{

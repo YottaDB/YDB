@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -77,7 +77,7 @@ int mu_replpool_release_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_typ
 	SETUP_THREADGBL_ACCESS;
 #	endif
 	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
-	assert(!jnlpool || (NULL != jnlpool->jnlpool_dummy_reg) && (jnlpool->jnlpool_dummy_reg == recvpool.recvpool_dummy_reg));
+	assert(!jnlpool || ((NULL != jnlpool->jnlpool_dummy_reg) && (jnlpool->jnlpool_dummy_reg == recvpool.recvpool_dummy_reg)));
 	if (jnlpool && (NULL != jnlpool->jnlpool_dummy_reg))
 		replreg = jnlpool->jnlpool_dummy_reg;
 	else

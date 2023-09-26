@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -113,9 +113,15 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 	SNPRINTF(tbuf, 16, "%02d%02d%02d%02d",ltime->tm_mon + 1,ltime->tm_mday,
 		ltime->tm_hour,ltime->tm_min);
 
+<<<<<<< HEAD
 	if (ydb_dist = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))
 	{
 	    	char subdir[YDB_PATH_MAX];
+=======
+	if ((gtm_dist=getenv("gtm_dist")))
+	{
+		char subdir[GTM_PATH_MAX];
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 		struct stat buf;
 
 		/* check for the subdirectory $ydb_dist/log/<omi_service>

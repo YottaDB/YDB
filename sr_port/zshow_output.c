@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2021 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+>>>>>>> fdfdea1e (GT.M V7.1-002)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -241,7 +245,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 					ENSURE_STP_FREE_SPACE(len);
 					mv_child->str.addr = (char *)stringpool.free;
 					stringpool.free +=len;
-					strncpy(mv_child->str.addr, piecestr, (size_t)len);
+					memcpy(mv_child->str.addr, piecestr, (size_t)len);
 					mv_child->str.len = len;
 					/* make sure the subscript will fit */
 					is_base_var = LV_IS_BASE_VAR(lv_child);

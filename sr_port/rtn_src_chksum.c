@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2018 Fidelity National Information	*
+ * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -189,6 +189,6 @@ int append_checksum(unsigned char *out, rhdtyp *routine)
 #	else
 	len = SNPRINTF(buf, MAX_ROUTINE_CHECKSUM_DIGITS, "%04x", (uint4)get_rtnhdr_checksum(hdr));
 #	endif
-	memcpy(out, (unsigned char *)buf, len);
+	memcpy((void *)out, (unsigned char *)buf, len);
 	return len;
 }

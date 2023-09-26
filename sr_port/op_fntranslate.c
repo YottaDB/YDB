@@ -277,7 +277,7 @@ void op_fnztranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 {
 	static int xlate[NUM_CHARS];					/* not STATICDEF to prevent conflict with op_fn */
 	static mstr prev_srch = {0, 0}, prev_rplc = {0, 0};
-	static unsigned int prev_gcols = -1;
+	static unsigned int prev_gcols = ~0x0;
 
 	MV_FORCE_STR(src);
 	MV_FORCE_STR(srch);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -60,9 +60,9 @@ void comp_indr(mstr *obj)
 		if (msp <= stacktop)
 		{
 			msp = save_msp;
-			RTS_ERROR_ABT(VARLSTCNT(1) ERR_STACKOFLOW);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
 		} else
-			RTS_ERROR_ABT(VARLSTCNT(1) ERR_STACKCRIT);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
 	}
 	syms = msp;
 	*sf = *frame_pointer;
@@ -71,7 +71,7 @@ void comp_indr(mstr *obj)
 	sf->temps_ptr = tmps;
 	sf->l_symtab = (ht_ent_mname **)syms;
 	sf->vartab_len = rtnhdr->vartab_len;
-	if (zapsz = (vartabsz + tempsz))	/* Note assignment */
+	if ((zapsz = (vartabsz + tempsz)))	/* Note assignment */
 		memset(syms, 0, zapsz);		/* Zap temps and symtab together */
 	sf->vartab_ptr = (char *)rtnhdr + rtnhdr->vartab_off;
 	sf->temp_mvals = rtnhdr->temp_mvals;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2021 Fidelity National Information	*
+ * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -23,6 +23,8 @@
 #define gtm_tls_socket			(*gtm_tls_socket_fptr)
 #define gtm_tls_connect			(*gtm_tls_connect_fptr)
 #define gtm_tls_accept			(*gtm_tls_accept_fptr)
+#define gtm_tls_do_post_hand_shake	(*gtm_tls_do_post_hand_shake_fptr)
+#define gtm_tls_repeat_hand_shake	(*gtm_tls_repeat_hand_shake_fptr)
 #define gtm_tls_renegotiate		(*gtm_tls_renegotiate_fptr)
 #define gtm_tls_get_conn_info		(*gtm_tls_get_conn_info_fptr)
 #define gtm_tls_send			(*gtm_tls_send_fptr)
@@ -49,6 +51,8 @@
 #undef gtm_tls_socket
 #undef gtm_tls_connect
 #undef gtm_tls_accept
+#undef gtm_tls_do_post_hand_shake
+#undef gtm_tls_repeat_hand_shake
 #undef gtm_tls_renegotiate
 #undef gtm_tls_get_conn_info
 #undef gtm_tls_send
@@ -73,6 +77,8 @@
 #define gtm_tls_socket			intrsafe_gtm_tls_socket
 #define gtm_tls_connect			intrsafe_gtm_tls_connect
 #define gtm_tls_accept			intrsafe_gtm_tls_accept
+#define gtm_tls_do_post_hand_shake	intrsafe_gtm_tls_do_post_hand_shake
+#define gtm_tls_repeat_hand_shake	intrsafe_gtm_tls_repeat_hand_shake
 #define gtm_tls_renegotiate		intrsafe_gtm_tls_renegotiate
 #define gtm_tls_get_conn_info		intrsafe_gtm_tls_get_conn_info
 #define gtm_tls_send			intrsafe_gtm_tls_send

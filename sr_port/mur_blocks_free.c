@@ -98,10 +98,12 @@ block_id mur_blocks_free(reg_ctl_list *rctl)
 			RTS_ERROR_CSA_ABT(rctl->csa, VARLSTCNT(5) ERR_DBRDERR, 2, DB_LEN_STR(gv_cur_region), status);
 		GDS_BLK_UPGRADE_IF_NEEDED(bnum, disk, disk, cs_data, &dummy_ondskblkver, status, cs_data->fully_upgraded);
 		if (SS_NORMAL != status)
+		{
 			if (ERR_DYNUPGRDFAIL == status)
 				rts_error_csa(CSA_ARG(rctl->csa) VARLSTCNT(5) status, 3, bnum, DB_LEN_STR(gv_cur_region));
 			else
 				rts_error_csa(CSA_ARG(rctl->csa) VARLSTCNT(1) status);
+		}
 		if (((blk_hdr *)disk)->bsiz != map_blk_size)
 		{
 			util_out_print("Wrong size map block", TRUE);

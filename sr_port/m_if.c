@@ -115,7 +115,11 @@ int m_if(void)
 				REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish); /* Note: Will set "boolexprfinish" to NULL */
 				v = &triptr->operand[0].oprval.mlit->v;
 				unuse_literal(v);
+<<<<<<< HEAD
 				if (0 == MV_FORCE_BOOL(v))	/* WARNING: assignment */
+=======
+				if ((t_set = (0 == MV_FORCE_BOOL(v))))	/* WARNING: assignment */
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 				{	/* it's FALSE, insert clear of $TEST */
 					newtriple(OC_CLRTEST);
 					if (TK_SPACE == TREF(director_token))			/* if there are trailing spaces */

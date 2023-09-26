@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,7 @@ int f_get(oprtype *a, opctype op)
 		r->opcode = OC_INDGET2;
 		if (SHIFT_SIDE_EFFECTS)
 			START_GVBIND_CHAIN(&save_state, oldchain);
-		if (ok = indirection(&indir))	/* NOTE: assignment */
+		if ((ok = indirection(&indir)))	/* NOTE: assignment */
 		{
 			used_glvn_slot = TRUE;
 			INSERT_INDSAVGLVN(control_slot, indir, ANY_SLOT, 1);

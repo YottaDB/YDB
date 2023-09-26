@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -414,7 +414,7 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, bool
 		/* Step 3 -- We have the correct lv_val in the hash table now but it has the wrong value.
 		 * Get rid of its current tree if any.
 		 */
-		if (lvt_child = LV_GET_CHILD(curr_lv))	/* Note assignment */
+		if ((lvt_child = LV_GET_CHILD(curr_lv)))	/* Note assignment */
 		{
 			DBGRFCT((stderr, "\ntp_unwind_restlv: Killing child tree of curr_lv 0x"lvaddr"\n", curr_lv));
 			assert((lvTreeNode *)curr_lv == LVT_PARENT(lvt_child));
@@ -449,7 +449,7 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, bool
 		/* save_lv -> curr_lv Copy done */
 		/* Some fixup may need to be done if the variable was cloned (and thus moved around) */
 		curr_lv->tp_var->var_cloned = FALSE;
-		if (lvt_child = LV_GET_CHILD(curr_lv))
+		if ((lvt_child = LV_GET_CHILD(curr_lv)))
 		{	/* Some pointer fix up needs to be done since the owner of the restored tree changed */
 			assert(LVT_PARENT(lvt_child) == ((lvTreeNode *)curr_lv->tp_var->save_value));
 			LV_CHILD(save_lv) = NULL;	/* now that curr_lv->tp_var->var_cloned has been reset */

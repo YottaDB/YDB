@@ -303,7 +303,8 @@ void mu_int_maps(void)
 						mu_int_err(ERR_DBBFSTAT,
 								0, 0, 0, 0, 0, 0, level);
 					}
-					else  if ((lfree = mu_int_isfree_mask[bcnt] & *(lmap)) ^ mu_int_isfree_mask[bcnt] & dskmap)
+					else  if ((lfree = mu_int_isfree_mask[bcnt] & *(lmap))
+							^ (mu_int_isfree_mask[bcnt] & dskmap))
 					{
 						mu_int_path[0] = blkno + lcnt + bcnt;
 						mu_int_plen = 1;

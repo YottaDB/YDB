@@ -71,7 +71,7 @@ boolean_t zwr2format(mstr *src, mstr *des)
 				{ /* beginning of a quoted string: prepare for the new graphic substring */
 					fastate = 1;
 					cpstart = cp;
-				} else if (('-' == ch) || ('0' <= ch) && (ch <= '9'))
+				} else if (('-' == ch) || (('0' <= ch) && (ch <= '9')))
 				{ /* a numeric */
 					FORMAT_CHAR(ch);
 					fastate = 4;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -80,13 +80,24 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 
 	if (!process_id)
 		getjobnum();
+<<<<<<< HEAD
 	if (!ydb_dist_ok_to_use)
+=======
+	if (!gtm_dist_ok_to_use)
+	{
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 		if (SERVER == caller)
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 					gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 		else
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 					gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+<<<<<<< HEAD
+=======
+	}
+	secshrsock_lognam.addr = GTMSECSHR_SOCK_DIR;
+	secshrsock_lognam.len = SIZEOF(GTMSECSHR_SOCK_DIR) - 1;
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 	/* Get the maximum size of the path excluding the socket filename */
 	max_sock_path_len = SIZEOF(gtmsecshr_sock_name.sun_path) - MAX_SECSHR_SOCKFILE_NAME_LEN;
 	/* Make sure this length is atmost equal to the size of the buffer that will hold the socket path */

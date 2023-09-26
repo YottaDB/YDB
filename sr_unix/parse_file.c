@@ -404,7 +404,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 			diff = (int)((ext - node));
 			if (def.b_ext + diff > pblk->buff_size)
 				return ERR_FILEPATHTOOLONG;
-			memcpy(ext, def.l_ext, def.b_ext);
+			memcpy((void *)ext, def.l_ext, def.b_ext);
 			ptr += def.b_ext;
 		}
 	}
@@ -421,7 +421,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 			memmove(name + diff, name, pblk->b_name + pblk->b_ext);	/*return ERR_FILEPATHTOOLONG ensures this is safe*/
 		else if (0 > diff)
 			memcpy(name + diff, name, pblk->b_name + pblk->b_ext);
-		memcpy(base, def.l_dir, def.b_dir);
+		memcpy((void *)base, def.l_dir, def.b_dir);
 		ptr += diff;
 		name += diff;
 	}

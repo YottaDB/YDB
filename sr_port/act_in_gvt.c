@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -38,7 +38,7 @@ void act_in_gvt(gv_namehead *gvt)
 	if (IS_MNAME_HASHT_GBLNAME(gvt->gvname.var_name))
 		return;		/* No collation for triggers */
 #	endif
-	if (csp = ready_collseq((int)(gvt->act)))	/* WARNING: ASSIGNMENT */
+	if ((csp = ready_collseq((int)(gvt->act))))	/* WARNING: ASSIGNMENT */
 	{
 		if (!do_verify(csp, gvt->act, gvt->ver))
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
@@ -185,7 +185,7 @@ gd_addr *zgbldir_opt(mval *v, boolean_t env_translated, boolean_t force_load)
 	tran_name = get_name(tran_mstr);
 	gd_ptr = gd_load(tran_name, force_load);
 	name = (gdr_name *)malloc(SIZEOF(gdr_name));
-	if (name->name.len = v->str.len)	/* Note embedded assignment */
+	if ((name->name.len = v->str.len))	/* Note embedded assignment */
 	{
 		name->name.addr = (char *)malloc(v->str.len);
 		memcpy(name->name.addr, v->str.addr, v->str.len);

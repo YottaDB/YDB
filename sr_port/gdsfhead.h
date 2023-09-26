@@ -816,8 +816,8 @@ MBSTART {														\
 	GBLREF	boolean_t	dse_running, write_after_image;								\
 	GBLREF	uint4		process_id;										\
 															\
-	assert((gds_t_write != cse->mode) && (gds_t_write_recycled != cse->mode) && gds_t_writemap != cse->mode		\
-		|| (NULL != cse->old_block));	/* don't miss writing a PBLK */						\
+	assert(((gds_t_write != cse->mode) && (gds_t_write_recycled != cse->mode) && gds_t_writemap != cse->mode)	\
+			|| (NULL != cse->old_block));	/* don't miss writing a PBLK */					\
 	if (NULL != cse->old_block)											\
 	{														\
 		if (!is_mm)												\
@@ -1035,9 +1035,9 @@ MBSTART {												\
 													\
 	DEBUG_ONLY(in_tend = cr->in_tend);								\
 	DEBUG_ONLY(data_invalid = cr->data_invalid);							\
-	assert((process_id == in_tend) || (0 == in_tend) && (0 == data_invalid));			\
+	assert((process_id == in_tend) || ((0 == in_tend) && (0 == data_invalid)));			\
 	assert((0 == in_tend)										\
-		|| (process_id == in_tend) && ((0 == data_invalid) || (process_id == data_invalid)));	\
+		|| ((process_id == in_tend) && ((0 == data_invalid) || (process_id == data_invalid))));	\
 	cr->data_invalid = process_id;									\
 } MBEND
 
@@ -1773,6 +1773,7 @@ enum tp_ntp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] *
 #define DONOTCOMMIT_GVCST_PUT_CONCURR_FMT_CHG		(1 << 15) /* Restartable situation seen in gvcst_put concurrent fmt delta */
 #define DONOTCOMMIT_T_END_CONCURR_FMT_CHG		(1 << 16) /* Restartable situation seen in t_end */
 #define DONOTCOMMIT_BLK_PTR_UPGRADE_INCORRECT		(1 << 17) /* Restartable situation where blk_ptr_adjust found wrong state */
+#define DONOTCOMMIT_GVCST_BLK_SRCH			(1 << 18) /* Restartable situation seen in gvcst_blk_search */
 
 #define TAB_BG_TRC_REC(A,B)	B,
 enum bg_trc_rec_type
@@ -2308,7 +2309,7 @@ typedef struct
 #define DO_BADDBVER_CHK(REG, TSD)									\
 MBSTART {												\
 	LITREF char		*gtm_dbversion_table[];							\
-	error_def(ERR_DBUPGRDREQ);									\
+	error_def(ERR_DBUPGRDREQ);	/* BYPASSOK */							\
 	uint4			gtm_errcode = 0;							\
 													\
 	if (MEMCMP_LIT(TSD->label, GDS_LABEL) && MEMCMP_LIT(TSD->label, V6_GDS_LABEL))			\
@@ -5086,6 +5087,7 @@ typedef struct
 	boolean_t		ztval_gvcst_put_redo;
 	mval			*val_forjnl;
 	int4			blk_reserved_bytes;
+	int4			indx_blk_reserved_bytes;
 #	ifdef GTM_TRIGGER
 	unsigned char		*save_msp;
 	unsigned char		*save_mv_chain; /* actually mv_stent ptr */
@@ -5312,7 +5314,7 @@ MBSTART {											\
 	/* Either udi->owning_gd was already set to the right value, or it is NULL.		\
 	 * This could be because "gvcst_init" was called previously, as in "mupip_set"		\
 	 */											\
-	assert((NULL != reg->owning_gd) && (NULL == FILE_INFO(reg)->owning_gd)			\
+	assert(((NULL != reg->owning_gd) && (NULL == FILE_INFO(reg)->owning_gd))		\
 			|| (FILE_INFO(reg)->owning_gd == reg->owning_gd)			\
 			|| IS_STATSDB_REG(reg));						\
 	FILE_INFO(reg)->owning_gd = reg->owning_gd;						\

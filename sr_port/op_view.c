@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -529,7 +529,7 @@ void	op_view(int numarg, mval *keyword, ...)
 			gvspan = (NULL == gvnh_reg) ? NULL : gvnh_reg->gvspan;
 			if (NULL != gvspan)
 			{
-				if (found_reg = gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg))	/* WARNING assignment */
+				if ((found_reg = gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg)))	/* WARNING assignment */
 				{
 					INVOKE_GVCST_SPR_XXX(gvnh_reg, lct = gvcst_spr_data());
 				}

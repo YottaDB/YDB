@@ -72,11 +72,20 @@ error_def(ERR_BUFOWNERSTUCK);
 					|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number)			\
 					|| (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == ydb_white_box_test_case_number))));	\
 	get_space_fail_cr = CR;												\
+<<<<<<< HEAD
 	if (TREF(ydb_environment_init) DEBUG_ONLY(&& !(ydb_white_box_test_case_enabled					\
 				&& ((WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)			\
 					|| (WBTEST_DB_WRITE_HANG == ydb_white_box_test_case_number)			\
 					|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number))			\
 					|| (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == ydb_white_box_test_case_number))))	\
+=======
+	get_space_fail_array = TRACEARRAY;										\
+	if (TREF(gtm_environment_init) DEBUG_ONLY(&& !(gtm_white_box_test_case_enabled					\
+				&& ((WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)			\
+					|| (WBTEST_DB_WRITE_HANG == gtm_white_box_test_case_number)			\
+					|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number)			\
+					|| (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == gtm_white_box_test_case_number)))))	\
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 		gtm_fork_n_core();	/* take a snapshot in case running in-house */					\
 	return FALSE;													\
 }

@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2015 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+>>>>>>> fdfdea1e (GT.M V7.1-002)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -139,7 +143,7 @@ int m_tstart(void)
 	tid = newtriple(OC_PARAMETER);
 	if (TK_COLON == TREF(window_token))
 	{	advancewindow();
-		if (has_lpar = (TK_LPAREN == TREF(window_token)))
+		if ((has_lpar = (TK_LPAREN == TREF(window_token))))
 			advancewindow();
 		for(;;)
 		{

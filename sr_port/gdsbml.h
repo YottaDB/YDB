@@ -58,9 +58,15 @@
 	error_def(ERR_DBBMLCORRUPT); /* BYPASSOK */									\
 															\
 	assert(BITS_PER_UCHAR % BML_BITS_PER_BLK == 0);	/* assert this for the BM_MINUS_BLKHDR_SIZE macro */		\
+<<<<<<< HEAD
 	if (IS_BITMAP_BLK(blk) && ((LCL_MAP_LEVL != (bp)->levl) || (BM_SIZE(csa->hdr->bplmap) != (bp)->bsiz))		\
 		UNIX_ONLY(DEBUG_ONLY(|| (ydb_white_box_test_case_enabled						\
 		&& (WBTEST_ANTIFREEZE_DBBMLCORRUPT == ydb_white_box_test_case_number)))))				\
+=======
+	if ((IS_BITMAP_BLK(blk) && ((LCL_MAP_LEVL != (bp)->levl) || (BM_SIZE(csa->hdr->bplmap) != (bp)->bsiz)))		\
+		UNIX_ONLY(DEBUG_ONLY(|| (gtm_white_box_test_case_enabled						\
+		&& (WBTEST_ANTIFREEZE_DBBMLCORRUPT == gtm_white_box_test_case_number)))))				\
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 	{														\
 		send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBBMLCORRUPT, 7, DB_LEN_STR(region),				\
 				&(blk), (bp)->bsiz, (bp)->levl, &(bp)->tn, &csa->ti->curr_tn);				\

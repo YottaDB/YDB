@@ -136,7 +136,7 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 				wildcard_match = mur_do_wildcard(pv->jpv_user, sl_ptr->buff, pv_len, sl_ptr->len);
 			if (!wildcard_match)
 				sl_len = MIN(sl_ptr->len, JPV_LEN_USER);
-			if (wildcard_match || (pv_len == sl_len) && (0 == memcmp(pv->jpv_user, sl_ptr->buff, sl_len)))
+			if (wildcard_match || ((pv_len == sl_len) && (0 == memcmp(pv->jpv_user, sl_ptr->buff, sl_len))))
 				SET_INCFLAG_OR_RETURN(sl_ptr);
 		}
 		RETURN_IF_ITEM_DOESNT_MATCH_ANY_INCLUDE_PATTERN;
@@ -157,9 +157,9 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 			if (sl_ptr->buff[i - 1] == ')')
 				--i;
 			if (wildcard_match
-				|| (key_len == i) && (0 == memcmp(asc_key_buff, sl_ptr->buff, i))
-				|| (key_len >  i) && (0 == memcmp(asc_key_buff, sl_ptr->buff, i))
-					&& (('(' == asc_key_buff[i]) || (')' == asc_key_buff[i]) || (',' == asc_key_buff[i])))
+				|| ((key_len == i) && (0 == memcmp(asc_key_buff, sl_ptr->buff, i)))
+				|| ((key_len >  i) && (0 == memcmp(asc_key_buff, sl_ptr->buff, i))
+					&& (('(' == asc_key_buff[i]) || (')' == asc_key_buff[i]) || (',' == asc_key_buff[i]))))
 			{
 					SET_INCFLAG_OR_RETURN(sl_ptr);
 			}
@@ -198,7 +198,7 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 				pv_len = real_len(JPV_LEN_PRCNAM, (uchar_ptr_t)pv->jpv_prcnam);
 				sl_len = MIN(sl_ptr->len, JPV_LEN_PRCNAM);
 			}
-			if (wildcard_match || (pv_len == sl_len) && (0 == memcmp(pv->jpv_prcnam, sl_ptr->buff, sl_len)))
+			if (wildcard_match || ((pv_len == sl_len) && (0 == memcmp(pv->jpv_prcnam, sl_ptr->buff, sl_len))))
 				SET_INCFLAG_OR_RETURN(sl_ptr);
 		}
 		RETURN_IF_ITEM_DOESNT_MATCH_ANY_INCLUDE_PATTERN;

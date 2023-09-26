@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2015 Fidelity National Information	*
+ * Copyright (c) 2011-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -320,7 +320,7 @@ int lvAvlTreeNodeSubscrCmp(lvTreeNode *aNode, lvTreeNode *bNode)
 				if (!aNodeFlt->key_flags.key_bits.key_iconv)
 					lvAvlTreeNodeFltConv(aNodeFlt);
 				assert(aNodeFlt->key_flags.key_bits.key_iconv);
-			} else if (b_mvtype = (MV_INT & b_mvtype))
+			} else if ((b_mvtype = (MV_INT & b_mvtype)))
 			{
 				if (!bNodeFlt->key_flags.key_bits.key_iconv)
 					lvAvlTreeNodeFltConv(bNodeFlt);
@@ -1723,7 +1723,7 @@ lvTreeNode *lvAvlTreeNodeInsert(lvTree *lvt, treeKeySubscr *key, lvTreeNode *par
 	/* At time of node insertion into tree, ensure that if we have MV_CANONICAL bit set, then MV_STR bit is not set.
 	 * This makes it clear that the node key is a number and does not have the string representation constructed.
 	 */
-	assert(!TREE_KEY_SUBSCR_IS_CANONICAL(key->mvtype) || MV_IS_NUMERIC(key) && !MV_IS_STRING(key));
+	assert(!TREE_KEY_SUBSCR_IS_CANONICAL(key->mvtype) || (MV_IS_NUMERIC(key) && !MV_IS_STRING(key)));
 	assert(NULL == lvAvlTreeLookup(lvt, key, &tmp_parent));
 	/* create a node in the avl tree and initialize it */
 	node = lvtreenode_getslot(LVT_GET_SYMVAL(lvt));

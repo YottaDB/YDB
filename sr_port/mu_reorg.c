@@ -52,6 +52,7 @@
 #include "muextr.h"
 #include "mu_reorg.h"
 #include "anticipatory_freeze.h"
+#include "min_max.h"
 
 /* Include prototypes */
 #include "is_proc_alive.h"
@@ -149,28 +150,28 @@ void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *
 	assert((NULL == (char *)(Z)) || (0 < (Z)->depth));
 	util_out_print("!AD::!16@XQ::", FALSE, LEN_AND_STR(X), &tn);
 	for (i = 0; i <= (Y)->depth; i++)
-		util_out_print("!SL|", FALSE, (Y)->h[i].blk_num);
+		util_out_print("0x!XL|", FALSE, (Y)->h[i].blk_num);
 	if (NULL != (char *)(Z))
 	{
 		util_out_print("-", FALSE);
 		for (i = 0; i <= (Z)->depth; i++)
-			util_out_print("!SL|", FALSE, (Z)->h[i].blk_num);
+			util_out_print("0x!XL|", FALSE, (Z)->h[i].blk_num);
 	}
 	if (cw_set_depth)
 	{
 		util_out_print("::", FALSE);
 		for (i = 0; i < cw_set_depth; i++)
-			util_out_print("!SL|", FALSE, cw_set[i].blk);
+			util_out_print("0x!XL|", FALSE, cw_set[i].blk);
 	}
 	if ((0 == memcmp((X), "SPL", 3))
 		|| (0 == memcmp((X), "CLS", 3))
 		|| (0 == memcmp((X), "SWA", 3)))
 	{
 		if (NULL != (char *)(Z))
-			util_out_print("::!SL|!SL", TRUE,
+			util_out_print("::0x!XL|0x!XL", TRUE,
 				(Y)->h[level].blk_num, (Z)->h[level].blk_num);
 		else
-			util_out_print("::!SL", TRUE, (Y)->h[level].blk_num);
+			util_out_print("::0x!XL", TRUE, (Y)->h[level].blk_num);
 	} else
 	{
 		if ((0 == memcmp((X), "KIL", 3)) && (NULL != kill_set_list))
@@ -184,12 +185,13 @@ void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *
 					if (1 != bitmap)
 						util_out_print("]", FALSE);
 					bitmap = temp_bitmap;
-					util_out_print("[!SL:", FALSE, bitmap);
+					util_out_print("[0x!XL:", FALSE, bitmap);
 				}
-				util_out_print("!SL,", FALSE, kill_set_list->blk[i].block);
+				util_out_print("0x!XL,", FALSE, kill_set_list->blk[i].block);
 			}
-			util_out_print("]", TRUE);
+			util_out_print("]", FALSE);
 		}
+		util_out_print(NULL, TRUE);
 	}
 }
 
@@ -205,10 +207,10 @@ Input/Output Parameter:
 			[Only for debugging]
  ****************************************************************/
 boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
-				int index_fill_factor, int data_fill_factor, int reorg_op)
+				int index_fill_factor, int data_fill_factor, int reorg_op, const int min_level)
 {
-	boolean_t		end_of_tree = FALSE, complete_merge, detailed_log;
-	int			rec_size;
+	boolean_t		end_of_tree = FALSE, detailed_log;
+	int			rec_size, pending_levels;
 	/*
 	 *
 	 * "level" is the level of the working block.
@@ -217,15 +219,18 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 	 * in which case pre_order_successor_level will be the maximum height of that subtree
 	 * until we reach the leaf level block .
 	 * In other words, pre_order_successor_level and level variable controls the iterative pre-order traversal.
-	 * We start reorg from the (root_level - 1) to 0. That is, level = pre_order_successor_level:-1:0.
+	 * We start reorg from the root_level to min level. That is, level = pre_order_successor_level:-1:min_level.
 	 */
-	int			pre_order_successor_level, level;
+	int			pre_order_successor_level, level, merge_split_level;
 	static block_id		dest_blk_id = 0;
-	int			tkeysize, altkeylen;
+	int			tkeysize, altkeylen, tkeylen, tkeycmpc;
 	block_id		blks_killed, blks_processed, blks_reused, blks_coalesced, blks_split, blks_swapped,
 				file_extended, lvls_reduced;
-	int			d_max_fill, i_max_fill, blk_size, cur_blk_size, max_fill, toler, d_toler, i_toler;
-	int			cnt1, cnt2, count;
+	int			d_max_fill, i_max_fill, blk_size, cur_blk_size, max_fill, toler, d_clsce_toler, i_clsce_toler,
+				i_rsrvbytes_maxsz, d_rsrvbytes_maxsz, d_split_toler, i_split_toler, i_rsrv_bytes, d_rsrv_bytes;
+	int			cnt1, cnt2, max_rightblk_lvl, count, rtsib_bstar_rec_sz = -1;
+	unsigned short		temp_ushort;
+	boolean_t		long_blk_id, rtsib_long_blk_id;
 	kill_set		kill_set_list;
 	sm_uc_ptr_t		rPtr1;
 	enum cdb_sc		status;
@@ -286,6 +291,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		gv_currkey->end = gn->len + 1;
 		return TRUE;
 	}
+	long_blk_id = (BLK_ID_32_VER < cs_data->desired_db_format);
 	if ((0 != cs_addrs->nl->reorg_upgrade_pid) && (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0)))
 		return FALSE;	/* REORG -UPGRADE cannot run concurrently with TRUNCATE which has higher priority. Stop */
 	memcpy(&gv_currkey_next_reorg->base[0], &gv_currkey->base[0], gv_currkey->end + 1);
@@ -294,15 +300,44 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		dest_blk_id = 2; /* we know that first block is bitmap and next one is directory tree root */
 	file_extended = cs_data->trans_hist.total_blks;
 	blk_size = cs_data->blk_size;
+<<<<<<< HEAD
 	d_max_fill = (double)data_fill_factor * (blk_size - cs_data->reserved_bytes) / 100;
 	i_max_fill = (double)index_fill_factor * (blk_size - cs_data->reserved_bytes) / 100;
 	d_toler = (double) DATA_FILL_TOLERANCE * blk_size / 100.0;
 	i_toler = (double) INDEX_FILL_TOLERANCE * blk_size / 100.0;
+=======
+	/* Enforce a minimum *_max_fill. It would be simplest to make this the same as what we take as the smallest acceptable
+	 * FILL_FACTOR in mupip_reorg (30% of the block size), but there are cases where the smallest safe effective block size
+	 * given by (blk_size - MAX_RESERVE_B) is larger than that. So take into account the maximum reserved bytes and enforce
+	 * a minimum *_max_fill of whatever would be the minimum fill if just considering reserved bytes.
+	 */
+	d_rsrv_bytes = cs_data->reserved_bytes;
+	d_max_fill = (double)data_fill_factor * blk_size / 100.0 - d_rsrv_bytes;
+	if (d_max_fill <= ((blk_size - MAX_RESERVE_B(cs_data, long_blk_id))))
+		d_max_fill = (blk_size - MAX_RESERVE_B(cs_data, long_blk_id));
+	d_rsrvbytes_maxsz = blk_size - d_rsrv_bytes;
+
+	i_rsrv_bytes = cs_data->i_reserved_bytes;
+	i_max_fill = (double)index_fill_factor * blk_size / 100.0 - i_rsrv_bytes;
+	if (i_max_fill <= ((blk_size - MAX_RESERVE_B(cs_data, long_blk_id))))
+		i_max_fill = (blk_size - MAX_RESERVE_B(cs_data, long_blk_id));
+	i_rsrvbytes_maxsz = blk_size - i_rsrv_bytes;
+	assert(d_rsrvbytes_maxsz >= d_max_fill);
+	assert(i_rsrvbytes_maxsz >= i_max_fill);
+	d_split_toler = d_clsce_toler = (double) DATA_FILL_TOLERANCE * blk_size / 100.0;
+	/* Make sure we always try to split if the block exceeds reserved bytes */
+	if ((d_split_toler + d_max_fill) > d_rsrvbytes_maxsz)
+		d_split_toler = d_rsrvbytes_maxsz - d_max_fill;
+	i_split_toler = i_clsce_toler = (double) INDEX_FILL_TOLERANCE * blk_size / 100.0;
+	if ((i_split_toler + i_max_fill) > i_rsrvbytes_maxsz)
+		i_split_toler = i_rsrvbytes_maxsz - i_max_fill;
+
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 	blks_killed = blks_processed = blks_reused = lvls_reduced = blks_coalesced = blks_split = blks_swapped = 0;
-	pre_order_successor_level = level = MAX_BT_DEPTH + 1; /* Just some high value to initialize */
+	level = pre_order_successor_level = MAX_BT_DEPTH + 1; /* Just some high value to initialize */
 
 	/* --- more detailed debugging information --- */
-	if (detailed_log = reorg_op & DETAIL)
+	if ((detailed_log = reorg_op & DETAIL))
 		util_out_print("STARTING to work on global ^!AD from region !AD", TRUE,
 			gn->len, gn->addr, REG_LEN_STR(gv_cur_region));
 
@@ -312,16 +347,25 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		/* If right sibling is completely merged with the working block, do not swap the working block
 		 * with its final destination block. Continue trying next right sibling. Swap only at the end.
 		 */
-		complete_merge = TRUE;
-		while(complete_merge)	/* === START WHILE COMPLETE_MERGE === */
+		/* We always start with a single pending level for the split-coalesce loop. More levels can be
+		 * enqueued by coalesces, which force us to revisit parents for split-coalesce reprocessing
+		 */
+		pending_levels = 1;
+		merge_split_level = level;
+		while(pending_levels)	/* === START WHILE COMPLETE_MERGE === */
 		{
+			assert(pending_levels >= 0);
 			if (mu_ctrlc_occurred || mu_ctrly_occurred || ((0 != cs_addrs->nl->reorg_upgrade_pid)
 						&& (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0))))
 			{	/* REORG -UPGRADE cannot run concurrently with REORG which has higher priority. Stop */
 				SAVE_REORG_RESTART;
 				return FALSE;
 			}
-			complete_merge = FALSE;
+			pending_levels--;
+			if (pending_levels)
+				merge_split_level++;
+			else
+				merge_split_level = level;
 			blks_processed++;
 			t_begin(ERR_MUREORGFAIL, UPDTRNS_DB_UPDATED_MASK);
 			/* Following for loop is to handle concurrency retry for split/coalesce */
@@ -334,30 +378,52 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 					t_retry(status);
 					continue;
 				}
-				if (gv_target->hist.depth <= level)
+				if (gv_target->hist.depth < level)
 				{
 					/* Will come here
 					 * 	1) first iteration of the for loop (since level == MAX_BT_DEPTH + 1) or,
 					 *	2) tree depth decreased for mu_reduce_level or, M-kill
 					 */
-					pre_order_successor_level = gv_target->hist.depth - 1;
+					if (min_level > gv_target->hist.depth)
+					{
+						util_out_print("REORG may be incomplete for this global.", TRUE);
+						reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
+							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
+						return TRUE;
+
+					}
+					pre_order_successor_level = min_level;
+					/* break the loop when tree depth decreased (case 2) */
 					if (MAX_BT_DEPTH + 1 != level)
 					{
-						/* break the loop when tree depth decreased (case 2) */
-						level = pre_order_successor_level;
+						level = merge_split_level = gv_target->hist.depth;
 						break;
 					}
-					level = pre_order_successor_level;
+					level = merge_split_level = gv_target->hist.depth;
 				}
+<<<<<<< HEAD
 				max_fill = (0 == level) ? d_max_fill : i_max_fill;
 				assert(0 <= max_fill);
 				toler = (0 == level) ? d_toler : i_toler;
 				cur_blk_size =  ((blk_hdr_ptr_t)(gv_target->hist.h[level].buffaddr))->bsiz;
 				if ((cur_blk_size > (max_fill + toler)) && (0 == (reorg_op & NOSPLIT))) /* SPLIT BLOCK */
+=======
+				assert(merge_split_level >= min_level);
+				max_fill = (0 == merge_split_level) ? d_max_fill : i_max_fill;
+				toler = (0 == merge_split_level) ? d_split_toler : i_split_toler;
+				cur_blk_size =  ((blk_hdr_ptr_t)(gv_target->hist.h[merge_split_level].buffaddr))->bsiz;
+				if (!pending_levels			/* While levels need reprocessing, avoid block split */
+						&& (cur_blk_size > (max_fill + toler)) /* Check for block split */
+						&& (0 == (reorg_op & NOSPLIT))) /* SPLIT BLOCK is ON*/
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 				{
+
+					assert(merge_split_level == level);
 					cnt1 = cnt2 = 0;
+					max_rightblk_lvl = merge_split_level;
 					/* history of current working block is in gv_target */
-					status = mu_split(level, i_max_fill, d_max_fill, &cnt1, &cnt2);
+					status = mu_split(merge_split_level, i_max_fill, d_max_fill, &cnt1, &cnt2,
+							&max_rightblk_lvl);
 					if (cdb_sc_maxlvl == status)
 					{
 						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_MAXBTLEVEL, 4, gn->len, gn->addr,
@@ -373,13 +439,24 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
 							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
+							max_rightblk_lvl = min_level;
 							continue;
 						}
 						if (detailed_log)
-							log_detailed_log("SPL", &(gv_target->hist), NULL, level, NULL, ret_tn);
+							log_detailed_log("SPL", &(gv_target->hist), NULL, merge_split_level,
+									NULL, ret_tn);
 						blks_reused += cnt1;
 						lvls_reduced -= cnt2;
 						blks_split++;
+						/* If mu_split created any new righthand index blocks which include the current
+						 * record's ancestor, then we need to ensure we fully traverse these blocks. This
+						 * means traversing them from the top-down, since it's possible to split off
+						 * several righthand blocks from multiple levels of the tree in one mu_split.
+						 */
+						if (max_rightblk_lvl > merge_split_level)
+							pre_order_successor_level = MAX(max_rightblk_lvl,
+									pre_order_successor_level);
+						max_rightblk_lvl = min_level;
 						break;
 					} else if (cdb_sc_oprnotneeded == status)
 					{	/* undo any update_array/cw_set changes and DROP THRU to mu_clsce */
@@ -394,7 +471,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				} /* end if SPLIT BLOCK */
 				/* We are here because, mu_split() was not called or, split was not done or, not required */
 				rtsib_hist = gv_target->alt_hist;
-				status = gvcst_rtsib(rtsib_hist, level);
+				status = gvcst_rtsib(rtsib_hist, merge_split_level);
 				if (cdb_sc_normal != status && cdb_sc_endtree != status)
 				{
 					t_retry(status);
@@ -402,24 +479,28 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				}
 				if (cdb_sc_endtree == status)
 				{
-					if (0 == level)
+					if (min_level == merge_split_level)
 						end_of_tree = TRUE;
 					break;
-				} else if (0 == level)
-					pre_order_successor_level = rtsib_hist->depth - 1;
+				} else if (min_level == merge_split_level)
+					pre_order_successor_level = MAX((rtsib_hist->depth - 1), pre_order_successor_level);
 				/* COALESCE WITH RTSIB */
 				kill_set_list.used = 0;
+				toler = (0 == merge_split_level) ? d_clsce_toler : i_clsce_toler;
 				if (cur_blk_size < max_fill - toler && 0 == (reorg_op & NOCOALESCE))
 				{
 					/* histories are sent in &gv_target->hist and gv_target->alt_hist */
-					status = mu_clsce(level, i_max_fill, d_max_fill, &kill_set_list, &complete_merge);
+
+					status = mu_clsce(merge_split_level, i_max_fill, d_max_fill, &kill_set_list,
+							&pending_levels);
 					if (cdb_sc_normal == status)
 					{
-						if (level) /* delete lower elements of array, t_end might confuse */
+						if (merge_split_level) /* delete lower elements of array, t_end might confuse */
 						{
-							memmove(&rtsib_hist->h[0], &rtsib_hist->h[level],
-								SIZEOF(srch_blk_status)*(rtsib_hist->depth - level + 2));
-							rtsib_hist->depth = rtsib_hist->depth - level;
+							memmove(&rtsib_hist->h[0], &rtsib_hist->h[merge_split_level],
+									SIZEOF(srch_blk_status)*(rtsib_hist->depth
+										- merge_split_level + 2));
+							rtsib_hist->depth = rtsib_hist->depth - merge_split_level;
 						}
 						if (0 < kill_set_list.used)     /* increase kill_in_prog */
 						{
@@ -434,20 +515,20 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
 							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
-							if (level)
+							if (merge_split_level)
 							{	/* reinitialize level member in rtsib_hist srch_blk_status' */
 								for (count = 0; count < MAX_BT_DEPTH; count++)
 									rtsib_hist->h[count].level = count;
 							}
 							continue;
 						}
-						if (level)
+						if (merge_split_level)
 						{	/* reinitialize level member in rtsib_hist srch_blk_status' */
 							for (count = 0; count < MAX_BT_DEPTH; count++)
 								rtsib_hist->h[count].level = count;
 						}
 						if (detailed_log)
-							log_detailed_log("CLS", &(gv_target->hist), rtsib_hist, level,
+							log_detailed_log("CLS", &(gv_target->hist), rtsib_hist, merge_split_level,
 								NULL, ret_tn);
 						assert(0 < kill_set_list.used || (NULL == kip_csa));
 						if (0 < kill_set_list.used)     /* decrease kill_in_prog */
@@ -458,7 +539,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 							DECR_KIP(cs_data, cs_addrs, kip_csa);
 							DEFERRED_EXIT_REORG_CHECK;
 							if (detailed_log)
-								log_detailed_log("KIL", &(gv_target->hist), NULL, level,
+								log_detailed_log("KIL", &(gv_target->hist), NULL, merge_split_level,
 									&kill_set_list, ret_tn);
 							blks_killed += kill_set_list.used;
 						}
@@ -475,9 +556,9 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 						continue;
 					}
 				} /* end if try coalesce */
-				if (0 == level)
+				if (min_level == merge_split_level)
 				{
-					/* Note: In data block level:
+					/* Note: In min level:
 					 *      if split is successful or,
 					 *	if coalesce is successful without a complete merge of rtsib,
 					 *	then gv_currkey_next_reorg is already set from the called function.
@@ -488,12 +569,45 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 					 *	here gv_currkey_next_reorg will be set from right sibling
 					 */
 					cw_set_depth = cw_map_depth = 0;
-					tkeysize = get_key_len(rtsib_hist->h[0].buffaddr, rtsib_hist->h[0].buffaddr
-											+ SIZEOF(blk_hdr) + SIZEOF(rec_hdr));
+					if (merge_split_level)
+					{
+						GET_RSIZ(rec_size, (rtsib_hist->h[merge_split_level].buffaddr + SIZEOF(blk_hdr)));
+						rtsib_long_blk_id = IS_64_BLK_ID(rtsib_hist->h[merge_split_level].buffaddr);
+						rtsib_bstar_rec_sz = bstar_rec_size(rtsib_long_blk_id);
+						status = gvcst_expand_any_key(&rtsib_hist->h[merge_split_level],
+								rtsib_hist->h[merge_split_level].buffaddr + SIZEOF(blk_hdr)
+								+ rec_size, gv_currkey_next_reorg->base, &rec_size, &tkeylen,
+								&tkeycmpc, rtsib_hist);
+						if (cdb_sc_normal != status)
+						{
+							t_retry(status);
+							continue;
+						}
+						tkeysize = tkeycmpc + tkeylen;
+						if (rtsib_bstar_rec_sz != rec_size)
+						{
+							/* If gvcst_expand_any_key found a star-key and therefore needed
+							 * to process all righthand children, do t_qreads on those blocks,
+							 * and initialize rtsib_hist->h[min_level - 1] to rtsib_hist->h[0],
+							 * then we need to do nothing. Otherwise, those lower levels can have
+							 * garbage data left over and confuse t_end, so we need to fix here
+							 * and clean up after.
+							 */
+							memmove(&rtsib_hist->h[0], &rtsib_hist->h[merge_split_level],
+									SIZEOF(srch_blk_status)*(rtsib_hist->depth
+										- merge_split_level + 2));
+							rtsib_hist->depth = rtsib_hist->depth - merge_split_level;
+
+						}
+					} else
+						tkeysize = get_key_len(rtsib_hist->h[merge_split_level].buffaddr,
+							rtsib_hist->h[merge_split_level].buffaddr + SIZEOF(blk_hdr)
+							+ SIZEOF(rec_hdr));
 					if (2 < tkeysize && MAX_KEY_SZ >= tkeysize)
 					{
-						memcpy(&(gv_currkey_next_reorg->base[0]), rtsib_hist->h[0].buffaddr
-							+ SIZEOF(blk_hdr) +SIZEOF(rec_hdr), tkeysize);
+						if (!merge_split_level)
+							memcpy(&(gv_currkey_next_reorg->base[0]), rtsib_hist->h[0].buffaddr
+									+ SIZEOF(blk_hdr) +SIZEOF(rec_hdr), tkeysize);
 						gv_currkey_next_reorg->end = tkeysize - 1;
 						inctn_opcode = inctn_invalid_op; /* temporary reset; satisfy an assert in t_end() */
 						assert(UPDTRNS_DB_UPDATED_MASK == update_trans);
@@ -504,6 +618,11 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
 							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
+							if (merge_split_level && (rtsib_bstar_rec_sz != rec_size))
+							{	/* reinitialize level member in rtsib_hist srch_blk_status' */
+								for (count = 0; count < MAX_BT_DEPTH; count++)
+									rtsib_hist->h[count].level = count;
+							}
 							inctn_opcode = inctn_mu_reorg;	/* reset inctn_opcode to its default */
 							update_trans = UPDTRNS_DB_UPDATED_MASK;/* reset update_trans to old value */
 							continue;
@@ -512,11 +631,21 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 						 * This is because before the next call to "t_end" we should have a call to
 						 * "t_begin" which will reset update_trans anyways.
 						 */
+						if (merge_split_level && (rtsib_bstar_rec_sz != rec_size))
+						{	/* reinitialize level member in rtsib_hist srch_blk_status' */
+							for (count = 0; count < MAX_BT_DEPTH; count++)
+								rtsib_hist->h[count].level = count;
+						}
 						inctn_opcode = inctn_mu_reorg;	/* reset inctn_opcode to its default */
 						if (detailed_log)
-							log_detailed_log("NOU", rtsib_hist, NULL, level, NULL, ret_tn);
+							log_detailed_log("NOU", rtsib_hist, NULL, merge_split_level, NULL, ret_tn);
 					} else
 					{
+						if (merge_split_level && (rtsib_bstar_rec_sz != rec_size))
+						{	/* reinitialize level member in rtsib_hist srch_blk_status' */
+							for (count = 0; count < MAX_BT_DEPTH; count++)
+								rtsib_hist->h[count].level = count;
+						}
 						t_retry(status);
 						continue;
 					}
@@ -612,7 +741,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 							level, NULL, ret_tn);
 					blks_swapped++;
 					if (reorg_op & SWAPHIST)
-						util_out_print("Dest !SL From !SL", TRUE, dest_blk_id,
+						util_out_print("Dest 0x!XL From 0x!XL", TRUE, dest_blk_id,
 							gv_target->hist.h[level].blk_num);
 				} else
 				{
@@ -631,11 +760,13 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		}
 		if (end_of_tree)
 			break;
-		if (0 < level)
+		if (min_level < level)
 			level--; /* Order of reorg is root towards leaf */
 		else
 		{
 			level = pre_order_successor_level;
+			pre_order_successor_level = min_level;
+			assert(gv_currkey_next_reorg->end < gv_currkey->top);
 			memcpy(&gv_currkey->base[0], &gv_currkey_next_reorg->base[0], gv_currkey_next_reorg->end + 1);
 			gv_currkey->end =  gv_currkey_next_reorg->end;
 			SAVE_REORG_RESTART;

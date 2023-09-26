@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -342,7 +342,7 @@ int gtmsource()
 	{	/* Parent. Wait until child sets "child_server_running" to FALSE. That is an indication that the child
 		 * source server has completed its initialization phase and is all set so the parent command can return.
 		 */
-		while (isalive = is_proc_alive(pid, 0))	/* note : intended assignment */
+		while ((isalive = is_proc_alive(pid, 0)))	/* note : intended assignment */
 		{
 			if (gtmsource_local->child_server_running)
 				break;

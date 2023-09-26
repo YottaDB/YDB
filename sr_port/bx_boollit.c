@@ -59,8 +59,12 @@ void bx_boollit(triple *t, int depth)
 	if (OC_BOOLINIT == t->opcode)
 		return;
 	assert(TRIP_REF == t->operand[0].oprclass);
+<<<<<<< HEAD
 	assert(((OC_COBOOL != t->opcode) && (OC_COM != t->opcode))
 		|| (TRIP_REF == t->operand[1].oprclass));
+=======
+	assert(((OC_COBOOL != opercode) && (OC_COM != opercode)) || (TRIP_REF == t->operand[1].oprclass));
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 	for (opr = t->operand, j = 0; opr < ARRAYTOP(t->operand); opr++, j++)
 	{	/* checkout an operand to see if we can simplify it */
 		p = opr;

@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> fdfdea1e (GT.M V7.1-002)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,7 +88,7 @@ void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 			lvent.var_name.len = lvname->str.len;
 			lvent.var_name.addr = lvname->str.addr;
 			COMPUTE_HASH_MNAME(&lvent);
-			if (tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &lvent))
+			if ((tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &lvent)))
 			{	/* save info about the variable */
 				lv = (lv_val *)tabent->value;
 				assert(lv);

@@ -669,7 +669,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 			for (xnewvar = symtab->xnew_var_list; xnewvar; xnewvar = xnewvar->next)
 				MSTR_STPG_ADD(&xnewvar->key.var_name);
 		}
-		if (x = comline_base)
+		if ((x = comline_base))
 			for (index = MAX_RECALL; index > 0 && x->len; index--, x++)
 			{	/* These strings are guaranteed to be in the stringpool so use MSTR_STPG_PUT macro directly
 				 * instead of going through MSTR_STPG_ADD. But assert accordingly to be sure.

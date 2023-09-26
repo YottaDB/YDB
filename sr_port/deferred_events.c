@@ -245,7 +245,7 @@ boolean_t xfer_reset_if_setter(int4 event_type)
 	if (res)
 	{	/* it's worth a try */
 		DBGDFRDEVNT((stderr, "%d %s: xfer_reset_if_setter: event_type %d is first\n", __LINE__, __FILE__, event_type));
-		if (res = (active == TAREF1(save_xfer_root, event_type).event_state))	/* WARNING: assignment */
+		if ((res = (active == TAREF1(save_xfer_root, event_type).event_state)))	/* WARNING: assignment */
 			res = (real_xfer_reset(event_type));
 		DBGDFRDEVNT((stderr, "%d %s: xfer_reset_if_setter: xfer_reset_handlers returned %d\n", __LINE__, __FILE__, res));
 		if (res && (not_in_play != TAREF1(save_xfer_root, tptimeout).event_state))

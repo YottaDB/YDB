@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -163,7 +163,7 @@ int icmp_ping(int conn)
 	}
 	/* compute ICMP checksum here */
 	icp->icmp_cksum = in_cksum((u_short *)icp, ICMP_MINLEN + SIZEOF(int));
-	while (cc = sendto(pingsock, (char *)pingsend, ICMP_MINLEN + SIZEOF(int), 0, (struct sockaddr *)&paddr, paddr_len) < 0)
+	while ((cc = sendto(pingsock, (char *)pingsend, ICMP_MINLEN + SIZEOF(int), 0, (struct sockaddr *)&paddr, paddr_len) < 0))
 	{
 		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (errno == EINTR)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2020 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
@@ -173,7 +173,7 @@ typedef struct
 		memset(&RECVPOOL_CTL->is_valid_strm_histinfo[0], 0, SIZEOF(RECVPOOL_CTL->is_valid_strm_histinfo));		\
 		RECVPOOL_CTL->max_strm_histinfo = 0;										\
 		assert((0 == RECVPOOL_CTL->jnl_seqno)										\
-			|| (0 < RECVPOOL_CTL->jnl_seqno) && (RECVPOOL_CTL->jnl_seqno >= JNLPOOL->jnlpool_ctl->jnl_seqno));	\
+			|| ((0 < RECVPOOL_CTL->jnl_seqno) && (RECVPOOL_CTL->jnl_seqno >= JNLPOOL->jnlpool_ctl->jnl_seqno)));	\
 		assert(0 < JNLPOOL->jnlpool_ctl->jnl_seqno);									\
 		RECVPOOL_CTL->insert_strm_histinfo = INSERT_STRM_HISTINFO;							\
 	}															\
@@ -377,6 +377,8 @@ typedef struct
 	boolean_t	autorollback;
 	boolean_t	autorollback_verbose;
 	boolean_t	stopreceiverfilter;
+	int4		send_buffsize;
+	int4		recv_buffsize;
 } gtmrecv_options_t;
 
 #include "gtm_inet.h"

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +34,7 @@ void rel_mmseg(caddr_t begin)
 			free(curr);
 			return;
 		}
-		while (next = curr->next)
+		while ((next = curr->next))
 		{
 			if ((sm_uc_ptr_t)begin == next->begin)
 			{
@@ -46,4 +47,3 @@ void rel_mmseg(caddr_t begin)
 	}
 	return;
 }
-

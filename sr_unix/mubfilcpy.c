@@ -243,6 +243,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		tempdir[0] = '.';
 		tempdir[1] = '\0';
 	}
+<<<<<<< HEAD
 	memset(prefix, 0, MAX_FN_LEN);
 	memcpy(prefix, gv_cur_region->rname, gv_cur_region->rname_len);
 	/* For testing purposes, we set the pid part of the temp file name to 99999 instead of the
@@ -256,6 +257,9 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	else
 #	endif
 		SNPRINTF(&prefix[gv_cur_region->rname_len], MAX_FN_LEN - gv_cur_region->rname_len, "_%d_", process_id);
+=======
+	snprintf(prefix, MAX_FN_LEN, "%.*s_%d_", (int) (gv_cur_region->rname_len), gv_cur_region->rname, process_id);
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 	/* verify that we have access to the temporary directory to avoid /tmp */
 	if (0 != ACCESS(tempdir, TMPDIR_ACCESS_MODE))
 	{

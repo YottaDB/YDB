@@ -294,7 +294,7 @@ int cmd(void)
 			/* Remove OC_BOOLEXPRSTART and OC_BOOLEXPRFINISH opcodes too */
 			REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish);	/* Note: Will set "boolexprfinish" to NULL */
 		}
-		if (shifting = ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode)))
+		if ((shifting = ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode))))
 		{	/* NOTE - assignment above */
 			temp_expr_start = TREF(expr_start);
 			triptr = newtriple(OC_GVRECTARG);

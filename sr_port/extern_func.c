@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2017 Fidelity National Information	*
+ * Copyright (c) 2011-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,7 +39,7 @@ int extern_func(oprtype *a)
 	extref = ((TREF(source_buffer)).addr + TREF(last_source_column) - 1);
 	package.len = 0;
 	package.addr = NULL;
-	if (have_ident = (TK_IDENT == TREF(window_token)))			/* NOTE assignment */
+	if ((have_ident = (TK_IDENT == TREF(window_token))))			/* NOTE assignment */
 	{
 		if (TK_PERIOD == TREF(director_token))
 		{	/* if ident is a package reference, then take it off */
@@ -48,7 +48,7 @@ int extern_func(oprtype *a)
 			extref = TREF(lexical_ptr);
 			advancewindow();		/* get to . */
 			advancewindow();		/* to next token */
-			if (have_ident = (TK_IDENT == TREF(window_token)))	/* NOTE assignment */
+			if ((have_ident = (TK_IDENT == TREF(window_token))))	/* NOTE assignment */
 				advancewindow();
 		} else
 			advancewindow();

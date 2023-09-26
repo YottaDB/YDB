@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -73,7 +73,7 @@ void dse_f_reg(void)
 	found = FALSE;
 	for (i = 0, regptr = original_header->regions; i < original_header->n_regions ;i++, regptr++)
 	{
-		if (found = !memcmp(&regptr->rname[0], &rn[0], MAX_RN_LEN))
+		if ((found = !memcmp(&regptr->rname[0], &rn[0], MAX_RN_LEN)))
 			break;
 	}
 	if (!found)

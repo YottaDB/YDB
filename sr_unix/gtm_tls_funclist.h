@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2021 Fidelity National Information	*
+ * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,8 @@ TLS_DEF(gtm_tls_prefetch_passwd)
 TLS_DEF(gtm_tls_socket)
 TLS_DEF(gtm_tls_connect)
 TLS_DEF(gtm_tls_accept)
+TLS_DEF(gtm_tls_do_post_hand_shake)
+TLS_DEF(gtm_tls_repeat_hand_shake)
 TLS_DEF(gtm_tls_renegotiate)
 TLS_DEF(gtm_tls_get_conn_info)
 TLS_DEF(gtm_tls_send)

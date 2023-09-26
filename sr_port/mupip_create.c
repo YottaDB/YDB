@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
@@ -104,7 +104,7 @@ void mupip_create(void)
 		gv_cur_region = NULL;
 	}
 	if (exit_stat & EXIT_MASK)
-		mupip_exit(ERR_DBNOCRE & ~EXIT_MASK | (exit_stat & EXIT_MASK));
+		mupip_exit((ERR_DBNOCRE & ~EXIT_MASK) | (exit_stat & EXIT_MASK));
 	else
 		mupip_exit(SS_NORMAL);
 }

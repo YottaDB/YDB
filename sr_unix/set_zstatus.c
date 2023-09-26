@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -74,7 +74,7 @@ unsigned char *set_zstatus(mstr *src, int max_len, int arg, unsigned char **ctxt
 	}
 	MV_FORCE_MVAL(&val, arg);
 	n2s(&val);
-	memcpy(zstatus_buff, val.str.addr, val.str.len);
+	memcpy((void *)zstatus_buff, val.str.addr, val.str.len);
 	zstatus_bptr = zstatus_buff + val.str.len;
 	*zstatus_bptr++ = ',';
 	if (copy_entryref)

@@ -87,7 +87,7 @@ char	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char **ext_buff, int *extract_bu
 			tmp = malloc(tmpbufsiz);
 			origbuf = *ext_buff;
 			tmpsize = extbuf - origbuf;
-			memcpy(tmp, origbuf, tmpsize);
+			memcpy((void *)tmp, origbuf, tmpsize);
 			free(origbuf);
 			*ext_buff = tmp;
 			*extract_bufsiz = tmpbufsiz;

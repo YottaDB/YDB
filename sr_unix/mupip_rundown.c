@@ -160,7 +160,11 @@ void mupip_rundown(void)
 		if ((jnlpool_rndwn_required = (region && mu_star_specified)) || anticipatory_freeze_available) /* note:assigmnent */
 		{
 			/* sets replpool_id/full_len; note: assignment */
+<<<<<<< HEAD
 			if (DEBUG_ONLY(repl_inst_available = )REPL_INST_AVAILABLE(gd_header))
+=======
+			if ((DEBUG_ONLY(repl_inst_available = )REPL_INST_AVAILABLE(NULL)))
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 			{
 				gd_id		instfilename_gdid;
 

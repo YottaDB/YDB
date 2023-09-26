@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2022 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
@@ -177,7 +177,7 @@
  * (including 1-byte and 2-byte codepoints).
  */
 #define	UTF8_NONCHAR_CODEPOINT(codepoint)							\
-	(((unsigned)(codepoint) <= UTF8_3BYTE_MAX) && (UTF8_NONCHAR_CODE_3BYTE(codepoint))	\
+	((((unsigned)(codepoint) <= UTF8_3BYTE_MAX) && (UTF8_NONCHAR_CODE_3BYTE(codepoint)))	\
 		||  UTF8_NONCHAR_CODE_4BYTE(codepoint))
 
 /* boolean_t UTF8_NONCHAR_3BYTE(char* mbptr)

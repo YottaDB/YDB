@@ -43,14 +43,14 @@ error_def(ERR_DSEWCREINIT);
 	assert(SIZEOF(dollarh_buffer) >= dollarh_mval.str.len);									\
 	/* if op_fnzdate (called below) calls stp_gcol, dollarh_mval might get corrupt because it is not known to stp_gcol.	\
 	 * To prevent problems, copy from stringpool to local buffer */								\
-	memcpy(dollarh_buffer, dollarh_mval.str.addr, dollarh_mval.str.len);							\
+	memcpy((void *)dollarh_buffer, dollarh_mval.str.addr, dollarh_mval.str.len);						\
 	dollarh_mval.str.addr = (char *)dollarh_buffer;										\
 	stringpool.free -= dollarh_mval.str.len; /* now that we've made a copy, we don't need dollarh_mval in stringpool */	\
 	op_fnzdate(&dollarh_mval, &dse_dmp_time_fmt, (mval *)&literal_null, (mval *)&literal_null, &zdate_mval);		\
 		/* op_fnzdate() returns zdate formatted string in stringpool */							\
 	assert(SIZEOF(zdate_buffer) >= zdate_mval.str.len);									\
 	/* copy over stringpool string into local buffer to ensure zdate_mval will not get corrupt */				\
-	memcpy(zdate_buffer, zdate_mval.str.addr, zdate_mval.str.len);								\
+	memcpy((void *)zdate_buffer, zdate_mval.str.addr, zdate_mval.str.len);							\
 	zdate_mval.str.addr = (char *)zdate_buffer;										\
 	stringpool.free -= zdate_mval.str.len; /* now that we've made a copy, we don't need zdate_mval in stringpool anymore */	\
 }
@@ -226,11 +226,13 @@ MBSTART {								\
 	patch_comp_count = patch_comp_key[0] = patch_comp_key[1] = 0;	\
 } MBEND
 
-/* Not a V7 database label and either not fully upgraded or there are blocks to upgrade */
+/* Not a V7 database label and either not fully upgraded or there are blocks to upgrade
+ *We BYPASSOK the error_defs because we don't want to require new error_defs for using this macro.
+ *We BYPASSOK the FGETS because LIT_AND_LEN would make the code less clear here (and it's not a LIT) */
 #define	DSE_DB_IS_TOO_OLD(CSA, CSD, REG)						\
 MBSTART {										\
-	error_def(ERR_DBUPGRDREQ); 							\
-	error_def(ERR_DSENOFINISH); 							\
+	error_def(ERR_DBUPGRDREQ); /* BYPASSOK */					\
+	error_def(ERR_DSENOFINISH); /* BYPASSOK */					\
 	LITREF	char *gtm_dbversion_table[];						\
 	char	confirm[256], *fgets_res;						\
 	size_t	len;									\
@@ -242,7 +244,7 @@ MBSTART {										\
 				3, DB_LEN_STR(REG),					\
 				gtm_dbversion_table[CSD->desired_db_format]);		\
 		util_out_print("Please confirm this action [yN]: ", TRUE);		\
-		FGETS(confirm, sizeof(confirm) - 1, stdin, fgets_res);			\
+		FGETS(confirm, sizeof(confirm) - 1, stdin, fgets_res); /* BYPASSOK */	\
 		len = strlen(confirm);							\
 		if ((0 == len) || (confirm[0] != 'Y' && confirm[0] != 'y'))		\
 		{									\

@@ -96,6 +96,7 @@ void jnl_file_close_timer(void)
 					/* Assert that we never have an active write on a previous generation journal file. */
 					assert(process_id != jpc->jnl_buff->io_in_prog_latch.u.parts.latch_pid);
 					JNL_FD_CLOSE(jpc->channel, rc);	/* sets jpc->channel to NOJNL */
+					assert(0 == rc); /* Journal file closing has an error */
 					jpc->pini_addr = 0;
 				}
 				do_timer_restart |= csa->snapshot_in_prog || ((NULL != jpc) && (NOJNL != jpc->channel));

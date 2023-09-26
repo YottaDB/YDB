@@ -106,6 +106,8 @@ int gtmsource_get_opt(void)
 	gtmsource_options.jnlpool = (CLI_PRESENT == cli_present("JNLPOOL"));
 	secondary = (CLI_PRESENT == cli_present("SECONDARY"));
 	gtmsource_options.rootprimary = ROOTPRIMARY_UNSPECIFIED; /* to indicate unspecified state */
+	gtmsource_options.send_buffsize = GTMSOURCE_TCP_SEND_BUFSIZE;
+	gtmsource_options.recv_buffsize = GTMSOURCE_TCP_RECV_BUFSIZE;
 	if ((CLI_PRESENT == cli_present("ROOTPRIMARY")) || (CLI_PRESENT == cli_present("UPDOK")))
 		gtmsource_options.rootprimary = ROOTPRIMARY_SPECIFIED;
 	else if ((CLI_PRESENT == cli_present("PROPAGATEPRIMARY")) || (CLI_PRESENT == cli_present("UPDNOTOK")))
@@ -425,6 +427,38 @@ int gtmsource_get_opt(void)
 			ydb_zlib_cmp_level = gtmsource_options.cmplvl;
 		} else
 			gtmsource_options.cmplvl = ZLIB_CMPLVL_MIN;	/* no compression in this case */
+		if (CLI_NEGATED == (status = cli_present("SENDBUFFSIZE")))
+			gtmsource_options.send_buffsize = 0;
+		else if (CLI_PRESENT == status)
+		{
+			if (!cli_get_int("SENDBUFFSIZE", &gtmsource_options.send_buffsize))
+			{
+				util_out_print("Error parsing SENDBUFFSIZE qualifier", TRUE);
+				return (-1);
+			} else if (GTMSOURCE_MIN_TCP_SEND_BUFSIZE > gtmsource_options.send_buffsize)
+			{
+				util_out_print("GTM-W-BUFFSIZETOOSMALL, TCP send buffer size passed to source too small, setting "
+						"to minimum size of !SL.", TRUE, GTMSOURCE_MIN_TCP_SEND_BUFSIZE);
+				gtmsource_options.send_buffsize = GTMSOURCE_MIN_TCP_SEND_BUFSIZE;
+			}
+			assert(GTMSOURCE_MIN_TCP_SEND_BUFSIZE <= gtmsource_options.send_buffsize);
+		}
+		if (CLI_NEGATED == (status = cli_present("RECVBUFFSIZE")))
+			gtmsource_options.recv_buffsize = 0;
+		else if (CLI_PRESENT == status)
+		{
+			if (!cli_get_int("RECVBUFFSIZE", &gtmsource_options.recv_buffsize))
+			{
+				util_out_print("Error parsing RECVBUFFSIZE qualifier", TRUE);
+				return (-1);
+			} else if (GTMSOURCE_MIN_TCP_RECV_BUFSIZE > gtmsource_options.recv_buffsize)
+			{
+				util_out_print("GTM-W-BUFFSIZETOOSMALL, TCP recv buffer size passed to source too small, setting "
+						"to minimum size of !SL.", TRUE, GTMSOURCE_MIN_TCP_RECV_BUFSIZE);
+				gtmsource_options.recv_buffsize = GTMSOURCE_MIN_TCP_RECV_BUFSIZE;
+			}
+			assert(GTMSOURCE_MIN_TCP_RECV_BUFSIZE <= gtmsource_options.recv_buffsize);
+		}
 		/* Check if SSL/TLS secure communication is requested. */
 #		ifdef GTM_TLS
 		if (CLI_PRESENT == cli_present("TLSID"))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -99,6 +99,7 @@ int gtcm_prsopt(int argc, char_ptr_t argv[])
 	char_ptr_t	debug_argv = NULL;
 	boolean_t	inv_option = FALSE;
 
+<<<<<<< HEAD
 	ASSERT_IS_LIBGTCM;
 	for (i = 1, argv++; i < argc; argv += optlist[j].args + 1, i += optlist[j].args + 1)
 	{
@@ -137,6 +138,72 @@ int gtcm_prsopt(int argc, char_ptr_t argv[])
 			ping_keepalive = 1;
 			break;
 		case opt_null:
+=======
+    for (i = 1, argv++; i < argc; argv += optlist[j].args + 1, i += optlist[j].args + 1)
+    {
+	    for(j = 0; (opt = optlist[j].option); j++)
+		    if (!strcmp(*argv, optlist[j].name))
+			    break;
+	    if ((i + optlist[j].args) >= argc)
+	    {
+		    FPRINTF(stderr, "%s option requires an argument - ignored\n", *argv);
+		    continue;
+	    }
+	    switch(opt)
+	    {
+		  case opt_debug:
+		    if ((*(argv + 1))[0] == '-' && (*(argv + 1))[1] == '\0')
+			    omi_debug = stdout;
+		    else if ((*(argv + 1))[0] == '=' && (*(argv + 1))[1] == '\0')
+			    omi_debug = stderr;
+		    else
+		    {
+#ifdef __MVS__
+			    if (-1 == gtm_zos_create_tagged_file(*(argv + 1), TAG_EBCDIC))
+					perror("error tagging log file");
+#endif
+		    	    Fopen(omi_debug, *(argv + 1), "w+");
+		    	    if (!omi_debug)
+		    	    {
+			    	    perror("error opening log file");
+			    	    EXIT(1);
+		    	    }
+		    }
+		    break;
+		  case opt_pktlog:	omi_pklog = *(argv + 1);  break;
+		  case opt_service:	omi_service = *(argv + 1); break;
+		  case opt_rc_id:	rc_server_id = atoi(*(argv + 1)); break;
+		  case opt_pktlog_addr: omi_pklog_addr = *(argv + 1); break;
+		  case opt_authenticate: authenticate = 1; break;
+		  case opt_multipleconn:
+		    one_conn_per_inaddr = 0;
+		    break;
+		  case opt_ping: 	ping_keepalive = 1; break;
+		  case opt_null:
+		    inv_option = TRUE;
+		    FPRINTF(stderr,"Unknown option:  %s\n",*argv);
+		    break;
+		  case opt_conn_timeout:
+		    t = atoi(*(argv + 1));
+		    if (t < MIN_TIMEOUT_INTERVAL)
+			FPRINTF(stderr,"-timeout parameter must be >= %d seconds. The default value %d seconds will be used\n"
+				, MIN_TIMEOUT_INTERVAL, TIMEOUT_INTERVAL);
+		    else
+			    conn_timeout = t;
+		    break;
+		  case opt_servtime:
+		    t = atoi(*(argv + 1));
+		    if (t < MIN_TIMEOUT_INTERVAL)
+			  FPRINTF(stderr, "-servtime parameter must be >= %d seconds. The default value %d seconds will be used\n",
+				    MIN_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL);
+		    else
+			    per_conn_servtime = t;
+		    break;
+		  case opt_history:
+		    history = 1;
+		    break;
+		  default:
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 			inv_option = TRUE;
 			FPRINTF(stderr,"Unknown option:  %s\n",*argv);
 			break;

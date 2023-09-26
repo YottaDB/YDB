@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -65,7 +65,7 @@ Return:
 	cdb_sc_normal on success
 	failure code on concurrency failure
  *******************************************************************************************/
-enum cdb_sc gvcst_expand_any_key (srch_blk_status *blk_stat, sm_uc_ptr_t rec_top, sm_uc_ptr_t expanded_key,
+enum cdb_sc gvcst_expand_any_key(srch_blk_status *blk_stat, sm_uc_ptr_t rec_top, sm_uc_ptr_t expanded_key,
 	int *rec_size, int *keylen, int *keycmpc, srch_hist *hist_ptr)
 {
 	block_id		tblk_num;

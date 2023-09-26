@@ -132,8 +132,9 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	 * we should have the same blk_target for both the histories and hence the same value for
 	 * !blk_target->noisolation and hence the same value for store_history. We assert this is the case below.
 	 */
-	assert(ERR_GVPUTFAIL == t_err && (NULL == hist1 || hist1 == &cs_addrs->dir_tree->hist && !cs_addrs->dir_tree->noisolation)
-			|| !hist1 || hist1->h[0].blk_target == gvt);
+	assert(((ERR_GVPUTFAIL == t_err) && ((NULL == hist1) || ((hist1 == &cs_addrs->dir_tree->hist)
+									&& !cs_addrs->dir_tree->noisolation)))
+			|| !hist1 || (hist1->h[0].blk_target == gvt));
 	/* We are going to reference fields from shared memory including cr->in_tend and t1->buffaddr->tn in that order (as part
 	 * of the TP_IS_CDB_SC_BLKMOD macro below). To ensure we read an uptodate value of cr->in_tend, we do a read memory
 	 * barrier here. Note that to avoid out-of-order reads, the read memory barrier needs to be done AFTER the reference
@@ -410,8 +411,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 					/* Ensure that "first_tp_srch_status" reflects what is in the hash-table.
 					 * The only exception is when two histories are passed (explained above)
 					 */
-					assert(local_hash_entry && lookup_tabent && (local_hash_entry == lookup_tabent->value)
-						|| !local_hash_entry && (hist == hist1));
+					assert((local_hash_entry && lookup_tabent && (local_hash_entry == lookup_tabent->value))
+						|| (!local_hash_entry && (hist == hist1)));
 					/* Ensure we don't miss updating "cse" */
 					assert((NULL != local_hash_entry) || ((srch_blk_status *)(tabent->value))->cse|| !t1->cse);
 					assert(!local_hash_entry || !local_hash_entry->cse || !t1->cse

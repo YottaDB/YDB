@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
@@ -162,7 +162,7 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 					key = &tmp_sbs;
 				}
 			}
-			if (lvt = LV_GET_CHILD(lv))	/* caution: assignment */
+			if ((lvt = LV_GET_CHILD(lv)))	/* caution: assignment */
 				assert(MV_LV_TREE == lvt->ident);
 			else	/* No children exist at this level - create a child */
 				LV_TREE_CREATE(lvt, (lvTreeNode *)lv, subs_level, base_lv);
@@ -184,7 +184,7 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			 * Since we are turning off MV_STR, turn off MV_UTF_LEN bit also in case it is set.
 			 */
 			tmp_sbs.mvtype &= (MV_STR_OFF & MV_UTF_LEN_OFF);
-			if (lvt = LV_GET_CHILD(lv))	/* caution: assignment */
+			if ((lvt = LV_GET_CHILD(lv)))	/* caution: assignment */
 				assert(MV_LV_TREE == lvt->ident);
 			else	/* No children exist at this level - create a child */
 				LV_TREE_CREATE(lvt, (lvTreeNode *)lv, subs_level, base_lv);

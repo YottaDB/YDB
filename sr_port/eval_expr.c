@@ -73,7 +73,7 @@ int eval_expr(oprtype *a)
 	}
 	se_handling = TREF(side_effect_handling);
 	se_warn = SE_WARN_ON;
-	while (bin_opcode = tokentable[TREF(window_token)].bo_type)	/* NOTE assignment NOT condition */
+	while ((bin_opcode = tokentable[TREF(window_token)].bo_type))	/* NOTE assignment NOT condition */
 	{
 		type = tokentable[TREF(window_token)].opr_type;
 		if (oc_tab[bin_opcode].octype & OCT_BOOL)

@@ -131,11 +131,11 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 					assert(!cr->twin || cr->bt_index);
 					assert((NULL == (bt = bt_get(blk)))
 						|| (CR_NOTVALID == bt->cache_index)
-						|| (cr == (cache_rec_ptr_t)GDS_REL2ABS(bt->cache_index)) && (0 == cr->in_tend));
+						|| ((cr == (cache_rec_ptr_t)GDS_REL2ABS(bt->cache_index)) && (0 == cr->in_tend)));
 				}
 				assert(MAX_DB_BLK_SIZE >= bp->bsiz);
 				bsiz = MIN(bp->bsiz, MAX_DB_BLK_SIZE);	/* avoid buffer overflows */
-				memcpy(temp_buff, bp, bsiz);
+				memcpy((void *)temp_buff, bp, bsiz);
 				if (!was_crit)
 					rel_crit(gv_cur_region);
 				for (rp = (rec_hdr_ptr_t)(temp_buff + SIZEOF(blk_hdr)), rtop = (rec_hdr_ptr_t)(temp_buff + bsiz);

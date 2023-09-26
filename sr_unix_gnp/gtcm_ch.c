@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -100,7 +100,7 @@ CONDITION_HANDLER(gtcm_ch)
 	/* Don't let severe error message cause client to necessarily die. Reflect error using ERR_SERVERERR */
 	if (4 <= SEVERITY)
 	{
-		memcpy(sevmsgbuf, TREF(util_outbuff_ptr), msglen);
+		memcpy((void *)sevmsgbuf, TREF(util_outbuff_ptr), msglen);
 		util_out_print(NULL, OPER);	/* write msg to operator log */
 		gtm_putmsg_noflush_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SERVERERR, 2, msglen, sevmsgbuf);
 		msglen = (int)(TREF(util_outptr) - TREF(util_outbuff_ptr));

@@ -136,17 +136,17 @@ error_def(ERR_TLSCONNINFO);
 {													\
 	if (IO_SIZE > MAX_TRACE_SIZE)									\
 	{												\
-		memcpy(TRACE_BUFF, IO_BUFF + IO_SIZE - MAX_TRACE_SIZE, MAX_TRACE_SIZE);			\
+		memcpy((void *)TRACE_BUFF, IO_BUFF + IO_SIZE - MAX_TRACE_SIZE, MAX_TRACE_SIZE);		\
 		TRACE_BUFF_POS = 0;									\
 	} else												\
 	{												\
 		int space_to_end = MAX_TRACE_SIZE - TRACE_BUFF_POS;					\
 		if (IO_SIZE > space_to_end)								\
 		{											\
-			memcpy(TRACE_BUFF + TRACE_BUFF_POS, IO_BUFF, space_to_end);			\
-			memcpy(TRACE_BUFF, IO_BUFF + space_to_end, IO_SIZE - space_to_end);		\
+			memcpy((void *)TRACE_BUFF + TRACE_BUFF_POS, IO_BUFF, space_to_end);		\
+			memcpy((void *)TRACE_BUFF, IO_BUFF + space_to_end, IO_SIZE - space_to_end);	\
 		} else											\
-			memcpy(TRACE_BUFF + TRACE_BUFF_POS, IO_BUFF, IO_SIZE);				\
+			memcpy((void *)TRACE_BUFF + TRACE_BUFF_POS, IO_BUFF, IO_SIZE);			\
 		TRACE_BUFF_POS = (TRACE_BUFF_POS + IO_SIZE) % MAX_TRACE_SIZE;				\
 	}												\
 }
@@ -714,5 +714,42 @@ int repl_do_tls_handshake(FILE *logfp, int sock_fd, boolean_t do_accept, int *po
 	assert(SS_NORMAL != save_errno);
 	repl_errno = do_accept ? EREPL_RECV : EREPL_SEND;
 	return save_errno;
+}
+
+int repl_do_tls_post_handshake(FILE *logfp, int sock_fd)
+{
+	int		io_ready, save_errno, status;
+	const char	*errp;
+	struct pollfd	fds;
+
+	assert(REPL_TLS_REQUESTED);
+	assert(NULL != tls_ctx);
+	assert(NULL != repl_tls.sock);
+	assert(!repl_tls.enabled);
+	/* Do the post handshake auth */
+	if (0 != (status = gtm_tls_do_post_hand_shake(repl_tls.sock)))
+	{
+		while ((GTMTLS_WANT_READ == status) || (GTMTLS_WANT_WRITE == status))
+		{	/* Need to retry the handshake */
+			if (0 >= (io_ready = fd_ioready(sock_fd, (GTMTLS_WANT_READ == status) ? POLLIN : POLLOUT, REPL_POLL_WAIT)))
+			{
+				if (!io_ready)
+					continue;
+				save_errno = errno;
+				repl_errno = EREPL_SELECT;
+				return save_errno;
+			}
+			status = gtm_tls_repeat_hand_shake(repl_tls.sock);
+		}
+	}
+	if (status)
+	{	/* Post handshake auth failure */
+		errp = gtm_tls_get_error(repl_tls.sock);
+		repl_log(logfp, TRUE, TRUE, "Post-handshake authentication failure: %s\n", errp);
+		repl_log_tls_info(logfp, repl_tls.sock);
+		repl_errno = EREPL_RECV;
+		return ECONNRESET;
+	}
+	return SS_NORMAL;
 }
 #endif

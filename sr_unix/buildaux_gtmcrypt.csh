@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2021 Fidelity National Information		#
+# Copyright (c) 2001-2023 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	#
@@ -59,11 +59,18 @@ endsw
 set helpers = "encrypt_sign_db_key,gen_keypair,gen_sym_hash,gen_sym_key,import_and_sign_key"
 set helpers = "$helpers,pinentry-gtm,show_install_config"
 
+set genfiles = "gpgagent,gtmtlsfuncs"
+
 set srcfiles = "gtmcrypt_dbk_ref.c gtmcrypt_pk_ref.c gtmcrypt_sym_ref.c gtmcrypt_ref.c gtm_tls_impl.c maskpass.c"
 set srcfiles = "$srcfiles gtmcrypt_util.c"
 
+<<<<<<< HEAD
 set incfiles = "ydbcrypt_interface.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_pk_ref.h gtmcrypt_ref.h"
 set incfiles = "$incfiles gtmcrypt_util.h gtm_tls_impl.h ydb_tls_interface.h"
+=======
+set incfiles = "gtmcrypt_interface.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_pk_ref.h gtmcrypt_ref.h"
+set incfiles = "$incfiles gtmcrypt_util.h gtm_tls_externalcalls.h gtm_tls_impl.h gtm_tls_interface.h"
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 
 set ydb_dist_plugin = $ydb_dist/plugin
 rm -rf $ydb_dist_plugin
@@ -74,11 +81,20 @@ eval cp -pf '${srcfile_list:gs||'$gtm_src'/|} $ydb_dist_plugin/gtmcrypt'
 set incfile_list = ($incfiles)
 eval cp -pf '${incfile_list:gs||'$gtm_inc'/|} $ydb_dist_plugin/gtmcrypt'
 
+<<<<<<< HEAD
 cp -pf $gtm_tools/{$helpers}.sh $ydb_dist_plugin/gtmcrypt
 cp -pf $gtm_pct/pinentry.m $ydb_dist_plugin/gtmcrypt
 rm -f $ydb_dist/{PINENTRY,pinentry}.[om]
 cp -pf $gtm_tools/Makefile.mk $ydb_dist_plugin/gtmcrypt/Makefile
 chmod +x $ydb_dist_plugin/gtmcrypt/*.sh
+=======
+cp -pf $gtm_tools/{$helpers}.sh $gtm_dist_plugin/gtmcrypt
+cp -pf $gtm_tools/{$genfiles}.tab.in $gtm_dist_plugin/gtmcrypt
+cp -pf $gtm_pct/pinentry.m $gtm_dist_plugin/gtmcrypt
+rm -f $gtm_dist/{PINENTRY,pinentry}.[om]
+cp -pf $gtm_tools/Makefile.mk $gtm_dist_plugin/gtmcrypt/Makefile
+chmod +x $gtm_dist_plugin/gtmcrypt/*.sh
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 #
 pushd $ydb_dist_plugin/gtmcrypt
 set make = "make"

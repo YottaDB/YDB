@@ -104,7 +104,7 @@ int rc_cpt_entry(block_id blk)
 	}
 	if (!rc_cpt)
 	{
-		if (i = rc_init_ipc())
+		if ((i = rc_init_ipc()))
 			return i;	/* return error code (errno) */
 	}
 	/* cpvfy is the value of cpsync when the CPT table was last sent to a client.

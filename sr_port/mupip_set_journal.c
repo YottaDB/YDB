@@ -797,6 +797,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			csd->autoswitchlimit = jnl_info.autoswitchlimit;
 			csd->jnl_buffer_size = jnl_buffer_size;
 			if (jnl_buffer_updated)
+			{
 				if (jnl_buffer_invalid)
 				{
 					SNPRINTF(s, JNLBUFFUPDAPNDX_SIZE, JNLBUFFUPDAPNDX, JNL_BUFF_PORT_MIN(csd), JNL_BUFFER_MAX);
@@ -811,6 +812,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 						(region ? gv_cur_region->rname_len : jnl_info.fn_len),
 						(region ? gv_cur_region->rname : jnl_info.fn),
 						jnl_info.buffer, jnl_buffer_size);
+			}
 			csd->epoch_interval = jnl_info.epoch_interval;
 			csd->jnl_deq = jnl_info.extend;
 			memcpy(csd->jnl_file_name, jnl_info.jnl, jnl_info.jnl_len);

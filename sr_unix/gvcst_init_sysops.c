@@ -700,7 +700,7 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
         }
 	set_gdid_from_stat(&udi->fileid, &buf);
-	if (prev_reg = gv_match(reg))
+	if ((prev_reg = gv_match(reg)))
 	{
 		CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 		free(seg->file_cntl->file_info);

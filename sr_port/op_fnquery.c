@@ -105,7 +105,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	lvent.var_name.len = varname->str.len;
 	lvent.var_name.addr = varname->str.addr;
 	COMPUTE_HASH_MNAME(&lvent);
-	if (tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &lvent))
+	if ((tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &lvent)))
 	{	/* if the variable exists find out if it has children */
 		ve = (lv_val *)tabent->value;
 		assert(ve);
@@ -141,7 +141,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				va_end(var);
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LVNULLSUBS);
 			}
-			if (is_num = MV_IS_CANONICAL(arg1))
+			if ((is_num = MV_IS_CANONICAL(arg1)))
 				MV_FORCE_NUM(arg1);
 			else if ((nexti == sbscnt) && !is_sqlnull && (0 == arg1->str.len))
 			{	/* The last search argument is a null string. For this situation, there is the possibility

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -62,6 +62,8 @@ int gtmrecv_get_opt(void)
 	gtmrecv_options.resume_specified = (CLI_PRESENT == cli_present("RESUME"));
 	gtmrecv_options.initialize_specified = (CLI_PRESENT == cli_present("INITIALIZE"));
 	gtmrecv_options.stopreceiverfilter = (CLI_PRESENT == cli_present("STOPRECEIVERFILTER"));
+	gtmrecv_options.send_buffsize = GTMRECV_TCP_SEND_BUFSIZE;
+	gtmrecv_options.recv_buffsize = GTMRECV_TCP_RECV_BUFSIZE;
 	if (gtmrecv_options.updateresync)
 	{
 		instfilename_len = SIZEOF(gtmrecv_options.updresync_instfilename) - 1;	/* keep 1 byte for trailing NULL */
@@ -107,6 +109,42 @@ int gtmrecv_get_opt(void)
 	gtmrecv_options.noresync = (CLI_PRESENT == cli_present("NORESYNC"));
 	gtmrecv_options.helpers = (CLI_PRESENT == cli_present("HELPERS"));
 	gtmrecv_options.listen_port = 0; /* invalid port; indicates listenport not specified */
+	if (gtmrecv_options.start)
+	{
+		if (CLI_NEGATED == (status = cli_present("SENDBUFFSIZE")))
+			gtmrecv_options.send_buffsize = 0;
+		else if (CLI_PRESENT == status)
+		{
+			if (!cli_get_int("SENDBUFFSIZE", &gtmrecv_options.send_buffsize))
+			{
+				util_out_print("Error parsing SENDBUFFSIZE qualifier", TRUE);
+				return (-1);
+			} else if (GTMRECV_MIN_TCP_SEND_BUFSIZE > gtmrecv_options.send_buffsize)
+			{
+				util_out_print("GTM-W-BUFFSIZETOOSMALL, TCP send buffer size passed to receiver too small, setting "
+						"to minimum size of !SL.", TRUE, GTMRECV_MIN_TCP_SEND_BUFSIZE);
+				gtmrecv_options.send_buffsize = GTMRECV_MIN_TCP_SEND_BUFSIZE;
+			}
+			assert(GTMRECV_MIN_TCP_SEND_BUFSIZE <= gtmrecv_options.send_buffsize);
+		}
+		if (CLI_NEGATED == (status = cli_present("RECVBUFFSIZE")))
+			gtmrecv_options.recv_buffsize = 0;
+		else if (CLI_PRESENT == status)
+		{
+			if (!cli_get_int("RECVBUFFSIZE", &gtmrecv_options.recv_buffsize))
+			{
+				util_out_print("Error parsing RECVBUFFSIZE qualifier", TRUE);
+				return (-1);
+			} else if (GTMRECV_MIN_TCP_RECV_BUFSIZE > gtmrecv_options.recv_buffsize)
+			{
+				util_out_print("GTM-W-BUFFSIZETOOSMALL, TCP recv buffer size passed to receiver too small, setting "
+						"to minimum size of !SL.", TRUE, GTMRECV_MIN_TCP_RECV_BUFSIZE);
+				gtmrecv_options.recv_buffsize = GTMRECV_MIN_TCP_RECV_BUFSIZE;
+			}
+			assert(GTMRECV_MIN_TCP_RECV_BUFSIZE <= gtmrecv_options.recv_buffsize);
+		}
+
+	}
 	if (gtmrecv_options.start && CLI_PRESENT == cli_present("LISTENPORT"))
 	{
 		if (!cli_get_int("LISTENPORT", &gtmrecv_options.listen_port))
@@ -135,7 +173,7 @@ int gtmrecv_get_opt(void)
 		if (gtmrecv_options.autorollback)
 			gtmrecv_options.autorollback_verbose = cli_present("AUTOROLLBACK.VERBOSE");
 		/* Check if compression level is specified */
-		if (cmplvl_status = (CLI_PRESENT == cli_present("CMPLVL")))
+		if ((cmplvl_status = (CLI_PRESENT == cli_present("CMPLVL"))))
 		{
 			if (!cli_get_int("CMPLVL", &gtmrecv_options.cmplvl))
 			{
@@ -148,10 +186,10 @@ int gtmrecv_get_opt(void)
 			ydb_zlib_cmp_level = gtmrecv_options.cmplvl;
 		} else
 			gtmrecv_options.cmplvl = ZLIB_CMPLVL_MIN;	/* no compression in this case */
-		if (filter = (CLI_PRESENT == cli_present("FILTER")))
+		if ((filter = (CLI_PRESENT == cli_present("FILTER"))))
 		{
 			filter_cmd_len = MAX_FILTER_CMD_LEN;
-	    		if (!cli_get_str("FILTER", gtmrecv_options.filter_cmd, &filter_cmd_len))
+			if (!cli_get_str("FILTER", gtmrecv_options.filter_cmd, &filter_cmd_len))
 			{
 				util_out_print("Error parsing FILTER qualifier", TRUE);
 				return (-1);

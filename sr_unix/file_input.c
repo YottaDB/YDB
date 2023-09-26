@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -219,7 +219,7 @@ int file_input_bin_read(void)
 	io_desc		*iod;
 
 	s1 = (int)(buff1_end - buff1_ptr);
-	memmove(buff1, buff1_ptr, s1);
+	memmove((void *)buff1, buff1_ptr, s1);
 	iod = io_curr_device.in;
 	d_rm = (d_rm_struct *)iod->dev_sp;
 	assert(NULL != d_rm);
@@ -317,8 +317,8 @@ int file_input_get(char **in_ptr, unsigned int max_len)
 				REVERT;
 				return FILE_INPUT_GET_ERROR;
 			}
-			assert(new_mbuff_len >= ret_len); /* For SCI */
-			memcpy(tmp_ptr, mbuff, ret_len);
+			assert(new_mbuff_len >= ret_len); /* For SCA */
+			memcpy((void *)tmp_ptr, mbuff, ret_len);
 			if (mbuff != buff1)	/* do not free static array, free all later expansions (malloc buffers) */
 				free(mbuff);
 			mbuff = tmp_ptr;

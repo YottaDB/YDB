@@ -82,15 +82,15 @@ Input Parameters:
 	i_blk_fill_size : Maximum fill allowed in an index block
 Output Parameters:
 	kill_set_ptr : List of blocks to be freed from LBM (already killed in mu_clsce)
-	remove_rtsib : if right sibling was completely merged with working
+	pending_levels : A count of number of levels to ascend in order to handle effects of
+	rightsibling removal in previous coalesces
 Returns:
 	cdb_sc_normal on success
 	Other wise error status
  *************************************************************************************************/
-enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_set_ptr, boolean_t *remove_rtsib)
+enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_set_ptr, int *pending_levels)
 {
-	boolean_t	complete_merge = FALSE,
-			old_ref_star_only = FALSE,
+	boolean_t	old_ref_star_only = FALSE,
 			new_rtsib_star_only = FALSE,
 			star_only_merge = FALSE,
 			blk2_ances_star_only = FALSE,
@@ -104,7 +104,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	unsigned short	temp_ushort;
 	int		new_levelp_cur_cmpc, new_levelp_cur_next_cmpc, tkeycmpc,
 			oldblk1_last_cmpc, newblk1_mid_cmpc = -1, newblk1_last_cmpc;
-	int		tmp_cmpc;
+	int		tmp_cmpc, lcl_pending_levels = 0;
 	int		levelp, level2;
 	int		old_blk1_sz, old_blk2_sz,
 			bstar_rec_sz, blkid_sz,
@@ -189,7 +189,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		old_levelp_cur_prev_keysz = 0;
 	else
 	{
-		if (cdb_sc_normal != (status = gvcst_expand_any_key (old_levelp_blk_stat, rec_base,
+		if (cdb_sc_normal != (status = gvcst_expand_any_key(old_levelp_blk_stat, rec_base,
 			&old_levelp_cur_prev_key[0], &rec_size, &tkeylen, &tkeycmpc, NULL)))
 		{
 			assert(t_tries < CDB_STAGNATE);
@@ -251,7 +251,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	BLK_ADDR(oldblk1_last_key, MAX_KEY_SZ + 1, unsigned char);
 	if (0 == level) /* data block */
 	{
-		if (cdb_sc_normal != (status = gvcst_expand_any_key (old_blk1_stat, old_blk1_base + old_blk1_sz,
+		if (cdb_sc_normal != (status = gvcst_expand_any_key(old_blk1_stat, old_blk1_base + old_blk1_sz,
 			oldblk1_last_key, &rec_size, &oldblk1_last_keylen, &oldblk1_last_cmpc, NULL)))
 		{
 			assert(t_tries < CDB_STAGNATE);
@@ -269,7 +269,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		memcpy (oldblk1_last_key, &old_levelp_cur_key[0], old_levelp_cur_keysz);
 		if (!old_ref_star_only) /* if the index block is not a *-key only block) */
 		{
-			if (cdb_sc_normal != (status = gvcst_expand_any_key (old_blk1_stat,
+			if (cdb_sc_normal != (status = gvcst_expand_any_key(old_blk1_stat,
 				old_blk1_base + old_blk1_sz - bstar_rec_sz, &oldblk1_prev_key[0],
 				&rec_size, &tkeylen, &tkeycmpc, NULL)))
 			{
@@ -292,14 +292,15 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	}
 
 	/*
-	newblk1_last_key = new working blocks final appended key
-	newblk1_mid_cmpc = new working blocks firstly appended key's cmpc
-	newblk1_last_keysz = new working blocks lastly appended key's size
-	star_only_merge = TRUE, we can append only a *-key record into the working block
-				(decompressing current *-key)
-	complete_merge = TRUE, rtsib can be completely merged with working block
-	piece_len = Size of data from old rtsibling to be merged into working block (includes rec_hdr size)
-	*/
+	 * newblk1_last_key = new working blocks final appended key
+	 * newblk1_mid_cmpc = new working blocks firstly appended key's cmpc
+	 * newblk1_last_keysz = new working blocks lastly appended key's size
+	 * star_only_merge = TRUE, we can append only a *-key record into the working block
+	 * (decompressing current *-key)
+	 * lcl_pending_levels = (1 + levelp - level) if rtsib can be completely merged with working block,
+	 * since levelp is the highest level which will be affected by the merge in the target block.
+	 * piece_len = Size of data from old rtsibling to be merged into working block (includes rec_hdr size)
+	 */
 	BLK_ADDR(newblk1_last_key, MAX_KEY_SZ + 1, unsigned char);
 	rec_base = old_blk2_base + SIZEOF(blk_hdr);
 	READ_RECORD(status, &rec_size, &newblk1_last_cmpc, &newblk1_last_keylen, newblk1_last_key,
@@ -309,7 +310,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		if (old_blk1_sz + oldblk1_last_keylen + bstar_rec_sz > i_max_fill ) /* cannot fit even one record */
 			return cdb_sc_oprnotneeded;
 		star_only_merge = TRUE;
-		complete_merge = TRUE;
+		lcl_pending_levels = 1 + levelp - level;
 		rec_base = old_blk2_base + SIZEOF(blk_hdr) + bstar_rec_sz;
 	} else if (cdb_sc_normal != status)
 	{
@@ -350,13 +351,13 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	Note: rec_base points to 2nd record of old rtsib */
 	if (0 == level) /* if data block */
 	{
-		complete_merge = TRUE;
+		lcl_pending_levels = 1 + levelp - level;
 		while (rec_base < old_blk2_base + old_blk2_sz)
 		{
 			GET_RSIZ(rec_size, rec_base);
 			if (old_blk1_sz + piece_len + rec_size > d_max_fill )
 			{
-				complete_merge = FALSE;
+				lcl_pending_levels = 0;
 				break;
 			}
 			READ_RECORD(status, &rec_size, &newblk1_last_cmpc, &newblk1_last_keylen, newblk1_last_key,
@@ -377,7 +378,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		if (!star_only_merge)
 		{
 			/* we know we can fit more record in working block and rtsibling has more records */
-			complete_merge = TRUE;
+			lcl_pending_levels = 1 + levelp - level;
 			while (rec_base < old_blk2_base + old_blk2_sz)
 			{
 				GET_RSIZ(rec_size, rec_base);
@@ -400,7 +401,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 				piece_len += rec_size;
 				if (old_blk1_sz + oldblk1_last_keylen + piece_len + bstar_rec_sz > i_max_fill )
 				{
-					complete_merge = FALSE;
+					lcl_pending_levels = 0;
 					break;
 				}
 			}/* end of "while" loop */
@@ -408,7 +409,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		} /* end else  *-only merge */
 	} /* end else index block */
 
-	if (!complete_merge)
+	if (!lcl_pending_levels)
 	{
 		/*
 		Adjust new right sibling's buffer
@@ -442,14 +443,14 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 
 
 	/*
-	if complete_merge and level+1 <= level2 < levelp,
+	if lcl_pending_levels and level+1 <= level2 < levelp,
 		if blk2ptr->h[level2].blk_num is *-record block then
 			delete it
 		else
 			prepare to update  blk2ptr->h[level2].blk_num (for first level2>level+1)
 			that is, we will delete 1st record pointing to rtsib which is merged with working.
 	*/
-	else /* complete merge */
+	else /* lcl_pending_levels (complete merge of the target) */
 	{
 		for (level2 = level + 1; level2 < levelp; level2++)
 		{
@@ -509,14 +510,14 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 				break;
 			}
 		} /* end for level2 */
-	} /* end if/else complete_merge */
+	} /* end if/else lcl_pending_levels */
 
 	/*
 	new_levelp_cur_hdr = new ancestor level curr_key header
 	new_levelp_cur_keylen =  new ancestor level curr_key length
 	new_levelp_cur_cmpc = new ancestor level curr_key compression count
 	*/
-	if (!complete_merge || !delete_all_blk2_ances) /* old_levelp_cur_key will be
+	if (!lcl_pending_levels || !delete_all_blk2_ances) /* old_levelp_cur_key will be
 							replaced by newblk1_last_key */
 	{
 		if (old_levelp_cur_prev_keysz == 0)	/* If a previous record doesn't exist */
@@ -551,7 +552,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	if (!levelp_next_is_star) /* if next record is not a *-record after levelp currkey */
 	{
 		assert(0 < old_levelp_cur_next_keysz);
-		if (!complete_merge || !delete_all_blk2_ances) /* old_levelp_cur_key will be
+		if (!lcl_pending_levels || !delete_all_blk2_ances) /* old_levelp_cur_key will be
 			replaced by newblk1_last_key and followed by old_levelp_cur_next_key */
 		{
 			GET_CMPC(new_levelp_cur_next_cmpc, newblk1_last_key, old_levelp_cur_next_key);
@@ -581,7 +582,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		SET_CMPC(new_levelp_cur_next_hdr, new_levelp_cur_next_cmpc);
 	} else
 	{
-		if (!complete_merge || !delete_all_blk2_ances)
+		if (!lcl_pending_levels || !delete_all_blk2_ances)
 		{
 			if (((blk_hdr_ptr_t)old_levelp_blk_base)->bsiz
 				- old_levelp_cur_keylen + new_levelp_cur_keylen > i_max_fill)
@@ -634,7 +635,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		{
 			assert(new_rec_hdr1);
 			assert(0 <= newblk1_mid_cmpc);
-			if (complete_merge)
+			if (lcl_pending_levels)
 			{	/* First key from rtsib had cmpc=0. After coalesce it will be nonzero.
 				 * Remainings from rtsib will be appened without change.
 				 */
@@ -669,7 +670,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	 * The right sibling
 	 * -----------------
 	 */
-	if (!complete_merge)
+	if (!lcl_pending_levels)
 	{
 		BLK_INIT(bs_ptr2, bs_ptr1);
 		if (!new_rtsib_star_only) /* more than one record in rtsib */
@@ -716,7 +717,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	{
 		assert(0 <= new_levelp_cur_next_cmpc);
 		assert(new_levelp_cur_next_hdr);
-		if (complete_merge && delete_all_blk2_ances)
+		if (lcl_pending_levels && delete_all_blk2_ances)
 		{ /* old_levelp_curr_key will be removed and old_levelp_cur_next_key will be inserted there */
 			assert (t_tries < CDB_STAGNATE || 0 != new_levelp_cur_next_keylen);
 			assert (t_tries < CDB_STAGNATE || (old_levelp_rec_offset - SIZEOF(blk_hdr)) || !new_levelp_cur_next_cmpc);
@@ -759,7 +760,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		}
 	} else /* there is *-rec after old_levelp_cur_key */
 	{
-		if (complete_merge && delete_all_blk2_ances)
+		if (lcl_pending_levels && delete_all_blk2_ances)
 		{	/* delete old old_levelp_cur_key and *-key and write new *-key */
 			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)old_levelp_star_rec_hdr, SIZEOF(rec_hdr));
 			BLK_SEG(bs_ptr2, bn_ptr2, old_levelp_blkid_sz);
@@ -829,9 +830,13 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	 * 	and still blk2ptr->h[level+1] correctly points to the
 	 * 	right most value of collation sequence at correct block.)
 	 */
-	*remove_rtsib = complete_merge;
+	/* If lcl_pending_levels is greater than the current, raise the pending_levels so that the caller continues the
+	 * coalesce operation.
+	 */
+	if (*pending_levels < lcl_pending_levels)
+		*pending_levels = lcl_pending_levels;
 	/* prepare next gv_currkey for reorg */
-	if (0 == level && !complete_merge)
+	if (0 == level && !lcl_pending_levels)
 	{
 		assert(newblk2_first_key);
 		assert(newblk2_first_keysz);

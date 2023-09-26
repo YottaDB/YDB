@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2021 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+>>>>>>> fdfdea1e (GT.M V7.1-002)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -196,11 +200,16 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		STR_HASH((char *)ydb_release_name, ydb_release_name_len, TREF(gtmsecshr_comkey), 0);
 	if (!gtmsecshr_file_check_done)
 	{
+<<<<<<< HEAD
 		len = STRLEN(ydb_dist);
 		assert(YDB_PATH_MAX >= (SECSHR_PARENT_DIR_LEN(len) + 1 + sizeof(GTMSECSHR_EXECUTABLE))); /* Includes null */
 		memcpy(gtmsecshr_path, SECSHR_PARENT_DIR(ydb_dist), SECSHR_PARENT_DIR_LEN(len));
 		gtmsecshr_path[SECSHR_PARENT_DIR_LEN(len)] =  '/';
 		memcpy(gtmsecshr_path + SECSHR_PARENT_DIR_LEN(len) + 1, GTMSECSHR_EXECUTABLE, sizeof(GTMSECSHR_EXECUTABLE)); /* Includes null */
+=======
+		assert(GTM_PATH_MAX >= (gtm_dist_len + 1 + sizeof(GTMSECSHR_EXECUTABLE))); /* Includes null */
+		SNPRINTF(gtmsecshr_path, GTM_PATH_MAX, "%s/%s", gtm_dist, GTMSECSHR_EXECUTABLE);
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 		gtmsecshr_pathname.addr = gtmsecshr_path;
 		gtmsecshr_pathname.len = (mstr_len_t)(SECSHR_PARENT_DIR_LEN(len) + 1 + strlen(GTMSECSHR_EXECUTABLE)); /* Excludes null */
 		assert((0 < gtmsecshr_pathname.len) && (YDB_PATH_MAX > gtmsecshr_pathname.len));
@@ -371,7 +380,7 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		}
 		/* Response to *our* latest message available */
 		assert(recv_complete);
-		if (ret_code = mesg.code)		/* Warning - assignment */
+		if ((ret_code = mesg.code))		/* Warning - assignment */
 		{
 			DBGGSSHR((LOGFLAGS, "secshr_client: non-zero response from gtmsecshr - request: %d  retcode: %d\n",
 				  req_code, ret_code));
@@ -456,8 +465,13 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 						RTS_ERROR_STRING(secshr_fail_mesg_code[req_code]));
 		}
 		ret_code = -1;
+<<<<<<< HEAD
 		/* If ydb_tmp is not defined, show default path */
 		if (ydb_tmp_ptr = ydb_getenv(YDBENVINDX_TMP, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))
+=======
+		/* If gtm_tmp is not defined, show default path */
+		if ((gtm_tmp_ptr = GETENV("gtm_tmp")))
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 		{
 			if (!IS_GTM_IMAGE)
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2,

@@ -923,7 +923,7 @@ int cli_present(char *entry)
 	STRNCPY_STR(local_str, entry, SIZEOF(local_str) - 1);
 	local_str[SIZEOF(local_str) - 1] = '\0';
 	cli_strupper(local_str);
-	if (pparm = get_parm_entry(local_str))
+	if ((pparm = get_parm_entry(local_str)))
 	{
 		if (pparm->negated)
 			return (CLI_NEGATED);
@@ -1008,7 +1008,7 @@ boolean_t cli_negated(char *entry) 		/* entity */
 	STRNCPY_STR(local_str, entry, SIZEOF(local_str) - 1);
 	local_str[SIZEOF(local_str) - 1] = '\0';
 	cli_strupper(local_str);
-	if (pparm = get_parm_entry(local_str))
+	if ((pparm = get_parm_entry(local_str)))
 		return (pparm->negated);
 	return (FALSE);
 }

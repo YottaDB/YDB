@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -87,7 +87,11 @@ void	lke_clear(void)
 	/* Search all regions specified on the command line */
 	for (reg = gd_header->regions, n = 0; n != gd_header->n_regions; ++reg, ++n)
 	{	/* If region matches and is open */
+<<<<<<< HEAD
 		if (((0 == regname.len) || (reg->rname_len == regname.len) && (0 == memcmp(reg->rname, regname.addr, regname.len)))
+=======
+		if (((0 == regname.len) || ((reg->rname_len == regname.len) && !memcmp(reg->rname, regname.addr, regname.len)))
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 			&& reg->open)
 		{
 			match = TRUE;

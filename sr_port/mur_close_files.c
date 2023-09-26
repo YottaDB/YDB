@@ -463,7 +463,7 @@ boolean_t mur_close_files(void)
 				jctl = rctl->jctl_turn_around;
 				head_jnl_fn_len = jctl->jnl_fn_len;
 				head_jnl_fn = fn;
-				memcpy(head_jnl_fn, jctl->jnl_fn, head_jnl_fn_len);
+				memcpy((void *)head_jnl_fn, jctl->jnl_fn, head_jnl_fn_len);
 				/* reset jctl->jfh->recover_interrupted field in all recover created jnl files to signal
 				 * that a future recover should not consider this recover as an interrupted recover.
 				 */

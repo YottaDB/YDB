@@ -95,7 +95,7 @@ void open_list_file(void)
 		pblk.def1_size -= ext_len;
 	/* filenames longer than the max are truncated. */
 	pblk.def1_size = MIN(pblk.def1_size, MAX_MIDENT_LEN);
-	memcpy(list_name, &source_file_name[cp], pblk.def1_size);
+	memcpy((void *)list_name, &source_file_name[cp], pblk.def1_size);
 	MEMCPY_LIT(&list_name[pblk.def1_size], LISTEXT);
 	pblk.def1_size += STR_LIT_LEN(LISTEXT);
 	pblk.def1_buf = list_name;
@@ -120,7 +120,7 @@ void open_list_file(void)
 	op_use(&file,&parms);
 	clock = time(0);
 	GTM_CTIME(p, &clock);
-	memcpy (print_time_buf, p + 4, SIZEOF(print_time_buf));
+	memcpy ((void *)print_time_buf, p + 4, SIZEOF(print_time_buf));
 	return;
 }
 

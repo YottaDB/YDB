@@ -466,12 +466,14 @@ void set_memory_reg()
 		instruction.destination_operand_reg = (char *)register_list[modrm_byte.modrm.r_m + 8 * rex_prefix.Base];
 	/* Printing of RIP has to be handled differently	*/
  	if (instruction.reg_rip)
+ 	{
 		if (instruction.source_operand_class == memory_class)
 			instruction.source_operand_reg = (char *)register_list[REG_RIP];
 		else if (instruction.destination_operand_class == memory_class)
 			instruction.destination_operand_reg = (char *)register_list[REG_RIP];
 		else
 			assertpro(FALSE);
+ 	}
 }
 
 void set_register_reg()

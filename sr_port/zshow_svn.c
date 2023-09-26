@@ -141,6 +141,7 @@ static readonly char ztwormhole_text[] = "$ZTWORMHOLE";
 static readonly char zusedstor_text[] = "$ZUSEDSTOR";
 static readonly char zversion_text[] = "$ZVERSION";
 static readonly char zreldate_text[] = "$ZRELDATE";
+static readonly char zicuver_text[] = "$ZICUVER";
 static readonly char zyerror_text[] = "$ZYERROR";
 static readonly char zyintrsig_text[] = "$ZYINTRSIG";
 static readonly char zyrelease_text[] = "$ZYRELEASE";
@@ -168,6 +169,7 @@ GBLREF volatile boolean_t	dollar_zininterrupt;
 #ifdef GTM_TRIGGER
 GBLREF int4			gtm_trigger_depth;
 GBLREF mstr			*dollar_ztname;
+GBLREF mstr			dollar_zicuver;
 GBLREF mval			*dollar_ztdata, *dollar_ztdelim, *dollar_ztoldval, *dollar_ztriggerop, dollar_ztslate;
 GBLREF mval			*dollar_ztupdate, *dollar_ztvalue, dollar_ztwormhole;
 #endif
@@ -482,7 +484,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 			setzdir(NULL, &zdir);
 			if (zdir.str.len != dollar_zdir.str.len || 0 != memcmp(zdir.str.addr, dollar_zdir.str.addr, zdir.str.len))
 			{
-				memcpy(zdir_error, zdir.str.addr, zdir.str.len);
+				memcpy((void *)zdir_error, zdir.str.addr, zdir.str.len);
 				memcpy(&zdir_error[zdir.str.len], arrow_text, STR_LIT_LEN(arrow_text));
 				zdir_error_rem_len = ZDIR_ERR_LEN - zdir.str.len - STR_LIT_LEN(arrow_text);
 				sgtm_putmsg(&zdir_error[zdir.str.len + STR_LIT_LEN(arrow_text)], zdir_error_rem_len,
@@ -526,6 +528,14 @@ void zshow_svn(zshow_out *output, int one_sv)
 		case SV_ZHOROLOG:
 			op_zhorolog(&var, TRUE);
 			ZS_VAR_EQU(&x, zhorolog_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
+		case SV_ZICUVER:
+			var.mvtype = MV_STR;
+			var.str = dollar_zicuver;
+			ZS_VAR_EQU(&x, zicuver_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;

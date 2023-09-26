@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -27,6 +27,7 @@ LITREF octabstruct	oc_tab[];	/* op-code table */
 GBLREF triple		t_orig;		/* head of triples */
 GBLREF uint4		ydbDebugLevel;
 
+<<<<<<< HEAD
 #define IND_NOT_DEFINED		((unsigned char)-2)
 #define JOPT_NO_OPT		1
 #define JOPT_REP_JMP		2
@@ -34,6 +35,15 @@ GBLREF uint4		ydbDebugLevel;
 #define NO_ENTRY		((unsigned char)-1)
 #define NUM_JO_TBL_ELE		9
 #define PTR_NOT_DEFINED		0
+=======
+#define IND_NOT_DEFINED ((unsigned char)-2)
+#define JOPT_NO_OPT 1
+#define JOPT_REP_JMP 2
+#define JOPT_REF_NXT_TRP 3
+#define NO_ENTRY ((unsigned char)(~0x0))
+#define NUM_JO_TBL_ELE 11
+#define PTR_NOT_DEFINED 0
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 
 typedef struct
 {
@@ -242,7 +252,11 @@ void jmp_opto(void)
 						{
 							dqloop(&jump_trip->jmplist, que, b)
 							{
+<<<<<<< HEAD
 								if (b->bkptr = cur_trip)
+=======
+								if ((b->bpt = cur_trip))
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 								{
 									dqdel(b, que);
 									break;
@@ -267,7 +281,11 @@ void jmp_opto(void)
 							assert(TJMP_REF == jump_trip->operand[0].oprclass);
 							dqloop(&jump_trip->jmplist, que, b)
 							{
+<<<<<<< HEAD
 								if (b->bkptr = cur_trip)
+=======
+								if ((b->bpt = cur_trip))
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 								{
 									dqdel(b, que);
 									break;

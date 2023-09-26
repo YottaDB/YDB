@@ -74,6 +74,14 @@ STATICFNDCL void relinkctl_map(open_relinkctl_sgm *linkctl);
 STATICFNDCL void relinkctl_unmap(open_relinkctl_sgm *linkctl);
 STATICFNDCL void relinkctl_delete(open_relinkctl_sgm *linkctl);
 
+<<<<<<< HEAD
+=======
+#define SLASH_GTM_RELINKCTL	"/gtm-relinkctl-"
+#define SLASH_GTM_RELINKCTL_LEN	STRLEN(SLASH_GTM_RELINKCTL)
+#define MAX_RCTL_OPEN_RETRIES	16
+
+error_def(ERR_EXCEEDRCTLRNDWN);
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 error_def(ERR_FILEPARSE);
 error_def(ERR_RELINKCTLERR);
 error_def(ERR_RELINKCTLFULL);
@@ -393,6 +401,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			relinkctl_unlock_exclu(linkctl);
 			relinkctl_unmap(linkctl);
 			assert(NULL == linkctl->hdr);
+<<<<<<< HEAD
 			/* We don't expect the below "continue" to execute too many times. But in practice we have seen
 			 * the continue execute as high as 40 on fast systems. This was before the YDB#872 fixes.
 			 * But because we know it is theoretically possible to execute the below as many times as possible
@@ -401,6 +410,10 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			 * We don't expect this to be an infinite loop in practice.
 			 */
 			assert(MAX_RCTL_RUNDOWN_RETRIES > rctl_rundown_count++);
+=======
+			if (MAX_RCTL_RUNDOWN_RETRIES <= rctl_rundown_count++)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_EXCEEDRCTLRNDWN, 1, MAX_RCTL_RUNDOWN_RETRIES);
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 			continue;
 		}
 		if (0 == hdr->relinkctl_max_rtn_entries)

@@ -65,6 +65,7 @@ error_def(ERR_JNLREAD);
 error_def(ERR_JNLREADBOF);
 error_def(ERR_NOPREVLINK);
 error_def(ERR_ORLBKNOSTP);
+error_def(ERR_ORLBKROLLED);
 
 /* Returns 0 (SS_NORMAL) for success; Non-zero for failure */
 /* #GTM_THREAD_SAFE : The below function (mur_apply_pblk) is thread-safe */
@@ -508,6 +509,17 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 			thread_block_sigsent = TRUE;
 		}
 		PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);
+	}
+	/* If this is an online rollback and we have applied at least one pblk and we have not already issued the message
+	 * let them know the region has been taken back in time from the application's point of view.
+	 */
+	if (jgbl.onlnrlbk && murgbl.incr_onln_rlbk_cycle && !(rctl->ORLBKROLLED_msg_issued))
+	{
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ORLBKROLLED, 6,
+			LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname),
+			LEN_AND_STR(rctl->gd->rname),
+			LEN_AND_STR(udi->fn));
+		rctl->ORLBKROLLED_msg_issued = TRUE;
 	}
 	return (dbfilop(db_ctl));
 }

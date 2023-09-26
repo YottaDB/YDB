@@ -143,8 +143,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	}
 	udi = FILE_INFO(reg);
 	assert((tmp_jnlpool && (recvpool.recvpool_dummy_reg != tmp_jnlpool->jnlpool_dummy_reg))
-		|| (!tmp_jnlpool && (NULL != recvpool.recvpool_dummy_reg)
-		|| ((reg->dyn.addr->fname_len == full_len) && !STRCMP(reg->dyn.addr->fname, instfilename))));
+		|| ((!tmp_jnlpool && (NULL != recvpool.recvpool_dummy_reg))
+			|| ((reg->dyn.addr->fname_len == full_len) && !STRCMP(reg->dyn.addr->fname, instfilename))));
 	if ((NULL == tmp_jnlpool) || (recvpool.recvpool_dummy_reg != tmp_jnlpool->jnlpool_dummy_reg))
 	{	/* Fill in fields only if this is the first time this process is opening the replication instance file */
 		memcpy((char *)reg->dyn.addr->fname, instfilename, full_len);

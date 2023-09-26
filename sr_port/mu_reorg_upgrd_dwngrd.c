@@ -336,7 +336,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			util_out_print("ROOT:0x!@XQ\tstatus:!UL\tRemaining:!UL(!UL)\tIndex:!UL DT:!UL CTRLC:!UL",
 					TRUE, &curr_blk, status, csd->blks_to_upgrd, last_blks_to_upgrd,
 					index_blks_at_v7, tot_dt, mu_ctrlc_occurred);
-		util_out_print("Region !AD : index block upgrade !ADcomplete.",
+		util_out_print("Region !AD : Index block upgrade !ADcomplete",
 				TRUE, REG_LEN_STR(reg), mu_ctrlc_occurred ? 2 : 0, "in");
 		util_out_print("Region !AD : Upgraded !@UQ index blocks for !@UQ global variable trees, ",
 				FALSE, REG_LEN_STR(reg), &tot_dt, &gv_trees);
@@ -404,7 +404,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 				}
 			}
 			curr_tn = csd->trans_hist.curr_tn;
-			if (csd->fully_upgraded = (0 == csd->blks_to_upgrd))	/* Upgrade complete, WARNING assignment */
+			if ((csd->fully_upgraded = (0 == csd->blks_to_upgrd)))	/* Upgrade complete, WARNING assignment */
 				csd->offset = 0;		/* Reset offset disabling V6p upgrades on read */
 			csd->minor_dbver = GDSMVCURR;		/* Raise the DB minor version to current */
 			csd->max_tn = MAX_TN_V7;		/* Expand TN limit */
@@ -721,7 +721,7 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 	enum db_ver	blk_ver;
 	gvnh_reg_t	*gvnh_reg = NULL;
 	int		blk_seg_cnt, i, key_cmpc, key_len, level, max_fill, new_blk_sz, num_recs, rec_sz, space_need,
-			split_blks_added, split_levels_added, v7_rec_sz;
+			split_blks_added, split_levels_added, v7_rec_sz, max_rightblk_lvl;
 	int4		blk_size, child_data_blks, status;
 	mname_entry	gvt_name;
 	sgmnt_addrs	*csa;
@@ -845,7 +845,7 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 			gv_target->clue.end = 0;	/* Invalidate the clue */
 			split_blks_added = split_levels_added = 0;
 			mu_reorg_process = TRUE;
-			status = mu_split(level, max_fill, max_fill, &split_blks_added, &split_levels_added);
+			status = mu_split(level, max_fill, max_fill, &split_blks_added, &split_levels_added, &max_rightblk_lvl);
 			mu_reorg_process = FALSE;
 			if (cdb_sc_normal != status)
 			{	/* split failed */

@@ -776,11 +776,11 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 			/* A "*" anywhere in the select list (at a place where a global name would be) is the same as only a "*" */
 			len -= (len1 + 1);		/* Length after the "*" -- len1 is length before the "*" */
 			assert((0 <= len1) && (0 <= len));
-			if (dump_all = ((0 == len1) && (0 == len) && (ptr1 == save_select_list))
+			if ((dump_all = ((0 == len1) && (0 == len) && (ptr1 == save_select_list))
 					|| ((0 == len1) && (0 == len) && (',' == *(ptr2 - 1)))
 					|| ((0 == len1) && (0 < len) && (',' == *(ptr2 + 1)))
 					|| ((0 < len1) && (0 == len) && (',' == *(ptr2 - 1)))
-					|| ((0 < len1) && (0 < len) && (',' == *(ptr2 - 1)) && (',' == *(ptr2 + 1))))
+					|| ((0 < len1) && (0 < len) && (',' == *(ptr2 - 1)) && (',' == *(ptr2 + 1)))))
 				break;
 		}
 	}

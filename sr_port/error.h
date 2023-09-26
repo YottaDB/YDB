@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -67,7 +67,7 @@ typedef struct err_ctl_struct
 #define MSGFLAG(msg)		((msg & 0x70000000) >> 28)
 
 /* to change default severity of msg to type */
-#define MAKE_MSG_TYPE(msg, type)  ((msg) & ~SEV_MSK | (type))
+#define MAKE_MSG_TYPE(msg, type)  (((msg) & ~SEV_MSK) | (type))
 
 /* Define SET_ERROR_CONDITION macro to set global variables "error_condition" as well as "severity" at the same time.
  * If the two are not kept in sync, it is possible "severity" reflects INFO (from an older error) whereas

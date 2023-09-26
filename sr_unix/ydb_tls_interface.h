@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2022 Fidelity National Information	*
+ * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -19,11 +19,12 @@
 #ifndef GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED
 #define GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED
 
-#define GTM_TLS_API_VERSION		0x00000006
+#define GTM_TLS_API_VERSION		0x00000007
 #define GTM_TLS_API_VERSION_SOCK	0x00000002	/* when TLS sockets added */
 #define GTM_TLS_API_VERSION_RENEGOPT	0x00000004	/* WRITE /TLS renegotiate with options */
 #define GTM_TLS_API_VERSION_NONBLOCK	0x00000005	/* WRITE /BLOCK("OFF") */
 #define GTM_TLS_API_VERSION_GET_ERROR	0x00000006	/* gtm_tls_get_error() socket ptr for errbuf */
+#define GTM_TLS_API_VERSION_EXTCALLS	0x00000007	/* External call functions for ciphers and versions */
 
 #define MAX_X509_LEN			256
 #define MAX_ALGORITHM_LEN		64
@@ -280,6 +281,28 @@ GBLREF	int		gtm_tls_connect(gtm_tls_socket_t *socket);
  *
  */
 GBLREF	int		gtm_tls_accept(gtm_tls_socket_t *socket);
+
+/* Attempts to perform peer verification after the handshake completes with Post Handshake Authentication.
+ *
+ * Arguments:
+ *    `socket' : The SSL/TLS socket (initialized using `gtm_tls_socket').
+ *
+ * Returns 0 if the connection is successful. Otherwise, one of -1, GTMTLS_WANT_READ or GTMTLS_WANT_WRITE is returned. In case of
+ * -1, `gtm_tls_errno' and `gtm_tls_get_error' can be used to obtain the necessary error detail.
+ *
+ */
+extern int		gtm_tls_do_post_hand_shake(gtm_tls_socket_t *socket);
+
+/* Repeat the handshake for PHA
+ *
+ * Arguments:
+ *    `socket' : The SSL/TLS socket (initialized using `gtm_tls_socket').
+ *
+ * Returns 0 if the connection is successful. Otherwise, one of -1, GTMTLS_WANT_READ or GTMTLS_WANT_WRITE is returned. In case of
+ * -1, `gtm_tls_errno' and `gtm_tls_get_error' can be used to obtain the necessary error detail.
+ *
+ */
+extern int		gtm_tls_repeat_hand_shake(gtm_tls_socket_t *socket);
 
 /* Renegotiates an active SSL/TLS connection. Note: This function does the renegotiation in a blocking fashion and more importantly
  * handles EINTR internally by retrying the renegotiation.

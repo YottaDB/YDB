@@ -111,7 +111,7 @@ static readonly mval literal_poollimit =
 void mupip_reorg(void)
 {
 	boolean_t		resume, reorg_success = TRUE;
-	int			data_fill_factor, index_fill_factor;
+	int			data_fill_factor, index_fill_factor, min_level = 0;
 	int			reorg_op, reg_max_rec, reg_max_key, reg_max_blk, status;
 	char			cli_buff[MAX_LINE], *ptr, keep_value_buffer[MAX_LINE + 1];
 	glist			gl_head, exclude_gl_head, *gl_ptr, hasht_gl;
@@ -151,7 +151,8 @@ void mupip_reorg(void)
 			keep_mval_ptr = (&keep_mval);
 			if ('%' == keep_mval.str.addr[keep_mval.str.len - 1])
 			{
-				STRNCPY_STR(cli_buff, keep_mval.str.addr,keep_mval.str.len);
+				assert(sizeof(cli_buff) > keep_mval.str.len);
+				memcpy(cli_buff, keep_mval.str.addr,keep_mval.str.len);
 				cli_buff[keep_mval.str.len - 1] = '\0';
 				if (!cli_is_dcm(cli_buff))
 				{
@@ -268,6 +269,13 @@ void mupip_reorg(void)
 		index_fill_factor = data_fill_factor;
 	util_out_print("Fill Factor:: Index blocks !UL%: Data blocks !UL%", FLUSH, index_fill_factor, data_fill_factor);
 
+	if ((cli_status = cli_present("MIN_LEVEL")))
+	{
+		if (!cli_get_int("MIN_LEVEL", &min_level))
+			min_level = 0;
+		else if (min_level > MAX_BT_DEPTH)
+			min_level = MAX_BT_DEPTH;
+	}
 	n_len = SIZEOF(cli_buff);
 	memset(cli_buff, 0, n_len);
 	if (CLI_PRESENT != cli_present("EXCLUDE"))
@@ -339,7 +347,7 @@ void mupip_reorg(void)
 		 */
 		reorg_gv_target->gvname.var_name = GNAME(gl_ptr);
 		GTMTRIG_ONLY(assert(!IS_MNAME_HASHT_GBLNAME(reorg_gv_target->gvname.var_name));)
-		cur_success = mu_reorg(gl_ptr, &exclude_gl_head, &resume, index_fill_factor, data_fill_factor, reorg_op);
+		cur_success = mu_reorg(gl_ptr, &exclude_gl_head, &resume, index_fill_factor, data_fill_factor, reorg_op, min_level);
 		reorg_success &= cur_success;
 		SET_GV_CURRKEY_FROM_GVT(reorg_gv_target);
 		if (truncate)
@@ -362,6 +370,7 @@ void mupip_reorg(void)
 					else
 						prev_reg->next = tmp_reg;
 #					ifdef GTM_TRIGGER
+<<<<<<< HEAD
 					/* Reorg ^#t in this region to move it out of the way. */
 					SET_GVTARGET_TO_HASHT_GBL(cs_addrs);	/* sets gv_target */
 					inctn_opcode = inctn_invalid_op;	/* needed for INITIAL_HASHT_ROOT_SEARCH */
@@ -380,6 +389,29 @@ void mupip_reorg(void)
 						cur_success = mu_reorg(&hasht_gl, &exclude_gl_head, &resume,
 									index_fill_factor, data_fill_factor, reorg_op);
 						reorg_success &= cur_success;
+=======
+					if (truncate)
+					{	/* Reorg ^#t in this region to move it out of the way. */
+						SET_GVTARGET_TO_HASHT_GBL(cs_addrs);	/* sets gv_target */
+						inctn_opcode = inctn_invalid_op;	/* needed for INITIAL_HASHT_ROOT_SEARCH */
+						INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;	/* sets gv_target->root */
+						DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+						hasht_gl.next = NULL;
+						hasht_gl.reg = gv_cur_region;
+						hasht_gl.gvt = gv_target;
+						if (0 != gv_target->root)
+						{
+							util_out_print("   ", FLUSH);
+							util_out_print("Global: !AD (region !AD)", FLUSH,
+								GNAME(&hasht_gl).len, GNAME(&hasht_gl).addr,
+								REG_LEN_STR(gv_cur_region));
+							reorg_gv_target->gvname.var_name = gv_target->gvname.var_name;
+							cur_success = mu_reorg(&hasht_gl, &exclude_gl_head, &resume,
+										index_fill_factor, data_fill_factor, reorg_op,
+										min_level);
+							reorg_success &= cur_success;
+						}
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 					}
 #					endif
 				}

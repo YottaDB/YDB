@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> fdfdea1e (GT.M V7.1-002)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,7 +104,7 @@ int rc_prc_setf(rc_q_hdr *qhdr)
     }
     else  /* the total record will fit into a block */
     {
-	if (rc_set_fragment = data_off) /* just send fragment */
+	if ((rc_set_fragment = data_off)) /* just send fragment */
 	{
 	    v.str.len = v.str.len - data_off - str_remain;
 	    v.str.addr = (char*)ptr;

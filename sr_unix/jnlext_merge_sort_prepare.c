@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015 Fidelity National Information		*
+ * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -80,9 +80,8 @@ void jnlext_merge_sort_prepare(jnl_ctl_list *jctl, jnl_record *rec, enum broken_
 			if ((NULL != forw_multi) && (repl_closed == rctl->repl_state))
 			{
 				assert(!IS_TUPD(rectype)
-					|| (1 < rec->jrec_set_kill.num_participants)
-						&& (forw_multi->num_reg_seen_backward
-							<= rec->jrec_set_kill.num_participants));
+					|| ((1 < rec->jrec_set_kill.num_participants)
+						&& (forw_multi->num_reg_seen_backward <= rec->jrec_set_kill.num_participants)));
 				assert(!IS_COM(rectype)
 					|| (forw_multi->num_reg_seen_backward <= rec->jrec_tcom.num_participants));
 				jext_rec->num_more_reg = IS_TUPD(rectype) ? forw_multi->num_reg_seen_backward - 1 : 0;

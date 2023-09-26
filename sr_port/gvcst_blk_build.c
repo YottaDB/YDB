@@ -231,7 +231,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 			cse->next_off = 0;
 		}
 #		ifdef DEBUG
-		if (offset = cse->first_off)
+		if ((offset = cse->first_off))
 		{	/* Verify the integrity of the TP chains within a newly created block.
 			 * If it is the first TP private build, the update array could have referenced
 			 * shared memory global buffers which could have been concurrently updated.

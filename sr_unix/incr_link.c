@@ -506,7 +506,7 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		zhent = (LINK_SHROBJ == linktyp) ? recent_zhist->end - 1 : NULL;
 		if ((old_rhead->objhash == hdr->objhash)
 		    && (((NULL == zhent) && (NULL == old_rhead->relinkctl_bkptr))			/* Both non-relink */
-			|| (NULL != zhent) && (zhent->relinkctl_bkptr == old_rhead->relinkctl_bkptr)))  /* Both same relink */
+			|| ((NULL != zhent) && (zhent->relinkctl_bkptr == old_rhead->relinkctl_bkptr))))  /* Both same relink */
 #		else
 		if (old_rhead->objhash == ((rhdtyp *)hdr)->objhash)
 #		endif

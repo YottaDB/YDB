@@ -402,6 +402,81 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				continue;
 			}
 		} while ((GTMTLS_WANT_READ == status) || (GTMTLS_WANT_WRITE == status));
+		if (tlsopt_server == option)
+		{	/* Servers do post hand-shake auth as needed */
+			status = gtm_tls_do_post_hand_shake((gtm_tls_socket_t *)socketptr->tlssocket);
+			if (0 != status)
+			{	/* Something wrong. Decide if an error occurred in setting PHA or handshake retry needed */
+				if ((GTMTLS_WANT_READ != status) && (GTMTLS_WANT_WRITE != status))
+				{	/* post hand-shake auth failure */
+					errp = gtm_tls_get_error((gtm_tls_socket_t *)socketptr->tlssocket);
+					SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
+					if (socketptr->ioerror)
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0,
+							ERR_TEXT, 2, errlen, errp);
+					if (NO_M_TIMEOUT != msec_timeout)
+						dollar_truth = FALSE;
+					REVERT_GTMIO_CH(&iod->pair, ch_set);
+					return;
+				}
+				/* Need to retry the handshake */
+				fds.fd = socketptr->sd;
+				do
+				{
+					/* Check timeout after each handshake attempt. Note that gtm_tls_do_post_hand_shake()
+					 * includes a hand-shake attempt, hence timeout checks are done first
+					 */
+					if ((0 != msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+					{
+						sys_get_curr_time(&cur_time);
+						cur_time = sub_abs_time(&end_time, &cur_time);
+						if (0 >= cur_time.at_sec)
+						{	/* no more time */
+							gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
+							socketptr->tlsenabled = FALSE;
+							dollar_truth = FALSE;
+							REVERT_GTMIO_CH(&iod->pair, ch_set);
+							return;
+						} else
+						{	/* adjust msec_timeout for poll */
+							msec_timeout = (cur_time.at_sec * MILLISECS_IN_SEC) +
+								DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC);
+						}
+					} else if (0 == msec_timeout)
+					{	/* only one chance */
+						gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
+						socketptr->tlsenabled = FALSE;
+						dollar_truth = FALSE;
+						REVERT_GTMIO_CH(&iod->pair, ch_set);
+						return;
+					}
+					fds.events = (GTMTLS_WANT_READ == status) ? POLLIN : POLLOUT;
+					if (-1 == (status2 = poll(&fds, 1, (NO_M_TIMEOUT == msec_timeout) ? -1 : msec_timeout)))
+					{
+						save_errno = errno;
+						if (EAGAIN == save_errno)
+						{
+							rel_quant();	/* allow resources to become available - likely nanosleep */
+							status2 = 0;	/* treat as timeout */
+						} else if (EINTR == save_errno)
+							status2 = 0;
+					}
+					status = gtm_tls_repeat_hand_shake((gtm_tls_socket_t *)socketptr->tlssocket);
+				} while ((GTMTLS_WANT_READ == status) || (GTMTLS_WANT_WRITE == status));
+				if (0 != status)
+				{	/* post hand-shake auth failure */
+					errp = gtm_tls_get_error((gtm_tls_socket_t *)socketptr->tlssocket);
+					SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
+					if (socketptr->ioerror)
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0,
+							ERR_TEXT, 2, errlen, errp);
+					if (NO_M_TIMEOUT != msec_timeout)
+						dollar_truth = FALSE;
+					REVERT_GTMIO_CH(&iod->pair, ch_set);
+					return;
+				}
+			}
+		}
 		/* turn on output buffering */
 		SOCKET_OBUFFER_INIT(socketptr, socketptr->buffer_size, DEFAULT_WRITE_WAIT, (DEFAULT_WRITE_WAIT * 2));
 		socketptr->obuffer_in_use = TRUE;

@@ -373,13 +373,20 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			{	/* Some error occurred. Check for restartable condition. */
 				if (EINTR == errno)
 				{
+<<<<<<< HEAD
 					eintr_handling_check();
+=======
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 					if (!out_of_time)
 						continue;
 					else
 						return 0;	/* timeout indicator */
+<<<<<<< HEAD
 				} else
 					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
+=======
+				}
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 				return bytesread;
 			}
 			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;

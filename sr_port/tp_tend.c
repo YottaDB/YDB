@@ -1545,7 +1545,7 @@ boolean_t	tp_tend()
 	/* the following section is the actual commitment of the changes in the database (phase1 for BG) */
 	for (si = first_tp_si_by_ftok;  (NULL != si); si = si->next_tp_si_by_ftok)
 	{
-		if (lcl_update_trans = si->update_trans)
+		if ((lcl_update_trans = si->update_trans))
 		{
 			assert((NULL == si->first_cw_set) || (0 != si->cw_set_depth));
 			sgm_info_ptr = si;

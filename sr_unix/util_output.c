@@ -438,7 +438,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					 */
 					assert((c + chlen) <= ctop);
 					assert(0 < chlen);
-					assert((0 < chwidth) || (0 == chwidth) && gtm_utf8_mode);
+					assert((0 < chwidth) || ((0 == chwidth) && gtm_utf8_mode));
 					nexti = i + chwidth;
 					if (nexti > cwidth)	/* adding next input char will cross requested width */
 						break;

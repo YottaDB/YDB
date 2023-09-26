@@ -106,6 +106,8 @@ GBLDEF int			muint_adj;
 GBLDEF int			mu_int_plen;
 GBLDEF int			mu_map_errs;
 GBLDEF int			trans_errors = 0;
+GBLDEF int4			max_data_blk_size;
+GBLDEF int4			max_index_blk_size;
 GBLDEF boolean_t		block = FALSE;
 GBLDEF boolean_t		muint_fast = FALSE;
 GBLDEF boolean_t		master_dir;
@@ -319,6 +321,26 @@ void mupip_integ(void)
 		disp_map_errors = 0;
 		master_dir = FALSE;
 	}
+	if (CLI_PRESENT == cli_present("DMAXBLOCKSIZE"))
+	{
+		if (0 == cli_get_int("DMAXBLOCKSIZE", &max_data_blk_size))
+			max_data_blk_size = 0;
+		else if (max_data_blk_size < 0)
+			max_data_blk_size = 0;
+		else if (max_data_blk_size > MAX_DB_BLK_SIZE)
+			max_data_blk_size = MAX_DB_BLK_SIZE;
+	} else
+		max_data_blk_size = 0;
+	if (CLI_PRESENT == cli_present("IMAXBLOCKSIZE"))
+	{
+		if (0 == cli_get_int("IMAXBLOCKSIZE", &max_index_blk_size))
+			max_index_blk_size = 0;
+		else if (max_index_blk_size < 0)
+			max_index_blk_size = 0;
+		else if (max_index_blk_size > MAX_DB_BLK_SIZE)
+			max_index_blk_size = MAX_DB_BLK_SIZE;
+	} else
+		max_index_blk_size = 0;
 	muint_all_index_blocks = !(block || mu_key);
 	mu_int_master = malloc(MASTER_MAP_SIZE_MAX);
 	tn_reset_specified = (CLI_PRESENT == cli_present("TN_RESET"));

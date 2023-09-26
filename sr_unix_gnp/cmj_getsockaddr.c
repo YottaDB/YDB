@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -145,9 +145,13 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 		}
 		errno = 0;
 		port = ATOI(port_str);
+<<<<<<< HEAD
 		if ((0 == port) && (0 != errno) || (0 >= port))
 		{
 			FREEADDRINFO(ai_ptr);
+=======
+		if (((0 == port) && (0 != errno)) || (0 >= port))
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 			return CMI_BADIPADDRPORT;
 		}
 	} else

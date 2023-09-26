@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -53,6 +53,7 @@
 GBLDEF	int			gtmsource_sock_fd = FD_INVALID;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF  FILE			*gtmsource_log_fp;
+GBLREF  gtmsource_options_t	gtmsource_options;
 
 error_def(ERR_REPLCOMM);
 error_def(ERR_GETADDRINFO);
@@ -61,7 +62,14 @@ error_def(ERR_TEXT);
 int gtmsource_comm_init(boolean_t print_addresolve_error)
 {
 	/* Initialize communication stuff */
+<<<<<<< HEAD
 	struct addrinfo 	*ai_ptr = NULL, *ai_head = NULL, hints;
+=======
+	struct	linger	disable_linger = {0, 0};
+	char	error_string[1024];
+	int	err_status, send_buffsize, recv_buffsize, tcp_s_buffsize;
+	struct addrinfo *ai_ptr = NULL, *ai_head = NULL, hints;
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 	gtmsource_local_ptr_t   gtmsource_local;
 	intrpt_state_t  	prev_intrpt_state;
 	struct linger		disable_linger = {0, 0};
@@ -122,6 +130,49 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 			SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket disable linger : %s",
 					STRERROR(err_status));
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
+		}
+		if (0 != (err_status = get_send_sock_buff_size(gtmsource_sock_fd, &send_buffsize)))
+		{
+			SNPRINTF(error_string, SIZEOF(error_string), "Error getting socket send buffsize : %s",
+					STRERROR(err_status));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(error_string));
+		}
+		if (send_buffsize < gtmsource_options.send_buffsize)
+		{
+			for (tcp_s_buffsize = gtmsource_options.send_buffsize;
+					tcp_s_buffsize >= MAX(send_buffsize, GTMSOURCE_MIN_TCP_SEND_BUFSIZE)
+					&&  0 != (err_status = set_send_sock_buff_size(gtmsource_sock_fd, tcp_s_buffsize));
+					tcp_s_buffsize -= GTMSOURCE_TCP_SEND_BUFSIZE_INCR)
+				;
+			if (tcp_s_buffsize < GTMSOURCE_MIN_TCP_SEND_BUFSIZE)
+			{
+				SNPRINTF(error_string, SIZEOF(error_string), "Could not set TCP send buffer size in range [%d, %d],"
+						"last known error : %s", GTMSOURCE_MIN_TCP_SEND_BUFSIZE,
+						gtmsource_options.send_buffsize, STRERROR(err_status));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2,
+						LEN_AND_STR(error_string));
+			}
+		}
+		if (0 != (err_status = get_recv_sock_buff_size(gtmsource_sock_fd, &recv_buffsize)))
+		{
+			SNPRINTF(error_string, SIZEOF(error_string), "Error getting socket recv buffsize : %s",
+					STRERROR(err_status));
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+					LEN_AND_LIT("Error getting socket recv buffsize"),
+					ERR_TEXT, 2, LEN_AND_STR(error_string));
+		}
+		if (recv_buffsize < gtmsource_options.recv_buffsize)
+		{
+			if (0 != (err_status = set_recv_sock_buff_size(gtmsource_sock_fd, gtmsource_options.recv_buffsize)))
+			{
+				if (recv_buffsize < GTMSOURCE_MIN_TCP_RECV_BUFSIZE)
+				{
+					SNPRINTF(error_string, SIZEOF(error_string), "Could not set TCP recv buffer size to"
+							" %d : %s", GTMSOURCE_MIN_TCP_RECV_BUFSIZE, STRERROR(err_status));
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2,
+							LEN_AND_STR(error_string));
+				}
+			}
 		}
 	}
 	return(errcode);

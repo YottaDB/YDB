@@ -309,7 +309,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 		free(srcfile_name);
 		srcfile_name = NULL;
 		srcfilnamlen = (int)rtn_vector->routine_name.len;
-		memcpy(srcnamebuf, rtn_vector->routine_name.addr, srcfilnamlen);
+		memcpy((void *)srcnamebuf, rtn_vector->routine_name.addr, srcfilnamlen);
 		if (srcnamebuf[0] == '%')	/* percents are translated to _ on filenames */
 			srcnamebuf[0] = '_';
 		MEMCPY_LIT(&srcnamebuf[srcfilnamlen], DOTM);

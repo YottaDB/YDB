@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2020 Fidelity National Information		#
+# Copyright (c) 2001-2023 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -35,7 +35,8 @@ if ( "$HOSTOS" == "Linux" ) then
 	rm -f $outfile
 	echo "Stripping debug symbols and generating .debug files. Leaving log at $PWD/$outfile"
 	foreach file (`find ../ -executable -type f`)
-		if ($file:e =~ {sh,csh}) continue
+		if ($file:e =~ {sh,csh,debug,dat,gld,gtc,h,xc}) continue
+		if ($file:t =~ {lower_cp,gtminstall,configure}) continue
 		echo "Stripping $file"				>>&! $outfile
 		objcopy --only-keep-debug $file $file.debug	>>&! $outfile
 		strip -g $file					>>&! $outfile

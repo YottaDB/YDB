@@ -897,7 +897,11 @@ GTMSECSHRSGIDF	<gtmsecshr server setgid to root failed>/warning/fao=0!/ansi=0
 GTMSECSHRSSIDF	<gtmsecshr server setsid failed>/warning/fao=0!/ansi=0
 GTMSECSHRFORKF	<gtmsecshr server unable to fork off a child process>/fatal/fao=0!/ansi=0
 DBFSYNCERR	<Error synchronizing database file !AD to disk>/error/fao=2!/ansi=0
+<<<<<<< HEAD
 UNUSEDMSG900	<SECONDAHEAD last used in V7.0-000 Jan 2021>/error/fao=0!/ansi=0
+=======
+EXCEEDRCTLRNDWN	<Maximum relinkctl rundown retries limit of !UL exceeded>/error/fao=1!/ansi=0
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 SCNDDBNOUPD	<Database Updates not allowed on the secondary>/error/fao=0!/ansi=0
 MUINFOUINT4	<!AD : !UL [0x!XL]>/info/fao=4!/ansi=0
 NLMISMATCHCALC	<Location of !AD expected at 0x!XL, but found at 0x!XL>/error/fao=4!/ansi=0
@@ -1009,7 +1013,11 @@ MUDESTROYFAIL	<Global section (!AD) corresponding to file !AD failed to be destr
 NOTALLDBOPN	<Not all required database files were opened>/fatal/fao=0!/ansi=0
 MUSELFBKUP	<Database file !AD can not be backed upon itself>/error/fao=2!/ansi=0
 DBDANGER	<Process !UL [0x!XL] killed while committing update for database file !AD.  Possibility of damage to block 0x!16@XQ.>/warning/fao=5!/ansi=0
+<<<<<<< HEAD
 UNUSEDMSG1012	<TRUNCATEFAIL nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
+=======
+ORLBKROLLED	<ONLINE ROLLBACK took the database for instance !AD region !AD corresponding to !AD to a prior state>/warning/fao=6!/ansi=0
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 TCGETATTR	<Error while getting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 TCSETATTR	<Error while setting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 IOWRITERR	<IO Write by pid 0x!XL to blk 0x!XL of database file !AD failed.  Pid 0x!XL retrying the IO.>/error/fao=5!/ansi=0
@@ -1050,7 +1058,11 @@ FILTERCOMM	<Error communicating seqno !16@XQ with the filter>/error/fao=1!/ansi=
 FILTERBADCONV	<Bad conversion of seqno !16@XQ by filter>/error/fao=1!/ansi=0
 PRIMARYISROOT	<Attempted operation not valid on root primary instance !AD>/error/fao=2!/ansi=0
 GVQUERYGETFAIL	<Global variable QUERY and GET failed.  Failure code: !AD.>/error/fao=2!/ansi=0
+<<<<<<< HEAD
 UNUSEDMSG1053	<DBCREC2BIGINBLK removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+=======
+BSIZTOOLARGE	<!AD Block larger than specified maximum size>/error/fao=2!/ansi=0/B
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 MERGEDESC	<Merge operation not possible.  !AD is descendent of !AD.>/error/fao=4!/ansi=19
 MERGEINCOMPL	<Error encountered during MERGE; operation may be incomplete>/warning/fao=0!/ansi=0
 DBNAMEMISMATCH	<Database file !AD points to shared memory (id = !UL) which in turn points to an inaccessible database file !AZ>/error/fao=4!/ansi=0
@@ -1238,7 +1250,7 @@ EPOCHTNHI	<At the EPOCH record at offset !UL of !AD transaction number [0x!16@XQ
 CHNGTPRSLVTM	<Mupip will change tp_resolve_time from !UL to !UL because expected EPOCH or EOF record was not found in Journal File !AD>/info/fao=4!/ansi=0
 JNLUNXPCTERR	<Unexpected error encountered for Journal !AD at disk address 0x!XL>/error/fao=3!/ansi=0
 OMISERVHANG	<GTCM OMI server is hung>/info/fao=0!/ansi=0
-RSVDBYTE2HIGH	<Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and Reserved bytes (!UL)>/error/fao=5!/ansi=0
+RSVDBYTE2HIGH	<Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and !AZ reserved bytes (!UL)>/error/fao=6!/ansi=0
 BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0//1
 BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0//1
 SHMHUGETLB	<Could not back shared memory with huge pages, using base pages instead !AD>/warning/fao=2!/ansi=0
@@ -1619,13 +1631,13 @@ SETQUALPROB	<Error getting !AD qualifier value>/error/fao=2!/ansi=0
 EXTRINTEGRITY	<Database !AD potentially contains spanning nodes or data encrypted with two different keys>/error/fao=2!/ansi=0
 CRYPTKEYRELEASEFAILED	<Could not safely release encryption key corresponding to file !AD. !AD>/error/fao=4!/ansi=0//1
 MUREENCRYPTSTART	<Database !AD : MUPIP REORG ENCRYPT started by pid !UL at transaction number [0x!16@XQ]>/info/fao=4!/ansi=0
-UNUSEDMSG1620	<MUREENCRYPTV4NOALLOW Last used in V7.0-004 Fed 2023>/fatal/fao=0!/ansi=0
+BUFFSIZETOOSMALL	<TCP !AD buffer size passed to !AD smaller than minimum size of !SL.>/warning/fao=5!/ansi=0
 ENCRYPTCONFLT	<MUPIP REORG -ENCRYPT and MUPIP EXTRACT -FORMAT=BIN cannot run concurrently - skipping !AD on region: !AD, file: !AD>/error/fao=6!/ansi=0
 JNLPOOLRECOVERY	<The size of the data written to the journal pool (!UL) does not match the size of the data in the journal files (!UL) at journal sequence number [0x!16@XQ] for the replication instance file !AZ. The journal pool has been recovered.>/error/fao=4!/ansi=0
 LOCKTIMINGINTP	<A LOCK at !AD within a TP transaction is waiting in a final TP retry, which may lead to a general response gap>/warning/fao=2!/ansi=0
 PBNUNSUPTYPE	<$ZPEEK() does not support type !AD>/error/fao=2!/ansi=0
 DBFHEADLRU	<Database file !AD LRU pointer: 0x!16@XQ is outside of range: 0x!16@XQ to 0x!16@XQ or misaligned>/info/fao=5!/ansi=0
-UNUSEDMSG1626	<ASYNCIONOV4 last used in V7.0-004 Fed 2023>/error/fao=0!/ansi=0
+UNUSEDMSG1626	<ASYNCIONOV4 last used in V7.0-004 Feb 2023>/error/fao=0!/ansi=0
 AIOCANCELTIMEOUT	<Pid [0x!XL] timed out waiting for pending async io to complete/cancel in database file !AD>/error/fao=3!/ansi=0
 DBGLDMISMATCH	<Database file !AD has !AZ whereas !AZ !AD in global directory !AD has !AZ>/error/fao=9!/ansi=0
 DBBLKSIZEALIGN	<Database file !AD has AIO=ON and block_size=!UL which is not a multiple of filesystem block size !UL>/error/fao=4!/ansi=0

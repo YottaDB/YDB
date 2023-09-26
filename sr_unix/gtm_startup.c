@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2021 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+>>>>>>> fdfdea1e (GT.M V7.1-002)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -201,7 +205,7 @@ void gtm_startup(struct startup_vector *svec)
 	MV_FORCE_STRD(&(TREF(tpnotacidtime)));
 	assert(6 >= (TREF(tpnotacidtime)).str.len);
 	temp = malloc((TREF(tpnotacidtime)).str.len);
-	memcpy(temp, (TREF(tpnotacidtime)).str.addr, (TREF(tpnotacidtime)).str.len);
+	memcpy((void *)temp, (TREF(tpnotacidtime)).str.addr, (TREF(tpnotacidtime)).str.len);
 	(TREF(tpnotacidtime)).str.addr = temp;
 	TREF(compile_time) = FALSE;
 	/* assert that is_replicator and run_time is properly set by gtm_imagetype_init invoked at process entry */

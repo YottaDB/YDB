@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,8 +73,8 @@ void genpat(mstr *input, mval *patbuf)
 		*pat_str++ = '"';
 	instr.addr = source_buffer;
 	instr.len = INTCAST(pat_str - source_buffer);
-	if (status = patstr(&instr, &pat_ptstr, NULL))
-		rts_error(VARLSTCNT(1) status);
+	if ((status = patstr(&instr, &pat_ptstr, NULL)))
+		rts_error_csa(NULL, VARLSTCNT(1) status);
 	assert(pat_ptstr.len <= MAX_PATOBJ_LENGTH);
 	patbuf->str.len = pat_ptstr.len * SIZEOF(uint4);
 	memcpy(patbuf->str.addr, &pat_ptstr.buff[0], patbuf->str.len);

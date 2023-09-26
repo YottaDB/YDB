@@ -53,7 +53,7 @@ void gvcst_map_build(block_id *array, sm_uc_ptr_t base_addr, cw_set_element *cs,
 	base_addr += SIZEOF(blk_hdr);
 	assert(cs_addrs->now_crit); /* Don't want to be messing with highest_lbm_with_busy_blk outside crit */
 	DETERMINE_BML_FUNC(bml_func, cs, cs_addrs);
-	while (bitnum = *array)		/* caution : intended assignment */
+	while ((bitnum = *array))		/* caution : intended assignment */
 	{
 		assert(bitnum == (int4)bitnum);		/* check that casting bitnum is valid */
 		assert((int4)bitnum < cs_addrs->hdr->bplmap);	/* check that bitnum is positive and within 0 to bplmap */

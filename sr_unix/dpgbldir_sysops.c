@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -176,11 +176,13 @@ void file_read(file_pointer *file_ptr, int4 size, uchar_ptr_t buff, int4 pos)
 
 	LSEEKREAD(file_ptr->fd, (off_t)(pos - 1 ) * DISK_BLOCK_SIZE, buff, size, save_errno);
 	if (0 != save_errno)
+	{
 		if (-1 == save_errno)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 		else
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr,
 				LEN_AND_LIT(""), LEN_AND_LIT(""), save_errno);
+	}
 	return;
 }
 

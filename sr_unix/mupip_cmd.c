@@ -349,6 +349,7 @@ static readonly CLI_PARM mup_integ_map_parm[] = {
 };
 
 static	CLI_ENTRY	mup_integ_qual[] = {		/* INTEG */
+<<<<<<< HEAD
 { "ADJACENCY",   mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0       },
 { "ANALYZE",     mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
 { "BLOCK",       mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, VAL_HEX },
@@ -368,6 +369,28 @@ static	CLI_ENTRY	mup_integ_qual[] = {		/* INTEG */
 { "TN_RESET",    mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 { "TRANSACTION", mupip_integ, 0, mup_integ_map_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0       },
 { "VERBOSE",     mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0       },
+=======
+{ "ADJACENCY",     mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0       },
+{ "ANALYZE",       mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
+{ "BLOCK",         mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, VAL_HEX },
+{ "BRIEF",         mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
+{ "DBG",           mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0       },
+{ "DMAXBLOCKSIZE", mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0       },
+{ "FAST",          mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
+{ "FILE",          mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
+{ "FULL",          mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
+{ "IMAXBLOCKSIZE", mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0       },
+{ "KEYRANGES",     mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0       },
+{ "MAP",           mupip_integ, 0, mup_integ_map_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0       },
+{ "MAXKEYSIZE",    mupip_integ, 0, mup_integ_map_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0       },
+{ "ONLINE",        mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 2, NEG,     VAL_N_A, 0       },
+{ "PRESERVE",      mupip_integ, 0, 0,                  0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_N_A, 0       },
+{ "REGION",        mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
+{ "STATS",         mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0       },
+{ "SUBSCRIPT",     mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
+{ "TN_RESET",      mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
+{ "TRANSACTION",   mupip_integ, 0, mup_integ_map_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0       },
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 { "" }
 };
 
@@ -507,6 +530,7 @@ static  CLI_ENTRY       mup_reorg_qual[] = {		/* REORG */
 { "FILL_FACTOR",        mupip_reorg, 0, mup_reorg_ff_parm, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0       },
 { "INDEX_FILL_FACTOR",  mupip_reorg, 0, mup_reorg_ff_parm, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0       },
 { "KEEP",               mupip_reorg, 0, 0,                 0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0       },
+{ "MIN_LEVEL",          mupip_reorg, 0, 0,                 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0       },
 { "NOCOALESCE",         mupip_reorg, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 { "NOSPLIT",            mupip_reorg, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 { "NOSWAP",             mupip_reorg, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
@@ -593,9 +617,11 @@ static CLI_ENTRY	gtmsource_qual[] = {	/* REPLIC -SOURCE */
 {"PASSIVE",              0, 0,                0,                      0, 0,                                  0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 {"PLAINTEXTFALLBACK",    0, 0,                0,                      0, 0,                                  0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 {"PROPAGATEPRIMARY",     0, 0,                0,                      0, 0,                                  0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+{"RECVBUFFSIZE",         0, 0,                0,                      0, 0,                                  0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0 },
 {"RENEGOTIATE_INTERVAL", 0, 0,                0,                      0, 0,                                  0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
 {"ROOTPRIMARY",          0, 0,                0,                      0, 0,                                  0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 {"SECONDARY",            0, 0,                0,                      0, 0,                                  0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
+{"SENDBUFFSIZE",         0, 0,                0,                      0, 0,                                  0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0 },
 {"SHOWBACKLOG",          0, 0,                0,                      0, 0,                                  0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 {"SHUTDOWN",             0, 0,                0,                      0, 0,                                  0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 {"START",                0, 0,                0,                      0, 0,                                  0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
@@ -634,8 +660,10 @@ static CLI_ENTRY	gtmrecv_qual[] = {	/* REPLIC -RECEIVE */
 {"LOG_INTERVAL",       0, 0, 0,                    0,                     0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
 {"NORESYNC",           0, 0, 0,                    0,                     0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 {"PLAINTEXTFALLBACK",  0, 0, 0,                    0,                     0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
+{"RECVBUFFSIZE",       0, 0, 0,                    0,                     0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0 },
 {"RESUME",             0, 0, 0,                    0,                     0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, 0 },
 {"REUSE",              0, 0, 0,                    0,                     0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
+{"SENDBUFFSIZE",       0, 0, 0,                    0,                     0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0 },
 {"SHOWBACKLOG",        0, 0, 0,                    0,                     0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 {"SHUTDOWN",           0, 0, 0,                    0,                     0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 {"START",              0, 0, 0,                    0,                     0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
@@ -737,6 +765,7 @@ static	CLI_ENTRY	mup_set_qual[] = {		/* SET */
 { "ACCESS_METHOD",        mupip_set, 0, 0,                  mup_set_acc_qual,     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0       },
 { "ASYNCIO",              mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0       },
 { "BYPASS",               mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0       },
+{ "DATA_RESERVED_BYTES",  mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0       },
 { "DBFILENAME",           mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0       },
 { "DEFER_ALLOCATE",       mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0       },
 { "DEFER_TIME",           mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0       },
@@ -749,6 +778,7 @@ static	CLI_ENTRY	mup_set_qual[] = {		/* SET */
 { "FULLBLKWRT",           mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0       },
 { "GLOBAL_BUFFERS",       mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0       },
 { "HARD_SPIN_COUNT",      mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "INDEX_RESERVED_BYTES", mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0	      },
 { "INST_FREEZE_ON_ERROR", mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0       },
 { "JNLFILE",              mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0       },
 { "JOURNAL",              mupip_set, 0, 0,                  mup_set_journal_qual, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_STR,  0       },

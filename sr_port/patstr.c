@@ -726,7 +726,8 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						topchar, min, max, size, total_min, total_max, count, lastpatptr, last_infinite,
 						min_dfa, altmin, altmax, instr, inchar, dfa);
 					start_dfa = ((MAX_DFA_STRLEN >= charpos) /* Try another DFA for remainder if possible */
-							&& (infinite || (lower_bound == upper_bound) && lower_bound) && leaf_num);
+							&& (infinite || ((lower_bound == upper_bound) && lower_bound))
+							&& leaf_num);
 					done = FALSE;
 					continue;
 				}

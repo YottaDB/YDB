@@ -710,7 +710,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
 					cr, &(cr->blk), RTS_ERROR_TEXT("cr->in_cw_set"), (uint4)cr->in_cw_set, 0, CALLFROM);
 			}
-			assert(!JNL_ALLOWED(csd) || (NULL != jpc) && (NULL != jbp));
+			assert(!JNL_ALLOWED(csd) || ((NULL != jpc) && (NULL != jbp)));
 			if (JNL_ENABLED(csd))
 			{
 				if ((0 != cr->dirty) && (cr->jnl_addr > jbp->rsrv_freeaddr))

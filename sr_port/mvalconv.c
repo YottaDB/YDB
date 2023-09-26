@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries. *
@@ -315,7 +315,7 @@ int4 mval2i(mval *v)
 		{
 			j = mval2double(v);
 			if (MINNEGINT4 > j)
-				i = MINNEGINT4;
+				i = (int4) MINNEGINT4;
 			else if (MAXPOSINT4 < j)
 				i = MAXPOSINT4;
 			else	/* if ((MINNEGINT4 <= j) && (MAXPOSINT4 >= j)) */

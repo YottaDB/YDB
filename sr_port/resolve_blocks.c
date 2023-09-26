@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -27,7 +28,7 @@ void resolve_blocks(void)
 
 	for (mlx = mline_root.child ; mlx ; mlx = mly)
 	{
-		if (mly = mlx->child)
+		if ((mly = mlx->child))
 		{
 			if (mlx->sibling)
 			{

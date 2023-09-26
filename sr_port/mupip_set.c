@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -89,6 +89,7 @@ void mupip_set(void)
 	if ((CLI_PRESENT == cli_present("ACCESS_METHOD"))
 		|| (CLI_PRESENT == cli_present("ASYNCIO"))
 		|| (CLI_NEGATED == cli_present("ASYNCIO"))
+		|| (CLI_PRESENT == cli_present("DATA_RESERVED_BYTES"))
 		|| (CLI_NEGATED == cli_present("DEFER_ALLOCATE"))
 		|| (CLI_PRESENT == cli_present("DEFER_ALLOCATE"))
 		|| (CLI_PRESENT == cli_present("DEFER_TIME"))
@@ -101,6 +102,7 @@ void mupip_set(void)
 		|| (CLI_PRESENT == cli_present("FLUSH_TIME"))
 		|| (CLI_PRESENT == cli_present("GLOBAL_BUFFERS"))
 		|| (CLI_PRESENT == cli_present("HARD_SPIN_COUNT"))
+		|| (CLI_PRESENT == cli_present("INDEX_RESERVED_BYTES"))
 		|| (CLI_NEGATED == cli_present("INST_FREEZE_ON_ERROR"))
 		|| (CLI_PRESENT == cli_present("INST_FREEZE_ON_ERROR"))
 		|| (CLI_PRESENT == cli_present("KEY_SIZE"))

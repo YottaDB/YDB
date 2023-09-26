@@ -1928,10 +1928,11 @@
 
    -R[ESERVED_BYTES]=size
 
-   Specifies the size to be reserved in each database block. RESERVED_BYTES
-   is generally used to reserve room for compatibility with other
-   implementations of M or to observe communications protocol restrictions.
-   RESERVED_BYTES may also be used as a user-managed fill factor.
+   Specifies the size for GT.M to reserve in each database block.
+   RESERVED_BYTES is generally used to reserve room for compatibility with
+   other implementations of M or to observe communications protocol
+   restrictions. RESERVED_BYTES may also be used as a user-managed fill
+   factor. GDE -RESERVED_BYTES controls both index and data reserved bytes.
 
    The minimum RESERVED_BYTES is zero bytes.
 

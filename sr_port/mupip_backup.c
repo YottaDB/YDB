@@ -306,7 +306,7 @@ void mupip_backup(void)
 		gvinit();
 	/* ============================ STEP 2. Parse and construct grlist ================================== */
 	tn_specified = FALSE;
-	if (incremental = (CLI_PRESENT == cli_present("INCREMENTAL") || CLI_PRESENT == cli_present("BYTESTREAM")))
+	if ((incremental = ((CLI_PRESENT == cli_present("INCREMENTAL")) || (CLI_PRESENT == cli_present("BYTESTREAM")))))
 	{
 		trans_num temp_tn;
 		if (0 == cli_get_hex64("TRANSACTION", &temp_tn))
@@ -1134,8 +1134,8 @@ repl_inst_bkup_done1:
 					error_mupip = TRUE;
 					goto repl_inst_bkup_done2;
 				}
-				assert(!pool_init || (INVALID_SHMID != shm_id) && (INVALID_SEMID != sem_id));
-				assert(pool_init || (INVALID_SHMID == shm_id) && (INVALID_SEMID == sem_id));
+				assert(!pool_init || ((INVALID_SHMID != shm_id) && (INVALID_SEMID != sem_id)));
+				assert(pool_init || ((INVALID_SHMID == shm_id) && (INVALID_SEMID == sem_id)));
 				if (pool_init)
 				{	/* The journal pool exists. Note down the journal seqno from there and copy that onto
 					 * the backed up instance file header. Also, clean up other fields in the backed up

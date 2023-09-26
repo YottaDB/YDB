@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
@@ -33,7 +33,7 @@ block_id gtm_ffs (block_id offset, uchar_ptr_t addr, block_id size)
 	block_id	i, j, top;
 
 	c = addr + (offset / BITS_PER_UCHAR);
-	if (i = (offset & (BITS_PER_UCHAR - 1)))
+	if ((i = (offset & (BITS_PER_UCHAR - 1))))
 	{	/* partial byte starting at offset */
 		for (j = 0;  (i < BITS_PER_UCHAR) && (j < size);  j++, i++)
 		{

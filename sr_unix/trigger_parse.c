@@ -596,7 +596,7 @@ STATICFNDEF boolean_t process_delim(char *delim_str, uint4 *delim_len)
 		util_out_print_gtmio("Delimiter too long", FLUSH);
 		return FALSE;
 	}
-	memcpy(delim_str, dst_string, dst.len);
+	memcpy((void *)delim_str, dst_string, dst.len);
 	*delim_len = dst.len;
 	return TRUE;
 }
@@ -642,7 +642,7 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 		util_out_print_gtmio("Too many options", FLUSH);
 		return FALSE;
 	}
-	memcpy(local_options, option_str, option_len);
+	memcpy((void *)local_options, option_str, option_len);
 	*isolation = *noisolation = *consistency = *noconsistency = FALSE;
 	ptr = local_options;
 	ptr[option_len] = '\0';	/* Null terminate string before passing to STRTOK_R */
@@ -1290,7 +1290,7 @@ boolean_t process_xecute(char *xecute_str, uint4 *xecute_len, boolean_t multi_li
 			util_out_print_gtmio("Invalid XECUTE string", FLUSH);
 			return FALSE;
 		}
-		memcpy(xecute_str, dst_string, ++dst_len);
+		memcpy((void *)xecute_str, dst_string, ++dst_len);
 		*xecute_len = dst_len;
 		trigdsc.xecute_str.str.addr = dst_string;
 		trigdsc.xecute_str.str.len = dst_len;

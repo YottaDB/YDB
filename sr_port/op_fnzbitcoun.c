@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,12 +27,12 @@ void op_fnzbitcoun(mval *dst, mval *bitstr)
 	MV_FORCE_STR(bitstr);
 
 	if (!bitstr->str.len)
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVBITSTR);
 
 	byte_1 = (unsigned char *)bitstr->str.addr;
 	str_len = (bitstr->str.len - 1) * 8;
 	if (7 < *byte_1)
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVBITSTR);
 	n = (str_len - *byte_1 + 7)/8 - 1;
 	m = (str_len - *byte_1) % 8;
 	if (0 == m)
@@ -42,13 +42,13 @@ void op_fnzbitcoun(mval *dst, mval *bitstr)
 	{
 		for (i = 0; 8 > i; i++)
 		{
-			if (byte_0 = *byte_n & mask[i])
+			if ((byte_0 = *byte_n & mask[i]))
 				bit_count++;
 		}
 	}
 	for (i = 0; i < m; i++)
 	{
-		if (byte_0 = *byte_n & mask[i])
+		if ((byte_0 = *byte_n & mask[i]))
 			bit_count++;
 	}
 	MV_FORCE_MVAL(dst, bit_count);

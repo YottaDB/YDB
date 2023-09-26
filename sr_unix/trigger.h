@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -121,7 +121,7 @@ typedef enum
 		return FALSE;							\
 	}									\
 	MAX_LEN -= LEN;								\
-	memcpy(DST, SRC, LEN);							\
+	memcpy((void *)DST, SRC, LEN);						\
 }
 
 /* Build up a comma delimited string */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -85,7 +85,7 @@ void op_gvzwithdraw(void)
 		gv_replication_error = gv_replopen_error;
 		gv_replopen_error = FALSE;
 		reg = gv_cur_region;
-		while (gv_cur_region = gv_cur_region->dyn.addr->repl_list)	/* set replicated segments */
+		while ((gv_cur_region = gv_cur_region->dyn.addr->repl_list))	/* set replicated segments */
 		{
 			if (gv_cur_region->open)
 			{

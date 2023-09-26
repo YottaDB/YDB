@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -79,7 +79,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 		jnl_options->image_type_specified = FALSE;
 	assert(JNL_ALLOC_MIN > DIVIDE_ROUND_UP(JNL_FILE_FIRST_RECORD, DISK_BLOCK_SIZE));
 	/* Parsing for other journal characteristics given in "JOURNAL" option */
-	if (jnl_options->allocation_specified = (CLI_PRESENT == cli_present("JOURNAL.ALLOCATION")))
+	if ((jnl_options->allocation_specified = (CLI_PRESENT == cli_present("JOURNAL.ALLOCATION"))))
 	{
 		if (!cli_get_int("JOURNAL.ALLOCATION", &jnl_info->alloc))
 			return FALSE;
@@ -90,7 +90,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 			return FALSE;
 		}
 	}
-	if (jnl_options->alignsize_specified = (CLI_PRESENT == cli_present("ALIGNSIZE")))
+	if ((jnl_options->alignsize_specified = (CLI_PRESENT == cli_present("ALIGNSIZE"))))
 	{
 		if (!cli_get_int("ALIGNSIZE", &alignsize))
 			return FALSE;
@@ -113,7 +113,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 		}
 		jnl_info->alignsize = alignsize * DISK_BLOCK_SIZE;
 	}
-	if (jnl_options->autoswitchlimit_specified = (CLI_PRESENT == cli_present("AUTOSWITCHLIMIT")))
+	if ((jnl_options->autoswitchlimit_specified = (CLI_PRESENT == cli_present("AUTOSWITCHLIMIT"))))
 	{
 		if (!cli_get_int("AUTOSWITCHLIMIT", &jnl_info->autoswitchlimit))
 			return FALSE;
@@ -125,14 +125,14 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 			return FALSE;
 		}
 	}
-	if (jnl_options->buffer_size_specified = (CLI_PRESENT == cli_present("BUFFER_SIZE")))
+	if ((jnl_options->buffer_size_specified = (CLI_PRESENT == cli_present("BUFFER_SIZE"))))
 	{
 		if (!cli_get_int("BUFFER_SIZE", &jnl_info->buffer))
 			return FALSE;
 		if (jnl_info->buffer <= 0)
 			return FALSE;
 	}
-	if (jnl_options->epoch_interval_specified = (CLI_PRESENT == cli_present("EPOCH_INTERVAL")))
+	if ((jnl_options->epoch_interval_specified = (CLI_PRESENT == cli_present("EPOCH_INTERVAL"))))
 	{
 		if (!cli_get_int("EPOCH_INTERVAL", &jnl_info->epoch_interval))
 			return FALSE;
@@ -148,7 +148,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 		}
 		jnl_info->epoch_interval = SECOND2EPOCH_SECOND(jnl_info->epoch_interval);
 	}
-	if (jnl_options->extension_specified = (CLI_PRESENT == cli_present("JOURNAL.EXTENSION")))
+	if ((jnl_options->extension_specified = (CLI_PRESENT == cli_present("JOURNAL.EXTENSION"))))
 	{
 		if (!cli_get_int("JOURNAL.EXTENSION", &jnl_info->extend))
 			return FALSE;
@@ -163,7 +163,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 			return FALSE;
 		}
 	}
-	if (jnl_options->filename_specified = (CLI_PRESENT == cli_present("FILENAME")))
+	if ((jnl_options->filename_specified = (CLI_PRESENT == cli_present("FILENAME"))))
 	{
 		temp_jnl_fn_len = jnl_info->jnl_len = ARRAYSIZE(jnl_info->jnl) - 1;	/* leave 1 byte for null terminator */
 		jnl_info->jnl[temp_jnl_fn_len] = '\0';	/* null terminate string in case "cli_get_str" returns file name that fills
@@ -181,7 +181,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 		jnl_options->sync_io = (CLI_PRESENT == cli_status1) ? TRUE: FALSE;
 	} else
 		jnl_options->sync_io_specified = FALSE;
-	if (jnl_options->yield_limit_specified = (CLI_PRESENT == cli_present("YIELD_LIMIT")))
+	if ((jnl_options->yield_limit_specified = (CLI_PRESENT == cli_present("YIELD_LIMIT"))))
 	{
 		if (!cli_get_int("YIELD_LIMIT", &jnl_options->yield_limit))
 			return FALSE;

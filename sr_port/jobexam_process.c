@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
@@ -142,7 +142,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec, mval *fmt)
 	{
 		assert(0 <= saved_util_outbuff_len);
 		assert(saved_util_outbuff_len <= SIZEOF(saved_util_outbuff));
-		memcpy(saved_util_outbuff, TREF(util_outbuff_ptr), saved_util_outbuff_len);
+		memcpy((void *)saved_util_outbuff, TREF(util_outbuff_ptr), saved_util_outbuff_len);
 	}
 	/* See comment inside "jobexam_dump()" for why "&dev_in_use" needs to be passed as a parameter */
 	jobexam_dump(input_dump_file_name, dump_file_spec, save_dump_file_name_buff, fmt, &dev_in_use);
@@ -213,8 +213,13 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
 	 */
 	if (process_exiting)
 	{
+<<<<<<< HEAD
 		assert(YDB_PATH_MAX >= dump_file_spec->str.len);
 		memcpy(fatal_file_name_buff, dump_file_spec->str.addr, dump_file_spec->str.len);
+=======
+		assert(GTM_PATH_MAX >= dump_file_spec->str.len);
+		memcpy((void *)fatal_file_name_buff, dump_file_spec->str.addr, dump_file_spec->str.len);
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 		dump_file_spec->str.addr = fatal_file_name_buff;
 	}
 	/* Parms of file to be created (newversion) */

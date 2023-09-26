@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
 
  *								*
@@ -43,7 +43,12 @@ lv_val *lv_getslot(symval *sym)
 	lv_val		*lv;
 	unsigned int	numElems, numUsed;
 
+<<<<<<< HEAD
 	if (lv = sym->lv_flist)
+=======
+	numElems = MAXUINT4;	/* maximum value */
+	if ((lv = sym->lv_flist))
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 	{
 		assert(NULL == LV_PARENT(lv));		/* stp_gcol relies on this for correct garbage collection */
 		sym->lv_flist = (lv_val *)lv->ptrs.free_ent.next_free;
@@ -101,7 +106,12 @@ lvTree *lvtree_getslot(symval *sym)
 	lvTree		*lvt;
 	unsigned int	numElems, numUsed;
 
+<<<<<<< HEAD
 	if (lvt = sym->lvtree_flist)
+=======
+	numElems = MAXUINT4;	/* maximum value */
+	if ((lvt = sym->lvtree_flist))
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 	{
 		assert(NULL == LVT_GET_PARENT(lvt));
 		sym->lvtree_flist = (lvTree *)lvt->avl_root;
@@ -142,7 +152,12 @@ lvTreeNode *lvtreenode_getslot(symval *sym)
 	lvTreeNode	*lv;
 	unsigned int	numElems, numUsed;
 
+<<<<<<< HEAD
 	if (lv = sym->lvtreenode_flist)
+=======
+	numElems = MAXUINT4;	/* maximum value */
+	if ((lv = sym->lvtreenode_flist))
+>>>>>>> fdfdea1e (GT.M V7.1-002)
 	{
 		assert(NULL == LV_PARENT(lv));	/* stp_gcol relies on this for correct garbage collection */
 		sym->lvtreenode_flist = (lvTreeNode *)lv->sbs_child;
