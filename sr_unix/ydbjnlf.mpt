@@ -58,7 +58,7 @@ etrap	; Set primary and fallback error handlers
 	set flag=1,stderr="/proc/"_$job_"/fd/2"
 	open stderr:(exception="goto etrap1")
 	close stderr
-	set $etrap="set $etrap=""open "_stderr_" use "_stderr_" write $zstatus,! zshow """"*"""" zhalt $piece($zstatus,"""","""",1)""  goto err^"_$text(+0)
+	set $etrap="set $etrap=""open """""_stderr_""""" use """""_stderr_""""" write $zstatus,! zshow """"*"""" zhalt $piece($zstatus,"""","""",1)""  goto err^"_$text(+0)
 	quit
 etrap1	set $etrap="set $etrap=""use $principal zshow """"*"""" if $zsyslog($zstatus)""  goto err^"_$text(+0)
 	quit
