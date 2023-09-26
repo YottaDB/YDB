@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -272,7 +272,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			remove_rms(gtm_err_dev);
 		gtm_err_dev = NULL;
 	}
-	if (repeat_error = (ERR_REPEATERROR == SIGNAL)) /* assignment and comparison */
+	if ((repeat_error = (ERR_REPEATERROR == SIGNAL))) /* assignment and comparison */
 		SIGNAL = dollar_ecode.error_last_ecode;
 	preemptive_db_clnup(SEVERITY);
 	assert(NULL == alias_retarg);
@@ -286,10 +286,10 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 * we signal the error and do it here
 		 */
 		neterr_pending = TRUE;
-                FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
-                FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
+		FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
+		FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);
+		FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
+		FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
 		CONTINUE;
 	}
 	MDB_START;

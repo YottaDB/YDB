@@ -488,7 +488,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	d_socket_struct_len = SIZEOF(d_socket_struct) + (SIZEOF(socket_struct) * (gtm_max_sockets - 1));
 	memcpy(newdsocket, dsocketptr, d_socket_struct_len);
 	/* ------------ create/identify the socket to work on and make a local copy ----------------- */
-	if (create_new_socket = (listen_specified || connect_specified))	/* real "=" */
+	if ((create_new_socket = (listen_specified || connect_specified)))	/* real "=" */
 	{
 		/* allocate the structure for a new socket */
 		if (NULL == (socketptr = iosocket_create(sockaddr, bfsize, -1, listen_specified)))

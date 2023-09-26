@@ -219,8 +219,8 @@ void op_zlink (mval *v, mval *quals)
 		zl_cmd_qlf(&quals->str, &cmd_qlf, srcnamebuf, &srcnamelen, TRUE);
 	objnamelen = MIN(pblk.b_name, MAX_MIDENT_LEN);
 	memcpy(objnamebuf, pblk.l_name, objnamelen);
-	if (!TREF(trigger_compile_and_link) &&
-		(objnamelen - object_name_len) || memcmp(objnamebuf, object_file_name, objnamelen))
+	if ((!TREF(trigger_compile_and_link) && (objnamelen - object_name_len))
+			|| memcmp(objnamebuf, object_file_name, objnamelen))
 	{	/* appear to have an object name that differs from the file name */
 		assert(MAX_MIDENT_LEN >= object_name_len);
 		objnamelen = object_name_len;
@@ -331,10 +331,11 @@ void op_zlink (mval *v, mval *quals)
 		objstr.len = objnamelen;
 		zro_search(&objstr, &objdir, &srcstr, &srcdir, PROBE_SHLIBS);
 		if (NULL == srcdir)
+		{
 			if (NULL == objdir)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(12) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
 					ERR_FILENOTFND, 2, srcnamelen, srcnamebuf, ERR_FILENOTFND, 2, objnamelen, objnamebuf);
-		else if (NULL == objdir)
+		} else if (NULL == objdir)
 			type = SRC;
 	}
 	if (OBJ == type)

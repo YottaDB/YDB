@@ -727,7 +727,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GTMSECSHRSSIDF */
 	   0,	/* GTMSECSHRFORKF */
 	   0,	/* DBFSYNCERR */
-	   0,	/* UNUSEDMSG898 */
+	   0,	/* EXCEEDRCTLRNDWN */
 	   0,	/* SCNDDBNOUPD */
 	   0,	/* MUINFOUINT4 */
 	   0,	/* NLMISMATCHCALC */
@@ -839,7 +839,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOTALLDBOPN */
 	   0,	/* MUSELFBKUP */
 	   0,	/* DBDANGER */
-	   0,	/* UNUSEDMSG1010 */
+	   0,	/* ORLBKROLLED */
 	   0,	/* TCGETATTR */
 	   0,	/* TCSETATTR */
 	   0,	/* IOWRITERR */
@@ -880,7 +880,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* FILTERBADCONV */
 	   0,	/* PRIMARYISROOT */
 	   0,	/* GVQUERYGETFAIL */
-	   0,	/* UNUSEDMSG1051 */
+	   0,	/* BSIZTOOLARGE */
 	  19,	/* MERGEDESC */
 	   0,	/* MERGEINCOMPL */
 	   0,	/* DBNAMEMISMATCH */
@@ -1447,7 +1447,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* EXTRINTEGRITY */
 	   0,	/* CRYPTKEYRELEASEFAILED */
 	   0,	/* MUREENCRYPTSTART */
-	   0,	/* UNUSEDMSG1620 */
+	   0,	/* BUFFSIZETOOSMALL */
 	   0,	/* ENCRYPTCONFLT */
 	   0,	/* JNLPOOLRECOVERY */
 	   0,	/* LOCKTIMINGINTP */

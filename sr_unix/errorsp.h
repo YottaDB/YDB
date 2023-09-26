@@ -118,11 +118,11 @@ GBLREF int			process_exiting;
 #define FATALFAILURE(X)		(X > 4)
 #define CHANDLER_EXISTS (active_ch >= &chnd[0])
 
-#define MAKE_MSG_WARNING(x)	((x) & ~SEV_MSK | WARNING)
-#define MAKE_MSG_SUCCESS(x)	((x) & ~SEV_MSK | SUCCESS)
-#define MAKE_MSG_ERROR(x)	((x) & ~SEV_MSK | ERROR)
-#define MAKE_MSG_INFO(x)	((x) & ~SEV_MSK | INFO)
-#define MAKE_MSG_SEVERE(x)	((x) & ~SEV_MSK | SEVERE)
+#define MAKE_MSG_WARNING(x)	(((x) & ~SEV_MSK) | WARNING)
+#define MAKE_MSG_SUCCESS(x)	(((x) & ~SEV_MSK) | SUCCESS)
+#define MAKE_MSG_ERROR(x)	(((x) & ~SEV_MSK) | ERROR)
+#define MAKE_MSG_INFO(x)	(((x) & ~SEV_MSK) | INFO)
+#define MAKE_MSG_SEVERE(x)	(((x) & ~SEV_MSK) | SEVERE)
 
 #define ERROR_RTN		error_return
 

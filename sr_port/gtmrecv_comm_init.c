@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,8 @@
 #include "repl_log.h"
 #include "repl_comm.h"
 
-GBLDEF	int		gtmrecv_listen_sock_fd = FD_INVALID;
+GBLDEF	int                gtmrecv_listen_sock_fd = FD_INVALID;
+GBLREF	gtmrecv_options_t  gtmrecv_options;
 
 error_def(ERR_GETADDRINFO);
 error_def(ERR_REPLCOMM);
@@ -52,7 +53,7 @@ int gtmrecv_comm_init(in_port_t port)
 	struct addrinfo		*ai_ptr = NULL, hints;
 	const	int		enable_reuseaddr = 1;
 	struct  linger  	disable_linger = {0, 0};
-	int			rc;
+	int			rc, send_buffsize, recv_buffsize, tcp_r_buffsize;
 	int			errcode;
 	char			port_buffer[NI_MAXSERV];
 	int			port_buffer_len;
@@ -91,8 +92,6 @@ int gtmrecv_comm_init(in_port_t port)
 		RTS_ERROR_ADDRINFO_CTX(NULL, ERR_GETADDRINFO, errcode, "FAILED in obtaining IP address on receiver server.");
 		return -1;
 	}
-
-
 	gtmrecv_listen_sock_fd = temp_sock_fd;
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, SIZEOF(disable_linger)))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
@@ -102,6 +101,45 @@ int gtmrecv_comm_init(in_port_t port)
 	{
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error with receiver server listen socket enable reuseaddr"), ERRNO);
+	}
+	if (0 != (errcode = get_send_sock_buff_size(gtmrecv_listen_sock_fd, &send_buffsize)))
+	{
+		SNPRINTF(err_buffer, SIZEOF(err_buffer), "Error getting socket send buffsize : %s", STRERROR(errcode));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_buffer));
+	}
+	if (send_buffsize < gtmrecv_options.send_buffsize)
+	{
+		if (0 != (errcode = set_send_sock_buff_size(gtmrecv_listen_sock_fd, gtmrecv_options.send_buffsize)))
+		{
+			if (send_buffsize < GTMRECV_MIN_TCP_SEND_BUFSIZE)
+			{
+				SNPRINTF(err_buffer, SIZEOF(err_buffer), "Could not set TCP send buffer size to %d : %s",
+						GTMRECV_MIN_TCP_SEND_BUFSIZE, STRERROR(errcode));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0,
+						ERR_TEXT, 2, LEN_AND_STR(err_buffer));
+			}
+		}
+	}
+	if (0 != (errcode = get_recv_sock_buff_size(gtmrecv_listen_sock_fd, &recv_buffsize)))
+	{
+		SNPRINTF(err_buffer, SIZEOF(err_buffer), "Error getting socket recv buffsize : %s", STRERROR(errcode));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_buffer));
+	}
+	if (recv_buffsize < gtmrecv_options.recv_buffsize)
+	{
+		for (tcp_r_buffsize = gtmrecv_options.recv_buffsize;
+				tcp_r_buffsize >= MAX(recv_buffsize, GTMRECV_MIN_TCP_RECV_BUFSIZE)
+				&&  0 != (errcode = set_recv_sock_buff_size(gtmrecv_listen_sock_fd, tcp_r_buffsize));
+				tcp_r_buffsize -= GTMRECV_TCP_RECV_BUFSIZE_INCR)
+			;
+		if (tcp_r_buffsize < GTMRECV_MIN_TCP_RECV_BUFSIZE)
+		{
+			SNPRINTF(err_buffer, SIZEOF(err_buffer), "Could not set TCP receive buffer size in range [%d, %d], last "
+					"known error : %s", GTMRECV_MIN_TCP_RECV_BUFSIZE, gtmrecv_options.recv_buffsize,
+					STRERROR(errcode));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0,
+					ERR_TEXT, 2, LEN_AND_STR(err_buffer));
+		}
 	}
 	if ((0 > BIND(gtmrecv_listen_sock_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen)) || (WBTEST_ENABLED(WBTEST_REPL_INIT_ERR)) )
 	{

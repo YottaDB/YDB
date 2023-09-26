@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,6 +51,7 @@ static inline char *malloc_cpy_str(char *src)
 	mcs_ptr = malloc(mcs_len);
 	assert(mcs_ptr);
 	memcpy(mcs_ptr, src, mcs_len);
+	mcs_ptr[mcs_len - 1] = '\0';	/* The memcpy() will have null terminated the string unless mcs_len was SIZE_MAX */
 	return(mcs_ptr);
 }
 #endif

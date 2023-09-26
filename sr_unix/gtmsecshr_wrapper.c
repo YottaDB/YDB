@@ -308,7 +308,7 @@ int main()
 #	endif /* _AIX */
 	ret = 0; /* start positive */
 	/* get the ones we need */
-	if (env_var_ptr = getenv(GTM_DIST))		/* Warning - assignment */
+	if ((env_var_ptr = getenv(GTM_DIST)))		/* Warning - assignment */
 	{
 		if (MAX_ALLOWABLE_LEN <
 				(strlen(env_var_ptr) + STR_LIT_LEN(SUB_PATH_TO_GTMSECSHRDIR) + STR_LIT_LEN(GTMSECSHR_BASENAME)))
@@ -333,7 +333,7 @@ int main()
 		SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRNOGTMDIST);
 		ret = -1;
 	}
-	if (env_var_ptr = getenv(GTM_TMP))		/* Warning - assignment */
+	if ((env_var_ptr = getenv(GTM_TMP)))		/* Warning - assignment */
 	{
 		if (MAX_ALLOWABLE_LEN < strlen(env_var_ptr))
 		{
@@ -352,13 +352,13 @@ int main()
 	 * in debug and they are length checked. If another white box case is ever needed by GTMSECSHR
 	 * it needs to be added here and in gtmsecshr.c.
 	 */
-	if (env_var_ptr = getenv(GTM_WHITE_BOX_TEST_CASE_NUMBER))	/* Warning - assignment */
+	if ((env_var_ptr = getenv(GTM_WHITE_BOX_TEST_CASE_NUMBER)))	/* Warning - assignment */
 	{
 		if (MAX_ALLOWABLE_LEN >= strlen(env_var_ptr))
 		{
 			strcpy(gtm_white_box_test_case_number_val, env_var_ptr);
 			if (WBTEST_FORCE_SEMGETERROR == atoi(gtm_white_box_test_case_number_val))
-				if (env_var_ptr = getenv(GTM_WHITE_BOX_TEST_CASE_ENABLE))	/* Warning - assignment */
+				if ((env_var_ptr = getenv(GTM_WHITE_BOX_TEST_CASE_ENABLE)))	/* Warning - assignment */
 					if (MAX_ALLOWABLE_LEN >= strlen(env_var_ptr))
 					{
 						gtm_white_box_test_case_pass_envvars = TRUE;

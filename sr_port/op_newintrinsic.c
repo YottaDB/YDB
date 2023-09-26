@@ -71,7 +71,7 @@ void op_newintrinsic(int intrtype)
 			/* Intentionally omitted the "break" here */
 		case SV_ETRAP:
 			/* Save the active error trap to the stack if either of them is new'ed */
-			if (etrap_was_active = ETRAP_IN_EFFECT)
+			if ((etrap_was_active = ETRAP_IN_EFFECT))
 				intrinsic = &(TREF(dollar_etrap));
 			else
 				intrinsic = &(TREF(dollar_ztrap));

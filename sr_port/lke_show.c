@@ -92,7 +92,7 @@ void	lke_show(void)
 	for (reg = gd_header->regions, n = 0; n != gd_header->n_regions; ++reg, ++n)
 	{
 		/* If region matches and is open */
-		if (((0 == regname.len) || (reg->rname_len == regname.len) && !memcmp(reg->rname, regname.addr, regname.len))
+		if (((0 == regname.len) || ((reg->rname_len == regname.len) && !memcmp(reg->rname, regname.addr, regname.len)))
 			&& reg->open)
 		{
 			match = TRUE;

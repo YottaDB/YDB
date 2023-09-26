@@ -182,7 +182,7 @@ void	strpiecediff(mstr *oldstr, mstr *newstr, mstr *delim,
 				bufflen = INTCAST(pcdiff_top - pcdiff_start);
 				newbufflen = bufflen * 2;
 				tmpbuff = (char *)malloc(newbufflen); /* expand by doubling buffer size */
-				memcpy(tmpbuff, pcdiff_start, bufflen);
+				memcpy((void *)tmpbuff, pcdiff_start, bufflen);
 				if (pcdiff_start != &pcdiff_buff[0])
 					free(pcdiff_start);	/* obtained by malloc. so free it */
 				pcdiff_len = INTCAST(pcdiff_ptr - pcdiff_start);

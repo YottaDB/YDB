@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2022 Fidelity National Information	*
+ * Copyright (c) 2005-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -331,7 +331,7 @@ boolean_t updproc_preread(void)
 					 * changed during the copy, a further validation on the key length (key_len) is done below
 					 * in the if.
 					 */
-					memcpy(lcl_key, keystr->text, key_len);
+					memcpy((void *)lcl_key, keystr->text, key_len);
 					if ((0 < key_len) && (0 == lcl_key[key_len - 1])
 						&& (upd_good_record == updproc_get_gblname(lcl_key, key_len, gv_mname, &gvname))
 						&& (key_len == keystr->length))	/* If the shared copy changed underneath us, what

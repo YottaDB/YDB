@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -813,7 +813,7 @@ void zshow_devices(zshow_out *output)
 							for (jj = 0; jj < socketptr->n_delimiter; jj++)
 							{
 								delim_len_sm = socketptr->delimiter[jj].len;
-								memcpy(delim_buff_sm,
+								memcpy((void *)delim_buff_sm,
 								       socketptr->delimiter[jj].addr, delim_len_sm);
 								delim_len = (MAX_DELIM_LEN * MAX_ZWR_EXP_RATIO) + 11;
 								format2zwr(delim_buff_sm, delim_len_sm,

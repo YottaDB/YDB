@@ -52,7 +52,7 @@ int is_srv_alive(int srv_type)
 	srv_pid = (GTMRECV == srv_type) ? recvpool.gtmrecv_local->recv_serv_pid : recvpool.upd_proc_local->upd_proc_pid;
 	if (0 < srv_pid)
 	{
-		if (srv_alive = is_proc_alive(srv_pid, 0))
+		if ((srv_alive = is_proc_alive(srv_pid, 0)))
 			semval = get_sem_info(RECV, (GTMRECV == srv_type) ? RECV_SERV_COUNT_SEM : UPD_PROC_COUNT_SEM, SEM_INFO_VAL);
 		else
 			semval = 0;

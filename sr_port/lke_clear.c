@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,9 +84,8 @@ void	lke_clear(void)
 	/* Search all regions specified on the command line */
 	for (reg = gd_header->regions, n = 0; n != gd_header->n_regions; ++reg, ++n)
 	{	/* If region matches and is open */
-		if ((regname.len == 0  ||
-		     reg->rname_len == regname.len  &&  memcmp(reg->rname, regname.addr, regname.len) == 0)  &&
-		    reg->open)
+		if (((0 == regname.len) || ((reg->rname_len == regname.len) && !memcmp(reg->rname, regname.addr, regname.len)))
+			&& reg->open)
 		{
 			match = TRUE;
 			util_out_print("!/!AD!/", NOFLUSH_OUT, REG_LEN_STR(reg));

@@ -491,7 +491,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 			RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("server already running"), errno);
 		/* If gtm_tmp is not defined, show default path */
-		if (gtm_tmp_ptr = GETENV("gtm_tmp"))		/* Warning - assignment */
+		if ((gtm_tmp_ptr = GETENV("gtm_tmp")))		/* Warning - assignment */
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2,
 				RTS_ERROR_TEXT(gtm_tmp_ptr), ERR_TEXT, 2, RTS_ERROR_TEXT("(from $gtm_tmp)"));
 		else

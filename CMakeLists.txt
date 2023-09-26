@@ -29,7 +29,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version ${V7.1-001})
+set(version ${V7.1-002})
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -57,7 +57,7 @@ if ( CMAKE_COMPILER_IS_GNUCC )
 				" -Wno-unused-but-set-variable"
 				" -Wchar-subscripts"
 				" -Wno-unused-function -Woverflow"
-				" -Wno-parentheses"
+#				" -Wno-parentheses"
 				" -Werror")
     #string(APPEND CMAKE_C_FLAGS " -Wpedantic")
     #string(APPEND CMAKE_C_FLAGS " -Wstrict-overflow=5")
@@ -622,6 +622,9 @@ foreach(f
       gen_keypair.sh
       gen_sym_hash.sh
       gen_sym_key.sh
+      gpgagent.tab.in
+      gtmtlsfuncs.tab.in
+      gtm_tls_externalcalls.h
       gtm_tls_impl.c
       gtm_tls_impl.h
       gtm_tls_interface.h
@@ -1033,6 +1036,12 @@ configure_file(sr_unix/gpgagent.tab.in plugin/gpgagent.tab @ONLY)
 set(GTM_TOP "${CMAKE_INSTALL_PREFIX}/${GTM_INSTALL_DIR}")
 configure_file(sr_unix/gpgagent.tab.in CMakeFiles/plugin/gpgagent.tab @ONLY)
 install(FILES ${GTM_BINARY_DIR}/CMakeFiles/plugin/gpgagent.tab DESTINATION ${GTM_INSTALL_DIR}/plugin)
+
+set(GTM_TOP "${GTM_BINARY_DIR}")
+configure_file(sr_unix/gtmtlsfuncs.tab.in plugin/gtmtlsfuncs.tab @ONLY)
+set(GTM_TOP "${CMAKE_INSTALL_PREFIX}/${GTM_INSTALL_DIR}")
+configure_file(sr_unix/gtmtlsfuncs.tab.in CMakeFiles/plugin/gtmtlsfuncs.tab @ONLY)
+install(FILES ${GTM_BINARY_DIR}/CMakeFiles/plugin/gtmtlsfuncs.tab DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
 install(FILES sr_unix/configure.gtc DESTINATION ${GTM_INSTALL_DIR}
   PERMISSIONS ${install_permissions_script}

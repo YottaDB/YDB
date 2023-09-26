@@ -451,7 +451,7 @@ typedef struct
 	boolean_t	PROTECT_LVN, SE_NOTIFY;											\
 	triple 		*REF2;													\
 																\
-	if (PROTECT_LVN = (TREF(side_effect_base))[TREF(expr_depth)])	/* NOTE assignment */					\
+	if ((PROTECT_LVN = (TREF(side_effect_base))[TREF(expr_depth)]))	/* NOTE assignment */					\
 		SE_NOTIFY = SE_WARN_ON;												\
 	else															\
 		SE_NOTIFY = FALSE;												\

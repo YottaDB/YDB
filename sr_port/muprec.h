@@ -667,6 +667,7 @@ typedef struct reg_ctl_list_struct
 	int			region_index;	/* Per-region index value, aligned to the order the region appears in grlist.
 						 * Used by mupip_freeze()
 						 */
+	boolean_t		ORLBKROLLED_msg_issued; /* Only issue this message once per region */
 } reg_ctl_list;
 
 typedef struct redirect_list_struct
@@ -1089,7 +1090,7 @@ typedef struct {
 				}												\
 			}													\
 		}														\
-		assert((NULL == FORW_MULTI) || (FORW_MULTI->time == REC_TIME) && (FORW_MULTI->token == REC_TOKEN));		\
+		assert((NULL == FORW_MULTI) || ((FORW_MULTI->time == REC_TIME) && (FORW_MULTI->token == REC_TOKEN)));		\
 	} else															\
 		FORW_MULTI = NULL;												\
 }

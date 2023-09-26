@@ -65,7 +65,10 @@ inline void gtmmrhash_128(const void *key, int len, uint4 seed, gtm_uint16 *out)
 	hash128_state_t state;
 
 	HASH128_STATE_INIT(state, seed);
+#ifndef STATIC_ANALYSIS
+	/* Don't do this assert if SCA since we are inline & gtm_abrt() won't resolve */
 	assert((state.carry_bytes == 0) && (state.c.one == 0) && (state.c.two == 0));
+#endif
 	gtmmrhash_128_ingest(&state, key, len);
 	gtmmrhash_128_result(&state, len, out);
 }

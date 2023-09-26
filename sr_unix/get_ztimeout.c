@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2021 Fidelity National Information	*
+ * Copyright (c) 2018-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,6 @@ int get_ztimeout(mval *result)
 	int		ztimeout_vector_len;
 	char		full_ztimeout[ZTIMEOUTSTRLEN];
 	int		req_len, time_len;
-	long int 	ms = 0;
 	ABS_TIME 	cur_time;
 	DCL_THREADGBL_ACCESS;
 
@@ -43,16 +42,14 @@ int get_ztimeout(mval *result)
 	if ((((TREF(dollar_ztimeout)).ztimeout_seconds.m[1] / MV_BIAS) == -1))
 		time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, "%s", !ztimeout_vector_len ? "-1" : "-1:");
 	else
-	{
+	{	/* In theory, this should guard against exceeding 18 digit accuracy, but limits on time specification kick in 1st */
 		sys_get_curr_time(&cur_time);
 		cur_time = sub_abs_time(&(TREF(dollar_ztimeout)).end_time, &cur_time);
 		if (0 <= cur_time.at_sec)
-		{
-			ms = DIVIDE_ROUND_DOWN(cur_time.at_usec, MICROSECS_IN_MSEC);
 			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, (!ztimeout_vector_len ? "%ld.%ld" : "%ld.%ld:"),
-					cur_time.at_sec, ms);
-		} else
-			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, (!ztimeout_vector_len ? "%ld" : "%ld:"), ms);
+				cur_time.at_sec, cur_time.at_usec);
+		else
+			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, (!ztimeout_vector_len ? "0" : "0:"));
 	}
 	assert((0 < time_len) && (time_len <= ZTIMEOUTSTRLEN));
 	assert(((0 == ztimeout_vector_len) && (NULL == ztimeout_vector_ptr))
@@ -67,7 +64,7 @@ int get_ztimeout(mval *result)
 	result->str.addr = (char *)cp;
 	result->str.len = req_len;
 	result->mvtype = MV_STR;
-	memcpy(cp, full_ztimeout, time_len);
+	memcpy((void *)cp, full_ztimeout, time_len);
 	if ((0 < ztimeout_vector_len) && (NULL != ztimeout_vector_ptr))
 		memcpy(cp + time_len, ztimeout_vector_ptr, ztimeout_vector_len);
 	assert(IS_AT_END_OF_STRINGPOOL(cp, req_len));

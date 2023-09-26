@@ -93,7 +93,7 @@ int m_if(void)
 				dqdel(triptr, exorder);
 				v = &triptr->operand[0].oprval.mlit->v;
 				unuse_literal(v);
-				if (t_set = (0 == MV_FORCE_BOOL(v)))	/* WARNING: assignment */
+				if ((t_set = (0 == MV_FORCE_BOOL(v))))	/* WARNING: assignment */
 				{	/* it's FALSE, insert clear of $TEST */
 					newtriple(OC_CLRTEST);
 					if (TK_SPACE == TREF(director_token))			/* if there are trailing spaces */

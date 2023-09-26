@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,7 +88,7 @@ gd_addr *zgbldir(mval *v)
 		tran_name = get_name(&v->str);
 	gd_ptr = gd_load(tran_name);
 	name = (gdr_name *)malloc(SIZEOF(gdr_name));
-	if (name->name.len = v->str.len)	/* Note embedded assignment */
+	if ((name->name.len = v->str.len))	/* Note embedded assignment */
 	{
 		name->name.addr = (char *)malloc(v->str.len);
 		memcpy(name->name.addr, v->str.addr, v->str.len);

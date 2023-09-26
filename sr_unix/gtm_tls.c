@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2022 Fidelity National Information	*
+ * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,6 +91,28 @@ int			intrsafe_gtm_tls_accept(gtm_tls_socket_t *socket)
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_accept_fptr)(socket);
+	ENABLE_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
+	return rv;
+}
+
+int			intrsafe_gtm_tls_do_post_hand_shake(gtm_tls_socket_t *socket)
+{
+	int		rv;
+	intrpt_state_t	prev_intrpt_state;
+
+	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
+	rv = (*gtm_tls_do_post_hand_shake_fptr)(socket);
+	ENABLE_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
+	return rv;
+}
+
+int			intrsafe_gtm_tls_repeat_hand_shake(gtm_tls_socket_t *socket)
+{
+	int		rv;
+	intrpt_state_t	prev_intrpt_state;
+
+	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
+	rv = (*gtm_tls_repeat_hand_shake_fptr)(socket);
 	ENABLE_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	return rv;
 }

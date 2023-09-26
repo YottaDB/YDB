@@ -444,8 +444,8 @@ void	repl_inst_dump_history_records(char *inst_fn, int4 num_histinfo)
 			curhistinfo.history_type, curhistinfo.history_type);
 
 		/* Assert that lms_group is filled in for non-zero stream #s and not for zero stream #s */
-		assert(!curhistinfo.strm_index && IS_REPL_INST_UUID_NULL(curhistinfo.lms_group)
-			|| curhistinfo.strm_index && IS_REPL_INST_UUID_NON_NULL(curhistinfo.lms_group));
+		assert((!curhistinfo.strm_index && IS_REPL_INST_UUID_NULL(curhistinfo.lms_group))
+			|| (curhistinfo.strm_index && IS_REPL_INST_UUID_NON_NULL(curhistinfo.lms_group)));
 		/* Assert that UPDATERESYNC type of history record is possible only in non-zero stream #s */
 		assert((HISTINFO_TYPE_UPDRESYNC != curhistinfo.history_type) || curhistinfo.strm_index);
 		/* Do not print "lms_group" info for all history records as it will clutter the output.
@@ -511,8 +511,8 @@ void	repl_dump_histinfo(FILE *log_fp, boolean_t stamptime, boolean_t flush, char
 		cur_histinfo->created_time, cur_histinfo->created_time, cur_histinfo->histinfo_num,
 		cur_histinfo->prev_histinfo_num, cur_histinfo->strm_index, cur_histinfo->history_type);
 	/* Assert that lms_group is filled in for non-zero stream #s and not for zero stream #s */
-	assert(!cur_histinfo->strm_index && IS_REPL_INST_UUID_NULL(cur_histinfo->lms_group)
-		|| cur_histinfo->strm_index && IS_REPL_INST_UUID_NON_NULL(cur_histinfo->lms_group));
+	assert((!cur_histinfo->strm_index && IS_REPL_INST_UUID_NULL(cur_histinfo->lms_group))
+		|| (cur_histinfo->strm_index && IS_REPL_INST_UUID_NON_NULL(cur_histinfo->lms_group)));
 	/* Assert that UPDATERESYNC type of history record is possible only in non-zero stream #s */
 	assert((HISTINFO_TYPE_UPDRESYNC != cur_histinfo->history_type) || cur_histinfo->strm_index);
 	/* Do not print "lms_group" info for all history records as it will clutter the output.

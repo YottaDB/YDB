@@ -103,7 +103,7 @@ int eval_expr(oprtype *a)
 	TREF(saw_side_effect) = lh_se ? TRUE : start_se;
 	se_handling = TREF(side_effect_handling);
 	se_warn = SE_WARN_ON;
-	while (bin_opcode = tokentable[TREF(window_token)].bo_type)	/* NOTE assignment NOT condition */
+	while ((bin_opcode = tokentable[TREF(window_token)].bo_type))	/* NOTE assignment NOT condition */
 	{
 		if (TREF(saw_side_effect))
 			(TREF(saw_side_effect)) = 0x10;

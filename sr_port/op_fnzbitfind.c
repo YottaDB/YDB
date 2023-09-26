@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,13 +26,13 @@ void op_fnzbitfind(mval *dst, mval *bitstr, int truthval, int pos)
 	MV_FORCE_STR(bitstr);
 
 	if (!bitstr->str.len)
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVBITSTR);
 
 	byte_1 = (unsigned char *)bitstr->str.addr;
 	str_len = (bitstr->str.len -1) * 8;
 	if (*byte_1 > 7)
 	{
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_INVBITSTR);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVBITSTR);
 	}
 	if (pos < 1)
 	{
@@ -62,7 +62,7 @@ void op_fnzbitfind(mval *dst, mval *bitstr, int truthval, int pos)
 			i1 = 8;
 		for (i = mp - 1; i < i1; i++)
 		{
-			if (byte_0 = *byte_n & mask[i])
+			if ((byte_0 = *byte_n & mask[i]))
 			{
 				find_bit = i + 2 + (np - 1)*8;
 				MV_FORCE_MVAL(dst, find_bit);
@@ -79,7 +79,7 @@ void op_fnzbitfind(mval *dst, mval *bitstr, int truthval, int pos)
 			byte_n++;
 			for (i = 0; i < 8; i++)
 			{
-				if (byte_0 = *byte_n & mask[i])
+				if ((byte_0 = *byte_n & mask[i]))
 				{
 					find_bit = i + 2 + (np + j - 1)*8;
 					MV_FORCE_MVAL(dst, find_bit);
@@ -90,7 +90,7 @@ void op_fnzbitfind(mval *dst, mval *bitstr, int truthval, int pos)
 		byte_n++;
 		for (i = 0; i < m; i++)
 		{
-			if (byte_0 = *byte_n & mask[i])
+			if ((byte_0 = *byte_n & mask[i]))
 			{
 				find_bit = i + 2 + n*8;
 				MV_FORCE_MVAL(dst, find_bit);

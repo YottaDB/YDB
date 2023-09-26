@@ -729,7 +729,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GTMSECSHRSSIDF", "gtmsecshr server setsid failed", 0, 0 },
 	{ "GTMSECSHRFORKF", "gtmsecshr server unable to fork off a child process", 0, 0 },
 	{ "DBFSYNCERR", "Error synchronizing database file !AD to disk", 2, 0 },
-	{ "UNUSEDMSG898", "SECONDAHEAD last used in V7.0-000 Jan 2021", 0, 0 },
+	{ "EXCEEDRCTLRNDWN", "Maximum relinkctl rundown retries limit of !UL exceeded", 1, 0 },
 	{ "SCNDDBNOUPD", "Database Updates not allowed on the secondary", 0, 0 },
 	{ "MUINFOUINT4", "!AD : !UL [0x!XL]", 4, 0 },
 	{ "NLMISMATCHCALC", "Location of !AD expected at 0x!XL, but found at 0x!XL", 4, 0 },
@@ -841,7 +841,7 @@ LITDEF	err_msg merrors[] = {
 	{ "NOTALLDBOPN", "Not all required database files were opened", 0, 0 },
 	{ "MUSELFBKUP", "Database file !AD can not be backed upon itself", 2, 0 },
 	{ "DBDANGER", "Process !UL [0x!XL] killed while committing update for database file !AD.  Possibility of damage to block 0x!16@XQ.", 5, 0 },
-	{ "UNUSEDMSG1010", "TRUNCATEFAIL last used in V6.3-001A May 2017", 0, 0 },
+	{ "ORLBKROLLED", "ONLINE ROLLBACK took the database for instance !AD region !AD corresponding to !AD to a prior state", 6, 0 },
 	{ "TCGETATTR", "Error while getting terminal attributes on file descriptor !UL", 1, 0 },
 	{ "TCSETATTR", "Error while setting terminal attributes on file descriptor !UL", 1, 0 },
 	{ "IOWRITERR", "IO Write by pid 0x!XL to blk 0x!XL of database file !AD failed.  Pid 0x!XL retrying the IO.", 5, 0 },
@@ -882,7 +882,7 @@ LITDEF	err_msg merrors[] = {
 	{ "FILTERBADCONV", "Bad conversion of seqno !16@XQ by filter", 1, 0 },
 	{ "PRIMARYISROOT", "Attempted operation not valid on root primary instance !AD", 2, 0 },
 	{ "GVQUERYGETFAIL", "Global variable QUERY and GET failed.  Failure code: !AD.", 2, 0 },
-	{ "UNUSEDMSG1051", "DBCREC2BIGINBLK removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "BSIZTOOLARGE", "!AD Block larger than specified maximum size", 2, 2 },
 	{ "MERGEDESC", "Merge operation not possible.  !AD is descendent of !AD.", 4, 0 },
 	{ "MERGEINCOMPL", "Error encountered during MERGE; operation may be incomplete", 0, 0 },
 	{ "DBNAMEMISMATCH", "Database file !AD points to shared memory (id = !UL) which in turn points to an inaccessible database file !AZ", 4, 0 },
@@ -1070,7 +1070,7 @@ LITDEF	err_msg merrors[] = {
 	{ "CHNGTPRSLVTM", "Mupip will change tp_resolve_time from !UL to !UL because expected EPOCH or EOF record was not found in Journal File !AD", 4, 0 },
 	{ "JNLUNXPCTERR", "Unexpected error encountered for Journal !AD at disk address 0x!XL", 3, 0 },
 	{ "OMISERVHANG", "GTCM OMI server is hung", 0, 0 },
-	{ "RSVDBYTE2HIGH", "Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and Reserved bytes (!UL)", 5, 0 },
+	{ "RSVDBYTE2HIGH", "Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and !AZ reserved bytes (!UL)", 6, 0 },
 	{ "BKUPTMPFILOPEN", "Open of backup temporary file !AD failed", 2, 0 },
 	{ "BKUPTMPFILWRITE", "Write to backup temporary file !AD failed", 2, 0 },
 	{ "SHMHUGETLB", "Could not back shared memory with huge pages, using base pages instead !AD", 2, 0 },
@@ -1449,13 +1449,13 @@ LITDEF	err_msg merrors[] = {
 	{ "EXTRINTEGRITY", "Database !AD potentially contains spanning nodes or data encrypted with two different keys", 2, 0 },
 	{ "CRYPTKEYRELEASEFAILED", "Could not safely release encryption key corresponding to file !AD. !AD", 4, 0 },
 	{ "MUREENCRYPTSTART", "Database !AD : MUPIP REORG ENCRYPT started by pid !UL at transaction number [0x!16@XQ]", 4, 0 },
-	{ "UNUSEDMSG1620", "MUREENCRYPTV4NOALLOW Last used in V7.0-004 Fed 2023", 0, 0 },
+	{ "BUFFSIZETOOSMALL", "TCP !AD buffer size passed to !AD smaller than minimum size of !SL.", 5, 0 },
 	{ "ENCRYPTCONFLT", "MUPIP REORG -ENCRYPT and MUPIP EXTRACT -FORMAT=BIN cannot run concurrently - skipping !AD on region: !AD, file: !AD", 6, 0 },
 	{ "JNLPOOLRECOVERY", "The size of the data written to the journal pool (!UL) does not match the size of the data in the journal files (!UL) at journal sequence number [0x!16@XQ] for the replication instance file !AZ. The journal pool has been recovered.", 4, 0 },
 	{ "LOCKTIMINGINTP", "A LOCK at !AD within a TP transaction is waiting in a final TP retry, which may lead to a general response gap", 2, 0 },
 	{ "PBNUNSUPTYPE", "$ZPEEK() does not support type !AD", 2, 0 },
 	{ "DBFHEADLRU", "Database file !AD LRU pointer: 0x!16@XQ is outside of range: 0x!16@XQ to 0x!16@XQ or misaligned", 5, 0 },
-	{ "UNUSEDMSG1626", "ASYNCIONOV4 last used in V7.0-004 Fed 2023", 0, 0 },
+	{ "UNUSEDMSG1626", "ASYNCIONOV4 last used in V7.0-004 Feb 2023", 0, 0 },
 	{ "AIOCANCELTIMEOUT", "Pid [0x!XL] timed out waiting for pending async io to complete/cancel in database file !AD", 3, 0 },
 	{ "DBGLDMISMATCH", "Database file !AD has !AZ whereas !AZ !AD in global directory !AD has !AZ", 9, 0 },
 	{ "DBBLKSIZEALIGN", "Database file !AD has AIO=ON and block_size=!UL which is not a multiple of filesystem block size !UL", 4, 0 },
@@ -2283,7 +2283,7 @@ LITDEF	int ERR_GTMSECSHRSGIDF = 150378056;
 LITDEF	int ERR_GTMSECSHRSSIDF = 150378064;
 LITDEF	int ERR_GTMSECSHRFORKF = 150378076;
 LITDEF	int ERR_DBFSYNCERR = 150378082;
-LITDEF	int ERR_UNUSEDMSG898 = 150378090;
+LITDEF	int ERR_EXCEEDRCTLRNDWN = 150378090;
 LITDEF	int ERR_SCNDDBNOUPD = 150378098;
 LITDEF	int ERR_MUINFOUINT4 = 150378107;
 LITDEF	int ERR_NLMISMATCHCALC = 150378114;
@@ -2395,7 +2395,7 @@ LITDEF	int ERR_MUDESTROYFAIL = 150378955;
 LITDEF	int ERR_NOTALLDBOPN = 150378964;
 LITDEF	int ERR_MUSELFBKUP = 150378970;
 LITDEF	int ERR_DBDANGER = 150378976;
-LITDEF	int ERR_UNUSEDMSG1010 = 150378986;
+LITDEF	int ERR_ORLBKROLLED = 150378984;
 LITDEF	int ERR_TCGETATTR = 150378994;
 LITDEF	int ERR_TCSETATTR = 150379002;
 LITDEF	int ERR_IOWRITERR = 150379010;
@@ -2436,7 +2436,7 @@ LITDEF	int ERR_FILTERCOMM = 150379282;
 LITDEF	int ERR_FILTERBADCONV = 150379290;
 LITDEF	int ERR_PRIMARYISROOT = 150379298;
 LITDEF	int ERR_GVQUERYGETFAIL = 150379306;
-LITDEF	int ERR_UNUSEDMSG1051 = 150379314;
+LITDEF	int ERR_BSIZTOOLARGE = 150379314;
 LITDEF	int ERR_MERGEDESC = 150379322;
 LITDEF	int ERR_MERGEINCOMPL = 150379328;
 LITDEF	int ERR_DBNAMEMISMATCH = 150379338;
@@ -3003,7 +3003,7 @@ LITDEF	int ERR_SETQUALPROB = 150383818;
 LITDEF	int ERR_EXTRINTEGRITY = 150383826;
 LITDEF	int ERR_CRYPTKEYRELEASEFAILED = 418819290;
 LITDEF	int ERR_MUREENCRYPTSTART = 150383843;
-LITDEF	int ERR_UNUSEDMSG1620 = 150383852;
+LITDEF	int ERR_BUFFSIZETOOSMALL = 150383848;
 LITDEF	int ERR_ENCRYPTCONFLT = 150383858;
 LITDEF	int ERR_JNLPOOLRECOVERY = 150383866;
 LITDEF	int ERR_LOCKTIMINGINTP = 150383872;

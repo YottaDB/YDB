@@ -363,7 +363,7 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 				 * but before updating the other which triggered exit handling for this process.
 				 */
 				assert(si->num_of_blks == si->blks_in_use->count
-					|| process_exiting && (si->num_of_blks == (si->blks_in_use->count - 1)));
+					|| (process_exiting && (si->num_of_blks == (si->blks_in_use->count - 1))));
 				reinitialize_hashtab_int8(si->blks_in_use);
 				si->num_of_blks = 0;
 			}

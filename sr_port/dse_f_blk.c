@@ -140,7 +140,7 @@ void dse_f_blk(void)
 	patch_find_root_search = TRUE;
 	if ((exhaust = (CLI_PRESENT == cli_present("EXHAUSTIVE"))) || (0 >= size))		/* NOTE assignment */
 	{
-		if (patch_exh_found = (patch_find_blk == patch_path[0]))			/* NOTE assignment */
+		if ((patch_exh_found = (patch_find_blk == patch_path[0])))			/* NOTE assignment */
 		{
 			if (patch_find_sibs)
 			{
@@ -164,7 +164,7 @@ void dse_f_blk(void)
 				patch_path[0] = global_roots_head->link->root;
 				patch_path_count = 1;
 				patch_left_sib = patch_right_sib = 0;
-				if (patch_exh_found = (patch_find_blk == patch_path[0]))	/* NOTE assignment */
+				if ((patch_exh_found = (patch_find_blk == patch_path[0])))	/* NOTE assignment */
 				{
 					if (patch_find_sibs)
 					{

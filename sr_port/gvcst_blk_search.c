@@ -676,7 +676,10 @@ enum cdb_sc	gvcst_search_blk(gv_key *pKey, srch_blk_status *pStat)
 			break;
 		}
 	}
-	assert(pPrevRec);
+#ifdef DEBUG
+	if (!pPrevRec)
+		TREF(donot_commit) |= DONOTCOMMIT_GVCST_BLK_SRCH;
+#endif
 	pStat->prev_rec.offset = (short)(pPrevRec - pBlkBase);
 	pStat->prev_rec.match = (short)nMatchCnt;
 	pStat->curr_rec.offset = (short)(pRecBase - pBlkBase);

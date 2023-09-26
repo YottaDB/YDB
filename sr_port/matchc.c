@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,7 +108,7 @@ unsigned char *matchc(int del_len, unsigned char *del_str, int src_len, unsigned
 			++char_len; /* maintain the source character position */
 		} while ((src_next < src_top) && ((src_cp != del_cp1) || ((WEOF == src_cp) && (*src_ptr != *del_str))));
 
-		if ((src_cp != del_cp1) || (WEOF == src_cp) && (*src_ptr != *del_str))
+		if ((src_cp != del_cp1) || ((WEOF == src_cp) && (*src_ptr != *del_str)))
 		{	/* could not find the 1st delimiter char in the source */
 			RETURN_NOMATCH;
 		}

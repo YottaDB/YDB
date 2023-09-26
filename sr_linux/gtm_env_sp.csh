@@ -197,7 +197,7 @@ if ( $?gtm_version_change == "1" ) then
 			#
 			# We should also look into how hard these would be to restore. Some of the warnings come from generated
 			# code and macro use, making them harder to deal with.
-			set undesired_warnings = ( -Wunused-result -Wparentheses -Wunused-value -Wunused-variable )
+			set undesired_warnings = ( -Wunused-result -Wunused-value -Wunused-variable )
 			set undesired_warnings = ( $undesired_warnings -Wunused-but-set-variable -Wunused-function )
 			if ( $cc_ver_major <= 4 ) then
 				set -f undesired_warnings = ( $undesired_warnings -Wuninitialized -Wstrict-aliasing )
@@ -231,10 +231,11 @@ if ( $?gtm_version_change == "1" ) then
 	if ($?scan_image) setenv gt_cc_option_DDEBUG	"$gt_cc_option_DDEBUG $gt_cc_option_DDEBUG_scan"
 
 	# -fno-defer-pop to prevent problems with assembly/generated code with optimization
+	# -fno-strict-aliasing until we comply with the rules
 	# -ffloat-store for consistent results avoiding rounding differences
 	# -fno-omit-frame-pointer so %rbp always gets set up (required by caller_id()). Default changed in gcc 4.6.
 	if ( "ia64" != $mach_type ) then
-		setenv	gt_cc_option_optimize	"-O3 -fno-defer-pop -ffloat-store -fno-omit-frame-pointer"
+		setenv	gt_cc_option_optimize	"-O3 -fno-strict-aliasing -fno-defer-pop -ffloat-store -fno-omit-frame-pointer"
 		if ( "32" == $gt_build_type ) then
 			# applies to 32bit x86_64, ia32 and cygwin
 			# Compile 32-bit x86 GT.M using 586 instruction set rather than 686 as the new Intel Quark

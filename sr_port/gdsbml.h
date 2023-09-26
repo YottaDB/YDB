@@ -55,7 +55,7 @@
 	error_def(ERR_DBBMLCORRUPT); /* BYPASSOK */									\
 															\
 	assert(BITS_PER_UCHAR % BML_BITS_PER_BLK == 0);	/* assert this for the BM_MINUS_BLKHDR_SIZE macro */		\
-	if (IS_BITMAP_BLK(blk) && ((LCL_MAP_LEVL != (bp)->levl) || (BM_SIZE(csa->hdr->bplmap) != (bp)->bsiz))		\
+	if ((IS_BITMAP_BLK(blk) && ((LCL_MAP_LEVL != (bp)->levl) || (BM_SIZE(csa->hdr->bplmap) != (bp)->bsiz)))		\
 		UNIX_ONLY(DEBUG_ONLY(|| (gtm_white_box_test_case_enabled						\
 		&& (WBTEST_ANTIFREEZE_DBBMLCORRUPT == gtm_white_box_test_case_number)))))				\
 	{														\

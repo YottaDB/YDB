@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,8 +31,7 @@
 
 void gt_timers_add_safe_hndlrs(void)
 {
-	add_safe_timer_handler(4, semwt2long_handler, client_timer_handler, simple_timeout_timer,
-				jnl_file_close_timer);
+	add_safe_timer_handler(3, semwt2long_handler, client_timer_handler, simple_timeout_timer);
 #	ifdef DEBUG
 	add_safe_timer_handler(2, fake_enospc, handle_deferred_syslog);
 	if (WBTEST_ENABLED(WBTEST_DEFERRED_TIMERS))

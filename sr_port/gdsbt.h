@@ -942,7 +942,7 @@ MBSTART {								\
 	node_local_ptr_t	cnl;					\
 	int4 			foindx;					\
 	assert(NULL != CSA);						\
-	if (cnl = (CSA->nl))						\
+	if ((cnl = (CSA->nl)))						\
 	{								\
 		foindx = ++cnl->ftok_ops_index;				\
 		if (FTOK_OPS_ARRAY_SIZE <= cnl->ftok_ops_index)		\

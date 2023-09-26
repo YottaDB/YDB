@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,7 @@ lv_val *lv_getslot(symval *sym)
 	unsigned int	numElems, numUsed;
 
 	numElems = MAXUINT4;	/* maximum value */
-	if (lv = sym->lv_flist)
+	if ((lv = sym->lv_flist))
 	{
 		assert(NULL == LV_PARENT(lv));		/* stp_gcol relies on this for correct garbage collection */
 		sym->lv_flist = (lv_val *)lv->ptrs.free_ent.next_free;
@@ -84,7 +84,7 @@ lvTree *lvtree_getslot(symval *sym)
 	unsigned int	numElems, numUsed;
 
 	numElems = MAXUINT4;	/* maximum value */
-	if (lvt = sym->lvtree_flist)
+	if ((lvt = sym->lvtree_flist))
 	{
 		assert(NULL == LVT_GET_PARENT(lvt));
 		sym->lvtree_flist = (lvTree *)lvt->avl_root;
@@ -125,7 +125,7 @@ lvTreeNode *lvtreenode_getslot(symval *sym)
 	unsigned int	numElems, numUsed;
 
 	numElems = MAXUINT4;	/* maximum value */
-	if (lv = sym->lvtreenode_flist)
+	if ((lv = sym->lvtreenode_flist))
 	{
 		assert(NULL == LV_PARENT(lv));	/* stp_gcol relies on this for correct garbage collection */
 		sym->lvtreenode_flist = (lvTreeNode *)lv->sbs_child;

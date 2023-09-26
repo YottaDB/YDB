@@ -579,6 +579,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	}
 	/* if new jnlpool, add to jnlpool_head list */
 	if (new_tmp_jnlpool)
+	{
 		if (NULL != jnlpool_head)
 		{
 			for (last_jnlpool = jnlpool_head; last_jnlpool->next; last_jnlpool = last_jnlpool->next)
@@ -587,6 +588,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 				last_jnlpool->next = tmp_jnlpool;
 		} else
 			jnlpool_head = tmp_jnlpool;
+	}
 	jnlpool = tmp_jnlpool;
 	jnlpool->jnlpool_ctl = tmp_jnlpool_ctl;
 	/* Now that we have attached to the journal pool, fix udi->counter_ftok_incremented back to an accurate value */
@@ -737,7 +739,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	 *	d) MUPIP REPLIC -EDITINSTANCE
 	 *		Invoke the function "repl_inst_edit"
 	 */
-	hold_onto_ftok_sem = is_src_srvr && (gtmsource_options.start || gtmsource_options.shut_down) || in_repl_inst_edit;
+	hold_onto_ftok_sem = (is_src_srvr && (gtmsource_options.start || gtmsource_options.shut_down)) || in_repl_inst_edit;
 	/* Determine "gtmsourcelocal_ptr" to later initialize jnlpool->gtmsource_local */
 	if (!is_src_srvr || !gtmsource_options.instsecondary)
 	{	/* GT.M or Update process or receiver server or a source server command that did not specify INSTSECONDARY */

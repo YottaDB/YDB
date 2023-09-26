@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,7 +86,7 @@ void gvcmz_netopen_attempt(struct CLB *c)
 		memcpy(ptr + S_PROTSIZE, (unsigned char *)prc_vec, prc_vec_size);
 #endif
 	}
-	memcpy(ptr, proto_str, S_PROTSIZE);
+	memcpy((void *)ptr, proto_str, S_PROTSIZE);
 	c->cbl = S_HDRSIZE + S_PROTSIZE + prc_vec_size;
 	status = cmi_write(c);	/* INITPROC */
 	if (CMI_ERROR(status))

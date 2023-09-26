@@ -350,7 +350,7 @@ boolean_t wcs_flu(uint4 options)
 		assert(jb);
 		cnl->doing_epoch = sync_epoch || write_epoch;
 		epoch_already_current = (!force_epoch && (jb->post_epoch_freeaddr == jb->rsrv_freeaddr));
-		if (return_early = (speedup_nobefore && !csd->jnl_before_image))
+		if ((return_early = (speedup_nobefore && !csd->jnl_before_image)))
 		{	/* Finish easiest option first. This database has NOBEFORE image journaling and caller has asked for
 			 * processing to be speeded up in that case. Write only an epoch record, don't do heavyweight flush or fsync
 			 * of db.This will avoid bunching of IO at the epoch time like is the case with before-image journaling

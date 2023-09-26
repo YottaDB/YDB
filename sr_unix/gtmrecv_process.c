@@ -688,7 +688,6 @@ STATICFNDEF int gtmrecv_est_conn(void)
 	boolean_t     		keepalive;
 	GTM_SOCKLEN_TYPE	optlen;
 	int			status, keepalive_opt, optval, save_errno;
-	int			send_buffsize, recv_buffsize, tcp_r_bufsize;
 	struct  linger  	disable_linger = {0, 0};
 	char			print_msg[1024];
 	struct addrinfo		primary_ai;
@@ -796,42 +795,9 @@ STATICFNDEF int gtmrecv_est_conn(void)
 	if (optval)
 		repl_log(gtmrecv_log_fp, FALSE, TRUE, "TCP_KEEPINTVL is %d.\n", optval);
 #	endif
-	if (0 != (status = get_send_sock_buff_size(gtmrecv_sock_fd, &send_buffsize)))
+	if (0 != (status = get_send_sock_buff_size(gtmrecv_sock_fd, &repl_max_send_buffsize)))
 		ISSUE_REPLCOMM_ERROR("Error getting socket send buffsize", errno);
-	if (send_buffsize < GTMRECV_TCP_SEND_BUFSIZE)
-	{
-		if (0 != (status = set_send_sock_buff_size(gtmrecv_sock_fd, GTMRECV_TCP_SEND_BUFSIZE)))
-		{
-			if (send_buffsize < GTMRECV_MIN_TCP_SEND_BUFSIZE)
-			{
-				SNPRINTF(print_msg, SIZEOF(print_msg), "Could not set TCP send buffer size to %d : %s",
-						GTMRECV_MIN_TCP_SEND_BUFSIZE, STRERROR(status));
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0,
-						ERR_TEXT, 2, LEN_AND_STR(print_msg));
-			}
-		}
-	}
-	if (0 != (status = get_send_sock_buff_size(gtmrecv_sock_fd, &repl_max_send_buffsize))) /* may have changed */
-		ISSUE_REPLCOMM_ERROR("Error getting socket send buffsize", errno);
-	if (0 != (status = get_recv_sock_buff_size(gtmrecv_sock_fd, &recv_buffsize)))
-		ISSUE_REPLCOMM_ERROR("Error getting socket recv buffsize", errno);
-	if (recv_buffsize < GTMRECV_TCP_RECV_BUFSIZE)
-	{
-		for (tcp_r_bufsize = GTMRECV_TCP_RECV_BUFSIZE;
-		     tcp_r_bufsize >= MAX(recv_buffsize, GTMRECV_MIN_TCP_RECV_BUFSIZE)
-		     &&  0 != (status = set_recv_sock_buff_size(gtmrecv_sock_fd, tcp_r_bufsize));
-		     tcp_r_bufsize -= GTMRECV_TCP_RECV_BUFSIZE_INCR)
-			;
-		if (tcp_r_bufsize < GTMRECV_MIN_TCP_RECV_BUFSIZE)
-		{
-			SNPRINTF(print_msg, SIZEOF(print_msg), "Could not set TCP receive buffer size in range [%d, %d], last "
-					"known error : %s", GTMRECV_MIN_TCP_RECV_BUFSIZE, GTMRECV_TCP_RECV_BUFSIZE,
-					STRERROR(status));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0,
-					ERR_TEXT, 2, LEN_AND_STR(print_msg));
-		}
-	}
-	if (0 != (status = get_recv_sock_buff_size(gtmrecv_sock_fd, &repl_max_recv_buffsize))) /* may have changed */
+	if (0 != (status = get_recv_sock_buff_size(gtmrecv_sock_fd, &repl_max_recv_buffsize)))
 		ISSUE_REPLCOMM_ERROR("Error getting socket recv buffsize", errno);
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection established, using TCP send buffer size %d receive buffer size %d\n",
 			repl_max_send_buffsize, repl_max_recv_buffsize);
@@ -1007,7 +973,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 		if (!(creator_pid & 0xff) && (creator_pid & 0xff000000))
 			ENDIAN_CONVERT_REPL_INST_UUID(&need_instinfo_msg->lms_group_info);
 	}
-	assert(is_rcvr_srvr && (NULL != gtmrecv_log_fp) || !is_rcvr_srvr && (NULL == gtmrecv_log_fp));
+	assert((is_rcvr_srvr && (NULL != gtmrecv_log_fp)) || (!is_rcvr_srvr && (NULL == gtmrecv_log_fp)));
 	assert(!is_rcvr_srvr || !repl_csa->hold_onto_crit);
 	assert(is_rcvr_srvr || !jgbl.onlnrlbk || repl_csa->hold_onto_crit);
 	log_fp = !is_rcvr_srvr ? stdout : gtmrecv_log_fp;
@@ -1065,7 +1031,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	 * ROLLBACK run on an instance which was once primary (not necessarily a supplementary one).
 	 */
 	assert((NULL == jnlpool->jnlpool_ctl) || jnlpool->jnlpool_ctl->upd_disabled
-		|| inst_hdr->is_supplementary && IS_REPL_INST_UUID_NON_NULL(inst_hdr->lms_group_info)
+		|| (inst_hdr->is_supplementary && IS_REPL_INST_UUID_NON_NULL(inst_hdr->lms_group_info))
 		|| jgbl.onlnrlbk || (jgbl.mur_rollback && INST_FREEZE_ON_ERROR_POLICY));
 	/* Check if primary and secondary are in same LMS group. Otherwise issue error. An exception is if the group info has
 	 * not yet been filled in after instance file creation. In that case, copy the info from primary and skip the error check.
@@ -1403,7 +1369,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 		instinfo_msg.strm_jnl_seqno = GTM_BYTESWAP_64(instinfo_msg.strm_jnl_seqno);
 	}
 	gtmrecv_repl_send((repl_msg_ptr_t)&instinfo_msg, REPL_INSTINFO, SIZEOF(repl_instinfo_msg_t), "REPL_INSTINFO", MAX_SEQNO);
-	if (repl_connection_reset || is_rcvr_srvr && gtmrecv_wait_for_jnl_seqno)
+	if (repl_connection_reset || (is_rcvr_srvr && gtmrecv_wait_for_jnl_seqno))
 		return;
 	/* Do not allow an instance which was formerly a root primary or which still
 	 * has a non-zero value of "zqgblmod_seqno" to start up as a tertiary. The only exception is
@@ -2693,10 +2659,17 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
 	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmrecv_sock_fd, repl_tls.id,
 					GTMTLS_OP_VERIFY_PEER | GTMTLS_OP_RENEGOTIATE_REQUESTED)))
 	{
-		if (!PLAINTEXT_FALLBACK)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSCONVSOCK), 0,
-				ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
+		if (PLAINTEXT_FALLBACK)
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSCONVSOCK), 0,
+					ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
+		else
+		{	/* Close the connection and issue an error message */
+			repl_close(&gtmrecv_sock_fd);
+			repl_connection_reset = TRUE;
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0,
+					ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
+			return FALSE;
+		}
 	} else
 	{
 		/* Do the actual handshake. */
@@ -2709,6 +2682,8 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
 			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 				return FALSE;
 		} while ((GTMTLS_WANT_READ == status) || (GTMTLS_WANT_WRITE == status));
+		if (SS_NORMAL == status) /* Where enabled, do post handshake auth */
+			status = repl_do_tls_post_handshake(gtmrecv_log_fp, gtmrecv_sock_fd);
 		if (SS_NORMAL == status)
 			return TRUE;
 		else if (REPL_CONN_RESET(status))

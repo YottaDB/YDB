@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -206,9 +206,7 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	if (!gtmsecshr_file_check_done)
 	{
 		assert(GTM_PATH_MAX >= (gtm_dist_len + 1 + sizeof(GTMSECSHR_EXECUTABLE))); /* Includes null */
-		memcpy(gtmsecshr_path, gtm_dist, gtm_dist_len);
-		gtmsecshr_path[gtm_dist_len] =  '/';
-		memcpy(gtmsecshr_path + gtm_dist_len + 1, GTMSECSHR_EXECUTABLE, sizeof(GTMSECSHR_EXECUTABLE)); /* Includes null */
+		SNPRINTF(gtmsecshr_path, GTM_PATH_MAX, "%s/%s", gtm_dist, GTMSECSHR_EXECUTABLE);
 		gtmsecshr_pathname.addr = gtmsecshr_path;
 		gtmsecshr_pathname.len = (mstr_len_t)(gtm_dist_len + 1 + strlen(GTMSECSHR_EXECUTABLE)); /* Excludes null */
 		assert((0 < gtmsecshr_pathname.len) && (GTM_PATH_MAX > gtmsecshr_pathname.len));
@@ -352,7 +350,7 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		}
 		/* Response to *our* latest message available */
 		assert(recv_complete);
-		if (ret_code = mesg.code)		/* Warning - assignment */
+		if ((ret_code = mesg.code))		/* Warning - assignment */
 		{
 			DBGGSSHR((LOGFLAGS, "secshr_client: non-zero response from gtmsecshr - request: %d  retcode: %d\n",
 				  req_code, ret_code));
@@ -438,7 +436,7 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		}
 		ret_code = -1;
 		/* If gtm_tmp is not defined, show default path */
-		if (gtm_tmp_ptr = GETENV("gtm_tmp"))
+		if ((gtm_tmp_ptr = GETENV("gtm_tmp")))
 		{
 			if (!IS_GTM_IMAGE)
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2,

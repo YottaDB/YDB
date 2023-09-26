@@ -47,9 +47,9 @@ int lkglvn(boolean_t gblvn)
 	lknam = lkname_buf;
 	if (gblvn)
 		*lknam++ = '^';
-	if (shifting = ((EXT_BOOL != TREF(gtm_fullbool)) && TREF(shift_side_effects)
+	if ((shifting = ((EXT_BOOL != TREF(gtm_fullbool)) && TREF(shift_side_effects)
 		&& (!TREF(saw_side_effect)
-			|| (GTM_BOOL == TREF(gtm_fullbool) && (OLD_SE == TREF(side_effect_handling))))))
+			|| (GTM_BOOL == TREF(gtm_fullbool) && (OLD_SE == TREF(side_effect_handling)))))))
 	{	/* NOTE assignment above */
 		exorder_init(&tmpchain);
 		oldchain = setcurtchain(&tmpchain);

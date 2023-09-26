@@ -91,7 +91,7 @@ void mupip_cvtgbl(void)
 		}
 		/* User wants to load from standard input */
 		assert(SIZEOF(fn) > sys_input.len);
-		memcpy(fn, sys_input.addr, sys_input.len);
+		memcpy((void *)fn, sys_input.addr, sys_input.len);
 		fn_len = sys_input.len;
 		assert(-1 != fcntl(fileno(stdin), F_GETFD));
 	} else if (!cli_get_str("FILE", fn, &fn_len))  /* User wants to read from a file. */
@@ -277,7 +277,7 @@ int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *lin
 		}
 		c1 = line1 + *line1_len;
 		*c1-- = 0;				/* null terminate the line to keep util_out_print happy */
-		if (*dos = ('\r' == *c1))		/* WARNING assignment */
+		if ((*dos = ('\r' == *c1)))		/* WARNING assignment */
 		{	/* [cariage] return before the <LF> / new line - we'll need to keep stripping them off */
 			*line1_len -= 1;
 			*c1 = 0;			/* null terminate earlier to keep util_out_print happy */

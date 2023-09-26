@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,7 +71,7 @@ void gv_xform_key(gv_key *keyp,  boolean_t xback)
 		if (STR_SUB_PREFIX != *c0)
 		{
 			assert(!(gv_target->nct));
-			while (*c1++ = *c0++)
+			while ((*c1++ = *c0++))
 				;
 			keyp->prev = keyp->end;
 			keyp->end = c1 - keyp->base;

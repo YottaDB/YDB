@@ -74,8 +74,8 @@ error_def(ERR_BUFOWNERSTUCK);
 	if (TREF(gtm_environment_init) DEBUG_ONLY(&& !(gtm_white_box_test_case_enabled					\
 				&& ((WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)			\
 					|| (WBTEST_DB_WRITE_HANG == gtm_white_box_test_case_number)			\
-					|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number))			\
-					|| (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == gtm_white_box_test_case_number))))	\
+					|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number)			\
+					|| (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == gtm_white_box_test_case_number)))))	\
 		gtm_fork_n_core();	/* take a snapshot in case running in-house */					\
 	return FALSE;													\
 }

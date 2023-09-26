@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@
 #define STP_MAXITEMS	8192	/* initial number of mval's for garbage collection; also grow by this value*/
 #define STP_NUM_INCRS	4 /* number of increments on the sliding scale used to grow string pool. Should be a power of 2 so that
 			 * so that divides can be done as shifts */
-#define STP_LOWRECLAIM_LEVEL(x) ((x >> 2) + (x >> 3) - (x >> 4)) /* level of available string pool (after reclaim) to
+#define STP_LOWRECLAIM_LEVEL(x) (((x) >> 2) + ((x) >> 3) - ((x) >> 4)) /* level of available string pool (after reclaim) to
 			 * count as a low reclaim pass (31.25%) */
 #define STP_MAXLOWRECLAIM_PASSES 2 /* after compaction, if at least STP_LOWRECLAIM_LEVEL of string pool is not free for
 			 * STP_MAXLOWRECLAIM_PASSES, force an expansion */

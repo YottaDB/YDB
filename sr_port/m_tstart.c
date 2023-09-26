@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -135,7 +135,7 @@ int m_tstart(void)
 	tid = newtriple(OC_PARAMETER);
 	if (TK_COLON == TREF(window_token))
 	{	advancewindow();
-		if (has_lpar = (TK_LPAREN == TREF(window_token)))
+		if ((has_lpar = (TK_LPAREN == TREF(window_token))))
 			advancewindow();
 		for(;;)
 		{

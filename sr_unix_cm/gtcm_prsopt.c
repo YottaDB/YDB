@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -97,10 +97,10 @@ int gtcm_prsopt(int argc, char_ptr_t argv[])
 
     for (i = 1, argv++; i < argc; argv += optlist[j].args + 1, i += optlist[j].args + 1)
     {
-	    for(j = 0; opt = optlist[j].option; j++)
-		    if (!strcmp(*argv,optlist[j].name))
+	    for(j = 0; (opt = optlist[j].option); j++)
+		    if (!strcmp(*argv, optlist[j].name))
 			    break;
-	    if (i + optlist[j].args >= argc)
+	    if ((i + optlist[j].args) >= argc)
 	    {
 		    FPRINTF(stderr, "%s option requires an argument - ignored\n", *argv);
 		    continue;

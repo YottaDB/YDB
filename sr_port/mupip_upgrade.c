@@ -46,6 +46,7 @@
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gvcst_protos.h"
+#include "min_max.h"
 #include "mu_getlst.h"
 #include "mu_reorg.h"
 #include "mu_rndwn_file.h"
@@ -137,7 +138,8 @@ void mupip_upgrade(void)
 	gd_segment		*seg;
 	gv_namehead		*gvt;
 	inctn_opcode_t		save_inctn_opcode;
-	int			exit_status, fd, close_res, rc, save_errno, split_blks_added, split_levels_added;
+	int			exit_status, fd, close_res, rc, save_errno, split_blks_added, split_levels_added,
+				start_i_rsvd_bytes;
 	int4			blk_size, bmls_to_work, lcl_max_key_size, new_bmm_size, status;
 	jnl_buffer_ptr_t	jbp;
 	jnl_private_control	*jpc;
@@ -219,7 +221,7 @@ void mupip_upgrade(void)
 			}
 			continue;
 		}
-		if (was_asyncio_enabled = csa->hdr->asyncio)	/* WARNING assignment */
+		if ((was_asyncio_enabled = csa->hdr->asyncio))	/* WARNING assignment */
 		{
 			fn_len = (size_t)rptr->reg->dyn.addr->fname_len + 1; /* Includes null terminator */
 			assert(sizeof(fn) >= fn_len);
@@ -365,7 +367,6 @@ void mupip_upgrade(void)
 			       TRUE, REG_LEN_STR(reg));
 			/* Start-up conditions */
 			mu_upgrade_in_prog = MUPIP_UPGRADE_IN_PROGRESS;
-			csd->fully_upgraded = FALSE;
 			/* Extend the DB to accomodate the larger master map. Asking for 2x SVBN blocks is quick'n'dirty math */
 			if (SS_NORMAL != (status = upgrade_extend(START_VBN_CURRENT << 1, reg)))	/* WARNING assignment */
 			{	/* extension failed, try the next region */
@@ -381,6 +382,7 @@ void mupip_upgrade(void)
 				grab_crit(reg, WS_1);
 			/* Adjust starting VBN and block counts accordingly. See mu_upgrade_bmm for the explanation of the
 			 * calculations here */
+			csd->fully_upgraded = FALSE;
 			blks_in_way = START_VBN_CURRENT - csd->start_vbn;
 			blks_in_way = ROUND_UP2((blks_in_way / (blk_size / DISK_BLOCK_SIZE)), BLKS_PER_LMAP);
 			bmls_to_work = blks_in_way / BLKS_PER_LMAP;		/* on a small DB this is overkill, but simpler */
@@ -445,6 +447,7 @@ void mupip_upgrade(void)
 			/* Make room for the enlarged master bitmap - calculate space needed to hold larger (64-bit) pointers */
 			csd->max_rec = (blk_size - SIZEOF(blk_hdr)) /* max records of smallest (1 char) keys with 2 delimiters */
 				/ (SIZEOF(rec_hdr) + (3 * SIZEOF(KEY_DELIMITER)) + SIZEOF_BLK_ID(BLKID_64));
+			start_i_rsvd_bytes = csd->i_reserved_bytes;
 			csd->i_reserved_bytes = csd->max_rec * (SIZEOF_BLK_ID(BLKID_64) - SIZEOF_BLK_ID(BLKID_32));
 			blocks_needed = blocks_needed >> 1; /* index blks cnt guess */
 			blocks_needed = DIVIDE_ROUND_UP(blocks_needed * csd->i_reserved_bytes, blk_size);
@@ -453,6 +456,8 @@ void mupip_upgrade(void)
 			csd->repl_state = csa->repl_state = repl_closed;		/* standalone gap in jnl and repl */
 			csd->jnl_state = csa->jnl_state = jnl_notallowed;
 			status = mu_upgrade_bmm(reg, blocks_needed);			/* main standane upgrade */
+			csd->i_reserved_bytes = MIN(start_i_rsvd_bytes, MAX_RESERVE_B(csd, TRUE));
+			csd->reserved_bytes = MIN(csd->reserved_bytes, MAX_RESERVE_B(csd, TRUE));
 			csd->jnl_state = csa->jnl_state = jnl_state;			/* restore jnl and repl states */
 			csd->repl_state = csa->repl_state = repl_state;
 			if (SS_NORMAL != status)

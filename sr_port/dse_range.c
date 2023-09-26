@@ -70,12 +70,12 @@ void dse_range(void)
 			return;
 	} else
 		to = cs_addrs->ti->total_blks - 1;
-	if (low = (CLI_PRESENT == cli_present("LOWER")))				/* WARNING: assignment */
+	if ((low = (CLI_PRESENT == cli_present("LOWER"))))				/* WARNING: assignment */
 	{
 		if (!dse_getki(&lower[0], &lower_len, LIT_AND_LEN("LOWER")))
 			return;
 	}
-	if (up = (CLI_PRESENT == cli_present("UPPER")))					/* WARNING: assignment */
+	if ((up = (CLI_PRESENT == cli_present("UPPER"))))					/* WARNING: assignment */
 	{
 		if (!dse_getki(&upper[0], &upper_len, LIT_AND_LEN("UPPER")))
 			return;

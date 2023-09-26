@@ -57,8 +57,8 @@ GBLREF	uint4			update_array_size;			/* for the BLK_* macros */
 GBLREF	uint4			mu_upgrade_in_prog;			/* non-zero while UPGRADE/REORD -UPGRADE in progress */
 GBLREF	unsigned char		cw_set_depth, t_tries;
 
-enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, int level, int cur_blk_size, int max_fill, int *last_rec_size,
-					unsigned char *last_key, int *last_keysz, int *top_off);
+static inline enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, int level, int cur_blk_size, int max_fill,
+		int *last_rec_size, unsigned char *last_key, int *last_keysz, int *top_off);
 
 /* Clear the block format setting before returning with the desired code */
 #define CLEAR_BLKFMT_AND_RETURN(CDB)		\
@@ -82,21 +82,22 @@ MBSTART {					\
 		cdb_sc_normal: if successful
 		cdb_sc status otherwise
  ************************************************************************************************/
-enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_created, int *lvls_increased)
+enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_created, int *lvls_increased, int *max_rightblk_lvl)
 {
 	blk_hdr_ptr_t	blk_hdr_ptr;
 	blk_segment	*bs_ptr1, *bs_ptr2;
 	block_id	allocation_clue;
 	block_index	left_index, right_index;
 	block_offset	ins_off, ins_off2;
-	boolean_t	create_root = FALSE, first_copy, insert_in_left, long_blk_id, new_rtblk_star_only, split_required;
+	boolean_t	create_root = FALSE, first_copy, insert_in_left = TRUE, long_blk_id, new_rtblk_star_only, split_required;
 	cw_set_element	*cse;
 	enum cdb_sc	status;
-	int		blk_id_sz, blk_seg_cnt, blk_size, bstar_rec_sz, delta, level, max_fill, max_fill_sav,
+	int		blk_id_sz, blk_seg_cnt, blk_size, bstar_rec_sz, delta, new_bsiz1, new_bsiz2, level, max_fill, max_fill_sav,
 			new_ances_currkeycmpc = 0, new_ances_currkeylen = 0, new_ances_currkeysz, new_blk1_last_keysz,
 			newblk2_first_keylen, newblk2_first_keysz, new_ins_keycmpc, new_ins_keylen, new_ins_keysz,
 			new_leftblk_top_off, next_gv_currkeysz, old_ances_currkeycmpc, old_ances_currkeylen, old_blk1_last_rec_size,
-			old_blk1_sz, old_right_piece_len, rec_size, reserve_bytes, save_blk_piece_len, tkeycmpc, tkeylen, tmp_cmpc;
+			old_blk1_sz, old_right_piece_len, rec_size, reserve_bytes, save_blk_piece_len, tkeycmpc, tkeylen, tmp_cmpc,
+			new_blk1_sz, new_blk2_sz;
 	rec_hdr_ptr_t	new_rec_hdr1a, new_rec_hdr1b, new_rec_hdr2 = NULL, root_hdr, star_rec_hdr, star_rec_hdr32, star_rec_hdr64;
 	sm_uc_ptr_t	ances_currkey = NULL, bn_ptr1, bn_ptr2, key_base, rec_base, rPtr1, rPtr2, new_blk1_top = NULL,
 			newblk2_first_key, new_blk2_frec_base, new_blk2_rem, new_blk2_top, new_ins_key, next_gv_currkey,
@@ -104,14 +105,18 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	srch_blk_status	*old_blk1_hist_ptr;
 	unsigned char	curr_prev_key[MAX_KEY_SZ + 3], new_blk1_last_key[MAX_KEY_SZ + 3], *zeroes;
 	unsigned short	temp_ushort;
+	bool		split_ins_and_curr;
+	sm_uc_ptr_t 	prev_blk2_frec_base, curr_blk2_frec_base;
+	int 		prev_blk1_top_off, prev_blk1_last_keysz, prev_blk1_last_rec_size, prev_blk1_last_cmpc, prev_new_blk1_size,
+			prev_new_blk2_size, curr_blk1_top_off, curr_blk1_last_cmpc, curr_blk1_last_keysz, curr_blk1_last_rec_size,
+			curr_new_blk1_size, curr_new_blk2_size;
+	unsigned char 	prev_blk1_last_key[MAX_KEY_SZ + 3], curr_blk1_last_key[MAX_KEY_SZ + 3];
+	bool		prev_splits_ins_and_curr, curr_splits_ins_and_curr, prev_ins_starts_rt, curr_ins_starts_rt;
 
 	blk_hdr_ptr = (blk_hdr_ptr_t)(gv_target->hist.h[cur_level].buffaddr);
-	reserve_bytes = cs_data->reserved_bytes;			/* for now, simple if not upgrade/downgrade */
-	if (mu_upgrade_in_prog)
-	{	/* Future enhancement should make full use of i_max_fill and d_max_fill */
-		assert(i_max_fill == d_max_fill);
+	reserve_bytes = cs_data->i_reserved_bytes; /* for now, simple if not upgrade/downgrade */
+	if (mu_upgrade_in_prog)	/* Future enhancement should make full use of i_max_fill and d_max_fill */
 		reserve_bytes = 0;					/* REORG -UPGRADE is top down, so zero the reserve bytes */
-	}
 	blk_size = cs_data->blk_size;
 	CHECK_AND_RESET_UPDATE_ARRAY;					/* reset update_array_ptr to update_array */
 	long_blk_id = IS_64_BLK_ID(blk_hdr_ptr);
@@ -129,12 +134,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	star_rec_hdr = long_blk_id ? star_rec_hdr64 : star_rec_hdr32;
 	level = cur_level;
 	max_fill_sav = max_fill = (0 == level) ? d_max_fill : i_max_fill;
-	if (create_root = ((level == gv_target->hist.depth) && (0 < level))) /* WARNING: assigment */
-	{	/* MUPIP REORG -UPGRADE starts from the top down as opposed to regular REORG which works from the
-		 * bottom up. As a result, the cur_level from the caller in a REORG -UPGRADE might be a root.
-		 */
-		assert(mu_upgrade_in_prog);
-	}
+	create_root = ((level == gv_target->hist.depth) && (0 < level));
 	/*  -------------------
 	 *  Split working block.
 	 *  -------------------
@@ -255,10 +255,11 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	BLK_ADDR(new_ins_key, new_blk1_last_keysz, unsigned char);
 	memcpy(new_ins_key, &new_blk1_last_key[0], new_blk1_last_keysz);
 	new_ins_keysz = new_blk1_last_keysz;
-	assert(!mu_upgrade_in_prog || max_fill);
+	max_fill_sav = i_max_fill;
+	assert(!mu_upgrade_in_prog || max_fill_sav);
 	while (!create_root) 	/* ========== loop through ancestors as necessary ======= */
 	{
-		if (create_root = (level == gv_target->hist.depth)) /* WARNING: assigment */
+		if ((create_root = (level == gv_target->hist.depth))) /* WARNING: assigment */
 			break;
 		level++;
 		max_fill = max_fill_sav;
@@ -334,50 +335,302 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			new_ins_keycmpc = 0;						 /* new_ins_key will be the 1st key */
 		new_ins_keylen = new_ins_keysz - new_ins_keycmpc;
 		delta = bstar_rec_sz + new_ins_keylen - old_ances_currkeylen + new_ances_currkeylen;
+		if ((old_blk1_sz == (SIZEOF(blk_hdr) + bstar_rec_sz)) /* If we've got a bstar-only block */
+				&& ((((old_blk1_sz + delta) > max_fill) && !mu_upgrade_in_prog) /* And max_fill says split */
+					|| (old_blk1_sz + delta) > (blk_size - reserve_bytes))) /* Or reserved bytes does */
+		{
+			/* Then we must have a concurrency issue, since max_fill is protected by limits in reorg and reserved bytes
+			 * by MAX_RESERVE_B such that even at an extreme there will be room for a full record and star record in
+			 * an index block.
+			 */
+			assert(CDB_STAGNATE > t_tries);
+			CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+		}
 		if ((old_blk1_sz + delta) > (blk_size - reserve_bytes))
 		{
 			split_required = TRUE;
+			/* Note that now the delta can no longer be taken at face value. There are three options for this split:
+			 * 	1) The split point will occur before the ancestor cur_rec such and it and the newly inserted rec
+			 * 	will be in the righthand block.
+			 * 	2) The split point will occur just before the ancestor curr_rec, and it will be the first record in
+			 * 	the righthand block with the inserted record becoming the lasts record in the lefthand block.
+			 * 	3) The split point will occur at or after the ancestor cur_rec such that it will be inside the left
+			 * 	block along with the newly inserted key.
+			 */
 			if (level == gv_target->hist.depth)
 			{
 				create_root = TRUE;
 				if ((MAX_BT_DEPTH - 1) <= level)
 					CLEAR_BLKFMT_AND_RETURN(cdb_sc_maxlvl);		/* maximum level reached */
 			}
-			if (max_fill + bstar_rec_sz > old_blk1_sz)
-			{	/* need more space than what was in the old block, so new block will be "too big" */
-				if (((SIZEOF(blk_hdr) + bstar_rec_sz) == old_blk1_sz) && !mu_upgrade_in_prog)
-					CLEAR_BLKFMT_AND_RETURN(cdb_sc_oprnotneeded);	/* Improve code to avoid this */
-				max_fill = old_blk1_sz - bstar_rec_sz;
+			if (old_blk1_sz - bstar_rec_sz < max_fill)
+			{
+				if (((SIZEOF(blk_hdr) + bstar_rec_sz) == old_blk1_sz))
+				{
+					if (mu_upgrade_in_prog)
+					{
+						assert(t_tries < CDB_STAGNATE);
+						CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+					}
+					/* This should be impossible given reorg input limits */
+					assert(FALSE);
+					CLEAR_BLKFMT_AND_RETURN(cdb_sc_oprnotneeded);
+				}
 			}
-			status = locate_block_split_point(old_blk1_hist_ptr, level, old_blk1_sz, max_fill,
-				&old_blk1_last_rec_size, new_blk1_last_key, &new_blk1_last_keysz, &new_leftblk_top_off);
-			if ((cdb_sc_normal != status) || (new_leftblk_top_off >= old_blk1_sz) || (0 == new_blk1_last_keysz))
+			/* 2) Find the most appropriate split point.
+			 */
+			prev_blk2_frec_base = curr_blk2_frec_base = old_blk1_base + SIZEOF(blk_hdr);
+			prev_blk1_top_off = curr_blk1_top_off = SIZEOF(blk_hdr);
+			prev_blk1_last_cmpc = prev_blk1_last_keysz = prev_blk1_last_rec_size = 0;
+			curr_blk1_last_cmpc = curr_blk1_last_keysz = curr_blk1_last_rec_size = 0;
+			prev_splits_ins_and_curr = curr_splits_ins_and_curr = false;
+			prev_ins_starts_rt = curr_ins_starts_rt = false;
+			/* Invariant: at the start of every loop, all curr_* variables reflect the state of things if the
+			 * split takes place right after the last record read in by READ_RECORD, or zero on the first loop.
+			 * All prev_* variables reflect the state of things if the split takes place right after the
+			 * next-to-last record read in by READ_RECORD, or zero on the second loop/uninitialized on the
+			 * first.
+			 */
+			prev_new_blk1_size = curr_new_blk1_size = SIZEOF(blk_hdr);
+			prev_new_blk2_size = curr_new_blk2_size = old_blk1_sz + delta;
+			if ((curr_blk1_top_off >= old_blk1_sz)
+					|| (curr_new_blk1_size > max_fill)
+					|| (curr_new_blk1_size > (blk_size - reserve_bytes)))
 			{
 				assert(t_tries < CDB_STAGNATE);
 				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
 				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 			}
-			assert((bstar_rec_sz != old_blk1_last_rec_size) || mu_upgrade_in_prog);
-			old_right_piece_len = old_blk1_sz - new_leftblk_top_off;
-			new_blk2_frec_base = new_blk1_top = old_blk1_base + new_leftblk_top_off;
-			if (bstar_rec_sz == old_right_piece_len)
+			/* We're now guaranteed at least one loop, though not that this loop will turn up anything valid */
+			for ( ; (curr_blk1_top_off < old_blk1_sz)
+					&& (curr_new_blk1_size <= max_fill)
+					&& (curr_new_blk1_size <= (blk_size - reserve_bytes)); )
+			{
+				/* Store the results of the last iteration so we have something to compare against */
+				prev_blk2_frec_base = curr_blk2_frec_base;
+				prev_blk1_top_off = curr_blk1_top_off;
+				prev_blk1_last_keysz = curr_blk1_last_keysz;
+				prev_blk1_last_rec_size = curr_blk1_last_rec_size;
+				prev_blk1_last_cmpc = curr_blk1_last_cmpc;
+				prev_new_blk1_size = curr_new_blk1_size;
+				prev_new_blk2_size = curr_new_blk2_size;
+				prev_splits_ins_and_curr = curr_splits_ins_and_curr;
+				prev_ins_starts_rt = curr_ins_starts_rt;
+				if (curr_blk1_last_keysz)
+					memcpy(prev_blk1_last_key, curr_blk1_last_key, curr_blk1_last_keysz);
+				/* Finish storing the last iteration */
+				if (!prev_ins_starts_rt)
+				{
+					READ_RECORD(status, &curr_blk1_last_rec_size, &curr_blk1_last_cmpc,
+							&curr_blk1_last_keysz, curr_blk1_last_key, level,
+							old_blk1_hist_ptr, curr_blk2_frec_base);
+					/* Store READ_RECORD meta-results */
+					/* (buffaddr + blk1_top_off) and blk2_frec_base are the same */
+					curr_blk1_top_off += curr_blk1_last_rec_size;
+					curr_blk2_frec_base += curr_blk1_last_rec_size;
+					curr_blk1_last_keysz += curr_blk1_last_cmpc;
+				}
+				/* Finish maintaining READ_RECORD meta-results */
+				if ((cdb_sc_starrecord == status) && (curr_blk1_top_off == old_blk1_sz))
+				{
+					status = cdb_sc_normal;
+					break;
+				}
+				if ((cdb_sc_normal != status))
+				{
+					assert(t_tries < CDB_STAGNATE);
+					status = cdb_sc_blkmod;
+					break;
+				}
+				/* Start calculation of new blk1 and blk2 sizes */
+				if ((curr_blk1_top_off == old_blk1_hist_ptr->curr_rec.offset) && prev_ins_starts_rt)
+				{
+					curr_ins_starts_rt = false;
+					curr_splits_ins_and_curr = true;
+					/* Calculate baseline size start */
+					curr_new_blk1_size = curr_blk1_top_off;
+					curr_new_blk2_size = SIZEOF(blk_hdr) + (old_blk1_sz - curr_blk1_top_off);
+					/* Calculate baseline size end */
+					/* Calculate adjustments due to new record insertion start */
+					curr_new_blk1_size += bstar_rec_sz;
+					/* Calculate adjustments due to new record insertion end */
+					/* Calculate contraction of last record of block 1 start */
+					/* Special case: when the last record is the ins_key.
+					 * Already handled by not adding new_ins_keylen above.
+					 */
+					/* Calculate contraction of last record of block 1 end */
+					/* Calculate expansion of first record of block 2 start */
+					/* Special case: when the curr rec is the first record in the right block.
+					 * In this situation curr_key will be the first key and will fully expand, so
+					 * add in its compression count.
+					 */
+					curr_new_blk2_size += old_ances_currkeycmpc;
+					/* Not using the newcmpc which was calculated on the assumption
+					 * of a preceding new_ins_key.
+					 */
+					/* Calculate expansion of first record of block 2 end */
+					/* Will redo this loop without splitting ins and curr thanks to condition around
+					 * READ_RECORD.
+					 */
+				} else if (curr_blk1_top_off <= old_blk1_hist_ptr->curr_rec.offset)
+					/* curr_ and new_ins records will go to the right */
+				{
+					curr_ins_starts_rt = (curr_blk1_top_off == old_blk1_hist_ptr->curr_rec.offset);
+					curr_splits_ins_and_curr = false;
+					/* Calculate baseline size start */
+					curr_new_blk1_size = curr_blk1_top_off;
+					curr_new_blk2_size = SIZEOF(blk_hdr) + (old_blk1_sz - curr_blk1_top_off);
+					/* Calculate baseline size end */
+					/* Calculate adjustments due to new record insertion start */
+					curr_new_blk2_size += (new_ins_keylen + bstar_rec_sz
+							+ new_ances_currkeylen - old_ances_currkeylen);
+					/* Calculate adjustments due to new record insertion end */
+					/* Calculate contraction of last record of block 1 start */
+					/* Special case: when the last record is the ances_curr_rec.
+					 * This cannot happen in this branch since this record is
+					 * going to the right.
+					 */
+					curr_new_blk1_size -= curr_blk1_last_rec_size;
+					curr_new_blk1_size += bstar_rec_sz;
+					/* Calculate contraction of last record of block 1 end */
+					/* Calculate expansion of first record of block 2 start */
+					/* Special case: when the curr rec is the first record in the right block.
+					 * In this situation new_ins_key will be the first key and will fully expand, so
+					 * add in its compression count. Otherwise, add in the compression count of the
+					 * curr_blk2_frec_base record.
+					 */
+					if (curr_blk1_top_off == old_blk1_hist_ptr->curr_rec.offset)
+						curr_new_blk2_size += new_ins_keycmpc;
+					else
+						curr_new_blk2_size += EVAL_CMPC((rec_hdr_ptr_t)curr_blk2_frec_base);
+					/* Calculate expansion of first record of block 2 end */
+				} else
+					/* curr_ and new_ins records will go to the left. */
+				{
+					curr_ins_starts_rt = false;
+					curr_splits_ins_and_curr = false;
+					/* Calculate baseline size start */
+					curr_new_blk1_size = curr_blk1_top_off;
+					curr_new_blk2_size = SIZEOF(blk_hdr) + (old_blk1_sz - curr_blk1_top_off);
+					/* Calculate baseline size end */
+					/* Calculate adjustments due to new record insertion start */
+					curr_new_blk1_size += (new_ins_keylen + bstar_rec_sz
+							+ new_ances_currkeylen - old_ances_currkeylen);
+					/* Special case: when the curr rec is the first record in the left block.
+					 * This can and must be dealt with at the time of calculating the initial
+					 * ances_currkeycmpc, etc. Assert that here without depending on volatile memory */
+					assert((SIZEOF(blk_hdr) != old_blk1_hist_ptr->curr_rec.offset) ||
+							(!new_ins_keycmpc && (new_ins_keysz == new_ins_keylen)));
+					/* Calculate adjustments due to new record insertion end */
+					/* Calculate contraction of last record of block 1 start */
+					/* Special case: when the last record is the ances_curr_rec.
+					 * in this case, we should subtract the new_ances_currkeylen.
+					 */
+					if (prev_blk1_top_off == old_blk1_hist_ptr->curr_rec.offset)
+					{
+						curr_new_blk1_size -= new_ances_currkeylen;
+						/* No way to assert that reclen - keylen == bstar_rec_size,
+						 * but the code depends on that invariant.
+						 */
+					} else
+					{
+						curr_new_blk1_size -= curr_blk1_last_rec_size;
+						curr_new_blk1_size += bstar_rec_sz;
+					}
+					/* Calculate contraction of last record of block 1 end */
+					/* Calculate expansion of first record of block 2 start */
+					/* Special case: when the curr rec is the first record in the right block.
+					 * Cannot occur here since we are in a split-to-left situation.
+					 */
+					curr_new_blk2_size += EVAL_CMPC((rec_hdr_ptr_t)curr_blk2_frec_base);
+					/* Calculate expansion of first record of block 2 end */
+				} /* Finish calculation of new blk1 and blk2 sizes */
+			} /* Finish READ_RECORD for-loop */
+			if (prev_new_blk1_size > max_fill)
+			{
+				/* If the loop overran its goal somehow, something has gone wrong in the READ_RECORD loop.
+				 * Still, this is not known to be possible.
+				 */
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+			} else if ((prev_new_blk1_size > (blk_size - reserve_bytes))
+					|| (prev_new_blk2_size > blk_size)
+					|| (prev_blk1_top_off >= old_blk1_sz))
+			{
+				/* If the loop overran the size of the previous block, or the hard limit of reserved bytes,
+				 * then there must have been a concurrency issue in reading from the block.
+				 */
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+			} else if ((curr_blk1_top_off > old_blk1_sz) || (((blk_hdr_ptr_t)old_blk1_base)->levl != level)
+					|| (((blk_hdr_ptr_t)old_blk1_base)->bsiz != old_blk1_sz))
+			{
+				/* If we think that the lefthand block is larger than the current block, or the level
+				 * doesn't match, or the size doesn't match what we read before, then concurrency issue
+				 */
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+			} else if ((SIZEOF(blk_hdr) >= prev_new_blk1_size)  || (SIZEOF(blk_hdr) >= prev_new_blk2_size))
+			{
+				/* If either of the calculated sizes contains only a block header or less, then concurrency issue.
+				 */
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+			} else if ((cdb_sc_normal != status)  || (0 == prev_blk1_last_keysz))
+			{
+				/* if we get a bad status from READ_RECORD or are trying to split after the star record,
+				 * concurrency issue.
+				 */
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+			}
+			split_ins_and_curr = prev_splits_ins_and_curr;
+			if ((SIZEOF(blk_hdr) + bstar_rec_sz) == prev_new_blk2_size)
 				new_rtblk_star_only = TRUE;
 			else
 				new_rtblk_star_only = FALSE;
-			if (new_leftblk_top_off == old_blk1_hist_ptr->curr_rec.offset)
-			{	/* inserted key will be the first record of new right block */
-				new_ins_keylen = new_ins_keysz;
-				new_ins_keycmpc = 0;
-				delta = (int)(bstar_rec_sz + new_ins_keylen - old_ances_currkeylen + new_ances_currkeylen);
+			if (prev_blk1_last_keysz)
+				memcpy(new_blk1_last_key, prev_blk1_last_key, prev_blk1_last_keysz);
+			if (prev_blk1_top_off == old_blk1_hist_ptr->curr_rec.offset)
+			{
+				if (split_ins_and_curr)
+				{
+					/* Need to preserve this information to re-initialize new_ins_key if needed
+					 * at the next split level
+					 */
+					memcpy(new_blk1_last_key, new_ins_key, new_ins_keysz);
+					prev_blk1_last_keysz = new_ins_keysz;
+					/* Newly inserted key will be the final star key, so has no length */
+					new_ins_keylen = new_ins_keysz = new_ins_keycmpc = 0;
+					/* If it had sz, will already have been expanded. If not, it's the star key
+					 * and will be the star key also in the new block.
+					 */
+					new_ances_currkeylen = new_ances_currkeysz;
+					new_ances_currkeycmpc = 0;
+				} else
+				{
+					/* Insertion key will start us off, and it is already expanded so just set the
+					 * length and cmpc to indicate that it won't be compressed.
+					 */
+					new_ins_keylen = new_ins_keysz;
+					new_ins_keycmpc = 0;
+
+				}
 			} else
 			{	/* process 1st record of new right block */
+				assert(!split_ins_and_curr);
 				BLK_ADDR(newblk2_first_key, MAX_KEY_SZ + 1, unsigned char);
 				READ_RECORD(status, &rec_size, &tkeycmpc, &newblk2_first_keylen, newblk2_first_key,
-						level, old_blk1_hist_ptr, new_blk2_frec_base);
+						level, old_blk1_hist_ptr, prev_blk2_frec_base);
 				if (cdb_sc_normal == status)
 				{
-					memcpy(newblk2_first_key, &new_blk1_last_key[0], tkeycmpc); /* compressed piece */
-					new_blk2_rem =  new_blk2_frec_base + SIZEOF(rec_hdr) + newblk2_first_keylen;
+					memcpy(newblk2_first_key, new_blk1_last_key, tkeycmpc); /* compressed piece */
+					new_blk2_rem = prev_blk2_frec_base + SIZEOF(rec_hdr) + newblk2_first_keylen;
 					newblk2_first_keysz = newblk2_first_keylen + tkeycmpc;
 					BLK_ADDR(new_rec_hdr2, SIZEOF(rec_hdr), rec_hdr);
 					new_rec_hdr2->rsiz = newblk2_first_keysz + bstar_rec_sz;
@@ -389,61 +642,31 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 					CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 				}
 			}
-			/* else old_blk1_hist_ptr->curr_rec will be newblk2_first_key */
-			if ((old_blk1_hist_ptr->curr_rec.offset + old_ances_currkeylen + bstar_rec_sz) < new_leftblk_top_off)
-			{	/* in this case prev_rec (if it exists), new key and curr_rec should go into left block */
-				if ((new_leftblk_top_off + delta - old_blk1_last_rec_size + bstar_rec_sz)
-					<= (blk_size - (mu_upgrade_in_prog ? 0 : reserve_bytes)))
-					insert_in_left = TRUE;
-				else
-				{	/* cannot handle this now */
-					assert(!mu_upgrade_in_prog);
-					CLEAR_BLKFMT_AND_RETURN(cdb_sc_oprnotneeded);
-				}
-			} else if ((old_blk1_hist_ptr->curr_rec.offset + old_ances_currkeylen + bstar_rec_sz) > new_leftblk_top_off)
-			{	/* if old_blk1_hist_ptr->curr_rec is the first key in old_blk1
-				   then in new right block,
-				   	new_ins_key will be the 1st record key and
-					curr_rec will be 2nd record and
-					there will be no prev_rec in right block.
-				   Else (if curr_rec is not first key)
-					there will be some records before new_ins_key, at least prev_rec */
-				delta =(int)(bstar_rec_sz + new_ins_keylen - old_ances_currkeylen + new_ances_currkeylen
-					+ ((0 == new_ins_keycmpc) ? 0 : (EVAL_CMPC((rec_hdr_ptr_t)new_blk2_frec_base))));
-				if ((SIZEOF(blk_hdr) + old_right_piece_len + delta)
-					<= (blk_size - (mu_upgrade_in_prog ? 0 : reserve_bytes)))
-				{
-					insert_in_left = FALSE;
-					if ((new_leftblk_top_off + bstar_rec_sz) >= old_blk1_sz)
-					{	/* cannot handle this now */
-						assert(!mu_upgrade_in_prog);
-						CLEAR_BLKFMT_AND_RETURN(cdb_sc_oprnotneeded);
-					}
-				} else
-				{	/* cannot handle this now */
-					assert(!mu_upgrade_in_prog);
-					CLEAR_BLKFMT_AND_RETURN(cdb_sc_oprnotneeded);
-				}
+			if ((prev_blk1_top_off <= old_blk1_hist_ptr->curr_rec.offset) && !split_ins_and_curr)
+			{
+				insert_in_left = FALSE;
 			} else
-			{	/* in this case prev_rec (if it exists), new key and curr_rec should go into left block
-				 * and curr_rec becomes the last record (*-key) of left new block
-				 */
-				delta = bstar_rec_sz + new_ins_keylen;
-				if ((new_leftblk_top_off + delta)
-					<= (blk_size - (mu_upgrade_in_prog ? 0 : reserve_bytes)))
-					insert_in_left = TRUE;
-				else
-				{	/* cannot handle this now */
-					assert(!mu_upgrade_in_prog);
-					CLEAR_BLKFMT_AND_RETURN(cdb_sc_oprnotneeded);
-				}
+			{
+				insert_in_left = TRUE;
 			}
+			new_blk2_frec_base = new_blk1_top = old_blk1_base + prev_blk1_top_off;
+			old_blk1_last_rec_size = prev_blk1_last_rec_size;
+			new_blk1_last_keysz = prev_blk1_last_keysz; /* Only used if we go another level up */
+			new_leftblk_top_off = prev_blk1_top_off;
+			new_blk1_sz = prev_new_blk1_size;
+			new_blk2_sz = prev_new_blk2_size;
+			assert(new_blk2_frec_base == prev_blk2_frec_base);
+			assert(bstar_rec_sz != prev_blk1_last_rec_size);
 		}	/* end if split required */
 		else
 		{
+			new_blk1_sz = delta + old_blk1_sz;
+			/* Used only in sanity checks at end; this asserts that we should only ever build one block in this case */
+			new_blk2_sz = -1;
 			split_required = FALSE;
 			new_rtblk_star_only = FALSE;
 		}
+		/* Construct the new index block(s) */
 		BLK_ADDR(new_rec_hdr1a, SIZEOF(rec_hdr), rec_hdr);
 		new_rec_hdr1a->rsiz = bstar_rec_sz + new_ins_keylen;
 		SET_CMPC(new_rec_hdr1a, new_ins_keycmpc);
@@ -453,14 +676,14 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		BLK_ADDR(bn_ptr1, blk_id_sz, unsigned char);
 		/* child block pointer of ances_currkey */
 		memcpy(bn_ptr1, old_blk1_base + old_blk1_hist_ptr->curr_rec.offset +
-			SIZEOF(rec_hdr) + old_ances_currkeylen, blk_id_sz);
+				SIZEOF(rec_hdr) + old_ances_currkeylen, blk_id_sz);
 		if (!split_required)
 		{	/* LEFT part of old BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			if (SIZEOF(blk_hdr) < old_blk1_hist_ptr->curr_rec.offset)
 			{
 				BLK_SEG(bs_ptr2, old_blk1_base + SIZEOF(blk_hdr),
-					old_blk1_hist_ptr->curr_rec.offset - SIZEOF(blk_hdr));
+						old_blk1_hist_ptr->curr_rec.offset - SIZEOF(blk_hdr));
 				first_copy = FALSE;
 			} else
 				first_copy = TRUE;
@@ -477,6 +700,12 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			BLK_SEG(bs_ptr2, zeroes, blk_id_sz);
 			if (0 < (old_blk1_base + old_blk1_sz - old_blk_after_currec))
 				BLK_SEG(bs_ptr2, old_blk_after_currec, old_blk1_base + old_blk1_sz - old_blk_after_currec);
+			if (new_blk1_sz != blk_seg_cnt)
+			{
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+			}
 			if (!BLK_FINI(bs_ptr2, bs_ptr1))
 			{
 				assert(t_tries < CDB_STAGNATE);
@@ -488,7 +717,96 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			break;
 		}
 		/* if SPLIT REQUIRED */
-		if (insert_in_left) /* new_ins_key will go to left block */
+		if (split_ins_and_curr)
+		{
+			/* If we're splitting the insertion key from the current key, there are two options for max_rightblk_lvl.
+			 * Take two extremes: In the first, the secondary split sends both to the left and the tertiary+ splits
+			 * split ins and curr. In the second, the secondary split sends both to the right and the tertiary+ splits
+			 * split ins and curr.
+			 * In the first case, we do not need to process any blocks; the right-sibling at the lowest level
+			 * (gv_currkey_next_reorg at the end of this fundtion) has the same lineage as the gv_currkey/target,
+			 * and that lineage is an entirely lefthand one (and therefore not in need of further traversal).
+			 * In the second case, we need to process all the split-to-right blocks: these are new blocks, so
+			 * they've been appended to the end and are not ideally swapped, the split logic does not guarantee
+			 * split-to-right blocks are well-sized (just that split-to-left ones are), and in the more common case
+			 * where these blocks are undersized they could benefit from coalescing. But we will never ordinarily
+			 * traverse them, because they are all ancestors we share with our right-sibling
+			 * (see the mu_reorg no-split no-coalesce branch for this mechanism).
+			 * Therefore this algorithm increases max_rightblk_lvl whenever:
+			 * 	1) There is a new righthand block created which contains both the insertion and current ancestor
+			 * 	keys, at any level, since thes means that there is a novel block which is an ancestor of both
+			 * 	the gv_currkey and the gv_currkey_next_reorg (and potentially many more keys besides), and it
+			 * 	needs processing.
+			 * 	2) There is a new righthand block that contains the current key, and 1) or 2) was true for
+			 * 	the previous split in the current sequence, or this is a secondary split.
+			 */
+			if (*max_rightblk_lvl == (level - 1))
+				*max_rightblk_lvl = level;
+			assert(insert_in_left);
+			/* LEFT BLOCK */
+			BLK_INIT(bs_ptr2, bs_ptr1);
+			if (SIZEOF(blk_hdr) < old_blk1_hist_ptr->curr_rec.offset)
+			{
+				BLK_SEG(bs_ptr2, old_blk1_base + SIZEOF(blk_hdr),
+					old_blk1_hist_ptr->curr_rec.offset - SIZEOF(blk_hdr));
+				first_copy = FALSE;
+			} else
+				first_copy = TRUE;
+			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, SIZEOF(rec_hdr));
+			BLK_SEG(bs_ptr2, bn_ptr1, blk_id_sz);
+			if (new_blk1_sz != blk_seg_cnt)
+			{
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+			}
+
+			if (!BLK_FINI(bs_ptr2, bs_ptr1))
+			{
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+			}
+			if (create_root)
+				left_index = t_create(allocation_clue++, bs_ptr1, 0, 0, level);
+			else
+				t_write(&gv_target->hist.h[level], bs_ptr1, 0, 0,
+						level, first_copy, TRUE, GDS_WRITE_KILLTN);
+			/* RIGHT BLOCK */
+			BLK_INIT(bs_ptr2, bs_ptr1);
+			if (new_rtblk_star_only)
+			{
+				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, SIZEOF(rec_hdr));
+				ins_off = blk_seg_cnt;
+				BLK_SEG(bs_ptr2, zeroes, blk_id_sz);
+			} else
+			{
+				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1b, SIZEOF(rec_hdr));
+				assert(new_ances_currkeysz && ances_currkey);
+				assert(new_ances_currkeysz == new_ances_currkeylen);
+				BLK_SEG(bs_ptr2, ances_currkey, new_ances_currkeysz);
+				ins_off = blk_seg_cnt;
+				BLK_SEG(bs_ptr2, zeroes, blk_id_sz);
+				save_blk_piece_len = (int)(new_blk2_top - old_blk_after_currec);
+				assert(save_blk_piece_len);
+				BLK_ADDR(save_blk_piece, save_blk_piece_len, unsigned char);
+				memcpy(save_blk_piece, old_blk_after_currec, save_blk_piece_len);
+				BLK_SEG(bs_ptr2, save_blk_piece, save_blk_piece_len);
+			}
+			if (new_blk2_sz != blk_seg_cnt)
+			{
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+			}
+			if (!BLK_FINI(bs_ptr2, bs_ptr1))
+			{
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+			}
+			right_index = t_create(allocation_clue++, bs_ptr1, ins_off, right_index, level);
+		} else if (insert_in_left) /* new_ins_key will go to left block */
 		{	/* LEFT BLOCK */
 			assert(new_blk1_top);
 			BLK_INIT(bs_ptr2, bs_ptr1);
@@ -499,6 +817,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				first_copy = FALSE;
 			} else
 				first_copy = TRUE;
+			assert(new_ins_keylen);
 			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1a, SIZEOF(rec_hdr));
 			BLK_SEG(bs_ptr2, new_ins_key + new_ins_keycmpc, new_ins_keylen);
 			BLK_SEG(bs_ptr2, bn_ptr1, blk_id_sz);
@@ -528,10 +847,16 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				BLK_SEG(bs_ptr2, bn_ptr2, blk_id_sz);
 			} else
 			{
-				assert (old_blk_after_currec == new_blk1_top);
+				assert(old_blk_after_currec == new_blk1_top);
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, SIZEOF(rec_hdr));
 				ins_off = blk_seg_cnt;
 				BLK_SEG(bs_ptr2, zeroes, blk_id_sz);
+			}
+			if (new_blk1_sz != blk_seg_cnt)
+			{
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 			}
 			if (!BLK_FINI(bs_ptr2, bs_ptr1))
 			{
@@ -543,7 +868,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				left_index = t_create(allocation_clue++, bs_ptr1, ins_off, right_index, level);
 			else
 				t_write(&gv_target->hist.h[level], bs_ptr1, ins_off, right_index,
-					level, first_copy, FALSE, GDS_WRITE_KILLTN);
+						level, first_copy, FALSE, GDS_WRITE_KILLTN);
 			/* RIGHT BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			if (new_rtblk_star_only)
@@ -568,6 +893,12 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				memcpy(save_blk_piece, new_blk2_rem, save_blk_piece_len);
 				BLK_SEG(bs_ptr2, save_blk_piece, save_blk_piece_len);
 			}
+			if (new_blk2_sz != blk_seg_cnt)
+			{
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+			}
 			if (!BLK_FINI(bs_ptr2, bs_ptr1))
 			{
 				assert(t_tries < CDB_STAGNATE);
@@ -578,7 +909,12 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			(*blks_created)++;
 		} else	/* end if insert_in_left */
 		{	/* new_ins_key to be inserted in right block */
-			/* RIGHT BLOCK */
+			/* This means that it is certain that a parent block of our gv_currkey_next_reorg-to-be
+			 * will be a newly-created righthand block, yet to be coalesced or swapped.
+			 * In this case we can unconditionally set max_rightblk_lvl
+			 */
+			*max_rightblk_lvl = level;
+			/* LEFT BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			save_blk_piece_len = (int)(new_leftblk_top_off - SIZEOF(blk_hdr) - old_blk1_last_rec_size);
 			if ((old_blk1_base + SIZEOF(blk_hdr) + save_blk_piece_len >= new_blk2_top) || (0 > save_blk_piece_len))
@@ -594,6 +930,12 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			BLK_ADDR(bn_ptr2, blk_id_sz, unsigned char);
 			memcpy(bn_ptr2, old_blk1_base + new_leftblk_top_off - blk_id_sz, blk_id_sz);
 			BLK_SEG(bs_ptr2, bn_ptr2, blk_id_sz);
+			if (new_blk1_sz != blk_seg_cnt)
+			{
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+			}
 			if (!BLK_FINI(bs_ptr2, bs_ptr1))
 			{
 				assert(t_tries < CDB_STAGNATE);
@@ -646,6 +988,12 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				memcpy(save_blk_piece, old_blk_after_currec, save_blk_piece_len);
 				BLK_SEG(bs_ptr2, save_blk_piece, save_blk_piece_len);
 			}
+			if (new_blk2_sz != blk_seg_cnt)
+			{
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
+			}
 			if (!BLK_FINI(bs_ptr2, bs_ptr1))
 			{
 				assert(t_tries < CDB_STAGNATE);
@@ -655,6 +1003,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			right_index = t_create(allocation_clue++, bs_ptr1, ins_off, right_index, level);
 			(*blks_created)++;
 		}	/* endif new_ins_key inserted in right block */
+		assert(new_blk1_last_keysz);
 		BLK_ADDR(new_ins_key, new_blk1_last_keysz, unsigned char);
 		memcpy(new_ins_key, &new_blk1_last_key[0], new_blk1_last_keysz);
 		new_ins_keysz = new_blk1_last_keysz;
@@ -715,11 +1064,11 @@ Return :
 		At least one record will be in left block after split
 -------------------------------------------------------------------------
 */
-enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, int level, int cur_blk_size, int max_fill, int *last_rec_size,
-					unsigned char *last_key, int *last_keysz, int *top_off)
+static inline enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, int level, int cur_blk_size, int max_fill,
+		int *last_rec_size, unsigned char *last_key, int *last_keysz, int *top_off)
 {
 	block_id	blkid;
-	int		index, rec_size, tkeycmpc;
+	int		tkeycmpc;
 	enum cdb_sc	status;
 	sm_uc_ptr_t 	blk_base, iter, rec_base, rPtr1, rPtr2, rPtr_arry[cs_data->max_rec];
 	unsigned short	temp_ushort;
@@ -729,14 +1078,13 @@ enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, int level, int c
 	*last_rec_size = 0;
 	blk_base = blk_stat->buffaddr;
 	rec_base = blk_base + SIZEOF(blk_hdr);
-	for (index = 0; *top_off < max_fill; )
+	for (; *top_off < max_fill; )
 	{
-		READ_RECORD(status, &rec_size, &tkeycmpc, last_keysz, last_key,
+		READ_RECORD(status, last_rec_size, &tkeycmpc, last_keysz, last_key,
 				level, blk_stat, rec_base);
-		*top_off += rec_size;
+		*top_off += *last_rec_size;
 		*last_keysz += tkeycmpc;
-		rec_base += rec_size;
-		*last_rec_size = rec_size;
+		rec_base += *last_rec_size;
 		if ((cdb_sc_starrecord == status) && (*top_off == cur_blk_size))
 			break;
 		if (cdb_sc_normal != status)

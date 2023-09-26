@@ -44,7 +44,7 @@
 #include "gtm_tls.h"
 #endif
 
-GBLREF boolean_t		prin_in_dev_failure, prin_out_dev_failure;
+GBLREF boolean_t		prin_dm_io, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF io_pair			io_curr_device, io_std_device;
 GBLREF mstr			chset_names[];
 GBLREF mval			dollar_zstatus;
@@ -486,10 +486,13 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	if (0 >= dsocketptr->n_socket)
 	{
-		if (iod == io_std_device.out)
+		if ((iod == io_std_device.out) && (!prin_dm_io))
 			ionl_write(v);
 		else
+		{
+			prin_out_dev_failure = TRUE;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOSOCKETINDEV);
+		}
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}

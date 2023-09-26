@@ -51,7 +51,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	if (!((link_info *)lnk->usr)->server_supports_long_names && (PRE_V5_MAX_MIDENT_LEN < strlen((char *)gv_currkey->base)))
 	{
 		end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
-		RTS_ERROR_ABT(VARLSTCNT(14) ERR_UNIMPLOP, 0,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(14) ERR_UNIMPLOP, 0,
 			ERR_TEXT, 2,
 			LEN_AND_LIT("GT.CM server does not support global names longer than 8 characters"),
 			ERR_GVIS, 2, end - buff, buff,
@@ -90,7 +90,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	}
 	if ((CMMS_Q_GET == query_code)
 			|| (CMMS_Q_INCREMENT == query_code)
-			|| (CMMS_Q_QUERY == query_code) && ((link_info *)lnk->usr)->query_is_queryget)
+			|| ((CMMS_Q_QUERY == query_code) && ((link_info *)lnk->usr)->query_is_queryget))
 		max_reply_len = lnk->mbl + SIZEOF(unsigned short) + MAX_DBSTRLEN; /* can't predict the length of data value */
 	else
 		max_reply_len = lnk->mbl;
@@ -145,7 +145,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		if (reply_code != *ptr)
 		{
 			if (*ptr != CMMS_E_ERROR)
-				RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			gvcmz_errmsg(lnk,FALSE);
 		}
 		return;
@@ -155,7 +155,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		if ((CMMS_R_UNDEF != *ptr) || ((CMMS_Q_GET != query_code) && (CMMS_Q_INCREMENT != query_code)))
 		{
 			if (CMMS_E_ERROR != *ptr)
-				RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			gvcmz_errmsg(lnk, FALSE);
 		}
 		if (CMMS_Q_INCREMENT == query_code)
@@ -167,7 +167,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	{
 		CM_GET_SHORT(temp_short, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 		if (1 != temp_short)
-			RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADSRVRNETMSG);
 		ptr += SIZEOF(short);
 		status = *ptr;	/* Temp assignment to status gets rid of compiler warning in MV_FORCE_MVAL macro */
 		MV_FORCE_MVAL(v, status);
@@ -183,7 +183,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		} else
 		{
 			if (*ptr++ != gv_cur_region->cmx_regnum)
-				RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADSRVRNETMSG);
 #ifdef DEBUG
 			CM_GET_USHORT(srv_buff_size, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 			assert(srv_buff_size == gv_altkey->top);
@@ -210,9 +210,9 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 			return;
 		}
 	}
-	assert(CMMS_R_GET == reply_code
-		|| CMMS_R_INCREMENT == reply_code
-		|| CMMS_R_QUERY == reply_code && ((link_info *)lnk->usr)->query_is_queryget && 1 < len);
+	assert((CMMS_R_GET == reply_code)
+		|| (CMMS_R_INCREMENT == reply_code)
+		|| ((CMMS_R_QUERY == reply_code) && ((link_info *)lnk->usr)->query_is_queryget && (1 < len)));
 	CM_GET_SHORT(len, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 	ptr += SIZEOF(unsigned short);
 	assert(ptr >= stringpool.base && ptr + len < stringpool.top); /* incoming message is in stringpool */

@@ -145,7 +145,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 			{
 				cp++;
 				chtmp = TOUPPER(*cp);
-				isdolar = (3 <= c_top - cp && 'C' == chtmp || '(' == cp[1]);
+				isdolar = (((3 <= c_top - cp) && ('C' == chtmp)) || ('(' == cp[1]));
 				if (!isdolar)
 					isdolar = (5 <= c_top - cp && 'Z' == chtmp && 'C' == cp[1] && 'H' == cp[2] && '(' == cp[3]);
 				if (!isdolar)

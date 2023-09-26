@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2017 Fidelity National Information	*
+ * Copyright (c) 2004-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,9 @@ void t_abort(gd_region *reg, sgmnt_addrs *csa)
 {
 #	ifdef DEBUG
 	uint4		save_dollar_tlevel;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 #	endif
 
 	assert(!dollar_tlevel);
@@ -60,6 +63,7 @@ void t_abort(gd_region *reg, sgmnt_addrs *csa)
 	 * 	b) DSE where a CRIT SEIZE had been done on this region previously
 	 * csa->hold_onto_crit is TRUE in both cases.
 	 */
+	DEBUG_ONLY(TREF(donot_commit) = FALSE;)
 	if (csa->now_crit && !csa->hold_onto_crit)
 		rel_crit(reg);
 	/* If this transaction had a cdb_sc_reorg_encrypt restart, but we later decided to abort it, we still

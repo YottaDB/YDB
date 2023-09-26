@@ -1,3 +1,14 @@
+/****************************************************************
+ *								*
+ * Copyright (c) 2013-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ *	This source code contains the intellectual property	*
+ *	of its copyright holder(s), and is made available	*
+ *	under a license.  If you do not know the terms of	*
+ *	the license, please stop and do not read further.	*
+ *								*
+ ****************************************************************/
 /* md5hash.c is adapted to work with FIS GT.M (http://fis-gtm.com) from
  * source code at http://cvsweb.xfree86.org/cvsweb/cvs/lib/md5.c?rev=1.1.1.2
  * to which no claim of Copyright was made by the authors. No claim of
@@ -115,10 +126,10 @@ cvs_MD5Update (ctx, buf, len)
 
 		t = 64-t;
 		if (len < t) {
-			memcpy(p, buf, len);
+			memcpy((void *)p, buf, len);
 			return;
 		}
-		memcpy(p, buf, t);
+		memcpy((void *)p, buf, t);
 		cvs_MD5Transform (ctx->buf, ctx->in);
 		buf += t;
 		len -= t;

@@ -53,6 +53,7 @@ ZOS_ONLY(GBLREF	char	*gtm_utf8_locale_object;)
 GBLREF boolean_t		gtm_dist_ok_to_use;
 GBLREF char			gtm_dist[GTM_PATH_MAX];
 GBLREF	volatile boolean_t	timer_in_handler;
+GBLREF mstr			dollar_zicuver;
 
 typedef void (*icu_func_t)();	/* a generic pointer type to the ICU function */
 
@@ -235,6 +236,8 @@ void gtm_icu_init(void)
 	intrpt_state_t  prev_intrpt_state;
 
 	assert(!gtm_utf8_mode);
+	dollar_zicuver.addr = (char *) malloc(MAX_ICU_VERSION_STRLEN);
+	memset(dollar_zicuver.addr, 0, MAX_ICU_VERSION_STRLEN);
 #	ifdef __MVS__
 	if (gtm_utf8_locale_object)
 		locale = setlocale(LC_CTYPE, gtm_utf8_locale_object);
@@ -249,7 +252,7 @@ void gtm_icu_init(void)
 	chset = nl_langinfo(CODESET);
 	if (NULL == chset)	/* 4SCA : null return nl_langinfo not possible */
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_LIT("<undefined>"));
-	if ((NULL == locale) || (0 != strcasecmp(chset, "utf-8")) && (0 != strcasecmp(chset, "utf8")))
+	if ((NULL == locale) || ((0 != strcasecmp(chset, "utf-8")) && (0 != strcasecmp(chset, "utf8"))))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_STR(chset));
 	/* By default, GT.M will henceforth expect that ICU has been built with symbol renaming disabled. If that is not the case,
 	 * GT.M can be notified of this through an environment variable (macro GTM_ICU_VERSION).  The variable should contain the
@@ -490,12 +493,12 @@ void gtm_icu_init(void)
 		 * an appropriate value in the environment then the version check would have happened before and there isn't any
 		 * need to repeat it again.
 		 */
-		if (!gtm_icu_ver_defined && (FALSE == icu_getversion_found) && (0 == strcmp(cur_icu_fname, GET_ICU_VERSION_FNAME)))
+		if (!icu_getversion_found && (0 == strcmp(cur_icu_fname, GET_ICU_VERSION_FNAME)))
 		{
 			icu_getversion_found = TRUE;
 			memset(icu_version, 0, MAX_ICU_VERSION_LENGTH);
 			fptr(icu_version);
-			if (!(IS_ICU_VER_GREATER_THAN_MIN_VER(icu_version[0], icu_version[1])))
+			if (!gtm_icu_ver_defined && !(IS_ICU_VER_GREATER_THAN_MIN_VER(icu_version[0], icu_version[1])))
 			{
 				/* Construct the first part of the ICUVERLT36 error message. */
 				SNPRINTF(tmp_errstr, SIZEOF(ICU_LIBNAME) + STR_LIT_LEN(ICU_LIBNAME_SUFFIX), "%s%s", ICU_LIBNAME,
@@ -503,6 +506,10 @@ void gtm_icu_init(void)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_ICUVERLT36, 4,
 					LEN_AND_STR(tmp_errstr), icu_version[0], icu_version[1]);
 			}
+			dollar_zicuver.len = SNPRINTF(dollar_zicuver.addr, MAX_ICU_VERSION_STRLEN, "%hu.%hu",
+				icu_version[0], icu_version[1]);
+			if (MAX_ICU_VERSION_STRLEN <= dollar_zicuver.len)
+				dollar_zicuver.len = MAX_ICU_VERSION_STRLEN - 1;
 		}
 	}
 	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);

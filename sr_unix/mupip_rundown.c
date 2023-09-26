@@ -145,7 +145,7 @@ void mupip_rundown(void)
 		if ((jnlpool_rndwn_required = (region && mu_star_specified)) || anticipatory_freeze_available) /* note:assigmnent */
 		{
 			/* sets replpool_id/full_len; note: assignment */
-			if (DEBUG_ONLY(repl_inst_available = )REPL_INST_AVAILABLE(NULL))
+			if ((DEBUG_ONLY(repl_inst_available = )REPL_INST_AVAILABLE(NULL)))
 			{
 				instfilename = &replpool_id.instfilename[0];
 				if (!mu_rndwn_repl_instance(&replpool_id, !anticipatory_freeze_available, TRUE,

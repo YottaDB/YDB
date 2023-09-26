@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -143,7 +143,7 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 		}
 		errno = 0;
 		port = ATOI(port_str);
-		if ((0 == port) && (0 != errno) || (0 >= port))
+		if (((0 == port) && (0 != errno)) || (0 >= port))
 			return CMI_BADIPADDRPORT;
 	} else
 	{	/* neither host nor port is specified */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2021 Fidelity National Information	*
+ * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,6 +56,7 @@ error_def(ERR_TLSCLOSE);
 
 void	repl_log_tls_info(FILE *logfp, gtm_tls_socket_t *socket);
 int 	repl_do_tls_handshake(FILE *logfp, int sock_fd, boolean_t do_accept, int *poll_direction);
+int	repl_do_tls_post_handshake(FILE *logfp, int sock_fd);
 void	repl_do_tls_init(FILE *logfp);
 
 #endif	/* GTM_TLS */

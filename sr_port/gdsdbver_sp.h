@@ -42,4 +42,5 @@ ENUM_ENTRY(GDSMV70000),		/* 25 - Changed GT.M to use 64-bit block numbers, requi
 ENUM_ENTRY(GDSMV70001),		/* 26 - GTM-9131 new statsdb_allocation option & GTM-8681 Backup Timestamp in file header */
 ENUM_ENTRY(GDSMV70002),		/* 27 - GTM-9426 - Automatically split database blocks based upon restarts... */
 ENUM_ENTRY(GDSMV71001),		/* 28 - Change default proactive block split threshhold */
+ENUM_ENTRY(GDSMV71002),		/* 29 - Make full use of the index reserved bytes field */
 ENUM_ENTRY(GDSMVLAST)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -310,7 +310,7 @@ void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	 * accordingly.
 	 */
 	assert(((NULL == jnlpool) || (NULL == jnlpool->jnlpool_dummy_reg)) || (NULL == recvpool.recvpool_dummy_reg)
-		|| (NULL != jnlpool) && (jnlpool->jnlpool_dummy_reg == recvpool.recvpool_dummy_reg));
+		|| ((NULL != jnlpool) && (jnlpool->jnlpool_dummy_reg == recvpool.recvpool_dummy_reg)));
 	DEBUG_ONLY(
 		reg = jnlpool ? jnlpool->jnlpool_dummy_reg : NULL;
 		if (NULL == reg)
@@ -602,7 +602,8 @@ int4	repl_inst_histinfo_find_seqno(seq_num seqno, int4 strm_idx, repl_histinfo *
 	assert(0 != seqno);
 	inst_hdr = jnlpool->repl_inst_filehdr;
 	assert(NULL != inst_hdr);
-	assert((INVALID_SUPPL_STRM == strm_idx) || inst_hdr->is_supplementary && (0 <= strm_idx) && (MAX_SUPPL_STRMS > strm_idx));
+	assert((INVALID_SUPPL_STRM == strm_idx)
+			|| (inst_hdr->is_supplementary && (0 <= strm_idx) && (MAX_SUPPL_STRMS > strm_idx)));
 	assert(inst_hdr->num_histinfo <= inst_hdr->num_alloc_histinfo);
 	if (INVALID_SUPPL_STRM == strm_idx)
 		histnum = inst_hdr->num_histinfo - 1;
@@ -701,7 +702,7 @@ void	repl_inst_histinfo_add(repl_histinfo *histinfo)
 	 */
 	assert((0 < histinfo_num) || (0 == strm_idx));
 	is_supplementary = jnlpool->repl_inst_filehdr->is_supplementary;
-	assert(!is_supplementary && (0 == strm_idx) || (is_supplementary && (0 <= strm_idx) && (MAX_SUPPL_STRMS > strm_idx)));
+	assert((!is_supplementary && (0 == strm_idx)) || (is_supplementary && (0 <= strm_idx) && (MAX_SUPPL_STRMS > strm_idx)));
 	/* If -updateresync is specified and instance is not supplementary, then there better be NO history records */
 	assert((HISTINFO_TYPE_UPDRESYNC != histinfo->history_type) || is_supplementary || (0 == histinfo_num));
 	assert(NULL != jnlpool->jnlpool_ctl);
@@ -776,7 +777,7 @@ void	repl_inst_histinfo_add(repl_histinfo *histinfo)
 		if (histinfo_strm_seqno == prev_strm_seqno)
 		{
 			start_seqno_equal = (histinfo->start_seqno == last_strm_histinfo->start_seqno);
-			if (histinfo_strm_seqno && strm_idx || start_seqno_equal)
+			if ((histinfo_strm_seqno && strm_idx) || start_seqno_equal)
 			{
 				assert(prev_histinfo_num > last_strm_histinfo->prev_histinfo_num);
 				prev_histinfo_num = last_strm_histinfo->prev_histinfo_num;
@@ -833,7 +834,7 @@ void	repl_inst_histinfo_add(repl_histinfo *histinfo)
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 	{
 		assert((jnlpool->repl_inst_filehdr->last_histinfo_num[idx] < histinfo_num)
-			|| (idx == strm_idx) && (jnlpool->repl_inst_filehdr->last_histinfo_num[idx] == histinfo_num));
+			|| ((idx == strm_idx) && (jnlpool->repl_inst_filehdr->last_histinfo_num[idx] == histinfo_num)));
 		histinfo->last_histinfo_num[idx] = jnlpool->repl_inst_filehdr->last_histinfo_num[idx];
 	}
 	if (strm_histinfo_num == histinfo_num)

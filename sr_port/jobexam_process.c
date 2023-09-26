@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -146,7 +146,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec, mval *fmt)
 	{
 		assert(0 <= saved_util_outbuff_len);
 		assert(saved_util_outbuff_len <= SIZEOF(saved_util_outbuff));
-		memcpy(saved_util_outbuff, TREF(util_outbuff_ptr), saved_util_outbuff_len);
+		memcpy((void *)saved_util_outbuff, TREF(util_outbuff_ptr), saved_util_outbuff_len);
 	}
 	jobexam_dump(input_dump_file_name, dump_file_spec, save_dump_file_name_buff, fmt);
 	/* If any errors occur in job_exam_dump, the condition handler will unwind the stack to this point and return.  */
@@ -215,7 +215,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
 	if (process_exiting)
 	{
 		assert(GTM_PATH_MAX >= dump_file_spec->str.len);
-		memcpy(fatal_file_name_buff, dump_file_spec->str.addr, dump_file_spec->str.len);
+		memcpy((void *)fatal_file_name_buff, dump_file_spec->str.addr, dump_file_spec->str.len);
 		dump_file_spec->str.addr = fatal_file_name_buff;
 	}
 	/* Parms of file to be created (newversion) */

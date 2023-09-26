@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2020 Fidelity National Information	*
+ * Copyright (c) 2004-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -112,7 +112,7 @@ GBLREF	boolean_t	gv_play_duplicate_kills;
  */
 #define	IS_OK_TO_INVOKE_GVCST_KILL(GVT)											\
 (															\
-	DBG_ASSERT(!jgbl.forw_phase_recovery || gv_play_duplicate_kills GTMTRIG_ONLY(&& IS_EXPLICIT_UPDATE_NOASSERT))	\
+	DBG_ASSERT(!jgbl.forw_phase_recovery || (gv_play_duplicate_kills GTMTRIG_ONLY(&& IS_EXPLICIT_UPDATE_NOASSERT)))	\
 	DBG_ASSERT(!jgbl.forw_phase_recovery || gv_target->root || (JS_IS_DUPLICATE & jgbl.mur_jrec_nodeflags)		\
 			|| jgbl.mur_options_forward)									\
 	(GVT->root || (gv_play_duplicate_kills GTMTRIG_ONLY(&& IS_EXPLICIT_UPDATE_NOASSERT)))				\

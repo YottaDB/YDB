@@ -18,7 +18,7 @@
 #include <sys/types.h>
 #include "gdsdbver.h"
 
-#define BML_LEVL ((unsigned char)-1)
+#define BML_LEVL ((unsigned char)(~0x0))
 
 #define CST_BSIZ(b)		((b)->bsiz - SIZEOF(blk_hdr))
 #define CST_RSIZ(r)		((r)->rsiz - SIZEOF(rec_hdr))

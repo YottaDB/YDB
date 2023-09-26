@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -183,7 +183,7 @@ void gtm_startup(struct startup_vector *svec)
 	MV_FORCE_STRD(&(TREF(tpnotacidtime)));
 	assert(6 >= (TREF(tpnotacidtime)).str.len);
 	temp = malloc((TREF(tpnotacidtime)).str.len);
-	memcpy(temp, (TREF(tpnotacidtime)).str.addr, (TREF(tpnotacidtime)).str.len);
+	memcpy((void *)temp, (TREF(tpnotacidtime)).str.addr, (TREF(tpnotacidtime)).str.len);
 	(TREF(tpnotacidtime)).str.addr = temp;
 	TREF(compile_time) = FALSE;
 	/* assert that is_replicator and run_time is properly set by gtm_imagetype_init invoked at process entry */

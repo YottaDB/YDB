@@ -156,9 +156,9 @@ int m_set(void)
 	 * and will trigger an error. This is because the source and targets of aliases require different values and references
 	 * than normal sets do and thus cannot be mixed.
 	 */
-	if (alias_processing = (TK_ASTERISK == TREF(window_token)))
+	if ((alias_processing = (TK_ASTERISK == TREF(window_token))))
 		advancewindow();
-	if (got_lparen = (TK_LPAREN == TREF(window_token)))
+	if ((got_lparen = (TK_LPAREN == TREF(window_token))))
 	{
 		if (alias_processing)
 			stx_error(ERR_NOALIASLIST);
@@ -531,7 +531,7 @@ int m_set(void)
 					assert(TRIP_REF == firstval.oprclass);
 				}
 				first->operand[0] = firstval;
-				if (first_is_lit = (OC_ILIT == firstval.oprval.tref->opcode))
+				if ((first_is_lit = (OC_ILIT == firstval.oprval.tref->opcode)))
 				{
 					assert(ILIT_REF ==firstval.oprval.tref->operand[0].oprclass);
 					first_val_lit = firstval.oprval.tref->operand[0].oprval.ilit;
@@ -628,7 +628,7 @@ int m_set(void)
 					 * lacking, branch around the getchain and the actual store so we avoid
 					 * setting the naked indicator so far as the target gvn is concerned.
 					 */
-					if (last_is_lit = (OC_ILIT == lastval.oprval.tref->opcode))	/* NOTE assignment */
+					if ((last_is_lit = (OC_ILIT == lastval.oprval.tref->opcode)))	/* NOTE assignment */
 					{	/* Case 1: last is a literal */
 						assert(ILIT_REF == lastval.oprval.tref->operand[0].oprclass);
 						last_val_lit = lastval.oprval.tref->operand[0].oprval.ilit;

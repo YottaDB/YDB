@@ -314,6 +314,19 @@ LITREF	mval	literal_null;
 			LEN_AND_LIT(SUBSCRIPT), ERR_TEXT, 2, RTS_ERROR_TEXT(MOREINFO));	\
 }
 
+/* This macro is used to give SCA info on size of the buf used in the memcpy().
+ * (More memory may be actually be allocated than is used by the "len" in the memcpy(), which is OK
+ * Hinting to SCA is done with dynamic typedefs which are only in scope in the macro context */
+#define ASSIGN_GVTR_SUBS_RANGE_KEYS(LEN,KEY_FIELD)										\
+{																\
+	typedef char new_elem_block[DIVIDE_ROUND_UP(LEN, GVTR_LIST_ELE_SIZE)];							\
+	typedef new_elem_block *new_elem_block_p;										\
+	new_elem_block_p dststart;												\
+	dststart = (new_elem_block_p) get_new_element(gvt_trigger->gv_trig_list, DIVIDE_ROUND_UP(LEN, GVTR_LIST_ELE_SIZE));	\
+	memcpy((char *) dststart, out_key->base, LEN);										\
+	subsdsc->KEY_FIELD = (char *) dststart;											\
+}
+
 /* This code is modeled around "updproc_ch" in updproc.c */
 CONDITION_HANDLER(gvtr_tpwrap_ch)
 {
@@ -496,9 +509,7 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 			assert(gvt_trigger);
 			len = out_key->end;	/* keep trailing 0 */
 			subsdsc->gvtr_subs_point.len = len;
-			dststart = (char *)get_new_element(gvt_trigger->gv_trig_list, DIVIDE_ROUND_UP(len, GVTR_LIST_ELE_SIZE));
-			memcpy(dststart, out_key->base, len);
-			subsdsc->gvtr_subs_point.subs_key = dststart;
+			ASSIGN_GVTR_SUBS_RANGE_KEYS(len,gvtr_subs_point.subs_key);
 			subsdsc->gvtr_subs_point.next_range = NULL;
 			subsdsc->gvtr_subs_type = GVTR_SUBS_POINT;
 			break;
@@ -509,10 +520,7 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 				assert(gvt_trigger);
 				len = out_key->end;	/* keep trailing 0 */
 				assert(len);
-				dststart = (char *)get_new_element(gvt_trigger->gv_trig_list,
-									DIVIDE_ROUND_UP(len, GVTR_LIST_ELE_SIZE));
-				memcpy(dststart, out_key->base, len);
-				subsdsc->gvtr_subs_range.subs_key1 = dststart;
+				ASSIGN_GVTR_SUBS_RANGE_KEYS(len,gvtr_subs_range.subs_key1);
 				subsdsc->gvtr_subs_range.len1 = len;
 			} else
 				subsdsc->gvtr_subs_range.len1 = GVTR_RANGE_OPEN_LEN;
@@ -526,10 +534,7 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 				len = out_key->end;	/* keep trailing 0 */
 				assert(len);
 				assert(gvt_trigger);
-				dststart = (char *)get_new_element(gvt_trigger->gv_trig_list,
-									DIVIDE_ROUND_UP(len, GVTR_LIST_ELE_SIZE));
-				memcpy(dststart, out_key->base, len);
-				subsdsc->gvtr_subs_range.subs_key2 = dststart;
+				ASSIGN_GVTR_SUBS_RANGE_KEYS(len,gvtr_subs_range.subs_key2);
 				subsdsc->gvtr_subs_range.len2 = len;
 				len1 = subsdsc->gvtr_subs_range.len1;
 				if (GVTR_RANGE_OPEN_LEN != len1)
@@ -537,7 +542,7 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 					min = MIN(len1, len);
 					cmpres = memcmp(subsdsc->gvtr_subs_range.subs_key1,
 								subsdsc->gvtr_subs_range.subs_key2, min);
-					if ((0 < cmpres) || (0 == cmpres) && (len1 > len))
+					if ((0 < cmpres) || ((0 == cmpres) && (len1 > len)))
 					{	/* Invalid range. Issue error */
 						DBG_MARK_STRINGPOOL_USABLE;
 						return ERR_TRIGSUBSCRANGE;
@@ -580,7 +585,7 @@ STATICFNDEF uint4	gvtr_process_pattern(char *ptr, uint4 len, gvtr_subs_t *subsds
 	memcpy(source_buffer, ptr, len);
 	instr.addr = source_buffer;
 	instr.len = len;
-	if (status = patstr(&instr, &pat_ptstr, NULL))
+	if ((status = patstr(&instr, &pat_ptstr, NULL)))
 		return status;
 	assert(pat_ptstr.len <= MAX_PATOBJ_LENGTH);
 	len = pat_ptstr.len * SIZEOF(uint4);
@@ -602,7 +607,7 @@ STATICFNDEF uint4 gvtr_process_gvsubs(char *start, char *end, gvtr_subs_t *subsd
 	if ('?' == start[0])
 	{
 		assert(!colon_imbalance);
-		if (status = gvtr_process_pattern(start, UINTCAST(end - start), subsdsc, gvt->gvt_trigger))
+		if ((status = gvtr_process_pattern(start, UINTCAST(end - start), subsdsc, gvt->gvt_trigger)))
 			return status;
 	} else if ('*' == start[0])
 	{	/* subscript is a "*" */
@@ -612,7 +617,7 @@ STATICFNDEF uint4 gvtr_process_gvsubs(char *start, char *end, gvtr_subs_t *subsd
 		subsdsc->gvtr_subs_star.next_range = NULL;
 	} else
 	{
-		if (status = gvtr_process_range(gvt, subsdsc, colon_imbalance ? GVTR_PARSE_RIGHT : GVTR_PARSE_POINT, start, end))
+		if ((status = gvtr_process_range(gvt, subsdsc, colon_imbalance ? GVTR_PARSE_RIGHT : GVTR_PARSE_POINT, start, end)))
 		{
 			/* As of now we expect only ERR_TRIGSUBSCRANGE (which is triggered only for GVTR_PARSE_RIGHT) */
 			assert((ERR_TRIGSUBSCRANGE == status) && colon_imbalance);
@@ -1255,7 +1260,7 @@ STATICFNDEF	boolean_t	gvtr_is_key_a_match(char *keysub_start[], gv_trigger_t *tr
 					{
 						min = MIN(len1, thissublen);
 						cmpres = memcmp(subsdsc1->gvtr_subs_range.subs_key1, thissub, min);
-						if ((0 < cmpres) || (0 == cmpres) && (thissublen < len1))
+						if ((0 < cmpres) || ((0 == cmpres) && (thissublen < len1)))
 							left_side_matched = FALSE;
 					}
 					/* Check right side of range */
@@ -1267,7 +1272,7 @@ STATICFNDEF	boolean_t	gvtr_is_key_a_match(char *keysub_start[], gv_trigger_t *tr
 						{
 							min = MIN(len2, thissublen);
 							cmpres = memcmp(subsdsc1->gvtr_subs_range.subs_key2, thissub, min);
-							if ((0 > cmpres) || (0 == cmpres) && (thissublen > len2))
+							if ((0 > cmpres) || ((0 == cmpres) && (thissublen > len2)))
 								right_side_matched = FALSE;
 						}
 						if (right_side_matched)

@@ -689,6 +689,8 @@ typedef struct
 	char		tlsid[MAX_TLSKEY_LEN];
 	int4		renegotiate_interval;
 #	endif
+	int4		send_buffsize;
+	int4		recv_buffsize;
 } gtmsource_options_t;
 
 /********** Source server function prototypes **********/

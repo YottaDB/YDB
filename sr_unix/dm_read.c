@@ -247,7 +247,7 @@ void	dm_read (mval *v)
 				current_32_ptr = buffer_32_start;
 				utf8_more = tt_state->utf8_more;
 				more_ptr = tt_state->more_ptr;
-				memcpy(more_buf, tt_state->more_buf, SIZEOF(more_buf));
+				memcpy((void*)more_buf, tt_state->more_buf, SIZEOF(more_buf));
 			}
 			instr = tt_state->instr;
 			outlen = tt_state->outlen;
@@ -506,11 +506,13 @@ void	dm_read (mval *v)
 						&& ((' ' == GET_OFF(match_length)) || ('\t' == GET_OFF(match_length))))
 							matched = TRUE;		/* REC or RECALL then space or tab */
 					else if (matched)
+					{
 						if (((SIZEOF(RECALL) - 1) != match_length) && ((SIZEOF(REC) - 1) != match_length))
 							matched = FALSE;	/* wrong size */
 						else if ((outlen > match_length)
 							&& (' ' != GET_OFF(match_length) && ('\t' != GET_OFF(match_length))))
 								matched = FALSE;	/* or RECALL then not eol, space, or tab */
+					}
 					if (!matched)
 						break;		/* not RECALL so end of line */
 					match_length++;		/* get past space or tab */
@@ -841,7 +843,7 @@ void	dm_read (mval *v)
 				instr = dx_instr = outlen = dx_outlen = 0;
 				if (0 == up)
 				{
-					if (((MAX_RECALL + 1 != index) && (0 != (*(comline_base + cl)).len) || (0 == index)))
+					if (((MAX_RECALL + 1 != index) && ((0 != (*(comline_base + cl)).len) || (0 == index))))
 						index++;
 				} else
 				{

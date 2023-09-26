@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,7 @@ void ecode_set(int errnum)
 	 */
 	ecode_ptr = &ecode_buff[0];
 	*ecode_ptr++ = ',';
-	if (ectl = err_check(errnum))
+	if ((ectl = err_check(errnum)))
 	{
 		ansi_error = (((errnum & 0x0FFFFFFF) & FACMASK(ectl->facnum)) && (MSGMASK(errnum, ectl->facnum) <= ectl->msg_cnt))
 			? error_ansi[MSGMASK(errnum, ectl->facnum) - 1]	: 0;

@@ -82,7 +82,8 @@ LITREF	char		*gtm_dbversion_table[];
 
 #define	NEED_TO_DUMP(string)													\
 	(is_dse_all ? (CLI_PRESENT == cli_present("ALL"))									\
-		: (CLI_PRESENT == cli_present(string) || CLI_PRESENT == cli_present("ALL") && CLI_NEGATED != cli_present(string)))
+		: ((CLI_PRESENT == cli_present(string))										\
+			|| ((CLI_PRESENT == cli_present("ALL")) && (CLI_NEGATED != cli_present(string)))))
 
 void dse_dmp_fhead (void)
 {
@@ -130,7 +131,7 @@ void dse_dmp_fhead (void)
 		is_mm = (csd->acc_meth == dba_mm);
 		util_out_print("  Access method                                  !AD", FALSE, 2, is_mm ? "MM" : "BG");
 		util_out_print("  Global Buffers                !12UL", TRUE, csd->n_bts);
-		util_out_print("  Reserved Bytes                !19UL", FALSE, csd->reserved_bytes);
+		util_out_print("                                                   ", FALSE);
 		util_out_print("  Block size (in bytes)         !12UL", TRUE, csd->blk_size);
 		util_out_print("  Maximum record size           !19UL", FALSE, csd->max_rec_size);
 		util_out_print("  Starting VBN                  !12UL", TRUE, csd->start_vbn);
@@ -255,6 +256,8 @@ void dse_dmp_fhead (void)
 		util_out_print("  Full Block Write                         !UL", TRUE, csd->write_fullblk);
 		if(db_shares_gvstats)
 			util_out_print("  StatsDB Allocation            !19UL", TRUE, csd->statsdb_allocation);
+		util_out_print("  Data Reserved Bytes           !19UL", FALSE, csd->reserved_bytes);
+		util_out_print("  Index Reserved Bytes          !12UL", TRUE, csd->i_reserved_bytes);
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump these if -/ALL as if part of above display */

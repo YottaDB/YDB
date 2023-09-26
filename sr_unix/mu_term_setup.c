@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,7 @@ void mu_get_term_characterstics(void)
 {
 	assert(!mu_get_term_invoked);	/* No need to invoke this more than once per process. If assert fails fix second caller. */
 	mu_get_term_invoked = TRUE;
-	if (get_stdout_charc_pass = isatty(STDOUT_FILENO))
+	if ((get_stdout_charc_pass = isatty(STDOUT_FILENO)))
 	{
 		if (-1 == tcgetattr(STDOUT_FILENO, &tty_settings))
 		{
@@ -43,7 +43,7 @@ void mu_get_term_characterstics(void)
 			PERROR("tcgetattr :");
 			FPRINTF(stderr, "Unable to get terminal characterstics for standard out\n");
 		}
-	} else if (get_stderr_charc_pass = isatty(STDERR_FILENO))
+	} else if ((get_stderr_charc_pass = isatty(STDERR_FILENO)))
 	{
 		if (-1 == tcgetattr(STDERR_FILENO, &tty_settings))
 		{

@@ -266,7 +266,7 @@ void bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 			/* Bitmap block should be the only block updated in this transaction. The only exception is if the
 			 * previous cw-set-element is of type gds_t_busy2free (which does not go through bg_update) */
 			assert((1 == cw_set_depth)
-				|| (2 == cw_set_depth) && (gds_t_busy2free == (cs-1)->old_mode));
+				|| ((2 == cw_set_depth) && (gds_t_busy2free == (cs-1)->old_mode)));
 			/* When deleting pre-V7m index blocks, decrement blks_to_upgrd */
 			if (!mu_upgrade_in_prog && (0 != inctn_detail.blknum_struct.blknum)
 					&& (!cs_data->fully_upgraded && (GDSV6 < cs_data->desired_db_format))
@@ -526,7 +526,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		if (NULL == cr)
 		{	/* no cache_rec associated with the block */
 			assert(((gds_t_acquired == mode) && (!read_before_image || (NULL == cs->old_block)))
-					|| (gds_t_acquired != mode) && (NULL != cs->new_buff));
+					|| ((gds_t_acquired != mode) && (NULL != cs->new_buff)));
 			INCR_DB_CSH_COUNTER(csa, n_bg_update_creates, 1);
 			cr = db_csh_getn(blkid);
 #			ifdef DEBUG
@@ -579,7 +579,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			 *	b) the buffer has already been constructed in private memory (cse->new_buff is non-NULL)
 			 */
 			assert(((gds_t_acquired == mode) && (!read_before_image || (NULL == cs->old_block)))
-					|| (gds_t_acquired != mode) && (NULL != cs->new_buff));
+					|| ((gds_t_acquired != mode) && (NULL != cs->new_buff)));
 			read_finished = wcs_read_in_progress_wait(cr, WBTEST_BG_UPDATE_READINPROGSTUCK1);
 			if (!read_finished)
 			{
@@ -647,7 +647,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			 */
 			assert(process_id != cr->in_tend);
 			assert(((gds_t_acquired == mode) && (!read_before_image || (NULL == cs->old_block)))
-					|| (gds_t_acquired != mode) && ((NULL != cs->new_buff) || mu_upgrade_in_prog));
+					|| ((gds_t_acquired != mode) && ((NULL != cs->new_buff) || mu_upgrade_in_prog)));
 			intend_finished = wcs_phase2_commit_wait(csa, cr);
 			GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_INTENDSTUCK, intend_finished, 0);
 			if (!intend_finished)
@@ -877,7 +877,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			 *	(b) the buffer has already been constructed in private memory
 			 */
 			assert(((gds_t_acquired == mode) && (!read_before_image || (NULL == cs->old_block)))
-					|| (gds_t_acquired != mode) && (NULL != cs->new_buff));
+					|| ((gds_t_acquired != mode) && (NULL != cs->new_buff)));
 			read_finished = wcs_read_in_progress_wait(cr, WBTEST_BG_UPDATE_READINPROGSTUCK2);
 			if (!read_finished)
 			{
@@ -963,7 +963,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	}
 	/* generic dse_running variable below is used for caller == dse_maps */
 	assert((gds_t_writemap != mode) || dse_running || mu_upgrade_in_prog
-		|| cr->twin || (CR_BLKEMPTY == cs->cr->blk) || (cs->cr == cr) && (cs->cycle == cr->cycle));
+		|| cr->twin || (CR_BLKEMPTY == cs->cr->blk) || ((cs->cr == cr) && (cs->cycle == cr->cycle)));
 	/* Before marking this cache-record dirty, record the value of cr->dirty into cr->tn.
 	 * This is used in phase2 to determine "recycled".
 	 */
@@ -1631,7 +1631,8 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 			next_rec_shrink = 0;
 		}
 		blk_size = cs_data->blk_size;	/* "blk_size" is also used by the BLK_FINI macro below */
-		blk_fill_size = (blk_size * gv_fillfactor) / 100 - cs_data->reserved_bytes;
+		blk_fill_size = (blk_size * gv_fillfactor) / 100 -
+			(cse->level ? cs_data->i_reserved_bytes : cs_data->reserved_bytes);
 		if ((cur_blk_size + delta) > blk_fill_size)
 		{
 			BG_TRACE_PRO_ANY(csa, recompute_upd_array_blk_split);

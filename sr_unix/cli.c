@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,8 +50,8 @@ boolean_t cli_get_hex(char *entry, uint4 *dst)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(strlen(entry) > 0);
-	strncpy(local_str, entry, SIZEOF(local_str) - 1);
+	assert((strlen(entry) > 0) && (strlen(entry) < SIZEOF(local_str)));
+	snprintf(local_str, sizeof(local_str), "%s", entry);
 	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
 	if ((cli_present(local_str) == CLI_PRESENT) && cli_get_value(local_str, buf))
 	{

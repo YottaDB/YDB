@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,6 +92,7 @@ void dollarx(io_desc *io_ptr, unsigned char *str, unsigned char *strtop)
 					case NATIVE_BS:
 						/* if bs at beginning of string but x > 0 need image of line */
 						if (io_ptr->dollar.x > 0)
+						{
 #ifdef UTF8_SUPPORTED
 							if (utf8_term)
 							{
@@ -113,6 +114,7 @@ void dollarx(io_desc *io_ptr, unsigned char *str, unsigned char *strtop)
 							} else
 #endif
 								io_ptr->dollar.x--;
+						}
 						str = strnext;
 						utf8_crlast = FALSE;
 						break;

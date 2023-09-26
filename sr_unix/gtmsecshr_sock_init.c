@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,12 +79,14 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 	if (!process_id)
 		getjobnum();
 	if (!gtm_dist_ok_to_use)
+	{
 		if (SERVER == caller)
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
 					gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 		else
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
 					gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+	}
 	secshrsock_lognam.addr = GTMSECSHR_SOCK_DIR;
 	secshrsock_lognam.len = SIZEOF(GTMSECSHR_SOCK_DIR) - 1;
 	/* Get the maximum size of the path excluding the socket filename */

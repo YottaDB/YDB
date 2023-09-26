@@ -287,7 +287,7 @@ int cmd(void)
 			unuse_literal(v);
 			dqdel(triptr, exorder);				/* if it's TRUE, so just pretend it never appeared */
 		}
-		if (shifting = ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode)))
+		if ((shifting = ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode))))
 		{	/* NOTE - assignment above */
 			temp_expr_start = TREF(expr_start);
 			triptr = newtriple(OC_GVRECTARG);

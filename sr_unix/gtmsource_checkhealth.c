@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2019 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,6 +53,7 @@ GBLREF	gd_addr			*gd_header;
 error_def(ERR_NOTALLDBOPN);
 error_def(ERR_REPLJNLCLOSED);
 error_def(ERR_SRCSRVNOTEXIST);
+error_def(ERR_TEXT);
 
 int gtmsource_checkhealth(void)
 {
@@ -161,8 +162,10 @@ int gtmsource_checkhealth(void)
 				assert(!JNL_ENABLED(csd) || REPL_ENABLED(csd));	/* || is for turning replication on concurrently */
 				reg_seqno = csd->reg_seqno;
 				jnlseqno = (NULL != jnlpool->jnlpool_ctl) ? jnlpool->jnlpool_ctl->jnl_seqno : MAX_SEQNO;
-				sgtm_putmsg(errtxt, OUT_BUFF_SIZE, VARLSTCNT(8) ERR_REPLJNLCLOSED, 6, DB_LEN_STR(reg),
-					&reg_seqno, &reg_seqno, &jnlseqno, &jnlseqno);
+				sgtm_putmsg(errtxt, OUT_BUFF_SIZE, VARLSTCNT(12) ERR_REPLJNLCLOSED, 6, DB_LEN_STR(reg),
+					&reg_seqno, &reg_seqno, &jnlseqno, &jnlseqno, ERR_TEXT, 2,
+					RTS_ERROR_TEXT("Replication will continue using records in the replication journal pool,"
+					" but will fail if operation requires access to journal files"));
 				repl_log(stderr, FALSE, TRUE, errtxt);
 				status |= SRV_ERR;
 			}

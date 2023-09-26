@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2011-2021 Fidelity National Information		#
+# Copyright (c) 2011-2023 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -208,7 +208,8 @@ set tmp_dist = "$gtm_ver/tmp_dist"
 set install = "$gtm_ver/install"
 set dist_prefix = "${product}_${version}_${osname}_${arch}"
 set mnotdistributed = '{CHK2LEV,CHKOP,GENDASH,GENOUT,GETNEAR,GTMDEFINEDTYPESTODB,GTMHLPLD,GTMTHREADGBLASM,LOAD,LOADOP,LOADVX,MSG,TTTGEN,TTTSCAN,UNLOAD}.[om] GDE*.m' #BYPASSOKLENGTH
-set notdistributed = '_*.o *.log map obj plugin/libgtm* plugin/gpgagent.tab plugin/gtmcrypt/maskpass plugin/r plugin/o'
+set notdistributed = '_*.o *.log map obj plugin/libgtm* plugin/*.tab plugin/gtmcrypt/maskpass{,.debug} plugin/r plugin/o'
+set misc_notdistributed = "gtcm_{pkdisp,play,shmclean}{,.debug}"
 set utf8_notdistributed = '_*.o *.m *.log map obj [a-z]*'
 
 if (-d $dist || -d $tmp_dist || -d $install) then
@@ -262,9 +263,9 @@ foreach image ($imagetype)
 
 	endif
 	echo ""
-	echo "Removing files that are not distributed (${notdistributed} ${mnotdistributed})"
-	set rm_from_dist = "$rm_from_dist `echo $mnotdistributed`"
-	/bin/rm -rf ${notdistributed} ${mnotdistributed} || exit 9
+	echo "Removing files that are not distributed (${notdistributed} ${mnotdistributed} ${misc_notdistributed})"
+	set rm_from_dist = "$rm_from_dist `echo $mnotdistributed $misc_notdistributed`"
+	/bin/rm -rf ${notdistributed} ${mnotdistributed} ${misc_notdistributed} || exit 9
 	if (-e utf8) then
 		cd utf8
 		/bin/rm -rf ${utf8_notdistributed} ${mnotdistributed} || exit 9

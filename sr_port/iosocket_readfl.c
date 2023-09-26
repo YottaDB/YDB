@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,7 @@
 #endif
 
 GBLREF	bool			out_of_time;
-GBLREF	boolean_t		gtm_utf8_mode, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF	boolean_t		gtm_utf8_mode, prin_dm_io, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF	int			socketus_interruptus;
 GBLREF	io_pair 		io_curr_device, io_std_device;
 GBLREF	mstr			chset_names[];
@@ -155,7 +155,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 	dsocketptr = (d_socket_struct *)(iod->dev_sp);
 	if (0 >= dsocketptr->n_socket)
 	{
-		if (iod == io_std_device.in)
+		if ((iod == io_std_device.in) && (!prin_dm_io))
 		{
 			result = ionl_readfl(v, width, msec_timeout);
 			REVERT_GTMIO_CH(&iod->pair, ch_set);

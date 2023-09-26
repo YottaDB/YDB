@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1276,8 +1276,8 @@ static	tr_search_state_t do_binary_search(repl_ctl_element *ctl, uint4 lo_addr, 
 
 			case TR_FIND_WOULD_BLOCK:
 				assert(mid == ROUND_DOWN(high, REPL_BLKSIZE(rb))); /* must be the last block for this retval */
-				assert(ctl->file_state == JNL_FILE_OPEN || /* file that is yet to grow, or truncated file */
-					ctl->file_state == JNL_FILE_CLOSED && 0 != fc->jfh->prev_recov_end_of_data);
+				assert((ctl->file_state == JNL_FILE_OPEN) /* file that is yet to grow, or truncated file */
+					|| ((ctl->file_state == JNL_FILE_CLOSED) && (0 != fc->jfh->prev_recov_end_of_data)));
 				if (srch_status->seqno != 0)
 				{ /* journal flush yet to be done, or truncated file's end_of_data reached, can't locate seqno */
 					assert(read_seqno > srch_status->seqno);
@@ -1787,9 +1787,9 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 							ctl->prev->jnl_fn, INT8_PRINT(ctl->prev->max_seqno));
 					REPL_DPRINT3(") and %s (min seqno "INT8_FMT, ctl->jnl_fn, INT8_PRINT(ctl->min_seqno));
 					REPL_DPRINT2(") found while looking for "INT8_FMT"\n", INT8_PRINT(read_jnl_seqno));
-					assert((JNL_FILE_CLOSED == ctl->prev->file_state)
-						&& (ctl->prev->max_seqno < read_jnl_seqno)
-							|| (JNL_FILE_EMPTY == ctl->prev->file_state));
+					assert(((JNL_FILE_CLOSED == ctl->prev->file_state)
+							&& (ctl->prev->max_seqno < read_jnl_seqno))
+						|| (JNL_FILE_EMPTY == ctl->prev->file_state));
 					found = TR_WILL_NOT_BE_FOUND;
 					continue;
 				}

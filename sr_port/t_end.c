@@ -258,8 +258,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	/* Currently, the only callers of t_end with NULL histories are the update process and journal recovery when they
 	 * are about to process a JRT_NULL record. Assert that.
 	 */
-	assert((hist1 != hist2) || (ERR_JRTNULLFAIL == t_err) && (NULL == hist1)
-					&& update_trans && (is_updproc || jgbl.forw_phase_recovery));
+	assert((hist1 != hist2) || ((ERR_JRTNULLFAIL == t_err) && (NULL == hist1)
+					&& update_trans && (is_updproc || jgbl.forw_phase_recovery)));
 #	ifdef DEBUG
 	/* Store global variable ready2signal_gvundef in a local variable and reset the global right away to ensure that
 	 * the global value does not incorrectly get carried over to the next call of "t_end".
@@ -683,7 +683,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			 * indicates which type of freeze it is. Assert based on that.
 			 */
 			assert(!cnl->freezer_waited_for_kip
-				|| (inctn_bmp_mark_free_gtm != inctn_opcode) && (inctn_bmp_mark_free_mu_reorg != inctn_opcode));
+				|| ((inctn_bmp_mark_free_gtm != inctn_opcode) && (inctn_bmp_mark_free_mu_reorg != inctn_opcode)));
 			while (FROZEN_HARD(csa))
 				hiber_start(1000);
 			assert(tmp_jnlpool == jnlpool);
@@ -1258,9 +1258,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	 */
 	assert((inctn_invalid_op != inctn_opcode) || cw_depth
 			|| !is_replicator						/* exception case (c) */
-			|| (ERR_GVPUTFAIL == t_err) && gvdupsetnoop			/* exception case (a) */
+			|| ((ERR_GVPUTFAIL == t_err) && gvdupsetnoop)			/* exception case (a) */
 			|| (ERR_JRTNULLFAIL == t_err)					/* exception case (d) */
-			|| (ERR_GVKILLFAIL == t_err) && gv_play_duplicate_kills);	/* exception case (b) */
+			|| ((ERR_GVKILLFAIL == t_err) && gv_play_duplicate_kills));	/* exception case (b) */
 	assert(cw_set_depth < CDB_CW_SET_SIZE);
 	ASSERT_CURR_TN_EQUALS_EARLY_TN(csa, dbtn);
 	if (JNL_ENABLED(csa))

@@ -215,7 +215,7 @@ void cli_strupper(char *sp)
 {
 	int c;
 
-	while (c = *sp)
+	while ((c = *sp))
 		*sp++ = TOUPPER(c);
 }
 

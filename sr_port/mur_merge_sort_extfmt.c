@@ -55,8 +55,8 @@ error_def(ERR_SYSCALL);
 	((ELEM1->time > ELEM2->time)							\
 		|| ((ELEM1->time == ELEM2->time)					\
 			&& ((ELEM1->token_seq.token > ELEM2->token_seq.token)		\
-				|| (ELEM1->token_seq.token == ELEM2->token_seq.token)	\
-					&& (ELEM1->update_num >= ELEM2->update_num))))
+				|| ((ELEM1->token_seq.token == ELEM2->token_seq.token)	\
+					&& (ELEM1->update_num >= ELEM2->update_num)))))
 
 /* Adds an element into heap "heap_array". Updates "heap_size".
  * If element cannot be added right away (due to multi-region TP resolution) it will add element into a hashtable.

@@ -419,6 +419,13 @@ void start_timer(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
 			|| (INTRPT_IN_TRIGGER_NOMANS_LAND == intrpt_ok_state)
 			|| (mu_reorg_process && (INTRPT_IN_KILL_CLEANUP == intrpt_ok_state)));
 		safe_to_add = TRUE;
+	} else if (jnl_file_close_timer_ptr == handler)
+	{	/* Account for known instances of the above function being called from within a deferred zone. */
+		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state)
+			|| (INTRPT_IN_TRIGGER_NOMANS_LAND == intrpt_ok_state) || (INTRPT_IN_SS_INITIATE == intrpt_ok_state)
+			|| (INTRPT_IN_GDS_RUNDOWN == intrpt_ok_state)
+			|| (mu_reorg_process && (INTRPT_IN_KILL_CLEANUP == intrpt_ok_state)));
+		safe_to_add = TRUE;
 	} else
 	{
 		for (i = 0; NULL != safe_handlers[i]; i++)
@@ -532,7 +539,6 @@ void clear_timers(void)
 		 */
 		assert((FALSE == timer_in_handler) || process_exiting);
 		assert(FALSE == timer_active);
-		assert(FALSE == oldjnlclose_started);
 		assert(FALSE == deferred_timers_check_needed);
 		return;
 	}
@@ -954,7 +960,7 @@ STATICFNDEF void remove_timer(TID tid)
 
 	SETUP_THREADGBL_ACCESS;
 	DUMP_TIMER_INFO("At the start of remove_timer()");
-	if (tp = find_timer(tid, &tprev))		/* Warning: assignment */
+	if ((tp = find_timer(tid, &tprev)))		/* Warning: assignment */
 	{
 		if (tprev)
 			tprev->next = tp->next;

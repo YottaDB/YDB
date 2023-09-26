@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,8 +23,8 @@
 #endif
 
 /* Following definitions give some default values for reorg */
-#define DATA_FILL_TOLERANCE 10
-#define INDEX_FILL_TOLERANCE 10
+#define DATA_FILL_TOLERANCE 5
+#define INDEX_FILL_TOLERANCE 5
 
 /*********************************************************************
 	block_number is used for swap

@@ -194,8 +194,9 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 	 * block that was killed inside of the transaction (possible if cert_blk is called directly from tp_tend). In this case,
 	 * the block number passed is a special value GDS_CREATE_BLK_MAX so check that.
 	 */
-	assert(!chain.flag || dollar_tlevel && (!csa->t_commit_crit
-						|| ((T_COMMIT_CRIT_PHASE1 == csa->t_commit_crit) && (GDS_CREATE_BLK_MAX == blk))));
+	assert(!chain.flag || (dollar_tlevel
+				&& (!csa->t_commit_crit
+					|| ((T_COMMIT_CRIT_PHASE1 == csa->t_commit_crit) && (GDS_CREATE_BLK_MAX == blk)))));
 	if (!chain.flag && ((offset_mm * (block_id)bplmap) == blk))					/* it's a bitmap */
 	{
 		if ((unsigned char)blk_levl != LCL_MAP_LEVL)

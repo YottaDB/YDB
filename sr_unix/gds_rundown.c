@@ -617,10 +617,12 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			 */
 			db_needs_flushing = (cnl->last_wcsflu_tn < csa->ti->curr_tn);
 			if (db_needs_flushing)
+			{
 				if (!FROZEN_CHILLED(csa))
 					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
 				else
 					jnl_wait(reg);
+			}
 			/* Same as above "wcs_flu" */
 			IF_LIBAIO(aio_shim_destroy(udi->owning_gd);)
 			assert(is_mm || (csd == cs_data));

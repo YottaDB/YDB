@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -121,7 +121,8 @@ uint4 have_crit(uint4 crit_state)
 					 * hold crit as otherwise we could see inconsistent values.
 					 */
 					if ((crit_state & CRIT_IN_COMMIT)
-						&& (csa->now_crit && (csa->ti->early_tn != csa->ti->curr_tn) || csa->t_commit_crit))
+						&& ((csa->now_crit && (csa->ti->early_tn != csa->ti->curr_tn))
+							|| csa->t_commit_crit))
 					{
 						crit_reg_cnt++;
 						if (0 == (crit_state & CRIT_ALL_REGIONS))

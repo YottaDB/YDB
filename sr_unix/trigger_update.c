@@ -405,7 +405,7 @@ STATICFNDEF int4 update_trigger_name(char *trigvn, int trigvn_len, int trigger_i
 
 	SETUP_THREADGBL_ACCESS;
 	retval = NO_NAME_CHANGE;
-	if (tf_trig_name_len && (tf_trig_name_len != STRLEN(db_trig_name) - 1)
+	if ((tf_trig_name_len && (tf_trig_name_len != STRLEN(db_trig_name) - 1))
 		|| memcmp(tf_trig_name, db_trig_name, tf_trig_name_len))
 	{
 		if (!validate_label(trigvn, trigvn_len))

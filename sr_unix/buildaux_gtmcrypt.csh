@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2021 Fidelity National Information		#
+# Copyright (c) 2001-2023 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -56,11 +56,13 @@ endsw
 set helpers = "encrypt_sign_db_key,gen_keypair,gen_sym_hash,gen_sym_key,import_and_sign_key"
 set helpers = "$helpers,pinentry-gtm,show_install_config"
 
+set genfiles = "gpgagent,gtmtlsfuncs"
+
 set srcfiles = "gtmcrypt_dbk_ref.c gtmcrypt_pk_ref.c gtmcrypt_sym_ref.c gtmcrypt_ref.c gtm_tls_impl.c maskpass.c"
 set srcfiles = "$srcfiles gtmcrypt_util.c"
 
 set incfiles = "gtmcrypt_interface.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_pk_ref.h gtmcrypt_ref.h"
-set incfiles = "$incfiles gtmcrypt_util.h gtm_tls_impl.h gtm_tls_interface.h"
+set incfiles = "$incfiles gtmcrypt_util.h gtm_tls_externalcalls.h gtm_tls_impl.h gtm_tls_interface.h"
 
 set gtm_dist_plugin = $gtm_dist/plugin
 rm -rf $gtm_dist_plugin
@@ -72,6 +74,7 @@ set incfile_list = ($incfiles)
 eval cp -pf '${incfile_list:gs||'$gtm_inc'/|} $gtm_dist_plugin/gtmcrypt'
 
 cp -pf $gtm_tools/{$helpers}.sh $gtm_dist_plugin/gtmcrypt
+cp -pf $gtm_tools/{$genfiles}.tab.in $gtm_dist_plugin/gtmcrypt
 cp -pf $gtm_pct/pinentry.m $gtm_dist_plugin/gtmcrypt
 rm -f $gtm_dist/{PINENTRY,pinentry}.[om]
 cp -pf $gtm_tools/Makefile.mk $gtm_dist_plugin/gtmcrypt/Makefile

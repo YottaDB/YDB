@@ -141,7 +141,7 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 			{
 				for (key_subsc.str.addr = src ; (')' != *src) && (',' != *src); src++)
 				{
-					if (src == top || (('0' > *src) || ('9' < *src)) && ('-' != *src) && ('.' != *src))
+					if ((src == top) || ((('0' > *src) || ('9' < *src)) && ('-' != *src) && ('.' != *src)))
 					{
 						util_out_print("Error:  invalid key.", TRUE);
 						return FALSE;

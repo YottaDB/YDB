@@ -360,10 +360,12 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			if (0 > bytesread)
 			{	/* Some error occurred. Check for restartable condition. */
 				if (EINTR == errno)
+				{
 					if (!out_of_time)
 						continue;
 					else
 						return 0;	/* timeout indicator */
+				}
 				return bytesread;
 			}
 			if (out_of_time)

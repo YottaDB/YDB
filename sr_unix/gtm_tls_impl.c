@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2022 Fidelity National Information	*
+ * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,7 @@
 
 #include "gtm_tls_interface.h"
 #include "gtm_tls_impl.h"
+#include "gtm_tls_externalcalls.h"
 #ifdef DEBUG
 #include <stdlib.h>
 #endif
@@ -43,6 +44,7 @@ GBLDEF	int			tls_errno;
 GBLDEF	gtmtls_passwd_list_t	*gtmtls_passwd_listhead;
 
 STATICDEF	config_t	gtm_tls_cfg;
+STATICDEF	gtm_tls_ctx_t	*gtm_tls_ctx = NULL;
 #if OPENSSL_VERSION_NUMBER < 0x30000000L
 STATICDEF DH			*dh512, *dh1024;	/* Diffie-Hellman structures for Ephemeral Diffie-Hellman key exchange. */
 #endif
@@ -70,6 +72,9 @@ STATICDEF	int		wbox_count_val = 0, wbox_test_count_val = 0, wbox_enable_val = 0,
 #define	TLS1_3_VERSION	0x0304
 #endif
 
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+#define PHA_MACROS_ENABLED	(SSL_VERIFY_PEER | SSL_VERIFY_POST_HANDSHAKE)
+#endif
 /* Below template translates to: Arrange ciphers in increasing order of strength after excluding the following:
  * ADH: Anonymous Diffie-Hellman Key Exchange (Since we want both encryption and authentication and ADH provides only former).
  * LOW: Low strength ciphers.
@@ -79,10 +84,21 @@ STATICDEF	int		wbox_count_val = 0, wbox_test_count_val = 0, wbox_enable_val = 0,
 #define REPL_CIPHER_LIST			"ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH"
 #define GTM_DEFAULT_CIPHER_LIST			"DEFAULT:!SRP"
 
+#define	CIPHER_LIST_SIZE	4096
+#define	ERR_STR_SIZE		2048
+
 #define OPTIONEND ':'
 #define OPTIONENDSTR ":"
 #define OPTIONNOT '!'
 #define DEFINE_SSL_OP(OP_DEF)   { #OP_DEF , OP_DEF }
+
+/* Macros for the external call function input parameters */
+#define TLS1_2_STR		"tls1_2"
+#define TLS1_3_STR		"tls1_3"
+#define SOCKET_STR		"SOCKET"
+#define REPLICATION_STR		"REPLICATION"
+#define COMPILE_TIME_STR	"compile-time"
+#define RUN_TIME_STR		"run-time"
 
 #define SET_AND_APPEND_OPENSSL_ERROR(...)										\
 {															\
@@ -149,6 +165,7 @@ STATICDEF struct gtm_ssl_options gtm_ssl_options_list[] =
 STATICFNDEF char *parse_SSL_options(struct gtm_ssl_options *opt_table, size_t opt_table_size, const char *options, long *current,
 					long *clear);
 STATICFNDEF int gtm_tls_set_error(gtm_tls_socket_t *tlssocket, const char *format, ...);
+STATICFNDEF void gtm_tls_copy_gcerror(gtm_tls_socket_t *tlssocket);
 
 STATICFNDEF char *parse_SSL_options(struct gtm_ssl_options *opt_table, size_t opt_table_size, const char *options, long *current,
 					long *clear)
@@ -470,7 +487,11 @@ STATICFNDEF int gtm_tls_set_error(gtm_tls_socket_t *tlssocket, const char *forma
 	if (NULL != tlssocket)
 	{	/* Separate DB and network error strings */
 		if (NULL == tlssocket->errstr)
+		{
 			errstr = tlssocket->errstr = malloc(MAX_GTMCRYPT_ERR_STRLEN);
+			if (NULL != errstr)
+				errstr[0] = '\0';
+		}
 		assert(NULL != tlssocket->errstr);
 	}
 	if (NULL == errstr)
@@ -479,6 +500,16 @@ STATICFNDEF int gtm_tls_set_error(gtm_tls_socket_t *tlssocket, const char *forma
 	ret = vsnprintf(errstr, MAX_GTMCRYPT_ERR_STRLEN, format, var);
 	va_end(var);
 	return ret;
+}
+
+/* Copies error messages set by the DB encryption routines shared by the SSL/TLS reference implementation. */
+STATICFNDEF void gtm_tls_copy_gcerror(gtm_tls_socket_t *tlssocket)
+{
+	assert(strlen(gtmcrypt_err_string));	/* If no error why copy? */
+	if ((NULL != tlssocket) && (NULL != tlssocket->errstr)) /* socket specific error string present */
+		memcpy(tlssocket->errstr, gtmcrypt_err_string, MAX_GTMCRYPT_ERR_STRLEN);
+	else if (gtmtls_err_string) /* TLS implementation's general error string */
+		memcpy(gtmtls_err_string, gtmcrypt_err_string, MAX_GTMCRYPT_ERR_STRLEN);
 }
 
 const char *gtm_tls_get_error(gtm_tls_socket_t *tlssocket)
@@ -511,19 +542,17 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 	X509_STORE		*store;
 	X509_LOOKUP		*lookup;
 	config_t		*cfg;
-#	if OPENSSL_VERSION_NUMBER < 0x009080dfL
-	unsigned int            cfg_line;
-	const char              *cfg_file;
-	config_setting_t        *cfg_setting;
-#	endif
-	gtm_tls_ctx_t		*gtm_tls_ctx;
+
+	if (NULL != gtm_tls_ctx) /* Non-null implies a repeat call which is possible when using the external call interface */
+		return gtm_tls_ctx;
 
 	assert(GTM_TLS_API_VERSION >= version); /* Make sure the caller is using the right API version */
 	if (NULL == (gtmtls_err_string = malloc(MAX_GTMCRYPT_ERR_STRLEN +  1)))
 	{
 		gtm_tls_set_error(NULL, "Unable to allocate error buffer for libgtmtls.so plugin");
 		return NULL;
-	}
+	} else
+		gtmtls_err_string[0] = '\0';
 
 	if (GTM_TLS_API_VERSION < version)
 	{
@@ -607,6 +636,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 	if (!(GTMTLS_OP_ABSENT_CONFIG & flags))
 	{	/* check for tls section */
 		if (NULL == config_lookup(cfg, "tls"))
+		{
 			if ((GTMTLS_OP_INTERACTIVE_MODE & flags))
 				flags |= GTMTLS_OP_ABSENT_CONFIG;
 			else
@@ -616,6 +646,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 				config_destroy(cfg);
 				return NULL;
 			}
+		}
 	}
 	/* Get global SSL configuration parameters */
 	if (config_lookup_int(cfg, "tls.verify-depth", &verify_depth))
@@ -769,28 +800,13 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		if (options_current != options_mask)
 			options_mask = SSL_CTX_set_options(ctx, options_mask);
 		if (0 != options_clear)
-#		if OPENSSL_VERSION_NUMBER >= 0x009080dfL
 			options_mask = SSL_CTX_clear_options(ctx, options_clear);
-#		else
-		{	/* clear_options first in OpenSSL 0.9.8m */
-			cfg_setting = config_lookup(cfg, "tls.ssl-options");
-			cfg_file = config_setting_source_file(cfg_setting);
-			cfg_line = config_setting_source_line(cfg_setting);
-			gtm_tls_set_error(NULL, "Unable to negate values in %s - need OpenSSL 0.9.8m or newer in %s line %d",
-				"tls.ssl-options", cfg_file, cfg_line);
-			SSL_CTX_free(ctx);
-			config_destroy(cfg);
-			return NULL;
-		}
-#		endif
 	}
 
-#if OPENSSL_VERSION_NUMBER >= 0x10002000L
 	/* Support for ECDHE Ciphers was added in OpenSSL 1.0.2 with the below.
 	 * OpenSSL 1.1.0 made this the default and made the function a no-op
 	 */
 	SSL_CTX_set_ecdh_auto(ctx, 1);
-#endif
 
 	gtm_tls_ctx = MALLOC(SIZEOF(gtm_tls_ctx_t));
 	gtm_tls_ctx->ctx = ctx;
@@ -870,11 +886,7 @@ int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *
 		gtmtls_passwd_listhead = pwent_node;
 	} else
 	{
-		if (gtmtls_err_string)
-		{	/* gc_update_passwd() uses gtmcrypt_err_string for error messages */
-			memcpy(gtmtls_err_string, gtmcrypt_err_string, MAX_GTMCRYPT_ERR_STRLEN);
-			gtmtls_err_string[MAX_GTMCRYPT_ERR_STRLEN] = '\0';
-		}
+		gtm_tls_copy_gcerror(NULL);
 		return -1;		/* gc_update_passwd freed pwent */
 	}
 	return 1;
@@ -901,10 +913,8 @@ void gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name)
 		pwent_node->next = gtmtls_passwd_listhead;
 		pwent_node->pwent = pwent;
 		gtmtls_passwd_listhead = pwent_node;
-	}
-	/* else, something went wrong while acquiring the password. Don't report it now. Later, `gtm_tls_socket' makes another
-	 * attempt to acquire the password.
-	 */
+	} else	/* Later, gtm_tls_socket makes another attempt to acquire the password. Keep the error just in case */
+		gtm_tls_copy_gcerror(NULL);
 }
 
 static int copy_tlsid_elem(const config_t *tmpcfg, config_t *cfg, config_setting_t *tlsid, const char *idstr, const char *elemname,
@@ -916,7 +926,7 @@ static int copy_tlsid_elem(const config_t *tmpcfg, config_t *cfg, config_setting
 	char			cfg_path[MAX_CONFIG_LOOKUP_PATHLEN];
 
 	SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.%s", idstr, elemname);
-	if (srcelem = config_lookup(tmpcfg, cfg_path))
+	if ((srcelem = config_lookup(tmpcfg, cfg_path)))
 	{
 		elem = config_lookup(cfg, cfg_path);
 		if (NULL == elem)
@@ -1036,10 +1046,6 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	EVP_PKEY		*evp_pkey = NULL;
 	config_t		*cfg;
 	config_setting_t	*cfg_setting;
-#	if OPENSSL_VERSION_NUMBER < 0x009080dfL
-	unsigned int		cfg_line;
-	const char		*cfg_file;
-#	endif
 	gtmtls_passwd_list_t	*pwent_node;
 	passwd_entry_t		*pwent;
 	gtm_tls_socket_t	*socket;
@@ -1146,7 +1152,34 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 		verify_level_set = FALSE;
 	}
 	if (verify_mode_set)
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+	{
+		if (CLIENT_MODE(flags) /* Using PHA flag in clients induces undesired behavior in TLS library */
+			|| (flags & GTMTLS_OP_RENEGOTIATE_REQUESTED)) /* Receiver Server currently does not handle PHA */
+			verify_mode &= ~SSL_VERIFY_POST_HANDSHAKE;
 		SSL_set_verify(ssl, verify_mode, NULL);
+		if (CLIENT_MODE(flags) && (SSL_VERIFY_PEER & verify_mode))
+			/* For client mode, Enable post-handshake with peer verification; Harmless for pre-TLSv1.3 */
+			SSL_set_post_handshake_auth(ssl, 1);
+	} else if (PHA_MACROS_ENABLED & (verify_mode = SSL_get_verify_mode(ssl)))
+	{	/* verify-mode was set by the main configuration */
+		if ((SSL_VERIFY_POST_HANDSHAKE & verify_mode)
+			&& (CLIENT_MODE(flags) /* Using PHA flag in clients induces undesired behavior in TLS library */
+				|| (flags & GTMTLS_OP_RENEGOTIATE_REQUESTED))) /* Receiver Server currently does not handle PHA */
+		{
+			verify_mode &= ~SSL_VERIFY_POST_HANDSHAKE;
+			SSL_set_verify(ssl, verify_mode, NULL);
+		}
+		/* When SSL_VERIFY_PEER is set, enable PHA in client mode. Doing so just sends the PHA extension in the
+		 * CLIENT_HELLO. It is up to the server to request and validate PHA. OpenSSL handles presenting the client
+		 * ceritificate(s) without any explicit action. Enabling PHA is harmless for pre-TLSv1.3
+		 */
+		if (CLIENT_MODE(flags) && (SSL_VERIFY_PEER | verify_mode))
+			SSL_set_post_handshake_auth(ssl, 1);
+	}
+#else
+		SSL_set_verify(ssl, verify_mode, NULL);
+#endif
 	if (verify_level_set)
 		flags = (GTMTLS_OP_VERIFY_LEVEL_CMPLMNT & flags) | verify_level;
 	else
@@ -1242,6 +1275,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 				SNPRINTF(prompt, GTM_PASSPHRASE_MAX_ASCII, "Enter passphrase for TLSID %s:", id);
 				if (0 != gc_update_passwd(input_env_name, &pwent, prompt, 0))
 				{
+					gtm_tls_copy_gcerror(NULL);
 					SSL_free(ssl);
 					return NULL;
 				}
@@ -1360,19 +1394,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			if (options_current != options_mask)
 				options_mask = SSL_set_options(ssl, options_mask);
 			if (0 != options_clear)
-#			if OPENSSL_VERSION_NUMBER >= 0x009080dfL
 				options_mask = SSL_clear_options(ssl, options_clear);
-#			else
-			{       /* clear_options first in OpenSSL 0.9.8m */
-				cfg_setting = config_lookup(cfg, cfg_path);
-				cfg_file = config_setting_source_file(cfg_setting);
-				cfg_line = config_setting_source_line(cfg_setting);
-				gtm_tls_set_error(NULL, "Unable to negate values in %s - need OpenSSL 0.9.8m or"
-					" newer in %s line %d", cfg_path, cfg_file, cfg_line);
-				SSL_free(ssl);
-				return NULL;
-			}
-#			endif
 
 		}
 		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.verify-depth", id);
@@ -1520,6 +1542,7 @@ int gtm_tls_accept(gtm_tls_socket_t *socket)
 	int		rv;
 	long		verify_result;
 
+	assert(!CLIENT_MODE(socket->flags));
 	rv = SSL_accept(socket->ssl);
 	verify_result = SSL_get_verify_result(socket->ssl);
 	if ((0 < rv) && (X509_V_OK == verify_result))
@@ -1527,10 +1550,53 @@ int gtm_tls_accept(gtm_tls_socket_t *socket)
 	return ssl_error(socket, rv, verify_result);
 }
 
+/* Call SSL_verify_client_post_handshake() when the connection uses TLSv1.3 and PHA was requested in the server's configuration.
+ * This function embeds a call to perform a handshake which might need a retry if the socket is non-blocking.
+ * NOTE: When TLSv1.3 and PHA do not apply, the function returns a success status as the embedded handshake returns with an
+ * error status only when the connection needs an extra READ/WRITE.
+ */
+int gtm_tls_do_post_hand_shake(gtm_tls_socket_t *socket)
+{
+	int		rv;
+	long		verify_result;
+
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+	/* Neither TLSv1.3 nor SSL_VERIFY_{PEER,POST_HANDSHAKE} combo requested. Skip PHA */
+	if ((TLS1_3_VERSION != SSL_version(socket->ssl))
+			|| (PHA_MACROS_ENABLED != (PHA_MACROS_ENABLED & SSL_get_verify_mode(socket->ssl))))
+		return 0;
+	/* Post Handshake Auth (PHA) requested for TLSv1.3 */
+	if (1 != SSL_verify_client_post_handshake(socket->ssl))
+		return ssl_error(socket, 0, 0);
+	return gtm_tls_repeat_hand_shake(socket);
+#else
+	return 0;
+#endif
+}
+
+/* Perform a handshake on demand. This function was added to perform handshake(s) after the server side initiates PHA */
+int gtm_tls_repeat_hand_shake(gtm_tls_socket_t *socket)
+{
+	int		rv;
+	long		verify_result;
+	X509		*cert;
+
+	/* WARNING: one-shot attempt at handshake, caller needs to loop */
+	rv = SSL_do_handshake(socket->ssl);
+	verify_result = SSL_get_verify_result(socket->ssl);
+	if ((0 < rv) && (X509_V_OK == verify_result))
+		return 0;	/* Success */
+	/* else error occurred */
+	rv = ssl_error(socket, rv, verify_result);
+	gtm_tls_set_error(socket, "post handshake auth error: %s",
+		X509_verify_cert_error_string(verify_result));
+	return rv;
+}
+
 int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 {
 	int		rv;
-	long		vresult;
+	long		verify_result;
 
 #if OPENSSL_VERSION_NUMBER >= 0x10101000L
 	if (TLS1_3_VERSION == SSL_version(socket->ssl))
@@ -1546,8 +1612,8 @@ int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 	do
 	{
 		rv = SSL_do_handshake(socket->ssl);
-		vresult = SSL_get_verify_result(socket->ssl);
-		if ((0 < rv) && (X509_V_OK == vresult))
+		verify_result = SSL_get_verify_result(socket->ssl);
+		if ((0 < rv) && (X509_V_OK == verify_result))
 			return 0;
 		/* On a blocking socket, SSL_do_handshake returns ONLY after successful completion. However, if the system call
 		 * is interrupted (say, by a SIGALRM), it can return with a WANT_READ or WANT_WRITE. Handle it by retrying.
@@ -1555,7 +1621,7 @@ int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 		 * since renegotiation is done seldomly and returning the control back to the caller causes interface issues, we
 		 * handle GTMTLS_WANT_READ or GTMTLS_WANT_WRITE by retrying.
 		 */
-		rv = ssl_error(socket, rv, vresult);
+		rv = ssl_error(socket, rv, verify_result);
 	} while ((GTMTLS_WANT_READ == rv) || (GTMTLS_WANT_WRITE == rv));
 	return rv;
 }
@@ -1833,12 +1899,8 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 			} else
 				conn_info->cert_algo[0] = '\0';
 			/* Is Secure Renegotiation Supported? */
-#			if OPENSSL_VERSION_NUMBER >= 0x009080dfL
 			/* SSL_get_secure_renegotiation_support function was introduced in OpenSSL version >= "0.9.8m". */
 			conn_info->secure_renegotiation = SSL_get_secure_renegotiation_support(ssl);
-#			else
-			conn_info->secure_renegotiation = FALSE;
-#			endif
 			/* Is the session reused? */
 			conn_info->reused = SSL_session_reused(ssl);
 			/* Negotiated Session-ID. */
@@ -2025,4 +2087,252 @@ void gtm_tls_fini(gtm_tls_ctx_t **tls_ctx)
 		node = node->next;
 		FREE(prev_node);
 	}
+}
+
+/***** EXTERNAL CALLs Section *****/
+
+/* Report the version of the gtmtls plugin library. The TLS plugin is not portable across GT.M versions. GT.M uses this
+ * version number to determine if the TLS version supports functionality that GT.M expects.
+ *
+ * Input:
+ * 	count	- number of arguments in the external call
+ *
+ * Output:
+ *	version	- 2048 byte external call interface allocated buffer containing the gtmtls plugin library version with
+ *		  relevant details
+ */
+long gtm_tls_get_version(int count, char *version)
+{
+	(void)snprintf(version, ERR_STR_SIZE, "libgtmtls.so(%s) %x %s",
+			PLUGIN_LIBRARY_OSNAME, GTM_TLS_API_VERSION, PLUGIN_LIBRARY_RELEASE_TYPE);
+	return GTM_TLS_API_VERSION;
+}
+
+/* Report the run-time time version of the 3rd party TLS library. OpenSSL functionality is often version dependent.
+ * Use this to determine what is available. For instance, one needs at least OpenSSL 1.1.0 for TLSv1.3 support.
+ *
+ * Input:
+ * 	count	 - number of arguments in the external call
+ *	libmode  - string of "run-time" for the run-time library version or "compile-time" for the library
+ *		   version at compile time
+ *
+ * Output:
+ *	version	- 2048 byte external call interface allocated buffer containing the 3rd party TLS library version
+ *	errstr	- 2048 byte external call allocated buffer containing an error message
+ *
+ * Return:
+ * 	Integer representation of the 3rd party TLS version (use hexadecimal printing to compare with source code),
+ * 	-1 on errror
+ */
+long gtm_tls_get_TLS_lib_version(int count, char *version, char *libmode, char *errstr)
+{
+	/* Load the TLS context if needed */
+	if ((NULL == gtm_tls_ctx) && (NULL == gtm_tls_init(GTM_TLS_API_VERSION, GTMTLS_OP_INTERACTIVE_MODE)))
+	{
+		(void)snprintf(errstr, ERR_STR_SIZE, "%s", gtm_tls_get_error(NULL));
+		return -1;
+	}
+	if ((NULL == libmode)
+			|| (strncasecmp(libmode, LIT_AND_LEN(RUN_TIME_STR))
+				&& strncasecmp(libmode, LIT_AND_LEN(COMPILE_TIME_STR))))
+	{
+		(void)snprintf(errstr, ERR_STR_SIZE, "'%s' is not a valid. Please use either 'run-time' or 'compile-time'",
+				(NULL == libmode)? "": libmode);
+		return -1;
+	}
+	if (0 == strncasecmp(libmode, LIT_AND_LEN(COMPILE_TIME_STR)))
+	{
+		(void)snprintf(version, ERR_STR_SIZE, "%s", OPENSSL_VERSION_TEXT);
+		return OPENSSL_VERSION_NUMBER;
+	} /* else RUN_TIME */
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	(void)snprintf(version, ERR_STR_SIZE, "%s", OpenSSL_version(OPENSSL_VERSION));
+	return OpenSSL_version_num();
+#else
+	(void)snprintf(version, ERR_STR_SIZE, "%s", SSLeay_version(SSLEAY_VERSION));
+	return SSLeay();
+#endif
+}
+
+/* Report the 3rd party TLS library's default set of ciphers
+ *
+ * Input:
+ * 	count	- number of arguments in the external call
+ *	tlsver	- string of either "tls1_3" or "tls1_2"
+ *
+ * Output:
+ *	tlscipher	- 4096 byte external call allocated buffer containing the colon delimited list of default set of
+ *			  pre-TLSv1.3 ciphers from 3rd party TLS library
+ *	errstr		- 2048 byte external call allocated buffer containing an error message
+ *
+ * Return:
+ * 	Positive integer (Success) for the number of pieces in the string, -1 (Error) check error message
+ *
+ */
+long gtm_tls_get_defaultciphers(int count, char *tlsciphers, char *tlsver, char *errstr)
+{
+	char	*cptr;
+	int	i;
+
+	/* Load the TLS context if needed */
+	if ((NULL == gtm_tls_ctx) && (NULL == gtm_tls_init(GTM_TLS_API_VERSION, GTMTLS_OP_INTERACTIVE_MODE)))
+	{
+		(void)snprintf(errstr, ERR_STR_SIZE, "%s", gtm_tls_get_error(NULL));
+		return -1;
+	}
+	if ((NULL == tlsver) || (strncasecmp(tlsver, LIT_AND_LEN(TLS1_2_STR)) && strncasecmp(tlsver, LIT_AND_LEN(TLS1_3_STR))))
+	{
+		(void)snprintf(errstr, ERR_STR_SIZE, "'%s' is not a valid TLS version. Please use either 'tls1_2' or 'tls1_3'",
+				(NULL == tlsver)? "": tlsver);
+		return -1;
+	}
+	if (0 == strncasecmp(tlsver, LIT_AND_LEN(TLS1_3_STR)))
+	{
+#if OPENSSL_VERSION_NUMBER > 0x30000000L
+		snprintf(tlsciphers, CIPHER_LIST_SIZE, "%s", OSSL_default_ciphersuites());
+#elif OPENSSL_VERSION_NUMBER >= 0x10100000L
+		snprintf(tlsciphers, CIPHER_LIST_SIZE, "%s", TLS_DEFAULT_CIPHERSUITES);
+#else
+		(void)snprintf(errstr, ERR_STR_SIZE, "tls1_3 ciphers are no supported with %s", SSLeay_version(SSLEAY_VERSION));
+		tlsciphers[0] = '\0';
+		return -1;
+#endif
+	} else
+	{	/* Defaults to TLSv1.2 */
+#if OPENSSL_VERSION_NUMBER > 0x30000000L
+		snprintf(tlsciphers, CIPHER_LIST_SIZE, "%s", OSSL_default_cipher_list());
+#else
+		snprintf(tlsciphers, CIPHER_LIST_SIZE, "%s", SSL_DEFAULT_CIPHER_LIST);
+#endif
+	}
+
+	/* Count the number of pieces */
+	for (i = 1, cptr = strchr(tlsciphers, ':'); NULL != cptr; cptr = strchr(cptr, ':'))
+		i++, cptr++;
+	return i;
+}
+
+/* Given a list of ciphers, return the resulting string of supported ciphers
+ *
+ * Input:
+ * 	count	- number of arguments in the external call
+ *	tlsver	- string which if not "tls1_3" or null is treated as tls1_2
+ *	mode	- string which if not REPLICATION or null is treated as SOCKETDEVICE
+ *	tlsid	- string TLS configuration identifier to use; If null/not present, the $gtmcrypt_config is NOT used
+ *
+ * Output:
+ * 	Available set of ciphers
+ *	tlscipher	- 4096 byte external call allocated buffer containing the colon delimited list of supported ciphersuites
+ *	errstr		- 2048 byte external call allocated buffer containing an error message
+ *
+ * Return:
+ * 	Positive integer (Success) for the number of pieces in the string, -1 (Error) check error message
+ */
+long gtm_tls_get_ciphers(int count, char *tlsciphers, char *tlsver, char *mode, char *tlsid, char *ciphersuites, char *errstr)
+{
+	const char		*ciphername;
+	char			*cptr, *endptr;
+	char			idstr[MAX_TLSID_LEN];
+	gtm_tls_ctx_t		*lcl_tls_ctx = NULL;
+	gtm_tls_socket_t	*lcl_gtm_tls_sock;
+	int			i, flags = GTMTLS_OP_SOCKET_DEV		/* Treat like a SOCKET device and not replication */
+					| GTMTLS_OP_INTERACTIVE_MODE;	/* Allows for no config file but will prompt for password */
+	long			status;
+	SSL			*lcl_ssl;
+	const SSL_CIPHER	*c;
+	STACK_OF(SSL_CIPHER)	*sk = NULL;
+
+	/* Load the TLS context if needed */
+	if ((NULL == gtm_tls_ctx) && (NULL == (lcl_tls_ctx = (gtm_tls_init(GTM_TLS_API_VERSION, GTMTLS_OP_INTERACTIVE_MODE)))))
+	{
+		(void)snprintf(errstr, ERR_STR_SIZE, "Error initializing OpenSSL context: %s", gtm_tls_get_error(NULL));
+		return -1;
+	}
+	lcl_tls_ctx = gtm_tls_ctx;
+
+	/* Use supplied TLSID if requested. Not asking for one makes checking $gtmcrypt_config optional and implies client mode */
+	if ((NULL != tlsid) && (0 < strlen(tlsid)))
+		(void)snprintf(idstr, MAX_TLSID_LEN, "%s", tlsid);
+	else
+	{
+		idstr[0] = '\0';
+		flags |= GTMTLS_OP_CLIENT_MODE;
+	}
+	/* TLS version */
+	if ((NULL == tlsver) || (strncasecmp(tlsver, LIT_AND_LEN(TLS1_2_STR)) && strncasecmp(tlsver, LIT_AND_LEN(TLS1_3_STR))))
+	{
+		(void)snprintf(errstr, ERR_STR_SIZE, "'%s' is not a valid TLS version. Please use either 'tls1_2' or 'tls1_3'",
+				(NULL == tlsver)? "": tlsver);
+		return -1;
+	}
+	/* By default, gtm_tls_init() limits the lowest TLS version to TLSv1.2 */
+	if (0 == strncasecmp(tlsver, LIT_AND_LEN(TLS1_3_STR)))
+	{
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+		SSL_CTX_set_min_proto_version(lcl_tls_ctx->ctx, TLS1_3_VERSION);
+		SSL_CTX_set_max_proto_version(lcl_tls_ctx->ctx, TLS1_3_VERSION);
+#else
+		(void)snprintf(errstr, ERR_STR_SIZE, "tls1_3 ciphers are no supported with %s", SSLeay_version(SSLEAY_VERSION));
+		tlsciphers[0] = '\0';
+		return -1;
+#endif
+	}
+	/* Use SOCKET device or Replication server defaults? */
+	if ((NULL == mode) || (strncasecmp(mode, LIT_AND_LEN(REPLICATION_STR)) && strncasecmp(mode, LIT_AND_LEN(SOCKET_STR))))
+	{
+		(void)snprintf(errstr, ERR_STR_SIZE, "'%s' is not valid. Please use either 'SOCKET' for SOCKET devices or "
+				"'REPLICATION' for replication servers", (NULL == mode)? "": mode);
+		return -1;
+	}
+	if (0 == strncasecmp(mode, LIT_AND_LEN(REPLICATION_STR)))
+		flags ^= GTMTLS_OP_INTERACTIVE_MODE;	/* Replication uses a different default ciphersuite */
+
+	/* Create the SSL object */
+	lcl_gtm_tls_sock = gtm_tls_socket(lcl_tls_ctx, NULL, 0, idstr, flags);
+	if (NULL == lcl_gtm_tls_sock)
+	{
+		(void)snprintf(errstr, ERR_STR_SIZE, "Error establishing SSL/TLS context: %s", gtm_tls_get_error(NULL));
+		return -1;
+	}
+
+	/* Update cipher suites using the SAME string for TLSv1.3 and pre-TLSv1.3 */
+	if ((NULL != ciphersuites) && (0 < strlen(ciphersuites))
+			&& (0 >= SSL_set_cipher_list(lcl_gtm_tls_sock->ssl, ciphersuites))	/* TLSv1.2 and before */
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+			&& (0 >= SSL_set_ciphersuites(lcl_gtm_tls_sock->ssl, ciphersuites))	/* TLSv1.3 since OpenSSL 1.1.0 */
+#endif
+	   )
+	{
+		(void)snprintf(errstr, ERR_STR_SIZE, "Cipher Suite error: %s", gtm_tls_get_error(NULL));
+		return -1;
+	}
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	sk = SSL_get1_supported_ciphers((SSL *)lcl_gtm_tls_sock->ssl);
+#else
+	sk = SSL_get_ciphers((SSL *)lcl_gtm_tls_sock->ssl);
+#endif
+	cptr = tlsciphers;
+	endptr = cptr + CIPHER_LIST_SIZE;
+	for (i = 0; (i < sk_SSL_CIPHER_num(sk)) && (cptr < endptr); i++)
+	{
+		c = sk_SSL_CIPHER_value(sk, i);
+		ciphername = SSL_CIPHER_get_name(c);
+		if (ciphername == NULL)
+			break;
+		cptr += snprintf(cptr, CIPHER_LIST_SIZE - (cptr - tlsciphers), "%s%s", (i)?":":"", ciphername);
+	}
+	if (cptr > endptr)
+	{
+		(void)snprintf(errstr, ERR_STR_SIZE, "truncated cipher list, %d of %d", i, sk_SSL_CIPHER_num(sk));
+		status = 0;
+	} else
+		status = sk_SSL_CIPHER_num(sk);
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	sk_SSL_CIPHER_free(sk);
+#endif
+	SSL_free(lcl_gtm_tls_sock->ssl);
+	gtm_free(lcl_gtm_tls_sock);
+
+	return status;
 }

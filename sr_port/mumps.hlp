@@ -3609,21 +3609,28 @@
    An unsuccessful transaction ends with a ROLLBACK. ROLLBACK is invoked
    explicitly by the TROLLBACK command, or implicitly at a process
    termination that occurs during a transaction in progress. An error within
-   a transaction does not cause an implicit ROLLBACK. A ROLLBACK removes any
+   a transaction does not itself cause an implicit ROLLBACK, although $ETRAP
+   error processing may cause an implicit TROLLBACK. A ROLLBACK removes any
    database updates performed within the transaction before they are made
    available to other processes. ROLLBACK also releases all resources LOCKed
    since the start of the transaction, and makes the naked reference
-   undefined.
+   undefined. While it cause a significant process state change, unlike a
+   RESTART, a TROLLBACK does not cause any transfer of control. Because of
+   this, a useful technique is to set a flag in a local variable that is not
+   a restart variable, issue a TRESTART and have a block conditioned on the
+   flag variable which does a TROLLBACK.
 
    A RESTART is a transfer of control to the TSTART at the beginning of the
    transaction. RESTART implicitly includes a ROLLBACK and may optionally
-   restore local variables to the values they had when the initial TSTART was
-   originally executed. A RESTART always restores $TEST and the naked
-   reference to the values they had when the initial TSTART was executed.
-   RESTART does not manage device state information. A RESTART is invoked by
-   the TRESTART command or by M if it is determined that the transaction is
-   in conflict with other database updates. RESTART can only successfully
-   occur if the initial TSTART includes an argument that enables RESTART.
+   restore local variables, known as restart variables, to the values they
+   had when the initial TSTART originally executed. A RESTART always restores
+   $TEST and the naked reference to the values they had when the initial
+   TSTART executed. RESTART does not manage device state information. A
+   RESTART is invoked by the TRESTART command or by M if it is determined
+   that the transaction is in conflict with other database updates. RESTART
+   can only successfully occur if the initial TSTART includes an argument
+   that enables RESTART, which FIS strongly recommends in order to deal with
+   implicit RESTARTs.
 
 3 TP_Performance
    TP Performance
@@ -3632,7 +3639,8 @@
 
      * be as short as possible
      * consist, as much as possible, only of global updates
-     * be SERIAL with no associated LOCKs
+     * be SERIAL with no embedded LOCKs and minimal surrounding LOCKs where
+       justified
      * have RESTART enabled with a minimum of local variables protected by a
        restart portion of the TSTART argument.
      * Large concurrent transactions using TCOMMIT may result in repeated and
@@ -7070,6 +7078,7 @@
    $ZERROR="Unprocessed $ZERROR, see $ZSTATUS"
    $ZGBLDIR="/path/to/the/global/directory/$gtmgbldir.gld"
    $ZHOROLOG="64813,13850,790453,14400"
+   $ZICUVER=""
    $ZININTERRUPT=0
    $ZINTERRUPT="IF $ZJOBEXAM()"
    $ZIO="/dev/pts/0"
@@ -12191,6 +12200,16 @@
    Time in UTC APR 10,2015 04:20:29 PM
    GTM>
 
+2 $ZICUver
+   $ZICUver
+
+   $ZICUVER provides the current International Character Utilities (ICU)
+   version or an empty string if ICU is not available.
+
+   **Note**
+
+   The version is blank/empty if $ZCHSET is "M".
+
 2 $ZINInterrupt
    $ZINInterrupt
 
@@ -13436,7 +13455,7 @@
 
    $ZTIMeout=([timeout][:labelref])
 
-     o The optional timeout in seconds specifies with millisecond accuracy
+     o The optional timeout in seconds specifies with microsecond accuracy
        how long from the current time the timer interrupts the process. If
        the specified timeout is negative, GT.M cancels the timer. If the
        timeout is zero, GT.M treats it as it would a DO of the vector.
@@ -13673,14 +13692,14 @@
    $ZTDAta
 
    Within trigger context, $ZTDATA returns $DATA(@$REFERENCE)#2 for a SET or
-   $DATA(@$REFERENCE) for a KILL, ZKILL or ZWITHDRAW prior to the explicit
-   update. This provides a fast path alternative, avoiding the need for
-   indirection in trigger code, to help trigger code determine the
-   characteristics of the triggering node prior to the triggering update. For
-   a SET, it shows whether the node did or did not hold data - whether a SET
-   is modifying the contents of an existing node or creating data at a new
-   node. For a KILL it shows whether the node had descendants and whether it
-   had data.
+   $DATA(@$REFERENCE) for a KILL at the time of trigger invocation, ZKILL or
+   ZWITHDRAW prior to the explicit update. This provides a fast path
+   alternative, avoiding the need for indirection in trigger code, to help
+   trigger code determine the characteristics of the triggering node prior to
+   the triggering update. For a SET, it shows whether the node did or did not
+   hold data - whether a SET is modifying the contents of an existing node or
+   creating data at a new node. For a KILL it shows whether the node had
+   descendants and whether it had data.
 
 3 $ZTDElim
    $ZTDElim

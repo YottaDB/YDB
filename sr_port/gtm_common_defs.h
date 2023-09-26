@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,7 +101,7 @@
 							 			 */
 
 #define	MEMCMP_LIT(SOURCE, LITERAL)		memcmp(SOURCE, LITERAL, SIZEOF(LITERAL) - 1)
-#define MEMCPY_LIT(TARGET, LITERAL)		memcpy(TARGET, LITERAL, SIZEOF(LITERAL) - 1)
+#define MEMCPY_LIT(TARGET, LITERAL)		memcpy((void *)TARGET, LITERAL, SIZEOF(LITERAL) - 1)
 
 #define DIVIDE_ROUND_UP(VALUE, MODULUS)		(((VALUE) + ((MODULUS) - 1)) / (MODULUS))
 #define DIVIDE_ROUND_DOWN(VALUE, MODULUS)	((VALUE) / (MODULUS))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,7 +34,7 @@ void getjobname(void)
 	i2usmval(&dollar_job, process_id);
 	n2s(&dollar_job);
 	assert(dollar_job.str.len <= SIZEOF(djbuff));
-	memcpy(djbuff,dollar_job.str.addr,dollar_job.str.len);
+	memcpy((void *)djbuff,dollar_job.str.addr,dollar_job.str.len);
 	dollar_job.str.addr = djbuff;
 #	ifdef DEBUG
 	/* The below white-box code was previously in INVOKE_INIT_SECSHR_ADDRS but when it was removed, the white-box

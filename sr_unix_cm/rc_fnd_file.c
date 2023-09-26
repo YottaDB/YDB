@@ -115,11 +115,18 @@ unsigned short rc_fnd_file(rc_xdsid *xdsid)
 		 * will fit into the client buffer when unpacked by the
 		 * client.
 		 */
-		if (cs_data->reserved_bytes < RC_RESERVED)
+		if (cs_data->reserved_bytes < RC_RESERVED || cs_data->i_reserved_bytes < RC_RESERVED)
 		{
-			OMI_DBG((omi_debug,
-			"Unable to access database file:  \"%s\"\nReserved_bytes field in the file header is too small for GT.CM\n",
-			fpath2.addr));
+			if (cs_data->reserved_bytes < RC_RESERVED)
+				OMI_DBG((omi_debug,
+						"Unable to access database file:  \"%s\"\ndata_reserved_bytes field in the file "
+						"header is too small for GT.CM\n",
+						fpath2.addr));
+			else
+				OMI_DBG((omi_debug,
+						"Unable to access database file:  \"%s\"\nindex_reserved_bytes field in the file "
+						"header is too small for GT.CM\n",
+						fpath2.addr));
 			free(dsid_list->fname);
 			dsid_list->fname = NULL;
 			free(dsid_list);
@@ -215,11 +222,18 @@ unsigned short rc_fnd_file(rc_xdsid *xdsid)
 		 * will fit into the client buffer when unpacked by the
 		 * client.
 		 */
-		if (cs_data->reserved_bytes < RC_RESERVED)
+		if (cs_data->reserved_bytes < RC_RESERVED || cs_data->i_reserved_bytes < RC_RESERVED)
 		{
-			OMI_DBG((omi_debug,
-			"Unable to access database file:  \"%s\"\nReserved_bytes field in the file header is too small for GT.CM\n",
-			fdi_ptr->fname));
+			if (cs_data->reserved_bytes < RC_RESERVED)
+				OMI_DBG((omi_debug,
+						"Unable to access database file:  \"%s\"\ndata_reserved_bytes field in the file "
+						"header is too small for GT.CM\n",
+						fpath2.addr));
+			else
+				OMI_DBG((omi_debug,
+						"Unable to access database file:  \"%s\"\nindex_reserved_bytes field in the file "
+						"header is too small for GT.CM\n",
+						fpath2.addr));
 			free(dsid_list->fname);
 			dsid_list->fname = NULL;
 			free(dsid_list);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,8 +85,7 @@ unsigned char *ext2jnlcvt(char *ext_buff, int4 ext_len, unsigned char **tr, int 
 				 */
 				assert((unsigned char *)&gtmsource_msgp->msg[0] == *tr);
 				assert(*tr_bufsiz == gtmsource_msgbufsiz);
-				UNIX_ONLY(gtmsource_alloc_msgbuff(tmpbufsiz, FALSE);)
-				VMS_ONLY(gtmsource_alloc_msgbuff(tmpbufsiz);)
+				gtmsource_alloc_msgbuff(tmpbufsiz, FALSE);
 				*tr_bufsiz = gtmsource_msgbufsiz;
 				*tr = &gtmsource_msgp->msg[0];
 				rec = *tr + tmpsize;
@@ -94,7 +93,7 @@ unsigned char *ext2jnlcvt(char *ext_buff, int4 ext_len, unsigned char **tr, int 
 			} else
 			{
 				tmp = malloc(tmpbufsiz);
-				memcpy(tmp, origbuf, tmpsize);
+				memcpy((void *)tmp, origbuf, tmpsize);
 				free(origbuf);
 				*tr = tmp;
 				*tr_bufsiz = tmpbufsiz;

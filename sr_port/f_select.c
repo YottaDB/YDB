@@ -89,8 +89,8 @@ int f_select(oprtype *a, opctype op)
 	TREF(side_effect_depth) = INITIAL_SIDE_EFFECT_DEPTH;
 	TREF(side_effect_base) = malloc(SIZEOF(boolean_t) * TREF(side_effect_depth));
 	memset((char *)(TREF(side_effect_base)), 0, SIZEOF(boolean_t) * TREF(side_effect_depth));
-	if (shifting = (save_state->shift_side_effects) && (NULL != save_state->expr_start) && ((!save_state->saw_side_effect)
-		|| (GTM_BOOL == TREF(gtm_fullbool))))
+	if ((shifting = (save_state->shift_side_effects) && (NULL != save_state->expr_start)
+				&& ((!save_state->saw_side_effect) || (GTM_BOOL == TREF(gtm_fullbool)))))
 	{	/* shift in progress; WARNING assignment above */
 		TREF(expr_depth) = 1;		/* Don't want to hit bottom with each expression, so start at 1 rather than 0 */
 		exorder_init(&tmpchain);

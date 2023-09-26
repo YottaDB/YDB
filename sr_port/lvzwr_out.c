@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -152,7 +152,7 @@ void lvzwr_out(lv_val *lvp)
 			lvpc = (lv_val *)lvp->v.str.addr;
 			assert(lvpc);
 			assert(LV_IS_BASE_VAR(lvpc));	/* Verify base var lv_val */
-			if (tabent_addr = (ht_ent_addr *)lookup_hashtab_addr(&zwrhtab->h_zwrtab, (char **)&lvpc))
+			if ((tabent_addr = (ht_ent_addr *)lookup_hashtab_addr(&zwrhtab->h_zwrtab, (char **)&lvpc)))
 			{	/* The value was found, we have  a reference we can print now */
 				assert(HTENT_VALID_ADDR(tabent_addr, zwr_alias_var, zav));
 				*one.addr = '*';

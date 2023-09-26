@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -105,7 +105,7 @@ int main(int argc, char_ptr_t argv[])
 			{
 				if (bptr != buff)
 				{
-					memmove(buff, bptr, blen);
+					memmove((void *)buff, bptr, blen);
 					bptr = buff;
 				}
 				continue;
@@ -117,7 +117,7 @@ int main(int argc, char_ptr_t argv[])
 		{
 			if (bptr != buff)
 			{
-				memmove(buff, bptr, blen);
+				memmove((void *)buff, bptr, blen);
 				bptr = buff;
 			}
 			rdmr = 1;

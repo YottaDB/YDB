@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,7 +87,7 @@ bool zlput_rname (rhdtyp *hdr)
 				((RTNTBL_EXP_MIN > size) ? RTNTBL_EXP_MIN : ((RTNTBL_EXP_MAX < size) ? RTNTBL_EXP_MAX : size)),
 				SIZEOF(rtn_tabent));
 			new = malloc(size);
-			memcpy(new, rtn_names, (char *)mid - (char *)rtn_names);
+			memcpy((void *)new, rtn_names, (char *)mid - (char *)rtn_names);
 			mid = (rtn_tabent *)((char *)mid + (new - (char *)rtn_names));
 			old_table = (char *)rtn_names;
 			/* Adjust rtn_named_end to point into new table by applying offset to new block */

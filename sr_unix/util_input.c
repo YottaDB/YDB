@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,6 +84,7 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 			{
 				U16_NEXT(ufgets_Ubuffer, u16_off, in_len, uc32_cp);	/* updates u16_off */
 				if (remove_leading_spaces && !found_non_space)
+				{
 					if (U_ISSPACE(uc32_cp))
 						continue;
 					else
@@ -92,6 +93,7 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 						non_space_off = u16_off;
 						U16_BACK_1(ufgets_Ubuffer, 0, non_space_off); /* get non space offset */
 					}
+				}
 				mbc_len += U8_LENGTH(uc32_cp);
 			}
 			if (mbc_len >= (buffersize - 1))

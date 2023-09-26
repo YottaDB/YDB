@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -119,17 +120,23 @@ rhdtyp *make_mode (int mode_index)
 	int algnd_lbltab_size = (int)ROUND_UP2(SIZEOF(lab_tabent), NATIVE_WSIZE);
 	int algnd_lnrtab_size = (int)ROUND_UP2(CODE_LINES * SIZEOF(lnr_tabent), NATIVE_WSIZE);
 
+	/* Define some types since SCA sometimes doesn't like the way we use the memory past the header */
+	typedef unsigned char rhd_bytes[algnd_rtnhdr_size + algnd_code_size + algnd_lbltab_size + algnd_lnrtab_size];
+	typedef rhd_bytes *rhd_bytes_p;
+	rhd_bytes_p bytes;
+
 	assert((DM_MODE == mode_index) || (CI_MODE == mode_index));
         base_address = (rhdtyp *)GTM_TEXT_ALLOC(algnd_rtnhdr_size + algnd_code_size + algnd_lbltab_size + algnd_lnrtab_size);
+	bytes = (rhd_bytes_p) base_address;	/* Treat our allocated memory as a sized array of bytes for SCA */
 	memset(base_address, 0, algnd_rtnhdr_size + algnd_code_size + algnd_lbltab_size + algnd_lnrtab_size);
 	dmode = &our_modes[mode_index];
 	base_address->routine_name.len = dmode->rtn_name_len;
 	base_address->routine_name.addr = dmode->rtn_name;
-	base_address->ptext_adr = (unsigned char *)base_address + algnd_rtnhdr_size;
-	base_address->ptext_end_adr = (unsigned char *)base_address->ptext_adr + algnd_code_size;
+	base_address->ptext_adr = &((unsigned char *)bytes)[algnd_rtnhdr_size];
+	base_address->ptext_end_adr = &((unsigned char *)bytes)[algnd_rtnhdr_size + algnd_code_size];
 	base_address->lnrtab_adr = (lnr_tabent *)base_address->ptext_end_adr;
-	base_address->labtab_adr = (lab_tabent *)((unsigned char *)base_address + algnd_rtnhdr_size +
-						  algnd_code_size + algnd_lnrtab_size);
+	base_address->labtab_adr = (lab_tabent *) &(((unsigned char *)bytes)[algnd_rtnhdr_size +
+		algnd_code_size + algnd_lnrtab_size]);
 	base_address->lnrtab_len = CODE_LINES;
 	base_address->labtab_len = 1;
 	code = (CODEBUF_TYPE *)base_address->ptext_adr;	/* start of executable code */

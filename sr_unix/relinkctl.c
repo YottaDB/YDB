@@ -73,6 +73,7 @@ STATICFNDCL void relinkctl_delete(open_relinkctl_sgm *linkctl);
 #define SLASH_GTM_RELINKCTL_LEN	STRLEN(SLASH_GTM_RELINKCTL)
 #define MAX_RCTL_OPEN_RETRIES	16
 
+error_def(ERR_EXCEEDRCTLRNDWN);
 error_def(ERR_FILEPARSE);
 error_def(ERR_RELINKCTLERR);
 error_def(ERR_RELINKCTLFULL);
@@ -355,7 +356,8 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			relinkctl_unlock_exclu(linkctl);
 			relinkctl_unmap(linkctl);
 			assert(NULL == linkctl->hdr);
-			assertpro(MAX_RCTL_RUNDOWN_RETRIES > rctl_rundown_count++); /* Too many loops should not be possible. */
+			if (MAX_RCTL_RUNDOWN_RETRIES <= rctl_rundown_count++)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_EXCEEDRCTLRNDWN, 1, MAX_RCTL_RUNDOWN_RETRIES);
 			continue;
 		}
 		if (0 == hdr->relinkctl_max_rtn_entries)

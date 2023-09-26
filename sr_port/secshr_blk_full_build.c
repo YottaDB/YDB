@@ -35,8 +35,8 @@ GBLREF	unsigned char		cw_set_depth;
 /* To check if an input CS->mode is gds_t_write_root, it is possible we are in phase2 in which case we would have
  * set CS->mode to gds_t_committed in which case CS->old_mode would hold the gds_t_write_root value hence the below macro.
  */
-#define	IS_T_WRITE_ROOT(CS) ((gds_t_write_root == CS->mode)							\
-					|| (gds_t_committed == CS->mode) && (gds_t_write_root == CS->old_mode))
+#define	IS_T_WRITE_ROOT(CS) ((gds_t_write_root == CS->mode)								\
+					|| ((gds_t_committed == CS->mode) && (gds_t_write_root == CS->old_mode)))
 
 /* Returns 0 if success, -1 if failure */
 int secshr_blk_full_build(boolean_t is_tp, sgmnt_addrs *csa,

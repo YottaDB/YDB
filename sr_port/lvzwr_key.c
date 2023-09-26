@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +32,7 @@ unsigned char *lvzwr_key(unsigned char *buff, int size)
 	assert(lvzwrite_block);
 	len = MIN(size, lvzwrite_block->curr_name->len);
 	assert(MAX_MIDENT_LEN >= len);
-	memcpy(buff, lvzwrite_block->curr_name->addr, len);
+	memcpy((void *)buff, lvzwrite_block->curr_name->addr, len);
 	size -= len;
 	buff += len;
 
@@ -47,7 +48,7 @@ unsigned char *lvzwr_key(unsigned char *buff, int size)
 			mval_lex(((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[sub_idx].actual, &sub);
 			if (0 <= (size -= sub.len))
 			{
-				memcpy(buff, sub.addr, sub.len);
+				memcpy((void *)buff, sub.addr, sub.len);
 				buff += sub.len;
 			} else
 				break;

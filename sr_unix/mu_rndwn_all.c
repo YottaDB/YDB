@@ -142,17 +142,15 @@ STATICFNDEF void mu_rndwn_all_helper(shm_parms *parm_buff, char *fname, int *exi
 {
 	replpool_identifier	replpool_id;
 	boolean_t 		ret_status, jnlpool_sem_created;
-	size_t			fname_len;
 	unsigned char		ipcs_buff[MAX_IPCS_ID_BUF], *ipcs_ptr;
 
 	ESTABLISH(mu_rndwn_all_helper_ch);
-	fname_len = strlen(fname);
 	if (validate_db_shm_entry(parm_buff, fname, tmp_exit_status))
 	{
 		if (SS_NORMAL == *tmp_exit_status)
 		{	/* shm still exists */
 			mu_gv_cur_reg_init();
-			gv_cur_region->dyn.addr->fname_len = MIN(fname_len, MAX_FN_LEN);
+			STRNLEN(fname, MAX_FN_LEN, gv_cur_region->dyn.addr->fname_len);
 			STRNCPY_STR(gv_cur_region->dyn.addr->fname, fname, gv_cur_region->dyn.addr->fname_len);
 			gv_cur_region->dyn.addr->fname[gv_cur_region->dyn.addr->fname_len] = '\0';
 			if (mu_rndwn_file(gv_cur_region, FALSE))

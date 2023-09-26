@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,6 +69,7 @@ GBLDEF	CLI_ENTRY			*cmd_ary = &mumps_cmd_ary[0]; /* Define cmd_ary to be the MUM
 
 #define GTMCRYPT_ERRLIT			"during GT.M startup"
 #define GTMXC_gblstat			"GTMXC_gblstat=%s/gtmgblstat.xc"
+#define GTMXC_gtmtlsfuncs		"GTMXC_gtmtlsfuncs=%s/plugin/gtmtlsfuncs.tab"
 #define	MUMPS				"MUMPS "
 
 #ifdef __osf__
@@ -98,7 +99,7 @@ int gtm_main (int argc, char **argv, char **envp)
 #endif
 {
 	char			*ptr, *eq, **p;
-	char			gtmlibxc[GTM_PATH_MAX];
+	char			gtmlibxc[GTM_PATH_MAX], gtmtlsfuncs[GTM_PATH_MAX];
 	int             	eof, parse_ret;
 	int			gtmcrypt_errno;
 	int			status;
@@ -164,6 +165,8 @@ int gtm_main (int argc, char **argv, char **envp)
 	SNPRINTF(gtmlibxc, GTM_PATH_MAX, GTMXC_gblstat, gtm_dist);
 	PUTENV(status, gtmlibxc);
 #	ifdef GTM_TLS
+	SNPRINTF(gtmtlsfuncs, GTM_PATH_MAX, GTMXC_gtmtlsfuncs, gtm_dist);
+	PUTENV(status, gtmtlsfuncs);
 	if (MUMPS_COMPILE != invocation_mode)
 	{
 		if ((NULL != (ptr = (char *)getenv(GTM_PASSWD_ENV))) && (0 == strlen(ptr)))
@@ -218,7 +221,7 @@ int gtm_main (int argc, char **argv, char **envp)
 					}
 					assert(NULL != tls_ctx);
 					cplen = (eq - ptr);
-					if (sizeof(tlsid_env_name) > (cplen + 1))
+					if (sizeof(tlsid_env_name) > (cplen + 1))	/* BYPASSOK unsigned comparison */
 						cplen = sizeof(tlsid_env_name) - 1;
 					memcpy(tlsid_env_name, ptr, cplen);
 					tlsid_env_name[cplen] = '\0';

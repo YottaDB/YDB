@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -222,7 +222,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 					ENSURE_STP_FREE_SPACE(len);
 					mv_child->str.addr = (char *)stringpool.free;
 					stringpool.free +=len;
-					strncpy(mv_child->str.addr, piecestr, (size_t)len);
+					memcpy(mv_child->str.addr, piecestr, (size_t)len);
 					mv_child->str.len = len;
 					/* make sure the subscript will fit */
 					is_base_var = LV_IS_BASE_VAR(lv_child);

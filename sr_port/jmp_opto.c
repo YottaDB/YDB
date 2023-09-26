@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,7 @@ GBLREF uint4		gtmDebugLevel;
 #define JOPT_NO_OPT 1
 #define JOPT_REP_JMP 2
 #define JOPT_REF_NXT_TRP 3
-#define NO_ENTRY ((unsigned char)-1)
+#define NO_ENTRY ((unsigned char)(~0x0))
 #define NUM_JO_TBL_ELE 11
 #define PTR_NOT_DEFINED 0
 
@@ -270,7 +270,7 @@ void jmp_opto(void)
 						{
 							dqloop(&jump_trip->jmplist, que, b)
 							{
-								if (b->bpt = cur_trip)
+								if ((b->bpt = cur_trip))
 								{
 									dqdel(b, que);
 									break;
@@ -295,7 +295,7 @@ void jmp_opto(void)
 							assert(TJMP_REF == jump_trip->operand[0].oprclass);
 							dqloop(&jump_trip->jmplist, que, b)
 							{
-								if (b->bpt = cur_trip)
+								if ((b->bpt = cur_trip))
 								{
 									dqdel(b, que);
 									break;

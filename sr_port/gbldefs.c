@@ -228,6 +228,7 @@ GBLDEF	mval		dollar_zgbldir,
 			dollar_zyerror,
 			dollar_ztexit = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
 GBLDEF  uint4		dollar_zjob;
+GBLDEF	mstr		dollar_zicuver;
 GBLDEF	mval		dollar_zinterrupt;
 GBLDEF	volatile boolean_t	dollar_zininterrupt;
 GBLDEF	boolean_t	dollar_ztexit_bool; /* Truth value of dollar_ztexit when coerced to boolean */

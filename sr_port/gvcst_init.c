@@ -922,7 +922,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		 * deadlock situation so it needs to hold multiple crits at the same time. Currently, there is no fine-granular
 		 * checking for mupip_set_journal, hence a coarse MUPIP_IMAGE check for image_type.
 		 */
-		assert(dollar_tlevel && (CDB_STAGNATE <= t_tries) || IS_MUPIP_IMAGE || (0 == have_crit(CRIT_HAVE_ANY_REG))
+		assert((dollar_tlevel && (CDB_STAGNATE <= t_tries)) || IS_MUPIP_IMAGE || (0 == have_crit(CRIT_HAVE_ANY_REG))
 		       || WBTEST_ENABLED(WBTEST_HOLD_CRIT_ENABLED));
 		if (dollar_tlevel && (0 != have_crit(CRIT_HAVE_ANY_REG)))
 		{	/* To avoid deadlocks with currently holding crits and the DLM lock request to be done in "db_init",

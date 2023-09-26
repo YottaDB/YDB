@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,7 @@ unsigned char *get_symb_line(unsigned char *out, int max_len, unsigned char **b_
 	 */
 	if (process_exiting || !IS_MCODE_RUNNING)
 	{	/* Show which image is running */
-		memcpy(out, gtmImageNames[image_type].imageName, gtmImageNames[image_type].imageNameLen);
+		memcpy((void *)out, gtmImageNames[image_type].imageName, gtmImageNames[image_type].imageNameLen);
 		out_addr = out + gtmImageNames[image_type].imageNameLen;
 		if (process_exiting)
 		{	/* Add the information that this process was exiting */

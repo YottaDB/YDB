@@ -564,7 +564,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 					RTS_ERROR_LITERAL("mnemonic argument (array index)"));
 			break;
 		case PO_PEEK:			/* Argument is address of form 0Xhhhhhhhh[hhhhhhhh] */
-			if (('0' != *cptr++) || ('x' != *cptr) && ('X' != *cptr))
+			if (('0' != *cptr++) || (('x' != *cptr) && ('X' != *cptr)))
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2,
 					RTS_ERROR_LITERAL("mnemonic argument (peek base address)"));
 			cptr++;			/* Bump past 'x' or 'X' - rest of arg should be hex value */

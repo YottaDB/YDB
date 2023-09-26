@@ -268,7 +268,7 @@ void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, 
 		if (fp->l_symtab != last_lsym_hte)
 		{	/* Different l_symtab than last time (don't want to update twice) */
 			last_lsym_hte = fp->l_symtab;
-			if (htcnt = fp->vartab_len)	/* Note assignment */
+			if ((htcnt = fp->vartab_len))	/* Note assignment */
 			{	/* Only process non-zero length l_symtabs */
 				DEBUG_ONLY(first_sym = TRUE);
 				for (htep = fp->l_symtab; htcnt; --htcnt, ++htep)

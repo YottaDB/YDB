@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,7 +59,7 @@ error_def(ERR_SIDEEFFECTEVAL);
 				if (TK_IDENT == TREF(window_token))
 				{
 					ot = put_mvar(&(TREF(window_ident)));
-					mask |= (1 << parmcount - 1);
+					mask |= (1 << (parmcount - 1));
 					advancewindow();
 				} else if (TK_ATSIGN == TREF(window_token))
 				{
@@ -68,7 +68,7 @@ error_def(ERR_SIDEEFFECTEVAL);
 					ref2 = newtriple(OC_INDLVNAMADR);
 					ref2->operand[0] = ot;
 					ot = put_tref(ref2);
-					mask |= (1 << parmcount - 1);
+					mask |= (1 << (parmcount - 1));
 				} else
 				{
 					stx_error(ERR_NAMEEXPECTED);

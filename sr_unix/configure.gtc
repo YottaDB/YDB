@@ -66,7 +66,7 @@ nscripts="gtmbase lowerc_cp"
 rscripts="gtmstart gtmstop"
 if [ $deliver_gtcm = "yes" ]; then
 	rscripts="$rscripts gtcm_run gtcm_slist"
-	binaries="$binaries gtcm_server gtcm_pkdisp gtcm_play gtcm_shmclean"
+	binaries="$binaries gtcm_server"
 fi
 
 if [ $deliver_gtcm_gnp = "yes" ]; then
@@ -226,7 +226,7 @@ if [ -d "utf8" ]; then
 				maj=`$echo $icu_version | cut -f 1 -d "."`
 				if [ "$maj" -ge "49" ] ; then
 					# Assuming the input is of the form 52.1. As of ICU 49 (aka 4.9),
-					# the version reported by icu-config --version is <major><minor>.<milli> and not <major>.<minor>
+					# icu-config --version reports <major><minor>.<milli> and not <major>.<minor>
 					majmin=$maj
 				else
 					# Assuming the input is of the form 4.2.1
@@ -415,11 +415,15 @@ gtmcryptscripts="$gtmcryptscripts import_and_sign_key.sh gen_sym_hash.sh show_in
 # Gtmcrypt related M file
 gtmcryptmfile="pinentry.m"
 
+# Gtmcrypt input files
+gtmcryptinfiles="gpgagent.tab.in gtmtlsfuncs.tab.in"
+
 # Gtmcrypt source files
 gtmcryptsrcfiles="Makefile README gtmcrypt_ref.c gtmcrypt_ref.h gtmcrypt_interface.h maskpass.c"
 gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_dbk_ref.c gtmcrypt_dbk_ref.h gtmcrypt_pk_ref.c gtmcrypt_pk_ref.h"
 gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_sym_ref.h gtmcrypt_sym_ref.c gtm_tls_interface.h gtm_tls_impl.h"
-gtmcryptsrcfiles="$gtmcryptsrcfiles gtm_tls_impl.c gtmcrypt_util.c gtmcrypt_util.h $gtmcryptmfile"
+gtmcryptsrcfiles="$gtmcryptsrcfiles gtm_tls_impl.c gtm_tls_externalcalls.h gtmcrypt_util.c gtmcrypt_util.h"
+gtmcryptsrcfiles="$gtmcryptsrcfiles $gtmcryptmfile $gtmcryptinfiles"
 
 dogtmcrypt=0
 if [ -d "$plugin_gtmcrypt" ]; then

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2021 Fidelity National Information	*
+ * Copyright (c) 2009-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -222,8 +222,8 @@ gtm_status_t gtmcrypt_init_device_cipher_context_by_keyname(gtmcrypt_key_t *hand
 	gtmcrypt_err_string[0] = '\0';
 	CHECK_IV_LENGTH(iv);
 	/* NULL-terminating to ensure correct lookups. */
-	memcpy(keyname, key_name.address, key_name.length);
-	memset(keyname + key_name.length, 0, GTM_PATH_MAX - key_name.length);
+	if (GTM_PATH_MAX < snprintf(keyname, GTM_PATH_MAX, "%.*s", (int) key_name.length, key_name.address))
+		return -1;
 	if (0 != gtmcrypt_getkey_by_keyname(keyname, NULL, &entry, FALSE))
 		return -1;
 	assert(NULL != entry);
@@ -355,7 +355,7 @@ gtm_status_t gtmcrypt_encrypt_decrypt(gtmcrypt_key_t handle, gtm_char_t *src_blo
 	{
 		case GTMCRYPT_IV_SET:
 			CHECK_IV_LENGTH(iv);
-			memcpy(iv_array, iv.address, iv.length);
+			memcpy((void *)iv_array, iv.address, iv.length);
 			if (GTMCRYPT_IV_LEN != iv.length)
 				memset(iv_array + iv.length, 0, GTMCRYPT_IV_LEN - iv.length);
 		case GTMCRYPT_IV_RESET:	/* CAUTION: Fall-through. */

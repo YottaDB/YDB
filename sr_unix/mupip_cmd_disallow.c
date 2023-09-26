@@ -358,7 +358,11 @@ boolean_t cli_disallow_mupip_replic_receive(void)
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (!d_c_cli_present("START") && (d_c_cli_present("LISTENPORT")
 								|| d_c_cli_present("UPDATERESYNC")
-								|| d_c_cli_present("NORESYNC")));
+								|| d_c_cli_present("NORESYNC")
+								|| d_c_cli_present("RECVBUFFSIZE")
+								|| d_c_cli_negated("RECVBUFFSIZE")
+								|| d_c_cli_present("SENDBUFFSIZE")
+								|| d_c_cli_negated("SENDBUFFSIZE")));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (d_c_cli_present("UPDATERESYNC") && d_c_cli_present("NORESYNC"));
 	CLI_DIS_CHECK_N_RESET;
@@ -438,14 +442,20 @@ boolean_t cli_disallow_mupip_replic_source(void)
 	disallow_return_value = (d_c_cli_present("PLAINTEXTFALLBACK") || d_c_cli_present("TLSID"));
 	CLI_DIS_CHECK_N_RESET;
 #	endif
-	/* BUFFSIZE, CMPLVL, FILTER, PASSIVE, PLAINTEXTFALLBACK and TLSID  are supported only with START qualifier */
+	/* Only -START supports the BUFFSIZE, CMPLVL, FILTER, PASSIVE, PLAINTEXTFALLBACK, TLSID,
+	 * RECVBUFFSIZE, and SENDBUFFSIZE qualifiers.
+	 */
 	disallow_return_value = (!d_c_cli_present("START")
 					&& (d_c_cli_present("BUFFSIZE")
 						|| d_c_cli_present("CMPLVL")
 						|| d_c_cli_present("FILTER")
 						|| d_c_cli_present("PASSIVE")
 						|| d_c_cli_present("PLAINTEXTFALLBACK")
-						|| d_c_cli_present("TLSID")));
+						|| d_c_cli_present("TLSID")
+						|| d_c_cli_present("RECVBUFFSIZE")
+						|| d_c_cli_negated("RECVBUFFSIZE")
+						|| d_c_cli_present("SENDBUFFSIZE")
+						|| d_c_cli_negated("SENDBUFFSIZE")));
 	CLI_DIS_CHECK_N_RESET;
 	/* CONNECTPARAMS, SECONDARY are supported only with START or ACTIVATE qualifiers */
 	disallow_return_value = (!d_c_cli_present("START") && !d_c_cli_present("ACTIVATE")
@@ -574,6 +584,8 @@ boolean_t cli_disallow_mupip_set(void)
 					(d_c_cli_present("ACCESS_METHOD")
 					|| d_c_cli_present("GLOBAL_BUFFERS")
 					|| d_c_cli_present("RESERVED_BYTES")
+					|| d_c_cli_present("DATA_RESERVED_BYTES")
+					|| d_c_cli_present("INDEX_RESERVED_BYTES")
 					|| d_c_cli_present("FLUSH_TIME")
 					|| d_c_cli_present("LOCK_SPACE")
 					|| d_c_cli_present("DEFER_TIME")
@@ -582,9 +594,10 @@ boolean_t cli_disallow_mupip_set(void)
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (d_c_cli_present("INST_FREEZE_ON_ERROR") && p3);
 	CLI_DIS_CHECK_N_RESET;
-	p1 = d_c_cli_present("KEY_SIZE");
-	p2 = d_c_cli_present("RESERVED_BYTES");
-	disallow_return_value =  cli_check_any2(VARLSTCNT(2) p1, p2);
+	disallow_return_value =  (d_c_cli_present("KEY_SIZE") &&
+				  (d_c_cli_present("RESERVED_BYTES")
+				   || d_c_cli_present("DATA_RESERVED_BYTES")
+				   || d_c_cli_present("INDEX_RESERVED_BYTES")));
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }

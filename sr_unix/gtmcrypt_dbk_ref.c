@@ -66,7 +66,7 @@
 	TYPE	*cur_node, **target_node;						\
 											\
 	target_node = &ROOT;								\
-	while (cur_node = *target_node)	/* NOTE: Assignment!!! */			\
+	while ((cur_node = *target_node))	/* NOTE: Assignment!!! */		\
 	{										\
 		diff = FIXED								\
 			? memcmp(cur_node->FIELD, VALUE, LENGTH)			\

@@ -238,9 +238,14 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 				bmphist.blk_num = lmap_blk_num;
 				bmphist.buffaddr = t_qread(bmphist.blk_num, &bmphist.cycle, &bmphist.cr);
 				lmap_blk_hdr = (blk_hdr_ptr_t)bmphist.buffaddr;
-				if (!(bmphist.buffaddr) || (BM_SIZE(BLKS_PER_LMAP) != lmap_blk_hdr->bsiz))
+				if (NULL == bmphist.buffaddr)
 				{ /* Could not read the block successfully. Retry. */
 					t_retry((enum cdb_sc)rdfail_detail);
+					continue;
+				}
+				if (BM_SIZE(BLKS_PER_LMAP) != lmap_blk_hdr->bsiz)
+				{ /* Lost the buffer. Retry. */
+					t_retry(cdb_sc_blkmod);
 					continue;
 				}
 				lmap_addr = bmphist.buffaddr + SIZEOF(blk_hdr);
@@ -320,9 +325,14 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 			/* Read the nth local bitmap into memory */
 			blkhist->buffaddr = t_qread(lmap_blk_num, (sm_int_ptr_t)&blkhist->cycle, &blkhist->cr);
 			lmap_blk_hdr = (blk_hdr_ptr_t)blkhist->buffaddr;
-			if (!(blkhist->buffaddr) || (BM_SIZE(BLKS_PER_LMAP) != lmap_blk_hdr->bsiz))
+			if (NULL == blkhist->buffaddr)
 			{ /* Could not read the block successfully. Retry. */
 				t_retry((enum cdb_sc)rdfail_detail);
+				continue;
+			}
+			if (BM_SIZE(BLKS_PER_LMAP) != lmap_blk_hdr->bsiz)
+			{ /* Lost the buffer. Retry */
+				t_retry(cdb_sc_blkmod);
 				continue;
 			}
 			t_write_map(blkhist, blkid_ptr, curr_tn, 0);

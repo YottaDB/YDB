@@ -231,7 +231,7 @@ void advancewindow(void)
 			x -= 32;
 			if (x < ARRAYSIZE(apos_ok))
 			{
-				if (y = apos_ok[x])
+				if ((y = apos_ok[x]))
 				{
 					if (DEL < (x = *++(TREF(lexical_ptr))))		/* note assignment */
 					{

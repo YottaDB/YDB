@@ -214,7 +214,8 @@ boolean_t mur_back_process(boolean_t apply_pblk, seq_num *pre_resolve_seqno)
 				/* Treat PTHREAD_CANCELED as if it is a normal status. This is because the thread got canceled
 				 * only because some other thread got an error. We need to only look at the error returns here.
 				 */
-				assert((NULL == jctl) || (SS_NORMAL != status2) && ((uint4)(UINTPTR_T)PTHREAD_CANCELED != status2));
+				assert((NULL == jctl)
+						|| ((SS_NORMAL != status2) && ((uint4)(UINTPTR_T)PTHREAD_CANCELED != status2)));
 				if ((SS_NORMAL == status2) || ((uint4)(UINTPTR_T)PTHREAD_CANCELED == status2))
 					continue;
 				if ((ERR_JNLBADRECFMT == status2) && jctl->after_end_of_data)

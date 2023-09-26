@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,7 +108,7 @@ STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_li
 	 * and point to it instead of val->str.addr.
 	 */
 	gvname.var_name.len = val->str.len;
-	memcpy(varstr, val->str.addr, gvname.var_name.len);
+	memcpy((void *)varstr, val->str.addr, gvname.var_name.len);
 	gvname.var_name.addr = varstr;
 	TREF(gd_targ_addr) = gd_header;		/* needed by name-level $order/$zprevious and various other functions */
 	/* Bind the unsubscripted global name to corresponding region in the global directory map */
@@ -137,7 +137,7 @@ STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_li
 	max_key = gv_cur_region->max_key_size;
 	if (gv_currkey->end >= max_key)
 		ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
-	assert(!dollar_tlevel || sgm_info_ptr && (sgm_info_ptr->tp_csa == cs_addrs));
+	assert(!dollar_tlevel || (sgm_info_ptr && (sgm_info_ptr->tp_csa == cs_addrs)));
 	TREF(gv_some_subsc_null) = was_null; /* if true, it indicates there is a null subscript (other than the last subscript)
 						in current key */
 	TREF(gv_last_subsc_null) = is_null; /* if true, it indicates that last subscript in current key is null */

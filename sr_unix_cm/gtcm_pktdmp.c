@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,9 +106,9 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 	SNPRINTF(tbuf, 16, "%02d%02d%02d%02d",ltime->tm_mon + 1,ltime->tm_mday,
 		ltime->tm_hour,ltime->tm_min);
 
-	if (gtm_dist=getenv("gtm_dist"))
+	if ((gtm_dist=getenv("gtm_dist")))
 	{
-	    	char subdir[GTM_PATH_MAX];
+		char subdir[GTM_PATH_MAX];
 		struct stat buf;
 
 		/* check for the subdirectory $gtm_dist/log/<omi_service>

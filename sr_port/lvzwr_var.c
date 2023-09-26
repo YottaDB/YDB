@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -211,7 +211,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 	if (!merge_args && LV_IS_BASE_VAR(lv) && IS_ALIASLV(lv))
 	{
 		assert(0 == n);	/* Verify base var lv_val */
-		if (tabent_addr = (ht_ent_addr *)lookup_hashtab_addr(&zwrhtab->h_zwrtab, (char **)&lv))
+		if ((tabent_addr = (ht_ent_addr *)lookup_hashtab_addr(&zwrhtab->h_zwrtab, (char **)&lv)))
 		{	/* We've seen it before but check if it was actually printed at that point */
 			zav = (zwr_alias_var *)tabent_addr->value;
 			assert(zav);
@@ -282,7 +282,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
 			}
 		}
-	} else  if (lvt = LV_GET_CHILD(lv))
+	} else  if ((lvt = LV_GET_CHILD(lv)))
 	{	/* If node has children, process them now */
 		zwr_sub->subsc_list[n].actual = &mv;
 		/* In case of standard null collation, first process null subscript if it exists */

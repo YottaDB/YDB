@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,7 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 			}
 			if ((CR_BLKEMPTY != cr->blk) && ((cr->blk % hmax) != blk_hash))
 				break;			/* Retry - something changed */
-			assert(!csa->now_crit || (0 != cr->blkque.fl) && (0 != cr->blkque.bl));
+			assert(!csa->now_crit || ((0 != cr->blkque.fl) && (0 != cr->blkque.bl)));
 			if (cr->blk == block)
 			{
 				if (CDB_STAGNATE <= t_tries || mu_reorg_process)

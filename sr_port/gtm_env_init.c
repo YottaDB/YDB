@@ -112,7 +112,7 @@ void	gtm_env_init(void)
 		gtmDebugLevel = INITIAL_DEBUG_LEVEL;
 		val.addr = GTM_DEBUG_LEVEL_ENVLOG;
 		val.len = SIZEOF(GTM_DEBUG_LEVEL_ENVLOG) - 1;
-		if (tdbglvl = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
+		if ((tdbglvl = trans_numeric(&val, &is_defined, TRUE))) /* Note assignment!! */
 		{	/* Some kind of debugging was asked for.. */
 			tdbglvl |= GDL_Simple;			/* Make sure simple debugging turned on if any is */
 			if ((GDL_SmChkFreeBackfill | GDL_SmChkAllocBackfill) & tdbglvl)
@@ -281,18 +281,18 @@ void	gtm_env_init(void)
 		outOfMemoryMitigateSize = GTM_MEMORY_RESERVE_DEFAULT;
 		val.addr = GTM_MEMORY_RESERVE;
 		val.len = SIZEOF(GTM_MEMORY_RESERVE) - 1;
-		if (reservesize = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
+		if ((reservesize = trans_numeric(&val, &is_defined, TRUE))) /* Note assignment!! */
 			outOfMemoryMitigateSize = reservesize;
 		/* Initialize indirect cache limits (max memory, max entries) */
 		max_cache_memsize = DEFAULT_INDRCACHE_KBSIZE * BIN_ONE_K;
 		val.addr = GTM_MAX_INDRCACHE_MEMORY;
 		val.len = SIZEOF(GTM_MAX_INDRCACHE_MEMORY) - 1;
-		if (memsize = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
+		if ((memsize = trans_numeric(&val, &is_defined, TRUE))) /* Note assignment!! */
 			max_cache_memsize = ((MAX_INDRCACHE_KBSIZE > memsize) ? memsize : MAX_INDRCACHE_KBSIZE) * BIN_ONE_K;
 		max_cache_entries = DEFAULT_INRDCACHE_ENTRIES;
 		val.addr = GTM_MAX_INDRCACHE_COUNT;
 		val.len = SIZEOF(GTM_MAX_INDRCACHE_COUNT) - 1;
-		if (cachent = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
+		if ((cachent = trans_numeric(&val, &is_defined, TRUE))) /* Note assignment!! */
 			max_cache_entries = cachent;
 		/* Initialize ZQUIT to control funky QUIT compilation */
 		val.addr = GTM_ZQUIT_ANYWAY;

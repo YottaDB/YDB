@@ -679,7 +679,7 @@ int4 mur_open_files(boolean_t retry)
 			cs_addrs->nl->onln_rlbk_pid = process_id;
 #			ifdef DEBUG
 			/* ensure that we don't have any pending journal writes or flushes */
-			assert(!JNL_ALLOWED(cs_data) || (NULL != cs_addrs->jnl) && (NULL != cs_addrs->jnl->jnl_buff));
+			assert(!JNL_ALLOWED(cs_data) || ((NULL != cs_addrs->jnl) && (NULL != cs_addrs->jnl->jnl_buff)));
 			if (NULL != cs_addrs->jnl)
 			{
 				jb = cs_addrs->jnl->jnl_buff;

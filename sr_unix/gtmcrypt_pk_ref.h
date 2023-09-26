@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2017 Fidelity National Information	*
+ * Copyright (c) 2009-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,8 +13,6 @@
 #ifndef	GTMCRYPT_PK_REF_H
 #define	GTMCRYPT_PK_REF_H
 
-int 			gc_pk_mask_unmask_passwd(char *in, char *out, int len);
-int 			gc_pk_mask_unmask_passwd_interlude(int nparm, gtm_string_t *in, gtm_string_t *out, int len);
 void 			gc_pk_scrub_passwd();
 void 			gc_pk_crypt_load_gtmci_env();
 xc_status_t 		gc_pk_update_passwd();
@@ -25,7 +23,6 @@ int 			gc_pk_crypt_passphrase_callback(void *opaque,
 							int fd);
 int 			gc_pk_crypt_retrieve_plain_text(gpgme_data_t plain_data, unsigned char *plain_text);
 gpgme_error_t 		gc_pk_get_decrypted_key(const char *cipher_file, unsigned char *plain_text, int *plain_text_length);
-int			gc_pk_mask_unmask_passwd(char *in, char *out, int len);
 void			gc_pk_scrub_passwd(void);
 void			gc_pk_crypt_load_gtmci_env(void);
 int			gc_pk_scrub_plaintext_keys_from_c_stack(void);
@@ -109,8 +106,8 @@ int			gc_pk_gpghome_has_permissions(void);
 
 #define GC_PK_APPEND_UNIQ_STRING(in_buff, symmetric_key)								\
 {															\
-	memcpy(in_buff, symmetric_key, SYMMETRIC_KEY_MAX);								\
-	memcpy(in_buff + SYMMETRIC_KEY_MAX, UNIQ_ENC_PARAM_STRING, UNIQ_ENC_PARAM_LEN);					\
+	memcpy((void *)in_buff, symmetric_key, SYMMETRIC_KEY_MAX);							\
+	memcpy((void *)(in_buff + SYMMETRIC_KEY_MAX), UNIQ_ENC_PARAM_STRING, UNIQ_ENC_PARAM_LEN);			\
 }
 
 #ifdef USE_OPENSSL

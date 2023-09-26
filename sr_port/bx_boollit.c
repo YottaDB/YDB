@@ -54,7 +54,7 @@ void bx_boollit(triple *t)
 	opercode = t->opcode;
 	assert(OCT_BOOL & oc_tab[opercode].octype);
 	assert(TRIP_REF == t->operand[0].oprclass);
-	assert((OC_COBOOL != opercode) && (OC_COM != opercode) || (TRIP_REF == t->operand[1].oprclass));
+	assert(((OC_COBOOL != opercode) && (OC_COM != opercode)) || (TRIP_REF == t->operand[1].oprclass));
 	for (opr = t->operand, j = 0; opr < ARRAYTOP(t->operand); opr++, j++)
 	{	/* checkout an operand to see if we can simplify it */
 		neg = num = 0;

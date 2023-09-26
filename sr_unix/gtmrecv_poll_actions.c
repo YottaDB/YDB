@@ -245,7 +245,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				; /* Empty Body */
 			if (SS_NORMAL != status)
 			{
-				if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
+				if (REPL_CONN_RESET(status) && (EREPL_SEND == repl_errno))
 				{
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending XOFF_ACK_ME. "
 							"Status = %d ; %s\n", status, STRERROR(status));
@@ -444,7 +444,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_BADTRANS message sent with seqno %llu\n", send_seqno);
 		} else
 		{
-			if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
+			if (REPL_CONN_RESET(status) && (EREPL_SEND == repl_errno))
 			{
 				if (send_cmp2uncmp)
 				{
@@ -480,7 +480,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		}
 	}
 	if ((upd_proc_local->bad_trans && bad_trans_detected) || onln_rlbk_flg_set
-		|| (UPDPROC_START == upd_proc_local->start_upd) && (1 != report_cnt))
+		|| ((UPDPROC_START == upd_proc_local->start_upd) && (1 != report_cnt)))
 	{
 		if (UPDPROC_START == upd_proc_local->start_upd)
 		{

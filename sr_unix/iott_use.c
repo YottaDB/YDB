@@ -107,6 +107,7 @@ void iott_use(io_desc *iod, mval *pp)
 	if (*(pp->str.addr + p_offset) != iop_eol)
 	{
 		if (tt_ptr->mupintr)
+		{
 			if (dollar_zininterrupt)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 			else
@@ -115,6 +116,7 @@ void iott_use(io_desc *iod, mval *pp)
 				tt_ptr->tt_state_save.who_saved = ttwhichinvalid;
 				io_find_mvstent(iod, TRUE);
 			}
+		}
 		status = tcgetattr(tt_ptr->fildes, &t);
 		if (0 != status)
 		{

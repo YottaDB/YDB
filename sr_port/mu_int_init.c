@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,6 +140,6 @@ boolean_t mu_int_init(void)
 	dbfilop(fc);
 	/* Ensure "mu_int_master" is populated even if we did not directly read into it for the O_DIRECT case */
 	if (udi->fd_opened_with_o_direct)
-		memcpy(mu_int_master, (TREF(dio_buff)).aligned, mu_int_data.master_map_len);
+		memcpy((void *)mu_int_master, (TREF(dio_buff)).aligned, mu_int_data.master_map_len);
 	return (mu_int_fhead());
 }

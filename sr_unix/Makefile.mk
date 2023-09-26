@@ -140,7 +140,7 @@ ifneq (,$(findstring AIX,$(UNAMESTR)))
 	# -G so that we can build shared library
 	# -bexpall exports all symbols from the shared library.
 	# -bnoentry to tell the linker that shared library has no entry point.
-	LDSHR = -Wl,-G -bexpall -bnoentry
+	LDSHR = -Wl,-G -bexpall -bnoentry -Wl,-L$(gtm_dist)/plugin
 	# On AIX, build maskpass and libgtmcryptutil.so with OpenSSL's libcrypto instead of libgcrypt.
 	default_thirdparty_CFLAGS = -DUSE_OPENSSL -DOPENSSL_API_COMPAT=0x10000000L
 	default_thirdparty_LDFLAGS = -lcrypto
@@ -244,8 +244,8 @@ install: all
 	@echo ; echo "Installing shared libraries to $(PLUGINDIR) and maskpass to $(PLUGINDIR)/gtmcrypt..."
 	mkdir -p $(PLUGINDIR)/o/utf8 $(PLUGINDIR)/r
 	cp -f *.so $(PLUGINDIR)
-	echo "$(PLUGINDIR)/libgtmcryptutil.so"                                                      > $(PLUGINDIR)/gpgagent.tab
-	echo "unmaskpwd: gtm_status_t gc_mask_unmask_passwd(I:gtm_string_t*,O:gtm_string_t*[512])" >> $(PLUGINDIR)/gpgagent.tab
+	sed "s;@GTM_TOP@;$(DISTDIR);" gpgagent.tab.in		> $(PLUGINDIR)/gpgagent.tab
+	sed "s;@GTM_TOP@;$(DISTDIR);" gtmtlsfuncs.tab.in	> $(PLUGINDIR)/gtmtlsfuncs.tab
 	ln -fs ./$(install_targ) $(PLUGINDIR)/libgtmcrypt.so
 	cp -pf pinentry.m $(PLUGINDIR)/r
 	(cd $(PLUGINDIR)/o      && env gtm_chset=M     ${gtm_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
@@ -261,7 +261,7 @@ endif
 
 uninstall:
 	@echo ; echo "Uninstalling shared libraries from $(PLUGINDIR) and maskpass from $(PLUGINDIR)/gtmcrypt..."
-	rm -f $(PLUGINDIR)/gpgagent.tab
+	rm -f $(PLUGINDIR)/gpgagent.tab $(PLUGINDIR)/gtmtlsfuncs.tab
 	rm -f $(PLUGINDIR)/libgtmcrypt*.so $(PLUGINDIR)/libgtmtls*.so
 	rm -f $(PLUGINDIR)/gtmcrypt/maskpass
 

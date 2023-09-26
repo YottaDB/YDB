@@ -230,7 +230,7 @@ int load_pattern_table(int name_len,char *file_name)
 				pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
 			}
 			newnamlen = idlen;
-			memcpy(newtabnam, ident, newnamlen + 1);
+			memcpy((void *)newtabnam, ident, newnamlen + 1);
 			if (T_NL != (token = pat_lex()))
 			{
 				util_out_print("Unrecognized text at end of line", TRUE);

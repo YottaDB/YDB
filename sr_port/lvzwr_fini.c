@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,7 +51,7 @@ void lvzwr_fini(zshow_out *out, int t)
 		temp_key.var_name = lvzwrite_block->pat->str;
 		COMPUTE_HASH_MNAME(&temp_key);
 		tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &temp_key);
-		if (!tabent || !LV_IS_VAL_DEFINED(tabent->value) && !LV_HAS_CHILD(tabent->value))
+		if (!tabent || (!LV_IS_VAL_DEFINED(tabent->value) && !LV_HAS_CHILD(tabent->value)))
 		{
 			lvzwrite_block->subsc_count = 0;
 			if (!undef_inhibit)

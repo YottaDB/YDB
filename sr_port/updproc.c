@@ -250,7 +250,7 @@ MBSTART {												\
 	ts_mv.mvtype = MV_STR;										\
 	ts_mv.str.len = 0;										\
 	ts_mv.str.addr = NULL;										\
-	assert((!dollar_tlevel && !tupd_num) || dollar_tlevel && (tupd_num || dollar_trestart));	\
+	assert((!dollar_tlevel && !tupd_num) || (dollar_tlevel && (tupd_num || dollar_trestart)));	\
 	if (!dollar_tlevel)										\
 	{												\
 		assert(!donot_INVOKE_MUMTSTART);							\
@@ -672,7 +672,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		/* Assert that dollar_tlevel & tupd_num are in sync with each other. The only exception is if dollar_tlevel
 		 * is non-zero, it is possible tupd_num is 0 in case we come here after a TP restart.
 		 */
-		assert((dollar_tlevel && (tupd_num || dollar_trestart)) || !dollar_tlevel && !tupd_num);
+		assert((dollar_tlevel && (tupd_num || dollar_trestart)) || (!dollar_tlevel && !tupd_num));
 		if (upd_proc_local->bad_trans || upd_proc_local->onln_rlbk_flg
 			|| (!dollar_tlevel && (FALSE == recvpool.recvpool_ctl->wrapped)
 				&& (temp_write = recvpool.recvpool_ctl->write) == upd_proc_local->read))
