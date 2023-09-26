@@ -27,6 +27,7 @@
 #include "zshow.h"
 #include "compiler.h"
 #include "io.h"
+#include "iormdef.h"
 #include "stringpool.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -46,17 +47,20 @@
 #define F_SUBSC_LEN		 3
 #define N_SUBSC_LEN		 5
 
-#define WRITE_ONE_LINE_FROM_BUFFER			\
+#define WRITE_ONE_LINE_FROM_BUFFER(WRITE_EOL)		\
 {							\
 	mv->str.addr = out->buff;			\
 	mv->str.len = INTCAST(out->ptr - out->buff);	\
 	mv->mvtype = MV_STR;				\
 	op_write(mv);					\
-	op_wteol(1);					\
 	out->ptr = out->buff;				\
 	out->len = 0;					\
 	out->displen = 0;				\
-	out->line_num++;				\
+	if (WRITE_EOL)					\
+	{						\
+		op_wteol(1);				\
+		out->line_num++;			\
+	}						\
 }
 
 GBLREF	io_pair		io_curr_device;
@@ -123,8 +127,11 @@ void zshow_output(zshow_out *out, const mstr *str)
 		zshow_depth = FALSE;
 	switch (out->type)
 	{
-	case ZSHOW_DEVICE:
-		if (str)
+	case ZSHOW_DEVICE:;
+		boolean_t	write_eol;
+
+		write_eol = TRUE;
+		if (NULL != str)
 		{
 			len = str->len;
 			strptr = str->addr;
@@ -132,10 +139,19 @@ void zshow_output(zshow_out *out, const mstr *str)
 			disp_len = UTF8_ONLY((gtm_utf8_mode) ?
 						(ssize_t)gtm_wcswidth((unsigned char *)strptr, (int)len, FALSE, 1) :) len;
 			str_processed = 0;
-		}
-		device_width = io_curr_device.out->width;
-		if (str)
-		{
+			device_width = io_curr_device.out->width;
+			if ((0 < len) && (rm == io_curr_device.out->type))
+			{	/* Check if STREAM + NOWRAP has been specified.
+				 * If so, allow for writing arbitrarily long lines without wrapping or truncation.
+				 */
+				io_desc		*iod;
+				d_rm_struct	*rm_ptr;
+
+				iod = io_curr_device.out;
+				rm_ptr = (d_rm_struct *)iod->dev_sp;
+				if (rm_ptr->stream && !iod->wrap)
+					write_eol = FALSE;
+			}
 			for (; (len > 0) && (disp_len + out->displen > device_width); )
 			{
 				assert(len <= out->size - (out->ptr - out->buff));
@@ -173,7 +189,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 				char_len -= chcnt;
 				assert((UTF8_ONLY((gtm_utf8_mode) ?
 						     (ssize_t)UTF8_LEN_STRICT(strptr, (int)len) :) len) == char_len);
-				WRITE_ONE_LINE_FROM_BUFFER;
+				WRITE_ONE_LINE_FROM_BUFFER(write_eol);
 			}
 			memcpy(out->ptr, str->addr + str_processed, len);
 			out->ptr += len;
@@ -181,7 +197,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 			out->displen += (int)disp_len;
 		}
 		if (out->flush && out->ptr != out->buff)
-			WRITE_ONE_LINE_FROM_BUFFER
+			WRITE_ONE_LINE_FROM_BUFFER(TRUE);
 		break;
 	case ZSHOW_LOCAL:
 		if (out->code) /* For locals, code == 0 indicates there is nothing to add (str) nor to flush */
