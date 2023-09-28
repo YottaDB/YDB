@@ -63,8 +63,14 @@ error_def(ERR_JNLENDIANLITTLE);
  * 		which needs to change to say IF_24TO44 if the earliest supported version changes to say V24).
  *      11) Add JRT_MAX_Vxx macro to jnl.h where xx is cur format (44 currently). And delete any unsupported JRT_MAX_Vxx macros.
  */
-#define JNL_LABEL_TEXT		"YDBJNL45"	/* see above comment paragraph for todos whenever this is changed */
+#define	JNL_LABEL_PREFIX	"YDBJNL"
 #define JNL_VER_THIS		45
+/* The STR_HELPER and STR macros are needed to get convert the JNL_VER_THIS number to a string
+ * See https://stackoverflow.com/a/5459929 for details.
+ */
+#define	STR_HELPER(NUM)		#NUM
+#define STR(NUM)		STR_HELPER(NUM)
+#define JNL_LABEL_TEXT		JNL_LABEL_PREFIX STR(JNL_VER_THIS) /* see above comment block for todos whenever this is changed */
 
 /* Since V24 filter format was first released in 09/2014 (see comment block in "repl_filter.h"), which is only 4 years
  * apart (our minimum is 5 years apart, see comment in sr_port/repl_filter.h) from when JNL_VER_THIS (i.e. V36 filter format)

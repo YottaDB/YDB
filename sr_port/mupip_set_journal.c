@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -588,6 +588,32 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 							if (is_file_identical((char *)header.data_file_name, (char *)jnl_info.fn))
 								jnl_points_to_db = TRUE;
 							header_is_usable = TRUE;
+						} else if (ERR_JNLBADLABEL == status1)
+						{	/* We know this file is not a journal file with the current journal
+							 * format. It could be a valid journal file with a different journal
+							 * format OR a completely different file (without a journal label).
+							 */
+							if (!MEMCMP_LIT(header.label, JNL_LABEL_PREFIX))
+							{
+								boolean_t	older_jnl_fmt;
+
+								older_jnl_fmt = (0 > STRCMP(header.label, JNL_LABEL_TEXT));
+								if (older_jnl_fmt)
+								{	/* This is an older format journal file. Since we cannot
+									 * access that journal file using current format
+									 * structures, we cannot look at "header.data_file_name"
+									 * to do the "is_file_identical()" comparison like is
+									 * done in the previous "if" block. But we would like to
+									 * consider the case where the database file header points
+									 * to a journal file of that name (i.e. "jnlname_same" is
+									 * TRUE) as a safe scenario to switch journal files.
+									 */
+									jnl_points_to_db = jnlname_same;
+								}
+								/* else : This is a newer format journal file. Treat this as
+								 * an unsafe scenario to switch the journal file.
+								 */
+							}
 						}
 					}
 				}
