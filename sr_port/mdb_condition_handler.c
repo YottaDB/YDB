@@ -1181,7 +1181,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			 "dispatched\n"));
 		if (!(SFT_ZINTR & proc_act_type) && !(SFT_ZTIMEOUT & proc_act_type))  	/* ztimeout vector precompiled */
 		{
-			assert(!dollar_zininterrupt || ((int)ERR_ZINTRECURSEIO == SIGNAL));
+			assert(!dollar_zininterrupt || ((int)ERR_ZINTRECURSEIO == SIGNAL) || ((int)ERR_STACKCRIT == SIGNAL));
 			trans_code_cleanup();
 		} else if (!(SFT_ZTIMEOUT & proc_act_type))
 		{
