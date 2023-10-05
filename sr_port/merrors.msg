@@ -1725,7 +1725,7 @@ INVSHUTDOWN	<Shutdown timeout should be from 0 to 3600 seconds>/error/fao=0!/ans
 SOCKBLOCKERR	<WRITE /BLOCK error: !AD>/error/fao=2!/ansi=0
 SOCKWAITARG	<!AD argument to WRITE /WAIT !AD>/error/fao=4!/ansi=0
 LASTTRANS	<Last transaction sequence number !AD : !@UQ>/info/fao=3!/ansi=0
-SRCBACKLOGSTATUS	<Instance !AD !AD !@UQ transaction(s)>/info/fao=5!/ansi=0
+SRCBACKLOGSTATUS	<Instance !AD !AD>/info/fao=4!/ansi=0
 BKUPRETRY	<Retrying MUPIP BACKUP for region: !AD (database file: !AD). Attempt: #!UL of !UL>/info/fao=6!/ansi=0
 BKUPPROGRESS	<Transfer : !AD ; Speed : !AD MiB/sec ; Transactions : !@UQ ; Estimated time left : !UL !AD>/info/fao=8!/ansi=0
 BKUPFILEPERM	<Backup file !AD does not have write permission>/error/fao=2!/ansi=0

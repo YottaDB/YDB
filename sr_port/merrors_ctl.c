@@ -1559,7 +1559,7 @@ LITDEF	err_msg merrors[] = {
 	{ "SOCKBLOCKERR", "WRITE /BLOCK error: !AD", 2, 0 },
 	{ "SOCKWAITARG", "!AD argument to WRITE /WAIT !AD", 4, 0 },
 	{ "LASTTRANS", "Last transaction sequence number !AD : !@UQ", 3, 0 },
-	{ "SRCBACKLOGSTATUS", "Instance !AD !AD !@UQ transaction(s)", 5, 0 },
+	{ "SRCBACKLOGSTATUS", "Instance !AD !AD", 4, 0 },
 	{ "BKUPRETRY", "Retrying MUPIP BACKUP for region: !AD (database file: !AD). Attempt: #!UL of !UL", 6, 0 },
 	{ "BKUPPROGRESS", "Transfer : !AD ; Speed : !AD MiB/sec ; Transactions : !@UQ ; Estimated time left : !UL !AD", 8, 0 },
 	{ "BKUPFILEPERM", "Backup file !AD does not have write permission", 2, 0 },

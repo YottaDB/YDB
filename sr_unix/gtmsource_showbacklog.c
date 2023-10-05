@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -58,9 +61,16 @@ int gtmsource_showbacklog(void)
 	seq_num			heartbeat_jnl_seqno, jnl_seqno, read_jnl_seqno, src_backlog;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
 	char * 			lasttrans[] = {"posted        ","sent          ","acknowledged  "};
-	char * 			syncstate[] = {"is behind by", "has not acknowledged", "is ahead by"};
-	int4			index, syncstateindex = 0;
+	char * 			syncstate[] = {
+						"is behind by",
+						"has not acknowledged",
+						"is ahead by",
+						"is not receiving transactions as source server is in passive mode"
+						};
+	int4			index, syncstateindex;
 	boolean_t		srv_alive;
+	char			buf[128];
+	int			buflen;
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 
@@ -70,6 +80,7 @@ int gtmsource_showbacklog(void)
 		gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
 	for (index = 0; index < NUM_GTMSRC_LCL; index++, gtmsourcelocal_ptr++)
 	{
+		syncstateindex = 0;
 		if ('\0' == gtmsourcelocal_ptr->secondary_instname[0])
 		{
 			assert(NULL == jnlpool->gtmsource_local);
@@ -111,16 +122,22 @@ int gtmsource_showbacklog(void)
 			src_backlog = heartbeat_jnl_seqno - MIN(jnl_seqno, read_jnl_seqno);
 			syncstateindex = 2;
 		}
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SRCBACKLOGSTATUS, 5,
-				LEN_AND_STR(gtmsourcelocal_ptr->secondary_instname),
-				LEN_AND_STR(syncstate[syncstateindex]), &src_backlog);
 		srv_alive = (0 == gtmsourcelocal_ptr->gtmsource_pid) ? FALSE : is_proc_alive(gtmsourcelocal_ptr->gtmsource_pid, 0);
+		if (srv_alive
+			&& ((gtmsourcelocal_ptr->mode == GTMSOURCE_MODE_PASSIVE)
+				|| (gtmsourcelocal_ptr->mode == GTMSOURCE_MODE_ACTIVE_REQUESTED)))
+			syncstateindex = 3;
+		if (3 == syncstateindex)
+			buflen = SNPRINTF(buf, SIZEOF(buf), "%s", syncstate[syncstateindex]);
+		else
+			buflen = SNPRINTF(buf, SIZEOF(buf), "%s %llu transaction(s)", syncstate[syncstateindex], src_backlog);
+		assert(buflen == STRLEN(buf));	/* assert that "buf[]" allocation had enough space to begin with */
+		PRO_ONLY(UNUSED(buflen));	/* to avoid [clang-analyzer-deadcode.DeadStores] warning */
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SRCBACKLOGSTATUS, 4,
+				LEN_AND_STR(gtmsourcelocal_ptr->secondary_instname), LEN_AND_STR(buf));
 		if (!srv_alive)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_WARNING(ERR_SRCSRVNOTEXIST), 2,
 						LEN_AND_STR(gtmsourcelocal_ptr->secondary_instname));
-		else if ((gtmsourcelocal_ptr->mode == GTMSOURCE_MODE_PASSIVE)
-				|| (gtmsourcelocal_ptr->mode == GTMSOURCE_MODE_ACTIVE_REQUESTED))
-			util_out_print("WARNING - Source Server is in passive mode, transactions are not being replicated", TRUE);
 		if (NULL != jnlpool->gtmsource_local)
 			break;
 	}
