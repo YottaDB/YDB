@@ -313,6 +313,7 @@ GBLDEF	char		**cmd_arg;
 #ifdef __osf__
 #pragma pointer_size (restore)
 #endif
+GBLDEF	mval		dollar_zcmdline;		/* Home for $ZCMDLINE - initialized at startup for YOTTADB/MUPIP */
 GBLDEF	boolean_t	oldjnlclose_started;
 /* DEFERRED EVENTS */
 GBLDEF	bool		licensed = TRUE;

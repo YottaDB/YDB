@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,7 @@ GBLREF gd_addr		*gd_header;
 GBLREF mval		dollar_estack_delta;
 GBLREF mval		dollar_zyerror;
 GBLREF mval		dollar_zgbldir;
+GBLREF mval		dollar_zcmdline;
 GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 #ifdef GTM_TRIGGER
 GBLREF int4		gtm_trigger_depth;
@@ -89,6 +90,9 @@ void op_newintrinsic(int intrtype)
 			break;
 		case SV_ZGBLDIR:
 			intrinsic = &dollar_zgbldir;
+			break;
+		case SV_ZCMDLINE:
+			intrinsic = &dollar_zcmdline;
 			break;
 #		ifdef GTM_TRIGGER
 		case SV_ZTWORMHOLE:

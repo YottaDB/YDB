@@ -42,7 +42,6 @@
 #include "mvalconv.h"
 #include "zroutines.h"
 #include "getstorage.h"
-#include "get_command_line.h"
 #include "getzposition.h"
 #include "dollar_zlevel.h"
 #include "get_ret_targ.h"
@@ -159,6 +158,7 @@ GBLREF mlk_subhash_val_t	mlk_last_hash;
 GBLREF mstr			dollar_zchset, dollar_zpatnumeric, dollar_zpin, dollar_zpout;
 GBLREF mval			dollar_estack_delta, dollar_job, dollar_system, dollar_zdir, dollar_zerror, dollar_zgbldir;
 GBLREF mval			dollar_zinterrupt, dollar_zproc, dollar_ztexit, dollar_zsource, dollar_zstatus, dollar_zyerror;
+GBLREF mval			dollar_zcmdline;
 GBLREF size_t			totalAlloc, totalRmalloc, totalUsed;
 GBLREF stack_frame		*frame_pointer;
 GBLREF spdesc			stringpool;
@@ -448,9 +448,8 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZCMDLINE:
-			get_command_line(&var, TRUE);	/* TRUE indicates $ZCMDLINE (i.e. processed not actual command line) */
 			ZS_VAR_EQU(&x, zcmdline_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, &dollar_zcmdline, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */

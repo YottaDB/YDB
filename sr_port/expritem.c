@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -179,7 +179,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZC, FALSE, ALL_SYS }
 	,{ SV_ZCHSET, FALSE, ALL_SYS }
 	,{ SV_ZCLOSE, FALSE, UNIX_OS }
-	,{ SV_ZCMDLINE, FALSE, ALL_SYS }
+	,{ SV_ZCMDLINE, TRUE, ALL_SYS }
 	,{ SV_ZCOMPILE, TRUE, ALL_SYS }
 	,{ SV_ZCSTATUS, FALSE, ALL_SYS}
 	,{ SV_ZDIR, TRUE, ALL_SYS }

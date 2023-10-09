@@ -64,7 +64,7 @@ GBLREF gv_key			*gv_currkey;
 GBLREF gv_namehead		*gv_target;
 GBLREF io_pair			io_curr_device;
 GBLREF mval			dollar_system, dollar_system_initial, dollar_zgbldir, dollar_zerror, dollar_zinterrupt;
-GBLREF mval			dollar_zsource, dollar_zstatus, dollar_ztexit, dollar_zyerror;
+GBLREF mval			dollar_zsource, dollar_zstatus, dollar_ztexit, dollar_zyerror, dollar_zcmdline;
 GBLREF stack_frame		*error_frame;
 GBLREF volatile int4		outofband;
 GBLREF volatile boolean_t	dollar_zininterrupt;
@@ -481,6 +481,11 @@ void op_svput(int varnum, mval *v)
 			break;
 		case SV_ZTIMEOUT:
 			check_and_set_ztimeout(v);
+			break;
+		case SV_ZCMDLINE:
+			MV_FORCE_STR(v);
+			dollar_zcmdline.mvtype = MV_STR;
+			dollar_zcmdline.str = v->str;
 			break;
 		default:
 			assertpro(FALSE && varnum);

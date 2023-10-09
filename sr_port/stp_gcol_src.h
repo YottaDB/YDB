@@ -92,7 +92,7 @@ GBLREF mliteral			literal_chain;
 GBLREF mstr			*comline_base, **stp_array;
 GBLREF mval			dollar_system, dollar_zerror, dollar_zgbldir, dollar_zstatus;
 GBLREF mval			dollar_zyerror, dollar_zinterrupt, dollar_zsource, dollar_ztexit;
-GBLREF mval			dollar_testmv;
+GBLREF mval			dollar_testmv, dollar_zcmdline;
 GBLREF mv_stent			*mv_chain;
 GBLREF sgm_info			*first_sgm_info;
 GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
@@ -721,6 +721,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		MVAL_STPG_ADD(&dollar_zerror);
 		MVAL_STPG_ADD(&dollar_ztexit);
 		MVAL_STPG_ADD(&dollar_zyerror);
+		MVAL_STPG_ADD(&dollar_zcmdline);
 #		ifdef GTM_TRIGGER
 		MVAL_STPG_ADD(&dollar_ztwormhole);
 #		endif

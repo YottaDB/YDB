@@ -97,6 +97,7 @@
 #include "invocation_mode.h"
 #include "ydb_os_signal_handler.h"
 #include "deferred_events.h"
+#include "get_command_line.h"
 
 #define	NOISOLATION_LITERAL	"NOISOLATION"
 
@@ -117,6 +118,7 @@ GBLREF	unsigned char		*fgncal_stack;
 GBLREF	mv_stent			*mv_chain;
 GBLREF	xfer_entry_t		xfer_table[];
 GBLREF	mval			dollar_system;
+GBLREF	mval			dollar_zcmdline;
 GBLREF	mval			dollar_zstatus;
 GBLREF	bool			compile_time;
 GBLREF	spdesc			stringpool;
@@ -285,6 +287,7 @@ void gtm_startup(struct startup_vector *svec)
 	INIT_ENV_AND_GBLDIR_XLATE;
 	dpzgbini();
 	zco_init();
+	get_command_line(&dollar_zcmdline, TRUE);
 	/* a base addr of 0 indicates a gtm_init call from an rpc server */
 	if ((GTM_IMAGE == image_type) && (NULL != svec->base_addr))
 		jobchild_init();

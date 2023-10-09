@@ -40,7 +40,6 @@
 #include "zroutines.h"
 #include "zshow.h"
 #include "getstorage.h"
-#include "get_command_line.h"
 #include "getzposition.h"
 #include "getzprocess.h"
 #include "get_ret_targ.h"
@@ -73,6 +72,7 @@ GBLREF mlk_subhash_val_t	mlk_last_hash;
 GBLREF mstr			dollar_zchset, dollar_zpatnumeric, dollar_zpin, dollar_zpout;
 GBLREF mval			dollar_estack_delta, dollar_job, dollar_system, dollar_zdir, dollar_zerror, dollar_zgbldir;
 GBLREF mval			dollar_zinterrupt, dollar_zproc, dollar_zsource, dollar_zstatus, dollar_ztexit, dollar_zyerror;
+GBLREF mval			dollar_zcmdline;
 GBLREF size_t			totalAlloc, totalAllocGta, totalRmalloc, totalRallocGta, totalUsed, totalUsedGta;
 GBLREF spdesc			stringpool;
 GBLREF stack_frame		*frame_pointer;
@@ -275,8 +275,7 @@ void op_svget(int varnum, mval *v)
 			v->str.len = INTCAST((char *)stringpool.free - v->str.addr);
 			break;
 		case SV_ZCMDLINE:
-			get_command_line(v, TRUE);	/* TRUE to indicate we want $ZCMDLINE
-							   (i.e. processed not actual command line) */
+			*v = dollar_zcmdline;
 			break;
 		case SV_ZEOF:
 #			ifdef UNIX

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,6 +93,7 @@ int m_new(void)
 				case SV_ZYERROR:
 				case SV_ZGBLDIR:
 				case SV_TEST:
+				case SV_ZCMDLINE:
 				GTMTRIG_ONLY(case SV_ZTWORMHOLE:)
 					tmp = maketriple(OC_NEWINTRINSIC);
 					tmp->operand[0] = put_ilit(svn_data[n].opcode);
