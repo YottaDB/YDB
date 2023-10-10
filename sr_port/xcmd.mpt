@@ -3,6 +3,9 @@
 ; Copyright (c) 2016-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -14,9 +17,9 @@
 %XCMD	; Usage: mumps -run %XCMD '<string>'
 	; If no $ETRAP defined, use CLIERR^%XCMD overriding a potential $ZTRAP error handler
 	if ""=$ETRAP new $ETRAP set $ETRAP="goto CLIERR^%XCMD"
-	new etrap set etrap=$ETRAP
+	new etrap,%cli set etrap=$ETRAP,%cli=$zcmdline
 	; Protect %XCMD's error handler by NEWing and SETing $ETRAP at the beginning of the XECUTEd command
-	xecute "new $ETRAP set $ETRAP=etrap "_$zcmdline
+	xecute "new $ETRAP,$zcmdline set $ETRAP=etrap "_%cli
 	quit
 
 CLIERR
@@ -37,6 +40,7 @@ LOOP	; Usage: mumps -run LOOP^%XCMD [--before=|<string>|] [--after=|<string>|] [
 	if ""=$ETRAP new $ETRAP set $ETRAP="goto LOOPERR^%XCMD"
 	new %cli,%l,%NR,%xcmd,etrap,xec
 	set %cli=$zcmdline,etrap=$ETRAP
+	new $zcmdline
 	for  quit:'$$trimleadingstr(.%cli,"--")  do 	; process command line options
 	. if $$trimleadingstr(.%cli,"after=") set %xcmd("after")=$$trimleadingdelimstr(.%cli)
 	. else  if $$trimleadingstr(.%cli,"before=") set %xcmd("before")=$$trimleadingdelimstr(.%cli)
