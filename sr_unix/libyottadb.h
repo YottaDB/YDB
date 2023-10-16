@@ -285,8 +285,8 @@ typedef uint64_t	ydb_uint64_t;		/* Only currently usable in 64 bit mode */
 typedef	float		ydb_float_t;
 typedef	double		ydb_double_t;
 typedef	char		ydb_char_t;
-typedef	int		(*ydb_pointertofunc_t)();
-typedef	void		(*ydb_funcptr_retvoid_t)();
+typedef	int		(*ydb_pointertofunc_t)(void);
+typedef	void		(*ydb_funcptr_retvoid_t)(void);
 
 /* Structure for passing (non-NULL-terminated) character arrays whose length corresponds to the value of the
  * 'length' field. Note that for output-only ydb_string_t * arguments the 'length' field is set to the
@@ -344,7 +344,7 @@ typedef	ydb_char_t	ydb_jbig_decimal_t;
 /* Function pointer types for use in the APIs below */
 typedef	int		(*ydb_tpfnptr_t)(void *tpfnparm);					   /* For use in SimpleAPI */
 typedef	int		(*ydb_tp2fnptr_t)(uint64_t tptoken, ydb_buffer_t *errstr, void *tpfnparm); /* For use in SimpleThreadAPI */
-typedef	uintptr_t	(*ydb_vplist_func)();		/* Indeterminate argument list for called variadic function */
+typedef	uintptr_t	(*ydb_vplist_func)(void);	/* Indeterminate argument list for called variadic function */
 typedef void		(*GPCallback)(int sigtype);	/* Type of Go callback "panic" routine */
 
 #	ifdef GTM_PTHREAD
