@@ -345,17 +345,6 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		t_abort(gv_cur_region, csa);
 		return ABORT_SWAP;
 	}
-#	ifdef DEBUG
-	if ((0 != ydb_skip_bml_num) && (1 == master_bit))
-	{
-		master_bit = bmm_find_free(ydb_skip_bml_num / BLKS_PER_LMAP, csa->bmm, num_local_maps);
-		if ((NO_FREE_SPACE == master_bit) || (1 == master_bit))
-		{
-			t_abort(gv_cur_region, csa);
-			return ABORT_SWAP;
-		}
-	}
-#	endif
 	bmlhist.blk_num = master_bit * BLKS_PER_LMAP;
 	if (NULL == (bmlhist.buffaddr = t_qread(bmlhist.blk_num, (sm_int_ptr_t)&bmlhist.cycle, &bmlhist.cr)))
 	{	/* WARNING: assignment above */
