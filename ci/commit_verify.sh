@@ -150,10 +150,66 @@ if [ -n "$commit_list" ]; then
 			if [[ (( $additions == 0 )) && (( $deletions == 0 )) ]]; then
 				continue
 			fi
-			num_copyright_additions=$(git diff upstream_repo/$target_branch..HEAD "$file" | grep -e '^+' | grep -c 'Copyright (c)' || true)
-			num_copyright_deletions=$(git diff upstream_repo/$target_branch..HEAD "$file" | grep -e '^-' | grep -c 'Copyright (c)' || true)
+			# Search not only for Copyright lines but also for surrounding context when counting number of lines
+			# that are added/deleted for Copyright. Or else we could miss out on signaling copyright-only changes
+			# like is described at https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1323#note_1599267130.
+			#
+			# Note that git diff output would include 4 lines starting which include lines of the form "+++ " or "--- "
+			# which would confuse the count when searching for lines starting with "^+" and "^-" in the diff output.
+			# In the most common case, the git diff output would be something like the following.
+			#
+			#	diff --git a/sr_unix/setactive.csh b/sr_unix/setactive.csh
+			#	index 41ce59aa..83d2f7b2 100755
+			#	--- a/sr_unix/setactive.csh
+			#	+++ b/sr_unix/setactive.csh
+			#	@@ -3,6 +3,9 @@
+			#
+			# Therefore using "tail -n +5" to filter out the first 4 lines of the git diff output would
+			# let us start printing lines from the "@@ -3,6..." line onwards.
+			#
+			# But git diff output could include 5 or 6 lines in some edge cases.
+			#
+			# a) In case a file got newly created, it would have 1 more line to indicate the mode of the new file.
+			#
+			#      Example output below.
+			#
+			#	diff --git a/sr_unix/x.csh b/sr_unix/x.csh
+			#	new file mode 100755
+			#	index 00000000..83d2f7b2
+			#	--- /dev/null
+			#	+++ b/sr_unix/x.csh
+			#	@@ -0,0 +1,154 @@
+			#
+			#    In this case, we should do a "tail -n +5" to get to the "@@ -0,0..." line.
+			#
+			# b) In case a file's mode also got changed, it would have 2 more lines to indicate the old and new modes.
+			#
+			#      Example output below.
+			#
+			#	diff --git a/sr_unix/setactive.csh b/sr_unix/setactive.csh
+			#	old mode 100755
+			#	new mode 100644
+			#	index 41ce59aa..83d2f7b2
+			#	--- a/sr_unix/setactive.csh
+			#	+++ b/sr_unix/setactive.csh
+			#	@@ -3,6 +3,9 @@
+			#
+			#    In this case, we should do a "tail -n +6" to get to the "@@ -0,0..." line.
+			#
+			# Since our final goal is to reach the line starting with "@@ " which is there in all the above cases,
+			# we use a "sed" command to filter out all lines in the git diff output until we see a "^@@ ".
+			#
+			# Also note that "grep -C" will by default include a group separator line ("--") to demarcate contiguous
+			# groups of matches. But that would again be confused as deleted lines in the git diff output so we disable
+			# that by adding a "--no-group-separator" to the "grep -C".
+			#
+			num_copyright_additions=$(git diff upstream_repo/$target_branch..HEAD "$file" | sed -n '/^@@ /,$p' | grep --no-group-separator -C 3 'Copyright (c)' | grep -c -e '^+' || true)
+			num_copyright_deletions=$(git diff upstream_repo/$target_branch..HEAD "$file" | sed -n '/^@@ /,$p' |  grep --no-group-separator -C 3 'Copyright (c)' | grep -c -e '^-' || true)
 			if [[ (( $deletions == $num_copyright_deletions )) && (( $additions == $num_copyright_additions )) ]]; then
-				copyright_only="$copyright_only $file"
+				if [[ "ci/commit_verify.sh" != $file ]]; then
+					# Avoid copyright-only check on this framework script
+					copyright_only="$copyright_only $file"
+				fi
 			fi
 			if $needs_copyright $file && ! grep -q 'Copyright (c) .*'$curyear' YottaDB LLC' $file; then
 				# Print these out only at the end so they're all shown at once
