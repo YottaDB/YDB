@@ -722,6 +722,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		MVAL_STPG_ADD(&dollar_ztexit);
 		MVAL_STPG_ADD(&dollar_zyerror);
 		MVAL_STPG_ADD(&dollar_zcmdline);
+		MVAL_STPG_ADD(&(TREF(trans_code_pop)));
 #		ifdef GTM_TRIGGER
 		MVAL_STPG_ADD(&dollar_ztwormhole);
 #		endif

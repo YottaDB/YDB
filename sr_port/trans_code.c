@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -127,7 +127,6 @@ void trans_code_finish(void)
 
 CONDITION_HANDLER(trans_code_ch)
 {
-	mval		dummy;
 	int		level2go;
 
 	START_CH(TRUE);
@@ -157,12 +156,9 @@ CONDITION_HANDLER(trans_code_ch)
 	if (POP_SPECIFIED)
 	{ /* pop to the level of last 'set $ztrap' */
 		GOLEVEL(level2go, TRUE);
-		/* previous trans_code_pop would have been popped out */
-		dummy.mvtype = MV_STR;
-		dummy.str = *err_act;
-		TREF(trans_code_pop) = push_mval(&dummy);
+		/* Note: TREF(trans_code_pop) already holds the stuff that we need to recompile */
 	}
-	op_commarg(TREF(trans_code_pop), indir_goto);
+	op_commarg(TADR(trans_code_pop), indir_goto);
 	if (NULL != gtm_err_dev)
 	{
 		if ((gtmsocket == gtm_err_dev->type) && gtm_err_dev->newly_created)
@@ -183,7 +179,6 @@ CONDITION_HANDLER(trans_code_ch)
 
 void trans_code(void)
 {
-	mval		dummy;
 	int		level2go;
 	DCL_THREADGBL_ACCESS;
 
@@ -216,11 +211,10 @@ void trans_code(void)
 	{
 		GOLEVEL(level2go, TRUE);
 	}
-	dummy.mvtype = MV_STR;
-	dummy.str = *err_act;
-	TREF(trans_code_pop) = push_mval(&dummy);
+	(TREF(trans_code_pop)).mvtype = MV_STR;
+	(TREF(trans_code_pop)).str = *err_act;
 	ESTABLISH(trans_code_ch);
-	op_commarg(TREF(trans_code_pop), (ZTRAP_CODE & (TREF(ztrap_form)) || IS_ETRAP) ? indir_linetail : indir_goto);
+	op_commarg(TADR(trans_code_pop), (ZTRAP_CODE & (TREF(ztrap_form)) || IS_ETRAP) ? indir_linetail : indir_goto);
 	REVERT;
 	if (NULL != gtm_err_dev)
 	{

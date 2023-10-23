@@ -357,7 +357,7 @@ THREADGBLDEF(set_zroutines_cycle,		uint4)				/* Informs us if we changed $ZROUTI
 										 */
 THREADGBLDEF(statsDB_init_defer_anchor,		statsDB_deferred_init_que_elem *) /* Anchor point for deferred init of statsDBs */
 THREADGBLDEF(statshare_opted_in,		uint4)				/* Flag controlling stats collection */
-THREADGBLDEF(trans_code_pop,			mval *)				/* trans_code holder for $ZTRAP popping */
+THREADGBLDEF(trans_code_pop,			mval)				/* trans_code holder for $ZTRAP popping */
 THREADGBLDEF(view_ydirt_str,			char *)				/* op_view working storage for ydir* ops */
 THREADGBLDEF(view_ydirt_str_len,		int4)				/* Part of op_view working storage for ydir* ops */
 THREADGBLDEF(view_region_list,			tp_region *)			/* used by view_arg_convert and op_view/view_dbop */
