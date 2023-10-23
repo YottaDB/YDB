@@ -286,7 +286,7 @@ typedef	float		ydb_float_t;
 typedef	double		ydb_double_t;
 typedef	char		ydb_char_t;
 typedef	int		(*ydb_pointertofunc_t)(void);
-typedef	void		(*ydb_funcptr_retvoid_t)(void);
+typedef	void		(*ydb_funcptr_retvoid_t)(intptr_t tid, unsigned int hd_len, char *hd_data);
 
 /* Structure for passing (non-NULL-terminated) character arrays whose length corresponds to the value of the
  * 'length' field. Note that for output-only ydb_string_t * arguments the 'length' field is set to the
