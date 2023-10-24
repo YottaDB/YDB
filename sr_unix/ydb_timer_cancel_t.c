@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,8 +31,7 @@ void ydb_timer_cancel_t(uint64_t tptoken, ydb_buffer_t *errstr, intptr_t timer_i
 	int			retval;
 	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
-	LIBYOTTADB_RUNTIME_CHECK_NORETVAL(errstr);
+	LIBYOTTADB_RUNTIME_CHECK_NORETVAL(errstr);	/* Note: Also does SETUP_THREADGBL_ACCESS; May return if error */
 	VERIFY_THREADED_API_NORETVAL(errstr);
 	threaded_api_ydb_engine_lock(tptoken, errstr, LYDB_RTN_TIMER_CANCEL, &save_active_stapi_rtn, &save_errstr, &get_lock,
 				     &retval);

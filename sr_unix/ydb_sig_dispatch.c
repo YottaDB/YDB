@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -161,7 +161,6 @@ int ydb_sig_dispatch(ydb_buffer_t *errstr, int signum)
 	pthread_t	sigThreadId;
 	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
 	assert(USING_ALTERNATE_SIGHANDLING);
 	if (exit_handler_active)
 	{	/* No signal processing after exit handler starts running - drain signal pending and processing queues */
@@ -170,7 +169,7 @@ int ydb_sig_dispatch(ydb_buffer_t *errstr, int signum)
 			return rc;
 		assert(FALSE);		/* drain_signal_queues() ALWAYS returns non-0 rc */
 	}
-	LIBYOTTADB_RUNTIME_CHECK((int), errstr);	/* Note macro may return from this routine if error */
+	LIBYOTTADB_RUNTIME_CHECK((int), errstr);	/* Note: Also does SETUP_THREADGBL_ACCESS; May return if error */
 	VERIFY_THREADED_API((int), errstr);		/* Note macro may return from this routine if error */
 	/* Note, any stream IO outside the system lock needs to be done normally or it causes failures */
 	DBGSIGHND_ONLY(fprintf(stderr, "ydb_sig_dispatch: Received dispatch request for signal %d\n", signum); fflush(stderr));

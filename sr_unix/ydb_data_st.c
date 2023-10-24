@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,12 +32,11 @@ int ydb_data_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varn
 	int			retval;
 	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
 	if (NULL != ret_value)
 		*ret_value = YDB_DATA_ERROR;	/* Initialize in case an error causes a premature return before we set a
 						 * meaningful value.
 						 */
-	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
+	LIBYOTTADB_RUNTIME_CHECK((int), errstr);	/* Note: Also does SETUP_THREADGBL_ACCESS; May return if error */
 	VERIFY_THREADED_API((int), errstr);
 	threaded_api_ydb_engine_lock(tptoken, errstr, LYDB_RTN_DATA, &save_active_stapi_rtn, &save_errstr, &get_lock, &retval);
 	if (YDB_OK == retval)

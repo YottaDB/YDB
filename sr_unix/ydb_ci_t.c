@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,8 +36,7 @@ int ydb_ci_t(uint64_t tptoken, ydb_buffer_t *errstr, const char *c_rtn_name, ...
 	ci_name_descriptor	ci_desc;
 	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
-	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
+	LIBYOTTADB_RUNTIME_CHECK((int), errstr);	/* Note: Also does SETUP_THREADGBL_ACCESS; May return if error */
 	VERIFY_THREADED_API((int), errstr);
 	VAR_START(var, c_rtn_name);
 	/* Ready a call-in name descriptor so we can use "ydb_cip_helper" */

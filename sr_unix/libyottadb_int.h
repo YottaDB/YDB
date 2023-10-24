@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -113,12 +113,20 @@ MBSTART	{													\
 			SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(-status, (ydb_buffer_t *)ERRSTR);			\
 			return RETTYPE -status;									\
 		}												\
-		/* Since we called "ydb_init" above, "gtm_threadgbl" would have been set to a non-null VALUE	\
-		 * and so any call to SETUP_THREADGBL_ACCESS done by the function that called this macro	\
-		 * needs to be redone to set "lcl_gtm_threadgbl" to point to this new "gtm_threadgbl".		\
-		 */												\
-		SETUP_THREADGBL_ACCESS;										\
 	}		       											\
+	/* At this point we are guaranteed "ydb_init_complete" is TRUE and so we are sure "gtm_threadgbl"	\
+	 * would have been set to a non-null VALUE. So now is a safe point to set "lcl_gtm_threadgbl" to	\
+	 * point to the global variable "gtm_threadgbl". We previously had this set inside the			\
+	 * "if (!ydb_init_complete)" code block above. But that is not correct as in case of a multi-threaded	\
+	 * application that uses the Simple Thread API it is possible multiple threads do concurrent calls to	\
+	 * say "ydb_tp_st()" at the same time and it is possible the callers C1 and C2 both come to the "if"	\
+	 * above at the same time and one of them, say C1, does the "ydb_init()" and sets "ydb_init_complete"	\
+	 * while C2 finds "ydb_init_complete" set and comes here. In that case, C2 would still have		\
+	 * not set "lcl_gtm_threadgbl" to a non-NULL value which is incorrect. Hence the set now happens after	\
+	 * the "if" block. But this means callers of this macro can skip the SETUP_THREADGBL_ACCESS call as	\
+	 * it is taken care of inside the macro now in all cases.						\
+	 */													\
+	SETUP_THREADGBL_ACCESS;											\
 } MBEND
 
 /* Macros to startup YottaDB runtime if it is not going yet - one for returns, one for not */
@@ -142,12 +150,9 @@ MBSTART	{													\
 			SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(-status, (ydb_buffer_t *)ERRSTR);			\
 			return;											\
 		}												\
-		/* Since we called "ydb_init" above, "gtm_threadgbl" would have been set to a non-null VALUE	\
-		 * and so any call to SETUP_THREADGBL_ACCESS done by the function that called this macro	\
-		 * needs to be redone to set "lcl_gtm_threadgbl" to point to this new "gtm_threadgbl".		\
-		 */												\
-		SETUP_THREADGBL_ACCESS;										\
 	}		       											\
+	/* See comment above similar code in LIBYOTTADB_RUNTIME_CHECK for why the below line is placed here */	\
+	SETUP_THREADGBL_ACCESS;											\
 } MBEND
 
 /* Initialization and cleanup macros for main simpleAPI calls. Having a value in TREF(libyottadb_active_rtn)
@@ -163,7 +168,7 @@ MBSTART	{															\
 																\
 	GBLREF	int	mumps_status;												\
 																\
-	LIBYOTTADB_RUNTIME_CHECK(RETTYPE, NULL);										\
+	LIBYOTTADB_RUNTIME_CHECK(RETTYPE, NULL);	/* Note: Also does SETUP_THREADGBL_ACCESS; May return if error */	\
 	assert(ydb_init_complete);	/* must be set by LIBYOTTADB_RUNTIME_CHECK above */					\
 	/* Check if a nested call-in frame is needed (logic similar to INVOKE_YDB_NESTED_CALLIN_AND_RETURN_ON_ERROR,		\
 	 * but cannot be directly used since the return is slightly different here.						\
@@ -204,7 +209,7 @@ MBSTART	{															\
 MBSTART	{															\
 	int		errcode;												\
 																\
-	LIBYOTTADB_RUNTIME_CHECK_NORETVAL(NULL);										\
+	LIBYOTTADB_RUNTIME_CHECK_NORETVAL(NULL);	/* Note: Also does SETUP_THREADGBL_ACCESS; May return if error */	\
 	assert(ydb_init_complete);	/* must be set by LIBYOTTADB_RUNTIME_CHECK_NORETVAL above */				\
 	/* Check if a nested call-in frame is needed (logic similar to INVOKE_YDB_NESTED_CALLIN_AND_RETURN_ON_ERROR,		\
 	 * but cannot be directly used since the return is slightly different here.						\
