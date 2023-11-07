@@ -38,6 +38,7 @@ RUN apt-get update && \
                     libelf-dev \
                     libicu-dev \
                     libncurses-dev \
+                    libreadline-dev \
                     && \
     apt-get clean
 
@@ -99,6 +100,7 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
                     nano \
                     wget \
                     netbase \
+                    readline-common \
                     && \
     /tmp/ydb-release/ydbinstall --utf8 --installdir /opt/yottadb/current && \
     apt-get remove -y wget && \

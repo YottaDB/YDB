@@ -34,7 +34,8 @@ RUN yum update -y || true && \
                     libicu-devel \
                     ncurses-devel \
                     elfutils-libelf-devel \
-                    binutils-devel
+                    binutils-devel \
+                    readline-devel
 
 RUN mkdir /tmp/yottadb-src
 ADD CMakeLists.txt /tmp/yottadb-src
@@ -90,6 +91,7 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
                     procps-ng \
                     nano \
                     gzip \
+                    readline \
                     && \
     # Add the CMake build_os_release file which is not part of the install
     # directory Needed to allow us to build Rocky Linux on AARCH64 for Docker

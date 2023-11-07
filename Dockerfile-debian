@@ -38,6 +38,7 @@ RUN apt-get update && \
                     libelf-dev \
                     libicu-dev \
                     libncurses-dev \
+                    libreadline-dev \
                     && \
     apt-get clean
 

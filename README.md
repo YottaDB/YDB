@@ -55,16 +55,16 @@ listed below. For example for Ubuntu Linux:
 
   ```sh
   Ubuntu Linux OR Raspbian Linux OR Beagleboard Debian
-  sudo apt-get install --no-install-recommends file cmake make gcc git curl tcsh {libconfig,libelf,libicu,libncurses}-dev binutils ca-certificates
+  sudo apt-get install --no-install-recommends file cmake make gcc git curl tcsh {libconfig,libelf,libicu,libncurses,libreadline}-dev binutils ca-certificates
 
   Arch Linux
-  sudo pacman -S file cmake make gcc git curl tcsh {libconfig,libelf,icu,ncurses} binutils ca-certificates
+  sudo pacman -S file cmake make gcc git curl tcsh {libconfig,libelf,icu,ncurses,readline} binutils ca-certificates
 
   CentOS Linux OR RedHat Linux
-  sudo yum install file cmake make gcc git curl tcsh {libconfig,libicu,ncurses,elfutils-libelf}-devel binutils ca-certificates
+  sudo yum install file cmake make gcc git curl tcsh {libconfig,libicu,ncurses,elfutils-libelf,readline}-devel binutils ca-certificates
 
   SUSE (SLES or SLED) or OpenSUSE Leap or OpenSUSE Tumbleweed
-  sudo zypper install cmake make gcc git file curl tcsh binutils-gold icu {libconfig,libicu,ncurses,libelf}-devel binutils ca-certificates
+  sudo zypper install cmake make gcc git file curl tcsh binutils-gold icu {libconfig,libicu,ncurses,libelf,readline}-devel binutils ca-certificates
   ```
 
   There may be other library dependencies or the packages may have different names.
