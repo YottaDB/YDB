@@ -95,6 +95,13 @@ INGEST(jnlf,label)
 	. read line
 	. set:$zeof $ecode=",U253,"
 	. set prevline=line
+	. ; Allow for messages that start with "%YDB-I-" or "%YDB-W-" in the mupip journal output.
+	. ; Treat any other messages such as "%YDB-E-" or "%YDB-F-" as errors.
+	. ; Note that it is possible this M program runs inside a docker container in which case "stderr" could also contain
+	. ; syslog output (e.g. %YDB-E-GTMSECSHRSRVF messages). In that case though, the line would start with "YDB-MUPIP"
+	. ; since we issued a "mupip" command in the pipe device above. Therefore skip such lines irrespective of what
+	. ; they contain as they are not errors in the "mupip journal -extract" processing.
+	. quit:line?@("1"""_prefix_"""1""-MUPIP"".E")	; these are syslog messages so skip them
 	. set:line'?@("1""%""1"""_prefix_"""1""-""1(1""W"",1""I"")1""-"".E") $ecode=",U250,"
 	; Purge old records with this label once MUPIP reports it has started forward processing
 	; Starting forward processing also confirms that the journal file format is correct

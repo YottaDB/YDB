@@ -291,12 +291,6 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 				DBGGSSHR((LOGFLAGS, "secshr_client: Connection error, reset socket\n"));
 			} else
 			{
-				if (0 < loop_count)
-					/* No message unless attempted server start at least once */
-					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_GTMSECSHRSRVF, 4,
-							RTS_ERROR_TEXT("Client"), process_id,
-							loop_count - 1, ERR_TEXT, 2,
-							RTS_ERROR_TEXT("sendto to gtmsecshr failed"), save_errno);
 				START_SERVER;
 				DBGGSSHR((LOGFLAGS, "secshr_client: sendto() failed - restarting server\n"));
 			}
