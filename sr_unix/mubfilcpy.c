@@ -204,7 +204,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	double			progper = 0, progfact = SHOWPERCENT;
 	size_t	 		tmpsize, transfersize, remaining;
 	ssize_t 		ret;
-	size_t			bytesspliced = 0, currspeed = 0, trans_cnt = 0, start_cnt = 0;
+	size_t			bytesspliced, currspeed = 0, trans_cnt = 0, start_cnt = 0;
 	time_t			endtm, strtm;
 	char 			sizep[BUF_MAX], progperstr[BUF_MAX], padding[MAX_DIGITS_IN_INT8], fil=' ';
 	boolean_t		sizeGiB = TRUE;
@@ -437,7 +437,6 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		/* set transfer size as maximum. Full copy-acceleration */
 		remaining = stat.st_size;
 		tmpsize = transfersize = remaining;
-		bytesspliced = 0;
 		if (GIGABYTE > tmpsize)
 			sizeGiB = FALSE;
 		tmpsize = (sizeGiB) ? DIVIDE_ROUND_UP(tmpsize, GIGABYTE) : DIVIDE_ROUND_UP(tmpsize, MEGABYTE);
@@ -535,7 +534,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 					ABORTBACKUP;
 			}
 			endtm = time(NULL);
-			bytesspliced = bytesspliced + (size_t)ret;
+			bytesspliced = in_off + (size_t)ret;
 			if ((endtm > strtm) && (0 < ret))
 				currspeed = DIVIDE_ROUND_UP(ret, (endtm - strtm)); /* bytes per second*/
 			remaining = remaining - ret;
