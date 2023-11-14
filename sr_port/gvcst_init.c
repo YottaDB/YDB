@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -442,10 +442,12 @@ void gvcst_init(gd_region *reg)
 				 *		as it would result in we later starting the final retry with t_tries = 2 but
 				 *		holding crit on all regions which is an out-of-design situation.
 				 */
+				assert(!mupip_jnl_recover);
+				TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;	/* Note this needs to be called BEFORE TP_REL_CRIT_ALL_REG.
+									 * See comment in TPNOTACID_CHECK macro for why.
+									 */
 				TP_REL_CRIT_ALL_REG;
 				assert(!baseDBcsa->now_crit);
-				assert(!mupip_jnl_recover);
-				TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;
 			}
 			db_init_region = baseDBreg;				/* gvcst_init_autoDB_ch needs reg 4 ftok_sem_lock */
 			DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);

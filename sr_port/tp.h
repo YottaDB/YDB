@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -983,9 +983,14 @@ GBLREF	unsigned int	t_tries;
 																\
 	if (IS_TP_AND_FINAL_RETRY)												\
 	{															\
-		TP_REL_CRIT_ALL_REG;												\
 		assert(!mupip_jnl_recover);											\
+		/* Note: The TP_REL_CRIT_ALL_REG call needs to happen AFTER the TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK call	\
+		 * as otherwise it is possible a SIGTERM/SIGINT/SIGQUIT signal gets handled as part of the TP_REL_CRIT_ALL_REG	\
+		 * call taking us to exit processing while "t_tries" is still set to "CDB_STAGNATE" which would confuse other	\
+		 * code as we are effectively in the final retry but not holding crit on a region inside a TP transaction.	\
+		 */														\
 		TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;										\
+		TP_REL_CRIT_ALL_REG;												\
 		getzposition(&zpos);												\
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_TPNOTACID, 7, LEN_AND_LIT(CALLER_STR), zpos.str.len, zpos.str.addr, \
 			 (TREF(tpnotacidtime)).str.len, (TREF(tpnotacidtime)).str.addr, dollar_trestart);			\
