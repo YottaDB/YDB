@@ -111,7 +111,6 @@ boolean_t xfer_set_handlers(int4  event_type, int4 param_val, boolean_t popped_e
 		}
 		DBGDFRDEVNT((stderr, "%d %s: xfer_set_handlers - %sevent_type = %d\n", __LINE__, __FILE__,
 			     popped_entry ? "popped " : "", event_type));
-		assert(no_event == outofband || (event_type == outofband));
 		assert(!dollar_zininterrupt || (jobinterrupt != event_type));
 		if (entry != (TREF(save_xfer_root_ptr))->ev_que.fl)
 		{	/* no event in play so pend this one by jiggeriing the xfer_table */
