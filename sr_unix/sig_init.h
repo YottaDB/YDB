@@ -271,20 +271,11 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];						\
 														\
 	/* If not in TP, the YottaDB engine lock index is 0 (i.e. ydb_engine_threadsafe_mutex_holder[0] is	\
-	 * current lock holder thread if it is non-zero). But if we are in TP, then lock index could be		\
-	 * "dollar_tlevel"     : e.g. if a "ydb_get_st" call occurs inside of the "ydb_tp_st" call OR		\
-	 * "dollar_tlevel - 1" : if control is in the TP callback function inside "ydb_tp_st" but not a		\
-	 *	SimpleThreadAPI call like "ydb_get_st" etc.							\
+	 * current lock holder thread if it is non-zero). But if we are in TP, then lock index would be		\
+	 * "dollar_tlevel".											\
 	 */													\
 	TLEVEL = dollar_tlevel;	/* take a local copy of global variable as it could be concurrently changing */	\
-	if (!TLEVEL)												\
-		HOLDER_THREAD_ID = ydb_engine_threadsafe_mutex_holder[0];					\
-	else													\
-	{													\
-		HOLDER_THREAD_ID = ydb_engine_threadsafe_mutex_holder[TLEVEL];					\
-		if (!HOLDER_THREAD_ID)										\
-			HOLDER_THREAD_ID = ydb_engine_threadsafe_mutex_holder[TLEVEL - 1];			\
-	}													\
+	HOLDER_THREAD_ID = ydb_engine_threadsafe_mutex_holder[TLEVEL];					\
 }
 
 /* Macro returns TRUE if SIG is generated as a direct result of the execution of a specific hardware instruction
