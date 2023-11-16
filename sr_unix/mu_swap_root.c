@@ -358,6 +358,18 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	assert(((master_bit + 1) < num_local_maps) || (BLKS_PER_LMAP >= (total_blks - bmlhist.blk_num)));
 	maxbitsthismap = (master_bit != (num_local_maps - 1)) ? BLKS_PER_LMAP : (int4)(total_blks - bmlhist.blk_num);
 	free_bit = bm_find_blk(hint_bit, bmlhist.buffaddr + SIZEOF(blk_hdr), maxbitsthismap, &free_blk_recycled);
+	if (NO_FREE_SPACE == free_bit)
+	{	/* This is a case where the master bitmap indicated this local bitmap had free space but the bitmap
+		 * has no free space. This is possible if a concurrent process in "bg_update_phase2()" that is updating
+		 * this exact same bitmap block has done a gvcst_map_build() call that marked all blocks in the bitmap
+		 * as allocated/used but BEFORE the bm_update() call happened a few instructions later. This is a
+		 * restartable situation.
+		 */
+		assert(0 == upg_mv_block);
+		assert(t_tries < CDB_STAGNATE);
+		t_retry(cdb_sc_bmlmod);
+		return RETRY_SWAP;
+	}
 	free_blk_id = bmlhist.blk_num + free_bit;
 	assert((0 == upg_mv_block) || (upg_mv_block + 1 == free_blk_id));
 	if (DIR_ROOT >= free_blk_id)
