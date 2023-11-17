@@ -1,6 +1,6 @@
  /***************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
@@ -564,12 +564,26 @@ void gtmsource_recv_ctl(void)
 					gtmsource_process_heartbeat((repl_heartbeat_msg_ptr_t)recv_msgp);
 #				ifdef GTM_TLS
 				hrtbt_cnt++;
+				/* Check whether it is time for renegotiation */
 				if ((0 < renegotiate_factor) && (0 == (hrtbt_cnt % renegotiate_factor))
 					&& (SHUTDOWN != gtmsource_local->shutdown))
 				{
-					next_renegotiate_hrtbt = TRUE;
-					repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_TIMEOUT;
-					poll_time = REPL_POLL_WAIT;
+					switch(repl_tls.renegotiate_state)
+					{
+						case REPLTLS_RENEG_STATE_NONE:
+						case REPLTLS_WAITING_FOR_RENEG_TIMEOUT:
+							next_renegotiate_hrtbt = TRUE;
+							repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_TIMEOUT;
+							poll_time = REPL_POLL_WAIT;
+							break;
+						case REPLTLS_WAITING_FOR_RENEG_ACK:
+						/* On slower systems, heartbeat responses may arrive late.
+						   In such a case, defer renegotiation */
+							break;
+						default:
+							assert(FALSE);
+							break;
+					}
 				}
 #				endif
 				break;
@@ -577,7 +591,7 @@ void gtmsource_recv_ctl(void)
 			case REPL_RENEG_ACK:
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_RENEG_ACK received\n");
 				REPLTLS_RENEGOTIATE(repl_tls.sock, status);
-				poll_time = REPL_POLL_WAIT; /* because we are back to sending data */
+				poll_time = REPL_POLL_NOWAIT; /* because we are back to sending data */
 				if (0 != status)
 				{
 					assert(GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state);
@@ -588,7 +602,7 @@ void gtmsource_recv_ctl(void)
 				renegotiate_msg.type = REPL_RENEG_COMPLETE;
 				renegotiate_msg.len = MIN_REPL_MSGLEN;
 				gtmsource_repl_send((repl_msg_ptr_t)&renegotiate_msg, "REPL_RENEG_COMPLETE",
-								MAX_SEQNO, INVALID_SUPPL_STRM);
+							MAX_SEQNO, INVALID_SUPPL_STRM);
 				if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 					return;
 				if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
