@@ -185,6 +185,8 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	set ydbretention=$select($data(currenv("ydb_retention")):+currenv("ydb_retention"),$data(currenv("gtm_retention")):+currenv("gtm_retention"),1:0)
 	set:'ydbretention ydbretention=42
 	do ExportEnv("ydb_retention",ydbretention),ExportEnv("gtm_retention",ydbretention)
+	; set ydb_readline
+	do ExportEnv("ydb_readline",1)
 	; ydb_gbldir is set here after setting ydb_repl_instance and
 	; ydb_retention because if an environment exists (determined
 	; by the existence of a global directory), Robustify needs
