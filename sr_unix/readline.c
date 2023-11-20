@@ -559,7 +559,7 @@ void readline_read_mval(mval *v) {
 				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));
 				system_free(line);
 				line = system_malloc(strlen(expansion) + 1);
-				strncpy(line, expansion, strlen(expansion) + 1);
+				memcpy(line, expansion, strlen(expansion) + 1);
 				done = TRUE;
 			}
 			else if (-1 == expansion_result) {
