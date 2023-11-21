@@ -824,7 +824,7 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 	if (!USING_ALTERNATE_SIGHANDLING)
 	{
 		signal_forwarded = IS_SIGNAL_FORWARDED(sig_hndlr_generic_signal_handler, why, info);
-		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_timer_handler, why, IS_EXI_SIGNAL_FALSE, info, context);
+		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_timer_handler, why, NULL, info, context);
 	}
 	/* Now that we know FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED did not return, we hold the YDB engine lock in case this is a
 	 * multi-threaded program. Therefore we can safely set the global variable "in_os_signal_handler".

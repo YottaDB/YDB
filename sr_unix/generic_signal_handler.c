@@ -89,6 +89,30 @@
 	}												\
 }
 
+/* This macro needs to be invoked while returning from "generic_signal_handler()". This is because it is possible
+ * we got the "tLevel"th YottaDB engine multi-thread lock inside the FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED macro
+ * call at the start of the function. If so, we need to unlock before the return to avoid deadlocks.
+ * Note that "pthread_mutex_unlock()" is not async-signal-safe (i.e. it should not be used inside a signal handler
+ * (which this "generic_signal_handler" is) but for the same reasons that the lock was obtained using "pthread_mutex_trylock()"
+ * (which is also not async-signal-safe) we release the lock here (to avoid messier alternatives when this just works).
+ */
+#define	CLEANUP_AND_RETURN(GOT_TLEVEL_LOCK)									\
+{														\
+	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];							\
+	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];						\
+														\
+	if (0 < GOT_TLEVEL_LOCK)										\
+	{													\
+		int	status;											\
+														\
+		ydb_engine_threadsafe_mutex_holder[GOT_TLEVEL_LOCK - 1] = 0;					\
+		status = pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[GOT_TLEVEL_LOCK - 1]);		\
+		assert(0 == status);										\
+		/* Not much we can do in Release builds if this fails since we are inside a signal handler. */	\
+	}													\
+	return;													\
+}
+
 GBLREF	int4			forced_exit_err;
 GBLREF	int4			forced_exit_sig;
 GBLREF	int4			exi_condition;
@@ -172,17 +196,19 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 #	ifdef DEBUG
 	boolean_t		save_in_nondeferrable_signal_handler;
 #	endif
+	uint4			got_tlevel_lock, *got_tlevel_lock_ptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	using_alternate_sighandling = USING_ALTERNATE_SIGHANDLING;	/* Simpler local version */
+	got_tlevel_lock = 0;
 	/* Check for rethrown signal before we check forwarding. When deferred_exit_handler() processes a deferred signal,
 	 * some non-M languages (specifically Golang, perhaps others) rethrow the signal so it comes through here twice.
 	 * Since we run the exit handler logic just prior to invoking non-YDB signal handlers that were in place before
 	 * YDB was initialized, we can check exit_handler_complete to see if it has already run. If it has, just return.
 	 */
 	if (exit_handler_complete)
-		return;		/* Nothing we can do if exit handler has run */
+		CLEANUP_AND_RETURN(got_tlevel_lock);		/* Nothing we can do if exit handler has run */
 	if (!using_alternate_sighandling)
 	{
 		signal_forwarded = IS_SIGNAL_FORWARDED(sig_hndlr_generic_signal_handler, sig, info);
@@ -193,7 +219,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 			assert(!non_forwarded_sig_seen[exit_state]);
 			non_forwarded_sig_seen[exit_state] = TRUE;
 		}
-		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_generic_signal_handler, sig, IS_EXI_SIGNAL_TRUE, info, context);
+		got_tlevel_lock_ptr = &got_tlevel_lock;	/* "got_tlevel_lock_ptr" needed to avoid a [-Waddress] warning on RHEL 7 */
+		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_generic_signal_handler, sig, got_tlevel_lock_ptr, info, context);
 		/* It is possible that the exit handler has been started but not finished when we get a signal. Check that here. If
 		 * true, we just ignore it letting the earlier signal finish its processing.
 		 */
@@ -204,7 +231,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 			 * c) sig == exi_condition implies we already are exiting because of this very same signal.
 			 * In this case, we let the original exit handler invocation continue by returning from this right away.
 			 */
-			return;
+			CLEANUP_AND_RETURN(got_tlevel_lock);
 		}
 	} else
 	{	/* Note signals are never considered "forwarded" in alterate sighandling mode - at least in the sense of the
@@ -233,7 +260,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 		 * In this case, we let the original exit handler invocation continue by returning from this right away.
 		 */
 		DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
-		return;
+		CLEANUP_AND_RETURN(got_tlevel_lock);
 	}
 	assert(!thread_block_sigsent || blocksig_initialized);
 	/* If "thread_block_sigsent" is TRUE, it means the threads do not want the master thread to honor external signals
@@ -242,7 +269,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 	if (thread_block_sigsent && sigismember(&block_sigsent, sig))
 	{
 		DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
-		return;
+		CLEANUP_AND_RETURN(got_tlevel_lock);
 	}
 #	ifdef DEBUG
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into timer_handler
@@ -313,7 +340,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 							SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
 					}
 					DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
-					return;
+					CLEANUP_AND_RETURN(got_tlevel_lock);
 				}
 				DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 				exit_state = EXIT_IMMED;
@@ -369,7 +396,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 					exit_state++;		/* Make exit pending, may still be tolerant though */
 				assert(!IS_GTMSECSHR_IMAGE);
 				DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
-				return;
+				CLEANUP_AND_RETURN(got_tlevel_lock);
 			}
 			DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 			exit_state = EXIT_IMMED;
@@ -427,7 +454,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 						need_core = TRUE;
 						MULTI_THREAD_AWARE_FORK_N_CORE(signal_forwarded);
 						DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
-						return;
+						CLEANUP_AND_RETURN(got_tlevel_lock);
 					}
 					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 					exit_state = EXIT_IMMED;
@@ -497,11 +524,11 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 	{
 		DEBUG_ONLY(in_nondeferrable_signal_handler = save_in_nondeferrable_signal_handler);
 		DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
-		return;
+		CLEANUP_AND_RETURN(got_tlevel_lock);
 	}
 	signal_exit_handler("generic_signal_handler", sig, info, context, IS_DEFERRED_EXIT_FALSE);	/* exits the process */
 	/* Below code is unreachable since the previous step would exit the process but is there for completeness */
 	assert(FALSE);
 	DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
-	return;
+	CLEANUP_AND_RETURN(got_tlevel_lock);
 }

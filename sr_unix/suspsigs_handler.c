@@ -38,7 +38,7 @@ void suspsigs_handler(int sig, siginfo_t* info, void *context)
 
 	if (!USING_ALTERNATE_SIGHANDLING)
 	{
-		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_suspsigs_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
+		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_suspsigs_handler, sig, NULL, info, context);
 		/* Note: We do not have any "drive_non_ydb_signal_handler_if_any()" usages below. That is, we do not forward
 		 * these signals to any non-YottaDB signal handler routine (e.g Go program using the YottaDB GoWrapper)
 		 * in this case but instead depend purely on YottaDB's suspend/continue operations.

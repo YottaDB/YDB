@@ -265,17 +265,17 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 
 #ifdef GTM_PTHREAD
 
-#define	SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(HOLDER_THREAD_ID, TLEVEL)						\
-{														\
-	GBLREF	uint4		dollar_tlevel;									\
-	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];						\
-														\
-	/* If not in TP, the YottaDB engine lock index is 0 (i.e. ydb_engine_threadsafe_mutex_holder[0] is	\
-	 * current lock holder thread if it is non-zero). But if we are in TP, then lock index would be		\
-	 * "dollar_tlevel".											\
-	 */													\
-	TLEVEL = dollar_tlevel;	/* take a local copy of global variable as it could be concurrently changing */	\
-	HOLDER_THREAD_ID = ydb_engine_threadsafe_mutex_holder[TLEVEL];					\
+#define	SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(HOLDER_THREAD_ID, TLEVEL)								\
+{																\
+	GBLREF	uint4		dollar_tlevel;											\
+	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];								\
+																\
+	/* If not in TP, the YottaDB engine lock index is 0 (i.e. ydb_engine_threadsafe_mutex_holder[0] is			\
+	 * current lock holder thread if it is non-zero). But if we are in TP, then lock index would be				\
+	 * "dollar_tlevel".													\
+	 */															\
+	TLEVEL = (volatile uint4)dollar_tlevel;	/* take a local copy of global variable as it could be concurrently changing */	\
+	HOLDER_THREAD_ID = ydb_engine_threadsafe_mutex_holder[TLEVEL];								\
 }
 
 /* Macro returns TRUE if SIG is generated as a direct result of the execution of a specific hardware instruction
@@ -294,16 +294,17 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 	     || (simpleThreadAPI_active && (SI_TKILL == INFO->si_code)			\
 		 && (SIG == stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_num)))
 
-/* Values to pass to FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED() macro below as the IS_EXI_SIGNAL parameter */
-#define	IS_EXI_SIGNAL_FALSE	FALSE
-#define	IS_EXI_SIGNAL_TRUE	TRUE
-
 /* If we detect a case when the signal came to a thread other than the main GT.M thread, this macro will redirect the signal to the
  * main thread if such is defined. Such scenarios is possible, for instance, if we are running along a JVM, which, upon receiving a
  * signal, dispatches a new thread to invoke signal handlers other than its own. The pthread_kill() enables us to target the signal
  * to a specific thread rather than rethrow it to the whole process.
+ *
+ * GOT_LOCK is an I/O parameter. If set to a non-NULL value, *GOT_LOCK is set to "tLevel + 1" if the YDB engine multi-threaded
+ * mutex lock was obtained inside this macro at the "tLevel"th depth. This way if no lock was obtained "*GOT_LOCK" is set to 0.
+ * There is an inherent assumption that the caller sets GOT_LOCK to a non-NULL value only if SIG is a process terminating signal.
+ * This is used in setting "is_exi_signal" to TRUE inside the macro.
  */
-#define FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGHNDLRTYPE, SIG, IS_EXI_SIGNAL, INFO, CONTEXT)					\
+#define FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGHNDLRTYPE, SIG, GOT_LOCK, INFO, CONTEXT)					\
 {																\
 	GBLREF	pthread_t		gtm_main_thread_id;									\
 	GBLREF	boolean_t		gtm_main_thread_id_set;									\
@@ -311,7 +312,8 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 	GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder[];							\
 	GBLREF	boolean_t		gtm_jvm_process;									\
 	GBLREF	enum sig_handler_t	ydb_stm_invoke_deferred_signal_handler_type;						\
-	DEBUG_ONLY(GBLREF uint4	dollar_tlevel;)											\
+	GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex[];								\
+	GBLREF	uint4			dollar_tlevel;										\
 																\
 	assert(!USING_ALTERNATE_SIGHANDLING);											\
 	assert((DUMMY_SIG_NUM == SIG) || (NULL != INFO));									\
@@ -325,7 +327,9 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 			pthread_t	mutexHolderThreadId, thisThreadId;							\
 			int		tLevel;											\
 			boolean_t	isSigThreadDirected, signalForwarded, thisThreadIsMutexHolder;				\
+			boolean_t	is_exi_signal;										\
 																\
+			is_exi_signal = (NULL != GOT_LOCK);									\
 			/* Note: The below comment talks about SIGALRM as an example but the same reasoning applies to		\
 			 * other signals too which this macro can be called for.						\
 			 *													\
@@ -346,6 +350,55 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 			thisThreadId = pthread_self();										\
 			assert(thisThreadId);											\
 			SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutexHolderThreadId, tLevel);					\
+			if (is_exi_signal)											\
+			{													\
+				*(volatile uint4 *)GOT_LOCK = 0;	/* volatile needed to avoid compiler warning when	\
+									 * GOT_LOCK is NULL in caller.				\
+									 */							\
+				if (!mutexHolderThreadId)									\
+				{	/* This is a signal that exits the process. And no thread holds the "tLevel"th		\
+					 * engine lock. See if we can get it right away as it will help this process		\
+					 * terminate quickly. Otherwise, like in the r130/ydb534 subtest for example, it	\
+					 * would take a minute to generate a core on SIGABRT.					\
+					 * Note that "pthread_mutex_trylock()" is not async-signal-safe (i.e. it should not	\
+					 * be used inside a signal handler (which this entire macro is) but it seems to work	\
+					 * without issues and alternate solutions are messier.					\
+					 */											\
+					int	status;										\
+																\
+					status = pthread_mutex_trylock(&ydb_engine_threadsafe_mutex[tLevel]);			\
+					if (0 == status)									\
+					{	/* We were able to successfully get the "tLevel"th lock.			\
+						 * If the global variable "dollar_tlevel" has changed since we noted down	\
+						 * "tLevel", things have changed enough that we cannot safely conclude if we	\
+						 * hold the YottaDB engine lock. Otherwise, check if "tLevel" is greater than	\
+						 * 0. In that case, additionally check if this same thread also holds the	\
+						 * "tLevel-1"th lock. If so we can safely assume this thread owns the YottaDB	\
+						 * engine lock. If not, it is possible for some other thread to decrement	\
+						 * "dollar_tlevel" while still being inside a "ydb_tp_st" call and make calls	\
+						 * to the YottaDB engine runtime. Therefore, we cannot safely assume engine	\
+						 * lock ownership in that case.							\
+						 */										\
+						if (((volatile uint4)dollar_tlevel == tLevel)					\
+							&& ((0 == tLevel)							\
+								|| (thisThreadId == 						\
+									ydb_engine_threadsafe_mutex_holder[tLevel - 1])))	\
+						{	/* The global "dollar_tlevel" is still the same as what we noted	\
+							 * down in "tLevel" a few lines above. Therefore, it is safe to		\
+							 * assume we are the owner of the YottaDB engine lock.			\
+							 */									\
+							assert(0 == ydb_engine_threadsafe_mutex_holder[tLevel]);		\
+							ydb_engine_threadsafe_mutex_holder[tLevel] = thisThreadId;		\
+							SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutexHolderThreadId, tLevel);	\
+							*(volatile uint4 *)GOT_LOCK = tLevel + 1;				\
+						} else										\
+						{										\
+							status = pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[tLevel]);	\
+							assert(0 == status);							\
+						}										\
+					}											\
+				}												\
+			}													\
 			/* If we are in TP, we hold the mutex lock "ydb_engine_threadsafe_mutex[tLevel]" but it is possible	\
 			 * concurrent threads are creating nested TP transactions in which case the YottaDB engine mutex lock	\
 			 * would move to "ydb_engine_threadsafe_mutex[tLevel+1]" and so on. In order to be sure we are the only	\
@@ -375,7 +428,7 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 				 return;											\
 			}													\
 			if (!thisThreadIsMutexHolder										\
-					|| (!IS_EXI_SIGNAL && (tLevel && (!isSigThreadDirected || signalForwarded))))		\
+					|| (!is_exi_signal && (tLevel && (!isSigThreadDirected || signalForwarded))))		\
 			{	/* Two possibilities.										\
 				 *  a) We do not hold the YottaDB engine lock OR						\
 				 *  b) We hold the YottaDB engine lock but this is not a signal that terminates the process	\
@@ -389,7 +442,7 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 				if (!signalForwarded)										\
 				{												\
 					STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG, INFO, CONTEXT);			\
-					if (IS_EXI_SIGNAL)									\
+					if (is_exi_signal)									\
 						DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED(SIG);					\
 				}												\
 				return;												\

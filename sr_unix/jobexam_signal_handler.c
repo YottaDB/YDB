@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,7 @@ void jobexam_signal_handler(int sig, siginfo_t *info, void *context)
 	/* Note we don't need to bypass this like in other handlers because this handler is not in use when using
 	 * simple[Threaded]API.
 	 */
-	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_jobexam_signal_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_jobexam_signal_handler, sig, NULL, info, context);
 	extract_signal_info(sig, info, context, &signal_info);
 	switch(signal_info.infotype)
 	{

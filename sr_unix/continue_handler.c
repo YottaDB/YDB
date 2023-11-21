@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,7 @@ void continue_handler(int sig, siginfo_t *info, void *context)
 	SETUP_THREADGBL_ACCESS;
 	if (!USING_ALTERNATE_SIGHANDLING)
 	{
-		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_continue_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
+		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_continue_handler, sig, NULL, info, context);
 	}
 	/* Count how many times we get a continue-process signal (in DEBUG) */
 	DEBUG_ONLY(DBGGSSHR((LOGFLAGS, "continue_handler: pid %d, continue_proc_cnt bumped from %d to %d\n",

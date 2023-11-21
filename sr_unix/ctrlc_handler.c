@@ -43,7 +43,7 @@ void ctrlc_handler(int sig, siginfo_t *info, void *context)
 	/* Note we don't need to bypass this like in other handlers because this handler is not in use when using
 	 * simple[Threaded]API.
 	 */
-	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_ctrlc_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_ctrlc_handler, sig, NULL, info, context);
 	assert((SIGINT == sig) || (SIGHUP == sig));
 	assert(!(MUMPS_CALLIN & invocation_mode));
 	/* Normal procedure from MUMPS is to set our outofband trigger to handle this signal */

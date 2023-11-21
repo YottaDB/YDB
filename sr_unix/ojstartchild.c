@@ -204,7 +204,7 @@ void job_term_handler(int sig, siginfo_t *info, void *context)
 
 	if (USING_ALTERNATE_SIGHANDLING)
 	{
-		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_job_term_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
+		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_job_term_handler, sig, NULL, info, context);
 	}
 	/*
 	 * ret	= 0 - Child is present but not changed the state

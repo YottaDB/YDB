@@ -55,7 +55,7 @@ void jobinterrupt_event(int sig, siginfo_t *info, void *context)
 {
 	if (!USING_ALTERNATE_SIGHANDLING)
 	{
-		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_jobinterrupt_event, sig, IS_EXI_SIGNAL_FALSE, info, context);
+		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_jobinterrupt_event, sig, NULL, info, context);
 	}
 	if (!dollar_zininterrupt)
 		(void)xfer_set_handlers(jobinterrupt, sig, FALSE);
