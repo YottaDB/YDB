@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -877,6 +877,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 			GET_KEY_AND_IV(output);
 			break;
 		case iop_buffered:
+			if (rm_ptr->fifo || rm_ptr->is_pipe)
+				break;	/* Buffering NOT enabled for FIFO/PIPE */
 			disk_block_multiple = (int)*((unsigned char *)(pp->str.addr + p_offset + 1));
 			/* Not enabled for stdout (initially) */
 			if (1 == rm_ptr->fildes)
