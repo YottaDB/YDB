@@ -58,18 +58,9 @@ fi
 # Native shared library extension.
 ext=".so"
 
-isarm_ydb=`file yottadb | grep -w "ARM" | wc -l`
-is64bit_ydb=`file yottadb | grep -c "64-bit"`
-
 # Flags to build shared libraries of M routines
 if [ "ibm" = $arch ] ; then ldflags="-brtl -G -bexpfull -bnoentry -b64" ; ldcmd="ld" # AIX
-elif [ "linux" = $arch ] ; then
-	ldflags="-shared"
-	if [ "$isarm_ydb" -eq 1 ] ; then
-		ldcmd="cc" # On Linux/ARM only cc (not ld) creates a valid ELF header when compiling M routines
-	else
-		ldcmd="ld.gold" # Linux - all platforms
-	fi
+elif [ "linux" = $arch ] ; then ldflags="-shared" ; ldcmd="ld.gold" # Linux - all platforms
 else echo "Shared libary ldflags not set for this platform"; exit 1
 fi
 
@@ -550,7 +541,7 @@ $echo ""
 # Ensure we are NOT in UTF-8 mode
 ydb_chset="M"
 export ydb_chset
-(cd $ydbdist; ./yottadb -noignore *.m; $echo $?>compstat ; $ldcmd $ldflags -o libyottadbutil$ext *.o)
+(cd $ydbdist; ./yottadb -noignore *.m; $echo $?>compstat ; $ldcmd $ldflags -o libyottadbutil$ext *.o; $echo $?>>$ydbdist/compstat)
 
 # Now work on UTF-8 mode
 if [ "$doutf8" -ne 0 ]; then
@@ -568,7 +559,7 @@ if [ "$doutf8" -ne 0 ]; then
 		ydb_chset="UTF-8"
 		export ydb_chset
 		(ydb_dist=$ydbdist/utf8; export ydb_dist; cd $ydb_dist; ./yottadb -noignore *.m; $echo $?>>$ydbdist/compstat; \
-		$ldcmd $ldflags -o libyottadbutil$ext *.o)
+		$ldcmd $ldflags -o libyottadbutil$ext *.o; $echo $?>>$ydbdist/compstat)
 	)
 fi
 

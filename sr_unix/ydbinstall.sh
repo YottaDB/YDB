@@ -414,7 +414,7 @@ if [ "Y" = "$ydb_debug" ] ; then set -x ; fi
 
 alldepflag=1
 # List of dependencies that ydbinstall.sh needs and ensure they are present.
-utillist="awk basename cat cut expr gzip ldconfig chmod cp date dirname grep id head mkdir mktemp rm sha256sum sed sort tar tr uname"
+utillist="awk basename cat cut expr gzip ld.gold ldconfig chmod cp date dirname grep id head mkdir mktemp rm sha256sum sed sort tar tr uname"
 check_if_utils_exist "Program(s) required to run the ydbinstall/ydbinstall.sh script not found:"
 if [ -z "$alldepflag" ] ; then err_exit ; fi
 
