@@ -510,6 +510,7 @@ void readline_read_mval(mval *v) {
 
 		if (readline_is_recall(line, &recall_data)) {
 			/* User typed rec/recall */
+			assert((recall_data.result == recall_all) || (recall_data.result == recall_one));
 			if (recall_data.result == recall_all) {
 				/* recall */
 				readline_print_history();
@@ -517,17 +518,16 @@ void readline_read_mval(mval *v) {
 				assert(NULL == recall_data.recall_string);
 				system_free(line);
 				continue;
-			} else if ((recall_data.result == recall_one) && (0 < recall_data.recall_number)) {
+			} else if (NULL == recall_data.recall_string) {
 				/* recall n */
 				/* replace line with event !n */
 				int len;
 
-				assert(NULL == recall_data.recall_string);
 				system_free(line);
 				len = snprintf(NULL, 0, "!%d", recall_data.recall_number) + 1; // NULL
 				line = system_malloc(len);
 				snprintf(line, len, "!%d", recall_data.recall_number);
-			} else if ((recall_data.result == recall_one) && (NULL != recall_data.recall_string)) {
+			} else {
 				/* recall xxx */
 				/* replace line with event !?xxx */
 				char *original_line;
@@ -541,10 +541,6 @@ void readline_read_mval(mval *v) {
 				line = system_malloc(len);
 				snprintf(line, len, "!?%s", recall_data.recall_string);
 				system_free(original_line);
-			} else {
-				/* Not supposed to get here */
-				assert(FALSE);
-				continue;
 			}
 		}
 
