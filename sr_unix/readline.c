@@ -637,7 +637,7 @@ boolean_t readline_is_recall(char* input, recall_data *recall_data) {
 	match_length = (uint4)strcspn((const char *)input, delimiter_string);
 	/* only "rec" and "recall" should be accepted */
 	if (((strlen(REC) == match_length) || (strlen(RECALL) == match_length))
-			&& (0 == strncmp((const char *)input, RECALL, match_length)))
+			&& (0 == strncasecmp((const char *)input, RECALL, match_length)))
 	{
 		char	*strtokptr;
 #ifdef DEBUG

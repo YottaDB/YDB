@@ -556,66 +556,35 @@ void	dm_read (mval *v)
 					/* exceeding the maximum length exits the while loop, so it must fit here . */
 #				ifdef UTF8_SUPPORTED
 				if (utf8_active)
-				{	/* recall buffer kept as UTF-8 */
-					matched = TRUE;
-					for (match_length = 0; (SIZEOF(RECALL) - 1) > match_length && outlen > match_length;
-							match_length++)
-					{
-						if (ASCII_MAX < GET_OFF(match_length)
-								|| recptr[match_length] != (char)GET_OFF(match_length))
-						{
-							matched = FALSE;
-							break;
-						}
-					}
-					if (!matched && (outlen > match_length)
-						&& (((SIZEOF(REC) - 1) == match_length) || (SIZEOF(RECALL) == match_length))
-						&& ((' ' == GET_OFF(match_length)) || ('\t' == GET_OFF(match_length))))
-							matched = TRUE;		/* REC or RECALL then space or tab */
-					else if (matched)
-						if (((SIZEOF(RECALL) - 1) != match_length) && ((SIZEOF(REC) - 1) != match_length))
-							matched = FALSE;	/* wrong size */
-						else if ((outlen > match_length)
-							&& (' ' != GET_OFF(match_length) && ('\t' != GET_OFF(match_length))))
-								matched = FALSE;	/* or RECALL then not eol, space, or tab */
-					if (!matched)
-						break;		/* not RECALL so end of line */
-					match_length++;		/* get past space or tab */
-					if (outlen <= match_length)
-						argv[1] = NULL;		/* nothing after RECALL */
-					else
-						argv[1] = (char *)buffer_start;
-					for (outptr = buffer_start ; outlen > match_length; match_length++)
+				{
+					// Copy utf-32 string into buffer_start as utf-8
+					outptr = buffer_start;
+					for (match_length = 0; outlen > match_length; match_length++)
 					{
 						inchar = GET_OFF(match_length);
 						outptr = UTF8_WCTOMB(inchar, outptr);
-						if ((ASCII_MAX > GET_OFF(match_length))
-							&& ((' ' == GET_OFF(match_length)) || ('\t' == GET_OFF(match_length))))
-								break;
 					}
 					*outptr = '\0';
-				} else
-				{
-#				endif
-					match_length = (uint4)strcspn((const char *)buffer_start, delimiter_string);
-					/* only "rec" and "recall" should be accepted */
-					if (((strlen(REC) == match_length) || (strlen(RECALL) == match_length))
-						&& (0 == strncmp((const char *)buffer_start, RECALL, match_length)))
-					{
-						char	*strtokptr;
-#						ifdef DEBUG
-						char	*delim_ptr;
-
-#						endif
-						DEBUG_ONLY(delim_ptr = )
-							STRTOK_R((char *)buffer_start, delimiter_string, &strtokptr);
-						assert(NULL != delim_ptr);
-						argv[1] = STRTOK_R(NULL, "", &strtokptr);
-					} else
-						break;		/* not RECALL so end of line */
-#				ifdef UTF8_SUPPORTED
 				}
 #				endif
+
+				match_length = (uint4)strcspn((const char *)buffer_start, delimiter_string);
+				/* only "rec" and "recall" should be accepted */
+				if (((strlen(REC) == match_length) || (strlen(RECALL) == match_length))
+					&& (0 == strncasecmp((const char *)buffer_start, RECALL, match_length)))
+				{
+					char	*strtokptr;
+#					ifdef DEBUG
+					char	*delim_ptr;
+
+#					endif
+					DEBUG_ONLY(delim_ptr = )
+						STRTOK_R((char *)buffer_start, delimiter_string, &strtokptr);
+					assert(NULL != delim_ptr);
+					argv[1] = STRTOK_R(NULL, "", &strtokptr);
+				} else
+					break;		/* not RECALL so end of line */
+
 				index = 0;
 				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));	/* BYPASSOK */
 				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));	/* BYPASSOK */
