@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -66,9 +69,9 @@ void dse_integ(void)
 		r_ptr = (unsigned char *)((sm_uc_ptr_t)bp + SIZEOF(blk_hdr)) + SIZEOF(rec_hdr);
 		for (key_len = 0; KEY_DELIMITER != *r_ptr; r_ptr++)
 			key_buff[key_len++] = *r_ptr;;
-		gvt = dse_find_gvt(gv_cur_region, (char *)key_buff, (key_len));
+		gvt = (0 != key_len) ? dse_find_gvt(gv_cur_region, (char *)key_buff, (key_len)) : NULL;
 	}
-	if (TRUE == cert_blk(gv_cur_region, blk, (blk_hdr_ptr_t)bp, 0, RTS_ERROR_ON_CERT_FAIL, gvt))
+	if (cert_blk(gv_cur_region, blk, (blk_hdr_ptr_t)bp, 0, RTS_ERROR_ON_CERT_FAIL, gvt))
 		util_out_print("!/  No errors detected.!/", TRUE);
 	else
 		util_out_print(NULL, TRUE);

@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -47,6 +50,7 @@ gv_namehead *dse_find_gvt(gd_region *reg, char *name, int name_len)
 		init_hashtab_mname(gvt_hashtab, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 	}
 	gvent.var_name.addr = name;
+	assert(0 < name_len);	/* caller must have ensured this */
 	gvent.var_name.len = MIN(name_len, MAX_MIDENT_LEN);
 	COMPUTE_HASH_MNAME(&gvent);
 	if (NULL != (tabent = lookup_hashtab_mname(gvt_hashtab, &gvent)))
