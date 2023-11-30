@@ -137,7 +137,7 @@ static	CLI_PARM mup_dumpfhead_parm[] = {
 static CLI_ENTRY mup_dumpfhead_qual[] = {		/* DUMP -FHEAD */
 { "FILE",   mupip_dump_fhead, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "FLUSH",  mupip_dump_fhead, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
-{ "REGION", mupip_dump_fhead, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
+{ "REGION", mupip_dump_fhead, 0, 0, 0, 0, 0, VAL_OR_PARAM, 1, NON_NEG, VAL_N_A, 0 },
 { "" }
 };
 
@@ -255,7 +255,7 @@ static	CLI_ENTRY	mup_convert_qual[] = {		/* CONVERT */
 };
 
 static	CLI_ENTRY	mup_create_qual[] = {		/* CREATE */
-{ "REGION", mupip_create, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0 },
+{ "REGION", mupip_create, 0, 0, 0, 0, 0, VAL_OR_PARAM, 0, NON_NEG, VAL_STR, 0 },
 { "" }
 };
 
@@ -282,7 +282,6 @@ static	CLI_ENTRY	mup_extend_qual[] = {		/* EXTEND */
 
 static	CLI_PARM	mup_extract_parm[] = {
 { "FILE",   "Output File: ", PARM_REQ},
-{ "REGION", "Region(s): "  , PARM_REQ},
 { "", "",                    PARM_REQ}
 };
 
@@ -299,7 +298,7 @@ static	CLI_ENTRY	mup_extract_qual[] = {		/* EXTRACT */
 { "NULL_IV",  mu_extract, 0, 0,                   0,                       0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 { "OCHSET",   mu_extract, 0, 0,                   0,                       0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 { "OVERRIDE", mu_extract, 0, 0,                   0,                       0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
-{ "REGION",   mu_extract, 0, 0,                   0,                       0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_N_A, 0 },
+{ "REGION",   mu_extract, 0, 0,                   0,                       0, 0, VAL_OR_PARAM,   1, NON_NEG, VAL_N_A, 0 },
 { "SELECT",   mu_extract, 0, 0,                   0,                       0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 { "STDOUT",   mu_extract, 0, 0,                   0,                       0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "" }
@@ -360,7 +359,7 @@ static	CLI_ENTRY	mup_integ_qual[] = {		/* INTEG */
 { "MAXKEYSIZE",  mupip_integ, 0, mup_integ_map_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0       },
 { "ONLINE",      mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 2, NEG,     VAL_N_A, 0       },
 { "PRESERVE",    mupip_integ, 0, 0,                  0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_N_A, 0       },
-{ "REGION",      mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
+{ "REGION",      mupip_integ, 0, 0,                  0, 0, 0, VAL_OR_PARAM,   1, NON_NEG, VAL_N_A, 0       },
 { "STATS",       mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0       },
 { "SUBSCRIPT",   mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
 { "TN_RESET",    mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
@@ -505,7 +504,7 @@ static  CLI_ENTRY       mup_reorg_qual[] = {		/* REORG */
 { "NOCOALESCE",         mupip_reorg, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 { "NOSPLIT",            mupip_reorg, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 { "NOSWAP",             mupip_reorg, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
-{ "REGION",             mupip_reorg, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
+{ "REGION",             mupip_reorg, 0, 0,                 0, 0, 0, VAL_OR_PARAM,   1, NON_NEG, VAL_N_A, 0       },
 { "RESUME",             mupip_reorg, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 { "SAFEJNL",            mupip_reorg, 0, 0,                 0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0       },
 { "SELECT",             mupip_reorg, 0, 0,                 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
@@ -530,11 +529,11 @@ static CLI_ENTRY mup_size_heuristic_qual[] = {		/* SIZE -HEURISTIC */
 { "" }
 };
 static  CLI_ENTRY	mup_size_qual[] = {		/* SIZE */
-{ "ADJACENCY", 0, 0, 0, 0,                       0, 0, VAL_REQ, 1, NON_NEG, VAL_NUM, 0	},
-{ "HEURISTIC", 0, 0, 0, mup_size_heuristic_qual, 0, 0, VAL_REQ, 1, NON_NEG, VAL_STR, 0	},
-{ "REGION",    0, 0, 0, 0,                       0, 0, VAL_REQ, 1, NON_NEG, VAL_STR, 0	},
-{ "SELECT",    0, 0, 0, 0,                       0, 0, VAL_REQ, 1, NON_NEG, VAL_STR, 0	},
-{ "SUBSCRIPT", 0, 0, 0, 0,                       0, 0, VAL_REQ, 1, NON_NEG, VAL_STR, 0	},
+{ "ADJACENCY", 0, 0, 0, 0,                       0, 0, VAL_REQ,      1, NON_NEG, VAL_NUM, 0	},
+{ "HEURISTIC", 0, 0, 0, mup_size_heuristic_qual, 0, 0, VAL_REQ,      1, NON_NEG, VAL_STR, 0	},
+{ "REGION",    0, 0, 0, 0,                       0, 0, VAL_OR_PARAM, 1, NON_NEG, VAL_STR, 0	},
+{ "SELECT",    0, 0, 0, 0,                       0, 0, VAL_REQ,      1, NON_NEG, VAL_STR, 0	},
+{ "SUBSCRIPT", 0, 0, 0, 0,                       0, 0, VAL_REQ,      1, NON_NEG, VAL_STR, 0	},
 { "" }
 };
 
@@ -701,14 +700,14 @@ static	CLI_PARM	mup_rundown_parm[] = {
 };
 
 /* Note: "R" is a duplicate of "REGION". It is there so -R usages continue to be treated as -REGION and not have an
- * ambiguity with "RELINKCTL".
+ * ambiguity with "RELINKCTL". Hence the use of VAL_OR_PARAM for the R line too (just like in the REGION line).
  */
 static	CLI_ENTRY	mup_rundown_qual[] = {		/* RUNDOWN */
 { "CLEANJNL",  mupip_rundown,    0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 }, /* DBG-only qualifier */
 { "FILE",      mupip_rundown,    0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "OVERRIDE",  mupip_rundown,    0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
-{ "R",         mupip_rundown,    0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
-{ "REGION",    mupip_rundown,    0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
+{ "R",         mupip_rundown,    0, 0, 0, 0, 0, VAL_OR_PARAM,   1, NON_NEG, VAL_N_A, 0 },
+{ "REGION",    mupip_rundown,    0, 0, 0, 0, 0, VAL_OR_PARAM,   1, NON_NEG, VAL_N_A, 0 },
 { "RELINKCTL", mu_rndwn_rlnkctl, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, 0,       0,       0 },
 { "" }
 };
@@ -757,7 +756,7 @@ static	CLI_ENTRY	mup_set_qual[] = {		/* SET */
 { "QDBRUNDOWN",           mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0       },
 { "READ_ONLY",            mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0       },
 { "RECORD_SIZE",          mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0       },
-{ "REGION",               mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0       },
+{ "REGION",               mupip_set, 0, 0,                  0,                    0, 0, VAL_OR_PARAM,   1, NON_NEG, VAL_N_A,  0       },
 { "REORG_SLEEP_NSEC",     mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  VAL_DCM },
 { "REPLICATION",          mupip_set, 0, 0,                  mup_repl_qual,        0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0       },
 { "REPL_STATE",           mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0       },
@@ -813,7 +812,7 @@ static	CLI_PARM	mup_stop_parm[] = {
 
 static	CLI_ENTRY	mup_upgrade_qual[] = {		/* UPGRADE */
 { "MASTERMAP", mupip_upgrade, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0},
-{ "REGION",    mupip_upgrade, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0},
+{ "REGION",    mupip_upgrade, 0, 0, 0, 0, 0, VAL_OR_PARAM,   1, NON_NEG, VAL_N_A, 0},
 { "" }
 };	/* TODO: revisit file vs region vs choice? 1 function or two? names? */
 

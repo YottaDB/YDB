@@ -184,7 +184,7 @@ void mupip_reorg_encrypt(void)
 	/* Get the region(s) parameter. */
 	gvinit();
 	error_mupip = FALSE;
-	mu_getlst("REG_NAME", SIZEOF(tp_region));
+	mu_getlst("REGION", SIZEOF(tp_region));
 	if (error_mupip)
 		EXIT_MUPIP_REORG(ERR_MUNOACTION);
 	else if (!grlist)

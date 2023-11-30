@@ -269,7 +269,7 @@ void mupip_integ(void)
 		if (stats_specified)
 			TREF(ok_to_see_statsdb_regs) = FALSE;
 		region = TRUE;
-		mu_getlst("WHAT", SIZEOF(tp_region));
+		mu_getlst("REGION", SIZEOF(tp_region));
 		if (!grlist)
 		{
 			error_mupip = TRUE;

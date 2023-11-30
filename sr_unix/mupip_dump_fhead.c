@@ -73,7 +73,7 @@ void mupip_dump_fhead(void)
 	{	/* region */
 		status = SS_NORMAL;
 		gvinit();
-		mu_getlst("WHAT", SIZEOF(tp_region));
+		mu_getlst("REGION", SIZEOF(tp_region));
 		if (!grlist)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DBNOREGION);
 		for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)

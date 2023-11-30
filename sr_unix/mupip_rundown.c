@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -104,12 +104,22 @@ void mupip_rundown(void)
 	unsigned char		ipcs_buff[MAX_IPCS_ID_BUF], *ipcs_ptr;
 	semid_queue_elem	*prev_elem;
 	gd_segment		*seg;
+	char			*qual_name;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	exit_status = SS_NORMAL;
 	file = (CLI_PRESENT == cli_present("FILE"));
-	region = (CLI_PRESENT == cli_present("REGION")) || (CLI_PRESENT == cli_present("R"));
+	if (CLI_PRESENT == cli_present("REGION"))
+	{
+		qual_name = "REGION";
+		region = TRUE;
+	} else if (CLI_PRESENT == cli_present("R"))
+	{
+		qual_name = "R";
+		region = TRUE;
+	} else
+		region = FALSE;
 	TREF(skip_file_corrupt_check) = TRUE;	/* rundown the database even if csd->file_corrupt is TRUE */
 	TREF(ok_to_see_statsdb_regs) = TRUE;
 	/* No need to do the following set (like is done in mupip_integ.c) since we call "mu_rndwn_file" (not "gvcst_init")
@@ -126,7 +136,7 @@ void mupip_rundown(void)
 	if (region)
 	{
 		gvinit();
-		mu_getlst("WHAT", SIZEOF(tp_region));
+		mu_getlst(qual_name, SIZEOF(tp_region));
 		rptr = grlist;
 		if (error_mupip)
 			exit_status = ERR_MUNOTALLSEC;

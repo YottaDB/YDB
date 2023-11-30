@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,6 +44,12 @@
 #define VAL_DISALLOWED	0	/* Value Disallowed */
 #define VAL_NOT_REQ	1	/* Value not Required, but allowed */
 #define VAL_REQ		2	/* Value Required */
+#define VAL_OR_PARAM	3	/* Value needs to be specified either with or without =.
+				 * e.g. -REGION=DEFAULT (is VAL case in VAL_OR_PARAM)
+				 *	-REGION DEFAULT (is PARAM case in VAL_OR_PARAM)
+				 * If value is specified without =, then it should immediately
+				 * follow the qualifier (cannot be anywhere else in the command line).
+				 */
 
 #define PARM_NOT_REQ	0	/* Parameter optional */
 #define PARM_REQ	1	/* Parameter required */

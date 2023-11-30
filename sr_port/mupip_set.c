@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,7 @@ void mupip_set(void)
 	if (region)
 	{
 		gvinit();
-		mu_getlst("WHAT", SIZEOF(mu_set_rlist));
+		mu_getlst("REGION", SIZEOF(mu_set_rlist));
 		if (error_mupip)
 			mupip_exit(ERR_MUNOACTION);
 		db_fn_len = 0;

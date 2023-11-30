@@ -186,7 +186,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 	status = SS_NORMAL;
 	error_mupip = FALSE;
 	gvinit();	/* initialize gd_header (needed by the later call to mu_getlst) */
-	mu_getlst("REG_NAME", SIZEOF(tp_region)); /* get the parm for the REGION qualifier */
+	mu_getlst("REGION", SIZEOF(tp_region)); /* get the parm for the REGION qualifier */
 	if (error_mupip)
 	{
 		util_out_print("!/MUPIP REORG !AD cannot proceed with above errors!/", TRUE, LEN_AND_STR(command));

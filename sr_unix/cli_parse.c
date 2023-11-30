@@ -372,19 +372,30 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 			return (-1);
 		}
 	} else
-	{	/* --------------------------------------------------
+	{	/* ----------------------------------------------------------------------------------
 		 * Get Value either optional, or required.
-		 * In either case, there must be an assignment token
-		 * --------------------------------------------------
+		 * In either case, there must be an assignment token except in the VAL_OR_PARAM case
+		 * where the value could be the following parameter without an assignment token.
+		 * For example, if "REGION DEFAULT" is specified and "REGION" is specified as VAL_OR_PARAM,
+		 * then treat "DEFAULT" as the value (i.e. as if "-REGION=DEFAULT" was specified).
+		 * ----------------------------------------------------------------------------------
 		 */
-		if (!cli_look_next_token(eof) || !cli_is_assign(cli_token_buf))
+		if (!cli_look_next_token(eof) || (!cli_is_assign(cli_token_buf) && (VAL_OR_PARAM != pparm->required)))
 		{
-	    		if (VAL_REQ == pparm->required)
+			switch(pparm->required)
 			{
+			case VAL_OR_PARAM:
+				/* In the "VAL_OR_PARAM" case, we are guaranteed there is no other token in the command line
+				 * after this qualifier (i.e. "cli_look_next_token(eof)" returned 0). This is a case of
+				 * a qualifier that expects a value to be specified immediately after but is not.
+				 * So treat this just like a "VAL_REQ" type qualifier was specified without a "=" value.
+				 * Hence the fall through to the "VAL_REQ" case below.
+				 */
+			case VAL_REQ:
 				SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Option : %s needs value", pparm->name);
 				return (-1);
-			} else
-			{
+				break;
+			default:
 				if (pparm->present)
 				{
 					/* The option was specified before, so clean up that one,
@@ -406,27 +417,34 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 					if (!cli_get_sub_quals(pparm))
 						return (-1);
 				}
+				break;
 			}
 		} else
-		{
-			cli_gettoken(eof);
-			/* ---------------------------------
+		{	/* ---------------------------------
 			 * Get the assignment token + value
+			 * Note that assignment token could be absent in the VAL_OR_PARAM case.
 			 * ---------------------------------
 			 */
-			if (!cli_is_assign(cli_token_buf))
+			cli_gettoken(eof);
+			if (cli_is_assign(cli_token_buf))
 			{
-				SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Assignment missing after option : %s", pparm->name);
-				return (-1);
-			}
-			/* --------------------------------------------------------
-			 * get the value token, "=" is NOT a token terminator here
-			 * --------------------------------------------------------
-			 */
-			if (!cli_look_next_string_token(eof) || 0 == cli_get_string_token(eof))
-			{
-				SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Unrecognized option : %s, value expected but not found",
-						pparm->name);
+				/* --------------------------------------------------------
+				 * get the value token, "=" is NOT a token terminator here
+				 * --------------------------------------------------------
+				 */
+				if (!cli_look_next_string_token(eof) || 0 == cli_get_string_token(eof))
+				{
+					SNPRINTF(cli_err_str, MAX_CLI_ERR_STR,
+						"Unrecognized option : %s, value expected but not found", pparm->name);
+					cli_lex_in_ptr->tp = 0;
+					return (-1);
+				}
+			} else if (cli_is_qualif(cli_token_buf))
+			{	/* case of "-region" followed by say "-online" (another qualifier) instead of the
+				 * region name say "DEFAULT" which would not start with a "-". Issue error.
+				 */
+				SNPRINTF(cli_err_str, MAX_CLI_ERR_STR,
+					"Value expected to follow option %s but another option was found", pparm->name);
 				cli_lex_in_ptr->tp = 0;
 				return (-1);
 			}
@@ -638,6 +656,10 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 			 * negated qualifiers
 			 * -------------------------------------------------------------
 			 */
+			/* We don't expect nested qualifiers (aka sub_quals) to need VAL_OR_PARAM so we assert accordingly.
+			 * This lets us not handle that scenario here. If ever the assert fails, we will need to handle it then.
+			 */
+			assert(VAL_OR_PARAM != pparm1->required);
 			if (neg_flg || VAL_DISALLOWED == pparm1->required)
 			{
 				if (val_flg)
@@ -794,11 +816,14 @@ int parse_cmd(void)
 		cli_lex_in_ptr->tp = 0;
 		res = -1;
 	}
-	if ((1 > opt_cnt) && (-1 != res) && (VAL_REQ == cmd_ary[cmd_ind].required))
-	{
-		SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Command argument expected, but not found");
-		res = -1;
-	}
+	/* We should never have a verb/command (e.g. INTEG in MUPIP INTEG) that requires a value/parameter.
+	 * For example, "mupip_cmd_ary[]" array in sr_unix/mupip_cmd.c should never have a line that says VAL_REQ,
+	 * "lke_cmd_ary[]" array in sr_unix/lke_cmd.c should never have a line that says VAL_REQ and so on.
+	 * One expects all lines to be VAL_DISALLOWED or in rare cases VAL_NOT_REQ (not sure why this is even there).
+	 * Assert accordingly so in case a new entry gets incorrectly added, we catch/fix it right away with this assert.
+	 */
+	assert(VAL_REQ != cmd_ary[cmd_ind].required);
+	assert(VAL_OR_PARAM != cmd_ary[cmd_ind].required);
 	/*------------------------------------------------------
 	 * Check that the disallow conditions are met (to allow)
 	 *------------------------------------------------------

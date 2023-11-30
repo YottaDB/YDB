@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -195,7 +195,7 @@ void mupip_reorg(void)
 		error_mupip = FALSE;
 		restrict_reg = TRUE;
 		gvinit();	/* initialize gd_header (needed by the following call to mu_getlst) */
-		mu_getlst("REG_NAME", SIZEOF(tp_region)); /* get parm for REGION qualifier */
+		mu_getlst("REGION", SIZEOF(tp_region)); /* get parm for REGION qualifier */
 		if (error_mupip)
 		{
 			util_out_print("!/MUPIP REORG cannot proceed with above errors!/", FLUSH);
