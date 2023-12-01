@@ -136,6 +136,7 @@ dump_info()
 	if [ -n "$ydb_syslog" ] ; then echo ydb_syslog " : " $ydb_syslog ; fi
 	if [ -n "$ydb_utf8" ] ; then echo ydb_utf8 " : " $ydb_utf8 ; fi
 	if [ -n "$ydb_version" ] ; then echo ydb_version " : " $ydb_version ; fi
+	if [ -n "$ydb_ws" ] ; then echo ydb_ws " : " $ydb_ws ; fi
 	if [ -n "$ydb_zlib" ] ; then echo ydb_zlib " : " $ydb_zlib ; fi
 	if [ -n "$gtm_arch" ] ; then echo gtm_arch " : " $gtm_arch ; fi
 	if [ -n "$gtm_buildtype" ] ; then echo gtm_buildtype " : " $gtm_buildtype ; fi
@@ -215,6 +216,7 @@ help_exit()
 	echo "--user username			-> user who should own YottaDB installation; default is root"
 	echo "--utf8				-> install UTF-8 support"
 	echo "--verbose				-> output diagnostic information as the script executes; default is to run quietly"
+	echo "--webserver			-> download and install the YottaDB Web Server plugin"
 	echo "--zlib				-> download and install the zlib plugin"
 	echo "Options that take a value (e.g, --group) can be specified as either --option=value or --option value."
 	echo "Options marked with \"*\" are likely to be of interest primarily to YottaDB developers."
@@ -292,8 +294,11 @@ isvaluevalid()
 
 install_plugins()
 {
+	# These plugins don't have any dependencies on any other plugins
 	if [ "Y" = $ydb_aim ] ; then install_std_plugin Util YDBAIM ; fi
-
+	if [ "Y" = "$ydb_posix" ] ; then install_std_plugin Util YDBPosix ; fi
+	if [ "Y" = "$ydb_sodium" ] ; then install_std_plugin Util YDBSodium ; fi
+	if [ "Y" = "$ydb_syslog" ] ; then install_std_plugin Util YDBSyslog ; fi
 	if [ "Y" = $ydb_encplugin ] ; then
 		echo "Now installing YDBEncrypt"
 		cd $tmpdir	# Get back to top level temporary directory as the current directory
@@ -322,17 +327,6 @@ install_plugins()
 			remove_tmpdir=0
 		fi
 	fi
-
-	if [ "Y" = "$ydb_gui" ] ; then install_std_plugin UI YDBGUI ; fi
-
-	if [ "Y" = $ydb_octo ] ; then install_std_plugin DBMS YDBOcto ; fi
-
-	if [ "Y" = "$ydb_posix" ] ; then install_std_plugin Util YDBPosix ; fi
-
-	if [ "Y" = "$ydb_sodium" ] ; then install_std_plugin Util YDBSodium ; fi
-
-	if [ "Y" = "$ydb_syslog" ] ; then install_std_plugin Util YDBSyslog ; fi
-
 	if [ "Y" = $ydb_zlib ] ; then
 		echo "Now installing YDBZlib"
 		cd $tmpdir	# Get back to top level temporary directory as the current directory
@@ -368,6 +362,15 @@ install_plugins()
 			remove_tmpdir=0
 		fi
 	fi
+
+	# This plugin has a dependency on sodium, and needs to come after it.
+	if [ "Y" = "$ydb_ws" ] ; then install_std_plugin Util YDB-Web-Server ; fi
+
+	# This plugin has a dependency on Posix & WS, and need to come after them.
+	if [ "Y" = "$ydb_gui" ] ; then install_std_plugin UI YDBGUI ; fi
+
+	# This plugin has a dependency on AIM, Posix, and Encrypt, and needs to come after they are installed
+	if [ "Y" = $ydb_octo ] ; then install_std_plugin DBMS YDBOcto ; fi
 }
 
 # Install a standard plugin.
@@ -455,6 +458,7 @@ if [ -z "$ydb_sodium" ] ; then ydb_sodium="N" ; fi
 if [ -z "$ydb_syslog" ] ; then ydb_syslog="N" ; fi
 if [ -n "$ydb_verbose" ] ; then gtm_verbose="$ydb_verbose" ; fi
 if [ -z "$ydb_utf8" ] ; then ydb_utf8="N" ; fi
+if [ -z "$ydb_ws" ] ; then ydb_ws="N" ; fi
 if [ -z "$ydb_zlib" ] ; then ydb_zlib="N" ; fi
 # GTM prefixed versions (for backwards compatibility)
 if [ -z "$gtm_buildtype" ] ; then gtm_buildtype="pro" ; fi
@@ -549,7 +553,12 @@ while [ $# -gt 0 ] ; do
 				fi
 			fi
 			shift ;;
-		--gui) ydb_gui="Y" ; shift ;;
+		--gui)
+			# Force install of YDB Web Server to ensure latest version
+			# Make need --overwrite-existing flag to ensure overwrite of an existing version
+			ydb_ws="Y"
+			ydb_gui="Y"
+			shift ;;
 		--help) help_exit ;;
 		--installdir*) tmp=`echo $1 | cut -s -d = -f 2-`
 			if [ -n "$tmp" ] ; then ydb_installdir=$tmp
@@ -632,6 +641,7 @@ while [ $# -gt 0 ] ; do
 			ydb_utf8="Y" ;
 			shift ;;
 		--verbose) gtm_verbose="Y" ; shift ;;
+		--webserver) ydb_ws="Y" ; shift ;;
 		--zlib) ydb_zlib="Y" ; shift ;;
 		-*) echo Unrecognized option "$1" ; err_exit ;;
 		*) if [ -n "$ydb_version" ] ; then echo Nothing must follow the YottaDB/GT.M version ; err_exit
@@ -713,6 +723,11 @@ fi
 # YDBSyslog plugin
 if [ "Y" = $ydb_syslog ] ; then
 	append_to_str utillist "gcc git cmake make pkg-config"
+fi
+
+# YDB Web Server plugin
+if [ "Y" = $ydb_ws ] ; then
+	append_to_str utillist "gcc git date cmake make pkg-config"
 fi
 
 # Zlib plugin; note that all required headers are part of the POSIX standard
@@ -859,6 +874,7 @@ if [ -n "$ydb_from_source" ] ; then
 	# invocations too (where --utf8 does require a icu version parameter).
 	if [ "Y" = "$ydb_utf8" ] ; then install_options="${install_options} --utf8 default" ; fi
 	if [ "Y" = "$gtm_verbose" ] ; then install_options="${install_options} --verbose" ; fi
+	if [ "Y" = "$ydb_ws" ] ; then install_options="${install_options} --webserver" ; fi
 	if [ "Y" = "$ydb_zlib" ] ; then install_options="${install_options} --zlib" ; fi
 
 	# Now that we have the full set of options, run ydbinstall
@@ -950,9 +966,12 @@ if [ "Y" = "$ydb_plugins_only" ]; then
 		fi
 		if [ "Y" = $ydb_sodium ] && [ -e $ydb_installdir/plugin/libsodium.so ] ; then
 			echo YDBSodium $msgsuffix ; unset nooverwrite
+		fi
 		if [ "Y" = $ydb_syslog ] && [ -e $ydb_installdir/plugin/o/_ydbsyslog.so ] ; then
 			echo YDBSyslog $msgsuffix ; unset nooverwrite
 		fi
+		if [ "Y" = $ydb_ws ] && [ -e $ydb_installdir/plugin/o/_ydbmwebserver.so ] ; then
+			echo YDB-Web-Server $msgsuffix ; unset nooverwrite
 		fi
 		if [ "Y" = $ydb_zlib ] && [ -e $ydb_installdir/plugin/libgtmzlib.so ] ; then
 			echo "YDBZlib $msgsuffix" ; unset nooverwrite
