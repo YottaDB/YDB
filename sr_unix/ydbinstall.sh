@@ -684,7 +684,7 @@ unset hdrlist shliblist utillist
 
 # YDBAIM
 if [ "Y" = $ydb_aim ] ; then
-	append_to_str utillist "gcc git cmake make pkg-config"
+	append_to_str utillist "git cmake ld.gold make pkg-config"
 fi
 
 # Encryption plugin
@@ -697,12 +697,12 @@ fi
 
 # GUI
 if [ "Y" = $ydb_gui ] ; then
-	append_to_str utillist "cmake cp df gcc git grep pkg-config ps rm stat"
+	append_to_str utillist "cmake cp df git grep ld.gold pkg-config ps rm stat"
 fi
 
 # Octo
 if [ "Y" = "$ydb_octo" ] ; then
-	append_to_str utillist "bison cmake flex gcc git gzip make pkg-config"
+	append_to_str utillist "bison cmake flex gcc git gzip make ld.gold pkg-config"
 	append_to_str shliblist "libconfig.so libreadline.so"
 	append_to_str hdrlist "endian.h getopt.h libconfig.h \
 		openssl/conf.h openssl/err.h openssl/evp.h openssl/md5.h openssl/ssl.h \
@@ -711,23 +711,23 @@ fi
 
 # POSIX plugin; note that all required headers are part of the POSIX standard
 if [ "Y" = "$ydb_posix" ] ; then
-	append_to_str utillist "cmake gcc git make pkg-config"
+	append_to_str utillist "cmake gcc git make ld.gold pkg-config"
 fi
 
 # libsodium plugin
 if [ "Y" = "$ydb_sodium" ] ; then
-	append_to_str utillist "cmake gcc git make"
+	append_to_str utillist "cmake gcc git make ld.gold"
 	append_to_str hdrlist "sodium.h"
 fi
 
 # YDBSyslog plugin
 if [ "Y" = $ydb_syslog ] ; then
-	append_to_str utillist "gcc git cmake make pkg-config"
+	append_to_str utillist "git cmake make ld.gold pkg-config"
 fi
 
 # YDB Web Server plugin
 if [ "Y" = $ydb_ws ] ; then
-	append_to_str utillist "gcc git date cmake make pkg-config"
+	append_to_str utillist "git date cmake make ld.gold pkg-config"
 fi
 
 # Zlib plugin; note that all required headers are part of the POSIX standard
