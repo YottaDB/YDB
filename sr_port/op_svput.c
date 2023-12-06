@@ -172,8 +172,16 @@ void op_svput(int varnum, mval *v)
 				TREF(zpeek_regname_len) = 0;
 			}
 			break;
-		case SV_ZMAXTPTIME:
-			TREF(dollar_zmaxtptime) = mval2i(v);
+		case SV_ZMAXTPTIME:;
+			int	num;
+
+			/* Ensure $ZMAXTPTIME is never negative. If negative value is specified, treat it as 0 (i.e. NO timeout).
+			 * This is similar to how YDBENVINDX_MAXTPTIME env var is handled in "sr_port/gtm_env_init.c".
+			 */
+			num = mval2i(v);
+			if (0 > num)
+				num = 0;
+			TREF(dollar_zmaxtptime) = num;
 			break;
 		case SV_ZROUTINES:
 			MV_FORCE_STR(v);
