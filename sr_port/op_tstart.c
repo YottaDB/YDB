@@ -653,7 +653,6 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 			si->tlvl_info_head = new_tli;
 	}
 	/* If starting first TP level, also start TP timer if set to non-default value */
-	assert(0 <= TREF(dollar_zmaxtptime));
 	if ((0 < TREF(dollar_zmaxtptime)) && (1 == dollar_tlevel))
 		(*tp_timeout_start_timer_ptr)(TREF(dollar_zmaxtptime));
 	DBGRFCT((stderr, "\nop_tstart: complete\n"));
