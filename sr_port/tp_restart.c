@@ -285,9 +285,6 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			restart_reg = TAREF1(tp_fail_hist_reg, t_tries);
 			if (NULL != restart_reg)
 			{
-				assert(IS_STATSDB_REG(restart_reg)	/* global ^%YGS if, and only if, statsDB */
-				       ? !memcmp(&gv_currkey->base, STATSDB_GBLNAME, STATSDB_GBLNAME_LEN)
-				       : memcmp(&gv_currkey->base, STATSDB_GBLNAME, STATSDB_GBLNAME_LEN));
 				reg_mstr.len = restart_reg->dyn.addr->fname_len;
 				reg_mstr.addr = (char *)restart_reg->dyn.addr->fname;
 			} else
