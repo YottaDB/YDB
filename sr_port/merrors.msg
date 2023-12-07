@@ -1275,8 +1275,8 @@ NONUTF8LOCALE	<Locale has character encoding (!AD) which is not compatible with 
 INVDLRCVAL	<Invalid $CHAR() value !UL>/error/fao=1!/ansi=0
 DBMISALIGN	<File header indicates total blocks is 0x!16@XQ but file size indicates total blocks would be between 0x!16@XQ and 0x!16@XQ. Reconstruct the database from a backup or extend it by at least !@UQ blocks.>/error/fao=4!/ansi=0
 LOADINVCHSET	<Extract file CHSET (!AD) is incompatible with ydb_chset/gtm_chset>/error/fao=2!/ansi=0
-DLLCHSETM	<Routine !AD in library !AD was compiled with CHSET=M which is different from $ZCHSET. Recompile with CHSET=UTF-8 and re-link.>/error/fao=4!/ansi=0
-DLLCHSETUTF8	<Routine !AD in library !AD was compiled with CHSET=UTF-8 which is different from $ZCHSET. Recompile with CHSET=M and re-link.>/error/fao=4!/ansi=0
+DLLCHSETM	<Routine !AD in library !AD was compiled with CHSET=M which is different from $ZCHSET>/error/fao=4!/ansi=0
+DLLCHSETUTF8	<Routine !AD in library !AD was compiled with CHSET=UTF-8 which is different from $ZCHSET>/error/fao=4!/ansi=0
 BOMMISMATCH	<!AD Byte Order Marker found when !AD character set specified>/error/fao=4!/ansi=0
 WIDTHTOOSMALL	<WIDTH should be at least 2 when device ICHSET or OCHSET is UTF-8 or UTF-16>/error/fao=0!/ansi=0
 SOCKMAX		<Attempt to exceed maximum sockets (!UL) for the SOCKET device>/error/fao=1!/ansi=80
