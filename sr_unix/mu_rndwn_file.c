@@ -1451,12 +1451,6 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				return FALSE;
 			}
 		}
-		if (NULL != tsd)
-		{
-			assert(!db_shm_in_sync);
-			free(tsd);
-			tsd = NULL;
-		}
 #		if !defined(_AIX)
 		if ((dba_mm == acc_meth) && db_shm_in_sync)
 		{
@@ -1482,6 +1476,13 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		 * opened, we will remove this statsdb and create a new one.
 		 */
 		UNLINK_STATSDB_AT_BASEDB_RUNDOWN(cnl, csd);
+		/* Note: "free()" below has to be done only AFTER the above step as csd/tsd would otherwise point to freed memory */
+		if (NULL != tsd)
+		{
+			assert(!db_shm_in_sync);
+			free(tsd);
+			csd = tsd = NULL;
+		}
 		break;
 	}
 	/* Detach from shared memory whether it is a GT.M shared memory or not */
