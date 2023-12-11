@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -128,8 +128,25 @@ int	ydb_child_init(void *param)
 		IF_LIBAIO(addr_ptr->gd_runtime->thread_gdi = NULL;)
 		for (reg = addr_ptr->regions, reg_top = reg + addr_ptr->n_regions; reg < reg_top; reg++)
 		{
+			gd_region	*statsDBreg;
+
 			if (reg->open && !reg->was_open && IS_REG_BG_OR_MM(reg))
 				ydb_child_init_sem_incrcnt(reg, DB_REG, NULL);	/* Bump sem count for database */
+			/* Check if there is a STATSDB region and if that region is open. If so, it would be a different
+			 * region. In that case, reset "statsDB_setup_completed" (which is part of csa and reg) as the setup
+			 * needs to be redone for the child process (each process gets a unique statsdb node based on its pid
+			 * and should not reuse the node corresponding to its parent pid which it would inherit in case the
+			 * child process was created by a "fork()" call).
+			 */
+			BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
+			if ((reg != statsDBreg) && statsDBreg->open)
+			{
+				sgmnt_addrs	*statsDBcsa;
+
+				statsDBcsa = &FILE_INFO(statsDBreg)->s_addrs;
+				statsDBcsa->statsDB_setup_completed = FALSE;
+				statsDBreg->statsDB_setup_completed = FALSE;
+			}
 		}
 	}
 	/* Bump semaphore count (for child process) in all journal pools that the parent process was attached to */
