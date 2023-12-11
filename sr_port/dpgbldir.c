@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -185,7 +185,7 @@ gd_addr *zgbldir_opt(mval *v, boolean_t env_translated, boolean_t force_load)
 	 * memory allocated for addr field of the mstr is needed as it has been copied over to "name->exp_name" */
 	free(tran_name);
 
-	if (gdr_name_head)
+	if (NULL != gdr_name_head)
 		name->link = (gdr_name *)gdr_name_head;
 	else
 		name->link = 0;

@@ -91,15 +91,12 @@
 #ifdef UTF8_SUPPORTED
 #include "utfcgr.h"
 #endif
-#include "ydb_getenv.h"
 #include "libyottadb_int.h"
 #include "mdq.h"
 #include "invocation_mode.h"
 #include "ydb_os_signal_handler.h"
 #include "deferred_events.h"
 #include "get_command_line.h"
-
-#define	NOISOLATION_LITERAL	"NOISOLATION"
 
 GBLDEF void			(*restart)() = &mum_tstart;
 #ifdef __MVS__
@@ -160,9 +157,7 @@ void gtm_startup(struct startup_vector *svec)
 	int4			temp_ydb_strpllim;
 	stack_frame 		*frame_pointer_lcl;
 	static char 		other_mode_buf[] = "OTHER";
-	char			*ptr;
 	int			i, status;
-	mval			noiso_lit, gbllist;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -351,17 +346,6 @@ void gtm_startup(struct startup_vector *svec)
 		ojchildparms(NULL, NULL, NULL);
 	if ((NULL != (TREF(mprof_env_gbl_name)).str.addr))
 		turn_tracing_on(TADR(mprof_env_gbl_name), TRUE, (TREF(mprof_env_gbl_name)).str.len > 0);
-	/* See if ydb_noisolation is specified */
-	if (NULL != (ptr = ydb_getenv(YDBENVINDX_APP_ENSURES_ISOLATION, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
-	{	/* Call the VIEW "NOISOLATION" command with the contents of the <ydb_app_ensures_isolation> env var */
-		noiso_lit.mvtype = MV_STR;
-		noiso_lit.str.len = STR_LIT_LEN(NOISOLATION_LITERAL);
-		noiso_lit.str.addr = NOISOLATION_LITERAL;
-		gbllist.mvtype = MV_STR;
-		gbllist.str.len = STRLEN(ptr);
-		gbllist.str.addr = ptr;
-		op_view(VARLSTCNT(2) &noiso_lit, &gbllist);
-	}
 	return;
 }
 
