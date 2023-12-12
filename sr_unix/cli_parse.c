@@ -822,8 +822,8 @@ int parse_cmd(void)
 	 * One expects all lines to be VAL_DISALLOWED or in rare cases VAL_NOT_REQ (not sure why this is even there).
 	 * Assert accordingly so in case a new entry gets incorrectly added, we catch/fix it right away with this assert.
 	 */
-	assert(VAL_REQ != cmd_ary[cmd_ind].required);
-	assert(VAL_OR_PARAM != cmd_ary[cmd_ind].required);
+	assert((-1 == cmd_ind) || (VAL_REQ != cmd_ary[cmd_ind].required));
+	assert((-1 == cmd_ind) || (VAL_OR_PARAM != cmd_ary[cmd_ind].required));
 	/*------------------------------------------------------
 	 * Check that the disallow conditions are met (to allow)
 	 *------------------------------------------------------
