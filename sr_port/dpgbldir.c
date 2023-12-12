@@ -42,6 +42,10 @@
 #include "trans_log_name.h"
 #include "gtm_env_xlate_init.h"
 #include "gtm_threadgbl.h"
+#include "ydb_getenv.h"
+#include "op.h"
+
+#define	NOISOLATION_LITERAL	"NOISOLATION"
 
 GBLREF	mstr		env_ydb_gbldir_xlate;
 GBLREF	gd_addr		*gd_header;
@@ -188,9 +192,28 @@ gd_addr *zgbldir_opt(mval *v, boolean_t env_translated, boolean_t force_load)
 	if (NULL != gdr_name_head)
 		name->link = (gdr_name *)gdr_name_head;
 	else
-		name->link = 0;
+		name->link = NULL;
 	gdr_name_head = name;
 	gdr_name_head->gd_ptr = gd_ptr;
+	if (NULL == name->link)
+	{	/* Now that the FIRST global directory has been opened by this process, check if "ydb_app_ensures_isolation"
+		 * env var was specified. If so do needed initialization for that here. Cannot do this initialization before
+		 * here as it can cause STATSDB related issues (YDB#1047).
+		 */
+		char	*ptr;
+		mval	noiso_lit, gbllist;
+
+		if (NULL != (ptr = ydb_getenv(YDBENVINDX_APP_ENSURES_ISOLATION, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
+		{	/* Call the VIEW "NOISOLATION" command with the contents of the <ydb_app_ensures_isolation> env var */
+			noiso_lit.mvtype = MV_STR;
+			noiso_lit.str.len = STR_LIT_LEN(NOISOLATION_LITERAL);
+			noiso_lit.str.addr = NOISOLATION_LITERAL;
+			gbllist.mvtype = MV_STR;
+			gbllist.str.len = STRLEN(ptr);
+			gbllist.str.addr = ptr;
+			op_view(VARLSTCNT(2) &noiso_lit, &gbllist);
+		}
+	}
 	return gd_ptr;
 }
 

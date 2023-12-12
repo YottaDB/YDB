@@ -23,10 +23,6 @@
 #include "gdsfhead.h"
 #include "dpgbldir.h"
 #include "gvt_inline.h"
-#include "ydb_getenv.h"
-#include "op.h"
-
-#define	NOISOLATION_LITERAL	"NOISOLATION"
 
 GBLREF	gd_addr		*gd_header;
 
@@ -41,23 +37,6 @@ void gvinit(void)
 		v.str.len = 0;
 		v.str.addr = NULL;
 		gd_header = zgbldir(&v);
-		/* Now that the default global directory has been opened by the process, check if "ydb_app_ensures_isolation"
-		 * env var was specified. If so do needed initialization for that here. Cannot do this initialization before
-		 * here as it can cause STATSDB related issues (YDB#1047).
-		 */
-		char	*ptr;
-		mval	noiso_lit, gbllist;
-
-		if (NULL != (ptr = ydb_getenv(YDBENVINDX_APP_ENSURES_ISOLATION, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
-		{	/* Call the VIEW "NOISOLATION" command with the contents of the <ydb_app_ensures_isolation> env var */
-			noiso_lit.mvtype = MV_STR;
-			noiso_lit.str.len = STR_LIT_LEN(NOISOLATION_LITERAL);
-			noiso_lit.str.addr = NOISOLATION_LITERAL;
-			gbllist.mvtype = MV_STR;
-			gbllist.str.len = STRLEN(ptr);
-			gbllist.str.addr = ptr;
-			op_view(VARLSTCNT(2) &noiso_lit, &gbllist);
-		}
 	}
 	/* May get in here after an extended ref call OR in mupip journal recover forward processing (with
 	 * function call graph "mur_output_record/gvcst_put/gvtr_init/gvtr_db_tpwrap/op_tstart").
