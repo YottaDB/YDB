@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -28,7 +31,6 @@ void op_zstepret(void)
 {
 	intrpt_state_t	prev_intrpt_state;
 
-	assert(!RESTRICTED(break_op));
 	assert(INTRPT_IN_EVENT_HANDLING != intrpt_ok_state);
 	DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
 	if (!neterr_pending && (no_event == outofband))

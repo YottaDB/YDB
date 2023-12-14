@@ -48,7 +48,6 @@ void op_zstep(uint4 code, mval *action)
 	SETUP_THREADGBL_ACCESS;
 	if ((0 < gtm_trigger_depth) && RESTRICTED(trigger_mod))
 		return;
-	assert(!(RESTRICTED(zbreak_op)));
 	TAREF1(save_xfer_root, zstep_pending).event_state = pending;
 	TAREF1(save_xfer_root, zstep_pending).param_val = (int)code;
 	if (neterr_pending)
