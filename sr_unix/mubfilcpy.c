@@ -104,35 +104,34 @@
 												\
 	if (FD_INVALID != backup_fd)								\
 		CLOSEFILE_RESET(backup_fd, rc);	/* resets "backup_fd" to FD_INVALID */		\
-	if (!debug_mupip)									\
-	{ /* An error happened. We are not sure if the temp dir is empty. Can't use rmdir() */	\
-		MEMCPY_LIT(tmpcmd, UNALIAS);							\
-		tmpcmdlen = STR_LIT_LEN(UNALIAS);						\
-		cmdpathlen = STRLEN(fulpathcmd[2]);						\
-		memcpy(&tmpcmd[tmpcmdlen], fulpathcmd[2], cmdpathlen);				\
-		tmpcmdlen += cmdpathlen;							\
-		MEMCPY_LIT(&tmpcmd[tmpcmdlen], RMDIR_OPT);					\
-		tmpcmdlen += STR_LIT_LEN(RMDIR_OPT);						\
-		/* tempdir[] is not necessarily null-terminated so null terminate it and	\
-		 * copy the null byte too into "tmpcmd" before calling SYSTEM.			\
-		 */										\
-		tempdir[tmpdirlen] = 0;	/* see comment "rm tempdir" for similar code */		\
-		memcpy(&tmpcmd[tmpcmdlen], tempdir, tmpdirlen + 1);				\
-		tmpcmdlen += tmpdirlen;								\
-		rv2 = SYSTEM((char *)tmpcmd);							\
-		if (0 != rv2)									\
+	/* An error happened. We are not sure if the temp dir is empty. Can't use rmdir() */	\
+	MEMCPY_LIT(tmpcmd, UNALIAS);								\
+	tmpcmdlen = STR_LIT_LEN(UNALIAS);							\
+	cmdpathlen = STRLEN(fulpathcmd[2]);							\
+	memcpy(&tmpcmd[tmpcmdlen], fulpathcmd[2], cmdpathlen);					\
+	tmpcmdlen += cmdpathlen;								\
+	MEMCPY_LIT(&tmpcmd[tmpcmdlen], RMDIR_OPT);						\
+	tmpcmdlen += STR_LIT_LEN(RMDIR_OPT);							\
+	/* tempdir[] is not necessarily null-terminated so null terminate it and		\
+	 * copy the null byte too into "tmpcmd" before calling SYSTEM.				\
+	 */											\
+	tempdir[tmpdirlen] = 0;	/* see comment "rm tempdir" for similar code */			\
+	memcpy(&tmpcmd[tmpcmdlen], tempdir, tmpdirlen + 1);					\
+	tmpcmdlen += tmpdirlen;									\
+	rv2 = SYSTEM((char *)tmpcmd);								\
+	if (0 != rv2)										\
+	{											\
+		if (-1 == rv2)									\
 		{										\
-			if (-1 == rv2)								\
-			{									\
-				save_errno = errno;						\
-				errptr = (char *)STRERROR(save_errno);				\
-				util_out_print("system : !AZ", TRUE, errptr);			\
-			}									\
-			util_out_print("Error removing temp dir !AD.", TRUE, tmpcmdlen, tmpcmd);\
+			save_errno = errno;							\
+			errptr = (char *)STRERROR(save_errno);					\
+			util_out_print("system : !AZ", TRUE, errptr);				\
 		}										\
+		util_out_print("Error removing temp dir !AD.", TRUE, tmpcmdlen, tmpcmd);	\
 	}											\
 	return FALSE;										\
 }
+
 #define	ABORTBACKUP						\
 {								\
 	if (online)						\
