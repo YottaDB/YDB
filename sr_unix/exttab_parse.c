@@ -172,7 +172,7 @@ const static struct
 	{"char",		{ydb_notfound,		ydb_char_star,		ydb_char_starstar}	},
 	{"double",		{ydb_double,		ydb_double_star,	ydb_notfound}		},
 	{"float",		{ydb_float,		ydb_float_star,		ydb_notfound}		},
-	{"int",			{ydb_int,		ydb_notfound,		ydb_notfound}		},
+	{"int",			{ydb_int,		ydb_int_star,		ydb_notfound}		},
 	{"long",		{ydb_long,		ydb_long_star,		ydb_notfound}		},
 	{"string",		{ydb_notfound,		ydb_string_star,	ydb_notfound}		},
 	{"uint",		{ydb_uint,		ydb_uint_star,		ydb_notfound}		},
@@ -724,8 +724,6 @@ struct extcall_package_list *exttab_parse(mval *package)
 #			endif
 			case ydb_double_star:
 			case ydb_char_starstar:
-			case ydb_pointertofunc:
-			case ydb_pointertofunc_star:
 			case ydb_jboolean:
 			case ydb_jint:
 			case ydb_jlong:
