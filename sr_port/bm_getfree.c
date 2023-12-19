@@ -334,7 +334,7 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 		assert((NO_FREE_SPACE == free_bit) && (!lcnt));	/* All maps full, should have extended */
 		assertpro(FALSE);
 	}
-	assert(0 < free_bit);	/* or else we would be allocating a block in the previous bit map */
+	assert(0 <= free_bit);	/* or else we would be allocating a block in the previous bit map */
 	if (0 != depth)
 	{
 		b_ptr = (block_id_ptr_t)(cs1->upd_addr);
