@@ -2,7 +2,7 @@
 #
 #################################################################
 #                                                               #
-# Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.       #
+# Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -16,6 +16,19 @@
 #
 set filelist = `git diff --name-only HEAD`
 @ exitstatus = 0
+
+# Set gtm_dist to $ydb_dist if it exists; otherwise, if gtm_dist is not already set, to one of the following, in order of highest precedence:
+#  $gtm_dist/$gtm_curpro/pro
+#  pkg-config --variable=prefix yottadb
+if ( $?ydb_dist ) then
+	setenv gtm_dist "$ydb_dist"
+endif
+if ( ! $?gtm_dist && $?gtm_root && $?gtm_curpro ) then
+	setenv gtm_dist $gtm_root/$gtm_curpro/pro
+endif
+if ( ! $?gtm_dist && `where pkg-config` != '' ) then
+	setenv gtm_dist `pkg-config --variable=prefix yottadb --silence-errors`
+endif
 
 # -----------------------------------------------------------------
 # 1) Regenerates auto-generated files/sections-of-files if needed
@@ -32,7 +45,6 @@ foreach file ($filelist)
 			endif
 			cd $arch
 			# Switch to gtm_curpro version
-			setenv gtm_dist $gtm_root/$gtm_curpro/pro
 			setenv gtm_tools ../sr_port	# needed for sr_port/copyright.txt to be used
 			mkdir tmpobj
 			unsetenv ydb_routines	# In case it is set in parent shell, do not let that interfere here
@@ -61,7 +73,6 @@ foreach file ($filelist)
 		foreach arch (sr_port)
 			cd $arch
 			# Switch to gtm_curpro version
-			setenv gtm_dist $gtm_root/$gtm_curpro/pro
 			setenv gtm_tools ../sr_port	# needed for sr_port/copyright.txt to be used
 			mkdir tmpobj
 			unsetenv ydb_routines	# In case it is set in parent shell, do not let that interfere here
