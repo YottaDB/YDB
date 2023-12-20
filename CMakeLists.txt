@@ -288,6 +288,7 @@ add_custom_command(
     -D ydb_dist=${gen_bootstrap_dist}
     -D gtm_tools=${YDB_SOURCE_DIR}/sr_port
     -D ydb_routines=.
+    -D ydb_chset=M
     -D mumps=${gen_bootstrap_yottadb}
     -D "args=${mumps_ttt_args}"
     -D output_file=ttt.log
@@ -315,6 +316,7 @@ foreach(msg
       -D ydb_dist=${gen_bootstrap_dist}
       -D gtm_tools=${YDB_SOURCE_DIR}/sr_port
       -D ydb_routines=.
+      -D ydb_chset=M
       -D mumps=${gen_bootstrap_yottadb}
       -D "args=${mumps_msg_args}"
       -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
@@ -527,7 +529,7 @@ foreach(d ${gt_src_list})
     get_filename_component(m_name "${m}" NAME_WE)
     string(TOUPPER "${m_name}" m_upper)
     if("${m}" MATCHES "^gde")
-      foreach(ydb_chset "" "UTF-8")
+        foreach(ydb_chset "M" "UTF-8")
         set(m_out "${YDB_BINARY_DIR}${ydb_chset_dir_${ydb_chset}}/${m_upper}.m")
         add_custom_command(
           OUTPUT "${m_out}"
@@ -686,7 +688,7 @@ else()
   message(FATAL_ERROR "Unable to find 'locale'.  Set LOCALECFG in CMake cache.")
 endif()
 
-foreach(ydb_chset "" "UTF-8")
+foreach(ydb_chset "M" "UTF-8")
   foreach(in ${ydb_chset_routines_${ydb_chset}})
     # ${in} is a ".m" file name. For example, "<path>/GDEGET.m". Derive the corresponding ".o" for it i.e. "<path>/GDEGET.o"
     # in the example case.
@@ -736,6 +738,7 @@ Halt")
     -D ydb_dist=${YDB_BINARY_DIR}
     -D ydb_routines=.
     -D ydb_gbldir=${YDB_BINARY_DIR}/${help}help
+    -D ydb_chset=M
     )
   add_custom_command(
     OUTPUT ${help}help.dat ${help}help.gld
@@ -775,6 +778,7 @@ add_custom_command(
     -D ydb_dist=${YDB_BINARY_DIR}
     -D ydb_routines=.
     -D ydb_gbldir=${YDB_BINARY_DIR}/gtmhelp
+    -D ydb_chset=M
     -D mumps=$<TARGET_FILE:yottadb>
     -D "args=-run;GTMDEFINEDTYPESTODB"
     -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
