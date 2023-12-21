@@ -102,8 +102,10 @@ if [ -z "$COMMIT_IDS" ]; then
 	# relative to when the latest 1 commit got merged. In that case, the copyright check should use the year of the
 	# commit instead of the current year. Hence the below code to retrieve that year from the latest commit.
 	# If the commit contains some newly created files, there will be additional lines output of the form "create mode 100644"
-	# for each newly created file. We do not want that. Hence filter that out using "head -1".
-	curyear=$(git show --summary --pretty=format:'%cd' --date=format:%Y HEAD | head -1)
+	# for each newly created file. We do not want that. Hence filter that out using "sed -n 1p". Do not use "head -1" as
+	# it can cause SIGPIPE errors on the "git show" side (exit status 141) in case "git show" has a lot of output since
+	# we also have "set -o pipefail" set. See https://unix.stackexchange.com/a/738538 for the "sed" suggestion.
+	curyear=$(git show --summary --pretty=format:'%cd' --date=format:%Y HEAD | sed -n 1p)
 else
 	# This is the normal case when the pipeline runs as part of an open MR in origin repo.
 	# Use the current year for copyright checks.
