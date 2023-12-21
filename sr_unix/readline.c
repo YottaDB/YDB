@@ -407,10 +407,9 @@ void readline_read_mval(mval *v) {
 					frl_free_line_state();
 					frl_reset_after_signal();
 				}
-				if (deferred_signal == outofband) {
-					/* SIGSTOP/mupip stop:
-					 * Reset terminal to be pre-readline so
-					 * we can go back to the shell */
+				if ((deferred_signal == outofband) || (ztimeout == outofband)) {
+					/* SIGSTOP/mupip stop: Reset terminal to be pre-readline so we can go back to the shell.
+					 * Also, make sure we do that for SIGALRM/$ZTIMEOUT too, as that may kick us out to the shell */
 					frl_cleanup_after_signal();
 				}
 				if (sighup == outofband) {
