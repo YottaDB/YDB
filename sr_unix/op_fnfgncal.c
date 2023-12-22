@@ -295,14 +295,12 @@ STATICFNDCL void free_return_type(INTPTR_T ret_val, enum ydb_types typ)
 		case ydb_ulong_star:
 			free(((ydb_ulong_t *)ret_val));
 			break;
-#		ifdef GTM64
 		case ydb_int64_star:
 			free(((ydb_int64_t *)ret_val));
 			break;
 		case ydb_uint64_star:
 			free(((ydb_uint64_t *)ret_val));
 			break;
-#		endif
 		case ydb_char_star:
 			free(((ydb_char_t *)ret_val));
 			break;
@@ -448,13 +446,13 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 			uns_int64_num = (ydb_uint64_t)src;
 			MV_FORCE_ULMVAL(dst, uns_int64_num);
 			break;
+#		endif
 		case ydb_int64_star:
 			VALIDATE_AND_CONVERT_PTR_TO_TYPE(MVAL, ydb_int64_t, s_int64_num, dst, src);
 			break;
 		case ydb_uint64_star:
 			VALIDATE_AND_CONVERT_PTR_TO_TYPE(UMVAL, ydb_uint64_t, uns_int64_num, dst, src);
 			break;
-#		endif
 		case ydb_string_star:
 			sp = (struct extcall_string *)src;
 			if (NULL == sp) /* If the assigned pointer value is NULL, pass back a literal_null */
@@ -599,10 +597,8 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct 
 		case ydb_uint_star:
 		case ydb_long_star:
 		case ydb_ulong_star:
-#		ifdef GTM64
 		case ydb_int64_star:
 		case ydb_uint64_star:
-#		endif
 		case ydb_jboolean:
 		case ydb_jint:
 		case ydb_jlong:
@@ -1247,7 +1243,6 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				NON_GTM64_ONLY(*((ydb_ulong_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_ulong_t)mval2ui(v) : 0);
 				free_space_pointer++;
 				break;
-#			ifdef GTM64
 			case ydb_int64_star:
 				param_list->arg[i] = free_space_pointer;
 				*((gtm_int64_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_int64_t)mval2i8(v) : 0;
@@ -1258,7 +1253,6 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				*((gtm_uint64_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_uint64_t)mval2ui8(v) : 0;
 				free_space_pointer++;
 				break;
-#			endif
 			case ydb_string_star:
 				param_list->arg[i] = free_space_pointer;
 				if (MASK_BIT_ON(m1))

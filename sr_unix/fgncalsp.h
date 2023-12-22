@@ -70,20 +70,16 @@ enum ydb_types
 	ydb_uint,
 	ydb_long,
 	ydb_ulong,
-#	ifdef GTM64
 	ydb_int64,
 	ydb_uint64,
-#	endif
 	ydb_float,
 	ydb_double,
 	ydb_int_star,
 	ydb_uint_star,
 	ydb_long_star,
 	ydb_ulong_star,
-#	ifdef GTM64
 	ydb_int64_star,
 	ydb_uint64_star,
-#	endif
 	ydb_string_star,
 	ydb_float_star,
 	ydb_char_star,

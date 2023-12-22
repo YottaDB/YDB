@@ -80,20 +80,16 @@ const int parm_space_needed[] =
 	SIZEOF(ydb_uint_t),									/* ydb_uint */
 	SIZEOF(ydb_long_t),									/* ydb_long */
 	SIZEOF(ydb_ulong_t),									/* ydb_ulong */
-#	ifdef GTM64
 	SIZEOF(ydb_int64_t),									/* ydb_int64 */
 	SIZEOF(ydb_uint64_t),									/* ydb_uint64 */
-#	endif
 	SIZEOF(ydb_float_t),									/* ydb_float */
 	SIZEOF(ydb_double_t),									/* ydb_double */
 	SIZEOF(ydb_int_t *) + SIZEOF(ydb_int_t),						/* ydb_int_star */
 	SIZEOF(ydb_uint_t *) + SIZEOF(ydb_uint_t),						/* ydb_uint_star */
 	SIZEOF(ydb_long_t *) + SIZEOF(ydb_long_t),						/* ydb_long_star */
 	SIZEOF(ydb_ulong_t *) + SIZEOF(ydb_ulong_t),						/* ydb_ulong_star */
-#	ifdef GTM64
 	SIZEOF(ydb_int64_t *) + SIZEOF(ydb_int64_t),						/* ydb_int64_star */
 	SIZEOF(ydb_uint64_t *) + SIZEOF(ydb_uint64_t),						/* ydb_uint64_star */
-#	endif
 	SIZEOF(ydb_string_t *) + SIZEOF(ydb_string_t),						/* ydb_string_star */
 	SIZEOF(ydb_float_t *) + SIZEOF(ydb_float_t),						/* ydb_float_star */
 	SIZEOF(ydb_char_t *),									/* ydb_char_star */
@@ -127,11 +123,19 @@ const static struct
 /*	typename		type			type *			type **			*/
 	{"ydb_char_t",		{ydb_notfound,		ydb_char_star,		ydb_char_starstar}	},
 	{"ydb_double_t",	{ydb_double,		ydb_double_star,	ydb_notfound}		},
+#ifdef GTM64
+	{"ydb_int64_t",		{ydb_int64,		ydb_int64_star,		ydb_notfound}		},
+	{"ydb_uint64_t",	{ydb_uint64,		ydb_uint64_star,	ydb_notfound}		},
+	{"int64",				{ydb_int64,		ydb_int64_star,		ydb_notfound}		},
+	{"uint64",			{ydb_uint64,		ydb_uint64_star,	ydb_notfound}		},
+#else
+	{"ydb_int64_t",		{ydb_notfound,	ydb_int64_star,		ydb_notfound}		},
+	{"ydb_uint64_t",	{ydb_notfound,	ydb_uint64_star,	ydb_notfound}		},
+	{"int64",				{ydb_notfound,	ydb_int64_star,		ydb_notfound}		},
+	{"uint64",			{ydb_notfound,	ydb_uint64_star,	ydb_notfound}		},
+#endif
 	{"ydb_float_t",		{ydb_float,		ydb_float_star,		ydb_notfound}		},
 	{"ydb_int_t",		{ydb_int,		ydb_int_star,		ydb_notfound}		},
-#	ifdef GTM64
-	{"ydb_int64_t",		{ydb_int64,		ydb_int64_star,		ydb_notfound}		},
-#	endif
 	{"ydb_jbig_decimal_t",	{ydb_jbig_decimal,	ydb_notfound,		ydb_notfound}		},
 	{"ydb_jboolean_t",	{ydb_jboolean,		ydb_notfound,		ydb_notfound}		},
 	{"ydb_jbyte_array_t",	{ydb_jbyte_array, 	ydb_notfound,		ydb_notfound}		},
@@ -145,9 +149,6 @@ const static struct
 	{"ydb_status_t",	{ydb_status,		ydb_notfound,		ydb_notfound}		},
 	{"ydb_string_t",	{ydb_notfound,		ydb_string_star,	ydb_notfound}		},
 	{"ydb_uint_t",		{ydb_uint,		ydb_uint_star,		ydb_notfound}		},
-#	ifdef GTM64
-	{"ydb_uint64_t",	{ydb_uint64,		ydb_uint64_star,	ydb_notfound}		},
-#	endif
 	{"ydb_ulong_t",		{ydb_ulong,		ydb_ulong_star,		ydb_notfound}		},
 	{"ydb_buffer_t",	{ydb_notfound,		ydb_buffer_star,	ydb_notfound}		},
 	{"gtm_char_t",		{ydb_notfound,		ydb_char_star,		ydb_char_starstar}	},
@@ -208,10 +209,8 @@ const static int default_pre_alloc_value[] =
 	1, /* pointer to unsigned int */
 	1, /* pointer to long */
 	1, /* pointer to unsigned long */
-#	ifdef GTM64
 	1, /* pointer to 64 bit int */
 	1, /* pointer to unsigned 64 bit int */
-#	endif
 	1, /* pointer to string */
 	1, /* pointer to float */
 	100, /* pointer to char */
@@ -718,10 +717,8 @@ struct extcall_package_list *exttab_parse(mval *package)
 			case ydb_uint_star:
 			case ydb_long_star:
 			case ydb_ulong_star:
-#			ifdef GTM64
 			case ydb_int64_star:
 			case ydb_uint64_star:
-#			endif
 			case ydb_double_star:
 			case ydb_char_starstar:
 			case ydb_jboolean:
@@ -927,10 +924,8 @@ callin_entry_list *citab_parse(boolean_t internal_use, char **fname)
 			case ydb_uint_star:
 			case ydb_long_star:
 			case ydb_ulong_star:
-#			ifdef GTM64
 			case ydb_int64_star:
 			case ydb_uint64_star:
-#			endif
 			case ydb_float_star:
 			case ydb_double_star:
 			case ydb_string_star:
@@ -990,10 +985,8 @@ callin_entry_list *citab_parse(boolean_t internal_use, char **fname)
 				case ydb_uint_star:
 				case ydb_long_star:
 				case ydb_ulong_star:
-#				ifdef GTM64
 				case ydb_int64_star:
 				case ydb_uint64_star:
-#				endif
 				case ydb_float_star:
 				case ydb_double_star:
 				case ydb_string_star:
