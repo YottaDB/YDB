@@ -29,7 +29,7 @@ GDFIND	s file=$zparse(tfile,"",defgldext)
 	. ; Total sleep time in the loop is 500 milliseconds (1 msec for each iteration).
 	. ; If the .gldinprogress file exists but it has not been renamed in 500 msec, we give up on waiting
 	. ; and move on with our ".gld" file creation.
-	. f i=1:1:500 s file2=$zsearch($zparse(tfile2,"",defgldext)) q:file2=""  h 0.001
+	. f i=1:1:500 s file2=$zsearch($zparse(tfile2,"",defgldext),-1) q:file2=""  h 0.001
 	. s file=$zsearch($zparse(tfile,"",defgldext))
 	i file="" s file=$zparse(tfile,"",defgldext),create=1 d message^GDE(gdeerr("GDUSEDEFS"),$zwrite(file))
 	e  s create=0 d message^GDE(gdeerr("LOADGD"),$zwrite(file))
