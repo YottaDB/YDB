@@ -3,7 +3,7 @@
 # Copyright (c) 2001-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -54,7 +54,6 @@ else if ( "x86_64" == $mach_type && ((! -e $gtm_inc/x86_64.h && "inc" == "${gtm_
 	setenv gt_build_type 32
 else
 	setenv gt_build_type 64
-	setenv gt_ld_m_shl_options "-shared"
 endif
 
 if ( $?gtm_version_change == "1" ) then
@@ -162,19 +161,17 @@ if ( $?gtm_version_change == "1" ) then
 		setenv gt_cc_options_common     "-c -std=c99 -fno-common "
 	endif
 
+	# Default linker options for M objects
+	setenv	gt_ld_m_shl_linker	"ld.gold"
+	setenv  gt_ld_m_shl_options     "-shared"
+
 	if ( "armv6l" == $mach_type ) then
-		setenv	gt_ld_m_shl_linker	"cc"
-		setenv  gt_ld_m_shl_options     "-shared"
 		setenv  gt_cc_options_common    "$gt_cc_options_common -marm -march=armv6 "
 	endif
 	if ( "armv7l" == $mach_type ) then
-		setenv	gt_ld_m_shl_linker	"cc"
-		setenv  gt_ld_m_shl_options     "-shared"
 		setenv  gt_cc_options_common    "$gt_cc_options_common -marm -march=armv7-a "
 	endif
 	if ( "aarch64" == $mach_type ) then
-		setenv	gt_ld_m_shl_linker	"cc"
-		setenv  gt_ld_m_shl_options     "-shared"
 		setenv  gt_cc_options_common    "$gt_cc_options_common -march=armv8-a -mcpu=cortex-a53 "
 	endif
 
