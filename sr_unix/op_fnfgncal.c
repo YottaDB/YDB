@@ -252,10 +252,8 @@ STATICFNDCL void free_return_type(INTPTR_T ret_val, enum ydb_types typ)
 		case ydb_uint:
 		case ydb_long:
 		case ydb_ulong:
-#		ifdef GTM64
 		case ydb_int64:
 		case ydb_uint64:
-#		endif
 		case ydb_float:
 		case ydb_double:
 		case ydb_pointertofunc:
@@ -319,10 +317,8 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 	ydb_long_t		str_len, s_long_num;
 	ydb_uint_t		uns_int_num;
 	ydb_ulong_t		uns_long_num;
-#	ifdef GTM64
 	ydb_int64_t		s_int64_num;
 	ydb_uint64_t		uns_int64_num;
-#	endif
 	char			*cp;
 	struct extcall_string	*sp;
 
@@ -565,6 +561,10 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct 
 			case ydb_uint:
 			case ydb_long:
 			case ydb_ulong:
+#		ifdef GTM64
+			case ydb_int64:
+			case ydb_uint64:
+#		endif
 			case ydb_jboolean:
 			case ydb_jint:
 			case ydb_jlong:
@@ -1339,7 +1339,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				free_space_pointer++;
 				break;
 			case ydb_double_star:
-				/* Only need to do this rounding on non-64 it platforms because this one type has a 64 bit
+				/* Only need to do this rounding on non-64 bit platforms because this one type has a 64 bit
 				 * alignment requirement on those platforms.
 				 */
 				NON_GTM64_ONLY(free_space_pointer = (ydb_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer),

@@ -716,12 +716,11 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 					va_arg(var, void *);
 					break;
 				case ydb_float:
-#				ifdef GTM64
-                    /* if we use ydb_float_t here compiler warns it is the same size as double */
+					/* Must use ydb_double_t here as float produces a warning.
+					 * On 64-bit machines, the compiler warns that float is the same size as double.
+					 * On 32-bit machines the compiler warns: 'float' is promoted to 'double' when passed through '...'
+					*/
 					va_arg(var, ydb_double_t);
-#				else
-					va_arg(var, ydb_float_t);
-#				endif
 					break;
 				case ydb_double:
 					va_arg(var, ydb_double_t);
