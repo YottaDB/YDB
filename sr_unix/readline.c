@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -187,7 +187,7 @@ void readline_init(void* handle) {
 	fusing_history			= dlsym(handle, "using_history");
 	fadd_history			= dlsym(handle, "add_history");
 	fread_history			= dlsym(handle, "read_history");
-	fwrite_history			= dlsym(handle, "write_history");
+	fappend_history			= dlsym(handle, "append_history");
 	fhistory_set_pos		= dlsym(handle, "history_set_pos");
 	fwhere_history			= dlsym(handle, "where_history");
 	fcurrent_history		= dlsym(handle, "current_history");
@@ -207,6 +207,7 @@ void readline_init(void* handle) {
 	frl_restore_state		= dlsym(handle, "rl_restore_state");
 	frl_bind_key_in_map		= dlsym(handle, "rl_bind_key_in_map");
 	frl_get_keymap			= dlsym(handle, "rl_get_keymap");
+	fhistory_truncate_file		= dlsym(handle, "history_truncate_file");
 	SYM				= 1;
 	vrl_readline_name		= dlsym(handle, "rl_readline_name");
 	vrl_prompt			= dlsym(handle, "rl_prompt");
@@ -225,7 +226,7 @@ void readline_init(void* handle) {
 				&& fusing_history
 				&& fadd_history
 				&& fread_history
-				&& fwrite_history
+				&& fappend_history
 				&& fhistory_set_pos
 				&& fwhere_history
 				&& fcurrent_history
@@ -245,6 +246,7 @@ void readline_init(void* handle) {
 				&& frl_restore_state
 				&& frl_bind_key_in_map
 				&& frl_get_keymap
+				&& fhistory_truncate_file
 				&& SYM
 				&& vrl_readline_name
 				&& vrl_prompt
@@ -260,7 +262,7 @@ void readline_init(void* handle) {
 		return;
 
 	/* Allow conditional parsing of the ~/.inputrc file. */
-	*vrl_readline_name = "yottadb";
+	*vrl_readline_name = "YottaDB";
 	/* Turn on history keeping */
 	fusing_history();
 	/* disable bracketed paste so that cursor doesn't jump to beginning of prompt */
@@ -294,13 +296,22 @@ void readline_init(void* handle) {
 	assert(0 == readline_file_history_read_status);
 	UNUSED(readline_file_history_read_status);
 
+	/* Initialize session entry count */
+	ydb_rl_entries_count = 0;
+
 	return;
 }
 
 /* Writes history; called by various functions in YottaDB at shutdown */
 void readline_write_history(void) {
 	if (NULL != readline_file) {
-		fwrite_history(readline_file);
+		/* Clamp the number of entries to append to the file to the maximum runtime list */
+		if (ydb_rl_entries_count > *vhistory_max_entries)
+			ydb_rl_entries_count = *vhistory_max_entries;
+		/* Append session history to readline file */
+		fappend_history(ydb_rl_entries_count, readline_file);
+		/* Truncate the file to 1000 entries; we have no setting right now to change this. */
+		fhistory_truncate_file(readline_file, 1000);
 		gtm_free(readline_file);
 		readline_file = NULL;
 	}
@@ -733,10 +744,13 @@ void add_single_history_item(char *input) {
 	/* get the last item added to the history; if it is the same don't add it to the history again */
 	cur_hist = fhistory_get(*vhistory_base + *vhistory_length - 1);
 	if (NULL != cur_hist) {
-		if (0 != strcmp(cur_hist->line, input))
+		if (0 != strcmp(cur_hist->line, input)) {
 			fadd_history(input);
+			ydb_rl_entries_count++;
+		}
 	} else {
 		fadd_history(input);
+		ydb_rl_entries_count++;
 	}
 }
 

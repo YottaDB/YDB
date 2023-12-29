@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1430,12 +1430,14 @@ GBLDEF volatile boolean_t	readline_catch_signal; /* to go to sigsetjmp location 
 #include <setjmp.h>
 GBLDEF sigjmp_buf		readline_signal_jmp;
 GBLDEF struct readline_state    *ydb_readline_state;
+/* Counter for entries in this session for use in saving history */
+GBLDEF int			ydb_rl_entries_count;
 /* Readline library functions = f + function name */
 GBLDEF char			*(*freadline)(char *);
 GBLDEF void			(*fusing_history)(void);
 GBLDEF void			(*fadd_history)(char *);
 GBLDEF int			(*fread_history)(const char *);
-GBLDEF int			(*fwrite_history)(const char *);
+GBLDEF int			(*fappend_history)(int, const char *);
 GBLDEF int 			(*fhistory_set_pos)(int);
 GBLDEF int 			(*fwhere_history)(void);
 GBLDEF HIST_ENTRY* 		(*fcurrent_history)(void);
@@ -1455,6 +1457,7 @@ GBLDEF int			(*frl_save_state)(struct readline_state*);
 GBLDEF int			(*frl_restore_state)(struct readline_state*);
 GBLDEF int			(*frl_bind_key_in_map)(int, rl_command_func_t *, Keymap);
 GBLDEF Keymap			(*frl_get_keymap)(void);
+GBLDEF int			(*fhistory_truncate_file)(const char *, int);
 /* Readline library variables = v + variable name */
 GBLDEF char			**vrl_readline_name;
 GBLDEF char			**vrl_prompt;

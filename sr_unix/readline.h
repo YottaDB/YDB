@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,13 +49,14 @@ GBLREF volatile boolean_t	readline_catch_signal; /* to go to sigsetjmp location 
 #include <setjmp.h>
 GBLREF sigjmp_buf		readline_signal_jmp; /* for signal handling */
 GBLREF struct readline_state    *ydb_readline_state; /* for saving state after an interrupt */
-#endif
+/* Counter for entries in this session for use in saving history */
+GBLREF int			ydb_rl_entries_count;
 /* Readline library functions = f + function name */
 GBLREF char			*(*freadline)(char *);
 GBLREF void			(*fusing_history)(void);
 GBLREF void			(*fadd_history)(char *);
 GBLREF int			(*fread_history)(const char *);
-GBLREF int			(*fwrite_history)(const char *);
+GBLREF int			(*fappend_history)(int, const char *);
 GBLREF int 			(*fhistory_set_pos)(int);
 GBLREF int 			(*fwhere_history)(void);
 GBLREF HIST_ENTRY* 		(*fcurrent_history)(void);
@@ -75,6 +76,7 @@ GBLREF int			(*frl_save_state)(struct readline_state*);
 GBLREF int			(*frl_restore_state)(struct readline_state*);
 GBLREF int			(*frl_bind_key_in_map)(int, rl_command_func_t *, Keymap);
 GBLREF Keymap			(*frl_get_keymap)(void);
+GBLREF int			(*fhistory_truncate_file)(const char *, int);
 /* Readline library variables = v + variable name */
 GBLREF char			**vrl_readline_name;
 GBLREF char			**vrl_prompt;
@@ -85,3 +87,4 @@ GBLREF int                      *vrl_catch_signals;
 GBLREF rl_hook_func_t		**vrl_startup_hook;
 GBLREF int			*vrl_already_prompted;
 GBLREF rl_voidfunc_t 		**vrl_redisplay_function;
+#endif
