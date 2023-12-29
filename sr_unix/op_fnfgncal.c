@@ -444,10 +444,10 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 			break;
 #		endif
 		case ydb_int64_star:
-			VALIDATE_AND_CONVERT_PTR_TO_TYPE(MVAL, ydb_int64_t, s_int64_num, dst, src);
+			VALIDATE_AND_CONVERT_PTR_TO_TYPE(LMVAL, ydb_int64_t, s_int64_num, dst, src);
 			break;
 		case ydb_uint64_star:
-			VALIDATE_AND_CONVERT_PTR_TO_TYPE(UMVAL, ydb_uint64_t, uns_int64_num, dst, src);
+			VALIDATE_AND_CONVERT_PTR_TO_TYPE(ULMVAL, ydb_uint64_t, uns_int64_num, dst, src);
 			break;
 		case ydb_string_star:
 			sp = (struct extcall_string *)src;
@@ -1245,13 +1245,13 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				break;
 			case ydb_int64_star:
 				param_list->arg[i] = free_space_pointer;
-				*((gtm_int64_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_int64_t)mval2i8(v) : 0;
-				free_space_pointer++;
+				*((ydb_int64_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_int64_t)mval2i8(v) : 0;
+				free_space_pointer += (SIZEOF(ydb_int64_t) / SIZEOF(ydb_long_t)); // increment properly for 32 or 64-bit build
 				break;
 			case ydb_uint64_star:
 				param_list->arg[i] = free_space_pointer;
-				*((gtm_uint64_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_uint64_t)mval2ui8(v) : 0;
-				free_space_pointer++;
+				*((ydb_uint64_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_uint64_t)mval2ui8(v) : 0;
+				free_space_pointer += (SIZEOF(ydb_uint64_t) / SIZEOF(ydb_long_t)); // increment properly for 32 or 64-bit build
 				break;
 			case ydb_string_star:
 				param_list->arg[i] = free_space_pointer;
