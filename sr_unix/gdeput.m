@@ -3,7 +3,7 @@
 ; Copyright (c) 2006-2021 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -350,6 +350,8 @@ writerec:
 	;
 writeerr
 	u @useio
-	c tempfile:delete
+	; It is possible with concurrent GDE invocations that "tempfile" does not exist.
+	; In that case, skip the below c tempfile:delete invocation as that might result in an error handler spinloop.
+	c:(""'=$zsearch(tempfile)) tempfile:delete
 	d message^GDE(gdeerr("WRITEERROR"),$zwrite(gdeputzs))
 	q 0
