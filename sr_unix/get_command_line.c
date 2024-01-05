@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,10 +62,11 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 			} else
 			{
 				cp = (unsigned char *)cmd_arg[1];
+				assert(NULL != cp);
 				if ('-' == *cp++)
 					first_item++;
 			}
-			if ((1 < first_item) && ('r' == TOLOWER(*cp)))
+			if ((1 < first_item) && (NULL != cp) && ('r' == TOLOWER(*cp)))
 				first_item++;
 		}
 		for (word_cnt = first_item; word_cnt < cmd_cnt; word_cnt++)
