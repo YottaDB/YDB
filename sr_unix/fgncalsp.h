@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,7 +60,9 @@ struct extcall_package_list
 	clnupfptr			package_clnup_rtn;
 };
 
-/* Any additions to the below enum would need additions to the "parm_space_needed[]" array in "sr_unix/exttab_parse.c" */
+/* Any additions to the following enum would need additions to the two tables in sr_unix/exttab_parse.c:
+  `parm_space_needed[]` and `default_pre_alloc_value[]`
+*/
 enum ydb_types
 {
 	ydb_notfound,
@@ -96,6 +98,7 @@ enum ydb_types
 	ydb_jbyte_array,
 	ydb_jbig_decimal,
 	ydb_buffer_star,
+    YDB_TYPES_COUNT  // used for compile-time check of sizes of `parm_space_needed` and `default_pre_alloc_value`
 };
 
 typedef enum {SIGSAFE, XCBEHAVIORTAILENTRY} gtm_ext_call_behavior;

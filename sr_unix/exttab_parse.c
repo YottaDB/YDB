@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,6 +23,7 @@
 
 #include <stdarg.h>
 #include <errno.h>
+#include <assert.h>
 
 #include "copy.h"
 #include "libyottadb.h"
@@ -107,6 +108,8 @@ const int parm_space_needed[] =
 	SIZEOF(ydb_string_t),									/* ydb_jbig_decimal */
 	SIZEOF(ydb_buffer_t *) + SIZEOF(ydb_buffer_t),						/* ydb_buffer_star */
 };
+static_assert(sizeof(parm_space_needed)/sizeof(parm_space_needed[0]) == YDB_TYPES_COUNT,
+	"array size does not match ydb_types enum");
 
 /* This table is searched serially so the search priority is:
  *   1. ydb_ types
@@ -190,6 +193,7 @@ const static struct
 	{"xc_ulong_t",		{ydb_ulong,		ydb_ulong_star,		ydb_notfound}		}
 };
 
+/* The following array needs to be maintained in sync with "enum ydb_types" in "sr_unix/fgncalsp.h" */
 const static int default_pre_alloc_value[] =
 {
 	0, /* unknown Type */
@@ -199,10 +203,8 @@ const static int default_pre_alloc_value[] =
 	0, /* uint */
 	0, /* long */
 	0, /* unsigned long */
-#	ifdef GTM64
 	0, /* 64 bit int */
 	0, /* unsigned 64 bit int */
-#	endif
 	0, /* float */
 	0, /* double */
 	1, /* pointer to int */
@@ -218,15 +220,18 @@ const static int default_pre_alloc_value[] =
 	1, /* pointer to double */
 	1, /* pointer to function */
 	1, /* pointer to pointer to function */
-	1, /* java int */
+	1, /* java boolean */
 	1, /* java int */
 	1, /* java long */
 	1, /* java float */
 	1, /* java double */
 	1, /* java string */
 	1, /* java byte array */
-	1  /* java big decimal */
+	1, /* java big decimal */
+	1, /* pointer to buffer */
 };
+static_assert(sizeof(default_pre_alloc_value)/sizeof(default_pre_alloc_value[0]) == YDB_TYPES_COUNT,
+	"array size does not match ydb_types enum");
 
 error_def(ERR_CIDIRECTIVE);
 error_def(ERR_CIENTNAME);

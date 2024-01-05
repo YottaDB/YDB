@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -306,6 +306,8 @@ STATICFNDCL void free_return_type(INTPTR_T ret_val, enum ydb_types typ)
 			if (NULL != *((ydb_char_t **)ret_val))
 				free(*((ydb_char_t **)ret_val));
 			free(((ydb_char_t **)ret_val));
+			break;
+		case YDB_TYPES_COUNT:  // merely prevents a compiler warning
 			break;
 	}
 }
