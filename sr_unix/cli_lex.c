@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -421,7 +421,6 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 	static FILE	*save_fp; /* Only used in this routine so not using STATICDEF */
 #	endif
 
-	assert(MAX_LINE >= buffersize);
 	if (in_tp)
 		cli_lex_in_ptr->tp = NULL;
 
