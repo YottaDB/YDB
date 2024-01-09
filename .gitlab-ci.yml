@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -112,8 +112,8 @@ build-test:
   script:
     - mkdir testarea
     - docker load < docker-images/ydbtest.tar
-    - docker run --init -v $PWD/testarea/:/testarea1/ -e CI_PIPELINE_ID -e CI_COMMIT_BRANCH --rm ydbtest -t ${TEST}
-    - docker run --init -v $PWD/testarea/:/testarea1/ -e CI_PIPELINE_ID -e CI_COMMIT_BRANCH --rm ydbtest -t ${TEST} -replic
+    - docker run --init -t -v $PWD/testarea/:/testarea1/ -e CI_PIPELINE_ID -e CI_COMMIT_BRANCH --rm ydbtest -t ${TEST}
+    - docker run --init -t -v $PWD/testarea/:/testarea1/ -e CI_PIPELINE_ID -e CI_COMMIT_BRANCH --rm ydbtest -t ${TEST} -replic
 
 test-basic:
   extends: .test-shared
@@ -134,6 +134,11 @@ test-r140:
   extends: .test-shared
   variables:
     TEST: r140
+
+test-v70001:
+  extends: .test-shared
+  variables:
+    TEST: v70001
 
 # Main and ONLY docker creation mechanism.
 .docker-create:
