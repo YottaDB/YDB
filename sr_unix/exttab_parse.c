@@ -108,8 +108,90 @@ const int parm_space_needed[] =
 	SIZEOF(ydb_string_t),									/* ydb_jbig_decimal */
 	SIZEOF(ydb_buffer_t *) + SIZEOF(ydb_buffer_t),						/* ydb_buffer_star */
 };
-static_assert(sizeof(parm_space_needed)/sizeof(parm_space_needed[0]) == YDB_TYPES_COUNT,
-	"array size does not match ydb_types enum");
+static_assert(ARRAYSIZE(parm_space_needed) == YDB_TYPES_COUNT, "array size does not match ydb_types enum");
+
+// Constants used in table below
+#define IN 1
+#define OUT 2
+#define RET 4
+
+// Whether each call-out type is valid as an input, output, and/or return value
+const char parm_allowed_callout[] =
+{
+    0,          // ydb_notfound
+    RET,        // ydb_void
+    RET,        // ydb_status
+    RET|IN,     // ydb_int
+    RET|IN,     // ydb_uint
+    RET|IN,     // ydb_long
+    RET|IN,     // ydb_ulong
+    GTM64_ONLY(RET|IN) NON_GTM64_ONLY(0),   // ydb_int64
+    GTM64_ONLY(RET|IN) NON_GTM64_ONLY(0),   // ydb_uint64
+    0,          // ydb_float
+    0,          // ydb_double
+    RET|IN|OUT, // ydb_int_star
+    RET|IN|OUT, // ydb_uint_star
+    RET|IN|OUT, // ydb_long_star
+    RET|IN|OUT, // ydb_ulong_star
+    RET|IN|OUT, // ydb_int64_star
+    RET|IN|OUT, // ydb_uint64_star
+    RET|IN|OUT, // ydb_string_star
+    RET|IN|OUT, // ydb_float_star
+    RET|IN|OUT, // ydb_char_star
+    RET|IN|OUT, // ydb_char_star_star
+    RET|IN|OUT, // ydb_double_star
+    IN,         // ydb_pointertofunc
+    IN,         // ydb_pointertofunc_star
+    RET|IN|OUT, // ydb_jboolean
+    RET|IN|OUT, // ydb_jint
+    RET|IN|OUT, // ydb_jlong
+    RET|IN|OUT, // ydb_jfloat
+    RET|IN|OUT, // ydb_jdouble
+    RET|IN|OUT, // ydb_jstring
+    RET|IN|OUT, // ydb_jbyte_array
+    0,          // ydb_jbig_decimal is not supported by call-outs
+    RET|IN|OUT, // ydb_buffer_star
+};
+static_assert(ARRAYSIZE(parm_allowed_callout) == YDB_TYPES_COUNT, "array size does not match ydb_types enum");
+
+// Whether each call-in type is valid as an input, output, and/or return value
+const char parm_allowed_callin[] =
+{
+    0,          // ydb_notfound
+    RET,        // ydb_void
+    0,          // ydb_status - not documented as valid for call-ins, so don't implement
+    IN,         // ydb_int
+    IN,         // ydb_uint
+    IN,         // ydb_long
+    IN,         // ydb_ulong
+    GTM64_ONLY(IN) NON_GTM64_ONLY(0),   // ydb_int64
+    GTM64_ONLY(IN) NON_GTM64_ONLY(0),   // ydb_uint64
+    IN,         // ydb_float
+    IN,         // ydb_double
+    RET|IN|OUT, // ydb_int_star
+    RET|IN|OUT, // ydb_uint_star
+    RET|IN|OUT, // ydb_long_star
+    RET|IN|OUT, // ydb_ulong_star
+    RET|IN|OUT, // ydb_int64_star
+    RET|IN|OUT, // ydb_uint64_star
+    RET|IN|OUT, // ydb_string_star
+    RET|IN|OUT, // ydb_float_star
+    RET|IN|OUT, // ydb_char_star
+    0,          // ydb_char_star_star - not documented as valid for call-ins, so don't implement
+    RET|IN|OUT, // ydb_double_star
+    0,          // ydb_pointertofunc -- irrelevant to call-ins
+    0,          // ydb_pointertofunc_star -- irrelevant to call-ins
+    RET|IN|OUT, // ydb_jboolean
+    RET|IN|OUT, // ydb_jint
+    RET|IN|OUT, // ydb_jlong
+    RET|IN|OUT, // ydb_jfloat
+    RET|IN|OUT, // ydb_jdouble
+    RET|IN|OUT, // ydb_jstring
+    RET|IN|OUT, // ydb_jbyte_array
+    IN,         // ydb_jbig_decimal
+    RET|IN|OUT, // ydb_buffer_star
+};
+static_assert(ARRAYSIZE(parm_allowed_callin) == YDB_TYPES_COUNT, "array size does not match ydb_types enum");
 
 /* This table is searched serially so the search priority is:
  *   1. ydb_ types
@@ -230,8 +312,7 @@ const static int default_pre_alloc_value[] =
 	1, /* java big decimal */
 	1, /* pointer to buffer */
 };
-static_assert(sizeof(default_pre_alloc_value)/sizeof(default_pre_alloc_value[0]) == YDB_TYPES_COUNT,
-	"array size does not match ydb_types enum");
+static_assert(ARRAYSIZE(default_pre_alloc_value) == YDB_TYPES_COUNT, "array size does not match ydb_types enum");
 
 error_def(ERR_CIDIRECTIVE);
 error_def(ERR_CIENTNAME);
@@ -258,7 +339,6 @@ error_def(ERR_ZCCTNULLF);
 error_def(ERR_ZCCTOPN);
 error_def(ERR_ZCENTNAME);
 error_def(ERR_ZCINVALIDKEYWORD);
-error_def(ERR_ZCMLTSTATUS);
 error_def(ERR_ZCPREALLNUMEX);
 error_def(ERR_ZCPREALLVALINV);
 error_def(ERR_ZCPREALLVALPAR);
@@ -550,10 +630,11 @@ STATICFNDEF uint4 array_to_mask(boolean_t ar[MAX_ACTUALS], int n)
 	return mask;
 }
 
-/* Note: Need condition handler to clean-up allocated structures and close intput file in the event of an error */
+/* Parse external call table for call-outs */
+/* Note: Need condition handler to clean-up allocated structures and close input file in the event of an error */
 struct extcall_package_list *exttab_parse(mval *package)
 {
-	boolean_t			is_input[MAX_ACTUALS], is_output[MAX_ACTUALS], got_status;
+	boolean_t			is_input[MAX_ACTUALS], is_output[MAX_ACTUALS];
 	char				*end, str_buffer[MAX_TABLINE_LEN], str_temp_buffer[MAX_TABLINE_LEN + 1], *tbp;
 	enum ydb_types			ret_tok, parameter_types[MAX_ACTUALS], pr;
 	FILE				*ext_table_file_handle;
@@ -701,44 +782,9 @@ struct extcall_package_list *exttab_parse(mval *package)
 			ext_stx_error(ERR_ZCCOLON, ext_table_file_name);
 		/* Get return type */
 		ret_tok = scan_keyword(&tbp);
-		/* Check for legal return type */
-		switch (ret_tok)
-		{
-			case ydb_status:
-			case ydb_void:
-			case ydb_int:
-			case ydb_uint:
-			case ydb_long:
-			case ydb_ulong:
-#			ifdef GTM64
-			case ydb_int64:
-			case ydb_uint64:
-#			endif
-			case ydb_char_star:
-			case ydb_float_star:
-			case ydb_string_star:
-			case ydb_buffer_star:
-			case ydb_int_star:
-			case ydb_uint_star:
-			case ydb_long_star:
-			case ydb_ulong_star:
-			case ydb_int64_star:
-			case ydb_uint64_star:
-			case ydb_double_star:
-			case ydb_char_starstar:
-			case ydb_jboolean:
-			case ydb_jint:
-			case ydb_jlong:
-			case ydb_jfloat:
-			case ydb_jdouble:
-			case ydb_jstring:
-			case ydb_jbyte_array:
-			case ydb_jbig_decimal:
-				break;
-			default:
-				ext_stx_error(ERR_ZCRTNTYP, ext_table_file_name);
-		}
-		got_status = (ret_tok == ydb_status);
+		// Check that it's a legal return type
+		if (!(parm_allowed_callout[ret_tok] & RET))
+			ext_stx_error(ERR_ZCRTNTYP, ext_table_file_name);
 		/* Get call name */
 		if ('[' == *tbp)
 		{
@@ -790,16 +836,10 @@ struct extcall_package_list *exttab_parse(mval *package)
 				ext_stx_error(ERR_ZCRCALLNAME, ext_table_file_name);
 			/* Scanned colon--now get type */
 			pr = scan_keyword(&tbp);
-			if (ydb_notfound == pr)
+			// Check that it's a legal parameter type
+			if (is_input[parameter_count] && !(parm_allowed_callout[pr] & IN)
+			  || is_output[parameter_count] && !(parm_allowed_callout[pr] & OUT))
 				ext_stx_error(ERR_ZCUNTYPE, ext_table_file_name);
-			if (ydb_status == pr)
-			{
-				/* Only one type "status" allowed per call */
-				if (got_status)
-					ext_stx_error(ERR_ZCMLTSTATUS, ext_table_file_name);
-				else
-					got_status = TRUE;
-			}
 			parameter_types[parameter_count] = pr;
 			if ('[' == *tbp)
 			{
@@ -857,6 +897,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 	return pak;
 }
 
+/* Parse external call table for call-ins */
 callin_entry_list *citab_parse(boolean_t internal_use, char **fname)
 {
 	int			parameter_count, i, fclose_res;
@@ -921,32 +962,9 @@ callin_entry_list *citab_parse(boolean_t internal_use, char **fname)
 		if (':' != *tbp++)
 			ext_stx_error(ERR_COLON, ext_table_file_name);
 		ret_tok = scan_keyword(&tbp); /* return type */
-		switch (ret_tok) /* return type valid ? */
-		{
-			case ydb_void:
-			case ydb_char_star:
-			case ydb_int_star:
-			case ydb_uint_star:
-			case ydb_long_star:
-			case ydb_ulong_star:
-			case ydb_int64_star:
-			case ydb_uint64_star:
-			case ydb_float_star:
-			case ydb_double_star:
-			case ydb_string_star:
-			case ydb_buffer_star:
-			case ydb_jboolean:
-			case ydb_jint:
-			case ydb_jlong:
-			case ydb_jfloat:
-			case ydb_jdouble:
-			case ydb_jstring:
-			case ydb_jbyte_array:
-			case ydb_jbig_decimal:
-				break;
-			default:
-				ext_stx_error(ERR_CIRTNTYP, ext_table_file_name);
-		}
+		// Check that it's a legal return type
+		if (!(parm_allowed_callin[ret_tok] & RET))
+			ext_stx_error(ERR_CIRTNTYP, ext_table_file_name);
 		labref.addr = tbp;
 		if ((end = scan_labelref(tbp)))
 			labref.len = INTCAST(end - tbp);
@@ -970,44 +988,27 @@ callin_entry_list *citab_parse(boolean_t internal_use, char **fname)
 			out_mask |= ('O' == *tbp) ? (tbp++, mask) : 0;
 			if ((!(inp_mask & mask) && !(out_mask & mask)) || (':' != *tbp++))
 				ext_stx_error(ERR_CIDIRECTIVE, ext_table_file_name);
-			switch ((pr = scan_keyword(&tbp))) /* valid param type? */
-			{
-				case ydb_int:
-				case ydb_uint:
-				case ydb_long:
-				case ydb_ulong:
-#				ifdef GTM64
-				case ydb_int64:
-				case ydb_uint64:
-#				endif
-				case ydb_float:
-				case ydb_double:
-					if (out_mask & mask)
+			pr = scan_keyword(&tbp); // get parameter type
+			// Check that it's a legal parameter type
+			if ((inp_mask & mask) && !(parm_allowed_callin[pr] & IN))
+				ext_stx_error(ERR_CIUNTYPE, ext_table_file_name);  // say it is invalid
+			if ((out_mask & mask) && !(parm_allowed_callin[pr] & OUT))
+				// outputs that try using non-pointer types get a more specific error message
+				switch (pr)
+				{
+					case ydb_int:
+					case ydb_uint:
+					case ydb_long:
+					case ydb_ulong:
+					case ydb_int64:
+					case ydb_uint64:
+					case ydb_float:
+					case ydb_double:
 						ext_stx_error(ERR_CIPARTYPE, ext_table_file_name);
-					/* fall-thru */
-				case ydb_char_star:
-				case ydb_int_star:
-				case ydb_uint_star:
-				case ydb_long_star:
-				case ydb_ulong_star:
-				case ydb_int64_star:
-				case ydb_uint64_star:
-				case ydb_float_star:
-				case ydb_double_star:
-				case ydb_string_star:
-				case ydb_buffer_star:
-				case ydb_jboolean:
-				case ydb_jint:
-				case ydb_jlong:
-				case ydb_jfloat:
-				case ydb_jdouble:
-				case ydb_jstring:
-				case ydb_jbyte_array:
-				case ydb_jbig_decimal:
-					break;
-				default:
-					ext_stx_error(ERR_CIUNTYPE, ext_table_file_name);
-			}
+						break;
+					default:
+						ext_stx_error(ERR_CIUNTYPE, ext_table_file_name);
+				}
 			parameter_types[parameter_count] = pr;
 			tbp = exttab_scan_space(tbp);
 		}

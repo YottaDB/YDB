@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -573,7 +573,7 @@ LITDEF	err_msg merrors[] = {
 	{ "ZCRCALLNAME", "Routine name expected but not found", 0, 0 },
 	{ "ZCRPARMNAME", "Parameter name expected but not found", 0, 0 },
 	{ "ZCUNTYPE", "Unknown type encountered", 0, 0 },
-	{ "ZCMLTSTATUS", "Multiple entries of xc_status in a single entry in external call table", 0, 0 },
+	{ "UNUSEDMSG740", "ZCMLTSTATUS nixed in r2.00 Jan 2024", 0, 0 },
 	{ "ZCSTATUSRET", "External call returned error status", 0, 0 },
 	{ "ZCMAXPARAM", "Exceeded maximum number of external call parameters", 0, 0 },
 	{ "ZCCSQRBR", "Closing Square bracket expected", 0, 0 },
