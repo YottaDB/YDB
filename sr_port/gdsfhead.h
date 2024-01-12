@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1755,29 +1755,29 @@ MBSTART {											\
 enum tp_ntp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] */
 {
 	/* TP transactions */
-	tp_blkmod_nomod = 0,
-	tp_blkmod_gvcst_srch,
-	tp_blkmod_t_qread,
-	tp_blkmod_tp_tend,
-	tp_blkmod_tp_hist,
-	tp_blkmod_op_tcommit,
-	n_tp_blkmod_types,
+	tp_blkmod_nomod = 0,		/* =  0 */
+	tp_blkmod_gvcst_srch,		/* =  1 */
+	tp_blkmod_t_qread,		/* =  2 */
+	tp_blkmod_tp_tend,		/* =  3 */
+	tp_blkmod_tp_hist,		/* =  4 */
+	tp_blkmod_op_tcommit,		/* =  5 */
+	n_tp_blkmod_types,		/* =  6 */
 	/* NON-TP transactions */
-	t_blkmod_nomod,
-	t_blkmod_gvcst_srch,
-	t_blkmod_gvcst_expand_key,
-	t_blkmod_t_qread,
-	t_blkmod_t_end1,
-	t_blkmod_t_end2,
-	t_blkmod_t_end3,
-	t_blkmod_t_end4,
+	t_blkmod_nomod,			/* =  7 */
+	t_blkmod_gvcst_srch,		/* =  8 */
+	t_blkmod_gvcst_expand_key,	/* =  9 */
+	t_blkmod_t_qread,		/* = 10 */
+	t_blkmod_t_end1,		/* = 11 */
+	t_blkmod_t_end2,		/* = 12 */
+	t_blkmod_t_end3,		/* = 13 */
+	t_blkmod_t_end4,		/* = 14 */
 	/* MUPIP specific */
-	t_blkmod_mu_clsce,
-	t_blkmod_mu_reduce_level,
-	t_blkmod_mu_split,
-	t_blkmod_mu_swap_blk,
-	t_blkmod_reorg_funcs,
-	n_nontp_blkmod_types
+	t_blkmod_mu_clsce,		/* = 15 */
+	t_blkmod_mu_reduce_level,	/* = 16 */
+	t_blkmod_mu_split,		/* = 17 */
+	t_blkmod_mu_swap_blk,		/* = 18 */
+	t_blkmod_reorg_funcs,		/* = 19 */
+	n_nontp_blkmod_types		/* = 20 */
 };
 
 /* Below is a list of macro bitmasks used to set the global variable "donot_commit". This variable should normally be 0.
