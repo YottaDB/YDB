@@ -735,7 +735,7 @@
 
    -BLO[CKS_FREE]=free blocks
 
-   Changes the hexidecimal free blocks field of the current file.
+   Changes the hexadecimal free blocks field of the current file.
 
    Use this to correct a value that MUPIP INTEG reports as needing a
    correction, but note that the "correct" value reported by INTEG may go
@@ -755,14 +755,14 @@
 
    -D[ATABASE]=transaction_number
 
-   Changes the hexidecimal transaction number in the file header of the last
+   Changes the hexadecimal transaction number in the file header of the last
    comprehensive backup to the value specified. Use this qualifier only in
    conjunction with the -FILEHEADER qualifier. For compatibility issues with
    prior versions, this can still be specified as -B_COMPREHENSIVE.
 
    -B_R[ECORD]=transaction_number
 
-   Changes the hexidecimal transaction number in the file header field that
+   Changes the hexadecimal transaction number in the file header field that
    maintains this information about the last -RECORD backup.
 
    -CO[RRUPT_FILE]=boolean
@@ -808,7 +808,7 @@
 
    -CU[RRENT_TN]=transaction_number
 
-   Changes the hexidecimal current transaction number for the current region.
+   Changes the hexadecimal current transaction number for the current region.
 
      o Raising the -CURRENT_TN can correct "block transaction number too
        large" errors
@@ -976,12 +976,12 @@
 
    -RESYNC_S[EQNO]=sequence-number
 
-   In an LMS environment, this sets the hexidecimal value of the "Resync
+   In an LMS environment, this sets the hexadecimal value of the "Resync
    Seqno" field.
 
    -RESYNC_T[N]=sequence-number
 
-   In an LMS environment, this sets the hexidecimal value ofthe "Resync
+   In an LMS environment, this sets the hexadecimal value ofthe "Resync
    transaction" field.
 
    -SPIN_SLEEP_MASK]=hexadecimal-mask
@@ -1032,7 +1032,7 @@
 
    -TO[TAL_BLKS]=total_blocks
 
-   Changes the hexidecimal total blocks field of the current file. Use only
+   Changes the hexadecimal total blocks field of the current file. Use only
    with: -FILEHEADER
 
    **Caution**

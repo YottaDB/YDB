@@ -3730,7 +3730,7 @@
 
    -SPIN_SLEEP_MASK=hex_mask
 
-     o hex_mask is a hexidecimal mask that controls the maximum time (in
+     o hex_mask is a hexadecimal mask that controls the maximum time (in
        nanoseconds) the process sleeps on a sleep spin.
      o The default is zero (0) which causes the process to return control to
        the UNIX kernel to be rescheduled with no explicit delay. When the
