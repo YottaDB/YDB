@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,6 +81,7 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	volatile boolean_t	in_wcs_recover; /* TRUE if in "wcs_recover" */
 GBLREF	uint4			update_trans;
 GBLREF	boolean_t		dse_running;
+GBLREF	boolean_t		mu_reorg_process;
 #endif
 
 error_def(ERR_WCBLOCKED);
@@ -430,6 +431,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					 */
 					if (si && (NULL != si->kill_set_head) && (NULL != si->kip_csa))
 					{
+						/* Assert that MUPIP REORG never leaves the database with an abandoned kill */
+						assert(!mu_reorg_process);
 						assert(csa == si->kip_csa);
 						DECR_KIP(csd, csa, si->kip_csa);
 						INCR_ABANDONED_KILLS(csd, csa);
@@ -439,6 +442,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				{
 					if ((NULL != kip_csa) && (csa == kip_csa))
 					{
+						/* Assert that MUPIP REORG never leaves the database with an abandoned kill */
+						assert(!mu_reorg_process);
 						assert(0 < kip_csa->hdr->kill_in_prog);
 						DECR_KIP(csd, csa, kip_csa);
 						INCR_ABANDONED_KILLS(csd, csa);

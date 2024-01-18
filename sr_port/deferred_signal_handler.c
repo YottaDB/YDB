@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,10 +16,19 @@
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
 #include "sig_init.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "gdskill.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsblk.h"
+#include "gdsfhead.h"
 
-GBLREF	int		process_exiting;
-GBLREF	VSIG_ATOMIC_T	forced_exit;
-GBLREF	volatile int	in_os_signal_handler;
+GBLREF	int			process_exiting;
+GBLREF	VSIG_ATOMIC_T		forced_exit;
+GBLREF	volatile int		in_os_signal_handler;
+GBLREF	boolean_t		mu_reorg_process;
+GBLREF	sgmnt_data_ptr_t	cs_data;
 
 void	deferred_signal_handler(void)
 {
@@ -70,6 +79,13 @@ void	deferred_signal_handler(void)
 	 */
 	if (forced_exit)
 	{
+		if (mu_reorg_process && cs_data->kill_in_prog)
+		{	/* This is a MUPIP REORG process and the database has a kill-in-progress.
+			 * Avoid KILLABANDONED state of the database by deferring handling of the MUPIP STOP
+			 * till a later DEFERRED_EXIT_REORG_CHECK call.
+			 */
+			return;
+		}
 		if (GET_DEFERRED_EXIT_CHECK_NEEDED)
 			deferred_exit_handler();
 	} else
