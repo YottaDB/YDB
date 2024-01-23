@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson.			*
@@ -1008,7 +1008,8 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 				if (!tid_found)
 				{
 					*deferred_tid = tpop->tid;
-					DBGFPF((stderr, "TIMER_HANDLER: deferred a timer\n"));
+					if ((void *)tpop->handler != (void*)wcs_clean_dbsync_fptr)
+						DBGFPF((stderr, "TIMER_HANDLER: deferred a timer\n"));
 				}
 			}
 #			endif
