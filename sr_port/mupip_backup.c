@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1435,14 +1435,6 @@ repl_inst_bkup_done2:
 				sbufh_p->dskaddr = 0;
 				sbufh_p->backup_errno = 0;
 				sbufh_p->failed = 0;
-#				ifdef DEBUG
-				/* Once the process register its pid as backup_pid, sleep for the 1 seconds, so that test
-				 * tests hits the scenario where BKUPRUNNING message is printed. Note that sleep of 1 sec
-				 * is fine because it is the box boxes which are failing to hit the concurrency scenario.
-				 */
-				if (ydb_white_box_test_case_enabled && (WBTEST_CONCBKUP_RUNNING == ydb_white_box_test_case_number))
-					LONG_SLEEP(1);
-#				endif
 				/* Make sure that the backup queue does not have any remnants on it. Note that we do not
 				   depend on the queue count here as it is imperative that, in the event that the count
 				   and queue get out of sync, that there ARE NO BLOCKS on this queue when we start or
@@ -1468,6 +1460,17 @@ repl_inst_bkup_done2:
 				/* Decerement counter so that inhibited KILLs can now proceed */
 				DECR_INHIBIT_KILLS(cs_addrs->nl);
 				rel_crit(rptr->reg);
+#				ifdef DEBUG
+				/* Now that the process has registered its pid as backup_pid, sleep for 1 second, so that the
+				 * test hits the scenario where BKUPRUNNING message is printed. Note that sleep is fine
+				 * because it will only slow down the boxes which are failing to hit the concurrency scenario.
+				 * Also take care to do this sleep AFTER releasing crit and the shmpool hdr lock or else
+				 * the other mupip backup process (which should print BKUPRUNNING message) will also be stuck
+				 * and the expected message might not show up anytime soon.
+				 */
+				if (ydb_white_box_test_case_enabled && (WBTEST_CONCBKUP_RUNNING == ydb_white_box_test_case_number))
+					LONG_SLEEP(1);
+#				endif
 			} else
 				rel_crit(rptr->reg);
 		}
