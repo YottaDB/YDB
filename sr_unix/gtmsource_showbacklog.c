@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -97,29 +97,37 @@ int gtmsource_showbacklog(void)
 		repl_log(stderr, TRUE, TRUE,
 			"Initiating SHOWBACKLOG operation on source server pid [%d] for secondary instance [%s]\n",
 			gtmsourcelocal_ptr->gtmsource_pid, gtmsourcelocal_ptr->secondary_instname);
-		/* jnlpool->jnlpool_ctl->jnl_seqno >= gtmsourcelocal_ptr->read_jnl_seqno is the most common case;
-		 * see gtmsource_readpool() for when the rare case can occur
-		 * Within a Source Server, jnlpool->jnlpool_ctl->jnl_seqno and gtmsourcelocal_ptr->read_jnl_seqno
+		/* Within a Source Server, jnlpool->jnlpool_ctl->jnl_seqno and gtmsourcelocal_ptr->read_jnl_seqno
 		 * counters start with 1 and cannot be 0 or less. heartbeat_jnl_seqno is 0 whenever the Source Server
 		 * restarts or we have an empty database.
 		 * Use local variables for arithmetic computation to prevent adjustments to the memory structure.
 		 */
-		if (0 < jnlpool->jnlpool_ctl->jnl_seqno)
-			jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno - 1;
+		assert(0 < jnlpool->jnlpool_ctl->jnl_seqno);
+		jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno - 1;
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LASTTRANS, 3, LEN_AND_STR(lasttrans[0]), &jnl_seqno);
-		if (0 < gtmsourcelocal_ptr->read_jnl_seqno)
-			read_jnl_seqno = gtmsourcelocal_ptr->read_jnl_seqno - 1;
+		assert(0 < gtmsourcelocal_ptr->read_jnl_seqno);
+		read_jnl_seqno = gtmsourcelocal_ptr->read_jnl_seqno - 1;
+		if (read_jnl_seqno > jnl_seqno)
+		{	/* jnlpool->jnlpool_ctl->jnl_seqno >= gtmsourcelocal_ptr->read_jnl_seqno is the most common case;
+			 * 1) See gtmsource_readpool() for when the rare opposite case can occur.
+			 * 2) Additionally it is possible that in between fetching "jnlpool->jnlpool_ctl->jnl_seqno" and
+			 *    "gtmsourcelocal_ptr->read_jnl_seqno", a few updates happen and get sent across by the source
+			 *    server and so "read_jnl_seqno > jnl_seqno" is possible even without (1).
+			 * Therefore handle it by forcing "read_jnl_seqno" to be equal to "jnl_seqno".
+			 */
+			read_jnl_seqno = jnl_seqno;
+		}
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LASTTRANS, 3, LEN_AND_STR(lasttrans[1]), &read_jnl_seqno);
 		if (0 != heartbeat_jnl_seqno)
 			heartbeat_jnl_seqno--;
 		assert(0 <= heartbeat_jnl_seqno);
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LASTTRANS, 3, LEN_AND_STR(lasttrans[2]), &heartbeat_jnl_seqno);
-		src_backlog = MAX(jnl_seqno, read_jnl_seqno) - heartbeat_jnl_seqno;
+		src_backlog = jnl_seqno - heartbeat_jnl_seqno;
 		if (0 == heartbeat_jnl_seqno)
 			syncstateindex = 1;
-		if (heartbeat_jnl_seqno > MIN(jnl_seqno, read_jnl_seqno))
+		if (heartbeat_jnl_seqno > read_jnl_seqno)
 		{
-			src_backlog = heartbeat_jnl_seqno - MIN(jnl_seqno, read_jnl_seqno);
+			src_backlog = heartbeat_jnl_seqno - read_jnl_seqno;
 			syncstateindex = 2;
 		}
 		srv_alive = (0 == gtmsourcelocal_ptr->gtmsource_pid) ? FALSE : is_proc_alive(gtmsourcelocal_ptr->gtmsource_pid, 0);
